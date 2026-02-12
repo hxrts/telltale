@@ -19,6 +19,8 @@ open scoped Classical
 
 section
 
+/-! ## Skip And Branch Post-State Helpers -/
+
 /-- Common post-state constructor for step cases that end in `skip` after
 updating a single endpoint in the framed global environment. -/
 lemma preserved_sub_frame_skip_after_update
@@ -46,6 +48,8 @@ lemma preserved_sub_frame_branch_cont
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
   intro h
   exact ⟨W, Δ, h, FootprintSubset_refl, SEnvDomSubset_refl⟩
+
+/-! ## Assign Case Core (Left Frame) -/
 
 /-- Shared assign-case core for left-framed environments (`G = Gbase ++ Gframe`). -/
 lemma preserved_sub_frame_assign_left_core
@@ -75,6 +79,8 @@ lemma preserved_sub_frame_assign_left_core
       (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown.updateLeft x Tstep) (G:=Gbase))
   · intro y hy; cases hy
   · intro y Ty hy; cases hy
+
+/-! ## Assign Case Core (Right Frame) -/
 
 /-- Shared assign-case core for right-framed environments (`G = Gframe ++ Gbase`). -/
 lemma preserved_sub_frame_assign_right_core
