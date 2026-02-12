@@ -22,11 +22,11 @@ open Batteries
 section
 
 /-! ## DEnv: Directed Edge → Type Trace -/
-/-! ## DEnv: Directed Edge → Type Trace -/
 
 /-- A trace stored in DEnv. Empty traces are treated as missing. -/
 abbrev Trace := List ValType
 
+/-! ## Ordering and RBMap Infrastructure -/
 def edgeCmpLT : (Edge × Trace) → (Edge × Trace) → Prop :=
   RBNode.cmpLT (compare ·.1 ·.1)
 
@@ -82,6 +82,7 @@ def normalizeTrace (ot : Option Trace) : Option Trace :=
 def DEnv.find? (env : DEnv) (e : Edge) : Option (List ValType) :=
   env.map.find? e
 
+/-! ## Canonical List Lookup Lemmas -/
 lemma lookup_mem {l : List (Edge × Trace)} {e : Edge} {ts : Trace}
     (h : l.lookup e = some ts) : (e, ts) ∈ l := by
   induction l with
@@ -118,6 +119,7 @@ lemma lookup_eq_none_of_forall_ne {l : List (Edge × Trace)} {e : Edge}
         intro p hp
         exact h p (List.mem_cons.mpr (Or.inr hp)))]
 
+/-! ## Pairwise Lookup Coherence -/
 theorem lookup_eq_some_of_mem_pairwise {l : List (Edge × Trace)} (h : l.Pairwise edgeCmpLT)
     {p : Edge × Trace} (hp : p ∈ l) : l.lookup p.1 = some p.2 := by
   induction l with
@@ -144,6 +146,7 @@ theorem lookup_eq_some_of_mem_pairwise {l : List (Edge × Trace)} (h : l.Pairwis
             exact beq_eq_false_iff_ne.mpr hne
           simp [List.lookup, hne', ih h.2 hMem]
 
+/-! ## RBMap/List Lookup Equivalence -/
 theorem find?_foldl_insert_of_pairwise
     (l : List (Edge × Trace)) (m : RBMap Edge Trace compare)
     (h : l.Pairwise edgeCmpLT) (k : Edge) :
@@ -186,6 +189,7 @@ theorem find?_foldl_insert_of_pairwise
         simpa [List.lookup, hne', hfind] using
           (ih (m := m.insert hd.1 hd.2) (h := h.2))
 
+/-! ## Canonical RBMap Construction Correctness -/
 theorem rbmap_find?_ofList_eq_lookup
     (l : List (Edge × Trace)) (h : l.Pairwise edgeCmpLT) (k : Edge) :
     (rbmapOfList l).find? k = l.lookup k := by
@@ -198,6 +202,7 @@ theorem DEnv_find?_eq_lookup (env : DEnv) (e : Edge) :
   have h := rbmap_find?_ofList_eq_lookup (l := env.list) (h := env.sorted) (k := e)
   simp [DEnv.find?, env.map_eq, h]
 
+/-! ## toList/find? Agreement -/
 theorem lookup_toList_eq_find? (m : RBMap Edge Trace compare) (e : Edge) :
     m.toList.lookup e = m.find? e := by
   cases h : m.find? e with
@@ -223,6 +228,7 @@ theorem lookup_toList_eq_find? (m : RBMap Edge Trace compare) (e : Edge) :
         lookup_eq_some_of_mem_pairwise hSorted hMem
       simpa [h] using hLookup
 
+/-! ## DEnv.ofMap Lookup Characterization -/
 theorem rbmapOfList_toList_find? (m : RBMap Edge Trace compare) (e : Edge) :
     (rbmapOfList m.toList).find? e = m.find? e := by
   have hSorted : m.toList.Pairwise edgeCmpLT := by
@@ -239,6 +245,7 @@ theorem rbmapOfList_toList_find? (m : RBMap Edge Trace compare) (e : Edge) :
   have hToList := lookup_toList_eq_find? (m := m) (e := e)
   simp [DEnv.find?, DEnv.ofMap, hLookup, hToList]
 
+/-! ## Pairwise Asymmetry Helper -/
 lemma edgeCmpLT_asymm {x y : Edge × Trace} (h : edgeCmpLT x y) : ¬ edgeCmpLT y x := by
   have hlt : compare x.1 y.1 = .lt := edgeCmpLT_eq_lt h
   have hgt : compare y.1 x.1 = .gt :=
@@ -249,6 +256,7 @@ lemma edgeCmpLT_asymm {x y : Edge × Trace} (h : edgeCmpLT x y) : ¬ edgeCmpLT y
     exact hgt.symm.trans hlt'
   cases this
 
+/-! ## Canonical List Extensionality -/
 theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
     (h₁ : l₁.Pairwise edgeCmpLT) (h₂ : l₂.Pairwise edgeCmpLT)
     (h₁₂ : l₁ ⊆ l₂) (h₂₁ : l₂ ⊆ l₁) : l₁ = l₂ := by
@@ -300,6 +308,7 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
                 exact hEq'.symm.trans hlt'
               cases this
             simpa [List.mem_cons, hneq] using hx'
+          /-! ## Tail Subset Transfer for Pairwise Extensionality -/
           have h₂₁' : l₂ ⊆ l₁ := by
             intro x hx
             have hx' : x ∈ a :: l₁ := h₂₁ (List.mem_cons.mpr (Or.inr hx))
@@ -316,6 +325,7 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
           have htl : l₁ = l₂ := ih (h₁ := h₁'.2) (h₂ := h₂'.2) h₁₂' h₂₁'
           simp [htl]
 
+/-! ## DEnv Extensional Equality -/
 /-- Two DEnvs with identical find? are equal. -/
 theorem DEnv_eq_of_find?_eq {D₁ D₂ : DEnv}
     (h : ∀ e, D₁.find? e = D₂.find? e) : D₁ = D₂ := by
@@ -355,6 +365,7 @@ theorem DEnv_eq_of_find?_eq {D₁ D₂ : DEnv}
           cases hmap
           rfl
 
+/-! ## DEnv Union and Append Instance -/
 /-- Union of DEnvs (left-biased on key collisions). -/
 def DEnvUnion (D₁ D₂ : DEnv) : DEnv :=
   DEnv.ofMap <|
@@ -365,6 +376,7 @@ def DEnvUnion (D₁ D₂ : DEnv) : DEnv :=
 
 instance : Append DEnv := ⟨DEnvUnion⟩
 
+/-! ## Public Lookup and Update Operations -/
 /-- Lookup a type trace for a directed edge. -/
 def lookupD (env : DEnv) (e : Edge) : List ValType :=
   match env.find? e with
@@ -376,6 +388,7 @@ def lookupD (env : DEnv) (e : Edge) : List ValType :=
 def updateD (env : DEnv) (e : Edge) (ts : List ValType) : DEnv :=
   DEnv.ofMap <| env.map.insert e ts
 
+/-! ## Lookup Preservation under Updates -/
 /-- Lookup after update on the same edge. -/
 theorem lookupD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
     lookupD (updateD env e ts) e = ts := by
@@ -401,6 +414,7 @@ theorem lookupD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
           (RBMap.find?_insert_of_eq (t := env.map) (k := e) (v := t :: ts') (k' := e) hEq)
       simp [lookupD, updateD, DEnv.find?, hmap, hfind, m]
 
+/-! ## Lookup Preservation on Distinct Edges -/
 /-- Lookup after update on a different edge. -/
 theorem lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
     lookupD (updateD env e ts) e' = lookupD env e' := by
@@ -431,6 +445,7 @@ theorem lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne :
 @[simp] theorem lookupD_empty (e : Edge) : lookupD (∅ : DEnv) e = [] := by
   simp [lookupD, DEnv.find?, DEnv_map_find?_empty]
 
+/-! ## find? Preservation under Updates -/
 /-- find? after update on the same edge. -/
 theorem find?_updateD_eq (env : DEnv) (e : Edge) (ts : List ValType) :
     (updateD env e ts).find? e = some ts := by
@@ -455,6 +470,7 @@ theorem find?_updateD_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : 
     simpa [m] using (RBMap.find?_insert_of_ne (t := env.map) (k := e) (v := ts) (k' := e') hne')
   simp only [updateD, DEnv.find?, hmap, hfind, m]
 
+/-! ## Queue-Style DEnv Helpers -/
 /-- Append a type to the in-flight trace. -/
 def appendD (env : DEnv) (e : Edge) (T : ValType) : DEnv :=
   updateD env e (lookupD env e ++ [T])
