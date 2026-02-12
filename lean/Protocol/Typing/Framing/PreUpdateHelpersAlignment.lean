@@ -103,6 +103,8 @@ lemma branch_branches_eq
   cases Option.some.inj this
   rfl
 
+/-! ## Left-Frame Branch Lookup Helpers -/
+
 /-- Helper: align the chosen label in a select step. -/
 lemma select_label_eq
     {bs bs' : List (Label × LocalType)} {ℓ : Label} {L L' : LocalType} :
@@ -174,6 +176,8 @@ lemma recv_types_eq_right
   cases Option.some.inj this
   exact ⟨rfl, rfl⟩
 
+/-! ## Right-Frame Branch Constructor Alignment -/
+
 /-- Helper: align the branches in a select step under a left frame. -/
 lemma select_branches_eq_right
     {G₁ G₂ G : GEnv} {e : Endpoint} {target q : Role}
@@ -217,6 +221,8 @@ lemma branch_branches_eq_right
     exact hG.symm.trans hG''
   cases Option.some.inj this
   rfl
+
+/-! ## Right-Frame Update And Store Helpers -/
 
 /-- Helper: pull a right update out of a left-framed G. -/
 lemma updateG_right_of_step
