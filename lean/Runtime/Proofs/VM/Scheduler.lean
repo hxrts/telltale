@@ -31,6 +31,8 @@ theorem schedule_confluence_holds {ι γ π ε ν : Type u} [IdentityModel ι] [
     have := h1.symm.trans h2
     exact Option.some.inj this
 
+/-! ## Cooperative Refinement -/
+
 theorem cooperative_refines_concurrent_holds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -46,6 +48,8 @@ theorem cooperative_refines_concurrent_holds {ι γ π ε ν : Type u} [Identity
     simp [hPolicy]
   rw [hEq]
   simp [st', pickRunnableInQueue]
+
+/-! ## Queue Extraction Helpers -/
 
 private theorem takeOut_some_of_mem (queue : SchedQueue) (p : CoroutineId → Bool)
     (cid : CoroutineId) (hmem : cid ∈ queue) (hp : p cid = true) :
@@ -63,6 +67,8 @@ private theorem takeOut_some_of_mem (queue : SchedQueue) (p : CoroutineId → Bo
         obtain ⟨found, rest, heq⟩ := ih hmem'
         rw [heq]
         exact ⟨found, hd :: rest, rfl⟩
+
+/-! ## Best-Candidate Helpers -/
 
 private theorem bestCandidate_some_of_exists (queue : SchedQueue) (score : CoroutineId → Nat)
     (p : CoroutineId → Bool)
@@ -96,6 +102,8 @@ private theorem bestCandidate_some_of_exists (queue : SchedQueue) (score : Corou
       refine ⟨cid', ?_⟩
       simp [bestCandidate, hHd, hBestTl]
 
+/-! ## Priority Pick Helpers -/
+
 private theorem pickBest_some_of_exists (queue : SchedQueue) (score : CoroutineId → Nat)
     (p : CoroutineId → Bool)
     (hExists : ∃ cid, cid ∈ queue ∧ p cid = true) :
@@ -103,6 +111,8 @@ private theorem pickBest_some_of_exists (queue : SchedQueue) (score : CoroutineI
   rcases bestCandidate_some_of_exists queue score p hExists with ⟨cid, hBest⟩
   refine ⟨cid, removeFirst cid queue, ?_⟩
   simp [pickBest, hBest]
+
+/-! ## Runnable Pick In Queue -/
 
 private theorem pickRunnableInQueue_some_of_mem_runnable
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -133,6 +143,8 @@ private theorem pickRunnableInQueue_some_of_mem_runnable
       | some pair =>
           refine ⟨pair.1, pair.2, ?_⟩
           simp [pickRunnableInQueue, pickProgressInQueue, hTok]
+
+/-! ## Runnable Pick From Scheduler -/
 
 private theorem pickRunnableFromSched_some_of_mem_runnable
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -171,6 +183,8 @@ private theorem pickRunnableFromSched_some_of_mem_runnable
             | none => none) = some (picked, removeFirst picked sched.readyQueue)
       simp [hLane]
 
+/-! ## Runnable Pick From VM State -/
+
 private theorem pickRunnable_some_of_mem_runnable
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -191,6 +205,8 @@ private theorem pickRunnable_some_of_mem_runnable
   refine ⟨found, rest, ?_⟩
   unfold pickRunnable
   simpa [sched, st'] using hFromSched
+
+/-! ## Starvation Freedom -/
 
 theorem starvation_free_holds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
