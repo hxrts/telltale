@@ -168,6 +168,8 @@ def VMInvariantSpaceWithDistributed.withCRDT
     (p : CRDTProfile) : VMInvariantSpaceWithDistributed store₀ State :=
   { space with distributed := { space.distributed with crdt? := some p } }
 
+/-! ### Consensus and Failure Envelope Families -/
+
 /-- Attach a consensus-envelope theorem-family profile to a distributed space. -/
 def VMInvariantSpaceWithDistributed.withConsensusEnvelope
     {store₀ : SessionStore ν} {State : Type v}
@@ -181,6 +183,8 @@ def VMInvariantSpaceWithDistributed.withFailureEnvelope
     (space : VMInvariantSpaceWithDistributed (ν := ν) store₀ State)
     (p : FailureEnvelopeProfile) : VMInvariantSpaceWithDistributed store₀ State :=
   { space with distributed := { space.distributed with failureEnvelope? := some p } }
+
+/-! ### VM Envelope and Protocol-Bridge Families -/
 
 /-- Attach a VM envelope-adherence theorem-family profile to a distributed space. -/
 def VMInvariantSpaceWithDistributed.withVMEnvelopeAdherence
