@@ -31,6 +31,8 @@ Solution Structure. We prove soundness by structural induction on global types:
 These theorems establish the correspondence between the boolean checker `projectb`
 and the coinductive relation `CProject`. -/
 
+/-! ## Equality Conversion Helpers -/
+
 /-- Helper: convert BEq equality to Prop equality for String. -/
 theorem string_beq_eq_true_to_eq {a b : String} (h : (a == b) = true) : a = b := by
   exact eq_of_beq h
@@ -72,6 +74,8 @@ theorem label_beq_eq_true_to_eq {a b : Label} (h : (a == b) = true) : a = b := b
   -- PayloadSort: use our helper
   have heq_s : s1 = s2 := payloadSort_beq_eq_true_to_eq hs
   simp only [heq_n, heq_s]
+
+/-! ## ValType and Option-ValType Helpers -/
 
 /-- Helper: ValType BEq true implies equality (avoid LawfulBEq instance). -/
 theorem valType_beq_eq_true_to_eq
@@ -122,6 +126,8 @@ theorem valType_beq_eq_true_to_eq
       | _ =>
           simp [reduceBEq] at h
 
+/-! ## Option-ValType and Label Reflexivity Helpers -/
+
 /-- Helper: Option ValType BEq true implies equality (avoid LawfulBEq instance). -/
 theorem optionValType_beq_eq_true_to_eq
     {a b : Option SessionTypes.ValType} (h : (a == b) = true) : a = b := by
@@ -163,12 +169,16 @@ theorem eq_to_label_beq_eq_true {a b : Label} (h : a = b) : (a == b) = true := b
   cases a with | mk n s =>
   simp only [reduceBEq, beq_self_eq_true, Bool.true_and, payloadSort_beq_refl]
 
+/-! ## SoundRel Core Helpers -/
+
 /-- Relation for coinduction in projectb_sound: pairs where projectb returns true. -/
 def SoundRel : ProjRel := fun g role cand => projectb g role cand = true
 
 /-- Helper: split Bool.and = true into two parts. -/
 theorem bool_and_true {a b : Bool} (h : (a && b) = true) : a = true ∧ b = true := by
   cases a <;> cases b <;> simp_all
+
+/-! ## Branch and All-Branch Reflection Helpers -/
 
 /-- Helper: projectbBranches true implies BranchesProjRel SoundRel. -/
 theorem projectbBranches_to_SoundRel
