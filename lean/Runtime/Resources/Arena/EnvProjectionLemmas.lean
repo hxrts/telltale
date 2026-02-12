@@ -51,6 +51,8 @@ theorem DEnv_foldl_append_comm {ν : Type u} [VerificationModel ν]
           (hd.snd.traces ++ List.foldl (fun acc p => acc ++ p.snd.traces) ∅ tl))
     rw [DEnvUnion_empty_left]
 
+/-! ### `lookupG`/`updateG` append behavior -/
+
 /-- lookupG in appended GEnv: searches left first. -/
 theorem lookupG_append_left {G1 G2 : GEnv} {e : Endpoint} {L : LocalType}
     (h : lookupG G1 e = some L) :
@@ -70,6 +72,8 @@ theorem lookupG_append_left {G1 G2 : GEnv} {e : Endpoint} {L : LocalType}
           have ih' := ih h'
           simpa [lookupG, List.lookup, hEq] using ih'
 
+/-! #### Right lookup fallback -/
+
 /-- lookupG in appended GEnv: if not in left, search right. -/
 theorem lookupG_append_right {G1 G2 : GEnv} {e : Endpoint}
     (h : lookupG G1 e = none) :
@@ -88,6 +92,8 @@ theorem lookupG_append_right {G1 G2 : GEnv} {e : Endpoint}
             simpa [lookupG, List.lookup, hEq] using h
           have ih' := ih h'
           simpa [lookupG, List.lookup, hEq] using ih'
+
+/-! #### Right-biased update distribution -/
 
 /-- updateG distributes over append (right) when not in left. -/
 theorem updateG_append_right {G1 G2 : GEnv} {e : Endpoint} {L : LocalType}
@@ -140,6 +146,8 @@ theorem Buffers_foldl_append_comm {ν : Type u} [VerificationModel ν]
     rw [ih (SignedBuffers.payloads hd.snd.buffers)]
     simp only [List.append_assoc]
 
+/-! ### `toGEnv` Extensional Update Bridge -/
+
 /-- Key bridge for `updateType` at lookup level.
     This captures the extensional behavior of `toGEnv` under updates. -/
 theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} {L : LocalType}
@@ -154,6 +162,9 @@ theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} 
   | cons hd tl ih =>
       obtain ⟨sid, st⟩ := hd
       by_cases hsid : sid = e.sid
+
+      /-! ## `toGEnv_updateType`: matching session-id case -/
+
       · simp only [SessionStore.updateType, hsid, ↓reduceIte]
         simp only [SessionStore.toGEnv, List.foldl]
         have hFoldUpd :
@@ -170,6 +181,9 @@ theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} 
         rw [hFoldUpd, hFoldOrig]
         simp only [SessionState.updateType]
         by_cases he' : e' = e
+
+        /-! ## `toGEnv_updateType`: matched endpoint -/
+
         · have hLeft : lookupG (updateG st.localTypes e L ++ SessionStore.toGEnv tl) e' = some L := by
             rw [he']
             exact lookupG_append_left
@@ -207,6 +221,9 @@ theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} 
               rw [lookupG_append_left (G1 := st.localTypes) (G2 := SessionStore.toGEnv tl)
                 (e := e') (L := T) hSome']
           exact hL.trans (by simpa using hR.symm)
+
+        /-! ## `toGEnv_updateType`: unmatched endpoint -/
+
       · have hMem' : ∃ st', (e.sid, st') ∈ tl := by
           obtain ⟨st', hst'⟩ := hMem
           simp only [List.mem_cons] at hst'
@@ -251,8 +268,10 @@ theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} 
             simpa using hSome.symm
           rw [lookupG_append_left (G1 := st.localTypes) (G2 := SessionStore.toGEnv (SessionStore.updateType tl e L))
             (e := e') (L := T) hSome']
-          rw [lookupG_append_left (G1 := st.localTypes) (G2 := updateG (SessionStore.toGEnv tl) e L)
-            (e := e') (L := T) hSome']
+	          rw [lookupG_append_left (G1 := st.localTypes) (G2 := updateG (SessionStore.toGEnv tl) e L)
+	            (e := e') (L := T) hSome']
+
+/-! ### `DEnv` Union Lookup Helpers -/
 
 /-- Key lemma: toDEnv commutes with updateTrace.
     Stated extensionally at lookup level. -/
@@ -306,6 +325,8 @@ theorem lookupD_updateD_union {D1 D2 : DEnv} {edge edge' : Edge} {ts : Trace} :
         rw [lookupD_DEnvUnion_left hSome]
     exact hLeft.trans (by simpa using hRight.symm)
 
+/-! ### `toDEnv` Extensional Update Bridge -/
+
 theorem SessionStore.toDEnv_updateTrace {store : SessionStore ν} {edge : Edge} {ts : List ValType}
     (hMem : ∃ st, (edge.sid, st) ∈ store)
     (hCons : store.consistent) :
@@ -319,6 +340,9 @@ theorem SessionStore.toDEnv_updateTrace {store : SessionStore ν} {edge : Edge} 
   | cons hd tl ih =>
       obtain ⟨sid, st⟩ := hd
       by_cases hsid : sid = edge.sid
+
+      /-! ## `toDEnv_updateTrace`: matching session-id case -/
+
       · simp only [SessionStore.updateTrace, hsid, ↓reduceIte]
         simp only [SessionStore.toDEnv, List.foldl]
         have hFoldUpd :
@@ -339,6 +363,9 @@ theorem SessionStore.toDEnv_updateTrace {store : SessionStore ν} {edge : Edge} 
         simp only [SessionState.updateTrace]
         exact lookupD_updateD_union (D1 := st.traces) (D2 := SessionStore.toDEnv tl)
           (edge := edge) (edge' := edge') (ts := ts)
+
+      /-! ## `toDEnv_updateTrace`: non-matching session-id case -/
+
       · have hMem' : ∃ st', (edge.sid, st') ∈ tl := by
           obtain ⟨st', hst'⟩ := hMem
           simp only [List.mem_cons] at hst'
@@ -389,6 +416,8 @@ theorem SessionStore.toDEnv_updateTrace {store : SessionStore ν} {edge : Edge} 
           rw [lookupD_DEnvUnion_left hSome']
           rw [lookupD_DEnvUnion_left hSome']
 
+/-! ### Projection Invariance Under Orthogonal Updates -/
+
 /-- toDEnv is unchanged by updateType (type update doesn't affect traces). -/
 theorem SessionStore.toDEnv_updateType {store : SessionStore ν} {e : Endpoint} {L : LocalType} :
     (store.updateType e L).toDEnv = store.toDEnv := by
@@ -407,6 +436,8 @@ theorem SessionStore.toDEnv_updateType {store : SessionStore ν} {e : Endpoint} 
         rw [DEnv_foldl_append_comm (D := st.traces) (store := tl)]
         simpa [SessionStore.toDEnv] using congrArg (fun D => st.traces ++ D) ih
 
+/-! ## `toGEnv` Invariance Under Trace Updates -/
+
 /-- toGEnv is unchanged by updateTrace (trace update doesn't affect types). -/
 theorem SessionStore.toGEnv_updateTrace {store : SessionStore ν} {edge : Edge} {ts : List ValType} :
     (store.updateTrace edge ts).toGEnv = store.toGEnv := by
@@ -422,6 +453,8 @@ theorem SessionStore.toGEnv_updateTrace {store : SessionStore ν} {edge : Edge} 
         rw [GEnv_foldl_append_comm (G := st.localTypes) (store := SessionStore.updateTrace tl edge ts)]
         rw [GEnv_foldl_append_comm (G := st.localTypes) (store := tl)]
         simpa [SessionStore.toGEnv] using congrArg (fun G => st.localTypes ++ G) ih
+
+/-! ## `toBuffers` Invariance Under Type Updates -/
 
 /-- toBuffers is unchanged by updateType (type update doesn't affect buffers). -/
 theorem SessionStore.toBuffers_updateType {store : SessionStore ν} {e : Endpoint} {L : LocalType} :
@@ -440,6 +473,8 @@ theorem SessionStore.toBuffers_updateType {store : SessionStore ν} {e : Endpoin
         rw [Buffers_foldl_append_comm (B := SignedBuffers.payloads st.buffers) (store := tl)]
         simpa [SessionStore.toBuffers] using
           congrArg (fun B => SignedBuffers.payloads st.buffers ++ B) ih
+
+/-! ## `toBuffers` Invariance Under Trace Updates -/
 
 /-- toBuffers is unchanged by updateTrace (trace update doesn't affect buffers). -/
 theorem SessionStore.toBuffers_updateTrace {store : SessionStore ν} {edge : Edge} {ts : List ValType} :
