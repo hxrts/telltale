@@ -28,6 +28,8 @@ open Choreography.Projection.Project
 open Choreography.Projection.Blind (isBlind isBlind_comm_branches)
 open Semantics.EnvStep
 
+/-! ## Core Step Recursor -/
+
 /-- Core recursion for proj_trans_other_step (case split on step/BranchesStep). -/
 private theorem proj_trans_other_step_core (g g' : GlobalType) (act : GlobalActionR) (role : String)
     (hstep : step g act g') (hclosed : g.isClosed = true) (hwf : g.wellFormed = true)
@@ -72,6 +74,8 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
     EQ2 (projTrans g' role) (projTrans g role) := by
   -- Delegate to the step-recursion core.
   exact proj_trans_other_step_core g g' act role hstep hclosed hwf hns hnr hblind
+
+/-! ## Branch-Step Preservation -/
 
 /- BranchesStep preserves projTransBranches up to branch-wise EQ2 for non-participants.
 
