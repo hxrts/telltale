@@ -36,6 +36,8 @@ universe u
 
 /-! ## Session lifecycle helpers -/
 
+/-! ### Open Argument and Handler Checks -/
+
 private def zipOpenArgs (localTypes : List (Role × LocalType))
     (dsts : List (Role × Reg)) : Option (List (Role × LocalType × Reg)) :=
   -- Align local types with destination registers by role.
@@ -80,6 +82,8 @@ private def handlersCoverEdges (sid : SessionId) (roles : List Role)
     (handlers : List (Edge × HandlerId)) : Bool :=
   -- Ensure every session edge is bound to some handler.
   (allEdges sid roles).all (fun e => handlerBound handlers e)
+
+/-! ### Open Context and Resource Constructors -/
 
 structure OpenContext (ν : Type u) [VerificationModel ν] where
   -- Derived context for session creation.
@@ -140,6 +144,8 @@ private def mkOpenTx {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
   , complianceProofs := [proof]
   , authorizedImbalance := true }
 
+/-! ### Open Commit Pipeline -/
+
 private def openCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -196,6 +202,8 @@ private def openWithTriples {ι γ π ε ν : Type u} [IdentityModel ι] [GuardL
     | none => faultPack st coro .outOfRegisters "bad dst reg"
     | some regs' => openWithRegs st coro sid roles triples regs' handlers
 
+/-! ## Open Instruction -/
+
 
 def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -211,6 +219,8 @@ def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   | some triples => openWithTriples st coro triples handlers
 
 /-! ## Close semantics -/
+
+/-! ### Close Lookup Helpers -/
 
 private def findEpoch {ν : Type u} [VerificationModel ν]
     (sid : SessionId) (ss : SessionStore ν) : Nat :=
@@ -239,6 +249,8 @@ private def closeSess {ν : Type u} [VerificationModel ν]
       else
         (sid', s) :: closeSess sid epoch' rest
 
+/-! ### Close Resource Constructors -/
+
 private def mkCloseResource {ν : Type u} [VerificationModel ν]
     (payload : Value) : Resource ν :=
   -- Create the V1 resource token for a session close.
@@ -260,6 +272,8 @@ private def mkCloseTx {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
   , logicProofs := []
   , complianceProofs := [proof]
   , authorizedImbalance := true }
+
+/-! ### Close Commit Pipeline -/
 
 private def closeCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -293,6 +307,8 @@ private def closeWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Guar
   let res := mkCloseResource payload
   let tx := mkCloseTx res (st.config.complianceProof res)
   closeCommit st coro ep epoch' tx
+
+/-! ## Close Instruction -/
 
 
 def stepClose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
