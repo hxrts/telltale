@@ -17,6 +17,8 @@ Solution Structure. We prove:
 
 /-! ## Merge Lemmas -/
 
+/-! ## Disjoint Lookup Basics -/
+
 /-- DisjointG: endpoints from the right are absent on the left. -/
 private theorem lookupG_none_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
     {e : Endpoint} {L : LocalType} (hLookup : lookupG G₂ e = some L) :
@@ -47,6 +49,8 @@ private theorem sid_not_in_right_of_left {G₁ G₂ : GEnv} (hDisj : DisjointG G
     have hInter' := hInter
     simp [hEmpty] at hInter'
   exact this.elim
+
+/-! ## Trace-Environment Disjointness Helpers -/
 
 /-- DConsistent: a missing session in G implies no edge entry in D. -/
 private theorem DEnv_find_none_of_notin_sessions {G : GEnv} {D : DEnv} (hCons : DConsistent G D)
@@ -81,6 +85,8 @@ private theorem DEnv_find_none_of_disjoint_left {D₁ D₂ : DEnv} (hDisj : Disj
     | some ts₂ =>
         have hSid₂ : e.sid ∈ SessionsOfD D₂ := ⟨e, ts₂, hSome, rfl⟩
         exact (hNot hSid₂).elim
+
+/-! ## Buffer Typing Rewrites and Lifts -/
 
 /-- BufferTyped is preserved when extending GEnv with compatible endpoints. -/
 private theorem BufferTyped_weakenG {G G' : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge} :
@@ -129,6 +135,8 @@ private theorem BufferTyped_lift_right {G₁ G₂ : GEnv} (hDisj : DisjointG G�
   have hNone : lookupG G₁ ep = none := lookupG_none_of_disjoint hDisj hLookup
   have hEq := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=ep) hNone
   simpa [hEq] using hLookup
+
+/-! ## Store and Buffer Merge Theorems -/
 
 /-- StoreTyped merges when SEnv is split and endpoints are disjoint. -/
 theorem StoreTyped_merge {G₁ G₂ : GEnv} {S₁ S₂ : SEnv} {store : VarStore}
@@ -181,6 +189,8 @@ theorem BuffersTyped_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} {bufs : Buffers
         have hBT1' : BufferTyped (G₁ ++ G₂) D₁ bufs e := BufferTyped_lift_left (hBT1 e)
         exact BufferTyped_rewriteD hEq hBT1'
 
+/-! ## Coherence Merge Side Lemmas -/
+
 /-- EdgeCoherent: receiver from the left implies left coherence is enough. -/
 private theorem EdgeCoherent_merge_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     (hC₁ : Coherent G₁ D₁) (hDisjG : DisjointG G₁ G₂) (hCons₂ : DConsistent G₂ D₂)
@@ -222,6 +232,8 @@ private theorem EdgeCoherent_merge_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     lookupG_append_left (G₁:=G₁) (G₂:=G₂) hGsender
   refine ⟨Lsender, hGsender', ?_⟩
   simpa [hEq] using hConsume
+
+/-! ## Coherence Merge Side Lemmas (Right Receiver) -/
 
 /-- EdgeCoherent: receiver from the right implies right coherence is enough. -/
 private theorem EdgeCoherent_merge_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
@@ -265,6 +277,8 @@ private theorem EdgeCoherent_merge_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
   refine ⟨Lsender, hGsender', ?_⟩
   simpa [hEq] using hConsume
 
+/-! ## Coherence Merge Theorem -/
+
 /-- Coherence merges when sessions are disjoint and traces follow their owners. -/
 theorem Coherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     (hC₁ : Coherent G₁ D₁) (hC₂ : Coherent G₂ D₂)
@@ -279,6 +293,8 @@ theorem Coherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
       exact EdgeCoherent_merge_left hC₁ hDisjG hCons₂ hLeft hActive
   | inr hRight =>
       exact EdgeCoherent_merge_right hC₂ hDisjG hCons₁ hRight.2 hActive
+
+/-! ## Session-Set Preservation Helpers -/
 
 /-- Updating an existing endpoint preserves the set of sessions. -/
 theorem SessionsOf_updateG_eq {G : GEnv} {e : Endpoint} {L L' : LocalType}
@@ -301,6 +317,8 @@ theorem SessionsOf_updateG_eq {G : GEnv} {e : Endpoint} {L L' : LocalType}
     · have hLookup'' : lookupG (updateG G e L) e' = some L'' := by
         simpa [lookupG_update_neq _ _ _ _ (Ne.symm heq)] using hLookup'
       exact ⟨e', L'', hLookup'', hSid⟩
+
+/-! ## Session-Set Monotonicity under TypedStep -/
 
 /-- Sessions only shrink under TypedStep (no new sessions introduced). -/
 theorem SessionsOf_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
