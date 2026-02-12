@@ -234,6 +234,8 @@ structure ResourceBundle (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] whe
 
 variable [GhostMapSlot LocalType]
 
+/-! ## Endpoint Ownership Laws -/
+
 /-- Endpoint ownership fragment from SessionRA. -/
 def endpoint_owns (γn : GhostName) (e : Endpoint) (L : LocalType) : iProp :=
   endpoint_frag γn e L
@@ -252,6 +254,8 @@ theorem endpoint_owns_transfer_holds : endpoint_owns_transfer := by
   simpa [endpoint_owns] using
     (session_advance γ m e Lold Lnew)
 
+/-! ## Bundle Ownership -/
+
 def bundle_owns {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (γn : GhostName) (b : ResourceBundle γ ε) : iProp :=
   -- Bundle ownership is the separating conjunction of all components.
@@ -267,6 +271,8 @@ def transfer_bundle {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
   -- Transfer preserves ownership of the same bundle.
   iProp.entails (bundle_owns γn b) (bundle_owns γn b)
+
+/-! ## Bundle Well-Formedness -/
 
 /-- Bundle progress token has internal sid/endpoint consistency and positive budget. -/
 def progress_token_well_formed (tok : SessionId × Endpoint × Nat) : Prop :=
@@ -285,6 +291,8 @@ def transfer_bundle_preserves {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε
   -- Placeholder: bundle transfer preserves invariants.
   transfer_bundle γn b
 
+/-! ## Transfer Typing Conditions -/
+
 def WellTypedTransfer {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (b : ResourceBundle γ ε) : Prop :=
   -- Well-typed transfer requires a complete ownership bundle.
@@ -299,6 +307,8 @@ def transfer_source_loses {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
   -- Placeholder: source loses ownership implies re-establishing bundle ownership elsewhere.
   iProp.entails (bundle_owns γn b) (bundle_owns γn b)
+
+/-! ## Higher-Order Transfer Skeleton -/
 
 structure ResourceTree (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
   root : ResourceBundle γ ε -- Root bundle for the tree.
