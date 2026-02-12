@@ -30,6 +30,8 @@ open SessionTypes.LocalTypeR
 
 /-! ## Core Conversion and Compilation -/
 
+/-! ### LocalTypeR to LocalType conversion helpers -/
+
 /-- LocalType is inhabited for partial conversions. -/
 instance : Inhabited LocalType := ⟨.end_⟩
 
@@ -47,6 +49,8 @@ def findVarIdx (ctx : List String) (name : String) : Nat :=
   match ctx.findIdx? (fun x => x == name) with
   | some idx => idx
   | none => 0
+
+/-! #### Mutual conversion recursion -/
 
 mutual
   /-- Convert LocalTypeR (named recursion) to LocalType (de Bruijn). -/
@@ -102,11 +106,15 @@ end
 def localTypeRToLocalType (lt : LocalTypeR) : LocalType :=
   localTypeRToLocalTypeAux [] lt
 
+/-! ### Bytecode construction helper -/
+
 /-- Replace the element at index `n` in a list. -/
 def listSet {α : Type u} : List α → Nat → α → List α
   | [], _, _ => []
   | _ :: xs, 0, v => v :: xs
   | x :: xs, n + 1, v => x :: listSet xs n v
+
+/-! ### Recursive bytecode compiler -/
 
 mutual
   def compileInner {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
@@ -128,6 +136,9 @@ mutual
             -- Deterministic choice: select the first label (matches default handler behavior).
             let code := code ++ [Instr.offer (γ:=γ) (ε:=ε) 0 lbl.name]
             compileInner defaultAction cont code loopTargets
+
+    /-! #### `recv` case code generation -/
+
     | .recv _ branches =>
         match branches with
         | [] => (code ++ [Instr.halt (γ:=γ) (ε:=ε)], loopTargets)
@@ -148,6 +159,9 @@ mutual
             let code : List (Instr γ ε) :=
               listSet code placeholderPc (Instr.choose (γ:=γ) (ε:=ε) 0 table)
             (code, loopTargets)
+
+    /-! #### recursion-variable code generation -/
+
     | .mu v body =>
         let target := code.length
         let loopTargets := (v, target) :: loopTargets
@@ -162,6 +176,8 @@ mutual
     all_goals
       simp
       try omega
+
+  /-! #### Receive-branch table compilation helper -/
 
   def compileRecvBranchesAux {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
       [Inhabited (EffectRuntime.EffectAction ε)]
@@ -184,6 +200,8 @@ mutual
       simp
       try omega
 end
+
+/-! ### Public compile entrypoint -/
 
 /-- Compile LocalTypeR into bytecode instructions. -/
 def ensureTerminal {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
