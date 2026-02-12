@@ -25,6 +25,8 @@ namespace SessionCoTypes.Coinductive
 
 attribute [local instance] Classical.decEq
 
+/-! ## Rational Fragment Definitions -/
+
 /-- Rational fragment of coinductive local types (finite reachable subterm graph). -/
 def RationalC (t : LocalTypeC) : Prop := Nonempty (Regular t)
 
@@ -34,6 +36,8 @@ def RationalC (t : LocalTypeC) : Prop := Nonempty (Regular t)
 def FiniteErasureTransportable (t : LocalTypeC) : Prop :=
   ∃ (n : Nat) (sys : FiniteSystem n) (start : Fin n),
     Bisim t (SystemToCoind sys start)
+
+/-! ## Finite-System Image Closure -/
 
 /-- Child-closure of the finite-system image under one unfolding step. -/
 private lemma systemToCoind_child_closed {n : Nat} (sys : FiniteSystem n)
@@ -67,6 +71,8 @@ private lemma reachable_subset_system_image {n : Nat} (sys : FiniteSystem n) (st
   | tail hreach hchild ih =>
       exact systemToCoind_child_closed sys ih hchild
 
+/-! ## Finite-System Regularity -/
+
 /-- Any finite-system unfolding is regular. -/
 def systemToCoind_regular {n : Nat} (sys : FiniteSystem n) (start : Fin n) :
     Regular (SystemToCoind sys start) := by
@@ -80,6 +86,8 @@ def systemToCoind_regular {n : Nat} (sys : FiniteSystem n) (start : Fin n) :
     rcases systemToCoind_child_closed sys (hx := ⟨i, rfl⟩) hchild with ⟨j, hj⟩
     exact List.mem_ofFn.2 ⟨j, hj.symm⟩
 
+/-! ## Rational-to-Finite Bisimulation -/
+
 /-- Every rational coinductive type has a finite-state coalgebra bisimilar to it. -/
 theorem rational_has_finite_bisimulation (t : LocalTypeC) (h : RationalC t) :
     ∃ (n : Nat) (sys : FiniteSystem n) (start : Fin n),
@@ -87,6 +95,8 @@ theorem rational_has_finite_bisimulation (t : LocalTypeC) (h : RationalC t) :
   by
     rcases h with ⟨hr⟩
     exact Regular_implies_System t hr
+
+/-! ## Finite Transport Implies Rationality -/
 
 /-- Erasure exactness (completeness): finite erasure witnesses imply rationality. -/
 theorem finite_erasure_transportable_implies_rational (t : LocalTypeC)
@@ -105,6 +115,8 @@ theorem rational_iff_finite_erasure_transportable (t : LocalTypeC) :
   · intro h
     exact finite_erasure_transportable_implies_rational t h
 
+/-! ## Exactness and Maximality -/
+
 /-- Relative maximality: any fragment transportable by finite erasure is a subset of `RationalC`. -/
 theorem rational_maximal_for_finite_erasure
     (S : Set LocalTypeC)
@@ -112,6 +124,8 @@ theorem rational_maximal_for_finite_erasure
     S ⊆ {t : LocalTypeC | RationalC t} := by
   intro t ht
   exact finite_erasure_transportable_implies_rational t (hS t ht)
+
+/-! ## Principal Witness Constructions -/
 
 /-- Canonical principal witness for regular types: the extracted regular system. -/
 theorem rational_principal_witness (t : LocalTypeC) (h : Regular t) :
@@ -132,6 +146,8 @@ theorem finite_witness_factors_through_principal
       (SystemToCoind sys start) := by
   exact Bisim_trans _ _ _ (Bisim_symm _ _ (rational_principal_witness t h)) hw
 
+/-! ## Witness Invariance -/
+
 /-- Witness invariance: any two finite erasure witnesses for the same type are bisimilar. -/
 theorem finite_erasure_witness_invariant
     (t : LocalTypeC)
@@ -148,9 +164,11 @@ theorem finite_erasure_witness_invariant_eq
     {n₁ : Nat} {sys₁ : FiniteSystem n₁} {start₁ : Fin n₁}
     {n₂ : Nat} {sys₂ : FiniteSystem n₂} {start₂ : Fin n₂}
     (h₁ : Bisim t (SystemToCoind sys₁ start₁))
-    (h₂ : Bisim t (SystemToCoind sys₂ start₂)) :
-    SystemToCoind sys₁ start₁ = SystemToCoind sys₂ start₂ :=
+  (h₂ : Bisim t (SystemToCoind sys₂ start₂)) :
+  SystemToCoind sys₁ start₁ = SystemToCoind sys₂ start₂ :=
   (Bisim_eq_iff _ _).1 (finite_erasure_witness_invariant t h₁ h₂)
+
+/-! ## Bisimulation Closure -/
 
 /-- Rationality is preserved under bisimulation. -/
 theorem rational_closed_under_bisim {a b : LocalTypeC}
@@ -173,6 +191,8 @@ theorem finite_erasure_transportable_closed_under_bisim_right
   rcases ha with ⟨n, sys, start, hsys⟩
   exact ⟨n, sys, start, Bisim_trans _ _ _ (Bisim_symm _ _ hab) hsys⟩
 
+/-! ## Principal Witness Adequacy -/
+
 /-- Operational adequacy: the principal extracted system replays exactly the source behavior. -/
 theorem rational_principal_witness_adequacy (t : LocalTypeC) (h : Regular t) :
     SystemToCoind (RegularSystem (witnessOfRegular h))
@@ -184,9 +204,11 @@ theorem rational_principal_witness_adequacy (t : LocalTypeC) (h : Regular t) :
 
 /-- Syntax-bridge exactness on inductive embeddings. -/
 theorem toCoind_image_exact
-    (r : SessionTypes.LocalTypeR.LocalTypeR) :
-    RationalC (toCoind r) ↔ FiniteErasureTransportable (toCoind r) :=
+  (r : SessionTypes.LocalTypeR.LocalTypeR) :
+  RationalC (toCoind r) ↔ FiniteErasureTransportable (toCoind r) :=
   rational_iff_finite_erasure_transportable (toCoind r)
+
+/-! ## Finite Representation Corollary -/
 
 /-- Rational coinductive types coincide extensionally with a finite coalgebra image. -/
 theorem rational_has_finite_representation (t : LocalTypeC) (h : RationalC t) :
