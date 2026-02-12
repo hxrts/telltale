@@ -7,10 +7,19 @@ set_option autoImplicit false
 High-level API for automatic CRDT theorem-family certification.
 -/
 
+/-
+The Problem. Downstream modules need a single certified interface bundling the
+CRDT theorem-family assumptions/premises and their derived conclusions.
+Solution Structure. Provide certified protocol/erasure structures, a canonical
+premise constructor, and a validation convenience theorem.
+-/
+
 namespace Distributed
 namespace CRDT
 
 universe u v w x y z
+
+/-! ## Certified Protocol Bundles -/
 
 /-- Certified CRDT package bundling theorem-family assumptions and premises. -/
 structure CRDTProtocol where
@@ -60,6 +69,8 @@ structure CRDTProtocol where
   hcrdtExtensions : HcrdtExtensions model := hcrdtExtensions_of_assumptions assumptions
   hcrdtLimits : HcrdtLimits model := hcrdtLimits_of_assumptions assumptions
 
+/-! ## Certified Erasure Bundle -/
+
 /-- Certified erasure package for weakest-core continuation proofs. -/
 structure CRDTErasureProtocol where
   State : Type u
@@ -86,6 +97,8 @@ structure CRDTErasureProtocol where
     ∀ kr, conformanceGate premises.lower kr = true ↔ ∃ kc, premises.lower kr = some kc :=
       conformanceGate_of_loweringSound premises
 
+/-! ## Canonical Premise Constructor -/
+
 /-- Build canonical erasure premises for the core-equivalent rich fragment. -/
 def coreEquivalentErasurePremises
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
@@ -110,6 +123,8 @@ def coreEquivalentErasurePremises
       intro kr kc hk
       exact lowerCoreEquivalent_sound kr kc hk
   }
+
+/-! ## Validation Convenience Theorem -/
 
 /-- Core assumptions are always validated for a certified CRDT protocol. -/
 theorem coreAssumptions_allPassed (P : CRDTProtocol) :
