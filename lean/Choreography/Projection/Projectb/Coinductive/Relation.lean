@@ -92,6 +92,8 @@ def CProjectF (R : ProjRel) : ProjRel := fun g role cand =>
         R cont role cand
   | _, _ => False
 
+/-! ## Unfold-Core Generator -/
+
 /-- One-step generator for CProjectU (fully-unfolded).
     This mirrors Coq's `project_gen`: add a non-participant end case and
     require uniform participation (`part_of_all2`) for non-participant comms. -/
@@ -118,6 +120,8 @@ def CProjectF_unfold (R : ProjRel) : ProjRel := fun g role cand =>
   g.wellFormed = true ∧ LocalTypeR.WellFormed cand ∧
     CProjectF_unfold_core R (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand)
 
+/-! ## Monotonicity Building Blocks -/
+
 private theorem BranchesProjRel_mono {R S : ProjRel}
     (h : ∀ g r c, R g r c → S g r c) :
     ∀ {gbs lbs role}, BranchesProjRel R gbs role lbs → BranchesProjRel S gbs role lbs := by
@@ -132,6 +136,8 @@ private theorem AllBranchesProj_mono {R S : ProjRel}
     ∀ {gbs role cand}, AllBranchesProj R gbs role cand → AllBranchesProj S gbs role cand := by
   intro gbs role cand hall gb hgb
   exact h _ _ _ (hall gb hgb)
+
+/-! ## Monotonicity of CProjectF -/
 
 private theorem CProjectF_mono : Monotone CProjectF := by
   intro R S h g role cand hrel
@@ -156,6 +162,7 @@ private theorem CProjectF_mono : Monotone CProjectF := by
           simp [CProjectF] at hrel
       | recv _ _ =>
           simp [CProjectF] at hrel
+  /-! ## CProjectF_mono: Comm Case -/
   | comm sender receiver gbs =>
       by_cases hs : role = sender
       · cases cand with
@@ -178,6 +185,7 @@ private theorem CProjectF_mono : Monotone CProjectF := by
               simp [CProjectF, hr, hns] at hrel ⊢
         · simp [CProjectF, hs, hr] at hrel ⊢
           exact AllBranchesProj_mono h hrel
+  /-! ## CProjectF_mono: Delegate Case -/
   | delegate p q sid r cont =>
       by_cases hp : role = p
       · cases cand with
@@ -202,6 +210,7 @@ private theorem CProjectF_mono : Monotone CProjectF := by
                     simpa using hrel
         | _ =>
             simp [CProjectF, hp] at hrel ⊢
+      /-! ## CProjectF_mono: Delegate Receiver/Other Subcases -/
       · by_cases hq : role = q
         · have hnp : q ≠ p := by
             intro hqp
@@ -230,6 +239,8 @@ private theorem CProjectF_mono : Monotone CProjectF := by
               simp [CProjectF, hq, hnp] at hrel ⊢
         · simp [CProjectF, hp, hq] at hrel ⊢
           exact h _ _ _ hrel
+
+/-! ## Monotonicity of CProjectF_unfold_core Helpers -/
 
 /-- Helper: monotonicity for the non-participant comm branch. -/
 private theorem CProjectF_unfold_core_mono_comm_other
@@ -266,6 +277,8 @@ private theorem CProjectF_unfold_core_mono_comm_send
       simp [hrr, hne] at hcore ⊢
     · simp [hrs, hrr] at hcore ⊢
       exact CProjectF_unfold_core_mono_comm_other h hcore
+
+/-! ## CProjectF_unfold_core: recv/non-participant cases -/
 
 private theorem CProjectF_unfold_core_mono_comm_recv
     {R S : ProjRel} (h : ∀ g r c, R g r c → S g r c)
@@ -350,6 +363,9 @@ private theorem CProjectF_unfold_mono : Monotone CProjectF_unfold := by
   intro R S h g role cand hrel
   rcases hrel with ⟨hwf, hWFcand, hproj⟩
   exact ⟨hwf, hWFcand, CProjectF_unfold_core_mono h _ _ _ hproj⟩
+
+/-! ## Greatest Fixed-Point Definitions -/
+
 instance : CoinductiveRel ProjRel CProjectF := ⟨CProjectF_mono⟩
 
 instance : CoinductiveRel ProjRel CProjectF_unfold := ⟨CProjectF_unfold_mono⟩
@@ -414,6 +430,8 @@ theorem CProjectU_fixed : CProjectF_unfold CProjectU = CProjectU := by
   change CProjectF_unfold (OrderHom.gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩) =
     OrderHom.gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩
   exact SessionCoTypes.CoinductiveRel.gfp_fixed (F := CProjectF_unfold)
+
+/-! ## Coinduction and Destruct Principles -/
 
 /-- Coinduction principle for CProject: if R ⊆ CProjectF R, then R ⊆ CProject. -/
 theorem CProject_coind {R : ProjRel} (h : ∀ g role cand, R g role cand → CProjectF R g role cand) :
