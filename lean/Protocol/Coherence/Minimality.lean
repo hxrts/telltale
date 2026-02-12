@@ -68,6 +68,8 @@ def minimalityCounterexampleD : DEnv :=
 /-- Distinguished edge for the strictness witness. -/
 def minimalityEdgeAB : Edge := { sid := 0, sender := "A", receiver := "B" }
 
+/-! ## Witness Lookup Lemmas -/
+
 /-- The witness has no blocked receivers at all. -/
 theorem lookup_minimalityCounterexample_B :
     lookupG minimalityCounterexampleG minimalityBEndpoint = some minimalityBType := by
@@ -115,6 +117,8 @@ theorem lookup_minimalityCounterexample_other (ep : Endpoint)
   rw [hStep2]
   simp [lookupG]
 
+/-! ## No Blocked Receivers -/
+
 theorem minimalityCounterexample_no_blocked (e : Edge) :
     ¬ BlockedEdge minimalityCounterexampleG e := by
   let ep : Endpoint := { sid := e.sid, role := e.receiver }
@@ -144,11 +148,15 @@ theorem minimalityCounterexample_no_blocked (e : Edge) :
         simpa [ep] using hLookup
       simpa [BlockedEdge, hLookup']
 
+/-! ## Weak Coherence Holds Vacuously -/
+
 /-- The witness satisfies weak coherence (vacuously, since no receiver is blocked). -/
 theorem minimalityCounterexample_WeakCoherent :
     WeakCoherent minimalityCounterexampleG minimalityCounterexampleD := by
   intro e _hActive hBlocked
   exact (False.elim ((minimalityCounterexample_no_blocked e) hBlocked))
+
+/-! ## Witness Violates Full Coherence -/
 
 /-- The witness is not coherent: edge A -> B cannot consume its non-empty trace. -/
 theorem minimalityCounterexample_not_Coherent :
