@@ -66,6 +66,8 @@ inductive RecoveryAction where
   | abort
   deriving Repr, DecidableEq, Inhabited
 
+/-! ## Shared Error-Code Schema -/
+
 /-- Machine-stable error code schema shared by Lean model and Rust runtime. -/
 inductive ErrorCode where
   | typeViolation
@@ -90,6 +92,8 @@ inductive ErrorCode where
   | transportTimeout
   | unknown
   deriving Repr, DecidableEq, Inhabited
+
+/-! ## Error-Code Wire Encodings -/
 
 /-- Stable wire/string representation for cross-target artifacts. -/
 def errorCodeString : ErrorCode → String
@@ -124,6 +128,8 @@ structure RecoveryEvidence where
   tick : Nat
   source : String
   deriving Repr, DecidableEq, Inhabited
+
+/-! ## Failure-Class Mappings -/
 
 /-- Map abstract failure classes to machine-stable error codes. -/
 def errorCodeOfFailureClass : FailureClass → ErrorCode
@@ -174,6 +180,8 @@ def failureClassOfLeanIngressFailure {ι : Type u} [IdentityModel ι] :
   | .corrupt _ _ => .transportCorruption
   | .timeout _ _ => .transportTimeout
 
+/-! ## Rust Fault-Tag Mappings -/
+
 /-- Rust fault tags mirrored for total cross-target classification mapping. -/
 inductive RustFaultTag where
   | typeViolation
@@ -223,6 +231,8 @@ def errorCodeOfLeanFault {γ : Type u} (f : _root_.Fault γ) : ErrorCode :=
 def errorCodeOfRustFaultTag (f : RustFaultTag) : ErrorCode :=
   errorCodeOfFailureClass (failureClassOfRustFaultTag f)
 
+/-! ## Fault-Class Tag Decoding -/
+
 /-- Decode fault-class tags used in structured error artifacts to stable error codes. -/
 def errorCodeOfFaultClassTag (faultClass : String) : ErrorCode :=
   if faultClass = "type_violation" then .typeViolation else
@@ -246,6 +256,8 @@ def errorCodeOfFaultClassTag (faultClass : String) : ErrorCode :=
   if faultClass = "transport_corruption" then .transportCorruption else
   if faultClass = "transport_timeout" then .transportTimeout else
   .unknown
+
+/-! ## Failure-Visible Snapshots -/
 
 /-- Failure-visible snapshot used for cross-target conformance theorems. -/
 structure FailureVisibleSnapshot where
@@ -278,6 +290,8 @@ def vmFailureVisibleSnapshot
   , safetyVerdict := safetyVerdict
   }
 
+/-! ## Failure-Visible Equivalence Forms -/
+
 /-- Failure-visible projection used by cross-target conformance theorems. -/
 abbrev FailureVisibleProjection (State : Type u) := State → FailureVisibleSnapshot
 
@@ -303,6 +317,8 @@ def CrossTargetFailureConformance {State : Type u}
       EqFailVisibleRun project single sharded ∧
       EqFailVisibleRun project multi sharded
 
+/-! ## Recovery Safety Forms -/
+
 /-- Abstract state transformer used by recovery/action theorems. -/
 abbrev RecoveryStep (State : Type u) := State → RecoveryAction → State
 
@@ -326,6 +342,8 @@ def NoUnsafeReplay {State : Type u}
     pre.nonceFresh st nonce →
     pre.reconciled st →
     Safe (replay st nonce)
+
+/-! ## Restart and Structured-Error Forms -/
 
 /-- Checkpoint-restart refinement theorem form. -/
 def CheckpointRestartRefinement {State : Type u}
@@ -365,6 +383,8 @@ theorem restartStructuredErrorAdequacy_identity
   · intro st
     rfl
 
+/-! ## Failure Envelope Extensions -/
+
 /-- Failure-envelope soundness extension over local envelopes. -/
 def FailureEnvelopeSoundnessExtension {State : Type u} {Obs : Type v}
     (E : LocalEnvelope State Obs)
@@ -388,6 +408,8 @@ def FailureEnvelopeMaximalityExtension {State : Type u} {Obs : Type v}
       RefRun ref → ImplRun impl →
       R ref impl →
       EqEnvLocal E (injectFailure ref) (injectFailure impl)
+
+/-! ## Failure-Envelope Premise Bundles -/
 
 /-- Premise bundle for abstract Phase-E8 failure/recovery theorem extraction. -/
 structure FailureEnvelopePremises (State : Type u) (Obs : Type v) where
