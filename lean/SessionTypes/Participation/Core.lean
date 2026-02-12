@@ -267,6 +267,8 @@ private abbrev CommAll (role : String) (P : GlobalType → Prop) : Prop :=
     (∀ pair, pair ∈ branches → part_of_all2 role pair.2 → P pair.2) →
     P (.comm sender receiver branches)
 
+/-! ### Main Structural Induction Principle -/
+
 theorem part_of_all2_ind2 (role : String) (P : GlobalType → Prop)
     (h_comm_direct : CommDirect role P)
     (h_comm_all : CommAll role P)
