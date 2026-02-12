@@ -113,6 +113,8 @@ structure BoundedBuffer where
   epoch : Nat
   deriving Repr
 
+/-! ### Core invariants and constructors -/
+
 def BoundedBuffer.capacity (buf : BoundedBuffer) : Nat :=
   -- Effective capacity derived from configuration.
   BufferConfig.capacity buf.cfg
@@ -167,6 +169,8 @@ inductive EnqueueResult where
   | error
   deriving Repr
 
+/-! ### Linearization and resize helpers -/
+
 def BoundedBuffer.toList (buf : BoundedBuffer) : List Value :=
   -- Linearize the ring buffer into FIFO order.
   let cap := buf.capacity
@@ -199,6 +203,8 @@ def BoundedBuffer.resize (buf : BoundedBuffer) (newCap : Nat) : BoundedBuffer :=
   let used := Nat.min values.length cap
   let data' := BoundedBuffer.loadArray cap values
   { buf with data := data', head := 0, tail := used, count := used }
+
+/-! ### Enqueue paths -/
 
 def BoundedBuffer.enqueueFIFO_noResize (buf : BoundedBuffer) (v : Value) : EnqueueResult :=
   -- FIFO enqueue without resizing (single attempt).
@@ -236,6 +242,8 @@ def BoundedBuffer.enqueue (buf : BoundedBuffer) (v : Value) : EnqueueResult :=
   match buf.cfg.mode with
   | .fifo => BoundedBuffer.enqueueFIFO buf v
   | .latestValue => BoundedBuffer.enqueueLatest buf v
+
+/-! ### Dequeue and epoch maintenance -/
 
 def BoundedBuffer.dequeue (buf : BoundedBuffer) : Option (BoundedBuffer × Value) :=
   -- FIFO dequeue; latest-value uses the same interface.
