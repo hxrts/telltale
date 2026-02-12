@@ -57,6 +57,8 @@ theorem LocalTypeR.WellFormed.fullUnfold {t : LocalTypeR} (h : LocalTypeR.WellFo
     LocalTypeR.WellFormed t.fullUnfold := by
   simpa [LocalTypeR.fullUnfold] using (LocalTypeR.WellFormed.unfold_iter (t := t) h t.muHeight)
 
+/-! ## Branch Well-Formedness Extraction Helpers -/
+
 private theorem LocalTypeR.branches_wellFormed_of_closed_contractive
     (bs : List BranchR)
     (hclosed : freeVarsOfBranches bs = [])
@@ -92,6 +94,8 @@ private theorem LocalTypeR.branches_wellFormed_of_closed_contractive
               | inr hmem_tail =>
                   exact htail_wf lb hmem_tail
 
+/-! ## Branch Well-Formedness from Send/Recv -/
+
 /-- Well-formed send branches are well-formed. -/
 theorem LocalTypeR.WellFormed.branches_of_send {p : String} {bs : List BranchR}
     (h : LocalTypeR.WellFormed (.send p bs)) :
@@ -115,6 +119,8 @@ theorem LocalTypeR.WellFormed.branches_of_recv {p : String} {bs : List BranchR}
   have hcontr : isContractiveBranches bs = true := by
     simpa [LocalTypeR.isContractive] using h.contractive
   exact LocalTypeR.branches_wellFormed_of_closed_contractive bs hclosed hcontr
+
+/-! ## Branch Aggregation Helpers -/
 
 /-- If all branches are well-formed, then `freeVarsOfBranches` is empty. -/
 private theorem freeVarsOfBranches_of_wellFormed (bs : List BranchR)
@@ -153,6 +159,8 @@ private theorem isContractiveBranches_of_wellFormed (bs : List BranchR)
                 fun lb hm => hWFbs lb (List.Mem.tail _ hm)
               simp [isContractiveBranches, hcont_wf.contractive, ih htail_wf]
 
+/-! ## Reconstructing Well-Formed Send/Recv -/
+
 /-- Well-formed send: if all branches are well-formed, then the send type is well-formed. -/
 theorem LocalTypeR.WellFormed_send {p : String} {bs : List BranchR}
     (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2) :
@@ -187,6 +195,8 @@ The intuition is:
 - An unguarded free variable sits at the "head" position
 - Unfolding only substitutes under mu, so the variable stays at head
 - After enough unfolding, we reach just the variable -/
+
+/-! ## Vacuous Unguarded-Variable Lemmas (Closed Case) -/
 
 /-- Helper for double substitution case in unfold_iter_subst_unguarded.
 
@@ -266,6 +276,8 @@ theorem LocalTypeR.unguarded_unfolds_to_var (lt : LocalTypeR) (v : String)
   have : False := by
     simpa [hnil] using hmem
   exact this.elim
+
+/-! ## Guarded Corollary for fullUnfold -/
 
 /-- The converse: if a free variable IS guarded, fullUnfold reaches a non-variable form.
 
