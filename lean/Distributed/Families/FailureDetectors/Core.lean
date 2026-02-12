@@ -48,6 +48,8 @@ def ImpossibilityBoundary
     (d : DetectorClass) : Prop :=
   ¬ M.supports d → True
 
+/-! ## Assumption Atoms and Contracts -/
+
 /-- Reusable core failure-detector assumption bundle. -/
 structure Assumptions
     {State : Type u} {Party : Type v}
@@ -74,6 +76,8 @@ def coreAssumptions : List Assumption :=
   [ .detectorClassContracts
   , .networkTimingFaultMapping
   ]
+
+/-! ## Assumption Validation API -/
 
 /-- Validate one assumption against an assumption bundle. -/
 def validateAssumption
@@ -118,6 +122,8 @@ def runAssumptionValidation
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
 
+/-! ## Theorem Premises and Derived Boundaries -/
+
 /-- Additional premises used to derive detector-boundary theorem forms. -/
 structure Premises
     {State : Type u} {Party : Type v}
@@ -148,5 +154,4 @@ theorem impossibility_boundary_of_assumptions
 
 end FailureDetectors
 end Distributed
-
 
