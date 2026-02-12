@@ -28,6 +28,8 @@ open SessionCoTypes.EQ2Props
 open Choreography.Projection.Project (trans_wellFormed_of_wellFormed)
 open Choreography.Projection.Blind (isBlind isBlind_mu_body isBlind_substitute)
 
+/-! ## Mu Case Helpers -/
+
 private theorem proj_trans_other_step_mu_chain
     (t : String) (body : GlobalType) (role : String)
     (hclosed : (GlobalType.mu t body).isClosed = true)
@@ -76,6 +78,8 @@ theorem proj_trans_other_step_mu
   have hWFc := trans_wellFormed_of_wellFormed (.mu t body) role hwf
   exact EQ2_trans_wf h1 h23 hWFa hWFb hWFc
 
+/-! ## Branch-Step Helpers -/
+
 /-- Helper: BranchesStep.nil case. -/
 
 
@@ -99,6 +103,8 @@ private abbrev BranchIH (rest rest' : List (Label × GlobalType)) (act : GlobalA
       ∀ role, role ≠ act.sender → role ≠ act.receiver →
         BranchesRel EQ2 (projTransBranches rest' role) (projTransBranches rest role)
 
+/-! ## Branch Cons Case -/
+
 /-- Helper: BranchesStep.cons case. -/
 
 
@@ -120,6 +126,8 @@ theorem proj_trans_other_step_branches_cons
   · exact ih_bstep (fun p hp => hclosed p (List.mem_cons_of_mem (label, g) hp))
       (fun p hp => hwf p (List.mem_cons_of_mem (label, g) hp))
       (fun p hp => hblind p (List.mem_cons_of_mem (label, g) hp)) role hns hnr
+
+/-! ## Induction Motives -/
 
 /-- Motive for non-participant step preservation. -/
 
