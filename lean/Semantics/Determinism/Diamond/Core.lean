@@ -25,6 +25,8 @@ For independent actions (different sender-receiver pairs), we do have
 a diamond property: they commute.
 -/
 
+/-! ### Independence and BranchesStep preliminaries -/
+
 /-- Two actions are independent if they involve disjoint role pairs. -/
 def IndependentActions (act₁ act₂ : GlobalActionR) : Prop :=
   act₁.sender ≠ act₂.sender ∧
@@ -52,6 +54,8 @@ theorem step_diamond_symm {g₁ g₂ g₃ : GlobalType} {act₁ act₂ : GlobalA
     (h : step g₁ act₂ g₃ ∧ step g₂ act₁ g₃) :
     step g₂ act₁ g₃ ∧ step g₁ act₂ g₃ :=
   ⟨h.2, h.1⟩
+
+/-! #### BranchesStep membership/label helpers -/
 
 /-- BranchesStep preserves membership: if (l, g) ∈ bs and BranchesStep bs act bs',
     then there exists g' such that step g act g' and (l, g') ∈ bs'. -/
@@ -106,6 +110,8 @@ theorem canStep_comm_head {s r : String} {branches : List (Label × GlobalType)}
     canStep (.comm s r branches) { sender := s, receiver := r, label := l } := by
   exact canStep.comm_head s r branches l cont hmem
 
+/-! ### Unique-label preservation infrastructure -/
+
 
 /-- uniqueBranchLabelsBranches implies each continuation has uniqueBranchLabels. -/
 theorem uniqueBranchLabelsBranches_mem {branches : List (Label × GlobalType)} {lbl : Label} {g : GlobalType}
@@ -145,17 +151,10 @@ theorem BranchesStep_preserves_branchLabels {bs bs' : List (Label × GlobalType)
       simp only [List.map_cons]
       rw [ih]
 
-/-- uniqueBranchLabels is preserved by step.
-    This is needed for the diamond property to maintain well-formedness.
+/-- uniqueBranchLabels is preserved by a single global step. -/
 
-    **Note:** This proof uses @step.rec for the nested induction. The structure
-    mirrors global_step_det but with uniqueBranchLabels preservation as the goal.
-    The key insight is that:
-    - comm_head: continuation inherits uniqueness from branch list
-    - comm_async: BranchesStep preserves labels (so Nodup is preserved) and
-                  each branch continuation preserves uniqueness by IH
-    - mu: substitution preserves uniqueness, then apply IH
--/
+/-! #### Motives for uniqueness-preservation recursion -/
+
 private abbrev UniqueStepMotive (g : GlobalType) (act : GlobalActionR) (g' : GlobalType)
     (_ : step g act g') : Prop :=
   -- Uniqueness-preservation motive for step recursion.
@@ -166,6 +165,8 @@ private abbrev UniqueBranchMotive (bs : List (Label × GlobalType)) (act : Globa
   -- Uniqueness + label preservation for branch steps.
   uniqueBranchLabelsBranches bs = true →
     uniqueBranchLabelsBranches bs' = true ∧ branchLabels bs' = branchLabels bs
+
+/-! #### Commutative/mu uniqueness lemmas -/
 
 private theorem uniqueBranchLabels_preserved_comm_head
     (sender receiver : String) (branches : List (Label × GlobalType)) (label : Label) (cont : GlobalType)
@@ -204,6 +205,8 @@ private theorem uniqueBranchLabels_preserved_mu
     GlobalType.uniqueBranchLabels_substitute body t (.mu t body) huniq huniq
   exact ih huniq_sub
 
+/-! #### Branch-step uniqueness lemmas -/
+
 private theorem uniqueBranchLabels_preserved_branches_nil
     (_act' : GlobalActionR) (_huniq : uniqueBranchLabelsBranches [] = true) :
     uniqueBranchLabelsBranches [] = true ∧ branchLabels [] = branchLabels [] := by
@@ -241,6 +244,8 @@ theorem uniqueBranchLabels_preserved_by_step {g g' : GlobalType} {act : GlobalAc
     uniqueBranchLabels_preserved_branches_cons
     (t := hstep)) huniq
 
+/-! ### Step/canStep bridge -/
+
 /-- Every step corresponds to a canStep. -/
 theorem step_implies_canStep {g g' : GlobalType} {act : GlobalActionR}
     (h : step g act g') : canStep g act :=
@@ -258,17 +263,9 @@ theorem step_implies_canStep {g g' : GlobalType} {act : GlobalActionR}
       BranchesCanStep.cons label g rest act ih_head ih_rest)
     (t := h)
 
-/-- Diamond property for global type step with independent actions.
-    This is the core lemma: independent actions on global types commute.
+/-! ### Diamond recursion motives and comm cases -/
 
-    **Proof strategy:**
-    - Case analysis on h₁ and h₂
-    - comm_head + comm_head: impossible (violates independence)
-    - comm_head + comm_async: use BranchesStep_mem
-    - comm_async + comm_head: symmetric
-    - comm_async + comm_async: use mutual IH via @step.rec
-    - mu + mu: use IH on unfolded body
--/
+/-- Core diamond lemma: independent global actions commute. -/
 private abbrev DiamondStepMotive (act₂ : GlobalActionR) (g : GlobalType) (act₁ : GlobalActionR)
     (g₁ : GlobalType) (_ : step g act₁ g₁) : Prop :=
   -- Diamond motive for step recursion.
@@ -287,6 +284,8 @@ private abbrev DiamondBranchMotive (act₂ : GlobalActionR) (bs : List (Label ×
       ∃ bs₃, BranchesStep step bs₁ act₂ bs₃ ∧
              BranchesStep step bs₂ act₁ bs₃ ∧
              uniqueBranchLabelsBranches bs₃ = true
+
+/-! #### Comm-head / async-head cases -/
 
 private theorem diamond_comm_head {act₂ : GlobalActionR}
     (sender receiver : String) (branches : List (Label × GlobalType)) (label₁ : Label) (cont₁ : GlobalType)
@@ -324,8 +323,10 @@ private theorem diamond_comm_async_head {act₂ : GlobalActionR}
   obtain ⟨cont₂', hstep_cont, hmem₂'⟩ := BranchesStep_mem hbs₁ hmem₂
   simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true] at huniq'
   refine ⟨cont₂', ?_, hstep_cont, ?_⟩
-  · simpa [hact₂] using (step.comm_head sender receiver branches₁ label₂ cont₂' hmem₂')
-  exact uniqueBranchLabels_preserved_by_step (uniqueBranchLabelsBranches_mem huniq'.2 hmem₂) hstep_cont
+	  · simpa [hact₂] using (step.comm_head sender receiver branches₁ label₂ cont₂' hmem₂')
+	  exact uniqueBranchLabels_preserved_by_step (uniqueBranchLabelsBranches_mem huniq'.2 hmem₂) hstep_cont
+
+/-! #### Async-async and mu cases -/
 
 private theorem canStep_of_branchesStep_mem
     {bs bs' : List (Label × GlobalType)} {act : GlobalActionR}
@@ -333,8 +334,10 @@ private theorem canStep_of_branchesStep_mem
     (hbs : BranchesStep step bs act bs') (hmem : (label, cont) ∈ bs) :
     canStep cont act := by
   -- Extract the step from BranchesStep, then use step_implies_canStep.
-  obtain ⟨_, hstep, _⟩ := BranchesStep_mem hbs hmem
-  exact step_implies_canStep hstep
+	  obtain ⟨_, hstep, _⟩ := BranchesStep_mem hbs hmem
+	  exact step_implies_canStep hstep
+
+/-! #### Async composition helpers -/
 
 private theorem comm_unique_from_branches_step {act₁' act₂ : GlobalActionR}
     (sender receiver : String) (branches branches₁ branches₃ : List (Label × GlobalType))
@@ -379,6 +382,8 @@ private theorem diamond_comm_async_async {act₂ : GlobalActionR}
   exact comm_unique_from_branches_step sender receiver branches branches₁ branches₃
     huniq' hbs₁ hbs₁_to_3 huniq_bs₃
 
+/-! #### Final async/mu branch cases -/
+
 private theorem diamond_comm_async {act₂ : GlobalActionR}
     (sender receiver : String) (branches branches₁ : List (Label × GlobalType)) (act₁' : GlobalActionR)
     (label₁ : Label) (cont₁ : GlobalType) (hns₁ : act₁'.sender ≠ receiver)
@@ -416,6 +421,8 @@ private theorem diamond_mu {act₂ : GlobalActionR}
       have huniq_sub := GlobalType.uniqueBranchLabels_substitute body t (.mu t body) huniq' huniq'
       exact ih_step huniq_sub hind' _ hstep₂
 
+/-! #### Branch-level diamond composition -/
+
 private theorem diamond_branches_nil {act₂ : GlobalActionR}
     (act₁' : GlobalActionR) (_huniq' : uniqueBranchLabelsBranches [] = true)
     (_hind' : IndependentActions act₁' act₂) (bs₂ : List (Label × GlobalType))
@@ -446,8 +453,10 @@ private theorem diamond_branches_cons {act₂ : GlobalActionR}
       refine ⟨(label, head₃) :: rest₃,
         .cons label head₁ head₃ rest₁ rest₃ act₂ hh₁_to_h₃ hr₁_to_r₃,
         .cons label head₂ head₃ rest₂ rest₃ act₁' hh₂_to_h₃ hr₂_to_r₃, ?_⟩
-      simp only [uniqueBranchLabelsBranches, Bool.and_eq_true]
-      exact ⟨huniq_h₃, huniq_r₃⟩
+	      simp only [uniqueBranchLabelsBranches, Bool.and_eq_true]
+	      exact ⟨huniq_h₃, huniq_r₃⟩
+
+/-! ### Global and configuration diamond theorems -/
 
 /-- Independent actions form a diamond under unique branch labels. -/
 theorem step_diamond_independent {g g₁ g₂ : GlobalType} {act₁ act₂ : GlobalActionR}
@@ -466,16 +475,7 @@ theorem step_diamond_independent {g g₁ g₂ : GlobalType} {act₁ act₂ : Glo
     diamond_branches_cons
     (t := h₁)) huniq hind g₂ h₂
 
-/-- Diamond property for independent actions.
-
-If two independent actions are both enabled, they commute:
-taking them in either order reaches the same final configuration.
-
-**Proof strategy:**
-1. Use step_diamond_independent to get the common global type g₃
-2. Construct c₃ with global type g₃ and environment c.env
-3. Show both step paths work with uniqueBranchLabels preserved
--/
+/-- Configuration-level diamond for independent actions. -/
 theorem diamond_independent {c c₁ c₂ : Configuration} {act₁ act₂ : GlobalActionR}
     (hind : IndependentActions act₁ act₂)
     (h₁ : ConfigStep c c₁ act₁)
