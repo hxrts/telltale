@@ -138,6 +138,8 @@ theorem lookupG_renamePR (σ : ProtocolRenaming) (G : GEnv) (ep : Endpoint) :
           beq_eq_false_iff_ne.mpr hne
         simpa [renameGEnvPR, lookupG, List.lookup, hbeq1, hbeq2] using ih
 
+/-! ## Lookup Inversion -/
+
 /-- Lookup in renamed GEnv: the preimage exists.
     For any endpoint in the renamed environment, there exists a corresponding
     endpoint in the original environment. -/
