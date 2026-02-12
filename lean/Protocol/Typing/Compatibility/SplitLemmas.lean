@@ -75,6 +75,8 @@ theorem DisjointG_append_left {G₁ G₁' G₂ : GEnv} :
       have : s ∈ (∅ : Set SessionId) := by simpa [hEmpty] using hInter
       exact this.elim
 
+/-! ## DEnv Append Lookup Facts -/
+
 theorem lookupD_append_left {D₁ D₂ : DEnv} {e : Edge} :
     lookupD D₁ e ≠ [] →
     lookupD (D₁ ++ D₂) e = lookupD D₁ e := by
@@ -121,6 +123,8 @@ theorem lookupD_append_left_of_right_none {D₁ D₂ : DEnv} {e : Edge} :
         simp [lookupD, hleft]
       simpa [hlookup] using hlookup'
 
+/-! ## SEnv Domain Inclusion Under Append -/
+
 theorem SEnvDomSubset_append_left {S₁ S₂ : SEnv} :
     SEnvDomSubset S₁ (S₁ ++ S₂) := by
   intro x T hLookup
@@ -135,6 +139,8 @@ theorem SEnvDomSubset_append_right {S₁ S₂ : SEnv} :
   | none =>
       have hEq := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hLeft
       exact ⟨T, by simpa [hEq] using hLookup⟩
+
+/-! ## Framed SEnv Lookup Transport -/
 
 theorem lookupSEnv_all_frame_left {Ssh S₁ S₂ : SEnv} {x : Var} {T : ValType} :
     DisjointS S₁ S₂ →
@@ -168,6 +174,8 @@ theorem lookupSEnv_all_frame_left {Ssh S₁ S₂ : SEnv} {x : Var} {T : ValType}
       have hEq'' := lookupSEnv_append_right (S₁:=Ssh) (S₂:=S₁ ++ S₂) (x:=x) hSsh
       simpa [hEq''] using hIn
 
+/-! ## HasTypeProcPreOut Domain Monotonicity -/
+
 theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
     HasTypeProcPreOut Ssh Sown G P Sown' G' W Δ →
     SEnvDomSubset Sown.left Sown'.left := by
@@ -187,6 +195,7 @@ theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
       exact hDom
   | seq hP hQ ihP ihQ =>
       exact SEnvDomSubset_trans ihP ihQ
+  /-! ## HasTypeProcPreOut Domain Monotonicity: parallel case -/
   | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
       hDisjW hDisjΔ hP hQ ihP ihQ =>
       -- Show dom subset for the left portion of the owned env.
@@ -225,10 +234,13 @@ theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
             obtain ⟨T', hLeft'⟩ := ihP hLeftSome'
             have hAppend := lookupSEnv_append_left (S₁:=S₁') (S₂:=S₂') hLeft'
             exact ⟨T', by simpa [hSfin] using hAppend⟩
+  /-! ## HasTypeProcPreOut Domain Monotonicity: assignment cases -/
   | assign_new =>
       exact SEnvDomSubset_update_left
   | assign_old =>
       exact SEnvDomSubset_update_left
+
+/-! ## StoreTyped Split Transport -/
 
 /-- StoreTyped splits to the left portion of SEnv. -/
 theorem StoreTyped_split_left {G : GEnv} {S₁ S₂ : SEnv} {store : VarStore} :
@@ -256,6 +268,8 @@ theorem StoreTyped_split_right {G : GEnv} {S₁ S₂ : SEnv} {store : VarStore}
     have h := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hNone
     simpa [hS] using h
   exact hST x v T hStore hS'
+
+/-! ## Coherence Split Transport -/
 
 /-- Coherence splits to the left portion of G/D. -/
 theorem Coherent_split_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
