@@ -61,6 +61,8 @@ inductive ClassicalAssumption where
   | spectralGapPos
   deriving Repr, DecidableEq, Inhabited
 
+/-! ## Evidence and Validation Result Records -/
+
 /-- User-supplied evidence profile for classical transport checks. -/
 structure ClassicalEvidence where
   finiteState : Bool := false
@@ -88,6 +90,8 @@ structure ClassicalValidationResult where
   missing : List ClassicalAssumption
   detail : String
   deriving Repr, DecidableEq, Inhabited
+
+/-! ## Family IDs and Required Assumption Profiles -/
 
 /-- Canonical family identifier for each transported property family. -/
 def familyIdFor (p : ClassicalProperty) : String :=
@@ -131,6 +135,8 @@ def assumptionsFor (p : ClassicalProperty) : List ClassicalAssumption :=
   | .spectralGapTermination =>
       base ++ [.markovAbstraction, .spectralGapPos]
 
+/-! ## Assumption Presence and Missing-Set Computation -/
+
 /-- Check whether one assumption atom is present in the evidence profile. -/
 def hasAssumption (ev : ClassicalEvidence) (a : ClassicalAssumption) : Bool :=
   match a with
@@ -155,6 +161,8 @@ def missingAssumptions (ev : ClassicalEvidence) (p : ClassicalProperty) :
     List ClassicalAssumption :=
   (assumptionsFor p).filter (fun a => !(hasAssumption ev a))
 
+/-! ## Property Validation API -/
+
 /-- Coarse eligibility check for using classical transport machinery. -/
 def validateClassicalProperty (spec : ProtocolSpec) (ev : ClassicalEvidence)
     (p : ClassicalProperty) : ClassicalValidationResult :=
@@ -178,6 +186,8 @@ def validateClassicalProperty (spec : ProtocolSpec) (ev : ClassicalEvidence)
 def validateClassicalProperties (spec : ProtocolSpec) (ev : ClassicalEvidence)
     (ps : List ClassicalProperty) : List ClassicalValidationResult :=
   ps.map (validateClassicalProperty spec ev)
+
+/-! ## Default Property Bundles -/
 
 /-- Default classical property set used for broad capability checks. -/
 def classicalCoreProperties : List ClassicalProperty :=
