@@ -39,6 +39,8 @@ private def tracesForEndpoint (D : DEnv) (ep : Endpoint) : List (Edge × List Va
 private def buffersForEndpoint (bufs : Buffers) (ep : Endpoint) : List (Edge × Buffer) :=
   bufs.filter (fun p => p.1.sid = ep.sid ∧ p.1.receiver = ep.role)
 
+/-! ## Coroutine Projection Operators -/
+
 /-- Projection of one coroutine against the current session store. -/
 def coroutineProjection {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -87,6 +89,8 @@ theorem coroutineView_eq_projection {ι γ π ε ν : Type u} [IdentityModel ι]
     coroutineView st cid = coroutineProjectionAt st cid := by
   cases hco : st.coroutines[cid]? <;> simp [coroutineView, coroutineProjectionAt, hco]
 
+/-! ## Observer Equivalence -/
+
 /-- VM observational equivalence for one coroutine id. -/
 def VMCEquiv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -125,6 +129,8 @@ theorem vmCEquiv_trans {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     {st₁ st₂ st₃ : VMState ι γ π ε ν} {cid : CoroutineId}
     (h₁₂ : VMCEquiv st₁ st₂ cid) (h₂₃ : VMCEquiv st₂ st₃ cid) :
     VMCEquiv st₁ st₃ cid := Eq.trans h₁₂ h₂₃
+
+/-! ## Topology-Change Noninterference -/
 
 /-- Topology-only failure events are blind to coroutine-local projections. -/
 theorem topology_change_preserves_coroutineView {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
