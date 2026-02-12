@@ -33,6 +33,8 @@ These helper lemmas avoid full transitivity by coinduction on relations
 that fix the intermediate constructor. They are useful in places where
 the middle term is `.end` or `.var v`, which need not be well-formed. -/
 
+/-! ## End Constructor Bridge -/
+
 set_option linter.unnecessarySimpa false
 
 private def EndRel : Rel := fun a b => EQ2 a .end ∧ EQ2 .end b
@@ -69,6 +71,9 @@ private theorem EndRel_postfix : ∀ a b, EndRel a b → EQ2F EndRel a b := by
   | recv p bs =>
       have haF : EQ2F EQ2 (.recv p bs) .end := EQ2.destruct ha
       simpa [EQ2F] using haF
+
+/-! ## End Constructor Bridge: μ-Case -/
+
   | mu t lbody =>
       have ha' : EQ2 (lbody.substitute t (.mu t lbody)) .end := by
         have haF : EQ2F EQ2 (.mu t lbody) .end := EQ2.destruct ha
@@ -103,6 +108,8 @@ private theorem EndRel_postfix : ∀ a b, EndRel a b → EQ2F EndRel a b := by
 theorem EQ2_trans_via_end {a b : LocalTypeR} (ha : EQ2 a .end) (hb : EQ2 .end b) : EQ2 a b := by
   have hinR : EndRel a b := ⟨ha, hb⟩
   exact EQ2_coind EndRel_postfix a b hinR
+
+/-! ## Variable Constructor Bridge -/
 
 private def VarRel (v : String) : Rel := fun a b => EQ2 a (.var v) ∧ EQ2 (.var v) b
 
@@ -151,6 +158,9 @@ private theorem VarRel_postfix (v : String) :
   | recv p bs =>
       have haF : EQ2F EQ2 (.recv p bs) (.var v) := EQ2.destruct ha
       simpa [EQ2F] using haF
+
+/-! ## Variable Constructor Bridge: μ-Case -/
+
   | mu t lbody =>
       have ha' : EQ2 (lbody.substitute t (.mu t lbody)) (.var v) := by
         have haF : EQ2F EQ2 (.mu t lbody) (.var v) := EQ2.destruct ha
