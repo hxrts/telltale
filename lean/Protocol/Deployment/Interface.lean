@@ -246,6 +246,8 @@ structure DeployedProtocol where
   /-- The session ID is registered in the interface. -/
   sessionId_in_interface : sessionId ∈ interface.sessionIds
 
+/-! ## DeployedProtocol Operations -/
+
 namespace DeployedProtocol
 
 /-- Get the initial monitor state for this protocol. -/
@@ -402,6 +404,8 @@ theorem mkInitBufs_lookup_mem (roles : RoleSet) (sid : SessionId)
   exact this _ h
 
 
+/-! ## Initial Consistency Certificates -/
+
 theorem mkInit_bConsistent (roles : RoleSet) (sid : SessionId)
     (localTypes : Role → LocalType) :
     BConsistent (mkInitGEnv roles sid localTypes) (mkInitBufs roles sid) := by
@@ -429,6 +433,8 @@ theorem mkInit_dConsistent (roles : RoleSet) (sid : SessionId) :
     simp [mkInitDEnv, initDEnv] at hFind
   exact this.elim
 
+
+/-! ## Linking Predicates -/
 
 def linkOK (p₁ p₂ : DeployedProtocol) : Bool :=
   -- Disjoint sessions
