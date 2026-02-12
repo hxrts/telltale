@@ -31,6 +31,8 @@ inductive DeterminismProfileClass where
   | commutativityModulo
   deriving Repr, DecidableEq, Inhabited
 
+/-! ## Capability Objects and Admission Predicate -/
+
 /-- Certified envelope capability summary used for admission checks. -/
 structure CertifiedEnvelopeCapability where
   maxDiff : Nat
@@ -63,6 +65,8 @@ def ShardedExchangeNormalization {State : Type u} {Obs : Type v}
     exchange ref₁ ref₂ →
     exchange impl₁ impl₂ →
       EqEnvShard E ref₁ impl₁ → EqEnvShard E ref₂ impl₂
+
+/-! ## VM Local/Sharded Hypothesis Bundles -/
 
 /-- E3: VM-side local determinism/envelope hypothesis bundle. -/
 structure VMLocalEnvelopeHypotheses (State : Type u) (Obs : Type v) where
@@ -114,6 +118,8 @@ theorem schedulerDeterminismSharded_of_hypotheses
     ShardedExchangeNormalization h.shardedEnvelope h.certifiedExchange :=
   h.schedulerDeterminismWitness
 
+/-! ## Adequacy and Capability Relations -/
+
 /-- E3: adequacy statement form between reference and VM semantics modulo envelope. -/
 def VMObservationalAdequacyModuloEnvelope {State : Type u}
     (R : Run State → Run State → Prop)
@@ -141,6 +147,8 @@ def CapabilityMonotonicity
     CapabilityStrengthens strong weak →
     guarantee weak →
     guarantee strong
+
+/-! ## VM Adherence Premises -/
 
 /-- E3: VM adherence + adequacy premise bundle for theorem extraction. -/
 structure VMEnvelopeAdherencePremises
@@ -173,6 +181,8 @@ structure VMEnvelopeAdherencePremises
   capabilityMonotonicityWitness : CapabilityMonotonicity guarantee
   strongStrengthensWeak :
     CapabilityStrengthens strongCapability weakCapability
+
+/-! ## Premise Projections -/
 
 /-- E3: extract local observational adequacy modulo envelope from VM premises. -/
 theorem vmLocalAdequacy_of_premises
@@ -217,6 +227,8 @@ theorem vmAdherenceMonotonicity_of_premises
     SpatialSubtypingMonotonicity p.subtype p.obligation :=
   p.monotonicityWitness
 
+/-! ## Capability-Monotonicity Projection -/
+
 /-- E3: extract capability monotonicity theorem from VM premises. -/
 theorem vmCapabilityMonotonicity_of_premises
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
@@ -225,6 +237,8 @@ theorem vmCapabilityMonotonicity_of_premises
   intro hWeak
   exact p.capabilityMonotonicityWitness
     p.weakCapability p.strongCapability p.strongStrengthensWeak hWeak
+
+/-! ## Packaged VM Adherence Protocol -/
 
 /-- E3: packaged VM adherence/adequacy protocol-level theorem family. -/
 structure VMEnvelopeAdherenceProtocol where
@@ -254,6 +268,9 @@ structure VMEnvelopeAdherenceProtocol where
       premises.shardedHypotheses.shardedEnvelope
       premises.shardedHypotheses.certifiedExchange :=
         schedulerDeterminismSharded_of_hypotheses premises.shardedHypotheses
+
+  /-! ## Packaged VM Adherence Protocol: Adequacy Fields -/
+
   monotonicity :
     SpatialSubtypingMonotonicity premises.subtype premises.obligation :=
       vmAdherenceMonotonicity_of_premises premises
@@ -269,6 +286,9 @@ structure VMEnvelopeAdherenceProtocol where
       premises.shardedHypotheses.refRun
       premises.shardedHypotheses.vmRun :=
         vmShardedAdequacy_of_premises premises
+
+  /-! ## Packaged VM Adherence Protocol: Full-Abstraction Fields -/
+
   localFullAbstraction :
     EnvelopeFullAbstraction
       premises.localHypotheses.localEnvelope.toEnvelope.observe
