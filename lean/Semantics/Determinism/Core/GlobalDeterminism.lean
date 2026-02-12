@@ -157,9 +157,11 @@ private theorem uniqueBranchLabelsBranchesL_cons {hd : BranchR}
         have : False := by
           simpa [h] using h1.1
         cases this
-    | false =>
+  | false =>
         rfl
   exact ⟨hnodup, h1.2⟩
+
+/-! ### Branch-membership helper lemmas -/
 
 private theorem mem_map_fst_of_mem {lbl : Label} {rest : Option ValType × LocalTypeR}
     {branches : List BranchR} (hmem : (lbl, rest) ∈ branches) :
@@ -211,6 +213,8 @@ theorem mem_branchL_unique_label {lbl : Label} {rest₁ rest₂ : Option ValType
           | tail _ hmem₂' =>
               exact ih htl_uniq hmem₁' hmem₂'
 
+/-! ### Local-step representation -/
+
 /-- Local step relation (inductive, avoids recursion through substitute).
     A local type steps when it performs a send or receive with matching label. -/
 inductive LocalStepRep : LocalTypeR → LocalTypeR → LocalActionR → Prop
@@ -253,6 +257,9 @@ Uses @step.rec to handle the nested inductive + mutual recursion with BranchesSt
 
 **Requires:** `g.uniqueBranchLabels = true` to ensure branch labels are distinct.
 Without this, two branches with the same label could have different continuations. -/
+
+/-! ### Determinism motives for mutual recursion -/
+
 private abbrev GlobalStepMotive (g : GlobalType) (act : GlobalActionR) (g' : GlobalType)
     (_ : step g act g') : Prop :=
   -- Determinism motive for step recursion.
@@ -262,6 +269,8 @@ private abbrev BranchStepMotive (bs : List (Label × GlobalType)) (act : GlobalA
     (bs' : List (Label × GlobalType)) (_ : BranchesStep step bs act bs') : Prop :=
   -- Determinism motive for branch-step recursion.
   uniqueBranchLabelsBranches bs = true → ∀ bs₂, BranchesStep step bs act bs₂ → bs' = bs₂
+
+/-! ### Comm/mu step determinism lemmas -/
 
 private theorem global_step_det_comm_head
     (sender receiver : String) (branches : List (Label × GlobalType)) (label : Label) (cont : GlobalType)
@@ -316,6 +325,8 @@ private theorem global_step_det_mu
         GlobalType.uniqueBranchLabels_substitute body t (.mu t body) huniq huniq
       exact ih huniq_sub g₂ hstep₂
 
+/-! ### Branch-step determinism lemmas -/
+
 private theorem global_step_det_branches_nil
     (act' : GlobalActionR) (_huniq : uniqueBranchLabelsBranches [] = true)
     (bs₂ : List (Label × GlobalType)) (h₂ : BranchesStep step [] act' bs₂) :
@@ -342,6 +353,8 @@ private theorem global_step_det_branches_cons
       have hrest := ih_bstep huniq.2 restNew hbstep₂
       subst hg hrest
       rfl
+
+/-! ### Main global-step determinism theorem -/
 
 /-- Global step determinism under unique branch labels. -/ theorem global_step_det
     {g g₁ g₂ : GlobalType} {act : GlobalActionR}
