@@ -51,6 +51,8 @@ theorem inScopeFamilies_adequate
   exact ⟨familyEnvelopeAdequate_of_lowering A.counter,
     familyEnvelopeAdequate_of_lowering A.orset⟩
 
+/-! ## Rich Family Fragments -/
+
 /-- Register CRDT rich fragment for in-scope lowering adequacy. -/
 inductive RegisterRich (OpTag : Type v) (Args : Type w) where
   | op : OpCore OpTag Args → RegisterRich OpTag Args
@@ -65,6 +67,8 @@ inductive CounterRich (OpTag : Type v) (Args : Type w) where
 inductive ORSetRich (OpTag : Type v) (Args : Type w) where
   | op : OpCore OpTag Args → ORSetRich OpTag Args
   deriving Repr, DecidableEq, Inhabited
+
+/-! ## Core-Representable Instances -/
 
 instance instCoreRepresentableFamilyRegisterRich
     {OpTag : Type v} {Args : Type w} :
@@ -95,6 +99,8 @@ instance instCoreRepresentableFamilyORSetRich
   toCore_ofCore _ := rfl
   ofCore_toCore
   | .op _ => rfl
+
+/-! ## Lowering Adequacy Constructors -/
 
 /-- Lowering adequacy witness for in-scope register family. -/
 def registerLoweringAdequacy
@@ -152,6 +158,8 @@ def inScopeFamiliesAdequacyCoreRepresentable
   , orset := orsetLoweringAdequacy M orsetInterp
   }
 
+/-! ## In-Scope Adequacy Theorem -/
+
 /-- Concrete adequacy theorem for representative in-scope CRDT families. -/
 theorem inScopeFamilies_adequate_coreRepresentable
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
@@ -165,6 +173,8 @@ theorem inScopeFamilies_adequate_coreRepresentable
       FamilyEnvelopeAdequate M A.orset := by
   intro A
   exact inScopeFamilies_adequate A
+
+/-! ## Core Hypothesis Analysis (`H_crdt_core`) -/
 
 /-- Hypothesis block matching `H_crdt_core`. -/
 def HcrdtCore
@@ -191,6 +201,8 @@ theorem hcrdtCore_iff_semilattice_plus_opContext
     HcrdtCore M ↔
       (SemilatticeOnlyFoundation M ∧ OpContextPrimitiveAlgebra M) := by
   rfl
+
+/-! ## Core Analysis Countermodels -/
 
 /-- Concrete model where semilattice and op-context layers are both present. -/
 def semilatticeWithOpContextModel : Model Nat Unit Unit Nat Unit where
@@ -247,6 +259,8 @@ theorem hcrdtCore_refute_semilatticeOnly_derivation :
     hDerive semilatticeOnlyNoOpContextModel hSemi
   simp [OpContextPrimitiveAlgebra, semilatticeOnlyNoOpContextModel] at hOp
 
+/-! ## Core Analysis Reconstruction -/
+
 /-- Distinct op-context primitive algebra is sufficient together with semilattice core. -/
 theorem hcrdtCore_of_semilattice_plus_opContext
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
@@ -254,6 +268,8 @@ theorem hcrdtCore_of_semilattice_plus_opContext
     SemilatticeOnlyFoundation M ∧ OpContextPrimitiveAlgebra M → HcrdtCore M := by
   intro h
   exact h
+
+/-! ## Foundation Hypothesis Analysis (`H_crdt_foundation`) -/
 
 /-- Hypothesis block matching `H_crdt_foundation`. -/
 def HcrdtFoundation
@@ -272,6 +288,8 @@ def CanonicalDConv
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     (M : Model State Op Context Obs Program) : Prop :=
   M.canonicalConvergenceDistanceClass
+
+/-! ## Foundation Non-Canonicity Countermodels -/
 
 /-- Two concrete models witnessing non-canonicity of convergence distance. -/
 def foundationModelDistance01 : Model Nat Unit Unit Nat Unit where
@@ -311,6 +329,8 @@ def foundationModelDistance02 : Model Nat Unit Unit Nat Unit where
   gcCausalDominanceClass := True
   stabilizationLowerBoundClass := True
 
+/-! ## Foundation Refutation and Counterexample Theorems -/
+
 /-- Formal non-canonicity witness for `d_conv` under minimal assumptions. -/
 theorem dconv_noncanonicity_counterexample :
     MinimalOpStateConditions foundationModelDistance01 ∧
@@ -332,6 +352,8 @@ theorem hcrdtFoundation_refute_canonical_from_minimal :
   have hCanon : CanonicalDConv foundationModelDistance01 :=
     hDerive foundationModelDistance01 hMin
   simp [CanonicalDConv, foundationModelDistance01] at hCanon
+
+/-! ## Dynamics Hypothesis Analysis (`H_crdt_dynamics`) -/
 
 /-- Hypothesis block matching `H_crdt_dynamics`. -/
 def HcrdtDynamics
