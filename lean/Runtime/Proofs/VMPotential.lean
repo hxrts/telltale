@@ -32,6 +32,8 @@ section
 
 universe u
 
+/-! ## Core Potential Measures -/
+
 def totalTypeDepth {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -81,6 +83,8 @@ def vmPotential {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     (st : VMState ι γ π ε ν) : Nat :=
   vmWorkMeasure st + vmCreditBank st
 
+/-! ## Topology-Change Invariance -/
+
 theorem vmWorkMeasure_applyTopologyChange_eq {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -128,6 +132,8 @@ theorem topology_change_nonincreasing_potential {ι γ π ε ν : Type u} [Ident
     vmPotential (applyTopologyChange st tc) ≤ vmPotential st := by
   simp [vmPotential, vmWorkMeasure_applyTopologyChange_eq, vmCreditBank_applyTopologyChange_eq]
 
+/-! ## Productive-Step Work Decrease -/
+
 /-- Productive VM steps are scheduler steps that strictly decrease work measure. -/
 def VMProductiveStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -148,6 +154,8 @@ theorem productive_steps_decrease_work_measure {ι γ π ε ν : Type u} [Identi
     (hProd : VMProductiveStep st st') :
     vmWorkMeasure st' + 1 ≤ vmWorkMeasure st := by
   exact Nat.succ_le_of_lt hProd.2
+
+/-! ## Paper 2 Work-Measure Bridge -/
 
 /-- Paper 2 work measure instantiated at VM level. -/
 def paper2WorkMeasure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -180,6 +188,7 @@ theorem vmPotential_extends_paper2WorkMeasure {ι γ π ε ν : Type u} [Identit
   exact Nat.le_add_right (vmWorkMeasure st) (vmCreditBank st)
 
 /-! ## VM-Level Foster-Lyapunov (3.9.1) -/
+/-! ### Drift Assumptions and Systems -/
 
 structure VMFosterAssumptions {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -204,6 +213,8 @@ def VMDriftSystem {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     V := vmPotential
     nonincrease := h.nonincrease
     strict_on_pos := h.strict_on_pos }
+
+/-! ### Transport Context and Input -/
 
 def vmFosterCtx {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -231,6 +242,8 @@ def vmFosterInput {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     Classical.Transport.FosterInput (VMState ι γ π ε ν) (vmFosterCtx step w) :=
   { system := VMDriftSystem step h
     step_agrees := rfl }
+
+/-! ### Transported Foster Conclusions -/
 
 theorem vm_transported_fosterLyapunov {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
