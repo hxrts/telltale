@@ -1,4 +1,5 @@
 import Protocol.Typing.Framing.Lemmas.MiddleFrameCases
+import Protocol.Typing.Framing.Lemmas.MiddleFrameParSkipCases
 
 /-! # Middle Frame Main Theorem
 
@@ -52,8 +53,13 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
         (TypedStep.branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut) hPre
   | assign hv hSout hStoreOut =>
       rename_i G D Ssh Sown store bufs x v Tstep Sown' store'
-      exact preserved_sub_middle_assign hDisjLM hEqG rfl hSout hv
-        (TypedStep.assign hv hSout hStoreOut) hPre
+      exact preserved_sub_middle_assign
+        (D:=D) (bufs:=bufs) (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+        (G:=G) (G':=G) (Ssh:=Ssh) (Sown:=Sown) (Sown':=Sown')
+        (store:=store) (store':=store') (x:=x) (v:=v) (Tstep:=Tstep)
+        (Sfin:=Sfin) (Gfin:=Gfin) (W:=W) (Δ:=Δ)
+        hDisjLM hEqG rfl hSout hv
+        (TypedStep.assign (D:=D) (bufs:=bufs) hv hSout hStoreOut) hPre
   | seq_step hStep ih =>
       rename_i G D Ssh Sown G' D' Sown' store bufs store' bufs' P P' Q
       have hMiddle : MiddleFrameGoal (hTS := hStep) := by
@@ -64,7 +70,11 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
         hEqG hStep hMiddle hDisjRightFin hPre
   | seq_skip =>
       rename_i G D Ssh Sown store bufs Q
-      exact preserved_sub_middle_seq_skip hEqG TypedStep.seq_skip hPre
+      exact preserved_sub_middle_seq_skip
+        (D:=D) (store:=store) (bufs:=bufs) (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+        (G:=G) (Ssh:=Ssh) (Sown:=Sown) (Q:=Q)
+        (Sfin:=Sfin) (Gfin:=Gfin) (W:=W) (Δ:=Δ)
+        hEqG (TypedStep.seq_skip (D:=D) (store:=store) (bufs:=bufs) (Q:=Q)) hPre
   | par_left split hSlen hTS hDisjG hDisjD hDisjS ih =>
       rename_i Ssh0 Sown0 store0 bufs0 store0' bufs0' P0 P0' Q0
         G0 D₁0 D₂0 G₁_step D₁_step S₁_step nS0 nG0
@@ -394,122 +404,14 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       · simpa [splitMid, hS1Eq, List.append_assoc] using hParMid
   | par_skip_left split hSlen hS1Nil =>
       rename_i G0 D0 Ssh0 Sown0 store0 bufs0 Q0 nS0 nG0
-      obtain ⟨pw, S₁_fin, S₂_fin, G₁_fin, G₂_fin, W₁, W₂, Δ₁, Δ₂,
-          hSfin, hGfin, hW, hΔ, hDisjG_mid, hDisjS_mid, hDisjS_left_mid, hDisjS_right_mid,
-          hDisjS_fin, hDisjW, hDisjΔ, hP_pre, hQ_pre⟩ :=
-        HasTypeProcPreOut_par_inv_witness hPre
-      let splitMid : ParSplit Sown0.left Gmid := pw.split
-      have hSlenEq : split.S1.length = splitMid.S1.length := by
-        calc
-          split.S1.length = nS0 := hSlen
-          _ = splitMid.S1.length := by simpa [splitMid] using pw.hSlen.symm
-      have hSidesEq := ParSplit.sides_eq_of_len (split₁:=split) (split₂:=splitMid) hSlenEq
-      have hS1Eq : split.S1 = splitMid.S1 := hSidesEq.1
-      have hS2Eq : split.S2 = splitMid.S2 := hSidesEq.2
-      have hS1MidNil : splitMid.S1 = ([] : SEnv) := by
-        simpa [hS1Eq] using hS1Nil
-      have hSownLeftEq : Sown0.left = splitMid.S2 := by
-        have hSownSplit : Sown0.left = splitMid.S1 ++ splitMid.S2 := by
-          simpa [splitMid] using splitMid.hS
-        simpa [hS1MidNil] using hSownSplit
-      cases hP_pre
-      simp at hS1MidNil
-      have hQ0 :
-          HasTypeProcPreOut Ssh0 Sown0 splitMid.G2 Q0
-            { right := Sown0.right, left := S₂_fin } G₂_fin W₂ Δ₂ := by
-        cases Sown0 with
-        | mk R L =>
-            simp at hSownLeftEq
-            simpa [splitMid, hSownLeftEq, hS1MidNil, List.nil_append] using hQ_pre
-      have hDisjRightIn0 : DisjointS Sown0.right Sown0.left := by
-        simpa [OwnedDisjoint] using hOwn
-      have hDisjRightOut0 : DisjointS Sown0.right S₂_fin := by
-        have hTmp : DisjointS Sown0.right (splitMid.S1 ++ S₂_fin) := by
-          simpa [hSfin] using hDisjRightFin
-        simpa [hS1MidNil] using hTmp
-      have hQfull :
-          HasTypeProcPreOut Ssh0 Sown0 Gmid Q0
-            { right := Sown0.right, left := S₂_fin } (splitMid.G1 ++ G₂_fin) W₂ Δ₂ := by
-        have hTmp :=
-          HasTypeProcPreOut_frame_G_left_local
-            (Ssh:=Ssh0) (Sown:=Sown0) (Gfr:=splitMid.G1) (G:=splitMid.G2)
-            (P:=Q0) (Sfin:={ right := Sown0.right, left := S₂_fin }) (Gfin:=G₂_fin)
-            (W:=W₂) (Δ:=Δ₂) hDisjG_mid hDisjRightIn0 hQ0 hDisjRightOut0
-        simpa [splitMid, splitMid.hG, List.append_assoc] using hTmp
-      have hSfinQ : Sfin = { right := Sown0.right, left := S₂_fin } := by
-        calc
-          Sfin = { right := Sown0.right, left := splitMid.S1 ++ S₂_fin } := by
-            simpa [splitMid] using hSfin
-          _ = { right := Sown0.right, left := S₂_fin } := by
-            simp [hS1MidNil]
-      have hGfinQ : Gfin = splitMid.G1 ++ G₂_fin := by
-        simpa [splitMid] using hGfin
-      have hWQ : W = W₂ := by
-        simpa using hW
-      have hΔQ : Δ = Δ₂ := by
-        simpa using hΔ
-      refine ⟨Gmid, W₂, Δ₂, hEqG, ?_, ?_, ?_, ?_⟩
-      · intro s hs
-        exact hs
-      · simpa [hSfinQ, hGfinQ] using hQfull
-      · simpa [hWQ] using (FootprintSubset_refl (W:=W₂))
-      · simpa [hΔQ] using (SEnvDomSubset_refl (S:=Δ₂))
+      exact preserved_sub_middle_par_skip_left
+        (hOwn:=hOwn) (hEqG:=hEqG) (hDisjRightFin:=hDisjRightFin)
+        (hPre:=hPre) (split:=split) (hSlen:=hSlen) (hS1Nil:=hS1Nil)
   | par_skip_right split hSlen hS2Nil =>
       rename_i G0 D0 Ssh0 Sown0 store0 bufs0 P0 nS0 nG0
-      obtain ⟨pw, S₁_fin, S₂_fin, G₁_fin, G₂_fin, W₁, W₂, Δ₁, Δ₂,
-          hSfin, hGfin, hW, hΔ, hDisjG_mid, hDisjS_mid, hDisjS_left_mid, hDisjS_right_mid,
-          hDisjS_fin, hDisjW, hDisjΔ, hP_pre, hQ_pre⟩ :=
-        HasTypeProcPreOut_par_inv_witness hPre
-      let splitMid : ParSplit Sown0.left Gmid := pw.split
-      have hSlenEq : split.S1.length = splitMid.S1.length := by
-        calc
-          split.S1.length = nS0 := hSlen
-          _ = splitMid.S1.length := by simpa [splitMid] using pw.hSlen.symm
-      have hSidesEq := ParSplit.sides_eq_of_len (split₁:=split) (split₂:=splitMid) hSlenEq
-      have hS1Eq : split.S1 = splitMid.S1 := hSidesEq.1
-      have hS2Eq : split.S2 = splitMid.S2 := hSidesEq.2
-      have hS2MidNil : splitMid.S2 = ([] : SEnv) := by
-        simpa [hS2Eq] using hS2Nil
-      have hSownLeftEq : Sown0.left = splitMid.S1 := by
-        have hSownSplit : Sown0.left = splitMid.S1 ++ splitMid.S2 := by
-          simpa [splitMid] using splitMid.hS
-        simpa [hS2MidNil] using hSownSplit
-      cases hQ_pre
-      simp at hS2MidNil
-      have hP0 :
-          HasTypeProcPreOut Ssh0 Sown0 splitMid.G1 P0
-            { right := Sown0.right, left := S₁_fin } G₁_fin W₁ Δ₁ := by
-        cases Sown0 with
-        | mk R L =>
-            simp at hSownLeftEq
-            simpa [splitMid, hSownLeftEq, hS2MidNil, List.append_nil] using hP_pre
-      have hPfull :
-          HasTypeProcPreOut Ssh0 Sown0 Gmid P0
-            { right := Sown0.right, left := S₁_fin } (G₁_fin ++ splitMid.G2) W₁ Δ₁ := by
-        have hTmp :=
-          HasTypeProcPreOut_frame_G_right_local
-            (Ssh:=Ssh0) (Sown:=Sown0) (G:=splitMid.G1) (Gfr:=splitMid.G2)
-            (P:=P0) (Sfin:={ right := Sown0.right, left := S₁_fin }) (Gfin:=G₁_fin)
-            (W:=W₁) (Δ:=Δ₁) hDisjG_mid hP0
-        simpa [splitMid, splitMid.hG, List.append_assoc] using hTmp
-      have hSfinP : Sfin = { right := Sown0.right, left := S₁_fin } := by
-        calc
-          Sfin = { right := Sown0.right, left := S₁_fin ++ splitMid.S2 } := by
-            simpa [splitMid] using hSfin
-          _ = { right := Sown0.right, left := S₁_fin } := by
-            simp [hS2MidNil]
-      have hGfinP : Gfin = G₁_fin ++ splitMid.G2 := by
-        simpa [splitMid] using hGfin
-      have hWP : W = W₁ := by
-        simpa using hW
-      have hΔP : Δ = Δ₁ := by
-        simpa using hΔ
-      refine ⟨Gmid, W₁, Δ₁, hEqG, ?_, ?_, ?_, ?_⟩
-      · intro s hs
-        exact hs
-      · simpa [hSfinP, hGfinP] using hPfull
-      · simpa [hWP] using (FootprintSubset_refl (W:=W₁))
-      · simpa [hΔP] using (SEnvDomSubset_refl (S:=Δ₁))
+      exact preserved_sub_middle_par_skip_right
+        (hOwn:=hOwn) (hEqG:=hEqG) (hDisjRightFin:=hDisjRightFin)
+        (hPre:=hPre) (split:=split) (hSlen:=hSlen) (hS2Nil:=hS2Nil)
 
 
 end

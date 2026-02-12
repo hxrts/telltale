@@ -76,49 +76,6 @@ lemma DisjointS_right_empty (S : SEnv) : DisjointS S (∅ : SEnv) := by
   have : lookupSEnv (∅ : SEnv) x = none := lookupSEnv_empty x
   cases hL2
 
-lemma SessionsOf_empty : SessionsOf ([] : GEnv) = ∅ := by
-  ext s; constructor
-  · intro h
-    rcases h with ⟨e, L, hLookup, hSid⟩
-    simp [lookupG] at hLookup
-  · intro h
-    cases h
-
-lemma lookupSEnv_erase_eq
-    {S : SEnv} {x : Var} :
-    lookupSEnv (eraseSEnv S x) x = none := by
-  induction S with
-  | nil =>
-      simp [eraseSEnv, lookupSEnv]
-  | cons hd tl ih =>
-      cases hd with
-      | mk y Ty =>
-          by_cases hxy : x = y
-          · subst hxy
-            simpa [eraseSEnv] using ih
-          · have hbeq : (x == y) = false := beq_eq_false_iff_ne.mpr hxy
-            simpa [eraseSEnv, hxy, lookupSEnv, List.lookup, hbeq] using ih
-
-lemma lookupSEnv_erase_ne
-    {S : SEnv} {x y : Var} (hxy : y ≠ x) :
-    lookupSEnv (eraseSEnv S x) y = lookupSEnv S y := by
-  induction S generalizing x y with
-  | nil =>
-      simp [eraseSEnv, lookupSEnv]
-  | cons hd tl ih =>
-      cases hd with
-      | mk z Tz =>
-          by_cases hxz : x = z
-          · subst hxz
-            have hyx : y ≠ x := by simpa using hxy
-            have hbeq : (y == x) = false := beq_eq_false_iff_ne.mpr hyx
-            simpa [eraseSEnv, lookupSEnv, List.lookup, hbeq] using (ih (x:=x) (y:=y) hyx)
-          · by_cases hyz : y = z
-            · subst hyz
-              simp [eraseSEnv, hxz, lookupSEnv, List.lookup]
-            · have hbeq : (y == z) = false := beq_eq_false_iff_ne.mpr hyz
-              simpa [eraseSEnv, hxz, lookupSEnv, List.lookup, hbeq] using (ih (x:=x) (y:=y) hxy)
-
 lemma SEnvDomSubset_erase
     {S : SEnv} {x : Var} :
     SEnvDomSubset (eraseSEnv S x) S := by
@@ -291,32 +248,17 @@ lemma DisjointG_left_empty (G : GEnv) : DisjointG [] G := by
 lemma DEnv_find_empty (e : Edge) : (∅ : DEnv).find? e = none := by
   rfl
 
-lemma SessionsOfD_empty : SessionsOfD (∅ : DEnv) = ∅ := by
-  ext s; constructor
-  · intro h
-    rcases h with ⟨e, ts, hFind, hSid⟩
-    have : (∅ : DEnv).find? e = none := DEnv_find_empty e
-    cases hFind
-  · intro h
-    cases h
-
 lemma DisjointD_right_empty (D : DEnv) : DisjointD D (∅ : DEnv) := by
   simp [DisjointD, SessionsOfD_empty]
 
 lemma DisjointD_left_empty (D : DEnv) : DisjointD (∅ : DEnv) D := by
   simp [DisjointD, SessionsOfD_empty]
 
-lemma DConsistent_empty (G : GEnv) : DConsistent G (∅ : DEnv) := by
-  simp [DConsistent, SessionsOfD_empty]
-
 theorem DEnv_append_empty_right (D : DEnv) : D ++ (∅ : DEnv) = D :=
   DEnvUnion_empty_right D
 
 theorem DEnv_append_empty_left (D : DEnv) : (∅ : DEnv) ++ D = D :=
   DEnvUnion_empty_left D
-
-lemma SEnv_append_empty_right (S : SEnv) : S ++ (∅ : SEnv) = S := by
-  simpa using (List.append_nil S)
 
 lemma SEnv_append_empty_left (S : SEnv) : (∅ : SEnv) ++ S = S := by
   simpa using (List.nil_append S)

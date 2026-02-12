@@ -304,6 +304,4 @@ theorem frame_left_par
 
 /-! ## Local G-Frame Transport (Right) -/
 
-/-- Helper: extend branch bodies under a right frame (pre-typing). -/
-
 end

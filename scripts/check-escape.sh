@@ -10,11 +10,17 @@
 #   High:     unsafe, partial def, @[csimp], unsafeCast, panic!, unreachable!
 #   Medium:   native_decide, implemented_by, extern, reduceBool, reduceNat
 #   Low:      opaque, noncomputable
+#   Shells:   Prop := True, Prop := by trivial (theorem-shell placeholders)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LEAN_ROOT="${SCRIPT_DIR}/../lean"
+
+if ! command -v rg >/dev/null 2>&1; then
+  echo "error: ripgrep (rg) is required" >&2
+  exit 2
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -34,26 +40,24 @@ print_header() {
     echo ""
 }
 
-search_pattern() {
-    local pattern="$1"
-    local description="$2"
-    local severity="$3"
-    local color
-
-    case "$severity" in
-        critical) color="$RED" ;;
-        high)     color="$YELLOW" ;;
-        medium)   color="$BLUE" ;;
-        low)      color="$GREEN" ;;
-        *)        color="$NC" ;;
+severity_color() {
+    case "$1" in
+        critical) echo "$RED" ;;
+        high)     echo "$YELLOW" ;;
+        medium)   echo "$BLUE" ;;
+        low)      echo "$GREEN" ;;
+        shells)   echo "$RED" ;;
+        *)        echo "$NC" ;;
     esac
+}
 
-    # Find matches, excluding .lake and target directories
-    local results
-    results=$(grep -rn --include="*.lean" -E "$pattern" "$LEAN_ROOT" 2>/dev/null | \
-              grep -v "/\.lake/" | \
-              grep -v "/target/" | \
-              grep -v "scripts/check-escape" || true)
+print_results() {
+    local description="$1"
+    local severity="$2"
+    local pattern_desc="$3"
+    local results="$4"
+    local color
+    color=$(severity_color "$severity")
 
     if [[ -n "$results" ]]; then
         local count
@@ -61,7 +65,7 @@ search_pattern() {
 
         echo -e "${BOLD}${color}────────────────────────────────────────────────────────────────${NC}"
         echo -e "${BOLD}${color}  ${description}${NC}"
-        printf "${BOLD}${color}  Pattern: %s  |  Severity: %s  |  Count: %s${NC}\n" "$pattern" "$severity" "$count"
+        printf "${BOLD}${color}  Pattern: %s  |  Severity: %s  |  Count: %s${NC}\n" "$pattern_desc" "$severity" "$count"
         echo -e "${BOLD}${color}────────────────────────────────────────────────────────────────${NC}"
 
         echo "$results" | while IFS= read -r line; do
@@ -74,6 +78,32 @@ search_pattern() {
         TOTAL=$((TOTAL + count))
         echo "$count" >> /tmp/escape_hatch_counts_$$
     fi
+}
+
+search_pattern() {
+    local pattern="$1"
+    local description="$2"
+    local severity="$3"
+
+    # Find matches using ripgrep, excluding .lake and target directories
+    local results
+    results=$(rg -n -g '*.lean' -g '!.lake/*' -g '!target/*' "$pattern" "$LEAN_ROOT" 2>/dev/null || true)
+
+    print_results "$description" "$severity" "$pattern" "$results"
+}
+
+# Search using PCRE2 multiline patterns (for theorem shells)
+search_pcre2() {
+    local pattern="$1"
+    local description="$2"
+    local severity="$3"
+    local pattern_desc="$4"
+    local targets=("${@:5}")
+
+    local results
+    results=$(rg -n --pcre2 -U -g '*.lean' "$pattern" "${targets[@]}" 2>/dev/null || true)
+
+    print_results "$description" "$severity" "$pattern_desc" "$results"
 }
 
 main() {
@@ -108,6 +138,31 @@ main() {
     # Low severity - worth tracking
     search_pattern "\\bopaque\\b" "Hides implementation details" "low"
     search_pattern "\\bnoncomputable\\b" "Non-computable definition" "low"
+
+    # Theorem shells - placeholder proofs in Runtime modules
+    local RUNTIME_TARGETS=(
+        "${LEAN_ROOT}/Runtime/Proofs"
+        "${LEAN_ROOT}/Runtime/VM"
+    )
+    # Check if targets exist before searching
+    local existing_targets=()
+    for t in "${RUNTIME_TARGETS[@]}"; do
+        [[ -d "$t" ]] && existing_targets+=("$t")
+    done
+    if [[ ${#existing_targets[@]} -gt 0 ]]; then
+        search_pcre2 \
+            '(?ms)^\s*(?:def|abbrev)\s+[A-Za-z0-9_'"'"'.]+\s*:[\s\S]{0,240}?\bProp\b[\s\S]{0,120}?\:=\s*True\b' \
+            "Prop shell placeholder (Prop := True)" \
+            "shells" \
+            "Prop := True" \
+            "${existing_targets[@]}"
+        search_pcre2 \
+            '(?ms)^\s*(?:def|abbrev|theorem|lemma)\s+[A-Za-z0-9_'"'"'.]+\s*:[\s\S]{0,240}?\bProp\b[\s\S]{0,160}?\:=\s*by\s*(?:trivial|exact\s+True\.intro)\b' \
+            "Prop shell placeholder (Prop := by trivial)" \
+            "shells" \
+            "Prop := by trivial" \
+            "${existing_targets[@]}"
+    fi
 
     # Calculate total from temp file
     if [[ -f /tmp/escape_hatch_counts_$$ ]]; then

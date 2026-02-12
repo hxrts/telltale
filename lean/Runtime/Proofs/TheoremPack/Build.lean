@@ -320,8 +320,6 @@ def buildVMTheoremPack
   , functionalCLT? := classicalPack.functionalCLT?
   }
 
-/-- Compact theorem inventory for quick diagnostics. -/
-
 end
 
 end Proofs

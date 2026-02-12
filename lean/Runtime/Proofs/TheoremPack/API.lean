@@ -1,4 +1,4 @@
-import Runtime.Proofs.TheoremPack.Artifacts
+import Runtime.Proofs.TheoremPack.Inventory
 
 /-! # Runtime.Proofs.TheoremPack.API
 
@@ -7,6 +7,8 @@ Public facade for theorem-pack construction and inventory.
 Downstream modules should prefer this API layer over directly importing
 builder/artifact internals.
 -/
+
+set_option autoImplicit false
 
 namespace Runtime
 namespace Proofs

@@ -212,6 +212,4 @@ theorem AcquireSpec_respects_ConfigEquiv
 
 /-! ## Instruction-Basis Exactness Interfaces -/
 
-/-- Coarse instruction classes used by erasure-basis statements. -/
-
 end

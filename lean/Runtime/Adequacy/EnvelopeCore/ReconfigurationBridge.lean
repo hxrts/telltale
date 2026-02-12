@@ -473,7 +473,5 @@ structure ProtocolEnvelopeBridgeBundle
     ProtocolShardCutPreservation premises.shardedEnvelope premises.shardCut :=
       protocolShardCutPreservation_of_premises premises
 
-/-- Determinism profile classes used for capability/theorem gating. -/
-
 end Adequacy
 end Runtime

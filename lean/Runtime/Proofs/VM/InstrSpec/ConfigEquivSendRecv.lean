@@ -301,6 +301,4 @@ theorem RecvSpec_respects_ConfigEquiv
       rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
       exact hD_equiv e'
 
-/-- Select is equivariant under session renaming. -/
-
 end

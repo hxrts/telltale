@@ -477,6 +477,4 @@ lemma preserved_sub_middle_send
           · intro y Ty hy
             cases hy
 
-/-- Constructive middle-frame preservation for a `select` step. -/
-
 end

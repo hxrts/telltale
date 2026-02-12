@@ -190,65 +190,6 @@ lemma lookupSEnv_SEnvAll_update_neq
         lookupSEnv_update_append_neq (S₁:=Sown) (S₂:=S₂) (x:=x) (y:=y) (T:=T) hxy
       simpa [hRight] using hLeft.trans hUpd
 
-lemma lookupSEnv_comm_of_disjoint {S₁ S₂ : SEnv} (hDisj : DisjointS S₁ S₂) :
-    ∀ x, lookupSEnv (S₁ ++ S₂) x = lookupSEnv (S₂ ++ S₁) x := by
-  intro x
-  cases hLeft : lookupSEnv S₁ x with
-  | some T =>
-      have hNone : lookupSEnv S₂ x = none :=
-        lookupSEnv_none_of_disjoint_left (S₁:=S₂) (S₂:=S₁) (x:=x) (T:=T)
-          (DisjointS_symm hDisj) hLeft
-      have hA := lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) (x:=x) (T:=T) hLeft
-      have hB := lookupSEnv_append_right (S₁:=S₂) (S₂:=S₁) (x:=x) hNone
-      simpa [hA, hB, hLeft]
-  | none =>
-      have hA := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hLeft
-      cases hRight : lookupSEnv S₂ x with
-      | some T =>
-          have hB := lookupSEnv_append_left (S₁:=S₂) (S₂:=S₁) (x:=x) (T:=T) hRight
-          simpa [hA, hB, hRight]
-      | none =>
-          have hB := lookupSEnv_append_right (S₁:=S₂) (S₂:=S₁) (x:=x) hRight
-          simpa [hA, hB, hRight, hLeft]
-
-lemma lookupSEnv_swap_left {S₁ S₂ S₃ : SEnv} (hDisj : DisjointS S₁ S₂) :
-    ∀ x, lookupSEnv ((S₁ ++ S₂) ++ S₃) x = lookupSEnv ((S₂ ++ S₁) ++ S₃) x := by
-  intro x
-  cases hLeft : lookupSEnv (S₁ ++ S₂) x with
-  | some T =>
-      have hA := lookupSEnv_append_left (S₁:=S₁ ++ S₂) (S₂:=S₃) (x:=x) (T:=T) hLeft
-      have hSwap := lookupSEnv_comm_of_disjoint hDisj x
-      have hLeft' : lookupSEnv (S₂ ++ S₁) x = some T := by
-        simpa [hSwap] using hLeft
-      have hB := lookupSEnv_append_left (S₁:=S₂ ++ S₁) (S₂:=S₃) (x:=x) (T:=T) hLeft'
-      have hA' : lookupSEnv (S₁ ++ (S₂ ++ S₃)) x = some T := by
-        simpa [List.append_assoc] using hA
-      have hB' : lookupSEnv (S₂ ++ (S₁ ++ S₃)) x = some T := by
-        simpa [List.append_assoc] using hB
-      simpa [hA', hB']
-  | none =>
-      have hA := lookupSEnv_append_right (S₁:=S₁ ++ S₂) (S₂:=S₃) (x:=x) hLeft
-      have hSwap := lookupSEnv_comm_of_disjoint hDisj x
-      have hNone : lookupSEnv (S₂ ++ S₁) x = none := by
-        simpa [hSwap] using hLeft
-      have hB := lookupSEnv_append_right (S₁:=S₂ ++ S₁) (S₂:=S₃) (x:=x) hNone
-      have hA' : lookupSEnv (S₁ ++ (S₂ ++ S₃)) x = lookupSEnv S₃ x := by
-        simpa [List.append_assoc] using hA
-      have hB' : lookupSEnv (S₂ ++ (S₁ ++ S₃)) x = lookupSEnv S₃ x := by
-        simpa [List.append_assoc] using hB
-      simpa [hA', hB']
-
-lemma DisjointS_append_right {S₁ S₂ S₃ : SEnv} :
-    DisjointS S₁ S₂ →
-    DisjointS S₁ S₃ →
-    DisjointS S₁ (S₂ ++ S₃) := by
-  intro hDisj hDisj'
-  have hLeft : DisjointS S₂ S₁ := DisjointS_symm hDisj
-  have hRight : DisjointS S₃ S₁ := DisjointS_symm hDisj'
-  have hAppend : DisjointS (S₂ ++ S₃) S₁ :=
-    DisjointS_append_left hLeft hRight
-  exact DisjointS_symm hAppend
-
 lemma DisjointS_owned_right {S₁ : SEnv} {Sown : OwnedEnv} :
     DisjointS S₁ (Sown : SEnv) →
     DisjointS S₁ Sown.right := by
@@ -455,7 +396,5 @@ lemma HasTypeProcPreOut_frame_G_left_par
       (Sown:={ right := Sown.right ++ split.S1, left := split.S2 })
       (G:=split.G2) (Gfr:=split.G1) hDisjG hDisjIn hQ hDisjOut
   simpa [split.hG] using hQ'
-
-/-- Recv preserves disjointness between shared and owned envs. -/
 
 end

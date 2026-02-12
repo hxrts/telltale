@@ -438,9 +438,4 @@ theorem TransferSpec_respects_ConfigEquiv
       rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
       exact hD_equiv e'
 
-/-- Acquire is equivariant under session renaming.
-
-    Note: This is a `def` rather than `theorem` because `AcquireSpec` contains
-    data (via `DelegationStep.A_type : LocalType`) and is thus not a Prop. -/
-
 end

@@ -172,6 +172,4 @@ lemma lookupSEnv_swap_left_prefix {Ssh S₁ S₂ S₃ : SEnv} (hDisj : DisjointS
 
 /-! ### Framing Lemmas -/
 
-/-- HasTypeVal is stable under framing on the left of G. -/
-
 end

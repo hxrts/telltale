@@ -46,25 +46,6 @@ theorem BuffersTyped_rewriteD
   · intro i hi
     simpa [hEq e] using hTyping i hi
 
-lemma findD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
-    (updateD env e ts).find? e = some ts := by
-  have hEq : compare e e = .eq := by
-    simp
-  simpa [updateD] using
-    (RBMap.find?_insert_of_eq (t := env.map) (k := e) (v := ts) (k' := e) hEq)
-
-lemma findD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
-    (updateD env e ts).find? e' = env.find? e' := by
-  have hne' : compare e' e ≠ .eq := by
-    intro hEq
-    exact hne ((Edge.compare_eq_iff_eq e' e).1 hEq).symm
-  have h' : (env.map.insert e ts).find? e' = env.map.find? e' := by
-    simpa using
-      (RBMap.find?_insert_of_ne (t := env.map) (k := e) (v := ts) (k' := e') hne')
-  have h'' : (updateD env e ts).find? e' = env.map.find? e' := by
-    simpa [updateD] using h'
-  simpa [DEnv.find?] using h''
-
 lemma lookupD_append_left_of_find {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType} :
     D₁.find? e = some ts →
     lookupD (D₁ ++ D₂) e = ts := by

@@ -253,7 +253,5 @@ theorem shardedExactEnvelopeCharacterization_of_e1Premises
       p.shardedEnvelope p.shardedRefRun p.shardedImplRun := by
   exact ⟨p.shardedSoundnessWitness, p.shardedRealizabilityWitness, p.shardedMaximalityWitness⟩
 
-/-- Bijective role renaming used for role-equivalence invariance statements. -/
-
 end Adequacy
 end Runtime

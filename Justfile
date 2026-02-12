@@ -177,7 +177,7 @@ serve: summary _gen-assets
     mdbook serve --open
     exit 1
 
-# Check Lean codebase for escape hatches (sorry, axiom, unsafe, partial, etc.)
+# Check Lean codebase for escape hatches (sorry, axiom, unsafe, partial, theorem shells, etc.)
 escape:
     ./scripts/check-escape.sh
 

@@ -121,45 +121,6 @@ theorem lookupD_append_left_of_right_none {D₁ D₂ : DEnv} {e : Edge} :
         simp [lookupD, hleft]
       simpa [hlookup] using hlookup'
 
-theorem lookupSEnv_append_left {S₁ S₂ : SEnv} {x : Var} {T : ValType} :
-    lookupSEnv S₁ x = some T →
-    lookupSEnv (S₁ ++ S₂) x = some T := by
-  intro hlookup
-  induction S₁ with
-  | nil =>
-      cases hlookup
-  | cons hd tl ih =>
-      by_cases hEq : x == hd.1
-      · have hT : T = hd.2 := by
-          have : some hd.2 = some T := by
-            simpa [lookupSEnv, List.lookup, hEq] using hlookup
-          exact Option.some.inj this.symm
-        subst hT
-        simp [lookupSEnv, List.lookup, hEq]
-      · have hTail : lookupSEnv tl x = some T := by
-          simpa [lookupSEnv, List.lookup, hEq] using hlookup
-        have hTail' := ih hTail
-        simpa [lookupSEnv, List.lookup, hEq] using hTail'
-
-theorem lookupSEnv_append_right {S₁ S₂ : SEnv} {x : Var} :
-    lookupSEnv S₁ x = none →
-    lookupSEnv (S₁ ++ S₂) x = lookupSEnv S₂ x := by
-  intro hlookup
-  induction S₁ with
-  | nil =>
-      simp [lookupSEnv]
-  | cons hd tl ih =>
-      by_cases hEq : x == hd.1
-      · have : lookupSEnv (hd :: tl) x = some hd.2 := by
-          simp [lookupSEnv, List.lookup, hEq]
-        have hContra : (none : Option ValType) = some hd.2 := by
-          simpa [hlookup] using this
-        cases hContra
-      · have hTail : lookupSEnv tl x = none := by
-          simpa [lookupSEnv, List.lookup, hEq] using hlookup
-        have hTail' := ih hTail
-        simpa [lookupSEnv, List.lookup, hEq] using hTail'
-
 theorem SEnvDomSubset_append_left {S₁ S₂ : SEnv} :
     SEnvDomSubset S₁ (S₁ ++ S₂) := by
   intro x T hLookup
@@ -340,5 +301,6 @@ theorem Coherent_split_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
   · have hTrace' : lookupD (D₁ ++ D₂) e = lookupD D₁ e :=
       lookupD_append_left (e := e) hTrace
     refine ⟨Lsender, hGsender, ?_⟩
+    simpa [hTrace'] using hConsume
 
 end

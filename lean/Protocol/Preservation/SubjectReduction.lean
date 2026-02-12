@@ -110,5 +110,6 @@ theorem subject_reduction {n : SessionId}
       exact StepBase.par_skip_left rfl
   | par_skip_right =>
       refine Step.base ?_
+      exact StepBase.par_skip_right rfl
 
 end

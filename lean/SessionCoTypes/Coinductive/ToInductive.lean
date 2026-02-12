@@ -162,9 +162,9 @@ decreasing_by
 
 /-- Convert a regular coinductive local type to its inductive representation. -/
 def toInductive (t : LocalTypeC) (h : Regular t) : LocalTypeR :=
-  let all := Set.Finite.toFinset h
+  let all := h.states.toFinset
   toInductiveAux t all ∅ t (reachable_is_closed_set t h)
     (Finset.empty_subset _)
-    ((Set.Finite.mem_toFinset h).2 Relation.ReflTransGen.refl)
+    (List.mem_toFinset.2 h.root_mem)
 
 end SessionCoTypes.Coinductive

@@ -389,11 +389,4 @@ lemma sumDepths_updateType
     exact List.mem_map_of_mem (f := fun (r, L) => (r, L.depth)) hmem
   exact sum_update_unique _ actor old.depth new.depth hunique' hmem'
 
-/-- Send step decreases the weighted measure.
-
-    When actor sends to partner with type `send partner T L`:
-    - Actor's depth decreases from (1 + L.depth) to L.depth (delta = -1)
-    - Buffer (actor, partner) increases by 1
-    - Net change to W = 2*(-1) + 1 = -1 -/
-
 end

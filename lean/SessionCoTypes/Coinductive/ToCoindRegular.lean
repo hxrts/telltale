@@ -54,7 +54,7 @@ private theorem toCoindBranches_regular_aux :
 
 /-- Embedding an inductive type always produces a regular coinductive type.
     This is the key lemma enabling round-trip conversion. -/
-theorem toCoind_regular : ∀ t : LocalTypeR, Regular (toCoind t)
+noncomputable def toCoind_regular : ∀ t : LocalTypeR, Regular (toCoind t)
   | .end => by apply regular_of_children; intro i; cases i
   | .var x => by apply regular_of_children; intro i; cases i
   | .mu x body => by

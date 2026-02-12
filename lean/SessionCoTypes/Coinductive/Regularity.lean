@@ -34,6 +34,12 @@ def childRel (t c : LocalTypeC) : Prop :=
 def Reachable (t : LocalTypeC) : Set LocalTypeC :=
   { s | Relation.ReflTransGen childRel t s }
 
+/-! ## Closed Sets -/
+
+/-- A finite set is closed under children if it contains all children of members. -/
+def IsClosedSet (s : Finset LocalTypeC) : Prop :=
+  ∀ x ∈ s, ∀ c, childRel x c → c ∈ s
+
 /-- If current is reachable from root and child is a child of current,
     then child is reachable from root. -/
 lemma reachable_step {root current child : LocalTypeC}
@@ -43,13 +49,54 @@ lemma reachable_step {root current child : LocalTypeC}
 
 /-! ## Regularity -/
 
-/-- A coinductive type is regular if its reachable set is finite.
-    Regular types can be converted back to inductive representations. -/
-def Regular (t : LocalTypeC) : Prop :=
-  Set.Finite (Reachable t)
+/-- Constructive witness that a coinductive type has finitely many reachable states. -/
+structure Regular (t : LocalTypeC) where
+  /-- Enumerated states containing all reachable states. -/
+  states : List LocalTypeC
+  /-- Root is in the set. -/
+  root_mem : t ∈ states
+  /-- List is closed under one-step children. -/
+  closed : ∀ x, x ∈ states → ∀ c, childRel x c → c ∈ states
+
+/-- Every reachable state belongs to the regular witness set. -/
+lemma mem_states_of_reachable {t s : LocalTypeC} (h : Regular t) (hs : s ∈ Reachable t) :
+    s ∈ h.states := by
+  induction hs with
+  | refl =>
+      simpa using h.root_mem
+  | tail hs' hstep ih =>
+      exact h.closed _ ih _ hstep
+
+/-- A regular witness implies finiteness of the reachable set. -/
+theorem finite_of_regular {t : LocalTypeC} (h : Regular t) : Set.Finite (Reachable t) := by
+  classical
+  refine Set.Finite.subset h.states.toFinset.finite_toSet ?_
+  intro s hs
+  exact List.mem_toFinset.2 (mem_states_of_reachable h hs)
+
+/-- Noncomputable constructor from finite reachability to regular witness data. -/
+noncomputable def regularOfFinite (t : LocalTypeC) (hfin : Set.Finite (Reachable t)) : Regular t := by
+  classical
+  refine
+    { states := (Set.Finite.toFinset hfin).toList
+      root_mem := ?_
+      closed := ?_ }
+  · have h_t : t ∈ Reachable t := Relation.ReflTransGen.refl
+    have h_t_fin : t ∈ Set.Finite.toFinset hfin := (Set.Finite.mem_toFinset hfin).2 h_t
+    simpa [Finset.mem_toList] using h_t_fin
+  · intro s hs c hchild
+    have hs_fin : s ∈ Set.Finite.toFinset hfin := by
+      simpa [Finset.mem_toList] using hs
+    have hs_reach : s ∈ Reachable t := (Set.Finite.mem_toFinset hfin).1 hs_fin
+    have hc_reach : c ∈ Reachable t := reachable_step hs_reach hchild
+    have hc_fin : c ∈ Set.Finite.toFinset hfin := (Set.Finite.mem_toFinset hfin).2 hc_reach
+    simpa [Finset.mem_toList] using hc_fin
+
+instance {t : LocalTypeC} : Coe (Regular t) (Set.Finite (Reachable t)) where
+  coe h := finite_of_regular h
 
 /-- Alias for regularity, used as a bridge witness in conversions. -/
-def HasFiniteRep (t : LocalTypeC) : Prop := Regular t
+def HasFiniteRep (t : LocalTypeC) : Prop := Nonempty (Regular t)
 
 /-! ## Productivity (observability of all reachable nodes) -/
 
@@ -63,19 +110,12 @@ lemma productive_of_reachable {t s : LocalTypeC}
   have : u ∈ Reachable t := hs.trans hu
   exact hprod _ this
 
-/-! ## Closed Sets -/
-
-/-- A finite set is closed under children if it contains all children of members. -/
-def IsClosedSet (s : Finset LocalTypeC) : Prop :=
-  ∀ x ∈ s, ∀ c, childRel x c → c ∈ s
-
-/-- The finite reachable set is closed under children. -/
+/-- The witness finite set is closed under children. -/
 lemma reachable_is_closed_set (t : LocalTypeC) (h : Regular t) :
-    IsClosedSet (Set.Finite.toFinset h) := by
-  intro s hs c hchild
-  have hs' : s ∈ Reachable t := (Set.Finite.mem_toFinset h).1 hs
-  have hc' : c ∈ Reachable t := reachable_step hs' hchild
-  exact (Set.Finite.mem_toFinset h).2 hc'
+    IsClosedSet h.states.toFinset := by
+  intro x hx c hchild
+  have hx' : x ∈ h.states := List.mem_toFinset.1 hx
+  exact List.mem_toFinset.2 (h.closed x hx' c hchild)
 
 /-- Membership in a closed set propagates to children. -/
 lemma mem_of_closed_child {s : Finset LocalTypeC} {x c : LocalTypeC}

@@ -20,10 +20,8 @@ proven theorems across several categories:
 - **Multi-session**: Cross-session diamond property (disjoint sessions commute)
 - **Handlers**: Transport spec satisfaction, effect polymorphism
 - **Cost metering**: Credit soundness, budget bounds, information-theoretic costs
-- **Aura placeholders**: Future work for capability-based instantiation
 
-Most theorems are fully proven. TODO: items marked "Placeholder" are `True` stubs
-for future Aura-specific instantiation work. -/
+Theorems in this module are stated and proved in executable form. -/
 
 /-
 The Problem. The VM runtime layer has many correctness properties spread across
@@ -135,16 +133,30 @@ equality, which is the correct notion of commutativity for concurrent steps.
 Frame preservation for protocol loading and concurrent session composition.
 -/
 
-/-- Placeholder predicate for existing-session weakest preconditions. -/
+/-- A postcondition is loader-frame-stable when loading any choreography preserves it. -/
+def LoaderFrameStable {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    [Inhabited (EffectRuntime.EffectCtx ε)]
+    (Q : VMState ι γ π ε ν → Prop) : Prop :=
+  ∀ (st : VMState ι γ π ε ν) (image : CodeImage γ ε),
+    Q st → Q (loadChoreography st image).1
+
+/-- Existing-session weakest-precondition contract:
+    the current state satisfies `Q` and `Q` is stable under protocol loading. -/
 def WPExisting {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (_st : VMState ι γ π ε ν)
-    (_Q : VMState ι γ π ε ν → Prop) : Prop :=
-  True
+    [Inhabited (EffectRuntime.EffectCtx ε)]
+    (st : VMState ι γ π ε ν)
+    (Q : VMState ι γ π ε ν → Prop) : Prop :=
+  Q st ∧ LoaderFrameStable (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) Q
 
 /-- Loading a new protocol preserves existing session specs. -/
 theorem wp_frame_load {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
@@ -159,8 +171,10 @@ theorem wp_frame_load {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     WPExisting st Q →
     (let (st', _) := loadChoreography st image; WPExisting st' Q) :=
 by
-  intro _
-  simp [WPExisting]
+  intro hWP
+  rcases hWP with ⟨hQst, hStable⟩
+  change WPExisting (loadChoreography st image).1 Q
+  exact ⟨hStable st image hQst, hStable⟩
 
 /-! ## Handler and Effect Polymorphism
 

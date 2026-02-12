@@ -11,10 +11,10 @@ local instance : DecidableEq LocalTypeC := by
   infer_instance
 
 theorem toCoind_toInductive_eq2ce (t : LocalTypeC) (h : Regular t) :
-    EQ2CE (envOf (Set.Finite.toFinset h) (Set.Finite.toFinset h))
+    EQ2CE (envOf (h.states.toFinset) (h.states.toFinset))
       (toCoind (toInductive t h)) t := by
   classical
-  let all := Set.Finite.toFinset h
+  let all := h.states.toFinset
   let h_closed : IsClosedSet all := reachable_is_closed_set t h
   let R : Rel := fun ρ a b =>
     ∃ (visited : Finset LocalTypeC) (h_visited : visited ⊆ all) (h_current : b ∈ all),
@@ -27,7 +27,7 @@ theorem toCoind_toInductive_eq2ce (t : LocalTypeC) (h : Regular t) :
   have hR : R (envOf all all) (toCoind (toInductive t h)) t := by
     refine ⟨∅, ?_, ?_, ?_, envOf_sub all all⟩
     · exact Finset.empty_subset _
-    · exact (Set.Finite.mem_toFinset h).2 Relation.ReflTransGen.refl
+    · exact List.mem_toFinset.2 h.root_mem
     · exact Or.inl rfl
   exact EQ2CE_coind hpost _ _ _ hR
 

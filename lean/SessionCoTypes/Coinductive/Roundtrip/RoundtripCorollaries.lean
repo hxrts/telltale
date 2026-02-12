@@ -11,16 +11,16 @@ namespace SessionCoTypes.Coinductive
 open SessionTypes.LocalTypeR
 theorem toCoind_toInductive_eq2c_of_eq2ce (t : LocalTypeC) (h : Regular t)
     (hprod : ProductiveC t)
-    (hback : ∀ c ∈ Set.Finite.toFinset h, EQ2C (mkVar (nameOf c (Set.Finite.toFinset h))) c)
-    (hce : EQ2CE (envOf (Set.Finite.toFinset h) (Set.Finite.toFinset h))
+    (hback : ∀ c ∈ h.states.toFinset, EQ2C (mkVar (nameOf c (h.states.toFinset))) c)
+    (hce : EQ2CE (envOf (h.states.toFinset) (h.states.toFinset))
              (toCoind (toInductive t h)) t) :
     EQ2C (toCoind (toInductive t h)) t := by
   -- Use back-edge resolution to construct EnvResolves and discharge productivity on the left.
-  have hEnv : EnvResolves (envOf (Set.Finite.toFinset h) (Set.Finite.toFinset h)) :=
-    envOf_resolves_of_backedge (all := Set.Finite.toFinset h)
-      (visited := Set.Finite.toFinset h) hback
-  have hEnvR : EnvVarR (envOf (Set.Finite.toFinset h) (Set.Finite.toFinset h)) :=
-    envOf_varR (Set.Finite.toFinset h) (Set.Finite.toFinset h)
+  have hEnv : EnvResolves (envOf (h.states.toFinset) (h.states.toFinset)) :=
+    envOf_resolves_of_backedge (all := h.states.toFinset)
+      (visited := h.states.toFinset) hback
+  have hEnvR : EnvVarR (envOf (h.states.toFinset) (h.states.toFinset)) :=
+    envOf_varR (h.states.toFinset) (h.states.toFinset)
   have hprod_left : ProductiveC (toCoind (toInductive t h)) :=
     productive_toCoind (toInductive t h)
   exact EQ2CE_to_EQ2C' hce hEnv.1 hEnvR hprod_left hprod
@@ -29,7 +29,7 @@ theorem toCoind_toInductive_eq2c_of_eq2ce (t : LocalTypeC) (h : Regular t)
     Requires productivity of the RHS. -/
 theorem toCoind_toInductive_eq2c_of_backedge (t : LocalTypeC) (h : Regular t)
     (hprod : ProductiveC t)
-    (hback : ∀ c ∈ Set.Finite.toFinset h, EQ2C (mkVar (nameOf c (Set.Finite.toFinset h))) c) :
+    (hback : ∀ c ∈ h.states.toFinset, EQ2C (mkVar (nameOf c (h.states.toFinset))) c) :
     EQ2C (toCoind (toInductive t h)) t :=
   toCoind_toInductive_eq2c_of_eq2ce t h hprod hback (toCoind_toInductive_eq2ce t h)
 
@@ -37,14 +37,14 @@ theorem toCoind_toInductive_eq2c_of_backedge (t : LocalTypeC) (h : Regular t)
     Requires productivity of the RHS. -/
 theorem toCoind_toInductive_eq2c_of_env (t : LocalTypeC) (h : Regular t)
     (hprod : ProductiveC t)
-    (hEnv : EnvResolves (envOf (Set.Finite.toFinset h) (Set.Finite.toFinset h))) :
+    (hEnv : EnvResolves (envOf (h.states.toFinset) (h.states.toFinset))) :
     EQ2C (toCoind (toInductive t h)) t := by
   -- Discharge productivity on the left using the toCoind image.
   have hce := toCoind_toInductive_eq2ce t h
   have hprod_left : ProductiveC (toCoind (toInductive t h)) :=
     productive_toCoind (toInductive t h)
-  have hEnvR : EnvVarR (envOf (Set.Finite.toFinset h) (Set.Finite.toFinset h)) :=
-    envOf_varR (Set.Finite.toFinset h) (Set.Finite.toFinset h)
+  have hEnvR : EnvVarR (envOf (h.states.toFinset) (h.states.toFinset)) :=
+    envOf_varR (h.states.toFinset) (h.states.toFinset)
   exact EQ2CE_to_EQ2C' hce hEnv.1 hEnvR hprod_left hprod
 
 /-- Round-trip in EQ2C for `toCoind` images, discharging productivity. -/
@@ -79,7 +79,7 @@ theorem toCoind_toInductive_eq2c_of_backedge_toCoind (t : LocalTypeR)
 
 /-- Canonical round-trip statement (alias). -/
 theorem toCoind_toInductive (t : LocalTypeC) (h : Regular t) :
-    EQ2CE (envOf (Set.Finite.toFinset h) (Set.Finite.toFinset h))
+    EQ2CE (envOf (h.states.toFinset) (h.states.toFinset))
       (toCoind (toInductive t h)) t :=
   toCoind_toInductive_eq2ce t h
 

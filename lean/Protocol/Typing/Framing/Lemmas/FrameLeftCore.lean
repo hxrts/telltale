@@ -314,7 +314,4 @@ abbrev FrameRight (Ssh S₁ S₂ : SEnv) (G₁ G₂ : GEnv) (P : Process) : Prop
     HasTypeProcPreOut Ssh S₁ G₁ P S₁' G₁' W Δ →
     HasTypeProcPreOut Ssh (S₁ ++ S₂) (G₁ ++ G₂) P (S₁' ++ S₂) (G₁' ++ G₂) W Δ
 
-
-/-- Left framing for skip. -/
-
 end

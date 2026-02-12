@@ -27,6 +27,7 @@ section
 
 /-! ## Buffer Preservation Under Framing -/
 
+set_option maxHeartbeats 2000000 in
 theorem BuffersTyped_preserved_frame_left
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'}
     {G₂ : GEnv} {D₂ : DEnv} :
@@ -251,13 +252,6 @@ theorem BuffersTyped_preserved_frame_right
   | par_skip_right =>
       simpa using hBT
 
-lemma SessionsOf_empty : SessionsOf ([] : GEnv) = ∅ := by
-  ext s; constructor
-  · intro h
-    rcases h with ⟨e, L, hLookup, hSid⟩
-    simp [lookupG] at hLookup
-  · intro h; cases h
-
 lemma SessionsOfD_empty : SessionsOfD (∅ : DEnv) = ∅ := by
   ext s; constructor
   · intro h
@@ -302,5 +296,6 @@ theorem BuffersTyped_preserved
     have hNone : (∅ : DEnv).find? e = none := by
       simp [DEnv.find?, DEnv_map_find?_empty]
     exact lookupD_append_left_of_right_none (D₁:=D') (D₂:=∅) (e:=e) hNone
+  exact BuffersTyped_rewriteD (D:=D' ++ (∅ : DEnv)) (D':=D') hEqD' hBT'''
 
 end

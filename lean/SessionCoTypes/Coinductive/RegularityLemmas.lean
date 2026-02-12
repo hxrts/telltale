@@ -61,20 +61,21 @@ lemma reachable_subset_children (t : LocalTypeC) :
 
 /-- If all children of a node are regular, then the node is regular.
     This is the key lemma for building regular types. -/
-lemma regular_of_children (t : LocalTypeC)
+noncomputable def regular_of_children (t : LocalTypeC)
     (h : ∀ i : LocalTypeChild (head t), Regular (children t i)) : Regular t := by
   classical
   haveI : Fintype (LocalTypeChild (head t)) := by
     cases hhead : head t <;> infer_instance
   have hfinite_children : Set.Finite (⋃ i, Reachable (children t i)) := by
-    simpa using Set.finite_iUnion (f := fun i => Reachable (children t i)) (H := h)
+    simpa using Set.finite_iUnion (f := fun i => Reachable (children t i))
+      (H := fun i => finite_of_regular (h i))
   have hfinite_union : Set.Finite ({t} ∪ ⋃ i, Reachable (children t i)) :=
     (Set.finite_singleton t).union hfinite_children
-  exact Set.Finite.subset hfinite_union (reachable_subset_children t)
+  exact regularOfFinite t (Set.Finite.subset hfinite_union (reachable_subset_children t))
 
 /-- Regularity is preserved under bisimilarity.
     Since bisimilarity equals equality, this is immediate. -/
-lemma regular_of_bisim {x y : LocalTypeC} (h : Bisim x y) (hx : Regular x) : Regular y := by
+def regular_of_bisim {x y : LocalTypeC} (h : Bisim x y) (hx : Regular x) : Regular y := by
   have hxy : x = y := (Bisim_eq_iff x y).1 h
   simpa [hxy] using hx
 

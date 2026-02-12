@@ -260,8 +260,6 @@ def VMInvariantSpaceWithProfiles.withFoster
   VMInvariantSpaceWithProfiles.updateClassicalProfiles space
     (fun classical => { classical with foster? := some p })
 
-/-- Packaged FLP lower-bound artifact. -/
-
 end
 
 end Proofs

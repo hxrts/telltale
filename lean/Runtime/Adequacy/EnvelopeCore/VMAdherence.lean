@@ -284,7 +284,5 @@ structure VMEnvelopeAdherenceProtocol where
     premises.guarantee premises.strongCapability :=
       vmCapabilityMonotonicity_of_premises premises
 
-/-- E4: input to inferred program-capability construction. -/
-
 end Adequacy
 end Runtime

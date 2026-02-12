@@ -82,14 +82,6 @@ abbrev HasTypeProcPre1 (S : SEnv) (G : GEnv) (P : Process) : Prop :=
 
 /-! ## Helper Lemmas -/
 
-theorem findLabel_eq {α : Type} {lbl lbl' : Label} {xs : List (Label × α)} {v : α}
-    (h : xs.find? (fun b => b.1 == lbl) = some (lbl', v)) : lbl' = lbl := by
-  have hPred : (lbl' == lbl) := (List.find?_eq_some_iff_append (xs := xs)
-    (p := fun b => b.1 == lbl) (b := (lbl', v))).1 h |>.1
-  have hPred' : (lbl' == lbl) = true := by
-    simpa using hPred
-  exact (beq_iff_eq).1 hPred'
-
 /-- StoreTyped is preserved when updating a non-channel variable. -/
 theorem StoreTyped_update_nonChan {G : GEnv} {S : SEnv} {store : VarStore}
     {x : Var} {v : Value} {T : ValType}
@@ -183,18 +175,6 @@ theorem DConsistent_preserved
 
 /-! ## Buffer/Coherence Rewrites -/
 
-theorem BuffersTyped_rewriteD
-    {G : GEnv} {D D' : DEnv} {bufs : Buffers} :
-    (∀ e, lookupD D e = lookupD D' e) →
-    BuffersTyped G D bufs →
-    BuffersTyped G D' bufs := by
-  intro hEq hBT e
-  rcases hBT e with ⟨hLen, hTyping⟩
-  refine ⟨?_, ?_⟩
-  · simpa [hEq e] using hLen
-  · intro i hi
-    simpa [hEq e] using hTyping i hi
-
 theorem Coherent_rewriteD
     {G : GEnv} {D D' : DEnv} :
     (∀ e, lookupD D e = lookupD D' e) →
@@ -205,71 +185,6 @@ theorem Coherent_rewriteD
   rcases hCohEdge with ⟨Lsender, hGsender, hConsume⟩
   refine ⟨Lsender, hGsender, ?_⟩
   simpa [hEq e] using hConsume
-
-theorem SessionsOf_empty : SessionsOf ([] : GEnv) = ∅ := by
-  ext s; constructor
-  · intro hs
-    rcases hs with ⟨e, L, hLookup, hSid⟩
-    cases hLookup
-  · intro hs
-    cases hs
-
-theorem SessionsOfD_empty : SessionsOfD (∅ : DEnv) = ∅ := by
-  ext s; constructor
-  · intro hs
-    rcases hs with ⟨e, ts, hFind, hSid⟩
-    simp [DEnv.find?, DEnv_map_find?_empty] at hFind
-  · intro hs
-    cases hs
-
-theorem DConsistent_append {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
-    DConsistent G₁ D₁ →
-    DConsistent G₂ D₂ →
-    DConsistent (G₁ ++ G₂) (D₁ ++ D₂) := by
-  intro h1 h2 s hs
-  have hs' : s ∈ SessionsOfD D₁ ∪ SessionsOfD D₂ :=
-    SessionsOfD_append_subset (D₁:=D₁) (D₂:=D₂) hs
-  cases hs' with
-  | inl hL =>
-      exact SessionsOf_append_left (G₂:=G₂) (h1 hL)
-  | inr hR =>
-      exact SessionsOf_append_right (G₁:=G₁) (h2 hR)
-
-theorem DConsistent_empty (G : GEnv) : DConsistent G (∅ : DEnv) := by
-  simp [DConsistent, SessionsOfD_empty]
-
-theorem lookupSEnv_erase_eq {S : SEnv} {x : Var} :
-    lookupSEnv (eraseSEnv S x) x = none := by
-  induction S with
-  | nil =>
-      simp [eraseSEnv, lookupSEnv]
-  | cons hd tl ih =>
-      cases hd with
-      | mk y Ty =>
-          by_cases hxy : x = y
-          · subst hxy
-            simpa [eraseSEnv] using ih
-          · have hbeq : (x == y) = false := beq_eq_false_iff_ne.mpr hxy
-            simpa [eraseSEnv, hxy, lookupSEnv, List.lookup, hbeq] using ih
-
-theorem lookupSEnv_erase_ne {S : SEnv} {x y : Var} (hxy : y ≠ x) :
-    lookupSEnv (eraseSEnv S x) y = lookupSEnv S y := by
-  induction S generalizing x y with
-  | nil =>
-      simp [eraseSEnv, lookupSEnv]
-  | cons hd tl ih =>
-      cases hd with
-      | mk z Tz =>
-          by_cases hxz : x = z
-          · subst hxz
-            have hyx : y ≠ x := by simpa using hxy
-            have hbeq : (y == x) = false := beq_eq_false_iff_ne.mpr hyx
-            simpa [eraseSEnv, lookupSEnv, List.lookup, hbeq] using (ih (x:=x) (y:=y) hyx)
-          · by_cases hyz : y = z
-            · subst hyz
-              simp [eraseSEnv, hxz, lookupSEnv, List.lookup]
-            · have hbeq : (y == z) = false := beq_eq_false_iff_ne.mpr hyz
-              simpa [eraseSEnv, hxz, lookupSEnv, List.lookup, hbeq] using (ih (x:=x) (y:=y) hxy)
 
 theorem OwnedDisjoint_updateLeft
     {Sown : OwnedEnv} {x : Var} {T : ValType} :
@@ -290,21 +205,6 @@ theorem OwnedDisjoint_updateLeft
       have hEq := lookupSEnv_update_neq (env:=Sown.left) (x:=x) (y:=y) (T:=T) (Ne.symm hxy)
       simpa [OwnedEnv.updateLeft, hEq] using hL
     exact hOwn y Ty1 Ty2 hR' hL'
-
-theorem SEnvDomSubset_erase
-    {S : SEnv} {x : Var} :
-    SEnvDomSubset (eraseSEnv S x) S := by
-  intro y Ty hErase
-  by_cases hxy : y = x
-  · subst hxy
-    have hNone : lookupSEnv (eraseSEnv S y) y = none := lookupSEnv_erase_eq (S:=S) (x:=y)
-    have : (some Ty : Option ValType) = none := by
-      have hErase' := hErase
-      simp [hNone] at hErase'
-    cases this
-  · have hEq : lookupSEnv (eraseSEnv S x) y = lookupSEnv S y :=
-      lookupSEnv_erase_ne (S:=S) (x:=x) (y:=y) hxy
-    exact ⟨Ty, by simpa [hEq] using hErase⟩
 
 theorem TypedStep_right_domsubset
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
@@ -407,19 +307,6 @@ theorem OwnedDisjoint_preserved_TypedStep
       simpa [OwnedDisjoint] using hOwn
   | par_skip_right =>
       simpa [OwnedDisjoint] using hOwn
-
-theorem DEnv_append_empty_right (D : DEnv) : D ++ (∅ : DEnv) = D := by
-  simpa using (DEnvUnion_empty_right D)
-
-theorem BuffersTyped_mono {G G' : GEnv} {D : DEnv} {bufs : Buffers} :
-    (∀ e L, lookupG G e = some L → lookupG G' e = some L) →
-    BuffersTyped G D bufs →
-    BuffersTyped G' D bufs := by
-  intro hMono hBT e
-  rcases hBT e with ⟨hLen, hTyping⟩
-  refine ⟨hLen, ?_⟩
-  intro i hi
-  exact HasTypeVal_mono G G' _ _ (hTyping i hi) hMono
 
 theorem Coherent_mono {G G' : GEnv} {D : DEnv} :
     (∀ e, lookupG G e = lookupG G' e) →

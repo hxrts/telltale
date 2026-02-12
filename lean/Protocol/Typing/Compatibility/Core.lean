@@ -203,9 +203,6 @@ theorem DisjointD_lookup_right {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType}
 def insertPairD (acc : DEnv) (p : Edge × List ValType) : DEnv :=
   updateD acc p.1 p.2
 
-def insertPairS (acc : SEnv) (p : Var × ValType) : SEnv :=
-  updateSEnv acc p.1 p.2
-
 theorem findD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
     (updateD env e ts).find? e = some ts := by
   have hEq : compare e e = .eq := by
@@ -361,62 +358,5 @@ theorem lookupD_foldl_insert_notin
   apply lookupD_foldl_insert_preserve' (L:=L) (env:=env) (e:=e) (ts:=ts) hlookup
   intro ts' hmem
   exact (hNot ts' hmem).elim
-
-theorem lookupSEnv_foldl_insert_preserve
-    (L : List (Var × ValType)) (env : SEnv) (x : Var) (T : ValType)
-    (hlookup : lookupSEnv env x = some T)
-    (hSame : ∀ T', (x, T') ∈ L → T' = T) :
-    lookupSEnv (L.foldl insertPairS env) x = some T := by
-  induction L generalizing env with
-  | nil =>
-      simpa using hlookup
-  | cons p L ih =>
-      cases p with
-      | mk x' T' =>
-          have hSame' : ∀ T'', (x, T'') ∈ L → T'' = T := by
-            intro T'' hmem
-            exact hSame T'' (List.mem_cons_of_mem _ hmem)
-          by_cases hEq : x' = x
-          · cases hEq
-            have hT' : T' = T := hSame T' (by simp)
-            cases hT'
-            have hlookup' : lookupSEnv (updateSEnv env x T) x = some T := by
-              simpa using (lookupSEnv_update_eq (env:=env) (x:=x) (T:=T))
-            simpa [List.foldl, insertPairS] using
-              (ih (env := updateSEnv env x T) (hlookup := hlookup') (hSame := hSame'))
-          · have hlookup' : lookupSEnv (updateSEnv env x' T') x = some T := by
-              have h := lookupSEnv_update_neq (env:=env) (x:=x') (y:=x) (T:=T') hEq
-              simpa [hlookup] using h
-            simpa [List.foldl, insertPairS] using
-              (ih (env := updateSEnv env x' T') (hlookup := hlookup') (hSame := hSame'))
-
-theorem lookupSEnv_foldl_insert_of_mem
-    (L : List (Var × ValType)) (env : SEnv) (x : Var) (T : ValType)
-    (hmem : (x, T) ∈ L)
-    (hSame : ∀ T', (x, T') ∈ L → T' = T) :
-    lookupSEnv (L.foldl insertPairS env) x = some T := by
-  induction L generalizing env with
-  | nil =>
-      cases hmem
-  | cons p L ih =>
-      cases p with
-      | mk x' T' =>
-          have hSame' : ∀ T'', (x, T'') ∈ L → T'' = T := by
-            intro T'' hmem'
-            exact hSame T'' (List.mem_cons_of_mem _ hmem')
-          cases hmem with
-          | head _ =>
-              have hlookup' : lookupSEnv (updateSEnv env x T) x = some T := by
-                simpa using (lookupSEnv_update_eq (env:=env) (x:=x) (T:=T))
-              simpa [List.foldl, insertPairS] using
-                (lookupSEnv_foldl_insert_preserve (L:=L) (env:=updateSEnv env x T)
-                  (x:=x) (T:=T) hlookup' hSame')
-          | tail _ htail =>
-              simpa [List.foldl, insertPairS] using
-                (ih (env := updateSEnv env x' T') (hmem := htail) (hSame := hSame'))
-
-theorem lookupSEnv_foldl_insert_notin
-    (L : List (Var × ValType)) (env : SEnv) (x : Var) (v : Option ValType)
-    (hlookup : lookupSEnv env x = v)
 
 end

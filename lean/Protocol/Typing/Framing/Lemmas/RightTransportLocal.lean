@@ -251,6 +251,4 @@ lemma HasTypeProcPreOut_frame_G_right_local
 
 /-! ## Local G-Frame Transport (Left) -/
 
-/-- Erasing a binding cannot introduce new domain elements. -/
-
 end

@@ -53,6 +53,4 @@ private theorem bne_of_notBoundAt_mu {v t : String} {body : LocalTypeR}
   simp only [bne_iff_ne, ne_eq] at hvt
   exact beq_eq_false_iff_ne.mpr (Ne.symm hvt)
 
-/-- Standard one-step analysis for SubstRel after flattening. -/
-
 end SessionCoTypes.SubstCommBarendregt

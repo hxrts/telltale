@@ -397,6 +397,4 @@ theorem StoreTypedStrong_frame_branch
     updateG_append_left_hit (G₁:=G) (G₂:=G₂) (e:=e) (L:=.branch source bs) (L':=L) hG
   simpa [hGrew] using hStore'
 
-/-- Frame: assignment updates S on the left under a right context. -/
-
 end

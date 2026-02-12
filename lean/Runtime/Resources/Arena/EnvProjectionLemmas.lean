@@ -89,30 +89,6 @@ theorem lookupG_append_right {G1 G2 : GEnv} {e : Endpoint}
           have ih' := ih h'
           simpa [lookupG, List.lookup, hEq] using ih'
 
-/-- updateG distributes over append (left). -/
-theorem updateG_append_left {G1 G2 : GEnv} {e : Endpoint} {L : LocalType}
-    (hMem : ∃ L', lookupG G1 e = some L') :
-    updateG (G1 ++ G2) e L = updateG G1 e L ++ G2 := by
-  induction G1 with
-  | nil =>
-      cases hMem with
-      | intro L' hLookup =>
-          have : False := by
-            simp [lookupG] at hLookup
-          exact this.elim
-  | cons hd tl ih =>
-    obtain ⟨e', L'⟩ := hd
-    by_cases he : e = e'
-    · simp [updateG, he]
-    · obtain ⟨L'', hLookup⟩ := hMem
-      have hbeq : (e == e') = false := by
-        exact beq_eq_false_iff_ne.mpr he
-      have hMem' : ∃ L', lookupG tl e = some L' := by
-        refine ⟨L'', ?_⟩
-        simpa [lookupG, List.lookup, hbeq] using hLookup
-      have ih' := ih hMem'
-      simp [updateG, he, ih', List.cons_append]
-
 /-- updateG distributes over append (right) when not in left. -/
 theorem updateG_append_right {G1 G2 : GEnv} {e : Endpoint} {L : LocalType}
     (hNotMem : lookupG G1 e = none) :

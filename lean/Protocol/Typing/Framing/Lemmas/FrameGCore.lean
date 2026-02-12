@@ -332,6 +332,4 @@ lemma lookupG_none_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
 -- NOTE: We intentionally avoid general G-framing lemmas here to keep full-G
 -- reasoning explicit under the par-step rule.
 
-/-- Pre-update typing is stable under framing on the left of S/G. -/
-
 end

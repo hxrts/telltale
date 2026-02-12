@@ -384,8 +384,6 @@ structure OutputConditionArtifact where
   witness : OutputConditionWitness
   soundness : ∀ claim, witness.verify claim = true → witness.accepted claim
 
-/-- Theorem pack auto-derived from a profile-carrying VM invariant space. -/
-
 end
 
 end Proofs

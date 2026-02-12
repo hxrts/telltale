@@ -359,7 +359,5 @@ structure VMEnvelopeAdmissionProtocol where
   necessityMinimality : HypothesisNecessityMinimality :=
     premises.necessityMinimalityWitness
 
-/-- Abstract failure taxonomy shared across Lean/Rust runtime surfaces. -/
-
 end Adequacy
 end Runtime

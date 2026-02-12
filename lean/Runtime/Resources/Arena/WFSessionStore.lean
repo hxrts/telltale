@@ -198,3 +198,5 @@ theorem SessionStore.updateTrace_preserves_WFSessionStore {store : SessionStore 
   · -- Buffer lookups agree (unchanged by trace update)
     intro edge'
     rw [SessionStore.toBuffers_updateTrace]
+    rw [SessionStore.lookupBuffer_updateTrace]
+    exact hBuf edge'

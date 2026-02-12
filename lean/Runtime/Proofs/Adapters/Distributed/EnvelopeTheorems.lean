@@ -439,9 +439,6 @@ theorem protocolBridge_shardCutPreservation_of_profile
 
 end
 
-
-end
-
 end Adapters
 end Proofs
 end Runtime

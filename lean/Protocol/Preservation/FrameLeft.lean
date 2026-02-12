@@ -279,6 +279,4 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
 
 /-! ## Subject Reduction -/
 
-/-- Soundness: TypedStep implies Step. -/
-
 end
