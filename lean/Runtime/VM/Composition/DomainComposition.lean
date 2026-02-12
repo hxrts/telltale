@@ -56,6 +56,8 @@ instance : GuardLayer Unit where
     | _ => none
   decEq := by infer_instance
 
+/-! ## Unit Effect Instances -/
+
 instance : EffectRuntime Unit where
   -- Unit effect model: no-op effects.
   EffectAction := Unit
@@ -65,6 +67,8 @@ instance : EffectRuntime Unit where
 instance : EffectSpec Unit where
   -- Unit effect typing: handlers are terminal.
   handlerType := fun _ => LocalType.end_
+
+/-! ## Unit Verification/Commitment Instances -/
 
 instance : VerificationModel Unit where
   -- Unit verification model: trivial cryptography.
@@ -92,6 +96,8 @@ instance : VerificationModel Unit where
   defaultCommitmentKey := ()
   defaultNullifierKey := ()
   defaultNonce := ()
+
+/-! ## Unit Authenticated-State Instances -/
 
 instance : AuthTree Unit where
   -- Unit authenticated tree: all proofs validate.
