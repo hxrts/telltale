@@ -260,6 +260,8 @@ theorem isGuarded_substitute_unguarded (body : LocalTypeR) (t v : String) (repl 
 
    **PROVABLE**: By induction on g, with guardedness preservation in the mu case. -/
 mutual
+  /-! ## proj_subst Main Theorem -/
+
   /-- Projection commutes with global type substitution (closed replacement). -/
   theorem proj_subst :
       ∀ (g : GlobalType) (t : String) (G : GlobalType) (role : String),
@@ -274,6 +276,9 @@ mutual
           simp [GlobalType.substitute, projTrans, Choreography.Projection.Trans.trans, LocalTypeR.substitute]
         · have hvt' : (v == t) = false := beq_eq_false_iff_ne.mpr hvt
           simp [GlobalType.substitute, hvt', projTrans, Choreography.Projection.Trans.trans, LocalTypeR.substitute]
+
+    /-! ## proj_subst Comm Case -/
+
     | .comm sender receiver branches, t, G, role, hclosed => by
         by_cases hsender : role = sender
         · simp [GlobalType.substitute, projTrans, projTransBranches,
@@ -303,6 +308,9 @@ mutual
                         ((label, cont.substitute t G) :: SessionTypes.GlobalType.substituteBranches tail t G) hs hr,
                       Choreography.Projection.Project.trans_comm_other sender receiver role ((label, cont) :: tail) hs hr,
                       hrec]
+
+    /-! ## proj_subst Mu Case -/
+
     | .mu s body, t, G, role, hclosed => by
         by_cases hst : s = t
         · subst hst
@@ -331,6 +339,9 @@ mutual
                 isGuarded_substitute_unguarded e t s repl hguard (Ne.symm hst)
               simp [GlobalType.substitute, hst, projTrans, Choreography.Projection.Trans.trans,
                 hproj', e, repl, hguard, hguard']
+
+    /-! ## proj_subst Delegate Case -/
+
     | .delegate p q sid r cont, t, G, role, hclosed => by
         -- Delegate case: projection follows the trans definition
         have hrec := proj_subst cont t G role hclosed
@@ -352,6 +363,8 @@ mutual
       | exact sizeOf_bs_lt_comm _ _ _
       | exact sizeOf_cont_lt_comm _ _ _ _ _
       | simp only [sizeOf, GlobalType._sizeOf_1]; omega
+
+  /-! ## proj_subst_branches Theorem -/
 
   /-- Branch-wise version of proj_subst for transBranches/substituteBranches. -/
   theorem proj_subst_branches :
