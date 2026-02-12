@@ -35,8 +35,10 @@ def roundtripRel
     ∃ (visited : Finset LocalTypeC) (h_visited : visited ⊆ all) (h_current : b ∈ all),
       (a = toCoind (toInductiveAux t all visited b h_closed h_visited h_current) ∨
        (b ∉ visited ∧
-        a = toCoind (toInductiveBody t all visited b h_closed h_visited h_current))) ∧
+       a = toCoind (toInductiveBody t all visited b h_closed h_visited h_current))) ∧
       EnvOfSub all ρ
+
+/-! ## Body Case: Fresh-Visit Postfix Step -/
 
 lemma roundtrip_hpost_body_case
     (t : LocalTypeC) (all : Finset LocalTypeC) (h_closed : IsClosedSet all)
@@ -47,10 +49,11 @@ lemma roundtrip_hpost_body_case
       a = toCoind (toInductiveBody t all visited b h_closed h_visited h_current)) :
     EQ2CE_step (roundtripRel t all h_closed) ρ a b := by
   let R : Rel := roundtripRel t all h_closed
-        rcases hcore with ⟨hmem, hcore⟩
-        cases hdest : PFunctor.M.dest b with
-        | mk hhead f =>
-            cases hhead with
+  rcases hcore with ⟨hmem, hcore⟩
+  cases hdest : PFunctor.M.dest b with
+  | mk hhead f =>
+      cases hhead with
+            /-! ## Body Case: `end` Head -/
             | «end» =>
                 have hbody_end :
                     toInductiveBody t all visited b h_closed h_visited h_current = LocalTypeR.end := by
@@ -63,6 +66,7 @@ lemma roundtrip_hpost_body_case
                 have hb : head b = .end := by
                   exact head_of_dest hdest
                 exact EQ2CE_step.end ha hb
+            /-! ## Body Case: `var` Head -/
             | var x =>
                 have hbody_var :
                     toInductiveBody t all visited b h_closed h_visited h_current = LocalTypeR.var x := by
@@ -75,6 +79,7 @@ lemma roundtrip_hpost_body_case
                 have hb : head b = .var x := by
                   exact head_of_dest hdest
                 exact EQ2CE_step.var ha hb
+            /-! ## Body Case: `mu` Head -/
             | mu x =>
                 have hb : PFunctor.M.dest b = ⟨LocalTypeHead.mu x, f⟩ := by
                   simp [hdest]
@@ -94,6 +99,7 @@ lemma roundtrip_hpost_body_case
                     simpa [PFunctor.M.dest_mk] using hcore
                   exact Or.inl hcore_mu
                 exact EQ2CE_step.mu_right hb hrel
+            /-! ## Body Case: `send` Head -/
             | send p labels =>
                 let fR : Fin labels.length → (Label × LocalTypeR) := fun i =>
                   let child := f i
@@ -141,6 +147,7 @@ lemma roundtrip_hpost_body_case
                   rw [hbranches_a]
                   simpa [branchesOf, hdest] using hbr'
                 exact EQ2CE_step.send ha hb hbr
+            /-! ## Body Case: `recv` Head -/
             | recv p labels =>
                 let fR : Fin labels.length → (Label × LocalTypeR) := fun i =>
                   let child := f i
