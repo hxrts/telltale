@@ -68,6 +68,8 @@ private theorem lookupBuf_none_of_notin_sessions {G : GEnv} {B : Buffers} {e : E
   | some buf =>
       exact hNot (hCons e buf hFind)
 
+/-! ## Typing Lifts Through Merged GEnv -/
+
 private theorem BufferTyped_monoG {G G' : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge} :
     BufferTyped G D bufs e →
     (∀ ep L, lookupG G ep = some L → lookupG G' ep = some L) →
@@ -99,6 +101,8 @@ private theorem HasTypeVal_lift_right {G₁ G₂ : GEnv}
   have hNone₁ : lookupG G₁ ep = none := lookupG_none_of_not_session hNot₁
   have hEq := lookupG_append_right (G₁ := G₁) (G₂ := G₂) (e := ep) hNone₁
   simpa [mergeGEnv, hEq] using hLookup
+
+/-! ## Active-Edge Split Across Disjoint Merge -/
 
 private theorem ActiveEdge_mergeGEnv_split {G₁ G₂ : GEnv} {e : Edge}
     (hDisj : DisjointG G₁ G₂)
