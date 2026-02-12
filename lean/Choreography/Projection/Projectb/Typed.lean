@@ -41,6 +41,8 @@ def BranchesProjRelTyped (R : ProjRel)
         R gb.2 role lb.2.2)
     gbs lbs
 
+/-! ## Typed Monotonicity Helpers -/
+
 private theorem BranchesProjRelTyped_mono {R S : ProjRel}
     (h : ∀ g r c, R g r c → S g r c) :
     ∀ {gbs lbs role}, BranchesProjRelTyped R gbs role lbs →
@@ -56,6 +58,8 @@ private theorem AllBranchesProj_mono {R S : ProjRel}
     ∀ {gbs role cand}, AllBranchesProj R gbs role cand → AllBranchesProj S gbs role cand := by
   intro gbs role cand hall gb hgb
   exact h _ _ _ (hall gb hgb)
+
+/-! ## Typed Generator -/
 
 /-- One-step generator for typed projection. -/
 def CProjectF_typed (R : ProjRel) : ProjRel := fun g role cand =>
@@ -98,6 +102,8 @@ def CProjectF_typed (R : ProjRel) : ProjRel := fun g role cand =>
         R cont role cand
   | _, _ => False
 
+/-! ## Typed Generator Monotonicity -/
+
 private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
   intro R S h g role cand hrel
   cases g with
@@ -121,6 +127,7 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
           simp [CProjectF_typed] at hrel
       | recv _ _ =>
           simp [CProjectF_typed] at hrel
+  /-! ## CProjectF_typed_mono: Comm Case -/
   | comm sender receiver gbs =>
       by_cases hs : role = sender
       · cases cand with
@@ -143,6 +150,7 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
               simp [CProjectF_typed, hr, hns] at hrel ⊢
         · simp [CProjectF_typed, hs, hr] at hrel ⊢
           exact AllBranchesProj_mono h hrel
+  /-! ## CProjectF_typed_mono: Delegate Case -/
   | delegate p q sid r cont =>
       by_cases hp : role = p
       · cases cand with
@@ -167,6 +175,7 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
                     exact hrel
         | _ =>
             simp [CProjectF_typed, hp] at hrel ⊢
+      /-! ## CProjectF_typed_mono: Delegate Receiver/Other Subcases -/
       · by_cases hq : role = q
         · have hnp : q ≠ p := by
             intro hqp
@@ -195,6 +204,8 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
               simp [CProjectF_typed, hq, hnp] at hrel ⊢
         · simp [CProjectF_typed, hp, hq] at hrel ⊢
           exact h _ _ _ hrel
+
+/-! ## Coinductive Typed Projection -/
 
 instance : CoinductiveRel ProjRel CProjectF_typed := ⟨CProjectF_typed_mono⟩
 
@@ -251,6 +262,8 @@ private theorem AllBranchesProjTyped_to_erase
   intro gb hgb
   exact ⟨cand, h gb hgb, rfl⟩
 
+/-! ## Erasure Bridge: Coinductive Postfix -/
+
 private theorem EraseRel_postfix :
     ∀ g role cand, EraseRel g role cand → CProjectF EraseRel g role cand := by
   intro g role cand hR
@@ -282,6 +295,7 @@ private theorem EraseRel_postfix :
           simp [CProjectF_typed] at hdes
       | recv _ _ =>
           simp [CProjectF_typed] at hdes
+  /-! ## Erasure Bridge: Comm Case -/
   | comm sender receiver gbs =>
       by_cases hs : role = sender
       · cases cand' with
@@ -297,6 +311,7 @@ private theorem EraseRel_postfix :
               And.intro hpartner hbranches'
         | _ =>
             simp [CProjectF_typed, hs] at hdes
+      /-! ## Erasure Bridge: Comm Receiver/Other Subcases -/
       · by_cases hr : role = receiver
         · have hns : receiver ≠ sender := by
             intro h
@@ -319,6 +334,7 @@ private theorem EraseRel_postfix :
               AllBranchesProj EraseRel gbs role (LocalTypeR.eraseValTypes cand') :=
             AllBranchesProjTyped_to_erase hdes
           simpa [CProjectF, hs, hr, LocalTypeR.eraseValTypes] using hbranches'
+  /-! ## Erasure Bridge: Delegate Case -/
   | delegate p q sid r cont =>
       by_cases hp : role = p
       · cases cand' with
@@ -348,6 +364,7 @@ private theorem EraseRel_postfix :
                     simpa [CProjectF, hp, LocalTypeR.eraseValTypes] using hdes
         | _ =>
             simp [CProjectF_typed, hp] at hdes
+      /-! ## Erasure Bridge: Delegate Receiver/Other Subcases -/
       · by_cases hq : role = q
         · have hnp : q ≠ p := by
             intro hqp
@@ -383,6 +400,8 @@ private theorem EraseRel_postfix :
               simpa [CProjectF, hp, hq, hnp, LocalTypeR.eraseValTypes] using hfalse
         · simp [CProjectF_typed, CProjectF, hp, hq] at hdes ⊢
           exact ⟨_, hdes, rfl⟩
+
+/-! ## Typed-to-Erased Theorem -/
 
 /-- Typed projection implies erased projection on the payload-erased candidate. -/
 theorem CProjectTyped_implies_CProject_erase
