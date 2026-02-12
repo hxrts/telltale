@@ -25,6 +25,9 @@ open SessionCoTypes.EQ2Props
 open SessionCoTypes.EQ2Paco
 open Paco
 open SessionTypes.Participation
+
+/-! ## Comm Send/Recv Postfix Helpers -/
+
 private theorem CProjectTransRel_postfix_comm_send_sender
     {sender receiver role partner : String}
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
@@ -59,6 +62,8 @@ private theorem CProjectTransRel_postfix_comm_send_nonpart
   rw [htrans_send]
   exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl (Or.inl hr))
     (branchesProjRel_to_branchesRel_CProjectTransRel gbs' role lbs hbranches' hwf_gbs')⟩
+
+/-! ## Comm Recv Postfix Helpers -/
 
 private theorem CProjectTransRel_postfix_comm_recv_receiver
     {sender receiver role partner : String}
@@ -95,6 +100,8 @@ private theorem CProjectTransRel_postfix_comm_recv_nonpart
   exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl (Or.inl hr))
     (branchesProjRel_to_branchesRel_CProjectTransRel gbs' role lbs hbranches' hwf_gbs')⟩
 
+/-! ## Comm Send/Recv Dispatchers -/
+
 private theorem CProjectTransRel_postfix_comm_send
     {sender receiver role partner : String}
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
@@ -130,6 +137,8 @@ private theorem CProjectTransRel_postfix_comm_recv
     · have hne' : receiver ≠ sender := fun heq => hrs (hrr ▸ heq)
       exact CProjectTransRel_postfix_comm_recv_receiver (t := t) hrr hne' hf htrans hwf
     · exact CProjectTransRel_postfix_comm_recv_nonpart (t := t) hproj htrans hwf
+
+/-! ## Comm Constructor Cases -/
 
 private theorem CProjectTransRel_postfix_comm_end
     {sender receiver role : String}
@@ -181,6 +190,8 @@ private theorem CProjectTransRel_postfix_comm_mu
     exact ⟨GlobalType.comm sender receiver gbs, role, hproj, htrans_mu'.symm, hwf⟩
   simpa [htrans_mu] using CProjectTransRel_postfix_mu_closure hmu_rel
 
+/-! ## Global Constructor Case Helpers -/
+
 /-- Helper: g = .end cases for CProjectTransRel_postfix. -/
 private theorem CProjectTransRel_postfix_end_cases
     {role : String} {lt t : LocalTypeR}
@@ -195,6 +206,8 @@ private theorem CProjectTransRel_postfix_end_cases
       -- Other constructors contradict CProjectF for .end.
       have : False := by simpa [CProjectF] using hf
       exact this.elim
+
+/-! ## Constructor Case Helpers: var/mu/comm -/
 
 /-- Helper: g = .var cases for CProjectTransRel_postfix. -/
 private theorem CProjectTransRel_postfix_var_cases
@@ -254,6 +267,8 @@ private theorem CProjectTransRel_postfix_comm_cases
   | var v =>
       exact CProjectTransRel_postfix_comm_var (t := t) hproj hne htrans
 
+/-! ## Main Postfix Theorem -/
+
 /-- Postfix property for CProjectTransRel with EQ2_closure of the composite relation. -/
 theorem CProjectTransRel_postfix :
     ∀ lt t, CProjectTransRel lt t → EQ2F (EQ2_closure CProjectTransRelComp) lt t := by
@@ -275,6 +290,8 @@ theorem CProjectTransRel_postfix :
   | comm sender receiver gbs =>
       exact CProjectTransRel_postfix_comm_cases (lt := lt) (sender := sender) (receiver := receiver)
         (gbs := gbs) hproj htrans hne hwf hf
+
+/-! ## Composition Extensions -/
 
 /-- CProjectTransRelComp can be extended with EQ2 at the right to produce another CProjectTransRelComp.
     This is the key lemma that allows the BranchesRel_trans_chain helper to work. -/
@@ -324,6 +341,8 @@ theorem CProjectTransRelComp_extend_left
     right; right; right
     have hWFm : LocalTypeR.WellFormed m := CProjectTransRel_wf_left hrel_mm'
     exact ⟨m, m', EQ2_trans_wf h1 heq_bm hWFa hWFb hWFm, hrel_mm', heq_m'c⟩
+
+/-! ## Reverse Branch Relation Chaining -/
 
 /-- Chain BranchesRel with EQ2 first, then EQ2_closure (reverse direction).
     Given BranchesRel EQ2 bs cs and BranchesRel (EQ2_closure R) cs ds,
