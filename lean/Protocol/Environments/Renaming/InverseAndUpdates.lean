@@ -160,7 +160,7 @@ theorem renameDEnv_updateD (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Tr
       updateD (renameDEnv ρ D) (renameEdge ρ e) (ts.map (renameValType ρ)) := by
   apply DEnv_eq_of_find?_eq
   intro e'
-  -- DEnv update commutation: target edge case.
+  /-! ## DEnv Update Commutation: Target Edge Case -/
   by_cases heq : e' = renameEdge ρ e
   case pos =>
     subst heq
@@ -183,7 +183,7 @@ theorem renameDEnv_updateD (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Tr
           (renameEdge ρ e) = some (ts.map (renameValType ρ)) :=
       find?_updateD_eq (renameDEnv ρ D) (renameEdge ρ e) (ts.map (renameValType ρ))
     rw [hLhs, hRhs]
-  -- DEnv update commutation: non-target edge case.
+  /-! ## DEnv Update Commutation: Non-target Edge Case -/
   case neg =>
     have hrhs :
         (updateD (renameDEnv ρ D) (renameEdge ρ e) (ts.map (renameValType ρ))).find? e' =
@@ -191,7 +191,7 @@ theorem renameDEnv_updateD (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Tr
       find?_updateD_neq (renameDEnv ρ D) (renameEdge ρ e) e' (ts.map (renameValType ρ))
         (fun h => heq h.symm)
     cases hpre : preimageEdge ρ e' with
-    -- Non-target edge: no preimage branch.
+    /-! ## Non-target Edge: No Preimage Branch -/
     | none =>
         have hno_lhs : ∀ p ∈ (updateD D e ts).list, renameEdge ρ p.1 ≠ e' := by
           intro p hp hEq
@@ -212,7 +212,7 @@ theorem renameDEnv_updateD (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Tr
             (find?_foldl_update_neq (ρ := ρ) (l := D.list)
               (acc := (∅ : DEnv)) (edge := e') hno_rhs)
         rw [hLhs, hrhs, hRhsBase]
-    -- Non-target edge: existing preimage branch.
+    /-! ## Non-target Edge: Existing Preimage Branch -/
     | some e'' =>
         have he'_eq : e' = renameEdge ρ e'' :=
           (preimageEdge_spec (by simp [hpre])).symm
