@@ -48,6 +48,8 @@ private lemma length_updateG_preserved_pu
               simpa [lookupG, List.lookup, hbeq] using hLookup
             simp [updateG, hEq, ih h']
 
+/-! ## TypedStep Preserves GEnv Length -/
+
 private lemma TypedStep_G_length_pu
     {G G' : GEnv} {D D' : DEnv} {Ssh : SEnv} {Sown Sown' : OwnedEnv}
     {store store' : VarStore} {bufs bufs' : Buffers} {P P' : Process} :
@@ -94,6 +96,8 @@ private lemma TypedStep_G_length_pu
   | par_skip_right =>
       simp
 
+/-! ## Pre-Out Preservation (Subset Form) -/
+
 /-- Pre-out typing is preserved by a single TypedStep: the remaining process
     still leads to the same final environments. -/
 private theorem HasTypeProcPreOut_preserved_sub
@@ -118,6 +122,8 @@ private theorem HasTypeProcPreOut_preserved_sub
       (D':=D') (Sown':=Sown') (store':=store') (bufs':=bufs') (P':=P')
       (Sfin:=Sfin) (Gfin:=Gfin) (W:=W) (Δ:=Δ)
       hMiddle hStore hDisjShAll hOwnDisj hDisjFrame hEq hEq' hTS hPre hDisjRightFin)
+
+/-! ## Pre-Out Preservation (Existence Form) -/
 
 /-- Pre-out typing is preserved by a single TypedStep: the remaining process
     still leads to the same final environments. -/
