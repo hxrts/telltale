@@ -70,6 +70,8 @@ lemma BranchesRelC_swap (R : LocalTypeC → LocalTypeC → Prop) :
       · exact ⟨hlabel.symm, hrel⟩
       · exact ih
 
+/-! ### Branch Relation Composition -/
+
 lemma BranchesRelC_comp {R S : LocalTypeC → LocalTypeC → Prop}
     (T : LocalTypeC → LocalTypeC → Prop) (hT : ∀ a c, T a c ↔ ∃ b, R a b ∧ S b c) :
     ∀ {bs cs ds}, BranchesRelC R bs cs → BranchesRelC S cs ds → BranchesRelC T bs ds := by
@@ -211,6 +213,7 @@ lemma observable_head_deterministic {t u1 u2 : LocalTypeC}
   simp [this]
 
 /-! ## Exclusion lemmas -/
+/-! ### End-Head Exclusion -/
 
 /-- If a type unfolds to end, it cannot unfold to a var. -/
 lemma not_end_and_var {t : LocalTypeC} (hend : UnfoldsToEndC t) (v : String) :
@@ -245,6 +248,8 @@ lemma not_end_and_recv {t : LocalTypeC} (hend : UnfoldsToEndC t) (p : String)
   have := observable_head_deterministic hunf1 hunf2 hnomu1 hnomu2
   simp [hhead1, hhead2] at this
 
+/-! ### Var-Head Exclusion -/
+
 /-- If a type unfolds to var, it cannot send. -/
 lemma not_var_and_send {t : LocalTypeC} (v : String) (hvar : UnfoldsToVarC t v)
     (p : String) (bs : List (Label × LocalTypeC)) : ¬ CanSendC t p bs := by
@@ -266,6 +271,8 @@ lemma not_var_and_recv {t : LocalTypeC} (v : String) (hvar : UnfoldsToVarC t v)
   have hnomu2 : ¬ (∃ x, head u2 = .mu x) := by simp [hhead2]
   have := observable_head_deterministic hunf1 hunf2 hnomu1 hnomu2
   simp [hhead1, hhead2] at this
+
+/-! ### Send/Recv Kind Exclusion -/
 
 /-- If a type can send, it cannot recv (with the same participant). -/
 lemma not_send_and_recv {t : LocalTypeC} (p : String) (bs : List (Label × LocalTypeC))
