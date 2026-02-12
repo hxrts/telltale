@@ -312,12 +312,12 @@ def RecoveryActionSafety {State : Type u}
     (step : RecoveryStep State) : Prop :=
   ∀ st act, Safe st → Safe (step st act)
 
-/-- Preconditions used by no-unsafe-replay theorem forms. -/
+/-- Preconditions used by no-harmful-replay theorem forms. -/
 structure ReplayPreconditions (State : Type u) where
   nonceFresh : State → Nat → Prop
   reconciled : State → Prop
 
-/-- Abstract no-unsafe-replay theorem form under nonce/reconciliation preconditions. -/
+/-- Abstract no-harmful-replay theorem form under nonce/reconciliation preconditions. -/
 def NoUnsafeReplay {State : Type u}
     (Safe : State → Prop)
     (pre : ReplayPreconditions State)

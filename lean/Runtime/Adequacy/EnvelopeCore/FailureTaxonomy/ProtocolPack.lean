@@ -27,7 +27,7 @@ theorem recoveryActionSafety_of_failurePremises
     RecoveryActionSafety p.Safe p.recoveryStep :=
   p.recoveryActionSafetyWitness
 
-/-- Extract abstract no-unsafe-replay theorem from failure premises. -/
+/-- Extract abstract no-harmful-replay theorem from failure premises. -/
 theorem noUnsafeReplay_of_failurePremises
     {State : Type u} {Obs : Type v}
     (p : FailureEnvelopePremises State Obs) :

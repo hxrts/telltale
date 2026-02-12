@@ -80,23 +80,9 @@ theorem finite_of_regular {t : LocalTypeC} (h : Regular t) : Set.Finite (Reachab
   intro s hs
   exact List.mem_toFinset.2 (mem_states_of_reachable h hs)
 
-/-- Noncomputable constructor from finite reachability to regular witness data. -/
-noncomputable def regularOfFinite (t : LocalTypeC) (hfin : Set.Finite (Reachable t)) : Regular t := by
-  classical
-  refine
-    { states := (Set.Finite.toFinset hfin).toList
-      root_mem := ?_
-      closed := ?_ }
-  · have h_t : t ∈ Reachable t := Relation.ReflTransGen.refl
-    have h_t_fin : t ∈ Set.Finite.toFinset hfin := (Set.Finite.mem_toFinset hfin).2 h_t
-    simpa [Finset.mem_toList] using h_t_fin
-  · intro s hs c hchild
-    have hs_fin : s ∈ Set.Finite.toFinset hfin := by
-      simpa [Finset.mem_toList] using hs
-    have hs_reach : s ∈ Reachable t := (Set.Finite.mem_toFinset hfin).1 hs_fin
-    have hc_reach : c ∈ Reachable t := reachable_step hs_reach hchild
-    have hc_fin : c ∈ Set.Finite.toFinset hfin := (Set.Finite.mem_toFinset hfin).2 hc_reach
-    simpa [Finset.mem_toList] using hc_fin
+/-- Computable bridge from finite reachability evidence plus an explicit witness. -/
+def regularOfFinite (t : LocalTypeC) (_hfin : Set.Finite (Reachable t)) (w : Regular t) : Regular t :=
+  w
 
 instance {t : LocalTypeC} : Coe (Regular t) (Set.Finite (Reachable t)) where
   coe h := finite_of_regular h

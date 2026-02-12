@@ -68,25 +68,17 @@ private lemma reachable_subset_system_image {n : Nat} (sys : FiniteSystem n) (st
       exact systemToCoind_child_closed sys ih hchild
 
 /-- Any finite-system unfolding is regular. -/
-noncomputable def systemToCoind_regular {n : Nat} (sys : FiniteSystem n) (start : Fin n) :
+def systemToCoind_regular {n : Nat} (sys : FiniteSystem n) (start : Fin n) :
     Regular (SystemToCoind sys start) := by
-  refine regularOfFinite (SystemToCoind sys start) ?_
-  refine Set.Finite.subset ?_ (reachable_subset_system_image sys start)
-  have hfiniteRange :
-      Set.Finite (Set.range (fun i : Fin n => SystemToCoind sys i)) :=
-    Set.finite_range (f := fun i : Fin n => SystemToCoind sys i)
-  have hset :
-      ({c : LocalTypeC | ∃ i : Fin n, c = SystemToCoind sys i}) =
-        Set.range (fun i : Fin n => SystemToCoind sys i) := by
-    ext c
-    constructor
-    · intro hc
-      rcases hc with ⟨i, rfl⟩
-      exact ⟨i, rfl⟩
-    · intro hc
-      rcases hc with ⟨i, hi⟩
-      exact ⟨i, hi.symm⟩
-  exact hset.symm ▸ hfiniteRange
+  refine
+    { states := List.ofFn (fun i : Fin n => SystemToCoind sys i)
+      root_mem := ?_
+      closed := ?_ }
+  · exact List.mem_ofFn.2 ⟨start, rfl⟩
+  · intro x hx c hchild
+    rcases List.mem_ofFn.1 hx with ⟨i, rfl⟩
+    rcases systemToCoind_child_closed sys (hx := ⟨i, rfl⟩) hchild with ⟨j, hj⟩
+    exact List.mem_ofFn.2 ⟨j, hj.symm⟩
 
 /-- Every rational coinductive type has a finite-state coalgebra bisimilar to it. -/
 theorem rational_has_finite_bisimulation (t : LocalTypeC) (h : RationalC t) :

@@ -213,7 +213,7 @@ theorem failureEnvelope_recoveryActionSafety_of_profile (p : FailureEnvelopeProf
       p.protocol.premises.Safe p.protocol.premises.recoveryStep :=
   p.protocol.recoveryActionSafety
 
-/-- Abstract no-unsafe-replay theorem extracted from a failure-envelope profile. -/
+/-- Abstract no-harmful-replay theorem extracted from a failure-envelope profile. -/
 theorem failureEnvelope_noUnsafeReplay_of_profile (p : FailureEnvelopeProfile) :
     Runtime.Adequacy.NoUnsafeReplay
       p.protocol.premises.Safe p.protocol.premises.replayPre p.protocol.premises.replay :=

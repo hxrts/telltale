@@ -19,8 +19,6 @@ Solution Structure.
 
 namespace SessionCoTypes.Coinductive
 
-open Classical
-
 /-! ## Relating childRel to children -/
 
 /-- Convert a childRel witness to a child index. -/
@@ -60,19 +58,59 @@ lemma reachable_subset_children (t : LocalTypeC) :
 
 /-! ## Regularity Propagation -/
 
+/-- Canonical list of child indices for each node head. -/
+private def childIndices (s : LocalTypeHead) : List (LocalTypeChild s) :=
+  match s with
+  | .end => []
+  | .var _ => []
+  | .mu _ => [()]
+  | .send _ ls => List.finRange ls.length
+  | .recv _ ls => List.finRange ls.length
+
+/-- Every child index is contained in `childIndices`. -/
+private theorem mem_childIndices (s : LocalTypeHead) (i : LocalTypeChild s) :
+    i ∈ childIndices s := by
+  cases s
+  · cases i
+  · cases i
+  · cases i
+    simp [childIndices]
+  · exact List.mem_finRange i
+  · exact List.mem_finRange i
+
+/-- Collect all child witness states into one list. -/
+private def childWitnessStates (t : LocalTypeC)
+    (h : ∀ i : LocalTypeChild (head t), Regular (children t i)) : List LocalTypeC :=
+  (childIndices (head t)).flatMap (fun i => (h i).states)
+
 /-- If all children of a node are regular, then the node is regular.
     This is the key lemma for building regular types. -/
-noncomputable def regular_of_children (t : LocalTypeC)
+def regular_of_children (t : LocalTypeC)
     (h : ∀ i : LocalTypeChild (head t), Regular (children t i)) : Regular t := by
-  classical
-  haveI : Fintype (LocalTypeChild (head t)) := by
-    cases hhead : head t <;> infer_instance
-  have hfinite_children : Set.Finite (⋃ i, Reachable (children t i)) := by
-    simpa using Set.finite_iUnion (f := fun i => Reachable (children t i))
-      (H := fun i => finite_of_regular (h i))
-  have hfinite_union : Set.Finite ({t} ∪ ⋃ i, Reachable (children t i)) :=
-    (Set.finite_singleton t).union hfinite_children
-  exact regularOfFinite t (Set.Finite.subset hfinite_union (reachable_subset_children t))
+  refine
+    { states := t :: childWitnessStates t h
+      root_mem := by simp [childWitnessStates]
+      closed := ?_ }
+  intro x hx c hchild
+  have hx' : x = t ∨ x ∈ childWitnessStates t h := by
+    simpa [childWitnessStates] using (List.mem_cons.1 hx)
+  cases hx' with
+  | inl hxt =>
+      cases hxt
+      rcases childRel_to_children hchild with ⟨i, hi⟩
+      have hi_mem : i ∈ childIndices (head t) := mem_childIndices (head t) i
+      have hc_mem_child : c ∈ childWitnessStates t h := by
+        refine List.mem_flatMap.2 ?_
+        refine ⟨i, hi_mem, ?_⟩
+        simpa [childWitnessStates, hi] using (h i).root_mem
+      exact List.mem_cons_of_mem _ hc_mem_child
+  | inr hxChild =>
+      rcases List.mem_flatMap.1 hxChild with ⟨i, hi_mem, hx_mem_i⟩
+      have hc_mem_i : c ∈ (h i).states :=
+        (h i).closed x hx_mem_i c hchild
+      have hc_mem_child : c ∈ childWitnessStates t h :=
+        List.mem_flatMap.2 ⟨i, hi_mem, hc_mem_i⟩
+      exact List.mem_cons_of_mem _ hc_mem_child
 
 /-- Regularity is preserved under bisimilarity.
     Since bisimilarity equals equality, this is immediate. -/
