@@ -116,6 +116,7 @@ theorem renameValType_renameValTypeRole_comm (ρ : SessionRenaming) (s : Session
       have hρne : ρ.f sid ≠ ρ.f s := fun heq => h (ρ.inj sid s heq)
       simp only [beq_iff_eq, h, ↓reduceIte, hρne, renameValType]
 
+/-! ## Size Helper for Branch Recursion -/
 /-- Size lemma for branch list elements. -/
 private theorem sizeOf_lt_branch (l : Label) (L : LocalType) (tl : List (Label × LocalType)) :
     sizeOf L < sizeOf ((l, L) :: tl) ∧ sizeOf tl < sizeOf ((l, L) :: tl) := by
@@ -124,6 +125,7 @@ private theorem sizeOf_lt_branch (l : Label) (L : LocalType) (tl : List (Label �
 
 mutual
 
+/-! ## Local/Branch Commutation under Session+Role Renaming -/
 /-- Session renaming commutes with role renaming on local types. -/
 theorem renameLocalType_renameLocalTypeRole_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (L : LocalType) :
     renameLocalType ρ (renameLocalTypeRole s A B L) =
@@ -176,6 +178,7 @@ termination_by sizeOf bs
 
 end
 
+/-! ## Endpoint Commutation under Session+Role Renaming -/
 /-- Session renaming commutes with role renaming on endpoints. -/
 theorem renameEndpoint_renameEndpointRole_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (ep : Endpoint) :
     renameEndpoint ρ (renameEndpointRole s A B ep) = renameEndpointRole (ρ.f s) A B (renameEndpoint ρ ep) := by
@@ -187,6 +190,7 @@ theorem renameEndpoint_renameEndpointRole_comm (ρ : SessionRenaming) (s : Sessi
     have hρne : ρ.f ep.sid ≠ ρ.f s := fun heq => h (ρ.inj ep.sid s heq)
     simp only [beq_iff_eq, h, ↓reduceIte, hρne]
 
+/-! ## Edge Commutation under Session+Role Renaming -/
 /-- Session renaming commutes with role renaming on edges. -/
 theorem renameEdge_renameEdgeRole_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (e : Edge) :
     renameEdge ρ (renameEdgeRole s A B e) = renameEdgeRole (ρ.f s) A B (renameEdge ρ e) := by
@@ -197,4 +201,3 @@ theorem renameEdge_renameEdgeRole_comm (ρ : SessionRenaming) (s : SessionId) (A
   · -- e.sid ≠ s case: both ifs are false (by injectivity)
     have hρne : ρ.f e.sid ≠ ρ.f s := fun heq => h (ρ.inj e.sid s heq)
     simp only [beq_iff_eq, h, ↓reduceIte, hρne]
-
