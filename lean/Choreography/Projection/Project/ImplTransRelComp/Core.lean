@@ -49,7 +49,9 @@ theorem EQ2F_mono {R S : Rel}
         | exact ⟨h _ _ h1, h _ _ h2⟩
         | exact ⟨h1, BranchesRel_mono h h2⟩
 
-NOTE: EQ2 transitivity is used with explicit LocalTypeR.WellFormed witnesses. -/
+/- NOTE: EQ2 transitivity is used with explicit LocalTypeR.WellFormed witnesses. -/
+
+/-! ## Branch Chain Helpers -/
 
 theorem wf_tail_of_cons
     {lb : BranchR} {bs : List BranchR}
@@ -93,6 +95,8 @@ theorem BranchesRel_trans_chain_rev_head {R : Rel}
     | inl hr => exact Or.inl (hextend _ _ _ h1.2 hr hWFa hWFb hWFc)
     | inr heq => exact Or.inr (EQ2_trans_wf h1.2 heq hWFa hWFb hWFc)
 
+/-! ## Branch Relation Chaining -/
+
 /-- Chain BranchesRel through an intermediate into the EQ2_closure.
     Given BranchesRel (EQ2_closure R) bs cs and BranchesRel EQ2 cs ds,
     produce BranchesRel (EQ2_closure R) bs ds.
@@ -122,6 +126,8 @@ theorem BranchesRel_trans_chain {R : Rel}
                   (hwf_bs lb_bs (by simp)) (hwf_cs lb_cs (by simp)) (hwf_ds lb_ds (by simp))
               · exact ih hcd_tail (wf_tail_of_cons hwf_bs)
                   (wf_tail_of_cons hwf_cs) (wf_tail_of_cons hwf_ds)
+
+/-! ## CProjectTransRel Core Relations -/
 
 /-- Witness relation for CProject_implies_EQ2_trans coinduction.
     Pairs local type lt with trans output when lt is a valid CProject output.
@@ -182,6 +188,8 @@ theorem CProjectTransRelCompWF_of_CProjectTransRel {a c : LocalTypeR}
   have hWFc : LocalTypeR.WellFormed c := CProjectTransRel_wf_right h
   exact ⟨Or.inl h, hWFa, hWFc⟩
 
+/-! ## Branch Projection Lift to CProjectTransRel -/
+
 private theorem allCommsNonEmpty_of_mem_branch
     (gbs : List (Label × GlobalType)) (label : Label) (cont : GlobalType)
     (hmem : (label, cont) ∈ gbs)
@@ -224,7 +232,7 @@ theorem branchesProjRel_to_branchesRel_CProjectTransRel
               intro gb' hmem
               exact hwf gb' (List.mem_cons_of_mem _ hmem)
             exact ih hwf_tail
-
+/-! ## Postfix Base Constructors -/
 
 theorem CProjectTransRel_postfix_mu_closure
     {v : String} {lbody t' : LocalTypeR}
@@ -261,6 +269,8 @@ theorem CProjectTransRel_postfix_var
   simp [CProjectF] at hf
   subst htrans hf
   simp [trans, EQ2F]
+
+/-! ## Postfix Mu Constructors -/
 
 /-- Helper: guarded mu/mu case for CProjectTransRel_postfix_mu_mu. -/
 private theorem CProjectTransRel_postfix_mu_mu_guarded
@@ -309,6 +319,8 @@ theorem CProjectTransRel_postfix_mu_mu
   · -- Unguarded case contradicts the mu candidate.
     have : False := by simpa using hend_eq
     exact this.elim
+
+/-! ## Postfix Case Dispatchers -/
 
 theorem CProjectTransRel_postfix_mu_end
     {muvar : String} {gbody : GlobalType} {t : LocalTypeR} {role : String}
