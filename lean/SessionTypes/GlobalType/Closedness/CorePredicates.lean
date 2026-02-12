@@ -119,6 +119,8 @@ private theorem freeVarsOfBranches_nil_iff (branches : List (Label × GlobalType
       · intro h
         exact ⟨h.1, ih.mpr h.2⟩
 
+/-! ## Closedness of Communication Branches -/
+
 /-- A closed comm has closed branch continuations.
 
 If `(comm sender receiver branches).isClosed = true`, then each branch continuation is closed.
@@ -134,6 +136,8 @@ theorem GlobalType.isClosed_comm_branches (sender receiver : String)
   intro p hp
   simp only [GlobalType.isClosed, List.isEmpty_iff]
   exact (hbranches.mp hclosed) p hp
+
+/-! ## allCommsNonEmpty Branch Lifting -/
 
 /-- Helper: allCommsNonEmptyBranches ensures each branch has allCommsNonEmpty. -/
 private theorem allCommsNonEmptyBranches_forall (branches : List (Label × GlobalType))
@@ -160,6 +164,8 @@ theorem GlobalType.allCommsNonEmpty_comm_branches (sender receiver : String)
   simp only [GlobalType.allCommsNonEmpty, Bool.and_eq_true] at hallcomms
   exact allCommsNonEmptyBranches_forall branches hallcomms.2
 
+/-! ## noSelfComm Branch Lifting -/
+
 private theorem noSelfCommBranches_forall (branches : List (Label × GlobalType))
     (h : noSelfCommBranches branches = true) :
     ∀ p ∈ branches, p.2.noSelfComm = true := by
@@ -179,6 +185,8 @@ theorem GlobalType.noSelfComm_comm_branches (sender receiver : String)
     ∀ p ∈ branches, p.2.noSelfComm = true := by
   simp only [GlobalType.noSelfComm, Bool.and_eq_true] at hns
   exact noSelfCommBranches_forall branches hns.2
+
+/-! ## Productivity and Well-Formed Branch Lifting -/
 
 private theorem isProductiveBranches_forall (branches : List (Label × GlobalType))
     (unguarded : List String)
