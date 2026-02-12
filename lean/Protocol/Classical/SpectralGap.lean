@@ -19,6 +19,8 @@ abbrev WTConfigN := WTConfigNState
 
 variable [DecidableEq WTConfigN]
 
+/-! ## Deterministic Kernel Encoding -/
+
 /-- Deterministic one-step kernel induced by protocol step function `FStep`. -/
 def wtConfigNDetTransition (step : FStep) (s s' : WTConfigN) : ℝ :=
   if s' = step s then 1 else 0
@@ -31,6 +33,8 @@ theorem wtConfigNDetTransition_nonneg (step : FStep) :
   · simp [wtConfigNDetTransition, h]
 
 variable [Fintype WTConfigN]
+
+/-! ## Markov-Chain Instance -/
 
 theorem wtConfigNDetTransition_stochastic (step : FStep) :
     ∀ s, (∑ s', wtConfigNDetTransition step s s') = 1 := by
@@ -46,6 +50,8 @@ def wtConfigNMarkovChain (step : FStep) :
   nonneg := wtConfigNDetTransition_nonneg step
   stochastic := wtConfigNDetTransition_stochastic step
 
+/-! ## Spectral and Conductance Bounds -/
+
 /-- 2.7 task: protocol-level Cheeger inequality over the `WTConfigN` chain. -/
 theorem wtConfigN_cheeger_inequality (step : FStep)
     (hGap : 0 ≤ spectralGap (wtConfigNMarkovChain step))
@@ -59,6 +65,8 @@ theorem wtConfigN_spectralGap_pos (step : FStep)
     (h : SpectralGapPos (wtConfigNMarkovChain step)) :
     0 < spectralGap (wtConfigNMarkovChain step) := by
   simpa using spectralGap_pos (mc := wtConfigNMarkovChain step) h
+
+/-! ## Stationary and Hitting-Time Corollaries -/
 
 /-- Existence of a stationary distribution from an explicit protocol witness. -/
 theorem wtConfigN_exists_stationary_dist (step : FStep)
@@ -80,6 +88,8 @@ theorem wtConfigN_expected_termination_bound (step : FStep)
     (w : TerminationWitness (wtConfigNMarkovChain step)) :
     ∀ st, expectedTerminationTime w st ≤ 1 / spectralGap (wtConfigNMarkovChain step) := by
   simpa using expected_termination_bound (mc := wtConfigNMarkovChain step) hGap w
+
+/-! ## Product-Chain Spectral Gap -/
 
 /-- Independent-session spectral-gap lower bound for two protocol kernels. -/
 theorem wtConfigN_independent_sessions_spectral_gap
