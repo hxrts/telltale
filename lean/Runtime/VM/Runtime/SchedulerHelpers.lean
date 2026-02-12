@@ -17,6 +17,8 @@ set_option autoImplicit false
 universe u
 /-! ## Scheduler helpers -/
 
+/-! ### Runnable predicates and lane lookup -/
+
 def runnable {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (c : CoroutineState γ ε) : Bool :=
   -- Ready and speculating coroutines are runnable.
@@ -50,7 +52,9 @@ def orderedLaneIds {γ : Type u} (sched : SchedState γ) : List LaneId :=
   let fromMap := sched.laneQueues.toList.map (fun p => p.1)
   let lanes := (fromMap ++ fromReady ++ fromBlocked).foldl
     (fun acc lane => insertLaneSorted lane acc) []
-  if lanes.isEmpty then [0] else lanes
+	  if lanes.isEmpty then [0] else lanes
+
+/-! ### Canonical lane-map normalization -/
 
 private def canonicalLaneOfMap {γ : Type u} (sched : SchedState γ) : LaneOfMap :=
   let withReady := sched.readyQueue.foldl
@@ -72,6 +76,8 @@ private def laneBlockedInsert {γ : Type u} (laneBlocked : LaneBlockedMap γ)
     (lane : LaneId) (cid : CoroutineId) (reason : BlockReason γ) : LaneBlockedMap γ :=
   let blocked := laneBlocked.getD lane {}
   laneBlocked.insert lane (blocked.insert cid reason)
+
+/-! ### Lane-view synchronization and edits -/
 
 /-- Rebuild per-lane queues/maps from the global ready/blocked structures. -/
 def syncLaneViews {γ : Type u} (sched : SchedState γ) : SchedState γ :=
@@ -107,6 +113,8 @@ def unblockCoroutine {γ : Type u} (sched : SchedState γ) (cid : CoroutineId) :
   else
     syncLaneViews sched
 
+/-! ### Coroutine view predicates -/
+
 def getCoro {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -134,6 +142,8 @@ def hasProgress {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   match getCoro st cid with
   | some c => hasProgressToken c
   | none => false
+
+/-! ### Queue combinators -/
 
 def takeOut (queue : SchedQueue) (p : CoroutineId → Bool) :
     Option (CoroutineId × SchedQueue) :=
@@ -174,6 +184,8 @@ def pickBest (queue : SchedQueue) (score : CoroutineId → Nat)
   match bestCandidate queue score p with
   | none => none
   | some cid => some (cid, removeFirst cid queue)
+
+/-! ### Policy-specific queue pickers -/
 
 def pickRoundRobinInQueue {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -224,6 +236,8 @@ def pickPriority {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     Option (CoroutineId × SchedQueue) :=
   pickPriorityInQueue st st.sched.readyQueue f
 
+/-! #### Policy dispatcher over queue pickers -/
+
 def pickRunnableInQueue {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -235,6 +249,8 @@ def pickRunnableInQueue {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
   | .cooperative => pickRoundRobinInQueue st queue
   | .priority f => pickPriorityInQueue st queue f
   | .progressAware => pickProgressInQueue st queue
+
+/-! ### Lane-aware global selection -/
 
 def pickLaneAux {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -280,6 +296,8 @@ def pickRunnable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   let sched := syncLaneViews st.sched
   let st' := { st with sched := sched }
   pickRunnableFromSched st'.sched.policy st' sched
+
+/-! ### Queue updates after execution steps -/
 
 def dropBlocked {γ : Type u} (blocked : BlockedSet γ) (cid : CoroutineId) :
     BlockedSet γ :=
@@ -335,4 +353,3 @@ def updateAfterStep {γ : Type u} (sched : SchedState γ) (cid : CoroutineId)
       syncLaneViews (recordCrossLaneTransfer sched1 cid endpoint targetId)
   | _ =>
       syncLaneViews { sched0 with blockedSet := blocked', readyQueue := enqueueCoro ready' cid }
-
