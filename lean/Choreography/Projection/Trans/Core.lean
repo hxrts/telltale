@@ -309,6 +309,7 @@ mutual
           have : False := by
             simp [hguard, Bool.false_eq_true, ↓reduceIte, LocalTypeR.freeVars] at hx
           exact this.elim
+    /-! ## trans_freeVars_subset: Communication Cases -/
     | .comm sender receiver branches =>
         cases hsender : role == sender with
         | true =>
@@ -326,6 +327,7 @@ mutual
                       SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap] at hx
                     have hmem := transBranches_freeVars_subset role ((label, cont) :: tail) x hx
                     simpa [GlobalType.freeVars, SessionTypes.GlobalType.freeVarsOfBranches_eq_flatMap] using hmem
+        /-! ## trans_freeVars_subset: Receiver-Side Communication Case -/
         | false =>
             cases hreceiver : role == receiver with
             | true =>
@@ -344,6 +346,7 @@ mutual
                           LocalTypeR.freeVars, SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap] at hx
                         have hmem := transBranches_freeVars_subset role ((label, cont) :: tail) x hx
                         simpa [GlobalType.freeVars, SessionTypes.GlobalType.freeVarsOfBranches_eq_flatMap] using hmem
+            /-! ## trans_freeVars_subset: Non-Participant Communication Case -/
             | false =>
                 cases branches with
                 | nil =>
@@ -358,6 +361,7 @@ mutual
                         have hmem' : x ∈ cont.freeVars := trans_freeVars_subset role cont x hx
                         simp [GlobalType.freeVars, SessionTypes.GlobalType.freeVarsOfBranches_eq_flatMap,
                           List.flatMap_cons, List.mem_append, hmem']
+    /-! ## trans_freeVars_subset: Delegation Case -/
     | .delegate p q sid r cont =>
         -- Delegate projects to continuation's freeVars
         simp only [trans] at hx
@@ -390,7 +394,7 @@ mutual
       | exact sizeOf_cont_lt_comm _ _ _ _ _
       | omega
 
-  /-- Branch-wise free variable inclusion for `transBranches`. -/
+  /-! ## transBranches_freeVars_subset -/
   theorem transBranches_freeVars_subset (role : String) :
       ∀ branches y,
         y ∈ (transBranches branches role).flatMap (fun (_, _, t) => t.freeVars) →
