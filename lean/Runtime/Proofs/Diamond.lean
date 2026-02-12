@@ -228,6 +228,8 @@ theorem updateCoro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
 
 /-! ## appendEvent Lemmas -/
 
+/-! ## appendEvent Trivial Cases -/
+
 @[simp] theorem appendEvent_none {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -247,6 +249,8 @@ theorem updateCoro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     appendEvent st (some StepEvent.internal) = st := by
   simp [appendEvent]
 
+/-! ## appendEvent Core-Preservation Skeleton -/
+
 /-- appendEvent only modifies obsTrace — all other fields are preserved. -/
 theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -263,6 +267,8 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
     | internal => simp [appendEvent]
     | obs o => simp [appendEvent]
 
+/-! ## appendEvent Runtime Field Preservation -/
+
 @[simp] theorem appendEvent_preserves_coroutines {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -277,6 +283,8 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
   | some e => cases e with
     | internal => simp [appendEvent]
     | obs o => simp [appendEvent]
+
+/-! ## appendEvent Static-Field Preservation -/
 
 @[simp] theorem appendEvent_preserves_programs {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
@@ -322,6 +330,8 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
   | some e => cases e with
     | internal => simp [appendEvent]
     | obs o => simp [appendEvent]
+
+/-! ## appendEvent Session/Buffer Preservation -/
 
 @[simp] theorem appendEvent_preserves_sessions {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
