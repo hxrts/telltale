@@ -118,6 +118,8 @@ theorem Consume_recv_cons (from_ : Role) (T : ValType) (L : LocalType) (ts : Lis
     Consume from_ (.recv from_ T L) (T :: ts) = Consume from_ L ts := by
   simp only [Consume, consumeOne, beq_self_eq_true, Bool.and_true, ↓reduceIte]
 
+/-! ## Consume Depth/Length Bounds -/
+
 /-- If consumeOne succeeds, the local type depth strictly decreases. -/
 theorem consumeOne_depth_lt {from_ : Role} {T : ValType} {L L' : LocalType}
     (h : consumeOne from_ T L = some L') : L'.depth < L.depth := by
@@ -162,6 +164,8 @@ theorem Consume_length_le_depth {from_ : Role} {L L' : LocalType} {ts : List Val
           have hLe1 : ts.length + 1 ≤ L1.depth + 1 := Nat.succ_le_succ hLen
           have hLe2 : L1.depth + 1 ≤ L.depth := Nat.succ_le_of_lt hLt
           simpa [Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using le_trans hLe1 hLe2
+
+/-! ## Consume Append/Cons Decomposition -/
 
 /-- Consume associativity for append: consuming ts then [T] equals consuming ts ++ [T].
     This is the key lemma for send preservation - appending to trace end
@@ -222,16 +226,20 @@ theorem Consume_rename (ρ : SessionRenaming) (from_ : Role) (L : LocalType) (ts
     cases h : consumeOne from_ t L with
     | none =>
         simp [consumeOne_rename, h]
-    | some L' =>
+  | some L' =>
         simp [consumeOne_rename, h, ih]
+
+/-! ## Consume Inversion Lemmas -/
 
 /-- Corollary: If Consume succeeds on [T] for a recv type from the same sender, the types match. -/
 theorem Consume_single_recv_match {from_ : Role} {T T' : ValType} {L L' : LocalType}
     (h : Consume from_ (.recv from_ T' L) [T] = some L') :
     T = T' := by
   simp only [Consume, consumeOne, beq_self_eq_true, Bool.true_and] at h
-  by_cases hEq : T == T' <;> simp [hEq] at h
+    by_cases hEq : T == T' <;> simp [hEq] at h
   exact eq_of_beq hEq
+
+/-! ## Consume Empty-Trace Consequences -/
 
 /-- Corollary: If Consume succeeds on [T] for a branch type from the same sender, T must be .string. -/
 theorem Consume_single_branch_string {from_ : Role} {bs : List (String × LocalType)} {T : ValType} {L' : LocalType}
@@ -279,6 +287,8 @@ theorem Consume_other_empty {from_ r : Role} {T : ValType} {L : LocalType}
     have hNeq : (from_ == r) = false := beq_eq_false_iff_ne.mpr hNe
     simp only [hNeq, Bool.false_and] at h
     exact Option.noConfusion h
+
+/-! ## Consume Head-Constraint Lemmas -/
 
 /-- If Consume succeeds on recv type with non-empty trace, then either:
     1. sender matches the recv's role AND trace head matches expected type, OR
