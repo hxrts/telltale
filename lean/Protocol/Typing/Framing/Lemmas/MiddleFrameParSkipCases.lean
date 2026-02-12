@@ -43,6 +43,7 @@ lemma preserved_sub_middle_par_skip_left
       HasTypeProcPreOut Ssh Sown Gmid' Q Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧
       SEnvDomSubset Δ' Δ := by
+  /-! ## `par_skip_left`: Invert Parallel Witness -/
   obtain ⟨pw, S₁_fin, S₂_fin, G₁_fin, G₂_fin, W₁, W₂, Δ₁, Δ₂,
       hSfin, hGfin, hW, hΔ, hDisjG_mid, hDisjS_mid, hDisjS_left_mid, hDisjS_right_mid,
       hDisjS_fin, hDisjW, hDisjΔ, hP_pre, hQ_pre⟩ :=
@@ -63,6 +64,7 @@ lemma preserved_sub_middle_par_skip_left
     simpa [hS1MidNil] using hSownSplit
   cases hP_pre
   simp at hS1MidNil
+  /-! ## `par_skip_left`: Reframe Surviving Branch -/
   have hQ0 :
       HasTypeProcPreOut Ssh Sown splitMid.G2 Q
         { right := Sown.right, left := S₂_fin } G₂_fin W₂ Δ₂ := by
@@ -97,12 +99,15 @@ lemma preserved_sub_middle_par_skip_left
     simpa using hW
   have hΔQ : Δ = Δ₂ := by
     simpa using hΔ
+  /-! ## `par_skip_left`: Package Subgoal -/
   refine ⟨Gmid, W₂, Δ₂, hEqG, ?_, ?_, ?_, ?_⟩
   · intro s hs
     exact hs
   · simpa [hSfinQ, hGfinQ] using hQfull
   · simpa [hWQ] using (FootprintSubset_refl (W:=W₂))
   · simpa [hΔQ] using (SEnvDomSubset_refl (S:=Δ₂))
+
+/-! ## `par_skip_right` Branch -/
 
 lemma preserved_sub_middle_par_skip_right
     {Gleft Gmid Gright G Ssh Sown P nS nG Sfin Gfin W Δ}
@@ -119,6 +124,7 @@ lemma preserved_sub_middle_par_skip_right
       HasTypeProcPreOut Ssh Sown Gmid' P Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧
       SEnvDomSubset Δ' Δ := by
+  /-! ## `par_skip_right`: Invert Parallel Witness -/
   obtain ⟨pw, S₁_fin, S₂_fin, G₁_fin, G₂_fin, W₁, W₂, Δ₁, Δ₂,
       hSfin, hGfin, hW, hΔ, hDisjG_mid, hDisjS_mid, hDisjS_left_mid, hDisjS_right_mid,
       hDisjS_fin, hDisjW, hDisjΔ, hP_pre, hQ_pre⟩ :=
@@ -139,6 +145,7 @@ lemma preserved_sub_middle_par_skip_right
     simpa [hS2MidNil] using hSownSplit
   cases hQ_pre
   simp at hS2MidNil
+  /-! ## `par_skip_right`: Reframe Surviving Branch -/
   have hP0 :
       HasTypeProcPreOut Ssh Sown splitMid.G1 P
         { right := Sown.right, left := S₁_fin } G₁_fin W₁ Δ₁ := by
@@ -167,6 +174,7 @@ lemma preserved_sub_middle_par_skip_right
     simpa using hW
   have hΔP : Δ = Δ₁ := by
     simpa using hΔ
+  /-! ## `par_skip_right`: Package Subgoal -/
   refine ⟨Gmid, W₁, Δ₁, hEqG, ?_, ?_, ?_, ?_⟩
   · intro s hs
     exact hs
