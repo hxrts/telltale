@@ -60,6 +60,8 @@ theorem transBranches_eq_of_BranchesProjRel
                   subst hnone
                   simp [Trans.transBranches, htrans_head, htail]
 
+/-! ## trans_eq_of_CProject Base Constructors -/
+
 /-- Helper: `trans` equality for end case. -/
 theorem trans_eq_of_CProject_end (role : String) (cand : LocalTypeR)
     (hproj : CProject .end role cand) : Trans.trans .end role = cand := by
@@ -101,6 +103,8 @@ theorem trans_eq_of_CProject_mu
       subst hlt
       simp [Trans.trans, htrans_body, hguard]
 
+/-! ## trans_eq_of_CProject Comm Constructor Helpers -/
+
 /-- Helper: sender comm case once branches are aligned. -/
 theorem trans_eq_of_CProject_comm_sender
     (sender receiver role : String) (branches : List (Label × GlobalType))
@@ -140,6 +144,8 @@ theorem trans_eq_of_CProject_comm_other
     simpa [hbranches_eq] using
       (Trans.trans_comm_other sender receiver role (first :: rest) hrs hrr)
   simp [htrans_comm, htrans_first]
+
+/-! ## trans_eq_of_CProject Comm Case: Sender/Receiver -/
 
 /-- Helper: sender comm case for send candidates. -/
 theorem trans_eq_of_CProject_comm_sender_send
@@ -193,6 +199,8 @@ theorem trans_eq_of_CProject_comm_receiver_recv
     trans_eq_of_CProject_comm_receiver partner receiver role branches lbs hrr hrs htrans_branches
   simpa using htrans
 
+/-! ## trans_eq_of_CProject Comm Case: Non-Participant -/
+
 /-- Helper: non-participant comm case on non-empty branches. -/
 theorem trans_eq_of_CProject_comm_other_nonempty
     (sender receiver role : String) (branches : List (Label × GlobalType))
@@ -236,6 +244,8 @@ theorem trans_eq_of_CProject_comm_other_case
       exact trans_eq_of_CProject_comm_other_nonempty sender receiver role (first :: rest) first rest
         cand hrs hrr rfl hproj hne ih
 
+/-! ## trans_eq_of_CProject Comm Case Dispatchers -/
+
 /-- Helper: sender comm case dispatcher. -/
 theorem trans_eq_of_CProject_comm_sender_case
     (sender receiver role : String) (branches : List (Label × GlobalType)) (cand : LocalTypeR)
@@ -268,6 +278,8 @@ theorem trans_eq_of_CProject_comm_sender_case
         have hf := CProject_destruct hproj
         simp [CProjectF, hrs] at hf
       exact hf'.elim
+
+/-! ## trans_eq_of_CProject Comm Case: Receiver Dispatcher -/
 
 /-- Helper: receiver comm case dispatcher. -/
 theorem trans_eq_of_CProject_comm_receiver_case
