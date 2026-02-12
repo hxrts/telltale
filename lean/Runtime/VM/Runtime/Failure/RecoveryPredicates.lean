@@ -1,5 +1,18 @@
 import Runtime.VM.Runtime.Failure.Transitions
 
+/-! # Runtime.VM.Runtime.Failure.RecoveryPredicates
+
+Logical predicates used by failure-recovery theorem statements.
+-/
+
+/-
+The Problem. Recovery theorems need a compact vocabulary for session coherence,
+drain states, participant survivability, and crash/close safety preconditions.
+
+Solution Structure. Define reusable predicates in three layers: session/drain
+predicates, participation predicates, and crash/close safety predicates.
+-/
+
 set_option autoImplicit false
 
 universe u
