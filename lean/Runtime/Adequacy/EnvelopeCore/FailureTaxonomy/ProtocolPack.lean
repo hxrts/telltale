@@ -12,6 +12,8 @@ namespace Adequacy
 
 universe u v
 
+/-! ## Premise Projection Theorems I -/
+
 /-- Extract cross-target failure-envelope conformance theorem from failure premises. -/
 theorem crossTargetFailureConformance_of_failurePremises
     {State : Type u} {Obs : Type v}
@@ -49,6 +51,8 @@ theorem restartStructuredErrorAdequacy_of_failurePremises
       p.Refines p.checkpoint p.restart p.structuredErrors :=
   p.restartStructuredErrorAdequacyWitness
 
+/-! ## Premise Projection Theorems II -/
+
 /-- Extract failure-envelope soundness extension theorem from failure premises. -/
 theorem failureEnvelopeSoundness_of_failurePremises
     {State : Type u} {Obs : Type v}
@@ -64,6 +68,8 @@ theorem failureEnvelopeMaximality_of_failurePremises
     FailureEnvelopeMaximalityExtension
       p.localEnvelope p.RefRun p.ImplRun p.injectFailure :=
   p.failureEnvelopeMaximalityWitness
+
+/-! ## Packaged Protocol Record -/
 
 /-- Packaged abstract failure/recovery theorem family. -/
 structure FailureEnvelopeProtocol where
