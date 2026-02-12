@@ -69,6 +69,8 @@ def ParticipantSurvives {ι : Type u} [IdentityModel ι]
 
 /-! ## Failure-aware step relation -/
 
+/-! ### Topology mutation primitives -/
+
 def crashSite {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -105,6 +107,8 @@ def reconnectEdges {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   let remaining := st.partitionedEdges.filter (fun e => decide (e ∉ _edges))
   { st with partitionedEdges := remaining }
 
+/-! ### Environment ingress events -/
+
 /-- Topology-only changes used by runtime scheduling/failure models. -/
 inductive TopologyChange {ι : Type u} [IdentityModel ι] where
   | crash (site : IdentityModel.SiteId ι)
@@ -115,6 +119,8 @@ inductive TopologyChange {ι : Type u} [IdentityModel ι] where
 Topology perturbations are modeled as external environment ingress. -/
 inductive EnvironmentEvent {ι : Type u} [IdentityModel ι] where
   | topology (tc : TopologyChange (ι := ι))
+
+/-! #### Topology-change application -/
 
 /-- Apply a topology change without executing protocol instructions. -/
 def applyTopologyChange {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -150,16 +156,18 @@ def applyEnvironmentEvent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
         | .crash _ => "topology:crash"
         | .partition edges => s!"topology:partition edges={edges.length}"
         | .heal edges => s!"topology:heal edges={edges.length}"
-      let traceEv : FailureTraceEvent :=
-        { tick := st'.clock
-        , seqNo := st'.nextFailureSeqNo
-        , tag := .topology
-        , detail := detail
-        }
-      { st' with
-          failureTrace := st'.failureTrace ++ [traceEv]
-        , nextFailureSeqNo := st'.nextFailureSeqNo + 1
-      }
+	  let traceEv : FailureTraceEvent :=
+	    { tick := st'.clock
+	    , seqNo := st'.nextFailureSeqNo
+	    , tag := .topology
+	    , detail := detail
+	    }
+	  { st' with
+	      failureTrace := st'.failureTrace ++ [traceEv]
+	    , nextFailureSeqNo := st'.nextFailureSeqNo + 1
+	  }
+
+/-! #### Batched environment ingress -/
 
 /-- Apply an environment-event batch in arrival order. -/
 def applyEnvironmentEvents {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -171,6 +179,8 @@ def applyEnvironmentEvents {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     (st : VMState ι γ π ε ν) (events : List (EnvironmentEvent (ι := ι))) :
     VMState ι γ π ε ν :=
   events.foldl applyEnvironmentEvent st
+
+/-! ### Session closure/coherence helpers -/
 
 /-- Lookup a session state by id. -/
 def sessionState? {ν : Type u} [VerificationModel ν]
@@ -209,6 +219,8 @@ def failureSessionCoherentB {ι γ π ε ν : Type u} [IdentityModel ι] [GuardL
       match sess.phase with
       | .closed => false
       | _ => true
+
+/-! ### Recovery policy vocabulary -/
 
 /-- Recovery actions used by the executable failure semantics. -/
 inductive RecoveryAction where
@@ -254,6 +266,8 @@ theorem retryBackoffDelay_bounded
   unfold retryBackoffDelay retryAllowed at *
   exact Nat.add_le_add_left (Nat.mul_le_mul_right _ hAttempt) _
 
+/-! ### Structured failure evidence and event mapping -/
+
 /-- Alias used by failure recovery to express commit certainty on ingress evidence. -/
 abbrev CommitCertainty := ErrorCertainty
 
@@ -281,6 +295,8 @@ def faultClassOfFailure {ι : Type u} [IdentityModel ι] : Failure ι → String
   | .heal _ => "topology_mutation"
   | .corrupt _ _ => "transport_corruption"
   | .timeout _ _ => "transport_timeout"
+
+/-! #### Deterministic trace/error event emission -/
 
 /-- Append one deterministic trace event in ingress order. -/
 def appendFailureTraceEvent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -324,10 +340,12 @@ def emitStructuredErrorEvent {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     , evidenceId := evidenceId
     , detail := detail
     }
-  { st with
-      structuredErrorEvents := st.structuredErrorEvents ++ [ev]
-    , nextFailureSeqNo := st.nextFailureSeqNo + 1
-  }
+	  { st with
+	      structuredErrorEvents := st.structuredErrorEvents ++ [ev]
+	    , nextFailureSeqNo := st.nextFailureSeqNo + 1
+	  }
+
+/-! ### Reconciliation pre-stage -/
 
 /-- Reconciliation stage used before replay when certainty is unknown. -/
 def reconcileBeforeReplay {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -342,6 +360,8 @@ def reconcileBeforeReplay {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     appendFailureTraceEvent st' .reconciliation s!"reconcile_before_replay sid={sid}"
   else
     st
+
+/-! ### Deterministic recovery decision procedures -/
 
 /-- Deterministic policy dispatcher for timeout handling under strict/bounded modes. -/
 def decideTimeoutRecovery
@@ -360,6 +380,8 @@ def decideTimeoutRecovery
         .retryAfter (retryBackoffDelay policy evidence.retryAttempt)
       else
         .closeSession sid
+
+/-! #### Session-scoped recovery decision -/
 
 /-- Deterministic recovery choice for a failure affecting a session. -/
 def decideRecovery {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -403,6 +425,8 @@ def decideRecovery {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
             decideTimeoutRecovery policy st.clock edge.sid deadline evidence
   else
     .closeSession sid
+
+/-! ### Totality witness -/
 
 /-- `decideRecovery` is total: every input yields a concrete recovery action. -/
 theorem decideRecovery_total
