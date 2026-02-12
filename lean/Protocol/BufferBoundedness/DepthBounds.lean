@@ -71,6 +71,8 @@ theorem totalTypeDepthG_updateG_le {G : GEnv} {e : Endpoint}
               ih (e:=e) (Lold:=Lold) (Lnew:=Lnew) hLookup' hLe
             simp [totalTypeDepthG_cons, updateG, hEq, hTail]
 
+/-! ## Step-Wise Depth Decrease Lemmas -/
+
 /-- Send steps reduce totalTypeDepth (depth strictly decreases at sender). -/
 theorem totalTypeDepth_send_le {C : Config} {e : Endpoint} {target : Role}
     {T : ValType} {L : LocalType} {v : Value}
@@ -129,6 +131,8 @@ theorem totalTypeDepth_branch_le {C : Config} {e : Endpoint} {source : Role}
   simpa [totalTypeDepth, totalTypeDepthG] using
     totalTypeDepthG_updateG_le (G:=C.G) (e:=e) (Lold:=.branch source typeBranches) (Lnew:=L) hG hLe
 
+/-! ## Depth Monotonicity Across Step Relations -/
+
 /-- StepBase does not increase totalTypeDepth. -/
 theorem totalTypeDepth_stepBase_le {C C' : Config} (h : StepBase C C') :
     totalTypeDepth C' ≤ totalTypeDepth C := by
@@ -179,6 +183,8 @@ theorem totalTypeDepth_step_le {C C' : Config} (h : Step C C') :
       -- par-right only changes the process wrapper.
       simpa [totalTypeDepth] using ih
 
+/-! ## Reachability-Wide Depth Bound -/
+
 /-- totalTypeDepth is non-increasing along unbounded reachability. -/
 theorem totalTypeDepth_reachable_le {C₀ C : Config} (h : UnboundedReachable C₀ C) :
     totalTypeDepth C ≤ totalTypeDepth C₀ := by
@@ -217,6 +223,8 @@ theorem length_updateG_of_lookup {G : GEnv} {e : Endpoint}
               have hEq' : (e == ep) = false := beq_eq_false_iff_ne.mpr hEq
               simpa [lookupG, List.lookup, hEq'] using hLookup
             simp [updateG, hEq, ih (e:=e) (Lold:=Lold) (Lnew:=Lnew) hLookup']
+
+/-! ## Step-Wise GEnv Length Preservation -/
 
 /-- StepBase preserves GEnv length. -/
 theorem G_length_stepBase_eq {C C' : Config} (h : StepBase C C') :
@@ -266,6 +274,8 @@ theorem G_length_step_eq {C C' : Config} (h : Step C C') :
       simpa using ih
   | par_right hProc hStep ih =>
       simpa using ih
+
+/-! ## Reachability-Wide GEnv Length Bound -/
 
 /-- GEnv length is preserved along unbounded reachability. -/
 theorem G_length_reachable_eq {C₀ C : Config} (h : UnboundedReachable C₀ C) :
