@@ -63,6 +63,8 @@ structure Edge where
 
 namespace Edge
 
+/-! ## Edge Constructors and Symmetry -/
+
 /-- Create an edge from session ID and role pair. -/
 def mk' (s : SessionId) (p q : Role) : Edge := { sid := s, sender := p, receiver := q }
 
@@ -86,6 +88,8 @@ theorem reverse_ne_self (e : Edge) (h : e.sender ≠ e.receiver) : e.reverse ≠
   exact h h1.symm
 
 instance : Inhabited Edge := ⟨{ sid := 0, sender := "", receiver := "" }⟩
+
+/-! ## Edge Ordering -/
 
 instance : Ord Edge where
   compare :=
@@ -147,6 +151,8 @@ abbrev RoleSet := List Role
 
 namespace RoleSet
 
+/-! ## Membership and Edge Enumeration -/
+
 /-- Check if a role is in the role set. -/
 def contains (rs : RoleSet) (r : Role) : Bool :=
   rs.elem r
@@ -183,6 +189,8 @@ theorem allEdges_sender_mem (sid : SessionId) (rs : RoleSet) :
   · have : False := by
       simp [hneq] at hite
     exact this.elim
+
+/-! ## Endpoint Enumeration -/
 
 /-- Get all endpoints for a session. -/
 def allEndpoints (sid : SessionId) (rs : RoleSet) : List Endpoint :=
