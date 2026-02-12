@@ -34,6 +34,8 @@ theorem trans_eq_of_CProject_comm_case
     · exact trans_eq_of_CProject_comm_receiver_case sender receiver role branches cand hrr hrs hproj hne ih
     · exact trans_eq_of_CProject_comm_other_case sender receiver role branches cand hrs hrr hproj hne ih
 
+/-! ## trans_eq_of_CProject Main Recursion -/
+
 /-- If CProject holds and all comms are non-empty, `trans` must return the same candidate. -/
 theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR)
     (hproj : CProject g role cand) (hne : g.allCommsNonEmpty = true) :
@@ -51,6 +53,7 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
       have htrans_body : Trans.trans body role = candBody :=
         trans_eq_of_CProject body role candBody hbody hne_body
       exact trans_eq_of_CProject_mu t body role cand candBody hcase htrans_body
+  /-! ## trans_eq_of_CProject: Comm Branch -/
   | comm sender receiver branches =>
       have hne_branches :
           ∀ gb ∈ branches, gb.2.allCommsNonEmpty = true :=
@@ -59,6 +62,7 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
           ∀ gb ∈ branches, ∀ lb, CProject gb.2 role lb → Trans.trans gb.2 role = lb :=
         fun gb hmem lb hcp => trans_eq_of_CProject gb.2 role lb hcp (hne_branches gb hmem)
       exact trans_eq_of_CProject_comm_case sender receiver role branches cand hproj hne ih
+  /-! ## trans_eq_of_CProject: Delegate Branch -/
   | delegate p q sid r cont =>
       by_cases hp : role = p
       · have hf := CProject_destruct hproj
@@ -95,6 +99,7 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
             simp [CProjectF, hp] at hf
         | mu _ _ =>
             simp [CProjectF, hp] at hf
+      /-! ## trans_eq_of_CProject: Delegate Receiver/Other -/
       · by_cases hq : role = q
         · have hnp : q ≠ p := by
             intro hqp
@@ -142,6 +147,7 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
               simp [CProjectF, hq, hnp] at hf
           | mu _ _ =>
               simp [CProjectF, hq, hnp] at hf
+        /-! ## trans_eq_of_CProject: Delegate Non-Participant -/
         · -- non-participant: follow continuation
           have hf := CProject_destruct hproj
           simp [CProjectF, hp, hq] at hf
@@ -158,6 +164,10 @@ decreasing_by
     | (subst_vars; apply sizeOf_elem_snd_lt_comm; assumption)
     | (subst_vars; simp only [sizeOf, GlobalType._sizeOf_1]; omega)
 
+/-! ## projectb Completeness Helpers -/
+
+/-! ## projectb Completeness: Base Cases -/
+
 /-- Completeness: if CProject holds and all comms are non-empty, then projectb returns true.
     Proven by well-founded recursion on g. -/
 theorem projectb_complete_end (role : String) (cand : LocalTypeR)
@@ -173,6 +183,8 @@ theorem projectb_complete_var (t : String) (role : String) (cand : LocalTypeR)
   cases cand <;> simp [CProjectF, projectb] at hF ⊢
   · subst hF; simp
 
+/-! ## projectb Completeness: Mu Cases -/
+
 theorem projectb_complete_mu_mu (t : String) (body : GlobalType) (role : String)
     (candBody : LocalTypeR) (hguard : candBody.isGuarded t = true)
     (hproj_body : projectb body role candBody = true) :
@@ -187,6 +199,8 @@ theorem projectb_complete_mu_end (t : String) (body : GlobalType) (role : String
     projectb (GlobalType.mu t body) role .end = true := by
   -- Unguarded branch of projectb.
   simp [projectb, htrans_body, hguard, hproj_body]
+
+/-! ## projectb Completeness: Mu Dispatcher -/
 
 theorem projectb_complete_mu
     (t : String) (body : GlobalType) (role : String) (cand candBody : LocalTypeR)
@@ -218,6 +232,8 @@ theorem projectb_complete_mu
       | inl h => cases h.2
       | inr h => cases h.2
 
+/-! ## projectb Completeness: Comm Cases -/
+
 theorem projectb_complete_comm_sender
     (s r role : String) (gbs : List (Label × GlobalType))
     (partner : String) (lbs : List BranchR)
@@ -227,6 +243,8 @@ theorem projectb_complete_comm_sender
   subst hs
   subst hpartner
   simp [projectb, hbranches_proj]
+
+/-! ## projectb Completeness: Comm Receiver -/
 
 theorem projectb_complete_comm_receiver
     (s r role : String) (gbs : List (Label × GlobalType))
@@ -241,6 +259,8 @@ theorem projectb_complete_comm_receiver
   have hpartner_beq : (partner == s) = true := by
     simp [hpartner]
   simpa [projectb, hne_sender, hne_receiver, hpartner_beq] using hbranches_proj
+
+/-! ## projectb Completeness: Comm Non-Participant -/
 
 theorem projectb_complete_comm_other
     (s r role : String) (gbs : List (Label × GlobalType)) (cand : LocalTypeR)
