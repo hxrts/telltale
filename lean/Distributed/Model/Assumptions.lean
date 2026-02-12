@@ -1,4 +1,4 @@
-import Distributed.Model.Classifier
+import Distributed.Model.Assumptions.Checks
 
 set_option autoImplicit false
 
@@ -64,107 +64,6 @@ structure AssumptionResult where
   passed : Bool
   detail : String
   deriving Repr, DecidableEq, Inhabited
-
-/-! ## Internal Consistency Checks -/
-
-/-- Internal helper: finality-mode coherence with certificate mode. -/
-def finalityModeConsistentCheck (p : ProtocolSpec) : Bool :=
-  match inferredCertificate? p with
-  | none => false
-  | some .quorum => p.deterministicFinality && !p.probabilisticFinality
-  | some .work => p.probabilisticFinality && !p.deterministicFinality
-  | some .hybrid => p.probabilisticFinality && p.deterministicFinality
-
-/-- Internal helper: primitive evidence selection is one coherent family. -/
-def evidencePrimitiveConsistentCheck (p : ProtocolSpec) : Bool :=
-  intersectionPrimitive p || additivePrimitive p || coupledPrimitive p
-
-/-- Internal helper: conflict-exclusion law matches evidence accumulation. -/
-def conflictExclusionPrimitiveConsistentCheck (p : ProtocolSpec) : Bool :=
-  match p.evidenceAccumulation with
-  | .intersection => p.conflictExclusionLaw = .quorumIntersection
-  | .additiveWeight => p.conflictExclusionLaw = .weightDominance
-  | .coupled => p.conflictExclusionLaw = .coupledRule
-
-/-- Internal helper: finalization witness rule matches evidence accumulation. -/
-def finalizationWitnessPrimitiveConsistentCheck (p : ProtocolSpec) : Bool :=
-  match p.evidenceAccumulation with
-  | .intersection => p.finalizationWitnessRule = .thresholdCertificate
-  | .additiveWeight => p.finalizationWitnessRule = .confirmationDepth
-  | .coupled => p.finalizationWitnessRule = .coupledWitness
-
-/-- Internal helper: witness monotonicity is coherent with evidence regime. -/
-def witnessMonotonicityConsistentCheck (p : ProtocolSpec) : Bool :=
-  match p.evidenceAccumulation with
-  | .intersection => p.witnessMonotonicity
-  | .additiveWeight => !p.witnessMonotonicity
-  | .coupled => p.witnessMonotonicity
-
-/-- Internal helper: coarse certificate tag agrees with primitive model. -/
-def certificateDerivedConsistentCheck (p : ProtocolSpec) : Bool :=
-  Distributed.certificateDerivedConsistent p
-
-/-! ## Internal Checks: Threshold/Timing/CAP Preconditions -/
-
-/-- Internal helper: quorum intersection assumptions are explicit and plausible. -/
-def quorumIntersectionWitnessedCheck (p : ProtocolSpec) : Bool :=
-  if additivePrimitive p then
-    false
-  else
-    (intersectionPrimitive p || coupledPrimitive p) &&
-      p.quorumIntersectionWitnessed && quorumSane p && bftThresholdOk p
-
-/-- Internal helper: timing/auth model is explicitly declared and compatible. -/
-def timingAuthCompatibleCheck (p : ProtocolSpec) : Bool :=
-  if additivePrimitive p then
-    p.timingAuthContractDeclared
-  else
-    p.timingAuthContractDeclared &&
-    p.authentication ≠ .none &&
-    bftThresholdOk p
-
-/-- Internal helper: CAP policy aligns with certificate pressure. -/
-def capPressureConsistentCheck (p : ProtocolSpec) : Bool :=
-  match inferredCertificate? p, p.partitionPolicy with
-  | some .quorum, .livenessFirst => false
-  | some .work, .safetyFirst => false
-  | some .hybrid, .adaptive => true
-  | some .hybrid, _ => true
-  | _, _ => true
-
-/-- Internal helper: if responsive path is claimed, preconditions must hold. -/
-def responsivePreconditionsCheck (p : ProtocolSpec) : Bool :=
-  if !p.responsivePath then
-    true
-  else
-    (intersectionPrimitive p || coupledPrimitive p) &&
-    (p.timing = .sync || p.timing = .partialSync) &&
-    p.authentication = .signatures &&
-    p.faultModel = .byzantine &&
-    basicWellFormed p
-
-/-- Internal helper: adversarial-budget check across count and weight regimes. -/
-def adversarialBudgetBoundedCheck (p : ProtocolSpec) : Bool :=
-  let countOk :=
-    if additivePrimitive p then true else bftThresholdOk p
-  let weightOk :=
-    if intersectionPrimitive p then true else p.adversarialWeightPermille < 500
-  basicWellFormed p && countOk && weightOk
-
-/-- Internal helper: hybrid finalized-prefix/available-prefix invariant status. -/
-def hybridFrontInvariantCheck (p : ProtocolSpec) : Bool :=
-  if coupledPrimitive p then
-    p.hybridFrontInvariantHolds
-  else
-    true
-
-/-- Internal helper: classical transport profile eligibility. -/
-def classicalTransportEligibleCheck (p : ProtocolSpec) : Bool :=
-  isSoundConsensus p &&
-  p.classicalTransportProfileDeclared &&
-  p.logicalTimeSemanticsDeclared &&
-  p.orderParameterDeclared &&
-  p.phaseBoundaryModelDeclared
 
 /-! ## Built-In Assumption Bundles -/
 
@@ -238,6 +137,23 @@ def byzantineSafetyAssumptions : List Assumption :=
   , .timingAuthCompatible
   , .adversarialBudgetBounded
   ]
+
+/-- Regime-aware Byzantine assumption bundle keyed by evidence accumulation mode. -/
+def byzantineSafetyAssumptionsFor (p : ProtocolSpec) : List Assumption :=
+  match p.evidenceAccumulation with
+  | .intersection =>
+      byzantineSafetyAssumptions
+  | .additiveWeight =>
+      -- Additive-weight regimes use budget/timing checks in place of quorum intersection.
+      [ .byzantineFaultModel
+      , .evidencePrimitiveConsistent
+      , .conflictExclusionPrimitiveConsistent
+      , .finalizationWitnessPrimitiveConsistent
+      , .timingAuthCompatible
+      , .adversarialBudgetBounded
+      ]
+  | .coupled =>
+      byzantineSafetyAssumptions
 
 /-! ## Assumption Validation -/
 
@@ -429,55 +345,62 @@ theorem validateAssumption_byzantineFaultModel_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .byzantineFaultModel).passed = true ↔
       p.faultModel = .byzantine := by
-  -- Unfold the validator branch and normalize booleans.
-  simp [validateAssumption]
+  -- Unfold the grouped validator cascade and normalize boolean equality.
+  simp [validateAssumption, validateAssumptionSpaceFinality?,
+    validateAssumptionFaultModel?, mkAssumptionResult]
 
 /-- Validator bridge: evidence-primitive consistency check is exact. -/
 theorem validateAssumption_evidencePrimitiveConsistent_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .evidencePrimitiveConsistent).passed = true ↔
       evidencePrimitiveConsistentCheck p = true := by
-  -- The branch is a direct projection of the internal checker.
-  simp [validateAssumption]
+  -- Unfold the grouped validator cascade and normalize boolean equality.
+  simp [validateAssumption, validateAssumptionSpaceFinality?, validateAssumptionFaultModel?,
+    validateAssumptionPrimitiveCoherence?, mkAssumptionResult]
 
 /-- Validator bridge: conflict-exclusion primitive check is exact. -/
 theorem validateAssumption_conflictExclusionPrimitiveConsistent_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .conflictExclusionPrimitiveConsistent).passed = true ↔
       conflictExclusionPrimitiveConsistentCheck p = true := by
-  -- The branch is a direct projection of the internal checker.
-  simp [validateAssumption]
+  -- Unfold the grouped validator cascade and normalize boolean equality.
+  simp [validateAssumption, validateAssumptionSpaceFinality?, validateAssumptionFaultModel?,
+    validateAssumptionPrimitiveCoherence?, mkAssumptionResult]
 
 /-- Validator bridge: finalization-witness primitive check is exact. -/
 theorem validateAssumption_finalizationWitnessPrimitiveConsistent_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .finalizationWitnessPrimitiveConsistent).passed = true ↔
       finalizationWitnessPrimitiveConsistentCheck p = true := by
-  -- The branch is a direct projection of the internal checker.
-  simp [validateAssumption]
+  -- Unfold the grouped validator cascade and normalize boolean equality.
+  simp [validateAssumption, validateAssumptionSpaceFinality?, validateAssumptionFaultModel?,
+    validateAssumptionPrimitiveCoherence?, mkAssumptionResult]
 
 /-- Validator bridge: quorum-intersection witness check is exact. -/
 theorem validateAssumption_quorumIntersectionWitnessed_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .quorumIntersectionWitnessed).passed = true ↔
       quorumIntersectionWitnessedCheck p = true := by
-  -- The branch is a direct projection of the internal checker.
-  simp [validateAssumption]
+  -- Unfold the grouped validator cascade and normalize boolean equality.
+  simp [validateAssumption, validateAssumptionSpaceFinality?, validateAssumptionFaultModel?,
+    validateAssumptionPrimitiveCoherence?, mkAssumptionResult]
 
 /-- Validator bridge: timing/auth compatibility check is exact. -/
 theorem validateAssumption_timingAuthCompatible_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .timingAuthCompatible).passed = true ↔
       timingAuthCompatibleCheck p = true := by
-  -- The branch is a direct projection of the internal checker.
-  simp [validateAssumption]
+  -- Unfold the grouped validator cascade and normalize boolean equality.
+  simp [validateAssumption, validateAssumptionSpaceFinality?, validateAssumptionFaultModel?,
+    validateAssumptionPrimitiveCoherence?, mkAssumptionResult]
 
 /-- Validator bridge: adversarial-budget check is exact. -/
 theorem validateAssumption_adversarialBudgetBounded_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .adversarialBudgetBounded).passed = true ↔
       adversarialBudgetBoundedCheck p = true := by
-  -- The branch is a direct projection of the internal checker.
-  simp [validateAssumption]
+  -- Unfold the grouped validator cascade and normalize boolean equality.
+  simp [validateAssumption, validateAssumptionSpaceFinality?, validateAssumptionFaultModel?,
+    validateAssumptionPrimitiveCoherence?, validateAssumptionPressureBudget?, mkAssumptionResult]
 
 end Distributed
