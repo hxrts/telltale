@@ -99,6 +99,8 @@ private theorem EQ2F_lift_compWF_recv
     LocalTypeR.WellFormed.branches_of_recv (p := q) (bs := cs) hWFc
   exact BranchesRel_lift_compWF h hWFbs hWFcs
 
+/-! ## EQ2F Mu-Unfold Lifting Helpers -/
+
 private theorem EQ2F_lift_compWF_mu_left
     {v : String} {body_lt t : LocalTypeR}
     (h : EQ2_closure CProjectTransRelComp (body_lt.substitute v (.mu v body_lt)) t)
@@ -121,6 +123,8 @@ private theorem EQ2F_lift_compWF_mu_right
     LocalTypeR.WellFormed.unfold hWFc
   exact lift_eq2_closure_compWF h hWFa hWF_unfold_t
 
+/-! ## EQ2F Mu/Mu Lifting -/
+
 /- Helper: mu-mu case for EQ2F_lift_compWF. -/
 private theorem EQ2F_lift_compWF_mu_mu
     {v v' : String} {body_lt body_t : LocalTypeR}
@@ -139,6 +143,8 @@ private theorem EQ2F_lift_compWF_mu_mu
     lift_eq2_closure_compWF h.2 hWFa hWF_unfold_t
   ⟩
 
+/-! ## EQ2F General Lifting -/
+
 private theorem EQ2F_lift_compWF {lt t : LocalTypeR}
     (h : EQ2F (EQ2_closure CProjectTransRelComp) lt t)
     (hWFa : LocalTypeR.WellFormed lt) (hWFc : LocalTypeR.WellFormed t) :
@@ -154,6 +160,9 @@ private theorem EQ2F_lift_compWF {lt t : LocalTypeR}
     | exact EQ2F_lift_compWF_mu_left h hWFa hWFc
     | exact ⟨h.1, EQ2F_lift_compWF_send (h := h.2) hWFa hWFc⟩
     | exact ⟨h.1, EQ2F_lift_compWF_recv (h := h.2) hWFa hWFc⟩
+
+/-! ## Through-Mu Composition (EQ2 then CProjectTransRel) -/
+
 theorem EQ2_CProjectTransRel_compose_through_mu_WF
     {a c : LocalTypeR} {v : String} {body : LocalTypeR}
     (heq : EQ2 a (.mu v body))
@@ -182,6 +191,8 @@ theorem EQ2_CProjectTransRel_compose_through_mu_WF
           EQ2_unfold_right (EQ2_refl (.mu v body_c))⟩)))
   exact EQ2F_lift_compWF hcomp hWFa hWFc
 
+/-! ## Through-Mu Composition (CProjectTransRel then EQ2) -/
+
 theorem CProjectTransRel_EQ2_compose_through_mu_WF
     {a c : LocalTypeR} {v : String} {body : LocalTypeR}
     (hrel : CProjectTransRel a (.mu v body))
@@ -192,6 +203,8 @@ theorem CProjectTransRel_EQ2_compose_through_mu_WF
   have h := CProjectTransRel_EQ2_compose_through_mu hrel heq hWFa hWFc
   exact EQ2F_lift_compWF h hWFa hWFc
 
+/-! ## Three-Hop Composition in WF Closure -/
+
 private theorem EQ2_CProjectTransRel_EQ2_compose_WF
     {a c : LocalTypeR} {b b' : LocalTypeR}
     (heq1 : EQ2 a b) (hrel : CProjectTransRel b b') (heq2 : EQ2 b' c)
@@ -200,6 +213,8 @@ private theorem EQ2_CProjectTransRel_EQ2_compose_WF
   -- Lift the 3-hop composition lemma into the WF closure.
   have h := EQ2_CProjectTransRel_EQ2_compose heq1 hrel heq2 hWFa hWFc
   exact EQ2F_lift_compWF h hWFa hWFc
+
+/-! ## Postfix Base and Chain Cases -/
 
 /-- CProjectTransRelComp is a post-fixpoint of EQ2F.
 
@@ -227,6 +242,8 @@ theorem CProjectTransRelComp_postfix_chain
     EQ2F (EQ2_closure CProjectTransRelCompWF) a c := by
   -- 3-hop chain: lift via the compose lemma into the WF closure.
   exact EQ2_CProjectTransRel_EQ2_compose_WF heq_ab hrel_bb' heq_b'c hWFa hWFc
+
+/-! ## Prefix Mu Cases with WF Closure -/
 
 theorem CProjectTransRelComp_postfix_prefix_mu_mu
     {v v' : String} {body_lt body_t b : LocalTypeR}
@@ -257,6 +274,8 @@ theorem CProjectTransRelComp_postfix_prefix_mu_mu
         (EQ2_unfold_right (EQ2_refl (.mu v' body_t))) hWFa hWFc hWF_unfold_t
     exact Or.inl hcomp_right
 
+/-! ## Prefix Mu/Non-Mu Case with WF Closure -/
+
 theorem CProjectTransRelComp_postfix_prefix_mu_nonmu
     {v : String} {body_lt t b : LocalTypeR}
     (heq_ab : EQ2 (.mu v body_lt) b) (hrel_bb' : CProjectTransRel b t)
@@ -278,6 +297,8 @@ theorem CProjectTransRelComp_postfix_prefix_mu_nonmu
         heq_ab hrel_bb' hWFa hWFc
   | _ =>
       simpa [EQ2F] using (Or.inl hcomp_left)
+
+/-! ## Prefix Non-Mu/Mu Case with WF Closure -/
 
 theorem CProjectTransRelComp_postfix_prefix_nonmu_mu
     {lt b : LocalTypeR} {v' : String} {body_t : LocalTypeR}
@@ -303,6 +324,8 @@ theorem CProjectTransRelComp_postfix_prefix_nonmu_mu
         heq_ab hrel_bb' hWFa hWFc
   | _ =>
       simpa [EQ2F] using (Or.inl hcomp_right)
+
+/-! ## Prefix Var/Var Case with WF Closure -/
 
 theorem CProjectTransRelComp_postfix_prefix_var_var
     {x y : String} {b : LocalTypeR}
