@@ -52,6 +52,8 @@ theorem DelegationStep_B_added_renaming (ρ : SessionRenaming)
   congr 1
   exact renameLocalType_renameLocalTypeRole_comm ρ s A B A_type
 
+/-! ## Renaming Transport for `other_roles_G` / `other_sessions_G` -/
+
 theorem DelegationStep_other_roles_G_renaming (ρ : SessionRenaming)
     {G G' : GEnv} {s : SessionId} {A B : Role}
     (hOrig : ∀ ep, ep.sid = s → ep.role ≠ A → ep.role ≠ B →
@@ -74,6 +76,8 @@ theorem DelegationStep_other_roles_G_renaming (ρ : SessionRenaming)
   congr 1
   funext L
   exact renameLocalType_renameLocalTypeRole_comm ρ s A B L
+
+/-! ## Renaming Transport for `other_sessions_G` -/
 
 theorem DelegationStep_other_sessions_G_renaming (ρ : SessionRenaming)
     {G G' : GEnv} {s : SessionId}
@@ -104,6 +108,8 @@ theorem DelegationStep_other_sessions_G_renaming (ρ : SessionRenaming)
     rw [hOther, hLookupG] at hResult
     simp only [Option.map_some] at hResult
     rw [hResult, hL]
+
+/-! ## Renaming Transport for `other_sessions_D` / `A_incident_empty` -/
 
 theorem DelegationStep_other_sessions_D_renaming (ρ : SessionRenaming)
     {D D' : DEnv} {s : SessionId}
@@ -151,6 +157,8 @@ theorem DelegationStep_A_incident_empty_renaming (ρ : SessionRenaming)
   rw [hEeq, lookupD_rename, hOrigEmpty]
   simp
 
+/-! ## Renaming Transport for `trace_preserved` (Other Session) -/
+
 /-- Helper for trace_preserved when edge is NOT in the renamed session. -/
 theorem DelegationStep_trace_preserved_other_session (ρ : SessionRenaming)
     {D D' : DEnv} {s : SessionId} {A B : Role}
@@ -187,6 +195,8 @@ theorem DelegationStep_trace_preserved_other_session (ρ : SessionRenaming)
     funext T
     exact renameValType_renameValTypeRole_comm ρ s A B T
 
+/-! ## Renaming Transport for `trace_preserved` (In Session) -/
+
 /-- Helper for trace_preserved when edge IS in the renamed session. -/
 theorem DelegationStep_trace_preserved_in_session (ρ : SessionRenaming)
     {D D' : DEnv} {s : SessionId} {A B : Role}
@@ -211,6 +221,8 @@ theorem DelegationStep_trace_preserved_in_session (ρ : SessionRenaming)
   congr 1
   funext T
   exact renameValType_renameValTypeRole_comm ρ s A B T
+
+/-! ## Renaming Equivariance of `DelegationStep` -/
 
 /-- DelegationStep is equivariant under session renaming. -/
 def DelegationStep_respects_renaming (ρ : SessionRenaming)
