@@ -146,6 +146,8 @@ end
 
 /-! ## Lift/Subst Interaction Laws -/
 
+/-! ## Lift/Subst Cancellation at Depth k+1 -/
+
 private theorem lift_subst_cancel_at_depth_any (e : LocalTypeDB) (k : Nat) (s : LocalTypeDB) :
     (e.lift 1 (k + 1)).subst (k + 1) s = e := by
   let P1 : LocalTypeDB → Prop :=
@@ -196,6 +198,8 @@ private theorem lift_subst_cancel_at_depth_any (e : LocalTypeDB) (k : Nat) (s : 
       exact ht
   exact hrec k s
 
+/-! ## Branch Lift/Subst Cancellation -/
+
 private theorem liftBranches_substBranches_cancel_at_depth_any
     (bs : List (Label × LocalTypeDB)) (k : Nat) (s : LocalTypeDB) :
     substBranches (liftBranches 1 (k + 1) bs) (k + 1) s = bs := by
@@ -204,6 +208,8 @@ private theorem liftBranches_substBranches_cancel_at_depth_any
   | cons head rest ih =>
       obtain ⟨l, t⟩ := head
       simp [liftBranches, substBranches, lift_subst_cancel_at_depth_any, ih]
+
+/-! ## Lift/Subst Cancellation at Depth 0 -/
 
 /-- Lifting then substituting at depth 0 is identity: `(e.lift 1 0).subst 0 t = e`. -/
 theorem lift_subst_cancel (e : LocalTypeDB) (t : LocalTypeDB) :
