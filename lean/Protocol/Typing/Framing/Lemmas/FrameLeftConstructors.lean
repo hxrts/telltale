@@ -61,6 +61,7 @@ theorem frame_left_send
     (HasTypeProcPreOut.send (Ssh:=Ssh) (Sown:={ right := S₁, left := S₂ }) (G:=G₁ ++ G₂) hk' hG' hx')
 
 /-- Left framing for recv_new. -/
+/-! ## Recv-New Framing -/
 theorem frame_left_recv_new
     {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {k x : Var} {e : Endpoint} {p : Role}
     {T : ValType} {L : LocalType} :
@@ -93,6 +94,7 @@ theorem frame_left_recv_new
       (G:=G₁ ++ G₂) hk' hG' hSsh hLeft)
 
 /-- Left framing for recv_old. -/
+/-! ## Recv-Old Framing -/
 theorem frame_left_recv_old
     {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {k x : Var} {e : Endpoint} {p : Role}
     {T : ValType} {L : LocalType} {T' : ValType} :
@@ -122,6 +124,7 @@ theorem frame_left_recv_old
       (G:=G₁ ++ G₂) hk' hG' hSsh hLeft)
 
 /-- Left framing for select. -/
+/-! ## Select Framing -/
 theorem frame_left_select
     {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {k : Var} {l : Label} {e : Endpoint}
     {q : Role} {bs : List (Label × LocalType)} {L : LocalType} :
@@ -147,6 +150,7 @@ theorem frame_left_select
       (G:=G₁ ++ G₂) hk' hG' hFind)
 
 /-- Frame-left helper for branch pre-typing. -/
+/-! ## Branch Pre-Typing Under Left Frame -/
 theorem frame_left_pre_updateG
     {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {e : Endpoint} {L L0 : LocalType} {P : Process} :
     DisjointS S₁ S₂ →
@@ -169,6 +173,7 @@ theorem frame_left_pre_updateG
   simpa [hUpd] using hPre'
 
 /-- Left framing for branch. -/
+/-! ## Branch Framing -/
 theorem frame_left_branch
     {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {k : Var} {procs : List (Label × Process)}
     {e : Endpoint} {p : Role} {bs : List (Label × LocalType)}
@@ -218,6 +223,7 @@ theorem frame_left_branch
         bs.find? (fun b => b.1 == lbl) = some (lbl, L) →
         HasTypeProcPreOut Ssh { right := S₁, left := S₂ } (updateG (G₁ ++ G₂) e L)
           P { right := S₁, left := S₂' } (G₁ ++ G₂') W Δ := by
+    /-! ## Branch Framing: Continuation Lifting -/
     intro lbl P L hP hB
     have hDisjG' : DisjointG G₁ (updateG G₂ e L) :=
       DisjointG_updateG_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=.branch p bs) (L':=L) hDisjG hG
@@ -238,6 +244,7 @@ theorem frame_left_branch
   exact HasTypeProcPreOut.branch hk' hG' hLen hLbl hProcs' hOut' hSess' hDom rfl
 
 /-- Left framing for assign_new. -/
+/-! ## Assign-New Framing -/
 theorem frame_left_assign_new
     {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {x : Var} {v : Value} {T : ValType} :
     DisjointS S₁ (updateSEnv S₂ x T) →
@@ -261,6 +268,7 @@ theorem frame_left_assign_new
       (G:=G₁ ++ G₂) hSsh hLeft hv')
 
 /-- Left framing for assign_old. -/
+/-! ## Assign-Old Framing -/
 theorem frame_left_assign_old
     {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {x : Var} {v : Value} {T T' : ValType} :
     DisjointS S₁ S₂ →
