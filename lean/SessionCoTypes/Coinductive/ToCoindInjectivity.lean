@@ -57,6 +57,7 @@ mutual
         exact congrArg (LocalTypeR.mu x) (toCoind_injective hchild)
     | .mu _ _, .send _ _, h => by cases (congrArg head h)
     | .mu _ _, .recv _ _, h => by cases (congrArg head h)
+    /-! ## toCoind Injectivity: Send/Recv Constructor Cases -/
     | .send _ _, .end, h => by cases (congrArg head h)
     | .send _ _, .var _, h => by cases (congrArg head h)
     | .send _ _, .mu _ _, h => by cases (congrArg head h)
@@ -89,6 +90,8 @@ mutual
           simpa [toCoind, branchesOf_mkRecv] using h'
         have hbs : bs = cs := toCoindBranches_injective hbranches
         subst hbs; rfl
+
+  /-! ## toCoindBranches Injectivity -/
 
   theorem toCoindBranches_injective :
       ∀ {bs cs : List BranchR}, toCoindBranches bs = toCoindBranches cs → bs = cs
