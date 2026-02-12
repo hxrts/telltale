@@ -37,6 +37,8 @@ theorem accountableSafety_of_profile (p : AccountableSafetyProfile) :
     Distributed.AccountableSafety.AccountableSafety p.protocol.model :=
   p.protocol.accountableSafety
 
+/-! ## Failure-Detector, DA, and Coordination Theorems -/
+
 /-- Failure-detector profile satisfies reusable core assumptions. -/
 theorem failureDetectors_coreAssumptions_allPassed (p : FailureDetectorsProfile) :
     (Distributed.FailureDetectors.runAssumptionValidation
@@ -82,6 +84,8 @@ theorem coordination_characterization_of_profile (p : CoordinationProfile) :
     Distributed.Coordination.CoordinationCharacterization p.protocol.model :=
   p.protocol.characterization
 
+/-! ## CRDT Envelope Theorems -/
+
 /-- CRDT profile satisfies reusable core assumptions. -/
 theorem crdt_coreAssumptions_allPassed (p : CRDTProfile) :
     (Distributed.CRDT.runAssumptionValidation
@@ -123,6 +127,8 @@ theorem crdt_opStateEquivalence_of_profile (p : CRDTProfile) :
     Distributed.CRDT.OpStateEquivalence
       p.protocol.model p.protocol.premises.opRun p.protocol.premises.stateRun :=
   p.protocol.opStateEquivalence
+
+/-! ## CRDT Approximation and Limit Theorems -/
 
 /-- CRDT GC-safety iff causal-dominance theorem extracted from a profile. -/
 theorem crdt_gcSafetyIff_of_profile (p : CRDTProfile) :
@@ -177,6 +183,8 @@ theorem crdt_hcrdtLimits_of_profile (p : CRDTProfile) :
     Distributed.CRDT.HcrdtLimits p.protocol.model :=
   p.protocol.hcrdtLimits
 
+/-! ## Consensus Envelope Theorems -/
+
 /-- Exact consensus envelope characterization extracted from a profile. -/
 theorem consensusEnvelope_exact_of_profile (p : ConsensusEnvelopeProfile) :
     Distributed.ConsensusEnvelope.ExactEnvelopeCharacterization_consensus
@@ -206,6 +214,8 @@ theorem consensusEnvelope_admissionCompleteness_of_profile (p : ConsensusEnvelop
     Distributed.ConsensusEnvelope.AdmissionCompleteness_consensus
       p.protocol.premises.inferredBudget p.protocol.premises.envelopeBudget :=
   p.protocol.admissionCompleteness
+
+/-! ## Failure Envelope Theorems -/
 
 /-- Abstract recovery-action safety theorem extracted from a failure-envelope profile. -/
 theorem failureEnvelope_recoveryActionSafety_of_profile (p : FailureEnvelopeProfile) :
@@ -261,6 +271,8 @@ theorem failureEnvelope_maximality_of_profile (p : FailureEnvelopeProfile) :
       p.protocol.premises.injectFailure :=
   p.protocol.failureEnvelopeMaximality
 
+/-! ## VM Envelope Adherence Theorems -/
+
 /-- VM local adherence theorem extracted from a VM-envelope-adherence profile. -/
 theorem vmEnvelope_localAdherence_of_profile (p : VMEnvelopeAdherenceProfile) :
     Runtime.Adequacy.LocalEnvelopeSoundness
@@ -290,6 +302,8 @@ theorem vmEnvelope_schedulerDeterminismSharded_of_profile (p : VMEnvelopeAdheren
       p.protocol.premises.shardedHypotheses.shardedEnvelope
       p.protocol.premises.shardedHypotheses.certifiedExchange :=
   p.protocol.schedulerDeterminismSharded
+
+/-! ### VM Envelope Adequacy and Full-Abstraction -/
 
 /-- VM adherence monotonicity under spatial refinement extracted from profile. -/
 theorem vmEnvelope_monotonicity_of_profile (p : VMEnvelopeAdherenceProfile) :
@@ -327,11 +341,15 @@ theorem vmEnvelope_shardedFullAbstraction_of_profile (p : VMEnvelopeAdherencePro
       (Runtime.Adequacy.EqEnvShard p.protocol.premises.shardedHypotheses.shardedEnvelope) :=
   p.protocol.shardedFullAbstraction
 
+/-! ### VM Envelope Capability Ordering -/
+
 /-- VM capability monotonicity theorem extracted from profile. -/
 theorem vmEnvelope_capabilityMonotonicity_of_profile (p : VMEnvelopeAdherenceProfile) :
     p.protocol.premises.guarantee p.protocol.premises.weakCapability →
     p.protocol.premises.guarantee p.protocol.premises.strongCapability :=
   p.protocol.capabilityMonotonicity
+
+/-! ## VM Admission Theorems -/
 
 /-- VM local capability-inference soundness extracted from admission profile. -/
 theorem vmAdmission_localInferenceSoundness_of_profile (p : VMEnvelopeAdmissionProfile) :
@@ -390,6 +408,8 @@ theorem vmAdmission_conservativeExtension_of_profile (p : VMEnvelopeAdmissionPro
 theorem vmAdmission_necessityMinimality_of_profile (p : VMEnvelopeAdmissionProfile) :
     Runtime.Adequacy.HypothesisNecessityMinimality :=
   p.protocol.necessityMinimality
+
+/-! ## Protocol Envelope Bridge Theorems -/
 
 /-- Protocol-bridge role-renaming invariance extracted from profile. -/
 theorem protocolBridge_roleRenamingInvariant_of_profile
