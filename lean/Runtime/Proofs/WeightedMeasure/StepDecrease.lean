@@ -22,6 +22,8 @@ section
 
 /-! ## Lookup/Buffer Membership Helpers -/
 
+/-! ### Type Lookup Membership -/
+
 lemma find?_mem_aux {r : Role} {L : LocalType} (types : List (Role × LocalType)) :
     (match types.find? (fun p => p.1 == r) with
       | some (_, L') => some L' | none => none) = some L → (r, L) ∈ types := by
@@ -50,6 +52,8 @@ lemma lookupType_mem {s : SessionState} {r : Role} {L : LocalType}
     (h : s.lookupType r = some L) : (r, L) ∈ s.localTypes := by
   unfold SessionState.lookupType at h
   exact find?_mem_aux s.localTypes h
+
+/-! ### Buffer Lookup Membership -/
 
 lemma getBuffer_mem_aux {sender receiver : Role}
     (bufs : List (Role × Role × Nat)) :
@@ -89,6 +93,8 @@ lemma getBuffer_mem_of_pos {s : SessionState} {sender receiver : Role}
   unfold SessionState.getBuffer at hpos ⊢
   exact getBuffer_mem_aux s.bufferSizes hpos
 
+/-! ### Buffer Sum Stability Without Matching Entry -/
+
 lemma sumBuffers_incr_eq_of_no_entry
     (s : SessionState) (actor partner : Role)
     (hmem : ¬ ∃ n, (actor, partner, n) ∈ s.bufferSizes) :
@@ -114,6 +120,8 @@ lemma sumBuffers_incr_eq_of_no_entry
   · -- Condition is false, so mapping is identity
     simp [hEq]
 
+/-! ## Unique-Key Sum Update Lemmas -/
+
 /-- Incrementing a unique key increases sum by 1. -/
 theorem sum_incr_unique {α : Type} [DecidableEq α]
     (l : List (α × Nat)) (key : α)
@@ -126,6 +134,9 @@ theorem sum_incr_unique {α : Type} [DecidableEq α]
   | cons hd tl ih =>
     obtain ⟨hd_k, hd_v⟩ := hd
     simp only [List.map_cons, List.foldl_cons, Nat.zero_add]
+
+    /-! ### `sum_incr_unique`: head-key case split -/
+
     by_cases heq : hd_k = key
     · -- hd_k = key: increment at head, identity on tail
       rw [heq]
@@ -153,6 +164,9 @@ theorem sum_incr_unique {α : Type} [DecidableEq α]
       rw [foldl_add_shift (l := tl.map Prod.snd) (n := hd_v + 1)]
       rw [foldl_add_shift (l := tl.map Prod.snd) (n := hd_v)]
       omega
+
+    /-! ### `sum_incr_unique`: tail recursion case -/
+
     · -- hd_k ≠ key: identity at head, recurse on tail
       have hcond : (hd_k == key) = false := beq_eq_false_iff_ne.mpr heq
       simp only [hcond, Bool.false_eq_true, ↓reduceIte]
@@ -169,6 +183,8 @@ theorem sum_incr_unique {α : Type} [DecidableEq α]
       rw [foldl_add_shift (l := tl.map Prod.snd) (n := hd_v)]
       omega
 
+/-! ## Unique-Key Decrement Lemmas -/
+
 /-- Decrementing a unique key decreases sum by 1 when positive. -/
 theorem sum_decr_unique {α : Type} [DecidableEq α]
     (l : List (α × Nat)) (key : α) (val : Nat)
@@ -183,6 +199,9 @@ theorem sum_decr_unique {α : Type} [DecidableEq α]
     obtain ⟨hd_k, hd_v⟩ := hd
     simp only [List.map_cons, List.foldl_cons, Nat.zero_add]
     rcases List.mem_cons.mp hmem with heq | htl
+
+    /-! ### `sum_decr_unique`: matching head case -/
+
     · -- (key, val) = (hd_k, hd_v)
       have hkey : key = hd_k := congrArg Prod.fst heq
       have hval : val = hd_v := congrArg Prod.snd heq
@@ -211,6 +230,9 @@ theorem sum_decr_unique {α : Type} [DecidableEq α]
       rw [foldl_add_shift (l := tl.map Prod.snd) (n := val - 1)]
       rw [foldl_add_shift (l := tl.map Prod.snd) (n := val)]
       omega
+
+    /-! ### `sum_decr_unique`: tail membership case -/
+
     · -- (key, val) is in tail
       have hnodup : (tl.map Prod.fst).Nodup := by
         simp only [List.map_cons, List.nodup_cons] at hunique
@@ -227,6 +249,8 @@ theorem sum_decr_unique {α : Type} [DecidableEq α]
       rw [foldl_add_shift (l := tl.map (fun (k, v) => if k == key then v - 1 else v)) (n := hd_v)]
       rw [foldl_add_shift (l := tl.map Prod.snd) (n := hd_v)]
       omega
+
+/-! ## Buffer-Pair Translation Helpers -/
 
 /-- Convert buffer triples to pairs for sum_incr_unique. -/
 lemma bufferSizes_to_pairs (bufs : List (Role × Role × Nat)) :
@@ -246,6 +270,8 @@ lemma bufferSizes_key_mem_pairs (bufs : List (Role × Role × Nat))
     (actor, partner) ∈ (bufs.map (fun (s', r', n) => ((s', r'), n))).map Prod.fst := by
   have h := bufferSizes_mem_pairs bufs actor partner n hmem
   exact List.mem_map_of_mem (f := Prod.fst) h
+
+/-! ## Session Buffer Increment/Decrement Equalities -/
 
 /-- Sum of buffers after increment equals old sum plus 1 when entry exists.
 
@@ -290,6 +316,8 @@ lemma sumBuffers_incr_eq_of_entry
   rw [hleft, hright]
   exact hsum_pairs
 
+/-! ## Derived Buffer/Depth Bounds -/
+
 /-- Sum of buffers after decrement equals old sum minus 1 when entry exists.
 
     Similar to sumBuffers_incr_eq_of_entry but for decrement.
@@ -333,6 +361,8 @@ lemma sumBuffers_decr_eq_of_entry
   rw [hleft, hright]
   exact hsum_pairs
 
+/-! ### Buffer Delta Bounds -/
+
 /-- Bound on buffer increment with uniqueness: sum increases by at most 1. -/
 lemma sumBuffers_incrBuffer_le (s : SessionState) (actor partner : Role)
     (hunique : s.uniqueBuffers) :
@@ -354,6 +384,8 @@ lemma sumBuffers_decrBuffer_eq (s : SessionState) (actor partner : Role) (n : Na
     (hpos : n > 0) :
     sumBuffers (s.decrBuffer actor partner) + 1 = sumBuffers s :=
   sumBuffers_decr_eq_of_entry s actor partner n hmem hunique hpos
+
+/-! ### Type-Depth Rewrite Under Update -/
 
 lemma sumDepths_updateType
     (s : SessionState) (actor : Role) (old new : LocalType)
