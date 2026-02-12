@@ -183,6 +183,8 @@ private theorem trans_unfold_EQ2_mu_unguarded
       (trans body role) t hguard
   simpa [GlobalType.unfold, hleft, hright] using heq
 
+/-! ## Mu Unfold Core Case -/
+
 /-- Helper: mu case for trans_unfold_EQ2. -/
 private theorem trans_unfold_EQ2_mu (t : String) (body : GlobalType) (role : String)
     (hwf : (GlobalType.mu t body).wellFormed = true) :
@@ -201,6 +203,8 @@ private theorem trans_unfold_EQ2_mu (t : String) (body : GlobalType) (role : Str
   | false =>
       simpa [GlobalType.unfold] using
         trans_unfold_EQ2_mu_unguarded t body role hproj' hguard
+
+/-! ## Single-Step Unfold Commutation -/
 
 /-- trans commutes with one unfold step up to EQ2. -/
 private theorem trans_unfold_EQ2 (g : GlobalType) (role : String)
@@ -243,6 +247,8 @@ private theorem trans_unfold_to_trans (g : GlobalType) (role : String)
     trans_wellFormed_of_wellFormed (GlobalType.unfold g) role hwf'
   exact EQ2_trans_wf hstep hback hWFa hWFb hWFc
 
+/-! ## Iterated Unfold Commutation -/
+
 /-- Iterated unfold commutes with trans up to EQ2. -/
 private theorem trans_unfold_iter_EQ2 (g : GlobalType) (role : String)
     (n : Nat) (hwf : g.wellFormed = true) :
@@ -278,12 +284,16 @@ private theorem trans_fullUnfoldIter_EQ2 (g : GlobalType) (role : String)
   simpa [GlobalType.fullUnfoldIter] using
     (trans_unfold_iter_EQ2 g role g.muHeight hwf)
 
+/-! ## Full-Unfold Alias -/
+
 /-- Coq-style alias: trans commuting with full unfold. -/
 private theorem proj_eq_full (g : GlobalType) (role : String)
     (hwf : g.wellFormed = true) :
     EQ2 (trans (GlobalType.fullUnfoldIter g) role) (trans g role) := by
   -- Keep the alias definally equal to the main lemma.
   exact trans_fullUnfoldIter_EQ2 g role hwf
+
+/-! ## EQ2 Full-Unfold Helpers -/
 
 /-- Iterated unfold on the left preserves EQ2. -/
 private theorem EQ2_unfold_left_iter {a b : LocalTypeR} :
@@ -310,6 +320,8 @@ private theorem EQ2_unfold_right_fullUnfold {a b : LocalTypeR} (h : EQ2 a b) :
   -- Expand fullUnfold into muHeight unfolds.
   simpa [LocalTypeR.fullUnfold] using (EQ2_unfold_right_iter (a := a) (b := b) h b.muHeight)
 
+/-! ## Closure Extension Helpers -/
+
 /-- Extend an EQ2_closure proof on the right by an EQ2 step. -/
 private theorem EQ2_closure_extend_right
     {x y z : LocalTypeR}
@@ -330,6 +342,8 @@ private theorem EQ2_mu_unfold_right (v : String) (body : LocalTypeR) :
   have hrefl := EQ2_refl (.mu v body)
   exact (EQ2.destruct hrefl).2
 
+/-! ## Mu-Compose Right Helper -/
+
 /-- Helper: right component for the mu/mu compose-through-mu case. -/
 private theorem CProjectTransRel_EQ2_compose_through_mu_mu_mu_right
     {av v cv : String} {abody body cbody : LocalTypeR}
@@ -349,6 +363,8 @@ private theorem CProjectTransRel_EQ2_compose_through_mu_mu_mu_right
   have hWF_unfold_c : LocalTypeR.WellFormed (cbody.substitute cv (.mu cv cbody)) :=
     LocalTypeR.WellFormed.unfold hWF_c
   exact EQ2_closure_extend_right hright_mid (EQ2_mu_unfold_right cv cbody) hWFa hWF_c hWF_unfold_c
+
+/-! ## Three-Hop EQ2/CProject/EQ2 Composition -/
 
 /-- Composing EQ2 → CProjectTransRel → EQ2 (3-hop) satisfies EQ2F.
     Used to discharge the 3-hop case in CProjectTransRelComp_postfix. -/
@@ -371,6 +387,8 @@ theorem EQ2_CProjectTransRel_EQ2_compose
   have heq_ac : EQ2 a c := EQ2_trans_wf heq1 heq2 hWFa hWFb hWFc
   have hF : EQ2F EQ2 a c := EQ2.destruct heq_ac
   exact EQ2F_mono (fun _ _ h => Or.inr h) hF
+
+/-! ## Mu-Compose Case Split Helpers -/
 
 /-- Helper: mu/mu target case for CProjectTransRel_EQ2_compose_through_mu. -/
 private theorem CProjectTransRel_EQ2_compose_through_mu_mu_mu
@@ -402,6 +420,8 @@ private theorem CProjectTransRel_EQ2_compose_through_mu_mu_mu
       hmid_right heq_left hWFa hWF_unfold_mu hWF_c
   exact ⟨hleft, hright⟩
 
+/-! ## Mu-Compose Non-Mu Target Helper -/
+
 /-- Helper: mu/non-mu target case for CProjectTransRel_EQ2_compose_through_mu. -/
 private theorem CProjectTransRel_EQ2_compose_through_mu_mu_nonmu
     {av v : String} {abody body c : LocalTypeR}
@@ -415,6 +435,8 @@ private theorem CProjectTransRel_EQ2_compose_through_mu_mu_nonmu
     EQ2_closure CProjectTransRelComp (abody.substitute av (.mu av abody)) c := by
   -- Extend the left branch with the EQ2 step.
   exact EQ2_closure_extend_right hmid_left heq hWF_unfold_a hWF_mu hWF_c
+
+/-! ## Mu-Compose Source Helper -/
 
 /-- Helper: mu source case for CProjectTransRel_EQ2_compose_through_mu. -/
 private theorem CProjectTransRel_EQ2_compose_through_mu_mu
@@ -442,6 +464,8 @@ private theorem CProjectTransRel_EQ2_compose_through_mu_mu
       simpa [EQ2F] using
         (CProjectTransRel_EQ2_compose_through_mu_mu_nonmu
           hmid_left heq hWF_unfold_a hWF_mu hWFc)
+
+/-! ## Mu-Target Composition Theorem -/
 
 /-- Compose an EQ2/CProjectTransRel/EQ2 chain through a mu target. -/
 theorem CProjectTransRel_EQ2_compose_through_mu
