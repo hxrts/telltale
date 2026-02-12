@@ -243,6 +243,8 @@ private theorem findIdx?_go_succ (p : String × Unit → Bool) (l : List (String
         simp only [Nat.add_assoc] at h
         exact h
 
+/-! ## IndexOf Constructor Cases -/
+
 theorem indexOf_cons_eq (v : String) (ctx : NameOnlyContext) :
     (cons v ctx).indexOf v = some 0 := by
   simp only [indexOf, cons_bindings, List.findIdx?, List.findIdx?.go]
@@ -254,6 +256,8 @@ theorem indexOf_cons_ne {v a : String} (ctx : NameOnlyContext) (hne : a ≠ v) :
   have hneq : (a == v) = false := by simp [hne]
   simp only [hneq]
   exact findIdx?_go_succ (fun w => w.1 == v) ctx.bindings 0
+
+/-! ## IndexOf/Get Correspondence -/
 
 theorem indexOf_get? {ctx : NameOnlyContext} {v : String} {i : Nat}
     (h : ctx.indexOf v = some i) : ctx.get? i = some v := by
@@ -273,6 +277,8 @@ theorem indexOf_get? {ctx : NameOnlyContext} {v : String} {i : Nat}
             cases h
             simp only [get?_cons_succ]
             exact ih hi
+
+/-! ## IndexOf Bounds and None Characterization -/
 
 theorem indexOf_lt {ctx : NameOnlyContext} {v : String} {i : Nat}
     (h : ctx.indexOf v = some i) : i < ctx.length := by
@@ -321,6 +327,8 @@ theorem indexOf_eq_none_iff {ctx : NameOnlyContext} {v : String} :
                 have hget := indexOf_get? hctx
                 exact get?_mem hget
               exact (h.2 hmem).elim
+
+/-! ## IndexOf Existence from Membership -/
 
 theorem indexOf_mem {ctx : NameOnlyContext} {v : String} (hmem : v ∈ ctx.names) :
     ∃ i, ctx.indexOf v = some i := by
