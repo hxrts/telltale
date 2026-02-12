@@ -40,6 +40,8 @@ def DataRetrievability
     (M : Model State Chunk) : Prop :=
   ∀ s, M.retrievable s
 
+/-! ## Assumption Atoms and Contracts -/
+
 /-- Reusable core data-availability assumption bundle. -/
 structure Assumptions
     {State : Type u} {Chunk : Type v}
@@ -68,6 +70,8 @@ def coreAssumptions : List Assumption :=
   , .samplingGuarantees
   , .withholdingBounded
   ]
+
+/-! ## Assumption Validation API -/
 
 /-- Validate one assumption against an assumption bundle. -/
 def validateAssumption
@@ -117,6 +121,8 @@ def runAssumptionValidation
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
 
+/-! ## Theorem Premises and Derived Results -/
+
 /-- Additional premises used to derive DA theorem forms. -/
 structure Premises
     {State : Type u} {Chunk : Type v}
@@ -146,5 +152,4 @@ theorem retrievability_of_assumptions
 
 end DataAvailability
 end Distributed
-
 
