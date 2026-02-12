@@ -2,6 +2,12 @@ import Mathlib
 import SessionCoTypes.Coinductive.Regularity
 import SessionCoTypes.Coinductive.Bisim
 
+/-! # SessionCoTypes.Coinductive.RegularityLemmas
+
+Regularity lemmas for coinductive local types: child decomposition,
+reachability decomposition, and regularity transport across bisimilarity.
+-/
+
 set_option linter.dupNamespace false
 
 
