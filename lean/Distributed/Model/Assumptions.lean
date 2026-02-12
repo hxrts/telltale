@@ -241,173 +241,159 @@ def byzantineSafetyAssumptions : List Assumption :=
 
 /-! ## Assumption Validation -/
 
+private def mkAssumptionResult
+    (h : Assumption) (passed : Bool) (detail : String) : AssumptionResult :=
+  { assumption := h, passed := passed, detail := detail }
+
+/-! ## Validation Group: Space and Finality -/
+
+private def validateAssumptionSpaceFinality?
+    (p : ProtocolSpec) (h : Assumption) : Option AssumptionResult :=
+  match h with
+  | .soundConsensus =>
+      some <| mkAssumptionResult h (isSoundConsensus p)
+        "Model-level soundness: basic well-formedness plus BFT/Nakamoto/Hybrid classification."
+  | .bftSpace =>
+      some <| mkAssumptionResult h (inBFTSpace p)
+        "BFT space check: intersection-style evidence primitive, Byzantine faults, authentication, and threshold constraints."
+  | .nakamotoSpace =>
+      some <| mkAssumptionResult h (inNakamotoSpace p)
+        "Nakamoto space check: additive-weight evidence primitive, probabilistic finality, and adversarial weight below 50%."
+  | .hybridSpace =>
+      some <| mkAssumptionResult h (inHybridSpace p)
+        "Hybrid space check: coupled quorum/work assumptions with both deterministic and probabilistic finality."
+  | .deterministicFinality =>
+      some <| mkAssumptionResult h p.deterministicFinality
+        "Deterministic finality characteristic flag."
+  | .probabilisticFinality =>
+      some <| mkAssumptionResult h p.probabilisticFinality
+        "Probabilistic finality characteristic flag."
+  | .responsiveCandidate =>
+      some <| mkAssumptionResult h p.responsivePath
+        "Responsive-path flag under the chosen timing/leader assumptions."
+  | .cpBiased =>
+      some <| mkAssumptionResult h (p.partitionPolicy = .safetyFirst)
+        "CP-leaning partition policy (safety-first)."
+  | .apBiased =>
+      some <| mkAssumptionResult h (p.partitionPolicy = .livenessFirst)
+        "AP-leaning partition policy (liveness-first)."
+  | _ => none
+
+/-! ## Validation Group: Fault Model -/
+
+private def validateAssumptionFaultModel?
+    (p : ProtocolSpec) (h : Assumption) : Option AssumptionResult :=
+  match h with
+  | .byzantineFaultModel =>
+      some <| mkAssumptionResult h (p.faultModel = .byzantine)
+        "Byzantine fault model assumption."
+  | .crashFaultOnly =>
+      some <| mkAssumptionResult h (p.faultModel = .crash)
+        "Crash-only fault model assumption."
+  | _ => none
+
+/-! ## Validation Group: Primitive Coherence -/
+
+private def validateAssumptionPrimitiveCoherence?
+    (p : ProtocolSpec) (h : Assumption) : Option AssumptionResult :=
+  match h with
+  | .evidencePrimitiveConsistent =>
+      some <| mkAssumptionResult h (evidencePrimitiveConsistentCheck p)
+        "Evidence primitive profile is coherent (intersection, additive-weight, or coupled)."
+  | .conflictExclusionPrimitiveConsistent =>
+      some <| mkAssumptionResult h (conflictExclusionPrimitiveConsistentCheck p)
+        "Conflict-exclusion law is consistent with declared evidence-accumulation primitive."
+  | .finalizationWitnessPrimitiveConsistent =>
+      some <| mkAssumptionResult h (finalizationWitnessPrimitiveConsistentCheck p)
+        "Finalization witness rule is consistent with declared evidence-accumulation primitive."
+  | .witnessMonotonicityConsistent =>
+      some <| mkAssumptionResult h (witnessMonotonicityConsistentCheck p)
+        "Witness monotonicity is consistent with the declared evidence regime."
+  | .certificateDerivedConsistent =>
+      some <| mkAssumptionResult h (certificateDerivedConsistentCheck p)
+        "Coarse certificate tag is consistent with primitive evidence assumptions."
+  | .finalityModeConsistent =>
+      some <| mkAssumptionResult h (finalityModeConsistentCheck p)
+        "Derived evidence mode and finality mode are consistent (intersection=deterministic, additive=probabilistic, coupled=both)."
+  | .quorumIntersectionWitnessed =>
+      some <| mkAssumptionResult h (quorumIntersectionWitnessedCheck p)
+        "Quorum-intersection obligations are explicitly witnessed and threshold-compatible."
+  | .timingAuthCompatible =>
+      some <| mkAssumptionResult h (timingAuthCompatibleCheck p)
+        "Timing/authentication assumptions are explicit and compatible with threshold claims."
+  | _ => none
+
+/-! ## Validation Group: Pressure and Budget -/
+
+private def validateAssumptionPressureBudget?
+    (p : ProtocolSpec) (h : Assumption) : Option AssumptionResult :=
+  match h with
+  | .capPressureConsistent =>
+      some <| mkAssumptionResult h (capPressureConsistentCheck p)
+        "CAP policy is consistent with evidence-driven partition pressure."
+  | .responsivePreconditions =>
+      some <| mkAssumptionResult h (responsivePreconditionsCheck p)
+        "If responsiveness is claimed, timing/auth/fault preconditions are satisfied."
+  | .hybridFrontInvariant =>
+      some <| mkAssumptionResult h (hybridFrontInvariantCheck p)
+        "Hybrid availability/finality front invariant is satisfied."
+  | .adversarialBudgetBounded =>
+      some <| mkAssumptionResult h (adversarialBudgetBoundedCheck p)
+        "Adversarial budget bounds are within declared count/weight regimes."
+  | _ => none
+
+/-! ## Validation Group: Declarations and Transport -/
+
+private def validateAssumptionDeclarations?
+    (p : ProtocolSpec) (h : Assumption) : Option AssumptionResult :=
+  match h with
+  | .faultThresholdDeclared =>
+      some <| mkAssumptionResult h p.thresholdRegimeDeclared
+        "Fault-threshold regime is explicitly declared."
+  | .spaceConfidenceTagged =>
+      some <| mkAssumptionResult h p.classificationHeuristicTagged
+        "Protocol-space claims are tagged with heuristic/confidence scope."
+  | .logicalTimeSemanticsDeclared =>
+      some <| mkAssumptionResult h p.logicalTimeSemanticsDeclared
+        "Logical-time semantics declaration (`t_logical`, `T_logical`)."
+  | .orderParameterDeclared =>
+      some <| mkAssumptionResult h p.orderParameterDeclared
+        "At least one order parameter is declared."
+  | .phaseBoundaryModelDeclared =>
+      some <| mkAssumptionResult h p.phaseBoundaryModelDeclared
+        "Phase-boundary model declaration is present."
+  | .interactiveDistanceDeclared =>
+      some <| mkAssumptionResult h p.interactiveDistanceDeclared
+        "Interactive distance declaration (`d_int`) is present."
+  | .universalityClassDeclared =>
+      some <| mkAssumptionResult h p.universalityClassDeclared
+        "Universality-class declaration is present."
+  | .classicalTransportEligible =>
+      some <| mkAssumptionResult h (classicalTransportEligibleCheck p)
+        "Classical transport profile is declared and consensus/model prerequisites are satisfied."
+  | _ => none
+
+/-! ## Validation Dispatcher -/
+
 /-- Validate one built-in assumption against a protocol spec. -/
 def validateAssumption (p : ProtocolSpec) (h : Assumption) : AssumptionResult :=
-  match h with
-  -- Validation group: space and finality flags.
-  | .soundConsensus =>
-      { assumption := h
-      , passed := isSoundConsensus p
-      , detail := "Model-level soundness: basic well-formedness plus BFT/Nakamoto/Hybrid classification."
-      }
-  | .bftSpace =>
-      { assumption := h
-      , passed := inBFTSpace p
-      , detail := "BFT space check: intersection-style evidence primitive, Byzantine faults, authentication, and threshold constraints."
-      }
-  | .nakamotoSpace =>
-      { assumption := h
-      , passed := inNakamotoSpace p
-      , detail := "Nakamoto space check: additive-weight evidence primitive, probabilistic finality, and adversarial weight below 50%."
-      }
-  | .hybridSpace =>
-      { assumption := h
-      , passed := inHybridSpace p
-      , detail := "Hybrid space check: coupled quorum/work assumptions with both deterministic and probabilistic finality."
-      }
-  | .deterministicFinality =>
-      { assumption := h
-      , passed := p.deterministicFinality
-      , detail := "Deterministic finality characteristic flag."
-      }
-  | .probabilisticFinality =>
-      { assumption := h
-      , passed := p.probabilisticFinality
-      , detail := "Probabilistic finality characteristic flag."
-      }
-  | .responsiveCandidate =>
-      { assumption := h
-      , passed := p.responsivePath
-      , detail := "Responsive-path flag under the chosen timing/leader assumptions."
-      }
-  | .cpBiased =>
-      { assumption := h
-      , passed := p.partitionPolicy = .safetyFirst
-      , detail := "CP-leaning partition policy (safety-first)."
-      }
-  | .apBiased =>
-      { assumption := h
-      , passed := p.partitionPolicy = .livenessFirst
-      , detail := "AP-leaning partition policy (liveness-first)."
-      }
-  /-! ## Validation Branches: Fault-Model Flags -/
-  -- Validation group: fault-model flags.
-  | .byzantineFaultModel =>
-      { assumption := h
-      , passed := p.faultModel = .byzantine
-      , detail := "Byzantine fault model assumption."
-      }
-  | .crashFaultOnly =>
-      { assumption := h
-      , passed := p.faultModel = .crash
-      , detail := "Crash-only fault model assumption."
-      }
-  /-! ## Validation Branches: Primitive/Certificate Coherence -/
-  -- Validation group: primitive/certificate coherence.
-  | .evidencePrimitiveConsistent =>
-      { assumption := h
-      , passed := evidencePrimitiveConsistentCheck p
-      , detail := "Evidence primitive profile is coherent (intersection, additive-weight, or coupled)."
-      }
-  | .conflictExclusionPrimitiveConsistent =>
-      { assumption := h
-      , passed := conflictExclusionPrimitiveConsistentCheck p
-      , detail := "Conflict-exclusion law is consistent with declared evidence-accumulation primitive."
-      }
-  | .finalizationWitnessPrimitiveConsistent =>
-      { assumption := h
-      , passed := finalizationWitnessPrimitiveConsistentCheck p
-      , detail := "Finalization witness rule is consistent with declared evidence-accumulation primitive."
-      }
-  | .witnessMonotonicityConsistent =>
-      { assumption := h
-      , passed := witnessMonotonicityConsistentCheck p
-      , detail := "Witness monotonicity is consistent with the declared evidence regime."
-      }
-  | .certificateDerivedConsistent =>
-      { assumption := h
-      , passed := certificateDerivedConsistentCheck p
-      , detail := "Coarse certificate tag is consistent with primitive evidence assumptions."
-      }
-  | .finalityModeConsistent =>
-      { assumption := h
-      , passed := finalityModeConsistentCheck p
-      , detail := "Derived evidence mode and finality mode are consistent (intersection=deterministic, additive=probabilistic, coupled=both)."
-      }
-  | .quorumIntersectionWitnessed =>
-      { assumption := h
-      , passed := quorumIntersectionWitnessedCheck p
-      , detail := "Quorum-intersection obligations are explicitly witnessed and threshold-compatible."
-      }
-  | .timingAuthCompatible =>
-      { assumption := h
-      , passed := timingAuthCompatibleCheck p
-      , detail := "Timing/authentication assumptions are explicit and compatible with threshold claims."
-      }
-  /-! ## Validation Branches: Pressure/Budget Preconditions -/
-  -- Validation group: pressure/budget preconditions.
-  | .capPressureConsistent =>
-      { assumption := h
-      , passed := capPressureConsistentCheck p
-      , detail := "CAP policy is consistent with evidence-driven partition pressure."
-      }
-  | .responsivePreconditions =>
-      { assumption := h
-      , passed := responsivePreconditionsCheck p
-      , detail := "If responsiveness is claimed, timing/auth/fault preconditions are satisfied."
-      }
-  | .hybridFrontInvariant =>
-      { assumption := h
-      , passed := hybridFrontInvariantCheck p
-      , detail := "Hybrid availability/finality front invariant is satisfied."
-      }
-  | .adversarialBudgetBounded =>
-      { assumption := h
-      , passed := adversarialBudgetBoundedCheck p
-      , detail := "Adversarial budget bounds are within declared count/weight regimes."
-      }
-  /-! ## Validation Branches: Declarations and Transport Gates -/
-  -- Validation group: declaration and transport gating.
-  | .faultThresholdDeclared =>
-      { assumption := h
-      , passed := p.thresholdRegimeDeclared
-      , detail := "Fault-threshold regime is explicitly declared."
-      }
-  | .spaceConfidenceTagged =>
-      { assumption := h
-      , passed := p.classificationHeuristicTagged
-      , detail := "Protocol-space claims are tagged with heuristic/confidence scope."
-      }
-  | .logicalTimeSemanticsDeclared =>
-      { assumption := h
-      , passed := p.logicalTimeSemanticsDeclared
-      , detail := "Logical-time semantics declaration (`t_logical`, `T_logical`)."
-      }
-  | .orderParameterDeclared =>
-      { assumption := h
-      , passed := p.orderParameterDeclared
-      , detail := "At least one order parameter is declared."
-      }
-  | .phaseBoundaryModelDeclared =>
-      { assumption := h
-      , passed := p.phaseBoundaryModelDeclared
-      , detail := "Phase-boundary model declaration is present."
-      }
-  | .interactiveDistanceDeclared =>
-      { assumption := h
-      , passed := p.interactiveDistanceDeclared
-      , detail := "Interactive distance declaration (`d_int`) is present."
-      }
-  | .universalityClassDeclared =>
-      { assumption := h
-      , passed := p.universalityClassDeclared
-      , detail := "Universality-class declaration is present."
-      }
-  | .classicalTransportEligible =>
-      { assumption := h
-      , passed := classicalTransportEligibleCheck p
-      , detail := "Classical transport profile is declared and consensus/model prerequisites are satisfied."
-      }
+  match validateAssumptionSpaceFinality? p h with
+  | some r => r
+  | none =>
+      match validateAssumptionFaultModel? p h with
+      | some r => r
+      | none =>
+          match validateAssumptionPrimitiveCoherence? p h with
+          | some r => r
+          | none =>
+              match validateAssumptionPressureBudget? p h with
+              | some r => r
+              | none =>
+                  match validateAssumptionDeclarations? p h with
+                  | some r => r
+                  | none =>
+                      mkAssumptionResult h false
+                        "Unhandled assumption (update validator groups)."
 
 /-! ## Validation Summary API -/
 
