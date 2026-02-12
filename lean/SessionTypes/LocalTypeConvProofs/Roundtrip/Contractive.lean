@@ -30,7 +30,7 @@ open SessionTypes.NameOnlyContext
 
 /-! ## Contractiveness preservation for fromDB -/
 
-/-! ## Contractiveness preservation for fromDB -/
+/-! ## isGuarded Preservation from DB -/
 
 lemma isGuarded_fromDB_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : String)
     (hget : NameContext.get? ctx i = some v)
@@ -48,6 +48,9 @@ lemma isGuarded_fromDB_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : S
           (t.fromDB ctx hclosed).isGuarded v = true
   let P2 : List (Label × LocalTypeDB) → Prop := fun _ => True
   let P3 : Label × LocalTypeDB → Prop := fun _ => True
+
+  /-! ## isGuarded Preservation: Structural Recursion -/
+
   have hrec : P1 t := by
     refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
@@ -71,6 +74,9 @@ lemma isGuarded_fromDB_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : S
       simp [LocalTypeDB.fromDB, LocalTypeR.isGuarded]
     · intro p bs hbs ctx i v hget huniq hclosed hguard
       simp [LocalTypeDB.fromDB, LocalTypeR.isGuarded]
+
+    /-! ## isGuarded Preservation: μ Case -/
+
     · intro body hbody ctx i v hget huniq hclosed hguard
       by_cases hv : v = NameContext.freshName ctx
       · subst hv
@@ -105,6 +111,8 @@ lemma isGuarded_fromDB_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : S
       exact True.intro
   exact hrec ctx i v hget huniq hclosed hguard
 
+/-! ## isGuarded Preservation at Fresh Binder -/
+
 lemma isGuarded_fromDB_fresh (t : LocalTypeDB) (ctx : NameContext)
     (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
     (hclosed : t.isClosedAt (ctx.length + 1) = true)
@@ -132,6 +140,8 @@ lemma isGuarded_fromDB_fresh (t : LocalTypeDB) (ctx : NameContext)
     exact hclosed
   exact isGuarded_fromDB_at t ctx' 0 fresh hget huniq hclosed' hguard
 
+/-! ## isContractive Preservation from DB -/
+
 theorem isContractive_fromDB (t : LocalTypeDB) (ctx : NameContext)
     (hfreshAll : ∀ c, NameContext.freshName c ∉ c) :
     t.isContractive = true →
@@ -156,6 +166,9 @@ theorem isContractive_fromDB (t : LocalTypeDB) (ctx : NameContext)
         b.2.isContractive = true →
         (hclosed : b.2.isClosedAt ctx.length = true) →
           (b.2.fromDB ctx hclosed).isContractive = true
+
+  /-! ## isContractive Preservation: Structural Recursion -/
+
   have hrec : P1 t := by
     refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
