@@ -23,6 +23,8 @@ open SessionTypes.GlobalType
 These lemmas show that participation is preserved under unfolding. They are
 useful for reasoning about `fullUnfoldIter` in projection proofs. -/
 
+/-! ## Structural Size Helpers -/
+
 private theorem sizeOf_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
     sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
   simp only [GlobalType.comm.sizeOf_spec]
@@ -52,6 +54,8 @@ private theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
   have h2 := sizeOf_bs_lt_comm sender receiver gbs
   omega
 
+/-! ## Branch-Membership Rewriting for substituteBranches -/
+
 private theorem mem_substituteBranches_iff_forward
     {branches : List (Label × GlobalType)} {t : String} {repl : GlobalType}
     {label : Label} {cont' : GlobalType}
@@ -75,6 +79,8 @@ private theorem mem_substituteBranches_iff_forward
           | inr hmemTail =>
               rcases ih hmemTail with ⟨cont, hcont_eq, hmem''⟩
               exact ⟨cont, hcont_eq, by simp [hmem'']⟩
+
+/-! ## Branch-Membership Rewriting: Backward Direction -/
 
 private theorem mem_substituteBranches_iff_backward
     {branches : List (Label × GlobalType)} {t : String} {repl : GlobalType}
@@ -102,6 +108,8 @@ private theorem mem_substituteBranches_iff_backward
                 ih hmemTail
               exact List.mem_cons_of_mem _ hmemSub
 
+/-! ## Branch-Membership Rewriting: Equivalence -/
+
 private theorem mem_substituteBranches_iff
     {branches : List (Label × GlobalType)} {t : String} {repl : GlobalType}
     {label : Label} {cont' : GlobalType} :
@@ -111,6 +119,8 @@ private theorem mem_substituteBranches_iff
   constructor
   · exact mem_substituteBranches_iff_forward
   · exact mem_substituteBranches_iff_backward
+
+/-! ## Substitution Preservation: Constructor Cases -/
 
 private theorem part_of2_substitute_var (role : String) (v t : String) (repl : GlobalType)
     (h : part_of2 role ((GlobalType.var v).substitute t repl)) :
@@ -167,6 +177,8 @@ private theorem part_of2_substitute_mu (role : String) (s : String) (body : Glob
         right
         exact hrepl
 
+/-! ## Substitution Preservation: Main Theorem -/
+
 theorem part_of2_substitute (role : String) :
     ∀ g t repl, part_of2 role (g.substitute t repl) →
       part_of2 role g ∨ part_of2 role repl := by
@@ -199,6 +211,7 @@ theorem part_of2_substitute (role : String) :
           | inr hrepl =>
               right
               exact hrepl
+  /-! ## Substitution Preservation: Mu/Delegate Cases -/
   | .mu s body =>
       by_cases hst : s = t
       · left
@@ -240,6 +253,8 @@ decreasing_by
       | (simpa [GlobalType.comm.sizeOf_spec] using
           (sizeOf_elem_snd_lt_comm _ _ _ _ (by assumption)))
       | (simp only [sizeOf, GlobalType._sizeOf_1] at *; omega)
+
+/-! ## Unfolding Preservation for Participation -/
 
 theorem part_of2_unfold (role : String) (g : GlobalType) :
     part_of2 role (GlobalType.unfold g) → part_of2 role g := by
@@ -349,6 +364,7 @@ mutual
           have hbody : part_of2 role body :=
             (part_of2_iff_participates role body).2 h
           exact .intro _ (.mu _ _ hbody)
+    /-! ## part_of2_iff_participates: Comm Case -/
     | comm sender receiver branches =>
         constructor
         · intro h
@@ -380,6 +396,7 @@ mutual
                 (participatesBranches_iff_part_of2 role branches).1 hbranches
               obtain ⟨pair, hmem, hcont⟩ := hexists
               exact .intro _ (.comm_branch _ _ pair.1 pair.2 _ hmem hcont)
+    /-! ## part_of2_iff_participates: Delegate Case -/
     | delegate p q sid r cont =>
         constructor
         · intro h
@@ -402,6 +419,8 @@ mutual
               have hcont' : part_of2 role cont :=
                 (part_of2_iff_participates role cont).2 hcont
               exact .intro _ (.delegate_cont _ _ _ _ _ hcont')
+
+  /-! ## Branch-Level Boolean/Inductive Equivalence -/
 
   /-- `participatesBranches` is equivalent to existence of a participating branch. -/
   theorem participatesBranches_iff_part_of2 (role : String) :
@@ -443,6 +462,8 @@ mutual
                 (participatesBranches_iff_part_of2 role tl).2 ⟨pair, hmemTail, hpo⟩
               exact Or.inr hrest
 end
+
+/-! ## Boolean Participation Corollaries -/
 
 theorem participates_comm_iff {role sender receiver : String} {branches : List (Label × GlobalType)} :
     participates role (.comm sender receiver branches) =
