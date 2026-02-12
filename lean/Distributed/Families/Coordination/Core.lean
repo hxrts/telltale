@@ -43,6 +43,8 @@ def CoordinationCharacterization
   (M.monotoneUpdateClass → CoordinationFreeSafety M) ∧
   (¬ M.monotoneUpdateClass → CoordinationRequired M)
 
+/-! ## Assumption Atoms and Contracts -/
+
 /-- Reusable core coordination assumption bundle. -/
 structure Assumptions
     {State : Type u} {Update : Type v}
@@ -64,6 +66,8 @@ structure AssumptionResult where
 /-- Core reusable coordination assumption set. -/
 def coreAssumptions : List Assumption :=
   [ .monotonicityClassDeclared ]
+
+/-! ## Assumption Validation API -/
 
 /-- Validate one assumption against an assumption bundle. -/
 def validateAssumption
@@ -103,6 +107,8 @@ def runAssumptionValidation
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
 
+/-! ## Theorem Premises and Main Result -/
+
 /-- Additional premises used to derive coordination theorem forms. -/
 structure Premises
     {State : Type u} {Update : Type v}
@@ -127,5 +133,4 @@ theorem coordination_characterization_of_assumptions
 
 end Coordination
 end Distributed
-
 
