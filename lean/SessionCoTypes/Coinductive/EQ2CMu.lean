@@ -85,6 +85,7 @@ lemma EQ2C_mu_paco_to_obs_of_bounds {a b : LocalTypeC} {na nb : Nat}
     (h : EQ2C_mu_paco a b) :
     ObservableRelC EQ2C_mu_paco a b := by
   classical
+  /-! ## Bounded-to-Observable Reduction -/
   -- Induct on the combined unfolding budget.
   have aux :
       ∀ n {a b : LocalTypeC} {na nb : Nat},
@@ -95,6 +96,7 @@ lemma EQ2C_mu_paco_to_obs_of_bounds {a b : LocalTypeC} {na nb : Nat}
         ObservableRelC EQ2C_mu_paco a b := by
     intro n
     induction n with
+    /-! ## Bounds Induction: Base Case -/
     | zero =>
         intro a b na nb hsum ha hb hmu
         -- na = 0 and nb = 0
@@ -118,6 +120,7 @@ lemma EQ2C_mu_paco_to_obs_of_bounds {a b : LocalTypeC} {na nb : Nat}
               simpa [fullUnfoldN] using hb
             have : False := by simp [hasNonMuHead, head, hdest] at hnonmu
             cases this
+    /-! ## Bounds Induction: Successor Case -/
     | succ n ih =>
         intro a b na nb hsum ha hb hmu
         have hstep := Paco.paco_unfold EQ2CMuMono ⊥ a b hmu
@@ -154,6 +157,7 @@ lemma EQ2C_mu_paco_to_obs_of_bounds {a b : LocalTypeC} {na nb : Nat}
                 have hobs' :=
                   ih (a := f ()) (b := b) (na := na') (nb := nb) hsum' ha' hb hrel
                 exact ObservableRelC_unfoldsC_left hstep' hobs'
+        /-! ## Bounds Induction: Right-Unfold Case -/
         | mu_right hstep hrel =>
             cases nb with
             | zero =>
@@ -181,6 +185,8 @@ lemma EQ2C_mu_paco_to_obs_of_bounds {a b : LocalTypeC} {na nb : Nat}
                   ih (a := a) (b := f ()) (na := na) (nb := nb') hsum' ha hb' hrel
                 exact ObservableRelC_unfoldsC_right hstep' hobs'
   exact aux (na + nb) rfl ha hb h
+
+/-! ## Observable Inputs Corollary -/
 
 /-- For observable types, mu-step paco yields an observable relation. -/
 lemma EQ2C_mu_paco_to_obs {a b : LocalTypeC}
