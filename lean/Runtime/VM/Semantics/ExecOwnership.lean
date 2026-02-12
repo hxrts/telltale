@@ -34,6 +34,8 @@ universe u
 
 /-! ## Ownership and knowledge semantics -/
 
+/-! ### Token/knowledge partition helpers -/
+
 private def splitTokens {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (coro : CoroutineState γ ε) (ep : Endpoint) : List ProgressToken × List ProgressToken :=
   -- Partition progress tokens by endpoint.
@@ -61,6 +63,8 @@ private def updateTargetCoro {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     coros.set (i := tid) (v := cT') (h := h)
   else
     coros
+
+/-! ### Transfer commit and validation helpers -/
 
 def transferCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -106,6 +110,8 @@ private def transferWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [G
     faultPack st coro (.transferFault "endpoint not owned") "endpoint not owned"
 
 
+/-! ### `transfer` instruction semantics -/
+
 def stepTransfer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -121,6 +127,8 @@ def stepTransfer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   | some v, _ => faultPack st coro (.typeViolation (.chan 0 "") (valTypeOf v)) "bad transfer endpoint"
   | none, _ => faultPack st coro .outOfRegisters "missing transfer endpoint"
 
+
+/-! ### Knowledge tagging/checking semantics -/
 
 def stepTag {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
