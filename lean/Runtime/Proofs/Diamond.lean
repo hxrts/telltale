@@ -123,6 +123,8 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
 
 /-! ## updateCoro Preservation Lemmas -/
 
+/-! ## updateCoro Core Field Preservation -/
+
 @[simp] theorem updateCoro_programs {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -163,6 +165,8 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     (updateCoro st c co).clock = st.clock := by
   unfold updateCoro; split <;> rfl
 
+/-! ## updateCoro Data Preservation -/
+
 @[simp] theorem updateCoro_sessions {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -202,6 +206,8 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     (st : VMState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
     (updateCoro st c co).coroutines.size = st.coroutines.size := by
   unfold updateCoro; split <;> simp [Array.size_set]
+
+/-! ## updateCoro Entry Access -/
 
 /-- updateCoro at c1 doesn't affect the coroutine entry at c2 ≠ c1. -/
 theorem updateCoro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
