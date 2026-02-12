@@ -3,8 +3,6 @@ import Mathlib.Logic.Function.Iterate
 import SessionTypes.GlobalType
 import SessionTypes.TypeContext
 import SessionTypes.ValType
--- Import after GlobalType to avoid circular dependencies
--- import SessionTypes.LocalTypeConv
 
 set_option linter.dupNamespace false
 set_option linter.unusedSimpArgs false
@@ -39,7 +37,6 @@ The following definitions form the semantic interface for proofs:
 -/
 
 namespace SessionTypes.LocalTypeR
-
 open SessionTypes.GlobalType
 open SessionTypes (ValType)
 
@@ -68,7 +65,6 @@ abbrev BranchR := Label × Option ValType × LocalTypeR
 def BranchR.cont : BranchR → LocalTypeR := fun (_, _, c) => c
 
 /-! ## Payload Erasure -/
-
 mutual
   /-- Erase all value types from a local type (set branch payloads to `none`). -/
   def LocalTypeR.eraseValTypes : LocalTypeR → LocalTypeR
@@ -120,6 +116,7 @@ theorem freeVarsOfBranches_eq_flatMap (branches : List BranchR) :
               simp [freeVarsOfBranches, ih, List.flatMap]
 
 /-! ## Size lemmas for termination proofs -/
+/-! ## Size Lemmas: Primitive Constructors -/
 
 @[simp]
 lemma sizeOf_cont_lt_sizeOf_branches (label : Label) (vt : Option ValType) (cont : LocalTypeR)
@@ -148,6 +145,7 @@ lemma sizeOf_body_lt_sizeOf_mu (t : String) (body : LocalTypeR) :
     sizeOf body < sizeOf (LocalTypeR.mu t body) := by
   simp +arith
 
+/-! ## Size Lemmas: Equality Rewrites -/
 @[simp] lemma sizeOf_branches_lt_of_send_eq {lt : LocalTypeR} {p : String}
     {bs : List BranchR} (h : lt = LocalTypeR.send p bs) :
     sizeOf bs < sizeOf lt := by
@@ -176,6 +174,7 @@ lemma sizeOf_body_lt_sizeOf_mu (t : String) (body : LocalTypeR) :
     sizeOf cont < sizeOf bs := by
   simpa [hbs, hhead] using sizeOf_cont_lt_sizeOf_branches label vt cont tail
 
+/-! ## Size Lemmas: Membership Bound -/
 /-- Size of continuation is less than size of branch list when the continuation is in the list. -/
 lemma sizeOf_cont_lt_sizeOf_branches_mem {cont : LocalTypeR}
     {bs : List BranchR} (hmem : cont ∈ bs.map BranchR.cont) :
@@ -196,6 +195,7 @@ lemma sizeOf_cont_lt_sizeOf_branches_mem {cont : LocalTypeR}
           have h1 := ih hmem'
           exact Nat.lt_trans h1 (sizeOf_tail_lt_sizeOf_branches hd tl)
 
+/-! ## Substitution Core -/
 mutual
   /-- Substitute a local type for a variable: `t.substitute v repl` replaces free occurrences of `v` in `t` with `repl`. -/
   def LocalTypeR.substitute : LocalTypeR → String → LocalTypeR → LocalTypeR
@@ -362,8 +362,9 @@ mutual
 end
 
 /-! ## freeVars / isFreeIn bridge lemmas -/
-
 mutual
+  /-! ## freeVars Membership Implies isFreeIn -/
+
   theorem mem_freeVars_isFreeIn (lt : LocalTypeR) (v : String) :
       v ∈ lt.freeVars → lt.isFreeIn v = true := by
     intro hmem
@@ -396,6 +397,8 @@ mutual
     all_goals
       simp [*] <;> omega
 
+  /-! ## Branch Membership Implies Branch isFreeIn -/
+
   theorem mem_freeVarsOfBranches_isFreeInBranches' (bs : List BranchR) (v : String) :
       v ∈ freeVarsOfBranches bs → isFreeInBranches' v bs = true := by
     intro hmem
@@ -423,6 +426,7 @@ mutual
       simp [*] <;> omega
 end
 
+/-! ## Guardedness Predicate -/
 /-- Check if a variable is guarded (only appears inside send/recv) in a local type.
     A variable is guarded if it doesn't appear at the "head" position -
     i.e., only inside the continuations of communications, not at mu bodies before communications.
@@ -457,6 +461,7 @@ def LocalTypeR.isGuarded (v : String) : LocalTypeR → Bool
     simp only [sizeOf, LocalTypeR._sizeOf_1]
     omega
 
+/-! ## Contractiveness Predicate -/
 mutual
   /-- A local type is contractive if every mu-bound variable is guarded in its body.
       This ensures mu-unfolding eventually reaches a communication. -/
@@ -474,6 +479,7 @@ mutual
 
 end
 
+/-! ## Well-Formedness -/
 /-- Well-formed local types are closed and contractive. -/
 structure LocalTypeR.WellFormed (t : LocalTypeR) : Prop where
   closed : t.isClosed
@@ -483,6 +489,4 @@ structure LocalTypeR.WellFormed (t : LocalTypeR) : Prop where
 theorem LocalTypeR.WellFormed_end : LocalTypeR.WellFormed .end :=
   ⟨by simp [LocalTypeR.isClosed, LocalTypeR.freeVars],
    by simp [LocalTypeR.isContractive]⟩
-
-
 end SessionTypes.LocalTypeR
