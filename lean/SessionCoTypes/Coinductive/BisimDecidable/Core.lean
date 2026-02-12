@@ -164,6 +164,8 @@ lemma fullUnfoldN_UnfoldsToC (n : Nat) (t : LocalTypeC) :
       | ⟨LocalTypeHead.send _ _, _⟩ => exact Relation.ReflTransGen.refl
       | ⟨LocalTypeHead.recv _ _, _⟩ => exact Relation.ReflTransGen.refl
 
+/-! ## Stability and Additivity of Bounded Unfolding -/
+
 /-- If a type already has a non-mu head, unfolding does nothing. -/
 lemma fullUnfoldN_of_hasNonMuHead {t : LocalTypeC} (h : hasNonMuHead t = true) :
     ∀ n, fullUnfoldN n t = t := by
@@ -210,6 +212,8 @@ lemma fullUnfoldN_add (n m : Nat) (t : LocalTypeC) :
               have hnonmu : hasNonMuHead t = true := by simp [hasNonMuHead, head, hdest]
               simp [fullUnfoldN_of_hasNonMuHead hnonmu]
 
+/-! ## Stabilization Beyond a Non-mu Cutoff -/
+
 lemma fullUnfoldN_eq_of_ge {t : LocalTypeC} {n m : Nat}
     (hge : m ≥ n) (h : hasNonMuHead (fullUnfoldN n t) = true) :
     fullUnfoldN m t = fullUnfoldN n t := by
@@ -218,6 +222,8 @@ lemma fullUnfoldN_eq_of_ge {t : LocalTypeC} {n m : Nat}
   have hstable : ∀ k, fullUnfoldN k (fullUnfoldN n t) = fullUnfoldN n t :=
     fullUnfoldN_of_hasNonMuHead h
   simpa [fullUnfoldN_add] using (hstable k)
+
+/-! ## Observable Kind Classification -/
 
 /-- Observable kind for comparison. -/
 inductive ObsKind
