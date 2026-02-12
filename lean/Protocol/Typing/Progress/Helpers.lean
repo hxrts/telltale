@@ -56,6 +56,8 @@ theorem findLabel_eq {α : Type} {lbl lbl' : Label} {xs : List (Label × α)} {v
     simpa using hPred
   exact (beq_iff_eq).1 hPred'
 
+/-! ## Blocked-Process Predicate -/
+
 def BlockedProc (store : VarStore) (bufs : Buffers) : Process → Prop
   | .recv k _ =>
       ∃ e source,
@@ -70,6 +72,8 @@ def BlockedProc (store : VarStore) (bufs : Buffers) : Process → Prop
   | .par _ _ P Q =>
       (P = .skip ∨ BlockedProc store bufs P) ∧ (Q = .skip ∨ BlockedProc store bufs Q)
   | _ => False
+
+/-! ## SEnv Domain-Subset Helpers -/
 
 lemma DisjointS_right_empty (S : SEnv) : DisjointS S (∅ : SEnv) := by
   intro x T₁ T₂ hL1 hL2
@@ -93,6 +97,8 @@ lemma SEnvDomSubset_updateLeft_right
     {Sown : OwnedEnv} {x : Var} {T : ValType} :
     SEnvDomSubset (OwnedEnv.updateLeft Sown x T).right Sown.right := by
   simpa [OwnedEnv.updateLeft] using (SEnvDomSubset_erase (S:=Sown.right) (x:=x))
+
+/-! ## Pre-Out Right-Environment Domain Inclusion -/
 
 theorem HasTypeProcPreOut_right_domsubset
     {Ssh Sown G P Sfin Gfin W Δ} :
@@ -123,6 +129,8 @@ theorem HasTypeProcPreOut_right_domsubset
       simpa using (SEnvDomSubset_updateLeft_right (Sown:=_) (x:=_) (T:=_))
   | assign_old _ _ _ =>
       simpa using (SEnvDomSubset_updateLeft_right (Sown:=_) (x:=_) (T:=_))
+
+/-! ## Typed-Step Preservation of Right-Owned Environment -/
 
 lemma TypedStep_preserves_right
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
@@ -174,6 +182,7 @@ lemma TypedStep_preserves_right
           have hRightEq : (OwnedEnv.updateLeft Sown x T).right = Sown.right := by
             simpa [OwnedEnv.updateLeft, hErase]
           simpa [hSout] using hRightEq
+  /-! ## Typed-Step Preservation: Assign Cases -/
   | assign =>
       rename_i G D Ssh Sown store bufs x v T S' store' hv hSout hStoreOut
       cases hPre with
@@ -215,6 +224,7 @@ lemma TypedStep_preserves_right
           have hRightEq : (OwnedEnv.updateLeft Sown x T).right = Sown.right := by
             simpa [OwnedEnv.updateLeft, hErase]
           simpa [hSout] using hRightEq
+  /-! ## Typed-Step Preservation: Structural Cases -/
   | seq_step _ ih =>
       cases hPre with
       | seq hP hQ =>
@@ -223,6 +233,8 @@ lemma TypedStep_preserves_right
           exact ih hP hSubP
   | _ =>
       rfl
+
+/-! ## Endpoint Equality from Full Store Lookup -/
 
 lemma channel_endpoint_eq_of_store
     {G : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : VarStore}
@@ -241,6 +253,8 @@ lemma channel_endpoint_eq_of_store
   have hEq : (Value.chan e') = (Value.chan e) := Option.some.inj hEqOpt
   cases hEq
   rfl
+
+/-! ## Empty-Environment and Disjointness Utilities -/
 
 lemma DisjointG_left_empty (G : GEnv) : DisjointG [] G := by
   simp [DisjointG, GEnvDisjoint, SessionsOf_empty]
