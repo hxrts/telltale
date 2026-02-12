@@ -122,6 +122,8 @@ lemma EQ2C_var_head {a b : LocalTypeC} {v : String}
     exact ⟨obs_x, obs_y, ObservableRelC.is_var v hx hy⟩
   exact ⟨R, hR, ⟨ha, hb⟩⟩
 
+/-! ## EQ2C Head Lemmas: Send/Recv Cases -/
+
 /-- Two types with matching send heads and related branches are EQ2C-equivalent. -/
 lemma EQ2C_send_head {a b : LocalTypeC} {p : String} {labels labels' : List Label}
     (ha : head a = .send p labels) (hb : head b = .send p labels')
@@ -156,6 +158,8 @@ lemma EQ2C_send_head {a b : LocalTypeC} {p : String} {labels labels' : List Labe
         exact ⟨obs_x, obs_y,
           ObservableRelC.is_send p (branchesOf x) (branchesOf y) ha_send hb_send hbr'⟩
   exact ⟨R', hR', Or.inl ⟨rfl, rfl⟩⟩
+
+/-! ## EQ2C Head Lemmas: Recv Case -/
 
 /-- Two types with matching recv heads and related branches are EQ2C-equivalent. -/
 lemma EQ2C_recv_head {a b : LocalTypeC} {p : String} {labels labels' : List Label}
@@ -266,6 +270,8 @@ lemma EQ2CE_step_to_EQ2C {R : Rel} {ρ : EnvPair} {a b : LocalTypeC}
       have hb' : b = mkMu x (f ()) := mu_eta (b := b) (x := x) (k := f) hb
       simpa [hb'] using hmu
 
+/-! ## EQ2CE → EQ2C Erasure Variants -/
+
 /-- Variant using EnvResolvesL and EnvVarR. -/
 lemma EQ2CE_step_to_EQ2C_varR {R : Rel} {ρ : EnvPair} {a b : LocalTypeC}
     (hR : ∀ ρ a b, R ρ a b → EQ2C a b)
@@ -273,6 +279,8 @@ lemma EQ2CE_step_to_EQ2C_varR {R : Rel} {ρ : EnvPair} {a b : LocalTypeC}
     (hstep : EQ2CE_step R ρ a b) : EQ2C a b := by
   have hEnv : EnvResolves ρ := EnvResolves_of_left_varR hEnvL hVarR
   exact EQ2CE_step_to_EQ2C (hR := hR) hEnv hstep
+
+/-! ## EQ2CE → EQ2C with Left-Only Environment -/
 
 /-- Variant with explicit no-right-var constraint. -/
 lemma EQ2CE_step_to_EQ2C_left {R : Rel} {ρ : EnvPair} {a b : LocalTypeC}
