@@ -39,6 +39,7 @@ open scoped Classical
 
 section
 
+/-! ## Core Type Grammars -/
 /-- Value types for MPST (same as binary, but with LocalType for channels). -/
 inductive ValType where
   | unit : ValType
@@ -87,6 +88,7 @@ abbrev Branch := Label × LocalType
 
 namespace LocalType
 
+/-! ## LocalType Helper Predicates -/
 /-- Check if a local type is terminated. -/
 def isEnd : LocalType → Bool
   | .end_ => true
@@ -100,6 +102,7 @@ def targetRole? : LocalType → Option Role
   | .branch r _ => some r
   | _ => none
 
+/-! ## LocalType Substitution and Unfolding -/
 /-- Substitute a type for variable n (structural recursion on continuation). -/
 def subst (n : Nat) (replacement : LocalType) : LocalType → LocalType
   | .send r T L => .send r T (subst n replacement L)
@@ -118,6 +121,7 @@ def unfold : LocalType → LocalType
   | .mu L => LocalType.subst 0 (.mu L) L
   | L => L
 
+/-! ## LocalType Role-Action Predicates -/
 /-- Check if a local type expects to send to role r next. -/
 def canSendTo (r : Role) : LocalType → Bool
   | .send r' _ _ => r == r'
@@ -132,6 +136,7 @@ def canRecvFrom (r : Role) : LocalType → Bool
   | .mu L => L.canRecvFrom r
   | _ => false
 
+/-! ## LocalType One-step Advancement Helpers -/
 /-- Advance a send type after sending. -/
 def advanceSend (r : Role) (T : ValType) : LocalType → Option LocalType
   | .send r' T' L => if r == r' && T == T' then some L else none
@@ -225,6 +230,7 @@ theorem depth_advance_recv (r : Role) (T : ValType) (L : LocalType) :
   show L.depth < 1 + L.depth
   omega
 
+/-! ## DepthList Branch Bounds -/
 /-- A branch continuation has depth at most the depthList. -/
 theorem depthList_mem_le (ℓ : Label) (L : LocalType) (bs : List (Label × LocalType))
     (h : (ℓ, L) ∈ bs) :
@@ -241,6 +247,7 @@ theorem depthList_mem_le (ℓ : Label) (L : LocalType) (bs : List (Label × Loca
     · have htl := ih hmem
       exact Nat.le_trans htl (Nat.le_max_right _ _)
 
+/-! ## Branch Advancement Strictness -/
 /-- Selecting a branch strictly decreases depth. -/
 theorem depth_advance_select (r : Role) (bs : List (Label × LocalType))
     (ℓ : Label) (L : LocalType) (h : (ℓ, L) ∈ bs) :
