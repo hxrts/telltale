@@ -50,6 +50,8 @@ def BoundedTerminationAfterGST
   ∀ run, FairRun run → M.initial (run 0) →
     ∃ n, n ≤ gst + bound ∧ ∃ v, M.decide (run n) = some v
 
+/-! ## Assumption Atoms and Contracts -/
+
 /-- Reusable core partial-synchrony assumption bundle. -/
 structure Assumptions
     {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
@@ -78,6 +80,8 @@ def coreAssumptions : List Assumption :=
   , .fairPacemaker
   , .eventuallyCorrectLeader
   ]
+
+/-! ## Assumption Validation API -/
 
 /-- Validate one assumption against an assumption bundle. -/
 def validateAssumption
@@ -127,6 +131,8 @@ def runAssumptionValidation
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
 
+/-! ## Theorem Premises and Derived Liveness Results -/
+
 /-- Additional premises used to derive the standard DLS-style liveness forms. -/
 structure Premises
     {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
@@ -163,5 +169,4 @@ theorem bounded_postGST_termination_of_assumptions
 
 end PartialSynchrony
 end Distributed
-
 
