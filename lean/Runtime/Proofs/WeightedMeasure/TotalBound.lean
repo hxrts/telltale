@@ -20,6 +20,10 @@ open scoped Classical
 
 section
 
+/-! ## Local Session Step Decrease Lemmas -/
+
+/-! ### Send -/
+
 theorem send_step_decreases
     (s : SessionState) (actor partner : Role) (T : ValType) (L : LocalType)
     (hlookup : s.lookupType actor = some (.send partner T L))
@@ -49,6 +53,8 @@ theorem send_step_decreases
     exact sumBuffers_incrBuffer_le s actor partner hunique_buffers
   -- Combine
   omega
+
+/-! ### Receive -/
 
 /-- Recv step decreases the weighted measure.
 
@@ -87,6 +93,8 @@ theorem recv_step_decreases
     exact sumBuffers_decrBuffer_eq s actor partner n hmem hunique_buffers (by omega : n > 0)
   -- Combine
   omega
+
+/-! ### Select -/
 
 /-- Select step decreases the weighted measure.
 
@@ -134,6 +142,8 @@ theorem select_step_decreases
   -- Combine
   omega
 
+/-! ### Branch -/
+
 /-- Branch step decreases the weighted measure.
 
     When actor branches on label ℓ from partner with type `branch partner branches`:
@@ -180,6 +190,8 @@ theorem branch_step_decreases
 
 /-! ## Total Measure Decrease -/
 
+/-! ### Fold-Sum Comparison Helpers -/
+
 /-- Sum is monotone: pointwise ≤ implies sum ≤. -/
 lemma sum_le_of_pointwise_le {α : Type*} (l : List α) (f g : α → Nat)
     (hle : ∀ y ∈ l, f y ≤ g y) :
@@ -190,9 +202,11 @@ lemma sum_le_of_pointwise_le {α : Type*} (l : List α) (f g : α → Nat)
     simp only [List.map_cons, List.foldl_cons, Nat.zero_add]
     rw [foldl_add_shift (l := tl.map f) (n := f hd)]
     rw [foldl_add_shift (l := tl.map g) (n := g hd)]
-    have h1 : f hd ≤ g hd := hle hd (by simp)
-    have h2 := ih (fun y hy => hle y (List.mem_cons.mpr (Or.inr hy)))
-    omega
+      have h1 : f hd ≤ g hd := hle hd (by simp)
+      have h2 := ih (fun y hy => hle y (List.mem_cons.mpr (Or.inr hy)))
+      omega
+
+/-! ### Strict Fold-Sum Decrease -/
 
 /-- Sum decreases when one element strictly decreases and others don't increase. -/
 lemma sum_lt_of_one_lt {α : Type*} (l : List α) (f g : α → Nat)
@@ -216,6 +230,8 @@ lemma sum_lt_of_one_lt {α : Type*} (l : List α) (f g : α → Nat)
       have h1 : f hd ≤ g hd := hle hd (by simp)
       have h2 := ih htl (fun y hy => hle y (List.mem_cons.mpr (Or.inr hy)))
       omega
+
+/-! ### Unique-Key Equality from Nodup Map -/
 
 /-- If a list has unique images under f and x, y are in the list with f x = f y, then x = y. -/
 lemma eq_of_mem_of_eq_of_nodup_map {α β : Type*} [DecidableEq β]
@@ -247,6 +263,8 @@ lemma eq_of_mem_of_eq_of_nodup_map {α β : Type*} [DecidableEq β]
         exact hnotmem hmem
       · -- Both in tail
         exact ih hx_tl hy_tl htl_nodup
+
+/-! ### Configuration-Level Decrease Lift -/
 
 /-- Any productive step decreases the total weighted measure. -/
 theorem total_measure_decreasing [sem : SessionSemantics]
