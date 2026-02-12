@@ -39,8 +39,10 @@ private theorem findLabel_eq {α : Type} {lbl lbl' : Label} {xs : List (Label ×
 theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
     StepBase C C' := by
   cases hProc : C.proc with
+  /-! ## Base-Decide Soundness: skip case -/
   | skip =>
       simp [stepBaseDecide, hProc] at h
+  /-! ## Base-Decide Soundness: send case -/
   | send k x =>
       cases hK : lookupStr C.store k <;> simp [stepBaseDecide, hProc, hK] at h
       case some v =>
@@ -60,6 +62,7 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
                 simp at h
         | _ =>
           simp at h
+  /-! ## Base-Decide Soundness: recv case -/
   | recv k x =>
       cases hK : lookupStr C.store k <;> simp [stepBaseDecide, hProc, hK] at h
       case some v =>
@@ -81,6 +84,7 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
               simp at h
         | _ =>
           simp at h
+  /-! ## Base-Decide Soundness: select case -/
   | select k ℓ =>
       cases hK : lookupStr C.store k <;> simp [stepBaseDecide, hProc, hK] at h
       case some v =>
@@ -108,6 +112,7 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
               simp at h
         | _ =>
           simp at h
+  /-! ## Base-Decide Soundness: branch case -/
   | branch k procBranches =>
       cases hK : lookupStr C.store k <;> simp [stepBaseDecide, hProc, hK] at h
       case some v =>
@@ -128,10 +133,11 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
                     cases pairP with
                     | mk lblP P =>
                       cases hFindT : typeBranches.find? (fun b => b.1 == ℓ) <;>
-                        simp [hFindT] at h
+	                        simp [hFindT] at h
                       case some pairT =>
                         cases pairT with
                         | mk lblT L =>
+                          /-! ## Base-Decide Soundness: branch dequeue subcase -/
                           cases hDeq : dequeueBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } <;>
                             simp [hDeq] at h
                           case some pairDeq =>
@@ -162,11 +168,13 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
               simp at h
         | _ =>
           simp at h
+  /-! ## Base-Decide Soundness: newSession case -/
   | newSession roles f P =>
       have hC' : C' = { (newSessionStep C roles f) with proc := P } := by
         simpa [stepBaseDecide, hProc] using h.symm
       subst hC'
       exact StepBase.newSession hProc
+  /-! ## Base-Decide Soundness: assign case -/
   | assign x v =>
       have hC' :
           C' =
@@ -176,12 +184,14 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
         simpa [stepBaseDecide, hProc] using h.symm
       subst hC'
       exact StepBase.assign hProc
+  /-! ## Base-Decide Soundness: seq case -/
   | seq P Q =>
       cases hP : P <;> simp [stepBaseDecide, hProc, hP] at h
       have hC' : C' = { C with proc := Q } := by
         simpa [stepBaseDecide, hProc, hP] using h.symm
       subst hC'
       exact StepBase.seq2 (by simpa [hP] using hProc)
+  /-! ## Base-Decide Soundness: par case -/
   | par nS nG P Q =>
       cases hP : P with
       | skip =>
@@ -207,12 +217,14 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
   refine (WellFounded.induction (C := fun C0 => ∀ C', stepDecide C0 = some C' → Step C0 C') wf (a := C) ?_) C' h
   intro C ih C' hstep
   cases hProc : C.proc with
+  /-! ## Contextual Soundness: skip case -/
   | skip =>
       have : False := by
         have hnone : stepDecide C = none := by
           simp [stepDecide, stepDecideAux, hProc]
         cases hstep.symm.trans hnone
       exact this.elim
+  /-! ## Contextual Soundness: seq case -/
   | seq P Q =>
       by_cases hPskip : P = .skip
       · subst hPskip
@@ -240,6 +252,7 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
             have hStepSub : Step { C with proc := P } C0 := by
               exact ih _ hlt _ hsub
             exact Step.seq_left hProc hStepSub
+  /-! ## Contextual Soundness: par case -/
   | par nS nG P Q =>
       by_cases hPskip : P = .skip
       · subst hPskip
@@ -286,28 +299,34 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
                   have : False := by
                     have hnone : stepDecide C = none := by
                       simp [stepDecide, stepDecideAux, hProc, hPskip, hQskip, hsub', hsubR']
-                    cases hstep.symm.trans hnone
+	                    cases hstep.symm.trans hnone
                   exact this.elim
+  /-! ## Contextual Soundness: base send case -/
   | send k x =>
       have hBase : stepBaseDecide C = some C' := by
         simpa [stepDecide, stepDecideAux, hProc] using hstep
       exact Step.base (stepBaseDecide_sound hBase)
+  /-! ## Contextual Soundness: base recv case -/
   | recv k x =>
       have hBase : stepBaseDecide C = some C' := by
         simpa [stepDecide, stepDecideAux, hProc] using hstep
       exact Step.base (stepBaseDecide_sound hBase)
+  /-! ## Contextual Soundness: base select case -/
   | select k ℓ =>
       have hBase : stepBaseDecide C = some C' := by
         simpa [stepDecide, stepDecideAux, hProc] using hstep
       exact Step.base (stepBaseDecide_sound hBase)
+  /-! ## Contextual Soundness: base branch case -/
   | branch k bs =>
       have hBase : stepBaseDecide C = some C' := by
         simpa [stepDecide, stepDecideAux, hProc] using hstep
       exact Step.base (stepBaseDecide_sound hBase)
+  /-! ## Contextual Soundness: base newSession case -/
   | newSession roles f P =>
       have hBase : stepBaseDecide C = some C' := by
         simpa [stepDecide, stepDecideAux, hProc] using hstep
       exact Step.base (stepBaseDecide_sound hBase)
+  /-! ## Contextual Soundness: base assign case -/
   | assign x v =>
       have hBase : stepBaseDecide C = some C' := by
         simpa [stepDecide, stepDecideAux, hProc] using hstep
