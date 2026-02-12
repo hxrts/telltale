@@ -52,6 +52,8 @@ theorem lookupSEnv_all_frame_left_owned
   have hEq' := lookupSEnv_append_assoc (S₁:=Ssh) (S₂:=Sown.right) (S₃:=Sframe ++ Sown.left) (x:=x)
   simpa [SEnvAll, hEq', List.append_assoc] using hFrame
 
+/-! ## Right-Side Owned Framing -/
+
 theorem lookupSEnv_all_frame_right_owned
     {Ssh : SEnv} {Sown : OwnedEnv} {Sframe : SEnv} {x : Var} {T : ValType} :
     lookupSEnv (SEnvAll Ssh Sown) x = some T →
@@ -88,6 +90,8 @@ theorem lookupSEnv_all_frame_right_prefix
   have hFrame := lookupSEnv_all_frame_left (Ssh:=Ssh) (S₁:=Sframe) (S₂:=Sown.right ++ Sown.left) hDisj hLookup'
   simpa [SEnvAll, List.append_assoc] using hFrame
 
+/-! ## Commutation Under Disjointness -/
+
 lemma lookupSEnv_comm_of_disjoint {S₁ S₂ : SEnv} (hDisj : DisjointS S₁ S₂) :
     ∀ x, lookupSEnv (S₁ ++ S₂) x = lookupSEnv (S₂ ++ S₁) x := by
   intro x
@@ -107,6 +111,8 @@ lemma lookupSEnv_comm_of_disjoint {S₁ S₂ : SEnv} (hDisj : DisjointS S₁ S�
       | none =>
           have hB := lookupSEnv_append_right (S₁:=S₂) (S₂:=S₁) (x:=x) hRight
           simpa [hA, hB, hRight, hLeft]
+
+/-! ## Left-Side Swap Through Suffix -/
 
 lemma lookupSEnv_swap_left {S₁ S₂ S₃ : SEnv} (hDisj : DisjointS S₁ S₂) :
     ∀ x, lookupSEnv ((S₁ ++ S₂) ++ S₃) x = lookupSEnv ((S₂ ++ S₁) ++ S₃) x := by
@@ -134,6 +140,8 @@ lemma lookupSEnv_swap_left {S₁ S₂ S₃ : SEnv} (hDisj : DisjointS S₁ S₂)
       have hB' : lookupSEnv (S₂ ++ (S₁ ++ S₃)) x = lookupSEnv S₃ x := by
         simpa [List.append_assoc] using hB
       simpa [hA', hB']
+
+/-! ## Prefix-Aware Swap For `SEnvAll` -/
 
 lemma lookupSEnv_swap_left_prefix {Ssh S₁ S₂ S₃ : SEnv} (hDisj : DisjointS S₁ S₂) :
     ∀ x, lookupSEnv (SEnvAll Ssh ((S₁ ++ S₂) ++ S₃)) x =
