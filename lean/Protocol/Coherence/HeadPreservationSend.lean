@@ -103,6 +103,7 @@ private theorem Consume_branch_nonempty_isSome_false
     The sender's G entry changes, but receiver's G entry is unchanged
     (unless sender = receiver, which is handled separately).
     Reference: `work/effects/004.lean` proof structure -/
+/-! ## Main Send Preservation Theorem -/
 theorem HeadCoherent_send_preserved
     (G : GEnv) (D : DEnv) (senderEp : Endpoint) (receiverRole : Role) (T : ValType) (L : LocalType)
     (hHead : HeadCoherent G D)
@@ -118,10 +119,12 @@ theorem HeadCoherent_send_preserved
   simp only [HeadCoherent] at hHead ⊢
   have hActiveOrig : ActiveEdge G e :=
     ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=senderEp) (L:=L) hActive (by simp [hG])
+  /-! ## Case Split on Updated Edge -/
   -- Case split: is e the send edge or not?
   by_cases heq : e = sendEdge
   · -- Case 1: e = sendEdge - type and trace both change
     subst heq
+    /-! ## Updated Edge: Self-Send vs Distinct Receiver -/
     -- Self-send case: receiver = sender, handled by subst and lookup lemmas.
     by_cases hRecvIsSender : receiverRole = senderEp.role
     · -- Self-send: receiver = sender, type at senderEp changes to L
@@ -172,6 +175,7 @@ theorem HeadCoherent_send_preserved
           rw [hOrigTrace] at hConsumeOrig
           simp only [Consume, consumeOne] at hConsumeOrig
           exact Option.noConfusion hConsumeOrig
+    /-! ## Updated Edge: Receiver Distinct from Sender -/
     · -- Normal case: receiver ≠ sender
       have hRecvNeq : senderEp ≠ { sid := senderEp.sid, role := receiverRole } := by
         intro h
@@ -195,6 +199,7 @@ theorem HeadCoherent_send_preserved
         | select _ _ => trivial
         | var _ => trivial
         | mu _ => trivial
+        /-! ## Distinct Receiver: Recv Continuation -/
         | recv r T' L' =>
           -- Original: if trace non-empty, head = T'
           -- After: trace ++ [T], head unchanged (unless trace was empty)
@@ -232,6 +237,7 @@ theorem HeadCoherent_send_preserved
             have hEpEq : { sid := sendEdge.sid, role := sendEdge.receiver : Endpoint } = { sid := senderEp.sid, role := receiverRole } := rfl
             simp only [hEpEq, hRecvType, hTrace] at hOrigAtEdge
             exact hOrigAtEdge
+        /-! ## Distinct Receiver: Branch Continuation -/
         | branch source bs =>
           cases hTrace : lookupD D sendEdge with
           | nil =>
@@ -257,9 +263,11 @@ theorem HeadCoherent_send_preserved
             have hEpEq : { sid := sendEdge.sid, role := sendEdge.receiver : Endpoint } = { sid := senderEp.sid, role := receiverRole } := rfl
             simp only [hEpEq, hRecvType, hTrace] at hOrigAtEdge
             exact hOrigAtEdge
+  /-! ## Unchanged Edge: Receiver Endpoint Updated or Not -/
   · -- Case 2: e ≠ sendEdge
     -- Check if receiver endpoint changed (is it senderEp?)
     by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = senderEp
+    /-! ## Unchanged Edge with Receiver Endpoint Replaced -/
     · -- Receiver endpoint is senderEp, type changed from SEND to L
       subst hRecvMatch
       rw [lookupG_update_eq]
@@ -291,6 +299,7 @@ theorem HeadCoherent_send_preserved
         have hTraceEmpty := trace_empty_when_send_receiver hEdgeCoh hRecvType'
         rw [hTraceEmpty]
         trivial
+    /-! ## Unchanged Edge with Unchanged Receiver Endpoint -/
     · -- Receiver endpoint unchanged
       have hRecvNoMatch : senderEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
       rw [lookupG_update_neq _ _ _ _ hRecvNoMatch]
