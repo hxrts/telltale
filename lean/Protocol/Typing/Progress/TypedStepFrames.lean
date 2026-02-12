@@ -44,46 +44,55 @@ lemma TypedStep_preserves_frames
     ∃ Gmid', G' = Gleft ++ Gmid' ++ Gright := by
   intro hGfull hDisjL hDisjLR hDisjR hStore hDisjShAll hOwnDisj hOut hStep
   induction hStep generalizing Gleft Gmid Gright Sfin Gfin W Δ with
+  /-! ## TypedStep Frame Preservation: Send -/
   | send =>
       rename_i Gfull D Ssh Sown store bufs k x eStep target Tstep Lstep v sendEdge G' D' bufs'
         hkStr hxStr hGStep hS hv hRecvReady hEdge hGout hDout hBufsOut
       exact TypedStep_preserves_frames_send (hGfull:=hGfull) (hDisjL:=hDisjL)
         (hStore:=hStore) hDisjShAll hOwnDisj (hOut:=hOut) hkStr hGout
+  /-! ## TypedStep Frame Preservation: Receive -/
   | recv =>
       rename_i Gfull D Ssh Sown store bufs k x eStep source Tstep Lstep v vs recvEdge G' D' Sown' store' bufs'
         hkStr hGStep hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut
       exact TypedStep_preserves_frames_recv (hGfull:=hGfull) (hDisjL:=hDisjL)
         (hStore:=hStore) hDisjShAll hOwnDisj (hOut:=hOut) hkStr hGout
+  /-! ## TypedStep Frame Preservation: Select -/
   | select =>
       rename_i Gfull D Ssh Sown store bufs k ℓ eStep target bsStep Lstep selectEdge G' D' bufs'
         hkStr hGStep hFind hTargetReady hEdge hGout hDout hBufsOut
       exact TypedStep_preserves_frames_select (hGfull:=hGfull) (hDisjL:=hDisjL)
         (hStore:=hStore) hDisjShAll hOwnDisj (hOut:=hOut) hkStr hGout
+  /-! ## TypedStep Frame Preservation: Branch -/
   | branch =>
       rename_i Gfull D Ssh Sown store bufs k procs eStep source bsStep ℓ P Lstep vs branchEdge G' D' bufs'
         hkStr hGStep hEdge hBuf hFindP hFindBs hTrace hGout hDout hBufsOut
       exact TypedStep_preserves_frames_branch (hGfull:=hGfull) (hDisjL:=hDisjL)
         (hStore:=hStore) hDisjShAll hOwnDisj (hOut:=hOut) hkStr hGout
+  /-! ## TypedStep Frame Preservation: Assign -/
   | assign =>
       rename_i Gfull D Ssh Sown store bufs x v T S' store' hv hSout hStoreOut
       cases hOut <;> refine ⟨Gmid, ?_⟩ <;> simpa [List.append_assoc, hGfull]
+  /-! ## TypedStep Frame Preservation: Seq Step -/
   | seq_step =>
       rename_i Gfull D Ssh Sown G' D' Sown' store bufs store' bufs' P P' Q hStepP ih
       cases hOut with
       | seq hP hQ =>
           exact ih hGfull hDisjL hDisjLR hDisjR hStore hDisjShAll hOwnDisj hP
+  /-! ## TypedStep Frame Preservation: Seq Skip -/
   | seq_skip =>
       rename_i Gfull D Ssh Sown store bufs Q
       cases hOut with
       | seq hP hQ =>
           refine ⟨Gmid, ?_⟩
           simpa [List.append_assoc, hGfull]
+  /-! ## TypedStep Frame Preservation: Par Left -/
   | par_left splitFull hSlen' hStepP hDisjGfull hDisjD hDisjSfull ih =>
       rename_i Ssh Sown store bufs store' bufs' P P' Q Gfull D₁ D₂ G₁' D₁' S₁' nS nG
       cases hOut with
       | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
           hDisjW hDisjΔ hP hQ =>
           rename_i S1out S2out S1out' S2out' G1out G2out W1out W2out Δ1out Δ2out
+          /-! ## Par Left: Align Splits and Reframe Stores -/
           have hSeq : splitFull.S1 ++ splitFull.S2 = split.S1 ++ split.S2 := by
             rw [← splitFull.hS, ← split.hS]
           have hSlenEq : splitFull.S1.length = split.S1.length :=
@@ -108,6 +117,7 @@ lemma TypedStep_preserves_frames
               StoreTypedStrong (Gleft ++ Gmid ++ Gright)
                 (SEnvAll Ssh { right := Sown.right ++ split.S1, left := split.S2 }) store := by
             simpa [hGfull, SEnvAll, split.hS, List.append_assoc] using hStore
+          /-! ## Par Left: Derive GEnv Disjointness for Subsplits -/
           have hSubG1 : SessionsOf split.G1 ⊆ SessionsOf Gmid := by
             intro s hs
             simpa [split.hG] using SessionsOf_append_left (G₂:=split.G2) hs
@@ -145,6 +155,7 @@ lemma TypedStep_preserves_frames
                 simpa [split.hG]
               _ = Gleft ++ split.G1 ++ (split.G2 ++ Gright) := by
                 simp [List.append_assoc]
+          /-! ## Par Left: Transport Typing/Step to Aligned Split -/
           have hStoreL' :
               StoreTypedStrong (Gleft ++ split.G1 ++ (split.G2 ++ Gright))
                 (SEnvAll Ssh { right := Sown.right ++ split.S2, left := split.S1 }) store := by
@@ -189,16 +200,19 @@ lemma TypedStep_preserves_frames
           have hOwnSubL' :
               OwnedDisjoint ({ right := Sown.right ++ splitFull.S2, left := splitFull.S1 } : OwnedEnv) := by
             simpa [hS1Eq, hS2Eq] using hOwnSubL
+          /-! ## Par Left: Apply IH and Reassemble -/
           rcases ih hGfull' hDisjGleftG1 hDisjLeftRight hDisjMidRight hStoreL''' hDisjShSubL' hOwnSubL' hP' with
             ⟨Gmid', hShape⟩
           refine ⟨Gmid' ++ split.G2, ?_⟩
           simp [hShape, List.append_assoc]
+  /-! ## TypedStep Frame Preservation: Par Right -/
   | par_right splitFull hSlen' hStepQ hDisjGfull hDisjD hDisjSfull ih =>
       rename_i Ssh Sown store bufs store' bufs' P Q Q' Gfull D₁ D₂ G₂' D₂' S₂' nS nG
       cases hOut with
       | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
           hDisjW hDisjΔ hP hQ =>
           rename_i S1out S2out S1out' S2out' G1out G2out W1out W2out Δ1out Δ2out
+          /-! ## Par Right: Align Splits and Reframe Stores -/
           have hSeq : splitFull.S1 ++ splitFull.S2 = split.S1 ++ split.S2 := by
             rw [← splitFull.hS, ← split.hS]
           have hSlenEq : splitFull.S1.length = split.S1.length :=
@@ -223,6 +237,7 @@ lemma TypedStep_preserves_frames
               StoreTypedStrong (Gleft ++ Gmid ++ Gright)
                 (SEnvAll Ssh { right := Sown.right ++ split.S1, left := split.S2 }) store := by
             simpa [hGfull, SEnvAll, split.hS, List.append_assoc] using hStore
+          /-! ## Par Right: Derive GEnv Disjointness for Subsplits -/
           have hSubG1 : SessionsOf split.G1 ⊆ SessionsOf Gmid := by
             intro s hs
             simpa [split.hG] using SessionsOf_append_left (G₂:=split.G2) hs
@@ -252,6 +267,7 @@ lemma TypedStep_preserves_frames
                 simpa [split.hG]
               _ = (Gleft ++ split.G1) ++ split.G2 ++ Gright := by
                 simp [List.append_assoc]
+          /-! ## Par Right: Transport Typing/Step to Aligned Split -/
           have hStoreR' :
               StoreTypedStrong ((Gleft ++ split.G1) ++ split.G2 ++ Gright)
                 (SEnvAll Ssh { right := Sown.right ++ split.S1, left := split.S2 }) store := by
@@ -296,16 +312,19 @@ lemma TypedStep_preserves_frames
           have hOwnSubR' :
               OwnedDisjoint ({ right := Sown.right ++ splitFull.S1, left := splitFull.S2 } : OwnedEnv) := by
             simpa [hS1Eq, hS2Eq] using hOwnSubR
+          /-! ## Par Right: Apply IH and Reassemble -/
           rcases ih hGfull' hDisjLeftMid hDisjLeftRight hDisjG2Right hStoreR''' hDisjShSubR' hOwnSubR' hQ' with
             ⟨Gmid', hShape⟩
           refine ⟨split.G1 ++ Gmid', ?_⟩
           simp [hShape, List.append_assoc]
+  /-! ## TypedStep Frame Preservation: Par Skip Left -/
   | par_skip_left =>
       rename_i Gfull D Ssh Sown store bufs Q nS nG
       cases hOut with
       | par _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
           refine ⟨Gmid, ?_⟩
           simpa [List.append_assoc] using hGfull
+  /-! ## TypedStep Frame Preservation: Par Skip Right -/
   | par_skip_right =>
       rename_i Gfull D Ssh Sown store bufs P nS nG
       cases hOut with
