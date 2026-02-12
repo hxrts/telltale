@@ -70,6 +70,8 @@ private lemma AllBranchesProjC_mono {R S : ProjRelC}
 
 /-! ## Projection step generator -/
 
+/-! ### Communication-Case Helper -/
+
 private def ProjectC_comm (R : ProjRelC) (sender receiver : String)
     (gbs : List (Label × GlobalType)) (role : String) (l' : LocalTypeC) : Prop :=
   (role = sender ∧
@@ -99,6 +101,8 @@ private lemma ProjectC_comm_mono {R S : ProjRelC}
           rcases hother with ⟨hns, hnr, hall⟩
           exact Or.inr (Or.inr ⟨hns, hnr, AllBranchesProjC_mono h hall⟩)
 
+/-! ### Step Operator Definition -/
+
 /-- One-step generator for coinductive projection, unfolding both sides finitely. -/
 def ProjectC_step (R : ProjRelC) : ProjRelC := fun g role cand =>
   ∃ g' l', UnfoldsToG g g' ∧ UnfoldsToC cand l' ∧
@@ -107,6 +111,8 @@ def ProjectC_step (R : ProjRelC) : ProjRelC := fun g role cand =>
     | .var t => head l' = .var t
     | .mu _ _ => False
     | .comm sender receiver gbs => ProjectC_comm R sender receiver gbs role l'
+
+/-! ### Step Operator Monotonicity -/
 
 private theorem ProjectC_step_mono : Monotone ProjectC_step := by
   intro R S h g role cand hrel
@@ -134,6 +140,8 @@ private theorem ProjectC_step_mono : Monotone ProjectC_step := by
               exact Or.inr (Or.inr ⟨hns, hnr, AllBranchesProjC_mono h hall⟩)
 
 instance : CoinductiveRel ProjRelC ProjectC_step := ⟨ProjectC_step_mono⟩
+
+/-! ### Greatest Fixed Point -/
 
 
 /-- Coinductive projection as the greatest fixed point of `ProjectC_step`. -/
