@@ -16,6 +16,8 @@ set_option autoImplicit false
 universe u
 /-! ## Scheduler step -/
 
+/-! ### Core scheduling primitives -/
+
 def schedule {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -66,10 +68,12 @@ def schedStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     -- Execute a single scheduled coroutine step.
     match schedule st with
     | none => none
-    | some (cid, st') =>
-        let (st'', res) := execInstr st' cid
-        let sched'' := updateAfterStep st''.sched cid res.status
-        some { st'' with sched := sched'' }
+	    | some (cid, st') =>
+	        let (st'', res) := execInstr st' cid
+	        let sched'' := updateAfterStep st''.sched cid res.status
+	        some { st'' with sched := sched'' }
+
+/-! ### Lane compatibility contracts -/
 
 /-- Compatibility contract when lane metadata snapshots are unchanged. -/
 def single_lane_schedule_compat {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -108,6 +112,8 @@ theorem single_lane_schedule_compat_holds {ι γ π ε ν : Type u} [IdentityMod
   subst hLaneBlocked
   subst hHandoffs
   rfl
+
+/-! ### Deterministic policy-selection contracts -/
 
 /-- Scheduler choices are confluent: `schedule` is a deterministic function. -/
 def schedule_confluence {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -162,6 +168,8 @@ theorem policy_selection_deterministic_holds {ι γ π ε ν : Type u} [Identity
     policy_selection_deterministic policy st := by
   intro _ st1 st2 h1 h2
   exact Option.some.inj (h1.symm.trans h2)
+
+/-! ### Policy refinement and liveness predicates -/
 
 /-- Cooperative scheduling refines round-robin: swapping the policy field before
     queue-level selection under normalized scheduler views. -/
