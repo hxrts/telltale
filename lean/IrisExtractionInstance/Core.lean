@@ -331,6 +331,8 @@ scope or until a specific event.
 The invariant erases to its content; the token erases to `emp`.
 -/
 
+/-! ## Cancelable Invariant Definitions -/
+
 /-- Cancelable invariant token handle. -/
 abbrev CancelToken := GhostName
 
@@ -357,6 +359,8 @@ eventually canceled by consuming the full token.
 def cinv (N : Namespace) (_ct : CancelToken) (P : iProp) : iProp :=
   Iris.BaseLogic.cinv (GF := ti.GF) (M := ti.M) (F := ti.F) ti.W N _ct P
 
+/-! ## Namespace and Allocation Lemmas -/
+
 /-- Distinct `Nat` children of the same namespace are disjoint. -/
 theorem namespace_disjoint (N : Namespace) (n₁ n₂ : Nat) (hNe : n₁ ≠ n₂) :
     Mask.disjoint (namespace_to_mask (Namespace.append_nat N n₁))
@@ -375,6 +379,8 @@ theorem cinv_alloc :
     intro N E P hFresh
     simpa [cinv, cancel_token_own, namespace_to_mask] using
       (Iris.BaseLogic.cinv_alloc (GF := ti.GF) (M := ti.M) (F := ti.F) ti.W E N P hFresh)
+
+/-! ## Access and Cancel Lemmas -/
 
 /-- Open a cancelable invariant using its full cancel token. -/
 theorem cinv_acc :
@@ -419,4 +425,3 @@ theorem cinv_cancel :
   := by
     intro N E ct P hSub
     exact cinv_acc N E ct P hSub
-
