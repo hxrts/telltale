@@ -246,6 +246,8 @@ variable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
   [IdentityVerificationBridge ι ν]
 
+/-! ## Site-to-Role Crash Projection -/
+
 /-- A role is considered crashed if there exists a site-to-role mapping
     and all sites that can host that role have crashed.
     This is a simplified model where we track crashed roles directly. -/
@@ -270,6 +272,8 @@ private theorem mkEdge_eq_some {roles : RoleSet} {src dst : Role} {e : Role × R
     · simpa [mkEdge, hSrc, hDst] using h
     · simp [mkEdge, hSrc, hDst] at h
   · simp [mkEdge, hSrc] at h
+
+/-! ## Session Graph Extraction -/
 
 /-- Extract the communication graph from a session in VMState.
     Uses the session's roles and builds edges from local type structure. -/
@@ -321,6 +325,8 @@ def commGraphOfVMState (st : VMState ι γ π ε ν) : CommGraph where
     · exact List.mem_flatMap.mpr ⟨(sid, sess), hmemSess, hIn.1⟩
     · exact List.mem_flatMap.mpr ⟨(sid, sess), hmemSess, hIn.2⟩
 
+/-! ## VM-Level Crash Tolerance Predicate -/
+
 /-- VM-level crash tolerance: a VMState tolerates a set of crashed sites
     if the residual communication graph remains connected. -/
 def VMCrashTolerant (siteToRoles : IdentityModel.SiteId ι → List Role)
@@ -328,6 +334,8 @@ def VMCrashTolerant (siteToRoles : IdentityModel.SiteId ι → List Role)
   let roles := (commGraphOfVMState st).participants
   let crashedRoles := crashedRolesOfSites siteToRoles roles st.crashedSites
   CrashTolerant (commGraphOfVMState st) crashedRoles
+
+/-! ## Graph and Crash-Set Invariance Lemmas -/
 
 /-- After a site crash, the crashed sites list grows. -/
 theorem crashSite_extends_crashed (st : VMState ι γ π ε ν) (site : IdentityModel.SiteId ι) :
@@ -358,6 +366,8 @@ theorem commGraph_preserved_by_reconnectEdges (st : VMState ι γ π ε ν) (edg
     commGraphOfVMState (reconnectEdges st edges) = commGraphOfVMState st := by
   unfold commGraphOfVMState reconnectEdges
   simp
+
+/-! ## Tolerance Transport and Preservation -/
 
 /-- Crash tolerance is preserved when graph and crash set are unchanged. -/
 theorem VMCrashTolerant_of_same_graph
@@ -402,6 +412,8 @@ theorem crashSite_preserves_tolerance
     VMCrashTolerant siteToRoles (crashSite st site) := by
   exact crashTolerant_preserved_of_no_new_role_crash siteToRoles st site hEqCrashed hTol
 
+/-! ## Topology-Preserving Operations -/
+
 /-- Partition steps preserve crash tolerance (no change to crash set). -/
 theorem disconnectEdges_preserves_tolerance
     (siteToRoles : IdentityModel.SiteId ι → List Role)
@@ -429,6 +441,8 @@ theorem closeSession_preserves_tolerance
     VMCrashTolerant siteToRoles (closeSession st sid) := by
   apply VMCrashTolerant_of_same_graph siteToRoles _ _ hGraph rfl hTol
 
+/-! ## Failure-Step Preservation Schema -/
+
 /-- Failure-aware steps preserve crash tolerance when each case's side conditions hold. -/
 theorem FStep_preserves_tolerance
     (siteToRoles : IdentityModel.SiteId ι → List Role)
@@ -440,6 +454,8 @@ theorem FStep_preserves_tolerance
     (hTol : VMCrashTolerant siteToRoles st) :
     VMCrashTolerant siteToRoles st' := by
   exact hStepPres st st' hStep hTol
+
+/-! ## Active Session Integration -/
 
 /-- Session coherence from Failure.lean implies our SessionCanComplete. -/
 theorem SessionCoherent_implies_active (st : VMState ι γ π ε ν) (sid : SessionId)
