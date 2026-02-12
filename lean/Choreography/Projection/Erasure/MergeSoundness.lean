@@ -35,6 +35,9 @@ private theorem mergeBranchesSend_sound
       lookupBranch lbl bs = some t →
       Erases t1 t2 t) := by
   induction bs1 generalizing bs with
+
+  /-! ## mergeBranchesSend Nil Case -/
+
   | nil =>
       cases hsubset : labelsSubsetb bs2 [] with
       | true =>
@@ -61,6 +64,9 @@ private theorem mergeBranchesSend_sound
           have : False := by
             simp [hnone] at h
           exact this.elim
+
+  /-! ## mergeBranchesSend Cons Case -/
+
   | cons head tail ih =>
       obtain ⟨l, vt1, t1⟩ := head
       rcases mergeBranchesSend_eq_some (lbl := l) (vt1 := vt1) (t1 := t1)
@@ -103,6 +109,9 @@ private theorem mergeBranchesSend_sound
             (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t) (rest := rest') hlt).1 hIn
           have hIn_tail := hsubb1 lbl hIn_rest'
           exact (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t1) (rest := tail) hlt).2 hIn_tail
+
+      /-! ## mergeBranchesSend Cons Branch Erasure Case -/
+
       · intro lbl t1' t2' t' h1 h2 hbs
         by_cases hlt : l = lbl
         ·
@@ -133,8 +142,11 @@ private theorem mergeBranchesSend_sound
               have h1_tail : lookupBranch lbl tail = some t1' := by
                 simpa [lookupBranch, hlt] using h1
               have hbs' : lookupBranch lbl rest' = some t' := by
-                simpa [lookupBranch, hlt] using hbs
+                  simpa [lookupBranch, hlt] using hbs
               exact hper lbl t1' t2' t' h1_tail h2 hbs'
+
+/-! ## mergeBranchesRecv Soundness -/
+
 private theorem mergeBranchesRecv_sound
     (m : Nat)
     (hmerge : ∀ a b c, sizeOf a + sizeOf b < m → merge a b = some c → Erases a b c)
@@ -155,6 +167,9 @@ private theorem mergeBranchesRecv_sound
       lookupBranch lbl bs2 = some t2 →
       lookupBranch lbl bs = some t2) := by
   induction bs1 generalizing bs with
+
+  /-! ## mergeBranchesRecv Nil Case -/
+
   | nil =>
       simp [mergeBranchesRecv] at h
       cases h
@@ -166,11 +181,17 @@ private theorem mergeBranchesRecv_sound
       · intro lbl t2 h1 h2
         simp [appendMissing_nil] at h2 ⊢
         exact h2
+
+  /-! ## mergeBranchesRecv Cons Case -/
+
   | cons head tail ih =>
       obtain ⟨l, vt1, t1⟩ := head
       rcases mergeBranchesRecv_eq_some (lbl := l) (vt1 := vt1) (t1 := t1)
           (rest := tail) (bs2 := bs2) (bs := bs) h with
         hnone | hsome
+
+      /-! ## mergeBranchesRecv Cons Missing-Label Path -/
+
       · rcases hnone with ⟨hlookup, rest', hrest, rfl⟩
         have hm_tail : sizeOf tail + sizeOf bs2 < m := by
           have htail : sizeOf tail < sizeOf ((l, vt1, t1) :: tail) := by
@@ -211,8 +232,11 @@ private theorem mergeBranchesRecv_sound
           ·
             have h1_tail : lookupBranch lbl tail = none := by
               simpa [lookupBranch, hlt] using h1'
-            have htail := hright lbl t2' h1_tail h2'
-            simpa [lookupBranch, hlt] using htail
+                have htail := hright lbl t2' h1_tail h2'
+                simpa [lookupBranch, hlt] using htail
+
+      /-! ## mergeBranchesRecv Cons Merged-Label Path -/
+
       · rcases hsome with ⟨t2, t, rest', hlookup, hmerge', hrest, rfl⟩
         have hm_tail : sizeOf tail + sizeOf bs2 < m := by
           have htail : sizeOf tail < sizeOf ((l, vt1, t1) :: tail) := by
@@ -255,6 +279,9 @@ private theorem mergeBranchesRecv_sound
                 have hbs' : lookupBranch lbl rest' = some t' := by
                   simpa [lookupBranch, hlt] using hbs
                 exact hper lbl t1' t2' t' h1_tail h2' hbs'
+
+            /-! ## mergeBranchesRecv Merged-Label Left-Preservation Subcase -/
+
             · intro lbl t1' h1' h2'
               by_cases hlt : l = lbl
               ·
@@ -267,14 +294,17 @@ private theorem mergeBranchesRecv_sound
                   simpa [lookupBranch, hlt] using h1'
                 have htail := hleft lbl t1' h1_tail h2'
                 simpa [lookupBranch, hlt] using htail
+
+            /-! ## mergeBranchesRecv Merged-Label Right-Preservation Subcase -/
+
             · intro lbl t2' h1' h2'
               by_cases hlt : l = lbl
               · simp [lookupBranch, hlt] at h1'
               ·
                 have h1_tail : lookupBranch lbl tail = none := by
                   simpa [lookupBranch, hlt] using h1'
-                have htail := hright lbl t2' h1_tail h2'
-                simpa [lookupBranch, hlt] using htail
+	                have htail := hright lbl t2' h1_tail h2'
+	                simpa [lookupBranch, hlt] using htail
 
 /-! ## Merge Soundness -/
 
@@ -295,6 +325,9 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
         intro a' b' c' hlt h'
         exact IH (a', b') hlt c' h'
       cases a with
+
+      /-! ## merge_sound: End Case -/
+
       | «end» =>
           cases b with
           | «end» =>
@@ -302,9 +335,12 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
               cases h
               exact Erases.end
           | var _ | mu _ _ | send _ _ | recv _ _ =>
-              have : False := by
-                simp [merge] at h
-              exact this.elim
+	              have : False := by
+	                simp [merge] at h
+	              exact this.elim
+
+      /-! ## merge_sound: Var Case -/
+
       | var v =>
           cases b with
           | var w =>
@@ -316,9 +352,12 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                   simp [merge, hv] at h
                 exact this.elim
           | «end» | mu _ _ | send _ _ | recv _ _ =>
-              have : False := by
-                simp [merge] at h
-              exact this.elim
+	              have : False := by
+	                simp [merge] at h
+	              exact this.elim
+
+      /-! ## merge_sound: Mu Case -/
+
       | mu v a' =>
           cases b with
           | mu w b' =>
@@ -342,9 +381,12 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                   simp [merge, hv] at h
                 exact this.elim
           | «end» | var _ | send _ _ | recv _ _ =>
-              have : False := by
-                simp [merge] at h
-              exact this.elim
+	              have : False := by
+	                simp [merge] at h
+	              exact this.elim
+
+      /-! ## merge_sound: Send Case -/
+
       | send p bs =>
           cases b with
           | send q bs' =>
@@ -377,10 +419,13 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                       exact Erases.send h1 h2 hper
                     · simp [hmerge', hsubset] at h
               · simp [merge, hp] at h
-          | «end» | var _ | mu _ _ | recv _ _ =>
-              have : False := by
-                simp [merge] at h
-              exact this.elim
+	          | «end» | var _ | mu _ _ | recv _ _ =>
+	              have : False := by
+	                simp [merge] at h
+	              exact this.elim
+
+      /-! ## merge_sound: Recv Case -/
+
       | recv p bs =>
           cases b with
           | recv q bs' =>
@@ -408,9 +453,12 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                     exact Erases.recv hper hleft hright
               · simp [merge, hp] at h
           | «end» | var _ | mu _ _ | send _ _ =>
-              have : False := by
-                simp [merge] at h
-              exact this.elim
+	              have : False := by
+	                simp [merge] at h
+	              exact this.elim
+
+/-! ## mergeAll Soundness -/
+
 /-- mergeAll is sound w.r.t. ErasesAll. -/
 theorem mergeAll_sound {ts : List LocalTypeR} {t : LocalTypeR}
     (h : mergeAll ts = some t) : ErasesAll ts t := by
