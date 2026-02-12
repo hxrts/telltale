@@ -87,6 +87,8 @@ theorem HasTypeVal_prod_inv {G : GEnv} {v : Value} {T₁ T₂ : ValType}
   cases h with
   | prod h1 h2 => exact ⟨_, _, rfl, h1, h2⟩
 
+/-! ## Typing Uniqueness and Monotonicity -/
+
 /-- HasTypeVal is deterministic: each value has exactly one type.
     This is essential for deriving trace types from buffer values. -/
 theorem HasTypeVal_unique {G : GEnv} {v : Value} {T₁ T₂ : ValType}
@@ -126,6 +128,8 @@ theorem HasTypeVal_prepend (G1 G2 : GEnv) (v : Value) (T : ValType)
   simp only [hNone, Option.none_or]
   exact hLookup
 
+/-! ## Buffer Typing Predicates -/
+
 /-- A buffer at edge e is typed by the type trace at e. -/
 def BufferTyped (G : GEnv) (D : DEnv) (bufs : Buffers) (e : Edge) : Prop :=
   let buf := lookupBuf bufs e
@@ -137,6 +141,8 @@ def BufferTyped (G : GEnv) (D : DEnv) (bufs : Buffers) (e : Edge) : Prop :=
 /-- All buffers are typed. -/
 def BuffersTyped (G : GEnv) (D : DEnv) (bufs : Buffers) : Prop :=
   ∀ e, BufferTyped G D bufs e
+
+/-! ## List Get/Map Helper -/
 
 namespace List
 
@@ -155,6 +161,8 @@ namespace List
           simp
 
 end List
+
+/-! ## Trace Head from Typed Buffers -/
 
 /-- If buffer has head v with type T, then trace has head T.
     Key lemma for deriving trace head in recv case.
