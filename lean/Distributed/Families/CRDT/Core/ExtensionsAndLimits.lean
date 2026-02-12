@@ -55,6 +55,8 @@ theorem boundedApproximation_zeroBudget_implies_envelope
     Nat.le_zero.mp hDist
   exact hZeroDistanceSafe (ref t) (impl t) hEqZero
 
+/-! ## Extension Counterexample Models -/
+
 /-- Counterexample id issuer violating sequence subclass criterion. -/
 def sequenceIdIssuerConstant : Nat → Nat :=
   fun _ => 0
@@ -101,6 +103,8 @@ def structuredMultiScaleModel : Model (Nat × Nat) Unit Unit (Nat × Nat) Unit w
   gcCausalDominanceClass := True
   stabilizationLowerBoundClass := True
 
+/-! ## Extension Counterexample Theorems -/
+
 /-- Constant id issue stream refutes strict sequence-subclass criteria. -/
 theorem sequenceIdCriterion_counterexample :
     ¬ SequenceIdSubclassCriterion sequenceIdIssuerConstant := by
@@ -133,6 +137,8 @@ theorem hcrdtExtensions_counterexample_bundle :
       ¬ EqSafe structuredMultiScaleModel (0, 0) (0, 1) := by
   exact ⟨sequenceIdCriterion_counterexample, actorIdRecycling_counterexample,
     singleScale_observables_not_sufficient, multiScale_observables_distinguish⟩
+
+/-! ## Limit Predicates and Frontier Witnesses -/
 
 /-- Hypothesis block matching `H_crdt_limits`. -/
 def HcrdtLimits
@@ -169,6 +175,8 @@ theorem metadataVsSEC_frontier_counterexample :
     have hEq : (0 : Nat) = 1 := by
       simp [EqSafe, natUnitModel, refRunMetadataFrontier, implRunMetadataFrontier] at h0
     exact Nat.zero_ne_one hEq
+
+/-! ## GC/Causal and Stabilization Delay Bounds -/
 
 /-- Simple GC-safety predicate for `Nat` states. -/
 def gcSafeZero : Nat → Prop :=
@@ -208,6 +216,8 @@ theorem stabilizationTail_lowerBound_exists
     (hGap : fairness < churn) :
     ∃ tail, StabilizationDelayTailLowerBound fairness churn tail ∧ 0 < tail := by
   refine ⟨churn - fairness, Nat.le_refl (churn - fairness), Nat.sub_pos_of_lt hGap⟩
+
+/-! ## Limits Witness Bundle -/
 
 /-- `H_crdt_limits` witness bundle: frontier, GC iff dominance, and churn/fairness lower bound. -/
 theorem hcrdtLimits_witness_bundle :
