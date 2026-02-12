@@ -20,6 +20,8 @@ Solution Structure. Keep core interfaces and exactness theorems in
 namespace Distributed
 namespace ByzantineSafety
 
+universe u v w x
+
 /-! ## Counterexample and Sharpness Shells -/
 
 /-- Counterexample shell: dropping quorum-style obligations can admit conflicts. -/
