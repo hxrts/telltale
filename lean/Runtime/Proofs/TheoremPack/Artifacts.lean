@@ -37,6 +37,8 @@ structure FLPImpossibilityArtifact where
   protocol : Distributed.FLP.ImpossibilityProtocol
   proof : ¬ Distributed.FLP.TerminatesOnAllFairRuns protocol.model protocol.premises.FairRun
 
+/-! ## Consensus Impossibility and Quorum -/
+
 /-- Packaged CAP impossibility artifact. -/
 structure CAPImpossibilityArtifact where
   protocol : Distributed.CAP.ImpossibilityProtocol
@@ -68,6 +70,8 @@ structure PartialSynchronyArtifact where
     Distributed.PartialSynchrony.BoundedTerminationAfterGST
       protocol.model protocol.premises.FairRun
       protocol.premises.gst protocol.premises.postGSTBound
+
+/-! ## Liveness and Responsiveness -/
 
 /-- Packaged responsiveness artifact. -/
 structure ResponsivenessArtifact where
@@ -103,6 +107,8 @@ structure ReconfigurationArtifact where
   livenessPreserved :
     Distributed.Reconfiguration.LivenessPreserved protocol.model
 
+/-! ## Chain and Reconfiguration Safety -/
+
 /-- Packaged atomic-broadcast artifact. -/
 structure AtomicBroadcastArtifact where
   protocol : Distributed.AtomicBroadcast.AtomicBroadcastProtocol
@@ -129,6 +135,8 @@ structure FailureDetectorsArtifact where
     Distributed.FailureDetectors.ImpossibilityBoundary
       protocol.model protocol.premises.detector
 
+/-! ## Accountability and Failure Detectors -/
+
 /-- Packaged data-availability artifact. -/
 structure DataAvailabilityArtifact where
   protocol : Distributed.DataAvailability.DAProtocol
@@ -142,6 +150,8 @@ structure CoordinationArtifact where
   protocol : Distributed.Coordination.CoordinationProtocol
   characterization :
     Distributed.Coordination.CoordinationCharacterization protocol.model
+
+/-! ## Data Availability and Coordination -/
 
 /-- Packaged CRDT theorem-family artifact. -/
 structure CRDTArtifact where
@@ -186,6 +196,8 @@ structure CRDTArtifact where
   hcrdtExtensions : Distributed.CRDT.HcrdtExtensions protocol.model
   hcrdtLimits : Distributed.CRDT.HcrdtLimits protocol.model
 
+/-! ## CRDT and Consensus Envelope Families -/
+
 /-- Packaged consensus-envelope theorem-family artifact. -/
 structure ConsensusEnvelopeArtifact where
   protocol : Distributed.ConsensusEnvelope.ConsensusEnvelopeProtocol
@@ -204,6 +216,8 @@ structure ConsensusEnvelopeArtifact where
   admissionCompleteness :
     Distributed.ConsensusEnvelope.AdmissionCompleteness_consensus
       protocol.premises.inferredBudget protocol.premises.envelopeBudget
+
+/-! ## Failure and VM Envelope Families -/
 
 /-- Packaged failure-envelope theorem-family artifact. -/
 structure FailureEnvelopeArtifact where
@@ -241,6 +255,8 @@ structure FailureEnvelopeArtifact where
       protocol.premises.RefRun
       protocol.premises.ImplRun
       protocol.premises.injectFailure
+
+/-! ## VM Envelope Adherence -/
 
 /-- Packaged VM envelope-adherence theorem-family artifact. -/
 structure VMEnvelopeAdherenceArtifact where
@@ -287,6 +303,8 @@ structure VMEnvelopeAdherenceArtifact where
   capabilityMonotonicity :
     protocol.premises.guarantee protocol.premises.weakCapability →
     protocol.premises.guarantee protocol.premises.strongCapability
+
+/-! ## VM Envelope Admission -/
 
 /-- Packaged VM envelope-admission theorem-family artifact. -/
 structure VMEnvelopeAdmissionArtifact where
@@ -338,6 +356,8 @@ structure VMEnvelopeAdmissionArtifact where
     ∀ baseline, Runtime.Adequacy.ConservativeExtension baseline protocol.premises.input
   necessityMinimality :
     Runtime.Adequacy.HypothesisNecessityMinimality
+
+/-! ## Bridge and Runtime Artifacts -/
 
 /-- Packaged protocol-envelope-bridge theorem-family artifact. -/
 structure ProtocolEnvelopeBridgeArtifact where
