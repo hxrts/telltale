@@ -65,6 +65,8 @@ structure AssumptionResult where
   detail : String
   deriving Repr, DecidableEq, Inhabited
 
+/-! ## Internal Consistency Checks -/
+
 /-- Internal helper: finality-mode coherence with certificate mode. -/
 def finalityModeConsistentCheck (p : ProtocolSpec) : Bool :=
   match inferredCertificate? p with
@@ -101,6 +103,8 @@ def witnessMonotonicityConsistentCheck (p : ProtocolSpec) : Bool :=
 /-- Internal helper: coarse certificate tag agrees with primitive model. -/
 def certificateDerivedConsistentCheck (p : ProtocolSpec) : Bool :=
   Distributed.certificateDerivedConsistent p
+
+/-! ## Internal Checks: Threshold/Timing/CAP Preconditions -/
 
 /-- Internal helper: quorum intersection assumptions are explicit and plausible. -/
 def quorumIntersectionWitnessedCheck (p : ProtocolSpec) : Bool :=
@@ -162,6 +166,8 @@ def classicalTransportEligibleCheck (p : ProtocolSpec) : Bool :=
   p.orderParameterDeclared &&
   p.phaseBoundaryModelDeclared
 
+/-! ## Built-In Assumption Bundles -/
+
 /-- Built-in core assumption set (general-purpose). -/
 def coreAssumptions : List Assumption :=
   [ .soundConsensus
@@ -218,9 +224,12 @@ def characterizationAssumptions : List Assumption :=
   , .classicalTransportEligible
   ]
 
+/-! ## Assumption Validation -/
+
 /-- Validate one built-in assumption against a protocol spec. -/
 def validateAssumption (p : ProtocolSpec) (h : Assumption) : AssumptionResult :=
   match h with
+  /-! ## Validation: Space and Finality Flags -/
   | .soundConsensus =>
       { assumption := h
       , passed := isSoundConsensus p
@@ -266,6 +275,7 @@ def validateAssumption (p : ProtocolSpec) (h : Assumption) : AssumptionResult :=
       , passed := p.partitionPolicy = .livenessFirst
       , detail := "AP-leaning partition policy (liveness-first)."
       }
+  /-! ## Validation: Fault-Model Flags -/
   | .byzantineFaultModel =>
       { assumption := h
       , passed := p.faultModel = .byzantine
@@ -276,6 +286,7 @@ def validateAssumption (p : ProtocolSpec) (h : Assumption) : AssumptionResult :=
       , passed := p.faultModel = .crash
       , detail := "Crash-only fault model assumption."
       }
+  /-! ## Validation: Primitive and Certificate Coherence -/
   | .evidencePrimitiveConsistent =>
       { assumption := h
       , passed := evidencePrimitiveConsistentCheck p
@@ -316,6 +327,7 @@ def validateAssumption (p : ProtocolSpec) (h : Assumption) : AssumptionResult :=
       , passed := timingAuthCompatibleCheck p
       , detail := "Timing/authentication assumptions are explicit and compatible with threshold claims."
       }
+  /-! ## Validation: Pressure and Budget Preconditions -/
   | .capPressureConsistent =>
       { assumption := h
       , passed := capPressureConsistentCheck p
@@ -336,6 +348,7 @@ def validateAssumption (p : ProtocolSpec) (h : Assumption) : AssumptionResult :=
       , passed := adversarialBudgetBoundedCheck p
       , detail := "Adversarial budget bounds are within declared count/weight regimes."
       }
+  /-! ## Validation: Declaration and Transport Gating -/
   | .faultThresholdDeclared =>
       { assumption := h
       , passed := p.thresholdRegimeDeclared
@@ -376,6 +389,8 @@ def validateAssumption (p : ProtocolSpec) (h : Assumption) : AssumptionResult :=
       , passed := classicalTransportEligibleCheck p
       , detail := "Classical transport profile is declared and consensus/model prerequisites are satisfied."
       }
+
+/-! ## Validation Summary API -/
 
 /-- Validate a list of assumptions. -/
 def validateAssumptions (p : ProtocolSpec) (hs : List Assumption) : List AssumptionResult :=
