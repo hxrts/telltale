@@ -290,6 +290,8 @@ theorem UnfoldsToVar.toBounded {v : String} {a : LocalTypeR} (h : UnfoldsToVar a
     obtain ⟨n, hn⟩ := ih
     exact ⟨n + 1, UnfoldPathVarBounded.step hn⟩
 
+/-! ## Send/Recv Boundedness Conversions -/
+
 /-- Bounded send path implies unbounded. -/
 theorem CanSendPathBounded.toCanSend {n : ℕ} {p : String}
     {bs : List BranchR} {a : LocalTypeR}
@@ -328,6 +330,7 @@ theorem CanRecv.toBounded {p : String} {bs : List BranchR} {a : LocalTypeR}
   simpa [dualBranches_dualBranches, LocalTypeR.dual_dual] using
     (CanSendPathBounded.to_CanRecvPathBounded_dual hn)
 
+/-! ## Concrete Unfold-Iteration Equalities -/
 
 /-- Bounded end path yields a concrete unfold iteration. -/
 private theorem UnfoldPathEndBounded.unfold_iter_eq {n : ℕ} {a : LocalTypeR} :
