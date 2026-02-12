@@ -47,6 +47,8 @@ def DProg_shard (input : ProgramCapabilityInput) : CertifiedEnvelopeCapability :
   , supportedProfiles := input.shardedProfiles
   }
 
+/-! ## Admission Soundness and Completeness Contracts -/
+
 /-- E4: soundness form for local capability inference. -/
 def DProgInferenceSoundness_local
     {State : Type u} {Obs : Type v}
@@ -80,6 +82,8 @@ def AdmissionCompleteness
     (dProg : CertifiedEnvelopeCapability)
     (runtimeCompliance : DUser → Prop) : Prop :=
   ∀ dUser, runtimeCompliance dUser ↔ dUserContained dUser dProg = true
+
+/-! ## Admission Diagnostics Vocabulary -/
 
 /-- E4: admission-check obligations used by diagnostics. -/
 inductive AdmissionObligation where
@@ -147,6 +151,8 @@ def ConservativeExtension
     DProg_local baseline = DProg_local strengthened ∧
     DProg_shard baseline = DProg_shard strengthened
 
+/-! ## Hypothesis Necessity Skeleton -/
+
 /-- E4: major hypotheses tracked for necessity/minimality analysis. -/
 inductive EnvelopeMajorHypothesis where
   | localAdherence
@@ -195,6 +201,8 @@ def transportCatalogNecessityHardened
     (catalog : List TransportNecessityProfile) : Prop :=
   ∀ p, p ∈ catalog → profileNecessityHardened p
 
+/-! ## Transport Hardening Theorems -/
+
 /-- Theorem-form tag semantics: if every assumption in a profile is tagged
     `provenNecessary`, the profile is necessity-hardened. -/
 theorem profileNecessityHardened_of_allProvenNecessary
@@ -209,6 +217,8 @@ theorem transportCatalogNecessityHardened_of_profiles
     (hAll : ∀ p, p ∈ catalog → profileNecessityHardened p) :
     transportCatalogNecessityHardened catalog :=
   hAll
+
+/-! ## Dropped-Assumption Witness Model -/
 
 /-- Dropped-assumption failure witness for one transport profile.
     Intended reading: removing `dropped` invalidates the transported theorem. -/
@@ -242,6 +252,8 @@ def transportCatalogMinimalBasis
     (catalog : List TransportNecessityProfile) : Prop :=
   ∀ p, p ∈ catalog → profileNecessityMinimalBasis p
 
+/-! ## Minimal-Basis Closure Theorems -/
+
 /-- Build profile-level minimal-basis closure from hardened tags + dropped-assumption oracle. -/
 theorem profileNecessityMinimalBasis_of_hardened_and_oracle
     (p : TransportNecessityProfile)
@@ -268,6 +280,8 @@ theorem transportCatalogMinimalBasis_of_hardened_and_oracles
   intro p hIn
   exact profileNecessityMinimalBasis_of_hardened_and_oracle
     p (hHard p hIn) (hOracle p hIn)
+
+/-! ## E4 Premise Bundle -/
 
 /-- E4: premise bundle for capability inference/admission theorem extraction. -/
 structure VMEnvelopeAdmissionPremises (State : Type u) (Obs : Type v) where
@@ -313,6 +327,8 @@ structure VMEnvelopeAdmissionPremises (State : Type u) (Obs : Type v) where
   conservativeExtensionWitness :
     ∀ baseline, ConservativeExtension baseline input
   necessityMinimalityWitness : HypothesisNecessityMinimality
+
+/-! ## E4 Packaged Protocol -/
 
 /-- E4: packaged capability inference/admission theorem family. -/
 structure VMEnvelopeAdmissionProtocol where
