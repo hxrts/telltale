@@ -49,9 +49,11 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
   cases P with
   | skip =>
       left; rfl
+  /-! ## progress_typed_aux: Send Case -/
   | send k x =>
       right; left
       exact progress_send hOut hStore hDisjShAll hOwnDisj hReady
+  /-! ## progress_typed_aux: Receive Case -/
   | recv k x =>
       have hProg := progress_recv hOut hStore hDisjShAll hOwnDisj hBufs hHead hComplete
       cases hProg with
@@ -59,9 +61,11 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
           right; left; exact hStep
       | inr hBlocked =>
           right; right; exact hBlocked
+  /-! ## progress_typed_aux: Select Case -/
   | select k ℓ =>
       right; left
       exact progress_select hOut hStore hDisjShAll hOwnDisj hSelectReady
+  /-! ## progress_typed_aux: Branch Case -/
   | branch k procs =>
       have hProg := progress_branch hOut hStore hDisjShAll hOwnDisj hBufs hHead hValid hComplete
       cases hProg with
@@ -69,6 +73,7 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
           right; left; exact hStep
       | inr hBlocked =>
           right; right; exact hBlocked
+  /-! ## progress_typed_aux: Sequential Composition -/
   | seq P Q =>
       cases hOut with
       | seq hP hQ =>
@@ -91,12 +96,13 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
               | inr hBlocked =>
                   right; right
                   simpa [BlockedProc] using hBlocked
+  /-! ## progress_typed_aux: Parallel Composition -/
   | par nS nG P Q =>
       cases hOut with
       | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
           hDisjW hDisjΔ hP hQ =>
           rename_i S₁_fin S₂_fin G₁_fin G₂_fin W₁_fin W₂_fin Δ₁_fin Δ₂_fin
-          -- Store typing for left and right processes.
+          /-! ## Parallel Case: Reframe Store Typing for Split Contexts -/
           have hStoreBase :
               StoreTypedStrong G (SEnvAll (Ssh ++ Sown.right) ((split.S1 ++ split.S2) ++ (∅ : SEnv))) store := by
             simpa [SEnvAll, split.hS, List.append_assoc] using hStore
@@ -146,7 +152,7 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
               (Gfr:=split.G1) (G:=split.G2) hDisjG hOwnR hQ hDisjOutQ
           simp only [← split.hG] at hP_full hQ_full
 
-          -- Progress on left process.
+          /-! ## Parallel Case: Drive Progress on Left Process -/
           have hProgP :=
             progress_typed_aux hP_full hStoreL hDisjShL hOwnL hDisjOutP
               hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
@@ -167,10 +173,10 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                     exact And.intro (Or.inl rfl) (Or.inl rfl)
                 | inr hRestQ =>
                     cases hRestQ with
-                    | inl hStepQ =>
-                        rcases hStepQ with ⟨G', D', S', store', bufs', Q', hStep⟩
-                        -- derive shape G' = split.G1 ++ G₂' from hStep.
-                        have hGshape : ∃ G₂', G' = split.G1 ++ G₂' := by
+              | inl hStepQ =>
+                  rcases hStepQ with ⟨G', D', S', store', bufs', Q', hStep⟩
+                  /-! ## Parallel Case: Left Skip, Right Steps -/
+                  have hGshape : ∃ G₂', G' = split.G1 ++ G₂' := by
                           have hShape :=
                             TypedStep_preserves_frames (Gleft:=split.G1) (Gmid:=split.G2) (Gright:=[])
                               (by simpa [split.hG])
@@ -213,7 +219,7 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
               cases hRestP with
               | inl hStepP =>
                   rcases hStepP with ⟨G', D', S', store', bufs', P', hStep⟩
-                  -- TODO: derive shape G' = G₁' ++ split.G2 from hStep.
+                  /-! ## Parallel Case: Left Steps -/
                   have hGshape : ∃ G₁', G' = G₁' ++ split.G2 := by
                     have hShape :=
                       TypedStep_preserves_frames (Gleft:=[]) (Gmid:=split.G1) (Gright:=split.G2)
@@ -251,7 +257,7 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                       (P:=P) (Q:=Q)
                       hSlen hStep' hDisjG (DisjointD_right_empty D) hDisjS)
               | inr hBlockedP =>
-                  -- Progress on right process.
+                  /-! ## Parallel Case: Left Blocked, Drive Right Progress -/
                   have hProgQ :=
                     progress_typed_aux hQ_full hStoreR hDisjShR hOwnR hDisjOutQ
                       hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
@@ -267,7 +273,7 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                       cases hRestQ with
                       | inl hStepQ =>
                           rcases hStepQ with ⟨G', D', S', store', bufs', Q', hStep⟩
-                          -- TODO: derive shape G' = split.G1 ++ G₂' from hStep.
+                          /-! ## Parallel Case: Right Steps Under Left Block -/
                           have hGshape : ∃ G₂', G' = split.G1 ++ G₂' := by
                             have hShape :=
                               TypedStep_preserves_frames (Gleft:=split.G1) (Gmid:=split.G2) (Gright:=[])
@@ -310,9 +316,12 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                             (Or.inr (by simpa using hBlockedQ))
   | newSession roles f P =>
       cases hOut
+  /-! ## progress_typed_aux: Assign Case -/
   | assign x v =>
       right; left
       exact progress_assign hOut
+
+/-! ## Top-Level Progress Packaging -/
 
 /-- Progress theorem: A complete well-formed process can either step or is in a final/blocked state.
 
