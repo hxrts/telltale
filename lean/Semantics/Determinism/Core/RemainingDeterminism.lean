@@ -169,6 +169,8 @@ def Confluent (_c c₁ c₂ : Configuration) : Prop :=
     ConfigStepStar c₁ c₃ acts₁ ∧
     ConfigStepStar c₂ c₃ acts₂
 
+/-! ### Stuck-var lemmas -/
+
 /-- There is no step from a var type (vars are stuck without enclosing mu). -/
 theorem no_step_from_var {x : String} {act : GlobalActionR} {g' : GlobalType} :
     ¬step (.var x) act g' := by
@@ -186,6 +188,8 @@ theorem var_only_reaches_self {x : String} {env : EnvConfig} {c' : Configuration
       -- But there's no step from .var x
       obtain ⟨_, hstep', _⟩ := hstep
       exact absurd hstep' no_step_from_var
+
+/-! ### Non-confluence counterexample construction -/
 
 /-- MPST is NOT confluent in general (branch choices diverge).
 
@@ -257,6 +261,9 @@ private theorem counter_c1_ne_c2 : counter_c1 ≠ counter_c2 := by
   have hxy : ("X" : String) = "Y" := by
     injection htype
   exact (by decide : ("X" : String) ≠ "Y") hxy
+
+/-! ### Counterexample theorem -/
+
 /-- A concrete counterexample: global confluence does not hold for all configurations. -/ theorem not_confluent_general :
     ¬∀ c c₁ c₂ act₁ act₂,
       ConfigStep c c₁ act₁ → ConfigStep c c₂ act₂ → act₁ ≠ act₂ →
