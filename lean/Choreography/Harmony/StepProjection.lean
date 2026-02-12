@@ -120,6 +120,8 @@ Coq `preserve_proj` head case). This avoids the invalid comm_async
 counterexamples where the sender participates in a nested action while
 the outer comm has not stepped. -/
 
+/-! ## Head-Action Predicate and Sender Result -/
+
 private def action_pred (g : GlobalType) (act : GlobalActionR) : Prop :=
   -- Only comm heads match the sender/receiver predicate.
   match g with
@@ -181,6 +183,8 @@ private theorem proj_trans_sender_step_v2_mu (t : String) (body : GlobalType)
     simp [action_pred] at hpred
   exact this.elim
 
+/-! ## Sender Step Theorem -/
+
 /-- Sender-side step projection under the head-action predicate. -/
 
 
@@ -195,6 +199,8 @@ theorem proj_trans_sender_step_v2 (g g' : GlobalType) (act : GlobalActionR)
       exact proj_trans_sender_step_v2_comm_async sender receiver branches branches' act hcond hpred
   | mu t body act g' hstep_inner =>
       exact proj_trans_sender_step_v2_mu t body act g' hstep_inner hpred
+
+/-! ## Receiver Result and Helpers -/
 
 /-- Statement type for step projection (receiver). -/
 
@@ -236,6 +242,8 @@ private theorem proj_trans_receiver_step_mu
     ReceiverStepResult (.mu t body) act g' := by
   -- Mu at head cannot satisfy the action predicate.
   simp [action_pred] at hpred
+
+/-! ## Receiver Step Theorem -/
 
 /-- Receiver-side step projection under the head-action predicate. -/
 
