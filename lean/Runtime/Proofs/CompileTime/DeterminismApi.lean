@@ -20,6 +20,8 @@ variable [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
 variable [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
 variable [IdentityVerificationBridge ι ν]
 
+/-! ## Profiles And Hypothesis Bundles -/
+
 /-- Runtime determinism profiles used for policy/theorem gating. -/
 inductive VMDeterminismProfile where
   | full
@@ -47,6 +49,8 @@ structure VMDeterminismArtifacts where
   moduloCommutativity : Bool
   replay : Bool
 
+/-! ## Artifact Construction -/
+
 /-- Build determinism artifacts from a hypothesis bundle. -/
 def buildVMDeterminismArtifacts {st₀ : VMState ι γ π ε ν}
     (_h : VMDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
@@ -56,6 +60,8 @@ def buildVMDeterminismArtifacts {st₀ : VMState ι γ π ε ν}
   , moduloCommutativity := true
   , replay := true
   }
+
+/-! ## Theorem Projections -/
 
 /-- Full determinism theorem from hypotheses. -/
 theorem full_determinism_from_hypotheses {st₀ : VMState ι γ π ε ν}
@@ -80,6 +86,8 @@ theorem replay_determinism_from_hypotheses {st₀ : VMState ι γ π ε ν}
     (h : VMDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
     h.replayDeterminism :=
   h.replayDeterminismProof
+
+/-! ## Runtime Inventory View -/
 
 /-- Inventory projection for runtime capability gates. -/
 def determinismInventory (artifacts : VMDeterminismArtifacts) : List (String × Bool) :=
