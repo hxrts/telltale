@@ -81,6 +81,8 @@ lemma EnvResolvesL_unfolds {ρ : EnvPair} {x : String} {c : LocalTypeC}
 
 /-! ## EnvResolves preservation under insert -/
 
+/-! ### Core Insert Preservation -/
+
 lemma EnvResolves_insertL {ρ : EnvPair} {x : String} {b : LocalTypeC}
     (hρ : EnvResolves ρ) (hvar : EQ2C (mkVar x) b) :
     EnvResolves (envInsertL ρ x b) := by
@@ -123,6 +125,8 @@ lemma EnvResolves_insertR {ρ : EnvPair} {x : String} {a : LocalTypeC}
       simp only [envInsertR, envR, Env.insert, hy, ↓reduceIte] at hmem
       exact hρ.2 _ _ hmem
 
+/-! ### Derived Insert Corollaries -/
+
 lemma EnvResolves_insertL_mem {ρ : EnvPair} {x : String} {b : LocalTypeC}
     (hρ : EnvResolves ρ) (hmem : b ∈ envL ρ x) :
     EnvResolves (envInsertL ρ x b) := by
@@ -141,6 +145,8 @@ lemma EnvResolves_envInsertR {ρ : EnvPair} {x : String} {a : LocalTypeC}
     (hρ : EnvResolves ρ) (hvar : EQ2C a (mkVar x)) :
     EnvResolves (envInsertR ρ x a) := by
   exact EnvResolves_insertR (ρ := ρ) (x := x) (a := a) hρ hvar
+
+/-! ### Left-Projection Preservation -/
 
 lemma EnvResolvesL_insertR {ρ : EnvPair} {x : String} {a : LocalTypeC}
     (hρ : EnvResolvesL ρ) : EnvResolvesL (envInsertR ρ x a) := by
@@ -275,6 +281,8 @@ inductive EQ2CE_step (R : Rel) (ρ : EnvPair) (a b : LocalTypeC) : Prop
 def EQ2CE_step_paco (R : StateRel) : StateRel :=
   fun s t =>
     s = t ∧ EQ2CE_step (fromPacoRel R) s.1 s.2.1 s.2.2
+
+/-! ## EQ2CE Paco Monotonicity -/
 
 lemma EQ2CE_step_mono : Paco.Monotone2 EQ2CE_step_paco := by
   intro R S h s t hrel
