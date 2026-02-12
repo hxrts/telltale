@@ -30,6 +30,8 @@ require iris from "/Users/hxrts/projects/iris-lean"
 require leanfmt from git
   "https://github.com/toku-sa-n/leanfmt" @ "main"
 
+/-! ## Libraries -/
+
 /-- Global and local session type definitions. -/
 lean_lib SessionTypes where
   globs := #[`SessionTypes.*]
@@ -81,6 +83,8 @@ def macosLinkArgs : Array String :=
     #["-mmacosx-version-min=15.0"]
   else
     #[]
+
+/-! ## Executables -/
 
 /-- Executable runtime tests for the VM example. -/
 lean_exe runtime_tests where
