@@ -53,6 +53,7 @@ invariant under quotienting read variables through the visible view below. -/
 /-- Right-gauge equivalence for owned environments.
     Two owned environments are gauge-equivalent when they agree on the local
     left component; the right component is treated as framing gauge. -/
+/-! ## Gauge Equivalence Laws -/
 def RightGaugeEq (S₁ S₂ : OwnedEnv) : Prop :=
   S₁.left = S₂.left
 
@@ -77,6 +78,7 @@ theorem RightGaugeEq_trans {S₁ S₂ S₃ : OwnedEnv} :
   rfl
 
 /-- Visible variable environment for typing obligations (shared + local left). -/
+/-! ## Visible Environment View -/
 def SEnvVisible (Ssh : SEnv) (Sown : OwnedEnv) : SEnv :=
   Ssh ++ Sown.left
 
@@ -84,6 +86,7 @@ def SEnvVisible (Ssh : SEnv) (Sown : OwnedEnv) : SEnv :=
 def StoreTypedVisible (G : GEnv) (Ssh : SEnv) (Sown : OwnedEnv) (store : VarStore) : Prop :=
   StoreTyped G (SEnvVisible Ssh Sown) store
 
+/-! ## Strong Visible Store Typing -/
 @[simp] theorem StoreTypedVisible_reframe_right
     (G : GEnv) (Ssh R R' L : SEnv) (store : VarStore) :
     StoreTypedVisible G Ssh { right := R, left := L } store ↔
@@ -107,6 +110,7 @@ theorem StoreTypedStrongVisible.toStoreTypedVisible
   h.typeCorrVisible
 
 /-- Visible bindings are domain-included in the full environment (`shared ++ right ++ left`). -/
+/-! ## Visible-to-Full Domain Bridge -/
 theorem SEnvDomSubset_visible_all {Ssh : SEnv} {Sown : OwnedEnv} :
     SEnvDomSubset (SEnvVisible Ssh Sown) (SEnvAll Ssh Sown) := by
   intro x T hVis
@@ -139,6 +143,7 @@ theorem SEnvDomSubset_visible_all {Ssh : SEnv} {Sown : OwnedEnv} :
           exact ⟨T, hAll⟩
 
 /-- Strong-visible store typing gives runtime lookup for any visible static lookup. -/
+/-! ## Visible Lookup Extraction -/
 theorem store_lookup_of_visible_lookup_strongVisible
     {G : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : VarStore} {x : Var} {T : ValType}
     (hStore : StoreTypedStrongVisible G Ssh Sown store)
@@ -153,6 +158,7 @@ theorem store_lookup_of_visible_lookup_strongVisible
   obtain ⟨v, hv⟩ := Option.isSome_iff_exists.mp hInStore
   exact ⟨v, hv, hStore.typeCorrVisible x v T hv hVis⟩
 
+/-! ## Visible Environment Reframing Lemmas -/
 @[simp] theorem SEnvVisible_reframe_right
     (Ssh R R' L : SEnv) :
     SEnvVisible Ssh { right := R, left := L } =
@@ -206,6 +212,7 @@ theorem SEnvVisible_congr_rightGauge {Ssh : SEnv} {S₁ S₂ : OwnedEnv} :
 def OwnedDisjoint (Sown : OwnedEnv) : Prop :=
   DisjointS Sown.right Sown.left
 
+/-! ## SEnv and GEnv Update Transport -/
 theorem updateSEnv_append_left {Ssh Sown : SEnv} {x : Var} {T : ValType}
     (h : lookupSEnv Ssh x = none) :
     updateSEnv (Ssh ++ Sown) x T = Ssh ++ updateSEnv Sown x T := by
@@ -218,10 +225,11 @@ theorem updateSEnv_append_left {Ssh Sown : SEnv} {x : Var} {T : ValType}
           by_cases hxy : x = y
           · subst hxy
             simp [lookupSEnv] at h
-          · have htl : lookupSEnv tl x = none := by
-              simpa [lookupSEnv, hxy] using h
-            simp [updateSEnv, hxy, ih htl]
+	          · have htl : lookupSEnv tl x = none := by
+	              simpa [lookupSEnv, hxy] using h
+	            simp [updateSEnv, hxy, ih htl]
 
+/-! ## GEnv Update Transport -/
 theorem updateG_append_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType}
     (h : lookupG G₁ e = none) :
     updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L := by
@@ -271,6 +279,7 @@ theorem updateG_append_left_hit {G₁ G₂ : GEnv} {e : Endpoint} {L L' : LocalT
     - S: value type environment
     - G: session type environment
     - D: delayed type environment -/
+/-! ## Core Process Typing Judgment -/
 inductive HasTypeProcN : SessionId → SEnv → GEnv → DEnv → Process → Prop where
   /-- Skip is always well-typed. -/
   | skip {n : SessionId} {S : SEnv} {G : GEnv} {D : DEnv} : HasTypeProcN n S G D .skip
@@ -320,6 +329,7 @@ inductive HasTypeProcN : SessionId → SEnv → GEnv → DEnv → Process → Pr
       bs.find? (fun b => b.1 == ℓ) = some (ℓ, L) →
       HasTypeProcN n S (updateG G e L) D (.select k ℓ)
 
+  /-! ## Core Process Typing: Branch Constructor -/
   /-- Branch: receive and branch on label through channel k.
       Requires:
       - k has channel type for endpoint e
@@ -338,6 +348,7 @@ inductive HasTypeProcN : SessionId → SEnv → GEnv → DEnv → Process → Pr
         HasTypeProcN n S (updateG G e (bs.get ⟨i, hi⟩).2) D (procs.get ⟨i, hip⟩).2) →
       HasTypeProcN n S G D (.branch k procs)
 
+  /-! ## Core Process Typing: Assignment and NewSession -/
   /-- Assign: assign a non-linear value to a variable. -/
   | assign {n S G D x v T} :
       HasTypeVal G v T →
