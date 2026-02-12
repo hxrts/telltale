@@ -153,6 +153,9 @@ lemma freeVars_fromDB_subset_ctx (t : LocalTypeDB) (ctx : NameContext)
     fun b =>
       ∀ ctx, (hclosed : b.2.isClosedAt ctx.length = true) →
         ∀ v, v ∈ (b.2.fromDB ctx hclosed).freeVars → v ∈ ctx
+
+  /-! ## fromDB Closedness: Structural Recursion Setup -/
+
   have hrec : P1 t := by
     refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
@@ -170,6 +173,9 @@ lemma freeVars_fromDB_subset_ctx (t : LocalTypeDB) (ctx : NameContext)
         simpa [LocalTypeR.freeVars] using hv'
       subst hv''
       exact get?_mem hget
+
+    /-! ## fromDB Closedness: send/recv/mu/branches Cases -/
+
     · intro p bs hbs ctx hclosed v hv
       have hclosed' : isClosedAtBranches ctx.length bs = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
@@ -212,6 +218,8 @@ lemma freeVars_fromDB_subset_ctx (t : LocalTypeDB) (ctx : NameContext)
       exact hsnd
   exact hrec ctx hclosed
 
+/-! ## fromDB Closedness at Empty Context -/
+
 theorem fromDB_closed (t : LocalTypeDB) (_hclosed : t.isClosed = true) :
     ∀ hclosed' : t.isClosedAt (TypeContext.empty : NameContext).length = true,
       (t.fromDB TypeContext.empty hclosed').isClosed = true := by
@@ -243,6 +251,9 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
   let P4 : Option ValType × LocalTypeR → Prop :=
     fun b =>
       ∀ ctx, Context.Covers ctx b.2 → ∃ db, b.2.toDB? ctx = some db ∧ db.isClosedAt ctx.length = true
+
+  /-! ## toDB? Success: Structural Recursion Setup -/
+
   have hrec : P1 t := by
     refine (SessionTypes.LocalTypeR.LocalTypeR.rec
       (motive_1 := P1) (motive_2 := P2) (motive_3 := P3) (motive_4 := P4)
@@ -251,6 +262,9 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
       refine ⟨LocalTypeDB.end, ?_, ?_⟩
       · simp [LocalTypeR.toDB?]
       · simp [LocalTypeDB.isClosedAt]
+
+    /-! ## toDB? Success: send/recv/μ Cases -/
+
     · intro p bs hbs ctx hcov
       have hcov' : ∀ l _vt t, (l, _vt, t) ∈ bs → Context.Covers ctx t := by
         intro l _vt t hmem v hv
@@ -296,6 +310,9 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
       · simp [LocalTypeR.toDB?, hdb]
       · simp only [LocalTypeDB.isClosedAt, NameOnlyContext.cons_length] at hclosed ⊢
         exact hclosed
+
+    /-! ## toDB? Success: var and branch-list Cases -/
+
     · intro v ctx hcov
       have hv : v ∈ ctx := by
         apply hcov
@@ -326,6 +343,8 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
     · intro fst snd hsnd
       exact hsnd
   exact hrec ctx hcov
+
+/-! ## toDB? Success for Branch Lists and Empty Context -/
 
 theorem branchesToDB?_some_of_covers (bs : List BranchR) (ctx : Context)
     (hcov : ∀ l _vt t, (l, _vt, t) ∈ bs → Context.Covers ctx t) :
@@ -375,6 +394,9 @@ theorem toDB_fromDB_roundtrip_generated (t : LocalTypeDB) (ctx : NameContext)
       ∀ ctx, GeneratedContext ctx →
         (hclosed : b.2.isClosedAt ctx.length = true) →
           (b.2.fromDB ctx hclosed).toDB? ctx = some b.2
+
+  /-! ## Roundtrip: Structural Recursion Setup -/
+
   have hrec : P1 t := by
     refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
@@ -391,6 +413,9 @@ theorem toDB_fromDB_roundtrip_generated (t : LocalTypeDB) (ctx : NameContext)
       simp [hfrom, LocalTypeR.toDB?]
       rw [Context.indexOf_eq] at hidx
       simp [hidx]
+
+    /-! ## Roundtrip: send/recv/μ Cases -/
+
     · intro p bs hbs ctx hgen hclosed
       have hclosed' : isClosedAtBranches ctx.length bs = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
@@ -420,6 +445,8 @@ theorem toDB_fromDB_roundtrip_generated (t : LocalTypeDB) (ctx : NameContext)
     · intro fst snd hsnd ctx hgen hclosed
       exact hsnd ctx hgen hclosed
   exact hrec ctx hgen hclosed
+
+/-! ## Roundtrip for Branch Lists and Empty Context -/
 
 theorem branches_toDB_fromDB_roundtrip_generated (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
     (hgen : GeneratedContext ctx)
