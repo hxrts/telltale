@@ -99,6 +99,7 @@ section
     We cannot guarantee the receiver can handle T after consuming the current buffer.
 
     Reference: `work/effects/004.lean` Coherent_send_preserved -/
+/-! ## Send Preservation: Edge Case Analysis -/
 theorem Coherent_send_preserved
     (G : GEnv) (D : DEnv) (senderEp : Endpoint) (receiverRole : Role) (T : ValType) (L : LocalType)
     (hCoh : Coherent G D)
@@ -113,6 +114,7 @@ theorem Coherent_send_preserved
   have hActiveOrig : ActiveEdge G e :=
     ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=senderEp) (L:=L) hActive (by simpa [hG])
 
+  /-! ## Case 1: Updated Edge -/
   -- Case split: updated edge / shares sender endpoint / unrelated
   rcases edge_case_split e sendEdge senderEp with heq | hShare | hOther
   · -- Case 1: e = sendEdge (the edge being modified)
@@ -124,6 +126,7 @@ theorem Coherent_send_preserved
     have hSenderLookup : lookupG (updateG G senderEp L) { sid := senderEp.sid, role := senderEp.role } = some L := by
       convert lookupG_update_eq G senderEp L
     refine ⟨L, hSenderLookup, ?_⟩
+    /-! ## Case 1A: Updated Edge Self-Send -/
     -- Check if receiver = sender (self-send case)
     by_cases hRecvIsSender : receiverRole = senderEp.role
     · -- Self-send: receiver role = sender role
@@ -158,6 +161,7 @@ theorem Coherent_send_preserved
         simp only [Consume, consumeOne] at hL'
         -- hL' : none = some L' is a contradiction
         exact Option.noConfusion hL'
+    /-! ## Case 1B: Updated Edge Distinct Receiver -/
     · -- Normal case: receiver ≠ sender
       have hRecvNeq : senderEp ≠ { sid := senderEp.sid, role := receiverRole } := by
         intro h
@@ -173,12 +177,14 @@ theorem Coherent_send_preserved
       obtain ⟨L', hL', hL'T⟩ := hRecvReady Lrecv hGrecv'
       rw [Consume_append _ _ _ _ hL']
       exact hL'T
+  /-! ## Case 2: Unchanged Edge Sharing Sender Endpoint -/
   · -- Case 2: e ≠ sendEdge, but e shares senderEp
     -- EdgeCoherent_updateD_irrelevant needs: sendEdge ≠ e
     have hNeSymm : sendEdge ≠ e := Ne.symm hShare.1
     have hShare' : { sid := e.sid, role := e.sender : Endpoint } = senderEp ∨
         { sid := e.sid, role := e.receiver : Endpoint } = senderEp := by
       simpa [EdgeShares, senderEndpoint, receiverEndpoint] using hShare.2
+    /-! ## Case 2A: Sender Endpoint Matches -/
     -- Check if senderEp is involved in edge e's endpoints
     by_cases hSenderMatch : { sid := e.sid, role := e.sender : Endpoint } = senderEp
     · -- Sender endpoint is senderEp
@@ -222,6 +228,7 @@ theorem Coherent_send_preserved
           simp only [Consume, consumeOne, Option.isSome] at hOrig
           -- hOrig : false = true is a contradiction
           exact Bool.noConfusion hOrig
+      /-! ## Case 2A(ii): Sender Matches, Receiver Distinct -/
       · -- Sender endpoint = senderEp, receiver endpoint ≠ senderEp
         -- Sender's type changed to L, but EdgeCoherent only checks receiver's Consume
         -- The receiver's type and trace are unchanged
@@ -245,6 +252,7 @@ theorem Coherent_send_preserved
         have hSenderLookup : lookupG (updateG G senderEp L) { sid := e.sid, role := e.sender } = some L := by
           conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G senderEp L
         refine ⟨L, hSenderLookup, hConsume⟩
+    /-! ## Case 2B: Receiver Endpoint Matches -/
     · -- Sender endpoint ≠ senderEp, so receiver must match
       have hSenderNoMatch : senderEp ≠ { sid := e.sid, role := e.sender } := fun h => hSenderMatch h.symm
       have hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = senderEp := by
@@ -285,6 +293,7 @@ theorem Coherent_send_preserved
         rw [hTrace] at hOrig
         simp only [Consume, consumeOne, Option.isSome] at hOrig
         exact Bool.noConfusion hOrig
+  /-! ## Case 3: Unrelated Edge -/
   · -- Case 3: e ≠ sendEdge and unrelated to senderEp
     have hNeSymm : sendEdge ≠ e := Ne.symm hOther.1
     have hOther' :
