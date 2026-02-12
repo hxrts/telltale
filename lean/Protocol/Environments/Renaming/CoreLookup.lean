@@ -1,11 +1,9 @@
 import Protocol.LocalType
 import Protocol.Values
 import Protocol.Environments.Core
-
 /-! # MPST Environments: Session Renaming
 
 This module provides session renaming infrastructure for environment composition. -/
-
 /-
 The Problem. Protocol composition and linking may require renaming session IDs
 to avoid conflicts. We need a principled way to rename sessions that preserves
@@ -16,15 +14,12 @@ Solution Structure. We define:
 2. `renameValType/LocalType/GEnv/DEnv`: lifting through all structures
 3. Preservation lemmas: renaming preserves lookups and coherence
 -/
-
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
 open scoped Classical
 section
-
-
 /-! ## Session Renaming Infrastructure -/
 
 /-- Session renaming: an injective function on session IDs. -/
@@ -71,7 +66,6 @@ def renameBranches (ρ : SessionRenaming) : List (Label × LocalType) → List (
 termination_by bs => sizeOf bs
 
 end
-
 /-- find? commutes with renameBranches: the label is preserved, type is renamed. -/
 theorem find_renameBranches (ρ : SessionRenaming) (chosen : Label)
     (branches : List (Label × LocalType)) :
@@ -86,6 +80,7 @@ theorem find_renameBranches (ρ : SessionRenaming) (chosen : Label)
     · simp [h]
     · simp [h, ih]
 
+/-! ## Runtime and Environment Renaming Maps -/
 /-- Rename a runtime value by updating any embedded endpoints. -/
 def renameValue (ρ : SessionRenaming) : Value → Value
   | .unit => .unit
@@ -94,7 +89,6 @@ def renameValue (ρ : SessionRenaming) : Value → Value
   | .string s => .string s
   | .prod v₁ v₂ => .prod (renameValue ρ v₁) (renameValue ρ v₂)
   | .chan e => .chan (renameEndpoint ρ e)
-
 /-- Rename all endpoints in GEnv. -/
 def renameGEnv (ρ : SessionRenaming) (G : GEnv) : GEnv :=
   G.map fun (e, L) => (renameEndpoint ρ e, renameLocalType ρ L)
@@ -106,7 +100,6 @@ def preimageEdge (ρ : SessionRenaming) (e : Edge) : Option Edge :=
     some { sid := sid', sender := e.sender, receiver := e.receiver }
   else
     none
-
 theorem preimageEdge_spec {ρ : SessionRenaming} {e e' : Edge} :
     preimageEdge ρ e = some e' → renameEdge ρ e' = e := by
   intro h
@@ -137,7 +130,7 @@ theorem renameEdge_inj (ρ : SessionRenaming) (e1 e2 : Edge) :
   simp only at hsid' hsender hrecv
   subst hsid' hsender hrecv
   rfl
-
+/-! ## DEnv Renaming via Fold Updates -/
 def renameDEnv (ρ : SessionRenaming) (D : DEnv) : DEnv :=
   D.list.foldl
     (fun acc p => updateD acc (renameEdge ρ p.1) (p.2.map (renameValType ρ)))
@@ -187,11 +180,10 @@ lemma find?_foldl_update_neq (ρ : SessionRenaming) :
         find?_updateD_neq acc (renameEdge ρ hd.1) edge (hd.2.map (renameValType ρ)) hne_hd
       simpa [List.foldl, hupd] using
         (ih (acc := updateD acc (renameEdge ρ hd.1) (hd.2.map (renameValType ρ))) hne_tl)
-
+/-! ## Buffer Renaming -/
 /-- Rename all edges in Buffers. -/
 def renameBufs (ρ : SessionRenaming) (bufs : Buffers) : Buffers :=
   bufs.map fun (e, buf) => (renameEdge ρ e, buf.map (renameValue ρ))
-
 /-! ## Renaming Injectivity Lemmas -/
 
 /-- Renaming preserves value type equality (injective). -/
@@ -239,6 +231,7 @@ theorem renameValType_inj (ρ : SessionRenaming) {T1 T2 : ValType} :
           rfl
       | prod _ _ => cases h
       | chan _ _ => cases h
+  /-! ## ValType Injectivity: Product and Channel Cases -/
   | prod T1a T1b ih1 ih2 =>
       cases T2 <;> simp [renameValType] at h
       case prod T2a T2b =>
@@ -256,7 +249,7 @@ theorem renameValType_inj (ρ : SessionRenaming) {T1 T2 : ValType} :
         rfl
 
 /-- Renaming preserves value type equality tests. -/
-
+/-! ## ValType Equality Test Preservation -/
 theorem renameValType_beq (ρ : SessionRenaming) (T1 T2 : ValType) :
     (renameValType ρ T1 == renameValType ρ T2) = (T1 == T2) := by
   by_cases h : T1 = T2
@@ -270,6 +263,7 @@ theorem renameValType_beq (ρ : SessionRenaming) (T1 T2 : ValType) :
     have hbeq2 : (T1 == T2) = false := beq_eq_false_iff_ne.mpr h
     simp [hbeq1, hbeq2]
 
+/-! ## Endpoint Injectivity under Renaming -/
 /-- Renaming preserves endpoint equality (injective). -/
 theorem renameEndpoint_inj (ρ : SessionRenaming) (e1 e2 : Endpoint) :
     renameEndpoint ρ e1 = renameEndpoint ρ e2 → e1 = e2 := by
@@ -288,6 +282,7 @@ theorem renameEndpoint_inj (ρ : SessionRenaming) (e1 e2 : Endpoint) :
   subst hsid' hrole
   rfl
 
+/-! ## Preimage Edge Characterization -/
 theorem preimageEdge_rename (ρ : SessionRenaming) (e : Edge) :
   preimageEdge ρ (renameEdge ρ e) = some e := by
   unfold preimageEdge
@@ -325,6 +320,7 @@ theorem lookupG_rename (ρ : SessionRenaming) (G : GEnv) (e : Endpoint) :
         beq_eq_false_iff_ne.mpr hne
       simpa [renameGEnv, lookupG, List.lookup, hbeq1, hbeq2] using ih
 
+/-! ## DEnv Lookup under Renaming -/
 /-- Looking up a renamed edge in a renamed DEnv. -/
 theorem lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
     lookupD (renameDEnv ρ D) (renameEdge ρ e) =
@@ -358,6 +354,7 @@ theorem lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
               have hpair := (List.pairwise_cons.1 sorted)
               have hhd : ∀ p ∈ tl, edgeCmpLT hd p := hpair.1
               have htl : tl.Pairwise edgeCmpLT := hpair.2
+              /-! ## lookupD_rename Fold Induction: Matching Head -/
               by_cases hEq : e = hd.1
               case pos =>
                 subst hEq
@@ -393,6 +390,7 @@ theorem lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
                     (lookupD_update_eq (env := acc) (e := renameEdge ρ hd.1)
                       (ts := hd.2.map (renameValType ρ)))
                 simp [List.lookup, htail, hupd]
+              /-! ## lookupD_rename Fold Induction: Non-matching Head -/
               case neg =>
                 have hne : renameEdge ρ hd.1 ≠ renameEdge ρ e := by
                   intro hEq'
@@ -414,6 +412,7 @@ theorem lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
   cases h : D.list.lookup e <;>
     simp [hfold, hlookup, h]
 
+/-! ## find? under Renaming Fold -/
 lemma find?_rename_foldl (ρ : SessionRenaming) :
     ∀ (l : List (Edge × Trace)) (sorted : l.Pairwise edgeCmpLT) (acc : DEnv) (e : Edge),
       (l.foldl
@@ -433,6 +432,7 @@ lemma find?_rename_foldl (ρ : SessionRenaming) :
       have hpair := (List.pairwise_cons.1 sorted)
       have hhd : ∀ p ∈ tl, edgeCmpLT hd p := hpair.1
       have htl : tl.Pairwise edgeCmpLT := hpair.2
+      /-! ## find?_rename_foldl: Matching Head Case -/
       by_cases hEq : e = hd.1
       case pos =>
         subst hEq
@@ -460,6 +460,7 @@ lemma find?_rename_foldl (ρ : SessionRenaming) :
               (renameEdge ρ hd.1) = some (hd.2.map (renameValType ρ)) :=
           find?_updateD_eq acc (renameEdge ρ hd.1) (hd.2.map (renameValType ρ))
         simp [List.lookup, htail, hupd]
+      /-! ## find?_rename_foldl: Non-matching Head Case -/
       case neg =>
         have hne : renameEdge ρ e ≠ renameEdge ρ hd.1 := fun h =>
           hEq (renameEdge_inj ρ _ _ h)
@@ -475,8 +476,8 @@ lemma find?_rename_foldl (ρ : SessionRenaming) :
               exact hne h.symm)
         simpa [List.lookup, hbeq, hupd] using ih'
 
+/-! ## Buffer Lookup under Renaming -/
 /-- Looking up a renamed edge in renamed buffers. -/
-
 theorem lookupBuf_rename (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) :
     lookupBuf (renameBufs ρ bufs) (renameEdge ρ e) =
       (lookupBuf bufs e).map (renameValue ρ) := by
@@ -496,5 +497,4 @@ theorem lookupBuf_rename (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) :
         beq_eq_false_iff_ne.mpr hne
       simp only [hbeq1, hbeq2]
       exact ih
-
 end
