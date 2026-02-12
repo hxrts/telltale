@@ -236,6 +236,8 @@ theorem migrate_preserves_spatial_holds {ι : Type} [IdentityModel ι]
   rw [← hTopoEq]
   exact hCreate
 
+/-! ## Lifecycle Monotonicity Properties -/
+
 def leave_preserves_coherent (sid : SessionId) (role : Role) : Prop :=
   -- Leaving preserves coherence: coherence over all endpoints implies
   -- coherence for every endpoint whose role differs from the leaving role.
@@ -250,6 +252,8 @@ omit [GhostMapSlot Unit] [GhostMapSlot Nat] [GhostMapSlot LocalType] in
 theorem leave_preserves_coherent_holds (sid : SessionId) (role : Role) :
     leave_preserves_coherent sid role :=
   fun _ _ hCoh e L _ hLook => hCoh e L hLook
+
+/-! ## Close-Phase Properties -/
 
 def close_empty (_sid : SessionId) : Prop :=
   -- Closing implies empty buffers and traces for the session id.
