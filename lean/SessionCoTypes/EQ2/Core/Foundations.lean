@@ -45,6 +45,8 @@ open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 open SessionCoTypes.CoinductiveRel
 
+/-! ## Core Relations -/
+
 /-- Relation on local types. -/
 abbrev Rel := LocalTypeR → LocalTypeR → Prop
 
@@ -57,6 +59,8 @@ private theorem BranchesRel_mono {R S : Rel}
     ∀ {bs cs}, BranchesRel R bs cs → BranchesRel S bs cs := by
   intro bs cs hrel
   exact List.Forall₂.imp (fun a b hab => ⟨hab.1, h _ _ hab.2⟩) hrel
+
+/-! ## One-Step Generator -/
 
 /-- One-step generator for EQ2. -/
 def EQ2F (R : Rel) : Rel
@@ -85,6 +89,7 @@ private theorem EQ2F_mono : Monotone EQ2F := by
         | exact ⟨h1, BranchesRel_mono (fun _ _ hr => h _ _ hr) h2⟩
 instance : CoinductiveRel Rel EQ2F := ⟨EQ2F_mono⟩
 
+/-! ## Fixed-Point Interface -/
 
 /-- EQ2 as the greatest fixed point of EQ2F. -/
 def EQ2 : Rel :=
@@ -115,6 +120,8 @@ theorem EQ2_fixed : EQ2F EQ2 = EQ2 := by
 theorem EQ2_destruct {a b : LocalTypeR} (h : EQ2 a b) : EQ2F EQ2 a b := by
   have hfix : EQ2F EQ2 = EQ2 := EQ2_fixed
   exact (Eq.mp (congrArg (fun R => R a b) hfix.symm) h)
+
+/-! ## Unfolding Lemmas -/
 
 /-- Unfold EQ2 on the left. -/
 theorem EQ2_unfold_left {a b : LocalTypeR} (h : EQ2 a b) :
