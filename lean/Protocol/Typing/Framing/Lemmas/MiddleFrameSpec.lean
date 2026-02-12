@@ -62,6 +62,7 @@ def MiddleFrameGoal
       HasTypeProcPreOut Ssh Sown' Gmid' P' Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ
 
+/-! ## Visible-to-Full Environment Alignment -/
 /-- Lift a visible lookup (`Ssh ++ Sown.left`) into `SEnvAll` under owned disjointness. -/
 lemma lookupSEnv_all_of_visible_owned
     {Ssh : SEnv} {Sown : OwnedEnv} {x : Var} {T : ValType} :
@@ -96,6 +97,7 @@ lemma endpoint_eq_of_store_visible_all
   cases hValEq
   rfl
 
+/-! ## Update-Length and Left-Side Session Bounds -/
 lemma length_updateG_hit {G : GEnv} {e : Endpoint} {L L' : LocalType} :
     lookupG G e = some L →
     (updateG G e L').length = G.length := by
@@ -116,6 +118,7 @@ lemma length_updateG_hit {G : GEnv} {e : Endpoint} {L L' : LocalType} :
               simpa [lookupG, List.lookup, hbeq] using hLookup
             simp [updateG, hEq, ih h']
 
+/-! ## Left-Side Session Projection Under Update -/
 lemma SessionsOf_left_subset_of_update
     {G₁ G₂ : GEnv} {e : Endpoint} {L L0 : LocalType} {G₁' : GEnv} :
     lookupG (G₁ ++ G₂) e = some L0 →
@@ -162,6 +165,7 @@ lemma SessionsOf_left_subset_of_update
           simpa [hG₁'] using hs
         simpa [hSess] using hs'
 
+/-! ## Update-Length and Right-Side Session Bounds -/
 lemma SessionsOf_right_subset_of_update
     {G₁ G₂ : GEnv} {e : Endpoint} {L L0 : LocalType} {G₂' : GEnv} :
     lookupG (G₁ ++ G₂) e = some L0 →
@@ -202,6 +206,7 @@ lemma SessionsOf_right_subset_of_update
         intro s hs
         simpa [hG₂'] using hs
 
+/-! ## Append-Cancellation Helpers -/
 lemma append_left_eq_of_eq {α : Type} {l1 l2 r : List α} (h : l1 ++ r = l2 ++ r) :
     l1 = l2 := by
   have hLen := congrArg List.length h
@@ -214,6 +219,7 @@ lemma append_right_eq_of_eq {α : Type} {l r1 r2 : List α} (h : l ++ r1 = l ++ 
   simp [List.length_append] at hLen
   exact List.append_inj_right h rfl
 
+/-! ## Middle-Frame Update Decomposition Helpers -/
 /-- Updating an endpoint known to live in the middle segment preserves outer frames. -/
 lemma updateG_append_middle_hit
     {Gleft Gmid Gright : GEnv} {e : Endpoint} {L0 L : LocalType} :
@@ -256,6 +262,7 @@ lemma updateG_append_middle_cancel
     exact append_right_eq_of_eq hEq'
   exact append_left_eq_of_eq hCancelLeft
 
+/-! ## Middle Segment Session and Lookup Facts -/
 /-- Session set of a middle update remains within the original middle segment. -/
 lemma SessionsOf_subset_middle_update
     {Gmid : GEnv} {e : Endpoint} {L0 L : LocalType} :
@@ -303,6 +310,7 @@ lemma updateG_middle_witness
       updateG_append_middle_hit (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
         (e:=e) (L0:=L0) (L:=L) hNoneLeft hSomeMid
 
+/-! ## Pre-Out Lookup Recovery (By Constructor) -/
 /-- Recover the stepped endpoint lookup in the middle segment for a pre-out send judgment. -/
 lemma middle_send_lookup_of_pre
     {Gstore : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {Gmid : GEnv}
@@ -323,6 +331,7 @@ lemma middle_send_lookup_of_pre
           (k:=k) (e:=e) (e':=eMid) hStore hOwn hkStore hkMid
       exact ⟨q, T, L, by simpa [hEqE] using hGmid⟩
 
+/-! ## Pre-Out Lookup Recovery: `recv` -/
 /-- Recover the stepped endpoint lookup in the middle segment for a pre-out recv judgment. -/
 lemma middle_recv_lookup_of_pre
     {Gstore : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {Gmid : GEnv}
@@ -350,6 +359,7 @@ lemma middle_recv_lookup_of_pre
           (k:=k) (e:=e) (e':=eMid) hStore hOwn hkStore hkMid
       exact ⟨p, T, L, by simpa [hEqE] using hGmid⟩
 
+/-! ## Pre-Out Lookup Recovery: `select` -/
 /-- Recover the stepped endpoint lookup in the middle segment for a pre-out select judgment. -/
 lemma middle_select_lookup_of_pre
     {Gstore : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {Gmid : GEnv}
@@ -370,6 +380,7 @@ lemma middle_select_lookup_of_pre
           (k:=k) (e:=e) (e':=eMid) hStore hOwn hkStore hkMid
       exact ⟨q, bs, by simpa [hEqE] using hGmid⟩
 
+/-! ## Pre-Out Lookup Recovery: `branch` -/
 /-- Recover the stepped endpoint lookup in the middle segment for a pre-out branch judgment. -/
 lemma middle_branch_lookup_of_pre
     {Gstore : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {Gmid : GEnv}
@@ -390,6 +401,7 @@ lemma middle_branch_lookup_of_pre
           (k:=k) (e:=e) (e':=eMid) hStore hOwn hkStore hkMid
       exact ⟨p, bs, by simpa [hEqE] using hGmid⟩
 
+/-! ## Send-Step Decomposition and Preservation -/
 /-- Decompose a middle `send` update inside a three-way framed global environment. -/
 lemma middle_send_update_decompose
     {Gleft Gmid Gright G G' : GEnv} {e : Endpoint}
@@ -414,6 +426,7 @@ lemma middle_send_update_decompose
   · exact SessionsOf_subset_middle_update (Gmid:=Gmid) (e:=e)
       (L0:=.send q Tmid Lmid) (L:=L) hMid
 
+/-! ## Send-Step Constructive Preservation Theorem -/
 /-- Constructive middle-frame preservation for a `send` step. -/
 lemma preserved_sub_middle_send
     {Gstore Gleft Gmid Gright G : GEnv} {D D' : DEnv}
@@ -464,6 +477,7 @@ lemma preserved_sub_middle_send
               (G:=G) (G':=G') (e:=e)
               (q:=q) (target:=target) (Tmid:=Tmid) (T:=T) (Lmid:=Lmid) (L:=L)
               hDisjLM hEqG hMid hGupd
+          /-! ## `preserved_sub_middle_send`: Pack Framed Post-State Witness -/
           refine ⟨Gmid', [], ∅, hEqG', hSubSess, ?_, ?_, ?_⟩
           · have hGmidEq : Gmid' = updateG Gmid eMid Lmid := by
               calc
