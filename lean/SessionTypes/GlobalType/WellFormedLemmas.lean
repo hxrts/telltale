@@ -40,6 +40,8 @@ theorem contains_cons_ne' {t x : String} {xs : List String}
       exact absurd heq hne
   | inr hmem => exact hmem
 
+/-! ## allVarsBound Monotonicity -/
+
 -- allVarsBound is monotonic: if vars are bound with bound1, they're bound with any superset.
 mutual
   theorem allVarsBound_mono (g : GlobalType) (bound₁ bound₂ : List String)
@@ -81,6 +83,8 @@ mutual
                allVarsBoundBranches_mono rest bound₁ bound₂ hsub hbound.2⟩
 end
 
+/-! ## allVarsBound Duplicate-Head Introduction -/
+
 /-- Adding a duplicate element to bound doesn't change allVarsBound. -/
 theorem allVarsBound_cons_dup (g : GlobalType) (x : String) (bound : List String)
     (hbound : g.allVarsBound (x :: bound) = true) :
@@ -97,6 +101,8 @@ theorem allVarsBound_cons_dup (g : GlobalType) (x : String) (bound : List String
         simp only [Bool.or_eq_true]
         right; exact hmem
   · exact hbound
+
+/-! ## allVarsBound Dedup and Swap Helpers -/
 
 /-- Removing a duplicate from bound preserves allVarsBound. -/
 theorem allVarsBound_cons_dedup (g : GlobalType) (x : String) (bound : List String)
@@ -148,6 +154,8 @@ theorem allVarsBound_swap (g : GlobalType) (x y : String) (bound : List String)
   · intro z hz; exact contains_cons_swap x y z bound hz
   · exact hbound
 
+/-! ## allVarsBound Substitution Preservation -/
+
 mutual
   private theorem allVarsBound_substitute_var (t varName : String) (repl : GlobalType)
       (bound : List String)
@@ -193,6 +201,8 @@ mutual
       · exact hrepl
     exact allVarsBound_substitute inner varName repl (t :: bound) hg' hrepl'
 
+  /-! ## allVarsBound Substitution: Main Theorem -/
+
   /-- allVarsBound is preserved when substituting a closed type for a bound variable.
 
   **Key insight**: When we substitute `mu t body` for occurrences of `var t` in body,
@@ -222,6 +232,8 @@ mutual
         simp only [GlobalType.substitute, GlobalType.allVarsBound] at hg ⊢
         exact allVarsBound_substitute cont varName repl bound hg hrepl
 
+  /-! ## allVarsBound Substitution: Branches -/
+
   theorem allVarsBoundBranches_substitute (branches : List (Label × GlobalType))
       (varName : String) (repl : GlobalType) (bound : List String)
       (hg : allVarsBoundBranches branches (varName :: bound) = true)
@@ -234,6 +246,8 @@ mutual
         exact ⟨allVarsBound_substitute cont varName repl bound hg.1 hrepl,
                allVarsBoundBranches_substitute rest varName repl bound hg.2 hrepl⟩
 end
+
+/-! ## allCommsNonEmpty Substitution Preservation -/
 
 mutual
   /-- allCommsNonEmpty is preserved by substitution. -/
@@ -280,6 +294,8 @@ mutual
                allCommsNonEmptyBranches_substitute rest varName repl hg.2 hrepl⟩
 end
 
+/-! ## noSelfComm Substitution Preservation -/
+
 mutual
   /-- noSelfComm is preserved by substitution. -/
   theorem noSelfComm_substitute (g : GlobalType) (varName : String) (repl : GlobalType)
@@ -318,6 +334,8 @@ mutual
         exact ⟨noSelfComm_substitute cont varName repl hg.1 hrepl,
                noSelfCommBranches_substitute rest varName repl hg.2 hrepl⟩
 end
+
+/-! ## isProductive Monotonicity -/
 
 -- Helper lemmas for isProductive monotonicity with respect to unguarded list
 
