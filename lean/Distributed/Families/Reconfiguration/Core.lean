@@ -57,6 +57,8 @@ def LivenessPreserved
     M.live sOld →
     M.live sNew
 
+/-! ## Assumption Atoms and Contracts -/
+
 /-- Reusable core reconfiguration assumption bundle. -/
 structure Assumptions
     {State : Type u} {Decision : Type v} {Certificate : Type w}
@@ -96,6 +98,8 @@ def coreAssumptions : List Assumption :=
   , .oldNewQuorumOverlap
   , .epochMonotonicity
   ]
+
+/-! ## Assumption Validation API -/
 
 /-- Validate one assumption against an assumption bundle. -/
 def validateAssumption
@@ -145,6 +149,8 @@ def runAssumptionValidation
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
 
+/-! ## Theorem Premises and Derived Results -/
+
 /-- Additional premises used to derive reconfiguration theorem forms. -/
 structure Premises
     {State : Type u} {Decision : Type v} {Certificate : Type w}
@@ -185,5 +191,4 @@ theorem liveness_preserved_of_assumptions
 
 end Reconfiguration
 end Distributed
-
 
