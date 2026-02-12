@@ -6,6 +6,8 @@ universe u
 
 /-! ## Recovery predicates -/
 
+/-! ### Session-Coherence and Drain Predicates -/
+
 def FailureSessionCoherent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -43,6 +45,8 @@ def Recoverable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   -- Recovery requires a drained state with coherent session.
   ∃ st', FStarDrain st st' ∧ FailureSessionCoherent st' sid
 
+/-! ### Participation Predicates -/
+
 def SiteParticipates {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -75,6 +79,8 @@ def CanResume {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     (_sid : SessionId) : Prop :=
   -- A surviving participant can resume if it still participates.
   ParticipantSurvives _st.crashedSites _p ∧ Participates _st _p _sid
+
+/-! ### Crash/Close Safety Predicates -/
 
 def crash_nonparticipant_preserves {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
