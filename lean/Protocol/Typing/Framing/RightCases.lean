@@ -64,6 +64,8 @@ lemma preserved_sub_right_frame_send
       · intro x hx0; cases hx0
       · intro x T hx0; cases hx0
 
+/-! ## Right-Frame Receive Cases -/
+
 /-- Helper: recv-new case for the right-frame preservation lemma. -/
 lemma preserved_sub_right_frame_recv_new
     {Gstore G₁ G₂ G G' Ssh Sown store k x e source T L G₂' Sown' Sfin Gfin W Δ}
@@ -100,6 +102,8 @@ lemma preserved_sub_right_frame_recv_new
       (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown.updateLeft x T) (G:=updateG G₂ e L))
   · intro x hx0; cases hx0
   · intro x T hx0; cases hx0
+
+/-! ## Right-Frame Receive-Old Case -/
 
 /-- Helper: recv-old case for the right-frame preservation lemma. -/
 lemma preserved_sub_right_frame_recv_old
@@ -138,6 +142,8 @@ lemma preserved_sub_right_frame_recv_old
   · intro x hx0; cases hx0
   · intro x T hx0; cases hx0
 
+/-! ## Right-Frame Choice Cases -/
+
 /-- Helper: select case for the right-frame preservation lemma. -/
 lemma preserved_sub_right_frame_select
     {Gstore G₁ G₂ G G' Ssh Sown store k ℓ e target bs L G₂' Sfin Gfin W Δ} :
@@ -175,6 +181,8 @@ lemma preserved_sub_right_frame_select
       · intro x hx0; cases hx0
       · intro x T hx0; cases hx0
 
+/-! ## Right-Frame Branch Case -/
+
 /-- Helper: branch case for the right-frame preservation lemma. -/
 lemma preserved_sub_right_frame_branch
     {Gstore G₁ G₂ G G' Ssh Sown store k procs e source bs ℓ P L G₂' Sfin Gfin W Δ} :
@@ -210,6 +218,8 @@ lemma preserved_sub_right_frame_branch
           (L:=L) (L0:=.branch p' bs') hDisj hEq hEq' hG₂e hGout.symm
       refine ⟨W, Δ, ?_, FootprintSubset_refl, SEnvDomSubset_refl⟩
       simpa [hG₂', hEqE] using hPre'
+
+/-! ## Right-Frame Assignment Cases -/
 
 /-- Helper: assign-new case for the right-frame preservation lemma. -/
 lemma preserved_sub_right_frame_assign_new
@@ -250,6 +260,8 @@ lemma preserved_sub_right_frame_assign_new
       (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown.updateLeft x T_step) (G:=G₂))
   · intro x hx; cases hx
   · intro x T hx; cases hx
+
+/-! ## Right-Frame Assign-Old Case -/
 
 /-- Helper: assign-old case for the right-frame preservation lemma. -/
 lemma preserved_sub_right_frame_assign_old
