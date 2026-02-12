@@ -41,6 +41,8 @@ variable [GhostMapSlot Unit]
 variable [GhostMapSlot Nat]
 variable [GhostMapSlot LocalType]
 
+/-! ## Send/Receive Rules -/
+
 def wp_send (γn : GhostName) (sid : SessionId) (ct : CancelToken)
     (e : Endpoint) (L : LocalType) : iProp :=
   -- Send requires the session invariant and endpoint ownership.
@@ -60,6 +62,8 @@ def wp_receive_delegation (γn : GhostName) (sid : SessionId) (ct : CancelToken)
   -- Delegating receive consumes from the session invariant and installs bundle ownership.
   iProp.sep (session_inv γn sid ct) (bundle_owns γn b)
 
+/-! ## Session Choice/Open/Close Rules -/
+
 def wp_offer : iProp :=
   -- WP rule derived from the generic pair rule.
   wp_pair (offerPair (γ:=γ) (ε:=ε))
@@ -76,6 +80,8 @@ def wp_close (γn : GhostName) (sid : SessionId) (ct : CancelToken) : iProp :=
   -- Close requires the cancel token and the session invariant.
   iProp.sep (session_inv γn sid ct) (cancel_token_own ct)
 
+/-! ## Guard And Effect Rules -/
+
 def wp_acquire (layer : γ) : iProp :=
   -- Acquire WP: parameterized by the guard layer.
   wp_pair (acquirePair (γ:=γ) (ε:=ε) layer)
@@ -87,6 +93,8 @@ def wp_release (layer : γ) : iProp :=
 def wp_invoke (action : EffectRuntime.EffectAction ε) : iProp :=
   -- Invoke WP: parameterized by the effect action.
   wp_pair (invokePair (γ:=γ) (ε:=ε) action)
+
+/-! ## Concurrency Rules -/
 
 def wp_fork : iProp :=
   -- WP rule derived from the generic pair rule.
@@ -100,6 +108,8 @@ def wp_abort : iProp :=
   -- WP rule derived from the generic pair rule.
   wp_pair (abortPair (γ:=γ) (ε:=ε))
 
+/-! ## Transfer And Tagging Rules -/
+
 def wp_transfer : iProp :=
   -- WP rule derived from the generic pair rule.
   wp_pair (transferPair (γ:=γ) (ε:=ε))
@@ -111,6 +121,8 @@ def wp_tag : iProp :=
 def wp_check : iProp :=
   -- WP rule derived from the generic pair rule.
   wp_pair (checkPair (γ:=γ) (ε:=ε))
+
+/-! ## Register/Control Rules -/
 
 def wp_set : iProp :=
   -- WP rule derived from the generic pair rule.
