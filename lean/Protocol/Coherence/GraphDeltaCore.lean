@@ -248,10 +248,12 @@ theorem ConsumeHO_conservative (from_ receiver : Role) (L : LocalType)
       simp only [Option.map]
       have hTsNoChans : hasNoChannels ts = true := by
         cases t <;> simp [hasNoChannels] at hNoChans ⊢ <;> exact hNoChans
-      specialize ih L' hTsNoChans
-      cases hRest : ConsumeHO from_ receiver L' ts with
-      | none => simp [hRest] at ih ⊢; exact ih
-      | some p => simp [hRest] at ih ⊢; exact ih
+	      specialize ih L' hTsNoChans
+	      cases hRest : ConsumeHO from_ receiver L' ts with
+	      | none => simp [hRest] at ih ⊢; exact ih
+	      | some p => simp [hRest] at ih ⊢; exact ih
+
+/-! ## Conservative Extension (Converse Existence) -/
 
 /-- Converse (existence form): for channel-free traces, any successful FO consume
     lifts to an HO consume run with the same residual local type. -/
@@ -303,6 +305,8 @@ private theorem consumeOneHO_non_channel_empty_delta
     · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
   | _ => simp [consumeOneHO] at h
 
+/-! ## Empty Delta Property (Main) -/
+
 /-- When no channels in trace, the graph delta is empty. -/
 theorem ConsumeHO_no_channels_empty_delta (from_ receiver : Role) (L : LocalType)
     (ts : List ValType) (hNoChans : hasNoChannels ts = true)
@@ -332,8 +336,10 @@ theorem ConsumeHO_no_channels_empty_delta (from_ receiver : Role) (L : LocalType
         -- Both deltas are empty, so composition is empty
         have hDelta1 := consumeOneHO_non_channel_empty_delta from_ receiver t L res hNotChan hOne
         have hDelta2 := ih res.residual hTsNoChans p.2 hRest
-        simp [GraphDelta.isEmpty, GraphDelta.compose, hDelta1, GraphDelta.empty] at hDelta2 ⊢
-        exact hDelta2
+	        simp [GraphDelta.isEmpty, GraphDelta.compose, hDelta1, GraphDelta.empty] at hDelta2 ⊢
+	        exact hDelta2
+
+/-! ## Empty Delta Converse Exactness -/
 
 /-- Converse (exactness form): for channel-free traces, FO success implies an HO run
     with identical residual local type and an empty graph delta. -/
