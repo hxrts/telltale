@@ -65,6 +65,9 @@ theorem fromDB?_eq_fromDB_all_ctx (t : LocalTypeDB) (ctx : NameContext)
     fun b =>
       ∀ ctx, (hclosed : b.2.isClosedAt ctx.length = true) →
         b.2.fromDB? ctx = some (b.2.fromDB ctx hclosed)
+
+  /-! ## fromDB? = fromDB: Structural Recursion -/
+
   have hrec : P1 t := by
     refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
@@ -109,6 +112,8 @@ theorem fromDB?_eq_fromDB_all_ctx (t : LocalTypeDB) (ctx : NameContext)
       exact hsnd
   exact hrec ctx hclosed
 
+/-! ## fromDB? = fromDB for Branch Lists -/
+
 theorem branchesFromDB?_eq_branchesFromDB (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
     (hclosed : isClosedAtBranches ctx.length bs = true) :
     branchesFromDB? ctx bs = some (branchesFromDB ctx bs hclosed) := by
@@ -122,6 +127,8 @@ theorem branchesFromDB?_eq_branchesFromDB (bs : List (Label × LocalTypeDB)) (ct
       have ht := fromDB?_eq_fromDB_all_ctx t ctx hclosed'.1
       have htl := ih hclosed'.2
       simp [LocalTypeDB.branchesFromDB?, LocalTypeDB.branchesFromDB, ht, htl]
+
+/-! ## fromDB? = fromDB at Empty Context -/
 
 theorem fromDB?_eq_fromDB_closed (t : LocalTypeDB) (_hclosed : t.isClosed = true) :
     ∀ hclosed' : t.isClosedAt (TypeContext.empty : NameContext).length = true,
