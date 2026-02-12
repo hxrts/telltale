@@ -170,6 +170,6 @@ lemma lookupSEnv_swap_left_prefix {Ssh S₁ S₂ S₃ : SEnv} (hDisj : DisjointS
         _ = lookupSEnv (SEnvAll Ssh (S₂ ++ (S₁ ++ S₃))) x := by
                 simp [SEnvAll]
 
-/-! ### Framing Lemmas -/
+/-! ## Framing Lemmas -/
 
 end

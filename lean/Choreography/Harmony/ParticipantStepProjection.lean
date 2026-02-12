@@ -12,7 +12,7 @@ Solution Structure. Build head-step lemmas, then discharge async/non-participant
 -/
 
 namespace Choreography.Harmony
-/-! ### Participant Projection Lemmas
+/-! ## Participant Projection Lemmas
 
 These lemmas capture the “head communication” case for participants.
 We use a lightweight predicate `action_pred` that asserts the action
@@ -28,6 +28,8 @@ open Choreography.Projection.Project
   (trans_comm_sender trans_comm_receiver trans_comm_other trans_wellFormed_of_wellFormed)
 open Choreography.Projection.Project (ProjectableClosedWellFormed)
 open Choreography.Projection.Projectb (CProject)
+
+
 
 abbrev projTransBranches := Choreography.Projection.Project.transBranches
 
@@ -72,6 +74,8 @@ private theorem proj_trans_sender_step_comm_head
   · simp [projTrans, EQ2_refl]
 
 /-- Sender-side projection for head steps in the original harmony statement. -/
+
+
 theorem proj_trans_sender_step (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hpred : action_pred g act) :
     ∃ bs cont,
@@ -119,6 +123,8 @@ private theorem proj_trans_receiver_step_comm_head
   · simp [projTrans, EQ2_refl]
 
 /-- Receiver-side projection for head steps in the original harmony statement. -/
+
+
 theorem proj_trans_receiver_step (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hpred : action_pred g act)
     (hno_self : g.noSelfComm = true) :
@@ -180,6 +186,8 @@ private theorem proj_trans_other_step_comm_head_nonempty
   simpa [htrans_g] using hcoherent
 
 /-- Helper: comm_head case (handles empty branches by contradiction). -/
+
+
 theorem proj_trans_other_step_comm_head
     (sender receiver : String) (branches : List (Label × GlobalType))
     (label : Label) (cont : GlobalType) (role : String)
@@ -200,6 +208,9 @@ theorem proj_trans_other_step_comm_head
             label cont role hmem hclosed hwf hns hnr hproj
 
 /-- Helper: comm_async case when role is the sender. -/
+
+/-! ## Non-Participant Async: Sender/Receiver Cases -/
+
 private theorem proj_trans_other_step_comm_async_sender
     (sender receiver : String) (branches branches' : List (Label × GlobalType)) (role : String)
     (hbranch_rel : BranchesRel EQ2 (projTransBranches branches' role) (projTransBranches branches role))
@@ -238,6 +249,9 @@ private theorem proj_trans_other_step_comm_async_receiver
   exact EQ2.construct ⟨rfl, hbranch_rel⟩
 
 /-- Helper: comm_async case for non-participants (role ≠ sender/receiver). -/
+
+/-! ## Non-Participant Async: Other Roles -/
+
 private theorem proj_trans_other_step_comm_async_other_cons
     (sender receiver : String) (label label' : Label) (cont cont' : GlobalType)
     (rest rest' : List (Label × GlobalType)) (role : String)
@@ -280,6 +294,8 @@ private theorem proj_trans_other_step_comm_async_other
         sender receiver label label cont cont' rest rest' role hbranch_rel' hrs hrr
 
 /-- Helper: comm_async case (dispatches by role). -/
+
+
 theorem proj_trans_other_step_comm_async
     (sender receiver : String) (branches branches' : List (Label × GlobalType)) (act : GlobalActionR)
     (hbstep : BranchesStep step branches act branches')

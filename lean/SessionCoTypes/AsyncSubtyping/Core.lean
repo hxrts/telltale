@@ -179,7 +179,6 @@ inductive AsyncStep : AsyncTriple → List AsyncTriple → Prop where
       (hBody : childRel T body) :
       AsyncStep ⟨S, T, buf⟩ [⟨S, body, buf⟩]
 
-/-! ## Coinductive Async Subtyping
 
 The full relation is the greatest fixpoint: a triple is in the relation
 if all its successors are in the relation (coinductively). -/

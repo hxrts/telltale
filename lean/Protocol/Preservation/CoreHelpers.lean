@@ -19,21 +19,21 @@ Solution Structure. We prove preservation by case analysis on step kind:
 4. NewSession: use freshness invariants (`SupplyInv_newSession`)
 -/
 
-/-!
-**UPDATE (2026-01-15)**: This module now imports Protocol.Typing which defines
-TypedStep - the linear resource transition typing judgment that resolves the
+
+/- UPDATE (2026-01-15): This module now imports `Protocol.Typing`, which defines
+`TypedStep` - the linear resource transition typing judgment that resolves the
 design issues that blocked the original preservation theorems below.
 
 The new preservation theorems are:
-- `preservation_typed` (in Typing.lean) - TypedStep preserves LocalTypeR.WellFormed
-- `progress_typed` (in Typing.lean) - WellFormedComplete processes can step or terminate
-- `subject_reduction` (this file) - TypedStep implies Step (soundness)
+- `preservation_typed` (in `Typing.lean`) - `TypedStep` preserves `LocalTypeR.WellFormed`
+- `progress_typed` (in `Typing.lean`) - `WellFormedComplete` processes can step or terminate
+- `subject_reduction` (this file) - `TypedStep` implies `Step` (soundness)
 
 The old theorems (`preservation_send`, `preservation_recv`, `preservation`, `progress`)
-have been removed. The canonical results are the TypedStep-based theorems below,
-which align with the pre-update typing discipline.
+have been removed. The canonical results are the `TypedStep`-based theorems below,
+which align with the pre-update typing discipline. -/
 
-## Proof Structure
+/-! ## Proof Structure
 
 The proof proceeds by case analysis on the step relation:
 

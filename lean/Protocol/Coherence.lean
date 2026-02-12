@@ -16,8 +16,8 @@ import Protocol.Coherence.ErasureCharacterization
 import Protocol.Coherence.Conserved
 import Protocol.Coherence.Minimality
 
-/-!
-# MPST Coherence
+
+/-! # MPST Coherence
 
 This module defines the coherence invariant for multiparty session types.
 

@@ -6,8 +6,8 @@ import Protocol.Coherence.EdgeCoherence
 Coherence lemmas and invariants for session-environment evolution.
 -/
 
-/-!
-# MPST Coherence: Send Head Preservation
+
+/-! # MPST Coherence: Send Head Preservation
 
 This module proves head preservation for send (value transmission) steps.
 -/
@@ -22,6 +22,7 @@ Solution Structure. We prove head preservation by:
 2. Proving Consume succeeds on the extended trace via `Consume_append`
 3. Handling the 3-way edge case split (updated, related, unrelated)
 -/
+
 
 /-!
 In binary session types, coherence states that after consuming in-flight messages,

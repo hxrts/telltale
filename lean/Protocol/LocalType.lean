@@ -22,8 +22,8 @@ Solution Structure. We define:
 The key insight is that actions are directed to specific roles, not just "dual".
 -/
 
-/-!
-- `!r(T).L` - send value of type T to role r, continue as L
+ /-
+ - `!r(T).L` - send value of type T to role r, continue as L
 - `?r(T).L` - receive value of type T from role r, continue as L
 - `⊕r{ℓᵢ: Lᵢ}` - select: send label ℓᵢ to role r, continue as Lᵢ
 - `&r{ℓᵢ: Lᵢ}` - branch: receive label from role r, branch on it
@@ -192,7 +192,7 @@ end
 
 namespace LocalType
 
-/-! ### Depth Properties -/
+/-! ## Depth Properties -/
 
 @[simp] theorem depth_end : LocalType.depth .end_ = 0 := rfl
 @[simp] theorem depth_var (n : Nat) : (LocalType.var n).depth = 0 := rfl

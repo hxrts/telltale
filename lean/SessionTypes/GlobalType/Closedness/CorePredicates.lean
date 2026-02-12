@@ -98,7 +98,7 @@ theorem GlobalType.isClosed_of_wellFormed (g : GlobalType)
   have hfree : g.freeVars = [] := allVarsBound_nil_implies_freeVars_nil g hbound
   simp [GlobalType.isClosed, hfree]
 
-/-! ### Closedness Lemmas
+/-! ## Closedness Lemmas
 
 These lemmas establish structural properties of closedness, following the Coq approach
 in `coGlobal.v` and `coLocal.v`. The key insight is that:

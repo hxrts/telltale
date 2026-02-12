@@ -14,8 +14,8 @@ Solution Structure. Define lightweight RA predicates and placeholder
 theorems for knowledge flow, progress, ghost sessions, and bundles.
 -/
 
-/-!
-# Tasks 20A–20C: Knowledge, Progress, Ghost Sessions, Resource Bundles
+
+/-! # Tasks 20A–20C: Knowledge, Progress, Ghost Sessions, Resource Bundles
 
 Epistemic separation, progress tokens, ghost sessions, and resource bundles
 from runtime.md §§16–19.

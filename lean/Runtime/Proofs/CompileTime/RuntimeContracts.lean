@@ -29,6 +29,8 @@ variable [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
 variable [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
 variable [IdentityVerificationBridge ι ν]
 
+/-! ## Contract Components -/
+
 /-- Cross-lane handoffs must represent actual delegation/capability transfer and
 never a no-op self-handoff. -/
 def DelegationOnlyCrossLaneHandoff (st : VMState ι γ π ε ν) : Prop :=
@@ -61,6 +63,8 @@ structure TheoremPackCapabilityContract
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State) where
   theoremPack : VMTheoremPack (space := space)
   capabilityInventory : List (String × Bool)
+
+/-! ## Combined Runtime Bundle -/
 
 /-- Combined runtime contract bundle threaded into VM admission/runtime policy. -/
 structure VMRuntimeContracts (store₀ : SessionStore ν) where

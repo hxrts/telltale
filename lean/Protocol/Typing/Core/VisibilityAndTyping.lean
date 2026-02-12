@@ -46,7 +46,7 @@ theorem lookupSEnv_none_of_disjoint_left {S₁ S₂ : SEnv} {x : Var} {T : ValTy
 def SEnvAll (Ssh : SEnv) (Sown : OwnedEnv) : SEnv :=
   Ssh ++ Sown.right ++ Sown.left
 
-/-! ### Gauge-Invariant View
+/-! ## Gauge-Invariant View
 
 `Sown.right` is a frame/gauge component. Typing obligations that should be
 invariant under quotienting read variables through the visible view below. -/

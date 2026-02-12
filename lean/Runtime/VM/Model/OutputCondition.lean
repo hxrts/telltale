@@ -1,7 +1,7 @@
 import Runtime.VM.Model.TypeClasses
 
-/-!
-# VM Output-Condition Model
+
+/-! # VM Output-Condition Model
 
 Core model types for output-condition commit gating.
 

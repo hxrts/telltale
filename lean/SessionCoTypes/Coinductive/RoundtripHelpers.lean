@@ -68,6 +68,7 @@ lemma childRel_toCoind {t : LocalTypeR} {c : LocalTypeC}
         cases i
         simp [i', castFin]
       simpa [hchild, hidx] using hcont
+  -- Children of `toCoind`: recv case.
   | recv p bs =>
       rcases childRel_to_children h with ⟨i, hi⟩
       have hi' : children (mkRecv p (toCoindBranches bs)) i = c := by
@@ -200,6 +201,7 @@ lemma childRel_toCoind_size {t : LocalTypeR} {c : LocalTypeC}
         simpa [hchild, hidx] using hcont
       · have hlt : sizeOf (bs.get i').2.2 < sizeOf bs := sizeOf_get_lt_sizeOf_branches i'
         exact lt_trans hlt (sizeOf_branches_lt_sizeOf_send p bs)
+  -- childRel with size bound: recv case.
   | recv p bs =>
       rcases childRel_to_children h with ⟨i, hi⟩
       have hi' : children (mkRecv p (toCoindBranches bs)) i = c := by
@@ -282,6 +284,8 @@ lemma childRel_toCoind_send {p : String} {bs : List BranchR} (i : Fin bs.length)
       simpa [toCoind, hidx, -children_mkSend] using hchild'
     exact hchild.trans hcont
 
+/-! ## childRel lemmas for specific constructors: recv case -/
+
 lemma childRel_toCoind_recv {p : String} {bs : List BranchR} (i : Fin bs.length) :
     childRel (toCoind (.recv p bs)) (toCoind (bs.get i).2.2) := by
   refine ⟨head (toCoind (.recv p bs)), children (toCoind (.recv p bs)), ?_, rfl, ?_⟩
@@ -326,6 +330,8 @@ lemma mem_freeVarsOfBranches {bs : List BranchR} {v : String} :
           rcases ih h with ⟨b', hb', hv'⟩
           exact ⟨b', by simp [hb'], hv'⟩
 
+/-! ## Free variable lemmas: namesIn inclusion -/
+
 lemma freeVars_subset_namesIn {t : LocalTypeR} {all : Finset LocalTypeC}
     (h_closed : IsClosedSet all) (hmem : toCoind t ∈ all) :
     ∀ v, v ∈ t.freeVars → v ∈ namesIn all := by
@@ -366,6 +372,7 @@ lemma freeVars_subset_namesIn {t : LocalTypeR} {all : Finset LocalTypeC}
         childRel_toCoind_send (p := p) (bs := bs) i
       have hmem_child : toCoind (bs.get i).2.2 ∈ all := mem_of_closed_child h_closed hmem hchild
       exact freeVars_subset_namesIn (t := (bs.get i).2.2) (all := all) h_closed hmem_child v hvi
+  -- Free variable lemmas: recv case.
   | recv p bs =>
       intro v hv
       have hv' : v ∈ SessionTypes.LocalTypeR.freeVarsOfBranches bs := by

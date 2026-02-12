@@ -26,7 +26,6 @@ section
 
 variable {ν : Type u} [VerificationModel ν]
 
-/-! ## Theorem Pack Structure -/
 
 structure VMTheoremPack
     {store₀ : SessionStore ν} {State : Type v}

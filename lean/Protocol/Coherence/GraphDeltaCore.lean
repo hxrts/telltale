@@ -7,8 +7,8 @@ import Protocol.Coherence.EdgeCoherence
 Core higher-order consume and graph-delta definitions used by coherence layers.
 -/
 
-/-!
-# Higher-Order Consume with Graph Deltas
+
+/-! # Higher-Order Consume with Graph Deltas
 
 This module defines a higher-order `Consume` function for multiparty session types
 that handles channel delegation by producing graph deltas.

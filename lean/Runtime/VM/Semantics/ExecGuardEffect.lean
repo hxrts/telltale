@@ -1,7 +1,7 @@
 import Runtime.VM.Semantics.ExecHelpers
 
-/-!
-# Guard and Effect Instruction Semantics
+
+/-! # Guard and Effect Instruction Semantics
 
 Step functions for `acquire`, `release`, and `invoke`.
 

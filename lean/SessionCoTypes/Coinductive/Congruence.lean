@@ -6,7 +6,8 @@ import SessionCoTypes.Coinductive.Regularity
 
 set_option linter.dupNamespace false
 
-/-!
+
+/-
 The Problem. When converting between inductive and coinductive representations,
 we need congruence lemmas: if inputs are equal (or bisimilar), outputs are equal.
 These lemmas enable substitution in proofs about type equivalence.

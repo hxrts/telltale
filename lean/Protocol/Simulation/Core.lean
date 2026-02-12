@@ -16,8 +16,8 @@ Solution Structure. We define:
 Non-determinism in parallel composition is resolved by left-first.
 -/
 
-/-!
-## Overview
+
+/-! ## Overview
 
 The `stepDecide` function implements a decidable step function that
 attempts to execute one step of a configuration. This enables:

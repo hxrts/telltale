@@ -4,7 +4,8 @@ import SessionCoTypes.Coinductive.Regularity
 
 set_option linter.dupNamespace false
 
-/-!
+
+/-
 The Problem. To convert regular coinductive types back to inductive types or
 to reason about them algorithmically, we need a finite representation. A regular
 type has finitely many reachable states, so we can index them with Fin n.

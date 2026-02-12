@@ -53,6 +53,8 @@ theorem CProject_mu (t : String) (body : GlobalType) (candBody : LocalTypeR) (ro
     exact ⟨hguard, rfl⟩
   exact Eq.mp (congrFun (congrFun (congrFun hfix (.mu t body)) role) (.mu t candBody)) hf
 
+/-! ## Constructor Lemmas: Communication Cases -/
+
 /-- CProject for comm-send (role is sender). -/
 theorem CProject_comm_send (sender receiver : String)
     (gbs : List (Label × GlobalType)) (lbs : List BranchR)

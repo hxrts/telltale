@@ -112,7 +112,7 @@ theorem dual_compatible : Compatible LocalTypeR.dual := by
 
 
 
-/-! ### Substitute Compatibility
+/-! ## Substitute Compatibility
 
 To prove `EQ2_substitute` we need to show that substitution is compatible.
 This requires showing that substitution preserves observable behavior. -/
@@ -151,7 +151,7 @@ theorem map_substitute_eq_self_of_not_free {bs : List BranchR} {var : String} {r
     have htl_eq := ih htail_free
     simp only [hc_eq, htl_eq]
 
-/-! ### Substitution Commutativity (EQ2 version)
+/-! ## Substitution Commutativity (EQ2 version)
 
 The syntactic `subst_mu_comm` requires Barendregt conditions. For general use,
 we need an EQ2-equivalence version that holds unconditionally.

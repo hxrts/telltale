@@ -140,6 +140,8 @@ private theorem isGuarded_substitute_preserved_mu
     · have ih' := ih t v repl hbody' hrepl
       simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hvs, hst, ih']
 
+/-! ## Guardedness Preservation: Var Helper -/
+
 /-- Helper: var case for guardedness preservation under substitution. -/
 private theorem isGuarded_substitute_preserved_var
     (w t v : String) (repl : LocalTypeR)
@@ -152,6 +154,8 @@ private theorem isGuarded_substitute_preserved_var
   · have hvw : v ≠ w := (bne_iff_ne).1 (by simpa [LocalTypeR.isGuarded] using hbody)
     have hvw' : (v != w) = true := (bne_iff_ne).2 hvw
     simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hwt, hvw']
+
+/-! ## Guardedness Preservation: Main Guarded Theorem -/
 
 /-- If body is guarded for v, and repl is guarded for v, then substitution preserves guardedness.
 
@@ -172,6 +176,8 @@ theorem isGuarded_substitute_preserved (body : LocalTypeR) (t v : String) (repl 
       exact isGuarded_substitute_preserved_mu s body
         (fun t' v' repl' hb hr => isGuarded_substitute_preserved body t' v' repl' hb hr)
         t v repl hbody hrepl
+
+/-! ## Guardedness Preservation: Mu Unguarded Helper -/
 
 /-- Helper: mu case for unguarded substitution. -/
 private theorem isGuarded_substitute_unguarded_mu
@@ -194,6 +200,8 @@ private theorem isGuarded_substitute_unguarded_mu
     · have ih' := ih t v repl hbody' hneq
       simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hvs, hst, ih']
 
+/-! ## Guardedness Preservation: Var Unguarded Helper -/
+
 /-- Helper: var case for unguarded substitution. -/
 private theorem isGuarded_substitute_unguarded_var
     (w t v : String) (repl : LocalTypeR)
@@ -209,6 +217,8 @@ private theorem isGuarded_substitute_unguarded_var
   subst hvw
   have hvneq : v ≠ t := Ne.symm hneq
   simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hvneq]
+
+/-! ## Guardedness Preservation: Main Unguarded Theorem -/
 
 /-- If body is NOT guarded for v (v appears unguarded), and t ≠ v, then substitution
     for t doesn't change guardedness for v.

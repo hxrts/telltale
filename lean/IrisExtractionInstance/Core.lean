@@ -17,8 +17,7 @@ runtime implementations:
 This is sound because Iris adequacy connects logical correctness to operational behavior.
 -/
 
-/-!
-## Trust Boundary
+/-! ## Trust Boundary
 
 This file is the **Iris extraction trust boundary**. It contains:
 
@@ -71,7 +70,7 @@ namespace Telltale
 
 variable [ti : TelltaleIris]
 
-/-! ### UPred Fancy Update Erasure
+/-! ## UPred Fancy Update Erasure
 
 Fancy updates `|={E₁,E₂}=> P` allow mask-changing view shifts — logical
 operations that open/close invariants. At runtime, mask manipulation is

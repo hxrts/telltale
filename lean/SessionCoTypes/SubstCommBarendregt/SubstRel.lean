@@ -9,7 +9,6 @@ namespace SessionCoTypes.SubstCommBarendregt
 open SessionTypes.LocalTypeR
 open SessionCoTypes.EQ2
 open SessionTypes.GlobalType
-/-! ## Inductive SubstRel -/
 
 /-- Relation for substitution congruence, closed under unfolding. -/
 inductive SubstRel (var : String) (repl : LocalTypeR) : Rel where

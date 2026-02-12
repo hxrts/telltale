@@ -28,7 +28,7 @@ open SessionTypes.GlobalType
 open SessionCoTypes.Observable
 open SessionCoTypes.EQ2
 open SessionCoTypes.CoinductiveRel
-/-! ### Phase 5: Unfold/Substitute Commutation
+/-! ## Phase 5: Unfold/Substitute Commutation
 
 The goal is to prove `unfold_substitute_EQ2`:
   EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl)

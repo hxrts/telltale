@@ -1,8 +1,8 @@
 import Classical.Transport.API
 import Classical.Families.SpectralGapTermination
 
-/-!
-# Classical Theorem Transport Layer
+
+/-! # Classical Theorem Transport Layer
 
 This module is the entry point for transported classical theorems from physics
 and queueing theory, adapted for session-typed protocol verification.

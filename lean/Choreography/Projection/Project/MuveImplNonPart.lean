@@ -32,7 +32,7 @@ This corresponds to Coq's `EQ_end` theorem from indProj.v (lines 147-152). -/
 If a role doesn't participate in the global type and the global type is well-formed
 (closed, all comms have branches), then trans g role is EQ2-equivalent to .end.
 
-### Proof Strategy
+## Proof Strategy
 
 1. Show that `trans` on a non-participant produces a "muve" type (mu-var-end chain):
    - `trans_muve_of_not_part_of2`: if ¬part_of2 role g, then isMuve (trans g role)
@@ -46,7 +46,7 @@ If a role doesn't participate in the global type and the global type is well-for
 
 5. By EQ2_coind, EQ2 .end (trans g role)
 
-### Coq Reference
+## Coq Reference
 
 See `subject_reduction/theories/Projection/indProj.v:147-152`. -/
 private theorem EQ_end_closed (g : GlobalType) (role : String)

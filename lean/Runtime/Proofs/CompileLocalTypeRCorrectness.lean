@@ -1,7 +1,7 @@
 import Runtime.VM.Model.CompileLocalTypeR
 
-/-!
-# CompileLocalTypeR Correctness Stubs
+
+/-! # CompileLocalTypeR Correctness Stubs
 
 Statements only (no proofs yet).
 -/

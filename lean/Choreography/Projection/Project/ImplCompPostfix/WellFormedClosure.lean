@@ -71,7 +71,7 @@ theorem CProjectTransRelCompWF_extend_left {a b c : LocalTypeR}
   -- Extend the underlying composition and reattach well-formedness.
   exact ⟨CProjectTransRelComp_extend_left h1 h2.1 hWFa hWFb hWFc, hWFa, hWFc⟩
 
-/-! ### EQ2F Lifting Helpers -/
+/-! ## EQ2F Lifting Helpers -/
 
 private theorem EQ2F_lift_compWF_send
     {p q : String} {bs cs : List BranchR}

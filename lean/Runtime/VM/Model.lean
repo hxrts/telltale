@@ -13,8 +13,8 @@ import Runtime.VM.Model.UnitModel
 
 set_option autoImplicit false
 
-/-!
-# Runtime.VM.Model
+
+/-! # Runtime.VM.Model
 
 VM data model layer: types, configuration, protocol image/model state, and
 unit/default model instances.

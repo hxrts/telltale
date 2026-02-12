@@ -9,8 +9,8 @@ import Runtime.VM.Model.Violation
 import Runtime.VM.Runtime.Monitor
 import Runtime.Resources.BufferRA
 
-/-!
-# VM Configuration
+
+/-! # VM Configuration
 
 `CostModel` and `VMConfig`, the static configuration that parameterizes a VM instance.
 `VMConfig` bundles buffer policies, scheduling policy, violation handling, knowledge flow

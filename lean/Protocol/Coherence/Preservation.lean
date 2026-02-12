@@ -7,8 +7,8 @@ import Protocol.Coherence.Unified
 Coherence lemmas and invariants for session-environment evolution.
 -/
 
-/-!
-# MPST Coherence: Preservation
+
+/-! # MPST Coherence: Preservation
 
 This module proves coherence preservation under all protocol steps.
 -/
@@ -23,6 +23,7 @@ Solution Structure. We combine the per-step preservation lemmas:
 3. Delegation preservation via `DelegationEnvelope`
 4. Main theorem: `Coherent_step_preserved`
 -/
+
 
 /-!
 In binary session types, coherence states that after consuming in-flight messages,

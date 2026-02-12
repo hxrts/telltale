@@ -28,8 +28,7 @@ unfolding.
 | `HasDerivAt`         | `step s = some s'`             |
 | `energy_dissipation` | communication consumes measure | -/
 
-/-!
-## Key Results
+/-! ## Key Results
 
 - `progressMeasure_nonincreasing_wt`: well-typed instruction steps do not
   increase the progress measure on local types.
@@ -83,7 +82,7 @@ where
     | [] => 0
     | (_, L) :: rest => progressMeasure L + sumBranches rest
 
-/-! ### Zero and positivity -/
+/-! ## Zero and positivity -/
 
 @[simp] theorem progressMeasure_end : LocalType.progressMeasure .end_ = 0 := rfl
 @[simp] theorem progressMeasure_var (n : Nat) : (LocalType.var n).progressMeasure = 0 := rfl
@@ -118,7 +117,7 @@ theorem progressMeasure_pos_of_decide :
       simp only [LocalType.progressMeasure]
       exact progressMeasure_pos_of_decide L' (by simp [reachesCommDecide] at h; exact h)
 
-/-! ### Decrease under communication -/
+/-! ## Decrease under communication -/
 
 /-- Sending strictly decreases the progress measure. -/
 theorem progressMeasure_advance_send (r : Role) (T : ValType) (L : LocalType) :
@@ -155,7 +154,7 @@ theorem progressMeasure_advance_select (r : Role) (bs : List (Label × LocalType
   have := sumBranches_mem_le l L bs h
   omega
 
-/-! ### Nonincreasing under well-typed steps -/
+/-! ## Nonincreasing under well-typed steps -/
 
 /-- Well-typed instruction steps do not increase the progress measure.
     This is the discrete analogue of Gibbs's `V_decreasing` property:
@@ -237,7 +236,7 @@ structure StrictProgressMeasureData (State : Type)
   productive_step_decreasing : ∀ s s',
     step s = some s' → is_productive s s' → measure s' < measure s
 
-/-! ### Consequences of the framework -/
+/-! ## Consequences of the framework -/
 
 /-- Deadlock freedom from the progress measure: non-terminal states can step. -/
 theorem ProgressMeasureData.deadlock_free {State : Type}

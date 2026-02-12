@@ -140,7 +140,7 @@ private theorem wellFormed_unfoldRec (g : GlobalType) (n : Nat) (hwf : g.wellFor
   -- Reduce to the recursor lemma.
   simpa [unfoldRec] using GlobalType.wellFormed_unfold_rec g n hwf
 
-/-! ### Unfold commuting for trans -/
+/-! ## Unfold commuting for trans -/
 
 /-- Helper: guarded mu case for trans_unfold_EQ2. -/
 private theorem trans_unfold_EQ2_mu_guarded

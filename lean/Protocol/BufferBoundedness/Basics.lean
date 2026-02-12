@@ -21,8 +21,8 @@ Solution Structure. We prove:
 The key insight is that coherence implies bounded buffer growth.
 -/
 
-/-!
-## Key Results
+
+/-! ## Key Results
 
 1. **Critical Buffer Size**: For any well-typed initial configuration C₀, there exists a
    critical buffer size B_c such that:

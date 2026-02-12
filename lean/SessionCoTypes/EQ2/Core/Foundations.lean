@@ -90,7 +90,7 @@ instance : CoinductiveRel Rel EQ2F := ⟨EQ2F_mono⟩
 def EQ2 : Rel :=
   (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩)
 
-/-! Shared coinduction aliases (see `CoinductiveRel`). -/
+/- Shared coinduction aliases (see `CoinductiveRel`). -/
 /-- Alias: EQ2 as gfp via CoinductiveRel. -/
 theorem EQ2_gfp : EQ2 = SessionCoTypes.CoinductiveRel.gfp (F := EQ2F) := rfl
 

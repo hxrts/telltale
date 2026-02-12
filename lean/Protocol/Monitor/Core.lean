@@ -16,8 +16,8 @@ Solution Structure. We define:
 4. Capability token interface for untrusted code interaction
 -/
 
-/-!
-## Overview
+
+/-! ## Overview
 
 The monitor is the trusted component that:
 1. Tracks protocol state (local types, in-flight messages, buffers)

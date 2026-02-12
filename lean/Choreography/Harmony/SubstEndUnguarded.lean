@@ -71,6 +71,8 @@ private theorem isFreeIn_subst_other_var (v t w : String) (repl : LocalTypeR)
 
 mutual
 /-- Free variables are preserved through substitution when not the substituted variable. -/
+
+
 theorem isFreeIn_subst_other (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
     (hvt : v ≠ t) (hfree : isFreeIn v e = true) :
     isFreeIn v (e.substitute t repl) = true := by
@@ -98,6 +100,8 @@ theorem isFreeIn_subst_other (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
 termination_by sizeOf e
 
 /-- Free variables in branches preserved through substitution. -/
+
+
 theorem isFreeInBranches_subst_other (bs : List BranchR) (v t : String)
     (repl : LocalTypeR) (hvt : v ≠ t) (hfree : isFreeInBranches v bs = true) :
     isFreeInBranches v (substituteBranches bs t repl) = true := by
@@ -121,6 +125,8 @@ end
 /-! ## Key Lemma: UnfoldsToEnd implies no free variables -/
 
 /-- Types satisfying UnfoldsToEnd have no free variables. -/
+
+
 theorem UnfoldsToEnd_no_free_vars (lt : LocalTypeR) (h : UnfoldsToEnd lt) (v : String) :
     isFreeIn v lt = false := by
   induction h with
@@ -140,6 +146,8 @@ theorem UnfoldsToEnd_no_free_vars (lt : LocalTypeR) (h : UnfoldsToEnd lt) (v : S
         exact absurd h_still_free (ih ▸ Bool.false_ne_true)
 
 /-- Substitution into a term satisfying UnfoldsToEnd is a no-op. -/
+
+
 theorem substitute_UnfoldsToEnd_eq (lt : LocalTypeR) (h : UnfoldsToEnd lt)
     (v : String) (repl : LocalTypeR) :
     lt.substitute v repl = lt := by
@@ -150,6 +158,8 @@ theorem substitute_UnfoldsToEnd_eq (lt : LocalTypeR) (h : UnfoldsToEnd lt)
 /-! ## Core Lemma: mu preserves UnfoldsToEnd -/
 
 /-- If X unfolds to .end, then .mu t X also unfolds to .end. -/
+
+
 theorem mu_preserves_unfolds_to_end (t : String) (body : LocalTypeR)
     (h : UnfoldsToEnd body) : UnfoldsToEnd (.mu t body) := by
   -- Unfold once and reuse the body witness.
@@ -206,6 +216,8 @@ private theorem substitute_end_unguarded_unfolds_to_end_mu
 
 /-- When `v` is unguarded in `lt`, substituting `.end` for `v` produces a type
     that unfolds to `.end`. -/
+
+
 theorem substitute_end_unguarded_unfolds_to_end (lt : LocalTypeR) (v : String)
     (hnotguard : lt.isGuarded v = false) :
     UnfoldsToEnd (lt.substitute v .end) := by
@@ -234,6 +246,8 @@ theorem substitute_end_unguarded_unfolds_to_end (lt : LocalTypeR) (v : String)
 /-- Substituting `.end` for an unguarded variable produces something EQ2 to `.end`.
 
     This is the main theorem that removes the extra assumption in Harmony.lean. -/
+
+
 theorem subst_end_unguarded_eq2_end (lt : LocalTypeR) (v : String)
     (hnotguard : lt.isGuarded v = false) :
     EQ2 (lt.substitute v .end) .end := by

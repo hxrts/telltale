@@ -16,8 +16,8 @@ Solution Structure. Repackage the FIFO preservation lemmas as model-specific
 wrappers for `CausalDelivery` and `LossyDelivery`.
 -/
 
-/-!
-# Coherence Preservation for Additional Delivery Models
+
+/-! # Coherence Preservation for Additional Delivery Models
 
 These lemmas specialize the FIFO preservation theorems to the named
 `CausalDelivery` and `LossyDelivery` models. The proofs are by rewriting to the

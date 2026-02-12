@@ -20,8 +20,8 @@ Solution Structure. We define:
 The key insight is that buffers/traces are keyed by directed edges, not endpoints.
 -/
 
-/-!
-- `Store`: Variable store mapping variables to runtime values
+
+/- `Store`: Variable store mapping variables to runtime values
 - `SEnv`: Type environment mapping variables to value types
 - `GEnv`: Session environment mapping endpoints to local types
 - `DEnv`: Delayed type environment for in-flight message traces per directed edge

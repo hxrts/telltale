@@ -27,11 +27,11 @@ Therefore:
 2. Per-edge coherence only involves one session
 3. Hence global coherence = conjunction over sessions of per-session coherence -/
 
-/-!
-This decomposition enables the frame rule: an instruction that only affects
-session `s` preserves `SessionCoherent s'` for all `s' ≠ s`.
 
-## Connection to Paper 3
+/- This decomposition enables the frame rule: an instruction that only affects
+session `s` preserves `SessionCoherent s'` for all `s' ≠ s`. -/
+
+/-! ## Connection to Paper 3
 
 Delegation provides the mechanism for coroutines to dynamically participate in
 multiple sessions. The `delegation_preserves_coherent` theorem (from Delegation.lean)

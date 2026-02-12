@@ -125,7 +125,7 @@ theorem HeadCoherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
       exact hRecv hEq.symm
     simpa [hLookupRecv] using hHead e hActivePre
 
-/-! ### ValidLabels helpers -/
+/-! ## ValidLabels helpers -/
 
 private lemma find?_isSome_of_label_mem {bs : List (Label × LocalType)} {ℓ : Label}
     (hMem : ℓ ∈ List.map Prod.fst bs) :

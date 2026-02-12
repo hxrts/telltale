@@ -12,8 +12,8 @@ Solution Structure. Provide hash-based load helpers and a `SafeUpdate`
 predicate aligned with runtime.md §10, leaving proofs as stubs.
 -/
 
-/-!
-# Task 21: Code Loading and Hot-Swap
+
+/-! # Task 21: Code Loading and Hot-Swap
 
 Dynamic code loading and safe protocol update from iris_runtime_2.md §10.
 
@@ -46,6 +46,8 @@ def code_signature_check {γ ε ν : Type} [GuardLayer γ] [EffectRuntime ε]
   let payload : Data := .string img.program.metadata.name
   VerificationModel.verifySignature img.signer payload img.signature
 
+/-! ## Code-Image Load Paths -/
+
 def loadTrusted {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -77,6 +79,8 @@ def loadUntrusted {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
   else
     (st, .verificationFailed "signature failed")
 
+/-! ## Safe Update Contract -/
+
 def SafeUpdate {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -87,6 +91,7 @@ def SafeUpdate {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
   -- V1 safe update: buffered traces agree and new type is communicative.
   (∀ r, Consume r current buffered = Consume r new_ buffered) ∧
   ReachesComm new_
+
 def hotSwap_preserves_coherent {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]

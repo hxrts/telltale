@@ -256,6 +256,7 @@ theorem renameValType_inj (ρ : SessionRenaming) {T1 T2 : ValType} :
         rfl
 
 /-- Renaming preserves value type equality tests. -/
+
 theorem renameValType_beq (ρ : SessionRenaming) (T1 T2 : ValType) :
     (renameValType ρ T1 == renameValType ρ T2) = (T1 == T2) := by
   by_cases h : T1 = T2
@@ -288,7 +289,7 @@ theorem renameEndpoint_inj (ρ : SessionRenaming) (e1 e2 : Endpoint) :
   rfl
 
 theorem preimageEdge_rename (ρ : SessionRenaming) (e : Edge) :
-    preimageEdge ρ (renameEdge ρ e) = some e := by
+  preimageEdge ρ (renameEdge ρ e) = some e := by
   unfold preimageEdge
   simp [renameEdge, ρ.left_inv e.sid]
 
@@ -475,6 +476,7 @@ lemma find?_rename_foldl (ρ : SessionRenaming) :
         simpa [List.lookup, hbeq, hupd] using ih'
 
 /-- Looking up a renamed edge in renamed buffers. -/
+
 theorem lookupBuf_rename (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) :
     lookupBuf (renameBufs ρ bufs) (renameEdge ρ e) =
       (lookupBuf bufs e).map (renameValue ρ) := by
@@ -494,6 +496,5 @@ theorem lookupBuf_rename (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) :
         beq_eq_false_iff_ne.mpr hne
       simp only [hbeq1, hbeq2]
       exact ih
-
 
 end

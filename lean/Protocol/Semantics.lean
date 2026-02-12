@@ -16,8 +16,8 @@ Solution Structure. We define:
 4. Edge-directed message passing with FIFO ordering
 -/
 
-/-!
-## Step Relations
+
+/-! ## Step Relations
 
 - `StepBase`: Head reductions (send, recv, select, branch, newSession, assign)
 - `Step`: Contextual closure (in seq left, par left, par right)

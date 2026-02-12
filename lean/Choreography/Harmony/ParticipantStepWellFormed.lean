@@ -57,6 +57,8 @@ private theorem allCommsNonEmptyBranches_of_forall
           have htail' := ih htail
           simp [allCommsNonEmptyBranches, hhead, htail']
 
+/-! ## Branch noSelfComm Aggregation -/
+
 private theorem noSelfCommBranches_of_forall
     (branches : List (Label × GlobalType))
     (h : ∀ b ∈ branches, b.2.noSelfComm = true) :
@@ -73,6 +75,8 @@ private theorem noSelfCommBranches_of_forall
             exact h b (by simp [hb])
           have htail' := ih htail
           simp [noSelfCommBranches, hhead, htail']
+
+/-! ## Branch Productivity Aggregation -/
 
 private theorem isProductiveBranches_of_forall
     (branches : List (Label × GlobalType)) (unguarded : List String)
@@ -141,6 +145,8 @@ private theorem comm_wellFormed_of_branches
   simp [GlobalType.wellFormed, GlobalType.allVarsBound, GlobalType.allCommsNonEmpty,
     GlobalType.noSelfComm, GlobalType.isProductive, hvars, hallcomms, hnoself, hprod, hne', hneq]
 
+/-! ## comm_wellFormed Structural Facts -/
+
 private lemma comm_sender_ne_receiver_of_wf {sender receiver : String} {branches : List (Label × GlobalType)}
     (hwf_comm : (GlobalType.comm sender receiver branches).wellFormed = true) : sender ≠ receiver := by
   -- noSelfComm rules out sender = receiver.
@@ -173,12 +179,16 @@ private theorem branchesStep_nonempty
       intro hnil
       cases hnil
 
+/-! ## Step Recursor Motives -/
+
 private abbrev StepWFMotive (g : GlobalType) (act : GlobalActionR) (g' : GlobalType) (_ : step g act g') : Prop :=
   g.wellFormed = true → g'.wellFormed = true
 
 private abbrev BranchWFMotive (bs : List (Label × GlobalType)) (act : GlobalActionR)
     (bs' : List (Label × GlobalType)) (_ : BranchesStep step bs act bs') : Prop :=
   (∀ p ∈ bs, p.2.wellFormed = true) → ∀ p ∈ bs', p.2.wellFormed = true
+
+/-! ## Step Constructor Cases -/
 
 private theorem step_preserves_wf_comm_head
     (sender receiver : String) (branches : List (Label × GlobalType))
@@ -218,6 +228,8 @@ private theorem step_preserves_wf_mu
     wellFormed_mu_unfold t body hwf_mu
   exact ih_step hsubst_wf
 
+/-! ## Branch Constructor Cases -/
+
 private theorem branches_wf_nil (_act : GlobalActionR)
     (_hwf_branches : ∀ p ∈ ([] : List (Label × GlobalType)), p.2.wellFormed = true) :
     ∀ p ∈ ([] : List (Label × GlobalType)), p.2.wellFormed = true := by
@@ -241,6 +253,8 @@ private theorem branches_wf_cons
       have hwf_tail : ∀ q ∈ rest, q.2.wellFormed = true := fun q hq =>
         hwf_rest q (List.mem_cons_of_mem (label, g) hq)
       exact ih_bstep hwf_tail p hp'
+
+
 
 theorem step_preserves_wellFormed (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hwf : g.wellFormed = true) : g'.wellFormed = true := by

@@ -39,7 +39,7 @@ Uses the pattern `_db0`, `_db1`, etc. based on context length. -/
 def freshName (ctx : NameOnlyContext) : String :=
   "_db" ++ toString ctx.length
 
-/-! ### Lemmas -/
+/-! ## Lemmas -/
 
 @[simp]
 theorem toList_fromList (l : List String) : (fromList l).toList = l := by
@@ -52,7 +52,7 @@ theorem toList_fromList (l : List String) : (fromList l).toList = l := by
 theorem length_fromList (l : List String) : (fromList l).length = l.length := by
   simp only [fromList, TypeContext.length, List.length_map]
 
-/-! ### Cons-like operation for easy context extension -/
+/-! ## Cons-like operation for easy context extension -/
 
 /-- Extend context with a name (prepends). This mirrors `::` on lists. -/
 def cons (v : String) (ctx : NameOnlyContext) : NameOnlyContext :=
@@ -66,7 +66,7 @@ instance : Coe (List String) NameOnlyContext where
 instance : Coe NameOnlyContext (List String) where
   coe ctx := ctx.toList
 
-/-! ### fromList cons lemma -/
+/-! ## fromList cons lemma -/
 
 /-- When we coerce `x :: ctx.toList`, we get `cons x ctx` after fromList.
     This bridges the List syntax to NameOnlyContext operations. -/
@@ -81,7 +81,7 @@ theorem fromList_cons_toList (x : String) (ctx : NameOnlyContext) :
   | nil => rfl
   | cons h t ih => simp [ih]
 
-/-! ### Operations matching List String -/
+/-! ## Operations matching List String -/
 
 /-- Get name at index (matches old NameContext.get?). -/
 def get? (ctx : NameOnlyContext) (i : Nat) : Option String :=
@@ -123,7 +123,7 @@ theorem empty_names : (TypeContext.empty : NameOnlyContext).names = [] := rfl
 @[simp]
 theorem empty_bindings : (TypeContext.empty : NameOnlyContext).bindings = [] := rfl
 
-/-! ### Induction Principle -/
+/-! ## Induction Principle -/
 
 /-- Induction principle for NameOnlyContext that mirrors List String induction.
     This allows `induction ctx using NameOnlyContext.induction` to work like
@@ -141,7 +141,7 @@ theorem induction {motive : NameOnlyContext → Prop}
       subst hu
       exact h_cons v ⟨tail⟩ ih
 
-/-! ### Append Operation -/
+/-! ## Append Operation -/
 
 /-- Append two NameOnlyContexts. -/
 def append (ctx1 ctx2 : NameOnlyContext) : NameOnlyContext :=
@@ -166,7 +166,7 @@ theorem append_names (ctx1 ctx2 : NameOnlyContext) :
 theorem append_bindings (ctx1 ctx2 : NameOnlyContext) :
     (ctx1 ++ ctx2).bindings = ctx1.bindings ++ ctx2.bindings := rfl
 
-/-! ### Nodup Lemmas -/
+/-! ## Nodup Lemmas -/
 
 theorem Nodup_empty : (TypeContext.empty : NameOnlyContext).Nodup := by
   simp [TypeContext.Nodup, TypeContext.names_empty, List.nodup_nil]
@@ -186,7 +186,7 @@ theorem notMem_of_Nodup_cons {v : String} {ctx : NameOnlyContext}
   simp only [TypeContext.Nodup, cons_names] at h
   exact (List.nodup_cons.mp h).1
 
-/-! ### Get/Name Lemmas -/
+/-! ## Get/Name Lemmas -/
 
 @[simp]
 theorem get?_cons_zero (v : String) (ctx : NameOnlyContext) :
@@ -229,7 +229,7 @@ theorem get?_lt {ctx : NameOnlyContext} {i : Nat} (h : i < ctx.length) :
           have h' : i < ctx.length := by simpa using h
           exact ih h'
 
-/-! ### IndexOf Lemmas -/
+/-! ## IndexOf Lemmas -/
 
 private theorem findIdx?_go_succ (p : String × Unit → Bool) (l : List (String × Unit)) (i : Nat) :
     List.findIdx?.go p l (i + 1) = Option.map Nat.succ (List.findIdx?.go p l i) := by
@@ -332,13 +332,13 @@ theorem indexOf_mem {ctx : NameOnlyContext} {v : String} (hmem : v ∈ ctx.names
     | some i => exact (h i hctx).elim
   exact (indexOf_eq_none_iff.mp hnone) hmem
 
-/-! ### Membership instance -/
+/-! ## Membership instance -/
 
 /-- String membership in NameOnlyContext: a string is in a context if it's in the names list. -/
 instance instMembershipStringNameOnlyContext : Membership String NameOnlyContext where
   mem := fun (ctx : NameOnlyContext) (v : String) => List.Mem v ctx.names
 
-/-! ### Roundtrip and Distribution Lemmas for Coercion -/
+/-! ## Roundtrip and Distribution Lemmas for Coercion -/
 
 /-- Roundtrip: fromList ∘ toList = id -/
 @[simp]

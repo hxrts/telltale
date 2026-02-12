@@ -6,8 +6,8 @@ import Protocol.Environments.RoleRenaming
 Coherence lemmas and invariants for session-environment evolution.
 -/
 
-/-!
-# Role Swap Renaming (Session-Local)
+
+/-! # Role Swap Renaming (Session-Local)
 
 Defines a bijective (swap) role renaming inside a fixed session and proves
 that coherence is preserved under this renaming. This is the minimal

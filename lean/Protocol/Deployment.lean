@@ -2,8 +2,8 @@ import Protocol.Deployment.Interface
 import Protocol.Deployment.Merge
 import Protocol.Deployment.Linking
 
-/-!
-# MPST Deployed Protocol Bundle
+
+/-! # MPST Deployed Protocol Bundle
 
 This module defines the structure for a deployed protocol: a bundle containing
 the protocol specification, projected local types, initial monitor state, and

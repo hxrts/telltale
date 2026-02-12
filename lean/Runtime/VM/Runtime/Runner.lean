@@ -1,8 +1,8 @@
 import Runtime.VM.Runtime.Scheduler
 import Runtime.VM.Semantics.ExecHelpers
 
-/-!
-# Scheduled Runner
+
+/-! # Scheduled Runner
 
 N-concurrent scheduler-driven execution with receiver unblocking.
 -/

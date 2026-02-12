@@ -167,7 +167,7 @@ theorem BisimF.mono : Monotone BisimF := by
 
 instance : CoinductiveRel Rel BisimF := ⟨BisimF.mono⟩
 
-/-! Shared coinduction aliases (see `CoinductiveRel`). -/
+Shared coinduction aliases (see `CoinductiveRel`). -/
 /-- Greatest fixed point of BisimF (coinductive bisimulation). -/
 def Bisim_gfp : Rel := SessionCoTypes.CoinductiveRel.gfp (F := BisimF)
 

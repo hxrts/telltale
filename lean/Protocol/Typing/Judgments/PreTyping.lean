@@ -15,13 +15,12 @@ Solution Structure. We define:
 3. `*_par_nG_irrel` lemmas for extensional treatment of the right index
 -/
 
-/-!
-Par typing uses an explicit split witness (`ParSplit`) and witness-oriented
+/- Par typing uses an explicit split witness (`ParSplit`) and witness-oriented
 inversion (`ParWitness`) so framed proofs can transport split identity without
 depending on ambient right-index bookkeeping. The right par index `nG` is
-treated extensionally via `*_par_nG_irrel` lemmas.
+treated extensionally via `*_par_nG_irrel` lemmas. -/
 
-## Key Judgments
+/-! ## Key Judgments
 
 - `HasTypeProcN n S G D P`: Process P is well-typed under environments S, G, D
   with maximum session ID n
@@ -214,7 +213,7 @@ inductive HasTypeProcPre : SEnv → OwnedEnv → GEnv → Process → Prop where
       HasTypeVal G v T →
       HasTypeProcPre Ssh Sown G (.assign x v)
 
-/-! ### Inversion Lemmas for Pre-Update Typing
+/-! ## Inversion Lemmas for Pre-Update Typing
 
 These lemmas directly extract type information from pre-update typing judgments.
 Reference: `work/effects/008.lean:274-300` -/
@@ -297,7 +296,7 @@ intrinsic to the typing judgment.
 3. **Coherence**: Uses existing `Coherent_send_preserved`, `Coherent_recv_preserved`
 4. **Soundness**: TypedStep refines Step -/
 
-/-! ### Pre-Update Typing with Post Environments -/
+/-! ## Pre-Update Typing with Post Environments -/
 
 /-- Pre-update style process typing with explicit post environments.
 
@@ -401,7 +400,7 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
         (OwnedEnv.updateLeft Sown x T) G [x] ∅
 
 
-/-! ### Inversion Helpers for Pre-Out Typing -/
+/-! ## Inversion Helpers for Pre-Out Typing -/
 
 /-- Frame-invariant witness for par split alignment at S-length `nS`. -/
 structure ParWitness (S : SEnv) (G : GEnv) (nS : Nat) where

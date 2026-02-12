@@ -5,8 +5,8 @@ import Protocol.Coherence.EdgeCoherence
 Coherence lemmas and invariants for session-environment evolution.
 -/
 
-/-!
-# MPST Coherence: Renaming
+
+/-! # MPST Coherence: Renaming
 
 This module proves coherence is preserved under session/role renaming.
 -/
@@ -20,6 +20,7 @@ Solution Structure. We prove:
 2. Lifting lemmas for GEnv/DEnv renaming
 3. Composition with the Conserved quantities view
 -/
+
 
 /-!
 In binary session types, coherence states that after consuming in-flight messages,

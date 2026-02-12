@@ -188,7 +188,7 @@ def starvation_free {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     | some c => (c.status = .ready ∨ c.status = .speculating) →
         ∃ cid' st', schedule st = some (cid', st')
 
-/-!
-Proof witnesses for scheduler properties (`*_holds`) live in:
+
+/- Proof witnesses for scheduler properties (`*_holds`) live in:
 `Runtime.Proofs.VM.Scheduler`.
 -/

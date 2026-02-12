@@ -49,7 +49,7 @@ theorem EQ2F_mono {R S : Rel}
         | exact ⟨h _ _ h1, h _ _ h2⟩
         | exact ⟨h1, BranchesRel_mono h h2⟩
 
-/-! NOTE: EQ2 transitivity is used with explicit LocalTypeR.WellFormed witnesses. -/
+NOTE: EQ2 transitivity is used with explicit LocalTypeR.WellFormed witnesses. -/
 
 theorem wf_tail_of_cons
     {lb : BranchR} {bs : List BranchR}

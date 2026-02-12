@@ -25,7 +25,7 @@ open SessionCoTypes.EQ2Props
 open SessionCoTypes.EQ2Paco
 open Paco
 open SessionTypes.Participation
-/-! ### Mu constructor agreement -/
+/-! ## Mu constructor agreement -/
 
 /-- Helper: `.end` cannot project to `.mu`. -/
 private theorem CProject_mu_implies_trans_mu_end (role v : String) (body : LocalTypeR)
@@ -75,7 +75,7 @@ private theorem CProject_mu_implies_trans_mu_mu (t : String) (gbody : GlobalType
   · have : False := by simpa using hend_eq
     exact this.elim
 
-/-! ### Mu constructor agreement -/
+/-! ## Mu constructor agreement: comm-role exclusions -/
 
 /-- Helper: sender role cannot project to `.mu`. -/
 private theorem CProject_mu_implies_trans_mu_comm_sender_contra
@@ -113,6 +113,8 @@ private theorem CProject_mu_implies_trans_mu_comm_other
     simpa using trans_comm_other sender receiver role (first :: rest) hrs hrr
   simpa [htrans] using htrans_mu
 
+/-! ## Mu constructor agreement: mutual recursion -/
+
 /- If CProject g role (.mu v body) holds, then trans g role has matching mu structure.
    Returns the global body and proof that trans produces .mu v (trans gbody role). -/
 mutual
@@ -143,6 +145,9 @@ termination_by (sizeOf g) * 3
 decreasing_by
     all_goals
       simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
+
+/-! ## Mu constructor agreement: comm case -/
+
 /-- Helper: comm case for mu projection agreement. -/
 private theorem CProject_mu_implies_trans_mu_comm (sender receiver : String)
       (gbs : List (Label × GlobalType)) (role v : String) (body : LocalTypeR)
@@ -169,6 +174,9 @@ termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
 decreasing_by
     all_goals
       simp [hgb, GlobalType.comm.sizeOf_spec]
+
+/-! ## Mu constructor agreement: main theorem -/
+
 /-- If CProject g role (.mu v body) holds, then trans g role has matching mu structure.
       Returns the global body and proof that trans produces `.mu v (trans gbody role)`. -/
 theorem CProject_mu_implies_trans_mu (g : GlobalType) (role : String)

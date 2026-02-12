@@ -44,6 +44,8 @@ private theorem proj_trans_other_step_mu_chain
   exact EQ2_trans_wf h2 h3 hWFb hWFunfold hWFc
 
 /-- Helper: mu case for non-participants. -/
+
+
 theorem proj_trans_other_step_mu
     (t : String) (body : GlobalType) (act : GlobalActionR) (g' : GlobalType)
     (hstep_sub : step (body.substitute t (.mu t body)) act g')
@@ -75,6 +77,8 @@ theorem proj_trans_other_step_mu
   exact EQ2_trans_wf h1 h23 hWFa hWFb hWFc
 
 /-- Helper: BranchesStep.nil case. -/
+
+
 theorem proj_trans_other_step_branches_nil (act : GlobalActionR) (role : String)
     (_hns : role ≠ act.sender) (_hnr : role ≠ act.receiver) :
     BranchesRel EQ2 (projTransBranches [] role) (projTransBranches [] role) := by
@@ -96,6 +100,8 @@ private abbrev BranchIH (rest rest' : List (Label × GlobalType)) (act : GlobalA
         BranchesRel EQ2 (projTransBranches rest' role) (projTransBranches rest role)
 
 /-- Helper: BranchesStep.cons case. -/
+
+
 theorem proj_trans_other_step_branches_cons
     (label : Label) (g g' : GlobalType) (rest rest' : List (Label × GlobalType))
     (act : GlobalActionR) (ih_step : StepIH g g' act) (ih_bstep : BranchIH rest rest' act)
@@ -116,6 +122,8 @@ theorem proj_trans_other_step_branches_cons
       (fun p hp => hblind p (List.mem_cons_of_mem (label, g) hp)) role hns hnr
 
 /-- Motive for non-participant step preservation. -/
+
+
 abbrev StepMotive (g : GlobalType) (act : GlobalActionR) (g' : GlobalType) (_ : step g act g') : Prop :=
   g.isClosed = true → g.wellFormed = true →
   isBlind g = true →
@@ -123,6 +131,8 @@ abbrev StepMotive (g : GlobalType) (act : GlobalActionR) (g' : GlobalType) (_ : 
     EQ2 (projTrans g' role) (projTrans g role)
 
 /-- Motive for branch-wise non-participant preservation. -/
+
+
 abbrev BranchMotive (bs : List (Label × GlobalType)) (act : GlobalActionR)
     (bs' : List (Label × GlobalType)) (_ : BranchesStep step bs act bs') : Prop :=
   (∀ p ∈ bs, p.2.isClosed = true) →

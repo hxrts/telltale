@@ -16,8 +16,8 @@ Solution Structure. We define:
 4. Structural congruence for parallel composition
 -/
 
-/-!
-The process language is similar to the binary session types language,
+
+/- The process language is similar to the binary session types language,
 but operations are multiparty-aware:
 - `send k x`: send value in x through channel k (target role is in the type)
 - `recv k x`: receive into x through channel k (source role is in the type)

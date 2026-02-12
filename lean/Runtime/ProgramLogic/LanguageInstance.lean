@@ -1,8 +1,8 @@
 import Runtime.VM.API
 import IrisExtractionInstance
 
-/-!
-# Task 12: Language Instance
+
+/-! # Task 12: Language Instance
 
 Instantiate the Iris `Language` typeclass for the bytecode VM.
 Connects VM execution to Iris program logic.

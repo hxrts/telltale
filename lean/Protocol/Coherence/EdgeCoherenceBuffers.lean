@@ -39,7 +39,7 @@ inductive HasTypeVal (G : GEnv) : Value → ValType → Prop where
       lookupG G e = some L →
       HasTypeVal G (.chan e) (.chan e.sid e.role)
 
-/-! ### Value Type Inversion Lemmas
+/-! ## Value Type Inversion Lemmas
 
 These lemmas extract concrete value forms from typing judgments.
 Reference: `work/effects/008.lean:313-324, 521-524` -/

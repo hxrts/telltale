@@ -88,6 +88,8 @@ def ObservationalAdequacyModuloEnvelope_consensus
     (AbstractRun RuntimeRun : Run State → Prop) : Prop :=
   ∀ abs rt, AbstractRun abs → RuntimeRun rt → Envelope_consensus observe abs rt
 
+/-! ## Core Envelope Forms: Admission Hooks -/
+
 /-- Consensus-family eligibility based on existing protocol-space classifier. -/
 def consensusFamilyAdmissible (p : ProtocolSpec) : Bool :=
   inBFTSpace p || inNakamotoSpace p || inHybridSpace p
@@ -158,6 +160,8 @@ def CompositionalEnvelopeBound_consensus
       committeeBoundSum committees component ref impl +
         crossCommitteeBoundSum pairs interaction ref impl
 
+/-! ## Compositional Committee Bounds: Theorems -/
+
 /-- Cross-committee interaction sum collapses to zero under explicit non-interference. -/
 theorem crossCommitteeBoundSum_eq_zero_of_nonInterference
     {State : Type u}
@@ -201,6 +205,8 @@ theorem compositionalExactness_under_nonInterference_consensus
     crossCommitteeBoundSum_eq_zero_of_nonInterference pairs interaction hPairs hNI ref impl
   have hTotal := hComp ref impl
   simpa [hInteractionZero] using hTotal
+
+/-! ## `d_int` Bounds and Theorem Objects -/
 
 /-- Representative consensus families for `d_int` theorem-object bounds. -/
 inductive ConsensusModelClass where
@@ -255,6 +261,8 @@ def mkDIntTheoremObject
   lowerLEUpper := dIntLower_le_dIntUpper p
   declared := hDeclared
 
+/-! ## `d_int` Bounds and Theorem Objects: Family Cases -/
+
 /-- Representative class theorem: quorum model `d_int` bounds. -/
 theorem dIntBounds_quorum
     (p : ProtocolSpec)
@@ -277,6 +285,8 @@ theorem dIntBounds_coupled
     dIntLowerBound p = p.f + p.adversarialWeightPermille + 1 ∧
     dIntUpperBound p = p.n + (p.f + p.adversarialWeightPermille + 1) := by
   simp [dIntLowerBound, dIntUpperBound, consensusModelClassOf, hCert]
+
+/-! ## Capability Admission Wrappers -/
 
 /-- Admissibility relation induced by a consensus envelope budget. -/
 def CapabilityAdmissible_consensus (envelopeBudget : DiffBudget) (d : DiffBudget) : Prop :=
@@ -329,6 +339,8 @@ theorem admissionCompleteness_inferred_consensus (p : ProtocolSpec) :
   · intro hAdmit
     exact hAdmit
 
+/-! ## Premise Bundles and Certified Package -/
+
 /-- Premises for consensus envelope statements over an existing `ProtocolSpec`. -/
 structure Premises
     {State : Type u} {Obs : Type v}
@@ -355,6 +367,8 @@ structure Premises
     EnvelopeRealizability_consensus observe RefRun ImplRun
   envelopeMaximalityWitness :
     EnvelopeMaximality_consensus observe RefRun ImplRun
+
+/-! ## Premise Bundles and Certified Package: Derived Theorems -/
 
 /-- Exact envelope characterization follows from protocol-aligned premises. -/
 theorem exactEnvelope_consensus_of_premises

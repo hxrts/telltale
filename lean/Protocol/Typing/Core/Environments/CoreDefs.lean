@@ -16,8 +16,7 @@ Solution Structure. We define:
 4. Linear context management for channel resources
 -/
 
-/-!
-## Key Judgments
+/-! ## Key Judgments
 
 - `HasTypeProcN n S G D P`: Process P is well-typed under environments S, G, D
   with maximum session ID n
@@ -50,7 +49,7 @@ section
 
 /-! ## Process Typing Judgment -/
 
-/-! ### Disjointness + Ownership/Footprints -/
+/-! ## Disjointness + Ownership/Footprints -/
 
 /-- Session type environment disjointness.
     Two environments are disjoint if they have no session IDs in common. -/

@@ -238,7 +238,7 @@ theorem SessionStore.lookupTrace_updateTrace_ne {store : SessionStore ν} {edge 
         simp [SessionStore.updateTrace, SessionStore.lookupBuffer, hsid_edge, hsid_ne]
       · simp [SessionStore.updateTrace, SessionStore.lookupBuffer, hsid, hsid_edge, ih]
 
-/-! ### Session consistency predicates -/
+/-! ## Session consistency predicates -/
 
 /-- A session state is consistent if all endpoints in localTypes have the session's sid,
     and all edges in traces have the session's sid. -/
@@ -269,7 +269,7 @@ theorem SessionState.traces_find?_none_of_sid_ne {st : SessionState ν} {edge : 
   have hEq := hCons.2 edge h
   exact hne hEq
 
-/-! Helper lemmas for DEnv updates. -/
+/-! ## DEnv Update Helpers -/
 
 theorem DEnv_find?_updateD_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
     (updateD env e ts).find? e' = env.find? e' := by
@@ -455,7 +455,7 @@ theorem SessionStore.updateTrace_preserves_consistent {store : SessionStore ν} 
           | inr hmem' => exact ⟨st'', hmem'⟩
         exact ih hTlCons hTlMem hmem
 
-/-! ### toGEnv/toDEnv under updates
+/-! ## toGEnv/toDEnv under updates
 
 Follow-on lemmas are in `Runtime.Resources.Arena.EnvProjectionLemmas`.
 -/

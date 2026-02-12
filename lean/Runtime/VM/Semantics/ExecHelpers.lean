@@ -74,6 +74,8 @@ def edgeFrom (sender : Role) (ep : Endpoint) : Edge :=
   -- Build a directed edge to this endpoint from a sender.
   { sid := ep.sid, sender := sender, receiver := ep.role }
 
+/-! ## Buffer helpers: topology checks -/
+
 def edgePartitioned {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -168,6 +170,8 @@ def signedBuffersEnsure {ν : Type u} [VerificationModel ν]
     (bufs : SignedBuffers ν) (edges : List Edge) : SignedBuffers ν :=
   -- Ensure empty entries for a list of edges.
   edges.foldl (fun acc e => signedBufferEnsure acc e) bufs
+
+/-! ## Signed buffer helpers: enqueue operations -/
 
 def bufferEffectiveCapacity (cfg : BufferConfig) : Nat :=
   -- V1 treats resize as "preallocated to max".
@@ -338,6 +342,8 @@ def pack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   -- Bundle the updated coroutine, state, and result.
   { coro := coro, st := st, res := res }
 
+/-! ## Result helpers: status-specific packs -/
+
 def faultPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -385,6 +391,8 @@ def haltPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   -- Mark the coroutine as done.
   let coro' := advancePc { coro with status := .done }
   pack coro' st (mkRes .halted none)
+
+/-! ## Result helpers: cost accounting -/
 
 def chargeCost {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]

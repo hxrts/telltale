@@ -212,7 +212,7 @@ inductive CanRecvPathBounded : ℕ → String → List BranchR → LocalTypeR �
       CanRecvPathBounded n p bs (body.substitute t (.mu t body)) →
       CanRecvPathBounded (n + 1) p bs (.mu t body)
 
-/-! ### Send/Recv Duality for Bounded Paths
+/-! ## Send/Recv Duality for Bounded Paths
 
 These lemmas establish the duality between `CanSendPathBounded` and `CanRecvPathBounded`,
 allowing recv lemmas to be derived from send lemmas. -/
@@ -256,7 +256,7 @@ theorem CanRecvPathBounded_iff_CanSendPathBounded_dual {n : ℕ} {p : String}
     simp only [dualBranches_dualBranches, LocalTypeR.dual_dual] at h'
     exact h'
 
-/-! ### Conversions between bounded and unbounded predicates -/
+/-! ## Conversions between bounded and unbounded predicates -/
 
 /-- Bounded end path implies unbounded. -/
 theorem UnfoldPathEndBounded.toUnfoldsToEnd {n : ℕ} {a : LocalTypeR}

@@ -97,6 +97,8 @@ def labelFromJson (j : Json) : Except String Label := do
 
 /-! ## GlobalType Serialization -/
 
+/-! ## GlobalType Encoding -/
+
 /-- Serialize a GlobalType to JSON. -/
 def globalTypeToJson : GlobalType → Json
   | .end => Json.mkObj [("kind", "end")]
@@ -119,6 +121,8 @@ def globalTypeToJson : GlobalType → Json
         ("delegatee", Json.str delegatee), ("session_id", Json.num sessionId),
         ("role", Json.str role), ("continuation", globalTypeToJson cont)]
 termination_by g => sizeOf g
+
+/-! ## GlobalType Decoding -/
 
 /-- Deserialize a GlobalType from JSON with fuel for termination. -/
 def globalTypeFromJsonAux (fuel : Nat) (j : Json) : Except String GlobalType :=
@@ -159,6 +163,8 @@ def globalTypeFromJson (j : Json) : Except String GlobalType :=
 
 /-! ## LocalTypeR Serialization -/
 
+/-! ## LocalTypeR Encoding -/
+
 /-- Serialize a LocalTypeR to JSON. -/
 def localTypeRToJson : LocalTypeR → Json
   | .end => Json.mkObj [("kind", "end")]
@@ -185,6 +191,8 @@ def localTypeRToJson : LocalTypeR → Json
   | .var name =>
       Json.mkObj [("kind", "var"), ("name", Json.str name)]
 termination_by lt => sizeOf lt
+
+/-! ## LocalTypeR Decoding -/
 
 /-- Deserialize a LocalTypeR from JSON with fuel for termination. -/
 def localTypeRFromJsonAux (fuel : Nat) (j : Json) : Except String LocalTypeR :=

@@ -39,7 +39,7 @@ namespace TypeContext
 
 variable {V T : Type}
 
-/-! ### Core Operations -/
+/-! ## Core Operations -/
 
 /-- Empty context. -/
 def empty : TypeContext V T := ⟨[]⟩
@@ -57,7 +57,7 @@ def names (ctx : TypeContext V T) : List V := ctx.bindings.map Prod.fst
 /-- Extract all values. -/
 def values (ctx : TypeContext V T) : List T := ctx.bindings.map Prod.snd
 
-/-! ### Lookup Operations -/
+/-! ## Lookup Operations -/
 
 /-- Look up a variable and return its associated value. -/
 def lookup [DecidableEq V] (ctx : TypeContext V T) (v : V) : Option T :=
@@ -79,12 +79,12 @@ def getVal? (ctx : TypeContext V T) (i : Nat) : Option T :=
 def getName? (ctx : TypeContext V T) (i : Nat) : Option V :=
   ctx.bindings[i]? |>.map Prod.fst
 
-/-! ### Properties -/
+/-! ## Properties -/
 
 /-- Context has no duplicate variable names. -/
 def Nodup [DecidableEq V] (ctx : TypeContext V T) : Prop := ctx.names.Nodup
 
-/-! ### Basic Lemmas -/
+/-! ## Basic Lemmas -/
 
 @[simp]
 theorem length_empty : (empty : TypeContext V T).length = 0 := rfl
@@ -119,14 +119,14 @@ theorem mem_names_extend_of_mem (ctx : TypeContext V T) (v w : V) (t : T)
   right
   exact h
 
-/-! ### IndexOf Lemmas -/
+/-! ## IndexOf Lemmas -/
 
 theorem indexOf_extend_eq [DecidableEq V] (ctx : TypeContext V T) (v : V) (t : T) :
     (ctx.extend v t).indexOf v = some 0 := by
   simp only [extend, indexOf, List.findIdx?]
   simp only [List.findIdx?.go, decide_eq_true_eq, ↓reduceIte]
 
-/-! ### Get Lemmas -/
+/-! ## Get Lemmas -/
 
 theorem getName?_lt (ctx : TypeContext V T) (i : Nat) (h : i < ctx.length) :
     ∃ v, ctx.getName? i = some v := by

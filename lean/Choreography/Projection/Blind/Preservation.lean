@@ -44,6 +44,8 @@ theorem isBlind_step_comm_head {sender receiver : String} {branches : List (Labe
     isBlind cont = true :=
   isBlind_of_mem_branches hblind hmem
 
+/-! ## Substitution Preservation: Branch Auxiliary -/
+
 /-- Helper: isBlindBranches is preserved by substitution.
     Uses well-founded recursion on branch list size. -/
 private theorem isBlindBranches_substitute_aux (bs : List (Label × GlobalType))
@@ -58,19 +60,89 @@ private theorem isBlindBranches_substitute_aux (bs : List (Label × GlobalType))
       simp only [SessionTypes.GlobalType.substituteBranches, isBlindBranches, Bool.and_eq_true]
       simp only [isBlindBranches, Bool.and_eq_true] at hbs
       constructor
-      · -- isBlind (cont.substitute t repl)
-        have hsize : sizeOf cont < sizeOf ((label, cont) :: rest) := by
+      · have hsize : sizeOf cont < sizeOf ((label, cont) :: rest) := by
           simp only [List.cons.sizeOf_spec, Prod.mk.sizeOf_spec]
           omega
         exact ih cont hsize hbs.1
-      · -- isBlindBranches (substituteBranches rest t repl)
-        have hrest_size : ∀ (g : GlobalType), sizeOf g < sizeOf rest →
+      · have hrest_size : ∀ (g : GlobalType), sizeOf g < sizeOf rest →
             sizeOf g < sizeOf ((label, cont) :: rest) := by
           intro g hg
           simp only [List.cons.sizeOf_spec, Prod.mk.sizeOf_spec]
           omega
         exact isBlindBranches_substitute_aux rest t repl hrepl hrepl_closed hbs.2
           (fun g hg hblind => ih g (hrest_size g hg) hblind)
+
+/-! ## Substitution Preservation: Uniformity Helpers -/
+
+/-! ## Uniformity Helper: Rest -/
+
+/-- Uniformity over branch tails is preserved by substitution. -/
+private theorem branchesUniformFor_substitute_rest
+    (rest : List (Label × GlobalType)) (cont : GlobalType)
+    (role t : String) (repl : GlobalType)
+    (hrepl_closed : repl.isClosed = true)
+    (hrest_uniform :
+      rest.all (fun p => localTypeRBEq (Trans.trans p.2 role) (Trans.trans cont role)) = true) :
+    (SessionTypes.GlobalType.substituteBranches rest t repl).all
+      (fun p => localTypeRBEq (Trans.trans p.2 role) (Trans.trans (cont.substitute t repl) role)) = true := by
+  induction rest with
+  | nil =>
+      simp [SessionTypes.GlobalType.substituteBranches]
+  | cons rhd rtl ih =>
+      simp only [SessionTypes.GlobalType.substituteBranches, List.all, Bool.and_eq_true]
+      simp only [List.all, Bool.and_eq_true] at hrest_uniform
+      constructor
+      · apply (localTypeRBEq_eq_true_iff _ _).2
+        have heq : Trans.trans rhd.2 role = Trans.trans cont role :=
+          localTypeRBEq_eq_true hrest_uniform.1
+        have h1 : Trans.trans (rhd.2.substitute t repl) role =
+            (Trans.trans rhd.2 role).substitute t (Trans.trans repl role) :=
+          ProjSubst.proj_subst rhd.2 t repl role hrepl_closed
+        have h2 : Trans.trans (cont.substitute t repl) role =
+            (Trans.trans cont role).substitute t (Trans.trans repl role) :=
+          ProjSubst.proj_subst cont t repl role hrepl_closed
+        rw [h1, h2, heq]
+      · exact ih hrest_uniform.2
+
+/-! ## Uniformity Helper: Branches -/
+
+/-- Uniformity on branches is preserved by substitution. -/
+private theorem branchesUniformFor_substitute
+    (branches : List (Label × GlobalType))
+    (role t : String) (repl : GlobalType)
+    (hrepl_closed : repl.isClosed = true)
+    (horiginal : branchesUniformFor branches role = true) :
+    branchesUniformFor (SessionTypes.GlobalType.substituteBranches branches t repl) role = true := by
+  simp only [branchesUniformFor] at horiginal ⊢
+  cases branches with
+  | nil =>
+      simp [SessionTypes.GlobalType.substituteBranches]
+  | cons head rest =>
+      cases head with
+      | mk label cont =>
+          have hrest_uniform :
+              rest.all (fun p => localTypeRBEq (Trans.trans p.2 role) (Trans.trans cont role)) = true := by
+            simpa [branchesUniformFor] using horiginal
+          simpa [SessionTypes.GlobalType.substituteBranches] using
+            branchesUniformFor_substitute_rest rest cont role t repl hrepl_closed hrest_uniform
+
+/-! ## Uniformity Helper: commBlindFor -/
+
+/-- commBlindFor is preserved by uniform substitution in branches. -/
+private theorem commBlindFor_substitute
+    (sender receiver : String) (branches : List (Label × GlobalType))
+    (t : String) (repl : GlobalType)
+    (hcomm : commBlindFor sender receiver branches = true)
+    (hrepl_closed : repl.isClosed = true) :
+    commBlindFor sender receiver (SessionTypes.GlobalType.substituteBranches branches t repl) = true := by
+  simp only [commBlindFor]
+  rw [decide_eq_true_iff]
+  intro role hns hnr
+  have horiginal : branchesUniformFor branches role = true := by
+    exact (of_decide_eq_true hcomm) role hns hnr
+  exact branchesUniformFor_substitute branches role t repl hrepl_closed horiginal
+
+/-! ## Substitution Preservation: Main Theorem -/
 
 /-- Substitution preserves blindness.
 
@@ -85,7 +157,8 @@ theorem isBlind_substitute (g : GlobalType) (t : String) (repl : GlobalType)
     (hrepl_closed : repl.isClosed = true) :
     isBlind (g.substitute t repl) = true := by
   match g with
-  | .end => simp [GlobalType.substitute, isBlind]
+  | .end =>
+      simp [GlobalType.substitute, isBlind]
   | .var s =>
       simp only [GlobalType.substitute]
       split
@@ -103,70 +176,8 @@ theorem isBlind_substitute (g : GlobalType) (t : String) (repl : GlobalType)
       have hblind_comm := hg
       simp only [isBlind, Bool.and_eq_true] at hblind_comm
       constructor
-      · -- commBlindFor preserved: uniformity is preserved under uniform substitution
-        simp only [commBlindFor]
-        rw [decide_eq_true_iff]
-        intro role hns hnr
-        have horiginal : branchesUniformFor branches role = true := by
-          have hdec := of_decide_eq_true hblind_comm.1
-          exact hdec role hns hnr
-        -- Show uniformity is preserved under substitution
-        simp only [branchesUniformFor] at horiginal ⊢
-        cases hbranches : SessionTypes.GlobalType.substituteBranches branches t repl with
-        | nil => simp
-        | cons head' rest' =>
-            -- The substituted branches have the same structure
-            cases horiginal_branches : branches with
-            | nil =>
-                -- branches = [] means substituteBranches = []
-                simp [SessionTypes.GlobalType.substituteBranches, horiginal_branches] at hbranches
-            | cons head rest =>
-                cases head with
-                | mk label cont =>
-                    -- substituteBranches ((l,c)::rest) = (l, c.sub)::substituteBranches rest
-                    simp [SessionTypes.GlobalType.substituteBranches, horiginal_branches] at hbranches
-                    cases head' with
-                    | mk label' cont' =>
-                        simp only [Prod.mk.injEq] at hbranches
-                        have hlabel : label' = label := hbranches.1.1.symm
-                        have hcont : cont' = cont.substitute t repl := hbranches.1.2.symm
-                        have hrest' : rest' = SessionTypes.GlobalType.substituteBranches rest t repl := hbranches.2.symm
-                        subst hlabel hcont hrest'
-                        -- Need: rest'.all (fun p => localTypeRBEq (trans p.2 role) (trans cont' role))
-                        -- Original: rest.all (fun p => localTypeRBEq (trans p.2 role) (trans cont role)) = true
-                        have hrest_uniform :
-                            rest.all (fun p => localTypeRBEq (Trans.trans p.2 role) (Trans.trans cont role)) = true := by
-                          simpa [branchesUniformFor, horiginal_branches] using horiginal
-                        -- For each p in rest, trans p.2 role = trans cont role
-                        -- After substitution, for each p' in rest', trans p'.2 role = trans cont' role
-                        -- where p'.2 = p.2.substitute t repl and cont' = cont.substitute t repl
-                        -- This follows if substitution commutes with trans uniformly
-                        -- Since all original projections are equal, and substitution is uniform,
-                        -- all substituted projections are also equal
-                        clear horiginal hbranches horiginal_branches hblind_comm hg
-                        induction rest with
-                        | nil => simp [SessionTypes.GlobalType.substituteBranches]
-                        | cons rhd rtl ih_rest =>
-                            simp only [SessionTypes.GlobalType.substituteBranches, List.all, Bool.and_eq_true]
-                            simp only [List.all, Bool.and_eq_true] at hrest_uniform
-                            constructor
-                            · -- localTypeRBEq on substituted projections is true
-                              apply (localTypeRBEq_eq_true_iff _ _).2
-                              -- From hrest_uniform.1: trans rhd.2 role = trans cont role
-                              have heq : Trans.trans rhd.2 role = Trans.trans cont role :=
-                                localTypeRBEq_eq_true hrest_uniform.1
-                              -- Use proj_subst to show substitution commutes with trans
-                              have h1 : Trans.trans (rhd.2.substitute t repl) role =
-                                  (Trans.trans rhd.2 role).substitute t (Trans.trans repl role) :=
-                                ProjSubst.proj_subst rhd.2 t repl role hrepl_closed
-                              have h2 : Trans.trans (cont.substitute t repl) role =
-                                  (Trans.trans cont role).substitute t (Trans.trans repl role) :=
-                                ProjSubst.proj_subst cont t repl role hrepl_closed
-                              -- Since trans rhd.2 role = trans cont role, the substituted results are equal
-                              rw [h1, h2, heq]
-                            · exact ih_rest hrest_uniform.2
-      · -- isBlindBranches preserved
-        have hsize : ∀ g, sizeOf g < sizeOf branches →
+      · exact commBlindFor_substitute sender receiver branches t repl hblind_comm.1 hrepl_closed
+      · have hsize : ∀ g, sizeOf g < sizeOf branches →
             isBlind g = true → isBlind (g.substitute t repl) = true := by
           intro g hg_size hg_blind
           have hcomm_size : sizeOf branches < sizeOf (GlobalType.comm sender receiver branches) := by
@@ -177,11 +188,12 @@ theorem isBlind_substitute (g : GlobalType) (t : String) (repl : GlobalType)
           exact isBlind_substitute g t repl hg_blind hrepl hrepl_closed
         exact isBlindBranches_substitute_aux branches t repl hrepl hrepl_closed hblind_comm.2 hsize
   | .delegate p q sid r cont =>
-      -- Delegate: blindness is preserved in the continuation.
       simp only [GlobalType.substitute, isBlind]
       have hcont : isBlind cont = true := isBlind_delegate_cont hg
       exact isBlind_substitute cont t repl hcont hrepl hrepl_closed
 termination_by g
+
+/-! ## Step Preservation on Branch Lists -/
 
 /-- BranchesStep preserves isBlindBranches.
 

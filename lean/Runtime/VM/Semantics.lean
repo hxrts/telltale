@@ -11,8 +11,8 @@ import Runtime.VM.Semantics.Exec
 
 set_option autoImplicit false
 
-/-!
-# Runtime.VM.Semantics
+
+/-! # Runtime.VM.Semantics
 
 Operational and denotational instruction semantics for VM execution.
 -/

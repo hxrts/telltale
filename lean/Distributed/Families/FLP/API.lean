@@ -49,6 +49,8 @@ structure ImpossibilityProtocol where
     ¬ TerminatesOnAllFairRuns model premises.FairRun :=
       impossibility_of_assumptions assumptions premises
 
+/-! ## Certified Bundle Extractors -/
+
 /-- Extract the FLP lower-bound theorem from a certified protocol bundle. -/
 theorem lowerBound_of_protocol (P : LowerBoundProtocol) :
     ∃ run, P.premises.FairRun run ∧ ∀ n, P.premises.Uncommitted (run n) :=

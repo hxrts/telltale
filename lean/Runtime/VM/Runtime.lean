@@ -7,8 +7,8 @@ import Runtime.VM.Runtime.Json
 
 set_option autoImplicit false
 
-/-!
-# Runtime.VM.Runtime
+
+/-! # Runtime.VM.Runtime
 
 Runtime orchestration layer: monitor, loading, scheduler/runner, failure model,
 and JSON interop.

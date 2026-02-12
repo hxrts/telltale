@@ -166,7 +166,7 @@ unfold-then-substitute.
 
 The proof proceeds by case analysis on `t`:
 
-### Non-mu cases (end, var, send, recv)
+## Non-mu cases (end, var, send, recv)
 
 For these constructors, `unfold` is the identity function:
 - `t.unfold = t`
@@ -175,7 +175,7 @@ For these constructors, `unfold` is the identity function:
 
 Both sides are definitionally equal, so `EQ2_refl` suffices.
 
-### Mu case (mu s body)
+## Mu case (mu s body)
 
 This is where the interesting confluence happens. Let `M = mu s body`:
 

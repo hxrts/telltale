@@ -4,7 +4,8 @@ import Semantics.EnvStep
 import Choreography.Harmony
 import SessionCoTypes.EQ2
 
-/-!
+
+/-
 The Problem. Show that typing is preserved by operational steps: when a
 well-typed configuration steps, its resulting configuration remains well-typed.
 

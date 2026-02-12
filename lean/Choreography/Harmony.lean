@@ -15,7 +15,7 @@ keeping each proof family isolated while presenting one cohesive API.
 
 /-! ## Notes
 
-### Projection Coherence
+## Projection Coherence
 
 These lemmas establish that projection is coherent with stepping:
 after a global step, the projected environment correctly reflects
@@ -38,7 +38,7 @@ We can prove this inductively on the branch list structure by showing that
 consecutive branches project coherently, which composes to full coherence.
 This approach uses only the structure of trans without requiring CProject proofs.
 
-### Substitution Commutation
+## Substitution Commutation
 
 The core coinductive property: projection (via trans) commutes with global mu-substitution.
 
@@ -48,7 +48,7 @@ For any GlobalType g, recursion variable t, and mu-body G (where G = mu t g for 
 This is the "projection commutes with substitution" lemma (Coq: `full_eunf_subst`).
 The property requires coinductive reasoning because branch continuations recurse indefinitely.
 
-### ProjSubstRel Postfixpoint Proof Notes
+## ProjSubstRel Postfixpoint Proof Notes
 
 ProjSubstRel is a post-fixpoint of EQ2F (with EQ2 as accumulator).
 
@@ -69,7 +69,7 @@ The proof proceeds by case analysis on the GlobalType witness:
     - empty branches: both .end ✓
     - non-empty: recursive call on continuation subterm ✓
 
-### trans_subst_comm intent
+## trans_subst_comm intent
 
 Projection commutes with substitution.
 
@@ -81,7 +81,7 @@ when fully unfolded.
 
 **Coq reference:** `full_eunf_subst` in `coLocal.v`
 
-### EQ2 transitivity + subst_end_unguarded_eq2_end
+## EQ2 transitivity + subst_end_unguarded_eq2_end
 
 EQ2 transitivity now uses `EQ2_trans_wf` from EQ2Props (Bisim detour).
 This replaces the prior `EQ2_trans` path and requires explicit

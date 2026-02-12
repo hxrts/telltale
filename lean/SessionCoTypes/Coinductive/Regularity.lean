@@ -2,9 +2,15 @@ import Mathlib
 import SessionCoTypes.Coinductive.LocalTypeC
 import SessionCoTypes.Coinductive.Observable
 
+/-! # SessionCoTypes.Coinductive.Regularity
+
+Reachability and regularity infrastructure for coinductive local types.
+-/
+
 set_option linter.dupNamespace false
 
-/-!
+
+/-
 The Problem. Coinductive types can represent infinite trees, but we often need
 finite representations (e.g., to convert back to inductive types). A coinductive
 type is "regular" if it has only finitely many distinct reachable subterms.

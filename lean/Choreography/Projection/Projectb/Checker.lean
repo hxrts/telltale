@@ -3,7 +3,8 @@ import SessionCoTypes.CoinductiveRel
 import Choreography.Projection.Trans.Core
 import SessionTypes.Participation
 
-/-!
+
+/-
 The Problem. Define a coinductive projection relation CProject that captures when a global
 type g projects to a local type e for a given role. The challenge is twofold:
 1. Projection is inherently coinductive: recursive types unfold infinitely, so we need
@@ -111,6 +112,8 @@ theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
   simp only [sizeOf, GlobalType._sizeOf_1]
   omega
 
+/-! ## Size-Of Lemmas for Branch/Comm Cases -/
+
 private theorem sizeOf_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
     sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
   simp only [GlobalType.comm.sizeOf_spec]
@@ -137,6 +140,8 @@ theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
 /-! ## Boolean Projection Checker -/
 
 mutual
+  /- Boolean Projection Checker: Global Type Case. -/
+
   /-- Boolean projection checker (`projectb`). -/
   def projectb : GlobalType → String → LocalTypeR → Bool
     | .end, _, cand => -- Dispatch by global head; each case validates candidate shape and recurses.
@@ -200,6 +205,8 @@ mutual
       | exact sizeOf_bs_lt_comm _ _ _
       | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
+  /- Boolean Projection Checker: Branch List Case. -/
+
   /-- Check branch-wise projection for participant roles. -/
   def projectbBranches :
       List (Label × GlobalType) → String → List BranchR → Bool
@@ -219,6 +226,8 @@ mutual
       first
       | exact sizeOf_cont_lt_branch_cons _ _ _
       | exact sizeOf_rest_lt_branch_cons _ _ _
+
+  /- Boolean Projection Checker: Non-Participant Case. -/
 
   /-- Check a single candidate against all branches for non-participants. -/
   def projectbAllBranches :

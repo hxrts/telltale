@@ -97,7 +97,6 @@ private theorem CEmbedF_mono : Monotone CEmbedF := by
 
 instance : CoinductiveRel EmbedRel CEmbedF := ⟨CEmbedF_mono⟩
 
-/-! ## Coinductive Definition -/
 
 /-- CEmbed as the greatest fixed point of CEmbedF. -/
 def CEmbed : EmbedRel :=
@@ -148,6 +147,10 @@ private theorem BranchesEmbedRel_to_Proj {lbs : List BranchR}
   | cons hpair _ ih =>
       exact List.Forall₂.cons ⟨hpair.1.symm, hpair.2.1, hpair.2.2⟩ ih
 
+/-! ## Per-Constructor Helpers -/
+
+/-! ## end -/
+
 /-- Helper: embed implies project for end case. -/
 private theorem embed_implies_project_end {g : GlobalType} {role : String}
     (hF : CEmbedF CEmbed LocalTypeR.end role g) :
@@ -156,6 +159,8 @@ private theorem embed_implies_project_end {g : GlobalType} {role : String}
   | «end» => simp [CProjectF]
   | var _ | mu _ _ | comm _ _ _ | delegate _ _ _ _ _ => simp [CEmbedF] at hF
 
+/-! ## var -/
+
 /-- Helper: embed implies project for var case. -/
 private theorem embed_implies_project_var {t : String} {g : GlobalType} {role : String}
     (hF : CEmbedF CEmbed (LocalTypeR.var t) role g) :
@@ -163,6 +168,8 @@ private theorem embed_implies_project_var {t : String} {g : GlobalType} {role : 
   cases g with
   | var t' => simp [CEmbedF] at hF; exact hF.symm
   | «end» | mu _ _ | comm _ _ _ | delegate _ _ _ _ _ => simp [CEmbedF] at hF
+
+/-! ## mu -/
 
 /-- Helper: embed implies project for mu case. -/
 private theorem embed_implies_project_mu {t : String} {body : LocalTypeR}
@@ -181,6 +188,8 @@ private theorem embed_implies_project_mu {t : String} {body : LocalTypeR}
         exact ⟨hcontr, rfl⟩
   | «end» | var _ | comm _ _ _ | delegate _ _ _ _ _ => simp [CEmbedF] at hF
 
+/-! ## send -/
+
 /-- Helper: embed implies project for send case. -/
 private theorem embed_implies_project_send {receiver : String}
     {lbs : List BranchR} {g : GlobalType} {role : String}
@@ -194,6 +203,8 @@ private theorem embed_implies_project_send {receiver : String}
       simp [CProjectF]
       exact ⟨hrecv, BranchesEmbedRel_to_Proj hbr⟩
   | «end» | var _ | mu _ _ | delegate _ _ _ _ _ => simp [CEmbedF] at hF
+
+/-! ## recv -/
 
 /-- Helper: embed implies project for recv case. -/
 private theorem embed_implies_project_recv {sender : String}
@@ -209,6 +220,8 @@ private theorem embed_implies_project_recv {sender : String}
       simp [CProjectF, hneq']
       exact ⟨hsend, BranchesEmbedRel_to_Proj hbr⟩
   | «end» | var _ | mu _ _ | delegate _ _ _ _ _ => simp [CEmbedF] at hF
+
+/-! ## Main Inclusion -/
 
 /-- Embedding implies projection (CEmbed ⊆ CProject with swapped arguments). -/
 theorem CEmbed_implies_CProject {e : LocalTypeR} {role : String} {g : GlobalType}

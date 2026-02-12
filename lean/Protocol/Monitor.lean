@@ -1,8 +1,8 @@
 import Protocol.Monitor.Core
 import Protocol.Monitor.Preservation
 
-/-!
-# MPST Verified Monitor
+
+/-! # MPST Verified Monitor
 
 This module implements the proof-carrying runtime monitor for MPST.
 

@@ -110,7 +110,7 @@ theorem updateG_append_right {G1 G2 : GEnv} {e : Endpoint} {L : LocalType}
       have ih' := ih hNotMem'
       simp [updateG, he, ih', List.cons_append]
 
-/-! ### toGEnv/toDEnv commute with updates -/
+/-! ## toGEnv/toDEnv commute with updates -/
 
 /-- Helper: GEnv foldl append comm. -/
 theorem GEnv_foldl_append_comm {ν : Type u} [VerificationModel ν]
@@ -459,7 +459,7 @@ theorem SessionStore.toBuffers_updateTrace {store : SessionStore ν} {edge : Edg
         simpa [SessionStore.toBuffers] using
           congrArg (fun B => SignedBuffers.payloads st.buffers ++ B) ih
 
-/-! ### WFSessionStore Preservation
+/-! ## WFSessionStore Preservation
 
 WFSessionStore-specific lemmas are in `Runtime.Resources.Arena.WFSessionStore`.
 -/

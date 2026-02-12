@@ -213,6 +213,8 @@ class Laws extends Model where
 instance (priority := 100) lawsToModel [Laws] : Model :=
   Laws.toModel
 
+/-! ## Entropy Laws: Exported Theorems -/
+
 section Laws
 
 variable [Laws]
@@ -384,6 +386,8 @@ class AnalysisLaws extends AnalysisModel where
       (kernel : State → State → ℝ),
       toAnalysisModel.spectralGapValue kernel =
       1 - toAnalysisModel.secondSpectrumValue kernel
+
+/-! ## Extended Analysis Laws: Exported Theorems -/
 
 section AnalysisLaws
 

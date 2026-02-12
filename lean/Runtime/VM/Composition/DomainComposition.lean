@@ -329,7 +329,7 @@ instance instIdentityVerificationBridgeSum (ι₁ ι₂ ν : Type u)
     | Sum.inl p => IdentityVerificationBridge.bridge (ι:=ι₁) p
     | Sum.inr p => IdentityVerificationBridge.bridge (ι:=ι₂) p
 
-/-!
-Proof-level composition claims and witnesses live in:
+
+/- Proof-level composition claims and witnesses live in:
 `Runtime.Proofs.VM.DomainComposition`.
 -/

@@ -18,7 +18,7 @@ from iris_runtime_2.md §14.
 
 ## Definitions
 
-### Unified Monitor
+## Unified Monitor
 - `SessionKind` — protocol, guard, handler, ghost
 - `WellTypedInstr` — unified typing judgment
 - `SessionMonitor` — monitor state tracking all session kinds

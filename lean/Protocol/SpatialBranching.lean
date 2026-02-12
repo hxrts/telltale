@@ -99,6 +99,8 @@ def chromaticNumber {L : Type*} [DecidableEq L] (g : ConfusabilityGraph L) : Nat
   -- For a complete graph, it equals the number of labels.
   g.labels.length
 
+/-! ## Branch Feasibility Objects -/
+
 /-- A branching choice is feasible on a topology if the channel capacity
     is sufficient to distinguish all branch labels. -/
 structure BranchFeasibility (L : Type*) where
@@ -127,7 +129,7 @@ theorem branch_feasible_iff_satisfies {L : Type*} (topo : Topology) (b : BranchF
     topo.supportsBranch b ↔ topo ⊨ branchReq b := by
   simp only [Topology.supportsBranch, branchReq]
 
-/-! ### Confusability and Distinguishability -/
+/-! ## Confusability and Distinguishability -/
 
 /-- Two labels are distinguishable if they're not confusable. -/
 def distinguishable {L : Type*} (g : ConfusabilityGraph L) (l₁ l₂ : L) : Prop :=
@@ -148,7 +150,7 @@ theorem deployable_empty_confusability {L : Type*} [DecidableEq L]
   rw [← hDep.2] at h₁ h₂
   exact hDist l₁ l₂ h₁ h₂ hne
 
-/-! ### Capacity Bounds -/
+/-! ## Capacity Bounds -/
 
 /-- Topology-induced capacity bound.
 
@@ -181,7 +183,7 @@ theorem sufficient_capacity_implies_feasible {L : Type*} (topo : Topology) (b : 
       exact Nat.clog_pos (by omega) hPos
     omega
 
-/-! ### Independence Number and Feasibility Characterization
+/-! ## Independence Number and Feasibility Characterization
 
 The independence number of a graph is the size of the largest independent set
 (set of vertices with no edges between them). For confusability graphs:
@@ -212,6 +214,8 @@ theorem distinguishable_labels_independent {L : Type*} [DecidableEq L]
     g.IsIndependentSet g.labels := by
   intro l₁ h₁ l₂ h₂ hne
   exact h l₁ l₂ h₁ h₂ hne
+
+/-! ## Main Characterization Theorems -/
 
 /-- Branching is deployable when both:
     1. Labels are distinguishable (independence number ≥ |labels|)
@@ -284,7 +288,7 @@ theorem branching_iff_chromatic_capacity {L : Type*} [DecidableEq L]
   -- If a reliable edge exists, the branch is supported
   exact hEdge
 
-/-! ### Summary
+/-! ## Summary
 
 This section establishes:
 1. **ConfusabilityGraph**: Labels that can be confused by observers

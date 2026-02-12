@@ -26,7 +26,7 @@ open SessionCoTypes.EQ2Paco
 open Paco
 open SessionTypes.Participation
 
-/-! ### Constructor Agreement Lemmas (Well-Founded Induction)
+/-! ## Constructor Agreement Lemmas (Well-Founded Induction)
 
 These lemmas prove that when CProject produces a specific constructor (.end, .var),
 trans also produces that same constructor. Proved by well-founded induction on the
@@ -60,6 +60,8 @@ theorem allCommsNonEmpty_of_wellFormed (g : GlobalType)
   have hwf' := hwf
   simp [GlobalType.wellFormed, Bool.and_eq_true] at hwf'
   exact hwf'.1.1.2
+
+/-! ## Constructor Agreement Size Lemmas -/
 
 /-- Helper: first branch inherits wellFormed from a non-empty comm. -/
 theorem wellFormed_first_of_comm (sender receiver : String)
@@ -113,7 +115,7 @@ theorem sizeOf_snd_lt_comm_head_mul3 (sender receiver : String)
   omega
 
 
-/-! ### End constructor agreement -/
+/-! ## End constructor agreement -/
 
 /-- Helper: `.end` case is definitional. -/
 private theorem CProject_end_trans_end_end (role : String)
@@ -163,6 +165,8 @@ private theorem CProject_end_trans_end_comm_receiver_contra
   have hns : receiver ≠ sender := by simpa [hrr] using hrs
   simp [CProjectF, hrr, hns] at hf
 
+/-! ## End Constructor Agreement: Commutative Other-Role Case -/
+
 /-- Helper: non-participant comm case reduces to the head branch. -/
 private theorem CProject_end_trans_end_comm_other
     (sender receiver role : String) (first : Label × GlobalType) (rest : List (Label × GlobalType))
@@ -174,6 +178,8 @@ private theorem CProject_end_trans_end_comm_other
       trans (.comm sender receiver (first :: rest)) role = trans first.2 role := by
     simpa using trans_comm_other sender receiver role (first :: rest) hrs hrr
   exact htrans.trans ih
+
+/-! ## End Constructor Agreement: Mutual Recursion -/
 
 mutual
 /-- Helper: comm/cons case for end projection agreement. -/
@@ -203,6 +209,8 @@ decreasing_by
     all_goals
       simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
 
+/-! ## End Constructor Agreement: Comm Case -/
+
 /-- Helper: comm case for end projection agreement. -/
 private theorem CProject_end_trans_end_comm (sender receiver : String)
       (gbs : List (Label × GlobalType)) (role : String)
@@ -229,6 +237,8 @@ decreasing_by
     all_goals
       simp [hgb, GlobalType.comm.sizeOf_spec]
 
+/-! ## End Constructor Agreement: Main Theorem -/
+
 /-- If CProject g role .end, then trans g role = .end.
       Proved by well-founded induction on g. -/
 theorem CProject_end_trans_end (g : GlobalType) (role : String)
@@ -253,7 +263,7 @@ decreasing_by
       simp [hg, GlobalType.comm.sizeOf_spec]
 end
 
-/-! ### Var constructor agreement -/
+/-! ## Var constructor agreement -/
 
 /-- Helper: `.end` cannot project to `.var`. -/
 private theorem CProject_var_trans_var_end (role v : String)
@@ -298,6 +308,8 @@ private theorem CProject_var_trans_var_comm_receiver_contra
   have hns : receiver ≠ sender := by simpa [hrr] using hrs
   simp [CProjectF, hrr, hns] at hf
 
+/-! ## Var Constructor Agreement: Commutative Other-Role Case -/
+
 /-- Helper: non-participant comm case reduces to the head branch. -/
 private theorem CProject_var_trans_var_comm_other
     (sender receiver role v : String) (first : Label × GlobalType) (rest : List (Label × GlobalType))
@@ -309,6 +321,8 @@ private theorem CProject_var_trans_var_comm_other
       trans (.comm sender receiver (first :: rest)) role = trans first.2 role := by
     simpa using trans_comm_other sender receiver role (first :: rest) hrs hrr
   exact htrans.trans ih
+
+/-! ## Var Constructor Agreement: Mutual Recursion -/
 
 mutual
 /-- Helper: comm/cons case for var projection agreement. -/
@@ -339,6 +353,8 @@ decreasing_by
     all_goals
       simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
 
+/-! ## Var Constructor Agreement: Comm Case -/
+
 /-- Helper: comm case for var projection agreement. -/
 private theorem CProject_var_trans_var_comm (sender receiver : String)
       (gbs : List (Label × GlobalType)) (role v : String)
@@ -365,6 +381,8 @@ decreasing_by
     all_goals
       simp [hgb, GlobalType.comm.sizeOf_spec]
 
+/-! ## Var Constructor Agreement: Main Theorem -/
+
 /-- If CProject g role (.var v) and g has non-empty branches, then trans g role = .var v.
       Proved by well-founded induction on g.
       The allCommsNonEmpty precondition ensures branches are non-empty. -/
@@ -389,7 +407,7 @@ decreasing_by
       simp [hg, GlobalType.comm.sizeOf_spec]
 end
 
-/-! ### CProject-to-Trans structure extraction
+/-! ## CProject-to-Trans structure extraction
 
 When CProject produces a specific local type constructor (.send, .recv, .end, .var, .mu),
 the global type must have a corresponding structure. These lemmas extract that structure

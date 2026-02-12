@@ -66,6 +66,8 @@ structure HandlerSession where
   sessionType : LocalType
   deriving Repr
 
+/-! ## Coroutine state: blocking and faults -/
+
 inductive BlockReason (γ : Type u) where
   -- Reasons a coroutine can block.
   | recvWait (edge : Edge) (token : ProgressToken)
@@ -191,6 +193,8 @@ private def setTick (sid : SessionId) (t : Nat) (ticks : List (SessionId × Nat)
           (sid', t') :: go rest
   go ticks
 
+/-! ## Trace helpers: normalization -/
+
 /-- Normalize a VM trace by assigning session-local ticks. -/
 def normalizeVmTrace {ε : Type u} [EffectRuntime ε]
     (trace : List (TickedObsEvent ε)) : List (TickedObsEvent ε) :=
@@ -247,6 +251,8 @@ abbrev LaneOfMap := Std.HashMap CoroutineId LaneId
 abbrev LaneQueueMap := Std.HashMap LaneId LaneQueue
 abbrev LaneBlockedMap (γ : Type u) := Std.HashMap LaneId (BlockedSet γ)
 
+/-! ## Scheduler state: handoff metadata -/
+
 structure CrossLaneHandoff where
   -- Delegation/capability-transfer handoff metadata for scheduler/runtime tracking.
   fromCoro : CoroutineId
@@ -288,6 +294,8 @@ structure FailureTraceEvent where
   detail : String
   deriving Repr, DecidableEq, Inhabited
 
+/-! ## Scheduler state: structured error taxonomy -/
+
 /-- Commit certainty level used by structured error reporting. -/
 inductive ErrorCertainty where
   | certain
@@ -315,6 +323,8 @@ structure StructuredErrorEvent where
   evidenceId : Nat
   detail : String
   deriving Repr, DecidableEq, Inhabited
+
+/-! ## Scheduler state: runtime record -/
 
 structure SchedState (γ : Type u) where
   -- Scheduler policy and bookkeeping queues.
@@ -362,6 +372,8 @@ structure VMState (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν] where
   mask : Unit
   ghostSessions : Unit
   progressSupply : Unit
+
+/-! ## VM state helpers and invariants -/
 
 /-- Allocate a fresh externally-visible effect nonce. -/
 def allocEffectNonce {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]

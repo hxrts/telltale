@@ -82,7 +82,7 @@ private theorem DEnv_find_none_of_notin_sessions_local
       have hSidG : e.sid ∈ SessionsOf G := hCons hSid
       exact (hNot hSidG)
 
-/-! ### Merge Lookup Lemmas -/
+/-! ## Merge Lookup Lemmas -/
 
 /-- Lookup in merged GEnv prefers the left environment. -/
 theorem MergeGEnv_Left (G₁ G₂ : GEnv) (e : Endpoint) (L : LocalType) :

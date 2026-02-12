@@ -1,8 +1,8 @@
 import Runtime.Transport
 import Runtime.VM.Model.State
 
-/-!
-# Handler Equivalence
+
+/-! # Handler Equivalence
 
 Effect-handler equivalence theorem for protocol outcomes:
 if two handlers satisfy the same handler contract, their outcomes are

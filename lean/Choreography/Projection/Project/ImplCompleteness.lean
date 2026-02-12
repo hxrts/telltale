@@ -30,14 +30,14 @@ CProject is preserved under EQ2 equivalence.
 
 This corresponds to the Coq lemma `Project_EQ2` from indProj.v (lines 263-300).
 
-### Proof Strategy
+## Proof Strategy
 
 The proof uses coinduction on CProject with the relation:
 ```
 EQ2_CProject_Rel g role e1 := ∃ e0, CProject g role e0 ∧ EQ2 e0 e1
 ```
 
-### Case Analysis
+## Case Analysis
 
 **Participant case** (role is sender or receiver):
 - By induction on the participation path
@@ -51,7 +51,7 @@ EQ2_CProject_Rel g role e1 := ∃ e0, CProject g role e0 ∧ EQ2 e0 e1
 - For each branch, we need CProject cont role e1
 - This follows by IH on continuations + EQ2 transitivity
 
-### Blocked Cases
+## Blocked Cases
 
 The fundamental issue is that CProjectF requires the candidate local type to have
 the same top-level constructor as dictated by the global type:
@@ -80,12 +80,12 @@ When EQ2 e0 e1 holds with e0 having the "right" constructor but e1 being a mu
 The Coq proof uses parametrized coinduction (pcofix) which can "remember" that
 e0 and e1 are EQ2-equivalent across unfolding steps, resolving these cases.
 
-### Coq Reference
+## Coq Reference
 
 See `subject_reduction/theories/Projection/indProj.v:263-300` for the Coq proof
 which uses `pcofix CIH` with participation predicates.
 
-### Semantic Soundness
+## Semantic Soundness
 
 If `CProject g role e0` holds and `EQ2 e0 e1` (i.e., e0 and e1 are observationally
 equivalent under equi-recursive equality), then `CProject g role e1` must hold.
@@ -160,6 +160,8 @@ private theorem BranchesProjRel_implies_BranchesRel_EQ2_cons
     List.Forall₂.cons ⟨hlab.symm, by simpa using heq⟩ htail'
   simpa [BranchesRel, htb] using hcons
 
+/-! ## Branch Projection EQ2 Transfer -/
+
 /-- BranchesProjRel implies branch-wise EQ2 on transBranches. -/
 theorem BranchesProjRel_implies_BranchesRel_EQ2
     (gbs : List (Label × GlobalType)) (role : String)
@@ -181,6 +183,8 @@ theorem BranchesProjRel_implies_BranchesRel_EQ2
             exact hwf gb' (List.mem_cons_of_mem _ hmem')
           have htail : BranchesRel EQ2 lbs_tail (transBranches gbs_tail role) := ih hwf_tail
           exact BranchesProjRel_implies_BranchesRel_EQ2_cons role hlab hnone hproj hwf htail
+
+/-! ## All-Branches EQ2 Transfer -/
 
 /-- AllBranchesProj with trans gives EQ2.
 
@@ -220,6 +224,8 @@ theorem AllBranchesProj_implies_EQ2_trans
 
 /-! ## Projection API Completeness -/
 
+/-! ## Projection API Completeness: trans Witness -/
+
 /-- trans produces a valid projection when CProject holds for some candidate.
 
 This follows from `trans_eq_of_CProject`: trans computes the same local type
@@ -249,6 +255,8 @@ theorem trans_CProject
   have htrans_eq : trans g role = lt := trans_eq_of_CProject g role lt h hne
   simpa [htrans_eq] using h
 
+/-! ## Projection API Completeness: Boolean Success -/
+
 /-- trans computes the canonical projection when CProject holds. -/
 theorem trans_is_projection
     (hend : ∀ e, EQ2 .end e → e = .end)
@@ -269,6 +277,8 @@ theorem trans_is_projection
       exact hwf.1.1.2
     exact projectb_complete g role (trans g role)
       (trans_CProject hend hvar hsend hrecv hmu g role lt h hwf) hne
+
+/-! ## Projection API Completeness: Option Completeness -/
 
 /-- Completeness: if CProject holds, then projectR? returns some.
 
@@ -291,6 +301,8 @@ theorem projectR?_complete
     trans_is_projection hend hvar hsend hrecv hmu g role lt h hwf
   simp only [hproj, ↓reduceDIte]
   exact ⟨⟨trans g role, projectb_sound g role (trans g role) hproj⟩, rfl⟩
+
+/-! ## Projection API Completeness: iff Spec -/
 
 /-- Specification: projectR? returns some iff CProject holds for some local type.
 

@@ -1,7 +1,7 @@
 import Runtime.VM.Semantics.ExecHelpers
 
-/-!
-# Speculation Instruction Semantics
+
+/-! # Speculation Instruction Semantics
 
 Step functions for `fork`, `join`, and `abort`, the speculation lifecycle
 described in `runtime.md` §17.

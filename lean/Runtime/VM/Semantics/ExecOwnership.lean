@@ -78,8 +78,8 @@ def transferCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
                                     , knowledgeSet := keptFacts }
   pack coro' st' (mkRes (.transferred ep tid) (some (.obs (.transferred ep coro.id tid))))
 
-/-!
-Proof-only transfer-conservation lemmas live in:
+
+/- Proof-only transfer-conservation lemmas live in:
 `Runtime.Proofs.VM.ExecOwnership`.
 -/
 

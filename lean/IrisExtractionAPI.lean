@@ -25,8 +25,8 @@ Solution Structure. We define:
 The companion `IrisExtractionInstance` provides runtime erasure.
 -/
 
-/-!
-## Trust Boundary
+
+/-! ## Trust Boundary
 
 This file and `IrisExtractionInstance.lean` form the **Iris extraction boundary**.
 Together they provide:

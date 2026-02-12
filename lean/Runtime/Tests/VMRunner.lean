@@ -9,8 +9,8 @@ import Runtime.VM.Semantics.Exec
 import Choreography.Projection.Json
 import Choreography.Projection.Project.Primitive
 
-/-!
-# VM Runner
+
+/-! # VM Runner
 
 Reads JSON from stdin, loads choreographies, runs the VM, and prints trace JSON.
 -/

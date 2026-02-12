@@ -2,8 +2,8 @@ import Protocol.DeliveryModel
 import Protocol.Coherence.Consume
 import Protocol.Coherence.EdgeCoherenceM
 
-/-!
-# MPST Coherence (Model-Parametric)
+
+/-! # MPST Coherence (Model-Parametric)
 
 Umbrella module that pulls in the model-parametric coherence infrastructure.
 -/

@@ -9,7 +9,7 @@ import Semantics.Determinism
 import Choreography.Harmony.MuUnfoldLemmas
 import Choreography.Harmony.SubstEndUnguarded
 
-/-!
+/-
 The Problem. Relate global protocol steps to environment steps in the operational
 semantics, showing that projection commutes with execution. The key difficulty is
 that projection distinguishes participants from non-participants, so step alignment
@@ -76,7 +76,7 @@ Coherence is now proven from first principles using participation structure, fol
 
 /-! ## Notes
 
-### Projection Coherence
+## Projection Coherence
 
 These lemmas establish that projection is coherent with stepping:
 after a global step, the projected environment correctly reflects
@@ -99,7 +99,7 @@ We can prove this inductively on the branch list structure by showing that
 consecutive branches project coherently, which composes to full coherence.
 This approach uses only the structure of trans without requiring CProject proofs.
 
-### Substitution Commutation
+## Substitution Commutation
 
 The core coinductive property: projection (via trans) commutes with global mu-substitution.
 
@@ -109,7 +109,7 @@ For any GlobalType g, recursion variable t, and mu-body G (where G = mu t g for 
 This is the "projection commutes with substitution" lemma (Coq: `full_eunf_subst`).
 The property requires coinductive reasoning because branch continuations recurse indefinitely.
 
-### ProjSubstRel Postfixpoint Proof Notes
+## ProjSubstRel Postfixpoint Proof Notes
 
 ProjSubstRel is a post-fixpoint of EQ2F (with EQ2 as accumulator).
 
@@ -130,7 +130,7 @@ The proof proceeds by case analysis on the GlobalType witness:
     - empty branches: both .end ✓
     - non-empty: recursive call on continuation subterm ✓
 
-### trans_subst_comm intent
+## trans_subst_comm intent
 
 Projection commutes with substitution.
 
@@ -142,7 +142,7 @@ when fully unfolded.
 
 **Coq reference:** `full_eunf_subst` in `coLocal.v`
 
-### EQ2 transitivity + subst_end_unguarded_eq2_end
+## EQ2 transitivity + subst_end_unguarded_eq2_end
 
 EQ2 transitivity now uses `EQ2_trans_wf` from EQ2Props (Bisim detour).
 This replaces the prior `EQ2_trans` path and requires explicit
@@ -178,6 +178,8 @@ open SessionCoTypes.Quotient
 open Semantics.EnvStep
 
 -- Alias to avoid ambiguity with Trans typeclass
+
+
 abbrev projTrans := Choreography.Projection.Project.trans
 open Choreography.Projection.Project (trans_comm_sender trans_comm_receiver trans_comm_other
   transBranches lcontractive trans_wellFormed_of_wellFormed)
@@ -185,6 +187,8 @@ open Choreography.Projection.Project (trans_comm_sender trans_comm_receiver tran
 /-! ## Claims Bundle -/
 
 /-- Claims bundle for harmony lemmas. -/
+
+
 structure Claims where
   /-- Global step induces environment step. -/
   harmony : ∀ g g' act, step g act g' → EnvStep (projEnv g) act (projEnv g')
@@ -199,6 +203,8 @@ the projected environment. This is the key lemma connecting global semantics
 to local session type semantics. -/
 
 /-- Global step induces environment step through projection. -/
+
+
 theorem step_harmony (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') :
     EnvStep (projEnv g) act (projEnv g') :=
@@ -207,7 +213,7 @@ theorem step_harmony (g g' : GlobalType) (act : GlobalActionR)
 
 /-! ## Projection Coherence -/
 
-/-! ### Key Theorem: trans Produces Valid Projections
+/-! ## Key Theorem: trans Produces Valid Projections
 
 The trans function produces valid CProject proofs for well-formed types.
 This is the bridge between computational projection (trans) and relational projection (CProject). -/
@@ -247,6 +253,9 @@ project to EQ2-equivalent local types. This is proven using the participation in
 
 This theorem eliminates the trans_branches_coherent assumption by proving coherence from
 first principles, following Coq's proof strategy. -/
+
+/-! ## Participant Case -/
+
 private theorem trans_branches_coherent_EQ2_participant
     (sender receiver : String) (branches : List (Label × GlobalType)) (role : String)
     (hnp : role ≠ sender ∧ role ≠ receiver)
@@ -276,6 +285,8 @@ private theorem trans_branches_coherent_EQ2_participant
       have hEq : projTrans b.2 role = projTrans hd.2 role := by simp [htrans_b, htrans_hd]
       simpa [hbranches, List.head!, hEq] using (EQ2_refl (projTrans hd.2 role))
 
+/-! ## Non-Participant Case -/
+
 private theorem trans_branches_coherent_EQ2_nonpart
     (sender receiver : String) (branches : List (Label × GlobalType)) (role : String)
     (hne : branches ≠ [])
@@ -300,6 +311,8 @@ private theorem trans_branches_coherent_EQ2_nonpart
       simpa [hbranches, List.head!] using (EQ2_trans_via_end hb_end (EQ2_symm hhd_end))
 
 /-- All branch projections are EQ2-coherent with the head branch for non-participants. -/
+
+
 theorem trans_branches_coherent_EQ2
     (sender receiver : String) (branches : List (Label × GlobalType)) (role : String)
     (hnp : role ≠ sender ∧ role ≠ receiver)
@@ -313,6 +326,8 @@ theorem trans_branches_coherent_EQ2
   · rcases hproj_comm with ⟨lt, hproj⟩
     exact trans_branches_coherent_EQ2_participant sender receiver branches role hnp hne hwf lt hproj b hmem
   · exact trans_branches_coherent_EQ2_nonpart sender receiver branches role hne hwf hpart b hmem
+
+/-! ## BranchesProjRel Infrastructure -/
 
 /-- Helper: transBranches produces branches satisfying BranchesProjRel with the witness relation. -/
 private theorem transBranches_satisfies_BranchesProjRel
@@ -340,6 +355,8 @@ private theorem transBranches_satisfies_BranchesProjRel
         -- Show: BranchesProjRel for tl
         exact ih (fun gb hmem => hwf gb (List.Mem.tail hd hmem))
 
+/-! ## Branch Witness Extraction -/
+
 /-- Helper: extract per-branch CProject witnesses from BranchesProjRel. -/
 private theorem branchesProjRel_to_CProject
     (gbs : List (Label × GlobalType)) (role : String) (lbs : List BranchR)
@@ -365,6 +382,8 @@ the computational trans function produces the same candidate, hence also satisfi
 
 **Proof strategy:**
 It uses `trans_eq_of_CProject` to rewrite the candidate to `trans g role`. -/
+
+
 theorem trans_produces_CProject (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt) (hwf : g.wellFormed = true) :
     CProject g role (projTrans g role) := by
@@ -400,6 +419,8 @@ private theorem branches_project_coherent_eq (sender receiver : String)
   simp [htrans_cont, htrans_first]
 
 /-- Branch coherence for non-participants: all branches project to EQ2-equivalent types. -/
+
+
 theorem branches_project_coherent (sender receiver : String)
     (first_label : Label) (first_cont : GlobalType)
     (rest : List (Label × GlobalType)) (label : Label) (cont : GlobalType) (role : String)

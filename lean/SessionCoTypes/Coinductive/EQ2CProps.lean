@@ -169,7 +169,9 @@ lemma EQ2C_send {p : String} {bs cs : List (Label × LocalTypeC)}
   refine ⟨R', hR', ?_⟩
   exact Or.inl ⟨rfl, rfl⟩
 
-/-- EQ2C is closed under recv, given branch-wise EQ2C. -/
+/-- EQ2C is closed under recv, given branch-wise EQ2C.
+    Communication congruence: recv case. -/
+
 lemma EQ2C_recv {p : String} {bs cs : List (Label × LocalTypeC)}
     (hbr : BranchesRelC EQ2C bs cs) : EQ2C (mkRecv p bs) (mkRecv p cs) := by
   let R' : LocalTypeC → LocalTypeC → Prop :=
@@ -262,7 +264,9 @@ lemma EQ2C_unfold_left {t u : LocalTypeC} (h : EQ2C t u) (x : String) :
   refine ⟨R', hR', ?_⟩
   exact Or.inl ⟨rfl, rfl⟩
 
-/-- Wrap a bisimulation on the right with a μ constructor. -/
+/-- Wrap a bisimulation on the right with a μ constructor.
+    Mu-unfolding congruence: right wrapper. -/
+
 lemma EQ2C_unfold_right {t u : LocalTypeC} (h : EQ2C t u) (x : String) :
     EQ2C t (mkMu x u) := by
   have h' : EQ2C u t := EQ2C_symm h
@@ -299,6 +303,8 @@ lemma ObservableRelC_mu_left {R : LocalTypeC → LocalTypeC → Prop} {x : Strin
       have hmu : CanRecvC (mkMu x t) p bs :=
         ⟨ut, labels, Relation.ReflTransGen.head hstep hsteps_t, hhead_t, hbs⟩
       exact ObservableRelC.is_recv p bs cs hmu hu hbr
+
+/-! ## ObservableRelC lifting through mu: right side -/
 
 lemma ObservableRelC_mu_right {R : LocalTypeC → LocalTypeC → Prop} {x : String}
     {t u : LocalTypeC} (hrel : ObservableRelC R t u) :
@@ -396,6 +402,8 @@ private lemma UnfoldsToC_tail_of_step {a a' u : LocalTypeC}
     subst hc
     exact hrest
 
+/-! ## ObservableRelC inversion through μ-unfolding: left inversion -/
+
 lemma ObservableRelC_unfoldsC_left_inv {R : LocalTypeC → LocalTypeC → Prop}
     {a a' b : LocalTypeC} (hstep : UnfoldsC a a') (hrel : ObservableRelC R a b) :
     ObservableRelC R a' b := by
@@ -420,6 +428,8 @@ lemma ObservableRelC_unfoldsC_left_inv {R : LocalTypeC → LocalTypeC → Prop}
       have hnomu : ¬ (∃ x, head u = .mu x) := by simp [hhead]
       have hunf' : UnfoldsToC a' u := UnfoldsToC_tail_of_step hstep hunf hnomu
       exact ObservableRelC.is_recv p bs cs ⟨u, labels, hunf', hhead, hbs⟩ hb hbr
+
+/-! ## ObservableRelC inversion through μ-unfolding: right inversion -/
 
 lemma ObservableRelC_unfoldsC_right_inv {R : LocalTypeC → LocalTypeC → Prop}
     {a b b' : LocalTypeC} (hstep : UnfoldsC b b') (hrel : ObservableRelC R a b) :

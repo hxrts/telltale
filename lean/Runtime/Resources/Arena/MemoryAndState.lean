@@ -36,6 +36,8 @@ set_option autoImplicit false
 
 universe u
 
+/-! ## Arena Core -/
+
 inductive SessionPhase where
   | opening
   | active
@@ -93,6 +95,8 @@ def Arena.free (a : Arena) (addr : Addr) : Arena :=
   else
     a
 
+/-! ## Session Store Core Records -/
+
 structure SessionState (ν : Type u) [VerificationModel ν] where
   -- Scope for resource commitments and nullifiers.
   scope : ScopeId -- Local resource scope.
@@ -110,6 +114,8 @@ abbrev SessionStore (ν : Type u) [VerificationModel ν] :=
   List (SessionId × SessionState ν)
 
 /-! ## Session environment projections -/
+
+/-! ## SessionState Accessors -/
 
 def SessionState.lookupType {ν : Type u} [VerificationModel ν]
     (st : SessionState ν) (e : Endpoint) : Option LocalType :=
@@ -161,6 +167,8 @@ def SessionState.lookupHandler {ν : Type u} [VerificationModel ν]
     (st.updateTrace edge ts).lookupBuffer edge' = st.lookupBuffer edge' := by
   simp [SessionState.updateTrace, SessionState.lookupBuffer]
 
+/-! ## SessionStore Lookups -/
+
 def SessionStore.lookupType {ν : Type u} [VerificationModel ν]
     (store : SessionStore ν) (e : Endpoint) : Option LocalType :=
   -- Find the matching session and then its local type.
@@ -204,6 +212,8 @@ def SessionStore.lookupHandler {ν : Type u} [VerificationModel ν]
         st.lookupHandler edge
       else
         SessionStore.lookupHandler rest edge
+
+/-! ## SessionStore Updates and Projections -/
 
 def SessionStore.updateType {ν : Type u} [VerificationModel ν]
     (store : SessionStore ν) (e : Endpoint) (L : LocalType) : SessionStore ν :=
@@ -252,6 +262,8 @@ def SessionStore.toBuffers {ν : Type u} [VerificationModel ν]
   -- Flatten and project signed buffers into payload buffers.
   store.foldl (fun acc p => acc ++ SignedBuffers.payloads p.snd.buffers) []
 
+/-! ## SessionStore Refinement Predicates -/
+
 def sessionStore_refines_envs {ν : Type u} [VerificationModel ν]
     (store : SessionStore ν) : Prop :=
   -- Store lookups agree with the corresponding environment projections.
@@ -263,6 +275,8 @@ def sessionStore_refines_envs {ν : Type u} [VerificationModel ν]
   (∀ e, lookupG G e = SessionStore.lookupType store e) ∧
   (∀ edge, lookupD D edge = SessionStore.lookupTrace store edge) ∧
   (∀ edge, lookupBuf bufs edge = SessionStore.lookupBuffer store edge)
+
+/-! ## Arena Lookup Predicates -/
 
 def arena_lookup_typed (arena : Arena) (idx : Addr) (slot : Slot) : Prop :=
   -- Typed lookup means the slot exists and is not free.
@@ -284,7 +298,7 @@ def arena_lookup_localType (arena : Arena) (idx : Addr) (t : LocalType) : Prop :
 
 variable {ν : Type u} [VerificationModel ν]
 
-/-! ### SessionState-level lemmas -/
+/-! ## SessionState-level lemmas -/
 
 @[simp] theorem SessionState.lookupType_updateType_eq {st : SessionState ν} {e : Endpoint} {L : LocalType} :
     (st.updateType e L).lookupType e = some L := by
@@ -317,7 +331,7 @@ theorem SessionState.lookupTrace_updateTrace_ne {st : SessionState ν} {edge edg
     (st.updateTrace edge ts).lookupType e = st.lookupType e := by
   simp only [SessionState.updateTrace, SessionState.lookupType]
 
-/-! ### SessionStore-level lemmas
+/-! ## SessionStore-level lemmas
 
 Additional SessionStore lookup/update lemmas live in
 `Runtime.Resources.Arena.LookupUpdateLemmas`.

@@ -1,8 +1,8 @@
 import Std
 import Runtime.VM.Model.TypeClasses
 
-/-!
-# Core VM Types
+
+/-! # Core VM Types
 
 Scalar aliases (`Reg`, `PC`, `CoroutineId`, etc.), the `Expr` handle for coroutine
 expressions, and the `Instr` bytecode instruction set. Instructions are parameterized

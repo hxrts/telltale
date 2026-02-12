@@ -23,6 +23,8 @@ def Total (step : CoherenceState → CoherenceState → Prop) : Prop :=
 def Deterministic (step : CoherenceState → CoherenceState → Prop) : Prop :=
   ∀ C C₁ C₂, step C C₁ → step C C₂ → C₁ = C₂
 
+/-! ## Classical Regime Record -/
+
 /-- Characterization of the classical regime used for theorem transport. -/
 structure ClassicalRegime (step : CoherenceState → CoherenceState → Prop) : Prop where
   /-- Session renaming (ConfigEquiv) commutes with one-step evolution. -/
@@ -42,6 +44,8 @@ structure ClassicalRegime (step : CoherenceState → CoherenceState → Prop) : 
   /-- Coherent states form a finite state space. -/
   classicalStateSpace :
     Set.Finite { C : CoherenceState | Coherent C.G C.D }
+
+/-! ## Regime Characterization Theorems -/
 
 /-- Default correlation law from the established Coherence/ConfigEquiv theorem. -/
 theorem classicalCorrelations_default {C₁ C₂ : CoherenceState}

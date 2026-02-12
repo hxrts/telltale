@@ -135,7 +135,6 @@ private theorem ProjectC_step_mono : Monotone ProjectC_step := by
 
 instance : CoinductiveRel ProjRelC ProjectC_step := ⟨ProjectC_step_mono⟩
 
-/-! ## Coinductive projection -/
 
 /-- Coinductive projection as the greatest fixed point of `ProjectC_step`. -/
 def ProjectC : ProjRelC :=

@@ -42,7 +42,7 @@ open SessionTypes
 abbrev Context := NameOnlyContext
 abbrev NameContext := NameOnlyContext
 
-/-! ### Context Operations -/
+/-! ## Context Operations -/
 
 -- Re-export Membership instance for Context/NameContext abbreviations
 instance : Membership String Context := inferInstance
@@ -100,7 +100,7 @@ theorem Context.covers_of_mu_closed_singleton (t : String) (body : LocalTypeR) :
       simpa [hnil] using hfilter
     exact this.elim
 
-/-! ### NameContext Operations -/
+/-! ## NameContext Operations -/
 
 /-- Fresh binder names for DB → named conversion (simple scheme). -/
 def NameContext.freshName (ctx : NameContext) : String :=

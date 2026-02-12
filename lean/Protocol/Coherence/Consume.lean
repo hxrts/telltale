@@ -13,8 +13,8 @@ Solution Structure. Define `Consume`/`consumeOne`, then prove inversion and
 preservation lemmas used by send/recv/select/branch coherence arguments.
 -/
 
-/-!
-# MPST Coherence
+
+/-! # MPST Coherence
 
 This module defines the coherence invariant for multiparty session types.
 

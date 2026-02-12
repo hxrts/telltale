@@ -1,7 +1,7 @@
 import Std
 
-/-!
-# Scheduler Policy Types
+
+/-! # Scheduler Policy Types
 
 `SchedPolicy`, the scheduling strategy enum referenced by `VMConfig`. Defined in
 its own file to avoid circular imports: `Config.lean` needs the policy type, but the

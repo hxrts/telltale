@@ -461,8 +461,8 @@ end VMConnection
 
 end
 
-/-!
-## Summary
+
+/-! ## Summary
 
 This module establishes crash tolerance for MPST:
 

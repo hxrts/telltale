@@ -16,8 +16,8 @@ Solution Structure. We prove:
 3. Coherence connection lemmas for the full preservation
 -/
 
-/-!
-## Key Judgments
+
+/-! ## Key Judgments
 
 - `HasTypeProcN n S G D P`: Process P is well-typed under environments S, G, D
   with maximum session ID n

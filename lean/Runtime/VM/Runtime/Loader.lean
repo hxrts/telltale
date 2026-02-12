@@ -260,7 +260,7 @@ theorem loadChoreography_snd_ge_nextSessionId
         · simp [hSess, hCoros]
         · simp [hSess, hCoros, loadChoreographyCore, nextFreshSessionId_ge]
 
-/-!
-Proof-only disjointness lemmas for `loadChoreography` live in:
+
+/- Proof-only disjointness lemmas for `loadChoreography` live in:
 `Runtime.Proofs.VM.LoadChoreography`.
 -/

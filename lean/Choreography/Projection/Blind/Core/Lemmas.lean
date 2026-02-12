@@ -78,6 +78,8 @@ theorem noSelfComm_comm_branches {s r : String} {bs : List (Label × GlobalType)
   simp only [GlobalType.noSelfComm, Bool.and_eq_true] at h
   exact noSelfComm_of_noSelfCommBranches h.2
 
+/-! ## allCommsNonEmpty Propagation -/
+
 /-- allCommsNonEmpty propagates to mu body. -/
 theorem allCommsNonEmpty_mu_body {t : String} {body : GlobalType}
     (h : (GlobalType.mu t body).allCommsNonEmpty = true) : body.allCommsNonEmpty = true := h
@@ -101,6 +103,8 @@ theorem allCommsNonEmpty_comm_branches {s r : String} {bs : List (Label × Globa
     ∀ p ∈ bs, p.2.allCommsNonEmpty = true := by
   simp only [GlobalType.allCommsNonEmpty, Bool.and_eq_true] at h
   exact allCommsNonEmpty_of_allCommsNonEmptyBranches h.2
+
+/-! ## isBlind Propagation -/
 
 /-- isBlind propagates to mu body. -/
 theorem isBlind_mu_body {t : String} {body : GlobalType}
@@ -172,6 +176,8 @@ theorem all_eq_true_of_all {α : Type} {p : α → Bool} {xs : List α}
       | head => exact h.1
       | tail _ hmem => exact ih h.2 x hmem
 
+/-! ## projectbBranches Soundness -/
+
 /-- Helper: projectbBranches succeeds when each branch satisfies the IH.
 
     Note: This follows by induction on branches. The base case is definitional,
@@ -202,6 +208,8 @@ theorem projectbBranches_trans_of_all (branches : List (Label × GlobalType)) (r
             else false) = true
           rw [hlabel]
           simp [hhead, ih']
+
+/-! ## projectbAllBranches Soundness -/
 
 /-- Helper: projectbAllBranches succeeds when all branches project to the same candidate
     and each branch satisfies the IH.

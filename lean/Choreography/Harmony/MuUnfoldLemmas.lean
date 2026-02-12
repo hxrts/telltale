@@ -51,6 +51,8 @@ because `unfold (.mu s X) = X.substitute s (.mu s X)`. -/
 /-- Mu self-unfold: the unfolding of a mu is EQ2-equivalent to the mu itself.
 
     This is the core lemma that powers the crossed-unfold proofs. -/
+
+
 theorem EQ2_mu_self_unfold (s : String) (body : LocalTypeR) :
     EQ2 (body.substitute s (.mu s body)) (.mu s body) := by
   have h := EQ2_unfold_left (EQ2_refl (.mu s body))
@@ -58,6 +60,8 @@ theorem EQ2_mu_self_unfold (s : String) (body : LocalTypeR) :
   exact h
 
 /-- Symmetric version: mu is EQ2-equivalent to its unfolding. -/
+
+
 theorem EQ2_mu_to_unfold (s : String) (body : LocalTypeR) :
     EQ2 (.mu s body) (body.substitute s (.mu s body)) := by
   -- Symmetry of EQ2 flips the direction of mu self-unfold.
@@ -78,6 +82,8 @@ theorem EQ2_mu_to_unfold (s : String) (body : LocalTypeR) :
 
     And `EQ2_mu_self_unfold` gives us `EQ2 (X.substitute s (.mu s X)) (.mu s X)`.
 -/
+
+
 theorem EQ2_mu_crossed_unfold_left'
     {s t : String} {inner G : GlobalType} {role : String}
     (hGclosed : G.isClosed = true)
@@ -95,6 +101,8 @@ theorem EQ2_mu_crossed_unfold_left'
 /-- Mu-mu crossed unfold: left mu relates to right unfold.
 
     Symmetric to `EQ2_mu_crossed_unfold_left'`. -/
+
+
 theorem EQ2_mu_crossed_unfold_right'
     {s t : String} {inner G : GlobalType} {role : String}
     (hGclosed : G.isClosed = true)
@@ -176,6 +184,8 @@ private theorem isGuarded_false_substitute_preserved_mu (s : String) (body : Loc
       exact ih hunguarded
 
 /-- Key lemma: Unguardedness is preserved when substituting a different variable. -/
+
+
 theorem isGuarded_false_substitute_preserved (t : LocalTypeR) (u v : String) (repl : LocalTypeR)
     (hneq : u ≠ v) (hunguarded : t.isGuarded v = false) :
     (t.substitute u repl).isGuarded v = false := by
@@ -193,6 +203,8 @@ theorem isGuarded_false_substitute_preserved (t : LocalTypeR) (u v : String) (re
 
 /-- Corollary: Unguardedness is preserved in the forward direction.
     (The reverse direction is more complex and not needed.) -/
+
+
 theorem isGuarded_substitute_forward (lt : LocalTypeR) (u v : String) (repl : LocalTypeR)
     (hneq : u ≠ v) (hunguarded : lt.isGuarded v = false) :
     (lt.substitute u repl).isGuarded v = false := by
@@ -214,6 +226,8 @@ So if `(projTrans inner role).isGuarded s = false` and `s ≠ t`, then by
 But `hL` claims `isGuarded s = true`, contradiction! -/
 
 /-- Mismatched guardedness: guarded mu unfold relates to end. -/
+
+
 theorem EQ2_mu_unguarded_to_end'
     {s t : String} {inner G : GlobalType} {role : String}
     (hst : s ≠ t)
@@ -237,6 +251,8 @@ theorem EQ2_mu_unguarded_to_end'
   simp at hL
 
 /-- Mismatched guardedness: end relates to guarded mu unfold. -/
+
+
 theorem EQ2_end_to_mu_unguarded'
     {s t : String} {inner G : GlobalType} {role : String}
     (hGclosed : G.isClosed = true)

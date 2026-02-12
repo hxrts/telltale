@@ -19,8 +19,8 @@ coherence/buffer typing, add lifecycle event types, and provide
 placeholder correctness statements that match runtime.md §7.
 -/
 
-/-!
-# Task 16: Session Cancelable Invariants
+
+/-! # Task 16: Session Cancelable Invariants
 
 Per-session cancelable invariant from iris_runtime_2.md §7.
 

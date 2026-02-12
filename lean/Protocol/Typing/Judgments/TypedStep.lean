@@ -43,7 +43,7 @@ theorem HasTypeProcPreOut_par_nG_irrel
 -- HasTypeProcPre, because seq/par pre-out typing does not imply pre-typing for
 -- the whole process without additional monotonicity assumptions.
 
-/-! ### TypedStep Inductive Definition -/
+/-! ## TypedStep Inductive Definition -/
 
 /-- Linear resource transition typing judgment.
 

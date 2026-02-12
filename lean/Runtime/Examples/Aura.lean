@@ -10,8 +10,8 @@ Solution Structure. Define stub identity/guard/persistence/effect types,
 instantiate the required typeclasses, and assemble a minimal `VMConfig`.
 -/
 
-/-!
-# Task 25: Aura Instantiation (V1)
+
+/-! # Task 25: Aura Instantiation (V1)
 
 Aura-specific model instances and configuration
 from runtime.md §12.

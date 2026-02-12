@@ -67,7 +67,7 @@ These correspond to key lemmas from the Coq development:
 - `proj_proj`: if CProject g p e, then EQ2 e (trans g p)
 - `Project_EQ2`: if CProject g p e0 and EQ2 e0 e1, then CProject g p e1
 
-### CProject_implies_EQ2_trans Proof Strategy
+## CProject_implies_EQ2_trans Proof Strategy
 
 The proof uses coinduction on EQ2 with the relation:
 `CProjectTransRel lt cand := ∃ g role, CProject g role lt ∧ cand = trans g role`
@@ -78,7 +78,7 @@ The mu case requires coinduction up-to with substitution lemmas.
 
 See `subject_reduction/theories/Projection/indProj.v:221-260` for the Coq reference. -/
 
-/-! ### Helper Lemmas for CProject_implies_EQ2_trans
+/-! ## Helper Lemmas for CProject_implies_EQ2_trans
 
 The following helper lemmas support the proof of the main theorem. -/
 
@@ -87,7 +87,7 @@ The following helper lemmas support the proof of the main theorem. -/
 If a role participates on all branches, it certainly participates on some path.
 The wellFormed hypothesis ensures branches are non-empty.
 
-### Proof Strategy
+## Proof Strategy
 
 Use well-founded induction on global type size:
 - `comm_direct`: Trivially get `part_of2` via `part_of2.intro (.comm_direct ...)`
@@ -97,7 +97,7 @@ Use well-founded induction on global type size:
 - `mu`: By IH on body, get `part_of2 role body`. Then construct
   `part_of2.intro (.mu ...)`.
 
-### Coq Reference
+## Coq Reference
 
 See `subject_reduction/theories/Projection/indProj.v:180-192`.
 
@@ -247,7 +247,7 @@ theorem part_of_all2_implies_part_of2 (role : String) (g : GlobalType)
 
 This uses the muve/closed infrastructure from EQ_end and part_of2_or_end.
 
-#### Proof Outline
+## Proof Outline
 
 1. By `part_of2_or_end`, we get `part_of_all2 role g ∨ EQ2 lt .end`
 2. The Left case contradicts `hnotpart` via `part_of_all2_implies_part_of2`
@@ -280,13 +280,13 @@ private theorem CProject_implies_EQ2_trans_nonpart (g : GlobalType) (role : Stri
       -- Chain EQ2 lt .end with EQ_end.
       exact CProject_implies_EQ2_trans_nonpart_right g role lt hnotpart hwf hlt_end
 
-/-! ### Main Theorem: CProject_implies_EQ2_trans
+/-! ## Main Theorem: CProject_implies_EQ2_trans
 
 Proof sketch: define `CProjectTransRel a b := ∃ g role, CProject g role a ∧ b = trans g role`,
 show it is a post-fixpoint of EQ2F by constructor cases (end/var/mu/comm participant/non-participant),
 and use the non-participant lemma for the .end bridge. Coq ref: indProj.v:221-260. -/
 
-/-! ### CProject Candidate-Shape Inversion Lemmas
+/-! ## CProject Candidate-Shape Inversion Lemmas
 
 These lemmas package common CProjectF destruct patterns for the Project_EQ2 port. -/
 

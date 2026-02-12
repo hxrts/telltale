@@ -6,8 +6,8 @@ import Runtime.VM.Semantics.ExecSpeculation
 import Runtime.VM.Semantics.ExecOwnership
 import Runtime.VM.Semantics.ExecControl
 
-/-!
-# Instruction Dispatcher
+
+/-! # Instruction Dispatcher
 
 `stepInstr`, the single match statement that routes each `Instr` variant to its
 corresponding step function defined in the `Exec*.lean` files. This is the only

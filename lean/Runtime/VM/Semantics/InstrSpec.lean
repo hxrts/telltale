@@ -325,9 +325,8 @@ def instrFootprint (ep : Endpoint) (delegatedSession : Option SessionId) : Set S
   | some s => {ep.sid, s}
 
 
-/-!
-Proof-only preservation and quotient-respecting theorems for instruction specs
-live in `Runtime.Proofs.VM.InstrSpec`.
--/
+
+/- Proof-only preservation and quotient-respecting theorems for instruction specs
+live in `Runtime.Proofs.VM.InstrSpec`. -/
 
 end

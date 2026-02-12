@@ -82,7 +82,7 @@ theorem instructionBasisExactness_of_components
     InstructionBasisExactness declared representable := by
   exact ⟨hComplete, hMinimal⟩
 
-/-! ### Concrete Canonical Basis Instantiation -/
+/-! ## Concrete Canonical Basis Instantiation -/
 
 /-- Canonical class basis used by the concrete VM exactness instantiation. -/
 def canonicalInstrBasis : List InstrClass :=
@@ -137,7 +137,7 @@ theorem canonicalInstrBasis_exactness :
     canonicalInstrBasis_completeness
     canonicalInstrBasis_minimality
 
-/-! ### VM <-> Classical-Erasure Exact Correspondence -/
+/-! ## VM <-> Classical-Erasure Exact Correspondence -/
 
 /-- The twelve classical erasures tracked by the paper/theory interface. -/
 inductive ClassicalErasure where

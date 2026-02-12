@@ -26,7 +26,7 @@ open SessionCoTypes.EQ2Paco
 open Paco
 open SessionTypes.Participation
 
-/-! ### CProjectU (unfolding-insensitive) EQ2 closure
+/-! ## CProjectU (unfolding-insensitive) EQ2 closure
 
 This is the Coq-style path: project on fully-unfolded global/local types.
 It avoids requiring exact constructor matching on the raw candidate. -/

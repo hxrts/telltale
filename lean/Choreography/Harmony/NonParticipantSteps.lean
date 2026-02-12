@@ -13,7 +13,7 @@ over the operational/projection relation.
 -/
 
 namespace Choreography.Harmony
-/-! ### Non-participant Step Preservation
+/-! ## Non-participant Step Preservation
 
 We prove by mutual induction on `step` and `BranchesStep`. The comm_head/comm_async cases
 use branch coherence and trans_comm_other, and the mu case uses trans_substitute_unfold. -/
@@ -61,6 +61,8 @@ private theorem proj_trans_other_step_core (g g' : GlobalType) (act : GlobalActi
       g act g' hstep hclosed hwf hblind role hns hnr
 
 /-- Non-participating roles have unchanged projections through a step. -/
+
+
 theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : String)
     (hstep : step g act g')
     (hclosed : g.isClosed = true)
@@ -107,6 +109,8 @@ private theorem branches_step_preserves_trans_cons
     hclosed hwf hblind_branches role hns hnr
 
 /-- Branch-level steps preserve trans projection for non-participant roles. -/
+
+
 theorem branches_step_preserves_trans (branches branches' : List (Label × GlobalType))
     (act : GlobalActionR) (role : String)
     (hstep : BranchesStep step branches act branches')
@@ -135,6 +139,8 @@ Note: EnvStep does NOT preserve domain equality because global steps can shrink
 the role set (step_roles_subset). Instead, we have containment.
 
 For domain equality, use EnvStepOnto which projects onto a fixed role set. -/
+
+
 theorem envstep_dom_subset {env env' : ProjectedEnv} {act : GlobalActionR}
     (h : EnvStep env act env') :
     ∀ p, p ∈ env'.map Prod.fst → p ∈ env.map Prod.fst := by
@@ -146,6 +152,8 @@ theorem envstep_dom_subset {env env' : ProjectedEnv} {act : GlobalActionR}
       exact step_roles_subset g g' _ hstep p hp
 
 /-- Build the claims bundle from proven theorems. -/
+
+
 def claims : Claims where
   -- Package the main harmony theorems.
   harmony := step_harmony

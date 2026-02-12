@@ -16,8 +16,8 @@ Solution Structure. We prove:
 4. `diamond_independent`: independent actions commute (diamond property)
 -/
 
-/-!
-## Overview
+
+/-! ## Overview
 
 Determinism states that given the same action context, a configuration transitions
 to a unique next configuration. This is crucial for:

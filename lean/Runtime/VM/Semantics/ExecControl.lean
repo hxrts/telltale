@@ -1,7 +1,7 @@
 import Runtime.VM.Semantics.ExecHelpers
 
-/-!
-# Control-Flow Instruction Semantics
+
+/-! # Control-Flow Instruction Semantics
 
 Step functions for `spawn`, `set`, `move`, `jump`, and `yield`. These are the
 non-session-typed instructions that manipulate coroutine-local state (registers,

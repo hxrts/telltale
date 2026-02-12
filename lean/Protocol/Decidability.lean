@@ -1,8 +1,8 @@
 import Protocol.DeadlockFreedom
 import Protocol.Spatial
 
-/-!
-# MPST Decidability Infrastructure
+
+/-! # MPST Decidability Infrastructure
 
 This module provides decidability instances and boolean decision procedures
 for key predicates in the Protocol library.

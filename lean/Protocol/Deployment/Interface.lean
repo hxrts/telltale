@@ -22,8 +22,7 @@ Solution Structure. We define:
 4. Composition interface for linking deployed protocols
 -/
 
-/-!
-## Overview
+/-! ## Overview
 
 A **deployed protocol** is the artifact produced when a developer:
 1. Defines a protocol (currently as local types, later as global type)
@@ -97,7 +96,7 @@ def DisjointSessions (i₁ i₂ : InterfaceType) : Prop :=
 def exportsMatchImports (i₁ i₂ : InterfaceType) : Bool :=
   i₂.imports.all fun (e, _) => i₁.exports.any fun (e', _) => e == e'
 
-/-! ### Type Compatibility (6.7.1)
+/-! ## Type Compatibility (6.7.1)
 
 Two endpoint-type pairs are compatible if they have the same endpoint
 and dual types. For composition, i₁'s exports should be dual to i₂'s imports.

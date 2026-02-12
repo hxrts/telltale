@@ -1,8 +1,8 @@
 import Protocol.DeliveryModel
 import Protocol.Coherence.EdgeCoherence
 
-/-!
-# Head Coherence (Model-Parametric)
+
+/-! # Head Coherence (Model-Parametric)
 
 HeadCoherent does not depend on the delivery model for FIFO semantics.
 We expose an M-parameterized wrapper for migration and prove FIFO equivalence.

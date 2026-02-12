@@ -15,7 +15,7 @@ Coinductive CProject relation, constructor lemmas, and reflection lemmas connect
 `projectb` to `CProject`.
 -/
 
-/-
+/- 
 The Problem. Projection must handle recursive global types, which requires a
 coinductive definition. The boolean checker `projectb` is executable but we need
 a relational specification `CProject` for reasoning about projection properties.
@@ -311,7 +311,7 @@ private theorem CProjectF_unfold_core_mono_comm_other_cand
     · simp [hrs, hrr] at hcore ⊢
       exact CProjectF_unfold_core_mono_comm_other h hcore
 
-/-! ### Monotonicity for CProjectF_unfold_core -/
+/-! ## Monotonicity for CProjectF_unfold_core -/
 
 private theorem CProjectF_unfold_core_mono : Monotone CProjectF_unfold_core := by
   intro R S h g role cand hrel
@@ -366,7 +366,7 @@ def CProject : ProjRel :=
 def CProjectU : ProjRel :=
   OrderHom.gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩
 
-/-! Shared coinduction aliases (see `CoinductiveRel`). -/
+/- Shared coinduction aliases (see `CoinductiveRel`). -/
 /-- Alias: CProject as gfp via CoinductiveRel. -/
 theorem CProject_gfp : CProject = SessionCoTypes.CoinductiveRel.gfp (F := CProjectF) := rfl
 

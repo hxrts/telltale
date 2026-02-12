@@ -15,8 +15,8 @@ Solution Structure. We prove progress by:
 3. Handling parallel composition via context splitting
 -/
 
-/-!
-## Key Judgments
+
+/-! ## Key Judgments
 
 - `HasTypeProcN n S G D P`: Process P is well-typed under environments S, G, D
   with maximum session ID n

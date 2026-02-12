@@ -24,7 +24,7 @@ Solution Structure. The proof proceeds by coinduction on CProject:
 3. Branch helpers for send/recv cases with Forall₂ induction
 -/
 
-/-! ### trans Branch Helper -/
+/-! ## trans Branch Helper -/
 
 /-- Helper: compute `transBranches` from a BranchesProjRel witness. -/
 theorem transBranches_eq_of_BranchesProjRel

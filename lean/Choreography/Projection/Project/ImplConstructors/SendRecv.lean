@@ -25,7 +25,7 @@ open SessionCoTypes.EQ2Props
 open SessionCoTypes.EQ2Paco
 open Paco
 open SessionTypes.Participation
-/-! ### Send constructor agreement -/
+/-! ## Send constructor agreement -/
 
 /- If CProject g role (.send partner lbs) holds, then g must be a comm where role is sender
     (possibly through non-participant layers), and trans g role = .send partner (transBranches ...).
@@ -239,7 +239,7 @@ private theorem CProject_recv_implies_trans_recv_comm_cons_receiver
   · intro gb hmem
     exact GlobalType.wellFormed_comm_branches sender role (first :: rest) hwf gb hmem
 
-/-! ### Recv constructor agreement -/
+/-! ## Recv constructor agreement -/
 
 /-- Helper: sender role cannot project to `.recv`. -/
 private theorem CProject_recv_implies_trans_recv_comm_sender_contra

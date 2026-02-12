@@ -16,6 +16,7 @@ Solution Structure. We prove head preservation by:
 3. Handling the 3-way edge case split (updated, related, unrelated)
 -/
 
+
 /-!
 In binary session types, coherence states that after consuming in-flight messages,
 dual endpoints have dual types. In MPST, this generalizes to:

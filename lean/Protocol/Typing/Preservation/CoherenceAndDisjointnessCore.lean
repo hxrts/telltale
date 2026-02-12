@@ -15,8 +15,8 @@ Solution Structure. We prove preservation by:
 3. Combining with coherence preservation for the full invariant
 -/
 
-/-!
-## Key Judgments
+
+/-! ## Key Judgments
 
 - `HasTypeProcN n S G D P`: Process P is well-typed under environments S, G, D
   with maximum session ID n

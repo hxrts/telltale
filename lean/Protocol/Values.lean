@@ -16,11 +16,11 @@ Solution Structure. We define:
 4. Helper functions for value typing and comparison
 -/
 
-/-!
-Values include base types (unit, bool, nat, string), products, and
-channel endpoints that carry session identifiers and role names.
 
-## Linear Capability Tokens
+/- Values include base types (unit, bool, nat, string), products, and
+channel endpoints that carry session identifiers and role names. -/
+
+/-! ## Linear Capability Tokens
 
 For proof-carrying runtime, we extend values with linear capability tokens.
 A token `tok e S` represents the capability to use endpoint `e` with local
@@ -51,6 +51,8 @@ inductive Value where
   deriving Repr, DecidableEq
 
 namespace Value
+
+/-! ## Value Projections and Session Bounds -/
 
 /-- Extract session ID from a channel value, if it is one. -/
 def sessionId? : Value → Option SessionId

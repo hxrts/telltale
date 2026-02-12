@@ -49,7 +49,7 @@ private theorem embed_deterministic_var {t : String} {role : String} {g1 g2 : Gl
           rfl
       | _ => simp [CEmbedF] at h2F
   | _ => simp [CEmbedF] at h1F
-
+/-! ## Determinism Core -/
 mutual
 /-- Determinism for embedding: a local type embeds into at most one global type. -/
 theorem embed_deterministic {e : LocalTypeR} {role : String} {g1 g2 : GlobalType}
@@ -65,11 +65,9 @@ theorem embed_deterministic {e : LocalTypeR} {role : String} {g1 g2 : GlobalType
           cases g2 with
           | mu t2 gbody2 =>
               simp [CEmbedF] at h1F h2F
-              rcases h1F with ⟨ht1, _, hbody1⟩
-              rcases h2F with ⟨ht2, _, hbody2⟩
+              rcases h1F with ⟨ht1, _, hbody1⟩; rcases h2F with ⟨ht2, _, hbody2⟩
               subst ht1 ht2
-              have hbody := embed_deterministic hbody1 hbody2
-              simp [hbody]
+              simpa [embed_deterministic hbody1 hbody2]
           | _ => simp [CEmbedF] at h2F
       | _ => simp [CEmbedF] at h1F
   | send receiver lbs =>
@@ -78,11 +76,9 @@ theorem embed_deterministic {e : LocalTypeR} {role : String} {g1 g2 : GlobalType
           cases g2 with
           | comm sender2 receiver2 gbs2 =>
               simp [CEmbedF] at h1F h2F
-              rcases h1F with ⟨hrole1, _, hrecv1, hbr1⟩
-              rcases h2F with ⟨hrole2, _, hrecv2, hbr2⟩
+              rcases h1F with ⟨hrole1, _, hrecv1, hbr1⟩; rcases h2F with ⟨hrole2, _, hrecv2, hbr2⟩
               subst hrole1 hrole2 hrecv1 hrecv2
-              have hbs := branches_embed_deterministic hbr1 hbr2
-              simp [hbs]
+              simpa [branches_embed_deterministic hbr1 hbr2]
           | _ => simp [CEmbedF] at h2F
       | _ => simp [CEmbedF] at h1F
   | recv sender lbs =>
@@ -91,11 +87,9 @@ theorem embed_deterministic {e : LocalTypeR} {role : String} {g1 g2 : GlobalType
           cases g2 with
           | comm sender2 receiver2 gbs2 =>
               simp [CEmbedF] at h1F h2F
-              rcases h1F with ⟨hrole1, _, hsend1, hbr1⟩
-              rcases h2F with ⟨hrole2, _, hsend2, hbr2⟩
+              rcases h1F with ⟨hrole1, _, hsend1, hbr1⟩; rcases h2F with ⟨hrole2, _, hsend2, hbr2⟩
               subst hrole1 hrole2 hsend1 hsend2
-              have hbs := branches_embed_deterministic hbr1 hbr2
-              simp [hbs]
+              simpa [branches_embed_deterministic hbr1 hbr2]
           | _ => simp [CEmbedF] at h2F
       | _ => simp [CEmbedF] at h1F
 termination_by sizeOf e
@@ -105,7 +99,7 @@ decreasing_by
     first
     | exact sizeOf_body_lt_sizeOf_mu _ _
     | exact sizeOf_branches_lt_sizeOf_send _ _
-
+/-! ## Determinism Branches -/
 /-- Determinism for branch-wise embedding. -/
 theorem branches_embed_deterministic {lbs : List BranchR} {role : String}
      {gbs1 gbs2 : List (Label × GlobalType)}
@@ -169,12 +163,11 @@ private theorem embed_project_roundtrip_var {t : String} {role : String} {g : Gl
           rfl
       | _ => simp [CProjectF] at hP
   | _ => simp [CEmbedF] at hF
-
+/-! ## Roundtrip Core -/
 mutual
 /-- Embed then project gives back the same local type. -/
 theorem embed_project_roundtrip {e : LocalTypeR} {role : String} {g : GlobalType} {e' : LocalTypeR}
     (he : CEmbed e role g) (hp : CProject g role e') : e = e' := by
-  -- Reduce to generator forms and dispatch on constructors.
   have hF := CEmbed_destruct he; have hP := CProject_destruct hp
   cases e with
   | «end» => exact embed_project_roundtrip_end hF hP
@@ -185,18 +178,12 @@ theorem embed_project_roundtrip {e : LocalTypeR} {role : String} {g : GlobalType
           cases e' with
           | mu t'' body' =>
               simp [CEmbedF] at hF; rcases hF with ⟨ht1, hguard, hbody1⟩; subst ht1
-              simp [CProjectF] at hP; rcases hP with ⟨hproj, hguard'⟩
-              rcases hguard' with ⟨_hguard, ht''⟩; subst ht''
-              have hbody := embed_project_roundtrip hbody1 hproj
-              simp [hbody]
+              simp [CProjectF] at hP; rcases hP with ⟨hproj, hguard'⟩; rcases hguard' with ⟨_, ht''⟩; subst ht''
+              simpa [embed_project_roundtrip hbody1 hproj]
           | «end» =>
               simp [CEmbedF] at hF; rcases hF with ⟨ht1, hguard, hbody1⟩; subst ht1
               simp [CProjectF] at hP; rcases hP with ⟨candBody, hproj, hguard_false⟩
-              have hbody := embed_project_roundtrip hbody1 hproj
-              have hfalse : body.isGuarded t = false := by simpa [hbody] using hguard_false
-              have : False := by
-                have h := hfalse
-                simp [hguard] at h
+              have : False := by simpa [embed_project_roundtrip hbody1 hproj, hguard] using hguard_false
               exact this.elim
           | _ => simp [CProjectF] at hP
       | _ => simp [CEmbedF] at hF
@@ -206,10 +193,8 @@ theorem embed_project_roundtrip {e : LocalTypeR} {role : String} {g : GlobalType
           simp [CEmbedF] at hF; rcases hF with ⟨hrole, _, hrecv, hbr⟩; subst hrole
           cases e' with
           | send receiver'' lbs' =>
-              simp [CProjectF] at hP; rcases hP with ⟨hrecv', hpr⟩
-              subst hrecv hrecv'
-              have hbs := branches_embed_project_roundtrip hbr hpr
-              simp [hbs]
+              simp [CProjectF] at hP; rcases hP with ⟨hrecv', hpr⟩; subst hrecv hrecv'
+              simpa [branches_embed_project_roundtrip hbr hpr]
           | _ => simp [CProjectF] at hP
       | _ => simp [CEmbedF] at hF
   | recv sender lbs =>
@@ -219,10 +204,8 @@ theorem embed_project_roundtrip {e : LocalTypeR} {role : String} {g : GlobalType
           have hneq' : role ≠ sender := by intro hrole'; exact hneq hrole'.symm
           cases e' with
           | recv sender'' lbs' =>
-              simp [CProjectF, hneq'] at hP; rcases hP with ⟨hsend', hpr⟩
-              subst hsend'
-              have hbs := branches_embed_project_roundtrip hbr hpr
-              simp [hbs]
+              simp [CProjectF, hneq'] at hP; rcases hP with ⟨hsend', hpr⟩; subst hsend'
+              simpa [branches_embed_project_roundtrip hbr hpr]
           | _ => simp [CProjectF, hneq'] at hP
       | _ => simp [CEmbedF] at hF
 termination_by sizeOf e
@@ -232,7 +215,7 @@ decreasing_by
     first
     | exact sizeOf_body_lt_sizeOf_mu _ _
     | exact sizeOf_branches_lt_sizeOf_send _ _
-
+/-! ## Roundtrip Branches -/
 /-- Embed/project roundtrip for branches. -/
 theorem branches_embed_project_roundtrip {lbs : List BranchR} {role : String}
     {gbs : List (Label × GlobalType)} {lbs' : List BranchR}
@@ -279,7 +262,7 @@ theorem project_embed_roundtrip {g g' : GlobalType} {role : String} {e : LocalTy
 
 Any well-formed local type can be embedded into some global type. -/
 
-/-! ### Helper Lemmas -/
+/-! ## Helper Lemmas -/
 
 /-- Helper: contractiveness for mu case of embed_lcontractive_of_local. -/
 private lemma embed_lcontractive_mu_case {t : String} {body' : LocalTypeR}
@@ -311,6 +294,7 @@ private lemma embed_lcontractive_mu_case {t : String} {body' : LocalTypeR}
 
 /-- If a local type body is contractive, then embedding preserves the contractiveness
     property in the global type. This is used in the mu case of localType_has_embed. -/
+/-! ## Embedding Existence Helpers: Contractiveness Lift -/
 private lemma embed_lcontractive_of_local {body : LocalTypeR} {role : String} {gbody : GlobalType}
     (hcontr : LocalTypeR.lcontractive body = true) (hembed : CEmbed body role gbody) :
     Choreography.Projection.Project.lcontractive gbody = true := by
@@ -334,6 +318,7 @@ private lemma embed_lcontractive_of_local {body : LocalTypeR} {role : String} {g
 /-- When lcontractive body = true in the context of a mu, body.isGuarded t = true.
     This follows from the structure of lcontractive which requires send/recv/end at the top,
     all of which are guarded for any variable. -/
+/-! ## Embedding Existence Helpers: Guardedness from Contractiveness -/
 private theorem lcontractive_implies_isGuarded (t : String) (body : LocalTypeR)
     (hcontr : LocalTypeR.lcontractive body = true) :
     body.isGuarded t = true := by
@@ -359,7 +344,7 @@ private theorem lcontractive_implies_isGuarded (t : String) (body : LocalTypeR)
       | mu s' inner' =>
           simp [LocalTypeR.lcontractive] at hcontr
 
-/-! ### Main Existence Theorems -/
+/-! ## Main Existence Theorems -/
 
 /-- Helper: derive branch well-formedness for send from parent well-formedness. -/
 private def derive_send_branch_wf (receiver : String) (lbs : List BranchR) (role : String)
@@ -479,7 +464,7 @@ decreasing_by
     | exact sizeOf_tail_lt_sizeOf_branches _ _
 end
 
-/-! ### Participant Gating -/
+/-! ## Participant Gating -/
 
 /-- If a role participates in a global type and we can project, some embedding exists.
     This is the existential form used for participant gating.

@@ -271,7 +271,7 @@ Credit-based cost model theorems: soundness, budget bounds, and
 information-theoretic costs for branching decisions.
 -/
 
-/-! ### Local Entropy Naming
+/-! ## Local Entropy Naming
 
 This file keeps protocol-oriented names local by mapping them to the neutral
 entropy API at the point of use.

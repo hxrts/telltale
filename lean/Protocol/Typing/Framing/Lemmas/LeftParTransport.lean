@@ -376,8 +376,8 @@ lemma HasTypeProcPreOut_frame_G_left_local
       rename_i Sown G x v T T'
       exact HasTypeProcPreOut.assign_old hNoSh hOwn (HasTypeVal_frame_left (G₁:=Gfr) (G₂:=G) hDisj hv)
 
-/-!
-  Full-G step rule: preserve pre-out typing when stepping in the middle of a G-frame.
+
+  /- Full-G step rule: preserve pre-out typing when stepping in the middle of a G-frame.
   This is kept as an explicit proposition so downstream proofs can thread it
   as a hypothesis while the constructive proof is being migrated.
 -/

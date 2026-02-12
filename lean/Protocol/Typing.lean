@@ -7,8 +7,8 @@ import Protocol.Typing.Framing
 import Protocol.Typing.Preservation
 import Protocol.Typing.Progress
 
-/-!
-# MPST Process Typing
+
+/-! # MPST Process Typing
 
 This module defines the typing rules for MPST processes.
 

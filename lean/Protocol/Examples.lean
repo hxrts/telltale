@@ -1,7 +1,7 @@
 import Protocol.Deployment
 
-/-!
-# Examples (Minimal)
+
+/-! # Examples (Minimal)
 
 This module is currently minimal to keep the Protocol build green while
 example proofs are refactored.

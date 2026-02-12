@@ -159,8 +159,8 @@ theorem blindness_exactness_single_of_counterexample_oracle
 
 end
 
-/-!
-## Summary
+
+/-! ## Summary
 
 This module establishes noninterference for MPST:
 

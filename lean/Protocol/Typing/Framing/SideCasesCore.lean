@@ -1,8 +1,8 @@
 import Protocol.Environments.Core
 import Protocol.Typing.Framing.Lemmas
 
-/-!
-# Protocol.Typing.Framing.SideCasesCore
+
+/-! # Protocol.Typing.Framing.SideCasesCore
 
 Shared side-parameterized cores for mirrored left/right framing case lemmas.
 

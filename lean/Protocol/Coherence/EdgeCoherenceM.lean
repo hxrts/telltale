@@ -1,8 +1,7 @@
 import Protocol.DeliveryModel
 import Protocol.Environments
 
-/-!
-# MPST Coherence (Model-Parametric)
+/-! # MPST Coherence (Model-Parametric)
 
 This module mirrors `Protocol.Coherence.EdgeCoherence` but parameterizes
 coherence by an explicit delivery model.
@@ -28,7 +27,7 @@ def EdgeCoherent (M : DeliveryModel) (G : GEnv) (D : DEnv) (e : Edge) : Prop :=
       lookupG G senderEp = some Lsender ∧
       (M.consume e.sender Lrecv trace).isSome
 
-/-! ### Active Edges -/
+/-! ## Active Edges -/
 
 /-- An edge is active if both sender and receiver endpoints exist in G. -/
 def ActiveEdge (G : GEnv) (e : Edge) : Prop :=
@@ -39,7 +38,7 @@ def ActiveEdge (G : GEnv) (e : Edge) : Prop :=
 def Coherent (M : DeliveryModel) (G : GEnv) (D : DEnv) : Prop :=
   ∀ e, ActiveEdge G e → EdgeCoherent M G D e
 
-/-! ### Small Helpers -/
+/-! ## Small Helpers -/
 
 /-- ActiveEdge from concrete sender/receiver lookups. -/
 theorem ActiveEdge_of_endpoints {G : GEnv} {e : Edge} {Lsender Lrecv : LocalType}

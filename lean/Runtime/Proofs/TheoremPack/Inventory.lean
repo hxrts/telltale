@@ -8,6 +8,8 @@ universe u v
 
 section
 
+/-! ## Base Inventory -/
+
 variable {ν : Type u} [VerificationModel ν]
 def theoremInventory
     {store₀ : SessionStore ν} {State : Type v}
@@ -45,6 +47,8 @@ def theoremInventory
   , ("classical_littles_law", pack.littlesLaw?.isSome)
   , ("classical_functional_clt", pack.functionalCLT?.isSome)
   ]
+
+/-! ## Determinism Extension -/
 
 /-- Theorem inventory extended with determinism artifacts. -/
 def theoremInventoryWithDeterminism

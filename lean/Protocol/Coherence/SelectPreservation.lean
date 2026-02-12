@@ -15,6 +15,7 @@ Solution Structure. We prove select preservation via:
 3. 3-way edge case analysis for unaffected edges
 -/
 
+
 /-!
 In binary session types, coherence states that after consuming in-flight messages,
 dual endpoints have dual types. In MPST, this generalizes to:

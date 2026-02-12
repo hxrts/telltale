@@ -1,7 +1,7 @@
 import Std
 
-/-!
-# Violations and Policy
+
+/-! # Violations and Policy
 
 `Violation` and `ViolationPolicy`, spec-level types for safety and liveness
 violations. A `Violation` is either a safety violation (should never occur in

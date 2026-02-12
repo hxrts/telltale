@@ -71,6 +71,8 @@ theorem project_deterministic {g : GlobalType} {role : String} {e1 e2 : LocalTyp
   subst hEq
   exact EQ2_refl _
 
+/-! ## Branch Determinism Helper -/
+
 /-- Helper: cons case for branches_proj_deterministic. -/
 private theorem branches_proj_deterministic_cons
     (lb1 : BranchR) (lbs1' : List BranchR)
@@ -101,6 +103,8 @@ private theorem branches_proj_deterministic_cons
                 intro gb' hmem; exact hwf gb' (by simp [hmem])
               have htail_eq := branches_det htail1 htail2 hwf_tail
               exact List.Forall₂.cons ⟨rfl, hcont_eq⟩ htail_eq
+
+/-! ## Branch Determinism Theorem -/
 
 /-- Determinism for branch-wise projection up to EQ2 (assuming well-formed branches). -/
 theorem branches_proj_deterministic {gbs : List (Label × GlobalType)} {role : String}

@@ -1,8 +1,8 @@
 import Protocol.Environments.Core
 import Protocol.Environments.Renaming
 
-/-!
-# MPST Environments
+
+/-! # MPST Environments
 
 This module defines the runtime environments for multiparty session types:
 

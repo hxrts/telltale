@@ -1,8 +1,8 @@
 import SessionCoTypes.AsyncSubtyping.Core
 import SessionCoTypes.AsyncSubtyping.Decidable
 
-/-!
-# Async Subtyping for Session Types
+
+/-! # Async Subtyping for Session Types
 
 This module provides decidable async subtyping for regular session types.
 

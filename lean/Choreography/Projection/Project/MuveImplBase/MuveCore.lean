@@ -353,7 +353,7 @@ theorem isMuve_substitute (lt : LocalTypeR) (varName : String) (repl : LocalType
       exact this.elim
 termination_by sizeOf lt
 
-/-! ### Structural Well-Formedness
+/-! ## Structural Well-Formedness
 
 Following the Coq development, we separate structural properties (allCommsNonEmpty, noSelfComm)
 from variable binding (allVarsBound). The structural properties compose well with mu bodies,

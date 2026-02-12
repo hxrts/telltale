@@ -20,8 +20,7 @@ Solution Structure. We prove:
 The proof uses the coherence preservation lemmas from Protocol.Coherence.
 -/
 
-/-!
-## Overview
+/-! ## Overview
 
 The monitor is the trusted component that:
 1. Tracks protocol state (local types, in-flight messages, buffers)
@@ -386,7 +385,7 @@ private def newSessionLin (sid : SessionId) (roles : RoleSet)
     (localTypes : Role → LocalType) : LinCtx :=
   roles.map fun r => ({ sid := sid, role := r }, localTypes r)
 
-/-! ### Certified Session Initialization Requirement -/
+/-! ## Certified Session Initialization Requirement -/
 
 /-- Compile-time proof bundle required to call `MonitorState.newSession`.
 

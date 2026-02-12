@@ -2,7 +2,8 @@ import SessionCoTypes.Coinductive.EQ2C
 import SessionCoTypes.Coinductive.EQ2CMu
 import SessionCoTypes.Coinductive.Roundtrip.Core
 
-/-!
+
+/-
 The Problem. The round-trip proof currently uses ProductiveC to turn
 EQ2C_mu_paco into EQ2C_paco. We want to test whether gpaco closures can
 provide the observable relation needed for the coinductive step without

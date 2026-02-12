@@ -3,8 +3,8 @@ Copyright (c) 2026 Sam Hart. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 
-/-!
-# Value Types for Session Types
+
+/-! # Value Types for Session Types
 
 Shared `ValType` definition used by both `LocalTypeR` (theory) and `LocalType` (runtime).
 Represents the types of values carried in messages.

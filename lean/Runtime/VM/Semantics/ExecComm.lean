@@ -85,6 +85,8 @@ private def sendOnHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
   let (res, bufs') := bufEnqueue cfg st.buffers edge signed
   sendAfterEnqueue st coro ep edge T L' v h res bufs'
 
+/-! ## Send semantics: edge and endpoint dispatch -/
+
 private def sendOnEdge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -128,6 +130,7 @@ private def sendWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
   else
     faultPack st coro (.channelClosed ep) "endpoint not owned"
 
+/-! ## Send semantics: instruction entrypoint -/
 
 def stepSend {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -190,6 +193,8 @@ private def recvAfterDequeue {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     else
       faultPack st coro (.invalidSignature edge) "invalid signature"
 
+/-! ## Receive semantics: dequeue and edge checks -/
+
 private def recvWithHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -242,6 +247,7 @@ private def recvWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
   else
     faultPack st coro (.channelClosed ep) "endpoint not owned"
 
+/-! ## Receive semantics: instruction entrypoint -/
 
 def stepReceive {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -311,6 +317,8 @@ private def offerOnHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
   let (res, bufs') := bufEnqueue cfg st.buffers edge signed
   offerAfterEnqueue st coro ep edge L' lbl h res bufs'
 
+/-! ## Offer semantics: edge and endpoint dispatch -/
+
 private def offerOnEdge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -343,6 +351,7 @@ private def offerWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Guar
   else
     faultPack st coro (.channelClosed ep) "endpoint not owned"
 
+/-! ## Offer semantics: instruction entrypoint -/
 
 def stepOffer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -400,6 +409,8 @@ private def chooseAfterDequeue {ι γ π ε ν : Type u} [IdentityModel ι] [Gua
     else
       faultPack st coro (.invalidSignature edge) "invalid signature"
 
+/-! ## Choose semantics: dequeue and edge checks -/
+
 private def chooseWithHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -445,6 +456,7 @@ private def chooseWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Gua
   else
     faultPack st coro (.channelClosed ep) "endpoint not owned"
 
+/-! ## Choose semantics: instruction entrypoint -/
 
 def stepChoose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]

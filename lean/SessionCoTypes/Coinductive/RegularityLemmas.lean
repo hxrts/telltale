@@ -4,7 +4,8 @@ import SessionCoTypes.Coinductive.Bisim
 
 set_option linter.dupNamespace false
 
-/-!
+
+/-
 The Problem. To prove that constructed coinductive types are regular, we need
 lemmas showing that regularity is preserved by constructors and bisimilarity.
 The key insight is that a node is regular if all its children are regular.

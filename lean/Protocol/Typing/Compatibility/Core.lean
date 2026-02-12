@@ -15,8 +15,7 @@ Solution Structure. We define:
 3. Compatibility lemmas used by the typing judgment
 -/
 
-/-!
-## Key Judgments
+/-! ## Key Judgments
 
 - `HasTypeProcN n S G D P`: Process P is well-typed under environments S, G, D
   with maximum session ID n
@@ -47,7 +46,7 @@ open Batteries
 
 section
 
-/-! ### Global Compatibility (Coinductive) -/
+/-! ## Global Compatibility (Coinductive) -/
 
 /-- GStep: projection of TypedStep to G/D (for compatibility closure). -/
 def GStep (G : GEnv) (D : DEnv) (G' : GEnv) (D' : DEnv) : Prop :=
@@ -94,7 +93,7 @@ theorem Compatible_preserved
   | mk _ _ hClosed =>
       exact hClosed ⟨Ssh, Sown, store, bufs, P, Sown', store', bufs', P', hTS⟩
 
-/-! ### LocalTypeR.WellFormed Predicate -/
+/-! ## LocalTypeR.WellFormed Predicate -/
 
 /-- Well-formed process configuration.
 

@@ -61,11 +61,15 @@ open Choreography.Projection.Project
 open SessionCoTypes.EQ2
 
 -- Alias to avoid confusion
+
+
 abbrev projTrans := trans
 
 /-! ## Helper Lemmas for transBranches and membership -/
 
 /-- If `(label, cont) ∈ branches`, then `(label, none, trans cont role) ∈ transBranches branches role`. -/
+
+
 theorem mem_transBranches_of_mem (branches : List (Label × GlobalType))
     (label : Label) (cont : GlobalType) (role : String)
     (hmem : (label, cont) ∈ branches) :
@@ -87,6 +91,8 @@ theorem mem_transBranches_of_mem (branches : List (Label × GlobalType))
 /-! ## Projection Shape Lemmas -/
 
 /-- For the comm_head case: if role = sender, the projection is `.send receiver branches`. -/
+
+
 theorem proj_trans_comm_sender_is_send
     (sender receiver : String) (branches : List (Label × GlobalType)) :
     trans (.comm sender receiver branches) sender =
@@ -95,6 +101,8 @@ theorem proj_trans_comm_sender_is_send
   exact trans_comm_sender sender receiver sender branches rfl
 
 /-- For the comm_head case: if role = receiver, the projection is `.recv sender branches`. -/
+
+
 theorem proj_trans_comm_receiver_is_recv
     (sender receiver : String) (branches : List (Label × GlobalType))
     (hne : receiver ≠ sender) :
@@ -121,6 +129,8 @@ private def action_pred (g : GlobalType) (act : GlobalActionR) : Prop :=
 
 /-- Statement type for step projection (sender).
     This factored-out type helps with the mutual induction. -/
+
+
 abbrev SenderStepResult (g : GlobalType) (act : GlobalActionR) (g' : GlobalType) : Prop :=
   -- Either the sender exposes the branch continuation, or stays EQ2-equivalent.
   (∃ bs lt, projTrans g act.sender = .send act.receiver bs ∧
@@ -172,6 +182,8 @@ private theorem proj_trans_sender_step_v2_mu (t : String) (body : GlobalType)
   exact this.elim
 
 /-- Sender-side step projection under the head-action predicate. -/
+
+
 theorem proj_trans_sender_step_v2 (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hpred : action_pred g act) :
     SenderStepResult g act g' := by
@@ -185,6 +197,8 @@ theorem proj_trans_sender_step_v2 (g g' : GlobalType) (act : GlobalActionR)
       exact proj_trans_sender_step_v2_mu t body act g' hstep_inner hpred
 
 /-- Statement type for step projection (receiver). -/
+
+
 abbrev ReceiverStepResult (g : GlobalType) (act : GlobalActionR) (g' : GlobalType) : Prop :=
   -- Either the receiver exposes the branch continuation, or stays EQ2-equivalent.
   (∃ bs lt, projTrans g act.receiver = .recv act.sender bs ∧
@@ -224,6 +238,8 @@ private theorem proj_trans_receiver_step_mu
   simp [action_pred] at hpred
 
 /-- Receiver-side step projection under the head-action predicate. -/
+
+
 theorem proj_trans_receiver_step_v2 (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hpred : action_pred g act) (hno_self : g.noSelfComm = true) :
     ReceiverStepResult g act g' := by
@@ -246,6 +262,8 @@ theorem proj_trans_receiver_step_v2 (g g' : GlobalType) (act : GlobalActionR)
 
 We expose a lightweight compatibility wrapper that simply reuses the v2
 statement under the head-action predicate. -/
+
+
 theorem proj_trans_sender_step_original_compat (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hpred : action_pred g act) :
     SenderStepResult g act g' := by

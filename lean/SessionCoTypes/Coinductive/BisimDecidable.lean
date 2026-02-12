@@ -3,8 +3,8 @@ import SessionCoTypes.Coinductive.BisimDecidable.BisimAux
 import SessionCoTypes.Coinductive.BisimDecidable.Correctness
 import SessionCoTypes.Coinductive.BisimDecidable.Decidable
 
-/-!
-# Decidable Bisimulation for Regular Types
+
+/-! # Decidable Bisimulation for Regular Types
 
 This module implements a decidable bisimulation check for regular coinductive types,
 following the approach in the Coq reference implementation (subject_reduction/theories/CoTypes/bisim.v).

@@ -1,8 +1,8 @@
 import Runtime.VM.Model.State
 import Runtime.VM.Semantics.Exec
 
-/-!
-# VM Definition (Re-exports)
+
+/-! # VM Definition (Re-exports)
 
 Single import point for the VM specification. Importing this file gives access to
 the full runtime state (`VMState`, `CoroutineState`, events, results) from `State`
