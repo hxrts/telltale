@@ -44,6 +44,7 @@ lemma lookupD_swap_left {D₁ D₂ D₃ : DEnv} (hDisj : DisjointD D₁ D₂) :
       have hB := findD_append_right (D₁:=D₂ ++ D₁) (D₂:=D₃) (e:=e) hLeft'
       simp [lookupD, hA, hB]
 
+/-! ## DEnv Update over Left Append -/
 lemma findD_updateD_append_left {D D₂ : DEnv} {e e' : Edge} {ts : List ValType} :
     (updateD (D ++ D₂) e ts).find? e' = (updateD D e ts ++ D₂).find? e' := by
   by_cases hEq : e' = e
@@ -77,6 +78,7 @@ lemma findD_updateD_append_left {D D₂ : DEnv} {e e' : Edge} {ts : List ValType
           simp [hA, hB]
         simp [hLeft, hRight]
 
+/-! ## DEnv Update over Right Append -/
 lemma findD_updateD_append_right {D₁ D : DEnv} {e e' : Edge} {ts : List ValType}
     (hNone : D₁.find? e = none) :
     (updateD (D₁ ++ D) e ts).find? e' = (D₁ ++ updateD D e ts).find? e' := by
@@ -108,6 +110,7 @@ lemma findD_updateD_append_right {D₁ D : DEnv} {e e' : Edge} {ts : List ValTyp
           simp [hA, hB, hfind]
         simp [hLeft, hRight]
 
+/-! ## DEnv updateD Append Equalities -/
 lemma updateD_append_left (D D₂ : DEnv) (e : Edge) (ts : List ValType) :
     updateD (D ++ D₂) e ts = updateD D e ts ++ D₂ := by
   apply DEnv_ext
@@ -121,6 +124,7 @@ lemma updateD_append_right (D₁ D : DEnv) (e : Edge) (ts : List ValType)
   intro e'
   exact findD_updateD_append_right (D₁:=D₁) (D:=D) (e:=e) (e':=e') (ts:=ts) hNone
 
+/-! ## GEnv Update over Right Append -/
 lemma updateG_append_right_hit {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType}
     (hNone : lookupG G₁ e = none) :
     updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L := by
@@ -156,6 +160,7 @@ theorem ValidLabels_preserved_frame_left
     ValidLabels (G' ++ Gfr) (D' ++ Dfr) bufs' := by
   intro hTS hDisj hConsFr hValid hCoh hBT
   induction hTS generalizing Gfr Dfr with
+  /-! ## ValidLabels Framing Preservation: Send Case -/
   | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
       subst hEdge hGout hDout hBufsOut
@@ -195,6 +200,7 @@ theorem ValidLabels_preserved_frame_left
           (senderEp:=e) (receiverRole:=target) (T:=T) (L:=L) (v:=v)
           hValid hCoh hBT hG' hRecvReady'
       simpa [updateG_append_left_hit hG, enqueueBuf, List.append_assoc] using hValid'
+  /-! ## ValidLabels Framing Preservation: Recv Case -/
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
       subst hEdge hGout hDout hSout hStoreOut hBufsOut
@@ -209,6 +215,7 @@ theorem ValidLabels_preserved_frame_left
           (receiverEp:=e) (senderRole:=source) (T:=T) (L:=L) (v:=v) (vs:=vs)
           hValid hCoh hBT hBuf hv' hG'
       simpa [ValidLabels, updateG_append_left_hit hG, List.append_assoc] using hValid'
+  /-! ## ValidLabels Framing Preservation: Select Case -/
   | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
       subst hEdge hGout hDout hBufsOut
@@ -248,6 +255,7 @@ theorem ValidLabels_preserved_frame_left
           (selectorEp:=e) (targetRole:=target) (selectBranches:=bs) (ℓ:=ℓ) (L:=L)
           hValid hCoh hBT hG' hFind hReady'
       simpa [ValidLabels, updateG_append_left_hit hG, enqueueBuf, List.append_assoc] using hValid'
+  /-! ## ValidLabels Framing Preservation: Branch Case -/
   | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
       subst hEdge hGout hDout hBufsOut
@@ -258,6 +266,7 @@ theorem ValidLabels_preserved_frame_left
           (brancherEp:=e) (senderRole:=source) (branchOptions:=bs) (ℓ:=ℓ) (L:=L) (vs:=vs)
           hValid hCoh hBT hG' hFindT hBuf
       simpa [ValidLabels, updateG_append_left_hit hG, List.append_assoc] using hValid'
+  /-! ## ValidLabels Framing Preservation: Structural Cases -/
   | assign =>
       simpa using hValid
   | seq_step _ ih =>
@@ -273,6 +282,7 @@ theorem ValidLabels_preserved_frame_left
   | par_skip_right =>
       simpa using hValid
 
+/-! ## ValidLabels Preservation without Extra Frame -/
 theorem ValidLabels_preserved
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
