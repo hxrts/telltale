@@ -36,6 +36,7 @@ def initDEnv (_sid : SessionId) (_roles : RoleSet) : DEnv :=
     (∅ : DEnv).find? e = none := by
   simp [DEnv.find?, DEnv_map_find?_empty]
 
+/-! ## DEnvUnion Identity Laws -/
 theorem DEnvUnion_empty_right (D : DEnv) : DEnvUnion D (∅ : DEnv) = D := by
   apply DEnv_eq_of_find?_eq
   intro e
@@ -71,6 +72,7 @@ theorem DEnvUnion_empty_left (D : DEnv) : DEnvUnion (∅ : DEnv) D = D := by
           (rbmapOfList D.map.toList).find? e := by
       exact congrArg (fun m => m.find? e) hFold
     exact hFoldFind.trans (rbmapOfList_toList_find? D.map e)
+  /-! ## Empty-Left Proof: Pairwise Fold Alignment -/
   -- Since we start from empty, acc.find? is always none for unseen keys.
   -- With unique keys (from sorted), every key is unseen.
   have hSorted : D.map.toList.Pairwise edgeCmpLT := by
@@ -107,6 +109,7 @@ theorem DEnvUnion_empty_left (D : DEnv) : DEnvUnion (∅ : DEnv) D = D := by
     have := RBMap.find?_insert_of_ne (t := acc) (k := p.1) (v := p.2) (k' := q.1) hNe
     simpa [this] using hNoneQ
 
+/-! ## DEnvUnion Lookup when Key is in Left -/
 /-- DEnvUnion find? when key is in left. -/
 theorem DEnvUnion_find?_left {D1 D2 : DEnv} {e : Edge} {ts : Trace}
     (h : D1.find? e = some ts) :
@@ -154,6 +157,7 @@ theorem DEnvUnion_find?_left {D1 D2 : DEnv} {e : Edge} {ts : Trace}
               ih (acc := acc.insert p.1 p.2) hacc'
   simpa [f] using hfold (ps := D2.map.toList) (acc := D1.map) h0
 
+/-! ## DEnvUnion Lookup when Key is Absent from Left -/
 /-- DEnvUnion find? when key not in left. -/
 theorem DEnvUnion_find?_right {D1 D2 : DEnv} {e : Edge}
     (h : D1.find? e = none) :
@@ -201,6 +205,7 @@ theorem DEnvUnion_find?_right {D1 D2 : DEnv} {e : Edge}
                 simp [hEq1, hEq2]
               simpa [List.foldl_cons, f, hkey, h1, h2] using
                 ih (acc1 := acc1.insert e p.2) (acc2 := acc2.insert e p.2) hEq'
+        /-! ## Empty-Left Lookup: Non-target Key Case -/
         · have hne' : compare e p.1 ≠ .eq := by
             intro hEq
             apply hkey
@@ -247,6 +252,7 @@ theorem DEnvUnion_find?_right {D1 D2 : DEnv} {e : Edge}
     simpa [Batteries.RBMap.foldl_eq_foldl_toList] using hEmptyUnion'
   exact hEqFold.trans hEmptyFold
 
+/-! ## updateD Distribution over DEnvUnion -/
 /-- updateD distributes over DEnvUnion when key not in left. -/
 theorem updateD_DEnvUnion_right {D1 D2 : DEnv} {e : Edge} {ts : List ValType}
     (h : D1.find? e = none) :
@@ -275,7 +281,8 @@ theorem updateD_DEnvUnion_right {D1 D2 : DEnv} {e : Edge} {ts : List ValType}
         simpa [updateD, DEnv_find?_ofMap] using hfind
       simp [hUpd] at hRight'
       exact hRight'
-    simp [hLeft, hRight]
+      simp [hLeft, hRight]
+  /-! ## updateD Distribution: Non-updated Keys -/
   · -- other keys unchanged
     have hLeft :
         (updateD (D1 ++ D2) e ts).find? e' = (D1 ++ D2).find? e' := by
@@ -312,6 +319,7 @@ theorem updateD_DEnvUnion_right {D1 D2 : DEnv} {e : Edge} {ts : List ValType}
           simpa [updateD, DEnv_find?_ofMap] using hfind
         simp [hLeft, hLeftUnion, hRightUnion, hUpd]
 
+/-! ## DEnvUnion Associativity -/
 /-- DEnvUnion is associative. -/
 theorem DEnvUnion_assoc (D1 D2 D3 : DEnv) : (D1 ++ D2) ++ D3 = D1 ++ (D2 ++ D3) := by
   apply DEnv_eq_of_find?_eq
@@ -348,6 +356,7 @@ theorem DEnvUnion_assoc (D1 D2 D3 : DEnv) : (D1 ++ D2) ++ D3 = D1 ++ (D2 ++ D3) 
             DEnvUnion_find?_right (D1 := D2) (D2 := D3) (e := e) h2
           simp [hLeft, hRight1, hRight2]
 
+/-! ## initBuffers Membership Lookup -/
 /-- Looking up an edge in initBuffers returns empty if edge is in allEdges. -/
 theorem initBuffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hMem : e ∈ RoleSet.allEdges sid roles) :
@@ -371,6 +380,7 @@ theorem initBuffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
         simp only [hNeq]
         exact ih hTl
 
+/-! ## initDEnv Trivial Lookup Lemmas -/
 /-- Looking up an edge in initDEnv returns empty if edge is in allEdges. -/
 theorem initDEnv_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
     (_hMem : e ∈ RoleSet.allEdges sid roles) :
@@ -383,6 +393,7 @@ theorem initDEnv_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
     lookupD (initDEnv sid roles) e = [] := by
   simp [initDEnv, lookupD]
 
+/-! ## initBuffers Non-membership from Lookup None -/
 /-- If initBuffers returns none, the edge is not in the role edges. -/
 theorem initBuffers_not_mem_of_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
     (h : (initBuffers sid roles).lookup e = none) :
@@ -392,6 +403,7 @@ theorem initBuffers_not_mem_of_lookup_none (sid : SessionId) (roles : RoleSet) (
   have hSome := initBuffers_lookup_mem sid roles e hMem
   exact Option.noConfusion (hSome.symm.trans h)
 
+/-! ## initBuffers Lookup None for Non-members -/
 /-- initBuffers returns none for edges not in allEdges. -/
 theorem initBuffers_lookup_none_of_notin (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hNot : e ∉ RoleSet.allEdges sid roles) :
@@ -409,6 +421,7 @@ theorem initBuffers_lookup_none_of_notin (sid : SessionId) (roles : RoleSet) (e 
       simp only [hne]
       exact ih hNot.2
 
+/-! ## initBuffers Session-Mismatch Lookup None -/
 /-- Looking up an edge with a different sid in initBuffers returns none. -/
 theorem initBuffers_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hne : e.sid ≠ sid) :
@@ -431,6 +444,7 @@ theorem initBuffers_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
     simp only [hBeqFalse]
     exact ih hNotIn.2
 
+/-! ## initDEnv Non-membership Lookup None -/
 /-- initDEnv has no entry for edges outside allEdges. -/
 theorem initDEnv_find?_none_of_notin (sid : SessionId) (roles : RoleSet) (e : Edge)
     (_hNot : e ∉ RoleSet.allEdges sid roles) :
