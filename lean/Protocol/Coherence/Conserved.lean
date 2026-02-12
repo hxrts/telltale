@@ -83,6 +83,8 @@ def SameConservedQuantities (C₁ C₂ : CoherenceConfig) : Prop :=
         renameEdgeTypeTrace (SessionIso.toRenaming σ)
           ((conservedOf C₁).typeTraceConsistency e))
 
+/-! ## Conserved/Profile Equivalence (`ConfigEquiv`) -/
+
 /-- `ConfigEquiv` implies equality of conserved profiles. -/
 theorem sameConserved_of_ConfigEquiv {C₁ C₂ : CoherenceConfig}
     (hEq : ConfigEquiv C₁ C₂) :
@@ -120,6 +122,8 @@ theorem sameConserved_of_ConfigEquiv {C₁ C₂ : CoherenceConfig}
       rw [EdgeTypeTrace.mk.injEq]
       exact ⟨hSender', hReceiver', hTrace'⟩
 
+/-! ## Reconstructing `ConfigEquiv` from Conserved Profiles -/
+
 /-- Equality of conserved profiles implies `ConfigEquiv`. -/
 theorem ConfigEquiv_of_sameConserved {C₁ C₂ : CoherenceConfig}
     (hSame : SameConservedQuantities C₁ C₂) :
@@ -142,6 +146,8 @@ theorem configEquiv_iff_sameConservedQuantities (C₁ C₂ : CoherenceConfig) :
   · exact sameConserved_of_ConfigEquiv
   · exact ConfigEquiv_of_sameConserved
 
+/-! ## Symmetry Action and Noether-Style Conservation -/
+
 /-- Symmetry action on configurations (session-ID renaming). -/
 def symmetryAction (σ : SessionIso) (C : CoherenceConfig) : CoherenceConfig :=
   { G := renameGEnv (SessionIso.toRenaming σ) C.G
@@ -157,6 +163,8 @@ theorem noether_coherence_conservation :
   intro σ C hCoh
   simpa [symmetryAction] using
     (CoherentRenaming (ρ := SessionIso.toRenaming σ) (G := C.G) (D := C.D) hCoh)
+
+/-! ## Observational Erasure and Quotient Invariance -/
 
 /-- Setoid for observational erasure by `ConfigEquiv`. -/
 def ConfigEquivSetoid : Setoid CoherenceConfig where
@@ -209,6 +217,8 @@ theorem factorsThroughObservationalErasure_of_configEquivInvariant
   intro C
   rfl
 
+/-! ## Quotient Universality -/
+
 /-- Quotient universality for coherence observables:
     factorization through `observationalErasure` iff `ConfigEquiv`-invariance. -/
 theorem factorsThroughObservationalErasure_iff_configEquivInvariant
@@ -217,6 +227,8 @@ theorem factorsThroughObservationalErasure_iff_configEquivInvariant
   constructor
   · exact configEquivInvariant_of_factorsThroughObservationalErasure
   · exact factorsThroughObservationalErasure_of_configEquivInvariant
+
+/-! ## Session-Projection Helpers -/
 
 /-- Empty edge snapshot used by out-of-session projections. -/
 def emptyEdgeTypeTrace : EdgeTypeTrace :=
@@ -240,6 +252,8 @@ theorem projectSessionConserved_local_types (Q : ConservedQuantities) (sid₀ : 
     {e : Edge} (hSid : e.sid ≠ sid₀) :
     (projectSessionConserved Q sid₀).typeTraceConsistency e = emptyEdgeTypeTrace := by
   simp [projectSessionConserved, hSid]
+
+/-! ## Edge Resource Conservation -/
 
 /-- Edge-local resource mass (trace length). -/
 def edgeResourceMass (Q : ConservedQuantities) (e : Edge) : Nat :=
