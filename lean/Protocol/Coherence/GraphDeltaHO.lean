@@ -80,10 +80,11 @@ lemma consumeOneHO_realizable (from_ receiver : Role) (T : ValType) (L : LocalTy
             | inr hnil => cases hnil
         · intro e he; simp at he
       · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
-    | _ => simp [consumeOneHO] at h
-  | unit =>
-    -- Non-channel case: delta is empty, trivially realizable
-    cases L with
+	    | _ => simp [consumeOneHO] at h
+	  /-! ## `consumeOneHO_realizable`: Scalar Cases -/
+	  | unit =>
+	    -- Non-channel case: delta is empty, trivially realizable
+	    cases L with
     | recv r' T' L' =>
       simp only [consumeOneHO] at h
       by_cases hEq : from_ == r' && ValType.unit == T'
@@ -102,10 +103,11 @@ lemma consumeOneHO_realizable (from_ receiver : Role) (T : ValType) (L : LocalTy
         simp only [Option.some.injEq] at h
         rw [← h]
         simp [GraphDelta.realizable, GraphDelta.empty]
-      · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
-    | _ => simp [consumeOneHO] at h
-  | nat =>
-    cases L with
+	      · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
+	    | _ => simp [consumeOneHO] at h
+	  /-! ## `consumeOneHO_realizable`: Remaining Base Cases -/
+	  | nat =>
+	    cases L with
     | recv r' T' L' =>
       simp only [consumeOneHO] at h
       by_cases hEq : from_ == r' && ValType.nat == T'
@@ -124,10 +126,11 @@ lemma consumeOneHO_realizable (from_ receiver : Role) (T : ValType) (L : LocalTy
         simp only [Option.some.injEq] at h
         rw [← h]
         simp [GraphDelta.realizable, GraphDelta.empty]
-      · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
-    | _ => simp [consumeOneHO] at h
-  | prod t1 t2 =>
-    cases L with
+	      · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
+	    | _ => simp [consumeOneHO] at h
+	  /-! ## `consumeOneHO_realizable`: Product Case -/
+	  | prod t1 t2 =>
+	    cases L with
     | recv r' T' L' =>
       simp only [consumeOneHO] at h
       by_cases hEq : from_ == r' && ValType.prod t1 t2 == T'
@@ -135,8 +138,10 @@ lemma consumeOneHO_realizable (from_ receiver : Role) (T : ValType) (L : LocalTy
         simp only [Option.some.injEq] at h
         rw [← h]
         simp [GraphDelta.realizable, GraphDelta.empty]
-      · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
-    | _ => simp [consumeOneHO] at h
+	      · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
+	    | _ => simp [consumeOneHO] at h
+
+/-! ## ConsumeHO Realizability over Traces -/
 
 /-- If ConsumeHO succeeds and the session environment is well-formed,
     the resulting delta is realizable. -/
