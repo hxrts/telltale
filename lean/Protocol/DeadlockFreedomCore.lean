@@ -114,6 +114,8 @@ theorem not_stuck (C : Config) (Ssh Sown : SEnv)
 
 /-! ## Session Isolation -/
 
+/-! ## Session-Affecting Step Identification -/
+
 /-- Get the session ID affected by a step, if applicable.
     Returns the session ID of the endpoint involved in communication steps,
     or the newly created session for newSession. -/
@@ -142,6 +144,8 @@ def stepSessionId (C : Config) : Option SessionId :=
 def affectsSession (C : Config) (sid : SessionId) : Prop :=
   stepSessionId C = some sid
 
+/-! ## Session Isolation Under Head Steps -/
+
 /-- Sessions don't interfere with each other.
 
 A step affecting session s₁ leaves session s₂'s buffers unchanged. -/
@@ -155,6 +159,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
   intro ep hep
   -- Define the edge we're querying
   let queryEdge : Edge := { sid := ep.sid, sender := ep.role, receiver := r }
+  /-! ## session_isolation: Step-Form Case Analysis -/
   cases hStep with
   | send hProc hk hx hG =>
     -- send modifies edge based on endpoint from store
@@ -170,6 +175,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     have heSid : (_ : Endpoint).sid = s1 := Option.some_injective _ hAffects
     rw [heSid, hep] at h1
     exact hNeq h1
+  /-! ## session_isolation: Receive Case -/
   | recv hProc hk hG hBufLookup =>
     -- recv modifies edge based on endpoint from store
     simp only [affectsSession, stepSessionId, hProc, hk] at hAffects
@@ -184,6 +190,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     have heSid : (_ : Endpoint).sid = s1 := Option.some_injective _ hAffects
     rw [heSid, hep] at h1
     exact hNeq h1
+  /-! ## session_isolation: Select Case -/
   | select hProc hk hG hFind =>
     -- select is like send
     simp only [affectsSession, stepSessionId, hProc, hk] at hAffects
@@ -196,6 +203,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     have heSid : (_ : Endpoint).sid = s1 := Option.some_injective _ hAffects
     rw [heSid, hep] at h1
     exact hNeq h1
+  /-! ## session_isolation: Branch Case -/
   | branch hProc hk hG hBufVal hFindP hFindT hdq =>
     -- branch modifies bufs directly via hdq
     rename_i bufs'_  -- the bufs' implicit argument
@@ -216,6 +224,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     have heSid : (_ : Endpoint).sid = s1 := Option.some_injective _ hAffects
     rw [heSid, hep] at h1
     exact hNeq h1
+  /-! ## session_isolation: New-Session Case -/
   | newSession hProc =>
     -- newSession prepends buffers for session C.nextSid = s1
     rename_i theRoles _ _  -- the implicit roles, f, P arguments
@@ -232,6 +241,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     have hLookupNone := initBuffers_lookup_none C.nextSid theRoles queryEdge hSidNe
     rw [hLookupNone]
     simp only [Option.none_or]
+  /-! ## session_isolation: Buffer-Preserving Structural Cases -/
   | assign hProc =>
     -- assign doesn't modify buffers
     rfl
@@ -244,6 +254,8 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
   | par_skip_right hProc =>
     -- par_skip_right doesn't modify buffers
     rfl
+
+/-! ## Disjoint-Step Commutativity Corollary -/
 
 /-- Disjoint sessions can be stepped independently.
 
