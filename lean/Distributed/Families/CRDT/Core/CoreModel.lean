@@ -25,6 +25,8 @@ namespace CRDT
 
 universe u v w x y z
 
+/-! ## Model Interface and Core Relations -/
+
 /-- Minimal model interface for CRDT-envelope and equivalence reasoning. -/
 structure Model
     (State : Type u)
@@ -65,6 +67,8 @@ def Envelope
     (ref impl : Run State) : Prop :=
   ∀ n, EqSafe M (ref n) (impl n)
 
+/-! ## Envelope Theorem Forms -/
+
 /-- Soundness half: admitted implementations stay inside the CRDT envelope. -/
 def EnvelopeSoundness
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
@@ -89,6 +93,8 @@ def EnvelopeMaximality
       ∀ n, EqSafe M (ref n) (impl n)) →
       (∀ ref impl, RefRun ref → ImplRun impl → R ref impl → Envelope M ref impl)
 
+/-! ## Exactness and Adequacy Forms -/
+
 /-- Exact characterization theorem form for `Envelope_crdt`. -/
 def ExactEnvelopeCharacterization
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
@@ -104,6 +110,8 @@ def ObservationalAdequacyModuloEnvelope
     (M : Model State Op Context Obs Program)
     (RefRun ImplRun : Run State → Prop) : Prop :=
   ∀ ref impl, RefRun ref → ImplRun impl → Envelope M ref impl
+
+/-! ## Budget and Capability Forms -/
 
 /-- Capability budget domain (coarse but decidable). -/
 abbrev DiffBudget := Nat
@@ -126,6 +134,8 @@ def AdmissionSoundness
 def AdmissionCompleteness
     (dProg envelopeBudget : DiffBudget) : Prop :=
   ∀ dUser, dUser ≤ dProg ↔ CapabilityAdmissible envelopeBudget dUser
+
+/-! ## Equivalence and Approximation Forms -/
 
 /-- Op-vs-state semantics equivalence theorem form. -/
 def OpStateEquivalence
@@ -167,6 +177,8 @@ def ExactSECRecoveryAsLimit
     (policy : Nat → Nat)
     (ref impl : Run State) : Prop :=
   (∀ t, policy t = 0) → BoundedMetadataApproximation M policy 0 0 ref impl
+
+/-! ## OpCore Continuation and Evaluation -/
 
 /-- First-order serializable core continuation payload (`OpCore`). -/
 structure OpCore (OpTag : Type v) (Args : Type w) where
@@ -224,6 +236,8 @@ theorem replayStable_of_deltaIdempotent
   · simpa [h] using hIdem k.opTag k.args s
   · simp [h]
 
+/-! ## Serialization Invariance Forms -/
+
 /-- Serialization roundtrip property for transport-stable `OpCore` payloads. -/
 def SerializationRoundTrip
     {OpTag : Type v} {Args : Type w} {Enc : Type x}
@@ -246,6 +260,8 @@ theorem transportSerializationInvariant_of_roundTrip
     (hRoundTrip : SerializationRoundTrip encode decode) :
     TransportSerializationInvariant encode decode :=
   hRoundTrip
+
+/-! ## Boundary Counterexample: Missing Causal Guard -/
 
 /-- Evaluator variant without causal-guard checking (used for boundary counterexamples). -/
 def evalCoreNoGuard
@@ -300,6 +316,8 @@ theorem envelopeCounterexample_without_causalGuard :
       interpDeniedIncrement, unitOpCore] at h0
   exact Nat.zero_ne_one hEq
 
+/-! ## Boundary Counterexample: Nondeterministic Step -/
+
 /-- Nondeterministic one-step semantics used to witness loss of determinism. -/
 def evalCoreNondet (s out : Nat) : Prop :=
   out = s ∨ out = s + 1
@@ -330,6 +348,8 @@ theorem envelopeCounterexample_without_determinism :
     have hEq : (0 : Nat) = 1 := by
       simp [EqSafe, natUnitModel, refRunDetZero, implRunNondetOne] at h0
     exact Nat.zero_ne_one hEq
+
+/-! ## Boundary Counterexample: Replay Discipline -/
 
 /-- Interpreter with duplicate-sensitive delta (increment). -/
 def interpReplayUnsafe : OpCoreInterpreter Nat Unit Unit Unit where
