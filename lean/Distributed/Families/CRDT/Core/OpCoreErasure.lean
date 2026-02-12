@@ -62,6 +62,8 @@ def ErasureMaximality
       ∃ normalize : OpCore OpTag Args → OpCore OpTag Args,
         ∀ kr, erase' kr = normalize (erase kr)
 
+/-! ## Erasure Theorem Shape -/
+
 /-- Weakest-core erasure theorem shape (soundness + completeness + maximality). -/
 def WeakestOpCoreErasureTheorem
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
@@ -73,6 +75,8 @@ def WeakestOpCoreErasureTheorem
   ErasureSoundness M evalRich interp erase ∧
   ErasureCompleteness M interp erase ∧
   ErasureMaximality M interp erase
+
+/-! ## Compile-Time Lowering Gate -/
 
 /-- Lowering relation used by compile-time conformance gates. -/
 abbrev LowerToCore (KRich : Type z) (OpTag : Type v) (Args : Type w) :=
@@ -99,6 +103,8 @@ theorem conformanceGate_accepts_lowerable
     (h : lower kr = some kc) :
     conformanceGate lower kr = true := by
   simp [conformanceGate, h]
+
+/-! ## Premise Bundle and Derived Lemmas -/
 
 /-- Erasure premise bundle for least-expressive `OpCore` theorem proving. -/
 structure ErasurePremises
@@ -144,6 +150,8 @@ theorem opCoreSerializationInvariant_of_premises
     TransportSerializationInvariant p.encode p.decode :=
   p.serializationWitness
 
+/-! ## Premise-Derived Conformance Gate Lemma -/
+
 /-- Conformance-gate theorem from lowering evidence. -/
 theorem conformanceGate_of_loweringSound
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
@@ -162,6 +170,8 @@ theorem conformanceGate_of_loweringSound
   · intro hLowered
     rcases hLowered with ⟨kc, hk⟩
     simp [hk]
+
+/-! ## Serializable AST Reduction Results -/
 
 /-- `ErasurePremises` viewed as an admissible serializable-AST continuation model. -/
 abbrev SerializableASTContinuationModel
@@ -213,6 +223,8 @@ theorem serializableAST_reducible_or_rejected
       refine ⟨kc, rfl, ?_⟩
       simpa [hk] using hSound
 
+/-! ## Core-Equivalent Rich Fragment -/
+
 /-- A concrete rich continuation fragment equivalent to core payloads. -/
 inductive CoreEquivalentKRich (OpTag : Type v) (Args : Type w) where
   | core : OpCore OpTag Args → CoreEquivalentKRich OpTag Args
@@ -236,6 +248,8 @@ def lowerCoreEquivalent
     {OpTag : Type v} {Args : Type w} :
     LowerToCore (CoreEquivalentKRich OpTag Args) OpTag Args
   | .core kc => some kc
+
+/-! ## Core-Equivalent Erasure Proofs -/
 
 /-- Soundness for the core-equivalent erasure fragment. -/
 theorem erasureSoundness_coreEquivalent
@@ -274,6 +288,8 @@ theorem erasureMaximality_coreEquivalent
   cases kr with
   | core kc => rfl
 
+/-! ## Core-Equivalent Weakest-Erasure Theorem -/
+
 /-- Weakest-core erasure theorem for the core-equivalent rich fragment. -/
 theorem weakestOpCoreErasure_coreEquivalent
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
@@ -305,6 +321,8 @@ theorem conformanceGate_coreEquivalent_true
   cases kr with
   | core kc =>
       simp [conformanceGate, lowerCoreEquivalent]
+
+/-! ## Core-Representable Family Interface -/
 
 /-- Families that are exactly representable by `OpCore` payloads. -/
 class CoreRepresentableFamily
@@ -353,6 +371,8 @@ theorem stepObsPreserved_coreRepresentable
   subst kc
   rfl
 
+/-! ## Family Lowering Adequacy Interface -/
+
 /-- Adequacy witness for one rich-family lowering into `OpCore`. -/
 structure FamilyLoweringAdequacy
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
@@ -382,6 +402,8 @@ theorem envelopePreserved_of_familyLowering
       (fun n => evalCore F.interp (runCore n) ctx (stateRun n)) := by
   intro n
   exact F.stepObsPreserved (runRich n) ctx (stateRun n) (runCore n) (hLower n)
+
+/-! ## Family Envelope Adequacy Proposition -/
 
 /-- Combined adequacy statement for one rich-family lowering. -/
 def FamilyEnvelopeAdequate
