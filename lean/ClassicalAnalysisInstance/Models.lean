@@ -130,6 +130,8 @@ noncomputable def realAnalysisModel : AnalysisModel where
       z ≠ (1 : ℂ) ∧ r = ‖z‖ } : Set ℝ)
 
 /-- Noncomputable laws for the extended analysis interface. -/
+/-! ## Extended Real-Analysis Laws -/
+
 noncomputable instance realAnalysisLaws : AnalysisLaws where
   toAnalysisModel := realAnalysisModel
   exponentialTail_nonneg := by
@@ -153,6 +155,9 @@ noncomputable instance realAnalysisLaws : AnalysisLaws where
     have hnonneg : (0 : ℝ) ≤ n := by
       exact_mod_cast Nat.zero_le n
     exact Real.sq_sqrt hnonneg
+
+  /-! ## Extended Laws: Finite Averages and Cumulative Sums -/
+
   finiteAverage_perm := by
     -- Finite sums are invariant under permutation of finite indices.
     intro n σ x
@@ -182,6 +187,9 @@ noncomputable instance realAnalysisLaws : AnalysisLaws where
     have hsqrt : (Real.sqrt N) ≠ 0 := by
       exact Real.sqrt_ne_zero'.2 (Nat.cast_pos.2 (Nat.pos_of_ne_zero hN))
     simp
+
+  /-! ## Extended Laws: Spectral Gap Identity -/
+
   spectral_gap_eq := by
     -- The gap field is defined as `1 - secondSpectrumValue`.
     intro State _ _ kernel
