@@ -37,6 +37,8 @@ These lemmas are semantically sound because CProject and trans compute
 the same observable behavior (just with different representation).
 -/
 
+/-! ## End Source Cases -/
+
 /-- End cannot be CProjectTransRelComp-related to var. -/
 theorem CProjectTransRelComp_end_not_var
     {v : String} (h : CProjectTransRelComp .end (.var v))
@@ -59,9 +61,11 @@ theorem CProjectTransRelComp_end_not_var
   · have hb : b = .end := CProjectTransRel_source_end hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .end) (c := .var v) heq hrel heq'
-      hWFa hWFc
-    simpa [EQ2F] using hcomp
+	  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .end) (c := .var v) heq hrel heq'
+	      hWFa hWFc
+	    simpa [EQ2F] using hcomp
+
+/-! ## End Source Cases (Send/Recv Targets) -/
 
 /-- End cannot be CProjectTransRelComp-related to send. -/
 theorem CProjectTransRelComp_end_not_send
@@ -111,9 +115,11 @@ theorem CProjectTransRelComp_end_not_recv
   · have hb : b = .end := CProjectTransRel_source_end hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .end) (c := .recv p bs) heq hrel heq'
-      hWFa hWFc
-    simpa [EQ2F] using hcomp
+	  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .end) (c := .recv p bs) heq hrel heq'
+	      hWFa hWFc
+	    simpa [EQ2F] using hcomp
+
+/-! ## Var Source Cases -/
 
 /-- Var cannot be CProjectTransRelComp-related to end. -/
 theorem CProjectTransRelComp_var_not_end
@@ -136,9 +142,11 @@ theorem CProjectTransRelComp_var_not_end
   · have hb : b = .var v := CProjectTransRel_source_var (v := v) hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .var v) (c := .end) heq hrel heq'
-      hWFa hWFc
-    simpa [EQ2F] using hcomp
+	  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .var v) (c := .end) heq hrel heq'
+	      hWFa hWFc
+	    simpa [EQ2F] using hcomp
+
+/-! ## Var Source Cases (Send/Recv Targets) -/
 
 /-- Var cannot be CProjectTransRelComp-related to send. -/
 theorem CProjectTransRelComp_var_not_send
@@ -188,9 +196,11 @@ theorem CProjectTransRelComp_var_not_recv
   · have hb : b = .var v := CProjectTransRel_source_var (v := v) hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .var v) (c := .recv p bs) heq hrel heq'
-      hWFa hWFc
-    simpa [EQ2F] using hcomp
+	  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .var v) (c := .recv p bs) heq hrel heq'
+	      hWFa hWFc
+	    simpa [EQ2F] using hcomp
+
+/-! ## Send Source Cases -/
 
 /-- Send cannot be CProjectTransRelComp-related to end. -/
 theorem CProjectTransRelComp_send_not_end
@@ -216,9 +226,11 @@ theorem CProjectTransRelComp_send_not_end
   · rcases CProjectTransRel_source_send (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .send p bs) (c := .end) heq hrel heq'
-      hWFa hWFc
-    simpa [EQ2F] using hcomp
+	  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .send p bs) (c := .end) heq hrel heq'
+	      hWFa hWFc
+	    simpa [EQ2F] using hcomp
+
+/-! ## Send Source Cases (Var/Recv Targets) -/
 
 /-- Send cannot be CProjectTransRelComp-related to var. -/
 theorem CProjectTransRelComp_send_not_var
@@ -244,9 +256,11 @@ theorem CProjectTransRelComp_send_not_var
   · rcases CProjectTransRel_source_send (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .send p bs) (c := .var v) heq hrel heq'
-      hWFa hWFc
-    simpa [EQ2F] using hcomp
+	  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .send p bs) (c := .var v) heq hrel heq'
+	      hWFa hWFc
+	    simpa [EQ2F] using hcomp
+
+/-! ## Send Source Cases (Recv Target) -/
 
 /-- Send cannot be CProjectTransRelComp-related to recv. -/
 theorem CProjectTransRelComp_send_not_recv
@@ -274,9 +288,11 @@ theorem CProjectTransRelComp_send_not_recv
   · rcases CProjectTransRel_source_send (p := p1) (bs := bs1) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .send p1 bs1) (c := .recv p2 bs2) heq hrel heq'
-      hWFa hWFc
-    simpa [EQ2F] using hcomp
+	  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .send p1 bs1) (c := .recv p2 bs2) heq hrel heq'
+	      hWFa hWFc
+	    simpa [EQ2F] using hcomp
+
+/-! ## Recv Source Cases -/
 
 /-- Recv cannot be CProjectTransRelComp-related to end. -/
 theorem CProjectTransRelComp_recv_not_end
@@ -302,9 +318,11 @@ theorem CProjectTransRelComp_recv_not_end
   · rcases CProjectTransRel_source_recv (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .recv p bs) (c := .end) heq hrel heq'
-      hWFa hWFc
-    simpa [EQ2F] using hcomp
+	  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .recv p bs) (c := .end) heq hrel heq'
+	      hWFa hWFc
+	    simpa [EQ2F] using hcomp
+
+/-! ## Recv Source Cases (Var/Send Targets) -/
 
 /-- Recv cannot be CProjectTransRelComp-related to var. -/
 theorem CProjectTransRelComp_recv_not_var
@@ -330,9 +348,11 @@ theorem CProjectTransRelComp_recv_not_var
   · rcases CProjectTransRel_source_recv (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .recv p bs) (c := .var v) heq hrel heq'
-      hWFa hWFc
-    simpa [EQ2F] using hcomp
+	  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .recv p bs) (c := .var v) heq hrel heq'
+	      hWFa hWFc
+	    simpa [EQ2F] using hcomp
+
+/-! ## Recv Source Cases (Send Target) -/
 
 /-- Recv cannot be CProjectTransRelComp-related to send. -/
 theorem CProjectTransRelComp_recv_not_send
