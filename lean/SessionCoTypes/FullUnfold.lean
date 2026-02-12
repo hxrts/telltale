@@ -221,6 +221,8 @@ theorem EQ2_of_fullUnfold_eq (a b : LocalTypeR)
     EQ2_trans_wf ha hab_full hWFa hWFa_full hWFb_full
   exact EQ2_trans_wf h1 (EQ2_symm hb) hWFa hWFb_full hWFb
 
+/-! ### EQ2 to Full-Unfold Equality -/
+
 /-- EQ2 implies equality of full unfolds for well-formed types.
 
     Note: This may require well-formedness (no infinite mu-chains). -/
@@ -240,6 +242,8 @@ theorem fullUnfold_eq_of_EQ2 (a b : LocalTypeR)
   have h1 : EQ2 a.fullUnfold b :=
     EQ2_trans_wf (EQ2_symm ha) heq hWFa_full hWFa hWFb
   exact EQ2_trans_wf h1 hb hWFa_full hWFb hWFb_full
+
+/-! ### Equivalence Theorem -/
 
 /-- EQ2 is equivalent to equality of full unfolds (for well-formed types). -/
 theorem EQ2_iff_fullUnfold_eq (a b : LocalTypeR)
