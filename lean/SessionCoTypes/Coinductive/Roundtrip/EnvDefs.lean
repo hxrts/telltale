@@ -86,6 +86,8 @@ lemma nameOf_ne_var_of_head_var {all : Finset LocalTypeC} {b : LocalTypeC} {x : 
     simpa [h_eq'] using hx
   exact (nameFor_not_mem_namesIn b all) hx'
 
+/-! ## toCoind Branch and Head Helpers -/
+
 lemma branchesOf_toCoind_send_ofFn {p : String} {n : Nat}
     (f : Fin n → (Label × LocalTypeR)) :
     branchesOf (toCoind (.send p (List.ofFn f))) =
@@ -117,6 +119,8 @@ lemma head_toCoind_recv_ofFn {p : String} {n : Nat}
     funext i
     rfl
   simp [head_mkRecv, toCoindBranches_ofFn, List.map_ofFn, hcomp]
+
+/-! ## envOf Resolution Lemmas -/
 
 lemma envOf_varR (all visited : Finset LocalTypeC) : EnvVarR (envOf all visited) := by
   intro x c hmem
@@ -173,6 +177,8 @@ def toInductiveBody (root : LocalTypeC) (all visited : Finset LocalTypeC)
           (subset_insert_of_mem h_current h_visited) hchild_mem
         (labels[i], body)
       LocalTypeR.recv p (List.ofFn f)
+
+/-! ## toInductiveBody Expansion Lemma -/
 
 lemma toInductiveBody_eq_match (root : LocalTypeC) (all visited : Finset LocalTypeC)
     (current : LocalTypeC)
