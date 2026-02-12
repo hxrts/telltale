@@ -53,6 +53,8 @@ def Validity
     (M : Model State Value Event Party) : Prop :=
   ∀ s v, M.initial s → M.decide s = some v → M.validValue v
 
+/-! ## Assumption Atoms and Contracts -/
+
 /-- Reusable core FLP assumption bundle.
 Any FLP theorem can depend on this single object instead of repeating assumptions. -/
 structure Assumptions
@@ -88,6 +90,8 @@ def coreAssumptions : List Assumption :=
   , .agreement
   , .validity
   ]
+
+/-! ## Assumption Validation API -/
 
 /-- Validate one assumption against an assumption bundle.
 Because `Assumptions` stores proofs, each requested atom is certified true. -/
@@ -148,6 +152,8 @@ def runAssumptionValidation
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
 
+/-! ## Assumption Projection Lemmas -/
+
 /-- Standard projection lemma: extract the deterministic assumption for reuse. -/
 theorem deterministic_of
     {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
@@ -169,6 +175,8 @@ theorem validity_of
     (a : Assumptions M) : Validity M :=
   a.validity
 
+/-! ## Termination Predicates -/
+
 /-- A run eventually decides if some index yields a decision value. -/
 def EventuallyDecidesOnRun
     {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
@@ -181,6 +189,8 @@ def TerminatesOnAllFairRuns
     (M : Model State Value Event Party)
     (FairRun : (Nat → State) → Prop) : Prop :=
   ∀ run, FairRun run → M.initial (run 0) → EventuallyDecidesOnRun M run
+
+/-! ## Lower-Bound Premises -/
 
 /-- Additional premises typically discharged by FLP valency lemmas.
 This isolates the two-step FLP proof pattern into reusable inputs. -/
@@ -201,6 +211,8 @@ structure ImpossibilityPremises
     (M : Model State Value Event Party)
     : Type (max u v w x) extends LowerBoundPremises M where
   uncommittedNotDeciding : ∀ s, Uncommitted s → M.decide s = none
+
+/-! ## Derived FLP Theorems -/
 
 /-- FLP lower-bound shape from reusable assumptions + valency premises.
 This theorem is the reusable endpoint consumed by concrete FLP instantiations. -/
@@ -245,5 +257,4 @@ theorem impossibility_of_assumptions
 
 end FLP
 end Distributed
-
 
