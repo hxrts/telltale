@@ -128,6 +128,8 @@ theorem selectReady_of_ProgressVMState {store : SessionStore ν}
     SelectReady (SessionStore.toGEnv store) (SessionStore.toDEnv store) :=
   Compatible_to_SelectReady hProg.compatible
 
+/-! ## Store/Environment Lookup Bridges -/
+
 /-- Store lookups agree with environment projections.
 
     This connects SessionStore operations to Protocol-level environments.
@@ -143,6 +145,8 @@ theorem store_lookupType_eq_lookupG {store : SessionStore ν} {ep : Endpoint}
     (hWF : sessionStore_refines_envs store) :
     lookupG (SessionStore.toGEnv store) ep = SessionStore.lookupType store ep := by
   exact hWF.2.1 ep
+
+/-! ## Session-Existence Transport Lemmas -/
 
 /-- If an endpoint lookup succeeds, the corresponding session exists in the store. -/
 private theorem exists_session_of_lookupType_some {store : SessionStore ν} {e : Endpoint} {L : LocalType}
@@ -191,6 +195,8 @@ private theorem exists_session_after_updateTrace {store : SessionStore ν} {sid 
         | inr hTail =>
             rcases ih (hMem := ⟨st0, hTail⟩) with ⟨st', hMem'⟩
             exact ⟨st', by simp [hMem']⟩
+
+/-! ## Receive-Data Extraction -/
 
 /-- If HeadCoherent and receiver has recv type with non-empty trace, the head matches.
 
@@ -250,6 +256,8 @@ theorem recv_has_data_of_HeadCoherent {store : SessionStore ν}
     simp only [hLookupG'] at hHeadAtEdge
     exact ⟨rest, by rw [hHeadAtEdge]⟩
 
+/-! ## Coherence Preservation Under Updates -/
+
 /-- After a send update, HeadCoherent is preserved.
 
     This lifts `HeadCoherent_send_preserved` to the `SessionStore` view by
@@ -302,6 +310,7 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
         hHead hCoh hLookupSendG hReadyAtSend
     simpa [sendEdge] using h
   subst store'
+  /-! ## Bridge Equalities For `toGEnv`/`toDEnv` -/
   intro e hActive
   have hGBridge :
       ∀ e', lookupG
@@ -329,6 +338,7 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
             exact SessionStore.toGEnv_updateType (hMem := hMemTrace) (hCons := hConsTrace) e'
       _ = lookupG (updateG (SessionStore.toGEnv store) ep L') e' := by
             simp [SessionStore.toGEnv_updateTrace]
+  /-! ## DEnv Bridge Equalities -/
   have hDBridge :
       ∀ edge', lookupD
           (SessionStore.toDEnv
@@ -364,6 +374,7 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
           (updateD (SessionStore.toDEnv store) sendEdge
             (lookupD (SessionStore.toDEnv store) sendEdge ++ [T]))
           edge' := by simp [hTraceLookup]
+  /-! ## Final Active-Edge Transport -/
   have hActiveUpd : ActiveEdge (updateG (SessionStore.toGEnv store) ep L') e := by
     unfold ActiveEdge at hActive ⊢
     constructor
@@ -375,4 +386,3 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
       exact hR
   have hPost := hHeadUpd e hActiveUpd
   simpa [sendEdge, hGBridge { sid := e.sid, role := e.receiver }, hDBridge e] using hPost
-
