@@ -143,6 +143,8 @@ def vmInstrFootprint {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
       | .acquire _ _ => instrFootprint ep (some ep.sid)
       | _ => instrFootprint ep none
 
+/-! ## VM Session Coherence Projection -/
+
 /-- Session coherence projected from VM state session store. -/
 def vmSessionCoherent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -161,6 +163,8 @@ abbrev VMInstrStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν] :=
   VMState ι γ π ε ν → CoroutineId → Instr γ ε → VMState ι γ π ε ν → Prop
+
+/-! ## Instruction Frame Contract -/
 
 /-- Frame contract: stepping an instruction preserves coherence for sessions
 outside that instruction's footprint. -/
