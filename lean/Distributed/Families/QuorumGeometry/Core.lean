@@ -47,6 +47,8 @@ def Forked
     (s : State) : Prop :=
   ∃ d₁ d₂, Committed M s d₁ ∧ Committed M s d₂ ∧ M.conflicts d₁ d₂
 
+/-! ## Assumption Atoms and Contracts -/
+
 /-- Reusable quorum-geometry assumption bundle. -/
 structure Assumptions
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Party : Type x}
@@ -89,6 +91,8 @@ def coreAssumptions : List Assumption :=
   , .certificateMonotonicity
   , .lockMonotonicity
   ]
+
+/-! ## Assumption Validation API -/
 
 /-- Validate one assumption against an assumption bundle. -/
 def validateAssumption
@@ -137,6 +141,8 @@ def runAssumptionValidation
     AssumptionSummary :=
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
+
+/-! ## Derived Safety and Finality Results -/
 
 /-- No conflicting commits follow from quorum intersection and lock monotonicity. -/
 theorem no_conflicting_commits_of_assumptions
@@ -187,5 +193,4 @@ theorem certificate_monotone_of_assumptions
 
 end QuorumGeometry
 end Distributed
-
 
