@@ -25,6 +25,9 @@ open SessionCoTypes.EQ2Props
 open SessionCoTypes.EQ2Paco
 open Paco
 open SessionTypes.Participation
+
+/-! ## Mu Postfix Case -/
+
 private theorem CProjectUEQ2Rel_postfix_mu_case
     {g role cand e0 : _} {t : String} {body : GlobalType}
     (hg : GlobalType.fullUnfoldIter g = .mu t body)
@@ -53,6 +56,10 @@ private theorem CProjectUEQ2Rel_postfix_mu_case
   | recv _ _ =>
       have : False := by simpa [CProjectF_unfold_core, CProjectF, hg, he0] using hcore
       exact this.elim
+
+/-! ## Comm Postfix End/Var/Mu Cases -/
+
+/-! ### Comm End Case -/
 
 private theorem CProjectUEQ2Rel_postfix_comm_end_case
     {g role cand e0 : _} {sender receiver : String} {gbs : List (Label × GlobalType)}
@@ -83,8 +90,10 @@ private theorem CProjectUEQ2Rel_postfix_comm_end_case
               AllBranchesProj CProjectU gbs role e0.fullUnfold := by
             simpa [hrs, hrr, he0] using hcore''
           exact Or.inr (by
-            simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using
-              (CProjectUEQ2Rel_comm_nonpart heq_full_cand_full hWF_full hWFcand_full hcore_nonpart))
+	            simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using
+	              (CProjectUEQ2Rel_comm_nonpart heq_full_cand_full hWF_full hWFcand_full hcore_nonpart))
+
+/-! ### Comm Var Case -/
 
 private theorem CProjectUEQ2Rel_postfix_comm_var_case
     {g role cand e0 : _} {sender receiver v : String} {gbs : List (Label × GlobalType)}
@@ -111,8 +120,10 @@ private theorem CProjectUEQ2Rel_postfix_comm_var_case
         simpa [he0] using hcore_nonpart
       have hnonpart' := CProjectUEQ2Rel_comm_nonpart
         heq_full_cand_full hWF_full hWFcand_full hcore_nonpart'
-      exact Or.inr (by
-        simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
+	      exact Or.inr (by
+	        simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
+
+/-! ### Comm Mu Case -/
 
 private theorem CProjectUEQ2Rel_postfix_comm_mu_case
     {g role cand e0 : _} {sender receiver t : String} {gbs : List (Label × GlobalType)}
@@ -139,6 +150,10 @@ private theorem CProjectUEQ2Rel_postfix_comm_mu_case
       exact Or.inr (by
         simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
 
+/-! ## Comm Send Cases -/
+
+/-! ### Comm Send Sender Case -/
+
 private theorem CProjectUEQ2Rel_postfix_comm_send_sender
     {g role cand e0 : _} {sender receiver p : String}
     {gbs : List (Label × GlobalType)} {bs : List BranchR}
@@ -164,9 +179,11 @@ private theorem CProjectUEQ2Rel_postfix_comm_send_sender
     LocalTypeR.WellFormed.branches_of_send (p := p) (bs := cs) (by simpa [hfull] using hWFcand_full)
   have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs sender cs :=
     BranchesProjRel_lift_EQ2_U hbranches hrel_br hWF_branches hWF_branches_cand
-  exact Or.inr (by
-    simpa [CProjectF_unfold_core, CProjectF, hg, hfull, hrs] using
-      ⟨(by simpa using hpartner), hbranches'⟩)
+	  exact Or.inr (by
+	    simpa [CProjectF_unfold_core, CProjectF, hg, hfull, hrs] using
+	      ⟨(by simpa using hpartner), hbranches'⟩)
+
+/-! ### Comm Send Nonparticipant Case -/
 
 private theorem CProjectUEQ2Rel_postfix_comm_send_nonpart
     {g role cand e0 : _} {sender receiver p : String}
@@ -190,8 +207,10 @@ private theorem CProjectUEQ2Rel_postfix_comm_send_nonpart
     simpa [he0] using hcore_nonpart
   have hnonpart' := CProjectUEQ2Rel_comm_nonpart
     heq_full_cand_full hWF_full hWFcand_full hcore_nonpart'
-  exact Or.inr (by
-    simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
+	  exact Or.inr (by
+	    simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
+
+/-! ### Comm Send Dispatcher -/
 
 private theorem CProjectUEQ2Rel_postfix_comm_send_case
     {g role cand e0 : _} {sender receiver p : String}
@@ -216,6 +235,10 @@ private theorem CProjectUEQ2Rel_postfix_comm_send_case
     · exact CProjectUEQ2Rel_postfix_comm_send_nonpart (g := g) (role := role) (cand := cand) (e0 := e0)
         (sender := sender) (receiver := receiver) (p := p) (gbs := gbs) (bs := bs)
         hg he0 hrs hrr hcore hWF_full hWFcand_full heq_full_cand_full
+
+/-! ## Comm Recv Cases -/
+
+/-! ### Comm Recv Receiver Case -/
 
 private theorem CProjectUEQ2Rel_postfix_comm_recv_receiver
     {g role cand e0 : _} {sender receiver p : String}
@@ -242,9 +265,11 @@ private theorem CProjectUEQ2Rel_postfix_comm_recv_receiver
     LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := cs) (by simpa [hfull] using hWFcand_full)
   have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs receiver cs :=
     BranchesProjRel_lift_EQ2_U hbranches hrel_br hWF_branches hWF_branches_cand
-  exact Or.inr (by
-    simpa [CProjectF_unfold_core, CProjectF, hg, hfull, hrr, hne] using
-      ⟨(by simpa using hpartner), hbranches'⟩)
+	  exact Or.inr (by
+	    simpa [CProjectF_unfold_core, CProjectF, hg, hfull, hrr, hne] using
+	      ⟨(by simpa using hpartner), hbranches'⟩)
+
+/-! ### Comm Recv Nonparticipant Case -/
 
 private theorem CProjectUEQ2Rel_postfix_comm_recv_nonpart
     {g role cand e0 : _} {sender receiver p : String}
@@ -268,8 +293,10 @@ private theorem CProjectUEQ2Rel_postfix_comm_recv_nonpart
     simpa [he0] using hcore_nonpart
   have hnonpart' := CProjectUEQ2Rel_comm_nonpart
     heq_full_cand_full hWF_full hWFcand_full hcore_nonpart'
-  exact Or.inr (by
-    simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
+	  exact Or.inr (by
+	    simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
+
+/-! ### Comm Recv Dispatcher -/
 
 private theorem CProjectUEQ2Rel_postfix_comm_recv_case
     {g role cand e0 : _} {sender receiver p : String}
@@ -294,6 +321,8 @@ private theorem CProjectUEQ2Rel_postfix_comm_recv_case
     · exact CProjectUEQ2Rel_postfix_comm_recv_nonpart (g := g) (role := role) (cand := cand) (e0 := e0)
         (sender := sender) (receiver := receiver) (p := p) (gbs := gbs) (bs := bs)
         hg he0 hrs hrr hcore hWF_full hWFcand_full heq_full_cand_full
+
+/-! ## Comm Case Dispatcher -/
 
 private theorem CProjectUEQ2Rel_postfix_comm_case
     {g role cand e0 : _} {sender receiver : String} {gbs : List (Label × GlobalType)}
@@ -322,6 +351,8 @@ private theorem CProjectUEQ2Rel_postfix_comm_case
   | recv p bs =>
       exact CProjectUEQ2Rel_postfix_comm_recv_case
         hg he0 hcore heq_full heq hWF_full hWF hWFcand hWFcand_full heq_full_cand_full
+
+/-! ## Postfix Closure -/
 
 
 
@@ -354,6 +385,8 @@ private theorem CProjectUEQ2Rel_postfix
         (CProjectUEQ2Rel_postfix_comm_case (g := g) (role := role) (cand := cand) (e0 := e0)
           (sender := sender) (receiver := receiver) (gbs := gbs)
           hg hcore heq_full heq hWF_full hWF hWFcand hWFcand_full)
+
+/-! ## Final EQ2 Stability Theorem -/
 
 /-- CProjectU is stable under EQ2-equivalent candidates (with well-formedness). -/
 theorem CProjectU_EQ2 (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
