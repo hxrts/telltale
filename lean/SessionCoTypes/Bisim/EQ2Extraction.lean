@@ -31,6 +31,8 @@ These lemmas require only that the fully-unfolded form has no leading `mu`.
 They are useful as a local, non-leaky swap point when such a fact is available
 (e.g., from closed+contractive hypotheses). -/
 
+/-! ## Non-μ Extraction: End/Var -/
+
 theorem EQ2.end_right_implies_UnfoldsToEnd_of_fullUnfold_nonmu {x : LocalTypeR}
     (hmu : x.fullUnfold.muHeight = 0) (heq : EQ2 .end x) : UnfoldsToEnd x := by
   have hiter := (EQ2_unfold_right_iter (a := .end) (b := x) heq) x.muHeight
@@ -79,6 +81,8 @@ theorem EQ2.var_right_implies_UnfoldsToVar_of_fullUnfold_nonmu {x : LocalTypeR} 
         simpa [LocalTypeR.muHeight, hx] using hmu
       exact (False.elim (Nat.succ_ne_zero _ hmu'))
 
+/-! ## Non-μ Extraction: Send/Recv -/
+
 theorem EQ2.send_right_implies_CanSend_of_fullUnfold_nonmu {x : LocalTypeR} {p : String}
     {bs : List BranchR} (hmu : x.fullUnfold.muHeight = 0)
     (heq : EQ2 (.send p bs) x) : ∃ cs, CanSend x p cs ∧ BranchesRel EQ2 bs cs := by
@@ -123,6 +127,8 @@ theorem EQ2.recv_right_implies_CanRecv_of_fullUnfold_nonmu {x : LocalTypeR} {p :
 
 
 /-! ## Observable Transfer via Unfold (no EQ2_trans) -/
+
+/-! ## Observable Transfer Recursors -/
 
 theorem UnfoldsToEnd_transfer {a b : LocalTypeR} (ha : UnfoldsToEnd a) (h : EQ2 a b)
     (hWFb : LocalTypeR.WellFormed b) : UnfoldsToEnd b := by
@@ -176,6 +182,7 @@ private theorem CanRecv_transfer {a b : LocalTypeR} {p : String} {bs : List Bran
   have hbr' : BranchesRel EQ2 bs (dualBranches cs) := BranchesRel_dual_eq2 hbr
   exact ⟨dualBranches cs, hrecv, hbr'⟩
 
+/-! ## Contractive μ/μ Observable Classification -/
 
 theorem EQ2_mus_to_BisimF_of_contractive {t s : String} {body body' : LocalTypeR}
     (h : EQ2 (LocalTypeR.mu t body) (LocalTypeR.mu s body'))
@@ -205,6 +212,8 @@ theorem EQ2_mus_to_BisimF_of_contractive {t s : String} {body body' : LocalTypeR
       obtain ⟨bs', hCanRecv, hbr⟩ := CanRecv_transfer hrecv h hWFb
       exact BisimF.eq_recv hrecv hCanRecv (BranchesRel_to_BranchesRelBisim hbr)
 
+/-! ## Extraction Bundles and Well-Formed Interface -/
+
 /-- Closed + contractive extraction (fully proven). -/
 def ContractiveExtraction : EQ2Extraction :=
   { Good := fun x => x.isClosed ∧ x.isContractive = true
@@ -228,6 +237,8 @@ def ContractiveExtraction : EQ2Extraction :=
 /-- Active extraction is gated on well-formedness (closed + contractive). -/
 def ActiveExtraction : EQ2Extraction := ContractiveExtraction
 
+/-! ## Well-Formed EQ2 Interface: End/Var -/
+
 /-- If EQ2 .end x and x is well-formed, then x unfolds to end. -/
 theorem EQ2.end_right_implies_UnfoldsToEnd {x : LocalTypeR} (hWF : LocalTypeR.WellFormed x)
     (h : EQ2 .end x) : UnfoldsToEnd x := by
@@ -247,6 +258,8 @@ theorem EQ2.var_right_implies_UnfoldsToVar {x : LocalTypeR} {v : String}
 theorem EQ2.var_left_implies_UnfoldsToVar {x : LocalTypeR} {v : String}
     (hWF : LocalTypeR.WellFormed x) (h : EQ2 x (.var v)) : UnfoldsToVar x v :=
   EQ2.var_right_implies_UnfoldsToVar hWF (EQ2_symm h)
+
+/-! ## Well-Formed EQ2 Interface: Send/Recv -/
 
 /-- If EQ2 (.send p bs) x, then x can send to p with EQ2-related branches. -/
 theorem EQ2.send_right_implies_CanSend {x : LocalTypeR} {p : String}
@@ -276,6 +289,8 @@ theorem EQ2.recv_left_implies_CanRecv {x : LocalTypeR} {p : String}
   obtain ⟨bs, hcan, hbr⟩ := EQ2.recv_right_implies_CanRecv hWF hsymm
   exact ⟨bs, hcan, BranchesRel_flip hbr⟩
 
+/-! ## Observable Transfer Relations -/
+
 /-- Transfer observables across EQ2, gated on well-formedness of the target. -/
 theorem EQ2_transfer_observable {a b : LocalTypeR} (h : EQ2 a b) (obs_a : Observable a)
     (hWF : LocalTypeR.WellFormed b) :
@@ -302,6 +317,8 @@ theorem EQ2_transfer_observable_of_wellFormed {a b : LocalTypeR} (h : EQ2 a b)
     (obs_a : Observable a) (hWF : LocalTypeR.WellFormed b) :
     ∃ obs_b : Observable b, ObservableRel EQ2 obs_a obs_b :=
   EQ2_transfer_observable h obs_a hWF
+
+/-! ## Observable Relation Utilities -/
 
 /-- BranchesRel is reflexive for EQ2. -/
 private theorem BranchesRel_refl : ∀ bs, BranchesRel EQ2 bs bs := by
@@ -341,6 +358,8 @@ theorem ObservableRel.symm {a b : LocalTypeR} {obs_a : Observable a} {obs_b : Ob
       rename_i p bs cs ha hb
       exact ObservableRel.is_recv (ha := hb) (hb := ha) (BranchesRel_flip hbr)
 
+/-! ## Observable Symmetry and μ/μ Bridge -/
+
 /-- Observability is symmetric across EQ2. -/
 theorem EQ2_observable_symmetric {a b : LocalTypeR} (h : EQ2 a b)
     (hWFa : LocalTypeR.WellFormed a) (hWFb : LocalTypeR.WellFormed b) :
@@ -364,6 +383,8 @@ theorem EQ2_mus_to_BisimF {t s : String} {body body' : LocalTypeR}
   exact ActiveExtraction.mus_to_BisimF
     (t := t) (s := s) (body := body) (body' := body')
     ⟨hWF1.closed, hWF1.contractive⟩ ⟨hWF2.closed, hWF2.contractive⟩ h
+
+/-! ## Well-Formed Strengthening for Bisim Witnesses -/
 
 private theorem BranchesRelBisim_strengthen {bs cs : List BranchR}
     (hbr : BranchesRelBisim EQ2 bs cs)
@@ -395,6 +416,9 @@ private theorem BisimF_EQ2_to_EQ2WF {x y : LocalTypeR} (h : BisimF EQ2 x y)
       exact BranchesRelBisim_strengthen hbr
         (WellFormed_branches_of_CanRecv ha hWFx)
         (WellFormed_branches_of_CanRecv hb hWFy)
+
+/-! ## Shared Observable Corollary for μ/μ -/
+
 theorem mus_shared_observable_contractive {t s : String} {body body' : LocalTypeR}
     (h : EQ2 (LocalTypeR.mu t body) (LocalTypeR.mu s body'))
     (hcl1 : (LocalTypeR.mu t body).isClosed)
@@ -423,8 +447,7 @@ theorem mus_shared_observable_contractive {t s : String} {body body' : LocalType
       rename_i p bs cs
       exact Or.inr (Or.inr (Or.inr ⟨p, bs, cs, ha, hb, BranchesRelBisim_to_BranchesRel hbr⟩))
 
-
-
+/-! ## EQ2 to Bisim Witness Construction -/
 /-- EQ2 implies Bisim.
 
     This direction shows that coinductive equality implies membership-based bisimulation.
