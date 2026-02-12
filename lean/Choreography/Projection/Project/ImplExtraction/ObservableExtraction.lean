@@ -36,6 +36,8 @@ These are sound because CProjectTransRelComp preserves observable behavior
 (modulo equi-recursive equivalence).
 -/
 
+/-! ## Composition Extension Helpers -/
+
 theorem CProjectTransRelComp_extend_right_noWF
     (h1 : CProjectTransRelComp a b) (h2 : EQ2 b c)
     (hWFa : LocalTypeR.WellFormed a) (hWFb : LocalTypeR.WellFormed b) (hWFc : LocalTypeR.WellFormed c) :
@@ -45,8 +47,10 @@ theorem CProjectTransRelComp_extend_right_noWF
 theorem CProjectTransRelComp_extend_left_noWF
     (h1 : EQ2 a b) (h2 : CProjectTransRelComp b c)
     (hWFa : LocalTypeR.WellFormed a) (hWFb : LocalTypeR.WellFormed b) (hWFc : LocalTypeR.WellFormed c) :
-    CProjectTransRelComp a c := by
-  exact CProjectTransRelComp_extend_left h1 h2 hWFa hWFb hWFc
+	    CProjectTransRelComp a c := by
+	  exact CProjectTransRelComp_extend_left h1 h2 hWFa hWFb hWFc
+
+/-! ## Branch-Head Composition Helpers -/
 
 private theorem BranchesRel_trans_chain_head_noWF {R : Rel}
     (hextend : ∀ a b c, R a b → EQ2 b c →
@@ -77,8 +81,10 @@ private theorem BranchesRel_trans_chain_rev_head_noWF {R : Rel}
   constructor
   · exact h1.1.trans h2.1
   · cases h2.2 with
-    | inl hr => exact Or.inl (hextend _ _ _ h1.2 hr hWFa hWFb hWFc)
-    | inr heq => exact Or.inr (EQ2_trans_wf h1.2 heq hWFa hWFb hWFc)
+	    | inl hr => exact Or.inl (hextend _ _ _ h1.2 hr hWFa hWFb hWFc)
+	    | inr heq => exact Or.inr (EQ2_trans_wf h1.2 heq hWFa hWFb hWFc)
+
+/-! ## Branch-Chain Composition Helpers -/
 
 theorem BranchesRel_trans_chain_noWF {R : Rel}
     (hextend : ∀ a b c, R a b → EQ2 b c →
@@ -102,8 +108,10 @@ theorem BranchesRel_trans_chain_noWF {R : Rel}
               constructor
               · exact BranchesRel_trans_chain_head_noWF hextend h1 h2
                   (hwf_bs lb_bs (by simp)) (hwf_cs lb_cs (by simp)) (hwf_ds lb_ds (by simp))
-              · exact ih hcd_tail (wf_tail_of_cons hwf_bs)
-                  (wf_tail_of_cons hwf_cs) (wf_tail_of_cons hwf_ds)
+	              · exact ih hcd_tail (wf_tail_of_cons hwf_bs)
+	                  (wf_tail_of_cons hwf_cs) (wf_tail_of_cons hwf_ds)
+
+/-! ## Branch-Chain Reverse Composition Helpers -/
 
 theorem BranchesRel_trans_chain_rev_noWF {R : Rel}
     (hextend : ∀ a b c, EQ2 a b → R b c →
@@ -127,8 +135,10 @@ theorem BranchesRel_trans_chain_rev_noWF {R : Rel}
               constructor
               · exact BranchesRel_trans_chain_rev_head_noWF hextend h1 h2
                   (hwf_bs lb_bs (by simp)) (hwf_cs lb_cs (by simp)) (hwf_ds lb_ds (by simp))
-              · exact ih hcd_tail (wf_tail_of_cons hwf_bs)
-                  (wf_tail_of_cons hwf_cs) (wf_tail_of_cons hwf_ds)
+	              · exact ih hcd_tail (wf_tail_of_cons hwf_bs)
+	                  (wf_tail_of_cons hwf_cs) (wf_tail_of_cons hwf_ds)
+
+/-! ## Var Extraction Left/Right/Base/Both Cases -/
 
 /- Helper: left composition case for CProjectTransRelComp_var_extract. -/
 private theorem CProjectTransRelComp_var_extract_left
@@ -161,11 +171,13 @@ private theorem CProjectTransRelComp_var_extract_right
 /- Helper: base case for CProjectTransRelComp_var_extract. -/
 private theorem CProjectTransRelComp_var_extract_base
     {v1 v2 : String} (hbase : CProjectTransRel (.var v1) (.var v2)) : v1 = v2 := by
-  -- Direct CProjectTransRel on vars enforces equality.
-  have hb : LocalTypeR.var v2 = LocalTypeR.var v1 :=
-    CProjectTransRel_source_var (v := v1) (b := LocalTypeR.var v2) hbase
-  cases hb
-  rfl
+	  -- Direct CProjectTransRel on vars enforces equality.
+	  have hb : LocalTypeR.var v2 = LocalTypeR.var v1 :=
+	    CProjectTransRel_source_var (v := v1) (b := LocalTypeR.var v2) hbase
+	  cases hb
+	  rfl
+
+/-! ## Var Extraction Final Theorem -/
 
 /- Helper: both composition case for CProjectTransRelComp_var_extract. -/
 private theorem CProjectTransRelComp_var_extract_both
@@ -188,16 +200,20 @@ theorem CProjectTransRelComp_var_extract
     exact CProjectTransRelComp_var_extract_left heq hrel
   · rcases hright with ⟨b, hrel, heq⟩
     exact CProjectTransRelComp_var_extract_right hrel heq
-  · rcases hboth with ⟨b, b', heq, hrel, heq'⟩
-    exact CProjectTransRelComp_var_extract_both heq hrel heq' hWFa hWFc
+	  · rcases hboth with ⟨b, b', heq, hrel, heq'⟩
+	    exact CProjectTransRelComp_var_extract_both heq hrel heq' hWFa hWFc
+
+/-! ## Send Branch Well-Formedness -/
 
 /-- When send is CProjectTransRelComp-related to send, partners and branches match.
     Returns the partner equality and a BranchesRel for the continuation. -/
 private theorem send_branches_wf (p : String) (bs : List BranchR)
     (hWF : LocalTypeR.WellFormed (.send p bs)) :
     ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 := by
-  -- Extract per-branch well-formedness from send well-formedness.
-  exact LocalTypeR.WellFormed.branches_of_send (p := p) (bs := bs) hWF
+	  -- Extract per-branch well-formedness from send well-formedness.
+	  exact LocalTypeR.WellFormed.branches_of_send (p := p) (bs := bs) hWF
+
+/-! ## Send Extraction Base/Left/Right/Both Cases -/
 
 /- Helper: base case for CProjectTransRelComp_send_extract. -/
 private theorem CProjectTransRelComp_send_extract_base
@@ -237,6 +253,8 @@ private theorem CProjectTransRelComp_send_extract_left
   | «end» | var _ | recv _ _ =>
       simpa [EQ2F] using (EQ2.destruct heq)
 
+/-! ## Send Extraction Right Case -/
+
 /- Helper: right case for CProjectTransRelComp_send_extract. -/
 private theorem CProjectTransRelComp_send_extract_right
     {p1 p2 : String} {bs1 bs2 : List BranchR} {b : LocalTypeR}
@@ -271,6 +289,8 @@ private theorem CProjectTransRelComp_send_extract_right
       have hrel_f := CProjectTransRel_postfix (.send p1 bs1) (.recv q cs) (by simpa using hrel)
       simpa [EQ2F] using hrel_f
 
+/-! ## Send Extraction Both Case -/
+
 /- Helper: both case for CProjectTransRelComp_send_extract. -/
 private theorem CProjectTransRelComp_send_extract_both
     {p1 p2 : String} {bs1 bs2 : List BranchR} {b b' : LocalTypeR}
@@ -278,11 +298,13 @@ private theorem CProjectTransRelComp_send_extract_both
     (hWFa : LocalTypeR.WellFormed (.send p1 bs1))
     (hWFc : LocalTypeR.WellFormed (.send p2 bs2)) :
     p1 = p2 ∧ BranchesRel (EQ2_closure CProjectTransRelComp) bs1 bs2 := by
-  -- Compose EQ2 ∘ CProjectTransRel ∘ EQ2, then destruct the send case.
-  have hcomp :=
-    EQ2_CProjectTransRel_EQ2_compose (a := .send p1 bs1) (c := .send p2 bs2) heq hrel heq'
-      hWFa hWFc
-  simpa [EQ2F] using hcomp
+	  -- Compose EQ2 ∘ CProjectTransRel ∘ EQ2, then destruct the send case.
+	  have hcomp :=
+	    EQ2_CProjectTransRel_EQ2_compose (a := .send p1 bs1) (c := .send p2 bs2) heq hrel heq'
+	      hWFa hWFc
+	  simpa [EQ2F] using hcomp
+
+/-! ## Send Extraction Final Theorem -/
 
 theorem CProjectTransRelComp_send_extract
     {p1 p2 : String} {bs1 bs2 : List BranchR}
@@ -296,8 +318,10 @@ theorem CProjectTransRelComp_send_extract
     exact CProjectTransRelComp_send_extract_left heq hrel hWFa hWFc
   · rcases hright with ⟨b, hrel, heq⟩
     exact CProjectTransRelComp_send_extract_right hrel heq hWFa hWFc
-  · rcases hboth with ⟨b, b', heq, hrel, heq'⟩
-    exact CProjectTransRelComp_send_extract_both heq hrel heq' hWFa hWFc
+	  · rcases hboth with ⟨b, b', heq, hrel, heq'⟩
+	    exact CProjectTransRelComp_send_extract_both heq hrel heq' hWFa hWFc
+
+/-! ## Recv Branch Well-Formedness -/
 
 /-- When recv is CProjectTransRelComp-related to recv, partners and branches match.
     Returns the partner equality and a BranchesRel for the continuation. -/
