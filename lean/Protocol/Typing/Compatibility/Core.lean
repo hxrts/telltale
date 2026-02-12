@@ -170,6 +170,8 @@ theorem lookupG_none_of_not_session {G : GEnv} {e : Endpoint} :
       have hSid : e.sid ∈ SessionsOf G := ⟨e, L, hLookup, rfl⟩
       exact (hNot hSid).elim
 
+/-! ## DisjointD Lookup Support -/
+
 theorem DisjointD_lookup_left {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType} :
     DisjointD D₁ D₂ →
     D₁.find? e = some ts →
@@ -199,6 +201,8 @@ theorem DisjointD_lookup_right {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType}
     simpa [DisjointD, Set.inter_comm] using hDisj
   exact DisjointD_lookup_left (D₁:=D₂) (D₂:=D₁) hDisj' hFind
 
+/-! ## DEnv Update and Find Support -/
+
 def insertPairD (acc : DEnv) (p : Edge × List ValType) : DEnv :=
   updateD acc p.1 p.2
 
@@ -219,6 +223,8 @@ theorem findD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e
   have h'' : (updateD env e ts).find? e' = env.map.find? e' := by
     simpa [updateD] using h'
   simpa [DEnv.find?] using h''
+
+/-! ## Folded Find Preservation -/
 
 theorem findD_foldl_insert_preserve
     (L : List (Edge × List ValType)) (env : DEnv) (e : Edge) (ts : List ValType)
@@ -249,6 +255,8 @@ theorem findD_foldl_insert_preserve
             simpa [List.foldl, insertPairD] using
               (ih (env := updateD env e' ts') (hfind := hfind') (hSame := hSame'))
 
+/-! ## Folded Find of Existing Entry -/
+
 theorem findD_foldl_insert_of_mem
     (L : List (Edge × List ValType)) (env : DEnv) (e : Edge) (ts : List ValType)
     (hmem : (e, ts) ∈ L)
@@ -274,6 +282,8 @@ theorem findD_foldl_insert_of_mem
               simpa [List.foldl, insertPairD] using
                 (ih (env := updateD env e' ts') (hmem := htail) (hSame := hSame'))
 
+/-! ## Folded Find for Missing Entry -/
+
 theorem findD_foldl_insert_notin
     (L : List (Edge × List ValType)) (env : DEnv) (e : Edge)
     (hNot : ∀ ts, (e, ts) ∈ L → False) :
@@ -295,6 +305,8 @@ theorem findD_foldl_insert_notin
             exact findD_update_neq env e' e ts' hneq
           simpa [List.foldl, insertPairD, hfind] using
             (ih (env := updateD env e' ts') (hNot := hNot'))
+
+/-! ## Folded Lookup Preservation -/
 
 theorem lookupD_foldl_insert_preserve'
     (L : List (Edge × List ValType)) (env : DEnv) (e : Edge) (ts : List ValType)
@@ -324,6 +336,8 @@ theorem lookupD_foldl_insert_preserve'
             simpa [List.foldl, insertPairD] using
               (ih (env := updateD env e' ts') (hlookup := hlookup') (hSame := hSame'))
 
+/-! ## Folded Lookup of Existing Entry -/
+
 theorem lookupD_foldl_insert_of_mem
     (L : List (Edge × List ValType)) (env : DEnv) (e : Edge) (ts : List ValType)
     (hmem : (e, ts) ∈ L)
@@ -348,6 +362,8 @@ theorem lookupD_foldl_insert_of_mem
           | tail _ htail =>
               simpa [List.foldl, insertPairD] using
                 (ih (env := updateD env e' ts') (hmem := htail) (hSame := hSame'))
+
+/-! ## Folded Lookup for Missing Entry -/
 
 theorem lookupD_foldl_insert_notin
     (L : List (Edge × List ValType)) (env : DEnv) (e : Edge) (ts : List ValType)
