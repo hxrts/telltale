@@ -46,6 +46,8 @@ inductive FlowPredicate where
   | any (predicates : List FlowPredicate)
   deriving Repr
 
+/-! ### Flow Predicate Evaluation -/
+
 private def stringContains (text fragment : String) : Bool :=
   if fragment.isEmpty then
     true
@@ -80,6 +82,8 @@ private def evalFuel (fuel : Nat) (pred : FlowPredicate) (knowledge : Knowledge)
 def FlowPredicate.eval (pred : FlowPredicate) (knowledge : Knowledge) (targetRole : Role) : Bool :=
   evalFuel (predicateDepth pred + 1) pred knowledge targetRole
 
+/-! ### Runtime Flow Policies -/
+
 inductive FlowPolicy where
   -- Permit all facts to all roles.
   | allowAll
@@ -107,6 +111,8 @@ def FlowPolicy.allowsKnowledge (policy : FlowPolicy) (knowledge : Knowledge) (ta
   | .predicate allowed => allowed knowledge targetRole
   | .predicateExpr pred => pred.eval knowledge targetRole
   | other => other.allows targetRole
+
+/-! ### Serializable Policy Representations -/
 
 inductive FlowPolicyRepr where
   -- Permit all facts to all roles.
@@ -137,6 +143,8 @@ def FlowPolicy.ofRepr (repr : FlowPolicyRepr) : FlowPolicy :=
   | .allowRoles roles => .allowRoles roles
   | .denyRoles roles => .denyRoles roles
   | .predicateExpr pred => .predicateExpr pred
+
+/-! ### Representation Roundtrip Laws -/
 
 theorem FlowPolicy.toRepr?_ofRepr (repr : FlowPolicyRepr) :
     (FlowPolicy.ofRepr repr).toRepr? = some repr := by
