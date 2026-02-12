@@ -55,6 +55,8 @@ abbrev TransportTrace (ν : Type u) [VerificationModel ν] :=
   -- Trace of transport events (signed payloads).
   List (TransportEvent ν)
 
+/-! ### Trace Position and Ordering Predicates -/
+
 private def listGet? {α : Type} : List α → Nat → Option α
   -- Total list lookup by index.
   | [], _ => none
@@ -79,6 +81,8 @@ def RecvBefore {ν : Type u} [VerificationModel ν]
   ∃ i j sv1 sv2, i < j ∧
     EventAt trace i (.received e sv1) ∧ sv1.payload = v1 ∧
     EventAt trace j (.received e sv2) ∧ sv2.payload = v2
+
+/-! ### Trace Multiplicity Counters -/
 
 def countSent {ν : Type u} [VerificationModel ν]
     (trace : TransportTrace ν) (e : Edge) (v : Value) : Nat :=
@@ -112,6 +116,8 @@ def RecvCount {ν : Type u} [VerificationModel ν]
   -- Receive multiplicity for payload v.
   countRecv trace e v
 
+/-! ### Transport Specification Records -/
+
 structure TransportSpec (ν : Type u) [VerificationModel ν] where
   -- FIFO and reliability requirements for a transport trace.
   fifo : TransportTrace ν → Prop
@@ -126,6 +132,8 @@ def TransportSpec.default {ν : Type u} [VerificationModel ν] : TransportSpec �
       ∀ e v, SendCount trace e v = RecvCount trace e v
   , noCreate := fun trace =>
       ∀ e v, RecvCount trace e v ≤ SendCount trace e v }
+
+/-! ### Handler-Induced Traces -/
 
 def traceOfBuffers {ν : Type u} [VerificationModel ν]
     (bufs : SignedBuffers ν) : TransportTrace ν :=
@@ -156,6 +164,8 @@ def SpecSatisfied {ν : Type u} [VerificationModel ν]
     (spec : TransportSpec ν) (trace : TransportTrace ν) : Prop :=
   -- The trace satisfies the specification predicates.
   spec.fifo trace ∧ spec.noDup trace ∧ spec.noCreate trace
+
+/-! ### Handler-Level Specification Witnesses -/
 
 class HandlerSatisfiesTransportSpec (ν : Type u) [VerificationModel ν]
     (handler : HandlerId) where
