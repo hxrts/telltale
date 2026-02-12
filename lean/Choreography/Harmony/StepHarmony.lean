@@ -418,6 +418,8 @@ private theorem branches_project_coherent_eq (sender receiver : String)
     trans_eq_of_CProject_wf cont role lt hproj_cont hwf_cont
   simp [htrans_cont, htrans_first]
 
+/-! ## Branch Coherence Theorem -/
+
 /-- Branch coherence for non-participants: all branches project to EQ2-equivalent types. -/
 
 
