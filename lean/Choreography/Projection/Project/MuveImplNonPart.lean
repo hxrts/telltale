@@ -92,6 +92,7 @@ Combined with wellFormedness (which implies closedness), this means non-particip
 projections are closed muve types, which are EQ2-equivalent to .end. -/
 
 /-- Helper: comm allCommsNonEmpty implies branch allCommsNonEmpty. -/
+/-! ## allCommsNonEmpty Branch Helper -/
 private theorem allCommsNonEmptyBranches_of_comm {sender receiver : String}
     {branches : List (Label × GlobalType)}
     (hne : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true) :
@@ -106,6 +107,7 @@ private theorem allCommsNonEmptyBranches_of_comm {sender receiver : String}
 /-- Auxiliary: Non-participant projections are muve types.
     Uses structural properties only (allCommsNonEmpty, noSelfComm) to avoid the semantic gap
     where body.allVarsBound [t] does not imply body.allVarsBound []. -/
+/-! ## Muve Classification Helpers: End/Var -/
 private theorem CProject_muve_of_not_part_of2_aux_end (role : String) (lt : LocalTypeR)
     (hproj : CProject .end role lt) : isMuve lt = true := by
   -- Reduce CProjectF for `.end` and discharge non-end constructors by contradiction.
@@ -148,6 +150,7 @@ private theorem CProject_muve_of_not_part_of2_aux_var (t role : String) (lt : Lo
       -- `.recv` cannot satisfy the `.var` CProjectF clause.
       simp [CProjectF] at hF
 
+/-! ## Muve Classification Helpers: Comm/Mu Cases -/
 private theorem CProject_muve_of_not_part_of2_aux_comm_nil (sender receiver _role : String)
     (lt : LocalTypeR) (hne : (GlobalType.comm sender receiver []).allCommsNonEmpty = true) :
     isMuve lt = true := by
@@ -206,6 +209,7 @@ private theorem CProject_muve_of_not_part_of2_aux_comm_cons_data (sender receive
     simpa [allCommsNonEmptyBranches, Bool.and_eq_true] using hbranches
   exact ⟨hfirst_proj, hnotpart_first, hbranches'.1⟩
 /-- CProject for non-participants enforces a muve local type. -/
+/-! ## Muve Classification Auxiliary Theorem -/
 theorem CProject_muve_of_not_part_of2_aux : (g : GlobalType) → (role : String) → (lt : LocalTypeR) →
     CProject g role lt → ¬ part_of2 role g → g.allCommsNonEmpty = true → isMuve lt = true
   | GlobalType.end, role, lt, hproj, _, _ =>
@@ -236,6 +240,7 @@ If a role doesn't participate in a global type, any CProject candidate
 for that role must be a muve type (only mu/var/end constructors).
 
 Proof by well-founded induction on global type size. -/
+/-! ## Muve Classification Public Theorem -/
 theorem CProject_muve_of_not_part_of2 (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt)
     (hnotpart : ¬part_of2 role g)
@@ -253,6 +258,7 @@ theorem CProject_muve_of_not_part_of2 (g : GlobalType) (role : String) (lt : Loc
 
     Key insight: allVarsBound bvars means freeVars ⊆ bvars. For mu, the bound var is
     added to bvars, allowing the recursive call to track that var properly. -/
+/-! ## Free-Variable Containment Helpers -/
 private theorem CProject_freeVars_subset_bvars_end (role : String) (lt : LocalTypeR)
     (hproj : CProject .end role lt) : ∀ v, v ∈ lt.freeVars → v ∈ [] := by
   -- CProjectF forces lt = .end, whose freeVars are empty.
@@ -300,6 +306,7 @@ private theorem CProject_freeVars_subset_bvars_var (t role : String) (lt : Local
   | recv _ _ =>
       simp [CProjectF] at hF
 
+/-! ## Free-Variable Containment: Mu Helpers -/
 private theorem CProject_freeVars_subset_bvars_mu_mu (t : String) (candBody : LocalTypeR)
     (bvars : List String)
     (ih_body : ∀ v, v ∈ candBody.freeVars → v ∈ t :: bvars) :
@@ -338,6 +345,7 @@ private theorem CProject_freeVars_subset_bvars_mu_case (t : String) (lt candBody
   | recv _ _ =>
       rcases hcase with ⟨_hguard, hEq⟩ | ⟨_hguard, hEq⟩ <;> cases hEq
 
+/-! ## Free-Variable Containment: Comm Helpers -/
 private theorem CProject_freeVars_subset_bvars_comm_nil (sender receiver _role : String)
     (lt : LocalTypeR) (bvars : List String)
     (hne : (GlobalType.comm sender receiver []).allCommsNonEmpty = true) :
@@ -373,6 +381,7 @@ private theorem CProject_freeVars_subset_bvars_comm_cons_data (sender receiver :
     simpa [allCommsNonEmptyBranches, Bool.and_eq_true] using
       (allCommsNonEmptyBranches_of_comm (sender := sender) (receiver := receiver) hne)
   exact ⟨hfirst_proj, hnotpart_first, havb_first, hbranches'.1⟩
+/-! ## Free-Variable Containment Auxiliary Theorem -/
 private theorem CProject_freeVars_subset_bvars :
     (g : GlobalType) → (role : String) → (lt : LocalTypeR) → (bvars : List String) →
     CProject g role lt → ¬ part_of2 role g → g.allVarsBound bvars = true →
@@ -403,6 +412,7 @@ decreasing_by
 
     Key insight: CProject_freeVars_subset_bvars with bvars = [] gives freeVars ⊆ [],
     which means freeVars = []. -/
+/-! ## Closedness Auxiliary Theorem -/
 private theorem CProject_closed_of_not_part_of2_aux (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt)
     (hnotpart : ¬part_of2 role g)
@@ -420,6 +430,7 @@ If a role doesn't participate in a well-formed (closed) global type,
 any CProject candidate for that role must be closed (no free variables).
 
 Proof by well-founded induction on global type size. -/
+/-! ## Closedness Public Theorem -/
 theorem CProject_closed_of_not_part_of2 (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt)
     (hnotpart : ¬part_of2 role g)
