@@ -95,6 +95,7 @@ private theorem lin_valid_after_consume_produce
         exact consumeToken_not_mem Lin lin' e Lold hLinUnique hConsume S' hMemE
       simpa [lookupG_update_neq G e e' Lnew hNe.symm] using hLookupOld
 
+/-! ## Linear Pairwise/Freshness Helper Lemmas -/
 private theorem lin_unique_after_consume_produce
     {Lin lin' : LinCtx} {e : Endpoint} {Lold Lnew : LocalType}
     (hLinUnique : Lin.Pairwise (fun a b => a.1 ≠ b.1))
@@ -115,6 +116,7 @@ private theorem endpoint_sid_fresh_of_consume
   have hIn : (e, Lold) ∈ Lin := consumeToken_endpoint_in_ctx Lin lin' e Lold hConsume
   exact hFresh e Lold hIn
 
+/-! ## Linear Supply Freshness Transport -/
 private theorem lin_supply_fresh_after_consume_produce
     {Lin lin' : LinCtx} {e : Endpoint} {Lold Lnew : LocalType} {supply : SessionId}
     (hFresh : ∀ e' S', (e', S') ∈ Lin → e'.sid < supply)
@@ -130,6 +132,7 @@ private theorem lin_supply_fresh_after_consume_produce
   | inr hTail =>
       exact consumeToken_preserves_supply_fresh Lin lin' e Lold supply hFresh hConsume e' S' hTail
 
+/-! ## Main WTMon Preservation Theorem -/
 theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v : Value)
     (hStep : MonStep ms act v ms')
     (hWTc : WTMonComplete ms) :
@@ -137,6 +140,7 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
   rcases hWTc with ⟨hWT, _hRoleComplete⟩
   rcases hWT with ⟨hCoh, hHead, hValid, hBT, hLinValid, hLinUnique, hSupplyFresh, hSupplyFreshG⟩
   cases hStep
+  /-! ## WTMon Preservation: Send Case -/
   case send hG hRecvReady hConsume hv =>
       rename_i e target T L lin'
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -168,6 +172,7 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
             (Lin:=ms.Lin) (lin':=lin') (e:=e)
             (Lold:=.send target T L) (supply:=ms.supply) hSupplyFresh hConsume
         exact updateG_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
+  /-! ## WTMon Preservation: Recv Case -/
   case recv hG hConsume hBuf hv =>
       rename_i e source T L vs lin'
       have hTrace :
@@ -202,6 +207,7 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
             (Lin:=ms.Lin) (lin':=lin') (e:=e)
             (Lold:=.recv source T L) (supply:=ms.supply) hSupplyFresh hConsume
         exact updateG_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
+  /-! ## WTMon Preservation: Select Case -/
   case select hG hFind hRecvReady hConsume =>
       rename_i e target bs ℓ L lin'
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -233,6 +239,7 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
             (Lin:=ms.Lin) (lin':=lin') (e:=e)
             (Lold:=.select target bs) (supply:=ms.supply) hSupplyFresh hConsume
         exact updateG_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
+  /-! ## WTMon Preservation: Branch Case -/
   case branch hG hBuf hFind hConsume =>
       rename_i e source bs ℓ L vs lin'
       have hTrace :
@@ -269,6 +276,7 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
             (Lold:=.branch source bs) (supply:=ms.supply) hSupplyFresh hConsume
         exact updateG_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
 
+/-! ## Token Removal Corollary -/
 theorem token_consumed_removed (ctx : LinCtx) (e : Endpoint) (ctx' : LinCtx) (S : LocalType)
     (hPairwise : ctx.Pairwise (fun a b => a.1 ≠ b.1))
     (h : LinCtx.consumeToken ctx e = some (ctx', S)) :
