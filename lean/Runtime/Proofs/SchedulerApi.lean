@@ -32,6 +32,8 @@ variable [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
 variable [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
 variable [IdentityVerificationBridge ι ν]
 
+/-! ### Policy Classification -/
+
 /-- Scheduler policy pinned to an initial VM state. -/
 abbrev SchedulerPolicyPinned (st : VMState ι γ π ε ν) (policy : SchedPolicy) : Prop :=
   st.sched.policy = policy
@@ -51,6 +53,8 @@ def schedulerPolicyProfileOf (policy : SchedPolicy) : SchedulerPolicyProfile :=
   | .cooperative => .cooperative
   | .priority _ => .priority
   | .progressAware => .progressAware
+
+/-! ### Iris Invariance Interface -/
 
 /-- Iris state-interpretation invariance for scheduler executions from a fixed state. -/
 def SchedulerIrisInvariant [Telltale.TelltaleIris]
@@ -75,6 +79,8 @@ structure VMSchedulerBundle (st₀ : VMState ι γ π ε ν) where
   policy : SchedPolicy
   policyPinned : SchedulerPolicyPinned st₀ policy
 
+/-! ### Bundle Metadata -/
+
 /-- Extract the policy-class profile from bundle evidence. -/
 def VMSchedulerBundle.profile {st₀ : VMState ι γ π ε ν}
     (bundle : VMSchedulerBundle st₀) : SchedulerPolicyProfile :=
@@ -85,6 +91,8 @@ theorem scheduler_profilePinned_from_bundle {st₀ : VMState ι γ π ε ν}
     (bundle : VMSchedulerBundle st₀) :
     schedulerPolicyProfileOf st₀.sched.policy = bundle.profile := by
   simp [VMSchedulerBundle.profile, schedulerPolicyProfileOf, bundle.policyPinned]
+
+/-! ### Hypothesis Inventory -/
 
 /-- Built-in scheduler hypothesis labels. -/
 inductive VMSchedulerHypothesis where
@@ -109,6 +117,8 @@ structure VMSchedulerSummary where
   allPassed : Bool
   deriving Repr, Inhabited
 
+/-! ### Validation Sets -/
+
 /-- Core scheduler hypotheses available from VM scheduler proofs alone. -/
 def vmSchedulerCoreHypotheses : List VMSchedulerHypothesis :=
   [ .policyPinned
@@ -121,6 +131,8 @@ def vmSchedulerCoreHypotheses : List VMSchedulerHypothesis :=
 /-- Scheduler hypothesis set that additionally requires Iris invariance support. -/
 def vmSchedulerWithIrisHypotheses : List VMSchedulerHypothesis :=
   vmSchedulerCoreHypotheses ++ [.irisStateInvariant]
+
+/-! ### Validation Procedures -/
 
 /-- Validate one scheduler hypothesis without Iris assumptions. -/
 def validateVMSchedulerHypothesis {st₀ : VMState ι γ π ε ν}
@@ -158,6 +170,8 @@ def validateVMSchedulerHypothesis {st₀ : VMState ι γ π ε ν}
       , detail := "Requires TelltaleIris instance; use validateVMSchedulerHypothesisWithIris."
       }
 
+/-! ## Validation Procedures: Iris-Aware Case -/
+
 /-- Validate one scheduler hypothesis when Iris support is available. -/
 def validateVMSchedulerHypothesisWithIris [Telltale.TelltaleIris]
     {st₀ : VMState ι γ π ε ν}
@@ -170,6 +184,8 @@ def validateVMSchedulerHypothesisWithIris [Telltale.TelltaleIris]
       , detail := "Iris state-interpretation invariance is available for this VM language instance."
       }
   | _ => validateVMSchedulerHypothesis bundle h
+
+/-! ## Validation Procedures: Batch Summaries -/
 
 /-- Validate an arbitrary scheduler hypothesis set without Iris assumptions. -/
 def validateVMSchedulerWithHypotheses {st₀ : VMState ι γ π ε ν}
@@ -200,6 +216,8 @@ def validateVMSchedulerWithIris [Telltale.TelltaleIris]
     {st₀ : VMState ι γ π ε ν}
     (bundle : VMSchedulerBundle st₀) : VMSchedulerSummary :=
   validateVMSchedulerWithHypothesesAndIris bundle vmSchedulerWithIrisHypotheses
+
+/-! ### Exported Scheduler Theorems -/
 
 /-- The pinned scheduler policy extracted from the scheduler bundle. -/
 theorem scheduler_policyPinned_from_bundle {st₀ : VMState ι γ π ε ν}
