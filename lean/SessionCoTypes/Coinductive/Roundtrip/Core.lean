@@ -185,6 +185,7 @@ theorem EQ2CE_resolved'_to_mu_paco {a b : LocalTypeC} (h : EQ2CE_resolved' a b) 
       rcases hR with ⟨ρ, hResL, hVarR, hce⟩
       have hstep := EQ2CE_unfold hce
       cases hstep with
+      /-! ## μ-paco Embed: Observable Cases -/
       | «end» ha hb =>
           have hend_a : UnfoldsToEndC a := UnfoldsToEndC_of_head ha
           have hend_b : UnfoldsToEndC b := UnfoldsToEndC_of_head hb
@@ -194,6 +195,7 @@ theorem EQ2CE_resolved'_to_mu_paco {a b : LocalTypeC} (h : EQ2CE_resolved' a b) 
           have hvar_a : UnfoldsToVarC a x := UnfoldsToVarC_of_head ha
           have hvar_b : UnfoldsToVarC b x := UnfoldsToVarC_of_head hb
           exact EQ2C_mu_step.obs (ObservableRelC.is_var x hvar_a hvar_b)
+      /-! ## μ-paco Embed: Communication Cases -/
       | send ha hb hbr =>
           rename_i p labels labels'
           have hbr0 : BranchesRelC (EQ2CE_resolved' ⊔ EQ2C) (branchesOf a) (branchesOf b) := by
@@ -218,6 +220,7 @@ theorem EQ2CE_resolved'_to_mu_paco {a b : LocalTypeC} (h : EQ2CE_resolved' a b) 
               BranchesRelC ((EQ2CE_resolved' ⊔ EQ2C) ⊔ ⊥) (branchesOf a) (branchesOf b) :=
             BranchesRelC_mono (fun _ _ hr => Or.inl hr) hbr0
           exact EQ2C_mu_step.obs (ObservableRelC.is_recv p _ _ hrecv_a hrecv_b hbr1)
+      /-! ## μ-paco Embed: Variable Cases -/
       | var_left ha hmem =>
           rename_i x
           have hvar_b : UnfoldsToVarC b x :=
@@ -231,6 +234,7 @@ theorem EQ2CE_resolved'_to_mu_paco {a b : LocalTypeC} (h : EQ2CE_resolved' a b) 
           have hvar_a : UnfoldsToVarC a x := UnfoldsToVarC_of_head ha
           have hvar_b : UnfoldsToVarC b x := UnfoldsToVarC_of_head hb
           exact EQ2C_mu_step.obs (ObservableRelC.is_var x hvar_a hvar_b)
+      /-! ## μ-paco Embed: μ-unfold Cases -/
       | mu_left ha hmem hrel =>
           rename_i x f
           have hEnvL' : EnvResolvesL (envInsertL ρ x b) := EnvResolvesL_insertL_mem hResL hmem
@@ -248,6 +252,8 @@ theorem EQ2CE_resolved'_to_mu_paco {a b : LocalTypeC} (h : EQ2CE_resolved' a b) 
           have hR' : EQ2CE_resolved' a (f ()) := ⟨envInsertR ρ x (mkVar x), hEnvL', hVarR', hrel⟩
           have hstep' : UnfoldsC b (f ()) := ⟨x, f, hb, rfl⟩
           exact EQ2C_mu_step.mu_right hstep' (Or.inl (Or.inl hR'))
+
+/-! ## EQ2CE_resolved' Step Erasure -/
 
 /-- EQ2CE_resolved' is a bisimulation: each step produces either EQ2C or stays in EQ2CE_resolved'.
     This uses EQ2CE_step_to_EQ2C_varR from BisimHelpers. -/
