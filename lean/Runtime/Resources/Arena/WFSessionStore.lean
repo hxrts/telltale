@@ -32,6 +32,8 @@ theorem WFSessionStore_nil : sessionStore_refines_envs ([] : SessionStore ν) :=
   · intro edge; simp [lookupD_empty, SessionStore.lookupTrace]
   · intro edge; simp [lookupBuf, SessionStore.lookupBuffer]
 
+/-! ## Session-Consistency Preservation Helpers -/
+
 /-- Helper: session consistency is preserved by updateType. -/
 theorem updateType_preserves_session_consistency {store : SessionStore ν} {e : Endpoint} {L : LocalType}
     (hSid : ∀ sid st, (sid, st) ∈ store → st.sid = sid ∧ (∀ e ∈ st.endpoints, e.sid = sid)) :
@@ -68,8 +70,10 @@ theorem updateType_preserves_session_consistency {store : SessionStore ν} {e : 
             have hTailSid : ∀ sid st, (sid, st) ∈ tl →
                 st.sid = sid ∧ (∀ e ∈ st.endpoints, e.sid = sid) := by
               intro sid'' st'' hMem
-              exact hSid sid'' st'' (List.Mem.tail _ hMem)
+            exact hSid sid'' st'' (List.Mem.tail _ hMem)
             exact ih hTailSid hTail
+
+/-! ### `updateTrace` session-consistency helper -/
 
 /-- Helper: session consistency is preserved by updateTrace. -/
 theorem updateTrace_preserves_session_consistency {store : SessionStore ν} {edge : Edge} {ts : List ValType}
@@ -107,8 +111,10 @@ theorem updateTrace_preserves_session_consistency {store : SessionStore ν} {edg
             have hTailSid : ∀ sid st, (sid, st) ∈ tl →
                 st.sid = sid ∧ (∀ e ∈ st.endpoints, e.sid = sid) := by
               intro sid'' st'' hMem
-              exact hSid sid'' st'' (List.Mem.tail _ hMem)
+            exact hSid sid'' st'' (List.Mem.tail _ hMem)
             exact ih hTailSid hTail
+
+/-! ## WF Refinement Preservation for `updateType` -/
 
 /-- Type update preserves WFSessionStore. -/
 theorem SessionStore.updateType_preserves_WFSessionStore {store : SessionStore ν} {e : Endpoint} {L : LocalType}
@@ -156,6 +162,8 @@ theorem SessionStore.updateType_preserves_WFSessionStore {store : SessionStore �
     rw [SessionStore.toBuffers_updateType]
     rw [SessionStore.lookupBuffer_updateType]
     exact hBuf edge
+
+/-! ## WF Refinement Preservation for `updateTrace` -/
 
 /-- Trace update preserves WFSessionStore. -/
 theorem SessionStore.updateTrace_preserves_WFSessionStore {store : SessionStore ν} {edge : Edge} {ts : List ValType}
