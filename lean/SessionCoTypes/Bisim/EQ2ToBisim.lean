@@ -140,6 +140,8 @@ theorem ObservableRel.toEQ2 {a b : LocalTypeR} {obs_a : Observable a} {obs_b : O
         EQ2_trans_via_Bisim ha_eq hrecv_eq hWFa hWFrecv_bs hWFrecv_cs
       exact EQ2_trans_via_Bisim h1 (EQ2_symm hb_eq) hWFa hWFrecv_cs hWFb
 
+/-! ## Observable Correspondence Equivalence -/
+
 /-- EQ2 equivalence iff observables correspond (WF-gated). -/
 theorem EQ2_iff_observable_correspond {a b : LocalTypeR} (obs_a : Observable a)
     (hWFa : LocalTypeR.WellFormed a) (hWFb : LocalTypeR.WellFormed b) :
@@ -150,6 +152,8 @@ theorem EQ2_iff_observable_correspond {a b : LocalTypeR} (obs_a : Observable a)
   · intro h
     obtain ⟨obs_b, hrel⟩ := h
     exact ObservableRel.toEQ2 hrel hWFa hWFb
+
+/-! ## Round-trip Corollaries -/
 
 /-- Round-trip: extract then inject recovers EQ2 (by proof irrelevance). -/
 theorem extract_inject_roundtrip {a b : LocalTypeR} (h : EQ2 a b) (obs_a : Observable a)
