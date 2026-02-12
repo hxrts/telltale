@@ -61,8 +61,10 @@ theorem BranchesRelBisim.map_image {f : LocalTypeR → LocalTypeR} {R : Rel}
     apply List.Forall₂.cons
     · constructor
       · exact hbc.1
-      · exact ⟨_, _, hbc.2, rfl, rfl⟩
+    · exact ⟨_, _, hbc.2, rfl, rfl⟩
     · exact ih
+
+/-! ### Compatibility Lifting to Bisim -/
 
 /-- Compatible functions are congruences for Bisim.
 
