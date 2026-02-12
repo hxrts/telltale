@@ -122,6 +122,8 @@ lemma childrenOf_recv_eq_snd_branchesOf {t : LocalTypeC} {p : String} {labels : 
   | ⟨LocalTypeHead.send _ _, _⟩ => simp_all
   | ⟨LocalTypeHead.mu _, _⟩ => simp_all
 
+/-! ## Constructing `BranchesRelC` from Pointwise Child Evidence -/
+
 /-- Helper: if bisimAll succeeds on zipped children, construct BranchesRelC.
     This requires showing that the branches have matching labels. -/
 lemma bisimAll_to_BranchesRelC {R : LocalTypeC → LocalTypeC → Prop}
@@ -173,6 +175,8 @@ lemma bisimAll_to_BranchesRelC {R : LocalTypeC → LocalTypeC → Prop}
             simp only [List.get_eq_getElem, List.getElem_cons_succ] at hchild
             exact hchild
 
+/-! ## Branch Label Reconstruction (Send) -/
+
 /-- Helper: branchesOf preserves label structure. -/
 lemma branchesOf_labels_eq {t : LocalTypeC} {p : String} {labels : List Label}
     (hhead : head t = .send p labels) :
@@ -191,6 +195,8 @@ lemma branchesOf_labels_eq {t : LocalTypeC} {p : String} {labels : List Label}
   | ⟨LocalTypeHead.recv _ _, _⟩ => simp_all
   | ⟨LocalTypeHead.mu _, _⟩ => simp_all
 
+/-! ## Branch Label Reconstruction (Recv) -/
+
 /-- Helper: branchesOf preserves label structure for recv. -/
 lemma branchesOf_labels_eq_recv {t : LocalTypeC} {p : String} {labels : List Label}
     (hhead : head t = .recv p labels) :
@@ -208,6 +214,8 @@ lemma branchesOf_labels_eq_recv {t : LocalTypeC} {p : String} {labels : List Lab
   | ⟨LocalTypeHead.var _, _⟩ => simp_all
   | ⟨LocalTypeHead.send _ _, _⟩ => simp_all
   | ⟨LocalTypeHead.mu _, _⟩ => simp_all
+
+/-! ## Send-Case Bridge from `bisimAll` to `BranchesRelC` -/
 
 /-- Key lemma: if obsMatch succeeds with send and bisimAll succeeds on nextPairs,
     then we have BranchesRelC relating the branches. -/
@@ -239,6 +247,7 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
       exact this
     omega
   apply bisimAll_to_BranchesRelC hlen
+  /-! ## `obsMatch_send_bisimAll_to_BranchesRelC`: Label Alignment -/
   · intro i
     have hlen_a : bs.length = labels.length := by
       have := congrArg List.length hlabels_a
@@ -273,6 +282,7 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
         simp [j, j_map]
       exact hmap'.trans hmap_get_b
     exact hget_a.trans hget_b.symm
+  /-! ## `obsMatch_send_bisimAll_to_BranchesRelC`: Child Relation -/
   · intro i
     -- Children are in BisimRel: extract from bisimAll on nextPairs
     simp only [nextPairs, zipChildren, bisimAll, List.all_eq_true] at hchildren
@@ -301,6 +311,8 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     -- This means it's in BisimRelCore, hence BisimRel
     rw [ha_child, hb_child]
     exact Or.inl ⟨fuel, visited_any, hvisited, hpair⟩
+
+/-! ## Recv-Case Bridge from `bisimAll` to `BranchesRelC` -/
 
 /-- Key lemma: if obsMatch succeeds with recv and bisimAll succeeds on nextPairs,
     then we have BranchesRelC relating the branches. -/
@@ -332,6 +344,7 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
       exact this
     omega
   apply bisimAll_to_BranchesRelC hlen
+  /-! ## `obsMatch_recv_bisimAll_to_BranchesRelC`: Label Alignment -/
   · intro i
     have hlen_a : bs.length = labels.length := by
       have := congrArg List.length hlabels_a
@@ -366,6 +379,7 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
         simp [j, j_map]
       exact hmap'.trans hmap_get_b
     exact hget_a.trans hget_b.symm
+  /-! ## `obsMatch_recv_bisimAll_to_BranchesRelC`: Child Relation -/
   · intro i
     -- Children are in BisimRel (same proof as send case)
     simp only [nextPairs, zipChildren, bisimAll, List.all_eq_true] at hchildren
