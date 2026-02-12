@@ -32,6 +32,8 @@ def BuffersActive (G : GEnv) (bufs : Buffers) : Prop :=
 def BuffersUnique (bufs : Buffers) : Prop :=
   (bufs.map Prod.fst).Nodup
 
+/-! ## Buffer Lookup and Typing Helpers -/
+
 /-- If buffers are unique, membership determines lookupBuf. -/
 theorem lookupBuf_eq_of_mem_unique {bufs : Buffers} (hUniq : BuffersUnique bufs)
     {e : Edge} {buf : Buffer} (hmem : (e, buf) ∈ bufs) :
@@ -72,6 +74,8 @@ theorem buffer_length_eq_trace_length {G : GEnv} {D : DEnv} {bufs : Buffers} (e 
   rcases hBT e with ⟨hLen, _⟩
   exact hLen
 
+/-! ## Coherence-to-Depth Bound -/
+
 /-- Coherence bounds trace length by receiver depth on active edges. -/
 theorem trace_length_le_depth_of_coherent {G : GEnv} {D : DEnv} {e : Edge}
     {Lrecv : LocalType} (hCoh : Coherent G D) (hActive : ActiveEdge G e)
@@ -82,6 +86,8 @@ theorem trace_length_le_depth_of_coherent {G : GEnv} {D : DEnv} {e : Edge}
   rcases hEdge with ⟨_, _hGsender, hConsume⟩
   rcases (Option.isSome_iff_exists).1 hConsume with ⟨L', hConsume'⟩
   exact Consume_length_le_depth hConsume'
+
+/-! ## Edge and Global Occupancy Bounds -/
 
 /-- Edge buffer occupancy is bounded by receiver depth on active edges. -/
 theorem edgeBufferOccupancy_le_receiver_depth {C : Config} {e : Edge}
@@ -128,6 +134,7 @@ theorem maxBufferOccupancy_le_totalTypeDepth {C : Config}
   have hLe := edgeBufferOccupancy_le_totalTypeDepth (C:=C) (e:=e) hBT hCoh hAct
   simpa [edgeBufferOccupancy, hLookup] using hLe
 
+/-! ## Reachable Coherence Transport -/
 
 /-- Coherence is preserved along unbounded-reachable paths. -/
 theorem coherent_on_reachable (C₀ : Config)
@@ -140,6 +147,8 @@ theorem coherent_on_reachable (C₀ : Config)
       simpa using hCoh₀
   | tail hreach hstep _ =>
       exact hPres _ _ hreach hstep
+
+/-! ## Global Occupancy BddAbove from Coherence -/
 
 /-- **Key theorem**: Well-typed coherent configurations have bounded buffer growth.
     This is because session types discipline the communication: every send must
@@ -168,6 +177,8 @@ theorem coherent_implies_bddAbove (C₀ : Config)
   have hSizeLe : C.G.length * d ≤ m * d := Nat.mul_le_mul_right d (hSize C hreach)
   exact le_trans hOccLeDepth (le_trans hDepthLe hSizeLe)
 
+/-! ## Derived Global Occupancy Bound -/
+
 /-- Coherence-driven boundedness hypotheses packaged as an explicit global occupancy
     bound usable by `phase_transition_sharp`. -/
 theorem coherent_implies_global_occupancy_bound (C₀ : Config)
@@ -184,6 +195,8 @@ theorem coherent_implies_global_occupancy_bound (C₀ : Config)
   refine ⟨bound, ?_⟩
   intro C hreach
   exact hbound ⟨C, hreach, rfl⟩
+
+/-! ## Invariant-Packaged BddAbove -/
 
 /-- Coherence yields bounded occupancy under buffer-activity/uniqueness invariants. -/
 theorem coherent_implies_bddAbove_of_invariants (C₀ : Config)
@@ -204,6 +217,8 @@ theorem coherent_implies_bddAbove_of_invariants (C₀ : Config)
   have hDepthBound := depth_bound_of_reachable C₀
   have hGSizeBound := G_length_bound_of_reachable C₀
   exact coherent_implies_bddAbove C₀ hCoh hPres hOccFromCoh hDepthBound hGSizeBound
+
+/-! ## Phase Transition from Base Regime -/
 
 /-- End-to-end sharp phase transition theorem where the occupancy boundedness
     assumptions are discharged from coherence + structural depth bounds. -/
@@ -228,6 +243,8 @@ theorem phase_transition_sharp_of_coherence_base_regime (C₀ : Config)
     coherent_implies_global_occupancy_bound C₀ hCoh hPres hOccFromCoh hDepthBound hGSizeBound
   exact phase_transition_sharp_of_base_regime C₀ hInit hBoundedReach hBase hNoPar
     hTerminalNoStep h_unbounded_safe hfinite
+
+/-! ## Bounded/Unbounded Coherence Refinement -/
 
 /-- Refinement: bounded coherent configurations refine unbounded ones. -/
 theorem bounded_refines_unbounded (B : Nat) (G : GEnv) (D : DEnv) (bufs : Buffers)
