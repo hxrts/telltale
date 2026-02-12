@@ -357,6 +357,8 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
       S'.right = Sown.right →
       HasTypeProcPreOut Ssh Sown G (.branch k procs) S' G' W Δ
 
+  /-! ## Pre-Out Sequential And Parallel Constructors -/
+
   /-- Sequential composition: compose post environments. -/
   | seq {Ssh Sown G P Q S₁ G₁ S₂ G₂ W₁ W₂ Δ₁ Δ₂} :
       HasTypeProcPreOut Ssh Sown G P S₁ G₁ W₁ Δ₁ →
@@ -383,6 +385,8 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
       HasTypeProcPreOut Ssh { right := Sown.right ++ split.S1, left := split.S2 } split.G2 Q
         { right := Sown.right ++ split.S1, left := S₂' } G₂' W₂ Δ₂ →
       HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin Wfin Δfin
+
+  /-! ## Pre-Out Assignment Constructors -/
 
   /-- Assignment updates S with x's type. -/
   | assign_new {Ssh Sown G x v T} :
@@ -423,6 +427,8 @@ theorem ParSplit.sides_eq_of_witness
       _ = pw.split.S1 ++ pw.split.S2 := by simpa [pw.split.hS]
   exact ⟨List.append_inj_left hSeq hSlenEq, List.append_inj_right hSeq hSlenEq⟩
 
+/-! ## Parallel Inversion -/
+
 /-- Inversion for parallel pre-out typing with explicit environment splits. -/
 theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
     HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin Wfin Δfin →
@@ -457,6 +463,8 @@ theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
           · simpa [hSfin] using rfl
           · simpa using hP
           · simpa using hQ
+
+/-! ## Witness-Form Parallel Inversion -/
 
 /-- Witness-oriented inversion for parallel pre-out typing. -/
 theorem HasTypeProcPreOut_par_inv_witness {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
