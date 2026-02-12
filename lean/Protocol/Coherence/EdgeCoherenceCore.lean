@@ -127,8 +127,10 @@ theorem ActiveEdge_updateG_inv {G : GEnv} {e : Edge} {ep : Endpoint} {L : LocalT
         exact Ne.symm hEq
       have hLr' : lookupG G { sid := e.sid, role := e.receiver } = some Lr := by
         simpa [lookupG_update_neq _ _ _ _ hNe] using hLr
-      exact (Option.isSome_iff_exists).2 ⟨Lr, hLr'⟩
+	      exact (Option.isSome_iff_exists).2 ⟨Lr, hLr'⟩
   exact ⟨hSender', hRecv'⟩
+
+/-! ## Coherence Extraction Lemmas -/
 
 /-- Extract EdgeCoherent from Coherent given sender/receiver lookups. -/
 theorem Coherent_edge_of_endpoints {G : GEnv} {D : DEnv} {e : Edge}
