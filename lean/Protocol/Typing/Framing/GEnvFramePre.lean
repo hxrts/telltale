@@ -43,6 +43,8 @@ private lemma pre_frame_right_branch_bodies
   rw [hUpd]
   exact hBody'
 
+/-! ## Pre Framing (Right): Main Theorem -/
+
 /-- Frame a disjoint GEnv on the right of pre-typing. -/
 lemma HasTypeProcPre_frame_G_right
     {Ssh : SEnv} {Sown : OwnedEnv} {G Gfr : GEnv} {P : Process} :
