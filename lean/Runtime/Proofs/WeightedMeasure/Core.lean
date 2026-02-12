@@ -286,6 +286,8 @@ lemma applyStepConcrete_isolation
   refine ⟨s, hs, ?_⟩
   simp [hfalse]
 
+/-! ## SessionSemantics Instance -/
+
 instance : SessionSemantics where
   applyStep := applyStepConcrete
   applySessionStep := applySessionStepConcrete
@@ -294,6 +296,25 @@ instance : SessionSemantics where
   step_nonincreasing_other := by
     intro cfg step newType s hs hne
     refine ⟨s, applyStepConcrete_isolation cfg step newType s hs hne, rfl, le_rfl⟩
+
+/-! ## Sum-Update Helper Lemmas -/
+
+private lemma map_update_eq_snd_of_not_mem {α : Type} [DecidableEq α]
+    (tl : List (α × Nat)) (key : α) (newVal : Nat)
+    (hnotIn : key ∉ tl.map Prod.fst) :
+    tl.map (fun (k, v) => if k == key then newVal else v) = tl.map Prod.snd := by
+  apply List.map_congr_left
+  intro kv hmem
+  rcases kv with ⟨k', v'⟩
+  simp only
+  have hne : k' ≠ key := by
+    intro heq
+    apply hnotIn
+    rw [← heq]
+    exact List.mem_map_of_mem (f := Prod.fst) hmem
+  simp [beq_eq_false_iff_ne.mpr hne]
+
+/-! ## Sum-Update Arithmetic -/
 
 /-- Sum update lemma: updating one unique key changes sum by the difference. -/
 theorem sum_update_unique {α : Type} [DecidableEq α]
@@ -319,16 +340,8 @@ theorem sum_update_unique {α : Type} [DecidableEq α]
         simp only [List.map_cons, List.nodup_cons] at hunique
         exact hunique.1
       -- Map on tail is identity for key
-      have htl_eq : tl.map (fun (k, v) => if k == key then newVal else v) = tl.map Prod.snd := by
-        apply List.map_congr_left
-        intro ⟨k', v'⟩ hmem'
-        simp only
-        have hne : k' ≠ key := by
-          intro heq
-          apply hnotIn
-          rw [← heq]
-          exact List.mem_map_of_mem (f := Prod.fst) hmem'
-        simp [beq_eq_false_iff_ne.mpr hne]
+      have htl_eq : tl.map (fun (k, v) => if k == key then newVal else v) = tl.map Prod.snd :=
+        map_update_eq_snd_of_not_mem tl key newVal hnotIn
       rw [htl_eq]
       rw [foldl_add_shift (l := tl.map Prod.snd) (n := newVal)]
       rw [foldl_add_shift (l := tl.map Prod.snd) (n := oldVal)]
