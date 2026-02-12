@@ -9,6 +9,9 @@ Final round-trip statements and aliases.
 
 namespace SessionCoTypes.Coinductive
 open SessionTypes.LocalTypeR
+
+/-! ## Core Roundtrip EQ2C Corollaries -/
+
 theorem toCoind_toInductive_eq2c_of_eq2ce (t : LocalTypeC) (h : Regular t)
     (hprod : ProductiveC t)
     (hback : ∀ c ∈ h.states.toFinset, EQ2C (mkVar (nameOf c (h.states.toFinset))) c)
@@ -47,6 +50,8 @@ theorem toCoind_toInductive_eq2c_of_env (t : LocalTypeC) (h : Regular t)
     envOf_varR (h.states.toFinset) (h.states.toFinset)
   exact EQ2CE_to_EQ2C' hce hEnv.1 hEnvR hprod_left hprod
 
+/-! ## toCoind-Source Corollaries -/
+
 /-- Round-trip in EQ2C for `toCoind` images, discharging productivity. -/
 theorem toCoind_toInductive_eq2c_of_env_toCoind (t : LocalTypeR)
     (hEnv : EnvResolves
@@ -64,6 +69,8 @@ by
       (Set.Finite.toFinset (toCoind_regular t))) (a := toInductive (toCoind t) (toCoind_regular t))
       (b := t) hce hEnv.1 hEnvR
 
+/-! ## toCoind Back-edge Corollary -/
+
 /-- Round-trip in EQ2C for `toCoind` images with explicit back-edge resolution. -/
 theorem toCoind_toInductive_eq2c_of_backedge_toCoind (t : LocalTypeR)
     (hback : ∀ c ∈ Set.Finite.toFinset (toCoind_regular t),
@@ -76,6 +83,8 @@ theorem toCoind_toInductive_eq2c_of_backedge_toCoind (t : LocalTypeR)
     envOf_resolves_of_backedge (all := Set.Finite.toFinset (toCoind_regular t))
       (visited := Set.Finite.toFinset (toCoind_regular t)) hback
   exact toCoind_toInductive_eq2c_of_env_toCoind t hEnv
+
+/-! ## Canonical Alias -/
 
 /-- Canonical round-trip statement (alias). -/
 theorem toCoind_toInductive (t : LocalTypeC) (h : Regular t) :
