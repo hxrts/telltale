@@ -34,6 +34,8 @@ structure MarkovChain (State : Type*) [Fintype State] where
 variable {State : Type*} [Fintype State] [DecidableEq State]
 variable [EntropyAPI.AnalysisModel]
 
+/-! ## Markov Chain and Spectral Quantities -/
+
 /-- Transition matrix over `ℝ`. -/
 def transitionMatrix (mc : MarkovChain State) : Matrix State State ℝ :=
   Matrix.of mc.transition
@@ -62,6 +64,8 @@ theorem spectralGap_nonneg (mc : MarkovChain State) (h : SpectralGapNonneg mc) :
     0 ≤ spectralGap mc := by
   unfold spectralGap SpectralGapNonneg at *
   linarith
+
+/-! ## Conductance and Cheeger Bound -/
 
 /-- Conductance witness used by the Cheeger inequality interface. -/
 structure ConductanceWitness (mc : MarkovChain State) where
@@ -111,6 +115,8 @@ theorem spectralGap_pos (mc : MarkovChain State) (h : SpectralGapPos mc) :
   unfold spectralGap SpectralGapPos at *
   linarith
 
+/-! ## Stationary Distribution Witnesses -/
+
 /-- Probability-distribution predicate on finite states. -/
 def IsProbabilityDist (π : State → ℝ) : Prop :=
   (∀ s, 0 ≤ π s) ∧ (∑ s, π s = 1)
@@ -130,6 +136,8 @@ theorem exists_stationary_dist (mc : MarkovChain State)
     (w : StationaryWitness mc) :
     ∃ π : State → ℝ, IsProbabilityDist π ∧ IsStationary mc π := by
   exact ⟨w.π, w.prob, w.stationary⟩
+
+/-! ## Hitting and Termination Bounds -/
 
 /-- Witness for expected hitting-time bounds from spectral data. -/
 structure HittingTimeWitness (mc : MarkovChain State) where
@@ -165,6 +173,8 @@ theorem expected_termination_bound (mc : MarkovChain State)
     ∀ s, expectedTerminationTime w s ≤ 1 / spectralGap mc := by
   intro s
   exact w.toHittingTimeWitness.bounded_by_gap s
+
+/-! ## Independent Session Composition -/
 
 section IndependentSessions
 
