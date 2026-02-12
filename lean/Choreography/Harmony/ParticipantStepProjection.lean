@@ -29,7 +29,7 @@ open Choreography.Projection.Project
 open Choreography.Projection.Project (ProjectableClosedWellFormed)
 open Choreography.Projection.Projectb (CProject)
 
-
+/-! ## Shared Projection Predicates -/
 
 abbrev projTransBranches := Choreography.Projection.Project.transBranches
 
@@ -55,6 +55,8 @@ private theorem mem_transBranches_of_mem (branches : List (Label × GlobalType))
         | tail _ htl =>
             have ih' := ih htl
             simp [projTransBranches, Choreography.Projection.Project.transBranches, List.mem_cons, ih']
+
+/-! ## Sender Head Case -/
 
 /-- Sender projection follows the head communication matching the action. -/
 private theorem proj_trans_sender_step_comm_head
@@ -99,6 +101,8 @@ theorem proj_trans_sender_step (g g' : GlobalType) (act : GlobalActionR)
   | mu _ _ _ _ _ =>
       -- action_pred is false on mu
       simp [action_pred] at hpred
+
+/-! ## Receiver Head Case -/
 
 /-- Receiver projection follows the head communication matching the action. -/
 private theorem proj_trans_receiver_step_comm_head
@@ -292,6 +296,8 @@ private theorem proj_trans_other_step_comm_async_other
         simpa using hbranch_rel
       exact proj_trans_other_step_comm_async_other_cons
         sender receiver label label cont cont' rest rest' role hbranch_rel' hrs hrr
+
+/-! ## Async Dispatcher -/
 
 /-- Helper: comm_async case (dispatches by role). -/
 
