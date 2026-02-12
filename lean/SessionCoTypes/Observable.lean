@@ -150,6 +150,8 @@ theorem CanSend.dual_iff_CanRecv {t : LocalTypeR} {p : String} {bs : List Branch
       CanRecv.dual (t := t.dual) h
     simpa [LocalTypeR.dual_dual, dualBranches_dualBranches] using h'
 
+/-! ### Duality Equivalence Corollaries -/
+
 /-- Duality swaps CanRecv and CanSend. -/
 theorem CanRecv.dual_iff_CanSend {t : LocalTypeR} {p : String} {bs : List BranchR} :
     CanRecv t p bs ↔ CanSend t.dual p (dualBranches bs) := by
@@ -160,6 +162,8 @@ theorem CanRecv.dual_iff_CanSend {t : LocalTypeR} {p : String} {bs : List Branch
     have h' : CanRecv t.dual.dual p (dualBranches (dualBranches bs)) :=
       CanSend.dual (t := t.dual) h
     simpa [LocalTypeR.dual_dual, dualBranches_dualBranches] using h'
+
+/-! ### CanRecvD Alias Corollaries -/
 
 /-- CanRecvD is equivalent to CanRecv (by duality). -/
 @[simp]
@@ -207,6 +211,8 @@ theorem UnfoldsToVar.mu_inv {t : String} {body : LocalTypeR} {v : String}
     (h : UnfoldsToVar (.mu t body) v) : UnfoldsToVar (body.substitute t (.mu t body)) v := by
   cases h with
   | mu h' => exact h'
+
+/-! ### Send/Recv Inversion -/
 
 theorem CanSend.cases {a : LocalTypeR} {partner : String} {branches : List BranchR}
     (h : CanSend a partner branches) :
