@@ -365,6 +365,8 @@ private def derive_recv_branch_wf (sender : String) (lbs : List BranchR) (role :
    fun _ hmem partner hrecv => hwf' partner (LocalTypeR.hasRecvFrom_recv_branch hmem hrecv)⟩
 
 mutual
+/-! ## localType_has_embed Theorem -/
+
 /-- Any well-formed local type can be embedded into some global type.
 
     The well-formedness conditions ensure that:
@@ -387,6 +389,9 @@ theorem localType_has_embed (e : LocalTypeR) (role : String)
       refine ⟨.var t, ?_⟩
       apply CEmbed_fold'
       simp [CEmbedF]
+
+  /-! ## localType_has_embed Mu Case -/
+
   | mu t body =>
       cases hcontr : LocalTypeR.lcontractive body with
       | true =>
@@ -407,6 +412,9 @@ theorem localType_has_embed (e : LocalTypeR) (role : String)
             LocalTypeR.hasSendTo_noncontractive (t := t) (body := body) (partner := role) hcontr
           have : False := (hwf role hbad) rfl
           exact this.elim
+
+  /-! ## localType_has_embed Send/Recv Cases -/
+
   | send receiver lbs =>
       have hne : role ≠ receiver := hwf receiver LocalTypeR.hasSendTo_send
       have ⟨hwf_branches, hwf'_branches⟩ := derive_send_branch_wf receiver lbs role hwf hwf'
@@ -415,6 +423,9 @@ theorem localType_has_embed (e : LocalTypeR) (role : String)
       apply CEmbed_fold'
       simp [CEmbedF]
       exact ⟨hne, hembed⟩
+
+  /-! ## localType_has_embed Recv Case -/
+
   | recv sender lbs =>
       have hne : sender ≠ role := by
         intro heq
@@ -427,12 +438,14 @@ theorem localType_has_embed (e : LocalTypeR) (role : String)
       simp [CEmbedF]
       exact ⟨hne, hembed⟩
 termination_by sizeOf e
-decreasing_by
+  decreasing_by
   all_goals
     subst_vars
     first
     | exact sizeOf_body_lt_sizeOf_mu _ _
     | exact sizeOf_branches_lt_sizeOf_send _ _
+
+/-! ## branches_have_embed Theorem -/
 
 /-- Helper theorem for embedding branch lists. -/
 theorem branches_have_embed (lbs : List BranchR) (role : String)
