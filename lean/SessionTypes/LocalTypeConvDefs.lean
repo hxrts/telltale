@@ -188,6 +188,8 @@ mutual
     bs => sizeOf bs
 end
 
+/-! ## Total Conversion with Closedness Proofs -/
+
 mutual
   /-- Total conversion from DB to named terms, requiring closedness at the given depth. -/
   def fromDB (ctx : SessionTypes.LocalTypeConv.NameContext) :
