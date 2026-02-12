@@ -56,6 +56,8 @@ theorem SendSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
   rw [hGUpdate, hSpec.trace_extended]
   exact hResult
 
+/-! ## Receive Preservation -/
+
 /-- Receive preserves Coherence.
 
     The proof uses the buffer head evidence from the spec to satisfy
@@ -87,6 +89,8 @@ theorem RecvSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
   -- Align the trace tail with `rest`
   simpa [edge, hBuffer, List.tail_cons] using hResult
 
+/-! ## Select/Branch Preservation -/
+
 /-- Select preserves Coherence when SelectReady holds.
 
     Similar to send, but uses SelectReady for the receiver's ability
@@ -113,6 +117,8 @@ theorem SelectSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
   have hGUpdate : G' = updateG G senderEp L' := hSpec.type_updated branches L' hSenderType hFind
   rw [hGUpdate, hSpec.trace_extended]
   exact hResult
+
+/-! ### Branch Preservation -/
 
 /-- Branch preserves Coherence.
 
@@ -143,6 +149,8 @@ theorem BranchSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
     exact List.tail_eq_of_cons_eq h3
   rw [hGUpdate, hDUpdate, ← hRestEq]
   simpa [edge, hBuffer, List.tail_cons] using hResult
+
+/-! ## Open/Close Preservation -/
 
 /-- Open preserves Coherence (new session is Coherent by construction).
 
@@ -187,6 +195,30 @@ theorem OpenSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
     · rw [hGFrameSender]; exact hLsender
     · rw [hDFrame]; exact hConsume
 
+/-! ### Close Preservation -/
+
+/-- Helper: an edge targeting the removed endpoint cannot stay active after close. -/
+private lemma close_target_removed_contra {G G' : GEnv} {D : DEnv}
+    {ep : Endpoint} {e : Edge}
+    (hSpec : CloseSpec G G' D ep)
+    (hActive : ActiveEdge G' e)
+    (hRecv : e.sid = ep.sid ∧ e.receiver = ep.role) : False := by
+  simp only [ActiveEdge] at hActive
+  obtain ⟨hSid, hRole⟩ := hRecv
+  have hEpRemoved : lookupG G' ep = none := hSpec.endpoint_removed
+  have hRecvEp : { sid := e.sid, role := e.receiver : Endpoint } = ep := by
+    cases ep with
+    | mk epSid epRole =>
+        cases e with
+        | mk sid sender receiver =>
+            cases hSid
+            cases hRole
+            rfl
+  rw [hRecvEp] at hActive
+  simp [hEpRemoved] at hActive
+
+/-! ## Close Preservation Theorem -/
+
 /-- Close preserves Coherence (edges become inactive).
 
     Removing an endpoint at `End` with empty traces makes edges involving
@@ -200,20 +232,7 @@ theorem CloseSpec_preserves_Coherent {G G' : GEnv} {D : DEnv}
   -- If edge involves ep as receiver, then ActiveEdge fails after close
   by_cases hRecv : e.sid = ep.sid ∧ e.receiver = ep.role
   · -- Edge has ep as receiver, but ep is removed
-    exfalso
-    simp only [ActiveEdge] at hActive
-    obtain ⟨hSid, hRole⟩ := hRecv
-    have hEpRemoved : lookupG G' ep = none := hSpec.endpoint_removed
-    have hRecvEp : { sid := e.sid, role := e.receiver : Endpoint } = ep := by
-      cases ep with
-      | mk epSid epRole =>
-          cases e with
-          | mk sid sender receiver =>
-              cases hSid
-              cases hRole
-              rfl
-    rw [hRecvEp] at hActive
-    simp [hEpRemoved] at hActive
+    exact False.elim (close_target_removed_contra hSpec hActive hRecv)
   · -- Edge doesn't have ep as receiver, preserved by frame
     push_neg at hRecv
     have hFrame : lookupG G' { sid := e.sid, role := e.receiver } =
@@ -250,6 +269,8 @@ theorem CloseSpec_preserves_Coherent {G G' : GEnv} {D : DEnv}
     constructor
     · rw [hFrameSender]; exact hLsender
     · exact hConsume
+
+/-! ## Acquire Preservation -/
 
 /-- Acquire preserves Coherence (uses delegation_preserves_coherent).
 
