@@ -20,7 +20,7 @@ open SessionTypes.GlobalType
 
 /-! ## Contractiveness Preservation -/
 
-/-! ## Contractiveness Preservation -/
+/-! ## Guardedness Under Lift (Below Cutoff) -/
 
 /-- Guardedness is preserved by lifting when the index is below the cutoff. -/
 theorem isGuarded_lift_lt (t : LocalTypeDB) (i c k : Nat) :
@@ -65,6 +65,8 @@ theorem isGuarded_lift_lt (t : LocalTypeDB) (i c k : Nat) :
     · intro l t ht
       exact ht
   exact hrec i c k hik hguard
+
+/-! ## Guardedness Under Lift (At/Above Cutoff) -/
 
 /-- Guardedness is preserved by lifting when the index is at or above the cutoff (shifted). -/
 theorem isGuarded_lift_ge (t : LocalTypeDB) (i c k : Nat) :
@@ -114,6 +116,8 @@ theorem isGuarded_lift_ge (t : LocalTypeDB) (i c k : Nat) :
       exact ht
   exact hrec i c k hik hguard
 
+/-! ## Guardedness Lift Gap -/
+
 /-- After lifting by 1 at cutoff k, index k cannot appear (it's in a gap). -/
 theorem isGuarded_lift_at_cutoff (t : LocalTypeDB) (k : Nat) :
     (t.lift 1 k).isGuarded k = true := by
@@ -158,6 +162,8 @@ theorem isGuarded_lift_at_cutoff (t : LocalTypeDB) (k : Nat) :
 /-- Lifting by 1 at cutoff 0 always guards index 0. -/
 theorem isGuarded_lift_zero (t : LocalTypeDB) : (t.lift 1 0).isGuarded 0 = true :=
   isGuarded_lift_at_cutoff t 0
+
+/-! ## Guardedness Under Substitution -/
 
 /-- Substitution preserves guardedness when the index is below the substitution point. -/
 theorem isGuarded_subst_lt (t e : LocalTypeDB) (i k : Nat) :
@@ -210,6 +216,8 @@ theorem isGuarded_subst_lt (t e : LocalTypeDB) (i k : Nat) :
     · intro l t ht; exact ht
   exact hrec e i k hik hguard heguard
 
+/-! ## Contractiveness Under Lift -/
+
 private theorem isContractive_lift (t : LocalTypeDB) (c k : Nat) :
     t.isContractive = true → (t.lift c k).isContractive = true := by
   intro h
@@ -240,6 +248,7 @@ private theorem isContractive_lift (t : LocalTypeDB) (c k : Nat) :
         simpa [LocalTypeDB.isContractive] using h
       have hbs'' := hbs c k hbs'
       simpa [LocalTypeDB.isContractive, LocalTypeDB.lift] using hbs''
+    /-! ## Contractiveness Lift: Recursive Cases -/
     -- mu case
     · intro body hbody c k h
       have hpair : body.isGuarded 0 = true ∧ body.isContractive = true := by
@@ -265,6 +274,8 @@ private theorem isContractive_lift (t : LocalTypeDB) (c k : Nat) :
       exact ht
   exact hrec c k h
 
+/-! ## Contractiveness Lift: Branches -/
+
 private theorem isContractiveBranches_lift (bs : List (Label × LocalTypeDB)) (c k : Nat) :
     isContractiveBranches bs = true → isContractiveBranches (liftBranches c k bs) = true := by
   intro h
@@ -277,6 +288,8 @@ private theorem isContractiveBranches_lift (bs : List (Label × LocalTypeDB)) (c
       constructor
       · exact isContractive_lift t c k ht
       · exact ih hrest
+
+/-! ## Contractiveness Under Substitution -/
 
 /-- Substitution preserves contractiveness. -/
 theorem isContractive_subst (body e : LocalTypeDB) (k : Nat) :
@@ -315,6 +328,7 @@ theorem isContractive_subst (body e : LocalTypeDB) (k : Nat) :
         simpa [LocalTypeDB.isContractive] using hbody
       have hbs'' := hbs e k hbs' he
       simpa [LocalTypeDB.subst, LocalTypeDB.isContractive] using hbs''
+    /-! ## Contractiveness Substitution: Recursive Cases -/
     -- mu case
     · intro body hbody_ih e k hbody he
       have hpair : body.isGuarded 0 = true ∧ body.isContractive = true := by
@@ -344,6 +358,8 @@ theorem isContractive_subst (body e : LocalTypeDB) (k : Nat) :
       exact ht
   exact hrec e k hbody he
 
+/-! ## Contractiveness Substitution: Branches -/
+
 theorem isContractive_subst_branches (bs : List (Label × LocalTypeDB)) (e : LocalTypeDB) (k : Nat) :
     isContractiveBranches bs = true → e.isContractive = true →
     isContractiveBranches (substBranches bs k e) = true := by
@@ -357,6 +373,8 @@ theorem isContractive_subst_branches (bs : List (Label × LocalTypeDB)) (e : Loc
       constructor
       · exact isContractive_subst t e k ht he
       · exact ih hrest
+
+/-! ## Contractiveness Under Unfolding -/
 
 /-- Substituting a mu into its body preserves contractiveness (mu-unfolding case). -/
 theorem isContractive_subst_mu (body : LocalTypeDB) :
