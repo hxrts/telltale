@@ -275,15 +275,16 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
           have h₁' := h₁
           have h₂' := h₂
           simp only [List.pairwise_cons] at h₁' h₂'
-          -- a must be the head of l₂
+          -- a must be the head of l₂.
           have hab : a = b := by
             have ha' : a = b ∨ a ∈ l₂ := by
               simpa [List.mem_cons] using ha
             cases ha' with
-            | inl hEq => exact hEq
-              | inr haTail =>
-                  have hb_lt_a : edgeCmpLT b a := h₂'.1 _ haTail
-                  have hba : b ≠ a := by
+            | inl hEq =>
+                exact hEq
+            | inr haTail =>
+                have hb_lt_a : edgeCmpLT b a := h₂'.1 _ haTail
+                have hba : b ≠ a := by
                   intro hEq
                   have hlt : edgeCmpLT a a := by
                     simpa [hEq] using hb_lt_a
@@ -292,12 +293,12 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
                 have hb_mem : b ∈ l₁ := by
                   simpa [List.mem_cons, hba] using hb_mem_all
                 have ha_lt_b : edgeCmpLT a b := h₁'.1 _ hb_mem
-                  exact False.elim ((edgeCmpLT_asymm ha_lt_b) hb_lt_a)
+                exact False.elim ((edgeCmpLT_asymm ha_lt_b) hb_lt_a)
           subst hab
 
           /-! ## Canonical List Extensionality: Tail Subset Transfer -/
 
-          -- tails are mutually subset
+          -- Tails are mutually subset.
           have h₁₂' : l₁ ⊆ l₂ := by
             intro x hx
             have hx' : x ∈ a :: l₂ := h₁₂ (List.mem_cons.mpr (Or.inr hx))
