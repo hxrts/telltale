@@ -25,6 +25,9 @@ open SessionCoTypes.EQ2Props
 open SessionCoTypes.EQ2Paco
 open Paco
 open SessionTypes.Participation
+
+/-! ## Prefix Send/Send Case -/
+
 private theorem CProjectTransRelComp_postfix_prefix_send_send
     {p q : String} {bs cs : List BranchR} {b : LocalTypeR}
     (heq_ab : EQ2 (.send p bs) b) (hrel_bb' : CProjectTransRel b (.send q cs))
@@ -55,6 +58,8 @@ private theorem CProjectTransRelComp_postfix_prefix_send_send
   | var _ => simp only [EQ2F] at heq_f
   | recv _ _ => simp only [EQ2F] at heq_f
 
+/-! ## Prefix Recv/Recv Case -/
+
 private theorem CProjectTransRelComp_postfix_prefix_recv_recv
     {p q : String} {bs cs : List BranchR} {b : LocalTypeR}
     (heq_ab : EQ2 (.recv p bs) b) (hrel_bb' : CProjectTransRel b (.recv q cs))
@@ -84,6 +89,8 @@ private theorem CProjectTransRelComp_postfix_prefix_recv_recv
   | var _ => simp only [EQ2F] at heq_f
   | send _ _ => simp only [EQ2F] at heq_f
 
+/-! ## Prefix End Dispatcher -/
+
 /- Helper: prefix case when lt is .end. -/
 private theorem CProjectTransRelComp_postfix_prefix_end
     {t b : LocalTypeR}
@@ -109,6 +116,8 @@ private theorem CProjectTransRelComp_postfix_prefix_end
       have hfalse : False := CProjectTransRelComp_end_not_recv
         (Or.inr (Or.inl ⟨b, heq_ab, hrel_bb'⟩)) LocalTypeR.WellFormed_end hWFc
       simpa [EQ2F] using hfalse
+
+/-! ## Prefix Var Dispatcher -/
 
 /- Helper: prefix case when lt is .var. -/
 private theorem CProjectTransRelComp_postfix_prefix_var
@@ -138,6 +147,8 @@ private theorem CProjectTransRelComp_postfix_prefix_var
       have hfalse : False := CProjectTransRelComp_var_not_recv hcomp hWFa hWFc
       simpa [EQ2F] using hfalse
 
+/-! ## Prefix Send Dispatcher -/
+
 /- Helper: prefix case when lt is .send. -/
 private theorem CProjectTransRelComp_postfix_prefix_send
     {p : String} {bs : List BranchR} {t b : LocalTypeR}
@@ -165,6 +176,8 @@ private theorem CProjectTransRelComp_postfix_prefix_send
         Or.inr (Or.inl ⟨b, heq_ab, hrel_bb'⟩)
       have hfalse : False := CProjectTransRelComp_send_not_recv hcomp hWFa hWFc
       simpa [EQ2F] using hfalse
+
+/-! ## Prefix Recv Dispatcher -/
 
 /- Helper: prefix case when lt is .recv. -/
 private theorem CProjectTransRelComp_postfix_prefix_recv
@@ -194,6 +207,8 @@ private theorem CProjectTransRelComp_postfix_prefix_recv
       have hfalse : False := CProjectTransRelComp_recv_not_send hcomp hWFa hWFc
       simpa [EQ2F] using hfalse
 
+/-! ## Prefix Mu Dispatcher -/
+
 /- Helper: prefix case when lt is .mu. -/
 private theorem CProjectTransRelComp_postfix_prefix_mu
     {v : String} {body_lt t b : LocalTypeR}
@@ -206,6 +221,8 @@ private theorem CProjectTransRelComp_postfix_prefix_mu
       exact CProjectTransRelComp_postfix_prefix_mu_mu heq_ab hrel_bb' hWFa hWFc
   | _ =>
       exact CProjectTransRelComp_postfix_prefix_mu_nonmu heq_ab hrel_bb' hWFa hWFc
+
+/-! ## Prefix Relation Dispatcher -/
 
 theorem CProjectTransRelComp_postfix_prefix
     {lt t b : LocalTypeR}
