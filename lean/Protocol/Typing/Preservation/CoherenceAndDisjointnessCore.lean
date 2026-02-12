@@ -113,6 +113,8 @@ theorem typed_step_preserves_coherence {G D Ssh Sown store bufs P G' D' Sown' st
 
 /-! ## StoreTypedStrong Preservation -/
 
+/-! ### SEnv Update Rewrites -/
+
 /- Updating a key already present in the left SEnv only affects the left side. -/
 theorem updateSEnv_append_left_of_left {S₁ S₂ : SEnv} {x : Var} {T T' : ValType}
     (hLeft : lookupSEnv S₁ x = some T') :
@@ -139,6 +141,8 @@ theorem updateSEnv_append_left_of_left {S₁ S₂ : SEnv} {x : Var} {T T' : ValT
               have hbeq : (x == y) = false := beq_eq_false_iff_ne.mpr hxy
               simpa [lookupSEnv, List.lookup, hbeq] using hLeftAll'
             simp [updateSEnv, hxy, ih hLeft']
+
+/-! ### Lookup Preservation Across Updates -/
 
 lemma lookupSEnv_update_append_neq
     {S₁ S₂ : SEnv} {x y : Var} {T : ValType} (hxy : y ≠ x) :
@@ -190,6 +194,8 @@ lemma lookupSEnv_SEnvAll_update_neq
         lookupSEnv_update_append_neq (S₁:=Sown) (S₂:=S₂) (x:=x) (y:=y) (T:=T) hxy
       simpa [hRight] using hLeft.trans hUpd
 
+/-! ### Owned-Environment Disjoint Projections -/
+
 lemma DisjointS_owned_right {S₁ : SEnv} {Sown : OwnedEnv} :
     DisjointS S₁ (Sown : SEnv) →
     DisjointS S₁ Sown.right := by
@@ -208,6 +214,8 @@ lemma DisjointS_owned_left {S₁ : SEnv} {Sown : OwnedEnv} :
       (SEnvDomSubset_append_right (S₁:=Sown.right) (S₂:=Sown.left))
   exact DisjointS_of_domsubset_right hSub hDisj
 
+/-! ### Disjointness Under Point Updates -/
+
 lemma DisjointS_update_right {S₁ S₂ : SEnv} {x : Var} {T : ValType}
     (hDisj : DisjointS S₁ S₂)
     (hNone : lookupSEnv S₁ x = none) :
@@ -223,6 +231,8 @@ lemma DisjointS_update_right {S₁ S₂ : SEnv} {x : Var} {T : ValType}
       have hEq := lookupSEnv_update_neq (env:=S₂) (x:=x) (y:=y) (T:=T) (Ne.symm hxy)
       simpa [hEq] using hL2
     exact hDisj y T₁ T₂ hL1 hL2'
+
+/-! ### Erase-Environment Lookup Facts -/
 
 lemma lookupSEnv_erase_eq
     {S : SEnv} {x : Var} :
@@ -259,6 +269,8 @@ lemma lookupSEnv_erase_ne
             · have hbeq : (y == z) = false := beq_eq_false_iff_ne.mpr hyz
               simpa [eraseSEnv, hxz, lookupSEnv, List.lookup, hbeq] using (ih (x:=x) (y:=y) hxy)
 
+/-! ### Owned Left-Update Disjointness -/
+
 lemma DisjointS_updateLeft {S₁ : SEnv} {Sown : OwnedEnv} {x : Var} {T : ValType}
     (hDisj : DisjointS S₁ (Sown : SEnv))
     (hNone : lookupSEnv S₁ x = none) :
@@ -282,6 +294,8 @@ lemma DisjointS_updateLeft {S₁ : SEnv} {Sown : OwnedEnv} {x : Var} {T : ValTyp
   have hAll : DisjointS S₁ (eraseSEnv Sown.right x ++ updateSEnv Sown.left x T) :=
     DisjointS_append_right hRight' hLeft'
   simpa [OwnedEnv.updateLeft] using hAll
+
+/-! ### Split-Disjointness Helpers -/
 
 /-- Disjointness against an append gives disjointness against the left part. -/
 lemma DisjointS_split_left {Ssh S₁ S₂ : SEnv} :
@@ -319,6 +333,8 @@ lemma DisjointS_split_from_owned_left
   have hLeftAll : DisjointS Ssh (split.S1 ++ split.S2) := by
     simpa [split.hS] using (DisjointS_owned_left (Sown:=Sown) hDisj)
   exact ⟨DisjointS_split_left hLeftAll, DisjointS_split_right hLeftAll⟩
+
+/-! ### Owned Repack and Finish Helpers -/
 
 /-- Repackage disjointness for an owned env with an extended right side. -/
 lemma DisjointS_owned_repack
@@ -364,6 +380,8 @@ lemma DisjointS_par_right_finish
   have hLeft : DisjointS Ssh (S₁ ++ S₂') := DisjointS_append_right hDisjS1 hDisjS2'
   have hAll : DisjointS Ssh (SownR ++ (S₁ ++ S₂')) := DisjointS_append_right hDisjRight hLeft
   simpa [OwnedEnv.all, List.append_assoc] using hAll
+
+/-! ### Par Framing Helpers -/
 
 /-- Frame G on the right for a par-left subprocess. -/
 lemma HasTypeProcPreOut_frame_G_right_par
