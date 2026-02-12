@@ -25,6 +25,8 @@ universe u v
 
 /-! ## Core Definitions -/
 
+/-! ## Envelope Relations and Equivalences -/
+
 /-- Canonical run type used by local/sharded envelope relations. -/
 abbrev Run (State : Type u) := Nat → State
 
@@ -60,6 +62,8 @@ def EqEnvLocal {State : Type u} {Obs : Type v}
 def EqEnvShard {State : Type u} {Obs : Type v}
     (E : ShardedEnvelope State Obs) (r₁ r₂ : Run State) : Prop :=
   eraseObs E.toEnvelope.observe r₁ = eraseObs E.toEnvelope.observe r₂
+
+/-! ## Soundness, Realizability, and Maximality Schemas -/
 
 /-- Local envelope soundness in the abstract erasure-first setting. -/
 def LocalEnvelopeSoundness {State : Type u} {Obs : Type v}
@@ -126,6 +130,8 @@ def LocalShardedCollapse {State : Type u} {Obs : Type v}
     (EShard : ShardedEnvelope State Obs) : Prop :=
   ∀ ref impl, EqEnvLocal ELocal ref impl ↔ EqEnvShard EShard ref impl
 
+/-! ## Exactness and Collapse Transport -/
+
 /-- Transport local exactness into sharded exactness under collapse. -/
 theorem shardedExact_of_localExact_and_collapse
     {State : Type u} {Obs : Type v}
@@ -173,6 +179,8 @@ theorem localExact_iff_shardedExact_of_collapse
     exact shardedExact_of_localExact_and_collapse hLocal hCollapse
   · intro hShard
     exact localExact_of_shardedExact_and_collapse hShard hCollapse
+
+/-! ## Phase E1 Premises and Projections -/
 
 /-- Premises bundle for Phase E1 local/sharded exact-characterization extraction. -/
 structure EnvelopePhaseE1Premises (State : Type u) (Obs : Type v) where
@@ -236,6 +244,8 @@ theorem shardedEnvelopeMaximality_of_e1Premises
     (p : EnvelopePhaseE1Premises State Obs) :
     ShardedEnvelopeMaximality p.shardedEnvelope p.shardedRefRun p.shardedImplRun :=
   p.shardedMaximalityWitness
+
+/-! ## E1 Exactness Packaging -/
 
 /-- Package local exact characterization from E1 premises. -/
 theorem localExactEnvelopeCharacterization_of_e1Premises
