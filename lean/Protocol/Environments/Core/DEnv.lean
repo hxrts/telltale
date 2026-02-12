@@ -281,9 +281,9 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
               simpa [List.mem_cons] using ha
             cases ha' with
             | inl hEq => exact hEq
-            | inr haTail =>
-                have hb_lt_a : edgeCmpLT b a := h₂'.1 _ haTail
-                have hba : b ≠ a := by
+              | inr haTail =>
+                  have hb_lt_a : edgeCmpLT b a := h₂'.1 _ haTail
+                  have hba : b ≠ a := by
                   intro hEq
                   have hlt : edgeCmpLT a a := by
                     simpa [hEq] using hb_lt_a
@@ -292,8 +292,11 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
                 have hb_mem : b ∈ l₁ := by
                   simpa [List.mem_cons, hba] using hb_mem_all
                 have ha_lt_b : edgeCmpLT a b := h₁'.1 _ hb_mem
-                exact (edgeCmpLT_asymm ha_lt_b hb_lt_a).elim
+                  exact False.elim ((edgeCmpLT_asymm ha_lt_b) hb_lt_a)
           subst hab
+
+          /-! ## Canonical List Extensionality: Tail Subset Transfer -/
+
           -- tails are mutually subset
           have h₁₂' : l₁ ⊆ l₂ := by
             intro x hx
@@ -308,7 +311,7 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
                 exact hEq'.symm.trans hlt'
               cases this
             simpa [List.mem_cons, hneq] using hx'
-          /-! ## Tail Subset Transfer for Pairwise Extensionality -/
+          -- Tail subset transfer for pairwise extensionality.
           have h₂₁' : l₂ ⊆ l₁ := by
             intro x hx
             have hx' : x ∈ a :: l₁ := h₂₁ (List.mem_cons.mpr (Or.inr hx))
@@ -323,7 +326,7 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
               cases this
             simpa [List.mem_cons, hneq] using hx'
           have htl : l₁ = l₂ := ih (h₁ := h₁'.2) (h₂ := h₂'.2) h₁₂' h₂₁'
-          simp [htl]
+          simpa [htl]
 
 /-! ## DEnv Extensional Equality -/
 /-- Two DEnvs with identical find? are equal. -/
