@@ -53,6 +53,8 @@ def RoleEquivalenceInvariantBound {Role : Type u} {State : Type v}
       (renameRun (Role := Role) (State := State) ρ impl) =
       bound ref impl
 
+/-! ## Envelope Bound Composition -/
+
 /-- Compositional envelope bound with explicit interaction term. -/
 def CompositionalEnvelopeBound {State : Type u}
     (component₁ component₂ interaction total : EnvelopeBound State) : Prop :=
@@ -86,6 +88,8 @@ structure NonInterferenceConverseWitness {State : Type u}
   component₂_active : component₂ ref impl ≠ 0
   interaction_zero : interaction ref impl = 0
   exactness_failure : total ref impl ≠ component₁ ref impl + component₂ ref impl
+
+/-! ## Non-Interference Converse -/
 
 /-- Oracle packaging: if non-interference is dropped, a strict witness can be produced. -/
 def NonInterferenceConverseOracle {State : Type u}
@@ -161,6 +165,8 @@ def HarmonySideConditionNecessityOracle {State : Type u} {Obs : Type v}
   ∀ c : HarmonySideCondition, ¬ conditions c →
     Nonempty (HarmonyDroppedConditionCounterexample project globalStep localStep conditions)
 
+/-! ## Harmony Necessity Theorems -/
+
 /-- Any dropped-condition witness certifies Harmony failure. -/
 theorem not_reconfigurationHarmony_of_dropped_condition_counterexample
     {State : Type u} {Obs : Type v}
@@ -187,6 +193,8 @@ theorem reconfigurationHarmony_side_condition_necessity
   intro c hDropped
   rcases hOracle c hDropped with ⟨w⟩
   exact not_reconfigurationHarmony_of_dropped_condition_counterexample w
+
+/-! ## E1 Envelope Bridge Interfaces -/
 
 /-- Delegation/handoff preserves local envelope equivalence. -/
 def DelegationPreservesEnvelope {State : Type u} {Obs : Type v}
@@ -216,6 +224,8 @@ def ExchangeNormalization {State : Type u} {Obs : Type v}
     exchange impl₁ impl₂ →
       EqEnvLocal E ref₁ impl₁ → EqEnvLocal E ref₂ impl₂
 
+/-! ## E1 Bridge Premises Record -/
+
 /-- Premises bundle for advanced E1 envelope-bridge theorem extraction. -/
 structure EnvelopePhaseE1BridgePremises
     (Role : Type u) (State : Type v) (Obs : Type (max u v))
@@ -241,6 +251,8 @@ structure EnvelopePhaseE1BridgePremises
     SpatialSubtypingMonotonicity subtype obligation
   exchangeNormalizationWitness :
     ExchangeNormalization localEnvelope exchange
+
+/-! ## E1 Bridge Premise Projections -/
 
 /-- Extract role-equivalence invariance from E1 bridge premises. -/
 theorem roleEquivalenceInvariant_of_e1BridgePremises
@@ -282,6 +294,8 @@ theorem exchangeNormalization_of_e1BridgePremises
     ExchangeNormalization p.localEnvelope p.exchange :=
   p.exchangeNormalizationWitness
 
+/-! ## Protocol Semantics Interfaces (E2) -/
+
 /-- Protocol-level role-renaming semantics over runs. -/
 structure ProtocolRoleRenamingSemantics (Protocol : Type u) (State : Type v) where
   renameRun : Protocol → Run State → Run State
@@ -308,6 +322,8 @@ structure ProtocolShardCutSemantics
     (Protocol : Type u) (Deployment : Type v) (State : Type (max u v)) where
   cut : Protocol → Deployment → Deployment → Prop
   runOf : Deployment → Run State
+
+/-! ## Protocol Semantics Properties (E2.1-E2.6) -/
 
 /-- E2.1: instantiate role-equivalence invariance for protocol role renaming. -/
 def ProtocolRoleRenamingEnvelopeInvariant
@@ -360,6 +376,8 @@ def ProtocolShardCutPreservation
   ∀ p d₁ d₂, S.cut p d₁ d₂ →
     EqEnvShard E (S.runOf d₁) (S.runOf d₂)
 
+/-! ## Protocol Envelope Premises -/
+
 /-- Premises bundle for protocol bridge theorem extraction (Phase E2). -/
 structure ProtocolEnvelopeBridgePremises
     (Protocol : Type u) (Placement : Type v)
@@ -390,6 +408,8 @@ structure ProtocolEnvelopeBridgePremises
     ProtocolExchangeNormalization localEnvelope exchange
   shardCutPreservationWitness :
     ProtocolShardCutPreservation shardedEnvelope shardCut
+
+/-! ## Protocol Bridge Theorem Projections -/
 
 /-- Extract E2 role-renaming invariance from protocol bridge premises. -/
 theorem protocolRoleRenamingInvariant_of_premises
@@ -445,6 +465,8 @@ theorem protocolShardCutPreservation_of_premises
     (p : ProtocolEnvelopeBridgePremises Protocol Placement Deployment State Obs) :
     ProtocolShardCutPreservation p.shardedEnvelope p.shardCut :=
   p.shardCutPreservationWitness
+
+/-! ## Protocol Bridge Bundle -/
 
 /-- E2.7: protocol-level theorem bundle collecting all bridge instantiations. -/
 structure ProtocolEnvelopeBridgeBundle
