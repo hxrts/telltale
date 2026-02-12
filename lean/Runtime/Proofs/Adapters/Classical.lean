@@ -44,6 +44,8 @@ def transportCtxOfWitness
   , finiteState := w.finiteState
   }
 
+/-! ## Classical Profile Wrappers -/
+
 /-- Profile wrapper for Foster-Lyapunov transport. -/
 structure FosterProfile (State : Type v) where
   ctx : Classical.Transport.TransportCtx State
@@ -87,6 +89,8 @@ structure LittlesLawProfile where
 /-- Profile wrapper for functional CLT transport. -/
 structure FunctionalCLTProfile where
   input : Classical.Transport.FunctionalCLTInput
+
+/-! ## Theorem Projections from Profiles -/
 
 /-- Foster theorem derived from a Foster profile. -/
 theorem foster_of_profile
@@ -151,6 +155,8 @@ theorem functionalCLT_of_profile
     Classical.Transport.FunctionalCLTConclusion p.input := by
   exact Classical.Transport.transported_functionalCLT p.input
 
+/-! ## Packaged Classical Artifacts -/
+
 /-- Packaged Foster transport artifact. -/
 structure FosterArtifact (State : Type v) where
   profile : FosterProfile State
@@ -202,6 +208,8 @@ structure FunctionalCLTArtifact where
   profile : FunctionalCLTProfile
   proof : Classical.Transport.FunctionalCLTConclusion profile.input
 
+/-! ## Artifact Constructors -/
+
 def fosterArtifactOfProfile
     {State : Type v}
     (p : FosterProfile State) : FosterArtifact State :=
@@ -220,6 +228,8 @@ def ldpArtifactOfProfile
   { profile := p
   , proof := ldp_of_profile p
   }
+
+/-! ## Artifact Constructors: Extended Profiles -/
 
 def meanFieldArtifactOfProfile
     (p : MeanFieldProfile) : MeanFieldArtifact :=
@@ -263,6 +273,8 @@ def functionalCLTArtifactOfProfile
   , proof := functionalCLT_of_profile p
   }
 
+/-! ## Optional Artifact Lifting -/
+
 def fosterArtifactOfProfile?
     {State : Type v}
     (p? : Option (FosterProfile State)) : Option (FosterArtifact State) :=
@@ -304,6 +316,8 @@ def functionalCLTArtifactOfProfile?
     (p? : Option FunctionalCLTProfile) : Option FunctionalCLTArtifact :=
   p?.map functionalCLTArtifactOfProfile
 
+/-! ## Classical Profile Bundles -/
+
 /-- Optional classical profile bundle attached to a VM invariant space. -/
 structure ClassicalProfiles (State : Type v) where
   foster? : Option (FosterProfile State) := none
@@ -322,6 +336,8 @@ structure VMInvariantSpaceWithClassical
     (store₀ : SessionStore ν) (State : Type v)
     extends VMInvariantSpace (ν := ν) store₀ State where
   classical : ClassicalProfiles State := {}
+
+/-! ## Classical Profile Updaters -/
 
 def VMInvariantSpaceWithClassical.withProfiles
     {store₀ : SessionStore ν} {State : Type v}
@@ -347,6 +363,8 @@ def VMInvariantSpaceWithClassical.withLDP
     (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State)
     (p : LDPProfile) : VMInvariantSpaceWithClassical store₀ State :=
   { space with classical := { space.classical with ldp? := some p } }
+
+/-! ## Classical Profile Updaters: Queueing and Limits -/
 
 def VMInvariantSpaceWithClassical.withMeanField
     {store₀ : SessionStore ν} {State : Type v}
@@ -389,6 +407,8 @@ def VMInvariantSpaceWithClassical.withFunctionalCLT
     (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State)
     (p : FunctionalCLTProfile) : VMInvariantSpaceWithClassical store₀ State :=
   { space with classical := { space.classical with functionalCLT? := some p } }
+
+/-! ## Classical Theorem Pack Builder -/
 
 /-- Classical theorem pack produced from classical profile evidence. -/
 structure VMClassicalTheoremPack
