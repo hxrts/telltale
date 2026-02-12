@@ -44,6 +44,8 @@ def AccountableSafety
     (M : Model State Decision Fault) : Prop :=
   SafetyHolds M ∨ AccountableEvidenceExists M
 
+/-! ## Assumption Atoms and Contracts -/
+
 /-- Reusable core accountable-safety assumption bundle. -/
 structure Assumptions
     {State : Type u} {Decision : Type v} {Fault : Type w}
@@ -69,6 +71,8 @@ def coreAssumptions : List Assumption :=
   [ .slashableEvidenceRules
   , .equivocationDetectability
   ]
+
+/-! ## Assumption Validation API -/
 
 /-- Validate one assumption against an assumption bundle. -/
 def validateAssumption
@@ -113,6 +117,8 @@ def runAssumptionValidation
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
 
+/-! ## Theorem Premises and Main Result -/
+
 /-- Additional premises used to derive accountable-safety theorem forms. -/
 structure Premises
     {State : Type u} {Decision : Type v} {Fault : Type w}
@@ -131,5 +137,4 @@ theorem accountable_safety_of_assumptions
 
 end AccountableSafety
 end Distributed
-
 
