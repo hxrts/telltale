@@ -7,7 +7,16 @@ set_option autoImplicit false
 Coarse protocol-space checks and classification.
 -/
 
+/-
+The Problem. We need a lightweight, deterministic classifier that checks basic
+protocol consistency before deeper theorem-specific analyses.
+Solution Structure. Encode primitive checks, derive certificate consistency, and
+compose these into coarse protocol-space predicates plus a final classifier.
+-/
+
 namespace Distributed
+
+/-! ## Baseline Sanity Checks -/
 
 /-- Generic well-formedness checks for protocol specs. -/
 def basicWellFormed (p : ProtocolSpec) : Bool :=
@@ -34,6 +43,8 @@ def coupledPrimitive (p : ProtocolSpec) : Bool :=
   p.evidenceAccumulation = .coupled &&
   p.conflictExclusionLaw = .coupledRule &&
   p.finalizationWitnessRule = .coupledWitness
+
+/-! ## Certificate Inference and Consistency -/
 
 /-- Infer the coarse certificate tag from fundamental evidence primitives. -/
 def inferredCertificate? (p : ProtocolSpec) : Option CertificateModel :=
@@ -64,6 +75,8 @@ def bftThresholdOk (p : ProtocolSpec) : Bool :=
   | .partialSync, .signatures => 3 * p.f + 1 <= p.n
   | .async, .signatures => 3 * p.f + 1 <= p.n
   | _, _ => false
+
+/-! ## Protocol Space Classification -/
 
 /-- Heuristic classifier for BFT protocol space. -/
 def inBFTSpace (p : ProtocolSpec) : Bool :=
@@ -99,6 +112,8 @@ def isSoundConsensus (p : ProtocolSpec) : Bool :=
   basicWellFormed p &&
   certificateDerivedConsistent p &&
   (inBFTSpace p || inNakamotoSpace p || inHybridSpace p)
+
+/-! ## Final Coarse Tag -/
 
 /-- Classify a protocol spec into one of the built-in spaces. -/
 def classify (p : ProtocolSpec) : ProtocolSpace :=
