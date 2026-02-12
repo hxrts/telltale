@@ -21,6 +21,8 @@ set_option autoImplicit false
 
 /-! ## Unit model instances -/
 
+/-! ### Marker types -/
+
 structure UnitIdentity where
   -- Marker type for unit identity instances.
   unit : Unit := ()
@@ -38,6 +40,8 @@ inductive UnitEffect : Type
 structure UnitVerify where
   -- Marker type for unit verification instances.
   unit : Unit := ()
+
+/-! ### Core domain instances -/
 
 instance : IdentityModel UnitIdentity where
   -- Simple identity model: one site per participant.
@@ -91,6 +95,8 @@ instance : EffectSpec UnitEffect where
 instance : Inhabited (EffectRuntime.EffectAction UnitEffect) := ⟨()⟩
 instance : Inhabited (EffectRuntime.EffectCtx UnitEffect) := ⟨()⟩
 
+/-! ### Verification and authenticated-state instances -/
+
 instance : VerificationModel UnitVerify where
   -- Unit verification model with unit-valued primitives.
   Hash := Unit
@@ -136,6 +142,8 @@ instance : AccumulatedSet UnitVerify where
   insert := fun st _ => st
   verifyMember := fun _ _ _ => true
   verifyNonMember := fun _ _ _ => true
+
+/-! ### Cross-domain bridge instances -/
 
 instance : IdentityGuardBridge UnitIdentity UnitGuard where
   -- Map participants into unit guard resources.
