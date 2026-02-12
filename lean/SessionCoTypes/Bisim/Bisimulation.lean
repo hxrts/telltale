@@ -57,6 +57,8 @@ inductive BisimF (R : Rel) : Rel where
       BranchesRelBisim R bsa bsb →
       BisimF R a b
 
+/-! ## BisimF Unfolding Lemmas -/
+
 /-- Unfold the left-hand side of a BisimF step. -/
 theorem BisimF.unfold_left {R : Rel} {a b : LocalTypeR} (h : BisimF R a b) :
     BisimF R (LocalTypeR.unfold a) b := by
@@ -112,6 +114,8 @@ theorem BisimF.unfold {R : Rel} {a b : LocalTypeR} (h : BisimF R a b) :
     BisimF R (LocalTypeR.unfold a) (LocalTypeR.unfold b) := by
   exact BisimF.unfold_right (BisimF.unfold_left h)
 
+/-! ## BisimF Unfold Iteration -/
+
 /-- Unfold the left-hand side for n steps. -/
 theorem BisimF.unfold_left_iter {R : Rel} {a b : LocalTypeR} :
     ∀ n, BisimF R a b → BisimF R ((LocalTypeR.unfold)^[n] a) b := by
@@ -154,6 +158,8 @@ theorem BranchesRelBisim.mono {R S : Rel} (hrs : ∀ a b, R a b → S a b)
   | cons hbc _ ih =>
     exact List.Forall₂.cons ⟨hbc.1, hrs _ _ hbc.2⟩ ih
 
+/-! ## BisimF Monotonicity and Coinduction Setup -/
+
 /-- BisimF is monotone. -/
 theorem BisimF.mono : Monotone BisimF := by
   intro R S hrs a b h
@@ -167,7 +173,8 @@ theorem BisimF.mono : Monotone BisimF := by
 
 instance : CoinductiveRel Rel BisimF := ⟨BisimF.mono⟩
 
-Shared coinduction aliases (see `CoinductiveRel`). -/
+/-! ## Shared Coinduction Aliases -/
+
 /-- Greatest fixed point of BisimF (coinductive bisimulation). -/
 def Bisim_gfp : Rel := SessionCoTypes.CoinductiveRel.gfp (F := BisimF)
 
@@ -179,6 +186,8 @@ theorem Bisim_gfp_unfold : Bisim_gfp ≤ BisimF Bisim_gfp := by
 
 theorem Bisim_gfp_fold : BisimF Bisim_gfp ≤ Bisim_gfp := by
   exact SessionCoTypes.CoinductiveRel.fold (F := BisimF)
+
+/-! ## Existential Bisimulation Predicate -/
 
 
 /-- Membership-based weak bisimulation.
@@ -202,6 +211,8 @@ theorem BranchesRelBisim.refl {R : Rel} (hrefl : ∀ t, R t t)
   | nil => exact List.Forall₂.nil
   | cons b rest ih =>
     exact List.Forall₂.cons ⟨rfl, hrefl b.2.2⟩ ih
+
+/-! ## Symmetry Infrastructure -/
 
 
 
@@ -250,6 +261,8 @@ theorem symm {a b : LocalTypeR} (h : Bisim a b) : Bisim b a := by
   · -- Show S b a = R a b
     exact hab
 
+/-! ## Transitivity Infrastructure -/
+
 /-- BranchesRelBisim is transitive when the underlying relation is. -/
 theorem BranchesRelBisim.trans {R : Rel}
     (htrans : ∀ a b c, R a b → R b c → R a c)
@@ -277,6 +290,8 @@ theorem BranchesRelBisim.compose {R1 R2 R3 : Rel}
     | cons h' hbc' =>
       exact List.Forall₂.cons ⟨h.1.trans h'.1, hcomp _ _ _ h.2 h'.2⟩ (ih hbc')
 
+/-! ## Bisim Transitivity -/
+
 
 
 /-- Bisim is transitive.
@@ -295,6 +310,7 @@ theorem trans {a b c : LocalTypeR} (hab : Bisim a b) (hbc : Bisim b c) : Bisim a
     intro x z ⟨y, hxy, hyz⟩
     have hf_xy : BisimF R1 x y := hpost1 x y hxy
     have hf_yz : BisimF R2 y z := hpost2 y z hyz
+    /-! ## Transitivity: Observable Case Analysis -/
     -- Case analysis on the observable behavior of x~y
     cases hf_xy with
     | eq_end hx hy =>
