@@ -350,7 +350,8 @@ structure ByzantineSafetyTheoremObject (protocol : ProtocolSpec) where
   Obs : Type (max u v)
   model : Distributed.ByzantineSafety.Model State Decision Certificate Obs
   assumptionsPassed :
-    (runAssumptionValidation protocol byzantineSafetyAssumptions).allPassed = true
+    (runAssumptionValidation
+      protocol (byzantineSafetyAssumptionsFor protocol)).allPassed = true
   exactCharacterization :
     Distributed.ByzantineSafety.ExactByzantineSafetyCharacterization model
 

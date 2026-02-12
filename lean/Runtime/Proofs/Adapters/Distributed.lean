@@ -36,6 +36,13 @@ def failureEnvelope?
     Option FailureEnvelopeProfile :=
   space.distributed.failureEnvelope?
 
+/-- Facade projection of the optional Byzantine-safety profile slot. -/
+def byzantineSafety?
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithDistributed (ν := ν) store₀ State) :
+    Option ByzantineSafetyProfile :=
+  space.distributed.byzantineSafety?
+
 /-- Facade projection of the optional VM-envelope adherence profile slot. -/
 def vmEnvelopeAdherence?
     {store₀ : SessionStore ν} {State : Type v}
@@ -65,6 +72,13 @@ def withFailureEnvelope
     (space : VMInvariantSpaceWithDistributed (ν := ν) store₀ State)
     (p : FailureEnvelopeProfile) : VMInvariantSpaceWithDistributed store₀ State :=
   VMInvariantSpaceWithDistributed.withFailureEnvelope space p
+
+/-- Facade helper forwarding to the canonical Byzantine-safety attachment. -/
+def withByzantineSafety
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithDistributed (ν := ν) store₀ State)
+    (p : ByzantineSafetyProfile) : VMInvariantSpaceWithDistributed store₀ State :=
+  VMInvariantSpaceWithDistributed.withByzantineSafety space p
 
 end
 

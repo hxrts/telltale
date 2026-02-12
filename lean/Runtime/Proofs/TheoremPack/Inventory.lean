@@ -31,6 +31,7 @@ def theoremInventory
   , ("data_availability_retrievability", pack.dataAvailability?.isSome)
   , ("coordination_characterization", pack.coordination?.isSome)
   , ("crdt_envelope_and_equivalence", pack.crdt?.isSome)
+  , ("byzantine_safety_characterization", pack.byzantineSafety?.isSome)
   , ("consensus_envelope", pack.consensusEnvelope?.isSome)
   , ("failure_envelope", pack.failureEnvelope?.isSome)
   , ("vm_envelope_adherence", pack.vmEnvelopeAdherence?.isSome)

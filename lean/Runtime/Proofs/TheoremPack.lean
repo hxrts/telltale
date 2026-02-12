@@ -47,10 +47,19 @@ def envelopeCapabilityBits
     {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
     (pack : VMTheoremPack (space := space)) : List (String × Bool) :=
   [ ("failure_envelope", pack.failureEnvelope?.isSome)
+  , ("byzantine_safety_characterization", pack.byzantineSafety?.isSome)
   , ("vm_envelope_adherence", pack.vmEnvelopeAdherence?.isSome)
   , ("vm_envelope_admission", pack.vmEnvelopeAdmission?.isSome)
   , ("protocol_envelope_bridge", pack.protocolEnvelopeBridge?.isSome)
   ]
+
+/-- Facade projection of the optional Byzantine-safety artifact slot. -/
+def byzantineSafetyArtifact?
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : VMTheoremPack (space := space)) :
+    Option ByzantineSafetyArtifact :=
+  pack.byzantineSafety?
 
 /-- Facade projection of the failure-envelope cross-target theorem witness. -/
 def failureEnvelopeCrossTargetConformance?

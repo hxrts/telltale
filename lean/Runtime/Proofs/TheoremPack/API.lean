@@ -79,6 +79,13 @@ def canUseMixedDeterminismProfiles
     (pack : VMTheoremPack (space := space)) : Bool :=
   pack.vmEnvelopeAdherence?.isSome && pack.vmEnvelopeAdmission?.isSome
 
+/-- Runtime gate: Byzantine-safe operation requires Byzantine + VM adherence artifacts. -/
+def canOperateUnderByzantineEnvelope
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : VMTheoremPack (space := space)) : Bool :=
+  pack.byzantineSafety?.isSome && pack.vmEnvelopeAdherence?.isSome
+
 /-- Runtime gate: autoscaling/repartitioning requires compositional-envelope evidence. -/
 def canAutoscaleOrRepartition
     {store₀ : SessionStore ν} {State : Type v}
@@ -103,6 +110,7 @@ def envelopeCapabilitySnapshot
     {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
     (pack : VMTheoremPack (space := space)) : List (String × Bool) :=
   (capabilities (space := space) pack).filter (fun p =>
+    p.1 = "byzantine_safety_characterization" ||
     p.1 = "protocol_envelope_bridge" ||
     p.1 = "vm_envelope_adherence" ||
     p.1 = "vm_envelope_admission")

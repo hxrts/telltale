@@ -60,6 +60,7 @@ def VMInvariantSpaceWithDistributed.withProfiles
     (dataAvailability? : Option DataAvailabilityProfile := none)
     (coordination? : Option CoordinationProfile := none)
     (crdt? : Option CRDTProfile := none)
+    (byzantineSafety? : Option ByzantineSafetyProfile := none)
     (consensusEnvelope? : Option ConsensusEnvelopeProfile := none)
     (failureEnvelope? : Option FailureEnvelopeProfile := none)
     (vmEnvelopeAdherence? : Option VMEnvelopeAdherenceProfile := none)
@@ -80,6 +81,7 @@ def VMInvariantSpaceWithDistributed.withProfiles
       , dataAvailability? := dataAvailability?
       , coordination? := coordination?
       , crdt? := crdt?
+      , byzantineSafety? := byzantineSafety?
       , consensusEnvelope? := consensusEnvelope?
       , failureEnvelope? := failureEnvelope?
       , vmEnvelopeAdherence? := vmEnvelopeAdherence?
@@ -167,6 +169,13 @@ def VMInvariantSpaceWithDistributed.withCRDT
     (space : VMInvariantSpaceWithDistributed (ν := ν) store₀ State)
     (p : CRDTProfile) : VMInvariantSpaceWithDistributed store₀ State :=
   { space with distributed := { space.distributed with crdt? := some p } }
+
+/-- Attach a Byzantine-safety theorem-family profile to a distributed space. -/
+def VMInvariantSpaceWithDistributed.withByzantineSafety
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithDistributed (ν := ν) store₀ State)
+    (p : ByzantineSafetyProfile) : VMInvariantSpaceWithDistributed store₀ State :=
+  { space with distributed := { space.distributed with byzantineSafety? := some p } }
 
 /-! ### Consensus and Failure Envelope Families -/
 

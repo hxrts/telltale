@@ -185,6 +185,31 @@ theorem atomicBroadcast_bridge_of_profile (p : AtomicBroadcastProfile) :
     Distributed.AtomicBroadcast.ConsensusAtomicBroadcastBridge p.protocol.model :=
   p.protocol.consensusAtomicBroadcastBridge
 
+/-! ## Theorem Extraction: Byzantine Safety -/
+
+/-- Byzantine-safety profile satisfies the reusable model-level assumption gate. -/
+theorem byzantineSafety_assumptions_allPassed (p : ByzantineSafetyProfile) :
+    (Distributed.runAssumptionValidation
+      p.protocol.protocolSpec
+      (Distributed.byzantineSafetyAssumptionsFor p.protocol.protocolSpec)).allPassed = true := by
+  -- Reuse the theorem exported by the Byzantine-safety API bundle.
+  simpa using Distributed.ByzantineSafety.byzantineAssumptions_allPassed p.protocol
+
+/-- Exact Byzantine safety characterization extracted from a profile. -/
+theorem byzantineSafety_exactCharacterization_of_profile (p : ByzantineSafetyProfile) :
+    Distributed.ByzantineSafety.ExactByzantineSafetyCharacterization p.protocol.model :=
+  p.protocol.exactCharacterization
+
+/-- Committed-side Byzantine safety extracted from a profile. -/
+theorem byzantineSafety_of_profile (p : ByzantineSafetyProfile) :
+    Distributed.ByzantineSafety.ByzantineSafety p.protocol.model :=
+  Distributed.ByzantineSafety.byzantineSafety_of_protocol p.protocol
+
+/-- Certified-side characterization condition extracted from a profile. -/
+theorem byzantineSafety_characterization_of_profile (p : ByzantineSafetyProfile) :
+    Distributed.ByzantineSafety.CharacterizationCondition p.protocol.model :=
+  Distributed.ByzantineSafety.characterization_of_protocol p.protocol
+
 end
 
 end Adapters

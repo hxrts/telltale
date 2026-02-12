@@ -214,6 +214,15 @@ def VMInvariantSpaceWithProfiles.withCRDT
   VMInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with crdt? := some p })
 
+/-- Attach a Byzantine-safety distributed profile to a combined space. -/
+def VMInvariantSpaceWithProfiles.withByzantineSafety
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (p : Adapters.ByzantineSafetyProfile) :
+    VMInvariantSpaceWithProfiles store₀ State :=
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with byzantineSafety? := some p })
+
 /-! ## Distributed Profile Setters: Envelope Families -/
 
 /-- Attach a consensus-envelope distributed profile to a combined space. -/

@@ -12,6 +12,7 @@ import Distributed.Families.FailureDetectors
 import Distributed.Families.DataAvailability
 import Distributed.Families.Coordination
 import Distributed.Families.CRDT
+import Distributed.Families.ByzantineSafety
 import Distributed.Model.ConsensusEnvelope
 import Runtime.Adequacy.EnvelopeCore
 
@@ -95,6 +96,10 @@ structure CoordinationProfile where
 structure CRDTProfile where
   protocol : Distributed.CRDT.CRDTProtocol
 
+/-- Byzantine-safety theorem-family profile wrapper for invariant-space attachment. -/
+structure ByzantineSafetyProfile where
+  protocol : Distributed.ByzantineSafety.SafetyProtocol
+
 /-- Consensus-envelope theorem-family profile wrapper for invariant-space attachment. -/
 structure ConsensusEnvelopeProfile where
   protocol : Distributed.ConsensusEnvelope.ConsensusEnvelopeProtocol
@@ -155,6 +160,7 @@ structure DistributedProfiles where
   dataAvailability? : Option DataAvailabilityProfile := none
   coordination? : Option CoordinationProfile := none
   crdt? : Option CRDTProfile := none
+  byzantineSafety? : Option ByzantineSafetyProfile := none
   consensusEnvelope? : Option ConsensusEnvelopeProfile := none
   failureEnvelope? : Option FailureEnvelopeProfile := none
   vmEnvelopeAdherence? : Option VMEnvelopeAdherenceProfile := none

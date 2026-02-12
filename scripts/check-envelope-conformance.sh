@@ -39,6 +39,8 @@ check "runtime reordering gate helper exists" \
   "rg -q 'def canRelaxReordering' '${THEOREMPACK_API_FILE}'"
 check "runtime mixed-determinism gate helper exists" \
   "rg -q 'def canUseMixedDeterminismProfiles' '${THEOREMPACK_API_FILE}'"
+check "runtime byzantine-envelope gate helper exists" \
+  "rg -q 'def canOperateUnderByzantineEnvelope' '${THEOREMPACK_API_FILE}'"
 check "runtime autoscale/repartition gate helper exists" \
   "rg -q 'def canAutoscaleOrRepartition' '${THEOREMPACK_API_FILE}'"
 
@@ -49,6 +51,8 @@ check "serialized envelope capability snapshot helper exists" \
 
 check "theorem-pack carries protocol bridge capability bit" \
   "rg -q '\\(\"protocol_envelope_bridge\", pack\\.protocolEnvelopeBridge\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
+check "theorem-pack carries byzantine safety capability bit" \
+  "rg -q '\\(\"byzantine_safety_characterization\", pack\\.byzantineSafety\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
 check "theorem-pack carries VM envelope adherence capability bit" \
   "rg -q '\\(\"vm_envelope_adherence\", pack\\.vmEnvelopeAdherence\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
 check "theorem-pack carries VM envelope admission capability bit" \
@@ -56,6 +60,8 @@ check "theorem-pack carries VM envelope admission capability bit" \
 
 check "distributed adapter carries protocol bridge profile slot" \
   "rg -q 'protocolEnvelopeBridge\\?' '${ADAPTER_FILE}'"
+check "distributed adapter carries byzantine safety profile slot" \
+  "rg -q 'byzantineSafety\\?' '${ADAPTER_FILE}'"
 check "distributed adapter carries VM adherence profile slot" \
   "rg -q 'vmEnvelopeAdherence\\?' '${ADAPTER_FILE}'"
 check "distributed adapter carries VM admission profile slot" \
@@ -81,4 +87,3 @@ echo "Summary: ${checks} checks, ${errors} failure(s)."
 if (( errors > 0 )); then
   exit 1
 fi
-

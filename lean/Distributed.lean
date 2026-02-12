@@ -13,6 +13,7 @@ import Distributed.Families.FailureDetectors
 import Distributed.Families.DataAvailability
 import Distributed.Families.Coordination
 import Distributed.Families.CRDT
+import Distributed.Families.ByzantineSafety
 import Distributed.Transport.API
 
 /-! # Distributed

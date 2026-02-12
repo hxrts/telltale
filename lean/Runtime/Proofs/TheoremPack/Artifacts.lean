@@ -196,6 +196,22 @@ structure CRDTArtifact where
   hcrdtExtensions : Distributed.CRDT.HcrdtExtensions protocol.model
   hcrdtLimits : Distributed.CRDT.HcrdtLimits protocol.model
 
+/-! ## Byzantine and Consensus Envelope Families -/
+
+/-- Packaged Byzantine-safety theorem-family artifact. -/
+structure ByzantineSafetyArtifact where
+  protocol : Distributed.ByzantineSafety.SafetyProtocol
+  exactCharacterization :
+    Distributed.ByzantineSafety.ExactByzantineSafetyCharacterization protocol.model
+  byzantineSafety :
+    Distributed.ByzantineSafety.ByzantineSafety protocol.model
+  characterization :
+    Distributed.ByzantineSafety.CharacterizationCondition protocol.model
+  assumptionsPassed :
+    (Distributed.runAssumptionValidation
+      protocol.protocolSpec
+      (Distributed.byzantineSafetyAssumptionsFor protocol.protocolSpec)).allPassed = true
+
 /-! ## CRDT and Consensus Envelope Families -/
 
 /-- Packaged consensus-envelope theorem-family artifact. -/

@@ -31,6 +31,10 @@ def validateAsHybrid (p : ProtocolSpec) : AssumptionSummary :=
 def validateCharacterization (p : ProtocolSpec) : AssumptionSummary :=
   validateWithAssumptions p characterizationAssumptions
 
+/-- Validate the protocol against Byzantine safety characterization assumptions. -/
+def validateByzantineSafety (p : ProtocolSpec) : AssumptionSummary :=
+  validateWithAssumptions p (byzantineSafetyAssumptionsFor p)
+
 /-- Validate with an arbitrary assumption bundle and classical property set. -/
 def validateWithClassical (p : ProtocolSpec) (ev : ClassicalEvidence)
     (hs : List Assumption) (ps : List ClassicalProperty) : CombinedSummary :=
@@ -46,5 +50,10 @@ def validateWithClassical (p : ProtocolSpec) (ev : ClassicalEvidence)
 /-- One-shot validation using core assumptions plus the classical core property set. -/
 def validateWithClassicalCore (p : ProtocolSpec) (ev : ClassicalEvidence) : CombinedSummary :=
   validateWithClassical p ev coreAssumptions classicalCoreProperties
+
+/-- One-shot validation using Byzantine safety assumptions and classical core properties. -/
+def validateByzantineSafetyWithClassicalCore
+    (p : ProtocolSpec) (ev : ClassicalEvidence) : CombinedSummary :=
+  validateWithClassical p ev (byzantineSafetyAssumptionsFor p) classicalCoreProperties
 
 end Distributed

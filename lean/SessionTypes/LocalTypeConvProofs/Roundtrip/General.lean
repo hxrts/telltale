@@ -53,6 +53,9 @@ theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
       ∀ ctx, ctx.Nodup → (∀ c, NameContext.freshName c ∉ c) →
         (hclosed : b.2.isClosedAt ctx.length = true) →
           (b.2.fromDB ctx hclosed).toDB? ctx = some b.2
+
+  /-! ## General Roundtrip: Structural Recursion Setup -/
+
   have hrec : P1 t := by
     refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
@@ -68,6 +71,9 @@ theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
       simp [hfrom, LocalTypeR.toDB?]
       rw [Context.indexOf_eq] at hidx
       simp [hidx]
+
+    /-! ## General Roundtrip: send/recv/μ and branch Cases -/
+
     · intro p bs hbs ctx hnodup hfreshAll hclosed
       have hclosed' : isClosedAtBranches ctx.length bs = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
@@ -98,6 +104,8 @@ theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
     · intro fst snd hsnd ctx hnodup hfreshAll hclosed
       exact hsnd ctx hnodup hfreshAll hclosed
   exact hrec ctx hnodup hfreshAll hclosed
+
+/-! ## General Roundtrip: Branch Lists -/
 
 theorem branches_toDB_fromDB_roundtrip (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
     (hnodup : ctx.Nodup)
@@ -131,6 +139,9 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
   let P2 : List BranchR → Prop := fun _ => True
   let P3 : BranchR → Prop := fun _ => True
   let P4 : Option ValType × LocalTypeR → Prop := fun _ => True
+
+  /-! ## Shadowed Prefix Guardedness: Structural Recursion -/
+
   have hrec : P1 t := by
     refine (LocalTypeR.LocalTypeR.rec
       (motive_1 := P1) (motive_2 := P2) (motive_3 := P3) (motive_4 := P4)
@@ -177,6 +188,9 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
               simp [Nat.add_left_comm, Nat.add_comm, cons_length]
             simpa [this] using hguard'
           simpa [LocalTypeDB.isGuarded, Nat.add_left_comm, Nat.add_comm] using hguard''
+
+    /-! ## Shadowed Prefix Guardedness: Variable Case -/
+
     · intro v pref ctx i db hidx hdb
       simp only [LocalTypeR.toDB?, fromList_cons_toList] at hdb
       cases hj : NameOnlyContext.indexOf (pref ++ NameOnlyContext.cons x ctx) v with
@@ -218,6 +232,8 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
       exact True.intro
   exact hrec pref ctx i db hidx hdb
 
+/-! ## Guardedness Preservation to DB -/
+
 theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (db : LocalTypeDB) :
     t.isGuarded x = true →
     ctx.indexOf x = some i →
@@ -234,6 +250,9 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
   let P2 : List BranchR → Prop := fun _ => True
   let P3 : BranchR → Prop := fun _ => True
   let P4 : Option ValType × LocalTypeR → Prop := fun _ => True
+
+  /-! ## Guardedness-toDB: Structural Recursion -/
+
   have hrec : P1 t := by
     refine (LocalTypeR.LocalTypeR.rec
       (motive_1 := P1) (motive_2 := P2) (motive_3 := P3) (motive_4 := P4)
@@ -242,6 +261,9 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
       simp [LocalTypeR.toDB?] at hdb
       cases hdb
       simp [LocalTypeDB.isGuarded]
+
+    /-! ## Guardedness-toDB: send/recv/μ Cases -/
+
     · intro p bs hbs ctx x i db hguard hidx hdb
       cases hdbs : LocalTypeR.branchesToDB? ctx bs with
       | none =>
@@ -290,6 +312,9 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
               rw [hidx'']
               rfl
             exact hbody (NameOnlyContext.cons y ctx) x (i + 1) db' hguard_body hidx' hbody_db
+
+    /-! ## Guardedness-toDB: Variable Case -/
+
     · intro v ctx x i db hguard hidx hdb
       simp only [LocalTypeR.toDB?] at hdb
       cases hj : NameOnlyContext.indexOf ctx v with
@@ -317,6 +342,8 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
       exact True.intro
   exact hrec ctx x i db hguard hidx hdb
 
+/-! ## Contractiveness Preservation to DB -/
+
 theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
     t.isContractive = true →
     t.toDB? ctx = some db →
@@ -336,6 +363,9 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
   let P4 : Option ValType × LocalTypeR → Prop :=
     fun b =>
       ∀ ctx db, b.2.isContractive = true → b.2.toDB? ctx = some db → db.isContractive = true
+
+  /-! ## Contractiveness-toDB: Structural Recursion -/
+
   have hrec : P1 t := by
     refine (LocalTypeR.LocalTypeR.rec
       (motive_1 := P1) (motive_2 := P2) (motive_3 := P3) (motive_4 := P4)
@@ -366,6 +396,9 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
           subst hdb
           have hdbs_contr := hbs ctx dbs hbs_contr hdbs
           simp [LocalTypeDB.isContractive, hdbs_contr]
+
+    /-! ## Contractiveness-toDB: μ/var/branch Cases -/
+
     · intro x body hbody ctx db hcontr hdb
       simp only [LocalTypeR.isContractive, Bool.and_eq_true] at hcontr
       rcases hcontr with ⟨hguard, hbody_contr⟩
@@ -383,6 +416,9 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
             exact isGuarded_toDB body (NameOnlyContext.cons x ctx) x 0 db' hguard hidx hbody_db
           · -- Show db'.isContractive = true using IH
             exact hbody (NameOnlyContext.cons x ctx) db' hbody_contr hbody_db
+
+    /-! ## Contractiveness-toDB: var/branch Cases -/
+
     · intro v ctx db hcontr hdb
       -- Variables are always contractive in both representations
       simp only [LocalTypeR.toDB?] at hdb
