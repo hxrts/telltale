@@ -34,6 +34,8 @@ It avoids requiring exact constructor matching on the raw candidate. -/
 def CProjectUEQ2Rel : ProjRel := fun g role cand =>
   ∃ e0, CProjectU g role e0 ∧ EQ2 e0 cand ∧ LocalTypeR.WellFormed e0 ∧ LocalTypeR.WellFormed cand
 
+/-! ## Branch Witness Utilities -/
+
 private theorem wf_tail_of_cons
     {lb : BranchR} {lbs : List BranchR}
     (hwf : ∀ lb' ∈ lb :: lbs, LocalTypeR.WellFormed lb'.2.2) :
@@ -41,6 +43,8 @@ private theorem wf_tail_of_cons
   -- Derive tail well-formedness from a cons list witness.
   intro lb' hmem
   exact hwf lb' (by simp [hmem])
+
+/-! ## Branch Relation Lifting -/
 
 theorem BranchesProjRel_lift_EQ2_U
     {gbs : List (Label × GlobalType)} {role : String}
@@ -64,8 +68,10 @@ theorem BranchesProjRel_lift_EQ2_U
             · exact hpair.1.trans hpair'.1
             · exact hvt1 lb1 (by simp)
             · exact ⟨lb0.2.2, hpair.2.2, hpair'.2, hwf0 lb0 (by simp), hwf1 lb1 (by simp)⟩
-          · exact ih heq_rest (wf_tail_of_cons hwf0) (wf_tail_of_cons hwf1)
-              (fun lb hmem => hvt1 lb (by simp [hmem]))
+	          · exact ih heq_rest (wf_tail_of_cons hwf0) (wf_tail_of_cons hwf1)
+	              (fun lb hmem => hvt1 lb (by simp [hmem]))
+
+/-! ## Full-Unfold Shape: End -/
 
 private theorem EQ2_fullUnfold_end {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
     EQ2 .end e → e.fullUnfold = .end := by
@@ -101,6 +107,8 @@ private theorem EQ2_fullUnfold_end_wf {e : LocalTypeR} (hWF : LocalTypeR.WellFor
     EQ2 .end e → e.fullUnfold = .end := by
   exact EQ2_fullUnfold_end hWF
 
+/-! ## Full-Unfold Shape: Var -/
+
 
 private theorem EQ2_fullUnfold_var {t : String} {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
     EQ2 (.var t) e → e.fullUnfold = .var t := by
@@ -135,6 +143,8 @@ private theorem EQ2_fullUnfold_var {t : String} {e : LocalTypeR} (hWF : LocalTyp
 private theorem EQ2_fullUnfold_var_wf {t : String} {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
     EQ2 (.var t) e → e.fullUnfold = .var t := by
   exact EQ2_fullUnfold_var (t := t) hWF
+
+/-! ## Full-Unfold Shape: Send -/
 
 
 theorem EQ2_fullUnfold_send {p : String} {bs : List BranchR}
@@ -173,6 +183,8 @@ private theorem EQ2_fullUnfold_send_wf {p : String} {bs : List BranchR} {e : Loc
     ∃ cs, e.fullUnfold = .send p cs ∧ BranchesRel EQ2 bs cs := by
   exact EQ2_fullUnfold_send (p := p) (bs := bs) hWF
 
+/-! ## Full-Unfold Shape: Recv -/
+
 
 theorem EQ2_fullUnfold_recv {p : String} {bs : List BranchR}
     {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
@@ -210,6 +222,8 @@ private theorem EQ2_fullUnfold_recv_wf {p : String} {bs : List BranchR} {e : Loc
     ∃ cs, e.fullUnfold = .recv p cs ∧ BranchesRel EQ2 bs cs := by
   exact EQ2_fullUnfold_recv (p := p) (bs := bs) hWF
 
+/-! ## EQ2 Transport Through Unfolding -/
+
 theorem EQ2_of_fullUnfold
     {e0 cand x : LocalTypeR}
     (heq_full : EQ2 e0 e0.fullUnfold) (heq : EQ2 e0 cand)
@@ -224,6 +238,8 @@ theorem EQ2_of_fullUnfold
     simpa [he0] using hWF_full
   exact EQ2_trans_wf (EQ2_symm heq_e0_x) heq hWF_x hWF hWFcand
 
+/-! ## Candidate End Consequence -/
+
 theorem cand_fullUnfold_eq_end
     {e0 cand : LocalTypeR}
     (heq_full : EQ2 e0 e0.fullUnfold) (heq : EQ2 e0 cand)
@@ -235,6 +251,8 @@ theorem cand_fullUnfold_eq_end
   have heq_end : EQ2 .end cand := EQ2_of_fullUnfold heq_full heq hWF_full hWF hWFcand he0
   exact EQ2_fullUnfold_end hWFcand heq_end
 
+/-! ## Full-Unfold-to-Full-Unfold Relation -/
+
 theorem EQ2_fullUnfold_to_fullUnfold
     {e0 cand : LocalTypeR}
     (heq_full : EQ2 e0 e0.fullUnfold) (heq : EQ2 e0 cand)
@@ -245,9 +263,11 @@ theorem EQ2_fullUnfold_to_fullUnfold
   have heq_full_cand : EQ2 e0.fullUnfold cand :=
     EQ2_trans_wf (EQ2_symm heq_full) heq hWF_full hWF hWFcand
   have heq_cand_full : EQ2 cand cand.fullUnfold := by
-    have hiter := (EQ2_unfold_right_iter (a := cand) (b := cand) (EQ2_refl cand)) cand.muHeight
-    simpa [LocalTypeR.fullUnfold] using hiter
+  have hiter := (EQ2_unfold_right_iter (a := cand) (b := cand) (EQ2_refl cand)) cand.muHeight
+  simpa [LocalTypeR.fullUnfold] using hiter
   exact EQ2_trans_wf heq_full_cand heq_cand_full hWF_full hWFcand hWFcand_full
+
+/-! ## Nonparticipant Branch Lifting -/
 
 private theorem AllBranchesProj_lift_EQ2_U
     {gbs : List (Label × GlobalType)} {role : String}
@@ -262,6 +282,8 @@ private theorem AllBranchesProj_lift_EQ2_U
   have hproj' : CProjectU gb.2 role e0_full := hall gb hgb
   exact ⟨e0_full, hproj', heq_full_cand_full, hWF_full, hWFcand_full⟩
 
+/-! ## Comm Nonparticipant Closure -/
+
 theorem CProjectUEQ2Rel_comm_nonpart
     {gbs : List (Label × GlobalType)} {role : String}
     {e0_full cand_full : LocalTypeR}
@@ -275,6 +297,8 @@ theorem CProjectUEQ2Rel_comm_nonpart
   rcases hcore_nonpart with ⟨hpart_all, hall⟩
   have hall' := AllBranchesProj_lift_EQ2_U heq_full_cand_full hWF_full hWFcand_full hall
   exact ⟨hpart_all, hall'⟩
+
+/-! ## Postfix End Case -/
 
 theorem CProjectUEQ2Rel_postfix_end_case
     {g role cand e0 : _}
@@ -302,6 +326,8 @@ theorem CProjectUEQ2Rel_postfix_end_case
   | mu _ _ =>
       have : False := by simpa [CProjectF_unfold_core, CProjectF, hg, he0] using hcore
       exact this.elim
+
+/-! ## Postfix Var Case -/
 
 theorem CProjectUEQ2Rel_postfix_var_case
     {g role cand e0 : _} {v : String}
@@ -331,6 +357,8 @@ theorem CProjectUEQ2Rel_postfix_var_case
   | mu _ _ =>
       have : False := by simpa [CProjectF_unfold_core, CProjectF, hg, he0] using hcore
       exact this.elim
+
+/-! ## Postfix Mu/End Case -/
 
 theorem CProjectUEQ2Rel_postfix_mu_end_case
     {g role cand e0 : _} {t : String} {body : GlobalType}
