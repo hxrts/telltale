@@ -73,6 +73,8 @@ lemma StoreTypedStrong_rewriteS {G : GEnv} {S S' : SEnv} {store : VarStore}
     apply StoreTyped_rewriteS (G:=G) (S:=S) (S':=S') hEq
     exact hStore.typeCorr
 
+/-! ## Disjoint-Lookup Commutation -/
+
 lemma lookupG_none_of_disjoint_early {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
     {e : Endpoint} {L : LocalType} (hLookup : lookupG G₂ e = some L) :
     lookupG G₁ e = none := by
@@ -89,6 +91,8 @@ lemma lookupG_none_of_disjoint_early {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ 
           have hInter' := hInter
           simp [hEmpty] at hInter'
         exact this.elim
+
+/-! ### Lookup Commutation on Disjoint Prefixes -/
 
 lemma lookupG_comm_of_disjoint_early {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂) :
     ∀ e, lookupG (G₁ ++ G₂) e = lookupG (G₂ ++ G₁) e := by
@@ -109,6 +113,8 @@ lemma lookupG_comm_of_disjoint_early {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ 
       | none =>
           have hB := lookupG_append_right (G₁:=G₂) (G₂:=G₁) (e:=e) hRight
           simpa [hA, hB, hRight, hLeft]
+
+/-! ### Left-Swap Lift Through Outer Append -/
 
 lemma lookupG_swap_left {G₁ G₂ G₃ : GEnv} (hDisj : DisjointG G₁ G₂) :
     ∀ e, lookupG ((G₁ ++ G₂) ++ G₃) e = lookupG ((G₂ ++ G₁) ++ G₃) e := by
@@ -137,6 +143,8 @@ lemma lookupG_swap_left {G₁ G₂ G₃ : GEnv} (hDisj : DisjointG G₁ G₂) :
         simpa [List.append_assoc] using hB
       simpa [hA', hB']
 
+/-! ## Swap Rewrites for Strong Store Typing -/
+
 lemma StoreTypedStrong_swap_G_left {G₁ G₂ G₃ : GEnv} {S : SEnv} {store : VarStore}
     (hDisj : DisjointG G₁ G₂) :
     StoreTypedStrong ((G₁ ++ G₂) ++ G₃) S store →
@@ -161,6 +169,8 @@ lemma StoreTypedStrong_swap_S_left_prefix
       intro x
       exact lookupSEnv_swap_left_prefix (Ssh:=Ssh) (S₁:=S₁) (S₂:=S₂) (S₃:=S₃) hDisj x)
   exact hStore
+
+/-! ## Store-Domain Update Lemmas -/
 
 theorem lookupSEnv_none_of_disjoint_update
     {S₁ S₂ : SEnv} {x : Var} {T : ValType}
@@ -191,6 +201,8 @@ theorem StoreTypedStrong_sameDomain_update
     have hStr : lookupStr (updateStr store x v) y = lookupStr store y := by
       simpa using (lookupStr_update_neq store x y v (Ne.symm hEq))
     simpa [hS, hStr] using hDom y
+
+/-! ## Assignment/Receive Update Corollaries -/
 
 /-- StoreTypedStrong is stable under updating G at a single endpoint. -/
 theorem StoreTypedStrong_updateG
@@ -245,6 +257,8 @@ theorem StoreTypedStrong_recv_update
         (x:=x) (v:=v) (T:=T) hStore.typeCorr hv
     simpa [SEnvAll, updateSEnv_append_left hNone] using hST
 
+/-! ## UpdateLeft Lookup Equivalence -/
+
 /-- Updating only `Sown.left` under a fixed shared/right prefix is lookup-equivalent
     to updating the full combined environment at `x`. -/
 
@@ -281,6 +295,7 @@ theorem lookupSEnv_updateLeft_frame_eq_updateSEnv
   intro y
   by_cases hxy : y = x
   · subst y
+    /-! ### Equal-Variable Case (`y = x`) -/
     have hPrefixNone : lookupSEnv (Ssh ++ eraseSEnv Sown.right x) x = none := by
       have hAppend := lookupSEnv_append_right (S₁:=Ssh) (S₂:=eraseSEnv Sown.right x) (x:=x) hNoSh
       simpa [lookupSEnv_erase_eq (S:=Sown.right) (x:=x)] using hAppend
@@ -300,6 +315,7 @@ theorem lookupSEnv_updateLeft_frame_eq_updateSEnv
       simpa using (lookupSEnv_update_eq (env:=SEnvAll Ssh (Sown ++ S₂)) (x:=x) (T:=T))
     exact hTarget.trans hUpdate.symm
   · have hTargetBase :
+      /-! ### Distinct-Variable Case (`y ≠ x`) -/
       lookupSEnv (SEnvAll Ssh (Sown.updateLeft x T ++ S₂)) y =
         lookupSEnv (SEnvAll Ssh (Sown ++ S₂)) y := by
       have hInner :
@@ -345,6 +361,8 @@ theorem lookupSEnv_updateLeft_frame_eq_updateSEnv
         (lookupSEnv_update_neq (env:=SEnvAll Ssh (Sown ++ S₂)) (x:=x) (y:=y) (T:=T)
           (Ne.symm hxy))
     exact hTargetBase.trans hUpdateNe.symm
+
+/-! ## Left-Frame Endpoint Update Theorems -/
 
 /-- Frame: send updates G on the left under a right context. -/
 theorem StoreTypedStrong_frame_send
