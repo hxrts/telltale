@@ -53,6 +53,8 @@ def LivenessUnderChurn
     (χ : Nat) : Prop :=
   ∀ run, AdmissibleRun run → True
 
+/-! ## Assumption Atoms and Contracts -/
+
 /-- Reusable core Nakamoto assumption bundle. -/
 structure Assumptions
     {State : Type u} {Block : Type v} {Party : Type w}
@@ -84,6 +86,8 @@ def coreAssumptions : List Assumption :=
   , .chainGrowthStyle
   , .chainQualityStyle
   ]
+
+/-! ## Assumption Validation API -/
 
 /-- Validate one assumption against an assumption bundle. -/
 def validateAssumption
@@ -138,6 +142,8 @@ def runAssumptionValidation
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
 
+/-! ## Theorem Premises and Derived Guarantees -/
+
 /-- Additional premises used to derive standard Nakamoto-style guarantees. -/
 structure Premises
     {State : Type u} {Block : Type v} {Party : Type w}
@@ -182,5 +188,4 @@ theorem liveness_under_churn_of_assumptions
 
 end Nakamoto
 end Distributed
-
 
