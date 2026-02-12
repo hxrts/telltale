@@ -193,6 +193,8 @@ theorem consumeOne_delegate (s : SessionId) (A B : Role) (T : ValType) (L L' : L
   | mu Lr =>
       cases h
 
+/-! ## Delegation Renaming over Consume Traces -/
+
 /-- Delegation renaming preserves Consume success (A → B). -/
 theorem Consume_delegate (s : SessionId) (A B : Role) (L : LocalType) (ts : List ValType) (L' : LocalType)
     (h : Consume A L ts = some L') :
@@ -269,6 +271,8 @@ theorem consumeOne_rename_unrelated (s : SessionId) (A B : Role) (from_ : Role)
   | mu Lr =>
       cases h
 
+/-! ## Unrelated Sender Renaming over Consume Traces -/
+
 /-- Renaming preserves Consume success for an unrelated sender. -/
 theorem Consume_rename_unrelated (s : SessionId) (A B : Role) (from_ : Role)
     (L : LocalType) (ts : List ValType) (L' : LocalType)
@@ -296,6 +300,8 @@ theorem Consume_rename_unrelated (s : SessionId) (A B : Role) (from_ : Role)
           simp [Consume, hRen, hTailRen]
 
 /-! ## Redirected Edge Coherence -/
+
+/-! ## Redirected Edge Coherence: Sender Case -/
 
 /-- Redirected edges preserve coherence under role renaming. -/
 theorem delegate_redirected_edge_coherent
@@ -341,8 +347,10 @@ theorem delegate_redirected_edge_coherent
               Consume_delegate (s:=s) (A:=A) (B:=B) (L:=Lrecv0)
                 (ts:=lookupD D ⟨s, A, C⟩) (L':=L') hCons
             simp [hRen]
-      refine ⟨renameLocalTypeRole s A B hDeleg.A_type, hDeleg.B_added, ?_⟩
-      simpa [hEq, hTrace] using hConsumeRen
+  refine ⟨renameLocalTypeRole s A B hDeleg.A_type, hDeleg.B_added, ?_⟩
+  simpa [hEq, hTrace] using hConsumeRen
+
+/-! ## Redirected Edge Coherence: Receiver Case -/
 
 /-- Redirected edges (receiver A → B) preserve coherence under role renaming. -/
 theorem delegate_redirected_edge_coherent_receiver
@@ -386,6 +394,8 @@ theorem delegate_redirected_edge_coherent_receiver
         simp [hRen]
   refine ⟨renameLocalTypeRole s A B Lsender0, hSenderLookup, ?_⟩
   simpa [hRecvEq, hTrace] using hConsumeRen
+
+/-! ## Redirected Edge Coherence: Self-Edge Case -/
 
 /-- Redirected self-edge `(A,A)` preserves coherence under delegation. -/
 theorem delegate_redirected_edge_coherent_self
