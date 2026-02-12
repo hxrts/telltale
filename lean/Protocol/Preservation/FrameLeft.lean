@@ -34,8 +34,10 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
     Step (frameConfigLeft C Gfr Dfr) (frameConfigLeft C' Gfr Dfr) := by
   intro hDisj hCons hStep
   induction hStep with
+  /-! ## Left Frame: Base-step Lifting Cases -/
   | base hBase =>
       cases hBase with
+      /-! ## Left Frame Base Case: Send -/
       | send hProc hk hx hG =>
           rename_i Ccfg k x e v target T L
           set sendEdge : Edge := { sid := e.sid, sender := e.role, receiver := target }
@@ -71,6 +73,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
                 frameConfigLeft (sendStep Ccfg e sendEdge v T L) Gfr Dfr := by
             simp [frameConfigLeft, sendStep, hUpdG, hUpdD, hLookupD]
           simpa [hEq] using (Step.base hStep')
+      /-! ## Left Frame Base Case: Recv -/
       | recv hProc hk hG hBuf =>
           rename_i Ccfg vs k x e v source T L
           set recvEdge : Edge := { sid := e.sid, sender := source, receiver := e.role }
@@ -105,6 +108,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
                 frameConfigLeft (recvStep Ccfg e recvEdge x v L) Gfr Dfr := by
             simp [frameConfigLeft, recvStep, dequeueBuf, hBuf, hUpdG, hUpdD, hLookupD]
           simpa [hEq] using (Step.base hStep')
+      /-! ## Left Frame Base Case: Select -/
       | select hProc hk hG hFind =>
           rename_i Ccfg k e ℓ target branches L
           set selEdge : Edge := { sid := e.sid, sender := e.role, receiver := target }
@@ -140,6 +144,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
                 frameConfigLeft (sendStep Ccfg e selEdge (.string ℓ) .string L) Gfr Dfr := by
             simp [frameConfigLeft, sendStep, hUpdG, hUpdD, hLookupD]
           simpa [hEq] using (Step.base hStep')
+      /-! ## Left Frame Base Case: Branch -/
       | branch hProc hk hG hBuf hFindP hFindT hDeq =>
           rename_i Ccfg vs vOut k e ℓ source procBranches typeBranches P L bufs'
           set brEdge : Edge := { sid := e.sid, sender := source, receiver := e.role }
@@ -161,6 +166,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
                 Dfr ++ updateD Ccfg.D brEdge (lookupD Ccfg.D brEdge).tail := by
             exact updateD_append_right (D₁:=Dfr) (D:=Ccfg.D) (e:=brEdge)
               (ts:=(lookupD Ccfg.D brEdge).tail) hDfrNone
+          /-! ## Left Frame Branch Case: Lifted Step Construction -/
           have hStep' :
               StepBase (frameConfigLeft Ccfg Gfr Dfr)
                 { frameConfigLeft Ccfg Gfr Dfr with
@@ -193,6 +199,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
                       D := updateD Ccfg.D brEdge (lookupD Ccfg.D brEdge).tail } Gfr Dfr := by
             simp [frameConfigLeft, hUpdG, hUpdD, hLookupD]
           simpa [hEq] using (Step.base hStep')
+      /-! ## Left Frame Base Case: NewSession -/
       | newSession hProc =>
           rename_i Ccfg roles f P
           have hStep' : StepBase (frameConfigLeft Ccfg Gfr Dfr)
@@ -204,6 +211,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
                 frameConfigLeft { (newSessionStep Ccfg roles f) with proc := P } Gfr Dfr := by
             simp [frameConfigLeft, newSessionStep]
           simpa [hEq] using (Step.base hStep')
+      /-! ## Left Frame Base Case: Assign -/
       | assign hProc =>
           rename_i Ccfg x v
           have hStep' : StepBase (frameConfigLeft Ccfg Gfr Dfr)
@@ -220,6 +228,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
                   { Ccfg with proc := .skip, store := updateStr Ccfg.store x v } Gfr Dfr := by
             simp [frameConfigLeft]
           simpa [hEq] using (Step.base hStep')
+      /-! ## Left Frame Base Case: Seq2 -/
       | seq2 hProc =>
           rename_i Ccfg Q
           have hStep' : StepBase (frameConfigLeft Ccfg Gfr Dfr)
@@ -230,6 +239,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
                 frameConfigLeft { Ccfg with proc := Q } Gfr Dfr := by
             simp [frameConfigLeft]
           simpa [hEq] using (Step.base hStep')
+      /-! ## Left Frame Base Case: Par Skip Left -/
       | par_skip_left hProc =>
           rename_i Ccfg Q nS nG
           have hStep' : StepBase (frameConfigLeft Ccfg Gfr Dfr)
@@ -241,6 +251,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
                 frameConfigLeft { Ccfg with proc := Q } Gfr Dfr := by
             simp [frameConfigLeft]
           simpa [hEq] using (Step.base hStep')
+      /-! ## Left Frame Base Case: Par Skip Right -/
       | par_skip_right hProc =>
           rename_i Ccfg P nS nG
           have hStep' : StepBase (frameConfigLeft Ccfg Gfr Dfr)
@@ -252,6 +263,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
                 frameConfigLeft { Ccfg with proc := P } Gfr Dfr := by
             simp [frameConfigLeft]
           simpa [hEq] using (Step.base hStep')
+  /-! ## Left Frame: Contextual Step Lifting Cases -/
   | seq_left hProc hSub ih =>
       rename_i Ccfg Ccfg' P Q
       have hProc' : (frameConfigLeft Ccfg Gfr Dfr).proc = .seq P Q := by
@@ -260,6 +272,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
         simpa using hDisj
       have hSub' := ih hDisj'
       simpa [frameConfigLeft] using (Step.seq_left hProc' hSub')
+  /-! ## Left Frame Context Case: Par Left -/
   | par_left hProc hSub ih =>
       rename_i Ccfg Ccfg' P Q nS nG nS' nG'
       have hProc' : (frameConfigLeft Ccfg Gfr Dfr).proc = .par nS nG P Q := by
@@ -268,6 +281,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
         simpa using hDisj
       have hSub' := ih hDisj'
       simpa [frameConfigLeft] using (Step.par_left hProc' hSub')
+  /-! ## Left Frame Context Case: Par Right -/
   | par_right hProc hSub ih =>
       rename_i Ccfg Ccfg' P Q nS nG nS' nG'
       have hProc' : (frameConfigLeft Ccfg Gfr Dfr).proc = .par nS nG P Q := by
