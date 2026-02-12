@@ -252,6 +252,8 @@ theorem ProgressMeasureData.not_done_of_pos {State : Type}
   have := (D.measure_zero_iff_done s).mpr hdone
   omega
 
+/-! ## Productive Chain Bounds -/
+
 /-- A trace forms a chain starting from state `s`: each pair's first element
     matches the current state and the next pair continues from the second. -/
 def IsChainFrom {State : Type} : State → List (State × State) → Prop
