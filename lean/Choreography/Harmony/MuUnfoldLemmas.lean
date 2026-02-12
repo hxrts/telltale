@@ -165,6 +165,8 @@ private theorem isGuarded_false_substitute_preserved_recv (p : String) (bs : Lis
   simp only [LocalTypeR.isGuarded] at hunguarded
   exact absurd hunguarded (by decide)
 
+/-! ## Mu Case and Main Preservation Theorem -/
+
 /-- Unguardedness preservation: mu case uses the induction hypothesis. -/
 private theorem isGuarded_false_substitute_preserved_mu (s : String) (body : LocalTypeR)
     (u v : String) (repl : LocalTypeR) (_hneq : u ≠ v)
@@ -200,6 +202,8 @@ theorem isGuarded_false_substitute_preserved (t : LocalTypeR) (u v : String) (re
         fun h => isGuarded_false_substitute_preserved body u v repl hneq h
       exact isGuarded_false_substitute_preserved_mu s body u v repl hneq hunguarded ih
   | .var w => exact isGuarded_false_substitute_preserved_var w u v repl hneq hunguarded
+
+/-! ## Forward Corollary -/
 
 /-- Corollary: Unguardedness is preserved in the forward direction.
     (The reverse direction is more complex and not needed.) -/
