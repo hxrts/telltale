@@ -173,6 +173,8 @@ theorem allVarsBound_comm_branches (sender receiver : String)
       | head _ => exact h.1
       | tail _ hmem' => exact ih h.2 b hmem'
 
+/-! ## Well-Formedness: Non-Empty Communications -/
+
 mutual
   /-- Check that all communications have at least one branch. -/
   def GlobalType.allCommsNonEmpty : GlobalType → Bool
@@ -187,6 +189,8 @@ mutual
     | [] => true
     | (_, g) :: rest => g.allCommsNonEmpty && allCommsNonEmptyBranches rest
 end
+
+/-! ## Well-Formedness: No Self Communication -/
 
 mutual
   /-- Disallow self-communication in all subterms.
@@ -266,6 +270,8 @@ private theorem mem_branch_unique_label_head
       have hbad : head.1 ∈ branchLabels rest := by simpa [hhead] using hlabel
       exact (hnotmem hbad).elim
 
+/-! ## Branch Label Uniqueness Predicate -/
+
 mutual
   /-- Check that all branch labels in communications are unique (no duplicates). -/
   def GlobalType.uniqueBranchLabels : GlobalType → Bool
@@ -311,6 +317,8 @@ theorem mem_branch_unique_label {branches : List (Label × GlobalType)}
           | inr htail2 =>
               exact ih htail htail1 htail2
 
+/-! ## Branch Label Substitution Invariance -/
+
 /-- Substitution preserves branch labels: the labels of substituted branches are the same as original. -/
 theorem branchLabels_substituteBranches (branches : List (Label × GlobalType))
     (varName : String) (replacement : GlobalType) :
@@ -320,6 +328,8 @@ theorem branchLabels_substituteBranches (branches : List (Label × GlobalType))
   | cons head tail ih =>
       simp only [substituteBranches, branchLabels, List.map_cons]
       exact congrArg (head.1 :: ·) ih
+
+/-! ## Unique Labels Preserved by Substitution -/
 
 mutual
   /-- uniqueBranchLabels is preserved by substitution on a global type.
