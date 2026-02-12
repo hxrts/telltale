@@ -39,6 +39,9 @@ private theorem CProjectF_comm_other_iff
     CProjectF CProject (.comm sender receiver gbs) role cand ↔
       AllBranchesProj CProject gbs role cand := by
   simp [CProjectF, hrs, hrr]
+
+/-! ## Send Agreement: Sender Case Helper -/
+
 /-- Helper: sender case for send projection agreement (comm/cons). -/
 private theorem CProject_send_implies_trans_send_comm_cons_sender
     (sender receiver : String) (first : Label × GlobalType) (rest : List (Label × GlobalType))
@@ -60,6 +63,8 @@ private theorem CProject_send_implies_trans_send_comm_cons_sender
   · intro gb hmem
     exact GlobalType.wellFormed_comm_branches sender receiver (first :: rest) hwf gb hmem
 
+/-! ## Send Agreement: Receiver Contradiction Helper -/
+
 /-- Helper: receiver role cannot project to `.send`. -/
 private theorem CProject_send_implies_trans_send_comm_receiver_contra
     (sender receiver role partner : String) (gbs : List (Label × GlobalType))
@@ -72,6 +77,8 @@ private theorem CProject_send_implies_trans_send_comm_receiver_contra
     exact hrs (hrr.trans h)
   have hf := CProject_destruct hproj
   simpa [CProjectF, hrr, hne] using hf
+
+/-! ## Send Agreement: Nonparticipant Helper -/
 
 /-- Helper: non-participant comm case for send projection agreement. -/
 private theorem CProject_send_implies_trans_send_comm_other
@@ -92,6 +99,8 @@ private theorem CProject_send_implies_trans_send_comm_other
       trans (.comm sender receiver (first :: rest)) role = trans first.2 role := by
     simpa using trans_comm_other sender receiver role (first :: rest) hrs hrr
   simpa [htrans] using htrans'
+
+/-! ## Send Agreement: Commutative Cases -/
 
 mutual
 /-- Helper: comm/cons case for send projection agreement. -/
@@ -122,8 +131,10 @@ private theorem CProject_send_implies_trans_send_comm_cons (g : GlobalType) (sen
           hrs hrr hrec
 termination_by (sizeOf g) * 3
 decreasing_by
-    all_goals
-      simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
+	    all_goals
+	      simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
+
+/-! ## Send Agreement: Comm Dispatcher -/
 
 /-- Helper: comm case for send projection agreement. -/
 private theorem CProject_send_implies_trans_send_comm (sender receiver : String)
@@ -152,8 +163,11 @@ private theorem CProject_send_implies_trans_send_comm (sender receiver : String)
           sender receiver first rest role partner lbs hproj' rfl hwf'
 termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
 decreasing_by
-    all_goals
-      simp [hgb, GlobalType.comm.sizeOf_spec]
+	    all_goals
+	      simp [hgb, GlobalType.comm.sizeOf_spec]
+
+/-! ## Send Agreement: Main Theorem -/
+
 /-- If CProject g role (.send partner lbs) holds, then g must be a comm where role is sender
       (possibly through non-participant layers), and trans g role = .send partner (transBranches ...). -/
 theorem CProject_send_implies_trans_send (g : GlobalType) (role : String)
@@ -178,9 +192,11 @@ theorem CProject_send_implies_trans_send (g : GlobalType) (role : String)
             (by simpa [hg] using hproj) (by simpa [hg] using hwf))
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
-    all_goals
-      simp [hg, GlobalType.comm.sizeOf_spec]
+	    all_goals
+	      simp [hg, GlobalType.comm.sizeOf_spec]
 end
+
+/-! ## Recv Agreement: Base Constructor Contradictions -/
 
 /-- Helper: `.end` cannot project to `.recv`. -/
 private theorem CProject_recv_implies_trans_recv_end (role partner : String)
@@ -217,6 +233,8 @@ private theorem CProject_recv_implies_trans_recv_mu (t : String) (body : GlobalT
   have hf := CProject_destruct hproj
   have : False := by simpa [CProjectF] using hf
   exact this.elim
+
+/-! ## Recv Agreement: Receiver Case Helper -/
 
 /-- Helper: receiver case for recv projection agreement (comm/cons). -/
 private theorem CProject_recv_implies_trans_recv_comm_cons_receiver
@@ -271,6 +289,8 @@ private theorem CProject_recv_implies_trans_recv_comm_other
     simpa using trans_comm_other sender receiver role (first :: rest) hrs hrr
   simpa [htrans] using htrans'
 
+/-! ## Recv Agreement: Commutative Cases -/
+
 /- Symmetric version for recv. -/
 mutual
 /-- Helper: comm/cons case for recv projection agreement. -/
@@ -301,8 +321,10 @@ private theorem CProject_recv_implies_trans_recv_comm_cons (g : GlobalType) (sen
           hrs hrr hrec
 termination_by (sizeOf g) * 3
 decreasing_by
-    all_goals
-      simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
+	    all_goals
+	      simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
+
+/-! ## Recv Agreement: Comm Dispatcher -/
 
 /-- Helper: comm case for recv projection agreement. -/
 private theorem CProject_recv_implies_trans_recv_comm (sender receiver : String)
@@ -331,8 +353,11 @@ private theorem CProject_recv_implies_trans_recv_comm (sender receiver : String)
           sender receiver first rest role partner lbs hproj' rfl hwf'
 termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
 decreasing_by
-    all_goals
-      simp [hgb, GlobalType.comm.sizeOf_spec]
+	    all_goals
+	      simp [hgb, GlobalType.comm.sizeOf_spec]
+
+/-! ## Recv Agreement: Main Theorem -/
+
 /-- Symmetric version for recv. -/
 theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String) (partner : String)
       (lbs : List BranchR) (hproj : CProject g role (.recv partner lbs)) (hwf : g.wellFormed = true) :
@@ -349,9 +374,11 @@ theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String) (partn
             (by simpa [hg] using hproj) (by simpa [hg] using hwf))
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
-    all_goals
-      simp [hg, GlobalType.comm.sizeOf_spec]
+	    all_goals
+	      simp [hg, GlobalType.comm.sizeOf_spec]
 end
+
+/-! ## Guardedness Transport -/
 
 /-- Helper: if CProject g role lt holds with lt.isGuarded v = true,
     then (trans g role).isGuarded v = true.
