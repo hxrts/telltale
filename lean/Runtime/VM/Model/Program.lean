@@ -92,6 +92,8 @@ def programLocalTypes (roles : RoleSet) (types : Role → LocalType) :
 
 /-! ## Code image construction from LocalTypeR -/
 
+/-! ### Ordering Helpers -/
+
 private def insertRoleOrdered
     (entry : Role × SessionTypes.LocalTypeR.LocalTypeR)
     (acc : List (Role × SessionTypes.LocalTypeR.LocalTypeR)) :
@@ -108,6 +110,8 @@ private def sortLocalTypesByRole
     (localTypes : List (Role × SessionTypes.LocalTypeR.LocalTypeR)) :
     List (Role × SessionTypes.LocalTypeR.LocalTypeR) :=
   localTypes.foldl (fun acc entry => insertRoleOrdered entry acc) []
+
+/-! ### Stable Hash Helpers -/
 
 private def mixHash64 (h : UInt64) (n : Nat) : UInt64 :=
   -- Deterministic 64-bit hash mixer (djb2 style).
@@ -129,6 +133,8 @@ private def hashCodeImagePayload
       mixHash64 h3 h4.toNat)
     seed
 
+/-! ### Role Map Builders -/
+
 private def localTypeRMap
     (localTypes : List (Role × SessionTypes.LocalTypeR.LocalTypeR)) :
     Std.HashMap Role SessionTypes.LocalTypeR.LocalTypeR :=
@@ -141,6 +147,8 @@ private def roleProgramMap {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
   localTypes.foldl
     (fun acc entry => acc.insert entry.1 (compileLocalTypeR (γ := γ) (ε := ε) entry.2).toArray)
     {}
+
+/-! ### Image Constructors -/
 
 /-- Build a CodeImage by compiling LocalTypeR per role and concatenating the bytecode. -/
 def CodeImage.fromLocalTypes {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
