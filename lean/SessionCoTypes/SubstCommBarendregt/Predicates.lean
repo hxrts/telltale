@@ -88,6 +88,8 @@ mutual
                 simp [dualBranches, isFreeInBranches, isFreeIn_dual, isFreeInBranches_dual]
 end
 
+/-! ## Duality Preservation: notBoundAt -/
+
 mutual
   /-- notBoundAt is invariant under duality. -/
   theorem notBoundAt_dual (v : String) (t : LocalTypeR) :
@@ -116,6 +118,8 @@ mutual
             | mk vt t =>
                 simp [dualBranches, notBoundAtBranches, notBoundAt_dual, notBoundAtBranches_dual]
 end
+
+/-! ## notBoundAt Substitution Preservation -/
 
 mutual
   /-- notBoundAt is preserved through substitution when repl also satisfies it. -/
@@ -172,6 +176,8 @@ mutual
     -- 0 < 1 + sizeOf hd is trivial
     case _ => omega
 end
+
+/-! ## notBoundAt Unfold Preservation -/
 
 /-- notBoundAt is preserved through unfolding. -/
 @[simp]
@@ -233,6 +239,8 @@ mutual
           exact substitute_not_free body x rx hnot_free
   termination_by sizeOf e
 
+  /-! ## Substitute-Not-Free: Branch Version -/
+
   /-- If x is not free in any branch, substituting for x leaves branches unchanged. -/
   theorem substituteBranches_not_free (bs : List BranchR) (x : String) (rx : LocalTypeR)
       (hnot_free : isFreeInBranches x bs = false) :
@@ -264,6 +272,8 @@ theorem substitute_closed (e : LocalTypeR) (x : String) (rx : LocalTypeR)
 theorem isFreeIn_mu_self (t : String) (body : LocalTypeR) :
     isFreeIn t (.mu t body) = false := by
   simp only [isFreeIn, beq_self_eq_true, ↓reduceIte]
+
+/-! ## Substitution Self-Elimination -/
 
 mutual
   /-- If t is not free in repl, then t is not free in (e.substitute t repl).
@@ -306,6 +316,8 @@ mutual
           exact isFreeIn_subst_self_general inner t repl hrepl
   termination_by sizeOf e
 
+  /-! ## Substitution Self-Elimination: Branch Version -/
+
   /-- Branch version of isFreeIn_subst_self_general. -/
   theorem isFreeInBranches_subst_self_general (bs : List BranchR) (t : String)
       (repl : LocalTypeR) (hrepl : isFreeIn t repl = false) :
@@ -330,6 +342,8 @@ end
 theorem isFreeIn_subst_mu_self (body : LocalTypeR) (t : String) :
     isFreeIn t (body.substitute t (.mu t body)) = false :=
   isFreeIn_subst_self_general body t (.mu t body) (isFreeIn_mu_self t body)
+
+/-! ## Substitution Preservation for Other Variables -/
 
 mutual
   /-- If v is not free in e and not free in repl, then v is not free in e.substitute t repl.
@@ -378,6 +392,8 @@ mutual
             exact isFreeIn_subst_preserves body v t repl hv_e hv_repl
   termination_by sizeOf e
 
+  /-! ## Substitution Preservation: Branch Version -/
+
   /-- Branch version of isFreeIn_subst_preserves. -/
   theorem isFreeInBranches_subst_preserves (bs : List BranchR) (v t : String)
       (repl : LocalTypeR)
@@ -396,6 +412,8 @@ mutual
     all_goals simp only [sizeOf, List._sizeOf_1, Prod._sizeOf_1]
     all_goals omega
 end
+
+/-! ## μ Substitution Helper -/
 
 /-- Key helper: (mu t body).substitute var repl = mu t (body.substitute var repl) when t ≠ var. -/
 @[simp]
