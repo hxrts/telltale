@@ -57,6 +57,8 @@ structure EQ2Extraction where
     ∀ {t s body body'}, Good (.mu t body) → Good (.mu s body') →
       EQ2 (LocalTypeR.mu t body) (LocalTypeR.mu s body') → BisimF EQ2 (LocalTypeR.mu t body) (LocalTypeR.mu s body')
 
+/-! ## Extraction: End Observables -/
+
 /-- For closed, contractive types, `EQ2 .end x` implies `UnfoldsToEnd x`.
 
     Proof: By `observable_of_closed_contractive`, x has observable behavior. By the
@@ -85,6 +87,8 @@ theorem EQ2.end_left_implies_UnfoldsToEnd_of_contractive {x : LocalTypeR}
     (hclosed : x.isClosed) (hcontr : x.isContractive = true) (heq : EQ2 x .end) : UnfoldsToEnd x :=
   EQ2.end_right_implies_UnfoldsToEnd_of_contractive hclosed hcontr (EQ2_symm heq)
 
+/-! ## Extraction: Variable Observables -/
+
 /-- For contractive types, `EQ2 (.var v) x` implies `UnfoldsToVar x v`. -/
 theorem EQ2.var_right_implies_UnfoldsToVar_of_contractive {x : LocalTypeR} {v : String}
     (hclosed : x.isClosed) (hcontr : x.isContractive = true) (heq : EQ2 (.var v) x) : UnfoldsToVar x v := by
@@ -103,6 +107,8 @@ theorem EQ2.var_right_implies_UnfoldsToVar_of_contractive {x : LocalTypeR} {v : 
 theorem EQ2.var_left_implies_UnfoldsToVar_of_contractive {x : LocalTypeR} {v : String}
     (hclosed : x.isClosed) (hcontr : x.isContractive = true) (heq : EQ2 x (.var v)) : UnfoldsToVar x v :=
   EQ2.var_right_implies_UnfoldsToVar_of_contractive hclosed hcontr (EQ2_symm heq)
+
+/-! ## Extraction: Send Observables -/
 
 /-- For contractive types, `EQ2 (.send p bs) x` implies `CanSend x p cs` with matching branches. -/
 theorem EQ2.send_right_implies_CanSend_of_contractive {x : LocalTypeR} {p : String}
@@ -131,6 +137,8 @@ theorem EQ2.send_right_implies_CanSend_of_contractive {x : LocalTypeR} {p : Stri
         simpa [EQ2F] using hf
       subst hp
       exact ⟨cs, hsend, hbr⟩
+
+/-! ## Branch Utilities for Extraction -/
 
 /-- Flip the direction of a BranchesRel proof. -/
 theorem BranchesRel_flip {as bs : List BranchR}
@@ -174,14 +182,7 @@ theorem CanSend_dual_to_CanRecv {x : LocalTypeR} {p : String}
   have hbr' : BranchesRel EQ2 bs (dualBranches cs) :=
     BranchesRel_dual_eq2 (bs := bs) (cs := cs) hbr
   exact ⟨dualBranches cs, hcan', hbr'⟩
-
-
-
-
-
-
-
-
+/-! ## Extraction: Send/Receive Symmetry -/
 
 /-- For contractive types, `EQ2 x (.send p cs)` implies `CanSend x p bs` with matching branches. -/
 theorem EQ2.send_left_implies_CanSend_of_contractive {x : LocalTypeR} {p : String}
