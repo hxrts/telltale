@@ -19,7 +19,7 @@ namespace SessionTypes.GlobalType
 
 /-! ## Substitution and Free-Variable Lemmas -/
 
-/-! ## Substitution and Free-Variable Lemmas -/
+/-! ## Branch Helper: Head Case -/
 
 /-- Helper for freeVars_substitute_subset: branches case with explicit IH.
 
@@ -49,6 +49,8 @@ private theorem freeVars_substituteBranches_subset_aux_head
       exact hmem
 
 /- Helper: tail case for freeVars_substituteBranches_subset_aux. -/
+/-! ## Branch Helper: Tail Case -/
+
 private theorem freeVars_substituteBranches_subset_aux_tail
     {n : Nat} {t : String} {repl : GlobalType}
     (_ih : ∀ g' : GlobalType, sizeOf g' < n →
@@ -68,6 +70,8 @@ private theorem freeVars_substituteBranches_subset_aux_tail
   | inr hmem =>
       right
       exact hmem
+
+/-! ## Branch Helper: Recursive Auxiliary -/
 
 private def freeVars_substituteBranches_subset_aux
     {n : Nat} {t : String} {repl : GlobalType}
@@ -95,6 +99,8 @@ private def freeVars_substituteBranches_subset_aux
           have hsub := freeVars_substituteBranches_subset_aux ih tail hsize_tail v hv_tail
           exact freeVars_substituteBranches_subset_aux_tail ih head tail v hsub
 
+/-! ## Strong-Induction Size Bounds -/
+
 /-- Strong induction principle for freeVars_substitute_subset. -/
 private theorem sizeOf_snd_lt_comm_of_mem (sender receiver : String)
     {branches : List (Label × GlobalType)} {p : Label × GlobalType} (hp : p ∈ branches) :
@@ -116,6 +122,8 @@ private theorem sizeOf_snd_lt_comm_of_mem (sender receiver : String)
       omega
     omega
   exact Nat.lt_trans h1 (Nat.lt_trans h2 h3)
+
+/-! ## Strong-Induction Cases: end/var/mu-shadowed -/
 
 private theorem freeVars_substitute_subset_strong_end
     {t : String} {repl : GlobalType} {v : String}
@@ -153,6 +161,8 @@ private theorem freeVars_substitute_subset_strong_mu_shadowed
     simpa [GlobalType.freeVars, List.mem_filter, bne_iff_ne, ne_eq, hst] using hv'
   have hne : v ≠ t := by simpa [hst] using hv'.2
   exact ⟨hmem, hne⟩
+
+/-! ## Strong-Induction Cases: mu/comm -/
 
 private theorem freeVars_substitute_subset_strong_mu_unshadowed
     {n : Nat} {t : String} {repl : GlobalType} {v : String}
@@ -195,6 +205,8 @@ private theorem freeVars_substitute_subset_strong_mu
   · exact freeVars_substitute_subset_strong_mu_shadowed s inner hst hv
   · exact freeVars_substitute_subset_strong_mu_unshadowed ih s inner hsize hst hv
 
+/-! ## Strong-Induction Case: comm -/
+
 private theorem freeVars_substitute_subset_strong_comm
     {n : Nat} {t : String} {repl : GlobalType} {v : String}
     (ih : ∀ g' : GlobalType, sizeOf g' < n →
@@ -216,6 +228,8 @@ private theorem freeVars_substitute_subset_strong_comm
   | inr hmem =>
       right
       exact hmem
+
+/-! ## Strong-Induction Driver -/
 
 private theorem freeVars_substitute_subset_strong (n : Nat) :
     ∀ body : GlobalType, sizeOf body ≤ n →
@@ -246,6 +260,8 @@ private theorem freeVars_substitute_subset_strong (n : Nat) :
             omega
           have hcont_lt : sizeOf cont < n := Nat.lt_of_lt_of_le hcont_size hsize
           exact ih' cont hcont_lt v hv
+
+/-! ## Substitution Free-Variable Subset Corollaries -/
 
 /-- Main theorem: free vars of substituted type are bounded. -/
 theorem freeVars_substitute_subset (body : GlobalType) (t : String) (repl : GlobalType)
@@ -296,6 +312,8 @@ theorem freeVars_substituteBranches_subset (branches : List (Label × GlobalType
               right
               exact hmem
 
+/-! ## Closedness under Substitution -/
+
 /-- Substitution preserves closedness when both repl is closed AND body has no free vars other than t.
 
 This is the precise property needed for mu-unfolding: if `(mu t body).isClosed`, then:
@@ -323,6 +341,8 @@ theorem GlobalType.isClosed_substitute_of_closed' (body : GlobalType) (t : Strin
   | inr hmem =>
       simp only [hrepl_closed, List.not_mem_nil] at hmem
 
+/-! ## Closed μ-Body Free-Variable Characterization -/
+
 /-- Mu type closedness implies body has only the bound variable free.
 
 If `(mu t body).isClosed = true`, then `body.freeVars ⊆ [t]`. -/
@@ -339,6 +359,8 @@ theorem GlobalType.isClosed_mu_body_freeVars (t : String) (body : GlobalType)
     simp only [List.mem_filter, bne_iff_ne]
     exact ⟨hv, hne⟩
   simp only [hclosed, List.not_mem_nil] at hfilter
+
+/-! ## Closedness of μ-Unfold Substitution -/
 
 /-- Mu-unfolding preserves closedness: if `(mu t body).isClosed`, then `(body.substitute t (mu t body)).isClosed`.
 
