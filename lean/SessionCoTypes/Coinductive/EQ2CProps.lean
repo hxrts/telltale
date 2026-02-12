@@ -172,6 +172,8 @@ lemma EQ2C_send {p : String} {bs cs : List (Label × LocalTypeC)}
 /-- EQ2C is closed under recv, given branch-wise EQ2C.
     Communication congruence: recv case. -/
 
+/-! ### Recv Congruence -/
+
 lemma EQ2C_recv {p : String} {bs cs : List (Label × LocalTypeC)}
     (hbr : BranchesRelC EQ2C bs cs) : EQ2C (mkRecv p bs) (mkRecv p cs) := by
   let R' : LocalTypeC → LocalTypeC → Prop :=
@@ -266,6 +268,8 @@ lemma EQ2C_unfold_left {t u : LocalTypeC} (h : EQ2C t u) (x : String) :
 
 /-- Wrap a bisimulation on the right with a μ constructor.
     Mu-unfolding congruence: right wrapper. -/
+
+/-! ### Right Mu Wrapper -/
 
 lemma EQ2C_unfold_right {t u : LocalTypeC} (h : EQ2C t u) (x : String) :
     EQ2C t (mkMu x u) := by
