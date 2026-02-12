@@ -46,6 +46,9 @@ theorem OpenSpec_respects_renaming (ρ : SessionRenaming)
       rw [Option.isSome_iff_exists]
       exact ⟨L', hLookup⟩
     exact hSpec.fresh ep' hSome' hPreimage
+
+  /-! ## Open Renaming Equivariance: Endpoint Additions -/
+
   endpoints_added := by
     intro r hr
     have hAdded := hSpec.endpoints_added r hr
@@ -56,6 +59,9 @@ theorem OpenSpec_respects_renaming (ρ : SessionRenaming)
       simp only [renameEndpoint]
     rw [hEp, lookupG_rename, hL]
     simp only [Option.map_some]
+
+  /-! ## Open Renaming Equivariance: GEnv Frame -/
+
   frame_G := by
     intro ep hSidNe
     have hSidNe' : ep.sid ≠ ρ.f s := hSidNe
@@ -87,6 +93,9 @@ theorem OpenSpec_respects_renaming (ρ : SessionRenaming)
         obtain ⟨ep', _, hEp, _, _⟩ := lookupG_rename_inv ρ G' ep L hL
         exact hPre ⟨ep', hEp.symm⟩
       rw [hNone, hNone']
+
+  /-! ## Open Renaming Equivariance: Trace Clauses -/
+
   traces_empty := by
     intro e hSidEq
     -- e.sid = ρ.f s, need to find preimage edge
@@ -108,6 +117,9 @@ theorem OpenSpec_respects_renaming (ρ : SessionRenaming)
       by_contra hNe
       obtain ⟨e', hE, _⟩ := lookupD_rename_inv ρ D' e hNe
       exact hPre ⟨e', hE.symm⟩
+
+  /-! ## Open Renaming Equivariance: DEnv Frame -/
+
   frame_D := by
     intro e hSidNe
     by_cases hPre : ∃ e', renameEdge ρ e' = e
@@ -134,6 +146,8 @@ theorem OpenSpec_respects_renaming (ρ : SessionRenaming)
         exact hPre ⟨e', hE.symm⟩
       rw [hEmpty, hEmpty']
 
+/-! ## Open ConfigEquiv Preservation -/
+
 /-- Open respects ConfigEquiv.
 
     Note: This proof requires additional specification constraints on OpenSpec.
@@ -159,10 +173,16 @@ theorem OpenSpec_respects_ConfigEquiv
     (hNoExtra₂ : ∀ r, r ∉ roles →
       lookupG G₂' { sid := hEquiv.choose.fwd s, role := r } = none) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+
+  /-! ## Open ConfigEquiv Preservation: Shared Setup -/
+
   let σ := hEquiv.choose
   let ρ := σ.toRenaming
   obtain ⟨hG, hD⟩ := hEquiv.choose_spec
   refine ⟨σ, ?_, ?_⟩
+
+  /-! ## Open ConfigEquiv Preservation: GEnv Component -/
+
   · intro e
     cases e with
     | mk sid role =>
@@ -191,6 +211,9 @@ theorem OpenSpec_respects_ConfigEquiv
                 hG { sid := sid, role := role }
           _ = (lookupG G₁' { sid := sid, role := role }).map (renameLocalType ρ) := by
                 rw [hFrame₁]
+
+  /-! ## Open ConfigEquiv Preservation: DEnv Component -/
+
   · intro e
     cases e with
     | mk sid sender receiver =>
@@ -227,6 +250,8 @@ theorem OpenSpec_respects_ConfigEquiv
           _ = (lookupD D₁' { sid := sid, sender := sender, receiver := receiver }).map (renameValType ρ) := by
                 rw [hFrame₁]
 
+/-! ## Close Renaming Equivariance -/
+
 /-- Close is equivariant under session renaming. -/
 theorem CloseSpec_respects_renaming (ρ : SessionRenaming)
     {G G' : GEnv} {D : DEnv} {ep : Endpoint}
@@ -255,6 +280,9 @@ theorem CloseSpec_respects_renaming (ρ : SessionRenaming)
   endpoint_removed := by
     rw [lookupG_rename, hSpec.endpoint_removed]
     simp only [Option.map_none]
+
+  /-! ## Close Renaming Equivariance: GEnv Frame -/
+
   frame_G := by
     intro ep' hne
     by_cases hPre : ∃ ep'', renameEndpoint ρ ep'' = ep'
@@ -281,6 +309,8 @@ theorem CloseSpec_respects_renaming (ρ : SessionRenaming)
         obtain ⟨ep'', _, hEp, _, _⟩ := lookupG_rename_inv ρ G' ep' L hL
         exact hPre ⟨ep'', hEp.symm⟩
       rw [hNone, hNone']
+
+/-! ## Close ConfigEquiv Preservation -/
 
 /-- Close respects ConfigEquiv.
     Note: Close doesn't modify D, so D₁ = D₁' and D₂ = D₂'. -/
@@ -314,6 +344,8 @@ theorem CloseSpec_respects_ConfigEquiv
   -- D condition: unchanged
   · exact hD_equiv
 
+/-! ## Transfer Renaming Equivariance -/
+
 /-- Transfer is equivariant under session renaming. -/
 theorem TransferSpec_respects_renaming (ρ : SessionRenaming)
     {G G' : GEnv} {D D' : DEnv}
@@ -337,6 +369,9 @@ theorem TransferSpec_respects_renaming (ρ : SessionRenaming)
       rfl
     have hG' := hSpec.type_updated L' hSender
     rw [hG', renameGEnv_updateG, hL'_eq]
+
+  /-! ## Transfer Renaming Equivariance: Trace and Frames -/
+
   trace_extended := by
     have hD' := hSpec.trace_extended
     simp only at hD'
@@ -367,6 +402,8 @@ theorem TransferSpec_respects_renaming (ρ : SessionRenaming)
       ((lookupD D { sid := ep.sid, sender := ep.role, receiver := r } ++ [ValType.chan delegatedSession delegatedRole]).map (renameValType ρ))
       hne.symm
 
+/-! ## Transfer ConfigEquiv Preservation -/
+
 /-- Transfer respects ConfigEquiv. -/
 theorem TransferSpec_respects_ConfigEquiv
     {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
@@ -382,6 +419,9 @@ theorem TransferSpec_respects_ConfigEquiv
   let ρ := σ.toRenaming
   obtain ⟨hG_equiv, hD_equiv⟩ := hEquiv.choose_spec
   refine ⟨σ, ?_, ?_⟩
+
+  /-! ## Transfer ConfigEquiv Preservation: GEnv Component -/
+
   -- G condition
   · intro e'
     by_cases he : e' = ep
@@ -413,6 +453,9 @@ theorem TransferSpec_respects_ConfigEquiv
         intro heq; exact he (renameEndpoint_inj ρ e' ep heq)
       rw [hSpec₁.frame_G e' he, hSpec₂.frame_G (renameEndpoint ρ e') hne₂]
       exact hG_equiv e'
+
+  /-! ## Transfer ConfigEquiv Preservation: DEnv Component -/
+
   -- D condition
   · intro e'
     let sendEdge : Edge := { sid := ep.sid, sender := ep.role, receiver := r }
