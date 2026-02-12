@@ -48,6 +48,7 @@ structure VMTheoremPack
   dataAvailability? : Option DataAvailabilityArtifact
   coordination? : Option CoordinationArtifact
   crdt? : Option CRDTArtifact
+  byzantineSafety? : Option ByzantineSafetyArtifact
   consensusEnvelope? : Option ConsensusEnvelopeArtifact
   failureEnvelope? : Option FailureEnvelopeArtifact
   vmEnvelopeAdherence? : Option VMEnvelopeAdherenceArtifact
@@ -226,6 +227,20 @@ def buildVMTheoremPack
           , hcrdtExtensions := p.protocol.hcrdtExtensions
           , hcrdtLimits := p.protocol.hcrdtLimits
           }
+
+  /-! ## Builder: Byzantine and Consensus Envelope Families -/
+
+  let byzantineSafety? :=
+    match space.distributed.byzantineSafety? with
+    | none => none
+    | some p =>
+        some
+          { protocol := p.protocol
+          , exactCharacterization := p.protocol.exactCharacterization
+          , byzantineSafety := Distributed.ByzantineSafety.byzantineSafety_of_protocol p.protocol
+          , characterization := Distributed.ByzantineSafety.characterization_of_protocol p.protocol
+          , assumptionsPassed := Distributed.ByzantineSafety.byzantineAssumptions_allPassed p.protocol
+          }
   let consensusEnvelope? :=
     match space.distributed.consensusEnvelope? with
     | none => none
@@ -324,6 +339,7 @@ def buildVMTheoremPack
   , dataAvailability? := dataAvailability?
   , coordination? := coordination?
   , crdt? := crdt?
+  , byzantineSafety? := byzantineSafety?
   , consensusEnvelope? := consensusEnvelope?
   , failureEnvelope? := failureEnvelope?
   , vmEnvelopeAdherence? := vmEnvelopeAdherence?
