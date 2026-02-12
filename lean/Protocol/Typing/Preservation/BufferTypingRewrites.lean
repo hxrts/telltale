@@ -46,6 +46,8 @@ theorem BuffersTyped_rewriteD
   · intro i hi
     simpa [hEq e] using hTyping i hi
 
+/-! ## DEnv Lookup Rewrites -/
+
 lemma lookupD_append_left_of_find {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType} :
     D₁.find? e = some ts →
     lookupD (D₁ ++ D₂) e = ts := by
@@ -95,6 +97,8 @@ lemma lookupD_updateD_append_left {D D₂ : DEnv} {e e' : Edge} {ts : List ValTy
           simp [lookupD, hfind_union]
         simpa [hLeftEq, hRightEq]
 
+/-! ## Right-Append Update Rewrites -/
+
 lemma lookupD_updateD_append_right {D₁ D : DEnv} {e e' : Edge} {ts : List ValType}
     (hNone : D₁.find? e = none) :
     lookupD (updateD (D₁ ++ D) e ts) e' = lookupD (D₁ ++ updateD D e ts) e' := by
@@ -133,6 +137,8 @@ lemma lookupD_updateD_append_right {D₁ D : DEnv} {e e' : Edge} {ts : List ValT
           simp [lookupD, hfind_union]
         simpa [hLeftEq, hRightEq]
 
+/-! ## Append Associativity Rewrites -/
+
 lemma lookupD_append_assoc {D₁ D₂ D₃ : DEnv} :
     ∀ e, lookupD ((D₁ ++ D₂) ++ D₃) e = lookupD (D₁ ++ (D₂ ++ D₃)) e := by
   intro e
@@ -146,6 +152,7 @@ lemma lookupD_append_assoc {D₁ D₂ D₃ : DEnv} :
         findD_append_left (D₁:=D₁) (D₂:=D₂ ++ D₃) (e:=e) (ts:=ts) h1
       simp [lookupD, hLeft, hRight]
   | none =>
+      /- For the right-biased path, inspect `D₂` to align both append associations. -/
       have h12 : (D₁ ++ D₂).find? e = D₂.find? e :=
         findD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) h1
       cases h2 : D₂.find? e with
@@ -171,6 +178,8 @@ lemma lookupD_append_assoc {D₁ D₂ D₃ : DEnv} :
             simpa [h23] using hRight0
           simp [lookupD, hLeft, hRight]
 
+/-! ## Buffer-Typing Transport Over Associativity -/
+
 lemma BuffersTyped_append_assoc
     {G : GEnv} {D₁ D₂ D₃ : DEnv} {bufs : Buffers} :
     BuffersTyped G ((D₁ ++ D₂) ++ D₃) bufs →
@@ -188,6 +197,8 @@ lemma BuffersTyped_append_assoc_symm
   symm
   exact lookupD_append_assoc (D₁:=D₁) (D₂:=D₂) (D₃:=D₃) e
 
+/-! ## Session Consistency Under Append -/
+
 lemma DConsistent_append {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     DConsistent G₁ D₁ →
     DConsistent G₂ D₂ →
@@ -200,6 +211,8 @@ lemma DConsistent_append {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
       exact SessionsOf_append_left (G₂:=G₂) (h1 hL)
   | inr hR =>
       exact SessionsOf_append_right (G₁:=G₁) (h2 hR)
+
+/-! ## Disjoint Lookup Commutation -/
 
 lemma DEnv_find_none_of_disjoint_left {D₁ D₂ : DEnv} (hDisj : DisjointD D₁ D₂)
     {e : Edge} {ts : List ValType} (hFind : D₁.find? e = some ts) :
@@ -236,6 +249,8 @@ lemma BuffersTyped_mono {G G' : GEnv} {D : DEnv} {bufs : Buffers} :
   intro i hi
   exact HasTypeVal_mono G G' _ _ (hTyping i hi) hMono
 
+/-! ## Global Environment Swap Rewrites -/
+
 lemma lookupG_comm_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂) :
     ∀ e, lookupG (G₁ ++ G₂) e = lookupG (G₂ ++ G₁) e := by
   intro e
@@ -256,6 +271,8 @@ lemma lookupG_comm_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂) 
           have hB := lookupG_append_right (G₁:=G₂) (G₂:=G₁) (e:=e) hRight
           simpa [hA, hB, hRight, hLeft]
 
+/-! ## Left-Swap Transport for Buffer Typing -/
+
 lemma BuffersTyped_swap_G_left {G₁ G₂ G₃ : GEnv} {D : DEnv} {bufs : Buffers}
     (hDisj : DisjointG G₁ G₂) :
     BuffersTyped ((G₁ ++ G₂) ++ G₃) D bufs →
@@ -272,6 +289,7 @@ lemma BuffersTyped_swap_G_left {G₁ G₂ G₃ : GEnv} {D : DEnv} {bufs : Buffer
             simpa [hSwap] using hLeft
           exact lookupG_append_left (G₁:=G₂ ++ G₁) (G₂:=G₃) hLeft'
       | inr hRight =>
+          /- If the hit comes from `G₃`, first show `(G₂ ++ G₁)` is empty at `ep`. -/
           have hSwap := lookupG_comm_of_disjoint hDisj ep
           have hNone : lookupG (G₂ ++ G₁) ep = none := by
             simpa [hSwap] using hRight.1
@@ -286,6 +304,8 @@ lemma BuffersTyped_swap_G_left {G₁ G₂ G₃ : GEnv} {D : DEnv} {bufs : Buffer
           exact hRight'''
     · exact hBT
   simpa [List.append_assoc] using hBT'
+
+/-! ## Left DEnv Swap Transport -/
 
 lemma BuffersTyped_swap_D_left {G : GEnv} {D₁ D₂ D₃ : DEnv} {bufs : Buffers}
     (hDisj : DisjointD D₁ D₂) :
@@ -309,6 +329,8 @@ lemma BuffersTyped_swap_D_left {G : GEnv} {D₁ D₂ D₃ : DEnv} {bufs : Buffer
         have hB := findD_append_right (D₁:=D₂ ++ D₁) (D₂:=D₃) (e:=e) hLeft'
         simp [lookupD, hA, hB]
   exact BuffersTyped_rewriteD hEq hBT
+
+/-! ## Right-Swap Transport for Buffer Typing -/
 
 lemma lookupG_swap_right {G₁ G₂ G₃ : GEnv} (hDisj : DisjointG G₂ G₃) :
     ∀ e, lookupG (G₁ ++ (G₂ ++ G₃)) e = lookupG (G₁ ++ (G₃ ++ G₂)) e := by
