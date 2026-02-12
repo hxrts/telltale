@@ -50,6 +50,7 @@ theorem HeadCoherent_split_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
   simp [hGrecv', hTraceEq] at hHeadMerged
   simpa [hGrecv, hTraceEq] using hHeadMerged
 
+/-! ## HeadCoherent Split: Right Component -/
 theorem HeadCoherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     HeadCoherent (G₁ ++ G₂) (D₁ ++ D₂) →
     DisjointG G₁ G₂ →
@@ -86,6 +87,7 @@ theorem HeadCoherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
   simp [hGrecv', hTraceEq] at hHeadMerged
   simpa [hGrecv, hTraceEq] using hHeadMerged
 
+/-! ## HeadCoherent Merge Reconstruction -/
 theorem HeadCoherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     HeadCoherent G₁ D₁ →
     HeadCoherent G₂ D₂ →
@@ -134,6 +136,7 @@ theorem HeadCoherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
         | x => True := by
           simpa [HeadCoherent, hLeft] using hHeadLeft
       simpa [HeadCoherent, hGrecv, hTraceEq] using hHeadLeft'
+  /-! ## HeadCoherent Merge: Right-side Receiver Case -/
   | inr hRight =>
       have hSid : e.sid ∈ SessionsOf G₂ :=
         ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hRight.2, rfl⟩
@@ -169,6 +172,7 @@ theorem HeadCoherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
           simpa [HeadCoherent, hRight.2] using hHeadRight
       simpa [HeadCoherent, hGrecv, hTraceEq] using hHeadRight'
 
+/-! ## TypedStep HeadCoherent Preservation -/
 theorem typed_step_preserves_headcoherent
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
