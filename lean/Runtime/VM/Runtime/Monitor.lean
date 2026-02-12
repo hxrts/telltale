@@ -98,6 +98,8 @@ inductive WellTypedInstr {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] [Ef
       -- Non-session instructions preserve local types.
       WellTypedInstr i sk L L
 
+/-! ## Monitor State and Recording -/
+
 structure MonitorJudgment where
   -- Endpoint checked by the monitor.
   endpoint : Endpoint
@@ -125,6 +127,8 @@ def SessionMonitor.reject {γ : Type u} (m : SessionMonitor γ) (msg : String) :
     SessionMonitor γ :=
   { m with lastRejection := some msg }
 
+/-! ## Monitor Modes and Session Interaction Filter -/
+
 /-- Monitor precheck mode aligned with Rust VM config. -/
 inductive MonitorMode where
   -- Disable monitor precheck.
@@ -144,6 +148,8 @@ private def distinctLabels : List Label → Bool
   | [] => true
   | l :: ls => !ls.contains l && distinctLabels ls
 
+/-! ## Monitor Admission Checks -/
+
 def monitorAllows {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (_m : SessionMonitor γ) (_i : Instr γ ε) : Bool :=
   match _i with
@@ -154,6 +160,8 @@ def monitorAllows {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     -- Role set and destination register list must align.
     roles.length == dsts.length
   | _ => true
+
+/-! ## Monitor Meta-Properties -/
 
 def monitor_sound {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (m : SessionMonitor γ) : Prop :=
