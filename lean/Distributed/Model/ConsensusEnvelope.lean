@@ -1,4 +1,5 @@
 import Distributed.Model.Assumptions
+import Distributed.Families.ByzantineSafety
 
 set_option autoImplicit false
 
@@ -341,6 +342,18 @@ theorem admissionCompleteness_inferred_consensus (p : ProtocolSpec) :
 
 /-! ## Premise Bundles and Certified Package -/
 
+/-- Byzantine-safety extension object attached to consensus-envelope premises. -/
+structure ByzantineSafetyTheoremObject (protocol : ProtocolSpec) where
+  State : Type u
+  Decision : Type v
+  Certificate : Type (max u v)
+  Obs : Type (max u v)
+  model : Distributed.ByzantineSafety.Model State Decision Certificate Obs
+  assumptionsPassed :
+    (runAssumptionValidation protocol byzantineSafetyAssumptions).allPassed = true
+  exactCharacterization :
+    Distributed.ByzantineSafety.ExactByzantineSafetyCharacterization model
+
 /-- Premises for consensus envelope statements over an existing `ProtocolSpec`. -/
 structure Premises
     {State : Type u} {Obs : Type v}
@@ -378,6 +391,8 @@ theorem exactEnvelope_consensus_of_premises
     ExactEnvelopeCharacterization_consensus observe p.RefRun p.ImplRun := by
   exact ⟨p.envelopeSoundnessWitness, p.envelopeRealizabilityWitness, p.envelopeMaximalityWitness⟩
 
+/-! ## Derived Theorems: Adequacy and Bounds -/
+
 /-- Observational adequacy follows directly from consensus envelope premises. -/
 theorem adequacy_consensus_of_premises
     {State : Type u} {Obs : Type v}
@@ -393,6 +408,8 @@ theorem dIntBounds_of_premises
     (p : Premises observe) :
     p.dIntTheorem.lower ≤ p.dIntTheorem.upper :=
   p.dIntTheorem.lowerLEUpper
+
+/-! ## Derived Theorems: Optional Byzantine Extension -/
 
 /-- Certified consensus-envelope package tied to `Distributed.Model` validation. -/
 structure ConsensusEnvelopeProtocol where
