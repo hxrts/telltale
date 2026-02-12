@@ -71,6 +71,7 @@ def DisjointS (S₁ S₂ : SEnv) : Prop :=
   ∀ x T₁ T₂, lookupSEnv S₁ x = some T₁ → lookupSEnv S₂ x = some T₂ → False
 
 /-- Explicit split of S/G environments for parallel composition. -/
+/-! ## Parallel Split and Consistency Primitives -/
 structure ParSplit (S : SEnv) (G : GEnv) where
   S1 : SEnv
   S2 : SEnv
@@ -98,6 +99,7 @@ def DConsistent (G : GEnv) (D : DEnv) : Prop :=
   SessionsOfD D ⊆ SessionsOf G
 
 /-- Footprint of variables a process may write/introduce. -/
+/-! ## Footprint and SEnv Subset Predicates -/
 abbrev Footprint := List Var
 
 /-- Delta environment: bindings introduced by a process (backtimed to parent at join). -/
@@ -121,6 +123,7 @@ def SEnvDomSubset (S₁ S₂ : SEnv) : Prop :=
 
 private instance : Std.TransCmp (α := Var) compare := inferInstance
 
+/-! ## SEnv Fold Insert Utilities -/
 def insertPairS (acc : SEnv) (p : Var × ValType) : SEnv :=
   updateSEnv acc p.1 p.2
 
@@ -152,6 +155,7 @@ theorem lookupSEnv_foldl_insert_preserve
             simpa [List.foldl, insertPairS] using
               (ih (env := updateSEnv env x' T') (hlookup := hlookup') (hSame := hSame'))
 
+/-! ## SEnv Fold Insert: Entry-Membership Case -/
 theorem lookupSEnv_foldl_insert_of_mem
     (L : List (Var × ValType)) (env : SEnv) (x : Var) (T : ValType)
     (hmem : (x, T) ∈ L)
@@ -177,6 +181,7 @@ theorem lookupSEnv_foldl_insert_of_mem
               simpa [List.foldl, insertPairS] using
                 (ih (env := updateSEnv env x' T') (hmem := htail) (hSame := hSame'))
 
+/-! ## SEnv Fold Insert: Missing-Key Case -/
 theorem lookupSEnv_foldl_insert_notin
     (L : List (Var × ValType)) (env : SEnv) (x : Var) (v : Option ValType)
     (hlookup : lookupSEnv env x = v)
@@ -200,6 +205,7 @@ theorem lookupSEnv_foldl_insert_notin
           simpa [List.foldl, insertPairS] using
             (ih (env := updateSEnv env x' T') (hlookup := hlookup') (hNot := hNot'))
 
+/-! ## SEnv Append Lookup Transport -/
 theorem lookupSEnv_append_left {S₁ S₂ : SEnv} {x : Var} {T : ValType} :
     lookupSEnv S₁ x = some T →
     lookupSEnv (S₁ ++ S₂) x = some T := by
@@ -220,6 +226,7 @@ theorem lookupSEnv_append_left {S₁ S₂ : SEnv} {x : Var} {T : ValType} :
         have hTail' := ih hTail
         simpa [lookupSEnv, List.lookup, hEq] using hTail'
 
+/-! ## SEnv Append Lookup: Right-Fallback -/
 theorem lookupSEnv_append_right {S₁ S₂ : SEnv} {x : Var} :
     lookupSEnv S₁ x = none →
     lookupSEnv (S₁ ++ S₂) x = lookupSEnv S₂ x := by
@@ -239,6 +246,7 @@ theorem lookupSEnv_append_right {S₁ S₂ : SEnv} {x : Var} :
         have hTail' := ih hTail
         simpa [lookupSEnv, List.lookup, hEq] using hTail'
 
+/-! ## SEnv Append Lookup: Associativity -/
 theorem lookupSEnv_append_assoc {S₁ S₂ S₃ : SEnv} {x : Var} :
     lookupSEnv ((S₁ ++ S₂) ++ S₃) x = lookupSEnv (S₁ ++ (S₂ ++ S₃)) x := by
   cases h1 : lookupSEnv S₁ x with
@@ -282,6 +290,7 @@ theorem SEnv_append_assoc (S₁ S₂ S₃ : SEnv) :
   simpa [List.append_assoc]
 
 /-- DEnv extensionality (lookup-based) using canonical list representation. -/
+/-! ## DEnv Extensionality and Reflexive Subsets -/
 theorem DEnv_ext {D₁ D₂ : DEnv} :
   (∀ e, D₁.find? e = D₂.find? e) → D₁ = D₂ := by
   intro h
@@ -325,6 +334,7 @@ theorem SEnvSubset_refl {S : SEnv} : SEnvSubset S S := by
 theorem SEnvDomSubset_refl {S : SEnv} : SEnvDomSubset S S := by
   intro x T h; exact ⟨T, h⟩
 
+/-! ## Footprint/SEnv Append Subset Transport -/
 theorem FootprintSubset_append_left {W₁ W₁' W₂ : Footprint} :
     FootprintSubset W₁' W₁ →
     FootprintSubset (W₁' ++ W₂) (W₁ ++ W₂) := by
@@ -352,6 +362,7 @@ theorem FootprintSubset_append_right_of_subset {W₁ W₂ W₂' : Footprint} :
   | inr hRight =>
       exact List.mem_append.mpr (Or.inr (hSub hRight))
 
+/-! ## SEnvDomSubset Append Transport -/
 theorem SEnvDomSubset_append_left_of_domsubset {S₁ S₁' S₂ : SEnv} :
     SEnvDomSubset S₁' S₁ →
     SEnvDomSubset (S₁' ++ S₂) (S₁ ++ S₂) := by
@@ -390,6 +401,7 @@ theorem SEnvDomSubset_append_right_of_domsubset {S₁ S₂ S₂' : SEnv} :
       have hRight' := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hLeft
       exact ⟨T', by simpa [hRight'] using hS2⟩
 
+/-! ## SEnvSubset Append Transport -/
 theorem SEnvSubset_append_left_self {S₁ S₂ : SEnv} :
     SEnvSubset S₁ (S₁ ++ S₂) := by
   intro x T hLookup
@@ -416,6 +428,7 @@ theorem SEnvSubset_append_right_of_subset {S₁ S₂ S₂' : SEnv} :
       have hEq' := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hLeft
       simpa [hEq'] using hS2
 
+/-! ## SEnvDomSubset and Disjointness Consequences -/
 theorem SEnvDomSubset_trans {S₁ S₂ S₃ : SEnv} :
     SEnvDomSubset S₁ S₂ →
     SEnvDomSubset S₂ S₃ →
@@ -423,7 +436,6 @@ theorem SEnvDomSubset_trans {S₁ S₂ S₃ : SEnv} :
   intro h₁ h₂ x T hLookup
   obtain ⟨T', hMid⟩ := h₁ hLookup
   exact h₂ hMid
-
 
 theorem SEnvDomSubset_update_left {S : SEnv} {x : Var} {T : ValType} :
     SEnvDomSubset S (updateSEnv S x T) := by
@@ -449,6 +461,7 @@ theorem DisjointW_of_subset_right {W₁ W₂ W₂' : Footprint} :
   intro hSub hDisj x hx hW2
   exact hDisj hx (hSub hW2)
 
+/-! ## DisjointS Consequences -/
 theorem DisjointS_append_left {S₁ S₁' S₂ : SEnv} :
     DisjointS S₁ S₂ →
     DisjointS S₁' S₂ →
