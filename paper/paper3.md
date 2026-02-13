@@ -28,11 +28,11 @@ Sharding correspondence follows a standard simulation view for distributed execu
 
 The envelope layer also admits a rate-distortion style reading. The reference semantics is the source, VM and sharded executions are channels, and admission profiles are distortion constraints on safety-visible observations (Shannon, 1948, and Cover and Thomas, 2006). Maximality then states that no strictly larger distortion class preserves the same certified safety guarantees.
 
-This paper closes the series architecture. *Coherence for Asynchronous Buffered MPST: A Mechanized Metatheory* supplies the invariant kernel. *Computable Dynamics for Asynchronous MPST: Lyapunov Descent, Capacity Thresholds, and Uniform Decision Procedures* supplies bounds and decision procedures. This paper supplies reconfiguration commutation and envelope-level runtime adherence.
+This paper closes the series architecture. *Coherence for Asynchronous Buffered MPST* supplies the invariant kernel. *Computable Dynamics for Asynchronous MPST* supplies bounds and decision procedures. This paper supplies reconfiguration commutation and envelope-level runtime adherence.
 
 Scope is restricted to asynchronous buffered semantics with explicit reconfiguration side conditions, crash-stop fault assumptions where fault claims are stated, and declared envelope-admission profiles. Claims outside those assumptions are not made.
 
-The contributions are explicit.
+Our contributions are as follows:
 
 1. A reconfiguration commutation theorem that covers both static composition and dynamic delegation.
 2. An exact characterization of Coherence by active-edge erasure realizability and a relative-minimality theorem over admissible invariants.
@@ -42,11 +42,24 @@ The contributions are explicit.
 
 Figure 1. Harmony commuting square. The figure shows commutation between reconfigured global steps and local projected steps.
 
+```text
+Global side:
+  C --step_reconfig(ρ)--> C'
+  |                       |
+  | project               | project
+  v                       v
+  L --local_step(ρ)-----> L'
+
+Commutation goal:
+  project(step_reconfig(C,ρ)) = local_step(project(C),ρ)
+  for ρ in {link, delegate}.
+```
+
 ## 2. Setup, Definitions, and Side Conditions
 
 ### 2.1 Base Recap
 
-Assume the base model from *Coherence for Asynchronous Buffered MPST: A Mechanized Metatheory* and *Computable Dynamics for Asynchronous MPST: Lyapunov Descent, Capacity Thresholds, and Uniform Decision Procedures*:
+Assume the base model from *Coherence for Asynchronous Buffered MPST* and *Computable Dynamics for Asynchronous MPST*:
 
 - asynchronous buffered steps,
 - active-edge Coherence,
@@ -80,7 +93,7 @@ Table 3 fixes paper-specific notation used in this paper.
 | Symbol          | Meaning                                                                                                                                                                |
 |-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Admissible(I)` | candidate invariant admissibility condition                                                                                     |
-| $W$             | weighted state function inherited from *Computable Dynamics for Asynchronous MPST: Lyapunov Descent, Capacity Thresholds, and Uniform Decision Procedures* |
+| $W$             | weighted state function inherited from *Computable Dynamics for Asynchronous MPST* |
 | $\mathcal E$    | determinism envelope relation                                                                                                   |
 | `ConfigEquiv`   | erasure-stability equivalence relation                                                                                          |
 
@@ -115,6 +128,20 @@ The objective is to preserve Coherence/Harmony across these mutations.
 
 Figure 2. Delegation footprint before and after reconfiguration. The figure marks affected edges and unchanged edges.
 
+```text
+Before delegate(C -> C'):
+  active:   (Pools[*], C), (C, M), (C, C')
+  inactive: (Pools[*], C')
+
+After delegate(C -> C'):
+  active:   (Pools[*], C'), (C', M)
+  reduced/closed: (Pools[*], C), (C, C')
+
+Footprint rule:
+  only footprint edges are rewritten;
+  unrelated/session-disjoint edges are preserved by frame transport.
+```
+
 ## 3. Worked Example
 
 Protocol family: Distributed Capacity Pool.
@@ -148,8 +175,8 @@ Table 4 gives the typed guard clauses for the optimistic-to-coordinated transiti
 | Guard clause                     | Static source                                                                                                                                               | Consequence                               |
 |----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
 | `conflict_detected`              | application-level trigger                                                                                                                                  | transition path enabled                   |
-| `reachable(Coord)`               | crash-tolerance decider from *Computable Dynamics for Asynchronous MPST: Lyapunov Descent, Capacity Thresholds, and Uniform Decision Procedures* | coordination path not disconnected        |
-| $W \leq \text{transitionBudget}$ | quantitative bound from *Computable Dynamics for Asynchronous MPST: Lyapunov Descent, Capacity Thresholds, and Uniform Decision Procedures*      | transition completes within budget        |
+| `reachable(Coord)`               | crash-tolerance decider from *Computable Dynamics for Asynchronous MPST* | coordination path not disconnected        |
+| $W \leq \text{transitionBudget}$ | quantitative bound from *Computable Dynamics for Asynchronous MPST*      | transition completes within budget        |
 | $|F| \leq f$                     | fault-budget declaration                                                                                                                                   | bounded crash tolerance during transition |
 
 The delegation trace is the concrete witness pattern used in Sections 4 and 6. State zero has `C` holding `Token(t)` and `C'` without rights. State one executes delegation and updates the footprint edges. State two has `C'` holding delegated rights with preserved coherence at affected active edges.
@@ -178,7 +205,33 @@ At the effect-observation boundary, the coinductive bridge supplies the composit
 
 Side-condition necessity is explicit. Dropped-condition counterexample interfaces are part of the reconfiguration bridge layer.
 
+*Proof sketch.* The theorem is proved by decomposition over reconfiguration operators.
+
+1. `link` case:
+   - construct composed deployment object under link well-formedness,
+   - apply composition-preservation and harmony lemmas (`link_preserves_coherent`, `link_harmony_through_link`),
+   - transport equality to projected local-step view.
+2. `delegate` case:
+   - apply delegation-preservation and footprint-local update lemmas,
+   - show only footprint edges are rewritten; unrelated edges are frame-preserved,
+   - commute projection with the delegated local transition.
+3. Quotient/effect boundary:
+   - use effect-bisim congruence under link and quotient bridge (`effectBisim_congr_link`, `configEquiv_iff_effectBisim_silent`) to align protocol and observational views.
+
+Hence reconfigured global evolution and projected local evolution commute under Assumption Block A. ∎
+
 Figure 3. Static and dynamic Harmony cases. The figure separates `link` commutation from delegation commutation.
+
+```text
+Static (`link`) branch:
+  project(link_step(C)) = local_link_step(project(C))
+
+Dynamic (`delegate`) branch:
+  project(delegate_step(C)) = local_delegate_step(project(C))
+
+Shared conclusion:
+  Harmony holds for both reconfiguration classes.
+```
 
 ## 5. Theorem A: Erasure Characterization of Coherence
 
@@ -194,6 +247,19 @@ That is, Coherence holds exactly when projected local views admit a compatible a
 Mechanized anchors include `coherent_erasure_stable` and its companion characterization lemmas.
 
 This theorem gives the formal content of the quotient-first claim: erasure is not a heuristic post-processing step but the semantic object preserved by the theorem stack.
+
+*Proof sketch.* The two directions are proved separately.
+
+1. `Coherent -> JointRealizable_active`:
+   - from edge-local compatibility (`EdgeCoherent`) build per-edge witnesses for projected local obligations,
+   - combine witnesses over active edges to obtain joint realizability.
+2. `JointRealizable_active -> Coherent`:
+   - invert witness assignment into edge-local consume compatibility,
+   - reassemble edge obligations into global `Coherent`.
+3. Erasure stability:
+   - use `coherent_erasure_stable` to show equivalence is preserved across configuration erasure classes.
+
+Therefore Coherence is exactly characterized by active-edge realizability of projected views. ∎
 
 ## 6. Theorem C: Safe Delegation Corollary
 
@@ -223,6 +289,16 @@ Mechanized anchors:
 
 These lemmas are grouped in the erasure-characterization layer.
 
+*Proof sketch (Theorem C).* Sufficiency follows by composing:
+
+1. Coherence on active edges,
+2. delegation well-formedness side conditions (`DelegationWF`),
+3. delegation-preservation lemmas that update only the delegation footprint.
+
+Together these imply safe delegation without introducing additional global invariants. ∎
+
+*Proof sketch (Corollary C.1).* The forward direction packages Theorem C into footprint obligations. The reverse direction uses footprint-to-global reconstruction (`footprint_to_safeDelegation`) plus strictness witnesses for dropped side conditions. ∎
+
 ## 7. Theorem D: Relative Minimality
 
 **Theorem D. Relative Minimality.**
@@ -241,7 +317,26 @@ Mechanized anchors:
 
 This theorem prevents "stronger-than-needed" invariant inflation and pins down the architectural core.
 
+*Proof sketch.* Assume any invariant `I` satisfying `Admissible(I)`.
+
+1. Use admissibility clauses (locality, erasure stability, frame stability, delegation adequacy) to transport `I` along the same edge-local transformations used by Coherence.
+2. Apply delegation-safety adequacy to derive local safety obligations on all active edges.
+3. Convert these obligations into Coherence via erasure-characterization lemmas.
+
+Hence every admissible safety-guaranteeing invariant implies Coherence, making Coherence relatively minimal. ∎
+
 Figure 4. Admissible-invariant lattice. The figure places Coherence as the weakest admissible invariant node.
+
+```text
+             Strong invariants I2, I3, ...
+                    /        |        \
+                   /         |         \
+               admissible + delegation-safe
+                        \    |    /
+                         \   |   /
+                           Coherent
+                     (weakest admissible core)
+```
 
 ## 8. Theorem E: Composed-System Conservation
 
@@ -263,7 +358,7 @@ The theorem separates conservation and dissipation roles. Pure reconfiguration p
 Under composition and delegation:
 
 1. Coherence and Harmony are preserved.
-2. Quantitative lift from *Computable Dynamics for Asynchronous MPST: Lyapunov Descent, Capacity Thresholds, and Uniform Decision Procedures* holds:
+2. Quantitative lift from *Computable Dynamics for Asynchronous MPST* holds:
    - pure reconfiguration conserves the weighted measure,
    - transition choreographies are governed by descent and budget certificates.
 
@@ -274,6 +369,18 @@ Mechanized anchors:
 
 This theorem combines composition, delegation, and quantitative invariants in one package.
 
+*Proof sketch.* Split reconfiguration into conservative and budgeted classes.
+
+1. Pure reconfiguration (`link`/delegation):
+   - preserve Coherence/Harmony by Theorem B-side machinery,
+   - show weighted measure `W` is invariant under balanced delegation/rewiring (`lyapunov_conserved_under_balanced_delegation`).
+2. Transition choreographies:
+   - apply inherited quantitative descent/budget certificates from the dynamics layer,
+   - conclude bounded dissipation under declared scheduler premises.
+3. Compose both cases to obtain theorem statement and conservative profile-dependent quantitative side.
+
+∎
+
 **Corollary S2. Compositional Exactness Under Non-Interference.** For all compositions $C_1 \otimes C_2$, if non-interference premises hold across the composition boundary, then envelope exactness is preserved by composition:
 $$
 \mathsf{EnvelopeExact}(C_1) \land \mathsf{EnvelopeExact}(C_2)
@@ -282,7 +389,20 @@ $$
 $$
 Strictness witnesses are provided for dropped non-interference premises.
 
+*Proof sketch.* Under non-interference, composed traces factor and preserve envelope exactness componentwise. Strictness follows from dropped-assumption counterexamples that create cross-boundary interference. ∎
+
 Figure 5. Composed-system conservation of $W$ under pure reconfiguration. The figure contrasts preserved and budgeted phases.
+
+```text
+Phase A: pure reconfiguration (link/delegate)
+  W(t+1) = W(t)     (conserved)
+
+Phase B: transition choreography
+  W(t+1) <= W(t)-1  (budgeted dissipation under profile assumptions)
+
+Overall:
+  rewiring is conservative; progress work consumes certified budget.
+```
 
 ## 9. Theorem F: Exact Characterization of Determinism Envelope
 
@@ -307,15 +427,30 @@ Conceptually, this is dual to Theorem D:
 
 Mechanized envelope bridge layers include core foundations, admission logic, and reconfiguration bridge components.
 
+*Proof sketch.* Exactness is obtained by packaging three envelope properties.
+
+1. Soundness:
+   - derive `Certified -> Envelope` from local/sharded envelope soundness definitions and profile extraction.
+2. Realizability/completeness:
+   - use realizability witness schemas to construct executions for admitted envelope behaviors.
+3. Maximality:
+   - show any strict envelope extension violates admissibility via explicit witness obligations.
+
+Core formal structures come from envelope foundations (`LocalExactEnvelopeCharacterization`, `ShardedExactEnvelopeCharacterization`) and profile-level extraction theorems (`consensusEnvelope_exact_of_profile`, `failureEnvelope_maximality_of_profile`). ∎
+
 **Corollary F.1. Finite-Erasure Transportability Boundary.** Under stated model assumptions,
 $$
 \forall t,\ \mathsf{FiniteErasureTransportable}(t) \iff \mathsf{RationalFiniteState}(t).
 $$
 
+*Proof sketch.* Use rational-fragment transport bridge and its converse boundary lemmas to show equivalence between finite erasure transportability and rational finite-state witnesses. ∎
+
 **Corollary F.2. Strict Boundary Witness.** There exists $t$ such that
 $$
 \neg \mathsf{RationalFiniteState}(t) \land \neg \mathsf{FiniteErasureTransportable}(t).
 $$
+
+*Proof sketch.* Witness is supplied by strict-boundary theorem in the rational-fragment layer (`strict_boundary_witness_effect`). ∎
 
 **Corollary F.3. Inductive-Embedding Exactness.** For all inductive states $x$, exact envelope characterization is preserved under `toCoind`:
 $$
@@ -323,6 +458,8 @@ $$
 \iff
 \mathsf{EnvelopeExact}_{\mathrm{coind}}(\mathsf{toCoind}(x)).
 $$
+
+*Proof sketch.* Transport exactness across the embedding using coinductive-inductive bridge lemmas and preservation of envelope predicates under embedding/projection compatibility. ∎
 
 Appendix A and Appendix C provide the detailed witness constructions and transport lemmas for these boundary corollaries.
 
@@ -354,6 +491,14 @@ Mechanized anchors in the bridge layer include:
 - `spatialSubtypingMonotonicity_of_e1BridgePremises`
 
 This theorem sharpens what "determinism modulo envelope" means operationally.
+
+*Proof sketch.* Instantiate reconfiguration-bridge theorem forms with exchange and spatial premises.
+
+1. Exchange normalization follows from bridge theorem `exchangeNormalization_of_e1BridgePremises`.
+2. Spatial monotonicity follows from `spatialSubtypingMonotonicity_of_e1BridgePremises`.
+3. Combine both to obtain determinism modulo envelope classes rather than raw traces.
+
+∎
 
 ## 11. Theorem H: Observational Adequacy and VM Adherence Modulo Envelope
 
@@ -387,11 +532,24 @@ Runtime consequence: proof-carrying conformance between claimed profile bits and
 
 This theorem is the formal bridge from abstract proofs to runtime capability claims. If an implementation advertises a profile capability bit, the corresponding theorem-pack artifact must exist and validate the same envelope obligations. This prevents profile over-claiming and makes runtime conformance checkable at artifact granularity.
 
+*Proof sketch (Theorem H).* The adequacy/adherence statement is obtained by composition of three bridges.
+
+1. Protocol outcome bridge:
+   - connect observational equality and effect-bisim (`protocolOutcome_effectBisim_of_observationalEq`).
+2. Compile/runtime refinement bridge:
+   - lift effect-bisim to compile-time observational refinement (`compile_refines_observationalEq_of_effectBisim`).
+3. VM view bridge:
+   - connect VM configuration equivalence and effect-bisim (`vmView_effectBisim_of_VMCEquiv`, converse, and topology-preservation lemmas).
+
+Adequacy follows from trace-consistency theorem (`vm_adequacy_of_trace_consistency`). Adherence follows from profile-capability extraction and theorem-pack gating. ∎
+
 **Corollary S1. Principal Capability and Admission Completeness.** Let $D_{\text{user}}$ be a requested envelope capability and let $D_{\text{prog}}$ be inferred from program and deployment profile. Under the admission premises,
 $$
 D_{\text{user}} \subseteq D_{\text{prog}} \subseteq \mathcal E
 $$
 and admission is complete with a principal inferred capability.
+
+*Proof sketch.* Use admission/profile extraction theorems for principal capability, admission soundness, and admission completeness in the envelope theorem layer. ∎
 
 **Assumption Block D. Byzantine Characterization Premises.** Byzantine characterization assumes explicit bundle $H_{\mathrm{byz}}$ with fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions.
 
@@ -401,9 +559,15 @@ $$
 $$
 The statement is exact for the declared Byzantine model profile.
 
+*Proof sketch.* Exactness is extracted from Byzantine profile theorem package (`byzantineSafety_exact_of_profile`) under Assumption Block D. Safety-side theorem instances are then interpreted through the same envelope-observation interface used by Theorem H. ∎
+
 **Corollary BZ.1. Converse Counterexample Families.** If any required class in Assumption Block D is dropped, there exists a counterexample family violating $\mathsf{ByzSafe}$. Covered dropped classes are quorum or intersection obligations, authentication or evidence-validity obligations, adversarial-budget obligations, and primitive-consistency obligations.
 
+*Proof sketch.* For each dropped assumption class, profile checks fail and a corresponding violation family is generated by the converse-sharpness interface in the Byzantine envelope layer. ∎
+
 **Proposition BZ.2. Byzantine VM Adherence and Admission Gating.** For runtime profile $(P,\Pi)$, if theorem-pack capability bits include Byzantine safety characterization and VM envelope adherence artifacts, then admitted executions satisfy $\mathsf{Eq}_{\mathrm{safe}}^{\mathrm{byz}}$ modulo $\mathcal E_{\mathrm{byz}}$ and rejected requests correspond to failed assumptions or missing artifacts.
+
+*Proof sketch.* Combine Byzantine envelope adherence witness (`vmByzantineEnvelopeAdherence_of_witness`) with cross-target conformance (`byzantineCrossTargetConformance_of_witnesses`) and theorem-pack admission gates. This yields both positive conformance and negative diagnostics for missing/failed prerequisites. ∎
 
 ## 12. Supporting Formal Layer
 
@@ -412,6 +576,19 @@ Three support packages make the main theorem stack executable and compositional.
 1. Higher-order extension: channel-carrying payloads and graph-delta semantics.
 2. Conservative extension: collapse back to first-order when no channel payloads are present.
 3. Delegation-preservation microkernel: redirected, unrelated, and other-session edge coherence lemmas.
+
+Concrete module anchors for these packages:
+
+1. Higher-order/graph-delta semantics:
+   - `lean/Protocol/Coherence/GraphDelta.lean`,
+   - `lean/Protocol/Coherence/GraphDeltaHO.lean`.
+2. First-order collapse and equivalence/renaming support:
+   - `lean/Protocol/Coherence/ConfigEquiv.lean`,
+   - `lean/Protocol/Coherence/ConfigEquivRenaming/*.lean`,
+   - `lean/Protocol/Coherence/RoleSwap/*.lean`.
+3. Delegation microkernel:
+   - `lean/Protocol/Coherence/Delegation/Core/*.lean`,
+   - `lean/Protocol/Coherence/Delegation/Preservation.lean`.
 
 ## 13. Worked Transport in Main Body
 
@@ -485,9 +662,9 @@ Honda, K., Yoshida, N., and Carbone, M. (2008). Multiparty Asynchronous Session 
 
 Shannon, C. E. (1948). A Mathematical Theory of Communication. Bell System Technical Journal, 27(3), 379-423 and 27(4), 623-656.
 
-Telltale Project. (2026). Coherence for Asynchronous Buffered MPST: A Mechanized Metatheory. Project manuscript.
+Telltale Project. (2026). Coherence for Asynchronous Buffered MPST. Project manuscript.
 
-Telltale Project. (2026). Computable Dynamics for Asynchronous MPST: Lyapunov Descent, Capacity Thresholds, and Uniform Decision Procedures. Project manuscript.
+Telltale Project. (2026). Computable Dynamics for Asynchronous MPST. Project manuscript.
 
 Tirore, L., Bengtson, J., and Carbone, M. (2025). Mechanized MPST metatheory with subject-reduction robustness analysis. ECOOP 2025.
 
@@ -495,54 +672,101 @@ Wadler, P. (2012). Propositions as Sessions. ICFP 2012.
 
 ## Appendices
 
-## Appendix A. Full Regime Analysis
+## Appendix A. Assumption Regimes and Dependency Shape
 
-- scheduling/failure regime matrix,
-- structural versus regime-sensitive theorem families,
-- crash-stop capability analysis for composed/delegated systems,
-- heavy-tail/non-normal boundary notes.
+We separate theorem validity by regime.
 
-## Appendix B. Expanded Practical Payoff Tables
+1. Structural regime: assumptions for reconfiguration, commutation, and coherence transport.
+2. Quantitative regime: structural regime plus scheduler and budget premises.
+3. Envelope regime: admission/adherence premises for exact observational boundaries.
+4. Byzantine safety regime: explicit Byzantine assumption bundle.
 
-- transported-result payoff matrix,
-- regime interpretation guide,
-- deployment-level reading notes.
+The dependency chain used in this paper is:
 
-## Appendix C. Full Theorem-Transport Catalog
+```text
+B -> (A, C) -> D -> E -> F -> G -> H
+                     \              \
+                      \              -> S1
+                       -> BZ family (through H-bridge + Byzantine assumptions)
+```
 
-- transport-only theorem matrix,
-- assumption profiles with necessity tags,
-- fully discharged exemplars,
-- limitation statement for analytic side conditions.
+## Appendix B. Deferred Transport Schemas
 
-## Appendix D. Formal Mechanization and Runtime Realization (Supporting)
+Transport statements are factored as:
 
-- supporting theorem decomposition,
-- coinductive effect-bisim bridge index (`effectBisim_implies_observationalEquivalence`, `effectBisim_congr_link`, `configEquiv_iff_effectBisim_silent`, `rationalEffect_transport_bridge`, `strict_boundary_witness_effect`),
-- cross-layer impact map,
-- theorem-to-file index,
-- proof dependency DAG,
-- build/check reproducibility commands.
+```text
+(Structural premises) + (Analytic premises) -> Transported consequence
+```
 
-## Appendix E. Theorem Index
+Structural premises come from the theorem stack in this paper; analytic premises are external (for example concentration or spectral assumptions).
 
-| Claim                                                               | Main section | Assumption scope                                                                            | Proof location                                       |
-|---------------------------------------------------------------------|--------------|---------------------------------------------------------------------------------------------|----------------------------------------------------- |
-| Theorem B. Reconfiguration Harmony                                  | Section 4    | Assumption Block A reconfiguration well-formedness premises                                 | Section 4 proof sketch, Appendix D                   |
-| Theorem A. Erasure Characterization of Coherence                    | Section 5    | Assumption Block 0 core model premises                                                      | Section 5 statement and proof sketch, Appendix D     |
-| Theorem C. Safe Delegation Sufficiency                              | Section 6    | Assumption Block A premises plus Coherence precondition                                     | Section 6 statement and proof sketch, Appendix D     |
-| Corollary C.1. Footprint Exactness Packaging                        | Section 6    | Assumption Block A premises plus theorem C premises and footprint side conditions           | Section 6 statement, Appendix D                      |
-| Theorem D. Relative Minimality                                      | Section 7    | Assumption Block A premises plus admissibility and delegation adequacy definitions          | Section 7 statement and proof sketch, Appendix D     |
-| Theorem E. Composed-System Conservation                             | Section 8    | Assumption Block A premises plus quantitative lift side conditions                          | Section 8 statement and proof sketch, Appendix A and Appendix D |
-| Corollary S2. Compositional Exactness Under Non-Interference        | Section 8    | Assumption Block A premises plus theorem E premises and non-interference assumptions        | Section 8 statement, Appendix C                      |
-| Theorem F. Exact Determinism Envelope                               | Section 9    | Assumption Block B envelope admissibility premises                                          | Section 9 statement and proof sketch, Appendix A and Appendix C |
-| Corollary F.1. Finite-Erasure Transportability Boundary             | Section 9    | Assumption Block B premises on rational finite-state fragment                               | Section 9 statement, Appendix C                      |
-| Corollary F.2. Strict Boundary Witness                              | Section 9    | Assumption Block B premises and strict extension witness conditions                         | Section 9 statement, Appendix C                      |
-| Corollary F.3. Inductive-Embedding Exactness                        | Section 9    | Assumption Block B premises and `toCoind` embedding side conditions                         | Section 9 statement, Appendix C                      |
-| Theorem G. Exchange-Normalized Determinism and Spatial Monotonicity | Section 10   | Assumption Block B premises plus exchange and spatial refinement side conditions            | Section 10 statement and proof sketch, Appendix C    |
-| Theorem H. Observational Adequacy and VM Adherence                  | Section 11   | Assumption Block C adequacy bridge premises                                                 | Section 11 statement and proof sketch, Appendix D    |
-| Corollary S1. Principal Capability and Admission Completeness       | Section 11   | Assumption Block C premises plus admission-completeness assumptions                         | Section 11 statement, Appendix D                     |
-| Proposition 1. Capability-Bit Soundness                             | Section 11   | Assumption Block C premises plus theorem-pack artifact existence and profile-premise alignment | Section 11 statement, Appendix D                     |
-| Theorem BZ. Exact Byzantine Safety Characterization                 | Section 11   | Assumption Block D Byzantine characterization premises                                      | Section 11 statement, Appendix D                     |
-| Corollary BZ.1. Converse Counterexample Families                    | Section 11   | Assumption Block D premises with dropped-assumption witnesses                               | Section 11 statement, Appendix D                     |
-| Proposition BZ.2. Byzantine VM Adherence and Admission Gating       | Section 11   | Assumption Block C and D premises with capability-bit and admission-diagnostic assumptions  | Section 11 statement, Appendix D                     |
+### B.1 Generic Transport Rule
+
+**Theorem B.1 (Transport by Premise Separation).** If structural premises of Theorems B-H hold and analytic premise package `A_T` holds for target claim `T`, then `T` is derivable without strengthening structural assumptions.
+
+*Proof sketch.* Compose the structural theorem chain with the external analytic rule through shared interfaces only; no additional semantic obligations are introduced.
+
+### B.2 Representative Instances
+
+1. Tail-bound transport under concentration assumptions.
+2. Convergence transport under spectral/contraction assumptions.
+3. Compositional exactness transport under non-interference assumptions.
+4. Byzantine adherence transport under the declared Byzantine bundle.
+
+## Appendix C. Deferred Consequence Statements
+
+### C.1 Reconfiguration and Minimality Consequences
+
+Harmony plus coherence transport yields first-class rewiring with preserved projection behavior; relative minimality identifies the weakest invariant class sufficient for the declared preservation goals.
+
+### C.2 Envelope and Determinism Consequences
+
+Exact envelope theorems characterize behavioral boundaries modulo exchange/spatial normalization under the stated assumptions.
+
+### C.3 Runtime Adequacy Consequences
+
+Observational adequacy links theorem-pack evidence to runtime admission and adherence, with explicit failure diagnostics when assumptions or artifacts are missing.
+
+### C.4 Byzantine Scope
+
+Byzantine results in this paper are exact safety characterizations under Assumption Block D and do not claim Byzantine liveness beyond the declared timing/fairness scope.
+
+## Appendix D. Mechanization and Reproducibility
+
+### D.1 Module Map
+
+| Theorem family | Primary modules |
+|----------------|-----------------|
+| `B` | `lean/Protocol/Deployment/LinkingCore.lean`, `lean/Protocol/Deployment/LinkingTheorems.lean`, `lean/Runtime/Proofs/EffectBisim/Congruence.lean` |
+| `A`, `C`, `D` | `lean/Protocol/Coherence/ErasureCharacterization.lean` |
+| `E` | `lean/Protocol/Deployment/LinkingTheorems.lean`, `lean/Runtime/Proofs/Lyapunov.lean` |
+| `F`, `G` | `lean/Runtime/Adequacy/EnvelopeCore/*.lean`, `lean/Runtime/Proofs/Adapters/Distributed/EnvelopeTheorems.lean` |
+| `H`, `S1` | `lean/Runtime/Adequacy/Adequacy.lean`, `lean/Runtime/Adequacy/CompileRefinesEffectBisim.lean`, `lean/Runtime/Proofs/ObserverProjectionEffectBisim.lean`, `lean/Runtime/Proofs/TheoremPack/*.lean` |
+| `BZ` family | `lean/Runtime/Proofs/Adapters/Distributed/EnvelopeTheorems.lean`, `lean/Runtime/Proofs/Adapters/Distributed/EnvelopeTheorems/AdmissionAndBridge.lean` |
+
+### D.2 Reproducibility
+
+Reproduction uses the pinned Lean toolchain and manifest. Build the module families in D.1 and run `just escape` and `just verify-protocols` for project-level consistency checks.
+
+## Appendix E. Index of Main Results
+
+| Claim | Main section | Assumption scope | Formal location |
+|-------|--------------|------------------|-----------------|
+| Theorem B. Reconfiguration Harmony | Section 4 | Assumption Block A reconfiguration well-formedness premises | linking/effect-bisim congruence modules; Appendix D |
+| Theorem A. Erasure Characterization of Coherence | Section 5 | Assumption Block 0 core model premises | `ErasureCharacterization.lean`; Appendix D |
+| Theorem C. Safe Delegation Sufficiency | Section 6 | Assumption Block A + coherence precondition | delegation/footprint lemmas; Appendix D |
+| Corollary C.1. Footprint Exactness Packaging | Section 6 | Assumption Block A + theorem C + footprint side conditions | footprint equivalence chain; Appendix D |
+| Theorem D. Relative Minimality | Section 7 | Assumption Block A + admissibility/delegation adequacy | `relative_minimality`; Appendix D |
+| Theorem E. Composed-System Conservation | Section 8 | Assumption Block A + quantitative lift side conditions | linking conservation + Lyapunov modules; Appendix D |
+| Corollary S2. Compositional Exactness Under Non-Interference | Section 8 | Assumption Block A + theorem E + non-interference assumptions | transport schema; Appendix B |
+| Theorem F. Exact Determinism Envelope | Section 9 | Assumption Block B envelope-admissibility premises | envelope-core/extraction modules; Appendix D |
+| Corollary F.1. Finite-Erasure Transportability Boundary | Section 9 | Assumption Block B rational finite-state premises | rational fragment bridge; Appendix B and D |
+| Corollary F.2. Strict Boundary Witness | Section 9 | Assumption Block B strict-extension witness premises | strict-boundary witness module; Appendix B and D |
+| Corollary F.3. Inductive-Embedding Exactness | Section 9 | Assumption Block B + embedding side conditions | coinductive-inductive bridge modules; Appendix B and D |
+| Theorem G. Exchange-Normalized Determinism and Spatial Monotonicity | Section 10 | Assumption Block B + exchange/spatial side conditions | reconfiguration-bridge normalization theorems; Appendix D |
+| Theorem H. Observational Adequacy and VM Adherence | Section 11 | Assumption Block C adequacy bridge premises | adequacy/refinement/VM-view bridge modules; Appendix D |
+| Corollary S1. Principal Capability and Admission Completeness | Section 11 | Assumption Block C + admission-completeness assumptions | admission/profile extraction modules; Appendix D |
+| Proposition 1. Capability-Bit Soundness | Section 11 | Assumption Block C + theorem-pack artifact/profile alignment | theorem-pack inventory/extraction modules; Appendix D |
+| Theorem BZ. Exact Byzantine Safety Characterization | Section 11 | Assumption Block D Byzantine premises | Byzantine profile extraction modules; Appendix D |
+| Corollary BZ.1. Converse Counterexample Families | Section 11 | Assumption Block D + dropped-assumption witness classes | Section 11 packaging + Appendix B and D |
+| Proposition BZ.2. Byzantine VM Adherence and Admission Gating | Section 11 | Assumption Block C and D + capability/admission premises | Byzantine adherence/conformance/admission modules; Appendix D |

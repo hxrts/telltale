@@ -46,6 +46,19 @@ Related liveness lines often emphasize qualitative progress in session-typed set
 
 Figure 1. Two-branch theorem architecture. A shared regularity kernel generates quantitative and algorithmic results.
 
+```text
+                Shared regularity kernel
+      (finite-reachability + Coherence-preserving semantics)
+                           |
+          +----------------+----------------+
+          |                                 |
+Quantitative branch                   Algorithmic branch
+  weighted measure W                    finite exploration
+  per-step decrease                     sound/complete deciders
+  productive-step bound                 predicate instantiations
+  scheduler lift                        (subtyping/equivalence/crash/branching)
+```
+
 ## 2. Model Summary
 
 The model uses asynchronous buffered semantics with active-edge Coherence from *Coherence for Asynchronous Buffered MPST*. Delivery behavior is parameterized by `DeliveryModel`.
@@ -138,13 +151,54 @@ The productive bound is exact under the model assumptions. The scheduler-lifted 
 
 *Proof sketch.* The proof has two levels. Level one proves per-rule decrease lemmas for send, recv, select, and branch. Level two lifts local decrease to configuration-level decrease and then to trace bounds using non-negativity. ∎
 
+Expanded derivation structure:
+
+1. Define `weightedMeasure = 2*sumDepths + sumBuffers`.
+2. Prove rule-local inequalities:
+   - `send_step_decreases`,
+   - `recv_step_decreases`,
+   - `select_step_decreases`,
+   - `branch_step_decreases`.
+3. Lift rule-local decreases to system-level decrease:
+   - `total_measure_decreasing`.
+4. Use non-negativity to bound productive steps:
+   - each productive step decreases `W` by at least 1,
+   - therefore productive-step count is at most `W0`.
+5. Apply scheduler-lift theorem for declared fairness profile:
+   - obtain `T(τ) ≤ κσ * W0`,
+   - classify this bound as conservative (profile-dependent).
+
 The local decrease artifacts are `send_step_decreases`, `recv_step_decreases`, `select_step_decreases`, and `branch_step_decreases`. The configuration-level lift is `total_measure_decreasing`.
 
 Figure 2 shows the weighted decomposition. Figure 3 shows per-rule $\Delta W$ profiles.
 
 Figure 2. Weighted measure decomposition. The figure separates depth and buffer contributions.
 
+```text
+W(state) = 2 * sumDepths(state) + sumBuffers(state)
+
+Depth term:
+  decreases when local type head is consumed/advanced
+
+Buffer term:
+  +1 on enqueue-like steps, -1 on dequeue-like steps
+
+Why coefficient 2:
+  send/select may do {depth -1, buffer +1}
+  so net change stays <= -1 after weighting
+```
+
 Figure 3. Per-rule decrease profile. The figure reports signed contributions for send, recv, select, and branch.
+
+```text
+Rule class      Depth delta   Buffer delta   Net delta in W
+send            -2            +1             -1
+recv             0            -1             -1
+select          -2            +1             -1
+branch           0            -1             -1
+
+All productive rules satisfy ΔW <= -1.
+```
 
 ## 5. Theorem 2: Algorithmic Dynamics Schema
 
@@ -160,11 +214,39 @@ Coinductive boundary note (artifact-level): effect-level transport is restricted
 
 *Proof sketch.* The argument is uniform. First construct a finite reachable-state space from regularity. Next run terminating exploration on this space. Last prove soundness and completeness for each predicate-specific reduction. ∎
 
+Expanded derivation structure:
+
+1. Reachability finiteness:
+   - build reachable triple/pair sets from regularity hypotheses,
+   - prove finite bounds (`reachable_triples_finite`, `reachablePairs_finite`).
+2. Executable exploration:
+   - construct exploration state and fuel discipline (`explore`, `checkAsync`, checker APIs).
+3. Predicate reduction:
+   - map each target predicate to a reachability or bisimulation checker.
+4. Correctness transfer:
+   - prove soundness and completeness of each checker,
+   - package resulting decider theorem.
+5. Instantiation:
+   - async subtyping and regular equivalence follow as direct corollaries.
+
 Async subtyping instantiation appears through `reachable_triples_finite` and `async_subtype_decidable`. Regular type-equivalence instantiation appears through `regularTypeEqCheck_sound` and `regularTypeEqDecide_spec`.
 
 Figure 4 presents the decision workflow used by all instantiations.
 
 Figure 4. Uniform decision workflow. The figure maps regularity assumptions to finite exploration and final decision output.
+
+```text
+Regularity assumptions
+    |
+finite reachable state construction
+    |
+terminating exploration/checker
+    |
+soundness + completeness
+    |
+Decider:
+  dec_P(x) = true  <->  P(x)
+```
 
 ## 6. Decidability Layer
 
@@ -182,6 +264,15 @@ The theorem also includes witness families where topology changes flip tolerance
 
 *Proof sketch.* Decision is provided by a graph-level decider and a soundness theorem. Characterization follows from residual reachability lemmas and completeness assumptions in the model profile. ∎
 
+Expanded derivation structure:
+
+1. Build communication graph and residual graph after crash set removal.
+2. Define Boolean decider `crashTolerantDec`.
+3. Prove decider soundness (`crashTolerantDec_sound`).
+4. Prove exact characterization (`crash_tolerance_iff`):
+   - crash tolerance iff residual connectivity.
+5. Export witness families showing topology-sensitive flips in tolerance outcomes under admissible changes.
+
 **Assumption Block 4. Byzantine Characterization Premises.** Byzantine characterization assumes explicit bundle $H_{\mathrm{byz}}$ with fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions.
 
 **Theorem 4. Exact Byzantine Safety Characterization.** Under Assumption Block 4, there exists a characterization predicate $\mathsf{ByzChar}$ such that
@@ -190,9 +281,30 @@ $$
 $$
 The statement is exact in the model scope of this paper.
 
+*Proof sketch.* This theorem is an interface-level exactness package at Paper 2 scope.
+
+1. Pin the Byzantine assumption bundle as a typed profile (`H_byz` components).
+2. Use profile extraction theorems to obtain safety-side implications from passed assumptions.
+3. Package both directions at the interface boundary:
+   - soundness: assumptions imply safety characterization conditions,
+   - completeness: characterization obligations reconstitute safety-visible guarantees in the model scope.
+4. Record explicit assumption classes for converse sharpness (Corollary 4.1).
+
+The full cross-layer envelope maximality program is outside Paper 2 and consumed by the later reconfiguration/envelope paper. ∎
+
 **Corollary 4.1. Converse Counterexample Families.** If any required class in $H_{\mathrm{byz}}$ is dropped, there exists a counterexample family that violates $\mathsf{ByzSafe}$. The dropped classes are quorum or intersection obligations, authentication or evidence-validity obligations, adversarial-budget obligations, and primitive-consistency obligations.
 
-**Proposition 2. Byzantine VM-Bridge Interface.** If theorem-pack capabilities include Byzantine characterization and VM envelope adherence artifacts, then runtime profile claims are constrained by $\mathsf{Eq}_{\mathrm{safe}}^{\mathrm{byz}}$ under $\mathcal E_{\mathrm{byz}}$. Full adherence packaging is discharged in *Harmony from Coherence in Asynchronous MPST*.
+*Proof sketch.* Counterexample constructors are indexed by dropped assumption class. For each class, the corresponding profile bit fails and a violating family is produced at the safety-visible interface. This establishes sharpness of the assumption bundle at the paper’s safety scope. ∎
+
+**Proposition 2. Byzantine VM-Bridge Interface.** If theorem-pack capabilities include Byzantine characterization and VM envelope-adherence artifacts, then runtime profile claims are constrained by $\mathsf{Eq}_{\mathrm{safe}}^{\mathrm{byz}}$ under $\mathcal E_{\mathrm{byz}}$, and claims lacking required capability evidence are rejected by profile admission.
+
+*Proof sketch.* The bridge follows capability-gated extraction:
+
+1. Byzantine profile assumptions are checked in theorem-pack/profile APIs.
+2. Safety-visible equalities are interpreted via the VM Byzantine envelope layer.
+3. Admission and conformance theorems enforce that only capability-backed claims pass profile checks.
+
+Thus the bridge is executable and checkable at the profile interface in this paper. ∎
 
 Core crash-tolerance artifacts include `crash_tolerance_iff` and `crashTolerantDec_sound`. Branching feasibility appears through `branching_iff_chromatic_capacity`.
 
@@ -247,6 +359,18 @@ Figure 5 locates the worked example on the phase boundary view.
 
 Figure 5. Capacity threshold view. The figure places the worked example relative to the bounded and bounded-stuck regions.
 
+```text
+                buffer-capacity axis B
+   unbounded / unstable        |         bounded regime
+                               |
+-------------------------------+---------------------------->
+                              Bc = 2
+
+Worked point:
+  protocol instance at B = 2 sits on the critical boundary
+  with W0 = 25 and profile-dependent total-step lift.
+```
+
 ## 8. Proof Architecture
 
 The architecture has one shared regularity kernel and two proof branches.
@@ -256,17 +380,26 @@ The architecture has one shared regularity kernel and two proof branches.
 
 This reuse reduces theorem fragmentation and proof duplication. It also gives a direct map from assumptions to output guarantees.
 
+Dependency sketch:
+
+```text
+Assumption Block 0
+   +-- Block 1 -> Theorem 1 -> Corollaries 1,2
+   +-- Block 2 -> Theorem 2 -> subtyping/equivalence decisions
+   +-- Block 3 -> Theorem 3 -> crash-stop exact characterization
+   +-- Block 4 -> Theorem 4 + Corollary 4.1 + Proposition 2
+```
+
 ## 9. Mechanization and Artifacts
 
-Table 9 lists the primary artifact groups.
+Table 9 maps claim families to concrete modules and theorem anchors.
 
-| Layer                                  | Artifact group                                                         |
-|----------------------------------------|------------------------------------------------------------------------|
-| Weighted dynamics                      | Core, step decrease, total bound, and Lyapunov layers                  |
-| Decision schemas                       | Async subtyping and regular equivalence decision layers                |
-| Protocol-level decision and thresholds | Crash tolerance, branching feasibility, and buffer-boundedness layers  |
-
-Build commands are listed in Appendix F. Appendix D and Appendix F provide the full index and reproducibility checklist.
+| Layer                                  | Primary modules | Representative anchors |
+|----------------------------------------|-----------------|------------------------|
+| Weighted dynamics                      | `lean/Runtime/Proofs/WeightedMeasure/Core.lean`, `lean/Runtime/Proofs/WeightedMeasure/TotalBound.lean`, `lean/Runtime/Proofs/Lyapunov.lean`, `lean/Runtime/Proofs/SchedulingBoundCore.lean` | `weightedMeasure`, `send_step_decreases`, `total_measure_decreasing`, `kfair_termination_bound`, `roundrobin_termination_bound` |
+| Decision schemas                       | `lean/SessionCoTypes/AsyncSubtyping/Core.lean`, `lean/SessionCoTypes/AsyncSubtyping/Decidable.lean`, `lean/SessionCoTypes/Coinductive/BisimDecidable/Decidable.lean` | `reachable_triples_finite`, `async_subtype_decidable`, `regularTypeEqCheck_sound`, `regularTypeEqDecide_spec` |
+| Protocol-level decision and thresholds | `lean/Protocol/CrashTolerance.lean`, `lean/Protocol/SpatialBranching.lean`, `lean/Protocol/BufferBoundedness/PhaseSharpness.lean`, `lean/Protocol/BufferBoundedness/OccupancyDelivery.lean` | `crash_tolerance_iff`, `crashTolerantDec_sound`, `branching_iff_chromatic_capacity`, `phase_transition_sharp`, `critical_buffer_computable` |
+| Byzantine profile/VM bridge            | `lean/Runtime/Proofs/Adapters/Distributed/EnvelopeTheorems.lean`, `lean/Runtime/Proofs/TheoremPack/API.lean`, `lean/Runtime/Proofs/TheoremPack/Profiles.lean` | `byzantineSafety_exact_of_profile`, `vmByzantineEnvelopeAdherence_of_witness`, `byzantineCrossTargetConformance_of_witnesses`, `canOperateUnderByzantineEnvelope` |
 
 **Proposition 1. Artifact Soundness Boundary.** For any claim class $c$ in Table 9, if $c$ is marked covered and artifact checks for $c$ pass under Appendix F workflow, then there exists a mechanized theorem artifact for $c$ within this paper's stated assumption scope.
 
@@ -316,52 +449,100 @@ Wadler, P. (2012). Propositions as Sessions. ICFP 2012.
 
 ## Appendices
 
-## Appendix A. Full Quantitative Proofs
+## Appendix A. Deferred Quantitative Proofs
 
-Per-rule decrease proofs. Configuration-level lift proofs. Productive-step and scheduler-lift derivations.
+### A.1 Weighted Potential
 
-## Appendix B. Full Algorithmic Schema Proofs
+The quantitative layer is based on:
 
-Finite-reachability construction. Exploration termination. Decision soundness and completeness.
-
-## Appendix C. Expanded Decision Instantiations
-
-Crash-tolerance details. Branching-feasibility details. Boundary witnesses.
-
-## Appendix D. Expanded Mechanization Inventory
-
-Theorem-to-file mapping. Dependency graph. Module footprint summary.
-
-## Appendix E. Boundary Cases and Tightness Notes
-
-Scheduler-sensitive tightness cases. Threshold edge cases. Regularity boundary notes.
-
-## Appendix F. Reproducibility Notes
-
-Build commands. Theorem index by file. Artifact checklist. Reproducibility assumes pinned toolchain versions for Lean, Mathlib, and dependent packages.
-
-```bash
-lake build Runtime.Proofs.WeightedMeasure.TotalBound
-lake build Runtime.Proofs.Lyapunov
-lake build SessionCoTypes.AsyncSubtyping.Core
-lake build SessionCoTypes.Coinductive.BisimDecidable.Decidable
-lake build Protocol.CrashTolerance
-lake build Protocol.BufferBoundedness.PhaseSharpness
+```text
+W(s) = 2 * sumDepths(s) + sumBuffers(s)
 ```
 
-The commands above build the core theorem modules for this paper.
+and its lifted form over global configurations.
 
-## Appendix G. Theorem Index
+### A.2 Rule-Level Decrease and Configuration Lift
 
-| Claim                                               | Main section | Assumption scope                                                             | Proof location                                    |
-|-----------------------------------------------------|--------------|------------------------------------------------------------------------------|---------------------------------------------------|
-| Theorem 1. Quantitative Dynamics                    | Section 4    | Assumption Block 1 quantitative descent premises                             | Section 4 proof sketch, Appendix A                |
-| Theorem 2. Algorithmic Dynamics Schema              | Section 5    | Assumption Block 2 regular finite-reachability premises                      | Section 5 proof sketch, Appendix B                |
-| Theorem 3. Crash-Stop Tolerance Characterization    | Section 6    | Assumption Block 3 crash-stop characterization premises                      | Section 6 proof sketch, Appendix C                |
-| Theorem 4. Exact Byzantine Safety Characterization  | Section 6    | Assumption Block 4 Byzantine characterization premises                       | Section 6 statement, Appendix C                   |
-| Corollary 4.1. Converse Counterexample Families     | Section 6    | theorem 4 premises with dropped-assumption class witnesses                   | Section 6 statement, Appendix C                   |
-| Corollary 1. Productive-Step Bound                  | Section 7    | Theorem 1 premises                                                           | Section 7 derivation notes, Appendix A            |
-| Corollary 2. Scheduler-Lifted Total Bound           | Section 7    | Theorem 1 premises plus scheduler profile assumptions                        | Section 7 derivation notes, Appendix A and Appendix E |
-| Corollary 3. Critical Capacity Boundary             | Section 7    | regular fragment and threshold side conditions                               | Section 7 statement, Appendix E                   |
-| Proposition 2. Byzantine VM-Bridge Interface        | Section 6    | theorem-pack capability and adherence side conditions                        | Section 6 statement, Appendix D                   |
-| Proposition 1. Artifact Soundness Boundary          | Section 9    | artifact checks pass under Appendix F workflow and scope declarations hold   | Section 9 statement, Appendix D and Appendix F    |
+**Lemma A.1 (Rule-Level Decrease).** Each productive transition class (send, recv, select, branch) strictly decreases `W` by at least one.
+
+**Lemma A.2 (Configuration Lift).** Rule-level decrease lifts to the configuration step relation (`total_measure_decreasing`).
+
+### A.3 Global Bounds
+
+**Proposition A.3 (Productive-Step Bound).** Under Assumption Block 1, productive-step count is bounded by `W0`.
+
+**Proposition A.4 (Scheduler-Lifted Total Bound).** Under scheduler profile `sigma`, total-step count is bounded by `kappa_sigma * W0`.
+
+Theorem 1 and Corollaries 1-2 follow from A.1-A.4.
+
+## Appendix B. Deferred Proof of Algorithmic Decidability Schema
+
+### B.1 Generic Decider Transfer
+
+The schema requires:
+
+1. a finite reachable-state presentation,
+2. a terminating exploration/checker,
+3. soundness and completeness of that checker.
+
+**Theorem B.1 (Generic Decider Transfer).** If predicate `P` admits the three obligations above, then `P` is decidable.
+
+*Proof sketch.* Finite exploration terminates by construction; soundness/completeness identify checker output with `P`; hence membership in `P` is decidable.
+
+### B.2 Instantiations Used in the Main Text
+
+Async subtyping is instantiated by the reachable triple graph; regular equivalence by the reachable pair/bisim graph over regular representatives.
+
+## Appendix C. Instantiated Decision Theorems
+
+### C.1 Crash-Stop Tolerance
+
+Exact criterion: crash tolerance holds iff residual communication connectivity holds in the declared crash-stop model.
+
+### C.2 Branching Feasibility
+
+Feasibility is characterized by the confusability/chromatic-capacity condition in the stated fragment.
+
+### C.3 Capacity Threshold
+
+The phase classifier has a sharp boundary with computable critical threshold `Bc`.
+
+### C.4 Byzantine Safety Interface (Scope of This Paper)
+
+This paper proves exact safety-side characterization under the declared Byzantine profile bundle, plus converse counterexample packaging when assumption classes are dropped.
+
+## Appendix D. Mechanization Map
+
+| Result family | Primary modules |
+|---------------|-----------------|
+| Quantitative dynamics and scheduler lift | `lean/Runtime/Proofs/WeightedMeasure/*.lean`, `lean/Runtime/Proofs/Lyapunov.lean`, `lean/Runtime/Proofs/SchedulingBoundCore.lean` |
+| Decidability schema and instances | `lean/SessionCoTypes/AsyncSubtyping/*.lean`, `lean/SessionCoTypes/Coinductive/BisimDecidable/*.lean` |
+| Crash/branching/threshold instantiations | `lean/Protocol/CrashTolerance.lean`, `lean/Protocol/SpatialBranching.lean`, `lean/Protocol/BufferBoundedness/PhaseSharpness.lean` |
+| Byzantine profile and runtime bridge | `lean/Runtime/Proofs/Adapters/Distributed/EnvelopeTheorems*.lean`, `lean/Runtime/Proofs/TheoremPack/*.lean` |
+
+## Appendix E. Exactness and Boundary Notes
+
+1. Productive-step decrease and productive-step bounds are exact under Assumption Block 1.
+2. Scheduler-lifted total bounds are profile-indexed upper bounds.
+3. Crash-stop exactness is scoped to Assumption Block 3.
+4. Byzantine exactness in this paper is safety-side and assumption-bundle scoped.
+5. Decidability transfer depends on regular finite-reachability assumptions.
+
+## Appendix F. Reproducibility
+
+Reproduction uses the pinned Lean toolchain and manifest. Build the module families in Appendix D; run `just escape` and `just verify-protocols` for project-level consistency checks.
+
+## Appendix G. Index of Main Results
+
+| Claim | Main section | Assumption scope | Formal location |
+|-------|--------------|------------------|-----------------|
+| Theorem 1. Quantitative Dynamics | Section 4 | Assumption Block 1 quantitative descent premises | `WeightedMeasure/TotalBound.lean`, `SchedulingBoundCore.lean`; Appendix A |
+| Theorem 2. Algorithmic Dynamics Schema | Section 5 | Assumption Block 2 regular finite-reachability premises | `AsyncSubtyping/*.lean`, `BisimDecidable/*.lean`; Appendix B |
+| Theorem 3. Crash-Stop Tolerance Characterization | Section 6 | Assumption Block 3 crash-stop premises | `Protocol/CrashTolerance.lean`; Appendix C |
+| Theorem 4. Exact Byzantine Safety Characterization | Section 6 | Assumption Block 4 Byzantine premises | Byzantine profile extraction modules; Appendix C |
+| Corollary 4.1. Converse Counterexample Families | Section 6 | Theorem 4 premises + dropped-assumption witness classes | Section 6 packaging + Appendix C |
+| Corollary 1. Productive-Step Bound | Section 7 | Theorem 1 premises | derived in Section 7; Appendix A |
+| Corollary 2. Scheduler-Lifted Total Bound | Section 7 | Theorem 1 premises + scheduler profile premises | derived in Section 7; Appendix A and E |
+| Corollary 3. Critical Capacity Boundary | Section 7 | regular fragment + threshold side conditions | `PhaseSharpness.lean`; Appendix C and E |
+| Proposition 2. Byzantine VM-Bridge Interface | Section 6 | theorem-pack capability and adherence premises | theorem-pack/profile modules; Appendix C and D |
+| Proposition 1. Artifact Soundness Boundary | Section 9 | artifact checks under reproducibility workflow | Section 9 argument + Appendix D and F |
