@@ -15,6 +15,7 @@ import Runtime.Adequacy.Adequacy
 import Runtime.Proofs.Concurrency
 import Runtime.Proofs.ProgressApi
 import Runtime.Proofs.SchedulerApi
+import Runtime.Proofs.EffectBisim
 import Runtime.Proofs.InvariantSpace
 import Runtime.Proofs.Adapters.Progress
 import Runtime.Proofs.Adapters.Classical

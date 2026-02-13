@@ -1,12 +1,20 @@
 import Runtime.Transport
 import Runtime.VM.Model.State
-
+import Runtime.Proofs.EffectBisim
 
 /-! # Handler Equivalence
 
-Effect-handler equivalence theorem for protocol outcomes:
-if two handlers satisfy the same handler contract, their outcomes are
-observationally equivalent.
+Effect-handler equivalence theorems for protocol outcomes.
+-/
+
+/-
+The Problem. If two handlers satisfy the same contract, we need a reusable
+observational-equivalence theorem and a coinductive consequence that can be
+consumed by the new effect-bisimulation layer.
+
+Solution Structure. First prove observational equivalence of outcomes under a
+shared contract. Then lift observational equivalence into a silent-step effect
+bisimulation over `ProtocolOutcome`.
 -/
 
 set_option autoImplicit false
@@ -14,6 +22,10 @@ set_option autoImplicit false
 section
 
 universe u
+
+open Runtime.Proofs.EffectBisim
+
+/-! ## Outcome Observer Layer -/
 
 /-- Observable protocol outcome extracted from a transport trace. -/
 structure ProtocolOutcome (ν ε : Type u) [VerificationModel ν] [EffectRuntime ε] where
@@ -25,6 +37,52 @@ structure ProtocolOutcome (ν ε : Type u) [VerificationModel ν] [EffectRuntime
 def ProtocolOutcome.ObservationalEq {ν ε : Type u} [VerificationModel ν] [EffectRuntime ε]
     (o₁ o₂ : ProtocolOutcome ν ε) : Prop :=
   o₁.obsTrace = o₂.obsTrace ∧ o₁.completed = o₂.completed
+
+/-- Observer used for coinductive handler-equivalence corollaries. -/
+def protocolOutcomeObs {ν ε : Type u} [VerificationModel ν] [EffectRuntime ε] :
+    EffectObs (ProtocolOutcome ν ε) (List (ObsEvent ε) × Bool) where
+  observe := fun o => (o.obsTrace, o.completed)
+
+/-- Silent step relation for outcome-level bisimulation packaging. -/
+def protocolOutcomeSilentStep {ν ε : Type u} [VerificationModel ν] [EffectRuntime ε] :
+    StateRel (ProtocolOutcome ν ε) :=
+  fun _ _ => False
+
+private theorem protocolOutcomeObsEq_postfixed {ν ε : Type u}
+    [VerificationModel ν] [EffectRuntime ε] :
+    (fun o₁ o₂ : ProtocolOutcome ν ε =>
+      ObservationalEq protocolOutcomeObs o₁ o₂) ≤
+      EffectBisimF protocolOutcomeObs protocolOutcomeSilentStep
+        (fun o₁ o₂ : ProtocolOutcome ν ε =>
+          ObservationalEq protocolOutcomeObs o₁ o₂) := by
+  intro o₁ o₂ hObs
+  refine ⟨hObs, ?_, ?_⟩
+  · intro o' hStep
+    cases hStep
+  · intro o' hStep
+    cases hStep
+
+/-! ### Outcome Bisim Lift -/
+
+/-- Lift outcome observational equivalence into silent-step effect bisimulation. -/
+theorem protocolOutcome_effectBisim_of_observationalEq {ν ε : Type u}
+    [VerificationModel ν] [EffectRuntime ε]
+    {o₁ o₂ : ProtocolOutcome ν ε}
+    (hEq : ProtocolOutcome.ObservationalEq o₁ o₂) :
+    EffectBisim protocolOutcomeObs protocolOutcomeSilentStep o₁ o₂ := by
+  have hLift :
+      (fun a b : ProtocolOutcome ν ε =>
+        ObservationalEq protocolOutcomeObs a b) ≤
+        EffectBisim protocolOutcomeObs protocolOutcomeSilentStep :=
+    SessionCoTypes.CoinductiveRel.coind
+      (F := EffectBisimF protocolOutcomeObs protocolOutcomeSilentStep)
+      (S := fun a b : ProtocolOutcome ν ε => ObservationalEq protocolOutcomeObs a b)
+      protocolOutcomeObsEq_postfixed
+  have hObs : ObservationalEq protocolOutcomeObs o₁ o₂ := by
+    simpa [protocolOutcomeObs, ProtocolOutcome.ObservationalEq, ObservationalEq] using hEq
+  exact hLift _ _ hObs
+
+/-! ## Contract Equivalence -/
 
 /-- Contract that an effect handler must satisfy. -/
 structure HandlerContract (ν ε : Type u) [VerificationModel ν] [EffectRuntime ε] where
@@ -48,8 +106,9 @@ theorem isHandlerTrace_handlerTraceOf {ν : Type u} [VerificationModel ν]
     IsHandlerTrace handler handlers (handlerTraceOf handler handlers bufs) := by
   exact ⟨bufs, rfl⟩
 
-/-- R.9 main theorem:
-if handlers `h₁` and `h₂` both satisfy the same contract, their outcomes are
+/-- Main observational handler-equivalence theorem.
+
+If handlers `h₁` and `h₂` both satisfy the same contract, their outcomes are
 observationally equivalent. -/
 theorem handler_equivalence {ν ε : Type u} [VerificationModel ν] [EffectRuntime ε]
     (contract : HandlerContract ν ε)
@@ -67,3 +126,20 @@ theorem handler_equivalence {ν ε : Type u} [VerificationModel ν] [EffectRunti
     ?_ ?_
   · exact hSat₁ handlers _ (isHandlerTrace_handlerTraceOf h₁ handlers bufs₁)
   · exact hSat₂ handlers _ (isHandlerTrace_handlerTraceOf h₂ handlers bufs₂)
+
+/-- Coinductive corollary: shared-contract handlers are effect-bisimilar
+    at the outcome-observer boundary. -/
+theorem handler_equivalence_effectBisim {ν ε : Type u} [VerificationModel ν] [EffectRuntime ε]
+    (contract : HandlerContract ν ε)
+    (h₁ h₂ : HandlerId)
+    (hSat₁ : HandlerModelsContract ν ε h₁ contract)
+    (hSat₂ : HandlerModelsContract ν ε h₂ contract)
+    (handlers : List (Edge × HandlerId))
+    (bufs₁ bufs₂ : SignedBuffers ν) :
+    EffectBisim protocolOutcomeObs protocolOutcomeSilentStep
+      (contract.outcome (handlerTraceOf h₁ handlers bufs₁))
+      (contract.outcome (handlerTraceOf h₂ handlers bufs₂)) := by
+  exact protocolOutcome_effectBisim_of_observationalEq
+    (handler_equivalence contract h₁ h₂ hSat₁ hSat₂ handlers bufs₁ bufs₂)
+
+end
