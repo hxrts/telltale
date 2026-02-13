@@ -21,9 +21,9 @@ set_option linter.unnecessarySimpa false
 open scoped Classical
 section
 
-/-! ## ValidLabels Preservation Lemmas -/
+-- ValidLabels Preservation Lemmas
 
-/-! ## Send-Step ValidLabels Preservation -/
+-- Send-Step ValidLabels Preservation
 
 /-- ValidLabels is preserved when sending.
     Send appends a value to the buffer, but ValidLabels checks branch labels
@@ -46,7 +46,7 @@ theorem ValidLabels_send_preserved
   let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
   have hActiveOrig : ActiveEdge G e :=
     ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=senderEp) (L:=L) hActive (by simpa [hG])
-  /-! ## Send ValidLabels: Updated Receiver vs Unchanged Receiver -/
+  -- Send ValidLabels: Updated Receiver vs Unchanged Receiver
   by_cases hRecvEq : recvEp = senderEp
   · -- Receiver is the updated endpoint: original type is .send, so buffers must be empty.
     have hNoSelf : receiverRole ≠ senderEp.role := by
@@ -92,7 +92,7 @@ theorem ValidLabels_send_preserved
         lookupBuf (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v])) e = [] := by
       simpa [hBufEq, hBufEmpty]
     simp [hBuf']
-  /-! ## Send ValidLabels: Unchanged Receiver Case -/
+  -- Send ValidLabels: Unchanged Receiver Case
   · -- Receiver endpoint unchanged: use original ValidLabels and buffer update facts.
     have hBranchOld : lookupG G recvEp = some (.branch source bs) := by
       have hBranch' := hBranch
@@ -122,7 +122,7 @@ theorem ValidLabels_send_preserved
       have hValidOld := hValid e source bs hActiveOrig hBranchOld
       simpa [hBufEq] using hValidOld
 
-/-! ## Select-Step ValidLabels Preservation -/
+-- Select-Step ValidLabels Preservation
 
 /-- ValidLabels is preserved when selecting (sending a label).
     Select appends label to buffer END, so HEAD unchanged.
@@ -146,7 +146,7 @@ theorem ValidLabels_select_preserved
   let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
   have hActiveOrig : ActiveEdge G e :=
     ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=selectorEp) (L:=L) hActive (by simpa [hG])
-  /-! ## Select ValidLabels: Updated Receiver vs Unchanged Receiver -/
+  -- Select ValidLabels: Updated Receiver vs Unchanged Receiver
   by_cases hRecvEq : recvEp = selectorEp
   · -- Receiver is the updated endpoint: original type is .select, so buffers must be empty.
     have hNoSelf : targetRole ≠ selectorEp.role := by
@@ -192,7 +192,7 @@ theorem ValidLabels_select_preserved
         lookupBuf (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ])) e = [] := by
       simpa [hBufEq, hBufEmpty]
     simp [hBuf']
-  /-! ## Select ValidLabels: Unchanged Receiver Case -/
+  -- Select ValidLabels: Unchanged Receiver Case
   · -- Receiver endpoint unchanged: use original ValidLabels and buffer update facts.
     have hBranchOld : lookupG G recvEp = some (.branch source bs) := by
       have hBranch' := hBranch

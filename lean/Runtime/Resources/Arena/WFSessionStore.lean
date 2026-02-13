@@ -70,7 +70,7 @@ theorem updateType_preserves_session_consistency {store : SessionStore ν} {e : 
             have hTailSid : ∀ sid st, (sid, st) ∈ tl →
                 st.sid = sid ∧ (∀ e ∈ st.endpoints, e.sid = sid) := by
               intro sid'' st'' hMem
-            exact hSid sid'' st'' (List.Mem.tail _ hMem)
+              exact hSid sid'' st'' (List.Mem.tail _ hMem)
             exact ih hTailSid hTail
 
 /-! ### `updateTrace` session-consistency helper -/
@@ -111,7 +111,7 @@ theorem updateTrace_preserves_session_consistency {store : SessionStore ν} {edg
             have hTailSid : ∀ sid st, (sid, st) ∈ tl →
                 st.sid = sid ∧ (∀ e ∈ st.endpoints, e.sid = sid) := by
               intro sid'' st'' hMem
-            exact hSid sid'' st'' (List.Mem.tail _ hMem)
+              exact hSid sid'' st'' (List.Mem.tail _ hMem)
             exact ih hTailSid hTail
 
 /-! ## WF Refinement Preservation for `updateType` -/

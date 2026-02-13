@@ -211,7 +211,7 @@ theorem part_of2_substitute (role : String) :
           | inr hrepl =>
               right
               exact hrepl
-  /-! ## Substitution Preservation: Mu/Delegate Cases -/
+  -- Mu/delegate cases.
   | .mu s body =>
       by_cases hst : s = t
       · left
@@ -364,7 +364,7 @@ mutual
           have hbody : part_of2 role body :=
             (part_of2_iff_participates role body).2 h
           exact .intro _ (.mu _ _ hbody)
-    /-! ## part_of2_iff_participates: Comm Case -/
+    -- Comm case.
     | comm sender receiver branches =>
         constructor
         · intro h
@@ -396,7 +396,7 @@ mutual
                 (participatesBranches_iff_part_of2 role branches).1 hbranches
               obtain ⟨pair, hmem, hcont⟩ := hexists
               exact .intro _ (.comm_branch _ _ pair.1 pair.2 _ hmem hcont)
-    /-! ## part_of2_iff_participates: Delegate Case -/
+    -- Delegate case.
     | delegate p q sid r cont =>
         constructor
         · intro h
@@ -419,8 +419,7 @@ mutual
               have hcont' : part_of2 role cont :=
                 (part_of2_iff_participates role cont).2 hcont
               exact .intro _ (.delegate_cont _ _ _ _ _ hcont')
-
-  /-! ## Branch-Level Boolean/Inductive Equivalence -/
+  -- Branch-level boolean/inductive equivalence.
 
   /-- `participatesBranches` is equivalent to existence of a participating branch. -/
   theorem participatesBranches_iff_part_of2 (role : String) :

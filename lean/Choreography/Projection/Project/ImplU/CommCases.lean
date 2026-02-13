@@ -90,8 +90,8 @@ private theorem CProjectUEQ2Rel_postfix_comm_end_case
               AllBranchesProj CProjectU gbs role e0.fullUnfold := by
             simpa [hrs, hrr, he0] using hcore''
           exact Or.inr (by
-	            simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using
-	              (CProjectUEQ2Rel_comm_nonpart heq_full_cand_full hWF_full hWFcand_full hcore_nonpart))
+              simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using
+                (CProjectUEQ2Rel_comm_nonpart heq_full_cand_full hWF_full hWFcand_full hcore_nonpart))
 
 /-! ### Comm Var Case -/
 
@@ -120,8 +120,8 @@ private theorem CProjectUEQ2Rel_postfix_comm_var_case
         simpa [he0] using hcore_nonpart
       have hnonpart' := CProjectUEQ2Rel_comm_nonpart
         heq_full_cand_full hWF_full hWFcand_full hcore_nonpart'
-	      exact Or.inr (by
-	        simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
+        exact Or.inr (by
+          simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
 
 /-! ### Comm Mu Case -/
 
@@ -179,9 +179,9 @@ private theorem CProjectUEQ2Rel_postfix_comm_send_sender
     LocalTypeR.WellFormed.branches_of_send (p := p) (bs := cs) (by simpa [hfull] using hWFcand_full)
   have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs sender cs :=
     BranchesProjRel_lift_EQ2_U hbranches hrel_br hWF_branches hWF_branches_cand
-	  exact Or.inr (by
-	    simpa [CProjectF_unfold_core, CProjectF, hg, hfull, hrs] using
-	      ⟨(by simpa using hpartner), hbranches'⟩)
+    exact Or.inr (by
+      simpa [CProjectF_unfold_core, CProjectF, hg, hfull, hrs] using
+        ⟨(by simpa using hpartner), hbranches'⟩)
 
 /-! ### Comm Send Nonparticipant Case -/
 
@@ -207,8 +207,8 @@ private theorem CProjectUEQ2Rel_postfix_comm_send_nonpart
     simpa [he0] using hcore_nonpart
   have hnonpart' := CProjectUEQ2Rel_comm_nonpart
     heq_full_cand_full hWF_full hWFcand_full hcore_nonpart'
-	  exact Or.inr (by
-	    simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
+    exact Or.inr (by
+      simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
 
 /-! ### Comm Send Dispatcher -/
 
@@ -265,9 +265,9 @@ private theorem CProjectUEQ2Rel_postfix_comm_recv_receiver
     LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := cs) (by simpa [hfull] using hWFcand_full)
   have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs receiver cs :=
     BranchesProjRel_lift_EQ2_U hbranches hrel_br hWF_branches hWF_branches_cand
-	  exact Or.inr (by
-	    simpa [CProjectF_unfold_core, CProjectF, hg, hfull, hrr, hne] using
-	      ⟨(by simpa using hpartner), hbranches'⟩)
+    exact Or.inr (by
+      simpa [CProjectF_unfold_core, CProjectF, hg, hfull, hrr, hne] using
+        ⟨(by simpa using hpartner), hbranches'⟩)
 
 /-! ### Comm Recv Nonparticipant Case -/
 
@@ -293,8 +293,8 @@ private theorem CProjectUEQ2Rel_postfix_comm_recv_nonpart
     simpa [he0] using hcore_nonpart
   have hnonpart' := CProjectUEQ2Rel_comm_nonpart
     heq_full_cand_full hWF_full hWFcand_full hcore_nonpart'
-	  exact Or.inr (by
-	    simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
+    exact Or.inr (by
+      simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
 
 /-! ### Comm Recv Dispatcher -/
 

@@ -50,7 +50,7 @@ theorem decideRecovery_deterministic
       decideRecovery st sid f evidence policy = a₁ →
       decideRecovery st sid f evidence policy = a₂ →
       a₁ = a₂ := by
-  simpa using
+  exact
     (_root_.decideRecovery_deterministic
       (st := st) (sid := sid) (f := f)
       (evidence := evidence) (policy := policy))

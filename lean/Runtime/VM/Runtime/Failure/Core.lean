@@ -156,16 +156,16 @@ def applyEnvironmentEvent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
         | .crash _ => "topology:crash"
         | .partition edges => s!"topology:partition edges={edges.length}"
         | .heal edges => s!"topology:heal edges={edges.length}"
-	  let traceEv : FailureTraceEvent :=
-	    { tick := st'.clock
-	    , seqNo := st'.nextFailureSeqNo
-	    , tag := .topology
-	    , detail := detail
-	    }
-	  { st' with
-	      failureTrace := st'.failureTrace ++ [traceEv]
-	    , nextFailureSeqNo := st'.nextFailureSeqNo + 1
-	  }
+    let traceEv : FailureTraceEvent :=
+      { tick := st'.clock
+      , seqNo := st'.nextFailureSeqNo
+      , tag := .topology
+      , detail := detail
+      }
+    { st' with
+        failureTrace := st'.failureTrace ++ [traceEv]
+      , nextFailureSeqNo := st'.nextFailureSeqNo + 1
+    }
 
 /-! #### Batched environment ingress -/
 
@@ -340,10 +340,10 @@ def emitStructuredErrorEvent {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     , evidenceId := evidenceId
     , detail := detail
     }
-	  { st with
-	      structuredErrorEvents := st.structuredErrorEvents ++ [ev]
-	    , nextFailureSeqNo := st.nextFailureSeqNo + 1
-	  }
+  { st with
+      structuredErrorEvents := st.structuredErrorEvents ++ [ev]
+    , nextFailureSeqNo := st.nextFailureSeqNo + 1
+  }
 
 /-! ### Reconciliation pre-stage -/
 

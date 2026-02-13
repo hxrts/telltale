@@ -125,7 +125,7 @@ private theorem sizeOf_lt_branch (l : Label) (L : LocalType) (tl : List (Label �
 
 mutual
 
-/-! ## Local/Branch Commutation under Session+Role Renaming -/
+-- Local/Branch Commutation under Session+Role Renaming
 /-- Session renaming commutes with role renaming on local types. -/
 theorem renameLocalType_renameLocalTypeRole_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (L : LocalType) :
     renameLocalType ρ (renameLocalTypeRole s A B L) =

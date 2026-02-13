@@ -231,7 +231,7 @@ theorem renameValType_inj (ρ : SessionRenaming) {T1 T2 : ValType} :
           rfl
       | prod _ _ => cases h
       | chan _ _ => cases h
-  /-! ## ValType Injectivity: Product and Channel Cases -/
+  -- ValType Injectivity: Product and Channel Cases
   | prod T1a T1b ih1 ih2 =>
       cases T2 <;> simp [renameValType] at h
       case prod T2a T2b =>
@@ -249,7 +249,7 @@ theorem renameValType_inj (ρ : SessionRenaming) {T1 T2 : ValType} :
         rfl
 
 /-- Renaming preserves value type equality tests. -/
-/-! ## ValType Equality Test Preservation -/
+-- ValType Equality Test Preservation
 theorem renameValType_beq (ρ : SessionRenaming) (T1 T2 : ValType) :
     (renameValType ρ T1 == renameValType ρ T2) = (T1 == T2) := by
   by_cases h : T1 = T2
@@ -354,7 +354,7 @@ theorem lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
               have hpair := (List.pairwise_cons.1 sorted)
               have hhd : ∀ p ∈ tl, edgeCmpLT hd p := hpair.1
               have htl : tl.Pairwise edgeCmpLT := hpair.2
-              /-! ## lookupD_rename Fold Induction: Matching Head -/
+              -- lookupD_rename Fold Induction: Matching Head
               by_cases hEq : e = hd.1
               case pos =>
                 subst hEq
@@ -390,7 +390,7 @@ theorem lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
                     (lookupD_update_eq (env := acc) (e := renameEdge ρ hd.1)
                       (ts := hd.2.map (renameValType ρ)))
                 simp [List.lookup, htail, hupd]
-              /-! ## lookupD_rename Fold Induction: Non-matching Head -/
+              -- lookupD_rename Fold Induction: Non-matching Head
               case neg =>
                 have hne : renameEdge ρ hd.1 ≠ renameEdge ρ e := by
                   intro hEq'
@@ -432,7 +432,7 @@ lemma find?_rename_foldl (ρ : SessionRenaming) :
       have hpair := (List.pairwise_cons.1 sorted)
       have hhd : ∀ p ∈ tl, edgeCmpLT hd p := hpair.1
       have htl : tl.Pairwise edgeCmpLT := hpair.2
-      /-! ## find?_rename_foldl: Matching Head Case -/
+      -- find?_rename_foldl: Matching Head Case
       by_cases hEq : e = hd.1
       case pos =>
         subst hEq
@@ -460,7 +460,7 @@ lemma find?_rename_foldl (ρ : SessionRenaming) :
               (renameEdge ρ hd.1) = some (hd.2.map (renameValType ρ)) :=
           find?_updateD_eq acc (renameEdge ρ hd.1) (hd.2.map (renameValType ρ))
         simp [List.lookup, htail, hupd]
-      /-! ## find?_rename_foldl: Non-matching Head Case -/
+      -- find?_rename_foldl: Non-matching Head Case
       case neg =>
         have hne : renameEdge ρ e ≠ renameEdge ρ hd.1 := fun h =>
           hEq (renameEdge_inj ρ _ _ h)

@@ -52,7 +52,7 @@ def orderedLaneIds {γ : Type u} (sched : SchedState γ) : List LaneId :=
   let fromMap := sched.laneQueues.toList.map (fun p => p.1)
   let lanes := (fromMap ++ fromReady ++ fromBlocked).foldl
     (fun acc lane => insertLaneSorted lane acc) []
-	  if lanes.isEmpty then [0] else lanes
+    if lanes.isEmpty then [0] else lanes
 
 /-! ### Canonical lane-map normalization -/
 

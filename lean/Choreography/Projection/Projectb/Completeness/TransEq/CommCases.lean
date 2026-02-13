@@ -53,7 +53,7 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
       have htrans_body : Trans.trans body role = candBody :=
         trans_eq_of_CProject body role candBody hbody hne_body
       exact trans_eq_of_CProject_mu t body role cand candBody hcase htrans_body
-  /-! ## trans_eq_of_CProject: Comm Branch -/
+  -- trans_eq_of_CProject: Comm Branch
   | comm sender receiver branches =>
       have hne_branches :
           ∀ gb ∈ branches, gb.2.allCommsNonEmpty = true :=
@@ -62,7 +62,7 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
           ∀ gb ∈ branches, ∀ lb, CProject gb.2 role lb → Trans.trans gb.2 role = lb :=
         fun gb hmem lb hcp => trans_eq_of_CProject gb.2 role lb hcp (hne_branches gb hmem)
       exact trans_eq_of_CProject_comm_case sender receiver role branches cand hproj hne ih
-  /-! ## trans_eq_of_CProject: Delegate Branch -/
+  -- trans_eq_of_CProject: Delegate Branch
   | delegate p q sid r cont =>
       by_cases hp : role = p
       · have hf := CProject_destruct hproj
@@ -99,7 +99,7 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
             simp [CProjectF, hp] at hf
         | mu _ _ =>
             simp [CProjectF, hp] at hf
-      /-! ## trans_eq_of_CProject: Delegate Receiver/Other -/
+      -- trans_eq_of_CProject: Delegate Receiver/Other
       · by_cases hq : role = q
         · have hnp : q ≠ p := by
             intro hqp
@@ -147,7 +147,7 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
               simp [CProjectF, hq, hnp] at hf
           | mu _ _ =>
               simp [CProjectF, hq, hnp] at hf
-        /-! ## trans_eq_of_CProject: Delegate Non-Participant -/
+        -- trans_eq_of_CProject: Delegate Non-Participant
         · -- non-participant: follow continuation
           have hf := CProject_destruct hproj
           simp [CProjectF, hp, hq] at hf

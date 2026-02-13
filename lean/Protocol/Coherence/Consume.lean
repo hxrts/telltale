@@ -226,7 +226,7 @@ theorem Consume_rename (ρ : SessionRenaming) (from_ : Role) (L : LocalType) (ts
     cases h : consumeOne from_ t L with
     | none =>
         simp [consumeOne_rename, h]
-  | some L' =>
+    | some L' =>
         simp [consumeOne_rename, h, ih]
 
 /-! ## Consume Inversion Lemmas -/
@@ -236,7 +236,7 @@ theorem Consume_single_recv_match {from_ : Role} {T T' : ValType} {L L' : LocalT
     (h : Consume from_ (.recv from_ T' L) [T] = some L') :
     T = T' := by
   simp only [Consume, consumeOne, beq_self_eq_true, Bool.true_and] at h
-    by_cases hEq : T == T' <;> simp [hEq] at h
+  by_cases hEq : T == T' <;> simp [hEq] at h
   exact eq_of_beq hEq
 
 /-! ## Consume Empty-Trace Consequences -/

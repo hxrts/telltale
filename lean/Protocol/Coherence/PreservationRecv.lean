@@ -50,7 +50,6 @@ section
 
     This is the dual of the send case: popping T from trace D[p,q]
     corresponds to the receiver advancing from `recv p T L` to `L`. -/
-/-! ## Recv Preservation: Edge Case Analysis -/
 theorem Coherent_recv_preserved
     (G : GEnv) (D : DEnv) (receiverEp : Endpoint) (senderRole : Role) (T : ValType) (L : LocalType)
     (hCoh : Coherent G D)
@@ -62,7 +61,7 @@ theorem Coherent_recv_preserved
   have hActiveOrig : ActiveEdge G e :=
     ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=receiverEp) (L:=L) hActive (by simpa [hG])
 
-  /-! ## Case 1: Updated Recv Edge -/
+  -- Case 1: Updated Recv Edge
   -- Case split: updated edge / shares receiver endpoint / unrelated
   rcases edge_case_split e recvEdge receiverEp with heq | hShare | hOther
   · -- Case 1: e = recvEdge (the edge being modified)
@@ -73,7 +72,7 @@ theorem Coherent_recv_preserved
     -- Receiver endpoint lookup in updated G
     have hRecvLookup : lookupG (updateG G receiverEp L) { sid := receiverEp.sid, role := receiverEp.role } = some L := by
       convert lookupG_update_eq G receiverEp L
-    /-! ## Case 1A: Updated Edge Self-Recv -/
+    -- Case 1A: Updated Edge Self-Recv
     -- Check if sender = receiver (self-recv case)
     by_cases hSenderIsRecv : senderRole = receiverEp.role
     · -- Self-recv: sender role = receiver role
@@ -118,7 +117,7 @@ theorem Coherent_recv_preserved
         -- Now we need: Consume recvEdge.sender L rest is some
         simp only [List.tail_cons]
         simpa [hEq] using hOrig
-    /-! ## Case 1B: Updated Edge Distinct Sender -/
+    -- Case 1B: Updated Edge Distinct Sender
     · -- Normal case: sender ≠ receiver
       have hSenderNeq : receiverEp ≠ { sid := receiverEp.sid, role := senderRole } := by
         intro h
@@ -155,13 +154,13 @@ theorem Coherent_recv_preserved
         simp only [hBeqRole, hBeqType, Bool.and_self, ite_true] at hOrig
         simp only [List.tail_cons]
         simpa [hEq] using hOrig
-  /-! ## Case 2: Unchanged Edge Sharing Receiver Endpoint -/
+  -- Case 2: Unchanged Edge Sharing Receiver Endpoint
   · -- Case 2: e ≠ recvEdge, but e shares receiverEp
     have hNeSymm : recvEdge ≠ e := Ne.symm hShare.1
     have hShare' : { sid := e.sid, role := e.sender : Endpoint } = receiverEp ∨
         { sid := e.sid, role := e.receiver : Endpoint } = receiverEp := by
       simpa [EdgeShares, senderEndpoint, receiverEndpoint] using hShare.2
-    /-! ## Case 2A: Sender Endpoint Matches -/
+    -- Case 2A: Sender Endpoint Matches
     by_cases hSenderMatch : { sid := e.sid, role := e.sender : Endpoint } = receiverEp
     · -- Sender endpoint is receiverEp
       by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = receiverEp
@@ -212,7 +211,7 @@ theorem Coherent_recv_preserved
               exact beq_eq_false_iff_ne.mpr (Ne.symm hSR)
             rw [hRole1, hTraceE] at hOrig
             simp [Consume, consumeOne, hBeqRole] at hOrig
-      /-! ## Case 2A(ii): Sender Matches, Receiver Distinct -/
+      -- Case 2A(ii): Sender Matches, Receiver Distinct
       · -- Sender endpoint = receiverEp, receiver endpoint ≠ receiverEp
         have hRecvNoMatch : receiverEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
         apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
@@ -227,7 +226,7 @@ theorem Coherent_recv_preserved
         have hSenderLookup : lookupG (updateG G receiverEp L) { sid := e.sid, role := e.sender } = some L := by
           conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G receiverEp L
         refine ⟨L, hSenderLookup, hConsume⟩
-    /-! ## Case 2B: Receiver Endpoint Matches -/
+    -- Case 2B: Receiver Endpoint Matches
     · -- Sender endpoint ≠ receiverEp, so receiver must match
       have hSenderNoMatch : receiverEp ≠ { sid := e.sid, role := e.sender } := fun h => hSenderMatch h.symm
       have hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = receiverEp := by
@@ -275,7 +274,7 @@ theorem Coherent_recv_preserved
         simp only [Option.isSome] at hOrig
         exfalso
         exact Bool.noConfusion hOrig
-  /-! ## Case 3: Unrelated Edge -/
+  -- Case 3: Unrelated Edge
   · -- Case 3: e ≠ recvEdge and unrelated to receiverEp
     have hNeSymm : recvEdge ≠ e := Ne.symm hOther.1
     have hOther' :

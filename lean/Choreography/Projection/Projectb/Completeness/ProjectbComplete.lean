@@ -133,7 +133,7 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
       have ih_body : ∀ candBody, CProject body role candBody → projectb body role candBody = true :=
         fun candBody hbody => projectb_complete body role candBody hbody hne_body
       exact projectb_complete_mu_case t body role cand h hne ih_body
-  /-! ## projectb_complete: Comm Case -/
+  -- projectb_complete: Comm Case
   | comm s r gbs =>
       have hne_branches : ∀ gb ∈ gbs, gb.2.allCommsNonEmpty = true :=
         GlobalType.allCommsNonEmpty_comm_branches _ _ gbs hne
@@ -148,7 +148,7 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
       · by_cases hr : role = r
         · exact projectb_complete_comm_receiver_case s r role gbs cand hr hs h hne_branches ih_branches
         · exact projectb_complete_comm_other_case s r role gbs cand hs hr h hne_branches ih_all
-  /-! ## projectb_complete: Delegate Case -/
+  -- projectb_complete: Delegate Case
   | delegate p q sid r cont =>
       have hne_cont : cont.allCommsNonEmpty = true := by
         simpa [GlobalType.allCommsNonEmpty] using hne
@@ -189,7 +189,7 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
             simp [CProjectF, hp] at hf
         | mu _ _ =>
             simp [CProjectF, hp] at hf
-      /-! ## projectb_complete: Delegate Receiver/Other Subcases -/
+      -- projectb_complete: Delegate Receiver/Other Subcases
       · by_cases hq : role = q
         · have hnp : q ≠ p := by
             intro hqp
@@ -233,7 +233,7 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
               simp [CProjectF, hq, hnp] at hf
           | mu _ _ =>
               simp [CProjectF, hq, hnp] at hf
-        /-! ## projectb_complete: Delegate Non-Participant Subcase -/
+        -- projectb_complete: Delegate Non-Participant Subcase
         · -- non-participant: follow continuation
           have hf := CProject_destruct h
           simp [CProjectF, hp, hq] at hf

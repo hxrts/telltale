@@ -16,6 +16,7 @@ ci-dry-run:
     just check-arch-lean
     just check-failure-capabilities
     just check-envelope-conformance
+    just check-byzantine-conformance
     just check-vm-placeholders
     just check-parity-ledger
     just check-vm-parity-suite
@@ -54,6 +55,10 @@ check-failure-capabilities:
 # Envelope theorem-capability and conformance checks
 check-envelope-conformance:
     ./scripts/check-envelope-conformance.sh
+
+# Byzantine theorem-capability and conformance checks
+check-byzantine-conformance:
+    ./scripts/check-byzantine-conformance.sh
 
 # Prevent new placeholder/stub/TODO markers in executable Lean VM modules.
 check-vm-placeholders:

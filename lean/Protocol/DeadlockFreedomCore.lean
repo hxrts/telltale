@@ -19,7 +19,7 @@ set_option autoImplicit false
 open scoped Classical
 
 section
-/-! ## Progress Predicates -/
+-- Progress Predicates
 
 /-- A configuration is done if:
     1. The process is `skip`
@@ -35,7 +35,7 @@ def CanProgress (C : Config) : Prop :=
 def Stuck (G : GEnv) (C : Config) : Prop :=
   ¬Done G C ∧ ¬CanProgress C
 
-/-! ## Fairness -/
+-- Fairness
 
 /-- A trace is fair if every message in a buffer is eventually consumed.
 
@@ -54,7 +54,7 @@ def EventuallyDelivered (e : Edge) (v : Value) (trace : List Config) : Prop :=
     ∃ j, ∃ hj : j < trace.length, j > i ∧
       v ∉ lookupBuf (trace.get ⟨j, hj⟩).bufs e
 
-/-! ## Deadlock Freedom Theorem -/
+-- Deadlock Freedom Theorem
 
 /-- Progress-ready configuration (gap to be discharged by projection).
 
@@ -112,9 +112,9 @@ theorem not_stuck (C : Config) (Ssh Sown : SEnv)
   | inl hDone => exact hNotDone hDone
   | inr hProg => exact hNotProg hProg
 
-/-! ## Session Isolation -/
+-- Session Isolation
 
-/-! ## Session-Affecting Step Identification -/
+-- Session-Affecting Step Identification
 
 /-- Get the session ID affected by a step, if applicable.
     Returns the session ID of the endpoint involved in communication steps,
@@ -144,7 +144,7 @@ def stepSessionId (C : Config) : Option SessionId :=
 def affectsSession (C : Config) (sid : SessionId) : Prop :=
   stepSessionId C = some sid
 
-/-! ## Session Isolation Under Head Steps -/
+-- Session Isolation Under Head Steps
 
 /-- Sessions don't interfere with each other.
 
@@ -159,7 +159,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
   intro ep hep
   -- Define the edge we're querying
   let queryEdge : Edge := { sid := ep.sid, sender := ep.role, receiver := r }
-  /-! ## session_isolation: Step-Form Case Analysis -/
+  -- session_isolation: Step-Form Case Analysis
   cases hStep with
   | send hProc hk hx hG =>
     -- send modifies edge based on endpoint from store
@@ -175,7 +175,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     have heSid : (_ : Endpoint).sid = s1 := Option.some_injective _ hAffects
     rw [heSid, hep] at h1
     exact hNeq h1
-  /-! ## session_isolation: Receive Case -/
+  -- session_isolation: Receive Case
   | recv hProc hk hG hBufLookup =>
     -- recv modifies edge based on endpoint from store
     simp only [affectsSession, stepSessionId, hProc, hk] at hAffects
@@ -190,7 +190,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     have heSid : (_ : Endpoint).sid = s1 := Option.some_injective _ hAffects
     rw [heSid, hep] at h1
     exact hNeq h1
-  /-! ## session_isolation: Select Case -/
+  -- session_isolation: Select Case
   | select hProc hk hG hFind =>
     -- select is like send
     simp only [affectsSession, stepSessionId, hProc, hk] at hAffects
@@ -203,7 +203,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     have heSid : (_ : Endpoint).sid = s1 := Option.some_injective _ hAffects
     rw [heSid, hep] at h1
     exact hNeq h1
-  /-! ## session_isolation: Branch Case -/
+  -- session_isolation: Branch Case
   | branch hProc hk hG hBufVal hFindP hFindT hdq =>
     -- branch modifies bufs directly via hdq
     rename_i bufs'_  -- the bufs' implicit argument
@@ -224,7 +224,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     have heSid : (_ : Endpoint).sid = s1 := Option.some_injective _ hAffects
     rw [heSid, hep] at h1
     exact hNeq h1
-  /-! ## session_isolation: New-Session Case -/
+  -- session_isolation: New-Session Case
   | newSession hProc =>
     -- newSession prepends buffers for session C.nextSid = s1
     rename_i theRoles _ _  -- the implicit roles, f, P arguments
@@ -241,7 +241,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     have hLookupNone := initBuffers_lookup_none C.nextSid theRoles queryEdge hSidNe
     rw [hLookupNone]
     simp only [Option.none_or]
-  /-! ## session_isolation: Buffer-Preserving Structural Cases -/
+  -- session_isolation: Buffer-Preserving Structural Cases
   | assign hProc =>
     -- assign doesn't modify buffers
     rfl
@@ -255,7 +255,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     -- par_skip_right doesn't modify buffers
     rfl
 
-/-! ## Disjoint-Step Commutativity Corollary -/
+-- Disjoint-Step Commutativity Corollary
 
 /-- Disjoint sessions can be stepped independently.
 

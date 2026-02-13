@@ -140,7 +140,7 @@ theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
 /-! ## Boolean Projection Checker -/
 
 mutual
-  /-! ## Boolean Checker: Global Type Case -/
+  -- Boolean Checker: Global Type Case
 
   /- Boolean Projection Checker: Global Type Case. -/
 
@@ -171,7 +171,7 @@ mutual
           | _ => false
         else
           projectbAllBranches branches role cand
-    /-! ## Boolean Checker: Delegation Case -/
+    -- Boolean Checker: Delegation Case
     | .delegate p q sid r cont, role, cand =>
         if role == p then
           -- delegator: must be send to q
@@ -208,7 +208,7 @@ mutual
       | exact sizeOf_bs_lt_comm _ _ _
       | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
-  /-! ## Boolean Checker: Participant Branches -/
+  -- Boolean Checker: Participant Branches
 
   /- Boolean Projection Checker: Branch List Case. -/
 
@@ -232,7 +232,7 @@ mutual
       | exact sizeOf_cont_lt_branch_cons _ _ _
       | exact sizeOf_rest_lt_branch_cons _ _ _
 
-  /-! ## Boolean Checker: Non-Participant Branches -/
+  -- Boolean Checker: Non-Participant Branches
 
   /- Boolean Projection Checker: Non-Participant Case. -/
 

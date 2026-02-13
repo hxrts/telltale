@@ -26,7 +26,7 @@ open scoped Classical
 
 section
 
-/-! ## Value Typing Under Framing -/
+-- Value Typing Under Framing
 
 theorem HasTypeVal_frame_left {G₁ G₂ : GEnv} {v : Value} {T : ValType} :
     DisjointG G₁ G₂ →
@@ -50,7 +50,7 @@ theorem HasTypeVal_frame_left {G₁ G₂ : GEnv} {v : Value} {T : ValType} :
       exact HasTypeVal.chan hLookup
 
 /-- Pre-update typing is stable under framing on the left of G (no S changes). -/
-/-! ## Process Branch Framing on the Left -/
+-- Process Branch Framing on the Left
 theorem HasTypeProcPre_frame_G_branch
     {Ssh : SEnv} {Sown : OwnedEnv} {G₁ G : GEnv} {k : Var} {procs : List (Label × Process)}
     {e : Endpoint} {p : Role} {bs : List (Label × LocalType)} :
@@ -81,7 +81,7 @@ theorem HasTypeProcPre_frame_G_branch
   have hNone : lookupG G₁ e = none := lookupG_none_of_not_session (G:=G₁) hNot
   have hG' : lookupG (G₁ ++ G) e = some (.branch p bs) := by
     simpa [lookupG_append_right hNone] using hG
-  /-! ## Process Branch Framing: Body Lifting -/
+  -- Process Branch Framing: Body Lifting
   have hProcs' :
       ∀ i (hi : i < bs.length) (hip : i < procs.length),
         HasTypeProcPre Ssh Sown
@@ -115,7 +115,7 @@ theorem HasTypeProcPre_frame_G_branch
     exact hPre'
   exact HasTypeProcPre.branch hk hG' hLen hLbl hProcs'
 
-/-! ## Process Framing on the Left -/
+-- Process Framing on the Left
 theorem HasTypeProcPre_frame_G {Ssh : SEnv} {Sown : OwnedEnv} {G₁ G₂ : GEnv} {P : Process} :
     DisjointG G₁ G₂ →
     HasTypeProcPre Ssh Sown G₂ P →
@@ -161,7 +161,7 @@ theorem HasTypeProcPre_frame_G {Ssh : SEnv} {Sown : OwnedEnv} {G₁ G₂ : GEnv}
   | assign hNoSh hv =>
       exact HasTypeProcPre.assign hNoSh (HasTypeVal_frame_left hDisj hv)
 
-/-! ## Left-Frame Wrapper and SEnv Transport -/
+-- Left-Frame Wrapper and SEnv Transport
 /-- Frame a disjoint GEnv on the left of pre-typing. -/
 lemma HasTypeProcPre_frame_G_left {Ssh : SEnv} {Sown : OwnedEnv} {Gfr G : GEnv} {P : Process} :
     DisjointG Gfr G →
@@ -190,7 +190,7 @@ theorem lookupSEnv_none_of_domsubset_right
         obtain ⟨T', hRight⟩ := hSub hL
         simpa [hNo] using hRight
 
-/-! ## DisjointS Append Decomposition -/
+-- DisjointS Append Decomposition
 
 /-- Disjointness with an appended SEnv implies disjointness with the left side. -/
 theorem DisjointS_of_append_left {S₁ S₂ S₃ : SEnv} :
@@ -228,7 +228,7 @@ theorem DisjointS_append_right
         simpa [hRight] using hL12
       exact hDisj2 x T₁ T₂ hLsh hL2
 
-/-! ## DisjointG Append Composition -/
+-- DisjointG Append Composition
 
 /-- DisjointG distributes over right appends. -/
 theorem DisjointG_append_right {G₁ G₂ G₃ : GEnv} :
@@ -255,7 +255,7 @@ theorem DisjointG_append_right {G₁ G₂ G₃ : GEnv} :
         simpa [hEmpty] using hInter
       exact this.elim
 
-/-! ## Empty-Right and Append Projection Lemmas -/
+-- Empty-Right and Append Projection Lemmas
 lemma SessionsOf_empty : SessionsOf ([] : GEnv) = (∅ : Set SessionId) := by
   apply Set.eq_empty_iff_forall_notMem.mpr
   intro s hs
@@ -287,7 +287,7 @@ theorem DisjointG_of_append_right {G₁ G₂ G₃ : GEnv} :
   have hDisj' := DisjointG_of_subset_left hSub hDisjSym
   exact DisjointG_symm hDisj'
 
-/-! ## Lookup and Update Preservation Under Disjoint Framing -/
+-- Lookup and Update Preservation Under Disjoint Framing
 
 /-- Lift a GEnv lookup across a left frame using disjointness. -/
 theorem lookupG_frame_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
@@ -324,7 +324,7 @@ theorem DisjointG_updateG_left
     DisjointG_of_subset_left (G₁:=G₂) (G₁':=updateG G₂ e L') (G₂:=G₁) hSub hDisjSym
   exact DisjointG_symm hDisj'
 
-/-! ## Disjoint Lookup Elimination -/
+-- Disjoint Lookup Elimination
 lemma lookupG_none_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
     {e : Endpoint} {L : LocalType} (hLookup : lookupG G₂ e = some L) :
     lookupG G₁ e = none := by

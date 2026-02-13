@@ -32,9 +32,9 @@ private theorem CProjectTransRelComp_recv_extract_base
     {p1 p2 : String} {bs1 bs2 : List BranchR}
     (hbase : CProjectTransRel (.recv p1 bs1) (.recv p2 bs2)) :
     p1 = p2 ∧ BranchesRel (EQ2_closure CProjectTransRelComp) bs1 bs2 := by
-	  -- Base CProjectTransRel implies postfix EQ2F on recv.
-	  have hbase_f := CProjectTransRel_postfix (.recv p1 bs1) (.recv p2 bs2) hbase
-	  simpa [EQ2F] using hbase_f
+    -- Base CProjectTransRel implies postfix EQ2F on recv.
+    have hbase_f := CProjectTransRel_postfix (.recv p1 bs1) (.recv p2 bs2) hbase
+    simpa [EQ2F] using hbase_f
 
 /-! ## Recv Extraction Left Case -/
 
@@ -64,8 +64,8 @@ private theorem CProjectTransRelComp_recv_extract_left
       rcases CProjectTransRel_source_mu (v := t) (body := body) (b := .recv p2 bs2) hrel
         with ⟨body', hEq⟩
       cases hEq
-	  | «end» | var _ | send _ _ =>
-	      simpa [EQ2F] using (EQ2.destruct heq)
+    | «end» | var _ | send _ _ =>
+        simpa [EQ2F] using (EQ2.destruct heq)
 
 /-! ## Recv Extraction Right Case -/
 
@@ -101,9 +101,9 @@ private theorem CProjectTransRelComp_recv_extract_right
   | var v =>
       have hrel_f := CProjectTransRel_postfix (.recv p1 bs1) (.var v) (by simpa using hrel)
       simpa [EQ2F] using hrel_f
-	  | send q cs =>
-	      have hrel_f := CProjectTransRel_postfix (.recv p1 bs1) (.send q cs) (by simpa using hrel)
-	      simpa [EQ2F] using hrel_f
+    | send q cs =>
+        have hrel_f := CProjectTransRel_postfix (.recv p1 bs1) (.send q cs) (by simpa using hrel)
+        simpa [EQ2F] using hrel_f
 
 /-! ## Recv Extraction Both Case -/
 
@@ -118,7 +118,7 @@ private theorem CProjectTransRelComp_recv_extract_both
   have hcomp :=
     EQ2_CProjectTransRel_EQ2_compose (a := .recv p1 bs1) (c := .recv p2 bs2) heq hrel heq'
       hWFa hWFc
-	  simpa [EQ2F] using hcomp
+    simpa [EQ2F] using hcomp
 
 /-! ## Recv Extraction Dispatcher -/
 
@@ -131,8 +131,8 @@ private theorem CProjectTransRelComp_recv_extract
   rcases h with hbase | hleft | hright | hboth -- Split the composed relation into base/left/right/both cases.
   · exact CProjectTransRelComp_recv_extract_base hbase
   · rcases hleft with ⟨b, heq, hrel⟩; exact CProjectTransRelComp_recv_extract_left heq hrel hWFa hWFc
-	  · rcases hright with ⟨b, hrel, heq⟩; exact CProjectTransRelComp_recv_extract_right hrel heq hWFa hWFc
-	  · rcases hboth with ⟨b, b', heq, hrel, heq'⟩; exact CProjectTransRelComp_recv_extract_both heq hrel heq' hWFa hWFc
+    · rcases hright with ⟨b, hrel, heq⟩; exact CProjectTransRelComp_recv_extract_right hrel heq hWFa hWFc
+    · rcases hboth with ⟨b, b', heq, hrel, heq'⟩; exact CProjectTransRelComp_recv_extract_both heq hrel heq' hWFa hWFc
 
 /-! ## Mu Intermediate Helpers -/
 
@@ -154,16 +154,16 @@ private theorem CProjectTransRelComp_recv_extract
 private theorem EQ2_unfold_mu (t : String) (body : LocalTypeR) :
     EQ2 (.mu t body) (body.substitute t (.mu t body)) := by
   -- Use reflexivity then destruct to expose the unfold equation.
-	  have hrefl := EQ2_refl (.mu t body)
-	  exact (EQ2.destruct hrefl).2
+    have hrefl := EQ2_refl (.mu t body)
+    exact (EQ2.destruct hrefl).2
 
 /-! ## Mu Intermediate Relation Wrapper -/
 
 private theorem CProjectTransRelComp_of_mu {a c : LocalTypeR} {v : String} {body : LocalTypeR}
     (heq : EQ2 a (.mu v body)) (hrel : CProjectTransRel (.mu v body) c) :
     CProjectTransRelComp a c := by
-	  -- Wrap EQ2 ∘ CProjectTransRel into the composed relation.
-	  exact Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+    -- Wrap EQ2 ∘ CProjectTransRel into the composed relation.
+    exact Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
 
 /-! ## Through-Mu: Mu/End Target -/
 
@@ -174,8 +174,8 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_mu_end
     EQ2F (EQ2_closure CProjectTransRelComp) (.mu av abody) .end := by
   -- Mu on the left, end on the right: use the EQ2 prefix.
   simp only [EQ2F]
-	  left; right; left
-	  exact ⟨.mu v body, heq_unfold_left, hrel⟩
+    left; right; left
+    exact ⟨.mu v body, heq_unfold_left, hrel⟩
 
 /-! ## Through-Mu: Mu/Var Target -/
 
@@ -186,8 +186,8 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_mu_var
     EQ2F (EQ2_closure CProjectTransRelComp) (.mu av abody) (.var cv) := by
   -- Mu on the left, var on the right: use the EQ2 prefix.
   simp only [EQ2F]
-	  left; right; left
-	  exact ⟨.mu v body, heq_unfold_left, hrel⟩
+    left; right; left
+    exact ⟨.mu v body, heq_unfold_left, hrel⟩
 
 /-! ## Through-Mu: Mu/Send Target -/
 
@@ -199,8 +199,8 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_mu_send
     EQ2F (EQ2_closure CProjectTransRelComp) (.mu av abody) (.send cp cbs) := by
   -- Mu on the left, send on the right: use the EQ2 prefix.
   simp only [EQ2F]
-	  left; right; left
-	  exact ⟨.mu v body, heq_unfold_left, hrel⟩
+    left; right; left
+    exact ⟨.mu v body, heq_unfold_left, hrel⟩
 
 /-! ## Through-Mu: Mu/Recv Target -/
 
@@ -212,8 +212,8 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_mu_recv
     EQ2F (EQ2_closure CProjectTransRelComp) (.mu av abody) (.recv cp cbs) := by
   -- Mu on the left, recv on the right: use the EQ2 prefix.
   simp only [EQ2F]
-	  left; right; left
-	  exact ⟨.mu v body, heq_unfold_left, hrel⟩
+    left; right; left
+    exact ⟨.mu v body, heq_unfold_left, hrel⟩
 
 /-! ## Through-Mu: Mu Source Dispatcher -/
 
@@ -240,8 +240,8 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_mu
       exact EQ2_CProjectTransRel_compose_through_mu_mu_var heq_unfold_left hrel
   | send cp cbs =>
       exact EQ2_CProjectTransRel_compose_through_mu_mu_send heq_unfold_left hrel
-	  | recv cp cbs =>
-	      exact EQ2_CProjectTransRel_compose_through_mu_mu_recv heq_unfold_left hrel
+    | recv cp cbs =>
+        exact EQ2_CProjectTransRel_compose_through_mu_mu_recv heq_unfold_left hrel
 
 /-! ## Through-Mu: End Source -/
 
@@ -264,9 +264,9 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_end
   | send _ _ =>
       simp only [EQ2F]
       exact CProjectTransRelComp_end_not_send (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
-	  | recv _ _ =>
-	      simp only [EQ2F]
-	      exact CProjectTransRelComp_end_not_recv (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
+    | recv _ _ =>
+        simp only [EQ2F]
+        exact CProjectTransRelComp_end_not_recv (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
 
 /-! ## Through-Mu: Var Source -/
 
@@ -290,9 +290,9 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_var
   | send _ _ =>
       simp only [EQ2F]
       exact CProjectTransRelComp_var_not_send (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
-	  | recv _ _ =>
-	      simp only [EQ2F]
-	      exact CProjectTransRelComp_var_not_recv (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
+    | recv _ _ =>
+        simp only [EQ2F]
+        exact CProjectTransRelComp_var_not_recv (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
 
 /-! ## Through-Mu: Send Source -/
 
@@ -316,9 +316,9 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_send
   | var _ =>
       simp only [EQ2F]
       exact CProjectTransRelComp_send_not_var (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
-	  | recv _ _ =>
-	      simp only [EQ2F]
-	      exact CProjectTransRelComp_send_not_recv (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
+    | recv _ _ =>
+        simp only [EQ2F]
+        exact CProjectTransRelComp_send_not_recv (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
 
 /-! ## Through-Mu: Recv Source -/
 
@@ -342,9 +342,9 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_recv
   | var _ =>
       simp only [EQ2F]
       exact CProjectTransRelComp_recv_not_var (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
-	  | send _ _ =>
-	      simp only [EQ2F]
-	      exact CProjectTransRelComp_recv_not_send (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
+    | send _ _ =>
+        simp only [EQ2F]
+        exact CProjectTransRelComp_recv_not_send (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
 
 /-! ## Through-Mu Final Theorem -/
 

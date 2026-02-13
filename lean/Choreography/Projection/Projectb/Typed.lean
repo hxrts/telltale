@@ -127,7 +127,7 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
           simp [CProjectF_typed] at hrel
       | recv _ _ =>
           simp [CProjectF_typed] at hrel
-  /-! ## CProjectF_typed_mono: Comm Case -/
+  -- CProjectF_typed_mono: Comm Case
   | comm sender receiver gbs =>
       by_cases hs : role = sender
       · cases cand with
@@ -150,7 +150,7 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
               simp [CProjectF_typed, hr, hns] at hrel ⊢
         · simp [CProjectF_typed, hs, hr] at hrel ⊢
           exact AllBranchesProj_mono h hrel
-  /-! ## CProjectF_typed_mono: Delegate Case -/
+  -- CProjectF_typed_mono: Delegate Case
   | delegate p q sid r cont =>
       by_cases hp : role = p
       · cases cand with
@@ -175,7 +175,7 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
                     exact hrel
         | _ =>
             simp [CProjectF_typed, hp] at hrel ⊢
-      /-! ## CProjectF_typed_mono: Delegate Receiver/Other Subcases -/
+      -- CProjectF_typed_mono: Delegate Receiver/Other Subcases
       · by_cases hq : role = q
         · have hnp : q ≠ p := by
             intro hqp
@@ -295,7 +295,7 @@ private theorem EraseRel_postfix :
           simp [CProjectF_typed] at hdes
       | recv _ _ =>
           simp [CProjectF_typed] at hdes
-  /-! ## Erasure Bridge: Comm Case -/
+  -- Erasure Bridge: Comm Case
   | comm sender receiver gbs =>
       by_cases hs : role = sender
       · cases cand' with
@@ -311,7 +311,7 @@ private theorem EraseRel_postfix :
               And.intro hpartner hbranches'
         | _ =>
             simp [CProjectF_typed, hs] at hdes
-      /-! ## Erasure Bridge: Comm Receiver/Other Subcases -/
+      -- Erasure Bridge: Comm Receiver/Other Subcases
       · by_cases hr : role = receiver
         · have hns : receiver ≠ sender := by
             intro h
@@ -334,7 +334,7 @@ private theorem EraseRel_postfix :
               AllBranchesProj EraseRel gbs role (LocalTypeR.eraseValTypes cand') :=
             AllBranchesProjTyped_to_erase hdes
           simpa [CProjectF, hs, hr, LocalTypeR.eraseValTypes] using hbranches'
-  /-! ## Erasure Bridge: Delegate Case -/
+  -- Erasure Bridge: Delegate Case
   | delegate p q sid r cont =>
       by_cases hp : role = p
       · cases cand' with
@@ -364,7 +364,7 @@ private theorem EraseRel_postfix :
                     simpa [CProjectF, hp, LocalTypeR.eraseValTypes] using hdes
         | _ =>
             simp [CProjectF_typed, hp] at hdes
-      /-! ## Erasure Bridge: Delegate Receiver/Other Subcases -/
+      -- Erasure Bridge: Delegate Receiver/Other Subcases
       · by_cases hq : role = q
         · have hnp : q ≠ p := by
             intro hqp

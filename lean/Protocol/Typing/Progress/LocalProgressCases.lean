@@ -25,7 +25,7 @@ open scoped Classical
 
 section
 
-/-! ## Send Progress -/
+-- Send Progress
 
 lemma progress_send
     {G D Ssh Sown store bufs k x Sfin Gfin W Δ} :
@@ -49,7 +49,7 @@ lemma progress_send
       have hRecvReady := hReady e q T L hG
       exact ⟨_, _, _, _, _, _, TypedStep.send hkStr hxStr hG hxAll hv hRecvReady rfl rfl rfl rfl⟩
 
-/-! ## Receive Progress -/
+-- Receive Progress
 
 lemma progress_recv
     {G D Ssh Sown store bufs k x Sfin Gfin W Δ} :
@@ -81,7 +81,7 @@ lemma progress_recv
           right
           refine ⟨e, p, hkStr, ?_⟩
           simpa [recvEdge, hBuf]
-      /-! ## Receive Progress: New-Variable Buffer-Ready Case -/
+      -- Receive Progress: New-Variable Buffer-Ready Case
       | cons v vs =>
           left
           have hTypedEdge := hBufs recvEdge
@@ -107,7 +107,7 @@ lemma progress_recv
               have hTraceHead : (lookupD D recvEdge).head? = some T := by
                 simp [hTrace, hEq]
               exact ⟨_, _, _, _, _, _, TypedStep.recv hkStr hG rfl hBuf hv hTraceHead rfl rfl rfl rfl rfl⟩
-  /-! ## Receive Progress: Existing-Owned Variable Case -/
+  -- Receive Progress: Existing-Owned Variable Case
   | recv_old hk hG hNoSh hOwn =>
       rename_i e p T L T'
       obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_visible_lookup hStore hDisjShAll hOwnDisj hk
@@ -150,7 +150,7 @@ lemma progress_recv
                 simp [hTrace, hEq]
               exact ⟨_, _, _, _, _, _, TypedStep.recv hkStr hG rfl hBuf hv hTraceHead rfl rfl rfl rfl rfl⟩
 
-/-! ## Select Progress -/
+-- Select Progress
 
 lemma progress_select
     {G D Ssh Sown store bufs k ℓ Sfin Gfin W Δ} :
@@ -171,7 +171,7 @@ lemma progress_select
       have hTargetReady := hSelectReady e q bs ℓ L hG hbs
       exact ⟨_, _, _, _, _, _, TypedStep.select hkStr hG hbs hTargetReady rfl rfl rfl rfl⟩
 
-/-! ## Branch Progress -/
+-- Branch Progress
 
 lemma progress_branch
     {G D Ssh Sown store bufs k procs Sfin Gfin W Δ} :
@@ -205,7 +205,7 @@ lemma progress_branch
           right
           refine ⟨e, p, hkStr, ?_⟩
           simpa [branchEdge, hBuf]
-      /-! ## Branch Progress: Non-Empty Buffer Case -/
+      -- Branch Progress: Non-Empty Buffer Case
       | cons v vs =>
           left
           have hTypedEdge := hBufs branchEdge
@@ -235,7 +235,7 @@ lemma progress_branch
                   rcases (Option.isSome_iff_exists).1 hBsSome with ⟨b, hFindBs⟩
                   cases b with
                   | mk lbl' L =>
-                      /-! ## Branch Progress: Label Alignment and Step Construction -/
+                      -- Branch Progress: Label Alignment and Step Construction
                       have hLbl : lbl' = lbl :=
                         findLabel_eq (xs := bs) (lbl := lbl) (lbl' := lbl') (v := L) hFindBs
                       subst lbl'
@@ -268,7 +268,7 @@ lemma progress_branch
                             simp [hTrace, hEq]
                           exact ⟨_, _, _, _, _, _, TypedStep.branch hkStr hG rfl hBuf hFindP hFindBs hTraceHead rfl rfl rfl⟩
 
-/-! ## Assign Progress -/
+-- Assign Progress
 
 lemma progress_assign
     {G D Ssh Sown store bufs x v Sfin Gfin W Δ} :

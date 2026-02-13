@@ -25,7 +25,7 @@ open scoped Classical
 
 section
 
-/-! ## Right Reframing -/
+-- Right Reframing
 
 theorem HasTypeProcPreOut_reframe_right_general
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {P : Process}
@@ -41,7 +41,7 @@ theorem HasTypeProcPreOut_reframe_right_general
   | skip =>
       intro R' hDisjIn hDisjOut
       exact HasTypeProcPreOut.skip
-  /-! ## Reframe Right: send case -/
+  -- Reframe Right: send case
   | send hk hG hx =>
       rename_i Sown G k x e q T L
       intro R' hDisjIn hDisjOut
@@ -53,7 +53,7 @@ theorem HasTypeProcPreOut_reframe_right_general
           lookupSEnv (SEnvVisible Ssh { right := R', left := Sown.left }) x = some T := by
         simpa [SEnvVisible] using hx
       exact HasTypeProcPreOut.send hk' hG hx'
-  /-! ## Reframe Right: recv cases -/
+  -- Reframe Right: recv cases
   | recv_new hk hG hNoSh hNoOwnL =>
       rename_i Sown G k x e p T L
       intro R' hDisjIn hDisjOut
@@ -88,7 +88,7 @@ theorem HasTypeProcPreOut_reframe_right_general
       simpa [OwnedEnv.updateLeft, hErase] using
         (HasTypeProcPreOut.recv_old (Ssh:=Ssh) (Sown:={ right := R', left := Sown.left })
           (G:=G) hk' hG hNoSh hOwn)
-  /-! ## Reframe Right: select and branch cases -/
+  -- Reframe Right: select and branch cases
   | select hk hG hFind =>
       rename_i Sown G k l e q bs L
       intro R' hDisjIn hDisjOut
@@ -122,7 +122,7 @@ theorem HasTypeProcPreOut_reframe_right_general
           (Sown:=Sown) (Sown':={ right := R', left := Sown.left }) rfl
           (hPre j hj hjp)
       exact HasTypeProcPreOut.branch hk' hG hLen hLbl hPre' hOutLbl' hSess hDom rfl
-  /-! ## Reframe Right: seq/par cases -/
+  -- Reframe Right: seq/par cases
   | seq hP hQ ihP ihQ =>
       rename_i Sown G P Q S₁ G₁ S₂ G₂ W₁ W₂ Δ₁ Δ₂
       intro R' hDisjIn hDisjOut
@@ -166,7 +166,7 @@ theorem HasTypeProcPreOut_reframe_right_general
         HasTypeProcPreOut.par split hSlen rfl rfl rfl rfl
           hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ hP' hQ'
       simpa [hSfin, hGfin, hW, hΔ] using hPar'
-  /-! ## Reframe Right: assignment cases -/
+  -- Reframe Right: assignment cases
   | assign_new hNoSh hNoOwnL hv =>
       rename_i Sown G x v T
       intro R' hDisjIn hDisjOut
@@ -198,7 +198,7 @@ theorem HasTypeProcPreOut_reframe_right_general
         (HasTypeProcPreOut.assign_old (Ssh:=Ssh) (Sown:={ right := R', left := Sown.left })
           (G:=G) hNoSh hOwn' hv)
 
-/-! ## Reframe Right Wrapper -/
+-- Reframe Right Wrapper
 
 theorem HasTypeProcPreOut_reframe_right
     {Ssh R R' L : SEnv} {G : GEnv} {P : Process}
@@ -214,7 +214,7 @@ theorem HasTypeProcPreOut_reframe_right
       (Sfin:={ right := R, left := L' }) (G':=G') (W:=W) (Δ:=Δ)
       h (R':=R') hDisjIn hDisjOut)
 
-/-! ## Left-Par Framing with Right Reframing -/
+-- Left-Par Framing with Right Reframing
 
 /-- Left framing for par: frame only the left component. -/
 theorem frame_left_par
@@ -242,7 +242,7 @@ theorem frame_left_par
         { right := S₁, left := S₁' } (G₁ ++ G₁') W₁ Δ₁) :
     HasTypeProcPreOut Ssh { right := S₁, left := S₂ } (G₁ ++ G₂) (.par nS nG P Q)
       { right := S₁, left := Sfin } (G₁ ++ Gfin) Wfin Δfin := by
-  /-! ## Left-Par Framing: subset and disjoint setup -/
+  -- Left-Par Framing: subset and disjoint setup
   have hSubSplit1 : SEnvDomSubset split.S1 S₂ := by
     simpa [split.hS] using (SEnvDomSubset_append_left (S₁:=split.S1) (S₂:=split.S2))
   have hSubSplit2 : SEnvDomSubset split.S2 S₂ := by
@@ -268,7 +268,7 @@ theorem frame_left_par
     exact DisjointG_symm (DisjointG_of_subset_left hSubG1 hDisjGsym)
   have hDisjG_frame_2 : DisjointG G₁ split.G2 := by
     exact DisjointG_symm (DisjointG_of_subset_left hSubG2 hDisjGsym)
-  /-! ## Left-Par Framing: reframe P/Q subderivations -/
+  -- Left-Par Framing: reframe P/Q subderivations
   have hP0 :
       HasTypeProcPreOut Ssh { right := S₁, left := split.S1 } (G₁ ++ split.G1) P
         { right := S₁, left := S₁' } (G₁ ++ G₁') W₁ Δ₁ :=
@@ -297,7 +297,7 @@ theorem frame_left_par
     HasTypeProcPreOut_reframe_right
       (R:=(∅ : SEnv)) (R':=S₁ ++ split.S1) (L:=split.S2) (L':=S₂')
       (G:=split.G2) (P:=Q) hDisjInQ hDisjOutQ hQ0
-  /-! ## Left-Par Framing: assemble final par judgment -/
+  -- Left-Par Framing: assemble final par judgment
   have hDisjG_out : DisjointG (G₁ ++ split.G1) split.G2 :=
     DisjointG_append_left hDisjG_frame_2 hDisjG
   let splitOut : ParSplit S₂ (G₁ ++ G₂) :=
@@ -314,6 +314,6 @@ theorem frame_left_par
       hDisjG_out hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ hP hQ'
   simpa [hSfin, hGfin, hW, hΔ, List.append_assoc] using hPar
 
-/-! ## Local G-Frame Transport (Right) -/
+-- Local G-Frame Transport (Right)
 
 end

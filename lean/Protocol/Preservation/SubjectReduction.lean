@@ -23,7 +23,7 @@ open Batteries
 
 section
 
-/-! ## TypedStep-to-Step Subject Reduction -/
+-- TypedStep-to-Step Subject Reduction
 theorem subject_reduction {n : SessionId}
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
@@ -32,7 +32,7 @@ theorem subject_reduction {n : SessionId}
       { proc := P', store := store', bufs := bufs', G := G', D := D', nextSid := n } := by
   intro hTS
   induction hTS with
-  /-! ## Subject Reduction Case: Send -/
+  -- Subject Reduction Case: Send
   | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
       -- Rewrite to match sendStep.
@@ -42,7 +42,7 @@ theorem subject_reduction {n : SessionId}
       have hStep : StepBase C (sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L) :=
         StepBase.send rfl hk hx hG
       simpa [C] using (Step.base hStep)
-  /-! ## Subject Reduction Case: Recv -/
+  -- Subject Reduction Case: Recv
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
       subst hEdge hGout hDout hSout hStoreOut hBufsOut
@@ -51,7 +51,7 @@ theorem subject_reduction {n : SessionId}
       have hStep : StepBase C (recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L) :=
         StepBase.recv rfl hk hG hBuf
       simpa [C, recvStep, dequeueBuf, hBuf] using (Step.base hStep)
-  /-! ## Subject Reduction Case: Select -/
+  -- Subject Reduction Case: Select
   | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
       subst hEdge hGout hDout hBufsOut
@@ -60,7 +60,7 @@ theorem subject_reduction {n : SessionId}
       have hStep : StepBase C (sendStep C e { sid := e.sid, sender := e.role, receiver := target } (.string ℓ) .string L) :=
         StepBase.select rfl hk hG hFind
       simpa [C] using (Step.base hStep)
-  /-! ## Subject Reduction Case: Branch -/
+  -- Subject Reduction Case: Branch
   | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
       subst hEdge hGout hDout hBufsOut
@@ -78,13 +78,13 @@ theorem subject_reduction {n : SessionId}
                    D := updateD D { sid := e.sid, sender := source, receiver := e.role } (lookupD D { sid := e.sid, sender := source, receiver := e.role }).tail } :=
         StepBase.branch rfl hk hG hBuf hFindP hFindT hDeq
       simpa [C] using (Step.base hStep)
-  /-! ## Subject Reduction Case: Assign -/
+  -- Subject Reduction Case: Assign
   | assign hv hS hStore =>
       rename_i G D Ssh Sown store bufs x v T S' store'
       refine Step.base ?_
       subst hS hStore
       exact StepBase.assign rfl
-  /-! ## Subject Reduction Case: Sequential Context -/
+  -- Subject Reduction Case: Sequential Context
   | seq_step hStep ih =>
       rename_i G D Ssh Sown G' D' Sown' store bufs store' bufs' P P' Q
       let C : Config :=
@@ -95,11 +95,11 @@ theorem subject_reduction {n : SessionId}
         simpa [C, C'] using ih
       have hProc : C.proc = .seq P Q := rfl
       simpa [C, C'] using (Step.seq_left hProc hSub)
-  /-! ## Subject Reduction Case: seq_skip -/
+  -- Subject Reduction Case: seq_skip
   | seq_skip =>
       refine Step.base ?_
       exact StepBase.seq2 rfl
-  /-! ## Subject Reduction Case: Parallel Left Context -/
+  -- Subject Reduction Case: Parallel Left Context
   | par_left split hSlen hStep hDisjG hDisjD hDisjS ih =>
       rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁' nS nG
       let C0 : Config :=
@@ -115,7 +115,7 @@ theorem subject_reduction {n : SessionId}
       have hProc : C.proc = .par nS nG P Q := rfl
       simpa [C, C0'] using
         (Step.par_left (nS':=S₁'.length) (nG':=nG) hProc hSub')
-  /-! ## Subject Reduction Case: Parallel Right Context -/
+  -- Subject Reduction Case: Parallel Right Context
   | par_right split hSlen hStep hDisjG hDisjD hDisjS ih =>
       rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂' nS nG
       let C0 : Config :=
@@ -131,7 +131,7 @@ theorem subject_reduction {n : SessionId}
       have hProc : C.proc = .par nS nG P Q := rfl
       simpa [C, C0'] using
         (Step.par_right (nS':=split.S1.length) (nG':=nG) hProc hSub')
-  /-! ## Subject Reduction Case: Parallel Skip Cases -/
+  -- Subject Reduction Case: Parallel Skip Cases
   | par_skip_left =>
       refine Step.base ?_
       exact StepBase.par_skip_left rfl

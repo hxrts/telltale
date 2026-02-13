@@ -289,7 +289,7 @@ mutual
       ∀ g x, x ∈ (trans g role).freeVars → x ∈ g.freeVars := by
     intro g x hx
     match g with
-    /-! ## FreeVars Subset: Base Cases -/
+    -- FreeVars Subset: Base Cases
     | .end =>
         have : False := by
           simp [trans, LocalTypeR.freeVars] at hx
@@ -310,7 +310,7 @@ mutual
           have : False := by
             simp [hguard, Bool.false_eq_true, ↓reduceIte, LocalTypeR.freeVars] at hx
           exact this.elim
-    /-! ## FreeVars Subset: Communication Cases -/
+    -- FreeVars Subset: Communication Cases
     | .comm sender receiver branches =>
         cases hsender : role == sender with
         | true =>
@@ -328,7 +328,7 @@ mutual
                       SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap] at hx
                     have hmem := transBranches_freeVars_subset role ((label, cont) :: tail) x hx
                     simpa [GlobalType.freeVars, SessionTypes.GlobalType.freeVarsOfBranches_eq_flatMap] using hmem
-        /-! ## FreeVars Subset: Receiver Communication -/
+        -- FreeVars Subset: Receiver Communication
         | false =>
             cases hreceiver : role == receiver with
             | true =>
@@ -347,7 +347,7 @@ mutual
                           LocalTypeR.freeVars, SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap] at hx
                         have hmem := transBranches_freeVars_subset role ((label, cont) :: tail) x hx
                         simpa [GlobalType.freeVars, SessionTypes.GlobalType.freeVarsOfBranches_eq_flatMap] using hmem
-            /-! ## FreeVars Subset: Non-Participant Communication -/
+            -- FreeVars Subset: Non-Participant Communication
             | false =>
                 cases branches with
                 | nil =>
@@ -362,7 +362,7 @@ mutual
                         have hmem' : x ∈ cont.freeVars := trans_freeVars_subset role cont x hx
                         simp [GlobalType.freeVars, SessionTypes.GlobalType.freeVarsOfBranches_eq_flatMap,
                           List.flatMap_cons, List.mem_append, hmem']
-    /-! ## FreeVars Subset: Delegation Case -/
+    -- FreeVars Subset: Delegation Case
     | .delegate p q sid r cont =>
         -- Delegate projects to continuation's freeVars
         simp only [trans] at hx
@@ -395,7 +395,7 @@ mutual
       | exact sizeOf_cont_lt_comm _ _ _ _ _
       | omega
 
-  /-! ## FreeVars Subset: Branch Fold Lemma -/
+  -- FreeVars Subset: Branch Fold Lemma
   theorem transBranches_freeVars_subset (role : String) :
       ∀ branches y,
         y ∈ (transBranches branches role).flatMap (fun (_, _, t) => t.freeVars) →

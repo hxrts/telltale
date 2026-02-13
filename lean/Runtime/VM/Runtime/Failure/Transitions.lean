@@ -19,7 +19,7 @@ set_option autoImplicit false
 
 universe u
 
-/-! ## Recovery Decision Determinism -/
+-- Recovery Decision Determinism
 
 /-- `decideRecovery` is deterministic: equal inputs imply equal chosen actions. -/
 theorem decideRecovery_deterministic
@@ -39,7 +39,7 @@ theorem decideRecovery_deterministic
   intro a₁ a₂ h₁ h₂
   simpa [h₁] using h₂
 
-/-! ### Recovery action application -/
+-- # Recovery action application
 
 /-- Apply a concrete recovery action to state. -/
 def applyRecoveryAction {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -65,7 +65,7 @@ def applyRecoveryAction {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     | .reconcileThenRetry ticks => s!"recovery:reconcile_then_retry ticks={ticks}"
   appendFailureTraceEvent st' .recovery detail
 
-/-! ### Single-failure transition with deterministic evidence -/
+-- # Single-failure transition with deterministic evidence
 
 /-- Apply one failure event, including deterministic recovery action selection. -/
 def applyFailure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -114,7 +114,7 @@ def applyFailure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
       let st'' := applyRecoveryAction st' act
       emitStructuredErrorEvent st'' (faultClassOfFailure f) evidence.certainty act evidence.evidenceId evidence.detail
 
-  /-! #### Corruption and timeout branches -/
+  -- ## Corruption and timeout branches
 
   | .corrupt edge _seqNo =>
       let st' := reconcileBeforeReplay st0 edge.sid
@@ -145,7 +145,7 @@ def applyFailure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
       let st'' := applyRecoveryAction st' act
       emitStructuredErrorEvent st'' (faultClassOfFailure f) evidence.certainty act evidence.evidenceId evidence.detail
 
-/-! ### Batched failure ingress -/
+-- # Batched failure ingress
 
 /-- Apply a failure-event batch in deterministic arrival order. -/
 def applyFailureEvents {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -158,7 +158,7 @@ def applyFailureEvents {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     VMState ι γ π ε ν :=
   events.foldl applyFailure st
 
-/-! ### Tick-level ingress orchestration -/
+-- # Tick-level ingress orchestration
 
 /-- Deterministic ingress for one runtime tick.
     Topology/environment events are applied first, then failure events, then scheduling. -/
@@ -177,7 +177,7 @@ def ingressTick {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   | some st''' => st'''
   | none => st''
 
-/-! ### Failure-aware scheduler fallback tick -/
+-- # Failure-aware scheduler fallback tick
 
 /-- Execute one failure-aware tick: consume at most one failure event, otherwise schedule. -/
 def failureTick {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -194,7 +194,7 @@ def failureTick {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
       | some st' => st'
       | none => st
 
-/-! ### Relational failure-step semantics -/
+-- # Relational failure-step semantics
 
 inductive FStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]

@@ -39,7 +39,7 @@ open scoped Classical
 
 section
 
-/-! ## Configuration Equivalence -/
+-- Configuration Equivalence
 
 /-- Two configurations are equivalent with respect to role r in session s
     if they have the same observable state for r. Observable state includes:
@@ -57,7 +57,7 @@ def CEquiv (C₁ C₂ : Config) (s : SessionId) (r : Role) : Prop :=
 
 notation:50 C₁ " ≈[" s ", " r "] " C₂ => CEquiv C₁ C₂ s r
 
-/-! ## CEquiv Properties -/
+-- CEquiv Properties
 
 /-- CEquiv is reflexive: every config is equivalent to itself. -/
 theorem CEquiv.refl (C : Config) (s : SessionId) (r : Role) : C ≈[s, r] C := by
@@ -81,7 +81,7 @@ theorem CEquiv.trans {C₁ C₂ C₃ : Config} {s : SessionId} {r : Role}
          fun p => (hBufs₁₂ p).trans (hBufs₂₃ p),
          fun p => (hD₁₂ p).trans (hD₂₃ p)⟩
 
-/-! ## Blindness -/
+-- Blindness
 
 /-- A role is blind to a communication if it is neither sender nor receiver. -/
 def BlindTo (r : Role) (sender receiver : Role) : Prop :=
@@ -92,7 +92,7 @@ theorem BlindTo.comm {r sender receiver : Role}
     (h : BlindTo r sender receiver) : BlindTo r receiver sender := by
   exact ⟨h.2, h.1⟩
 
-/-! ## Step Locality: G Environment -/
+-- Step Locality: G Environment
 
 /-- Send step only changes G at the sender's endpoint.
     Other endpoints are unaffected. -/
@@ -115,7 +115,7 @@ theorem recv_G_locality {C : Config} {ep : Endpoint} {edge : Edge}
     simp [recvStep, hdq]
     exact lookupG_updateG_ne hne
 
-/-! ## Step Locality: Buffers -/
+-- Step Locality: Buffers
 
 /-- Send step only adds to the sender→receiver buffer.
     Other buffers are unaffected. -/
@@ -139,7 +139,7 @@ theorem recv_buf_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
     simp [recvStep, hdq]
     exact lookupBuf_dequeueBuf_ne hdq hne
 
-/-! ## Step Locality: Traces -/
+-- Step Locality: Traces
 
 /-- Send step only extends the sender→receiver trace.
     Other traces are unaffected. -/
@@ -163,9 +163,9 @@ theorem recv_D_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
     simp [recvStep, hdq]
     exact lookupD_update_neq C.D edge edge' (lookupD C.D edge).tail hne.symm
 
-/-! ## Noninterference Theorem -/
+-- Noninterference Theorem
 
-/-! ## CEquiv and Process Independence -/
+-- CEquiv and Process Independence
 
 /-- Changing only the process does not affect CEquiv. -/
 theorem CEquiv_ignore_proc {C C' : Config} {s : SessionId} {r : Role}
@@ -173,7 +173,7 @@ theorem CEquiv_ignore_proc {C C' : Config} {s : SessionId} {r : Role}
     C ≈[s, r] { C' with proc := Q } := by
   simpa [CEquiv] using h
 
-/-! ## Blind Locality Helpers for Send Steps -/
+-- Blind Locality Helpers for Send Steps
 /-- Helper: blind role's G is unchanged by send step. -/
 private theorem send_blind_G_unchanged {C : Config} {ep : Endpoint} {target : Role}
     {v : Value} {T : ValType} {L : LocalType}
@@ -217,7 +217,7 @@ private theorem send_blind_D_unchanged {C : Config} {ep : Endpoint} {target : Ro
   simp only [Edge.mk.injEq] at heq
   exact hBlind.2 heq.2.2
 
-/-! ## Blindness Predicates for Concrete Step Forms -/
+-- Blindness Predicates for Concrete Step Forms
 /-- A role is blind to a send step if it's neither the sender nor the target. -/
 def BlindToSend (r : Role) (sender target : Role) : Prop :=
   r ≠ sender ∧ r ≠ target
@@ -226,7 +226,7 @@ def BlindToSend (r : Role) (sender target : Role) : Prop :=
 def BlindToRecv (r : Role) (source receiver : Role) : Prop :=
   r ≠ source ∧ r ≠ receiver
 
-/-! ## CEquiv Preservation for Primitive Communication Steps -/
+-- CEquiv Preservation for Primitive Communication Steps
 /-- Send step preserves CEquiv for blind roles.
     The observable state of a role r is unchanged if r is neither sender nor target. -/
 theorem send_preserves_CEquiv {C : Config} {ep : Endpoint} {target : Role}
@@ -261,7 +261,7 @@ theorem send_preserves_CEquiv {C : Config} {ep : Endpoint} {target : Role}
     subst hSid
     exact hBlind.2 heq.2.2
 
-/-! ## CEquiv Preservation for Primitive Recv Steps -/
+-- CEquiv Preservation for Primitive Recv Steps
 /-- Recv step preserves CEquiv for blind roles. -/
 theorem recv_preserves_CEquiv {C : Config} {ep : Endpoint} {source : Role}
     {x : Var} {v : Value} {L : LocalType}
@@ -292,7 +292,7 @@ theorem recv_preserves_CEquiv {C : Config} {ep : Endpoint} {source : Role}
     simp only [Edge.mk.injEq] at heq
     exact hBlind.2 heq.2.2
 
-/-! ## Main Blind-step Noninterference Theorem -/
+-- Main Blind-step Noninterference Theorem
 /-- Main noninterference theorem: blind steps preserve observable equivalence.
 
     If role r is blind to a step (not sender/source or receiver/target),
@@ -316,7 +316,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
       lookupBuf C.bufs ⟨C.nextSid, sender, receiver⟩ = []) :
     C ≈[s, r] C' := by
   cases hStep with
-  /-! ## Blind-step Theorem: Send Case -/
+  -- Blind-step Theorem: Send Case
   | send hProc hk hx hG =>
     -- Send step: extract endpoint from store lookup
     rename_i k x e v target T L
@@ -333,7 +333,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
       · apply Eq.symm; apply send_D_locality; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
-  /-! ## Blind-step Theorem: Recv Case -/
+  -- Blind-step Theorem: Recv Case
   | recv hProc hk hG hBuf =>
     rename_i k x e v source T L
     by_cases hsid : e.sid = s
@@ -348,7 +348,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
       · apply Eq.symm; apply recv_D_locality; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
-  /-! ## Blind-step Theorem: Select Case -/
+  -- Blind-step Theorem: Select Case
   | select hProc hk hG hFind =>
     rename_i k e ℓ target branches L
     by_cases hsid : e.sid = s
@@ -363,7 +363,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
       · apply Eq.symm; apply send_D_locality; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
-  /-! ## Blind-step Theorem: Branch Case -/
+  -- Blind-step Theorem: Branch Case
   | branch hProc hk hG hBuf hPFind hTFind hDq =>
     rename_i k e ℓ source procBranches typeBranches P L bufs'
     by_cases hsid : e.sid = s
@@ -409,7 +409,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
         -- lookupD_update_neq has e ≠ e', so heq : e.sid = s ∧ ...
         have hs : e.sid = s := congrArg Edge.sid heq
         exact hsid hs
-  /-! ## Blind-step Theorem: New Session Case -/
+  -- Blind-step Theorem: New Session Case
   | newSession hProc =>
     -- newSessionStep creates a new session but doesn't change G or D.
     -- Buffers change only for the new session (C.nextSid).
@@ -445,7 +445,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
       · -- D is unchanged
         intro _
         simp [newSessionStep]
-  /-! ## Blind-step Theorem: Local Control-flow Cases -/
+  -- Blind-step Theorem: Local Control-flow Cases
   | assign hProc =>
     unfold CEquiv
     simp

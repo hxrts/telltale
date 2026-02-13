@@ -363,8 +363,6 @@ end
 
 /-! ## freeVars / isFreeIn bridge lemmas -/
 mutual
-  /-! ## freeVars Membership Implies isFreeIn -/
-
   theorem mem_freeVars_isFreeIn (lt : LocalTypeR) (v : String) :
       v ∈ lt.freeVars → lt.isFreeIn v = true := by
     intro hmem
@@ -396,8 +394,6 @@ mutual
     classical
     all_goals
       simp [*] <;> omega
-
-  /-! ## Branch Membership Implies Branch isFreeIn -/
 
   theorem mem_freeVarsOfBranches_isFreeInBranches' (bs : List BranchR) (v : String) :
       v ∈ freeVarsOfBranches bs → isFreeInBranches' v bs = true := by

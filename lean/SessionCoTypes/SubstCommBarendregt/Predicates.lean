@@ -23,7 +23,7 @@ open SessionCoTypes.EQ2
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 
-/-! ## Barendregt Predicates -/
+-- Barendregt Predicates
 
 mutual
   /-- Check if a variable appears free in a type. -/
@@ -55,7 +55,7 @@ mutual
     | (_, _, cont) :: rest => notBoundAt v cont && notBoundAtBranches v rest
 end
 
-/-! ## Duality Preservation for Barendregt Predicates -/
+-- Duality Preservation for Barendregt Predicates
 
 mutual
   /-- isFreeIn is invariant under duality. -/
@@ -88,7 +88,7 @@ mutual
                 simp [dualBranches, isFreeInBranches, isFreeIn_dual, isFreeInBranches_dual]
 end
 
-/-! ## Duality Preservation: notBoundAt -/
+-- Duality Preservation: notBoundAt
 
 mutual
   /-- notBoundAt is invariant under duality. -/
@@ -119,7 +119,7 @@ mutual
                 simp [dualBranches, notBoundAtBranches, notBoundAt_dual, notBoundAtBranches_dual]
 end
 
-/-! ## notBoundAt Substitution Preservation -/
+-- notBoundAt Substitution Preservation
 
 mutual
   /-- notBoundAt is preserved through substitution when repl also satisfies it. -/
@@ -177,7 +177,7 @@ mutual
     case _ => omega
 end
 
-/-! ## notBoundAt Unfold Preservation -/
+-- notBoundAt Unfold Preservation
 
 /-- notBoundAt is preserved through unfolding. -/
 @[simp]
@@ -201,7 +201,7 @@ theorem notBoundAt_unfold (v : String) (a : LocalTypeR)
       unfold notBoundAt
       exact Bool.and_eq_true_iff.mpr ⟨hvt, hbarBody⟩
 
-/-! ## Substitution Helper Lemmas -/
+-- Substitution Helper Lemmas
 
 mutual
   /-- If x is not free in e, then substituting for x leaves e unchanged. -/
@@ -239,7 +239,7 @@ mutual
           exact substitute_not_free body x rx hnot_free
   termination_by sizeOf e
 
-  /-! ## Substitute-Not-Free: Branch Version -/
+  -- Substitute-Not-Free: Branch Version
 
   /-- If x is not free in any branch, substituting for x leaves branches unchanged. -/
   theorem substituteBranches_not_free (bs : List BranchR) (x : String) (rx : LocalTypeR)
@@ -273,7 +273,7 @@ theorem isFreeIn_mu_self (t : String) (body : LocalTypeR) :
     isFreeIn t (.mu t body) = false := by
   simp only [isFreeIn, beq_self_eq_true, ↓reduceIte]
 
-/-! ## Substitution Self-Elimination -/
+-- Substitution Self-Elimination
 
 mutual
   /-- If t is not free in repl, then t is not free in (e.substitute t repl).
@@ -316,7 +316,7 @@ mutual
           exact isFreeIn_subst_self_general inner t repl hrepl
   termination_by sizeOf e
 
-  /-! ## Substitution Self-Elimination: Branch Version -/
+  -- Substitution Self-Elimination: Branch Version
 
   /-- Branch version of isFreeIn_subst_self_general. -/
   theorem isFreeInBranches_subst_self_general (bs : List BranchR) (t : String)
@@ -343,7 +343,7 @@ theorem isFreeIn_subst_mu_self (body : LocalTypeR) (t : String) :
     isFreeIn t (body.substitute t (.mu t body)) = false :=
   isFreeIn_subst_self_general body t (.mu t body) (isFreeIn_mu_self t body)
 
-/-! ## Substitution Preservation for Other Variables -/
+-- Substitution Preservation for Other Variables
 
 mutual
   /-- If v is not free in e and not free in repl, then v is not free in e.substitute t repl.
@@ -392,7 +392,7 @@ mutual
             exact isFreeIn_subst_preserves body v t repl hv_e hv_repl
   termination_by sizeOf e
 
-  /-! ## Substitution Preservation: Branch Version -/
+  -- Substitution Preservation: Branch Version
 
   /-- Branch version of isFreeIn_subst_preserves. -/
   theorem isFreeInBranches_subst_preserves (bs : List BranchR) (v t : String)
@@ -413,7 +413,7 @@ mutual
     all_goals omega
 end
 
-/-! ## μ Substitution Helper -/
+-- μ Substitution Helper
 
 /-- Key helper: (mu t body).substitute var repl = mu t (body.substitute var repl) when t ≠ var. -/
 @[simp]

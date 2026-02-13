@@ -20,7 +20,7 @@ open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 section
 open Classical
-/-! ## Label Predicates -/
+-- Label Predicates
 
 /-- Boolean label-in predicate for branch lists. -/
 def labelInb (lbl : Label) (branches : List BranchR) : Bool :=
@@ -43,7 +43,7 @@ def appendMissing (bs2 bs1 : List BranchR) : List BranchR :=
 def labelsSubset (bs1 bs2 : List BranchR) : Prop :=
   ∀ lbl, labelIn lbl bs1 → labelIn lbl bs2
 
-/-! ## Basic Lookup Lemmas -/
+-- Basic Lookup Lemmas
 
 private theorem labelIn_head (lbl : Label) (vt : Option SessionTypes.ValType) (t : LocalTypeR) (rest : List BranchR) :
     labelIn lbl ((lbl, vt, t) :: rest) := by
@@ -74,7 +74,7 @@ theorem mem_of_lookupBranch {lbl : Label} {t : LocalTypeR} {bs : List BranchR}
         obtain ⟨vt, hmem⟩ := ih h
         exact ⟨vt, List.mem_cons_of_mem _ hmem⟩
 
-/-! ## Subset Coherence -/
+-- Subset Coherence
 
 /-- sameLabels from both subset directions. -/
 theorem sameLabels_of_subsets {bs1 bs2 : List BranchR}
@@ -113,7 +113,7 @@ theorem labelsSubset_of_labelsSubsetb {bs1 bs2 : List BranchR}
           (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt) (t := t) (rest := tail) hlt).1 hIn
         exact ih h'.2 lbl hIn_tail
 
-/-! ## appendMissing Lemmas -/
+-- appendMissing Lemmas
 
 theorem appendMissing_nil (bs : List BranchR) :
     appendMissing bs [] = bs := by
@@ -127,7 +127,7 @@ private theorem labelInb_of_lookup_none {lbl : Label} {bs : List BranchR}
     (h : lookupBranch lbl bs = none) : labelInb lbl bs = false := by
   simp [labelInb, h]
 
-/-! ## appendMissing Lookup Preservation -/
+-- appendMissing Lookup Preservation
 
 private theorem lookupBranch_appendMissing_of_not_in
     {lbl : Label} {bs2 bs1 : List BranchR}
@@ -164,9 +164,9 @@ private theorem lookupBranch_appendMissing_of_not_in
                 _ = lookupBranch lbl ((l, t) :: tail) := by
                   simp [lookupBranch, hlt]
 
-/-! ## Merge Algorithm -/
+-- Merge Algorithm
 
-/-! ## Well-Founded Lookup Helper -/
+-- Well-Founded Lookup Helper
 
 private def lookupBranchEq (lbl : Label) :
     (bs : List BranchR) →
@@ -203,7 +203,7 @@ private lemma lookupBranchEq_none {lbl : Label} :
             exact this.elim
 
 mutual
-  /-! ## Core Merge -/
+  -- Core Merge
 
   /-- Merge two local types, returning a common erasure if possible. -/
   def merge : LocalTypeR → LocalTypeR → Option LocalTypeR
@@ -239,7 +239,7 @@ mutual
       | exact Nat.add_lt_add (sizeOf_body_lt_sizeOf_mu _ _) (sizeOf_body_lt_sizeOf_mu _ _)
       | exact Nat.add_lt_add (sizeOf_branches_lt_sizeOf_send _ _) (sizeOf_branches_lt_sizeOf_send _ _)
 
-  /-! ## Send-Branch Merge -/
+  -- Send-Branch Merge
 
   /-- Merge send branches using `merge` on continuations. -/
   def mergeBranchesSend : List BranchR → List BranchR →
@@ -269,7 +269,7 @@ mutual
           sizeOf_cont_lt_sizeOf_branches_mem hmem2_cont
         exact Nat.add_lt_add hlt1 hlt2
 
-  /-! ## Recv-Branch Merge -/
+  -- Recv-Branch Merge
 
   /-- Merge recv branches using `merge` on continuations. -/
   def mergeBranchesRecv : List BranchR → List BranchR →
@@ -303,7 +303,7 @@ mutual
         exact Nat.add_lt_add hlt1 hlt2
 end
 
-/-! ## Inversion Lemmas -/
+-- Inversion Lemmas
 
 theorem mergeBranchesSend_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValType} {t1 : LocalTypeR}
     {rest bs2 bs : List BranchR}
@@ -334,7 +334,7 @@ theorem mergeBranchesSend_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValTy
               · rfl
               · cases h; rfl
 
-/-! ## Recv Inversion -/
+-- Recv Inversion
 
 theorem mergeBranchesRecv_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValType} {t1 : LocalTypeR}
     {rest bs2 bs : List BranchR}
@@ -377,7 +377,7 @@ theorem mergeBranchesRecv_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValTy
               · rfl
               · cases h; rfl
 
-/-! ## Folded Merge for Lists -/
+-- Folded Merge for Lists
 
 /-- Merge a list of local types (right fold). -/
 def mergeAll : List LocalTypeR → Option LocalTypeR

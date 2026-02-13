@@ -108,11 +108,11 @@ lemma coherent_case_senderB_receiverNeB
         ActiveEdge_of_endpoints (e:=⟨s, A, receiver⟩) hDeleg.A_lookup hGrecv0
       have hCohOld : EdgeCoherent G D ⟨s, A, receiver⟩ :=
         Coherent_edge_any hCoh hActiveOld
-	      have hEdge :=
-	        delegate_redirected_edge_coherent (G:=G) (G':=G') (D:=D) (D':=D')
-	          (s:=s) (A:=A) (B:=B) (C:=receiver)
-	          (Ne.symm hReceiverNeA) (Ne.symm hReceiverB') hCohOld hDeleg
-	      simpa [hSid', hSenderB'] using hEdge
+      have hEdge :=
+        delegate_redirected_edge_coherent (G:=G) (G':=G') (D:=D) (D':=D')
+          (s:=s) (A:=A) (B:=B) (C:=receiver)
+          (Ne.symm hReceiverNeA) (Ne.symm hReceiverB') hCohOld hDeleg
+      simpa [hSid', hSenderB'] using hEdge
 
 /-! ## Helper Case: Redirected Receiver `(C,B)` -/
 
@@ -144,11 +144,11 @@ lemma coherent_case_senderNeB_receiverB
         ActiveEdge_of_endpoints (e:=⟨s, sender, A⟩) hGsender0 hDeleg.A_lookup
       have hCohOld : EdgeCoherent G D ⟨s, sender, A⟩ :=
         Coherent_edge_any hCoh hActiveOld
-	      have hEdge :=
-	        delegate_redirected_edge_coherent_receiver (G:=G) (G':=G') (D:=D) (D':=D')
-	          (s:=s) (A:=A) (B:=B) (C:=sender)
-	          hSenderNeA hSenderB' hCohOld hDeleg
-	      simpa [hSid', hReceiverB'] using hEdge
+      have hEdge :=
+        delegate_redirected_edge_coherent_receiver (G:=G) (G':=G') (D:=D) (D':=D')
+          (s:=s) (A:=A) (B:=B) (C:=sender)
+          hSenderNeA hSenderB' hCohOld hDeleg
+      simpa [hSid', hReceiverB'] using hEdge
 
 /-! ## Helper Case: Unrelated Session Edge `(C,D)` -/
 

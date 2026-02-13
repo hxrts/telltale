@@ -25,7 +25,7 @@ open Batteries
 
 section
 
-/-! ## Send Frame Lemma -/
+-- Send Frame Lemma
 
 theorem BuffersTyped_send_frame_left
     {G : GEnv} {D : DEnv} {G₂ : GEnv} {D₂ : DEnv} {bufs : Buffers}
@@ -77,7 +77,7 @@ theorem BuffersTyped_send_frame_left
     updateG_append_left_hit (G₁:=G) (G₂:=G₂) (e:=e) (L:=.send target T L) (L':=L) hG
   simpa [hGrew] using hBT'''
 
-/-! ## Recv Frame Lemma (Left Append) -/
+-- Recv Frame Lemma (Left Append)
 
 theorem BuffersTyped_recv_frame_left
     {G : GEnv} {D : DEnv} {G₂ : GEnv} {D₂ : DEnv} {bufs : Buffers}
@@ -119,7 +119,7 @@ theorem BuffersTyped_recv_frame_left
           (lookupD D { sid := e.sid, sender := source, receiver := e.role }).tail)
         (updateBuf bufs { sid := e.sid, sender := source, receiver := e.role } vs) := by
     simpa [hEq] using hBT'
-  /-! ### Lift Along `updateG` and Reassociate -/
+  -- # Lift Along `updateG` and Reassociate
   have hBT''' :
       BuffersTyped (updateG (G ++ G₂) e L)
         (updateD (D ++ D₂) { sid := e.sid, sender := source, receiver := e.role }
@@ -131,7 +131,7 @@ theorem BuffersTyped_recv_frame_left
     updateG_append_left_hit (G₁:=G) (G₂:=G₂) (e:=e) (L:=.recv source T L) (L':=L) hG
   simpa [hGrew] using hBT'''
 
-/-! ## Select Frame Lemma (Left Append) -/
+-- Select Frame Lemma (Left Append)
 
 theorem BuffersTyped_select_frame_left
     {G : GEnv} {D : DEnv} {G₂ : GEnv} {D₂ : DEnv} {bufs : Buffers}
@@ -183,7 +183,7 @@ theorem BuffersTyped_select_frame_left
     updateG_append_left_hit (G₁:=G) (G₂:=G₂) (e:=e) (L:=.select target bs) (L':=L) hG
   simpa [hGrew] using hBT'''
 
-/-! ## Branch Frame Lemma (Left Append) -/
+-- Branch Frame Lemma (Left Append)
 
 theorem BuffersTyped_branch_frame_left
     {G : GEnv} {D : DEnv} {G₂ : GEnv} {D₂ : DEnv} {bufs : Buffers}
@@ -209,7 +209,7 @@ theorem BuffersTyped_branch_frame_left
       lookupD (D ++ D₂) { sid := e.sid, sender := source, receiver := e.role } =
         lookupD D { sid := e.sid, sender := source, receiver := e.role } :=
     lookupD_append_left_of_right_none (D₁:=D) (D₂:=D₂) (e:={ sid := e.sid, sender := source, receiver := e.role }) hD2none
-  /-! ### Normalize Lookup Head Premise Through Rewritten DEnv -/
+  -- # Normalize Lookup Head Premise Through Rewritten DEnv
   have hHead' :
       (lookupD (D ++ D₂) { sid := e.sid, sender := source, receiver := e.role }).head? = some .string := by
     simpa [hEq] using hHead
@@ -238,7 +238,7 @@ theorem BuffersTyped_branch_frame_left
     updateG_append_left_hit (G₁:=G) (G₂:=G₂) (e:=e) (L:=.branch source bs) (L':=L) hG
   simpa [hGrew] using hBT'''
 
-/-! ## Send Frame Lemma (Right Append) -/
+-- Send Frame Lemma (Right Append)
 
 theorem BuffersTyped_send_frame_right
     {G : GEnv} {D : DEnv} {G₁ : GEnv} {D₁ : DEnv} {bufs : Buffers}
@@ -283,7 +283,7 @@ theorem BuffersTyped_send_frame_right
           (lookupD D { sid := e.sid, sender := e.role, receiver := target } ++ [T]))
         (enqueueBuf bufs { sid := e.sid, sender := e.role, receiver := target } v) := by
     simpa [hEq] using hBT'
-  /-! ### Lift Along `updateG` and Reassociate -/
+  -- # Lift Along `updateG` and Reassociate
   have hBT''' :
       BuffersTyped (updateG (G₁ ++ G) e L)
         (updateD (D₁ ++ D) { sid := e.sid, sender := e.role, receiver := target }
@@ -296,7 +296,7 @@ theorem BuffersTyped_send_frame_right
       (lookupG_none_of_disjoint (G₁:=G₁) (G₂:=G) hDisj hG)
   simpa [hGrew] using hBT'''
 
-/-! ## Recv Frame Lemma (Right Append) -/
+-- Recv Frame Lemma (Right Append)
 
 theorem BuffersTyped_recv_frame_right
     {G : GEnv} {D : DEnv} {G₁ : GEnv} {D₁ : DEnv} {bufs : Buffers}
@@ -339,7 +339,7 @@ theorem BuffersTyped_recv_frame_right
           (lookupD D { sid := e.sid, sender := source, receiver := e.role }).tail)
         (updateBuf bufs { sid := e.sid, sender := source, receiver := e.role } vs) := by
     simpa [hEq] using hBT'
-  /-! ### Lift Along `updateG` and Reassociate -/
+  -- # Lift Along `updateG` and Reassociate
   have hBT''' :
       BuffersTyped (updateG (G₁ ++ G) e L)
         (updateD (D₁ ++ D) { sid := e.sid, sender := source, receiver := e.role }
@@ -352,7 +352,7 @@ theorem BuffersTyped_recv_frame_right
       (lookupG_none_of_disjoint (G₁:=G₁) (G₂:=G) hDisj hG)
   simpa [hGrew] using hBT'''
 
-/-! ## Select Frame Lemma (Right Append) -/
+-- Select Frame Lemma (Right Append)
 
 theorem BuffersTyped_select_frame_right
     {G : GEnv} {D : DEnv} {G₁ : GEnv} {D₁ : DEnv} {bufs : Buffers}
@@ -396,7 +396,7 @@ theorem BuffersTyped_select_frame_right
           (lookupD D { sid := e.sid, sender := e.role, receiver := target } ++ [.string]))
         (enqueueBuf bufs { sid := e.sid, sender := e.role, receiver := target } (.string ℓ)) := by
     simpa [hEq] using hBT'
-  /-! ### Lift Along `updateG` and Reassociate -/
+  -- # Lift Along `updateG` and Reassociate
   have hBT''' :
       BuffersTyped (updateG (G₁ ++ G) e L)
         (updateD (D₁ ++ D) { sid := e.sid, sender := e.role, receiver := target }
@@ -409,7 +409,7 @@ theorem BuffersTyped_select_frame_right
       (lookupG_none_of_disjoint (G₁:=G₁) (G₂:=G) hDisj hG)
   simpa [hGrew] using hBT'''
 
-/-! ## Branch Frame Lemma (Right Append) -/
+-- Branch Frame Lemma (Right Append)
 
 theorem BuffersTyped_branch_frame_right
     {G : GEnv} {D : DEnv} {G₁ : GEnv} {D₁ : DEnv} {bufs : Buffers}
@@ -453,7 +453,7 @@ theorem BuffersTyped_branch_frame_right
           (lookupD D { sid := e.sid, sender := source, receiver := e.role }).tail)
         (updateBuf bufs { sid := e.sid, sender := source, receiver := e.role } vs) := by
     simpa [hEq] using hBT'
-  /-! ### Lift Along `updateG` and Reassociate -/
+  -- # Lift Along `updateG` and Reassociate
   have hBT''' :
       BuffersTyped (updateG (G₁ ++ G) e L)
         (updateD (D₁ ++ D) { sid := e.sid, sender := source, receiver := e.role }

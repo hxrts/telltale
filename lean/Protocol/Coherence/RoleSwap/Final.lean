@@ -20,9 +20,9 @@ open scoped Classical
 
 section
 
-/-! ## Coherence Preservation for Role Swap -/
+-- Coherence Preservation for Role Swap
 
-/-! ## Single-Swap Coherence Theorem -/
+-- Single-Swap Coherence Theorem
 
 /-- Coherence is preserved under swapping two roles within a session. -/
 theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
@@ -31,7 +31,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
   intro e hActive Lrecv hGrecv
   by_cases hSid : e.sid = s
   · -- Session-local swap case.
-    /-! ## CoherentRoleSwap: Session-Local Edge Case -/
+    -- CoherentRoleSwap: Session-Local Edge Case
     let e' : Edge := swapEdgeRole s A B e
     let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
     let senderEp : Endpoint := { sid := e.sid, role := e.sender }
@@ -41,7 +41,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
       simp [recvEp, recvEp', e', swapEdgeRole, swapEndpointRole, hSid, swapRole_involutive]
     have hSenderEp : swapEndpointRole s A B senderEp' = senderEp := by
       simp [senderEp, senderEp', e', swapEdgeRole, swapEndpointRole, hSid, swapRole_involutive]
-    /-! ## CoherentRoleSwap: Translate Endpoint Lookups -/
+    -- CoherentRoleSwap: Translate Endpoint Lookups
     have hLookupRecvMap :
         lookupG (swapGEnvRole s A B G) recvEp =
           (lookupG G recvEp').map (swapLocalTypeRole s A B) := by
@@ -68,7 +68,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
             simpa [hLookupR] using hLookupRecvEq
           exact (Option.some.inj this).symm
         have hGrecv0 : lookupG G recvEp' = some Lrecv0 := hLookupR
-        /-! ## CoherentRoleSwap: Recover Sender Preimage Lookup -/
+        -- CoherentRoleSwap: Recover Sender Preimage Lookup
         have hLookupSenderMap :
             lookupG (swapGEnvRole s A B G) senderEp =
               (lookupG G senderEp').map (swapLocalTypeRole s A B) := by
@@ -95,7 +95,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
           | some Lsender0 =>
               exact ⟨Lsender0, rfl⟩
         rcases hGsender0 with ⟨Lsender0, hGsender0⟩
-        /-! ## CoherentRoleSwap: Pull Back Coherence Witness -/
+        -- CoherentRoleSwap: Pull Back Coherence Witness
         have hActive' : ActiveEdge G e' :=
           ActiveEdge_of_endpoints (e:=e') hGsender0 hGrecv0
         have hCoh' := hCoh e' hActive' Lrecv0 hGrecv0
@@ -113,7 +113,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
                   = (lookupG G senderEp').map (swapLocalTypeRole s A B) := hLookupSenderMap
               _ = some (swapLocalTypeRole s A B Lsender1) := this)
         rcases (Option.isSome_iff_exists).1 hConsume with ⟨Lafter, hConsumeEq⟩
-        /-! ## CoherentRoleSwap: Push Consume Through Swap -/
+        -- CoherentRoleSwap: Push Consume Through Swap
         have hConsumeSwap :
             Consume (swapRole A B e'.sender) (swapLocalTypeRole s A B Lrecv0)
                 ((lookupD D e').map (swapValTypeRole s A B)) =
@@ -138,7 +138,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
           simpa [hSenderEq, hLrecv, hTrace] using hConsumeSwap
         refine ⟨swapLocalTypeRole s A B Lsender1, hLookupSender', ?_⟩
         simp [hConsumeSwapped]
-  /-! ## CoherentRoleSwap: Non-Target Session Edge -/
+  -- CoherentRoleSwap: Non-Target Session Edge
   · -- Other-session edges are unchanged.
     have hSidNe : e.sid ≠ s := hSid
     let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
@@ -188,7 +188,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
     refine ⟨Lsender, hLookupSender', ?_⟩
     simpa [hTrace] using hConsume
 
-/-! ## Role Swap Sequences (Exchangeability Primitive) -/
+-- Role Swap Sequences (Exchangeability Primitive)
 
 /-- Apply a list of role swaps to a role. -/
 def swapRoleList (pairs : List (Role × Role)) (r : Role) : Role :=

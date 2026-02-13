@@ -53,93 +53,29 @@ lemma consumeOneHO_realizable (from_ receiver : Role) (T : ValType) (L : LocalTy
     (res : ConsumeResult)
     (h : consumeOneHO from_ receiver T L = some res) :
     res.delta.realizable env := by
-  cases T with
-  | chan sid role =>
-    -- Channel case: delta has the two new edges
-    cases L with
-    | recv r' T' L' =>
-      simp only [consumeOneHO] at h
-      by_cases hEq : from_ == r' && ValType.chan sid role == T'
-      · simp only [hEq, ↓reduceIte] at h
-        simp only [Option.some.injEq] at h
-        rw [← h]
-        -- The two edges reference (role, receiver) in session sid
-        simp only [GraphDelta.realizable]
+  cases L with
+  | recv r T' L' =>
+    by_cases hEq : from_ == r && T == T'
+    · cases T with
+      | chan sid role =>
+        simp [consumeOneHO, hEq] at h
+        cases h
+        rcases hT with ⟨hRole, hReceiver⟩
         constructor
         · intro e he
-          simp only [List.mem_cons] at he
-          cases he with
-          | inl heq =>
-            rw [heq]
-            exact ⟨hT.1, hT.2⟩
-          | inr heq =>
-            cases heq with
-            | inl heq2 =>
-              rw [heq2]
-              exact ⟨hT.2, hT.1⟩
-            | inr hnil => cases hnil
-        · intro e he; simp at he
-      · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
-	    | _ => simp [consumeOneHO] at h
-	  /-! ## `consumeOneHO_realizable`: Scalar Cases -/
-	  | unit =>
-	    -- Non-channel case: delta is empty, trivially realizable
-	    cases L with
-    | recv r' T' L' =>
-      simp only [consumeOneHO] at h
-      by_cases hEq : from_ == r' && ValType.unit == T'
-      · simp only [hEq, ↓reduceIte] at h
-        simp only [Option.some.injEq] at h
-        rw [← h]
+          simp at he
+          rcases he with rfl | rfl
+          · exact ⟨hRole, hReceiver⟩
+          · exact ⟨hReceiver, hRole⟩
+        · intro e he
+          simp at he
+      | unit | bool | nat | string | prod _ _ =>
+        simp [consumeOneHO, hEq] at h
+        cases h
         simp [GraphDelta.realizable, GraphDelta.empty]
-      · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
-    | _ => simp [consumeOneHO] at h
-  | bool =>
-    cases L with
-    | recv r' T' L' =>
-      simp only [consumeOneHO] at h
-      by_cases hEq : from_ == r' && ValType.bool == T'
-      · simp only [hEq, ↓reduceIte] at h
-        simp only [Option.some.injEq] at h
-        rw [← h]
-        simp [GraphDelta.realizable, GraphDelta.empty]
-	      · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
-	    | _ => simp [consumeOneHO] at h
-	  /-! ## `consumeOneHO_realizable`: Remaining Base Cases -/
-	  | nat =>
-	    cases L with
-    | recv r' T' L' =>
-      simp only [consumeOneHO] at h
-      by_cases hEq : from_ == r' && ValType.nat == T'
-      · simp only [hEq, ↓reduceIte] at h
-        simp only [Option.some.injEq] at h
-        rw [← h]
-        simp [GraphDelta.realizable, GraphDelta.empty]
-      · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
-    | _ => simp [consumeOneHO] at h
-  | string =>
-    cases L with
-    | recv r' T' L' =>
-      simp only [consumeOneHO] at h
-      by_cases hEq : from_ == r' && ValType.string == T'
-      · simp only [hEq, ↓reduceIte] at h
-        simp only [Option.some.injEq] at h
-        rw [← h]
-        simp [GraphDelta.realizable, GraphDelta.empty]
-	      · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
-	    | _ => simp [consumeOneHO] at h
-	  /-! ## `consumeOneHO_realizable`: Product Case -/
-	  | prod t1 t2 =>
-	    cases L with
-    | recv r' T' L' =>
-      simp only [consumeOneHO] at h
-      by_cases hEq : from_ == r' && ValType.prod t1 t2 == T'
-      · simp only [hEq, ↓reduceIte] at h
-        simp only [Option.some.injEq] at h
-        rw [← h]
-        simp [GraphDelta.realizable, GraphDelta.empty]
-	      · simp only [hEq, Bool.false_eq_true, ↓reduceIte] at h; cases h
-	    | _ => simp [consumeOneHO] at h
+    · simp [consumeOneHO, hEq] at h
+  | _ =>
+    simp [consumeOneHO] at h
 
 /-! ## ConsumeHO Realizability over Traces -/
 

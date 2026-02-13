@@ -67,9 +67,9 @@ theorem Consume_mono {from_ : Role} {L₁ L₂ : LocalType} {ts : List ValType} 
   rcases (Option.isSome_iff_exists).1 hSome2 with ⟨L₂', hL₂'⟩
   exact ⟨L₂', hL₂'⟩
 
-/-! ## Coherence Preservation Under Type Replacement -/
+-- Coherence Preservation Under Type Replacement
 
-/-! ## Edge-Level Replacement Preservation -/
+-- Edge-Level Replacement Preservation
 
 /-- EdgeCoherent is preserved when replacing the receiver's type with a compatible type.
 
@@ -117,7 +117,7 @@ theorem EdgeCoherent_type_replacement {G : GEnv} {D : DEnv} {e : Edge}
     -- L₂ can also consume the trace
     exact hCompat.1 _ hConsumeOk
 
-/-! ## Global Coherence Replacement Preservation -/
+-- Global Coherence Replacement Preservation
 
 /-- **Coherent_type_replacement**: Coherence is preserved under compatible type replacement.
 
@@ -147,7 +147,7 @@ theorem Coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
       exact hRecv hEq.symm
     intro Lrecv hLookupRecv'
     rw [hLookupRecv] at hLookupRecv'
-    /-! ## Coherent_type_replacement: Sender Match vs Unrelated Split -/
+    -- Coherent_type_replacement: Sender Match vs Unrelated Split
     -- Case split on whether ep is the sender
     by_cases hSend : ep = { sid := e.sid, role := e.sender }
     · -- ep is sender: sender changes but receiver and trace unchanged
@@ -167,7 +167,7 @@ theorem Coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
       constructor
       · subst hSend; exact lookupG_updateG_eq
       · exact hConsume
-    /-! ## Coherent_type_replacement: Unrelated Endpoint Case -/
+    -- Coherent_type_replacement: Unrelated Endpoint Case
     · -- ep is neither sender nor receiver: both unchanged
       have hLookupSendUnch : lookupG (updateG G ep L₂) { sid := e.sid, role := e.sender } =
           lookupG G { sid := e.sid, role := e.sender } := by

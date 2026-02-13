@@ -296,7 +296,7 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
                 exact False.elim ((edgeCmpLT_asymm ha_lt_b) hb_lt_a)
           subst hab
 
-          /-! ## Canonical List Extensionality: Tail Subset Transfer -/
+          -- Canonical List Extensionality: Tail Subset Transfer
           -- Tails are mutually subset.
           have h₁₂' : l₁ ⊆ l₂ := by
             intro x hx
@@ -326,7 +326,7 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
               cases this
             simpa [List.mem_cons, hneq] using hx'
           have htl : l₁ = l₂ := ih (h₁ := h₁'.2) (h₂ := h₂'.2) h₁₂' h₂₁'
-          simpa [htl]
+          simp [htl]
 
 /-! ## DEnv Extensional Equality -/
 /-- Two DEnvs with identical find? are equal. -/

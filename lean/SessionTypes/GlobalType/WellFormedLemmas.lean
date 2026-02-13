@@ -201,8 +201,6 @@ mutual
       · exact hrepl
     exact allVarsBound_substitute inner varName repl (t :: bound) hg' hrepl'
 
-  /-! ## allVarsBound Substitution: Main Theorem -/
-
   /-- allVarsBound is preserved when substituting a closed type for a bound variable.
 
   **Key insight**: When we substitute `mu t body` for occurrences of `var t` in body,
@@ -231,8 +229,6 @@ mutual
     | .delegate p q sid r cont =>
         simp only [GlobalType.substitute, GlobalType.allVarsBound] at hg ⊢
         exact allVarsBound_substitute cont varName repl bound hg hrepl
-
-  /-! ## allVarsBound Substitution: Branches -/
 
   theorem allVarsBoundBranches_substitute (branches : List (Label × GlobalType))
       (varName : String) (repl : GlobalType) (bound : List String)

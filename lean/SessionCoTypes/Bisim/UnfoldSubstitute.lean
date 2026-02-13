@@ -20,7 +20,7 @@ BisimF, yielding the commutation lemma.
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 
-/-! ## Core Development -/
+-- Core Development
 
 namespace SessionCoTypes.Bisim
 open SessionTypes.LocalTypeR
@@ -77,7 +77,7 @@ private theorem BranchesRelBisim_SubstUnfoldClosure_refl (var : String) (repl : 
           (WellFormed_substitute var (hWFbs b (List.Mem.head _)) hWFrepl))⟩
       · exact ih (fun lb hm => hWFbs lb (List.Mem.tail _ hm))
 
-/-! ## Postfix Construction for `SubstUnfoldClosure` -/
+-- Postfix Construction for `SubstUnfoldClosure`
 
 /-- SubstUnfoldClosure is a post-fixpoint of BisimF.
     This is the key lemma for proving unfold_substitute_EQ2. -/
@@ -87,7 +87,7 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
       BisimF (SubstUnfoldClosure var repl) u v := by
   intro u v huv
   cases huv with
-  /-! ## Postfix: `SubstUnfoldRel` Branch -/
+  -- Postfix: `SubstUnfoldRel` Branch
   | inl hSubst =>
     -- Case: SubstUnfoldRel var repl u v
     obtain ⟨t, hWFt, hu, hv⟩ := hSubst
@@ -137,14 +137,14 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
       apply BisimF.eq_recv CanRecv.base CanRecv.base
       exact BranchesRelBisim_SubstUnfoldClosure_refl var repl hWFrepl bs
         (LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := bs) hWFt)
-    /-! ## Postfix: `SubstUnfoldRel` Mu Case -/
+    -- Postfix: `SubstUnfoldRel` Mu Case
     | mu x body =>
       -- t = .mu x body: the complex case
       -- LHS: ((.mu x body).substitute var repl).unfold
       -- RHS: ((.mu x body).unfold).substitute var repl
       simp only [LocalTypeR.unfold] at hu hv
       by_cases hshadow : x = var
-      /-! ## Postfix: Mu Case with Shadowing (`x = var`) -/
+      -- Postfix: Mu Case with Shadowing (`x = var`)
       · -- x = var: substitution is shadowed
         -- Use hshadow : x = var to rewrite x occurrences
         have hsame : (x == var) = true := by simp [hshadow]
@@ -175,7 +175,7 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
         have hlift : ∀ a b, R' a b → SubstUnfoldClosure var repl a b :=
           fun a b h => Or.inr ⟨R', hR'post, h⟩
         exact BisimF.mono hlift _ _ hf
-      /-! ## Postfix: Mu Case without Shadowing (`x ≠ var`) -/
+      -- Postfix: Mu Case without Shadowing (`x ≠ var`)
       · -- x ≠ var: substitution goes through
         have hdiff : (x == var) = false := by simp [hshadow]
         simp only [LocalTypeR.substitute, hdiff] at hu
@@ -204,7 +204,7 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
         have hlift : ∀ a b, R' a b → SubstUnfoldClosure var repl a b :=
           fun a b h => Or.inr ⟨R', hR'post, h⟩
         exact BisimF.mono hlift _ _ hf
-  /-! ## Postfix: Existing `Bisim` Branch -/
+  -- Postfix: Existing `Bisim` Branch
   | inr hBisim =>
     -- Case: Bisim u v - use the existing Bisim post-fixpoint property
     obtain ⟨R, hRpost, huv⟩ := hBisim
@@ -214,7 +214,7 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
       fun a b hab => Or.inr ⟨R, hRpost, hab⟩
     exact BisimF.mono hlift u v hf
 
-/-! ## Consequences of the Postfix Construction -/
+-- Consequences of the Postfix Construction
 
 /-- SubstUnfoldRel implies Bisim via the closure.
 

@@ -48,14 +48,14 @@ open scoped Classical
 
 section
 
-/-! ## Core Step Lemmas -/
+-- Core Step Lemmas
 
 theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     SessionsOfD D' ⊆ SessionsOfD D ∪ SessionsOf G := by
   intro hTS
   induction hTS with
-  /-! ### Communication Cases -/
+  -- # Communication Cases
   | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
       intro s hs
@@ -72,7 +72,7 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
           have hEq : s = sendEdge.sid := by
             simpa using hIn
           exact Or.inr (by simpa [hEq] using hSid)
-  /-! #### Recv Case -/
+  -- ## Recv Case
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
       intro s hs
@@ -89,7 +89,7 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
           have hEq : s = recvEdge.sid := by
             simpa using hIn
           exact Or.inr (by simpa [hEq] using hSid)
-  /-! #### Select Case -/
+  -- ## Select Case
   | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
       intro s hs
@@ -106,7 +106,7 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
           have hEq : s = selectEdge.sid := by
             simpa using hIn
           exact Or.inr (by simpa [hEq] using hSid)
-  /-! #### Branch Case -/
+  -- ## Branch Case
   | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
       intro s hs
@@ -123,7 +123,7 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
           have hEq : s = branchEdge.sid := by
             simpa using hIn
           exact Or.inr (by simpa [hEq] using hSid)
-  /-! ### Local/Structural Cases -/
+  -- # Local/Structural Cases
   | assign =>
       simp
   | seq_step _ ih =>
@@ -139,7 +139,7 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
   | par_skip_right =>
       simp
 
-/-! ## Disjointness and Coherence Transport -/
+-- Disjointness and Coherence Transport
 
 theorem lookupD_none_of_disjointG {G₁ G₂ : GEnv} {D₂ : DEnv} {e : Edge} :
     DisjointG G₁ G₂ →
@@ -160,7 +160,7 @@ theorem lookupD_none_of_disjointG {G₁ G₂ : GEnv} {D₂ : DEnv} {e : Edge} :
         simpa [hEmpty] using hInter
       exact this.elim
 
-/-! ## Coherence Projection -/
+-- Coherence Projection
 
 /-- Coherence splits to the right portion of G/D when sessions are disjoint. -/
 theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
@@ -215,7 +215,7 @@ theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
   refine ⟨Lsender, hGsenderG2, ?_⟩
   simpa [hTraceEq] using hConsume
 
-/-! ## Value-Typing Weakening -/
+-- Value-Typing Weakening
 
 /-- HasTypeVal weakening: values typed in empty environment are typed in any environment. -/
 theorem HasTypeVal_weaken {v : Value} {T : ValType} {G : GEnv} :
@@ -261,7 +261,7 @@ theorem HasTypeVal_updateG_weaken {G : GEnv} {e : Endpoint} {L : LocalType} {v :
       rw [lookupG_update_neq G e e' L (Ne.symm heq)]
       exact h
 
-/-! ## Store-Typing Preservation Helpers -/
+-- Store-Typing Preservation Helpers
 
 /-- For the send case: StoreTyped is trivially preserved because store is unchanged.
     We just need to weaken G, which works for all values (with caveat for sent channel). -/
@@ -299,7 +299,7 @@ theorem StoreTyped_assign_preserved {G : GEnv} {S : SEnv} {store : VarStore} {x 
     rw [lookupStr_update_neq store x y v (Ne.symm heq)] at hStoreY
     exact hST y w T' hStoreY hSY
 
-/-! ## Buffer-Typing Preservation Helpers -/
+-- Buffer-Typing Preservation Helpers
 
 /-- BuffersTyped is preserved when updating G: all values in buffers remain well-typed
     because HasTypeVal_updateG_weaken preserves typing for all values. -/
@@ -341,7 +341,7 @@ theorem StoreTyped_recv_preserved {G : GEnv} {S : SEnv} {store : VarStore} {e : 
     have hValOrig := hST y w T' hStoreY hSY
     exact HasTypeVal_updateG_weaken hValOrig
 
-/-! ## Enqueue Typing Preservation -/
+-- Enqueue Typing Preservation
 
 /-- BuffersTyped is preserved when enqueuing a well-typed value.
 
@@ -355,7 +355,7 @@ theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
   intro a
   unfold BufferTyped
   by_cases ha : a = e
-  /-! ### Target Edge Case (`a = e`) -/
+  -- # Target Edge Case (`a = e`)
   · -- a = e: the edge we're enqueuing on
     have hOrig := hBT e
     unfold BufferTyped at hOrig
@@ -378,7 +378,7 @@ theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
     intro i hi
     -- Case split: is i < original length or i = original length?
     by_cases hOld : i < (lookupBuf bufs a).length
-    /-! #### Existing-Entry Subcase (`i < oldLen`) -/
+    -- ## Existing-Entry Subcase (`i < oldLen`)
     · -- i < old length: use original typing
       have hTrace : i < (lookupD D a).length := hLen ▸ hOld
       have hiTrace : i < (lookupD D a ++ [T]).length := by
@@ -392,7 +392,7 @@ theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
       have hGoal' : HasTypeVal G (lookupBuf bufs a ++ [v])[i] (lookupD D a ++ [T])[i] := by
         simpa [hBufGet, hTraceGet] using hGoal
       simpa [hBufUpdate, hTraceUpdate] using hGoal'
-    /-! #### Appended-Entry Subcase (`i = oldLen`) -/
+    -- ## Appended-Entry Subcase (`i = oldLen`)
     · -- i >= old length: must be the newly added element
       have hLe : (lookupBuf bufs a).length ≤ i := Nat.le_of_not_lt hOld
       have hLe' : i ≤ (lookupBuf bufs a).length := by
@@ -417,7 +417,7 @@ theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
       have hGoal' : HasTypeVal G (lookupBuf bufs a ++ [v])[i] (lookupD D a ++ [T])[i] := by
         simpa [hBufGet, hTraceGet] using hv
       simpa [hBufUpdate, hTraceUpdate] using hGoal'
-  /-! ### Non-Target Edge Case (`a ≠ e`) -/
+  -- # Non-Target Edge Case (`a ≠ e`)
   · -- a ≠ e: unaffected edge
     have hOrig := hBT a
     have hBufEq : lookupBuf (updateBuf bufs e (lookupBuf bufs e ++ [v])) a = lookupBuf bufs a := by
@@ -426,7 +426,7 @@ theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
       exact lookupD_update_neq _ _ _ _ (Ne.symm ha)
     simpa [BufferTyped, hBufEq, hTraceEq, enqueueBuf] using hOrig
 
-/-! ## Dequeue Typing Preservation -/
+-- Dequeue Typing Preservation
 
 /-- BuffersTyped is preserved when dequeuing a buffer: removing the head preserves typing
     for the remaining elements (which shift down by one index).
@@ -442,7 +442,7 @@ theorem BuffersTyped_dequeue {G : GEnv} {D : DEnv} {bufs : Buffers}
   intro hBT hBuf hHead a
   unfold BufferTyped
   by_cases ha : a = recvEdge
-  /-! ### Target Edge Case (`a = recvEdge`) -/
+  -- # Target Edge Case (`a = recvEdge`)
   · subst a
     have hOrig := hBT recvEdge
     unfold BufferTyped at hOrig
@@ -485,7 +485,7 @@ theorem BuffersTyped_dequeue {G : GEnv} {D : DEnv} {bufs : Buffers}
             simpa [List.get_eq_getElem, hBuf, hTrace, List.getElem_cons_succ] using hTypedIdx
           -- Now rewrite indices in updated envs
           simpa [hBufEq, lookupD_update_eq] using hTypedIdx'
-  /-! ### Non-Target Edge Case (`a ≠ recvEdge`) -/
+  -- # Non-Target Edge Case (`a ≠ recvEdge`)
   · -- a ≠ recvEdge: unaffected edge
     have hOrig := hBT a
     have hBufEq : lookupBuf (updateBuf bufs recvEdge vs) a = lookupBuf bufs a := by

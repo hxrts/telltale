@@ -72,7 +72,7 @@ theorem DEnvUnion_empty_left (D : DEnv) : DEnvUnion (∅ : DEnv) D = D := by
           (rbmapOfList D.map.toList).find? e := by
       exact congrArg (fun m => m.find? e) hFold
     exact hFoldFind.trans (rbmapOfList_toList_find? D.map e)
-  /-! ## Empty-Left Proof: Pairwise Fold Alignment -/
+  -- Empty-Left Proof: Pairwise Fold Alignment
   -- Since we start from empty, acc.find? is always none for unseen keys.
   -- With unique keys (from sorted), every key is unseen.
   have hSorted : D.map.toList.Pairwise edgeCmpLT := by
@@ -205,7 +205,7 @@ theorem DEnvUnion_find?_right {D1 D2 : DEnv} {e : Edge}
                 simp [hEq1, hEq2]
               simpa [List.foldl_cons, f, hkey, h1, h2] using
                 ih (acc1 := acc1.insert e p.2) (acc2 := acc2.insert e p.2) hEq'
-        /-! ## Empty-Left Lookup: Non-target Key Case -/
+        -- Empty-Left Lookup: Non-target Key Case
         · have hne' : compare e p.1 ≠ .eq := by
             intro hEq
             apply hkey
@@ -279,10 +279,9 @@ theorem updateD_DEnvUnion_right {D1 D2 : DEnv} {e : Edge} {ts : List ValType}
           simpa using
             (RBMap.find?_insert_of_eq (t := D2.map) (k := e) (v := ts) (k' := e) hEq)
         simpa [updateD, DEnv_find?_ofMap] using hfind
-      simp [hUpd] at hRight'
-      exact hRight'
-      simp [hLeft, hRight]
-  /-! ## updateD Distribution: Non-updated Keys -/
+      simpa [hUpd] using hRight'
+    simp [hLeft, hRight]
+  -- updateD Distribution: Non-updated Keys
   · -- other keys unchanged
     have hLeft :
         (updateD (D1 ++ D2) e ts).find? e' = (D1 ++ D2).find? e' := by

@@ -180,7 +180,7 @@ inductive AsyncStep : AsyncTriple → List AsyncTriple → Prop where
       AsyncStep ⟨S, T, buf⟩ [⟨S, body, buf⟩]
 
 
-/-! ### Coinductive closure of AsyncStep -/
+-- # Coinductive closure of AsyncStep
 
 /- The full relation is the greatest fixpoint: a triple is in the relation
 if all its successors are in the relation (coinductively). -/
@@ -199,7 +199,7 @@ coinductive AsyncSubtypeRel : AsyncTriple → Prop where
       (hSuccs : ∀ s ∈ succs, AsyncSubtypeRel s) :
       AsyncSubtypeRel t
 
-/-! ### Async subtyping notation -/
+-- # Async subtyping notation
 
 /-- Notation for async subtyping with buffer. -/
 notation:50 S " ≤ₐ[" buf "] " T => AsyncSubtypeRel ⟨S, T, buf⟩
@@ -268,7 +268,7 @@ theorem reachable_sub_in_reachable {t₀ t : AsyncTriple}
         | inr heq =>
             left; rw [← heq]; exact Relation.ReflTransGen.single (hfS i)
 
-    /-! #### Buffer/scope constructor cases -/
+    -- ## Buffer/scope constructor cases
 
     | sup_recv_buffer _ _ _ _ _ _ _ =>
         simp at hmem
@@ -286,7 +286,7 @@ theorem reachable_sub_in_reachable {t₀ t : AsyncTriple}
         subst hmem
         exact ih
 
-/-! ### Reachable-supertype theorem -/
+-- # Reachable-supertype theorem
 
 /-- Types appearing in supertype position come from reachable types. -/
 theorem reachable_sup_in_reachable {t₀ t : AsyncTriple}

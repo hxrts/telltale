@@ -20,7 +20,7 @@ Closedness and contractiveness preservation for lift, subst, unfold on de Bruijn
 
 namespace SessionTypes
 open SessionTypes.GlobalType
-/-! ## Closedness Preservation -/
+-- Closedness Preservation
 
 private theorem isClosedAt_lift_at (t : LocalTypeDB) (c k d : Nat) :
     t.isClosedAt d = true → (t.lift c k).isClosedAt (d + c) = true := by
@@ -55,7 +55,7 @@ private theorem isClosedAt_lift_at (t : LocalTypeDB) (c k d : Nat) :
     · intro p bs hbs c k d h
       simp only [LocalTypeDB.isClosedAt, LocalTypeDB.lift] at h ⊢
       exact hbs c k d h
-    /-! ## Closedness Lift: Recursive Cases -/
+    -- Closedness Lift: Recursive Cases
     -- mu case
     · intro body hbody c k d h
       simp only [LocalTypeDB.isClosedAt, LocalTypeDB.lift] at h ⊢
@@ -78,7 +78,7 @@ private theorem isClosedAt_lift_at (t : LocalTypeDB) (c k d : Nat) :
       exact ht
   exact hrec c k d h
 
-/-! ## Closedness Lift: Branches -/
+-- Closedness Lift: Branches
 
 private theorem isClosedAt_lift_at_branches (bs : List (Label × LocalTypeDB)) (c k d : Nat) :
     isClosedAtBranches d bs = true →
@@ -94,7 +94,7 @@ private theorem isClosedAt_lift_at_branches (bs : List (Label × LocalTypeDB)) (
       · exact isClosedAt_lift_at t c k d ht
       · exact ih hrest
 
-/-! ## Closedness Lift: Public API -/
+-- Closedness Lift: Public API
 
 /-- Lifting preserves closedness: if `t` is closed at `k`, then `t.lift c k` is closed at `k + c`. -/
 theorem isClosedAt_lift (t : LocalTypeDB) (c k : Nat) :
@@ -108,7 +108,7 @@ theorem isClosedAt_lift_branches (bs : List (Label × LocalTypeDB)) (c k : Nat) 
   intro h
   exact isClosedAt_lift_at_branches bs c k k h
 
-/-! ## Closedness Substitution -/
+-- Closedness Substitution
 
 /-- Substitution preserves closedness: if `t` is closed at `k+1` and `e` is closed at `k`,
     then `t.subst k e` is closed at `k`. -/
@@ -150,7 +150,7 @@ theorem isClosedAt_subst (t e : LocalTypeDB) (k : Nat) :
     · intro p bs hbs e k ht he
       simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt] at ht ⊢
       exact hbs e k ht he
-    /-! ## Closedness Substitution: Recursive Cases -/
+    -- Closedness Substitution: Recursive Cases
     -- mu case
     · intro body hbody e k ht he
       simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt] at ht ⊢
@@ -173,7 +173,7 @@ theorem isClosedAt_subst (t e : LocalTypeDB) (k : Nat) :
       exact ht
   exact hrec e k ht he
 
-/-! ## Closedness Substitution: Branches -/
+-- Closedness Substitution: Branches
 
 theorem isClosedAt_subst_branches (bs : List (Label × LocalTypeDB)) (e : LocalTypeDB) (k : Nat) :
     isClosedAtBranches (k + 1) bs = true → e.isClosedAt k = true →

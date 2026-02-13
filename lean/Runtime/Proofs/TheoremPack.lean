@@ -66,16 +66,26 @@ def failureEnvelopeCrossTargetConformance?
     {store₀ : SessionStore ν} {State : Type v}
     {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
     (pack : VMTheoremPack (space := space)) :
-    Option Runtime.Adequacy.CrossTargetFailureConformance :=
-  pack.failureEnvelope?.map (fun artifact => artifact.crossTargetConformance)
+    Option ({ protocol : Runtime.Adequacy.FailureEnvelopeProtocol //
+      Runtime.Adequacy.CrossTargetFailureConformance
+        protocol.premises.failureVisible
+        protocol.premises.singleThreadRun
+        protocol.premises.multiThreadRun
+        protocol.premises.shardedRun }) :=
+  pack.failureEnvelope?.map (fun artifact => ⟨artifact.protocol, artifact.crossTargetConformance⟩)
 
 /-- Facade projection of restart structured-error adequacy witness. -/
 def failureEnvelopeRestartStructuredErrorAdequacy?
     {store₀ : SessionStore ν} {State : Type v}
     {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
     (pack : VMTheoremPack (space := space)) :
-    Option Runtime.Adequacy.RestartRefinementStructuredErrorAdequacy :=
-  pack.failureEnvelope?.map (fun artifact => artifact.restartStructuredErrorAdequacy)
+    Option ({ protocol : Runtime.Adequacy.FailureEnvelopeProtocol //
+      Runtime.Adequacy.RestartRefinementStructuredErrorAdequacy
+        protocol.premises.Refines
+        protocol.premises.checkpoint
+        protocol.premises.restart
+        protocol.premises.structuredErrors }) :=
+  pack.failureEnvelope?.map (fun artifact => ⟨artifact.protocol, artifact.restartStructuredErrorAdequacy⟩)
 
 end
 

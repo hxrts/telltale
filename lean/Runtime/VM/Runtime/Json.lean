@@ -83,7 +83,7 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         , ("receiver", Json.str edge.receiver)
         , ("label", Json.str lbl) ]
 
-  /-! #### Session lifecycle events -/
+  -- Session lifecycle events
 
   | .opened sid roles =>
       Json.mkObj
@@ -103,7 +103,7 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         , ("session", Json.num sid)
         , ("epoch", Json.num epoch) ]
 
-  /-! #### Runtime ownership/coroutine events -/
+  -- Runtime ownership/coroutine events
 
   | .transferred ep fromCoro toCoro =>
       Json.mkObj
@@ -130,7 +130,7 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid) ]
 
-  /-! #### Guard/effect and monitoring events -/
+  -- Guard/effect and monitoring events
 
   | .acquired layer ep =>
       Json.mkObj

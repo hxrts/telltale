@@ -190,7 +190,7 @@ mutual
     all_goals
       simp [*] <;> omega
 
-  /-! ## Branch freeVars/isFreeIn Bridge -/
+  -- Branch freeVars/isFreeIn Bridge
 
   theorem isFreeInBranches'_mem_freeVarsOfBranches (bs : List BranchR) (v : String) :
       isFreeInBranches' v bs = true → v ∈ freeVarsOfBranches bs := by

@@ -21,7 +21,7 @@ open scoped Classical
 
 section
 
-/-! ## Productive Trace Bound -/
+-- Productive Trace Bound
 
 /-- A trace is productive if every step decreases the total measure. -/
 def ProductiveTrace [SessionSemantics] (cfg : MultiConfig) :
@@ -44,9 +44,9 @@ theorem total_productive_steps_bounded [SessionSemantics]
     simp only [List.length_cons]
     omega
 
-/-! ## Shared Participant Decomposition -/
+-- Shared Participant Decomposition
 
-/-! ### Session Membership Helpers -/
+-- # Session Membership Helpers
 
 /-- Sessions a role participates in. -/
 def roleSessions (cfg : MultiConfig) (r : Role) : List SessionId :=
@@ -56,7 +56,7 @@ def roleSessions (cfg : MultiConfig) (r : Role) : List SessionId :=
 def SharedParticipant (cfg : MultiConfig) (s1 s2 : SessionId) (r : Role) : Prop :=
   s1 ∈ roleSessions cfg r ∧ s2 ∈ roleSessions cfg r ∧ s1 ≠ s2
 
-/-! ### Unique-SID Permutation Helper -/
+-- # Unique-SID Permutation Helper
 
 /-- Pull a session to the front of a unique-sid list, filtering the rest by sid. -/
 lemma perm_cons_filter_sid
@@ -109,7 +109,7 @@ lemma perm_cons_filter_sid
         List.Perm.swap s hd _
       exact (List.Perm.cons hd hperm_tl).trans hswap
 
-/-! ### No-Overhead Decomposition Theorem -/
+-- # No-Overhead Decomposition Theorem
 
 /-- Measure additivity: the total measure is the sum of session measures.
     Shared participants do not introduce multiplicative overhead. -/
@@ -126,7 +126,7 @@ theorem shared_participant_no_overhead_unique
   -- filter captures everything else. Sum is invariant under this decomposition.
   have hne : s1.sid ≠ s2.sid := hshared.2.2
 
-  /-! #### Step 1: isolate the first shared session -/
+  -- ## Step 1: isolate the first shared session
 
   -- Pull s1 to front
   have hperm1 := perm_cons_filter_sid cfg.sessions s1 hs1 hunique
@@ -147,7 +147,7 @@ theorem shared_participant_no_overhead_unique
       cfg.sessions.filter (fun s => s.sid != s1.sid && s.sid != s2.sid) := by
     simp only [List.filter_filter, Bool.and_comm]
 
-  /-! #### Step 2: express total measure with `s1` pulled out -/
+  -- ## Step 2: express total measure with `s1` pulled out
 
   -- Decompose total measure by pulling s1, then s2, to the front.
   have hsum1 :
@@ -173,7 +173,7 @@ theorem shared_participant_no_overhead_unique
             rw [foldl_add_shift (l := (cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure)
               (n := weightedMeasure s1)]
 
-  /-! #### Step 3: express filtered measure with `s2` pulled out -/
+  -- ## Step 3: express filtered measure with `s2` pulled out
 
   have hsum2 :
       List.foldl (· + ·) 0 ((cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure) =
@@ -201,7 +201,7 @@ theorem shared_participant_no_overhead_unique
               (l := ((cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid)).map weightedMeasure)
               (n := weightedMeasure s2)]
 
-  /-! #### Step 4: combine decompositions -/
+  -- ## Step 4: combine decompositions
 
   have htotal_eq :
       totalWeightedMeasure cfg =

@@ -81,7 +81,7 @@ theorem Coherent_select_preserved
   intro selectEdge e hActive
   have hActiveOrig : ActiveEdge G e :=
     ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=selectorEp) (L:=L) hActive (by simp [hG])
-  /-! ## Select Preservation: Updated Edge vs Other Edges -/
+  -- Select Preservation: Updated Edge vs Other Edges
   by_cases heq : e = selectEdge
   · -- Case 1: e = selectEdge
     subst heq
@@ -90,7 +90,7 @@ theorem Coherent_select_preserved
     have hSenderLookup : lookupG (updateG G selectorEp L) { sid := selectorEp.sid, role := selectorEp.role } = some L := by
       convert lookupG_update_eq G selectorEp L
     refine ⟨L, hSenderLookup, ?_⟩
-    /-! ## Select Preservation: Updated Edge Self-Select vs Distinct Target -/
+    -- Select Preservation: Updated Edge Self-Select vs Distinct Target
     by_cases hTargetIsSender : targetRole = selectorEp.role
     · -- Self-select: target = selector
       subst hTargetIsSender
@@ -115,7 +115,7 @@ theorem Coherent_select_preserved
         rw [hTrace] at hL'
         simp only [Consume, consumeOne] at hL'
         exact Option.noConfusion hL'
-    /-! ## Select Preservation: Updated Edge with Distinct Target -/
+    -- Select Preservation: Updated Edge with Distinct Target
     · -- Normal case: target ≠ selector
       have hTargetNeq : selectorEp ≠ { sid := selectorEp.sid, role := targetRole } := by
         intro h
@@ -127,10 +127,10 @@ theorem Coherent_select_preserved
       obtain ⟨L', hL', hL'T⟩ := hTargetReady Lrecv hGrecv'
       rw [Consume_append _ _ _ _ hL']
       exact hL'T
-  /-! ## Select Preservation: Unchanged Edge Cases -/
+  -- Select Preservation: Unchanged Edge Cases
   · -- Case 2: e ≠ selectEdge - use irrelevance lemmas
     have hNeSymm : selectEdge ≠ e := Ne.symm heq
-    /-! ## Select Preservation: Sender Endpoint Matches Selector -/
+    -- Select Preservation: Sender Endpoint Matches Selector
     by_cases hSenderMatch : { sid := e.sid, role := e.sender : Endpoint } = selectorEp
     · -- Sender endpoint is selectorEp
       by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = selectorEp
@@ -165,7 +165,7 @@ theorem Coherent_select_preserved
           rw [hRole1, hTrace] at hOrig
           simp only [Consume, consumeOne, Option.isSome] at hOrig
           exact Bool.noConfusion hOrig
-      /-! ## Select Preservation: Sender Matches, Receiver Distinct -/
+      -- Select Preservation: Sender Matches, Receiver Distinct
       · -- Sender = selectorEp, receiver ≠ selectorEp
         have hRecvNoMatch : selectorEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
         apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
@@ -180,10 +180,10 @@ theorem Coherent_select_preserved
         have hSenderLookup : lookupG (updateG G selectorEp L) { sid := e.sid, role := e.sender } = some L := by
           conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G selectorEp L
         refine ⟨L, hSenderLookup, hConsume⟩
-    /-! ## Select Preservation: Sender Endpoint Distinct from Selector -/
+    -- Select Preservation: Sender Endpoint Distinct from Selector
     · -- Sender endpoint ≠ selectorEp
       have hSenderNoMatch : selectorEp ≠ { sid := e.sid, role := e.sender } := fun h => hSenderMatch h.symm
-      /-! ## Select Preservation: Receiver Matches Selector vs Unrelated -/
+      -- Select Preservation: Receiver Matches Selector vs Unrelated
       by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = selectorEp
       · -- Receiver = selectorEp, sender ≠ selectorEp
         apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
@@ -234,7 +234,7 @@ theorem Coherent_branch_preserved
   intro branchEdge e hActive
   have hActiveOrig : ActiveEdge G e :=
     ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=brancherEp) (L:=L) hActive (by simp [hG])
-  /-! ## Branch Preservation: Updated Edge vs Other Edges -/
+  -- Branch Preservation: Updated Edge vs Other Edges
   by_cases heq : e = branchEdge
   · -- Case 1: e = branchEdge
     subst heq
@@ -242,7 +242,7 @@ theorem Coherent_branch_preserved
     intro Lrecv hGrecv
     have hRecvLookup : lookupG (updateG G brancherEp L) { sid := brancherEp.sid, role := brancherEp.role } = some L := by
       convert lookupG_update_eq G brancherEp L
-    /-! ## Branch Preservation: Self-Branch vs Distinct Sender -/
+    -- Branch Preservation: Self-Branch vs Distinct Sender
     by_cases hSenderIsRecv : senderRole = brancherEp.role
     · -- Self-branch: sender = receiver
       subst hSenderIsRecv
@@ -271,7 +271,7 @@ theorem Coherent_branch_preserved
         rw [hTraceVal] at hOrig
         simp only [Consume, consumeOne, Option.isSome] at hOrig
         exact Bool.noConfusion hOrig
-    /-! ## Branch Preservation: Updated Edge with Distinct Sender -/
+    -- Branch Preservation: Updated Edge with Distinct Sender
     · -- Normal case: sender ≠ receiver
       have hSenderNeq : brancherEp ≠ { sid := brancherEp.sid, role := senderRole } := by
         intro h
@@ -301,10 +301,10 @@ theorem Coherent_branch_preserved
         simp only [Consume, consumeOne, Option.isSome] at hOrig
         -- consumeOne on branch type returns none, so Consume fails on non-empty trace
         exact Bool.noConfusion hOrig
-  /-! ## Branch Preservation: Unchanged Edge Cases -/
+  -- Branch Preservation: Unchanged Edge Cases
   · -- Case 2: e ≠ branchEdge
     have hNeSymm : branchEdge ≠ e := Ne.symm heq
-    /-! ## Branch Preservation: Sender Endpoint Matches Brancher -/
+    -- Branch Preservation: Sender Endpoint Matches Brancher
     by_cases hSenderMatch : { sid := e.sid, role := e.sender : Endpoint } = brancherEp
     · -- Sender endpoint is brancherEp
       by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = brancherEp
@@ -339,7 +339,7 @@ theorem Coherent_branch_preserved
           rw [hRole1, hTraceE] at hOrig
           simp only [Consume, consumeOne, Option.isSome] at hOrig
           exact Bool.noConfusion hOrig
-      /-! ## Branch Preservation: Sender Matches, Receiver Distinct -/
+      -- Branch Preservation: Sender Matches, Receiver Distinct
       · -- Sender = brancherEp, receiver ≠ brancherEp
         have hRecvNoMatch : brancherEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
         apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
@@ -354,10 +354,10 @@ theorem Coherent_branch_preserved
         have hSenderLookup : lookupG (updateG G brancherEp L) { sid := e.sid, role := e.sender } = some L := by
           conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G brancherEp L
         refine ⟨L, hSenderLookup, hConsume⟩
-    /-! ## Branch Preservation: Sender Endpoint Distinct from Brancher -/
+    -- Branch Preservation: Sender Endpoint Distinct from Brancher
     · -- Sender endpoint ≠ brancherEp
       have hSenderNoMatch : brancherEp ≠ { sid := e.sid, role := e.sender } := fun h => hSenderMatch h.symm
-      /-! ## Branch Preservation: Receiver Matches Brancher vs Unrelated -/
+      -- Branch Preservation: Receiver Matches Brancher vs Unrelated
       by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = brancherEp
       · -- Receiver = brancherEp, sender ≠ brancherEp
         apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm

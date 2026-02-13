@@ -85,7 +85,7 @@ private theorem participatesFirstBranch_imp_participates_comm
 /-! ## First-Branch Delegate Helper -/
 
 private theorem participatesFirstBranch_imp_participates_delegate
-    (role p q sid r : String) (cont : GlobalType)
+    (role p q r : String) (sid : Nat) (cont : GlobalType)
     (h : participatesFirstBranch role (.delegate p q sid r cont) = true)
     (ih : ∀ g : GlobalType, participatesFirstBranch role g = true →
       SessionTypes.Participation.participates role g = true) :
@@ -113,15 +113,45 @@ theorem participatesFirstBranch_imp_participates (g : GlobalType) (role : String
   | .var _ =>
       simp [participatesFirstBranch] at h
   | .mu t body =>
+      simpa [participatesFirstBranch, SessionTypes.Participation.participates] using
+        (participatesFirstBranch_imp_participates body role h)
+  | .comm sender receiver branches =>
       unfold participatesFirstBranch at h
       unfold SessionTypes.Participation.participates
-      exact participatesFirstBranch_imp_participates body role h
-  | .comm sender receiver branches =>
-      exact participatesFirstBranch_imp_participates_comm role sender receiver branches h
-        (fun g hg => participatesFirstBranch_imp_participates g role hg)
+      cases hpart : SessionTypes.Participation.is_participant role sender receiver with
+      | true =>
+          simp
+      | false =>
+          cases hbranches : branches with
+          | nil =>
+              simp [hpart, hbranches] at h
+          | cons head tail =>
+              cases head with
+              | mk label cont =>
+                  have hcont : participatesFirstBranch role cont = true := by
+                    simpa [hpart, hbranches] using h
+                  have hcont_part : SessionTypes.Participation.participates role cont = true :=
+                    participatesFirstBranch_imp_participates cont role hcont
+                  have hbranches_part :
+                      SessionTypes.Participation.participatesBranches role ((label, cont) :: tail) = true := by
+                    simp [SessionTypes.Participation.participatesBranches, hcont_part]
+                  simpa [hpart] using hbranches_part
   | .delegate p q sid r cont =>
-      exact participatesFirstBranch_imp_participates_delegate role p q sid r cont h
-        (fun g hg => participatesFirstBranch_imp_participates g role hg)
+      unfold participatesFirstBranch at h
+      unfold SessionTypes.Participation.participates
+      cases hpart : SessionTypes.Participation.is_participant role p q with
+      | true =>
+          simp
+      | false =>
+          have hcont_part : SessionTypes.Participation.participates role cont = true :=
+            participatesFirstBranch_imp_participates cont role (by simpa [hpart] using h)
+          exact hcont_part
+termination_by sizeOf g
+decreasing_by
+  all_goals
+    subst_vars
+    simp_wf
+    omega
 
 mutual
   /-- Participation that continues through ALL branch continuations, not just first branch.
@@ -207,7 +237,7 @@ theorem trans_isGuarded_of_participatesFirstBranch
       simp [participatesFirstBranch] at hpart
   | .var _ =>
       simp [participatesFirstBranch] at hpart
-  /-! ## trans_isGuarded_of_participatesFirstBranch: Mu Case -/
+  -- trans_isGuarded_of_participatesFirstBranch: Mu Case
   | .mu t body =>
       -- Mu case: follow the body and propagate guardedness.
       unfold participatesFirstBranch at hpart
@@ -220,7 +250,7 @@ theorem trans_isGuarded_of_participatesFirstBranch
           simp only [hvne, Bool.false_eq_true, ↓reduceIte]
           exact trans_isGuarded_of_participatesFirstBranch body v role hpart
       · simp [hguard, Bool.false_eq_true, ↓reduceIte, LocalTypeR.isGuarded]
-  /-! ## trans_isGuarded_of_participatesFirstBranch: Comm Case -/
+  -- trans_isGuarded_of_participatesFirstBranch: Comm Case
   | .comm sender receiver branches =>
       -- Comm case: direct participant or follow the first branch.
       cases hpart_direct : SessionTypes.Participation.is_participant role sender receiver with
@@ -248,18 +278,18 @@ theorem trans_isGuarded_of_participatesFirstBranch
                       SessionTypes.Participation.is_participant role sender receiver = true ∨
                         participatesFirstBranch role cont = true := by
                     have hpart' := hpart
-                    simp [participatesFirstBranch, Bool.or_eq_true] at hpart'
-                    exact hpart'
+                    simpa [participatesFirstBranch, Bool.or_eq_true] using hpart'
                   have hcont : participatesFirstBranch role cont = true := by
                     cases hcont' with
                     | inl hleft =>
-                        have hleft' : False := by
-                          simp [SessionTypes.Participation.is_participant, hpart_direct] at hleft
-                        exact hleft'.elim
+                        have : False := by
+                          unfold SessionTypes.Participation.is_participant at hleft
+                          simp [hpart_direct] at hleft
+                        exact this.elim
                     | inr hright =>
-                  exact hright
+                        exact hright
                   exact trans_isGuarded_of_participatesFirstBranch cont v role hcont
-  /-! ## trans_isGuarded_of_participatesFirstBranch: Delegate Case -/
+  -- trans_isGuarded_of_participatesFirstBranch: Delegate Case
   | .delegate p q sid r cont =>
       -- Delegate case: direct participant or follow the continuation.
       cases hpart_direct : SessionTypes.Participation.is_participant role p q with

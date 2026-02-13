@@ -49,7 +49,7 @@ private theorem embed_deterministic_var {t : String} {role : String} {g1 g2 : Gl
           rfl
       | _ => simp [CEmbedF] at h2F
   | _ => simp [CEmbedF] at h1F
-/-! ## Determinism Core -/
+-- Determinism Core
 mutual
 /-- Determinism for embedding: a local type embeds into at most one global type. -/
 theorem embed_deterministic {e : LocalTypeR} {role : String} {g1 g2 : GlobalType}
@@ -99,7 +99,7 @@ decreasing_by
     first
     | exact sizeOf_body_lt_sizeOf_mu _ _
     | exact sizeOf_branches_lt_sizeOf_send _ _
-/-! ## Determinism Branches -/
+-- Determinism Branches
 /-- Determinism for branch-wise embedding. -/
 theorem branches_embed_deterministic {lbs : List BranchR} {role : String}
      {gbs1 gbs2 : List (Label × GlobalType)}
@@ -163,7 +163,7 @@ private theorem embed_project_roundtrip_var {t : String} {role : String} {g : Gl
           rfl
       | _ => simp [CProjectF] at hP
   | _ => simp [CEmbedF] at hF
-/-! ## Roundtrip Core -/
+-- Roundtrip Core
 mutual
 /-- Embed then project gives back the same local type. -/
 theorem embed_project_roundtrip {e : LocalTypeR} {role : String} {g : GlobalType} {e' : LocalTypeR}
@@ -215,7 +215,7 @@ decreasing_by
     first
     | exact sizeOf_body_lt_sizeOf_mu _ _
     | exact sizeOf_branches_lt_sizeOf_send _ _
-/-! ## Roundtrip Branches -/
+-- Roundtrip Branches
 /-- Embed/project roundtrip for branches. -/
 theorem branches_embed_project_roundtrip {lbs : List BranchR} {role : String}
     {gbs : List (Label × GlobalType)} {lbs' : List BranchR}
@@ -262,7 +262,7 @@ theorem project_embed_roundtrip {g g' : GlobalType} {role : String} {e : LocalTy
 
 Any well-formed local type can be embedded into some global type. -/
 
-/-! ## Helper Lemmas -/
+-- Helper Lemmas
 
 /-- Helper: contractiveness for mu case of embed_lcontractive_of_local. -/
 private lemma embed_lcontractive_mu_case {t : String} {body' : LocalTypeR}
@@ -294,7 +294,7 @@ private lemma embed_lcontractive_mu_case {t : String} {body' : LocalTypeR}
 
 /-- If a local type body is contractive, then embedding preserves the contractiveness
     property in the global type. This is used in the mu case of localType_has_embed. -/
-/-! ## Embedding Existence Helpers: Contractiveness Lift -/
+-- Embedding Existence Helpers: Contractiveness Lift
 private lemma embed_lcontractive_of_local {body : LocalTypeR} {role : String} {gbody : GlobalType}
     (hcontr : LocalTypeR.lcontractive body = true) (hembed : CEmbed body role gbody) :
     Choreography.Projection.Project.lcontractive gbody = true := by
@@ -318,7 +318,7 @@ private lemma embed_lcontractive_of_local {body : LocalTypeR} {role : String} {g
 /-- When lcontractive body = true in the context of a mu, body.isGuarded t = true.
     This follows from the structure of lcontractive which requires send/recv/end at the top,
     all of which are guarded for any variable. -/
-/-! ## Embedding Existence Helpers: Guardedness from Contractiveness -/
+-- Embedding Existence Helpers: Guardedness from Contractiveness
 private theorem lcontractive_implies_isGuarded (t : String) (body : LocalTypeR)
     (hcontr : LocalTypeR.lcontractive body = true) :
     body.isGuarded t = true := by
@@ -344,7 +344,7 @@ private theorem lcontractive_implies_isGuarded (t : String) (body : LocalTypeR)
       | mu s' inner' =>
           simp [LocalTypeR.lcontractive] at hcontr
 
-/-! ## Main Existence Theorems -/
+-- Main Existence Theorems
 
 /-- Helper: derive branch well-formedness for send from parent well-formedness. -/
 private def derive_send_branch_wf (receiver : String) (lbs : List BranchR) (role : String)
@@ -365,7 +365,7 @@ private def derive_recv_branch_wf (sender : String) (lbs : List BranchR) (role :
    fun _ hmem partner hrecv => hwf' partner (LocalTypeR.hasRecvFrom_recv_branch hmem hrecv)⟩
 
 mutual
-/-! ## localType_has_embed Theorem -/
+-- localType_has_embed Theorem
 
 /-- Any well-formed local type can be embedded into some global type.
 
@@ -390,7 +390,7 @@ theorem localType_has_embed (e : LocalTypeR) (role : String)
       apply CEmbed_fold'
       simp [CEmbedF]
 
-  /-! ## localType_has_embed Mu Case -/
+  -- localType_has_embed Mu Case
 
   | mu t body =>
       cases hcontr : LocalTypeR.lcontractive body with
@@ -413,7 +413,7 @@ theorem localType_has_embed (e : LocalTypeR) (role : String)
           have : False := (hwf role hbad) rfl
           exact this.elim
 
-  /-! ## localType_has_embed Send/Recv Cases -/
+  -- localType_has_embed Send/Recv Cases
 
   | send receiver lbs =>
       have hne : role ≠ receiver := hwf receiver LocalTypeR.hasSendTo_send
@@ -424,7 +424,7 @@ theorem localType_has_embed (e : LocalTypeR) (role : String)
       simp [CEmbedF]
       exact ⟨hne, hembed⟩
 
-  /-! ## localType_has_embed Recv Case -/
+  -- localType_has_embed Recv Case
 
   | recv sender lbs =>
       have hne : sender ≠ role := by
@@ -445,7 +445,7 @@ termination_by sizeOf e
     | exact sizeOf_body_lt_sizeOf_mu _ _
     | exact sizeOf_branches_lt_sizeOf_send _ _
 
-/-! ## branches_have_embed Theorem -/
+-- branches_have_embed Theorem
 
 /-- Helper theorem for embedding branch lists. -/
 theorem branches_have_embed (lbs : List BranchR) (role : String)
@@ -477,7 +477,7 @@ decreasing_by
     | exact sizeOf_tail_lt_sizeOf_branches _ _
 end
 
-/-! ## Participant Gating -/
+-- Participant Gating
 
 /-- If a role participates in a global type and we can project, some embedding exists.
     This is the existential form used for participant gating.

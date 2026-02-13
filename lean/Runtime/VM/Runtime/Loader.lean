@@ -38,9 +38,9 @@ private lemma foldl_max_ge_start (xs : List Nat) (start : Nat) :
       simp [List.foldl]
       exact Nat.le_trans (Nat.le_max_left start x) (ih (Nat.max start x))
 
-/-! ## Session disjointness (executable checks) -/
+-- Session disjointness (executable checks)
 
-/-! ### Existing id inspection and fresh-id selection -/
+-- # Existing id inspection and fresh-id selection
 
 /-- Existing session ids in a VM state. -/
 def existingSessionIds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -72,7 +72,7 @@ def sessionIdAvailable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     (st : VMState ι γ π ε ν) (sid : SessionId) : Bool :=
   !(existingSessionIds st).contains sid
 
-/-! #### Fresh-id synthesis and lower bound -/
+-- ## Fresh-id synthesis and lower bound
 
 /-- Deterministically choose a fresh session id even if state ids are non-canonical. -/
 def nextFreshSessionId {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -105,7 +105,7 @@ private lemma nextFreshSessionId_ge {ι γ π ε ν : Type u} [IdentityModel ι]
       (foldl_max_ge_start (existingSessionIds st) st.nextSessionId)
       (Nat.le_succ _)
 
-/-! ### Loader result type and image validation -/
+-- # Loader result type and image validation
 
 /-- Outcome of choreography loading with explicit error categories. -/
 inductive ChoreographyLoadResult (ι γ π ε ν : Type u) [IdentityModel ι] [GuardLayer γ]
@@ -147,7 +147,7 @@ private def validateImage? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     | some role => some s!"projection mismatch for role {role}"
     | none => none
 
-/-! ### Core trusted loader path -/
+-- # Core trusted loader path
 
 /-- Core trusted loader path used by checked and compatibility APIs. -/
 private def loadChoreographyCore {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -181,7 +181,7 @@ private def loadChoreographyCore {ι γ π ε ν : Type u} [IdentityModel ι] [G
     , phase := .active }
   let sessions' := (sid, session) :: st.sessions
 
-  /-! #### Coroutine installation for each entry role -/
+  -- ## Coroutine installation for each entry role
 
   let mkCoro := fun (acc : Array (CoroutineState γ ε) × List CoroutineId × CoroutineId)
       (entry : Role × PC) =>
@@ -214,7 +214,7 @@ private def loadChoreographyCore {ι γ π ε ν : Type u} [IdentityModel ι] [G
     nextSessionId := sid + 1 }
   (st', sid)
 
-/-! ### Public loader APIs -/
+-- # Public loader APIs
 
 /-- Load a choreography with explicit validation and capacity error results. -/
 def loadChoreographyResult {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -251,7 +251,7 @@ def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
   | .ok st' sid => (st', sid)
   | _ => (st, st.nextSessionId)
 
-/-! ### Fresh session-id monotonicity -/
+-- # Fresh session-id monotonicity
 
 theorem loadChoreography_snd_ge_nextSessionId
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]

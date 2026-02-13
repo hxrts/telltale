@@ -133,7 +133,7 @@ decreasing_by
 /-! ## All-Branch Contractiveness Preservation -/
 
 mutual
-  /-! ## trans Contractiveness from All-Branch Participation -/
+  -- trans Contractiveness from All-Branch Participation
   theorem trans_isContractive_of_participatesAllBranches (g : GlobalType) (role : String)
       (hpart : participatesAllBranches role g = true) :
       (trans g role).isContractive = true := by
@@ -149,7 +149,7 @@ mutual
         · simp [hguard, LocalTypeR.isContractive]
           exact trans_isContractive_of_participatesAllBranches body role hpart
         · simp [hguard, LocalTypeR.isContractive]
-    /-! ## All-Branch Contractiveness: Comm Cases -/
+    -- All-Branch Contractiveness: Comm Cases
     | .comm sender receiver [] =>
         cases hpart_direct : is_participant role sender receiver with
         | true =>
@@ -185,7 +185,7 @@ mutual
               simp [hpart_direct] at this
             rw [trans_comm_other sender receiver role [] hne_s hne_r]
             simp [LocalTypeR.isContractive]
-    /-! ## All-Branch Contractiveness: Nonempty Comm Case -/
+    -- All-Branch Contractiveness: Nonempty Comm Case
     | .comm sender receiver ((label, cont) :: rest) =>
         cases hpart_direct : is_participant role sender receiver with
         | true =>
@@ -224,7 +224,7 @@ mutual
               simp at hpart_direct
             rw [trans_comm_other sender receiver role ((label, cont) :: rest) hne_s hne_r]
             exact trans_isContractive_of_participatesAllBranches cont role hpart
-    /-! ## All-Branch Contractiveness: Delegate Case -/
+    -- All-Branch Contractiveness: Delegate Case
     | .delegate p q sid r cont =>
         simp only [trans]
         cases hp : role == p with
@@ -261,7 +261,7 @@ mutual
       | exact sizeOf_cont_lt_comm _ _ _ _ _
       | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
-  /-! ## transBranches Contractiveness from All-Branch Participation -/
+  -- transBranches Contractiveness from All-Branch Participation
   theorem transBranches_isContractive_of_participatesAllBranches
       (branches : List (Label × GlobalType)) (role : String)
       (hpart : participatesAllBranchesList role branches = true) :
@@ -304,7 +304,7 @@ open SessionTypes.LocalTypeR
 /-! ## Productive Contractiveness Preservation -/
 
 mutual
-  /-! ## trans Contractiveness from Productivity -/
+  -- trans Contractiveness from Productivity
   theorem trans_isContractive_of_isProductive
       (g : GlobalType) (role : String) (hprod : g.isProductive = true) :
       (trans g role).isContractive = true := by
@@ -325,7 +325,7 @@ mutual
         by_cases hguard : (trans body role).isGuarded t
         · simp [trans, hguard, LocalTypeR.isContractive, hbody]
         · simp [trans, hguard, LocalTypeR.isContractive]
-    /-! ## Productivity Contractiveness: Comm Case -/
+    -- Productivity Contractiveness: Comm Case
     | .comm sender receiver branches =>
         have hprod' : isProductiveBranches branches [] = true := by
           simpa [GlobalType.isProductive] using hprod
@@ -350,7 +350,7 @@ mutual
                     isProductiveBranches tail [] = true := by
                   simpa [isProductiveBranches, Bool.and_eq_true] using hprod'
                 exact trans_isContractive_of_isProductive cont role hpair.1
-    /-! ## Productivity Contractiveness: Delegate Case -/
+    -- Productivity Contractiveness: Delegate Case
     | .delegate p q sid r cont =>
         -- Delegate is productive → cont is productive with [] unguarded
         have hcont_prod : cont.isProductive = true := by
@@ -375,7 +375,7 @@ mutual
       | exact sizeOf_cont_lt_comm _ _ _ _ _
       | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
-  /-! ## transBranches Contractiveness from Productivity -/
+  -- transBranches Contractiveness from Productivity
   theorem transBranches_isContractive_of_isProductive
       (branches : List (Label × GlobalType)) (role : String)
       (hprod : isProductiveBranches branches [] = true) :

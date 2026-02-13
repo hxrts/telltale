@@ -27,7 +27,7 @@ namespace SessionCoTypes.Coinductive
 open SessionTypes.GlobalType
 open SessionCoTypes.CoinductiveRel
 
-/-! ## Global type unfolding -/
+-- Global type unfolding
 
 /-- One-step global unfolding: µt.G ↦ G[µt.G/t]. -/
 def UnfoldsG (g g' : GlobalType) : Prop :=
@@ -37,7 +37,7 @@ def UnfoldsG (g g' : GlobalType) : Prop :=
 def UnfoldsToG (g g' : GlobalType) : Prop :=
   Relation.ReflTransGen UnfoldsG g g'
 
-/-! ## Branch relations -/
+-- Branch relations
 
 /-- Projection relation type (global × role × coinductive local). -/
 abbrev ProjRelC := GlobalType → String → LocalTypeC → Prop
@@ -68,9 +68,9 @@ private lemma AllBranchesProjC_mono {R S : ProjRelC}
   intro gbs role cand hall gb hmem
   exact h _ _ _ (hall gb hmem)
 
-/-! ## Projection step generator -/
+-- Projection step generator
 
-/-! ### Communication-Case Helper -/
+-- # Communication-Case Helper
 
 private def ProjectC_comm (R : ProjRelC) (sender receiver : String)
     (gbs : List (Label × GlobalType)) (role : String) (l' : LocalTypeC) : Prop :=
@@ -101,7 +101,7 @@ private lemma ProjectC_comm_mono {R S : ProjRelC}
           rcases hother with ⟨hns, hnr, hall⟩
           exact Or.inr (Or.inr ⟨hns, hnr, AllBranchesProjC_mono h hall⟩)
 
-/-! ### Step Operator Definition -/
+-- # Step Operator Definition
 
 /-- One-step generator for coinductive projection, unfolding both sides finitely. -/
 def ProjectC_step (R : ProjRelC) : ProjRelC := fun g role cand =>
@@ -112,7 +112,7 @@ def ProjectC_step (R : ProjRelC) : ProjRelC := fun g role cand =>
     | .mu _ _ => False
     | .comm sender receiver gbs => ProjectC_comm R sender receiver gbs role l'
 
-/-! ### Step Operator Monotonicity -/
+-- # Step Operator Monotonicity
 
 private theorem ProjectC_step_mono : Monotone ProjectC_step := by
   intro R S h g role cand hrel
@@ -141,14 +141,14 @@ private theorem ProjectC_step_mono : Monotone ProjectC_step := by
 
 instance : CoinductiveRel ProjRelC ProjectC_step := ⟨ProjectC_step_mono⟩
 
-/-! ### Greatest Fixed Point -/
+-- # Greatest Fixed Point
 
 
 /-- Coinductive projection as the greatest fixed point of `ProjectC_step`. -/
 def ProjectC : ProjRelC :=
   SessionCoTypes.CoinductiveRel.gfp (F := ProjectC_step)
 
-/-! ## Fixed-point helpers -/
+-- Fixed-point helpers
 
 theorem ProjectC_destruct {g : GlobalType} {role : String} {cand : LocalTypeC}
     (h : ProjectC g role cand) : ProjectC_step ProjectC g role cand := by
@@ -162,7 +162,7 @@ theorem ProjectC_fold {g : GlobalType} {role : String} {cand : LocalTypeC}
     (SessionCoTypes.CoinductiveRel.fold (F := ProjectC_step))
   exact hle _ _ _ h
 
-/-! ## Unfolding utilities -/
+-- Unfolding utilities
 
 private lemma UnfoldsG_rightUnique : Relator.RightUnique UnfoldsG := by
   intro a b c hab hac
@@ -219,9 +219,9 @@ private lemma UnfoldsToC_total {l l1 l2 : LocalTypeC} (h1 : UnfoldsToC l l1) (h2
     UnfoldsToC l1 l2 ∨ UnfoldsToC l2 l1 :=
   Relation.ReflTransGen.total_of_right_unique (U := UnfoldsC_rightUnique) h1 h2
 
-/-! ## Unfolding stability -/
+-- Unfolding stability
 
-/-! ## ProjectC Stability under Global Unfolding -/
+-- ProjectC Stability under Global Unfolding
 
 theorem ProjectC_unfoldG {g g' : GlobalType} {role : String} {l : LocalTypeC}
     (hproj : ProjectC g role l) (hg : UnfoldsToG g g') : ProjectC g' role l := by
@@ -242,7 +242,7 @@ theorem ProjectC_unfoldG {g g' : GlobalType} {role : String} {l : LocalTypeC}
         UnfoldsToG_compare_nonmu hg1 hg (by intro t body hmu; cases hmu)
       exact ProjectC_fold ⟨.comm sender receiver gbs, l1, hcomp, hl1, by simpa using hmatch⟩
 
-/-! ## ProjectC Stability under Local Unfolding -/
+-- ProjectC Stability under Local Unfolding
 
 theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
     (hproj : ProjectC g role l) (hl : UnfoldsToC l l') : ProjectC g role l' := by
@@ -256,7 +256,7 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
     rcases ProjectC_destruct hproj0 with ⟨g1, l1, hg1, hl1, hmatch⟩
     have hcomp := UnfoldsToC_total hl1 hstep0
     cases hcomp with
-    /-! ## Local Unfolding: Candidate Already Unfolds to Witness -/
+    -- Local Unfolding: Candidate Already Unfolds to Witness
     | inr h_cand_l1 =>
         refine ⟨g1, l1, hg1, h_cand_l1, ?_⟩
         cases g1 with
@@ -268,7 +268,7 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
             simpa using hmatch
         | comm sender receiver gbs =>
             exact ProjectC_comm_mono hinc hmatch
-    /-! ## Local Unfolding: Witness Unfolds to Candidate -/
+    -- Local Unfolding: Witness Unfolds to Candidate
     | inl h_l1_cand =>
         cases g1 with
         | mu t body =>
@@ -287,7 +287,7 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
             have hEq : cand = l1 := UnfoldsToC_eq_of_head_ne_mu h_l1_cand hne
             subst cand
             exact ⟨.var t, l1, hg1, Relation.ReflTransGen.refl, by simpa using hmatch⟩
-        /-! ## Local Unfolding: Communication Subcases -/
+        -- Local Unfolding: Communication Subcases
         | comm sender receiver gbs =>
             cases hmatch with
             | inl hsender =>

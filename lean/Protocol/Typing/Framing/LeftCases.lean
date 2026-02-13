@@ -63,7 +63,7 @@ lemma preserved_sub_left_frame_send
       · intro x T hx0; cases hx0
 
 /-- Helper: select case for the left-frame preservation lemma. -/
-/-! ## Left-Frame Select Case -/
+-- Left-Frame Select Case
 lemma preserved_sub_left_frame_select
     {Gstore G₁ G₂ G G' Ssh Sown store k ℓ e target bs L G₁' Sfin Gfin W Δ} :
     StoreTypedVisible Gstore Ssh Sown store →
@@ -100,7 +100,7 @@ lemma preserved_sub_left_frame_select
       · intro x T hx0; cases hx0
 
 /-- Helper: branch case for the left-frame preservation lemma. -/
-/-! ## Left-Frame Branch Case -/
+-- Left-Frame Branch Case
 lemma preserved_sub_left_frame_branch
     {Gstore G₁ G₂ G G' Ssh Sown store k procs e source bs ℓ P L G₁' Sfin Gfin W Δ} :
     StoreTypedVisible Gstore Ssh Sown store →
@@ -136,7 +136,7 @@ lemma preserved_sub_left_frame_branch
       simpa [hG₁', hEqE] using hPre'
 
 /-- Helper: assign-new case for the left-frame preservation lemma. -/
-/-! ## Left-Frame Assign-New Case -/
+-- Left-Frame Assign-New Case
 lemma preserved_sub_left_frame_assign_new
     {G₁ G₂ G Ssh Sown x v T_step Sown' G₁' Sfin Gfin W Δ} {T_pre : ValType} :
     G = G₁ ++ G₂ →
@@ -174,7 +174,7 @@ lemma preserved_sub_left_frame_assign_new
   · intro x T hx; cases hx
 
 /-- Helper: assign-old case for the left-frame preservation lemma. -/
-/-! ## Left-Frame Assign-Old Case -/
+-- Left-Frame Assign-Old Case
 lemma preserved_sub_left_frame_assign_old
     {G₁ G₂ G Ssh Sown x v T_step Sown' G₁' Sfin Gfin W Δ} {T_pre T_old : ValType} :
     G = G₁ ++ G₂ →
@@ -212,7 +212,7 @@ lemma preserved_sub_left_frame_assign_old
   · intro x T hx; cases hx
 
 /-- Helper: recv-new case for the left-frame preservation lemma. -/
-/-! ## Left-Frame Recv-New Case -/
+-- Left-Frame Recv-New Case
 lemma preserved_sub_left_frame_recv_new
     {Gstore G₁ G₂ G G' Ssh Sown store k x e source T L G₁' Sown' Sfin Gfin W Δ}
     {e' : Endpoint} {p' : Role} {T' : ValType} {L' : LocalType} :
@@ -249,7 +249,7 @@ lemma preserved_sub_left_frame_recv_new
   · intro x T hx0; cases hx0
 
 /-- Helper: recv-old case for the left-frame preservation lemma. -/
-/-! ## Left-Frame Recv-Old Case -/
+-- Left-Frame Recv-Old Case
 lemma preserved_sub_left_frame_recv_old
     {Gstore G₁ G₂ G G' Ssh Sown store k x e source T L G₁' Sown' Sfin Gfin W Δ}
     {e' : Endpoint} {p' : Role} {T' : ValType} {L' : LocalType} :

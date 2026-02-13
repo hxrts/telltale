@@ -20,7 +20,7 @@ a bisimulation. Completeness shows EQ2C implies `bisim = true`.
 open Classical
 
 namespace SessionCoTypes.Coinductive
-/-! ## Reachable Pairs -/
+-- Reachable Pairs
 
 /-- Local decidable equality for visited membership. -/
 local instance : DecidableEq (LocalTypeC × LocalTypeC) := by
@@ -43,7 +43,7 @@ def reachablePairsFinset (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) :
     Finset (LocalTypeC × LocalTypeC) :=
   (reachablePairs_finite ha hb).toFinset
 
-/-! ## Measure for Termination -/
+-- Measure for Termination
 
 /-- The measure: size of unvisited pairs from the reachable set. -/
 def pairMeasure (all : Finset (LocalTypeC × LocalTypeC))
@@ -66,7 +66,7 @@ lemma pairMeasure_lt {all visited : Finset (LocalTypeC × LocalTypeC)}
     exact Finset.card_lt_card hsub
   omega
 
-/-! ## Bisimulation Functions -/
+-- Bisimulation Functions
 
 /-- Compute sufficient fuel for bisim based on reachable pairs. -/
 def bisimFuel (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) : Nat :=
@@ -76,9 +76,9 @@ def bisimFuel (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) : Nat :=
 def bisim (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) (bound : Nat) : Bool :=
   bisimAux (bisimFuel a b ha hb) bound ∅ (a, b)
 
-/-! ## Soundness via Paco Coinduction -/
+-- Soundness via Paco Coinduction
 
-/-! ## Soundness Helpers: Observable Extraction -/
+-- Soundness Helpers: Observable Extraction
 
 /-- Helper: obsMatch true with end kind implies both unfold to end. -/
 lemma obsMatch_end_implies_UnfoldsToEndC {bound : Nat} {a b : LocalTypeC}
@@ -125,7 +125,7 @@ lemma fullUnfoldN_recv_implies_CanRecvC {bound : Nat} {t : LocalTypeC}
   have hhead := obsKindOf_recv_iff.mp hk
   exact ⟨fullUnfoldN bound t, labels, fullUnfoldN_UnfoldsToC bound t, hhead, rfl⟩
 
-/-! ## Soundness Helpers: Matching Labels from `obsMatch` -/
+-- Soundness Helpers: Matching Labels from `obsMatch`
 
 /-- obsMatch with send implies same participant and labels (needed for BranchesRelC).
 
@@ -171,7 +171,7 @@ lemma obsMatch_var_implies_UnfoldsToVarC {bound : Nat} {a b : LocalTypeC} {v : S
   · exact ⟨fullUnfoldN bound a, fullUnfoldN_UnfoldsToC bound a, hhead_a⟩
   · exact ⟨fullUnfoldN bound b, fullUnfoldN_UnfoldsToC bound b, hhead_b⟩
 
-/-! ## Soundness Helpers: Post-Fixpoint Lifting -/
+-- Soundness Helpers: Post-Fixpoint Lifting
 
 /-- EQ2C is a post-fixpoint of EQ2CMono.F (needed for BisimRel_postfixpoint). -/
 lemma EQ2C_postfixpoint : ∀ a b, EQ2C a b → EQ2CMono.F EQ2C a b := by
@@ -199,7 +199,7 @@ theorem BisimRel_postfixpoint (bound : Nat) :
   simp only [Paco.Rel.sup_bot]
   -- Case split on BisimRel disjunction
   rcases h with hcore | heq
-  /-! ## `BisimRel_postfixpoint`: EQ2C Branch -/
+  -- `BisimRel_postfixpoint`: EQ2C Branch
   -- Case 1: EQ2C (including visited pairs via hvisited)
   case inr =>
     -- EQ2C is a post-fixpoint, lift to BisimRel by monotonicity
@@ -209,7 +209,7 @@ theorem BisimRel_postfixpoint (bound : Nat) :
     -- EQ2C ⊆ BisimRel (right disjunct)
     have hEQ2C_le : EQ2C ≤ BisimRel bound := fun x y hxy => Or.inr hxy
     exact ObservableRelC_mono hEQ2C_le hrel
-  /-! ## `BisimRel_postfixpoint`: Core Checker Branch -/
+  -- `BisimRel_postfixpoint`: Core Checker Branch
   -- Case 2: BisimRelCore (bisimAux returns true)
   case inl =>
     rcases hcore with ⟨fuel, visited, hvisited, hbisim⟩
@@ -234,7 +234,7 @@ theorem BisimRel_postfixpoint (bound : Nat) :
           simp only [hmem, ↓reduceIte] at hbisim
           have ⟨hobs, hchildren⟩ := Bool.and_eq_true_iff.mp hbisim
           have ⟨k, hk1, hk2⟩ := obsMatch_true_implies_same_kind hobs
-          /-! ## `BisimRel_postfixpoint`: Observable Kind Split -/
+          -- `BisimRel_postfixpoint`: Observable Kind Split
           -- Case split on observable kind k
           match k with
           | .obs_end =>
@@ -299,7 +299,7 @@ theorem bisim_sound {a b : LocalTypeC} {ha : Regular a} {hb : Regular b} {bound 
   unfold bisim at hbisim
   exact bisimAux_sound (fun _ h => (Finset.notMem_empty _ h).elim) hbisim
 
-/-! ## Maximum Unfolding Depth -/
+-- Maximum Unfolding Depth
 
 /-- Maximum mu-nesting depth for a regular type (upper bound on unfoldings needed). -/
 def maxUnfoldDepth (t : LocalTypeC) : Nat := by
@@ -310,7 +310,7 @@ def maxUnfoldDepth (t : LocalTypeC) : Nat := by
   else
     0
 
-/-! ## Maximum Depth: Stability and Head Agreement -/
+-- Maximum Depth: Stability and Head Agreement
 
 lemma hasNonMuHead_fullUnfoldN_maxUnfoldDepth {t : LocalTypeC} (hobs : ObservableC t) :
     hasNonMuHead (fullUnfoldN (maxUnfoldDepth t) t) = true := by
@@ -334,7 +334,7 @@ lemma head_fullUnfoldN_eq_of_unfoldsToC {t u : LocalTypeC} {bound : Nat}
     fullUnfoldN_eq_of_ge hbound hmax
   simpa [hge] using hdet.symm
 
-/-! ## `obsMatch` Soundness from EQ2C -/
+-- `obsMatch` Soundness from EQ2C
 
 lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
     (heq : EQ2C a b) (hbound : bound ≥ maxUnfoldDepth a ∧ bound ≥ maxUnfoldDepth b) :
@@ -342,7 +342,7 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
   rcases heq with ⟨R, hR, hab⟩
   obtain ⟨obs_a, obs_b, hrel⟩ := hR a b hab
   cases hrel with
-  /-! ## `obsMatch_of_EQ2C`: End Case -/
+  -- `obsMatch_of_EQ2C`: End Case
   | is_end ha hb =>
       rcases ha with ⟨ua, hunf_a, hhead_a⟩
       rcases hb with ⟨ub, hunf_b, hhead_b⟩
@@ -355,7 +355,7 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
         have := head_fullUnfoldN_eq_of_unfoldsToC (bound := bound) hunf_b hnomu obs_b hbound.2
         simpa [hhead_b] using this
       simp [obsMatch, obsKindOf, hhead_a', hhead_b']
-  /-! ## `obsMatch_of_EQ2C`: Var Case -/
+  -- `obsMatch_of_EQ2C`: Var Case
   | is_var v ha hb =>
       rcases ha with ⟨ua, hunf_a, hhead_a⟩
       rcases hb with ⟨ub, hunf_b, hhead_b⟩
@@ -368,7 +368,7 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
         have := head_fullUnfoldN_eq_of_unfoldsToC (bound := bound) hunf_b hnomu obs_b hbound.2
         simpa [hhead_b] using this
       simp [obsMatch, obsKindOf, hhead_a', hhead_b']
-  /-! ## `obsMatch_of_EQ2C`: Send Case -/
+  -- `obsMatch_of_EQ2C`: Send Case
   | is_send p bs cs ha hb hbr =>
       rcases ha with ⟨ua, labels_a, hunf_a, hhead_a, hbs_a⟩
       rcases hb with ⟨ub, labels_b, hunf_b, hhead_b, hbs_b⟩
@@ -390,7 +390,7 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
           _ = labelsOfBranches cs := labelsOfBranches_eq_of_BranchesRelC hbr
           _ = labels_b := hlabels_b
       simp [obsMatch, obsKindOf, hhead_a', hhead_b', hlabels_eq]
-  /-! ## `obsMatch_of_EQ2C`: Recv Case -/
+  -- `obsMatch_of_EQ2C`: Recv Case
   | is_recv p bs cs ha hb hbr =>
       rcases ha with ⟨ua, labels_a, hunf_a, hhead_a, hbs_a⟩
       rcases hb with ⟨ub, labels_b, hunf_b, hhead_b, hbs_b⟩
@@ -413,7 +413,7 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
           _ = labels_b := hlabels_b
       simp [obsMatch, obsKindOf, hhead_a', hhead_b', hlabels_eq]
 
-/-! ## Checker Completeness (Deferred) -/
+-- Checker Completeness (Deferred)
 
 /-
 Completeness (EQ2C ⇒ bisim = true) is intentionally omitted in the paco-first approach.
@@ -423,7 +423,7 @@ the EQ2CE/EQ2C erasure lemmas directly (see Roundtrip.lean).
 For a total decision interface, see `BisimDecidable/Decidable.lean`.
 -/
 
-/-! ## Connection to EQ2CE -/
+-- Connection to EQ2CE
 
 /-- Environment-aware bisimulation with resolution (local definition for this module).
     This matches the definition in Roundtrip.lean. -/

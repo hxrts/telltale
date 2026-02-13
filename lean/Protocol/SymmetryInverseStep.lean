@@ -18,7 +18,7 @@ set_option autoImplicit false
 open scoped Classical
 
 section
-/-! ## Inverse Step Theorems -/
+-- Inverse Step Theorems
 
 /-- Helper: branch membership under renaming.
     If (l', L') is in the renamed branches, there exists an original (l, L). -/
@@ -44,7 +44,7 @@ theorem mem_renameBranchesPR_inv (σ : ProtocolRenaming)
           obtain ⟨l, L, hmem', hl, hL⟩ := ih hmem
           exact ⟨l, L, List.mem_cons.mpr (Or.inr hmem'), hl, hL⟩
 
-/-! ## Inverse Send Reconstruction -/
+-- Inverse Send Reconstruction
 
 /-- Inverse step for send: if σ(C) has a send type, C has a corresponding send type.
     The renamed sender/receiver are preimages under σ.roleMap.
@@ -79,7 +79,7 @@ theorem inverse_step_send_exists (σ : ProtocolRenaming)
       have hLookup : lookupG G { sid := sid, role := ep.role } = some (.send r T Lcont) := by
         simpa [hEqEp, hL] using hep
       refine ⟨ep.role, r, T, Lcont, hrole, hr'.symm, hT', hLookup, hLcont'⟩
-  /-! ## Inverse Send Reconstruction: impossible local forms -/
+  -- Inverse Send Reconstruction: impossible local forms
   | recv _ _ _ =>
       rw [hL] at hLfull
       have hFalse : False := by
@@ -111,7 +111,7 @@ theorem inverse_step_send_exists (σ : ProtocolRenaming)
         simp [renameLocalTypePR] at hLfull
       exact hFalse.elim
 
-/-! ## Inverse Select Reconstruction -/
+-- Inverse Select Reconstruction
 
 /-- Inverse step for select: if σ(C) has a select type, C has a corresponding select type.
     From Aristotle 06b. -/
@@ -151,7 +151,7 @@ theorem inverse_step_select_exists (σ : ProtocolRenaming)
       have hLookup : lookupG G { sid := sid, role := ep.role } = some (.select r bs) := by
         simpa [hEqEp, hL] using hep
       refine ⟨ep.role, r, bs, l, L, hrole, hr'.symm, hlmap.symm, hLookup, hl, hLmap⟩
-  /-! ## Inverse Select Reconstruction: impossible local forms -/
+  -- Inverse Select Reconstruction: impossible local forms
   | send _ _ _ =>
       rw [hL] at hLfull
       have hFalse : False := by
@@ -183,7 +183,7 @@ theorem inverse_step_select_exists (σ : ProtocolRenaming)
         simp [renameLocalTypePR] at hLfull
       exact hFalse.elim
 
-/-! ## Inverse Branch Reconstruction -/
+-- Inverse Branch Reconstruction
 
 /-- Inverse step for branch: if σ(C) has a branch type, C has a corresponding branch type.
     From Aristotle 06b. -/
@@ -223,7 +223,7 @@ theorem inverse_step_branch_exists (σ : ProtocolRenaming)
       have hLookup : lookupG G { sid := sid, role := ep.role } = some (.branch s bs) := by
         simpa [hEqEp, hL] using hep
       refine ⟨s, ep.role, bs, l, L, hs'.symm, hrole, hlmap.symm, hLookup, hl, hLmap⟩
-  /-! ## Inverse Branch Reconstruction: impossible local forms -/
+  -- Inverse Branch Reconstruction: impossible local forms
   | send _ _ _ =>
       rw [hL] at hLfull
       have hFalse : False := by

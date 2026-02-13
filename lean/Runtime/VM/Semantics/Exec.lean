@@ -214,9 +214,9 @@ def execWithInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
           | none =>
               let pack' := faultPack st' coro .outOfCredits "out of credits"
               commitPack st' coroId pack'
-	          | some coro' =>
-	              let pack' := stepInstr st' coro' instr
-	              commitPack st' coroId pack'
+          | some coro' =>
+              let pack' := stepInstr st' coro' instr
+              commitPack st' coroId pack'
 
 /-! ### PC/status dispatch wrapper -/
 

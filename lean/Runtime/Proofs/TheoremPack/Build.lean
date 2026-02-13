@@ -27,7 +27,7 @@ section
 variable {ν : Type u} [VerificationModel ν]
 
 
-/-! ## Theorem Pack Structure -/
+-- Theorem Pack Structure
 
 structure VMTheoremPack
     {store₀ : SessionStore ν} {State : Type v}
@@ -65,7 +65,7 @@ structure VMTheoremPack
   littlesLaw? : Option Adapters.LittlesLawArtifact
   functionalCLT? : Option Adapters.FunctionalCLTArtifact
 
-/-! ## Builder -/
+-- Builder
 
 /-- Build theorem artifacts from one invariant space. -/
 def buildVMTheoremPack
@@ -90,7 +90,7 @@ def buildVMTheoremPack
           , soundness := w.sound
           }
 
-  /-! ## Builder: Distributed Impossibility and Quorum -/
+  -- Builder: Distributed Impossibility and Quorum
 
   let flpLowerBound? :=
     match space.distributed.flp? with
@@ -115,7 +115,7 @@ def buildVMTheoremPack
           , safeFinality := p.protocol.safeFinality
           }
 
-  /-! ## Builder: Liveness and Responsiveness -/
+  -- Builder: Liveness and Responsiveness
 
   let partialSynchrony? :=
     match space.distributed.partialSynchrony? with
@@ -166,7 +166,7 @@ def buildVMTheoremPack
           , consensusAtomicBroadcastBridge := p.protocol.consensusAtomicBroadcastBridge
           }
 
-  /-! ## Builder: Safety Boundaries and Availability -/
+  -- Builder: Safety Boundaries and Availability
 
   let accountableSafety? :=
     match space.distributed.accountableSafety? with
@@ -203,7 +203,7 @@ def buildVMTheoremPack
           , characterization := p.protocol.characterization
           }
 
-  /-! ## Builder: CRDT and Consensus Envelope Families -/
+  -- Builder: CRDT and Consensus Envelope Families
 
   let crdt? :=
     match space.distributed.crdt? with
@@ -228,7 +228,7 @@ def buildVMTheoremPack
           , hcrdtLimits := p.protocol.hcrdtLimits
           }
 
-  /-! ## Builder: Byzantine and Consensus Envelope Families -/
+  -- Builder: Byzantine and Consensus Envelope Families
 
   let byzantineSafety? :=
     match space.distributed.byzantineSafety? with
@@ -268,7 +268,7 @@ def buildVMTheoremPack
           , failureEnvelopeMaximality := p.protocol.failureEnvelopeMaximality
           }
 
-  /-! ## Builder: VM Envelope Families -/
+  -- Builder: VM Envelope Families
 
   let vmEnvelopeAdherence? :=
     match space.distributed.vmEnvelopeAdherence? with
@@ -307,7 +307,7 @@ def buildVMTheoremPack
           , necessityMinimality := p.protocol.necessityMinimality
           }
 
-  /-! ## Builder: Protocol Bridge and Classical Pack -/
+  -- Builder: Protocol Bridge and Classical Pack
 
   let protocolEnvelopeBridge? :=
     match space.distributed.protocolEnvelopeBridge? with

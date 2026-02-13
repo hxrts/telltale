@@ -24,7 +24,7 @@ open scoped Classical
 
 section
 
-/-! ## Branch Bodies Right Transport -/
+-- Branch Bodies Right Transport
 
 lemma pre_frame_right_branch_bodies_local
     {Ssh : SEnv} {Sown : OwnedEnv} {G Gfr : GEnv} {e : Endpoint} {p : Role}
@@ -45,7 +45,7 @@ lemma pre_frame_right_branch_bodies_local
   rw [hUpd]
   exact hBody'
 
-/-! ## Pre-Typing Right-Frame Transport -/
+-- Pre-Typing Right-Frame Transport
 
 /-- Local right-frame transport for `HasTypeProcPre`. -/
 lemma HasTypeProcPre_frame_G_right_local
@@ -78,7 +78,7 @@ lemma HasTypeProcPre_frame_G_right_local
       rename_i Sown G x v T
       exact HasTypeProcPre.assign hNoSh (HasTypeVal_frame_right (G₁:=G) (G₂:=Gfr) hv)
 
-/-! ## Pre-Out Branch Helpers -/
+-- Pre-Out Branch Helpers
 
 /-- Helper: extend branch bodies under a right G-frame (pre-out typing). -/
 lemma frame_right_branch_bodies_local
@@ -124,7 +124,7 @@ lemma frame_right_branch_out_local
   have hUpd := updateG_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e) (L:=.branch p bs) (L':=L) hG
   simpa [hUpd] using hOut'
 
-/-! ## Parallel Case Helper -/
+-- Parallel Case Helper
 
 /-- Helper: par case for right-frame pre-out transport. -/
 lemma frame_pre_out_right_par_local
@@ -162,7 +162,7 @@ lemma frame_pre_out_right_par_local
       G2 := split.G2 ++ Gfr
       hS := by simpa using split.hS
       hG := by simpa [split.hG, List.append_assoc] }
-  /-! ## Derived Disjointness And Reconstruction -/
+  -- Derived Disjointness And Reconstruction
   have hDisjG1fr : DisjointG split.G1 Gfr :=
     (disjointG_split_frame_right (split:=split) hDisj).1
   have hDisjG2fr : DisjointG split.G2 Gfr :=
@@ -183,7 +183,7 @@ lemma frame_pre_out_right_par_local
   · simpa [hΔ] using rfl
   · simpa [splitOut] using hQ'
 
-/-! ## Pre-Out Right-Frame Transport -/
+-- Pre-Out Right-Frame Transport
 
 /-- Local right-frame transport for `HasTypeProcPreOut`. -/
 lemma HasTypeProcPreOut_frame_G_right_local
@@ -194,7 +194,7 @@ lemma HasTypeProcPreOut_frame_G_right_local
     HasTypeProcPreOut Ssh Sown (G ++ Gfr) P Sfin (Gfin ++ Gfr) W Δ := by
   intro hDisj h
   induction h with
-  /-! ## Base And Single-Step Cases -/
+  -- Base And Single-Step Cases
   | skip =>
       rename_i Sown G
       simpa using (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr))
@@ -226,7 +226,7 @@ lemma HasTypeProcPreOut_frame_G_right_local
       simpa [hUpd] using
         (HasTypeProcPreOut.select (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr)
           hk (lookupG_append_left (G₂:=Gfr) hG) hbs)
-  /-! ## Branch Case Transport -/
+  -- Branch Case Transport
   | branch hk hG hLen hLabels hBodies hOutLbl hSess hDom hRight ihOutLbl =>
       rename_i Sown G k procs e p bs Sfin Gfin W Δ
       have hBodies' := frame_right_branch_bodies_local (G:=G) (Gfr:=Gfr) hG hBodies
@@ -241,7 +241,7 @@ lemma HasTypeProcPreOut_frame_G_right_local
             exact SessionsOf_append_right (G₁:=G) hsR
       exact HasTypeProcPreOut.branch (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr)
         hk (lookupG_append_left (G₂:=Gfr) hG) hLen hLabels hBodies' hOutLbl' hSess' hDom hRight
-  /-! ## Sequential And Parallel Cases -/
+  -- Sequential And Parallel Cases
   | seq hP hQ ihP ihQ =>
       rename_i Sown G P Q S₁ G₁ S₂ G₂ W₁ W₂ Δ₁ Δ₂
       have hP' := ihP hDisj
@@ -254,7 +254,7 @@ lemma HasTypeProcPreOut_frame_G_right_local
       exact frame_pre_out_right_par_local (split:=split)
         hDisj hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
         hDisjW hDisjΔ hP hQ ihQ
-  /-! ## Assignment Cases -/
+  -- Assignment Cases
   | assign_new hNoSh hNoOwnL hv =>
       rename_i Sown G x v T
       exact HasTypeProcPreOut.assign_new hNoSh hNoOwnL (HasTypeVal_frame_right (G₁:=G) (G₂:=Gfr) hv)
@@ -262,6 +262,6 @@ lemma HasTypeProcPreOut_frame_G_right_local
       rename_i Sown G x v T T'
       exact HasTypeProcPreOut.assign_old hNoSh hOwn (HasTypeVal_frame_right (G₁:=G) (G₂:=Gfr) hv)
 
-/-! ## Local G-Frame Transport (Left) -/
+-- Local G-Frame Transport (Left)
 
 end

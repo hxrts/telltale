@@ -25,7 +25,7 @@ open scoped Classical
 
 section
 
-/-! ## Select Case -/
+-- Select Case
 
 lemma preserved_sub_middle_select
     {Gstore Gleft Gmid Gright G : GEnv} {D D' : DEnv}
@@ -48,7 +48,7 @@ lemma preserved_sub_middle_select
       SessionsOf Gmid' ⊆ SessionsOf Gmid ∧
       HasTypeProcPreOut Ssh Sown Gmid' .skip Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
-  /-! ## Select Case: Transport and Witness Packing -/
+  -- Select Case: Transport and Witness Packing
   intro hStore hOwn hDisjLM hEqG hkStore hGstep hFindStep hGupd hTS hPre
   cases hTS with
   | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
@@ -89,7 +89,7 @@ lemma preserved_sub_middle_select
             rw [hMid']
             exact SessionsOf_subset_middle_update (Gmid:=Gmid) (e:=e)
               (L0:=.select q bsMid) (L:=L) hMid
-          /-! ## Select Case: Final Framed Post-State Witness -/
+          -- Select Case: Final Framed Post-State Witness
           refine ⟨Gmid', [], ∅, hEqG', hSubSess, ?_, ?_, ?_⟩
           · have hGmidEq : Gmid' = updateG Gmid eMid Lmid := by
               calc
@@ -103,7 +103,7 @@ lemma preserved_sub_middle_select
           · intro y Ty hy
             cases hy
 
-/-! ## Recv Case -/
+-- Recv Case
 
 /-- Constructive middle-frame preservation for a `recv` step. -/
 lemma preserved_sub_middle_recv
@@ -147,7 +147,7 @@ lemma preserved_sub_middle_recv
               _ = some (.recv p Tmid Lmid) :=
                 lookupG_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
                   (e:=e) (L0:=.recv p Tmid Lmid) hNoneLeft hMid
-          /-! ## Recv Case (`recv_new`): Align Step Payload and Continuation -/
+          -- Recv Case (`recv_new`): Align Step Payload and Continuation
           have hRecvEq : LocalType.recv source T L = LocalType.recv p Tmid Lmid := by
             exact Option.some.inj (by simpa [hGstep] using hFullMid)
           have hT : Tmid = T := by
@@ -165,7 +165,7 @@ lemma preserved_sub_middle_recv
             rw [hMid']
             exact SessionsOf_subset_middle_update (Gmid:=Gmid) (e:=e)
               (L0:=.recv p Tmid Lmid) (L:=L) hMid
-          /-! ## Recv Case (`recv_new`): Final Framed Witness -/
+          -- Recv Case (`recv_new`): Final Framed Witness
           refine ⟨Gmid', [], ∅, hEqG', hSubSess, ?_, ?_, ?_⟩
           · have hSownEq : Sown' = OwnedEnv.updateLeft Sown x Tmid := by
               calc
@@ -182,7 +182,7 @@ lemma preserved_sub_middle_recv
             cases hy
           · intro y Ty hy
             cases hy
-      /-! ## Recv Case (`recv_old`) -/
+      -- Recv Case (`recv_old`)
       | recv_old hkMid hGmid hNoSh hOwnL =>
           rename_i eMid p Tmid Lmid Told
           have hEqE : e = eMid :=
@@ -216,7 +216,7 @@ lemma preserved_sub_middle_recv
             rw [hMid']
             exact SessionsOf_subset_middle_update (Gmid:=Gmid) (e:=e)
               (L0:=.recv p Tmid Lmid) (L:=L) hMid
-          /-! ## Recv Case (`recv_old`): Final Framed Witness -/
+          -- Recv Case (`recv_old`): Final Framed Witness
           refine ⟨Gmid', [], ∅, hEqG', hSubSess, ?_, ?_, ?_⟩
           · have hSownEq : Sown' = OwnedEnv.updateLeft Sown x Tmid := by
               calc
@@ -234,7 +234,7 @@ lemma preserved_sub_middle_recv
           · intro y Ty hy
             cases hy
 
-/-! ## Branch Case -/
+-- Branch Case
 
 /-- Constructive middle-frame preservation for a `branch` step. -/
 lemma preserved_sub_middle_branch
@@ -274,7 +274,7 @@ lemma preserved_sub_middle_branch
             simpa [hEqE] using hGmid
           have hNoneLeft : lookupG Gleft e = none :=
             lookupG_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
-          /-! ## Branch Case: Align Middle Lookup with Framed Global Lookup -/
+          -- Branch Case: Align Middle Lookup with Framed Global Lookup
           have hFullMid : lookupG G e = some (.branch p bsMid) := by
             calc
               lookupG G e = lookupG (Gleft ++ Gmid ++ Gright) e := by simpa [hEqG]
@@ -295,18 +295,18 @@ lemma preserved_sub_middle_branch
           obtain ⟨Gmid', hEqG', hMid'⟩ :=
             updateG_middle_witness (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
               (G':=G') (e:=e) (L0:=.branch p bsMid) (L:=L) hNoneLeft hMid hGupd'
-          /-! ## Branch Case: Package Framed Post-State Witness -/
+          -- Branch Case: Package Framed Post-State Witness
           have hSubSess : SessionsOf Gmid' ⊆ SessionsOf Gmid := by
             rw [hMid']
             exact SessionsOf_subset_middle_update (Gmid:=Gmid) (e:=e)
               (L0:=.branch p bsMid) (L:=L) hMid
-          /-! ## Branch Case: Final Framed Witness -/
+          -- Branch Case: Final Framed Witness
           refine ⟨Gmid', W, Δ, hEqG', hSubSess, ?_, FootprintSubset_refl, SEnvDomSubset_refl⟩
           have hGmidEq : Gmid' = updateG Gmid eMid L := by
             simpa [hEqE] using hMid'
           simpa [hGmidEq] using hPre'
 
-/-! ## Assign Case -/
+-- Assign Case
 
 /-- Constructive middle-frame preservation for an `assign` step. -/
 lemma preserved_sub_middle_assign
@@ -355,7 +355,7 @@ lemma preserved_sub_middle_assign
             cases hy
           · intro y Ty hy
             cases hy
-      /-! ## Assign Case (`assign_old`) -/
+      -- Assign Case (`assign_old`)
       | assign_old hNoSh hOwnL hvMid =>
           rename_i Tpre Told
           have hvG : HasTypeVal G v Tstep := hvStep
@@ -382,7 +382,7 @@ lemma preserved_sub_middle_assign
           · intro y Ty hy
             cases hy
 
-/-! ## Sequential Cases -/
+-- Sequential Cases
 
 /-- Constructive middle-frame preservation for `seq_skip`. -/
 lemma preserved_sub_middle_seq_skip
@@ -412,7 +412,7 @@ lemma preserved_sub_middle_seq_skip
           · simpa using (FootprintSubset_refl (W:=W₂))
           · simpa using (SEnvDomSubset_append_right (S₁:=∅) (S₂:=Δ₂))
 
-/-! ## Sequential Case: `seq_step` via Recursive Middle Goal -/
+-- Sequential Case: `seq_step` via Recursive Middle Goal
 
 /-- Constructive middle-frame preservation for `seq_step`, assuming recursive middle preservation. -/
 lemma preserved_sub_middle_seq_step
@@ -454,7 +454,7 @@ lemma preserved_sub_middle_seq_step
       · exact FootprintSubset_append_left hSubW
       · exact SEnvDomSubset_append_left_of_domsubset hSubΔ
 
-/-! ## Parallel Helper Lemmas -/
+-- Parallel Helper Lemmas
 
 lemma ParSplit.sides_eq_of_len
     {S : SEnv} {G₁ G₂ : GEnv}

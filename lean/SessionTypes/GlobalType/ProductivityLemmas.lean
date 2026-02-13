@@ -160,8 +160,6 @@ mutual
     subst heq'
     exact isProductive_cons_dedup inner t unguarded hg
 
-  /-! ## Substitution Preserves Productivity: Main Recursive Theorem -/
-
   /-- isProductive is preserved under substitution.
 
   The replacement must be productive for any unguarded list it might encounter.
@@ -196,8 +194,6 @@ mutual
         -- delegate resets unguarded to [], so hg : cont.isProductive [] = true
         exact isProductive_substitute_any cont varName repl [] hg hrepl
 
-  /-! ## Substitution Preserves Productivity: Branch Form -/
-
   -- For branches, if replacement is always productive, substitution preserves productivity
   -- regardless of whether varName is in unguarded
   theorem isProductiveBranches_substitute_any (branches : List (Label × GlobalType))
@@ -211,8 +207,6 @@ mutual
         simp only [substituteBranches, isProductiveBranches, Bool.and_eq_true] at hg ⊢
         exact ⟨isProductive_substitute_any cont varName repl unguarded hg.1 hrepl,
                isProductiveBranches_substitute_any rest varName repl unguarded hg.2 hrepl⟩
-
-  /-! ## Substitution Preserves Productivity: General Form -/
 
   -- If replacement is always productive, substitution preserves productivity
   -- This is a more general version that doesn't require varName in unguarded

@@ -68,10 +68,10 @@ def schedStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     -- Execute a single scheduled coroutine step.
     match schedule st with
     | none => none
-	    | some (cid, st') =>
-	        let (st'', res) := execInstr st' cid
-	        let sched'' := updateAfterStep st''.sched cid res.status
-	        some { st'' with sched := sched'' }
+      | some (cid, st') =>
+          let (st'', res) := execInstr st' cid
+          let sched'' := updateAfterStep st''.sched cid res.status
+          some { st'' with sched := sched'' }
 
 /-! ### Lane compatibility contracts -/
 

@@ -34,7 +34,7 @@ open scoped Classical
 
 section
 
-/-! ## Swap Renaming -/
+-- Swap Renaming
 
 /-- Swap two roles A and B, leaving all others unchanged. -/
 def swapRole (A B : Role) (r : Role) : Role :=
@@ -54,7 +54,7 @@ theorem swapRole_involutive (A B : Role) (r : Role) :
         exact (beq_eq_false_iff_ne (a:=r) (b:=B)).1 (by simpa using hB)
       simp [swapRole, hA, hB]
 
-/-! ## Session-Scoped Type Swaps -/
+-- Session-Scoped Type Swaps
 
 /-- Swap roles inside value types (only for endpoints in session s). -/
 def swapValTypeRole (s : SessionId) (A B : Role) : ValType → ValType
@@ -106,7 +106,7 @@ def swapEdgeRole (s : SessionId) (A B : Role) (e : Edge) : Edge :=
   else
     e
 
-/-! ## Endpoint and Edge Swap Properties -/
+-- Endpoint and Edge Swap Properties
 
 theorem swapEndpointRole_sid (s : SessionId) (A B : Role) (ep : Endpoint) :
     (swapEndpointRole s A B ep).sid = ep.sid := by
@@ -148,7 +148,7 @@ theorem swapEdgeRole_inj (s : SessionId) (A B : Role) (e1 e2 : Edge) :
   have h' := congrArg (swapEdgeRole s A B) h
   simpa [swapEdgeRole_involutive] using h'
 
-/-! ## Environment Swap Lifts -/
+-- Environment Swap Lifts
 
 /-- Swap all endpoints and their local types for session s. -/
 def swapGEnvRole (s : SessionId) (A B : Role) (G : GEnv) : GEnv :=
@@ -168,7 +168,7 @@ def swapDEnvRole (s : SessionId) (A B : Role) (D : DEnv) : DEnv :=
         updateD acc p.1 p.2)
     (∅ : DEnv)
 
-/-! ## Lookup Lemmas -/
+-- Lookup Lemmas
 
 lemma lookupD_eq_list_lookup (D : DEnv) (e : Edge) :
     lookupD D e = match D.list.lookup e with
@@ -181,7 +181,7 @@ lemma lookupD_eq_list_lookup (D : DEnv) (e : Edge) :
   | some ts =>
       simp [lookupD, hfind, h]
 
-/-! ## Fold/Update Stability for Non-Target Edges -/
+-- Fold/Update Stability for Non-Target Edges
 
 lemma lookupD_foldl_update_neq_swap (s : SessionId) (A B : Role) :
     ∀ (l : List (Edge × Trace)) (acc : DEnv) (edge : Edge),
@@ -199,7 +199,7 @@ lemma lookupD_foldl_update_neq_swap (s : SessionId) (A B : Role) :
   intro l acc edge hne
   induction l generalizing acc with
   | nil => rfl
-  /-! ## Fold/Update Stability: Cons Case -/
+  -- Fold/Update Stability: Cons Case
   | cons hd tl ih =>
       have hne' : ∀ p ∈ tl,
           (if p.1.sid = s then swapEdgeRole s A B p.1 else p.1) ≠ edge := by
@@ -208,7 +208,7 @@ lemma lookupD_foldl_update_neq_swap (s : SessionId) (A B : Role) :
       have hhd :
           (if hd.1.sid = s then swapEdgeRole s A B hd.1 else hd.1) ≠ edge :=
         hne hd (List.mem_cons.mpr (Or.inl rfl))
-      /-! ## Fold/Update Stability: Branch on Session Match -/
+      -- Fold/Update Stability: Branch on Session Match
       by_cases hSid : hd.1.sid = s
       · have hneEdge : swapEdgeRole s A B hd.1 ≠ edge := by
           simpa [hSid] using hhd
@@ -232,7 +232,7 @@ lemma lookupD_foldl_update_neq_swap (s : SessionId) (A B : Role) :
                   (List.map (swapValTypeRole s A B) hd.2))
                 edge := by
           simpa using ih'
-        /-! ## Fold/Update Stability: In-Session Rewrite -/
+        -- Fold/Update Stability: In-Session Rewrite
         dsimp [List.foldl]
         simp [hSid]
         calc
@@ -269,7 +269,7 @@ lemma lookupD_foldl_update_neq_swap (s : SessionId) (A B : Role) :
                 edge =
               lookupD (updateD acc hd.1 hd.2) edge := by
           simpa using ih'
-        /-! ## Fold/Update Stability: Out-of-Session Rewrite -/
+        -- Fold/Update Stability: Out-of-Session Rewrite
         dsimp [List.foldl]
         simp [hSid]
         calc
@@ -286,7 +286,7 @@ lemma lookupD_foldl_update_neq_swap (s : SessionId) (A B : Role) :
           _ = lookupD acc edge :=
             lookupD_update_neq (env:=acc) (e:=hd.1) (e':=edge) (ts:=hd.2) hneEdge
 
-/-! ## Lookup Behavior Through GEnv Role Swap -/
+-- Lookup Behavior Through GEnv Role Swap
 
 /-- Looking up a swapped endpoint in a swapped GEnv. -/
 theorem lookupG_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
@@ -294,10 +294,10 @@ theorem lookupG_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
       if e.sid = s then (lookupG G e).map (swapLocalTypeRole s A B) else lookupG G e := by
   induction G with
   | nil =>
-    by_cases hSid : e.sid = s
+      by_cases hSid : e.sid = s
       · simp [swapGEnvRole, lookupG, List.lookup, hSid]
       · simp [swapGEnvRole, lookupG, List.lookup, hSid, swapEndpointRole]
-  /-! ## lookupG_swap: Inductive Cons Case -/
+  -- lookupG_swap: Inductive Cons Case
   | cons hd tl ih =>
       by_cases heq : e = hd.1
       · subst heq
@@ -307,7 +307,7 @@ theorem lookupG_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
           have hSwap : swapEndpointRole s A B hd.1 = hd.1 := by
             simp [swapEndpointRole, hSid]
           simp [swapGEnvRole, lookupG, List.lookup, hSid, hSwap]
-      /-! ## lookupG_swap: Distinct Endpoint Case -/
+      -- lookupG_swap: Distinct Endpoint Case
       · have hne :
           swapEndpointRole s A B e ≠
             (if hd.1.sid = s then swapEndpointRole s A B hd.1 else hd.1) := by
@@ -334,7 +334,7 @@ theorem lookupG_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
               have hSwap : swapEndpointRole s A B e = e := by
                 simp [swapEndpointRole, hSid]
               exact (heq (by simpa [hSwap, hHdSid] using hEq)).elim
-        /-! ## lookupG_swap: Transport Through Mapped Tail Lookup -/
+        -- lookupG_swap: Transport Through Mapped Tail Lookup
         have hne1 :
             swapEndpointRole s A B e ≠
               (if hd.1.sid = s then

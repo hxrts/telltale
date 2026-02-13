@@ -321,8 +321,6 @@ mutual
             exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inr horiginal))
         | inr hrepl => right; exact hrepl
 
-  /-! ## Substitution Role Containment: Global Types -/
-
   /-- Substitution can only introduce roles from the replacement type. -/
   theorem substitute_roles_subset (g : GlobalType) (t : String) (repl : GlobalType) :
       ∀ p, p ∈ (g.substitute t repl).roles → p ∈ g.roles ∨ p ∈ repl.roles :=
@@ -358,8 +356,6 @@ mutual
                 left
                 exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inr horiginal))
             | inr hrepl => right; exact hrepl
-
-  /-! ## Substitution Role Containment: Branch Lists -/
 
   /-- Branch substitution preserves role containment. -/
   theorem substituteBranches_roles_subset (branches : List (Label × GlobalType))

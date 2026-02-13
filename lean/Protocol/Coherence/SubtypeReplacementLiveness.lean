@@ -125,7 +125,7 @@ theorem HeadCoherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
       exact hRecv hEq.symm
     simpa [hLookupRecv] using hHead e hActivePre
 
-/-! ## ValidLabels helpers -/
+-- ValidLabels helpers
 
 private lemma find?_isSome_of_label_mem {bs : List (Label × LocalType)} {ℓ : Label}
     (hMem : ℓ ∈ List.map Prod.fst bs) :
@@ -170,7 +170,7 @@ private lemma ValidLabels_branch_transfer {bufs : Buffers} {e : Edge}
             find?_isSome_of_label_mem hMemLbl₂
           simpa [hBuf] using hSome₂
 
-/-! ## ValidLabels Preservation Under Replacement -/
+-- ValidLabels Preservation Under Replacement
 
 /-- ValidLabels is preserved under compatible type replacement.
 
@@ -193,7 +193,7 @@ theorem ValidLabels_type_replacement {G : GEnv} {D : DEnv} {bufs : Buffers}
     have hBranch' : L₂ = .branch source bs := by
       simpa [lookupG_updateG_eq] using hBranch
     have hShape := (hCompat source).2
-    /-! ## ValidLabels Replacement: Receiver-Updated Shape Analysis -/
+    -- ValidLabels Replacement: Receiver-Updated Shape Analysis
     -- L₁ must also be a matching branch with the same labels.
     cases L₁ with
     | send r T L =>
@@ -231,7 +231,7 @@ theorem ValidLabels_type_replacement {G : GEnv} {D : DEnv} {bufs : Buffers}
           simpa using hLookup
         have hOrig := hValid e source bs₁ hActivePre hLookup₁
         exact ValidLabels_branch_transfer hLabels hOrig
-  /-! ## ValidLabels Replacement: Receiver Unchanged Case -/
+  -- ValidLabels Replacement: Receiver Unchanged Case
   case neg =>
     -- ep is not receiver: lookup unchanged
     have hLookupRecv :
@@ -244,7 +244,7 @@ theorem ValidLabels_type_replacement {G : GEnv} {D : DEnv} {bufs : Buffers}
       simpa [hLookupRecv] using hBranch
     simpa using hValid e source bs hActivePre hBranch'
 
-/-! ## Role Target Compatibility Helpers -/
+-- Role Target Compatibility Helpers
 
 /-- RecvCompatible preserves target role structure.
 
@@ -269,7 +269,7 @@ theorem RecvCompatible_targetRole {L₁ L₂ : LocalType}
     LocalType.targetRole? L₁ = LocalType.targetRole? L₂ := by
   exact ShapeCompatible_targetRole (hCompat (default : Role)).2
 
-/-! ## RoleComplete Preservation Under Replacement -/
+-- RoleComplete Preservation Under Replacement
 
 /-- RoleComplete is preserved under type replacement.
 
@@ -308,7 +308,7 @@ theorem RoleComplete_type_replacement {G : GEnv} {ep : Endpoint} {L₁ L₂ : Lo
         use L'
         rw [lookupG_updateG_ne hPeer]
         exact hL'
-  /-! ## RoleComplete Replacement: Non-Replaced Endpoint Case -/
+  -- RoleComplete Replacement: Non-Replaced Endpoint Case
   · -- e ≠ ep: lookup unchanged
     have hUnchanged : lookupG (updateG G ep L₂) e = lookupG G e := by
       apply lookupG_updateG_ne h
@@ -330,7 +330,7 @@ theorem RoleComplete_type_replacement {G : GEnv} {ep : Endpoint} {L₁ L₂ : Lo
         rw [lookupG_updateG_ne hTarget']
         exact hL'
 
-/-! ## Progress Conditions Bundle -/
+-- Progress Conditions Bundle
 
 /-- **Full liveness preservation**: All progress conditions are preserved
     under compatible type replacement.

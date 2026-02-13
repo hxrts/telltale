@@ -61,7 +61,7 @@ open scoped Classical
 
 section
 
-/-! ## Protocol ProtoActions -/
+-- Protocol ProtoActions
 
 /-- ProtoActions that can be performed on the protocol.
     Each action specifies the endpoint, peer role, and payload type. -/
@@ -86,7 +86,7 @@ def sessionId (a : ProtoAction) : SessionId := a.endpoint.sid
 
 end ProtoAction
 
-/-! ## Monitor State -/
+-- Monitor State
 
 /-- Monitor state tracks all protocol-relevant information.
 
@@ -123,7 +123,7 @@ def recvEdge (e : Endpoint) (source : Role) : Edge :=
 
 end MonitorState
 
-/-! ## Monitor Transition Judgment -/
+-- Monitor Transition Judgment
 
 /-- Monitor transition judgment.
 
@@ -141,7 +141,7 @@ And produces:
 3. Updated buffers
 4. Updated linear context with new token -/
 inductive MonStep : MonitorState → ProtoAction → Value → MonitorState → Prop where
-  /-! ## MonStep Send/Recv Rules -/
+  -- MonStep Send/Recv Rules
   /-- Send: enqueue value and advance sender's type. -/
   | send {ms e target T L v lin'} :
       lookupG ms.G e = some (.send target T L) →
@@ -172,7 +172,7 @@ inductive MonStep : MonitorState → ProtoAction → Value → MonitorState → 
           bufs := updateBuf ms.bufs (MonitorState.recvEdge e source) vs
           Lin := LinCtx.produceToken lin' e L }
 
-  /-! ## MonStep Select/Branch Rules -/
+  -- MonStep Select/Branch Rules
   /-- Select: send label and advance sender's type. -/
   | select {ms e target bs ℓ L lin'} :
       lookupG ms.G e = some (.select target bs) →
@@ -203,7 +203,7 @@ inductive MonStep : MonitorState → ProtoAction → Value → MonitorState → 
           bufs := updateBuf ms.bufs (MonitorState.recvEdge e source) vs
           Lin := LinCtx.produceToken lin' e L }
 
-/-! ## Well-Typed Monitor State -/
+-- Well-Typed Monitor State
 
 /-- A monitor state is well-typed if:
     1. G and D are coherent
@@ -236,7 +236,7 @@ structure WTMon (ms : MonitorState) : Prop where
   /-- All endpoints in G have session ID below supply (freshness) -/
   supply_fresh_G : ∀ e S, (e, S) ∈ ms.G → e.sid < ms.supply
 
-/-! ## Complete Monitor Invariant -/
+-- Complete Monitor Invariant
 
 /-- Complete monitor invariant: well-typedness plus role completeness. -/
 def WTMonComplete (ms : MonitorState) : Prop :=
@@ -254,7 +254,7 @@ theorem WTMonComplete.toRoleComplete (ms : MonitorState) (h : WTMonComplete ms) 
   -- Project the role-completeness half.
   exact h.2
 
-/-! ## Helper Lemmas for Linear Context -/
+-- Helper Lemmas for Linear Context
 
 /-- Membership in produceToken: new entry is at the head. -/
 theorem mem_produceToken_head (ctx : LinCtx) (e : Endpoint) (S : LocalType) :
@@ -297,7 +297,7 @@ theorem mem_of_consumeToken (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' : LocalT
         | inl heqMem => exact Or.inl heqMem
         | inr hmemTl => exact Or.inr (ih result.1 hConsume' hmemTl)
 
-/-! ## consumeToken Preservation for Non-target Endpoints -/
+-- consumeToken Preservation for Non-target Endpoints
 /-- consumeToken preserves other entries: if (e', S') was in ctx and e' ≠ e,
     then (e', S') is still in ctx' after consuming the token for e. -/
 theorem mem_consumeToken_preserved (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' : LocalType)
@@ -336,7 +336,7 @@ theorem mem_consumeToken_preserved (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' :
         | inl heqMem => exact Or.inl heqMem
         | inr hmemTl => exact Or.inr (ih result.1 hConsume' hmemTl)
 
-/-! ## Linearity Invariant Lemmas -/
+-- Linearity Invariant Lemmas
 
 /-- If ctx has no duplicate endpoints and consumeToken succeeds,
     the consumed endpoint e is not in the result ctx'. -/
@@ -383,7 +383,7 @@ theorem consumeToken_not_mem (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
         | inr hmemTl =>
           exact ih result.1 hTlPairwise hConsume' S' hmemTl
 
-/-! ## Pairwise Preservation under consumeToken -/
+-- Pairwise Preservation under consumeToken
 /-- consumeToken preserves the Pairwise property. -/
 theorem consumeToken_pairwise (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
     (hPairwise : ctx.Pairwise (fun a b => a.1 ≠ b.1))
@@ -418,7 +418,7 @@ theorem consumeToken_pairwise (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
           exact hAll a haInTl
         · exact ih result.1 hTlPairwise hConsume'
 
-/-! ## Pairwise Preservation under produceToken -/
+-- Pairwise Preservation under produceToken
 /-- produceToken preserves Pairwise if the new endpoint wasn't in the context. -/
 theorem produceToken_pairwise (ctx : LinCtx) (e : Endpoint) (S : LocalType)
     (hPairwise : ctx.Pairwise (fun a b => a.1 ≠ b.1))
@@ -436,7 +436,7 @@ theorem produceToken_pairwise (ctx : LinCtx) (e : Endpoint) (S : LocalType)
     exact hNotIn a.2 haMem'
   · exact hPairwise
 
-/-! ## consumeToken Membership Recovery -/
+-- consumeToken Membership Recovery
 /-- If consumeToken succeeds, the endpoint was in the original context. -/
 theorem consumeToken_endpoint_in_ctx (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
     (hConsume : LinCtx.consumeToken ctx e = some (ctx', S)) :
@@ -464,7 +464,7 @@ theorem consumeToken_endpoint_in_ctx (ctx ctx' : LinCtx) (e : Endpoint) (S : Loc
         have hInTl : (e, result.2) ∈ tl := ih result.1 hConsume'
         exact List.mem_cons_of_mem hd hInTl
 
-/-! ## Freshness Preservation for Token Operations -/
+-- Freshness Preservation for Token Operations
 /-- consumeToken preserves supply freshness: if all endpoints in ctx have sid < supply,
     then all endpoints in ctx' have sid < supply. -/
 theorem consumeToken_preserves_supply_fresh (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)

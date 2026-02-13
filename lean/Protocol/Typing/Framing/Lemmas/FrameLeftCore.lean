@@ -24,7 +24,7 @@ open scoped Classical
 
 section
 
-/-! ## Main Left Frame Theorem -/
+-- Main Left Frame Theorem
 
 theorem HasTypeProcPre_frame_left
     {Ssh : SEnv} {Sown : OwnedEnv} {Sframe : SEnv} {G₁ G₂ : GEnv} {P : Process} :
@@ -42,7 +42,7 @@ theorem HasTypeProcPre_frame_left
           (Ssh:=Ssh)
           (Sown:={ right := Sframe ++ Sown.right, left := Sown.left })
           (G:=G₁ ++ G))
-  /-! ## Left Frame: send case -/
+  -- Left Frame: send case
   | send hk hG hx =>
       rename_i Sown G k x e q T L
       have hk' :
@@ -54,7 +54,7 @@ theorem HasTypeProcPre_frame_left
           lookupSEnv (SEnvVisible Ssh { right := Sframe ++ Sown.right, left := Sown.left }) x = some T := by
         simpa [SEnvVisible, List.append_assoc] using hx
       exact HasTypeProcPre.send hk' hG' hx'
-  /-! ## Left Frame: recv/select cases -/
+  -- Left Frame: recv/select cases
   | recv hk hG hNoSh =>
       rename_i Sown G k x e p T L
       have hk' :
@@ -71,7 +71,7 @@ theorem HasTypeProcPre_frame_left
         simpa [SEnvVisible, List.append_assoc] using hk
       have hG' := lookupG_frame_left hDisjG hG
       exact HasTypeProcPre.select hk' hG' hFind
-  /-! ## Left Frame: branch case -/
+  -- Left Frame: branch case
   | branch hk hG hLen hLbl hProcs ih =>
       rename_i Sown G k procs e p bs
       have hk' :
@@ -97,7 +97,7 @@ theorem HasTypeProcPre_frame_left
         rw [← hUpd] at hBody'
         exact hBody'
       exact HasTypeProcPre.branch hk' hG' hLen hLbl hProcs'
-  /-! ## Left Frame: seq/par cases -/
+  -- Left Frame: seq/par cases
   | seq hP hQ ihP ihQ =>
       exact HasTypeProcPre.seq (ihP hDisjR hDisjL hDisjG) (ihQ hDisjR hDisjL hDisjG)
   | par hDisjS hS hP hQ ihP ihQ =>
@@ -117,11 +117,11 @@ theorem HasTypeProcPre_frame_left
       exact HasTypeProcPre.par hDisjS (by simpa [hS] using hS)
         (by simpa [List.append_assoc] using hP')
         (by simpa [List.append_assoc] using hQ')
-  /-! ## Left Frame: assign case -/
+  -- Left Frame: assign case
   | assign hNoSh hv =>
       exact HasTypeProcPre.assign hNoSh (HasTypeVal_frame_left hDisjG hv)
 
-/-! ## Gauge Reframing of Pre-Typing -/
+-- Gauge Reframing of Pre-Typing
 
 /-- Pre-typing is invariant under right-gauge reframe of the owned environment. -/
 theorem HasTypeProcPre_reframe_right
@@ -133,7 +133,7 @@ theorem HasTypeProcPre_reframe_right
   induction h generalizing Sown' with
   | skip =>
       exact HasTypeProcPre.skip
-  /-! ## Reframe Right: channel action cases -/
+  -- Reframe Right: channel action cases
   | send hk hG hx =>
       rename_i Sown G k x e q T L
       have hk' :
@@ -155,7 +155,7 @@ theorem HasTypeProcPre_reframe_right
           lookupSEnv (SEnvVisible Ssh Sown') k = some (.chan e.sid e.role) := by
         simpa [SEnvVisible, hLeft] using hk
       exact HasTypeProcPre.select hk' hG hFind
-  /-! ## Reframe Right: branch and composition cases -/
+  -- Reframe Right: branch and composition cases
   | branch hk hG hLen hLbl hProcs ih =>
       rename_i Sown G k procs e p bs
       have hk' :
@@ -180,11 +180,11 @@ theorem HasTypeProcPre_reframe_right
           HasTypeProcPre Ssh { right := Sown'.right ++ S₁, left := S₂ } G Q := by
         exact ihQ (Sown':={ right := Sown'.right ++ S₁, left := S₂ }) rfl
       exact HasTypeProcPre.par hDisjS hS' hP' hQ'
-  /-! ## Reframe Right: assignment case -/
+  -- Reframe Right: assignment case
   | assign hNoSh hv =>
       exact HasTypeProcPre.assign hNoSh hv
 
-/-! ## Session-Subset Transport Under Updates -/
+-- Session-Subset Transport Under Updates
 
 /-- Sessions only shrink under pre-out typing (no new sessions introduced). -/
 theorem SessionsOf_subset_update_send
@@ -214,7 +214,7 @@ theorem SessionsOf_subset_update_select
     SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.select q bs) hG
   simpa [hEq] using hs
 
-/-! ## Session-Subset of Pre-Out Derivations -/
+-- Session-Subset of Pre-Out Derivations
 
 theorem SessionsOf_subset_of_HasTypeProcPreOut
     {Ssh Sown G P Sown' G' W Δ} :
@@ -255,7 +255,7 @@ theorem SessionsOf_subset_of_HasTypeProcPreOut
       intro s hs
       simpa using hs
 
-/-! ## Right-Frame Lookup and Value Transport -/
+-- Right-Frame Lookup and Value Transport
 
 /-- Lift SEnvAll lookups across a right frame (left-biased). -/
 theorem lookupSEnv_all_frame_right
@@ -285,7 +285,7 @@ theorem HasTypeVal_frame_right {G₁ G₂ : GEnv} {v : Value} {T : ValType} :
   | chan h =>
       exact HasTypeVal.chan (lookupG_append_left h)
 
-/-! ## Auxiliary Disjointness and Update Helpers -/
+-- Auxiliary Disjointness and Update Helpers
 
 /-- If the right frame is disjoint from a lookup on the left, the right lookup is none. -/
 theorem lookupSEnv_none_of_disjoint_right {S₁ S₂ : SEnv} {x : Var} {T : ValType} :

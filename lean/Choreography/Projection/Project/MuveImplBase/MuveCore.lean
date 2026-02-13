@@ -80,8 +80,8 @@ theorem isMuve_of_not_guarded : ∀ lt v, lt.isGuarded v = false → isMuve lt =
 /-- A local type is closed if it has no free variables. -/
 def isClosed (lt : LocalTypeR) : Bool := lt.freeVars == []
 
-/-! ## FreeVars lemmas for substitution -/
-/-! ## Substitution Free-Variable Base Helpers -/
+-- FreeVars lemmas for substitution
+-- Substitution Free-Variable Base Helpers
 private theorem freeVars_substitute_subset_end (varName : String) (repl : LocalTypeR)
     (x : String) (hx : x ∈ (LocalTypeR.end.substitute varName repl).freeVars) :
     x ∈ repl.freeVars ∨ (x ∈ LocalTypeR.end.freeVars ∧ x ≠ varName) := by
@@ -124,7 +124,7 @@ private theorem freeVars_substitute_subset_mu_shadow
   · simpa [LocalTypeR.freeVars] using hx
   · simpa [htv] using hxne_t
 
-/-! ## Substitution Under Mu (Shadowing Cases) -/
+-- Substitution Under Mu (Shadowing Cases)
 private theorem freeVars_substitute_subset_mu_noshadow
     (t varName : String) (body repl : LocalTypeR) (x : String)
     (hx : x ∈ (body.substitute varName repl).freeVars.filter (fun v => v != t))
@@ -143,7 +143,7 @@ private theorem freeVars_substitute_subset_mu_noshadow
         exact ⟨hpair.1, by simpa [bne_iff_ne] using hxne_t⟩
       · exact hpair.2
 
-/-! ## Mutual Substitution Recursion -/
+-- Mutual Substitution Recursion
 mutual
 private def freeVars_substitute_subset_aux (lt : LocalTypeR) (varName : String) (repl : LocalTypeR)
     (x : String) (hx : x ∈ (lt.substitute varName repl).freeVars) :
@@ -175,7 +175,7 @@ private def freeVars_substitute_subset_aux (lt : LocalTypeR) (varName : String) 
           exact freeVars_substitute_subset_mu_noshadow t varName body repl x hx' ih
 termination_by sizeOf lt
 
-/-! ## Branch Substitution Recursion -/
+-- Branch Substitution Recursion
 private def freeVars_substituteBranches_subset_aux
     (branches : List BranchR) (varName : String) (repl : LocalTypeR)
     (x : String) (hx : x ∈ SessionTypes.LocalTypeR.freeVarsOfBranches (SessionTypes.LocalTypeR.substituteBranches branches varName repl)) :
@@ -204,13 +204,13 @@ private def freeVars_substituteBranches_subset_aux
 termination_by sizeOf branches
 end
 
-/-! ## Substitution Free-Variable Superset Theorem -/
+-- Substitution Free-Variable Superset Theorem
 theorem freeVars_substitute_subset (lt : LocalTypeR) (varName : String) (repl : LocalTypeR) :
     ∀ x, x ∈ (lt.substitute varName repl).freeVars →
          x ∈ repl.freeVars ∨ (x ∈ lt.freeVars ∧ x ≠ varName) :=
   fun x hx => freeVars_substitute_subset_aux lt varName repl x hx
 
-/-! ## Substitution Closedness Lemma -/
+-- Substitution Closedness Lemma
 theorem substitute_closed_when_only_var (lt : LocalTypeR) (varName : String) (repl : LocalTypeR)
     (hlt : ∀ x, x ∈ lt.freeVars → x = varName)
     (hrepl : repl.freeVars = []) :
@@ -230,7 +230,7 @@ theorem substitute_closed_when_only_var (lt : LocalTypeR) (varName : String) (re
       have hxeq := hlt x hpair.1
       exact hpair.2 hxeq
 
-/-! ## Closed Mu Body Variable Constraint -/
+-- Closed Mu Body Variable Constraint
 theorem mu_closed_body_freeVars (t : String) (body : LocalTypeR)
     (hclosed : (.mu t body : LocalTypeR).freeVars = []) :
     ∀ x, x ∈ body.freeVars → x = t := by
@@ -247,7 +247,7 @@ theorem mu_closed_body_freeVars (t : String) (body : LocalTypeR)
       exact hne
   simp only [hclosed, List.not_mem_nil] at hfilter
 
-/-! ## Filter Helper for Uniform Variables -/
+-- Filter Helper for Uniform Variables
 private theorem filter_all_eq_nil {L : List String} {t : String}
     (h : ∀ x, x ∈ L → x = t) :
     L.filter (· != t) = [] := by
@@ -264,7 +264,7 @@ private theorem filter_all_eq_nil {L : List String} {t : String}
       exact filter_all_eq_nil htl
 termination_by L.length
 
-/-! ## allVarsBound Implies Free-Variable Inclusion -/
+-- allVarsBound Implies Free-Variable Inclusion
 mutual
 private def allVarsBound_implies_freeVars_subset_aux (g : GlobalType) (bound : List String)
     (h : g.allVarsBound bound = true) (x : String) (hx : x ∈ g.freeVars) : x ∈ bound :=
@@ -317,7 +317,7 @@ theorem allVarsBound_nil_implies_freeVars_nil (g : GlobalType)
   have hmem := allVarsBound_implies_freeVars_subset_aux g [] h x hx
   simp only [List.not_mem_nil] at hmem
 
-/-! ## Muve Preservation Under Substitution -/
+-- Muve Preservation Under Substitution
 theorem isMuve_substitute (lt : LocalTypeR) (varName : String) (repl : LocalTypeR)
     (hlt : isMuve lt = true) (hrepl : isMuve repl = true) :
     isMuve (lt.substitute varName repl) = true := by
@@ -351,7 +351,7 @@ while allVarsBound does not (body.allVarsBound [t] doesn't imply body.allVarsBou
 
 This avoids the semantic gap that arises from using full wellFormed. -/
 
-/-! ## Mu Structural Well-Formedness Helper -/
+-- Mu Structural Well-Formedness Helper
 private theorem wellFormed_mu_body (t : String) (body : GlobalType)
     (hwf : (GlobalType.mu t body).wellFormed = true) :
     body.allCommsNonEmpty = true ∧ body.noSelfComm = true := by
@@ -359,7 +359,7 @@ private theorem wellFormed_mu_body (t : String) (body : GlobalType)
   simp only [GlobalType.allCommsNonEmpty, GlobalType.noSelfComm, Bool.and_eq_true] at hwf
   simp_all only [and_self]
 
-/-! ## Size Decrease Helper for Comm Branches -/
+-- Size Decrease Helper for Comm Branches
 private theorem sizeOf_pair_snd_lt_comm (sender receiver : String) (pair : Label × GlobalType)
     (rest : List (Label × GlobalType)) :
     sizeOf pair.2 < sizeOf (GlobalType.comm sender receiver (pair :: rest)) := by
@@ -375,7 +375,7 @@ private theorem sizeOf_pair_snd_lt_comm (sender receiver : String) (pair : Label
   simp only [List.cons.sizeOf_spec, hp]
   omega
 
-/-! ## Comm Branch Well-Formedness Helper -/
+-- Comm Branch Well-Formedness Helper
 private theorem wellFormed_comm_cont (sender receiver : String) (pair : Label × GlobalType)
     (rest : List (Label × GlobalType))
     (hwf : (GlobalType.comm sender receiver (pair :: rest)).wellFormed = true) :
@@ -388,7 +388,7 @@ private theorem wellFormed_comm_cont (sender receiver : String) (pair : Label ×
              Bool.and_eq_true] at hwf ⊢
   tauto
 
-/-! ## Auxiliary Muve Projection Theorems -/
+-- Auxiliary Muve Projection Theorems
 private theorem trans_muve_of_not_part_of2_aux_base (g : GlobalType) (role : String) :
     g = .end ∨ (∃ t, g = .var t) → isMuve (trans g role) = true := by
   -- Base cases follow directly from trans and isMuve definitions.
@@ -397,7 +397,7 @@ private theorem trans_muve_of_not_part_of2_aux_base (g : GlobalType) (role : Str
   | inl hEnd => cases hEnd; simp [trans, isMuve]
   | inr hVar => rcases hVar with ⟨t, rfl⟩; simp [trans, isMuve]
 
-/-! ## Auxiliary Mu Case -/
+-- Auxiliary Mu Case
 private theorem trans_muve_of_not_part_of2_aux_mu (t : String) (body : GlobalType) (role : String)
     (_hnotpart : ¬ part_of2 role (.mu t body))
     (_hne : (GlobalType.mu t body).allCommsNonEmpty = true)
@@ -411,7 +411,7 @@ private theorem trans_muve_of_not_part_of2_aux_mu (t : String) (body : GlobalTyp
     exact hbody
   · simp only [hguard, Bool.false_eq_true, ↓reduceIte, isMuve]
 
-/-! ## Main Auxiliary Recursor -/
+-- Main Auxiliary Recursor
 private theorem trans_muve_of_not_part_of2_aux (g : GlobalType) (role : String)
     (hnotpart : ¬ part_of2 role g)
     (hne : g.allCommsNonEmpty = true) (hnsc : g.noSelfComm = true) :
@@ -431,7 +431,7 @@ private theorem trans_muve_of_not_part_of2_aux (g : GlobalType) (role : String)
       have hbody : isMuve (trans body role) = true :=
         trans_muve_of_not_part_of2_aux body role hnotpart_body hne_body hnsc_body
       exact trans_muve_of_not_part_of2_aux_mu t body role hnotpart hne hnsc hbody
-  /-! ## Auxiliary Recursor: Comm Case -/
+  -- Auxiliary Recursor: Comm Case
   | .comm sender receiver branches =>
       -- Participants contradict the non-participation hypothesis; non-participants recurse.
       cases hrole_sender : role == sender with
@@ -478,7 +478,7 @@ decreasing_by
     | exact sizeOf_body_lt_mu _ _
     | simpa [GlobalType.comm.sizeOf_spec] using sizeOf_pair_snd_lt_comm _ _ _ _
 
-/-! ## Non-Participant Muve Projection Theorem -/
+-- Non-Participant Muve Projection Theorem
 theorem trans_muve_of_not_part_of2 (g : GlobalType) (role : String)
     (hnotpart : ¬ part_of2 role g) (hwf : g.wellFormed = true) :
     isMuve (trans g role) = true := by

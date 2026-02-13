@@ -20,7 +20,7 @@ RegularSystem_at_index shows system matches dest of state, defines RegularBisim
 relating states to their reconstructions, and proves this satisfies IsBisimulation.
 -/
 
-/-! ## Core Development -/
+-- Core Development
 
 namespace SessionCoTypes.Coinductive
 
@@ -28,7 +28,7 @@ open Classical
 
 attribute [local instance] Classical.decEq
 
-/-! ## State Index Retrieval -/
+-- State Index Retrieval
 
 /-- `StateIndex` returns the index witnessing membership in the reachable list. -/
 theorem get_StateIndex (t : LocalTypeC) (h : Regular t) (s : LocalTypeC)
@@ -46,7 +46,7 @@ theorem get_StateIndex (t : LocalTypeC) (h : Regular t) (s : LocalTypeC)
       have hget : (ReachableList w)[i] = s := (List.finIdxOf?_eq_some_iff).1 hidx |>.1
       simpa [hidx] using hget
 
-/-! ## RegularSystem at Indexed States -/
+-- RegularSystem at Indexed States
 
 /-- One-step behavior of the regular system at a reachable state. -/
 theorem RegularSystem_at_index (t : LocalTypeC) (h : Regular t) (s : LocalTypeC)
@@ -75,7 +75,7 @@ theorem RegularSystem_at_index (t : LocalTypeC) (h : Regular t) (s : LocalTypeC)
       rw [get_StateIndex t h s hs]
       rfl
 
-/-! ## RegularBisim Relation -/
+-- RegularBisim Relation
 
 /-- A bisimulation relating reachable states to their finite-system image. -/
 def RegularBisim (t : LocalTypeC) (h : Regular t)
@@ -83,7 +83,7 @@ def RegularBisim (t : LocalTypeC) (h : Regular t)
   ∃ s, s ∈ ReachableList (witnessOfRegular h) ∧
     s1 = s ∧ s2 = SystemToCoind sys (StateIndex (witnessOfRegular h) s)
 
-/-! ## RegularBisim Is a Bisimulation -/
+-- RegularBisim Is a Bisimulation
 
 /-- The regular bisimulation is a bisimulation. -/
 theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
@@ -101,7 +101,7 @@ theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
       exact ⟨hd, f, i, hdest, rfl⟩
     exact w.closed s1 hs _ hchild
   cases hd with
-  /-! ## Head Case: end -/
+  -- Head Case: end
   | «end» =>
       let g : LocalTypeChild LocalTypeHead.end → LocalTypeC :=
         PFunctor.M.corec (RegularSystem w) ∘ fun x => PEmpty.elim x
@@ -114,7 +114,7 @@ theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
         simpa [SystemToCoind, PFunctor.M.dest_corec, g, Function.comp] using hmap
       · intro i
         cases i
-  /-! ## Head Case: var -/
+  -- Head Case: var
   | var v =>
       let g : LocalTypeChild (LocalTypeHead.var v) → LocalTypeC :=
         PFunctor.M.corec (RegularSystem w) ∘ fun x => PEmpty.elim x
@@ -127,7 +127,7 @@ theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
         simpa [SystemToCoind, PFunctor.M.dest_corec, g, Function.comp] using hmap
       · intro i
         cases i
-  /-! ## Head Case: mu -/
+  -- Head Case: mu
   | mu v =>
       let g : LocalTypeChild (LocalTypeHead.mu v) → LocalTypeC :=
         PFunctor.M.corec (RegularSystem w) ∘ fun _ => StateIndex w (f ())
@@ -141,7 +141,7 @@ theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
       · intro i
         cases i
         refine ⟨f (), hchild_mem (), rfl, rfl⟩
-  /-! ## Head Case: send -/
+  -- Head Case: send
   | send p labels =>
       let g : LocalTypeChild (LocalTypeHead.send p labels) → LocalTypeC :=
         PFunctor.M.corec (RegularSystem w) ∘ fun i => StateIndex w (f i)
@@ -154,7 +154,7 @@ theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
         simpa [SystemToCoind, PFunctor.M.dest_corec, g, Function.comp] using hmap
       · intro i
         refine ⟨f i, hchild_mem i, rfl, rfl⟩
-  /-! ## Head Case: recv -/
+  -- Head Case: recv
   | recv p labels =>
       let g : LocalTypeChild (LocalTypeHead.recv p labels) → LocalTypeC :=
         PFunctor.M.corec (RegularSystem w) ∘ fun i => StateIndex w (f i)
@@ -168,7 +168,7 @@ theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
       · intro i
         refine ⟨f i, hchild_mem i, rfl, rfl⟩
 
-/-! ## Finite-System Extraction Theorems -/
+-- Finite-System Extraction Theorems
 
 /-- Regular coinductive types are bisimilar to their finite-system presentation. -/
 theorem Regular_implies_System (t : LocalTypeC) (h : Regular t) :

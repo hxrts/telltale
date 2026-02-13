@@ -24,7 +24,7 @@ open scoped Classical
 
 section
 
-/-! ## Erasure Domain Subset -/
+-- Erasure Domain Subset
 
 lemma eraseSEnv_domsubset_local {S : SEnv} {x : Var} :
     SEnvDomSubset (eraseSEnv S x) S := by
@@ -54,7 +54,7 @@ lemma eraseSEnv_domsubset_local {S : SEnv} {x : Var} :
               obtain ⟨T', hT'⟩ := ih hLookup
               exact ⟨T', by simpa [lookupSEnv, List.lookup, hbeq] using hT'⟩
 
-/-! ## Right-Domain Monotonicity -/
+-- Right-Domain Monotonicity
 
 /-- Pre-out typing only preserves or erases right-owned bindings. -/
 lemma HasTypeProcPreOut_right_domsubset_local
@@ -89,9 +89,9 @@ lemma HasTypeProcPreOut_right_domsubset_local
       simpa [OwnedEnv.updateLeft] using
         (eraseSEnv_domsubset_local : SEnvDomSubset (eraseSEnv _ _) _)
 
-/-! ## Left Parallel Reframing Helpers -/
+-- Left Parallel Reframing Helpers
 
-/-! ## Reframe To Empty Right Ownership -/
+-- Reframe To Empty Right Ownership
 
 /-- Helper: reframe the left-par pre-out typing across an empty right frame. -/
 lemma frame_left_par_reframe_local
@@ -118,7 +118,7 @@ lemma frame_left_par_reframe_local
       (DisjointS_left_empty S₂) (DisjointS_left_empty S₂') hQ
   exact ⟨hP0, hQ0⟩
 
-/-! ## Assemble Empty-Right Parallel Step -/
+-- Assemble Empty-Right Parallel Step
 
 /-- Helper: assemble the par case with empty right frame. -/
 lemma frame_left_par_apply_local
@@ -164,7 +164,7 @@ lemma frame_left_par_apply_local
     hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ
     hQ hDisjEmpty_left hDisjEmpty_fin hDisjGfrG ihP
 
-/-! ## Restore Right Ownership Frame -/
+-- Restore Right Ownership Frame
 
 /-- Helper: restore the right-owned frame after a par step. -/
 lemma frame_left_par_restore_local
@@ -181,7 +181,7 @@ lemma frame_left_par_restore_local
     (R:=(∅ : SEnv)) (R':=Sown.right) (L:=Sown.left) (L':=S₁' ++ S₂')
     (G:=Gfr ++ G) (P:=.par nS nG P Q) hDisjIn hDisjOut hPar0
 
-/-! ## Constructive Left-Par Framing -/
+-- Constructive Left-Par Framing
 
 /-- Local constructive par case for left-G framing. -/
 lemma HasTypeProcPreOut_frame_G_left_par_local
@@ -225,7 +225,7 @@ lemma HasTypeProcPreOut_frame_G_left_par_local
     hDisjRightIn hDisjRightOut hPar0
   simpa [hSfin] using hPar1
 
-/-! ## Left G-Frame Transport -/
+-- Left G-Frame Transport
 
 /-- Local left-frame transport for `HasTypeProcPreOut`. -/
 lemma HasTypeProcPreOut_frame_G_left_local
@@ -238,7 +238,7 @@ lemma HasTypeProcPreOut_frame_G_left_local
     HasTypeProcPreOut Ssh Sown (Gfr ++ G) P Sfin (Gfr ++ Gfin) W Δ := by
   intro hDisj hDisjRightIn h hDisjRightOut
   induction h with
-  /-! ## Base And Single-Step Cases -/
+  -- Base And Single-Step Cases
   | skip =>
       rename_i Sown G
       simpa using (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G))
@@ -288,7 +288,7 @@ lemma HasTypeProcPreOut_frame_G_left_local
           hk (by simpa [hG] using lookupG_append_right (G₁:=Gfr) (G₂:=G) (e:=e) hNone) hbs
       rw [hUpd] at hSel
       exact hSel
-  /-! ## Branch Case Transport -/
+  -- Branch Case Transport
   | branch hk hG hLen hLabels hBodies hOutLbl hSess hDom hRight ihOutLbl =>
       rename_i Sown G k procs e p bs Sfin Gfin W Δ
       have hNone := lookupG_none_of_disjoint hDisj hG
@@ -336,7 +336,7 @@ lemma HasTypeProcPreOut_frame_G_left_local
       exact HasTypeProcPreOut.branch (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G)
         hk (by simpa [hG] using lookupG_append_right (G₁:=Gfr) (G₂:=G) (e:=e) hNone)
         hLen hLabels hBodies' hOutLbl' hSess' hDom hRight
-  /-! ## Sequential Composition Case -/
+  -- Sequential Composition Case
   | seq hP hQ ihP ihQ =>
       rename_i Sown G P Q S₁ G₁ S₂ G₂ W₁ W₂ Δ₁ Δ₂
       have hDomQ : SEnvDomSubset S₁.left S₂.left := HasTypeProcPreOut_domsubset hQ
@@ -355,7 +355,7 @@ lemma HasTypeProcPreOut_frame_G_left_local
         have hDisj' : DisjointG G₁ Gfr := DisjointG_of_subset_left hSubG1 (DisjointG_symm hDisj)
         exact DisjointG_symm hDisj'
       exact HasTypeProcPreOut.seq hP' (ihQ hDisjG1fr hDisjMidIn hDisjMidOut)
-  /-! ## Parallel Composition Case -/
+  -- Parallel Composition Case
   | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
       hDisjW hDisjΔ hP hQ ihP ihQ =>
       rename_i Sown G P Q Sfin Gfin W Δ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG
@@ -387,7 +387,7 @@ lemma HasTypeProcPreOut_frame_G_left_local
       exact HasTypeProcPreOut_frame_G_left_par_local (Ssh:=Ssh) (Gfr:=Gfr) (split:=split)
         hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
         hDisjRightIn hDisjRightOut' hDisjW hDisjΔ hP' hQ hDisjGfrG1 hDisjGfrG2
-  /-! ## Assignment Cases -/
+  -- Assignment Cases
   | assign_new hNoSh hNoOwnL hv =>
       rename_i Sown G x v T
       exact HasTypeProcPreOut.assign_new hNoSh hNoOwnL (HasTypeVal_frame_left (G₁:=Gfr) (G₂:=G) hDisj hv)

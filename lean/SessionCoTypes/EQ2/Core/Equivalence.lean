@@ -202,7 +202,7 @@ private theorem ReflRel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b := b
       | mu t body =>
           simpa [EQ2F] using (ReflRel_unfold_right h)
 
-/-! ## ReflRel Postfixpoint: Send/Recv Cases -/
+-- ReflRel Postfixpoint: Send/Recv Cases
 
   | send p bs =>
       cases b with
@@ -243,7 +243,7 @@ private theorem ReflRel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b := b
       | mu t body =>
           simpa [EQ2F] using (ReflRel_unfold_right h)
 
-/-! ## ReflRel Postfixpoint: μ Cases -/
+-- ReflRel Postfixpoint: mu Cases
 
   | mu t body =>
       cases b with

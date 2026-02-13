@@ -310,7 +310,7 @@ private lemma kfair_measure_zero_terminal
     omega
   · cases htc : sys.isTerminal c with
     | false => exact False.elim (hnt htc)
-    | true => simpa using htc
+    | true => exact rfl
 
 /-! ### Successor Case Helper -/
 
@@ -402,7 +402,7 @@ theorem kfair_termination_bound
         · have hterm0 : sys.isTerminal c' = true := by
             cases htc : sys.isTerminal c' with
             | false => exact False.elim (hnt0 htc)
-            | true => simpa using htc
+            | true => exact rfl
           have hstay := terminal_persists sys c' sched' 0
             (by simpa [execute] using hterm0)
             (k * Nat.succ m') (by omega)

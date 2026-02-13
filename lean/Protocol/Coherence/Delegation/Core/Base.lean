@@ -347,8 +347,8 @@ theorem delegate_redirected_edge_coherent
               Consume_delegate (s:=s) (A:=A) (B:=B) (L:=Lrecv0)
                 (ts:=lookupD D ⟨s, A, C⟩) (L':=L') hCons
             simp [hRen]
-  refine ⟨renameLocalTypeRole s A B hDeleg.A_type, hDeleg.B_added, ?_⟩
-  simpa [hEq, hTrace] using hConsumeRen
+      refine ⟨renameLocalTypeRole s A B hDeleg.A_type, hDeleg.B_added, ?_⟩
+      simpa [hEq, hTrace] using hConsumeRen
 
 /-! ## Redirected Edge Coherence: Receiver Case -/
 

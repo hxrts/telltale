@@ -15,7 +15,7 @@ open SessionTypes.LocalTypeR
 open SessionCoTypes.EQ2
 open SessionTypes.GlobalType
 
-/-! ## Standard Case Analysis -/
+-- Standard Case Analysis
 
 theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     (a b : LocalTypeR) (_hab : EQ2 a b)
@@ -24,7 +24,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     (hf : EQ2F EQ2 a b) :
     EQ2F (EQ2_closure (SubstRel var repl)) (a.substitute var repl) (b.substitute var repl) := by
   cases a <;> cases b
-  /-! ## Constructor-Aligned Base Cases -/
+  -- Constructor-Aligned Base Cases
   -- end-end
   case end.end =>
     unfold LocalTypeR.substitute
@@ -69,7 +69,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     unfold notBoundAt at hbarA hbarB
     obtain ⟨hp, hbranches⟩ := hf
     exact ⟨hp, BranchesRel_substitute var repl bs cs hbranches hbarA hbarB hfresh⟩
-  /-! ## Recursive Pair Case: `mu` vs `mu` -/
+  -- Recursive Pair Case: `mu` vs `mu`
   -- mu-mu
   case mu.mu t body s body' =>
     unfold notBoundAt at hbarA hbarB
@@ -104,7 +104,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
       exact SubstRel.base _ _ hright
         hmu_t_bar
         (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
-  /-! ## Mixed Case: `mu` vs `end` -/
+  -- Mixed Case: `mu` vs `end`
   -- mu-end (unfolding on left)
   case mu.end t body =>
     have htvar := bne_of_notBoundAt_mu hbarA
@@ -121,7 +121,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     exact SubstRel.base _ _ hf
       (notBoundAt_subst var t body (.mu t body) hbarBody hmu_t_bar)
       (by rfl)
-  /-! ## Mixed Case: `mu` vs `var` -/
+  -- Mixed Case: `mu` vs `var`
   case mu.var t body v =>
     have htvar := bne_of_notBoundAt_mu hbarA
     unfold notBoundAt at hbarA
@@ -132,9 +132,9 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     simp only [EQ2F_mu_var] at hf
     have ha_subst := mu_substitute_ne t body var repl htvar
     rw [ha_subst]
-    /-! ## `mu.var`: Split on Whether `v = var` -/
+    -- `mu.var`: Split on Whether `v = var`
     by_cases hv : v == var
-    /-! ## `mu.var`: `v = var`, Analyze `repl` Shape -/
+    -- `mu.var`: `v = var`, Analyze `repl` Shape
     · have hb_subst := var_substitute_eq v var repl hv
       rw [hb_subst]
       cases repl with
@@ -182,7 +182,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
             (by rfl : notBoundAt var (.var v) = true)
         rw [var_substitute_eq v var (.recv p bs) hv] at hsr
         exact hsr
-      /-! ## `mu.var`: `v = var`, `repl = mu` -/
+      -- `mu.var`: `v = var`, `repl = mu`
       | mu s body' =>
         simp only [EQ2F]
         constructor
@@ -227,7 +227,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
           have hsr' := SubstRel.unfold_right hsr
           simp only [LocalTypeR.unfold] at hsr'
           exact hsr'
-    /-! ## `mu.var`: `v ≠ var` -/
+    -- `mu.var`: `v ≠ var`
     · have hv' : (v == var) = false := by cases h : v == var <;> simp_all
       have hb_subst := var_substitute_ne v var repl hv'
       rw [hb_subst]
@@ -241,7 +241,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
           (by rfl : notBoundAt var (.var v) = true)
       rw [hb_subst] at hsr
       exact hsr
-  /-! ## Mixed Case: `mu` vs `send` -/
+  -- Mixed Case: `mu` vs `send`
   case mu.send t body p bs =>
     have htvar := bne_of_notBoundAt_mu hbarA
     have hbarB_orig := hbarB  -- Save before unfolding
@@ -264,7 +264,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
         hbarB_orig
     rw [hb_subst] at hsr
     exact hsr
-  /-! ## Mixed Case: `mu` vs `recv` -/
+  -- Mixed Case: `mu` vs `recv`
   case mu.recv t body p bs =>
     have htvar := bne_of_notBoundAt_mu hbarA
     have hbarB_orig := hbarB  -- Save before unfolding
@@ -287,7 +287,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
         hbarB_orig
     rw [hb_subst] at hsr
     exact hsr
-  /-! ## Mixed Case: `end` vs `mu` -/
+  -- Mixed Case: `end` vs `mu`
   -- end-mu (unfolding on right)
   case end.mu s body' =>
     have hsvar := bne_of_notBoundAt_mu hbarB
@@ -310,7 +310,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
         (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
     rw [ha_subst] at hsr
     exact hsr
-  /-! ## Mixed Case: `var` vs `mu` -/
+  -- Mixed Case: `var` vs `mu`
   case var.mu v s body' =>
     have hsvar := bne_of_notBoundAt_mu hbarB
     unfold notBoundAt at hbarB
@@ -320,9 +320,9 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
       unfold notBoundAt; exact Bool.and_eq_true_iff.mpr ⟨hvars, hbarBody'⟩
     have hb_subst := mu_substitute_ne s body' var repl hsvar
     simp only [EQ2F_var_mu] at hf
-    /-! ## `var.mu`: Split on Whether `v = var` -/
+    -- `var.mu`: Split on Whether `v = var`
     by_cases hv : v == var
-    /-! ## `var.mu`: `v = var`, Analyze `repl` Shape -/
+    -- `var.mu`: `v = var`, Analyze `repl` Shape
     ·
       have ha_subst := var_substitute_eq v var repl hv
       cases repl with
@@ -370,7 +370,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
             (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
         rw [var_substitute_eq v var (.recv p bs) hv] at hsr
         exact hsr
-      /-! ## `var.mu`: `v = var`, `repl = mu` -/
+      -- `var.mu`: `v = var`, `repl = mu`
       | mu t body =>
         simp only [ha_subst, hb_subst, EQ2F]
         constructor
@@ -415,7 +415,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
               (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
           rw [var_substitute_eq v var (.mu t body) hv] at hsr
           exact hsr
-    /-! ## `var.mu`: `v ≠ var` -/
+    -- `var.mu`: `v ≠ var`
     ·
       have hv' : (v == var) = false := by cases h : v == var <;> simp_all
       have ha_subst := var_substitute_ne v var repl hv'
@@ -429,7 +429,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
           (notBoundAt_subst var s body' (LocalTypeR.mu s body') hbarBody' hmu_s_bar)
       rw [ha_subst] at hsr
       exact hsr
-  /-! ## Mixed Case: `send` vs `mu` -/
+  -- Mixed Case: `send` vs `mu`
   case send.mu p bs s body' =>
     have hsvar := bne_of_notBoundAt_mu hbarB
     have hbarA_orig := hbarA  -- Save original before unfolding
@@ -452,7 +452,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
         (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
     rw [ha_subst] at hsr
     exact hsr
-  /-! ## Mixed Case: `recv` vs `mu` -/
+  -- Mixed Case: `recv` vs `mu`
   case recv.mu p bs s body' =>
     have hsvar := bne_of_notBoundAt_mu hbarB
     have hbarA_orig := hbarA  -- Save original before unfolding
@@ -475,7 +475,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
         (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
     rw [ha_subst] at hsr
     exact hsr
-  /-! ## Constructor-Incompatible Cases -/
+  -- Constructor-Incompatible Cases
   -- Impossible cases (structurally incompatible constructors)
   case end.var | end.send | end.recv =>
     unfold EQ2F at hf; exact hf.elim

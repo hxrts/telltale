@@ -202,9 +202,9 @@ lemma sum_le_of_pointwise_le {α : Type*} (l : List α) (f g : α → Nat)
     simp only [List.map_cons, List.foldl_cons, Nat.zero_add]
     rw [foldl_add_shift (l := tl.map f) (n := f hd)]
     rw [foldl_add_shift (l := tl.map g) (n := g hd)]
-      have h1 : f hd ≤ g hd := hle hd (by simp)
-      have h2 := ih (fun y hy => hle y (List.mem_cons.mpr (Or.inr hy)))
-      omega
+    have h1 : f hd ≤ g hd := hle hd (by simp)
+    have h2 := ih (fun y hy => hle y (List.mem_cons.mpr (Or.inr hy)))
+    omega
 
 /-! ### Strict Fold-Sum Decrease -/
 

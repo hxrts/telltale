@@ -87,7 +87,7 @@ theorem HeadCoherent_select_preserved
   by_cases heq : e = selectEdge
   · -- e = selectEdge: trace gets .string appended at END
     subst heq
-    /-! ## Select Updated-Edge Subcase: Self-Select -/
+    -- Select Updated-Edge Subcase: Self-Select
     -- Self-select case is unusual
     by_cases hTargetIsSelector : targetRole = selectorEp.role
     · -- Self-select: receiver = selector, type at selectorEp changes to L
@@ -138,7 +138,7 @@ theorem HeadCoherent_select_preserved
           rw [hOrigTrace] at hConsumeOrig
           simp only [Consume, consumeOne] at hConsumeOrig
           exact Option.noConfusion hConsumeOrig
-    /-! ## Select Updated-Edge Subcase: Distinct Target -/
+    -- Select Updated-Edge Subcase: Distinct Target
     · -- Normal case: target ≠ selector
       have hTargetNeq : selectorEp ≠ { sid := selectorEp.sid, role := targetRole } := by
         intro h
@@ -148,7 +148,7 @@ theorem HeadCoherent_select_preserved
       rw [lookupG_update_neq _ _ _ _ hTargetNeq]
       simp only [lookupD_update_eq]
       have hOrigHead := hHead selectEdge hActiveOrig
-      /-! ## Select Distinct-Target: Receiver-Type Case Split -/
+      -- Select Distinct-Target: Receiver-Type Case Split
       -- Case on target's type in original G
       cases hTargetType : lookupG G { sid := selectorEp.sid, role := targetRole } with
       | none => trivial
@@ -200,7 +200,7 @@ theorem HeadCoherent_select_preserved
             have hEpEq : { sid := selectEdge.sid, role := selectEdge.receiver : Endpoint } = { sid := selectorEp.sid, role := targetRole } := rfl
             simp only [hEpEq, hTargetType, hTrace] at hOrigHead
             exact hOrigHead
-  /-! ## Select Unchanged-Edge Subcases -/
+  -- Select Unchanged-Edge Subcases
   · -- e ≠ selectEdge: unchanged
     have hNeSymm : selectEdge ≠ e := Ne.symm heq
     rw [lookupD_update_neq _ _ _ _ hNeSymm]
@@ -216,7 +216,7 @@ theorem HeadCoherent_select_preserved
       | select _ _ => trivial
       | var _ => trivial
       | mu _ => trivial
-      /-! ## Branch Unchanged-Edge: Continuation Cases (`recv`/`branch`) -/
+      -- Branch Unchanged-Edge: Continuation Cases (`recv`/`branch`)
       | recv r T' L' =>
         -- HeadCoherent for recv: check if trace head matches T'
         -- Key insight: Original G[selectorEp] = .select, so by trace_empty_when_select_receiver, D[e] = []
@@ -261,7 +261,7 @@ theorem HeadCoherent_branch_preserved
   by_cases heq : e = branchEdge
   · -- Case 1: e = branchEdge - type and trace both change
     subst heq
-    /-! ## Branch Updated-Edge Subcase: Self-Branch -/
+    -- Branch Updated-Edge Subcase: Self-Branch
     -- Self-branch case is unusual
     by_cases hSenderIsBrancher : senderRole = brancherEp.role
     · -- Self-branch: sender = receiver, Coherent forces empty trace; hTrace contradicts.
@@ -287,7 +287,7 @@ theorem HeadCoherent_branch_preserved
           rcases (Option.isSome_iff_exists).1 hConsume' with ⟨L', hEq⟩
           exact (Consume_branch_nonempty_false
             (from_:=brancherEp.role) (r:=brancherEp.role) (bs:=bs) (t:=t) (ts:=ts) (L':=L') hEq).elim
-    /-! ## Branch Updated-Edge Subcase: Distinct Sender -/
+    -- Branch Updated-Edge Subcase: Distinct Sender
     · -- Normal case: sender ≠ brancher
       have hSenderNeq : brancherEp ≠ { sid := brancherEp.sid, role := senderRole } := by
         intro h; exact hSenderIsBrancher (congrArg Endpoint.role h).symm
@@ -340,11 +340,11 @@ theorem HeadCoherent_branch_preserved
             exact (Consume_branch_nonempty_false
               (from_:=senderRole) (r:=senderRole) (bs:=bs) (t:=.string) (ts:=t' :: ts')
               (L':=L') hEq).elim
-  /-! ## Branch Unchanged-Edge Subcases -/
+  -- Branch Unchanged-Edge Subcases
   · -- Case 2: e ≠ branchEdge - unchanged
     have hNeSymm : branchEdge ≠ e := Ne.symm heq
     rw [lookupD_update_neq _ _ _ _ hNeSymm]
-    /-! ## Branch Unchanged-Edge: Receiver-Match Split -/
+    -- Branch Unchanged-Edge: Receiver-Match Split
     by_cases hRecvMatch : brancherEp = { sid := e.sid, role := e.receiver }
     · -- brancherEp is the receiver for edge e
       subst hRecvMatch
@@ -379,7 +379,7 @@ theorem HeadCoherent_branch_preserved
         have hTraceEmpty := trace_empty_when_branch_other_sender hEdgeCoh hBranchType' hSenderNe
         rw [hTraceEmpty]
         trivial
-      /-! ## Branch Unchanged-Edge: Branch Continuation Case -/
+      -- Branch Unchanged-Edge: Branch Continuation Case
       | branch source bs' =>
         -- Same reasoning
         have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh hActiveOrig

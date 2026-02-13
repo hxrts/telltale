@@ -20,7 +20,7 @@ section
 
 universe u
 variable {ν : Type u} [VerificationModel ν]
-/-! ## Progress Theorem -/
+-- Progress Theorem
 
 /-- Terminal state: all sessions are complete (all endpoints at `end`). -/
 def AllSessionsComplete (store : SessionStore ν) : Prop :=
@@ -80,7 +80,7 @@ theorem vm_progress {store : SessionStore ν}
     right; right; right
     exact ⟨ep, source, ⟨bs, hTy, ℓ, L', rest, hBuf, hFind⟩⟩
 
-/-! ## Termination Under Fairness -/
+-- Termination Under Fairness
 
 /-- Sum of per-endpoint communication work in a session store. -/
 def vmTypeMeasure (store : SessionStore ν) : Nat :=
@@ -148,7 +148,7 @@ theorem vm_termination_under_fairness {store₀ : SessionStore ν}
     model.terminal_complete _ hterm
   exact ⟨n, store_final, rfl, hcomplete, le_rfl⟩
 
-/-! ## HeadCoherent Maintenance -/
+-- HeadCoherent Maintenance
 
 /-- HeadCoherent is preserved for edges not affected by an instruction.
 
@@ -177,7 +177,7 @@ theorem instr_preserves_HeadCoherent_other {store store' : SessionStore ν}
   let senderEp : Endpoint := { sid := e.sid, role := e.sender }
   let receiverEp : Endpoint := { sid := e.sid, role := e.receiver }
 
-  /-! ### Global Lookup Frame Equalities -/
+  -- # Global Lookup Frame Equalities
 
   have hSenderEq : lookupG (SessionStore.toGEnv store') senderEp =
       lookupG (SessionStore.toGEnv store) senderEp := by
@@ -200,7 +200,7 @@ theorem instr_preserves_HeadCoherent_other {store store' : SessionStore ν}
       _ = lookupG (SessionStore.toGEnv store) receiverEp :=
             (store_lookupType_eq_lookupG (hWF := hWF)).symm
 
-  /-! ### Trace Lookup Equality -/
+  -- # Trace Lookup Equality
 
   have hTraceEq : lookupD (SessionStore.toDEnv store') e =
       lookupD (SessionStore.toDEnv store) e := by
@@ -213,7 +213,7 @@ theorem instr_preserves_HeadCoherent_other {store store' : SessionStore ν}
       _ = lookupD (SessionStore.toDEnv store) e :=
             (store_lookupTrace_eq_lookupD (hWF := hWF)).symm
 
-  /-! ### ActiveEdge and HeadCoherent Transfer -/
+  -- # ActiveEdge and HeadCoherent Transfer
 
   have hActive : ActiveEdge (SessionStore.toGEnv store) e := by
     unfold ActiveEdge at hActive' ⊢

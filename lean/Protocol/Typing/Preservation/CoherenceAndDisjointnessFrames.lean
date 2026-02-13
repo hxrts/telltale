@@ -25,7 +25,7 @@ open Batteries
 
 section
 
-/-! ## Recv Disjointness Preservation -/
+-- Recv Disjointness Preservation
 
 lemma DisjointS_preserved_TypedStep_right_recv
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var} {T : ValType}
@@ -42,7 +42,7 @@ lemma DisjointS_preserved_TypedStep_right_recv
       exact DisjointS_updateLeft (S₁:=Ssh) (Sown:=Sown) (x:=x) (T:=T) hDisj hNoSh
 
 /-- Assignment preserves disjointness between shared and owned envs. -/
-/-! ## Assign Disjointness Preservation -/
+-- Assign Disjointness Preservation
 lemma DisjointS_preserved_TypedStep_right_assign
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {x : Var} {v : Value} {T : ValType}
     {Sfin Gfin W Δ} :
@@ -58,7 +58,7 @@ lemma DisjointS_preserved_TypedStep_right_assign
       exact DisjointS_updateLeft (S₁:=Ssh) (Sown:=Sown) (x:=x) (T:=T) hDisj hNoSh
 
 /-- Par-left step preserves disjointness on the owned env. -/
-/-! ## Par-Left Disjointness Preservation (Right Projection) -/
+-- Par-Left Disjointness Preservation (Right Projection)
 lemma DisjointS_preserved_TypedStep_right_par_left
     {Ssh : SEnv} {Sown : OwnedEnv} {P Q : Process} {G : GEnv} {S₁' : SEnv}
     {nS nG : Nat} {Sfin Gfin W Δ}
@@ -96,7 +96,7 @@ lemma DisjointS_preserved_TypedStep_right_par_left
       HasTypeProcPreOut Ssh { right := Sown.right ++ split.S2, left := split.S1 } split_pre.G1 P
         { right := Sown.right ++ split.S2, left := S₁_fin } G₁_fin W₁_fin Δ₁_fin := by
     simpa [hS1eq, hS2eq] using hP_pre
-  /-! ### Repackage Owned/Shared Disjointness for IH -/
+  -- # Repackage Owned/Shared Disjointness for IH
   rcases DisjointS_split_from_owned_left (Sown:=Sown) (split:=split) hDisj with ⟨hDisjS1, hDisjS2⟩
   have hDisjRight : DisjointS Ssh Sown.right := DisjointS_owned_right hDisj
   have hOwnLeftAll : DisjointS Sown.right (split.S1 ++ split.S2) := by
@@ -122,7 +122,7 @@ lemma DisjointS_preserved_TypedStep_right_par_left
     hDisjRight hDisjS2 hInnerRes
 
 /-- Par-right step preserves disjointness on the owned env. -/
-/-! ## Par-Right Disjointness Preservation (Right Projection) -/
+-- Par-Right Disjointness Preservation (Right Projection)
 lemma DisjointS_preserved_TypedStep_right_par_right
     {Ssh : SEnv} {Sown : OwnedEnv} {P Q : Process} {G : GEnv} {S₂' : SEnv}
     {nS nG : Nat} {Sfin Gfin W Δ}
@@ -160,7 +160,7 @@ lemma DisjointS_preserved_TypedStep_right_par_right
       HasTypeProcPreOut Ssh { right := Sown.right ++ split.S1, left := split.S2 } split_pre.G2 Q
         { right := Sown.right ++ split.S1, left := S₂_fin } G₂_fin W₂_fin Δ₂_fin := by
     simpa [hS1eq, hS2eq] using hQ_pre
-  /-! ### Repackage Owned/Shared Disjointness for IH -/
+  -- # Repackage Owned/Shared Disjointness for IH
   rcases DisjointS_split_from_owned_left (Sown:=Sown) (split:=split) hDisj with ⟨hDisjS1, hDisjS2⟩
   have hDisjRight : DisjointS Ssh Sown.right := DisjointS_owned_right hDisj
   have hOwnLeftAll : DisjointS Sown.right (split.S1 ++ split.S2) := by
@@ -186,7 +186,7 @@ lemma DisjointS_preserved_TypedStep_right_par_right
     hDisjRight hDisjS1 (ih hQ_full hInner hDisjInQ hDisjOutQ)
 
 /-- Recv preserves disjointness against the left owned env. -/
-/-! ## Recv Disjointness Preservation (Left Projection) -/
+-- Recv Disjointness Preservation (Left Projection)
 lemma DisjointS_preserved_TypedStep_left_recv
     {Sframe Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var} {T : ValType}
     {Sfin Gfin W Δ} :
@@ -208,7 +208,7 @@ lemma DisjointS_preserved_TypedStep_left_recv
       exact DisjointS_update_right (S₁:=Sframe) (S₂:=Sown.left) hDisj hNone
 
 /-- Assignment preserves disjointness against the left owned env. -/
-/-! ## Assign Disjointness Preservation (Left Projection) -/
+-- Assign Disjointness Preservation (Left Projection)
 lemma DisjointS_preserved_TypedStep_left_assign
     {Sframe Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {x : Var} {v : Value} {T : ValType}
     {Sfin Gfin W Δ} :
@@ -230,7 +230,7 @@ lemma DisjointS_preserved_TypedStep_left_assign
       exact DisjointS_update_right (S₁:=Sframe) (S₂:=Sown.left) hDisj hNone
 
 /-- Par-left step preserves disjointness on the left owned env. -/
-/-! ## Par-Left Disjointness Preservation (Left Projection) -/
+-- Par-Left Disjointness Preservation (Left Projection)
 lemma DisjointS_preserved_TypedStep_left_par_left
     {Sframe Ssh : SEnv} {Sown : OwnedEnv} {P Q : Process} {G : GEnv} {S₁' : SEnv}
     {nS nG : Nat} {Sfin Gfin W Δ}
@@ -271,7 +271,7 @@ lemma DisjointS_preserved_TypedStep_left_par_left
       HasTypeProcPreOut Ssh { right := Sown.right ++ split.S2, left := split.S1 } split_pre.G1 P
         { right := Sown.right ++ split.S2, left := S₁_fin } G₁_fin W₁_fin Δ₁_fin := by
     simpa [hS1eq, hS2eq] using hP_pre
-  /-! ### Establish IH Side Conditions -/
+  -- # Establish IH Side Conditions
   have hOwnLeftAll : DisjointS Sown.right (split.S1 ++ split.S2) := by
     simpa [OwnedDisjoint, split.hS] using hOwnDisj
   have hDisjRightS1 : DisjointS Sown.right split.S1 := DisjointS_split_left hOwnLeftAll
@@ -294,7 +294,7 @@ lemma DisjointS_preserved_TypedStep_left_par_left
   exact DisjointS_append_right (ih hP_full hDisjS1 hSubInner hDisjInP hDisjOutP rfl) hDisjS2
 
 /-- Par-right step preserves disjointness on the left owned env. -/
-/-! ## Par-Right Disjointness Preservation (Left Projection) -/
+-- Par-Right Disjointness Preservation (Left Projection)
 lemma DisjointS_preserved_TypedStep_left_par_right
     {Sframe Ssh : SEnv} {Sown : OwnedEnv} {P Q : Process} {G : GEnv} {S₂' : SEnv}
     {nS nG : Nat} {Sfin Gfin W Δ}
@@ -335,7 +335,7 @@ lemma DisjointS_preserved_TypedStep_left_par_right
       HasTypeProcPreOut Ssh { right := Sown.right ++ split.S1, left := split.S2 } split_pre.G2 Q
         { right := Sown.right ++ split.S1, left := S₂_fin } G₂_fin W₂_fin Δ₂_fin := by
     simpa [hS1eq, hS2eq] using hQ_pre
-  /-! ### Establish IH Side Conditions -/
+  -- # Establish IH Side Conditions
   have hOwnLeftAll : DisjointS Sown.right (split.S1 ++ split.S2) := by
     simpa [OwnedDisjoint, split.hS] using hOwnDisj
   have hDisjRightS2 : DisjointS Sown.right split.S2 := DisjointS_split_right hOwnLeftAll
@@ -358,7 +358,7 @@ lemma DisjointS_preserved_TypedStep_left_par_right
     simpa [hS1eq, hS2eq] using hQ_full_pre
   exact DisjointS_append_right hDisjS1 (ih hQ_full hDisjS2 hSubInner hDisjInQ hDisjOutQ rfl)
 
-/-! ## Global Right-Preservation Theorem -/
+-- Global Right-Preservation Theorem
 
 theorem DisjointS_preserved_TypedStep_right
     {G D Ssh Sown store bufs Q G' D' Sown' store' bufs' Q' Sfin Gfin W Δ} :
@@ -393,7 +393,7 @@ theorem DisjointS_preserved_TypedStep_right
       (split:=split) (hSlen:=hSlen) (ih:=ih)
       (hPre:=hPre) hDisj hOwnDisj hDisjRightFin
 
-/-! ## Global Left-Preservation Theorem -/
+-- Global Left-Preservation Theorem
 
 theorem DisjointS_preserved_TypedStep_left
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sframe Sfin Gfin W Δ} :
@@ -433,7 +433,7 @@ theorem DisjointS_preserved_TypedStep_left
     have hDisj' :=
       DisjointS_preserved_TypedStep_left_assign (x:=x) (v:=v) (T:=T) hPre hNoOwnR hDisj hSub
     simpa [hSout] using hDisj'
-  /-! ### Structural Cases (Seq/Par) -/
+  -- # Structural Cases (Seq/Par)
   case seq_step _ ih =>
     cases hPre with
     | seq hP hQ =>

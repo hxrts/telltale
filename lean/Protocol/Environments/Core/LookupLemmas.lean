@@ -49,9 +49,9 @@ theorem lookupStr_update_neq (store : VarStore) (x y : Var) (v : Value) (hne : x
       simp [updateStr, lookupStr, List.lookup, h, hyh]
     · by_cases hy : y = hd.1
       · simp [updateStr, lookupStr, List.lookup, h, hy]
-        · have hne' : (y == hd.1) = false := beq_eq_false_iff_ne.mpr hy
-          simp [updateStr, lookupStr, List.lookup, h, hne']
-          simpa [lookupStr] using ih
+      · have hne' : (y == hd.1) = false := beq_eq_false_iff_ne.mpr hy
+        simp [updateStr, lookupStr, List.lookup, h, hne']
+        simpa [lookupStr] using ih
 
 /-! ## SEnv Lookup/Update Lemmas -/
 theorem lookupSEnv_update_eq (env : SEnv) (x : Var) (T : ValType) :
@@ -101,10 +101,10 @@ theorem updateSEnv_append_left_of_mem {S₁ S₂ : SEnv} {x : Var} {T : ValType}
       · -- Not at head: recurse
         simp only [updateSEnv, heq, ↓reduceIte, List.cons_append]
         obtain ⟨T', hT'⟩ := h
-          have hT'' : lookupSEnv tl x = some T' := by
-            simp only [lookupSEnv, List.lookup] at hT'
-            have hne : (x == hd.1) = false := beq_eq_false_iff_ne.mpr heq
-            simpa [hne] using hT'
+        have hT'' : lookupSEnv tl x = some T' := by
+          simp only [lookupSEnv, List.lookup] at hT'
+          have hne : (x == hd.1) = false := beq_eq_false_iff_ne.mpr heq
+          simpa [hne] using hT'
         rw [ih ⟨T', hT''⟩]
 
 /-! ## GEnv Lookup/Update Core Lemmas -/

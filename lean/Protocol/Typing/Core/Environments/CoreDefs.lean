@@ -70,8 +70,8 @@ def DisjointD (D₁ D₂ : DEnv) : Prop :=
 def DisjointS (S₁ S₂ : SEnv) : Prop :=
   ∀ x T₁ T₂, lookupSEnv S₁ x = some T₁ → lookupSEnv S₂ x = some T₂ → False
 
-/-- Explicit split of S/G environments for parallel composition. -/
 /-! ## Parallel Split and Consistency Primitives -/
+/-- Explicit split of S/G environments for parallel composition. -/
 structure ParSplit (S : SEnv) (G : GEnv) where
   S1 : SEnv
   S2 : SEnv
@@ -98,8 +98,8 @@ theorem ParSplit.unique {S : SEnv} {G : GEnv} (s₁ s₂ : ParSplit S G)
 def DConsistent (G : GEnv) (D : DEnv) : Prop :=
   SessionsOfD D ⊆ SessionsOf G
 
-/-- Footprint of variables a process may write/introduce. -/
 /-! ## Footprint and SEnv Subset Predicates -/
+/-- Footprint of variables a process may write/introduce. -/
 abbrev Footprint := List Var
 
 /-- Delta environment: bindings introduced by a process (backtimed to parent at join). -/
@@ -289,8 +289,8 @@ theorem SEnv_append_assoc (S₁ S₂ S₃ : SEnv) :
     (S₁ ++ S₂) ++ S₃ = S₁ ++ (S₂ ++ S₃) := by
   simpa [List.append_assoc]
 
-/-- DEnv extensionality (lookup-based) using canonical list representation. -/
 /-! ## DEnv Extensionality and Reflexive Subsets -/
+/-- DEnv extensionality (lookup-based) using canonical list representation. -/
 theorem DEnv_ext {D₁ D₂ : DEnv} :
   (∀ e, D₁.find? e = D₂.find? e) → D₁ = D₂ := by
   intro h

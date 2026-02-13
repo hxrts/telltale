@@ -20,7 +20,7 @@ types are productive, mu-aware equality equals standard equality. Provides
 -/
 
 namespace SessionCoTypes.Coinductive
-/-! ## μ-aware paco collapse (productivity assumption) -/
+-- μ-aware paco collapse (productivity assumption)
 
 lemma head_of_dest {t : LocalTypeC} {h : LocalTypeHead}
     {f : LocalTypeChild h → LocalTypeC}
@@ -37,7 +37,7 @@ lemma list_get_coe_fin_symm {α : Type} (l : List α) (i : Fin l.length) :
     l.get i = l[↑i] := by
   rfl
 
-/-! ## Branch-to-Child Membership Helpers -/
+-- Branch-to-Child Membership Helpers
 
 lemma mem_childrenOf_of_mem_branchesOf {u : LocalTypeC} {b : Label × LocalTypeC}
     (hmem : b ∈ branchesOf u) : b.2 ∈ childrenOf u := by
@@ -75,7 +75,7 @@ lemma mem_childrenOf_of_mem_branchesOf {u : LocalTypeC} {b : Label × LocalTypeC
           rw [hchildren]
           exact hmem'
 
-/-! ## Reachability from Observable Branches -/
+-- Reachability from Observable Branches
 
 lemma reachable_of_canSendC_mem {t : LocalTypeC} {p : String} {bs : List (Label × LocalTypeC)}
     (h : CanSendC t p bs) {b : Label × LocalTypeC} (hmem : b ∈ bs) :
@@ -95,7 +95,7 @@ lemma reachable_of_canRecvC_mem {t : LocalTypeC} {p : String} {bs : List (Label 
   have hchild : childRel u b.2 := childRel_of_mem_childrenOf (mem_childrenOf_of_mem_branchesOf hmem')
   exact reachable_step hreach hchild
 
-/-! ## Productive μ-paco Collapse -/
+-- Productive μ-paco Collapse
 
 theorem EQ2C_mu_paco_le_paco_of_productive {a b : LocalTypeC}
     (ha : ProductiveC a) (hb : ProductiveC b) (h : EQ2C_mu_paco a b) :
@@ -115,7 +115,7 @@ theorem EQ2C_mu_paco_le_paco_of_productive {a b : LocalTypeC}
       exact ObservableRelC.is_end ha hb
   | is_var v ha hb =>
       exact ObservableRelC.is_var v ha hb
-  /-! ## Productive Collapse: Send Case -/
+  -- Productive Collapse: Send Case
   | is_send p bs cs ha_send hb_send hbr =>
       -- Strengthen branch relation with productivity.
       have hbr' : BranchesRelC R bs cs := by
@@ -145,7 +145,7 @@ theorem EQ2C_mu_paco_le_paco_of_productive {a b : LocalTypeC}
                 (go_send htl hsub_l' hsub_r')
         exact go_send hbr (by intro b hb; exact hb) (by intro c hc; exact hc)
       exact ObservableRelC.is_send p bs cs ha_send hb_send (BranchesRelC_mono (fun _ _ hr => Or.inl hr) hbr')
-  /-! ## Productive Collapse: Recv Case -/
+  -- Productive Collapse: Recv Case
   | is_recv p bs cs ha_recv hb_recv hbr =>
       have hbr' : BranchesRelC R bs cs := by
         let rec go_recv {bs' cs'}
@@ -174,7 +174,7 @@ theorem EQ2C_mu_paco_le_paco_of_productive {a b : LocalTypeC}
         exact go_recv hbr (by intro b hb; exact hb) (by intro c hc; exact hc)
       exact ObservableRelC.is_recv p bs cs ha_recv hb_recv (BranchesRelC_mono (fun _ _ hr => Or.inl hr) hbr')
 
-/-! ## gpaco-based Collapse Criterion -/
+-- gpaco-based Collapse Criterion
 
 /-- gpaco-based collapse: if μ-paco steps are observable under GpacoRel, then μ-paco collapses. -/
 theorem EQ2C_mu_paco_le_paco_of_obs
@@ -184,7 +184,7 @@ theorem EQ2C_mu_paco_le_paco_of_obs
   -- Delegate to the gpaco collapse lemma in GpacoCollapse.
   exact mu_paco_le_paco_of_obs hrr h
 
-/-! ## Erasure from EQ2CE_resolved' -/
+-- Erasure from EQ2CE_resolved'
 
 /-- EQ2CE_resolved' implies EQ2C, assuming productivity on both sides. -/
 theorem EQ2CE_resolved'_implies_EQ2C (a b : LocalTypeC) (h : EQ2CE_resolved' a b)
@@ -194,7 +194,7 @@ theorem EQ2CE_resolved'_implies_EQ2C (a b : LocalTypeC) (h : EQ2CE_resolved' a b
   have hpaco : EQ2C_paco a b := EQ2C_mu_paco_le_paco_of_productive ha hb hmu
   exact paco_to_EQ2C hpaco
 
-/-! ## Erasure from EQ2CE -/
+-- Erasure from EQ2CE
 
 /-- The main erasure theorem: EQ2CE with resolving env implies EQ2C.
     This uses EQ2CE_resolved'_step_to_EQ2C with the coinductive IH
@@ -216,7 +216,7 @@ theorem EQ2CE_to_EQ2C {ρ : EnvPair} {a b : LocalTypeC}
   -- Delegate to EQ2CE_to_EQ2C' which handles all cases
   EQ2CE_to_EQ2C' hce hEnvL hVarR ha hb
 
-/-! ## Sourced versions (toCoind) -/
+-- Sourced versions (toCoind)
 
 /-- Erasure for toCoind sources, discharging productivity. -/
 theorem EQ2CE_to_EQ2C'_toCoind {ρ : EnvPair}
@@ -235,7 +235,7 @@ theorem EQ2CE_resolved_to_EQ2C :
   intro ρ a b ⟨hResL, hVarR, hce⟩ ha hb
   exact EQ2CE_to_EQ2C' hce hResL hVarR ha hb
 
-/-! ## Paco-style erasure (alternative) -/
+-- Paco-style erasure (alternative)
 
 def EQ2CE_rel_paco (a b : LocalTypeC) : Prop :=
   ∃ ρ, EnvResolvesL ρ ∧ EnvVarR ρ ∧ EQ2CE ρ a b
@@ -247,7 +247,7 @@ theorem EQ2CE_to_EQ2C_paco {a b : LocalTypeC} (hR : EQ2CE_rel_paco a b)
   rw [← EQ2C_eq_paco_bot]
   exact EQ2CE_to_EQ2C' hce hResL hVarR ha hb
 
-/-! ## Sourced versions (toCoind) -/
+-- Sourced versions (toCoind)
 
 /-- Simplified erasure for toCoind sources. -/
 theorem EQ2CE_to_EQ2C_toCoind {ρ : EnvPair}
@@ -280,7 +280,7 @@ theorem EQ2CE_to_EQ2C_paco_toCoind
     EQ2C_paco (toCoind a) (toCoind b) :=
   EQ2CE_to_EQ2C_paco hR (productive_toCoind a) (productive_toCoind b)
 
-/-! ## Sourced versions (projTrans) -/
+-- Sourced versions (projTrans)
 
 /-- Erasure for projection sources, discharging productivity. -/
 theorem EQ2CE_to_EQ2C_projTrans {ρ : EnvPair}

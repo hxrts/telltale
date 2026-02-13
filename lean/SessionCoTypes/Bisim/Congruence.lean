@@ -64,7 +64,7 @@ theorem BranchesRelBisim.map_image {f : LocalTypeR → LocalTypeR} {R : Rel}
     · exact ⟨_, _, hbc.2, rfl, rfl⟩
     · exact ih
 
-/-! ### Compatibility Lifting to Bisim -/
+-- # Compatibility Lifting to Bisim
 
 /-- Compatible functions are congruences for Bisim.
 
@@ -183,7 +183,7 @@ theorem EQ2_subst_mu_comm (body : LocalTypeR) (var t : String) (repl : LocalType
         ((body.substitute t (.mu t body)).substitute var repl) := by
   exact SessionCoTypes.EQ2_subst_mu_comm_via_DB body var t repl htne hWFmu
 
-/-! ## Transfer through EQ2 -/
+-- Transfer through EQ2
 
 /-- Transfer UnfoldsToEnd through EQ2 equivalence.
 
@@ -192,7 +192,7 @@ theorem UnfoldsToEnd_of_EQ2 {a b : LocalTypeR} (ha : UnfoldsToEnd a) (heq : EQ2 
     (hWFb : LocalTypeR.WellFormed b) : UnfoldsToEnd b := by
   exact UnfoldsToEnd_transfer ha heq hWFb
 
-/-! ## Substitution Preserves UnfoldsToEnd (WF) -/
+-- Substitution Preserves UnfoldsToEnd (WF)
 
 /-- Substitution preserves UnfoldsToEnd.
 
@@ -236,7 +236,7 @@ theorem substitute_preserves_UnfoldsToEnd {a : LocalTypeR} {var : String} {repl 
     rw [hsubst]
     exact UnfoldsToEnd.mu hinner
 
-/-! ## Substitution Preserves UnfoldsToEnd (Barendregt) -/
+-- Substitution Preserves UnfoldsToEnd (Barendregt)
 
 open SessionCoTypes.SubstCommBarendregt in
 /-- Substitution preserves UnfoldsToEnd under Barendregt conditions.
@@ -284,7 +284,7 @@ theorem substitute_preserves_UnfoldsToEnd_barendregt {a : LocalTypeR} {var : Str
       notBoundAt_unfold var (.mu t body) (by simp [notBoundAt, hvt, hbar_body])
     exact ih hbar_unfold hfresh
 
-/-! ## Substitution Preserves UnfoldsToVar (Barendregt) -/
+-- Substitution Preserves UnfoldsToVar (Barendregt)
 
 open SessionCoTypes.SubstCommBarendregt in
 /-- Substitution preserves UnfoldsToVar (when not the substituted variable).
@@ -332,7 +332,7 @@ theorem substitute_preserves_UnfoldsToVar {a : LocalTypeR} {var v : String} {rep
       have ih' := ih hne hbar_unfold hfresh
       rw [hsame] at ih'
       exact UnfoldsToVar.mu ih'
-    /-! ## UnfoldsToVar Preservation: Non-shadowed Branch -/
+    -- UnfoldsToVar Preservation: Non-shadowed Branch
     · -- t == var is false: substitution goes through
       rename_i htvar
       simp only [beq_iff_eq] at htvar
@@ -350,7 +350,7 @@ theorem substitute_preserves_UnfoldsToVar {a : LocalTypeR} {var v : String} {rep
       rw [← hcomm] at ih'
       exact UnfoldsToVar.mu ih'
 
-/-! ## Non-free Variables Cannot Be Unfold Targets -/
+-- Non-free Variables Cannot Be Unfold Targets
 
 open SessionCoTypes.SubstCommBarendregt in
 /-- If a variable is not free in a type, the type cannot unfold to that variable.

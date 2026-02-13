@@ -24,7 +24,7 @@ open SessionTypes.GlobalType
 open SessionCoTypes.Observable
 open SessionCoTypes.EQ2
 open SessionCoTypes.CoinductiveRel
-/-! ## RelImage lift for Bisim branches (closed/fixed-point case) -/
+-- RelImage lift for Bisim branches (closed/fixed-point case)
 
 private theorem BranchesRelBisim_of_Bisim_with_relImage
     {f : LocalTypeR → LocalTypeR} {R : Rel}
@@ -52,7 +52,7 @@ private theorem BranchesRelBisim_of_Bisim_with_relImage
       · exact ih (fun lb hm => hfix_bs _ (List.Mem.tail _ hm))
                  (fun lc hm => hfix_cs _ (List.Mem.tail _ hm))
 
-/-! ## Well-Formedness Preservation under Substitution -/
+-- Well-Formedness Preservation under Substitution
 theorem WellFormed_substitute {a repl : LocalTypeR} (var : String)
     (hWFa : LocalTypeR.WellFormed a) (hWFrepl : LocalTypeR.WellFormed repl) :
     LocalTypeR.WellFormed (a.substitute var repl) := by
@@ -72,7 +72,7 @@ theorem WellFormed_substitute {a repl : LocalTypeR} (var : String)
     isContractive_substitute a var repl hWFa.contractive hWFrepl.contractive hWFrepl.closed
   exact ⟨hclosed, hcontr⟩
 
-/-! ## Well-Formedness Preservation: Mu Wrapper -/
+-- Well-Formedness Preservation: Mu Wrapper
 
 theorem WellFormed_mu_substitute {body repl : LocalTypeR} (x var : String)
     (hWFmu : LocalTypeR.WellFormed (.mu x body)) (hWFrepl : LocalTypeR.WellFormed repl) :
@@ -116,7 +116,7 @@ theorem WellFormed_mu_substitute {body repl : LocalTypeR} (x var : String)
     · exact isContractive_substitute body var repl hbody_contr hWFrepl.contractive hWFrepl.closed
   exact ⟨hclosed_result, hcontr_result⟩
 
-/-! ## EQ2 Behavior of Variable-Unfolding under Substitution -/
+-- EQ2 Behavior of Variable-Unfolding under Substitution
 /-- When `UnfoldsToVar x var`, substituting `var → repl` yields something EQ2-equivalent to `repl`.
 
     Proof sketch: By induction on `UnfoldsToVar x var`:
@@ -134,12 +134,12 @@ theorem UnfoldsToVar_substitute_EQ2 {x : LocalTypeR} {var : String} {repl : Loca
   refine (UnfoldsToVar.rec
     (motive := fun x var _ => LocalTypeR.WellFormed x → EQ2 (x.substitute var repl) repl)
     ?base ?mu h) hWFx
-  /-! ## `UnfoldsToVar_substitute_EQ2`: Base Case -/
+  -- `UnfoldsToVar_substitute_EQ2`: Base Case
   · intro var _hWF
     -- x = .var var, so x.substitute var repl = repl
     simp only [LocalTypeR.substitute, beq_self_eq_true, ↓reduceIte]
     exact EQ2_refl _
-  /-! ## `UnfoldsToVar_substitute_EQ2`: Mu Case -/
+  -- `UnfoldsToVar_substitute_EQ2`: Mu Case
   · intro t body var hinner ih hWFx
     -- x = .mu t body, body.substitute t (.mu t body) unfolds to var
     by_cases htv : t = var
@@ -147,7 +147,7 @@ theorem UnfoldsToVar_substitute_EQ2 {x : LocalTypeR} {var : String} {repl : Loca
       have hnotfree := SessionCoTypes.SubstCommBarendregt.isFreeIn_subst_mu_self body t
       have hinner' : UnfoldsToVar (body.substitute t (.mu t body)) t := htv ▸ hinner
       exact (False.elim (not_UnfoldsToVar_of_not_isFreeIn hnotfree hinner'))
-    /-! ## `UnfoldsToVar_substitute_EQ2`: Mu Case (`t ≠ var`) -/
+    -- `UnfoldsToVar_substitute_EQ2`: Mu Case (`t ≠ var`)
     · -- Case t ≠ var: use EQ2_subst_mu_comm + IH (WF-gated trans)
       have htv_beq : (t == var) = false := beq_eq_false_iff_ne.mpr htv
       simp only [LocalTypeR.substitute, htv_beq, Bool.false_eq_true, ↓reduceIte]
@@ -169,7 +169,7 @@ theorem UnfoldsToVar_substitute_EQ2 {x : LocalTypeR} {var : String} {repl : Loca
         WellFormed_substitute (var := var) hWF_unfold hWFrepl
       have hunfolded : EQ2 ((body.substitute var repl).substitute t (.mu t (body.substitute var repl))) repl :=
         EQ2_trans_via_Bisim hcomm ih' hWF_left hWF_right hWFrepl
-      /-! ## `UnfoldsToVar_substitute_EQ2`: Analyze `repl` Shape -/
+      -- `UnfoldsToVar_substitute_EQ2`: Analyze `repl` Shape
       apply EQ2.construct
       cases repl with
       | «end» =>
@@ -208,7 +208,7 @@ theorem UnfoldsToVar_substitute_EQ2 {x : LocalTypeR} {var : String} {repl : Loca
             LocalTypeR.WellFormed.unfold (t := .mu s body') hWFrepl
           exact EQ2_trans_via_Bisim hmu_to_unfold hunfolded_right hWF_subst' hWF_left hWF_repl_unfold
 
-/-! ## Substitution at the Observable Variable Head -/
+-- Substitution at the Observable Variable Head
 /-- When both types unfold to the substituted variable, their substitutions are BisimF-related.
 
     This is the key lemma for the eq_var case of substitute_compatible.
@@ -245,7 +245,7 @@ theorem substitute_at_var_bisimF {x y : LocalTypeR} {var : String} {repl : Local
     EQ2.toBisim hxyeq hWFx_subst hWFy_subst
   obtain ⟨R', hR'post, hxy'⟩ := hBisim
   have hBisimF : BisimF R' (x.substitute var repl) (y.substitute var repl) := hR'post _ _ hxy'
-  /-! ## `substitute_at_var_bisimF`: Observable Case Split -/
+  -- `substitute_at_var_bisimF`: Observable Case Split
   cases hBisimF with
   | eq_end hxend hyend =>
     -- Both unfold to end, so BisimF.eq_end applies directly
@@ -253,7 +253,7 @@ theorem substitute_at_var_bisimF {x y : LocalTypeR} {var : String} {repl : Local
   | eq_var hxvar hyvar =>
     -- Both unfold to the same var, so BisimF.eq_var applies directly
     exact BisimF.eq_var hxvar hyvar
-  /-! ## `substitute_at_var_bisimF`: Send/Recv Cases -/
+  -- `substitute_at_var_bisimF`: Send/Recv Cases
   | eq_send hxsend hysend hbr =>
     -- Both can send with R'-related branches bs and cs
     apply BisimF.eq_send hxsend hysend
@@ -319,7 +319,7 @@ theorem substitute_at_var_bisimF {x y : LocalTypeR} {var : String} {repl : Local
         isFreeIn_false_of_closed lc.2.2 var hclosed
       exact substitute_not_free _ _ _ hnotfree
     exact BranchesRelBisim_of_Bisim_with_relImage h_rel hbr_bisim hfix_bs hfix_cs
-/-! ## RelImage Helpers for Substitution Compatibility -/
+-- RelImage Helpers for Substitution Compatibility
 /-- Helper: Bisim can be embedded into RelImage via identity mapping.
 
     Any Bisim-related pair can be viewed as related through RelImage by taking
@@ -350,7 +350,7 @@ private theorem BranchesRelBisim_to_RelImage (f : LocalTypeR → LocalTypeR)
       · exact hlift _ _ hbc.2
     · exact ih
 
-/-! ## `CanSend` Preservation under Barendregt Conditions -/
+-- `CanSend` Preservation under Barendregt Conditions
 open SessionCoTypes.SubstCommBarendregt in
 /-- Substitution preserves CanSend.
 
@@ -404,7 +404,7 @@ theorem substitute_preserves_CanSend {a : LocalTypeR} {var : String} {repl : Loc
       rw [← hcomm] at ih'
       exact CanSend.mu ih'
 
-/-! ## `CanRecv` Preservation under Barendregt Conditions -/
+-- `CanRecv` Preservation under Barendregt Conditions
 open SessionCoTypes.SubstCommBarendregt in
 /-- Substitution preserves CanRecv.
 
@@ -444,7 +444,7 @@ theorem substitute_preserves_CanRecv {a : LocalTypeR} {var : String} {repl : Loc
   have hrecv := CanSend.dual hsend'
   simpa [LocalTypeR.dual_dual, dualBranches_dualBranches] using hrecv
 
-/-! ## Compatibility Theorem for Substitution -/
+-- Compatibility Theorem for Substitution
 open SessionCoTypes.SubstCommBarendregt in
 /-- Substitution is compatible (preserves BisimF structure) under Barendregt convention.
 

@@ -72,7 +72,7 @@ private theorem EndRel_postfix : ∀ a b, EndRel a b → EQ2F EndRel a b := by
       have haF : EQ2F EQ2 (.recv p bs) .end := EQ2.destruct ha
       simpa [EQ2F] using haF
 
-/-! ## End Constructor Bridge: μ-Case -/
+-- End Constructor Bridge: mu Case
 
   | mu t lbody =>
       have ha' : EQ2 (lbody.substitute t (.mu t lbody)) .end := by
@@ -159,7 +159,7 @@ private theorem VarRel_postfix (v : String) :
       have haF : EQ2F EQ2 (.recv p bs) (.var v) := EQ2.destruct ha
       simpa [EQ2F] using haF
 
-/-! ## Variable Constructor Bridge: μ-Case -/
+-- Variable Constructor Bridge: mu Case
 
   | mu t lbody =>
       have ha' : EQ2 (lbody.substitute t (.mu t lbody)) (.var v) := by

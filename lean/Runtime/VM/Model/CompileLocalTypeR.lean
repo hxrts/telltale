@@ -137,7 +137,7 @@ mutual
             let code := code ++ [Instr.offer (γ:=γ) (ε:=ε) 0 lbl.name]
             compileInner defaultAction cont code loopTargets
 
-    /-! #### `recv` case code generation -/
+    -- `recv` case code generation
 
     | .recv _ branches =>
         match branches with
@@ -160,7 +160,7 @@ mutual
               listSet code placeholderPc (Instr.choose (γ:=γ) (ε:=ε) 0 table)
             (code, loopTargets)
 
-    /-! #### recursion-variable code generation -/
+    -- recursion-variable code generation
 
     | .mu v body =>
         let target := code.length
@@ -177,7 +177,7 @@ mutual
       simp
       try omega
 
-  /-! #### Receive-branch table compilation helper -/
+  -- Receive-branch table compilation helper
 
   def compileRecvBranchesAux {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
       [Inhabited (EffectRuntime.EffectAction ε)]

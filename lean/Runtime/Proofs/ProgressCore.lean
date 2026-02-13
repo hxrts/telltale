@@ -23,7 +23,7 @@ section
 
 universe u
 
-/-! ## VM-Level Coherence Predicates -/
+-- VM-Level Coherence Predicates
 
 variable {ν : Type u} [VerificationModel ν]
 
@@ -57,7 +57,7 @@ structure WellFormedVMState (store : SessionStore ν) : Prop where
   coherent : CoherentVMState store
   progress : ProgressVMState store
 
-/-! ## Session-Level Coherence -/
+-- Session-Level Coherence
 
 /-- Session-local coherence lifted to VM. -/
 def SessionCoherentVM (store : SessionStore ν) (s : SessionId) : Prop :=
@@ -69,7 +69,7 @@ theorem CoherentVMState_iff_forall_session {store : SessionStore ν} :
   simp only [CoherentVMState, SessionCoherentVM]
   exact VMCoherent_iff_forall_SessionCoherent
 
-/-! ## Instruction Enablement -/
+-- Instruction Enablement
 
 /-- A send instruction is enabled when:
     1. The sender has a send type for the target
@@ -109,7 +109,7 @@ def BranchEnabled (store : SessionStore ν) (ep : Endpoint) (source : Role) : Pr
       SessionStore.lookupBuffer store edge = .string ℓ :: rest ∧
       bs.find? (fun b => b.1 == ℓ) = some (ℓ, L')
 
-/-! ## Bridge Lemmas -/
+-- Bridge Lemmas
 
 /-- SendReady follows from ProgressVMState (specifically Compatible).
 
@@ -128,7 +128,7 @@ theorem selectReady_of_ProgressVMState {store : SessionStore ν}
     SelectReady (SessionStore.toGEnv store) (SessionStore.toDEnv store) :=
   Compatible_to_SelectReady hProg.compatible
 
-/-! ## Store/Environment Lookup Bridges -/
+-- Store/Environment Lookup Bridges
 
 /-- Store lookups agree with environment projections.
 
@@ -146,7 +146,7 @@ theorem store_lookupType_eq_lookupG {store : SessionStore ν} {ep : Endpoint}
     lookupG (SessionStore.toGEnv store) ep = SessionStore.lookupType store ep := by
   exact hWF.2.1 ep
 
-/-! ## Session-Existence Transport Lemmas -/
+-- Session-Existence Transport Lemmas
 
 /-- If an endpoint lookup succeeds, the corresponding session exists in the store. -/
 private theorem exists_session_of_lookupType_some {store : SessionStore ν} {e : Endpoint} {L : LocalType}
@@ -196,7 +196,7 @@ private theorem exists_session_after_updateTrace {store : SessionStore ν} {sid 
             rcases ih (hMem := ⟨st0, hTail⟩) with ⟨st', hMem'⟩
             exact ⟨st', by simp [hMem']⟩
 
-/-! ## Receive-Data Extraction -/
+-- Receive-Data Extraction
 
 /-- If HeadCoherent and receiver has recv type with non-empty trace, the head matches.
 
@@ -256,7 +256,7 @@ theorem recv_has_data_of_HeadCoherent {store : SessionStore ν}
     simp only [hLookupG'] at hHeadAtEdge
     exact ⟨rest, by rw [hHeadAtEdge]⟩
 
-/-! ## Coherence Preservation Under Updates -/
+-- Coherence Preservation Under Updates
 
 /-- After a send update, HeadCoherent is preserved.
 
@@ -310,7 +310,7 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
         hHead hCoh hLookupSendG hReadyAtSend
     simpa [sendEdge] using h
   subst store'
-  /-! ## Bridge Equalities For `toGEnv`/`toDEnv` -/
+  -- Bridge Equalities For `toGEnv`/`toDEnv`
   intro e hActive
   have hGBridge :
       ∀ e', lookupG
@@ -338,7 +338,7 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
             exact SessionStore.toGEnv_updateType (hMem := hMemTrace) (hCons := hConsTrace) e'
       _ = lookupG (updateG (SessionStore.toGEnv store) ep L') e' := by
             simp [SessionStore.toGEnv_updateTrace]
-  /-! ## DEnv Bridge Equalities -/
+  -- DEnv Bridge Equalities
   have hDBridge :
       ∀ edge', lookupD
           (SessionStore.toDEnv
@@ -374,7 +374,7 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
           (updateD (SessionStore.toDEnv store) sendEdge
             (lookupD (SessionStore.toDEnv store) sendEdge ++ [T]))
           edge' := by simp [hTraceLookup]
-  /-! ## Final Active-Edge Transport -/
+  -- Final Active-Edge Transport
   have hActiveUpd : ActiveEdge (updateG (SessionStore.toGEnv store) ep L') e := by
     unfold ActiveEdge at hActive ⊢
     constructor

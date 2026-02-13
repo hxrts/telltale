@@ -25,7 +25,7 @@ namespace SessionCoTypes.Coinductive
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 
-/-! ## toCoind Injectivity -/
+-- toCoind Injectivity
 
 mutual
   theorem toCoind_injective : ∀ {t u : LocalTypeR}, toCoind t = toCoind u → t = u
@@ -57,7 +57,7 @@ mutual
         exact congrArg (LocalTypeR.mu x) (toCoind_injective hchild)
     | .mu _ _, .send _ _, h => by cases (congrArg head h)
     | .mu _ _, .recv _ _, h => by cases (congrArg head h)
-    /-! ## toCoind Injectivity: Send/Recv Constructor Cases -/
+    -- toCoind Injectivity: Send/Recv Constructor Cases
     | .send _ _, .end, h => by cases (congrArg head h)
     | .send _ _, .var _, h => by cases (congrArg head h)
     | .send _ _, .mu _ _, h => by cases (congrArg head h)
@@ -91,7 +91,7 @@ mutual
         have hbs : bs = cs := toCoindBranches_injective hbranches
         subst hbs; rfl
 
-  /-! ## toCoindBranches Injectivity -/
+  -- toCoindBranches Injectivity
 
   theorem toCoindBranches_injective :
       ∀ {bs cs : List BranchR}, toCoindBranches bs = toCoindBranches cs → bs = cs
@@ -112,7 +112,7 @@ mutual
         subst hrest; rfl
 end
 
-/-! ## toCoindBranches Indexing -/
+-- toCoindBranches Indexing
 
 lemma toCoindBranches_length (bs : List BranchR) :
     (toCoindBranches bs).length = bs.length := by

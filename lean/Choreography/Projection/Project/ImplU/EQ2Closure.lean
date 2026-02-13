@@ -68,8 +68,8 @@ theorem BranchesProjRel_lift_EQ2_U
             · exact hpair.1.trans hpair'.1
             · exact hvt1 lb1 (by simp)
             · exact ⟨lb0.2.2, hpair.2.2, hpair'.2, hwf0 lb0 (by simp), hwf1 lb1 (by simp)⟩
-	          · exact ih heq_rest (wf_tail_of_cons hwf0) (wf_tail_of_cons hwf1)
-	              (fun lb hmem => hvt1 lb (by simp [hmem]))
+            · exact ih heq_rest (wf_tail_of_cons hwf0) (wf_tail_of_cons hwf1)
+                (fun lb hmem => hvt1 lb (by simp [hmem]))
 
 /-! ## Full-Unfold Shape: End -/
 

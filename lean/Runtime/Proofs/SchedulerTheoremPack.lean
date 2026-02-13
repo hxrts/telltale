@@ -18,7 +18,7 @@ CooperativePolicyArtifact, etc.) with their characteristic properties. The
 with optional policy-specific extensions.
 -/
 
-/-! ## Core Development -/
+-- Core Development
 
 namespace Runtime
 namespace Proofs
@@ -33,7 +33,7 @@ variable [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
 variable [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
 variable [IdentityVerificationBridge ι ν]
 
-/-! ## Policy-Specific Artifacts -/
+-- Policy-Specific Artifacts
 
 /-- Round-robin profile artifact. -/
 structure RoundRobinPolicyArtifact (st₀ : VMState ι γ π ε ν) : Type where
@@ -67,7 +67,7 @@ structure VMSchedulerArtifact (st₀ : VMState ι γ π ε ν) where
   progressAware? :
     Option (ProgressAwarePolicyArtifact (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀)
 
-/-! ## Scheduler Artifact Construction -/
+-- Scheduler Artifact Construction
 
 /-- Build scheduler theorem artifact from a scheduler bundle. -/
 def buildVMSchedulerArtifact {st₀ : VMState ι γ π ε ν}
@@ -94,7 +94,7 @@ def buildVMSchedulerArtifact {st₀ : VMState ι γ π ε ν}
     | .priority _ => none
     | .progressAware => none
 
-  /-! ## Scheduler Artifact Construction: Remaining Policy Cases -/
+  -- Scheduler Artifact Construction: Remaining Policy Cases
 
   let priority? :=
     match hpol : bundle.policy with
@@ -130,7 +130,7 @@ def buildVMSchedulerArtifact {st₀ : VMState ι γ π ε ν}
   , progressAware? := progressAware?
   }
 
-/-! ## Protocol Proof-Space Packaging -/
+-- Protocol Proof-Space Packaging
 
 /-- Protocol proof space that combines scheduler evidence with invariant-space
 profiles for distributed/classical theorem derivation. -/
@@ -157,7 +157,7 @@ def buildVMProtocolProofPack
   , theorems := Runtime.Proofs.TheoremPackAPI.mk (space := proofSpace.profiles)
   }
 
-/-! ## Combined Inventory and Iris Bridge -/
+-- Combined Inventory and Iris Bridge
 
 /-- Compact inventory for the combined proof pack. -/
 def protocolProofInventory

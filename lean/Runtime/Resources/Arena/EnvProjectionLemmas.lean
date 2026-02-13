@@ -163,7 +163,7 @@ theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} 
       obtain ⟨sid, st⟩ := hd
       by_cases hsid : sid = e.sid
 
-      /-! ## `toGEnv_updateType`: matching session-id case -/
+      -- `toGEnv_updateType`: matching session-id case
 
       · simp only [SessionStore.updateType, hsid, ↓reduceIte]
         simp only [SessionStore.toGEnv, List.foldl]
@@ -182,7 +182,7 @@ theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} 
         simp only [SessionState.updateType]
         by_cases he' : e' = e
 
-        /-! ## `toGEnv_updateType`: matched endpoint -/
+        -- `toGEnv_updateType`: matched endpoint
 
         · have hLeft : lookupG (updateG st.localTypes e L ++ SessionStore.toGEnv tl) e' = some L := by
             rw [he']
@@ -222,7 +222,7 @@ theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} 
                 (e := e') (L := T) hSome']
           exact hL.trans (by simpa using hR.symm)
 
-        /-! ## `toGEnv_updateType`: unmatched endpoint -/
+        -- `toGEnv_updateType`: unmatched endpoint
 
       · have hMem' : ∃ st', (e.sid, st') ∈ tl := by
           obtain ⟨st', hst'⟩ := hMem
@@ -268,8 +268,8 @@ theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} 
             simpa using hSome.symm
           rw [lookupG_append_left (G1 := st.localTypes) (G2 := SessionStore.toGEnv (SessionStore.updateType tl e L))
             (e := e') (L := T) hSome']
-	          rw [lookupG_append_left (G1 := st.localTypes) (G2 := updateG (SessionStore.toGEnv tl) e L)
-	            (e := e') (L := T) hSome']
+          rw [lookupG_append_left (G1 := st.localTypes) (G2 := updateG (SessionStore.toGEnv tl) e L)
+            (e := e') (L := T) hSome']
 
 /-! ### `DEnv` Union Lookup Helpers -/
 
@@ -341,7 +341,7 @@ theorem SessionStore.toDEnv_updateTrace {store : SessionStore ν} {edge : Edge} 
       obtain ⟨sid, st⟩ := hd
       by_cases hsid : sid = edge.sid
 
-      /-! ## `toDEnv_updateTrace`: matching session-id case -/
+      -- `toDEnv_updateTrace`: matching session-id case
 
       · simp only [SessionStore.updateTrace, hsid, ↓reduceIte]
         simp only [SessionStore.toDEnv, List.foldl]
@@ -364,7 +364,7 @@ theorem SessionStore.toDEnv_updateTrace {store : SessionStore ν} {edge : Edge} 
         exact lookupD_updateD_union (D1 := st.traces) (D2 := SessionStore.toDEnv tl)
           (edge := edge) (edge' := edge') (ts := ts)
 
-      /-! ## `toDEnv_updateTrace`: non-matching session-id case -/
+      -- `toDEnv_updateTrace`: non-matching session-id case
 
       · have hMem' : ∃ st', (edge.sid, st') ∈ tl := by
           obtain ⟨st', hst'⟩ := hMem

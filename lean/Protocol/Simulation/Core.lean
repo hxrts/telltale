@@ -45,7 +45,7 @@ open scoped Classical
 
 section
 
-/-! ## Decidable Step Function -/
+-- Decidable Step Function
 
 /-- Attempt to execute a base step.
 
@@ -58,7 +58,7 @@ def stepBaseDecide (C : Config) : Option Config :=
   match C.proc with
   | .skip => none  -- Already terminated
 
-  /-! ## Base Decision: Send -/
+  -- Base Decision: Send
   | .send k x =>
     match lookupStr C.store k with
     | some (.chan e) =>
@@ -73,7 +73,7 @@ def stepBaseDecide (C : Config) : Option Config :=
       | _ => none
     | _ => none
 
-  /-! ## Base Decision: Receive -/
+  -- Base Decision: Receive
   | .recv k x =>
     match lookupStr C.store k with
     | some (.chan e) =>
@@ -87,7 +87,7 @@ def stepBaseDecide (C : Config) : Option Config :=
         | _ => none
     | _ => none
 
-  /-! ## Base Decision: Select -/
+  -- Base Decision: Select
   | .select k ℓ =>
     match lookupStr C.store k with
     | some (.chan e) =>
@@ -100,7 +100,7 @@ def stepBaseDecide (C : Config) : Option Config :=
       | _ => none
     | _ => none
 
-  /-! ## Base Decision: Branch -/
+  -- Base Decision: Branch
   | .branch k bs =>
     match lookupStr C.store k with
     | some (.chan e) =>
@@ -120,7 +120,7 @@ def stepBaseDecide (C : Config) : Option Config :=
       | _ => none  -- No matching type in G
     | _ => none
 
-  /-! ## Base Decision: Structural Heads -/
+  -- Base Decision: Structural Heads
   | .newSession roles f P =>
     some { (newSessionStep C roles f) with proc := P }
 
@@ -142,7 +142,7 @@ def stepBaseDecide (C : Config) : Option Config :=
       | .skip => some { C with proc := P }  -- par P skip → P
       | _ => none  -- Would need recursive step
 
-/-! ## Recursive Step Driver Helpers -/
+-- Recursive Step Driver Helpers
 
 /-- Coarse size measure for well-founded recursion on processes. -/
 private def procSize : Process → Nat
@@ -173,7 +173,7 @@ private lemma procSize_lt_par_right (nS nG : Nat) (P Q : Process) :
   have h := Nat.lt_add_of_pos_left (n := procSize Q) hpos
   simpa [procSize, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using h
 
-/-! ## Recursive Contextual Step Decision -/
+-- Recursive Contextual Step Decision
 
 /-- Attempt a full step with contextual closure.
 
@@ -220,7 +220,7 @@ decreasing_by
 def stepDecide (C : Config) : Option Config :=
   stepDecideAux C.proc C
 
-/-! ## Multi-Step Execution -/
+-- Multi-Step Execution
 
 /-- Run up to n steps, returning the final configuration.
 

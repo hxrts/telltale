@@ -162,7 +162,7 @@ private theorem CProjectF_mono : Monotone CProjectF := by
           simp [CProjectF] at hrel
       | recv _ _ =>
           simp [CProjectF] at hrel
-  /-! ## CProjectF_mono: Comm Case -/
+  -- CProjectF_mono: Comm Case
   | comm sender receiver gbs =>
       by_cases hs : role = sender
       · cases cand with
@@ -185,7 +185,7 @@ private theorem CProjectF_mono : Monotone CProjectF := by
               simp [CProjectF, hr, hns] at hrel ⊢
         · simp [CProjectF, hs, hr] at hrel ⊢
           exact AllBranchesProj_mono h hrel
-  /-! ## CProjectF_mono: Delegate Case -/
+  -- CProjectF_mono: Delegate Case
   | delegate p q sid r cont =>
       by_cases hp : role = p
       · cases cand with
@@ -210,7 +210,7 @@ private theorem CProjectF_mono : Monotone CProjectF := by
                     simpa using hrel
         | _ =>
             simp [CProjectF, hp] at hrel ⊢
-      /-! ## CProjectF_mono: Delegate Receiver/Other Subcases -/
+      -- CProjectF_mono: Delegate Receiver/Other Subcases
       · by_cases hq : role = q
         · have hnp : q ≠ p := by
             intro hqp

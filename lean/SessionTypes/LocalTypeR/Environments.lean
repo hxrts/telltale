@@ -187,7 +187,7 @@ theorem closedUnder_nil_iff_isClosed (lt : LocalTypeR) :
 /-! ## Free Vars under Substitution (subset lemma) -/
 
 mutual
-  /-! ## Free Vars Substitution: Local-Type Auxiliary -/
+  -- Free Vars Substitution: Local-Type Auxiliary
 
   private def freeVars_substitute_subset_aux
       (lt : LocalTypeR) (varName : String) (repl : LocalTypeR)
@@ -215,7 +215,7 @@ mutual
         -- Send/recv cases share the same branch substitution behavior.
         simp [LocalTypeR.substitute, LocalTypeR.freeVars, -substituteBranches_eq_map] at hx
         exact freeVars_substituteBranches_subset_aux bs varName repl x hx
-    /-! ## Free Vars Substitution: Local-Type Mu Case -/
+    -- Free Vars Substitution: Local-Type Mu Case
     | .mu t body => by
         by_cases h : t = varName
         · -- Shadowed case
@@ -248,7 +248,7 @@ mutual
               · exact hpair.2
   termination_by sizeOf lt
 
-  /-! ## Free Vars Substitution: Branch Auxiliary -/
+  -- Free Vars Substitution: Branch Auxiliary
 
   private def freeVars_substituteBranches_subset_aux
       (branches : List BranchR) (varName : String) (repl : LocalTypeR)

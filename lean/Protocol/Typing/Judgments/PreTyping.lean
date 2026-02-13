@@ -50,7 +50,7 @@ open scoped Classical
 
 section
 
-/-! ## Well-Typed Configuration -/
+-- Well-Typed Configuration
 
 /-- A configuration is well-typed if all components are consistent:
     - Session IDs in store/buffers are < nextSid
@@ -70,7 +70,7 @@ structure WTConfigN (n : SessionId) (S : SEnv) (G : GEnv) (D : DEnv) (C : Config
   /-- Process is typed. -/
   proc_typed : HasTypeProcN n S G D C.proc
 
-/-! ## Typing Lemmas -/
+-- Typing Lemmas
 
 /-- Skip is well-typed under any environments. -/
 theorem skip_typed (n : SessionId) (S : SEnv) (G : GEnv) (D : DEnv) :
@@ -85,7 +85,7 @@ theorem seq_typed (n : SessionId) (S : SEnv) (G : GEnv) (D : DEnv)
     HasTypeProcN n S G D (.seq P Q) :=
   HasTypeProcN.seq hP hQ
 
-/-! ## Inversion Lemmas -/
+-- Inversion Lemmas
 
 /-- Inversion for send typing.
     Note: The send constructor produces a judgment with updated G,
@@ -296,7 +296,7 @@ intrinsic to the typing judgment.
 3. **Coherence**: Uses existing `Coherent_send_preserved`, `Coherent_recv_preserved`
 4. **Soundness**: TypedStep refines Step -/
 
-/-! ## Pre-Update Typing with Post Environments -/
+-- Pre-Update Typing with Post Environments
 
 /-- Pre-update style process typing with explicit post environments.
 
@@ -357,7 +357,7 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
       S'.right = Sown.right →
       HasTypeProcPreOut Ssh Sown G (.branch k procs) S' G' W Δ
 
-  /-! ## Pre-Out Sequential And Parallel Constructors -/
+  -- Pre-Out Sequential And Parallel Constructors
 
   /-- Sequential composition: compose post environments. -/
   | seq {Ssh Sown G P Q S₁ G₁ S₂ G₂ W₁ W₂ Δ₁ Δ₂} :
@@ -386,7 +386,7 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
         { right := Sown.right ++ split.S1, left := S₂' } G₂' W₂ Δ₂ →
       HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin Wfin Δfin
 
-  /-! ## Pre-Out Assignment Constructors -/
+  -- Pre-Out Assignment Constructors
 
   /-- Assignment updates S with x's type. -/
   | assign_new {Ssh Sown G x v T} :
@@ -404,7 +404,7 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
         (OwnedEnv.updateLeft Sown x T) G [x] ∅
 
 
-/-! ## Inversion Helpers for Pre-Out Typing -/
+-- Inversion Helpers for Pre-Out Typing
 
 /-- Frame-invariant witness for par split alignment at S-length `nS`. -/
 structure ParWitness (S : SEnv) (G : GEnv) (nS : Nat) where
@@ -427,7 +427,7 @@ theorem ParSplit.sides_eq_of_witness
       _ = pw.split.S1 ++ pw.split.S2 := by simpa [pw.split.hS]
   exact ⟨List.append_inj_left hSeq hSlenEq, List.append_inj_right hSeq hSlenEq⟩
 
-/-! ## Parallel Inversion -/
+-- Parallel Inversion
 
 /-- Inversion for parallel pre-out typing with explicit environment splits. -/
 theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
@@ -464,7 +464,7 @@ theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
           · simpa using hP
           · simpa using hQ
 
-/-! ## Witness-Form Parallel Inversion -/
+-- Witness-Form Parallel Inversion
 
 /-- Witness-oriented inversion for parallel pre-out typing. -/
 theorem HasTypeProcPreOut_par_inv_witness {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :

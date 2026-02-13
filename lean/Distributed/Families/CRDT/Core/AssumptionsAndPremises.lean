@@ -126,7 +126,7 @@ def validateAssumption
       , passed := true
       , detail := "Mixing-time control premise is provided."
       }
-  /-! ## Validation Cases: Dynamics and Limits -/
+  -- Validation cases: dynamics and limits.
   | .hotspotSlowModesClass =>
       { assumption := h
       , passed := true

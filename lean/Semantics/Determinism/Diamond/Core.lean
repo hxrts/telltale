@@ -323,8 +323,8 @@ private theorem diamond_comm_async_head {act₂ : GlobalActionR}
   obtain ⟨cont₂', hstep_cont, hmem₂'⟩ := BranchesStep_mem hbs₁ hmem₂
   simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true] at huniq'
   refine ⟨cont₂', ?_, hstep_cont, ?_⟩
-	  · simpa [hact₂] using (step.comm_head sender receiver branches₁ label₂ cont₂' hmem₂')
-	  exact uniqueBranchLabels_preserved_by_step (uniqueBranchLabelsBranches_mem huniq'.2 hmem₂) hstep_cont
+    · simpa [hact₂] using (step.comm_head sender receiver branches₁ label₂ cont₂' hmem₂')
+    exact uniqueBranchLabels_preserved_by_step (uniqueBranchLabelsBranches_mem huniq'.2 hmem₂) hstep_cont
 
 /-! #### Async-async and mu cases -/
 
@@ -334,8 +334,8 @@ private theorem canStep_of_branchesStep_mem
     (hbs : BranchesStep step bs act bs') (hmem : (label, cont) ∈ bs) :
     canStep cont act := by
   -- Extract the step from BranchesStep, then use step_implies_canStep.
-	  obtain ⟨_, hstep, _⟩ := BranchesStep_mem hbs hmem
-	  exact step_implies_canStep hstep
+    obtain ⟨_, hstep, _⟩ := BranchesStep_mem hbs hmem
+    exact step_implies_canStep hstep
 
 /-! #### Async composition helpers -/
 
@@ -453,8 +453,8 @@ private theorem diamond_branches_cons {act₂ : GlobalActionR}
       refine ⟨(label, head₃) :: rest₃,
         .cons label head₁ head₃ rest₁ rest₃ act₂ hh₁_to_h₃ hr₁_to_r₃,
         .cons label head₂ head₃ rest₂ rest₃ act₁' hh₂_to_h₃ hr₂_to_r₃, ?_⟩
-	      simp only [uniqueBranchLabelsBranches, Bool.and_eq_true]
-	      exact ⟨huniq_h₃, huniq_r₃⟩
+        simp only [uniqueBranchLabelsBranches, Bool.and_eq_true]
+        exact ⟨huniq_h₃, huniq_r₃⟩
 
 /-! ### Global and configuration diamond theorems -/
 

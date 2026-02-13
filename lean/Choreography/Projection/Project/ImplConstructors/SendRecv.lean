@@ -131,8 +131,8 @@ private theorem CProject_send_implies_trans_send_comm_cons (g : GlobalType) (sen
           hrs hrr hrec
 termination_by (sizeOf g) * 3
 decreasing_by
-	    all_goals
-	      simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
+      all_goals
+        simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
 
 /-! ## Send Agreement: Comm Dispatcher -/
 
@@ -163,8 +163,8 @@ private theorem CProject_send_implies_trans_send_comm (sender receiver : String)
           sender receiver first rest role partner lbs hproj' rfl hwf'
 termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
 decreasing_by
-	    all_goals
-	      simp [hgb, GlobalType.comm.sizeOf_spec]
+      all_goals
+        simp [hgb, GlobalType.comm.sizeOf_spec]
 
 /-! ## Send Agreement: Main Theorem -/
 
@@ -192,8 +192,8 @@ theorem CProject_send_implies_trans_send (g : GlobalType) (role : String)
             (by simpa [hg] using hproj) (by simpa [hg] using hwf))
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
-	    all_goals
-	      simp [hg, GlobalType.comm.sizeOf_spec]
+      all_goals
+        simp [hg, GlobalType.comm.sizeOf_spec]
 end
 
 /-! ## Recv Agreement: Base Constructor Contradictions -/
@@ -321,8 +321,8 @@ private theorem CProject_recv_implies_trans_recv_comm_cons (g : GlobalType) (sen
           hrs hrr hrec
 termination_by (sizeOf g) * 3
 decreasing_by
-	    all_goals
-	      simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
+      all_goals
+        simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
 
 /-! ## Recv Agreement: Comm Dispatcher -/
 
@@ -353,8 +353,8 @@ private theorem CProject_recv_implies_trans_recv_comm (sender receiver : String)
           sender receiver first rest role partner lbs hproj' rfl hwf'
 termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
 decreasing_by
-	    all_goals
-	      simp [hgb, GlobalType.comm.sizeOf_spec]
+      all_goals
+        simp [hgb, GlobalType.comm.sizeOf_spec]
 
 /-! ## Recv Agreement: Main Theorem -/
 
@@ -374,8 +374,8 @@ theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String) (partn
             (by simpa [hg] using hproj) (by simpa [hg] using hwf))
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
-	    all_goals
-	      simp [hg, GlobalType.comm.sizeOf_spec]
+      all_goals
+        simp [hg, GlobalType.comm.sizeOf_spec]
 end
 
 /-! ## Guardedness Transport -/

@@ -14,7 +14,7 @@ open scoped Classical
 
 section
 
-/-! ## Right-Frame Session Subset -/
+-- Right-Frame Session Subset
 
 theorem SessionsOf_subset_of_TypedStep_right_frame
     {G₁ G₂ G G' D Ssh Sown store bufs P G₂' D' Sown' store' bufs' P'} :
@@ -25,7 +25,7 @@ theorem SessionsOf_subset_of_TypedStep_right_frame
     SessionsOf G₂' ⊆ SessionsOf G₂ := by
   intro hDisj hEq hEq' hTS
   induction hTS with
-  /-! ## Communication Cases -/
+  -- Communication Cases
   | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
       have hLookup : lookupG (G₁ ++ G₂) e = some (.send target T L) := by
@@ -54,7 +54,7 @@ theorem SessionsOf_subset_of_TypedStep_right_frame
       have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ G₂' := by
         simpa [hEq, hEq'] using hGout.symm
       exact SessionsOf_right_subset_of_update hLookup hUpd
-  /-! ## Structural Cases -/
+  -- Structural Cases
   | assign =>
       intro s hs
       have hEqG : G₁ ++ G₂' = G₁ ++ G₂ :=

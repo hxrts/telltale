@@ -84,7 +84,7 @@ mutual
           simp [LocalTypeR.substitute, hbeq, hbody']
   termination_by sizeOf e
 
-  /-! ## Substitute-Not-Free on Branch Lists -/
+  -- Substitute-Not-Free on Branch Lists
 
   theorem substituteBranches_not_free (bs : List BranchR) (x : String) (rx : LocalTypeR)
       (hnot_free : isFreeInBranches' x bs = false) :
@@ -278,7 +278,7 @@ mutual
           simp [LocalTypeR.substitute, LocalTypeR.isContractive, hbeq, hguard', hbody']
   termination_by sizeOf body
 
-  /-! ## Contractiveness on Branch Substitution -/
+  -- Contractiveness on Branch Substitution
 
   theorem isContractiveBranches_substitute (bs : List BranchR) (t : String) (e : LocalTypeR) :
       isContractiveBranches bs = true → e.isContractive = true → e.isClosed →

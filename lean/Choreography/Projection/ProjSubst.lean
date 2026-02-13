@@ -260,7 +260,7 @@ theorem isGuarded_substitute_unguarded (body : LocalTypeR) (t v : String) (repl 
 
    **PROVABLE**: By induction on g, with guardedness preservation in the mu case. -/
 mutual
-  /-! ## proj_subst Main Theorem -/
+  -- proj_subst Main Theorem
 
   /-- Projection commutes with global type substitution (closed replacement). -/
   theorem proj_subst :
@@ -277,7 +277,7 @@ mutual
         · have hvt' : (v == t) = false := beq_eq_false_iff_ne.mpr hvt
           simp [GlobalType.substitute, hvt', projTrans, Choreography.Projection.Trans.trans, LocalTypeR.substitute]
 
-    /-! ## proj_subst Comm Case -/
+    -- proj_subst Comm Case
 
     | .comm sender receiver branches, t, G, role, hclosed => by
         by_cases hsender : role = sender
@@ -309,7 +309,7 @@ mutual
                       Choreography.Projection.Project.trans_comm_other sender receiver role ((label, cont) :: tail) hs hr,
                       hrec]
 
-    /-! ## proj_subst Mu Case -/
+    -- proj_subst Mu Case
 
     | .mu s body, t, G, role, hclosed => by
         by_cases hst : s = t
@@ -340,7 +340,7 @@ mutual
               simp [GlobalType.substitute, hst, projTrans, Choreography.Projection.Trans.trans,
                 hproj', e, repl, hguard, hguard']
 
-    /-! ## proj_subst Delegate Case -/
+    -- proj_subst Delegate Case
 
     | .delegate p q sid r cont, t, G, role, hclosed => by
         -- Delegate case: projection follows the trans definition
@@ -364,7 +364,7 @@ mutual
       | exact sizeOf_cont_lt_comm _ _ _ _ _
       | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
-  /-! ## proj_subst_branches Theorem -/
+  -- proj_subst_branches Theorem
 
   /-- Branch-wise version of proj_subst for transBranches/substituteBranches. -/
   theorem proj_subst_branches :

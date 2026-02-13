@@ -18,7 +18,7 @@ set_option autoImplicit false
 open scoped Classical
 
 section
-/-! ## Tightness Construction -/
+-- Tightness Construction
 
 /-- A tight progress system: single role, measure = config value,
     step decrements by 1. -/
@@ -60,7 +60,7 @@ def TightSystem : ProgressSystem Nat := {
       | zero => cases hc  -- hc : (0 == 0) = false is impossible
       | succ n => exact Nat.succ_pos n
 
-  /-! ## Tightness Witness: Decrease/No-op Obligations -/
+  -- Tightness Witness: Decrease/No-op Obligations
 
   enabled_step_decreases := by
     intros c r hnt hr
@@ -97,7 +97,7 @@ def TightSystem : ProgressSystem Nat := {
     · have hbeq : (r == 0) = false := beq_eq_false_iff_ne.mpr hr0
       simp [hbeq]
 
-  /-! ## Tightness Witness: Terminal-Step Obligations -/
+  -- Tightness Witness: Terminal-Step Obligations
 
   terminal_step_noop := by
     intros c r hc
@@ -120,7 +120,7 @@ def TightSystem : ProgressSystem Nat := {
       cases hc
 }
 
-/-! ## Tightness Witness: Fairness and Trace Lemmas -/
+-- Tightness Witness: Fairness and Trace Lemmas
 
 /-- A schedule that delays role 0 for k-1 steps each cycle. -/
 def TightSchedule (k : Nat) (i : Nat) : Nat :=
@@ -174,7 +174,7 @@ theorem TightSystem_KFair (k : Nat) (hk : k ≥ 1) : KFair TightSystem (TightSch
       exact Nat.mul_mod_right _ _
     simp [TightSchedule, hmod]
 
-/-! ## Tightness Witness: Execution Trace -/
+-- Tightness Witness: Execution Trace
 
 /-- Execution trace for TightSystem with TightSchedule 2. -/
 lemma TightSystem_execution_trace :
@@ -187,7 +187,7 @@ lemma TightSystem_execution_trace :
   · simp [execute, TightSchedule, TightSystem]
   · simp [execute, TightSchedule, TightSystem]
 
-/-! ## Tightness Theorem -/
+-- Tightness Theorem
 
 /-- **Theorem 6 (Tightness)**: The bound k * W₀ is tight. There exists a system
     where termination takes exactly k * W₀ steps. -/
@@ -226,9 +226,9 @@ theorem bound_is_tight :
     -- TightSystem.isTerminal 1 = false, i.e., (1 == 0) = false
     rfl
 
-/-! ## Integration with Session Types -/
+-- Integration with Session Types
 
-/-! ## Session Integration: Progress-System Construction -/
+-- Session Integration: Progress-System Construction
 
 /-- Construct a ProgressSystem from SessionSemantics and MultiConfig.
 
@@ -263,7 +263,7 @@ def sessionProgressSystem [sem : SessionSemantics] (cfg₀ : MultiConfig) :
     refine ⟨0, Nat.zero_lt_succ _, ?_⟩
     simp [hnt]
 
-  /-! ## Session Integration: Decrease/Stability Obligations -/
+  -- Session Integration: Decrease/Stability Obligations
 
   enabled_step_decreases := by
     intros cfg r hnt hr
@@ -304,7 +304,7 @@ def sessionProgressSystem [sem : SessionSemantics] (cfg₀ : MultiConfig) :
     simp [hterm]
 }
 
-/-! ## Session Integration: Termination Bound -/
+-- Session Integration: Termination Bound
 
 /-- Multi-session termination bound: under k-fair scheduling with k ≥ numSessions,
     all sessions terminate within k * W₀ steps where W₀ is the total weighted measure. -/
