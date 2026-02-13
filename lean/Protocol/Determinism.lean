@@ -232,6 +232,7 @@ theorem diamond_independent_sessions {C C₁ C₂ : Config}
       -- par skip Q = par P skip means skip = P and Q = skip
       have heq : Process.par _ _ _ _ = Process.par _ _ _ _ := hProc.symm.trans hProc'
       simp only [Process.par.injEq] at heq
+/- ## Structured Block 1 -/
       rcases heq with ⟨_, ⟨_, ⟨hskip_P, hQ_skip⟩⟩⟩
       -- hskip_P : skip = P, hQ_skip : Q = skip
       -- C₁.proc = Q = skip, C₂.proc = P = skip
@@ -350,6 +351,7 @@ structure DeterminismClaims where
     lookupG C.G e = some (.send target T L) →
     C₁ = sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L →
     C₂ = sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L →
+/- ## Structured Block 2 -/
     C₁ = C₂
   /-- Unique branch label implies unique continuation. -/
   branch_unique : ∀ {lbl : Label} {cont₁ cont₂ : LocalType} {branches : List (Label × LocalType)},

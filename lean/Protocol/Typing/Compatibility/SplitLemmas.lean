@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Compatibility.DEnvLemmas
 
 /-! # Protocol.Typing.Compatibility.SplitLemmas
@@ -12,6 +13,7 @@ of append/swap/split lemmas.
 Solution Structure. Collects remaining split/append compatibility results.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -73,6 +75,7 @@ theorem DisjointG_append_left {G₁ G₁' G₂ : GEnv} :
         simpa [DisjointG, GEnvDisjoint] using hDisj'
       have hInter : s ∈ SessionsOf G₁' ∩ SessionsOf G₂ := ⟨hIn2, hs.2⟩
       have : s ∈ (∅ : Set SessionId) := by simpa [hEmpty] using hInter
+/- ## Structured Block 2 -/
       exact this.elim
 
 -- DEnv Append Lookup Facts
@@ -132,6 +135,7 @@ theorem SEnvDomSubset_append_left {S₁ S₂ : SEnv} :
 
 theorem SEnvDomSubset_append_right {S₁ S₂ : SEnv} :
     SEnvDomSubset S₂ (S₁ ++ S₂) := by
+/- ## Structured Block 3 -/
   intro x T hLookup
   cases hLeft : lookupSEnv S₁ x with
   | some T₁ =>
@@ -188,6 +192,7 @@ theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
   | recv_new =>
       exact SEnvDomSubset_update_left
   | recv_old =>
+/- ## Structured Block 4 -/
       exact SEnvDomSubset_update_left
   | select =>
       exact SEnvDomSubset_refl
@@ -245,6 +250,7 @@ theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
 /-- StoreTyped splits to the left portion of SEnv. -/
 theorem StoreTyped_split_left {G : GEnv} {S₁ S₂ : SEnv} {store : VarStore} :
     StoreTyped G (S₁ ++ S₂) store →
+/- ## Structured Block 5 -/
     StoreTyped G S₁ store := by
   intro hST x v T hStore hS
   have hS' : lookupSEnv (S₁ ++ S₂) x = some T :=
@@ -302,6 +308,7 @@ theorem Coherent_split_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
       simpa [hEmpty] using hInter
     exact this.elim
   have hG2none_sender : lookupG G₂ senderEp = none := lookupG_none_of_not_session hNot
+/- ## Structured Block 6 -/
   have hGsender : lookupG G₁ senderEp = some Lsender := by
     cases lookupG_append_inv (G₁:=G₁) (G₂:=G₂) (e:=senderEp) hGsenderMerged with
     | inl hLeft => exact hLeft

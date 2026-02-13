@@ -103,6 +103,7 @@ lemma SEnvDomSubset_updateLeft_right
 theorem HasTypeProcPreOut_right_domsubset
     {Ssh Sown G P Sfin Gfin W Δ} :
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
+/- ## Structured Block 1 -/
     SEnvDomSubset Sfin.right Sown.right := by
   intro h
   induction h with
@@ -156,6 +157,7 @@ lemma TypedStep_preserves_right
                   have hNoneErase : lookupSEnv (eraseSEnv Sown.right x) x = none :=
                     lookupSEnv_erase_eq (S:=Sown.right) (x:=x)
                   have : (some Tfin : Option ValType) = none := by
+/- ## Structured Block 2 -/
                     simpa [OwnedEnv.updateLeft, hNoneErase] using hInFin
                   cases this
           have hErase : eraseSEnv Sown.right x = Sown.right :=
@@ -207,6 +209,7 @@ lemma TypedStep_preserves_right
           simpa [hSout] using hRightEq
       | assign_old hNoSh hOwn hv' =>
           have hNoOwnR : lookupSEnv Sown.right x = none := by
+/- ## Structured Block 3 -/
             by_cases hNone : lookupSEnv Sown.right x = none
             · exact hNone
             · cases hOwnR : lookupSEnv Sown.right x with
@@ -268,6 +271,7 @@ lemma DisjointD_right_empty (D : DEnv) : DisjointD D (∅ : DEnv) := by
 lemma DisjointD_left_empty (D : DEnv) : DisjointD (∅ : DEnv) D := by
   simp [DisjointD, SessionsOfD_empty]
 
+/- ## Structured Block 4 -/
 theorem DEnv_append_empty_right (D : DEnv) : D ++ (∅ : DEnv) = D :=
   DEnvUnion_empty_right D
 

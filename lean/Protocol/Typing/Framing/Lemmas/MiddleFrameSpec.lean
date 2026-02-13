@@ -1,10 +1,7 @@
 import Protocol.Typing.Framing.Lemmas.LeftParTransport
-
 /-! # Middle Frame Specification
-
 Specification of the middle-frame preservation property, defining the
 goal shape for the main inductive proof. -/
-
 /-
 The Problem. The middle-frame theorem has a complex statement with many
 parameters and conditions. Defining it directly in the main theorem
@@ -15,6 +12,7 @@ as the full specification. Define `MiddleFrameGoal` as a specialized
 version bound to a concrete `TypedStep` for use in induction hypotheses.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -77,6 +75,7 @@ lemma lookupSEnv_all_of_visible_owned
 
 /-- Align channel endpoints from `StoreTyped` and a visible channel typing fact. -/
 lemma endpoint_eq_of_store_visible_all
+/- ## Structured Block 2 -/
     {Gstore : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : VarStore}
     {k : Var} {e e' : Endpoint} :
     StoreTyped Gstore (SEnvAll Ssh Sown) store →
@@ -131,6 +130,7 @@ lemma SessionsOf_left_subset_of_update
         updateG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hLeft
     have hEq : G₁' ++ G₂ = G₁ ++ updateG G₂ e L := by
       simpa [hUpd'] using hUpd.symm
+/- ## Structured Block 3 -/
     have hLookupG2 : lookupG G₂ e = some L0 := by
       have hLookup' :=
         lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
@@ -183,6 +183,7 @@ lemma SessionsOf_right_subset_of_update
     have hLookupG2 : lookupG G₂ e = some L0 := by
       have hLookup' :=
         lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
+/- ## Structured Block 4 -/
       simpa [hLookup'] using hLookup
     have hSess :
         SessionsOf (updateG G₂ e L) = SessionsOf G₂ :=
@@ -239,6 +240,7 @@ lemma updateG_append_middle_hit
     updateG (Gleft ++ Gmid ++ Gright) e L
         = updateG (Gleft ++ (Gmid ++ Gright)) e L := by simp [List.append_assoc]
     _ = Gleft ++ updateG (Gmid ++ Gright) e L := hOut
+/- ## Structured Block 5 -/
     _ = Gleft ++ (updateG Gmid e L ++ Gright) := by simp [hMid]
     _ = Gleft ++ updateG Gmid e L ++ Gright := by simp [List.append_assoc]
 
@@ -300,6 +302,7 @@ lemma updateG_middle_witness
     {Gleft Gmid Gright G' : GEnv} {e : Endpoint} {L0 L : LocalType} :
     lookupG Gleft e = none →
     lookupG Gmid e = some L0 →
+/- ## Structured Block 6 -/
     G' = updateG (Gleft ++ Gmid ++ Gright) e L →
     ∃ Gmid', G' = Gleft ++ Gmid' ++ Gright ∧ Gmid' = updateG Gmid e L := by
   intro hNoneLeft hSomeMid hG'
@@ -356,6 +359,7 @@ lemma middle_recv_lookup_of_pre
       have hEqE : e = eMid :=
         endpoint_eq_of_store_visible_all
           (Gstore:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+/- ## Structured Block 7 -/
           (k:=k) (e:=e) (e':=eMid) hStore hOwn hkStore hkMid
       exact ⟨p, T, L, by simpa [hEqE] using hGmid⟩
 
@@ -415,6 +419,7 @@ lemma middle_send_update_decompose
       Gmid' = updateG Gmid e L := by
   intro hDisjLM hEq hMid hUpd
   have hNoneLeft : lookupG Gleft e = none :=
+/- ## Structured Block 8 -/
     lookupG_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
   refine ⟨updateG Gmid e L, ?_, ?_, rfl⟩
   · calc
@@ -468,6 +473,7 @@ lemma preserved_sub_middle_send
                 lookupG_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
                   (e:=e) (L0:=.send q Tmid Lmid) hNoneLeft hMid
           have hSendEq : LocalType.send target T L = LocalType.send q Tmid Lmid := by
+/- ## Structured Block 9 -/
             exact Option.some.inj (by simpa [hGstep] using hFullMid)
           have hL : L = Lmid := by
             cases hSendEq

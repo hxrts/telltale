@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Preservation.CoherenceAndDisjointnessFrames
 
 /-! # Store Typing Core Lemmas
@@ -16,6 +17,7 @@ Solution Structure. Prove `StoreTyped_rewriteG` for GEnv substitution,
 Extend to `StoreTypedStrong` which includes same-domain conditions.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -78,6 +80,7 @@ lemma StoreTypedStrong_rewriteS {G : GEnv} {S S' : SEnv} {store : VarStore}
 lemma lookupG_none_of_disjoint_early {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
     {e : Endpoint} {L : LocalType} (hLookup : lookupG G₂ e = some L) :
     lookupG G₁ e = none := by
+/- ## Structured Block 2 -/
   by_cases hNone : lookupG G₁ e = none
   · exact hNone
   · cases hSome : lookupG G₁ e with
@@ -134,6 +137,7 @@ lemma lookupG_swap_left {G₁ G₂ G₃ : GEnv} (hDisj : DisjointG G₁ G₂) :
   | none =>
       have hA := lookupG_append_right (G₁:=G₁ ++ G₂) (G₂:=G₃) (e:=e) hLeft
       have hSwap := lookupG_comm_of_disjoint_early hDisj e
+/- ## Structured Block 3 -/
       have hNone : lookupG (G₂ ++ G₁) e = none := by
         simpa [hSwap] using hLeft
       have hB := lookupG_append_right (G₁:=G₂ ++ G₁) (G₂:=G₃) (e:=e) hNone
@@ -195,6 +199,7 @@ theorem StoreTypedStrong_sameDomain_update
   intro y
   by_cases hEq : y = x
   · subst hEq
+/- ## Structured Block 4 -/
     simp [lookupSEnv_update_eq, lookupStr_update_eq]
   · have hS : lookupSEnv (updateSEnv S x T) y = lookupSEnv S y := by
       simpa using (lookupSEnv_update_neq (env:=S) (x:=x) (y:=y) (T:=T) (Ne.symm hEq))
@@ -262,6 +267,7 @@ theorem StoreTypedStrong_recv_update
 /-- Updating only `Sown.left` under a fixed shared/right prefix is lookup-equivalent
     to updating the full combined environment at `x`. -/
 
+/- ## Structured Block 5 -/
 lemma lookupSEnv_append_erase_ne
     {Sright Srest : SEnv} {x y : Var} (hxy : y ≠ x) :
     lookupSEnv (eraseSEnv Sright x ++ Srest) y =
@@ -314,6 +320,7 @@ theorem lookupSEnv_updateLeft_frame_eq_updateSEnv
     have hUpdate : lookupSEnv (updateSEnv (SEnvAll Ssh (Sown ++ S₂)) x T) x = some T := by
       simpa using (lookupSEnv_update_eq (env:=SEnvAll Ssh (Sown ++ S₂)) (x:=x) (T:=T))
     exact hTarget.trans hUpdate.symm
+/- ## Structured Block 6 -/
   · have hTargetBase :
       -- # Distinct-Variable Case (`y ≠ x`)
       lookupSEnv (SEnvAll Ssh (Sown.updateLeft x T ++ S₂)) y =
@@ -369,6 +376,7 @@ theorem StoreTypedStrong_frame_send
     {G G₂ : GEnv} {Ssh Sown S₂ : SEnv} {store : VarStore}
     {e : Endpoint} {target : Role} {T : ValType} {L : LocalType}
     (hStore : StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown ++ S₂)) store)
+/- ## Structured Block 7 -/
     (hG : lookupG G e = some (.send target T L)) :
     StoreTypedStrong (updateG G e L ++ G₂) (SEnvAll Ssh (Sown ++ S₂)) store := by
   -- Update G on the left; SEnv/store unchanged.

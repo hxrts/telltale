@@ -197,6 +197,7 @@ mutual
               else
                 false
           | _ => false
+/- ## Structured Block 1 -/
         else
           -- non-participant: follows continuation
           projectb cont role cand

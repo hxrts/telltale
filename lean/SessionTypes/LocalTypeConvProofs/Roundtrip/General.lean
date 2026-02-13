@@ -1,5 +1,7 @@
+
 import SessionTypes.LocalTypeConvProofs.ClosedRoundtrip
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option maxHeartbeats 0
 set_option maxRecDepth 4000
@@ -76,6 +78,7 @@ theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
 
     · intro p bs hbs ctx hnodup hfreshAll hclosed
       have hclosed' : isClosedAtBranches ctx.length bs = true := by
+/- ## Structured Block 2 -/
         simpa [LocalTypeDB.isClosedAt] using hclosed
       have hbs' := hbs ctx hnodup hfreshAll hclosed'
       simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hbs']
@@ -132,6 +135,7 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
   intro hidx hdb
   let P1 : LocalTypeR → Prop :=
     fun t =>
+/- ## Structured Block 3 -/
       ∀ pref ctx i db,
         Context.indexOf ctx x = some i →
         t.toDB? (pref ++ x :: ctx) = some db →
@@ -185,6 +189,7 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
             exact hbody (pref := cons y pref) (ctx := ctx) (i := i) (db := db') hidx hbody'
           have hguard'' : db'.isGuarded (i + pref.length + 1 + 1) = true := by
             have : i + (cons y pref).length + 1 = i + pref.length + 1 + 1 := by
+/- ## Structured Block 4 -/
               simp [Nat.add_left_comm, Nat.add_comm, cons_length]
             simpa [this] using hguard'
           simpa [LocalTypeDB.isGuarded, Nat.add_left_comm, Nat.add_comm] using hguard''
@@ -247,6 +252,7 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
         ctx.indexOf x = some i →
         t.toDB? ctx = some db →
           db.isGuarded i = true
+/- ## Structured Block 5 -/
   let P2 : List BranchR → Prop := fun _ => True
   let P3 : BranchR → Prop := fun _ => True
   let P4 : Option ValType × LocalTypeR → Prop := fun _ => True
@@ -304,6 +310,7 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
               have hbeq : (x == y) = false := beq_eq_false_iff_ne.mpr hxy
               simp only [hbeq, Bool.false_eq_true, ↓reduceIte] at hguard
               exact hguard
+/- ## Structured Block 6 -/
             have hidx' : (NameOnlyContext.cons y ctx).indexOf x = some (i + 1) := by
               show NameOnlyContext.indexOf (NameOnlyContext.cons y ctx) x = some (i + 1)
               rw [NameOnlyContext.indexOf_cons_ne ctx (Ne.symm hxy)]
@@ -362,6 +369,7 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
       ∀ ctx db, b.2.2.isContractive = true → b.2.2.toDB? ctx = some db → db.isContractive = true
   let P4 : Option ValType × LocalTypeR → Prop :=
     fun b =>
+/- ## Structured Block 7 -/
       ∀ ctx db, b.2.isContractive = true → b.2.toDB? ctx = some db → db.isContractive = true
 
   -- Contractiveness-toDB: Structural Recursion
@@ -422,6 +430,7 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
     · intro v ctx db hcontr hdb
       -- Variables are always contractive in both representations
       simp only [LocalTypeR.toDB?] at hdb
+/- ## Structured Block 8 -/
       cases hj : NameOnlyContext.indexOf ctx v with
       | none => simp [hj] at hdb
       | some j =>

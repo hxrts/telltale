@@ -1,3 +1,4 @@
+
 import Choreography.Projection.Erasure.Merge
 
 /-! # Choreography.Projection.Erasure.MergeSoundness
@@ -15,6 +16,7 @@ Solution Structure. We prove soundness by structural induction:
 2. `merge_sound`: the main merge function produces valid Erases witnesses
 The key insight is that merge only succeeds when the types are compatible.
 -/
+/- ## Structured Block 1 -/
 namespace Choreography.Projection.Erasure
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
@@ -73,6 +75,7 @@ private theorem mergeBranchesSend_sound
           (rest := tail) (bs2 := bs2) (bs := bs) h with
         ⟨t2, t, rest', hlookup, hmerge', hrest, rfl⟩
       have hm_tail : sizeOf tail + sizeOf bs2 < m := by
+/- ## Structured Block 2 -/
         have htail : sizeOf tail < sizeOf ((l, vt1, t1) :: tail) := by
           simpa using (sizeOf_tail_lt_sizeOf_branches (head := (l, vt1, t1)) (tail := tail))
         have hsum : sizeOf tail + sizeOf bs2 < sizeOf ((l, vt1, t1) :: tail) + sizeOf bs2 :=
@@ -126,6 +129,7 @@ private theorem mergeBranchesSend_sound
             sizeOf_cont_lt_sizeOf_branches lbl vt1 t1 tail
           have hlt2 : sizeOf t2 < sizeOf bs2 :=
             sizeOf_cont_lt_sizeOf_branches_mem hmem2_cont
+/- ## Structured Block 3 -/
           have hsum :
               sizeOf t1 + sizeOf t2 < sizeOf ((lbl, vt1, t1) :: tail) + sizeOf bs2 :=
             Nat.add_lt_add hlt1 hlt2
@@ -185,6 +189,7 @@ private theorem mergeBranchesRecv_sound
   -- mergeBranchesRecv Cons Case
 
   | cons head tail ih =>
+/- ## Structured Block 4 -/
       obtain ⟨l, vt1, t1⟩ := head
       rcases mergeBranchesRecv_eq_some (lbl := l) (vt1 := vt1) (t1 := t1)
           (rest := tail) (bs2 := bs2) (bs := bs) h with
@@ -241,6 +246,7 @@ private theorem mergeBranchesRecv_sound
         have hm_tail : sizeOf tail + sizeOf bs2 < m := by
           have htail : sizeOf tail < sizeOf ((l, vt1, t1) :: tail) := by
             simpa using (sizeOf_tail_lt_sizeOf_branches (head := (l, vt1, t1)) (tail := tail))
+/- ## Structured Block 5 -/
           have hsum : sizeOf tail + sizeOf bs2 < sizeOf ((l, vt1, t1) :: tail) + sizeOf bs2 :=
             Nat.add_lt_add_right htail _
           exact Nat.lt_trans hsum hm
@@ -297,6 +303,7 @@ private theorem mergeBranchesRecv_sound
 
             -- mergeBranchesRecv Merged-Label Right-Preservation Subcase
 
+/- ## Structured Block 6 -/
             · intro lbl t2' h1' h2'
               by_cases hlt : l = lbl
               · simp [lookupBranch, hlt] at h1'
@@ -361,6 +368,7 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
       | mu v a' =>
           cases b with
           | mu w b' =>
+/- ## Structured Block 7 -/
               by_cases hv : v = w
               · simp [merge, hv] at h
                 cases h' : merge a' b' with
@@ -414,6 +422,7 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                       rcases hsend with ⟨hsub12, hsub1b, hsubb1, hper⟩
                       have hsub21 : labelsSubset bs' bs :=
                         labelsSubset_of_labelsSubsetb (bs1 := bs') (bs2 := bs) hsubset
+/- ## Structured Block 8 -/
                       have h1 : sameLabels bs bs' := sameLabels_of_subsets hsub12 hsub21
                       have h2 : sameLabels bs bs'' := sameLabels_of_subsets hsub1b hsubb1
                       exact Erases.send h1 h2 hper
@@ -471,6 +480,7 @@ theorem mergeAll_sound {ts : List LocalTypeR} {t : LocalTypeR}
           cases h
           simp [ErasesAll]
       | cons b rest' =>
+/- ## Structured Block 9 -/
           simp [mergeAll] at h
           cases hrest : mergeAll (b :: rest') with
           | none => simp [hrest] at h

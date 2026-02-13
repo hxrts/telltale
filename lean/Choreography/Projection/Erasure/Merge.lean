@@ -1,3 +1,4 @@
+
 import Choreography.Projection.Erasure.Core
 
 /-! # Choreography.Projection.Erasure.Merge
@@ -15,6 +16,7 @@ Solution Structure. We define:
 2. `appendMissing` to combine branch lists with different labels
 3. Soundness theorems showing the predicates match their boolean implementations
 -/
+/- ## Structured Block 1 -/
 namespace Choreography.Projection.Erasure
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
@@ -79,6 +81,7 @@ theorem mem_of_lookupBranch {lbl : Label} {t : LocalTypeR} {bs : List BranchR}
 /-- sameLabels from both subset directions. -/
 theorem sameLabels_of_subsets {bs1 bs2 : List BranchR}
     (h12 : labelsSubset bs1 bs2) (h21 : labelsSubset bs2 bs1) :
+/- ## Structured Block 2 -/
     sameLabels bs1 bs2 := by
   intro lbl
   constructor
@@ -136,6 +139,7 @@ private theorem lookupBranch_appendMissing_of_not_in
   induction bs2 with
   | nil => simp [appendMissing]
   | cons head tail ih =>
+/- ## Structured Block 3 -/
       cases head with
       | mk l t =>
           by_cases hlt : l = lbl
@@ -192,6 +196,7 @@ private lemma lookupBranchEq_none {lbl : Label} :
         have : False := by
           simp [lookupBranchEq, lookupBranch, hl] at h
         exact this.elim
+/- ## Structured Block 4 -/
       ·
         cases hrest : lookupBranchEq lbl rest with
         | none =>
@@ -250,6 +255,7 @@ mutual
         | none => none
         | some ⟨t2, _hlookup⟩ =>
             match merge t1 t2, mergeBranchesSend rest bs2 with
+/- ## Structured Block 5 -/
             | some t, some rest' => some ((lbl, vt1, t) :: rest')
             | _, _ => none
   termination_by bs1 bs2 => sizeOf bs1 + sizeOf bs2
@@ -307,6 +313,7 @@ end
 
 theorem mergeBranchesSend_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValType} {t1 : LocalTypeR}
     {rest bs2 bs : List BranchR}
+/- ## Structured Block 6 -/
     (h : mergeBranchesSend ((lbl, vt1, t1) :: rest) bs2 = some bs) :
     ∃ t2 t rest',
       lookupBranch lbl bs2 = some t2 ∧
@@ -360,6 +367,7 @@ theorem mergeBranchesRecv_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValTy
           · rfl
           · cases h; rfl
   | some ht =>
+/- ## Structured Block 7 -/
       rcases ht with ⟨t2, hlookup⟩
       cases hmerge : merge t1 t2 with
       | none =>

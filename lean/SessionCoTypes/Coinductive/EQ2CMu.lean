@@ -1,3 +1,4 @@
+
 import Mathlib
 import Paco
 import SessionCoTypes.Coinductive.Observable
@@ -6,6 +7,7 @@ import SessionCoTypes.Coinductive.EQ2CProps
 import SessionCoTypes.Coinductive.EQ2CPaco
 import SessionCoTypes.Coinductive.BisimDecidable
 
+/- ## Structured Block 1 -/
 set_option linter.dupNamespace false
 
 /-! # EQ2CMu
@@ -94,6 +96,7 @@ lemma EQ2C_mu_paco_to_obs_of_bounds {a b : LocalTypeC} {na nb : Nat}
         hasNonMuHead (fullUnfoldN nb b) = true →
         EQ2C_mu_paco a b →
         ObservableRelC EQ2C_mu_paco a b := by
+/- ## Structured Block 2 -/
     intro n
     induction n with
     -- Bounds Induction: Base Case
@@ -147,6 +150,7 @@ lemma EQ2C_mu_paco_to_obs_of_bounds {a b : LocalTypeC} {na nb : Nat}
                       _ = na' + (1 + nb) := by
                         simp [Nat.add_comm]
                       _ = na' + 1 + nb := by
+/- ## Structured Block 3 -/
                         simp [Nat.add_assoc]
                       _ = n + 1 := hsum
                   exact Nat.add_right_cancel hsum''

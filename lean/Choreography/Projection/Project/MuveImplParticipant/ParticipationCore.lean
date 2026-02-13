@@ -1,19 +1,14 @@
 import Choreography.Projection.Project.MuveImplNonPart
-
 /-! # Project MuveImplParticipant
-
 Participant projection classification and part_of2_or_end theorem.
 -/
-
 -- Core Development
-
 /-
 The Problem. State the projection/harmony lemma objective and the exact invariant boundary it preserves.
 Solution Structure. Introduce local helper lemmas first, then discharge the main theorem by case analysis over the operational/projection relation.
 -/
-
+/- ## Structured Block 1 -/
 namespace Choreography.Projection.Project
-
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 open Choreography.Projection.Project
@@ -21,7 +16,6 @@ open Choreography.Projection.Projectb
 open SessionTypes.Participation
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
-
 -- Size Helpers
 /-- Helper: sizeOf a member's continuation is less than sizeOf the list. -/
 private theorem sizeOf_mem_snd_lt {branches : List (Label × GlobalType)} {pair : Label × GlobalType}
@@ -38,7 +32,6 @@ private theorem sizeOf_mem_snd_lt {branches : List (Label × GlobalType)} {pair 
           have ih' := ih hmem'
           simp only [sizeOf, List._sizeOf_1, Prod._sizeOf_1] at ih' ⊢
           omega
-
 /-- Helper: sizeOf a member's continuation is less than sizeOf the comm. -/
 private theorem sizeOf_mem_snd_lt_comm {sender receiver : String} {branches : List (Label × GlobalType)}
     {pair : Label × GlobalType} (hmem : pair ∈ branches) :
@@ -48,7 +41,6 @@ private theorem sizeOf_mem_snd_lt_comm {sender receiver : String} {branches : Li
       1 + sizeOf sender + sizeOf receiver + sizeOf branches := by
     simp only [GlobalType.comm.sizeOf_spec]
   omega
-
 -- Branch Property Inheritance
 /-- Helper: allCommsNonEmpty for a branch list implies allCommsNonEmpty for each member. -/
 private theorem allCommsNonEmpty_of_mem {branches : List (Label × GlobalType)} {pair : Label × GlobalType}
@@ -75,6 +67,7 @@ private theorem noSelfComm_of_mem {branches : List (Label × GlobalType)} {pair 
       | tail _ hmem' => exact ih hmem' hnsc.2
 
 /-- Helper: comm allCommsNonEmpty implies branch allCommsNonEmpty. -/
+/- ## Structured Block 2 -/
 private theorem allCommsNonEmptyBranches_of_comm {sender receiver : String}
     {branches : List (Label × GlobalType)}
     (hne : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true) :
@@ -135,6 +128,7 @@ private theorem CProject_not_muve_of_part_of2_aux_mu_mu (t : String) (body : Glo
 
 /-- Helper: mu/end case for CProject_not_muve_of_part_of2_aux. -/
 -- Muve Negation: Mu/End Helper
+/- ## Structured Block 3 -/
 private theorem CProject_not_muve_of_part_of2_aux_mu_end (t : String) (body : GlobalType)
     (role : String)
     (hproj : CProject (.mu t body) role .end)
@@ -189,6 +183,7 @@ private theorem CProject_not_muve_of_part_of2_aux_comm_nonpart
     (hne : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true)
     (hs : role ≠ sender) (hr : role ≠ receiver)
     (ih : ∀ pair, pair ∈ branches → CProject pair.2 role lt → part_of2 role pair.2 →
+/- ## Structured Block 4 -/
       pair.2.allCommsNonEmpty = true → isMuve lt = false) :
     isMuve lt = false := by
   obtain ⟨label, cont, hmem, hpart_cont⟩ :=
@@ -242,6 +237,7 @@ private theorem CProject_not_muve_of_part_of2_aux_comm_cons
           exact hfalse.elim
       | var _ =>
           have hfalse : False := by
+/- ## Structured Block 5 -/
             simp at hF
           exact hfalse.elim
       | mu _ _ =>
@@ -308,6 +304,7 @@ theorem CProject_not_muve_of_part_of2 (g : GlobalType) (role : String) (lt : Loc
 
 /-- Helper: mu/mu case for CProject_part_of2_implies_part_of_all2_aux. -/
 -- all-branch Participation: Mu/Mu Helper
+/- ## Structured Block 6 -/
 private theorem CProject_part_of2_implies_part_of_all2_aux_mu_mu (t : String) (body : GlobalType)
     (role t' : String) (candBody : LocalTypeR)
     (hproj : CProject (.mu t body) role (.mu t' candBody))
@@ -361,6 +358,7 @@ private theorem CProject_part_of2_implies_part_of_all2_aux_mu_end (t : String) (
         simpa [GlobalType.allCommsNonEmpty] using hne
       have hnsc_body : body.noSelfComm = true := by
         simpa [GlobalType.noSelfComm] using hnsc
+/- ## Structured Block 7 -/
       have ih' := ih candBody0 hbody_proj hpart_body hne_body hnsc_body
       exact part_of_all2.intro _ (part_of_allF.mu t body ih')
 
@@ -418,6 +416,7 @@ private theorem CProject_part_of2_implies_part_of_all2_aux_comm_branch
     (hs : role ≠ sender) (hr : role ≠ receiver)
     (ih : ∀ pair, pair ∈ first :: rest → CProject pair.2 role lt → part_of2 role pair.2 →
       pair.2.allCommsNonEmpty = true → pair.2.noSelfComm = true → part_of_all2 role pair.2) :
+/- ## Structured Block 8 -/
     part_of_all2 role pair.2 := by
   have hpair_proj : CProject pair.2 role lt := hF pair hmem
   by_cases hpart_pair : part_of2 role pair.2
@@ -472,6 +471,7 @@ private theorem CProject_part_of2_implies_part_of_all2_aux : (g : GlobalType) �
       exact CProject_part_of2_implies_part_of_all2_aux_mu t body role lt hproj hpart hne hnsc
         (fun lt' hproj' hpart' hne' hnsc' =>
           CProject_part_of2_implies_part_of_all2_aux body role lt' hproj' hpart' hne' hnsc')
+/- ## Structured Block 9 -/
   | .comm _ _ [], _, _, _, _, hne, _ => by
       simp only [GlobalType.allCommsNonEmpty, List.isEmpty_nil, Bool.and_eq_true,
         decide_eq_true_eq] at hne; exact Bool.noConfusion hne.1

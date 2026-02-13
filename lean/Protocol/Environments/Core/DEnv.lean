@@ -312,6 +312,7 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
               cases this
             simpa [List.mem_cons, hneq] using hx'
           -- Tail subset transfer for pairwise extensionality.
+/- ## Structured Block 1 -/
           have h₂₁' : l₂ ⊆ l₁ := by
             intro x hx
             have hx' : x ∈ a :: l₁ := h₂₁ (List.mem_cons.mpr (Or.inr hx))

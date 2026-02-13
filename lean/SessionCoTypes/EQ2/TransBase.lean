@@ -90,6 +90,7 @@ private theorem EndRel_postfix : ∀ a b, EndRel a b → EQ2F EndRel a b := by
       | send p bs =>
           have hrel : EndRel (lbody.substitute t (.mu t lbody)) (.send p bs) :=
             ⟨ha', hb⟩
+/- ## Structured Block 1 -/
           simpa [EQ2F] using hrel
       | recv p bs =>
           have hrel : EndRel (lbody.substitute t (.mu t lbody)) (.recv p bs) :=
@@ -165,6 +166,7 @@ private theorem VarRel_postfix (v : String) :
       have ha' : EQ2 (lbody.substitute t (.mu t lbody)) (.var v) := by
         have haF : EQ2F EQ2 (.mu t lbody) (.var v) := EQ2.destruct ha
         simpa [EQ2F] using haF
+/- ## Structured Block 2 -/
       cases b with
       | «end» =>
           have hbF : EQ2F EQ2 (.var v) .end := EQ2.destruct hb

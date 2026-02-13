@@ -240,6 +240,7 @@ mutual
           cases ih with
           | inl hrepl =>
               left; exact hrepl
+/- ## Structured Block 1 -/
           | inr hpair =>
               right
               constructor

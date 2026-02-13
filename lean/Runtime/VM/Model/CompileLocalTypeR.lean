@@ -173,6 +173,7 @@ mutual
   termination_by
     sizeOf t
   decreasing_by
+/- ## Structured Block 1 -/
     all_goals
       simp
       try omega

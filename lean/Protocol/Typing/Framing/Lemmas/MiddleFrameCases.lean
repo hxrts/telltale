@@ -1,21 +1,18 @@
 import Protocol.Typing.Framing.Lemmas.MiddleFrameSpec
-
 /-! # Middle Frame Cases
-
 Per-constructor case lemmas for middle-frame preservation, showing
 typed steps in a three-way split `Gleft ++ Gmid ++ Gright` preserve
 the middle portion's typing structure. -/
-
 /-
 The Problem. For preservation with parallel composition, we split GEnv
 into three parts. When a step occurs in the middle, we need to show
 the step's effect stays within Gmid and typing is preserved.
-
 Solution Structure. Prove `preserved_sub_middle_select`, `_branch`,
 `_send`, `_recv` lemmas. Each extracts the endpoint equality, shows
 the update stays in Gmid, and reconstructs the output typing.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -72,6 +69,7 @@ lemma preserved_sub_middle_select
           have hSelEq : LocalType.select target bs = LocalType.select q bsMid := by
             exact Option.some.inj (by simpa [hGstep] using hFullMid)
           have hBs : bs = bsMid := by
+/- ## Structured Block 2 -/
             cases hSelEq
             rfl
           have hFindMid' : bs.find? (fun b => b.1 == ℓ) = some (ℓ, Lmid) := by
@@ -127,6 +125,7 @@ lemma preserved_sub_middle_recv
       SessionsOf Gmid' ⊆ SessionsOf Gmid ∧
       HasTypeProcPreOut Ssh Sown' Gmid' .skip Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
+/- ## Structured Block 3 -/
   intro hStore hOwn hDisjLM hEqG hkStore hGstep hGupd hSownUpd hTS hPre
   cases hTS with
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
@@ -179,6 +178,7 @@ lemma preserved_sub_middle_recv
             simpa [hSownEq, hGmidEq] using
               (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown') (G:=Gmid'))
           · intro y hy
+/- ## Structured Block 4 -/
             cases hy
           · intro y Ty hy
             cases hy
@@ -231,6 +231,7 @@ lemma preserved_sub_middle_recv
               (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown') (G:=Gmid'))
           · intro y hy
             cases hy
+/- ## Structured Block 5 -/
           · intro y Ty hy
             cases hy
 
@@ -286,6 +287,7 @@ lemma preserved_sub_middle_branch
           have hBs : bs = bsMid := by
             cases hBranchEq
             rfl
+/- ## Structured Block 6 -/
           have hFindTmid : bsMid.find? (fun b => b.1 == ℓ) = some (ℓ, L) := by
             simpa [hBs] using hFindTstep
           have hPre' : HasTypeProcPreOut Ssh Sown (updateG Gmid eMid L) P Sfin Gfin W Δ :=
@@ -342,6 +344,7 @@ lemma preserved_sub_middle_assign
                 lookupG (Gleft ++ Gmid ++ Gright) e = some L :=
               lookupG_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
                 (e:=e) (L0:=L) hNoneLeft hLookMid
+/- ## Structured Block 7 -/
             simpa [hEqG] using hLookFull
           have hEqT : Tpre = Tstep := HasTypeVal_unique hvGmid hvG
           have hSownEq : Sown' = OwnedEnv.updateLeft Sown x Tpre := by
@@ -397,6 +400,7 @@ lemma preserved_sub_middle_seq_skip
     ∃ Gmid' W' Δ', G = Gleft ++ Gmid' ++ Gright ∧
       SessionsOf Gmid' ⊆ SessionsOf Gmid ∧
       HasTypeProcPreOut Ssh Sown Gmid' Q Sfin Gfin W' Δ' ∧
+/- ## Structured Block 8 -/
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
   intro hEqG hTS hPre
   cases hTS with
@@ -451,6 +455,7 @@ lemma preserved_sub_middle_seq_step
           hDisjRightMid hP
       refine ⟨Gmid₁, W₁' ++ W₂, Δ₁' ++ Δ₂, hEqG₁, hSubSess, ?_, ?_, ?_⟩
       · exact HasTypeProcPreOut.seq hP' hQ
+/- ## Structured Block 9 -/
       · exact FootprintSubset_append_left hSubW
       · exact SEnvDomSubset_append_left_of_domsubset hSubΔ
 
@@ -491,6 +496,5 @@ lemma StoreTyped_par_left_inner
   have hOuter : lookupSEnv (SEnvAll Ssh Sown) x = some T := by
     simpa [SEnvAll, split.hS, List.append_assoc] using hOuter'
   exact hStore x v T hx hOuter
-
 
 end

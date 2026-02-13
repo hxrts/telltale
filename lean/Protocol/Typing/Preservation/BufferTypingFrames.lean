@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Preservation.BufferTypingRewrites
 
 /-! # Buffer Typing Frame Lemmas
@@ -15,6 +16,7 @@ combining lookup localization (send edge is in left portion) with
 the underlying buffer update lemmas.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -70,6 +72,7 @@ theorem BuffersTyped_send_frame_left
       BuffersTyped (updateG (G ++ G₂) e L)
         (updateD (D ++ D₂) { sid := e.sid, sender := e.role, receiver := target }
           (lookupD D { sid := e.sid, sender := e.role, receiver := target } ++ [T]))
+/- ## Structured Block 2 -/
         (enqueueBuf bufs { sid := e.sid, sender := e.role, receiver := target } v) :=
     BuffersTyped_updateG_weaken (e:=e) (L:=L) hBT''
   have hGrew :
@@ -124,6 +127,7 @@ theorem BuffersTyped_recv_frame_left
       BuffersTyped (updateG (G ++ G₂) e L)
         (updateD (D ++ D₂) { sid := e.sid, sender := source, receiver := e.role }
           (lookupD D { sid := e.sid, sender := source, receiver := e.role }).tail)
+/- ## Structured Block 3 -/
         (updateBuf bufs { sid := e.sid, sender := source, receiver := e.role } vs) :=
     BuffersTyped_updateG_weaken (e:=e) (L:=L) hBT''
   have hGrew :
@@ -177,6 +181,7 @@ theorem BuffersTyped_select_frame_left
         (updateD (D ++ D₂) { sid := e.sid, sender := e.role, receiver := target }
           (lookupD D { sid := e.sid, sender := e.role, receiver := target } ++ [.string]))
         (enqueueBuf bufs { sid := e.sid, sender := e.role, receiver := target } (.string ℓ)) :=
+/- ## Structured Block 4 -/
     BuffersTyped_updateG_weaken (e:=e) (L:=L) hBT''
   have hGrew :
       updateG (G ++ G₂) e L = updateG G e L ++ G₂ :=
@@ -231,6 +236,7 @@ theorem BuffersTyped_branch_frame_left
       BuffersTyped (updateG (G ++ G₂) e L)
         (updateD (D ++ D₂) { sid := e.sid, sender := source, receiver := e.role }
           (lookupD D { sid := e.sid, sender := source, receiver := e.role }).tail)
+/- ## Structured Block 5 -/
         (updateBuf bufs { sid := e.sid, sender := source, receiver := e.role } vs) :=
     BuffersTyped_updateG_weaken (e:=e) (L:=L) hBT''
   have hGrew :
@@ -286,6 +292,7 @@ theorem BuffersTyped_send_frame_right
   -- # Lift Along `updateG` and Reassociate
   have hBT''' :
       BuffersTyped (updateG (G₁ ++ G) e L)
+/- ## Structured Block 6 -/
         (updateD (D₁ ++ D) { sid := e.sid, sender := e.role, receiver := target }
           (lookupD D { sid := e.sid, sender := e.role, receiver := target } ++ [T]))
         (enqueueBuf bufs { sid := e.sid, sender := e.role, receiver := target } v) :=
@@ -340,6 +347,7 @@ theorem BuffersTyped_recv_frame_right
         (updateBuf bufs { sid := e.sid, sender := source, receiver := e.role } vs) := by
     simpa [hEq] using hBT'
   -- # Lift Along `updateG` and Reassociate
+/- ## Structured Block 7 -/
   have hBT''' :
       BuffersTyped (updateG (G₁ ++ G) e L)
         (updateD (D₁ ++ D) { sid := e.sid, sender := source, receiver := e.role }
@@ -393,6 +401,7 @@ theorem BuffersTyped_select_frame_right
   have hBT'' :
       BuffersTyped (G₁ ++ G)
         (updateD (D₁ ++ D) { sid := e.sid, sender := e.role, receiver := target }
+/- ## Structured Block 8 -/
           (lookupD D { sid := e.sid, sender := e.role, receiver := target } ++ [.string]))
         (enqueueBuf bufs { sid := e.sid, sender := e.role, receiver := target } (.string ℓ)) := by
     simpa [hEq] using hBT'
@@ -447,6 +456,7 @@ theorem BuffersTyped_branch_frame_right
     BuffersTyped_dequeue (G:=G₁ ++ G) (D:=D₁ ++ D) (bufs:=bufs)
       (recvEdge:={ sid := e.sid, sender := source, receiver := e.role }) (v:=.string ℓ) (vs:=vs) (T:=.string)
       hBT hBuf hHead'
+/- ## Structured Block 9 -/
   have hBT'' :
       BuffersTyped (G₁ ++ G)
         (updateD (D₁ ++ D) { sid := e.sid, sender := source, receiver := e.role }

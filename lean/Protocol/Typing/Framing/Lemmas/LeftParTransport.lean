@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Framing.Lemmas.RightTransportLocal
 
 /-! # Left Parallel Transport
@@ -15,6 +16,7 @@ preserves domain subset. Extend to `HasTypeProcPreOut_right_domsubset_local`
 for the full typing judgment.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -74,6 +76,7 @@ lemma HasTypeProcPreOut_right_domsubset_local
   | recv_old _ _ _ _ =>
       simpa [OwnedEnv.updateLeft] using
         (eraseSEnv_domsubset_local : SEnvDomSubset (eraseSEnv _ _) _)
+/- ## Structured Block 2 -/
   | select =>
       exact SEnvDomSubset_refl
   | branch _ _ _ _ _ _ _ hDom hRight _ =>
@@ -134,6 +137,7 @@ lemma frame_left_par_apply_local
     DisjointG split.G1 split.G2 →
     DisjointS split.S1 split.S2 →
     DisjointS S₁' split.S2 →
+/- ## Structured Block 3 -/
     DisjointS split.S1 S₂' →
     DisjointS S₁' S₂' →
     DisjointW W₁ W₂ →
@@ -192,6 +196,7 @@ lemma HasTypeProcPreOut_frame_G_left_par_local
     split.S1.length = nS →
     Sfin = { right := Sown.right, left := S₁' ++ S₂' } →
     Gfin = (G₁' ++ G₂') →
+/- ## Structured Block 4 -/
     Wfin = (W₁ ++ W₂) →
     Δfin = (Δ₁ ++ Δ₂) →
     DisjointG split.G1 split.G2 →
@@ -247,6 +252,7 @@ lemma HasTypeProcPreOut_frame_G_left_local
       have hNone := lookupG_none_of_disjoint hDisj hG
       have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e) (L:=L) hNone
       have hSend :
+/- ## Structured Block 5 -/
           HasTypeProcPreOut Ssh Sown (Gfr ++ G) (.send k x) Sown
             (updateG (Gfr ++ G) e L) [] ∅ :=
         HasTypeProcPreOut.send (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G)
@@ -298,6 +304,7 @@ lemma HasTypeProcPreOut_frame_G_left_local
               (updateG (Gfr ++ G) e (bs.get ⟨i, hi⟩).2)
               (procs.get ⟨i, hip⟩).2 := by
         intro i hi hip
+/- ## Structured Block 6 -/
         have hBody := hBodies i hi hip
         have hDisj' : DisjointG Gfr (updateG G e (bs.get ⟨i, hi⟩).2) := by
           have hDisj'0 :
@@ -349,6 +356,7 @@ lemma HasTypeProcPreOut_frame_G_left_local
         DisjointS_of_domsubset_left hSubRightMid hDisjRightMid
       have hDisjMidOut : DisjointS S₁.right S₂.left :=
         DisjointS_of_domsubset_left hSubRightMid hDisjRightOut
+/- ## Structured Block 7 -/
       have hSubG1 : SessionsOf G₁ ⊆ SessionsOf G :=
         SessionsOf_subset_of_HasTypeProcPreOut hP
       have hDisjG1fr : DisjointG Gfr G₁ := by

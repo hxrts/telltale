@@ -1,5 +1,7 @@
+
 import SessionCoTypes.Coinductive.BisimDecidable.BisimAux
 
+/- ## Structured Block 1 -/
 set_option linter.dupNamespace false
 
 /-! # SessionCoTypes.Coinductive.BisimDecidable.Correctness
@@ -98,6 +100,7 @@ lemma obsMatch_end_implies_UnfoldsToEndC {bound : Nat} {a b : LocalTypeC}
 /-- Helper: obsKindOf send implies CanSendC -/
 lemma obsKindOf_send_implies_CanSendC {t : LocalTypeC} {p : String} {labels : List Label}
     (hk : obsKindOf t = some (.obs_send p labels)) :
+/- ## Structured Block 2 -/
     CanSendC t p (branchesOf t) := by
   have hhead := obsKindOf_send_iff.mp hk
   exact ⟨t, labels, Relation.ReflTransGen.refl, hhead, rfl⟩
@@ -174,6 +177,7 @@ lemma obsMatch_var_implies_UnfoldsToVarC {bound : Nat} {a b : LocalTypeC} {v : S
 -- Soundness Helpers: Post-Fixpoint Lifting
 
 /-- EQ2C is a post-fixpoint of EQ2CMono.F (needed for BisimRel_postfixpoint). -/
+/- ## Structured Block 3 -/
 lemma EQ2C_postfixpoint : ∀ a b, EQ2C a b → EQ2CMono.F EQ2C a b := by
   intro a b heq
   rcases heq with ⟨R, hR, hab⟩
@@ -247,6 +251,7 @@ theorem BisimRel_postfixpoint (bound : Nat) :
               have obs_a := ObservableC.is_var v ha
               have obs_b := ObservableC.is_var v hb
               exact ⟨obs_a, obs_b, ObservableRelC.is_var v ha hb⟩
+/- ## Structured Block 4 -/
           | .obs_send p labels =>
               -- For send, children come from bisimAll = true
               have hk_a := hk1
@@ -323,6 +328,7 @@ lemma head_fullUnfoldN_eq_of_unfoldsToC {t u : LocalTypeC} {bound : Nat}
     (hobs : ObservableC t) (hbound : bound ≥ maxUnfoldDepth t) :
     head (fullUnfoldN bound t) = head u := by
   have hmax := hasNonMuHead_fullUnfoldN_maxUnfoldDepth (t := t) hobs
+/- ## Structured Block 5 -/
   have hnomu' : ¬ (∃ x, head (fullUnfoldN (maxUnfoldDepth t) t) = .mu x) := by
     intro hx
     rcases hx with ⟨x, hx⟩
@@ -379,6 +385,7 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
       have hhead_b' : head (fullUnfoldN bound b) = .send p labels_b := by
         have hnomu : ¬ (∃ x, head ub = .mu x) := by simp [hhead_b]
         have := head_fullUnfoldN_eq_of_unfoldsToC (bound := bound) hunf_b hnomu obs_b hbound.2
+/- ## Structured Block 6 -/
         simpa [hhead_b] using this
       have hlabels_a : labelsOfBranches bs = labels_a := by
         simpa [hbs_a] using (branchesOf_labels_eq (t := ua) (p := p) (labels := labels_a) hhead_a)

@@ -110,6 +110,7 @@ def stepBaseDecide (C : Config) : Option Config :=
         | .string ℓ :: _ =>
           match bs.find? (fun b => b.1 == ℓ), typeBranches.find? (fun b => b.1 == ℓ) with
           | some (_, P), some (_, L) =>
+/- ## Structured Block 1 -/
             match dequeueBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } with
             | some (bufs', _) =>
               let edge : Edge := { sid := e.sid, sender := source, receiver := e.role }
@@ -179,6 +180,7 @@ private lemma procSize_lt_par_right (nS nG : Nat) (P Q : Process) :
 
 For seq and par, we recursively try to step the subprocesses.
 -/
+/- ## Structured Block 2 -/
 private def stepDecideAux (proc : Process) (C : Config) : Option Config :=
   match proc with
   | .skip => none
@@ -252,6 +254,7 @@ termination_by n
 
 /-- Check if a configuration can step. -/
 def canStep (C : Config) : Bool :=
+/- ## Structured Block 3 -/
   (stepDecide C).isSome
 
 /-- Check if a configuration is terminated. -/

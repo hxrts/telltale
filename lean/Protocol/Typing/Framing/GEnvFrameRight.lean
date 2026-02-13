@@ -1,3 +1,4 @@
+
 import Protocol.Environments.Core
 import Protocol.Typing.StepLemmas
 import Protocol.Typing.MergeLemmas
@@ -20,6 +21,7 @@ This module also exposes a regression lemma showing framed par proofs are
 independent of the ambient right index `nG`.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -84,6 +86,7 @@ private lemma frame_pre_out_right_par
     {Ssh : SEnv} {Sown : OwnedEnv} {G Gfr : GEnv} {P Q : Process}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv}
     {S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂} {nS nG : Nat}
+/- ## Structured Block 2 -/
     (split : ParSplit Sown.left G) :
     DisjointG G Gfr →
     split.S1.length = nS →
@@ -139,6 +142,7 @@ private lemma frame_pre_out_right_par
 lemma HasTypeProcPreOut_frame_G_right
     {Ssh : SEnv} {Sown : OwnedEnv} {G Gfr : GEnv} {P : Process}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
+/- ## Structured Block 3 -/
     DisjointG G Gfr →
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
     HasTypeProcPreOut Ssh Sown (G ++ Gfr) P Sfin (Gfin ++ Gfr) W Δ := by
@@ -196,6 +200,7 @@ lemma HasTypeProcPreOut_frame_G_right
         | inr hsR =>
             exact SessionsOf_append_right (G₁:=G) hsR
       exact HasTypeProcPreOut.branch (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr)
+/- ## Structured Block 4 -/
         hk hG' hLen hLabels hBodies' hOutLbl' hSess' hDom hRight
   -- Right-Frame Case: seq
   | seq hP hQ ihP ihQ =>

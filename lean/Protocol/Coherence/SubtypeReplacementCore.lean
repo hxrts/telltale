@@ -129,6 +129,7 @@ theorem Coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
     (hLookup : lookupG G ep = some L₁)
     (hCompat : ∀ r : Role, RecvCompatible r L₁ L₂) :
     Coherent (updateG G ep L₂) D := by
+/- ## Structured Block 1 -/
   intro e hActive
   -- Case split: is ep the receiver of e?
   by_cases hRecv : ep = { sid := e.sid, role := e.receiver }
@@ -186,6 +187,7 @@ theorem Coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
       use Lsender
       constructor
       · rw [hLookupSendUnch]; exact hSender
+/- ## Structured Block 2 -/
       · exact hConsume
 
 

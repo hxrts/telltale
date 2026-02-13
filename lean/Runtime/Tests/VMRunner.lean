@@ -1,3 +1,4 @@
+
 import Lean.Data.Json
 import Runtime.VM.Model.UnitModel
 import Runtime.VM.Runtime.Json
@@ -26,6 +27,7 @@ stdin, parses choreographies, loads them into the VM, executes until termination
 and prints the resulting trace as JSON for external validation.
 -/
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 
 open Lean (Json)
@@ -89,6 +91,7 @@ def execStatusTag : ExecStatus UnitGuard → String
   | .transferred _ _ => "transferred"
   | .closed _ => "closed"
   | .forked _ => "forked"
+/- ## Structured Block 2 -/
   | .joined => "joined"
   | .aborted => "aborted"
 
@@ -146,6 +149,7 @@ def main : IO Unit := do
     match json.getObjValAs? (Array Json) "choreographies" with
     | .ok arr => pure arr
     | .error e => throw (IO.userError s!"missing choreographies: {e}")
+/- ## Structured Block 3 -/
   let concurrency ←
     match json.getObjValAs? Nat "concurrency" with
     | .ok n => pure n

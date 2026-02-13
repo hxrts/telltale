@@ -1,3 +1,4 @@
+
 import Protocol.Environments.Core
 import Protocol.Typing.StepLemmas
 import Protocol.Typing.MergeLemmas
@@ -20,6 +21,7 @@ This module also exposes a regression lemma showing framed par proofs are
 independent of the ambient right index `nG`.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -79,6 +81,7 @@ private lemma HasTypeProcPreOut_right_domsubset
   | recv_old _ _ _ _ =>
       simpa [OwnedEnv.updateLeft] using
         (eraseSEnv_domsubset : SEnvDomSubset (eraseSEnv _ _) _)
+/- ## Structured Block 2 -/
   | select =>
       exact SEnvDomSubset_refl
   | branch _ _ _ _ _ _ _ hDom hRight _ =>
@@ -136,6 +139,7 @@ private lemma frame_left_par_apply
     DisjointG split.G1 split.G2 →
     DisjointS split.S1 split.S2 →
     DisjointS S₁' split.S2 →
+/- ## Structured Block 3 -/
     DisjointS split.S1 S₂' →
     DisjointS S₁' S₂' →
     DisjointW W₁ W₂ →
@@ -195,6 +199,7 @@ private lemma HasTypeProcPreOut_frame_G_left_par
     split.S1.length = nS →
     Sfin = { right := Sown.right, left := S₁' ++ S₂' } →
     Gfin = (G₁' ++ G₂') →
+/- ## Structured Block 4 -/
     Wfin = (W₁ ++ W₂) →
     Δfin = (Δ₁ ++ Δ₂) →
     DisjointG split.G1 split.G2 →
@@ -252,6 +257,7 @@ lemma HasTypeProcPreOut_frame_G_left
       have hNone := lookupG_none_of_disjoint hDisj hG
       have hG' := lookupG_append_right (G₁:=Gfr) (G₂:=G) (e:=e) hNone
       have hG'' : lookupG (Gfr ++ G) e = some (.send q T L) := by
+/- ## Structured Block 5 -/
         simpa [hG] using hG'
       have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e) (L:=L) hNone
       simpa [hUpd] using
@@ -308,6 +314,7 @@ lemma HasTypeProcPreOut_frame_G_left
             disjointG_updateG_left (e:=e) (L:=(bs.get ⟨i, hi⟩).2) (L0:=.branch p bs)
               hG (DisjointG_symm hDisj)
           exact DisjointG_symm hDisj'0
+/- ## Structured Block 6 -/
         have hBody' := HasTypeProcPre_frame_G (G₁:=Gfr)
           (G₂:=updateG G e (bs.get ⟨i, hi⟩).2) hDisj' hBody
         have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e)
@@ -362,6 +369,7 @@ lemma HasTypeProcPreOut_frame_G_left
       exact HasTypeProcPreOut.seq hP' hQ'
   -- Left-Frame Case: par
   | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+/- ## Structured Block 7 -/
       hDisjW hDisjΔ hP hQ ihP ihQ =>
       rename_i Sown G P Q Sfin Gfin W Δ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG
       have hDisjG1fr : DisjointG split.G1 Gfr :=

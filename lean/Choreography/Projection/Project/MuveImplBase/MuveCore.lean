@@ -107,6 +107,7 @@ private theorem freeVars_substitute_subset_var
     refine Or.inr ?_
     constructor
     · simp [LocalTypeR.freeVars, hx]
+/- ## Structured Block 1 -/
     · simpa [hx] using heq
 
 private theorem freeVars_substitute_subset_mu_shadow
@@ -165,6 +166,7 @@ private def freeVars_substitute_subset_aux (lt : LocalTypeR) (varName : String) 
         by_cases heq : t = varName
         · have hbool : (t == varName) = true := by simp [heq]
           have hx' : x ∈ body.freeVars.filter (fun v => v != t) := by
+/- ## Structured Block 2 -/
             simpa [hbool, LocalTypeR.freeVars] using hx
           exact freeVars_substitute_subset_mu_shadow t varName body repl x hbool hx'
         · have hbool : (t == varName) = false := (beq_eq_false_iff_ne).2 heq
@@ -224,6 +226,7 @@ theorem substitute_closed_when_only_var (lt : LocalTypeR) (varName : String) (re
   | inl hrepl_mem =>
       -- x ∈ repl.freeVars contradicts hrepl : repl.freeVars = []
       simp only [hrepl, List.not_mem_nil] at hrepl_mem
+/- ## Structured Block 3 -/
   | inr hpair =>
       -- x ∈ lt.freeVars ∧ x ≠ varName
       -- But hlt says x = varName, contradicting x ≠ varName
@@ -284,6 +287,7 @@ private def allVarsBound_implies_freeVars_subset_aux (g : GlobalType) (bound : L
       rw [List.mem_filter] at hx
       simp only [bne_iff_ne, ne_eq] at hx
       have ⟨hxbody, hxnet⟩ := hx
+/- ## Structured Block 4 -/
       simp only [GlobalType.allVarsBound] at h
       -- IH gives: x ∈ t :: bound
       have hmem := allVarsBound_implies_freeVars_subset_aux body (t :: bound) h x hxbody
@@ -341,6 +345,7 @@ theorem isMuve_substitute (lt : LocalTypeR) (varName : String) (repl : LocalType
       have : False := by
         simp [isMuve] at hlt
       exact this.elim
+/- ## Structured Block 5 -/
 termination_by sizeOf lt
 
 /-! ## Structural Well-Formedness
@@ -422,6 +427,7 @@ private theorem trans_muve_of_not_part_of2_aux (g : GlobalType) (role : String)
   | .var t => exact trans_muve_of_not_part_of2_aux_base (.var t) role (Or.inr ⟨t, rfl⟩)
   | .mu t body =>
       have hnotpart_body : ¬ part_of2 role body := by
+/- ## Structured Block 6 -/
         intro hbody
         exact hnotpart (part_of2.intro _ (part_ofF.mu t body hbody))
       have hne_body : body.allCommsNonEmpty = true := by
@@ -474,6 +480,7 @@ decreasing_by
     simp_wf
     subst_vars
     first
+/- ## Structured Block 7 -/
     | omega
     | exact sizeOf_body_lt_mu _ _
     | simpa [GlobalType.comm.sizeOf_spec] using sizeOf_pair_snd_lt_comm _ _ _ _

@@ -121,6 +121,7 @@ theorem Coherent_select_preserved
         intro h
         have : selectorEp.role = targetRole := congrArg Endpoint.role h
         exact hTargetIsSender this.symm
+/- ## Structured Block 1 -/
       have hGrecv' : lookupG G { sid := selectorEp.sid, role := targetRole } = some Lrecv := by
         simpa [lookupG_update_neq _ _ _ _ hTargetNeq, selectEdge] using hGrecv
       simp only [lookupD_update_eq]
@@ -174,6 +175,7 @@ theorem Coherent_select_preserved
         have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv := by
           simpa [lookupG_update_neq _ _ _ _ hRecvNoMatch] using hGrecv
         have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
+/- ## Structured Block 2 -/
         have hConsume := EdgeCoherent_consume_of_receiver hOrigCoh hGrecv'
         have hSid : e.sid = selectorEp.sid := congrArg Endpoint.sid hSenderMatch
         have hRole : e.sender = selectorEp.role := congrArg Endpoint.role hSenderMatch
@@ -278,6 +280,7 @@ theorem Coherent_branch_preserved
         have : brancherEp.role = senderRole := congrArg Endpoint.role h
         exact hSenderIsRecv this.symm
       have hEq : Lrecv = L := by
+/- ## Structured Block 3 -/
         have : some L = some Lrecv := by
           simpa [hRecvLookup, branchEdge] using hGrecv
         exact (Option.some.inj this).symm
@@ -331,6 +334,7 @@ theorem Coherent_branch_preserved
         have hOrigRecvG : lookupG G { sid := e.sid, role := e.receiver } = some (.branch senderRole bs) := by
           conv => lhs; rw [hSid2, hRole2]; exact hG
         have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hOrigRecvG
+/- ## Structured Block 4 -/
         cases hTraceE : lookupD D e with
         | nil =>
           rw [hRole1]
@@ -384,6 +388,7 @@ theorem Coherent_branch_preserved
         | cons t ts =>
           rw [hTraceE] at hOrig
           simp only [Consume, consumeOne, Option.isSome] at hOrig
+/- ## Structured Block 5 -/
           exact Bool.noConfusion hOrig
       · -- Neither endpoint is brancherEp
         have hRecvNoMatch : brancherEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm

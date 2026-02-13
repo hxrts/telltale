@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Judgments.PreTyping
 
 /-! # TypedStep: Linear Resource Transition Typing
@@ -18,6 +19,7 @@ Each constructor specifies the exact state transformation and its
 typing preconditions.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -107,6 +109,7 @@ inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffe
       -- Pre-conditions (resources consumed)
       lookupStr store k = some (.chan e) →
       lookupG G e = some (.select target bs) →
+/- ## Structured Block 2 -/
       bs.find? (fun b => b.1 == ℓ) = some (ℓ, L) →
       -- Receiver readiness for label
       (∀ Ltarget, lookupG G { sid := e.sid, role := target } = some Ltarget →
@@ -190,6 +193,7 @@ inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffe
                 store' bufs' (.par S₁'.length nG P' Q)
 
   | par_right {Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂' nS nG}
+/- ## Structured Block 3 -/
       (split : ParSplit Sown.left G) :
       split.S1.length = nS →
       -- Right process transitions with its resources
@@ -253,6 +257,7 @@ theorem TypedStep_par_inv
         Sown' = { right := Sown.right, left := pw.split.S1 ++ S₂' } ∧
         P' = .par pw.split.S1.length nG P Qright')
       ∨
+/- ## Structured Block 4 -/
       (P = .skip ∧ G' = G ∧ D' = D ∧ Sown' = Sown ∧ store' = store ∧ bufs' = bufs ∧ P' = Q)
       ∨
       (Q = .skip ∧ G' = G ∧ D' = D ∧ Sown' = Sown ∧ store' = store ∧ bufs' = bufs ∧ P' = P) := by

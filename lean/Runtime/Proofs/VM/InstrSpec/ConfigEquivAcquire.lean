@@ -1,3 +1,4 @@
+
 import Runtime.Proofs.VM.InstrSpec.ConfigEquivOpenCloseTransfer
 
 /-! # ConfigEquiv: Acquire Instruction
@@ -16,6 +17,7 @@ each spec component (receiver_type, buffer_has_capability, type_updated)
 transforms correctly under session renaming.
 -/
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 set_option relaxedAutoImplicit false
 
@@ -84,6 +86,7 @@ def AcquireSpec_respects_renaming (ρ : SessionRenaming)
         | nat => simp only [renameValType] at hT; nomatch hT
         | string => simp only [renameValType] at hT; nomatch hT
         | prod _ _ => simp only [renameValType] at hT; nomatch hT
+/- ## Structured Block 2 -/
       | send _ _ _ => simp only [renameLocalType] at hEq; nomatch hEq
       | select _ _ => simp only [renameLocalType] at hEq; nomatch hEq
       | branch _ _ => simp only [renameLocalType] at hEq; nomatch hEq
@@ -145,6 +148,7 @@ theorem AcquireSpec_respects_ConfigEquiv
         · have hB' : e = { sid := delegatedSession, role := ep.role } := by
             cases e
             simp only [Endpoint.mk.injEq]
+/- ## Structured Block 3 -/
             exact ⟨hSid, hB⟩
           rw [hB']
           simp only [renameEndpoint]
@@ -201,6 +205,7 @@ theorem AcquireSpec_respects_ConfigEquiv
           exact (redirectEdge_no_A e delegatedSession r ep.role hSid hSenderNe hReceiverNe).symm
         have hD₁' :
             lookupD D₁' e =
+/- ## Structured Block 4 -/
               (lookupD D₁ e).map (renameValTypeRole delegatedSession r ep.role) :=
           hDeleg₁.trace_preserved e e hRedir₁
         have hSidRen : (renameEdge ρ e).sid = ρ.f delegatedSession := by

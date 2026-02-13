@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Preservation.BufferTypingFrames
 
 /-! # Main Preservation Theorems
@@ -15,6 +16,7 @@ induction on `TypedStep`. Dispatch each constructor to its specific
 preservation lemma from the component-level files.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -72,6 +74,7 @@ theorem BuffersTyped_preserved_frame_left
           exact
             lookupD_updateD_append_left (D:=D) (D₂:=D₂) (e:=recvEdge) (e':=e')
               (ts:=(lookupD D recvEdge).tail)
+/- ## Structured Block 2 -/
       have hBT'' := BuffersTyped_rewriteD hEq hBT'
       cases hGout
       cases hDout
@@ -125,6 +128,7 @@ theorem BuffersTyped_preserved_frame_left
   | seq_skip =>
       simpa using hBT
   | par_left split hSlen hTS hDisjG hDisjD hDisjS ih =>
+/- ## Structured Block 3 -/
       exact ih hDisj hCons hBT
   | par_right split hSlen hTS hDisjG hDisjD hDisjS ih =>
       exact ih hDisj hCons hBT
@@ -180,6 +184,7 @@ theorem BuffersTyped_preserved_frame_right
         BuffersTyped_recv_frame_right (G:=G) (D:=D) (G₁:=G₁) (D₁:=D₁)
           (e:=e) (source:=source) (T:=T) (L:=L) (v:=v) (vs:=vs) (recvEdge:=recvEdge)
           hG hBuf hTrace hEdge hDisj hCons hBT
+/- ## Structured Block 4 -/
       have hSid : recvEdge.sid ∈ SessionsOf G := by
         rcases hEdge with rfl
         exact ⟨e, .recv source T L, hG, rfl⟩
@@ -232,6 +237,7 @@ theorem BuffersTyped_preserved_frame_right
           (e:=e) (source:=source) (bs:=bs) (ℓ:=ℓ) (L:=L) (vs:=vs) (branchEdge:=branchEdge)
           hG hFindT hBuf hTrace hEdge hDisj hCons hBT
       have hSid : branchEdge.sid ∈ SessionsOf G := by
+/- ## Structured Block 5 -/
         rcases hEdge with rfl
         exact ⟨e, .branch source bs, hG, rfl⟩
       have hNone : D₁.find? branchEdge = none :=
@@ -288,6 +294,7 @@ theorem BuffersTyped_preserved
   have hEqD : ∀ e, lookupD (D ++ (∅ : DEnv)) e = lookupD D e := by
     intro e
     have hNone : (∅ : DEnv).find? e = none := by
+/- ## Structured Block 6 -/
       simp [DEnv.find?, DEnv_map_find?_empty]
     exact lookupD_append_left_of_right_none (D₁:=D) (D₂:=∅) (e:=e) hNone
   have hBT' :

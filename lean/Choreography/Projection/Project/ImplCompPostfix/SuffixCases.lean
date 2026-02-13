@@ -1,3 +1,4 @@
+
 import Choreography.Projection.Project.ImplCompPostfix.PrefixCases
 
 /-! # Choreography.Projection.Project.ImplCompPostfix.SuffixCases
@@ -10,6 +11,7 @@ The Problem. State the projection/harmony lemma objective and the exact invarian
 Solution Structure. Introduce local helper lemmas first, then discharge the main theorem by case analysis over the operational/projection relation.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.unnecessarySimpa false
 
 -- Core Development
@@ -76,6 +78,7 @@ private theorem CProjectTransRelComp_postfix_suffix_mu_nonmu
   have hcomp_ab : CProjectTransRelCompWF (.mu v body_lt) b :=
     CProjectTransRelCompWF_of_CProjectTransRel hrel_ab
   have hcomp_lt_t : CProjectTransRelCompWF (.mu v body_lt) t :=
+/- ## Structured Block 2 -/
     CProjectTransRelCompWF_extend_right hcomp_ab heq_bc hWFa hWFb hWFc
   have hcomp_left : CProjectTransRelCompWF (body_lt.substitute v (.mu v body_lt)) t :=
     CProjectTransRelCompWF_extend_left
@@ -134,6 +137,7 @@ private theorem CProjectTransRelComp_postfix_suffix_var_var
   | mu _ _ =>
       simpa only [EQ2F] using
         CProjectTransRel_EQ2_compose_through_mu_WF hrel_ab heq_bc hWFa hWFc
+/- ## Structured Block 3 -/
     | «end» => simp only [EQ2F] at hbase_f
     | send _ _ => simp only [EQ2F] at hbase_f
     | recv _ _ => simp only [EQ2F] at hbase_f
@@ -192,6 +196,7 @@ private theorem CProjectTransRelComp_postfix_suffix_recv_recv
         LocalTypeR.WellFormed.branches_of_recv (p := q) (bs := cs) hWFc
       have hbase_br := BranchesRel_lift_compWF hbase_f.2 hWFbs hWFbbs
       exact ⟨hbase_f.1.trans heq_f.1,
+/- ## Structured Block 4 -/
         BranchesRel_trans_chain
           (fun a b c => @CProjectTransRelCompWF_extend_right a b c)
           hbase_br heq_f.2 hWFbs hWFbbs hWFcs⟩
@@ -252,6 +257,7 @@ private theorem CProjectTransRelComp_postfix_suffix_var
       have hcomp : CProjectTransRelComp (.var x) (.send p bs) :=
         Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))
       have hfalse : False := CProjectTransRelComp_var_not_send hcomp hWFa hWFc
+/- ## Structured Block 5 -/
       simpa [EQ2F] using hfalse
     | recv p bs =>
         have hcomp : CProjectTransRelComp (.var x) (.recv p bs) :=
@@ -312,6 +318,7 @@ private theorem CProjectTransRelComp_postfix_suffix_recv
       have hcomp : CProjectTransRelComp (.recv p bs) (.var v) :=
         Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))
       have hfalse : False := CProjectTransRelComp_recv_not_var hcomp hWFa hWFc
+/- ## Structured Block 6 -/
       simpa [EQ2F] using hfalse
     | send q cs =>
         have hcomp : CProjectTransRelComp (.recv p bs) (.send q cs) :=
@@ -389,6 +396,7 @@ theorem CProject_implies_EQ2_trans_thm (g : GlobalType) (role : String) (lt : Lo
     intro lt' t' hrel
     exact CProjectTransRelComp_postfix lt' t' hrel
   · -- Seed relation: CProjectTransRelCompWF holds by the base CProjectTransRel case.
+/- ## Structured Block 7 -/
     have hrel : CProjectTransRel lt (trans g role) := ⟨g, role, h, rfl, hwf⟩
     exact CProjectTransRelCompWF_of_CProjectTransRel hrel
 

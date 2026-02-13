@@ -1,5 +1,7 @@
+
 import Runtime.Proofs.TheoremPack
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 
 /-! # Runtime.Proofs.Examples.DistributedProfiles
@@ -70,6 +72,7 @@ example (bundle : VMLivenessBundle store₀) (p : Adapters.NakamotoProfile) :
     (buildVMTheoremPack
       (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withNakamoto p)
     ).nakamoto?.isSome = true := by
+/- ## Structured Block 2 -/
   rfl
 
 example (bundle : VMLivenessBundle store₀) (p : Adapters.ReconfigurationProfile) :

@@ -1,3 +1,4 @@
+
 import Mathlib
 import SessionCoTypes.Coinductive.LocalTypeC
 import SessionCoTypes.Coinductive.Bridge
@@ -9,6 +10,7 @@ import SessionCoTypes.Coinductive.WellFormed
 import SessionTypes.LocalTypeR
 import Choreography.Projection.Project
 
+/- ## Structured Block 1 -/
 set_option linter.dupNamespace false
 
 /-! # Round-Trip Helpers
@@ -80,6 +82,7 @@ lemma childRel_toCoind {t : LocalTypeR} {c : LocalTypeC}
         castFin (toCoindBranches_length bs) (castFin (by simp) i)
       refine ⟨(bs.get i').2.2, ?_⟩
       have hcont :
+/- ## Structured Block 2 -/
           ((toCoindBranches bs).get (castFin (toCoindBranches_length bs).symm i')).2 =
             toCoind (bs.get i').2.2 := by
         simpa using toCoindBranches_get_snd (bs := bs) i'
@@ -142,6 +145,7 @@ lemma productive_toCoind_of_projTrans (g : GlobalType) (role : String) :
     sizeOf (bs.get i).2.2 < sizeOf (LocalTypeR.send p bs) := by
   exact lt_trans (sizeOf_get_lt_sizeOf_branches i) (sizeOf_branches_lt_sizeOf_send p bs)
 
+/- ## Structured Block 3 -/
 @[simp] lemma sizeOf_get_lt_sizeOf_recv {p : String} {bs : List BranchR}
     (i : Fin bs.length) :
     sizeOf (bs.get i).2.2 < sizeOf (LocalTypeR.recv p bs) := by
@@ -197,6 +201,7 @@ lemma childRel_toCoind_size {t : LocalTypeR} {c : LocalTypeC}
             castFin (by simp) i =
               castFin (toCoindBranches_length bs).symm i' := by
           cases i
+/- ## Structured Block 4 -/
           rfl
         simpa [hchild, hidx] using hcont
       · have hlt : sizeOf (bs.get i').2.2 < sizeOf bs := sizeOf_get_lt_sizeOf_branches i'
@@ -258,6 +263,7 @@ lemma childRel_toCoind_mu {x : String} {body : LocalTypeR} :
   refine ⟨.mu x, (fun _ => toCoind body), (), ?_, rfl⟩
   rfl
 
+/- ## Structured Block 5 -/
 lemma childRel_toCoind_send {p : String} {bs : List BranchR} (i : Fin bs.length) :
     childRel (toCoind (.send p bs)) (toCoind (bs.get i).2.2) := by
   refine ⟨head (toCoind (.send p bs)), children (toCoind (.send p bs)), ?_, rfl, ?_⟩
@@ -314,6 +320,7 @@ lemma childRel_toCoind_recv {p : String} {bs : List BranchR} (i : Fin bs.length)
 
 -- Free variable lemmas
 
+/- ## Structured Block 6 -/
 lemma mem_freeVarsOfBranches {bs : List BranchR} {v : String} :
     v ∈ SessionTypes.LocalTypeR.freeVarsOfBranches bs → ∃ b ∈ bs, v ∈ b.2.2.freeVars := by
   induction bs with
@@ -367,6 +374,7 @@ lemma freeVars_subset_namesIn {t : LocalTypeR} {all : Finset LocalTypeC}
           ∃ i : Fin bs.length, v ∈ (bs.get i).2.2.freeVars := by
         have : ∃ b ∈ bs, v ∈ b.2.2.freeVars := ⟨b, hb, hvb⟩
         simpa using (List.exists_mem_iff_get (l := bs) (p := fun b => v ∈ b.2.2.freeVars)).1 this
+/- ## Structured Block 7 -/
       rcases hidx with ⟨i, hvi⟩
       have hchild : childRel (toCoind (.send p bs)) (toCoind (bs.get i).2.2) :=
         childRel_toCoind_send (p := p) (bs := bs) i

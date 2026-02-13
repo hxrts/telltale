@@ -1,3 +1,4 @@
+
 import Protocol.Coherence.RoleSwap.Core
 
 /-! # Protocol.Coherence.RoleSwap.LookupConsume
@@ -12,6 +13,7 @@ consume-commutation lemmas.
 Solution Structure. Proves lookup transport and consume-preservation results.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -71,6 +73,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
           -- lookupD_swap: Non-Empty List Case
           | cons hd tl ih =>
               intro sorted
+/- ## Structured Block 2 -/
               have hpair := (List.pairwise_cons.1 sorted)
               have hhd : ∀ p ∈ tl, edgeCmpLT hd p := hpair.1
               have htl : tl.Pairwise edgeCmpLT := hpair.2
@@ -124,6 +127,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                           (swapEdgeRole s A B hd.1) := by
                     apply lookupD_foldl_update_neq_swap (s:=s) (A:=A) (B:=B)
                     intro p hp
+/- ## Structured Block 3 -/
                     exact hne p hp
                   simp [List.lookup, List.foldl, hSid, htail, lookupD_update_eq]
                 -- lookupD_swap: Target Session, Distinct-Head Case
@@ -176,6 +180,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                       simpa [hHdSid] using hne
                     have ih' := ih (acc:=updateD acc hd.1 hd.2) htl
                     have ih'' :
+/- ## Structured Block 4 -/
                         lookupD
                             (List.foldl
                               (fun acc p =>
@@ -229,6 +234,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                                 updateD acc (swapEdgeRole s A B p.1)
                                   (p.2.map (swapValTypeRole s A B))
                               else
+/- ## Structured Block 5 -/
                                 updateD acc p.1 p.2)
                             (updateD acc hd.1 hd.2))
                           hd.1 =
@@ -281,6 +287,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                                 (hd.2.map (swapValTypeRole s A B))) tl)
                             e =
                           match List.lookup e tl with
+/- ## Structured Block 6 -/
                           | some ts => ts
                           | none => lookupD acc e := by
                       simpa [hSid, hHdSid, swapEdgeRole, lookupD_update_neq, hne''] using ih'
@@ -337,6 +344,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
 
 /-- Consume a single step commutes with role swapping. -/
 theorem consumeOne_swap (s : SessionId) (A B : Role) (from_ : Role)
+/- ## Structured Block 7 -/
     (T : ValType) (L L' : LocalType)
     (h : consumeOne from_ T L = some L') :
     consumeOne (swapRole A B from_) (swapValTypeRole s A B T) (swapLocalTypeRole s A B L) =
@@ -391,6 +399,7 @@ theorem Consume_swap (s : SessionId) (A B : Role) (from_ : Role)
       simp [Consume] at h
       simp [Consume, h]
   | cons t ts ih =>
+/- ## Structured Block 8 -/
       simp [Consume] at h
       cases hOne : consumeOne from_ t L with
       | none =>

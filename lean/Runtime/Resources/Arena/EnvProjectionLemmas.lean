@@ -1,10 +1,7 @@
 import Runtime.Resources.Arena.LookupUpdateLemmas
-
 /-! # Environment Projection Lemmas
-
 Lemmas relating SessionStore projections (toGEnv, toDEnv) to direct
 environment operations, enabling proof transfer between representations. -/
-
 /-
 The Problem. The VM uses a structured `SessionStore` representation,
 but proofs often work with flat `GEnv` and `DEnv`. We need lemmas
@@ -206,6 +203,7 @@ theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} 
             by_cases hLeft : lookupG st.localTypes e' = none
             · have hLeftUpd : lookupG (updateG st.localTypes e L) e' = none := by
                 simpa [hLeft] using
+/- ## Structured Block 1 -/
                   (lookupG_updateG_ne (env := st.localTypes) (e := e) (e' := e') (L := L) he')
               rw [lookupG_append_right (G1 := updateG st.localTypes e L) (G2 := SessionStore.toGEnv tl)
                 (e := e') hLeftUpd]
@@ -259,6 +257,7 @@ theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} 
         rw [updateG_append_right (G1 := st.localTypes) (G2 := SessionStore.toGEnv tl) (e := e) (L := L) hNotMemLeft]
         by_cases hLeft : lookupG st.localTypes e' = none
         · rw [lookupG_append_right (G1 := st.localTypes) (G2 := SessionStore.toGEnv (SessionStore.updateType tl e L))
+/- ## Structured Block 2 -/
             (e := e') hLeft]
           rw [lookupG_append_right (G1 := st.localTypes) (G2 := updateG (SessionStore.toGEnv tl) e L)
             (e := e') hLeft]
@@ -383,6 +382,7 @@ theorem SessionStore.toDEnv_updateTrace {store : SessionStore ν} {edge : Edge} 
           intro hEq
           exact hsid (hHead.1.symm.trans hEq.symm)
         have hNoneLeft : st.traces.find? edge = none :=
+/- ## Structured Block 3 -/
           SessionState.traces_find?_none_of_sid_ne hHead.2 hSidNe
         simp only [SessionStore.updateTrace, hsid, ↓reduceIte]
         simp only [SessionStore.toDEnv, List.foldl]

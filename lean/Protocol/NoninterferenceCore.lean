@@ -1,3 +1,4 @@
+
 import Protocol.Semantics
 import Protocol.Coherence
 import Protocol.Preservation
@@ -31,6 +32,7 @@ was selected. Ported from Aristotle file 01 (185 lines, no proof holes).
 - `BlindTo` : role is neither sender nor receiver
 - `blind_step_preserves_CEquiv` : the main noninterference theorem -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -124,6 +126,7 @@ theorem send_buf_locality {C : Config} {ep : Endpoint} {target : Role}
     (edge : Edge) (hne : edge ≠ ⟨ep.sid, ep.role, target⟩) :
     lookupBuf (sendStep C ep ⟨ep.sid, ep.role, target⟩ v T L).bufs edge =
     lookupBuf C.bufs edge := by
+/- ## Structured Block 2 -/
   simp only [sendStep]
   exact lookupBuf_enqueueBuf_ne hne
 
@@ -199,6 +202,7 @@ private theorem send_blind_bufs_unchanged {C : Config} {ep : Endpoint} {target :
   -- Send enqueues at (ep.sid, ep.role, target).
   -- r ≠ target, so (s, sender, r) ≠ (ep.sid, ep.role, target).
   apply send_buf_locality
+/- ## Structured Block 3 -/
   intro heq
   subst hSid
   simp only [Edge.mk.injEq] at heq
@@ -263,6 +267,7 @@ theorem send_preserves_CEquiv {C : Config} {ep : Endpoint} {target : Role}
 
 -- CEquiv Preservation for Primitive Recv Steps
 /-- Recv step preserves CEquiv for blind roles. -/
+/- ## Structured Block 4 -/
 theorem recv_preserves_CEquiv {C : Config} {ep : Endpoint} {source : Role}
     {x : Var} {v : Value} {L : LocalType}
     {s : SessionId} {r : Role}
@@ -325,6 +330,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
     · -- Different session, trivially unchanged
       unfold CEquiv
       constructor
+/- ## Structured Block 5 -/
       · apply Eq.symm; apply send_G_locality; intro heq
         have : e.sid = s := congrArg Endpoint.sid heq.symm
         exact hsid this
@@ -378,6 +384,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
         exact hb.2 hr
       constructor
       · -- Buffers to r unchanged (dequeueBuf only affects specific edge)
+/- ## Structured Block 6 -/
         intro sender'
         apply Eq.symm
         apply lookupBuf_dequeueBuf_ne hDq
@@ -435,6 +442,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
           · have hLookup :
               (initBuffers C.nextSid roles).lookup ⟨C.nextSid, sender', r⟩ = none :=
               initBuffers_lookup_none_of_notin C.nextSid roles ⟨C.nextSid, sender', r⟩ hMem
+/- ## Structured Block 7 -/
             simp [newSessionStep, lookupBuf, List.lookup_append, hLookup]
         · have hne : (⟨s, sender', r⟩ : Edge).sid ≠ C.nextSid := by
             simpa using hsid'

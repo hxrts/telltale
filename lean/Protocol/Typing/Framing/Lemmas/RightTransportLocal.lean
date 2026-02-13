@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Framing.Lemmas.FrameOutRight
 
 /-! # Right Transport Local Lemmas
@@ -15,6 +16,7 @@ branch body transport. Prove `HasTypeProcPre_frame_G_right_local` for
 general right-framing by induction on pre-typing.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -74,6 +76,7 @@ lemma HasTypeProcPre_frame_G_right_local
       exact HasTypeProcPre.seq ihP ihQ
   | par hDisjS hSsplit hP hQ ihP ihQ =>
       exact HasTypeProcPre.par hDisjS hSsplit ihP ihQ
+/- ## Structured Block 2 -/
   | assign hNoSh hv =>
       rename_i Sown G x v T
       exact HasTypeProcPre.assign hNoSh (HasTypeVal_frame_right (G₁:=G) (G₂:=Gfr) hv)
@@ -134,6 +137,7 @@ lemma frame_pre_out_right_par_local
     (split : ParSplit Sown.left G) :
     DisjointG G Gfr →
     split.S1.length = nS →
+/- ## Structured Block 3 -/
     Sfin = { right := Sown.right, left := S₁' ++ S₂' } →
     Gfin = G₁' ++ G₂' →
     W = W₁ ++ W₂ →
@@ -189,6 +193,7 @@ lemma frame_pre_out_right_par_local
 lemma HasTypeProcPreOut_frame_G_right_local
     {Ssh : SEnv} {Sown : OwnedEnv} {G Gfr : GEnv} {P : Process}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
+/- ## Structured Block 4 -/
     DisjointG G Gfr →
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
     HasTypeProcPreOut Ssh Sown (G ++ Gfr) P Sfin (Gfin ++ Gfr) W Δ := by
@@ -242,6 +247,7 @@ lemma HasTypeProcPreOut_frame_G_right_local
       exact HasTypeProcPreOut.branch (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr)
         hk (lookupG_append_left (G₂:=Gfr) hG) hLen hLabels hBodies' hOutLbl' hSess' hDom hRight
   -- Sequential And Parallel Cases
+/- ## Structured Block 5 -/
   | seq hP hQ ihP ihQ =>
       rename_i Sown G P Q S₁ G₁ S₂ G₂ W₁ W₂ Δ₁ Δ₂
       have hP' := ihP hDisj

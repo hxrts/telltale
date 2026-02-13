@@ -2,13 +2,11 @@ import Protocol.LocalType
 import Protocol.Values
 import Protocol.Environments.Core
 /-! # MPST Environments: Session Renaming
-
 This module provides session renaming infrastructure for environment composition. -/
 /-
 The Problem. Protocol composition and linking may require renaming session IDs
 to avoid conflicts. We need a principled way to rename sessions that preserves
 all environment invariants.
-
 Solution Structure. We define:
 1. `SessionRenaming`: bijective session ID renaming with inverse
 2. `renameValType/LocalType/GEnv/DEnv`: lifting through all structures
@@ -17,7 +15,6 @@ Solution Structure. We define:
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
-
 open scoped Classical
 section
 /-! ## Session Renaming Infrastructure -/
@@ -238,6 +235,7 @@ theorem renameValType_inj (ρ : SessionRenaming) {T1 T2 : ValType} :
         obtain ⟨h1, h2⟩ := h
         have h1' := ih1 h1
         have h2' := ih2 h2
+/- ## Structured Block 1 -/
         subst h1' h2'
         rfl
   | chan sid role =>
@@ -373,6 +371,7 @@ theorem lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
                           (fun acc p =>
                             updateD acc (renameEdge ρ p.1) (p.2.map (renameValType ρ)))
                           (updateD acc (renameEdge ρ hd.1)
+/- ## Structured Block 2 -/
                             (hd.2.map (renameValType ρ))))
                         (renameEdge ρ hd.1) =
                       lookupD (updateD acc (renameEdge ρ hd.1)
@@ -465,6 +464,7 @@ lemma find?_rename_foldl (ρ : SessionRenaming) :
         have hne : renameEdge ρ e ≠ renameEdge ρ hd.1 := fun h =>
           hEq (renameEdge_inj ρ _ _ h)
         have hbeq : (e == hd.1) = false := beq_eq_false_iff_ne.mpr hEq
+/- ## Structured Block 3 -/
         have ih' :=
           ih (acc := updateD acc (renameEdge ρ hd.1) (hd.2.map (renameValType ρ))) htl
         have hupd :

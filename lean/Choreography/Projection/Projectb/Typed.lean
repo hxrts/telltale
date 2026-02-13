@@ -156,6 +156,7 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
       · cases cand with
         | send partner lbs =>
             simp [CProjectF_typed, hp] at hrel ⊢
+/- ## Structured Block 1 -/
             cases lbs with
             | nil => exact hrel
             | cons b bs =>
@@ -316,6 +317,7 @@ private theorem EraseRel_postfix :
         · have hns : receiver ≠ sender := by
             intro h
             exact hs (hr.trans h)
+/- ## Structured Block 2 -/
           cases cand' with
           | recv partner lbs =>
               simp [CProjectF_typed, hr, hns] at hdes
@@ -368,6 +370,7 @@ private theorem EraseRel_postfix :
       · by_cases hq : role = q
         · have hnp : q ≠ p := by
             intro hqp
+/- ## Structured Block 3 -/
             exact hp (hq.trans hqp)
           cases cand' with
           | recv partner lbs =>

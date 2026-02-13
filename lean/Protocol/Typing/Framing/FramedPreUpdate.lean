@@ -1,3 +1,4 @@
+
 import Protocol.Environments.Core
 import Protocol.Typing.StepLemmas
 import Protocol.Typing.MergeLemmas
@@ -21,6 +22,7 @@ Solution Structure. Prove case-specific stepping lemmas and assemble them by
 induction on the TypedStep derivation, keeping frame and subset facts explicit.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -80,6 +82,7 @@ private lemma preserved_sub_right_frame_via_middle
     DisjointS Ssh (Sown : SEnv) →
     OwnedDisjoint Sown →
     DisjointG G₁ G₂ →
+/- ## Structured Block 2 -/
     G = G₁ ++ G₂ →
     G' = G₁ ++ G₂' →
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
@@ -136,6 +139,7 @@ theorem HasTypeProcPreOut_preserved_sub_left_frame
           hStore hDisjShAll hOwnDisj
       -- Use the dedicated helper for the send case.
       exact preserved_sub_left_frame_send (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
+/- ## Structured Block 3 -/
         (Ssh:=Ssh) (Sown:=Sown) (k:=k) (x:=x) (e:=e) (target:=target) (T:=T) (L:=L)
         (G₁':=G₁')
         hStoreVis hEq hEq' hk hG hGout hPre
@@ -197,6 +201,7 @@ theorem HasTypeProcPreOut_preserved_sub_left_frame
             (G₁':=G₁')
             hEq hEq' hv hSout rfl rfl hSsh hSownL hv'
   -- Left-Frame Case: seq_step
+/- ## Structured Block 4 -/
   | seq_step hTS ih =>
       cases hPre with
       | seq hP hQ =>
@@ -250,6 +255,7 @@ theorem HasTypeProcPreOut_preserved_sub_left_frame
           TypedStep G (D₁ ++ D₂) Ssh Sown store bufs (.par nS nG P Q)
             (split.G1 ++ G₂_step) (D₁ ++ D₂_step)
             { right := Sown.right, left := split.S1 ++ S₂_step } store' bufs'
+/- ## Structured Block 5 -/
             (.par split.S1.length nG P Q') :=
         TypedStep.par_right split hSlen hTS hDisjG hDisjD hDisjS
       exact preserved_sub_left_frame_via_middle
@@ -306,6 +312,7 @@ theorem HasTypeProcPreOut_preserved_sub_right_frame
     DisjointG G₁ G₂ →
     G = G₁ ++ G₂ →
     G' = G₁ ++ G₂' →
+/- ## Structured Block 6 -/
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     HasTypeProcPreOut Ssh Sown G₂ P Sfin Gfin W Δ →
     DisjointS Sown.right Sfin.left →
@@ -366,6 +373,7 @@ theorem HasTypeProcPreOut_preserved_sub_right_frame
         (ℓ:=ℓ) (P:=P) (L:=L) (G₂':=G₂')
         hStoreVis hDisj hEq hEq' hk hG hFindP hFindT hGout hPre
   -- Right-Frame Case: assign
+/- ## Structured Block 7 -/
   | assign hv hSout hStoreOut =>
       rename_i G D Ssh Sown store bufs x v T_step Sown' store'
       cases hPre with
@@ -421,6 +429,7 @@ theorem HasTypeProcPreOut_preserved_sub_right_frame
         TypedStep.par_left split hSlen hTS hDisjG hDisjD hDisjS
       exact preserved_sub_right_frame_via_middle
         (Gstore:=Gstore) (G₁:=G₁) (G₂:=G₂)
+/- ## Structured Block 8 -/
         (G:=G) (G':=G₁_step ++ split.G2)
         (D:=D₁ ++ D₂) (Ssh:=Ssh) (Sown:=Sown)
         (store:=store) (bufs:=bufs) (P:=.par nS nG P Q)
@@ -474,6 +483,7 @@ theorem HasTypeProcPreOut_preserved_sub_right_frame
         (G:=G) (G':=G)
         (D:=D) (Ssh:=Ssh) (Sown:=Sown)
         (store:=store) (bufs:=bufs) (P:=.par nS nG P .skip)
+/- ## Structured Block 9 -/
         (D':=D) (Sown':=Sown)
         (store':=store) (bufs':=bufs) (P':=P)
         (Sfin:=Sfin) (Gfin:=Gfin) (W:=W) (Δ:=Δ) (G₂':=G₂')

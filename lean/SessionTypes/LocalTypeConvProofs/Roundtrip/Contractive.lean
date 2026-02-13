@@ -1,3 +1,4 @@
+
 import SessionTypes.LocalTypeConvProofs.Roundtrip.General
 
 /-! # SessionTypes.LocalTypeConvProofs.Roundtrip.Contractive
@@ -13,6 +14,7 @@ Solution Structure. Isolates contractiveness-preservation proofs, reusing the
 general roundtrip context lemmas.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option maxHeartbeats 0
 set_option maxRecDepth 4000
@@ -72,6 +74,7 @@ lemma isGuarded_fromDB_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : S
       simp [hfrom, LocalTypeR.isGuarded, hwne]
     · intro p bs hbs ctx i v hget huniq hclosed hguard
       simp [LocalTypeDB.fromDB, LocalTypeR.isGuarded]
+/- ## Structured Block 2 -/
     · intro p bs hbs ctx i v hget huniq hclosed hguard
       simp [LocalTypeDB.fromDB, LocalTypeR.isGuarded]
 
@@ -128,6 +131,7 @@ lemma isGuarded_fromDB_fresh (t : LocalTypeDB) (ctx : NameContext)
   have huniq : ∀ j, NameContext.get? ctx' j = some fresh → j = 0 := by
     intro j hj
     cases j with
+/- ## Structured Block 3 -/
     | zero => rfl
     | succ j =>
         have hj' : NameContext.get? ctx j = some fresh := by
@@ -184,6 +188,7 @@ theorem isContractive_fromDB (t : LocalTypeDB) (ctx : NameContext)
       have hbs' := hbs ctx hfreshAll hbs_contr hbs_closed
       simp [LocalTypeDB.fromDB, LocalTypeR.isContractive, hbs']
     · intro p bs hbs ctx hfreshAll hcontr hclosed
+/- ## Structured Block 4 -/
       have hbs_contr : isContractiveBranches bs = true := by
         simpa [LocalTypeDB.isContractive] using hcontr
       have hbs_closed : isClosedAtBranches ctx.length bs = true := by

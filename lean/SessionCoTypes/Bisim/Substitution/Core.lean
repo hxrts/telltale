@@ -1,23 +1,19 @@
 import SessionCoTypes.Bisim.Congruence
 /-! # SessionCoTypes.Bisim.Substitution
-
 Proves substitute_compatible_barendregt and EQ2_substitute_via_Bisim.
 -/
-
 /-
 The Problem. Substitution must preserve Bisim/EQ2: if a ≈ b then a[x:=t] ≈ b[x:=t].
 The Barendregt convention (bound variables are fresh) is needed to avoid capture,
 making the proof non-trivial for recursive types.
-
 Solution Structure. Uses `RelImage` lifting and the `Compatible` framework from
 Congruence.lean. Proves `WellFormed_substitute` preserving well-formedness, then
 `substitute_compatible_barendregt` showing substitution is Compatible under the
 Barendregt condition. `EQ2_substitute_via_Bisim` transfers the result to EQ2.
 -/
-
+/- ## Structured Block 1 -/
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
-
 namespace SessionCoTypes.Bisim
 open SessionTypes.LocalTypeR
 open SessionTypes.GlobalType
@@ -25,7 +21,6 @@ open SessionCoTypes.Observable
 open SessionCoTypes.EQ2
 open SessionCoTypes.CoinductiveRel
 -- RelImage lift for Bisim branches (closed/fixed-point case)
-
 private theorem BranchesRelBisim_of_Bisim_with_relImage
     {f : LocalTypeR → LocalTypeR} {R : Rel}
     (h_rel : ∀ a b, Bisim a b → R a b)
@@ -51,7 +46,6 @@ private theorem BranchesRelBisim_of_Bisim_with_relImage
         · exact hc_fix.symm
       · exact ih (fun lb hm => hfix_bs _ (List.Mem.tail _ hm))
                  (fun lc hm => hfix_cs _ (List.Mem.tail _ hm))
-
 -- Well-Formedness Preservation under Substitution
 theorem WellFormed_substitute {a repl : LocalTypeR} (var : String)
     (hWFa : LocalTypeR.WellFormed a) (hWFrepl : LocalTypeR.WellFormed repl) :
@@ -74,6 +68,7 @@ theorem WellFormed_substitute {a repl : LocalTypeR} (var : String)
 
 -- Well-Formedness Preservation: Mu Wrapper
 
+/- ## Structured Block 2 -/
 theorem WellFormed_mu_substitute {body repl : LocalTypeR} (x var : String)
     (hWFmu : LocalTypeR.WellFormed (.mu x body)) (hWFrepl : LocalTypeR.WellFormed repl) :
     LocalTypeR.WellFormed (.mu x (body.substitute var repl)) := by
@@ -146,6 +141,7 @@ theorem UnfoldsToVar_substitute_EQ2 {x : LocalTypeR} {var : String} {repl : Loca
     · -- Case t = var: IMPOSSIBLE
       have hnotfree := SessionCoTypes.SubstCommBarendregt.isFreeIn_subst_mu_self body t
       have hinner' : UnfoldsToVar (body.substitute t (.mu t body)) t := htv ▸ hinner
+/- ## Structured Block 3 -/
       exact (False.elim (not_UnfoldsToVar_of_not_isFreeIn hnotfree hinner'))
     -- `UnfoldsToVar_substitute_EQ2`: Mu Case (`t ≠ var`)
     · -- Case t ≠ var: use EQ2_subst_mu_comm + IH (WF-gated trans)
@@ -199,6 +195,7 @@ theorem UnfoldsToVar_substitute_EQ2 {x : LocalTypeR} {var : String} {repl : Loca
               EQ2F EQ2 (.mu t (body.substitute var (.mu s body')))
                 (.mu t (body.substitute var (.mu s body'))) := EQ2.destruct hrefl
           have hmu_to_unfold :
+/- ## Structured Block 4 -/
               EQ2 (.mu t (body.substitute var (.mu s body')))
                 ((body.substitute var (.mu s body')).substitute t
                   (.mu t (body.substitute var (.mu s body')))) := by
@@ -287,6 +284,7 @@ theorem substitute_at_var_bisimF {x y : LocalTypeR} {var : String} {repl : Local
       have hclosed : lb.2.2.isClosed := (hWFbs lb hmem).closed
       have hnotfree : LocalTypeR.isFreeIn var lb.2.2 = false :=
         isFreeIn_false_of_closed lb.2.2 var hclosed
+/- ## Structured Block 5 -/
       exact substitute_not_free _ _ _ hnotfree
     have hfix_cs : ∀ lc ∈ cs, (lc.2.2.substitute var repl) = lc.2.2 := by
       intro lc hmem
@@ -348,6 +346,7 @@ private theorem BranchesRelBisim_to_RelImage (f : LocalTypeR → LocalTypeR)
     · constructor
       · exact hbc.1
       · exact hlift _ _ hbc.2
+/- ## Structured Block 6 -/
     · exact ih
 
 -- `CanSend` Preservation under Barendregt Conditions
@@ -405,6 +404,7 @@ theorem substitute_preserves_CanSend {a : LocalTypeR} {var : String} {repl : Loc
       exact CanSend.mu ih'
 
 -- `CanRecv` Preservation under Barendregt Conditions
+/- ## Structured Block 7 -/
 open SessionCoTypes.SubstCommBarendregt in
 /-- Substitution preserves CanRecv.
 
@@ -474,6 +474,7 @@ theorem substitute_compatible_barendregt (var : String) (repl : LocalTypeR)
     -- After substitution: if v ≠ var, still unfolds to v; if v = var, unfolds to repl
     rename_i v
     by_cases heq : v = var
+/- ## Structured Block 8 -/
     · -- Case: v = var, both become repl after substitution
       -- Use substitute_at_var_bisimF with Bisim reflexivity
       have hx_eq : UnfoldsToVar x var := heq ▸ hx
@@ -495,6 +496,5 @@ theorem substitute_compatible_barendregt (var : String) (repl : LocalTypeR)
     have hy' := substitute_preserves_CanRecv hy hbar_y hfresh
     apply BisimF.eq_recv hx' hy'
     exact BranchesRelBisim.map_image hbr
-
 
 end SessionCoTypes.Bisim

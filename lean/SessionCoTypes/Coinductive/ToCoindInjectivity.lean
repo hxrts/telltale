@@ -1,9 +1,11 @@
+
 import Mathlib
 import SessionCoTypes.Coinductive.LocalTypeC
 import SessionCoTypes.Coinductive.Bridge
 import SessionCoTypes.Coinductive.Observable
 import SessionTypes.LocalTypeR
 
+/- ## Structured Block 1 -/
 set_option linter.dupNamespace false
 
 /-! # toCoind Injectivity
@@ -74,6 +76,7 @@ mutual
         have hbs : bs = cs := toCoindBranches_injective hbranches
         subst hbs; rfl
     | .send _ _, .recv _ _, h => by cases (congrArg head h)
+/- ## Structured Block 2 -/
     | .recv _ _, .end, h => by cases (congrArg head h)
     | .recv _ _, .var _, h => by cases (congrArg head h)
     | .recv _ _, .mu _ _, h => by cases (congrArg head h)
@@ -132,6 +135,7 @@ lemma toCoindBranches_get {bs : List BranchR} (i : Fin bs.length) :
           | mk label rest => cases rest with | mk vt cont => simp [toCoindBranches, castFin, toCoindBranches_length]
       | succ i => simpa [castFin, toCoindBranches_length] using ih i
 
+/- ## Structured Block 3 -/
 lemma toCoindBranches_get_snd {bs : List BranchR} (i : Fin bs.length) :
     ((toCoindBranches bs).get (castFin (toCoindBranches_length bs).symm i)).2 =
       toCoind (bs.get i).2.2 := by

@@ -96,6 +96,7 @@ theorem BisimF.unfold_right {R : Rel} {a b : LocalTypeR} (h : BisimF R a b) :
   | eq_var ha hb =>
       rcases UnfoldsToVar.cases hb with hb_var | ⟨t, body, hb_mu, hb'⟩
       · simpa [LocalTypeR.unfold, hb_var] using (BisimF.eq_var ha hb)
+/- ## Structured Block 1 -/
       · subst hb_mu
         simpa [LocalTypeR.unfold] using (BisimF.eq_var ha hb')
   | eq_send ha hb hbr =>
@@ -162,6 +163,7 @@ theorem BranchesRelBisim.mono {R S : Rel} (hrs : ∀ a b, R a b → S a b)
 
 /-- BisimF is monotone. -/
 theorem BisimF.mono : Monotone BisimF := by
+/- ## Structured Block 2 -/
   intro R S hrs a b h
   cases h with
   | eq_end ha hb => exact BisimF.eq_end ha hb
@@ -249,6 +251,7 @@ theorem symm {a b : LocalTypeR} (h : Bisim a b) : Bisim b a := by
     -- Transform BisimF R y x into BisimF S x y
     cases hf with
     | eq_end ha hb => exact BisimF.eq_end hb ha
+/- ## Structured Block 3 -/
     | eq_var ha hb => exact BisimF.eq_var hb ha
     | eq_send ha hb hbr =>
       apply BisimF.eq_send hb ha
@@ -324,6 +327,7 @@ theorem trans {a b c : LocalTypeR} (hab : Bisim a b) (hbc : Bisim b c) : Bisim a
     | eq_var hx hy =>
       -- x unfolds to var v, y unfolds to var v
       cases hf_yz with
+/- ## Structured Block 4 -/
       | eq_end hy' _ => exact absurd hy' (UnfoldsToVar.not_end_of_var hy)
       | eq_var hy' hz =>
         have heq := UnfoldsToVar.deterministic hy hy'

@@ -108,6 +108,7 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
         -- Goal: BisimF (SubstUnfoldClosure var repl) (LocalTypeR.unfold repl) repl
         -- LocalTypeR.unfold repl and repl are Bisim via EQ2_unfold_left
         have hWFrepl_unfold : LocalTypeR.WellFormed repl.unfold :=
+/- ## Structured Block 1 -/
           LocalTypeR.WellFormed.unfold (t := repl) hWFrepl
         have hBisim : Bisim (LocalTypeR.unfold repl) repl :=
           EQ2.toBisim (EQ2_unfold_left (EQ2_refl repl)) hWFrepl_unfold hWFrepl
@@ -176,6 +177,7 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
           fun a b h => Or.inr ⟨R', hR'post, h⟩
         exact BisimF.mono hlift _ _ hf
       -- Postfix: Mu Case without Shadowing (`x ≠ var`)
+/- ## Structured Block 2 -/
       · -- x ≠ var: substitution goes through
         have hdiff : (x == var) = false := by simp [hshadow]
         simp only [LocalTypeR.substitute, hdiff] at hu

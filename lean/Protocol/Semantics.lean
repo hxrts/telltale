@@ -134,6 +134,7 @@ inductive StepBase : Config → Config → Prop where
 
   /-- Par with skip right: par P skip → P -/
   | par_skip_right {C P nS nG} :
+/- ## Structured Block 1 -/
       C.proc = .par nS nG P .skip →
       StepBase C { C with proc := P }
 
@@ -207,6 +208,7 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       -- G lookups must match
       rw [hG₁] at hG₂
       simp only [Option.some.injEq, LocalType.recv.injEq] at hG₂
+/- ## Structured Block 2 -/
       obtain ⟨hsrc, hT, hL⟩ := hG₂
       subst hsrc hT hL
       -- Buffer lookups at same edge must match
@@ -263,6 +265,7 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       rw [hFindP₁] at hFindP₂
       simp only [Option.some.injEq, Prod.mk.injEq] at hFindP₂
       obtain ⟨_, hP_eq⟩ := hFindP₂
+/- ## Structured Block 3 -/
       subst hP_eq
       -- Same type branch lookup (same typeBranches, same ℓ)
       rw [hFindT₁] at hFindT₂
@@ -320,6 +323,7 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       exact ⟨_, _, _, _, hProc₁⟩
     | _ => simp_all
   -- Determinism: par-skip-right head step
+/- ## Structured Block 4 -/
   | par_skip_right hProc₁ =>
     cases h₂ with
     | par_skip_right hProc₂ =>

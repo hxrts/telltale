@@ -352,6 +352,7 @@ mutual
         | inr hcont =>
             have ih := substitute_roles_subset cont t repl p hcont
             cases ih with
+/- ## Structured Block 1 -/
             | inl horiginal =>
                 left
                 exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inr horiginal))

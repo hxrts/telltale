@@ -208,6 +208,7 @@ theorem renameDEnv_updateD (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Tr
             simpa [hEq] using (preimageEdge_rename ρ p.1)
           exact Option.noConfusion (hpre ▸ hsome)
         have hRhsBase : (renameDEnv ρ D).find? e' = none := by
+/- ## Structured Block 1 -/
           simpa [renameDEnv] using
             (find?_foldl_update_neq (ρ := ρ) (l := D.list)
               (acc := (∅ : DEnv)) (edge := e') hno_rhs)

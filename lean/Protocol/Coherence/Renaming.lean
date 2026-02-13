@@ -1,3 +1,4 @@
+
 import Protocol.Coherence.EdgeCoherence
 
 /-! # Protocol.Coherence.Renaming
@@ -58,6 +59,7 @@ This 3-way case split is the core proof technique for coherence preservation.
 Adapted from binary session types where the split is: a = e, a = e.dual, a unrelated.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -124,6 +126,7 @@ theorem CoherentRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv)
         have hSenderRole' : e.sender = role := by simpa using hSenderRole
         have hEq : (⟨e'.sid, e'.sender⟩ : Endpoint) = ⟨sid, role⟩ := by
           simp [e', hSidEq'.symm, hSenderRole']
+/- ## Structured Block 2 -/
         simpa [hEq] using hGsender'
   -- CoherentRenaming: Rebuild Coherence Witness on Preimage Edge
   -- Apply original coherence at e'.
@@ -187,6 +190,7 @@ theorem HasTypeVal_rename (ρ : SessionRenaming) (G : GEnv) (v : Value) (T : Val
 theorem BuffersTypedRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv) (bufs : Buffers)
     (hTyped : BuffersTyped G D bufs) :
     BuffersTyped (renameGEnv ρ G) (renameDEnv ρ D) (renameBufs ρ bufs) := by
+/- ## Structured Block 3 -/
   intro e
   simp only [BufferTyped]
   -- Check if e is in the image of renameEdge
@@ -259,6 +263,7 @@ theorem RenamedDisjoint (ρ1 ρ2 : SessionRenaming) (G1 G2 : GEnv)
     (hDisj : RenamingsDisjoint ρ1 ρ2 G1 G2) :
     GEnvDisjoint (renameGEnv ρ1 G1) (renameGEnv ρ2 G2) := by
   simp only [GEnvDisjoint, Set.eq_empty_iff_forall_notMem, Set.mem_inter_iff]
+/- ## Structured Block 4 -/
   intro s ⟨hS1, hS2⟩
   simp only [SessionsOf, Set.mem_setOf_eq] at hS1 hS2
   obtain ⟨e1, L1, hLookup1, hSid1⟩ := hS1
@@ -334,6 +339,7 @@ theorem Dual_implies_Coherent_empty (L1 L2 : LocalType) (r1 r2 : Role)
     simp [htrace, Consume]
   · -- EdgeCoherent for e21 (r2 → r1)
     intro Lrecv hGrecv
+/- ## Structured Block 5 -/
     by_cases h : r2 = r1
     · subst h
       refine ⟨L1, ?_, ?_⟩

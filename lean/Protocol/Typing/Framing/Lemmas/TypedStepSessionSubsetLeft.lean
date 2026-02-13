@@ -15,6 +15,7 @@ open scoped Classical
 section
 
 -- Left-Frame Session Subset
+/-! ## Left Frame Subset -/
 
 theorem SessionsOf_subset_of_TypedStep_left_frame
     {G₁ G₂ G G' D Ssh Sown store bufs P G₁' D' Sown' store' bufs' P'} :
@@ -62,6 +63,7 @@ theorem SessionsOf_subset_of_TypedStep_left_frame
       have hG₁' : G₁' = G₁ := append_left_eq_of_eq hEqG
       simpa [hG₁'] using hs
   | seq_step _ ih =>
+/- ## Structured Block 1 -/
       exact ih hEq hEq'
   | seq_skip =>
       intro s hs

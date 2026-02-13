@@ -1,3 +1,4 @@
+
 import Mathlib
 import Mathlib.Data.List.Forall2
 import SessionCoTypes.Coinductive.LocalTypeC
@@ -5,6 +6,7 @@ import SessionCoTypes.Coinductive.Observable
 import SessionTypes.GlobalType
 import SessionCoTypes.CoinductiveRel
 
+/- ## Structured Block 1 -/
 set_option linter.dupNamespace false
 
 /-! # Coinductive Projection
@@ -94,6 +96,7 @@ private lemma ProjectC_comm_mono {R S : ProjRelC}
       exact Or.inl ⟨hrole, labels, hhead, BranchesProjRelC_mono h hbr⟩
   | inr hrest =>
       cases hrest with
+/- ## Structured Block 2 -/
       | inl hreceiver =>
           rcases hreceiver with ⟨hrole, labels, hhead, hbr⟩
           exact Or.inr (Or.inl ⟨hrole, labels, hhead, BranchesProjRelC_mono h hbr⟩)
@@ -164,6 +167,7 @@ theorem ProjectC_fold {g : GlobalType} {role : String} {cand : LocalTypeC}
 
 -- Unfolding utilities
 
+/- ## Structured Block 3 -/
 private lemma UnfoldsG_rightUnique : Relator.RightUnique UnfoldsG := by
   intro a b c hab hac
   rcases hab with ⟨t1, body1, rfl, rfl⟩
@@ -225,6 +229,7 @@ private lemma UnfoldsToC_total {l l1 l2 : LocalTypeC} (h1 : UnfoldsToC l l1) (h2
 
 theorem ProjectC_unfoldG {g g' : GlobalType} {role : String} {l : LocalTypeC}
     (hproj : ProjectC g role l) (hg : UnfoldsToG g g') : ProjectC g' role l := by
+/- ## Structured Block 4 -/
   rcases ProjectC_destruct hproj with ⟨g1, l1, hg1, hl1, hmatch⟩
   cases g1 with
   | mu t body =>
@@ -280,6 +285,7 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
             have hEq : cand = l1 := UnfoldsToC_eq_of_head_ne_mu h_l1_cand hne
             subst cand
             exact ⟨.end, l1, hg1, Relation.ReflTransGen.refl, by simpa using hmatch⟩
+/- ## Structured Block 5 -/
         | var t =>
             have hne : ∀ x, head l1 ≠ .mu x := by
               intro x hx

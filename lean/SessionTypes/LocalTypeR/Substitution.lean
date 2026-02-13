@@ -97,6 +97,7 @@ mutual
         have h1 : cont.substitute x rx = cont :=
           substitute_not_free cont x rx hsplit.1
         have h2 : LocalTypeR.substituteBranches rest x rx = rest :=
+/- ## Structured Block 1 -/
           substituteBranches_not_free rest x rx hsplit.2
         simp [LocalTypeR.substituteBranches, h1, h2, -substituteBranches_eq_map]
   termination_by sizeOf bs
@@ -294,6 +295,7 @@ mutual
               simpa [isContractiveBranches, Bool.and_eq_true] using hbs
             have hcont' : (cont.substitute t e).isContractive = true :=
               isContractive_substitute cont t e hpair.1 hcontr hclosed
+/- ## Structured Block 2 -/
             have htail' : isContractiveBranches (substituteBranches tail t e) = true :=
               isContractiveBranches_substitute tail t e hpair.2 hcontr hclosed
             simp [isContractiveBranches, LocalTypeR.substituteBranches, hcont', htail', -substituteBranches_eq_map]

@@ -173,6 +173,7 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
                                 (projectb_complete cont p contCand hcont hne_cont)
                             subst hpartner
                             subst hlbl
+/- ## Structured Block 1 -/
                             subst hvt
                             simp [projectb, hp]
                             refine And.intro ?_ (And.intro ?_ ?_)
@@ -224,6 +225,7 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
                               · simp [reduceBEq]
                               · simpa [hq] using hproj_cont
                   | cons b2 bs2 =>
+/- ## Structured Block 2 -/
                       simp [CProjectF, hq, hnp] at hf
           | send _ _ =>
               simp [CProjectF, hq, hnp] at hf

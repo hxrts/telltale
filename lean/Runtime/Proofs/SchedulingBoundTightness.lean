@@ -1,3 +1,4 @@
+
 import Runtime.Proofs.SchedulingBoundCore
 
 /-! # Runtime.Proofs.SchedulingBoundTightness
@@ -11,6 +12,7 @@ The Problem. Show the `k * W₀` bound is tight and instantiate it for session s
 Solution Structure. Build a witness tight system and then specialize bounds to `MultiConfig`.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -73,6 +75,7 @@ def TightSystem : ProgressSystem Nat := {
       have h_and : (r == 0 && decide (c > 0)) = true := hr
       have hsplit : (r == 0) = true ∧ decide (c > 0) = true := by
         simpa [Bool.and_eq_true] using h_and
+/- ## Structured Block 2 -/
       by_cases hc : c > 0
       · exact hc
       · have hdecFalse : decide (c > 0) = false := by simp [hc]
@@ -133,6 +136,7 @@ theorem TightSystem_KFair (k : Nat) (hk : k ≥ 1) : KFair TightSystem (TightSch
     have hr' : r < 1 := by simpa [TightSystem] using hr
     omega
   subst hr0
+/- ## Structured Block 3 -/
   have hkpos : k > 0 := by omega
   let q : Nat := block_start / k + 1
   let j : Nat := q * k - 1
@@ -192,6 +196,7 @@ lemma TightSystem_execution_trace :
 /-- **Theorem 6 (Tightness)**: The bound k * W₀ is tight. There exists a system
     where termination takes exactly k * W₀ steps. -/
 theorem bound_is_tight :
+/- ## Structured Block 4 -/
     ∃ (Config : Type) (sys : ProgressSystem Config) (c : Config)
       (sched : Nat → Nat) (k : Nat),
       k ≥ sys.numRoles ∧
@@ -258,6 +263,7 @@ def sessionProgressSystem [sem : SessionSemantics] (cfg₀ : MultiConfig) :
   terminal_no_enabled := by
     intro cfg r hterm
     simp [hterm]
+/- ## Structured Block 5 -/
   progress := by
     intros cfg hnt
     refine ⟨0, Nat.zero_lt_succ _, ?_⟩
@@ -318,4 +324,5 @@ theorem multisession_termination_bound [sem : SessionSemantics]
   exact kfair_termination_bound (sessionProgressSystem cfg₀) cfg₀ sched k hk hfair
 
 
+/- ## Structured Block 6 -/
 end

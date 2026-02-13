@@ -216,6 +216,7 @@ mutual
     | .mu t inner =>
         simp only [GlobalType.substitute]
         split
+/- ## Structured Block 1 -/
         · -- t = varName, shadowed, so no substitution in inner
           rename_i heq
           simp only [GlobalType.allVarsBound] at hg ⊢

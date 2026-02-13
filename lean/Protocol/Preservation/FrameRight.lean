@@ -1,3 +1,4 @@
+
 import Protocol.Preservation.ProgressLemmas
 
 /-! # Right Frame Preservation
@@ -16,6 +17,7 @@ configuration constructors. Prove `step_frame_right` by induction on
 `Step`, showing update operations stay within the original portion.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -76,6 +78,7 @@ lemma step_frame_right {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
           simpa [hEq] using (Step.base hStep')
       -- Right Frame Base Case: Recv
       | recv hProc hk hG hBuf =>
+/- ## Structured Block 2 -/
           rename_i Ccfg vs k x e v source T L
           set recvEdge : Edge := { sid := e.sid, sender := source, receiver := e.role }
           have hSid : e.sid ∈ SessionsOf Ccfg.G := ⟨e, .recv source T L, hG, rfl⟩
@@ -127,6 +130,7 @@ lemma step_frame_right {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
             refine StepBase.select (C:=frameConfigRight Ccfg Gfr Dfr) (k:=k) (e:=e) (ℓ:=ℓ)
               (target:=target) (branches:=branches) (L:=L) ?_ ?_ ?_ ?_
             · simpa [frameConfigRight] using hProc
+/- ## Structured Block 3 -/
             · simpa [frameConfigRight] using hk
             · exact lookupG_append_left hG
             · simpa using hFind
@@ -179,6 +183,7 @@ lemma step_frame_right {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
                         (lookupD (frameConfigRight Ccfg Gfr Dfr).D brEdge).tail } =
                 frameConfigRight
                   { Ccfg with
+/- ## Structured Block 4 -/
                       proc := P,
                       bufs := bufs',
                       G := updateG Ccfg.G e L,
@@ -233,6 +238,7 @@ lemma step_frame_right {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
             StepBase.par_skip_left (C:=frameConfigRight Ccfg Gfr Dfr) (Q:=Q)
               (by simpa [frameConfigRight] using hProc)
           have hEq :
+/- ## Structured Block 5 -/
               { frameConfigRight Ccfg Gfr Dfr with proc := Q } =
                 frameConfigRight { Ccfg with proc := Q } Gfr Dfr := by
             simp [frameConfigRight]

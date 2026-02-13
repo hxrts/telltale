@@ -191,6 +191,7 @@ private theorem CProjectF_mono : Monotone CProjectF := by
       · cases cand with
         | send partner lbs =>
             simp [CProjectF, hp] at hrel ⊢
+/- ## Structured Block 1 -/
             cases lbs with
             | nil => simpa using hrel
             | cons b bs =>

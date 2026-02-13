@@ -1,3 +1,4 @@
+
 import Protocol.SymmetryCore
 
 /-! # Protocol.SymmetryConsumeRenaming
@@ -11,6 +12,7 @@ The Problem. Show Consume/coherence invariants are preserved by protocol renamin
 Solution Structure. Prove type/role renaming injectivity and commutation, then lift to coherence.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -70,6 +72,7 @@ theorem renameValTypePR_inj (σ : ProtocolRenaming) :
   -- Injectivity: string constructor
   | string =>
       cases T2 with
+/- ## Structured Block 2 -/
       | string => rfl
       | unit =>
           cases h
@@ -128,6 +131,7 @@ theorem renameValTypePR_beq (σ : ProtocolRenaming) (T T' : ValType) :
 theorem consumeOne_renamePR (σ : ProtocolRenaming) (from_ : Role) (T : ValType) (L : LocalType) :
     consumeOne (σ.roleMap from_) (renameValTypePR σ T) (renameLocalTypePR σ L) =
       (consumeOne from_ T L).map (renameLocalTypePR σ) := by
+/- ## Structured Block 3 -/
   cases L <;>
     simp [consumeOne, renameLocalTypePR, roleMap_beq, renameValTypePR_beq]
 
@@ -186,6 +190,7 @@ theorem branch_labels_nodup_preserved (σ : ProtocolRenaming)
             have hl'Eq : l' = l := σ.labelMap_inj _ _ hmap
             exact hNotMem (by simpa [hl'Eq] using hl')
           have hNodupRen :
+/- ## Structured Block 4 -/
               List.Nodup (σ.labelMap l :: List.map Prod.fst (renameBranchesPR σ tl)) := by
             exact (List.nodup_cons).2 ⟨hNotMem', hTail'⟩
           simpa [renameBranchesPR] using hNodupRen
@@ -249,6 +254,7 @@ private theorem lookupD_renamePR_foldl (σ : ProtocolRenaming) :
       · have hEq' : renameEdgePR σ e ≠ renameEdgePR σ hd.1 := by
           intro hcontra
           exact hEq (renameEdgePR_inj σ _ _ hcontra)
+/- ## Structured Block 5 -/
         have hEq'' : renameEdgePR σ hd.1 ≠ renameEdgePR σ e := Ne.symm hEq'
         have hIH :=
           ih (acc:=updateD acc (renameEdgePR σ hd.1) (hd.2.map (renameValTypePR σ)))
@@ -312,6 +318,7 @@ theorem lookupD_renamePR (σ : ProtocolRenaming) (D : DEnv) (e : Edge) :
       simpa [hLookup, h] using hFold
   | some ts =>
       simp [h] at hFold
+/- ## Structured Block 6 -/
       simpa [hLookup, h] using hFold
 
 /-- The coherence invariant is preserved under protocol renaming.
@@ -377,6 +384,7 @@ theorem coherence_protocol_renaming_preserved (σ : ProtocolRenaming) (G : GEnv)
   -- Coherence on preimage edge
   have hRecvLookup0 : lookupG G { sid := e0.sid, role := e0.receiver } = some Lrecv0 := by
     simpa [e0, hRecvEqEp] using hRecvLookup
+/- ## Structured Block 7 -/
   obtain ⟨Lsender0', hSender0', hConsume0⟩ := hCoh e0 hActive0 Lrecv0 hRecvLookup0
   have hSender0'' :
       lookupG G { sid := e.sid, role := sendEp.role } = some Lsender0' := by

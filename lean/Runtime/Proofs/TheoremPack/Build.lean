@@ -1,3 +1,4 @@
+
 import Runtime.Proofs.TheoremPack.Artifacts
 
 /-! # Theorem Pack Building
@@ -15,6 +16,7 @@ each artifact type. The pack is parameterized by a `VMInvariantSpace-
 WithProfiles` providing the base invariant and profile structure.
 -/
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 
 namespace Runtime
@@ -77,6 +79,7 @@ def buildVMTheoremPack
     | none => none
     | some bundle =>
         some
+/- ## Structured Block 2 -/
           { bundle := bundle
           , proof := by
               simpa using vm_termination_from_bundle (bundle := bundle)
@@ -133,6 +136,7 @@ def buildVMTheoremPack
         some
           { protocol := p.protocol
           , eventualDecision := p.protocol.eventualDecision
+/- ## Structured Block 3 -/
           , timeoutIndependentLatency := p.protocol.timeoutIndependentLatency
           }
   let nakamoto? :=
@@ -186,6 +190,7 @@ def buildVMTheoremPack
           , impossibilityBoundary := p.protocol.impossibilityBoundary
           }
   let dataAvailability? :=
+/- ## Structured Block 4 -/
     match space.distributed.dataAvailability? with
     | none => none
     | some p =>
@@ -242,6 +247,7 @@ def buildVMTheoremPack
           , assumptionsPassed := Distributed.ByzantineSafety.byzantineAssumptions_allPassed p.protocol
           }
   let consensusEnvelope? :=
+/- ## Structured Block 5 -/
     match space.distributed.consensusEnvelope? with
     | none => none
     | some p =>
@@ -295,6 +301,7 @@ def buildVMTheoremPack
           { protocol := p.protocol
           , localInferenceSoundness := p.protocol.localInferenceSoundness
           , shardedInferenceSoundness := p.protocol.shardedInferenceSoundness
+/- ## Structured Block 6 -/
           , localPrincipalCapability := p.protocol.localPrincipalCapability
           , shardedPrincipalCapability := p.protocol.shardedPrincipalCapability
           , localAdmissionSoundness := p.protocol.localAdmissionSoundness
@@ -348,6 +355,7 @@ def buildVMTheoremPack
   , foster? := classicalPack.foster?
   , maxWeight? := classicalPack.maxWeight?
   , ldp? := classicalPack.ldp?
+/- ## Structured Block 7 -/
   , meanField? := classicalPack.meanField?
   , heavyTraffic? := classicalPack.heavyTraffic?
   , mixing? := classicalPack.mixing?

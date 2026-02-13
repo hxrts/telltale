@@ -1,3 +1,4 @@
+
 import Protocol.Coherence.PreservationRecv
 import Protocol.Coherence.StoreTyping
 import Protocol.Coherence.Unified
@@ -61,6 +62,7 @@ This 3-way case split is the core proof technique for coherence preservation.
 Adapted from binary session types where the split is: a = e, a = e.dual, a unrelated.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -163,6 +165,7 @@ theorem Coherent_send_preserved
         exact Option.noConfusion hL'
     -- Case 1B: Updated Edge Distinct Receiver
     · -- Normal case: receiver ≠ sender
+/- ## Structured Block 2 -/
       have hRecvNeq : senderEp ≠ { sid := senderEp.sid, role := receiverRole } := by
         intro h
         have : senderEp.role = receiverRole := by
@@ -225,6 +228,7 @@ theorem Coherent_send_preserved
           simp only [Consume, Option.isSome]
         | cons t ts =>
           rw [hRole1, hTrace] at hOrig
+/- ## Structured Block 3 -/
           simp only [Consume, consumeOne, Option.isSome] at hOrig
           -- hOrig : false = true is a contradiction
           exact Bool.noConfusion hOrig
@@ -296,6 +300,7 @@ theorem Coherent_send_preserved
   -- Case 3: Unrelated Edge
   · -- Case 3: e ≠ sendEdge and unrelated to senderEp
     have hNeSymm : sendEdge ≠ e := Ne.symm hOther.1
+/- ## Structured Block 4 -/
     have hOther' :
         ¬ ({ sid := e.sid, role := e.sender : Endpoint } = senderEp ∨
             { sid := e.sid, role := e.receiver : Endpoint } = senderEp) := by

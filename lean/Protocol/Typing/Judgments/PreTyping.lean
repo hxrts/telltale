@@ -129,6 +129,7 @@ theorem select_typed_inv {n : SessionId} {S : SEnv} {G : GEnv} {D : DEnv} {k : V
     Reference: `work/effects/008.lean:294-300` -/
 theorem branch_typed_inv {n : SessionId} {S : SEnv} {G : GEnv} {D : DEnv}
     {k : Var} {procs : List (Label × Process)}
+/- ## Structured Block 1 -/
     (h : HasTypeProcN n S G D (.branch k procs)) :
     ∃ e p bs,
       lookupSEnv S k = some (.chan e.sid e.role) ∧
@@ -370,6 +371,7 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
          S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG} (split : ParSplit Sown.left G) :
       split.S1.length = nS →
       Sfin = { right := Sown.right, left := S₁' ++ S₂' } →
+/- ## Structured Block 2 -/
       Gfin = (G₁' ++ G₂') →
       Wfin = (W₁ ++ W₂) →
       Δfin = (Δ₁ ++ Δ₂) →
@@ -403,7 +405,6 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
       HasTypeProcPreOut Ssh Sown G (.assign x v)
         (OwnedEnv.updateLeft Sown x T) G [x] ∅
 
-
 -- Inversion Helpers for Pre-Out Typing
 
 /-- Frame-invariant witness for par split alignment at S-length `nS`. -/
@@ -436,6 +437,7 @@ theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
       Sown.left = (S₁ ++ S₂) ∧
       G = (G₁ ++ G₂) ∧
       Sfin.right = Sown.right ∧
+/- ## Structured Block 3 -/
       Sfin.left = (S₁' ++ S₂') ∧
       Gfin = (G₁' ++ G₂') ∧
       Wfin = (W₁ ++ W₂) ∧
@@ -490,6 +492,7 @@ theorem HasTypeProcPreOut_par_inv_witness {Ssh Sown G P Q Sfin Gfin Wfin Δfin n
   | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
       hDisjW hDisjΔ hP hQ =>
       rename_i S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂
+/- ## Structured Block 4 -/
       exact ⟨⟨split, hSlen⟩, S₁', S₂', G₁', G₂', W₁, W₂, Δ₁, Δ₂,
         hSfin, hGfin, hW, hΔ, hDisjG, hDisjS, hDisjS_left,
         hDisjS_right, hDisjS', hDisjW, hDisjΔ, hP, hQ⟩

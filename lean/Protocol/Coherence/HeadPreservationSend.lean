@@ -1,3 +1,4 @@
+
 import Protocol.Coherence.HeadPreservationRecv
 import Protocol.Coherence.EdgeCoherence
 
@@ -60,6 +61,7 @@ This 3-way case split is the core proof technique for coherence preservation.
 Adapted from binary session types where the split is: a = e, a = e.dual, a unrelated.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -138,6 +140,7 @@ theorem HeadCoherent_send_preserved
       | end_ => exact True.intro
       | send _ _ _ => exact True.intro
       | select _ _ => exact True.intro
+/- ## Structured Block 2 -/
       | var _ => exact True.intro
       | mu _ => exact True.intro
       | recv r T' L' =>
@@ -203,6 +206,7 @@ theorem HeadCoherent_send_preserved
         | recv r T' L' =>
           -- Original: if trace non-empty, head = T'
           -- After: trace ++ [T], head unchanged (unless trace was empty)
+/- ## Structured Block 3 -/
           cases hTrace : lookupD D sendEdge with
           | nil =>
             simp only [List.nil_append]
@@ -277,6 +281,7 @@ theorem HeadCoherent_send_preserved
       cases hL : L with
       | end_ => trivial
       | send _ _ _ => trivial
+/- ## Structured Block 4 -/
       | select _ _ => trivial
       | var _ => trivial
       | mu _ => trivial

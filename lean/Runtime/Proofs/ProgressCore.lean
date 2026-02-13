@@ -1,3 +1,4 @@
+
 import Runtime.Proofs.SessionLocal
 import Runtime.Resources.Arena
 import Runtime.VM.Model.TypeClasses
@@ -15,6 +16,7 @@ The Problem. Lift protocol-side coherence/progress premises to VM session-store 
 Solution Structure. Define VM predicates, instruction enablement, and prove store/environment bridge lemmas.
 -/
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 set_option relaxedAutoImplicit false
 
@@ -124,6 +126,7 @@ theorem sendReady_of_ProgressVMState {store : SessionStore ν}
 
     Similar to SendReady, but for select/branch. -/
 theorem selectReady_of_ProgressVMState {store : SessionStore ν}
+/- ## Structured Block 2 -/
     (hProg : ProgressVMState store) :
     SelectReady (SessionStore.toGEnv store) (SessionStore.toDEnv store) :=
   Compatible_to_SelectReady hProg.compatible
@@ -190,6 +193,7 @@ private theorem exists_session_after_updateTrace {store : SessionStore ν} {sid 
       · simp [SessionStore.updateTrace, hsid]
         cases hMem0 with
         | inl hEq =>
+/- ## Structured Block 3 -/
             cases hEq
             exact ⟨st, by simp⟩
         | inr hTail =>
@@ -272,6 +276,7 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
     (hReady : SendReady (SessionStore.toGEnv store) (SessionStore.toDEnv store))
     (hSend : SessionStore.updateType
                (SessionStore.updateTrace store
+/- ## Structured Block 4 -/
                  { sid := ep.sid, sender := ep.role, receiver := target }
                  (SessionStore.lookupTrace store
                    { sid := ep.sid, sender := ep.role, receiver := target } ++ [T]))
@@ -323,6 +328,7 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
     intro e'
     calc
       lookupG
+/- ## Structured Block 5 -/
           (SessionStore.toGEnv
             (SessionStore.updateType
               (SessionStore.updateTrace store sendEdge (SessionStore.lookupTrace store sendEdge ++ [T]))
@@ -375,6 +381,7 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
             (lookupD (SessionStore.toDEnv store) sendEdge ++ [T]))
           edge' := by simp [hTraceLookup]
   -- Final Active-Edge Transport
+/- ## Structured Block 6 -/
   have hActiveUpd : ActiveEdge (updateG (SessionStore.toGEnv store) ep L') e := by
     unfold ActiveEdge at hActive ⊢
     constructor

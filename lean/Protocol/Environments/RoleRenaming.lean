@@ -174,6 +174,7 @@ theorem renameBranches_renameBranchesRole_comm (ρ : SessionRenaming) (s : Sessi
       · congr 1
         exact renameLocalType_renameLocalTypeRole_comm ρ s A B L
       · exact renameBranches_renameBranchesRole_comm ρ s A B tl
+/- ## Structured Block 1 -/
 termination_by sizeOf bs
 
 end

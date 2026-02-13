@@ -1,25 +1,18 @@
 import Protocol.Deployment.LinkingCore
-
 /-! # Protocol.Deployment.LinkingTheorems
-
 Main linking theorems for WTMon preservation and delegation-aware composition.
 -/
-
 /-
 The Problem. Lift linking infrastructure into compositional well-typing and coherence results.
-
 Solution Structure. Prove merge preservation properties and assemble story-level theorems.
 -/
-
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
-
 open scoped Classical
-
 section
 -- Linking Theorems
-
 -- Merge Typing Infrastructure
 theorem mergeBufs_typed (G₁ G₂ : GEnv) (D₁ D₂ : DEnv) (B₁ B₂ : Buffers)
     (hTyped₁ : BuffersTyped G₁ D₁ B₁)
@@ -67,6 +60,7 @@ theorem mergeBufs_typed (G₁ G₂ : GEnv) (D₁ D₂ : DEnv) (B₁ B₂ : Buffe
               exact BufferTyped_monoG hBT₁ (by
                 intro ep L hLookup
                 simpa [mergeGEnv] using
+/- ## Structured Block 2 -/
                   (lookupG_append_left (G₁ := G₁) (G₂ := G₂) (e := ep) (L := L) hLookup))
             simpa [BufferTyped, hTraceEq, hBufEq] using hBT₁'
   -- mergeBufs_typed: Left Trace Present Case
@@ -95,7 +89,6 @@ theorem mergeBufs_typed (G₁ G₂ : GEnv) (D₁ D₂ : DEnv) (B₁ B₂ : Buffe
               simpa [mergeGEnv] using
                 (lookupG_append_left (G₁ := G₁) (G₂ := G₂) (e := ep) (L := L) hLookup))
           simpa [BufferTyped, hTraceEq, hBufEq] using hBT₁'
-
 -- Linear Context Merge Lemmas
 theorem mergeLin_valid (G₁ G₂ : GEnv) (L₁ L₂ : LinCtx)
     (hValid₁ : ∀ e S, (e, S) ∈ L₁ → lookupG G₁ e = some S)
@@ -121,6 +114,7 @@ theorem mergeLin_unique (L₁ L₂ : LinCtx)
     (hUnique₁ : L₁.Pairwise (fun a b => a.1 ≠ b.1))
     (hUnique₂ : L₂.Pairwise (fun a b => a.1 ≠ b.1))
     (hDisjoint : ∀ e, (∃ S, (e, S) ∈ L₁) → ∀ S', (e, S') ∉ L₂) :
+/- ## Structured Block 3 -/
     (mergeLin L₁ L₂).Pairwise (fun a b => a.1 ≠ b.1) := by
   refine (List.pairwise_append.2 ?_)
   refine ⟨hUnique₁, hUnique₂, ?_⟩
@@ -173,6 +167,7 @@ private theorem HeadCoherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
           | some (.recv _ T _) =>
               match lookupD D₁ e with
               | [] => True
+/- ## Structured Block 4 -/
               | T' :: _ => T = T'
           | some (.branch _ _) =>
               match lookupD D₁ e with
@@ -226,6 +221,7 @@ private theorem ValidLabels_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} {B₁ B�
     (hDisjG : DisjointG G₁ G₂)
     (hConsB₁ : BConsistent G₁ B₁)
     (hConsB₂ : BConsistent G₂ B₂) :
+/- ## Structured Block 5 -/
     ValidLabels (mergeGEnv G₁ G₂) (mergeDEnv D₁ D₂) (mergeBufs B₁ B₂) := by
   intro e source bs hActive hBranch
   have hActiveSplit : ActiveEdge G₁ e ∨ ActiveEdge G₂ e :=
@@ -278,6 +274,7 @@ theorem link_preserves_WTMon_full (p₁ p₂ : DeployedProtocol)
     WTMon (composeMonitorState p₁.initMonitorState p₂.initMonitorState) := by
   constructor
   · -- coherent
+/- ## Structured Block 6 -/
     simpa [composeMonitorState] using LinkOKFull_coherent p₁ p₂ hLink
   · -- headCoherent
     simpa [composeMonitorState] using
@@ -330,6 +327,7 @@ theorem link_preserves_WTMon_full (p₁ p₂ : DeployedProtocol)
     intro e S hMem
     have hMem' : (e, S) ∈ p₁.initMonitorState.G ++ p₂.initMonitorState.G := by
       simpa [composeMonitorState, mergeGEnv] using hMem
+/- ## Structured Block 7 -/
     cases List.mem_append.mp hMem' with
     | inl hIn =>
         exact Nat.lt_of_lt_of_le (hWT₁.supply_fresh_G e S hIn) (Nat.le_max_left _ _)
@@ -387,6 +385,7 @@ theorem compose_deadlock_free (p₁ p₂ : DeployedProtocol)
   have hCases : r ∈ p₁.roles ∨ r ∈ p₂.roles := by simpa [List.mem_append] using hMem
   cases hCases with
   | inl hIn₁ =>
+/- ## Structured Block 8 -/
       simpa [composeBundle, ProtocolBundle.fromDeployed, List.elem_eq_mem, hIn₁] using hDF₁ r hIn₁
   | inr hIn₂ =>
       by_cases hIn₁ : r ∈ p₁.roles
@@ -460,6 +459,7 @@ theorem delegation_in_composed_systems
     (s : SessionId) (A B : Role)
     (hLink : LinkOKFull p₁ p₂)
     (hDeleg : DelegationStep p₁.initGEnv G₁' p₁.initDEnv D₁' s A B)
+/- ## Structured Block 9 -/
     (hDisjG' : DisjointG G₁' p₂.initGEnv)
     (hCons₁' : DConsistent G₁' D₁') :
     Coherent (mergeGEnv p₁.initGEnv p₂.initGEnv) (mergeDEnv p₁.initDEnv p₂.initDEnv) ∧

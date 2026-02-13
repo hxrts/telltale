@@ -1,3 +1,4 @@
+
 import Runtime.VM.Runtime.Failure.Core
 
 /-! # Failure Recovery Transitions
@@ -15,6 +16,7 @@ decision is functional. Define `applyRecoveryAction` mapping actions
 to state transitions.
 -/
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 
 universe u
@@ -78,6 +80,7 @@ def applyFailure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   let st0 := appendFailureTraceEvent st .failure s!"failure:{faultClassOfFailure f}"
   match f with
   | .siteCrash site =>
+/- ## Structured Block 2 -/
       let st' := crashSite st0 site
       let evidence : RecoveryEvidence :=
         { retryAttempt := 0
@@ -131,6 +134,7 @@ def applyFailure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   | .timeout edge _deadline =>
       let st' := reconcileBeforeReplay st0 edge.sid
       let retryAttempt :=
+/- ## Structured Block 3 -/
         if st'.clock >= _deadline then st'.clock - _deadline else 0
       let certainty : CommitCertainty :=
         if st'.clock >= _deadline then .unknown else .boundedDiff
@@ -197,6 +201,7 @@ def failureTick {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
 -- # Relational failure-step semantics
 
 inductive FStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+/- ## Structured Block 4 -/
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]

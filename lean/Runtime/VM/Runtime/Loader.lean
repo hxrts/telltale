@@ -1,3 +1,4 @@
+
 import Runtime.VM.Model.State
 import Runtime.VM.Semantics.ExecHelpers
 import Runtime.VM.Model.Program
@@ -20,6 +21,7 @@ then packages result-typed and compatibility APIs plus monotonicity lemmas for
 the allocated session identifier.
 -/
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 
 universe u
@@ -87,6 +89,7 @@ def nextFreshSessionId {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     sid
   else
     let maxSeen := (existingSessionIds st).foldl Nat.max sid
+/- ## Structured Block 2 -/
     maxSeen + 1
 
 private lemma nextFreshSessionId_ge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -143,6 +146,7 @@ private def validateImage? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
           match projected? with
           | none => true
           | some projected =>
+/- ## Structured Block 3 -/
               reprStr (localTypeRToLocalType projected.1) != reprStr claimed) with
     | some role => some s!"projection mismatch for role {role}"
     | none => none
@@ -200,6 +204,7 @@ private def loadChoreographyCore {ι γ π ε ν : Type u} [IdentityModel ι] [G
       , specState := none }
     (coros.push coro, ready ++ [nextId], nextId + 1)
   let (coroutines', readyQueue', nextCoroId') :=
+/- ## Structured Block 4 -/
     image.program.entryPoints.foldl mkCoro (st.coroutines, st.sched.readyQueue, st.nextCoroId)
   let sched' := { st.sched with readyQueue := readyQueue' }
   let trace' := st.obsTrace ++ [{ tick := st.clock, event := .opened sid roles }]
@@ -259,6 +264,7 @@ theorem loadChoreography_snd_ge_nextSessionId
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+/- ## Structured Block 5 -/
     [IdentityVerificationBridge ι ν]
     [Inhabited (EffectRuntime.EffectCtx ε)]
     (st : VMState ι γ π ε ν) (image : CodeImage γ ε) :

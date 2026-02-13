@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Framing.Lemmas.MiddleFrameCases
 import Protocol.Typing.Framing.Lemmas.MiddleFrameParSkipCases
 
@@ -18,6 +19,7 @@ from `MiddleFrameCases`. Handle recursive cases (seq, par) by invoking
 the induction hypothesis.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -76,6 +78,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       exact preserved_sub_middle_seq_skip
         (D:=D) (store:=store) (bufs:=bufs) (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
         (G:=G) (Ssh:=Ssh) (Sown:=Sown) (Q:=Q)
+/- ## Structured Block 2 -/
         (Sfin:=Sfin) (Gfin:=Gfin) (W:=W) (Δ:=Δ)
         hEqG (TypedStep.seq_skip (D:=D) (store:=store) (bufs:=bufs) (Q:=Q)) hPre
   -- Parallel-Left Constructor
@@ -129,6 +132,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       have hDisjLeftG1 : DisjointG Gleft splitMid.G1 := by
         have hSym : DisjointG Gmid Gleft := DisjointG_symm hDisjLM
         have hTmp : DisjointG splitMid.G1 Gleft := DisjointG_of_subset_left hSubG1 hSym
+/- ## Structured Block 3 -/
         exact DisjointG_symm hTmp
       have hDisjLeftG2 : DisjointG Gleft splitMid.G2 := by
         have hSym : DisjointG Gmid Gleft := DisjointG_symm hDisjLM
@@ -180,6 +184,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       have hDisjInQNew : DisjointS (Sown0.right ++ S₁_step) split.S2 :=
         DisjointS_append_left hDisjRightS2 hStepS2
       have hDisjOutQNew : DisjointS (Sown0.right ++ S₁_step) S₂_fin :=
+/- ## Structured Block 4 -/
         DisjointS_append_left hDisjRightS2Fin hStepS2fin
       have hQ0 :
           HasTypeProcPreOut Ssh0 { right := Sown0.right ++ split.S1, left := split.S2 } splitMid.G2 Q0
@@ -232,6 +237,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
         have hs' := SessionsOf_append_subset (G₁:=G₁_mid') (G₂:=splitMid.G2) hs
         cases hs' with
         | inl hsL =>
+/- ## Structured Block 5 -/
             have hsMid1 : s ∈ SessionsOf splitMid.G1 := hSubSess1 hsL
             simpa [splitMid, splitMid.hG] using
               (SessionsOf_append_left (G₁:=splitMid.G1) (G₂:=splitMid.G2) hsMid1)
@@ -285,6 +291,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       -- `par_right`: Session/Disjointness Projections
       have hSubG1 : SessionsOf splitMid.G1 ⊆ SessionsOf Gmid := by
         intro s hs
+/- ## Structured Block 6 -/
         simpa [splitMid, splitMid.hG] using
           (SessionsOf_append_left (G₁:=splitMid.G1) (G₂:=splitMid.G2) hs)
       have hSubG2 : SessionsOf splitMid.G2 ⊆ SessionsOf Gmid := by
@@ -336,6 +343,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       have hStepS1 : DisjointS S₂_step split.S1 := by
         have hTmp : DisjointS split.S1 S₂_step :=
           DisjointS_of_domsubset_right hDomStep hDisjS_right
+/- ## Structured Block 7 -/
         exact DisjointS_symm hTmp
       have hStepS1fin : DisjointS S₂_step S₁_fin := by
         have hTmp : DisjointS S₁_fin S₂_step :=
@@ -388,6 +396,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
           hG := rfl }
       have hParMid :
           HasTypeProcPreOut Ssh0 { right := Sown0.right, left := splitMid.S1 ++ S₂_step }
+/- ## Structured Block 8 -/
             (splitMid.G1 ++ G₂_mid') (.par splitMid.S1.length nG0 P0 Q0')
             Sfin Gfin (W₁ ++ W₂') (Δ₁ ++ Δ₂') :=
         HasTypeProcPreOut.par splitOut rfl hSfin hGfin rfl rfl

@@ -86,6 +86,7 @@ lemma preserved_sub_left_frame_select
       have hG₁e : lookupG G₁ e = some (.select q' bs') := by
         simpa [hEqE] using hG'
       have hBs : bs' = bs :=
+/- ## Structured Block 1 -/
         select_branches_eq (G₁:=G₁) (G₂:=G₂) (G:=G) (e:=e) (target:=target) (q:=q')
           (bs:=bs) (bs':=bs') hEq hG₁e hG
       have hL : L' = L :=
@@ -143,6 +144,7 @@ lemma preserved_sub_left_frame_assign_new
     G = G₁' ++ G₂ →
     HasTypeVal G v T_step →
     Sown' = OwnedEnv.updateLeft Sown x T_step →
+/- ## Structured Block 2 -/
     Sfin = OwnedEnv.updateLeft Sown x T_pre →
     Gfin = G₁ →
     lookupSEnv Ssh x = none →
@@ -200,6 +202,7 @@ lemma preserved_sub_left_frame_assign_old
   have hT := HasTypeVal_unique hv'' hv
   cases hT
   have hEqG : G₁' ++ G₂ = G₁ ++ G₂ := by
+/- ## Structured Block 3 -/
     have hEqG0 : G₁' ++ G₂ = G := by
       simpa using hEq'.symm
     simpa [hEq] using hEqG0
@@ -257,6 +260,7 @@ lemma preserved_sub_left_frame_recv_old
     G = G₁ ++ G₂ →
     G' = G₁' ++ G₂ →
     lookupStr store k = some (.chan e) →
+/- ## Structured Block 4 -/
     lookupG G e = some (.recv source T L) →
     G' = updateG G e L →
     Sown' = OwnedEnv.updateLeft Sown x T →

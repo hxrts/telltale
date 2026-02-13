@@ -230,6 +230,7 @@ theorem part_of2_substitute (role : String) :
             exact hrepl
   | .delegate p q sid r cont =>
       have hcases := part_of2_delegate_inv (role := role) h
+/- ## Structured Block 1 -/
       simp only [GlobalType.substitute] at hcases h
       cases hcases with
       | inl hpart =>
@@ -393,6 +394,7 @@ mutual
               -- participation through a branch
               have hexists :
                   ∃ pair, pair ∈ branches ∧ part_of2 role pair.2 :=
+/- ## Structured Block 2 -/
                 (participatesBranches_iff_part_of2 role branches).1 hbranches
               obtain ⟨pair, hmem, hcont⟩ := hexists
               exact .intro _ (.comm_branch _ _ pair.1 pair.2 _ hmem hcont)
@@ -447,6 +449,7 @@ mutual
               exact ⟨pair, by simp [hmem], hpo⟩
         · intro h
           obtain ⟨pair, hmem, hpo⟩ := h
+/- ## Structured Block 3 -/
           simp [participatesBranches]  -- reduces to head/tail cases
           have hmem' := (List.mem_cons).1 hmem
           cases hmem' with

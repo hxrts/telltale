@@ -1,3 +1,4 @@
+
 import Runtime.Proofs.ProgressCore
 
 /-! # Runtime.Proofs.ProgressTheorems
@@ -11,6 +12,7 @@ The Problem. Derive executable progress and termination consequences from VM-lev
 Solution Structure. State enabled-frontier progress, fairness termination, and frame-preservation theorems.
 -/
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 set_option relaxedAutoImplicit false
 
@@ -87,6 +89,7 @@ def vmTypeMeasure (store : SessionStore ν) : Nat :=
   ((SessionStore.toGEnv store).map (fun p => p.2.progressMeasure)).foldl (· + ·) 0
 
 /-- Sum of pending trace payload sizes in a session store. -/
+/- ## Structured Block 2 -/
 def vmTraceMeasure (store : SessionStore ν) : Nat :=
   ((SessionStore.toDEnv store).list.map (fun p => p.2.length)).foldl (· + ·) 0
 
@@ -166,6 +169,7 @@ theorem instr_preserves_HeadCoherent_other {store store' : SessionStore ν}
       match lookupG (SessionStore.toGEnv store') { sid := e.sid, role := e.receiver } with
       | some (.recv _ T _) =>
           match lookupD (SessionStore.toDEnv store') e with
+/- ## Structured Block 3 -/
           | [] => True
           | T' :: _ => T = T'
       | some (.branch _ _) =>

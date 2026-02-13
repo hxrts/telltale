@@ -1,3 +1,4 @@
+
 import Protocol.Preservation.FrameLeft
 
 /-! # Subject Reduction
@@ -14,6 +15,7 @@ Solution Structure. Prove `subject_reduction` by induction on `TypedStep`,
 constructing the corresponding `StepBase` case and lifting it to `Step`.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -76,6 +78,7 @@ theorem subject_reduction {n : SessionId}
                    bufs := updateBuf bufs { sid := e.sid, sender := source, receiver := e.role } vs,
                    G := updateG G e L,
                    D := updateD D { sid := e.sid, sender := source, receiver := e.role } (lookupD D { sid := e.sid, sender := source, receiver := e.role }).tail } :=
+/- ## Structured Block 2 -/
         StepBase.branch rfl hk hG hBuf hFindP hFindT hDeq
       simpa [C] using (Step.base hStep)
   -- Subject Reduction Case: Assign
@@ -132,6 +135,7 @@ theorem subject_reduction {n : SessionId}
       simpa [C, C0'] using
         (Step.par_right (nS':=split.S1.length) (nG':=nG) hProc hSub')
   -- Subject Reduction Case: Parallel Skip Cases
+/- ## Structured Block 3 -/
   | par_skip_left =>
       refine Step.base ?_
       exact StepBase.par_skip_left rfl

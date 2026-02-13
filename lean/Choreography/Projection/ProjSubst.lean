@@ -318,6 +318,7 @@ mutual
             simp [GlobalType.substitute, projTrans, Choreography.Projection.Trans.trans,
               LocalTypeR.substitute, hguard]
         · have hrepl_closed : (projTrans G role).isClosed = true :=
+/- ## Structured Block 1 -/
             Choreography.Projection.Project.trans_isClosed_of_isClosed G role hclosed
           have hrepl_guarded : (projTrans G role).isGuarded s = true :=
             SessionTypes.LocalTypeR.isGuarded_of_closed (projTrans G role) s (by simpa using hrepl_closed)
@@ -376,6 +377,7 @@ mutual
         simp [SessionTypes.GlobalType.substituteBranches, projTransBranches,
           Choreography.Projection.Trans.transBranches]
     | (label, cont) :: tail, t, G, role, hclosed => by
+/- ## Structured Block 2 -/
         simp [SessionTypes.GlobalType.substituteBranches, projTransBranches,
           Choreography.Projection.Trans.transBranches,
           proj_subst cont t G role hclosed, proj_subst_branches tail t G role hclosed]

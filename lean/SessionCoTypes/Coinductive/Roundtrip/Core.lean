@@ -1,3 +1,4 @@
+
 import Mathlib
 import SessionCoTypes.Coinductive.Bridge
 import SessionCoTypes.Coinductive.LocalTypeC
@@ -17,6 +18,7 @@ import SessionCoTypes.Coinductive.BisimDecidable
 import SessionCoTypes.Coinductive.WellFormed
 import SessionTypes.LocalTypeR
 
+/- ## Structured Block 1 -/
 set_option linter.dupNamespace false
 
 /-! # Round-Trip Correctness
@@ -118,6 +120,7 @@ lemma mu_clo_compat : Paco.Compatible EQ2CMono mu_clo := by
 
 lemma BranchesRelC_gupaco_clo {rr : LocalTypeC → LocalTypeC → Prop}
     {bs cs : List (Label × LocalTypeC)}
+/- ## Structured Block 2 -/
     (hbr : BranchesRelC rr bs cs) :
     BranchesRelC (Paco.gupaco_clo EQ2CMono mu_clo rr) bs cs := by
   refine BranchesRelC_mono ?_ hbr
@@ -181,6 +184,7 @@ theorem EQ2CE_resolved'_to_mu_paco {a b : LocalTypeC} (h : EQ2CE_resolved' a b) 
       have hrel' : ObservableRelC ((EQ2CE_resolved' ⊔ EQ2C) ⊔ ⊥) a b :=
         ObservableRelC_mono (fun _ _ hr => Or.inl (Or.inr hr)) hrel
       exact EQ2C_mu_step.obs hrel'
+/- ## Structured Block 3 -/
   | inl hR =>
       rcases hR with ⟨ρ, hResL, hVarR, hce⟩
       have hstep := EQ2CE_unfold hce
@@ -235,6 +239,7 @@ theorem EQ2CE_resolved'_to_mu_paco {a b : LocalTypeC} (h : EQ2CE_resolved' a b) 
           have hvar_b : UnfoldsToVarC b x := UnfoldsToVarC_of_head hb
           exact EQ2C_mu_step.obs (ObservableRelC.is_var x hvar_a hvar_b)
       -- μ-paco Embed: μ-unfold Cases
+/- ## Structured Block 4 -/
       | mu_left ha hmem hrel =>
           rename_i x f
           have hEnvL' : EnvResolvesL (envInsertL ρ x b) := EnvResolvesL_insertL_mem hResL hmem
@@ -292,6 +297,7 @@ theorem EQ2CE_resolved'_step_to_EQ2C {a b : LocalTypeC}
           intro x c hc; simp only [envInsertL, envR] at hc; exact hVarR x c hc
         exact EQ2CE_step.mu_left ha hmem ⟨hEnvL', hVarR', hrel⟩
     | mu_right hb hrel =>
+/- ## Structured Block 5 -/
         rename_i vname f
         have hEnvL' : EnvResolvesL (envInsertR ρ vname (mkVar vname)) := by
           intro x c hc; simp only [envInsertR, envL] at hc; exact hResL x c hc

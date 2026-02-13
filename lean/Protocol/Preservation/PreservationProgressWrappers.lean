@@ -1,3 +1,4 @@
+
 import Protocol.Preservation.ValidLabelsHeadCoherent
 
 /-! # Preservation and Progress Wrappers
@@ -15,6 +16,7 @@ using disjointness and consistency to isolate each component's trace.
 Provide wrapper theorems connecting typed configs to progress.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -72,6 +74,7 @@ theorem HeadCoherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
   have hGrecv' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.receiver } = some Lrecv := by
     simpa [lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.receiver }) hG1none]
       using hGrecv
+/- ## Structured Block 2 -/
   have hGsender' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.sender } = some Lsender := by
     have hG1none' : lookupG G₁ { sid := e.sid, role := e.sender } = none :=
       lookupG_none_of_not_session hNot
@@ -124,6 +127,7 @@ theorem HeadCoherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
       have hActiveLeft : ActiveEdge G₁ e :=
         ActiveEdge_of_endpoints hSenderLeft hLeft
       have hHeadLeft := hHead1 e hActiveLeft
+/- ## Structured Block 3 -/
       have hHeadLeft' : match some Lrecv with
         | some (LocalType.recv a T a_1) =>
           match lookupD D₁ e with
@@ -177,6 +181,7 @@ theorem typed_step_preserves_headcoherent
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     HeadCoherent G D →
+/- ## Structured Block 4 -/
     Coherent G D →
     HeadCoherent G' D' := by
   intro hTS hHead hCoh
@@ -231,6 +236,7 @@ theorem preservation_typed
   have hStore' :
       StoreTypedStrong G' (SEnvAll Ssh Sown') store' :=
     StoreTypedStrong_preserved hTS hStore hPre hOwn hDisjRightFin
+/- ## Structured Block 5 -/
   have hCoh' : Coherent G' D' := typed_step_preserves_coherence hTS hCoh
   have hBT' : BuffersTyped G' D' bufs' := BuffersTyped_preserved hTS hCoh hBT
   have hHead' : HeadCoherent G' D' := typed_step_preserves_headcoherent hTS hHead hCoh

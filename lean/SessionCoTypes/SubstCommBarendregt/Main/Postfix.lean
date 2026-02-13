@@ -1,3 +1,4 @@
+
 import SessionCoTypes.SubstCommBarendregt.Main.StandardCase
 
 /-! # SessionCoTypes.SubstCommBarendregt.Main.Postfix
@@ -10,6 +11,7 @@ The Problem. Prove `SubstRel` is closed under one-step EQ2 unfolding.
 Solution Structure. Constructor-by-constructor EQ2F case analysis.
 -/
 
+/- ## Structured Block 1 -/
 namespace SessionCoTypes.SubstCommBarendregt
 open SessionTypes.LocalTypeR
 open SessionCoTypes.EQ2
@@ -71,6 +73,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     exact ⟨hp, BranchesRel_substitute var repl bs cs hbranches hbarA hbarB hfresh⟩
   -- Recursive Pair Case: `mu` vs `mu`
   -- mu-mu
+/- ## Structured Block 2 -/
   case mu.mu t body s body' =>
     unfold notBoundAt at hbarA hbarB
     have ⟨hvart, hbarBody⟩ := Bool.and_eq_true_iff.mp hbarA
@@ -126,6 +129,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     have htvar := bne_of_notBoundAt_mu hbarA
     unfold notBoundAt at hbarA
     have ⟨hvart, hbarBody⟩ := Bool.and_eq_true_iff.mp hbarA
+/- ## Structured Block 3 -/
     have htne : t ≠ var := by simp only [bne_iff_ne, ne_eq] at hvart; exact fun h => hvart h.symm
     have hmu_t_bar : notBoundAt var (.mu t body) = true := by
       unfold notBoundAt; exact Bool.and_eq_true_iff.mpr ⟨hvart, hbarBody⟩
@@ -178,6 +182,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
         have hsr : SubstRel var (.recv p bs) ((body.substitute t (.mu t body)).substitute var (.recv p bs))
             ((LocalTypeR.var v).substitute var (.recv p bs)) :=
           SubstRel.base (body.substitute t (.mu t body)) (LocalTypeR.var v) hf
+/- ## Structured Block 4 -/
             (notBoundAt_subst var t body (.mu t body) hbarBody hmu_t_bar)
             (by rfl : notBoundAt var (.var v) = true)
         rw [var_substitute_eq v var (.recv p bs) hv] at hsr
@@ -231,6 +236,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     · have hv' : (v == var) = false := by cases h : v == var <;> simp_all
       have hb_subst := var_substitute_ne v var repl hv'
       rw [hb_subst]
+/- ## Structured Block 5 -/
       simp only [EQ2F_mu_var]
       rw [subst_mu_comm body var t repl hbarBody hfresh htne]
       apply Or.inl
@@ -285,6 +291,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
       SubstRel.base (body.substitute t (.mu t body)) (LocalTypeR.recv p bs) hf
         (notBoundAt_subst var t body (.mu t body) hbarBody hmu_t_bar)
         hbarB_orig
+/- ## Structured Block 6 -/
     rw [hb_subst] at hsr
     exact hsr
   -- Mixed Case: `end` vs `mu`
@@ -341,6 +348,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
         simp only [ha_subst, hb_subst, EQ2F_var_mu]
         rw [subst_mu_comm body' var s (.var w) hbarBody' (by intro t'; exact hfresh t') hsne]
         apply Or.inl
+/- ## Structured Block 7 -/
         have hsr : SubstRel var (.var w) ((LocalTypeR.var v).substitute var (.var w))
             ((body'.substitute s (.mu s body')).substitute var (.var w)) :=
           SubstRel.base (LocalTypeR.var v) (body'.substitute s (.mu s body')) hf
@@ -393,6 +401,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
             mu_substitute_ne s body' var (LocalTypeR.mu t body) hsvar
           have hsr : SubstRel var (LocalTypeR.mu t body)
               (LocalTypeR.mu t body)
+/- ## Structured Block 8 -/
               (LocalTypeR.mu s (body'.substitute var (LocalTypeR.mu t body))) := by
             have heq : SubstRel var (LocalTypeR.mu t body)
                 ((LocalTypeR.var v).substitute var (LocalTypeR.mu t body))
@@ -446,6 +455,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     rw [subst_mu_comm body' var s repl hbarBody' hfresh hsne]
     apply Or.inl
     have hsr : SubstRel var repl ((LocalTypeR.send p bs).substitute var repl)
+/- ## Structured Block 9 -/
         ((body'.substitute s (.mu s body')).substitute var repl) :=
       SubstRel.base (LocalTypeR.send p bs) (body'.substitute s (.mu s body')) hf
         hbarA_orig

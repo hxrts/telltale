@@ -1,5 +1,7 @@
+
 import SessionCoTypes.Coinductive.BisimDecidable.Core
 
+/- ## Structured Block 1 -/
 set_option linter.dupNamespace false
 
 /-! # SessionCoTypes.Coinductive.BisimDecidable.BisimAux
@@ -108,6 +110,7 @@ lemma childrenOf_send_eq_snd_branchesOf {t : LocalTypeC} {p : String} {labels : 
 
 /-- Helper: childrenOf for recv equals the second components of branchesOf. -/
 lemma childrenOf_recv_eq_snd_branchesOf {t : LocalTypeC} {p : String} {labels : List Label}
+/- ## Structured Block 2 -/
     (hhead : head t = .recv p labels) :
     childrenOf t = (branchesOf t).map (·.2) := by
   simp only [childrenOf, branchesOf, head] at hhead ⊢
@@ -163,6 +166,7 @@ lemma bisimAll_to_BranchesRelC {R : LocalTypeC → LocalTypeC → Prop}
             have hi_succ : i.val + 1 < (b :: bs).length := by
               simp only [List.length_cons]
               omega
+/- ## Structured Block 3 -/
             have hlabel := hlabels ⟨i.val + 1, hi_succ⟩
             simp only [List.get_eq_getElem, List.getElem_cons_succ] at hlabel
             exact hlabel
@@ -226,6 +230,7 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     (hk_b : obsKindOf (fullUnfoldN n b) = some (.obs_send p labels))
     (hchildren : bisimAll (bisimAux fuel n visited_any) (nextPairs n (a, b)) = true)
     (hvisited : ∀ q ∈ visited_any, EQ2C q.1 q.2) :
+/- ## Structured Block 4 -/
     BranchesRelC (BisimRel n)
       (branchesOf (fullUnfoldN n a))
       (branchesOf (fullUnfoldN n b)) := by
@@ -277,6 +282,7 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     have hmap_get_b : (cs.map (·.1)).get j_map = labels.get i_label := by
       have h := List.get_eq_get_of_eq hlabels_b' j_map
       simpa [j_map, i_label, hlen_b] using h
+/- ## Structured Block 5 -/
     have hget_b : (cs.get j).1 = labels.get i_label := by
       have hmap' : (cs.get j).1 = (cs.map (·.1)).get j_map := by
         simp [j, j_map]
@@ -340,6 +346,7 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
       exact this
     have hb : cs.length = labels.length := by
       have := congrArg List.length hlabels_b
+/- ## Structured Block 6 -/
       simp only [List.length_map] at this
       exact this
     omega
@@ -393,6 +400,7 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
                  (List.map (·.2) cs).get ⟨i.val, by simp only [List.length_map]; omega⟩) ∈
                 List.zip (List.map (·.2) bs) (List.map (·.2) cs) := by
       apply List.get_mem_zip
+/- ## Structured Block 7 -/
       simp only [List.length_map, hlen]
     -- Convert hmem to use childrenOf
     have hmem' : ((List.map (·.2) bs).get ⟨i.val, by simp only [List.length_map]; exact i.isLt⟩,

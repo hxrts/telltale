@@ -1,3 +1,4 @@
+
 import Runtime.Proofs.WeightedMeasure.TotalBound
 
 /-! # Runtime.Proofs.WeightedMeasure.SharedParticipants
@@ -13,6 +14,7 @@ Solution Structure. Defines shared-participant helpers and proves the final
 no-overhead theorem.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -86,6 +88,7 @@ lemma perm_cons_filter_sid
         have hsid_eq : hd.sid = s.sid := congrArg (·.sid) heq
         rw [hsid_eq] at hnotmem
         exact hnotmem hmem
+/- ## Structured Block 2 -/
       rw [hfilter]
     · -- hd ≠ s: s is in tail
       have hs_tl : s ∈ tl := by
@@ -157,6 +160,7 @@ theorem shared_participant_no_overhead_unique
     unfold totalWeightedMeasure
     have hpermNat :
         List.Perm (cfg.sessions.map weightedMeasure)
+/- ## Structured Block 3 -/
           ((s1 :: cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure) := by
       exact hperm1.map weightedMeasure
     have hsumEq :
@@ -213,6 +217,7 @@ theorem shared_participant_no_overhead_unique
           = weightedMeasure s1 +
               List.foldl (· + ·) 0 ((cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure) := hsum1
       _ = weightedMeasure s1 +
+/- ## Structured Block 4 -/
             (weightedMeasure s2 +
               List.foldl (· + ·) 0
                 ((((cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid)).map weightedMeasure))) := by

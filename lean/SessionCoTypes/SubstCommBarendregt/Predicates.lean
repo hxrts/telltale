@@ -1,3 +1,4 @@
+
 import SessionCoTypes.EQ2
 import SessionTypes.LocalTypeR
 
@@ -17,6 +18,7 @@ recursion handles branches. Proves duality preservation and substitution helpers
 like `substitute_not_free` (substituting into a term where the variable isn't free).
 -/
 
+/- ## Structured Block 1 -/
 namespace SessionCoTypes.SubstCommBarendregt
 
 open SessionCoTypes.EQ2
@@ -86,6 +88,7 @@ mutual
             cases rest with
             | mk vt t =>
                 simp [dualBranches, isFreeInBranches, isFreeIn_dual, isFreeInBranches_dual]
+/- ## Structured Block 2 -/
 end
 
 -- Duality Preservation: notBoundAt
@@ -148,6 +151,7 @@ mutual
         · -- Not shadowed: recurse
           simp only [htvar, Bool.false_eq_true, ↓reduceIte, notBoundAt]
           unfold notBoundAt at hbar
+/- ## Structured Block 3 -/
           have ⟨hvt, hbarBody⟩ := Bool.and_eq_true_iff.mp hbar
           exact Bool.and_eq_true_iff.mpr ⟨hvt, notBoundAt_subst v var body repl hbarBody hvarRepl⟩
   termination_by sizeOf a
@@ -217,6 +221,7 @@ mutual
           rw [beq_eq_false_iff_ne] at hnot_free ⊢; exact fun h => hnot_free h.symm
         simp only [hwx, Bool.false_eq_true, ↓reduceIte]
     | send p bs =>
+/- ## Structured Block 4 -/
         simp only [LocalTypeR.substitute]
         congr 1
         simp only [isFreeIn] at hnot_free
@@ -282,6 +287,7 @@ mutual
       and t is not free in repl, so t cannot be free in the result. -/
   theorem isFreeIn_subst_self_general (e : LocalTypeR) (t : String) (repl : LocalTypeR)
       (hrepl : isFreeIn t repl = false) :
+/- ## Structured Block 5 -/
       isFreeIn t (e.substitute t repl) = false := by
     cases e with
     | «end» =>
@@ -340,6 +346,7 @@ end
     This is a special case of isFreeIn_subst_self_general where repl = .mu t body. -/
 @[simp]
 theorem isFreeIn_subst_mu_self (body : LocalTypeR) (t : String) :
+/- ## Structured Block 6 -/
     isFreeIn t (body.substitute t (.mu t body)) = false :=
   isFreeIn_subst_self_general body t (.mu t body) (isFreeIn_mu_self t body)
 
@@ -404,6 +411,7 @@ mutual
     | (label, _vt, cont) :: rest =>
         simp only [SessionTypes.LocalTypeR.substituteBranches, isFreeInBranches, Bool.or_eq_false_iff]
         simp only [isFreeInBranches, Bool.or_eq_false_iff] at hv_bs
+/- ## Structured Block 7 -/
         exact ⟨isFreeIn_subst_preserves cont v t repl hv_bs.1 hv_repl,
                isFreeInBranches_subst_preserves rest v t repl hv_bs.2 hv_repl⟩
   termination_by sizeOf bs

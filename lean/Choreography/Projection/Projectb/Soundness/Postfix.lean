@@ -278,6 +278,7 @@ theorem SoundRel_postfix_delegate_delegator
   | «end» =>
       have hfalse : False := by
         dsimp [SoundRel] at h
+/- ## Structured Block 1 -/
         unfold projectb at h
         simpa [hp] using h
       exact hfalse.elim
@@ -345,6 +346,7 @@ theorem SoundRel_postfix_delegate_delegatee
         dsimp [SoundRel] at h
         unfold projectb at h
         simpa [hqeq, hqf, hpf, hqp] using h
+/- ## Structured Block 2 -/
       exact hfalse.elim
   | «end» =>
       have hfalse : False := by

@@ -1,3 +1,4 @@
+
 import SessionCoTypes.Coinductive.Roundtrip.EnvDefs
 
 /-! # Roundtrip Body Case
@@ -15,6 +16,7 @@ Solution Structure. Define `roundtripRel` capturing both forms. Prove
 and showing EQ2CE_step holds for each constructor.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.dupNamespace false
 
 namespace SessionCoTypes.Coinductive
@@ -75,6 +77,7 @@ lemma roundtrip_hpost_body_case
                   unfold toInductiveBody
                   simp [PFunctor.M.dest_mk]
                 have ha : head a = .var x := by
+/- ## Structured Block 2 -/
                   simp [hcore, hbody_var]
                 have hb : head b = .var x := by
                   exact head_of_dest hdest
@@ -127,6 +130,7 @@ lemma roundtrip_hpost_body_case
                   exact head_of_dest hdest
                 have hbranches_a :
                     branchesOf a =
+/- ## Structured Block 3 -/
                       List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)) := by
                   simpa [hcore_send] using (branchesOf_toCoind_send_ofFn (p := p) fR)
                 have hbr' :
@@ -178,6 +182,7 @@ lemma roundtrip_hpost_body_case
                       List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)) := by
                   simpa [hcore_recv] using (branchesOf_toCoind_recv_ofFn (p := p) fR)
                 have hbr' :
+/- ## Structured Block 4 -/
                     BranchesRelCE R ρ
                       (List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)))
                       (List.ofFn (fun i => (labels[i], f i))) := by

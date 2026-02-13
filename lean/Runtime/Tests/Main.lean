@@ -1,3 +1,4 @@
+
 import Runtime.Examples.SimpleProtocol
 import Runtime.VM.Runtime.Runner
 import Runtime.VM.Runtime.Loader
@@ -10,6 +11,7 @@ import SessionTypes.GlobalType
 Executable Lean tests for the scheduled VM runner.
 -/
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 
 open SessionTypes.LocalTypeR
@@ -71,6 +73,7 @@ def twoPartyImage : CodeImage UnitGuard UnitEffect :=
 
 /-- Test helper: assert a boolean. -/
 def expect (ok : Bool) (msg : String) : IO Unit :=
+/- ## Structured Block 2 -/
   if ok then pure () else throw (IO.userError msg)
 
 def mkReadyCoro (id : CoroutineId) (tokens : List ProgressToken := []) :
@@ -127,6 +130,7 @@ def collectSchedulePicks (fuel : Nat)
 def main : IO Unit := do
   -- Test 1: N=1, single protocol.
   let (st1, _) := loadChoreography emptyState twoPartyImage
+/- ## Structured Block 3 -/
   let st1' := runScheduled 50 1 st1
   expect (allTerminal st1') "N=1: not all done"
 
@@ -191,6 +195,7 @@ def main : IO Unit := do
   match schedHandoff.crossLaneHandoffs with
   | h :: _ =>
       expect (decide (h.fromLane = 0 ∧ h.toLane = 1)) "handoff lanes not recorded correctly"
+/- ## Structured Block 4 -/
       expect (decide (h.reason = "transfer 7:A")) "handoff reason tag mismatch"
   | [] => expect false "missing handoff payload"
 
@@ -251,6 +256,7 @@ def main : IO Unit := do
     ]
   let localSingle := runScheduled 20 1 (applyFailureEvents { stFail with clock := 8 } localFaults)
   let localMulti := runScheduled 20 100 (applyFailureEvents { stFail with clock := 8 } localFaults)
+/- ## Structured Block 5 -/
   expect (decide (localSingle.partitionedEdges = localMulti.partitionedEdges))
     "local fault differential: partitioned edges diverged"
   expect (decide (localSingle.failureTrace = localMulti.failureTrace))
@@ -310,6 +316,7 @@ def main : IO Unit := do
   let localEnvMulti := runScheduled 100 32 st4
   let localEnvSingleNorm := Runtime.VM.normalizeTrace localEnvSingle.obsTrace
   let localEnvMultiNorm := Runtime.VM.normalizeTrace localEnvMulti.obsTrace
+/- ## Structured Block 6 -/
   let localS1 := traceTags (filterBySid sid1 localEnvSingleNorm)
   let localM1 := traceTags (filterBySid sid1 localEnvMultiNorm)
   let localS2 := traceTags (filterBySid sid2 localEnvSingleNorm)
@@ -370,6 +377,7 @@ def main : IO Unit := do
 
   -- Test 18: restart/refinement preserves structured error adequacy (identity checkpoint/restart baseline).
   let checkpointId := fun (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify) => st
+/- ## Structured Block 7 -/
   let restartId := fun (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify) => st
   let restarted := restartId (checkpointId refFaultRun)
   expect (decide (restarted.structuredErrorEvents = refFaultRun.structuredErrorEvents))

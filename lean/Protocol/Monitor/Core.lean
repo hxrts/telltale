@@ -16,7 +16,6 @@ Solution Structure. We define:
 4. Capability token interface for untrusted code interaction
 -/
 
-
 /-! ## Overview
 
 The monitor is the trusted component that:
@@ -155,6 +154,7 @@ inductive MonStep : MonitorState → ProtoAction → Value → MonitorState → 
           G := updateG ms.G e L
           D := updateD ms.D (MonitorState.sendEdge e target)
               (lookupD ms.D (MonitorState.sendEdge e target) ++ [T])
+/- ## Structured Block 1 -/
           bufs := enqueueBuf ms.bufs (MonitorState.sendEdge e target) v
           Lin := LinCtx.produceToken lin' e L }
 
@@ -241,6 +241,7 @@ structure WTMon (ms : MonitorState) : Prop where
 /-- Complete monitor invariant: well-typedness plus role completeness. -/
 def WTMonComplete (ms : MonitorState) : Prop :=
   -- Combine typing invariants with endpoint coverage.
+/- ## Structured Block 2 -/
   WTMon ms ∧ RoleComplete ms.G
 
 /-- Extract the WTMon component. -/
@@ -309,6 +310,7 @@ theorem mem_consumeToken_preserved (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' :
   | nil =>
     simp only [LinCtx.consumeToken] at hConsume
     exact Option.noConfusion hConsume
+/- ## Structured Block 3 -/
   | cons hd tl ih =>
     simp only [LinCtx.consumeToken] at hConsume
     split_ifs at hConsume with heq
@@ -368,6 +370,7 @@ theorem consumeToken_not_mem (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
       | none =>
         simp only [hConsume'] at hConsume
         exact Option.noConfusion hConsume
+/- ## Structured Block 4 -/
       | some result =>
         simp only [hConsume', Option.some.injEq, Prod.mk.injEq] at hConsume
         obtain ⟨rfl, rfl⟩ := hConsume
@@ -425,6 +428,7 @@ theorem produceToken_pairwise (ctx : LinCtx) (e : Endpoint) (S : LocalType)
     (hNotIn : ∀ S', (e, S') ∉ ctx) :
     (LinCtx.produceToken ctx e S).Pairwise (fun a b => a.1 ≠ b.1) := by
   simp only [LinCtx.produceToken, List.pairwise_cons]
+/- ## Structured Block 5 -/
   constructor
   · -- Show e ≠ every element's first component in ctx
     intro a haMem heq
@@ -485,12 +489,12 @@ theorem produceToken_preserves_supply_fresh (ctx : LinCtx) (e : Endpoint) (S : L
   intro e' S' hMem
   simp only [LinCtx.produceToken, List.mem_cons] at hMem
   cases hMem with
+/- ## Structured Block 6 -/
   | inl heq =>
     simp only [Prod.mk.injEq] at heq
     obtain ⟨rfl, rfl⟩ := heq
     exact heFresh
   | inr hTail =>
     exact hFresh e' S' hTail
-
 
 end

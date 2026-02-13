@@ -147,6 +147,7 @@ def validateAssumption
       , passed := true
       , detail := "Epoch-barrier premise is provided."
       }
+/- ## Structured Block 1 -/
   | .boundedMetadataApproxClass =>
       { assumption := h
       , passed := true

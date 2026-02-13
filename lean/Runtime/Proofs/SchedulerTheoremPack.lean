@@ -1,6 +1,8 @@
+
 import Runtime.Proofs.SchedulerApi
 import Runtime.Proofs.TheoremPack.API
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 
 /-! # Scheduler Theorem Pack
@@ -87,6 +89,7 @@ def buildVMSchedulerArtifact {st₀ : VMState ι γ π ε ν}
     | .cooperative =>
         let pinned : SchedulerPolicyPinned st₀ .cooperative := by
           simpa [SchedulerPolicyPinned, hpol] using bundle.policyPinned
+/- ## Structured Block 2 -/
         some
           { pinned := pinned
           , normalization := cooperative_refines_concurrent_holds st₀
@@ -149,6 +152,7 @@ structure VMProtocolProofPack
   theorems : VMTheoremPack (space := proofSpace.profiles)
 
 /-- Build a combined protocol proof pack from one proof space. -/
+/- ## Structured Block 3 -/
 def buildVMProtocolProofPack
     {store₀ : SessionStore ν}
     (proofSpace : VMProtocolProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :

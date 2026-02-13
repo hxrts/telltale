@@ -98,6 +98,7 @@ theorem DEnvUnion_empty_left (D : DEnv) : DEnvUnion (∅ : DEnv) D = D := by
     rw [hNoneP]
     have hPW' := (List.pairwise_cons.1 hPW)
     refine ih (acc := acc.insert p.1 p.2) hPW'.2 ?_
+/- ## Structured Block 1 -/
     intro q hq
     have hNoneQ := hNone q (List.mem_cons_of_mem p hq)
     have hLT := hPW'.1 q hq
@@ -212,6 +213,7 @@ theorem DEnvUnion_find?_right {D1 D2 : DEnv} {e : Edge}
             exact (Edge.compare_eq_iff_eq e p.1).1 hEq |>.symm
           have hstep1 : (f acc1 p).find? e = acc1.find? e := by
             cases h1 : acc1.find? p.1 with
+/- ## Structured Block 2 -/
             | some v =>
                 simp [f, h1]
             | none =>
@@ -310,6 +312,7 @@ theorem updateD_DEnvUnion_right {D1 D2 : DEnv} {e : Edge} {ts : List ValType}
             (updateD D2 e ts).find? e' = D2.find? e' := by
           have hne' : compare e' e ≠ .eq := by
             intro hEq
+/- ## Structured Block 3 -/
             exact he' ((Edge.compare_eq_iff_eq e' e).1 hEq)
           have hfind :
               (D2.map.insert e ts).find? e' = D2.map.find? e' := by

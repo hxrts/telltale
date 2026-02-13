@@ -1,3 +1,4 @@
+
 import Protocol.Preservation.FrameRight
 
 /-! # Left Frame Preservation
@@ -16,6 +17,7 @@ For each base step (send, recv, select, branch), show the frame is
 untouched by update operations and lookup results are preserved.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -74,6 +76,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
             simp [frameConfigLeft, sendStep, hUpdG, hUpdD, hLookupD]
           simpa [hEq] using (Step.base hStep')
       -- Left Frame Base Case: Recv
+/- ## Structured Block 2 -/
       | recv hProc hk hG hBuf =>
           rename_i Ccfg vs k x e v source T L
           set recvEdge : Edge := { sid := e.sid, sender := source, receiver := e.role }
@@ -125,6 +128,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
             simpa [lookupG_append_right (G₁:=Gfr) (G₂:=Ccfg.G) (e:=e) hGfrNone] using hG
           have hUpdG : updateG (Gfr ++ Ccfg.G) e L = Gfr ++ updateG Ccfg.G e L :=
             updateG_append_right_hit hGfrNone
+/- ## Structured Block 3 -/
           have hUpdD :
               updateD (Dfr ++ Ccfg.D) selEdge (lookupD Ccfg.D selEdge ++ [.string]) =
                 Dfr ++ updateD Ccfg.D selEdge (lookupD Ccfg.D selEdge ++ [.string]) := by
@@ -177,6 +181,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
                           (lookupD (frameConfigLeft Ccfg Gfr Dfr).D brEdge).tail } := by
             refine (@StepBase.branch vs vOut (frameConfigLeft Ccfg Gfr Dfr)
               k e ℓ source procBranches typeBranches P L bufs' ?_ ?_ ?_ ?_ ?_ ?_ ?_)
+/- ## Structured Block 4 -/
             · simpa [frameConfigLeft] using hProc
             · simpa [frameConfigLeft] using hk
             · exact hLookupG
@@ -230,6 +235,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
           simpa [hEq] using (Step.base hStep')
       -- Left Frame Base Case: Seq2
       | seq2 hProc =>
+/- ## Structured Block 5 -/
           rename_i Ccfg Q
           have hStep' : StepBase (frameConfigLeft Ccfg Gfr Dfr)
               { frameConfigLeft Ccfg Gfr Dfr with proc := Q } :=
@@ -285,6 +291,7 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
   | par_right hProc hSub ih =>
       rename_i Ccfg Ccfg' P Q nS nG nS' nG'
       have hProc' : (frameConfigLeft Ccfg Gfr Dfr).proc = .par nS nG P Q := by
+/- ## Structured Block 6 -/
         simpa [frameConfigLeft] using hProc
       have hDisj' : DisjointG Gfr { Ccfg with proc := Q }.G := by
         simpa using hDisj

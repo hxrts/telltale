@@ -1,3 +1,4 @@
+
 import Protocol.Preservation
 import Protocol.DeadlockFreedomReachability
 
@@ -12,6 +13,7 @@ The Problem. Lift reachability assumptions into full configuration progress and 
 Solution Structure. Define done/stuck predicates, prove deadlock-freedom, then isolate sessions.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -109,6 +111,7 @@ theorem not_stuck (C : Config) (Ssh Sown : SEnv)
   rcases hStuck with ⟨hNotDone, hNotProg⟩
   have h := deadlock_free (C:=C) (Ssh:=Ssh) (Sown:=Sown) hWF hReady hReaches
   cases h with
+/- ## Structured Block 2 -/
   | inl hDone => exact hNotDone hDone
   | inr hProg => exact hNotProg hProg
 
@@ -184,6 +187,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     -- Now goal is: lookup C.bufs = lookup (updateBuf C.bufs edge _) queryEdge
     symm
     apply lookupBuf_update_neq
+/- ## Structured Block 3 -/
     intro heq
     have h1 : (_ : Edge).sid = queryEdge.sid := congrArg Edge.sid heq
     simp only [queryEdge] at h1
@@ -250,6 +254,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     rfl
   | par_skip_left hProc =>
     -- par_skip_left doesn't modify buffers
+/- ## Structured Block 4 -/
     rfl
   | par_skip_right hProc =>
     -- par_skip_right doesn't modify buffers

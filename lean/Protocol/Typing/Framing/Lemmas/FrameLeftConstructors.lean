@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Framing.Lemmas.FrameLeftCore
 
 /-! # Left Frame Constructor Lemmas
@@ -15,6 +16,7 @@ for each process constructor. Use core lemmas from `FrameLeftCore` to
 lift lookups and push updates into the appropriate GEnv portion.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -78,6 +80,7 @@ theorem frame_left_recv_new
   intro hDisjS hDisjS' hDisjG hk hG hSsh hSown
   have hk' :
       lookupSEnv (SEnvVisible Ssh { right := S₁, left := S₂ }) k = some (.chan e.sid e.role) := by
+/- ## Structured Block 2 -/
     simpa [SEnvVisible] using hk
   have hG' := lookupG_frame_left hDisjG hG
   have hDisjSym := DisjointG_symm hDisjG
@@ -136,6 +139,7 @@ theorem frame_left_select
     HasTypeProcPreOut Ssh { right := S₁, left := S₂ } (G₁ ++ G₂) (.select k l)
       { right := S₁, left := S₂ } (G₁ ++ updateG G₂ e L) [] ∅ := by
   -- Lift lookups and push update into the right GEnv.
+/- ## Structured Block 3 -/
   intro hDisjS hDisjG hk hG hFind
   have hk' :
       lookupSEnv (SEnvVisible Ssh { right := S₁, left := S₂ }) k = some (.chan e.sid e.role) := by
@@ -193,6 +197,7 @@ theorem frame_left_branch
       bs.find? (fun b => b.1 == lbl) = some (lbl, L) →
       HasTypeProcPreOut Ssh S₂ (updateG G₂ e L) P S₂' G₂' W Δ) →
     SessionsOf G₂' ⊆ SessionsOf G₂ →
+/- ## Structured Block 4 -/
     SEnvDomSubset S₂ S₂' →
     (∀ lbl P L,
       procs.find? (fun b => b.1 == lbl) = some (lbl, P) →
@@ -248,6 +253,7 @@ theorem frame_left_branch
 theorem frame_left_assign_new
     {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {x : Var} {v : Value} {T : ValType} :
     DisjointS S₁ (updateSEnv S₂ x T) →
+/- ## Structured Block 5 -/
     DisjointG G₁ G₂ →
     lookupSEnv Ssh x = none →
     lookupSEnv S₂ x = none →

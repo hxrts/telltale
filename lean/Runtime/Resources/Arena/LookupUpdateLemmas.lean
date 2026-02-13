@@ -410,6 +410,7 @@ theorem SessionStore.updateType_preserves_consistent {store : SessionStore ν} {
       | inr hmem =>
         -- tail case: recurse
         have hTlCons : SessionStore.consistent tl := fun sid'' st'' h =>
+/- ## Structured Block 1 -/
           hCons sid'' st'' (List.Mem.tail _ h)
         have hTlMem : ∃ st, (e.sid, st) ∈ tl := by
           obtain ⟨st'', hst''⟩ := hMem
@@ -471,6 +472,7 @@ theorem SessionStore.updateTrace_preserves_consistent {store : SessionStore ν} 
         obtain ⟨hsid_eq, hst_eq⟩ := heq
         have hOrigCons := hCons sid' st' (List.Mem.head _)
         constructor
+/- ## Structured Block 2 -/
         · rw [hst_eq, hsid_eq]; exact hOrigCons.1
         · rw [hst_eq]; exact hOrigCons.2
       | inr hmem =>

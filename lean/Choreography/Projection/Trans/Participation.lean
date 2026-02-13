@@ -158,6 +158,7 @@ mutual
       This is needed for contractiveness: when role is sender/receiver, we need
       participation to continue in ALL continuations, not just the outer level. -/
   def participatesAllBranches (role : String) : GlobalType → Bool
+/- ## Structured Block 1 -/
     | .end => false
     | .var _ => false
     | .mu _ body => participatesAllBranches role body
@@ -282,6 +283,7 @@ theorem trans_isGuarded_of_participatesFirstBranch
                   have hcont : participatesFirstBranch role cont = true := by
                     cases hcont' with
                     | inl hleft =>
+/- ## Structured Block 2 -/
                         have : False := by
                           unfold SessionTypes.Participation.is_participant at hleft
                           simp [hpart_direct] at hleft

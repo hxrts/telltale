@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Progress.TypedStepFrames
 
 /-! # Local Progress Cases
@@ -16,6 +17,7 @@ Solution Structure. Prove `progress_send`, `progress_recv`,
 from typing, looking up the store value, and constructing the step.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -74,6 +76,7 @@ lemma progress_recv
       have hActiveRecv : ActiveEdge G recvEdge := by
         have hGrecv : lookupG G { sid := recvEdge.sid, role := recvEdge.receiver } = some (.recv p T L) := by
           simpa [recvEdge] using hG
+/- ## Structured Block 2 -/
         rcases RoleComplete_recv hComplete hG with ⟨Lsender, hGsender⟩
         exact ActiveEdge_of_endpoints (e:=recvEdge) hGsender hGrecv
       cases hBuf : lookupBuf bufs recvEdge with
@@ -126,6 +129,7 @@ lemma progress_recv
           simpa [recvEdge, hBuf]
       | cons v vs =>
           left
+/- ## Structured Block 3 -/
           have hTypedEdge := hBufs recvEdge
           rcases hTypedEdge with ⟨hLen, hTyping⟩
           have h0buf : 0 < (lookupBuf bufs recvEdge).length := by
@@ -182,6 +186,7 @@ lemma progress_branch
     BuffersTyped G D bufs →
     HeadCoherent G D →
     ValidLabels G D bufs →
+/- ## Structured Block 4 -/
     RoleComplete G →
     (∃ G' D' Sown' store' bufs' P', TypedStep G D Ssh Sown store bufs (.branch k procs)
       G' D' Sown' store' bufs' P') ∨
@@ -233,6 +238,7 @@ lemma progress_branch
                   have hBsSome : (bs.find? (fun b => b.1 == lbl)).isSome := by
                     simpa [hBuf] using hValidEdge
                   rcases (Option.isSome_iff_exists).1 hBsSome with ⟨b, hFindBs⟩
+/- ## Structured Block 5 -/
                   cases b with
                   | mk lbl' L =>
                       -- Branch Progress: Label Alignment and Step Construction

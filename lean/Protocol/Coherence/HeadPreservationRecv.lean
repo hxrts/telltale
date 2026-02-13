@@ -110,6 +110,7 @@ theorem HeadCoherent_recv_preserved
           have hConsume :
               (Consume receiverEp.role (.recv receiverEp.role Trecv L) (Trecv :: ts)).isSome := by
             simpa [hHeadEq] using hConsumeRaw
+/- ## Structured Block 1 -/
           have hConsumeTail : (Consume receiverEp.role L ts).isSome :=
             Consume_tail_of_self_recv (from_:=receiverEp.role) (T:=Trecv) (L:=L) (ts:=ts) hConsume
           cases hL : L with
@@ -160,6 +161,7 @@ theorem HeadCoherent_recv_preserved
           | end_ => trivial
           | send _ _ _ => trivial
           | select _ _ => trivial
+/- ## Structured Block 2 -/
           | var _ => trivial
           | mu _ => trivial
           | recv r T' L' =>
@@ -210,6 +212,7 @@ theorem HeadCoherent_recv_preserved
       cases hL : L with
       | end_ => trivial
       | send _ _ _ => trivial
+/- ## Structured Block 3 -/
       | select _ _ => trivial
       | var _ => trivial
       | mu _ => trivial

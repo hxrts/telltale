@@ -1,3 +1,4 @@
+
 import Protocol.SymmetryCore
 
 /-! # Protocol.SymmetryInverseStep
@@ -11,6 +12,7 @@ The Problem. Recover preimage send/select/branch steps from renamed-step observa
 Solution Structure. Use renamed lookup inversion and branch-membership inversion lemmas.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -74,6 +76,7 @@ theorem inverse_step_send_exists (σ : ProtocolRenaming)
   cases hL : L with
   | send r T Lcont =>
       rw [hL] at hLfull
+/- ## Structured Block 2 -/
       simp only [renameLocalTypePR, LocalType.send.injEq] at hLfull
       obtain ⟨hr', hT', hLcont'⟩ := hLfull
       have hLookup : lookupG G { sid := sid, role := ep.role } = some (.send r T Lcont) := by
@@ -131,6 +134,7 @@ theorem inverse_step_select_exists (σ : ProtocolRenaming)
   have hsid : ep.sid = sid := by
     have := congrArg Endpoint.sid hep'
     simp [renameEndpointPR] at this
+/- ## Structured Block 3 -/
     exact this.symm
   have hrole : σ.roleMap ep.role = s' := by
     have := congrArg Endpoint.role hep'
@@ -187,6 +191,7 @@ theorem inverse_step_select_exists (σ : ProtocolRenaming)
 
 /-- Inverse step for branch: if σ(C) has a branch type, C has a corresponding branch type.
     From Aristotle 06b. -/
+/- ## Structured Block 4 -/
 theorem inverse_step_branch_exists (σ : ProtocolRenaming)
     (G : GEnv) (s' r' : Role) (bs' : List (Label × LocalType)) (l' : Label) (L' : LocalType)
     (sid : SessionId)
@@ -239,6 +244,7 @@ theorem inverse_step_branch_exists (σ : ProtocolRenaming)
       have hFalse : False := by
         simp [renameLocalTypePR] at hLfull
       exact hFalse.elim
+/- ## Structured Block 5 -/
   | end_ =>
       rw [hL] at hLfull
       have hFalse : False := by

@@ -1,5 +1,7 @@
+
 import Distributed.Families.ByzantineSafety
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 
 /-!
@@ -70,6 +72,7 @@ example
     (hDrop : ¬ H.adversarialBudgetBounded)
     (w : SafetyContradictionWitness M) :
     ¬ CharacterizationCondition M := by
+/- ## Structured Block 2 -/
   let cex := thresholdBudgetCounterexample_of_droppedAssumption H hDrop w
   exact thresholdBudgetCounterexample_minimal cex
 
@@ -134,6 +137,7 @@ example (base injected : List ByzantineEvent) :
 
 example (base injected : List ByzantineEvent) :
     Envelope_byz injectedByzantineModel
+/- ## Structured Block 3 -/
       (injectedRun base injected)
       (injectedRun base injected) := by
   intro n

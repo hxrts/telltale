@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Framing.Lemmas.FrameLeftConstructors
 
 /-! # Output Framing Right
@@ -16,6 +17,7 @@ right-owned portion is only used for lookups that don't conflict
 with the left-owned portion under disjointness.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -73,6 +75,7 @@ theorem HasTypeProcPreOut_reframe_right_general
           (G:=G) hk' hG hNoSh hNoOwnL)
   | recv_old hk hG hNoSh hOwn =>
       rename_i Sown G k x e p T L T'
+/- ## Structured Block 2 -/
       intro R' hDisjIn hDisjOut
       have hk' :
           lookupSEnv (SEnvVisible Ssh { right := R', left := Sown.left }) k =
@@ -125,6 +128,7 @@ theorem HasTypeProcPreOut_reframe_right_general
   -- Reframe Right: seq/par cases
   | seq hP hQ ihP ihQ =>
       rename_i Sown G P Q S₁ G₁ S₂ G₂ W₁ W₂ Δ₁ Δ₂
+/- ## Structured Block 3 -/
       intro R' hDisjIn hDisjOut
       have hDomQ : SEnvDomSubset S₁.left S₂.left := HasTypeProcPreOut_domsubset hQ
       have hDisjMid : DisjointS R' S₁.left :=
@@ -176,6 +180,7 @@ theorem HasTypeProcPreOut_reframe_right_general
         simpa using (lookupSEnv_update_eq (env:=Sown.left) (x:=x) (T:=T))
       have hNoOwnR' : lookupSEnv R' x = none :=
         lookupSEnv_none_of_disjoint_left hDisjOut' hxOut
+/- ## Structured Block 4 -/
       have hErase : eraseSEnv R' x = R' := eraseSEnv_of_lookup_none hNoOwnR'
       have hNoOwnL' : lookupSEnv ({ right := R', left := Sown.left } : OwnedEnv).left x = none := by
         simpa using hNoOwnL
@@ -233,6 +238,7 @@ theorem frame_left_par
     (hDisjS' : DisjointS S₁' S₂')
     (hDisjW : DisjointW W₁ W₂)
     (hDisjΔ : DisjointS Δ₁ Δ₂)
+/- ## Structured Block 5 -/
     (hQ : HasTypeProcPreOut Ssh split.S2 split.G2 Q S₂' G₂' W₂ Δ₂)
     (hDisjS_frame : DisjointS S₁ S₂)
     (hDisjS_frame' : DisjointS S₁ Sfin)
@@ -285,6 +291,7 @@ theorem frame_left_par
       (G:=G₁ ++ split.G1) (P:=P) hDisjInP hDisjOutP hP0
   have hQ0 :
       HasTypeProcPreOut Ssh { right := (∅ : SEnv), left := split.S2 } split.G2 Q
+/- ## Structured Block 6 -/
         { right := (∅ : SEnv), left := S₂' } G₂' W₂ Δ₂ := by
     simpa using hQ
   have hDisjInQ : DisjointS (S₁ ++ split.S1) split.S2 :=

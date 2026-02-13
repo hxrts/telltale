@@ -1,6 +1,8 @@
+
 import SessionCoTypes.Coinductive.Roundtrip.Core
 import SessionCoTypes.Coinductive.Roundtrip.GpacoCollapse
 
+/- ## Structured Block 1 -/
 set_option linter.dupNamespace false
 
 /-! # SessionCoTypes.Coinductive.Roundtrip.PacoCollapse
@@ -78,6 +80,7 @@ lemma mem_childrenOf_of_mem_branchesOf {u : LocalTypeC} {b : Label × LocalTypeC
 -- Reachability from Observable Branches
 
 lemma reachable_of_canSendC_mem {t : LocalTypeC} {p : String} {bs : List (Label × LocalTypeC)}
+/- ## Structured Block 2 -/
     (h : CanSendC t p bs) {b : Label × LocalTypeC} (hmem : b ∈ bs) :
     b.2 ∈ Reachable t := by
   rcases h with ⟨u, labels, hunf, hhead, hbs⟩
@@ -135,6 +138,7 @@ theorem EQ2C_mu_paco_le_paco_of_productive {a b : LocalTypeC}
                 reachable_of_canSendC_mem hb_send (hsub_r (by simp))
               have hprod_l : ProductiveC b0.2 := productive_of_reachable hx hreach_l
               have hprod_r : ProductiveC c0.2 := productive_of_reachable hy hreach_r
+/- ## Structured Block 3 -/
               have hsub_l' : ∀ {b}, b ∈ bs'' → b ∈ bs := by
                 intro b hb
                 exact hsub_l (by simp [hb])
@@ -201,6 +205,7 @@ theorem EQ2CE_resolved'_implies_EQ2C (a b : LocalTypeC) (h : EQ2CE_resolved' a b
     EQ2CE_resolved'_implies_EQ2C. -/
 theorem EQ2CE_to_EQ2C' {ρ : EnvPair} {a b : LocalTypeC}
     (hce : EQ2CE ρ a b) (hEnvL : EnvResolvesL ρ) (hVarR : EnvVarR ρ)
+/- ## Structured Block 4 -/
     (ha : ProductiveC a) (hb : ProductiveC b) :
     EQ2C a b :=
   EQ2CE_resolved'_implies_EQ2C a b ⟨ρ, hEnvL, hVarR, hce⟩ ha hb
@@ -284,6 +289,7 @@ theorem EQ2CE_to_EQ2C_paco_toCoind
 
 /-- Erasure for projection sources, discharging productivity. -/
 theorem EQ2CE_to_EQ2C_projTrans {ρ : EnvPair}
+/- ## Structured Block 5 -/
     {g₁ g₂ : SessionTypes.GlobalType.GlobalType}
     {role₁ role₂ : String}
     (hce : EQ2CE ρ

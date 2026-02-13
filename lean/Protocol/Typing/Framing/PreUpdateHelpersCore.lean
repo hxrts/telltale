@@ -1,3 +1,4 @@
+
 import Protocol.Environments.Core
 import Protocol.Typing.StepLemmas
 import Protocol.Typing.MergeLemmas
@@ -18,6 +19,7 @@ Solution Structure.
 3. Provide endpoint and left-frame update alignment helpers.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -74,6 +76,7 @@ lemma lookupSEnv_all_of_visible
         exact lookupSEnv_none_of_disjoint_left
           (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) (T:=T)
           hOwnDisj hLeftSome
+/- ## Structured Block 2 -/
       have hOwnSome : lookupSEnv (Sown : SEnv) x = some T := by
         have hOwnRight := lookupSEnv_append_right (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) hRightNone
         simpa [hOwnRight] using hLeftSome
@@ -138,6 +141,7 @@ lemma DisjointS_owned_right_pu {S₁ : SEnv} {Sown : OwnedEnv} :
 
 /-- Project shared-vs-owned disjointness to the owned left segment. -/
 lemma DisjointS_owned_left_pu {S₁ : SEnv} {Sown : OwnedEnv} :
+/- ## Structured Block 3 -/
     DisjointS S₁ (Sown : SEnv) →
     DisjointS S₁ Sown.left := by
   intro hDisj
@@ -202,6 +206,7 @@ lemma OwnedDisjoint_sub_left_pu
     simpa [OwnedDisjoint, split.hS] using hOwn
   have hR1 : DisjointS Sown.right split.S1 := DisjointS_split_left_pu hOwnLeftAll
   have hS2S1 : DisjointS split.S2 split.S1 := DisjointS_symm hDisjS
+/- ## Structured Block 4 -/
   have hAll : DisjointS (Sown.right ++ split.S2) split.S1 :=
     DisjointS_append_left hR1 hS2S1
   simpa [OwnedDisjoint, OwnedEnv.all] using hAll
@@ -265,6 +270,7 @@ lemma updateG_left_of_step
     G = G₁ ++ G₂ →
     G' = G₁' ++ G₂ →
     lookupG G₁ e = some L0 →
+/- ## Structured Block 5 -/
     updateG G e L = G' →
     G₁' = updateG G₁ e L := by
   -- Rewrite the update and cancel the shared right frame.

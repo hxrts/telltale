@@ -202,6 +202,7 @@ mutual
         cases hhead : head with
         | mk label rest =>
           cases rest with
+/- ## Structured Block 1 -/
           | mk _vt cont =>
             have h' : cont.isFreeIn v = true ∨ isFreeInBranches' v tail = true := by
               simpa [isFreeInBranches', hbs, hhead, Bool.or_eq_true] using h

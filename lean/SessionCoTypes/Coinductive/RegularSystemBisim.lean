@@ -1,9 +1,11 @@
+
 import Mathlib
 import SessionCoTypes.Coinductive.LocalTypeC
 import SessionCoTypes.Coinductive.Regularity
 import SessionCoTypes.Coinductive.FiniteSystem
 import SessionCoTypes.Coinductive.Bisim
 
+/- ## Structured Block 1 -/
 set_option linter.dupNamespace false
 
 /-! # Regular System Bisimulation
@@ -89,6 +91,7 @@ def RegularBisim (t : LocalTypeC) (h : Regular t)
 theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
     IsBisimulation (RegularBisim t h (RegularSystem (witnessOfRegular h))) := by
   classical
+/- ## Structured Block 2 -/
   let w := witnessOfRegular h
   intro s1 s2 hrel
   change RegularBisim t h (RegularSystem w) s1 s2 at hrel
@@ -143,6 +146,7 @@ theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
         refine ⟨f (), hchild_mem (), rfl, rfl⟩
   -- Head Case: send
   | send p labels =>
+/- ## Structured Block 3 -/
       let g : LocalTypeChild (LocalTypeHead.send p labels) → LocalTypeC :=
         PFunctor.M.corec (RegularSystem w) ∘ fun i => StateIndex w (f i)
       refine ⟨LocalTypeHead.send p labels, f, g, ?_, ?_, ?_⟩

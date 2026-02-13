@@ -1,3 +1,4 @@
+
 import Protocol.Simulation.Core
 
 /-! # Protocol Simulation Properties
@@ -16,6 +17,7 @@ process form, matching each function branch to its `StepBase` constructor.
 Use helper lemmas to extract label equalities from list finds.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -77,6 +79,7 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
               case cons v vs =>
                 have hC' :
                     C' = recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L := by
+/- ## Structured Block 2 -/
                   simpa using h.symm
                 subst hC'
                 exact StepBase.recv hProc hK hG hBuf
@@ -129,6 +132,7 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
                 | string ℓ =>
                   cases hFindP : procBranches.find? (fun b => b.1 == ℓ) <;>
                     simp [hFindP] at h
+/- ## Structured Block 3 -/
                   case some pairP =>
                     cases pairP with
                     | mk lblP P =>
@@ -182,6 +186,7 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
               proc := .skip
               store := updateStr C.store x v } := by
         simpa [stepBaseDecide, hProc] using h.symm
+/- ## Structured Block 4 -/
       subst hC'
       exact StepBase.assign hProc
   -- Base-Decide Soundness: seq case
@@ -238,6 +243,7 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
               simpa [stepDecide] using hsub
             have : False := by
               have hnone : stepDecide C = none := by
+/- ## Structured Block 5 -/
                 simp [stepDecide, stepDecideAux, hProc, hPskip, hsub']
               cases hstep.symm.trans hnone
             exact this.elim
@@ -289,6 +295,7 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
                     simpa [stepDecide, stepDecideAux, hProc, hPskip, hQskip, hsub', hsubR'] using hstep.symm
                   subst hC'
                   have hlt : procSize ({ C with proc := Q }.proc) < procSize C.proc := by
+/- ## Structured Block 6 -/
                     simpa [hProc] using procSize_lt_par_right nS nG P Q
                   have hStepSub : Step { C with proc := Q } C0 := by
                     exact ih _ hlt _ hsubR

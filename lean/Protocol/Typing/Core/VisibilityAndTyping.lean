@@ -128,6 +128,7 @@ theorem SEnvDomSubset_visible_all {Ssh : SEnv} {Sown : OwnedEnv} :
       cases hR : lookupSEnv Sown.right x with
       | some Tr =>
           have hOwn : lookupSEnv (Sown.right ++ Sown.left) x = some Tr :=
+/- ## Structured Block 1 -/
             lookupSEnv_append_left (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) (T:=Tr) hR
           have hAll : lookupSEnv (SEnvAll Ssh Sown) x = some Tr := by
             have hEq := lookupSEnv_append_right (S₁:=Ssh) (S₂:=Sown.right ++ Sown.left) (x:=x) hSh
@@ -186,6 +187,7 @@ theorem SEnvVisible_updateLeft_of_shared_none
 
 theorem SEnvVisible_congr_rightGauge {Ssh : SEnv} {S₁ S₂ : OwnedEnv} :
     RightGaugeEq S₁ S₂ →
+/- ## Structured Block 2 -/
     SEnvVisible Ssh S₁ = SEnvVisible Ssh S₂ := by
   intro h
   simpa [RightGaugeEq, SEnvVisible, h]
@@ -246,6 +248,7 @@ theorem updateG_append_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType}
               simp [lookupG, List.lookup, hxe]
             have hNone : lookupG ((e', L') :: tl) e = none := h
             have hContr : False := by
+/- ## Structured Block 3 -/
               simpa [hNone] using hLookup
             exact hContr.elim
           · have h' : lookupG tl e = none := by
@@ -338,6 +341,7 @@ inductive HasTypeProcN : SessionId → SEnv → GEnv → DEnv → Process → Pr
   | branch {n : SessionId} {S : SEnv} {G : GEnv} {D : DEnv}
       {k : Var} {e : Endpoint} {p : Role} {bs : List (Label × LocalType)} {procs : List (Label × Process)} :
       lookupSEnv S k = some (.chan e.sid e.role) →
+/- ## Structured Block 4 -/
       lookupG G e = some (.branch p bs) →
       bs.length = procs.length →
       -- Label matching (non-recursive, pure data)

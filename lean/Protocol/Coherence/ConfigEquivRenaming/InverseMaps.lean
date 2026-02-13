@@ -99,6 +99,7 @@ theorem renameBranches_left_inv (σ : SessionIso) :
           simp [renameBranches, renameLocalType_left_inv (σ:=σ) L,
             renameBranches_left_inv (σ:=σ) tl]
 termination_by bs => sizeOf bs
+/- ## Structured Block 1 -/
 decreasing_by
   all_goals
     simpa using (sizeOf_lt_branch_head_expanded (l:=_) (L:=_) (tl:=_))

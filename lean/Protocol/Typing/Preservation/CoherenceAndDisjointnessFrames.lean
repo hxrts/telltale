@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Preservation.CoherenceAndDisjointnessCore
 
 /-! # Coherence and Disjointness Frame Preservation
@@ -15,6 +16,7 @@ and `_assign` by case analysis on the pre-out typing. Use the fact
 that updated variables are absent from the shared env.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -79,6 +81,7 @@ lemma DisjointS_preserved_TypedStep_right_par_left
   obtain ⟨pw, S₁_fin, S₂_fin, G₁_fin, G₂_fin, W₁_fin, W₂_fin, Δ₁_fin, Δ₂_fin,
       hSfin, hGfin, hW, hΔ, hDisjG_pre, hDisjS_pre, hDisjS_left_pre, hDisjS_right_pre,
       hDisjS_fin, hDisjW, hDisjΔ, hP_pre, hQ_pre⟩ :=
+/- ## Structured Block 2 -/
     HasTypeProcPreOut_par_inv_witness hPre
   let split_pre : ParSplit Sown.left G := pw.split
   have hS1eq : split.S1 = split_pre.S1 := by
@@ -133,6 +136,7 @@ lemma DisjointS_preserved_TypedStep_right_par_right
       DisjointS Ssh ({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) →
       DisjointS (Sown.right ++ split.S1) split.S2 →
       DisjointS (Sown.right ++ split.S1) Sfin.left →
+/- ## Structured Block 3 -/
       DisjointS Ssh ({ right := Sown.right ++ split.S1, left := S₂' } : OwnedEnv))
     (hPre : HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin W Δ)
     (hDisj : DisjointS Ssh Sown)
@@ -188,6 +192,7 @@ lemma DisjointS_preserved_TypedStep_right_par_right
 /-- Recv preserves disjointness against the left owned env. -/
 -- Recv Disjointness Preservation (Left Projection)
 lemma DisjointS_preserved_TypedStep_left_recv
+/- ## Structured Block 4 -/
     {Sframe Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var} {T : ValType}
     {Sfin Gfin W Δ} :
     HasTypeProcPreOut Ssh Sown G (.recv k x) Sfin Gfin W Δ →
@@ -246,6 +251,7 @@ lemma DisjointS_preserved_TypedStep_left_par_left
       DisjointS Sframe S₁')
     (hPre : HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin W Δ)
     (hDisj : DisjointS Sframe Sown.left)
+/- ## Structured Block 5 -/
     (hSub : SEnvDomSubset Sframe Sown.right)
     (hOwnDisj : OwnedDisjoint Sown)
     (hDisjRightFin : DisjointS Sown.right Sfin.left) :
@@ -301,6 +307,7 @@ lemma DisjointS_preserved_TypedStep_left_par_right
     (split : ParSplit Sown.left G)
     (hSlen : split.S1.length = nS)
         (ih : ∀ {Sfin Gfin W Δ},
+/- ## Structured Block 6 -/
       HasTypeProcPreOut Ssh { right := Sown.right ++ split.S1, left := split.S2 } G Q Sfin Gfin W Δ →
       DisjointS Sframe split.S2 →
       SEnvDomSubset Sframe (Sown.right ++ split.S1) →
@@ -353,6 +360,7 @@ lemma DisjointS_preserved_TypedStep_left_par_right
   have hQ_full_pre := HasTypeProcPreOut_frame_G_left_par (split:=split_pre) hDisjG
     (by simpa [hS1eq, hS2eq] using hDisjInQ) hQ_pre (by simpa [hS1eq, hS2eq] using hDisjOutQ)
   have hQ_full :
+/- ## Structured Block 7 -/
       HasTypeProcPreOut Ssh { right := Sown.right ++ split.S1, left := split.S2 } G Q
         { right := Sown.right ++ split.S1, left := S₂_fin } (split_pre.G1 ++ G₂_fin) W₂_fin Δ₂_fin := by
     simpa [hS1eq, hS2eq] using hQ_full_pre
@@ -411,6 +419,7 @@ theorem DisjointS_preserved_TypedStep_left
   case recv G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
       hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
     have hUpdRightEq : (OwnedEnv.updateLeft Sown x T).right = Sown.right := by
+/- ## Structured Block 8 -/
       simpa [hSout] using hRightEq
     have hEraseEq : eraseSEnv Sown.right x = Sown.right := by
       simpa [OwnedEnv.updateLeft] using hUpdRightEq

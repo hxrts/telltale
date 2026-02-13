@@ -163,6 +163,7 @@ def checkAsyncStep (unfoldBound : Nat) (t : AsyncTriple) : StepResult :=
       match findLabelIdx labelsT msg with
       | some idx =>
           let childrenT := getChildren T
+/- ## Structured Block 1 -/
           if h : idx.val < childrenT.length then
             .continue [⟨S, childrenT.get ⟨idx.val, h⟩, rest⟩]
           else
@@ -275,6 +276,7 @@ def checkAsync (S T : LocalTypeC) (_unfoldBound _fuel : Nat) : ExploreResult := 
     exact .accepted
   else
     match explore _unfoldBound _fuel (ExploreState.initial (AsyncTriple.initial S T)) with
+/- ## Structured Block 2 -/
     | .rejected => exact .rejected
     | _ => exact .outOfFuel
 

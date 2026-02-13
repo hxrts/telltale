@@ -1,22 +1,18 @@
 import SessionCoTypes.Bisim.Bisimulation
 /-! # SessionCoTypes.Bisim.EQ2Equivalence
-
 Proves Bisim implies EQ2 and establishes EQ2 incompatibility lemmas.
 -/
 /-
 The Problem. The Bisim relation is designed for easier proofs, but we need to
 connect it back to EQ2 (the standard coinductive equality). We must prove
 Bisim ↔ EQ2 to transfer properties between formulations.
-
 Solution Structure. Proves `BranchesRelBisim_to_BranchesRel` and its inverse
 for converting branch relations. Then shows Bisim implies EQ2 by translating
 membership predicates to EQ2F structure. The reverse follows from EQ2's
 observable characterization. This enables deriving EQ2_trans from Bisim.trans.
 -/
-
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
-
 namespace SessionCoTypes.Bisim
 open SessionTypes.LocalTypeR
 open SessionTypes.GlobalType
@@ -24,7 +20,6 @@ open SessionCoTypes.Observable
 open SessionCoTypes.EQ2
 open SessionCoTypes.CoinductiveRel
 /-! ## Equivalence with EQ2
-
 The membership predicates in BisimF correspond to unfolding behavior in EQ2F.
 We prove Bisim ↔ EQ2, which enables deriving EQ2_trans from Bisim.trans. -/
 
@@ -125,6 +120,7 @@ theorem Bisim_of_same_recv {a b : LocalTypeR} {p : String}
       obtain ⟨p', bsa', bsb', hxSend, hySend, hbr'⟩ := hSend
       have hbr_R : BranchesRelBisim R bsa' bsb' :=
         BranchesRelBisim.mono (fun a b hBisim => Or.inr (Or.inr hBisim)) hbr'
+/- ## Structured Block 1 -/
       exact BisimF.eq_send hxSend hySend hbr_R
     | inr hRest =>
       cases hRest with
@@ -196,6 +192,7 @@ theorem BranchesRelBisim.toEQ2 {R : Rel} (hR : ∀ a b, R a b → EQ2 a b)
     BranchesRel EQ2 bs cs := by
   induction h with
   | nil => exact List.Forall₂.nil
+/- ## Structured Block 2 -/
   | cons hbc _ ih =>
     exact List.Forall₂.cons ⟨hbc.1, hR _ _ hbc.2⟩ ih
 
@@ -285,6 +282,7 @@ theorem Bisim.toEQ2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
           constructor
           · have hBisim := Bisim_of_same_send hinner (CanSend.mu hinner') hbr_bisim
             exact Or.inl hBisim
+/- ## Structured Block 3 -/
           · have hBisim := Bisim_of_same_send (CanSend.mu hinner) hinner' hbr_bisim
             exact Or.inl hBisim
     -- Bisim.toEQ2: Receive Case
@@ -401,6 +399,7 @@ theorem EQ2_recv_not_UnfoldsToEnd {x : LocalTypeR} {p : String} {bs : List Branc
     (hunf : UnfoldsToEnd x) (heq : EQ2 (.recv p bs) x) : False := by
   revert heq
   refine UnfoldsToEnd.rec (motive := fun x _ => EQ2 (.recv p bs) x → False) ?base ?mu hunf
+/- ## Structured Block 4 -/
   · intro heq
     simpa [EQ2F] using (EQ2.destruct heq)
   · intro t body h ih heq
@@ -464,6 +463,7 @@ theorem EQ2_var_not_UnfoldsToVar_diff {x : LocalTypeR} {v w : String}
     (hunf : UnfoldsToVar x w) (heq : EQ2 (.var v) x) (hne : w ≠ v) : False := by
   revert heq hne
   refine UnfoldsToVar.rec (motive := fun x w _ => EQ2 (.var v) x → w ≠ v → False) ?base ?mu hunf
+/- ## Structured Block 5 -/
   · intro w heq hne
     -- x = .var w, EQ2 (.var v) (.var w) requires v = w
     have hv : v = w := by

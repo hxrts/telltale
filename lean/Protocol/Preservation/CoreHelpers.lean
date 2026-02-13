@@ -131,6 +131,7 @@ theorem SessionsOf_eq_of_TypedStep
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
       have hEq : SessionsOf (updateG G e L) = SessionsOf G :=
+/- ## Structured Block 1 -/
         SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.recv source T L) hG
       simp [hGout, hEq]
   | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
@@ -188,6 +189,7 @@ theorem Coherent_rewriteD
   simpa [hEq e] using hConsume
 
 -- Owned Environment Disjointness Update Lemma
+/- ## Structured Block 2 -/
 theorem OwnedDisjoint_updateLeft
     {Sown : OwnedEnv} {x : Var} {T : ValType} :
     OwnedDisjoint Sown →
@@ -240,6 +242,7 @@ theorem TypedStep_right_domsubset
   | par_left =>
       exact SEnvDomSubset_refl
   | par_right =>
+/- ## Structured Block 3 -/
       exact SEnvDomSubset_refl
   | par_skip_left =>
       exact SEnvDomSubset_refl
@@ -293,6 +296,7 @@ theorem OwnedDisjoint_preserved_TypedStep
       have hLeftDisj : DisjointS Sown.right (S₁' ++ split.S2) :=
         DisjointS_preserved_TypedStep_left (Sframe:=Sown.right) hTS' hPre
           hOwn hDom hOwn hDisjRightFin rfl
+/- ## Structured Block 4 -/
       simpa [OwnedDisjoint] using hLeftDisj
   | par_right split hSlen hStep hDisjG hDisjD hDisjS ih =>
       rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂' nS nG
@@ -346,6 +350,7 @@ theorem ValidLabels_mono {G G' : GEnv} {D : DEnv} {bufs : Buffers} :
     exact ⟨hSender', hRecv'⟩
   have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some (.branch source bs) := by
     simpa [hEq _] using hGrecv
+/- ## Structured Block 5 -/
   exact hValid e source bs hActive' hGrecv'
 
 

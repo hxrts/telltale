@@ -1,3 +1,4 @@
+
 import SessionCoTypes.Coinductive.Roundtrip.RoundtripPostfixBodyCase
 
 /-! # Roundtrip Postfix Lemma
@@ -15,6 +16,7 @@ tracking. Prove `roundtrip_hpost` showing R is preserved by EQ2CE steps.
 Case split on wrap (aux) vs body forms and back-edge vs fresh visits.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.dupNamespace false
 
 namespace SessionCoTypes.Coinductive
@@ -76,6 +78,7 @@ lemma roundtrip_hpost
                     exact head_of_dest hdest
                   have haux_end :
                       toInductiveAux t all visited b h_closed h_visited h_current = LocalTypeR.end := by
+/- ## Structured Block 2 -/
                     have hb_eq : b = PFunctor.M.mk ⟨LocalTypeHead.end, f⟩ := mk_of_dest hdest
                     subst hb_eq
                     unfold toInductiveAux
@@ -129,6 +132,7 @@ lemma roundtrip_hpost
                     have hchild : childRel b child := ⟨.send p labels, f, i, hdest, rfl⟩
                     have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
                     (labels[i],
+/- ## Structured Block 3 -/
                       toInductiveAux t all (Insert.insert b visited) child h_closed
                         (subset_insert_of_mem h_current h_visited) hchild_mem)
                   -- Fresh Wrap Send: Mu Wrapper vs Plain Send
@@ -182,6 +186,7 @@ lemma roundtrip_hpost
                         fun _ => toCoind (toInductiveBody t all visited b h_closed h_visited h_current)⟩ := by
                       simp [haux, haux_mu, toCoind_mu, mkMu, PFunctor.M.dest_mk]
                     have hmem' : b ∈ envL ρ (nameOf b all) := hmem_env
+/- ## Structured Block 4 -/
                     have hcore : R (envInsertL ρ (nameOf b all) b)
                         (toCoind (toInductiveBody t all visited b h_closed h_visited h_current)) b := by
                       refine ⟨visited, h_visited, h_current, ?_,
@@ -234,6 +239,7 @@ lemma roundtrip_hpost
                       rw [if_neg hcond]
                       simp [fR]
                     -- Fresh Wrap Send Plain: Build Send Observables
+/- ## Structured Block 5 -/
                     have haux_send_coind : a = toCoind (.send p (List.ofFn fR)) := by
                       simpa [haux_send] using haux
                     have hlabels : List.ofFn (fun i => (fR i).1) = labels := by
@@ -288,6 +294,7 @@ lemma roundtrip_hpost
                               (toInductiveBody t all visited b h_closed h_visited h_current) := by
                         have hfv' :
                             nameFor b all ∈
+/- ## Structured Block 6 -/
                               (match hdest : PFunctor.M.dest b with
                               | ⟨.end, _⟩   => LocalTypeR.end
                               | ⟨.var x, _⟩ => LocalTypeR.var x
@@ -340,6 +347,7 @@ lemma roundtrip_hpost
                       refine ⟨visited, h_visited, h_current, ?_,
                         EnvOfSub_insertL (nameOf b all) b hsub'⟩
                       exact Or.inr ⟨hmem, rfl⟩
+/- ## Structured Block 7 -/
                     exact EQ2CE_step.mu_left ha hmem' hcore
                   -- Fresh Wrap Recv: Plain Recv
                   · have haux_recv :
@@ -392,6 +400,7 @@ lemma roundtrip_hpost
                       have hlabels : List.ofFn (fun i => (fR i).1) = labels := by
                         simp [fR]
                       have ha' : head a = .recv p (List.ofFn fun i => (fR i).1) := by
+/- ## Structured Block 8 -/
                         simpa [haux_recv_coind] using (head_toCoind_recv_ofFn (p := p) fR)
                       simpa [hlabels] using ha'
                     have hbranches_a :

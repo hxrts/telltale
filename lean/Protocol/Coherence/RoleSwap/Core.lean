@@ -1,3 +1,4 @@
+
 import Protocol.Coherence.EdgeCoherence
 import Protocol.Environments.RoleRenaming
 
@@ -26,6 +27,7 @@ Solution Structure. We prove:
 4. `swapCoherent`: coherence preserved under role swap
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -95,6 +97,7 @@ def swapEndpointRole (s : SessionId) (A B : Role) (ep : Endpoint) : Endpoint :=
   if ep.sid = s then
     { sid := ep.sid, role := swapRole A B ep.role }
   else
+/- ## Structured Block 2 -/
     ep
 
 /-- Swap roles in an edge, but only for session s. -/
@@ -161,6 +164,7 @@ def swapGEnvRole (s : SessionId) (A B : Role) (G : GEnv) : GEnv :=
 /-- Swap all edges and their traces for session s. -/
 def swapDEnvRole (s : SessionId) (A B : Role) (D : DEnv) : DEnv :=
   D.list.foldl
+/- ## Structured Block 3 -/
     (fun acc p =>
       if p.1.sid = s then
         updateD acc (swapEdgeRole s A B p.1) (p.2.map (swapValTypeRole s A B))
@@ -219,6 +223,7 @@ lemma lookupD_foldl_update_neq_swap (s : SessionId) (A B : Role) :
             lookupD
                 (List.foldl
                   (fun acc p =>
+/- ## Structured Block 4 -/
                     if p.1.sid = s then
                       updateD acc (swapEdgeRole s A B p.1) (List.map (swapValTypeRole s A B) p.2)
                     else
@@ -271,6 +276,7 @@ lemma lookupD_foldl_update_neq_swap (s : SessionId) (A B : Role) :
           simpa using ih'
         -- Fold/Update Stability: Out-of-Session Rewrite
         dsimp [List.foldl]
+/- ## Structured Block 5 -/
         simp [hSid]
         calc
           lookupD
@@ -327,6 +333,7 @@ theorem lookupG_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
                 simpa using (swapEndpointRole_sid (s:=s) (A:=A) (B:=B) (ep:=e))
               have hSidEq' : e.sid = hd.1.sid := by simpa [hSidL] using hSidEq
               have hSidEq'' : hd.1.sid = s := by
+/- ## Structured Block 6 -/
                 exact hSidEq'.symm.trans hSid
               exact (hHdSidNe hSidEq'').elim
             · intro hEq

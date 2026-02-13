@@ -146,6 +146,7 @@ private lemma ValidLabels_branch_transfer {bufs : Buffers} {e : Edge}
     | (.string l) :: _ => (bs.find? (fun b => b.1 == l)).isSome
     | _ => True := by
   cases hBuf : lookupBuf bufs e with
+/- ## Structured Block 1 -/
   | nil =>
       simp
   | cons v _ =>
@@ -206,6 +207,7 @@ theorem ValidLabels_type_replacement {G : GEnv} {D : DEnv} {bufs : Buffers}
         cases hFalse
     | select r bs =>
         have hFalse : False := by
+/- ## Structured Block 2 -/
           simp [hBranch', ShapeCompatible] at hShape
         cases hFalse
     | end_ =>
@@ -265,6 +267,7 @@ private lemma ShapeCompatible_targetRole {L₁ L₂ : LocalType}
     exact hShape.1
 
 theorem RecvCompatible_targetRole {L₁ L₂ : LocalType}
+/- ## Structured Block 3 -/
     (hCompat : ∀ r : Role, RecvCompatible r L₁ L₂) :
     LocalType.targetRole? L₁ = LocalType.targetRole? L₂ := by
   exact ShapeCompatible_targetRole (hCompat (default : Role)).2
@@ -326,6 +329,7 @@ theorem RoleComplete_type_replacement {G : GEnv} {ep : Endpoint} {L₁ L₂ : Lo
         subst hTarget'
         exact lookupG_updateG_eq
       · -- Target is not ep: unchanged
+/- ## Structured Block 4 -/
         use L'
         rw [lookupG_updateG_ne hTarget']
         exact hL'

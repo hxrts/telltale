@@ -1,3 +1,4 @@
+
 import Protocol.Preservation.CoreHelpers
 
 /-! # Valid Labels and HeadCoherent Lemmas
@@ -15,6 +16,7 @@ Provide valid-label lemmas showing HeadCoherent is preserved when
 environments are split or merged.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -72,6 +74,7 @@ lemma findD_updateD_append_left {D D₂ : DEnv} {e e' : Edge} {ts : List ValType
         have hLeft'' : (updateD D e ts).find? e' = none := by
           simp [hLeft'] at hfind
           exact hfind
+/- ## Structured Block 2 -/
         have hA := findD_append_right (D₁:=updateD D e ts) (D₂:=D₂) (e:=e') hLeft''
         have hB := findD_append_right (D₁:=D) (D₂:=D₂) (e:=e') hLeft'
         have hRight : (updateD D e ts ++ D₂).find? e' = (D ++ D₂).find? e' := by
@@ -129,6 +132,7 @@ lemma updateG_append_right_hit {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType}
     (hNone : lookupG G₁ e = none) :
     updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L := by
   induction G₁ with
+/- ## Structured Block 3 -/
   | nil =>
       simp
   | cons hd tl ih =>
@@ -183,6 +187,7 @@ theorem ValidLabels_preserved_frame_left
           ∀ Lrecv, lookupG (G ++ Gfr) recvEp = some Lrecv →
             ∃ L', Consume e.role Lrecv (lookupD (D ++ Dfr) { sid := e.sid, sender := e.role, receiver := target }) = some L' ∧
                   (Consume e.role L' [T]).isSome := by
+/- ## Structured Block 4 -/
         intro Lrecv hLookup
         cases lookupG_append_inv (G₁:=G) (G₂:=Gfr) (e:=recvEp) hLookup with
         | inl hLeft =>
@@ -235,6 +240,7 @@ theorem ValidLabels_preserved_frame_left
         lookupD_append_left_of_right_none (D₁:=D) (D₂:=Dfr) (e:={ sid := e.sid, sender := e.role, receiver := target }) hDfrNone
       have hGfrNone : lookupG Gfr recvEp = none := lookupG_none_of_not_session hNotIn
       have hReady' :
+/- ## Structured Block 5 -/
           ∀ Ltarget, lookupG (G ++ Gfr) recvEp = some Ltarget →
             ∃ L', Consume e.role Ltarget (lookupD (D ++ Dfr) { sid := e.sid, sender := e.role, receiver := target }) = some L' ∧
                   (Consume e.role L' [.string]).isSome := by
@@ -289,6 +295,7 @@ theorem ValidLabels_preserved
     ValidLabels G D bufs →
     Coherent G D →
     BuffersTyped G D bufs →
+/- ## Structured Block 6 -/
     ValidLabels G' D' bufs' := by
   intro hTS hValid hCoh hBT
   have hDisj : DisjointG G [] := DisjointG_right_empty G

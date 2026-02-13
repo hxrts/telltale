@@ -219,6 +219,7 @@ private theorem ReflRel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b := b
             BranchesRel_refl (R := ReflRel) hrefl bs
           exact ⟨rfl, hbr⟩
       | recv q cs =>
+/- ## Structured Block 1 -/
           have hEq := ReflRel_eq_of_nonmu (nonmu_send p bs) (nonmu_recv q cs) h
           cases hEq
       | mu t body =>

@@ -174,6 +174,7 @@ noncomputable instance realAnalysisLaws : AnalysisLaws where
   finiteAverage_const := by
     -- The average of a constant family is that constant.
     intro n c hn
+/- ## Structured Block 1 -/
     change (if h : n = 0 then 0 else (∑ _ : Fin n, c) / (n : ℝ)) = c
     have hnR : (n : ℝ) ≠ 0 := by exact_mod_cast hn
     simp [hn, hnR]

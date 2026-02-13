@@ -98,6 +98,7 @@ theorem SendSpec_respects_renaming (ρ : SessionRenaming)
 -- Send ConfigEquiv Preservation
 
 /-- Send respects ConfigEquiv: equivalent configs produce equivalent results. -/
+/- ## Structured Block 1 -/
 theorem SendSpec_respects_ConfigEquiv
     {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
     {ep : Endpoint} {r : Role} {T : ValType}
@@ -163,6 +164,7 @@ theorem SendSpec_respects_ConfigEquiv
       have hD₂' := hSpec₂.trace_extended
       simp only at hD₁' hD₂'
       simp only [renameEndpoint] at hD₂'
+/- ## Structured Block 2 -/
       have hTrace := hD_equiv sendEdge
       simp only [renameEdge] at hTrace
       -- Rewrite goal with he, then use the update equations
@@ -223,6 +225,7 @@ theorem RecvSpec_respects_renaming (ρ : SessionRenaming)
     have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := r, receiver := ep.role })
     simp only [renameEdge] at hLookup
     constructor
+/- ## Structured Block 3 -/
     · rw [hLookup, hBuffer]
       simp only [List.map_cons]
     · rw [hD', renameDEnv_updateD]
@@ -287,6 +290,7 @@ theorem RecvSpec_respects_ConfigEquiv
           = lookupG G₂' (renameEndpoint ρ ep) := by rw [he]
         _ = lookupG (updateG G₂ (renameEndpoint ρ ep) L'₂) (renameEndpoint ρ ep) := by rw [hG₂']
         _ = some L'₂ := lookupG_update_eq _ _ _
+/- ## Structured Block 4 -/
         _ = some (renameLocalType ρ L') := by rw [hL'₂_eq]
         _ = (some L').map (renameLocalType ρ) := by simp only [Option.map_some]
         _ = (lookupG (updateG G₁ ep L') ep).map (renameLocalType ρ) := by rw [lookupG_update_eq]

@@ -106,6 +106,7 @@ theorem dual_compatible : Compatible LocalTypeR.dual := by
       rename_i p bsa bsb
       have hx' : CanSend x.dual p (dualBranches bsa) := CanRecv.dual hx
       have hy' : CanSend y.dual p (dualBranches bsb) := CanRecv.dual hy
+/- ## Structured Block 1 -/
       have hbr' : BranchesRelBisim (RelImage LocalTypeR.dual R)
           (dualBranches bsa) (dualBranches bsb) := by
         simpa [dualBranches_eq_map] using
@@ -266,6 +267,7 @@ theorem substitute_preserves_UnfoldsToEnd_barendregt {a : LocalTypeR} {var : Str
     -- notBoundAt var (.mu t body) = (var != t) && notBoundAt var body = true
     simp only [notBoundAt] at hbar
     have ⟨hvt, hbar_body⟩ := Bool.and_eq_true_iff.mp hbar
+/- ## Structured Block 2 -/
     have hvt' : var ≠ t := by simp only [bne_iff_ne, ne_eq] at hvt; exact hvt
     have htv' : t ≠ var := hvt'.symm
     -- Since var ≠ t, substitution goes through
@@ -333,6 +335,7 @@ theorem substitute_preserves_UnfoldsToVar {a : LocalTypeR} {var v : String} {rep
       rw [hsame] at ih'
       exact UnfoldsToVar.mu ih'
     -- UnfoldsToVar Preservation: Non-shadowed Branch
+/- ## Structured Block 3 -/
     · -- t == var is false: substitution goes through
       rename_i htvar
       simp only [beq_iff_eq] at htvar

@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Progress.LocalProgressCases
 
 /-! # Main Progress Theorems
@@ -16,6 +17,7 @@ process form. Each constructor case invokes its local progress lemma.
 Parallel and sequential cases recurse on subprocesses.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -76,6 +78,7 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
   -- progress_typed_aux: Sequential Composition
   | seq P Q =>
       cases hOut with
+/- ## Structured Block 2 -/
       | seq hP hQ =>
           have hDomQ := HasTypeProcPreOut_domsubset hQ
           have hDisjRightMid := DisjointS_of_domsubset_right hDomQ hDisjRightFin
@@ -128,6 +131,7 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
             DisjointS_owned_repack hDisjShRight hDisjShSplit.2 hDisjShSplit.1
           have hOwnL :
               OwnedDisjoint ({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) :=
+/- ## Structured Block 3 -/
             OwnedDisjoint_sub_left (Sown:=Sown) (split:=split) hOwnDisj hDisjS
           have hOwnR :
               OwnedDisjoint ({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) :=
@@ -183,6 +187,7 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                               hDisjG (DisjointG_right_empty split.G1) (DisjointG_right_empty split.G2)
                               hStoreR hDisjShR hOwnR hQ hStep
                           rcases hShape with ⟨G₂', hShape⟩
+/- ## Structured Block 4 -/
                           refine ⟨G₂', ?_⟩
                           simpa [List.append_assoc] using hShape
                         rcases hGshape with ⟨G₂', hGshape⟩
@@ -234,6 +239,7 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                     TypedStep_preserves_right hStep hP_full
                       (by
                         intro x T hLookup
+/- ## Structured Block 5 -/
                         exact ⟨T, by simpa using hLookup⟩)
                   have hStep' :
                       TypedStep G (D ++ (∅ : DEnv)) Ssh { right := Sown.right ++ split.S2, left := split.S1 }
@@ -286,6 +292,7 @@ theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                           rcases hGshape with ⟨G₂', hGshape⟩
                           have hRightEq : S'.right = Sown.right ++ split.S1 :=
                             TypedStep_preserves_right hStep hQ_full
+/- ## Structured Block 6 -/
                               (by
                                 intro x T hLookup
                                 exact ⟨T, by simpa using hLookup⟩)
@@ -352,6 +359,7 @@ theorem progress_typed {G D Ssh Sown store bufs P} :
 /-- Progress with explicit RoleComplete (keeps the old WellFormed ergonomics). -/
 theorem progress_typed_with_rolecomplete {G D Ssh Sown store bufs P} :
     LocalTypeR.WellFormed G D Ssh Sown store bufs P →
+/- ## Structured Block 7 -/
     RoleComplete G →
     (P = .skip) ∨
     (∃ G' D' Sown' store' bufs' P', TypedStep G D Ssh Sown store bufs P

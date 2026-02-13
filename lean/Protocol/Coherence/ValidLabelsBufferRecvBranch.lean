@@ -1,3 +1,4 @@
+
 import Protocol.Coherence.ValidLabelsSendSelect
 
 /-! # Protocol.Coherence.ValidLabelsBufferRecvBranch
@@ -11,6 +12,7 @@ The Problem. Extend ValidLabels preservation to recv/branch updates and initiali
 Solution Structure. Build buffer-typing helper lemmas, then prove recv/branch preservation and init coherence.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -69,6 +71,7 @@ private theorem HasTypeVal_updateG_weaken {G : GEnv} {ep : Endpoint} {Lnew : Loc
     · subst heq
       apply HasTypeVal.chan
       exact lookupG_update_eq G e' Lnew
+/- ## Structured Block 2 -/
     · apply HasTypeVal.chan
       rw [lookupG_update_neq G ep e' Lnew (Ne.symm heq)]
       exact h
@@ -124,6 +127,7 @@ private theorem BuffersTyped_enqueue_local {G : GEnv} {D : DEnv} {bufs : Buffers
       have hLe' : i ≤ (lookupBuf bufs a).length := by
         have hi' : i < (lookupBuf bufs a).length + 1 := by
           have hi' := hi
+/- ## Structured Block 3 -/
           simp [List.length_append] at hi'
           exact hi'
         exact Nat.le_of_lt_succ hi'
@@ -178,6 +182,7 @@ private theorem BuffersTyped_dequeue_local {G : GEnv} {D : DEnv} {bufs : Buffers
           exact lookupBuf_update_eq _ _ _
         have hTraceEq :
             lookupD (updateD D recvEdge (lookupD D recvEdge).tail) recvEdge = ts := by
+/- ## Structured Block 4 -/
           simp [lookupD_update_eq, hTrace]
         refine ⟨?_, ?_⟩
         · simp [lookupD_update_eq, hLen']
@@ -239,6 +244,7 @@ theorem BuffersTyped_recv_preserved
     let recvEdge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
     BuffersTyped (updateG G receiverEp L) (updateD D recvEdge (lookupD D recvEdge).tail)
                  (updateBuf bufs recvEdge vs) := by
+/- ## Structured Block 5 -/
   intro recvEdge
   have hTypedEdge := hTyped recvEdge
   have hTrace : (lookupD D recvEdge).head? = some T :=
@@ -299,6 +305,7 @@ theorem BuffersTyped_branch_preserved
   intro branchEdge
   have hv : HasTypeVal G (.string ℓ) .string := HasTypeVal.string ℓ
   have hTypedEdge := hTyped branchEdge
+/- ## Structured Block 6 -/
   have hTrace : (lookupD D branchEdge).head? = some .string :=
     trace_head_from_buffer hBuf hv hTypedEdge
   have hBT' :
@@ -352,6 +359,7 @@ theorem ValidLabels_recv_preserved
     have hNe : e ≠ recvEdge := by
       intro hEq
       apply hRecvEq
+/- ## Structured Block 7 -/
       subst hEq
       rfl
     have hBufEq : lookupBuf (updateBuf bufs recvEdge vs) e = lookupBuf bufs e := by
@@ -405,6 +413,7 @@ theorem ValidLabels_branch_preserved
     have hBufEq' : lookupBuf (updateBuf bufs branchEdge vs) e = lookupBuf bufs e := by
       exact lookupBuf_update_neq _ _ _ _ (Ne.symm hNe)
     have hValidOld := hValid e source bs hActiveOrig hBranchOld
+/- ## Structured Block 8 -/
     simpa [hBufEq'] using hValidOld
 
 -- Initialization Lemma

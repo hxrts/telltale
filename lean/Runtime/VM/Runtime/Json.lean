@@ -101,6 +101,7 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         [ ("kind", Json.str "epoch_advanced")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid)
+/- ## Structured Block 1 -/
         , ("epoch", Json.num epoch) ]
 
   -- Runtime ownership/coroutine events
@@ -157,6 +158,7 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
   | .checked _ permitted =>
       Json.mkObj
         [ ("kind", Json.str "checked")
+/- ## Structured Block 2 -/
         , ("tick", Json.num ev.tick)
         , ("permitted", Json.bool permitted) ]
 

@@ -1,5 +1,7 @@
+
 import SessionTypes.LocalTypeDB.Core
 
+/- ## Structured Block 1 -/
 set_option linter.unusedSimpArgs false
 
 /-
@@ -81,6 +83,7 @@ private theorem isClosedAt_lift_at (t : LocalTypeDB) (c k d : Nat) :
 -- Closedness Lift: Branches
 
 private theorem isClosedAt_lift_at_branches (bs : List (Label × LocalTypeDB)) (c k d : Nat) :
+/- ## Structured Block 2 -/
     isClosedAtBranches d bs = true →
     isClosedAtBranches (d + c) (liftBranches c k bs) = true := by
   intro h
@@ -144,6 +147,7 @@ theorem isClosedAt_subst (t e : LocalTypeDB) (k : Nat) :
           simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt, hnk, hgt, hlt]
     -- send case
     · intro p bs hbs e k ht he
+/- ## Structured Block 3 -/
       simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt] at ht ⊢
       exact hbs e k ht he
     -- recv case

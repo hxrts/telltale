@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Progress.Helpers
 
 /-! # Framing Inversions for Progress
@@ -15,6 +16,7 @@ visible lookup implies full lookup under disjointness. Use this to
 bridge typing judgments to store access in progress proofs.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -71,6 +73,7 @@ lemma lookupSEnv_all_of_visible_prog
           (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) (T:=T)
           hOwnDisj hLeftSome
       have hOwnSome : lookupSEnv (Sown : SEnv) x = some T := by
+/- ## Structured Block 2 -/
         have hOwnRight := lookupSEnv_append_right (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) hRightNone
         simpa [hOwnRight] using hLeftSome
       have hAll :
@@ -131,6 +134,7 @@ lemma OwnedDisjoint_sub_right
 
 -- Endpoint Equality from Store Typing
 
+/- ## Structured Block 3 -/
 lemma channel_endpoint_eq_of_store_visible
     {G : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : VarStore}
     {k : Var} {e e' : Endpoint}
@@ -187,6 +191,7 @@ lemma HasTypeProcPreOut_select_inv
   cases h with
   | select hk hG hbs => exact ⟨_, _, _, hk, hG⟩
 
+/- ## Structured Block 4 -/
 lemma HasTypeProcPreOut_branch_inv
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {procs : List (Label × Process)}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
@@ -243,6 +248,7 @@ lemma TypedStep_preserves_frames_send
     ∃ Gmid', G' = Gleft ++ Gmid' ++ Gright := by
   intro hGfull hDisjL hStore hDisjShAll hOwnDisj hOut hkStr hGout
   rcases HasTypeProcPreOut_send_inv hOut with ⟨eOut, qOut, TOut, LOut, hk, hG⟩
+/- ## Structured Block 5 -/
   have hEq : eStep = eOut :=
     channel_endpoint_eq_of_store_visible (hStore:=hStore) (k:=k) (e:=eOut) (e':=eStep)
       hDisjShAll hOwnDisj hk hkStr
@@ -302,6 +308,7 @@ lemma TypedStep_preserves_frames_select
 
 -- Typed-Step Frame Preservation (Branch Case)
 
+/- ## Structured Block 6 -/
 lemma TypedStep_preserves_frames_branch
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfull Gleft Gmid Gright : GEnv}
     {store : VarStore}

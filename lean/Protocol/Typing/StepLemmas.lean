@@ -1,21 +1,16 @@
 import Protocol.Typing.Compatibility
-
 /-! # MPST Process Typing: Step Lemmas
-
 Core step lemmas for preservation proofs.
 -/
-
 /-
 The Problem. Preservation proofs require lemmas about how TypedStep affects
 environments (session sets, GEnv, DEnv). These provide the building blocks
 for the main preservation theorem.
-
 Solution Structure. We prove:
 1. `SessionsOfD_subset_of_TypedStep`: session set inclusion after steps
 2. Environment update lemmas for each step kind
 3. Coherence connection lemmas for the full preservation
 -/
-
 
 /-! ## Key Judgments
 
@@ -96,6 +91,7 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
       have hs' : s ∈ SessionsOfD (appendD D selectEdge .string) := by
         simpa [hDout] using hs
       have hSub := SessionsOfD_updateD_subset (D:=D) (e:=selectEdge)
+/- ## Structured Block 1 -/
         (ts:=lookupD D selectEdge ++ [.string]) hs'
       cases hSub with
       | inl hIn => exact Or.inl hIn
@@ -151,6 +147,7 @@ theorem lookupD_none_of_disjointG {G₁ G₂ : GEnv} {D₂ : DEnv} {e : Edge} :
   cases hFind : D₂.find? e with
   | none =>
       exact (hSome hFind)
+/- ## Structured Block 2 -/
   | some ts =>
       have hSid : e.sid ∈ SessionsOfD D₂ := ⟨e, ts, hFind, rfl⟩
       have hSid2 : e.sid ∈ SessionsOf G₂ := hCons hSid
@@ -207,6 +204,7 @@ theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     have hRecvMerged : (lookupG (G₁ ++ G₂) { sid := e.sid, role := e.receiver }).isSome = true := by
       simp [hGrecv']
     exact ⟨hSenderMerged, hRecvMerged⟩
+/- ## Structured Block 3 -/
   have hCohEdge := hCoh e hActive' Lrecv hGrecv'
   rcases hCohEdge with ⟨Lsender, hGsenderMerged, hConsume⟩
   have hSenderEq := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.sender }) hG1none_sender
@@ -278,6 +276,7 @@ theorem StoreTyped_send_preserved {G : GEnv} {S : SEnv} {store : VarStore} {e : 
     The value v has type T in G (from TypedStep.assign premise). After update,
     store[x] = v and S[x] = T match. -/
 theorem StoreTyped_assign_preserved {G : GEnv} {S : SEnv} {store : VarStore} {x : Var} {v : Value} {T : ValType} :
+/- ## Structured Block 4 -/
     StoreTyped G S store →
     HasTypeVal G v T →
     StoreTyped G (updateSEnv S x T) (updateStr store x v) := by
@@ -336,6 +335,7 @@ theorem StoreTyped_recv_preserved {G : GEnv} {S : SEnv} {store : VarStore} {e : 
     cases hStoreY
     exact HasTypeVal_updateG_weaken hv
   · -- y ≠ x case: use original typing with G weakening
+/- ## Structured Block 5 -/
     rw [lookupSEnv_update_neq S x y T (Ne.symm heq)] at hSY
     rw [lookupStr_update_neq store x y v (Ne.symm heq)] at hStoreY
     have hValOrig := hST y w T' hStoreY hSY
@@ -400,6 +400,7 @@ theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
           have hi' := hi
           simp [List.length_append] at hi'
           exact hi'
+/- ## Structured Block 6 -/
         exact Nat.le_of_lt_succ hi'
       have hEq : i = (lookupBuf bufs a).length := Nat.le_antisymm hLe' hLe
       have hTraceEq : i = (lookupD D a).length := hLen ▸ hEq
@@ -467,6 +468,7 @@ theorem BuffersTyped_dequeue {G : GEnv} {D : DEnv} {bufs : Buffers}
             lookupD (updateD D recvEdge (lookupD D recvEdge).tail) recvEdge = ts := by
           simp [lookupD_update_eq, hTrace]
         refine ⟨?_, ?_⟩
+/- ## Structured Block 7 -/
         · -- length equality
           -- Simplify lookups on the updated environments
           simp [lookupD_update_eq, hLen']
@@ -494,6 +496,5 @@ theorem BuffersTyped_dequeue {G : GEnv} {D : DEnv} {bufs : Buffers}
         lookupD (updateD D recvEdge (lookupD D recvEdge).tail) a = lookupD D a := by
       exact lookupD_update_neq _ _ _ _ (Ne.symm ha)
     simpa [BufferTyped, hBufEq, hTraceEq] using hOrig
-
 
 end

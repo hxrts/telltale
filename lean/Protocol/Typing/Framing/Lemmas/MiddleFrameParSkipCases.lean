@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Framing.Lemmas.MiddleFrameCases
 
 /-! # Middle Frame `par_skip` Cases
@@ -17,6 +18,7 @@ preserve the same hypotheses/conclusions, then call them from
 `MiddleFrameMain`.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -74,6 +76,7 @@ lemma preserved_sub_middle_par_skip_left
         simpa [splitMid, hSownLeftEq, hS1MidNil, List.nil_append] using hQ_pre
   have hDisjRightIn0 : DisjointS Sown.right Sown.left := by
     simpa [OwnedDisjoint] using hOwn
+/- ## Structured Block 2 -/
   have hDisjRightOut0 : DisjointS Sown.right S₂_fin := by
     have hTmp : DisjointS Sown.right (splitMid.S1 ++ S₂_fin) := by
       simpa [hSfin] using hDisjRightFin
@@ -129,6 +132,7 @@ lemma preserved_sub_middle_par_skip_right
       hSfin, hGfin, hW, hΔ, hDisjG_mid, hDisjS_mid, hDisjS_left_mid, hDisjS_right_mid,
       hDisjS_fin, hDisjW, hDisjΔ, hP_pre, hQ_pre⟩ :=
     HasTypeProcPreOut_par_inv_witness hPre
+/- ## Structured Block 3 -/
   let splitMid : ParSplit Sown.left Gmid := pw.split
   have hSlenEq : split.S1.length = splitMid.S1.length := by
     calc
@@ -182,4 +186,5 @@ lemma preserved_sub_middle_par_skip_right
   · simpa [hWP] using (FootprintSubset_refl (W:=W₁))
   · simpa [hΔP] using (SEnvDomSubset_refl (S:=Δ₁))
 
+/- ## Structured Block 4 -/
 end

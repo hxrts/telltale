@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Framing.Lemmas.LookupAndDisjointBasics
 
 /-! # GEnv Framing Core Lemmas
@@ -17,6 +18,7 @@ original lookup is preserved. Extend to `HasTypeProcPre` for each
 process constructor.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -75,6 +77,7 @@ theorem HasTypeProcPre_frame_G_branch
     have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G := ⟨hIn, hSid⟩
     have hEmpty : SessionsOf G₁ ∩ SessionsOf G = (∅ : Set SessionId) := by
       simpa [DisjointG, GEnvDisjoint] using hDisj
+/- ## Structured Block 2 -/
     have : e.sid ∈ (∅ : Set SessionId) := by
       simpa [hEmpty] using hInter
     exact this.elim
@@ -128,6 +131,7 @@ theorem HasTypeProcPre_frame_G {Ssh : SEnv} {Sown : OwnedEnv} {G₁ G₂ : GEnv}
   | send hk hG hx =>
       rename_i Sown G k x e q T L
       have hNone : lookupG G₁ e = none :=
+/- ## Structured Block 3 -/
         DisjointG_lookup_left (G₁:=G) (G₂:=G₁) (DisjointG_symm hDisj) hG
       have hG' : lookupG (G₁ ++ G) e = some (.send q T L) := by
         simpa [lookupG_append_right hNone] using hG
@@ -185,6 +189,7 @@ theorem lookupSEnv_none_of_domsubset_right
   by_cases hNone : lookupSEnv Sframe x = none
   · exact hNone
   · cases hL : lookupSEnv Sframe x with
+/- ## Structured Block 4 -/
     | none => exact (hNone hL).elim
     | some T =>
         obtain ⟨T', hRight⟩ := hSub hL
@@ -250,6 +255,7 @@ theorem DisjointG_append_right {G₁ G₂ G₃ : GEnv} :
       exact this.elim
   | inr h3 =>
       have hEmpty : SessionsOf G₁ ∩ SessionsOf G₃ = (∅ : Set SessionId) := hDisj13
+/- ## Structured Block 5 -/
       have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₃ := ⟨h1, h3⟩
       have : s ∈ (∅ : Set SessionId) := by
         simpa [hEmpty] using hInter
@@ -316,6 +322,7 @@ theorem DisjointG_updateG_left
         simpa [hEq] using hLookup
       exact ⟨e', L, hLookup'', hSid⟩
     · have hLookup'' : lookupG G₂ e' = some L'' := by
+/- ## Structured Block 6 -/
         have h := lookupG_update_neq (env:=G₂) (e:=e) (e':=e') (L:=L') (Ne.symm hEq)
         simpa [h] using hLookup'
       exact ⟨e', L'', hLookup'', hSid⟩

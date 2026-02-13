@@ -188,6 +188,7 @@ if all its successors are in the relation (coinductively). -/
 /-- Coinductive async subtyping relation.
     A triple satisfies async subtyping if it can reach a successful base case
     (both end with empty buffer) following the step rules. -/
+/- ## Structured Block 1 -/
 coinductive AsyncSubtypeRel : AsyncTriple → Prop where
   /-- Base case: both end with empty buffer. -/
   | done {t : AsyncTriple}
@@ -290,6 +291,7 @@ theorem reachable_sub_in_reachable {t₀ t : AsyncTriple}
 
 /-- Types appearing in supertype position come from reachable types. -/
 theorem reachable_sup_in_reachable {t₀ t : AsyncTriple}
+/- ## Structured Block 2 -/
     (h : tripleReachable t₀ t) :
     t.sup ∈ Reachable t₀.sup ∨ t.sup = t₀.sup := by
   induction h with

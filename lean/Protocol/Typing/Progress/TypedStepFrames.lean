@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Progress.FramingInversions
 
 /-! # TypedStep Frame Preservation
@@ -15,6 +16,7 @@ on `TypedStep`. Each constructor case shows the update stays within
 Gmid by endpoint locality, producing `G' = Gleft ++ Gmid' ++ Gright`.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -76,6 +78,7 @@ lemma TypedStep_preserves_frames
   | seq_step =>
       rename_i Gfull D Ssh Sown G' D' Sown' store bufs store' bufs' P P' Q hStepP ih
       cases hOut with
+/- ## Structured Block 2 -/
       | seq hP hQ =>
           exact ih hGfull hDisjL hDisjLR hDisjR hStore hDisjShAll hOwnDisj hP
   -- TypedStep Frame Preservation: Seq Skip
@@ -130,6 +133,7 @@ lemma TypedStep_preserves_frames
             exact DisjointG_symm hTmp
           have hDisjGleftG2 : DisjointG Gleft split.G2 := by
             have hSym : DisjointG Gmid Gleft := DisjointG_symm hDisjL
+/- ## Structured Block 3 -/
             have hTmp : DisjointG split.G2 Gleft := DisjointG_of_subset_left hSubG2 hSym
             exact DisjointG_symm hTmp
           have hDisjG1Right : DisjointG split.G1 Gright :=
@@ -181,6 +185,7 @@ lemma TypedStep_preserves_frames
             simpa [hGfull', hS1Eq, hS2Eq, split.hG, List.append_assoc] using hStepP
           have hStepP'' :
               TypedStep Gfull (D₁ ++ D₂) Ssh { right := Sown.right ++ split.S2, left := split.S1 }
+/- ## Structured Block 4 -/
                 store bufs P
                 (G₁' ++ splitFull.G2) (D₁' ++ D₂)
                 { right := Sown.right ++ split.S2, left := S₁' } store' bufs' P' := by
@@ -234,6 +239,7 @@ lemma TypedStep_preserves_frames
                 (SEnvAll Ssh { right := Sown.right ++ split.S2, left := split.S1 }) store := by
             simpa [SEnvAll, List.append_assoc] using hStoreSwap
           have hStoreR :
+/- ## Structured Block 5 -/
               StoreTypedStrong (Gleft ++ Gmid ++ Gright)
                 (SEnvAll Ssh { right := Sown.right ++ split.S1, left := split.S2 }) store := by
             simpa [hGfull, SEnvAll, split.hS, List.append_assoc] using hStore
@@ -286,6 +292,7 @@ lemma TypedStep_preserves_frames
             simpa [hS1Eq, hS2Eq] using hQ
           have hStepQ' :
               TypedStep ((Gleft ++ split.G1) ++ split.G2 ++ Gright)
+/- ## Structured Block 6 -/
                 (D₁ ++ D₂) Ssh { right := Sown.right ++ split.S1, left := split.S2 }
                 store bufs Q
                 (splitFull.G1 ++ G₂') (D₁ ++ D₂')

@@ -1,3 +1,4 @@
+
 import Runtime.Proofs.WeightedMeasure.Core
 
 /-! # Runtime.Proofs.WeightedMeasure.StepDecrease
@@ -12,6 +13,7 @@ for all communication forms.
 Solution Structure. Proves send/recv/select/branch decrease lemmas.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -73,6 +75,7 @@ lemma getBuffer_mem_aux {sender receiver : Role}
     · -- Head matches
       simp only [hEq]
       intro _
+/- ## Structured Block 2 -/
       simp only [Bool.and_eq_true, beq_iff_eq] at hEq
       have ⟨hSender, hRecv⟩ := hEq
       have heq : hd = (sender, receiver, hd.2.2) := by
@@ -137,6 +140,7 @@ theorem sum_incr_unique {α : Type} [DecidableEq α]
 
     -- # `sum_incr_unique`: head-key case split
 
+/- ## Structured Block 3 -/
     by_cases heq : hd_k = key
     · -- hd_k = key: increment at head, identity on tail
       rw [heq]
@@ -196,6 +200,7 @@ theorem sum_decr_unique {α : Type} [DecidableEq α]
   induction l with
   | nil => simp only [List.not_mem_nil] at hmem
   | cons hd tl ih =>
+/- ## Structured Block 4 -/
     obtain ⟨hd_k, hd_v⟩ := hd
     simp only [List.map_cons, List.foldl_cons, Nat.zero_add]
     rcases List.mem_cons.mp hmem with heq | htl
@@ -259,6 +264,7 @@ lemma bufferSizes_to_pairs (bufs : List (Role × Role × Nat)) :
   simp only [List.map_map, Function.comp_def]
 
 lemma bufferSizes_mem_pairs (bufs : List (Role × Role × Nat))
+/- ## Structured Block 5 -/
     (actor partner : Role) (n : Nat)
     (hmem : (actor, partner, n) ∈ bufs) :
     ((actor, partner), n) ∈ bufs.map (fun (s', r', n) => ((s', r'), n)) := by
@@ -329,6 +335,7 @@ lemma sumBuffers_decr_eq_of_entry
     (_hn : _n > 0) :
     sumBuffers (s.decrBuffer actor partner) + 1 = sumBuffers s := by
   -- Re-express buffer triples as key/value pairs keyed by (sender, receiver).
+/- ## Structured Block 6 -/
   let pairs : List ((Role × Role) × Nat) :=
     s.bufferSizes.map (fun (s', r', n) => ((s', r'), n))
   have hunique_pairs : (pairs.map Prod.fst).Nodup := by
@@ -390,6 +397,7 @@ lemma sumBuffers_decrBuffer_eq (s : SessionState) (actor partner : Role) (n : Na
 lemma sumDepths_updateType
     (s : SessionState) (actor : Role) (old new : LocalType)
     (hlookup : s.lookupType actor = some old)
+/- ## Structured Block 7 -/
     (hunique : s.uniqueRoles) :
     sumDepths (s.updateType actor new) + old.depth = sumDepths s + new.depth := by
   -- updateType replaces old.depth with new.depth in the sum

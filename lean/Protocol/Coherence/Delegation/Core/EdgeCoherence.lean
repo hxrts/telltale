@@ -21,6 +21,7 @@ open scoped Classical
 section
 
 -- Unrelated-Edge Coherence
+/-! ## Unrelated Edge -/
 
 theorem delegate_unrelated_edge_coherent
     (G G' : GEnv) (D D' : DEnv) (s : SessionId)
@@ -72,6 +73,7 @@ theorem delegate_unrelated_edge_coherent
         exact hDeleg.trace_preserved _ _ hRedir
       -- Consume success is preserved under renaming for unrelated sender.
       have hConsumeRen :
+/- ## Structured Block 1 -/
           (Consume e.sender (renameLocalTypeRole s A B Lrecv0)
             ((lookupD D e).map (renameValTypeRole s A B))).isSome := by
         cases hCons : Consume e.sender Lrecv0 (lookupD D e) with

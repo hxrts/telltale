@@ -1,3 +1,4 @@
+
 import Runtime.Proofs.VM.InstrSpec.ConfigEquivSelectBranch
 
 /-! # ConfigEquiv: Open, Close, Transfer Instructions
@@ -15,6 +16,7 @@ respects_renaming`, `TransferSpec_respects_renaming` by showing
 freshness, endpoint addition, and frame preservation transform correctly.
 -/
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 set_option relaxedAutoImplicit false
 
@@ -80,6 +82,7 @@ theorem OpenSpec_respects_renaming (ρ : SessionRenaming)
       rw [← hEp, lookupG_rename, lookupG_rename, hFrame]
     case neg =>
       -- ep not in renamed image, so lookupG is none on both sides
+/- ## Structured Block 2 -/
       have hNone : lookupG (renameGEnv ρ G) ep = none := by
         by_contra hSome
         rw [← ne_eq, Option.ne_none_iff_exists'] at hSome
@@ -140,6 +143,7 @@ theorem OpenSpec_respects_renaming (ρ : SessionRenaming)
         by_contra hNe
         obtain ⟨e', hE, _⟩ := lookupD_rename_inv ρ D e hNe
         exact hPre ⟨e', hE.symm⟩
+/- ## Structured Block 3 -/
       have hEmpty' : lookupD (renameDEnv ρ D') e = [] := by
         by_contra hNe
         obtain ⟨e', hE, _⟩ := lookupD_rename_inv ρ D' e hNe
@@ -209,6 +213,7 @@ theorem OpenSpec_respects_ConfigEquiv
               = lookupG G₂ (renameEndpoint ρ { sid := sid, role := role }) := hFrame₂
           _ = (lookupG G₁ { sid := sid, role := role }).map (renameLocalType ρ) :=
                 hG { sid := sid, role := role }
+/- ## Structured Block 4 -/
           _ = (lookupG G₁' { sid := sid, role := role }).map (renameLocalType ρ) := by
                 rw [hFrame₁]
 
@@ -266,6 +271,7 @@ theorem CloseSpec_respects_renaming (ρ : SessionRenaming)
     have hEmpty := hSpec.outgoing_empty other
     simp only [renameEndpoint]
     have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := ep.role, receiver := other })
+/- ## Structured Block 5 -/
     simp only [renameEdge] at hLookup
     rw [hLookup, hEmpty]
     simp only [List.map_nil]
@@ -327,6 +333,7 @@ theorem CloseSpec_respects_ConfigEquiv
   obtain ⟨hG_equiv, hD_equiv⟩ := hEquiv.choose_spec
   refine ⟨σ, ?_, ?_⟩
   -- G condition
+/- ## Structured Block 6 -/
   · intro e'
     by_cases he : e' = ep
     · -- Case: e' = ep (the removed endpoint)
@@ -385,6 +392,7 @@ theorem TransferSpec_respects_renaming (ρ : SessionRenaming)
     simp
   frame_G := by
     intro ep' hne
+/- ## Structured Block 7 -/
     obtain ⟨L', hSender⟩ := hSpec.sender_type
     have hG' := hSpec.type_updated L' hSender
     rw [hG', renameGEnv_updateG]
@@ -447,6 +455,7 @@ theorem TransferSpec_respects_ConfigEquiv
         _ = (some L'₁).map (renameLocalType ρ) := by simp only [Option.map_some]
         _ = (lookupG (updateG G₁ ep L'₁) ep).map (renameLocalType ρ) := by rw [lookupG_update_eq]
         _ = (lookupG G₁' ep).map (renameLocalType ρ) := by rw [← hG₁']
+/- ## Structured Block 8 -/
         _ = (lookupG G₁' e').map (renameLocalType ρ) := by rw [← he]
     · -- Case: e' ≠ ep (frame)
       have hne₂ : renameEndpoint ρ e' ≠ renameEndpoint ρ ep := by

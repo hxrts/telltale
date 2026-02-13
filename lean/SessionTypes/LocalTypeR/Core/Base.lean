@@ -414,6 +414,7 @@ mutual
                     simp [isFreeInBranches', hbs, hhead, hrest, hfree]
                 | inr htail =>
                     have hfree := mem_freeVarsOfBranches_isFreeInBranches' tail v htail
+/- ## Structured Block 1 -/
                     simp [isFreeInBranches', hbs, hhead, hrest, hfree]
   termination_by sizeOf bs
   decreasing_by

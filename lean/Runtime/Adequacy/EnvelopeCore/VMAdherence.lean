@@ -1,3 +1,4 @@
+
 import Runtime.Adequacy.EnvelopeCore.ReconfigurationBridge
 
 /-! # VM Envelope Adherence
@@ -16,6 +17,7 @@ Solution Structure. Define `DeterminismProfileClass` enum. Define
 `dUserContained` decision procedure for admission checking.
 -/
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 
 namespace Runtime
@@ -88,6 +90,7 @@ structure VMShardedEnvelopeHypotheses (State : Type u) (Obs : Type v) where
   adherenceWitness :
     ShardedEnvelopeSoundness shardedEnvelope refRun vmRun
   schedulerDeterminismWitness :
+/- ## Structured Block 2 -/
     ShardedExchangeNormalization shardedEnvelope certifiedExchange
 
 /-- E3: extract VM local adherence from local hypothesis bundle assumptions. -/
@@ -160,6 +163,7 @@ structure VMEnvelopeAdherencePremises
   monotonicityWitness :
     SpatialSubtypingMonotonicity subtype obligation
   localAdequacyWitness :
+/- ## Structured Block 3 -/
     VMObservationalAdequacyModuloEnvelope
       (EqEnvLocal localHypotheses.localEnvelope)
       localHypotheses.refRun localHypotheses.vmRun
@@ -222,6 +226,7 @@ theorem vmShardedFullAbstraction_of_premises
 
 /-- E3: extract VM adherence monotonicity under spatial refinement. -/
 theorem vmAdherenceMonotonicity_of_premises
+/- ## Structured Block 4 -/
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
     (p : VMEnvelopeAdherencePremises State Obs Placement) :
     SpatialSubtypingMonotonicity p.subtype p.obligation :=
@@ -283,6 +288,7 @@ structure VMEnvelopeAdherenceProtocol where
   shardedAdequacy :
     VMObservationalAdequacyModuloEnvelope
       (EqEnvShard premises.shardedHypotheses.shardedEnvelope)
+/- ## Structured Block 5 -/
       premises.shardedHypotheses.refRun
       premises.shardedHypotheses.vmRun :=
         vmShardedAdequacy_of_premises premises

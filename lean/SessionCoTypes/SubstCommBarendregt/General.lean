@@ -96,6 +96,7 @@ mutual
       (hxy : x ≠ y)
       (hx_not_bound : notBoundAtBranches x bs = true)
       (hrx_closed : ∀ v, isFreeIn v rx = false)
+/- ## Structured Block 1 -/
       (hry_rel : ry'.substitute x rx = ry) :
       SessionTypes.LocalTypeR.substituteBranches (SessionTypes.LocalTypeR.substituteBranches bs x rx) y ry
       = SessionTypes.LocalTypeR.substituteBranches (SessionTypes.LocalTypeR.substituteBranches bs y ry') x rx := by

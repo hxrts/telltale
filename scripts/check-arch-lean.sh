@@ -108,8 +108,8 @@ collect_file_metric_hits() {
         fi
         ;;
       section_headers)
-        if ! rg -q "/-![[:space:]]*##[[:space:]]+" "${file}"; then
-          out+="${file}:${line_count}: missing section headers (/-! ## ... -/)"$'\n'
+        if ! rg -q "/-[!]?[[:space:]]*##[[:space:]]+" "${file}"; then
+          out+="${file}:${line_count}: missing section headers (/-! ## ... -/ or /- ## ... -/)"$'\n'
         fi
         ;;
       module_doc)
@@ -148,9 +148,9 @@ collect_long_code_blocks() {
         code_lines = 0
       }
 
-      # Section header: /-! ## ... (single or multi-line)
+      # Section header: /-! ## ... or /- ## ... (single or multi-line)
       # Check FIRST before block comment handling since section headers are block comments
-      /\/-![[:space:]]*##/ {
+      /\/-[!]?[[:space:]]*##/ {
         if (code_lines > threshold) {
           print filename ":" block_start ": code block has " code_lines " non-comment lines (threshold: " threshold ")"
         }

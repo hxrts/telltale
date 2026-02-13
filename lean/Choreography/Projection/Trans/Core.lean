@@ -337,6 +337,7 @@ mutual
                     have : False := by
                       unfold trans at hx
                       simp [hsender, Bool.false_eq_true, ↓reduceIte, hreceiver, transBranches,
+/- ## Structured Block 1 -/
                         LocalTypeR.freeVars, SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap,
                         List.flatMap_nil] at hx
                     exact this.elim
@@ -391,6 +392,7 @@ mutual
       | exact sizeOf_body_lt_mu _ _
       | exact sizeOf_branches_lt_comm_expanded _ _ _ _ _
       | exact sizeOf_cont_lt_comm_expanded _ _ _ _ _
+/- ## Structured Block 2 -/
       | exact sizeOf_bs_lt_comm _ _ _
       | exact sizeOf_cont_lt_comm _ _ _ _ _
       | omega

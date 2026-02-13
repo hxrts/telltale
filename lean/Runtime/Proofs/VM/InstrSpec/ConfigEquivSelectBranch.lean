@@ -1,3 +1,4 @@
+
 import Runtime.Proofs.VM.InstrSpec.ConfigEquivSendRecv
 
 /-! # ConfigEquiv: Select and Branch Instructions
@@ -15,6 +16,7 @@ Solution Structure. Prove `SelectSpec_respects_renaming` and
 label lookup commutes with branch list renaming.
 -/
 
+/- ## Structured Block 1 -/
 set_option autoImplicit false
 set_option relaxedAutoImplicit false
 
@@ -73,6 +75,7 @@ theorem SelectSpec_respects_renaming (ρ : SessionRenaming)
     rw [hG', renameGEnv_updateG]
     exact lookupG_update_neq (renameGEnv ρ G) (renameEndpoint ρ ep) ep'
       (renameLocalType ρ L') hne.symm
+/- ## Structured Block 2 -/
   frame_D := by
     intro e hne
     have hD' := hSpec.trace_extended
@@ -138,6 +141,7 @@ theorem SelectSpec_respects_ConfigEquiv
         _ = (lookupG (updateG G₁ ep L'₁) ep).map (renameLocalType ρ) := by rw [lookupG_update_eq]
         _ = (lookupG G₁' ep).map (renameLocalType ρ) := by rw [← hG₁']
         _ = (lookupG G₁' e').map (renameLocalType ρ) := by rw [← he]
+/- ## Structured Block 3 -/
     · -- Case: e' ≠ ep (frame)
       have hne₂ : renameEndpoint ρ e' ≠ renameEndpoint ρ ep := by
         intro heq; exact he (renameEndpoint_inj ρ e' ep heq)
@@ -198,6 +202,7 @@ theorem BranchSpec_respects_renaming (ρ : SessionRenaming)
     rw [lookupG_rename] at hRecv_renamed
     obtain ⟨branches, L', hRecv, hFind⟩ := hSpec.receiver_type
     rw [hRecv] at hRecv_renamed
+/- ## Structured Block 4 -/
     simp only [Option.map_some, renameLocalType] at hRecv_renamed
     have hBranches_eq : branches_renamed = renameBranches ρ branches := by
       cases hRecv_renamed
@@ -263,6 +268,7 @@ theorem BranchSpec_respects_ConfigEquiv
 
   -- G condition
   · intro e'
+/- ## Structured Block 5 -/
     by_cases he : e' = ep
     · -- Case: e' = ep (the updated endpoint)
       obtain ⟨branches₁, L'₁, hRecv₁, hFind₁⟩ := hSpec₁.receiver_type
@@ -327,6 +333,7 @@ theorem BranchSpec_respects_ConfigEquiv
     · -- Case: e' ≠ recvEdge (frame)
       have hne₂ : renameEdge ρ e' ≠ renameEdge ρ recvEdge := by
         intro heq; exact he (renameEdge_inj ρ e' recvEdge heq)
+/- ## Structured Block 6 -/
       simp only [renameEdge] at hne₂
       rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
       exact hD_equiv e'

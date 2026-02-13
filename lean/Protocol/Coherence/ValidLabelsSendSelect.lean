@@ -1,3 +1,4 @@
+
 import Protocol.Coherence.EdgeCoherence
 import Protocol.Coherence.Preservation
 import Protocol.Coherence.SelectPreservation
@@ -13,6 +14,7 @@ The Problem. Show label validity is preserved for message and label send-side up
 Solution Structure. Prove edge-case analyses for send/select buffer updates and endpoint changes.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -74,6 +76,7 @@ theorem ValidLabels_send_preserved
       cases hBuf : lookupBuf bufs e with
       | nil => rfl
       | cons v' vs =>
+/- ## Structured Block 2 -/
           have hLen' : Nat.succ vs.length = 0 := by
             simpa [hTraceEmpty, hBuf] using hLen
           exact (False.elim (Nat.succ_ne_zero _ hLen'))
@@ -131,6 +134,7 @@ theorem ValidLabels_select_preserved
     (G : GEnv) (D : DEnv) (bufs : Buffers)
     (selectorEp : Endpoint) (targetRole : Role)
     (selectBranches : List (String × LocalType)) (ℓ : String) (L : LocalType)
+/- ## Structured Block 3 -/
     (hValid : ValidLabels G D bufs)
     (hCoh : Coherent G D)
     (hBT : BuffersTyped G D bufs)
@@ -182,6 +186,7 @@ theorem ValidLabels_select_preserved
       subst hEq
       have hRecvRole : targetRole = selectorEp.role := by
         have h' := congrArg Endpoint.role hRecvEq
+/- ## Structured Block 4 -/
         simpa [recvEp] using h'
       exact hNoSelf hRecvRole
     have hBufEq :

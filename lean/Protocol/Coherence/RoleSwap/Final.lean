@@ -1,3 +1,4 @@
+
 import Protocol.Coherence.RoleSwap.LookupConsume
 
 /-! # Protocol.Coherence.RoleSwap.Final
@@ -12,6 +13,7 @@ and list-based swaps.
 Solution Structure. Proves final coherence and exchangeability theorems.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -73,6 +75,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
             lookupG (swapGEnvRole s A B G) senderEp =
               (lookupG G senderEp').map (swapLocalTypeRole s A B) := by
           have hSid' : senderEp'.sid = s := by
+/- ## Structured Block 2 -/
             simp [senderEp', e', swapEdgeRole, hSid]
           simpa [hSenderEp, hSid'] using
             (lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=senderEp'))
@@ -125,6 +128,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
               (lookupD D e').map (swapValTypeRole s A B) := by
           have hLookup :=
             lookupD_swap (s:=s) (A:=A) (B:=B) (D:=D) (e:=e')
+/- ## Structured Block 3 -/
           have hSwap : swapEdgeRole s A B e' = e := by
             simp [e', swapEdgeRole_involutive]
           have hSid' : e'.sid = s := by
@@ -176,6 +180,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
     have hLookupSender' :
         lookupG (swapGEnvRole s A B G) senderEp = some Lsender := by
       have hLookup :=
+/- ## Structured Block 4 -/
         lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=senderEp)
       simpa [hSid, hSwapSender, hGsender, senderEp] using hLookup
     have hTrace :

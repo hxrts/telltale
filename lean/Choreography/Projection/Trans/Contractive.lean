@@ -184,6 +184,7 @@ mutual
                 simp [is_participant, heq, Bool.or_comm]
               simp [hpart_direct] at this
             rw [trans_comm_other sender receiver role [] hne_s hne_r]
+/- ## Structured Block 1 -/
             simp [LocalTypeR.isContractive]
     -- All-Branch Contractiveness: Nonempty Comm Case
     | .comm sender receiver ((label, cont) :: rest) =>
@@ -237,6 +238,7 @@ mutual
             exact trans_isContractive_of_participatesAllBranches cont role hpart
         | false =>
             cases hq : role == q with
+/- ## Structured Block 2 -/
             | true =>
                 -- Receiver case: recv is contractive
                 simp only [Bool.false_eq_true, ↓reduceIte, LocalTypeR.isContractive,
@@ -358,6 +360,7 @@ mutual
           apply isProductive_mono cont [] []
           · intro x hx; exact hx
           · exact hprod
+/- ## Structured Block 3 -/
         by_cases hp : role == p
         · simp [trans, hp, LocalTypeR.isContractive, isContractiveBranches]
           exact trans_isContractive_of_isProductive cont role hcont_prod

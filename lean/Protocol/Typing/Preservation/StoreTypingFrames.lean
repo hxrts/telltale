@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Preservation.StoreTypingCore
 
 /-! # Store Typing Frame Lemmas
@@ -15,6 +16,7 @@ same-domain update and value typing lift. Use SEnv rewriting to show
 the framed environment has equivalent lookups.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -74,6 +76,7 @@ theorem StoreTypedStrong_frame_recv
     StoreTypedStrong (updateG G e L ++ G₂)
       (SEnvAll Ssh (Sown.updateLeft x T ++ S₂)) (updateStr store x v) := by
   intro hStore hNoSh hv hG
+/- ## Structured Block 2 -/
   have hvFrame : HasTypeVal (G ++ G₂) v T := by
     apply HasTypeVal_mono G (G ++ G₂) v T hv
     intro ep Lt hLookup
@@ -129,6 +132,7 @@ theorem StoreTypedStrong_preserved_frame_left
   induction hTS generalizing G₂ S₂ Sfin Gfin W Δ with
   -- # Communication Cases (Send/Recv/Select/Branch)
   | send =>
+/- ## Structured Block 3 -/
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
         hk hx hG hS hv hRecvReady hEdge hGout hDout hBufsOut
       cases hPre
@@ -182,6 +186,7 @@ theorem StoreTypedStrong_preserved_frame_left
             StoreTypedStrong (updateG (G ++ G₂) e L) (SEnvAll Ssh (Sown ++ S₂)) store :=
           StoreTypedStrong_updateG (G:=G ++ G₂) (S:=SEnvAll Ssh (Sown ++ S₂))
             (store:=store) (e:=e) (L:=L) hStore
+/- ## Structured Block 4 -/
         have hGrew :
             updateG (G ++ G₂) e L = updateG G e L ++ G₂ :=
           updateG_append_left_hit (G₁:=G) (G₂:=G₂) (e:=e) (L:=.branch source bs) (L':=L) hG
@@ -234,6 +239,7 @@ theorem StoreTypedStrong_preserved_frame_left
         simpa [split.hG, split.hS, SEnvAll, List.append_assoc] using hStore
       have hStore_swap :
           StoreTypedStrong (split.G1 ++ (split.G2 ++ G₂))
+/- ## Structured Block 5 -/
             (SEnvAll (Ssh0 ++ Sown0.right) (split.S2 ++ (split.S1 ++ S₂))) store0 :=
         StoreTypedStrong_swap_S_left_prefix (Ssh:=Ssh0 ++ Sown0.right)
           (S₁:=split.S1) (S₂:=split.S2) (S₃:=S₂) hDisjS hStore_pre
@@ -287,6 +293,7 @@ theorem StoreTypedStrong_preserved_frame_left
       simpa [SEnvAll, OwnedEnv.frameLeft, List.append_assoc] using hStore_final
   -- # Parallel Right Case
   | par_right split hSlen hTS hDisjG hDisjD hDisjS ih =>
+/- ## Structured Block 6 -/
       rename_i Ssh0 Sown0 store0 bufs0 store0' bufs0' P0 Q0 Q0' G0 D₁0 D₂0 G₂out0 D₂'0 S₂out0 nS0 nG0
       obtain ⟨pw, S₁_fin, S₂_fin, G₁_fin, G₂_fin, W₁, W₂, Δ₁, Δ₂, hSfin, hGfin, hW, hΔ,
           hDisjG_pre, hDisjS_pre, hDisjS_left_pre, hDisjS_right_pre, hDisjS_fin, hDisjW, hDisjΔ,
@@ -338,6 +345,7 @@ theorem StoreTypedStrong_preserved_frame_left
       have hOwnSubQ : OwnedDisjoint ({ right := Sown0.right ++ split.S1, left := split.S2 } : OwnedEnv) :=
         DisjointS_append_left hDisjRightS2 hDisjS
       have hDisjRightFin' : DisjointS Sown0.right (S₁_fin ++ S₂_fin) := by
+/- ## Structured Block 7 -/
         simpa [hSfin] using hDisjRightFin
       have hDisjRightS2' : DisjointS Sown0.right S₂_fin := DisjointS_split_right hDisjRightFin'
       have hDisjOutQ : DisjointS (Sown0.right ++ split.S1) S₂_fin :=

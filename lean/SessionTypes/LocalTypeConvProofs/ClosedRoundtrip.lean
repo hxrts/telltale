@@ -1,5 +1,7 @@
+
 import SessionTypes.LocalTypeConvProofs.Helpers
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option maxHeartbeats 0
 set_option maxRecDepth 4000
@@ -73,6 +75,7 @@ theorem fromDB?_eq_fromDB_all_ctx (t : LocalTypeDB) (ctx : NameContext)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
     · intro ctx hclosed
       simp [LocalTypeDB.fromDB?, LocalTypeDB.fromDB]
+/- ## Structured Block 2 -/
     · intro n ctx hclosed
       have hlt : n < ctx.length := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
@@ -126,6 +129,7 @@ theorem branchesFromDB?_eq_branchesFromDB (bs : List (Label × LocalTypeDB)) (ct
         simpa [isClosedAtBranches] using hclosed
       have ht := fromDB?_eq_fromDB_all_ctx t ctx hclosed'.1
       have htl := ih hclosed'.2
+/- ## Structured Block 3 -/
       simp [LocalTypeDB.branchesFromDB?, LocalTypeDB.branchesFromDB, ht, htl]
 
 -- fromDB? = fromDB at Empty Context
@@ -188,6 +192,7 @@ lemma freeVars_fromDB_subset_ctx (t : LocalTypeDB) (ctx : NameContext)
         simpa [LocalTypeDB.isClosedAt] using hclosed
       have hv' :
           v ∈ LocalTypeR.freeVarsOfBranches (LocalTypeDB.branchesFromDB ctx bs hclosed') := by
+/- ## Structured Block 4 -/
         simpa [LocalTypeDB.fromDB, LocalTypeR.freeVars] using hv
       exact hbs ctx hclosed' v hv'
     · intro body hbody ctx hclosed v hv
@@ -244,6 +249,7 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
     fun bs =>
       ∀ ctx, (∀ l _vt t, (l, _vt, t) ∈ bs → Context.Covers ctx t) →
         ∃ dbs, LocalTypeR.branchesToDB? ctx bs = some dbs ∧
+/- ## Structured Block 5 -/
           isClosedAtBranches ctx.length dbs = true
   let P3 : BranchR → Prop :=
     fun b =>
@@ -300,6 +306,7 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
         intro v hv
         by_cases hvt : v = t
         · simp only [hvt, NameOnlyContext.mem_cons_self]
+/- ## Structured Block 6 -/
         · have hmem : v ∈ body.freeVars := hv
           have : v ∈ (LocalTypeR.mu t body).freeVars := by
             simp [LocalTypeR.freeVars, hmem, hvt]
@@ -356,6 +363,7 @@ theorem branchesToDB?_some_of_covers (bs : List BranchR) (ctx : Context)
       · simp [LocalTypeR.branchesToDB?]
       · simp [isClosedAtBranches]
   | cons hd tl ih =>
+/- ## Structured Block 7 -/
       obtain ⟨l, _vt, t⟩ := hd
       have hcov_t : Context.Covers ctx t := hcov l _vt t (by simp)
       have hcov_tl : ∀ l _vt t, (l, _vt, t) ∈ tl → Context.Covers ctx t :=
@@ -416,6 +424,7 @@ theorem toDB_fromDB_roundtrip_generated (t : LocalTypeDB) (ctx : NameContext)
 
     -- Roundtrip: send/recv/μ Cases
 
+/- ## Structured Block 8 -/
     · intro p bs hbs ctx hgen hclosed
       have hclosed' : isClosedAtBranches ctx.length bs = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
@@ -471,6 +480,7 @@ theorem toDB_fromDB_roundtrip_closed (t : LocalTypeDB) (_hclosed : t.isClosed = 
 
 theorem branches_toDB_fromDB_roundtrip_closed (bs : List (Label × LocalTypeDB))
     (_hclosed : isClosedAtBranches 0 bs = true) :
+/- ## Structured Block 9 -/
   ∀ hclosed' : isClosedAtBranches (TypeContext.empty : NameContext).length bs = true,
     LocalTypeR.branchesToDB? TypeContext.empty
       (LocalTypeDB.branchesFromDB TypeContext.empty bs hclosed') = some bs := by

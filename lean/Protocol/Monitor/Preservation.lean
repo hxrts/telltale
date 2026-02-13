@@ -120,6 +120,7 @@ private theorem endpoint_sid_fresh_of_consume
 private theorem lin_supply_fresh_after_consume_produce
     {Lin lin' : LinCtx} {e : Endpoint} {Lold Lnew : LocalType} {supply : SessionId}
     (hFresh : ∀ e' S', (e', S') ∈ Lin → e'.sid < supply)
+/- ## Structured Block 1 -/
     (hConsume : LinCtx.consumeToken Lin e = some (lin', Lold)) :
     ∀ e' S', (e', S') ∈ LinCtx.produceToken lin' e Lnew → e'.sid < supply := by
   intro e' S' hMem
@@ -174,6 +175,7 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
         exact updateG_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
   -- WTMon Preservation: Recv Case
   case recv hG hConsume hBuf hv =>
+/- ## Structured Block 2 -/
       rename_i e source T L vs lin'
       have hTrace :
           (lookupD ms.D { sid := e.sid, sender := source, receiver := e.role }).head? = some T := by
@@ -225,6 +227,7 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
           hLinValid hLinUnique hConsume e' S' hMem
       ·
         exact lin_unique_after_consume_produce
+/- ## Structured Block 3 -/
           (Lin:=ms.Lin) (lin':=lin') (e:=e)
           (Lold:=.select target bs) (Lnew:=L) hLinUnique hConsume
       ·
@@ -278,6 +281,7 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
 
 -- Token Removal Corollary
 theorem token_consumed_removed (ctx : LinCtx) (e : Endpoint) (ctx' : LinCtx) (S : LocalType)
+/- ## Structured Block 4 -/
     (hPairwise : ctx.Pairwise (fun a b => a.1 ≠ b.1))
     (h : LinCtx.consumeToken ctx e = some (ctx', S)) :
     ¬LinCtx.contains ctx' e := by
@@ -343,6 +347,7 @@ theorem lookup_mapped_endpoints_sid_ne (roles : RoleSet) (sid : SessionId)
     have hNeqEndpoint : (e == Endpoint.mk sid r) = false := by
       rw [beq_eq_false_iff_ne]
       intro heq
+/- ## Structured Block 5 -/
       have : e.sid = sid := by simp [heq]
       exact hNeq this
     simp only [hNeqEndpoint]
@@ -425,6 +430,7 @@ abbrev CertifiedDeploymentProofForNewSession
     (ms : MonitorState) (roles : RoleSet) (localTypes : Role → LocalType) : Prop :=
   NewSessionCert ms roles localTypes
 
+/- ## Structured Block 6 -/
 def MonitorState.newSession (ms : MonitorState) (roles : RoleSet)
     (localTypes : Role → LocalType)
     (_cert : CertifiedDeploymentProofForNewSession ms roles localTypes) : MonitorState :=

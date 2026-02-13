@@ -90,6 +90,7 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
                             simp [Trans.trans, hp]
                             exact hcont'
                 | cons b2 bs2 =>
+/- ## Structured Block 1 -/
                     simp [CProjectF, hp] at hf
         | recv _ _ =>
             simp [CProjectF, hp] at hf
@@ -141,6 +142,7 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
                       simp [CProjectF, hq, hnp] at hf
           | send _ _ =>
               simp [CProjectF, hq, hnp] at hf
+/- ## Structured Block 2 -/
           | «end» =>
               simp [CProjectF, hq, hnp] at hf
           | var _ =>

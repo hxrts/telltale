@@ -1,7 +1,6 @@
 import Choreography.Projection.Embed
 import Choreography.Projection.Projectb
 import SessionTypes.Participation
-
 /-
 The Problem. Establish determinism and roundtrip laws for `CEmbed`/`CProject`.
 Solution Structure. Use mutual induction over local types and branch lists for
@@ -81,6 +80,7 @@ theorem embed_deterministic {e : LocalTypeR} {role : String} {g1 g2 : GlobalType
               simpa [branches_embed_deterministic hbr1 hbr2]
           | _ => simp [CEmbedF] at h2F
       | _ => simp [CEmbedF] at h1F
+/- ## Structured Block 1 -/
   | recv sender lbs =>
       cases g1 with
       | comm sender1 receiver1 gbs1 =>
@@ -193,6 +193,7 @@ theorem embed_project_roundtrip {e : LocalTypeR} {role : String} {g : GlobalType
           simp [CEmbedF] at hF; rcases hF with ⟨hrole, _, hrecv, hbr⟩; subst hrole
           cases e' with
           | send receiver'' lbs' =>
+/- ## Structured Block 2 -/
               simp [CProjectF] at hP; rcases hP with ⟨hrecv', hpr⟩; subst hrecv hrecv'
               simpa [branches_embed_project_roundtrip hbr hpr]
           | _ => simp [CProjectF] at hP
@@ -246,6 +247,7 @@ theorem branches_embed_project_roundtrip {lbs : List BranchR} {role : String}
                               cases hcont_eq; simp [htail_eq]
 termination_by sizeOf lbs
 decreasing_by
+/- ## Structured Block 3 -/
   all_goals
     subst_vars
     first
@@ -325,6 +327,7 @@ private theorem lcontractive_implies_isGuarded (t : String) (body : LocalTypeR)
   cases body with
   | «end» =>
       simp [LocalTypeR.isGuarded]
+/- ## Structured Block 4 -/
   | var w =>
       simp [LocalTypeR.lcontractive] at hcontr
   | send p bs =>
@@ -396,6 +399,7 @@ theorem localType_has_embed (e : LocalTypeR) (role : String)
       cases hcontr : LocalTypeR.lcontractive body with
       | true =>
           have hwf_body : ∀ partner, body.hasSendTo partner → role ≠ partner := by
+/- ## Structured Block 5 -/
             intro partner hsend
             exact hwf partner (LocalTypeR.hasSendTo_mu hsend)
           have hwf'_body : ∀ partner, body.hasRecvFrom partner → role ≠ partner := by
@@ -457,6 +461,7 @@ theorem branches_have_embed (lbs : List BranchR) (role : String)
   | nil => exact ⟨[], List.Forall₂.nil⟩
   | cons hd tl =>
       have hwf_hd : ∀ partner, hd.2.2.hasSendTo partner → role ≠ partner :=
+/- ## Structured Block 6 -/
         fun p h => hwf hd (List.Mem.head tl) p h
       have hwf'_hd : ∀ partner, hd.2.2.hasRecvFrom partner → role ≠ partner :=
         fun p h => hwf' hd (List.Mem.head tl) p h

@@ -130,6 +130,7 @@ theorem HeadCoherent_select_preserved
         | nil =>
           rw [hOrigTrace] at hConsumeOrig
           simp only [Consume] at hConsumeOrig
+/- ## Structured Block 1 -/
           have hL''eq : L'' = .select selectorEp.role bs := Option.some.inj hConsumeOrig.symm
           rw [hL''eq] at hConsumeSingle
           simp only [Consume, consumeOne, Option.isSome] at hConsumeSingle
@@ -189,6 +190,7 @@ theorem HeadCoherent_select_preserved
             have hEpEq : { sid := selectEdge.sid, role := selectEdge.receiver : Endpoint } = { sid := selectorEp.sid, role := targetRole } := rfl
             simp only [hEpEq, hTargetType, hTrace] at hOrigHead
             exact hOrigHead
+/- ## Structured Block 2 -/
         | branch source bs' =>
           cases hTrace : lookupD D selectEdge with
           | nil =>
@@ -301,6 +303,7 @@ theorem HeadCoherent_branch_preserved
         rw [hTraceVal] at hTrace
         simp only [List.head?] at hTrace
         exact Option.noConfusion hTrace
+/- ## Structured Block 3 -/
       | cons t ts =>
         rw [hTraceVal] at hTrace
         simp only [List.head?, Option.some.injEq] at hTrace
@@ -356,6 +359,7 @@ theorem HeadCoherent_branch_preserved
       | select _ _ => trivial
       | var _ => trivial
       | mu _ => trivial
+/- ## Structured Block 4 -/
       | recv r T' L' =>
         -- HeadCoherent for recv: check if trace head matches T'
         -- Key insight: Original G[brancherEp] = .branch senderRole bs

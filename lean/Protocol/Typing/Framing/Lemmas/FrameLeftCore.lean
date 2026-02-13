@@ -1,3 +1,4 @@
+
 import Protocol.Typing.Framing.Lemmas.FrameGCore
 
 /-! # Left Frame Core Lemmas
@@ -15,6 +16,7 @@ the typing derivation. For each constructor, lift lookups using
 disjointness and reassemble the typing judgment.
 -/
 
+/- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -73,6 +75,7 @@ theorem HasTypeProcPre_frame_left
       exact HasTypeProcPre.select hk' hG' hFind
   -- Left Frame: branch case
   | branch hk hG hLen hLbl hProcs ih =>
+/- ## Structured Block 2 -/
       rename_i Sown G k procs e p bs
       have hk' :
           lookupSEnv (SEnvVisible Ssh { right := Sframe ++ Sown.right, left := Sown.left }) k =
@@ -129,6 +132,7 @@ theorem HasTypeProcPre_reframe_right
     Sown'.left = Sown.left →
     HasTypeProcPre Ssh Sown G P →
     HasTypeProcPre Ssh Sown' G P := by
+/- ## Structured Block 3 -/
   intro hLeft h
   induction h generalizing Sown' with
   | skip =>
@@ -182,6 +186,7 @@ theorem HasTypeProcPre_reframe_right
       exact HasTypeProcPre.par hDisjS hS' hP' hQ'
   -- Reframe Right: assignment case
   | assign hNoSh hv =>
+/- ## Structured Block 4 -/
       exact HasTypeProcPre.assign hNoSh hv
 
 -- Session-Subset Transport Under Updates
@@ -241,6 +246,7 @@ theorem SessionsOf_subset_of_HasTypeProcPreOut
   | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
       hDisjW hDisjΔ hP hQ ihP ihQ =>
       intro s hs
+/- ## Structured Block 5 -/
       cases hGfin
       have hs' := SessionsOf_append_subset hs
       cases hs' with
@@ -313,6 +319,7 @@ theorem SEnv_append_empty_right (S : SEnv) : S ++ (∅ : SEnv) = S := by
 /-- When x is in S₁, update distributes over append.
     NOTE: This was previously an unsound assumption. The theorem requires x ∈ S₁.
     Uses Core.updateSEnv_append_left_of_mem. -/
+/- ## Structured Block 6 -/
 theorem updateSEnv_append_left' {S₁ S₂ : SEnv} {x : Var} {T : ValType}
     (h : ∃ T', lookupSEnv S₁ x = some T') :
     updateSEnv (S₁ ++ S₂) x T = updateSEnv S₁ x T ++ S₂ :=

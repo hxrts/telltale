@@ -189,6 +189,7 @@ mutual
         -- comm resets unguarded to [], so hg : isProductiveBranches branches [] = true
         -- Goal: isProductiveBranches (substituteBranches branches varName repl) [] = true
         exact isProductiveBranches_substitute_any branches varName repl [] hg hrepl
+/- ## Structured Block 1 -/
     | .delegate p q sid r cont =>
         simp only [GlobalType.substitute, GlobalType.isProductive] at hg ⊢
         -- delegate resets unguarded to [], so hg : cont.isProductive [] = true

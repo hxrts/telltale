@@ -122,6 +122,7 @@ theorem Coherent_recv_preserved
       have hSenderNeq : receiverEp ≠ { sid := receiverEp.sid, role := senderRole } := by
         intro h
         have : receiverEp.role = senderRole := congrArg Endpoint.role h
+/- ## Structured Block 1 -/
         exact hSenderIsRecv this.symm
       have hEq : Lrecv = L := by
         have : some L = some Lrecv := by
@@ -178,6 +179,7 @@ theorem Coherent_recv_preserved
           conv => lhs; rw [hSid2, hRole2]
           exact lookupG_update_eq G receiverEp L
         have hEq : Lrecv = L := by
+/- ## Structured Block 2 -/
           have : some L = some Lrecv := by
             simpa [hLookupR] using hGrecv
           exact (Option.some.inj this).symm
@@ -231,6 +233,7 @@ theorem Coherent_recv_preserved
       have hSenderNoMatch : receiverEp ≠ { sid := e.sid, role := e.sender } := fun h => hSenderMatch h.symm
       have hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = receiverEp := by
         cases hShare' with
+/- ## Structured Block 3 -/
         | inl h => exact (hSenderMatch h).elim
         | inr h => exact h
       apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
@@ -283,6 +286,7 @@ theorem Coherent_recv_preserved
       simpa [EdgeShares, senderEndpoint, receiverEndpoint] using hOther.2
     have hSenderNoMatch : receiverEp ≠ { sid := e.sid, role := e.sender } := by
       intro h
+/- ## Structured Block 4 -/
       apply hOther'
       exact Or.inl h.symm
     have hRecvNoMatch : receiverEp ≠ { sid := e.sid, role := e.receiver } := by
