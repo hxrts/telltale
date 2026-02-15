@@ -12,6 +12,7 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{array}
+\usepackage{tabularx}
 \usepackage{longtable}
 \usepackage{listings}
 \usepackage{xcolor}
@@ -261,7 +262,7 @@ Table~1 records the model assumptions for exact claims in this paper.
 \begin{table}[tbp]
 \centering
 \small
-\begin{tabular}{@{}L{0.55\columnwidth}L{0.4\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.55\columnwidth}L{0.4\columnwidth}@{}}
 \toprule
 \textbf{Assumption} & \textbf{Status} \\
 \midrule
@@ -271,7 +272,7 @@ reconfig.\ conditions \texttt{DelegationWF} & required \\
 fair scheduling profile & req.\ where stated \\
 crash-stop fault model & req.\ for fault claims \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Model assumptions for exact claims}
 \end{table}
 
@@ -284,7 +285,7 @@ Table~2 fixes notation used in this paper.
 \begin{table}[tbp]
 \centering
 \small
-\begin{tabular}{@{}L{0.28\columnwidth}L{0.67\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.28\columnwidth}L{0.67\columnwidth}@{}}
 \toprule
 \textbf{Symbol} & \textbf{Meaning} \\
 \midrule
@@ -297,7 +298,7 @@ $W$ & weighted state function \\
 $\mathcal{E}$ & determinism envelope relation \\
 \ConfigEquiv{} & erasure-stability equivalence \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Notation}
 \end{table}
 
@@ -522,7 +523,7 @@ Table~4 gives the typed guard clauses used to discharge $\mathsf{WF}_{\rho_{\mat
 \begin{table}[tbp]
 \centering
 \footnotesize
-\begin{tabular}{@{}L{0.27\columnwidth}L{0.36\columnwidth}L{0.27\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.27\columnwidth}L{0.36\columnwidth}L{0.27\columnwidth}@{}}
 \toprule
 \textbf{Guard} & \textbf{Source} & \textbf{Consequence} \\
 \midrule
@@ -531,7 +532,7 @@ Table~4 gives the typed guard clauses used to discharge $\mathsf{WF}_{\rho_{\mat
 $W \leq \text{budget}$ & quant.\ bound & completes in budget \\
 $|F| \leq f$ & fault-budget decl. & bounded tolerance \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Typed guard clauses for transition well-formedness}
 \end{table}
 
@@ -1528,7 +1529,7 @@ Theorem~BZ and Corollary~BZ.1 provide exact Byzantine safety characterization an
 \begin{table}[tbp]
 \centering
 \footnotesize
-\begin{tabular}{@{}L{0.12\columnwidth}L{0.48\columnwidth}L{0.34\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.12\columnwidth}L{0.48\columnwidth}L{0.34\columnwidth}@{}}
 \toprule
 \textbf{Thm} & \textbf{Modules} & \textbf{Anchors} \\
 \midrule
@@ -1539,7 +1540,7 @@ F,G & EnvelopeCore/*.lean & \nolinkurl{consensusEnvelope_exact} \\
 H,S1 & Adequacy.lean, TheoremPack/*.lean & \nolinkurl{vm_adequacy_of_trace} \\
 BZ & EnvelopeTheorems.lean & \nolinkurl{byzantineSafety_exact} \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Module map}
 \end{table}
 
@@ -1561,7 +1562,7 @@ Expected outcome: Full theorem-spine compilation (B through H, S1, BZ) succeeds,
 \begin{table}[!h]
 \centering
 \footnotesize
-\begin{tabular}{@{}L{0.2\columnwidth}L{0.1\columnwidth}L{0.34\columnwidth}L{0.3\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.2\columnwidth}L{0.1\columnwidth}L{0.34\columnwidth}L{0.3\columnwidth}@{}}
 \toprule
 \textbf{Claim} & \textbf{Sec.} & \textbf{Assumptions} & \textbf{Location} \\
 \midrule
@@ -1580,7 +1581,7 @@ Thm BZ & \S11 & Byzantine & EnvelopeThms.lean \\
 Cor.\ BZ.1 & \S11 & Byzantine + drop & Section 11 \\
 Prop.\ BZ.2 & \S11 & Adequacy + Byz. & conformance \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Index of main results}
 \end{table}
 

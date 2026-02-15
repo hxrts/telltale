@@ -12,6 +12,7 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{array}
+\usepackage{tabularx}
 \usepackage{longtable}
 \usepackage{listings}
 \usepackage{xcolor}
@@ -301,7 +302,7 @@ Table~1 records the model assumptions used for exact statements in this paper.
 \begin{table}[tbp]
 \centering
 \small
-\begin{tabular}{@{}L{0.55\columnwidth}L{0.4\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.55\columnwidth}L{0.4\columnwidth}@{}}
 \toprule
 \textbf{Assumption} & \textbf{Status} \\
 \midrule
@@ -311,7 +312,7 @@ fair scheduling profile & assumed where stated \\
 \texttt{DeliveryModel} param. & required \\
 crash-stop and Byzantine claims & interface claim only \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Model assumptions for exact statements}
 \end{table}
 
@@ -361,7 +362,7 @@ Table~2 fixes notation used in this paper.
 \begin{table}[tbp]
 \centering
 \small
-\begin{tabular}{@{}L{0.4\columnwidth}L{0.55\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.4\columnwidth}L{0.55\columnwidth}@{}}
 \toprule
 \textbf{Symbol} & \textbf{Meaning} \\
 \midrule
@@ -374,7 +375,7 @@ $\Ebyz$ & Byzantine determinism-envelope \\
 \Consume & trace-to-type alignment function \\
 \ActiveEdge & endpoint-presence guard \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Notation}
 \end{table}
 
@@ -391,7 +392,7 @@ The key structural correspondence is compatibility. A coherence-space token corr
 \begin{table}[tbp]
 \centering
 \small
-\begin{tabular}{@{}L{0.38\columnwidth}L{0.57\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.38\columnwidth}L{0.57\columnwidth}@{}}
 \toprule
 \textbf{Coherence-space} & \textbf{MPST operational} \\
 \midrule
@@ -400,7 +401,7 @@ coherence relation & \texttt{EdgeCoherent} \\
 clique & \texttt{Coherent} configuration \\
 linear-map preservation & step preservation theorem \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Coherence-space correspondence}
 \end{table}
 
@@ -647,7 +648,7 @@ Table~4 maps each core claim to concrete modules and representative theorem anch
 \begin{table}[tbp]
 \centering
 \footnotesize
-\begin{tabular}{@{}L{0.27\columnwidth}L{0.36\columnwidth}L{0.27\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.27\columnwidth}L{0.36\columnwidth}L{0.27\columnwidth}@{}}
 \toprule
 \textbf{Claim} & \textbf{Modules} & \textbf{Anchors} \\
 \midrule
@@ -658,7 +659,7 @@ Preservation & Preservation*.lean & Coherent\_*\_preserved \\
 Delivery variants & DeliveryModel.lean & *Delivery\_laws \\
 Subtype repl. & SubtypeReplacement*.lean & Consume\_mono \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Claim to artifact mapping}
 \end{table}
 
@@ -680,7 +681,7 @@ Let $h$ satisfy choreography-side obligations and \texttt{EffectSpec.handlerType
 \begin{table}[tbp]
 \centering
 \small
-\begin{tabular}{@{}L{0.45\columnwidth}L{0.5\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.45\columnwidth}L{0.5\columnwidth}@{}}
 \toprule
 \textbf{Bridge item} & \textbf{Role} \\
 \midrule
@@ -688,7 +689,7 @@ choreography obligation & source protocol obligation \\
 effect handler typing & typed executable obligation \\
 VM runtime typing check & enforcement layer \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Bridge intent}
 \end{table}
 
@@ -726,7 +727,7 @@ The main difference from prior work is a single local invariant kernel with a re
 \begin{table}[tbp]
 \centering
 \small
-\begin{tabular}{@{}L{0.47\columnwidth}L{0.48\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.47\columnwidth}L{0.48\columnwidth}@{}}
 \toprule
 \textbf{Prior limitation} & \textbf{Contribution} \\
 \midrule
@@ -735,7 +736,7 @@ weak theory/execution boundary & explicit effect-typed bridge \\
 FIFO-centric semantics & one theorem under \texttt{DeliveryModel} \\
 fragmented proof structure & split kernel + \texttt{Consume} lemmas \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Comparison with prior work}
 \end{table}
 
@@ -968,7 +969,7 @@ Reproduction uses the repository-pinned Lean toolchain and manifest.
 
 \begin{center}
 \footnotesize
-\begin{tabular}{@{}L{0.2\columnwidth}L{0.08\columnwidth}L{0.3\columnwidth}L{0.32\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.2\columnwidth}L{0.08\columnwidth}L{0.3\columnwidth}L{0.32\columnwidth}@{}}
 \toprule
 \textbf{Claim} & \textbf{Sec.} & \textbf{Assumption} & \textbf{Location} \\
 \midrule
@@ -979,7 +980,7 @@ Thm.\ BZ-1 & \S8 & Block 2 iface & EnvelopeThms.lean \\
 Cor.\ BZ-1.1 & \S8 & Block 2 + wit. & derived \\
 Prop.\ BZ-1.2 & \S8 & Block 2 + gate & TheoremPack/*.lean \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \captionof{table}{Index of main results}
 \end{center}
 

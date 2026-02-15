@@ -12,6 +12,7 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{array}
+\usepackage{tabularx}
 \usepackage{longtable}
 \usepackage{listings}
 \usepackage{xcolor}
@@ -219,7 +220,7 @@ Table~1 records the assumptions used for exact statements in this paper.
 \begin{table}[tbp]
 \centering
 \small
-\begin{tabular}{@{}L{0.52\columnwidth}L{0.43\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.52\columnwidth}L{0.43\columnwidth}@{}}
 \toprule
 \textbf{Assumption} & \textbf{Status} \\
 \midrule
@@ -230,7 +231,7 @@ fairness profile & req.\ for scheduler bounds \\
 crash-stop fault model & req.\ for Theorem~3 \\
 Byzantine bundle $\Hbyz$ & req.\ for Thm.~4, Cor.~4.1 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Assumptions for exact statements}
 \end{table}
 
@@ -243,7 +244,7 @@ Table~2 fixes notation used in this paper.
 \begin{table}[tbp]
 \centering
 \small
-\begin{tabular}{@{}L{0.35\columnwidth}L{0.6\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.35\columnwidth}L{0.6\columnwidth}@{}}
 \toprule
 \textbf{Symbol} & \textbf{Meaning} \\
 \midrule
@@ -256,7 +257,7 @@ $W_0$ & initial weighted measure \\
 $\Bc$ & critical capacity threshold \\
 \texttt{DeliveryModel} & parametric delivery interface \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Notation}
 \end{table}
 
@@ -275,7 +276,7 @@ Table~3 lists scheduler profiles used by the bound statements.
 \begin{table}[tbp]
 \centering
 \footnotesize
-\begin{tabular}{@{}L{0.22\columnwidth}L{0.43\columnwidth}L{0.28\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.22\columnwidth}L{0.43\columnwidth}L{0.28\columnwidth}@{}}
 \toprule
 \textbf{Profile} & \textbf{Assumption} & \textbf{Bound class} \\
 \midrule
@@ -283,7 +284,7 @@ round-robin & bounded delay & total conservative \\
 $k$-fair & enabled within $k$ slots & total conservative \\
 adversarial fair & fairness only & productive exact \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Scheduler profiles}
 \end{table}
 
@@ -372,7 +373,7 @@ Table~4 records the per-rule $\Delta W$ facts used in this witness.
 \begin{table}[tbp]
 \centering
 \small
-\begin{tabular}{@{}lr@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.65\columnwidth}>{\raggedleft\arraybackslash}p{0.30\columnwidth}@{}}
 \toprule
 \textbf{Rule instance} & $\Delta W$ \\
 \midrule
@@ -381,7 +382,7 @@ receive \texttt{Request} & $-1$ \\
 send \texttt{Grant} & $-2 + 1 = -1$ \\
 receive \texttt{Grant} & $-1$ \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Per-rule $\Delta W$ facts}
 \end{table}
 
@@ -610,7 +611,7 @@ Table~5 summarizes the decidability results.
 \begin{table}[tbp]
 \centering
 \footnotesize
-\begin{tabular}{@{}L{0.3\columnwidth}L{0.42\columnwidth}L{0.22\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.3\columnwidth}L{0.42\columnwidth}L{0.22\columnwidth}@{}}
 \toprule
 \textbf{Predicate} & \textbf{Method} & \textbf{Result} \\
 \midrule
@@ -620,7 +621,7 @@ Crash-stop toler. & residual graph decider & decidable + iff \\
 Byzantine safety & bundle + counterex. & exact iff \\
 Branching feasib. & chromatic criterion & decidable \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Decidability results summary}
 \end{table}
 
@@ -629,7 +630,7 @@ Table~6 summarizes complexity envelopes for the decision layer.
 \begin{table}[tbp]
 \centering
 \footnotesize
-\begin{tabular}{@{}L{0.27\columnwidth}L{0.36\columnwidth}L{0.27\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.27\columnwidth}L{0.36\columnwidth}L{0.27\columnwidth}@{}}
 \toprule
 \textbf{Predicate} & \textbf{Driver} & \textbf{Complexity} \\
 \midrule
@@ -638,7 +639,7 @@ regular type equiv. & finite bisim graph & poly in graph size \\
 crash-stop toler. & residual connectivity & linear/near-linear \\
 branching feasib. & coloring checks & poly for fixed prof. \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Complexity envelopes}
 \end{table}
 
@@ -679,7 +680,7 @@ Table~7 separates exact and conservative consequences.
 \begin{table}[tbp]
 \centering
 \small
-\begin{tabular}{@{}L{0.6\columnwidth}l@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.70\columnwidth}L{0.25\columnwidth}@{}}
 \toprule
 \textbf{Result} & \textbf{Class} \\
 \midrule
@@ -688,7 +689,7 @@ productive-step bound by $W_0$ & exact \\
 scheduler-lifted total-step bound & conservative \\
 threshold under scheduler profile & conservative \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Exact vs conservative results}
 \end{table}
 
@@ -697,7 +698,7 @@ Table~8 gives worked values used in the worked example.
 \begin{table}[tbp]
 \centering
 \small
-\begin{tabular}{@{}lr@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.70\columnwidth}>{\raggedleft\arraybackslash}p{0.25\columnwidth}@{}}
 \toprule
 \textbf{Quantity} & \textbf{Value} \\
 \midrule
@@ -706,7 +707,7 @@ productive-step bound & $\leq 25$ \\
 2-fair total-step bound & $\leq 50$ \\
 $\Bc$ & 2 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Worked example values}
 \end{table}
 
@@ -763,7 +764,7 @@ Table~9 maps claim families to concrete modules and theorem anchors.
 \begin{table}[tbp]
 \centering
 \footnotesize
-\begin{tabular}{@{}L{0.22\columnwidth}L{0.42\columnwidth}L{0.3\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.22\columnwidth}L{0.42\columnwidth}L{0.3\columnwidth}@{}}
 \toprule
 \textbf{Layer} & \textbf{Modules} & \textbf{Anchors} \\
 \midrule
@@ -772,7 +773,7 @@ Decision & AsyncSubtyping/*.lean, BisimDecidable/*.lean & reachable\_triples\_fi
 Protocol & CrashTolerance.lean, PhaseSharpness.lean & crash\_tolerance\_iff \\
 Byzantine & EnvelopeTheorems.lean, TheoremPack/*.lean & byzantineSafety\_exact \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Claim to artifact mapping}
 \end{table}
 
@@ -1033,7 +1034,7 @@ Under Assumption Block~4, this paper provides the exact safety-side interface an
 \begin{table}[tbp]
 \centering
 \footnotesize
-\begin{tabular}{@{}L{0.24\columnwidth}L{0.42\columnwidth}L{0.28\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.24\columnwidth}L{0.42\columnwidth}L{0.28\columnwidth}@{}}
 \toprule
 \textbf{Result} & \textbf{Modules} & \textbf{Anchors} \\
 \midrule
@@ -1042,7 +1043,7 @@ Decidability & AsyncSubtyping/*.lean, BisimDecidable/*.lean & reachable\_triples
 Crash/branch & CrashTolerance.lean, PhaseSharpness.lean & crash\_tolerance\_iff \\
 Byzantine & EnvelopeTheorems*.lean, TheoremPack/*.lean & byzantineSafety\_exact \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Mechanization map}
 \end{table}
 
@@ -1092,7 +1093,7 @@ Expected checks: Finite-reachability and decision modules compile, weighted-meas
 \begin{table}[!h]
 \centering
 \footnotesize
-\begin{tabular}{@{}L{0.22\columnwidth}L{0.1\columnwidth}L{0.32\columnwidth}L{0.3\columnwidth}@{}}
+\begin{tabularx}{\columnwidth}{@{}L{0.22\columnwidth}L{0.1\columnwidth}L{0.32\columnwidth}L{0.3\columnwidth}@{}}
 \toprule
 \textbf{Claim} & \textbf{Sec.} & \textbf{Assumption} & \textbf{Location} \\
 \midrule
@@ -1107,7 +1108,7 @@ Cor.\ 3 & \S7 & regular + thresh. & PhaseSharpness.lean \\
 Prop.\ 2 & \S6 & pack + adhere & TheoremPack/*.lean \\
 Prop.\ 1 & \S9 & repro checks & Appendix D, F \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Index of main results}
 \end{table}
 
