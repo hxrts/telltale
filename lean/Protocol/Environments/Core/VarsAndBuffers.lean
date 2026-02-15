@@ -1,7 +1,5 @@
 import Protocol.LocalType
 import Protocol.Values
-import Batteries.Data.RBMap
-import Batteries.Data.RBMap.Lemmas
 
 /-! # MPST Environments
 
@@ -64,7 +62,6 @@ def updateStr (store : VarStore) (x : Var) (v : Value) : VarStore :=
 
 /-! ## SEnv: Variable → ValType -/
 
-open Batteries
 
 /-- SEnv maps variables to their value types (list-backed). -/
 abbrev SEnv := List (Var × ValType)

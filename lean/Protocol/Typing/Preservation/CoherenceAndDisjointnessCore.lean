@@ -1,5 +1,4 @@
 import Protocol.Typing.Framing
-import Batteries.Data.RBMap.Lemmas
 
 /-! # MPST Process Typing: Preservation
 
@@ -43,7 +42,6 @@ set_option autoImplicit false
 set_option linter.unnecessarySimpa false
 
 open scoped Classical
-open Batteries
 
 section
 

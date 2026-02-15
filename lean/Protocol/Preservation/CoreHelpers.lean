@@ -1,7 +1,6 @@
 import Protocol.Semantics
 import Protocol.Typing
 import Protocol.Coherence
-import Batteries.Data.RBMap.Lemmas
 
 /-! # MPST Preservation Theorem
 
@@ -70,7 +69,6 @@ set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
 open scoped Classical
-open Batteries
 
 section
 

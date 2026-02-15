@@ -17,6 +17,8 @@ and `lookupType_updateType_ne` for different-endpoint lookup.
 
 set_option autoImplicit false
 
+open Batteries
+
 universe u
 
 variable {ν : Type u} [VerificationModel ν]
@@ -293,7 +295,7 @@ theorem DEnv_find?_updateD_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (h
     intro hEq
     exact hne ((Edge.compare_eq_iff_eq e' e).1 hEq).symm
   have hfind :=
-    Batteries.RBMap.find?_insert_of_ne (t := env.map) (k := e) (v := ts) (k' := e') hne'
+    RBMap.find?_insert_of_ne (t := env.map) (k := e) (v := ts) (k' := e') hne'
   calc
     (updateD env e ts).find? e'
         = (DEnv.ofMap (env.map.insert e ts)).find? e' := by

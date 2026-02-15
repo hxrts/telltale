@@ -1,6 +1,4 @@
 import Protocol.Environments.Core
-import Batteries.Data.RBMap
-import Batteries.Data.RBMap.Lemmas
 import Runtime.VM.Model.TypeClasses
 import Runtime.VM.Model.Core
 import Runtime.Resources.BufferRA

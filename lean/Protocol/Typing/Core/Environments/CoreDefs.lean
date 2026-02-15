@@ -43,7 +43,6 @@ set_option autoImplicit false
 set_option linter.unnecessarySimpa false
 
 open scoped Classical
-open Batteries
 
 section
 

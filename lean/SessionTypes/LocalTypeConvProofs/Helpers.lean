@@ -1,5 +1,4 @@
 import Mathlib
-import Batteries.Data.Nat.Digits
 import SessionTypes.LocalTypeConvDefs
 
 set_option linter.mathlibStandardSet false

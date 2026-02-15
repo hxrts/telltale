@@ -1,7 +1,7 @@
 import Runtime.VM.Semantics.Exec
 import Runtime.Proofs.Frame
 import Runtime.VM.Runtime.Loader
-import Batteries.Data.List.Perm
+import Init.Data.List.Perm
 
 /-! # Cross-Session Diamond Property
 

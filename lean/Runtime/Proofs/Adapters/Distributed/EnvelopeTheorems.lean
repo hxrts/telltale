@@ -1,5 +1,6 @@
 import Runtime.Proofs.Adapters.Distributed.CoreProfiles
 import Runtime.Proofs.Adapters.Distributed.EnvelopeTheorems.AdmissionAndBridge
+import Protocol.Coherence.EdgeCoherenceCore
 
 /-! # Runtime.Proofs.Adapters.Distributed.EnvelopeTheorems
 
@@ -185,6 +186,27 @@ theorem crdt_hcrdtLimits_of_profile (p : CRDTProfile) :
   p.protocol.hcrdtLimits
 
 /-! ## Byzantine Safety Theorems -/
+
+/-- Byzantine interface well-formedness used by the paper-level safety interface.
+It is exactly the active-edge Coherence invariant. -/
+abbrev ByzIfaceWF (G : GEnv) (D : DEnv) : Prop :=
+  Coherent G D
+
+/-- `ByzIfaceWF` is definitionally equivalent to `Coherent`. -/
+@[simp] theorem byzIfaceWF_iff_coherent {G : GEnv} {D : DEnv} :
+    ByzIfaceWF G D ↔ Coherent G D :=
+  Iff.rfl
+
+/-- BZ-1: interface well-formedness gives the exact edge-local `Consume` obligation. -/
+theorem bz1_byzantineInterfaceWellFormedness
+    {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
+    (hWF : ByzIfaceWF G D)
+    (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv)
+    (hActive : ActiveEdge G e) :
+    ∃ Lsender,
+      lookupG G { sid := e.sid, role := e.sender } = some Lsender ∧
+      (Consume e.sender Lrecv (lookupD D e)).isSome := by
+  exact Coherent_edge_of_receiver hWF hGrecv hActive
 
 /-- Byzantine-safety profile satisfies the model-level assumption gate. -/
 theorem byzantineSafety_assumptionsPassed_of_profile (p : ByzantineSafetyProfile) :

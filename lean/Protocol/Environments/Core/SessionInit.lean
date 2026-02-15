@@ -41,7 +41,7 @@ theorem DEnvUnion_empty_right (D : DEnv) : DEnvUnion D (∅ : DEnv) = D := by
   apply DEnv_eq_of_find?_eq
   intro e
   simp only [DEnvUnion, DEnv_find?_ofMap]
-  rw [Batteries.RBMap.foldl_eq_foldl_toList]
+  rw [RBMap.foldl_eq_foldl_toList]
   have : (∅ : DEnv).map.toList = [] := rfl
   rw [this, List.foldl_nil]
   simp [DEnv.find?]
@@ -54,7 +54,7 @@ theorem DEnvUnion_empty_left (D : DEnv) : DEnvUnion (∅ : DEnv) D = D := by
   -- Starting from empty, every key is new, so all inserts happen.
   -- The result has the same find? as D.map.
   simp only [DEnvUnion, DEnv_find?_ofMap]
-  rw [Batteries.RBMap.foldl_eq_foldl_toList]
+  rw [RBMap.foldl_eq_foldl_toList]
   -- Goal: (DEnv.ofMap (D.map.toList.foldl f (∅).map)).find? e = D.find? e
   -- where f is the conditional insert.
   -- Suffices to show the foldl equals rbmapOfList D.map.toList
@@ -120,7 +120,7 @@ theorem DEnvUnion_find?_left {D1 D2 : DEnv} {e : Edge} {ts : Trace}
     simpa [DEnv.find?] using h
   change (DEnvUnion D1 D2).find? e = some ts
   simp only [DEnvUnion, DEnv_find?_ofMap]
-  rw [Batteries.RBMap.foldl_eq_foldl_toList]
+  rw [RBMap.foldl_eq_foldl_toList]
   -- Fold over D2.map.toList preserves existing keys in D1.map.
   let f := fun (acc : RBMap Edge Trace compare) (p : Edge × Trace) =>
     match acc.find? p.1 with
@@ -168,7 +168,7 @@ theorem DEnvUnion_find?_right {D1 D2 : DEnv} {e : Edge}
     simpa [DEnv.find?] using h
   change (DEnvUnion D1 D2).find? e = D2.find? e
   simp only [DEnvUnion, DEnv_find?_ofMap]
-  rw [Batteries.RBMap.foldl_eq_foldl_toList]
+  rw [RBMap.foldl_eq_foldl_toList]
   let f := fun (acc : RBMap Edge Trace compare) (p : Edge × Trace) =>
     match acc.find? p.1 with
     | some _ => acc
@@ -251,7 +251,7 @@ theorem DEnvUnion_find?_right {D1 D2 : DEnv} {e : Edge}
           | none => acc.insert k v) (∅ : RBMap Edge Trace compare) D2.map).find? e =
         D2.find? e := by
       simpa [DEnvUnion, DEnv_find?_ofMap] using hEmptyUnion
-    simpa [Batteries.RBMap.foldl_eq_foldl_toList] using hEmptyUnion'
+    simpa [RBMap.foldl_eq_foldl_toList] using hEmptyUnion'
   exact hEqFold.trans hEmptyFold
 
 /-! ## updateD Distribution over DEnvUnion -/
