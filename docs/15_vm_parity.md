@@ -113,3 +113,4 @@ When any parity matrix row changes, update this file and `docs/lean_vs_rust_devi
 - [VM Architecture](11_vm_architecture.md)
 - [Bytecode Instructions](12_bytecode_instructions.md)
 - [Lean Verification](18_lean_verification.md)
+- [Capability and Admission](25_capability_admission.md)

@@ -116,3 +116,4 @@ Release conformance surfaces are exported through theorem-pack APIs and enforced
 - [VM Simulation](14_vm_simulation.md)
 - [VM Parity](15_vm_parity.md)
 - [Lean Verification](18_lean_verification.md)
+- [Capability and Admission](25_capability_admission.md)

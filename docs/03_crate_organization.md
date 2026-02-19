@@ -126,9 +126,9 @@ These commands generate samples, validate round-trips, and import JSON respectiv
 
 This crate is located in `rust/vm/`. It provides a bytecode VM for executing session type protocols. The VM is the core engine used by the simulator and can also be embedded directly.
 
-The `instr` module defines the bytecode instruction set. Instructions include `Send`, `Recv`, `Offer`, and `Choose` for communication. Instructions include `Open` and `Close` for session lifecycle. The `Invoke` instruction calls the VM effect handler. Control flow uses `LoadImm`, `Mov`, `Jmp`, `Yield`, and `Halt`.
+The `instr` module defines the bytecode instruction set. Communication instructions include `Send`, `Receive`, `Offer`, and `Choose`. Session lifecycle uses `Open` and `Close`. Effect and guard execution uses `Invoke`, `Acquire`, and `Release`. Speculation and ownership support uses `Fork`, `Join`, `Abort`, `Transfer`, `Tag`, and `Check`. Control flow uses `Set`, `Move`, `Jump`, `Spawn`, `Yield`, and `Halt`.
 
-The `coroutine` module defines lightweight execution units. Each coroutine has a program counter, register file, and status. Each coroutine stores its session ID, role, and bytecode program. The `scheduler` module implements scheduling policies. Available policies are `Cooperative`, `RoundRobin`, and `ProgressAware`.
+The `coroutine` module defines lightweight execution units. Each coroutine has a program counter, register file, and status. Each coroutine stores its session ID, role, and bytecode program. The `scheduler` module implements scheduling policies. Available policies are `Cooperative`, `RoundRobin`, `Priority`, and `ProgressAware`.
 
 The `session` module manages session state and type advancement. The `buffer` module provides bounded message buffers. Buffer modes include `Fifo` and `LatestValue`. Backpressure policies include `Block`, `Drop`, `Error`, and `Resize`.
 
@@ -175,7 +175,15 @@ The `ast/` directory contains extended AST types including `Protocol`, `LocalTyp
 
 The parser now supports proof-bundle declarations and protocol bundle requirements. Parsed bundles are stored as typed metadata on `Choreography` through `ProofBundleDecl`.
 
-The parser also supports VM-core statements such as `acquire`, `transfer`, `fork`, and `check`. These statements lower to `Protocol::Extension` nodes with annotations that record operation kind, operands, and required capability. Projection preserves continuation projection when it encounters these extension nodes.
+The parser supports enriched proof-bundle fields (`version`, `issuer`, `constraint`). It also supports capability inference that can auto-select required bundles when protocol `requires` is omitted.
+
+The parser supports VM-core statements such as `acquire`, `transfer`, `fork`, and `check`. These statements lower to `Protocol::Extension` nodes with annotations that record operation kind, operands, and required capability. Projection preserves continuation projection when it encounters these extension nodes.
+
+The parser includes a linear usage checker for delegation assets introduced by `acquire`. It rejects double-consume, consume-before-acquire, and branch divergence for linear asset state.
+
+The parser supports first-class combinators (`handshake`, `retry`, `quorum_collect`). It also supports typed metadata for top-level role-set and topology declarations (`role_set`, `cluster`, `ring`, `mesh`).
+
+Lowering diagnostics are exposed through `explain_lowering` and `choreo-fmt --explain-lowering`. Lint output includes fix suggestions and an LSP-style JSON rendering helper.
 
 Validation in this crate now includes bundle and capability checks. It rejects duplicate bundle declarations, missing required bundles, and missing capability coverage for VM-core statements. See [Choreographic DSL](04_choreographic_dsl.md) for syntax details.
 

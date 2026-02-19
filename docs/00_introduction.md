@@ -33,7 +33,7 @@ G = Alice -> Bob: Int.
 
 This global type projects to different local types. Alice gets `Bob!Int.Bob&{Sum: Int, Product: Int}`. Bob gets `Alice?Int.Alice⊕{Sum: Int, Product: Int}`. Each participant sees only their part of the protocol.
 
-The projection algorithm ensures the local types are compatible. If projection succeeds, the protocol is guaranteed to be deadlock-free. All participants will complete the protocol without communication errors.
+The projection algorithm ensures the local types are compatible. Deadlock-freedom claims in this project are assumption-scoped and theorem-specific. Typical premises include well-typedness, progress reachability, and fairness scheduling assumptions. Under those premises, participants complete without protocol communication errors.
 
 ## Lean Signatures (Core Types)
 

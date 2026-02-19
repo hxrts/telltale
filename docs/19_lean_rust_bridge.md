@@ -275,3 +275,4 @@ This removes cross-session interleaving noise but keeps event payload difference
 - [Lean Verification](18_lean_verification.md)
 - [VM Simulation](14_vm_simulation.md)
 - [VM Parity](15_vm_parity.md)
+- [Capability and Admission](25_capability_admission.md)
