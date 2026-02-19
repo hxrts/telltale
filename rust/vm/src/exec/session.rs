@@ -12,7 +12,9 @@ pub(crate) fn step_open(
     coro_idx: usize,
     role: &str,
     roles: &[String],
-    endpoints: &[(String, u16)],
+    local_types: &[(String, telltale_types::LocalTypeR)],
+    handlers: &[((String, String), String)],
+    dsts: &[(String, u16)],
 ) -> Result<StepPack, Fault> {
-    vm.step_open(coro_idx, role, roles, endpoints)
+    vm.step_open(coro_idx, role, roles, local_types, handlers, dsts)
 }

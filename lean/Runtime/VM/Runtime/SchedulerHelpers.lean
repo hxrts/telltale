@@ -311,6 +311,24 @@ def enqueueCoro (queue : SchedQueue) (cid : CoroutineId) : SchedQueue :=
 private def transferReason (endpoint : Endpoint) : String :=
   s!"transfer {endpoint.sid}:{endpoint.role}"
 
+private def delegationWitness (fromCoro toCoro : CoroutineId) (endpoint : Endpoint) : String :=
+  s!"delegation[{endpoint.sid}:{endpoint.role}] {fromCoro}->{toCoro}"
+
+private def delegationHandoffValid (h : CrossLaneHandoff) : Bool :=
+  h.fromCoro ≠ h.toCoro &&
+  h.reason.startsWith "transfer " &&
+  h.delegationWitness.length > 0
+
+private def typedTransferTransitionAllowed {γ : Type u}
+    (sched : SchedState γ) (fromCoro : CoroutineId) (endpoint : Endpoint) : Bool :=
+  -- Cross-lane ownership transitions are only allowed when the source lane
+  -- currently owns the transferred endpoint key (or key is not tracked yet).
+  let key : OwnershipKey := (endpoint.sid, endpoint.role)
+  let fromLane := laneOf sched fromCoro
+  match sched.ownershipIndex.get? key with
+  | none => true
+  | some ownerLane => ownerLane = fromLane
+
 private def recordCrossLaneTransfer {γ : Type u}
     (sched : SchedState γ) (fromCoro : CoroutineId) (endpoint : Endpoint)
     (toCoro : CoroutineId) : SchedState γ :=
@@ -325,13 +343,16 @@ private def recordCrossLaneTransfer {γ : Type u}
       , fromLane := fromLane
       , toLane := toLane
       , step := sched.stepCount
-      , reason := transferReason endpoint }
+      , reason := transferReason endpoint
+      , delegationWitness := delegationWitness fromCoro toCoro endpoint }
     { sched with crossLaneHandoffs := sched.crossLaneHandoffs ++ [handoff] }
 
 def updateAfterStep {γ : Type u} (sched : SchedState γ) (cid : CoroutineId)
     (status : ExecStatus γ) : SchedState γ :=
   -- Update queues and blocked set based on step status.
-  let sched0 := syncLaneViews sched
+  let schedFiltered :=
+    { sched with crossLaneHandoffs := sched.crossLaneHandoffs.filter delegationHandoffValid }
+  let sched0 := syncLaneViews schedFiltered
   let blocked' := dropBlocked sched0.blockedSet cid
   let ready' := removeFirst cid sched0.readyQueue
   match status with
@@ -350,6 +371,12 @@ def updateAfterStep {γ : Type u} (sched : SchedState γ) (cid : CoroutineId)
   | .transferred endpoint targetId =>
       let sched1 :=
         { sched0 with blockedSet := blocked', readyQueue := enqueueCoro ready' cid }
-      syncLaneViews (recordCrossLaneTransfer sched1 cid endpoint targetId)
+      if typedTransferTransitionAllowed sched1 cid endpoint then
+        let toLane := laneOf sched1 targetId
+        let ownership' := sched1.ownershipIndex.insert (endpoint.sid, endpoint.role) toLane
+        let sched2 := { sched1 with ownershipIndex := ownership' }
+        syncLaneViews (recordCrossLaneTransfer sched2 cid endpoint targetId)
+      else
+        syncLaneViews sched1
   | _ =>
       syncLaneViews { sched0 with blockedSet := blocked', readyQueue := enqueueCoro ready' cid }

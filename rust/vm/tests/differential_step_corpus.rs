@@ -13,7 +13,7 @@ use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::EffectHandler;
 use telltale_vm::effect::SendDecision;
-use telltale_vm::instr::{Endpoint, ImmValue, Instr};
+use telltale_vm::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_vm::loader::CodeImage;
 #[cfg(feature = "multi-thread")]
 use telltale_vm::threaded::ThreadedVM;
@@ -201,7 +201,10 @@ fn tag_check_fixture_image() -> CodeImage {
 
 fn guard_effect_fixture_image() -> CodeImage {
     single_role_end_image(vec![
-        Instr::Invoke { action: 0, dst: 1 },
+        Instr::Invoke {
+            action: InvokeAction::Reg(0),
+            dst: Some(1),
+        },
         Instr::Acquire {
             layer: "auth".to_string(),
             dst: 2,
@@ -222,6 +225,7 @@ fn speculation_fixture_image() -> CodeImage {
         },
         Instr::Fork { ghost: 1 },
         Instr::Join,
+        Instr::Fork { ghost: 1 },
         Instr::Abort,
         Instr::Halt,
     ])

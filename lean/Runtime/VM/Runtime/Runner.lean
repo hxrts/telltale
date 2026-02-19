@@ -35,6 +35,18 @@ def tryUnblockReceivers {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
 
 /-! ## Round Execution -/
 
+/-- Execute one canonical scheduler step when possible. -/
+def schedRoundOne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
+  match schedStep st with
+  | none => st
+  | some st' => st'
+
 /-- Execute one round: advance at most one ready coroutine.
     Concurrency is abstracted away in the canonical runner. -/
 def schedRound {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -47,9 +59,7 @@ def schedRound {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   if n = 0 then
     st
   else
-    match schedStep st with
-    | none => st
-    | some st' => st'
+    schedRoundOne st
 
 /-! ## Termination Predicates -/
 

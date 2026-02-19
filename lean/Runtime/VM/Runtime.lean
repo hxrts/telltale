@@ -2,6 +2,7 @@ import Runtime.VM.Runtime.Monitor
 import Runtime.VM.Runtime.Loader
 import Runtime.VM.Runtime.Scheduler
 import Runtime.VM.Runtime.Runner
+import Runtime.VM.Runtime.ThreadedRunner
 import Runtime.VM.Runtime.Failure
 import Runtime.VM.Runtime.Json
 

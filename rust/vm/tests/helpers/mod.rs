@@ -189,6 +189,65 @@ impl EffectHandler for FailingHandler {
 // Builders
 // ============================================================================
 
+#[derive(Debug, Clone)]
+pub enum ScenarioKind {
+    SimpleSendRecv,
+    RecursiveSendRecv,
+    Choice,
+}
+
+#[derive(Debug, Clone)]
+pub struct ScenarioSpec {
+    pub kind: ScenarioKind,
+    pub sender: String,
+    pub receiver: String,
+    pub labels: Vec<String>,
+}
+
+impl ScenarioSpec {
+    pub fn simple(sender: &str, receiver: &str, label: &str) -> Self {
+        Self {
+            kind: ScenarioKind::SimpleSendRecv,
+            sender: sender.to_string(),
+            receiver: receiver.to_string(),
+            labels: vec![label.to_string()],
+        }
+    }
+
+    pub fn recursive(sender: &str, receiver: &str, label: &str) -> Self {
+        Self {
+            kind: ScenarioKind::RecursiveSendRecv,
+            sender: sender.to_string(),
+            receiver: receiver.to_string(),
+            labels: vec![label.to_string()],
+        }
+    }
+
+    pub fn choice(sender: &str, receiver: &str, labels: &[&str]) -> Self {
+        Self {
+            kind: ScenarioKind::Choice,
+            sender: sender.to_string(),
+            receiver: receiver.to_string(),
+            labels: labels.iter().map(|label| (*label).to_string()).collect(),
+        }
+    }
+
+    pub fn to_code_image(&self) -> CodeImage {
+        match self.kind {
+            ScenarioKind::SimpleSendRecv => {
+                simple_send_recv_image(&self.sender, &self.receiver, &self.labels[0])
+            }
+            ScenarioKind::RecursiveSendRecv => {
+                recursive_send_recv_image(&self.sender, &self.receiver, &self.labels[0])
+            }
+            ScenarioKind::Choice => {
+                let labels: Vec<_> = self.labels.iter().map(String::as_str).collect();
+                choice_image(&self.sender, &self.receiver, &labels)
+            }
+        }
+    }
+}
+
 /// Simple A→B:label, then End.
 pub fn simple_send_recv_image(sender: &str, receiver: &str, label: &str) -> CodeImage {
     let mut local_types = BTreeMap::new();

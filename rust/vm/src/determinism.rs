@@ -7,6 +7,19 @@ use crate::trace::{normalize_trace, obs_session};
 use crate::vm::ObsEvent;
 use serde::{Deserialize, Serialize};
 
+/// Runtime effect-determinism tier used for admission and trace artifacts.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum EffectDeterminismTier {
+    /// Strictly deterministic execution for fixed scheduler/effect inputs.
+    #[default]
+    StrictDeterministic,
+    /// Deterministic under replayed effect outcomes.
+    ReplayDeterministic,
+    /// Nondeterminism is permitted only within a declared envelope bound.
+    EnvelopeBoundedNondeterministic,
+}
+
 /// Determinism profile aligned with the VM architecture spec.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DeterminismMode {
@@ -16,6 +29,8 @@ pub enum DeterminismMode {
     ModuloEffects,
     /// Determinism modulo admissible commutative reorderings.
     ModuloCommutativity,
+    /// Replay-deterministic profile under recorded effect outcomes.
+    Replay,
 }
 
 /// Compare two executions according to a determinism profile.
@@ -37,6 +52,7 @@ pub fn replay_consistent(
         DeterminismMode::ModuloCommutativity => {
             commutativity_normalize(baseline_trace) == commutativity_normalize(replay_trace)
         }
+        DeterminismMode::Replay => baseline_trace == replay_trace,
     }
 }
 
@@ -256,6 +272,32 @@ mod tests {
             DeterminismMode::ModuloCommutativity,
             &baseline,
             &reordered,
+            &[],
+            &[]
+        ));
+    }
+
+    #[test]
+    fn replay_mode_requires_exact_observation_trace() {
+        let left = vec![ObsEvent::Halted {
+            tick: 1,
+            coro_id: 0,
+        }];
+        let right = vec![ObsEvent::Halted {
+            tick: 2,
+            coro_id: 0,
+        }];
+        assert!(replay_consistent(
+            DeterminismMode::Replay,
+            &left,
+            &left,
+            &[],
+            &[]
+        ));
+        assert!(!replay_consistent(
+            DeterminismMode::Replay,
+            &left,
+            &right,
             &[],
             &[]
         ));

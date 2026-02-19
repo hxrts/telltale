@@ -31,9 +31,12 @@ pub(crate) fn step_instr(
         Instr::Choose { chan, table } => {
             comm::step_choose(vm, coro_idx, role, chan, &table, handler)
         }
-        Instr::Open { roles, endpoints } => {
-            session::step_open(vm, coro_idx, role, &roles, &endpoints)
-        }
+        Instr::Open {
+            roles,
+            local_types,
+            handlers,
+            dsts,
+        } => session::step_open(vm, coro_idx, role, &roles, &local_types, &handlers, &dsts),
         Instr::Close { session } => session::step_close(vm, coro_idx, session),
         Instr::Invoke { action, dst } => {
             guard_effect::step_invoke(vm, coro_idx, role, action, dst, handler)

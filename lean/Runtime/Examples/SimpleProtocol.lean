@@ -102,6 +102,16 @@ def exampleMonitor : SessionMonitor UnitGuard :=
   -- Permissive monitor for the example VM run.
   { step := fun sk => some sk }
 
+/-- The example monitor satisfies the control-flow acceptance contract. -/
+theorem exampleMonitor_monitor_sound {ε : Type} [EffectRuntime ε] :
+    monitor_sound (γ:=UnitGuard) (ε:=ε) exampleMonitor := by
+  simpa [exampleMonitor] using (monitor_sound_any (γ:=UnitGuard) (ε:=ε) exampleMonitor)
+
+/-- The example monitor preserves protocol session ids. -/
+theorem exampleMonitor_unified_monitor_preserves :
+    unified_monitor_preserves exampleMonitor := by
+  simpa [exampleMonitor] using (unified_monitor_preserves_identity (γ:=UnitGuard))
+
 def exampleState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
   -- Assemble the initial VM state for the example program.
   { config := unitConfig
@@ -123,5 +133,5 @@ def exampleState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVer
   , crashedSites := []
   , partitionedEdges := []
   , mask := ()
-  , ghostSessions := ()
+  , ghostSessions := default
   , progressSupply := () }

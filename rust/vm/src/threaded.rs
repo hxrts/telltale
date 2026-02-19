@@ -23,7 +23,12 @@ use crate::effect::{
     CorruptionType, EffectHandler, EffectTraceEntry, ReplayEffectHandler, SendDecision,
     TopologyPerturbation,
 };
-use crate::instr::{Endpoint, Instr, PC};
+use crate::faults::{
+    speculation_fault_abort_requires_active, speculation_fault_disabled,
+    speculation_fault_join_requires_active, transfer_fault_delegation_guard_violation,
+};
+use crate::instr::{Endpoint, Instr, InvokeAction, PC};
+use crate::instruction_semantics::{decode_endpoint_fact, endpoint_from_reg};
 use crate::intern::{StringId, SymbolTable};
 use crate::kernel::{KernelMachine, VMKernel};
 use crate::loader::CodeImage;
@@ -35,6 +40,7 @@ use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragment
 use crate::session::{
     unfold_if_var_with_scope, unfold_mu, Edge, SessionId, SessionState, SessionStatus, TypeEntry,
 };
+use crate::transfer_semantics::{decode_transfer_request, move_endpoint_bundle};
 use crate::vm::{MonitorMode, ObsEvent, Program, ResourceState, StepResult, VMConfig, VMError};
 
 /// Lane identifier in the threaded runtime.
@@ -89,11 +95,24 @@ pub struct LaneSchedulerState {
     pub step_count: usize,
 }
 
+/// Certificate for one threaded scheduler wave plan.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WaveCertificate {
+    /// Planned waves for this round.
+    pub waves: Vec<Vec<usize>>,
+    /// Scheduler step at planning time.
+    pub planner_step: usize,
+}
+
 /// Runtime contention and scheduling metrics for threaded execution.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContentionMetrics {
-    /// Number of lock-contention observations (`try_lock` would block).
+    /// Aggregate contention count for backward-compatible dashboards.
     pub lock_contention_events: u64,
+    /// Number of mutex lock-contention observations (`try_lock` would block).
+    pub mutex_lock_contention_events: u64,
+    /// Number of planner conflicts (lane/session/footprint admissions).
+    pub planner_conflict_events: u64,
     /// Maximum scheduler ready-queue depth observed.
     pub max_ready_queue_depth: usize,
     /// Maximum parallel wave width observed.
@@ -143,6 +162,7 @@ pub struct ThreadedVM {
     handoff_trace_log: Vec<LaneHandoff>,
     next_handoff_id: u64,
     contention_metrics: ContentionMetrics,
+    force_invalid_wave_certificate_once: bool,
 }
 
 impl KernelMachine for ThreadedVM {
@@ -263,6 +283,13 @@ struct Picked {
     lane: LaneId,
     coro: Arc<Mutex<Coroutine>>,
     session: Arc<Mutex<SessionState>>,
+}
+
+struct PlannedWave {
+    picks: Vec<Picked>,
+    /// When true, stop this round after executing this wave to preserve
+    /// canonical single-step fallback semantics.
+    stop_after_wave: bool,
 }
 
 /// How to update the coroutine after an instruction.
@@ -397,6 +424,7 @@ impl ThreadedVM {
             handoff_trace_log: Vec::new(),
             next_handoff_id: 0,
             contention_metrics: ContentionMetrics::default(),
+            force_invalid_wave_certificate_once: false,
         }
     }
 
@@ -418,6 +446,17 @@ impl ThreadedVM {
             &self.config.buffer_config,
             &image.local_types,
         );
+        if let Some(session) = self.sessions.get(sid) {
+            let mut session_guard = session.lock().expect("session lock poisoned");
+            for sender in &roles {
+                for receiver in &roles {
+                    session_guard.edge_handlers.insert(
+                        Edge::new(sid, sender.clone(), receiver.clone()),
+                        "default_handler".to_string(),
+                    );
+                }
+            }
+        }
         self.resource_states
             .lock()
             .expect("resource state lock poisoned")
@@ -496,112 +535,26 @@ impl ThreadedVM {
         let mut progressed = false;
         let mut remaining = n;
         let mut wave = 0_u64;
+        let enforce_certified_wave = n > 1;
 
         // Run in parallel waves. Each wave schedules at most one coroutine per session,
         // and at most one coroutine per lane. A session may execute again in a later wave.
         while remaining > 0 {
-            self.contention_metrics
-                .observe_ready_depth(self.scheduler.ready_count());
-            let picks = self.pick_ready(remaining)?;
-            if picks.is_empty() {
+            let Some(planned_wave) = self.plan_next_wave(remaining, enforce_certified_wave)? else {
+                break;
+            };
+
+            let stop_after_wave = planned_wave.stop_after_wave;
+            let picks = planned_wave.picks;
+            self.record_lane_trace(&picks, tick, wave);
+            let picks_len = picks.len();
+            progressed |= self.execute_picks(picks, handler, tick)?;
+
+            remaining = remaining.saturating_sub(picks_len);
+            wave = wave.saturating_add(1);
+            if stop_after_wave {
                 break;
             }
-            self.contention_metrics.observe_wave_width(picks.len());
-            for pick in &picks {
-                self.lane_trace.push(LaneSelection {
-                    tick,
-                    wave,
-                    coro_id: pick.coro_id,
-                    session: pick.sid,
-                    lane: pick.lane,
-                });
-            }
-
-            let results: Vec<Result<(StepPack, Option<OutputConditionHint>), Fault>> =
-                self.pool.install(|| {
-                    picks
-                        .par_iter()
-                        .map(|pick| {
-                            exec_instr(
-                                &pick.coro,
-                                &pick.session,
-                                &self.sessions,
-                                &self.programs,
-                                &self.config,
-                                &self.guard_resources,
-                                &self.resource_states,
-                                &self.crashed_sites,
-                                &self.partitioned_edges,
-                                &self.corrupted_edges,
-                                &self.timed_out_sites,
-                                handler,
-                                tick,
-                            )
-                        })
-                        .collect()
-                });
-
-            for (pick, result) in picks.iter().zip(results.into_iter()) {
-                match result {
-                    Ok((pack, output_hint)) => {
-                        progressed = true;
-                        match self.commit_pack(
-                            &pick.coro,
-                            &pick.session,
-                            pack,
-                            output_hint,
-                            &handler.handler_identity(),
-                        ) {
-                            Ok(outcome) => match outcome {
-                                ExecOutcome::Continue => {
-                                    self.scheduler.reschedule(pick.coro_id);
-                                }
-                                ExecOutcome::Blocked(reason) => {
-                                    self.scheduler.mark_blocked(pick.coro_id, reason);
-                                }
-                                ExecOutcome::Halted => {
-                                    self.scheduler.mark_done(pick.coro_id);
-                                    self.trace.push(ObsEvent::Halted {
-                                        tick,
-                                        coro_id: pick.coro_id,
-                                    });
-                                }
-                            },
-                            Err(fault) => {
-                                self.trace.push(ObsEvent::Faulted {
-                                    tick,
-                                    coro_id: pick.coro_id,
-                                    fault: fault.clone(),
-                                });
-                                let mut coro = pick.coro.lock().expect("coroutine lock poisoned");
-                                coro.status = CoroStatus::Faulted(fault.clone());
-                                self.scheduler.mark_done(pick.coro_id);
-                                return Err(VMError::Fault {
-                                    coro_id: pick.coro_id,
-                                    fault,
-                                });
-                            }
-                        }
-                    }
-                    Err(fault) => {
-                        self.trace.push(ObsEvent::Faulted {
-                            tick,
-                            coro_id: pick.coro_id,
-                            fault: fault.clone(),
-                        });
-                        let mut coro = pick.coro.lock().expect("coroutine lock poisoned");
-                        coro.status = CoroStatus::Faulted(fault.clone());
-                        self.scheduler.mark_done(pick.coro_id);
-                        return Err(VMError::Fault {
-                            coro_id: pick.coro_id,
-                            fault,
-                        });
-                    }
-                }
-            }
-
-            remaining = remaining.saturating_sub(picks.len());
-            wave = wave.saturating_add(1);
         }
 
         if self.all_done() {
@@ -611,6 +564,211 @@ impl ThreadedVM {
         } else {
             Ok(StepResult::Stuck)
         }
+    }
+
+    fn plan_next_wave(
+        &mut self,
+        budget: usize,
+        enforce_certified_wave: bool,
+    ) -> Result<Option<PlannedWave>, VMError> {
+        self.contention_metrics
+            .observe_ready_depth(self.scheduler.ready_count());
+        let ready_before_pick: BTreeSet<usize> =
+            self.scheduler.ready_snapshot().into_iter().collect();
+        let picks = self.pick_ready(budget)?;
+        if picks.is_empty() {
+            return Ok(None);
+        }
+
+        if enforce_certified_wave {
+            let cert = WaveCertificate {
+                waves: vec![picks.iter().map(|pick| pick.coro_id).collect()],
+                planner_step: self.scheduler.step_count(),
+            };
+            if !self.check_wave_certificate(&cert, &ready_before_pick) {
+                self.restore_picks_to_ready(&picks);
+                let fallback = self.pick_ready(1)?;
+                if fallback.is_empty() {
+                    return Ok(None);
+                }
+                return Ok(Some(PlannedWave {
+                    picks: fallback,
+                    stop_after_wave: true,
+                }));
+            }
+        }
+
+        Ok(Some(PlannedWave {
+            picks,
+            stop_after_wave: false,
+        }))
+    }
+
+    fn execute_picks(
+        &mut self,
+        picks: Vec<Picked>,
+        handler: &dyn EffectHandler,
+        tick: u64,
+    ) -> Result<bool, VMError> {
+        self.contention_metrics.observe_wave_width(picks.len());
+        let results: Vec<Result<(StepPack, Option<OutputConditionHint>), Fault>> =
+            self.pool.install(|| {
+                picks
+                    .par_iter()
+                    .map(|pick| {
+                        exec_instr(
+                            &pick.coro,
+                            &pick.session,
+                            &self.sessions,
+                            &self.programs,
+                            &self.config,
+                            &self.guard_resources,
+                            &self.resource_states,
+                            &self.crashed_sites,
+                            &self.partitioned_edges,
+                            &self.corrupted_edges,
+                            &self.timed_out_sites,
+                            handler,
+                            tick,
+                        )
+                    })
+                    .collect()
+            });
+
+        let mut progressed = false;
+        for (pick, result) in picks.into_iter().zip(results.into_iter()) {
+            match result {
+                Ok((pack, output_hint)) => {
+                    progressed = true;
+                    match self.commit_pack(
+                        &pick.coro,
+                        &pick.session,
+                        pack,
+                        output_hint,
+                        &handler.handler_identity(),
+                    ) {
+                        Ok(outcome) => match outcome {
+                            ExecOutcome::Continue => {
+                                self.scheduler.reschedule(pick.coro_id);
+                            }
+                            ExecOutcome::Blocked(reason) => {
+                                self.scheduler.mark_blocked(pick.coro_id, reason);
+                            }
+                            ExecOutcome::Halted => {
+                                self.scheduler.mark_done(pick.coro_id);
+                                self.trace.push(ObsEvent::Halted {
+                                    tick,
+                                    coro_id: pick.coro_id,
+                                });
+                            }
+                        },
+                        Err(fault) => {
+                            self.trace.push(ObsEvent::Faulted {
+                                tick,
+                                coro_id: pick.coro_id,
+                                fault: fault.clone(),
+                            });
+                            let mut coro = pick.coro.lock().expect("coroutine lock poisoned");
+                            coro.status = CoroStatus::Faulted(fault.clone());
+                            self.scheduler.mark_done(pick.coro_id);
+                            return Err(VMError::Fault {
+                                coro_id: pick.coro_id,
+                                fault,
+                            });
+                        }
+                    }
+                }
+                Err(fault) => {
+                    self.trace.push(ObsEvent::Faulted {
+                        tick,
+                        coro_id: pick.coro_id,
+                        fault: fault.clone(),
+                    });
+                    let mut coro = pick.coro.lock().expect("coroutine lock poisoned");
+                    coro.status = CoroStatus::Faulted(fault.clone());
+                    self.scheduler.mark_done(pick.coro_id);
+                    return Err(VMError::Fault {
+                        coro_id: pick.coro_id,
+                        fault,
+                    });
+                }
+            }
+        }
+        Ok(progressed)
+    }
+
+    fn record_lane_trace(&mut self, picks: &[Picked], tick: u64, wave: u64) {
+        for pick in picks {
+            self.lane_trace.push(LaneSelection {
+                tick,
+                wave,
+                coro_id: pick.coro_id,
+                session: pick.sid,
+                lane: pick.lane,
+            });
+        }
+    }
+
+    fn restore_picks_to_ready(&mut self, picks: &[Picked]) {
+        for pick in picks {
+            self.scheduler.reschedule(pick.coro_id);
+        }
+    }
+
+    fn check_wave_certificate(
+        &mut self,
+        cert: &WaveCertificate,
+        ready_before_pick: &BTreeSet<usize>,
+    ) -> bool {
+        if self.force_invalid_wave_certificate_once {
+            self.force_invalid_wave_certificate_once = false;
+            return false;
+        }
+        if cert.planner_step != self.scheduler.step_count() {
+            return false;
+        }
+        let mut seen = BTreeSet::new();
+        for wave in &cert.waves {
+            for coro_id in wave {
+                if !seen.insert(*coro_id) {
+                    return false;
+                }
+            }
+            if !self.check_wave_admissible(wave, ready_before_pick) {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn check_wave_admissible(&self, wave: &[usize], ready_before_pick: &BTreeSet<usize>) -> bool {
+        let mut seen = BTreeSet::new();
+        let mut lanes = BTreeSet::new();
+        let mut footprint = BTreeSet::new();
+
+        for coro_id in wave {
+            if !seen.insert(*coro_id) || !ready_before_pick.contains(coro_id) {
+                return false;
+            }
+            let Some(coro) = self.coroutines.get(*coro_id) else {
+                return false;
+            };
+            let guard = coro.lock().expect("coroutine lock poisoned");
+            if !matches!(guard.status, CoroStatus::Ready | CoroStatus::Speculating) {
+                return false;
+            }
+            let lane = *coro_id % self.lane_count.max(1);
+            if !lanes.insert(lane) {
+                return false;
+            }
+            for endpoint in &guard.owned_endpoints {
+                let key = (endpoint.sid, endpoint.role.clone());
+                if !footprint.insert(key) {
+                    return false;
+                }
+            }
+        }
+        true
     }
 
     /// Execute one scheduler round through the canonical kernel API.
@@ -664,6 +822,11 @@ impl ThreadedVM {
         VMKernel::run_concurrent(self, handler, max_rounds, concurrency)
     }
 
+    /// Test/debug hook: force the next wave-certificate check to fail.
+    pub fn force_invalid_wave_certificate_once(&mut self) {
+        self.force_invalid_wave_certificate_once = true;
+    }
+
     /// Run with explicit concurrency and replayed effect outcomes.
     ///
     /// # Errors
@@ -712,6 +875,7 @@ impl ThreadedVM {
             self.partitioned_edges.iter().cloned().collect(),
             corrupted_edges,
             timed_out_sites,
+            self.config.effect_determinism_tier,
         )
     }
 
@@ -1022,11 +1186,13 @@ impl ThreadedVM {
         let mut picks = Vec::new();
         let mut used_sessions = BTreeSet::new();
         let mut used_lanes = BTreeSet::new();
-        let mut used_footprints: BTreeSet<(SessionId, String)> = BTreeSet::new();
+        let mut used_footprints: BTreeSet<(SessionId, u64)> = BTreeSet::new();
+        let mut planner_conflict_events = 0_u64;
         let coros = &self.coroutines;
         let lane_count = self.lane_count.max(1);
         let crashed_sites = &self.crashed_sites;
         let timed_out_sites = &self.timed_out_sites;
+        let allow_same_session_disjoint = self.config.footprint_guided_wave_widening;
 
         while picks.len() < n {
             let Some(coro_id) = VMKernel::select_ready_eligible(
@@ -1044,21 +1210,28 @@ impl ThreadedVM {
                     {
                         return false;
                     }
-                    if used_sessions.contains(&sid) || used_lanes.contains(&lane) {
+                    let same_session_conflict = used_sessions.contains(&sid);
+                    if used_lanes.contains(&lane) {
+                        planner_conflict_events = planner_conflict_events.saturating_add(1);
+                        return false;
+                    }
+                    if same_session_conflict && !allow_same_session_disjoint {
+                        planner_conflict_events = planner_conflict_events.saturating_add(1);
                         return false;
                     }
 
                     // Frame/diamond-inspired eligibility: picks within the same wave must
                     // have disjoint endpoint footprints to commute safely.
-                    let footprint: Vec<(SessionId, String)> = coro_guard
+                    let footprint: Vec<(SessionId, u64)> = coro_guard
                         .owned_endpoints
                         .iter()
-                        .map(|ep| (ep.sid, ep.role.clone()))
+                        .map(|ep| (ep.sid, role_fingerprint(&ep.role)))
                         .collect();
                     if footprint
                         .iter()
                         .any(|entry| used_footprints.contains(entry))
                     {
+                        planner_conflict_events = planner_conflict_events.saturating_add(1);
                         return false;
                     }
                     for entry in footprint {
@@ -1100,6 +1273,15 @@ impl ThreadedVM {
             });
         }
 
+        self.contention_metrics.lock_contention_events = self
+            .contention_metrics
+            .lock_contention_events
+            .saturating_add(planner_conflict_events);
+        self.contention_metrics.planner_conflict_events = self
+            .contention_metrics
+            .planner_conflict_events
+            .saturating_add(planner_conflict_events);
+
         Ok(picks)
     }
 
@@ -1113,7 +1295,7 @@ impl ThreadedVM {
         handler_identity: &str,
     ) -> Result<ExecOutcome, Fault> {
         if !pack.events.is_empty() {
-            let digest = format!("events:{}:tick:{}", pack.events.len(), self.clock.tick);
+            let digest = "vm.output_digest.unspecified".to_string();
             let meta = match output_hint {
                 Some(h) => OutputConditionMeta::from_hint(h, digest),
                 None => OutputConditionMeta::default_observable(digest),
@@ -1368,6 +1550,7 @@ impl ThreadedVM {
         to_coro: usize,
         tick: u64,
     ) -> Result<(), Fault> {
+        self.assert_delegation_handoff_owner(&endpoint, from_coro)?;
         let from_lane = self.lane_of_coro(from_coro).ok_or(Fault::TransferFault {
             message: "transfer source coroutine not found".into(),
         })?;
@@ -1399,6 +1582,16 @@ impl ThreadedVM {
     fn apply_handoffs_deterministically(&mut self) -> Result<(), Fault> {
         while let Some(handoff) = self.pending_handoffs.pop_front() {
             self.apply_handoff(&handoff)?;
+            let endpoint = Endpoint {
+                sid: handoff.session,
+                role: handoff.endpoint_role.clone(),
+            };
+            let expected_owner = if handoff.from_coro == handoff.to_coro {
+                handoff.from_coro
+            } else {
+                handoff.to_coro
+            };
+            self.assert_delegation_handoff_owner(&endpoint, expected_owner)?;
             self.contention_metrics.handoff_applied_count = self
                 .contention_metrics
                 .handoff_applied_count
@@ -1450,6 +1643,36 @@ impl ThreadedVM {
             }
         }
     }
+
+    fn assert_delegation_handoff_owner(
+        &self,
+        endpoint: &Endpoint,
+        expected_owner: usize,
+    ) -> Result<(), Fault> {
+        let mut owners = Vec::new();
+        for coro in &self.coroutines {
+            let guard = coro.lock().expect("coroutine lock poisoned");
+            if guard.owned_endpoints.contains(endpoint) {
+                owners.push(guard.id);
+            }
+        }
+        if owners == vec![expected_owner] {
+            return Ok(());
+        }
+        let _ = (endpoint, owners, expected_owner);
+        Err(transfer_fault_delegation_guard_violation("for handoff"))
+    }
+}
+
+fn role_fingerprint(role: &str) -> u64 {
+    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+    let mut hash = FNV_OFFSET;
+    for byte in role.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
 }
 
 fn lock_with_contention<'a, T>(
@@ -1461,77 +1684,10 @@ fn lock_with_contention<'a, T>(
         Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
         Err(TryLockError::WouldBlock) => {
             metrics.lock_contention_events = metrics.lock_contention_events.saturating_add(1);
+            metrics.mutex_lock_contention_events =
+                metrics.mutex_lock_contention_events.saturating_add(1);
             arc.lock().expect("mutex lock poisoned after contention")
         }
-    }
-}
-
-fn move_endpoint_bundle(
-    endpoint: &Endpoint,
-    source: &mut Coroutine,
-    target: Option<&mut Coroutine>,
-) -> Result<(), Fault> {
-    if !source.owned_endpoints.contains(endpoint) {
-        return Err(Fault::TransferFault {
-            message: "endpoint not owned".into(),
-        });
-    }
-
-    let mut moved_tokens = Vec::new();
-    source.progress_tokens.retain(|token| {
-        if token.endpoint == *endpoint {
-            moved_tokens.push(token.clone());
-            false
-        } else {
-            true
-        }
-    });
-    let mut moved_knowledge = Vec::new();
-    source.knowledge_set.retain(|fact| {
-        if fact.endpoint == *endpoint {
-            moved_knowledge.push(fact.clone());
-            false
-        } else {
-            true
-        }
-    });
-    source.owned_endpoints.retain(|e| e != endpoint);
-
-    if let Some(target) = target {
-        target.owned_endpoints.push(endpoint.clone());
-        target.progress_tokens.extend(moved_tokens);
-        target.knowledge_set.extend(moved_knowledge);
-    } else {
-        source.owned_endpoints.push(endpoint.clone());
-        source.progress_tokens.extend(moved_tokens);
-        source.knowledge_set.extend(moved_knowledge);
-    }
-
-    Ok(())
-}
-
-fn endpoint_from_reg(coro: &Coroutine, reg: u16) -> Result<Endpoint, Fault> {
-    match coro.regs.get(usize::from(reg)).cloned() {
-        Some(Value::Endpoint(ep)) => Ok(ep),
-        Some(_) => Err(Fault::TypeViolation {
-            expected: telltale_types::ValType::Chan {
-                sid: 0,
-                role: String::new(),
-            },
-            actual: telltale_types::ValType::Unit,
-            message: "expected endpoint register".to_string(),
-        }),
-        None => Err(Fault::OutOfRegisters),
-    }
-}
-
-fn decode_fact(value: Value) -> Option<(Endpoint, String)> {
-    match value {
-        Value::Prod(left, right) => match (*left, *right) {
-            (Value::Endpoint(endpoint), Value::Str(fact)) => Some((endpoint, fact)),
-            _ => None,
-        },
-        _ => None,
     }
 }
 
@@ -1618,7 +1774,16 @@ fn exec_instr(
             events: vec![],
         }),
         Instr::Invoke { action, dst } => {
-            step_invoke(&mut coro_guard, &role, action, dst, handler, tick)
+            let session_guard = session.lock().expect("session lock poisoned");
+            step_invoke(
+                &mut coro_guard,
+                &session_guard,
+                &role,
+                action,
+                dst,
+                handler,
+                tick,
+            )
         }
         Instr::Acquire { layer, dst } => step_acquire(
             &mut coro_guard,
@@ -1722,8 +1887,19 @@ fn exec_instr(
         }
         Instr::Open {
             ref roles,
-            ref endpoints,
-        } => step_open(&mut coro_guard, &role, store, roles, endpoints, tick),
+            ref local_types,
+            ref handlers,
+            ref dsts,
+        } => step_open(
+            &mut coro_guard,
+            &role,
+            store,
+            roles,
+            local_types,
+            handlers,
+            dsts,
+            tick,
+        ),
     }?;
 
     let output_hint = if pack.events.is_empty() {
@@ -1775,7 +1951,7 @@ fn monitor_precheck(
                 })
             }
         }
-        Instr::Receive { .. } | Instr::Choose { .. } => {
+        Instr::Receive { .. } => {
             let session_guard = session.lock().expect("session lock poisoned");
             let local_type = session_guard
                 .local_types
@@ -1794,6 +1970,49 @@ fn monitor_precheck(
                     expected: telltale_types::ValType::Unit,
                     actual: telltale_types::ValType::Unit,
                     message: format!("[monitor] {role}: expected Recv state, got {local_type:?}"),
+                })
+            }
+        }
+        Instr::Choose { table, .. } => {
+            let mut labels = BTreeSet::new();
+            if !table
+                .iter()
+                .map(|(label, _)| label)
+                .all(|label| labels.insert(label.clone()))
+            {
+                return Err(Fault::SpecFault {
+                    message: "[monitor] structural precheck failed: duplicate choose labels"
+                        .to_string(),
+                });
+            }
+            let session_guard = session.lock().expect("session lock poisoned");
+            let local_type = session_guard
+                .local_types
+                .get(ep)
+                .ok_or_else(|| Fault::TypeViolation {
+                    expected: telltale_types::ValType::Unit,
+                    actual: telltale_types::ValType::Unit,
+                    message: format!("[monitor] {role}: no type registered"),
+                })?
+                .current
+                .clone();
+            if matches!(local_type, LocalTypeR::Recv { .. }) {
+                Ok(())
+            } else {
+                Err(Fault::TypeViolation {
+                    expected: telltale_types::ValType::Unit,
+                    actual: telltale_types::ValType::Unit,
+                    message: format!("[monitor] {role}: expected Recv state, got {local_type:?}"),
+                })
+            }
+        }
+        Instr::Open { roles, dsts, .. } => {
+            if roles.len() == dsts.len() {
+                Ok(())
+            } else {
+                Err(Fault::SpecFault {
+                    message: "[monitor] structural precheck failed: open arity mismatch"
+                        .to_string(),
                 })
             }
         }
@@ -2056,34 +2275,40 @@ fn step_halt(session: &mut SessionState, ep: &Endpoint, _tick: u64) -> Result<St
 
 fn step_invoke(
     coro: &mut Coroutine,
+    session: &SessionState,
     role: &str,
-    action: u16,
-    dst: u16,
+    action: InvokeAction,
+    legacy_dst: Option<u16>,
     handler: &dyn EffectHandler,
     tick: u64,
 ) -> Result<StepPack, Fault> {
-    let _action = coro
-        .regs
-        .get(usize::from(action))
-        .cloned()
-        .ok_or(Fault::OutOfRegisters)?;
-    if usize::from(dst) >= coro.regs.len() {
-        return Err(Fault::OutOfRegisters);
-    }
-    let invoke_out = match coro.regs[usize::from(dst)].clone() {
-        Value::Endpoint(ep) => Value::Endpoint(ep),
-        _ => Value::Bool(true),
+    let _action_repr = match action {
+        InvokeAction::Named(name) => name,
+        InvokeAction::Reg(reg) => format!(
+            "{:?}",
+            coro.regs
+                .get(usize::from(reg))
+                .cloned()
+                .ok_or(Fault::OutOfRegisters)?
+        ),
     };
+    if let Some(dst) = legacy_dst {
+        if usize::from(dst) >= coro.regs.len() {
+            return Err(Fault::OutOfRegisters);
+        }
+    }
+    if session.edge_handlers.is_empty() {
+        return Err(Fault::InvokeFault {
+            message: "no handler bound".to_string(),
+        });
+    }
     let coro_id = coro.id;
     handler
         .step(role, &mut coro.regs)
         .map_err(|e| Fault::InvokeFault { message: e })?;
 
     Ok(StepPack {
-        coro_update: CoroUpdate::AdvancePcWriteReg {
-            reg: dst,
-            val: invoke_out,
-        },
+        coro_update: CoroUpdate::AdvancePc,
         type_update: None,
         events: vec![ObsEvent::Invoked {
             tick,
@@ -2244,9 +2469,7 @@ fn step_fork(
     tick: u64,
 ) -> Result<StepPack, Fault> {
     if !config.speculation_enabled {
-        return Err(Fault::SpecFault {
-            message: "speculation disabled".into(),
-        });
+        return Err(speculation_fault_disabled());
     }
     let ghost_val = coro
         .regs
@@ -2283,6 +2506,9 @@ fn step_fork(
 }
 
 fn step_join(coro: &mut Coroutine, sid: SessionId, tick: u64) -> Result<StepPack, Fault> {
+    if coro.spec_state.is_none() {
+        return Err(speculation_fault_join_requires_active());
+    }
     coro.spec_state = None;
     Ok(StepPack {
         coro_update: CoroUpdate::AdvancePc,
@@ -2292,6 +2518,11 @@ fn step_join(coro: &mut Coroutine, sid: SessionId, tick: u64) -> Result<StepPack
 }
 
 fn step_abort(coro: &mut Coroutine, sid: SessionId, tick: u64) -> Result<StepPack, Fault> {
+    if coro.spec_state.is_none() {
+        return Err(speculation_fault_abort_requires_active());
+    }
+    // Deterministic V2 policy mirrors cooperative VM: clear speculation state
+    // and emit one abort event without side effects on non-spec runtime fields.
     coro.spec_state = None;
     Ok(StepPack {
         coro_update: CoroUpdate::AdvancePc,
@@ -2308,49 +2539,17 @@ fn step_transfer(
     _bundle: u16,
     tick: u64,
 ) -> Result<StepPack, Fault> {
-    let ep_val = coro
-        .regs
-        .get(usize::from(endpoint))
-        .ok_or(Fault::OutOfRegisters)?
-        .clone();
-    let ep = match ep_val {
-        Value::Endpoint(ep) => ep,
-        _ => {
-            return Err(Fault::TransferFault {
-                message: format!("{role}: transfer expects endpoint register"),
-            })
-        }
-    };
-    let target_val = coro
-        .regs
-        .get(usize::from(target))
-        .ok_or(Fault::OutOfRegisters)?
-        .clone();
-    let target_id = match target_val {
-        Value::Nat(v) => usize::try_from(v).map_err(|_| Fault::TransferFault {
-            message: format!("{role}: target id out of range"),
-        })?,
-        _ => {
-            return Err(Fault::TransferFault {
-                message: format!("{role}: transfer expects nat target coroutine id"),
-            })
-        }
-    };
-    if !coro.owned_endpoints.contains(&ep) {
-        return Err(Fault::TransferFault {
-            message: "endpoint not owned".into(),
-        });
-    }
+    let request = decode_transfer_request(coro, role, endpoint, target)?;
 
     Ok(StepPack {
         coro_update: CoroUpdate::AdvancePc,
         type_update: None,
         events: vec![ObsEvent::Transferred {
             tick,
-            session: ep.sid,
+            session: request.endpoint.sid,
             role: role.to_string(),
             from: coro.id,
-            to: target_id,
+            to: request.target_id,
         }],
     })
 }
@@ -2367,7 +2566,7 @@ fn step_tag(
         .get(usize::from(fact_reg))
         .ok_or(Fault::OutOfRegisters)?
         .clone();
-    let (endpoint, fact) = decode_fact(fact_val).ok_or_else(|| Fault::TransferFault {
+    let (endpoint, fact) = decode_endpoint_fact(fact_val).ok_or_else(|| Fault::TransferFault {
         message: format!("{role}: tag expects (endpoint, string) fact"),
     })?;
     coro.knowledge_set.push(crate::coroutine::KnowledgeFact {
@@ -2403,7 +2602,7 @@ fn step_check(
         .get(usize::from(knowledge))
         .ok_or(Fault::OutOfRegisters)?
         .clone();
-    let (endpoint, fact) = decode_fact(know_val).ok_or_else(|| Fault::TransferFault {
+    let (endpoint, fact) = decode_endpoint_fact(know_val).ok_or_else(|| Fault::TransferFault {
         message: format!("{role}: check expects (endpoint, string) fact"),
     })?;
     let target_val = coro
@@ -2683,12 +2882,9 @@ fn step_close(
     sid: SessionId,
     tick: u64,
 ) -> Result<StepPack, Fault> {
-    let has_pending = session.buffers.values().any(|b| !b.is_empty());
-    if has_pending {
-        session.status = SessionStatus::Draining;
-    } else {
-        session.status = SessionStatus::Closed;
-    }
+    session.status = SessionStatus::Closed;
+    session.buffers.clear();
+    session.edge_traces.clear();
     session.epoch = session.epoch.saturating_add(1);
 
     Ok(StepPack {
@@ -2710,16 +2906,79 @@ fn step_open(
     _role: &str,
     store: &ThreadedSessionStore,
     roles: &[String],
-    endpoints: &[(String, u16)],
+    local_types: &[(String, LocalTypeR)],
+    handlers: &[((String, String), String)],
+    dsts: &[(String, u16)],
     tick: u64,
 ) -> Result<StepPack, Fault> {
-    let sid = store.open(roles.to_vec(), &BufferConfig::default(), &BTreeMap::new());
-    for (_, reg) in endpoints {
+    if local_types.len() != dsts.len() {
+        return Err(Fault::CloseFault {
+            message: "open arity mismatch".to_string(),
+        });
+    }
+
+    let triples: Vec<(String, LocalTypeR, u16)> = local_types
+        .iter()
+        .zip(dsts.iter())
+        .map(|((r, lt), (r2, dst))| (r.clone(), lt.clone(), r2.clone(), *dst))
+        .map(|(r, lt, r2, dst)| {
+            if r == r2 {
+                Ok((r, lt, dst))
+            } else {
+                Err(Fault::CloseFault {
+                    message: "open arity mismatch".to_string(),
+                })
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let open_roles: Vec<String> = triples.iter().map(|(r, _, _)| r.clone()).collect();
+    let mut distinct = BTreeSet::new();
+    let spatial_ok =
+        !open_roles.is_empty() && open_roles.iter().all(|r| distinct.insert(r.clone()));
+    if !spatial_ok {
+        return Err(Fault::SpecFault {
+            message: "spatial requirements failed".to_string(),
+        });
+    }
+
+    let has_handler = |sender: &str, receiver: &str| {
+        handlers
+            .iter()
+            .any(|((s, r), _)| s == sender && r == receiver)
+    };
+    let covers_edges = open_roles.iter().all(|sender| {
+        open_roles
+            .iter()
+            .all(|receiver| has_handler(sender, receiver))
+    });
+    if !covers_edges {
+        return Err(Fault::SpecFault {
+            message: "handler bindings missing".to_string(),
+        });
+    }
+
+    let initial_types: BTreeMap<String, LocalTypeR> = local_types.iter().cloned().collect();
+    let sid = store.open(open_roles.clone(), &BufferConfig::default(), &initial_types);
+    let session = store.get(sid).ok_or_else(|| Fault::CloseFault {
+        message: "open session missing after allocation".to_string(),
+    })?;
+    {
+        let mut session_guard = session.lock().expect("session lock poisoned");
+        for ((sender, receiver), handler_id) in handlers {
+            session_guard.edge_handlers.insert(
+                Edge::new(sid, sender.clone(), receiver.clone()),
+                handler_id.clone(),
+            );
+        }
+    }
+
+    for (_, _, reg) in &triples {
         if usize::from(*reg) >= coro.regs.len() {
             return Err(Fault::OutOfRegisters);
         }
     }
-    for (endpoint_role, reg) in endpoints {
+    for (endpoint_role, _, reg) in &triples {
         let ep = Endpoint {
             sid,
             role: endpoint_role.clone(),
@@ -2736,7 +2995,11 @@ fn step_open(
         events: vec![ObsEvent::Opened {
             tick,
             session: sid,
-            roles: roles.to_vec(),
+            roles: if roles.is_empty() {
+                open_roles
+            } else {
+                roles.to_vec()
+            },
         }],
     })
 }
@@ -2751,7 +3014,7 @@ mod tests {
     use crate::verification::{Hash, Signature, VerifyingKey};
     use crate::vm::{FlowPolicy, FlowPredicate};
     use std::collections::{BTreeMap, BTreeSet};
-    use telltale_types::{Label, LocalTypeR};
+    use telltale_types::{GlobalType, Label, LocalTypeR};
 
     #[derive(Debug, Clone, Copy)]
     struct NoopHandler;
@@ -2939,5 +3202,62 @@ mod tests {
             Err(err) => err,
         };
         assert!(matches!(err, Fault::VerificationFailed { .. }));
+    }
+
+    #[test]
+    fn delegation_handoff_guard_rejects_ambiguous_endpoint_ownership() {
+        let mut local_types = BTreeMap::new();
+        local_types.insert(
+            "A".to_string(),
+            LocalTypeR::send("B", Label::new("m"), LocalTypeR::End),
+        );
+        local_types.insert(
+            "B".to_string(),
+            LocalTypeR::recv("A", Label::new("m"), LocalTypeR::End),
+        );
+        let global = GlobalType::send("A", "B", Label::new("m"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 2);
+        let sid = vm.load_choreography(&image).expect("load choreography");
+        let endpoint = Endpoint {
+            sid,
+            role: "A".to_string(),
+        };
+
+        let mut source = None;
+        let mut target = None;
+        for coro in &vm.coroutines {
+            let guard = coro.lock().expect("coroutine lock poisoned");
+            if guard.role == "A" {
+                source = Some(guard.id);
+            } else if guard.role == "B" {
+                target = Some(guard.id);
+            }
+        }
+        let source = source.expect("source coroutine");
+        let target = target.expect("target coroutine");
+        {
+            let target_arc = vm
+                .coroutines
+                .get(target)
+                .cloned()
+                .expect("target coroutine arc");
+            let mut target_guard = target_arc.lock().expect("coroutine lock poisoned");
+            target_guard.owned_endpoints.push(endpoint.clone());
+        }
+
+        let err = vm
+            .enqueue_handoff(endpoint, source, target, vm.clock.tick)
+            .expect_err("ambiguous ownership must fail");
+        match err {
+            Fault::TransferFault { message } => {
+                assert!(
+                    message.contains("delegation guard violation"),
+                    "unexpected transfer fault message: {message}"
+                );
+            }
+            other => panic!("expected transfer fault, got {other:?}"),
+        }
     }
 }

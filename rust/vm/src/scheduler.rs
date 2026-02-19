@@ -224,7 +224,6 @@ impl Scheduler {
     where
         F: Fn(usize) -> bool,
     {
-        self.step_count += 1;
         let lane = self.next_lane_with_ready()?;
         let policy = self.policy.clone();
         let picked = match policy {
@@ -247,6 +246,7 @@ impl Scheduler {
             SchedPolicy::Cooperative | SchedPolicy::RoundRobin => self.lane_queue_pop_front(lane),
         };
         if let Some(coro_id) = picked {
+            self.step_count += 1;
             self.remove_from_global_ready(coro_id);
             Some(coro_id)
         } else {
@@ -566,5 +566,13 @@ mod tests {
         assert_eq!(decoded.cross_lane_handoffs(), sched.cross_lane_handoffs());
         assert_eq!(decoded.step_count(), sched.step_count());
         assert_eq!(decoded.timeslice(), sched.timeslice());
+    }
+
+    #[test]
+    fn test_step_count_does_not_advance_when_no_pick() {
+        let mut sched = Scheduler::new(SchedPolicy::Cooperative);
+        assert_eq!(sched.step_count(), 0);
+        assert_eq!(sched.schedule(), None);
+        assert_eq!(sched.step_count(), 0);
     }
 }

@@ -96,17 +96,44 @@ def wp_invoke (action : EffectRuntime.EffectAction ε) : iProp :=
 
 /-! ## Concurrency Rules -/
 
-def wp_fork : iProp :=
-  -- WP rule derived from the generic pair rule.
-  wp_pair (forkPair (γ:=γ) (ε:=ε))
+def wp_fork (γn : GhostName) (sid ghostSid : SessionId) (ct : CancelToken)
+    (depth : Nat) : iProp :=
+  -- Fork opens the session invariant and allocates/specifies speculation ownership.
+  wp_pair (γ:=γ) (ε:=ε) ({
+      instr := Instr.fork 0
+      openCtx := session_inv γn sid ct
+      interact := speculation_token_own γn sid ghostSid depth
+      closeCtx := session_inv γn sid ct
+      pre := session_inv γn sid ct
+      post := iProp.sep (session_inv γn sid ct)
+        (speculation_token_own γn sid ghostSid depth)
+    } : InstrPair γ ε)
 
-def wp_join : iProp :=
-  -- WP rule derived from the generic pair rule.
-  wp_pair (joinPair (γ:=γ) (ε:=ε))
+def wp_join (γn : GhostName) (sid ghostSid : SessionId) (ct : CancelToken)
+    (depth : Nat) : iProp :=
+  -- Join consumes the active speculation token and restores plain session ownership.
+  wp_pair (γ:=γ) (ε:=ε) ({
+      instr := Instr.join
+      openCtx := session_inv γn sid ct
+      interact := speculation_token_own γn sid ghostSid depth
+      closeCtx := session_inv γn sid ct
+      pre := iProp.sep (session_inv γn sid ct)
+        (speculation_token_own γn sid ghostSid depth)
+      post := session_inv γn sid ct
+    } : InstrPair γ ε)
 
-def wp_abort : iProp :=
-  -- WP rule derived from the generic pair rule.
-  wp_pair (abortPair (γ:=γ) (ε:=ε))
+def wp_abort (γn : GhostName) (sid ghostSid : SessionId) (ct : CancelToken)
+    (depth : Nat) : iProp :=
+  -- Abort mirrors join at the ownership layer: token is discharged, invariant remains.
+  wp_pair (γ:=γ) (ε:=ε) ({
+      instr := Instr.abort
+      openCtx := session_inv γn sid ct
+      interact := speculation_token_own γn sid ghostSid depth
+      closeCtx := session_inv γn sid ct
+      pre := iProp.sep (session_inv γn sid ct)
+        (speculation_token_own γn sid ghostSid depth)
+      post := session_inv γn sid ct
+    } : InstrPair γ ε)
 
 /-! ## Transfer And Tagging Rules -/
 

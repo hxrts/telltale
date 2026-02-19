@@ -51,14 +51,16 @@ structure VMDeterminismArtifacts where
 
 /-! ## Artifact Construction -/
 
+private def witnessToBool {P : Prop} (_h : P) : Bool := true
+
 /-- Build determinism artifacts from a hypothesis bundle. -/
 def buildVMDeterminismArtifacts {st₀ : VMState ι γ π ε ν}
-    (_h : VMDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
+    (h : VMDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
     VMDeterminismArtifacts :=
-  { full := true
-  , moduloEffectTrace := true
-  , moduloCommutativity := true
-  , replay := true
+  { full := witnessToBool h.fullDeterminismProof
+  , moduloEffectTrace := witnessToBool h.moduloEffectTraceProof
+  , moduloCommutativity := witnessToBool h.moduloCommutativityProof
+  , replay := witnessToBool h.replayDeterminismProof
   }
 
 /-! ## Theorem Projections -/

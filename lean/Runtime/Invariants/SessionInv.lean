@@ -88,7 +88,8 @@ def session_inv_body (γ : GhostName) (sid : SessionId) : iProp :=
             (iProp.sep (session_auth γ G)
               (iProp.sep (head_coherent sid G D)
                 (iProp.sep (session_progress_supply γ sid)
-                  (knowledge_inv_all γ sid G)))))
+                  (iProp.sep (speculation_session_inv γ sid)
+                    (knowledge_inv_all γ sid G))))))
 
 def sessionNs (sid : SessionId) : Namespace :=
   -- Namespace for a session invariant.

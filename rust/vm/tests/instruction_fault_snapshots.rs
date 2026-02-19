@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Fault;
-use telltale_vm::instr::{ImmValue, Instr};
+use telltale_vm::instr::{ImmValue, Instr, InvokeAction};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::{VMConfig, VMError, VM};
 
@@ -105,7 +105,10 @@ fn case_close_non_endpoint() -> (&'static str, CodeImage) {
 }
 
 fn case_invoke_dst_oob() -> (&'static str, CodeImage) {
-    let image = single_role_end_image(vec![Instr::Invoke { action: 0, dst: 99 }]);
+    let image = single_role_end_image(vec![Instr::Invoke {
+        action: InvokeAction::Reg(0),
+        dst: Some(99),
+    }]);
     ("invoke/dst_oob", image)
 }
 
@@ -152,6 +155,27 @@ fn case_fork_non_nat_ghost() -> (&'static str, CodeImage) {
         Instr::Fork { ghost: 1 },
     ]);
     ("fork/non_nat_ghost", image)
+}
+
+fn case_fork_speculation_disabled() -> (&'static str, CodeImage) {
+    let image = single_role_end_image(vec![
+        Instr::Set {
+            dst: 1,
+            val: ImmValue::Nat(1),
+        },
+        Instr::Fork { ghost: 1 },
+    ]);
+    ("fork/speculation_disabled", image)
+}
+
+fn case_join_without_speculation() -> (&'static str, CodeImage) {
+    let image = single_role_end_image(vec![Instr::Join]);
+    ("join/without_speculation", image)
+}
+
+fn case_abort_without_speculation() -> (&'static str, CodeImage) {
+    let image = single_role_end_image(vec![Instr::Abort]);
+    ("abort/without_speculation", image)
 }
 
 fn case_choose_unknown_label() -> (&'static str, CodeImage) {
@@ -228,6 +252,9 @@ fn snapshot_fault_tags_for_core_instruction_families() {
         case_invoke_dst_oob(),
         case_transfer_non_nat_target(),
         case_check_malformed_knowledge(),
+        case_fork_speculation_disabled(),
+        case_join_without_speculation(),
+        case_abort_without_speculation(),
         case_choose_unknown_label(),
     ];
 
@@ -257,7 +284,10 @@ fn snapshot_fault_tags_for_core_instruction_families() {
         "transfer/non_nat_target" => 3,
         "check/malformed_knowledge" => 4,
         "fork/non_nat_ghost" => 5,
-        "choose/unknown_label" => 6,
+        "fork/speculation_disabled" => 6,
+        "join/without_speculation" => 7,
+        "abort/without_speculation" => 8,
+        "choose/unknown_label" => 9,
         _ => 99,
     });
 
@@ -268,6 +298,9 @@ fn snapshot_fault_tags_for_core_instruction_families() {
         ("transfer/non_nat_target", "transfer_fault"),
         ("check/malformed_knowledge", "transfer_fault"),
         ("fork/non_nat_ghost", "type_violation"),
+        ("fork/speculation_disabled", "spec_fault"),
+        ("join/without_speculation", "spec_fault"),
+        ("abort/without_speculation", "spec_fault"),
         ("choose/unknown_label", "unknown_label"),
     ];
     assert_eq!(observed, expected);
@@ -276,7 +309,10 @@ fn snapshot_fault_tags_for_core_instruction_families() {
 #[test]
 fn snapshot_fault_api_shape_is_vm_fault_wrapper() {
     use assert_matches::assert_matches;
-    let image = single_role_end_image(vec![Instr::Invoke { action: 0, dst: 99 }]);
+    let image = single_role_end_image(vec![Instr::Invoke {
+        action: InvokeAction::Reg(0),
+        dst: Some(99),
+    }]);
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).expect("load");
     let result = vm.run(&PassthroughHandler, 8);

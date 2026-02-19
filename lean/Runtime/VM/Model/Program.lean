@@ -28,6 +28,8 @@ set_option autoImplicit false
 
 universe u
 
+open SessionTypes.LocalTypeR
+
 /-! ## Program metadata -/
 
 structure ProgramMeta where
@@ -35,6 +37,7 @@ structure ProgramMeta where
   name : String
   version : Nat
   sourceHash : UInt64
+  footprintSummary : List (Role × List Role) := []
   deriving Repr
 
 /-- Default metadata for generated programs. -/
@@ -133,6 +136,31 @@ private def hashCodeImagePayload
       mixHash64 h3 h4.toNat)
     seed
 
+/-! ### Compile-time Footprint Summary Helpers -/
+
+private def dedupRoles (roles : List Role) : List Role :=
+  roles.foldl (fun acc r => if r ∈ acc then acc else acc ++ [r]) []
+
+mutual
+  private def localTypeRFootprintRoles : LocalTypeR → List Role
+    | .end => []
+    | .send partner branches =>
+        dedupRoles (partner :: branchFootprintRoles branches)
+    | .recv partner branches =>
+        dedupRoles (partner :: branchFootprintRoles branches)
+    | .mu _ body => localTypeRFootprintRoles body
+    | .var _ => []
+
+  private def branchFootprintRoles : List BranchR → List Role
+    | [] => []
+    | (_, _, cont) :: rest =>
+        localTypeRFootprintRoles cont ++ branchFootprintRoles rest
+end
+
+private def footprintSummaryOf
+    (ordered : List (Role × LocalTypeR)) : List (Role × List Role) :=
+  ordered.map (fun p => (p.1, dedupRoles (localTypeRFootprintRoles p.2)))
+
 /-! ### Role Map Builders -/
 
 private def localTypeRMap
@@ -157,6 +185,7 @@ def CodeImage.fromLocalTypes {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (globalType : GlobalType) : CodeImage γ ε :=
   let ordered := sortLocalTypesByRole localTypes
   let sourceHash := hashCodeImagePayload ordered globalType
+  let footprintSummary := footprintSummaryOf ordered
   let step := fun (acc : List (Instr γ ε) × List (Role × PC)) (entry : Role × SessionTypes.LocalTypeR.LocalTypeR) =>
     let (code, entryPoints) := acc
     let (role, lt) := entry
@@ -171,7 +200,9 @@ def CodeImage.fromLocalTypes {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
       , localTypes := localTypes'
       , localTypesR := ordered
       , handlerTypes := []
-      , metadata := { ProgramMeta.empty with sourceHash := sourceHash } }
+      , metadata := { ProgramMeta.empty with
+          sourceHash := sourceHash
+          footprintSummary := footprintSummary } }
   , globalType := globalType }
 
 def CodeImage.toRoleCodeImage {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]

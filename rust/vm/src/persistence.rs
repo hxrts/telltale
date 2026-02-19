@@ -19,6 +19,10 @@ pub trait PersistenceModel {
     fn open_delta(session: SessionId) -> Self::Delta;
     /// Close-session lifecycle delta.
     fn close_delta(session: SessionId) -> Self::Delta;
+    /// Optional invoke-action delta.
+    fn invoke_delta(_session: SessionId, _action: &str) -> Option<Self::Delta> {
+        None
+    }
 
     /// Lean-name compatibility wrapper.
     #[allow(non_snake_case)]
@@ -30,6 +34,12 @@ pub trait PersistenceModel {
     #[allow(non_snake_case)]
     fn closeDelta(session: SessionId) -> Self::Delta {
         Self::close_delta(session)
+    }
+
+    /// Lean-name compatibility wrapper.
+    #[allow(non_snake_case)]
+    fn invokeDelta(session: SessionId, action: &str) -> Option<Self::Delta> {
+        Self::invoke_delta(session, action)
     }
 }
 

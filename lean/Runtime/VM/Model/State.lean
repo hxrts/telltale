@@ -58,6 +58,33 @@ structure SpeculationState where
   depth : Nat
   deriving Repr
 
+structure VMGhostSession where
+  -- Runtime bookkeeping entry for one ghost session.
+  ghostSid : GhostSessionId
+  realSid : SessionId
+  owner : CoroutineId
+  projectedLocalTypes : List (Endpoint × LocalType) := []
+  createdTick : Nat
+  deriving Repr
+
+structure VMSpeculationCheckpoint where
+  -- Scoped rollback metadata for one ghost session.
+  ghostSid : GhostSessionId
+  tick : Nat
+  coroId : CoroutineId
+  traceLen : Nat
+  nextEffectNonce : Nat
+  needsReconciliation : Bool
+  deriving Repr, DecidableEq, Inhabited
+
+abbrev VMGhostSessionStore := Std.HashMap GhostSessionId VMGhostSession
+abbrev VMSpeculationCheckpointStore := Std.HashMap GhostSessionId VMSpeculationCheckpoint
+
+structure GhostRuntimeState where
+  sessions : VMGhostSessionStore := {}
+  checkpoints : VMSpeculationCheckpointStore := {}
+  deriving Repr, Inhabited
+
 structure HandlerSession where
   -- Internal session between a coroutine and its effect handler.
   sid : SessionId
@@ -246,6 +273,7 @@ structure ExecResult (γ ε : Type u) [EffectRuntime ε] where
 
 abbrev SchedQueue := List CoroutineId -- FIFO queue of runnable coroutines.
 abbrev BlockedSet (γ : Type u) := Std.HashMap CoroutineId (BlockReason γ)
+abbrev OwnershipKey := SessionId × Role
 abbrev LaneQueue := SchedQueue
 abbrev LaneOfMap := Std.HashMap CoroutineId LaneId
 abbrev LaneQueueMap := Std.HashMap LaneId LaneQueue
@@ -261,6 +289,7 @@ structure CrossLaneHandoff where
   toLane : LaneId
   step : Nat
   reason : String
+  delegationWitness : String := ""
   deriving Repr
 
 /-- Metadata for a persisted checkpoint used by deterministic restart/replay. -/
@@ -331,6 +360,7 @@ structure SchedState (γ : Type u) where
   policy : SchedPolicy
   readyQueue : SchedQueue
   blockedSet : BlockedSet γ
+  ownershipIndex : Std.HashMap OwnershipKey LaneId := {}
   laneOf : LaneOfMap := {}
   laneQueues : LaneQueueMap := {}
   laneBlocked : LaneBlockedMap γ := {}
@@ -370,7 +400,7 @@ structure VMState (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν] where
   structuredErrorEvents : List StructuredErrorEvent := []
   nextFailureSeqNo : Nat := 0
   mask : Unit
-  ghostSessions : Unit
+  ghostSessions : GhostRuntimeState
   progressSupply : Unit
 
 /-! ## VM state helpers and invariants -/

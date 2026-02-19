@@ -3,6 +3,7 @@
 use crate::coroutine::Fault;
 use crate::effect::EffectHandler;
 use crate::instr::Endpoint;
+use crate::instr::InvokeAction;
 use crate::session::SessionId;
 use crate::vm::{StepPack, VM};
 
@@ -10,8 +11,8 @@ pub(crate) fn step_invoke(
     vm: &mut VM,
     coro_idx: usize,
     role: &str,
-    action: u16,
-    dst: u16,
+    action: InvokeAction,
+    dst: Option<u16>,
     handler: &dyn EffectHandler,
 ) -> Result<StepPack, Fault> {
     vm.step_invoke(coro_idx, role, action, dst, handler)

@@ -1,5 +1,6 @@
 //! Control-flow instruction execution.
 
+use crate::coroutine::BlockReason;
 use crate::coroutine::{Fault, Value};
 use crate::exec::helpers::{empty_pack, write_reg_pack};
 use crate::instr::{Endpoint, ImmValue, PC};
@@ -33,7 +34,7 @@ pub(crate) fn step_jump(target: PC) -> StepPack {
 /// Execute `yield`.
 #[must_use]
 pub(crate) fn step_yield() -> StepPack {
-    empty_pack(CoroUpdate::AdvancePc)
+    empty_pack(CoroUpdate::AdvancePcBlock(BlockReason::SpawnWait))
 }
 
 /// Execute `halt`.

@@ -13,6 +13,16 @@ pub type Reg = u16;
 /// Program counter.
 pub type PC = usize;
 
+/// Effect action descriptor carried by `Invoke`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum InvokeAction {
+    /// Named action descriptor (Lean-aligned shape).
+    Named(String),
+    /// Legacy register-carried action descriptor.
+    Reg(Reg),
+}
+
 /// Structured endpoint: identifies a role within a session.
 ///
 /// Matches the Lean `Endpoint` which carries `{ sid, role }`.
@@ -67,8 +77,12 @@ pub enum Instr {
     Open {
         /// Role names for the session.
         roles: Vec<String>,
+        /// Role-to-local-type mappings for session initialization.
+        local_types: Vec<(String, telltale_types::LocalTypeR)>,
+        /// Edge-to-handler mappings as `((sender, receiver), handler_id)`.
+        handlers: Vec<((String, String), String)>,
         /// Role-to-register endpoint mappings.
-        endpoints: Vec<(String, Reg)>,
+        dsts: Vec<(String, Reg)>,
     },
     /// Close the session referenced by the register.
     Close {
@@ -79,10 +93,11 @@ pub enum Instr {
     // -- Effects --
     /// Invoke an effect handler action.
     Invoke {
-        /// Register holding the action descriptor.
-        action: Reg,
-        /// Destination register for the result.
-        dst: Reg,
+        /// Action descriptor.
+        action: InvokeAction,
+        /// Legacy compatibility field for register-result encoding.
+        #[serde(default)]
+        dst: Option<Reg>,
     },
     /// Acquire a guard layer and store evidence in a register.
     Acquire {

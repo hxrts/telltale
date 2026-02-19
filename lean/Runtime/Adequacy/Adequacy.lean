@@ -10,8 +10,8 @@ import Protocol.Process
 The Problem. Define observable traces and adequacy statements that connect
 the VM execution to protocol-level correctness claims.
 
-Solution Structure. Provide trace/event types and placeholder adequacy
-statements that will be refined by later proofs.
+Solution Structure. Provide trace/event types and adequacy
+statements that can be refined by later proofs.
 -/
 
 /-! # Task 22: Observable Trace Infrastructure and VM Adequacy
@@ -160,14 +160,55 @@ def FIFOConsistent {ε : Type u} [EffectRuntime ε]
 
 /-! ## VM Adequacy Statement -/
 
+def session_endpoint_resources {ν : Type u} [VerificationModel ν]
+    [GhostMapSlot LocalType]
+    (γs : GhostName) (store : SessionStore ν) : iProp :=
+  -- Concrete endpoint fragments extracted from the session store.
+  sepList ((store.foldr (fun p acc => p.snd.localTypes ++ acc) []).map
+    (fun epL => endpoint_frag γs epL.1 epL.2))
+
+def coroutine_progress_resources {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    [GhostMapSlot Nat]
+    (γp : GhostName) (coros : Array (CoroutineState γ ε)) : iProp :=
+  -- Concrete progress-token fragments carried by coroutine runtime state.
+  sepList ((coros.toList.foldr (fun c acc => c.progressTokens ++ acc) []).map
+    (fun tok => progress_token_own γp tok.sid tok.endpoint 1))
+
+def coroutine_knowledge_resources {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    [GhostMapSlot Unit]
+    (γk : GhostName) (coros : Array (CoroutineState γ ε)) : iProp :=
+  -- Concrete knowledge ownership per coroutine.
+  sepList (coros.toList.map (fun c => knowledge_set_owns γk c.knowledgeSet))
+
+def ghost_speculation_resources {ι γ π ε ν : Type u}
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
+    [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    [GhostMapSlot Nat]
+    (γsp : GhostName) (st : VMState ι γ π ε ν) : iProp :=
+  -- Session-scoped speculation resources for active ghost sessions.
+  sepList (st.ghostSessions.sessions.toList.map
+    (fun p => speculation_session_inv γsp p.snd.realSid))
+
 def session_state_interp {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    [GhostMapSlot Unit] [GhostMapSlot Nat] [GhostMapSlot LocalType]
     (st : VMState ι γ π ε ν) : iProp :=
-  -- Interpret the concrete VM state as logical resources.
-  iProp.sep (iProp.pure (WFVMState st))
-    (iProp.pure (sessionStore_refines_envs st.sessions))
+  -- Interpret concrete VM state as WF/refinement facts plus concrete ghost resources.
+  iProp.exist fun γs =>
+    iProp.exist fun γp =>
+      iProp.exist fun γk =>
+        iProp.exist fun γsp =>
+          iProp.sep (iProp.pure (WFVMState st))
+            (iProp.sep (iProp.pure (sessionStore_refines_envs st.sessions))
+              (iProp.sep (session_endpoint_resources γs st.sessions)
+                (iProp.sep (coroutine_progress_resources γp st.coroutines)
+                  (iProp.sep (coroutine_knowledge_resources γk st.coroutines)
+                    (ghost_speculation_resources γsp st)))))
 
 def vm_adequacy {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]

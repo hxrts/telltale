@@ -1,9 +1,15 @@
 
 import Runtime.Examples.SimpleProtocol
 import Runtime.VM.Runtime.Runner
+import Runtime.VM.Runtime.ThreadedRunner
+import Runtime.VM.Semantics.ExecSpeculation
+import Runtime.VM.Semantics.ExecOwnership
 import Runtime.VM.Runtime.Loader
 import Runtime.VM.Runtime.Failure
 import Runtime.Adequacy.EnvelopeCore
+import Runtime.Proofs.CompileTime.RuntimeContracts
+import Runtime.Proofs.Examples.ComposedProofPack
+import Runtime.Proofs.TheoremPack.API
 import SessionTypes.LocalTypeR
 import SessionTypes.GlobalType
 
@@ -13,6 +19,7 @@ Executable Lean tests for the scheduled VM runner.
 
 /- ## Structured Block 1 -/
 set_option autoImplicit false
+set_option maxRecDepth 4096
 
 open SessionTypes.LocalTypeR
 open SessionTypes.GlobalType
@@ -61,7 +68,7 @@ def emptyState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerif
   , crashedSites := []
   , partitionedEdges := []
   , mask := ()
-  , ghostSessions := ()
+  , ghostSessions := default
   , progressSupply := () }
 
 /-- Simple two-party LocalTypeR image. -/
@@ -89,6 +96,29 @@ def mkReadyCoro (id : CoroutineId) (tokens : List ProgressToken := []) :
   , knowledgeSet := []
   , costBudget := unitConfig.costModel.defaultBudget
   , specState := none }
+
+def withSpecConfig
+    (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify)
+    (enabled : Bool) (maxDepth : Nat) :
+    VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+  { st with
+      config := { st.config with speculationEnabled := enabled, maxSpeculationDepth := maxDepth } }
+
+def mkForkOperandCoro (id : CoroutineId) (ghostSid : Nat)
+    (spec : Option SpeculationState := none) :
+    CoroutineState UnitGuard UnitEffect :=
+  let regs : RegFile := #[.nat ghostSid, .unit, .unit, .unit, .unit, .unit, .unit, .unit]
+  { mkReadyCoro id with regs := regs, specState := spec }
+
+def isSpecFault (res : ExecResult UnitGuard UnitEffect) : Bool :=
+  match res.status with
+  | .faulted (.specFault _) => true
+  | _ => false
+
+def hasTransferFaultMsg (res : ExecResult UnitGuard UnitEffect) (msg : String) : Bool :=
+  match res.status with
+  | .faulted (.transferFault m) => m = msg
+  | _ => false
 
 def schedulerTestState (policy : SchedPolicy) (allTokens : Bool := false) :
     VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
@@ -125,6 +155,11 @@ def collectSchedulePicks (fuel : Nat)
       | some (cid, st') =>
           let sched' := updateAfterStep st'.sched cid .continue
           collectSchedulePicks fuel' { st' with sched := sched' } (cid :: acc)
+
+theorem schedRoundOne_eq_schedRound_one
+    (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify) :
+    schedRoundOne st = schedRound 1 st := by
+  simp [schedRound]
 
 /-- Main test entry point. -/
 def main : IO Unit := do
@@ -382,3 +417,214 @@ def main : IO Unit := do
   let restarted := restartId (checkpointId refFaultRun)
   expect (decide (restarted.structuredErrorEvents = refFaultRun.structuredErrorEvents))
     "restart structured-error adequacy mismatch under identity refinement"
+
+  -- Test 19: threaded runner is exactly aligned with canonical runner at concurrency 1.
+  let (stThreadedEq, sidThreadedEq) := loadChoreography emptyState twoPartyImage
+  let canonicalEq := runScheduled 50 1 stThreadedEq
+  let threadedEq := runScheduledThreaded 50 1 stThreadedEq
+  expect (decide (canonicalEq.sched.stepCount = threadedEq.sched.stepCount))
+    "threaded@1 step-count mismatch against canonical runner"
+  let canonicalEqNorm := Runtime.VM.normalizeTrace canonicalEq.obsTrace
+  let threadedEqNorm := Runtime.VM.normalizeTrace threadedEq.obsTrace
+  expect (decide (traceTags (filterBySid sidThreadedEq canonicalEqNorm) =
+    traceTags (filterBySid sidThreadedEq threadedEqNorm)))
+    "threaded@1 per-session trace mismatch against canonical runner"
+
+  -- Test 20: threaded n>1 respects certified-round gate semantics:
+  -- either advances by certified waves or falls back to canonical one-step.
+  let (stThreadedRound, _) := loadChoreography emptyState twoPartyImage
+  let canonicalRound := runScheduled 1 1 stThreadedRound
+  let threadedRound := runScheduledThreaded 1 2 stThreadedRound
+  expect (decide (threadedRound.sched.stepCount >= canonicalRound.sched.stepCount))
+    "threaded n>1 violated certified-round/fallback progression bound"
+
+  -- Test 21: fork is rejected when speculation is disabled.
+  let stSpecDisabled := withSpecConfig emptyState false 4
+  let forkDisabled := stepFork stSpecDisabled (mkForkOperandCoro 0 5) 0
+  expect (isSpecFault forkDisabled.res)
+    "fork with speculation disabled should fault"
+
+  -- Test 22: join is rejected when no speculation state is active.
+  let joinNoSpec := stepJoin stSpecDisabled (mkReadyCoro 0)
+  expect (isSpecFault joinNoSpec.res)
+    "join without speculation should fault"
+
+  -- Test 23: abort is rejected when no speculation state is active.
+  let abortNoSpec := stepAbort stSpecDisabled (mkReadyCoro 0)
+  expect (isSpecFault abortNoSpec.res)
+    "abort without speculation should fault"
+
+  -- Test 24: fork initializes depth from maxSpeculationDepth and records ghost sid.
+  let stSpecEnabled := withSpecConfig emptyState true 3
+  let forkEnabled := stepFork stSpecEnabled (mkForkOperandCoro 0 9) 0
+  let forkInitOk :=
+    match forkEnabled.coro.specState, forkEnabled.res.status,
+        forkEnabled.st.ghostSessions.sessions.get? 9,
+        forkEnabled.st.ghostSessions.checkpoints.get? 9 with
+    | some spec, .forked gsid, some ghost, some checkpoint =>
+        spec.ghostSid = 9 &&
+        spec.depth = 2 &&
+        gsid = 9 &&
+        ghost.owner = 0 &&
+        checkpoint.coroId = 0
+    | _, _, _, _ => false
+  expect forkInitOk
+    "fork depth initialization from maxSpeculationDepth is incorrect"
+
+  -- Test 25: fork is rejected when nested speculation depth is exhausted.
+  let exhaustedSpec : SpeculationState := { ghostSid := 9, depth := 0 }
+  let forkExhausted := stepFork stSpecEnabled (mkForkOperandCoro 0 9 (some exhaustedSpec)) 0
+  expect (isSpecFault forkExhausted.res)
+    "fork with exhausted speculation depth should fault"
+
+  -- Test 26: successful join emits active ghost sid and clears speculation state.
+  let forkForJoin := stepFork stSpecEnabled (mkForkOperandCoro 0 23) 0
+  let joinActive := stepJoin forkForJoin.st forkForJoin.coro
+  let joinSidOk :=
+    match joinActive.res.status, joinActive.res.event, joinActive.coro.specState,
+        joinActive.st.ghostSessions.sessions.get? 23,
+        joinActive.st.ghostSessions.checkpoints.get? 23,
+        joinActive.st.needsReconciliation with
+    | .joined, some (.obs (.joined sid)), none, none, none, false => sid = 23
+    | _, _, _, _, _, _ => false
+  expect joinSidOk
+    "join should emit active ghost sid and clear speculation state"
+
+  -- Test 27: join fails when reconciliation predicate does not hold.
+  let forkForJoinFail := stepFork stSpecEnabled (mkForkOperandCoro 0 40) 0
+  let joinMismatchResult :=
+    match forkForJoinFail.st.ghostSessions.sessions.get? 40 with
+    | none => forkForJoinFail
+    | some ghost =>
+        let ghostBad : VMGhostSession :=
+          { ghost with projectedLocalTypes := [({ sid := ghost.realSid, role := "A" }, LocalType.end_)] }
+        let ghostStateBad : GhostRuntimeState :=
+          { forkForJoinFail.st.ghostSessions with
+              sessions := forkForJoinFail.st.ghostSessions.sessions.insert 40 ghostBad }
+        let stBad := { forkForJoinFail.st with ghostSessions := ghostStateBad }
+        stepJoin stBad forkForJoinFail.coro
+  expect (isSpecFault joinMismatchResult.res)
+    "join should fault when reconciliation predicate fails"
+
+  -- Test 28: successful abort emits active ghost sid and clears speculation state.
+  let abortActive := stepAbort stSpecEnabled
+    { mkReadyCoro 0 with specState := some { ghostSid := 24, depth := 1 } }
+  let abortSidOk :=
+    match abortActive.res.status, abortActive.res.event, abortActive.coro.specState,
+        abortActive.st.ghostSessions.sessions.get? 24,
+        abortActive.st.ghostSessions.checkpoints.get? 24,
+        abortActive.st.needsReconciliation with
+    | .aborted, some (.obs (.aborted sid)), none, none, none, false => sid = 24
+    | _, _, _, _, _, _ => false
+  expect abortSidOk
+    "abort should emit active ghost sid and clear speculation state"
+
+  -- Test 29: abort restores checkpointed trace length and effect nonce.
+  let forkForAbort := stepFork stSpecEnabled (mkForkOperandCoro 0 31) 0
+  let stDirty :=
+    { forkForAbort.st with
+        obsTrace := forkForAbort.st.obsTrace ++ [{ tick := 999, event := .joined 31 }]
+        nextEffectNonce := forkForAbort.st.nextEffectNonce + 7
+        needsReconciliation := true }
+  let abortRestored := stepAbort stDirty forkForAbort.coro
+  let abortRestoreOk :=
+    abortRestored.st.obsTrace.length = forkForAbort.st.obsTrace.length &&
+    abortRestored.st.nextEffectNonce = forkForAbort.st.nextEffectNonce &&
+    abortRestored.st.needsReconciliation = false
+  expect abortRestoreOk
+    "abort should restore checkpointed trace length/nonce/reconciliation state"
+
+  -- Test 30: replay conformance checks pass against certified equivalence classes.
+  let replayInventory : List (String × Bool) :=
+    [ ("protocol_envelope_bridge", true)
+    , ("vm_envelope_adherence", true)
+    , ("vm_envelope_admission", true)
+    , ("failure_envelope", true)
+    ]
+  let replayClasses := Runtime.Proofs.TheoremPackAPI.defaultCertifiedReplayClasses
+  let replayConformanceOk :=
+    Runtime.Proofs.TheoremPackAPI.replayConformsToClasses
+      replayInventory replayClasses localEnvSingle.obsTrace localEnvMulti.obsTrace
+  expect replayConformanceOk
+    "replay conformance mismatch against certified equivalence class"
+
+  -- Test 31: deterministic planner yields the same wave plan for the same input state.
+  let stPlan := schedulerTestState .roundRobin true
+  let planA := planDeterministicWaves stPlan
+  let planB := planDeterministicWaves stPlan
+  expect (decide (planA = planB))
+    "deterministic planner produced non-deterministic wave plans"
+
+  -- Test 32: worker-count chunking preserves the deterministic planned pick set/order.
+  let flattenWaves := fun (waves : List (List CoroutineId)) =>
+    waves.foldl (fun acc wave => acc ++ wave) []
+  let samePickSeq := fun (xs ys : List CoroutineId) =>
+    xs.length == ys.length &&
+      (List.zip xs ys).all (fun p => p.1 == p.2)
+  let picks2 := flattenWaves (plannedWaveCertificate 2 stPlan).waves
+  let picks4 := flattenWaves (plannedWaveCertificate 4 stPlan).waves
+  let picks8 := flattenWaves (plannedWaveCertificate 8 stPlan).waves
+  expect (samePickSeq picks2 picks4 && samePickSeq picks2 picks8)
+    "worker-count changed deterministic planned picks"
+
+  -- Test 33: n>1 round is certificate-gated and falls back to canonical one-step when needed.
+  let cert2 := plannedWaveCertificate 2 stPlan
+  let expected2 :=
+    if checkWaveCertificate stPlan cert2 then
+      executePlannedWaves stPlan cert2.waves
+    else
+      schedRound 1 stPlan
+  let actual2 := schedRoundThreaded 2 stPlan
+  expect (decide (actual2.sched.stepCount = expected2.sched.stepCount))
+    "threaded n>1 round violated certificate/fallback gate semantics"
+
+  -- Test 34: threaded n>1 divergence from canonical remains envelope-bounded per session.
+  let threadedEnv := runScheduledThreaded 100 4 st4
+  let canonicalEnv := runScheduled 100 1 st4
+  let threadedEnvNorm := Runtime.VM.normalizeTrace threadedEnv.obsTrace
+  let canonicalEnvNorm := Runtime.VM.normalizeTrace canonicalEnv.obsTrace
+  let threadedS1 := traceTags (filterBySid sid1 threadedEnvNorm)
+  let canonicalS1 := traceTags (filterBySid sid1 canonicalEnvNorm)
+  let threadedS2 := traceTags (filterBySid sid2 threadedEnvNorm)
+  let canonicalS2 := traceTags (filterBySid sid2 canonicalEnvNorm)
+  expect (decide (threadedS1 = canonicalS1 ∧ threadedS2 = canonicalS2))
+    "threaded n>1 divergence exceeded envelope-bounded per-session traces"
+
+  -- Test 35: non-delegation cross-shard ownership mutations are rejected.
+  let endpointKey : Endpoint := { sid := 7, role := "A" }
+  let schedOwned :=
+    { stLane.sched with ownershipIndex := stLane.sched.ownershipIndex.insert (7, "A") 0 }
+  let schedRejected := updateAfterStep schedOwned 1 (.transferred endpointKey 0)
+  expect (decide (schedRejected.ownershipIndex.get? (7, "A") = some 0))
+    "non-delegation cross-shard ownership mutation should be rejected"
+  expect (decide (schedRejected.crossLaneHandoffs.length = 0))
+    "rejected transfer should not emit cross-lane handoff evidence"
+
+  -- Test 36: handoff evidence is deterministic and auditable for replay.
+  let schedEvidence1 := updateAfterStep stLane.sched 0 (.transferred endpointKey 1)
+  let schedEvidence2 := updateAfterStep stLane.sched 0 (.transferred endpointKey 1)
+  let handoffStable :=
+    match schedEvidence1.crossLaneHandoffs, schedEvidence2.crossLaneHandoffs with
+    | h1 :: _, h2 :: _ =>
+        h1.reason = h2.reason &&
+        h1.delegationWitness = h2.delegationWitness &&
+        h1.reason.startsWith "transfer " &&
+        h1.delegationWitness.length > 0
+    | _, _ => false
+  expect handoffStable
+    "handoff evidence must be replay-stable and auditable"
+
+  -- Test 37: shared canonical one-step helper is covered by
+  -- `schedRoundOne_eq_schedRound_one` above.
+
+  -- Test 38: transfer fault helper emits normalized transfer target fault message.
+  let transferEp : Endpoint := { sid := 9, role := "A" }
+  let badTransferRegs : RegFile :=
+    #[ .chan transferEp
+     , .string "not-a-target"
+     , .unit, .unit, .unit, .unit, .unit, .unit ]
+  let badTransferCoro : CoroutineState UnitGuard UnitEffect :=
+    { mkReadyCoro 0 with regs := badTransferRegs, ownedEndpoints := [transferEp] }
+  let badTransferPack := stepTransfer stPlan badTransferCoro 0 1 0
+  expect (hasTransferFaultMsg badTransferPack.res "bad transfer target")
+    "transfer target type fault did not use normalized transfer fault helper"

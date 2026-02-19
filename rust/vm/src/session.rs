@@ -406,12 +406,9 @@ impl SessionStore {
             .get_mut(&sid)
             .ok_or_else(|| format!("session {sid} not found"))?;
 
-        let has_pending = session.buffers.values().any(|b| !b.is_empty());
-        if has_pending {
-            session.status = SessionStatus::Draining;
-        } else {
-            session.status = SessionStatus::Closed;
-        }
+        session.status = SessionStatus::Closed;
+        session.buffers.clear();
+        session.edge_traces.clear();
         session.epoch = session.epoch.saturating_add(1);
         Ok(())
     }
@@ -435,6 +432,12 @@ impl SessionStore {
     #[must_use]
     pub fn lookup_handler(&self, edge: &Edge) -> Option<&HandlerId> {
         self.sessions.get(&edge.sid)?.edge_handlers.get(edge)
+    }
+
+    /// Lookup a default handler id for a session, if any edge binding exists.
+    #[must_use]
+    pub fn default_handler_for_session(&self, sid: SessionId) -> Option<&HandlerId> {
+        self.sessions.get(&sid)?.edge_handlers.values().next()
     }
 
     /// Update edge-bound handler id.
@@ -617,6 +620,29 @@ mod tests {
 
         let val = session.recv("A", "B");
         assert_eq!(val, Some(Value::Nat(42)));
+    }
+
+    #[test]
+    fn test_close_clears_buffers_and_traces_even_when_messages_pending() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &BTreeMap::new(),
+        );
+        let edge = Edge::new(sid, "A", "B");
+        store
+            .get_mut(sid)
+            .expect("session exists")
+            .send("A", "B", Value::Nat(7))
+            .expect("enqueue pending message");
+        store.update_trace(&edge, vec![ValType::Nat]);
+
+        store.close(sid).expect("close session");
+        let session = store.get(sid).expect("session exists after close");
+        assert_eq!(session.status, SessionStatus::Closed);
+        assert!(session.buffers.is_empty());
+        assert!(session.edge_traces.is_empty());
     }
 
     #[test]

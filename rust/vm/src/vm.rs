@@ -24,15 +24,22 @@ use crate::clock::SimClock;
 use crate::coroutine::{
     BlockReason, CoroStatus, Coroutine, Fault, KnowledgeFact, ProgressToken, Value,
 };
-use crate::determinism::DeterminismMode;
+use crate::determinism::{DeterminismMode, EffectDeterminismTier};
 use crate::effect::{
     CorruptionType, EffectHandler, EffectTraceEntry, ReplayEffectHandler, SendDecision,
     TopologyPerturbation,
 };
 use crate::exec;
+use crate::faults::{
+    speculation_fault_abort_requires_active, speculation_fault_disabled,
+    speculation_fault_join_requires_active, transfer_fault_delegation_guard_violation,
+};
 use crate::guard::{GuardLayer, InMemoryGuardLayer, LayerId};
 use crate::identity::IdentityModel;
-use crate::instr::{Endpoint, Instr, PC};
+use crate::instr::{Endpoint, Instr, InvokeAction, PC};
+use crate::instruction_semantics::{
+    decode_endpoint_fact, endpoint_from_reg as decode_endpoint_from_reg,
+};
 use crate::intern::{StringId, SymbolTable};
 use crate::kernel::{KernelMachine, VMKernel};
 use crate::loader::CodeImage;
@@ -43,6 +50,9 @@ use crate::persistence::{NoopPersistence, PersistenceModel};
 use crate::scheduler::{SchedPolicy, Scheduler};
 use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragmentV1};
 use crate::session::{unfold_if_var_with_scope, Edge, SessionId, SessionStatus, SessionStore};
+use crate::transfer_semantics::{
+    decode_transfer_request, endpoint_owner_ids, move_endpoint_bundle,
+};
 use crate::verification::{DefaultVerificationModel, VerificationModel};
 
 fn default_instruction_cost() -> usize {
@@ -489,6 +499,17 @@ impl FlowPredicate {
     }
 }
 
+/// Typed runtime tuning profile for benchmark/runtime configuration harmonization.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeTuningProfile {
+    /// Default production-like tuning.
+    #[default]
+    Standard,
+    /// Reference profile approximating early M1 stress behavior.
+    M1StressReference,
+}
+
 /// VM configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VMConfig {
@@ -513,6 +534,9 @@ pub struct VMConfig {
     pub speculation_enabled: bool,
     /// Determinism profile for replay/equivalence behavior.
     pub determinism_mode: DeterminismMode,
+    /// Effect determinism tier used by admission and envelope artifacts.
+    #[serde(default)]
+    pub effect_determinism_tier: EffectDeterminismTier,
     /// Output-condition policy for commit eligibility of observable outputs.
     pub output_condition_policy: OutputConditionPolicy,
     /// Monitor mode for pre-dispatch type checks.
@@ -527,6 +551,12 @@ pub struct VMConfig {
     /// Initial cost budget assigned to each coroutine.
     #[serde(default = "default_initial_cost_budget")]
     pub initial_cost_budget: usize,
+    /// Whether threaded scheduler may admit same-session picks when footprint-disjoint.
+    #[serde(default)]
+    pub footprint_guided_wave_widening: bool,
+    /// Runtime tuning profile used by instrumentation/benchmark harnesses.
+    #[serde(default)]
+    pub runtime_tuning_profile: RuntimeTuningProfile,
 }
 
 impl Default for VMConfig {
@@ -542,11 +572,14 @@ impl Default for VMConfig {
             guard_layers: Vec::new(),
             speculation_enabled: false,
             determinism_mode: DeterminismMode::Full,
+            effect_determinism_tier: EffectDeterminismTier::StrictDeterministic,
             output_condition_policy: OutputConditionPolicy::AllowAll,
             monitor_mode: MonitorMode::SessionTypePrecheck,
             flow_policy: FlowPolicy::AllowAll,
             instruction_cost: 1,
             initial_cost_budget: usize::MAX,
+            footprint_guided_wave_widening: false,
+            runtime_tuning_profile: RuntimeTuningProfile::Standard,
         }
     }
 }
@@ -846,6 +879,8 @@ pub(crate) enum CoroUpdate {
     SetPc(PC),
     /// Block with given reason. PC unchanged.
     Block(BlockReason),
+    /// Advance PC by 1 and set blocked status.
+    AdvancePcBlock(BlockReason),
     /// Halt (Done). PC unchanged.
     Halt,
     /// Advance PC by 1, write a value to a register, status = Ready.
@@ -955,6 +990,59 @@ impl<I, G, P, Nu> VM<I, G, P, Nu>
 where
     P: PersistenceModel,
 {
+    /// Create a VM for arbitrary persistence/verification model parameters.
+    #[must_use]
+    pub fn new_with_models(config: VMConfig) -> Self
+    where
+        P::PState: Default,
+        Nu: VerificationModel + Default,
+    {
+        config.assert_invariants();
+        let tick_duration = config.tick_duration;
+        let sched = Scheduler::new(config.sched_policy.clone());
+        let mut guard_resources = BTreeMap::new();
+        for layer in &config.guard_layers {
+            guard_resources.insert(layer.id.clone(), Value::Unit);
+        }
+        Self {
+            config,
+            code: None,
+            programs: Vec::new(),
+            identity_model: PhantomData,
+            guard_model: PhantomData,
+            persistence_model: PhantomData,
+            persistent: P::PState::default(),
+            verification: Nu::default(),
+            coroutines: Vec::new(),
+            sessions: SessionStore::new(),
+            arena: Arena::default(),
+            resource_states: Vec::new(),
+            sched,
+            monitor: SessionMonitor::default(),
+            obs_trace: Vec::new(),
+            role_symbols: SymbolTable::new(),
+            label_symbols: SymbolTable::new(),
+            clock: SimClock::new(tick_duration),
+            next_coro_id: 0,
+            next_session_id: 0,
+            paused_roles: BTreeSet::new(),
+            guard_layer: InMemoryGuardLayer {
+                resources: guard_resources
+                    .into_iter()
+                    .map(|(k, v)| (LayerId(k), v))
+                    .collect(),
+            },
+            effect_trace: Vec::new(),
+            next_effect_id: 0,
+            output_condition_checks: Vec::new(),
+            crashed_sites: Vec::new(),
+            partitioned_edges: Vec::new(),
+            corrupted_edges: Vec::new(),
+            timed_out_sites: Vec::new(),
+            last_sched_step: None,
+        }
+    }
+
     /// Borrow the persistent state tracked by the configured persistence model.
     #[must_use]
     pub fn persistent_state(&self) -> &P::PState {
@@ -964,6 +1052,23 @@ where
     /// Mutably borrow persistent state.
     pub fn persistent_state_mut(&mut self) -> &mut P::PState {
         &mut self.persistent
+    }
+
+    fn apply_open_delta(&mut self, sid: SessionId) -> Result<(), String> {
+        let delta = P::open_delta(sid);
+        P::apply(&mut self.persistent, &delta)
+    }
+
+    fn apply_close_delta(&mut self, sid: SessionId) -> Result<(), String> {
+        let delta = P::close_delta(sid);
+        P::apply(&mut self.persistent, &delta)
+    }
+
+    fn apply_invoke_delta(&mut self, sid: SessionId, action: &str) -> Result<(), String> {
+        if let Some(delta) = P::invoke_delta(sid, action) {
+            P::apply(&mut self.persistent, &delta)?;
+        }
+        Ok(())
     }
 
     /// Resolve guard-layer capability for a participant via bridge binding.
@@ -1001,60 +1106,18 @@ impl VM {
     /// Create a new VM with the given configuration.
     #[must_use]
     pub fn new(config: VMConfig) -> Self {
-        config.assert_invariants();
-        let tick_duration = config.tick_duration;
-        let sched = Scheduler::new(config.sched_policy.clone());
-        let mut guard_resources = BTreeMap::new();
-        for layer in &config.guard_layers {
-            guard_resources.insert(layer.id.clone(), Value::Unit);
-        }
-        Self {
-            config,
-            code: None,
-            programs: Vec::new(),
-            identity_model: PhantomData,
-            guard_model: PhantomData,
-            persistence_model: PhantomData,
-            persistent: (),
-            verification: DefaultVerificationModel,
-            coroutines: Vec::new(),
-            sessions: SessionStore::new(),
-            arena: Arena::default(),
-            resource_states: Vec::new(),
-            sched,
-            monitor: SessionMonitor::default(),
-            obs_trace: Vec::new(),
-            role_symbols: SymbolTable::new(),
-            label_symbols: SymbolTable::new(),
-            clock: SimClock::new(tick_duration),
-            next_coro_id: 0,
-            next_session_id: 0,
-            paused_roles: BTreeSet::new(),
-            guard_layer: InMemoryGuardLayer {
-                resources: guard_resources
-                    .into_iter()
-                    .map(|(k, v)| (LayerId(k), v))
-                    .collect(),
-            },
-            effect_trace: Vec::new(),
-            next_effect_id: 0,
-            output_condition_checks: Vec::new(),
-            crashed_sites: Vec::new(),
-            partitioned_edges: Vec::new(),
-            corrupted_edges: Vec::new(),
-            timed_out_sites: Vec::new(),
-            last_sched_step: None,
-        }
+        Self::new_with_models(config)
     }
 
-    fn apply_open_delta(&mut self, sid: SessionId) -> Result<(), String> {
-        let delta = NoopPersistence::open_delta(sid);
-        NoopPersistence::apply(&mut self.persistent, &delta)
-    }
-
-    fn apply_close_delta(&mut self, sid: SessionId) -> Result<(), String> {
-        let delta = NoopPersistence::close_delta(sid);
-        NoopPersistence::apply(&mut self.persistent, &delta)
+    fn bind_default_handlers_for_session(&mut self, sid: SessionId, roles: &[String]) {
+        for sender in roles {
+            for receiver in roles {
+                self.sessions.update_handler(
+                    &Edge::new(sid, sender.clone(), receiver.clone()),
+                    "default_handler".to_string(),
+                );
+            }
+        }
     }
 
     /// Load a choreography from a verified code image.
@@ -1082,6 +1145,7 @@ impl VM {
             &self.config.buffer_config,
             &image.local_types,
         );
+        self.bind_default_handlers_for_session(sid, &roles);
         self.monitor.set_kind(sid, SessionKind::Peer);
         self.resource_states.push((sid, ResourceState::default()));
         self.apply_open_delta(sid)
@@ -1133,7 +1197,7 @@ impl VM {
         Ok(sid)
     }
 
-    /// Execute one scheduler round: advance up to N ready coroutines.
+    /// Execute one scheduler round: advance at most one ready coroutine.
     ///
     /// # Errors
     ///
@@ -1160,96 +1224,110 @@ impl VM {
         self.prune_expired_timeouts();
         self.try_unblock_receivers();
 
-        let mut progressed = false;
-        for _ in 0..n {
-            if self.coroutines.iter().all(|c| c.is_terminal()) {
-                return Ok(StepResult::AllDone);
+        let progress_ids: BTreeSet<usize> = self
+            .coroutines
+            .iter()
+            .filter(|c| !c.progress_tokens.is_empty())
+            .map(|c| c.id)
+            .collect();
+
+        let paused_roles = &self.paused_roles;
+        let crashed_sites = &self.crashed_sites;
+        let timed_out_sites = &self.timed_out_sites;
+        let coroutines = &self.coroutines;
+        let progress_ids = &progress_ids;
+        let has_eligible = self.sched.ready_snapshot().into_iter().any(|id| {
+            coroutines
+                .get(id)
+                .map(|c| {
+                    !paused_roles.contains(&c.role)
+                        && !crashed_sites.iter().any(|site| site == &c.role)
+                        && !timed_out_sites.iter().any(|timeout| timeout.site == c.role)
+                })
+                .unwrap_or(false)
+        });
+        if !has_eligible {
+            return Ok(StepResult::Stuck);
+        }
+        let Some(coro_id) = VMKernel::select_ready_eligible(
+            &mut self.sched,
+            |id| progress_ids.contains(&id),
+            |id| {
+                coroutines
+                    .get(id)
+                    .map(|c| {
+                        !paused_roles.contains(&c.role)
+                            && !crashed_sites.iter().any(|site| site == &c.role)
+                            && !timed_out_sites.iter().any(|timeout| timeout.site == c.role)
+                    })
+                    .unwrap_or(false)
+            },
+        ) else {
+            return Ok(StepResult::Stuck);
+        };
+
+        let result = self.exec_instr(coro_id, handler);
+
+        match result {
+            Ok(ExecOutcome::Continue) => {
+                self.last_sched_step = Some(SchedStepDebug {
+                    selected_coro: coro_id,
+                    exec_status: "continue".to_string(),
+                });
+                self.sched.reschedule(coro_id);
             }
-
-            let progress_ids: BTreeSet<usize> = self
-                .coroutines
-                .iter()
-                .filter(|c| !c.progress_tokens.is_empty())
-                .map(|c| c.id)
-                .collect();
-
-            let paused_roles = &self.paused_roles;
-            let crashed_sites = &self.crashed_sites;
-            let timed_out_sites = &self.timed_out_sites;
-            let coroutines = &self.coroutines;
-            let progress_ids = &progress_ids;
-            let Some(coro_id) = VMKernel::select_ready_eligible(
-                &mut self.sched,
-                |id| progress_ids.contains(&id),
-                |id| {
-                    coroutines
-                        .get(id)
-                        .map(|c| {
-                            !paused_roles.contains(&c.role)
-                                && !crashed_sites.iter().any(|site| site == &c.role)
-                                && !timed_out_sites.iter().any(|timeout| timeout.site == c.role)
-                        })
-                        .unwrap_or(false)
-                },
-            ) else {
-                break;
-            };
-
-            let result = self.exec_instr(coro_id, handler);
-
-            match result {
-                Ok(ExecOutcome::Continue) => {
-                    progressed = true;
-                    self.last_sched_step = Some(SchedStepDebug {
-                        selected_coro: coro_id,
-                        exec_status: "continue".to_string(),
-                    });
+            Ok(ExecOutcome::Blocked(reason)) => {
+                let yielded = matches!(reason, BlockReason::SpawnWait);
+                self.last_sched_step = Some(SchedStepDebug {
+                    selected_coro: coro_id,
+                    exec_status: if yielded {
+                        "yielded".to_string()
+                    } else {
+                        "blocked".to_string()
+                    },
+                });
+                if yielded {
                     self.sched.reschedule(coro_id);
-                }
-                Ok(ExecOutcome::Blocked(reason)) => {
-                    progressed = true;
-                    self.last_sched_step = Some(SchedStepDebug {
-                        selected_coro: coro_id,
-                        exec_status: "blocked".to_string(),
-                    });
+                } else {
                     self.sched.mark_blocked(coro_id, reason);
                 }
-                Ok(ExecOutcome::Halted) => {
-                    progressed = true;
-                    self.last_sched_step = Some(SchedStepDebug {
-                        selected_coro: coro_id,
-                        exec_status: "halted".to_string(),
-                    });
-                    self.sched.mark_done(coro_id);
-                    self.obs_trace.push(ObsEvent::Halted {
-                        tick: self.clock.tick,
-                        coro_id,
-                    });
-                }
-                Err(fault) => {
-                    self.last_sched_step = Some(SchedStepDebug {
-                        selected_coro: coro_id,
-                        exec_status: "faulted".to_string(),
-                    });
-                    self.obs_trace.push(ObsEvent::Faulted {
-                        tick: self.clock.tick,
-                        coro_id,
-                        fault: fault.clone(),
-                    });
-                    let idx = self.coro_index(coro_id);
-                    self.coroutines[idx].status = CoroStatus::Faulted(fault.clone());
-                    self.sched.mark_done(coro_id);
-                    return Err(VMError::Fault { coro_id, fault });
-                }
+            }
+            Ok(ExecOutcome::Halted) => {
+                self.last_sched_step = Some(SchedStepDebug {
+                    selected_coro: coro_id,
+                    exec_status: "halted".to_string(),
+                });
+                self.sched.mark_done(coro_id);
+                self.obs_trace.push(ObsEvent::Halted {
+                    tick: self.clock.tick,
+                    coro_id,
+                });
+            }
+            Err(fault) => {
+                self.last_sched_step = Some(SchedStepDebug {
+                    selected_coro: coro_id,
+                    exec_status: "faulted".to_string(),
+                });
+                self.obs_trace.push(ObsEvent::Faulted {
+                    tick: self.clock.tick,
+                    coro_id,
+                    fault: fault.clone(),
+                });
+                let idx = self.coro_index(coro_id);
+                self.coroutines[idx].status = CoroStatus::Faulted(fault.clone());
+                self.sched.mark_done(coro_id);
+                return Err(VMError::Fault { coro_id, fault });
             }
         }
 
-        if progressed {
+        if self.coroutines.iter().all(|c| c.is_terminal()) {
+            #[cfg(debug_assertions)]
+            debug_assert!(self.wf_vm_state().is_ok());
+            Ok(StepResult::AllDone)
+        } else {
             #[cfg(debug_assertions)]
             debug_assert!(self.wf_vm_state().is_ok());
             Ok(StepResult::Continue)
-        } else {
-            Ok(StepResult::Stuck)
         }
     }
 
@@ -1372,6 +1450,12 @@ impl VM {
         self.last_sched_step.as_ref()
     }
 
+    /// Scheduler-dispatched step counter.
+    #[must_use]
+    pub fn scheduler_step_count(&self) -> usize {
+        self.sched.step_count()
+    }
+
     /// Number of coroutine records in the VM.
     #[must_use]
     pub fn coroutine_count(&self) -> usize {
@@ -1432,6 +1516,7 @@ impl VM {
             partitioned_edges,
             corrupted_edges,
             timed_out_sites,
+            self.config.effect_determinism_tier,
         )
     }
 
@@ -1690,45 +1775,11 @@ impl VM {
     }
 
     fn endpoint_from_reg(&self, coro_idx: usize, reg: u16) -> Result<Endpoint, Fault> {
-        match self.read_reg_checked(coro_idx, reg)? {
-            Value::Endpoint(ep) => Ok(ep),
-            other => Err(Fault::TypeViolation {
-                expected: telltale_types::ValType::Chan {
-                    sid: 0,
-                    role: String::new(),
-                },
-                actual: Self::val_type_of(&other),
-                message: "expected endpoint register".to_string(),
-            }),
-        }
+        decode_endpoint_from_reg(&self.coroutines[coro_idx], reg)
     }
 
     fn decode_fact(value: Value) -> Option<(Endpoint, String)> {
-        match value {
-            Value::Prod(left, right) => match (*left, *right) {
-                (Value::Endpoint(endpoint), Value::Str(fact)) => Some((endpoint, fact)),
-                _ => None,
-            },
-            _ => None,
-        }
-    }
-
-    fn val_type_of(value: &Value) -> telltale_types::ValType {
-        use telltale_types::ValType;
-        match value {
-            Value::Unit => ValType::Unit,
-            Value::Nat(_) => ValType::Nat,
-            Value::Bool(_) => ValType::Bool,
-            Value::Str(_) => ValType::String,
-            Value::Prod(left, right) => ValType::Prod(
-                Box::new(Self::val_type_of(left)),
-                Box::new(Self::val_type_of(right)),
-            ),
-            Value::Endpoint(ep) => ValType::Chan {
-                sid: ep.sid,
-                role: ep.role.clone(),
-            },
-        }
+        decode_endpoint_fact(value)
     }
 
     /// Extract partner and branches from a Recv local type.
@@ -1779,7 +1830,7 @@ impl VM {
                     })
                 }
             }
-            crate::instr::Instr::Receive { .. } | crate::instr::Instr::Choose { .. } => {
+            crate::instr::Instr::Receive { .. } => {
                 let local_type =
                     self.sessions
                         .lookup_type(ep)
@@ -1797,6 +1848,48 @@ impl VM {
                         message: format!(
                             "[monitor] {role}: expected Recv state, got {local_type:?}"
                         ),
+                    })
+                }
+            }
+            crate::instr::Instr::Choose { table, .. } => {
+                let mut labels = BTreeSet::new();
+                if !table
+                    .iter()
+                    .map(|(label, _)| label)
+                    .all(|label| labels.insert(label.clone()))
+                {
+                    return Err(Fault::SpecFault {
+                        message: "[monitor] structural precheck failed: duplicate choose labels"
+                            .to_string(),
+                    });
+                }
+                let local_type =
+                    self.sessions
+                        .lookup_type(ep)
+                        .ok_or_else(|| Fault::TypeViolation {
+                            expected: telltale_types::ValType::Unit,
+                            actual: telltale_types::ValType::Unit,
+                            message: format!("[monitor] {role}: no type registered"),
+                        })?;
+                if matches!(local_type, LocalTypeR::Recv { .. }) {
+                    Ok(())
+                } else {
+                    Err(Fault::TypeViolation {
+                        expected: telltale_types::ValType::Unit,
+                        actual: telltale_types::ValType::Unit,
+                        message: format!(
+                            "[monitor] {role}: expected Recv state, got {local_type:?}"
+                        ),
+                    })
+                }
+            }
+            crate::instr::Instr::Open { roles, dsts, .. } => {
+                if roles.len() == dsts.len() {
+                    Ok(())
+                } else {
+                    Err(Fault::SpecFault {
+                        message: "[monitor] structural precheck failed: open arity mismatch"
+                            .to_string(),
                     })
                 }
             }
@@ -2451,28 +2544,39 @@ impl VM {
         &mut self,
         coro_idx: usize,
         role: &str,
-        action: u16,
-        dst: u16,
+        action: InvokeAction,
+        legacy_dst: Option<u16>,
         handler: &dyn EffectHandler,
     ) -> Result<StepPack, Fault> {
-        let _action = self.read_reg_checked(coro_idx, action)?;
-        if usize::from(dst) >= self.coroutines[coro_idx].regs.len() {
-            return Err(Fault::OutOfRegisters);
-        }
-        let invoke_out = match self.read_reg_checked(coro_idx, dst)? {
-            Value::Endpoint(ep) => Value::Endpoint(ep),
-            _ => Value::Bool(true),
+        let action_repr = match action {
+            InvokeAction::Named(name) => name,
+            InvokeAction::Reg(reg) => {
+                let action_value = self.read_reg_checked(coro_idx, reg)?;
+                format!("{action_value:?}")
+            }
         };
+        if let Some(dst) = legacy_dst {
+            if usize::from(dst) >= self.coroutines[coro_idx].regs.len() {
+                return Err(Fault::OutOfRegisters);
+            }
+        }
+        let sid = self.coroutines[coro_idx].session_id;
+        if self.sessions.default_handler_for_session(sid).is_none() {
+            return Err(Fault::InvokeFault {
+                message: "no handler bound".to_string(),
+            });
+        }
         let coro_id = self.coroutines[coro_idx].id;
         handler
             .step(role, &mut self.coroutines[coro_idx].regs)
             .map_err(|e| Fault::InvokeFault { message: e })?;
+        self.apply_invoke_delta(sid, &action_repr)
+            .map_err(|e| Fault::InvokeFault {
+                message: format!("invoke persistence delta failed: {e}"),
+            })?;
 
         Ok(StepPack {
-            coro_update: CoroUpdate::AdvancePcWriteReg {
-                reg: dst,
-                val: invoke_out,
-            },
+            coro_update: CoroUpdate::AdvancePc,
             type_update: None,
             events: vec![ObsEvent::Invoked {
                 tick: self.clock.tick,
@@ -2639,9 +2743,7 @@ impl VM {
         ghost: u16,
     ) -> Result<StepPack, Fault> {
         if !self.config.speculation_enabled {
-            return Err(Fault::SpecFault {
-                message: "speculation disabled".into(),
-            });
+            return Err(speculation_fault_disabled());
         }
         let ghost_val = self.coroutines[coro_idx]
             .regs
@@ -2683,6 +2785,9 @@ impl VM {
         _role: &str,
         sid: SessionId,
     ) -> Result<StepPack, Fault> {
+        if self.coroutines[coro_idx].spec_state.is_none() {
+            return Err(speculation_fault_join_requires_active());
+        }
         self.coroutines[coro_idx].spec_state = None;
         Ok(StepPack {
             coro_update: CoroUpdate::AdvancePc,
@@ -2700,6 +2805,12 @@ impl VM {
         _role: &str,
         sid: SessionId,
     ) -> Result<StepPack, Fault> {
+        if self.coroutines[coro_idx].spec_state.is_none() {
+            return Err(speculation_fault_abort_requires_active());
+        }
+        // Deterministic V2 policy: abort clears speculation state and records
+        // one abort event. It does not mutate effect nonce, topology-failure
+        // fields, or effect trace outside normal event emission.
         self.coroutines[coro_idx].spec_state = None;
         Ok(StepPack {
             coro_update: CoroUpdate::AdvancePc,
@@ -2720,29 +2831,9 @@ impl VM {
         target: u16,
         _bundle: u16,
     ) -> Result<StepPack, Fault> {
-        let ep_val = self.coroutines[coro_idx]
-            .regs
-            .get(usize::from(endpoint))
-            .ok_or(Fault::OutOfRegisters)?
-            .clone();
-        let ep = match ep_val {
-            Value::Endpoint(ep) => ep,
-            _ => {
-                return Err(Fault::TransferFault {
-                    message: format!("{role}: transfer expects endpoint register"),
-                })
-            }
-        };
-        let target_id = match self.read_reg_checked(coro_idx, target)? {
-            Value::Nat(v) => usize::try_from(v).map_err(|_| Fault::TransferFault {
-                message: format!("{role}: target id out of range"),
-            })?,
-            _ => {
-                return Err(Fault::TransferFault {
-                    message: format!("{role}: transfer expects nat target coroutine id"),
-                })
-            }
-        };
+        let request = decode_transfer_request(&self.coroutines[coro_idx], role, endpoint, target)?;
+        let target_id = request.target_id;
+        let ep = request.endpoint;
         let target_idx = self
             .coroutines
             .iter()
@@ -2750,40 +2841,22 @@ impl VM {
             .ok_or(Fault::TransferFault {
                 message: "target coroutine not found".into(),
             })?;
-        if !self.coroutines[coro_idx].owned_endpoints.contains(&ep) {
-            return Err(Fault::TransferFault {
-                message: "endpoint not owned".into(),
-            });
+        if endpoint_owner_ids(&self.coroutines, &ep) != vec![self.coroutines[coro_idx].id] {
+            return Err(transfer_fault_delegation_guard_violation("before"));
         }
 
-        self.coroutines[coro_idx]
-            .owned_endpoints
-            .retain(|e| e != &ep);
-        self.coroutines[target_idx].owned_endpoints.push(ep.clone());
-
-        let mut moved_tokens = Vec::new();
-        self.coroutines[coro_idx].progress_tokens.retain(|token| {
-            if token.endpoint == ep {
-                moved_tokens.push(token.clone());
-                false
-            } else {
-                true
-            }
-        });
-        self.coroutines[target_idx]
-            .progress_tokens
-            .extend(moved_tokens);
-
-        let mut moved = Vec::new();
-        self.coroutines[coro_idx].knowledge_set.retain(|fact| {
-            if fact.endpoint == ep {
-                moved.push(fact.clone());
-                false
-            } else {
-                true
-            }
-        });
-        self.coroutines[target_idx].knowledge_set.extend(moved);
+        if coro_idx == target_idx {
+            move_endpoint_bundle(&ep, &mut self.coroutines[coro_idx], None)?;
+        } else if coro_idx < target_idx {
+            let (left, right) = self.coroutines.split_at_mut(target_idx);
+            move_endpoint_bundle(&ep, &mut left[coro_idx], Some(&mut right[0]))?;
+        } else {
+            let (left, right) = self.coroutines.split_at_mut(coro_idx);
+            move_endpoint_bundle(&ep, &mut right[0], Some(&mut left[target_idx]))?;
+        }
+        if endpoint_owner_ids(&self.coroutines, &ep) != vec![self.coroutines[target_idx].id] {
+            return Err(transfer_fault_delegation_guard_violation("after"));
+        }
 
         self.sched.record_cross_lane_handoff(
             self.coroutines[coro_idx].id,
@@ -3163,13 +3236,66 @@ impl VM {
         coro_idx: usize,
         _role: &str,
         roles: &[String],
-        endpoints: &[(String, u16)],
+        local_types: &[(String, LocalTypeR)],
+        handlers: &[((String, String), String)],
+        dsts: &[(String, u16)],
     ) -> Result<StepPack, Fault> {
-        let sid = self.sessions.open(
-            roles.to_vec(),
-            &BufferConfig::default(),
-            &std::collections::BTreeMap::new(),
-        );
+        if local_types.len() != dsts.len() {
+            return Err(Fault::CloseFault {
+                message: "open arity mismatch".to_string(),
+            });
+        }
+        let triples: Vec<(String, LocalTypeR, u16)> = local_types
+            .iter()
+            .zip(dsts.iter())
+            .map(|((r, lt), (r2, dst))| (r.clone(), lt.clone(), r2.clone(), *dst))
+            .map(|(r, lt, r2, dst)| {
+                if r == r2 {
+                    Ok((r, lt, dst))
+                } else {
+                    Err(Fault::CloseFault {
+                        message: "open arity mismatch".to_string(),
+                    })
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let open_roles: Vec<String> = triples.iter().map(|(r, _, _)| r.clone()).collect();
+        let mut distinct = BTreeSet::new();
+        let spatial_ok =
+            !open_roles.is_empty() && open_roles.iter().all(|r| distinct.insert(r.clone()));
+        if !spatial_ok {
+            return Err(Fault::SpecFault {
+                message: "spatial requirements failed".to_string(),
+            });
+        }
+
+        let has_handler = |sender: &str, receiver: &str| {
+            handlers
+                .iter()
+                .any(|((s, r), _)| s == sender && r == receiver)
+        };
+        let covers_edges = open_roles.iter().all(|sender| {
+            open_roles
+                .iter()
+                .all(|receiver| has_handler(sender, receiver))
+        });
+        if !covers_edges {
+            return Err(Fault::SpecFault {
+                message: "handler bindings missing".to_string(),
+            });
+        }
+
+        let initial_types: BTreeMap<String, LocalTypeR> = local_types.iter().cloned().collect();
+        let sid = self
+            .sessions
+            .open(open_roles.clone(), &BufferConfig::default(), &initial_types);
+        for ((sender, receiver), handler_id) in handlers {
+            self.sessions.update_handler(
+                &Edge::new(sid, sender.clone(), receiver.clone()),
+                handler_id.clone(),
+            );
+        }
         self.monitor.set_kind(sid, SessionKind::Peer);
         self.resource_states.push((sid, ResourceState::default()));
         self.apply_open_delta(sid)
@@ -3177,7 +3303,7 @@ impl VM {
                 message: format!("open persistence delta failed: {e}"),
             })?;
 
-        for (_, reg) in endpoints {
+        for (_, _, reg) in &triples {
             if usize::from(*reg) >= self.coroutines[coro_idx].regs.len() {
                 return Err(Fault::OutOfRegisters);
             }
@@ -3185,7 +3311,7 @@ impl VM {
 
         {
             let coro = &mut self.coroutines[coro_idx];
-            for (endpoint_role, reg) in endpoints {
+            for (endpoint_role, _, reg) in &triples {
                 let ep = Endpoint {
                     sid,
                     role: endpoint_role.clone(),
@@ -3203,7 +3329,11 @@ impl VM {
             events: vec![ObsEvent::Opened {
                 tick: self.clock.tick,
                 session: sid,
-                roles: roles.to_vec(),
+                roles: if roles.is_empty() {
+                    open_roles
+                } else {
+                    roles.to_vec()
+                },
             }],
         })
     }
@@ -3219,7 +3349,7 @@ impl VM {
     ) -> Result<ExecOutcome, Fault> {
         // Output-condition gate: any observable output must pass the configured verifier.
         if !pack.events.is_empty() {
-            let digest = format!("events:{}:tick:{}", pack.events.len(), self.clock.tick);
+            let digest = "vm.output_digest.unspecified".to_string();
             let meta = match output_hint {
                 Some(h) => OutputConditionMeta::from_hint(h, digest),
                 None => OutputConditionMeta::default_observable(digest),
@@ -3360,6 +3490,10 @@ impl VM {
                 coro.status = CoroStatus::Blocked(reason.clone());
                 // PC unchanged — instruction will re-execute on unblock.
             }
+            CoroUpdate::AdvancePcBlock(ref reason) => {
+                coro.pc += 1;
+                coro.status = CoroStatus::Blocked(reason.clone());
+            }
             CoroUpdate::Halt => {
                 coro.status = CoroStatus::Done;
             }
@@ -3445,6 +3579,7 @@ mod tests {
     use super::*;
     use crate::instr::Instr;
     use crate::loader::CodeImage;
+    use crate::persistence::PersistenceModel;
     use std::collections::{BTreeMap, BTreeSet};
     use std::time::Duration;
     use telltale_types::{GlobalType, Label, LocalTypeR};
@@ -3544,6 +3679,35 @@ mod tests {
 
         fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
             Ok(())
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, Default)]
+    struct RecordingPersistence;
+
+    impl PersistenceModel for RecordingPersistence {
+        type PState = Vec<String>;
+        type Delta = String;
+
+        fn apply(state: &mut Self::PState, delta: &Self::Delta) -> Result<(), String> {
+            state.push(delta.clone());
+            Ok(())
+        }
+
+        fn derive(_before: &Self::PState, _after: &Self::PState) -> Result<Self::Delta, String> {
+            Ok("derive".to_string())
+        }
+
+        fn open_delta(session: SessionId) -> Self::Delta {
+            format!("open:{session}")
+        }
+
+        fn close_delta(session: SessionId) -> Self::Delta {
+            format!("close:{session}")
+        }
+
+        fn invoke_delta(session: SessionId, action: &str) -> Option<Self::Delta> {
+            Some(format!("invoke:{session}:{action}"))
         }
     }
 
@@ -3739,6 +3903,335 @@ mod tests {
 
         // Both coroutines should be done.
         assert!(vm.coroutines.iter().all(|c| c.is_terminal()));
+    }
+
+    #[test]
+    fn test_step_round_advances_at_most_one_coroutine_when_concurrency_gt_one() {
+        let mut local_types = BTreeMap::new();
+        local_types.insert("A".to_string(), LocalTypeR::End);
+        local_types.insert("B".to_string(), LocalTypeR::End);
+
+        let mut programs = BTreeMap::new();
+        programs.insert("A".to_string(), vec![Instr::Halt]);
+        programs.insert("B".to_string(), vec![Instr::Halt]);
+
+        let image = CodeImage {
+            programs,
+            global_type: GlobalType::End,
+            local_types,
+        };
+
+        let mut vm = VM::new(VMConfig::default());
+        vm.load_choreography(&image).expect("load choreography");
+        let handler = PassthroughHandler;
+
+        assert_eq!(vm.scheduler_step_count(), 0);
+        let first = vm.step_round(&handler, 8).expect("first round");
+        assert!(matches!(first, StepResult::Continue));
+        assert_eq!(vm.scheduler_step_count(), 1);
+        assert_eq!(
+            vm.coroutines
+                .iter()
+                .filter(|c| matches!(c.status, CoroStatus::Done))
+                .count(),
+            1
+        );
+
+        let second = vm.step_round(&handler, 8).expect("second round");
+        assert!(matches!(second, StepResult::AllDone));
+        assert_eq!(vm.scheduler_step_count(), 2);
+    }
+
+    #[test]
+    fn test_step_round_with_no_eligible_coroutines_does_not_increment_step_count() {
+        let mut local_types = BTreeMap::new();
+        local_types.insert("A".to_string(), LocalTypeR::End);
+
+        let mut programs = BTreeMap::new();
+        programs.insert("A".to_string(), vec![Instr::Halt]);
+
+        let image = CodeImage {
+            programs,
+            global_type: GlobalType::End,
+            local_types,
+        };
+
+        let mut vm = VM::new(VMConfig::default());
+        vm.load_choreography(&image).expect("load choreography");
+        vm.pause_role("A");
+        let handler = PassthroughHandler;
+
+        assert_eq!(vm.scheduler_step_count(), 0);
+        let result = vm.step_round(&handler, 1).expect("step round");
+        assert!(matches!(result, StepResult::Stuck));
+        assert_eq!(vm.scheduler_step_count(), 0);
+    }
+
+    #[test]
+    fn test_yield_advances_pc_and_sets_spawn_wait_blocked_status() {
+        let mut local_types = BTreeMap::new();
+        local_types.insert("A".to_string(), LocalTypeR::End);
+
+        let mut programs = BTreeMap::new();
+        programs.insert("A".to_string(), vec![Instr::Yield, Instr::Halt]);
+
+        let image = CodeImage {
+            programs,
+            global_type: GlobalType::End,
+            local_types,
+        };
+
+        let mut vm = VM::new(VMConfig::default());
+        vm.load_choreography(&image).expect("load choreography");
+        let handler = PassthroughHandler;
+
+        let first = vm.step_round(&handler, 1).expect("yield step");
+        assert!(matches!(first, StepResult::Continue));
+        let coro = vm.coroutine(0).expect("coroutine exists");
+        assert_eq!(coro.pc, 1);
+        assert!(matches!(
+            coro.status,
+            CoroStatus::Blocked(BlockReason::SpawnWait)
+        ));
+
+        let second = vm.step_round(&handler, 1).expect("halt step");
+        assert!(matches!(second, StepResult::AllDone));
+    }
+
+    fn open_test_image(open_instr: Instr) -> CodeImage {
+        let mut local_types = BTreeMap::new();
+        local_types.insert("A".to_string(), LocalTypeR::End);
+        let mut programs = BTreeMap::new();
+        programs.insert("A".to_string(), vec![open_instr, Instr::Halt]);
+        CodeImage {
+            programs,
+            global_type: GlobalType::End,
+            local_types,
+        }
+    }
+
+    #[test]
+    fn test_open_faults_on_arity_mismatch() {
+        let image = open_test_image(Instr::Open {
+            roles: vec!["A".to_string()],
+            local_types: vec![("A".to_string(), LocalTypeR::End)],
+            handlers: vec![(("A".to_string(), "A".to_string()), "h".to_string())],
+            dsts: vec![("B".to_string(), 0)],
+        });
+
+        let mut vm = VM::new(VMConfig::default());
+        vm.load_choreography(&image).expect("load choreography");
+        let handler = PassthroughHandler;
+
+        let err = vm
+            .step_round(&handler, 1)
+            .expect_err("expected open arity fault");
+        match err {
+            VMError::Fault {
+                fault: Fault::CloseFault { message },
+                ..
+            } => assert_eq!(message, "open arity mismatch"),
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_open_faults_when_handler_coverage_is_incomplete() {
+        let image = open_test_image(Instr::Open {
+            roles: vec!["A".to_string(), "B".to_string()],
+            local_types: vec![
+                ("A".to_string(), LocalTypeR::End),
+                ("B".to_string(), LocalTypeR::End),
+            ],
+            handlers: vec![(("A".to_string(), "B".to_string()), "h".to_string())],
+            dsts: vec![("A".to_string(), 0), ("B".to_string(), 1)],
+        });
+
+        let mut vm = VM::new(VMConfig::default());
+        vm.load_choreography(&image).expect("load choreography");
+        let handler = PassthroughHandler;
+
+        let err = vm
+            .step_round(&handler, 1)
+            .expect_err("expected handler coverage fault");
+        match err {
+            VMError::Fault {
+                fault: Fault::SpecFault { message },
+                ..
+            } => assert_eq!(message, "handler bindings missing"),
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_open_initializes_local_types_handlers_and_endpoints() {
+        let full_handlers = vec![
+            (("A".to_string(), "A".to_string()), "hAA".to_string()),
+            (("A".to_string(), "B".to_string()), "hAB".to_string()),
+            (("B".to_string(), "A".to_string()), "hBA".to_string()),
+            (("B".to_string(), "B".to_string()), "hBB".to_string()),
+        ];
+        let image = open_test_image(Instr::Open {
+            roles: vec!["A".to_string(), "B".to_string()],
+            local_types: vec![
+                ("A".to_string(), LocalTypeR::End),
+                ("B".to_string(), LocalTypeR::End),
+            ],
+            handlers: full_handlers.clone(),
+            dsts: vec![("A".to_string(), 0), ("B".to_string(), 1)],
+        });
+
+        let mut vm = VM::new(VMConfig::default());
+        vm.load_choreography(&image).expect("load choreography");
+        let handler = PassthroughHandler;
+
+        let result = vm.step_round(&handler, 1).expect("open step");
+        assert!(matches!(result, StepResult::Continue));
+
+        let sid = match vm
+            .trace()
+            .iter()
+            .rev()
+            .find(|event| matches!(event, ObsEvent::Opened { .. }))
+            .expect("opened event emitted")
+        {
+            ObsEvent::Opened { session, .. } => *session,
+            _ => unreachable!(),
+        };
+        let session = vm.sessions().get(sid).expect("opened session exists");
+        assert_eq!(session.local_types.len(), 2);
+        for ((sender, receiver), handler_id) in full_handlers {
+            let edge = Edge::new(sid, sender, receiver);
+            assert_eq!(session.edge_handlers.get(&edge), Some(&handler_id));
+        }
+
+        let coro = vm.coroutine(0).expect("coroutine exists");
+        assert!(matches!(coro.regs[0], Value::Endpoint(_)));
+        assert!(matches!(coro.regs[1], Value::Endpoint(_)));
+    }
+
+    #[test]
+    fn test_monitor_precheck_rejects_duplicate_choose_labels() {
+        let image = open_test_image(Instr::Choose {
+            chan: 0,
+            table: vec![("L".to_string(), 0), ("L".to_string(), 1)],
+        });
+        let mut vm = VM::new(VMConfig::default());
+        vm.load_choreography(&image).expect("load choreography");
+        let handler = PassthroughHandler;
+
+        let err = vm
+            .step_round(&handler, 1)
+            .expect_err("duplicate labels must fail monitor precheck");
+        match err {
+            VMError::Fault {
+                fault: Fault::SpecFault { message },
+                ..
+            } => assert!(message.contains("duplicate choose labels")),
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_monitor_precheck_rejects_open_role_dst_arity_mismatch() {
+        let image = open_test_image(Instr::Open {
+            roles: vec!["A".to_string(), "B".to_string()],
+            local_types: vec![("A".to_string(), LocalTypeR::End)],
+            handlers: vec![(("A".to_string(), "A".to_string()), "h".to_string())],
+            dsts: vec![("A".to_string(), 0)],
+        });
+
+        let mut vm = VM::new(VMConfig::default());
+        vm.load_choreography(&image).expect("load choreography");
+        let handler = PassthroughHandler;
+
+        let err = vm
+            .step_round(&handler, 1)
+            .expect_err("open monitor precheck should fail");
+        match err {
+            VMError::Fault {
+                fault: Fault::SpecFault { message },
+                ..
+            } => assert!(message.contains("open arity mismatch")),
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_invoke_faults_when_no_default_handler_is_bound() {
+        let image = open_test_image(Instr::Invoke {
+            action: InvokeAction::Reg(0),
+            dst: Some(1),
+        });
+        let mut vm = VM::new(VMConfig::default());
+        let sid = vm.load_choreography(&image).expect("load choreography");
+        vm.sessions_mut()
+            .get_mut(sid)
+            .expect("session exists")
+            .edge_handlers
+            .clear();
+        let handler = PassthroughHandler;
+
+        let err = vm
+            .step_round(&handler, 1)
+            .expect_err("invoke should fault without default handler");
+        match err {
+            VMError::Fault {
+                fault: Fault::InvokeFault { message },
+                ..
+            } => assert_eq!(message, "no handler bound"),
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_invoke_applies_persistence_delta_when_model_provides_one() {
+        let mut vm: VM<(), (), RecordingPersistence, DefaultVerificationModel> =
+            VM::new_with_models(VMConfig::default());
+        vm.apply_open_delta(0).expect("open delta");
+        vm.apply_invoke_delta(0, "Nat(7)").expect("invoke delta");
+
+        assert!(
+            vm.persistent_state().iter().any(|d| d.starts_with("open:")),
+            "expected open delta to be applied"
+        );
+        assert!(
+            vm.persistent_state()
+                .iter()
+                .any(|d| d.starts_with("invoke:0:Nat(7)")),
+            "expected invoke delta with action witness"
+        );
+    }
+
+    #[test]
+    fn test_close_applies_persistence_delta_when_model_provides_one() {
+        let mut vm: VM<(), (), RecordingPersistence, DefaultVerificationModel> =
+            VM::new_with_models(VMConfig::default());
+        vm.apply_close_delta(0).expect("close delta");
+        assert!(
+            vm.persistent_state()
+                .iter()
+                .any(|d| d.starts_with("close:0")),
+            "expected close delta to be applied"
+        );
+    }
+
+    #[test]
+    fn test_output_condition_digest_matches_lean_placeholder() {
+        let image = open_test_image(Instr::Invoke {
+            action: InvokeAction::Reg(0),
+            dst: Some(1),
+        });
+        let mut vm = VM::new(VMConfig::default());
+        vm.load_choreography(&image).expect("load choreography");
+        let handler = PassthroughHandler;
+
+        vm.step_round(&handler, 1).expect("invoke step");
+        let check = vm
+            .output_condition_checks()
+            .last()
+            .expect("output-condition check recorded");
+        assert_eq!(check.meta.output_digest, "vm.output_digest.unspecified");
     }
 
     #[test]
@@ -4511,6 +5004,62 @@ mod tests {
             .progress_tokens
             .iter()
             .any(|t| t.sid == sid && t.endpoint == ep_a));
+    }
+
+    #[test]
+    fn test_transfer_rejects_delegation_guard_violation() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig::default());
+        let sid = vm.load_choreography(&image).unwrap();
+
+        let a_idx = vm
+            .coroutines
+            .iter()
+            .position(|c| c.role == "A")
+            .expect("A coroutine exists");
+        let b_idx = vm
+            .coroutines
+            .iter()
+            .position(|c| c.role == "B")
+            .expect("B coroutine exists");
+
+        let ep_a = Endpoint {
+            sid,
+            role: "A".to_string(),
+        };
+        vm.coroutines[b_idx].owned_endpoints.push(ep_a.clone());
+        vm.coroutines[a_idx].regs[2] = Value::Endpoint(ep_a);
+        vm.coroutines[a_idx].regs[3] =
+            Value::Nat(u64::try_from(vm.coroutines[b_idx].id).expect("coroutine id fits in u64"));
+
+        let a_program_id = vm.coroutines[a_idx].program_id;
+        vm.programs[a_program_id] = vec![
+            Instr::Transfer {
+                endpoint: 2,
+                target: 3,
+                bundle: 0,
+            },
+            Instr::Halt,
+        ];
+
+        let err = vm
+            .step(&PassthroughHandler)
+            .expect_err("transfer must fail");
+        match err {
+            VMError::Fault { fault, .. } => match fault {
+                Fault::TransferFault { message } => {
+                    assert!(
+                        message.contains("delegation guard violation before transfer"),
+                        "unexpected transfer fault message: {message}"
+                    );
+                }
+                other => panic!("expected transfer fault, got {other:?}"),
+            },
+            other => panic!("expected VMError::Fault, got {other:?}"),
+        }
     }
 
     #[test]

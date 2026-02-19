@@ -39,7 +39,7 @@ fn test_session_active_to_closed() {
 }
 
 #[test]
-fn test_session_active_to_draining() {
+fn test_session_active_to_closed_clears_pending_buffers() {
     let mut store = SessionStore::new();
     let sid = store.open(
         vec!["A".into(), "B".into()],
@@ -51,9 +51,11 @@ fn test_session_active_to_draining() {
     let session = store.get_mut(sid).unwrap();
     let _ = session.send("A", "B", Value::Nat(1)).unwrap();
 
-    // Close with pending messages → Draining.
+    // Lean-aligned close: closes immediately and clears pending buffers.
     store.close(sid).unwrap();
-    assert_matches!(store.get(sid).unwrap().status, SessionStatus::Draining);
+    let session = store.get(sid).unwrap();
+    assert_matches!(session.status, SessionStatus::Closed);
+    assert!(session.buffers.is_empty());
 }
 
 #[test]

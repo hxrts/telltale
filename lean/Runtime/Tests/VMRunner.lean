@@ -41,6 +41,16 @@ def emptyArena : Arena :=
 def emptyMonitor : SessionMonitor UnitGuard :=
   { step := fun sk => some sk }
 
+/-- The runner monitor satisfies the control-flow acceptance contract. -/
+theorem emptyMonitor_monitor_sound {ε : Type} [EffectRuntime ε] :
+    monitor_sound (γ:=UnitGuard) (ε:=ε) emptyMonitor := by
+  simpa [emptyMonitor] using (monitor_sound_any (γ:=UnitGuard) (ε:=ε) emptyMonitor)
+
+/-- The runner monitor preserves protocol session ids. -/
+theorem emptyMonitor_unified_monitor_preserves :
+    unified_monitor_preserves emptyMonitor := by
+  simpa [emptyMonitor] using (unified_monitor_preserves_identity (γ:=UnitGuard))
+
 /-- Empty VM state for loading choreographies. -/
 def emptyState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
   { config := unitConfig
@@ -62,7 +72,7 @@ def emptyState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerif
   , crashedSites := []
   , partitionedEdges := []
   , mask := ()
-  , ghostSessions := ()
+  , ghostSessions := default
   , progressSupply := () }
 
 /-- Parse one choreography block from JSON. -/

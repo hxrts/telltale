@@ -55,24 +55,28 @@ pub mod coroutine;
 pub mod determinism;
 pub mod driver;
 pub mod effect;
+pub mod envelope_diff;
 pub mod exec;
 pub mod exec_api;
 pub mod faults;
 pub mod guard;
 pub mod identity;
 pub mod instr;
+pub mod instruction_semantics;
 pub mod intern;
 pub mod kernel;
 pub mod loader;
 pub mod nested;
 pub mod output_condition;
 pub mod persistence;
+pub mod runtime_contracts;
 pub mod scheduler;
 pub mod serialization;
 pub mod session;
 #[cfg(feature = "multi-thread")]
 pub mod threaded;
 pub mod trace;
+pub mod transfer_semantics;
 pub mod verification;
 pub mod vm;
 #[cfg(target_arch = "wasm32")]
@@ -93,13 +97,17 @@ pub use composition::{
     MemoryUsage, ProtocolBundle, SchedulerCapability, TheoremPackCapabilities,
 };
 pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
-pub use determinism::DeterminismMode;
+pub use determinism::{DeterminismMode, EffectDeterminismTier};
 pub use driver::NativeSingleThreadDriver;
 #[cfg(feature = "multi-thread")]
 pub use driver::NativeThreadedDriver;
 pub use effect::{
     CorruptionType, EffectTraceEntry, EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler,
     TopologyPerturbation,
+};
+pub use envelope_diff::{
+    EffectOrderingClass, EnvelopeDiff, EnvelopeDiffArtifactV1, FailureVisibleDiffClass,
+    SchedulerPermutationClass, WaveWidthBound,
 };
 pub use exec_api::{ExecResult, ExecStatus, StepEvent, StepPack};
 pub use faults::{classify_fault, fault_code, fault_code_of, FaultClass};
@@ -114,6 +122,11 @@ pub use output_condition::{
     OutputConditionPolicy,
 };
 pub use persistence::{NoopPersistence, PersistenceModel};
+pub use runtime_contracts::{
+    admit_vm_runtime, determinism_profile_supported, enforce_vm_runtime_gates,
+    request_determinism_profile, requires_vm_runtime_contracts, runtime_capability_snapshot,
+    DeterminismArtifacts, RuntimeAdmissionResult, RuntimeContracts, RuntimeGateResult,
+};
 pub use scheduler::{
     CrossLaneHandoff, LaneId as SchedulerLaneId, PriorityPolicy, SchedPolicy, SchedState,
     Scheduler, StepUpdate,
@@ -131,11 +144,12 @@ pub use trace::{
     normalize_trace, normalize_trace_v1, obs_session, strict_trace, with_tick, NormalizedTraceV1,
     TRACE_NORMALIZATION_SCHEMA_VERSION,
 };
+pub use transfer_semantics::{decode_transfer_request, move_endpoint_bundle, TransferRequest};
 pub use verification::{
     signValue, sign_value, verifySignedValue, verify_signed_value, AuthProof, AuthTree, Commitment,
     DefaultVerificationModel, Hash, HashTag, Nullifier, Signature, SigningKey, VerificationModel,
     VerifyingKey,
 };
-pub use vm::{MonitorMode, Program, SchedStepDebug, VMConfig, VMState, VM};
+pub use vm::{MonitorMode, Program, RuntimeTuningProfile, SchedStepDebug, VMConfig, VMState, VM};
 #[cfg(target_arch = "wasm32")]
 pub use wasm::WasmVM;

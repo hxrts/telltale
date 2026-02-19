@@ -8,11 +8,11 @@ mod helpers;
 
 use std::collections::BTreeMap;
 
-use helpers::simple_send_recv_image;
+use helpers::ScenarioSpec;
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::EffectHandler;
-use telltale_vm::instr::{Endpoint, ImmValue, Instr};
+use telltale_vm::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::threaded::{ContentionMetrics, ThreadedVM};
 use telltale_vm::vm::{StepResult, VMConfig};
@@ -75,7 +75,10 @@ fn transfer_image() -> CodeImage {
     programs.insert(
         "A".to_string(),
         vec![
-            Instr::Invoke { action: 0, dst: 0 },
+            Instr::Invoke {
+                action: InvokeAction::Reg(0),
+                dst: Some(0),
+            },
             Instr::Set {
                 dst: 1,
                 val: ImmValue::Nat(1),
@@ -100,7 +103,7 @@ fn transfer_image() -> CodeImage {
 fn run_composed(workers: usize, protocols: usize) -> (usize, ContentionMetrics) {
     let mut vm = ThreadedVM::with_workers(VMConfig::default(), workers);
     for i in 0..protocols {
-        let image = simple_send_recv_image("A", "B", &format!("m{i}"));
+        let image = ScenarioSpec::simple("A", "B", &format!("m{i}")).to_code_image();
         vm.load_choreography(&image).expect("load choreography");
     }
 
@@ -128,7 +131,7 @@ fn run_composed(workers: usize, protocols: usize) -> (usize, ContentionMetrics) 
 fn lane_assignment_and_single_lane_compatibility() {
     let mut vm = ThreadedVM::with_workers(VMConfig::default(), 4);
     for i in 0..6 {
-        let image = simple_send_recv_image("A", "B", &format!("lane{i}"));
+        let image = ScenarioSpec::simple("A", "B", &format!("lane{i}")).to_code_image();
         vm.load_choreography(&image).expect("load choreography");
     }
     vm.run(&RuntimeHandler, 512).expect("threaded run");
@@ -142,7 +145,7 @@ fn lane_assignment_and_single_lane_compatibility() {
 
     let mut single_lane = ThreadedVM::with_workers(VMConfig::default(), 1);
     for i in 0..6 {
-        let image = simple_send_recv_image("A", "B", &format!("lane{i}"));
+        let image = ScenarioSpec::simple("A", "B", &format!("lane{i}")).to_code_image();
         single_lane
             .load_choreography(&image)
             .expect("load choreography");
@@ -204,10 +207,10 @@ fn no_deadlock_livelock_and_scaling_proxy_hold() {
 fn disjoint_footprints_parallelize_in_same_wave() {
     let mut vm = ThreadedVM::with_workers(VMConfig::default(), 2);
     let sid_a = vm
-        .load_choreography(&simple_send_recv_image("A", "B", "m1"))
+        .load_choreography(&ScenarioSpec::simple("A", "B", "m1").to_code_image())
         .expect("load choreography A");
     let sid_b = vm
-        .load_choreography(&simple_send_recv_image("A", "B", "m2"))
+        .load_choreography(&ScenarioSpec::simple("A", "B", "m2").to_code_image())
         .expect("load choreography B");
 
     vm.step_round(&RuntimeHandler, 2)
@@ -233,7 +236,7 @@ fn disjoint_footprints_parallelize_in_same_wave() {
 fn overlapping_footprints_serialize_per_wave() {
     let mut vm = ThreadedVM::with_workers(VMConfig::default(), 2);
     let sid = vm
-        .load_choreography(&simple_send_recv_image("A", "B", "m"))
+        .load_choreography(&ScenarioSpec::simple("A", "B", "m").to_code_image())
         .expect("load choreography");
 
     vm.step_round(&RuntimeHandler, 2)
@@ -259,7 +262,7 @@ fn lane_selection_tie_break_is_repeatable_for_fixed_input() {
     let run_once = || {
         let mut vm = ThreadedVM::with_workers(VMConfig::default(), 4);
         for i in 0..8 {
-            let image = simple_send_recv_image("A", "B", &format!("det{i}"));
+            let image = ScenarioSpec::simple("A", "B", &format!("det{i}")).to_code_image();
             vm.load_choreography(&image).expect("load choreography");
         }
         vm.run(&RuntimeHandler, 512).expect("threaded run");
@@ -275,10 +278,31 @@ fn lane_selection_tie_break_is_repeatable_for_fixed_input() {
 }
 
 #[test]
+fn planner_trace_is_worker_count_invariant_for_fixed_ready_set() {
+    let run_once = |workers: usize| {
+        let mut vm = ThreadedVM::with_workers(VMConfig::default(), workers);
+        for i in 0..2 {
+            let image = ScenarioSpec::simple("A", "B", &format!("wc{i}")).to_code_image();
+            vm.load_choreography(&image).expect("load choreography");
+        }
+        vm.run_concurrent(&RuntimeHandler, 512, 4)
+            .expect("threaded run");
+        vm.lane_trace().to_vec()
+    };
+
+    let workers4 = run_once(4);
+    let workers8 = run_once(8);
+    assert_eq!(
+        workers4, workers8,
+        "planner trace should be invariant across worker counts for the same ready-set footprint"
+    );
+}
+
+#[test]
 fn lane_scheduler_state_roundtrip_is_stable() {
     let mut vm = ThreadedVM::with_workers(VMConfig::default(), 4);
     for i in 0..4 {
-        let image = simple_send_recv_image("A", "B", &format!("state{i}"));
+        let image = ScenarioSpec::simple("A", "B", &format!("state{i}")).to_code_image();
         vm.load_choreography(&image).expect("load choreography");
     }
     vm.step_round(&RuntimeHandler, 4)
@@ -291,5 +315,54 @@ fn lane_scheduler_state_roundtrip_is_stable() {
     assert_eq!(
         decoded, state,
         "lane scheduler state roundtrip must be stable"
+    );
+}
+
+#[test]
+fn invalid_wave_certificate_falls_back_to_single_step() {
+    let mut vm = ThreadedVM::with_workers(VMConfig::default(), 2);
+    vm.load_choreography(&ScenarioSpec::simple("A", "B", "m1").to_code_image())
+        .expect("load choreography A");
+    vm.load_choreography(&ScenarioSpec::simple("A", "B", "m2").to_code_image())
+        .expect("load choreography B");
+
+    vm.force_invalid_wave_certificate_once();
+    vm.step_round(&RuntimeHandler, 2)
+        .expect("threaded step round");
+
+    let tick = vm.clock().tick;
+    let scheduled_this_tick = vm
+        .lane_trace()
+        .iter()
+        .filter(|entry| entry.tick == tick)
+        .count();
+    assert_eq!(
+        scheduled_this_tick, 1,
+        "invalid certificate should degrade to canonical single-step behavior"
+    );
+}
+
+#[test]
+fn footprint_guided_wave_widening_allows_same_session_disjoint_roles() {
+    let cfg = VMConfig {
+        footprint_guided_wave_widening: true,
+        ..VMConfig::default()
+    };
+    let mut vm = ThreadedVM::with_workers(cfg, 2);
+    let sid = vm
+        .load_choreography(&ScenarioSpec::simple("A", "B", "m").to_code_image())
+        .expect("load choreography");
+
+    vm.step_round(&RuntimeHandler, 2)
+        .expect("threaded step round");
+    let tick = vm.clock().tick;
+    let count = vm
+        .lane_trace()
+        .iter()
+        .filter(|entry| entry.tick == tick && entry.session == sid)
+        .count();
+    assert!(
+        count >= 2,
+        "widening should allow disjoint same-session roles in one wave"
     );
 }

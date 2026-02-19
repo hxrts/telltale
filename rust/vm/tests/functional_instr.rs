@@ -15,7 +15,7 @@ use assert_matches::assert_matches;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::buffer::{BackpressurePolicy, BufferConfig, BufferMode};
 use telltale_vm::coroutine::{CoroStatus, Fault, Value};
-use telltale_vm::instr::{Endpoint, ImmValue, Instr};
+use telltale_vm::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::{ObsEvent, StepResult, VMConfig, VMError, VM};
 
@@ -73,7 +73,10 @@ fn test_send_type_mismatch() {
         "B".to_string(),
         vec![
             Instr::Send { chan: 0, val: 1 },
-            Instr::Invoke { action: 0, dst: 0 },
+            Instr::Invoke {
+                action: InvokeAction::Reg(0),
+                dst: Some(0),
+            },
             Instr::Halt,
         ],
     );
@@ -537,7 +540,10 @@ fn test_choose_type_not_send() {
         "B".to_string(),
         vec![
             Instr::Send { chan: 0, val: 1 },
-            Instr::Invoke { action: 0, dst: 0 },
+            Instr::Invoke {
+                action: InvokeAction::Reg(0),
+                dst: Some(0),
+            },
             Instr::Halt,
         ],
     );

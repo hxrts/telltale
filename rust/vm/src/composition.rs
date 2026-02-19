@@ -12,6 +12,7 @@ use crate::determinism::DeterminismMode;
 use crate::effect::EffectHandler;
 use crate::loader::CodeImage;
 use crate::output_condition::OutputConditionPolicy;
+use crate::runtime_contracts::{enforce_vm_runtime_gates, RuntimeContracts, RuntimeGateResult};
 use crate::scheduler::SchedPolicy;
 use crate::vm::{VMConfig, VMError, VM};
 
@@ -24,6 +25,8 @@ pub enum DeterminismCapability {
     ModuloEffects,
     /// Supports determinism modulo admissible commutativity.
     ModuloCommutativity,
+    /// Supports replay determinism profile.
+    Replay,
 }
 
 /// Scheduler profile capability required to admit a protocol bundle.
@@ -59,6 +62,7 @@ impl TheoremPackCapabilities {
                 DeterminismCapability::Full,
                 DeterminismCapability::ModuloEffects,
                 DeterminismCapability::ModuloCommutativity,
+                DeterminismCapability::Replay,
             ],
             schedulers: vec![
                 SchedulerCapability::Cooperative,
@@ -80,6 +84,8 @@ pub struct CompositionCertificate {
     pub link_ok_full: bool,
     /// Theorem-pack capabilities proven by this certificate.
     pub theorem_pack: TheoremPackCapabilities,
+    /// Optional runtime contract bundle required for advanced runtime modes.
+    pub runtime_contracts: Option<RuntimeContracts>,
 }
 
 /// Immutable protocol bundle loaded by the composition API.
@@ -153,6 +159,12 @@ pub enum CompositionError {
         artifact_id: String,
         /// Human-readable capability key.
         capability: String,
+    },
+    /// Advanced runtime mode requires runtime contract evidence.
+    #[error("bundle `{artifact_id}` rejected: missing VM runtime contracts for advanced mode")]
+    MissingRuntimeContracts {
+        /// Certificate artifact id that failed admission.
+        artifact_id: String,
     },
     /// Admission would violate memory budget.
     #[error("bundle `{artifact_id}` rejected: memory budget exceeded ({reason})")]
@@ -323,6 +335,25 @@ impl ComposedRuntime {
     fn require_capabilities(&self, bundle: &ProtocolBundle) -> Result<(), CompositionError> {
         let cert = &bundle.certificate;
         let caps = &cert.theorem_pack;
+        let runtime_contracts = cert.runtime_contracts.as_ref();
+
+        match enforce_vm_runtime_gates(self.vm.config(), runtime_contracts) {
+            RuntimeGateResult::Admitted => {}
+            RuntimeGateResult::RejectedMissingContracts => {
+                return Err(CompositionError::MissingRuntimeContracts {
+                    artifact_id: cert.artifact_id.clone(),
+                });
+            }
+            RuntimeGateResult::RejectedUnsupportedDeterminismProfile => {
+                return Err(CompositionError::MissingCapability {
+                    artifact_id: cert.artifact_id.clone(),
+                    capability: format!(
+                        "determinism_profile::{:?}",
+                        self.vm.config().determinism_mode
+                    ),
+                });
+            }
+        }
 
         let required_sched = match self.vm.config().sched_policy {
             SchedPolicy::Cooperative => SchedulerCapability::Cooperative,
@@ -341,6 +372,7 @@ impl ComposedRuntime {
             DeterminismMode::Full => DeterminismCapability::Full,
             DeterminismMode::ModuloEffects => DeterminismCapability::ModuloEffects,
             DeterminismMode::ModuloCommutativity => DeterminismCapability::ModuloCommutativity,
+            DeterminismMode::Replay => DeterminismCapability::Replay,
         };
         if !caps.determinism.contains(&required_det) {
             return Err(CompositionError::MissingCapability {
@@ -348,7 +380,6 @@ impl ComposedRuntime {
                 capability: format!("determinism::{required_det:?}"),
             });
         }
-
         if !matches!(
             self.vm.config().output_condition_policy,
             OutputConditionPolicy::Disabled
@@ -438,6 +469,7 @@ mod tests {
                 artifact_id: "cert/bad".to_string(),
                 link_ok_full: false,
                 theorem_pack: TheoremPackCapabilities::full(),
+                runtime_contracts: None,
             },
         );
         assert!(matches!(
@@ -456,6 +488,7 @@ mod tests {
                 artifact_id: "cert/1".to_string(),
                 link_ok_full: true,
                 theorem_pack: TheoremPackCapabilities::full(),
+                runtime_contracts: None,
             },
         );
         let b2 = ProtocolBundle::new(
@@ -464,6 +497,7 @@ mod tests {
                 artifact_id: "cert/2".to_string(),
                 link_ok_full: true,
                 theorem_pack: TheoremPackCapabilities::full(),
+                runtime_contracts: None,
             },
         );
         runtime.admit_bundle(b1).expect("admit b1");
@@ -483,6 +517,7 @@ mod tests {
                 artifact_id: "cert/ok".to_string(),
                 link_ok_full: true,
                 theorem_pack: TheoremPackCapabilities::full(),
+                runtime_contracts: None,
             },
         );
         runtime.admit_bundle(b).expect("admit");
@@ -515,6 +550,7 @@ mod tests {
                     schedulers: vec![SchedulerCapability::Cooperative],
                     output_condition_gating: true,
                 },
+                runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
 
@@ -545,6 +581,7 @@ mod tests {
                     schedulers: vec![SchedulerCapability::Cooperative],
                     output_condition_gating: true,
                 },
+                runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
 
@@ -575,6 +612,7 @@ mod tests {
                     schedulers: vec![SchedulerCapability::Cooperative],
                     output_condition_gating: false,
                 },
+                runtime_contracts: None,
             },
         );
 
@@ -605,6 +643,7 @@ mod tests {
                 artifact_id: "cert/full".to_string(),
                 link_ok_full: true,
                 theorem_pack: TheoremPackCapabilities::full(),
+                runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
         runtime
@@ -626,10 +665,85 @@ mod tests {
                     schedulers: vec![SchedulerCapability::Cooperative],
                     output_condition_gating: true,
                 },
+                runtime_contracts: None,
             },
         );
         runtime
             .admit_bundle(bundle)
             .expect("minimal required capabilities should be sufficient");
+    }
+
+    #[test]
+    fn admission_rejects_advanced_mode_without_runtime_contracts() {
+        let cfg = VMConfig {
+            sched_policy: SchedPolicy::RoundRobin,
+            ..VMConfig::default()
+        };
+        let mut runtime = ComposedRuntime::new(cfg, MemoryBudget::default());
+        let bundle = ProtocolBundle::new(
+            image("m"),
+            CompositionCertificate {
+                artifact_id: "cert/no-runtime-contracts".to_string(),
+                link_ok_full: true,
+                theorem_pack: TheoremPackCapabilities::full(),
+                runtime_contracts: None,
+            },
+        );
+        let err = runtime
+            .admit_bundle(bundle)
+            .expect_err("advanced mode should reject missing runtime contracts");
+        assert!(matches!(
+            err,
+            CompositionError::MissingRuntimeContracts { .. }
+        ));
+    }
+
+    #[test]
+    fn admission_rejects_replay_profile_without_mixed_profile_gate() {
+        let cfg = VMConfig {
+            determinism_mode: DeterminismMode::Replay,
+            ..VMConfig::default()
+        };
+        let mut runtime = ComposedRuntime::new(cfg, MemoryBudget::default());
+        let mut contracts = RuntimeContracts::full();
+        contracts.can_use_mixed_determinism_profiles = false;
+        let bundle = ProtocolBundle::new(
+            image("m"),
+            CompositionCertificate {
+                artifact_id: "cert/no-mixed-profile-gate".to_string(),
+                link_ok_full: true,
+                theorem_pack: TheoremPackCapabilities::full(),
+                runtime_contracts: Some(contracts),
+            },
+        );
+        let err = runtime
+            .admit_bundle(bundle)
+            .expect_err("replay profile should require mixed-profile gate");
+        assert!(matches!(
+            err,
+            CompositionError::MissingCapability { capability, .. }
+            if capability == "determinism_profile::Replay"
+        ));
+    }
+
+    #[test]
+    fn admission_accepts_replay_profile_with_contracts_and_capability() {
+        let cfg = VMConfig {
+            determinism_mode: DeterminismMode::Replay,
+            ..VMConfig::default()
+        };
+        let mut runtime = ComposedRuntime::new(cfg, MemoryBudget::default());
+        let bundle = ProtocolBundle::new(
+            image("m"),
+            CompositionCertificate {
+                artifact_id: "cert/replay-ok".to_string(),
+                link_ok_full: true,
+                theorem_pack: TheoremPackCapabilities::full(),
+                runtime_contracts: Some(RuntimeContracts::full()),
+            },
+        );
+        runtime
+            .admit_bundle(bundle)
+            .expect("replay profile should admit with matching contracts");
     }
 }

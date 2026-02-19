@@ -687,10 +687,16 @@ fn test_lean_acquire_release_guard_behavior() {
 /// Lean VM invoke semantics: invoke emits event and output-condition hint is used in commit checks.
 #[test]
 fn test_lean_invoke_and_output_condition_hint_behavior() {
-    use telltale_vm::instr::Instr;
+    use telltale_vm::instr::{Instr, InvokeAction};
     use telltale_vm::output_condition::OutputConditionPolicy;
 
-    let image = single_role_end_image(vec![Instr::Invoke { action: 0, dst: 1 }, Instr::Halt]);
+    let image = single_role_end_image(vec![
+        Instr::Invoke {
+            action: InvokeAction::Reg(0),
+            dst: Some(1),
+        },
+        Instr::Halt,
+    ]);
     let cfg = VMConfig {
         output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
             "vm.custom.observable".to_string(),
@@ -782,6 +788,7 @@ fn test_lean_fork_join_abort_speculation_behavior() {
         },
         Instr::Fork { ghost: 1 },
         Instr::Join,
+        Instr::Fork { ghost: 1 },
         Instr::Abort,
         Instr::Halt,
     ]);
@@ -810,6 +817,163 @@ fn test_lean_fork_join_abort_speculation_behavior() {
             .iter()
             .any(|e| matches!(e, ObsEvent::Aborted { .. })),
         "expected aborted event"
+    );
+}
+
+/// Lean VM speculation semantics: `fork` fails when speculation is disabled.
+#[test]
+fn test_lean_fork_requires_speculation_enabled() {
+    use telltale_vm::instr::{ImmValue, Instr};
+
+    let image = single_role_end_image(vec![
+        Instr::Set {
+            dst: 1,
+            val: ImmValue::Nat(3),
+        },
+        Instr::Fork { ghost: 1 },
+    ]);
+    let mut vm = VM::new(VMConfig::default());
+    vm.load_choreography(&image).unwrap();
+
+    let result = vm.run(&PassthroughHandler, 16);
+    assert_matches!(
+        result,
+        Err(telltale_vm::vm::VMError::Fault {
+            fault: Fault::SpecFault { .. },
+            ..
+        })
+    );
+}
+
+/// Lean VM speculation semantics: `join` requires active speculation state.
+#[test]
+fn test_lean_join_requires_active_speculation() {
+    use telltale_vm::instr::Instr;
+
+    let image = single_role_end_image(vec![Instr::Join]);
+    let cfg = VMConfig {
+        speculation_enabled: true,
+        ..VMConfig::default()
+    };
+    let mut vm = VM::new(cfg);
+    vm.load_choreography(&image).unwrap();
+
+    let result = vm.run(&PassthroughHandler, 16);
+    assert_matches!(
+        result,
+        Err(telltale_vm::vm::VMError::Fault {
+            fault: Fault::SpecFault { .. },
+            ..
+        })
+    );
+}
+
+/// Lean VM speculation semantics: `abort` requires active speculation state.
+#[test]
+fn test_lean_abort_requires_active_speculation() {
+    use telltale_vm::instr::Instr;
+
+    let image = single_role_end_image(vec![Instr::Abort]);
+    let cfg = VMConfig {
+        speculation_enabled: true,
+        ..VMConfig::default()
+    };
+    let mut vm = VM::new(cfg);
+    vm.load_choreography(&image).unwrap();
+
+    let result = vm.run(&PassthroughHandler, 16);
+    assert_matches!(
+        result,
+        Err(telltale_vm::vm::VMError::Fault {
+            fault: Fault::SpecFault { .. },
+            ..
+        })
+    );
+}
+
+/// Abort policy is deterministic and scoped: only speculation state is cleared.
+#[test]
+fn test_lean_abort_policy_is_deterministic_and_scoped() {
+    use telltale_vm::instr::{ImmValue, Instr};
+
+    let image = single_role_end_image(vec![
+        Instr::Set {
+            dst: 1,
+            val: ImmValue::Nat(7),
+        },
+        Instr::Fork { ghost: 1 },
+        Instr::Abort,
+        Instr::Halt,
+    ]);
+
+    let run_once = || {
+        let cfg = VMConfig {
+            speculation_enabled: true,
+            ..VMConfig::default()
+        };
+        let mut vm = VM::new(cfg);
+        let sid = vm.load_choreography(&image).unwrap();
+
+        assert_matches!(
+            vm.step(&PassthroughHandler),
+            Ok(telltale_vm::vm::StepResult::Continue)
+        ); // set
+        assert_matches!(
+            vm.step(&PassthroughHandler),
+            Ok(telltale_vm::vm::StepResult::Continue)
+        ); // fork
+
+        let before_effect_len = vm.effect_trace().len();
+        let before_crashed = vm.crashed_sites().to_vec();
+        let before_partitioned = vm.partitioned_edges().to_vec();
+        let before_corrupted = vm.corrupted_edges().to_vec();
+        let before_timed_out = vm.timed_out_sites().to_vec();
+        let before_trace_len = vm.trace().len();
+
+        assert_matches!(
+            vm.step(&PassthroughHandler),
+            Ok(telltale_vm::vm::StepResult::Continue)
+        ); // abort
+
+        let coros = vm.session_coroutines(sid);
+        assert_eq!(
+            coros.len(),
+            1,
+            "single-role fixture should keep one coroutine"
+        );
+        assert!(
+            coros[0].spec_state.is_none(),
+            "abort should clear speculation state"
+        );
+        assert_eq!(
+            vm.effect_trace().len(),
+            before_effect_len,
+            "abort should not mutate effect trace"
+        );
+        assert_eq!(vm.crashed_sites(), before_crashed.as_slice());
+        assert_eq!(vm.partitioned_edges(), before_partitioned.as_slice());
+        assert_eq!(vm.corrupted_edges(), before_corrupted.as_slice());
+        assert_eq!(vm.timed_out_sites(), before_timed_out.as_slice());
+        assert!(
+            vm.trace().len() >= before_trace_len + 1,
+            "abort step should append at least one observable event"
+        );
+        assert!(
+            vm.trace()[before_trace_len..]
+                .iter()
+                .any(|event| matches!(event, ObsEvent::Aborted { .. })),
+            "abort step should append an Aborted event"
+        );
+
+        vm.run(&PassthroughHandler, 16).unwrap();
+        vm.canonical_replay_fragment()
+    };
+
+    let left = run_once();
+    let right = run_once();
+    assert_eq!(
+        left, right,
+        "abort policy should be deterministic for fixed initial state and handler"
     );
 }
 

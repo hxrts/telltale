@@ -94,6 +94,70 @@ pub fn fault_code_of(fault: &Fault) -> &'static str {
     fault_code(classify_fault(fault))
 }
 
+/// Build a stable transfer fault for a non-endpoint transfer source register.
+#[must_use]
+pub fn transfer_fault_expect_endpoint_register(role: &str) -> Fault {
+    Fault::TransferFault {
+        message: format!("{role}: transfer expects endpoint register"),
+    }
+}
+
+/// Build a stable transfer fault for a non-nat transfer target register.
+#[must_use]
+pub fn transfer_fault_expect_nat_target(role: &str) -> Fault {
+    Fault::TransferFault {
+        message: format!("{role}: transfer expects nat target coroutine id"),
+    }
+}
+
+/// Build a stable transfer fault when transfer target id is out of range.
+#[must_use]
+pub fn transfer_fault_target_id_out_of_range(role: &str) -> Fault {
+    Fault::TransferFault {
+        message: format!("{role}: target id out of range"),
+    }
+}
+
+/// Build a stable transfer fault when endpoint ownership is missing.
+#[must_use]
+pub fn transfer_fault_endpoint_not_owned() -> Fault {
+    Fault::TransferFault {
+        message: "endpoint not owned".to_string(),
+    }
+}
+
+/// Build a stable transfer fault for delegation-owner guard violations.
+#[must_use]
+pub fn transfer_fault_delegation_guard_violation(phase: &str) -> Fault {
+    Fault::TransferFault {
+        message: format!("delegation guard violation {phase} transfer"),
+    }
+}
+
+/// Build a stable speculation fault when speculation is disabled.
+#[must_use]
+pub fn speculation_fault_disabled() -> Fault {
+    Fault::SpecFault {
+        message: "speculation disabled".to_string(),
+    }
+}
+
+/// Build a stable speculation fault when join is attempted without active state.
+#[must_use]
+pub fn speculation_fault_join_requires_active() -> Fault {
+    Fault::SpecFault {
+        message: "join requires active speculation".to_string(),
+    }
+}
+
+/// Build a stable speculation fault when abort is attempted without active state.
+#[must_use]
+pub fn speculation_fault_abort_requires_active() -> Fault {
+    Fault::SpecFault {
+        message: "abort requires active speculation".to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

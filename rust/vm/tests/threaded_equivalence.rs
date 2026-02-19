@@ -81,7 +81,8 @@ fn run_threaded(
     for image in images {
         vm.load_choreography(image).expect("load image");
     }
-    vm.run(&handler, 200).expect("threaded run");
+    vm.run_concurrent(&handler, 200, 1)
+        .expect("threaded run at canonical concurrency=1");
     per_session(vm.trace())
 }
 

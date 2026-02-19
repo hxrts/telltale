@@ -66,6 +66,14 @@ private def updateTargetCoro {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
 
 /-! ### Transfer commit and validation helpers -/
 
+private def transferFaultPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (msg : String) :
+    StepPack ι γ π ε ν :=
+  faultPack st coro (.transferFault msg) msg
+
 def transferCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -104,10 +112,10 @@ private def transferWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [G
       , authorizedImbalance := true }
     match applyTransactionAtScope st.resourceStates { id := ep.sid } tx with
     | none =>
-        faultPack st coro (.transferFault "resource transaction failed") "resource transaction failed"
+        transferFaultPack st coro "resource transaction failed"
     | some resources' => transferCommit st coro ep tid resources'
   else
-    faultPack st coro (.transferFault "endpoint not owned") "endpoint not owned"
+    transferFaultPack st coro "endpoint not owned"
 
 
 /-! ### `transfer` instruction semantics -/
@@ -122,8 +130,8 @@ def stepTransfer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   match readReg coro.regs endpoint, readReg coro.regs targetCoro with
   | some (.chan ep), some (.nat tid) => transferWithEndpoint st coro ep tid
   | some (.chan _), none => faultPack st coro .outOfRegisters "missing transfer target"
-  | some (.chan _), some v =>
-      faultPack st coro (.typeViolation .nat (valTypeOf v)) "bad transfer target"
+  | some (.chan _), some _ =>
+      transferFaultPack st coro "bad transfer target"
   | some v, _ => faultPack st coro (.typeViolation (.chan 0 "") (valTypeOf v)) "bad transfer endpoint"
   | none, _ => faultPack st coro .outOfRegisters "missing transfer endpoint"
 

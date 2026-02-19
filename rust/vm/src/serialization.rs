@@ -1,5 +1,6 @@
 //! Canonical serialization helpers for deterministic replay/testing artifacts.
 
+use crate::determinism::EffectDeterminismTier;
 use crate::effect::{CorruptionType, EffectTraceEntry};
 use crate::trace::normalize_trace;
 use crate::vm::ObsEvent;
@@ -37,6 +38,9 @@ pub struct CanonicalReplayFragmentV1 {
     pub corrupted_edges: Vec<((String, String), CorruptionType)>,
     /// Sorted timeout horizons keyed by site.
     pub timed_out_sites: Vec<(String, u64)>,
+    /// Declared effect determinism tier for this run.
+    #[serde(default)]
+    pub effect_determinism_tier: EffectDeterminismTier,
 }
 
 /// Normalize an observable trace into the canonical versioned format.
@@ -71,6 +75,7 @@ pub fn canonical_replay_fragment_v1(
     mut partitioned_edges: Vec<(String, String)>,
     mut corrupted_edges: Vec<((String, String), CorruptionType)>,
     mut timed_out_sites: Vec<(String, u64)>,
+    effect_determinism_tier: EffectDeterminismTier,
 ) -> CanonicalReplayFragmentV1 {
     crashed_sites.sort_unstable();
     crashed_sites.dedup();
@@ -91,6 +96,7 @@ pub fn canonical_replay_fragment_v1(
         partitioned_edges,
         corrupted_edges,
         timed_out_sites,
+        effect_determinism_tier,
     }
 }
 

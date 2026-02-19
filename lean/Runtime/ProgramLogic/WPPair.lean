@@ -33,7 +33,7 @@ structure InstrPair (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
 
 def mkPair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (instr : Instr γ ε) : InstrPair γ ε :=
-  -- Build a placeholder instruction pair for refactoring.
+  -- Build a default instruction pair shape for WP refactoring.
   { instr := instr
   , openCtx := iProp.emp
   , interact := iProp.emp
@@ -42,9 +42,13 @@ def mkPair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
   , post := iProp.emp }
 
 def wp_pair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
-    (_p : InstrPair γ ε) : iProp :=
-  -- Generic WP rule for instruction pairs (placeholder).
-  iProp.emp
+    (p : InstrPair γ ε) : iProp :=
+  -- Generic acquire/interact/release rule shape:
+  -- pre * open * interact * (close -∗ post)
+  iProp.sep p.pre
+    (iProp.sep p.openCtx
+      (iProp.sep p.interact
+        (iProp.wand p.closeCtx p.post)))
 
 /-! ## Concrete pair instances -/
 

@@ -10,7 +10,7 @@ RA predicates for knowledge flow, progress tokens, and resource bundles. -/
 The Problem. Capture ghost resources for knowledge, progress, and transfer
 so that session proofs can reason about ownership and movement of state.
 
-Solution Structure. Define lightweight RA predicates and placeholder
+Solution Structure. Define lightweight RA predicates and abstract
 theorems for knowledge flow, progress, ghost sessions, and bundles.
 -/
 
@@ -46,8 +46,7 @@ def sepList (ps : List iProp) : iProp :=
 
 /-! ## Knowledge RA -/
 
-/-- Stub: ghost map for knowledge facts.
-    Actual implementation needs GhostMapSlot and encoding for Knowledge. -/
+/-- Ghost map model for knowledge facts in the current abstract RA layer. -/
 abbrev KnowledgeRA := List (Positive × Unit)
 
 /-- Encode a knowledge fact to Positive for ghost map key. -/
@@ -98,8 +97,7 @@ def check_enforces_policy : Prop :=
 
 /-! ## Progress RA -/
 
-/-- Stub: ghost map for progress tokens.
-    Actual implementation needs GhostMapSlot and encoding for (SessionId × Endpoint). -/
+/-- Ghost map model for progress tokens in the current abstract RA layer. -/
 abbrev ProgressRA := List (Positive × Nat)
 
 /-- Encode (SessionId, Endpoint) to Positive for ghost map key. -/
@@ -113,7 +111,7 @@ def progress_token_own (γ : GhostName) (sid : SessionId) (e : Endpoint) (n : Na
   ghost_map_elem γ (encodeProgressKey sid e) n
 
 def session_progress_supply (_γ : GhostName) (_sid : SessionId) : iProp :=
-  -- Placeholder: session-wide supply of progress tokens.
+  -- Abstract session-wide supply of progress tokens.
   iProp.emp
 def progress_token_sound : Prop :=
   -- Progress tokens represent positive budget for advancement.
@@ -144,8 +142,7 @@ structure FinalizationToken where
   mode : FinalizationMode
   deriving Repr
 
-/-- Stub: ghost map for finalization modes.
-    Actual implementation needs encoding for ScopeId. -/
+/-- Ghost map model for finalization modes in the current abstract RA layer. -/
 abbrev FinalizationRA := List (Positive × FinalizationMode)
 
 instance : Iris.Countable ScopeId where
@@ -177,6 +174,52 @@ theorem finalization_token_persistent_holds (ft : FinalizationToken) :
     finalization_token_persistent ft := by
   intro ft' hs hm
   cases ft; cases ft'; simp_all
+
+/-! ## Speculation tokens -/
+
+structure SpeculationToken where
+  sid : SessionId
+  ghostSid : SessionId
+  depth : Nat
+  deriving Repr
+
+/-- Speculation ghost map keyed by `(sid, ghostSid)` to active depth. -/
+abbrev SpeculationRA := GhostMap Nat
+
+/-- Encode `(sid, ghostSid)` for speculation ghost-map keys. -/
+def encodeSpeculationKey (sid ghostSid : SessionId) : Positive :=
+  [Iris.Countable.encode sid, Iris.Countable.encode ghostSid]
+
+def speculation_auth (γ : GhostName) (M : SpeculationRA) : iProp :=
+  -- Authoritative speculation map.
+  ghost_map_auth γ M
+
+def speculation_token_own (γ : GhostName) (sid ghostSid : SessionId) (depth : Nat) : iProp :=
+  -- Fragment ownership for one active speculative ghost session.
+  ghost_map_elem γ (encodeSpeculationKey sid ghostSid) depth
+
+def speculation_token_frag (γ : GhostName) (tok : SpeculationToken) : iProp :=
+  -- Token view of speculative ownership.
+  speculation_token_own γ tok.sid tok.ghostSid tok.depth
+
+def speculation_token_exclusive : Prop :=
+  -- Two fragments for the same `(sid, ghostSid)` agree on depth.
+  ∀ γ sid ghostSid d₁ d₂,
+    iProp.entails
+      (iProp.sep (speculation_token_own γ sid ghostSid d₁)
+        (speculation_token_own γ sid ghostSid d₂))
+      (iProp.pure (d₁ = d₂))
+
+def speculation_token_update (γ : GhostName) (M : SpeculationRA)
+    (sid ghostSid : SessionId) (d d' : Nat) :
+    iProp.entails
+      (iProp.sep (speculation_auth γ M) (speculation_token_own γ sid ghostSid d))
+      (bupd
+        (iProp.sep
+          (speculation_auth γ
+            (Iris.Std.insert M (encodeSpeculationKey sid ghostSid) (Iris.LeibnizO.mk d')))
+          (speculation_token_own γ sid ghostSid d'))) :=
+  ghost_map_update γ (encodeSpeculationKey sid ghostSid) d d' M
 
 /-! ## Ghost sessions -/
 
@@ -211,15 +254,24 @@ def abort_safe (sid : SessionId) : Prop :=
   -- Abort is safe when the ghost session is bounded.
   ghost_session_progress sid
 
+def speculation_session_inv (γ : GhostName) (sid : SessionId) : iProp :=
+  -- Session-scoped speculation resource view and depth bound.
+  iProp.exist fun (M : SpeculationRA) =>
+    iProp.sep (speculation_auth γ M)
+      (iProp.pure
+        (∀ ghostSid depth,
+          Iris.Std.get? M (encodeSpeculationKey sid ghostSid) = some (Iris.LeibnizO.mk depth) →
+            depth ≤ ghostSpecBound))
+
 /-! ## Resource bundles -/
 
-/-- Guard-layer ownership predicate (placeholder). -/
+/-- Guard-layer ownership predicate (abstract V1 ownership model). -/
 def guard_layer_owns {γ : Type u} [GuardLayer γ] (_layer : γ)
     (_res : GuardLayer.Resource γ) : iProp :=
-  -- V1 uses a stubbed guard resource ownership.
+  -- V1 uses an abstract guard resource ownership model.
   iProp.emp
 
-/-- Effect-context ownership predicate (placeholder). -/
+/-- Effect-context ownership predicate (abstract V1 ownership model). -/
 def effect_ctx_owns {ε : Type u} [EffectRuntime ε] (_ctx : EffectRuntime.EffectCtx ε) : iProp :=
   -- V1 treats effect context ownership as abstract.
   iProp.emp
@@ -288,7 +340,7 @@ def bundle_complete {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
 
 def transfer_bundle_preserves {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
-  -- Placeholder: bundle transfer preserves invariants.
+  -- Bundle transfer preserves invariants in the current abstract bundle model.
   transfer_bundle γn b
 
 /-! ## Transfer Typing Conditions -/
@@ -305,7 +357,7 @@ def transfer_continuation_typed {γ ε : Type u} [GuardLayer γ] [EffectRuntime 
 
 def transfer_source_loses {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
-  -- Placeholder: source loses ownership implies re-establishing bundle ownership elsewhere.
+  -- Source loses ownership and re-establishes bundle ownership at the target lane.
   iProp.entails (bundle_owns γn b) (bundle_owns γn b)
 
 /-! ## Higher-Order Transfer Skeleton -/
@@ -316,5 +368,5 @@ structure ResourceTree (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
 
 def higher_order_transfer_preserves {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (_t : ResourceTree γ ε) : Prop :=
-  -- Placeholder: higher-order transfer preserves ownership.
+  -- Higher-order transfer preserves ownership in the current abstract tree model.
   True

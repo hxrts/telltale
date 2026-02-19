@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use telltale_types::LocalTypeR;
 
-use crate::instr::{Instr, PC};
+use crate::instr::{Instr, InvokeAction, PC};
 
 /// Compile a local type to a bytecode program.
 ///
@@ -39,7 +39,10 @@ fn compile_inner(
             if branches.len() == 1 {
                 if let Some((_, _vt, cont)) = branches.first() {
                     instrs.push(Instr::Send { chan: 0, val: 1 });
-                    instrs.push(Instr::Invoke { action: 0, dst: 0 });
+                    instrs.push(Instr::Invoke {
+                        action: InvokeAction::Named("runtime.step".to_string()),
+                        dst: None,
+                    });
                     compile_inner(cont, instrs, loop_targets);
                 }
             } else if branches.len() > 1 {
@@ -50,7 +53,10 @@ fn compile_inner(
             if branches.len() == 1 {
                 if let Some((_, _vt, cont)) = branches.first() {
                     instrs.push(Instr::Receive { chan: 0, dst: 1 });
-                    instrs.push(Instr::Invoke { action: 0, dst: 0 });
+                    instrs.push(Instr::Invoke {
+                        action: InvokeAction::Named("runtime.step".to_string()),
+                        dst: None,
+                    });
                     compile_inner(cont, instrs, loop_targets);
                 }
             } else if branches.len() > 1 {
@@ -140,7 +146,10 @@ mod tests {
             code,
             vec![
                 Instr::Send { chan: 0, val: 1 },
-                Instr::Invoke { action: 0, dst: 0 },
+                Instr::Invoke {
+                    action: InvokeAction::Named("runtime.step".to_string()),
+                    dst: None,
+                },
                 Instr::Halt,
             ]
         );
@@ -162,7 +171,10 @@ mod tests {
             code,
             vec![
                 Instr::Send { chan: 0, val: 1 },
-                Instr::Invoke { action: 0, dst: 0 },
+                Instr::Invoke {
+                    action: InvokeAction::Named("runtime.step".to_string()),
+                    dst: None,
+                },
                 Instr::Jump { target: 0 },
             ]
         );
@@ -191,9 +203,15 @@ mod tests {
             code,
             vec![
                 Instr::Send { chan: 0, val: 1 },
-                Instr::Invoke { action: 0, dst: 0 },
+                Instr::Invoke {
+                    action: InvokeAction::Named("runtime.step".to_string()),
+                    dst: None,
+                },
                 Instr::Receive { chan: 0, dst: 1 },
-                Instr::Invoke { action: 0, dst: 0 },
+                Instr::Invoke {
+                    action: InvokeAction::Named("runtime.step".to_string()),
+                    dst: None,
+                },
                 Instr::Jump { target: 0 },
             ]
         );
