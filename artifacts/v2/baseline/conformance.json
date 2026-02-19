@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "canonical": {
+    "passed": 3,
+    "total": 3,
+    "pass_rate": 1.000
+  },
+  "threaded": {
+    "passed": 2,
+    "total": 3,
+    "pass_rate": 0.667
+  }
+}

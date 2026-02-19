@@ -1,5 +1,29 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-02-11",
-  "deviations": []
+  "updated_at": "2026-02-18",
+  "deviations": [
+    {
+      "id": "threaded-round-extension",
+      "title": "Threaded backend keeps multi-pick wave rounds as an extension",
+      "owner": "vm-runtime",
+      "status": "active",
+      "revisit_date": "2026-04-30",
+      "lean_refs": [
+        "Runtime/VM/Runtime/Runner.lean"
+      ],
+      "rust_refs": [
+        "rust/vm/src/threaded.rs"
+      ],
+      "reason": "Canonical VM rounds were aligned to one-step semantics; threaded backend still supports parallel waves for performance.",
+      "impact": "Threaded round granularity differs from Lean canonical round semantics, while preserving tested trace-level contracts.",
+      "alternatives_considered": "Forcing one-step threaded rounds would eliminate this divergence but materially reduces throughput and was deferred until certified-wave parity is complete.",
+      "covers": [
+        "threaded.round.wave.parallelism"
+      ],
+      "tests": [
+        "rust/vm/tests/topology_effect_ingress.rs::cooperative_vm_ingests_topology_events_before_instruction_effects",
+        "rust/vm/tests/threaded_lane_runtime.rs"
+      ]
+    }
+  ]
 }

@@ -1,176 +1,53 @@
 # VM Overview
 
-This document introduces the bytecode VM that executes session type protocols.
+This document defines the current VM architecture used by Rust runtime targets and Lean conformance surfaces.
 
-## Introduction
+## Architecture Snapshot
 
-The bytecode VM is the core execution engine used by the simulator. The VM compiles local types to bytecode instructions and manages scheduling, buffers, and session lifecycle. Effect handlers remain pluggable through the `EffectHandler` trait.
+The canonical semantic authority is `VMKernel`. The cooperative `VM` and threaded `ThreadedVM` are execution adapters that call kernel-owned step entrypoints.
 
-The VM is located in `rust/vm/`. The crate depends on `telltale-types` and `telltale-theory` for type definitions and projection algorithms.
+The runtime keeps a single state model across targets. Core state includes coroutines, sessions, scheduler queues, observable trace, effect trace, and failure-topology snapshot fields.
 
-Normative architecture reference for lanes, scheduler proofs, determinism profiles, and output-condition semantics:
-`work/docs/vm_instructions.md`.
+The canonical round model is one semantic step when concurrency is nonzero. Threaded execution is admitted as an extension only when the wave certificate gate is satisfied.
 
-## Design Principles
+## Engine Roles
 
-The VM follows three core principles that enable formal verification.
+| Engine | Role | Contract Surface |
+|---|---|---|
+| `VM` | Canonical cooperative runtime | Exact reference for parity at concurrency `1` |
+| `ThreadedVM` | Parallel wave executor | Certified-wave execution with fallback to canonical one-step |
+| WASM runtime | Single-thread deployment | Cooperative schedule only |
 
-Canonical semantic authority is `VMKernel`. Runtime-specific engines (`VM`,
-`ThreadedVM`, and wasm drivers) are adapter surfaces and must not define
-instruction semantics independently.
+## Runtime Gates
 
-Session isolation ensures that coroutines in different sessions cannot interfere with each other. Each session has its own buffers, type state, and namespace. Cross-session operations are impossible by construction.
+Runtime mode admission and profile selection are capability gated.
 
-Deterministic execution means that given the same inputs, the VM produces the same observable trace. The simulation clock provides deterministic timing. Random number generation requires explicit seeding through effect handlers.
-
-Effect separation keeps the VM core pure. All side effects flow through the `EffectHandler` trait. The handler contract requires deterministic, session-local behavior for N-invariance guarantees.
-The repository enforces this with a kernel guard test (`rust/vm/tests/kernel_nondeterminism_guard.rs`) that blocks direct host nondeterminism calls in core VM modules.
-
-## Cross-Target Contract
-
-The runtime defines this semantic contract:
-
-- `NativeThreaded ~= NativeSingleThreaded ~= WasmCooperative` modulo effect policy.
-- Equivalence surfaces:
-  - normalized VM observable trace
-  - normalized scheduler/step trace
-  - effect trace
-
-Cross-target matrix tests enforce this contract (`rust/lean-bridge/tests/vm_cross_target_matrix_tests.rs`).
+| Gate | Runtime Surface | Current Rust Path |
+|---|---|---|
+| Advanced mode admission | `requires_vm_runtime_contracts` and `admit_vm_runtime` | `rust/vm/src/runtime_contracts.rs`, `rust/vm/src/composition.rs` |
+| Determinism profile validation | `request_determinism_profile` | `rust/vm/src/runtime_contracts.rs`, `rust/vm/src/composition.rs` |
+| Threaded certified-wave fallback | `WaveCertificate` check with one-step degrade | `rust/vm/src/threaded.rs` |
+| Deviation registry enforcement | undocumented parity drift rejection | `scripts/check-parity-ledger.sh` |
 
 ## Determinism Profiles
 
-`VMConfig` exposes a determinism profile:
+`VMConfig.determinism_mode` now includes `Full`, `ModuloEffects`, `ModuloCommutativity`, and `Replay`.
 
-- `Full`
-- `ModuloEffects`
-- `ModuloCommutativity`
+`Full` is exact-trace mode. `ModuloEffects` and `ModuloCommutativity` require mixed-profile capability evidence plus artifact support. `Replay` requires replay artifact support and mixed-profile capability evidence.
 
-The runtime uses this profile to classify equivalence checks and replay expectations. The profile is configuration-level, so native and wasm runs can be compared under the same declared determinism contract.
+## Conformance Envelope
 
-## Output-Condition Commit Gate
+The project keeps exact parity at concurrency `1`. For `n > 1`, threaded behavior is accepted only inside declared `EnvelopeDiff` classes.
 
-The VM applies a predicate gate before committing observable outputs.
+The parity fixture lane verifies speculation behavior, canonical `n = 1` equality, threaded `n > 1` envelope-bounded behavior, and failure-envelope scenarios. The lane is wired through `scripts/check-vm-parity-suite.sh`.
 
-- Output-condition policy is configured via `VMConfig.output_condition_policy`.
-- Each output-producing commit path emits an `OutputConditionChecked` event with:
-  - `predicate_ref`
-  - `witness_ref` (optional)
-  - `output_digest`
-  - `passed`
-- If verification fails, the step faults with `Fault::OutputConditionFault` and the output is not committed.
+## Proof Boundary
 
-This provides a stable interface for future ZK predicate integration while preserving deterministic kernel ownership of final output acceptance.
+This page describes runtime architecture and executable gates. For theorem-level status, including proved versus premise-scoped surfaces, see [Lean Verification](19_lean_verification.md) and [Lean VM Concurrency and Envelope Architecture](37_lean_vm_concurrency_envelope_architecture.md).
 
-## Architecture
+## Related Docs
 
-The VM struct contains coroutines, sessions, scheduler state, and the observable trace.
-
-```rust
-pub struct VM {
-    config: VMConfig,
-    coroutines: Vec<Coroutine>,
-    sessions: SessionStore,
-    scheduler: Scheduler,
-    trace: Vec<ObsEvent>,
-    clock: SimClock,
-    next_coro_id: usize,
-    paused_roles: BTreeSet<String>,
-}
-```
-
-Each coroutine owns its bytecode program. The `sessions` store tracks active sessions with their buffers and type state. The `scheduler` manages the ready queue and blocked set. The trace records observable events for deterministic replay.
-
-The `Coroutine` struct represents a lightweight execution unit.
-
-```rust
-pub struct Coroutine {
-    pub id: usize,
-    pub pc: usize,
-    pub regs: Vec<Value>,
-    pub status: CoroStatus,
-    pub session_id: SessionId,
-    pub role: String,
-    pub program: Vec<Instr>,
-}
-```
-
-Each coroutine has a program counter, register file, and status. The `role` field identifies which participant this coroutine embodies. The `session_id` links the coroutine to its session.
-
-## Code Image Loading
-
-The `CodeImage` struct packages bytecode programs with their source types.
-
-```rust
-pub struct CodeImage {
-    pub global_type: GlobalType,
-    pub local_types: BTreeMap<String, LocalTypeR>,
-    pub programs: BTreeMap<String, Vec<Instr>>,
-}
-
-impl CodeImage {
-    pub fn from_local_types(
-        local_types: &BTreeMap<String, LocalTypeR>,
-        global_type: &GlobalType,
-    ) -> Self
-}
-```
-
-The constructor takes projected local types and the source global type. It assumes the inputs are already validated. Use `UntrustedImage::validate` when loading untrusted inputs.
-
-The `load_choreography` method instantiates a session from a code image.
-
-```rust
-impl VM {
-    pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError>
-}
-```
-
-This method loads precompiled bytecode from the image. It allocates buffers for all role pairs. It spawns one coroutine per role with the appropriate program. The method returns the new session ID.
-
-Multiple calls to `load_choreography` create independent sessions. Each call compiles fresh programs and spawns new coroutines. This supports dynamic protocol loading at runtime.
-
-## VMBackend Trait
-
-The `VMBackend` trait abstracts over cooperative and threaded execution.
-
-```rust
-pub trait VMBackend {
-    fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError>;
-    fn step_round(&mut self, handler: &dyn EffectHandler, n: usize) -> Result<StepResult, VMError>;
-    fn run(&mut self, handler: &dyn EffectHandler, max_rounds: usize) -> Result<(), VMError>;
-    fn trace(&self) -> Vec<ObsEvent>;
-}
-```
-
-The cooperative backend executes in a single thread using manual yielding. The threaded backend uses OS threads when the `multi-thread` feature is enabled. Both backends produce identical per-session traces due to scheduling confluence in the Lean model.
-
-WASM targets use the cooperative backend exclusively. The `wasm` feature configures the VM for single-threaded execution with JavaScript-compatible random number generation.
-
-## Example
-
-This example loads and runs a simple protocol.
-
-```rust
-use std::collections::BTreeMap;
-use telltale_theory::project_all;
-use telltale_types::LocalTypeR;
-use telltale_vm::{VM, VMConfig};
-use telltale_vm::loader::CodeImage;
-
-// Project global type to local types
-let projected = project_all(&global)?;
-let local_types: BTreeMap<String, LocalTypeR> = projected.into_iter().collect();
-
-// Create code image and VM
-let image = CodeImage::from_local_types(&local_types, &global);
-let mut vm = VM::new(VMConfig::default());
-
-// Load choreography and run
-let sid = vm.load_choreography(&image)?;
-vm.run(&handler, 1000)?;
-```
-
-The first section projects the global type for each role. The second section creates a code image and initializes the VM. The third section loads the choreography and runs until completion or fuel exhaustion.
-
-See [Bytecode Instructions](10_bytecode_instructions.md) for the instruction set reference. See [VM Scheduling](11_vm_scheduling.md) for concurrency and N-invariance details.
+- [VM Scheduling](11_vm_scheduling.md)
+- [VM Parity Contract](29_vm_parity_contract.md)
+- [Lean-Rust Parity Matrix](31_lean_rust_parity_matrix.md)
+- [Lean VM Concurrency and Envelope Architecture](37_lean_vm_concurrency_envelope_architecture.md)

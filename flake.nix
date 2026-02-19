@@ -31,6 +31,27 @@
           targets = [ "wasm32-unknown-unknown" ];
         };
 
+        # LaTeX distribution for paper compilation
+        texlive = pkgs.texlive.combine {
+          inherit (pkgs.texlive)
+            scheme-medium
+            latexmk
+            biber
+            biblatex
+            booktabs
+            cleveref
+            enumitem
+            etoolbox
+            hyperref
+            mathtools
+            natbib
+            parskip
+            pgf
+            tikz-cd
+            xcolor
+            ;
+        };
+
         nativeBuildInputs = with pkgs; [
           rustToolchain
           pkg-config
@@ -45,6 +66,7 @@
           gnused
           elan
           python3
+          texlive
         ];
 
         buildInputs =
@@ -89,6 +111,36 @@
               asl20
             ];
             maintainers = [ ];
+          };
+        };
+
+        # Paper PDF compilation (all three papers)
+        packages.paper = pkgs.stdenvNoCC.mkDerivation {
+          pname = "telltale-papers";
+          version = "0.1.0";
+
+          src = ./paper;
+
+          nativeBuildInputs = [ texlive ];
+
+          buildPhase = ''
+            # Compile each paper twice for references
+            for paper in paper1 paper2 paper3; do
+              pdflatex -interaction=nonstopmode $paper.tex || true
+              pdflatex -interaction=nonstopmode $paper.tex
+            done
+          '';
+
+          installPhase = ''
+            mkdir -p $out
+            cp paper1.pdf $out/telltale-paper1-coherence.pdf
+            cp paper2.pdf $out/telltale-paper2-dynamics.pdf
+            cp paper3.pdf $out/telltale-paper3-harmony.pdf
+          '';
+
+          meta = with pkgs.lib; {
+            description = "Telltale papers: MPST metatheory series (Coherence, Dynamics, Harmony)";
+            license = licenses.cc-by-40;
           };
         };
       }

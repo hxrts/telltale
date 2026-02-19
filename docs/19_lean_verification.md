@@ -1,79 +1,53 @@
 # Lean Verification
 
-Telltale uses Lean 4 to formalize session types, projection, and runtime models. This document summarizes what is proven, what remains axiomatized, and how the Lean tooling integrates with Rust.
+This document summarizes the Lean theorem surfaces that are currently consumed by runtime architecture and release gates.
 
-## Verified Scope
+## Scope
 
-The Lean codebase defines the core session type theory and projection pipeline. The `SessionTypes` and `SessionCoTypes` libraries cover inductive and coinductive representations, along with duality and roundtrip lemmas. The `Choreography` library proves projection properties using blindness arguments to avoid projectability axioms.
+Lean covers session typing, projection, scheduler semantics, runtime envelope interfaces, and theorem-pack inventory APIs.
 
-## Axiomatized Areas
+Rust parity and bridge tests consume these surfaces through executable fixtures, artifact schemas, and capability gate checks.
 
-Several areas are still axiomatized. The main stubs live in:
+## Proved Theorem Surfaces
 
-- `lean/Protocol/Preservation.lean` and `lean/Protocol/DeadlockFreedom.lean`
-- `lean/Protocol/Deployment/Linking.lean` and related deployment files
-- `lean/Runtime/Shim/*` for the Iris style logic shims
-- `lean/Runtime/Proofs/TheoremStubs.lean` for remaining runtime level placeholders
+| Area | Lean Surface | Status |
+|---|---|---|
+| Canonical scheduler normalization | `Runtime/Proofs/Concurrency.lean` | Proved |
+| Threaded equality at `n = 1` | `Runtime/Proofs/ConcurrencyThreaded.lean` | Proved |
+| Scheduler policy theorems | `Runtime/Proofs/VM/Scheduler.lean` | Proved |
+| Release conformance gate surfaces | `Runtime/Proofs/TheoremPack/ReleaseConformance.lean` | Proved API surface with executable checks |
+| Speculation theorem API exports | `Runtime/Proofs/VM/Speculation.lean`, `Runtime/Proofs/TheoremPack/API.lean` | Proved interface exports |
 
-Use the axiom inventory in [Lean Verification Code Map](../lean/CODE_MAP.md) for the complete list.
+## Premise-Scoped Interfaces
 
-## Module Map
+| Area | Lean Surface | Interface Type |
+|---|---|---|
+| Threaded `n > 1` refinement | `ThreadedRoundRefinementPremises` in `Runtime/Proofs/ConcurrencyThreaded.lean` | Premise-scoped |
+| Runtime contract admission and profile gates | `Runtime/Proofs/CompileTime/RuntimeContracts.lean` | Interface consumed by runtime gating |
+| Theorem-pack capability inventory composition | `Runtime/Proofs/TheoremPack/API.lean` | Interface consumed by admission logic |
 
-The Lean tree is organized into top level libraries:
+These interfaces are explicit and versioned. They are not presented as unconditional global theorems.
 
-- `SessionTypes` for inductive global and local types
-- `SessionCoTypes` for coinductive equality and bisimulation
-- `Choreography` for projection and harmony proofs
-- `Semantics` for operational rules
-- `Protocol` for buffered MPST and monitoring
-- `Runtime` for VM models and Iris shims
+## Runtime Alignment Checks
 
-See [Lean Verification Code Map](../lean/CODE_MAP.md) for file level detail.
+Lean-facing contract checks run through repository scripts and test lanes.
 
-## Rust Integration
+| Check | Path |
+|---|---|
+| Runtime contract gate shape | `scripts/check-runtime-contract-gates.sh` |
+| Speculation/WP surface checks | `scripts/check-speculation-wp-surface.sh` |
+| Release conformance checks | `scripts/check-release-conformance.sh` |
+| Lean/Rust parity and deviation checks | `scripts/check-parity-ledger.sh`, `scripts/check-vm-parity-suite.sh` |
 
-The `telltale-lean-bridge` crate exports GlobalType JSON plus per-role LocalTypeR JSON and runs the Lean validator. The main entry points are the `lean-bridge-exporter` binary and the `telltale_validator` Lean executable.
+## Bridge and Fixture Lanes
 
-The Justfile includes convenience recipes:
+Bridge correspondence is exercised in `rust/lean-bridge/tests`. VM parity fixtures are exercised in `rust/vm/tests/parity_fixtures_v2.rs` and `rust/vm/tests/threaded_equivalence.rs`.
 
-```bash
-just telltale-lean-check
-just telltale-lean-check-extended
-just telltale-lean-check-failing
-```
+These lanes enforce practical alignment between executable Rust behavior and Lean theorem/API surfaces.
 
-These recipes expect `.choreo` inputs under `fixtures/choreo/` and write artifacts to `lean/artifacts`.
+## Related Docs
 
-## VM Correspondence
-
-Runtime correspondence checks live in the bridge and VM test suites:
-
-- `rust/lean-bridge/tests/vm_correspondence_tests.rs`
-  - runs Tier1 protocol fixtures through Rust VM execution
-  - compares normalized Rust traces against Lean VM runner traces via `VmRunner::compare_execution`
-- `rust/lean-bridge/tests/invariant_verification_tests.rs`
-  - validates protocol bundles against Lean verification entrypoints
-  - asserts structured error artifacts (`code`, `path`) for negative cases
-
-The bridge schema tests (`rust/lean-bridge/tests/schema_version_tests.rs`) also gate payload compatibility for:
-
-- `lean_bridge.v1`
-- `protocol_bundle.v1`
-- `vm_state.v1`
-
-## Golden Equivalence Tests
-
-There are golden comparison tests in `telltale-lean-bridge` that check Rust and Lean outputs.
-
-```bash
-just check-golden-drift
-just test-live-equivalence
-```
-
-These commands build the Lean runner and execute the bridge tests.
-
-## Working With Lean
-
-Lean builds use Lake with the toolchain in `lean/lean-toolchain`. Use `just lean-test` to confirm the toolchain is available before running the full recipes.
-
-See [Lean-Rust Bridge](20_lean_rust_bridge.md) for the exporter format and the runner protocol.
+- [Lean-Rust Bridge](20_lean_rust_bridge.md)
+- [VM Parity Contract](29_vm_parity_contract.md)
+- [Lean-Rust Parity Matrix](31_lean_rust_parity_matrix.md)
+- [Lean VM Concurrency and Envelope Architecture](37_lean_vm_concurrency_envelope_architecture.md)

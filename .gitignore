@@ -45,6 +45,9 @@ iris-lean/
 /docs/book/
 /docs/SUMMARY.md
 
+# Paper build artifacts
+/paper/build/
+
 # mdbook generated files
 /mermaid.min.js
 /mermaid-init.js

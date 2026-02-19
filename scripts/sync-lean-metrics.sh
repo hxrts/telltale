@@ -29,9 +29,11 @@ LIB_NAMES=(
   "Choreography"
   "Semantics"
   "Classical"
+  "ClassicalAnalysis"
   "Distributed"
   "Protocol"
   "Runtime"
+  "IrisExtraction"
 )
 
 LIB_ROOTS=(
@@ -40,9 +42,11 @@ LIB_ROOTS=(
   "Choreography"
   "Semantics"
   "Classical"
+  "ClassicalAnalysisInstance"
   "Distributed"
   "Protocol"
   "Runtime"
+  "IrisExtractionInstance"
 )
 
 LIB_FOCUS=(
@@ -51,9 +55,11 @@ LIB_FOCUS=(
   "Projection, harmony, blindness, embedding, erasure"
   "Operational semantics, determinism, deadlock freedom"
   "Transported theorems (queueing, large deviations, mixing)"
+  "Real analysis concrete models for classical transport"
   "Distributed assumptions, validation, FLP/CAP theorem packaging"
   "Async buffered MPST, coherence, preservation, monitoring"
   "VM, Iris backend via iris-lean, resource algebras, WP"
+  "Iris ghost state and program logic extraction"
 )
 
 replace_block() {
@@ -107,6 +113,11 @@ collect_lib_files() {
     fi
     if [[ -f "${LEAN_DIR}/${root_module}.lean" ]]; then
       printf '%s\n' "${LEAN_DIR}/${root_module}.lean"
+    fi
+    # Also collect *API.lean for Instance modules (e.g., ClassicalAnalysisAPI.lean)
+    local api_base="${lib_root%Instance}"
+    if [[ "$api_base" != "$lib_root" && -f "${LEAN_DIR}/${api_base}API.lean" ]]; then
+      printf '%s\n' "${LEAN_DIR}/${api_base}API.lean"
     fi
   } | sort -u | rg -v "$EXCLUDE_REGEX" || true
 }

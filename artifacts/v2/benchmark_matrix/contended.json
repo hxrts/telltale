@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "workload": {
+    "mode": "contended",
+    "tuning_profile": "standard",
+    "sessions": 48,
+    "canonical_concurrency": 1,
+    "threaded_workers": 2,
+    "footprint_guided_wave_widening": false,
+    "max_rounds": 4096
+  },
+  "canonical": {
+    "elapsed_ms": 450,
+    "steps": 1104,
+    "throughput_steps_per_sec": 2452.452946324766,
+    "throughput_sessions_per_sec": 106.628388970642,
+    "p50_step_latency_us": 436,
+    "p99_step_latency_us": 646,
+    "mean_wave_width": 1.0,
+    "max_wave_width": 1,
+    "lock_contention_events_per_1k_steps": 0.0,
+    "mutex_lock_contention_events_per_1k_steps": 0.0,
+    "planner_conflict_events_per_1k_steps": 0.0
+  },
+  "threaded": {
+    "elapsed_ms": 150,
+    "steps": 1151,
+    "throughput_steps_per_sec": 7649.649152596658,
+    "throughput_sessions_per_sec": 319.01230175902657,
+    "p50_step_latency_us": 158,
+    "p99_step_latency_us": 265,
+    "mean_wave_width": 1.1878224974200207,
+    "max_wave_width": 2,
+    "lock_contention_events_per_1k_steps": 681.146828844483,
+    "mutex_lock_contention_events_per_1k_steps": 0.0,
+    "planner_conflict_events_per_1k_steps": 681.146828844483
+  },
+  "canonical_replay_fragment_hash": "e1663025cbb3c2559a700cef22a3ceb80667730d8e3d2ece52e6eaa7528e31f4",
+  "threaded_replay_fragment_hash": "6411aebc7cdb32aced567fafd7c1f1c4ad080590f355130b0bb4bfad9db6f399",
+  "envelope_diff_artifact": {
+    "schema_version": 1,
+    "envelope_diff": {
+      "schema_version": 1,
+      "baseline_engine": "native_single_thread",
+      "candidate_engine": "native_threaded",
+      "scheduler_permutation_class": "SessionNormalizedPermutation",
+      "wave_width_bound": {
+        "baseline_max_wave_width": 1,
+        "candidate_max_wave_width": 2,
+        "declared_upper_bound": 2
+      },
+      "effect_ordering_class": "ReplayDeterministic",
+      "failure_visible_diff_class": "Exact",
+      "effect_determinism_tier": "envelope_bounded_nondeterministic"
+    },
+    "baseline_fragment_hash": "e1663025cbb3c2559a700cef22a3ceb80667730d8e3d2ece52e6eaa7528e31f4",
+    "candidate_fragment_hash": "6411aebc7cdb32aced567fafd7c1f1c4ad080590f355130b0bb4bfad9db6f399",
+    "envelope_diff_hash": "96d647c9f5cef2ddf9638d371a5df82b06a24ad1d08cc92abdc786fe1bedfd83"
+  },
+  "artifact_hash": "58b1ebe148eef38d71dfc64fa0378f8e561e22f04d4e5e362ff6754c835846e7"
+}

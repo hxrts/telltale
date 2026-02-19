@@ -1,104 +1,64 @@
 # VM Parity Contract
 
-This document defines the Lean/Rust parity contract for VM policy and data encodings.
+This document defines the Lean/Rust parity contract for VM behavior, policy/data encodings, and deviation governance.
 
-## Policy
+## Contract Levels
 
-- **Default rule**: Lean and Rust use the same shape and naming for VM policy/data encodings.
-- **Project policy**: **spec-first for shape, runtime-first for justified execution details**.
-- Any mismatch must be an explicit justified break, recorded before merge.
+Parity is enforced at two levels.
 
-## Canonical Encodings
+Level 1 is policy/data shape parity for shared runtime encodings. Level 2 is behavior parity for executable traces under the declared concurrency envelope.
 
-### Flow Policy
+## Policy/Data Shape Contract
 
-- Lean: `lean/Runtime/VM/Model/Knowledge.lean`
-  - `FlowPolicy.allowAll`
-  - `FlowPolicy.denyAll`
-  - `FlowPolicy.allowRoles`
-  - `FlowPolicy.denyRoles`
-  - `FlowPolicy.predicate` (runtime closure; not serializable)
-  - `FlowPolicy.predicateExpr`
-- Rust: `rust/vm/src/vm.rs`
-  - `FlowPolicy::AllowAll`
-  - `FlowPolicy::DenyAll`
-  - `FlowPolicy::AllowRoles`
-  - `FlowPolicy::DenyRoles`
-  - `FlowPolicy::Predicate` (runtime closure; not serializable)
-  - `FlowPolicy::PredicateExpr`
+The following shapes must remain aligned between Lean and Rust unless a deviation entry is active.
 
-### Flow Predicate
+- `FlowPolicy` and `FlowPredicate`.
+- `OutputConditionPolicy`.
+- core runtime `Value` variants.
+- `ProgressToken` field shape.
 
-- Lean: `FlowPredicate.targetRolePrefix`, `factContains`, `endpointRoleMatchesTarget`, `all`, `any`
-- Rust: `FlowPredicate::TargetRolePrefix`, `FactContains`, `EndpointRoleMatchesTarget`, `All`, `Any`
+These checks are automated by `scripts/check-parity-ledger.sh`.
 
-### Output-Condition Policy
+## Behavior Contract
 
-- Lean: `lean/Runtime/VM/Model/OutputCondition.lean`
-  - `OutputConditionPolicy.disabled`
-  - `OutputConditionPolicy.allowAll`
-  - `OutputConditionPolicy.denyAll`
-  - `OutputConditionPolicy.predicateAllowList`
-- Rust: `rust/vm/src/output_condition.rs`
-  - `OutputConditionPolicy::Disabled`
-  - `OutputConditionPolicy::AllowAll`
-  - `OutputConditionPolicy::DenyAll`
-  - `OutputConditionPolicy::PredicateAllowList`
+| Regime | Required Behavior |
+|---|---|
+| Canonical `n = 1` | Exact parity between cooperative and threaded execution |
+| Threaded `n > 1` | Conformance within declared `EnvelopeDiff` bounds |
+| Failure-visible artifacts | Snapshot parity within declared failure envelope class |
+| Speculation | No sentinel fallback behavior for join/abort; deterministic gated semantics |
 
-### Core Runtime Values
+These checks are automated by `scripts/check-vm-parity-suite.sh`.
 
-- Lean: `lean/Protocol/Values.lean`
-  - `Value.unit`
-  - `Value.bool`
-  - `Value.nat`
-  - `Value.string`
-  - `Value.prod`
-  - `Value.chan`
-- Rust: `rust/vm/src/coroutine.rs`
-  - `Value::Unit`
-  - `Value::Bool`
-  - `Value::Nat`
-  - `Value::Str`
-  - `Value::Prod`
-  - `Value::Endpoint`
+## Runtime Capability and Profile Gates
 
-### Progress Tokens
+Runtime modes that require theorem/capability evidence are admission gated.
 
-- Lean: `lean/Runtime/VM/Model/State.lean`
-  - `ProgressToken.sid`
-  - `ProgressToken.endpoint`
-- Rust: `rust/vm/src/coroutine.rs`
-  - `ProgressToken.sid`
-  - `ProgressToken.endpoint`
+| Gate | Rust Surface |
+|---|---|
+| Advanced mode admission | `admit_vm_runtime` in `rust/vm/src/runtime_contracts.rs` |
+| Determinism profile selection | `request_determinism_profile` in `rust/vm/src/runtime_contracts.rs` |
+| Composition admission enforcement | `rust/vm/src/composition.rs` |
 
-### Output-Condition Claim/Check Metadata
+## Deviation Governance
 
-- Lean `OutputConditionClaim`: `predicateRef`, `witnessRef`, `outputDigest : String`.
-- Rust `OutputConditionMeta`: `predicate_ref`, `witness_ref`, `output_digest : String`.
-- Default observable predicate ref in both runtimes: `vm.observable_output`.
+Any intentional parity break must be recorded in `docs/lean_vs_rust_deviations.json` before merge.
 
-### Default Predicate Reference
+Required fields include `id`, `owner`, `status`, `reason`, `impact`, `alternatives_considered`, `revisit_date`, and `covers`. CI fails when a parity mismatch is not covered by an active deviation entry.
 
-- Canonical default predicate ref for observable output checks: `vm.observable_output`.
+## CI Gates
 
-### Output Digest Strategy
+The minimum parity governance gates are:
 
-- Canonical representation is an opaque **string digest**.
-- Current Lean executable path uses deterministic placeholder `"vm.output_digest.unspecified"` until full digest parity is wired.
+1. `scripts/check-parity-ledger.sh`.
+2. `scripts/check-vm-parity-suite.sh`.
+3. workflow wiring in `.github/workflows/verify.yml` and `.github/workflows/check.yml`.
 
-## Serialization Rule
+If any gate fails, parity drift is treated as a release blocker.
 
-- Runtime closure flow predicates are intentionally non-serializable.
-- Serializable interchange shape is `FlowPolicyRepr`/`FlowPredicate` (Lean) and `FlowPolicyRepr`/`FlowPredicate` (Rust).
+## Related Docs
 
-## Justified Break Process
-
-1. Add a deviation entry in `docs/lean_vs_rust_deviations.json`.
-2. Fill the template in `docs/templates/justified_break.md`.
-3. Assign an explicit owner and revisit date.
-4. Include mismatch fingerprints under `covers`.
-
-## CI Enforcement
-
-- CI runs `scripts/check-parity-ledger.sh`.
-- The check compares selected Lean/Rust policy/data shapes and fails when an uncovered mismatch appears.
+- [VM Overview](09_vm_overview.md)
+- [VM Scheduling](11_vm_scheduling.md)
+- [Lean-Rust Parity Matrix](31_lean_rust_parity_matrix.md)
+- [Lean VM Concurrency and Envelope Architecture](37_lean_vm_concurrency_envelope_architecture.md)

@@ -3,6 +3,57 @@
 use telltale_types::FixedQ32;
 use telltale_vm::coroutine::Value;
 
+const Q32_SCALAR_PREFIX: &str = "q32:";
+const Q32_VEC_PREFIX: &str = "q32vec:";
+
+fn parse_q32_scalar_text(text: &str) -> Option<FixedQ32> {
+    let bits_text = text.strip_prefix(Q32_SCALAR_PREFIX)?;
+    let bits = bits_text.parse::<i64>().ok()?;
+    Some(FixedQ32::from_bits(bits))
+}
+
+fn parse_q32_vec_text(text: &str) -> Option<Vec<FixedQ32>> {
+    let payload = text.strip_prefix(Q32_VEC_PREFIX)?;
+    if payload.is_empty() {
+        return Some(Vec::new());
+    }
+    payload
+        .split(',')
+        .map(|bits_text| bits_text.parse::<i64>().ok().map(FixedQ32::from_bits))
+        .collect()
+}
+
+/// Encode one fixed-point value into the current VM value surface.
+pub(crate) fn fixed_to_value(value: FixedQ32) -> Value {
+    Value::Str(format!("{Q32_SCALAR_PREFIX}{}", value.to_bits()))
+}
+
+/// Encode a fixed-point vector into the current VM value surface.
+pub(crate) fn fixed_vec_to_value(values: &[FixedQ32]) -> Value {
+    let joined = values
+        .iter()
+        .map(|value| value.to_bits().to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    Value::Str(format!("{Q32_VEC_PREFIX}{joined}"))
+}
+
+/// Decode one fixed-point value from a VM value when possible.
+pub(crate) fn try_decode_fixed(value: &Value) -> Option<FixedQ32> {
+    match value {
+        Value::Str(text) => parse_q32_scalar_text(text),
+        _ => None,
+    }
+}
+
+/// Decode a fixed-point vector from a VM value when possible.
+pub(crate) fn try_decode_fixed_vec(value: &Value) -> Option<Vec<FixedQ32>> {
+    match value {
+        Value::Str(text) => parse_q32_vec_text(text),
+        _ => None,
+    }
+}
+
 /// Extract numeric state values from a register file.
 ///
 /// Non-numeric values are ignored.
@@ -10,7 +61,7 @@ pub(crate) fn values_to_f64s(values: &[Value]) -> Vec<FixedQ32> {
     values
         .iter()
         .filter_map(|v| match v {
-            Value::Q32(r) => Some(*r),
+            Value::Str(text) => parse_q32_scalar_text(text),
             Value::Nat(n) => i64::try_from(*n)
                 .ok()
                 .and_then(|i| FixedQ32::try_from_i64(i).ok()),
@@ -29,7 +80,7 @@ pub(crate) fn registers_to_f64s(values: &[Value]) -> Vec<FixedQ32> {
 
 /// Convert numeric state values into VM register values.
 pub(crate) fn f64s_to_values(state: &[FixedQ32]) -> Vec<Value> {
-    state.iter().copied().map(Value::Q32).collect()
+    state.iter().copied().map(fixed_to_value).collect()
 }
 
 /// Overwrite the numeric portion of a register file with new state values.
@@ -42,9 +93,9 @@ pub(crate) fn write_f64s(state: &mut Vec<Value>, values: &[FixedQ32]) {
     for (i, &v) in values.iter().enumerate() {
         let idx = i + 2;
         if idx < state.len() {
-            state[idx] = Value::Q32(v);
+            state[idx] = fixed_to_value(v);
         } else {
-            state.push(Value::Q32(v));
+            state.push(fixed_to_value(v));
         }
     }
 }
@@ -52,8 +103,10 @@ pub(crate) fn write_f64s(state: &mut Vec<Value>, values: &[FixedQ32]) {
 /// Convert a payload value to a scalar FixedQ32.
 pub(crate) fn value_to_f64(value: &Value) -> Result<FixedQ32, String> {
     match value {
-        Value::Q32(r) => Ok(*r),
-        Value::Q32Vec(v) => v
+        Value::Str(text) if text.starts_with(Q32_SCALAR_PREFIX) => parse_q32_scalar_text(text)
+            .ok_or_else(|| format!("invalid q32 scalar payload: {text}")),
+        Value::Str(text) if text.starts_with(Q32_VEC_PREFIX) => parse_q32_vec_text(text)
+            .and_then(|v| v.first().copied())
             .first()
             .copied()
             .ok_or_else(|| "empty vector payload".into()),

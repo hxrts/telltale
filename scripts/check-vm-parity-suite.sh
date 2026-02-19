@@ -33,6 +33,10 @@ run_check "bridge vm differential-step correspondence" \
   "cargo test -p telltale-lean-bridge --test vm_differential_step_tests"
 run_check "threaded parity equivalence" \
   "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_equivalence"
+run_check "planner trace worker-count conformance" \
+  "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_lane_runtime planner_trace_is_worker_count_invariant_for_fixed_ready_set"
+run_check "v2 parity fixtures (speculation/scheduler/failure-envelope)" \
+  "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test parity_fixtures_v2"
 
 echo "[parity-suite] Summary: ${checks} checks, ${failures} failures."
 

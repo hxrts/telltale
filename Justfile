@@ -14,9 +14,15 @@ ci-dry-run:
     cargo test --workspace --all-targets --all-features
     just check-arch
     just check-arch-lean
+    just check-speculation-wp-surface
+    just check-runtime-contract-gates
+    just check-runtime-performance-governance
     just check-failure-capabilities
+    just check-release-conformance
     just check-envelope-conformance
     just check-byzantine-conformance
+    just check-delegation-shard-gate
+    just check-v2-baseline
     just check-vm-placeholders
     just check-parity-ledger
     just check-vm-parity-suite
@@ -44,21 +50,53 @@ lint-quick:
 check-arch-rust:
     ./scripts/check-arch-rust.sh
 
+# Governance gate: proof/conformance checks before perf lanes
+check-runtime-performance-governance:
+    ./scripts/check-runtime-performance-governance.sh
+
 # Lean architecture/style-guide pattern checker
 check-arch-lean:
     ./scripts/check-arch-lean.sh
+
+# Speculation/WP placeholder-surface conformance checks
+check-speculation-wp-surface:
+    ./scripts/check-speculation-wp-surface.sh
+
+# Runtime admission/profile capability-gate checks
+check-runtime-contract-gates:
+    ./scripts/check-runtime-contract-gates.sh
 
 # Failure theorem-capability conformance checks
 check-failure-capabilities:
     ./scripts/check-failure-capabilities.sh
 
+# Release theorem-capability and conformance checks
+check-release-conformance:
+    ./scripts/check-release-conformance.sh
+
 # Envelope theorem-capability and conformance checks
 check-envelope-conformance:
     ./scripts/check-envelope-conformance.sh
 
+# V2 baseline artifact integrity checks
+check-v2-baseline:
+    ./scripts/check-v2-baseline.sh
+
+# Capture/freeze V2 baseline metrics + conformance artifacts
+v2-freeze-baseline:
+    ./scripts/v2-freeze-baseline.sh
+
+# Run V2 benchmark matrix across disjoint and contended workloads
+run-v2-benchmark-matrix:
+    ./scripts/run-v2-benchmark-matrix.sh
+
 # Byzantine theorem-capability and conformance checks
 check-byzantine-conformance:
     ./scripts/check-byzantine-conformance.sh
+
+# Delegation-only cross-shard ownership transition gate
+check-delegation-shard-gate:
+    ./scripts/check-delegation-shard-gate.sh
 
 # Prevent new placeholder/stub/TODO markers in executable Lean VM modules.
 check-vm-placeholders:
@@ -174,6 +212,23 @@ _clean-assets:
 # Build the book after regenerating the summary
 book: summary _gen-assets
     mdbook build && just _clean-assets
+
+# Build paper PDFs (requires texlive from nix develop shell)
+paper:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd paper
+    mkdir -p build
+    for p in paper1 paper2 paper3; do
+        echo "Building $p.pdf..."
+        pdflatex -interaction=nonstopmode -output-directory=build "$p.tex" > /dev/null || true
+        pdflatex -interaction=nonstopmode -output-directory=build "$p.tex" > /dev/null
+    done
+    echo "Built: build/paper1.pdf build/paper2.pdf build/paper3.pdf"
+
+# Clean paper build artifacts
+paper-clean:
+    rm -rf paper/build
 
 # Serve locally with live reload
 serve: summary _gen-assets

@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "workload": {
+    "sessions": 96,
+    "canonical_concurrency": 8,
+    "threaded_workers": 8,
+    "max_rounds": 4096
+  },
+  "canonical": {
+    "elapsed_ms": 245,
+    "steps": 576,
+    "throughput_steps_per_sec": 2343.9518720919787,
+    "throughput_sessions_per_sec": 390.65864534866313,
+    "p50_step_latency_us": 424,
+    "p99_step_latency_us": 449,
+    "mean_wave_width": 1.0,
+    "max_wave_width": 1,
+    "lock_contention_events_per_1k_steps": 0.0
+  },
+  "threaded": {
+    "elapsed_ms": 12,
+    "steps": 624,
+    "throughput_steps_per_sec": 50620.929791285205,
+    "throughput_sessions_per_sec": 7787.835352505415,
+    "p50_step_latency_us": 130,
+    "p99_step_latency_us": 321,
+    "mean_wave_width": 8.0,
+    "max_wave_width": 8,
+    "lock_contention_events_per_1k_steps": 0.0
+  },
+  "canonical_replay_fragment_hash": "fcd9aa5721e08dea6d7046f742844fb5b59fcf8c1800ea2a7b389ec01a44cd39",
+  "threaded_replay_fragment_hash": "1754b91f02e813c82fb82b7b62ef59d316fbad3e89ac248ea2580d835d315b40",
+  "envelope_diff_artifact": {
+    "schema_version": 1,
+    "envelope_diff": {
+      "schema_version": 1,
+      "baseline_engine": "native_single_thread",
+      "candidate_engine": "native_threaded",
+      "scheduler_permutation_class": "SessionNormalizedPermutation",
+      "wave_width_bound": {
+        "baseline_max_wave_width": 1,
+        "candidate_max_wave_width": 8,
+        "declared_upper_bound": 8
+      },
+      "effect_ordering_class": "ReplayDeterministic",
+      "failure_visible_diff_class": "Exact",
+      "effect_determinism_tier": "envelope_bounded_nondeterministic"
+    },
+    "baseline_fragment_hash": "fcd9aa5721e08dea6d7046f742844fb5b59fcf8c1800ea2a7b389ec01a44cd39",
+    "candidate_fragment_hash": "1754b91f02e813c82fb82b7b62ef59d316fbad3e89ac248ea2580d835d315b40",
+    "envelope_diff_hash": "b9672014bd8a215a9b32be313650b5b2d7b7d978eb2af441f1fe0f7f88a816c2"
+  },
+  "artifact_hash": "0a4f49b14914beb0f8bfa4c6624bd11367fa7e2006521cafe2881dd5c63abaf5"
+}

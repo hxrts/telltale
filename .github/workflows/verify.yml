@@ -41,6 +41,16 @@ jobs:
           mkdir -p artifacts
           just check-vm-parity-suite | tee artifacts/check-vm-parity-suite.log
 
+      - name: Run delegation-shard ownership gate
+        run: |
+          mkdir -p artifacts
+          just check-delegation-shard-gate | tee artifacts/check-delegation-shard-gate.log
+
+      - name: Run release conformance checks
+        run: |
+          mkdir -p artifacts
+          just check-release-conformance | tee artifacts/check-release-conformance.log
+
       - name: Build targeted Lean VM modules
         run: just verify-lean-vm-targets
 
@@ -95,6 +105,16 @@ jobs:
           mkdir -p artifacts
           just check-vm-parity-suite | tee artifacts/check-vm-parity-suite.log
 
+      - name: Run delegation-shard ownership gate
+        run: |
+          mkdir -p artifacts
+          just check-delegation-shard-gate | tee artifacts/check-delegation-shard-gate.log
+
+      - name: Run release conformance checks
+        run: |
+          mkdir -p artifacts
+          just check-release-conformance | tee artifacts/check-release-conformance.log
+
       - name: Setup Lean
         uses: leanprover/lean4-action@v1
 
@@ -124,6 +144,11 @@ jobs:
         run: |
           mkdir -p artifacts
           just verify-composition-stress | tee artifacts/verify-composition-stress.log
+
+      - name: Run V2 benchmark matrix
+        run: |
+          mkdir -p artifacts
+          just run-v2-benchmark-matrix | tee artifacts/run-v2-benchmark-matrix.log
 
       - name: Upload heavy-lane artifacts
         uses: actions/upload-artifact@v4
