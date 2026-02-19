@@ -13,10 +13,10 @@ Standard session type systems use duality to relate the two endpoints of a binar
 For each directed edge from sender to receiver, Coherence requires that consuming the in-flight message trace against the receiver's local type succeeds. The `Consume` function models this. It takes a receiver's local type and a sequence of buffered messages and returns the local type that remains after processing those messages.
 
 ```lean
-def Consume (sender : Role) (L : LocalType) (trace : List Label) : Option LocalType
+def Consume (from_ : Role) : LocalType → List ValType → Option LocalType
 ```
 
-This function steps through the trace one label at a time. At each step it checks that the receiver's local type expects a receive from the sender with the matching label.
+This function steps through the trace one value at a time. At each step it checks that the receiver's local type expects a receive from the sender with a matching payload type.
 
 The `EdgeCoherent` predicate applies `Consume` to a single directed edge. The top-level `Coherent` predicate universally quantifies over all directed edges in all sessions. A configuration is coherent when every edge satisfies `EdgeCoherent`.
 
@@ -77,14 +77,16 @@ The `LocalTypeR` type represents recursive local session types with named recurs
 
 ```lean
 inductive LocalTypeR where
-  | send (role : Role) (label : Label) (cont : LocalTypeR)
-  | recv (role : Role) (label : Label) (cont : LocalTypeR)
-  | end
-  | mu (body : LocalTypeR)
-  | var (idx : Nat)
+  | end : LocalTypeR
+  | send : String → List (Label × Option ValType × LocalTypeR) → LocalTypeR
+  | recv : String → List (Label × Option ValType × LocalTypeR) → LocalTypeR
+  | mu : String → LocalTypeR → LocalTypeR
+  | var : String → LocalTypeR
 ```
 
-Substitution replaces the outermost bound variable with a given type. Well-formedness requires that all variables are bound by an enclosing `mu`. The de Bruijn representation in `SessionTypes/LocalTypeDB/` provides an alternative with clean substitution properties.
+The `send` and `recv` constructors take a partner role name and a list of branches. Each branch is a triple of label, optional payload type, and continuation. The `mu` constructor binds a named variable.
+
+Substitution replaces the bound variable with a given type. Well-formedness requires that all variables are bound by an enclosing `mu`. The de Bruijn representation in `SessionTypes/LocalTypeDB/` provides an alternative with positional indices.
 
 ### Coinductive Representation
 

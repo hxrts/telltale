@@ -8,7 +8,9 @@ Session types encode communication protocols as types. They specify the sequence
 
 Traditional type systems ensure data safety. They prevent type errors like passing a string where an integer is expected. Session types extend this to communication safety. They prevent protocol errors like sending when you should receive or terminating when more messages are expected.
 
-A session type describes a communication channel from one endpoint's perspective. The type `!String.?Int.end` means send a string, then receive an integer, then close the channel. The dual type `?String.!Int.end` means receive a string, then send an integer, then close. These types are complementary. They ensure the endpoints coordinate correctly.
+A session type describes a communication channel from one endpoint's perspective. The type `!String.?Int.end` means send a string, then receive an integer, then close the channel. The dual type `?String.!Int.end` means receive a string, then send an integer, then close.
+
+These types are complementary and ensure the endpoints coordinate correctly.
 
 ## Multiparty Session Types (MPST)
 

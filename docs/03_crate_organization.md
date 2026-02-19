@@ -171,7 +171,9 @@ The `run` function executes a choreography and returns a trace. The trace contai
 
 This crate is located in `rust/choreography/`. It provides DSL and parsing for choreographic programming. It depends on `telltale-types` and `telltale-theory`.
 
-The `ast/` directory contains extended AST types including `Protocol`, `LocalType`, and `Role`. The `compiler/parser` module handles DSL parsing. The `compiler/projection` module handles choreography to `LocalType` projection. The `compiler/codegen` module handles Rust code generation. The `effects/` directory contains the effect system and handlers. The `extensions/` directory contains the DSL extension system. The `runtime/` directory contains platform abstraction.
+The `ast/` directory contains extended AST types including `Protocol`, `LocalType`, and `Role`. The `compiler/parser` module handles DSL parsing. The `compiler/projection` module handles choreography to `LocalType` projection. The `compiler/codegen` module handles Rust code generation.
+
+The `effects/` directory contains the effect system and handlers. The `extensions/` directory contains the DSL extension system. The `runtime/` directory contains platform abstraction.
 
 The `topology/` directory provides deployment configuration. See [Topology](20_topology.md) for the separation between protocol logic and deployment. The `heap/` directory provides explicit resource management. See [Resource Heap](17_resource_heap.md) for nullifier-based consumption tracking.
 

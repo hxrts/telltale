@@ -1,6 +1,8 @@
 # Effect Handlers and Session Types
 
-Telltale uses algebraic effects as the intermediate representation between choreographic protocols and verified execution. The architecture has three layers. The choreography DSL specifies global protocols. The effect algebra represents projected per-role programs. The VM executes bytecode verified against session types. Formal connections at each layer boundary ensure that protocol-level guarantees carry through to execution.
+Telltale uses algebraic effects as the intermediate representation between choreographic protocols and verified execution. The architecture has three layers: the choreography DSL specifies global protocols, the effect algebra represents projected per-role programs, and the VM executes bytecode verified against session types.
+
+Formal connections at each layer boundary ensure that protocol-level guarantees carry through to execution.
 
 ## Three-Layer Architecture
 
