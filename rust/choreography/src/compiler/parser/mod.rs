@@ -21,19 +21,20 @@ mod types;
 // Re-export public API
 pub use error::{ErrorSpan, ParseError};
 
-use crate::ast::{Choreography, ProofBundleDecl};
+use crate::ast::{Choreography, ProofBundleDecl, Protocol, RoleSetDecl, TopologyDecl};
 use crate::compiler::layout::preprocess_layout;
 use crate::extensions::{ExtensionRegistry, ProtocolExtension};
 use pest::Parser;
 use pest_derive::Parser;
 use proc_macro2::{Span, TokenStream};
 use quote::format_ident;
+use std::fmt::Write as _;
 use std::collections::{HashMap, HashSet};
 
 use conversion::{convert_statements_to_protocol, inline_calls};
 use role::parse_roles_from_pair;
 use statement::{parse_local_protocol_decl, parse_protocol_body};
-use types::Statement;
+use types::{Statement, VmCoreOp};
 
 #[derive(Parser)]
 #[grammar = "compiler/choreography.pest"]
@@ -78,24 +79,95 @@ fn parse_proof_bundle_decl(
     }
 
     let mut capabilities = Vec::new();
-    if let Some(requires_pair) = inner.next() {
-        if requires_pair.as_rule() == Rule::proof_bundle_requires {
-            for item in requires_pair.into_inner() {
-                if item.as_rule() == Rule::capability_list {
-                    for cap in item.into_inner() {
-                        if cap.as_rule() == Rule::ident {
-                            capabilities.push(cap.as_str().to_string());
+    let mut version = None;
+    let mut issuer = None;
+    let mut constraints = Vec::new();
+
+    for item in inner {
+        match item.as_rule() {
+            Rule::proof_bundle_meta => {
+                let Some(meta) = item.into_inner().next() else {
+                    continue;
+                };
+                match meta.as_rule() {
+                    Rule::proof_bundle_version => {
+                        let value = meta
+                            .into_inner()
+                            .next()
+                            .ok_or_else(|| ParseError::Syntax {
+                                span: ErrorSpan::from_pest_span(span, input),
+                                message: "proof_bundle version is missing value".to_string(),
+                            })?;
+                        version = Some(parse_quoted_string(value.as_str()).map_err(|message| {
+                            ParseError::Syntax {
+                                span: ErrorSpan::from_pest_span(span, input),
+                                message,
+                            }
+                        })?);
+                    }
+                    Rule::proof_bundle_issuer => {
+                        let value = meta
+                            .into_inner()
+                            .next()
+                            .ok_or_else(|| ParseError::Syntax {
+                                span: ErrorSpan::from_pest_span(span, input),
+                                message: "proof_bundle issuer is missing value".to_string(),
+                            })?;
+                        issuer = Some(parse_quoted_string(value.as_str()).map_err(|message| {
+                            ParseError::Syntax {
+                                span: ErrorSpan::from_pest_span(span, input),
+                                message,
+                            }
+                        })?);
+                    }
+                    Rule::proof_bundle_constraint => {
+                        let value = meta
+                            .into_inner()
+                            .next()
+                            .ok_or_else(|| ParseError::Syntax {
+                                span: ErrorSpan::from_pest_span(span, input),
+                                message: "proof_bundle constraint is missing value".to_string(),
+                            })?;
+                        constraints.push(parse_quoted_string(value.as_str()).map_err(
+                            |message| ParseError::Syntax {
+                                span: ErrorSpan::from_pest_span(span, input),
+                                message,
+                            },
+                        )?);
+                    }
+                    _ => {}
+                }
+            }
+            Rule::proof_bundle_requires => {
+                for requires_item in item.into_inner() {
+                    if requires_item.as_rule() == Rule::capability_list {
+                        for cap in requires_item.into_inner() {
+                            if cap.as_rule() == Rule::ident {
+                                capabilities.push(cap.as_str().to_string());
+                            }
                         }
                     }
                 }
             }
+            _ => {}
         }
     }
 
     Ok(ProofBundleDecl {
         name: name_pair.as_str().to_string(),
         capabilities,
+        version,
+        issuer,
+        constraints,
     })
+}
+
+fn parse_quoted_string(value: &str) -> Result<String, String> {
+    if value.starts_with('\"') && value.ends_with('\"') && value.len() >= 2 {
+        Ok(value[1..value.len() - 1].to_string())
+    } else {
+        Err("expected quoted string literal".to_string())
+    }
 }
 
 /// Parse protocol-level required proof bundles.
@@ -104,6 +176,338 @@ fn parse_protocol_requires(pair: pest::iterators::Pair<Rule>) -> Vec<String> {
         .filter(|p| p.as_rule() == Rule::ident)
         .map(|p| p.as_str().to_string())
         .collect()
+}
+
+fn parse_role_set_decl(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<RoleSetDecl, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let name = inner
+        .next()
+        .ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "role_set is missing name".to_string(),
+        })?
+        .as_str()
+        .to_string();
+    let expr = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "role_set is missing expression".to_string(),
+    })?;
+
+    let mut decl = RoleSetDecl {
+        name,
+        members: Vec::new(),
+        subset_of: None,
+        subset_start: None,
+        subset_end: None,
+    };
+
+    for expr_item in expr.into_inner() {
+        match expr_item.as_rule() {
+            Rule::role_set_members => {
+                decl.members = expr_item
+                    .into_inner()
+                    .filter(|p| p.as_rule() == Rule::ident)
+                    .map(|p| p.as_str().to_string())
+                    .collect();
+            }
+            Rule::role_set_subset => {
+                let mut subset_inner = expr_item.into_inner();
+                let source = subset_inner.next().ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "role_set subset is missing source".to_string(),
+                })?;
+                let start = subset_inner.next().ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "role_set subset is missing start".to_string(),
+                })?;
+                let end = subset_inner.next().ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "role_set subset is missing end".to_string(),
+                })?;
+                decl.subset_of = Some(source.as_str().to_string());
+                decl.subset_start = Some(start.as_str().parse::<u32>().map_err(|_| {
+                    ParseError::Syntax {
+                        span: ErrorSpan::from_pest_span(span, input),
+                        message: "role_set subset start must be an integer".to_string(),
+                    }
+                })?);
+                decl.subset_end = Some(end.as_str().parse::<u32>().map_err(|_| {
+                    ParseError::Syntax {
+                        span: ErrorSpan::from_pest_span(span, input),
+                        message: "role_set subset end must be an integer".to_string(),
+                    }
+                })?);
+            }
+            _ => {}
+        }
+    }
+
+    Ok(decl)
+}
+
+fn parse_topology_decl(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<TopologyDecl, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let kind = inner
+        .next()
+        .ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "topology declaration is missing kind".to_string(),
+        })?
+        .as_str()
+        .to_string();
+    let name = inner
+        .next()
+        .ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "topology declaration is missing name".to_string(),
+        })?
+        .as_str()
+        .to_string();
+    let members_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "topology declaration is missing members".to_string(),
+    })?;
+    let members = members_pair
+        .into_inner()
+        .filter(|p| p.as_rule() == Rule::ident)
+        .map(|p| p.as_str().to_string())
+        .collect();
+    Ok(TopologyDecl {
+        kind,
+        name,
+        members,
+    })
+}
+
+fn linear_usage_error(input: &str, message: impl Into<String>) -> ParseError {
+    ParseError::Syntax {
+        span: ErrorSpan::from_line_col(1, 1, input),
+        message: message.into(),
+    }
+}
+
+fn consume_linear_asset(
+    live_assets: &mut HashSet<String>,
+    asset: &str,
+    input: &str,
+    op: &str,
+) -> Result<(), ParseError> {
+    if live_assets.remove(asset) {
+        Ok(())
+    } else {
+        Err(linear_usage_error(
+            input,
+            format!("linear asset '{asset}' used by {op} before acquire"),
+        ))
+    }
+}
+
+fn validate_linear_vm_assets(statements: &[Statement], input: &str) -> Result<(), ParseError> {
+    fn validate_block(
+        statements: &[Statement],
+        incoming: &HashSet<String>,
+        input: &str,
+    ) -> Result<HashSet<String>, ParseError> {
+        let mut live_assets = incoming.clone();
+
+        for statement in statements {
+            match statement {
+                Statement::VmCoreOp { op } => match op {
+                    VmCoreOp::Acquire { dst, .. } => {
+                        if !live_assets.insert(dst.clone()) {
+                            return Err(linear_usage_error(
+                                input,
+                                format!("linear asset '{dst}' acquired more than once"),
+                            ));
+                        }
+                    }
+                    VmCoreOp::Release { evidence, .. } => {
+                        consume_linear_asset(&mut live_assets, evidence, input, "release")?;
+                    }
+                    VmCoreOp::Transfer { endpoint, .. } => {
+                        consume_linear_asset(&mut live_assets, endpoint, input, "transfer")?;
+                    }
+                    VmCoreOp::Fork { .. }
+                    | VmCoreOp::Join
+                    | VmCoreOp::Abort
+                    | VmCoreOp::Tag { .. }
+                    | VmCoreOp::Check { .. } => {}
+                },
+                Statement::Choice { branches, .. } | Statement::TimedChoice { branches, .. } => {
+                    let mut merged: Option<HashSet<String>> = None;
+                    for branch in branches {
+                        let out = validate_block(&branch.statements, &live_assets, input)?;
+                        if let Some(prev) = &merged {
+                            if prev != &out {
+                                return Err(linear_usage_error(
+                                    input,
+                                    "linear assets diverge across choice branches",
+                                ));
+                            }
+                        } else {
+                            merged = Some(out);
+                        }
+                    }
+                    if let Some(out) = merged {
+                        live_assets = out;
+                    }
+                }
+                Statement::Loop { body, .. } => {
+                    let out = validate_block(body, &live_assets, input)?;
+                    if out != live_assets {
+                        return Err(linear_usage_error(
+                            input,
+                            "loop body must preserve linear assets across iterations",
+                        ));
+                    }
+                }
+                Statement::Rec { body, .. } => {
+                    let out = validate_block(body, &live_assets, input)?;
+                    if out != live_assets {
+                        return Err(linear_usage_error(
+                            input,
+                            "recursive body must preserve linear assets across unfoldings",
+                        ));
+                    }
+                }
+                Statement::Parallel { branches } => {
+                    for branch in branches {
+                        let out = validate_block(branch, &live_assets, input)?;
+                        if out != live_assets {
+                            return Err(linear_usage_error(
+                                input,
+                                "parallel branches must preserve linear assets",
+                            ));
+                        }
+                    }
+                }
+                Statement::Branch { body, .. } => {
+                    let out = validate_block(body, &live_assets, input)?;
+                    if out != live_assets {
+                        return Err(linear_usage_error(
+                            input,
+                            "branch blocks must preserve linear assets",
+                        ));
+                    }
+                }
+                Statement::Heartbeat {
+                    on_missing_body,
+                    body,
+                    ..
+                } => {
+                    let alive = validate_block(body, &live_assets, input)?;
+                    let missing = validate_block(on_missing_body, &live_assets, input)?;
+                    if alive != missing || alive != live_assets {
+                        return Err(linear_usage_error(
+                            input,
+                            "heartbeat branches must preserve identical linear assets",
+                        ));
+                    }
+                }
+                Statement::Send { .. }
+                | Statement::Broadcast { .. }
+                | Statement::Continue { .. }
+                | Statement::Handshake { .. }
+                | Statement::QuorumCollect { .. }
+                | Statement::Call { .. } => {}
+            }
+        }
+
+        Ok(live_assets)
+    }
+
+    validate_block(statements, &HashSet::new(), input).map(|_| ())
+}
+
+fn collect_vm_required_capabilities(statements: &[Statement], out: &mut HashSet<String>) {
+    for statement in statements {
+        match statement {
+            Statement::VmCoreOp { op } => {
+                out.insert(op.required_capability().to_string());
+            }
+            Statement::Choice { branches, .. } | Statement::TimedChoice { branches, .. } => {
+                for branch in branches {
+                    collect_vm_required_capabilities(&branch.statements, out);
+                }
+            }
+            Statement::Loop { body, .. }
+            | Statement::Rec { body, .. }
+            | Statement::Branch { body, .. } => {
+                collect_vm_required_capabilities(body, out);
+            }
+            Statement::Parallel { branches } => {
+                for branch in branches {
+                    collect_vm_required_capabilities(branch, out);
+                }
+            }
+            Statement::Heartbeat {
+                on_missing_body,
+                body,
+                ..
+            } => {
+                collect_vm_required_capabilities(on_missing_body, out);
+                collect_vm_required_capabilities(body, out);
+            }
+            Statement::Send { .. }
+            | Statement::Broadcast { .. }
+            | Statement::Continue { .. }
+            | Statement::Handshake { .. }
+            | Statement::QuorumCollect { .. }
+            | Statement::Call { .. } => {}
+        }
+    }
+}
+
+fn infer_required_proof_bundles(
+    explicit_required: &[String],
+    proof_bundles: &[ProofBundleDecl],
+    statements: &[Statement],
+) -> Vec<String> {
+    if !explicit_required.is_empty() {
+        return Vec::new();
+    }
+    if proof_bundles.is_empty() {
+        return Vec::new();
+    }
+
+    let mut required_caps = HashSet::new();
+    collect_vm_required_capabilities(statements, &mut required_caps);
+    if required_caps.is_empty() {
+        return Vec::new();
+    }
+
+    let mut selected = Vec::new();
+    let mut covered = HashSet::new();
+    let mut caps: Vec<_> = required_caps.into_iter().collect();
+    caps.sort();
+
+    for cap in caps {
+        if covered.contains(&cap) {
+            continue;
+        }
+        let Some(bundle) = proof_bundles
+            .iter()
+            .find(|bundle| bundle.capabilities.iter().any(|c| c == &cap))
+        else {
+            return Vec::new();
+        };
+        if !selected.contains(&bundle.name) {
+            selected.push(bundle.name.clone());
+        }
+        for bundle_cap in &bundle.capabilities {
+            covered.insert(bundle_cap.clone());
+        }
+    }
+
+    selected
 }
 
 /// Parse a choreographic protocol from a string
@@ -135,6 +539,8 @@ pub fn parse_choreography_str_with_extensions(
     let mut statements: Vec<Statement> = Vec::new();
     let mut proof_bundles: Vec<ProofBundleDecl> = Vec::new();
     let mut required_bundles: Vec<String> = Vec::new();
+    let mut role_sets: Vec<RoleSetDecl> = Vec::new();
+    let mut topologies: Vec<TopologyDecl> = Vec::new();
 
     for pair in pairs {
         if pair.as_rule() == Rule::choreography {
@@ -148,6 +554,12 @@ pub fn parse_choreography_str_with_extensions(
                     }
                     Rule::proof_bundle_decl => {
                         proof_bundles.push(parse_proof_bundle_decl(inner, &preprocessed)?);
+                    }
+                    Rule::role_set_decl => {
+                        role_sets.push(parse_role_set_decl(inner, &preprocessed)?);
+                    }
+                    Rule::topology_decl => {
+                        topologies.push(parse_topology_decl(inner, &preprocessed)?);
                     }
                     Rule::protocol_decl => {
                         let mut proto_inner = inner.into_inner();
@@ -223,6 +635,7 @@ pub fn parse_choreography_str_with_extensions(
                         }
 
                         statements = inline_calls(&body_statements, &protocol_defs, &preprocessed)?;
+                        validate_linear_vm_assets(&statements, &preprocessed)?;
                     }
                     _ => {}
                 }
@@ -250,8 +663,34 @@ pub fn parse_choreography_str_with_extensions(
             span: ErrorSpan::from_line_col(1, 1, &preprocessed),
             message,
         })?;
+    let inferred_required_bundles =
+        infer_required_proof_bundles(&required_bundles, &proof_bundles, &statements);
+    let resolved_required_bundles = if required_bundles.is_empty() {
+        inferred_required_bundles.clone()
+    } else {
+        required_bundles.clone()
+    };
+
     choreography
-        .set_required_proof_bundles(&required_bundles)
+        .set_required_proof_bundles(&resolved_required_bundles)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            message,
+        })?;
+    choreography
+        .set_inferred_required_proof_bundles(&inferred_required_bundles)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            message,
+        })?;
+    choreography
+        .set_role_sets(&role_sets)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            message,
+        })?;
+    choreography
+        .set_topologies(&topologies)
         .map_err(|message| ParseError::Syntax {
             span: ErrorSpan::from_line_col(1, 1, &preprocessed),
             message,
@@ -355,6 +794,201 @@ pub fn parse_choreography_file(
 /// Parse choreography DSL
 pub fn parse_dsl(input: &str) -> std::result::Result<Choreography, ParseError> {
     parse_choreography_str(input)
+}
+
+/// Lint level for parser diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LintLevel {
+    Off,
+    Warn,
+    Deny,
+}
+
+/// Structured lint diagnostic with optional fix suggestion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LintDiagnostic {
+    pub code: String,
+    pub level: LintLevel,
+    pub message: String,
+    pub suggestion: Option<String>,
+}
+
+/// Collect DSL lint diagnostics for a parsed choreography.
+pub fn collect_dsl_lints(choreography: &Choreography, level: LintLevel) -> Vec<LintDiagnostic> {
+    if level == LintLevel::Off {
+        return Vec::new();
+    }
+
+    let mut diagnostics = Vec::new();
+    let inferred = choreography.inferred_required_proof_bundles();
+    let required = choreography.required_proof_bundles();
+    if !inferred.is_empty() && inferred == required {
+        diagnostics.push(LintDiagnostic {
+            code: "dsl.inferred_requires".to_string(),
+            level,
+            message: "Protocol requirements were inferred from VM-core capabilities".to_string(),
+            suggestion: Some(format!(
+                "Add explicit `requires {}` to the protocol header",
+                inferred.join(", ")
+            )),
+        });
+    }
+
+    diagnostics
+}
+
+/// Render lint diagnostics into a lightweight LSP-like JSON string.
+pub fn render_lsp_lint_diagnostics(choreography: &Choreography, level: LintLevel) -> String {
+    let diagnostics: Vec<serde_json::Value> = collect_dsl_lints(choreography, level)
+        .into_iter()
+        .map(|lint| {
+            serde_json::json!({
+                "code": lint.code,
+                "severity": match lint.level {
+                    LintLevel::Off => "off",
+                    LintLevel::Warn => "warning",
+                    LintLevel::Deny => "error",
+                },
+                "message": lint.message,
+                "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 0, "character": 1}
+                },
+                "data": {
+                    "quickFix": lint.suggestion
+                }
+            })
+        })
+        .collect();
+    serde_json::to_string_pretty(&diagnostics).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// Produce a canonical lowering report for a DSL snippet.
+pub fn explain_lowering(input: &str) -> std::result::Result<String, ParseError> {
+    fn render_protocol(protocol: &Protocol, depth: usize, out: &mut String) {
+        let indent = "  ".repeat(depth);
+        match protocol {
+            Protocol::Send {
+                from,
+                to,
+                message,
+                continuation,
+                ..
+            } => {
+                let _ = writeln!(
+                    out,
+                    "{indent}- send {} -> {} : {}",
+                    from.name(),
+                    to.name(),
+                    message.name
+                );
+                render_protocol(continuation, depth + 1, out);
+            }
+            Protocol::Broadcast {
+                from,
+                message,
+                continuation,
+                ..
+            } => {
+                let _ = writeln!(
+                    out,
+                    "{indent}- broadcast {} ->* : {}",
+                    from.name(),
+                    message.name
+                );
+                render_protocol(continuation, depth + 1, out);
+            }
+            Protocol::Choice { role, branches, .. } => {
+                let _ = writeln!(out, "{indent}- choice at {}", role.name());
+                for branch in branches {
+                    let _ = writeln!(out, "{indent}  branch {}", branch.label);
+                    render_protocol(&branch.protocol, depth + 2, out);
+                }
+            }
+            Protocol::Loop { body, .. } => {
+                let _ = writeln!(out, "{indent}- loop");
+                render_protocol(body, depth + 1, out);
+            }
+            Protocol::Parallel { protocols } => {
+                let _ = writeln!(out, "{indent}- parallel");
+                for (idx, branch) in protocols.iter().enumerate() {
+                    let _ = writeln!(out, "{indent}  branch#{idx}");
+                    render_protocol(branch, depth + 2, out);
+                }
+            }
+            Protocol::Rec { label, body } => {
+                let _ = writeln!(out, "{indent}- rec {label}");
+                render_protocol(body, depth + 1, out);
+            }
+            Protocol::Var(label) => {
+                let _ = writeln!(out, "{indent}- continue {label}");
+            }
+            Protocol::Extension {
+                annotations,
+                continuation,
+                ..
+            } => {
+                let kind = annotations
+                    .custom("vm_core_op")
+                    .or_else(|| annotations.custom("dsl_combinator"))
+                    .unwrap_or("extension");
+                let _ = writeln!(out, "{indent}- extension {kind}");
+                render_protocol(continuation, depth + 1, out);
+            }
+            Protocol::End => {
+                let _ = writeln!(out, "{indent}- end");
+            }
+        }
+    }
+
+    let choreography = parse_choreography_str(input)?;
+    let mut out = String::new();
+    let _ = writeln!(out, "Protocol: {}", choreography.qualified_name());
+    let _ = writeln!(
+        out,
+        "Roles: {}",
+        choreography
+            .roles
+            .iter()
+            .map(|r| r.name().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    let bundles = choreography.proof_bundles();
+    if !bundles.is_empty() {
+        let _ = writeln!(
+            out,
+            "Proof bundles: {}",
+            bundles
+                .iter()
+                .map(|b| b.name.clone())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+    let required = choreography.required_proof_bundles();
+    if !required.is_empty() {
+        let _ = writeln!(out, "Required bundles: {}", required.join(", "));
+    }
+    let inferred = choreography.inferred_required_proof_bundles();
+    if !inferred.is_empty() {
+        let _ = writeln!(out, "Inferred bundles: {}", inferred.join(", "));
+    }
+    let _ = writeln!(out, "Lowering:");
+    render_protocol(&choreography.protocol, 1, &mut out);
+
+    let lints = collect_dsl_lints(&choreography, LintLevel::Warn);
+    if !lints.is_empty() {
+        let _ = writeln!(out, "Lints:");
+        for lint in lints {
+            let _ = writeln!(out, "- [{}] {}", lint.code, lint.message);
+            if let Some(fix) = lint.suggestion {
+                let _ = writeln!(out, "  fix: {fix}");
+            }
+        }
+    }
+
+    Ok(out)
 }
 
 // Example of how the macro would work
@@ -1608,7 +2242,7 @@ protocol WithBundles requires Base, Extra =
 protocol VmOps =
   roles A, B
   acquire guard as token
-  transfer ep to B with bundle Base
+  transfer token to B with bundle Base
   check k for B into out
   A -> B : Ping
 "#;
@@ -1731,5 +2365,217 @@ protocol ExtensionProjection =
             LocalType::Send { to, .. } => assert_eq!(to.name(), "B"),
             other => panic!("expected send continuation projection, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_parse_enriched_proof_bundle_metadata() {
+        let input = r#"
+proof_bundle Base version "1.0.0" issuer "did:example:issuer" constraint "fresh_nonce" constraint "sig_valid" requires [delegation, guard_tokens]
+protocol BundleMeta requires Base =
+  roles A, B
+  A -> B : Ping
+"#;
+
+        let choreo = parse_choreography_str(input).expect("parse should succeed");
+        let bundles = choreo.proof_bundles();
+        assert_eq!(bundles.len(), 1);
+        let bundle = &bundles[0];
+        assert_eq!(bundle.name, "Base");
+        assert_eq!(bundle.version.as_deref(), Some("1.0.0"));
+        assert_eq!(bundle.issuer.as_deref(), Some("did:example:issuer"));
+        assert_eq!(
+            bundle.constraints,
+            vec!["fresh_nonce".to_string(), "sig_valid".to_string()]
+        );
+        assert_eq!(
+            bundle.capabilities,
+            vec!["delegation".to_string(), "guard_tokens".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_infer_required_bundles_from_vm_capabilities() {
+        let input = r#"
+proof_bundle Spec requires [speculation]
+protocol Inferred =
+  roles A, B
+  fork ghost0
+  A -> B : Ping
+"#;
+
+        let choreo = parse_choreography_str(input).expect("parse should succeed");
+        assert_eq!(choreo.required_proof_bundles(), vec!["Spec".to_string()]);
+        assert_eq!(
+            choreo.inferred_required_proof_bundles(),
+            vec!["Spec".to_string()]
+        );
+        assert!(choreo.validate().is_ok());
+    }
+
+    #[test]
+    fn test_linear_assets_reject_double_consume() {
+        let input = r#"
+protocol LinearDoubleConsume =
+  roles A, B
+  acquire guard as token
+  release guard using token
+  release guard using token
+"#;
+
+        let err = parse_choreography_str(input).expect_err("parse should fail");
+        assert!(err.to_string().contains("before acquire"));
+    }
+
+    #[test]
+    fn test_linear_assets_reject_branch_divergence() {
+        let input = r#"
+protocol LinearBranchDivergence =
+  roles A, B
+  acquire guard as token
+  choice at A
+    consume ->
+      release guard using token
+    keep ->
+      A -> B : Skip
+"#;
+
+        let err = parse_choreography_str(input).expect_err("parse should fail");
+        assert!(err.to_string().contains("diverge"));
+    }
+
+    #[test]
+    fn test_parse_first_class_combinators() {
+        fn has_quorum_extension(protocol: &Protocol) -> bool {
+            match protocol {
+                Protocol::Extension {
+                    annotations,
+                    continuation,
+                    ..
+                } => {
+                    annotations.custom("dsl_combinator") == Some("quorum_collect")
+                        || has_quorum_extension(continuation)
+                }
+                Protocol::Send { continuation, .. } | Protocol::Broadcast { continuation, .. } => {
+                    has_quorum_extension(continuation)
+                }
+                Protocol::Choice { branches, .. } => {
+                    branches.iter().any(|b| has_quorum_extension(&b.protocol))
+                }
+                Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => {
+                    has_quorum_extension(body)
+                }
+                Protocol::Parallel { protocols } => protocols.iter().any(has_quorum_extension),
+                Protocol::Var(_) | Protocol::End => false,
+            }
+        }
+
+        let input = r#"
+protocol Combinators =
+  roles A, B
+  handshake A <-> B : Hello
+  quorum_collect A -> B min 2 : Vote
+  A -> B : Done
+  retry 2 {
+    A -> B : Ping
+  }
+"#;
+
+        let choreo = parse_choreography_str(input).expect("parse should succeed");
+        match &choreo.protocol {
+            Protocol::Send {
+                from,
+                to,
+                message,
+                continuation,
+                ..
+            } => {
+                assert_eq!(from.name(), "A");
+                assert_eq!(to.name(), "B");
+                assert_eq!(message.name.to_string(), "Hello");
+                match continuation.as_ref() {
+                    Protocol::Send { message, .. } => {
+                        assert_eq!(message.name.to_string(), "HelloAck");
+                    }
+                    _ => panic!("expected second send from handshake"),
+                }
+            }
+            _ => panic!("expected send from handshake lowering"),
+        }
+        assert!(has_quorum_extension(&choreo.protocol));
+    }
+
+    #[test]
+    fn test_parse_role_sets_and_topologies() {
+        let input = r#"
+role_set Signers = Alice, Bob, Carol
+role_set Quorum = subset(Signers, 0..2)
+cluster LocalCluster = Signers, Quorum
+ring RingNet = Alice, Bob, Carol
+mesh FullMesh = Alice, Bob, Carol
+protocol TopologyAware =
+  roles Alice, Bob
+  Alice -> Bob : Ping
+"#;
+
+        let choreo = parse_choreography_str(input).expect("parse should succeed");
+        let role_sets = choreo.role_sets();
+        assert_eq!(role_sets.len(), 2);
+        assert_eq!(role_sets[0].name, "Signers");
+        assert_eq!(
+            role_sets[0].members,
+            vec!["Alice".to_string(), "Bob".to_string(), "Carol".to_string()]
+        );
+        assert_eq!(role_sets[1].subset_of.as_deref(), Some("Signers"));
+        assert_eq!(role_sets[1].subset_start, Some(0));
+        assert_eq!(role_sets[1].subset_end, Some(2));
+
+        let topologies = choreo.topologies();
+        assert_eq!(topologies.len(), 3);
+        assert_eq!(topologies[0].kind, "cluster");
+        assert_eq!(topologies[1].kind, "ring");
+        assert_eq!(topologies[2].kind, "mesh");
+    }
+
+    #[test]
+    fn test_explain_lowering_and_lint_suggestions() {
+        let input = r#"
+proof_bundle Spec requires [speculation]
+protocol ExplainMe =
+  roles A, B
+  fork ghost0
+  A -> B : Ping
+"#;
+
+        let report = explain_lowering(input).expect("report generation should succeed");
+        assert!(report.contains("Inferred bundles: Spec"));
+        assert!(report.contains("dsl.inferred_requires"));
+        assert!(report.contains("Lowering:"));
+
+        let choreo = parse_choreography_str(input).expect("parse should succeed");
+        let lints = collect_dsl_lints(&choreo, LintLevel::Warn);
+        assert!(!lints.is_empty());
+        assert!(lints[0]
+            .suggestion
+            .as_deref()
+            .unwrap_or_default()
+            .contains("requires"));
+        let lsp = render_lsp_lint_diagnostics(&choreo, LintLevel::Warn);
+        assert!(lsp.contains("\"quickFix\""));
+    }
+
+    #[test]
+    fn test_typed_predicate_ir_rejects_if_expression() {
+        let input = r#"
+protocol PredicateTyping =
+  roles A, B
+  choice at A
+    ok when (if ready { true } else { false }) ->
+      A -> B : Accept
+    no ->
+      A -> B : Reject
+"#;
+
+        let err = parse_choreography_str(input).expect_err("parse should fail");
+        assert!(err.to_string().contains("boolean-like"));
     }
 }

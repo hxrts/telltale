@@ -47,7 +47,7 @@ pub use telltale_types::{
 
 // Re-export DSL-specific types
 pub use annotation::{Annotations, ProtocolAnnotation};
-pub use choreography::{Choreography, ProofBundleDecl};
+pub use choreography::{Choreography, ProofBundleDecl, RoleSetDecl, TopologyDecl};
 pub use execution_hints::{
     ChoreographyWithHints, ExecutionHints, ExecutionHintsBuilder, OperationHints, OperationPath,
     OperationStep,

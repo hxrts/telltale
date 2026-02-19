@@ -9,7 +9,7 @@ COMMENT = _{ "--" ~ (!"\n" ~ ANY)* ~ ("\n" | EOI) | "{-" ~ (!"-}" ~ ANY)* ~ "-}"
 
 // Top-level choreography definition
 choreography = {
-    SOI ~ module_decl? ~ import_decl* ~ proof_bundle_decl* ~ protocol_decl ~ EOI
+    SOI ~ module_decl? ~ import_decl* ~ proof_bundle_decl* ~ role_set_decl* ~ topology_decl* ~ protocol_decl ~ EOI
 }
 
 // Module and imports (optional)
@@ -24,10 +24,24 @@ locals_block = { "{" ~ local_protocol_decl+ ~ "}" | "(" ~ local_protocol_decl+ ~
 local_protocol_decl = { "protocol" ~ ident ~ header_roles? ~ "=" ~ protocol_body }
 
 // Proof-bundle declarations and protocol requirements
-proof_bundle_decl = { "proof_bundle" ~ ident ~ proof_bundle_requires? }
+proof_bundle_decl = { "proof_bundle" ~ ident ~ proof_bundle_meta* ~ proof_bundle_requires? }
+proof_bundle_meta = { proof_bundle_version | proof_bundle_issuer | proof_bundle_constraint }
+proof_bundle_version = { "version" ~ string }
+proof_bundle_issuer = { "issuer" ~ string }
+proof_bundle_constraint = { "constraint" ~ string }
 proof_bundle_requires = { "requires" ~ "[" ~ capability_list? ~ "]" }
 capability_list = { ident ~ ("," ~ ident)* }
 protocol_requires = { "requires" ~ ident ~ ("," ~ ident)* }
+
+// Role-set and topology declarations
+role_set_decl = { "role_set" ~ ident ~ "=" ~ role_set_expr }
+role_set_expr = { role_set_subset | role_set_members }
+role_set_members = { ident ~ ("," ~ ident)* }
+role_set_subset = { "subset" ~ "(" ~ ident ~ "," ~ integer ~ ".." ~ integer ~ ")" }
+
+topology_decl = { topology_kind ~ ident ~ "=" ~ topology_members }
+topology_kind = { "cluster" | "ring" | "mesh" }
+topology_members = { ident ~ ("," ~ ident)* }
 
 header_roles = { "(" ~ role_list ~ ")" }
 
@@ -55,6 +69,9 @@ statement = _{
     | rec_stmt
     | continue_stmt
     | call_stmt
+    | handshake_stmt
+    | retry_stmt
+    | quorum_collect_stmt
     | vm_acquire_stmt
     | vm_release_stmt
     | vm_fork_stmt
@@ -82,6 +99,9 @@ inner_stmt = _{
     | branch_stmt
     | rec_stmt
     | call_stmt
+    | handshake_stmt
+    | retry_stmt
+    | quorum_collect_stmt
     | vm_acquire_stmt
     | vm_release_stmt
     | vm_fork_stmt
@@ -106,6 +126,11 @@ heartbeat_body = { "body" ~ block }
 
 // Protocol call statement (for sub-protocols in where blocks)
 call_stmt = { "call" ~ ident }
+
+// First-class combinators
+handshake_stmt = { "handshake" ~ role_ref ~ "<->" ~ role_ref ~ ":" ~ ident }
+retry_stmt = { "retry" ~ int_expr ~ block }
+quorum_collect_stmt = { "quorum_collect" ~ role_ref ~ "->" ~ role_ref ~ "min" ~ integer ~ ":" ~ message }
 
 // VM-core operational statements
 vm_acquire_stmt = { "acquire" ~ vm_layer ~ "as" ~ ident }

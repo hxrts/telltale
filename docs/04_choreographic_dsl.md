@@ -67,7 +67,7 @@ case choose Client of
 ```
 
 The deciding role (`Client`) selects a branch. Guards are optional.
-Guard expressions are parsed as Rust expressions and must be boolean-like. Valid examples include `ready`, `balance > price`, and `is_open()`.
+Guard expressions are parsed through a typed predicate IR and must be boolean-like. Valid examples include `ready`, `balance > price`, and `is_open()`.
 
 Alias syntax (sugar):
 
@@ -128,7 +128,7 @@ loop while "has_more_data"
   A -> B : Data
 ```
 
-This loop parses the string content as a boolean-like predicate expression. The parser rejects non-boolean predicates such as `"count + 1"` before building the AST.
+This loop parses the string content through the same typed predicate IR used by guards. The parser rejects non-boolean predicates such as `"count + 1"` before building the AST.
 
 ```rust
 loop forever
@@ -314,7 +314,7 @@ Unlike `timed_choice`, this annotation does not change the session type. It is a
 `proof_bundle` declarations define capability sets. `protocol ... requires ...` selects the bundles required by a protocol.
 
 ```rust
-proof_bundle DelegationBase requires [delegation, guard_tokens]
+proof_bundle DelegationBase version "1.0.0" issuer "did:example:issuer" constraint "fresh_nonce" requires [delegation, guard_tokens]
 proof_bundle KnowledgeBase requires [knowledge_flow]
 
 protocol TransferFlow requires DelegationBase, KnowledgeBase =
@@ -328,7 +328,9 @@ protocol TransferFlow requires DelegationBase, KnowledgeBase =
   A -> B : Commit
 ```
 
-The parser stores bundle declarations and required bundle names in typed choreography metadata. Validation fails on duplicate bundles, missing required bundles, or missing capability coverage for VM-core statements.
+The parser stores bundle declarations and required bundle names in typed choreography metadata. Bundle records include optional `version`, `issuer`, and repeated `constraint` fields.
+
+Validation fails on duplicate bundles, missing required bundles, or missing capability coverage for VM-core statements. If `requires` is omitted and bundle coverage is unambiguous, the parser infers required bundles from VM-core capability demand.
 
 VM-core statements lower to `Protocol::Extension` nodes with annotations. The annotation keys are `vm_core_op`, `required_capability`, and `vm_core_operands`.
 
@@ -342,7 +344,47 @@ protocol SpeculativeFlow requires SpecBundle =
 
 This lowering preserves statement order and continuation structure. Projection skips extension-local behavior for now and continues projecting the remaining protocol.
 
-#### 12) String-based Protocol Definition
+#### 12) First-Class Combinators
+
+The DSL includes first-class combinators for common patterns.
+
+```rust
+protocol Combinators =
+  roles A, B
+  handshake A <-> B : Hello
+  quorum_collect A -> B min 2 : Vote
+  retry 3 {
+    A -> B : Ping
+  }
+```
+
+`handshake` lowers to a two-message exchange (`Hello` and `HelloAck`). `retry` lowers to a bounded loop. `quorum_collect` lowers to a protocol extension node with combinator annotations.
+
+#### 13) Role Sets and Topologies
+
+Role sets and topologies are declared at the top level and stored as typed metadata.
+
+```rust
+role_set Signers = Alice, Bob, Carol
+role_set Quorum = subset(Signers, 0..2)
+cluster LocalCluster = Signers, Quorum
+ring RingNet = Alice, Bob, Carol
+mesh FullMesh = Alice, Bob, Carol
+```
+
+These declarations do not change core protocol semantics. They provide structured topology context for tooling and simulation setup.
+
+#### 14) Lowering Diagnostics
+
+Use `choreo-fmt --explain-lowering` to inspect canonical lowering output.
+
+```bash
+choreo-fmt --explain-lowering protocol.choreo
+```
+
+The report includes proof-bundle metadata, inferred requirements, lowered protocol shape, and lint suggestions.
+
+#### 15) String-based Protocol Definition
 
 ```rust
 use telltale_choreography::compiler::parser::parse_choreography_str;
@@ -455,7 +497,9 @@ This pattern matches common parse errors. It formats diagnostics with the report
 - Keywords: `protocol`, `roles`, `case`, `choose`, `of`, `choice`, `at`, `loop`,
   `decide`, `by`, `repeat`, `while`, `forever`, `branch`, `rec`, `call`, `where`,
   `module`, `import`, `exposing`, `proof_bundle`, `requires`, `acquire`, `release`,
-  `fork`, `join`, `abort`, `transfer`, `delegate`, `tag`, `check`, `using`, `into`
+  `fork`, `join`, `abort`, `transfer`, `delegate`, `tag`, `check`, `using`, `into`,
+  `version`, `issuer`, `constraint`, `handshake`, `retry`, `quorum_collect`, `min`,
+  `role_set`, `subset`, `cluster`, `ring`, `mesh`
 - Operators: `->`, `->*`, `:`, `{}`, `()`, `,`, `|`
 
 ### Comments

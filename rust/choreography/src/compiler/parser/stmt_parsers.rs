@@ -4,60 +4,25 @@
 
 use crate::ast::{Condition, Role};
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::format_ident;
 use std::collections::{HashMap, HashSet};
-use syn::{BinOp, Expr, Lit, UnOp};
 
 use super::error::{ErrorSpan, ParseError};
 use super::role::parse_role_ref;
 use super::statement::{parse_block, parse_duration};
-use super::types::{ChoiceBranch, Statement, VmCoreOp};
+use super::types::{ChoiceBranch, PredicateExpr, Statement, VmCoreOp};
 use super::Rule;
-
-fn is_boolean_like_predicate(expr: &Expr) -> bool {
-    match expr {
-        Expr::Binary(binary) => matches!(
-            binary.op,
-            BinOp::And(_)
-                | BinOp::Or(_)
-                | BinOp::Eq(_)
-                | BinOp::Ne(_)
-                | BinOp::Lt(_)
-                | BinOp::Le(_)
-                | BinOp::Gt(_)
-                | BinOp::Ge(_)
-        ),
-        Expr::Unary(unary) => matches!(unary.op, UnOp::Not(_)),
-        Expr::Paren(paren) => is_boolean_like_predicate(&paren.expr),
-        Expr::Group(group) => is_boolean_like_predicate(&group.expr),
-        Expr::Lit(lit) => matches!(lit.lit, Lit::Bool(_)),
-        // Keep compatibility for named bool flags or predicate-returning calls.
-        Expr::Path(_)
-        | Expr::Field(_)
-        | Expr::Index(_)
-        | Expr::Call(_)
-        | Expr::MethodCall(_)
-        | Expr::Macro(_) => true,
-        _ => false,
-    }
-}
 
 fn parse_guard_predicate(
     expr_src: &str,
     span: pest::Span,
     input: &str,
 ) -> std::result::Result<TokenStream, ParseError> {
-    let expr = syn::parse_str::<Expr>(expr_src).map_err(|e| ParseError::Syntax {
+    let predicate = PredicateExpr::parse(expr_src).map_err(|e| ParseError::Syntax {
         span: ErrorSpan::from_pest_span(span, input),
         message: format!("Invalid guard expression: {e}"),
     })?;
-    if !is_boolean_like_predicate(&expr) {
-        return Err(ParseError::Syntax {
-            span: ErrorSpan::from_pest_span(span, input),
-            message: "Invalid guard expression: predicate must be boolean-like".to_string(),
-        });
-    }
-    Ok(quote!(#expr))
+    Ok(predicate.to_token_stream())
 }
 
 fn parse_loop_predicate(
@@ -65,17 +30,11 @@ fn parse_loop_predicate(
     span: pest::Span,
     input: &str,
 ) -> std::result::Result<TokenStream, ParseError> {
-    let expr = syn::parse_str::<Expr>(expr_src).map_err(|e| ParseError::InvalidCondition {
+    let predicate = PredicateExpr::parse(expr_src).map_err(|e| ParseError::InvalidCondition {
         message: format!("Invalid loop condition: {e}"),
         span: ErrorSpan::from_pest_span(span, input),
     })?;
-    if !is_boolean_like_predicate(&expr) {
-        return Err(ParseError::InvalidCondition {
-            message: "Invalid loop condition: predicate must be boolean-like".to_string(),
-            span: ErrorSpan::from_pest_span(span, input),
-        });
-    }
-    Ok(quote!(#expr))
+    Ok(predicate.to_token_stream())
 }
 
 /// Parse send statement: A -> B: Message(payload)
@@ -622,6 +581,101 @@ pub(super) fn parse_call_stmt(
 
     Ok(Statement::Call {
         name: format_ident!("{}", proto_name),
+    })
+}
+
+pub(super) fn parse_handshake_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let initiator_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "handshake is missing initiator role".to_string(),
+    })?;
+    let responder_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "handshake is missing responder role".to_string(),
+    })?;
+    let label_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "handshake is missing label".to_string(),
+    })?;
+    Ok(Statement::Handshake {
+        initiator: parse_role_ref(initiator_pair, declared_roles, input)?,
+        responder: parse_role_ref(responder_pair, declared_roles, input)?,
+        label: format_ident!("{}", label_pair.as_str()),
+    })
+}
+
+pub(super) fn parse_retry_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+    protocol_defs: &HashMap<String, Vec<Statement>>,
+) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let count_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "retry is missing iteration count".to_string(),
+    })?;
+    let block_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "retry is missing block body".to_string(),
+    })?;
+    let count_src = count_pair.as_str();
+    let condition = if let Ok(count) = count_src.parse::<usize>() {
+        Condition::Count(count)
+    } else {
+        Condition::Custom(
+            syn::parse_str::<TokenStream>(count_src).map_err(|e| ParseError::InvalidCondition {
+                message: format!("Invalid retry count: {e}"),
+                span: ErrorSpan::from_pest_span(span, input),
+            })?,
+        )
+    };
+    let body = parse_block(block_pair, declared_roles, input, protocol_defs)?;
+    Ok(Statement::Loop {
+        condition: Some(condition),
+        body,
+    })
+}
+
+pub(super) fn parse_quorum_collect_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let source_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "quorum_collect is missing source role".to_string(),
+    })?;
+    let destination_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "quorum_collect is missing destination role".to_string(),
+    })?;
+    let min_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "quorum_collect is missing min count".to_string(),
+    })?;
+    let message_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "quorum_collect is missing message".to_string(),
+    })?;
+    let min_responses = min_pair.as_str().parse::<u32>().map_err(|_| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "quorum_collect min count must be an integer".to_string(),
+    })?;
+    Ok(Statement::QuorumCollect {
+        source: parse_role_ref(source_pair, declared_roles, input)?,
+        destination: parse_role_ref(destination_pair, declared_roles, input)?,
+        min_responses,
+        message: super::statement::parse_message(message_pair, input)?,
     })
 }
 

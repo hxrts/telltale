@@ -51,8 +51,9 @@ pub use extension_parser::{
 pub use grammar::{GrammarComposer, GrammarComposerBuilder, GrammarCompositionError};
 pub use merge::{can_merge, merge, merge_all, MergeError};
 pub use parser::{
+    collect_dsl_lints, explain_lowering, render_lsp_lint_diagnostics,
     choreography_macro, parse_choreography, parse_choreography_file, parse_choreography_str,
-    parse_dsl, ErrorSpan, ParseError,
+    parse_dsl, ErrorSpan, LintDiagnostic, LintLevel, ParseError,
 };
 pub use pretty::{
     format_choreography, format_choreography_str, format_choreography_with_config, PrettyConfig,

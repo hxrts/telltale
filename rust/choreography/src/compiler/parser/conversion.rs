@@ -76,6 +76,61 @@ impl ProtocolExtension for VmCoreOpExtension {
     }
 }
 
+#[derive(Debug, Clone)]
+struct DslCombinatorExtension {
+    kind: String,
+}
+
+impl DslCombinatorExtension {
+    fn new(kind: impl Into<String>) -> Self {
+        Self { kind: kind.into() }
+    }
+}
+
+impl ProtocolExtension for DslCombinatorExtension {
+    fn type_name(&self) -> &'static str {
+        "dsl_combinator"
+    }
+
+    fn mentions_role(&self, _role: &Role) -> bool {
+        false
+    }
+
+    fn validate(&self, _roles: &[Role]) -> Result<(), ExtensionValidationError> {
+        Ok(())
+    }
+
+    fn project(
+        &self,
+        _role: &Role,
+        _context: &ProjectionContext,
+    ) -> Result<LocalType, ProjectionError> {
+        Ok(LocalType::End)
+    }
+
+    fn generate_code(&self, _context: &CodegenContext) -> proc_macro2::TokenStream {
+        let kind = &self.kind;
+        quote::quote! {
+            {
+                let _dsl_combinator_kind: &str = #kind;
+                let _ = _dsl_combinator_kind;
+            }
+        }
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn type_id(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
+}
+
 fn vm_op_operands(op: &VmCoreOp) -> String {
     match op {
         VmCoreOp::Acquire { layer, dst } => format!("layer={layer},dst={dst}"),
@@ -411,6 +466,58 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
             },
             Statement::Continue { label } => Protocol::Var(label.clone()),
             Statement::Call { .. } => current,
+            Statement::Handshake {
+                initiator,
+                responder,
+                label,
+            } => {
+                let ack_label = format_ident!("{}Ack", label);
+                let ack = Protocol::Send {
+                    from: responder.clone(),
+                    to: initiator.clone(),
+                    message: MessageType {
+                        name: ack_label,
+                        type_annotation: None,
+                        payload: None,
+                    },
+                    continuation: Box::new(current),
+                    annotations: Annotations::new(),
+                    from_annotations: Annotations::new(),
+                    to_annotations: Annotations::new(),
+                };
+                Protocol::Send {
+                    from: initiator.clone(),
+                    to: responder.clone(),
+                    message: MessageType {
+                        name: label.clone(),
+                        type_annotation: None,
+                        payload: None,
+                    },
+                    continuation: Box::new(ack),
+                    annotations: Annotations::new(),
+                    from_annotations: Annotations::new(),
+                    to_annotations: Annotations::new(),
+                }
+            }
+            Statement::QuorumCollect {
+                source,
+                destination,
+                min_responses,
+                message,
+            } => {
+                let annotations = Annotations::from_vec(vec![
+                    ProtocolAnnotation::custom("dsl_combinator", "quorum_collect"),
+                    ProtocolAnnotation::custom("quorum_min", min_responses.to_string()),
+                    ProtocolAnnotation::custom("quorum_source", source.name().to_string()),
+                    ProtocolAnnotation::custom("quorum_destination", destination.name().to_string()),
+                    ProtocolAnnotation::custom("quorum_message", message.name.to_string()),
+                ]);
+                Protocol::Extension {
+                    extension: Box::new(DslCombinatorExtension::new("quorum_collect")),
+                    continuation: Box::new(current),
+                    annotations,
+                }
+            }
             Statement::VmCoreOp { op } => {
                 let annotations = Annotations::from_vec(vec![
                     ProtocolAnnotation::custom("vm_core_op", op.op_name()),
@@ -532,6 +639,30 @@ pub(crate) fn inline_calls(
                 result.push(Statement::Rec {
                     label: label.clone(),
                     body: inline_calls(body, protocol_defs, input)?,
+                });
+            }
+            Statement::Handshake {
+                initiator,
+                responder,
+                label,
+            } => {
+                result.push(Statement::Handshake {
+                    initiator: initiator.clone(),
+                    responder: responder.clone(),
+                    label: label.clone(),
+                });
+            }
+            Statement::QuorumCollect {
+                source,
+                destination,
+                min_responses,
+                message,
+            } => {
+                result.push(Statement::QuorumCollect {
+                    source: source.clone(),
+                    destination: destination.clone(),
+                    min_responses: *min_responses,
+                    message: message.clone(),
                 });
             }
             Statement::VmCoreOp { op } => {

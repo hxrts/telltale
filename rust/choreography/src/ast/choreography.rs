@@ -7,6 +7,9 @@ use std::collections::{HashMap, HashSet};
 
 const ATTR_PROOF_BUNDLES: &str = "dsl.proof_bundles";
 const ATTR_REQUIRED_PROOF_BUNDLES: &str = "dsl.required_proof_bundles";
+const ATTR_INFERRED_REQUIRED_PROOF_BUNDLES: &str = "dsl.inferred_required_proof_bundles";
+const ATTR_ROLE_SETS: &str = "dsl.role_sets";
+const ATTR_TOPOLOGIES: &str = "dsl.topologies";
 
 /// Typed proof-bundle declaration metadata from DSL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -16,6 +19,46 @@ pub struct ProofBundleDecl {
     /// Capabilities provided by this bundle.
     #[serde(default)]
     pub capabilities: Vec<String>,
+    /// Optional bundle version.
+    #[serde(default)]
+    pub version: Option<String>,
+    /// Optional bundle issuer.
+    #[serde(default)]
+    pub issuer: Option<String>,
+    /// Optional constraints attached to the bundle.
+    #[serde(default)]
+    pub constraints: Vec<String>,
+}
+
+/// Typed role-set declaration metadata from DSL.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoleSetDecl {
+    /// Stable role-set name.
+    pub name: String,
+    /// Explicit members for this role-set.
+    #[serde(default)]
+    pub members: Vec<String>,
+    /// Optional subset selector source role-set or family.
+    #[serde(default)]
+    pub subset_of: Option<String>,
+    /// Optional subset selector start index (inclusive).
+    #[serde(default)]
+    pub subset_start: Option<u32>,
+    /// Optional subset selector end index (exclusive).
+    #[serde(default)]
+    pub subset_end: Option<u32>,
+}
+
+/// Typed topology declaration metadata from DSL.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TopologyDecl {
+    /// Topology kind (`cluster`, `ring`, `mesh`).
+    pub kind: String,
+    /// Topology name.
+    pub name: String,
+    /// Referenced members.
+    #[serde(default)]
+    pub members: Vec<String>,
 }
 
 /// A complete choreographic protocol specification
@@ -217,6 +260,61 @@ impl Choreography {
             .unwrap_or_default()
     }
 
+    /// Set inferred protocol-required proof bundles.
+    pub fn set_inferred_required_proof_bundles(
+        &mut self,
+        required: &[String],
+    ) -> Result<(), String> {
+        let encoded =
+            serde_json::to_string(required).map_err(|e| format!("encode inferred bundles: {e}"))?;
+        self.attrs
+            .insert(ATTR_INFERRED_REQUIRED_PROOF_BUNDLES.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get inferred protocol-required proof bundles.
+    #[must_use]
+    pub fn inferred_required_proof_bundles(&self) -> Vec<String> {
+        self.attrs
+            .get(ATTR_INFERRED_REQUIRED_PROOF_BUNDLES)
+            .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
+            .unwrap_or_default()
+    }
+
+    /// Set role-set declarations for this choreography.
+    pub fn set_role_sets(&mut self, role_sets: &[RoleSetDecl]) -> Result<(), String> {
+        let encoded = serde_json::to_string(role_sets)
+            .map_err(|e| format!("encode role sets: {e}"))?;
+        self.attrs.insert(ATTR_ROLE_SETS.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get typed role-set declarations.
+    #[must_use]
+    pub fn role_sets(&self) -> Vec<RoleSetDecl> {
+        self.attrs
+            .get(ATTR_ROLE_SETS)
+            .and_then(|s| serde_json::from_str::<Vec<RoleSetDecl>>(s).ok())
+            .unwrap_or_default()
+    }
+
+    /// Set topology declarations for this choreography.
+    pub fn set_topologies(&mut self, topologies: &[TopologyDecl]) -> Result<(), String> {
+        let encoded =
+            serde_json::to_string(topologies).map_err(|e| format!("encode topologies: {e}"))?;
+        self.attrs.insert(ATTR_TOPOLOGIES.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get typed topology declarations.
+    #[must_use]
+    pub fn topologies(&self) -> Vec<TopologyDecl> {
+        self.attrs
+            .get(ATTR_TOPOLOGIES)
+            .and_then(|s| serde_json::from_str::<Vec<TopologyDecl>>(s).ok())
+            .unwrap_or_default()
+    }
+
     fn required_bundle_capabilities(&self) -> HashSet<String> {
         let required = self.required_proof_bundles();
         let required_set: HashSet<&str> = required.iter().map(String::as_str).collect();
@@ -275,10 +373,16 @@ mod tests {
             ProofBundleDecl {
                 name: "Base".to_string(),
                 capabilities: vec!["delegation".to_string()],
+                version: None,
+                issuer: None,
+                constraints: Vec::new(),
             },
             ProofBundleDecl {
                 name: "Guard".to_string(),
                 capabilities: vec!["guard_tokens".to_string()],
+                version: None,
+                issuer: None,
+                constraints: Vec::new(),
             },
         ];
         let required = vec!["Base".to_string()];
