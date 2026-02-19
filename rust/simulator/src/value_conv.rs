@@ -103,12 +103,11 @@ pub(crate) fn write_f64s(state: &mut Vec<Value>, values: &[FixedQ32]) {
 /// Convert a payload value to a scalar FixedQ32.
 pub(crate) fn value_to_f64(value: &Value) -> Result<FixedQ32, String> {
     match value {
-        Value::Str(text) if text.starts_with(Q32_SCALAR_PREFIX) => parse_q32_scalar_text(text)
-            .ok_or_else(|| format!("invalid q32 scalar payload: {text}")),
+        Value::Str(text) if text.starts_with(Q32_SCALAR_PREFIX) => {
+            parse_q32_scalar_text(text).ok_or_else(|| format!("invalid q32 scalar payload: {text}"))
+        }
         Value::Str(text) if text.starts_with(Q32_VEC_PREFIX) => parse_q32_vec_text(text)
             .and_then(|v| v.first().copied())
-            .first()
-            .copied()
             .ok_or_else(|| "empty vector payload".into()),
         Value::Nat(n) => i64::try_from(*n)
             .map_err(|e| format!("nat overflow: {e}"))

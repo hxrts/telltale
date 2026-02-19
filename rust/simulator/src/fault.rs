@@ -11,6 +11,9 @@ use telltale_vm::session::SessionId;
 use telltale_vm::vm::ObsEvent;
 
 use crate::rng::SimRng;
+use crate::value_conv::{
+    fixed_to_value, fixed_vec_to_value, try_decode_fixed, try_decode_fixed_vec,
+};
 
 /// Fault types that can be injected during simulation.
 #[derive(Debug, Clone)]
@@ -490,15 +493,19 @@ fn corrupt_value(val: Value) -> Value {
         Value::Unit => Value::Unit,
         Value::Nat(n) => Value::Nat(n.wrapping_add(1)),
         Value::Bool(b) => Value::Bool(!b),
-        Value::Str(s) => Value::Str(format!("corrupt:{s}")),
+        Value::Str(s) => {
+            if let Some(v) = try_decode_fixed(&Value::Str(s.clone())) {
+                return fixed_to_value(-v);
+            }
+            if let Some(mut vals) = try_decode_fixed_vec(&Value::Str(s.clone())) {
+                if let Some(first) = vals.first_mut() {
+                    *first = -*first;
+                }
+                return fixed_vec_to_value(&vals);
+            }
+            Value::Str(format!("corrupt:{s}"))
+        }
         Value::Prod(a, b) => Value::Prod(Box::new(corrupt_value(*a)), b),
         Value::Endpoint(_) => val,
-        Value::Q32(r) => Value::Q32(-r),
-        Value::Q32Vec(mut v) => {
-            if let Some(first) = v.first_mut() {
-                *first = -*first;
-            }
-            Value::Q32Vec(v)
-        }
     }
 }

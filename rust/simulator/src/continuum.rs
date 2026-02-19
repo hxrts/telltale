@@ -12,7 +12,7 @@ use std::sync::Mutex;
 use telltale_types::FixedQ32;
 
 use crate::material::ContinuumFieldParams;
-use crate::value_conv::{registers_to_f64s, value_to_f64, write_f64s};
+use crate::value_conv::{fixed_to_value, registers_to_f64s, value_to_f64, write_f64s};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::EffectHandler;
 
@@ -58,7 +58,7 @@ impl EffectHandler for ContinuumFieldHandler {
         if vals.is_empty() {
             return Err("continuum field expects at least 1 field component".into());
         }
-        Ok(Value::Q32(vals[0]))
+        Ok(fixed_to_value(vals[0]))
     }
 
     fn handle_recv(

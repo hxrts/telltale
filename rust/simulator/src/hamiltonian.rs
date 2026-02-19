@@ -13,7 +13,7 @@ use std::sync::Mutex;
 use telltale_types::FixedQ32;
 
 use crate::material::HamiltonianParams;
-use crate::value_conv::{registers_to_f64s, value_to_f64, write_f64s};
+use crate::value_conv::{fixed_to_value, registers_to_f64s, value_to_f64, write_f64s};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, SendDecision};
 use telltale_vm::session::SessionId;
@@ -71,7 +71,7 @@ impl EffectHandler for HamiltonianHandler {
             "position" => vals
                 .first()
                 .copied()
-                .map(Value::Q32)
+                .map(fixed_to_value)
                 .ok_or_else(|| "missing position state".into()),
             "force" => {
                 let peer_pos = self
@@ -83,7 +83,7 @@ impl EffectHandler for HamiltonianHandler {
                     .unwrap_or_else(FixedQ32::zero);
                 let my_pos = vals.first().copied().unwrap_or_else(FixedQ32::zero);
                 let f = self.force(my_pos, peer_pos);
-                Ok(Value::Q32(f))
+                Ok(fixed_to_value(f))
             }
             other => Err(format!("unknown label: {other}")),
         }

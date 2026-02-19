@@ -5,7 +5,7 @@
 //! local drift, advance state, send updated concentrations.
 
 use crate::material::MeanFieldParams;
-use crate::value_conv::{registers_to_f64s, write_f64s};
+use crate::value_conv::{fixed_vec_to_value, registers_to_f64s, write_f64s};
 use telltale_types::FixedQ32;
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::EffectHandler;
@@ -32,7 +32,7 @@ impl EffectHandler for IsingHandler {
         state: &[Value],
     ) -> Result<Value, String> {
         // Send current concentrations as the payload.
-        Ok(Value::Q32Vec(registers_to_f64s(state)))
+        Ok(fixed_vec_to_value(&registers_to_f64s(state)))
     }
 
     fn handle_recv(
@@ -187,6 +187,6 @@ mod tests {
         let payload = handler
             .handle_send("A", "B", "concentration", &state)
             .unwrap();
-        assert_eq!(payload, Value::Q32Vec(vec![v06, v04]));
+        assert_eq!(payload, fixed_vec_to_value(&[v06, v04]));
     }
 }
