@@ -19,7 +19,19 @@ protocol PingPong =
 "#);
 ```
 
-This example shows role declarations and message passing with the macro. The macro expects a string literal that contains the DSL.
+This form passes the DSL as a string literal.
+
+```rust
+choreography! {
+  protocol PingPong = {
+    roles Alice, Bob;
+    Alice -> Bob : Ping;
+    Bob -> Alice : Pong;
+  }
+}
+```
+
+This form passes the DSL as normal macro tokens. Semicolons are treated as statement separators. Composite operators are normalized for DSL parsing.
 
 ### Namespaces
 

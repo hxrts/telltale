@@ -760,17 +760,65 @@ pub fn parse_choreography(input: TokenStream) -> syn::Result<Choreography> {
         });
     }
 
-    // If not a string literal, return an error with helpful message
-    Err(syn::Error::new(
-        proc_macro2::Span::call_site(),
-        "choreography! macro expects a string literal containing the choreography DSL.\n\
-         Example usage:\n\
-         choreography! { r#\"\n\
-         protocol MyProtocol =\n\
-           roles Alice, Bob\n\
-           Alice -> Bob : Hello\n\
-         \"# }",
-    ))
+    let normalized = normalize_macro_token_input(&input);
+    parse_choreography_str(&normalized).map_err(|e| {
+        syn::Error::new(
+            proc_macro2::Span::call_site(),
+            format!(
+                "Choreography parse error: {e}\n\
+                 Macro token input is parsed as DSL text after normalization.\n\
+                 You can use either string-literal DSL or token-stream DSL forms."
+            ),
+        )
+    })
+}
+
+fn normalize_macro_token_input(input: &TokenStream) -> String {
+    fn strip_outer_delimiters(s: &str) -> &str {
+        let trimmed = s.trim();
+        if trimmed.len() < 2 {
+            return trimmed;
+        }
+        let first = trimmed.chars().next().unwrap_or_default();
+        let last = trimmed.chars().last().unwrap_or_default();
+        let is_pair = (first == '{' && last == '}') || (first == '(' && last == ')');
+        if is_pair {
+            &trimmed[1..trimmed.len() - 1]
+        } else {
+            trimmed
+        }
+    }
+
+    fn normalize_composite_ops(mut s: String) -> String {
+        let patterns = [
+            ("-> *", "->*"),
+            ("->  *", "->*"),
+            ("<- >", "<->"),
+            ("< - >", "<->"),
+            ("<  - >", "<->"),
+            ("< -  >", "<->"),
+        ];
+
+        loop {
+            let mut changed = false;
+            for (from, to) in patterns {
+                if s.contains(from) {
+                    s = s.replace(from, to);
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        s
+    }
+
+    let raw = input.to_string();
+    let stripped = strip_outer_delimiters(&raw);
+    let mut normalized = normalize_composite_ops(stripped.to_string());
+    normalized = normalized.replace(';', "\n");
+    normalized
 }
 
 /// Parse a choreography from a file
@@ -2577,5 +2625,35 @@ protocol PredicateTyping =
 
         let err = parse_choreography_str(input).expect_err("parse should fail");
         assert!(err.to_string().contains("boolean-like"));
+    }
+
+    #[test]
+    fn test_parse_choreography_macro_tokens_basic() {
+        let input: TokenStream = quote::quote! {
+            protocol PingPong = {
+                roles Alice, Bob;
+                Alice -> Bob : Ping;
+                Bob -> Alice : Pong;
+            }
+        };
+
+        let choreo = parse_choreography(input).expect("macro token parsing should succeed");
+        assert_eq!(choreo.name.to_string(), "PingPong");
+        assert_eq!(choreo.roles.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_choreography_macro_tokens_normalizes_composite_operators() {
+        let input: TokenStream = quote::quote! {
+            protocol Ops = {
+                roles A, B;
+                handshake A <-> B : Hello;
+                A ->* : Notice;
+            }
+        };
+
+        let choreo = parse_choreography(input).expect("macro token parsing should succeed");
+        assert_eq!(choreo.name.to_string(), "Ops");
+        assert_eq!(choreo.roles.len(), 2);
     }
 }
