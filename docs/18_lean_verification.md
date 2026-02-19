@@ -47,7 +47,6 @@ These lanes enforce practical alignment between executable Rust behavior and Lea
 
 ## Related Docs
 
-- [Lean-Rust Bridge](20_lean_rust_bridge.md)
-- [VM Parity Contract](29_vm_parity_contract.md)
-- [Lean-Rust Parity Matrix](31_lean_rust_parity_matrix.md)
-- [Lean VM Concurrency and Envelope Architecture](37_lean_vm_concurrency_envelope_architecture.md)
+- [Lean-Rust Bridge](19_lean_rust_bridge.md)
+- [VM Architecture](11_vm_architecture.md)
+- [VM Parity](15_vm_parity.md)

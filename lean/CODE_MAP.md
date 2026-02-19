@@ -1,7 +1,7 @@
 # Lean Verification Code Map
 
 <!-- GENERATED_METRICS:BEGIN -->
-**Last Updated:** 2026-02-18
+**Last Updated:** 2026-02-19
 <!-- GENERATED_METRICS:END -->
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
@@ -17,17 +17,18 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 7. [Distributed](#distributed)
 8. [Protocol](#protocol)
 9. [Runtime](#runtime)
-10. [Build Configuration](#build-configuration)
-11. [Axiom Inventory](#axiom-inventory)
-12. [Proof Strategies](#proof-strategies)
-13. [Quick Navigation Guide](#quick-navigation-guide)
+10. [Entropy](#entropy)
+11. [Build Configuration](#build-configuration)
+12. [Axiom Inventory](#axiom-inventory)
+13. [Proof Strategies](#proof-strategies)
+14. [Quick Navigation Guide](#quick-navigation-guide)
 
 ---
 
 ## Overview
 
 **Toolchain:** Lean 4 v4.26.0
-**Build:** Lake with 8 library targets
+**Build:** Lake with 9 library targets
 **Dependencies:** mathlib, paco-lean v0.1.3, iris-lean
 
 <!-- GENERATED_OVERVIEW_TABLE:BEGIN -->
@@ -41,9 +42,9 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | ClassicalAnalysis |     3 |   1,128 | Real analysis concrete models for classical transport      |
 | Distributed    |    59 |   7,266 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   170 |  40,109 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   135 |  26,447 | VM, Iris backend via iris-lean, resource algebras, WP      |
+| Runtime        |   137 |  27,733 | VM, Iris backend via iris-lean, resource algebras, WP      |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **608** | **124,974** |                                                            |
+| **Total**      | **610** | **126,260** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
@@ -604,7 +605,7 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 | ExecOwnership.lean | 162 | Ownership transfer and capability operations |
 | ExecControl.lean | 103 | Control flow (jump, call, return, halt) |
 | ExecGuardEffect.lean | 111 | Guard chain evaluation and effect dispatch |
-| ExecSpeculation.lean | 66 | Speculative execution (fork/join/abort) |
+| ExecSpeculation.lean | 66 | V2: Speculative execution semantics (fork/join/abort with checkpoint store) |
 | ExecSteps.lean | 54 | Multi-step execution wrapper |
 | InstrSpec.lean | 324 | Denotational specs for 8 instruction types |
 
@@ -614,7 +615,9 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 |------|------:|-------------|
 | Loader.lean | 109 | Dynamic choreography loading into running VM state |
 | Runner.lean | 104 | N-concurrent scheduler-driven execution loop |
+| ThreadedRunner.lean | ~200 | V2: Deterministic threaded execution with wave planning |
 | Scheduler.lean | 294 | Process scheduler with fairness and priority |
+| SchedulerHelpers.lean | ~150 | Shared scheduler utility functions |
 | Monitor.lean | 139 | SessionKind, WellTypedInstr judgment, unified session monitor |
 | Failure.lean | 290 | Failure modes (crash, partition, heal), FStep relation, recovery predicates |
 | Json.lean | 145 | JSON serialization for runtime values and trace events |
@@ -666,14 +669,34 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 | Proofs/VM/DomainComposition.lean | 49 | Domain composition and guard chain proofs |
 | Proofs/VM/ExecOwnership.lean | 22 | Ownership transfer proof bridge |
 | Proofs/VM/LoadChoreography.lean | 37 | Choreography loading and verification |
+| Proofs/VM/Speculation.lean | ~200 | V2: Speculation correctness (depth monotonicity, abort restore, join cleanup) |
+| Proofs/VM/InstrSpec/ConfigEquivSendRecv.lean | ~150 | V2: Send/recv configuration equivalence |
+| Proofs/VM/InstrSpec/ConfigEquivSelectBranch.lean | ~150 | V2: Select/branch configuration equivalence |
+| Proofs/VM/InstrSpec/ConfigEquivAcquire.lean | ~100 | V2: Acquire configuration equivalence |
+| Proofs/VM/InstrSpec/ConfigEquivOpenCloseTransfer.lean | ~200 | V2: Open/close/transfer configuration equivalence |
+| Proofs/VM/InstrSpec/ErasureExactness.lean | ~150 | V2: Erasure exactness proofs |
+| Proofs/VM/InstrSpec/Preservation.lean | ~200 | V2: Instruction preservation proofs |
 
-### Adequacy and Proofs
+### Adequacy (V2 Envelope-Based)
 
 | File | Lines | Description |
 |------|------:|-------------|
 | Adequacy/Adequacy.lean | 168 | Adequacy theorem connecting WP to execution |
+| Adequacy/CompileRefinesEffectBisim.lean | ~100 | Compilation refinement via effect bisimulation |
+| Adequacy/EnvelopeCore.lean | ~50 | V2: Envelope core re-exports |
+| Adequacy/EnvelopeCore/CoreFoundations.lean | ~200 | V2: Core envelope definitions and axioms |
+| Adequacy/EnvelopeCore/AdmissionLogic.lean | ~150 | V2: Runtime admission checks and capability gates |
+| Adequacy/EnvelopeCore/VMAdherence.lean | ~200 | V2: VM adherence proofs for determinism envelope |
+| Adequacy/EnvelopeCore/ReconfigurationBridge.lean | ~150 | V2: Reconfiguration integration with coherence |
+| Adequacy/EnvelopeCore/FailureTaxonomy.lean | ~100 | V2: Failure taxonomy re-exports |
+| Adequacy/EnvelopeCore/FailureTaxonomy/Core.lean | ~150 | V2: Core failure classification |
+| Adequacy/EnvelopeCore/FailureTaxonomy/ProtocolPack.lean | ~100 | V2: Protocol-specific failure handling |
+
+### Proofs
 | Proofs/RuntimeTheorems.lean | 465 | Runtime theorem facade unifying proof exports |
 | Proofs/Concurrency.lean | 109 | Iris-backed N-invariance and policy-invariance proofs |
+| Proofs/ConcurrencyThreaded.lean | ~200 | V2: Threaded concurrency proofs with wave certification |
+| Proofs/SchedulerTheoremPack.lean | ~150 | V2: Scheduler theorem bundle for runtime admission |
 | Proofs/CompileLocalTypeRCorrectness.lean | 53 | Compiler correctness stubs (nonempty, ends with halt/jmp) |
 | Proofs/SessionLocal.lean | 337 | `SessionSlice`, `SessionCoherent`, session-local frame infrastructure |
 | Proofs/Frame.lean | 128 | `session_local_op_preserves_other`, `disjoint_ops_preserve_unrelated` |
@@ -682,9 +705,38 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 | Proofs/ProgressApi.lean | 181 | Bundle-oriented liveness API and optional progress hypothesis surface |
 | Proofs/InvariantSpace.lean | 61 | Proof-carrying invariant-space bundle for VM theorem derivation |
 | Proofs/Adapters/Progress.lean | 50 | Invariant-space adapters for liveness/progress theorems |
-| Proofs/Adapters/Distributed.lean | 447 | Invariant-space adapters for distributed profiles (FLP/CAP, quorum-geometry, partial-synchrony, responsiveness, Nakamoto, reconfiguration, atomic-broadcast, accountable-safety, failure-detectors, data-availability, coordination) |
 | Proofs/Adapters/Classical.lean | 416 | Invariant-space adapters for classical transport profiles and artifacts |
-| Proofs/TheoremPack.lean | 499 | Unified VM theorem pack and theorem inventory summary |
+| Proofs/Adapters/Distributed.lean | ~100 | V2: Distributed adapter re-exports |
+| Proofs/Adapters/Distributed/CoreProfiles.lean | ~150 | V2: Distributed profile definitions |
+| Proofs/Adapters/Distributed/ProfileSetters.lean | ~100 | V2: Profile configuration utilities |
+| Proofs/Adapters/Distributed/ProfileWrappers.lean | ~100 | V2: Profile wrapper types |
+| Proofs/Adapters/Distributed/ProfileExtractionTheorems.lean | ~200 | V2: Profile extraction theorems |
+| Proofs/Adapters/Distributed/EnvelopeTheorems.lean | ~100 | V2: Envelope theorem re-exports |
+| Proofs/Adapters/Distributed/EnvelopeTheorems/AdmissionAndBridge.lean | ~150 | V2: Admission and bridge theorems |
+
+### Proofs/TheoremPack (V2 Theorem Bundle Infrastructure)
+
+| File | Lines | Description |
+|------|------:|-------------|
+| Proofs/TheoremPack/API.lean | ~100 | V2: Public theorem pack interface |
+| Proofs/TheoremPack/Build.lean | ~150 | V2: Theorem pack construction |
+| Proofs/TheoremPack/Artifacts.lean | ~100 | V2: Artifact generation for release gates |
+| Proofs/TheoremPack/Profiles.lean | ~100 | V2: Determinism profile definitions |
+| Proofs/TheoremPack/Inventory.lean | ~100 | V2: Capability inventory management |
+| Proofs/TheoremPack/ReleaseConformance.lean | ~100 | V2: Release gate conformance checking |
+
+### Proofs/EffectBisim (V2 Handler Equivalence)
+
+| File | Lines | Description |
+|------|------:|-------------|
+| Proofs/EffectBisim/Core.lean | ~150 | V2: Effect bisimulation definition |
+| Proofs/EffectBisim/Bridge.lean | ~100 | V2: Bridge to protocol coherence |
+| Proofs/EffectBisim/ConfigEquivBridge.lean | ~150 | V2: Configuration equivalence integration |
+| Proofs/EffectBisim/Congruence.lean | ~100 | V2: Congruence properties |
+| Proofs/EffectBisim/RationalFragment.lean | ~100 | V2: Rational fragment handling |
+| Proofs/EffectBisim/Examples.lean | ~50 | V2: Usage examples |
+
+### Proofs (Additional V2 Files)
 | Proofs/Lyapunov.lean | 381 | `progressMeasure`, weighted measure W = 2·depth + buffer |
 | Proofs/VMPotential.lean | 266 | VM potential integration and transported Foster bridge |
 | Proofs/WeightedMeasure.lean | 1,198 | Lyapunov measure infrastructure, step decrease theorems |
@@ -704,11 +756,36 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 
 ---
 
+## Entropy
+
+**Root Modules:** `ClassicalAnalysisAPI.lean`, `IrisExtractionAPI.lean`
+**Description:** Trust boundary layer providing pure API definitions with separate concrete implementations. This pattern isolates interface contracts from implementation details.
+
+### Classical Analysis (Trust Boundary)
+
+| File | Lines | Description |
+|------|------:|-------------|
+| ClassicalAnalysisAPI.lean | 437 | Pure API: `EntropyAPI.Model`, `EntropyAPI.Laws` typeclasses for Shannon entropy, KL divergence, mutual information; `AnalysisModel`/`AnalysisLaws` for real/complex analysis |
+| ClassicalAnalysisInstance.lean | 3 | Re-export wrapper |
+| ClassicalAnalysisInstance/Models.lean | 200 | Concrete model instances |
+| ClassicalAnalysisInstance/RealConcrete.lean | 491 | Concrete real analysis models via Mathlib |
+
+### Iris Extraction (Trust Boundary)
+
+| File | Lines | Description |
+|------|------:|-------------|
+| IrisExtractionAPI.lean | 173 | Pure API: `TelltaleIris` parameter bundle, iProp, GhostName, Mask, Namespace; `GhostVarSlot`, `SavedPropSlot`, `GhostMapSlot` typeclasses |
+| IrisExtractionInstance.lean | 3 | Re-export wrapper |
+| IrisExtractionInstance/Core.lean | 427 | Core iris-lean integration |
+| IrisExtractionInstance/GhostAndProgramLogic.lean | 230 | Ghost state and program logic wiring |
+
+---
+
 ## Build Configuration
 
 ### lakefile.lean
 
-Eight library targets with glob-based module discovery:
+Nine library targets with glob-based module discovery:
 
 ```
 telltale (package)
@@ -719,10 +796,21 @@ telltale (package)
 ├── ClassicalLayer   ← Transported queueing/probability theorem families + transport API
 ├── Distributed      ← Distributed theorem families (FLP/CAP, quorum safety, liveness, ordering, DA, coordination)
 ├── Protocol         ← Async MPST, coherence, preservation, monitoring
-└── Runtime          ← VM, Iris backend, WP, adequacy (default target)
+├── Runtime          ← VM, Iris backend, WP, adequacy (default target)
+└── Entropy          ← Trust boundary: ClassicalAnalysis + IrisExtraction APIs and instances
 ```
 
 **Dependencies:** mathlib, paco-lean v0.1.3, iris-lean
+
+### Executables
+
+Three executables defined in lakefile.lean:
+
+| Executable | Root Module | Purpose |
+|------------|-------------|---------|
+| `runtime_tests` | `Runtime.Tests.Main` | VM example tests |
+| `vm_runner` | `Runtime.Tests.VMRunner` | Execute choreographies, emit observable traces |
+| `telltale_validator` | `Choreography.Projection.Validator` | Projection validator (default target) |
 
 ---
 
@@ -816,3 +904,18 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **Spectral gap bounds?** → Protocol/Classical/SpectralGap.lean
 - **VM JSON runner?** → Runtime/Tests/VMRunner.lean
 - **What is axiomatized?** → [Axiom Inventory](#axiom-inventory)
+
+### V2 Additions
+
+- **Speculation semantics?** → Runtime/VM/Semantics/ExecSpeculation.lean
+- **Threaded execution?** → Runtime/VM/Runtime/ThreadedRunner.lean
+- **Threaded concurrency proofs?** → Runtime/Proofs/ConcurrencyThreaded.lean
+- **Envelope-based adequacy?** → Runtime/Adequacy/EnvelopeCore/
+- **Theorem pack infrastructure?** → Runtime/Proofs/TheoremPack/
+- **Effect bisimulation?** → Runtime/Proofs/EffectBisim/
+- **Distributed profile adapters?** → Runtime/Proofs/Adapters/Distributed/
+- **VM speculation proofs?** → Runtime/Proofs/VM/Speculation.lean
+- **Configuration equivalence proofs?** → Runtime/Proofs/VM/InstrSpec/
+- **Iris extraction?** → IrisExtractionInstance/
+- **Classical analysis?** → ClassicalAnalysisInstance/
+- **Release conformance?** → Runtime/Proofs/TheoremPack/ReleaseConformance.lean

@@ -10,7 +10,7 @@ use telltale_types::FixedQ32;
 
 use crate::fault::{Fault, FaultSchedule, ScheduledFault, Trigger};
 use crate::material::MaterialParams;
-use crate::network::{NetworkConfig, Partition};
+use crate::network::{LinkPolicy, NetworkConfig, Partition};
 use crate::property::{parse_predicate, Property, PropertyMonitor};
 
 /// A simulation scenario loaded from TOML.
@@ -92,6 +92,9 @@ pub struct NetworkSpec {
     /// Optional static partitions.
     #[serde(default)]
     pub partitions: Vec<PartitionSpec>,
+    /// Optional per-link role policies.
+    #[serde(default)]
+    pub links: Vec<LinkSpec>,
 }
 
 impl NetworkSpec {
@@ -111,6 +114,20 @@ impl NetworkSpec {
                     end_tick: p.end_tick,
                 })
                 .collect(),
+            links: self
+                .links
+                .iter()
+                .map(|link| LinkPolicy {
+                    from: link.from.clone(),
+                    to: link.to.clone(),
+                    start_tick: link.start_tick,
+                    end_tick: link.end_tick,
+                    enabled: link.enabled,
+                    base_latency: link.base_latency_ms.map(Duration::from_millis),
+                    latency_variance: link.latency_variance,
+                    loss_probability: link.loss_probability,
+                })
+                .collect(),
         }
     }
 }
@@ -124,6 +141,33 @@ pub struct PartitionSpec {
     pub start_tick: u64,
     /// Tick when the partition heals.
     pub end_tick: u64,
+}
+
+/// Role-to-role link policy specification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinkSpec {
+    /// Source role.
+    pub from: String,
+    /// Destination role.
+    pub to: String,
+    /// Tick when this link policy becomes active.
+    #[serde(default)]
+    pub start_tick: Option<u64>,
+    /// Tick when this link policy becomes inactive.
+    #[serde(default)]
+    pub end_tick: Option<u64>,
+    /// Whether this link is enabled while active.
+    #[serde(default = "default_link_enabled")]
+    pub enabled: bool,
+    /// Optional base latency override in milliseconds.
+    #[serde(default)]
+    pub base_latency_ms: Option<u64>,
+    /// Optional latency variance override.
+    #[serde(default)]
+    pub latency_variance: Option<FixedQ32>,
+    /// Optional loss probability override.
+    #[serde(default)]
+    pub loss_probability: Option<FixedQ32>,
 }
 
 /// Fault injection event specification.
@@ -230,6 +274,10 @@ fn default_seed() -> u64 {
 
 fn default_concurrency() -> u64 {
     1
+}
+
+fn default_link_enabled() -> bool {
+    true
 }
 
 impl Scenario {
@@ -476,5 +524,68 @@ mod tests {
 
         let scenario = Scenario::parse(toml).expect("parse scenario");
         assert_eq!(scenario.seed, 0);
+    }
+
+    #[test]
+    fn test_parse_network_link_topology() {
+        let toml = r#"
+            name = "links"
+            roles = ["A", "B", "C"]
+            steps = 10
+
+            [material]
+            layer = "mean_field"
+
+            [material.params]
+            beta = "1.0"
+            species = ["up", "down"]
+            initial_state = ["0.5", "0.5"]
+            step_size = "0.01"
+
+            [network]
+            base_latency_ms = 5
+            latency_variance = "0.1"
+            loss_probability = "0.01"
+
+            [[network.links]]
+            from = "A"
+            to = "B"
+            start_tick = 3
+            end_tick = 9
+            enabled = true
+            base_latency_ms = 25
+            latency_variance = "0.2"
+            loss_probability = "0.4"
+
+            [[network.links]]
+            from = "B"
+            to = "C"
+            enabled = false
+        "#;
+
+        let scenario = Scenario::parse(toml).expect("parse scenario");
+        let cfg = scenario.network_config().expect("network config");
+        assert_eq!(cfg.links.len(), 2);
+
+        let ab = &cfg.links[0];
+        assert_eq!(ab.from, "A");
+        assert_eq!(ab.to, "B");
+        assert_eq!(ab.start_tick, Some(3));
+        assert_eq!(ab.end_tick, Some(9));
+        assert!(ab.enabled);
+        assert_eq!(ab.base_latency, Some(Duration::from_millis(25)));
+        let expected_loss = FixedQ32::from_ratio(2, 5).expect("0.4");
+        let eps = FixedQ32::from_ratio(1, 1_000_000).expect("epsilon");
+        assert!(
+            (ab.loss_probability.expect("loss") - expected_loss).abs() < eps,
+            "expected 0.4 link loss override"
+        );
+
+        let bc = &cfg.links[1];
+        assert_eq!(bc.from, "B");
+        assert_eq!(bc.to, "C");
+        assert!(!bc.enabled);
+        assert_eq!(bc.start_tick, None);
+        assert_eq!(bc.end_tick, None);
     }
 }

@@ -21,6 +21,7 @@ graph TB
     subgraph Runtime
         vm["telltale-vm<br/>Bytecode VM & scheduler"]
         simulator["telltale-simulator<br/>VM-based simulation"]
+        transport["telltale-transport<br/>Production transports"]
     end
 
     subgraph Application
@@ -90,7 +91,7 @@ The `projection` module handles `GlobalType` to `LocalTypeR` projection with mer
 
 The `subtyping/sync` module provides synchronous subtyping. The `subtyping/async` module provides asynchronous subtyping via SISO decomposition. The `well_formedness` module contains validation predicates. The `duality` module computes dual types. The `bounded` module implements bounded recursion strategies.
 
-Projection memoization uses the content store in `telltale-types` to cache by content ID. See [Content Addressing](21_content_addressing.md) for details.
+Projection memoization uses the content store in `telltale-types` to cache by content ID. See [Content Addressing](16_content_addressing.md) for details.
 
 ```rust
 use telltale_theory::{project, merge, sync_subtype, async_subtype};
@@ -107,7 +108,7 @@ The `project` function computes the local type for a given role. The `sync_subty
 
 ### telltale-lean-bridge
 
-This crate is located in `rust/lean-bridge/`. It provides bidirectional conversion between Rust types and Lean-compatible JSON. See [Lean-Rust Bridge](20_lean_rust_bridge.md) for detailed documentation.
+This crate is located in `rust/lean-bridge/`. It provides bidirectional conversion between Rust types and Lean-compatible JSON. See [Lean-Rust Bridge](19_lean_rust_bridge.md) for detailed documentation.
 
 The `export` module converts Rust types to JSON for Lean. The `import` module converts Lean JSON back to Rust types. The `validate` module provides cross-validation between Rust and Lean.
 
@@ -172,7 +173,13 @@ This crate is located in `rust/choreography/`. It provides DSL and parsing for c
 
 The `ast/` directory contains extended AST types including `Protocol`, `LocalType`, and `Role`. The `compiler/parser` module handles DSL parsing. The `compiler/projection` module handles choreography to `LocalType` projection. The `compiler/codegen` module handles Rust code generation. The `effects/` directory contains the effect system and handlers. The `extensions/` directory contains the DSL extension system. The `runtime/` directory contains platform abstraction.
 
-The `topology/` directory provides deployment configuration. See [Topology](14_topology.md) for the separation between protocol logic and deployment. The `heap/` directory provides explicit resource management. See [Resource Heap](22_resource_heap.md) for nullifier-based consumption tracking.
+The `topology/` directory provides deployment configuration. See [Topology](20_topology.md) for the separation between protocol logic and deployment. The `heap/` directory provides explicit resource management. See [Resource Heap](17_resource_heap.md) for nullifier-based consumption tracking.
+
+### telltale-transport
+
+This crate is located in `rust/transport/`. It provides production transport implementations for session types. The crate depends on `telltale-choreography` and `telltale-types`.
+
+The crate implements TCP-based transports with async networking via tokio. Future features include TLS support. The transport layer integrates with the effect handler system from `telltale-choreography`.
 
 ### telltale
 
@@ -270,6 +277,8 @@ The types crate mirrors Lean definitions exactly. The following table shows the 
 The Rust variant names match Lean constructor names. Field names are consistent across both implementations.
 Rust `LocalTypeR` branches also carry `Option<ValType>` payload annotations. Lean tracks payload sorts at the label level in `GlobalType`.
 
+Lean `GlobalType` includes a `delegate` constructor for channel delegation that is not yet present in Rust. This is tracked as a known parity gap.
+
 ## Extension Points
 
 The architecture supports extension at several points.
@@ -318,4 +327,4 @@ impl Validator {
 }
 ```
 
-Custom validation methods can implement domain-specific comparison rules. See [Lean-Rust Bridge](20_lean_rust_bridge.md) for more details.
+Custom validation methods can implement domain-specific comparison rules. See [Lean-Rust Bridge](19_lean_rust_bridge.md) for more details.

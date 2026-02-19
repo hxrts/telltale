@@ -236,7 +236,7 @@ The VM provides a bytecode execution model for local types. The `telltale-vm` cr
 
 The VM maintains session state with bounded message buffers. Each coroutine references its assigned program by ID. The scheduler policies are observationally equivalent per the Lean model. Nested VMs can be hosted inside a coroutine for hierarchical simulation.
 
-See [VM Overview](09_vm_overview.md) for details on the bytecode VM architecture.
+See [VM Architecture](11_vm_architecture.md) for details on the bytecode VM architecture.
 
 ## Data Flow
 
@@ -341,7 +341,7 @@ This abstraction makes the core library portable. The same code runs on servers 
 
 ### Custom Handlers
 
-Implement `ChoreoHandler` to add new transport mechanisms. See [Effect Handlers](07_effect_handlers.md) for details.
+Implement `ChoreoHandler` to add new transport mechanisms. See [Effect Handlers](08_effect_handlers.md) for details.
 
 ### Middleware
 
@@ -389,6 +389,7 @@ telltale/
 │   │       └── runner.rs   Lean binary invocation
 │   ├── vm/                 Bytecode VM engine (telltale-vm)
 │   ├── simulator/          Deterministic simulation (telltale-simulator)
+│   ├── transport/          Production transports (telltale-transport)
 │   └── macros/             Procedural macros (telltale-macros)
 ├── lean/                   Lean 4 verification code
 ├── examples/               Example protocols

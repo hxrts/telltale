@@ -9,6 +9,9 @@ use std::process::{Command, Stdio};
 use thiserror::Error;
 
 use crate::runner::ChoreographyJson;
+use crate::sim_reference::{
+    SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
+};
 use crate::vm_export::TickedObsEvent;
 use crate::vm_trace::{
     normalize_vm_trace, traces_equivalent, EffectTraceEvent, OutputConditionTraceEvent,
@@ -364,6 +367,37 @@ impl VmRunner {
         })
     }
 
+    /// Run the Lean reference simulator operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lean invocation fails or output cannot be decoded.
+    pub fn run_reference_simulation(
+        &self,
+        input: &SimRunInput,
+    ) -> Result<SimRunOutput, VmRunnerError> {
+        crate::schema::ensure_supported_schema_version(&input.schema_version, "SimRunInput")
+            .map_err(VmRunnerError::ParseError)?;
+        let payload =
+            serde_json::to_value(input).map_err(|e| VmRunnerError::ParseError(e.to_string()))?;
+        let response = self.run_lean_validation("runSimulation", &payload)?;
+        parse_sim_run_output(response)
+    }
+
+    /// Validate simulator trace output against Lean reference rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lean invocation fails.
+    pub fn validate_simulation_trace(
+        &self,
+        trace: &[VmTraceEvent],
+    ) -> Result<SimTraceValidation, VmRunnerError> {
+        let payload = simulation_trace_payload(trace);
+        let response = self.run_lean_validation("validateSimulationTrace", &payload)?;
+        Ok(parse_sim_trace_validation(&response))
+    }
+
     /// Run the same choreography in Lean and compare normalized traces.
     ///
     /// # Errors
@@ -470,6 +504,79 @@ pub fn compute_trace_diff(
         "rust_len": rust_trace.len(),
         "lean_len": lean_trace.len(),
     }))
+}
+
+fn parse_sim_run_output(value: Value) -> Result<SimRunOutput, VmRunnerError> {
+    let output: SimRunOutput =
+        serde_json::from_value(value).map_err(|e| VmRunnerError::ParseError(e.to_string()))?;
+    crate::schema::ensure_supported_schema_version(&output.schema_version, "SimRunOutput")
+        .map_err(VmRunnerError::ParseError)?;
+    Ok(output)
+}
+
+fn parse_sim_trace_validation(response: &Value) -> SimTraceValidation {
+    let valid = response
+        .get("valid")
+        .and_then(Value::as_bool)
+        .unwrap_or_else(|| response.get("errors").is_none());
+    SimTraceValidation {
+        valid,
+        errors: parse_simulation_errors(response),
+        artifacts: response.get("artifacts").cloned().unwrap_or(Value::Null),
+    }
+}
+
+fn simulation_trace_payload(trace: &[VmTraceEvent]) -> Value {
+    serde_json::json!({
+        "trace": trace,
+    })
+}
+
+fn parse_simulation_errors(response: &Value) -> Vec<SimulationStructuredError> {
+    let Some(errors) = response.get("errors") else {
+        return Vec::new();
+    };
+    match errors {
+        Value::Array(items) => items
+            .iter()
+            .map(|item| {
+                if let Some(obj) = item.as_object() {
+                    SimulationStructuredError {
+                        code: obj
+                            .get("code")
+                            .and_then(Value::as_str)
+                            .unwrap_or("simulation.error")
+                            .to_string(),
+                        path: obj
+                            .get("path")
+                            .and_then(Value::as_str)
+                            .map(ToString::to_string),
+                        message: obj
+                            .get("message")
+                            .and_then(Value::as_str)
+                            .unwrap_or("unspecified simulation error")
+                            .to_string(),
+                    }
+                } else {
+                    SimulationStructuredError {
+                        code: "simulation.error".to_string(),
+                        path: None,
+                        message: item.to_string(),
+                    }
+                }
+            })
+            .collect(),
+        Value::String(msg) => vec![SimulationStructuredError {
+            code: "simulation.error".to_string(),
+            path: None,
+            message: msg.clone(),
+        }],
+        other => vec![SimulationStructuredError {
+            code: "simulation.error".to_string(),
+            path: None,
+            message: other.to_string(),
+        }],
+    }
 }
 
 fn parse_structured_errors(response: &Value) -> Vec<LeanStructuredError> {
@@ -612,5 +719,45 @@ mod tests {
         assert_eq!(errors.len(), 1);
         assert_eq!(errors[0].code, "trace.mismatch");
         assert_eq!(errors[0].path.as_deref(), Some("trace[0]"));
+    }
+
+    #[test]
+    fn parse_sim_trace_validation_reads_errors_and_artifacts() {
+        let response = serde_json::json!({
+            "valid": false,
+            "errors": [
+                { "code": "sim.trace.mismatch", "path": "trace[1]", "message": "mismatch" }
+            ],
+            "artifacts": { "kind": "diff" }
+        });
+        let parsed = parse_sim_trace_validation(&response);
+        assert!(!parsed.valid);
+        assert_eq!(parsed.errors.len(), 1);
+        assert_eq!(parsed.errors[0].code, "sim.trace.mismatch");
+        assert_eq!(parsed.errors[0].path.as_deref(), Some("trace[1]"));
+        assert_eq!(parsed.artifacts["kind"], "diff");
+    }
+
+    #[test]
+    fn parse_sim_run_output_checks_schema_version() {
+        let payload = serde_json::json!({
+            "schema_version": crate::schema::default_schema_version(),
+            "trace": [],
+            "violations": [],
+            "artifacts": {}
+        });
+        let parsed = parse_sim_run_output(payload).expect("parse sim run output");
+        assert_eq!(
+            parsed.schema_version,
+            crate::schema::default_schema_version()
+        );
+    }
+
+    #[test]
+    fn simulation_trace_payload_has_expected_shape() {
+        let trace = vec![trace_event("sent", 1, Some(0))];
+        let payload = simulation_trace_payload(&trace);
+        assert!(payload["trace"].is_array());
+        assert_eq!(payload["trace"][0]["kind"], "sent");
     }
 }

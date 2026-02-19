@@ -270,3 +270,30 @@ fn test_nested_matches_flat_per_site() {
     assert_eq!(nested_a, flat_a, "site A trace should match flat session");
     assert_eq!(nested_b, flat_b, "site B trace should match flat session");
 }
+
+#[test]
+fn test_distributed_concurrency_configuration() {
+    let (inner_global, inner_locals) = simple_protocol("A", "B", "msg");
+    let inner_image = CodeImage::from_local_types(&inner_locals, &inner_global);
+
+    let (outer_global, outer_locals) = outer_loop_protocol("site_A", "site_B", "tick");
+    let outer_image = CodeImage::from_local_types(&outer_locals, &outer_global);
+
+    let builder = DistributedSimBuilder::new()
+        .add_site("site_A", vec![inner_image.clone()])
+        .add_site("site_B", vec![inner_image])
+        .inter_site(outer_image)
+        .outer_concurrency(2)
+        .inner_rounds_per_step(3);
+
+    let mut sim = builder
+        .build_with(&VMConfig::default(), |_| Box::new(NoOpHandler))
+        .expect("build distributed sim");
+
+    assert_eq!(sim.outer_concurrency(), 2);
+    assert_eq!(sim.handler().rounds_per_step(), 3);
+
+    sim.run(50).expect("run outer vm");
+    assert_eq!(sim.handler().site_all_done("site_A"), Some(true));
+    assert_eq!(sim.handler().site_all_done("site_B"), Some(true));
+}

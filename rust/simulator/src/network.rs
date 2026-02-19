@@ -23,6 +23,8 @@ pub struct NetworkConfig {
     pub loss_probability: FixedQ32,
     /// Network partition definitions.
     pub partitions: Vec<Partition>,
+    /// Per-link policy overrides for role-to-role traffic.
+    pub links: Vec<LinkPolicy>,
 }
 
 impl Default for NetworkConfig {
@@ -32,6 +34,7 @@ impl Default for NetworkConfig {
             latency_variance: FixedQ32::zero(),
             loss_probability: FixedQ32::zero(),
             partitions: Vec::new(),
+            links: Vec::new(),
         }
     }
 }
@@ -45,6 +48,27 @@ pub struct Partition {
     pub start_tick: u64,
     /// Tick when the partition heals.
     pub end_tick: u64,
+}
+
+/// Per-link policy override for role-to-role traffic.
+#[derive(Debug, Clone)]
+pub struct LinkPolicy {
+    /// Source role.
+    pub from: String,
+    /// Destination role.
+    pub to: String,
+    /// Tick when link policy becomes active. None means always active.
+    pub start_tick: Option<u64>,
+    /// Tick when link policy becomes inactive. None means no end.
+    pub end_tick: Option<u64>,
+    /// Whether this link is enabled while active.
+    pub enabled: bool,
+    /// Optional latency override for this link.
+    pub base_latency: Option<Duration>,
+    /// Optional latency variance override for this link.
+    pub latency_variance: Option<FixedQ32>,
+    /// Optional loss probability override for this link.
+    pub loss_probability: Option<FixedQ32>,
 }
 
 #[derive(Debug, Clone)]
@@ -183,6 +207,28 @@ impl<H: EffectHandler> NetworkModel<H> {
         }
         false
     }
+
+    fn link_active(link: &LinkPolicy, tick: u64) -> bool {
+        if let Some(start) = link.start_tick {
+            if tick < start {
+                return false;
+            }
+        }
+        if let Some(end) = link.end_tick {
+            if tick > end {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn link_policy(&self, from: &str, to: &str, tick: u64) -> Option<&LinkPolicy> {
+        self.config
+            .links
+            .iter()
+            .rev()
+            .find(|link| link.from == from && link.to == to && Self::link_active(link, tick))
+    }
 }
 
 impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
@@ -218,13 +264,31 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
             return Ok(SendDecision::Drop);
         }
 
-        let delay_ticks = {
-            let mut rng = self.rng.lock().expect("network rng lock poisoned");
-            if rng.should_trigger(self.config.loss_probability) {
+        let mut loss_probability = self.config.loss_probability;
+        let mut base_latency = self.config.base_latency;
+        let mut latency_variance = self.config.latency_variance;
+
+        if let Some(link) = self.link_policy(role, partner, tick) {
+            if !link.enabled {
                 return Ok(SendDecision::Drop);
             }
-            let latency =
-                rng.sample_duration(self.config.base_latency, self.config.latency_variance);
+            if let Some(override_loss) = link.loss_probability {
+                loss_probability = override_loss;
+            }
+            if let Some(override_latency) = link.base_latency {
+                base_latency = override_latency;
+            }
+            if let Some(override_variance) = link.latency_variance {
+                latency_variance = override_variance;
+            }
+        }
+
+        let delay_ticks = {
+            let mut rng = self.rng.lock().expect("network rng lock poisoned");
+            if rng.should_trigger(loss_probability) {
+                return Ok(SendDecision::Drop);
+            }
+            let latency = rng.sample_duration(base_latency, latency_variance);
             self.latency_ticks(latency)
         };
 
@@ -268,5 +332,165 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
 
     fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String> {
         self.inner.step(role, state)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct PassthroughHandler;
+
+    impl EffectHandler for PassthroughHandler {
+        fn handle_send(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &[Value],
+        ) -> Result<Value, String> {
+            Ok(Value::Unit)
+        }
+
+        fn send_decision(
+            &self,
+            _sid: SessionId,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &[Value],
+            payload: Option<Value>,
+        ) -> Result<SendDecision, String> {
+            Ok(SendDecision::Deliver(payload.unwrap_or(Value::Unit)))
+        }
+
+        fn handle_recv(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &mut Vec<Value>,
+            _payload: &Value,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn handle_choose(
+            &self,
+            _role: &str,
+            _partner: &str,
+            labels: &[String],
+            _state: &[Value],
+        ) -> Result<String, String> {
+            labels
+                .first()
+                .cloned()
+                .ok_or_else(|| "no labels available".to_string())
+        }
+
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    fn model(config: NetworkConfig) -> NetworkModel<PassthroughHandler> {
+        NetworkModel::new(
+            PassthroughHandler,
+            config,
+            SimRng::new(7),
+            Duration::from_millis(1),
+        )
+    }
+
+    #[test]
+    fn link_disabled_drops_message() {
+        let config = NetworkConfig {
+            links: vec![LinkPolicy {
+                from: "A".to_string(),
+                to: "B".to_string(),
+                start_tick: None,
+                end_tick: None,
+                enabled: false,
+                base_latency: None,
+                latency_variance: None,
+                loss_probability: None,
+            }],
+            ..NetworkConfig::default()
+        };
+        let model = model(config);
+        model.set_tick(0);
+        let decision = model
+            .send_decision(0, "A", "B", "msg", &[], Some(Value::Nat(1)))
+            .expect("send decision");
+        assert!(matches!(decision, SendDecision::Drop));
+    }
+
+    #[test]
+    fn link_window_inactive_uses_global_policy() {
+        let config = NetworkConfig {
+            links: vec![LinkPolicy {
+                from: "A".to_string(),
+                to: "B".to_string(),
+                start_tick: Some(10),
+                end_tick: Some(20),
+                enabled: false,
+                base_latency: None,
+                latency_variance: None,
+                loss_probability: None,
+            }],
+            ..NetworkConfig::default()
+        };
+        let model = model(config);
+        model.set_tick(5);
+        let decision = model
+            .send_decision(0, "A", "B", "msg", &[], Some(Value::Nat(1)))
+            .expect("send decision");
+        assert!(matches!(decision, SendDecision::Deliver(Value::Nat(1))));
+    }
+
+    #[test]
+    fn link_latency_override_defers_delivery() {
+        let config = NetworkConfig {
+            links: vec![LinkPolicy {
+                from: "A".to_string(),
+                to: "B".to_string(),
+                start_tick: None,
+                end_tick: None,
+                enabled: true,
+                base_latency: Some(Duration::from_millis(10)),
+                latency_variance: Some(FixedQ32::zero()),
+                loss_probability: Some(FixedQ32::zero()),
+            }],
+            ..NetworkConfig::default()
+        };
+        let model = model(config);
+        model.set_tick(3);
+        let decision = model
+            .send_decision(0, "A", "B", "msg", &[], Some(Value::Nat(1)))
+            .expect("send decision");
+        assert!(matches!(decision, SendDecision::Defer));
+    }
+
+    #[test]
+    fn link_loss_override_applies() {
+        let config = NetworkConfig {
+            links: vec![LinkPolicy {
+                from: "A".to_string(),
+                to: "B".to_string(),
+                start_tick: None,
+                end_tick: None,
+                enabled: true,
+                base_latency: None,
+                latency_variance: None,
+                loss_probability: Some(FixedQ32::one()),
+            }],
+            ..NetworkConfig::default()
+        };
+        let model = model(config);
+        model.set_tick(0);
+        let decision = model
+            .send_decision(0, "A", "B", "msg", &[], Some(Value::Nat(1)))
+            .expect("send decision");
+        assert!(matches!(decision, SendDecision::Drop));
     }
 }

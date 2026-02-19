@@ -7,8 +7,9 @@ use std::collections::BTreeMap;
 use telltale_types::FixedQ32;
 
 use telltale_types::{GlobalType, LocalTypeR};
-use telltale_vm::effect::EffectHandler;
+use telltale_vm::effect::{EffectHandler, EffectTraceEntry};
 use telltale_vm::loader::CodeImage;
+use telltale_vm::output_condition::OutputConditionCheck;
 use telltale_vm::vm::{ObsEvent, StepResult, VMConfig, VM};
 
 use crate::checkpoint::CheckpointStore;
@@ -68,6 +69,57 @@ fn init_coro_regs(
                     }
                 }
             }
+        }
+    }
+}
+
+/// Count newly appended `Invoked` events and advance trace cursor.
+fn count_new_invokes(trace: &[ObsEvent], prev_trace_len: &mut usize) -> usize {
+    let count = trace[*prev_trace_len..]
+        .iter()
+        .filter(|e| matches!(e, ObsEvent::Invoked { .. }))
+        .count();
+    *prev_trace_len = trace.len();
+    count
+}
+
+/// Collect sessions referenced by newly appended `Invoked` events.
+fn collect_invoked_sessions(
+    trace: &[ObsEvent],
+    prev_trace_len: &mut usize,
+    coro_to_session: &BTreeMap<usize, usize>,
+) -> Vec<usize> {
+    let sessions = trace[*prev_trace_len..]
+        .iter()
+        .filter_map(|event| match event {
+            ObsEvent::Invoked { coro_id, .. } => coro_to_session.get(coro_id).copied(),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    *prev_trace_len = trace.len();
+    sessions
+}
+
+/// Advance invoke-driven sampling counters and emit step records as needed.
+fn advance_sampling(
+    invoke_count: &mut usize,
+    active_count: &mut usize,
+    step_idx: &mut usize,
+    num_roles: usize,
+    apr: usize,
+    steps: usize,
+    mut record_step: impl FnMut(usize),
+) {
+    while *invoke_count >= num_roles && *step_idx < steps {
+        *invoke_count -= num_roles;
+        record_step(*step_idx);
+        *step_idx += 1;
+        *active_count += 1;
+
+        if *active_count >= apr && *step_idx < steps {
+            *active_count = 0;
+            record_step(*step_idx);
+            *step_idx += 1;
         }
     }
 }
@@ -162,33 +214,24 @@ pub fn run_concurrent(
 
         let invoked_sessions: Vec<usize> = {
             let current_trace = vm.trace();
-            let result: Vec<usize> = current_trace[prev_trace_len..]
-                .iter()
-                .filter_map(|event| match event {
-                    ObsEvent::Invoked { coro_id, .. } => coro_to_session.get(coro_id).copied(),
-                    _ => None,
-                })
-                .collect();
-            prev_trace_len = current_trace.len();
-            result
+            collect_invoked_sessions(current_trace, &mut prev_trace_len, &coro_to_session)
         };
 
         for si in invoked_sessions {
             per_session_invokes[si] += 1;
             let (_sid, coro_info, num_roles) = &session_infos[si];
-
-            while per_session_invokes[si] >= *num_roles && per_session_step[si] < steps {
-                per_session_invokes[si] -= *num_roles;
-                record_all_roles(&vm, coro_info, per_session_step[si], &mut traces[si]);
-                per_session_step[si] += 1;
-                per_session_active[si] += 1;
-
-                if per_session_active[si] >= per_session_apr[si] && per_session_step[si] < steps {
-                    per_session_active[si] = 0;
-                    record_all_roles(&vm, coro_info, per_session_step[si], &mut traces[si]);
-                    per_session_step[si] += 1;
-                }
-            }
+            let apr = per_session_apr[si];
+            advance_sampling(
+                &mut per_session_invokes[si],
+                &mut per_session_active[si],
+                &mut per_session_step[si],
+                *num_roles,
+                apr,
+                steps,
+                |sample_step| {
+                    record_all_roles(&vm, coro_info, sample_step, &mut traces[si]);
+                },
+            );
         }
     }
 
@@ -261,27 +304,17 @@ pub fn run(
             Err(e) => return Err(format!("vm error: {e}")),
         }
 
-        let current_trace = vm.trace();
-        let new_invokes = current_trace[prev_trace_len..]
-            .iter()
-            .filter(|e| matches!(e, ObsEvent::Invoked { .. }))
-            .count();
-        prev_trace_len = current_trace.len();
-
+        let new_invokes = count_new_invokes(vm.trace(), &mut prev_trace_len);
         invoke_count += new_invokes;
-
-        while invoke_count >= num_roles && step_idx < steps {
-            invoke_count -= num_roles;
-            record_all_roles(&vm, &coro_info, step_idx, &mut trace);
-            step_idx += 1;
-            active_count += 1;
-
-            if active_count >= apr && step_idx < steps {
-                active_count = 0;
-                record_all_roles(&vm, &coro_info, step_idx, &mut trace);
-                step_idx += 1;
-            }
-        }
+        advance_sampling(
+            &mut invoke_count,
+            &mut active_count,
+            &mut step_idx,
+            num_roles,
+            apr,
+            steps,
+            |sample_step| record_all_roles(&vm, &coro_info, sample_step, &mut trace),
+        );
     }
 
     if trace.records.is_empty() {
@@ -297,6 +330,38 @@ pub struct ScenarioResult {
     pub trace: Trace,
     /// Property violations detected during execution.
     pub violations: Vec<PropertyViolation>,
+    /// Replay-ready VM artifact data captured for this run.
+    pub replay: ScenarioReplayArtifact,
+    /// Structured run statistics for observability.
+    pub stats: ScenarioStats,
+}
+
+/// Replay-ready artifact data captured from a scenario run.
+pub struct ScenarioReplayArtifact {
+    /// Raw observable VM trace.
+    pub obs_trace: Vec<ObsEvent>,
+    /// Effect trace entries for deterministic replay.
+    pub effect_trace: Vec<EffectTraceEntry>,
+    /// Output-condition verification checks captured by the VM.
+    pub output_condition_trace: Vec<OutputConditionCheck>,
+}
+
+/// Structured statistics emitted by scenario execution.
+pub struct ScenarioStats {
+    /// Scenario seed used for middleware RNG.
+    pub seed: u64,
+    /// Scenario scheduler concurrency value.
+    pub concurrency: u64,
+    /// Number of VM rounds executed by the scenario loop.
+    pub rounds_executed: u64,
+    /// Final VM clock tick.
+    pub final_tick: u64,
+    /// Number of observable events in the final VM trace.
+    pub total_obs_events: usize,
+    /// Number of observed `Invoked` events.
+    pub total_invoked_events: usize,
+    /// Number of checkpoint writes attempted by interval policy.
+    pub checkpoint_writes: usize,
 }
 
 /// Run a choreography with scenario-defined middleware (faults/network/properties).
@@ -331,10 +396,13 @@ pub fn run_with_scenario(
         .unwrap_or(0);
 
     let max_vm_rounds = scenario.steps * (num_roles as u64) * 10;
+    let steps_limit = scenario.steps as usize;
     let mut prev_trace_len = 0;
     let mut invoke_count: usize = 0;
     let mut active_count: usize = 0;
     let mut step_idx: usize = 0;
+    let mut rounds_executed: u64 = 0;
+    let mut checkpoint_writes: usize = 0;
 
     if scenario.steps > 0 {
         record_all_roles(&vm, &coro_info, 0, &mut trace);
@@ -371,7 +439,7 @@ pub fn run_with_scenario(
     }
 
     for _ in 0..max_vm_rounds {
-        if step_idx as u64 >= scenario.steps {
+        if step_idx >= steps_limit {
             break;
         }
 
@@ -394,6 +462,7 @@ pub fn run_with_scenario(
                 Ok(StepResult::Continue) => {}
                 Err(e) => return Err(format!("vm error: {e}")),
             }
+            rounds_executed = rounds_executed.saturating_add(1);
         } else {
             let fault = fault_only.as_ref().expect("fault injector");
             fault.tick(next_tick, vm.trace());
@@ -407,29 +476,20 @@ pub fn run_with_scenario(
                 Ok(StepResult::Continue) => {}
                 Err(e) => return Err(format!("vm error: {e}")),
             }
+            rounds_executed = rounds_executed.saturating_add(1);
         }
 
-        let current_trace = vm.trace();
-        let new_invokes = current_trace[prev_trace_len..]
-            .iter()
-            .filter(|e| matches!(e, ObsEvent::Invoked { .. }))
-            .count();
-        prev_trace_len = current_trace.len();
-
+        let new_invokes = count_new_invokes(vm.trace(), &mut prev_trace_len);
         invoke_count += new_invokes;
-
-        while invoke_count >= num_roles && (step_idx as u64) < scenario.steps {
-            invoke_count -= num_roles;
-            record_all_roles(&vm, &coro_info, step_idx, &mut trace);
-            step_idx += 1;
-            active_count += 1;
-
-            if active_count >= apr && (step_idx as u64) < scenario.steps {
-                active_count = 0;
-                record_all_roles(&vm, &coro_info, step_idx, &mut trace);
-                step_idx += 1;
-            }
-        }
+        advance_sampling(
+            &mut invoke_count,
+            &mut active_count,
+            &mut step_idx,
+            num_roles,
+            apr,
+            steps_limit,
+            |sample_step| record_all_roles(&vm, &coro_info, sample_step, &mut trace),
+        );
 
         let ctx = PropertyContext {
             tick: vm.clock().tick,
@@ -439,6 +499,11 @@ pub fn run_with_scenario(
         };
         monitor.check(&ctx);
         if let Some(store) = &mut checkpoints {
+            if let Some(interval) = scenario.checkpoint_interval {
+                if interval != 0 && vm.clock().tick % interval == 0 {
+                    checkpoint_writes = checkpoint_writes.saturating_add(1);
+                }
+            }
             store.maybe_checkpoint(vm.clock().tick, &vm);
         }
     }
@@ -452,8 +517,30 @@ pub fn run_with_scenario(
         );
     }
 
+    let obs_trace = vm.trace().to_vec();
+    let effect_trace = vm.effect_trace().to_vec();
+    let output_condition_trace = vm.output_condition_checks().to_vec();
+    let total_invoked_events = obs_trace
+        .iter()
+        .filter(|event| matches!(event, ObsEvent::Invoked { .. }))
+        .count();
+
     Ok(ScenarioResult {
         trace,
         violations: monitor.violations().to_vec(),
+        replay: ScenarioReplayArtifact {
+            obs_trace,
+            effect_trace,
+            output_condition_trace,
+        },
+        stats: ScenarioStats {
+            seed: scenario.seed,
+            concurrency: scenario.concurrency,
+            rounds_executed,
+            final_tick: vm.clock().tick,
+            total_obs_events: vm.trace().len(),
+            total_invoked_events,
+            checkpoint_writes,
+        },
     })
 }

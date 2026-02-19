@@ -138,7 +138,7 @@ let mut endpoint = ();
 let result = interpret(&mut handler, &mut endpoint, program).await?;
 ```
 
-The `InMemoryHandler` provides local message passing for testing. See [Using Telltale Handlers](08_telltale_handler.md) for production handlers.
+The `InMemoryHandler` provides local message passing for testing. See [Using Telltale Handlers](09_telltale_handler.md) for production handlers.
 
 ## Core Concepts
 

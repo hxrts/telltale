@@ -8,7 +8,7 @@ The first layer is the choreography. A global protocol specifies interactions fr
 
 The second layer is the effect algebra. The projected protocol for each role becomes a `Program` value, a sequence of choreographic effects that can be analyzed, composed, and verified before execution. The interpreter evaluates the program by dispatching each effect to a handler.
 
-The third layer is the VM. The bytecode VM executes instructions that correspond to effect operations. A formal Lean specification mirrors the Rust implementation. The monitor checks each instruction against the role's local session type. See [VM Overview](09_vm_overview.md) for the instruction set.
+The third layer is the VM. The bytecode VM executes instructions that correspond to effect operations. A formal Lean specification mirrors the Rust implementation. The monitor checks each instruction against the role's local session type. See [VM Overview](11_vm_architecture.md) for the instruction set.
 
 ## Effect Algebra
 
@@ -34,7 +34,7 @@ Programs compose sequentially with the `then` method. The `End` effect terminate
 
 The system defines two distinct handler traits for different purposes.
 
-`ChoreoHandler` is async and typed. It operates on concrete Rust message types with serialization bounds. Handlers like `InMemoryHandler`, `TelltaleHandler`, and `RecordingHandler` implement this trait. Middleware like `Trace`, `Retry`, and `FaultInjection` compose as handler wrappers. See [Effect Handlers](07_effect_handlers.md) for usage.
+`ChoreoHandler` is async and typed. It operates on concrete Rust message types with serialization bounds. Handlers like `InMemoryHandler`, `TelltaleHandler`, and `RecordingHandler` implement this trait. Middleware like `Trace`, `Retry`, and `FaultInjection` compose as handler wrappers. See [Effect Handlers](08_effect_handlers.md) for usage.
 
 ```rust
 pub trait ChoreoHandler: Send {

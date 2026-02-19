@@ -88,7 +88,7 @@ The TelltaleHandler is located in `rust/choreography/src/effects/handlers/tellta
 
 This handler enforces session types at runtime. It provides strong guarantees about protocol compliance.
 
-See [Using Telltale Handlers](08_telltale_handler.md) for complete documentation.
+See [Using Telltale Handlers](09_telltale_handler.md) for complete documentation.
 
 ### RecordingHandler
 
@@ -254,7 +254,7 @@ Use middleware to add logging, metrics, retries, or fault injection. Middleware 
 
 InMemoryHandler and TelltaleHandler both work in WASM environments. They use futures channels for communication.
 
-For WASM network communication, implement a custom handler. Use web-sys WebSocket or fetch APIs. See [WASM Guide](15_wasm_guide.md) for details.
+For WASM network communication, implement a custom handler. Use web-sys WebSocket or fetch APIs. See [WASM Guide](21_wasm_guide.md) for details.
 
 ## Role Family Resolution
 

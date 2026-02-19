@@ -12,6 +12,8 @@ use telltale_vm::vm::{VMConfig, VMError, VM};
 pub struct DistributedSimBuilder {
     sites: BTreeMap<String, Vec<CodeImage>>,
     inter_site: Option<CodeImage>,
+    outer_concurrency: usize,
+    inner_rounds_per_step: usize,
 }
 
 impl DistributedSimBuilder {
@@ -21,6 +23,8 @@ impl DistributedSimBuilder {
         Self {
             sites: BTreeMap::new(),
             inter_site: None,
+            outer_concurrency: 1,
+            inner_rounds_per_step: 1,
         }
     }
 
@@ -35,6 +39,20 @@ impl DistributedSimBuilder {
     #[must_use]
     pub fn inter_site(mut self, protocol: CodeImage) -> Self {
         self.inter_site = Some(protocol);
+        self
+    }
+
+    /// Set outer VM scheduler concurrency.
+    #[must_use]
+    pub fn outer_concurrency(mut self, concurrency: usize) -> Self {
+        self.outer_concurrency = concurrency.max(1);
+        self
+    }
+
+    /// Set inner VM rounds attempted per outer handler callback.
+    #[must_use]
+    pub fn inner_rounds_per_step(mut self, rounds: usize) -> Self {
+        self.inner_rounds_per_step = rounds.max(1);
         self
     }
 
@@ -77,7 +95,7 @@ impl DistributedSimBuilder {
             .load_choreography(&inter_site)
             .map_err(|e| format!("outer load error: {e}"))?;
 
-        let mut nested = NestedVMHandler::new();
+        let mut nested = NestedVMHandler::new().with_rounds_per_step(self.inner_rounds_per_step);
 
         for (site, protocols) in self.sites {
             let mut inner_vm = VM::new(config.clone());
@@ -93,6 +111,7 @@ impl DistributedSimBuilder {
         Ok(DistributedSimulation {
             outer_vm,
             handler: nested,
+            outer_concurrency: self.outer_concurrency,
         })
     }
 }
@@ -107,6 +126,7 @@ impl Default for DistributedSimBuilder {
 pub struct DistributedSimulation {
     outer_vm: VM,
     handler: NestedVMHandler,
+    outer_concurrency: usize,
 }
 
 impl DistributedSimulation {
@@ -116,7 +136,8 @@ impl DistributedSimulation {
     ///
     /// Returns a `VMError` if the outer VM faults.
     pub fn run(&mut self, max_rounds: usize) -> Result<(), VMError> {
-        self.outer_vm.run_concurrent(&self.handler, max_rounds, 1)
+        self.outer_vm
+            .run_concurrent(&self.handler, max_rounds, self.outer_concurrency)
     }
 
     /// Access the outer VM.
@@ -129,6 +150,12 @@ impl DistributedSimulation {
     #[must_use]
     pub fn handler(&self) -> &NestedVMHandler {
         &self.handler
+    }
+
+    /// Configured outer VM scheduler concurrency.
+    #[must_use]
+    pub fn outer_concurrency(&self) -> usize {
+        self.outer_concurrency
     }
 }
 

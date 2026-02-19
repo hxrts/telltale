@@ -38,6 +38,12 @@ impl NestedVMHandler {
         self
     }
 
+    /// Number of inner VM rounds attempted per outer handler call.
+    #[must_use]
+    pub fn rounds_per_step(&self) -> usize {
+        self.max_rounds_per_step
+    }
+
     /// Register a site by name with its inner VM and handler.
     pub fn add_site(&mut self, name: impl Into<String>, vm: VM, handler: Box<dyn EffectHandler>) {
         self.sites.insert(

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::determinism::EffectDeterminismTier;
 use crate::serialization::CanonicalReplayFragmentV1;
+use crate::trace::normalize_trace;
 use crate::trace::obs_session;
 use crate::verification::{DefaultVerificationModel, HashTag, VerificationModel};
 use crate::vm::ObsEvent;
@@ -184,7 +185,10 @@ fn classify_scheduler_permutation(
     if baseline_trace == candidate_trace {
         return SchedulerPermutationClass::Exact;
     }
-    if per_session_projection(baseline_trace) == per_session_projection(candidate_trace) {
+    let baseline_normalized = normalize_trace(baseline_trace);
+    let candidate_normalized = normalize_trace(candidate_trace);
+    if per_session_projection(&baseline_normalized) == per_session_projection(&candidate_normalized)
+    {
         return SchedulerPermutationClass::SessionNormalizedPermutation;
     }
     SchedulerPermutationClass::EnvelopeBounded

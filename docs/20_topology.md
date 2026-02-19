@@ -159,4 +159,4 @@ assert!(matches!(transport_type, TransportType::Tcp));
 
 The Lean formalization for topology is in `lean/Protocol/Spatial.lean`. Projection correctness does not depend on topology data, so location checks are enforced during deployment instead of compilation.
 
-See [Choreographic DSL](04_choreographic_dsl.md) for role declarations and [Effect Handlers](07_effect_handlers.md) for handler usage patterns.
+See [Choreographic DSL](04_choreographic_dsl.md) for role declarations and [Effect Handlers](08_effect_handlers.md) for handler usage patterns.

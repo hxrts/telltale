@@ -65,6 +65,9 @@ pub mod equivalence;
 pub mod runner;
 
 #[cfg(feature = "runner")]
+pub mod sim_reference;
+
+#[cfg(feature = "runner")]
 pub mod validate;
 
 #[cfg(feature = "runner")]
@@ -107,6 +110,9 @@ pub use equivalence::{
 
 #[cfg(feature = "runner")]
 pub use runner::{ChoreographyJson, LeanRunner, LeanRunnerError, LeanValidationResult};
+
+#[cfg(feature = "runner")]
+pub use sim_reference::{SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError};
 
 #[cfg(feature = "runner")]
 pub use vm_runner::{
