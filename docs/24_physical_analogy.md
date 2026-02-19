@@ -1,6 +1,6 @@
 # Physical Analogies for the Telltale Runtime
 
-This document develops physical intuitions for the theoretical pillars underlying Telltale's session-type VM. The analogies are drawn from thermodynamics, statistical mechanics, and field theory, building on the session-physics correspondence developed in the Gibbs framework.
+This document develops physical intuitions for the theoretical pillars underlying Telltale's session-type VM. The analogies are drawn from thermodynamics, statistical mechanics, and field theory.
 
 
 ## Overview

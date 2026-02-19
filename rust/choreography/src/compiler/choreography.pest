@@ -9,7 +9,7 @@ COMMENT = _{ "--" ~ (!"\n" ~ ANY)* ~ ("\n" | EOI) | "{-" ~ (!"-}" ~ ANY)* ~ "-}"
 
 // Top-level choreography definition
 choreography = {
-    SOI ~ module_decl? ~ import_decl* ~ protocol_decl ~ EOI
+    SOI ~ module_decl? ~ import_decl* ~ proof_bundle_decl* ~ protocol_decl ~ EOI
 }
 
 // Module and imports (optional)
@@ -18,10 +18,16 @@ import_decl = { "import" ~ ident ~ ("as" ~ ident)? ~ ("exposing" ~ "(" ~ expose_
 expose_list = { (!")" ~ ANY)* }
 
 // Protocol definitions
-protocol_decl = { "protocol" ~ ident ~ header_roles? ~ "=" ~ protocol_body ~ where_block? }
+protocol_decl = { "protocol" ~ ident ~ header_roles? ~ protocol_requires? ~ "=" ~ protocol_body ~ where_block? }
 where_block = { "where" ~ locals_block }
 locals_block = { "{" ~ local_protocol_decl+ ~ "}" | "(" ~ local_protocol_decl+ ~ ")" | local_protocol_decl+ }
 local_protocol_decl = { "protocol" ~ ident ~ header_roles? ~ "=" ~ protocol_body }
+
+// Proof-bundle declarations and protocol requirements
+proof_bundle_decl = { "proof_bundle" ~ ident ~ proof_bundle_requires? }
+proof_bundle_requires = { "requires" ~ "[" ~ capability_list? ~ "]" }
+capability_list = { ident ~ ("," ~ ident)* }
+protocol_requires = { "requires" ~ ident ~ ("," ~ ident)* }
 
 header_roles = { "(" ~ role_list ~ ")" }
 
@@ -49,6 +55,14 @@ statement = _{
     | rec_stmt
     | continue_stmt
     | call_stmt
+    | vm_acquire_stmt
+    | vm_release_stmt
+    | vm_fork_stmt
+    | vm_join_stmt
+    | vm_abort_stmt
+    | vm_transfer_stmt
+    | vm_tag_stmt
+    | vm_check_stmt
 }
 
 // Annotated statement - statement with prefix annotation(s)
@@ -68,6 +82,14 @@ inner_stmt = _{
     | branch_stmt
     | rec_stmt
     | call_stmt
+    | vm_acquire_stmt
+    | vm_release_stmt
+    | vm_fork_stmt
+    | vm_join_stmt
+    | vm_abort_stmt
+    | vm_transfer_stmt
+    | vm_tag_stmt
+    | vm_check_stmt
 }
 
 // Timed choice statement - desugars to choice with timeout annotation
@@ -84,6 +106,17 @@ heartbeat_body = { "body" ~ block }
 
 // Protocol call statement (for sub-protocols in where blocks)
 call_stmt = { "call" ~ ident }
+
+// VM-core operational statements
+vm_acquire_stmt = { "acquire" ~ vm_layer ~ "as" ~ ident }
+vm_release_stmt = { "release" ~ vm_layer ~ "using" ~ ident }
+vm_fork_stmt = { "fork" ~ ident }
+vm_join_stmt = { "join" }
+vm_abort_stmt = { "abort" }
+vm_transfer_stmt = { ("transfer" | "delegate") ~ ident ~ "to" ~ ident ~ ("with" ~ "bundle" ~ ident)? }
+vm_tag_stmt = { "tag" ~ ident ~ "as" ~ ident }
+vm_check_stmt = { "check" ~ ident ~ "for" ~ role_ref ~ "into" ~ ident }
+vm_layer = { ident | string }
 
 // Continue statement (for recursive back-references)
 continue_stmt = { "continue" ~ ident }

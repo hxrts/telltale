@@ -20,4 +20,13 @@ pub enum ValidationError {
 
     #[error("Extension error: {0}")]
     ExtensionError(String),
+
+    #[error("Duplicate proof bundle declaration: {0}")]
+    DuplicateProofBundle(String),
+
+    #[error("Required proof bundle is not declared: {0}")]
+    MissingProofBundle(String),
+
+    #[error("VM-core operation requires capability not covered by required bundles: {0}")]
+    MissingCapability(String),
 }

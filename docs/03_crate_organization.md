@@ -173,6 +173,12 @@ This crate is located in `rust/choreography/`. It provides DSL and parsing for c
 
 The `ast/` directory contains extended AST types including `Protocol`, `LocalType`, and `Role`. The `compiler/parser` module handles DSL parsing. The `compiler/projection` module handles choreography to `LocalType` projection. The `compiler/codegen` module handles Rust code generation.
 
+The parser now supports proof-bundle declarations and protocol bundle requirements. Parsed bundles are stored as typed metadata on `Choreography` through `ProofBundleDecl`.
+
+The parser also supports VM-core statements such as `acquire`, `transfer`, `fork`, and `check`. These statements lower to `Protocol::Extension` nodes with annotations that record operation kind, operands, and required capability. Projection preserves continuation projection when it encounters these extension nodes.
+
+Validation in this crate now includes bundle and capability checks. It rejects duplicate bundle declarations, missing required bundles, and missing capability coverage for VM-core statements. See [Choreographic DSL](04_choreographic_dsl.md) for syntax details.
+
 The `effects/` directory contains the effect system and handlers. The `extensions/` directory contains the DSL extension system. The `runtime/` directory contains platform abstraction.
 
 The `topology/` directory provides deployment configuration. See [Topology](20_topology.md) for the separation between protocol logic and deployment. The `heap/` directory provides explicit resource management. See [Resource Heap](17_resource_heap.md) for nullifier-based consumption tracking.

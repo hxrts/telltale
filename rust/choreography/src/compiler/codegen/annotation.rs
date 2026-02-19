@@ -8,6 +8,20 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::HashMap;
 
+fn is_valid_field_ident(candidate: &str) -> bool {
+    if candidate.is_empty() {
+        return false;
+    }
+    let mut chars = candidate.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first == '_' || first.is_ascii_alphabetic()) {
+        return false;
+    }
+    chars.all(|c| c == '_' || c.is_ascii_alphanumeric())
+}
+
 /// Generate documentation comments from annotations
 pub(crate) fn generate_annotation_docs(annotations: &HashMap<String, String>) -> TokenStream {
     if annotations.is_empty() {
@@ -37,10 +51,25 @@ pub(crate) fn generate_annotation_metadata(
         return quote! {};
     }
 
+    let supported: Vec<(&str, &String)> = annotations
+        .iter()
+        .filter_map(|(key, value)| {
+            let normalized = key.to_lowercase();
+            if is_valid_field_ident(&normalized) {
+                Some((key.as_str(), value))
+            } else {
+                None
+            }
+        })
+        .collect();
+    if supported.is_empty() {
+        return quote! {};
+    }
+
     let metadata_name = format_ident!("{}Annotations", name);
-    let annotation_fields: Vec<TokenStream> = annotations
-        .keys()
-        .map(|key| {
+    let annotation_fields: Vec<TokenStream> = supported
+        .iter()
+        .map(|(key, _)| {
             let field_name = format_ident!("{}", key.to_lowercase());
             quote! {
                 pub #field_name: &'static str,
@@ -48,7 +77,7 @@ pub(crate) fn generate_annotation_metadata(
         })
         .collect();
 
-    let annotation_values: Vec<TokenStream> = annotations
+    let annotation_values: Vec<TokenStream> = supported
         .iter()
         .map(|(key, value)| {
             let field_name = format_ident!("{}", key.to_lowercase());

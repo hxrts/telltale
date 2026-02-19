@@ -67,6 +67,7 @@ case choose Client of
 ```
 
 The deciding role (`Client`) selects a branch. Guards are optional.
+Guard expressions are parsed as Rust expressions and must be boolean-like. Valid examples include `ready`, `balance > price`, and `is_open()`.
 
 Alias syntax (sugar):
 
@@ -127,7 +128,7 @@ loop while "has_more_data"
   A -> B : Data
 ```
 
-This loop uses a custom condition token. The condition is preserved for tooling and extension passes.
+This loop parses the string content as a boolean-like predicate expression. The parser rejects non-boolean predicates such as `"count + 1"` before building the AST.
 
 ```rust
 loop forever
@@ -308,7 +309,40 @@ protocol TimedOps =
 
 Unlike `timed_choice`, this annotation does not change the session type. It is a hint to the transport layer and is not verified in Lean. Use it for operational timeouts when you do not want the protocol to branch on timeout.
 
-#### 11) String-based Protocol Definition
+#### 11) Proof Bundles and VM-Core Statements
+
+`proof_bundle` declarations define capability sets. `protocol ... requires ...` selects the bundles required by a protocol.
+
+```rust
+proof_bundle DelegationBase requires [delegation, guard_tokens]
+proof_bundle KnowledgeBase requires [knowledge_flow]
+
+protocol TransferFlow requires DelegationBase, KnowledgeBase =
+  roles A, B
+  acquire guard as token
+  transfer endpoint to B with bundle DelegationBase
+  delegate endpoint to B with bundle DelegationBase
+  tag obligation as obligation_tag
+  check obligation for B into witness
+  release guard using token
+  A -> B : Commit
+```
+
+The parser stores bundle declarations and required bundle names in typed choreography metadata. Validation fails on duplicate bundles, missing required bundles, or missing capability coverage for VM-core statements.
+
+VM-core statements lower to `Protocol::Extension` nodes with annotations. The annotation keys are `vm_core_op`, `required_capability`, and `vm_core_operands`.
+
+```rust
+protocol SpeculativeFlow requires SpecBundle =
+  roles A, B
+  fork ghost0
+  A -> B : Try
+  join
+```
+
+This lowering preserves statement order and continuation structure. Projection skips extension-local behavior for now and continues projecting the remaining protocol.
+
+#### 12) String-based Protocol Definition
 
 ```rust
 use telltale_choreography::compiler::parser::parse_choreography_str;
@@ -354,8 +388,9 @@ The parser builds the AST for projection, validation, and code generation.
 1. Preprocess layout (indentation -> `{}`/`()`).
 2. Parse with Pest grammar.
 3. Build statements and normalize branch adjacency to `Parallel`.
-4. Validate roles and resolve `call` references.
-5. Build `Choreography`/`Protocol` AST.
+4. Resolve `call` references and lower VM-core statements to `Protocol::Extension`.
+5. Build `Choreography` and attach typed proof-bundle metadata.
+6. Run optional semantic checks with `choreography.validate()`.
 
 ## API
 
@@ -393,14 +428,14 @@ This example parses a file path into a `Choreography`. The file must contain a v
 ```rust
 match parse_choreography_str(input) {
     Ok(choreo) => { /* use choreography */ }
-    Err(ParseError::UndefinedRole(role)) => {
+    Err(ParseError::UndefinedRole { role, .. }) => {
         eprintln!("Role '{}' used but not declared", role);
     }
-    Err(ParseError::DuplicateRole(role)) => {
+    Err(ParseError::DuplicateRole { role, .. }) => {
         eprintln!("Role '{}' declared multiple times", role);
     }
-    Err(ParseError::Syntax { location, message }) => {
-        eprintln!("Syntax error at {}: {}", location, message);
+    Err(ParseError::Syntax { span, message }) => {
+        eprintln!("Syntax error at {}:{}: {}", span.line, span.column, message);
     }
     Err(e) => {
         eprintln!("Parse error: {}", e);
@@ -419,7 +454,8 @@ This pattern matches common parse errors. It formats diagnostics with the report
 - Strings: `"..."` (used in `loop while`)
 - Keywords: `protocol`, `roles`, `case`, `choose`, `of`, `choice`, `at`, `loop`,
   `decide`, `by`, `repeat`, `while`, `forever`, `branch`, `rec`, `call`, `where`,
-  `module`, `import`, `exposing`
+  `module`, `import`, `exposing`, `proof_bundle`, `requires`, `acquire`, `release`,
+  `fork`, `join`, `abort`, `transfer`, `delegate`, `tag`, `check`, `using`, `into`
 - Operators: `->`, `->*`, `:`, `{}`, `()`, `,`, `|`
 
 ### Comments
@@ -441,7 +477,7 @@ Indentation defines blocks. Use `{}` to force an empty block or to opt out of la
 
 ## Validation
 
-The parser validates that roles are declared, declared roles are unique, and `branch` blocks appear in parallel adjacency. Additional semantic validation is performed by `choreography.validate()`.
+The parser validates role declarations and `branch` adjacency. `choreography.validate()` also validates proof-bundle declarations, required bundle references, and VM-core capability coverage.
 
 ## Error Messages
 

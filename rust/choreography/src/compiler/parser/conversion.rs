@@ -5,13 +5,102 @@
 //! and inlining of protocol calls.
 
 use crate::ast::{
-    Annotations, Branch, Condition, MessageType, NonEmptyVec, Protocol, ProtocolAnnotation, Role,
+    Annotations, Branch, Condition, LocalType, MessageType, NonEmptyVec, Protocol,
+    ProtocolAnnotation, Role,
+};
+use crate::compiler::projection::ProjectionError;
+use crate::extensions::{
+    CodegenContext, ExtensionValidationError, ProjectionContext, ProtocolExtension,
 };
 use quote::format_ident;
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 use super::error::{ErrorSpan, ParseError};
-use super::types::{ChoiceBranch, Statement};
+use super::types::{ChoiceBranch, Statement, VmCoreOp};
+
+#[derive(Debug, Clone)]
+struct VmCoreOpExtension {
+    op_name: String,
+}
+
+impl VmCoreOpExtension {
+    fn new(op_name: impl Into<String>) -> Self {
+        Self {
+            op_name: op_name.into(),
+        }
+    }
+}
+
+impl ProtocolExtension for VmCoreOpExtension {
+    fn type_name(&self) -> &'static str {
+        "vm_core_op"
+    }
+
+    fn mentions_role(&self, _role: &Role) -> bool {
+        false
+    }
+
+    fn validate(&self, _roles: &[Role]) -> Result<(), ExtensionValidationError> {
+        Ok(())
+    }
+
+    fn project(
+        &self,
+        _role: &Role,
+        _context: &ProjectionContext,
+    ) -> Result<LocalType, ProjectionError> {
+        Ok(LocalType::End)
+    }
+
+    fn generate_code(&self, _context: &CodegenContext) -> proc_macro2::TokenStream {
+        let op = &self.op_name;
+        quote::quote! {
+            {
+                let _vm_core_op: &str = #op;
+                let _ = _vm_core_op;
+            }
+        }
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn type_id(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
+}
+
+fn vm_op_operands(op: &VmCoreOp) -> String {
+    match op {
+        VmCoreOp::Acquire { layer, dst } => format!("layer={layer},dst={dst}"),
+        VmCoreOp::Release { layer, evidence } => {
+            format!("layer={layer},evidence={evidence}")
+        }
+        VmCoreOp::Fork { ghost } => format!("ghost={ghost}"),
+        VmCoreOp::Join => "none".to_string(),
+        VmCoreOp::Abort => "none".to_string(),
+        VmCoreOp::Transfer {
+            endpoint,
+            target,
+            bundle,
+        } => format!(
+            "endpoint={endpoint},target={target},bundle={}",
+            bundle.as_deref().unwrap_or("none")
+        ),
+        VmCoreOp::Tag { fact, dst } => format!("fact={fact},dst={dst}"),
+        VmCoreOp::Check {
+            knowledge,
+            target_role,
+            dst,
+        } => format!("knowledge={knowledge},target_role={target_role},dst={dst}"),
+    }
+}
 
 /// Convert statements to protocol AST
 pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[Role]) -> Protocol {
@@ -322,6 +411,18 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
             },
             Statement::Continue { label } => Protocol::Var(label.clone()),
             Statement::Call { .. } => current,
+            Statement::VmCoreOp { op } => {
+                let annotations = Annotations::from_vec(vec![
+                    ProtocolAnnotation::custom("vm_core_op", op.op_name()),
+                    ProtocolAnnotation::custom("required_capability", op.required_capability()),
+                    ProtocolAnnotation::custom("vm_core_operands", vm_op_operands(op)),
+                ]);
+                Protocol::Extension {
+                    extension: Box::new(VmCoreOpExtension::new(op.op_name())),
+                    continuation: Box::new(current),
+                    annotations,
+                }
+            }
         };
     }
 
@@ -432,6 +533,9 @@ pub(crate) fn inline_calls(
                     label: label.clone(),
                     body: inline_calls(body, protocol_defs, input)?,
                 });
+            }
+            Statement::VmCoreOp { op } => {
+                result.push(Statement::VmCoreOp { op: op.clone() });
             }
             _ => {
                 // Other statements remain unchanged

@@ -162,13 +162,12 @@ impl<'a> ProjectionContext<'a> {
 
             Protocol::Extension {
                 extension: _,
-                continuation: _,
+                continuation,
                 annotations: _,
             } => {
-                // Delegate projection to the extension implementation
-                // Note: We would need to convert between ProjectionContext types here
-                // For now, just return a placeholder
-                Ok(LocalType::End)
+                // Preserve continuation structure for extension nodes.
+                // Extension-local projection can be layered later once LocalType models it.
+                self.project_protocol(continuation)
             }
         }
     }

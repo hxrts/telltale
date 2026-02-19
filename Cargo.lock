@@ -1528,6 +1528,7 @@ dependencies = [
  "quote",
  "rand 0.8.5",
  "serde",
+ "serde_json",
  "sha2",
  "syn 2.0.110",
  "telltale",

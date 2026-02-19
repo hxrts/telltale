@@ -4,14 +4,79 @@
 
 use crate::ast::{Condition, Role};
 use proc_macro2::TokenStream;
-use quote::format_ident;
+use quote::{format_ident, quote};
 use std::collections::{HashMap, HashSet};
+use syn::{BinOp, Expr, Lit, UnOp};
 
 use super::error::{ErrorSpan, ParseError};
 use super::role::parse_role_ref;
 use super::statement::{parse_block, parse_duration};
-use super::types::{ChoiceBranch, Statement};
+use super::types::{ChoiceBranch, Statement, VmCoreOp};
 use super::Rule;
+
+fn is_boolean_like_predicate(expr: &Expr) -> bool {
+    match expr {
+        Expr::Binary(binary) => matches!(
+            binary.op,
+            BinOp::And(_)
+                | BinOp::Or(_)
+                | BinOp::Eq(_)
+                | BinOp::Ne(_)
+                | BinOp::Lt(_)
+                | BinOp::Le(_)
+                | BinOp::Gt(_)
+                | BinOp::Ge(_)
+        ),
+        Expr::Unary(unary) => matches!(unary.op, UnOp::Not(_)),
+        Expr::Paren(paren) => is_boolean_like_predicate(&paren.expr),
+        Expr::Group(group) => is_boolean_like_predicate(&group.expr),
+        Expr::Lit(lit) => matches!(lit.lit, Lit::Bool(_)),
+        // Keep compatibility for named bool flags or predicate-returning calls.
+        Expr::Path(_)
+        | Expr::Field(_)
+        | Expr::Index(_)
+        | Expr::Call(_)
+        | Expr::MethodCall(_)
+        | Expr::Macro(_) => true,
+        _ => false,
+    }
+}
+
+fn parse_guard_predicate(
+    expr_src: &str,
+    span: pest::Span,
+    input: &str,
+) -> std::result::Result<TokenStream, ParseError> {
+    let expr = syn::parse_str::<Expr>(expr_src).map_err(|e| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: format!("Invalid guard expression: {e}"),
+    })?;
+    if !is_boolean_like_predicate(&expr) {
+        return Err(ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "Invalid guard expression: predicate must be boolean-like".to_string(),
+        });
+    }
+    Ok(quote!(#expr))
+}
+
+fn parse_loop_predicate(
+    expr_src: &str,
+    span: pest::Span,
+    input: &str,
+) -> std::result::Result<TokenStream, ParseError> {
+    let expr = syn::parse_str::<Expr>(expr_src).map_err(|e| ParseError::InvalidCondition {
+        message: format!("Invalid loop condition: {e}"),
+        span: ErrorSpan::from_pest_span(span, input),
+    })?;
+    if !is_boolean_like_predicate(&expr) {
+        return Err(ParseError::InvalidCondition {
+            message: "Invalid loop condition: predicate must be boolean-like".to_string(),
+            span: ErrorSpan::from_pest_span(span, input),
+        });
+    }
+    Ok(quote!(#expr))
+}
 
 /// Parse send statement: A -> B: Message(payload)
 pub(super) fn parse_send_stmt(
@@ -107,12 +172,7 @@ pub(super) fn parse_choice_stmt(
                 .next()
                 .expect("grammar: guard must have expression")
                 .as_str();
-            guard = Some(syn::parse_str::<TokenStream>(guard_expr).map_err(|e| {
-                ParseError::Syntax {
-                    span: ErrorSpan::from_pest_span(guard_span, input),
-                    message: format!("Invalid guard expression: {e}"),
-                }
-            })?);
+            guard = Some(parse_guard_predicate(guard_expr, guard_span, input)?);
             parse_block(
                 branch_inner
                     .next()
@@ -216,12 +276,7 @@ pub(super) fn parse_timed_choice_stmt(
                 .next()
                 .expect("grammar: guard must have expression")
                 .as_str();
-            guard = Some(syn::parse_str::<TokenStream>(guard_expr).map_err(|e| {
-                ParseError::Syntax {
-                    span: ErrorSpan::from_pest_span(guard_span, input),
-                    message: format!("Invalid guard expression: {e}"),
-                }
-            })?);
+            guard = Some(parse_guard_predicate(guard_expr, guard_span, input)?);
             parse_block(
                 branch_inner
                     .next()
@@ -428,14 +483,13 @@ pub(super) fn parse_loop_stmt(
                                 .into_inner()
                                 .next()
                                 .expect("grammar: loop while must have string");
-                            let cond_str = cond_pair.as_str();
-                            let token_stream =
-                                syn::parse_str::<TokenStream>(cond_str).map_err(|e| {
-                                    ParseError::InvalidCondition {
-                                        message: format!("Invalid loop condition: {e}"),
-                                        span: ErrorSpan::from_pest_span(span, input),
-                                    }
+                            let cond_lit = syn::parse_str::<syn::LitStr>(cond_pair.as_str())
+                                .map_err(|e| ParseError::InvalidCondition {
+                                    message: format!("Invalid loop condition string: {e}"),
+                                    span: ErrorSpan::from_pest_span(span, input),
                                 })?;
+                            let token_stream =
+                                parse_loop_predicate(&cond_lit.value(), span, input)?;
                             condition = Some(Condition::Custom(token_stream));
                         }
                         Rule::loop_forever => {
@@ -487,14 +541,14 @@ pub(super) fn parse_loop_stmt(
                             .into_inner()
                             .next()
                             .expect("grammar: loop while must have string");
-                        let cond_str = cond_pair.as_str();
-                        let token_stream =
-                            syn::parse_str::<TokenStream>(cond_str).map_err(|e| {
+                        let cond_lit =
+                            syn::parse_str::<syn::LitStr>(cond_pair.as_str()).map_err(|e| {
                                 ParseError::InvalidCondition {
-                                    message: format!("Invalid loop condition: {e}"),
+                                    message: format!("Invalid loop condition string: {e}"),
                                     span: ErrorSpan::from_pest_span(span, input),
                                 }
                             })?;
+                        let token_stream = parse_loop_predicate(&cond_lit.value(), span, input)?;
                         condition = Some(Condition::Custom(token_stream));
                     }
                     Rule::loop_forever => {
@@ -583,5 +637,185 @@ pub(super) fn parse_continue_stmt(
 
     Ok(Statement::Continue {
         label: format_ident!("{}", label),
+    })
+}
+
+fn parse_vm_layer(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<String, ParseError> {
+    let span = pair.as_span();
+    let value = match pair.as_rule() {
+        Rule::vm_layer => {
+            let inner = pair
+                .into_inner()
+                .next()
+                .ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "vm layer is missing name".to_string(),
+                })?;
+            inner.as_str().to_string()
+        }
+        Rule::ident | Rule::string => pair.as_str().to_string(),
+        _ => {
+            return Err(ParseError::Syntax {
+                span: ErrorSpan::from_pest_span(span, input),
+                message: "invalid vm layer".to_string(),
+            });
+        }
+    };
+    if value.starts_with('\"') && value.ends_with('\"') && value.len() >= 2 {
+        Ok(value[1..value.len() - 1].to_string())
+    } else {
+        Ok(value)
+    }
+}
+
+pub(super) fn parse_vm_acquire_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let layer_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "acquire is missing layer".to_string(),
+    })?;
+    let dst_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "acquire is missing destination token".to_string(),
+    })?;
+    Ok(Statement::VmCoreOp {
+        op: VmCoreOp::Acquire {
+            layer: parse_vm_layer(layer_pair, input)?,
+            dst: dst_pair.as_str().to_string(),
+        },
+    })
+}
+
+pub(super) fn parse_vm_release_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let layer_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "release is missing layer".to_string(),
+    })?;
+    let evidence_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "release is missing evidence token".to_string(),
+    })?;
+    Ok(Statement::VmCoreOp {
+        op: VmCoreOp::Release {
+            layer: parse_vm_layer(layer_pair, input)?,
+            evidence: evidence_pair.as_str().to_string(),
+        },
+    })
+}
+
+pub(super) fn parse_vm_fork_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let ghost_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "fork is missing ghost token".to_string(),
+    })?;
+    Ok(Statement::VmCoreOp {
+        op: VmCoreOp::Fork {
+            ghost: ghost_pair.as_str().to_string(),
+        },
+    })
+}
+
+pub(super) fn parse_vm_join_stmt() -> std::result::Result<Statement, ParseError> {
+    Ok(Statement::VmCoreOp { op: VmCoreOp::Join })
+}
+
+pub(super) fn parse_vm_abort_stmt() -> std::result::Result<Statement, ParseError> {
+    Ok(Statement::VmCoreOp {
+        op: VmCoreOp::Abort,
+    })
+}
+
+pub(super) fn parse_vm_transfer_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let endpoint_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "transfer is missing endpoint token".to_string(),
+    })?;
+    let target_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "transfer is missing target token".to_string(),
+    })?;
+    let bundle = inner.next().map(|p| p.as_str().to_string());
+
+    Ok(Statement::VmCoreOp {
+        op: VmCoreOp::Transfer {
+            endpoint: endpoint_pair.as_str().to_string(),
+            target: target_pair.as_str().to_string(),
+            bundle,
+        },
+    })
+}
+
+pub(super) fn parse_vm_tag_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let fact_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "tag is missing fact token".to_string(),
+    })?;
+    let dst_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "tag is missing destination token".to_string(),
+    })?;
+
+    Ok(Statement::VmCoreOp {
+        op: VmCoreOp::Tag {
+            fact: fact_pair.as_str().to_string(),
+            dst: dst_pair.as_str().to_string(),
+        },
+    })
+}
+
+pub(super) fn parse_vm_check_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let knowledge_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "check is missing knowledge token".to_string(),
+    })?;
+    let target_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "check is missing target role".to_string(),
+    })?;
+    let dst_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "check is missing destination token".to_string(),
+    })?;
+    let target_role = parse_role_ref(target_pair, declared_roles, input)?;
+
+    Ok(Statement::VmCoreOp {
+        op: VmCoreOp::Check {
+            knowledge: knowledge_pair.as_str().to_string(),
+            target_role: target_role.name().to_string(),
+            dst: dst_pair.as_str().to_string(),
+        },
     })
 }

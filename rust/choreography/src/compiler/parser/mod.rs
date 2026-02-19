@@ -21,7 +21,7 @@ mod types;
 // Re-export public API
 pub use error::{ErrorSpan, ParseError};
 
-use crate::ast::Choreography;
+use crate::ast::{Choreography, ProofBundleDecl};
 use crate::compiler::layout::preprocess_layout;
 use crate::extensions::{ExtensionRegistry, ProtocolExtension};
 use pest::Parser;
@@ -57,6 +57,55 @@ fn parse_module_decl(
     })
 }
 
+/// Parse a proof-bundle declaration from the AST.
+fn parse_proof_bundle_decl(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<ProofBundleDecl, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let Some(name_pair) = inner.next() else {
+        return Err(ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "Invalid proof_bundle declaration".to_string(),
+        });
+    };
+    if name_pair.as_rule() != Rule::ident {
+        return Err(ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "Invalid proof_bundle name".to_string(),
+        });
+    }
+
+    let mut capabilities = Vec::new();
+    if let Some(requires_pair) = inner.next() {
+        if requires_pair.as_rule() == Rule::proof_bundle_requires {
+            for item in requires_pair.into_inner() {
+                if item.as_rule() == Rule::capability_list {
+                    for cap in item.into_inner() {
+                        if cap.as_rule() == Rule::ident {
+                            capabilities.push(cap.as_str().to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(ProofBundleDecl {
+        name: name_pair.as_str().to_string(),
+        capabilities,
+    })
+}
+
+/// Parse protocol-level required proof bundles.
+fn parse_protocol_requires(pair: pest::iterators::Pair<Rule>) -> Vec<String> {
+    pair.into_inner()
+        .filter(|p| p.as_rule() == Rule::ident)
+        .map(|p| p.as_str().to_string())
+        .collect()
+}
+
 /// Parse a choreographic protocol from a string
 pub fn parse_choreography_str(input: &str) -> std::result::Result<Choreography, ParseError> {
     parse_choreography_str_with_extensions(input, &ExtensionRegistry::new())
@@ -84,6 +133,8 @@ pub fn parse_choreography_str_with_extensions(
     let mut declared_roles: HashSet<String> = HashSet::new();
     let mut protocol_defs: HashMap<String, Vec<Statement>> = HashMap::new();
     let mut statements: Vec<Statement> = Vec::new();
+    let mut proof_bundles: Vec<ProofBundleDecl> = Vec::new();
+    let mut required_bundles: Vec<String> = Vec::new();
 
     for pair in pairs {
         if pair.as_rule() == Rule::choreography {
@@ -94,6 +145,9 @@ pub fn parse_choreography_str_with_extensions(
                     }
                     Rule::import_decl => {
                         // Imports are parsed for completeness but ignored for now.
+                    }
+                    Rule::proof_bundle_decl => {
+                        proof_bundles.push(parse_proof_bundle_decl(inner, &preprocessed)?);
                     }
                     Rule::protocol_decl => {
                         let mut proto_inner = inner.into_inner();
@@ -111,6 +165,9 @@ pub fn parse_choreography_str_with_extensions(
                                 Rule::header_roles => {
                                     header_roles =
                                         Some(parse_roles_from_pair(item, &preprocessed)?);
+                                }
+                                Rule::protocol_requires => {
+                                    required_bundles = parse_protocol_requires(item);
                                 }
                                 Rule::protocol_body => {
                                     body_pair = Some(item);
@@ -179,16 +236,28 @@ pub fn parse_choreography_str_with_extensions(
 
     let protocol = convert_statements_to_protocol(&statements, &roles);
 
-    Ok((
-        Choreography {
-            name,
-            namespace,
-            roles,
-            protocol,
-            attrs: HashMap::new(),
-        },
-        Vec::new(),
-    ))
+    let mut choreography = Choreography {
+        name,
+        namespace,
+        roles,
+        protocol,
+        attrs: HashMap::new(),
+    };
+
+    choreography
+        .set_proof_bundles(&proof_bundles)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            message,
+        })?;
+    choreography
+        .set_required_proof_bundles(&required_bundles)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            message,
+        })?;
+
+    Ok((choreography, Vec::new()))
 }
 
 /// Preprocess extension syntax to transform it into standard DSL syntax.
@@ -318,7 +387,7 @@ pub fn choreography_macro(input: TokenStream) -> TokenStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{Condition, Protocol};
+    use crate::ast::{Condition, LocalType, Protocol, ValidationError};
 
     #[test]
     fn test_parse_simple_send() {
@@ -1469,6 +1538,198 @@ protocol ParallelThreshold =
                 assert_eq!(annotations.min_responses(), Some(2));
             }
             _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_parse_proof_bundles_and_protocol_requires_metadata() {
+        let input = r#"
+proof_bundle Base requires [guard_tokens, delegation]
+proof_bundle Extra requires [knowledge_flow]
+protocol WithBundles requires Base, Extra =
+  roles A, B
+  A -> B : Ping
+"#;
+
+        let choreo = parse_choreography_str(input).expect("parse should succeed");
+        let bundles = choreo.proof_bundles();
+        assert_eq!(bundles.len(), 2);
+        assert_eq!(bundles[0].name, "Base");
+        assert_eq!(
+            bundles[0].capabilities,
+            vec!["guard_tokens".to_string(), "delegation".to_string()]
+        );
+        assert_eq!(bundles[1].name, "Extra");
+        assert_eq!(
+            bundles[1].capabilities,
+            vec!["knowledge_flow".to_string()]
+        );
+        assert_eq!(
+            choreo.required_proof_bundles(),
+            vec!["Base".to_string(), "Extra".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_parse_vm_core_statements_into_extensions() {
+        fn collect_vm_ops(protocol: &Protocol, out: &mut Vec<String>) {
+            match protocol {
+                Protocol::Extension {
+                    annotations,
+                    continuation,
+                    ..
+                } => {
+                    if let Some(op) = annotations.custom("vm_core_op") {
+                        out.push(op.to_string());
+                    }
+                    collect_vm_ops(continuation, out);
+                }
+                Protocol::Send { continuation, .. } | Protocol::Broadcast { continuation, .. } => {
+                    collect_vm_ops(continuation, out);
+                }
+                Protocol::Choice { branches, .. } => {
+                    for branch in branches {
+                        collect_vm_ops(&branch.protocol, out);
+                    }
+                }
+                Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => {
+                    collect_vm_ops(body, out);
+                }
+                Protocol::Parallel { protocols } => {
+                    for protocol in protocols {
+                        collect_vm_ops(protocol, out);
+                    }
+                }
+                Protocol::Var(_) | Protocol::End => {}
+            }
+        }
+
+        let input = r#"
+protocol VmOps =
+  roles A, B
+  acquire guard as token
+  transfer ep to B with bundle Base
+  check k for B into out
+  A -> B : Ping
+"#;
+
+        let choreo = parse_choreography_str(input).expect("parse should succeed");
+        let mut vm_ops = Vec::new();
+        collect_vm_ops(&choreo.protocol, &mut vm_ops);
+        assert_eq!(
+            vm_ops,
+            vec![
+                "acquire".to_string(),
+                "transfer".to_string(),
+                "check".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_validate_missing_required_bundle_fails() {
+        let input = r#"
+protocol MissingBundle requires Core =
+  roles A, B
+  A -> B : Ping
+"#;
+
+        let choreo = parse_choreography_str(input).expect("parse should succeed");
+        let err = choreo.validate().expect_err("validation should fail");
+        assert!(matches!(
+            err,
+            ValidationError::MissingProofBundle(ref name) if name == "Core"
+        ));
+    }
+
+    #[test]
+    fn test_validate_missing_capability_fails() {
+        let input = r#"
+proof_bundle DelegationOnly requires [delegation]
+protocol NeedGuard requires DelegationOnly =
+  roles A, B
+  acquire guard as token
+  A -> B : Ping
+"#;
+
+        let choreo = parse_choreography_str(input).expect("parse should succeed");
+        let err = choreo.validate().expect_err("validation should fail");
+        assert!(matches!(
+            err,
+            ValidationError::MissingCapability(ref cap) if cap == "guard_tokens"
+        ));
+    }
+
+    #[test]
+    fn test_validate_duplicate_bundle_fails() {
+        let input = r#"
+proof_bundle Core requires [delegation]
+proof_bundle Core requires [guard_tokens]
+protocol DuplicateBundle requires Core =
+  roles A, B
+  A -> B : Ping
+"#;
+
+        let choreo = parse_choreography_str(input).expect("parse should succeed");
+        let err = choreo.validate().expect_err("validation should fail");
+        assert!(matches!(
+            err,
+            ValidationError::DuplicateProofBundle(ref name) if name == "Core"
+        ));
+    }
+
+    #[test]
+    fn test_parse_guard_predicate_rejects_non_boolean_expression() {
+        let input = r#"
+protocol GuardTypeCheck =
+  roles A, B
+  choice at A
+    ok when (count + 1) ->
+      A -> B : Ack
+    no ->
+      A -> B : Nack
+"#;
+
+        let err = parse_choreography_str(input).expect_err("guard should fail");
+        assert!(matches!(err, ParseError::Syntax { .. }));
+        assert!(err.to_string().contains("boolean-like"));
+    }
+
+    #[test]
+    fn test_parse_loop_while_rejects_non_boolean_expression() {
+        let input = r#"
+protocol LoopTypeCheck =
+  roles A, B
+  loop while "count + 1"
+    A -> B : Tick
+"#;
+
+        let err = parse_choreography_str(input).expect_err("loop condition should fail");
+        assert!(matches!(err, ParseError::InvalidCondition { .. }));
+        assert!(err.to_string().contains("boolean-like"));
+    }
+
+    #[test]
+    fn test_projection_preserves_continuation_after_extension() {
+        let input = r#"
+protocol ExtensionProjection =
+  roles A, B
+  acquire guard as token
+  A -> B : Ping
+"#;
+
+        let choreo = parse_choreography_str(input).expect("parse should succeed");
+        let role_a = choreo
+            .roles
+            .iter()
+            .find(|r| r.name() == "A")
+            .expect("role A should exist");
+        let projected =
+            crate::compiler::projection::project(&choreo, role_a).expect("projection must work");
+
+        match projected {
+            LocalType::Send { to, .. } => assert_eq!(to.name(), "B"),
+            other => panic!("expected send continuation projection, got {other:?}"),
         }
     }
 }

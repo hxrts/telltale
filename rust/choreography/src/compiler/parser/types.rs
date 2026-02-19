@@ -71,6 +71,65 @@ pub(crate) enum Statement {
     Call {
         name: Ident,
     },
+    VmCoreOp {
+        op: VmCoreOp,
+    },
+}
+
+/// VM-core statement op parsed from DSL.
+#[derive(Debug, Clone)]
+pub(crate) enum VmCoreOp {
+    Acquire {
+        layer: String,
+        dst: String,
+    },
+    Release {
+        layer: String,
+        evidence: String,
+    },
+    Fork {
+        ghost: String,
+    },
+    Join,
+    Abort,
+    Transfer {
+        endpoint: String,
+        target: String,
+        bundle: Option<String>,
+    },
+    Tag {
+        fact: String,
+        dst: String,
+    },
+    Check {
+        knowledge: String,
+        target_role: String,
+        dst: String,
+    },
+}
+
+impl VmCoreOp {
+    pub(crate) fn op_name(&self) -> &'static str {
+        match self {
+            Self::Acquire { .. } => "acquire",
+            Self::Release { .. } => "release",
+            Self::Fork { .. } => "fork",
+            Self::Join => "join",
+            Self::Abort => "abort",
+            Self::Transfer { .. } => "transfer",
+            Self::Tag { .. } => "tag",
+            Self::Check { .. } => "check",
+        }
+    }
+
+    pub(crate) fn required_capability(&self) -> &'static str {
+        match self {
+            Self::Acquire { .. } | Self::Release { .. } => "guard_tokens",
+            Self::Fork { .. } | Self::Join | Self::Abort => "speculation",
+            Self::Transfer { .. } => "delegation",
+            Self::Tag { .. } | Self::Check { .. } => "knowledge_flow",
+        }
+    }
 }
 
 /// Choice branch in choreography

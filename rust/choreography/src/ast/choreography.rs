@@ -2,7 +2,21 @@
 
 use super::{Protocol, Role, ValidationError};
 use proc_macro2::Ident;
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+
+const ATTR_PROOF_BUNDLES: &str = "dsl.proof_bundles";
+const ATTR_REQUIRED_PROOF_BUNDLES: &str = "dsl.required_proof_bundles";
+
+/// Typed proof-bundle declaration metadata from DSL.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProofBundleDecl {
+    /// Stable bundle name.
+    pub name: String,
+    /// Capabilities provided by this bundle.
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+}
 
 /// A complete choreographic protocol specification
 #[derive(Debug)]
@@ -39,6 +53,32 @@ impl Choreography {
 
         // Check protocol is well-formed
         self.protocol.validate(&self.roles)?;
+        self.validate_proof_bundles()?;
+
+        Ok(())
+    }
+
+    fn validate_proof_bundles(&self) -> Result<(), ValidationError> {
+        let bundles = self.proof_bundles();
+        let mut declared: HashSet<String> = HashSet::new();
+        for bundle in &bundles {
+            if !declared.insert(bundle.name.clone()) {
+                return Err(ValidationError::DuplicateProofBundle(bundle.name.clone()));
+            }
+        }
+
+        for required in self.required_proof_bundles() {
+            if !declared.contains(&required) {
+                return Err(ValidationError::MissingProofBundle(required));
+            }
+        }
+
+        let required_caps = self.required_bundle_capabilities();
+        for capability in self.required_vm_core_capabilities() {
+            if !required_caps.contains(&capability) {
+                return Err(ValidationError::MissingCapability(capability));
+            }
+        }
 
         Ok(())
     }
@@ -139,5 +179,118 @@ impl Choreography {
     /// Count total annotations across the entire choreography
     pub fn total_annotation_count(&self) -> usize {
         self.attribute_count() + self.protocol.deep_annotation_count()
+    }
+
+    /// Set proof-bundle declarations for this choreography.
+    pub fn set_proof_bundles(&mut self, bundles: &[ProofBundleDecl]) -> Result<(), String> {
+        let encoded =
+            serde_json::to_string(bundles).map_err(|e| format!("encode proof bundles: {e}"))?;
+        self.attrs
+            .insert(ATTR_PROOF_BUNDLES.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get typed proof-bundle declarations.
+    #[must_use]
+    pub fn proof_bundles(&self) -> Vec<ProofBundleDecl> {
+        self.attrs
+            .get(ATTR_PROOF_BUNDLES)
+            .and_then(|s| serde_json::from_str::<Vec<ProofBundleDecl>>(s).ok())
+            .unwrap_or_default()
+    }
+
+    /// Set protocol-required proof bundles.
+    pub fn set_required_proof_bundles(&mut self, required: &[String]) -> Result<(), String> {
+        let encoded =
+            serde_json::to_string(required).map_err(|e| format!("encode required bundles: {e}"))?;
+        self.attrs
+            .insert(ATTR_REQUIRED_PROOF_BUNDLES.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get protocol-required proof bundles.
+    #[must_use]
+    pub fn required_proof_bundles(&self) -> Vec<String> {
+        self.attrs
+            .get(ATTR_REQUIRED_PROOF_BUNDLES)
+            .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
+            .unwrap_or_default()
+    }
+
+    fn required_bundle_capabilities(&self) -> HashSet<String> {
+        let required = self.required_proof_bundles();
+        let required_set: HashSet<&str> = required.iter().map(String::as_str).collect();
+        self.proof_bundles()
+            .into_iter()
+            .filter(|bundle| required_set.contains(bundle.name.as_str()))
+            .flat_map(|bundle| bundle.capabilities.into_iter())
+            .collect()
+    }
+
+    fn required_vm_core_capabilities(&self) -> HashSet<String> {
+        fn collect(protocol: &Protocol, out: &mut HashSet<String>) {
+            if let Some(cap) = protocol.get_annotation("required_capability") {
+                out.insert(cap);
+            }
+            match protocol {
+                Protocol::Send { continuation, .. }
+                | Protocol::Broadcast { continuation, .. }
+                | Protocol::Extension { continuation, .. } => collect(continuation, out),
+                Protocol::Choice { branches, .. } => {
+                    for branch in branches {
+                        collect(&branch.protocol, out);
+                    }
+                }
+                Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => collect(body, out),
+                Protocol::Parallel { protocols } => {
+                    for p in protocols {
+                        collect(p, out);
+                    }
+                }
+                Protocol::Var(_) | Protocol::End => {}
+            }
+        }
+
+        let mut out = HashSet::new();
+        collect(&self.protocol, &mut out);
+        out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quote::format_ident;
+
+    #[test]
+    fn proof_bundle_metadata_roundtrip() {
+        let mut choreo = Choreography {
+            name: format_ident!("RoundTrip"),
+            namespace: None,
+            roles: Vec::new(),
+            protocol: Protocol::End,
+            attrs: HashMap::new(),
+        };
+        let bundles = vec![
+            ProofBundleDecl {
+                name: "Base".to_string(),
+                capabilities: vec!["delegation".to_string()],
+            },
+            ProofBundleDecl {
+                name: "Guard".to_string(),
+                capabilities: vec!["guard_tokens".to_string()],
+            },
+        ];
+        let required = vec!["Base".to_string()];
+
+        choreo
+            .set_proof_bundles(&bundles)
+            .expect("set proof bundles");
+        choreo
+            .set_required_proof_bundles(&required)
+            .expect("set required bundles");
+
+        assert_eq!(choreo.proof_bundles(), bundles);
+        assert_eq!(choreo.required_proof_bundles(), required);
     }
 }
