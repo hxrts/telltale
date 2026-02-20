@@ -228,8 +228,7 @@ impl Choreography {
     pub fn set_proof_bundles(&mut self, bundles: &[ProofBundleDecl]) -> Result<(), String> {
         let encoded =
             serde_json::to_string(bundles).map_err(|e| format!("encode proof bundles: {e}"))?;
-        self.attrs
-            .insert(ATTR_PROOF_BUNDLES.to_string(), encoded);
+        self.attrs.insert(ATTR_PROOF_BUNDLES.to_string(), encoded);
         Ok(())
     }
 
@@ -283,8 +282,8 @@ impl Choreography {
 
     /// Set role-set declarations for this choreography.
     pub fn set_role_sets(&mut self, role_sets: &[RoleSetDecl]) -> Result<(), String> {
-        let encoded = serde_json::to_string(role_sets)
-            .map_err(|e| format!("encode role sets: {e}"))?;
+        let encoded =
+            serde_json::to_string(role_sets).map_err(|e| format!("encode role sets: {e}"))?;
         self.attrs.insert(ATTR_ROLE_SETS.to_string(), encoded);
         Ok(())
     }

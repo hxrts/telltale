@@ -630,12 +630,12 @@ pub(super) fn parse_retry_stmt(
     let condition = if let Ok(count) = count_src.parse::<usize>() {
         Condition::Count(count)
     } else {
-        Condition::Custom(
-            syn::parse_str::<TokenStream>(count_src).map_err(|e| ParseError::InvalidCondition {
+        Condition::Custom(syn::parse_str::<TokenStream>(count_src).map_err(|e| {
+            ParseError::InvalidCondition {
                 message: format!("Invalid retry count: {e}"),
                 span: ErrorSpan::from_pest_span(span, input),
-            })?,
-        )
+            }
+        })?)
     };
     let body = parse_block(block_pair, declared_roles, input, protocol_defs)?;
     Ok(Statement::Loop {
@@ -667,10 +667,13 @@ pub(super) fn parse_quorum_collect_stmt(
         span: ErrorSpan::from_pest_span(span, input),
         message: "quorum_collect is missing message".to_string(),
     })?;
-    let min_responses = min_pair.as_str().parse::<u32>().map_err(|_| ParseError::Syntax {
-        span: ErrorSpan::from_pest_span(span, input),
-        message: "quorum_collect min count must be an integer".to_string(),
-    })?;
+    let min_responses = min_pair
+        .as_str()
+        .parse::<u32>()
+        .map_err(|_| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "quorum_collect min count must be an integer".to_string(),
+        })?;
     Ok(Statement::QuorumCollect {
         source: parse_role_ref(source_pair, declared_roles, input)?,
         destination: parse_role_ref(destination_pair, declared_roles, input)?,
@@ -701,13 +704,10 @@ fn parse_vm_layer(
     let span = pair.as_span();
     let value = match pair.as_rule() {
         Rule::vm_layer => {
-            let inner = pair
-                .into_inner()
-                .next()
-                .ok_or_else(|| ParseError::Syntax {
-                    span: ErrorSpan::from_pest_span(span, input),
-                    message: "vm layer is missing name".to_string(),
-                })?;
+            let inner = pair.into_inner().next().ok_or_else(|| ParseError::Syntax {
+                span: ErrorSpan::from_pest_span(span, input),
+                message: "vm layer is missing name".to_string(),
+            })?;
             inner.as_str().to_string()
         }
         Rule::ident | Rule::string => pair.as_str().to_string(),

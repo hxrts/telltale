@@ -192,8 +192,7 @@ impl PredicateExpr {
     pub(crate) fn to_token_stream(&self) -> TokenStream {
         match self {
             Self::BoolLiteral(v) => quote!(#v),
-            Self::Atom(src) => syn::parse_str::<TokenStream>(src)
-                .unwrap_or_else(|_| quote!(false)),
+            Self::Atom(src) => syn::parse_str::<TokenStream>(src).unwrap_or_else(|_| quote!(false)),
             Self::Not(inner) => {
                 let inner_ts = inner.to_token_stream();
                 quote!(!(#inner_ts))

@@ -28,8 +28,8 @@ use pest::Parser;
 use pest_derive::Parser;
 use proc_macro2::{Span, TokenStream};
 use quote::format_ident;
-use std::fmt::Write as _;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write as _;
 
 use conversion::{convert_statements_to_protocol, inline_calls};
 use role::parse_roles_from_pair;
@@ -91,13 +91,10 @@ fn parse_proof_bundle_decl(
                 };
                 match meta.as_rule() {
                     Rule::proof_bundle_version => {
-                        let value = meta
-                            .into_inner()
-                            .next()
-                            .ok_or_else(|| ParseError::Syntax {
-                                span: ErrorSpan::from_pest_span(span, input),
-                                message: "proof_bundle version is missing value".to_string(),
-                            })?;
+                        let value = meta.into_inner().next().ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(span, input),
+                            message: "proof_bundle version is missing value".to_string(),
+                        })?;
                         version = Some(parse_quoted_string(value.as_str()).map_err(|message| {
                             ParseError::Syntax {
                                 span: ErrorSpan::from_pest_span(span, input),
@@ -106,13 +103,10 @@ fn parse_proof_bundle_decl(
                         })?);
                     }
                     Rule::proof_bundle_issuer => {
-                        let value = meta
-                            .into_inner()
-                            .next()
-                            .ok_or_else(|| ParseError::Syntax {
-                                span: ErrorSpan::from_pest_span(span, input),
-                                message: "proof_bundle issuer is missing value".to_string(),
-                            })?;
+                        let value = meta.into_inner().next().ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(span, input),
+                            message: "proof_bundle issuer is missing value".to_string(),
+                        })?;
                         issuer = Some(parse_quoted_string(value.as_str()).map_err(|message| {
                             ParseError::Syntax {
                                 span: ErrorSpan::from_pest_span(span, input),
@@ -121,13 +115,10 @@ fn parse_proof_bundle_decl(
                         })?);
                     }
                     Rule::proof_bundle_constraint => {
-                        let value = meta
-                            .into_inner()
-                            .next()
-                            .ok_or_else(|| ParseError::Syntax {
-                                span: ErrorSpan::from_pest_span(span, input),
-                                message: "proof_bundle constraint is missing value".to_string(),
-                            })?;
+                        let value = meta.into_inner().next().ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(span, input),
+                            message: "proof_bundle constraint is missing value".to_string(),
+                        })?;
                         constraints.push(parse_quoted_string(value.as_str()).map_err(
                             |message| ParseError::Syntax {
                                 span: ErrorSpan::from_pest_span(span, input),
@@ -229,18 +220,25 @@ fn parse_role_set_decl(
                     message: "role_set subset is missing end".to_string(),
                 })?;
                 decl.subset_of = Some(source.as_str().to_string());
-                decl.subset_start = Some(start.as_str().parse::<u32>().map_err(|_| {
-                    ParseError::Syntax {
-                        span: ErrorSpan::from_pest_span(span, input),
-                        message: "role_set subset start must be an integer".to_string(),
-                    }
-                })?);
-                decl.subset_end = Some(end.as_str().parse::<u32>().map_err(|_| {
-                    ParseError::Syntax {
-                        span: ErrorSpan::from_pest_span(span, input),
-                        message: "role_set subset end must be an integer".to_string(),
-                    }
-                })?);
+                decl.subset_start =
+                    Some(
+                        start
+                            .as_str()
+                            .parse::<u32>()
+                            .map_err(|_| ParseError::Syntax {
+                                span: ErrorSpan::from_pest_span(span, input),
+                                message: "role_set subset start must be an integer".to_string(),
+                            })?,
+                    );
+                decl.subset_end =
+                    Some(
+                        end.as_str()
+                            .parse::<u32>()
+                            .map_err(|_| ParseError::Syntax {
+                                span: ErrorSpan::from_pest_span(span, input),
+                                message: "role_set subset end must be an integer".to_string(),
+                            })?,
+                    );
             }
             _ => {}
         }
@@ -2242,10 +2240,7 @@ protocol WithBundles requires Base, Extra =
             vec!["guard_tokens".to_string(), "delegation".to_string()]
         );
         assert_eq!(bundles[1].name, "Extra");
-        assert_eq!(
-            bundles[1].capabilities,
-            vec!["knowledge_flow".to_string()]
-        );
+        assert_eq!(bundles[1].capabilities, vec!["knowledge_flow".to_string()]);
         assert_eq!(
             choreo.required_proof_bundles(),
             vec!["Base".to_string(), "Extra".to_string()]

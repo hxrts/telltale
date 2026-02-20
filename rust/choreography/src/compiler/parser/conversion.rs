@@ -509,7 +509,10 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                     ProtocolAnnotation::custom("dsl_combinator", "quorum_collect"),
                     ProtocolAnnotation::custom("quorum_min", min_responses.to_string()),
                     ProtocolAnnotation::custom("quorum_source", source.name().to_string()),
-                    ProtocolAnnotation::custom("quorum_destination", destination.name().to_string()),
+                    ProtocolAnnotation::custom(
+                        "quorum_destination",
+                        destination.name().to_string(),
+                    ),
                     ProtocolAnnotation::custom("quorum_message", message.name.to_string()),
                 ]);
                 Protocol::Extension {
