@@ -140,7 +140,7 @@ fn vm_new_rejects_invalid_config() {
         max_sessions: 0,
         ..VMConfig::default()
     };
-    let _ = telltale_vm::vm::VM::new(cfg);
+    drop(telltale_vm::vm::VM::new(cfg));
 }
 
 #[cfg(feature = "multi-thread")]
@@ -151,5 +151,5 @@ fn threaded_vm_rejects_invalid_config() {
         instruction_cost: 0,
         ..VMConfig::default()
     };
-    let _ = telltale_vm::threaded::ThreadedVM::with_workers(cfg, 2);
+    drop(telltale_vm::threaded::ThreadedVM::with_workers(cfg, 2));
 }

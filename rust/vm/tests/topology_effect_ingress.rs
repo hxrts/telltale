@@ -10,7 +10,7 @@ use std::{collections::BTreeMap, time::Duration};
 
 use helpers::simple_send_recv_image;
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, SendDecision, TopologyPerturbation};
+use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput, TopologyPerturbation};
 #[cfg(feature = "multi-thread")]
 use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::vm::{VMConfig, VM};
@@ -41,16 +41,8 @@ impl EffectHandler for TopologyBurstHandler {
         Ok(Value::Str(label.to_string()))
     }
 
-    fn send_decision(
-        &self,
-        _sid: usize,
-        _role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
-        Ok(SendDecision::Deliver(payload.unwrap_or(Value::Unit)))
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
     }
 
     fn handle_recv(
@@ -122,16 +114,8 @@ impl EffectHandler for ScriptedTopologyHandler {
         Ok(Value::Str(label.to_string()))
     }
 
-    fn send_decision(
-        &self,
-        _sid: usize,
-        _role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
-        Ok(SendDecision::Deliver(payload.unwrap_or(Value::Unit)))
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
     }
 
     fn handle_recv(

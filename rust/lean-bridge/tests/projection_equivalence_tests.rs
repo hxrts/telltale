@@ -35,6 +35,28 @@ use telltale_choreography::compiler::parser::parse_choreography_str;
 use telltale_choreography::compiler::projection::project;
 use telltale_theory::projection::project as theory_project;
 
+#[derive(Debug, thiserror::Error)]
+enum ProjectionValidationError {
+    #[error("role {0} not found in choreography")]
+    MissingRole(String),
+    #[error("dsl projection failed: {0}")]
+    DslProjection(String),
+    #[error("global type conversion failed: {0}")]
+    GlobalConversion(String),
+    #[error("theory projection failed: {0}")]
+    TheoryProjection(String),
+    #[error("local type conversion failed: {0}")]
+    LocalConversion(String),
+    #[error("projection mismatch for role {role}: DSL={dsl:?} THEORY={theory:?}")]
+    Mismatch {
+        role: String,
+        dsl: Box<telltale_types::LocalTypeR>,
+        theory: Box<telltale_types::LocalTypeR>,
+    },
+    #[error("skipped: {0} is DSL-only feature")]
+    SkippedFeature(String),
+}
+
 /// Parse a DSL choreography string.
 fn parse_choreography(input: &str) -> Choreography {
     parse_choreography_str(input).expect("Failed to parse choreography")
@@ -49,44 +71,52 @@ fn find_role<'a>(
 }
 
 /// Helper to run the cross-validation for a given DSL input and role.
-fn validate_projection_equivalence(dsl_input: &str, role_name: &str) -> Result<(), String> {
+fn validate_projection_equivalence(
+    dsl_input: &str,
+    role_name: &str,
+) -> Result<(), ProjectionValidationError> {
     // Step 1: Parse DSL to Choreography
     let choreography = parse_choreography(dsl_input);
 
     // Find the role in the choreography
     let role = find_role(&choreography, role_name)
-        .ok_or_else(|| format!("Role {} not found in choreography", role_name))?;
+        .ok_or_else(|| ProjectionValidationError::MissingRole(role_name.to_string()))?;
 
     // Step 2: Project using DSL projection
-    let dsl_local =
-        project(&choreography, role).map_err(|e| format!("DSL projection failed: {:?}", e))?;
+    let dsl_local = project(&choreography, role)
+        .map_err(|e| ProjectionValidationError::DslProjection(format!("{e:?}")))?;
 
     // Step 3: Convert Choreography to GlobalType
     let global = match choreography_to_global(&choreography) {
         Ok(g) => g,
         Err(ConversionError::UnsupportedFeature { feature, .. }) => {
             // Skip tests for DSL-only features
-            return Err(format!("Skipped: {} is DSL-only feature", feature));
+            return Err(ProjectionValidationError::SkippedFeature(feature));
         }
-        Err(e) => return Err(format!("GlobalType conversion failed: {:?}", e)),
+        Err(e) => {
+            return Err(ProjectionValidationError::GlobalConversion(format!(
+                "{e:?}"
+            )))
+        }
     };
 
     // Step 4: Project using theory projection
     let theory_local = theory_project(&global, role_name)
-        .map_err(|e| format!("Theory projection failed: {:?}", e))?;
+        .map_err(|e| ProjectionValidationError::TheoryProjection(format!("{e:?}")))?;
 
     // Step 5: Convert DSL LocalType to LocalTypeR for comparison
     let dsl_local_r = local_to_local_r(&dsl_local)
-        .map_err(|e| format!("LocalType conversion failed: {:?}", e))?;
+        .map_err(|e| ProjectionValidationError::LocalConversion(format!("{e:?}")))?;
 
     // Step 6: Compare results
     if local_types_equivalent(&dsl_local_r, &theory_local) {
         Ok(())
     } else {
-        Err(format!(
-            "Projections differ for role {}:\n  DSL:    {:?}\n  Theory: {:?}",
-            role_name, dsl_local_r, theory_local
-        ))
+        Err(ProjectionValidationError::Mismatch {
+            role: role_name.to_string(),
+            dsl: Box::new(dsl_local_r),
+            theory: Box::new(theory_local),
+        })
     }
 }
 
@@ -419,7 +449,7 @@ protocol DeepNesting = {
 // ============================================================================
 
 /// Run equivalence check for all roles in a choreography
-fn validate_all_roles(dsl: &str) -> Vec<(String, Result<(), String>)> {
+fn validate_all_roles(dsl: &str) -> Vec<(String, Result<(), ProjectionValidationError>)> {
     let choreography = parse_choreography(dsl);
     choreography
         .roles
@@ -447,7 +477,7 @@ fn test_comprehensive_validation() {
         let results = validate_all_roles(dsl);
         for (role, result) in results {
             if let Err(e) = result {
-                if !e.starts_with("Skipped:") {
+                if !matches!(e, ProjectionValidationError::SkippedFeature(_)) {
                     panic!("Test case {} failed for role {}: {}", i, role, e);
                 }
             }

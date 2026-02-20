@@ -8,10 +8,18 @@ use telltale_lean_bridge::{
     OutputConditionTraceEvent, VmRunOutput, VmRunner, VmSessionStatus, VmTraceEvent,
 };
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, SendDecision};
+use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::output_condition::OutputConditionPolicy;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+
+#[derive(Debug, thiserror::Error)]
+enum VmCorrespondenceError {
+    #[error("vm load failed: {0}")]
+    Load(String),
+    #[error("vm run failed: {0}")]
+    Run(String),
+}
 
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;
@@ -27,16 +35,8 @@ impl EffectHandler for PassthroughHandler {
         Ok(Value::Str(label.to_string()))
     }
 
-    fn send_decision(
-        &self,
-        _sid: usize,
-        _role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
-        Ok(SendDecision::Deliver(payload.unwrap_or(Value::Unit)))
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
     }
 
     fn handle_recv(
@@ -162,15 +162,16 @@ fn obs_to_vm_trace(ev: &ObsEvent) -> Option<VmTraceEvent> {
 fn run_rust_vm(
     fixture: &test_choreographies::ProtocolFixture,
     max_steps: usize,
-) -> Result<VmRunOutput, String> {
+) -> Result<VmRunOutput, VmCorrespondenceError> {
     let image = CodeImage::from_local_types(&fixture.local_types, &fixture.global);
     let mut vm = VM::new(VMConfig {
         output_condition_policy: OutputConditionPolicy::AllowAll,
         ..VMConfig::default()
     });
-    vm.load_choreography(&image).map_err(|e| e.to_string())?;
+    vm.load_choreography(&image)
+        .map_err(|e| VmCorrespondenceError::Load(e.to_string()))?;
     vm.run(&PassthroughHandler, max_steps)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| VmCorrespondenceError::Run(e.to_string()))?;
 
     let trace = vm.trace().iter().filter_map(obs_to_vm_trace).collect();
     let sessions = vm

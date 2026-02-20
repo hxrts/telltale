@@ -28,6 +28,7 @@ use std::path::PathBuf;
 use telltale_lean_bridge::equivalence::EquivalenceChecker;
 use telltale_lean_bridge::runner::LeanRunner;
 use telltale_types::{GlobalType, Label};
+use tracing::{debug, info, warn};
 
 /// Deterministic seed for property-based tests.
 const DETERMINISTIC_SEED: [u8; 32] = [
@@ -45,8 +46,8 @@ fn golden_dir() -> PathBuf {
 /// Try to get a working Lean checker. Returns None if Lean is unavailable or broken.
 fn try_get_lean_checker() -> Option<EquivalenceChecker> {
     if !LeanRunner::is_available() {
-        println!("Lean runner not available, skipping test");
-        println!("Build with: cd lean && lake build telltale_validator");
+        warn!("Lean runner not available, skipping test");
+        warn!("Build with: cd lean && lake build telltale_validator");
         return None;
     }
 
@@ -58,8 +59,8 @@ fn try_get_lean_checker() -> Option<EquivalenceChecker> {
         .check_projection_against_lean(&test_global, "A")
         .is_err()
     {
-        println!("Lean runner not responding correctly (may need rebuild)");
-        println!("Rebuild with: cd lean && lake build telltale_validator");
+        warn!("Lean runner not responding correctly (may need rebuild)");
+        warn!("Rebuild with: cd lean && lake build telltale_validator");
         return None;
     }
 
@@ -295,7 +296,7 @@ fn proptest_live_projection_equivalence() {
             }
             Err(e) => {
                 // Some generated types may fail to project - that's OK
-                println!("Projection failed for {:?}: {:?}", global, e);
+                debug!(?global, ?e, "Projection failed in generated property case");
             }
         }
     }
@@ -327,7 +328,7 @@ fn generate_golden_ping_pong() {
         .write_golden_bundle("ping_pong", &bundle)
         .expect("Failed to write golden bundle");
 
-    println!("Generated golden files for ping_pong");
+    info!("Generated golden files for ping_pong");
 }
 
 #[test]
@@ -360,5 +361,5 @@ fn generate_golden_choice() {
         .write_golden_bundle("choice_protocol", &bundle)
         .expect("Failed to write golden bundle");
 
-    println!("Generated golden files for choice_protocol");
+    info!("Generated golden files for choice_protocol");
 }

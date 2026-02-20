@@ -138,6 +138,34 @@ The local constructor sets `TopologyMode::Local` and creates in process transpor
 
 Generated protocols include helpers like `Protocol::handler(role)` and `Protocol::with_topology(topology, role)`. These return a `TopologyHandler` for the selected role.
 
+### Generated Topology Helper Surface
+
+`choreography!` emits a topology helper module per protocol. The generated surface follows this shape:
+
+```rust
+pub mod topology {
+    pub fn handler(role: Role) -> TopologyHandler;
+    pub fn with_topology(topology: Topology, role: Role) -> Result<TopologyHandler, String>;
+
+    pub mod topologies {
+        pub fn dev() -> Topology;
+        pub fn dev_handler(role: Role) -> Result<TopologyHandler, String>;
+        pub fn prod() -> Topology;
+        pub fn prod_handler(role: Role) -> Result<TopologyHandler, String>;
+    }
+}
+```
+
+`handler(role)` builds a local topology handler. `with_topology(topology, role)` validates role coverage and returns a role-bound handler. The `topologies` submodule is emitted when inline topology definitions are present in the DSL.
+
+Usage pattern:
+
+```rust
+let local = MyProtocol::topology::handler(Role::Alice);
+let prod = MyProtocol::topology::topologies::prod_handler(Role::Alice)?;
+let custom = MyProtocol::topology::with_topology(custom_topology, Role::Alice)?;
+```
+
 ## Transport Selection
 
 Transport selection is based on role locations.

@@ -28,12 +28,12 @@ appropriate subtyping relation for asynchronous message-passing systems.
 
 ```lean
 -- Check if S is an async subtype of T
-#check (S ≤ₐ T)
+example : Prop := S ≤ₐ T
 
 -- With explicit buffer
-#check (S ≤ₐ[buf] T)
+example : Prop := S ≤ₐ[buf] T
 
 -- Decision procedure
-#check isAsyncSubtype S T unfoldBound fuel
+example : Bool := isAsyncSubtype S T unfoldBound fuel
 ```
 -/

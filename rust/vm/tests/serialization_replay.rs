@@ -7,7 +7,7 @@ mod helpers;
 use helpers::{simple_send_recv_image, PassthroughHandler};
 use std::collections::BTreeMap;
 use std::time::Duration;
-use telltale_vm::effect::{EffectHandler, SendDecision, TopologyPerturbation};
+use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput, TopologyPerturbation};
 #[cfg(feature = "multi-thread")]
 use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::trace::normalize_trace_v1;
@@ -35,17 +35,9 @@ impl EffectHandler for OrderedTopologyHandler {
         Ok(telltale_vm::Value::Str(label.to_string()))
     }
 
-    fn send_decision(
-        &self,
-        _sid: usize,
-        _role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &[telltale_vm::Value],
-        payload: Option<telltale_vm::Value>,
-    ) -> Result<SendDecision, String> {
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
         Ok(SendDecision::Deliver(
-            payload.unwrap_or(telltale_vm::Value::Unit),
+            input.payload.unwrap_or(telltale_vm::Value::Unit),
         ))
     }
 
@@ -164,7 +156,10 @@ fn canonical_replay_fragment_sorts_topology_state() {
         .expect("step with topology events");
 
     let fragment = vm.canonical_replay_fragment();
-    assert_eq!(fragment.schema_version, 1);
+    assert_eq!(
+        fragment.schema_version,
+        telltale_vm::serialization::SERIALIZATION_SCHEMA_VERSION
+    );
     assert!(fragment.crashed_sites.windows(2).all(|w| w[0] <= w[1]));
     assert!(fragment.partitioned_edges.windows(2).all(|w| w[0] <= w[1]));
 }

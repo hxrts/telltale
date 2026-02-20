@@ -14,7 +14,7 @@ use assert_matches::assert_matches;
 use telltale_types::LocalTypeR;
 use telltale_vm::buffer::BufferConfig;
 use telltale_vm::coroutine::{CoroStatus, Fault};
-use telltale_vm::effect::{EffectHandler, SendDecision};
+use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
 use telltale_vm::instr::Endpoint;
 use telltale_vm::output_condition::OutputConditionHint;
 use telltale_vm::session::{SessionStatus, SessionStore};
@@ -55,19 +55,11 @@ impl EffectHandler for KnowledgePayloadHandler {
         Ok(telltale_vm::coroutine::Value::Unit)
     }
 
-    fn send_decision(
-        &self,
-        sid: usize,
-        role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &[telltale_vm::coroutine::Value],
-        _payload: Option<telltale_vm::coroutine::Value>,
-    ) -> Result<SendDecision, String> {
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
         Ok(SendDecision::Deliver(telltale_vm::coroutine::Value::Prod(
             Box::new(telltale_vm::coroutine::Value::Endpoint(Endpoint {
-                sid,
-                role: role.to_string(),
+                sid: input.sid,
+                role: input.role.to_string(),
             })),
             Box::new(telltale_vm::coroutine::Value::Str("secret".to_string())),
         )))
@@ -839,7 +831,7 @@ fn test_lean_fork_requires_speculation_enabled() {
     assert_matches!(
         result,
         Err(telltale_vm::vm::VMError::Fault {
-            fault: Fault::SpecFault { .. },
+            fault: Fault::Speculation { .. },
             ..
         })
     );
@@ -862,7 +854,7 @@ fn test_lean_join_requires_active_speculation() {
     assert_matches!(
         result,
         Err(telltale_vm::vm::VMError::Fault {
-            fault: Fault::SpecFault { .. },
+            fault: Fault::Speculation { .. },
             ..
         })
     );
@@ -885,7 +877,7 @@ fn test_lean_abort_requires_active_speculation() {
     assert_matches!(
         result,
         Err(telltale_vm::vm::VMError::Fault {
-            fault: Fault::SpecFault { .. },
+            fault: Fault::Speculation { .. },
             ..
         })
     );
@@ -955,7 +947,7 @@ fn test_lean_abort_policy_is_deterministic_and_scoped() {
         assert_eq!(vm.corrupted_edges(), before_corrupted.as_slice());
         assert_eq!(vm.timed_out_sites(), before_timed_out.as_slice());
         assert!(
-            vm.trace().len() >= before_trace_len + 1,
+            vm.trace().len() > before_trace_len,
             "abort step should append at least one observable event"
         );
         assert!(

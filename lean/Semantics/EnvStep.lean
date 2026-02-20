@@ -187,6 +187,11 @@ theorem envstepOnto_preserves_dom {S : List String} {env env' : ProjectedEnv}
 /-! ## Legacy API (deprecated)
 
 These definitions are kept for backward compatibility but should be migrated
-to use the fixed role set approach. -/
+to use the fixed role set approach.
+
+Migration timeline:
+- 2026-03-15: no new uses of legacy `EnvStep` in Lean modules.
+- 2026-04-15: bridge/runtime callers switch to `EnvStepOnto`.
+- 2026-05-31: remove legacy aliases after downstream parity checks pass. -/
 
 end Semantics.EnvStep

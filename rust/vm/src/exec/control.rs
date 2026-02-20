@@ -34,7 +34,7 @@ pub(crate) fn step_jump(target: PC) -> StepPack {
 /// Execute `yield`.
 #[must_use]
 pub(crate) fn step_yield() -> StepPack {
-    empty_pack(CoroUpdate::AdvancePcBlock(BlockReason::SpawnWait))
+    empty_pack(CoroUpdate::AdvancePcBlock(BlockReason::Spawn))
 }
 
 /// Execute `halt`.

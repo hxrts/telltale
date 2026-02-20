@@ -54,163 +54,68 @@ pub fn obs_session(ev: &ObsEvent) -> Option<SessionId> {
 
 /// Clone an event with a new tick value.
 #[must_use]
-#[allow(clippy::too_many_lines)]
 pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
-    match ev {
+    let mut out = ev.clone();
+    match &mut out {
         ObsEvent::Sent {
-            edge,
-            session,
-            from,
-            to,
-            label,
-            ..
-        } => ObsEvent::Sent {
-            tick,
-            edge: edge.clone(),
-            session: *session,
-            from: from.clone(),
-            to: to.clone(),
-            label: label.clone(),
-        },
-        ObsEvent::Received {
-            edge,
-            session,
-            from,
-            to,
-            label,
-            ..
-        } => ObsEvent::Received {
-            tick,
-            edge: edge.clone(),
-            session: *session,
-            from: from.clone(),
-            to: to.clone(),
-            label: label.clone(),
-        },
-        ObsEvent::Offered { edge, label, .. } => ObsEvent::Offered {
-            tick,
-            edge: edge.clone(),
-            label: label.clone(),
-        },
-        ObsEvent::Chose { edge, label, .. } => ObsEvent::Chose {
-            tick,
-            edge: edge.clone(),
-            label: label.clone(),
-        },
-        ObsEvent::Opened { session, roles, .. } => ObsEvent::Opened {
-            tick,
-            session: *session,
-            roles: roles.clone(),
-        },
-        ObsEvent::Closed { session, .. } => ObsEvent::Closed {
-            tick,
-            session: *session,
-        },
-        ObsEvent::EpochAdvanced { sid, epoch, .. } => ObsEvent::EpochAdvanced {
-            tick,
-            sid: *sid,
-            epoch: *epoch,
-        },
-        ObsEvent::Halted { coro_id, .. } => ObsEvent::Halted {
-            tick,
-            coro_id: *coro_id,
-        },
-        ObsEvent::Invoked { coro_id, role, .. } => ObsEvent::Invoked {
-            tick,
-            coro_id: *coro_id,
-            role: role.clone(),
-        },
-        ObsEvent::Acquired {
-            session,
-            role,
-            layer,
-            ..
-        } => ObsEvent::Acquired {
-            tick,
-            session: *session,
-            role: role.clone(),
-            layer: layer.clone(),
-        },
-        ObsEvent::Released {
-            session,
-            role,
-            layer,
-            ..
-        } => ObsEvent::Released {
-            tick,
-            session: *session,
-            role: role.clone(),
-            layer: layer.clone(),
-        },
-        ObsEvent::Transferred {
-            session,
-            role,
-            from,
-            to,
-            ..
-        } => ObsEvent::Transferred {
-            tick,
-            session: *session,
-            role: role.clone(),
-            from: *from,
-            to: *to,
-        },
-        ObsEvent::Forked { session, ghost, .. } => ObsEvent::Forked {
-            tick,
-            session: *session,
-            ghost: *ghost,
-        },
-        ObsEvent::Joined { session, .. } => ObsEvent::Joined {
-            tick,
-            session: *session,
-        },
-        ObsEvent::Aborted { session, .. } => ObsEvent::Aborted {
-            tick,
-            session: *session,
-        },
-        ObsEvent::Tagged {
-            session,
-            role,
-            fact,
-            ..
-        } => ObsEvent::Tagged {
-            tick,
-            session: *session,
-            role: role.clone(),
-            fact: fact.clone(),
-        },
-        ObsEvent::Checked {
-            session,
-            role,
-            target,
-            permitted,
-            ..
-        } => ObsEvent::Checked {
-            tick,
-            session: *session,
-            role: role.clone(),
-            target: target.clone(),
-            permitted: *permitted,
-        },
-        ObsEvent::Faulted { coro_id, fault, .. } => ObsEvent::Faulted {
-            tick,
-            coro_id: *coro_id,
-            fault: fault.clone(),
-        },
-        ObsEvent::OutputConditionChecked {
-            predicate_ref,
-            witness_ref,
-            output_digest,
-            passed,
-            ..
-        } => ObsEvent::OutputConditionChecked {
-            tick,
-            predicate_ref: predicate_ref.clone(),
-            witness_ref: witness_ref.clone(),
-            output_digest: output_digest.clone(),
-            passed: *passed,
-        },
+            tick: event_tick, ..
+        }
+        | ObsEvent::Received {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Offered {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Chose {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Opened {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Closed {
+            tick: event_tick, ..
+        }
+        | ObsEvent::EpochAdvanced {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Halted {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Invoked {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Acquired {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Released {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Transferred {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Forked {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Joined {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Aborted {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Tagged {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Checked {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Faulted {
+            tick: event_tick, ..
+        }
+        | ObsEvent::OutputConditionChecked {
+            tick: event_tick, ..
+        } => *event_tick = tick,
     }
+    out
 }
 
 /// Normalize a trace by assigning session-local ticks.

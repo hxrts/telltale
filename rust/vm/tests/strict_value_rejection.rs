@@ -148,7 +148,7 @@ fn tag_rejects_non_fact_shape() {
     assert_matches!(
         result,
         Err(VMError::Fault {
-            fault: Fault::TransferFault { .. },
+            fault: Fault::Transfer { .. },
             ..
         })
     );

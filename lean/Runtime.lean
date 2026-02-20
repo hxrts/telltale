@@ -25,7 +25,6 @@ import Runtime.Proofs.Adapters.Classical
 import Runtime.Proofs.Adapters.Distributed
 import Runtime.Proofs.TheoremPack.API
 import Runtime.Proofs.SchedulerTheoremPack
-import Runtime.Proofs.Examples.ComposedProofPack
 import IrisExtractionInstance
 
 /- 

@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, SendDecision};
+use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::threaded::ThreadedVM;
@@ -25,16 +25,8 @@ impl EffectHandler for DeterministicNoopHandler {
         Ok(Value::Unit)
     }
 
-    fn send_decision(
-        &self,
-        _sid: usize,
-        _role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
-        Ok(SendDecision::Deliver(payload.unwrap_or(Value::Unit)))
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
     }
 
     fn handle_recv(
@@ -76,20 +68,23 @@ fn lcg_next(state: &mut u64) -> u64 {
 fn build_random_program(seed: u64, num_regs: u16) -> Vec<Instr> {
     let mut rng = seed;
     let mut program = Vec::new();
-    let body_len = 6 + (lcg_next(&mut rng) % 8) as usize;
+    let body_len = 6 + usize::try_from(lcg_next(&mut rng) % 8).expect("mod 8 fits usize");
     for _ in 0..body_len {
         match lcg_next(&mut rng) % 3 {
             0 => {
-                let dst = (lcg_next(&mut rng) % u64::from(num_regs)) as u16;
-                let val = (lcg_next(&mut rng) % 1000) as u64;
+                let dst = u16::try_from(lcg_next(&mut rng) % u64::from(num_regs))
+                    .expect("mod num_regs fits u16");
+                let val = lcg_next(&mut rng) % 1000;
                 program.push(Instr::Set {
                     dst,
                     val: ImmValue::Nat(val),
                 });
             }
             1 => {
-                let dst = (lcg_next(&mut rng) % u64::from(num_regs)) as u16;
-                let src = (lcg_next(&mut rng) % u64::from(num_regs)) as u16;
+                let dst = u16::try_from(lcg_next(&mut rng) % u64::from(num_regs))
+                    .expect("mod num_regs fits u16");
+                let src = u16::try_from(lcg_next(&mut rng) % u64::from(num_regs))
+                    .expect("mod num_regs fits u16");
                 program.push(Instr::Move { dst, src });
             }
             _ => {
@@ -107,9 +102,10 @@ fn random_lane_image(seed: u64, num_regs: u16) -> CodeImage {
     let mut local_types = BTreeMap::new();
 
     for (idx, role) in roles.iter().enumerate() {
+        let idx_u64 = u64::try_from(idx).expect("index fits u64");
         programs.insert(
             (*role).to_string(),
-            build_random_program(seed + idx as u64 * 17, num_regs),
+            build_random_program(seed + idx_u64 * 17, num_regs),
         );
         local_types.insert((*role).to_string(), LocalTypeR::End);
     }

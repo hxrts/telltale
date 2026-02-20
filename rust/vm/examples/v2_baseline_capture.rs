@@ -359,8 +359,9 @@ mod app {
         }
         let mut sorted = values.to_vec();
         sorted.sort_unstable();
-        let p = percentile.clamp(0, 100) as f64 / 100.0;
-        let idx = ((sorted.len() - 1) as f64 * p).round() as usize;
+        let p = percentile.clamp(0, 100);
+        let len_minus_one = sorted.len() - 1;
+        let idx = (len_minus_one.saturating_mul(p).saturating_add(50)) / 100;
         sorted[idx]
     }
 
@@ -553,7 +554,7 @@ mod app {
         let mut out = String::with_capacity(digest.0.len() * 2);
         for byte in digest.0 {
             use std::fmt::Write as _;
-            let _ = write!(&mut out, "{byte:02x}");
+            write!(&mut out, "{byte:02x}").expect("writing to String should not fail");
         }
         out
     }

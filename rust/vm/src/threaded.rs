@@ -21,7 +21,7 @@ use crate::clock::SimClock;
 use crate::coroutine::{BlockReason, CoroStatus, Coroutine, Fault, ProgressToken, Value};
 use crate::effect::{
     CorruptionType, EffectHandler, EffectTraceEntry, ReplayEffectHandler, SendDecision,
-    TopologyPerturbation,
+    SendDecisionInput, TopologyPerturbation,
 };
 use crate::faults::{
     speculation_fault_abort_requires_active, speculation_fault_disabled,
@@ -41,7 +41,10 @@ use crate::session::{
     unfold_if_var_with_scope, unfold_mu, Edge, SessionId, SessionState, SessionStatus, TypeEntry,
 };
 use crate::transfer_semantics::{decode_transfer_request, move_endpoint_bundle};
-use crate::vm::{MonitorMode, ObsEvent, Program, ResourceState, StepResult, VMConfig, VMError};
+use crate::vm::{
+    MonitorMode, ObsEvent, Program, ResourceState, StepResult, ThreadedRoundSemantics, VMConfig,
+    VMError,
+};
 
 /// Lane identifier in the threaded runtime.
 pub type LaneId = usize;
@@ -515,7 +518,6 @@ impl ThreadedVM {
     /// # Errors
     ///
     /// Returns a `VMError` if any coroutine faults.
-    #[allow(clippy::too_many_lines)]
     pub(crate) fn kernel_step_round(
         &mut self,
         handler: &dyn EffectHandler,
@@ -537,9 +539,12 @@ impl ThreadedVM {
         self.try_unblock_receivers();
 
         let mut progressed = false;
-        let mut remaining = n;
+        let mut remaining = match self.config.threaded_round_semantics {
+            ThreadedRoundSemantics::CanonicalOneStep => 1,
+            ThreadedRoundSemantics::WaveParallelExtension => n,
+        };
         let mut wave = 0_u64;
-        let enforce_certified_wave = n > 1;
+        let enforce_certified_wave = remaining > 1;
 
         // Run in parallel waves. Each wave schedules at most one coroutine per session,
         // and at most one coroutine per lane. A session may execute again in a later wave.
@@ -615,27 +620,27 @@ impl ThreadedVM {
         tick: u64,
     ) -> Result<bool, VMError> {
         self.contention_metrics.observe_wave_width(picks.len());
+        let step_ctx = ThreadedStepCtx {
+            config: &self.config,
+            guard_resources: &self.guard_resources,
+            resource_states: &self.resource_states,
+            crashed_sites: &self.crashed_sites,
+            partitioned_edges: &self.partitioned_edges,
+            corrupted_edges: &self.corrupted_edges,
+            timed_out_sites: &self.timed_out_sites,
+            handler,
+            tick,
+        };
+        let exec_ctx = ThreadedExecCtx {
+            store: &self.sessions,
+            programs: &self.programs,
+            step: step_ctx,
+        };
         let results: Vec<Result<(StepPack, Option<OutputConditionHint>), Fault>> =
             self.pool.install(|| {
                 picks
                     .par_iter()
-                    .map(|pick| {
-                        exec_instr(
-                            &pick.coro,
-                            &pick.session,
-                            &self.sessions,
-                            &self.programs,
-                            &self.config,
-                            &self.guard_resources,
-                            &self.resource_states,
-                            &self.crashed_sites,
-                            &self.partitioned_edges,
-                            &self.corrupted_edges,
-                            &self.timed_out_sites,
-                            handler,
-                            tick,
-                        )
-                    })
+                    .map(|pick| exec_instr(&pick.coro, &pick.session, &exec_ctx))
                     .collect()
             });
 
@@ -1052,7 +1057,7 @@ impl ThreadedVM {
         for coro in &self.coroutines {
             let mut guard = coro.lock().expect("coroutine lock poisoned");
             if guard.role == site && !guard.is_terminal() {
-                let fault = Fault::InvokeFault {
+                let fault = Fault::Invoke {
                     message: reason.clone(),
                 };
                 guard.status = CoroStatus::Faulted(fault.clone());
@@ -1171,7 +1176,7 @@ impl ThreadedVM {
                 continue;
             }
             let reason = self.scheduler.block_reason(coro_id).cloned();
-            if let Some(BlockReason::RecvWait { token, .. }) = reason {
+            if let Some(BlockReason::Recv { token, .. }) = reason {
                 if let Some(session) = self.sessions.get(token.sid) {
                     let session = session.lock().expect("session lock poisoned");
                     let has_msg = session.roles.iter().any(|sender| {
@@ -1317,7 +1322,7 @@ impl ThreadedVM {
                 passed,
             });
             if !passed {
-                return Err(Fault::OutputConditionFault {
+                return Err(Fault::OutputCondition {
                     predicate_ref: meta.predicate_ref,
                 });
             }
@@ -1486,12 +1491,12 @@ impl ThreadedVM {
 
         if let Some((endpoint, from_id, _to_id)) = &transfer {
             if *from_id != coro_guard.id {
-                return Err(Fault::TransferFault {
+                return Err(Fault::Transfer {
                     message: "transfer source mismatch".into(),
                 });
             }
             if !coro_guard.owned_endpoints.contains(endpoint) {
-                return Err(Fault::TransferFault {
+                return Err(Fault::Transfer {
                     message: "endpoint not owned".into(),
                 });
             }
@@ -1555,10 +1560,10 @@ impl ThreadedVM {
         tick: u64,
     ) -> Result<(), Fault> {
         self.assert_delegation_handoff_owner(&endpoint, from_coro)?;
-        let from_lane = self.lane_of_coro(from_coro).ok_or(Fault::TransferFault {
+        let from_lane = self.lane_of_coro(from_coro).ok_or(Fault::Transfer {
             message: "transfer source coroutine not found".into(),
         })?;
-        let to_lane = self.lane_of_coro(to_coro).ok_or(Fault::TransferFault {
+        let to_lane = self.lane_of_coro(to_coro).ok_or(Fault::Transfer {
             message: "target coroutine not found".into(),
         })?;
         if from_lane != to_lane {
@@ -1614,7 +1619,7 @@ impl ThreadedVM {
                 self.coroutines
                     .get(handoff.from_coro)
                     .cloned()
-                    .ok_or(Fault::TransferFault {
+                    .ok_or(Fault::Transfer {
                         message: "transfer source coroutine not found".into(),
                     })?;
             let mut source = lock_with_contention(&source_arc, &mut self.contention_metrics);
@@ -1624,14 +1629,14 @@ impl ThreadedVM {
                 self.coroutines
                     .get(handoff.from_coro)
                     .cloned()
-                    .ok_or(Fault::TransferFault {
+                    .ok_or(Fault::Transfer {
                         message: "transfer source coroutine not found".into(),
                     })?;
             let target_arc =
                 self.coroutines
                     .get(handoff.to_coro)
                     .cloned()
-                    .ok_or(Fault::TransferFault {
+                    .ok_or(Fault::Transfer {
                         message: "target coroutine not found".into(),
                     })?;
 
@@ -1695,25 +1700,52 @@ fn lock_with_contention<'a, T>(
     }
 }
 
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+struct ThreadedStepCtx<'a> {
+    config: &'a VMConfig,
+    guard_resources: &'a Arc<Mutex<BTreeMap<String, Value>>>,
+    resource_states: &'a Arc<Mutex<BTreeMap<SessionId, ResourceState>>>,
+    crashed_sites: &'a BTreeSet<String>,
+    partitioned_edges: &'a BTreeSet<(String, String)>,
+    corrupted_edges: &'a BTreeMap<(String, String), CorruptionType>,
+    timed_out_sites: &'a BTreeMap<String, u64>,
+    handler: &'a dyn EffectHandler,
+    tick: u64,
+}
+
+struct ThreadedExecCtx<'a> {
+    store: &'a ThreadedSessionStore,
+    programs: &'a [Vec<Instr>],
+    step: ThreadedStepCtx<'a>,
+}
+
+#[derive(Clone, Copy)]
+struct GuardAcquireStep<'a> {
+    ep: &'a Endpoint,
+    role: &'a str,
+    sid: SessionId,
+    layer: &'a str,
+    dst: u16,
+}
+
+#[derive(Clone, Copy)]
+struct GuardReleaseStep<'a> {
+    ep: &'a Endpoint,
+    role: &'a str,
+    sid: SessionId,
+    layer: &'a str,
+    evidence: u16,
+}
+
+#[allow(clippy::too_many_lines)]
 fn exec_instr(
     coro: &Arc<Mutex<Coroutine>>,
     session: &Arc<Mutex<SessionState>>,
-    store: &ThreadedSessionStore,
-    programs: &[Vec<Instr>],
-    config: &VMConfig,
-    guard_resources: &Arc<Mutex<BTreeMap<String, Value>>>,
-    resource_states: &Arc<Mutex<BTreeMap<SessionId, ResourceState>>>,
-    crashed_sites: &BTreeSet<String>,
-    partitioned_edges: &BTreeSet<(String, String)>,
-    corrupted_edges: &BTreeMap<(String, String), CorruptionType>,
-    timed_out_sites: &BTreeMap<String, u64>,
-    handler: &dyn EffectHandler,
-    tick: u64,
+    ctx: &ThreadedExecCtx<'_>,
 ) -> Result<(StepPack, Option<OutputConditionHint>), Fault> {
     let mut coro_guard = coro.lock().expect("coroutine lock poisoned");
     let pc = coro_guard.pc;
-    let program = programs
+    let program = ctx
+        .programs
         .get(coro_guard.program_id)
         .ok_or(Fault::PcOutOfBounds)?;
     if pc >= program.len() {
@@ -1728,11 +1760,11 @@ fn exec_instr(
     let role = coro_guard.role.clone();
     let sid = coro_guard.session_id;
 
-    monitor_precheck(config.monitor_mode, session, &ep, &role, &instr)?;
-    if coro_guard.cost_budget < config.instruction_cost {
+    monitor_precheck(ctx.step.config.monitor_mode, session, &ep, &role, &instr)?;
+    if coro_guard.cost_budget < ctx.step.config.instruction_cost {
         return Err(Fault::OutOfCredits);
     }
-    coro_guard.cost_budget -= config.instruction_cost;
+    coro_guard.cost_budget -= ctx.step.config.instruction_cost;
 
     let pack = match instr {
         Instr::Send { chan, val } => {
@@ -1743,12 +1775,7 @@ fn exec_instr(
                 &role,
                 chan,
                 val,
-                crashed_sites,
-                partitioned_edges,
-                corrupted_edges,
-                timed_out_sites,
-                handler,
-                tick,
+                &ctx.step,
             )
         }
         Instr::Receive { chan, dst } => {
@@ -1759,13 +1786,12 @@ fn exec_instr(
                 &role,
                 chan,
                 dst,
-                handler,
-                tick,
+                &ctx.step,
             )
         }
         Instr::Halt => {
             let mut session_guard = session.lock().expect("session lock poisoned");
-            step_halt(&mut session_guard, &ep, tick)
+            step_halt(&mut session_guard, &ep, ctx.step.tick)
         }
         Instr::Jump { target } => Ok(StepPack {
             coro_update: CoroUpdate::SetPc(target),
@@ -1785,50 +1811,68 @@ fn exec_instr(
                 &role,
                 action,
                 dst,
-                handler,
-                tick,
+                ctx.step.handler,
+                ctx.step.tick,
             )
         }
         Instr::Acquire { layer, dst } => step_acquire(
             &mut coro_guard,
-            &ep,
-            &role,
-            sid,
-            &layer,
-            dst,
-            config,
-            guard_resources,
-            resource_states,
-            handler,
-            tick,
+            GuardAcquireStep {
+                ep: &ep,
+                role: &role,
+                sid,
+                layer: &layer,
+                dst,
+            },
+            &ctx.step,
         ),
         Instr::Release { layer, evidence } => step_release(
             &mut coro_guard,
-            &ep,
+            GuardReleaseStep {
+                ep: &ep,
+                role: &role,
+                sid,
+                layer: &layer,
+                evidence,
+            },
+            &ctx.step,
+        ),
+        Instr::Fork { ghost } => step_fork(
+            &mut coro_guard,
             &role,
             sid,
-            &layer,
-            evidence,
-            config,
-            guard_resources,
-            resource_states,
-            handler,
-            tick,
+            ghost,
+            ctx.step.config,
+            ctx.step.tick,
         ),
-        Instr::Fork { ghost } => step_fork(&mut coro_guard, &role, sid, ghost, config, tick),
-        Instr::Join => step_join(&mut coro_guard, sid, tick),
-        Instr::Abort => step_abort(&mut coro_guard, sid, tick),
+        Instr::Join => step_join(&mut coro_guard, sid, ctx.step.tick),
+        Instr::Abort => step_abort(&mut coro_guard, sid, ctx.step.tick),
         Instr::Transfer {
             endpoint,
             target,
             bundle,
-        } => step_transfer(&mut coro_guard, &role, endpoint, target, bundle, tick),
-        Instr::Tag { fact, dst } => step_tag(&mut coro_guard, &role, fact, dst, tick),
+        } => step_transfer(
+            &mut coro_guard,
+            &role,
+            endpoint,
+            target,
+            bundle,
+            ctx.step.tick,
+        ),
+        Instr::Tag { fact, dst } => step_tag(&mut coro_guard, &role, fact, dst, ctx.step.tick),
         Instr::Check {
             knowledge,
             target,
             dst,
-        } => step_check(&mut coro_guard, config, &role, knowledge, target, dst, tick),
+        } => step_check(
+            &mut coro_guard,
+            ctx.step.config,
+            &role,
+            knowledge,
+            target,
+            dst,
+            ctx.step.tick,
+        ),
         Instr::Set { dst, val } => {
             let v = match val {
                 crate::instr::ImmValue::Unit => Value::Unit,
@@ -1858,8 +1902,7 @@ fn exec_instr(
                 &role,
                 chan,
                 table,
-                handler,
-                tick,
+                &ctx.step,
             )
         }
         Instr::Offer { chan, ref label } => {
@@ -1870,11 +1913,10 @@ fn exec_instr(
                 &role,
                 chan,
                 label,
-                handler,
-                tick,
+                &ctx.step,
             )
         }
-        Instr::Spawn { .. } => Err(Fault::SpecFault {
+        Instr::Spawn { .. } => Err(Fault::Speculation {
             message: "spawn not implemented in threaded VM".to_string(),
         }),
         Instr::Close {
@@ -1883,11 +1925,11 @@ fn exec_instr(
             let mut session_guard = session.lock().expect("session lock poisoned");
             let close_ep = endpoint_from_reg(&coro_guard, session_reg)?;
             if !coro_guard.owned_endpoints.contains(&close_ep) {
-                return Err(Fault::CloseFault {
+                return Err(Fault::Close {
                     message: "endpoint not owned".to_string(),
                 });
             }
-            step_close(&mut session_guard, &close_ep, close_ep.sid, tick)
+            step_close(&mut session_guard, &close_ep, close_ep.sid, ctx.step.tick)
         }
         Instr::Open {
             ref roles,
@@ -1897,12 +1939,12 @@ fn exec_instr(
         } => step_open(
             &mut coro_guard,
             &role,
-            store,
+            ctx.store,
             roles,
             local_types,
             handlers,
             dsts,
-            tick,
+            ctx.step.tick,
         ),
     }?;
 
@@ -1910,7 +1952,8 @@ fn exec_instr(
         None
     } else {
         Some(
-            handler
+            ctx.step
+                .handler
                 .output_condition_hint(sid, role.as_str(), &coro_guard.regs)
                 .unwrap_or(OutputConditionHint {
                     predicate_ref: "vm.observable_output".to_string(),
@@ -1984,7 +2027,7 @@ fn monitor_precheck(
                 .map(|(label, _)| label)
                 .all(|label| labels.insert(label.clone()))
             {
-                return Err(Fault::SpecFault {
+                return Err(Fault::Speculation {
                     message: "[monitor] structural precheck failed: duplicate choose labels"
                         .to_string(),
                 });
@@ -2014,7 +2057,7 @@ fn monitor_precheck(
             if roles.len() == dsts.len() {
                 Ok(())
             } else {
-                Err(Fault::SpecFault {
+                Err(Fault::Speculation {
                     message: "[monitor] structural precheck failed: open arity mismatch"
                         .to_string(),
                 })
@@ -2024,19 +2067,14 @@ fn monitor_precheck(
     }
 }
 
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)]
 fn step_send(
     coro: &mut Coroutine,
     session: &mut SessionState,
     role: &str,
     chan: u16,
     val_reg: u16,
-    crashed_sites: &BTreeSet<String>,
-    partitioned_edges: &BTreeSet<(String, String)>,
-    corrupted_edges: &BTreeMap<(String, String), CorruptionType>,
-    timed_out_sites: &BTreeMap<String, u64>,
-    handler: &dyn EffectHandler,
-    tick: u64,
+    ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
     let ep = endpoint_from_reg(coro, chan)?;
     if !coro.owned_endpoints.contains(&ep) {
@@ -2083,25 +2121,28 @@ fn step_send(
         .get(usize::from(val_reg))
         .cloned()
         .ok_or(Fault::OutOfRegisters)?;
-    let decision = handler
-        .send_decision(
+    let decision = ctx
+        .handler
+        .send_decision(SendDecisionInput {
             sid,
             role,
-            &partner,
-            &label.name,
-            &coro.regs,
-            Some(send_payload),
-        )
-        .map_err(|e| Fault::InvokeFault { message: e })?;
+            partner: &partner,
+            label: &label.name,
+            state: &coro.regs,
+            payload: Some(send_payload),
+        })
+        .map_err(|e| Fault::Invoke { message: e })?;
 
-    if crashed_sites.contains(role)
-        || crashed_sites.contains(&partner)
-        || timed_out_sites.contains_key(role)
-        || timed_out_sites.contains_key(&partner)
-        || partitioned_edges.contains(&(role.to_string(), partner.clone()))
+    if ctx.crashed_sites.contains(role)
+        || ctx.crashed_sites.contains(&partner)
+        || ctx.timed_out_sites.contains_key(role)
+        || ctx.timed_out_sites.contains_key(&partner)
+        || ctx
+            .partitioned_edges
+            .contains(&(role.to_string(), partner.clone()))
     {
         return Ok(StepPack {
-            coro_update: CoroUpdate::Block(BlockReason::SendWait {
+            coro_update: CoroUpdate::Block(BlockReason::Send {
                 edge: Edge::new(sid, role.to_string(), partner.clone()),
             }),
             type_update: None,
@@ -2109,7 +2150,8 @@ fn step_send(
         });
     }
 
-    let maybe_corruption = corrupted_edges
+    let maybe_corruption = ctx
+        .corrupted_edges
         .get(&(role.to_string(), partner.clone()))
         .cloned();
     let enqueue = match decision {
@@ -2121,7 +2163,7 @@ fn step_send(
             };
             session
                 .send(role, &partner, payload)
-                .map_err(|e| Fault::InvokeFault { message: e })?
+                .map_err(|e| Fault::Invoke { message: e })?
         }
         SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
     };
@@ -2130,7 +2172,7 @@ fn step_send(
         EnqueueResult::Ok => {}
         EnqueueResult::WouldBlock => {
             return Ok(StepPack {
-                coro_update: CoroUpdate::Block(BlockReason::SendWait {
+                coro_update: CoroUpdate::Block(BlockReason::Send {
                     edge: Edge::new(sid, role.to_string(), partner.clone()),
                 }),
                 type_update: None,
@@ -2156,7 +2198,7 @@ fn step_send(
         coro_update: CoroUpdate::AdvancePc,
         type_update,
         events: vec![ObsEvent::Sent {
-            tick,
+            tick: ctx.tick,
             edge: Edge::new(sid, role.to_string(), partner.clone()),
             session: sid,
             from: role.to_string(),
@@ -2166,15 +2208,13 @@ fn step_send(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn step_recv(
     coro: &mut Coroutine,
     session: &mut SessionState,
     role: &str,
     chan: u16,
     dst_reg: u16,
-    handler: &dyn EffectHandler,
-    tick: u64,
+    ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
     let ep = endpoint_from_reg(coro, chan)?;
     if !coro.owned_endpoints.contains(&ep) {
@@ -2219,7 +2259,7 @@ fn step_recv(
 
     if !session.has_message(&partner, role) {
         return Ok(StepPack {
-            coro_update: CoroUpdate::Block(BlockReason::RecvWait {
+            coro_update: CoroUpdate::Block(BlockReason::Recv {
                 edge: Edge::new(sid, partner.clone(), role.to_string()),
                 token: ProgressToken::for_endpoint(ep.clone()),
             }),
@@ -2239,9 +2279,9 @@ fn step_recv(
             endpoint: ep.clone(),
         })?;
 
-    handler
+    ctx.handler
         .handle_recv(role, &partner, &label.name, &mut coro.regs, &val)
-        .map_err(|e| Fault::InvokeFault { message: e })?;
+        .map_err(|e| Fault::Invoke { message: e })?;
 
     let original = session
         .local_types
@@ -2254,7 +2294,7 @@ fn step_recv(
         coro_update: CoroUpdate::AdvancePcWriteReg { reg: dst_reg, val },
         type_update,
         events: vec![ObsEvent::Received {
-            tick,
+            tick: ctx.tick,
             edge,
             session: sid,
             from: partner,
@@ -2302,14 +2342,14 @@ fn step_invoke(
         }
     }
     if session.edge_handlers.is_empty() {
-        return Err(Fault::InvokeFault {
+        return Err(Fault::Invoke {
             message: "no handler bound".to_string(),
         });
     }
     let coro_id = coro.id;
     handler
         .step(role, &mut coro.regs)
-        .map_err(|e| Fault::InvokeFault { message: e })?;
+        .map_err(|e| Fault::Invoke { message: e })?;
 
     Ok(StepPack {
         coro_update: CoroUpdate::AdvancePc,
@@ -2327,11 +2367,11 @@ fn guard_active(config: &VMConfig, layer: &str) -> Result<(), Fault> {
         return Ok(());
     }
     match config.guard_layers.iter().find(|cfg| cfg.id == layer) {
-        None => Err(Fault::AcquireFault {
+        None => Err(Fault::Acquire {
             layer: layer.to_string(),
             message: "unknown layer".into(),
         }),
-        Some(cfg) if !cfg.active => Err(Fault::AcquireFault {
+        Some(cfg) if !cfg.active => Err(Fault::Acquire {
             layer: layer.to_string(),
             message: "inactive layer".into(),
         }),
@@ -2339,63 +2379,60 @@ fn guard_active(config: &VMConfig, layer: &str) -> Result<(), Fault> {
     }
 }
 
-#[allow(clippy::too_many_arguments, clippy::let_underscore_must_use)]
 fn step_acquire(
     coro: &mut Coroutine,
-    ep: &Endpoint,
-    role: &str,
-    sid: SessionId,
-    layer: &str,
-    dst: u16,
-    config: &VMConfig,
-    guard_resources: &Arc<Mutex<BTreeMap<String, Value>>>,
-    resource_states: &Arc<Mutex<BTreeMap<SessionId, ResourceState>>>,
-    handler: &dyn EffectHandler,
-    tick: u64,
+    input: GuardAcquireStep<'_>,
+    ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
-    guard_active(config, layer)?;
+    guard_active(ctx.config, input.layer)?;
     {
-        let mut resources = guard_resources
+        let mut resources = ctx
+            .guard_resources
             .lock()
             .expect("guard resources lock poisoned");
-        resources.entry(layer.to_string()).or_insert(Value::Unit);
+        resources
+            .entry(input.layer.to_string())
+            .or_insert(Value::Unit);
     }
-    let decision = handler
-        .handle_acquire(sid, role, layer, &coro.regs)
-        .map_err(|e| Fault::AcquireFault {
-            layer: layer.to_string(),
+    let decision = ctx
+        .handler
+        .handle_acquire(input.sid, input.role, input.layer, &coro.regs)
+        .map_err(|e| Fault::Acquire {
+            layer: input.layer.to_string(),
             message: e,
         })?;
     match decision {
         crate::effect::AcquireDecision::Grant(evidence) => {
-            let mut resources = guard_resources
+            let mut resources = ctx
+                .guard_resources
                 .lock()
                 .expect("guard resources lock poisoned");
-            resources.insert(layer.to_string(), evidence.clone());
+            resources.insert(input.layer.to_string(), evidence.clone());
             drop(resources);
 
-            let mut scoped_states = resource_states
+            let mut scoped_states = ctx
+                .resource_states
                 .lock()
                 .expect("resource state lock poisoned");
-            let state = scoped_states.entry(sid).or_default();
-            let _ = state.commit(&evidence);
+            let state = scoped_states.entry(input.sid).or_default();
+            let _commitment = state.commit(&evidence);
             Ok(StepPack {
                 coro_update: CoroUpdate::AdvancePcWriteReg {
-                    reg: dst,
+                    reg: input.dst,
                     val: evidence,
                 },
                 type_update: None,
                 events: vec![ObsEvent::Acquired {
-                    tick,
-                    session: ep.sid,
-                    role: role.to_string(),
-                    layer: layer.to_string(),
+                    tick: ctx.tick,
+                    session: input.ep.sid,
+                    role: input.role.to_string(),
+                    layer: input.layer.to_string(),
                 }],
             })
         }
         crate::effect::AcquireDecision::Block => Ok(StepPack {
             coro_update: CoroUpdate::Block(BlockReason::AcquireDenied {
-                layer: layer.to_string(),
+                layer: input.layer.to_string(),
             }),
             type_update: None,
             events: vec![],
@@ -2403,52 +2440,48 @@ fn step_acquire(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn step_release(
     coro: &mut Coroutine,
-    ep: &Endpoint,
-    role: &str,
-    sid: SessionId,
-    layer: &str,
-    evidence: u16,
-    config: &VMConfig,
-    guard_resources: &Arc<Mutex<BTreeMap<String, Value>>>,
-    resource_states: &Arc<Mutex<BTreeMap<SessionId, ResourceState>>>,
-    handler: &dyn EffectHandler,
-    tick: u64,
+    input: GuardReleaseStep<'_>,
+    ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
-    guard_active(config, layer)?;
+    guard_active(ctx.config, input.layer)?;
     {
-        let mut resources = guard_resources
+        let mut resources = ctx
+            .guard_resources
             .lock()
             .expect("guard resources lock poisoned");
-        resources.entry(layer.to_string()).or_insert(Value::Unit);
+        resources
+            .entry(input.layer.to_string())
+            .or_insert(Value::Unit);
     }
     let ev = coro
         .regs
-        .get(usize::from(evidence))
+        .get(usize::from(input.evidence))
         .ok_or(Fault::OutOfRegisters)?
         .clone();
-    handler
-        .handle_release(sid, role, layer, &ev, &coro.regs)
-        .map_err(|e| Fault::AcquireFault {
-            layer: layer.to_string(),
+    ctx.handler
+        .handle_release(input.sid, input.role, input.layer, &ev, &coro.regs)
+        .map_err(|e| Fault::Acquire {
+            layer: input.layer.to_string(),
             message: e,
         })?;
     {
-        let mut resources = guard_resources
+        let mut resources = ctx
+            .guard_resources
             .lock()
             .expect("guard resources lock poisoned");
-        resources.insert(layer.to_string(), ev.clone());
+        resources.insert(input.layer.to_string(), ev.clone());
     }
 
-    if let Some(state) = resource_states
+    if let Some(state) = ctx
+        .resource_states
         .lock()
         .expect("resource state lock poisoned")
-        .get_mut(&sid)
+        .get_mut(&input.sid)
     {
-        state.consume(&ev).map_err(|message| Fault::AcquireFault {
-            layer: layer.to_string(),
+        state.consume(&ev).map_err(|message| Fault::Acquire {
+            layer: input.layer.to_string(),
             message,
         })?;
     }
@@ -2456,10 +2489,10 @@ fn step_release(
         coro_update: CoroUpdate::AdvancePc,
         type_update: None,
         events: vec![ObsEvent::Released {
-            tick,
-            session: ep.sid,
-            role: role.to_string(),
-            layer: layer.to_string(),
+            tick: ctx.tick,
+            session: input.ep.sid,
+            role: input.role.to_string(),
+            layer: input.layer.to_string(),
         }],
     })
 }
@@ -2570,7 +2603,7 @@ fn step_tag(
         .get(usize::from(fact_reg))
         .ok_or(Fault::OutOfRegisters)?
         .clone();
-    let (endpoint, fact) = decode_endpoint_fact(fact_val).ok_or_else(|| Fault::TransferFault {
+    let (endpoint, fact) = decode_endpoint_fact(fact_val).ok_or_else(|| Fault::Transfer {
         message: format!("{role}: tag expects (endpoint, string) fact"),
     })?;
     coro.knowledge_set.push(crate::coroutine::KnowledgeFact {
@@ -2606,7 +2639,7 @@ fn step_check(
         .get(usize::from(knowledge))
         .ok_or(Fault::OutOfRegisters)?
         .clone();
-    let (endpoint, fact) = decode_endpoint_fact(know_val).ok_or_else(|| Fault::TransferFault {
+    let (endpoint, fact) = decode_endpoint_fact(know_val).ok_or_else(|| Fault::Transfer {
         message: format!("{role}: check expects (endpoint, string) fact"),
     })?;
     let target_val = coro
@@ -2617,7 +2650,7 @@ fn step_check(
     let target_role = match target_val {
         Value::Str(s) => s,
         _ => {
-            return Err(Fault::TransferFault {
+            return Err(Fault::Transfer {
                 message: format!("{role}: check expects target role string"),
             })
         }
@@ -2644,15 +2677,14 @@ fn step_check(
     })
 }
 
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)]
 fn step_choose(
     coro: &mut Coroutine,
     session: &mut SessionState,
     role: &str,
     chan: u16,
     table: &[(String, PC)],
-    handler: &dyn EffectHandler,
-    tick: u64,
+    ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
     let ep = endpoint_from_reg(coro, chan)?;
     if !coro.owned_endpoints.contains(&ep) {
@@ -2688,7 +2720,7 @@ fn step_choose(
 
     if !session.has_message(&partner, role) {
         return Ok(StepPack {
-            coro_update: CoroUpdate::Block(BlockReason::RecvWait {
+            coro_update: CoroUpdate::Block(BlockReason::Recv {
                 edge: Edge::new(sid, partner.clone(), role.to_string()),
                 token: ProgressToken::for_endpoint(ep.clone()),
             }),
@@ -2734,9 +2766,9 @@ fn step_choose(
             label: label.clone(),
         })?;
 
-    handler
+    ctx.handler
         .handle_recv(role, &partner, &label, &mut coro.regs, &val)
-        .map_err(|e| Fault::InvokeFault { message: e })?;
+        .map_err(|e| Fault::Invoke { message: e })?;
 
     let original = session
         .local_types
@@ -2750,7 +2782,7 @@ fn step_choose(
         type_update,
         events: vec![
             ObsEvent::Received {
-                tick,
+                tick: ctx.tick,
                 edge,
                 session: sid,
                 from: partner.clone(),
@@ -2758,7 +2790,7 @@ fn step_choose(
                 label: label.clone(),
             },
             ObsEvent::Chose {
-                tick,
+                tick: ctx.tick,
                 edge: Edge::new(sid, partner, role.to_string()),
                 label,
             },
@@ -2766,15 +2798,13 @@ fn step_choose(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn step_offer(
     coro: &mut Coroutine,
     session: &mut SessionState,
     role: &str,
     chan: u16,
     label: &str,
-    handler: &dyn EffectHandler,
-    tick: u64,
+    ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
     let ep = endpoint_from_reg(coro, chan)?;
     if !coro.owned_endpoints.contains(&ep) {
@@ -2810,27 +2840,28 @@ fn step_offer(
                 })?
                 .clone();
 
-            let decision = handler
-                .send_decision(
+            let decision = ctx
+                .handler
+                .send_decision(SendDecisionInput {
                     sid,
                     role,
-                    &partner,
+                    partner: &partner,
                     label,
-                    &coro.regs,
-                    Some(Value::Str(label.to_string())),
-                )
-                .map_err(|e| Fault::InvokeFault { message: e })?;
+                    state: &coro.regs,
+                    payload: Some(Value::Str(label.to_string())),
+                })
+                .map_err(|e| Fault::Invoke { message: e })?;
             let enqueue = match decision {
                 SendDecision::Deliver(payload) => session
                     .send(role, &partner, payload)
-                    .map_err(|e| Fault::InvokeFault { message: e })?,
+                    .map_err(|e| Fault::Invoke { message: e })?,
                 SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
             };
             match enqueue {
                 EnqueueResult::Ok => {}
                 EnqueueResult::WouldBlock => {
                     return Ok(StepPack {
-                        coro_update: CoroUpdate::Block(BlockReason::SendWait {
+                        coro_update: CoroUpdate::Block(BlockReason::Send {
                             edge: Edge::new(sid, role.to_string(), partner.clone()),
                         }),
                         type_update: None,
@@ -2857,7 +2888,7 @@ fn step_offer(
                 type_update,
                 events: vec![
                     ObsEvent::Sent {
-                        tick,
+                        tick: ctx.tick,
                         edge: Edge::new(sid, role.to_string(), partner.clone()),
                         session: sid,
                         from: role.to_string(),
@@ -2865,7 +2896,7 @@ fn step_offer(
                         label: label.to_string(),
                     },
                     ObsEvent::Offered {
-                        tick,
+                        tick: ctx.tick,
                         edge: Edge::new(sid, role.to_string(), partner),
                         label: label.to_string(),
                     },
@@ -2916,7 +2947,7 @@ fn step_open(
     tick: u64,
 ) -> Result<StepPack, Fault> {
     if local_types.len() != dsts.len() {
-        return Err(Fault::CloseFault {
+        return Err(Fault::Close {
             message: "open arity mismatch".to_string(),
         });
     }
@@ -2929,7 +2960,7 @@ fn step_open(
             if r == r2 {
                 Ok((r, lt, dst))
             } else {
-                Err(Fault::CloseFault {
+                Err(Fault::Close {
                     message: "open arity mismatch".to_string(),
                 })
             }
@@ -2941,7 +2972,7 @@ fn step_open(
     let spatial_ok =
         !open_roles.is_empty() && open_roles.iter().all(|r| distinct.insert(r.clone()));
     if !spatial_ok {
-        return Err(Fault::SpecFault {
+        return Err(Fault::Speculation {
             message: "spatial requirements failed".to_string(),
         });
     }
@@ -2957,14 +2988,14 @@ fn step_open(
             .all(|receiver| has_handler(sender, receiver))
     });
     if !covers_edges {
-        return Err(Fault::SpecFault {
+        return Err(Fault::Speculation {
             message: "handler bindings missing".to_string(),
         });
     }
 
     let initial_types: BTreeMap<String, LocalTypeR> = local_types.iter().cloned().collect();
     let sid = store.open(open_roles.clone(), &BufferConfig::default(), &initial_types);
-    let session = store.get(sid).ok_or_else(|| Fault::CloseFault {
+    let session = store.get(sid).ok_or_else(|| Fault::Close {
         message: "open session missing after allocation".to_string(),
     })?;
     {
@@ -3013,7 +3044,7 @@ mod tests {
     use super::*;
     use crate::buffer::BufferConfig;
     use crate::coroutine::KnowledgeFact;
-    use crate::effect::{EffectHandler, SendDecision};
+    use crate::effect::{EffectHandler, SendDecision, SendDecisionInput};
     use crate::session::SessionStore;
     use crate::verification::{Hash, Signature, VerifyingKey};
     use crate::vm::{FlowPolicy, FlowPredicate};
@@ -3034,16 +3065,8 @@ mod tests {
             Ok(Value::Unit)
         }
 
-        fn send_decision(
-            &self,
-            _sid: usize,
-            _role: &str,
-            _partner: &str,
-            _label: &str,
-            _state: &[Value],
-            payload: Option<Value>,
-        ) -> Result<SendDecision, String> {
-            Ok(SendDecision::Deliver(payload.unwrap_or(Value::Unit)))
+        fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+            Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
         }
 
         fn handle_recv(
@@ -3201,7 +3224,25 @@ mod tests {
         coro.owned_endpoints.push(endpoint.clone());
         coro.regs[0] = Value::Endpoint(endpoint);
 
-        let err = match step_recv(&mut coro, session, "B", 0, 1, &NoopHandler, 1) {
+        let config = VMConfig::default();
+        let guard_resources = Arc::new(Mutex::new(BTreeMap::new()));
+        let resource_states = Arc::new(Mutex::new(BTreeMap::new()));
+        let crashed_sites = BTreeSet::new();
+        let partitioned_edges = BTreeSet::new();
+        let corrupted_edges = BTreeMap::new();
+        let timed_out_sites = BTreeMap::new();
+        let step_ctx = ThreadedStepCtx {
+            config: &config,
+            guard_resources: &guard_resources,
+            resource_states: &resource_states,
+            crashed_sites: &crashed_sites,
+            partitioned_edges: &partitioned_edges,
+            corrupted_edges: &corrupted_edges,
+            timed_out_sites: &timed_out_sites,
+            handler: &NoopHandler,
+            tick: 1,
+        };
+        let err = match step_recv(&mut coro, session, "B", 0, 1, &step_ctx) {
             Ok(_) => panic!("tampered signature must fault"),
             Err(err) => err,
         };
@@ -3255,7 +3296,7 @@ mod tests {
             .enqueue_handoff(endpoint, source, target, vm.clock.tick)
             .expect_err("ambiguous ownership must fail");
         match err {
-            Fault::TransferFault { message } => {
+            Fault::Transfer { message } => {
                 assert!(
                     message.contains("delegation guard violation"),
                     "unexpected transfer fault message: {message}"

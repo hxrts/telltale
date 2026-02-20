@@ -18,10 +18,10 @@ fn fault_name(err: &VMError) -> Option<&'static str> {
         VMError::Fault { fault, .. } => Some(match fault {
             telltale_vm::coroutine::Fault::TypeViolation { .. } => "type_violation",
             telltale_vm::coroutine::Fault::UnknownLabel { .. } => "unknown_label",
-            telltale_vm::coroutine::Fault::TransferFault { .. } => "transfer_fault",
+            telltale_vm::coroutine::Fault::Transfer { .. } => "transfer_fault",
             telltale_vm::coroutine::Fault::OutOfRegisters => "out_of_registers",
-            telltale_vm::coroutine::Fault::CloseFault { .. } => "close_fault",
-            telltale_vm::coroutine::Fault::SpecFault { .. } => "spec_fault",
+            telltale_vm::coroutine::Fault::Close { .. } => "close_fault",
+            telltale_vm::coroutine::Fault::Speculation { .. } => "spec_fault",
             _ => "other_fault",
         }),
         _ => None,

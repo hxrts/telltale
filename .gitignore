@@ -44,6 +44,7 @@ iris-lean/
 # Generated documentation
 /docs/book/
 /docs/SUMMARY.md
+/artifacts/
 
 # Paper build artifacts
 /paper/build/

@@ -195,15 +195,14 @@ fn matches_direction(lt: &LocalTypeR, direction: Direction) -> bool {
     )
 }
 
+type LocalBranch = (Label, Option<telltale_types::ValType>, LocalTypeR);
+type LocalBranchSlice<'a> = &'a [LocalBranch];
+
 /// Extract partner and branches from a LocalTypeR if it matches the direction
-#[allow(clippy::type_complexity)]
 fn extract_components(
     lt: &LocalTypeR,
     direction: Direction,
-) -> Option<(
-    &String,
-    &[(Label, Option<telltale_types::ValType>, LocalTypeR)],
-)> {
+) -> Option<(&String, LocalBranchSlice<'_>)> {
     match (direction, lt) {
         (Direction::Output, LocalTypeR::Send { partner, branches }) => Some((partner, branches)),
         (Direction::Input, LocalTypeR::Recv { partner, branches }) => Some((partner, branches)),

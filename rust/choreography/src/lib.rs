@@ -91,18 +91,18 @@ pub fn parse_and_generate_with_extensions(
 
     let (choreography, extensions) =
         parse_choreography_str_with_extensions(input, extension_registry)
-            .map_err(CompilationError::ParseError)?;
+            .map_err(CompilationError::Parse)?;
 
     // Validate the choreography
     choreography
         .validate()
-        .map_err(|e| CompilationError::ValidationError(e.to_string()))?;
+        .map_err(|e| CompilationError::Validation(e.to_string()))?;
 
     // Project to local types
     let mut local_types = Vec::new();
     for role in &choreography.roles {
         let local_type = project(&choreography, role)
-            .map_err(|e| CompilationError::ProjectionError(e.to_string()))?;
+            .map_err(|e| CompilationError::Projection(e.to_string()))?;
         local_types.push((role.clone(), local_type));
     }
 
@@ -129,24 +129,23 @@ pub fn parse_choreography_with_extensions(
     use compiler::parser::parse_choreography_str_with_extensions;
 
     parse_choreography_str_with_extensions(input, extension_registry)
-        .map_err(CompilationError::ParseError)
+        .map_err(CompilationError::Parse)
 }
 
 /// Compilation errors that can occur during choreography processing
 #[derive(Debug, thiserror::Error)]
-#[allow(clippy::enum_variant_names)]
 pub enum CompilationError {
     #[error("parse error: {0}")]
-    ParseError(#[from] compiler::parser::ParseError),
+    Parse(#[from] compiler::parser::ParseError),
 
     #[error("validation error: {0}")]
-    ValidationError(String),
+    Validation(String),
 
     #[error("projection error: {0}")]
-    ProjectionError(String),
+    Projection(String),
 
     #[error("code generation error: {0}")]
-    CodegenError(String),
+    Codegen(String),
 }
 
 #[cfg(test)]

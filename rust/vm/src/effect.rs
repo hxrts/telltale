@@ -199,6 +199,23 @@ pub enum SendDecision {
     Defer,
 }
 
+/// Structured input for [`EffectHandler::send_decision`].
+#[derive(Debug, Clone)]
+pub struct SendDecisionInput<'a> {
+    /// Session context for the send.
+    pub sid: SessionId,
+    /// Sending role.
+    pub role: &'a str,
+    /// Receiving role.
+    pub partner: &'a str,
+    /// Message label.
+    pub label: &'a str,
+    /// Current register state.
+    pub state: &'a [Value],
+    /// Optional precomputed payload.
+    pub payload: Option<Value>,
+}
+
 /// Decision returned by [`EffectHandler::handle_acquire`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AcquireDecision {
@@ -436,20 +453,11 @@ pub trait EffectHandler: Send + Sync {
     /// # Errors
     ///
     /// Returns an error string if the handler fails.
-    #[allow(clippy::too_many_arguments)]
-    fn send_decision(
-        &self,
-        _sid: SessionId,
-        role: &str,
-        partner: &str,
-        label: &str,
-        state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
-        if let Some(payload) = payload {
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        if let Some(payload) = input.payload {
             Ok(SendDecision::Deliver(payload))
         } else {
-            self.handle_send(role, partner, label, state)
+            self.handle_send(input.role, input.partner, input.label, input.state)
                 .map(SendDecision::Deliver)
         }
     }
@@ -577,16 +585,8 @@ impl<T: EffectHandler + ?Sized> EffectHandler for &T {
         (**self).handle_send(role, partner, label, state)
     }
 
-    fn send_decision(
-        &self,
-        sid: SessionId,
-        role: &str,
-        partner: &str,
-        label: &str,
-        state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
-        (**self).send_decision(sid, role, partner, label, state, payload)
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        (**self).send_decision(input)
     }
 
     fn handle_recv(
@@ -664,18 +664,9 @@ impl EffectHandler for RecordingEffectHandler<'_> {
         self.inner.handle_send(role, partner, label, state)
     }
 
-    fn send_decision(
-        &self,
-        sid: SessionId,
-        role: &str,
-        partner: &str,
-        label: &str,
-        state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
-        let decision =
-            self.inner
-                .send_decision(sid, role, partner, label, state, payload.clone())?;
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        let payload_hint = input.payload.clone();
+        let decision = self.inner.send_decision(input.clone())?;
         let outputs = match &decision {
             SendDecision::Deliver(value) => json!({
                 "decision": "deliver",
@@ -691,11 +682,11 @@ impl EffectHandler for RecordingEffectHandler<'_> {
         self.tape.record(
             "send_decision",
             json!({
-                "sid": sid,
-                "role": role,
-                "partner": partner,
-                "label": label,
-                "payload_hint": payload,
+                "sid": input.sid,
+                "role": input.role,
+                "partner": input.partner,
+                "label": input.label,
+                "payload_hint": payload_hint,
             }),
             outputs,
             &self.inner.handler_identity(),
@@ -871,26 +862,18 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         }
     }
 
-    fn send_decision(
-        &self,
-        sid: SessionId,
-        role: &str,
-        partner: &str,
-        label: &str,
-        state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
         let entry = self.next_entry("send_decision")?;
-        if let Some(decision) = Self::parse_send_decision(&entry.outputs, payload.clone()) {
+        if let Some(decision) = Self::parse_send_decision(&entry.outputs, input.payload.clone()) {
             return Ok(decision);
         }
         if let Some(committed) = entry.outputs.get("committed").and_then(JsonValue::as_bool) {
             if committed {
-                return Ok(SendDecision::Deliver(payload.unwrap_or(Value::Unit)));
+                return Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)));
             }
         }
         if let Some(fallback) = self.fallback {
-            return fallback.send_decision(sid, role, partner, label, state, payload);
+            return fallback.send_decision(input);
         }
         Err("replay send_decision missing decision payload".to_string())
     }
@@ -1029,19 +1012,11 @@ mod tests {
         }
 
         #[allow(clippy::as_conversions, clippy::cast_possible_wrap)]
-        fn send_decision(
-            &self,
-            _sid: SessionId,
-            _role: &str,
-            _partner: &str,
-            _label: &str,
-            _state: &[Value],
-            payload: Option<Value>,
-        ) -> Result<SendDecision, String> {
+        fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
             let idx = self.counter.fetch_add(1, Ordering::Relaxed);
             if idx % 2 == 0 {
                 Ok(SendDecision::Deliver(
-                    payload.unwrap_or(Value::Nat(idx as u64)),
+                    input.payload.unwrap_or(Value::Nat(idx as u64)),
                 ))
             } else {
                 Ok(SendDecision::Drop)
@@ -1083,20 +1058,48 @@ mod tests {
         let recorder = RecordingEffectHandler::new(&base);
 
         let first = recorder
-            .send_decision(0, "A", "B", "m", &[], Some(Value::Nat(7)))
+            .send_decision(SendDecisionInput {
+                sid: 0,
+                role: "A",
+                partner: "B",
+                label: "m",
+                state: &[],
+                payload: Some(Value::Nat(7)),
+            })
             .expect("first decision");
         let second = recorder
-            .send_decision(0, "A", "B", "m", &[], Some(Value::Nat(8)))
+            .send_decision(SendDecisionInput {
+                sid: 0,
+                role: "A",
+                partner: "B",
+                label: "m",
+                state: &[],
+                payload: Some(Value::Nat(8)),
+            })
             .expect("second decision");
         assert!(matches!(first, SendDecision::Deliver(_)));
         assert!(matches!(second, SendDecision::Drop));
 
         let replay = ReplayEffectHandler::new(recorder.effect_trace());
         let replay_first = replay
-            .send_decision(0, "A", "B", "m", &[], Some(Value::Nat(0)))
+            .send_decision(SendDecisionInput {
+                sid: 0,
+                role: "A",
+                partner: "B",
+                label: "m",
+                state: &[],
+                payload: Some(Value::Nat(0)),
+            })
             .expect("replay first decision");
         let replay_second = replay
-            .send_decision(0, "A", "B", "m", &[], Some(Value::Nat(0)))
+            .send_decision(SendDecisionInput {
+                sid: 0,
+                role: "A",
+                partner: "B",
+                label: "m",
+                state: &[],
+                payload: Some(Value::Nat(0)),
+            })
             .expect("replay second decision");
         assert!(matches!(replay_first, SendDecision::Deliver(_)));
         assert!(matches!(replay_second, SendDecision::Drop));

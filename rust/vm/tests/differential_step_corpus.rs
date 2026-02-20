@@ -11,8 +11,7 @@ use std::collections::BTreeMap;
 
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::EffectHandler;
-use telltale_vm::effect::SendDecision;
+use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
 use telltale_vm::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_vm::loader::CodeImage;
 #[cfg(feature = "multi-thread")]
@@ -267,19 +266,11 @@ impl EffectHandler for KnowledgePayloadHandler {
         Ok(Value::Unit)
     }
 
-    fn send_decision(
-        &self,
-        sid: usize,
-        role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &[Value],
-        _payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
         Ok(SendDecision::Deliver(Value::Prod(
             Box::new(Value::Endpoint(Endpoint {
-                sid,
-                role: role.to_string(),
+                sid: input.sid,
+                role: input.role.to_string(),
             })),
             Box::new(Value::Str("secret".to_string())),
         )))

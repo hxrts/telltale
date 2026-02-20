@@ -11,8 +11,39 @@ use crate::trace::obs_session;
 use crate::verification::{DefaultVerificationModel, HashTag, VerificationModel};
 use crate::vm::ObsEvent;
 
-fn default_schema_version() -> u32 {
-    1
+/// Canonical schema version identifier for envelope differential artifacts.
+pub const ENVELOPE_DIFF_SCHEMA_VERSION: &str = "vm.envelope_diff.v1";
+
+fn default_schema_version() -> String {
+    ENVELOPE_DIFF_SCHEMA_VERSION.to_string()
+}
+
+fn normalize_envelope_schema_version(raw: &str) -> String {
+    if raw == "1" {
+        ENVELOPE_DIFF_SCHEMA_VERSION.to_string()
+    } else {
+        raw.to_string()
+    }
+}
+
+fn deserialize_envelope_schema_version<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum SchemaVersionValue {
+        String(String),
+        Integer(u64),
+    }
+
+    let parsed = SchemaVersionValue::deserialize(deserializer)?;
+    Ok(match parsed {
+        SchemaVersionValue::String(version) => normalize_envelope_schema_version(&version),
+        SchemaVersionValue::Integer(version) => {
+            normalize_envelope_schema_version(&version.to_string())
+        }
+    })
 }
 
 /// Scheduler-level differential class between two runs.
@@ -57,12 +88,23 @@ pub struct WaveWidthBound {
     pub declared_upper_bound: usize,
 }
 
+impl WaveWidthBound {
+    /// Return true when the observed candidate width stays within the declared bound.
+    #[must_use]
+    pub fn within_declared_bound(&self) -> bool {
+        self.candidate_max_wave_width <= self.declared_upper_bound
+    }
+}
+
 /// Runtime differential envelope emitted by multi-engine runs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnvelopeDiff {
     /// Schema version for this artifact payload.
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
+    #[serde(
+        default = "default_schema_version",
+        deserialize_with = "deserialize_envelope_schema_version"
+    )]
+    pub schema_version: String,
     /// Baseline engine identifier.
     pub baseline_engine: String,
     /// Candidate engine identifier.
@@ -134,8 +176,11 @@ impl EnvelopeDiff {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnvelopeDiffArtifactV1 {
     /// Schema version for this artifact payload.
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
+    #[serde(
+        default = "default_schema_version",
+        deserialize_with = "deserialize_envelope_schema_version"
+    )]
+    pub schema_version: String,
     /// Envelope differential payload.
     pub envelope_diff: EnvelopeDiff,
     /// Stable hash of the baseline canonical replay fragment.
@@ -251,7 +296,9 @@ fn bytes_to_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut out = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
+        // Nibble values are always in 0..16, so usize indexing is safe.
         out.push(HEX[(byte >> 4) as usize] as char);
+        // Same invariant for the low nibble.
         out.push(HEX[(byte & 0x0f) as usize] as char);
     }
     out
@@ -275,7 +322,7 @@ mod tests {
 
     fn fragment(trace: Vec<ObsEvent>) -> CanonicalReplayFragmentV1 {
         CanonicalReplayFragmentV1 {
-            schema_version: 1,
+            schema_version: crate::serialization::SERIALIZATION_SCHEMA_VERSION.to_string(),
             obs_trace: trace,
             effect_trace: Vec::new(),
             crashed_sites: Vec::new(),
@@ -352,5 +399,26 @@ mod tests {
             artifact.envelope_diff_hash,
             artifact.envelope_diff.stable_hash_hex()
         );
+    }
+
+    #[test]
+    fn legacy_numeric_schema_version_deserializes_to_string_identifier() {
+        let payload = serde_json::json!({
+            "schema_version": 1,
+            "baseline_engine": "lean",
+            "candidate_engine": "threaded",
+            "scheduler_permutation_class": "Exact",
+            "wave_width_bound": {
+                "baseline_max_wave_width": 1,
+                "candidate_max_wave_width": 1,
+                "declared_upper_bound": 1
+            },
+            "effect_ordering_class": "Exact",
+            "failure_visible_diff_class": "Exact",
+            "effect_determinism_tier": "strict_deterministic"
+        });
+        let decoded: EnvelopeDiff =
+            serde_json::from_value(payload).expect("legacy schema version should deserialize");
+        assert_eq!(decoded.schema_version, ENVELOPE_DIFF_SCHEMA_VERSION);
     }
 }

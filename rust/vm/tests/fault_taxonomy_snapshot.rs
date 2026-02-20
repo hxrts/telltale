@@ -9,7 +9,7 @@ use telltale_vm::session::Edge;
 
 #[test]
 fn fault_taxonomy_mapping_snapshot_is_stable() {
-    let samples = vec![
+    let samples = [
         Fault::TypeViolation {
             expected: ValType::Unit,
             actual: ValType::Nat,
@@ -28,7 +28,7 @@ fn fault_taxonomy_mapping_snapshot_is_stable() {
             edge: Edge::new(2, "A", "B"),
             message: "bad sig".to_string(),
         },
-        Fault::TransferFault {
+        Fault::Transfer {
             message: "ownership".to_string(),
         },
         Fault::OutOfCredits,

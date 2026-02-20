@@ -21,5 +21,5 @@ protocol MealService =
     tacos ->
       Chef -> SousChef : PrepTortillas
       SousChef -> Chef : TortillasReady
-      Chef -> Baker : HeatFillings
-      Baker -> Chef : FillingsReady
+      Chef -> Baker : PrepareGarlicBread
+      Baker -> Chef : BreadReady

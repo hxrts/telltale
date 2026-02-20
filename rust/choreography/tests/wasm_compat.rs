@@ -3,11 +3,6 @@
 // These tests verify that core choreographic programming features
 // work correctly when compiled to WASM.
 //
-// TODO: These tests are disabled pending API updates. The RoleId trait and
-// Program API have changed since these tests were written. See:
-// - RoleId now requires `type Label` and `role_name()` instead of `name()`
-// - Program.effects is now private (use .effects() method)
-// - Label import path changed
 #![cfg(all(target_arch = "wasm32", feature = "_wasm_integration_tests"))]
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
@@ -17,7 +12,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use telltale_choreography::{
-    interpret, Effect, InMemoryHandler, InterpretResult, InterpreterState, Label, Program, RoleId,
+    interpret, Effect, InMemoryHandler, InterpreterState, LabelId, MessageTag, Program, RoleId,
+    RoleName,
 };
 use wasm_bindgen_test::*;
 
@@ -29,7 +25,48 @@ enum TestRole {
     Bob,
 }
 
-// RoleId is automatically implemented via blanket impl
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+enum TestLabel {
+    Branch1,
+    Option1,
+    Option2,
+    Opt1,
+    Test,
+}
+
+impl LabelId for TestLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            TestLabel::Branch1 => "branch1",
+            TestLabel::Option1 => "option1",
+            TestLabel::Option2 => "option2",
+            TestLabel::Opt1 => "opt1",
+            TestLabel::Test => "test",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "branch1" => Some(TestLabel::Branch1),
+            "option1" => Some(TestLabel::Option1),
+            "option2" => Some(TestLabel::Option2),
+            "opt1" => Some(TestLabel::Opt1),
+            "test" => Some(TestLabel::Test),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for TestRole {
+    type Label = TestLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            TestRole::Alice => RoleName::from_static("Alice"),
+            TestRole::Bob => RoleName::from_static("Bob"),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 enum TestMessage {
@@ -43,8 +80,9 @@ fn test_role_id_trait() {
     let alice = TestRole::Alice;
     let bob = TestRole::Bob;
 
-    // RoleId is automatically implemented for types with the required bounds
     assert_ne!(alice, bob);
+    assert_eq!(alice.role_name().as_str(), "Alice");
+    assert_eq!(bob.role_name().as_str(), "Bob");
 }
 
 #[wasm_bindgen_test]
@@ -89,19 +127,19 @@ fn test_program_builder() {
         .end();
 
     // Verify program structure
-    assert_eq!(program.effects.len(), 2); // send + recv
+    assert_eq!(program.effects().len(), 3); // send + recv + end
     assert_eq!(program.send_count(), 1);
     assert_eq!(program.recv_count(), 1);
 }
 
 #[wasm_bindgen_test]
 fn test_program_with_choice() {
-    let program = Program::new()
-        .choose(TestRole::Bob, Label("branch1"))
+    let program: Program<TestRole, TestMessage> = Program::new()
+        .choose(TestRole::Bob, TestLabel::Branch1)
         .offer(TestRole::Alice)
         .end();
 
-    assert_eq!(program.effects.len(), 2);
+    assert_eq!(program.effects().len(), 3); // choose + offer + end
 }
 
 #[wasm_bindgen_test]
@@ -166,12 +204,14 @@ async fn test_message_serialization() {
 
 #[wasm_bindgen_test]
 async fn test_label_operations() {
-    let label1 = Label("option1");
-    let label2 = Label("option2");
+    let label1 = TestLabel::Option1;
+    let label2 = TestLabel::Option2;
 
-    assert_eq!(label1.0, "option1");
-    assert_eq!(label2.0, "option2");
+    assert_eq!(label1.as_str(), "option1");
+    assert_eq!(label2.as_str(), "option2");
     assert_ne!(label1, label2);
+    assert_eq!(TestLabel::from_str("option1"), Some(TestLabel::Option1));
+    assert_eq!(TestLabel::from_str("option2"), Some(TestLabel::Option2));
 
     // Test cloning
     let label_clone = label1.clone();
@@ -188,21 +228,23 @@ async fn test_effect_types() {
 
     let _recv = Effect::<TestRole, TestMessage>::Recv {
         from: TestRole::Alice,
+        msg_tag: MessageTag::of::<TestMessage>(),
     };
 
     let _choose = Effect::<TestRole, TestMessage>::Choose {
-        who: TestRole::Alice,
-        label: Label("test"),
+        at: TestRole::Alice,
+        label: TestLabel::Test,
     };
 
     let _offer = Effect::<TestRole, TestMessage>::Offer {
         from: TestRole::Bob,
     };
 
-    let _timeout = Effect::WithTimeout {
+    let _timeout = Effect::<TestRole, TestMessage>::Timeout {
         at: TestRole::Alice,
         dur: Duration::from_millis(100),
         body: Box::new(Program::new().end()),
+        on_timeout: None,
     };
 
     let _parallel = Effect::<TestRole, TestMessage>::Parallel {
@@ -218,7 +260,7 @@ async fn test_program_analysis() {
         .send(TestRole::Bob, TestMessage::Number(1))
         .send(TestRole::Bob, TestMessage::Number(2))
         .recv::<TestMessage>(TestRole::Bob)
-        .choose(TestRole::Alice, Label("opt1"))
+        .choose(TestRole::Alice, TestLabel::Opt1)
         .with_timeout(
             TestRole::Alice,
             Duration::from_millis(50),
@@ -230,7 +272,7 @@ async fn test_program_analysis() {
     // Verify program analysis methods work
     assert_eq!(program.send_count(), 2);
     assert_eq!(program.recv_count(), 1);
-    assert_eq!(program.effects.len(), 6);
+    assert_eq!(program.effects().len(), 7);
     assert!(program.has_timeouts());
     assert!(program.has_parallel());
 }
@@ -247,7 +289,7 @@ fn test_handler_with_new() {
 #[wasm_bindgen_test]
 async fn test_empty_program() {
     let mut handler = InMemoryHandler::new(TestRole::Alice);
-    let program = Program::new().end();
+    let program: Program<TestRole, TestMessage> = Program::new().end();
 
     let mut endpoint = ();
     let result = interpret(&mut handler, &mut endpoint, program).await;
@@ -263,7 +305,7 @@ async fn test_futures_channel_compatibility() {
     use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
     use futures::StreamExt;
 
-    let (mut tx, mut rx): (UnboundedSender<i32>, UnboundedReceiver<i32>) = unbounded();
+    let (tx, mut rx): (UnboundedSender<i32>, UnboundedReceiver<i32>) = unbounded();
 
     // Test send
     tx.unbounded_send(42).unwrap();

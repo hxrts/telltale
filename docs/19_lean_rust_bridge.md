@@ -82,6 +82,8 @@ Each family has an explicit version constant.
 
 `schema::ensure_supported_schema_version()` rejects unsupported `lean_bridge` versions.
 `vm_export` supports alias decoding for legacy `vm_state.v0` field names such as `next_coro_id` and `obs_trace`.
+VM runtime parity artifacts use the same string-based scheme: `vm.serialization.v1` and `vm.envelope_diff.v1`.
+Legacy numeric schema values (`1`) are normalized during deserialization for backward compatibility.
 
 ## Reference Simulation Payloads
 

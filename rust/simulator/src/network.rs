@@ -7,7 +7,7 @@ use telltale_types::FixedQ32;
 
 use telltale_vm::buffer::EnqueueResult;
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, SendDecision};
+use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
 use telltale_vm::session::SessionId;
 
 use crate::rng::SimRng;
@@ -242,18 +242,11 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
         self.inner.handle_send(role, partner, label, state)
     }
 
-    fn send_decision(
-        &self,
-        sid: SessionId,
-        role: &str,
-        partner: &str,
-        label: &str,
-        state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
-        let base = self
-            .inner
-            .send_decision(sid, role, partner, label, state, payload)?;
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        let base = self.inner.send_decision(input.clone())?;
+        let sid = input.sid;
+        let role = input.role;
+        let partner = input.partner;
 
         let SendDecision::Deliver(payload) = base else {
             return Ok(base);
@@ -352,16 +345,8 @@ mod tests {
             Ok(Value::Unit)
         }
 
-        fn send_decision(
-            &self,
-            _sid: SessionId,
-            _role: &str,
-            _partner: &str,
-            _label: &str,
-            _state: &[Value],
-            payload: Option<Value>,
-        ) -> Result<SendDecision, String> {
-            Ok(SendDecision::Deliver(payload.unwrap_or(Value::Unit)))
+        fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+            Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
         }
 
         fn handle_recv(
@@ -420,7 +405,14 @@ mod tests {
         let model = model(config);
         model.set_tick(0);
         let decision = model
-            .send_decision(0, "A", "B", "msg", &[], Some(Value::Nat(1)))
+            .send_decision(SendDecisionInput {
+                sid: 0,
+                role: "A",
+                partner: "B",
+                label: "msg",
+                state: &[],
+                payload: Some(Value::Nat(1)),
+            })
             .expect("send decision");
         assert!(matches!(decision, SendDecision::Drop));
     }
@@ -443,7 +435,14 @@ mod tests {
         let model = model(config);
         model.set_tick(5);
         let decision = model
-            .send_decision(0, "A", "B", "msg", &[], Some(Value::Nat(1)))
+            .send_decision(SendDecisionInput {
+                sid: 0,
+                role: "A",
+                partner: "B",
+                label: "msg",
+                state: &[],
+                payload: Some(Value::Nat(1)),
+            })
             .expect("send decision");
         assert!(matches!(decision, SendDecision::Deliver(Value::Nat(1))));
     }
@@ -466,7 +465,14 @@ mod tests {
         let model = model(config);
         model.set_tick(3);
         let decision = model
-            .send_decision(0, "A", "B", "msg", &[], Some(Value::Nat(1)))
+            .send_decision(SendDecisionInput {
+                sid: 0,
+                role: "A",
+                partner: "B",
+                label: "msg",
+                state: &[],
+                payload: Some(Value::Nat(1)),
+            })
             .expect("send decision");
         assert!(matches!(decision, SendDecision::Defer));
     }
@@ -489,7 +495,14 @@ mod tests {
         let model = model(config);
         model.set_tick(0);
         let decision = model
-            .send_decision(0, "A", "B", "msg", &[], Some(Value::Nat(1)))
+            .send_decision(SendDecisionInput {
+                sid: 0,
+                role: "A",
+                partner: "B",
+                label: "msg",
+                state: &[],
+                payload: Some(Value::Nat(1)),
+            })
             .expect("send decision");
         assert!(matches!(decision, SendDecision::Drop));
     }

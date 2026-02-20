@@ -37,8 +37,8 @@ Import this module to access the stable `Classical.Transport` API:
 import Classical
 
 -- Use transported theorems
-#check Classical.Transport.transported_fosterLyapunov
-#check Classical.Transport.transported_littlesLaw
+example := Classical.Transport.transported_fosterLyapunov
+example := Classical.Transport.transported_littlesLaw
 ```
 
 ## See Also

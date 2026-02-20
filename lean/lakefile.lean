@@ -16,14 +16,16 @@ package telltale where
   ]
 
 -- Mathlib provides standard lemmas and automation for proofs.
--- Pin to a mathlib tag that matches the Lean toolchain.
+-- Local checkout is pinned by revision in `lean/dependency_pins.json`
+-- and validated by `scripts/check-lean-dependency-pins.sh`.
 require mathlib from "/Users/hxrts/projects/lean_common/mathlib4"
 
 -- Paco provides parametrized coinduction for EQ2 proofs.
 require paco from git
   "https://github.com/hxrts/paco-lean" @ "v0.1.3"
 
--- Iris separation logic framework (local checkout).
+-- Iris separation logic framework (local checkout, revision-pinned in
+-- `lean/dependency_pins.json` for drift control).
 require iris from "/Users/hxrts/projects/iris-lean"
 
 -- Lean 4 code formatter.

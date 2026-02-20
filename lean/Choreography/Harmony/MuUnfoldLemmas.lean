@@ -192,7 +192,6 @@ theorem isGuarded_false_substitute_preserved (t : LocalTypeR) (u v : String) (re
     (hneq : u ≠ v) (hunguarded : t.isGuarded v = false) :
     (t.substitute u repl).isGuarded v = false := by
   -- Structural recursion on the local type (avoid `induction` on nested inductive).
-  -- TODO: Fix recursor invocation after BranchR structure change
   match t with
   | .end => exact isGuarded_false_substitute_preserved_end u v repl hunguarded
   | .send p bs => exact isGuarded_false_substitute_preserved_send p bs u v repl hunguarded

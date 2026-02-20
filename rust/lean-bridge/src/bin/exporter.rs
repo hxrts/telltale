@@ -16,9 +16,10 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Context, Result};
 use serde_json::json;
 
-use telltale_choreography::ast::convert::{choreography_to_global, local_to_local_r};
-use telltale_choreography::compiler::{parse_choreography_str, project};
+use telltale_choreography::ast::convert::choreography_to_global;
+use telltale_choreography::compiler::parse_choreography_str;
 use telltale_lean_bridge::export::{global_to_json, local_to_json};
+use telltale_theory::projection::project as theory_project;
 
 struct Config {
     input: PathBuf,
@@ -45,18 +46,14 @@ fn main() -> Result<()> {
 
     let global_json = global_to_json(&global);
 
-    let role = choreography
-        .roles
-        .iter()
-        .find(|role| *role.name() == config.role)
-        .ok_or_else(|| anyhow!("Unknown role {}", config.role))?;
-
-    let local_type = project(&choreography, role)?;
-    let local_r = local_to_local_r(&local_type)
-        .map_err(|e| anyhow!("Failed to convert local type to LocalTypeR: {}", e))?;
+    if !global.roles().contains(&config.role) {
+        return Err(anyhow!("Unknown role {}", config.role));
+    }
+    let local_r = theory_project(&global, &config.role)
+        .map_err(|e| anyhow!("Failed to project local type from global type: {e:?}"))?;
 
     let program_json = json!({
-        "role": role.name().to_string(),
+        "role": config.role,
         "local_type": local_to_json(&local_r)
     });
 

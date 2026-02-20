@@ -27,7 +27,7 @@ use crate::coroutine::{
 use crate::determinism::{DeterminismMode, EffectDeterminismTier};
 use crate::effect::{
     CorruptionType, EffectHandler, EffectTraceEntry, ReplayEffectHandler, SendDecision,
-    TopologyPerturbation,
+    SendDecisionInput, TopologyPerturbation,
 };
 use crate::exec;
 use crate::faults::{
@@ -375,6 +375,9 @@ impl PartialEq for FlowPolicy {
             (Self::AllowRoles(lhs), Self::AllowRoles(rhs)) => lhs == rhs,
             (Self::DenyRoles(lhs), Self::DenyRoles(rhs)) => lhs == rhs,
             (Self::Predicate(lhs), Self::Predicate(rhs)) => {
+                // Dynamic closure policies cannot be value-compared.
+                // Equality is identity-based: true only when both variants
+                // point to the exact same trait object instance.
                 std::ptr::eq::<dyn FlowPolicyFn>(&**lhs, &**rhs)
             }
             (Self::PredicateExpr(lhs), Self::PredicateExpr(rhs)) => lhs == rhs,
@@ -511,6 +514,17 @@ pub enum RuntimeTuningProfile {
     M1StressReference,
 }
 
+/// Threaded scheduler round semantics mode.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ThreadedRoundSemantics {
+    /// Canonical one-step semantics aligned with Lean runner rounds.
+    #[default]
+    CanonicalOneStep,
+    /// Performance extension: multi-pick waves within one round.
+    WaveParallelExtension,
+}
+
 /// VM configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VMConfig {
@@ -558,6 +572,9 @@ pub struct VMConfig {
     /// Runtime tuning profile used by instrumentation/benchmark harnesses.
     #[serde(default)]
     pub runtime_tuning_profile: RuntimeTuningProfile,
+    /// Round semantics mode used by threaded scheduler.
+    #[serde(default)]
+    pub threaded_round_semantics: ThreadedRoundSemantics,
 }
 
 impl Default for VMConfig {
@@ -581,6 +598,7 @@ impl Default for VMConfig {
             initial_cost_budget: usize::MAX,
             footprint_guided_wave_widening: false,
             runtime_tuning_profile: RuntimeTuningProfile::Standard,
+            threaded_round_semantics: ThreadedRoundSemantics::CanonicalOneStep,
         }
     }
 }
@@ -927,6 +945,26 @@ pub(crate) struct StepPack {
     pub(crate) type_update: Option<(Endpoint, TypeUpdate)>,
     /// Observable events to emit.
     pub(crate) events: Vec<ObsEvent>,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct GuardAcquireInput<'a> {
+    pub coro_idx: usize,
+    pub endpoint: &'a Endpoint,
+    pub role: &'a str,
+    pub sid: SessionId,
+    pub layer: &'a str,
+    pub dst: u16,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct GuardReleaseInput<'a> {
+    pub coro_idx: usize,
+    pub endpoint: &'a Endpoint,
+    pub role: &'a str,
+    pub sid: SessionId,
+    pub layer: &'a str,
+    pub evidence: u16,
 }
 
 /// Internal outcome after committing a `StepPack`.
@@ -1279,7 +1317,7 @@ impl VM {
                 self.sched.reschedule(coro_id);
             }
             Ok(ExecOutcome::Blocked(reason)) => {
-                let yielded = matches!(reason, BlockReason::SpawnWait);
+                let yielded = matches!(reason, BlockReason::Spawn);
                 self.last_sched_step = Some(SchedStepDebug {
                     selected_coro: coro_id,
                     exec_status: if yielded {
@@ -1865,7 +1903,7 @@ impl VM {
                     .map(|(label, _)| label)
                     .all(|label| labels.insert(label.clone()))
                 {
-                    return Err(Fault::SpecFault {
+                    return Err(Fault::Speculation {
                         message: "[monitor] structural precheck failed: duplicate choose labels"
                             .to_string(),
                     });
@@ -1894,7 +1932,7 @@ impl VM {
                 if roles.len() == dsts.len() {
                     Ok(())
                 } else {
-                    Err(Fault::SpecFault {
+                    Err(Fault::Speculation {
                         message: "[monitor] structural precheck failed: open arity mismatch"
                             .to_string(),
                     })
@@ -2020,7 +2058,7 @@ impl VM {
         let mut faulted = Vec::new();
         for coro in &mut self.coroutines {
             if coro.role == site && !coro.is_terminal() {
-                let fault = Fault::InvokeFault {
+                let fault = Fault::Invoke {
                     message: reason.clone(),
                 };
                 coro.status = CoroStatus::Faulted(fault.clone());
@@ -2144,7 +2182,7 @@ impl VM {
                 continue;
             }
             let reason = self.sched.block_reason(coro_id).cloned();
-            if let Some(BlockReason::RecvWait { token, .. }) = reason {
+            if let Some(BlockReason::Recv { token, .. }) = reason {
                 if let Some(session) = self.sessions.get(token.sid) {
                     let has_msg = session.roles.iter().any(|sender| {
                         sender != &token.endpoint.role
@@ -2201,7 +2239,7 @@ impl VM {
             Instr::Close { session } => self
                 .endpoint_from_reg(idx, *session)
                 .unwrap_or_else(|_| fallback_ep.clone()),
-            _ => fallback_ep.clone(),
+            _ => fallback_ep,
         };
 
         // 1.5 Monitor precheck and deterministic cost charge.
@@ -2235,9 +2273,7 @@ impl VM {
     ) -> Result<StepPack, Fault> {
         let ep = self.endpoint_from_reg(coro_idx, chan)?;
         if !self.coroutines[coro_idx].owned_endpoints.contains(&ep) {
-            return Err(Fault::ChannelClosed {
-                endpoint: ep.clone(),
-            });
+            return Err(Fault::ChannelClosed { endpoint: ep });
         }
         let sid = ep.sid;
 
@@ -2280,15 +2316,15 @@ impl VM {
         let coro = &self.coroutines[coro_idx];
         let send_payload = self.read_reg_checked(coro_idx, val_reg)?;
         let decision = handler
-            .send_decision(
+            .send_decision(SendDecisionInput {
                 sid,
                 role,
-                &partner,
-                &label.name,
-                &coro.regs,
-                Some(send_payload.clone()),
-            )
-            .map_err(|e| Fault::InvokeFault { message: e })?;
+                partner: &partner,
+                label: &label.name,
+                state: &coro.regs,
+                payload: Some(send_payload),
+            })
+            .map_err(|e| Fault::Invoke { message: e })?;
 
         let edge = Edge::new(sid, role.to_string(), partner.clone());
 
@@ -2299,7 +2335,7 @@ impl VM {
             || self.is_edge_partitioned(role, &partner)
         {
             return Ok(StepPack {
-                coro_update: CoroUpdate::Block(BlockReason::SendWait { edge: edge.clone() }),
+                coro_update: CoroUpdate::Block(BlockReason::Send { edge }),
                 type_update: None,
                 events: vec![],
             });
@@ -2320,14 +2356,14 @@ impl VM {
                 })?;
             match decision {
                 SendDecision::Deliver(payload) => {
-                    let payload = if let Some(corruption) = maybe_corruption.clone() {
+                    let payload = if let Some(corruption) = maybe_corruption {
                         Self::apply_corruption(payload, corruption)
                     } else {
                         payload
                     };
                     session
                         .send(role, &partner, payload)
-                        .map_err(|e| Fault::InvokeFault { message: e })?
+                        .map_err(|e| Fault::Invoke { message: e })?
                 }
                 SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
             }
@@ -2338,15 +2374,13 @@ impl VM {
             EnqueueResult::WouldBlock => {
                 // Block — NO type advancement.
                 return Ok(StepPack {
-                    coro_update: CoroUpdate::Block(BlockReason::SendWait { edge: edge.clone() }),
+                    coro_update: CoroUpdate::Block(BlockReason::Send { edge }),
                     type_update: None,
                     events: vec![],
                 });
             }
             EnqueueResult::Full => {
-                return Err(Fault::BufferFull {
-                    endpoint: ep.clone(),
-                });
+                return Err(Fault::BufferFull { endpoint: ep });
             }
             EnqueueResult::Dropped => {}
         }
@@ -2364,7 +2398,7 @@ impl VM {
                 session: sid,
                 from: role.to_string(),
                 to: partner,
-                label: label.name.clone(),
+                label: label.name,
             }],
         })
     }
@@ -2380,9 +2414,7 @@ impl VM {
     ) -> Result<StepPack, Fault> {
         let ep = self.endpoint_from_reg(coro_idx, chan)?;
         if !self.coroutines[coro_idx].owned_endpoints.contains(&ep) {
-            return Err(Fault::ChannelClosed {
-                endpoint: ep.clone(),
-            });
+            return Err(Fault::ChannelClosed { endpoint: ep });
         }
         let sid = ep.sid;
 
@@ -2427,8 +2459,8 @@ impl VM {
         if !session.has_message(&partner, role) {
             // Block — NO type advancement, NO state change.
             return Ok(StepPack {
-                coro_update: CoroUpdate::Block(BlockReason::RecvWait {
-                    edge: Edge::new(sid, partner.clone(), role.to_string()),
+                coro_update: CoroUpdate::Block(BlockReason::Recv {
+                    edge: Edge::new(sid, partner, role.to_string()),
                     token: ProgressToken::for_endpoint(ep.clone()),
                 }),
                 type_update: None,
@@ -2465,7 +2497,7 @@ impl VM {
                 &mut self.coroutines[coro_idx].regs,
                 &val,
             )
-            .map_err(|e| Fault::InvokeFault { message: e })?;
+            .map_err(|e| Fault::Invoke { message: e })?;
 
         // Resolve continuation and advance type.
         let original = self.sessions.original_type(&ep).unwrap_or(&LocalTypeR::End);
@@ -2480,7 +2512,7 @@ impl VM {
                 session: sid,
                 from: partner,
                 to: role.to_string(),
-                label: label.name.clone(),
+                label: label.name,
             }],
         })
     }
@@ -2508,7 +2540,7 @@ impl VM {
         args: &[u16],
     ) -> Result<StepPack, Fault> {
         if self.coroutines.len() >= self.config.max_coroutines {
-            return Err(Fault::SpecFault {
+            return Err(Fault::Speculation {
                 message: "max coroutines exceeded".to_string(),
             });
         }
@@ -2569,16 +2601,16 @@ impl VM {
         }
         let sid = self.coroutines[coro_idx].session_id;
         if self.sessions.default_handler_for_session(sid).is_none() {
-            return Err(Fault::InvokeFault {
+            return Err(Fault::Invoke {
                 message: "no handler bound".to_string(),
             });
         }
         let coro_id = self.coroutines[coro_idx].id;
         handler
             .step(role, &mut self.coroutines[coro_idx].regs)
-            .map_err(|e| Fault::InvokeFault { message: e })?;
+            .map_err(|e| Fault::Invoke { message: e })?;
         self.apply_invoke_delta(sid, &action_repr)
-            .map_err(|e| Fault::InvokeFault {
+            .map_err(|e| Fault::Invoke {
                 message: format!("invoke persistence delta failed: {e}"),
             })?;
 
@@ -2598,11 +2630,11 @@ impl VM {
             return Ok(());
         }
         match self.config.guard_layers.iter().find(|cfg| cfg.id == layer) {
-            None => Err(Fault::AcquireFault {
+            None => Err(Fault::Acquire {
                 layer: layer.to_string(),
                 message: "unknown layer".into(),
             }),
-            Some(cfg) if !cfg.active => Err(Fault::AcquireFault {
+            Some(cfg) if !cfg.active => Err(Fault::Acquire {
                 layer: layer.to_string(),
                 message: "inactive layer".into(),
             }),
@@ -2610,19 +2642,13 @@ impl VM {
         }
     }
 
-    #[allow(clippy::too_many_arguments, clippy::let_underscore_must_use)]
     pub(crate) fn step_acquire(
         &mut self,
-        coro_idx: usize,
-        ep: &Endpoint,
-        role: &str,
-        sid: SessionId,
-        layer: &str,
-        dst: u16,
+        input: GuardAcquireInput<'_>,
         handler: &dyn EffectHandler,
     ) -> Result<StepPack, Fault> {
-        self.guard_active(layer)?;
-        let layer_id = LayerId(layer.to_string());
+        self.guard_active(input.layer)?;
+        let layer_id = LayerId(input.layer.to_string());
         if self.guard_layer.resources.is_empty() {
             self.guard_layer
                 .resources
@@ -2631,14 +2657,19 @@ impl VM {
         let _ = self
             .guard_layer
             .open_(&layer_id)
-            .map_err(|e| Fault::AcquireFault {
-                layer: layer.to_string(),
+            .map_err(|e| Fault::Acquire {
+                layer: input.layer.to_string(),
                 message: e,
             })?;
         let decision = handler
-            .handle_acquire(sid, role, layer, &self.coroutines[coro_idx].regs)
-            .map_err(|e| Fault::AcquireFault {
-                layer: layer.to_string(),
+            .handle_acquire(
+                input.sid,
+                input.role,
+                input.layer,
+                &self.coroutines[input.coro_idx].regs,
+            )
+            .map_err(|e| Fault::Acquire {
+                layer: input.layer.to_string(),
                 message: e,
             })?;
         match decision {
@@ -2649,31 +2680,31 @@ impl VM {
                 if let Some((_, state)) = self
                     .resource_states
                     .iter_mut()
-                    .find(|(scope, _)| *scope == sid)
+                    .find(|(scope, _)| *scope == input.sid)
                 {
-                    let _ = state.commit(&evidence);
+                    let _commitment = state.commit(&evidence);
                 } else {
                     let mut state = ResourceState::default();
-                    let _ = state.commit(&evidence);
-                    self.resource_states.push((sid, state));
+                    let _commitment = state.commit(&evidence);
+                    self.resource_states.push((input.sid, state));
                 }
                 Ok(StepPack {
                     coro_update: CoroUpdate::AdvancePcWriteReg {
-                        reg: dst,
+                        reg: input.dst,
                         val: evidence,
                     },
                     type_update: None,
                     events: vec![ObsEvent::Acquired {
                         tick: self.clock.tick,
-                        session: ep.sid,
-                        role: role.to_string(),
-                        layer: layer.to_string(),
+                        session: input.endpoint.sid,
+                        role: input.role.to_string(),
+                        layer: input.layer.to_string(),
                     }],
                 })
             }
             crate::effect::AcquireDecision::Block => Ok(StepPack {
                 coro_update: CoroUpdate::Block(BlockReason::AcquireDenied {
-                    layer: layer.to_string(),
+                    layer: input.layer.to_string(),
                 }),
                 type_update: None,
                 events: vec![],
@@ -2681,52 +2712,52 @@ impl VM {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn step_release(
         &mut self,
-        coro_idx: usize,
-        ep: &Endpoint,
-        role: &str,
-        sid: SessionId,
-        layer: &str,
-        evidence: u16,
+        input: GuardReleaseInput<'_>,
         handler: &dyn EffectHandler,
     ) -> Result<StepPack, Fault> {
-        self.guard_active(layer)?;
-        let layer_id = LayerId(layer.to_string());
+        self.guard_active(input.layer)?;
+        let layer_id = LayerId(input.layer.to_string());
         if self.guard_layer.resources.is_empty() {
             self.guard_layer
                 .resources
                 .insert(layer_id.clone(), Value::Unit);
         }
-        let ev = self.coroutines[coro_idx]
+        let ev = self.coroutines[input.coro_idx]
             .regs
-            .get(usize::from(evidence))
+            .get(usize::from(input.evidence))
             .ok_or(Fault::OutOfRegisters)?
             .clone();
-        let decoded = InMemoryGuardLayer::decodeEvidence(&ev).map_err(|e| Fault::AcquireFault {
-            layer: layer.to_string(),
+        let decoded = InMemoryGuardLayer::decodeEvidence(&ev).map_err(|e| Fault::Acquire {
+            layer: input.layer.to_string(),
             message: e,
         })?;
         handler
-            .handle_release(sid, role, layer, &ev, &self.coroutines[coro_idx].regs)
-            .map_err(|e| Fault::AcquireFault {
-                layer: layer.to_string(),
+            .handle_release(
+                input.sid,
+                input.role,
+                input.layer,
+                &ev,
+                &self.coroutines[input.coro_idx].regs,
+            )
+            .map_err(|e| Fault::Acquire {
+                layer: input.layer.to_string(),
                 message: e,
             })?;
         self.guard_layer
             .close(&layer_id, decoded)
-            .map_err(|e| Fault::AcquireFault {
-                layer: layer.to_string(),
+            .map_err(|e| Fault::Acquire {
+                layer: input.layer.to_string(),
                 message: e,
             })?;
         if let Some((_, state)) = self
             .resource_states
             .iter_mut()
-            .find(|(scope, _)| *scope == sid)
+            .find(|(scope, _)| *scope == input.sid)
         {
-            state.consume(&ev).map_err(|e| Fault::AcquireFault {
-                layer: layer.to_string(),
+            state.consume(&ev).map_err(|e| Fault::Acquire {
+                layer: input.layer.to_string(),
                 message: e,
             })?;
         }
@@ -2735,9 +2766,9 @@ impl VM {
             type_update: None,
             events: vec![ObsEvent::Released {
                 tick: self.clock.tick,
-                session: ep.sid,
-                role: role.to_string(),
-                layer: layer.to_string(),
+                session: input.endpoint.sid,
+                role: input.role.to_string(),
+                layer: input.layer.to_string(),
             }],
         })
     }
@@ -2845,7 +2876,7 @@ impl VM {
             .coroutines
             .iter()
             .position(|c| c.id == target_id)
-            .ok_or(Fault::TransferFault {
+            .ok_or(Fault::Transfer {
                 message: "target coroutine not found".into(),
             })?;
         if endpoint_owner_ids(&self.coroutines, &ep) != vec![self.coroutines[coro_idx].id] {
@@ -2897,7 +2928,7 @@ impl VM {
             .get(usize::from(fact_reg))
             .ok_or(Fault::OutOfRegisters)?
             .clone();
-        let (endpoint, fact) = Self::decode_fact(fact_val).ok_or_else(|| Fault::TransferFault {
+        let (endpoint, fact) = Self::decode_fact(fact_val).ok_or_else(|| Fault::Transfer {
             message: format!("{role}: tag expects (endpoint, string) fact"),
         })?;
         self.coroutines[coro_idx]
@@ -2935,7 +2966,7 @@ impl VM {
             .get(usize::from(knowledge))
             .ok_or(Fault::OutOfRegisters)?
             .clone();
-        let (endpoint, fact) = Self::decode_fact(know_val).ok_or_else(|| Fault::TransferFault {
+        let (endpoint, fact) = Self::decode_fact(know_val).ok_or_else(|| Fault::Transfer {
             message: format!("{role}: check expects (endpoint, string) fact"),
         })?;
         let target_val = self.coroutines[coro_idx]
@@ -2946,7 +2977,7 @@ impl VM {
         let target_role = match target_val {
             Value::Str(s) => s,
             _ => {
-                return Err(Fault::TransferFault {
+                return Err(Fault::Transfer {
                     message: format!("{role}: check expects target role string"),
                 })
             }
@@ -2984,9 +3015,7 @@ impl VM {
     ) -> Result<StepPack, Fault> {
         let ep = self.endpoint_from_reg(coro_idx, chan)?;
         if !self.coroutines[coro_idx].owned_endpoints.contains(&ep) {
-            return Err(Fault::ChannelClosed {
-                endpoint: ep.clone(),
-            });
+            return Err(Fault::ChannelClosed { endpoint: ep });
         }
         let sid = ep.sid;
 
@@ -3007,8 +3036,8 @@ impl VM {
         })?;
         if !session.has_message(&partner, role) {
             return Ok(StepPack {
-                coro_update: CoroUpdate::Block(BlockReason::RecvWait {
-                    edge: Edge::new(sid, partner.clone(), role.to_string()),
+                coro_update: CoroUpdate::Block(BlockReason::Recv {
+                    edge: Edge::new(sid, partner, role.to_string()),
                     token: ProgressToken::for_endpoint(ep.clone()),
                 }),
                 type_update: None,
@@ -3062,7 +3091,7 @@ impl VM {
                 &mut self.coroutines[coro_idx].regs,
                 &val,
             )
-            .map_err(|e| Fault::InvokeFault { message: e })?;
+            .map_err(|e| Fault::Invoke { message: e })?;
 
         let original = self.sessions.original_type(&ep).unwrap_or(&LocalTypeR::End);
         let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);
@@ -3073,7 +3102,7 @@ impl VM {
             events: vec![
                 ObsEvent::Received {
                     tick: self.clock.tick,
-                    edge: edge.clone(),
+                    edge,
                     session: sid,
                     from: partner.clone(),
                     to: role.to_string(),
@@ -3099,9 +3128,7 @@ impl VM {
     ) -> Result<StepPack, Fault> {
         let ep = self.endpoint_from_reg(coro_idx, chan)?;
         if !self.coroutines[coro_idx].owned_endpoints.contains(&ep) {
-            return Err(Fault::ChannelClosed {
-                endpoint: ep.clone(),
-            });
+            return Err(Fault::ChannelClosed { endpoint: ep });
         }
         let sid = ep.sid;
 
@@ -3131,15 +3158,15 @@ impl VM {
                     .clone();
 
                 let decision = handler
-                    .send_decision(
+                    .send_decision(SendDecisionInput {
                         sid,
                         role,
-                        &partner,
+                        partner: &partner,
                         label,
-                        &self.coroutines[coro_idx].regs,
-                        Some(Value::Str(label.to_string())),
-                    )
-                    .map_err(|e| Fault::InvokeFault { message: e })?;
+                        state: &self.coroutines[coro_idx].regs,
+                        payload: Some(Value::Str(label.to_string())),
+                    })
+                    .map_err(|e| Fault::Invoke { message: e })?;
                 let session = self
                     .sessions
                     .get_mut(sid)
@@ -3149,14 +3176,14 @@ impl VM {
                 let enqueue = match decision {
                     SendDecision::Deliver(payload) => session
                         .send(role, &partner, payload)
-                        .map_err(|e| Fault::InvokeFault { message: e })?,
+                        .map_err(|e| Fault::Invoke { message: e })?,
                     SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
                 };
                 match enqueue {
                     EnqueueResult::Ok => {}
                     EnqueueResult::WouldBlock => {
                         return Ok(StepPack {
-                            coro_update: CoroUpdate::Block(BlockReason::SendWait {
+                            coro_update: CoroUpdate::Block(BlockReason::Send {
                                 edge: Edge::new(sid, role.to_string(), partner.clone()),
                             }),
                             type_update: None,
@@ -3206,16 +3233,16 @@ impl VM {
     pub(crate) fn step_close(&mut self, coro_idx: usize, session: u16) -> Result<StepPack, Fault> {
         let ep = self.endpoint_from_reg(coro_idx, session)?;
         if !self.coroutines[coro_idx].owned_endpoints.contains(&ep) {
-            return Err(Fault::CloseFault {
+            return Err(Fault::Close {
                 message: "endpoint not owned".to_string(),
             });
         }
         let sid = ep.sid;
         self.sessions
             .close(sid)
-            .map_err(|e| Fault::CloseFault { message: e })?;
+            .map_err(|e| Fault::Close { message: e })?;
         self.apply_close_delta(sid)
-            .map_err(|e| Fault::CloseFault { message: e })?;
+            .map_err(|e| Fault::Close { message: e })?;
         self.monitor.remove_kind(sid);
         self.resource_states.retain(|(scope, _)| *scope != sid);
         let epoch = self.sessions.get(sid).map_or(0, |session| session.epoch);
@@ -3248,7 +3275,7 @@ impl VM {
         dsts: &[(String, u16)],
     ) -> Result<StepPack, Fault> {
         if local_types.len() != dsts.len() {
-            return Err(Fault::CloseFault {
+            return Err(Fault::Close {
                 message: "open arity mismatch".to_string(),
             });
         }
@@ -3260,7 +3287,7 @@ impl VM {
                 if r == r2 {
                     Ok((r, lt, dst))
                 } else {
-                    Err(Fault::CloseFault {
+                    Err(Fault::Close {
                         message: "open arity mismatch".to_string(),
                     })
                 }
@@ -3272,7 +3299,7 @@ impl VM {
         let spatial_ok =
             !open_roles.is_empty() && open_roles.iter().all(|r| distinct.insert(r.clone()));
         if !spatial_ok {
-            return Err(Fault::SpecFault {
+            return Err(Fault::Speculation {
                 message: "spatial requirements failed".to_string(),
             });
         }
@@ -3288,7 +3315,7 @@ impl VM {
                 .all(|receiver| has_handler(sender, receiver))
         });
         if !covers_edges {
-            return Err(Fault::SpecFault {
+            return Err(Fault::Speculation {
                 message: "handler bindings missing".to_string(),
             });
         }
@@ -3305,10 +3332,9 @@ impl VM {
         }
         self.monitor.set_kind(sid, SessionKind::Peer);
         self.resource_states.push((sid, ResourceState::default()));
-        self.apply_open_delta(sid)
-            .map_err(|e| Fault::TransferFault {
-                message: format!("open persistence delta failed: {e}"),
-            })?;
+        self.apply_open_delta(sid).map_err(|e| Fault::Transfer {
+            message: format!("open persistence delta failed: {e}"),
+        })?;
 
         for (_, _, reg) in &triples {
             if usize::from(*reg) >= self.coroutines[coro_idx].regs.len() {
@@ -3374,7 +3400,7 @@ impl VM {
                 passed,
             });
             if !passed {
-                let fault = Fault::OutputConditionFault {
+                let fault = Fault::OutputCondition {
                     predicate_ref: meta.predicate_ref,
                 };
                 self.coroutines[coro_idx].status = CoroStatus::Faulted(fault.clone());
@@ -3648,15 +3674,7 @@ mod tests {
             Err("send failed".to_string())
         }
 
-        fn send_decision(
-            &self,
-            _sid: SessionId,
-            _role: &str,
-            _partner: &str,
-            _label: &str,
-            _state: &[Value],
-            _payload: Option<Value>,
-        ) -> Result<SendDecision, String> {
+        fn send_decision(&self, _input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
             Err("send failed".to_string())
         }
 
@@ -3998,7 +4016,7 @@ mod tests {
         assert_eq!(coro.pc, 1);
         assert!(matches!(
             coro.status,
-            CoroStatus::Blocked(BlockReason::SpawnWait)
+            CoroStatus::Blocked(BlockReason::Spawn)
         ));
 
         let second = vm.step_round(&handler, 1).expect("halt step");
@@ -4035,7 +4053,7 @@ mod tests {
             .expect_err("expected open arity fault");
         match err {
             VMError::Fault {
-                fault: Fault::CloseFault { message },
+                fault: Fault::Close { message },
                 ..
             } => assert_eq!(message, "open arity mismatch"),
             other => panic!("unexpected error: {other:?}"),
@@ -4063,7 +4081,7 @@ mod tests {
             .expect_err("expected handler coverage fault");
         match err {
             VMError::Fault {
-                fault: Fault::SpecFault { message },
+                fault: Fault::Speculation { message },
                 ..
             } => assert_eq!(message, "handler bindings missing"),
             other => panic!("unexpected error: {other:?}"),
@@ -4132,7 +4150,7 @@ mod tests {
             .expect_err("duplicate labels must fail monitor precheck");
         match err {
             VMError::Fault {
-                fault: Fault::SpecFault { message },
+                fault: Fault::Speculation { message },
                 ..
             } => assert!(message.contains("duplicate choose labels")),
             other => panic!("unexpected error: {other:?}"),
@@ -4157,7 +4175,7 @@ mod tests {
             .expect_err("open monitor precheck should fail");
         match err {
             VMError::Fault {
-                fault: Fault::SpecFault { message },
+                fault: Fault::Speculation { message },
                 ..
             } => assert!(message.contains("open arity mismatch")),
             other => panic!("unexpected error: {other:?}"),
@@ -4184,7 +4202,7 @@ mod tests {
             .expect_err("invoke should fault without default handler");
         match err {
             VMError::Fault {
-                fault: Fault::InvokeFault { message },
+                fault: Fault::Invoke { message },
                 ..
             } => assert_eq!(message, "no handler bound"),
             other => panic!("unexpected error: {other:?}"),
@@ -4907,7 +4925,7 @@ mod tests {
             matches!(
                 result,
                 Err(VMError::Fault {
-                    fault: Fault::OutputConditionFault { .. },
+                    fault: Fault::OutputCondition { .. },
                     ..
                 })
             ),
@@ -5057,7 +5075,7 @@ mod tests {
             .expect_err("transfer must fail");
         match err {
             VMError::Fault { fault, .. } => match fault {
-                Fault::TransferFault { message } => {
+                Fault::Transfer { message } => {
                     assert!(
                         message.contains("delegation guard violation before transfer"),
                         "unexpected transfer fault message: {message}"

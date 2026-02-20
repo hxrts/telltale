@@ -3,11 +3,6 @@
 // This test demonstrates a complete two-party protocol executing in WASM,
 // including message exchange, timeouts, and error handling.
 //
-// TODO: These tests are disabled pending API updates. The RoleId trait and
-// Program API have changed since these tests were written. See:
-// - RoleId now requires `type Label` and `role_name()` instead of `name()`
-// - Program.effects is now private (use .effects() method)
-// - Label import path changed
 #![cfg(all(target_arch = "wasm32", feature = "_wasm_integration_tests"))]
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
@@ -17,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use telltale_choreography::{
-    interpret, InMemoryHandler, InterpretResult, InterpreterState, Label, Program, RoleId,
+    interpret, InMemoryHandler, InterpreterState, LabelId, Program, RoleId, RoleName,
 };
 use wasm_bindgen_test::*;
 
@@ -29,11 +24,33 @@ enum Role {
     Server,
 }
 
-impl RoleId for Role {
-    fn name(&self) -> String {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+enum BranchLabel {
+    Success,
+}
+
+impl LabelId for BranchLabel {
+    fn as_str(&self) -> &'static str {
         match self {
-            Role::Client => "Client".to_string(),
-            Role::Server => "Server".to_string(),
+            BranchLabel::Success => "success",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "success" => Some(BranchLabel::Success),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for Role {
+    type Label = BranchLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            Role::Client => RoleName::from_static("Client"),
+            Role::Server => RoleName::from_static("Server"),
         }
     }
 }
@@ -157,7 +174,7 @@ async fn test_protocol_with_branching() {
         InMemoryHandler::with_channels(Role::Client, channels.clone(), choice_channels.clone());
 
     let program = Program::new()
-        .choose(Role::Server, Label("success"))
+        .choose(Role::Server, BranchLabel::Success)
         .send(
             Role::Server,
             Message::Response {
@@ -277,7 +294,7 @@ fn test_program_composition() {
 
     assert_eq!(complete.send_count(), 2);
     assert_eq!(complete.recv_count(), 2);
-    assert_eq!(complete.effects.len(), 4);
+    assert_eq!(complete.effects().len(), 5);
 }
 
 /// Test parallel program execution structure
@@ -306,7 +323,7 @@ fn test_parallel_program_structure() {
     let parallel_program = Program::new().parallel(vec![p1, p2]).end();
 
     assert!(parallel_program.has_parallel());
-    assert_eq!(parallel_program.effects.len(), 1); // The parallel effect itself
+    assert_eq!(parallel_program.effects().len(), 2); // parallel + end
 }
 
 /// Test handler state independence
@@ -333,9 +350,9 @@ fn test_handler_independence() {
 /// Test role name functionality
 #[wasm_bindgen_test]
 fn test_role_names() {
-    assert_eq!(Role::Client.name(), "Client");
-    assert_eq!(Role::Server.name(), "Server");
-    assert_ne!(Role::Client.name(), Role::Server.name());
+    assert_eq!(Role::Client.role_name().as_str(), "Client");
+    assert_eq!(Role::Server.role_name().as_str(), "Server");
+    assert_ne!(Role::Client.role_name(), Role::Server.role_name());
 }
 
 /// Test message variant construction

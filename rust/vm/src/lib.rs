@@ -150,6 +150,9 @@ pub use verification::{
     DefaultVerificationModel, Hash, HashTag, Nullifier, Signature, SigningKey, VerificationModel,
     VerifyingKey,
 };
-pub use vm::{MonitorMode, Program, RuntimeTuningProfile, SchedStepDebug, VMConfig, VMState, VM};
+pub use vm::{
+    MonitorMode, Program, RuntimeTuningProfile, SchedStepDebug, ThreadedRoundSemantics, VMConfig,
+    VMState, VM,
+};
 #[cfg(target_arch = "wasm32")]
 pub use wasm::WasmVM;

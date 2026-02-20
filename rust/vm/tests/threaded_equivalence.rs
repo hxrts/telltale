@@ -15,7 +15,7 @@ use helpers::{
 use telltale_vm::coroutine::Fault;
 use telltale_vm::coroutine::Value;
 use telltale_vm::determinism::{replay_consistent, DeterminismMode};
-use telltale_vm::effect::{EffectHandler, RecordingEffectHandler, SendDecision};
+use telltale_vm::effect::{EffectHandler, RecordingEffectHandler, SendDecision, SendDecisionInput};
 use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::vm::{ObsEvent, VMConfig, VMError, VM};
 use telltale_vm::OutputConditionPolicy;
@@ -102,18 +102,12 @@ impl EffectHandler for FlakySendHandler {
         Ok(Value::Nat(1))
     }
 
-    fn send_decision(
-        &self,
-        _sid: usize,
-        _role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
         let idx = self.counter.fetch_add(1, Ordering::Relaxed);
         if idx % 2 == 0 {
-            Ok(SendDecision::Deliver(payload.unwrap_or(Value::Nat(1))))
+            Ok(SendDecision::Deliver(
+                input.payload.unwrap_or(Value::Nat(1)),
+            ))
         } else {
             Ok(SendDecision::Drop)
         }
@@ -241,7 +235,7 @@ fn test_output_condition_commit_fail_artifacts_match_across_drivers() {
 
     let extract_output_condition_fault = |err: VMError| match err {
         VMError::Fault {
-            fault: Fault::OutputConditionFault { predicate_ref },
+            fault: Fault::OutputCondition { predicate_ref },
             ..
         } => predicate_ref,
         other => panic!("expected output-condition fault, got {other:?}"),

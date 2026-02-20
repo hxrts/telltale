@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::json;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, RecordingEffectHandler, SendDecision};
+use telltale_vm::effect::{EffectHandler, RecordingEffectHandler, SendDecision, SendDecisionInput};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
@@ -31,16 +31,8 @@ impl EffectHandler for DeterministicHandler {
         Ok(Value::Str(label.to_string()))
     }
 
-    fn send_decision(
-        &self,
-        _sid: usize,
-        _role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
-        Ok(SendDecision::Deliver(payload.unwrap_or(Value::Unit)))
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
     }
 
     fn handle_recv(
@@ -88,18 +80,12 @@ impl EffectHandler for FlakySendHandler {
         Ok(Value::Nat(1))
     }
 
-    fn send_decision(
-        &self,
-        _sid: usize,
-        _role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
         let idx = self.counter.fetch_add(1, Ordering::Relaxed);
         if idx % 2 == 0 {
-            Ok(SendDecision::Deliver(payload.unwrap_or(Value::Nat(1))))
+            Ok(SendDecision::Deliver(
+                input.payload.unwrap_or(Value::Nat(1)),
+            ))
         } else {
             Ok(SendDecision::Drop)
         }

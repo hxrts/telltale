@@ -6,7 +6,7 @@ use telltale_types::FixedQ32;
 
 use telltale_vm::buffer::EnqueueResult;
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, SendDecision};
+use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
 use telltale_vm::session::SessionId;
 use telltale_vm::vm::ObsEvent;
 
@@ -343,18 +343,11 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
         self.inner.handle_send(role, partner, label, state)
     }
 
-    fn send_decision(
-        &self,
-        sid: SessionId,
-        role: &str,
-        partner: &str,
-        label: &str,
-        state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
-        let base = self
-            .inner
-            .send_decision(sid, role, partner, label, state, payload)?;
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        let base = self.inner.send_decision(input.clone())?;
+        let sid = input.sid;
+        let role = input.role;
+        let partner = input.partner;
 
         let SendDecision::Deliver(payload) = base else {
             return Ok(base);

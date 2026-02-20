@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-02-20",
+  "dependencies": [
+    {
+      "name": "mathlib4",
+      "path": "/Users/hxrts/projects/lean_common/mathlib4",
+      "revision": "2df2f0150c275ad53cb3c90f7c98ec15a56a1a67"
+    },
+    {
+      "name": "iris-lean",
+      "path": "/Users/hxrts/projects/iris-lean",
+      "revision": "53793b6499c51f33c9afa4273f39f657d24e8526"
+    }
+  ]
+}

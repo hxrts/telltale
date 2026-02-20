@@ -1564,6 +1564,7 @@ dependencies = [
  "telltale-vm",
  "tempfile",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]

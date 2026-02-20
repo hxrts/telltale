@@ -6,16 +6,50 @@ use crate::trace::normalize_trace;
 use crate::vm::ObsEvent;
 use serde::{Deserialize, Serialize};
 
-fn default_serialization_schema_version() -> u32 {
-    1
+/// Canonical schema version identifier for VM replay/trace payloads.
+pub const SERIALIZATION_SCHEMA_VERSION: &str = "vm.serialization.v1";
+
+fn default_serialization_schema_version() -> String {
+    SERIALIZATION_SCHEMA_VERSION.to_string()
+}
+
+fn normalize_serialization_schema_version(raw: &str) -> String {
+    if raw == "1" {
+        SERIALIZATION_SCHEMA_VERSION.to_string()
+    } else {
+        raw.to_string()
+    }
+}
+
+fn deserialize_serialization_schema_version<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum SchemaVersionValue {
+        String(String),
+        Integer(u64),
+    }
+
+    let parsed = SchemaVersionValue::deserialize(deserializer)?;
+    Ok(match parsed {
+        SchemaVersionValue::String(version) => normalize_serialization_schema_version(&version),
+        SchemaVersionValue::Integer(version) => {
+            normalize_serialization_schema_version(&version.to_string())
+        }
+    })
 }
 
 /// Versioned canonical trace payload used for cross-target normalization.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CanonicalTraceV1 {
     /// Schema version for canonical trace serialization.
-    #[serde(default = "default_serialization_schema_version")]
-    pub schema_version: u32,
+    #[serde(
+        default = "default_serialization_schema_version",
+        deserialize_with = "deserialize_serialization_schema_version"
+    )]
+    pub schema_version: String,
     /// Canonically normalized observable events.
     pub events: Vec<ObsEvent>,
 }
@@ -24,8 +58,11 @@ pub struct CanonicalTraceV1 {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CanonicalReplayFragmentV1 {
     /// Schema version for canonical replay serialization.
-    #[serde(default = "default_serialization_schema_version")]
-    pub schema_version: u32,
+    #[serde(
+        default = "default_serialization_schema_version",
+        deserialize_with = "deserialize_serialization_schema_version"
+    )]
+    pub schema_version: String,
     /// Canonically normalized observable trace.
     pub obs_trace: Vec<ObsEvent>,
     /// Canonically sorted effect trace.
@@ -144,7 +181,18 @@ mod tests {
             label: "m".to_string(),
         }];
         let payload = canonical_trace_v1(&trace);
-        assert_eq!(payload.schema_version, 1);
+        assert_eq!(payload.schema_version, SERIALIZATION_SCHEMA_VERSION);
         assert_eq!(payload.events.len(), 1);
+    }
+
+    #[test]
+    fn legacy_numeric_schema_version_deserializes_to_string_identifier() {
+        let payload = serde_json::json!({
+            "schema_version": 1,
+            "events": []
+        });
+        let decoded: CanonicalTraceV1 =
+            serde_json::from_value(payload).expect("legacy schema version should deserialize");
+        assert_eq!(decoded.schema_version, SERIALIZATION_SCHEMA_VERSION);
     }
 }

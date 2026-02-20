@@ -83,22 +83,24 @@ pub enum CoroStatus {
 
 /// Why a coroutine is blocked.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[allow(clippy::enum_variant_names)]
 pub enum BlockReason {
     /// Waiting to receive on an edge.
-    RecvWait {
+    #[serde(alias = "RecvWait")]
+    Recv {
         /// Edge scope for the receive wait.
         edge: Edge,
         /// Progress token associated with the blocked receive.
         token: ProgressToken,
     },
     /// Waiting for buffer space to send.
-    SendWait {
+    #[serde(alias = "SendWait")]
+    Send {
         /// Edge awaiting buffer space.
         edge: Edge,
     },
     /// Waiting for an effect handler response.
-    InvokeWait {
+    #[serde(alias = "InvokeWait")]
+    Invoke {
         /// Effect handler identifier.
         handler: HandlerId,
     },
@@ -108,14 +110,17 @@ pub enum BlockReason {
         layer: String,
     },
     /// Waiting for consensus-related condition to resolve.
-    ConsensusWait {
+    #[serde(alias = "ConsensusWait")]
+    Consensus {
         /// Consensus wait tag.
         tag: usize,
     },
     /// Waiting for spawn scheduling/activation.
-    SpawnWait,
+    #[serde(alias = "SpawnWait")]
+    Spawn,
     /// Waiting for a session close to complete.
-    CloseWait {
+    #[serde(alias = "CloseWait")]
+    Close {
         /// The session being closed.
         sid: SessionId,
     },
@@ -123,7 +128,6 @@ pub enum BlockReason {
 
 /// Runtime fault.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[allow(clippy::enum_variant_names)]
 pub enum Fault {
     /// Instruction violated the session type.
     TypeViolation {
@@ -157,29 +161,34 @@ pub enum Fault {
         message: String,
     },
     /// Effect handler error.
-    InvokeFault {
+    #[serde(alias = "InvokeFault")]
+    Invoke {
         /// Error message from the handler.
         message: String,
     },
     /// Guard layer failure.
-    AcquireFault {
+    #[serde(alias = "AcquireFault")]
+    Acquire {
         /// Guard layer identifier.
         layer: String,
         /// Error message.
         message: String,
     },
     /// Ownership transfer failure.
-    TransferFault {
+    #[serde(alias = "TransferFault")]
+    Transfer {
         /// Error message.
         message: String,
     },
     /// Speculation failure.
-    SpecFault {
+    #[serde(alias = "SpecFault")]
+    Speculation {
         /// Error message.
         message: String,
     },
     /// Session close error.
-    CloseFault {
+    #[serde(alias = "CloseFault")]
+    Close {
         /// Error message from close.
         message: String,
     },
@@ -194,7 +203,8 @@ pub enum Fault {
         edge: Edge,
     },
     /// Output-condition commit gate rejected emitted outputs.
-    OutputConditionFault {
+    #[serde(alias = "OutputConditionFault")]
+    OutputCondition {
         /// Predicate reference that failed verification.
         predicate_ref: String,
     },
@@ -236,20 +246,20 @@ impl std::fmt::Display for Fault {
                 "verification failed on edge {}:{}→{}: {message}",
                 edge.sid, edge.sender, edge.receiver
             ),
-            Self::InvokeFault { message } => write!(f, "invoke fault: {message}"),
-            Self::AcquireFault { layer, message } => {
+            Self::Invoke { message } => write!(f, "invoke fault: {message}"),
+            Self::Acquire { layer, message } => {
                 write!(f, "acquire fault ({layer}): {message}")
             }
-            Self::TransferFault { message } => write!(f, "transfer fault: {message}"),
-            Self::SpecFault { message } => write!(f, "speculation fault: {message}"),
-            Self::CloseFault { message } => write!(f, "close fault: {message}"),
+            Self::Transfer { message } => write!(f, "transfer fault: {message}"),
+            Self::Speculation { message } => write!(f, "speculation fault: {message}"),
+            Self::Close { message } => write!(f, "close fault: {message}"),
             Self::FlowViolation { message } => write!(f, "flow violation: {message}"),
             Self::NoProgressToken { edge } => write!(
                 f,
                 "missing progress token for edge {}:{}→{}",
                 edge.sid, edge.sender, edge.receiver
             ),
-            Self::OutputConditionFault { predicate_ref } => {
+            Self::OutputCondition { predicate_ref } => {
                 write!(f, "output-condition rejected: {predicate_ref}")
             }
             Self::OutOfRegisters => write!(f, "out of registers"),

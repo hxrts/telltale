@@ -473,7 +473,7 @@ mod tests {
 
         sched.mark_blocked(
             0,
-            BlockReason::RecvWait {
+            BlockReason::Recv {
                 edge: Edge::new(0, "B", "A"),
                 token: ProgressToken::for_endpoint(Endpoint {
                     sid: 0,
@@ -520,7 +520,7 @@ mod tests {
         sched.add_ready(7);
         sched.update_after_step(
             7,
-            StepUpdate::Blocked(BlockReason::InvokeWait {
+            StepUpdate::Blocked(BlockReason::Invoke {
                 handler: "default".to_string(),
             }),
         );
@@ -528,7 +528,7 @@ mod tests {
         assert_eq!(sched.blocked_count(), 1);
         assert!(matches!(
             sched.block_reason(7),
-            Some(BlockReason::InvokeWait { .. })
+            Some(BlockReason::Invoke { .. })
         ));
     }
 
@@ -545,7 +545,7 @@ mod tests {
         sched.add_ready(3);
         sched.mark_blocked(
             2,
-            BlockReason::InvokeWait {
+            BlockReason::Invoke {
                 handler: "io".to_string(),
             },
         );

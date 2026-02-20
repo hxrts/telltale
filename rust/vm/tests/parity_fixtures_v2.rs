@@ -12,15 +12,22 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use helpers::{PassthroughHandler, ScenarioSpec};
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, SendDecision, TopologyPerturbation};
+use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput, TopologyPerturbation};
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::threaded::ThreadedVM;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::vm::{ObsEvent, ThreadedRoundSemantics, VMConfig, VM};
 use telltale_vm::{
     EffectDeterminismTier, EnvelopeDiffArtifactV1, FailureVisibleDiffClass,
     SchedulerPermutationClass,
 };
+
+fn threaded_wave_config() -> VMConfig {
+    VMConfig {
+        threaded_round_semantics: ThreadedRoundSemantics::WaveParallelExtension,
+        ..VMConfig::default()
+    }
+}
 
 fn speculation_fixture_image() -> CodeImage {
     let mut local_types = BTreeMap::new();
@@ -72,16 +79,8 @@ impl EffectHandler for TopologyOnceHandler {
         Ok(Value::Str(label.to_string()))
     }
 
-    fn send_decision(
-        &self,
-        _sid: usize,
-        _role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &[Value],
-        payload: Option<Value>,
-    ) -> Result<SendDecision, String> {
-        Ok(SendDecision::Deliver(payload.unwrap_or(Value::Unit)))
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
     }
 
     fn handle_recv(
@@ -213,7 +212,7 @@ fn canonical_parity_is_exact_at_concurrency_one() {
         ScenarioSpec::simple("A", "B", "m3").to_code_image(),
     ];
     let mut coop = VM::new(VMConfig::default());
-    let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 4);
+    let mut threaded = ThreadedVM::with_workers(threaded_wave_config(), 4);
     for image in &images {
         coop.load_choreography(image)
             .expect("load cooperative image");
@@ -242,6 +241,7 @@ fn envelope_bounded_parity_holds_for_n_gt_1() {
         .collect();
     let cfg = VMConfig {
         effect_determinism_tier: EffectDeterminismTier::EnvelopeBoundedNondeterministic,
+        threaded_round_semantics: ThreadedRoundSemantics::WaveParallelExtension,
         ..VMConfig::default()
     };
     let mut coop = VM::new(cfg.clone());
@@ -285,13 +285,66 @@ fn envelope_bounded_parity_holds_for_n_gt_1() {
         artifact
             .envelope_diff
             .wave_width_bound
-            .candidate_max_wave_width
-            <= artifact.envelope_diff.wave_width_bound.declared_upper_bound
+            .within_declared_bound(),
+        "threaded wave width must remain within declared envelope bound"
     );
     assert!(matches!(
         artifact.envelope_diff.failure_visible_diff_class,
         FailureVisibleDiffClass::Exact | FailureVisibleDiffClass::EnvelopeBounded
     ));
+}
+
+#[test]
+fn envelope_bounded_parity_detects_wave_width_bound_violation() {
+    let images: Vec<_> = (0..8)
+        .map(|i| ScenarioSpec::simple("A", "B", &format!("m{i}")).to_code_image())
+        .collect();
+    let cfg = VMConfig {
+        effect_determinism_tier: EffectDeterminismTier::EnvelopeBoundedNondeterministic,
+        threaded_round_semantics: ThreadedRoundSemantics::WaveParallelExtension,
+        ..VMConfig::default()
+    };
+    let mut coop = VM::new(cfg.clone());
+    let mut threaded = ThreadedVM::with_workers(cfg.clone(), 4);
+    for image in &images {
+        coop.load_choreography(image)
+            .expect("load cooperative image");
+        threaded
+            .load_choreography(image)
+            .expect("load threaded image");
+    }
+    coop.run_concurrent(&PassthroughHandler, 512, 1)
+        .expect("cooperative baseline run");
+    threaded
+        .run_concurrent(&PassthroughHandler, 512, 4)
+        .expect("threaded n>1 run");
+
+    let artifact = EnvelopeDiffArtifactV1::from_replay_fragments(
+        "cooperative",
+        "threaded",
+        &coop.canonical_replay_fragment(),
+        &threaded.canonical_replay_fragment(),
+        1,
+        threaded.contention_metrics().max_wave_width,
+        1,
+        cfg.effect_determinism_tier,
+    );
+
+    assert!(
+        artifact
+            .envelope_diff
+            .wave_width_bound
+            .candidate_max_wave_width
+            > 1,
+        "fixture requires multi-wave execution to validate bound rejection"
+    );
+    assert!(
+        !artifact
+            .envelope_diff
+            .wave_width_bound
+            .within_declared_bound(),
+        "under-declared bound must be reported as a violation"
+    );
 }
 
 #[test]
@@ -304,7 +357,7 @@ fn failure_envelope_fixture_matches_cross_runtime() {
     coop.run_concurrent(&handler, 64, 1)
         .expect("cooperative run");
 
-    let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 2);
+    let mut threaded = ThreadedVM::with_workers(threaded_wave_config(), 2);
     threaded
         .load_choreography(&image)
         .expect("load threaded image");

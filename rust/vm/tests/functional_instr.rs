@@ -289,7 +289,7 @@ fn test_send_handler_error() {
     assert_matches!(
         result,
         Err(VMError::Fault {
-            fault: Fault::InvokeFault { .. },
+            fault: Fault::Invoke { .. },
             ..
         })
     );
@@ -852,7 +852,7 @@ fn test_invoke_handler_error() {
     assert_matches!(
         result,
         Err(VMError::Fault {
-            fault: Fault::InvokeFault { .. },
+            fault: Fault::Invoke { .. },
             ..
         })
     );

@@ -50,14 +50,14 @@ pub fn classify_fault(fault: &Fault) -> FaultClass {
         Fault::InvalidSignature { .. } | Fault::VerificationFailed { .. } => {
             FaultClass::Verification
         }
-        Fault::InvokeFault { .. } => FaultClass::Invoke,
-        Fault::AcquireFault { .. } => FaultClass::Acquire,
-        Fault::TransferFault { .. } => FaultClass::Transfer,
-        Fault::SpecFault { .. } => FaultClass::Speculation,
-        Fault::CloseFault { .. } => FaultClass::Close,
+        Fault::Invoke { .. } => FaultClass::Invoke,
+        Fault::Acquire { .. } => FaultClass::Acquire,
+        Fault::Transfer { .. } => FaultClass::Transfer,
+        Fault::Speculation { .. } => FaultClass::Speculation,
+        Fault::Close { .. } => FaultClass::Close,
         Fault::FlowViolation { .. } => FaultClass::Flow,
         Fault::NoProgressToken { .. } => FaultClass::Progress,
-        Fault::OutputConditionFault { .. } => FaultClass::OutputCondition,
+        Fault::OutputCondition { .. } => FaultClass::OutputCondition,
         Fault::OutOfRegisters => FaultClass::Register,
         Fault::PcOutOfBounds => FaultClass::ProgramCounter,
         Fault::BufferFull { .. } => FaultClass::Buffer,
@@ -97,7 +97,7 @@ pub fn fault_code_of(fault: &Fault) -> &'static str {
 /// Build a stable transfer fault for a non-endpoint transfer source register.
 #[must_use]
 pub fn transfer_fault_expect_endpoint_register(role: &str) -> Fault {
-    Fault::TransferFault {
+    Fault::Transfer {
         message: format!("{role}: transfer expects endpoint register"),
     }
 }
@@ -105,7 +105,7 @@ pub fn transfer_fault_expect_endpoint_register(role: &str) -> Fault {
 /// Build a stable transfer fault for a non-nat transfer target register.
 #[must_use]
 pub fn transfer_fault_expect_nat_target(role: &str) -> Fault {
-    Fault::TransferFault {
+    Fault::Transfer {
         message: format!("{role}: transfer expects nat target coroutine id"),
     }
 }
@@ -113,7 +113,7 @@ pub fn transfer_fault_expect_nat_target(role: &str) -> Fault {
 /// Build a stable transfer fault when transfer target id is out of range.
 #[must_use]
 pub fn transfer_fault_target_id_out_of_range(role: &str) -> Fault {
-    Fault::TransferFault {
+    Fault::Transfer {
         message: format!("{role}: target id out of range"),
     }
 }
@@ -121,7 +121,7 @@ pub fn transfer_fault_target_id_out_of_range(role: &str) -> Fault {
 /// Build a stable transfer fault when endpoint ownership is missing.
 #[must_use]
 pub fn transfer_fault_endpoint_not_owned() -> Fault {
-    Fault::TransferFault {
+    Fault::Transfer {
         message: "endpoint not owned".to_string(),
     }
 }
@@ -129,7 +129,7 @@ pub fn transfer_fault_endpoint_not_owned() -> Fault {
 /// Build a stable transfer fault for delegation-owner guard violations.
 #[must_use]
 pub fn transfer_fault_delegation_guard_violation(phase: &str) -> Fault {
-    Fault::TransferFault {
+    Fault::Transfer {
         message: format!("delegation guard violation {phase} transfer"),
     }
 }
@@ -137,7 +137,7 @@ pub fn transfer_fault_delegation_guard_violation(phase: &str) -> Fault {
 /// Build a stable speculation fault when speculation is disabled.
 #[must_use]
 pub fn speculation_fault_disabled() -> Fault {
-    Fault::SpecFault {
+    Fault::Speculation {
         message: "speculation disabled".to_string(),
     }
 }
@@ -145,7 +145,7 @@ pub fn speculation_fault_disabled() -> Fault {
 /// Build a stable speculation fault when join is attempted without active state.
 #[must_use]
 pub fn speculation_fault_join_requires_active() -> Fault {
-    Fault::SpecFault {
+    Fault::Speculation {
         message: "join requires active speculation".to_string(),
     }
 }
@@ -153,7 +153,7 @@ pub fn speculation_fault_join_requires_active() -> Fault {
 /// Build a stable speculation fault when abort is attempted without active state.
 #[must_use]
 pub fn speculation_fault_abort_requires_active() -> Fault {
-    Fault::SpecFault {
+    Fault::Speculation {
         message: "abort requires active speculation".to_string(),
     }
 }

@@ -121,19 +121,19 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
           exact Or.inr (by simpa [hEq] using hSid)
   -- # Local/Structural Cases
   | assign =>
-      simp
+      simpa
   | seq_step _ ih =>
       exact ih
   | seq_skip =>
-      simp
+      simpa
   | par_left split hSlen hTS hDisjG hDisjD hDisjS ih =>
       exact ih
   | par_right split hSlen hTS hDisjG hDisjD hDisjS ih =>
       exact ih
   | par_skip_left =>
-      simp
+      simpa
   | par_skip_right =>
-      simp
+      simpa
 
 -- Disjointness and Coherence Transport
 
