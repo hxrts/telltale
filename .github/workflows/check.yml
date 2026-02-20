@@ -21,6 +21,8 @@ jobs:
         with:
           command: build
           args: --workspace --all-targets --all-features
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: Run executable VM placeholder baseline checks
         run: ./scripts/check-vm-placeholders.sh
       - name: Run VM parity contract checks
