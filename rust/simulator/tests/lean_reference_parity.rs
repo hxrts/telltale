@@ -248,6 +248,7 @@ fn validate_sim_trace_or_skip(
     }
 }
 
+#[allow(clippy::as_conversions)]
 fn obs_to_vm_trace(event: &ObsEvent) -> Option<VmTraceEvent> {
     let mut out = VmTraceEvent {
         schema_version: default_schema_version(),
@@ -393,6 +394,7 @@ fn to_sim_run_input(fixture: &SimFixture) -> SimRunInput {
     }
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn assert_reference_parity(fixture: SimFixture) {
     let rust_result = run_rust_scenario(&fixture);
 

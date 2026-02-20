@@ -1,4 +1,4 @@
-#![allow(missing_docs)]
+#![allow(missing_docs, clippy::as_conversions)]
 
 #[cfg(not(feature = "multi-thread"))]
 fn main() {

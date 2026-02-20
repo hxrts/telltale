@@ -246,6 +246,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn unified_runtime_gate_combines_admission_and_profile_checks() {
         let mut cfg = VMConfig::default();
         cfg.speculation_enabled = true;

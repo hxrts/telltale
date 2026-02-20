@@ -28,16 +28,11 @@ open scoped Classical
 
 section
 
-/-! ## ReachesComm Decidability -/
+/-! ## ReachesComm Decision Support -/
 
-/-- ReachesComm is decidable via the boolean checker. -/
-instance instDecidableReachesComm (L : LocalType) : Decidable (ReachesComm L) :=
-  if h : reachesCommDecide L = true then
-    isTrue (reachesCommDecide_sound L h)
-  else
-    -- If reachesCommDecide returns false, we use Classical.dec
-    -- Full completeness proof would require showing reachesCommDecide is complete
-    Classical.dec _
+/- We provide a sound boolean-to-proposition bridge.
+   A full `Decidable (ReachesComm L)` instance is deferred until
+   a complete false-branch theorem is established for `reachesCommDecide`. -/
 
 /-- Alternative: use reachesCommDecide directly for proof by decide. -/
 theorem reachesComm_of_decide {L : LocalType} (h : reachesCommDecide L = true) :

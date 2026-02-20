@@ -38,20 +38,8 @@ lemma fromDB_var_of_get (ctx : NameContext) (n : Nat)
     (hclosed : (LocalTypeDB.var n).isClosedAt ctx.length = true)
     (v : String) (hget : ctx.get? n = some v) :
     LocalTypeDB.fromDB ctx (.var n) hclosed = LocalTypeR.var v := by
-  classical
-  have hlt : n < ctx.length := by
-    simpa [LocalTypeDB.isClosedAt] using hclosed
-  have hspec :
-      SessionTypes.NameOnlyContext.get? ctx n =
-        some (Classical.choose (SessionTypes.NameOnlyContext.get?_lt (ctx := ctx) (i := n) hlt)) :=
-    Classical.choose_spec (SessionTypes.NameOnlyContext.get?_lt (ctx := ctx) (i := n) hlt)
-  have hget' : SessionTypes.NameOnlyContext.get? ctx n = some v := by
-    simpa using hget
-  have hv :
-      Classical.choose (SessionTypes.NameOnlyContext.get?_lt (ctx := ctx) (i := n) hlt) = v := by
-    apply Option.some.inj
-    exact hspec.symm.trans hget'
-  simp [LocalTypeDB.fromDB, hv]
+  simp [LocalTypeDB.fromDB]
+  simpa using (Option.get_of_eq_some (h := Option.isSome_of_eq_some hget) hget)
 
 theorem fromDB?_eq_fromDB_all_ctx (t : LocalTypeDB) (ctx : NameContext)
     (hclosed : t.isClosedAt ctx.length = true) :

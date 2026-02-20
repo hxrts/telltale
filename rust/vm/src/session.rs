@@ -149,7 +149,7 @@ impl SessionState {
         &mut self,
         from: &str,
         to: &str,
-        signed: SignedValue<Signature>,
+        signed: &SignedValue<Signature>,
     ) -> Result<crate::buffer::EnqueueResult, String> {
         let edge = Edge::new(self.sid, from, to);
         let buf = self
@@ -158,7 +158,7 @@ impl SessionState {
             .ok_or_else(|| format!("no buffer for edge {from} → {to}"))?;
         let result = buf.enqueue(signed.clone());
         if matches!(result, crate::buffer::EnqueueResult::Ok) {
-            self.update_auth_tree(&edge, &signed);
+            self.update_auth_tree(&edge, signed);
         }
         Ok(result)
     }
@@ -184,7 +184,7 @@ impl SessionState {
         self.send_signed(
             from,
             to,
-            SignedValue {
+            &SignedValue {
                 payload: val,
                 signature,
             },

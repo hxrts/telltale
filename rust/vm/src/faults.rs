@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn fault_codes_are_stable_for_representative_variants() {
-        let samples = vec![
+        let samples = [
             Fault::TypeViolation {
                 expected: ValType::Unit,
                 actual: ValType::Nat,

@@ -31,7 +31,7 @@ theorem session_of_lookupG {G : GEnv} {e : Endpoint} {L : LocalType}
     (h : lookupG G e = some L) : e.sid ∈ SessionsOf G :=
   ⟨e, L, h, rfl⟩
 
-private theorem sid_not_in_right_of_left {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
+theorem sid_not_in_right_of_left {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
     {s : SessionId} (hIn : s ∈ SessionsOf G₁) :
     s ∉ SessionsOf G₂ := by
   intro hIn₂
@@ -42,12 +42,12 @@ private theorem sid_not_in_right_of_left {G₁ G₂ : GEnv} (hDisj : DisjointG G
     exact hInter
   exact this.elim
 
-private theorem sid_not_in_left_of_right {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
+theorem sid_not_in_left_of_right {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
     {s : SessionId} (hIn : s ∈ SessionsOf G₂) :
     s ∉ SessionsOf G₁ := by
   exact sid_not_in_right_of_left (G₁ := G₂) (G₂ := G₁) (DisjointG_symm hDisj) hIn
 
-private theorem lookupD_none_of_notin_sessions {G : GEnv} {D : DEnv} {e : Edge}
+theorem lookupD_none_of_notin_sessions {G : GEnv} {D : DEnv} {e : Edge}
     (hCons : DConsistent G D) (hNot : e.sid ∉ SessionsOf G) :
     D.find? e = none := by
   by_contra hSome
@@ -58,7 +58,7 @@ private theorem lookupD_none_of_notin_sessions {G : GEnv} {D : DEnv} {e : Edge}
       have hSid : e.sid ∈ SessionsOfD D := ⟨e, ts, hFind, rfl⟩
       exact hNot (hCons hSid)
 
-private theorem lookupBuf_none_of_notin_sessions {G : GEnv} {B : Buffers} {e : Edge}
+theorem lookupBuf_none_of_notin_sessions {G : GEnv} {B : Buffers} {e : Edge}
     (hCons : BConsistent G B) (hNot : e.sid ∉ SessionsOf G) :
     B.lookup e = none := by
   by_contra hSome
@@ -70,7 +70,7 @@ private theorem lookupBuf_none_of_notin_sessions {G : GEnv} {B : Buffers} {e : E
 
 /-! ## Typing Lifts Through Merged GEnv -/
 
-private theorem BufferTyped_monoG {G G' : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge} :
+theorem BufferTyped_monoG {G G' : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge} :
     BufferTyped G D bufs e →
     (∀ ep L, lookupG G ep = some L → lookupG G' ep = some L) →
     BufferTyped G' D bufs e := by
@@ -104,7 +104,7 @@ private theorem HasTypeVal_lift_right {G₁ G₂ : GEnv}
 
 /-! ## Active-Edge Split Across Disjoint Merge -/
 
-private theorem ActiveEdge_mergeGEnv_split {G₁ G₂ : GEnv} {e : Edge}
+theorem ActiveEdge_mergeGEnv_split {G₁ G₂ : GEnv} {e : Edge}
     (hDisj : DisjointG G₁ G₂)
     (hActive : ActiveEdge (mergeGEnv G₁ G₂) e) :
     ActiveEdge G₁ e ∨ ActiveEdge G₂ e := by

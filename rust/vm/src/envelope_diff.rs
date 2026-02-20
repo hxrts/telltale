@@ -115,6 +115,10 @@ impl EnvelopeDiff {
     }
 
     /// Stable canonical JSON serialization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if JSON serialization fails.
     pub fn canonical_json(&self) -> Result<Vec<u8>, serde_json::Error> {
         serde_json::to_vec(self)
     }
@@ -242,6 +246,7 @@ fn stable_hash_hex_from_serializable<T: Serialize>(value: &T) -> String {
     bytes_to_hex(&digest.0)
 }
 
+#[allow(clippy::as_conversions)]
 fn bytes_to_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut out = String::with_capacity(bytes.len() * 2);

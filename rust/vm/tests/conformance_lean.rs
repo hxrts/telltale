@@ -442,7 +442,7 @@ fn test_lean_send_receive_signature_verification() {
         .expect("signed payload must exist");
     signed.signature.signer = telltale_vm::verification::VerifyingKey([0_u8; 32]);
     let _ = sess
-        .send_signed("A", "B", signed)
+        .send_signed("A", "B", &signed)
         .expect("re-enqueue tampered payload");
 
     let result = vm.run(&handler, 32);

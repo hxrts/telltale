@@ -145,6 +145,10 @@ pub fn signed_enqueue<V>(
 ///
 /// The verifier is provided by the caller so this buffer module stays
 /// independent from any specific verification backend.
+///
+/// # Errors
+///
+/// Returns [`SignedDequeueError::VerificationFailed`] if the signature does not verify.
 pub fn signed_dequeue_verified<V, F>(
     buffers: &mut SignedBuffers<V>,
     edge: &Edge,

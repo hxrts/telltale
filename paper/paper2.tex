@@ -70,23 +70,45 @@
 \setlist[description]{leftmargin=0pt, labelindent=0pt, itemsep=2pt, topsep=3pt}
 
 % ============================================================================
+% Numbering by section
+% ============================================================================
+
+\makeatletter
+\@addtoreset{figure}{section}
+\renewcommand{\thefigure}{\thesection.\arabic{figure}}
+\@addtoreset{table}{section}
+\renewcommand{\thetable}{\thesection.\arabic{table}}
+\makeatother
+\numberwithin{equation}{section}
+
+% ============================================================================
 % Theorem environments
 % ============================================================================
 
-\theoremstyle{definition}
+\newtheoremstyle{paperplain}%
+{3pt}{3pt}{\itshape}{}{\bfseries}{.}{0.5em}%
+{\thmname{#1}\thmnumber{ #2}\thmnote{. #3}}
+\newtheoremstyle{paperdef}%
+{3pt}{3pt}{\normalfont}{}{\bfseries}{.}{0.5em}%
+{\thmname{#1}\thmnumber{ #2}\thmnote{. #3}}
+\newtheoremstyle{paperremark}%
+{3pt}{3pt}{\normalfont}{}{\itshape}{.}{0.5em}%
+{\thmname{#1}\thmnumber{ #2}\thmnote{. #3}}
+
+\theoremstyle{paperdef}
 \newtheorem{definition}{Definition}[section]
 
-\theoremstyle{plain}
+\theoremstyle{paperplain}
 \newtheorem{theorem}[definition]{Theorem}
 \newtheorem{lemma}[definition]{Lemma}
 \newtheorem{proposition}[definition]{Proposition}
 \newtheorem{corollary}[definition]{Corollary}
 
-\theoremstyle{definition}
+\theoremstyle{paperdef}
 \newtheorem{example}[definition]{Example}
-\newtheorem{assumption}{Assumption Block}
+\newtheorem{assumption}{Assumption Block}[section]
 
-\theoremstyle{remark}
+\theoremstyle{paperremark}
 \newtheorem{remark}[definition]{Remark}
 
 % ============================================================================
@@ -122,11 +144,14 @@
   commentstyle=\color{gray},
   stringstyle=\color{red},
   breaklines=true,
-  frame=single,
+  frame=leftline,
+  rulecolor=\color{black!10},
+  framerule=3pt,
+  framesep=1em,
   columns=fullflexible,
   aboveskip=5pt,
   belowskip=5pt,
-  xleftmargin=0pt,
+  xleftmargin=1.5em,
   literate={->}{$\to$\ }2 {forall}{$\forall$}1 {:=}{$\coloneqq$}2
 }
 
@@ -235,28 +260,22 @@ Our contributions are as follows:
 	\item A mechanized architecture that shares one regularity kernel across quantitative and algorithmic branches.
 \end{enumerate}
 
-Related liveness lines often emphasize qualitative progress in session-typed settings (Honda et al., 2008, and Caires and Pfenning, 2010). Related mechanized lines expose proof brittleness and motivate reusable proof architecture (Tirore et al., 2025). Figure~1 records the proof split used in this paper: one shared regularity kernel induces both the quantitative branch (descent and bounds) and the algorithmic branch (finite exploration and deciders).
+Related liveness lines often emphasize qualitative progress in session-typed settings (Honda et al., 2008, and Caires and Pfenning, 2010). Related mechanized lines expose proof brittleness and motivate reusable proof architecture (Tirore et al., 2025). Equation~\ref{eq:p2-proof-split} records the proof split used in this paper: one shared regularity kernel induces both the quantitative branch (descent and bounds) and the algorithmic branch (finite exploration and deciders).
 
-\begin{figure}[tbp]
-	\centering
-	\scriptsize
-	\[
-		\begin{array}{c}
-			\text{regularity kernel}
-			\\
-			\Downarrow
-			\\
+\begin{equation}
+	\label{eq:p2-proof-split}
+	\begin{array}{c}
+		\text{regularity kernel}
+		\\
+		\Downarrow
+		\\
 			\begin{array}{l}
 				\text{quantitative branch: }W\text{-descent} \Rightarrow \text{bounds}
 				\\
-				\text{algorithmic branch: finite exploration} \Rightarrow \text{deciders}
+				\text{algorithmic branch: finite exploration} \Rightarrow \text{deciders}.
 			\end{array}
 		\end{array}
-	\]
-	\vspace{-8pt}
-	\caption{Shared proof split: one regularity kernel feeds quantitative and algorithmic theorem branches.}
-	\label{fig:p2-proof-split}
-\end{figure}
+	\end{equation}
 
 % ============================================================================
 \section{Model Summary}
@@ -265,7 +284,7 @@ Related liveness lines often emphasize qualitative progress in session-typed set
 
 The model uses asynchronous buffered semantics with active-edge Coherence from \emph{Coherence for Asynchronous Buffered MPST}. Delivery behavior is parameterized by \texttt{DeliveryModel}.
 
-Table~1 records the assumptions used for exact statements in this paper.
+Table~\ref{tab:p2-assumptions} records the assumptions used for exact statements in this paper.
 
 \begin{table}[tbp]
 	\centering
@@ -283,13 +302,15 @@ Table~1 records the assumptions used for exact statements in this paper.
 		\bottomrule
 	\end{tabularx}
 	\caption{Assumptions for exact statements}
+\label{tab:p2-assumptions}
 \end{table}
 
 \begin{assumption}[Core Model Premises]
+\label{assump:p2-core}
 	Core claims in this paper assume asynchronous buffered semantics, active-edge Coherence, regular finite reachability for decision results, and the stated fairness profile for scheduler-lifted bounds.
 \end{assumption}
 
-Table~2 fixes notation used in this paper.
+Table~\ref{tab:p2-notation} fixes notation used in this paper.
 
 \begin{table}[tbp]
 	\centering
@@ -309,6 +330,7 @@ Table~2 fixes notation used in this paper.
 		\bottomrule
 	\end{tabularx}
 	\caption{Notation}
+\label{tab:p2-notation}
 \end{table}
 
 \begin{definition}[Productive Step]
@@ -321,7 +343,7 @@ Table~2 fixes notation used in this paper.
 
 The factor two is required for strict decrease on send and select steps where one enqueue occurs. The same definition is used for global lifts and scheduler bounds.
 
-Table~3 lists scheduler profiles used by the bound statements.
+Table~\ref{tab:p2-scheduler-profiles} lists scheduler profiles used by the bound statements.
 
 \begin{table}[tbp]
 	\centering
@@ -336,6 +358,7 @@ Table~3 lists scheduler profiles used by the bound statements.
 		\bottomrule
 	\end{tabularx}
 	\caption{Scheduler profiles}
+\label{tab:p2-scheduler-profiles}
 \end{table}
 
 % ============================================================================
@@ -345,7 +368,7 @@ Table~3 lists scheduler profiles used by the bound statements.
 
 We use one running example with explicit trace witnesses.
 
-\textbf{Running example.} Protocol (as in the Coherence paper):
+\textbf{Running example.} Protocol (as in \emph{Coherence for Asynchronous Buffered MPST}):
 
 \noindent\begin{minipage}{\columnwidth}
 	\begin{lstlisting}
@@ -358,21 +381,21 @@ P -> C : Token(t)
 \end{minipage}
 
 Let the initial state be $s_0$ with one pending request on edge \texttt{(C,P)} and local depths 5, 5, and 2 for \texttt{P}, \texttt{C}, and \texttt{M}. Then
-\[
+\begin{equation}
 	W_0 = W(s_0) = 2 \cdot (5+5+2) + 1 = 25.
-\]
+\end{equation}
 Assume the typing/well-formedness judgment $\Gamma \vdash s_0\ \wf$ and step judgments $s_i \to s_{i+1}$ for the trace below.
 
 Define witness trace
-\[
-	\tau_{\mathrm{ex}}: s_0 \to s_1 \to s_2 \to s_3 \to s_4
-\]
+\begin{equation}
+	\tau_{\mathrm{ex}}: s_0 \to s_1 \to s_2 \to s_3 \to s_4,
+\end{equation}
 with step kinds \texttt{recv Request}, \texttt{send Grant}, \texttt{recv Grant}, \texttt{send Report}.
 
 The quantitative facts are used through the following derivation forms.
 
 	{\scriptsize
-		\[
+		\begin{equation}
 			\dfrac{
 				\begin{aligned}[t]
 					 & \Gamma \vdash \tau_{\mathrm{ex}}: s_0 \to^\ast s_4 \\
@@ -385,9 +408,8 @@ The quantitative facts are used through the following derivation forms.
 				\end{aligned}
 			}
 			\;(\textsc{Ex-Descent})
-		\]
-
-		\[
+		\end{equation}
+		\begin{equation}
 			\dfrac{
 				\Profile(\sigma)
 				\quad
@@ -398,9 +420,8 @@ The quantitative facts are used through the following derivation forms.
 				\forall \tau,\ T(\tau)\le \kappa_\sigma W_0 = 50
 			}
 			\;(\textsc{Ex-SchedulerLift})
-		\]
-
-		\[
+		\end{equation}
+		\begin{equation}
 			\dfrac{
 				\Bc=2
 				\quad
@@ -413,10 +434,10 @@ The quantitative facts are used through the following derivation forms.
 				\end{aligned}
 			}
 			\;(\textsc{Ex-PhaseBoundary})
-		\]
+		\end{equation}
 	}
 
-Table~4 records the per-rule $\Delta W$ facts used in this witness.
+Table~\ref{tab:p2-delta-w} records the per-rule $\Delta W$ facts used in this witness.
 
 \begin{table}[tbp]
 	\centering
@@ -432,6 +453,7 @@ Table~4 records the per-rule $\Delta W$ facts used in this witness.
 		\bottomrule
 	\end{tabularx}
 	\caption{Per-rule $\Delta W$ facts}
+\label{tab:p2-delta-w}
 \end{table}
 
 % ============================================================================
@@ -440,19 +462,20 @@ Table~4 records the per-rule $\Delta W$ facts used in this witness.
 % ============================================================================
 
 \begin{assumption}[Quantitative Descent Premises]
-	The descent theorem assumes well-typed asynchronous buffered transitions, active-edge Coherence preservation from \emph{Coherence for Asynchronous Buffered MPST}, non-negativity of $W$, and a scheduler profile from Table~3 when total-step lifting is claimed.
+\label{assump:p2-quantitative}
+	The descent theorem assumes well-typed asynchronous buffered transitions, active-edge Coherence preservation from \emph{Coherence for Asynchronous Buffered MPST}, non-negativity of $W$, and a scheduler profile from Table~\ref{tab:p2-scheduler-profiles} when total-step lifting is claimed.
 \end{assumption}
 
 \begin{theorem}[Quantitative Dynamics]
 	\label{thm:quantitative}
-	For any initial state $s_0$ and finite trace $\tau : s_0 \to \cdots \to s_n$ satisfying Assumption Block~1, let $P(\tau)$ be the productive-step count and $T(\tau)$ be the total-step count. Then
-	\[
+	For any initial state $s_0$ and finite trace $\tau : s_0 \to \cdots \to s_n$ satisfying Assumption Block~\ref{assump:p2-quantitative}, let $P(\tau)$ be the productive-step count and $T(\tau)$ be the total-step count. Then
+	\begin{equation}
 		P(\tau) \le W(s_0) = W_0.
-	\]
+	\end{equation}
 	If the selected scheduler profile provides lift constant $\kappa_\sigma$, then
-	\[
+	\begin{equation}
 		T(\tau) \le \kappa_\sigma \cdot W_0.
-	\]
+	\end{equation}
 	The productive bound is exact under the model assumptions. The scheduler-lifted bound is conservative and profile-dependent.
 \end{theorem}
 
@@ -462,47 +485,38 @@ Table~4 records the per-rule $\Delta W$ facts used in this witness.
 
 The local decrease lemmas are \texttt{send\_step\_decreases}, \texttt{recv\_step\_decreases}, \texttt{select\_step\_decreases}, and \texttt{branch\_step\_decreases}. The configuration-level lift is \texttt{total\_measure\_decreasing}.
 
-\begin{figure}[tbp]
-	\centering
-	\scriptsize
-	\[
-		\begin{array}{c}
-			W(s) = 2 \cdot \Sigma\mathrm{depth}(s) + \Sigma\mathrm{buffer}(s)
-			\\
-			\Downarrow
-			\\
-			\begin{aligned}[t]
-				D(s) & := \Sigma\mathrm{depth}(s),  \\
-				B(s) & := \Sigma\mathrm{buffer}(s), \\
-				W(s) & = 2D(s)+B(s).
-			\end{aligned}
-		\end{array}
-	\]
-	\vspace{-8pt}
-	\caption{Weighted-measure decomposition used by Theorem~1.}
-	\label{fig:p2-weighted-decomposition}
-\end{figure}
+The weighted-measure decomposition used by Theorem~1 is:
+\begin{equation}
+	\label{eq:p2-weighted-decomposition}
+	\begin{array}{c}
+		W(s) = 2 \cdot \Sigma\mathrm{depth}(s) + \Sigma\mathrm{buffer}(s)
+		\\
+		\Downarrow
+		\\
+		\begin{aligned}[t]
+			D(s) & := \Sigma\mathrm{depth}(s),  \\
+			B(s) & := \Sigma\mathrm{buffer}(s), \\
+			W(s) & = 2D(s)+B(s).
+		\end{aligned}
+	\end{array}
+\end{equation}
 
-\begin{figure}[tbp]
-	\centering
-	\footnotesize
-	\[
+The rule-local descent pattern lifted to global productive-step bounds is:
+\begin{equation}
+	\label{eq:p2-rule-descent-table}
 		\begin{array}{c|c}
 			\text{productive rule family} & \text{net effect on }W
 			\\
 			\hline
 			\text{send / select}          & \Delta W \le -1
 			\\
-			\text{recv / branch}          & \Delta W \le -1
+			\text{recv / branch}          & \Delta W \le -1,
 		\end{array}
-	\]
-	\[
-		\text{therefore}\quad \Delta W \le -1\ \text{on productive steps}.
-	\]
-	\vspace{-10pt}
-	\caption{Rule-local descent pattern lifted to global productive-step bounds.}
-	\label{fig:p2-rule-descent}
-\end{figure}
+	\end{equation}
+\begin{equation}
+	\label{eq:p2-rule-descent}
+	\text{therefore}\quad \Delta W \le -1\ \text{on productive steps}.
+\end{equation}
 
 % ============================================================================
 \section{Theorem 2: Algorithmic Dynamics Schema}
@@ -510,23 +524,24 @@ The local decrease lemmas are \texttt{send\_step\_decreases}, \texttt{recv\_step
 % ============================================================================
 
 \begin{assumption}[Regular Finite-Reachability Premises]
+\label{assump:p2-regular}
 	The decision schema assumes regularity hypotheses that produce finite reachable-state spaces and predicate reductions expressed by total decision procedures on those spaces.
 \end{assumption}
 
 \begin{theorem}[Algorithmic Dynamics Schema]
 	\label{thm:algorithmic}
-	For any predicate family $\mathcal{P}$ that satisfies Assumption Block~2, there exists a total decider $\mathsf{dec}_{\mathcal{P}}$ such that
-	\[
+	For any predicate family $\mathcal{P}$ that satisfies Assumption Block~\ref{assump:p2-regular}, there exists a total decider $\mathsf{dec}_{\mathcal{P}}$ such that
+	\begin{equation}
 		\begin{aligned}[t]
 			\forall x,\ \mathsf{dec}_{\mathcal{P}}(x) = \mathsf{true}
 			\\
 			\iff\ \mathcal{P}(x).
 		\end{aligned}
-	\]
+	\end{equation}
 	In particular, asynchronous subtyping and regular type equivalence are decidable on the regular fragment.
 \end{theorem}
 
-Coinductive boundary note: effect-level transport is restricted to the witness-carrying rational subclass via \texttt{rationalEffect\_transport\_bridge}; witness-check soundness/completeness is provided by \texttt{checkRationalEffectWitness\_sound} and \texttt{checkRationalEffectWitness\_complete}; strict outside non-transportability is witnessed by \texttt{strict\_boundary\_witness\_effect}. These do not alter Theorem~2 assumptions and are used in the Harmony paper boundary layer.
+Coinductive boundary note: effect-level transport is restricted to the witness-carrying rational subclass via \texttt{rationalEffect\_transport\_bridge}; witness-check soundness/completeness is provided by \texttt{checkRationalEffectWitness\_sound} and \texttt{checkRationalEffectWitness\_complete}; strict outside non-transportability is witnessed by \texttt{strict\_boundary\_witness\_effect}. These do not alter Theorem~2 assumptions and are used in the \emph{Harmony from Coherence in Asynchronous MPST} boundary layer.
 
 \begin{proof}[Proof sketch]
 	The argument is uniform. Build finite reachable triple/pair structures from regularity (\texttt{reachable\_triples\_finite}, \texttt{reachablePairs\_finite}), run terminating exploration/checkers, and prove soundness/completeness for each reduction. Instantiating this schema yields deciders for async subtyping and regular equivalence (\texttt{async\_subtype\_decidable}, \texttt{regularTypeEqDecide\_spec}).
@@ -534,31 +549,25 @@ Coinductive boundary note: effect-level transport is restricted to the witness-c
 
 Async subtyping instantiation appears through \texttt{reachable\_triples\_finite} and \texttt{async\_subtype\_decidable}. Regular type-equivalence instantiation appears through \texttt{regularTypeEqCheck\_sound} and \texttt{regularTypeEqDecide\_spec}.
 
-Figure~4 records the generic workflow.
-\begin{figure}[tbp]
-	\centering
-	\footnotesize
-	\[
-		\begin{array}{c}
-			\text{regularity assumptions}
-			\\
-			\Downarrow
-			\\
-			\text{finite reachable structure}
-			\\
-			\Downarrow
-			\\
+Equation~\ref{eq:p2-algorithmic-workflow} records the generic workflow.
+\begin{equation}
+	\label{eq:p2-algorithmic-workflow}
+	\begin{array}{c}
+		\text{regularity assumptions}
+		\\
+		\Downarrow
+		\\
+		\text{finite reachable structure}
+		\\
+		\Downarrow
+		\\
 			\text{terminating checker } \mathsf{dec}_P
 			\\
 			\Downarrow
 			\\
-			\mathsf{dec}_P(x)=\mathsf{true}\ \Longleftrightarrow\ P(x)
+			\mathsf{dec}_P(x)=\mathsf{true}\ \Longleftrightarrow\ P(x).
 		\end{array}
-	\]
-	\vspace{-8pt}
-	\caption{Algorithmic dynamics schema: regularity gives finite exploration, then soundness/completeness gives exact decision.}
-	\label{fig:p2-algorithmic-workflow}
-\end{figure}
+	\end{equation}
 
 % ============================================================================
 \section{Decidability Layer}
@@ -566,28 +575,29 @@ Figure~4 records the generic workflow.
 % ============================================================================
 
 \begin{assumption}[Crash-Stop Characterization Premises]
+\label{assump:p2-crash}
 	Crash-tolerance characterization assumes crash-stop faults, finite role graphs, and the residual-graph side conditions used by the decision profile.
 \end{assumption}
 
 \begin{theorem}[Crash-Stop Tolerance Characterization]
 	\label{thm:crash}
-	Under Assumption Block~3, there exists a total decider $\mathsf{decCrash}$ such that
-	\[
+	Under Assumption Block~\ref{assump:p2-crash}, there exists a total decider $\mathsf{decCrash}$ such that
+	\begin{equation}
 		\begin{aligned}
 			\forall (R,F),\quad
 			\mathsf{decCrash}(R,F) = \mathsf{true}
 			\\
 			\iff\ \mathsf{CrashTolerant}(R,F).
 		\end{aligned}
-	\]
+	\end{equation}
 	Moreover crash tolerance satisfies an exact residual-graph characterization:
-	\[
+	\begin{equation}
 		\begin{aligned}[t]
 			\mathsf{CrashTolerant}(R,F)
 			\\
 			\iff\ \mathsf{ResidualReachable}(R,F).
 		\end{aligned}
-	\]
+	\end{equation}
 	The theorem also includes witness families where topology changes flip tolerance outcomes within the stated side-condition class.
 \end{theorem}
 
@@ -596,28 +606,29 @@ Figure~4 records the generic workflow.
 \end{proof}
 
 \begin{assumption}[Byzantine Characterization Premises]
+\label{assump:p2-byzantine}
 	Byzantine characterization assumes explicit bundle $\Hbyz$ with fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions.
 \end{assumption}
 
 Define
-\[
+\begin{equation}
 	\begin{aligned}
 		\ByzChar :=\; & \mathsf{ByzQuorumOK}                   \\
 		              & \land \mathsf{ByzAuthEvidenceOK}       \\
 		              & \land \mathsf{ByzBudgetOK}             \\
 		              & \land \mathsf{ByzPrimitiveConsistent}.
 	\end{aligned}
-\]
+\end{equation}
 where each conjunct names the corresponding requirement class in $\Hbyz$.
 
 \begin{theorem}[Exact Byzantine Safety Characterization]
 	\label{thm:byzantine}
-	Under Assumption Block~4, profile extraction yields an exact-characterization package for the declared Byzantine model. At this paper interface, the package gives
-	\[
+	Under Assumption Block~\ref{assump:p2-byzantine}, profile extraction yields an exact-characterization package for the declared Byzantine model. At this paper interface, the package gives
+	\begin{equation}
 		\ByzChar \Rightarrow \ByzSafe,
 		\qquad
 		\ByzSafe \Rightarrow \ByzChar,
-	\]
+	\end{equation}
 	with relative maximality for the same characterization relation.
 \end{theorem}
 
@@ -631,7 +642,7 @@ where each conjunct names the corresponding requirement class in $\Hbyz$.
 		\item Record explicit assumption classes for converse sharpness (Corollary~4.1).
 	\end{enumerate}
 
-	The full envelope-maximality development is deferred to the Harmony paper.
+		The full envelope-maximality development is deferred to \emph{Harmony from Coherence in Asynchronous MPST}.
 \end{proof}
 
 \begin{corollary}[Converse Counterexample Families]
@@ -640,7 +651,7 @@ where each conjunct names the corresponding requirement class in $\Hbyz$.
 \end{corollary}
 
 \begin{proof}[Proof sketch]
-	Define one constructor family per dropped assumption class in the Byzantine bundle. Each constructor forces failure of the corresponding profile obligation and induces a safety-visible violation trace. This yields class-indexed converse witnesses and therefore sharpness of Assumption Block~4 at the safety scope stated in this paper.
+	Define one constructor family per dropped assumption class in the Byzantine bundle. Each constructor forces failure of the corresponding profile obligation and induces a safety-visible violation trace. This yields class-indexed converse witnesses and therefore sharpness of Assumption Block~\ref{assump:p2-byzantine} at the safety scope stated in this paper.
 \end{proof}
 
 \begin{proposition}[Byzantine VM-Bridge Interface]
@@ -654,7 +665,7 @@ where each conjunct names the corresponding requirement class in $\Hbyz$.
 
 Core crash-tolerance lemmas include \texttt{crash\_tolerance\_iff} and \texttt{crashTolerantDec\_sound}. Branching feasibility appears through \texttt{branching\_iff\_chromatic\_capacity}.
 
-Table~5 summarizes the decidability results.
+Table~\ref{tab:p2-decidability-summary} summarizes the decidability results.
 
 \begin{table}[tbp]
 	\centering
@@ -671,9 +682,10 @@ Table~5 summarizes the decidability results.
 		\bottomrule
 	\end{tabularx}
 	\caption{Decidability results summary}
+\label{tab:p2-decidability-summary}
 \end{table}
 
-Table~6 summarizes complexity envelopes for the decision layer.
+Table~\ref{tab:p2-complexity-envelopes} summarizes complexity envelopes for the decision layer.
 
 \begin{table}[tbp]
 	\centering
@@ -689,6 +701,7 @@ Table~6 summarizes complexity envelopes for the decision layer.
 		\bottomrule
 	\end{tabularx}
 	\caption{Complexity envelopes}
+\label{tab:p2-complexity-envelopes}
 \end{table}
 
 % ============================================================================
@@ -698,12 +711,12 @@ Table~6 summarizes complexity envelopes for the decision layer.
 
 \begin{corollary}[Productive-Step Bound]
 	\label{cor:productive}
-	For any trace $\tau$ satisfying Assumption Block~1, $P(\tau) \le W_0$.
+	For any trace $\tau$ satisfying Assumption Block~\ref{assump:p2-quantitative}, $P(\tau) \le W_0$.
 \end{corollary}
 
 \begin{corollary}[Scheduler-Lifted Total Bound]
 	\label{cor:scheduler}
-	For any trace $\tau$ satisfying Assumption Block~1 and scheduler profile $\sigma$ with lift constant $\kappa_\sigma$, $T(\tau) \le \kappa_\sigma \cdot W_0$.
+	For any trace $\tau$ satisfying Assumption Block~\ref{assump:p2-quantitative} and scheduler profile $\sigma$ with lift constant $\kappa_\sigma$, $T(\tau) \le \kappa_\sigma \cdot W_0$.
 \end{corollary}
 
 \begin{corollary}[Critical Capacity Boundary]
@@ -723,7 +736,7 @@ Table~6 summarizes complexity envelopes for the decision layer.
 	\texttt{critical\_buffer\_computable} provides existence of a computable boundary value $\Bc$, and \texttt{phase\_transition\_sharp} proves exact classifier behavior on each side of that boundary. Composing these two lemmas yields the stated theorem-level threshold characterization.
 \end{proof}
 
-Table~7 separates exact and conservative consequences.
+Table~\ref{tab:p2-exact-vs-conservative} separates exact and conservative consequences.
 
 \begin{table}[tbp]
 	\centering
@@ -739,9 +752,10 @@ Table~7 separates exact and conservative consequences.
 		\bottomrule
 	\end{tabularx}
 	\caption{Exact vs conservative results}
+\label{tab:p2-exact-vs-conservative}
 \end{table}
 
-Table~8 gives worked values used in the worked example.
+Table~\ref{tab:p2-worked-values} gives worked values used in the worked example.
 
 \begin{table}[tbp]
 	\centering
@@ -757,27 +771,22 @@ Table~8 gives worked values used in the worked example.
 		\bottomrule
 	\end{tabularx}
 	\caption{Worked example values}
+\label{tab:p2-worked-values}
 \end{table}
 
-Figure~5 locates the worked example on the phase boundary.
-\begin{figure}[tbp]
-	\centering
-	\scriptsize
-	\[
-		\begin{array}{c}
+Equation~\ref{eq:p2-phase-boundary} locates the worked example on the phase boundary.
+\begin{equation}
+	\label{eq:p2-phase-boundary}
+	\begin{array}{c}
 			\begin{aligned}[t]
 				B<\Bc & \Rightarrow \Phase(B)=\mathsf{Low},      \\
 				B=\Bc & \Rightarrow \Phase(B)=\mathsf{Critical}, \\
 				B>\Bc & \Rightarrow \Phase(B)=\mathsf{High}.
 			\end{aligned}
 			\\[2pt]
-			\text{worked instance: } \Bc=2,\ W_0=25,\ B=\Bc
+			\text{worked instance: } \Bc=2,\ W_0=25,\ B=\Bc.
 		\end{array}
-	\]
-	\vspace{-8pt}
-	\caption{Worked-example placement at the critical capacity boundary.}
-	\label{fig:p2-phase-boundary}
-\end{figure}
+\end{equation}
 With $\Bc=2$ and $W_0=25$, the instance sits at the critical capacity line, so productive-step and scheduler-lift conclusions apply exactly as in Theorem~1 and Corollaries~1--2.
 
 % ============================================================================
@@ -796,10 +805,10 @@ This reuse reduces theorem fragmentation and proof duplication. It also gives a 
 
 Dependency sketch:
 \begin{enumerate}
-	\item Assumption Block~1 gives Theorem~1 and Corollaries~1--2.
-	\item Assumption Block~2 gives Theorem~2 and the subtyping/equivalence deciders.
-	\item Assumption Block~3 gives Theorem~3.
-	\item Assumption Block~4 gives Theorem~4, Corollary~4.1, and Proposition~2.
+	\item Assumption Block~\ref{assump:p2-quantitative} gives Theorem~1 and Corollaries~1--2.
+	\item Assumption Block~\ref{assump:p2-regular} gives Theorem~2 and the subtyping/equivalence deciders.
+	\item Assumption Block~\ref{assump:p2-crash} gives Theorem~3.
+	\item Assumption Block~\ref{assump:p2-byzantine} gives Theorem~4, Corollary~4.1, and Proposition~2.
 \end{enumerate}
 
 % ============================================================================
@@ -807,7 +816,7 @@ Dependency sketch:
 \label{sec:mechanization}
 % ============================================================================
 
-Table~9 maps claim families to concrete modules and theorem anchors.
+Table~\ref{tab:p2-claim-artifact-map} maps claim families to concrete modules and theorem anchors.
 
 \begin{table}[tbp]
 	\centering
@@ -816,22 +825,23 @@ Table~9 maps claim families to concrete modules and theorem anchors.
 		\toprule
 		\textbf{Layer} & \textbf{Modules}                             & \textbf{Anchors}                      \\
 		\midrule
-		Weighted dyn.  & WeightedMeasure/*.lean, Lyapunov.lean        & weightedMeasure, total\_measure\_decr \\
-		Decision       & AsyncSubtyping/*.lean, BisimDecidable/*.lean & reachable\_triples\_finite            \\
-		Protocol       & CrashTolerance.lean, PhaseSharpness.lean     & crash\_tolerance\_iff                 \\
-		Byzantine      & EnvelopeTheorems.lean, TheoremPack/*.lean    & byzantineSafety\_exact                \\
+		Weighted dyn.  & \nolinkurl{WeightedMeasure/*.lean}, \nolinkurl{Lyapunov.lean}        & \texttt{weightedMeasure}, \texttt{total\_measure\_decr} \\
+		Decision       & \nolinkurl{AsyncSubtyping/*.lean}, \nolinkurl{BisimDecidable/*.lean} & \texttt{reachable\_triples\_finite}                      \\
+		Protocol       & \nolinkurl{CrashTolerance.lean}, \nolinkurl{PhaseSharpness.lean}     & \texttt{crash\_tolerance\_iff}                           \\
+		Byzantine      & \nolinkurl{EnvelopeTheorems.lean}, \nolinkurl{TheoremPack/*.lean}    & \texttt{byzantineSafety\_exact}                          \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Claim to artifact mapping}
+\label{tab:p2-claim-artifact-map}
 \end{table}
 
 \begin{proposition}[Mechanization Coverage Soundness]
 	\label{prop:coverage}
-	For any claim class $c$ in Table~9, if $c$ is marked covered and the corresponding Appendix~F checks pass, then there exists a mechanized theorem object for $c$ within this paper's assumption scope.
+	For any claim class $c$ in Table~\ref{tab:p2-claim-artifact-map}, if $c$ is marked covered and the corresponding Appendix~F checks pass, then there exists a mechanized theorem object for $c$ within this paper's assumption scope.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
-	Coverage labels in Table~9 are defined by explicit module-and-theorem anchors. Appendix~F rebuild checks certify that these declarations resolve and typecheck under the pinned toolchain. Therefore a passing check witnesses existence of a theorem object for each covered claim class.
+	Coverage labels in Table~\ref{tab:p2-claim-artifact-map} are defined by explicit module-and-theorem anchors. Appendix~F rebuild checks certify that these declarations resolve and typecheck under the pinned toolchain. Therefore a passing check witnesses existence of a theorem object for each covered claim class.
 \end{proof}
 
 % ============================================================================
@@ -858,11 +868,11 @@ This paper differs in structure. It unifies quantitative bounds and algorithmic 
 \label{sec:limitations}
 % ============================================================================
 
-Quantitative bounds require the Assumption Block~1 premises: well-typed asynchronous buffered transitions, active-edge Coherence preservation, non-negativity of $W$, and an explicit scheduler profile when total-step lifting is claimed. Scheduler-lifted totals remain conservative profile-dependent bounds rather than exact universal runtime counts.
+Quantitative bounds require the Assumption Block~\ref{assump:p2-quantitative} premises: well-typed asynchronous buffered transitions, active-edge Coherence preservation, non-negativity of $W$, and an explicit scheduler profile when total-step lifting is claimed. Scheduler-lifted totals remain conservative profile-dependent bounds rather than exact universal runtime counts.
 
-Crash-stop characterization is exact only under Assumption Block~3, with crash-stop faults, finite role graph, and residual-graph side conditions. Byzantine results are exact safety characterizations only under Assumption Block~4, with $\Hbyz$ fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions, and they do not imply Byzantine liveness.
+Crash-stop characterization is exact only under Assumption Block~\ref{assump:p2-crash}, with crash-stop faults, finite role graph, and residual-graph side conditions. Byzantine results are exact safety characterizations only under Assumption Block~\ref{assump:p2-byzantine}, with $\Hbyz$ fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions, and they do not imply Byzantine liveness.
 
-Decidability and finite exploration require the Assumption Block~2 regular finite-reachability premises. Non-regular fragments and stronger adversarial models require different constructions.
+Decidability and finite exploration require the Assumption Block~\ref{assump:p2-regular} regular finite-reachability premises. Non-regular fragments and stronger adversarial models require different constructions.
 
 Reconfiguration commutation and envelope maximality claims are out of scope for this paper and handled separately in the series.
 
@@ -871,7 +881,7 @@ Reconfiguration commutation and envelope maximality claims are out of scope for 
 \label{sec:conclusion}
 % ============================================================================
 
-This paper turns Coherence-preserving dynamics into computable dynamics. Quantitative bounds and decision procedures come from the same regularity source. That result provides the computational bridge between the Coherence paper and the reconfiguration and envelope claims in the Harmony paper.
+This paper turns Coherence-preserving dynamics into computable dynamics. Quantitative bounds and decision procedures come from the same regularity source. That result provides the computational bridge between \emph{Coherence for Asynchronous Buffered MPST} and the reconfiguration and envelope claims in \emph{Harmony from Coherence in Asynchronous MPST}.
 
 Byzantine contribution in this paper is the exact safety-characterization interface and converse counterexample family packaging. Byzantine liveness beyond the stated assumptions remains open and is tracked as future work.
 
@@ -976,16 +986,16 @@ productiveStep C C' -> W(C') <= W(C) - 1
 
 \begin{proposition}[Scheduler-Lifted Total Bound]
 	If scheduler profile $\sigma$ admits lift constant $\kappa_\sigma$, then total steps $T$ satisfy:
-	\[
+	\begin{equation}
 		T \le \kappa_\sigma \cdot W(C_0).
-	\]
+	\end{equation}
 \end{proposition}
 
 \begin{proof}[Proof sketch]
 	Proposition~A.4 bounds the number of productive steps by $W(C_0)$. The scheduler profile contributes a bound on how many non-productive steps can occur between productive ones. Multiplying these bounds gives $T \le \kappa_\sigma \cdot W(C_0)$.
 \end{proof}
 
-Theorem~1 and Corollaries~1--2 are exactly Propositions~A.4--A.5 under Assumption Block~1.
+Theorem~1 and Corollaries~1--2 are exactly Propositions~A.4--A.5 under Assumption Block~\ref{assump:p2-quantitative}.
 
 \section{Deferred Proof of Algorithmic Decidability Schema}
 \label{app:algorithmic}
@@ -1028,13 +1038,13 @@ This explains why the paper reports complexity in explored-graph size, not in ra
 Given role graph $R$ and crash set $F$, let $\mathrm{Residual}(R,F)$ remove crashed roles and incident edges.
 
 \begin{theorem}[Crash-Stop Exactness]
-	\[
-		\begin{aligned}[t]
-			\mathsf{CrashTolerant}(R,F)
-			\\
-			\iff\ \mathsf{ResidualReachable}(R,F)
-		\end{aligned}
-	\]
+		\begin{equation}
+			\begin{aligned}[t]
+				\mathsf{CrashTolerant}(R,F)
+				\\
+				\iff\ \mathsf{ResidualReachable}(R,F).
+			\end{aligned}
+		\end{equation}
 \end{theorem}
 
 \begin{proof}[Proof sketch]
@@ -1056,25 +1066,24 @@ Let \texttt{ConfGraph} be the confusability graph induced by branch-distinguisha
 \subsection{Capacity Threshold Instantiation}
 
 Define the phase classifier
-\[
+\begin{equation}
 	\Phase(B) =
 	\begin{cases}
 		\mathsf{Low},      & B < \Bc, \\
 		\mathsf{Critical}, & B = \Bc, \\
 		\mathsf{High},     & B > \Bc.
 	\end{cases}
-\]
-
+\end{equation}
 \begin{theorem}[Sharp Capacity Boundary]
 	There exists a computable threshold $\Bc$ such that
-	\[
+	\begin{equation}
 		\forall B,\quad
 		\begin{aligned}[t]
 			        & (B < \Bc \Rightarrow \Phase(B)=\mathsf{Low})      \\
 			\land\; & (B = \Bc \Rightarrow \Phase(B)=\mathsf{Critical}) \\
 			\land\; & (B > \Bc \Rightarrow \Phase(B)=\mathsf{High}),
 		\end{aligned}
-	\]
+	\end{equation}
 	with exactness at the theorem interface.
 \end{theorem}
 
@@ -1084,7 +1093,7 @@ Define the phase classifier
 
 \subsection{Byzantine Safety Interface (Scope of This Paper)}
 
-Under Assumption Block~4, this paper provides the exact safety-side interface and converse counterexample packaging; full envelope maximality and transport are deferred to the Harmony paper.
+Under Assumption Block~\ref{assump:p2-byzantine}, this paper provides the exact safety-side interface and converse counterexample packaging; full envelope maximality and transport are deferred to \emph{Harmony from Coherence in Asynchronous MPST}.
 
 \section{Mechanization Map}
 \label{app:mechanization}
@@ -1096,13 +1105,14 @@ Under Assumption Block~4, this paper provides the exact safety-side interface an
 		\toprule
 		\textbf{Result}  & \textbf{Modules}                             & \textbf{Anchors}           \\
 		\midrule
-		Quant.\ dynamics & WeightedMeasure/*.lean, Lyapunov.lean        & weightedMeasure            \\
-		Decidability     & AsyncSubtyping/*.lean, BisimDecidable/*.lean & reachable\_triples\_finite \\
-		Crash/branch     & CrashTolerance.lean, PhaseSharpness.lean     & crash\_tolerance\_iff      \\
-		Byzantine        & EnvelopeTheorems*.lean, TheoremPack/*.lean   & byzantineSafety\_exact     \\
+		Quant.\ dynamics & \nolinkurl{WeightedMeasure/*.lean}, \nolinkurl{Lyapunov.lean}        & \texttt{weightedMeasure}            \\
+		Decidability     & \nolinkurl{AsyncSubtyping/*.lean}, \nolinkurl{BisimDecidable/*.lean} & \texttt{reachable\_triples\_finite} \\
+		Crash/branch     & \nolinkurl{CrashTolerance.lean}, \nolinkurl{PhaseSharpness.lean}     & \texttt{crash\_tolerance\_iff}      \\
+		Byzantine        & \nolinkurl{EnvelopeTheorems*.lean}, \nolinkurl{TheoremPack/*.lean}   & \texttt{byzantineSafety\_exact}     \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Mechanization map}
+\label{tab:p2-mechanization-map}
 \end{table}
 
 \section{Exactness and Boundary Notes}
@@ -1111,9 +1121,9 @@ Under Assumption Block~4, this paper provides the exact safety-side interface an
 \subsection{Exact Claims}
 
 \begin{enumerate}
-	\item Productive-step decrease and productive-step bounds (Assumption Block~1).
-	\item Crash-stop characterization (Assumption Block~3).
-	\item Byzantine safety characterization at paper interface scope (Assumption Block~4).
+	\item Productive-step decrease and productive-step bounds (Assumption Block~\ref{assump:p2-quantitative}).
+	\item Crash-stop characterization (Assumption Block~\ref{assump:p2-crash}).
+	\item Byzantine safety characterization at paper interface scope (Assumption Block~\ref{assump:p2-byzantine}).
 \end{enumerate}
 
 \subsection{Conservative or Profile-Indexed Claims}
@@ -1129,7 +1139,7 @@ Under Assumption Block~4, this paper provides the exact safety-side interface an
 \begin{enumerate}
 	\item Non-regular fragments for decision transfer.
 	\item Byzantine liveness under weaker timing/adversary assumptions.
-	\item Reconfiguration commutation and envelope maximality (Harmony paper).
+		\item Reconfiguration commutation and envelope maximality (\emph{Harmony from Coherence in Asynchronous MPST}).
 \end{enumerate}
 
 \section{Reproducibility}
@@ -1155,19 +1165,20 @@ Expected checks: Finite-reachability and decision modules compile, weighted-meas
 		\toprule
 		\textbf{Claim} & \textbf{Sec.} & \textbf{Assumption} & \textbf{Location}      \\
 		\midrule
-		Theorem 1      & \S4           & Block 1 quant.      & WeightedMeasure/*.lean \\
-		Theorem 2      & \S5           & Block 2 regular.    & AsyncSubtyping/*.lean  \\
-		Theorem 3      & \S6           & Block 3 crash       & CrashTolerance.lean    \\
-		Theorem 4      & \S6           & Block 4 Byz.        & EnvelopeTheorems.lean  \\
+		Theorem 1      & \S4           & Assump.~\ref{assump:p2-quantitative} & \nolinkurl{WeightedMeasure/*.lean} \\
+		Theorem 2      & \S5           & Assump.~\ref{assump:p2-regular}      & \nolinkurl{AsyncSubtyping/*.lean}  \\
+		Theorem 3      & \S6           & Assump.~\ref{assump:p2-crash}        & \nolinkurl{CrashTolerance.lean}    \\
+		Theorem 4      & \S6           & Assump.~\ref{assump:p2-byzantine}    & \nolinkurl{EnvelopeTheorems.lean}  \\
 		Cor.\ 4.1      & \S6           & Thm 4 + dropped     & Section 6              \\
 		Cor.\ 1        & \S7           & Thm 1 premises      & derived in \S7         \\
 		Cor.\ 2        & \S7           & Thm 1 + sched.      & derived in \S7         \\
-		Cor.\ 3        & \S7           & regular + thresh.   & PhaseSharpness.lean    \\
-		Prop.\ 2       & \S6           & pack + adhere       & TheoremPack/*.lean     \\
+		Cor.\ 3        & \S7           & regular + thresh.   & \nolinkurl{PhaseSharpness.lean}    \\
+		Prop.\ 2       & \S6           & pack + adhere       & \nolinkurl{TheoremPack/*.lean}     \\
 		Prop.\ 1       & \S9           & repro checks        & Appendix D, F          \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Index of main results}
+\label{tab:p2-index}
 \end{table}
 
 \end{document}

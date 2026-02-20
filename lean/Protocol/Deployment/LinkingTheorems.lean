@@ -125,7 +125,7 @@ theorem mergeLin_unique (L₁ L₂ : LinCtx)
   exact hNo hb'
 
 -- Coherence Component Merge Lemmas
-private theorem HeadCoherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
+private theorem HeadCoherent_merge_link {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     (hHead₁ : HeadCoherent G₁ D₁)
     (hHead₂ : HeadCoherent G₂ D₂)
     (hDisjG : DisjointG G₁ G₂)
@@ -278,7 +278,7 @@ theorem link_preserves_WTMon_full (p₁ p₂ : DeployedProtocol)
     simpa [composeMonitorState] using LinkOKFull_coherent p₁ p₂ hLink
   · -- headCoherent
     simpa [composeMonitorState] using
-      HeadCoherent_merge hWT₁.headCoherent hWT₂.headCoherent hDisjG
+      HeadCoherent_merge_link hWT₁.headCoherent hWT₂.headCoherent hDisjG
         p₁.dConsistent_cert p₂.dConsistent_cert
   · -- validLabels
     simpa [composeMonitorState] using

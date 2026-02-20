@@ -24,21 +24,48 @@ pub trait GuardLayer {
     type Evidence: Clone;
 
     /// Acquire a layer resource and produce evidence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the layer cannot be acquired.
     fn open_(&mut self, layer: &LayerId) -> Result<(Self::Resource, Self::Evidence), String>;
+
     /// Release a layer resource and consume evidence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the layer cannot be released.
     fn close(&mut self, layer: &LayerId, evidence: Self::Evidence) -> Result<(), String>;
+
     /// Encode evidence for register transport.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if encoding fails.
     fn encode_evidence(evidence: &Self::Evidence) -> Result<Value, String>;
+
     /// Decode evidence from register value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if decoding fails.
     fn decode_evidence(value: &Value) -> Result<Self::Evidence, String>;
 
     /// Lean-name compatibility wrapper.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if encoding fails.
     #[allow(non_snake_case)]
     fn encodeEvidence(evidence: &Self::Evidence) -> Result<Value, String> {
         Self::encode_evidence(evidence)
     }
 
     /// Lean-name compatibility wrapper.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if decoding fails.
     #[allow(non_snake_case)]
     fn decodeEvidence(value: &Value) -> Result<Self::Evidence, String> {
         Self::decode_evidence(value)

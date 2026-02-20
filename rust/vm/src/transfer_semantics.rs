@@ -17,6 +17,11 @@ pub struct TransferRequest {
 }
 
 /// Decode transfer endpoint/target operands and enforce source ownership.
+///
+/// # Errors
+///
+/// Returns a `Fault` if registers are invalid, type mismatches occur, or
+/// the source coroutine does not own the endpoint.
 pub fn decode_transfer_request(
     coro: &Coroutine,
     role: &str,
@@ -58,6 +63,10 @@ pub fn decode_transfer_request(
 /// Move endpoint ownership plus all endpoint-scoped progress/knowledge bundles.
 ///
 /// If `target` is `None`, ownership is removed then restored on `source`.
+///
+/// # Errors
+///
+/// Returns a `Fault` if the source coroutine does not own the endpoint.
 pub fn move_endpoint_bundle(
     endpoint: &Endpoint,
     source: &mut Coroutine,

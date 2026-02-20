@@ -433,6 +433,10 @@ impl ThreadedVM {
     /// # Errors
     ///
     /// Returns a `VMError` if session or coroutine limits are exceeded.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a session lock is poisoned.
     pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
         if self.sessions.active_count() >= self.config.max_sessions {
             return Err(VMError::TooManySessions {
@@ -2020,7 +2024,7 @@ fn monitor_precheck(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn step_send(
     coro: &mut Coroutine,
     session: &mut SessionState,
@@ -2335,7 +2339,7 @@ fn guard_active(config: &VMConfig, layer: &str) -> Result<(), Fault> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::let_underscore_must_use)]
 fn step_acquire(
     coro: &mut Coroutine,
     ep: &Endpoint,
@@ -2640,7 +2644,7 @@ fn step_check(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn step_choose(
     coro: &mut Coroutine,
     session: &mut SessionState,
@@ -3186,7 +3190,7 @@ mod tests {
             },
         };
         session
-            .send_signed("A", "B", tampered)
+            .send_signed("A", "B", &tampered)
             .expect("inject signed payload");
 
         let mut coro = Coroutine::new(0, 0, sid, "B".to_string(), 8, usize::MAX);

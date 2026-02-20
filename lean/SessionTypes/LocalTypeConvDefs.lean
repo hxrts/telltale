@@ -199,13 +199,16 @@ mutual
     | .end, _ => LocalTypeR.end
     | .var n, hclosed =>
         by
-          classical
           -- Closedness ensures the index is in bounds.
           have hlt : n < ctx.length := by
             simpa [SessionTypes.LocalTypeDB.isClosedAt] using hclosed
           have hsome : ∃ v, SessionTypes.NameOnlyContext.get? ctx n = some v :=
             SessionTypes.NameOnlyContext.get?_lt (ctx := ctx) (i := n) hlt
-          exact LocalTypeR.var (Classical.choose hsome)
+          let ov := SessionTypes.NameOnlyContext.get? ctx n
+          have hov : ov.isSome := by
+            rcases hsome with ⟨v, hv⟩
+            simp [ov, hv]
+          exact LocalTypeR.var (Option.get ov hov)
     | .send p bs, hclosed =>
         have hclosed' : isClosedAtBranches ctx.length bs = true := by
           simpa [SessionTypes.LocalTypeDB.isClosedAt] using hclosed

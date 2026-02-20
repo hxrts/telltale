@@ -22,6 +22,11 @@ set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
 namespace SessionTypes.LocalTypeConvProofs
+open SessionTypes.GlobalType
+open SessionTypes.LocalTypeR
+open SessionTypes.LocalTypeDB
+open SessionTypes.LocalTypeConv
+open SessionTypes.NameOnlyContext
 
 /-! ## Substitution (Named → DB) -/
 

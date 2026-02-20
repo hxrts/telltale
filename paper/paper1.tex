@@ -83,23 +83,45 @@
 \setlist[description]{leftmargin=0pt, labelindent=0pt, itemsep=2pt, topsep=3pt}
 
 % ============================================================================
+% Numbering by section
+% ============================================================================
+
+\makeatletter
+\@addtoreset{figure}{section}
+\renewcommand{\thefigure}{\thesection.\arabic{figure}}
+\@addtoreset{table}{section}
+\renewcommand{\thetable}{\thesection.\arabic{table}}
+\makeatother
+\numberwithin{equation}{section}
+
+% ============================================================================
 % Theorem environments
 % ============================================================================
 
-\theoremstyle{definition}
+\newtheoremstyle{paperplain}%
+{3pt}{3pt}{\itshape}{}{\bfseries}{.}{0.5em}%
+{\thmname{#1}\thmnumber{ #2}\thmnote{. #3}}
+\newtheoremstyle{paperdef}%
+{3pt}{3pt}{\normalfont}{}{\bfseries}{.}{0.5em}%
+{\thmname{#1}\thmnumber{ #2}\thmnote{. #3}}
+\newtheoremstyle{paperremark}%
+{3pt}{3pt}{\normalfont}{}{\itshape}{.}{0.5em}%
+{\thmname{#1}\thmnumber{ #2}\thmnote{. #3}}
+
+\theoremstyle{paperdef}
 \newtheorem{definition}{Definition}[section]
 
-\theoremstyle{plain}
+\theoremstyle{paperplain}
 \newtheorem{theorem}[definition]{Theorem}
 \newtheorem{lemma}[definition]{Lemma}
 \newtheorem{proposition}[definition]{Proposition}
 \newtheorem{corollary}[definition]{Corollary}
 
-\theoremstyle{definition}
+\theoremstyle{paperdef}
 \newtheorem{example}[definition]{Example}
-\newtheorem{assumption}{Assumption Block}
+\newtheorem{assumption}{Assumption Block}[section]
 
-\theoremstyle{remark}
+\theoremstyle{paperremark}
 \newtheorem{remark}[definition]{Remark}
 
 % ============================================================================
@@ -141,11 +163,14 @@
   commentstyle=\color{gray},
   stringstyle=\color{red},
   breaklines=true,
-  frame=single,
+  frame=leftline,
+  rulecolor=\color{black!10},
+  framerule=3pt,
+  framesep=1em,
   columns=fullflexible,
   aboveskip=5pt,
   belowskip=5pt,
-  xleftmargin=0pt,
+  xleftmargin=1.5em,
   literate={->}{$\to$\ }2 {forall}{$\forall$}1 {:=}{$\coloneqq$}2
 }
 
@@ -220,7 +245,8 @@ compose directly.
 
 The local-to-global shape follows standard invariant methods from program logics (Reynolds, 2002;
 O'Hearn, 2007), while aligning with process-calculus decomposition tradition (Plotkin, 1981;
-Milner, 1999).
+Milner, 1999) and Lyapunov-style invariant-function reasoning in dynamical systems (Lyapunov, 1892;
+LaSalle, 1960).
 
 \subsection{Scope and Claims}
 
@@ -230,9 +256,9 @@ applies uniformly across transitions. The second is session evolution under subt
 compatibility premises.
 
 This is the first publication in a three-part series on asynchronous buffered semantics with
-\texttt{DeliveryModel} parameterization. This paper precisely defines the invariant kernel. The second paper
-develops quantitative bounds and decision procedures on that kernel. And the third paper proves
-reconfiguration commutation and envelope exactness.
+\texttt{DeliveryModel} parameterization. This paper precisely defines the invariant kernel.
+\emph{Computable Dynamics for Asynchronous MPST} develops quantitative bounds and decision procedures on that kernel.
+\emph{Harmony from Coherence in Asynchronous MPST} proves reconfiguration commutation and envelope exactness.
 
 Our contributions are as follows:
 \begin{enumerate}
@@ -314,6 +340,7 @@ Configurations are represented by endpoint and edge environments. \GEnv{} maps e
 \end{table}
 
 \begin{assumption}[Core Model Premises]
+	\label{assump:p1-core}
 	Core claims in this paper assume asynchronous buffered semantics, active-edge quantification, and \texttt{DeliveryModel} parameterization. Fair scheduling assumptions apply where stated.
 \end{assumption}
 
@@ -338,20 +365,14 @@ Configurations are represented by endpoint and edge environments. \GEnv{} maps e
 \end{definition}
 
 Delivery behavior is parameterized by \texttt{DeliveryModel}. This gives one theorem shape across FIFO, causal, and lossy instances.
-\begin{figure}[tbp]
-	\centering
-	\footnotesize
-	\[
-		\begin{aligned}[t]
-			\Coherent(G,D)\ :=\ \forall e,\ \ActiveEdge(G,e)
-			\\
-			\to\ \EdgeCoherent(G,D,e).
-		\end{aligned}
-	\]
-	\vspace{-6pt}
-	\caption{Active-edge quantification boundary: only edges with present endpoints contribute coherence obligations.}
-	\label{fig:p1-active-edge-boundary}
-\end{figure}
+\begin{equation}
+	\label{eq:p1-active-edge-boundary}
+	\begin{aligned}[t]
+		\Coherent(G,D)\ :=\ \forall e,\ \ActiveEdge(G,e)
+		\\
+		\to\ \EdgeCoherent(G,D,e).
+	\end{aligned}
+\end{equation}
 Edges incident to absent endpoints are excluded by $\ActiveEdge$.
 
 \begin{table}[tbp]
@@ -407,20 +428,20 @@ The key structural correspondence is compatibility. A coherence-space token corr
 
 \textbf{Running example.} Roles are \texttt{C} (client), \texttt{P} (pool), and \texttt{M} (monitor), with global interaction:
 
-	\noindent\begin{minipage}{\columnwidth}
-		\begin{lstlisting}
+\noindent\begin{minipage}{\columnwidth}
+	\begin{lstlisting}
 C -> P : Request(n)
 P -> C : Grant(k)
 C -> M : Report(k)
 M -> P : Confirm
 P -> C : Token(t)
 \end{lstlisting}
-	\end{minipage}
+\end{minipage}
 
-	Fix local continuations:
+Fix local continuations:
 
-	\noindent\begin{minipage}{\columnwidth}
-		\begin{lstlisting}
+\noindent\begin{minipage}{\columnwidth}
+	\begin{lstlisting}
 L_C := recv P Grant(k);
        send M Report(k);
        recv P Token(t); end
@@ -429,53 +450,49 @@ L_P := recv M Confirm;
 L_M := recv C Report(k);
        send P Confirm; end
 \end{lstlisting}
-	\end{minipage}
+\end{minipage}
 
-	and in-flight configuration $(G_0,D_0)$:
+and in-flight configuration $(G_0,D_0)$:
 
-	\noindent\begin{minipage}{\columnwidth}
-		\begin{lstlisting}
+\noindent\begin{minipage}{\columnwidth}
+	\begin{lstlisting}
 G_0(C) = L_C
 G_0(P) = L_P
 G_0(M) = L_M
 D_0(P,C) = [Grant(k)]
 D_0(e)   = []    for e != (P,C)
 \end{lstlisting}
-	\end{minipage}
+\end{minipage}
 
 Assume typing judgment $\Gamma \vdash (G_0,D_0)\ \wf$.
 
 The active-edge obligation is:
-\[
+\begin{equation}
 	\forall e,\ \ActiveEdge(G_0,e)\to \EdgeCoherent(G_0,D_0,e).
-\]
-
+\end{equation}
 The example is used via the following derived rule instances.
 
 	{\footnotesize
-		\[
+		\begin{gather}
 			\dfrac{
 				\Gamma \vdash (G_0,D_0)\ \wf \quad D_0(P,C){=}[\mathrm{Grant}]
 			}{
 				(G_0,D_0){\to}(G_1,D_1) \land \EdgeCoherent(G_1,D_1,e)
 			}
-		\]
-
-		\[
+			\\[10pt]
 			\dfrac{
 				\Gamma \vdash (G_1,D_1)\ \wf \quad \mathsf{Consume\_append}
 			}{
 				(G_1,D_1){\to}(G_2,D_2) \land \EdgeCoherent(G_2,D_2,e)
 			}
-		\]
-
-		\[
+			\\[10pt]
 			\dfrac{
 				\Coherent(G_0,D_0) \quad \RecvCompatible(G_0,G'_0)
 			}{
 				\Coherent(G'_0,D_0)
 			}
-		\]
+		\end{gather}
+		\vspace{6pt}
 	}
 
 For the step edge $u=(C,M)$, the case split used later is: updated ($e=u$), shared-endpoint ($e\neq u \land \EdgeShares(e,C\ \text{or}\ M)$), and unrelated ($e\neq u$ and no shared endpoint).
@@ -488,9 +505,9 @@ For the step edge $u=(C,M)$, the case split used later is: updated ($e=u$), shar
 \begin{theorem}[Coherence Preservation]
 	\label{thm:coherence-preservation}
 	For all environments $G,D,G',D'$, if $(G,D) \to (G',D')$ is a well-typed step in the send and recv and select and branch fragment, then
-	\[
+	\begin{equation}
 		\Coherent(G,D) \implies \Coherent(G',D').
-	\]
+	\end{equation}
 	This claim is exact for one-step preservation in the stated core rule fragment.
 \end{theorem}
 
@@ -514,35 +531,28 @@ For the step edge $u=(C,M)$, the case split used later is: updated ($e=u$), shar
 	The same skeleton is used uniformly across send/recv/select/branch, which is the main proof-reuse gain in this paper.
 \end{proof}
 
-The split operator is implemented by \texttt{edge\_case\_split}. Rule-level preservation lemmas are grouped by send, recv, select, and branch cases. Table~4 gives the primary module map, and \cref{app:chains} records theorem-to-lemma chains with exact Lean anchors.
+The split operator is implemented by \texttt{edge\_case\_split}. Rule-level preservation lemmas are grouped by send, recv, select, and branch cases. Table~\ref{tab:p1-claim-artifact-map} gives the primary module map, and \cref{app:chains} records theorem-to-lemma chains with exact Lean anchors.
 
 The architecture is quotient-first. The concrete step relation induces dynamics on equivalence classes once coherence-preserving symmetries are quotiented out.
 
 The quotienting step should be read as symmetry reduction. Distinct interleavings that are equivalent under the symmetry relation are identified as one observable class. Formally, the induced square is:
-\[
+\begin{equation}
 	q(\mathsf{step}(C))\ =\ \mathsf{step}_{/ \sim}(q(C)).
-\]
-
+\end{equation}
 The square states the commuting condition used across these three papers. This paper establishes the preservation side needed to make the quotient dynamics well-defined.
 
-\begin{figure}[tbp]
-	\centering
-	\scriptsize
-	\[
-		\begin{array}{c}
-			\text{checked edge }e \\[2pt]
-			\Downarrow            \\[2pt]
-			\begin{array}{l}
-				\text{(updated)}\quad e=u                                    \\
-				\text{(shared)}\quad e\neq u\land \EdgeShares(e,\mathit{ep}) \\
-				\text{(unrelated)}\quad e\neq u\land \neg \EdgeShares(e,\mathit{ep})
-			\end{array}
+The case partition used by \texttt{edge\_case\_split} is:
+\begin{equation}
+	\begin{array}{c}
+		\text{checked edge }e \\[2pt]
+		\Downarrow            \\[2pt]
+		\begin{array}{l}
+			\text{(updated)}\quad e=u                                    \\
+			\text{(shared)}\quad e\neq u\land \EdgeShares(e,\mathit{ep}) \\
+			\text{(unrelated)}\quad e\neq u\land \neg \EdgeShares(e,\mathit{ep}).
 		\end{array}
-	\]
-	\vspace{-6pt}
-	\caption{Case partition used by \texttt{edge\_case\_split}: updated, shared-endpoint, and unrelated edges.}
-	\label{fig:p1-case-partition}
-\end{figure}
+	\end{array}
+\end{equation}
 The three branches are discharged by updated-edge preservation, shared-endpoint transport, and unrelated-edge frame transport, respectively.
 
 % ============================================================================
@@ -584,16 +594,17 @@ Session evolution replaces one endpoint local type with a compatible refinement 
 This replacement argument follows a standard commutation intuition from trace-equivalence and commuting-conversion lines. The standard point is that local reorderings or local refinements should preserve observable behavior when compatibility conditions hold. What is new here is an operational criterion for asynchronous subtype replacement that is stated directly through \texttt{Consume\_mono} and discharged with edge-local coherence obligations.
 
 \begin{assumption}[Replacement Compatibility]
+	\label{assump:p1-replacement}
 	The subtype-evolution theorem assumes endpoint replacement at $ep$ satisfies typing-domain preservation, receive-side monotonicity side conditions, and environment consistency for unaffected endpoints.
 \end{assumption}
 
 \begin{theorem}[Session Evolution via \texttt{Consume\_mono}]
 	\label{thm:session-evolution}
-	For all endpoints $ep$ and environments $G,D,G_{\mathrm{rep}}$, if Assumption Block~1 holds for replacement at $ep$, then
-	\[
+	For all endpoints $ep$ and environments $G,D,G_{\mathrm{rep}}$, if Assumption Block~\ref{assump:p1-replacement} holds for replacement at $ep$, then
+	\begin{equation}
 		\Coherent(G,D) \implies \Coherent(G_{\mathrm{rep}},D).
-	\]
-	This claim is exact for type replacement steps covered by Assumption Block~1.
+	\end{equation}
+	This claim is exact for type replacement steps covered by Assumption Block~\ref{assump:p1-replacement}.
 \end{theorem}
 
 \begin{proof}[Proof sketch]
@@ -610,23 +621,17 @@ This replacement argument follows a standard commutation intuition from trace-eq
 \end{proof}
 
 Core lemmas are in the subtype-replacement core and liveness layers.
-\begin{figure}[tbp]
-	\centering
-	\footnotesize
-	\[
-		\begin{aligned}[t]
-			\Coherent(G,D)\ \land\ \mathsf{Compat}_{ep}(G,G_{\mathrm{rep}})
-			\\
-			\Longrightarrow\ \Coherent(G_{\mathrm{rep}},D)
-		\end{aligned}
-	\]
-	\[
-		\texttt{Consume\_mono}\ \Longrightarrow\ \text{edge lift}\ \Longrightarrow\ \text{global lift}
-	\]
-	\vspace{-8pt}
-	\caption{Subtype-replacement commutation principle and proof-lift chain.}
-	\label{fig:p1-replacement-commutation}
-\end{figure}
+The subtype-replacement commutation principle and proof-lift chain are:
+\begin{equation}
+	\begin{aligned}[t]
+		\Coherent(G,D)\ \land\ \mathsf{Compat}_{ep}(G,G_{\mathrm{rep}})
+		\\
+		\Longrightarrow\ \Coherent(G_{\mathrm{rep}},D),
+	\end{aligned}
+\end{equation}
+\begin{equation}
+	\texttt{Consume\_mono}\ \Longrightarrow\ \text{edge lift}\ \Longrightarrow\ \text{global lift},
+\end{equation}
 with compatibility discharged by \texttt{Consume\_mono} and replacement side conditions.
 
 % ============================================================================
@@ -634,24 +639,25 @@ with compatibility discharged by \texttt{Consume\_mono} and replacement side con
 \label{sec:mechanization}
 % ============================================================================
 
-Table~4 maps each core claim to concrete modules and representative theorem anchors.
+Table~\ref{tab:p1-claim-artifact-map} maps each core claim to concrete modules and representative theorem anchors.
 
 \begin{table}[tbp]
 	\centering
 	\footnotesize
 	\begin{tabularx}{\columnwidth}{@{}L{0.27\columnwidth}L{0.36\columnwidth}L{0.27\columnwidth}@{}}
 		\toprule
-		\textbf{Claim}    & \textbf{Modules}                       & \textbf{Anchors}        \\
+		\textbf{Claim}    & \textbf{Modules}                                              & \textbf{Anchors}                        \\
 		\midrule
-		Definitions       & Consume.lean, EdgeCoherence\-Core.lean & Consume, Edge\-Coherent \\
-		Consume kernel    & Consume.lean                           & Consume\_append         \\
-		Three-way split   & Unified.lean                           & edge\_case\_split       \\
-		Preservation      & Preservation*.lean                     & Coherent\_*\_preserved  \\
-		Delivery variants & DeliveryModel.lean                     & *Delivery\_laws         \\
-		Subtype repl.     & SubtypeReplacement*.lean               & Consume\_mono           \\
+		Definitions       & \nolinkurl{Consume.lean}, \nolinkurl{EdgeCoherence-Core.lean} & \texttt{Consume}, \texttt{EdgeCoherent} \\
+		Consume kernel    & \nolinkurl{Consume.lean}                                      & \texttt{Consume\_append}                \\
+		Three-way split   & \nolinkurl{Unified.lean}                                      & \texttt{edge\_case\_split}              \\
+		Preservation      & \nolinkurl{Preservation*.lean}                                & \texttt{Coherent\_*\_preserved}         \\
+		Delivery variants & \nolinkurl{DeliveryModel.lean}                                & \texttt{*Delivery\_laws}                \\
+		Subtype repl.     & \nolinkurl{SubtypeReplacement*.lean}                          & \texttt{Consume\_mono}                  \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Claim to artifact mapping}
+	\label{tab:p1-claim-artifact-map}
 \end{table}
 
 % ============================================================================
@@ -686,11 +692,12 @@ this section are conditional on explicit monitor and quotient-transport premises
 \end{table}
 
 \begin{assumption}[Byzantine Interface Premises]
+	\label{assump:p1-byzantine}
 	The interface statements in this section assume shared notation for $\Hbyz$, $\Obssafe$, $\Eqsafe$, and $\Ebyz$, plus theorem-pack capability naming consistency between abstract and runtime layers.
 \end{assumption}
 
 \begin{theorem}[Byzantine Interface Well-Formedness (BZ-1)]
-	Under Assumption Block~2, Byzantine safety-track statements in this paper are interpreted on configurations $(G,D)$ satisfying $\ByzIfaceWF(G,D)$ (definitional alias of $\Coherent(G,D)$). For any active edge, this interface yields the same sender-existence and $\Consume$ obligations as the Coherence layer.
+	Under Assumption Block~\ref{assump:p1-byzantine}, Byzantine safety-track statements in this paper are interpreted on configurations $(G,D)$ satisfying $\ByzIfaceWF(G,D)$ (definitional alias of $\Coherent(G,D)$). For any active edge, this interface yields the same sender-existence and $\Consume$ obligations as the Coherence layer.
 \end{theorem}
 
 \begin{corollary}[Dropped-Assumption Witness Interface (BZ-1.1)]
@@ -708,7 +715,7 @@ this section are conditional on explicit monitor and quotient-transport premises
 
 Classical MPST establishes global coherence and projectability as conditions on global types and projection (Honda et al., 2008, Honda et al., 2016, Castagna et al., 2012, and Majumdar et al., 2021). Logical lines interpret multiparty compatibility as n-ary duality and proof compatibility (Carbone et al., 2015, Carbone et al., 2016, and Carbone et al., 2017). Data certification extensions remain in the same global-projection discipline (Toninho et al., 2017).
 
-This paper does not introduce coherence as a new MPST notion. It refines established coherence with an operational invariant $\Coherent(G,D)$ over local environments and buffered traces. The novelty is an asynchronous preservation architecture that discharges obligations edge-locally and avoids per-step global re-derivation.
+This paper refines the established notion of coherence in MPST with an operational invariant $\Coherent(G,D)$ over local environments and buffered traces. The novelty is an asynchronous preservation architecture that discharges obligations edge-locally and avoids per-step global re-derivation.
 
 Local-first and rely/guarantee lines motivate alternatives to global-first checks (Scalas and Yoshida, 2018). Program-logical lines such as Actris target implementation proofs over protocol resources at a different verification layer (Hinrichsen et al., 2020). Event-structure and partial-order lines provide complementary macro semantics for concurrency (Castellan et al., 2023).
 
@@ -749,7 +756,7 @@ Quantitative, fault-characterization, and envelope-level claims are proved in la
 \label{sec:conclusion}
 % ============================================================================
 
-Since Honda et al.\ (2008), many preservation accounts for asynchronous MPST have been organized around global re-derivation after each step. This paper gives a mechanized alternative.
+Since Honda et al.\ (2008), many preservation accounts for asynchronous MPST have been organized around global re-derivation after each step. This paper provides a mechanized alternative.
 
 The key insight is that projection from global to local types defines an erasure. The operational invariant $\Coherent(G,D)$ is exact for our preservation architecture. Because it is exact at the operational boundary, local proofs compose without global re-derivation.
 
@@ -778,6 +785,8 @@ The resulting kernel is small, compositional, and extensible. It supports subtyp
 	\item Honda, K., Vasconcelos, V. T., and Kubo, M. (1998). Language Primitives and Type Discipline for Structured Communication-Based Programming. ESOP 1998.
 	\item Honda, K., Yoshida, N., and Carbone, M. (2008). Multiparty Asynchronous Session Types. POPL 2008.
 	\item Honda, K., Yoshida, N., and Carbone, M. (2016). Multiparty Asynchronous Session Types. Journal of the ACM, 63(1), Article 9.
+	\item LaSalle, J. P. (1960). Some Extensions of Liapunov's Second Method. IRE Transactions on Circuit Theory, 7(4), 520--527.
+	\item Lyapunov, A. M. (1892). The General Problem of the Stability of Motion. Kharkov Mathematical Society.
 	\item Majumdar, R., Mukund, M., Stutz, F., and Zufferey, D. (2021). Generalising Projection in Asynchronous Multiparty Session Types. CONCUR 2021.
 	\item Milner, R. (1999). Communicating and Mobile Systems: The Pi-Calculus. Cambridge University Press.
 	\item Milner, R., Parrow, J., and Walker, D. (1992). A Calculus of Mobile Processes, I and II. Information and Computation, 100(1), 1--77.
@@ -967,14 +976,14 @@ Reproduction uses the repository-pinned Lean toolchain and manifest.
 	\footnotesize
 	\begin{tabularx}{\columnwidth}{@{}L{0.2\columnwidth}L{0.08\columnwidth}L{0.3\columnwidth}L{0.32\columnwidth}@{}}
 		\toprule
-		\textbf{Claim} & \textbf{Sec.} & \textbf{Assumption} & \textbf{Location}  \\
+		\textbf{Claim} & \textbf{Sec.} & \textbf{Assumption}                                      & \textbf{Location}              \\
 		\midrule
-		Theorem 1      & \S4           & Block 0 + core      & Preservation*.lean \\
-		Theorem 2      & \S6           & Block 1 compat.     & SubtypeRepl*.lean  \\
-		Prop.\ 1       & \S8           & Block 0 + oblig.    & runtime bridge     \\
-		Thm.\ BZ-1     & \S8           & Block 2 iface       & EnvelopeThms.lean  \\
-		Cor.\ BZ-1.1   & \S8           & Block 2 + wit.      & derived            \\
-		Prop.\ BZ-1.2  & \S8           & Block 2 + gate      & TheoremPack/*.lean \\
+		Theorem 1      & \S4           & Core model premises (\ref{assump:p1-core})               & \nolinkurl{Preservation*.lean} \\
+		Theorem 2      & \S6           & Replacement compatibility (\ref{assump:p1-replacement})  & \nolinkurl{SubtypeRepl*.lean}  \\
+		Prop.\ 1       & \S8           & Core model + bridge obligations                          & runtime bridge                 \\
+		Thm.\ BZ-1     & \S8           & Byzantine interface premises (\ref{assump:p1-byzantine}) & \nolinkurl{EnvelopeThms.lean}  \\
+		Cor.\ BZ-1.1   & \S8           & Byzantine interface + witnesses                          & derived                        \\
+		Prop.\ BZ-1.2  & \S8           & Byzantine interface + gate                               & \nolinkurl{TheoremPack/*.lean} \\
 		\bottomrule
 	\end{tabularx}
 	\captionof{table}{Index of main results}

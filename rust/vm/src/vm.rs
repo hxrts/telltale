@@ -332,6 +332,7 @@ impl Clone for Box<dyn FlowPolicyFn> {
     }
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for FlowPolicy {
     fn default() -> Self {
         Self::AllowAll
@@ -1202,6 +1203,7 @@ impl VM {
     /// # Errors
     ///
     /// Returns a `VMError` if a coroutine faults.
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn kernel_step_round(
         &mut self,
         handler: &dyn EffectHandler,
@@ -1595,6 +1597,11 @@ impl VM {
     }
 
     /// Runtime well-formedness predicate used by debug assertions.
+    ///
+    /// # Errors
+    ///
+    /// Returns a description of the invariant violation if the VM state is invalid.
+    #[allow(clippy::too_many_lines)]
     pub fn wf_vm_state(&self) -> Result<(), String> {
         for coro in &self.coroutines {
             if self.sessions.get(coro.session_id).is_none() {
@@ -2217,6 +2224,7 @@ impl VM {
     // ---- Per-instruction step functions (each owns its type logic) ----
 
     /// Send: lookup type → match Send → compute payload → enqueue → StepPack with L'.
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn step_send(
         &mut self,
         coro_idx: usize,
@@ -2317,10 +2325,9 @@ impl VM {
                     } else {
                         payload
                     };
-                    let enqueue = session
+                    session
                         .send(role, &partner, payload)
-                        .map_err(|e| Fault::InvokeFault { message: e })?;
-                    enqueue
+                        .map_err(|e| Fault::InvokeFault { message: e })?
                 }
                 SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
             }
@@ -2603,7 +2610,7 @@ impl VM {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, clippy::let_underscore_must_use)]
     pub(crate) fn step_acquire(
         &mut self,
         coro_idx: usize,
