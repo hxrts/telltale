@@ -2,15 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BASELINE_FILE="${ROOT_DIR}/scripts/baselines/vm_placeholders.allowlist"
 
 if ! command -v rg >/dev/null 2>&1; then
   echo "error: ripgrep (rg) is required" >&2
-  exit 2
-fi
-
-if [[ ! -f "${BASELINE_FILE}" ]]; then
-  echo "error: missing baseline file ${BASELINE_FILE}" >&2
   exit 2
 fi
 
@@ -25,13 +19,6 @@ CURRENT_HITS="$({
     "${ROOT_DIR}/lean/Runtime/VM/API.lean" \
     -g '*.lean' || true
 } | sed "s#${ROOT_DIR}/##" | sort -u)"
-
-BASELINE_HITS="$(sed '/^\s*#/d;/^\s*$/d' "${BASELINE_FILE}")"
-if [[ -n "${BASELINE_HITS}" ]]; then
-  echo "error: ${BASELINE_FILE} must be empty in strict-conformance mode." >&2
-  echo "Remove allowlisted markers and clear the baseline file." >&2
-  exit 1
-fi
 
 if [[ -n "${CURRENT_HITS}" ]]; then
   echo "error: found placeholder/todo/stub markers in executable VM modules:" >&2
