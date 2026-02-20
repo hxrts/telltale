@@ -94,9 +94,33 @@ Executable modules must not depend on placeholder proof definitions. Proof-only 
 
 ## Deviation Governance
 
-Any intentional parity break must be recorded in `docs/lean_vs_rust_deviations.json` before merge. Required fields include `id`, `owner`, `status`, `reason`, `impact`, `alternatives_considered`, `revisit_date`, and `covers`.
+Any intentional parity break must be recorded in the deviation table below before merge. Required fields include id, owner, status, reason, impact, alternatives considered, revisit date, and coverage scope.
 
-Active deviations are tracked in `docs/lean_vs_rust_deviations.json`. Current active entry keeps threaded multi-pick wave rounds as a performance extension. The entry is gated by CI and revisit date ownership.
+### Deviation Registry
+
+| ID | Status | Owner | Revisit | Summary |
+|----|--------|-------|---------|---------|
+| threaded-round-extension | resolved | vm-runtime | 2026-04-30 | Threaded backend defaults to canonical one-step rounds |
+
+### Deviation Details
+
+#### threaded-round-extension
+
+**Lean:** `Runtime/VM/Runtime/Runner.lean`
+**Rust:** `rust/vm/src/threaded.rs`
+
+**Reason:** VMConfig now exposes `threaded_round_semantics` and defaults to canonical one-step semantics aligned with Lean.
+
+**Impact:** No active parity divergence remains for default threaded execution; multi-pick wave mode is now an explicit opt-in extension.
+
+**Alternatives considered:** Keeping wave-parallel semantics as default was rejected because it kept parity drift in the baseline runner path.
+
+**Covers:** `threaded.round.wave.parallelism`
+
+**Tests:**
+- `rust/vm/tests/topology_effect_ingress.rs::cooperative_vm_ingests_topology_events_before_instruction_effects`
+- `rust/vm/tests/threaded_lane_runtime.rs`
+- `rust/vm/tests/parity_fixtures_v2.rs::envelope_bounded_parity_holds_for_n_gt_1`
 
 ## CI Gates
 
@@ -104,9 +128,24 @@ The minimum parity governance gates are `scripts/check-parity-ledger.sh`, `scrip
 
 If any gate fails, parity drift is treated as a release blocker.
 
+## Performance SLA
+
+Runtime performance governance enforces explicit thresholds from `artifacts/v2/benchmark_matrix/summary.json` in `scripts/check-runtime-performance-governance.sh`.
+
+- `TT_SLA_THROUGHPUT_RATIO_MIN` (default `1.0`)
+- `TT_SLA_P99_REGRESSION_MAX_PERCENT` (default `15.0`)
+- `TT_SLA_LOCK_CONTENTION_REDUCTION_MIN_PERCENT` (default `50.0`)
+
+If any threshold is violated, CI fails before benchmark lanes are considered healthy.
+
 ## Update Rule
 
-When any parity matrix row changes, update this file and `docs/lean_vs_rust_deviations.json` in the same change set. For any VM PR that changes public runtime behavior, include a parity impact statement in the PR checklist and add differential tests when observable behavior changes.
+When any parity matrix row changes, update the Deviation Registry table in this file in the same change set. For any VM PR that changes public runtime behavior, include a parity impact statement in the PR checklist and add differential tests when observable behavior changes.
+
+## Naming Compatibility
+
+Rust VM includes explicit Lean-compatibility wrappers such as `openDelta`, `siteName`, and `signValue`.
+These wrappers intentionally keep Lean-facing casing and therefore retain focused `#[allow(non_snake_case)]` annotations in `guard.rs`, `identity.rs`, `persistence.rs`, and `verification.rs`.
 
 ## Related Docs
 

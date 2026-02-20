@@ -2,22 +2,13 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LEDGER_PATH="${ROOT_DIR}/docs/lean_vs_rust_deviations.json"
 
-if [[ ! -f "${LEDGER_PATH}" ]]; then
-  echo "error: missing deviation ledger at ${LEDGER_PATH}" >&2
-  exit 1
-fi
-
-python3 - "${ROOT_DIR}" "${LEDGER_PATH}" <<'PY'
-import json
+python3 - "${ROOT_DIR}" <<'PY'
 import re
 import sys
 from pathlib import Path
-from datetime import datetime
 
 root = Path(sys.argv[1])
-ledger_path = Path(sys.argv[2])
 
 
 def fail(msg: str) -> None:
@@ -225,84 +216,6 @@ struct_checks = [
     },
 ]
 
-try:
-    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
-except json.JSONDecodeError as exc:
-    fail(f"invalid JSON in {ledger_path}: {exc}")
-
-if not isinstance(ledger, dict):
-    fail("deviation ledger root must be a JSON object")
-if not isinstance(ledger.get("schema_version"), int):
-    fail("deviation ledger must include integer schema_version")
-deviations = ledger.get("deviations")
-if not isinstance(deviations, list):
-    fail("deviation ledger must include array field deviations")
-
-allowed_status = {"active", "resolved"}
-seen_ids: set[str] = set()
-active_coverage: set[str] = set()
-
-required_fields = {
-    "id",
-    "owner",
-    "status",
-    "reason",
-    "impact",
-    "alternatives_considered",
-    "revisit_date",
-    "covers",
-    "lean_refs",
-    "rust_refs",
-}
-
-for idx, entry in enumerate(deviations):
-    if not isinstance(entry, dict):
-        fail(f"deviations[{idx}] must be an object")
-    missing = sorted(required_fields - set(entry.keys()))
-    if missing:
-        fail(f"deviations[{idx}] missing required fields: {', '.join(missing)}")
-
-    entry_id = entry["id"]
-    if not isinstance(entry_id, str) or not entry_id:
-        fail(f"deviations[{idx}].id must be a non-empty string")
-    if entry_id in seen_ids:
-        fail(f"duplicate deviation id: {entry_id}")
-    seen_ids.add(entry_id)
-
-    status = entry["status"]
-    if status not in allowed_status:
-        fail(f"deviation {entry_id}: status must be one of {sorted(allowed_status)}")
-
-    owner = entry["owner"]
-    if not isinstance(owner, str) or not owner.strip():
-        fail(f"deviation {entry_id}: owner must be a non-empty string")
-
-    revisit = entry["revisit_date"]
-    if not isinstance(revisit, str):
-        fail(f"deviation {entry_id}: revisit_date must be a YYYY-MM-DD string")
-    try:
-        datetime.strptime(revisit, "%Y-%m-%d")
-    except ValueError:
-        fail(f"deviation {entry_id}: invalid revisit_date (expected YYYY-MM-DD)")
-
-    covers = entry["covers"]
-    if not isinstance(covers, list) or not all(isinstance(item, str) for item in covers):
-        fail(f"deviation {entry_id}: covers must be an array of strings")
-
-    for ref_field in ("lean_refs", "rust_refs"):
-        refs = entry[ref_field]
-        if not isinstance(refs, list) or not refs or not all(isinstance(item, str) for item in refs):
-            fail(f"deviation {entry_id}: {ref_field} must be a non-empty array of strings")
-
-    for text_field in ("reason", "impact", "alternatives_considered"):
-        if not isinstance(entry[text_field], str) or not entry[text_field].strip():
-            fail(f"deviation {entry_id}: {text_field} must be a non-empty string")
-
-    if status == "active":
-        if not covers:
-            fail(f"deviation {entry_id}: active deviation must cover at least one mismatch fingerprint")
-        active_coverage.update(covers)
-
 verify_workflow = root / ".github/workflows/verify.yml"
 check_workflow = root / ".github/workflows/check.yml"
 justfile = root / "justfile"
@@ -341,16 +254,13 @@ for check in struct_checks:
     for field in missing_in_rust:
         mismatches.append(f"{check['label']}:missing_field_in_rust:{field}")
 
-if not mismatches:
-    print("[parity] policy/data shape parity check passed with no mismatches")
-else:
-    uncovered = [m for m in mismatches if m not in active_coverage]
-    if uncovered:
-        print("[parity] uncovered mismatches:")
-        for mismatch in uncovered:
-            print(f"  - {mismatch}")
-        fail("found Lean/Rust parity mismatches without active ledger coverage")
-    print("[parity] mismatches are fully covered by active ledger entries")
+if mismatches:
+    print("[parity] uncovered mismatches:")
+    for mismatch in mismatches:
+        print(f"  - {mismatch}")
+    fail("found Lean/Rust parity mismatches - add deviation entry to docs/15_vm_parity.md Deviation Registry")
+
+print("[parity] policy/data shape parity check passed with no mismatches")
 
 verify_text = verify_workflow.read_text(encoding="utf-8")
 check_text = check_workflow.read_text(encoding="utf-8")
