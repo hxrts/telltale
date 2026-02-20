@@ -14,18 +14,13 @@ ci-dry-run:
     cargo test --workspace --all-targets --all-features
     just check-arch
     just check-arch-lean
-    just check-speculation-wp-surface
-    just check-runtime-contract-gates
-    just check-runtime-performance-governance
-    just check-failure-capabilities
+    just check-lean-dependency-pins
+    just check-capability-gates
     just check-release-conformance
-    just check-envelope-conformance
-    just check-byzantine-conformance
-    just check-delegation-shard-gate
-    just check-v2-baseline
+    just v2-baseline check
     just check-vm-placeholders
-    just check-parity-ledger
-    just check-vm-parity-suite
+    just check-parity
+    just v2-baseline sla
     just check-lean-metrics
     # Benchmark target compilation checks
     just bench-check
@@ -50,65 +45,36 @@ lint-quick:
 check-arch-rust:
     ./scripts/check-arch-rust.sh
 
-# Governance gate: proof/conformance checks before perf lanes
-check-runtime-performance-governance:
-    ./scripts/check-runtime-performance-governance.sh
+# Backward-compatible alias used by CI dry-run pipeline
+check-arch: check-arch-rust
 
 # Lean architecture/style-guide pattern checker
 check-arch-lean:
     ./scripts/check-arch-lean.sh
 
-# Speculation/WP placeholder-surface conformance checks
-check-speculation-wp-surface:
-    ./scripts/check-speculation-wp-surface.sh
+# Validate pinned revisions for local Lean dependency checkouts.
+check-lean-dependency-pins:
+    ./scripts/check-lean-dependency-pins.sh
 
-# Runtime admission/profile capability-gate checks
-check-runtime-contract-gates:
-    ./scripts/check-runtime-contract-gates.sh
-
-# Failure theorem-capability conformance checks
-check-failure-capabilities:
-    ./scripts/check-failure-capabilities.sh
+# Consolidated capability gate checks (byzantine, delegation, envelope, failure, contracts, speculation)
+check-capability-gates:
+    ./scripts/check-capability-gates.sh --all
 
 # Release theorem-capability and conformance checks
 check-release-conformance:
     ./scripts/check-release-conformance.sh
 
-# Envelope theorem-capability and conformance checks
-check-envelope-conformance:
-    ./scripts/check-envelope-conformance.sh
-
-# V2 baseline artifact integrity checks
-check-v2-baseline:
-    ./scripts/check-v2-baseline.sh
-
-# Capture/freeze V2 baseline metrics + conformance artifacts
-v2-freeze-baseline:
-    ./scripts/v2-freeze-baseline.sh
-
-# Run V2 benchmark matrix across disjoint and contended workloads
-run-v2-benchmark-matrix:
-    ./scripts/run-v2-benchmark-matrix.sh
-
-# Byzantine theorem-capability and conformance checks
-check-byzantine-conformance:
-    ./scripts/check-byzantine-conformance.sh
-
-# Delegation-only cross-shard ownership transition gate
-check-delegation-shard-gate:
-    ./scripts/check-delegation-shard-gate.sh
+# V2 baseline management (check, freeze, run, sla)
+v2-baseline mode="check":
+    ./scripts/v2-baseline.sh {{ mode }}
 
 # Prevent new placeholder/stub/TODO markers in executable Lean VM modules.
 check-vm-placeholders:
     ./scripts/check-vm-placeholders.sh
 
-# Lean/Rust VM parity-contract + deviation-ledger checks
-check-parity-ledger:
-    ./scripts/check-parity-ledger.sh
-
-# Canonical Lean/Rust VM differential parity suite
-check-vm-parity-suite:
-    ./scripts/check-vm-parity-suite.sh
+# Consolidated Lean/Rust parity checks (types, suite, conformance)
+check-parity mode="--all":
+    ./scripts/check-parity.sh {{ mode }}
 
 # Refresh generated Lean metrics in docs
 sync-lean-metrics:
@@ -342,7 +308,7 @@ verify-protocols:
 verify-track-b:
     just verify-protocols
     just verify-cross-target-matrix
-    just vm-strict-conformance
+    just check-parity --conformance
 
 # Full Lean build gate for nightly/scheduled validation.
 verify-lean-full: lean-init
@@ -374,7 +340,3 @@ verify-properties:
 # Generate normalized traces for bridge-level VM correspondence fixtures.
 generate-test-traces:
     cargo test -p telltale-lean-bridge --test vm_correspondence_tests -- --nocapture
-
-# Strict Lean-core VM conformance lane (cooperative + threaded backends).
-vm-strict-conformance:
-    ./scripts/vm-strict-conformance.sh

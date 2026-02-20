@@ -1,9 +1,41 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Consolidated Lean/Rust parity checks.
+# Usage:
+#   ./scripts/check-parity.sh [--all|--types|--suite|--conformance]
+#
+# Modes:
+#   --all         Run all parity checks (default)
+#   --types       Type shape parity (enum variants, struct fields)
+#   --suite       VM differential parity test suite
+#   --conformance Strict Lean-core VM conformance (cooperative + threaded)
 
-python3 - "${ROOT_DIR}" <<'PY'
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${ROOT_DIR}"
+
+MODE="${1:---all}"
+
+checks=0
+failures=0
+
+run_check() {
+  local name="$1"
+  local cmd="$2"
+  checks=$((checks + 1))
+  echo "[parity] ${name}"
+  if eval "${cmd}"; then
+    echo "[parity] OK: ${name}"
+  else
+    failures=$((failures + 1))
+    echo "[parity] FAIL: ${name}" >&2
+  fi
+  echo
+}
+
+# --- Type Shape Parity (from check-parity-ledger.sh) ---
+check_types() {
+  python3 - "${ROOT_DIR}" <<'PY'
 import re
 import sys
 from pathlib import Path
@@ -267,12 +299,9 @@ check_text = check_workflow.read_text(encoding="utf-8")
 just_text = justfile.read_text(encoding="utf-8")
 
 required_ci_markers = [
-    ("verify workflow parity ledger gate", "just check-parity-ledger", verify_text),
-    ("verify workflow parity suite gate", "just check-vm-parity-suite", verify_text),
-    ("check workflow parity ledger gate", "./scripts/check-parity-ledger.sh", check_text),
-    ("check workflow parity suite gate", "./scripts/check-vm-parity-suite.sh", check_text),
-    ("ci-dry-run parity ledger gate", "just check-parity-ledger", just_text),
-    ("ci-dry-run parity suite gate", "just check-vm-parity-suite", just_text),
+    ("verify workflow parity gate", "just check-parity", verify_text),
+    ("check workflow parity gate", "./scripts/check-parity.sh", check_text),
+    ("ci-dry-run parity gate", "just check-parity", just_text),
 ]
 
 for desc, needle, haystack in required_ci_markers:
@@ -281,3 +310,86 @@ for desc, needle, haystack in required_ci_markers:
 
 print("[parity] CI parity-regression gates are present in workflows and ci-dry-run")
 PY
+}
+
+# --- Suite: VM Differential Parity Suite ---
+check_suite() {
+  echo "== VM Parity Suite =="
+  run_check "lean conformance corpus" \
+    "cargo test -p telltale-vm --test conformance_lean"
+  run_check "lean equivalence corpus" \
+    "cargo test -p telltale-vm --test equivalence_lean"
+  run_check "differential step corpus" \
+    "cargo test -p telltale-vm --test differential_step_corpus"
+  run_check "bridge vm correspondence" \
+    "cargo test -p telltale-lean-bridge --test vm_correspondence_tests"
+  run_check "bridge vm differential-step correspondence" \
+    "cargo test -p telltale-lean-bridge --test vm_differential_step_tests"
+  run_check "simulator lean-reference parity suite" \
+    "cargo test -p telltale-simulator --test lean_reference_parity"
+  run_check "threaded parity equivalence" \
+    "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_equivalence"
+  run_check "planner trace worker-count conformance" \
+    "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_lane_runtime planner_trace_is_worker_count_invariant_for_fixed_ready_set"
+  run_check "v2 parity fixtures (speculation/scheduler/failure-envelope)" \
+    "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test parity_fixtures_v2"
+}
+
+# --- Conformance: Strict VM Conformance ---
+check_conformance() {
+  echo "== Strict VM Conformance =="
+
+  # Cooperative backend
+  cargo test -p telltale-vm --test conformance_lean
+  cargo test -p telltale-vm --test equivalence_lean
+  cargo test -p telltale-vm --test lean_vm_equivalence
+  cargo test -p telltale-vm --test trace_corpus
+  cargo test -p telltale-vm --test strict_tick_equality
+
+  cargo test -p telltale-vm --test differential_step_corpus
+  cargo test -p telltale-vm --test strict_value_rejection
+  cargo test -p telltale-vm --test instruction_fault_snapshots
+  cargo test -p telltale-vm --test schedule_robustness
+  cargo test -p telltale-vm --test serialization_strict_lean
+  cargo test -p telltale-vm --test bytecode_mutation_conformance
+
+  # Threaded backend
+  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_feature_contract
+  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_equivalence
+  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_lane_runtime
+  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test differential_step_corpus
+  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test schedule_robustness
+
+  echo "OK   strict VM conformance passed"
+}
+
+# --- Main ---
+case "${MODE}" in
+  --all)
+    check_types
+    echo ""
+    check_suite
+    ;;
+  --types)
+    check_types
+    ;;
+  --suite)
+    check_suite
+    ;;
+  --conformance)
+    check_conformance
+    ;;
+  *)
+    echo "error: unknown mode ${MODE}" >&2
+    echo "Usage: $0 [--all|--types|--suite|--conformance]" >&2
+    exit 2
+    ;;
+esac
+
+if [[ "${MODE}" == "--suite" ]] || [[ "${MODE}" == "--all" ]]; then
+  echo ""
+  echo "[parity] Summary: ${checks} checks, ${failures} failures."
+  if (( failures > 0 )); then
+    exit 1
+  fi
+fi

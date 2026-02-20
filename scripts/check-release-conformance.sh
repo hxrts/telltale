@@ -6,7 +6,7 @@ RELEASE_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/ReleaseConformance.lea
 API_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/API.lean"
 INVENTORY_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Inventory.lean"
 TEST_FILE="${ROOT_DIR}/lean/Runtime/Tests/Main.lean"
-JUSTFILE="${ROOT_DIR}/Justfile"
+JUSTFILE="${ROOT_DIR}/justfile"
 REPORT_FILE="${ROOT_DIR}/artifacts/release_conformance_report.json"
 
 if ! command -v rg >/dev/null 2>&1; then
@@ -116,9 +116,9 @@ echo "OK   release conformance report exported: ${REPORT_FILE}"
 
 if [[ "${TT_RELEASE_TAGGED:-0}" == "1" ]]; then
   check "release-tagged mode enforces failure capability lane" \
-    "${ROOT_DIR}/scripts/check-failure-capabilities.sh >/dev/null"
+    "${ROOT_DIR}/scripts/check-capability-gates.sh --failure >/dev/null"
   check "release-tagged mode enforces envelope conformance lane" \
-    "${ROOT_DIR}/scripts/check-envelope-conformance.sh >/dev/null"
+    "${ROOT_DIR}/scripts/check-capability-gates.sh --envelope >/dev/null"
 fi
 
 echo ""

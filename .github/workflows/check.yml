@@ -25,10 +25,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: Run executable VM placeholder baseline checks
         run: ./scripts/check-vm-placeholders.sh
-      - name: Run VM parity contract checks
-        run: ./scripts/check-parity-ledger.sh
-      - name: Run VM differential parity suite
-        run: ./scripts/check-vm-parity-suite.sh
+      - name: Run parity checks
+        run: ./scripts/check-parity.sh --all
       - name: Run linter
         uses: actions-rs/cargo@v1
         with:

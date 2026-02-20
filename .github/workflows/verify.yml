@@ -31,20 +31,15 @@ jobs:
           mkdir -p artifacts
           just check-vm-placeholders | tee artifacts/check-vm-placeholders.log
 
-      - name: Run VM parity contract checks
+      - name: Run parity checks
         run: |
           mkdir -p artifacts
-          just check-parity-ledger | tee artifacts/check-parity-ledger.log
+          just check-parity | tee artifacts/check-parity.log
 
-      - name: Run VM differential parity suite
+      - name: Run capability gate checks
         run: |
           mkdir -p artifacts
-          just check-vm-parity-suite | tee artifacts/check-vm-parity-suite.log
-
-      - name: Run delegation-shard ownership gate
-        run: |
-          mkdir -p artifacts
-          just check-delegation-shard-gate | tee artifacts/check-delegation-shard-gate.log
+          just check-capability-gates | tee artifacts/check-capability-gates.log
 
       - name: Run release conformance checks
         run: |
@@ -95,20 +90,15 @@ jobs:
           mkdir -p artifacts
           just check-vm-placeholders | tee artifacts/check-vm-placeholders.log
 
-      - name: Run VM parity contract checks
+      - name: Run parity checks
         run: |
           mkdir -p artifacts
-          just check-parity-ledger | tee artifacts/check-parity-ledger.log
+          just check-parity | tee artifacts/check-parity.log
 
-      - name: Run VM differential parity suite
+      - name: Run capability gate checks
         run: |
           mkdir -p artifacts
-          just check-vm-parity-suite | tee artifacts/check-vm-parity-suite.log
-
-      - name: Run delegation-shard ownership gate
-        run: |
-          mkdir -p artifacts
-          just check-delegation-shard-gate | tee artifacts/check-delegation-shard-gate.log
+          just check-capability-gates | tee artifacts/check-capability-gates.log
 
       - name: Run release conformance checks
         run: |
@@ -148,7 +138,7 @@ jobs:
       - name: Run V2 benchmark matrix
         run: |
           mkdir -p artifacts
-          just run-v2-benchmark-matrix | tee artifacts/run-v2-benchmark-matrix.log
+          just v2-baseline run | tee artifacts/v2-baseline-run.log
 
       - name: Upload heavy-lane artifacts
         uses: actions/upload-artifact@v4
