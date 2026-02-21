@@ -65,6 +65,6 @@ This matters for the analogy. Conservation and bridge claims in this document co
 
 ## Related Docs
 
-- [Session Type Theory](06_session_type_theory.md)
+- [Theory](06_theory.md)
 - [Lean Verification](18_lean_verification.md)
 - [Theorem Program](26_theorem_program.md)

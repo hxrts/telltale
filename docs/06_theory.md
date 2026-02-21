@@ -1,6 +1,6 @@
-# Session Type Theory
+# Theory
 
-This document provides a primer on session type theory for readers unfamiliar with the field. It covers binary session types, multiparty session types, and the key properties that make them useful for distributed programming.
+This document provides a primer on the theoretical foundations of Telltale. It covers session types, multiparty session types, and the key properties that make them useful for distributed programming. It also covers delivery models, coherence, harmony, and delegation.
 
 ## Why Session Types
 
@@ -197,6 +197,48 @@ Deadlock freedom follows from preservation and progress together. A well-typed p
 
 This property is assumption-scoped. It holds under the premises required for progress. Circular dependencies between participants are ruled out by the global type structure.
 
+### Harmony
+
+Harmony states that projection commutes with protocol evolution. When the global protocol takes a step, projecting the result equals taking the corresponding local step on the projected type.
+
+```
+project(step(G)) = localStep(project(G))
+```
+
+This equation establishes that global and local views remain synchronized. The global choreography and the local implementations evolve in lockstep.
+
+Harmony is essential for compositional reasoning. It allows proving properties at the global level and transferring them to local implementations. Without harmony, the connection between choreography and endpoint code would be unclear.
+
+## Delegation
+
+Delegation allows dynamic changes to participant sets during protocol execution. A participant can transfer their session endpoint to another party. The receiving party takes over the communication obligations.
+
+### The Problem
+
+Static MPST assumes a fixed set of participants. The global type names all roles at the start. But real distributed systems often need dynamic topology. New participants join. Existing participants leave. Capabilities transfer between parties.
+
+### Delegation Operations
+
+A delegation operation transfers an endpoint from one participant to another. The delegating party sends a channel endpoint. The receiving party gains the ability to communicate on that channel.
+
+```
+Alice -> Bob: delegate(channel_to_Carol)
+```
+
+After this operation, Bob can communicate with Carol on the delegated channel. Alice no longer participates in that sub-protocol.
+
+### Reconfiguration Harmony
+
+Delegation introduces a reconfiguration step that changes the participant structure. Telltale proves that harmony extends to these reconfiguration steps. Projection commutes with both static linking and dynamic delegation.
+
+The reconfiguration harmony theorem covers two cases. Static composition through linking combines independent sub-protocols. Dynamic delegation transfers endpoints during execution. Both preserve coherence when well-formedness conditions hold.
+
+### Delegation Safety
+
+For delegation to be safe, certain conditions must hold. The delegated endpoint must be in a state compatible with the receiver's expectations. The delegation must not create orphaned messages or dangling references.
+
+Telltale's `DelegationWF` predicate captures these conditions. The safe delegation theorem shows that coherence is preserved when this predicate holds.
+
 ## Coherence
 
 Coherence is the invariant that makes multiparty session types work. It ensures that the collective state of all participants remains consistent with the global protocol.
@@ -206,7 +248,31 @@ In Telltale, coherence is formulated as a per-edge property. Each communication 
 - The local type states of both endpoints
 - The global type structure
 
-The `Consume` predicate checks that buffered messages align with expected types. Preservation proofs show that transitions maintain coherence across all edges.
+The `Consume` function is the recursive alignment check at the heart of coherence. It interprets buffered traces against receiver expectations. For a receiver expecting type T and a buffer containing messages [m1, m2, ...], `Consume` verifies that each message matches the expected type at that point.
+
+Two key lemmas support preservation proofs. `Consume_append` shows that consumption over concatenated traces factors through sequential consumption. `Consume_cons` shows that head consumption reduces to one-step alignment plus recursive continuation alignment. These lemmas isolate message-type alignment complexity into reusable components.
+
+## Delivery Models
+
+Asynchronous session types parameterize over message delivery semantics. Different delivery models affect what orderings are possible and what safety properties hold.
+
+### FIFO Delivery
+
+FIFO (first-in-first-out) delivery guarantees that messages between any two participants arrive in the order they were sent. If Alice sends m1 then m2 to Bob, Bob receives m1 before m2.
+
+This is the most common model in MPST literature. It matches the behavior of TCP connections and many message queue systems.
+
+### Causal Delivery
+
+Causal delivery preserves causality across all participants. If message m1 causally precedes message m2, then any participant that receives both will receive m1 first.
+
+Causal delivery is stronger than FIFO. It handles scenarios where Alice sends to Bob, Bob sends to Carol based on that message, and Carol must see consistent ordering even though she communicates with both.
+
+### Lossy Delivery
+
+Lossy delivery permits message loss. Messages may fail to arrive. The type system must account for this possibility in its safety guarantees.
+
+Telltale's theorems are parameterized by `DeliveryModel`. This gives one theorem shape across FIFO, causal, and lossy instances. The delivery model affects which buffer orderings are possible and which coherence conditions must hold.
 
 ## Recursion
 
