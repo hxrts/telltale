@@ -45,9 +45,13 @@ All Rust source lives in `rust/`.
 
 **`telltale-lean-bridge`** converts between Rust session types and Lean-compatible JSON. The `exporter` feature serializes choreography ASTs for the Lean verification pipeline.
 
+**`telltale-vm`** is the bytecode VM execution engine, the single source of truth for protocol scheduling.
+
+**`telltale-simulator`** provides VM-backed simulation with deterministic middleware for network, faults, and property testing.
+
 ## Lean Formalization
 
-The `lean/` directory contains six libraries organized by concern.
+The `lean/` directory contains eight libraries organized by concern.
 
 **SessionTypes** defines the inductive global and local type structures.
 
@@ -57,7 +61,7 @@ The `lean/` directory contains six libraries organized by concern.
 
 **Semantics** defines operational rules, typing judgments, and metatheory including determinism, deadlock freedom, and subject reduction.
 
-**Protocol** models async buffered multiparty sessions with coherence, preservation, monitors, deployment, and spatial reasoning. This library carries 35 axioms and 0 sorries.
+**Protocol** models async buffered multiparty sessions with coherence, preservation, monitors, deployment, and spatial reasoning.
 
 **Runtime** is the session-type bytecode VM verified with Iris separation logic. It covers resource algebras, cancelable invariants, a cooperative scheduler, WP rules for each instruction, and an adequacy theorem connecting the VM to observable traces. Iris primitives are axiomatized as shims that retire as the upstream iris-lean library matures.
 
