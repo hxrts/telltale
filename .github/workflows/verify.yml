@@ -18,6 +18,22 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Lean toolchain
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Lean installation
+        run: |
+          lake --version
+          lean --version
+
+      - name: Provision pinned Lean dependencies
+        run: |
+          sudo mkdir -p /Users/hxrts/projects
+          sudo chown -R "$USER":"$USER" /Users/hxrts
+          ./scripts/bootstrap-lean-dependency-checkouts.sh
+
       - name: Install just
         run: cargo install just --locked
 
@@ -76,6 +92,22 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Lean toolchain
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Lean installation
+        run: |
+          lake --version
+          lean --version
+
+      - name: Provision pinned Lean dependencies
+        run: |
+          sudo mkdir -p /Users/hxrts/projects
+          sudo chown -R "$USER":"$USER" /Users/hxrts
+          ./scripts/bootstrap-lean-dependency-checkouts.sh
 
       - name: Install just
         run: cargo install just --locked

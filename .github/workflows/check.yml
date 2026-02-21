@@ -19,6 +19,11 @@ jobs:
         run: |
           lake --version
           lean --version
+      - name: Provision pinned Lean dependencies
+        run: |
+          sudo mkdir -p /Users/hxrts/projects
+          sudo chown -R "$USER":"$USER" /Users/hxrts
+          ./scripts/bootstrap-lean-dependency-checkouts.sh
       - name: Check formatting
         uses: actions-rs/cargo@v1
         with:
