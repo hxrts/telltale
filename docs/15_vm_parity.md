@@ -17,6 +17,7 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 | `OutputConditionPolicy` | `Runtime/VM/Model/OutputCondition.lean` | `rust/vm/src/output_condition.rs` | Aligned |
 | Runtime `Value` variants | `Protocol/Values.lean` | `rust/vm/src/coroutine.rs` | Aligned |
 | `ProgressToken` fields | `Runtime/VM/Model/State.lean` | `rust/vm/src/coroutine.rs` | Aligned |
+| Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | no executable admission gate in baseline Lean runner | `rust/vm/src/vm.rs` | Runtime-only extension (documented deviation) |
 
 These checks are automated by `scripts/check-parity-ledger.sh`.
 
@@ -101,6 +102,7 @@ Any intentional parity break must be recorded in the deviation table below befor
 | ID | Status | Owner | Revisit | Summary |
 |----|--------|-------|---------|---------|
 | threaded-round-extension | resolved | vm-runtime | 2026-04-30 | Threaded backend defaults to canonical one-step rounds |
+| payload-hardening-extension | active | vm-runtime | 2026-06-30 | Rust VM adds configurable payload-admission checks for malformed/adversarial message values |
 
 ### Deviation Details
 
@@ -121,6 +123,25 @@ Any intentional parity break must be recorded in the deviation table below befor
 - `rust/vm/tests/topology_effect_ingress.rs::cooperative_vm_ingests_topology_events_before_instruction_effects`
 - `rust/vm/tests/threaded_lane_runtime.rs`
 - `rust/vm/tests/parity_fixtures_v2.rs::envelope_bounded_parity_holds_for_n_gt_1`
+
+#### payload-hardening-extension
+
+**Lean:** Baseline executable semantics assume well-formed value flows for typed transitions.
+**Rust:** `rust/vm/src/vm.rs`, `rust/vm/src/threaded.rs` add `VMConfig.payload_validation_mode` and `VMConfig.max_payload_bytes` runtime checks.
+
+**Reason:** Integrations often run in environments where peers may construct malformed payloads. VM-level admission checks avoid requiring each integrator to hand-write custom guards.
+
+**Impact:** For well-formed traces, behavior is parity-preserving. For malformed/adversarial payload traces, Rust may reject earlier via `Fault::TypeViolation` under `structural`/`strict_schema` modes.
+
+**Alternatives considered:** Integrator-only guard implementations and codegen-only validation were rejected as insufficiently uniform at the VM boundary.
+
+**Covers:** `runtime.payload.admission`, `runtime.payload.size_bound`, `runtime.payload.strict_schema`
+
+**Tests:**
+- `rust/vm/src/vm.rs::tests::test_payload_validation_structural_rejects_annotated_type_mismatch`
+- `rust/vm/src/vm.rs::tests::test_payload_validation_off_allows_annotated_type_mismatch_for_compatibility`
+- `rust/vm/src/vm.rs::tests::test_payload_validation_strict_schema_requires_annotations_for_send_recv`
+- `rust/vm/src/vm.rs::tests::test_payload_validation_size_bound_rejects_oversized_payloads`
 
 ## CI Gates
 

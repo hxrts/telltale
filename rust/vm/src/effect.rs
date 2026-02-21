@@ -4,10 +4,20 @@
 //! material-specific behavior: computing payloads for sends, processing
 //! received values, and performing integration steps.
 //!
+//! Normative integration contract:
+//! - `topology_events` is queried once per scheduler round before pick/dispatch.
+//! - `send_decision` is the canonical send hook for `Send` and `Offer`.
+//! - `handle_recv` is the canonical receive hook for `Receive` and `Choose`.
+//! - `step` is called only from the `Invoke` instruction.
+//! - `output_condition_hint` is queried only for eventful commits.
+//! - `handle_send` and `handle_choose` are compatibility hooks.
+//!
 //! This is intentionally **not** the same as `telltale_choreography::ChoreoHandler`:
 //! the VM handler is synchronous, session-local, and operates on bytecode state,
 //! while `ChoreoHandler` is an async, typed transport abstraction for generated
 //! choreography code.
+//!
+//! Integration guide: [`Effect Handlers and Session Types`](../../../docs/10_effect_session_bridge.md).
 
 use crate::coroutine::Value;
 use crate::output_condition::OutputConditionHint;
@@ -214,6 +224,224 @@ pub struct SendDecisionInput<'a> {
     pub state: &'a [Value],
     /// Optional precomputed payload.
     pub payload: Option<Value>,
+}
+
+/// Coarse payload shape for optional send fast-path dispatch.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SendPayloadKind {
+    /// `Value::Unit`.
+    Unit,
+    /// `Value::Nat`.
+    Nat,
+    /// `Value::Bool`.
+    Bool,
+    /// `Value::Str`.
+    Str,
+    /// `Value::Prod`.
+    Prod,
+    /// `Value::Endpoint`.
+    Endpoint,
+}
+
+impl SendPayloadKind {
+    /// Classify one runtime value into a payload kind.
+    #[must_use]
+    pub fn from_value(value: &Value) -> Self {
+        match value {
+            Value::Unit => Self::Unit,
+            Value::Nat(_) => Self::Nat,
+            Value::Bool(_) => Self::Bool,
+            Value::Str(_) => Self::Str,
+            Value::Prod(_, _) => Self::Prod,
+            Value::Endpoint(_) => Self::Endpoint,
+        }
+    }
+}
+
+/// Optional metadata for fast send-decision lookup paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SendDecisionFastPathInput<'a> {
+    /// Deterministic key for per-host cache lookup.
+    pub key: u64,
+    /// Session context for the send.
+    pub sid: SessionId,
+    /// Sending role.
+    pub role: &'a str,
+    /// Receiving role.
+    pub partner: &'a str,
+    /// Message label.
+    pub label: &'a str,
+    /// Optional payload kind hint.
+    pub payload_kind: Option<SendPayloadKind>,
+}
+
+impl<'a> SendDecisionFastPathInput<'a> {
+    /// Build fast-path metadata for one send decision.
+    #[must_use]
+    pub fn new(
+        sid: SessionId,
+        role: &'a str,
+        partner: &'a str,
+        label: &'a str,
+        payload: Option<&Value>,
+    ) -> Self {
+        let payload_kind = payload.map(SendPayloadKind::from_value);
+        Self {
+            key: send_fast_path_key(sid, role, partner, label, payload_kind),
+            sid,
+            role,
+            partner,
+            label,
+            payload_kind,
+        }
+    }
+}
+
+/// Classify a stringly-typed effect error into a structured category.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EffectErrorCategory {
+    /// Timeout/deadline failure.
+    Timeout,
+    /// Transport/runtime unavailable.
+    Unavailable,
+    /// Invalid host input or payload contract.
+    InvalidInput,
+    /// Replay/determinism contract failure.
+    Determinism,
+    /// Topology ingress or topology mutation failure.
+    Topology,
+    /// Host contract assertion or identity violation.
+    ContractViolation,
+    /// Unclassified failure.
+    Unknown,
+}
+
+/// Structured view of host effect errors.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EffectError {
+    /// Typed category inferred from message content.
+    pub category: EffectErrorCategory,
+    /// Original host error string.
+    pub message: String,
+}
+
+impl EffectError {
+    /// Build a structured error from a raw host message.
+    #[must_use]
+    pub fn classify(message: impl Into<String>) -> Self {
+        let message = message.into();
+        Self {
+            category: classify_effect_error(&message),
+            message,
+        }
+    }
+}
+
+impl core::fmt::Display for EffectError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}: {}", self.category, self.message)
+    }
+}
+
+impl std::error::Error for EffectError {}
+
+impl From<EffectError> for String {
+    fn from(value: EffectError) -> Self {
+        value.message
+    }
+}
+
+/// Classify a raw error message into a coarse effect category.
+#[must_use]
+pub fn classify_effect_error(message: &str) -> EffectErrorCategory {
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("timeout") || lower.contains("timed out") || lower.contains("deadline") {
+        return EffectErrorCategory::Timeout;
+    }
+    if lower.contains("topology")
+        || lower.contains("partition")
+        || lower.contains("crash")
+        || lower.contains("corrupt")
+        || lower.contains("heal")
+    {
+        return EffectErrorCategory::Topology;
+    }
+    if lower.contains("determinism")
+        || lower.contains("replay")
+        || lower.contains("mismatch")
+        || lower.contains("nondetermin")
+        || lower.contains("ordering")
+    {
+        return EffectErrorCategory::Determinism;
+    }
+    if lower.contains("contract") || lower.contains("assert") || lower.contains("identity") {
+        return EffectErrorCategory::ContractViolation;
+    }
+    if lower.contains("unavailable")
+        || lower.contains("disconnect")
+        || lower.contains("closed")
+        || lower.contains("missing")
+        || lower.contains("not found")
+        || lower.contains("exhausted")
+    {
+        return EffectErrorCategory::Unavailable;
+    }
+    if lower.contains("invalid")
+        || lower.contains("unknown label")
+        || lower.contains("malformed")
+        || lower.contains("type")
+        || lower.contains("register")
+    {
+        return EffectErrorCategory::InvalidInput;
+    }
+    EffectErrorCategory::Unknown
+}
+
+/// Build a typed error wrapper from a raw host error message.
+#[must_use]
+pub fn classify_effect_error_owned(message: impl Into<String>) -> EffectError {
+    EffectError::classify(message)
+}
+
+/// Deterministic key for optional send fast-path caches.
+#[must_use]
+pub fn send_fast_path_key(
+    sid: SessionId,
+    role: &str,
+    partner: &str,
+    label: &str,
+    payload_kind: Option<SendPayloadKind>,
+) -> u64 {
+    const FNV_OFFSET: u64 = 14_695_981_039_346_656_037;
+    const FNV_PRIME: u64 = 1_099_511_628_211;
+    fn mix(mut hash: u64, bytes: &[u8]) -> u64 {
+        for byte in bytes {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(FNV_PRIME);
+        }
+        hash
+    }
+    let mut hash = FNV_OFFSET;
+    hash = mix(hash, &sid.to_le_bytes());
+    hash = mix(hash, role.as_bytes());
+    hash = mix(hash, &[0x1f]);
+    hash = mix(hash, partner.as_bytes());
+    hash = mix(hash, &[0x1f]);
+    hash = mix(hash, label.as_bytes());
+    if let Some(kind) = payload_kind {
+        let tag = match kind {
+            SendPayloadKind::Unit => 0_u8,
+            SendPayloadKind::Nat => 1_u8,
+            SendPayloadKind::Bool => 2_u8,
+            SendPayloadKind::Str => 3_u8,
+            SendPayloadKind::Prod => 4_u8,
+            SendPayloadKind::Endpoint => 5_u8,
+        };
+        hash = mix(hash, &[tag]);
+    }
+    hash
 }
 
 /// Decision returned by [`EffectHandler::handle_acquire`].
@@ -429,6 +657,10 @@ pub trait EffectHandler: Send + Sync {
 
     /// Compute the payload for a send instruction.
     ///
+    /// Compatibility hook:
+    /// Canonical VM send paths pass an explicit payload into `send_decision`.
+    /// This method remains for adapters and custom runners.
+    ///
     /// # Arguments
     /// * `role` - The sending role
     /// * `partner` - The receiving role
@@ -444,6 +676,19 @@ pub trait EffectHandler: Send + Sync {
         label: &str,
         state: &[Value],
     ) -> Result<Value, String>;
+
+    /// Optional fast-path hook for send decision dispatch.
+    ///
+    /// Returning `Some(result)` bypasses `send_decision`.
+    /// Returning `None` keeps canonical behavior unchanged.
+    fn send_decision_fast_path(
+        &self,
+        _fast_path: SendDecisionFastPathInput<'_>,
+        _state: &[Value],
+        _payload: Option<&Value>,
+    ) -> Option<Result<SendDecision, String>> {
+        None
+    }
 
     /// Decide how to handle a send, optionally with a precomputed payload.
     ///
@@ -484,9 +729,11 @@ pub trait EffectHandler: Send + Sync {
 
     /// Choose which branch to take for internal choice (select).
     ///
-    /// Called when executing a multi-branch Send (internal choice). The handler
-    /// receives the available labels and returns the chosen one. Matches the Lean
-    /// `stepChoose` semantics where the handler/process decides which label to select.
+    /// Compatibility hook:
+    /// The canonical VM currently resolves branch labels from received payloads and
+    /// does not call this method in default dispatch paths.
+    ///
+    /// Custom runners may still use this as an explicit branch-selection hook.
     ///
     /// # Arguments
     /// * `role` - The choosing role
@@ -587,6 +834,15 @@ impl<T: EffectHandler + ?Sized> EffectHandler for &T {
 
     fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
         (**self).send_decision(input)
+    }
+
+    fn send_decision_fast_path(
+        &self,
+        fast_path: SendDecisionFastPathInput<'_>,
+        state: &[Value],
+        payload: Option<&Value>,
+    ) -> Option<Result<SendDecision, String>> {
+        (**self).send_decision_fast_path(fast_path, state, payload)
     }
 
     fn handle_recv(
@@ -693,6 +949,16 @@ impl EffectHandler for RecordingEffectHandler<'_> {
             None,
         );
         Ok(decision)
+    }
+
+    fn send_decision_fast_path(
+        &self,
+        fast_path: SendDecisionFastPathInput<'_>,
+        state: &[Value],
+        payload: Option<&Value>,
+    ) -> Option<Result<SendDecision, String>> {
+        self.inner
+            .send_decision_fast_path(fast_path, state, payload)
     }
 
     fn handle_recv(
@@ -1178,5 +1444,44 @@ mod tests {
         assert_eq!(replay_first.len(), 1);
         assert!(replay_second.is_empty());
         assert_eq!(replay.remaining(), 0);
+    }
+
+    #[test]
+    fn classify_effect_error_categories_from_strings() {
+        assert_eq!(
+            classify_effect_error("timed out waiting for recv"),
+            EffectErrorCategory::Timeout
+        );
+        assert_eq!(
+            classify_effect_error("topology partition mismatch"),
+            EffectErrorCategory::Topology
+        );
+        assert_eq!(
+            classify_effect_error("replay trace kind mismatch"),
+            EffectErrorCategory::Determinism
+        );
+        assert_eq!(
+            classify_effect_error("handler identity contract violated"),
+            EffectErrorCategory::ContractViolation
+        );
+        assert_eq!(
+            classify_effect_error("channel unavailable"),
+            EffectErrorCategory::Unavailable
+        );
+        assert_eq!(
+            classify_effect_error("invalid payload type"),
+            EffectErrorCategory::InvalidInput
+        );
+    }
+
+    #[test]
+    fn send_fast_path_key_is_deterministic_for_same_inputs() {
+        let left = send_fast_path_key(7, "A", "B", "msg", Some(SendPayloadKind::Nat));
+        let right = send_fast_path_key(7, "A", "B", "msg", Some(SendPayloadKind::Nat));
+        assert_eq!(left, right);
+        assert_ne!(
+            left,
+            send_fast_path_key(7, "A", "B", "msg2", Some(SendPayloadKind::Nat))
+        );
     }
 }

@@ -63,6 +63,7 @@ pub mod guard;
 pub mod identity;
 pub mod instr;
 pub mod instruction_semantics;
+pub mod integration;
 pub mod intern;
 pub mod kernel;
 pub mod loader;
@@ -102,8 +103,9 @@ pub use driver::NativeSingleThreadDriver;
 #[cfg(feature = "multi-thread")]
 pub use driver::NativeThreadedDriver;
 pub use effect::{
-    CorruptionType, EffectTraceEntry, EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler,
-    TopologyPerturbation,
+    classify_effect_error, classify_effect_error_owned, send_fast_path_key, CorruptionType,
+    EffectError, EffectErrorCategory, EffectTraceEntry, EffectTraceTape, RecordingEffectHandler,
+    ReplayEffectHandler, SendDecisionFastPathInput, SendPayloadKind, TopologyPerturbation,
 };
 pub use envelope_diff::{
     EffectOrderingClass, EnvelopeDiff, EnvelopeDiffArtifactV1, FailureVisibleDiffClass,
@@ -114,6 +116,7 @@ pub use faults::{classify_fault, fault_code, fault_code_of, FaultClass};
 pub use guard::{GuardLayer, InMemoryGuardLayer, LayerId};
 pub use identity::{IdentityModel, ParticipantId, SiteId as IdentitySiteId, StaticIdentityModel};
 pub use instr::Instr;
+pub use integration::{run_loaded_vm_record_replay_conformance, LoadedVmReplayConformance};
 pub use intern::{StringId, SymbolTable};
 pub use kernel::VMKernel;
 pub use nested::NestedVMHandler;
@@ -151,8 +154,8 @@ pub use verification::{
     VerifyingKey,
 };
 pub use vm::{
-    MonitorMode, Program, RuntimeTuningProfile, SchedStepDebug, ThreadedRoundSemantics, VMConfig,
-    VMState, VM,
+    EffectTraceCaptureMode, MonitorMode, PayloadValidationMode, Program, RuntimeTuningProfile,
+    SchedStepDebug, ThreadedRoundSemantics, VMConfig, VMState, VM,
 };
 #[cfg(target_arch = "wasm32")]
 pub use wasm::WasmVM;

@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::marker::PhantomData;
 use std::time::Duration;
-use telltale_types::LocalTypeR;
+use telltale_types::{LocalTypeR, ValType};
 
 use crate::bridge::{IdentityGuardBridge, IdentityVerificationBridge};
 use crate::buffer::{BufferConfig, EnqueueResult};
@@ -27,7 +27,7 @@ use crate::coroutine::{
 use crate::determinism::{DeterminismMode, EffectDeterminismTier};
 use crate::effect::{
     CorruptionType, EffectHandler, EffectTraceEntry, ReplayEffectHandler, SendDecision,
-    SendDecisionInput, TopologyPerturbation,
+    SendDecisionFastPathInput, SendDecisionInput, TopologyPerturbation,
 };
 use crate::exec;
 use crate::faults::{
@@ -67,6 +67,10 @@ fn default_config_schema_version() -> u32 {
     1
 }
 
+fn default_max_payload_bytes() -> usize {
+    64 * 1024
+}
+
 /// Lean-aligned scope identifier placeholder.
 pub type ScopeId = usize;
 
@@ -79,6 +83,55 @@ type BranchList = Vec<(
     Option<telltale_types::ValType>,
     LocalTypeR,
 )>;
+
+pub(crate) fn runtime_value_val_type(value: &Value) -> ValType {
+    match value {
+        Value::Unit => ValType::Unit,
+        Value::Nat(_) => ValType::Nat,
+        Value::Bool(_) => ValType::Bool,
+        Value::Str(_) => ValType::String,
+        Value::Prod(left, right) => ValType::Prod(
+            Box::new(runtime_value_val_type(left)),
+            Box::new(runtime_value_val_type(right)),
+        ),
+        Value::Endpoint(endpoint) => ValType::Chan {
+            sid: endpoint.sid,
+            role: endpoint.role.clone(),
+        },
+    }
+}
+
+pub(crate) fn runtime_value_wire_size_bytes(value: &Value) -> usize {
+    match value {
+        Value::Unit => 1,
+        Value::Nat(_) => 8,
+        Value::Bool(_) => 1,
+        Value::Str(text) => 8_usize.saturating_add(text.len()),
+        Value::Prod(left, right) => 1_usize
+            .saturating_add(runtime_value_wire_size_bytes(left))
+            .saturating_add(runtime_value_wire_size_bytes(right)),
+        Value::Endpoint(endpoint) => 8_usize
+            .saturating_add(8_usize)
+            .saturating_add(endpoint.role.len()),
+    }
+}
+
+pub(crate) fn runtime_value_matches_val_type(value: &Value, expected: &ValType) -> bool {
+    match (value, expected) {
+        (Value::Unit, ValType::Unit) => true,
+        (Value::Nat(_), ValType::Nat) => true,
+        (Value::Bool(_), ValType::Bool) => true,
+        (Value::Str(_), ValType::String) => true,
+        (Value::Prod(left, right), ValType::Prod(expected_left, expected_right)) => {
+            runtime_value_matches_val_type(left, expected_left)
+                && runtime_value_matches_val_type(right, expected_right)
+        }
+        (Value::Endpoint(endpoint), ValType::Chan { sid, role }) => {
+            endpoint.sid == *sid && endpoint.role == *role
+        }
+        _ => false,
+    }
+}
 
 /// Lean-aligned resource state with commitments and nullifiers.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -525,6 +578,32 @@ pub enum ThreadedRoundSemantics {
     WaveParallelExtension,
 }
 
+/// Effect-trace capture mode for runtime overhead control.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum EffectTraceCaptureMode {
+    /// Record all canonical effect kinds.
+    #[default]
+    Full,
+    /// Record only topology ingress events.
+    TopologyOnly,
+    /// Disable effect-trace recording.
+    Disabled,
+}
+
+/// Payload validation mode for runtime message hardening.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PayloadValidationMode {
+    /// Disable VM-side payload validation checks.
+    Off,
+    /// Validate payload size and annotated `ValType` compatibility.
+    #[default]
+    Structural,
+    /// Structural checks plus strict annotation requirement for `Send` and `Receive`.
+    StrictSchema,
+}
+
 /// VM configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VMConfig {
@@ -575,6 +654,18 @@ pub struct VMConfig {
     /// Round semantics mode used by threaded scheduler.
     #[serde(default)]
     pub threaded_round_semantics: ThreadedRoundSemantics,
+    /// Effect-trace capture mode for integration/perf tuning.
+    #[serde(default)]
+    pub effect_trace_capture_mode: EffectTraceCaptureMode,
+    /// Runtime payload hardening mode for inbound/outbound messages.
+    #[serde(default)]
+    pub payload_validation_mode: PayloadValidationMode,
+    /// Upper bound for VM payload values in estimated wire bytes.
+    #[serde(default = "default_max_payload_bytes")]
+    pub max_payload_bytes: usize,
+    /// Enable runtime host-contract assertions with deterministic diagnostics.
+    #[serde(default)]
+    pub host_contract_assertions: bool,
 }
 
 impl Default for VMConfig {
@@ -599,6 +690,10 @@ impl Default for VMConfig {
             footprint_guided_wave_widening: false,
             runtime_tuning_profile: RuntimeTuningProfile::Standard,
             threaded_round_semantics: ThreadedRoundSemantics::CanonicalOneStep,
+            effect_trace_capture_mode: EffectTraceCaptureMode::Full,
+            payload_validation_mode: PayloadValidationMode::Structural,
+            max_payload_bytes: default_max_payload_bytes(),
+            host_contract_assertions: false,
         }
     }
 }
@@ -618,6 +713,7 @@ impl VMConfig {
         assert!(self.max_coroutines > 0, "max_coroutines must be > 0");
         assert!(self.num_registers > 0, "num_registers must be > 0");
         assert!(self.instruction_cost > 0, "instruction_cost must be > 0");
+        assert!(self.max_payload_bytes > 0, "max_payload_bytes must be > 0");
     }
 }
 
@@ -1019,6 +1115,7 @@ where
     corrupted_edges: Vec<CorruptedEdge>,
     timed_out_sites: Vec<SiteTimeout>,
     last_sched_step: Option<SchedStepDebug>,
+    handler_identity_anchor: Option<String>,
 }
 
 /// Lean-aligned VM state alias.
@@ -1079,6 +1176,7 @@ where
             corrupted_edges: Vec::new(),
             timed_out_sites: Vec::new(),
             last_sched_step: None,
+            handler_identity_anchor: None,
         }
     }
 
@@ -1827,6 +1925,62 @@ impl VM {
         decode_endpoint_fact(value)
     }
 
+    fn validate_payload(
+        &self,
+        role: &str,
+        context: &str,
+        label: &str,
+        expected_type: Option<&ValType>,
+        value: &Value,
+        strict_requires_annotation: bool,
+    ) -> Result<(), Fault> {
+        let mode = self.config.payload_validation_mode;
+        if mode == PayloadValidationMode::Off {
+            return Ok(());
+        }
+
+        let actual_type = runtime_value_val_type(value);
+        let payload_bytes = runtime_value_wire_size_bytes(value);
+        if payload_bytes > self.config.max_payload_bytes {
+            return Err(Fault::TypeViolation {
+                expected: expected_type.cloned().unwrap_or_else(|| actual_type.clone()),
+                actual: actual_type,
+                message: format!(
+                    "{role}: {context} payload '{label}' exceeds max_payload_bytes={} (actual={payload_bytes})",
+                    self.config.max_payload_bytes
+                ),
+            });
+        }
+
+        match expected_type {
+            Some(expected) => {
+                if runtime_value_matches_val_type(value, expected) {
+                    Ok(())
+                } else {
+                    Err(Fault::TypeViolation {
+                        expected: expected.clone(),
+                        actual: actual_type,
+                        message: format!(
+                            "{role}: {context} payload '{label}' violated expected type {expected:?}"
+                        ),
+                    })
+                }
+            }
+            None
+                if mode == PayloadValidationMode::StrictSchema && strict_requires_annotation =>
+            {
+                Err(Fault::TypeViolation {
+                    expected: ValType::Unit,
+                    actual: actual_type,
+                    message: format!(
+                        "{role}: {context} payload '{label}' requires explicit ValType annotation in strict_schema mode"
+                    ),
+                })
+            }
+            None => Ok(()),
+        }
+    }
+
     /// Extract partner and branches from a Recv local type.
     fn expect_recv_type(
         local_type: &LocalTypeR,
@@ -2085,6 +2239,50 @@ impl VM {
         Ok(())
     }
 
+    fn should_capture_effect_kind(&self, effect_kind: &str) -> bool {
+        match self.config.effect_trace_capture_mode {
+            EffectTraceCaptureMode::Full => true,
+            EffectTraceCaptureMode::TopologyOnly => effect_kind == "topology_event",
+            EffectTraceCaptureMode::Disabled => false,
+        }
+    }
+
+    fn enforce_handler_identity_contract(&mut self, handler_identity: &str) -> Result<(), VMError> {
+        if !self.config.host_contract_assertions {
+            return Ok(());
+        }
+        match &self.handler_identity_anchor {
+            None => {
+                self.handler_identity_anchor = Some(handler_identity.to_string());
+                Ok(())
+            }
+            Some(anchor) if anchor == handler_identity => Ok(()),
+            Some(anchor) => Err(VMError::HandlerError(format!(
+                "[host-contract] handler_identity changed from '{anchor}' to '{handler_identity}'"
+            ))),
+        }
+    }
+
+    fn assert_topology_events_sorted(
+        &self,
+        tick: u64,
+        events: &[TopologyPerturbation],
+    ) -> Result<(), VMError> {
+        if !self.config.host_contract_assertions {
+            return Ok(());
+        }
+        for idx in 1..events.len() {
+            let prev_key = events[idx - 1].ordering_key();
+            let next_key = events[idx].ordering_key();
+            if prev_key > next_key {
+                return Err(VMError::HandlerError(format!(
+                    "[host-contract] topology_events at tick {tick} must be pre-sorted by ordering_key; out-of-order index {idx}"
+                )));
+            }
+        }
+        Ok(())
+    }
+
     fn apply_topology_event(&mut self, event: &TopologyPerturbation) {
         match event {
             TopologyPerturbation::Crash { site } => {
@@ -2144,27 +2342,32 @@ impl VM {
 
     fn ingest_topology_events(&mut self, handler: &dyn EffectHandler) -> Result<(), VMError> {
         let tick = self.clock.tick;
+        let handler_identity = handler.handler_identity();
+        self.enforce_handler_identity_contract(&handler_identity)?;
         let mut events = handler
             .topology_events(tick)
             .map_err(VMError::HandlerError)?;
+        self.assert_topology_events_sorted(tick, &events)?;
         events.sort_by_key(TopologyPerturbation::ordering_key);
         for event in events {
             self.apply_topology_event(&event);
-            self.effect_trace.push(EffectTraceEntry {
-                effect_id: self.next_effect_id,
-                effect_kind: "topology_event".to_string(),
-                inputs: json!({
-                    "tick": tick,
-                }),
-                outputs: json!({
-                    "applied": true,
-                    "topology": event,
-                }),
-                handler_identity: handler.handler_identity(),
-                ordering_key: self.next_effect_id,
-                topology: Some(event),
-            });
-            self.next_effect_id = self.next_effect_id.saturating_add(1);
+            if self.should_capture_effect_kind("topology_event") {
+                self.effect_trace.push(EffectTraceEntry {
+                    effect_id: self.next_effect_id,
+                    effect_kind: "topology_event".to_string(),
+                    inputs: json!({
+                        "tick": tick,
+                    }),
+                    outputs: json!({
+                        "applied": true,
+                        "topology": event,
+                    }),
+                    handler_identity: handler_identity.clone(),
+                    ordering_key: self.next_effect_id,
+                    topology: Some(event),
+                });
+                self.next_effect_id = self.next_effect_id.saturating_add(1);
+            }
         }
         Ok(())
     }
@@ -2207,6 +2410,11 @@ impl VM {
         coro_id: usize,
         handler: &dyn EffectHandler,
     ) -> Result<ExecOutcome, Fault> {
+        let handler_identity = handler.handler_identity();
+        self.enforce_handler_identity_contract(&handler_identity)
+            .map_err(|e| Fault::Invoke {
+                message: e.to_string(),
+            })?;
         let idx = self.coro_index(coro_id);
         let pc = self.coroutines[idx].pc;
         let sid = self.coroutines[idx].session_id;
@@ -2256,7 +2464,7 @@ impl VM {
         };
 
         // 3. Commit atomically.
-        self.commit_pack(idx, pack, output_hint, &handler.handler_identity())
+        self.commit_pack(idx, pack, output_hint, &handler_identity)
     }
 
     // ---- Per-instruction step functions (each owns its type logic) ----
@@ -2303,7 +2511,7 @@ impl VM {
         };
 
         // Extract continuation (L') from first branch.
-        let (label, _vt, continuation) = branches
+        let (label, expected_type, continuation) = branches
             .first()
             .ok_or_else(|| Fault::TypeViolation {
                 expected: telltale_types::ValType::Unit,
@@ -2315,16 +2523,24 @@ impl VM {
         // Compute payload/decision via handler.
         let coro = &self.coroutines[coro_idx];
         let send_payload = self.read_reg_checked(coro_idx, val_reg)?;
-        let decision = handler
-            .send_decision(SendDecisionInput {
-                sid,
-                role,
-                partner: &partner,
-                label: &label.name,
-                state: &coro.regs,
-                payload: Some(send_payload),
-            })
-            .map_err(|e| Fault::Invoke { message: e })?;
+        let fast_path =
+            SendDecisionFastPathInput::new(sid, role, &partner, &label.name, Some(&send_payload));
+        let decision = if let Some(decision) =
+            handler.send_decision_fast_path(fast_path, &coro.regs, Some(&send_payload))
+        {
+            decision.map_err(|e| Fault::Invoke { message: e })?
+        } else {
+            handler
+                .send_decision(SendDecisionInput {
+                    sid,
+                    role,
+                    partner: &partner,
+                    label: &label.name,
+                    state: &coro.regs,
+                    payload: Some(send_payload),
+                })
+                .map_err(|e| Fault::Invoke { message: e })?
+        };
 
         let edge = Edge::new(sid, role.to_string(), partner.clone());
 
@@ -2347,6 +2563,16 @@ impl VM {
             role.to_string(),
             partner.clone(),
         ));
+        if let SendDecision::Deliver(payload) = &decision {
+            self.validate_payload(
+                role,
+                "send",
+                &label.name,
+                expected_type.as_ref(),
+                payload,
+                true,
+            )?;
+        }
         let enqueue = {
             let session = self
                 .sessions
@@ -2443,7 +2669,7 @@ impl VM {
             }
         };
 
-        let (label, _vt, continuation) = branches
+        let (label, expected_type, continuation) = branches
             .first()
             .ok_or_else(|| Fault::TypeViolation {
                 expected: telltale_types::ValType::Unit,
@@ -2487,6 +2713,15 @@ impl VM {
                     endpoint: ep.clone(),
                 })?
         };
+
+        self.validate_payload(
+            role,
+            "receive",
+            &label.name,
+            expected_type.as_ref(),
+            &val,
+            true,
+        )?;
 
         // Process via handler.
         handler
@@ -3056,15 +3291,17 @@ impl VM {
             .ok_or_else(|| Fault::ChannelClosed {
                 endpoint: ep.clone(),
             })?;
+        self.validate_payload(
+            role,
+            "choose",
+            "<branch-label>",
+            Some(&ValType::String),
+            &val,
+            false,
+        )?;
         let label = match &val {
             Value::Str(l) => l.clone(),
-            _ => {
-                return Err(Fault::TypeViolation {
-                    expected: telltale_types::ValType::String,
-                    actual: telltale_types::ValType::Unit,
-                    message: format!("{role}: Choose expected String label, got {val:?}"),
-                });
-            }
+            _ => unreachable!("validate_payload enforces string branch labels for choose"),
         };
 
         let (_lbl, _vt, continuation) = branches
@@ -3149,7 +3386,7 @@ impl VM {
                 let partner = partner.clone();
                 let branches = branches.clone();
 
-                let (_lbl, _vt, continuation) = branches
+                let (_lbl, expected_type, continuation) = branches
                     .iter()
                     .find(|(l, _, _)| l.name == label)
                     .ok_or_else(|| Fault::UnknownLabel {
@@ -3157,16 +3394,42 @@ impl VM {
                     })?
                     .clone();
 
-                let decision = handler
-                    .send_decision(SendDecisionInput {
-                        sid,
+                let offer_payload = Value::Str(label.to_string());
+                let fast_path = SendDecisionFastPathInput::new(
+                    sid,
+                    role,
+                    &partner,
+                    label,
+                    Some(&offer_payload),
+                );
+                let decision = if let Some(decision) = handler.send_decision_fast_path(
+                    fast_path,
+                    &self.coroutines[coro_idx].regs,
+                    Some(&offer_payload),
+                ) {
+                    decision.map_err(|e| Fault::Invoke { message: e })?
+                } else {
+                    handler
+                        .send_decision(SendDecisionInput {
+                            sid,
+                            role,
+                            partner: &partner,
+                            label,
+                            state: &self.coroutines[coro_idx].regs,
+                            payload: Some(offer_payload),
+                        })
+                        .map_err(|e| Fault::Invoke { message: e })?
+                };
+                if let SendDecision::Deliver(payload) = &decision {
+                    self.validate_payload(
                         role,
-                        partner: &partner,
+                        "offer",
                         label,
-                        state: &self.coroutines[coro_idx].regs,
-                        payload: Some(Value::Str(label.to_string())),
-                    })
-                    .map_err(|e| Fault::Invoke { message: e })?;
+                        expected_type.as_ref(),
+                        payload,
+                        false,
+                    )?;
+                }
                 let session = self
                     .sessions
                     .get_mut(sid)
@@ -3502,8 +3765,10 @@ impl VM {
                 _ => None,
             };
             if let Some(entry) = maybe_entry {
-                self.effect_trace.push(entry);
-                self.next_effect_id = self.next_effect_id.saturating_add(1);
+                if self.should_capture_effect_kind(&entry.effect_kind) {
+                    self.effect_trace.push(entry);
+                    self.next_effect_id = self.next_effect_id.saturating_add(1);
+                }
             }
         }
 
@@ -3614,8 +3879,9 @@ mod tests {
     use crate::loader::CodeImage;
     use crate::persistence::PersistenceModel;
     use std::collections::{BTreeMap, BTreeSet};
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
-    use telltale_types::{GlobalType, Label, LocalTypeR};
+    use telltale_types::{GlobalType, Label, LocalTypeR, ValType};
 
     /// Trivial handler that passes values through.
     struct PassthroughHandler;
@@ -3895,6 +4161,274 @@ mod tests {
         }
     }
 
+    struct IdentityFlappingHandler {
+        calls: AtomicUsize,
+    }
+
+    impl IdentityFlappingHandler {
+        fn new() -> Self {
+            Self {
+                calls: AtomicUsize::new(0),
+            }
+        }
+    }
+
+    impl EffectHandler for IdentityFlappingHandler {
+        fn handler_identity(&self) -> String {
+            if self.calls.fetch_add(1, Ordering::Relaxed) % 2 == 0 {
+                "handler_a".to_string()
+            } else {
+                "handler_b".to_string()
+            }
+        }
+
+        fn handle_send(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &[Value],
+        ) -> Result<Value, String> {
+            Ok(Value::Unit)
+        }
+
+        fn handle_recv(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &mut Vec<Value>,
+            _payload: &Value,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn handle_choose(
+            &self,
+            _role: &str,
+            _partner: &str,
+            labels: &[String],
+            _state: &[Value],
+        ) -> Result<String, String> {
+            labels
+                .first()
+                .cloned()
+                .ok_or_else(|| "no labels available".to_string())
+        }
+
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    struct UnsortedTopologyHandler;
+
+    impl EffectHandler for UnsortedTopologyHandler {
+        fn handle_send(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &[Value],
+        ) -> Result<Value, String> {
+            Ok(Value::Unit)
+        }
+
+        fn handle_recv(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &mut Vec<Value>,
+            _payload: &Value,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn handle_choose(
+            &self,
+            _role: &str,
+            _partner: &str,
+            labels: &[String],
+            _state: &[Value],
+        ) -> Result<String, String> {
+            labels
+                .first()
+                .cloned()
+                .ok_or_else(|| "no labels available".to_string())
+        }
+
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn topology_events(&self, tick: u64) -> Result<Vec<TopologyPerturbation>, String> {
+            if tick == 1 {
+                Ok(vec![
+                    TopologyPerturbation::Timeout {
+                        site: "B".to_string(),
+                        duration: Duration::from_millis(1),
+                    },
+                    TopologyPerturbation::Crash {
+                        site: "A".to_string(),
+                    },
+                ])
+            } else {
+                Ok(Vec::new())
+            }
+        }
+    }
+
+    #[derive(Default)]
+    struct CallbackAuditHandler {
+        send_decision_calls: AtomicUsize,
+        handle_send_calls: AtomicUsize,
+        handle_recv_calls: AtomicUsize,
+        handle_choose_calls: AtomicUsize,
+    }
+
+    impl EffectHandler for CallbackAuditHandler {
+        fn handle_send(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &[Value],
+        ) -> Result<Value, String> {
+            self.handle_send_calls.fetch_add(1, Ordering::Relaxed);
+            Ok(Value::Nat(1))
+        }
+
+        fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+            self.send_decision_calls.fetch_add(1, Ordering::Relaxed);
+            Ok(SendDecision::Deliver(
+                input.payload.unwrap_or(Value::Nat(1)),
+            ))
+        }
+
+        fn handle_recv(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &mut Vec<Value>,
+            _payload: &Value,
+        ) -> Result<(), String> {
+            self.handle_recv_calls.fetch_add(1, Ordering::Relaxed);
+            Ok(())
+        }
+
+        fn handle_choose(
+            &self,
+            _role: &str,
+            _partner: &str,
+            labels: &[String],
+            _state: &[Value],
+        ) -> Result<String, String> {
+            self.handle_choose_calls.fetch_add(1, Ordering::Relaxed);
+            labels
+                .first()
+                .cloned()
+                .ok_or_else(|| "no labels available".to_string())
+        }
+
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    struct AdversarialBoolSendHandler;
+
+    impl EffectHandler for AdversarialBoolSendHandler {
+        fn handle_send(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &[Value],
+        ) -> Result<Value, String> {
+            Ok(Value::Bool(true))
+        }
+
+        fn send_decision(&self, _input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+            Ok(SendDecision::Deliver(Value::Bool(true)))
+        }
+
+        fn handle_recv(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &mut Vec<Value>,
+            _payload: &Value,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn handle_choose(
+            &self,
+            _role: &str,
+            _partner: &str,
+            labels: &[String],
+            _state: &[Value],
+        ) -> Result<String, String> {
+            labels
+                .first()
+                .cloned()
+                .ok_or_else(|| "no labels available".to_string())
+        }
+
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    struct OversizedPayloadSendHandler;
+
+    impl EffectHandler for OversizedPayloadSendHandler {
+        fn handle_send(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &[Value],
+        ) -> Result<Value, String> {
+            Ok(Value::Str("x".repeat(128)))
+        }
+
+        fn send_decision(&self, _input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+            Ok(SendDecision::Deliver(Value::Str("x".repeat(128))))
+        }
+
+        fn handle_recv(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &mut Vec<Value>,
+            _payload: &Value,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn handle_choose(
+            &self,
+            _role: &str,
+            _partner: &str,
+            labels: &[String],
+            _state: &[Value],
+        ) -> Result<String, String> {
+            labels
+                .first()
+                .cloned()
+                .ok_or_else(|| "no labels available".to_string())
+        }
+
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
     fn simple_send_recv_types() -> BTreeMap<String, LocalTypeR> {
         let mut m = BTreeMap::new();
         m.insert(
@@ -3914,6 +4448,84 @@ mod tests {
         m
     }
 
+    fn typed_send_recv_types(expected: Option<ValType>) -> BTreeMap<String, LocalTypeR> {
+        let mut m = BTreeMap::new();
+        m.insert(
+            "A".to_string(),
+            LocalTypeR::Send {
+                partner: "B".into(),
+                branches: vec![(Label::new("msg"), expected.clone(), LocalTypeR::End)],
+            },
+        );
+        m.insert(
+            "B".to_string(),
+            LocalTypeR::Recv {
+                partner: "A".into(),
+                branches: vec![(Label::new("msg"), expected, LocalTypeR::End)],
+            },
+        );
+        m
+    }
+
+    fn choice_image_with_explicit_offer_choose() -> CodeImage {
+        let mut local_types = BTreeMap::new();
+        local_types.insert(
+            "A".to_string(),
+            LocalTypeR::Send {
+                partner: "B".into(),
+                branches: vec![
+                    (Label::new("left"), None, LocalTypeR::End),
+                    (Label::new("right"), None, LocalTypeR::End),
+                ],
+            },
+        );
+        local_types.insert(
+            "B".to_string(),
+            LocalTypeR::Recv {
+                partner: "A".into(),
+                branches: vec![
+                    (Label::new("left"), None, LocalTypeR::End),
+                    (Label::new("right"), None, LocalTypeR::End),
+                ],
+            },
+        );
+
+        let mut programs = BTreeMap::new();
+        programs.insert(
+            "A".to_string(),
+            vec![
+                Instr::Offer {
+                    chan: 0,
+                    label: "left".to_string(),
+                },
+                Instr::Halt,
+            ],
+        );
+        programs.insert(
+            "B".to_string(),
+            vec![
+                Instr::Choose {
+                    chan: 0,
+                    table: vec![("left".to_string(), 1), ("right".to_string(), 1)],
+                },
+                Instr::Halt,
+            ],
+        );
+
+        CodeImage {
+            programs,
+            global_type: GlobalType::Comm {
+                sender: "A".into(),
+                receiver: "B".into(),
+                branches: vec![
+                    (Label::new("left"), GlobalType::End),
+                    (Label::new("right"), GlobalType::End),
+                ],
+            },
+            local_types,
+        }
+    }
+
     #[test]
     fn test_vm_simple_send_recv() {
         let local_types = simple_send_recv_types();
@@ -3928,6 +4540,132 @@ mod tests {
 
         // Both coroutines should be done.
         assert!(vm.coroutines.iter().all(|c| c.is_terminal()));
+    }
+
+    #[test]
+    fn test_canonical_dispatch_uses_send_decision_and_handle_recv() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig::default());
+        vm.load_choreography(&image).expect("load choreography");
+        let handler = CallbackAuditHandler::default();
+        vm.run(&handler, 100).expect("run should succeed");
+
+        assert!(handler.send_decision_calls.load(Ordering::Relaxed) > 0);
+        assert!(handler.handle_recv_calls.load(Ordering::Relaxed) > 0);
+        assert_eq!(handler.handle_send_calls.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn test_canonical_dispatch_does_not_call_handle_choose() {
+        let image = choice_image_with_explicit_offer_choose();
+        let mut vm = VM::new(VMConfig::default());
+        vm.load_choreography(&image).expect("load choreography");
+        let handler = CallbackAuditHandler::default();
+        vm.run(&handler, 100).expect("run should succeed");
+
+        assert_eq!(handler.handle_choose_calls.load(Ordering::Relaxed), 0);
+        assert!(handler.send_decision_calls.load(Ordering::Relaxed) > 0);
+        assert!(handler.handle_recv_calls.load(Ordering::Relaxed) > 0);
+    }
+
+    #[test]
+    fn test_payload_validation_structural_rejects_annotated_type_mismatch() {
+        let local_types = typed_send_recv_types(Some(ValType::Nat));
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig {
+            payload_validation_mode: PayloadValidationMode::Structural,
+            ..VMConfig::default()
+        });
+        vm.load_choreography(&image).expect("load choreography");
+
+        let err = vm
+            .run(&AdversarialBoolSendHandler, 100)
+            .expect_err("annotated payload type mismatch should fault");
+        match err {
+            VMError::Fault {
+                fault:
+                    Fault::TypeViolation {
+                        expected, actual, ..
+                    },
+                ..
+            } => {
+                assert_eq!(expected, ValType::Nat);
+                assert_eq!(actual, ValType::Bool);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_payload_validation_off_allows_annotated_type_mismatch_for_compatibility() {
+        let local_types = typed_send_recv_types(Some(ValType::Nat));
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig {
+            payload_validation_mode: PayloadValidationMode::Off,
+            ..VMConfig::default()
+        });
+        vm.load_choreography(&image).expect("load choreography");
+        vm.run(&AdversarialBoolSendHandler, 100)
+            .expect("off mode preserves compatibility behavior");
+    }
+
+    #[test]
+    fn test_payload_validation_strict_schema_requires_annotations_for_send_recv() {
+        let local_types = typed_send_recv_types(None);
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig {
+            payload_validation_mode: PayloadValidationMode::StrictSchema,
+            ..VMConfig::default()
+        });
+        vm.load_choreography(&image).expect("load choreography");
+
+        let err = vm
+            .run(&PassthroughHandler, 100)
+            .expect_err("strict schema mode should require explicit payload annotations");
+        match err {
+            VMError::Fault {
+                fault: Fault::TypeViolation { message, .. },
+                ..
+            } => {
+                assert!(message.contains("requires explicit ValType annotation"));
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_payload_validation_size_bound_rejects_oversized_payloads() {
+        let local_types = typed_send_recv_types(None);
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig {
+            max_payload_bytes: 16,
+            ..VMConfig::default()
+        });
+        vm.load_choreography(&image).expect("load choreography");
+
+        let err = vm
+            .run(&OversizedPayloadSendHandler, 100)
+            .expect_err("payload above max_payload_bytes should fault");
+        match err {
+            VMError::Fault {
+                fault: Fault::TypeViolation { message, .. },
+                ..
+            } => {
+                assert!(message.contains("exceeds max_payload_bytes"));
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 
     #[test]
@@ -4977,6 +5715,97 @@ mod tests {
             .collect();
         assert!(kinds.contains(&"send_decision"));
         assert!(kinds.contains(&"handle_recv"));
+    }
+
+    #[test]
+    fn test_effect_trace_capture_mode_disabled_records_no_entries() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig {
+            effect_trace_capture_mode: EffectTraceCaptureMode::Disabled,
+            ..VMConfig::default()
+        });
+        vm.load_choreography(&image).expect("load choreography");
+        vm.run(&PassthroughHandler, 100)
+            .expect("run should succeed");
+
+        assert!(vm.effect_trace().is_empty());
+    }
+
+    #[test]
+    fn test_effect_trace_capture_mode_topology_only_filters_runtime_effects() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig {
+            effect_trace_capture_mode: EffectTraceCaptureMode::TopologyOnly,
+            ..VMConfig::default()
+        });
+        vm.load_choreography(&image).expect("load choreography");
+        vm.run(&TimeoutOnTickOneHandler, 100)
+            .expect("run should succeed");
+
+        assert!(!vm.effect_trace().is_empty());
+        assert!(vm
+            .effect_trace()
+            .iter()
+            .all(|entry| entry.effect_kind == "topology_event"));
+    }
+
+    #[test]
+    fn test_host_contract_assertions_reject_handler_identity_flips() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig {
+            host_contract_assertions: true,
+            ..VMConfig::default()
+        });
+        vm.load_choreography(&image).expect("load choreography");
+
+        let err = vm
+            .step(&IdentityFlappingHandler::new())
+            .expect_err("identity change should fail with assertions enabled");
+        match err {
+            VMError::HandlerError(message) => {
+                assert!(message.contains("handler_identity changed"));
+            }
+            VMError::Fault {
+                fault: Fault::Invoke { message },
+                ..
+            } => {
+                assert!(message.contains("handler_identity changed"));
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_host_contract_assertions_reject_unsorted_topology_inputs() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig {
+            host_contract_assertions: true,
+            ..VMConfig::default()
+        });
+        vm.load_choreography(&image).expect("load choreography");
+
+        let err = vm
+            .step(&UnsortedTopologyHandler)
+            .expect_err("unsorted topology events should fail with assertions enabled");
+        match err {
+            VMError::HandlerError(message) => {
+                assert!(message.contains("topology_events"));
+                assert!(message.contains("pre-sorted"));
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 
     #[test]

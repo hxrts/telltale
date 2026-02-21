@@ -14,14 +14,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock, TryLockError};
 use std::time::Duration;
 
-use telltale_types::LocalTypeR;
+use telltale_types::{LocalTypeR, ValType};
 
 use crate::buffer::{BoundedBuffer, BufferConfig, EnqueueResult};
 use crate::clock::SimClock;
 use crate::coroutine::{BlockReason, CoroStatus, Coroutine, Fault, ProgressToken, Value};
 use crate::effect::{
     CorruptionType, EffectHandler, EffectTraceEntry, ReplayEffectHandler, SendDecision,
-    SendDecisionInput, TopologyPerturbation,
+    SendDecisionFastPathInput, SendDecisionInput, TopologyPerturbation,
 };
 use crate::faults::{
     speculation_fault_abort_requires_active, speculation_fault_disabled,
@@ -42,8 +42,9 @@ use crate::session::{
 };
 use crate::transfer_semantics::{decode_transfer_request, move_endpoint_bundle};
 use crate::vm::{
-    MonitorMode, ObsEvent, Program, ResourceState, StepResult, ThreadedRoundSemantics, VMConfig,
-    VMError,
+    runtime_value_matches_val_type, runtime_value_val_type, runtime_value_wire_size_bytes,
+    EffectTraceCaptureMode, MonitorMode, ObsEvent, Program, ResourceState, StepResult,
+    ThreadedRoundSemantics, VMConfig, VMError,
 };
 
 /// Lane identifier in the threaded runtime.
@@ -166,6 +167,7 @@ pub struct ThreadedVM {
     next_handoff_id: u64,
     contention_metrics: ContentionMetrics,
     force_invalid_wave_certificate_once: bool,
+    handler_identity_anchor: Option<String>,
 }
 
 impl KernelMachine for ThreadedVM {
@@ -428,6 +430,7 @@ impl ThreadedVM {
             next_handoff_id: 0,
             contention_metrics: ContentionMetrics::default(),
             force_invalid_wave_certificate_once: false,
+            handler_identity_anchor: None,
         }
     }
 
@@ -619,6 +622,8 @@ impl ThreadedVM {
         handler: &dyn EffectHandler,
         tick: u64,
     ) -> Result<bool, VMError> {
+        let handler_identity = handler.handler_identity();
+        self.enforce_handler_identity_contract(&handler_identity)?;
         self.contention_metrics.observe_wave_width(picks.len());
         let step_ctx = ThreadedStepCtx {
             config: &self.config,
@@ -654,7 +659,7 @@ impl ThreadedVM {
                         &pick.session,
                         pack,
                         output_hint,
-                        &handler.handler_identity(),
+                        &handler_identity,
                     ) {
                         Ok(outcome) => match outcome {
                             ExecOutcome::Continue => {
@@ -1137,29 +1142,78 @@ impl ThreadedVM {
         }
     }
 
+    fn should_capture_effect_kind(&self, effect_kind: &str) -> bool {
+        match self.config.effect_trace_capture_mode {
+            EffectTraceCaptureMode::Full => true,
+            EffectTraceCaptureMode::TopologyOnly => effect_kind == "topology_event",
+            EffectTraceCaptureMode::Disabled => false,
+        }
+    }
+
+    fn enforce_handler_identity_contract(&mut self, handler_identity: &str) -> Result<(), VMError> {
+        if !self.config.host_contract_assertions {
+            return Ok(());
+        }
+        match &self.handler_identity_anchor {
+            None => {
+                self.handler_identity_anchor = Some(handler_identity.to_string());
+                Ok(())
+            }
+            Some(anchor) if anchor == handler_identity => Ok(()),
+            Some(anchor) => Err(VMError::HandlerError(format!(
+                "[host-contract] handler_identity changed from '{anchor}' to '{handler_identity}'"
+            ))),
+        }
+    }
+
+    fn assert_topology_events_sorted(
+        &self,
+        tick: u64,
+        events: &[TopologyPerturbation],
+    ) -> Result<(), VMError> {
+        if !self.config.host_contract_assertions {
+            return Ok(());
+        }
+        for idx in 1..events.len() {
+            let prev_key = events[idx - 1].ordering_key();
+            let next_key = events[idx].ordering_key();
+            if prev_key > next_key {
+                return Err(VMError::HandlerError(format!(
+                    "[host-contract] topology_events at tick {tick} must be pre-sorted by ordering_key; out-of-order index {idx}"
+                )));
+            }
+        }
+        Ok(())
+    }
+
     fn ingest_topology_events(&mut self, handler: &dyn EffectHandler) -> Result<(), VMError> {
         let tick = self.clock.tick;
+        let handler_identity = handler.handler_identity();
+        self.enforce_handler_identity_contract(&handler_identity)?;
         let mut events = handler
             .topology_events(tick)
             .map_err(VMError::HandlerError)?;
+        self.assert_topology_events_sorted(tick, &events)?;
         events.sort_by_key(TopologyPerturbation::ordering_key);
         for event in events {
             self.apply_topology_event(&event);
-            self.effect_trace.push(EffectTraceEntry {
-                effect_id: self.next_effect_id,
-                effect_kind: "topology_event".to_string(),
-                inputs: json!({
-                    "tick": tick,
-                }),
-                outputs: json!({
-                    "applied": true,
-                    "topology": event,
-                }),
-                handler_identity: handler.handler_identity(),
-                ordering_key: self.next_effect_id,
-                topology: Some(event),
-            });
-            self.next_effect_id = self.next_effect_id.saturating_add(1);
+            if self.should_capture_effect_kind("topology_event") {
+                self.effect_trace.push(EffectTraceEntry {
+                    effect_id: self.next_effect_id,
+                    effect_kind: "topology_event".to_string(),
+                    inputs: json!({
+                        "tick": tick,
+                    }),
+                    outputs: json!({
+                        "applied": true,
+                        "topology": event,
+                    }),
+                    handler_identity: handler_identity.clone(),
+                    ordering_key: self.next_effect_id,
+                    topology: Some(event),
+                });
+                self.next_effect_id = self.next_effect_id.saturating_add(1);
+            }
         }
         Ok(())
     }
@@ -1422,8 +1476,10 @@ impl ThreadedVM {
                 _ => None,
             };
             if let Some(entry) = maybe_entry {
-                self.effect_trace.push(entry);
-                self.next_effect_id = self.next_effect_id.saturating_add(1);
+                if self.should_capture_effect_kind(&entry.effect_kind) {
+                    self.effect_trace.push(entry);
+                    self.next_effect_id = self.next_effect_id.saturating_add(1);
+                }
             }
         }
 
@@ -2067,6 +2123,62 @@ fn monitor_precheck(
     }
 }
 
+fn validate_payload(
+    config: &VMConfig,
+    role: &str,
+    context: &str,
+    label: &str,
+    expected_type: Option<&ValType>,
+    value: &Value,
+    strict_requires_annotation: bool,
+) -> Result<(), Fault> {
+    if config.payload_validation_mode == crate::vm::PayloadValidationMode::Off {
+        return Ok(());
+    }
+
+    let actual_type = runtime_value_val_type(value);
+    let payload_bytes = runtime_value_wire_size_bytes(value);
+    if payload_bytes > config.max_payload_bytes {
+        return Err(Fault::TypeViolation {
+            expected: expected_type.cloned().unwrap_or_else(|| actual_type.clone()),
+            actual: actual_type,
+            message: format!(
+                "{role}: {context} payload '{label}' exceeds max_payload_bytes={} (actual={payload_bytes})",
+                config.max_payload_bytes
+            ),
+        });
+    }
+
+    match expected_type {
+        Some(expected) => {
+            if runtime_value_matches_val_type(value, expected) {
+                Ok(())
+            } else {
+                Err(Fault::TypeViolation {
+                    expected: expected.clone(),
+                    actual: actual_type,
+                    message: format!(
+                        "{role}: {context} payload '{label}' violated expected type {expected:?}"
+                    ),
+                })
+            }
+        }
+        None
+            if config.payload_validation_mode == crate::vm::PayloadValidationMode::StrictSchema
+                && strict_requires_annotation =>
+        {
+            Err(Fault::TypeViolation {
+                expected: ValType::Unit,
+                actual: actual_type,
+                message: format!(
+                    "{role}: {context} payload '{label}' requires explicit ValType annotation in strict_schema mode"
+                ),
+            })
+        }
+        None => Ok(()),
+    }
+}
+
 #[allow(clippy::too_many_lines)]
 fn step_send(
     coro: &mut Coroutine,
@@ -2107,7 +2219,7 @@ fn step_send(
         }
     };
 
-    let (label, _vt, continuation) = branches
+    let (label, expected_type, continuation) = branches
         .first()
         .ok_or_else(|| Fault::TypeViolation {
             expected: telltale_types::ValType::Unit,
@@ -2121,17 +2233,25 @@ fn step_send(
         .get(usize::from(val_reg))
         .cloned()
         .ok_or(Fault::OutOfRegisters)?;
-    let decision = ctx
-        .handler
-        .send_decision(SendDecisionInput {
-            sid,
-            role,
-            partner: &partner,
-            label: &label.name,
-            state: &coro.regs,
-            payload: Some(send_payload),
-        })
-        .map_err(|e| Fault::Invoke { message: e })?;
+    let fast_path =
+        SendDecisionFastPathInput::new(sid, role, &partner, &label.name, Some(&send_payload));
+    let decision = if let Some(decision) =
+        ctx.handler
+            .send_decision_fast_path(fast_path, &coro.regs, Some(&send_payload))
+    {
+        decision.map_err(|e| Fault::Invoke { message: e })?
+    } else {
+        ctx.handler
+            .send_decision(SendDecisionInput {
+                sid,
+                role,
+                partner: &partner,
+                label: &label.name,
+                state: &coro.regs,
+                payload: Some(send_payload),
+            })
+            .map_err(|e| Fault::Invoke { message: e })?
+    };
 
     if ctx.crashed_sites.contains(role)
         || ctx.crashed_sites.contains(&partner)
@@ -2154,6 +2274,17 @@ fn step_send(
         .corrupted_edges
         .get(&(role.to_string(), partner.clone()))
         .cloned();
+    if let SendDecision::Deliver(payload) = &decision {
+        validate_payload(
+            ctx.config,
+            role,
+            "send",
+            &label.name,
+            expected_type.as_ref(),
+            payload,
+            true,
+        )?;
+    }
     let enqueue = match decision {
         SendDecision::Deliver(payload) => {
             let payload = if let Some(corruption) = maybe_corruption {
@@ -2248,7 +2379,7 @@ fn step_recv(
         }
     };
 
-    let (label, _vt, continuation) = branches
+    let (label, expected_type, continuation) = branches
         .first()
         .ok_or_else(|| Fault::TypeViolation {
             expected: telltale_types::ValType::Unit,
@@ -2278,6 +2409,16 @@ fn step_recv(
         .ok_or_else(|| Fault::ChannelClosed {
             endpoint: ep.clone(),
         })?;
+
+    validate_payload(
+        ctx.config,
+        role,
+        "receive",
+        &label.name,
+        expected_type.as_ref(),
+        &val,
+        true,
+    )?;
 
     ctx.handler
         .handle_recv(role, &partner, &label.name, &mut coro.regs, &val)
@@ -2739,15 +2880,18 @@ fn step_choose(
         .ok_or_else(|| Fault::ChannelClosed {
             endpoint: ep.clone(),
         })?;
+    validate_payload(
+        ctx.config,
+        role,
+        "choose",
+        "<branch-label>",
+        Some(&ValType::String),
+        &val,
+        false,
+    )?;
     let label = match &val {
         Value::Str(l) => l.clone(),
-        _ => {
-            return Err(Fault::TypeViolation {
-                expected: telltale_types::ValType::String,
-                actual: telltale_types::ValType::Unit,
-                message: format!("{role}: Choose expected String label, got {val:?}"),
-            })
-        }
+        _ => unreachable!("validate_payload enforces string branch labels for choose"),
     };
 
     let (_lbl, _vt, continuation) = branches
@@ -2832,7 +2976,7 @@ fn step_offer(
             let partner = partner.clone();
             let branches = branches.clone();
 
-            let (_lbl, _vt, continuation) = branches
+            let (_lbl, expected_type, continuation) = branches
                 .iter()
                 .find(|(l, _, _)| l.name == label)
                 .ok_or_else(|| Fault::UnknownLabel {
@@ -2840,17 +2984,37 @@ fn step_offer(
                 })?
                 .clone();
 
-            let decision = ctx
-                .handler
-                .send_decision(SendDecisionInput {
-                    sid,
+            let offer_payload = Value::Str(label.to_string());
+            let fast_path =
+                SendDecisionFastPathInput::new(sid, role, &partner, label, Some(&offer_payload));
+            let decision = if let Some(decision) =
+                ctx.handler
+                    .send_decision_fast_path(fast_path, &coro.regs, Some(&offer_payload))
+            {
+                decision.map_err(|e| Fault::Invoke { message: e })?
+            } else {
+                ctx.handler
+                    .send_decision(SendDecisionInput {
+                        sid,
+                        role,
+                        partner: &partner,
+                        label,
+                        state: &coro.regs,
+                        payload: Some(offer_payload),
+                    })
+                    .map_err(|e| Fault::Invoke { message: e })?
+            };
+            if let SendDecision::Deliver(payload) = &decision {
+                validate_payload(
+                    ctx.config,
                     role,
-                    partner: &partner,
+                    "offer",
                     label,
-                    state: &coro.regs,
-                    payload: Some(Value::Str(label.to_string())),
-                })
-                .map_err(|e| Fault::Invoke { message: e })?;
+                    expected_type.as_ref(),
+                    payload,
+                    false,
+                )?;
+            }
             let enqueue = match decision {
                 SendDecision::Deliver(payload) => session
                     .send(role, &partner, payload)

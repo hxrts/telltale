@@ -45,6 +45,10 @@ lint-quick:
 check-arch-rust:
     ./scripts/check-arch-rust.sh
 
+# Generate deterministic EffectHandler + test stubs for host integration.
+effect-scaffold out="work/effect_handler_scaffold" name="HostEffectHandler":
+    cargo run -p effect-scaffold -- {{ out }} {{ name }}
+
 # Backward-compatible alias used by CI dry-run pipeline
 check-arch: check-arch-rust
 

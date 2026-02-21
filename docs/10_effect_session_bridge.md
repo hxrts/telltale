@@ -65,6 +65,8 @@ The boundary separates protocol semantics from host materialization.
 
 The VM dispatch path is in `rust/vm/src/vm.rs`.
 The trait surface is in `rust/vm/src/effect.rs`.
+The normative contract is documented in that trait module.
+The contract marks `handle_send` and `handle_choose` as compatibility hooks.
 
 | Callback | VM call point | Runtime behavior | Integration note |
 |---|---|---|---|
@@ -79,14 +81,49 @@ The trait surface is in `rust/vm/src/effect.rs`.
 | `output_condition_hint` | post-dispatch pre-commit | queried only when a step emits events | return `None` to use VM default |
 | `handler_identity` | trace and commit attribution | stable handler id in traces | use deterministic identity value |
 
+## Error Classification
+
+The VM keeps callback signatures as `Result<_, String>`.
+Use `classify_effect_error` and `EffectError` from `telltale-vm` for typed diagnostics.
+This keeps runtime semantics unchanged and improves host observability.
+
+| Utility | Purpose |
+|---|---|
+| `classify_effect_error` | maps raw handler error strings to `EffectErrorCategory` |
+| `classify_effect_error_owned` | wraps raw strings into `EffectError` |
+| `EffectErrorCategory` | coarse taxonomy for timeout, topology, determinism, and contract failures |
+
 ## Integration Workflow
 
 1. Use `telltale-theory` at setup time to project global types to local types.
 2. Compile local types to VM bytecode and load with `CodeImage`.
 3. Implement `EffectHandler` with deterministic host operations.
 4. Map each callback to host primitives without reimplementing protocol typing.
-5. Run conformance tests with effect trace recording and replay.
+5. Run `run_loaded_vm_record_replay_conformance` to validate record and replay behavior on a loaded VM.
 6. Run Lean bridge lanes for parity and equivalence checks.
+
+## Integration Tooling
+
+Use `just effect-scaffold` to generate host integration stubs.
+The command emits deterministic `EffectHandler` and test templates.
+The generated files include checklist comments for host assumptions.
+
+## Performance and Diagnostics Controls
+
+`send_decision_fast_path` is an optional hook for host-side cache lookups.
+Default behavior is unchanged when the hook returns `None`.
+
+`VMConfig.effect_trace_capture_mode` controls effect trace overhead.
+Default mode is `full`.
+
+`VMConfig.payload_validation_mode` controls runtime payload hardening.
+Use `off` for trusted benchmarks, `structural` for standard deployments, and `strict_schema` for adversarial inputs.
+
+`VMConfig.max_payload_bytes` bounds payload size in VM message validation.
+Default is `65536`.
+
+`VMConfig.host_contract_assertions` enables runtime checks for handler identity stability and topology ordering inputs.
+Default value is `false`.
 
 ## Integration Checklist
 

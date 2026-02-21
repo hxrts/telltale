@@ -118,6 +118,8 @@ fn vm_config_optional_hooks_have_deterministic_defaults() {
     obj.remove("flow_policy");
     obj.remove("instruction_cost");
     obj.remove("initial_cost_budget");
+    obj.remove("payload_validation_mode");
+    obj.remove("max_payload_bytes");
     obj.remove("config_schema_version");
 
     let decoded: VMConfig =
@@ -127,6 +129,11 @@ fn vm_config_optional_hooks_have_deterministic_defaults() {
     assert_eq!(decoded.flow_policy, defaults.flow_policy);
     assert_eq!(decoded.instruction_cost, defaults.instruction_cost);
     assert_eq!(decoded.initial_cost_budget, defaults.initial_cost_budget);
+    assert_eq!(
+        decoded.payload_validation_mode,
+        defaults.payload_validation_mode
+    );
+    assert_eq!(decoded.max_payload_bytes, defaults.max_payload_bytes);
     assert_eq!(
         decoded.config_schema_version,
         defaults.config_schema_version
