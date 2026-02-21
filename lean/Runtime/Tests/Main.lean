@@ -7,7 +7,7 @@ import Runtime.VM.Semantics.ExecOwnership
 import Runtime.VM.Runtime.Loader
 import Runtime.VM.Runtime.Failure
 import Runtime.Adequacy.EnvelopeCore
-import Runtime.Proofs.CompileTime.RuntimeContracts
+import Runtime.Proofs.Contracts.RuntimeContracts
 import Runtime.Proofs.Examples.ComposedProofPack
 import Runtime.Proofs.TheoremPack.API
 import SessionTypes.LocalTypeR

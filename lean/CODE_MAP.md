@@ -611,15 +611,20 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 
 ### VM Runtime (VM/Runtime/)
 
+Executable runtime surface used for Lean↔Rust parity. Proof theorems and proof-only
+predicate vocabularies now live under `Runtime/Proofs/VM/`.
+
 | File | Lines | Description |
 |------|------:|-------------|
-| Loader.lean | 109 | Dynamic choreography loading into running VM state |
+| Loader.lean | 234 | Dynamic choreography loading into running VM state (result-typed admission + compatibility API) |
 | Runner.lean | 104 | N-concurrent scheduler-driven execution loop |
 | ThreadedRunner.lean | ~200 | V2: Deterministic threaded execution with wave planning |
 | Scheduler.lean | 294 | Process scheduler with fairness and priority |
 | SchedulerHelpers.lean | ~150 | Shared scheduler utility functions |
-| Monitor.lean | 139 | SessionKind, WellTypedInstr judgment, unified session monitor |
-| Failure.lean | 290 | Failure modes (crash, partition, heal), FStep relation, recovery predicates |
+| Monitor.lean | 181 | SessionKind, WellTypedInstr judgment, unified session monitor (executable monitor only) |
+| Failure.lean | 40 | Failure runtime facade (executable symbols only) |
+| Failure/Core.lean | 418 | Failure modes (crash/partition/heal/corrupt/timeout), ingress updates, deterministic recovery actions |
+| Failure/Transitions.lean | 201 | Deterministic recovery transition helpers and mode classifiers |
 | Json.lean | 145 | JSON serialization for runtime values and trace events |
 
 ### VM Composition (VM/Composition/)
@@ -665,10 +670,15 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 |------|------:|-------------|
 | Proofs/VM/InstrSpec.lean | 1,415 | Preservation theorems for all 8 instruction types, quotient-respecting variants |
 | Proofs/VM/BridgeStrengthening.lean | 143 | VM bridge premise bundle (`VMBridgePremises`), handler local/trace/step typing bridge, composed `ConfigEquiv`→`EffectBisim`→observational transport |
-| Proofs/VM/Scheduler.lean | 136 | Scheduler proof infrastructure |
+| Proofs/VM/Scheduler.lean | 265 | Scheduler proof infrastructure, including single-lane/policy determinism compatibility lemmas |
 | Proofs/VM/DomainComposition.lean | 49 | Domain composition and guard chain proofs |
 | Proofs/VM/ExecOwnership.lean | 22 | Ownership transfer proof bridge |
-| Proofs/VM/LoadChoreography.lean | 37 | Choreography loading and verification |
+| Proofs/VM/LoadChoreography.lean | 83 | Loader monotonicity and choreography-load disjointness proofs |
+| Proofs/VM/Knowledge.lean | 20 | Flow-policy serialization roundtrip theorems moved from `Runtime.VM.Model.Knowledge` |
+| Proofs/VM/Monitor.lean | 24 | Monitor soundness/identity preservation lemmas moved from `Runtime.VM.Runtime.Monitor` |
+| Proofs/VM/Failure.lean | 53 | Retry/deterministic recovery lemmas moved from failure runtime modules |
+| Proofs/VM/FailurePredicates.lean | 135 | Recovery predicate vocabulary (proof-only) moved from VM failure runtime |
+| Proofs/VM/ProgramWitnesses.lean | 21 | Proof-only verified image witnesses moved from `Runtime.VM.Model.Program` |
 | Proofs/VM/Speculation.lean | ~200 | V2: Speculation correctness (depth monotonicity, abort restore, join cleanup) |
 | Proofs/VM/InstrSpec/ConfigEquivSendRecv.lean | ~150 | V2: Send/recv configuration equivalence |
 | Proofs/VM/InstrSpec/ConfigEquivSelectBranch.lean | ~150 | V2: Select/branch configuration equivalence |
@@ -693,7 +703,9 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 | Adequacy/EnvelopeCore/FailureTaxonomy/ProtocolPack.lean | ~100 | V2: Protocol-specific failure handling |
 
 ### Proofs
-| Proofs/RuntimeTheorems.lean | 465 | Runtime theorem facade unifying proof exports |
+| Proofs/Contracts/RuntimeTheorems.lean | 493 | Runtime theorem facade unifying proof exports |
+| Proofs/Contracts/DeterminismApi.lean | 105 | Determinism profile artifacts and hypothesis bundles for runtime gating |
+| Proofs/Contracts/RuntimeContracts.lean | 274 | Runtime admission/capability contract surfaces for theorem-guided VM policy |
 | Proofs/Concurrency.lean | 109 | Iris-backed N-invariance and policy-invariance proofs |
 | Proofs/ConcurrencyThreaded.lean | ~200 | V2: Threaded concurrency proofs with wave certification |
 | Proofs/SchedulerTheoremPack.lean | ~150 | V2: Scheduler theorem bundle for runtime admission |
@@ -896,9 +908,11 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **VM instruction specifications?** → Runtime/VM/Semantics/InstrSpec.lean
 - **VM instruction preservation proofs?** → Runtime/Proofs/VM/InstrSpec.lean
 - **VM bytecode compiler?** → Runtime/VM/Model/CompileLocalTypeR.lean
-- **Dynamic choreography loading?** → Runtime/VM/Runtime/Loader.lean
+- **Dynamic choreography loading (executable path)?** → Runtime/VM/Runtime/Loader.lean
+- **Dynamic choreography loading proofs?** → Runtime/Proofs/VM/LoadChoreography.lean
 - **N-concurrent scheduling?** → Runtime/VM/Runtime/Runner.lean, Runtime/Proofs/Concurrency.lean
-- **VM failure model?** → Runtime/VM/Runtime/Failure.lean
+- **VM failure model (executable path)?** → Runtime/VM/Runtime/Failure.lean, Runtime/VM/Runtime/Failure/Core.lean
+- **VM failure proofs/predicates?** → Runtime/Proofs/VM/Failure.lean, Runtime/Proofs/VM/FailurePredicates.lean
 - **Buffer boundedness?** → Protocol/BufferBoundedness.lean
 - **Protocol symmetry?** → Protocol/Symmetry.lean
 - **Spectral gap bounds?** → Protocol/Classical/SpectralGap.lean

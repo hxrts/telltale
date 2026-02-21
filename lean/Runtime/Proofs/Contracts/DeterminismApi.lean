@@ -2,7 +2,7 @@ import Runtime.VM.API
 
 set_option autoImplicit false
 
-/-! # Runtime.Proofs.CompileTime.DeterminismApi
+/-! # Runtime.Proofs.Contracts.DeterminismApi
 
 Lean-facing determinism contract API for VM runtime/profile gating.
 -/

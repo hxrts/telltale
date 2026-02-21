@@ -8,7 +8,7 @@ import SessionTypes.LocalTypeR
 `Program`, `CodeImage`, and `UntrustedImage`, the program representation that the
 VM loads and executes. A `Program` is bytecode plus per-role entry points, local types,
 handler types, and source metadata. A `CodeImage` bundles executable program payload with
-its global type. `VerifiedCodeImage` carries proof-only witnesses for theorem layers. An
+its global type. An
 `UntrustedImage` is an unverified program pending signature and typing checks, used by
 the code loading pipeline (`runtime.md` §10).
 -/
@@ -20,8 +20,7 @@ distinguish trusted (verified) from untrusted (pending verification) code.
 
 Solution Structure. Defines `Program` with bytecode, entry points per role, local
 types, and metadata. `CodeImage` carries executable data used by the runtime.
-`VerifiedCodeImage` carries theorem-facing proof witnesses. `UntrustedImage`
-represents unverified code pending validation.
+`UntrustedImage` represents unverified code pending validation.
 -/
 
 set_option autoImplicit false
@@ -64,12 +63,6 @@ structure CodeImage (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
   -- Executable program image consumed by runtime loader.
   program : Program γ ε
   globalType : GlobalType
-
-structure VerifiedCodeImage (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
-  -- Proof-oriented witnesses detached from runtime loader surfaces.
-  image : CodeImage γ ε
-  wfBlind : Prop
-  projectionCorrect : Prop
 
 structure RoleCodeImage (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
   -- Rust-style map-per-role image view for parity checks and tooling.
@@ -211,11 +204,3 @@ def CodeImage.toRoleCodeImage {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε
   { programs := roleProgramMap (γ := γ) (ε := ε) image.program.localTypesR
   , globalType := image.globalType
   , localTypes := localTypeRMap image.program.localTypesR }
-
-def VerifiedCodeImage.fromLocalTypes {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
-    [Inhabited (EffectRuntime.EffectAction ε)]
-    (localTypes : List (Role × SessionTypes.LocalTypeR.LocalTypeR))
-    (globalType : GlobalType) : VerifiedCodeImage γ ε :=
-  { image := CodeImage.fromLocalTypes (γ := γ) (ε := ε) localTypes globalType
-  , wfBlind := True
-  , projectionCorrect := True }

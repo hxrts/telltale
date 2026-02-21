@@ -899,35 +899,15 @@ Dependency sketch:
 \label{sec:mechanization}
 % ============================================================================
 
-Table~\ref{tab:p2-claim-artifact-map} maps claim families to concrete modules and theorem anchors.
-Module references use path identifiers of the form \texttt{P$n$-A$xx$}, where $n$ is the paper number and $xx$ is the artifact index; these resolve to file paths in Appendix~\ref{app:p2-path-registry}.
-
-\begin{table}[H]
-	\centering
-	\footnotesize
-		{\setlength{\tabcolsep}{3pt}
-		\begin{tabularx}{\columnwidth}{@{}L{0.19\columnwidth}L{0.27\columnwidth}>{\raggedright\arraybackslash}X@{}}
-		\toprule
-		\thead{Layer} & \thead{Modules}                               & \thead{Anchors}                                          \\
-		\midrule
-		Weighted dyn. & \pathref{P2-A01},\allowbreak \pathref{P2-A02} & \texttt{weightedMeasure},\allowbreak\ \nolinkurl{total_measure_decreasing} \\
-			Decision      & \pathref{P2-A03},\allowbreak \pathref{P2-A04} & \nolinkurl{reachable_triples_finite},\allowbreak\ \nolinkurl{async_subtype_decidable},\newline \nolinkurl{regularTypeEqDecide_spec} \\
-			Protocol      & \pathref{P2-A05},\allowbreak \pathref{P2-A06} & \nolinkurl{crash_tolerance_iff},\allowbreak\ \nolinkurl{branching_iff_chromatic_capacity},\newline \nolinkurl{phase_transition_sharp} \\
-			Byzantine     & \pathref{P2-A07},\allowbreak \pathref{P2-A08} & \nolinkurl{byzantineSafety_exact_of_profile},\newline \texttt{canOperateUnder}\allowbreak\texttt{Byzantine}\allowbreak\texttt{Envelope} \\
-		\bottomrule
-	\end{tabularx}
-	}
-	\caption{Claim to artifact mapping.}
-	\label{tab:p2-claim-artifact-map}
-\end{table}
+Core theorem anchors and their source locations are listed in Table~\ref{tab:p2-anchor-registry} (Appendix~\ref{app:p2-anchor-registry}).
 
 \begin{proposition}[Mechanization Coverage Soundness]
 	\label{prop:coverage}
-	For any claim class $c$ in Table~\ref{tab:p2-claim-artifact-map}, if $c$ is marked covered and the corresponding Appendix~\ref{app:reproducibility} checks pass, then there exists a mechanized theorem object for $c$ within this paper's assumption scope.
+	For any anchor in Table~\ref{tab:p2-anchor-registry}, if the corresponding Appendix~\ref{app:reproducibility} checks pass, then there exists a mechanized theorem object within this paper's assumption scope.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
-	Coverage labels in Table~\ref{tab:p2-claim-artifact-map} are defined by explicit module-and-theorem anchors. Appendix~\ref{app:reproducibility} rebuild checks certify that these declarations resolve and typecheck under the pinned toolchain. Therefore a passing check witnesses existence of a theorem object for each covered claim class.
+	Anchors in Table~\ref{tab:p2-anchor-registry} are defined by explicit theorem names and file paths. Appendix~\ref{app:reproducibility} rebuild checks certify that these declarations resolve and typecheck under the pinned toolchain. Therefore a passing check witnesses existence of a theorem object for each anchor.
 \end{proof}
 
 % ============================================================================
@@ -1192,52 +1172,32 @@ Define the phase classifier
 
 Under Assumption Block~\ref{assump:p2-byzantine}, this paper provides the exact safety-side interface and converse counterexample packaging; full envelope maximality and transport are deferred to \emph{Harmony from Coherence in Asynchronous MPST}.
 
-\section{Mechanization Map}
-\label{app:mechanization}
+\section{Anchor Registry}
+\label{app:p2-anchor-registry}
+
+Table~\ref{tab:p2-anchor-registry} maps theorem anchors to their source files.
 
 \begin{table}[H]
 	\centering
 	\footnotesize
-		{\setlength{\tabcolsep}{3pt}
-		\begin{tabularx}{\columnwidth}{@{}L{0.23\columnwidth}L{0.25\columnwidth}>{\raggedright\arraybackslash}X@{}}
+	\begin{tabularx}{\columnwidth}{@{}L{0.42\columnwidth}L{0.53\columnwidth}@{}}
 		\toprule
-		\thead{Result}   & \thead{Modules}                               & \thead{Anchors}                      \\
+		\thead{Anchor} & \thead{Path (relative to \texttt{lean/})} \\
 		\midrule
-		Quant.\ dynamics & \pathref{P2-A01},\allowbreak \pathref{P2-A02} & \texttt{weightedMeasure},\allowbreak\ \nolinkurl{total_measure_decreasing} \\
-			Decidability     & \pathref{P2-A03},\allowbreak \pathref{P2-A04} & \nolinkurl{reachable_triples_finite},\allowbreak\ \nolinkurl{async_subtype_decidable},\newline \nolinkurl{regularTypeEqDecide_spec} \\
-			Crash/branch     & \pathref{P2-A05},\allowbreak \pathref{P2-A06} & \nolinkurl{crash_tolerance_iff},\allowbreak\ \nolinkurl{branching_iff_chromatic_capacity},\newline \nolinkurl{phase_transition_sharp}      \\
-			Byzantine        & \pathref{P2-A07},\allowbreak \pathref{P2-A08} & \nolinkurl{byzantineSafety_exact_of_profile},\newline \texttt{canOperateUnder}\allowbreak\texttt{Byzantine}\allowbreak\texttt{Envelope}    \\
+		\texttt{weightedMeasure} & \texttt{Runtime/Proofs/\allowbreak WeightedMeasure/}\mbox{\texttt{*.lean}} \\
+		\texttt{total\_measure\_decreasing} & \texttt{Runtime/Proofs/}\mbox{\texttt{Lyapunov.lean}} \\
+		\texttt{reachable\_triples\_finite} & \texttt{SessionCoTypes/AsyncSubtyping/}\mbox{\texttt{*.lean}} \\
+		\texttt{async\_subtype\_decidable} & \texttt{SessionCoTypes/AsyncSubtyping/}\mbox{\texttt{*.lean}} \\
+		\texttt{regularTypeEqDecide\_spec} & \texttt{SessionCoTypes/Coinductive/\allowbreak BisimDecidable/}\mbox{\texttt{*.lean}} \\
+		\texttt{crash\_tolerance\_iff} & \texttt{Protocol/}\mbox{\texttt{CrashTolerance.lean}} \\
+		\texttt{branching\_iff\_chromatic\_capacity} & \texttt{Protocol/BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}} \\
+		\texttt{phase\_transition\_sharp} & \texttt{Protocol/BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}} \\
+		\texttt{byzantineSafety\_exact\_of\_profile} & \texttt{Runtime/Proofs/Adapters/Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
+		\texttt{canOperateUnderByzantineEnvelope} & \texttt{Runtime/Proofs/TheoremPack/}\mbox{\texttt{*.lean}} \\
 		\bottomrule
 	\end{tabularx}
-	}
-	\caption{Mechanization map.}
-	\label{tab:p2-mechanization-map}
-\end{table}
-
-\section{Artifact Path Registry}
-\label{app:p2-path-registry}
-
-All Lean file-path references in this paper use the identifiers listed in Table~\ref{tab:p2-path-registry}.
-
-\begin{table}[H]
-	\centering
-	\footnotesize
-	\begin{tabularx}{\columnwidth}{@{}L{0.2\columnwidth}L{0.75\columnwidth}@{}}
-		\toprule
-		\thead{ID}      & \thead{Path (relative to \texttt{lean/})}                          \\
-		\midrule
-		\texttt{P2-A01} & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{*.lean}}                   \\
-		\texttt{P2-A02} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{Lyapunov.lean}}                            \\
-		\texttt{P2-A03} & \texttt{SessionCoTypes/\allowbreak AsyncSubtyping/\allowbreak}\mbox{\texttt{*.lean}}                    \\
-		\texttt{P2-A04} & \texttt{SessionCoTypes/\allowbreak Coinductive/\allowbreak BisimDecidable/\allowbreak}\mbox{\texttt{*.lean}}        \\
-		\texttt{P2-A05} & \texttt{Protocol/\allowbreak}\mbox{\texttt{CrashTolerance.lean}}                            \\
-		\texttt{P2-A06} & \texttt{Protocol/\allowbreak BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}}          \\
-		\texttt{P2-A07} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
-		\texttt{P2-A08} & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{*.lean}}                       \\
-		\bottomrule
-	\end{tabularx}
-	\caption{Artifact path registry for \emph{Computable Dynamics for Asynchronous MPST}.}
-	\label{tab:p2-path-registry}
+	\caption{Anchor registry.}
+	\label{tab:p2-anchor-registry}
 \end{table}
 
 \section{Exactness and Boundary Notes}
@@ -1287,21 +1247,21 @@ Expected checks: Finite-reachability and decision modules compile, weighted-meas
 	\centering
 	\footnotesize
 	{\setlength{\tabcolsep}{3pt}
-	\begin{tabularx}{\columnwidth}{@{}L{0.22\columnwidth}L{0.09\columnwidth}L{0.33\columnwidth}L{0.27\columnwidth}@{}}
+	\begin{tabularx}{\columnwidth}{@{}L{0.22\columnwidth}L{0.09\columnwidth}L{0.40\columnwidth}L{0.19\columnwidth}@{}}
 		\toprule
-		\thead{Claim} & \thead{Sec.} & \thead{Assumption}                   & \thead{Location}      \\
+		\thead{Claim} & \thead{Sec.} & \thead{Assumption} & \thead{Anchor} \\
 		\midrule
-		Thm.~\ref{thm:quantitative}    & \S4 & Assump.~\ref{assump:p2-quantitative} & \pathref{P2-A01} \\
-		Thm.~\ref{thm:algorithmic}     & \S5 & Assump.~\ref{assump:p2-regular}      & \pathref{P2-A03} \\
-			Thm.~\ref{thm:crash}           & \S6 & Assump.~\ref{assump:p2-crash}        & \pathref{P2-A05} \\
-			Thm.~\ref{thm:byzantine}       & \S6 & Assump.~\ref{assump:p2-byzantine}    & \pathref{P2-A07} \\
-			Cor.~\ref{cor:converse}        & \S6 & Thm.~\ref{thm:byzantine} + dropped class & \pathref{P2-A07} \\
-			Cor.~\ref{cor:productive}      & \S7 & Thm.~\ref{thm:quantitative} premises & \pathref{P2-A01} \\
-			Cor.~\ref{cor:scheduler}       & \S7 & Thm.~\ref{thm:quantitative} + sched. & \pathref{P2-A02} \\
-			Cor.~\ref{cor:capacity}        & \S7 & regular + threshold assumptions       & \pathref{P2-A06}  \\
-			Thm.~\ref{thm:app-p2-branching} & App.\ C & regular + branch profile & \pathref{P2-A06} \\
-			Prop.~\ref{prop:vm-bridge}     & \S6 & pack + adherence                      & \pathref{P2-A08}  \\
-			Prop.~\ref{prop:coverage}      & \S9 & claim-map + App.~\ref{app:reproducibility} checks & \S9 \\
+		Thm.~\ref{thm:quantitative}    & \S4 & Assump.~\ref{assump:p2-quantitative} & \texttt{weighted*} \\
+		Thm.~\ref{thm:algorithmic}     & \S5 & Assump.~\ref{assump:p2-regular}      & \texttt{reachable*} \\
+			Thm.~\ref{thm:crash}           & \S6 & Assump.~\ref{assump:p2-crash}        & \texttt{crash\_*} \\
+			Thm.~\ref{thm:byzantine}       & \S6 & Assump.~\ref{assump:p2-byzantine}    & \texttt{byzantine*} \\
+			Cor.~\ref{cor:converse}        & \S6 & Thm.~\ref{thm:byzantine} + dropped class & \texttt{byzantine*} \\
+			Cor.~\ref{cor:productive}      & \S7 & Thm.~\ref{thm:quantitative} premises & \texttt{weighted*} \\
+			Cor.~\ref{cor:scheduler}       & \S7 & Thm.~\ref{thm:quantitative} + sched. & \texttt{total\_*} \\
+			Cor.~\ref{cor:capacity}        & \S7 & regular + threshold assumptions       & \texttt{phase\_*} \\
+			Thm.~\ref{thm:app-p2-branching} & App.\ C & regular + branch profile & \texttt{branching*} \\
+			Prop.~\ref{prop:vm-bridge}     & \S6 & pack + adherence                      & \texttt{canOperate*} \\
+			Prop.~\ref{prop:coverage}      & \S9 & anchor registry + App.~\ref{app:reproducibility} checks & \S9 \\
 		\bottomrule
 	\end{tabularx}
 	}

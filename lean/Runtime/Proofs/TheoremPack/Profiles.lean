@@ -1,7 +1,7 @@
 import Runtime.Proofs.Adapters.Progress
 import Runtime.Proofs.Adapters.Distributed
 import Runtime.Proofs.Adapters.Classical
-import Runtime.Proofs.CompileTime.DeterminismApi
+import Runtime.Proofs.Contracts.DeterminismApi
 
 set_option autoImplicit false
 

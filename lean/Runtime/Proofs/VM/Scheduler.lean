@@ -49,6 +49,35 @@ theorem cooperative_refines_concurrent_holds {ι γ π ε ν : Type u} [Identity
   rw [hEq]
   simp [st', pickRunnableInQueue]
 
+theorem single_lane_schedule_compat_holds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν)
+    (laneOf' : LaneOfMap)
+    (laneQueues' : LaneQueueMap)
+    (laneBlocked' : LaneBlockedMap γ)
+    (handoffs' : List CrossLaneHandoff)
+    (hLaneOf : laneOf' = st.sched.laneOf)
+    (hLaneQueues : laneQueues' = st.sched.laneQueues)
+    (hLaneBlocked : laneBlocked' = st.sched.laneBlocked)
+    (hHandoffs : handoffs' = st.sched.crossLaneHandoffs) :
+    single_lane_schedule_compat st laneOf' laneQueues' laneBlocked' handoffs' := by
+  subst hLaneOf
+  subst hLaneQueues
+  subst hLaneBlocked
+  subst hHandoffs
+  rfl
+
+theorem policy_selection_deterministic_holds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (policy : SchedPolicy) (st : VMState ι γ π ε ν) :
+    policy_selection_deterministic policy st := by
+  intro _ st1 st2 h1 h2
+  exact Option.some.inj (h1.symm.trans h2)
+
 /-! ## Queue Extraction Helpers -/
 
 private theorem takeOut_some_of_mem (queue : SchedQueue) (p : CoroutineId → Bool)

@@ -577,7 +577,7 @@ For the step edge $u=(C,M)$ with stepped endpoint $ep_{\mathrm{step}}$, the case
 	The same skeleton is used uniformly across send/recv/select/branch, which is the main proof-reuse gain in this paper.
 \end{proof}
 
-The split operator is implemented by \nolinkurl{edge_case_split}. Rule-level preservation lemmas are grouped by send, recv, select, and branch cases. Table~\ref{tab:p1-claim-artifact-map} gives the primary module map, and \cref{app:chains} records theorem-to-lemma chains with exact Lean anchors.
+The split operator is implemented by \nolinkurl{edge_case_split}. Rule-level preservation lemmas are grouped by send, recv, select, and branch cases. Table~\ref{tab:p1-anchor-registry} gives the anchor-to-file mapping, and \cref{app:chains} records theorem-to-lemma chains.
 
 The architecture is quotient-first. The concrete step relation induces dynamics on equivalence classes once coherence-preserving symmetries are quotiented out.
 
@@ -683,27 +683,7 @@ with compatibility discharged by \nolinkurl{Consume_mono} and replacement side c
 \label{sec:mechanization}
 % ============================================================================
 
-Table~\ref{tab:p1-claim-artifact-map} maps each core claim to concrete modules and representative theorem anchors.
-Module references use path identifiers of the form \texttt{P$n$-A$xx$}, where $n$ is the paper number and $xx$ is the artifact index; these resolve to file paths in Appendix~\ref{app:p1-path-registry}.
-
-\begin{table}[H]
-	\centering
-	\footnotesize
-			\begin{tabularx}{\columnwidth}{@{}L{0.23\columnwidth}L{0.28\columnwidth}L{0.41\columnwidth}@{}}
-			\toprule
-			\thead{Claim}    & \thead{Modules}                              & \thead{Anchors}                        \\
-			\midrule
-			Definitions       & \pathref{P1-A01},\allowbreak \pathref{P1-A02} & \texttt{Consume}, \texttt{EdgeCoherent},\allowbreak\ \texttt{Coherent} \\
-			Consume kernel    & \pathref{P1-A01}                              & \nolinkurl{Consume_append}              \\
-			Three-way split   & \pathref{P1-A03}                              & \nolinkurl{edge_case_split}             \\
-			Preservation      & \pathref{P1-A04},\allowbreak \pathref{P1-A07},\allowbreak \pathref{P1-A08} & \nolinkurl{Coherent_send_preserved},\allowbreak\ \nolinkurl{Coherent_recv_preserved},\allowbreak\ \nolinkurl{Coherent_select_preserved},\allowbreak\ \nolinkurl{Coherent_branch_preserved} \\
-			Delivery variants & \pathref{P1-A05}                              & \nolinkurl{FIFODelivery_laws},\allowbreak\ \nolinkurl{CausalDelivery_laws},\allowbreak\ \nolinkurl{LossyDelivery_laws}              \\
-			Subtype repl.     & \pathref{P1-A06}                              & \nolinkurl{Consume_mono},\allowbreak\ \nolinkurl{Coherent_type_replacement},\allowbreak\ \nolinkurl{progress_conditions_type_replacement}                \\
-			\bottomrule
-		\end{tabularx}
-	\caption{Claim to artifact mapping.}
-	\label{tab:p1-claim-artifact-map}
-\end{table}
+Core theorem anchors and their source locations are listed in Table~\ref{tab:p1-anchor-registry} (Appendix~\ref{app:p1-anchor-registry}).
 
 % ============================================================================
 \section{Effect-Typed Bridge}
@@ -932,13 +912,13 @@ This appendix records compact proof skeletons for theorem-level claims and the e
 \end{enumerate}
 
 	\textbf{Exact Lean anchors.}
-	\begin{itemize}
-		\item \pathref{P1-A03}: \nolinkurl{edge_case_split}
-		\item \pathref{P1-A04}: \nolinkurl{Coherent_send_preserved}
-		\item \pathref{P1-A08}: \nolinkurl{Coherent_recv_preserved}
-		\item \pathref{P1-A07}: \nolinkurl{Coherent_select_preserved},\allowbreak\ \nolinkurl{Coherent_branch_preserved}
-		\item \pathref{P1-A01}: \nolinkurl{Consume_append},\allowbreak\ \nolinkurl{Consume_cons}
-	\end{itemize}
+	\nolinkurl{edge_case_split},
+	\nolinkurl{Coherent_send_preserved},
+	\nolinkurl{Coherent_recv_preserved},
+	\nolinkurl{Coherent_select_preserved},
+	\nolinkurl{Coherent_branch_preserved},
+	\nolinkurl{Consume_append},
+	\nolinkurl{Consume_cons}.
 
 \subsection{Theorem 6.1: Session Evolution via \texorpdfstring{\texttt{Consume\_mono}}{Consume_mono}}
 
@@ -951,10 +931,10 @@ This appendix records compact proof skeletons for theorem-level claims and the e
 \end{enumerate}
 
 	\textbf{Exact Lean anchors.}
-	\begin{itemize}
-		\item \pathref{P1-A06}: \nolinkurl{Consume_mono},\allowbreak\ \nolinkurl{EdgeCoherent_type_replacement},\allowbreak\ \nolinkurl{Coherent_type_replacement}
-		\item \pathref{P1-A06}: \nolinkurl{progress_conditions_type_replacement}
-	\end{itemize}
+	\nolinkurl{Consume_mono},
+	\nolinkurl{EdgeCoherent_type_replacement},
+	\nolinkurl{Coherent_type_replacement},
+	\nolinkurl{progress_conditions_type_replacement}.
 
 \subsection{Proposition 8.1: Bridge Soundness}
 
@@ -966,12 +946,15 @@ This appendix records compact proof skeletons for theorem-level claims and the e
 \end{enumerate}
 
 	\textbf{Exact Lean anchors.}
-	\begin{itemize}
-		\item \pathref{P1-A09}: \nolinkurl{monitor_sound},\allowbreak\ \nolinkurl{unified_monitor_preserves}
-		\item \pathref{P1-A10}: \texttt{VMBridgePremises},\allowbreak\ \nolinkurl{handler_obligation_local},\allowbreak\ \nolinkurl{handler_fragment_typing_of_premises},\allowbreak\ \nolinkurl{handler_vm_step_typing},\allowbreak\ \nolinkurl{vm_bridge_soundness_composed}
-		\item \pathref{P1-A11}: \nolinkurl{effectBisim_implies_observationalEquivalence}
-		\item \pathref{P1-A12}: \nolinkurl{configEquiv_iff_effectBisim_silent}
-	\end{itemize}
+	\nolinkurl{monitor_sound},
+	\nolinkurl{unified_monitor_preserves},
+	\texttt{VMBridgePremises},
+	\nolinkurl{handler_obligation_local},
+	\nolinkurl{handler_fragment_typing_of_premises},
+	\nolinkurl{handler_vm_step_typing},
+	\nolinkurl{vm_bridge_soundness_composed},
+	\nolinkurl{effectBisim_implies_observationalEquivalence},
+	\nolinkurl{configEquiv_iff_effectBisim_silent}.
 
 \subsection{Theorem BZ-1: Byzantine Interface Well-Formedness}
 
@@ -982,12 +965,9 @@ This appendix records compact proof skeletons for theorem-level claims and the e
 \end{enumerate}
 
 	\textbf{Exact Lean anchors.}
-	\begin{itemize}
-		\item \pathref{P1-A13}:\\
-		      \texttt{ByzIfaceWF},\\
-		      \nolinkurl{byzIfaceWF_iff_coherent},\\
-		      \nolinkurl{bz1_byzantineInterfaceWellFormedness}
-\end{itemize}
+	\texttt{ByzIfaceWF},
+	\nolinkurl{byzIfaceWF_iff_coherent},
+	\nolinkurl{bz1_byzantineInterfaceWellFormedness}.
 
 \subsection{Proposition BZ-1.2: Capability-Gated VM Interface}
 
@@ -999,50 +979,58 @@ This appendix records compact proof skeletons for theorem-level claims and the e
 \end{enumerate}
 
 	\textbf{Exact Lean anchors.}
-	\begin{itemize}
-		\item \pathref{P1-A14}:\\
-		      \texttt{canOperateUnderByzantineEnvelope}
-		\item \pathref{P1-A13}:\\
-		      \nolinkurl{vmByzantineEnvelopeAdherence_of_witness},\\
-		      \nolinkurl{byzantineCrossTargetConformance_of_witnesses}
-	\end{itemize}
+	\texttt{canOperateUnderByzantineEnvelope},
+	\nolinkurl{vmByzantineEnvelopeAdherence_of_witness},
+	\nolinkurl{byzantineCrossTargetConformance_of_witnesses}.
 
 \section{Delivery Parametricity and Runtime Bridge}
 \label{app:delivery}
 
 Preservation is parametric over \texttt{ConsumeM} laws. Required laws are: \texttt{nil}, \texttt{append}, \texttt{cons}, and renaming stability under endpoint-preserving renamings.
 
-\section{Artifact Path Registry}
-\label{app:p1-path-registry}
+\section{Anchor Registry}
+\label{app:p1-anchor-registry}
 
-All Lean file-path references in this paper use the identifiers listed in Table~\ref{tab:p1-path-registry}.
+Table~\ref{tab:p1-anchor-registry} maps theorem anchors to their source files.
 
 \begin{table}[H]
 	\centering
 	\footnotesize
-	\begin{tabularx}{\columnwidth}{@{}L{0.2\columnwidth}L{0.75\columnwidth}@{}}
+	\begin{tabularx}{\columnwidth}{@{}L{0.42\columnwidth}L{0.53\columnwidth}@{}}
 		\toprule
-		\thead{ID}      & \thead{Path (relative to \texttt{lean/})}                          \\
+		\thead{Anchor} & \thead{Path (relative to \texttt{lean/})} \\
 		\midrule
-		\texttt{P1-A01} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Consume.lean}}                         \\
-		\texttt{P1-A02} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{EdgeCoherenceCore.lean}}               \\
-		\texttt{P1-A03} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Unified.lean}}                         \\
-		\texttt{P1-A04} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Preservation*.lean}}                   \\
-		\texttt{P1-A05} & \texttt{Protocol/\allowbreak}\mbox{\texttt{DeliveryModel.lean}}                             \\
-		\texttt{P1-A06} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacement*.lean}}             \\
-		\texttt{P1-A07} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SelectPreservation.lean}}              \\
-		\texttt{P1-A08} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{PreservationRecv.lean}}                \\
-		\texttt{P1-A09} & \texttt{Runtime/\allowbreak VM/\allowbreak Runtime/\allowbreak}\mbox{\texttt{Monitor.lean}}                         \\
-		\texttt{P1-A10} & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}              \\
-		\texttt{P1-A11} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{Bridge.lean}}                  \\
-		\texttt{P1-A12} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{ConfigEquivBridge.lean}}       \\
-		\texttt{P1-A13} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
-		\texttt{P1-A14} & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{API.lean}}                     \\
-		\texttt{P1-A15} & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{*.lean}}                       \\
+		\texttt{Consume} & \texttt{Protocol/Coherence/}\mbox{\texttt{Consume.lean}} \\
+		\texttt{Consume\_append} & \texttt{Protocol/Coherence/}\mbox{\texttt{Consume.lean}} \\
+		\texttt{Consume\_cons} & \texttt{Protocol/Coherence/}\mbox{\texttt{Consume.lean}} \\
+		\texttt{Consume\_mono} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacement*.lean}} \\
+		\texttt{EdgeCoherent} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{EdgeCoherenceCore.lean}} \\
+		\texttt{Coherent} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{EdgeCoherenceCore.lean}} \\
+		\texttt{edge\_case\_split} & \texttt{Protocol/Coherence/}\mbox{\texttt{Unified.lean}} \\
+		\texttt{Coherent\_send\_preserved} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{Preservation*.lean}} \\
+		\texttt{Coherent\_recv\_preserved} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{PreservationRecv.lean}} \\
+		\texttt{Coherent\_select\_preserved} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SelectPreservation.lean}} \\
+		\texttt{Coherent\_branch\_preserved} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SelectPreservation.lean}} \\
+		\texttt{EdgeCoherent\_type\_replacement} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacement*.lean}} \\
+		\texttt{Coherent\_type\_replacement} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacement*.lean}} \\
+		\texttt{progress\_conditions\_type\_replacement} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacement*.lean}} \\
+		\texttt{FIFODelivery\_laws} & \texttt{Protocol/}\mbox{\texttt{DeliveryModel.lean}} \\
+		\texttt{CausalDelivery\_laws} & \texttt{Protocol/}\mbox{\texttt{DeliveryModel.lean}} \\
+		\texttt{LossyDelivery\_laws} & \texttt{Protocol/}\mbox{\texttt{DeliveryModel.lean}} \\
+		\texttt{monitor\_sound} & \texttt{Runtime/VM/Runtime/}\mbox{\texttt{Monitor.lean}} \\
+		\texttt{unified\_monitor\_preserves} & \texttt{Runtime/VM/Runtime/}\mbox{\texttt{Monitor.lean}} \\
+		\texttt{VMBridgePremises} & \texttt{Runtime/Proofs/VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}} \\
+		\texttt{handler\_obligation\_local} & \texttt{Runtime/Proofs/VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}} \\
+		\texttt{vm\_bridge\_soundness\_composed} & \texttt{Runtime/Proofs/VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}} \\
+		\texttt{effectBisim\_implies\_observationalEquivalence} & \texttt{Runtime/Proofs/EffectBisim/}\mbox{\texttt{Bridge.lean}} \\
+		\texttt{configEquiv\_iff\_effectBisim\_silent} & \texttt{Runtime/Proofs/EffectBisim/\allowbreak}\mbox{\texttt{ConfigEquivBridge.lean}} \\
+		\texttt{ByzIfaceWF} & \texttt{Runtime/Proofs/Adapters/Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
+		\texttt{byzIfaceWF\_iff\_coherent} & \texttt{Runtime/Proofs/Adapters/Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
+		\texttt{canOperateUnderByzantineEnvelope} & \texttt{Runtime/Proofs/TheoremPack/}\mbox{\texttt{API.lean}} \\
 		\bottomrule
 	\end{tabularx}
-	\caption{Artifact path registry for \emph{Coherence for Asynchronous Buffered MPST}.}
-	\label{tab:p1-path-registry}
+	\caption{Anchor registry.}
+	\label{tab:p1-anchor-registry}
 \end{table}
 
 \section{Reproducibility}
@@ -1062,16 +1050,16 @@ Reproduction uses the repository-pinned Lean toolchain and manifest.
 \begin{center}
 	\footnotesize
 	{\setlength{\tabcolsep}{3pt}
-	\begin{tabularx}{\columnwidth}{@{}L{0.2\columnwidth}L{0.08\columnwidth}L{0.3\columnwidth}L{0.32\columnwidth}@{}}
+	\begin{tabularx}{\columnwidth}{@{}L{0.2\columnwidth}L{0.08\columnwidth}L{0.42\columnwidth}L{0.20\columnwidth}@{}}
 		\toprule
-		\thead{Claim} & \thead{Sec.} & \thead{Assumption}                                      & \thead{Location} \\
+		\thead{Claim} & \thead{Sec.} & \thead{Assumption} & \thead{Anchor} \\
 		\midrule
-			Theorem 4.1    & \S4           & Core model premises (\ref{assump:p1-core})               & \pathref{P1-A04}  \\
-			Theorem 6.1    & \S6           & Replacement compatibility (\ref{assump:p1-replacement})  & \pathref{P1-A06}  \\
-			Prop.\ 8.1     & \S8           & Core model + bridge obligations                          & \pathref{P1-A10}  \\
-			Thm.\ BZ-1     & \S8           & Byzantine interface premises (\ref{assump:p1-byzantine}) & \pathref{P1-A13}  \\
+			Theorem 4.1    & \S4           & Core model premises (\ref{assump:p1-core})               & \texttt{Coherent\_*\_preserved}  \\
+			Theorem 6.1    & \S6           & Replacement compatibility (\ref{assump:p1-replacement})  & \texttt{Consume\_mono}  \\
+			Prop.\ 8.1     & \S8           & Core model + bridge obligations                          & \texttt{vm\_bridge\_*}  \\
+			Thm.\ BZ-1     & \S8           & Byzantine interface premises (\ref{assump:p1-byzantine}) & \texttt{ByzIfaceWF}  \\
 			Cor.\ BZ-1.1   & \S8           & Byzantine interface + witnesses                          & derived           \\
-			Prop.\ BZ-1.2  & \S8           & Byzantine interface + gate                               & \pathref{P1-A14}  \\
+			Prop.\ BZ-1.2  & \S8           & Byzantine interface + gate                               & \texttt{canOperate*}  \\
 			\bottomrule
 		\end{tabularx}
 	}

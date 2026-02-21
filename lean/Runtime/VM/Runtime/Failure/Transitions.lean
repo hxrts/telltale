@@ -11,35 +11,14 @@ The Problem. When failures occur, the VM must decide and apply recovery
 actions. For deterministic execution, `decideRecovery` must be a function
 (equal inputs give equal outputs) and action application must be defined.
 
-Solution Structure. Prove `decideRecovery_deterministic` showing the
-decision is functional. Define `applyRecoveryAction` mapping actions
-to state transitions.
+Solution Structure. Define `applyRecoveryAction` mapping actions to state
+transitions. Determinism proofs live in `Runtime.Proofs.VM.Failure`.
 -/
 
 /- ## Structured Block 1 -/
 set_option autoImplicit false
 
 universe u
-
--- Recovery Decision Determinism
-
-/-- `decideRecovery` is deterministic: equal inputs imply equal chosen actions. -/
-theorem decideRecovery_deterministic
-    {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
-    [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (sid : SessionId) (f : Failure ι)
-    (evidence : RecoveryEvidence := {})
-    (policy : RecoveryPolicy := defaultRecoveryPolicy) :
-    ∀ a₁ a₂,
-      decideRecovery st sid f evidence policy = a₁ →
-      decideRecovery st sid f evidence policy = a₂ →
-      a₁ = a₂ := by
-  intro a₁ a₂ h₁ h₂
-  simpa [h₁] using h₂
 
 -- # Recovery action application
 

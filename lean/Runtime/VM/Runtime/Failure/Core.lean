@@ -21,8 +21,7 @@ from runtime.md §9.
 - `Failure` — site crash, partition, heal, corrupt, timeout
 - `ParticipantLost`, `ParticipantSurvives`
 - `FStep` — failure-aware step relation
-- `Recoverable`, `crash_nonparticipant_preserves`
-- `participant_failover`, `crash_close_safe`
+- Recovery transition primitives used by loader/scheduler integration
 
 Dependencies: Task 23, Scheduler. -/
 
@@ -256,16 +255,6 @@ def retryBackoffDelay (policy : RecoveryPolicy) (attempt : Nat) : Nat :=
 def retryAllowed (policy : RecoveryPolicy) (attempt : Nat) : Prop :=
   attempt ≤ policy.maxRetries
 
-/-- Retry delay is bounded by the configured max-retry envelope. -/
-theorem retryBackoffDelay_bounded
-    (policy : RecoveryPolicy)
-    {attempt : Nat}
-    (hAttempt : retryAllowed policy attempt) :
-    retryBackoffDelay policy attempt ≤
-      policy.baseBackoffTicks + policy.maxRetries * policy.backoffStepTicks := by
-  unfold retryBackoffDelay retryAllowed at *
-  exact Nat.add_le_add_left (Nat.mul_le_mul_right _ hAttempt) _
-
 /-! ### Structured failure evidence and event mapping -/
 
 /-- Alias used by failure recovery to express commit certainty on ingress evidence. -/
@@ -426,18 +415,4 @@ def decideRecovery {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   else
     .closeSession sid
 
-/-! ### Totality witness -/
-
-/-- `decideRecovery` is total: every input yields a concrete recovery action. -/
-theorem decideRecovery_total
-    {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
-    [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (sid : SessionId) (f : Failure ι)
-    (evidence : RecoveryEvidence := {})
-    (policy : RecoveryPolicy := defaultRecoveryPolicy) :
-    ∃ act, decideRecovery st sid f evidence policy = act := by
-  exact ⟨decideRecovery st sid f evidence policy, rfl⟩
+/-! Proof-only recovery lemmas are in `Runtime.Proofs.VM.Failure`. -/

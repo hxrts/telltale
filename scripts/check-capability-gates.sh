@@ -190,6 +190,7 @@ check_envelope() {
 check_failure() {
   require_ripgrep
   local FAILURE_FILE="${ROOT_DIR}/lean/Runtime/VM/Runtime/Failure.lean"
+  local FAILURE_PROOFS_FILE="${ROOT_DIR}/lean/Runtime/Proofs/VM/Failure.lean"
   local ADAPTER_FILE="${ROOT_DIR}/lean/Runtime/Proofs/Adapters/Distributed.lean"
   local THEOREMPACK_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack.lean"
   local TEST_FILE="${ROOT_DIR}/lean/Runtime/Tests/Main.lean"
@@ -227,7 +228,7 @@ check_failure() {
      rg -q 'def errorCodeOfRustFaultTag' '${ENVELOPE_FILE}'"
 
   check "phase-2 gate: deterministic recovery + checkpoint/idempotency mechanisms are present" \
-    "rg -q 'theorem decideRecovery_deterministic' '${FAILURE_FILE}' && \
+    "rg -q 'theorem decideRecovery_deterministic' '${FAILURE_PROOFS_FILE}' && \
      rg -q 'checkpointLog' '${STATE_FILE}' && \
      rg -q 'nextEffectNonce' '${STATE_FILE}'"
 
@@ -254,7 +255,7 @@ check_failure() {
 # --- Runtime Contract Checks ---
 check_contracts() {
   require_ripgrep
-  local CONTRACTS_FILE="${ROOT_DIR}/lean/Runtime/Proofs/CompileTime/RuntimeContracts.lean"
+  local CONTRACTS_FILE="${ROOT_DIR}/lean/Runtime/Proofs/Contracts/RuntimeContracts.lean"
   local API_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/API.lean"
   local EXAMPLE_FILE="${ROOT_DIR}/lean/Runtime/Proofs/Examples/ComposedProofPack.lean"
 
@@ -278,7 +279,7 @@ check_contracts() {
   if command -v lake >/dev/null 2>&1; then
     (
       cd "${ROOT_DIR}/lean"
-      lake build Runtime.Proofs.CompileTime.RuntimeContracts \
+      lake build Runtime.Proofs.Contracts.RuntimeContracts \
         Runtime.Proofs.TheoremPack.API \
         Runtime.Proofs.Examples.ComposedProofPack >/dev/null
     )
@@ -287,7 +288,7 @@ check_contracts() {
     (
       cd "${ROOT_DIR}"
       elan run leanprover/lean4:v4.26.0 lake --dir lean build \
-        Runtime.Proofs.CompileTime.RuntimeContracts \
+        Runtime.Proofs.Contracts.RuntimeContracts \
         Runtime.Proofs.TheoremPack.API \
         Runtime.Proofs.Examples.ComposedProofPack >/dev/null
     )

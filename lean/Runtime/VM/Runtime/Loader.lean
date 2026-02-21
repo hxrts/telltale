@@ -31,15 +31,6 @@ private def allEdges (sid : SessionId) (roles : List Role) : List Edge :=
     (fun acc r1 => acc ++ roles.map (fun r2 => { sid := sid, sender := r1, receiver := r2 }))
     []
 
-private lemma foldl_max_ge_start (xs : List Nat) (start : Nat) :
-    start ≤ xs.foldl Nat.max start := by
-  induction xs generalizing start with
-  | nil =>
-      simp
-  | cons x xs ih =>
-      simp [List.foldl]
-      exact Nat.le_trans (Nat.le_max_left start x) (ih (Nat.max start x))
-
 -- Session disjointness (executable checks)
 
 -- # Existing id inspection and fresh-id selection
@@ -91,22 +82,6 @@ def nextFreshSessionId {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     let maxSeen := (existingSessionIds st).foldl Nat.max sid
 /- ## Structured Block 2 -/
     maxSeen + 1
-
-private lemma nextFreshSessionId_ge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
-    [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) :
-    st.nextSessionId ≤ nextFreshSessionId st := by
-  unfold nextFreshSessionId
-  by_cases hAvail : sessionIdAvailable st st.nextSessionId
-  · simp [hAvail]
-  · simp [hAvail]
-    exact Nat.le_trans
-      (foldl_max_ge_start (existingSessionIds st) st.nextSessionId)
-      (Nat.le_succ _)
 
 -- # Loader result type and image validation
 
@@ -161,9 +136,8 @@ private def loadChoreographyCore {ι γ π ε ν : Type u} [IdentityModel ι] [G
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     [Inhabited (EffectRuntime.EffectCtx ε)]
-    (st : VMState ι γ π ε ν) (image : CodeImage γ ε) :
-    VMState ι γ π ε ν × SessionId :=
-  let sid := nextFreshSessionId st
+    (st : VMState ι γ π ε ν) (image : CodeImage γ ε) (sid : SessionId) :
+    VMState ι γ π ε ν :=
   let programId := st.programs.size
   let programs' := st.programs.push image.program
   let roles := image.program.entryPoints.map (fun p => p.fst)
@@ -217,7 +191,7 @@ private def loadChoreographyCore {ι γ π ε ν : Type u} [IdentityModel ι] [G
     obsTrace := trace'
     nextCoroId := nextCoroId'
     nextSessionId := sid + 1 }
-  (st', sid)
+  st'
 
 -- # Public loader APIs
 
@@ -239,7 +213,8 @@ def loadChoreographyResult {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
       else if st.coroutines.size + image.program.entryPoints.length > st.config.maxCoroutines then
         .tooManyCoroutines st.config.maxCoroutines
       else
-        let (st', sid) := loadChoreographyCore st image
+        let sid := nextFreshSessionId st
+        let st' := loadChoreographyCore st image sid
         .ok st' sid
 
 /-- Load a choreography into a running VM, returning the updated state and session id. -/
@@ -256,32 +231,4 @@ def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
   | .ok st' sid => (st', sid)
   | _ => (st, st.nextSessionId)
 
--- # Fresh session-id monotonicity
-
-theorem loadChoreography_snd_ge_nextSessionId
-    {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
-    [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-/- ## Structured Block 5 -/
-    [IdentityVerificationBridge ι ν]
-    [Inhabited (EffectRuntime.EffectCtx ε)]
-    (st : VMState ι γ π ε ν) (image : CodeImage γ ε) :
-    st.nextSessionId ≤ (loadChoreography st image).2 := by
-  unfold loadChoreography loadChoreographyResult
-  cases hVal : validateImage? image with
-  | some reason =>
-      simp
-  | none =>
-      by_cases hSess : st.sessions.length >= st.config.maxSessions
-      · simp [hSess]
-      · by_cases hCoros :
-            st.coroutines.size + image.program.entryPoints.length > st.config.maxCoroutines
-        · simp [hSess, hCoros]
-        · simp [hSess, hCoros, loadChoreographyCore, nextFreshSessionId_ge]
-
-
-/- Proof-only disjointness lemmas for `loadChoreography` live in:
-`Runtime.Proofs.VM.LoadChoreography`.
--/
+/-! Proof-only loader lemmas are in `Runtime.Proofs.VM.LoadChoreography`. -/

@@ -1,6 +1,5 @@
 import Runtime.VM.Runtime.Failure.Core
 import Runtime.VM.Runtime.Failure.Transitions
-import Runtime.VM.Runtime.Failure.RecoveryPredicates
 
 /-! # Runtime.VM.Runtime.Failure
 
@@ -9,7 +8,7 @@ by conformance checks and downstream imports. -/
 
 /-
 The Problem. The executable failure semantics live in split modules
-(`Core`, `Transitions`, `RecoveryPredicates`), but some checks scan
+(`Core`, `Transitions`), but some checks scan
 this façade file for specific recovery-policy symbols.
 
 Solution Structure. Provide compact façade definitions that forward to
@@ -33,27 +32,7 @@ def supportsBoundedDiff (mode : RecoveryDeterminismMode) : Bool :=
   | .strict => false
   | .boundedDiff _ => true
 
-/-! ## Determinism Theorem Facade -/
-
-/-- Facade-level re-export of deterministic recovery decision uniqueness. -/
-theorem decideRecovery_deterministic
-    {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
-    [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (sid : SessionId) (f : Failure ι)
-    (evidence : RecoveryEvidence := {})
-    (policy : RecoveryPolicy := defaultRecoveryPolicy) :
-    ∀ a₁ a₂,
-      decideRecovery st sid f evidence policy = a₁ →
-      decideRecovery st sid f evidence policy = a₂ →
-      a₁ = a₂ := by
-  exact
-    (_root_.decideRecovery_deterministic
-      (st := st) (sid := sid) (f := f)
-      (evidence := evidence) (policy := policy))
+/-! Proof-facing failure modules are in `Runtime.Proofs.VM.Failure*`. -/
 
 end FailureFacade
 end Runtime

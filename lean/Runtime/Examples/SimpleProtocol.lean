@@ -3,6 +3,7 @@ import Runtime.VM.Semantics.Exec
 import Runtime.VM.Semantics.ExecHelpers
 import Runtime.VM.Model.UnitModel
 import Runtime.VM.Runtime.Monitor
+import Runtime.Proofs.VM.Monitor
 
 /-
 The Problem. Provide a concrete, runnable VM example that exercises

@@ -6,6 +6,7 @@ import Runtime.VM.Runtime.Loader
 import Runtime.VM.Runtime.Runner
 import Runtime.VM.Runtime.Scheduler
 import Runtime.VM.Runtime.Monitor
+import Runtime.Proofs.VM.Monitor
 import Runtime.VM.Semantics.Exec
 import Choreography.Projection.Json
 import Choreography.Projection.Project.Primitive

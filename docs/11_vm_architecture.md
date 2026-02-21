@@ -100,7 +100,7 @@ Runtime mode admission and profile selection are capability gated.
 | Area | Lean Surface | Interface Type |
 |---|---|---|
 | Threaded `n > 1` refinement | `ThreadedRoundRefinementPremises` | Premise-scoped |
-| Runtime admission/profile gates | `Runtime/Proofs/CompileTime/RuntimeContracts.lean` | Interface consumed by runtime |
+| Runtime admission/profile gates | `Runtime/Proofs/Contracts/RuntimeContracts.lean` | Interface consumed by runtime |
 | Theorem-pack capability inventory APIs | `Runtime/Proofs/TheoremPack/API.lean` | Interface consumed by runtime |
 
 These interfaces are intentionally explicit. They are not claimed as unconditional global theorems. Canonical one-step normalization and `n = 1` refinement are theorem-backed in Lean. Higher-concurrency threaded refinement is modeled as a certified interface with premise-scoped refinement obligations. Rust uses executable certificate checking and parity fixtures as release guards.

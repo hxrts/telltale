@@ -1,11 +1,11 @@
 import Runtime.Proofs.SchedulerTheoremPack
-import Runtime.Proofs.CompileTime.DeterminismApi
+import Runtime.Proofs.Contracts.DeterminismApi
 import Runtime.VM.Runtime.Scheduler
 import Runtime.VM.Runtime.ThreadedRunner
 
 set_option autoImplicit false
 
-/-! # Runtime.Proofs.CompileTime.RuntimeContracts
+/-! # Runtime.Proofs.Contracts.RuntimeContracts
 
 Lean-facing runtime contract surface for proof-carrying VM admission and
 capability gating. This module packages the contract classes referenced by the

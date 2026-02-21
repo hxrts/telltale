@@ -1279,24 +1279,18 @@ Three support packages make the main theorem stack executable and compositional.
 		\end{enumerate}
 	}
 
-Concrete module anchors for these packages are listed by path identifier (resolved in Appendix~\ref{app:p3-path-registry}):
+Concrete modules for these packages:
 \begin{enumerate}
 	\item Higher-order/graph-delta semantics:
-	      \begin{itemize}
-		      \item \pathref{P3-A01},
-		      \item \pathref{P3-A02}.
-	      \end{itemize}
+	      \texttt{Protocol/Coherence/GraphDelta.lean},
+	      \texttt{Protocol/Coherence/GraphDeltaHO.lean}.
 	\item First-order collapse and equivalence/renaming support:
-	      \begin{itemize}
-		      \item \pathref{P3-A03},
-		      \item \pathref{P3-A04},
-		      \item \pathref{P3-A05}.
-	      \end{itemize}
+	      \texttt{Protocol/Coherence/ConfigEquiv.lean},
+	      \texttt{Protocol/Coherence/ConfigEquivRenaming/*.lean},
+	      \texttt{Protocol/Coherence/RoleSwap/*.lean}.
 	\item Delegation microkernel:
-	      \begin{itemize}
-		      \item \pathref{P3-A06},
-		      \item \pathref{P3-A07}.
-	      \end{itemize}
+	      \texttt{Protocol/Coherence/Delegation/Core/*.lean},
+	      \texttt{Protocol/Coherence/Delegation/Preservation.lean}.
 \end{enumerate}
 
 % ============================================================================
@@ -1665,63 +1659,31 @@ This prevents hidden strengthening of either side.
 	Theorem~\ref{thm:byzantine} and Corollary~\ref{cor:byzantine-converse} provide exact Byzantine safety characterization and converse counterexample packaging under Assumption Block~\ref{assump:p3-byzantine}. Section~\ref{sec:limitations} explicitly restricts scope away from weaker timing and fairness assumptions required for Byzantine liveness. Therefore the claimed boundary follows directly.
 \end{proof}
 
-\section{Mechanization Summary}
-\label{app:mechanization}
+\section{Anchor Registry}
+\label{app:p3-anchor-registry}
 
-Table~\ref{tab:p3-module-map} maps theorem families to concrete modules and theorem anchors.
-Module references use path identifiers of the form \texttt{P$n$-A$xx$}, where $n$ is the paper number and $xx$ is the artifact index; these resolve to file paths in Appendix~\ref{app:p3-path-registry}.
-
-\begin{table}[H]
-	\centering
-	\footnotesize
-	\begin{tabularx}{\columnwidth}{@{}L{0.11\columnwidth}L{0.44\columnwidth}L{0.35\columnwidth}@{}}
-		\toprule
-		\thead{Thm} & \thead{Modules}                               & \thead{Anchors}                       \\
-		\midrule
-		B           & \pathref{P3-A08},\allowbreak \pathref{P3-A09} & \nolinkurl{link_harmony_through_link} \\
-		A,C,D       & \pathref{P3-A10}                              & \nolinkurl{coherent_erasure_stable}   \\
-			E           & \pathref{P3-A11},\allowbreak \pathref{P3-A12} & \nolinkurl{flagship_composed_system_conservation} \\
-			F,G         & \pathref{P3-A13}                              & \nolinkurl{consensusEnvelope_exact_of_profile} \\
-			H,S1        & \pathref{P3-A14},\allowbreak \pathref{P3-A15} & \nolinkurl{vm_adequacy_of_trace_consistency} \\
-			BZ          & \pathref{P3-A16}                              & \nolinkurl{byzantineSafety_exact_of_profile} \\
-		\bottomrule
-	\end{tabularx}
-	\caption{Module map.}
-	\label{tab:p3-module-map}
-\end{table}
-
-\section{Artifact Path Registry}
-\label{app:p3-path-registry}
-
-All Lean file-path references in this paper use the identifiers listed in Table~\ref{tab:p3-path-registry}.
+Table~\ref{tab:p3-anchor-registry} maps theorem anchors to their source files.
 
 \begin{table}[H]
 	\centering
 	\footnotesize
-	\begin{tabularx}{\columnwidth}{@{}L{0.2\columnwidth}L{0.75\columnwidth}@{}}
+	\begin{tabularx}{\columnwidth}{@{}L{0.47\columnwidth}L{0.48\columnwidth}@{}}
 		\toprule
-		\thead{ID}      & \thead{Path (relative to \texttt{lean/})}                          \\
+		\thead{Anchor} & \thead{Path (relative to \texttt{lean/})} \\
 		\midrule
-		\texttt{P3-A01} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{GraphDelta.lean}}                      \\
-		\texttt{P3-A02} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{GraphDeltaHO.lean}}                    \\
-		\texttt{P3-A03} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ConfigEquiv.lean}}                     \\
-		\texttt{P3-A04} & \texttt{Protocol/\allowbreak Coherence/\allowbreak ConfigEquivRenaming/\allowbreak}\mbox{\texttt{*.lean}}           \\
-		\texttt{P3-A05} & \texttt{Protocol/\allowbreak Coherence/\allowbreak RoleSwap/\allowbreak}\mbox{\texttt{*.lean}}                      \\
-		\texttt{P3-A06} & \texttt{Protocol/\allowbreak Coherence/\allowbreak Delegation/\allowbreak Core/\allowbreak}\mbox{\texttt{*.lean}}               \\
-		\texttt{P3-A07} & \texttt{Protocol/\allowbreak Coherence/\allowbreak Delegation/\allowbreak}\mbox{\texttt{Preservation.lean}}         \\
-		\texttt{P3-A08} & \texttt{Protocol/\allowbreak Deployment/\allowbreak}\mbox{\texttt{LinkingCore.lean}}                    \\
-		\texttt{P3-A09} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{Congruence.lean}}              \\
-		\texttt{P3-A10} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}}         \\
-		\texttt{P3-A11} & \texttt{Protocol/\allowbreak Deployment/\allowbreak}\mbox{\texttt{LinkingTheorems.lean}}                \\
-		\texttt{P3-A12} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{Lyapunov.lean}}                            \\
-		\texttt{P3-A13} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak EnvelopeCore/\allowbreak}\mbox{\texttt{*.lean}}                    \\
-		\texttt{P3-A14} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak}\mbox{\texttt{Adequacy.lean}}                          \\
-		\texttt{P3-A15} & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{*.lean}}                       \\
-		\texttt{P3-A16} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
+		\texttt{link\_harmony\_through\_link} & \texttt{Protocol/Deployment/\allowbreak}\mbox{\texttt{LinkingCore.lean}} \\
+		\texttt{coherent\_erasure\_stable} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}} \\
+		\texttt{flagship\_composed\_system\_conservation} & \texttt{Protocol/Deployment/\allowbreak}\mbox{\texttt{LinkingTheorems.lean}} \\
+		\texttt{consensusEnvelope\_exact\_of\_profile} & \texttt{Runtime/Adequacy/\allowbreak EnvelopeCore/}\mbox{\texttt{*.lean}} \\
+		\texttt{vm\_adequacy\_of\_trace\_consistency} & \texttt{Runtime/Adequacy/}\mbox{\texttt{Adequacy.lean}} \\
+		\texttt{byzantineSafety\_exact\_of\_profile} & \texttt{Runtime/Proofs/Adapters/\allowbreak Distributed/}\mbox{\texttt{EnvelopeTheorems.lean}} \\
+		\texttt{canOperateUnderByzantineEnvelope} & \texttt{Runtime/Proofs/TheoremPack/}\mbox{\texttt{*.lean}} \\
+		\texttt{effectBisim\_congruence} & \texttt{Runtime/Proofs/EffectBisim/\allowbreak}\mbox{\texttt{Congruence.lean}} \\
+		\texttt{lyapunov\_descent} & \texttt{Runtime/Proofs/}\mbox{\texttt{Lyapunov.lean}} \\
 		\bottomrule
 	\end{tabularx}
-	\caption{Artifact path registry for \emph{Harmony from Coherence in Asynchronous MPST}.}
-	\label{tab:p3-path-registry}
+	\caption{Anchor registry.}
+	\label{tab:p3-anchor-registry}
 \end{table}
 
 \section{Reproducibility}
@@ -1730,9 +1692,9 @@ All Lean file-path references in this paper use the identifiers listed in Table~
 Reproduction uses the pinned Lean toolchain and manifest.
 
 \begin{enumerate}
-	\item Build theorem families listed in Table~\ref{tab:p3-module-map}.
+	\item Build anchors listed in Table~\ref{tab:p3-anchor-registry}.
 	\item Run \texttt{just escape} and \texttt{just verify-protocols}.
-	\item Validate that Table~\ref{tab:p3-module-map} anchor names resolve and no proof holes remain.
+	\item Validate that Table~\ref{tab:p3-anchor-registry} anchor names resolve and no proof holes remain.
 \end{enumerate}
 
 Expected outcome: Full theorem-dependency compilation for Theorems~\ref{thm:harmony}--\ref{thm:adequacy}, Corollary~\ref{cor:principal}, Theorem~\ref{thm:byzantine}, and Corollary~\ref{cor:byzantine-converse} succeeds, profile extraction and admission modules compile, and bridge and adequacy modules compile under the pinned toolchain.
@@ -1744,30 +1706,30 @@ Expected outcome: Full theorem-dependency compilation for Theorems~\ref{thm:harm
 	\centering
 	\footnotesize
 	{\setlength{\tabcolsep}{3pt}
-	\begin{tabularx}{\columnwidth}{@{}L{0.22\columnwidth}L{0.09\columnwidth}L{0.32\columnwidth}L{0.27\columnwidth}@{}}
+	\begin{tabularx}{\columnwidth}{@{}L{0.22\columnwidth}L{0.09\columnwidth}L{0.42\columnwidth}L{0.17\columnwidth}@{}}
 		\toprule
-		\thead{Claim}          & \thead{Sec.} & \thead{Assumptions}                   & \thead{Location}        \\
+		\thead{Claim}          & \thead{Sec.} & \thead{Assumptions} & \thead{Anchor} \\
 		\midrule
-		Thm.~\ref{thm:harmony}            & \S\ref{sec:theorem-b} & Assump.~\ref{assump:p3-reconfiguration} & \pathref{P3-A08}, \pathref{P3-A09} \\
-		Thm.~\ref{thm:erasure}            & \S\ref{sec:theorem-a} & Assump.~\ref{assump:p3-core}            & \pathref{P3-A10}                    \\
-		Thm.~\ref{thm:delegation}         & \S\ref{sec:theorem-c} & Assump.~\ref{assump:p3-reconfiguration} & \pathref{P3-A10}                    \\
-		Cor.~\ref{cor:footprint}          & \S\ref{sec:theorem-c} & Thm.~\ref{thm:delegation} + side conds  & \pathref{P3-A10}                    \\
-		Thm.~\ref{thm:minimality}         & \S\ref{sec:theorem-d} & admissibility clauses + core model       & \pathref{P3-A10}                    \\
-		Thm.~\ref{thm:conservation}       & \S\ref{sec:theorem-e} & Assump.~\ref{assump:p3-reconfiguration} + quant.\ profile & \pathref{P3-A11}, \pathref{P3-A12} \\
-		Cor.~\ref{cor:compositional}      & \S\ref{sec:theorem-e} & non-interference + envelope exactness    & \S\ref{sec:theorem-e}               \\
-		Thm.~\ref{thm:envelope}           & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \pathref{P3-A13}                    \\
-		Cor.~\ref{cor:transportability}   & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \pathref{P3-A13}                    \\
-		Cor.~\ref{cor:boundary}           & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \pathref{P3-A13}                    \\
-		Cor.~\ref{cor:embedding}          & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \pathref{P3-A13}                    \\
-		Thm.~\ref{thm:normalization}      & \S\ref{sec:theorem-g} & Assump.~\ref{assump:p3-envelope} + exch./spatial premises & \pathref{P3-A13} \\
-		Thm.~\ref{thm:adequacy}           & \S\ref{sec:theorem-h} & Assump.~\ref{assump:p3-adequacy}         & \pathref{P3-A14}, \pathref{P3-A15} \\
-		Prop.~\ref{prop:capability}       & \S\ref{sec:theorem-h} & Assump.~\ref{assump:p3-adequacy}         & \pathref{P3-A15}                    \\
-		Cor.~\ref{cor:principal}          & \S\ref{sec:theorem-h} & adequacy + admission premises            & \pathref{P3-A15}                    \\
-		Thm.~\ref{thm:byzantine}          & \S\ref{sec:theorem-h} & Assump.~\ref{assump:p3-byzantine}        & \pathref{P3-A16}                    \\
-		Cor.~\ref{cor:byzantine-converse} & \S\ref{sec:theorem-h} & Thm.~\ref{thm:byzantine} + dropped class & \pathref{P3-A16}                    \\
-		Prop.~\ref{prop:byzantine-vm}     & \S\ref{sec:theorem-h} & adequacy + Byzantine profile + capability bits & \pathref{P3-A15}, \pathref{P3-A16} \\
-		Thm.~\ref{thm:tail}               & \S\ref{sec:transport} & Assump.~\ref{assump:p3-transport}        & \S\ref{sec:transport}               \\
-		Thm.~\ref{thm:mixing}             & \S\ref{sec:transport} & Assump.~\ref{assump:p3-transport}        & \S\ref{sec:transport}               \\
+		Thm.~\ref{thm:harmony}            & \S\ref{sec:theorem-b} & Assump.~\ref{assump:p3-reconfiguration} & \texttt{link\_harmony*} \\
+		Thm.~\ref{thm:erasure}            & \S\ref{sec:theorem-a} & Assump.~\ref{assump:p3-core}            & \texttt{coherent\_*} \\
+		Thm.~\ref{thm:delegation}         & \S\ref{sec:theorem-c} & Assump.~\ref{assump:p3-reconfiguration} & \texttt{coherent\_*} \\
+		Cor.~\ref{cor:footprint}          & \S\ref{sec:theorem-c} & Thm.~\ref{thm:delegation} + side conds  & \texttt{coherent\_*} \\
+		Thm.~\ref{thm:minimality}         & \S\ref{sec:theorem-d} & admissibility clauses + core model       & \texttt{coherent\_*} \\
+		Thm.~\ref{thm:conservation}       & \S\ref{sec:theorem-e} & Assump.~\ref{assump:p3-reconfiguration} + quant.\ profile & \texttt{flagship\_*} \\
+		Cor.~\ref{cor:compositional}      & \S\ref{sec:theorem-e} & non-interference + envelope exactness    & \S\ref{sec:theorem-e} \\
+		Thm.~\ref{thm:envelope}           & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \texttt{consensus*} \\
+		Cor.~\ref{cor:transportability}   & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \texttt{consensus*} \\
+		Cor.~\ref{cor:boundary}           & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \texttt{consensus*} \\
+		Cor.~\ref{cor:embedding}          & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \texttt{consensus*} \\
+		Thm.~\ref{thm:normalization}      & \S\ref{sec:theorem-g} & Assump.~\ref{assump:p3-envelope} + exch./spatial premises & \texttt{consensus*} \\
+		Thm.~\ref{thm:adequacy}           & \S\ref{sec:theorem-h} & Assump.~\ref{assump:p3-adequacy}         & \texttt{vm\_adequacy*} \\
+		Prop.~\ref{prop:capability}       & \S\ref{sec:theorem-h} & Assump.~\ref{assump:p3-adequacy}         & \texttt{canOperate*} \\
+		Cor.~\ref{cor:principal}          & \S\ref{sec:theorem-h} & adequacy + admission premises            & \texttt{canOperate*} \\
+		Thm.~\ref{thm:byzantine}          & \S\ref{sec:theorem-h} & Assump.~\ref{assump:p3-byzantine}        & \texttt{byzantine*} \\
+		Cor.~\ref{cor:byzantine-converse} & \S\ref{sec:theorem-h} & Thm.~\ref{thm:byzantine} + dropped class & \texttt{byzantine*} \\
+		Prop.~\ref{prop:byzantine-vm}     & \S\ref{sec:theorem-h} & adequacy + Byzantine profile + capability bits & \texttt{canOperate*} \\
+		Thm.~\ref{thm:tail}               & \S\ref{sec:transport} & Assump.~\ref{assump:p3-transport}        & \S\ref{sec:transport} \\
+		Thm.~\ref{thm:mixing}             & \S\ref{sec:transport} & Assump.~\ref{assump:p3-transport}        & \S\ref{sec:transport} \\
 		\bottomrule
 	\end{tabularx}
 	}
