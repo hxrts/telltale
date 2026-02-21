@@ -83,6 +83,16 @@ The Rust surfaces are in `rust/vm/src/runtime_contracts.rs` and `rust/vm/src/com
 | Certified-wave fallback | `executeCertifiedRound` | `threaded.rs` wave certificate check with one-step fallback | Aligned |
 | `n > 1` envelope-bounded parity | `ThreadedRoundRefinementPremises` (premise-scoped) | `parity_fixtures_v2.rs::envelope_bounded_parity_holds_for_n_gt_1` | Aligned under envelope contract |
 
+## Simulator Material Mirror
+
+Lean now includes executable mirror dynamics for simulator material handlers under `lean/Runtime/Simulation/`.
+Rust material handlers live under `rust/simulator/src/material_handlers/` with compatibility re-exports.
+
+Parity fixtures are enforced by:
+
+- `rust/simulator/tests/material_handler_parity.rs`
+- `lean/Runtime/Tests/SimulatorParity.lean` (built as `simulator_parity_tests`)
+
 ## Lean Module Boundaries
 
 The `lean/Runtime/VM` directory is organized into executable and proof modules.

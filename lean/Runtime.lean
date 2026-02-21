@@ -8,6 +8,7 @@ import Runtime.Resources.BufferRA
 import Runtime.Resources.Arena
 import Runtime.Invariants.SessionInv
 import Runtime.Transport
+import Runtime.Simulation
 import Runtime.ProgramLogic.SessionWP
 import Runtime.ProgramLogic.GhostState
 import Runtime.ProgramLogic.CodeLoading

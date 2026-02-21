@@ -6,7 +6,7 @@ It describes how the simulator drives `telltale-vm`, records state traces, appli
 ## Scope
 
 The simulator crate is split into focused modules.
-The primary modules are `runner`, `scenario`, `trace`, `fault`, `network`, `property`, `checkpoint`, `distributed`, `analysis`, `material`, `ising`, `hamiltonian`, `continuum`, `rng`, and `value_conv`.
+The primary modules are `runner`, `scenario`, `trace`, `fault`, `network`, `property`, `checkpoint`, `distributed`, `analysis`, `material`, `material_handlers`, `rng`, and `value_conv`.
 
 This page documents behavior that is implemented in `rust/simulator/src` and `rust/vm/src/vm.rs`.
 It does not restate instruction-level VM semantics.
@@ -367,13 +367,14 @@ Cross-session snapshot timing in `run_concurrent()` depends on `Invoked` events 
 
 ## Test and Conformance Coverage
 
-The simulator test suite includes `end_to_end.rs`, `regression.rs`, and `distributed.rs`.
+The simulator test suite includes `end_to_end.rs`, `regression.rs`, `distributed.rs`, and `material_handler_parity.rs`.
 These tests exercise Lean projection integration, trace equivalence, analysis checks, and nested VM behavior.
 
 `regression.rs` compares Lean-projected and Rust-projected traces for mean-field and Hamiltonian scenarios.
 The comparisons use fixed-point tolerance and step plus role indexing.
 `end_to_end.rs` validates full pipeline behavior from global type to projection to simulation to analysis.
 `distributed.rs` validates nested site traces and outer plus inner integration behavior.
+`material_handler_parity.rs` validates deterministic material-step fixtures shared with Lean mirror simulator tests.
 
 ## Current Limits and Sharp Edges
 

@@ -5,13 +5,11 @@
 use std::path::PathBuf;
 
 use telltale_simulator::fault::FaultInjector;
+use telltale_simulator::handler_from_material;
 use telltale_simulator::network::NetworkModel;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
 use telltale_simulator::rng::SimRng;
 use telltale_simulator::scenario::Scenario;
-use telltale_simulator::{continuum::ContinuumFieldHandler, hamiltonian::HamiltonianHandler};
-use telltale_simulator::{ising::IsingHandler, material::MaterialParams};
-use telltale_vm::effect::EffectHandler;
 use telltale_vm::vm::{StepResult, VM};
 
 fn main() {
@@ -39,7 +37,7 @@ fn main() {
     let checkpoint = std::fs::read(&checkpoint_path).unwrap_or_else(|e| fatal(&e.to_string()));
     let mut vm: VM = serde_json::from_slice(&checkpoint).unwrap_or_else(|e| fatal(&e.to_string()));
 
-    let handler = build_handler(&scenario.material);
+    let handler = handler_from_material(&scenario.material);
     let max_rounds = rounds.unwrap_or(scenario.steps);
 
     let mut rng = SimRng::new(scenario.seed);
@@ -119,16 +117,6 @@ fn main() {
             println!("{} @ tick {}: {}", v.property_name, v.tick, v.details);
         }
         std::process::exit(2);
-    }
-}
-
-fn build_handler(material: &MaterialParams) -> Box<dyn EffectHandler> {
-    match material {
-        MaterialParams::MeanField(params) => Box::new(IsingHandler::new(params.clone())),
-        MaterialParams::Hamiltonian(params) => Box::new(HamiltonianHandler::new(params.clone())),
-        MaterialParams::ContinuumField(params) => {
-            Box::new(ContinuumFieldHandler::new(params.clone()))
-        }
     }
 }
 

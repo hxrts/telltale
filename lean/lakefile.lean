@@ -93,6 +93,11 @@ lean_exe runtime_tests where
   root := `Runtime.Tests.Main
   moreLinkArgs := macosLinkArgs
 
+/-- Executable simulator parity fixtures for material dynamics. -/
+lean_exe simulator_parity_tests where
+  root := `Runtime.Tests.SimulatorParity
+  moreLinkArgs := macosLinkArgs
+
 /-- VM runner: executes choreographies and emits observable traces. -/
 lean_exe vm_runner where
   root := `Runtime.Tests.VMRunner
