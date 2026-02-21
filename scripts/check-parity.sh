@@ -330,7 +330,7 @@ check_suite() {
   run_check "simulator material parity fixtures (Rust handlers)" \
     "cargo test -p telltale-simulator --test material_handler_parity"
   run_check "simulator material parity fixtures (Lean mirror)" \
-    "lake --dir lean build simulator_parity_tests && ./lean/.lake/build/bin/simulator_parity_tests"
+    "if command -v lake >/dev/null 2>&1; then lake --dir lean build simulator_parity_tests && ./lean/.lake/build/bin/simulator_parity_tests; else echo '[parity] SKIP: lake not found; skipping Lean mirror simulator parity check'; fi"
   run_check "threaded parity equivalence" \
     "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_equivalence"
   run_check "planner trace worker-count conformance" \
