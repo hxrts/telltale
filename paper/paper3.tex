@@ -129,6 +129,7 @@
 \theoremstyle{paperremark}
 \newtheorem{remark}[definition]{Remark}
 
+\theoremstyle{paperdef}
 \newtheorem{assumptions}[assumption]{Assumption Block}
 
 % ============================================================================
@@ -168,6 +169,7 @@
 \newcommand{\envD}{\ensuremath{\mathsf{envD}}}
 \newcommand{\pathref}[1]{\texttt{#1}}
 \newcommand{\eqnote}[1]{\par\noindent\textit{#1.}\par\vspace{-2pt}}
+\newcommand{\ABHStack}{Theorems~\ref{thm:harmony}, \ref{thm:erasure}, \ref{thm:delegation}, \ref{thm:minimality}, \ref{thm:conservation}, \ref{thm:envelope}, \ref{thm:normalization}, and~\ref{thm:adequacy}}
 
 \newenvironment{citelist}{%
   \begin{list}{}{%
@@ -234,9 +236,9 @@ correspondence and mobility (Hoare, 1985; Plotkin, 1981; Milner et al., 1992; Mi
 
 The central statement is Harmony under reconfiguration:
 \begin{equation}
-	\mathsf{project} \circ \mathsf{step}_{\mathsf{reconfig}}
-	=
-	\mathsf{localStep}_{\mathsf{reconfig}} \circ \mathsf{project}.
+		\mathsf{project}\,\circ\,\mathsf{step}_{\mathsf{reconfig}}
+		=
+		\mathsf{localStep}_{\mathsf{reconfig}}\,\circ\,\mathsf{project}.
 \end{equation}
 for well-formed \texttt{link} and delegation operations with enabled post-reconfiguration steps. The
 theorem development then proceeds from commutation to characterization and runtime adherence. It
@@ -247,29 +249,53 @@ with VM adherence.
 
 \begin{figure}[H]
 	\centering
-		\begin{tikzpicture}[figfont, node distance=22mm]
-			% Corner nodes
-			\node[font=\footnotesize\sffamily] (TL) {$C$};
-			\node[right=of TL, font=\footnotesize\sffamily] (TR) {$C'$};
-			\coordinate[below=of TL] (BL);
-			\coordinate[below=of TR] (BR);
-			\node[font=\footnotesize\sffamily, xshift=-2mm, yshift=-1.5mm] (BLlbl) at (BL) {$\mathsf{project}(C)$};
-			\node[font=\footnotesize\sffamily, xshift=2mm, yshift=-1.5mm] (BRlbl) at (BR) {$\mathsf{project}(C')$};
+			\begin{tikzpicture}[x=1.1mm,y=1mm,figfont]
+				% Exact envelope corridor around local trace
+					\fill[gray!8] (-33,-11.5) rectangle (33,6.5);
+					\draw[gray!60, line width=0.5pt] (-33,6.5) -- (33,6.5);
+					\draw[gray!60, line width=0.5pt] (-33,-11.5) -- (33,-11.5);
+					\node[font=\scriptsize, align=center] at (0,3.6) {exact envelope $\mathcal{E}$};
 
-		% Horizontal arrows
-			\draw[figarrowstrong] (TL) -- node[above=1.0pt, font=\scriptsize] {$\mathsf{step}_{\mathsf{reconfig}}$} (TR);
-			\draw[figarrowstrong] (BLlbl) -- node[below=1.5pt, font=\scriptsize] {$\mathsf{localStep}_{\mathsf{reconfig}}$} (BRlbl);
+			% Top: global reconfiguration trace
+					\node[font=\scriptsize, anchor=west] at (-33,27.5) {global reconfiguration trace};
+				\fill (-31.2,21.0) circle (1.2pt) node[above=2.0pt] {$C_0$};
+				\fill (-10.4,21.0) circle (1.2pt) node[above=2.0pt] {$C_1$};
+				\fill (10.4,21.0) circle (1.2pt) node[above=2.0pt] {$C_2$};
+				\fill (31.2,21.0) circle (1.2pt) node[above=2.0pt] {$C_3$};
+				\draw[figarrowstrong] (-31.2,21.0) -- node[above=1.5pt, font=\scriptsize] {$\rho_1$} (-10.4,21.0);
+				\draw[figarrowstrong] (-10.4,21.0) -- node[above=1.5pt, font=\scriptsize] {$\rho_2$} (10.4,21.0);
+				\draw[figarrowstrong] (10.4,21.0) -- node[above=1.5pt, font=\scriptsize] {$\rho_3$} (31.2,21.0);
+					\node[font=\scriptsize, anchor=east] at (33,27.2)
+					{$\rho_i\in\{\texttt{link}, \texttt{delegate}\}$};
 
-		% Vertical arrows
-			\draw[figarrowstrong] (TL) -- node[left=1.5pt, font=\scriptsize] {$\mathsf{project}$} (BL);
-			\draw[figarrowstrong] (TR) -- node[right=1.5pt, font=\scriptsize] {$\mathsf{project}$} (BR);
+			% Bottom: projected local trace
+				\node[font=\scriptsize, anchor=west] at (-33,-14.6) {projected local trace};
+				\fill (-31.2,-2.5) circle (1.2pt) node[below=2.0pt] {$P_0$};
+				\fill (-10.4,-2.5) circle (1.2pt) node[below=2.0pt] {$P_1$};
+				\fill (10.4,-2.5) circle (1.2pt) node[below=2.0pt] {$P_2$};
+				\fill (31.2,-2.5) circle (1.2pt) node[below=2.0pt] {$P_3$};
+				\draw[figarrowstrong] (-31.2,-2.5) -- node[below=1.5pt, font=\scriptsize] {$\ell_1$} (-10.4,-2.5);
+				\draw[figarrowstrong] (-10.4,-2.5) -- node[below=1.5pt, font=\scriptsize] {$\ell_2$} (10.4,-2.5);
+				\draw[figarrowstrong] (10.4,-2.5) -- node[below=1.5pt, font=\scriptsize] {$\ell_3$} (31.2,-2.5);
+
+			% Projection alignments (Harmony correspondences)
+				\draw[densely dotted, ->, line width=0.35pt] (-31.2,20.2) -- (-31.2,-1.7);
+				\draw[densely dotted, ->, line width=0.35pt] (-10.4,20.2) -- (-10.4,-1.7);
+				\draw[densely dotted, ->, line width=0.35pt] (10.4,20.2) -- (10.4,-1.7);
+				\draw[densely dotted, ->, line width=0.35pt] (31.2,20.2) -- (31.2,-1.7);
+				\node[font=\scriptsize, align=center] at (0,12.8)
+				{Harmony:\colorbox{white}{projection aligns each reconfiguration} step};
+
+				% In-band admissible runtime trace (piecewise-linear, crossing local transitions)
+				\draw[dash pattern=on 1.6pt off 1.2pt, line width=0.45pt]
+				(-31,-2.5) -- (-21.8,1.8) -- (-8,-5.4) -- (0.2,-1.0) --
+				(10.6,-8) -- (31.2,2.2);
+				\node[font=\scriptsize, align=right, anchor=east] at (31,-9.2)
+				{admitted runtime or sharded trace};
 		\end{tikzpicture}
-
-	\vspace{4pt}
-	{\footnotesize $\rho\in\{\mathsf{link},\mathsf{delegate}\}$}
-	\caption{Commuting-square formulation of Harmony.}
-	\label{fig:p3-commuting-square}
-\end{figure}
+		\caption{Dual-track trace view: reconfiguration steps and projected local steps align under Harmony, while admitted runtime traces remain inside the exact envelope.}
+		\label{fig:p3-layered-stack}
+	\end{figure}
 
 The determinism-envelope layer follows a standard refinement-bound idea. One defines an admissible
 behavior relation that captures implementation freedom while preserving safety-visible observations.
@@ -305,7 +331,7 @@ et al., 2017), and data-certification extensions remain in the same global-proje
 the inherited operational invariant on local environments and buffered traces, and the contribution is a
 reconfiguration and envelope theorem stack over that refined operational form.
 
-Scope is confined to asynchronous buffered semantics with explicit reconfiguration side conditions,
+Scope is confined to asynchronous buffered semantics with explicit reconfiguration conditions,
 crash-stop fault assumptions where fault claims are stated, and declared envelope-admission profiles.
 
 Our contributions are as follows:
@@ -333,12 +359,16 @@ Our contributions are as follows:
 			$\Admissible(I)$ & candidate invariant admissibility    \\
 			$W$              & weighted state function              \\
 			$\mathcal{E}$    & determinism envelope relation        \\
-			\EnvelopeRel     & envelope relation between VM and reference states \\
-			\EnvelopeExact   & exactness of envelope characterization \\
-			\ConfigEquiv{}   & erasure-stability equivalence        \\
-			\Obs             & observation map on executions/states \\
-			\VMAdheres       & VM adherence predicate under admitted profile \\
-			$\rho$           & reconfiguration step label (link/delegate/transition) \\
+				\EnvelopeRel     & envelope relation between VM and reference states \\
+				\EnvelopeExact   & exactness of envelope characterization \\
+				\EnvelopeOK      & envelope-admission predicate            \\
+				\ConfigEquiv{}   & erasure-stability equivalence        \\
+				\Obs             & observation map on executions/states \\
+				\ByzChar         & Byzantine characterization formula    \\
+				\ByzSafe         & Byzantine safety predicate            \\
+				\HasProfileCapabilities & theorem-pack capability-evidence predicate \\
+				\VMAdheres       & VM adherence predicate under admitted profile \\
+				$\rho$           & reconfiguration step label (link/delegate/transition) \\
 			\bottomrule
 		\end{tabularx}
 	\caption{Notation used in this paper.}
@@ -395,7 +425,7 @@ The paper distinguishes:
 \end{itemize}
 
 Representative mechanized anchors are in the deployment-composition layer, the delegation-preservation
-layer, and the higher-order graph-delta layer. Appendix~D provides the file-level mapping.
+layer, and the higher-order graph-delta layer. Appendix~\ref{app:mechanization} provides the file-level mapping.
 
 \subsection{Dynamic Participant Sets}
 
@@ -436,6 +466,33 @@ $\mathsf{project}(\mathsf{step}_{\mathsf{reconfig}}(C,\rho))$,
 and $\LocStep{C}{\rho}$ abbreviates
 $\mathsf{localStep}_{\mathsf{reconfig}}(\mathsf{project}(C),\rho)$.
 
+Figure~\ref{fig:p3-commuting-square} gives the explicit commuting-square instance for Harmony.
+\begin{figure}[H]
+	\centering
+		\begin{tikzpicture}[figfont, node distance=22mm]
+			% Corner nodes
+			\node[font=\footnotesize\sffamily] (TL) {$C$};
+			\node[right=of TL, font=\footnotesize\sffamily] (TR) {$C'$};
+			\coordinate[below=of TL] (BL);
+			\coordinate[below=of TR] (BR);
+			\node[font=\footnotesize\sffamily, xshift=-2mm, yshift=-1.5mm] (BLlbl) at (BL) {$\mathsf{project}(C)$};
+			\node[font=\footnotesize\sffamily, xshift=2mm, yshift=-1.5mm] (BRlbl) at (BR) {$\mathsf{project}(C')$};
+
+		% Horizontal arrows
+			\draw[figarrowstrong] (TL) -- node[above=1.0pt, font=\scriptsize] {$\mathsf{step}_{\mathsf{reconfig}}$} (TR);
+			\draw[figarrowstrong] (BLlbl) -- node[below=1.5pt, font=\scriptsize] {$\mathsf{localStep}_{\mathsf{reconfig}}$} (BRlbl);
+
+		% Vertical arrows
+			\draw[figarrowstrong] (TL) -- node[left=1.5pt, font=\scriptsize] {$\mathsf{project}$} (BL);
+			\draw[figarrowstrong] (TR) -- node[right=1.5pt, font=\scriptsize] {$\mathsf{project}$} (BR);
+		\end{tikzpicture}
+
+	\vspace{4pt}
+	{\footnotesize $\rho\in\{\mathsf{link},\mathsf{delegate}\}$}
+	\caption{Commuting-square formulation of Harmony.}
+	\label{fig:p3-commuting-square}
+\end{figure}
+
 \begin{definition}[Joint Realizability on Active Edges]
 	$\mathsf{JointRealizable}_{\mathsf{active}}(\mathsf{project}(C))$ holds when projected
 	local views admit witnesses for all active edges.
@@ -460,7 +517,7 @@ $\mathsf{localStep}_{\mathsf{reconfig}}(\mathsf{project}(C),\rho)$.
 	$\EnvelopeRel(S_{\mathrm{vm}}, S_{\mathrm{ref}})$ is the envelope relation between VM and
 	reference states. $\EnvelopeExact(C)$ is exactness of the declared envelope (soundness and
 	realizability and maximality) at configuration $C$. $\EnvelopeOK(C)$ means $C$ satisfies
-	the envelope-admission obligations used in Theorems~F--G.
+	the envelope-admission obligations used in Theorems~\ref{thm:envelope}--\ref{thm:normalization}.
 \end{definition}
 
 \begin{definition}[Capability/Adherence Predicates]
@@ -471,7 +528,7 @@ $\mathsf{localStep}_{\mathsf{reconfig}}(\mathsf{project}(C),\rho)$.
 
 \begin{definition}[Normalization Relations]
 	$\ExchangeEq(C_1,C_2)$ is exchange equivalence modulo admissible reordering.
-	$C \sqsubseteq_{\mathsf{sp}} C'$ is the spatial-subtyping preorder used in Theorem~G.
+$C \sqsubseteq_{\mathsf{sp}} C'$ is the spatial-subtyping preorder used in Theorem~\ref{thm:normalization}.
 \end{definition}
 
 Equation~\ref{eq:p3-delegation-footprint} states the delegation-footprint update discipline.
@@ -490,7 +547,7 @@ Equation~\ref{eq:p3-delegation-footprint} states the delegation-footprint update
 \label{sec:example}
 % ============================================================================
 
-We use one running example that carries all theorems B--H.
+We use one running example that carries the full structural theorem stack (\ABHStack).
 
 \noindent\begingroup\raggedright
 \textbf{Running example.} Baseline choreography:
@@ -524,11 +581,13 @@ Assume well-formedness judgments $\Gamma \vdash C_i\ \wf$ for $i=0,1,2,3$.
 \end{itemize}
 
 The running obligations are used through these derived rule instances.
+Write $\mathsf{TrPrem}(C)$ for the transition-profile premise package at $C$, and
+$\mathsf{BDesc}(C,C')$ for a budget-certified descent witness from $C$ to $C'$.
 
-{\footnotesize
-	\begin{equation}
-		\begin{aligned}
-			\mathsf{SD}(C,\rho)        & := \mathsf{SafeDelegation}(C,\rho);                      \\
+	{\small
+		\begin{equation}
+			\begin{aligned}
+				\mathsf{SD}(C,\rho)        & := \mathsf{SafeDelegation}(C,\rho);                      \\
 			\mathsf{SDF}(C,\rho)       & := \mathsf{SafeDelegationFootprint}(C,\rho);             \\
 			\mathsf{EnvRel}^{\star}(C) & := \EnvelopeRel(S_{\mathsf{vm}}(C),S_{\mathsf{ref}}(C)); \\
 			\mathsf{ObsEq}^{\star}(C)  & := \Obs(S_{\mathsf{vm}}(C))=\Obs(S_{\mathsf{ref}}(C)).
@@ -536,10 +595,10 @@ The running obligations are used through these derived rule instances.
 	\end{equation}
 }
 \eqnote{Example derivation: link harmony}
-{\scriptsize
-	\begin{equation}
-		\dfrac{
-			\Gamma \vdash C_0\ \wf;\ \mathsf{WF}_{\rho_{\mathsf{link}}}(C_0)
+	{\small
+		\begin{equation}
+			\dfrac{
+				\Gamma \vdash C_0\ \wf;\ \mathsf{WF}_{\rho_{\mathsf{link}}}(C_0)
 		}{
 			\ProjStep{C_0}{\rho_{\mathsf{link}}}
 			=
@@ -548,40 +607,40 @@ The running obligations are used through these derived rule instances.
 	\end{equation}
 }
 \eqnote{Example derivation: delegation safety}
-{\scriptsize
-	\begin{equation}
-		\dfrac{
-			\Coherent(C_1);\ \mathsf{DelegationWF}(C_1,\rho_{\mathsf{del}})
+	{\small
+		\begin{equation}
+			\dfrac{
+				\Coherent(C_1);\ \mathsf{DelegationWF}(C_1,\rho_{\mathsf{del}})
 		}{
 			\mathsf{SD}(C_1,\rho_{\mathsf{del}});\ \mathsf{SDF}(C_1,\rho_{\mathsf{del}})
 		}
 	\end{equation}
 }
 \eqnote{Example derivation: conservation}
-{\scriptsize
-	\begin{equation}
-		\dfrac{
-			\mathsf{WF}_{\rho_{\mathsf{link}}}(C_0);\ \Coherent(C_0)
+	{\small
+		\begin{equation}
+			\dfrac{
+				\mathsf{WF}_{\rho_{\mathsf{link}}}(C_0);\ \Coherent(C_0)
 		}{
 			W(C_1)=W(C_0)
 		}
 	\end{equation}
 }
 \eqnote{Example derivation: transition}
-{\scriptsize
-		\begin{equation}
-			\dfrac{
-				\mathsf{WF}_{\rho_{\mathsf{tr}}}(C_2);\ \Coherent(C_2);\ \text{transition-profile premises}
-			}{
-				C_2 \to^\ast C_3;\ \text{budget-certified descent}
-			}
-		\end{equation}
-}
+{\small
+			\begin{equation}
+				\dfrac{
+					\mathsf{WF}_{\rho_{\mathsf{tr}}}(C_2);\ \Coherent(C_2);\ \mathsf{TrPrem}(C_2)
+				}{
+					C_2 \to^\ast C_3;\ \mathsf{BDesc}(C_2,C_3)
+				}
+			\end{equation}
+	}
 \eqnote{Example derivation: adequacy and adherence}
-	{\scriptsize
-		\begin{equation}
-			\dfrac{
-				\mathsf{EnvRel}^{\star}(C_3);\ \HasProfileCapabilities(P,\Pi)
+		{\small
+			\begin{equation}
+				\dfrac{
+					\mathsf{EnvRel}^{\star}(C_3);\ \HasProfileCapabilities(P,\Pi)
 			}{
 				\mathsf{ObsEq}^{\star}(C_3);\ \VMAdheres(P,\Pi)
 			}
@@ -598,7 +657,7 @@ for the optimistic-to-coordinated step.
 		\toprule
 		\thead{Guard}                                 & \thead{Source}          & \thead{Consequence} \\
 		\midrule
-		\nolinkurl{conflict_detected}                 & app-level trigger       & transition enabled  \\
+			\texttt{conflict\_detected}                   & app-level trigger       & transition enabled  \\
 		\texttt{reachable}\allowbreak\texttt{(Coord)} & crash-tolerance decider & path not cut        \\
 		$W \leq \text{budget}$                        & quant.\ bound           & completes in budget \\
 		$|F| \leq f$                                  & fault-budget decl.      & bounded tolerance   \\
@@ -782,7 +841,7 @@ These lemmas are grouped in the erasure-characterization layer.
 \end{proof}
 
 \begin{proof}[Proof sketch]
-	For the forward direction, instantiate Theorem~C and project its obligations to the declared delegation footprint. For the reverse direction, apply \nolinkurl{footprint_to_safeDelegation} to reconstruct global safety from footprint obligations, then use strictness witnesses to show necessity of the side conditions. Combining both implications yields the stated equivalence.
+	For the forward direction, instantiate Theorem~\ref{thm:delegation} and project its obligations to the declared delegation footprint. For the reverse direction, apply \nolinkurl{footprint_to_safeDelegation} to reconstruct global safety from footprint obligations, then use strictness witnesses to show necessity of the side conditions. Combining both implications yields the stated equivalence.
 \end{proof}
 
 % ============================================================================
@@ -823,7 +882,7 @@ This theorem prevents ``stronger-than-needed'' invariant inflation and pins down
 	Hence every admissible safety-guaranteeing invariant implies Coherence, making Coherence relatively minimal.
 \end{proof}
 
-Equation~\ref{eq:p3-admissible-order} summarizes the admissible-invariant order behind Theorem~D.
+Equation~\ref{eq:p3-admissible-order} summarizes the admissible-invariant order behind Theorem~\ref{thm:minimality}.
 \begin{equation}
 	\label{eq:p3-admissible-order}
 	\begin{array}{c}
@@ -887,7 +946,7 @@ This theorem combines composition, delegation, and quantitative invariants in on
 	\begin{enumerate}
 		\item Pure reconfiguration (\texttt{link}/delegation):
 		      \begin{itemize}
-			      \item preserve Coherence/Harmony by Theorem~B-side machinery,
+				      \item preserve Coherence/Harmony by Theorem~\ref{thm:harmony}-side machinery,
 			      \item show weighted measure $W$ is invariant under balanced delegation/rewiring (\nolinkurl{lyapunov_conserved_under_balanced_delegation}).
 		      \end{itemize}
 		\item Transition choreographies:
@@ -955,7 +1014,7 @@ The envelope claim is exact under the stated model and assumption bundle:
 	\item maximality: strict supersets are rejected by witness counterexamples.
 \end{enumerate}
 
-Conceptually, this is dual to Theorem~D:
+Conceptually, this is dual to Theorem~\ref{thm:minimality}:
 \begin{itemize}
 	\item D: weakest admissible invariant core,
 	\item F: maximal admissible behavior envelope.
@@ -1020,7 +1079,7 @@ Mechanized envelope bridge layers include core foundations, admission logic, and
 	\end{equation}
 \end{corollary}
 
-Appendix~A and Appendix~C provide the detailed witness constructions and transport lemmas for these boundary corollaries.
+Appendices~\ref{app:regimes} and~\ref{app:consequences} provide the detailed witness constructions and transport lemmas for these boundary corollaries.
 
 % ============================================================================
 \section{Theorem G: Exchange-Normalized Determinism and Spatial Monotonicity}
@@ -1050,7 +1109,7 @@ Appendix~A and Appendix~C provide the detailed witness constructions and transpo
 	\end{enumerate}
 \end{theorem}
 
-Theorem~G combines two normalization properties.
+Theorem~\ref{thm:normalization} combines two normalization properties.
 \begin{enumerate}
 	\item Exchange normalization: admissible reorderings collapse to equivalent safety-visible outcomes.
 	\item Spatial monotonicity: envelope and safety obligations are preserved under admissible spatial refinement.
@@ -1110,7 +1169,7 @@ This theorem sharpens what ``determinism modulo envelope'' means operationally.
 
 \begin{proposition}[Capability-Bit Soundness]
 	\label{prop:capability}
-	For all runtime profiles $q$ and capability bits $b$, if $q$ advertises $b$, then there exists a corresponding theorem-pack object $a_b$ such that $a_b$ satisfies the same envelope-premise profile used by Theorem~H.
+	For all runtime profiles $q$ and capability bits $b$, if $q$ advertises $b$, then there exists a corresponding theorem-pack object $a_b$ such that $a_b$ satisfies the same envelope-premise profile used by Theorem~\ref{thm:adequacy}.
 \end{proposition}
 
 Mechanized anchors:
@@ -1132,7 +1191,7 @@ Coinductive adequacy bridge pack used here:
 Runtime consequence: proof-carrying conformance between claimed profile bits and available theorem-pack evidence.
 
 \begin{proof}[Proof sketch]
-	By definition of capability extraction, each advertised bit is accepted only if the corresponding theorem-pack entry is present and typechecks against the same profile premises used by admission. Soundness of profile extraction then yields a witness object $a_b$ for each advertised bit. Therefore advertised capabilities are justified by theorem-pack evidence under the Theorem~H premise profile.
+	By definition of capability extraction, each advertised bit is accepted only if the corresponding theorem-pack entry is present and typechecks against the same profile premises used by admission. Soundness of profile extraction then yields a witness object $a_b$ for each advertised bit. Therefore advertised capabilities are justified by theorem-pack evidence under the Theorem~\ref{thm:adequacy} premise profile.
 \end{proof}
 
 \begin{proof}[Proof sketch]
@@ -1192,7 +1251,7 @@ where each conjunct names the corresponding requirement class in Assumption Bloc
 \end{theorem}
 
 \begin{proof}[Proof sketch]
-	Instantiate the Byzantine profile package under Assumption Block~\ref{assump:p3-byzantine} and apply \nolinkurl{byzantineSafety_exact_of_profile} to obtain \texttt{ExactByzantineSafetyCharacterization} for the profile model. Project soundness, completeness, and maximality from that package, and interpret soundness/completeness through the same safety-visible envelope observation interface used in Theorem~H. This yields the stated exact interface characterization for the declared Byzantine profile.
+	Instantiate the Byzantine profile package under Assumption Block~\ref{assump:p3-byzantine} and apply \nolinkurl{byzantineSafety_exact_of_profile} to obtain \texttt{ExactByzantineSafetyCharacterization} for the profile model. Project soundness, completeness, and maximality from that package, and interpret soundness/completeness through the same safety-visible envelope observation interface used in Theorem~\ref{thm:adequacy}. This yields the stated exact interface characterization for the declared Byzantine profile.
 \end{proof}
 
 \begin{corollary}[Converse Counterexample Families]
@@ -1245,19 +1304,19 @@ Concrete module anchors for these packages are listed by path identifier (resolv
 \label{sec:transport}
 % ============================================================================
 
-This section formalizes two transport instances from the generic schema in Appendix~B.
+This section formalizes two transport instances from the generic schema in Appendix~\ref{app:transport}.
 
 \begin{assumptions}[Transport]
 	\label{assump:p3-transport}
 	For each target claim, assume:
 	\begin{enumerate}
-		\item the structural theorem interface required by Theorems~B--H at the relevant profile,
+		\item the structural theorem interface required by \ABHStack\ at the relevant profile,
 		\item an external analytic package for the target claim,
 		\item interface compatibility between structural observables and analytic variables.
 	\end{enumerate}
 \end{assumptions}
 
-Fix the source execution family to the running-example transition slice from Section~3:
+Fix the source execution family to the running-example transition slice from Section~\ref{sec:example}:
 \begin{equation}
 	C_2 \xrightarrow{\rho_{\mathsf{tr}}} C_3 \xrightarrow{} \cdots.
 \end{equation}
@@ -1273,7 +1332,7 @@ and let transported observables be computed from the safety-visible projection $
 \end{theorem}
 
 \begin{proof}[Proof sketch]
-	Instantiate Appendix~B.1 with target claim equal to the tail bound. Theorems~B--H discharge the structural side of the transport interface, and $\mathrm{TailPkg}(\theta)$ discharges the analytic inequality. Compatibility of observables identifies the transported random variable on both interfaces. Composition yields the stated tail inequality.
+	Instantiate Theorem~\ref{thm:app-p3-transport-separation} with target claim equal to the tail bound. \ABHStack\ discharge the structural side of the transport interface, and $\mathrm{TailPkg}(\theta)$ discharges the analytic inequality. Compatibility of observables identifies the transported random variable on both interfaces. Composition yields the stated tail inequality.
 \end{proof}
 
 \begin{theorem}[Mixing-Rate Transport]
@@ -1286,7 +1345,7 @@ and let transported observables be computed from the safety-visible projection $
 \end{theorem}
 
 \begin{proof}[Proof sketch]
-	Apply Appendix~B.1 with target claim equal to the mixing bound. Structural premises are identical to Theorem~T1 and are discharged by the same theorem stack. $\mathrm{MixPkg}(\eta)$ supplies the analytic contraction estimate, and interface compatibility maps the transported process to the analytic state space. The resulting inequality is exactly the stated total-variation bound.
+	Apply Theorem~\ref{thm:app-p3-transport-separation} with target claim equal to the mixing bound. Structural premises are identical to Theorem~\ref{thm:tail} and are discharged by the same theorem stack. $\mathrm{MixPkg}(\eta)$ supplies the analytic contraction estimate, and interface compatibility maps the transported process to the analytic state space. The resulting inequality is exactly the stated total-variation bound.
 \end{proof}
 
 % ============================================================================
@@ -1294,7 +1353,7 @@ and let transported observables be computed from the safety-visible projection $
 \label{sec:discussion}
 % ============================================================================
 
-This section is interpretive and does not add theorem premises. Theorems~A through~H remain valid without this interpretation. The discussion explains why the proof architecture has its current shape. It also explains where the current model intentionally stops.
+This section is interpretive and does not add theorem premises. Theorems~\ref{thm:harmony} through~\ref{thm:adequacy} remain valid without this interpretation. The discussion explains why the proof architecture has its current shape. It also explains where the current model intentionally stops.
 
 The formal layer establishes exchangeability through delegation-compatible symmetries, local compatibility through active-edge Coherence, and well-posed quotient dynamics through Harmony and envelope laws. These results define an erasure-safe regime for the model class in this paper. Within that regime, safety-visible behavior is invariant under the declared symmetries. This is the precise sense in which identity details are treated as gauge.
 
@@ -1494,16 +1553,17 @@ Structural theorems (A--D) are insensitive to quantitative profile constants; qu
 \section{Deferred Transport Schemas}
 \label{app:transport}
 
-Transport results in Section~13 factor into structural and analytic layers.
+Transport results in Section~\ref{sec:transport} factor into structural and analytic layers.
 
 \subsection{Generic Transport Rule}
 
 \begin{theorem}[Transport by Premise Separation]
-	If structural premises of Theorems~B--H hold and analytic package $A_T$ holds for target claim $T$, then $T$ follows without strengthening structural premises.
+	\label{thm:app-p3-transport-separation}
+	If structural premises of \ABHStack\ hold and analytic package $A_T$ holds for target claim $T$, then $T$ follows without strengthening structural premises.
 \end{theorem}
 
 \begin{proof}[Proof sketch]
-	Map the structural side of Theorems~B--H into the interface required by $A_T$. Apply the analytic theorem in that interface to obtain the target claim. Then transport the conclusion back to the protocol statement through the same interface map. No extra semantic premise is added during transport.
+	Map the structural side of \ABHStack\ into the interface required by $A_T$. Apply the analytic theorem in that interface to obtain the target claim. Then transport the conclusion back to the protocol statement through the same interface map. No extra semantic premise is added during transport.
 \end{proof}
 
 \subsection{Interface Discipline}
@@ -1568,47 +1628,48 @@ This prevents hidden strengthening of either side.
 \subsection{Reconfiguration and Minimality}
 
 \begin{proposition}
-	Under Assumption Block~\ref{assump:p3-reconfiguration}, Harmony (Theorem~B) and Relative Minimality (Theorem~D) imply that any admissible safe-reconfiguration invariant implies $\Coherent$ and therefore factors through the same canonical safety core.
+	Under Assumption Block~\ref{assump:p3-reconfiguration}, Harmony (Theorem~\ref{thm:harmony}) and Relative Minimality (Theorem~\ref{thm:minimality}) imply that any admissible safe-reconfiguration invariant implies $\Coherent$ and therefore factors through the same canonical safety core.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
-	Theorem~D shows that every admissible invariant factors through $\Coherent$. Theorem~B then gives commutation of reconfiguration steps over that common core. Chaining these two implications yields the proposition.
+	Theorem~\ref{thm:minimality} shows that every admissible invariant factors through $\Coherent$. Theorem~\ref{thm:harmony} then gives commutation of reconfiguration steps over that common core. Chaining these two implications yields the proposition.
 \end{proof}
 
 \subsection{Envelope and Determinism Boundary}
 
 \begin{proposition}
-	Under Assumption Block~\ref{assump:p3-envelope}, Theorem~F and Theorem~G jointly characterize determinism modulo exchange/spatial normalization and identify strict boundary witnesses for inadmissible envelope extensions.
+	Under Assumption Block~\ref{assump:p3-envelope}, Theorem~\ref{thm:envelope} and Theorem~\ref{thm:normalization} jointly characterize determinism modulo exchange/spatial normalization and identify strict boundary witnesses for inadmissible envelope extensions.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
-	Apply Theorem~F to obtain exact envelope characterization via soundness, realizability, and maximality. Apply Theorem~G to identify the normalized observational equalities that hold inside that exact envelope. Combining both gives the claimed determinism boundary statement.
+	Apply Theorem~\ref{thm:envelope} to obtain exact envelope characterization via soundness, realizability, and maximality. Apply Theorem~\ref{thm:normalization} to identify the normalized observational equalities that hold inside that exact envelope. Combining both gives the claimed determinism boundary statement.
 \end{proof}
 
 \subsection{Runtime Adequacy and Admission}
 
 \begin{proposition}
-	Under Assumption Block~\ref{assump:p3-adequacy}, Theorem~H plus Corollary~S1 yields principal-capability admission completeness with explicit rejection diagnostics when premise evidence is missing.
+	Under Assumption Block~\ref{assump:p3-adequacy}, Theorem~\ref{thm:adequacy} plus Corollary~\ref{cor:principal} yields principal-capability admission completeness with explicit rejection diagnostics when premise evidence is missing.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
-	Theorem~H yields adequacy and adherence under Assumption Block~\ref{assump:p3-adequacy}.  Corollary~S1 then refines this with principal-capability inference and admission completeness. Together they imply the proposition.
+	Theorem~\ref{thm:adequacy} yields adequacy and adherence under Assumption Block~\ref{assump:p3-adequacy}. Corollary~\ref{cor:principal} then refines this with principal-capability inference and admission completeness. Together they imply the proposition.
 \end{proof}
 
 \subsection{Byzantine Scope Boundary}
 
 \begin{proposition}
-	Under Assumption Block~\ref{assump:p3-byzantine}, the BZ family establishes exact safety characterization and converse counterexample packaging, but does not establish Byzantine liveness outside declared timing/fairness assumptions.
+	Under Assumption Block~\ref{assump:p3-byzantine}, Theorem~\ref{thm:byzantine} and Corollary~\ref{cor:byzantine-converse} establish exact safety characterization and converse counterexample packaging, but do not establish Byzantine liveness outside declared timing/fairness assumptions.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
-	Theorem~BZ and Corollary~BZ.1 provide exact Byzantine safety characterization and converse counterexample packaging under Assumption Block~\ref{assump:p3-byzantine}. Section~16 explicitly restricts scope away from weaker timing and fairness assumptions required for Byzantine liveness. Therefore the claimed boundary follows directly.
+	Theorem~\ref{thm:byzantine} and Corollary~\ref{cor:byzantine-converse} provide exact Byzantine safety characterization and converse counterexample packaging under Assumption Block~\ref{assump:p3-byzantine}. Section~\ref{sec:limitations} explicitly restricts scope away from weaker timing and fairness assumptions required for Byzantine liveness. Therefore the claimed boundary follows directly.
 \end{proof}
 
-\section{Mechanization and Reproducibility}
+\section{Mechanization Summary}
 \label{app:mechanization}
 
-\subsection{Module Map}
+Table~\ref{tab:p3-module-map} maps theorem families to concrete modules and theorem anchors.
+Module references use path identifiers of the form \texttt{P$n$-A$xx$}, where $n$ is the paper number and $xx$ is the artifact index; these resolve to file paths in Appendix~\ref{app:p3-path-registry}.
 
 \begin{table}[H]
 	\centering
@@ -1619,17 +1680,17 @@ This prevents hidden strengthening of either side.
 		\midrule
 		B           & \pathref{P3-A08},\allowbreak \pathref{P3-A09} & \nolinkurl{link_harmony_through_link} \\
 		A,C,D       & \pathref{P3-A10}                              & \nolinkurl{coherent_erasure_stable}   \\
-		E           & \pathref{P3-A11},\allowbreak \pathref{P3-A12} & \nolinkurl{flagship_composed_sys}     \\
-		F,G         & \pathref{P3-A13}                              & \nolinkurl{consensusEnvelope_exact}   \\
-		H,S1        & \pathref{P3-A14},\allowbreak \pathref{P3-A15} & \nolinkurl{vm_adequacy_of_trace}      \\
-		BZ          & \pathref{P3-A16}                              & \nolinkurl{byzantineSafety_exact}     \\
+			E           & \pathref{P3-A11},\allowbreak \pathref{P3-A12} & \nolinkurl{flagship_composed_system_conservation} \\
+			F,G         & \pathref{P3-A13}                              & \nolinkurl{consensusEnvelope_exact_of_profile} \\
+			H,S1        & \pathref{P3-A14},\allowbreak \pathref{P3-A15} & \nolinkurl{vm_adequacy_of_trace_consistency} \\
+			BZ          & \pathref{P3-A16}                              & \nolinkurl{byzantineSafety_exact_of_profile} \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Module map.}
 	\label{tab:p3-module-map}
 \end{table}
 
-\subsection{Artifact Path Registry}
+\section{Artifact Path Registry}
 \label{app:p3-path-registry}
 
 All Lean file-path references in this paper use the identifiers listed in Table~\ref{tab:p3-path-registry}.
@@ -1639,41 +1700,42 @@ All Lean file-path references in this paper use the identifiers listed in Table~
 	\footnotesize
 	\begin{tabularx}{\columnwidth}{@{}L{0.2\columnwidth}L{0.75\columnwidth}@{}}
 		\toprule
-		\thead{ID}      & \thead{Path}                                                     \\
+		\thead{ID}      & \thead{Path (relative to \texttt{lean/})}                          \\
 		\midrule
-		\texttt{P3-A01} & \nolinkurl{lean/Protocol/Coherence/GraphDelta.lean}              \\
-		\texttt{P3-A02} & \nolinkurl{lean/Protocol/Coherence/GraphDeltaHO.lean}            \\
-		\texttt{P3-A03} & \nolinkurl{lean/Protocol/Coherence/ConfigEquiv.lean}             \\
-		\texttt{P3-A04} & \nolinkurl{lean/Protocol/Coherence/ConfigEquivRenaming/*.lean}   \\
-		\texttt{P3-A05} & \nolinkurl{lean/Protocol/Coherence/RoleSwap/*.lean}              \\
-		\texttt{P3-A06} & \nolinkurl{lean/Protocol/Coherence/Delegation/Core/*.lean}       \\
-		\texttt{P3-A07} & \nolinkurl{lean/Protocol/Coherence/Delegation/Preservation.lean} \\
-		\texttt{P3-A08} & \nolinkurl{LinkingCore.lean}                                     \\
-		\texttt{P3-A09} & \nolinkurl{Congruence.lean}                                      \\
-		\texttt{P3-A10} & \nolinkurl{ErasureCharacterization.lean}                         \\
-		\texttt{P3-A11} & \nolinkurl{LinkingTheorems.lean}                                 \\
-		\texttt{P3-A12} & \nolinkurl{Lyapunov.lean}                                        \\
-		\texttt{P3-A13} & \nolinkurl{EnvelopeCore/*.lean}                                  \\
-		\texttt{P3-A14} & \nolinkurl{Adequacy.lean}                                        \\
-		\texttt{P3-A15} & \nolinkurl{TheoremPack/*.lean}                                   \\
-		\texttt{P3-A16} & \nolinkurl{EnvelopeTheorems.lean}                                \\
+		\texttt{P3-A01} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{GraphDelta.lean}}                      \\
+		\texttt{P3-A02} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{GraphDeltaHO.lean}}                    \\
+		\texttt{P3-A03} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ConfigEquiv.lean}}                     \\
+		\texttt{P3-A04} & \texttt{Protocol/\allowbreak Coherence/\allowbreak ConfigEquivRenaming/\allowbreak}\mbox{\texttt{*.lean}}           \\
+		\texttt{P3-A05} & \texttt{Protocol/\allowbreak Coherence/\allowbreak RoleSwap/\allowbreak}\mbox{\texttt{*.lean}}                      \\
+		\texttt{P3-A06} & \texttt{Protocol/\allowbreak Coherence/\allowbreak Delegation/\allowbreak Core/\allowbreak}\mbox{\texttt{*.lean}}               \\
+		\texttt{P3-A07} & \texttt{Protocol/\allowbreak Coherence/\allowbreak Delegation/\allowbreak}\mbox{\texttt{Preservation.lean}}         \\
+		\texttt{P3-A08} & \texttt{Protocol/\allowbreak Deployment/\allowbreak}\mbox{\texttt{LinkingCore.lean}}                    \\
+		\texttt{P3-A09} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{Congruence.lean}}              \\
+		\texttt{P3-A10} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}}         \\
+		\texttt{P3-A11} & \texttt{Protocol/\allowbreak Deployment/\allowbreak}\mbox{\texttt{LinkingTheorems.lean}}                \\
+		\texttt{P3-A12} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{Lyapunov.lean}}                            \\
+		\texttt{P3-A13} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak EnvelopeCore/\allowbreak}\mbox{\texttt{*.lean}}                    \\
+		\texttt{P3-A14} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak}\mbox{\texttt{Adequacy.lean}}                          \\
+		\texttt{P3-A15} & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{*.lean}}                       \\
+		\texttt{P3-A16} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Artifact path registry for \emph{Harmony from Coherence in Asynchronous MPST}.}
 	\label{tab:p3-path-registry}
 \end{table}
 
-\subsection{Reproducibility Protocol}
+\section{Reproducibility}
+\label{app:reproducibility}
 
 Reproduction uses the pinned Lean toolchain and manifest.
 
 \begin{enumerate}
-	\item Build theorem families listed in D.1.
+	\item Build theorem families listed in Table~\ref{tab:p3-module-map}.
 	\item Run \texttt{just escape} and \texttt{just verify-protocols}.
-	\item Validate that D.1 anchor names resolve and no proof holes remain.
+	\item Validate that Table~\ref{tab:p3-module-map} anchor names resolve and no proof holes remain.
 \end{enumerate}
 
-Expected outcome: Full theorem-dependency compilation (B through H, S1, BZ) succeeds, profile extraction and admission modules compile, and bridge and adequacy modules compile under the pinned toolchain.
+Expected outcome: Full theorem-dependency compilation for Theorems~\ref{thm:harmony}--\ref{thm:adequacy}, Corollary~\ref{cor:principal}, Theorem~\ref{thm:byzantine}, and Corollary~\ref{cor:byzantine-converse} succeeds, profile extraction and admission modules compile, and bridge and adequacy modules compile under the pinned toolchain.
 
 \section{Index of Main Results}
 \label{app:index}
@@ -1681,32 +1743,34 @@ Expected outcome: Full theorem-dependency compilation (B through H, S1, BZ) succ
 \begin{table}[H]
 	\centering
 	\footnotesize
-	\begin{tabularx}{\columnwidth}{@{}L{0.23\columnwidth}L{0.09\columnwidth}L{0.33\columnwidth}L{0.29\columnwidth}@{}}
+	{\setlength{\tabcolsep}{3pt}
+	\begin{tabularx}{\columnwidth}{@{}L{0.22\columnwidth}L{0.09\columnwidth}L{0.32\columnwidth}L{0.27\columnwidth}@{}}
 		\toprule
 		\thead{Claim}          & \thead{Sec.} & \thead{Assumptions}                   & \thead{Location}        \\
 		\midrule
-		Thm B                  & \S4          & Reconfig.                             & linking + congruence    \\
-		Thm A                  & \S5          & Core                                  & \pathref{P3-A10}        \\
-		Thm C                  & \S6          & Reconfig.\ + coh.                     & delegation lemmas       \\
-		Cor.\ C.1              & \S6          & Reconfig.\ + thm C                    & footprint equiv.        \\
-		Thm D                  & \S7          & Reconfig.\ + admis.                   & minimality layer        \\
-		Thm E                  & \S8          & Reconfig.\ + quant.                   & conservation            \\
-		Cor.\ S2               & \S8          & Reconfig.\ + non-int.                 & transport schema        \\
-		Thm F                  & \S9          & Envelope                              & envelope-core           \\
-		Cor.\ Finite-Erasure   & \S9          & Envelope (\ref{assump:p3-envelope})   & Appendix~A/C witnesses  \\
-		Cor.\ Boundary Witness & \S9          & Envelope (\ref{assump:p3-envelope})   & boundary witness family \\
-		Cor.\ Embedding        & \S9          & Envelope (\ref{assump:p3-envelope})   & embedding bridge        \\
-		Thm G                  & \S10         & Envelope + exch.                      & normalization           \\
-		Thm H                  & \S11         & Adequacy                              & adequacy bridge         \\
-		Prop.\ Capability-Bit  & \S11         & Adequacy (\ref{assump:p3-adequacy})   & capability extraction   \\
-		Cor.\ S1               & \S11         & Adequacy + admis.                     & profile extract.        \\
-		Thm BZ                 & \S11         & Byzantine                             & \pathref{P3-A16}        \\
-		Cor.\ BZ.1             & \S11         & Byzantine + drop                      & Section 11              \\
-		Prop.\ BZ.2            & \S11         & Adequacy + Byz.                       & conformance             \\
-		Thm.\ Tail-Bound       & \S13         & Transport (\ref{assump:p3-transport}) & Section~13 transport    \\
-		Thm.\ Mixing-Rate      & \S13         & Transport (\ref{assump:p3-transport}) & Section~13 transport    \\
+		Thm.~\ref{thm:harmony}            & \S\ref{sec:theorem-b} & Assump.~\ref{assump:p3-reconfiguration} & \pathref{P3-A08}, \pathref{P3-A09} \\
+		Thm.~\ref{thm:erasure}            & \S\ref{sec:theorem-a} & Assump.~\ref{assump:p3-core}            & \pathref{P3-A10}                    \\
+		Thm.~\ref{thm:delegation}         & \S\ref{sec:theorem-c} & Assump.~\ref{assump:p3-reconfiguration} & \pathref{P3-A10}                    \\
+		Cor.~\ref{cor:footprint}          & \S\ref{sec:theorem-c} & Thm.~\ref{thm:delegation} + side conds  & \pathref{P3-A10}                    \\
+		Thm.~\ref{thm:minimality}         & \S\ref{sec:theorem-d} & admissibility clauses + core model       & \pathref{P3-A10}                    \\
+		Thm.~\ref{thm:conservation}       & \S\ref{sec:theorem-e} & Assump.~\ref{assump:p3-reconfiguration} + quant.\ profile & \pathref{P3-A11}, \pathref{P3-A12} \\
+		Cor.~\ref{cor:compositional}      & \S\ref{sec:theorem-e} & non-interference + envelope exactness    & \S\ref{sec:theorem-e}               \\
+		Thm.~\ref{thm:envelope}           & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \pathref{P3-A13}                    \\
+		Cor.~\ref{cor:transportability}   & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \pathref{P3-A13}                    \\
+		Cor.~\ref{cor:boundary}           & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \pathref{P3-A13}                    \\
+		Cor.~\ref{cor:embedding}          & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \pathref{P3-A13}                    \\
+		Thm.~\ref{thm:normalization}      & \S\ref{sec:theorem-g} & Assump.~\ref{assump:p3-envelope} + exch./spatial premises & \pathref{P3-A13} \\
+		Thm.~\ref{thm:adequacy}           & \S\ref{sec:theorem-h} & Assump.~\ref{assump:p3-adequacy}         & \pathref{P3-A14}, \pathref{P3-A15} \\
+		Prop.~\ref{prop:capability}       & \S\ref{sec:theorem-h} & Assump.~\ref{assump:p3-adequacy}         & \pathref{P3-A15}                    \\
+		Cor.~\ref{cor:principal}          & \S\ref{sec:theorem-h} & adequacy + admission premises            & \pathref{P3-A15}                    \\
+		Thm.~\ref{thm:byzantine}          & \S\ref{sec:theorem-h} & Assump.~\ref{assump:p3-byzantine}        & \pathref{P3-A16}                    \\
+		Cor.~\ref{cor:byzantine-converse} & \S\ref{sec:theorem-h} & Thm.~\ref{thm:byzantine} + dropped class & \pathref{P3-A16}                    \\
+		Prop.~\ref{prop:byzantine-vm}     & \S\ref{sec:theorem-h} & adequacy + Byzantine profile + capability bits & \pathref{P3-A15}, \pathref{P3-A16} \\
+		Thm.~\ref{thm:tail}               & \S\ref{sec:transport} & Assump.~\ref{assump:p3-transport}        & \S\ref{sec:transport}               \\
+		Thm.~\ref{thm:mixing}             & \S\ref{sec:transport} & Assump.~\ref{assump:p3-transport}        & \S\ref{sec:transport}               \\
 		\bottomrule
 	\end{tabularx}
+	}
 	\caption{Index of main results.}
 	\label{tab:p3-index}
 \end{table}

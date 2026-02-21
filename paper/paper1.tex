@@ -224,7 +224,7 @@ refining projection criteria (Majumdar et al., 2021).
 
 In 2008, Honda et al.\ introduced asynchronous buffered MPST. Their preservation proof was organized
 around global typing and projection consistency after transitions. Many later presentations keep this
-global-first organization (Honda et al., 1998; Scalas and Yoshida, 2019), while
+global-first organization (Honda et al., 2016; Scalas and Yoshida, 2018), while
 mechanized developments continue to refine proof organization and robustness (Tirore et al., 2025).
 
 Prior MPST literature formulates coherence at the global-type level through projectability and
@@ -247,9 +247,10 @@ edges combine to yield global preservation. No global re-derivation is required.
 
 \subsection{Technical Approach}
 
-Preservation reduces to a three-way case split over edges. For each edge, exactly one case applies:
-directly updated, adjacent, or disjoint. Each case admits a focused local proof. After which, proofs
-compose directly.
+The core contribution is one operational kernel with two theorem-level lifts: typed-step preservation
+and subtype replacement. The shared kernel is edge-local checking with active-edge lifting.
+For typed transitions, this kernel is instantiated by a three-way edge split.
+For subtype replacement, it is instantiated by \nolinkurl{Consume_mono} under receive-compatibility.
 
 The local-to-global shape follows standard invariant methods from program logics (Reynolds, 2002;
 O'Hearn, 2007), while aligning with process-calculus decomposition tradition (Plotkin, 1981;
@@ -258,49 +259,35 @@ LaSalle, 1960).
 
 \begin{figure}[H]
 	\centering
-	\resizebox{\columnwidth}{!}{%
-		\begin{tikzpicture}[figfont]
-			% Typed step at top
-			\node[figboxgray, minimum width=44mm] (step)
-			{\textbf{Typed step}\\[2pt] $(G,D)\to(G',D')$};
+	\begin{tikzpicture}[figfont, x=1mm, y=1mm]
+		% State space boundary
+		\draw[rounded corners=3pt] (-38,-14) rectangle (38,18);
+		\node at (0,15) {\textbf{Operational state space}};
 
-			% Three-way split: predicate boxes only (case names on arrows)
-			\node[figsubbox, below=14mm of step, xshift=-36mm, minimum width=30mm, minimum height=12mm] (updated)
-			{$e=e_{\mathrm{step}}$};
-			\node[figsubbox, below=14mm of step, minimum width=34mm, minimum height=12mm] (shared)
-			{$e\neq e_{\mathrm{step}}$\\[1pt] $\land\,\EdgeShares(e,ep_{\mathrm{step}})$};
-			\node[figsubbox, below=14mm of step, xshift=36mm, minimum width=30mm, minimum height=12mm] (unrel)
-			{$e\neq e_{\mathrm{step}}$\\[1pt] $\land\,\neg\EdgeShares(e,ep_{\mathrm{step}})$};
+		% Coherent invariant region
+		\draw[rounded corners=6pt, fill=gray!10] (-32,-8) rectangle (32,12);
+		\node at (0,9) {\textbf{\textsf{Coherent} invariant region}};
 
-			\node[figboxgray, below=14mm of shared, minimum width=44mm] (global)
-			{\textbf{Global invariant}\\[2pt] $\Coherent(G',D')$};
+		% Typed-step trajectory
+		\fill (-20,2) circle (1.4pt);
+		\fill (-6,2) circle (1.4pt);
+		\draw[figarrowstrong] (-20,2) -- (-6,2);
+		\node[anchor=south] at (-13,3) {typed step};
 
-			% Labeled arrows from step to each case
-			\draw[figarrowstrong] (step) -- (shared);
-			\draw[figarrowstrong] (step.west) -- (updated.north |- step.west) -- (updated.north);
-			\draw[figarrowstrong] (step.east) -- (unrel.north |- step.east) -- (unrel.north);
-			% Arrow labels centered on vertical segments, same height
-			% White fill creates clean break in arrow where text appears
-			\coordinate (label-y-top) at ($(step.south)!0.5!(shared.north)$);
-			\node[font=\scriptsize, fill=white, inner sep=2pt] at (updated |- label-y-top) {updated};
-			\node[font=\scriptsize, fill=white, inner sep=2pt] at (shared |- label-y-top) {adjacent};
-			\node[font=\scriptsize, fill=white, inner sep=2pt] at (unrel |- label-y-top) {disjoint};
+		% Subtype-replacement trajectory
+		\fill (6,2) circle (1.4pt);
+		\fill (20,2) circle (1.4pt);
+		\draw[figarrowstrong] (6,2) -- (20,2);
+		\node[anchor=south] at (13,3) {subtype replacement};
 
-			% Labeled arrows from cases to global invariant
-			\draw[figarrowstrong] (updated.south) |- (global.west);
-			\draw[figarrowstrong] (shared.south) -- (global.north);
-			\draw[figarrowstrong] (unrel.south) |- (global.east);
-			% Arrow labels centered on vertical segments, same height
-			% White fill creates clean break in arrow where text appears
-			\coordinate (label-y-bot) at ($(shared.south)!0.5!(global.north)$);
-			\node[font=\scriptsize, fill=white, inner sep=2pt] at (updated |- label-y-bot) {$\EdgeCoherent(G',D',e_{\mathrm{step}})$};
-			\node[font=\scriptsize, fill=white, inner sep=2pt] at (shared |- label-y-bot) {$\EdgeShares \to \EdgeCoherent$};
-			\node[font=\scriptsize, fill=white, inner sep=2pt] at (unrel |- label-y-bot) {$\neg\EdgeShares \to \EdgeCoherent$};
-		\end{tikzpicture}
-	}%
-	\caption{Local-to-global preservation architecture.}
-	\label{fig:p1-preservation-architecture}
-	\vspace{7pt}
+		% Symbolic statement
+		\node[align=center] at (0,-4)
+		{$\Coherent \xrightarrow{\;\text{step}\;} \Coherent
+		\qquad
+		\Coherent \xrightarrow{\;\text{repl.}\;} \Coherent$};
+	\end{tikzpicture}
+	\caption{Invariant-geometric view of preservation and subtype evolution.}
+	\label{fig:p1-operational-kernel}
 \end{figure}
 
 \subsection{Scope and Claims}
@@ -332,14 +319,16 @@ In this paper, our contributions are as follows:
 			$\Hbyz$         & Byzantine characterization bundle    \\
 			$\Obssafe$      & Byzantine safety-visible observation \\
 			$\Eqsafe$       & Byzantine safety-visible equality    \\
-			$\Ebyz$         & Byzantine determinism-envelope       \\
-			$\ByzChar$      & Byzantine characterization formula    \\
-			$\ByzSafe$      & Byzantine safety predicate            \\
-			\Coherent       & global active-edge compatibility     \\
-			\EdgeCoherent   & edge-local compatibility check       \\
-			\Consume        & trace-to-type alignment function     \\
-			\GEnv           & endpoint-to-local-type environment    \\
-			\DEnv           & edge-to-buffered-trace environment    \\
+				$\Ebyz$         & Byzantine determinism-envelope       \\
+				$\ByzChar$      & Byzantine characterization formula    \\
+				$\ByzSafe$      & Byzantine safety predicate            \\
+				\ByzIfaceWF     & Byzantine interface well-formedness   \\
+				\Coherent       & global active-edge compatibility     \\
+				\EdgeCoherent   & edge-local compatibility check       \\
+				\EdgeShares     & edge-to-endpoint incidence predicate \\
+				\Consume        & trace-to-type alignment function     \\
+				\GEnv           & endpoint-to-local-type environment    \\
+				\DEnv           & edge-to-buffered-trace environment    \\
 			\ActiveEdge     & endpoint-presence guard              \\
 			\RecvCompatible & receive-side replacement compatibility \\
 			\texttt{DeliveryModel} & parametric delivery interface \\
@@ -487,22 +476,22 @@ The active-edge obligation is:
 \end{equation}
 The example is used via the following derived rule instances.
 
-	{\footnotesize
-		\begin{gather}
-			\dfrac{
-				\Gamma \vdash (G_0,D_0)\ \wf \quad D_0(P,C){=}[\mathrm{Grant}]
-			}{
-				(G_0,D_0){\to}(G_1,D_1) \land \EdgeCoherent(G_1,D_1,e)
-			}\hspace{0.75em}
-			\\[10pt]
-			\dfrac{
-				\Gamma \vdash (G_1,D_1)\ \wf \quad \mathsf{Consume\_append}
-			}{
-				(G_1,D_1){\to}(G_2,D_2) \land \EdgeCoherent(G_2,D_2,e)
-			}\hspace{0.75em}
-			\\[10pt]
-			\dfrac{
-				\Coherent(G_0,D_0) \quad \RecvCompatible(G_0,G'_0)
+		{\footnotesize
+			\begin{gather}
+				\dfrac{
+					\Gamma \vdash (G_0,D_0)\ \wf \quad D_0(P,C){=}[\mathrm{Grant}(k)]
+				}{
+					(G_0,D_0){\to}(G_1,D_1) \land \Coherent(G_1,D_1)
+				}\hspace{0.75em}
+				\\[10pt]
+				\dfrac{
+					\Gamma \vdash (G_1,D_1)\ \wf \quad \mathsf{Consume\_append}
+				}{
+					(G_1,D_1){\to}(G_2,D_2) \land \Coherent(G_2,D_2)
+				}\hspace{0.75em}
+				\\[10pt]
+				\dfrac{
+					\Coherent(G_0,D_0) \quad \RecvCompatible(G_0,G'_0)
 			}{
 				\Coherent(G'_0,D_0)
 			}\hspace{0.75em}
@@ -510,12 +499,54 @@ The example is used via the following derived rule instances.
 		\vspace{6pt}
 	}
 
-For the step edge $u=(C,M)$, the case split used later is: updated ($e=u$), shared-endpoint ($e\neq u \land \EdgeShares(e,C\ \text{or}\ M)$), and unrelated ($e\neq u$ and no shared endpoint).
+For the step edge $u=(C,M)$ with stepped endpoint $ep_{\mathrm{step}}$, the case split used later is: updated ($e=u$), shared-endpoint ($e\neq u \land \EdgeShares(e,ep_{\mathrm{step}})$), and unrelated ($e\neq u \land \neg\EdgeShares(e,ep_{\mathrm{step}})$).
 
 % ============================================================================
 \section{Coherence Preservation Architecture}
 \label{sec:preservation}
 % ============================================================================
+
+\begin{figure}[H]
+	\centering
+	\resizebox{\columnwidth}{!}{%
+		\begin{tikzpicture}[figfont]
+			% Typed step at top
+			\node[figboxgray, minimum width=44mm] (step)
+			{\textbf{Typed step}\\[2pt] $(G,D)\to(G',D')$};
+
+			% Three-way split: predicate boxes only (case names on arrows)
+			\node[figsubbox, below=14mm of step, xshift=-36mm, minimum width=30mm, minimum height=12mm] (updated)
+			{$e=e_{\mathrm{step}}$};
+			\node[figsubbox, below=14mm of step, minimum width=34mm, minimum height=12mm] (shared)
+			{$e\neq e_{\mathrm{step}}$\\[1pt] $\land\,\EdgeShares(e,ep_{\mathrm{step}})$};
+			\node[figsubbox, below=14mm of step, xshift=36mm, minimum width=30mm, minimum height=12mm] (unrel)
+			{$e\neq e_{\mathrm{step}}$\\[1pt] $\land\,\neg\EdgeShares(e,ep_{\mathrm{step}})$};
+
+			\node[figboxgray, below=14mm of shared, minimum width=44mm] (global)
+			{\textbf{Global invariant}\\[2pt] $\Coherent(G',D')$};
+
+			% Labeled arrows from step to each case
+			\draw[figarrowstrong] (step) -- (shared);
+			\draw[figarrowstrong] (step.west) -- (updated.north |- step.west) -- (updated.north);
+			\draw[figarrowstrong] (step.east) -- (unrel.north |- step.east) -- (unrel.north);
+			\coordinate (label-y-top) at ($(step.south)!0.5!(shared.north)$);
+			\node[font=\scriptsize, fill=white, inner sep=2pt] at (updated |- label-y-top) {updated};
+			\node[font=\scriptsize, fill=white, inner sep=2pt] at (shared |- label-y-top) {adjacent};
+			\node[font=\scriptsize, fill=white, inner sep=2pt] at (unrel |- label-y-top) {disjoint};
+
+			% Labeled arrows from cases to global invariant
+			\draw[figarrowstrong] (updated.south) |- (global.west);
+			\draw[figarrowstrong] (shared.south) -- (global.north);
+			\draw[figarrowstrong] (unrel.south) |- (global.east);
+			\coordinate (label-y-bot) at ($(shared.south)!0.5!(global.north)$);
+			\node[font=\scriptsize, fill=white, inner sep=2pt] at (updated |- label-y-bot) {$\EdgeCoherent(G',D',e_{\mathrm{step}})$};
+			\node[font=\scriptsize, fill=white, inner sep=2pt] at (shared |- label-y-bot) {$\EdgeShares \to \EdgeCoherent$};
+			\node[font=\scriptsize, fill=white, inner sep=2pt] at (unrel |- label-y-bot) {$\neg\EdgeShares \to \EdgeCoherent$};
+		\end{tikzpicture}
+	}%
+	\caption{Three-way edge split used by the preservation proof.}
+	\label{fig:p1-preservation-architecture}
+\end{figure}
 
 \begin{theorem}[Coherence Preservation]
 	\label{thm:coherence-preservation}
@@ -558,7 +589,7 @@ The square states the commuting condition used across these three papers. This p
 
 The case partition used by \nolinkurl{edge_case_split} is:
 \eqnote{Case partition for checked edge}
-Here $S(e):=\EdgeShares(e,\mathit{ep})$.
+Here $S(e):=\EdgeShares(e,ep_{\mathrm{step}})$.
 \begin{equation}
 	\begin{aligned}
 		\mathsf{updated}   & :\ e=u;\\
@@ -653,23 +684,23 @@ with compatibility discharged by \nolinkurl{Consume_mono} and replacement side c
 % ============================================================================
 
 Table~\ref{tab:p1-claim-artifact-map} maps each core claim to concrete modules and representative theorem anchors.
-Path identifiers used in this table resolve in Appendix~\ref{app:p1-path-registry}.
+Module references use path identifiers of the form \texttt{P$n$-A$xx$}, where $n$ is the paper number and $xx$ is the artifact index; these resolve to file paths in Appendix~\ref{app:p1-path-registry}.
 
 \begin{table}[H]
 	\centering
 	\footnotesize
-	\begin{tabularx}{\columnwidth}{@{}L{0.27\columnwidth}L{0.36\columnwidth}L{0.27\columnwidth}@{}}
-		\toprule
-		\thead{Claim}    & \thead{Modules}                              & \thead{Anchors}                        \\
-		\midrule
-		Definitions       & \pathref{P1-A01},\allowbreak \pathref{P1-A02} & \texttt{Consume}, \texttt{EdgeCoherent} \\
-		Consume kernel    & \pathref{P1-A01}                              & \nolinkurl{Consume_append}              \\
-		Three-way split   & \pathref{P1-A03}                              & \nolinkurl{edge_case_split}             \\
-		Preservation      & \pathref{P1-A04}                              & \nolinkurl{Coherent_*_preserved}        \\
-		Delivery variants & \pathref{P1-A05}                              & \nolinkurl{*Delivery_laws}              \\
-		Subtype repl.     & \pathref{P1-A06}                              & \nolinkurl{Consume_mono}                \\
-		\bottomrule
-	\end{tabularx}
+			\begin{tabularx}{\columnwidth}{@{}L{0.23\columnwidth}L{0.28\columnwidth}L{0.41\columnwidth}@{}}
+			\toprule
+			\thead{Claim}    & \thead{Modules}                              & \thead{Anchors}                        \\
+			\midrule
+			Definitions       & \pathref{P1-A01},\allowbreak \pathref{P1-A02} & \texttt{Consume}, \texttt{EdgeCoherent},\allowbreak\ \texttt{Coherent} \\
+			Consume kernel    & \pathref{P1-A01}                              & \nolinkurl{Consume_append}              \\
+			Three-way split   & \pathref{P1-A03}                              & \nolinkurl{edge_case_split}             \\
+			Preservation      & \pathref{P1-A04},\allowbreak \pathref{P1-A07},\allowbreak \pathref{P1-A08} & \nolinkurl{Coherent_send_preserved},\allowbreak\ \nolinkurl{Coherent_recv_preserved},\allowbreak\ \nolinkurl{Coherent_select_preserved},\allowbreak\ \nolinkurl{Coherent_branch_preserved} \\
+			Delivery variants & \pathref{P1-A05}                              & \nolinkurl{FIFODelivery_laws},\allowbreak\ \nolinkurl{CausalDelivery_laws},\allowbreak\ \nolinkurl{LossyDelivery_laws}              \\
+			Subtype repl.     & \pathref{P1-A06}                              & \nolinkurl{Consume_mono},\allowbreak\ \nolinkurl{Coherent_type_replacement},\allowbreak\ \nolinkurl{progress_conditions_type_replacement}                \\
+			\bottomrule
+		\end{tabularx}
 	\caption{Claim to artifact mapping.}
 	\label{tab:p1-claim-artifact-map}
 \end{table}
@@ -727,7 +758,7 @@ this section are conditional on explicit monitor and quotient-transport premises
 \label{sec:related}
 % ============================================================================
 
-Classical MPST establishes global coherence and projectability as conditions on global types and projection (Honda et al., 2008, Honda et al., 2016, Castagna et al., 2012, and Majumdar et al., 2021). Logical lines interpret multiparty compatibility as n-ary duality and proof compatibility (Carbone et al., 2015, Carbone et al., 2016, and Carbone et al., 2017). Data certification extensions remain in the same global-projection discipline (Toninho et al., 2017).
+Classical MPST establishes global coherence and projectability as conditions on global types and projection (Honda et al., 2008, Honda et al., 2016, Castagna et al., 2012, and Majumdar et al., 2021). Logical lines interpret multiparty compatibility as n-ary duality and proof compatibility (Carbone et al., 2015, Carbone et al., 2016, and Carbone et al., 2017). Data certification extensions remain in the same global-projection discipline (Toninho and Yoshida, 2017).
 
 This paper refines the established notion of coherence in MPST with an operational invariant $\Coherent(G,D)$ over local environments and buffered traces. The novelty is an asynchronous preservation architecture that discharges obligations edge-locally and avoids per-step global re-derivation.
 
@@ -890,7 +921,7 @@ Coherent G D := forall e, ActiveEdge G e -> EdgeCoherent G D e
 
 This appendix records compact proof skeletons for theorem-level claims and the exact Lean anchors used by each chain.
 
-\subsection{Theorem 1: Coherence Preservation}
+\subsection{Theorem 4.1: Coherence Preservation}
 
 \textbf{Lemma chain.}
 \begin{enumerate}
@@ -900,16 +931,16 @@ This appendix records compact proof skeletons for theorem-level claims and the e
 	\item Reassemble to global active-edge quantification for \texttt{Coherent}.
 \end{enumerate}
 
-\textbf{Exact Lean anchors.}
-\begin{itemize}
-	\item \pathref{P1-A07}: \nolinkurl{edge_case_split}
-	\item \pathref{P1-A08}: \nolinkurl{Coherent_send_preserved}
-	\item \pathref{P1-A09}: \nolinkurl{Coherent_recv_preserved}
-	\item \pathref{P1-A10}: \nolinkurl{Coherent_select_preserved},\allowbreak\ \nolinkurl{Coherent_branch_preserved}
-	\item \pathref{P1-A11}: \nolinkurl{Consume_append},\allowbreak\ \nolinkurl{Consume_cons}
-\end{itemize}
+	\textbf{Exact Lean anchors.}
+	\begin{itemize}
+		\item \pathref{P1-A03}: \nolinkurl{edge_case_split}
+		\item \pathref{P1-A04}: \nolinkurl{Coherent_send_preserved}
+		\item \pathref{P1-A08}: \nolinkurl{Coherent_recv_preserved}
+		\item \pathref{P1-A07}: \nolinkurl{Coherent_select_preserved},\allowbreak\ \nolinkurl{Coherent_branch_preserved}
+		\item \pathref{P1-A01}: \nolinkurl{Consume_append},\allowbreak\ \nolinkurl{Consume_cons}
+	\end{itemize}
 
-\subsection{Theorem 2: Session Evolution via \texorpdfstring{\texttt{Consume\_mono}}{Consume_mono}}
+\subsection{Theorem 6.1: Session Evolution via \texorpdfstring{\texttt{Consume\_mono}}{Consume_mono}}
 
 \textbf{Lemma chain.}
 \begin{enumerate}
@@ -919,13 +950,13 @@ This appendix records compact proof skeletons for theorem-level claims and the e
 	\item Lift globally by \nolinkurl{Coherent_type_replacement}; preserve progress side conditions.
 \end{enumerate}
 
-\textbf{Exact Lean anchors.}
-\begin{itemize}
-	\item \pathref{P1-A12}: \nolinkurl{Consume_mono},\allowbreak\ \nolinkurl{EdgeCoherent_type_replacement},\allowbreak\ \nolinkurl{Coherent_type_replacement}
-	\item \pathref{P1-A13}: \texttt{progress\_conditions\_type\_replacement}
-\end{itemize}
+	\textbf{Exact Lean anchors.}
+	\begin{itemize}
+		\item \pathref{P1-A06}: \nolinkurl{Consume_mono},\allowbreak\ \nolinkurl{EdgeCoherent_type_replacement},\allowbreak\ \nolinkurl{Coherent_type_replacement}
+		\item \pathref{P1-A06}: \nolinkurl{progress_conditions_type_replacement}
+	\end{itemize}
 
-\subsection{Proposition 1: Bridge Soundness}
+\subsection{Proposition 8.1: Bridge Soundness}
 
 \textbf{Lemma chain.}
 \begin{enumerate}
@@ -934,13 +965,13 @@ This appendix records compact proof skeletons for theorem-level claims and the e
 	\item Compose configuration-equivalence transport with effect-bisimulation observational transport.
 \end{enumerate}
 
-\textbf{Exact Lean anchors.}
-\begin{itemize}
-	\item \pathref{P1-A14}: \nolinkurl{monitor_sound},\allowbreak\ \nolinkurl{unified_monitor_preserves}
-	\item \pathref{P1-A15}: \texttt{VMBridgePremises},\allowbreak\ \nolinkurl{handler_obligation_local},\allowbreak\ \nolinkurl{handler_fragment_typing_of_premises},\allowbreak\ \nolinkurl{handler_vm_step_typing},\allowbreak\ \nolinkurl{vm_bridge_soundness_composed}
-	\item \pathref{P1-A16}: \nolinkurl{effectBisim_implies_observationalEquivalence}
-	\item \pathref{P1-A17}: \nolinkurl{configEquiv_iff_effectBisim_silent}
-\end{itemize}
+	\textbf{Exact Lean anchors.}
+	\begin{itemize}
+		\item \pathref{P1-A09}: \nolinkurl{monitor_sound},\allowbreak\ \nolinkurl{unified_monitor_preserves}
+		\item \pathref{P1-A10}: \texttt{VMBridgePremises},\allowbreak\ \nolinkurl{handler_obligation_local},\allowbreak\ \nolinkurl{handler_fragment_typing_of_premises},\allowbreak\ \nolinkurl{handler_vm_step_typing},\allowbreak\ \nolinkurl{vm_bridge_soundness_composed}
+		\item \pathref{P1-A11}: \nolinkurl{effectBisim_implies_observationalEquivalence}
+		\item \pathref{P1-A12}: \nolinkurl{configEquiv_iff_effectBisim_silent}
+	\end{itemize}
 
 \subsection{Theorem BZ-1: Byzantine Interface Well-Formedness}
 
@@ -950,12 +981,12 @@ This appendix records compact proof skeletons for theorem-level claims and the e
 	\item On each active edge, extract sender witness and \texttt{Consume} success.
 \end{enumerate}
 
-\textbf{Exact Lean anchors.}
-\begin{itemize}
-	\item \pathref{P1-A18}:\\
-	      \texttt{ByzIfaceWF},\\
-	      \nolinkurl{byzIfaceWF_iff_coherent},\\
-	      \nolinkurl{bz1_byzantineInterfaceWellFormedness}
+	\textbf{Exact Lean anchors.}
+	\begin{itemize}
+		\item \pathref{P1-A13}:\\
+		      \texttt{ByzIfaceWF},\\
+		      \nolinkurl{byzIfaceWF_iff_coherent},\\
+		      \nolinkurl{bz1_byzantineInterfaceWellFormedness}
 \end{itemize}
 
 \subsection{Proposition BZ-1.2: Capability-Gated VM Interface}
@@ -967,14 +998,14 @@ This appendix records compact proof skeletons for theorem-level claims and the e
 	\item Package cross-target conformance under the same envelope interface.
 \end{enumerate}
 
-\textbf{Exact Lean anchors.}
-\begin{itemize}
-	\item \pathref{P1-A19}:\\
-	      \texttt{canOperateUnderByzantineEnvelope}
-	\item \pathref{P1-A18}:\\
-	      \nolinkurl{vmByzantineEnvelopeAdherence_of_witness},\\
-	      \nolinkurl{byzantineCrossTargetConformance_of_witnesses}
-\end{itemize}
+	\textbf{Exact Lean anchors.}
+	\begin{itemize}
+		\item \pathref{P1-A14}:\\
+		      \texttt{canOperateUnderByzantineEnvelope}
+		\item \pathref{P1-A13}:\\
+		      \nolinkurl{vmByzantineEnvelopeAdherence_of_witness},\\
+		      \nolinkurl{byzantineCrossTargetConformance_of_witnesses}
+	\end{itemize}
 
 \section{Delivery Parametricity and Runtime Bridge}
 \label{app:delivery}
@@ -991,30 +1022,23 @@ All Lean file-path references in this paper use the identifiers listed in Table~
 	\footnotesize
 	\begin{tabularx}{\columnwidth}{@{}L{0.2\columnwidth}L{0.75\columnwidth}@{}}
 		\toprule
-		\thead{ID}     & \thead{Path}                                                              \\
+		\thead{ID}      & \thead{Path (relative to \texttt{lean/})}                          \\
 		\midrule
-		\texttt{P1-A01} & \nolinkurl{Consume.lean}                                                   \\
-		\texttt{P1-A02} & \nolinkurl{EdgeCoherence-Core.lean}                                        \\
-		\texttt{P1-A03} & \nolinkurl{Unified.lean}                                                   \\
-		\texttt{P1-A04} & \nolinkurl{Preservation*.lean}                                             \\
-		\texttt{P1-A05} & \nolinkurl{DeliveryModel.lean}                                             \\
-		\texttt{P1-A06} & \nolinkurl{SubtypeReplacement*.lean}                                       \\
-		\texttt{P1-A07} & \nolinkurl{lean/Protocol/Coherence/Unified.lean}                           \\
-		\texttt{P1-A08} & \nolinkurl{lean/Protocol/Coherence/Preservation.lean}                      \\
-		\texttt{P1-A09} & \nolinkurl{lean/Protocol/Coherence/PreservationRecv.lean}                  \\
-		\texttt{P1-A10} & \nolinkurl{lean/Protocol/Coherence/SelectPreservation.lean}                \\
-		\texttt{P1-A11} & \nolinkurl{lean/Protocol/Coherence/Consume.lean}                           \\
-		\texttt{P1-A12} & \nolinkurl{lean/Protocol/Coherence/SubtypeReplacementCore.lean}            \\
-		\texttt{P1-A13} & \nolinkurl{lean/Protocol/Coherence/SubtypeReplacementLiveness.lean}        \\
-		\texttt{P1-A14} & \nolinkurl{lean/Runtime/VM/Runtime/Monitor.lean}                           \\
-		\texttt{P1-A15} & \nolinkurl{lean/Runtime/Proofs/VM/BridgeStrengthening.lean}                \\
-		\texttt{P1-A16} & \nolinkurl{lean/Runtime/Proofs/EffectBisim/Bridge.lean}                    \\
-		\texttt{P1-A17} & \nolinkurl{lean/Runtime/Proofs/EffectBisim/ConfigEquivBridge.lean}         \\
-		\texttt{P1-A18} & \nolinkurl{lean/Runtime/Proofs/Adapters/Distributed/EnvelopeTheorems.lean} \\
-		\texttt{P1-A19} & \nolinkurl{lean/Runtime/Proofs/TheoremPack/API.lean}                       \\
-		\texttt{P1-A20} & \nolinkurl{SubtypeRepl*.lean}                                              \\
-		\texttt{P1-A21} & \nolinkurl{EnvelopeThms.lean}                                              \\
-		\texttt{P1-A22} & \nolinkurl{TheoremPack/*.lean}                                             \\
+		\texttt{P1-A01} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Consume.lean}}                         \\
+		\texttt{P1-A02} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{EdgeCoherenceCore.lean}}               \\
+		\texttt{P1-A03} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Unified.lean}}                         \\
+		\texttt{P1-A04} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Preservation*.lean}}                   \\
+		\texttt{P1-A05} & \texttt{Protocol/\allowbreak}\mbox{\texttt{DeliveryModel.lean}}                             \\
+		\texttt{P1-A06} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacement*.lean}}             \\
+		\texttt{P1-A07} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SelectPreservation.lean}}              \\
+		\texttt{P1-A08} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{PreservationRecv.lean}}                \\
+		\texttt{P1-A09} & \texttt{Runtime/\allowbreak VM/\allowbreak Runtime/\allowbreak}\mbox{\texttt{Monitor.lean}}                         \\
+		\texttt{P1-A10} & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}              \\
+		\texttt{P1-A11} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{Bridge.lean}}                  \\
+		\texttt{P1-A12} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{ConfigEquivBridge.lean}}       \\
+		\texttt{P1-A13} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
+		\texttt{P1-A14} & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{API.lean}}                     \\
+		\texttt{P1-A15} & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{*.lean}}                       \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Artifact path registry for \emph{Coherence for Asynchronous Buffered MPST}.}
@@ -1037,18 +1061,20 @@ Reproduction uses the repository-pinned Lean toolchain and manifest.
 
 \begin{center}
 	\footnotesize
+	{\setlength{\tabcolsep}{3pt}
 	\begin{tabularx}{\columnwidth}{@{}L{0.2\columnwidth}L{0.08\columnwidth}L{0.3\columnwidth}L{0.32\columnwidth}@{}}
 		\toprule
 		\thead{Claim} & \thead{Sec.} & \thead{Assumption}                                      & \thead{Location} \\
 		\midrule
-		Theorem 1      & \S4           & Core model premises (\ref{assump:p1-core})               & \pathref{P1-A04}  \\
-		Theorem 2      & \S6           & Replacement compatibility (\ref{assump:p1-replacement})  & \pathref{P1-A20}  \\
-		Prop.\ 1       & \S8           & Core model + bridge obligations                          & runtime bridge    \\
-		Thm.\ BZ-1     & \S8           & Byzantine interface premises (\ref{assump:p1-byzantine}) & \pathref{P1-A21}  \\
-		Cor.\ BZ-1.1   & \S8           & Byzantine interface + witnesses                          & derived           \\
-		Prop.\ BZ-1.2  & \S8           & Byzantine interface + gate                               & \pathref{P1-A22}  \\
-		\bottomrule
-	\end{tabularx}
+			Theorem 4.1    & \S4           & Core model premises (\ref{assump:p1-core})               & \pathref{P1-A04}  \\
+			Theorem 6.1    & \S6           & Replacement compatibility (\ref{assump:p1-replacement})  & \pathref{P1-A06}  \\
+			Prop.\ 8.1     & \S8           & Core model + bridge obligations                          & \pathref{P1-A10}  \\
+			Thm.\ BZ-1     & \S8           & Byzantine interface premises (\ref{assump:p1-byzantine}) & \pathref{P1-A13}  \\
+			Cor.\ BZ-1.1   & \S8           & Byzantine interface + witnesses                          & derived           \\
+			Prop.\ BZ-1.2  & \S8           & Byzantine interface + gate                               & \pathref{P1-A14}  \\
+			\bottomrule
+		\end{tabularx}
+	}
 	\captionof{table}{Index of main results.}
 \end{center}
 
