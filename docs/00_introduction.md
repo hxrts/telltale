@@ -252,6 +252,6 @@ Topology configuration separates deployment concerns from protocol logic. Resour
 
 ## Further Reading
 
-See [Architecture](02_architecture.md) for system design details. See [Choreographic DSL](04_choreographic_dsl.md) for the choreography language. See [Effect Handlers](08_effect_handlers.md) for the handler system.
+See [Architecture](02_architecture.md) for system design details. See [Choreographic DSL](04_choreographic_dsl.md) for the choreography language. See [Choreography Effect Handlers](08_effect_handlers.md) for the choreography handler system.
 
 See [Content Addressing](16_content_addressing.md) for cryptographic protocol identities. See [Topology](20_topology.md) for deployment configuration. See [Resource Heap](17_resource_heap.md) for explicit state management. See [VM Architecture](11_vm_architecture.md) for the bytecode execution model.

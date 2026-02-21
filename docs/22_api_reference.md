@@ -51,9 +51,13 @@ Key exports:
 
 - `VM`, `VMConfig`, `SchedPolicy`, `SimClock`
 - `Instr`, `Value`, `SessionStore`, `SessionId`
+- Effect boundary: `EffectHandler`, `SendDecision`, `AcquireDecision`
+- Effect trace and replay: `RecordingEffectHandler`, `ReplayEffectHandler`, `EffectTraceEntry`
+- Topology and output metadata: `TopologyPerturbation`, `OutputConditionHint`
 - `VMBackend` and `NestedVMHandler`
 
 See `rust/vm/src/lib.rs` for the full API.
+See [Effect Handlers and Session Types](10_effect_session_bridge.md) for integration-boundary guidance.
 
 ### `telltale-simulator`
 

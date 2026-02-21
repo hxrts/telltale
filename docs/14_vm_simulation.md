@@ -388,6 +388,7 @@ It is not a separate per-session step counter.
 
 ## Related Docs
 
-- [Effect Handlers](08_effect_handlers.md)
+- [Choreography Effect Handlers](08_effect_handlers.md)
+- [Effect Handlers and Session Types](10_effect_session_bridge.md)
 - [VM Architecture](11_vm_architecture.md)
 - [VM Parity](15_vm_parity.md)

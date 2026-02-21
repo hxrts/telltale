@@ -1,10 +1,26 @@
-# Effect Handlers
+# Choreography Effect Handlers
 
 ## Overview
 
-The effect handler system decouples protocol logic from transport implementation. Handlers interpret choreographic effects into actual communication operations.
+This page documents the choreography-layer handler surface in `telltale-choreography`.
+This surface is `ChoreoHandler`.
+For VM host integration, see [Effect Handlers and Session Types](10_effect_session_bridge.md).
 
-A protocol executes by calling handler methods for each operation. Different handlers provide different execution strategies. Protocol code remains unchanged.
+`ChoreoHandler` decouples protocol logic from transport implementation.
+Handlers interpret choreographic effects into concrete communication operations.
+Protocol code remains unchanged across handlers.
+
+## Boundary Selection
+
+Choose the handler surface by integration level.
+
+| Use case | Handler surface |
+|---|---|
+| Generated choreography code over typed messages | `ChoreoHandler` |
+| VM bytecode execution in a host runtime | `EffectHandler` |
+
+`EffectHandler` is the integration boundary for third-party runtimes.
+`ChoreoHandler` is the integration boundary for async choreography transports.
 
 ## ChoreoHandler Trait
 

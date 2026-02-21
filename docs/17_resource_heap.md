@@ -86,4 +86,4 @@ Use these errors to distinguish missing resources from double consumption.
 
 All operations are deterministic and avoid hash map iteration order. The resource byte encoding is currently a bespoke format, and future work may replace it with a canonical codec.
 
-See [Content Addressing](16_content_addressing.md) for the type level content ID system and [Effect Handlers](08_effect_handlers.md) for runtime integration.
+See [Content Addressing](16_content_addressing.md) for the type level content ID system and [Choreography Effect Handlers](08_effect_handlers.md) for choreography runtime integration.

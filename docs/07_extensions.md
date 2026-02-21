@@ -359,6 +359,6 @@ The `extensions::timeout` module contains a sample grammar extension, parser, an
 
 ## Related Docs
 
-- [Effect Handlers](08_effect_handlers.md)
+- [Choreography Effect Handlers](08_effect_handlers.md)
 - [Choreographic DSL](04_choreographic_dsl.md)
 - [Using Telltale Handlers](09_telltale_handler.md)

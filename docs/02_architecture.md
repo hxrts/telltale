@@ -229,6 +229,7 @@ pub trait ChoreoHandler: Send {
 ```
 
 Handlers implement this trait to provide different execution strategies. This async handler is distinct from the synchronous `telltale_vm::effect::EffectHandler` used by the VM.
+Use [Effect Handlers and Session Types](10_effect_session_bridge.md) for VM integration guidance.
 
 ### VM Execution Layer
 
@@ -341,7 +342,7 @@ This abstraction makes the core library portable. The same code runs on servers 
 
 ### Custom Handlers
 
-Implement `ChoreoHandler` to add new transport mechanisms. See [Effect Handlers](08_effect_handlers.md) for details.
+Implement `ChoreoHandler` to add new transport mechanisms. See [Choreography Effect Handlers](08_effect_handlers.md) for details.
 
 ### Middleware
 
