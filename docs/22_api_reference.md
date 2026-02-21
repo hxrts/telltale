@@ -68,6 +68,14 @@ Key exports:
 - `Trace` and `StepRecord` in `rust/simulator/src/trace.rs`
 - Runner functions in `rust/simulator/src/runner.rs`
 - Scenario types in `rust/simulator/src/scenario.rs`
+- Harness surface in `rust/simulator/src/harness.rs`:
+  `HostAdapter`, `DirectAdapter`, `MaterialAdapter`, `HarnessSpec`, `HarnessConfig`, `SimulationHarness`
+- Contract checks in `rust/simulator/src/contracts.rs`:
+  `ContractCheckConfig`, `ContractCheckReport`, `evaluate_contracts`, `assert_contracts`
+- Preset helpers in `rust/simulator/src/presets.rs`
+- Material handlers and factory:
+  `IsingHandler`, `HamiltonianHandler`, `ContinuumFieldHandler`, `handler_from_material`
+  in `rust/simulator/src/material_handlers/`
 
 ### `telltale-lean-bridge`
 

@@ -19,11 +19,14 @@
 
 pub mod analysis;
 pub mod checkpoint;
+pub mod contracts;
 pub mod distributed;
 pub mod fault;
+pub mod harness;
 pub mod material;
 pub mod material_handlers;
 pub mod network;
+pub mod presets;
 pub mod property;
 pub mod rng;
 pub mod runner;
@@ -31,6 +34,13 @@ pub mod scenario;
 pub mod trace;
 mod value_conv;
 
+pub use contracts::{
+    assert_contracts, evaluate_contracts, ContractCheckConfig, ContractCheckReport,
+};
+pub use harness::{
+    derive_initial_states, DirectAdapter, HarnessConfig, HarnessSpec, HostAdapter, MaterialAdapter,
+    SimulationHarness,
+};
 pub use material::MaterialParams;
 pub use material_handlers::{
     handler_from_material, ContinuumFieldHandler, HamiltonianHandler, IsingHandler,

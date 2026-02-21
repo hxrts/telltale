@@ -105,8 +105,39 @@ This keeps runtime semantics unchanged and improves host observability.
 ## Integration Tooling
 
 Use `just effect-scaffold` to generate host integration stubs.
-The command emits deterministic `EffectHandler` and test templates.
-The generated files include checklist comments for host assumptions.
+The command emits deterministic `EffectHandler` templates, VM smoke tests, and simulator harness contract tests.
+It also writes a local scaffold `README.md` with next-step instructions.
+
+```text
+just effect-scaffold
+```
+
+This command writes files under `work/effect_handler_scaffold` by default. Use `cargo run -p effect-scaffold -- --no-simulator` when you want only VM level stubs without simulator harness artifacts.
+
+Use `just sim-run <config>` to execute a simulator harness config file.
+This command runs the VM with scenario middleware and contract checks.
+It is the fastest path for CI validation in third party host projects.
+
+```text
+just sim-run work/sim_integration.toml
+```
+
+This command prints a JSON report. The process exits with code `2` when contract checks fail.
+
+## Simulator Validation Lane
+
+Use `telltale-simulator` harness types for integration tests.
+`HarnessSpec` carries local types, global type, scenario, and optional initial states.
+`SimulationHarness` runs the spec with one `HostAdapter`.
+
+```rust
+let adapter = DirectAdapter::new(&my_effect_handler);
+let harness = SimulationHarness::new(&adapter);
+let result = harness.run(&spec)?;
+assert_contracts(&result, &ContractCheckConfig::default())?;
+```
+
+This lane validates runtime behavior without reimplementing VM checks in the host project. See [VM Simulation](14_vm_simulation.md) for harness config fields and preset helpers.
 
 ## Performance and Diagnostics Controls
 

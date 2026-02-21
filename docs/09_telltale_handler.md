@@ -108,6 +108,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 This example creates two endpoints and connects them with a `SimpleChannel` pair. It demonstrates direct `send` and `recv` calls through the handler.
 
+## Simulator Regression Lane
+
+Use `telltale-simulator` to regression test projects that mix `TelltaleHandler` style protocol logic with VM execution.
+The harness API gives one stable path for scenario setup and contract checks.
+This avoids project-specific guard boilerplate for common replay and trace assertions.
+
+```rust
+let harness = SimulationHarness::new(&DirectAdapter::new(&handler));
+let result = harness.run(&spec)?;
+assert_contracts(&result, &ContractCheckConfig::default())?;
+```
+
+This check complements endpoint unit tests. It validates VM level behavior under the same scenario middleware used by simulator parity lanes.
+
 ---
 
 ## Core Concepts

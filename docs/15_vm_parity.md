@@ -86,7 +86,7 @@ The Rust surfaces are in `rust/vm/src/runtime_contracts.rs` and `rust/vm/src/com
 ## Simulator Material Mirror
 
 Lean now includes executable mirror dynamics for simulator material handlers under `lean/Runtime/Simulation/`.
-Rust material handlers live under `rust/simulator/src/material_handlers/` with compatibility re-exports.
+Rust material handlers live under `rust/simulator/src/material_handlers/`.
 
 Parity fixtures are enforced by:
 

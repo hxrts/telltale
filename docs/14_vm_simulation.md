@@ -6,7 +6,7 @@ It describes how the simulator drives `telltale-vm`, records state traces, appli
 ## Scope
 
 The simulator crate is split into focused modules.
-The primary modules are `runner`, `scenario`, `trace`, `fault`, `network`, `property`, `checkpoint`, `distributed`, `analysis`, `material`, `material_handlers`, `rng`, and `value_conv`.
+The primary modules are `runner`, `scenario`, `trace`, `fault`, `network`, `property`, `checkpoint`, `distributed`, `analysis`, `material`, `material_handlers`, `harness`, `contracts`, `presets`, `rng`, and `value_conv`.
 
 This page documents behavior that is implemented in `rust/simulator/src` and `rust/vm/src/vm.rs`.
 It does not restate instruction-level VM semantics.
@@ -125,6 +125,93 @@ pub fn run_with_scenario(
 `ScenarioResult` also includes replay and observability payloads.
 The replay payload includes `obs_trace`, `effect_trace`, and `output_condition_trace`.
 The stats payload includes seed, concurrency, executed rounds, final tick, and checkpoint write count.
+
+## Harness API
+
+The harness module provides a single integration entrypoint for external projects.
+It wraps scenario execution, initial state wiring, and contract checks.
+The core types are `HostAdapter`, `HarnessSpec`, `HarnessConfig`, and `SimulationHarness`.
+
+```rust
+pub trait HostAdapter {
+    fn effect_handler(&self) -> &dyn EffectHandler;
+    fn initial_states(&self, scenario: &Scenario)
+        -> Result<Option<BTreeMap<String, Vec<FixedQ32>>>, String>;
+    fn validate_result(&self, scenario: &Scenario, result: &ScenarioResult)
+        -> Result<(), String>;
+}
+
+pub struct SimulationHarness<'a, A: HostAdapter + ?Sized> { /* ... */ }
+```
+
+`HostAdapter` gives each project one place to connect its runtime behavior. `DirectAdapter` wraps a raw `EffectHandler`. `MaterialAdapter` uses scenario material parameters to construct built in handlers.
+
+```rust
+let adapter = MaterialAdapter::from_scenario(&config.spec.scenario);
+let harness = SimulationHarness::new(&adapter);
+let result = harness.run_config(&config)?;
+```
+
+This flow executes the scenario and then evaluates configured contract checks.
+
+## Initial State Derivation
+
+`derive_initial_states(&Scenario)` maps scenario roles to default state vectors.
+For `mean_field`, each role gets the same concentration vector.
+For `hamiltonian`, each role gets `[position_i, momentum_i]`.
+For `continuum_field`, each role gets one scalar field value.
+
+## Contract Checks
+
+Contract checks are reusable post run assertions in `contracts`.
+They return `ContractCheckReport` and can fail CI with deterministic messages.
+Default checks include no property violations and replay coherence.
+
+```rust
+pub struct ContractCheckConfig {
+    pub no_property_violations: bool,
+    pub replay_coherence: bool,
+    pub min_rounds_executed: Option<u64>,
+    pub expected_roles: Vec<String>,
+}
+```
+
+`evaluate_contracts` returns a structured report. `assert_contracts` returns one error string for quick test integration.
+
+## Preset Builders
+
+The `presets` module provides composable scenario helpers.
+These helpers reduce setup code for smoke tests and fault tests.
+They are optional and they do not change runner semantics.
+
+```rust
+let scenario = with_standard_properties(
+    deterministic_baseline("smoke", vec!["A".into(), "B".into()], 64, material),
+    0,
+    32,
+    16,
+);
+```
+
+`deterministic_baseline` sets stable defaults.
+`with_standard_properties` injects a standard property suite.
+`with_message_drop_fault` adds one deterministic fault event.
+
+## CLI Runner
+
+The simulator crate now includes `telltale-simulator-run`.
+It loads one `HarnessConfig` file and emits a JSON report.
+The process exits with code `2` when contract checks fail.
+
+```text
+cargo run -p telltale-simulator --bin run -- --config path/to/config.toml --pretty
+```
+
+Use this binary for external CI where the project does not want custom Rust harness code.
+
+`effect-scaffold` now generates a simulator harness contract test template by default.
+This gives host projects a ready to run simulator lane after scaffold generation.
+Disable this output with `--no-simulator` when the host only wants VM callback stubs.
 
 ## Sampling Model and Step Mapping
 

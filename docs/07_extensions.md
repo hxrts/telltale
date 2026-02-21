@@ -8,6 +8,20 @@ The extension system has two parts. Runtime extensions add type-safe effects tha
 
 Extensions are projected to roles during compilation and dispatched by `interpret_extensible` at runtime.
 
+## Simulator Integration for Extensions
+
+Extension projects often need VM level regression tests in addition to parser tests.
+Use `telltale-simulator` harness APIs to run projected local types under scenario middleware.
+This keeps extension validation aligned with VM effect contracts.
+
+```rust
+let harness = SimulationHarness::new(&DirectAdapter::new(&handler));
+let result = harness.run(&spec)?;
+assert_contracts(&result, &ContractCheckConfig::default())?;
+```
+
+This pattern makes extension runtime checks reusable across projects. See [VM Simulation](14_vm_simulation.md) for harness config files and preset constructors.
+
 ## Runtime Effect Extensions
 
 ### ExtensionEffect Trait

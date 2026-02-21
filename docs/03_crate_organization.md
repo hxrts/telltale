@@ -154,6 +154,12 @@ The `runner` module provides `run`, `run_concurrent`, and `run_with_scenario` fo
 
 The `ChoreographySpec` struct packages a choreography for simulation. It includes local types, global type, and initial state vectors. The `Trace` type collects step records during execution.
 
+The `harness` module adds high level integration APIs for third party projects.
+It exports `HostAdapter`, `DirectAdapter`, `MaterialAdapter`, `HarnessSpec`, `HarnessConfig`, and `SimulationHarness`.
+The `contracts` module exports reusable post run checks for replay coherence and expected role coverage.
+
+Material-model handlers are grouped in `rust/simulator/src/material_handlers/`. The crate re-exports `IsingHandler`, `HamiltonianHandler`, `ContinuumFieldHandler`, and `handler_from_material` from this module for runtime selection by scenario material type.
+
 ```rust
 use telltale_simulator::runner::{run, ChoreographySpec};
 
@@ -166,6 +172,9 @@ let trace = run(&spec.local_types, &spec.global_type, &spec.initial_states, 100,
 ```
 
 The `run` function executes a choreography and returns a trace. The trace contains step records for each role at each step.
+
+The simulator crate also ships a CLI entrypoint in `rust/simulator/src/bin/run.rs`.
+Use `just sim-run <config>` for a single config file execution path.
 
 ### telltale-choreography
 

@@ -45,9 +45,17 @@ lint-quick:
 check-arch-rust:
     ./scripts/check-arch-rust.sh
 
-# Generate deterministic EffectHandler + test stubs for host integration.
+# Generate deterministic EffectHandler stubs plus simulator harness test templates.
 effect-scaffold out="work/effect_handler_scaffold" name="HostEffectHandler":
     cargo run -p effect-scaffold -- {{ out }} {{ name }}
+
+# Run a simulator harness config and print a JSON report.
+sim-run config:
+    cargo run -p telltale-simulator --bin run -- --config {{ config }} --pretty
+
+# Run a simulator harness config and write the JSON report to a file.
+sim-run-out config output:
+    cargo run -p telltale-simulator --bin run -- --config {{ config }} --output {{ output }} --pretty
 
 # Backward-compatible alias used by CI dry-run pipeline
 check-arch: check-arch-rust

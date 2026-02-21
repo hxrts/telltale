@@ -22,6 +22,20 @@ Choose the handler surface by integration level.
 `EffectHandler` is the integration boundary for third-party runtimes.
 `ChoreoHandler` is the integration boundary for async choreography transports.
 
+## VM Handler Test Path
+
+Projects that implement `EffectHandler` should validate behavior in `telltale-simulator`.
+Use `SimulationHarness` with `DirectAdapter` for host handlers.
+Use `MaterialAdapter` when the scenario should select the handler from material parameters.
+
+```rust
+let adapter = DirectAdapter::new(&handler);
+let harness = SimulationHarness::new(&adapter);
+let result = harness.run(&spec)?;
+```
+
+This test path runs the same VM callback surface that production execution uses. Add `assert_contracts` checks to make replay and trace guarantees explicit in CI.
+
 ## ChoreoHandler Trait
 
 All handlers implement this trait.
