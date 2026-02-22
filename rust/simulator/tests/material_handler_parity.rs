@@ -187,7 +187,7 @@ fn material_handler_factory_dispatches_all_variants() {
         step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
     });
 
-    let _ = handler_from_material(&mean);
-    let _ = handler_from_material(&ham);
-    let _ = handler_from_material(&cont);
+    drop(handler_from_material(&mean));
+    drop(handler_from_material(&ham));
+    drop(handler_from_material(&cont));
 }

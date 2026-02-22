@@ -2942,6 +2942,7 @@ fn step_choose(
     })
 }
 
+#[allow(clippy::too_many_lines)]
 fn step_offer(
     coro: &mut Coroutine,
     session: &mut SessionState,

@@ -3355,6 +3355,7 @@ impl VM {
     }
 
     /// Offer: internal choice — send selected label.
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn step_offer(
         &mut self,
         coro_idx: usize,
