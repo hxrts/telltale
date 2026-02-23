@@ -840,13 +840,7 @@ This appendix fixes the formal objects and judgment forms used in Sections~2--6.
 
 Let \texttt{Role} be the finite set of role names. An endpoint is a pair $(\mathit{sid},r)$ of session identifier and role. A directed edge is a triple $(\mathit{sid}, r_s, r_r)$ with sender role $r_s$ and receiver role $r_r$.
 
-We write:
-\begin{itemize}
-	\item $\mathsf{src}(e)$ for the sender endpoint of edge $e$,
-	\item $\mathsf{dst}(e)$ for the receiver endpoint of edge $e$,
-	\item $\mathsf{role}(ep)$ for the role component of endpoint $ep$,
-	\item $\EdgeShares(e, ep)$ when endpoint $ep$ is either $\mathsf{src}(e)$ or $\mathsf{dst}(e)$.
-\end{itemize}
+We write $\mathsf{src}(e)$ for the sender endpoint of edge $e$, $\mathsf{dst}(e)$ for the receiver endpoint, $\mathsf{role}(ep)$ for the role component of endpoint $ep$, and $\EdgeShares(e, ep)$ when endpoint $ep$ is either $\mathsf{src}(e)$ or $\mathsf{dst}(e)$.
 
 \subsection{Local Types and Environments}
 

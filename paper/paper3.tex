@@ -383,14 +383,7 @@ Our contributions are as follows:
 
 \subsection{Base Recap}
 
-Assume the base model from \emph{Coherence for Asynchronous Buffered MPST} and \emph{Computable Dynamics for Asynchronous MPST}:
-\begin{itemize}
-	\item asynchronous buffered steps,
-	\item active-edge Coherence,
-	\item fair scheduling assumptions stated per theorem,
-	\item \DeliveryModel parametricity,
-	\item crash-stop setting for fault claims.
-\end{itemize}
+Assume the base model from \emph{Coherence for Asynchronous Buffered MPST} and \emph{Computable Dynamics for Asynchronous MPST}: asynchronous buffered steps, active-edge Coherence, fair scheduling assumptions stated per theorem, \DeliveryModel parametricity, and crash-stop setting for fault claims.
 
 \begin{table}[H]
 	\centering
@@ -419,23 +412,11 @@ Assume the base model from \emph{Coherence for Asynchronous Buffered MPST} and \
 
 \subsection{Reconfiguration Operators}
 
-The paper distinguishes:
-\begin{itemize}
-	\item static composition (\texttt{link}) in deployment-level composition,
-	\item dynamic delegation (endpoint/capability transfer during execution).
-\end{itemize}
-
-Representative mechanized anchors are in the deployment-composition layer, the delegation-preservation
-layer, and the higher-order graph-delta layer. Appendix~\ref{app:index} provides the file-level mapping.
+The paper distinguishes static composition (\texttt{link}) in deployment-level composition from dynamic delegation (endpoint/capability transfer during execution). Representative mechanized anchors are in the deployment-composition layer, the delegation-preservation layer, and the higher-order graph-delta layer. Appendix~\ref{app:index} provides the file-level mapping.
 
 \subsection{Dynamic Participant Sets}
 
-Participant sets are not fixed:
-\begin{itemize}
-	\item joining through delegation,
-	\item leaving through crash-stop or transfer-and-exit,
-	\item topology change through composition.
-\end{itemize}
+Participant sets are not fixed: participants may join through delegation, leave through crash-stop or transfer-and-exit, or change topology through composition.
 
 The objective is to preserve Coherence/Harmony across these mutations.
 
@@ -572,14 +553,7 @@ Fix configurations and reconfiguration operators:
 	C_0 \xrightarrow{\rho_{\mathsf{link}}} C_1 \xrightarrow{\rho_{\mathsf{del}}}
 	C_2 \xrightarrow{\rho_{\mathsf{tr}}} C_3.
 \end{equation}
-Assume well-formedness judgments $\Gamma \vdash C_i\ \wf$ for $i=0,1,2,3$.
-
-\begin{itemize}
-	\item $C_0$: coherent single-pool state before federation.
-	\item $C_1$: linked/federated state.
-	\item $C_2$: post-delegation state where token capability is held by $C'$.
-	\item $C_3$: coordinated-mode state after transition choreography.
-\end{itemize}
+Assume well-formedness judgments $\Gamma \vdash C_i\ \wf$ for $i=0,1,2,3$. Here $C_0$ is the coherent single-pool state before federation, $C_1$ is the linked/federated state, $C_2$ is the post-delegation state where token capability is held by $C'$, and $C_3$ is the coordinated-mode state after transition choreography.
 
 The running obligations are used through these derived rule instances.
 Write $\mathsf{TrPrem}(C)$ for the transition-profile premise package at $C$, and
@@ -695,16 +669,7 @@ coordinated mode with preserved envelope obligations.
 	Equivalently, the reconfiguration square commutes at the projection boundary.
 \end{theorem}
 
-The proof has two components.
-\begin{enumerate}
-	\item Static Harmony via \texttt{link}. Composition-level commutation and coherence
-	      preservation are established in deployment theorems, for example
-	      \nolinkurl{link_harmony_through_link} and \nolinkurl{link_preserves_coherent}.
-	\item Dynamic Harmony via delegation. Delegation preservation and renaming and
-	      footprint lemmas establish commutation for topology-changing transfers.
-\end{enumerate}
-
-At the effect-observation boundary, the coinductive bridge supplies the composition-facing
+The proof has two components: static Harmony via \texttt{link}, where composition-level commutation and coherence preservation are established in deployment theorems such as \nolinkurl{link_harmony_through_link} and \nolinkurl{link_preserves_coherent}; and dynamic Harmony via delegation, where delegation preservation and footprint lemmas establish commutation for topology-changing transfers. At the effect-observation boundary, the coinductive bridge supplies the composition-facing
 congruence and quotient lift used by this section: \nolinkurl{effect_bisim_congr_link} and
 \nolinkurl{config_equiv_iff_effect_bisim_silent}.
 

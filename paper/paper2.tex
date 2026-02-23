@@ -872,22 +872,7 @@ With $\Bc=2$ and $W_0=25$, the instance sits at the critical capacity line, so p
 \label{sec:architecture}
 % ============================================================================
 
-The architecture has one shared regularity kernel and two proof branches.
-
-\begin{itemize}
-	\item quantitative branch: local-step algebra to strict descent to global bounds
-	\item algorithmic branch: regularity to finite reachability to predicate decisions
-\end{itemize}
-
-This reuse reduces theorem fragmentation and proof duplication. It also gives a direct map from assumptions to output guarantees.
-
-Dependency sketch:
-\begin{enumerate}
-	\item Assumption Block~\ref{assump:p2-quantitative} gives Theorem~\ref{thm:quantitative} and Corollaries~\ref{cor:productive}--\ref{cor:scheduler}.
-	\item Assumption Block~\ref{assump:p2-regular} gives Theorem~\ref{thm:algorithmic} and the subtyping/equivalence deciders.
-	\item Assumption Block~\ref{assump:p2-crash} gives Theorem~\ref{thm:crash}.
-	\item Assumption Block~\ref{assump:p2-byzantine} gives Theorem~\ref{thm:byzantine}, Corollary~\ref{cor:converse}, and Proposition~\ref{prop:vm-bridge}.
-\end{enumerate}
+The architecture has one shared regularity kernel and two proof branches: the quantitative branch derives global bounds through local-step algebra and strict descent, while the algorithmic branch derives predicate decisions through regularity and finite reachability. This reuse reduces theorem fragmentation and proof duplication. It also gives a direct map from assumptions to output guarantees: Assumption Block~\ref{assump:p2-quantitative} yields Theorem~\ref{thm:quantitative} and Corollaries~\ref{cor:productive}--\ref{cor:scheduler}; Assumption Block~\ref{assump:p2-regular} yields Theorem~\ref{thm:algorithmic} and the subtyping/equivalence deciders; Assumption Block~\ref{assump:p2-crash} yields Theorem~\ref{thm:crash}; and Assumption Block~\ref{assump:p2-byzantine} yields Theorem~\ref{thm:byzantine}, Corollary~\ref{cor:converse}, and Proposition~\ref{prop:vm-bridge}.
 
 % ============================================================================
 \section{Related Work}
