@@ -152,7 +152,7 @@ theorem subst_preserves_reaches_comm_decide (n : Nat) (replacement : LocalType) 
     simp only [LocalType.subst, reachesCommDecide] at *
     -- Now hL : reachesCommDecide L' = true
     -- Goal : reachesCommDecide (L'.subst (n+1) replacement) = true
-    -- Use structural recursion (subst_preserves_reachesCommDecide is proved by structural recursion)
+    -- Use structural recursion (subst_preserves_reaches_comm_decide is proved by structural recursion)
     exact subst_preserves_reaches_comm_decide (n + 1) replacement L' hL
 
 /-! ## Constructor-Level Reachability Helpers -/

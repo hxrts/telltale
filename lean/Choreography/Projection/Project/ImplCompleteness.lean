@@ -248,7 +248,7 @@ theorem trans_c_project
       ∃ body', e = .mu t body' ∧ EQ2 body body')
     (g : GlobalType) (role : String) (lt : LocalTypeR)
     (h : CProject g role lt) (hwf : g.wellFormed = true) : CProject g role (trans g role) := by
-  -- Use trans_eq_of_CProject to replace the candidate with trans.
+  -- Use trans_eq_of_c_project to replace the candidate with trans.
   have hne : g.allCommsNonEmpty = true := by
     simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
     exact hwf.1.1.2
@@ -270,7 +270,7 @@ theorem trans_is_projection
     (g : GlobalType) (role : String) (lt : LocalTypeR)
     (h : CProject g role lt) (hwf : g.wellFormed = true) :
     projectb g role (trans g role) = true := by
-    -- Reduce to projectb_complete with the trans_CProject witness.
+    -- Reduce to projectb_complete with the trans_c_project witness.
     have hne : g.allCommsNonEmpty = true := by
       -- wellFormed = (((allVarsBound ∧ allCommsNonEmpty) ∧ noSelfComm) ∧ isProductive)
       simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf

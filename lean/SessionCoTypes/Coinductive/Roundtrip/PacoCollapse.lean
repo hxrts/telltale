@@ -218,7 +218,7 @@ theorem eq2_ce_to_eq2_c {ρ : EnvPair} {a b : LocalTypeC}
     (hce : EQ2CE ρ a b) (hEnvL : EnvResolvesL ρ) (hVarR : EnvVarR ρ)
     (ha : ProductiveC a) (hb : ProductiveC b) :
     EQ2C a b :=
-  -- Delegate to EQ2CE_to_EQ2C' which handles all cases
+  -- Delegate to eq2_ce_to_eq2_c' which handles all cases
   eq2_ce_to_eq2_c' hce hEnvL hVarR ha hb
 
 -- Sourced versions (toCoind)

@@ -238,7 +238,7 @@ theorem trans_is_guarded_of_participates_first_branch
       simp [participatesFirstBranch] at hpart
   | .var _ =>
       simp [participatesFirstBranch] at hpart
-  -- trans_isGuarded_of_participatesFirstBranch: Mu Case
+  -- trans_is_guarded_of_participates_first_branch: Mu Case
   | .mu t body =>
       -- Mu case: follow the body and propagate guardedness.
       unfold participatesFirstBranch at hpart
@@ -251,7 +251,7 @@ theorem trans_is_guarded_of_participates_first_branch
           simp only [hvne, Bool.false_eq_true, ↓reduceIte]
           exact trans_is_guarded_of_participates_first_branch body v role hpart
       · simp [hguard, Bool.false_eq_true, ↓reduceIte, LocalTypeR.isGuarded]
-  -- trans_isGuarded_of_participatesFirstBranch: Comm Case
+  -- trans_is_guarded_of_participates_first_branch: Comm Case
   | .comm sender receiver branches =>
       -- Comm case: direct participant or follow the first branch.
       cases hpart_direct : SessionTypes.Participation.is_participant role sender receiver with
@@ -291,7 +291,7 @@ theorem trans_is_guarded_of_participates_first_branch
                     | inr hright =>
                         exact hright
                   exact trans_is_guarded_of_participates_first_branch cont v role hcont
-  -- trans_isGuarded_of_participatesFirstBranch: Delegate Case
+  -- trans_is_guarded_of_participates_first_branch: Delegate Case
   | .delegate p q sid r cont =>
       -- Delegate case: direct participant or follow the continuation.
       cases hpart_direct : SessionTypes.Participation.is_participant role p q with

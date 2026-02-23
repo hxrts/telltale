@@ -286,7 +286,7 @@ theorem token_consumed_removed (ctx : LinCtx) (e : Endpoint) (ctx' : LinCtx) (S 
     (h : LinCtx.consumeToken ctx e = some (ctx', S)) :
     ¬LinCtx.contains ctx' e := by
   -- LinCtx.contains ctx' e = true means ∃ S', (e, S') ∈ ctx'
-  -- But consumeToken_not_mem says ∀ S', (e, S') ∉ ctx'
+  -- But consume_token_not_mem says ∀ S', (e, S') ∉ ctx'
   intro hContains
   simp only [LinCtx.contains, List.any_eq_true] at hContains
   obtain ⟨⟨e', S'⟩, hMem, hEq⟩ := hContains

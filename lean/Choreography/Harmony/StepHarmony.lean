@@ -230,7 +230,7 @@ private theorem all_comms_non_empty_of_wf (g : GlobalType) (hwf : g.wellFormed =
 private theorem trans_eq_of_c_project_wf (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt) (hwf : g.wellFormed = true) :
     projTrans g role = lt := by
-  -- Use trans_eq_of_CProject after extracting allCommsNonEmpty.
+  -- Use trans_eq_of_c_project after extracting allCommsNonEmpty.
   have hne := all_comms_non_empty_of_wf g hwf
   simpa [projTrans] using (trans_eq_of_c_project g role lt hproj hne)
 
@@ -387,7 +387,7 @@ It uses `trans_eq_of_c_project` to rewrite the candidate to `trans g role`. -/
 theorem trans_produces_c_project (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt) (hwf : g.wellFormed = true) :
     CProject g role (projTrans g role) := by
-  -- Reduce to the original candidate via trans_eq_of_CProject.
+  -- Reduce to the original candidate via trans_eq_of_c_project.
   have htrans_eq : projTrans g role = lt := trans_eq_of_c_project_wf g role lt hproj hwf
   simpa [htrans_eq] using hproj
 

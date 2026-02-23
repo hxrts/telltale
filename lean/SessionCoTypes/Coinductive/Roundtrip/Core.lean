@@ -45,20 +45,20 @@ open SessionTypes.LocalTypeR
 
 -- Re-exports from ToCoindInjectivity
 
--- toCoind_injective is available from ToCoindInjectivity
--- toCoindBranches_injective is available from ToCoindInjectivity
--- toCoindBranches_length, toCoindBranches_get are available from ToCoindInjectivity
+-- to_coind_injective is available from ToCoindInjectivity
+-- to_coind_branches_injective is available from ToCoindInjectivity
+-- to_coind_branches_length, to_coind_branches_get are available from ToCoindInjectivity
 
 -- Re-exports from RoundtripHelpers
 
--- childRel_toCoind, childRel_toCoind_size are available from RoundtripHelpers
--- VisitedLt, visitedLt_not_mem, visitedLt_insert are available from RoundtripHelpers
--- childRel_toCoind_mu, childRel_toCoind_send, childRel_toCoind_recv are available
+-- child_rel_to_coind, child_rel_to_coind_size are available from RoundtripHelpers
+-- VisitedLt, visited_lt_not_mem, visited_lt_insert are available from RoundtripHelpers
+-- child_rel_to_coind_mu, child_rel_to_coind_send, child_rel_to_coind_recv are available
 
 -- Re-exports from BisimHelpers
 
--- EQ2C_end_head, EQ2C_var_head, EQ2C_send_head, EQ2C_recv_head are available from BisimHelpers
--- EQ2CE_step_to_EQ2C is available from BisimHelpers
+-- eq2_c_end_head, eq2_c_var_head, eq2_c_send_head, eq2_c_recv_head are available from BisimHelpers
+-- eq2_ce_step_to_eq2_c is available from BisimHelpers
 
 -- EQ2CE → EQ2C erasure (coinductive)
 

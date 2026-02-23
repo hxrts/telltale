@@ -182,7 +182,7 @@ theorem coherent_send_preserved
       exact hL'T
   -- Case 2: Unchanged Edge Sharing Sender Endpoint
   · -- Case 2: e ≠ sendEdge, but e shares senderEp
-    -- EdgeCoherent_updateD_irrelevant needs: sendEdge ≠ e
+    -- edge_coherent_update_d_irrelevant needs: sendEdge ≠ e
     have hNeSymm : sendEdge ≠ e := Ne.symm hShare.1
     have hShare' : { sid := e.sid, role := e.sender : Endpoint } = senderEp ∨
         { sid := e.sid, role := e.receiver : Endpoint } = senderEp := by
@@ -238,7 +238,7 @@ theorem coherent_send_preserved
         -- The receiver's type and trace are unchanged
         have hRecvNoMatch : senderEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
         apply edge_coherent_update_d_irrelevant _ _ _ _ _ hNeSymm
-        -- For EdgeCoherent_updateG_irrelevant, we need both endpoints ≠ senderEp
+        -- For edge_coherent_update_g_irrelevant, we need both endpoints ≠ senderEp
         -- But sender endpoint = senderEp! So we can't use that lemma directly.
         -- However, EdgeCoherent doesn't actually depend on sender's type in a way that matters
         -- Let's prove it directly

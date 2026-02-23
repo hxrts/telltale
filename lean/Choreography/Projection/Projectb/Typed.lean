@@ -127,7 +127,7 @@ private theorem c_project_f_typed_mono : Monotone CProjectF_typed := by
           simp [CProjectF_typed] at hrel
       | recv _ _ =>
           simp [CProjectF_typed] at hrel
-  -- CProjectF_typed_mono: Comm Case
+  -- c_project_f_typed_mono: Comm Case
   | comm sender receiver gbs =>
       by_cases hs : role = sender
       · cases cand with
@@ -150,7 +150,7 @@ private theorem c_project_f_typed_mono : Monotone CProjectF_typed := by
               simp [CProjectF_typed, hr, hns] at hrel ⊢
         · simp [CProjectF_typed, hs, hr] at hrel ⊢
           exact all_branches_proj_mono h hrel
-  -- CProjectF_typed_mono: Delegate Case
+  -- c_project_f_typed_mono: Delegate Case
   | delegate p q sid r cont =>
       by_cases hp : role = p
       · cases cand with
@@ -176,7 +176,7 @@ private theorem c_project_f_typed_mono : Monotone CProjectF_typed := by
                     exact hrel
         | _ =>
             simp [CProjectF_typed, hp] at hrel ⊢
-      -- CProjectF_typed_mono: Delegate Receiver/Other Subcases
+      -- c_project_f_typed_mono: Delegate Receiver/Other Subcases
       · by_cases hq : role = q
         · have hnp : q ≠ p := by
             intro hqp

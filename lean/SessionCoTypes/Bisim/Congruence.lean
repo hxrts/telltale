@@ -382,7 +382,7 @@ theorem not_unfolds_to_var_of_not_is_free_in {x : LocalTypeR} {v : String}
     -- We need to show isFreeIn v (body.substitute t (.mu t body)) = false
     simp only [isFreeIn] at h
     by_cases hvt : v == t
-    · -- v == t case: use isFreeIn_subst_mu_self
+    · -- v == t case: use is_free_in_subst_mu_self
       simp only [beq_iff_eq] at hvt
       subst hvt
       have hnotfree := is_free_in_subst_mu_self body v
@@ -393,7 +393,7 @@ theorem not_unfolds_to_var_of_not_is_free_in {x : LocalTypeR} {v : String}
       -- Need: isFreeIn v (body.substitute t (.mu t body)) = false
       have hmu_notfree : isFreeIn v (.mu t body) = false := by
         simp only [isFreeIn, hvt, Bool.false_eq_true, ↓reduceIte, h]
-      -- By isFreeIn_subst_preserves: v not free in body ∧ v not free in repl → v not free in result
+      -- By is_free_in_subst_preserves: v not free in body ∧ v not free in repl → v not free in result
       have hsubst_notfree := is_free_in_subst_preserves body v t (.mu t body) h hmu_notfree
       exact ih hsubst_notfree
 

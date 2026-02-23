@@ -352,7 +352,7 @@ theorem lookup_d_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
               have hpair := (List.pairwise_cons.1 sorted)
               have hhd : ∀ p ∈ tl, edgeCmpLT hd p := hpair.1
               have htl : tl.Pairwise edgeCmpLT := hpair.2
-              -- lookupD_rename Fold Induction: Matching Head
+              -- lookup_d_rename Fold Induction: Matching Head
               by_cases hEq : e = hd.1
               case pos =>
                 subst hEq
@@ -389,7 +389,7 @@ theorem lookup_d_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
                     (lookup_d_update_eq (env := acc) (e := renameEdge ρ hd.1)
                       (ts := hd.2.map (renameValType ρ)))
                 simp [List.lookup, htail, hupd]
-              -- lookupD_rename Fold Induction: Non-matching Head
+              -- lookup_d_rename Fold Induction: Non-matching Head
               case neg =>
                 have hne : renameEdge ρ hd.1 ≠ renameEdge ρ e := by
                   intro hEq'

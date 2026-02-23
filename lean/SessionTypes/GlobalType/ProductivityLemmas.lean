@@ -116,13 +116,12 @@ theorem mu_is_productive_forall (t : String) (body : GlobalType)
   simp only [GlobalType.isProductive]
   -- Goal: body.isProductive (t :: ug) = true
   -- We have: body.allVarsBound [t] = true and body.isProductive [t] = true
-  -- Use isProductive_extend with bound = [t] and extra = ug
+  -- Use is_productive_extend with bound = [t] and extra = ug
   have h : [t] ++ ug = t :: ug := rfl
   rw [← h]
   exact is_productive_extend body [t] ug hbound hprod
 
--- isProductive preservation under substitution
---
+-- is_productive preservation under substitution.
 -- Key insight: When g.isProductive (varName :: unguarded) = true, any occurrence of
 -- var varName in g must be after a comm (which resets unguarded to []). So the replacement
 -- only needs to be productive with [].
@@ -276,7 +275,7 @@ theorem all_vars_bound_mu_unfold (t : String) (body : GlobalType)
   -- which unfolds to: body.allVarsBound [t] = true
   simp only [GlobalType.allVarsBound] at hbound
   -- Now hbound: body.allVarsBound [t] = true
-  -- Apply allVarsBound_substitute with bound = []
+  -- Apply all_vars_bound_substitute with bound = []
   -- Need: body.allVarsBound (t :: []) = body.allVarsBound [t] = true ✓
   -- Need: (mu t body).allVarsBound [] = true
   have hrepl : (GlobalType.mu t body).allVarsBound [] = true := by
@@ -302,7 +301,7 @@ theorem is_productive_mu_unfold (t : String) (body : GlobalType)
   -- hbound: body.allVarsBound [t] = true
   -- hprod: body.isProductive [t] = true
   -- Goal: (body.substitute t (mu t body)).isProductive [] = true
-  -- Use isProductive_substitute with hrepl from mu_isProductive_forall
+  -- Use is_productive_substitute with hrepl from mu_is_productive_forall
   have hrepl : ∀ ug, (GlobalType.mu t body).isProductive ug = true :=
     mu_is_productive_forall t body hbound hprod
   exact is_productive_substitute body t (GlobalType.mu t body) [] hprod hrepl

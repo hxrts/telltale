@@ -169,7 +169,7 @@ theorem CanRecv.dual_iff_can_send {t : LocalTypeR} {p : String} {bs : List Branc
 @[simp]
 theorem can_recv_d_iff_can_recv {t : LocalTypeR} {p : String} {bs : List BranchR} :
     CanRecvD t p bs ↔ CanRecv t p bs := by
-  -- Flip CanRecv.dual_iff_CanSend to match the alias shape.
+  -- Flip CanRecv.dual_iff_can_send to match the alias shape.
   simpa [CanRecvD] using
     (CanRecv.dual_iff_can_send (t := t) (p := p) (bs := bs)).symm
 

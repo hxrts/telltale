@@ -129,12 +129,12 @@ theorem unfolds_to_var_substitute_eq2 {x : LocalTypeR} {var : String} {repl : Lo
   refine (UnfoldsToVar.rec
     (motive := fun x var _ => LocalTypeR.WellFormed x → EQ2 (x.substitute var repl) repl)
     ?base ?mu h) hWFx
-  -- `UnfoldsToVar_substitute_EQ2`: Base Case
+  -- `unfolds_to_var_substitute_eq2`: Base Case
   · intro var _hWF
     -- x = .var var, so x.substitute var repl = repl
     simp only [LocalTypeR.substitute, beq_self_eq_true, ↓reduceIte]
     exact eq2_refl _
-  -- `UnfoldsToVar_substitute_EQ2`: Mu Case
+  -- `unfolds_to_var_substitute_eq2`: Mu Case
   · intro t body var hinner ih hWFx
     -- x = .mu t body, body.substitute t (.mu t body) unfolds to var
     by_cases htv : t = var
@@ -143,8 +143,8 @@ theorem unfolds_to_var_substitute_eq2 {x : LocalTypeR} {var : String} {repl : Lo
       have hinner' : UnfoldsToVar (body.substitute t (.mu t body)) t := htv ▸ hinner
 /- ## Structured Block 3 -/
       exact (False.elim (not_unfolds_to_var_of_not_is_free_in hnotfree hinner'))
-    -- `UnfoldsToVar_substitute_EQ2`: Mu Case (`t ≠ var`)
-    · -- Case t ≠ var: use EQ2_subst_mu_comm + IH (WF-gated trans)
+    -- `unfolds_to_var_substitute_eq2`: Mu Case (`t ≠ var`)
+    · -- Case t ≠ var: use eq2_subst_mu_comm + IH (WF-gated trans)
       have htv_beq : (t == var) = false := beq_eq_false_iff_ne.mpr htv
       simp only [LocalTypeR.substitute, htv_beq, Bool.false_eq_true, ↓reduceIte]
       have hcomm := eq2_subst_mu_comm body var t repl htv hWFx
@@ -165,7 +165,7 @@ theorem unfolds_to_var_substitute_eq2 {x : LocalTypeR} {var : String} {repl : Lo
         well_formed_substitute (var := var) hWF_unfold hWFrepl
       have hunfolded : EQ2 ((body.substitute var repl).substitute t (.mu t (body.substitute var repl))) repl :=
         eq2_trans_via_bisim hcomm ih' hWF_left hWF_right hWFrepl
-      -- `UnfoldsToVar_substitute_EQ2`: Analyze `repl` Shape
+      -- `unfolds_to_var_substitute_eq2`: Analyze `repl` Shape
       apply EQ2.construct
       cases repl with
       | «end» =>
@@ -242,7 +242,7 @@ theorem substitute_at_var_bisim_f {x y : LocalTypeR} {var : String} {repl : Loca
     EQ2.to_bisim hxyeq hWFx_subst hWFy_subst
   obtain ⟨R', hR'post, hxy'⟩ := hBisim
   have hBisimF : BisimF R' (x.substitute var repl) (y.substitute var repl) := hR'post _ _ hxy'
-  -- `substitute_at_var_bisimF`: Observable Case Split
+  -- `substitute_at_var_bisim_f`: Observable Case Split
   cases hBisimF with
   | eq_end hxend hyend =>
     -- Both unfold to end, so BisimF.eq_end applies directly
@@ -250,26 +250,13 @@ theorem substitute_at_var_bisim_f {x y : LocalTypeR} {var : String} {repl : Loca
   | eq_var hxvar hyvar =>
     -- Both unfold to the same var, so BisimF.eq_var applies directly
     exact BisimF.eq_var hxvar hyvar
-  -- `substitute_at_var_bisimF`: Send/Recv Cases
+  -- `substitute_at_var_bisim_f`: Send/Recv Cases
   | eq_send hxsend hysend hbr =>
     -- Both can send with R'-related branches bs and cs
     apply BisimF.eq_send hxsend hysend
-    -- Need: BranchesRelBisim (RelImage f R) bs cs where f = (fun t => t.substitute var repl)
-    -- We have: BranchesRelBisim R' bs cs
-    --
-    -- Strategy: Since x and y both unfold to var, after substitution they both become
-    -- EQ2-equivalent to repl. The branches bs and cs come from repl's structure.
-    -- Since both x and y unfold to the same var, their branches are Bisim-related.
-    --
-    -- Key insight with reflexivity: For any branch b in bs (or cs), since x and y both
-    -- unfold to var, the branch b is a "fixed point" of the overall structure.
-    -- We can construct RelImage witnesses by taking pre-images = post-images (the branches
-    -- themselves), and use reflexivity: R b b.
-    --
-    -- More precisely: RelImage f R b b = ∃ a a', R a a' ∧ b = f a ∧ b = f a'
-    -- We take a = a' = b, and use h_refl to get R b b.
-    -- Then we need f b = b, which holds when var is not free in b (the branch is a
-    -- fixed point of substitution at var).
+    -- Lift branch relatedness from `R'` to `Bisim`.
+    -- Then build `RelImage` witnesses pointwise, using reflexivity and
+    -- substitution-fixed branch continuations.
     rename_i bs cs
     have hR'_to_Bisim : ∀ a b, R' a b → Bisim a b := fun a b hr' => ⟨R', hR'post, hr'⟩
     have hbr_bisim : BranchesRelBisim Bisim bs cs :=
@@ -476,7 +463,7 @@ theorem substitute_compatible_barendregt (var : String) (repl : LocalTypeR)
     by_cases heq : v = var
 /- ## Structured Block 8 -/
     · -- Case: v = var, both become repl after substitution
-      -- Use substitute_at_var_bisimF with Bisim reflexivity
+      -- Use substitute_at_var_bisim_f with Bisim reflexivity
       have hx_eq : UnfoldsToVar x var := heq ▸ hx
       have hy_eq : UnfoldsToVar y var := heq ▸ hy
       exact substitute_at_var_bisim_f (R := R) h_rel hWFrepl hWFx hWFy hx_eq hy_eq

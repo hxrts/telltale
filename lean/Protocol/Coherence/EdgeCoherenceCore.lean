@@ -237,7 +237,7 @@ theorem trace_empty_when_recv_other_sender
   simp only [EdgeCoherent] at hCoh
   obtain ⟨Ls, hLsender, hIsSome⟩ := hCoh (.recv r T L) hRecv
   -- hIsSome : (Consume e.sender (.recv r T L) (lookupD D e)).isSome
-  -- From Consume_other_empty, if trace is non-empty, Consume returns none
+  -- From consume_other_empty, if trace is non-empty, Consume returns none
   cases hTrace : lookupD D e with
   | nil => rfl
   | cons t ts =>

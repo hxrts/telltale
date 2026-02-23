@@ -339,7 +339,7 @@ private theorem proj_subst_rel_eq2_f_comm_sender
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
       (projTrans (GlobalType.comm sender receiver (gSubstBranches branches t G)) role)
       ((projTrans (GlobalType.comm sender receiver branches) role).substitute t (projTrans G role)) := by
-  -- Sender projection stays send; relate branches via transBranches_ProjSubstRel.
+  -- Sender projection stays send; relate branches via trans_branches_proj_subst_rel.
   have hLHS :
       projTrans (GlobalType.comm sender receiver (gSubstBranches branches t G)) role =
         LocalTypeR.send receiver (projTransBranches (gSubstBranches branches t G) role) :=
@@ -362,7 +362,7 @@ private theorem proj_subst_rel_eq2_f_comm_receiver
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
       (projTrans (GlobalType.comm sender receiver (gSubstBranches branches t G)) role)
       ((projTrans (GlobalType.comm sender receiver branches) role).substitute t (projTrans G role)) := by
-  -- Receiver projection stays recv; relate branches via transBranches_ProjSubstRel.
+  -- Receiver projection stays recv; relate branches via trans_branches_proj_subst_rel.
   have hLHS :
       projTrans (GlobalType.comm sender receiver (gSubstBranches branches t G)) role =
         LocalTypeR.recv sender (projTransBranches (gSubstBranches branches t G) role) :=

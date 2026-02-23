@@ -410,7 +410,7 @@ theorem coherence_protocol_renaming_preserved (σ : ProtocolRenaming) (G : GEnv)
   -- Consume preserved by renaming
   have hConsumeRen :
       (Consume e.sender Lrecv (lookupD (renameDEnvPR σ D) e)).isSome := by
-    -- Use Consume_renamePR on the preimage data
+    -- Use consume_rename_pr on the preimage data
     have hCons :=
       consume_rename_pr (σ:=σ) (from_:=sendEp.role) (L:=Lrecv0) (ts:=lookupD D e0)
     -- Rewrite roles/types/traces

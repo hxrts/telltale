@@ -277,16 +277,16 @@ def unbox_Prj {n : Nat} {i : PFin2 n} {α : ITreeTypeVec n} (x : (P_Prj i).Obj �
 
 def instMvQPF_Prj {n : Nat} (i : PFin2 n) : ITreeMvQPF (PrjF i) :=
   ITreeMvQPF.ofPolynomial (P_Prj i) box_Prj unbox_Prj (by
-  -- By definition of `box_Prj` and `unbox_Prj`, they are inverses of each other.
+  -- `box_Prj` and `unbox_Prj` are inverse by construction.
   intros α x
   simp [box_Prj, unbox_Prj];
-  -- Since the first component is PUnit.unit, which is the same as x.1, we can focus on the second component.
+  -- The first component is definitionally `PUnit.unit`; reduce to the function component.
   congr;
-  -- Since the function is defined as taking i and p and returning b i (p.down.down), and p is a ULift of a PLift of i = j, which simplifies to i = j, then p.down.down is just i = j. Therefore, the function simplifies to b i (i = j).
+  -- Extensionality on indices; simplify the transport witness.
   funext j p; simp [P_Prj];
-  -- Since `p` is a `ULift` of a `PLift` of `i = j`, and `ULift` and `PLift` are just type synonyms, we can simplify `p` to `i = j`.
+  -- Unpack the lifted equality witness.
   obtain ⟨p_eq⟩ := p.down.down;
   congr) (by
-  -- The identity function is its own inverse.
+  -- The reverse composite is definitional.
   simp [unbox_Prj, box_Prj]) (by
   exact fun α β f a => rfl)

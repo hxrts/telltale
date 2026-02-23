@@ -132,7 +132,7 @@ theorem select_step_decreases
     simp only [hdepthSelect] at h
     -- h : sumDepths (s.updateType actor L) + (1 + depthList branches) = sumDepths s + L.depth
     -- We need: sumDepths (s.updateType actor L) + L.depth + 1 ≤ sumDepths s + L.depth
-    -- From depthList_mem_le: L.depth ≤ depthList branches
+    -- From depth_list_mem_le: L.depth ≤ depthList branches
     have hle := LocalType.depth_list_mem_le ℓ L branches hmem
     omega
   -- Bound on buffer increase

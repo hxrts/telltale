@@ -220,7 +220,7 @@ theorem substitute_closed_when_only_var (lt : LocalTypeR) (varName : String) (re
   -- Show the list is empty by proving no element can be in it
   rw [List.eq_nil_iff_forall_not_mem]
   intro x hx
-  -- By freeVars_substitute_subset, x ∈ repl.freeVars ∨ (x ∈ lt.freeVars ∧ x ≠ varName)
+  -- By free_vars_substitute_subset, x ∈ repl.freeVars ∨ (x ∈ lt.freeVars ∧ x ≠ varName)
   have hsub := free_vars_substitute_subset lt varName repl x hx
   cases hsub with
   | inl hrepl_mem =>

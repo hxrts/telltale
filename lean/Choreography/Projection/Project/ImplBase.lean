@@ -286,7 +286,7 @@ private theorem c_project_implies_eq2_trans_nonpart_left (g : GlobalType) (role 
 private theorem c_project_implies_eq2_trans_nonpart_right (g : GlobalType) (role : String)
     (lt : LocalTypeR) (hnotpart : ¬part_of2 role g) (hwf : g.wellFormed = true)
     (hlt_end : EQ2 lt .end) : EQ2 lt (trans g role) := by
-  -- Chain EQ2 lt .end with EQ_end for trans.
+  -- Chain EQ2 lt .end with eq_end for trans.
   have hend_trans := eq_end role g hnotpart hwf
   exact eq2_trans_via_end hlt_end hend_trans
 
@@ -304,7 +304,7 @@ private theorem c_project_implies_eq2_trans_nonpart (g : GlobalType) (role : Str
       -- Contradiction: part_of_all2 implies part_of2.
       exact (c_project_implies_eq2_trans_nonpart_left g role hnotpart hwf hpart_all).elim
   | inr hlt_end =>
-      -- Chain EQ2 lt .end with EQ_end.
+      -- Chain EQ2 lt .end with eq_end.
       exact c_project_implies_eq2_trans_nonpart_right g role lt hnotpart hwf hlt_end
 
 /-! ## Main Theorem: CProject_implies_EQ2_trans

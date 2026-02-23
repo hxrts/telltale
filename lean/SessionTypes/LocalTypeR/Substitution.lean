@@ -235,7 +235,7 @@ theorem is_guarded_substitute_other (body : LocalTypeR) (t v : String) (e : Loca
   intro _ hguard hclosed
   exact is_guarded_substitute body t v e hguard hclosed
 
--- NOTE: isContractive_substitute_mu is proved in LocalTypeRDBBridge.lean
+-- NOTE: is_contractive_substitute_mu is proved in LocalTypeRDBBridge.lean
 
 /-! ## Contractiveness Under Substitution -/
 

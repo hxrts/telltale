@@ -203,7 +203,7 @@ theorem bisim_rel_postfixpoint (bound : Nat) :
   simp only [Paco.Rel.sup_bot]
   -- Case split on BisimRel disjunction
   rcases h with hcore | heq
-  -- `BisimRel_postfixpoint`: EQ2C Branch
+  -- `bisim_rel_postfixpoint`: EQ2C Branch
   -- Case 1: EQ2C (including visited pairs via hvisited)
   case inr =>
     -- EQ2C is a post-fixpoint, lift to BisimRel by monotonicity
@@ -213,7 +213,7 @@ theorem bisim_rel_postfixpoint (bound : Nat) :
     -- EQ2C ⊆ BisimRel (right disjunct)
     have hEQ2C_le : EQ2C ≤ BisimRel bound := fun x y hxy => Or.inr hxy
     exact observable_rel_c_mono hEQ2C_le hrel
-  -- `BisimRel_postfixpoint`: Core Checker Branch
+  -- `bisim_rel_postfixpoint`: Core Checker Branch
   -- Case 2: BisimRelCore (bisimAux returns true)
   case inl =>
     rcases hcore with ⟨fuel, visited, hvisited, hbisim⟩
@@ -238,7 +238,7 @@ theorem bisim_rel_postfixpoint (bound : Nat) :
           simp only [hmem, ↓reduceIte] at hbisim
           have ⟨hobs, hchildren⟩ := Bool.and_eq_true_iff.mp hbisim
           have ⟨k, hk1, hk2⟩ := obs_match_true_implies_same_kind hobs
-          -- `BisimRel_postfixpoint`: Observable Kind Split
+          -- `bisim_rel_postfixpoint`: Observable Kind Split
           -- Case split on observable kind k
           match k with
           | .obs_end =>
@@ -288,7 +288,7 @@ theorem bisim_aux_sound {fuel bound : Nat} {visited : Finset (LocalTypeC × Loca
   -- Show p is in BisimRel bound via BisimRelCore (left disjunct)
   have hCore : BisimRelCore bound p.1 p.2 := ⟨fuel, visited, hvisited, hbisim⟩
   have hBisim : BisimRel bound p.1 p.2 := Or.inl hCore
-  -- Use paco coinduction: BisimRel_postfixpoint shows BisimRel is a post-fixpoint
+  -- Use paco coinduction: bisim_rel_postfixpoint shows BisimRel is a post-fixpoint
   -- By paco_coind', BisimRel ≤ paco EQ2CMono ⊥ = EQ2C_paco
   have hle : BisimRel bound ≤ EQ2C_paco :=
     Paco.paco_coind' EQ2CMono ⊥ (BisimRel bound) (bisim_rel_postfixpoint bound)
@@ -348,7 +348,7 @@ lemma obs_match_of_eq2_c {a b : LocalTypeC} {bound : Nat}
   rcases heq with ⟨R, hR, hab⟩
   obtain ⟨obs_a, obs_b, hrel⟩ := hR a b hab
   cases hrel with
-  -- `obsMatch_of_EQ2C`: End Case
+  -- `obs_match_of_eq2_c`: End Case
   | is_end ha hb =>
       rcases ha with ⟨ua, hunf_a, hhead_a⟩
       rcases hb with ⟨ub, hunf_b, hhead_b⟩
@@ -361,7 +361,7 @@ lemma obs_match_of_eq2_c {a b : LocalTypeC} {bound : Nat}
         have := head_full_unfold_n_eq_of_unfolds_to_c (bound := bound) hunf_b hnomu obs_b hbound.2
         simpa [hhead_b] using this
       simp [obsMatch, obsKindOf, hhead_a', hhead_b']
-  -- `obsMatch_of_EQ2C`: Var Case
+  -- `obs_match_of_eq2_c`: Var Case
   | is_var v ha hb =>
       rcases ha with ⟨ua, hunf_a, hhead_a⟩
       rcases hb with ⟨ub, hunf_b, hhead_b⟩
@@ -374,7 +374,7 @@ lemma obs_match_of_eq2_c {a b : LocalTypeC} {bound : Nat}
         have := head_full_unfold_n_eq_of_unfolds_to_c (bound := bound) hunf_b hnomu obs_b hbound.2
         simpa [hhead_b] using this
       simp [obsMatch, obsKindOf, hhead_a', hhead_b']
-  -- `obsMatch_of_EQ2C`: Send Case
+  -- `obs_match_of_eq2_c`: Send Case
   | is_send p bs cs ha hb hbr =>
       rcases ha with ⟨ua, labels_a, hunf_a, hhead_a, hbs_a⟩
       rcases hb with ⟨ub, labels_b, hunf_b, hhead_b, hbs_b⟩
@@ -397,7 +397,7 @@ lemma obs_match_of_eq2_c {a b : LocalTypeC} {bound : Nat}
           _ = labelsOfBranches cs := labels_of_branches_eq_of_branches_rel_c hbr
           _ = labels_b := hlabels_b
       simp [obsMatch, obsKindOf, hhead_a', hhead_b', hlabels_eq]
-  -- `obsMatch_of_EQ2C`: Recv Case
+  -- `obs_match_of_eq2_c`: Recv Case
   | is_recv p bs cs ha hb hbr =>
       rcases ha with ⟨ua, labels_a, hunf_a, hhead_a, hbs_a⟩
       rcases hb with ⟨ub, labels_b, hunf_b, hhead_b, hbs_b⟩

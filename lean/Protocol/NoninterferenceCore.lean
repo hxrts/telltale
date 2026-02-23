@@ -390,7 +390,7 @@ theorem blind_step_preserves_c_equiv_single {C C' : Config}
         apply lookup_buf_dequeue_buf_ne hDq
         intro heq
         simp only [Edge.mk.injEq] at heq
-        -- lookupBuf_dequeueBuf_ne has e' ≠ e, so heq.2.2 : r = e.role
+        -- lookup_buf_dequeue_buf_ne has e' ≠ e, so heq.2.2 : r = e.role
         exact hb.2 heq.2.2
       · -- Traces to r unchanged
         intro sender'
@@ -398,7 +398,7 @@ theorem blind_step_preserves_c_equiv_single {C C' : Config}
         apply lookup_d_update_neq
         intro heq
         simp only [Edge.mk.injEq] at heq
-        -- lookupD_update_neq has e ≠ e', so heq : e.sid = s ∧ ... ∧ e.role = r
+        -- lookup_d_update_neq has e ≠ e', so heq : e.sid = s ∧ ... ∧ e.role = r
         exact hb.2 heq.2.2.symm
     · -- Different session
       unfold CEquiv
@@ -409,11 +409,11 @@ theorem blind_step_preserves_c_equiv_single {C C' : Config}
       constructor
       · intro sender'; apply Eq.symm
         apply lookup_buf_dequeue_buf_ne hDq; intro heq
-        -- lookupBuf_dequeueBuf_ne has e' ≠ e, so heq : s = e.sid ∧ ...
+        -- lookup_buf_dequeue_buf_ne has e' ≠ e, so heq : s = e.sid ∧ ...
         have hs : e.sid = s := (congrArg Edge.sid heq).symm
         exact hsid hs
       · intro sender'; apply Eq.symm; apply lookup_d_update_neq; intro heq
-        -- lookupD_update_neq has e ≠ e', so heq : e.sid = s ∧ ...
+        -- lookup_d_update_neq has e ≠ e', so heq : e.sid = s ∧ ...
         have hs : e.sid = s := congrArg Edge.sid heq
         exact hsid hs
   -- Blind-step Theorem: New Session Case

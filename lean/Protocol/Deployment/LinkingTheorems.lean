@@ -22,7 +22,7 @@ theorem merge_bufs_typed (G₁ G₂ : GEnv) (D₁ D₂ : DEnv) (B₁ B₂ : Buff
     (hConsB₁ : BConsistent G₁ B₁)
     (hDom₁ : BufsDom B₁ D₁) :
     BuffersTyped (mergeGEnv G₁ G₂) (mergeDEnv D₁ D₂) (mergeBufs B₁ B₂) := by
-  -- mergeBufs_typed: Case Split on Left Trace Presence
+  -- merge_bufs_typed: Case Split on Left Trace Presence
   intro e
   cases hFindD₁ : D₁.find? e with
   | none =>
@@ -63,7 +63,7 @@ theorem merge_bufs_typed (G₁ G₂ : GEnv) (D₁ D₂ : DEnv) (B₁ B₂ : Buff
 /- ## Structured Block 2 -/
                   (lookup_g_append_left (G₁ := G₁) (G₂ := G₂) (e := ep) (L := L) hLookup))
             simpa [BufferTyped, hTraceEq, hBufEq] using hBT₁'
-  -- mergeBufs_typed: Left Trace Present Case
+  -- merge_bufs_typed: Left Trace Present Case
   | some ts₁ =>
       have hB₁_not_none : B₁.lookup e ≠ none := by
         intro hNone
@@ -176,7 +176,7 @@ private theorem head_coherent_merge_link {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
           | _ => True := by
         simpa [HeadCoherent, hLeft] using hHeadLeft
       simpa [HeadCoherent, hGrecv, hTraceEq] using hHeadLeft'
-  -- HeadCoherent_merge: Receiver-Origin in Right Component
+  -- head_coherent_merge: Receiver-Origin in Right Component
   | inr hRight =>
       have hSid : e.sid ∈ SessionsOf G₂ :=
         ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hRight.2, rfl⟩
@@ -276,7 +276,7 @@ theorem link_preserves_wt_mon_full (p₁ p₂ : DeployedProtocol)
   · -- coherent
 /- ## Structured Block 6 -/
     simpa [composeMonitorState] using link_ok_full_coherent p₁ p₂ hLink
-  · -- headCoherent
+  · -- head_coherent
     simpa [composeMonitorState] using
       head_coherent_merge_link hWT₁.headCoherent hWT₂.headCoherent hDisjG
         p₁.dConsistent_cert p₂.dConsistent_cert
@@ -290,7 +290,7 @@ theorem link_preserves_wt_mon_full (p₁ p₂ : DeployedProtocol)
         p₁.initBufs p₂.initBufs
         hWT₁.buffers_typed hWT₂.buffers_typed
         hDisjG p₂.dConsistent_cert p₁.bConsistent_cert p₁.bufsDom_cert
-  -- link_preserves_WTMon_full: Linear-Context Obligations
+  -- link_preserves_wt_mon_full: Linear-Context Obligations
   · -- lin_valid
     intro e S hMem
     simpa [composeMonitorState] using
@@ -313,7 +313,7 @@ theorem link_preserves_wt_mon_full (p₁ p₂ : DeployedProtocol)
               rw [← hEmpty]
               exact hInter
             exact this.elim)
-  -- link_preserves_WTMon_full: Supply Freshness Obligations
+  -- link_preserves_wt_mon_full: Supply Freshness Obligations
   · -- supply_fresh (Lin)
     intro e S hMem
     have hMem' : (e, S) ∈ p₁.initMonitorState.Lin ++ p₂.initMonitorState.Lin := by

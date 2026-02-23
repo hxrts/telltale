@@ -133,7 +133,7 @@ theorem coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
   intro e hActive
   -- Case split: is ep the receiver of e?
   by_cases hRecv : ep = { sid := e.sid, role := e.receiver }
-  · -- ep is the receiver: use EdgeCoherent_type_replacement
+  · -- ep is the receiver: use edge_coherent_type_replacement
     subst hRecv
     have hActivePre : ActiveEdge G e := by
       -- ActiveEdge after update implies ActiveEdge before (receiver was already there)
@@ -148,7 +148,7 @@ theorem coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
       exact hRecv hEq.symm
     intro Lrecv hLookupRecv'
     rw [hLookupRecv] at hLookupRecv'
-    -- Coherent_type_replacement: Sender Match vs Unrelated Split
+    -- coherent_type_replacement: Sender Match vs Unrelated Split
     -- Case split on whether ep is the sender
     by_cases hSend : ep = { sid := e.sid, role := e.sender }
     · -- ep is sender: sender changes but receiver and trace unchanged
@@ -168,7 +168,7 @@ theorem coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
       constructor
       · subst hSend; exact lookupG_updateG_eq
       · exact hConsume
-    -- Coherent_type_replacement: Unrelated Endpoint Case
+    -- coherent_type_replacement: Unrelated Endpoint Case
     · -- ep is neither sender nor receiver: both unchanged
       have hLookupSendUnch : lookupG (updateG G ep L₂) { sid := e.sid, role := e.sender } =
           lookupG G { sid := e.sid, role := e.sender } := by

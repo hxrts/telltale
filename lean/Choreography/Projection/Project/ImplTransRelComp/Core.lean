@@ -71,7 +71,7 @@ private theorem branches_rel_trans_chain_head {R : Rel}
     (hWFb : LocalTypeR.WellFormed lb_cs.2.2)
     (hWFc : LocalTypeR.WellFormed lb_ds.2.2) :
     lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
-  -- Combine labels and chain the continuation relation through hextend or EQ2_trans_wf.
+  -- Combine labels and chain the continuation relation through hextend or eq2_trans_wf.
   constructor
   · exact h1.1.trans h2.1
   · cases h1.2 with
@@ -88,7 +88,7 @@ theorem branches_rel_trans_chain_rev_head {R : Rel}
     (hWFb : LocalTypeR.WellFormed lb_cs.2.2)
     (hWFc : LocalTypeR.WellFormed lb_ds.2.2) :
     lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
-  -- Combine labels and chain the continuation relation through hextend or EQ2_trans_wf.
+  -- Combine labels and chain the continuation relation through hextend or eq2_trans_wf.
   constructor
   · exact h1.1.trans h2.1
   · cases h2.2 with
@@ -238,7 +238,7 @@ theorem c_project_trans_rel_postfix_mu_closure
     {v : String} {lbody t' : LocalTypeR}
     (hmu_rel : CProjectTransRel (LocalTypeR.mu v lbody) (LocalTypeR.mu v t')) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.mu v lbody) (LocalTypeR.mu v t') := by
-  -- Build EQ2_closure witnesses using EQ2_refl on both mu sides.
+  -- Build EQ2_closure witnesses using eq2_refl on both mu sides.
   simp [EQ2F, EQ2_closure]
   have heq_unfold_left : EQ2 ((LocalTypeR.mu v lbody).unfold) (LocalTypeR.mu v lbody) := by
     have hrefl := EQ2_refl (LocalTypeR.mu v lbody)

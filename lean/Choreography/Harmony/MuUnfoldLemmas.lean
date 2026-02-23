@@ -244,7 +244,7 @@ theorem eq2_mu_unguarded_to_end'
   rw [proj_subst inner t G role hGclosed] at hL
   -- Now hL says: ((projTrans inner role).substitute t (projTrans G role)).isGuarded s = true
   -- But since (projTrans inner role).isGuarded s = false and s ≠ t,
-  -- by isGuarded_false_substitute_preserved, the substituted term also has isGuarded s = false.
+  -- by is_guarded_false_substitute_preserved, the substituted term also has isGuarded s = false.
   have hcontra := is_guarded_false_substitute_preserved
     (projTrans inner role) t s (projTrans G role) (Ne.symm hst) hR_pre
   -- hcontra: ((projTrans inner role).substitute t (projTrans G role)).isGuarded s = false
@@ -273,7 +273,7 @@ theorem eq2_end_to_mu_unguarded'
   -- For closed local types, all variables are guarded
   have hProjGguarded : (projTrans G role).isGuarded s = true :=
     is_guarded_of_closed (projTrans G role) s hProjGclosed
-  -- By isGuarded_substitute (LocalTypeR.lean:1242), guardedness is preserved under substitution
+  -- By is_guarded_substitute (LocalTypeR.lean:1242), guardedness is preserved under substitution
   -- when the replacement is closed.
   have hSubstGuarded : ((projTrans inner role).substitute t (projTrans G role)).isGuarded s = true :=
     is_guarded_substitute (projTrans inner role) t s (projTrans G role) hR hProjGclosed

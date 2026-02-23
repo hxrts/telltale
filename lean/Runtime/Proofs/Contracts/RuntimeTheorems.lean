@@ -370,7 +370,7 @@ theorem wp_lift_step_with_cost_holds : wp_lift_step_with_cost := by
     next h => exact absurd hAfford h
   · -- Budget conservation: (budget - cost) + cost = budget
     exact Nat.sub_add_cancel hAfford
-  · -- Strict decrease: stepCost ≥ 1 from CostModel invariants
+  · -- Strict decrease: step_cost ≥ 1 from CostModel invariants
     show coro.costBudget - cfg.costModel.stepCost i < coro.costBudget
     have hCost : cfg.costModel.stepCost i ≥ 1 :=
       Nat.le_trans cfg.costModel.hMinPos (cfg.costModel.hMinCost i hNotHalt)

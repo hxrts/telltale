@@ -373,7 +373,7 @@ theorem eq2_c_project_trans_rel_eq2_compose
     (heq1 : EQ2 a b) (hrel : CProjectTransRel b b') (heq2 : EQ2 b' c)
     (hWFa : LocalTypeR.WellFormed a) (hWFc : LocalTypeR.WellFormed c) :
     EQ2F (EQ2_closure CProjectTransRelComp) a c := by
-  -- Use trans_eq_of_CProject to collapse the middle CProjectTransRel witness
+  -- Use trans_eq_of_c_project to collapse the middle CProjectTransRel witness
   have hWFb : LocalTypeR.WellFormed b := c_project_trans_rel_wf_left hrel
   rcases hrel with ⟨g, role, hproj, htrans, hwf⟩
   have hne : g.allCommsNonEmpty = true := by

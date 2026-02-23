@@ -160,7 +160,7 @@ theorem SessionStore.to_g_env_update_type {store : SessionStore ν} {e : Endpoin
       obtain ⟨sid, st⟩ := hd
       by_cases hsid : sid = e.sid
 
-      -- `toGEnv_updateType`: matching session-id case
+      -- `to_g_env_update_type`: matching session-id case
 
       · simp only [SessionStore.updateType, hsid, ↓reduceIte]
         simp only [SessionStore.toGEnv, List.foldl]
@@ -179,7 +179,7 @@ theorem SessionStore.to_g_env_update_type {store : SessionStore ν} {e : Endpoin
         simp only [SessionState.updateType]
         by_cases he' : e' = e
 
-        -- `toGEnv_updateType`: matched endpoint
+        -- `to_g_env_update_type`: matched endpoint
 
         · have hLeft : lookupG (updateG st.localTypes e L ++ SessionStore.toGEnv tl) e' = some L := by
             rw [he']
@@ -220,7 +220,7 @@ theorem SessionStore.to_g_env_update_type {store : SessionStore ν} {e : Endpoin
                 (e := e') (L := T) hSome']
           exact hL.trans (by simpa using hR.symm)
 
-        -- `toGEnv_updateType`: unmatched endpoint
+        -- `to_g_env_update_type`: unmatched endpoint
 
       · have hMem' : ∃ st', (e.sid, st') ∈ tl := by
           obtain ⟨st', hst'⟩ := hMem
@@ -340,7 +340,7 @@ theorem SessionStore.to_d_env_update_trace {store : SessionStore ν} {edge : Edg
       obtain ⟨sid, st⟩ := hd
       by_cases hsid : sid = edge.sid
 
-      -- `toDEnv_updateTrace`: matching session-id case
+      -- `to_d_env_update_trace`: matching session-id case
 
       · simp only [SessionStore.updateTrace, hsid, ↓reduceIte]
         simp only [SessionStore.toDEnv, List.foldl]
@@ -363,7 +363,7 @@ theorem SessionStore.to_d_env_update_trace {store : SessionStore ν} {edge : Edg
         exact lookup_d_update_d_union (D1 := st.traces) (D2 := SessionStore.toDEnv tl)
           (edge := edge) (edge' := edge') (ts := ts)
 
-      -- `toDEnv_updateTrace`: non-matching session-id case
+      -- `to_d_env_update_trace`: non-matching session-id case
 
       · have hMem' : ∃ st', (edge.sid, st') ∈ tl := by
           obtain ⟨st', hst'⟩ := hMem

@@ -81,7 +81,7 @@ theorem trace_length_le_depth_of_coherent {G : GEnv} {D : DEnv} {e : Edge}
     {Lrecv : LocalType} (hCoh : Coherent G D) (hActive : ActiveEdge G e)
     (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
     (lookupD D e).length ≤ Lrecv.depth := by
-  -- Extract Consume witness from coherence and apply Consume_length_le_depth.
+  -- Extract Consume witness from coherence and apply consume_length_le_depth.
   have hEdge := hCoh e hActive Lrecv hGrecv
   rcases hEdge with ⟨_, _hGsender, hConsume⟩
   rcases (Option.isSome_iff_exists).1 hConsume with ⟨L', hConsume'⟩

@@ -366,7 +366,7 @@ theorem SessionStore.update_type_preserves_consistent {store : SessionStore ν} 
     simp only [SessionStore.updateType] at hMemUpdated
     by_cases hsid : sid' = e.sid
 
-    -- `updateType_preserves_consistent`: matching sid case
+    -- `update_type_preserves_consistent`: matching sid case
 
     · -- Found the session to update
       simp only [hsid, ↓reduceIte] at hMemUpdated
@@ -394,7 +394,7 @@ theorem SessionStore.update_type_preserves_consistent {store : SessionStore ν} 
           hCons sid'' st'' (List.Mem.tail _ h)
         exact hTlCons sid st hmem
 
-    -- `updateType_preserves_consistent`: non-matching sid case
+    -- `update_type_preserves_consistent`: non-matching sid case
 
     · -- Not the session to update
       simp only [hsid, ↓reduceIte] at hMemUpdated
@@ -437,7 +437,7 @@ theorem SessionStore.update_trace_preserves_consistent {store : SessionStore ν}
     simp only [SessionStore.updateTrace] at hMemUpdated
     by_cases hsid : sid' = edge.sid
 
-    -- `updateTrace_preserves_consistent`: matching sid case
+    -- `update_trace_preserves_consistent`: matching sid case
 
     · -- Found the session to update
       simp only [hsid, ↓reduceIte] at hMemUpdated
@@ -462,7 +462,7 @@ theorem SessionStore.update_trace_preserves_consistent {store : SessionStore ν}
           hCons sid'' st'' (List.Mem.tail _ h)
         exact hTlCons sid st hmem
 
-    -- `updateTrace_preserves_consistent`: non-matching sid case
+    -- `update_trace_preserves_consistent`: non-matching sid case
 
     · -- Not the session to update
       simp only [hsid, ↓reduceIte] at hMemUpdated

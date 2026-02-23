@@ -213,7 +213,7 @@ lemma index_of_append_suffix {pref ctx : Context} {x v : String} {j : Nat}
       rw [empty_append_eq] at hj
       -- hj : (cons x ctx).indexOf v = some j, hjgt : j > 0
       -- Since v ≠ x, v must be found in ctx at position j - 1
-      -- indexOf_cons_ne requires x ≠ v (the element at cons position ≠ the lookup key)
+      -- index_of_cons_ne requires x ≠ v (the element at cons position ≠ the lookup key)
       rw [NameOnlyContext.index_of_cons_ne ctx (Ne.symm hvx)] at hj
       -- hj : Option.map Nat.succ (ctx.indexOf v) = some j
       cases hctx : NameOnlyContext.indexOf ctx v with

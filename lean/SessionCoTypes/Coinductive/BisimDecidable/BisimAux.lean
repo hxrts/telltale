@@ -252,7 +252,7 @@ lemma obs_match_send_bisim_all_to_branches_rel_c {n : Nat} {a b : LocalTypeC}
       exact this
     omega
   apply bisim_all_to_branches_rel_c hlen
-  -- `obsMatch_send_bisimAll_to_BranchesRelC`: Label Alignment
+  -- `obs_match_send_bisim_all_to_branches_rel_c`: Label Alignment
   · intro i
     have hlen_a : bs.length = labels.length := by
       have := congrArg List.length hlabels_a
@@ -288,7 +288,7 @@ lemma obs_match_send_bisim_all_to_branches_rel_c {n : Nat} {a b : LocalTypeC}
         simp [j, j_map]
       exact hmap'.trans hmap_get_b
     exact hget_a.trans hget_b.symm
-  -- `obsMatch_send_bisimAll_to_BranchesRelC`: Child Relation
+  -- `obs_match_send_bisim_all_to_branches_rel_c`: Child Relation
   · intro i
     -- Children are in BisimRel: extract from bisimAll on nextPairs
     simp only [nextPairs, zipChildren, bisimAll, List.all_eq_true] at hchildren
@@ -351,7 +351,7 @@ lemma obs_match_recv_bisim_all_to_branches_rel_c {n : Nat} {a b : LocalTypeC}
       exact this
     omega
   apply bisim_all_to_branches_rel_c hlen
-  -- `obsMatch_recv_bisimAll_to_BranchesRelC`: Label Alignment
+  -- `obs_match_recv_bisim_all_to_branches_rel_c`: Label Alignment
   · intro i
     have hlen_a : bs.length = labels.length := by
       have := congrArg List.length hlabels_a
@@ -386,7 +386,7 @@ lemma obs_match_recv_bisim_all_to_branches_rel_c {n : Nat} {a b : LocalTypeC}
         simp [j, j_map]
       exact hmap'.trans hmap_get_b
     exact hget_a.trans hget_b.symm
-  -- `obsMatch_recv_bisimAll_to_BranchesRelC`: Child Relation
+  -- `obs_match_recv_bisim_all_to_branches_rel_c`: Child Relation
   · intro i
     -- Children are in BisimRel (same proof as send case)
     simp only [nextPairs, zipChildren, bisimAll, List.all_eq_true] at hchildren

@@ -54,7 +54,7 @@ private theorem c_project_trans_rel_postfix_comm_send_nonpart
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.send partner lbs) t := by
-  -- Non-participant send: use the extracted comm witness from CProject_send_implies_trans_send.
+  -- Non-participant send: use the extracted comm witness from c_project_send_implies_trans_send.
   have hexists := c_project_send_implies_trans_send
     (GlobalType.comm sender receiver gbs) role partner lbs hproj hwf
   obtain ⟨gbs', htrans_send, hbranches', hwf_gbs'⟩ := hexists
@@ -91,7 +91,7 @@ private theorem c_project_trans_rel_postfix_comm_recv_nonpart
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.recv partner lbs) t := by
-  -- Non-participant recv: use the extracted comm witness from CProject_recv_implies_trans_recv.
+  -- Non-participant recv: use the extracted comm witness from c_project_recv_implies_trans_recv.
   have hexists := c_project_recv_implies_trans_recv
     (GlobalType.comm sender receiver gbs) role partner lbs hproj hwf
   obtain ⟨gbs', htrans_recv, hbranches', hwf_gbs'⟩ := hexists
@@ -147,7 +147,7 @@ private theorem c_project_trans_rel_postfix_comm_end
     (hne : (GlobalType.comm sender receiver gbs).allCommsNonEmpty = true)
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role) :
     EQ2F (EQ2_closure CProjectTransRelComp) LocalTypeR.end t := by
-  -- Non-participant projecting to .end via CProject_end_trans_end.
+  -- Non-participant projecting to .end via c_project_end_trans_end.
   have htrans_end := c_project_end_trans_end (GlobalType.comm sender receiver gbs) role hproj hne
   subst htrans
   rw [htrans_end]
@@ -160,7 +160,7 @@ private theorem c_project_trans_rel_postfix_comm_var
     (hne : (GlobalType.comm sender receiver gbs).allCommsNonEmpty = true)
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.var v) t := by
-  -- Non-participant projecting to .var via CProject_var_trans_var.
+  -- Non-participant projecting to .var via c_project_var_trans_var.
   have htrans_var := c_project_var_trans_var (GlobalType.comm sender receiver gbs) role v hproj hne
   subst htrans
   rw [htrans_var]

@@ -60,25 +60,25 @@ theorem typed_step_preserves_coherence {G D Ssh Sown store bufs P G' D' Sown' st
     Coherent G D →
     Coherent G' D'
   | @TypedStep.send G D Ssh Sown store bufs k x e target T L v sendEdge Gout Dout bufsOut hk hx hG hS hv hRecvReady hEdge hGout hDout hBufsOut, hCoh => by
-    -- Use Coherent_send_preserved with explicit arguments
+    -- Use coherent_send_preserved with explicit arguments
     -- After rewriting with the equalities, Gout = updateG G e L and Dout = appendD D sendEdge T
     rw [hGout, hDout, hEdge]
     unfold appendD
     exact @coherent_send_preserved G D e target T L hCoh hG hRecvReady
   | @TypedStep.recv G D Ssh Sown store bufs k x e source T L v vs recvEdge Gout Dout SownOut storeOut bufsOut hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut, hCoh => by
-    -- Use Coherent_recv_preserved with explicit arguments
+    -- Use coherent_recv_preserved with explicit arguments
     rw [hGout, hDout]
     have hTrace' : (lookupD D { sid := e.sid, sender := source, receiver := e.role }).head? = some T := by
       rw [← hEdge]; exact hTrace
     rw [hEdge]
     exact @coherent_recv_preserved G D e source T L hCoh hG hTrace'
   | @TypedStep.select G D Ssh Sown store bufs k ℓ e target bs L selectEdge Gout Dout bufsOut hk hG hFind hTargetReady hEdge hGout hDout hBufsOut, hCoh => by
-    -- Use Coherent_select_preserved with explicit arguments
+    -- Use coherent_select_preserved with explicit arguments
     rw [hGout, hDout, hEdge]
     unfold appendD
     exact @coherent_select_preserved G D e target bs ℓ L hCoh hG hFind hTargetReady
   | @TypedStep.branch G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge Gout Dout bufsOut hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut, hCoh => by
-    -- Use Coherent_branch_preserved with explicit arguments
+    -- Use coherent_branch_preserved with explicit arguments
     have hTrace' : (lookupD D { sid := e.sid, sender := source, receiver := e.role }).head? = some .string := by
       rw [← hEdge]; exact hTrace
     rw [hGout, hDout, hEdge]

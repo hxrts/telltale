@@ -93,7 +93,7 @@ private theorem buffer_typed_weaken_g {G G' : GEnv} {D : DEnv} {bufs : Buffers} 
     BufferTyped G D bufs e →
     (∀ ep L, lookupG G ep = some L → lookupG G' ep = some L) →
     BufferTyped G' D bufs e := by
-  -- Lift each value typing using HasTypeVal_mono.
+  -- Lift each value typing using has_type_val_mono.
   intro hBT hMono
   rcases hBT with ⟨hLen, hTyping⟩
   refine ⟨hLen, ?_⟩
@@ -117,7 +117,7 @@ private theorem buffer_typed_rewrite_d {G : GEnv} {D D' : DEnv} {bufs : Buffers}
 private theorem buffer_typed_lift_left {G₁ G₂ : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge} :
     BufferTyped G₁ D bufs e →
     BufferTyped (G₁ ++ G₂) D bufs e := by
-  -- Use lookupG_append_left to lift HasTypeVal.
+  -- Use lookup_g_append_left to lift HasTypeVal.
   intro hBT
   apply buffer_typed_weaken_g hBT
   intro ep L hLookup

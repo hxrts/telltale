@@ -77,7 +77,7 @@ theorem coherent_select_preserved
             (Consume selectorEp.role L' [.string]).isSome) :
     let selectEdge := { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole : Edge }
     Coherent (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string])) := by
-  -- Similar structure to Coherent_send_preserved, with .string for labels
+  -- Similar structure to coherent_send_preserved, with .string for labels
   intro selectEdge e hActive
   have hActiveOrig : ActiveEdge G e :=
     active_edge_update_g_inv (G:=G) (e:=e) (ep:=selectorEp) (L:=L) hActive (by simp [hG])
@@ -232,7 +232,7 @@ theorem coherent_branch_preserved
     (hTrace : (lookupD D { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role }).head? = some .string) :
     let branchEdge := { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role : Edge }
     Coherent (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail) := by
-  -- Similar structure to Coherent_recv_preserved, adapted for branch/select
+  -- Similar structure to coherent_recv_preserved, adapted for branch/select
   intro branchEdge e hActive
   have hActiveOrig : ActiveEdge G e :=
     active_edge_update_g_inv (G:=G) (e:=e) (ep:=brancherEp) (L:=L) hActive (by simp [hG])

@@ -229,7 +229,7 @@ theorem store_typed_strong_assign_update
     (hNone : lookupSEnv Ssh x = none)
     (hv : HasTypeVal G v T) :
     StoreTypedStrong G (SEnvAll Ssh (updateSEnv Sown x T)) (updateStr store x v) := by
-  -- Same-domain updates pointwise; typing uses StoreTyped_assign_preserved.
+  -- Same-domain updates pointwise; typing uses store_typed_assign_preserved.
   refine ⟨?_, ?_⟩
   ·
     have hDom := store_typed_strong_same_domain_update (S:=SEnvAll Ssh Sown) (store:=store)
@@ -249,7 +249,7 @@ theorem store_typed_strong_recv_update
     (hNone : lookupSEnv Ssh x = none)
     (hv : HasTypeVal G v T) :
     StoreTypedStrong (updateG G e L) (SEnvAll Ssh (updateSEnv Sown x T)) (updateStr store x v) := by
-  -- Same-domain updates pointwise; typing uses StoreTyped_recv_preserved.
+  -- Same-domain updates pointwise; typing uses store_typed_recv_preserved.
   refine ⟨?_, ?_⟩
   ·
     have hDom := store_typed_strong_same_domain_update (S:=SEnvAll Ssh Sown) (store:=store)

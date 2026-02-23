@@ -105,7 +105,7 @@ theorem edge_coherent_update_g_irrelevant (G : GEnv) (D : DEnv) (e : Edge)
     EdgeCoherent (updateG G ep L) D e := by
   simp only [EdgeCoherent] at hCoh ⊢
   intro Lrecv hGrecv
-  -- Use lookupG_update_neq since ep is different from both endpoints
+  -- Use lookup_g_update_neq since ep is different from both endpoints
   have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv := by
     simpa [lookup_g_update_neq _ _ _ _ hNeRecv] using hGrecv
   obtain ⟨Lsender, hGsender, hConsume⟩ := hCoh Lrecv hGrecv'
@@ -121,7 +121,7 @@ theorem edge_coherent_update_d_irrelevant (G : GEnv) (D : DEnv) (e e' : Edge)
     EdgeCoherent G (updateD D e' ts) e := by
   simp only [EdgeCoherent] at hCoh ⊢
   intro Lrecv hGrecv
-  -- Use lookupD_update_neq since e' ≠ e
+  -- Use lookup_d_update_neq since e' ≠ e
   simp only [lookup_d_update_neq _ _ _ _ hNe]
   exact hCoh Lrecv hGrecv
 

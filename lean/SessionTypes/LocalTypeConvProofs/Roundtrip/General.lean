@@ -207,7 +207,7 @@ theorem is_guarded_to_db_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (
           intro heq
           -- heq: j = i + pref.length + 1
           -- Need to derive contradiction by showing j ≤ pref.length or j = pref.length + 1 + k for some k ≠ i
-          -- Use indexOf_append_x_le to show x appears at position ≤ pref.length
+          -- Use index_of_append_x_le to show x appears at position ≤ pref.length
           have ⟨k, hk, hkle⟩ := index_of_append_x_le pref ctx x
           simp only [Context.indexOf] at hk hj
           -- If v = x, then j = k ≤ pref.length < i + pref.length + 1, contradiction
@@ -296,7 +296,7 @@ theorem is_guarded_to_db (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat)
           simp only [LocalTypeDB.isGuarded]
           by_cases hxy : x = y
           · -- Case x = y: variable is shadowed by the mu binder
-            -- Use isGuarded_toDB_shadowed_prefix with empty prefix
+            -- Use is_guarded_to_db_shadowed_prefix with empty prefix
             subst hxy
             have hbody' : body.toDB? (TypeContext.empty ++ (x :: (ctx : List String) : Context)) = some db' := by
               simp only [empty_append_eq, from_list_cons_to_list]
@@ -331,7 +331,7 @@ theorem is_guarded_to_db (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat)
           subst hdb
           simp only [LocalTypeDB.isGuarded, bne_iff_ne, ne_eq]
           -- v ≠ x from hguard, indexOf ctx v = some j, indexOf ctx x = some i
-          -- By indexOf_inj contrapositive, j ≠ i
+          -- By index_of_inj contrapositive, j ≠ i
           have hvx : v ≠ x := by
             simp only [LocalTypeR.isGuarded, bne_iff_ne, ne_eq] at hguard
             exact Ne.symm hguard

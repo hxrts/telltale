@@ -332,7 +332,7 @@ lemma typed_step_preserves_frames_branch
   refine ⟨updateG Gmid eStep Lstep, ?_⟩
   exact update_g_full_eq_update_g_mid hGfull hDisjL hG hGout
 
--- Use HasTypeProcPreOut_frame_G_right/left from Protocol.Typing.Framing.
+-- Use has_type_proc_pre_out_frame_g_right/left from Protocol.Typing.Framing.
 
 
 end

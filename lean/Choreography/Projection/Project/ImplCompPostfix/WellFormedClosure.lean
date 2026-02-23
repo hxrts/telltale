@@ -231,7 +231,7 @@ theorem c_project_trans_rel_comp_postfix_base
     (hbase : CProjectTransRel lt t)
     (hWFa : LocalTypeR.WellFormed lt) (hWFc : LocalTypeR.WellFormed t) :
     EQ2F (EQ2_closure CProjectTransRelCompWF) lt t := by
-  -- Base case: lift CProjectTransRel_postfix into the WF closure.
+  -- Base case: lift c_project_trans_rel_postfix into the WF closure.
   have hbase_f := c_project_trans_rel_postfix lt t hbase
   exact eq2_f_lift_comp_wf hbase_f hWFa hWFc
 

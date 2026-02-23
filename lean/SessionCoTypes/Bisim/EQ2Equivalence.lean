@@ -181,7 +181,7 @@ theorem CanRecv.to_eq2 {a : LocalTypeR} {p : String} {bs : List BranchR}
 /-- Helper: CanRecvD implies EQ2 to the corresponding recv type. -/
 theorem CanRecvD.to_eq2 {a : LocalTypeR} {p : String} {bs : List BranchR}
     (h : CanRecvD a p bs) : EQ2 a (.recv p bs) := by
-  -- Convert the alias to CanRecv, then reuse CanRecv.toEQ2.
+  -- Convert the alias to CanRecv, then reuse CanRecv.to_eq2.
   exact CanRecv.to_eq2 ((can_recv_d_iff_can_recv).1 h)
 
 -- Branch Relation Lifting to EQ2
@@ -209,7 +209,7 @@ theorem BranchesRelBisim.to_eq2 {R : Rel} (hR : ∀ a b, R a b → EQ2 a b)
     - Use the toEQ2 helpers to convert membership predicates to EQ2 proofs
     - Apply eq2_coind -/
 theorem Bisim.to_eq2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
-  -- Use EQ2_coind_upto which allows using EQ2 directly in the post-fixpoint proof
+  -- Use eq2_coind_upto which allows using EQ2 directly in the post-fixpoint proof
   apply eq2_coind_upto (R := Bisim)
   · -- Show: ∀ x y, Bisim x y → EQ2F (EQ2_closure Bisim) x y
     intro x y hBisim
@@ -217,7 +217,7 @@ theorem Bisim.to_eq2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
     have hf : BisimF R x y := hRpost x y hxy
     -- Case on BisimF to determine observable behavior
     cases hf with
-    -- Bisim.toEQ2: End Case
+    -- Bisim.to_eq2: End Case
     | eq_end hx hy =>
       -- Both unfold to end, so both are EQ2 to .end
       have hxeq : EQ2 x .end := UnfoldsToEnd.to_eq2 hx
@@ -227,7 +227,7 @@ theorem Bisim.to_eq2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
       -- Lift EQ2F EQ2 to EQ2F (EQ2_closure Bisim) using monotonicity
       have hf_eq2 : EQ2F EQ2 x y := EQ2.destruct hxy_eq2
       exact EQ2F.mono (fun _ _ h => Or.inr h) x y hf_eq2
-    -- Bisim.toEQ2: Var Case
+    -- Bisim.to_eq2: Var Case
     | eq_var hx hy =>
       -- Both unfold to the same var
       have hxeq : EQ2 x (.var _) := UnfoldsToVar.to_eq2 hx
@@ -235,7 +235,7 @@ theorem Bisim.to_eq2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
       have hxy_eq2 : EQ2 x y := eq2_trans_via_var hxeq (eq2_symm hyeq)
       have hf_eq2 : EQ2F EQ2 x y := EQ2.destruct hxy_eq2
       exact EQ2F.mono (fun _ _ h => Or.inr h) x y hf_eq2
-    -- Bisim.toEQ2: Send Case
+    -- Bisim.to_eq2: Send Case
     | @eq_send _ _ partner bsa bsb hx hy hbr =>
       -- Key insight: R ⊆ Bisim since R is a post-fixpoint of BisimF
       have hR_to_Bisim : ∀ a b, R a b → Bisim a b := fun a b hr => ⟨R, hRpost, hr⟩
@@ -246,7 +246,7 @@ theorem Bisim.to_eq2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
       have hbr_rel : BranchesRel (EQ2_closure Bisim) bsa bsb :=
         branches_rel_bisim_to_branches_rel hbr_closure
       -- Case on the actual constructors of x and y
-      -- Lift branch relation to Bisim for use in Bisim_of_same_send/recv
+      -- Lift branch relation to Bisim for use in bisim_of_same_send/recv
       have hbr_bisim : BranchesRelBisim Bisim bsa bsb :=
         BranchesRelBisim.mono (fun a b h => hR_to_Bisim a b h) hbr
       cases hx with
@@ -285,7 +285,7 @@ theorem Bisim.to_eq2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
 /- ## Structured Block 3 -/
           · have hBisim := bisim_of_same_send (CanSend.mu hinner) hinner' hbr_bisim
             exact Or.inl hBisim
-    -- Bisim.toEQ2: Receive Case
+    -- Bisim.to_eq2: Receive Case
     | @eq_recv _ _ partner bsa bsb hx hy hbr =>
       -- Similar to eq_send with recv
       have hR_to_Bisim : ∀ a b, R a b → Bisim a b := fun a b hr => ⟨R, hRpost, hr⟩

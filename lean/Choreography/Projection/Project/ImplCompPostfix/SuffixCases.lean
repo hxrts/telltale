@@ -389,8 +389,8 @@ non-participant cases which recurse through branches. -/
 theorem c_project_implies_eq2_trans_thm (g : GlobalType) (role : String) (lt : LocalTypeR)
     (h : CProject g role lt) (hwf : g.wellFormed = true) : EQ2 lt (trans g role) := by
   -- Apply coinduction up-to with witness relation CProjectTransRelCompWF
-  -- EQ2_coind_upto says: if ∀ a b, R a b → EQ2F (EQ2_closure R) a b, then R ⊆ EQ2
-  -- EQ2_closure R = fun a b => R a b ∨ EQ2 a b, which matches CProjectTransRelComp_postfix
+  -- eq2_coind_upto says: if ∀ a b, R a b → EQ2F (EQ2_closure R) a b, then R ⊆ EQ2
+  -- EQ2_closure R = fun a b => R a b ∨ EQ2 a b, which matches c_project_trans_rel_comp_postfix
   apply eq2_coind_upto (R := CProjectTransRelCompWF)
   · -- Post-fixpoint: CProjectTransRelComp closes under EQ2F with EQ2 closure.
     intro lt' t' hrel

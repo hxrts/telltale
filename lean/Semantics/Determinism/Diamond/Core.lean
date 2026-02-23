@@ -296,7 +296,7 @@ private theorem diamond_comm_head {act₂ : GlobalActionR}
     ∃ g₃, step cont₁ act₂ g₃ ∧
       step g₂' { sender := sender, receiver := receiver, label := label₁ } g₃ ∧
       g₃.uniqueBranchLabels = true := by
-  -- Head/head is impossible; head/async steps via BranchesStep_mem.
+  -- Head/head is impossible; head/async steps via branches_step_mem.
   cases h₂' with
   | comm_head _ _ _ _ _ _ =>
       exact absurd rfl hind'.1
@@ -319,7 +319,7 @@ private theorem diamond_comm_async_head {act₂ : GlobalActionR}
     (hact₂ : act₂ = { sender := sender, receiver := receiver, label := label₂ }) :
     ∃ g₃, step (.comm sender receiver branches₁) act₂ g₃ ∧
       step cont₂ act₁' g₃ ∧ g₃.uniqueBranchLabels = true := by
-  -- Use BranchesStep_mem to find the stepped continuation in branches₁.
+  -- Use branches_step_mem to find the stepped continuation in branches₁.
   obtain ⟨cont₂', hstep_cont, hmem₂'⟩ := BranchesStep_mem hbs₁ hmem₂
   simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true] at huniq'
   refine ⟨cont₂', ?_, hstep_cont, ?_⟩
@@ -333,7 +333,7 @@ private theorem can_step_of_branches_step_mem
     {label : Label} {cont : GlobalType}
     (hbs : BranchesStep step bs act bs') (hmem : (label, cont) ∈ bs) :
     canStep cont act := by
-  -- Extract the step from BranchesStep, then use step_implies_canStep.
+  -- Extract the step from BranchesStep, then use step_implies_can_step.
     obtain ⟨_, hstep, _⟩ := BranchesStep_mem hbs hmem
     exact step_implies_can_step hstep
 

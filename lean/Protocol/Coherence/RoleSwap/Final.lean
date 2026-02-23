@@ -33,7 +33,7 @@ theorem coherent_role_swap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
   intro e hActive Lrecv hGrecv
   by_cases hSid : e.sid = s
   · -- Session-local swap case.
-    -- CoherentRoleSwap: Session-Local Edge Case
+    -- coherent_role_swap: Session-Local Edge Case
     let e' : Edge := swapEdgeRole s A B e
     let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
     let senderEp : Endpoint := { sid := e.sid, role := e.sender }
@@ -43,7 +43,7 @@ theorem coherent_role_swap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
       simp [recvEp, recvEp', e', swapEdgeRole, swapEndpointRole, hSid, swap_role_involutive]
     have hSenderEp : swapEndpointRole s A B senderEp' = senderEp := by
       simp [senderEp, senderEp', e', swapEdgeRole, swapEndpointRole, hSid, swap_role_involutive]
-    -- CoherentRoleSwap: Translate Endpoint Lookups
+    -- coherent_role_swap: Translate Endpoint Lookups
     have hLookupRecvMap :
         lookupG (swapGEnvRole s A B G) recvEp =
           (lookupG G recvEp').map (swapLocalTypeRole s A B) := by
@@ -70,7 +70,7 @@ theorem coherent_role_swap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
             simpa [hLookupR] using hLookupRecvEq
           exact (Option.some.inj this).symm
         have hGrecv0 : lookupG G recvEp' = some Lrecv0 := hLookupR
-        -- CoherentRoleSwap: Recover Sender Preimage Lookup
+        -- coherent_role_swap: Recover Sender Preimage Lookup
         have hLookupSenderMap :
             lookupG (swapGEnvRole s A B G) senderEp =
               (lookupG G senderEp').map (swapLocalTypeRole s A B) := by
@@ -98,7 +98,7 @@ theorem coherent_role_swap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
           | some Lsender0 =>
               exact ⟨Lsender0, rfl⟩
         rcases hGsender0 with ⟨Lsender0, hGsender0⟩
-        -- CoherentRoleSwap: Pull Back Coherence Witness
+        -- coherent_role_swap: Pull Back Coherence Witness
         have hActive' : ActiveEdge G e' :=
           active_edge_of_endpoints (e:=e') hGsender0 hGrecv0
         have hCoh' := hCoh e' hActive' Lrecv0 hGrecv0
@@ -116,7 +116,7 @@ theorem coherent_role_swap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
                   = (lookupG G senderEp').map (swapLocalTypeRole s A B) := hLookupSenderMap
               _ = some (swapLocalTypeRole s A B Lsender1) := this)
         rcases (Option.isSome_iff_exists).1 hConsume with ⟨Lafter, hConsumeEq⟩
-        -- CoherentRoleSwap: Push Consume Through Swap
+        -- coherent_role_swap: Push Consume Through Swap
         have hConsumeSwap :
             Consume (swapRole A B e'.sender) (swapLocalTypeRole s A B Lrecv0)
                 ((lookupD D e').map (swapValTypeRole s A B)) =
@@ -142,7 +142,7 @@ theorem coherent_role_swap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
           simpa [hSenderEq, hLrecv, hTrace] using hConsumeSwap
         refine ⟨swapLocalTypeRole s A B Lsender1, hLookupSender', ?_⟩
         simp [hConsumeSwapped]
-  -- CoherentRoleSwap: Non-Target Session Edge
+  -- coherent_role_swap: Non-Target Session Edge
   · -- Other-session edges are unchanged.
     have hSidNe : e.sid ≠ s := hSid
     let recvEp : Endpoint := { sid := e.sid, role := e.receiver }

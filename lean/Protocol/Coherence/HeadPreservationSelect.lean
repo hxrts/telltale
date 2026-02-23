@@ -79,7 +79,7 @@ theorem head_coherent_select_preserved
             (Consume selectorEp.role L' [.string]).isSome) :
     let selectEdge := { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole : Edge }
     HeadCoherent (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string])) := by
-  -- Same structure as HeadCoherent_send_preserved: appending to END doesn't change HEAD
+  -- Same structure as head_coherent_send_preserved: appending to END doesn't change HEAD
   intro selectEdge e hActive
   simp only [HeadCoherent] at hHead ⊢
   have hActiveOrig : ActiveEdge G e :=
@@ -255,7 +255,7 @@ theorem head_coherent_branch_preserved
     (hTrace : (lookupD D { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role }).head? = some .string) :
     let branchEdge := { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role : Edge }
     HeadCoherent (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail) := by
-  -- Same structure as HeadCoherent_recv_preserved: removes HEAD, advances type
+  -- Same structure as head_coherent_recv_preserved: removes HEAD, advances type
   intro branchEdge e hActive
   simp only [HeadCoherent] at hHead ⊢
   have hActiveOrig : ActiveEdge G e :=

@@ -58,7 +58,7 @@ theorem inverse_step_send_exists (σ : ProtocolRenaming)
       T' = renameValTypePR σ T ∧
       lookupG G ⟨sid, s⟩ = some (.send r T L) ∧
       L' = renameLocalTypePR σ L := by
-  -- Use lookupG_renamePR_inv to get preimage, then case split on local type
+  -- Use lookup_g_rename_pr_inv to get preimage, then case split on local type
   obtain ⟨ep, L, hep, hep', hLfull⟩ := lookup_g_rename_pr_inv σ G _ _ hG'
   have hsid : ep.sid = sid := by
     have := congrArg Endpoint.sid hep'
@@ -129,7 +129,7 @@ theorem inverse_step_select_exists (σ : ProtocolRenaming)
       lookupG G ⟨sid, s⟩ = some (.select r bs) ∧
       (l, L) ∈ bs ∧
       L' = renameLocalTypePR σ L := by
-  -- Use lookupG_renamePR_inv + mem_renameBranchesPR_inv
+  -- Use lookup_g_rename_pr_inv + mem_rename_branches_pr_inv
   obtain ⟨ep, Lep, hep, hep', hLfull⟩ := lookup_g_rename_pr_inv σ G _ _ hG'
   have hsid : ep.sid = sid := by
     have := congrArg Endpoint.sid hep'
@@ -203,7 +203,7 @@ theorem inverse_step_branch_exists (σ : ProtocolRenaming)
       lookupG G ⟨sid, r⟩ = some (.branch s bs) ∧
       (l, L) ∈ bs ∧
       L' = renameLocalTypePR σ L := by
-  -- Use lookupG_renamePR_inv + mem_renameBranchesPR_inv
+  -- Use lookup_g_rename_pr_inv + mem_rename_branches_pr_inv
   obtain ⟨ep, Lep, hep, hep', hLfull⟩ := lookup_g_rename_pr_inv σ G _ _ hG'
   have hsid : ep.sid = sid := by
     have := congrArg Endpoint.sid hep'

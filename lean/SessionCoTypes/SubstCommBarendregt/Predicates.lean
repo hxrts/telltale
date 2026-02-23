@@ -199,7 +199,7 @@ theorem not_bound_at_unfold (v : String) (a : LocalTypeR)
       -- means: (v != t) && notBoundAt v body = true
       unfold notBoundAt at hbar
       have ⟨hvt, hbarBody⟩ := Bool.and_eq_true_iff.mp hbar
-      -- Apply notBoundAt_subst: need notBoundAt v body and notBoundAt v (.mu t body)
+      -- Apply not_bound_at_subst: need notBoundAt v body and notBoundAt v (.mu t body)
       apply not_bound_at_subst v t body (.mu t body) hbarBody
       -- Need: notBoundAt v (.mu t body) = true
       unfold notBoundAt

@@ -128,7 +128,7 @@ theorem coherent_renaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv)
           simp [e', hSidEq'.symm, hSenderRole']
 /- ## Structured Block 2 -/
         simpa [hEq] using hGsender'
-  -- CoherentRenaming: Rebuild Coherence Witness on Preimage Edge
+  -- coherent_renaming: Rebuild Coherence Witness on Preimage Edge
   -- Apply original coherence at e'.
   have hActive' : ActiveEdge G e' :=
     active_edge_of_endpoints (G:=G) (e:=e') hGsender'' hGrecv'
@@ -147,7 +147,7 @@ theorem coherent_renaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv)
           (lookupG G senderEp').map (renameLocalType ρ) := by
       simpa [hSenderEq] using hLookupRen
     simpa [hGsender', senderEp'] using hLookupRen'
-  -- CoherentRenaming: Transport Consume Through Renaming
+  -- coherent_renaming: Transport Consume Through Renaming
   -- Rename preservation for Consume.
   have hConsumeRen :
       (Consume e.sender (renameLocalType ρ Lrecv') ((lookupD D e').map (renameValType ρ))).isSome := by

@@ -27,7 +27,7 @@ section
 theorem lookup_d_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
     lookupD (swapDEnvRole s A B D) (swapEdgeRole s A B e) =
       if e.sid = s then (lookupD D e).map (swapValTypeRole s A B) else lookupD D e := by
-  -- lookupD_swap: Reduce Goal to Fold Computation
+  -- lookup_d_swap: Reduce Goal to Fold Computation
   have hfold :
       lookupD (swapDEnvRole s A B D) (swapEdgeRole s A B e) =
         if e.sid = s then
@@ -38,10 +38,10 @@ theorem lookup_d_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
           match D.list.lookup e with
           | some ts => ts
           | none => [] := by
-    -- lookupD_swap: Expand DEnv Representation
+    -- lookup_d_swap: Expand DEnv Representation
     cases D with
     | mk l m map_eq sorted =>
-        -- lookupD_swap: Fold Invariant over Sorted Edge List
+        -- lookup_d_swap: Fold Invariant over Sorted Edge List
         have hfold' :
             ∀ (l : List (Edge × Trace)) (sorted : l.Pairwise edgeCmpLT) (acc : DEnv) (e : Edge),
               lookupD
@@ -70,16 +70,16 @@ theorem lookup_d_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
               by_cases hSid : e.sid = s
               · simp [List.lookup, hSid]
               · simp [List.lookup, hSid, swapEdgeRole]
-          -- lookupD_swap: Non-Empty List Case
+          -- lookup_d_swap: Non-Empty List Case
           | cons hd tl ih =>
               intro sorted
 /- ## Structured Block 2 -/
               have hpair := (List.pairwise_cons.1 sorted)
               have hhd : ∀ p ∈ tl, edgeCmpLT hd p := hpair.1
               have htl : tl.Pairwise edgeCmpLT := hpair.2
-              -- lookupD_swap: Branch on Target Session Edge
+              -- lookup_d_swap: Branch on Target Session Edge
               by_cases hSid : e.sid = s
-              -- lookupD_swap: Target Session, Head Match Split
+              -- lookup_d_swap: Target Session, Head Match Split
               · by_cases hEq : e = hd.1
                 · subst hEq
                   have hSidHd : hd.1.sid = s := by simpa using hSid
@@ -130,7 +130,7 @@ theorem lookup_d_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
 /- ## Structured Block 3 -/
                     exact hne p hp
                   simp [List.lookup, List.foldl, hSid, htail, lookup_d_update_eq]
-                -- lookupD_swap: Target Session, Distinct-Head Case
+                -- lookup_d_swap: Target Session, Distinct-Head Case
                 · -- e ≠ hd.1
                   have hne :
                       (if hd.1.sid = s then swapEdgeRole s A B hd.1 else hd.1) ≠
@@ -152,7 +152,7 @@ theorem lookup_d_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                         congrArg Edge.sid (by simpa [hHdSid] using hEq)
                       exact (hSidNe (by simpa [hSidTarget] using hSidEq)).elim
                   have hbeq : (e == hd.1) = false := beq_eq_false_iff_ne.mpr hEq
-                  -- lookupD_swap: Target Session Distinct-Head Inner Sid Split
+                  -- lookup_d_swap: Target Session Distinct-Head Inner Sid Split
                   by_cases hHdSid : hd.1.sid = s
                   · have hne' : swapEdgeRole s A B hd.1 ≠ swapEdgeRole s A B e := by
                       simpa [hHdSid] using hne
@@ -196,9 +196,9 @@ theorem lookup_d_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                       simpa [hSid, lookup_d_update_neq, hne'] using ih'
                     dsimp [List.foldl]
                     simp [hSid, hHdSid, List.lookup, hbeq, ih'']
-              -- lookupD_swap: Non-Target Session Edge Branch
+              -- lookup_d_swap: Non-Target Session Edge Branch
               · -- hSid false
-                -- lookupD_swap: Non-Target Session, Head Match Split
+                -- lookup_d_swap: Non-Target Session, Head Match Split
                 by_cases hEq : e = hd.1
                 · subst hEq
                   have hSidHd : hd.1.sid ≠ s := hSid
@@ -246,7 +246,7 @@ theorem lookup_d_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                     simp [swapEdgeRole, hSidHd]
                   dsimp [List.foldl]
                   simp [List.lookup, hSid, hSwap, htail, lookup_d_update_eq]
-                -- lookupD_swap: Non-Target Session, Distinct-Head Case
+                -- lookup_d_swap: Non-Target Session, Distinct-Head Case
                 · -- e ≠ hd.1
                   have hne :
                       (if hd.1.sid = s then swapEdgeRole s A B hd.1 else hd.1) ≠ e := by
@@ -265,7 +265,7 @@ theorem lookup_d_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                     · intro hEq'
                       exact hEq (by simpa [hHdSid] using hEq'.symm)
                   have hbeq : (e == hd.1) = false := beq_eq_false_iff_ne.mpr hEq
-                  -- lookupD_swap: Non-Target Session, Inner Session-Id Split
+                  -- lookup_d_swap: Non-Target Session, Inner Session-Id Split
                   by_cases hHdSid : hd.1.sid = s
                   · have hne' : swapEdgeRole s A B hd.1 ≠ e := by
                       simpa [hHdSid] using hne
@@ -312,7 +312,7 @@ theorem lookup_d_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                       simpa [hSid, hHdSid, swapEdgeRole, lookup_d_update_neq, hne'] using ih'
                     dsimp [List.foldl]
                     simpa [List.lookup, hbeq, swapEdgeRole, hSid, hHdSid] using ih''
-        -- lookupD_swap: Instantiate Invariant at Empty Accumulator
+        -- lookup_d_swap: Instantiate Invariant at Empty Accumulator
         have hfold'' :
             lookupD
                 (l.foldl
@@ -334,7 +334,7 @@ theorem lookup_d_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                 | none => [] := by
           simpa using hfold' (l:=l) (sorted:=sorted) (acc:=(∅ : DEnv)) (e:=e)
         simpa [swapDEnvRole] using hfold''
-  -- lookupD_swap: Rewrite Back to lookupD
+  -- lookup_d_swap: Rewrite Back to lookupD
   rw [hfold]
   by_cases hSid : e.sid = s
   · cases h : D.list.lookup e <;> simp [hSid, lookup_d_eq_list_lookup, h]
@@ -385,7 +385,7 @@ theorem consume_one_swap (s : SessionId) (A B : Role) (from_ : Role)
   | mu Lr =>
       cases h
 
--- Consume_swap: Structural Recursion on Trace
+-- consume_swap: Structural Recursion on Trace
 
 /-- Consume commutes with role swapping. -/
 theorem consume_swap (s : SessionId) (A B : Role) (from_ : Role)

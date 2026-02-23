@@ -106,7 +106,7 @@ theorem subst_unfold_closure_postfix (var : String) (repl : LocalTypeR)
         -- hu : u = LocalTypeR.unfold repl, hv : v = repl
         rw [hu, hv]
         -- Goal: BisimF (SubstUnfoldClosure var repl) (LocalTypeR.unfold repl) repl
-        -- LocalTypeR.unfold repl and repl are Bisim via EQ2_unfold_left
+        -- LocalTypeR.unfold repl and repl are Bisim via eq2_unfold_left
         have hWFrepl_unfold : LocalTypeR.WellFormed repl.unfold :=
 /- ## Structured Block 1 -/
           LocalTypeR.WellFormed.unfold (t := repl) hWFrepl
@@ -153,7 +153,7 @@ theorem subst_unfold_closure_postfix (var : String) (repl : LocalTypeR)
         -- LHS = (.mu x body).unfold = body.substitute x (.mu x body)
         -- RHS = (body.substitute x (.mu x body)).substitute var repl
         subst hu hv
-        -- Key insight: x is not free in body.substitute x (.mu x body) (isFreeIn_mu_unfold_false)
+        -- Key insight: x is not free in body.substitute x (.mu x body) (is_free_in_mu_unfold_false)
         have hnotfree : SessionCoTypes.SubstCommBarendregt.isFreeIn x
             (body.substitute x (.mu x body)) = false :=
           is_free_in_mu_unfold_false body x
@@ -166,7 +166,7 @@ theorem subst_unfold_closure_postfix (var : String) (repl : LocalTypeR)
           exact SessionCoTypes.SubstCommBarendregt.substitute_not_free _ x repl hnotfree
         rw [hv_eq_u]
         -- Now we need BisimF (SubstUnfoldClosure var repl) u u where u = body.substitute x (.mu x body)
-        -- Both sides are equal, use Bisim.refl via EQ2_refl
+        -- Both sides are equal, use Bisim.refl via eq2_refl
         have hWF_unfold : LocalTypeR.WellFormed (body.substitute x (.mu x body)) :=
           LocalTypeR.WellFormed.unfold (t := .mu x body) (by simpa using hWFt)
         have hBisim : Bisim (body.substitute x (.mu x body)) (body.substitute x (.mu x body)) :=
@@ -187,7 +187,7 @@ theorem subst_unfold_closure_postfix (var : String) (repl : LocalTypeR)
         subst hu hv
         -- x ≠ var from hdiff
         have hxne : x ≠ var := by simp only [beq_eq_false_iff_ne] at hdiff; exact hdiff
-        -- EQ2_subst_mu_comm gives: EQ2 LHS RHS
+        -- eq2_subst_mu_comm gives: EQ2 LHS RHS
         have heq := eq2_subst_mu_comm body var x repl hxne hWFt
         -- EQ2 implies Bisim (well-formedness from unfold + substitution)
         have hWFmu' : LocalTypeR.WellFormed (.mu x (body.substitute var repl)) :=

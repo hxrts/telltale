@@ -303,7 +303,7 @@ theorem lookup_g_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
       by_cases hSid : e.sid = s
       · simp [swapGEnvRole, lookupG, List.lookup, hSid]
       · simp [swapGEnvRole, lookupG, List.lookup, hSid, swapEndpointRole]
-  -- lookupG_swap: Inductive Cons Case
+  -- lookup_g_swap: Inductive Cons Case
   | cons hd tl ih =>
       by_cases heq : e = hd.1
       · subst heq
@@ -313,7 +313,7 @@ theorem lookup_g_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
           have hSwap : swapEndpointRole s A B hd.1 = hd.1 := by
             simp [swapEndpointRole, hSid]
           simp [swapGEnvRole, lookupG, List.lookup, hSid, hSwap]
-      -- lookupG_swap: Distinct Endpoint Case
+      -- lookup_g_swap: Distinct Endpoint Case
       · have hne :
           swapEndpointRole s A B e ≠
             (if hd.1.sid = s then swapEndpointRole s A B hd.1 else hd.1) := by
@@ -341,7 +341,7 @@ theorem lookup_g_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
               have hSwap : swapEndpointRole s A B e = e := by
                 simp [swapEndpointRole, hSid]
               exact (heq (by simpa [hSwap, hHdSid] using hEq)).elim
-        -- lookupG_swap: Transport Through Mapped Tail Lookup
+        -- lookup_g_swap: Transport Through Mapped Tail Lookup
         have hne1 :
             swapEndpointRole s A B e ≠
               (if hd.1.sid = s then

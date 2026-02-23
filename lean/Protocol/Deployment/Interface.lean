@@ -263,7 +263,7 @@ theorem init_monitor_state_well_typed (p : DeployedProtocol) :
     WTMon p.initMonitorState := by
   constructor
   · exact p.coherence_cert
-  · -- headCoherent: buffer heads match expected receive types
+  · -- head_coherent: buffer heads match expected receive types
     exact p.headCoherent_cert
   · -- validLabels: branch labels in buffers are valid
     exact p.validLabels_cert

@@ -91,7 +91,7 @@ theorem coherent_recv_preserved
       -- Receiver's original type was .recv, so original coherence worked
       -- The trace was T :: rest (from hTrace), original Consume consumed T and continued
       -- After recv, we consume from rest
-      -- Use Consume_cons to decompose the original
+      -- Use consume_cons to decompose the original
       cases hTraceVal : lookupD D recvEdge with
       | nil =>
         -- If trace was empty, hTrace would say head? = some T, but [] has head? = none
