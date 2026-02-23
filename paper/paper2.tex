@@ -15,7 +15,7 @@
 \usepackage{tabularx}
 \usepackage{longtable}
 \usepackage{listings}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
 \usepackage{hyperref}
 \usepackage{url}
 \makeatletter
@@ -569,8 +569,6 @@ Table~\ref{tab:p2-delta-w} records the per-rule $\Delta W$ facts used in this wi
 	Define \texttt{weightedMeasure = 2*sumDepths + sumBuffers}. First prove rule-local decrease lemmas for send/recv/select/branch (\nolinkurl{send_step_decreases},\allowbreak\ \nolinkurl{recv_step_decreases},\allowbreak\ \nolinkurl{select_step_decreases},\allowbreak\ \nolinkurl{branch_step_decreases}). Lift these to the configuration step relation using \nolinkurl{total_measure_decreasing}. Since $W \ge 0$ and each productive step decreases $W$ by at least one, productive-step count is bounded by $W_0$. Under a scheduler profile with lift constant $\kappa_\sigma$, apply the scheduler-lift theorem to obtain $T(\tau) \le \kappa_\sigma W_0$.
 \end{proof}
 
-The local decrease lemmas are \nolinkurl{send_step_decreases},\allowbreak\ \nolinkurl{recv_step_decreases},\allowbreak\ \nolinkurl{select_step_decreases}, and \nolinkurl{branch_step_decreases}. The configuration-level lift is \nolinkurl{total_measure_decreasing}.
-
 The weighted-measure decomposition used by Theorem~\ref{thm:quantitative} is:
 \begin{equation}
 	\label{eq:p2-weighted-decomposition}
@@ -630,10 +628,8 @@ The rule-local descent pattern lifted to global productive-step bounds is:
 Coinductive boundary note: effect-level transport is restricted to the witness-carrying rational subclass via \nolinkurl{rational_effect_transport_bridge}; witness-check soundness/completeness is provided by \nolinkurl{check_rational_effect_witness_sound} and \nolinkurl{check_rational_effect_witness_complete}; strict outside non-transportability is witnessed by \nolinkurl{strict_boundary_witness_effect}. These do not alter Theorem~\ref{thm:algorithmic} assumptions and are used in the \emph{Harmony from Coherence in Asynchronous MPST} boundary layer.
 
 \begin{proof}[Proof sketch]
-	The argument is uniform. Build finite reachable triple/pair structures from regularity (\nolinkurl{reachable_triples_finite},\allowbreak\ \nolinkurl{reachable_pairs_finite}), run terminating exploration/checkers, and prove soundness/completeness for each reduction. Instantiating this schema yields deciders for async subtyping and regular equivalence (\nolinkurl{async_subtype_decidable},\allowbreak\ \nolinkurl{regular_type_eq_decide_spec}).
+	The argument is uniform. Build finite reachable triple/pair structures from regularity (\nolinkurl{reachable_triples_finite},\allowbreak\ \nolinkurl{reachable_pairs_finite}), run terminating exploration/checkers, and prove soundness/completeness for each reduction. Instantiating this schema yields deciders for async subtyping (\nolinkurl{async_subtype_decidable}) and regular equivalence (\nolinkurl{regular_type_eq_check_sound},\allowbreak\ \nolinkurl{regular_type_eq_decide_spec}).
 \end{proof}
-
-Async subtyping instantiation appears through \nolinkurl{reachable_triples_finite} and \nolinkurl{async_subtype_decidable}. Regular type-equivalence instantiation appears through \nolinkurl{regular_type_eq_check_sound} and \nolinkurl{regular_type_eq_decide_spec}.
 
 Equation~\ref{eq:p2-algorithmic-workflow} records the generic workflow.
 \begin{equation}
@@ -744,10 +740,8 @@ where each conjunct names the corresponding requirement class in \Hbyz.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
-	The proof proceeds by capability-gated extraction. First, theorem-pack/profile APIs check the Byzantine premise bits required by the profile. Second, admitted profiles are interpreted through the VM Byzantine envelope layer, which gives the safety-visible relation \Eqsafe. Third, admission and conformance theorems ensure that claims without required evidence are rejected. Thus the interface is executable and proof-carrying.
+	The proof proceeds by capability-gated extraction. First, \texttt{canOperateUnderByzantineEnvelope} checks that the theorem pack has both Byzantine safety and VM envelope adherence evidence. Second, admitted profiles are interpreted through the VM Byzantine envelope layer, which gives the safety-visible relation \Eqsafe. Third, admission and conformance theorems ensure that claims without required evidence are rejected. Thus the interface is executable and proof-carrying.
 \end{proof}
-
-Core crash-tolerance lemmas include \nolinkurl{crash_tolerance_iff} and \nolinkurl{crash_tolerant_dec_sound}. Branching feasibility appears through \nolinkurl{branching_iff_chromatic_capacity}.
 
 Table~\ref{tab:p2-decidability-summary} summarizes the decidability results.
 
@@ -1121,7 +1115,7 @@ Let \texttt{ConfGraph} be the confusability graph induced by branch-distinguisha
 \end{theorem}
 
 \begin{proof}[Proof sketch]
-	Encode branch distinguishability constraints as coloring constraints on \texttt{ConfGraph}. The profile fixes admissible class counts, so feasibility reduces to existence of a coloring within that bound. The equivalence follows by bidirectional translation between branch witnesses and valid colorings.
+	Encode branch distinguishability constraints as coloring constraints on \texttt{ConfGraph}. The profile fixes admissible class counts, so feasibility reduces to existence of a coloring within that bound. The equivalence follows from \nolinkurl{branching_iff_chromatic_capacity} via bidirectional translation between branch witnesses and valid colorings.
 \end{proof}
 
 \subsection{Capacity Threshold Instantiation}
@@ -1157,34 +1151,6 @@ Define the phase classifier
 
 Under Assumption Block~\ref{assump:p2-byzantine}, this paper provides the exact safety-side interface and converse counterexample packaging; full envelope maximality and transport are deferred to \emph{Harmony from Coherence in Asynchronous MPST}.
 
-\section{Anchor Registry}
-\label{app:p2-anchor-registry}
-
-Table~\ref{tab:p2-anchor-registry} maps theorem anchors to their source files.
-
-\begin{table}[H]
-	\centering
-	\scriptsize
-	\begin{tabularx}{\columnwidth}{@{}L{0.475\columnwidth}L{0.475\columnwidth}@{}}
-		\toprule
-		\thead{Anchor} & \thead{Path (relative to \texttt{lean/})} \\
-		\midrule
-		\texttt{weightedMeasure} & \texttt{Runtime/Proofs/\allowbreak WeightedMeasure/}\mbox{\texttt{*.lean}} \\
-		\texttt{total\_measure\_decreasing} & \texttt{Runtime/Proofs/WeightedMeasure/}\mbox{\texttt{TotalBound.lean}} \\
-		\texttt{reachable\_triples\_finite} & \texttt{SessionCoTypes/AsyncSubtyping/}\mbox{\texttt{*.lean}} \\
-		\texttt{async\_subtype\_decidable} & \texttt{SessionCoTypes/AsyncSubtyping/}\mbox{\texttt{*.lean}} \\
-		\texttt{regular\_type\_eq\_decide\_spec} & \texttt{SessionCoTypes/Coinductive/\allowbreak BisimDecidable/}\mbox{\texttt{*.lean}} \\
-		\texttt{crash\_tolerance\_iff} & \texttt{Protocol/}\mbox{\texttt{CrashTolerance.lean}} \\
-		\texttt{branching\_iff\_chromatic\_capacity} & \texttt{Protocol/}\mbox{\texttt{SpatialBranching.lean}} \\
-		\texttt{phase\_transition\_sharp} & \texttt{Protocol/BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}} \\
-		\texttt{byzantine\_safety\_exact\_of\_profile} & \texttt{Runtime/Proofs/Adapters/Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
-		\texttt{canOperateUnderByzantineEnvelope} & \texttt{Runtime/Proofs/TheoremPack/}\mbox{\texttt{*.lean}} \\
-		\bottomrule
-	\end{tabularx}
-	\caption{Anchor registry.}
-	\label{tab:p2-anchor-registry}
-\end{table}
-
 \section{Exactness and Boundary Notes}
 \label{app:exactness}
 
@@ -1218,38 +1184,74 @@ Table~\ref{tab:p2-anchor-registry} maps theorem anchors to their source files.
 Reproduction uses the pinned Lean toolchain and manifest.
 
 \begin{enumerate}
-	\item Build module families listed in Appendix~\ref{app:p2-anchor-registry}.
+	\item Build anchors listed in Table~\ref{tab:p2-index}.
 	\item Run \texttt{just escape} and \texttt{just verify-protocols}.
-	\item Confirm Appendix~\ref{app:p2-anchor-registry} theorem anchors resolve and typecheck.
+	\item Confirm anchor names resolve and typecheck.
 \end{enumerate}
 
 Expected checks: Finite-reachability and decision modules compile, weighted-measure descent and scheduler modules compile, crash and branching and threshold modules compile, and theorem-pack and profile-bridge modules compile.
 
-\section{Index of Main Results}
+% Full-width index on its own page
+\clearpage
+\onecolumn
+
+\section{Anchor Index}
 \label{app:index}
+
+Table~\ref{tab:p2-index} maps paper claims to their Lean anchors and source files. Anchors marked with --- are infrastructure lemmas used in proofs but not tied to a single claim.
 
 \begin{table}[H]
 	\centering
-	\footnotesize
-	{\setlength{\tabcolsep}{3pt}
-	\begin{tabularx}{\columnwidth}{@{}L{0.22\columnwidth}L{0.09\columnwidth}L{0.40\columnwidth}L{0.19\columnwidth}@{}}
+	\scriptsize
+	\setlength{\aboverulesep}{0pt}
+	\setlength{\belowrulesep}{0pt}
+	\setlength{\extrarowheight}{2pt}
+	\begin{tabularx}{\textwidth}{L{0.27\textwidth}L{0.37\textwidth}L{0.06\textwidth}>{\raggedright\arraybackslash}X}
 		\toprule
-		\thead{Claim} & \thead{Sec.} & \thead{Assumption} & \thead{Anchor} \\
+		\thead{Anchor} & \thead{Path (relative to \texttt{lean/})} & \thead{Sec.} & \thead{Claims} \\
 		\midrule
-		Thm.~\ref{thm:quantitative}    & \S4 & Assump.~\ref{assump:p2-quantitative} & \texttt{weighted*} \\
-		Thm.~\ref{thm:algorithmic}     & \S5 & Assump.~\ref{assump:p2-regular}      & \texttt{reachable*} \\
-			Thm.~\ref{thm:crash}           & \S6 & Assump.~\ref{assump:p2-crash}        & \texttt{crash\_*} \\
-			Thm.~\ref{thm:byzantine}       & \S6 & Assump.~\ref{assump:p2-byzantine}    & \texttt{byzantine*} \\
-			Cor.~\ref{cor:converse}        & \S6 & Thm.~\ref{thm:byzantine} + dropped class & \texttt{byzantine*} \\
-			Cor.~\ref{cor:productive}      & \S7 & Thm.~\ref{thm:quantitative} premises & \texttt{weighted*} \\
-			Cor.~\ref{cor:scheduler}       & \S7 & Thm.~\ref{thm:quantitative} + sched. & \texttt{total\_*} \\
-			Cor.~\ref{cor:capacity}        & \S7 & regular + threshold assumptions       & \texttt{phase\_*} \\
-			Thm.~\ref{thm:app-p2-branching} & App.\ C & regular + branch profile & \texttt{branching*} \\
-			Prop.~\ref{prop:vm-bridge}     & \S6 & pack + adherence                      & \texttt{canOperate*} \\
+		\multicolumn{4}{@{}l}{\textit{Definitions}} \\
+		\rowcolor{gray!8}
+		\texttt{weightedMeasure} & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{Core.lean}} & \S\ref{sec:theorem1} & --- \\
+		\midrule
+		\multicolumn{4}{@{}l}{\textit{Theorems}} \\
+		\rowcolor{gray!8}
+		\texttt{send\_step\_decreases} & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}} & \S\ref{sec:theorem1} & --- \\
+		\texttt{recv\_step\_decreases} & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}} & \S\ref{sec:theorem1} & --- \\
+		\rowcolor{gray!8}
+		\texttt{select\_step\_decreases} & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}} & \S\ref{sec:theorem1} & --- \\
+		\texttt{branch\_step\_decreases} & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}} & \S\ref{sec:theorem1} & --- \\
+		\rowcolor{gray!8}
+		\texttt{total\_measure\_\allowbreak decreasing} & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}} & \S\ref{sec:theorem1} & Thm.~\ref{thm:quantitative}, Cors.~\ref{cor:productive}--\ref{cor:scheduler} \\
+		\texttt{reachable\_triples\_\allowbreak finite} & \texttt{SessionCoTypes/\allowbreak AsyncSubtyping/\allowbreak}\mbox{\texttt{Core.lean}} & \S\ref{sec:theorem2} & --- \\
+		\rowcolor{gray!8}
+		\texttt{async\_subtype\_\allowbreak decidable} & \texttt{SessionCoTypes/\allowbreak AsyncSubtyping/\allowbreak}\mbox{\texttt{Core.lean}} & \S\ref{sec:theorem2} & Thm.~\ref{thm:algorithmic} \\
+		\texttt{reachable\_pairs\_\allowbreak finite} & \texttt{SessionCoTypes/\allowbreak Coinductive/\allowbreak BisimDecidable/\allowbreak}\mbox{\texttt{Correctness.lean}} & \S\ref{sec:theorem2} & --- \\
+		\rowcolor{gray!8}
+		\texttt{regular\_type\_eq\_\allowbreak check\_sound} & \texttt{SessionCoTypes/\allowbreak Coinductive/\allowbreak BisimDecidable/\allowbreak}\mbox{\texttt{Decidable.lean}} & \S\ref{sec:theorem2} & --- \\
+		\texttt{regular\_type\_eq\_\allowbreak decide\_spec} & \texttt{SessionCoTypes/\allowbreak Coinductive/\allowbreak BisimDecidable/\allowbreak}\mbox{\texttt{Decidable.lean}} & \S\ref{sec:theorem2} & Thm.~\ref{thm:algorithmic} \\
+		\rowcolor{gray!8}
+		\texttt{rational\_effect\_\allowbreak transport\_bridge} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}} & \S\ref{sec:theorem2} & --- \\
+		\texttt{check\_rational\_effect\_\allowbreak witness\_sound} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}} & \S\ref{sec:theorem2} & --- \\
+		\rowcolor{gray!8}
+		\texttt{check\_rational\_effect\_\allowbreak witness\_complete} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}} & \S\ref{sec:theorem2} & --- \\
+		\texttt{strict\_boundary\_\allowbreak witness\_effect} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}} & \S\ref{sec:theorem2} & --- \\
+		\rowcolor{gray!8}
+		\texttt{crash\_tolerant\_\allowbreak dec\_sound} & \texttt{Protocol/\allowbreak}\mbox{\texttt{CrashTolerance.lean}} & \S\ref{sec:decidability} & --- \\
+		\texttt{crash\_tolerance\_iff} & \texttt{Protocol/\allowbreak}\mbox{\texttt{CrashTolerance.lean}} & \S\ref{sec:decidability} & Thm.~\ref{thm:crash} \\
+		\rowcolor{gray!8}
+		\texttt{byzantine\_safety\_\allowbreak exact\_of\_profile} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:decidability} & Thm.~\ref{thm:byzantine}, Cor.~\ref{cor:converse} \\
+		\texttt{branching\_iff\_\allowbreak chromatic\_capacity} & \texttt{Protocol/\allowbreak}\mbox{\texttt{SpatialBranching.lean}} & \S\ref{app:instantiated} & Thm.~\ref{thm:app-p2-branching} \\
+		\rowcolor{gray!8}
+		\texttt{critical\_buffer\_\allowbreak computable} & \texttt{Protocol/\allowbreak BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}} & \S\ref{sec:corollaries} & --- \\
+		\texttt{phase\_transition\_sharp} & \texttt{Protocol/\allowbreak BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}} & \S\ref{sec:corollaries} & Cor.~\ref{cor:capacity} \\
+		\midrule
+		\multicolumn{4}{@{}l}{\textit{Runtime Gates}} \\
+		\rowcolor{gray!8}
+		\texttt{canOperateUnder\allowbreak ByzantineEnvelope} & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{API.lean}} & \S\ref{sec:decidability} & Prop.~\ref{prop:vm-bridge} \\
 		\bottomrule
 	\end{tabularx}
-	}
-	\caption{Index of main results.}
+	\caption{Anchor index.}
 	\label{tab:p2-index}
 \end{table}
 

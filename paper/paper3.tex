@@ -15,7 +15,7 @@
 \usepackage{tabularx}
 \usepackage{longtable}
 \usepackage{listings}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
 \usepackage{hyperref}
 \usepackage{url}
 \makeatletter
@@ -426,7 +426,7 @@ The paper distinguishes:
 \end{itemize}
 
 Representative mechanized anchors are in the deployment-composition layer, the delegation-preservation
-layer, and the higher-order graph-delta layer. Appendix~\ref{app:p3-anchor-registry} provides the file-level mapping.
+layer, and the higher-order graph-delta layer. Appendix~\ref{app:index} provides the file-level mapping.
 
 \subsection{Dynamic Participant Sets}
 
@@ -764,8 +764,6 @@ Equation~\ref{eq:p3-commutation-instances} separates static-link and dynamic-del
 	That is, Coherence holds exactly when projected local views admit a compatible active-edge witness assignment.
 \end{theorem}
 
-Mechanized anchors include \nolinkurl{coherent_erasure_stable} and its companion characterization lemmas.
-
 This theorem gives the formal content of the quotient-first claim: erasure is not a heuristic post-processing step but the semantic object preserved by the theorem stack.
 
 \begin{proof}[Proof sketch]
@@ -821,16 +819,6 @@ This theorem gives the formal content of the quotient-first claim: erasure is no
 	The converse direction is accompanied by strictness witnesses for dropped side conditions.
 \end{corollary}
 
-Mechanized anchors:
-\begin{itemize}
-	\item \nolinkurl{safe_delegation_local_necessity}
-	\item \nolinkurl{safe_delegation_to_footprint}
-	\item \nolinkurl{footprint_to_safe_delegation}
-	\item \nolinkurl{safe_delegation_iff_footprint}
-\end{itemize}
-
-These lemmas are grouped in the erasure-characterization layer.
-
 \begin{proof}[Proof sketch]
 	Sufficiency follows by composing:
 	\begin{enumerate}
@@ -842,7 +830,7 @@ These lemmas are grouped in the erasure-characterization layer.
 \end{proof}
 
 \begin{proof}[Proof sketch]
-	For the forward direction, instantiate Theorem~\ref{thm:delegation} and project its obligations to the declared delegation footprint. For the reverse direction, apply \nolinkurl{footprint_to_safe_delegation} to reconstruct global safety from footprint obligations, then use strictness witnesses to show necessity of the side conditions. Combining both implications yields the stated equivalence.
+	For the forward direction, apply \nolinkurl{safe_delegation_to_footprint} to project Theorem~\ref{thm:delegation} obligations to the declared delegation footprint. For the reverse direction, apply \nolinkurl{footprint_to_safe_delegation} to reconstruct global safety from footprint obligations. Strictness witnesses from \nolinkurl{safe_delegation_local_necessity} show necessity of the side conditions. The full equivalence is packaged as \nolinkurl{safe_delegation_iff_footprint}.
 \end{proof}
 
 % ============================================================================
@@ -863,12 +851,6 @@ These lemmas are grouped in the erasure-characterization layer.
 	Hence Coherence is the weakest admissible invariant that guarantees delegation safety under the stated model side conditions.
 \end{theorem}
 
-Mechanized anchors:
-\begin{itemize}
-	\item \nolinkurl{relative_minimality}
-	\item supporting witness and counterexample lemmas in the minimality layer
-\end{itemize}
-
 This theorem prevents ``stronger-than-needed'' invariant inflation and pins down the architectural core.
 
 \begin{proof}[Proof sketch]
@@ -880,7 +862,7 @@ This theorem prevents ``stronger-than-needed'' invariant inflation and pins down
 		\item Convert these obligations into Coherence via erasure-characterization lemmas.
 	\end{enumerate}
 
-	Hence every admissible safety-guaranteeing invariant implies Coherence, making Coherence relatively minimal.
+	The full minimality statement is packaged as \nolinkurl{relative_minimality}. Hence every admissible safety-guaranteeing invariant implies Coherence, making Coherence relatively minimal.
 \end{proof}
 
 Equation~\ref{eq:p3-admissible-order} summarizes the admissible-invariant order behind Theorem~\ref{thm:minimality}.
@@ -933,12 +915,6 @@ Under composition and delegation:
 	      \end{itemize}
 \end{enumerate}
 
-Mechanized anchors:
-\begin{itemize}
-	\item \nolinkurl{flagship_composed_system_conservation}
-	\item \nolinkurl{lyapunov_conserved_under_balanced_delegation}
-\end{itemize}
-
 This theorem combines composition, delegation, and quantitative invariants in one package.
 
 \begin{proof}[Proof sketch]
@@ -955,7 +931,7 @@ This theorem combines composition, delegation, and quantitative invariants in on
 			      \item apply inherited quantitative descent/budget certificates from the dynamics layer,
 			      \item conclude bounded dissipation under declared scheduler premises.
 		      \end{itemize}
-		\item Compose both cases to obtain theorem statement and conservative profile-dependent quantitative side.
+		\item Compose both cases via \nolinkurl{flagship_composed_system_conservation} to obtain theorem statement and conservative profile-dependent quantitative side.
 	\end{enumerate}
 \end{proof}
 
@@ -1020,8 +996,6 @@ Conceptually, this is dual to Theorem~\ref{thm:minimality}:
 	\item D: weakest admissible invariant core,
 	\item F: maximal admissible behavior envelope.
 \end{itemize}
-
-Mechanized envelope bridge layers include core foundations, admission logic, and reconfiguration bridge components.
 
 \begin{proof}[Proof sketch]
 	Exactness is obtained by packaging three envelope properties.
@@ -1118,12 +1092,6 @@ Theorem~\ref{thm:normalization} combines two normalization properties.
 
 This is a symmetry-reduction statement. Different concrete traces can represent the same observable behavior class once exchange symmetries are quotiented. The theorem makes that collapse explicit and checkable at the envelope layer.
 
-Mechanized anchors in the bridge layer include:
-\begin{itemize}
-	\item \nolinkurl{exchange_normalization_of_e1_bridge_premises}
-	\item \nolinkurl{spatial_subtyping_monotonicity_of_e1_bridge_premises}
-\end{itemize}
-
 This theorem sharpens what ``determinism modulo envelope'' means operationally.
 
 \begin{proof}[Proof sketch]
@@ -1173,26 +1141,8 @@ This theorem sharpens what ``determinism modulo envelope'' means operationally.
 	For all runtime profiles $q$ and capability bits $b$, if $q$ advertises $b$, then there exists a corresponding theorem-pack object $a_b$ such that $a_b$ satisfies the same envelope-premise profile used by Theorem~\ref{thm:adequacy}.
 \end{proposition}
 
-Mechanized anchors:
-\begin{itemize}
-	\item adequacy theorem layer, including \nolinkurl{vm_adequacy_of_trace_consistency}
-	\item VM adherence and admission layers
-	\item profile extraction to theorem packs and distributed adapters
-\end{itemize}
-
-Coinductive adequacy bridge pack used here:
-\begin{itemize}
-	\item \nolinkurl{protocol_outcome_effect_bisim_of_observational_eq}
-	\item \nolinkurl{compile_refines_observational_eq_of_effect_bisim}
-	\item \nolinkurl{vm_view_effect_bisim_of_vmc_equiv}
-	\item \nolinkurl{vmc_equiv_of_vm_view_effect_bisim}
-	\item \nolinkurl{topology_change_preserves_vmc_equiv_via_effect_bisim}
-\end{itemize}
-
-Runtime consequence: proof-carrying conformance between claimed profile bits and available theorem-pack evidence.
-
 \begin{proof}[Proof sketch]
-	By definition of capability extraction, each advertised bit is accepted only if the corresponding theorem-pack entry is present and typechecks against the same profile premises used by admission. Soundness of profile extraction then yields a witness object $a_b$ for each advertised bit. Therefore advertised capabilities are justified by theorem-pack evidence under the Theorem~\ref{thm:adequacy} premise profile.
+	By definition of capability extraction, each advertised bit is accepted only if the corresponding theorem-pack entry is present and typechecks against the same profile premises used by admission. The runtime gate \texttt{canOperateUnderByzantineEnvelope} checks required capability evidence. Soundness of profile extraction then yields a witness object $a_b$ for each advertised bit. Therefore advertised capabilities are justified by theorem-pack evidence under the Theorem~\ref{thm:adequacy} premise profile.
 \end{proof}
 
 \begin{proof}[Proof sketch]
@@ -1209,7 +1159,7 @@ Runtime consequence: proof-carrying conformance between claimed profile bits and
 		      \end{itemize}
 		\item VM view bridge:
 		      \begin{itemize}
-			      \item connect VM configuration equivalence and effect-bisim (\nolinkurl{vm_view_effect_bisim_of_vmc_equiv},\allowbreak\ converse, and topology-preservation lemmas).
+			      \item connect VM configuration equivalence and effect-bisim (\nolinkurl{vm_view_effect_bisim_of_vmc_equiv},\allowbreak\ \nolinkurl{vm_c_equiv_of_vm_view_effect_bisim},\allowbreak\ \nolinkurl{topology_change_preserves_vmc_equiv_via_effect_bisim}).
 		      \end{itemize}
 	\end{enumerate}
 
@@ -1283,15 +1233,15 @@ Three support packages make the main theorem stack executable and compositional.
 Concrete modules for these packages:
 \begin{enumerate}
 	\item Higher-order/graph-delta semantics:
-	      \texttt{Protocol/Coherence/GraphDelta.lean},
-	      \texttt{Protocol/Coherence/GraphDeltaHO.lean}.
+	      \texttt{Protocol/\allowbreak Coherence/\allowbreak GraphDelta.lean},
+	      \texttt{Protocol/\allowbreak Coherence/\allowbreak GraphDeltaHO.lean}.
 	\item First-order collapse and equivalence/renaming support:
-	      \texttt{Protocol/Coherence/ConfigEquiv.lean},
-	      \texttt{Protocol/Coherence/ConfigEquivRenaming/*.lean},
-	      \texttt{Protocol/Coherence/RoleSwap/*.lean}.
+	      \texttt{Protocol/\allowbreak Coherence/\allowbreak ConfigEquiv.lean},
+	      \texttt{Protocol/\allowbreak Coherence/\allowbreak ConfigEquivRenaming/\allowbreak *.lean},
+	      \texttt{Protocol/\allowbreak Coherence/\allowbreak RoleSwap/\allowbreak *.lean}.
 	\item Delegation microkernel:
-	      \texttt{Protocol/Coherence/Delegation/Core/*.lean},
-	      \texttt{Protocol/Coherence/Delegation/Preservation.lean}.
+	      \texttt{Protocol/\allowbreak Coherence/\allowbreak Delegation/\allowbreak Core/\allowbreak *.lean},
+	      \texttt{Protocol/\allowbreak Coherence/\allowbreak Delegation/\allowbreak Preservation.lean}.
 \end{enumerate}
 
 % ============================================================================
@@ -1660,81 +1610,81 @@ This prevents hidden strengthening of either side.
 	Theorem~\ref{thm:byzantine} and Corollary~\ref{cor:byzantine-converse} provide exact Byzantine safety characterization and converse counterexample packaging under Assumption Block~\ref{assump:p3-byzantine}. Section~\ref{sec:limitations} explicitly restricts scope away from weaker timing and fairness assumptions required for Byzantine liveness. Therefore the claimed boundary follows directly.
 \end{proof}
 
-\section{Anchor Registry}
-\label{app:p3-anchor-registry}
-
-Table~\ref{tab:p3-anchor-registry} maps theorem anchors to their source files.
-
-\begin{table}[H]
-	\centering
-	\scriptsize
-	\begin{tabularx}{\columnwidth}{@{}L{0.475\columnwidth}L{0.475\columnwidth}@{}}
-		\toprule
-		\thead{Anchor} & \thead{Path (relative to \texttt{lean/})} \\
-		\midrule
-		\texttt{link\_harmony\_through\_link} & \texttt{Protocol/Deployment/\allowbreak}\mbox{\texttt{LinkingTheorems.lean}} \\
-		\texttt{coherent\_erasure\_stable} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}} \\
-		\texttt{flagship\_composed\_system\_conservation} & \texttt{Protocol/Deployment/\allowbreak}\mbox{\texttt{LinkingTheorems.lean}} \\
-		\texttt{consensus\_envelope\_exact\_of\_profile} & \texttt{Runtime/Proofs/Adapters/\allowbreak Distributed/}\mbox{\texttt{EnvelopeTheorems.lean}} \\
-		\texttt{vm\_adequacy\_of\_trace\_consistency} & \texttt{Runtime/Adequacy/}\mbox{\texttt{Adequacy.lean}} \\
-		\texttt{byzantine\_safety\_exact\_of\_profile} & \texttt{Runtime/Proofs/Adapters/\allowbreak Distributed/}\mbox{\texttt{EnvelopeTheorems.lean}} \\
-		\texttt{canOperateUnderByzantineEnvelope} & \texttt{Runtime/Proofs/TheoremPack/}\mbox{\texttt{*.lean}} \\
-		\texttt{effect\_bisim\_congr\_link} & \texttt{Runtime/Proofs/EffectBisim/\allowbreak}\mbox{\texttt{Congruence.lean}} \\
-		\texttt{lyapunov\_conserved\_under\_balanced\_delegation} & \texttt{Runtime/Proofs/}\mbox{\texttt{Lyapunov.lean}} \\
-		\bottomrule
-	\end{tabularx}
-	\caption{Anchor registry.}
-	\label{tab:p3-anchor-registry}
-\end{table}
-
 \section{Reproducibility}
 \label{app:reproducibility}
 
 Reproduction uses the pinned Lean toolchain and manifest.
 
 \begin{enumerate}
-	\item Build anchors listed in Table~\ref{tab:p3-anchor-registry}.
+	\item Build anchors listed in Table~\ref{tab:p3-index}.
 	\item Run \texttt{just escape} and \texttt{just verify-protocols}.
-	\item Validate that Table~\ref{tab:p3-anchor-registry} anchor names resolve and no proof holes remain.
+	\item Validate that anchor names resolve and no proof holes remain.
 \end{enumerate}
 
 Expected outcome: Full theorem-dependency compilation for Theorems~\ref{thm:harmony}--\ref{thm:adequacy}, Corollary~\ref{cor:principal}, Theorem~\ref{thm:byzantine}, and Corollary~\ref{cor:byzantine-converse} succeeds, profile extraction and admission modules compile, and bridge and adequacy modules compile under the pinned toolchain.
 
-\section{Index of Main Results}
+% Full-width index on its own page
+\clearpage
+\onecolumn
+
+\section{Anchor Index}
 \label{app:index}
+
+Table~\ref{tab:p3-index} maps paper claims to their Lean anchors and source files. Anchors marked with --- are infrastructure lemmas used in proofs but not tied to a single claim.
 
 \begin{table}[H]
 	\centering
-	\footnotesize
-	{\setlength{\tabcolsep}{3pt}
-	\begin{tabularx}{\columnwidth}{@{}L{0.22\columnwidth}L{0.09\columnwidth}L{0.42\columnwidth}L{0.17\columnwidth}@{}}
+	\scriptsize
+	\setlength{\aboverulesep}{0pt}
+	\setlength{\belowrulesep}{0pt}
+	\setlength{\extrarowheight}{2pt}
+	\begin{tabularx}{\textwidth}{L{0.29\textwidth}L{0.37\textwidth}L{0.06\textwidth}>{\raggedright\arraybackslash}X}
 		\toprule
-		\thead{Claim}          & \thead{Sec.} & \thead{Assumptions} & \thead{Anchor} \\
+		\thead{Anchor} & \thead{Path (relative to \texttt{lean/})} & \thead{Sec.} & \thead{Claims} \\
 		\midrule
-		Thm.~\ref{thm:harmony}            & \S\ref{sec:theorem-b} & Assump.~\ref{assump:p3-reconfiguration} & \texttt{link\_harmony*} \\
-		Thm.~\ref{thm:erasure}            & \S\ref{sec:theorem-a} & Assump.~\ref{assump:p3-core}            & \texttt{coherent\_*} \\
-		Thm.~\ref{thm:delegation}         & \S\ref{sec:theorem-c} & Assump.~\ref{assump:p3-reconfiguration} & \texttt{coherent\_*} \\
-		Cor.~\ref{cor:footprint}          & \S\ref{sec:theorem-c} & Thm.~\ref{thm:delegation} + side conds  & \texttt{coherent\_*} \\
-		Thm.~\ref{thm:minimality}         & \S\ref{sec:theorem-d} & admissibility clauses + core model       & \texttt{coherent\_*} \\
-		Thm.~\ref{thm:conservation}       & \S\ref{sec:theorem-e} & Assump.~\ref{assump:p3-reconfiguration} + quant.\ profile & \texttt{flagship\_*} \\
-		Cor.~\ref{cor:compositional}      & \S\ref{sec:theorem-e} & non-interference + envelope exactness    & \S\ref{sec:theorem-e} \\
-		Thm.~\ref{thm:envelope}           & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \texttt{consensus*} \\
-		Cor.~\ref{cor:transportability}   & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \texttt{consensus*} \\
-		Cor.~\ref{cor:boundary}           & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \texttt{consensus*} \\
-		Cor.~\ref{cor:embedding}          & \S\ref{sec:theorem-f} & Assump.~\ref{assump:p3-envelope}         & \texttt{consensus*} \\
-		Thm.~\ref{thm:normalization}      & \S\ref{sec:theorem-g} & Assump.~\ref{assump:p3-envelope} + exch./spatial premises & \texttt{consensus*} \\
-		Thm.~\ref{thm:adequacy}           & \S\ref{sec:theorem-h} & Assump.~\ref{assump:p3-adequacy}         & \texttt{vm\_adequacy*} \\
-		Prop.~\ref{prop:capability}       & \S\ref{sec:theorem-h} & Assump.~\ref{assump:p3-adequacy}         & \texttt{canOperate*} \\
-		Cor.~\ref{cor:principal}          & \S\ref{sec:theorem-h} & adequacy + admission premises            & \texttt{canOperate*} \\
-		Thm.~\ref{thm:byzantine}          & \S\ref{sec:theorem-h} & Assump.~\ref{assump:p3-byzantine}        & \texttt{byzantine*} \\
-		Cor.~\ref{cor:byzantine-converse} & \S\ref{sec:theorem-h} & Thm.~\ref{thm:byzantine} + dropped class & \texttt{byzantine*} \\
-		Prop.~\ref{prop:byzantine-vm}     & \S\ref{sec:theorem-h} & adequacy + Byzantine profile + capability bits & \texttt{canOperate*} \\
-		Thm.~\ref{thm:tail}               & \S\ref{sec:transport} & Assump.~\ref{assump:p3-transport}        & \S\ref{sec:transport} \\
-		Thm.~\ref{thm:mixing}             & \S\ref{sec:transport} & Assump.~\ref{assump:p3-transport}        & \S\ref{sec:transport} \\
+		\multicolumn{4}{@{}l}{\textit{Theorems}} \\
+		\rowcolor{gray!8}
+		\texttt{link\_harmony\_\allowbreak through\_link} & \texttt{Protocol/\allowbreak Deployment/\allowbreak}\mbox{\texttt{LinkingTheorems.lean}} & \S\ref{sec:theorem-b} & Thm.~\ref{thm:harmony} \\
+		\texttt{link\_preserves\_\allowbreak coherent} & \texttt{Protocol/\allowbreak Deployment/\allowbreak}\mbox{\texttt{LinkingCore.lean}} & \S\ref{sec:theorem-b} & Thm.~\ref{thm:harmony} \\
+		\rowcolor{gray!8}
+		\texttt{effect\_bisim\_\allowbreak congr\_link} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{Congruence.lean}} & \S\ref{sec:theorem-b} & --- \\
+		\texttt{config\_equiv\_iff\_\allowbreak effect\_bisim\_silent} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{ConfigEquivBridge.lean}} & \S\ref{sec:theorem-b} & --- \\
+		\rowcolor{gray!8}
+		\texttt{coherent\_erasure\_\allowbreak stable} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}} & \S\ref{sec:theorem-a} & Thm.~\ref{thm:erasure} \\
+		\texttt{safe\_delegation\_\allowbreak local\_necessity} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}} & \S\ref{sec:theorem-c} & --- \\
+		\rowcolor{gray!8}
+		\texttt{safe\_delegation\_\allowbreak to\_footprint} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}} & \S\ref{sec:theorem-c} & --- \\
+		\texttt{footprint\_to\_\allowbreak safe\_delegation} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}} & \S\ref{sec:theorem-c} & Cor.~\ref{cor:footprint} \\
+		\rowcolor{gray!8}
+		\texttt{safe\_delegation\_\allowbreak iff\_footprint} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}} & \S\ref{sec:theorem-c} & Thm.~\ref{thm:delegation} \\
+		\texttt{relative\_minimality} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}} & \S\ref{sec:theorem-d} & Thm.~\ref{thm:minimality} \\
+		\rowcolor{gray!8}
+		\texttt{flagship\_composed\_\allowbreak system\_conservation} & \texttt{Protocol/\allowbreak Deployment/\allowbreak}\mbox{\texttt{LinkingTheorems.lean}} & \S\ref{sec:theorem-e} & Thm.~\ref{thm:conservation} \\
+		\texttt{lyapunov\_conserved\_\allowbreak under\_balanced\_\allowbreak delegation} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{Lyapunov.lean}} & \S\ref{sec:theorem-e} & --- \\
+		\rowcolor{gray!8}
+		\texttt{consensus\_envelope\_\allowbreak exact\_of\_profile} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:theorem-f} & Thm.~\ref{thm:envelope}, Cors.~\ref{cor:transportability}--\ref{cor:embedding} \\
+		\texttt{failure\_envelope\_\allowbreak maximality\_of\_profile} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:theorem-f} & --- \\
+		\rowcolor{gray!8}
+		\texttt{exchange\_normalization\_\allowbreak of\_e1\_bridge\_premises} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak EnvelopeCore/\allowbreak}\mbox{\texttt{ReconfigurationBridge.lean}} & \S\ref{sec:theorem-g} & Thm.~\ref{thm:normalization} \\
+		\texttt{spatial\_subtyping\_\allowbreak monotonicity\_of\_e1\_\allowbreak bridge\_premises} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak EnvelopeCore/\allowbreak}\mbox{\texttt{ReconfigurationBridge.lean}} & \S\ref{sec:theorem-g} & Thm.~\ref{thm:normalization} \\
+		\rowcolor{gray!8}
+		\texttt{vm\_adequacy\_of\_\allowbreak trace\_consistency} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak}\mbox{\texttt{Adequacy.lean}} & \S\ref{sec:theorem-h} & Thm.~\ref{thm:adequacy} \\
+		\texttt{protocol\_outcome\_\allowbreak effect\_bisim\_of\_\allowbreak observational\_eq} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{HandlerEquivalence.lean}} & \S\ref{sec:theorem-h} & --- \\
+		\rowcolor{gray!8}
+		\texttt{compile\_refines\_\allowbreak observational\_eq\_\allowbreak of\_effect\_bisim} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak}\mbox{\texttt{CompileRefinesEffectBisim.lean}} & \S\ref{sec:theorem-h} & --- \\
+		\texttt{vm\_view\_effect\_bisim\_\allowbreak of\_vmc\_equiv} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{ObserverProjectionEffectBisim.lean}} & \S\ref{sec:theorem-h} & --- \\
+		\rowcolor{gray!8}
+		\texttt{vm\_c\_equiv\_of\_\allowbreak vm\_view\_effect\_bisim} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{ObserverProjectionEffectBisim.lean}} & \S\ref{sec:theorem-h} & --- \\
+		\texttt{topology\_change\_\allowbreak preserves\_vmc\_equiv\_\allowbreak via\_effect\_bisim} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{ObserverProjectionEffectBisim.lean}} & \S\ref{sec:theorem-h} & --- \\
+		\rowcolor{gray!8}
+		\texttt{byzantine\_safety\_\allowbreak exact\_of\_profile} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:theorem-h} & Thm.~\ref{thm:byzantine}, Cor.~\ref{cor:byzantine-converse} \\
+		\midrule
+		\multicolumn{4}{@{}l}{\textit{Runtime Gates}} \\
+		\rowcolor{gray!8}
+		\texttt{canOperateUnder\allowbreak ByzantineEnvelope} & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{API.lean}} & \S\ref{sec:theorem-h} & Prop.~\ref{prop:capability}, Cor.~\ref{cor:principal}, Prop.~\ref{prop:byzantine-vm} \\
 		\bottomrule
 	\end{tabularx}
-	}
-	\caption{Index of main results.}
+	\caption{Anchor index.}
 	\label{tab:p3-index}
 \end{table}
 
