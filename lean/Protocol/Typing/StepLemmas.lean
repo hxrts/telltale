@@ -7,7 +7,7 @@ The Problem. Preservation proofs require lemmas about how TypedStep affects
 environments (session sets, GEnv, DEnv). These provide the building blocks
 for the main preservation theorem.
 Solution Structure. We prove:
-1. `SessionsOfD_subset_of_TypedStep`: session set inclusion after steps
+1. `sessions_of_d_subset_of_typed_step`: session set inclusion after steps
 2. Environment update lemmas for each step kind
 3. Coherence connection lemmas for the full preservation
 -/
@@ -45,7 +45,7 @@ section
 
 -- Core Step Lemmas
 
-theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
+theorem sessions_of_d_subset_of_typed_step {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     SessionsOfD D' ⊆ SessionsOfD D ∪ SessionsOf G := by
   intro hTS
@@ -56,7 +56,7 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
       intro s hs
       have hs' : s ∈ SessionsOfD (appendD D sendEdge T) := by
         simpa [hDout] using hs
-      have hSub := SessionsOfD_updateD_subset (D:=D) (e:=sendEdge)
+      have hSub := sessions_of_d_update_d_subset (D:=D) (e:=sendEdge)
         (ts:=lookupD D sendEdge ++ [T]) hs'
       cases hSub with
       | inl hIn => exact Or.inl hIn
@@ -73,7 +73,7 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
       intro s hs
       have hs' : s ∈ SessionsOfD (updateD D recvEdge (lookupD D recvEdge).tail) := by
         simpa [hDout] using hs
-      have hSub := SessionsOfD_updateD_subset (D:=D) (e:=recvEdge)
+      have hSub := sessions_of_d_update_d_subset (D:=D) (e:=recvEdge)
         (ts:=(lookupD D recvEdge).tail) hs'
       cases hSub with
       | inl hIn => exact Or.inl hIn
@@ -90,7 +90,7 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
       intro s hs
       have hs' : s ∈ SessionsOfD (appendD D selectEdge .string) := by
         simpa [hDout] using hs
-      have hSub := SessionsOfD_updateD_subset (D:=D) (e:=selectEdge)
+      have hSub := sessions_of_d_update_d_subset (D:=D) (e:=selectEdge)
 /- ## Structured Block 1 -/
         (ts:=lookupD D selectEdge ++ [.string]) hs'
       cases hSub with
@@ -108,7 +108,7 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
       intro s hs
       have hs' : s ∈ SessionsOfD (updateD D branchEdge (lookupD D branchEdge).tail) := by
         simpa [hDout] using hs
-      have hSub := SessionsOfD_updateD_subset (D:=D) (e:=branchEdge)
+      have hSub := sessions_of_d_update_d_subset (D:=D) (e:=branchEdge)
         (ts:=(lookupD D branchEdge).tail) hs'
       cases hSub with
       | inl hIn => exact Or.inl hIn
@@ -137,7 +137,7 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
 
 -- Disjointness and Coherence Transport
 
-theorem lookupD_none_of_disjointG {G₁ G₂ : GEnv} {D₂ : DEnv} {e : Edge} :
+theorem lookup_d_none_of_disjoint_g {G₁ G₂ : GEnv} {D₂ : DEnv} {e : Edge} :
     DisjointG G₁ G₂ →
     DConsistent G₂ D₂ →
     e.sid ∈ SessionsOf G₁ →
@@ -160,7 +160,7 @@ theorem lookupD_none_of_disjointG {G₁ G₂ : GEnv} {D₂ : DEnv} {e : Edge} :
 -- Coherence Projection
 
 /-- Coherence splits to the right portion of G/D when sessions are disjoint. -/
-theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
+theorem coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     Coherent (G₁ ++ G₂) (D₁ ++ D₂) →
     DisjointG G₁ G₂ →
     DConsistent G₁ D₁ →
@@ -169,7 +169,7 @@ theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
   -- endpoints are in G₂; ensure G₁ has none for this session
   have hSid : e.sid ∈ SessionsOf G₂ := ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hGrecv, rfl⟩
   have hG1none_sender : lookupG G₁ { sid := e.sid, role := e.sender } = none := by
-    apply lookupG_none_of_not_session
+    apply lookup_g_none_of_not_session
     intro hIn
     have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn, hSid⟩
     have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj
@@ -177,7 +177,7 @@ theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
       simpa [hEmpty] using hInter
     exact hContra.elim
   have hG1none_recv : lookupG G₁ { sid := e.sid, role := e.receiver } = none := by
-    apply lookupG_none_of_not_session
+    apply lookup_g_none_of_not_session
     intro hIn
     have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn, hSid⟩
     have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj
@@ -185,7 +185,7 @@ theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
       simpa [hEmpty] using hInter
     exact hContra.elim
   have hGrecv' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.receiver } = some Lrecv := by
-    simpa [lookupG_append_right hG1none_recv] using hGrecv
+    simpa [lookup_g_append_right hG1none_recv] using hGrecv
   -- D₁ has no entries for this session
   have hDisjSym : DisjointG G₂ G₁ := by
     unfold DisjointG at *
@@ -193,21 +193,21 @@ theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     unfold GEnvDisjoint
     simpa [Set.inter_comm] using hDisj
   have hD1none : D₁.find? e = none :=
-    lookupD_none_of_disjointG (G₁:=G₂) (G₂:=G₁) (D₂:=D₁) hDisjSym hCons hSid
+    lookup_d_none_of_disjoint_g (G₁:=G₂) (G₂:=G₁) (D₂:=D₁) hDisjSym hCons hSid
   have hTraceEq : lookupD (D₁ ++ D₂) e = lookupD D₂ e :=
-    lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hD1none
+    lookup_d_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hD1none
   have hActive' : ActiveEdge (G₁ ++ G₂) e := by
     have hSenderMerged : (lookupG (G₁ ++ G₂) { sid := e.sid, role := e.sender }).isSome = true := by
       cases hActive with
       | intro hSender _ =>
-          simpa [lookupG_append_right hG1none_sender] using hSender
+          simpa [lookup_g_append_right hG1none_sender] using hSender
     have hRecvMerged : (lookupG (G₁ ++ G₂) { sid := e.sid, role := e.receiver }).isSome = true := by
       simp [hGrecv']
     exact ⟨hSenderMerged, hRecvMerged⟩
 /- ## Structured Block 3 -/
   have hCohEdge := hCoh e hActive' Lrecv hGrecv'
   rcases hCohEdge with ⟨Lsender, hGsenderMerged, hConsume⟩
-  have hSenderEq := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.sender }) hG1none_sender
+  have hSenderEq := lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.sender }) hG1none_sender
   have hGsenderG2 : lookupG G₂ { sid := e.sid, role := e.sender } = some Lsender := by
     simpa [hSenderEq] using hGsenderMerged
   refine ⟨Lsender, hGsenderG2, ?_⟩
@@ -216,7 +216,7 @@ theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
 -- Value-Typing Weakening
 
 /-- HasTypeVal weakening: values typed in empty environment are typed in any environment. -/
-theorem HasTypeVal_weaken {v : Value} {T : ValType} {G : GEnv} :
+theorem has_type_val_weaken {v : Value} {T : ValType} {G : GEnv} :
     HasTypeVal ∅ v T → HasTypeVal G v T := by
   intro hv
   cases hv with
@@ -225,7 +225,7 @@ theorem HasTypeVal_weaken {v : Value} {T : ValType} {G : GEnv} :
   | nat n => exact HasTypeVal.nat n
   | string s => exact HasTypeVal.string s
   | prod h₁ h₂ =>
-    exact HasTypeVal.prod (HasTypeVal_weaken h₁) (HasTypeVal_weaken h₂)
+    exact HasTypeVal.prod (has_type_val_weaken h₁) (has_type_val_weaken h₂)
   | chan h =>
     -- Channel in empty environment is impossible
     simp [lookupG] at h
@@ -233,7 +233,7 @@ theorem HasTypeVal_weaken {v : Value} {T : ValType} {G : GEnv} :
 /-- HasTypeVal weakening for updateG: if the value doesn't depend on the updated endpoint.
     For non-channel values, this is always true. For channel values, we need the channel
     to be a different endpoint. -/
-theorem HasTypeVal_updateG_weaken {G : GEnv} {e : Endpoint} {L : LocalType} {v : Value} {T : ValType} :
+theorem has_type_val_update_g_weaken {G : GEnv} {e : Endpoint} {L : LocalType} {v : Value} {T : ValType} :
     HasTypeVal G v T →
     HasTypeVal (updateG G e L) v T := by
   intro hv
@@ -243,7 +243,7 @@ theorem HasTypeVal_updateG_weaken {G : GEnv} {e : Endpoint} {L : LocalType} {v :
   | nat n => exact HasTypeVal.nat n
   | string s => exact HasTypeVal.string s
   | prod h₁ h₂ =>
-    exact HasTypeVal.prod (HasTypeVal_updateG_weaken h₁) (HasTypeVal_updateG_weaken h₂)
+    exact HasTypeVal.prod (has_type_val_update_g_weaken h₁) (has_type_val_update_g_weaken h₂)
   | chan h =>
     -- Channel case: need to show lookupG (updateG G e L) e' = some L''
     -- e' and L' are implicit arguments from the chan constructor
@@ -253,29 +253,29 @@ theorem HasTypeVal_updateG_weaken {G : GEnv} {e : Endpoint} {L : LocalType} {v :
       -- After update, lookupG (updateG G e L) e = some L
       rw [heq]
       apply HasTypeVal.chan
-      apply lookupG_update_eq
+      apply lookup_g_update_eq
     · -- e' ≠ e: use update_neq lemma
       apply HasTypeVal.chan
-      rw [lookupG_update_neq G e e' L (Ne.symm heq)]
+      rw [lookup_g_update_neq G e e' L (Ne.symm heq)]
       exact h
 
 -- Store-Typing Preservation Helpers
 
 /-- For the send case: StoreTyped is trivially preserved because store is unchanged.
     We just need to weaken G, which works for all values (with caveat for sent channel). -/
-theorem StoreTyped_send_preserved {G : GEnv} {S : SEnv} {store : VarStore} {e : Endpoint} {L : LocalType} :
+theorem store_typed_send_preserved {G : GEnv} {S : SEnv} {store : VarStore} {e : Endpoint} {L : LocalType} :
     StoreTyped G S store →
     StoreTyped (updateG G e L) S store := by
   intro hST
   unfold StoreTyped at hST ⊢
   intro x v T hStore hS
   have hVal := hST x v T hStore hS
-  exact HasTypeVal_updateG_weaken hVal
+  exact has_type_val_update_g_weaken hVal
 
 /-- For the assign case: StoreTyped with updated S and updated store.
     The value v has type T in G (from TypedStep.assign premise). After update,
     store[x] = v and S[x] = T match. -/
-theorem StoreTyped_assign_preserved {G : GEnv} {S : SEnv} {store : VarStore} {x : Var} {v : Value} {T : ValType} :
+theorem store_typed_assign_preserved {G : GEnv} {S : SEnv} {store : VarStore} {x : Var} {v : Value} {T : ValType} :
 /- ## Structured Block 4 -/
     StoreTyped G S store →
     HasTypeVal G v T →
@@ -286,23 +286,23 @@ theorem StoreTyped_assign_preserved {G : GEnv} {S : SEnv} {store : VarStore} {x 
   by_cases heq : y = x
   · -- y = x case: use the new typing
     subst heq
-    rw [lookupSEnv_update_eq] at hSY
+    rw [lookup_s_env_update_eq] at hSY
     simp at hSY
     cases hSY
-    rw [lookupStr_update_eq] at hStoreY
+    rw [lookup_str_update_eq] at hStoreY
     simp at hStoreY
     cases hStoreY
     exact hv
   · -- y ≠ x case: use original typing from unchanged variables
-    rw [lookupSEnv_update_neq S x y T (Ne.symm heq)] at hSY
-    rw [lookupStr_update_neq store x y v (Ne.symm heq)] at hStoreY
+    rw [lookup_s_env_update_neq S x y T (Ne.symm heq)] at hSY
+    rw [lookup_str_update_neq store x y v (Ne.symm heq)] at hStoreY
     exact hST y w T' hStoreY hSY
 
 -- Buffer-Typing Preservation Helpers
 
 /-- BuffersTyped is preserved when updating G: all values in buffers remain well-typed
-    because HasTypeVal_updateG_weaken preserves typing for all values. -/
-theorem BuffersTyped_updateG_weaken {G : GEnv} {D : DEnv} {bufs : Buffers} {e : Endpoint} {L : LocalType} :
+    because has_type_val_update_g_weaken preserves typing for all values. -/
+theorem buffers_typed_update_g_weaken {G : GEnv} {D : DEnv} {bufs : Buffers} {e : Endpoint} {L : LocalType} :
     BuffersTyped G D bufs →
     BuffersTyped (updateG G e L) D bufs := by
   intro hBT edge
@@ -312,11 +312,11 @@ theorem BuffersTyped_updateG_weaken {G : GEnv} {D : DEnv} {bufs : Buffers} {e : 
   refine ⟨hLen, ?_⟩
   intro i hi
   have hVal := hTyping i hi
-  exact HasTypeVal_updateG_weaken hVal
+  exact has_type_val_update_g_weaken hVal
 
 /-- For the recv case: StoreTyped is preserved when receiving a value into the store.
     The received value has type T in G, so it has type T in (updateG G e L) by weakening. -/
-theorem StoreTyped_recv_preserved {G : GEnv} {S : SEnv} {store : VarStore} {e : Endpoint} {L : LocalType}
+theorem store_typed_recv_preserved {G : GEnv} {S : SEnv} {store : VarStore} {e : Endpoint} {L : LocalType}
     {x : Var} {v : Value} {T : ValType} :
     StoreTyped G S store →
     HasTypeVal G v T →
@@ -327,19 +327,19 @@ theorem StoreTyped_recv_preserved {G : GEnv} {S : SEnv} {store : VarStore} {e : 
   by_cases heq : y = x
   · -- y = x case: use the received value's typing
     subst heq
-    rw [lookupSEnv_update_eq] at hSY
+    rw [lookup_s_env_update_eq] at hSY
     simp at hSY
     cases hSY
-    rw [lookupStr_update_eq] at hStoreY
+    rw [lookup_str_update_eq] at hStoreY
     simp at hStoreY
     cases hStoreY
-    exact HasTypeVal_updateG_weaken hv
+    exact has_type_val_update_g_weaken hv
   · -- y ≠ x case: use original typing with G weakening
 /- ## Structured Block 5 -/
-    rw [lookupSEnv_update_neq S x y T (Ne.symm heq)] at hSY
-    rw [lookupStr_update_neq store x y v (Ne.symm heq)] at hStoreY
+    rw [lookup_s_env_update_neq S x y T (Ne.symm heq)] at hSY
+    rw [lookup_str_update_neq store x y v (Ne.symm heq)] at hStoreY
     have hValOrig := hST y w T' hStoreY hSY
-    exact HasTypeVal_updateG_weaken hValOrig
+    exact has_type_val_update_g_weaken hValOrig
 
 -- Enqueue Typing Preservation
 
@@ -347,7 +347,7 @@ theorem StoreTyped_recv_preserved {G : GEnv} {S : SEnv} {store : VarStore} {e : 
 
     NOTE: This lemma is proven in Protocol.Preservation. It's duplicated here to avoid
     circular dependencies, but should be moved to a shared module. -/
-theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
+theorem buffers_typed_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
     {e : Edge} {v : Value} {T : ValType}
     (hBT : BuffersTyped G D bufs)
     (hv : HasTypeVal G v T) :
@@ -363,13 +363,13 @@ theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
     subst ha
     -- The buffer becomes: lookupBuf bufs a ++ [v]
     -- The trace becomes: lookupD D a ++ [T]
-    simp only [enqueueBuf, lookupBuf_update_eq, lookupD_update_eq]
+    simp only [enqueueBuf, lookup_buf_update_eq, lookup_d_update_eq]
     have hBufUpdate :
         lookupBuf (updateBuf bufs a (lookupBuf bufs a ++ [v])) a = (lookupBuf bufs a ++ [v]) := by
       simp
     have hTraceUpdate :
         lookupD (updateD D a (lookupD D a ++ [T])) a = (lookupD D a ++ [T]) := by
-      simp [lookupD_update_eq]
+      simp [lookup_d_update_eq]
     -- New lengths are equal
     have hNewLen : (lookupBuf bufs a ++ [v]).length = (lookupD D a ++ [T]).length := by
       simp [List.length_append]
@@ -422,9 +422,9 @@ theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
   · -- a ≠ e: unaffected edge
     have hOrig := hBT a
     have hBufEq : lookupBuf (updateBuf bufs e (lookupBuf bufs e ++ [v])) a = lookupBuf bufs a := by
-      exact lookupBuf_update_neq _ _ _ _ (Ne.symm ha)
+      exact lookup_buf_update_neq _ _ _ _ (Ne.symm ha)
     have hTraceEq : lookupD (updateD D e (lookupD D e ++ [T])) a = lookupD D a := by
-      exact lookupD_update_neq _ _ _ _ (Ne.symm ha)
+      exact lookup_d_update_neq _ _ _ _ (Ne.symm ha)
     simpa [BufferTyped, hBufEq, hTraceEq, enqueueBuf] using hOrig
 
 -- Dequeue Typing Preservation
@@ -432,9 +432,9 @@ theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
 /-- BuffersTyped is preserved when dequeuing a buffer: removing the head preserves typing
     for the remaining elements (which shift down by one index).
 
-    NOTE: This lemma needs to be proven. Similar to BuffersTyped_enqueue, this should be
+    NOTE: This lemma needs to be proven. Similar to buffers_typed_enqueue, this should be
     moved to a shared module to avoid circular dependencies. -/
-theorem BuffersTyped_dequeue {G : GEnv} {D : DEnv} {bufs : Buffers}
+theorem buffers_typed_dequeue {G : GEnv} {D : DEnv} {bufs : Buffers}
     {recvEdge : Edge} {v : Value} {vs : List Value} {T : ValType} :
     BuffersTyped G D bufs →
     lookupBuf bufs recvEdge = v :: vs →
@@ -463,15 +463,15 @@ theorem BuffersTyped_dequeue {G : GEnv} {D : DEnv} {bufs : Buffers}
           simpa [hBuf, hTrace] using hLen
         -- Updated buffer/trace
         have hBufEq : lookupBuf (updateBuf bufs recvEdge vs) recvEdge = vs := by
-          exact lookupBuf_update_eq _ _ _
+          exact lookup_buf_update_eq _ _ _
         have hTraceEq :
             lookupD (updateD D recvEdge (lookupD D recvEdge).tail) recvEdge = ts := by
-          simp [lookupD_update_eq, hTrace]
+          simp [lookup_d_update_eq, hTrace]
         refine ⟨?_, ?_⟩
 /- ## Structured Block 7 -/
         · -- length equality
           -- Simplify lookups on the updated environments
-          simp [lookupD_update_eq, hLen']
+          simp [lookup_d_update_eq, hLen']
         · intro i hi
           -- Use original typing at index i+1
           have hi' : i < vs.length := by
@@ -486,15 +486,15 @@ theorem BuffersTyped_dequeue {G : GEnv} {D : DEnv} {bufs : Buffers}
           have hTypedIdx' : HasTypeVal G vs[i] ts[i] := by
             simpa [List.get_eq_getElem, hBuf, hTrace, List.getElem_cons_succ] using hTypedIdx
           -- Now rewrite indices in updated envs
-          simpa [hBufEq, lookupD_update_eq] using hTypedIdx'
+          simpa [hBufEq, lookup_d_update_eq] using hTypedIdx'
   -- # Non-Target Edge Case (`a ≠ recvEdge`)
   · -- a ≠ recvEdge: unaffected edge
     have hOrig := hBT a
     have hBufEq : lookupBuf (updateBuf bufs recvEdge vs) a = lookupBuf bufs a := by
-      exact lookupBuf_update_neq _ _ _ _ (Ne.symm ha)
+      exact lookup_buf_update_neq _ _ _ _ (Ne.symm ha)
     have hTraceEq :
         lookupD (updateD D recvEdge (lookupD D recvEdge).tail) a = lookupD D a := by
-      exact lookupD_update_neq _ _ _ _ (Ne.symm ha)
+      exact lookup_d_update_neq _ _ _ _ (Ne.symm ha)
     simpa [BufferTyped, hBufEq, hTraceEq] using hOrig
 
 end

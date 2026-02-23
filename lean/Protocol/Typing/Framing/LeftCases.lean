@@ -54,7 +54,7 @@ lemma preserved_sub_left_frame_send
       have hL : L' = L := send_localtype_eq (G₁:=G₁) (G₂:=G₂) (G:=G) (e:=e)
         (target:=target) (q:=q') (T:=T) (T':=T') (L:=L) (L':=L') hEq hG₁e hG
       have hG₁' : G₁' = updateG G₁ e L :=
-        updateG_left_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₁':=G₁') (e:=e)
+        update_g_left_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₁':=G₁') (e:=e)
           (L:=L) (L0:=.send q' T' L') hEq hEq' hG₁e hGout.symm
       refine ⟨[], ∅, ?_, ?_, ?_⟩
       · simpa [hG₁', hL, hEqE] using
@@ -92,7 +92,7 @@ lemma preserved_sub_left_frame_select
       have hL : L' = L :=
         select_label_eq (bs:=bs) (bs':=bs') (ℓ:=ℓ) (L:=L) (L':=L') hBs hFind' hFind
       have hG₁' : G₁' = updateG G₁ e L :=
-        updateG_left_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₁':=G₁') (e:=e)
+        update_g_left_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₁':=G₁') (e:=e)
           (L:=L) (L0:=.select q' bs') hEq hEq' hG₁e hGout.symm
       refine ⟨[], ∅, ?_, ?_, ?_⟩
       · simpa [hG₁', hL, hEqE] using
@@ -131,9 +131,9 @@ lemma preserved_sub_left_frame_branch
         branch_find_eq (bs:=bs) (bs':=bs') (ℓ:=ℓ) (L:=L) hBs hFindT
       have hPre' := hPost _ _ _ hFindP hFindT'
       have hG₁' : G₁' = updateG G₁ e L :=
-        updateG_left_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₁':=G₁') (e:=e)
+        update_g_left_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₁':=G₁') (e:=e)
           (L:=L) (L0:=.branch p' bs') hEq hEq' hG₁e hGout.symm
-      refine ⟨W, Δ, ?_, FootprintSubset_refl, SEnvDomSubset_refl⟩
+      refine ⟨W, Δ, ?_, footprint_subset_refl, s_env_dom_subset_refl⟩
       simpa [hG₁', hEqE] using hPre'
 
 /-- Helper: assign-new case for the left-frame preservation lemma. -/
@@ -156,12 +156,12 @@ lemma preserved_sub_left_frame_assign_new
   intro hEq hEq' hv hSout hSfin hGfin hSsh hSownL hv'
   have hv'' : HasTypeVal G v T_pre := by
     -- Strengthen the typing to the framed global environment.
-    refine HasTypeVal_mono G₁ G v T_pre hv' ?_
+    refine has_type_val_mono G₁ G v T_pre hv' ?_
     intro e L hLookup
     have hLookup' : lookupG (G₁ ++ G₂) e = some L :=
-      lookupG_append_left (G₁:=G₁) (G₂:=G₂) hLookup
+      lookup_g_append_left (G₁:=G₁) (G₂:=G₂) hLookup
     simpa [hEq] using hLookup'
-  have hT := HasTypeVal_unique hv'' hv
+  have hT := has_type_val_unique hv'' hv
   cases hT
   have hEqG : G₁' ++ G₂ = G₁ ++ G₂ := by
     have hEqG0 : G₁' ++ G₂ = G := by
@@ -194,12 +194,12 @@ lemma preserved_sub_left_frame_assign_old
   intro hEq hEq' hv hSout hSfin hGfin hSsh hSownL hv'
   have hv'' : HasTypeVal G v T_pre := by
     -- Strengthen the typing to the framed global environment.
-    refine HasTypeVal_mono G₁ G v T_pre hv' ?_
+    refine has_type_val_mono G₁ G v T_pre hv' ?_
     intro e L hLookup
     have hLookup' : lookupG (G₁ ++ G₂) e = some L :=
-      lookupG_append_left (G₁:=G₁) (G₂:=G₂) hLookup
+      lookup_g_append_left (G₁:=G₁) (G₂:=G₂) hLookup
     simpa [hEq] using hLookup'
-  have hT := HasTypeVal_unique hv'' hv
+  have hT := has_type_val_unique hv'' hv
   cases hT
   have hEqG : G₁' ++ G₂ = G₁ ++ G₂ := by
 /- ## Structured Block 3 -/
@@ -242,7 +242,7 @@ lemma preserved_sub_left_frame_recv_new
     recv_types_eq (G₁:=G₁) (G₂:=G₂) (G:=G) (e:=e) (source:=source) (p:=p')
       (T:=T) (T':=T') (L:=L) (L':=L') hEq hG₁e hG
   have hG₁' : G₁' = updateG G₁ e L :=
-    updateG_left_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₁':=G₁') (e:=e)
+    update_g_left_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₁':=G₁') (e:=e)
       (L:=L) (L0:=.recv p' T' L') hEq hEq' hG₁e hGout.symm
   refine ⟨[], ∅, ?_, ?_, ?_⟩
   · subst hSout
@@ -280,7 +280,7 @@ lemma preserved_sub_left_frame_recv_old
     recv_types_eq (G₁:=G₁) (G₂:=G₂) (G:=G) (e:=e) (source:=source) (p:=p')
       (T:=T) (T':=T') (L:=L) (L':=L') hEq hG₁e hG
   have hG₁' : G₁' = updateG G₁ e L :=
-    updateG_left_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₁':=G₁') (e:=e)
+    update_g_left_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₁':=G₁') (e:=e)
       (L:=L) (L0:=.recv p' T' L') hEq hEq' hG₁e hGout.symm
   refine ⟨[], ∅, ?_, ?_, ?_⟩
   · subst hSout

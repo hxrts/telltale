@@ -33,8 +33,8 @@ Premise inventory:
 3. `handlerTyping` is discharged by `WellTypedInstr.wt_invoke` from the same monitor layer.
 
 Bridge transport used by end-to-end theorems:
-1. `configEquiv_iff_effectBisim_silent` in `Runtime/Proofs/EffectBisim/ConfigEquivBridge.lean`.
-2. `effectBisim_implies_observationalEquivalence` in `Runtime/Proofs/EffectBisim/Bridge.lean`. -/
+1. `config_equiv_iff_effect_bisim_silent` in `Runtime/Proofs/EffectBisim/ConfigEquivBridge.lean`.
+2. `effect_bisim_implies_observational_equivalence` in `Runtime/Proofs/EffectBisim/Bridge.lean`. -/
 structure VMBridgePremises (m : SessionMonitor γ) : Prop where
   monitorSound : monitor_sound (γ:=γ) (ε:=ε) m
   monitorPreserves : unified_monitor_preserves m
@@ -43,7 +43,7 @@ structure VMBridgePremises (m : SessionMonitor γ) : Prop where
       handler_invoke_typed (γ:=γ) (ε:=ε) action hsid
 
 /-- Canonical constructor for bridge premises from monitor contracts. -/
-theorem vmBridgePremises_of_monitor
+theorem vm_bridge_premises_of_monitor
     (m : SessionMonitor γ)
     (hSound : monitor_sound (γ:=γ) (ε:=ε) m)
     (hPres : unified_monitor_preserves m) :
@@ -105,9 +105,9 @@ theorem vm_bridge_soundness_composed
     ObservationalEq configErasureObs C₁ C₂ := by
   have hLocal := handler_vm_step_typing (γ:=γ) (ε:=ε) hPrem action hsid hStep hHandler
   have hBisim : EffectBisim configErasureObs configSilentStep C₁ C₂ :=
-    (configEquiv_iff_effectBisim_silent C₁ C₂).1 hCfg
+    (config_equiv_iff_effect_bisim_silent C₁ C₂).1 hCfg
   have hObs : ObservationalEq configErasureObs C₁ C₂ :=
-    effectBisim_implies_observationalEquivalence configErasureObs configSilentStep hBisim
+    effect_bisim_implies_observational_equivalence configErasureObs configSilentStep hBisim
   exact ⟨hLocal.1, hObs⟩
 
 end

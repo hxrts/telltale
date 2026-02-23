@@ -2,8 +2,8 @@ import Choreography.Projection.Trans.Participation
 
 /-! # Trans Contractive
 
-Contractiveness preservation for projection: `trans_isContractive_of_participatesAllBranches`
-and `trans_wellFormed_of_wellFormed`.
+Contractiveness preservation for projection: `trans_is_contractive_of_participates_all_branches`
+and `trans_well_formed_of_well_formed`.
 -/
 
 /-
@@ -13,9 +13,9 @@ protocols make progress.
 
 Solution Structure. We prove contractiveness preservation:
 1. Size-of lemmas for termination of recursive proofs
-2. `trans_isContractive_of_participatesAllBranches`: participation in all branches
+2. `trans_is_contractive_of_participates_all_branches`: participation in all branches
    ensures the projection is contractive
-3. `trans_wellFormed_of_wellFormed`: well-formedness lifts through projection
+3. `trans_well_formed_of_well_formed`: well-formedness lifts through projection
 -/
 
 namespace Choreography.Projection.Trans
@@ -27,52 +27,52 @@ open SessionTypes.Participation
 The `participatesAllBranches` predicate is stronger than `participatesFirstBranch`:
 - For direct participants, it requires participation in ALL branch continuations
 - This ensures that `transBranches` produces contractive results
-- The theorem `trans_isContractive_of_participatesAllBranches` is fully provable
+- The theorem `trans_is_contractive_of_participates_all_branches` is fully provable
 -/
 
 /-! ## Size-Of Lemmas for Termination -/
 
-private theorem sizeOf_snd_lt_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b : β) :
+private theorem size_of_snd_lt_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b : β) :
     sizeOf b < sizeOf (a, b) := by
   simp only [sizeOf, Prod._sizeOf_1]
   omega
 
-private theorem sizeOf_head_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
+private theorem size_of_head_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf x < sizeOf (x :: l) := by
   simp only [sizeOf, List._sizeOf_1]
   omega
 
-private theorem sizeOf_tail_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
+private theorem size_of_tail_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf l < sizeOf (x :: l) := by
   simp only [sizeOf, List._sizeOf_1]
   omega
 
-private theorem sizeOf_head_snd_lt_cons (pair : Label × GlobalType) (rest : List (Label × GlobalType)) :
+private theorem size_of_head_snd_lt_cons (pair : Label × GlobalType) (rest : List (Label × GlobalType)) :
     sizeOf pair.2 < sizeOf (pair :: rest) := by
-  have h1 : sizeOf pair.2 < sizeOf pair := sizeOf_snd_lt_prod pair.1 pair.2
-  have h2 : sizeOf pair < sizeOf (pair :: rest) := sizeOf_head_lt_cons pair rest
+  have h1 : sizeOf pair.2 < sizeOf pair := size_of_snd_lt_prod pair.1 pair.2
+  have h2 : sizeOf pair < sizeOf (pair :: rest) := size_of_head_lt_cons pair rest
   exact Nat.lt_trans h1 h2
 
-private theorem sizeOf_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
+private theorem size_of_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
     sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
   simp only [GlobalType.comm.sizeOf_spec]
   have h : 0 < 1 + sizeOf sender + sizeOf receiver := by omega
   omega
 
-private theorem sizeOf_cont_lt_comm
+private theorem size_of_cont_lt_comm
     (sender receiver : String) (label : Label) (cont : GlobalType) (rest : List (Label × GlobalType)) :
     sizeOf cont < sizeOf (GlobalType.comm sender receiver ((label, cont) :: rest)) := by
   have h1 : sizeOf cont < sizeOf ((label, cont) :: rest) :=
-    sizeOf_head_snd_lt_cons (label, cont) rest
+    size_of_head_snd_lt_cons (label, cont) rest
   have h2 : sizeOf ((label, cont) :: rest) < sizeOf (GlobalType.comm sender receiver ((label, cont) :: rest)) :=
-    sizeOf_bs_lt_comm sender receiver ((label, cont) :: rest)
+    size_of_bs_lt_comm sender receiver ((label, cont) :: rest)
   exact Nat.lt_trans h1 h2
 
-private theorem sizeOf_cont_lt_cons (label : Label) (cont : GlobalType) (rest : List (Label × GlobalType)) :
+private theorem size_of_cont_lt_cons (label : Label) (cont : GlobalType) (rest : List (Label × GlobalType)) :
     sizeOf cont < sizeOf ((label, cont) :: rest) := by
-  exact sizeOf_head_snd_lt_cons (label, cont) rest
+  exact size_of_head_snd_lt_cons (label, cont) rest
 
-private theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
+private theorem size_of_body_lt_mu (t : String) (body : GlobalType) :
     sizeOf body < sizeOf (GlobalType.mu t body) := by
   have hk : 0 < 1 + sizeOf t := by
     simp only [Nat.one_add]
@@ -84,7 +84,7 @@ private theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
 
 /-! ## All-Branch Participation Implies First-Branch Participation -/
 
-theorem participatesAllBranches_imp_participatesFirstBranch (g : GlobalType) (role : String) :
+theorem participates_all_branches_imp_participates_first_branch (g : GlobalType) (role : String) :
     participatesAllBranches role g = true → participatesFirstBranch role g = true := by
   intro h
   match g with
@@ -94,7 +94,7 @@ theorem participatesAllBranches_imp_participatesFirstBranch (g : GlobalType) (ro
       simp [participatesAllBranches] at h
   | .mu _ body =>
       simpa [participatesAllBranches, participatesFirstBranch] using
-        (participatesAllBranches_imp_participatesFirstBranch body role h)
+        (participates_all_branches_imp_participates_first_branch body role h)
   | .comm sender receiver [] =>
       unfold participatesAllBranches at h
       unfold participatesFirstBranch
@@ -111,7 +111,7 @@ theorem participatesAllBranches_imp_participatesFirstBranch (g : GlobalType) (ro
           simp
       | false =>
           simp only [hpart, Bool.false_and, Bool.false_or] at h ⊢
-          exact participatesAllBranches_imp_participatesFirstBranch cont role h
+          exact participates_all_branches_imp_participates_first_branch cont role h
   | .delegate p q sid r cont =>
       unfold participatesAllBranches at h
       unfold participatesFirstBranch
@@ -120,21 +120,21 @@ theorem participatesAllBranches_imp_participatesFirstBranch (g : GlobalType) (ro
           simp
       | false =>
           simp only [hpart, Bool.false_and, Bool.false_or] at h ⊢
-          exact participatesAllBranches_imp_participatesFirstBranch cont role h
+          exact participates_all_branches_imp_participates_first_branch cont role h
 termination_by sizeOf g
 decreasing_by
   all_goals
     simp_wf
     first
-    | exact sizeOf_body_lt_mu _ _
-    | exact sizeOf_cont_lt_comm _ _ _ _ _
+    | exact size_of_body_lt_mu _ _
+    | exact size_of_cont_lt_comm _ _ _ _ _
     | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
 /-! ## All-Branch Contractiveness Preservation -/
 
 mutual
   -- trans Contractiveness from All-Branch Participation
-  theorem trans_isContractive_of_participatesAllBranches (g : GlobalType) (role : String)
+  theorem trans_is_contractive_of_participates_all_branches (g : GlobalType) (role : String)
       (hpart : participatesAllBranches role g = true) :
       (trans g role).isContractive = true := by
     match g with
@@ -147,7 +147,7 @@ mutual
         simp only [trans]
         by_cases hguard : (trans body role).isGuarded t
         · simp [hguard, LocalTypeR.isContractive]
-          exact trans_isContractive_of_participatesAllBranches body role hpart
+          exact trans_is_contractive_of_participates_all_branches body role hpart
         · simp [hguard, LocalTypeR.isContractive]
     -- All-Branch Contractiveness: Comm Cases
     | .comm sender receiver [] =>
@@ -200,7 +200,7 @@ mutual
                 have heq : role = sender := beq_iff_eq.mp hrole_s
                 rw [trans_comm_sender sender receiver role ((label, cont) :: rest) heq]
                 simp only [LocalTypeR.isContractive]
-                exact transBranches_isContractive_of_participatesAllBranches ((label, cont) :: rest) role hbranches
+                exact trans_branches_is_contractive_of_participates_all_branches ((label, cont) :: rest) role hbranches
             | false =>
                 simp only [hrole_s, Bool.false_or] at hpart_direct
                 have heq : role = receiver := beq_iff_eq.mp hpart_direct
@@ -210,7 +210,7 @@ mutual
                   simp at hrole_s
                 rw [trans_comm_receiver sender receiver role ((label, cont) :: rest) heq hne]
                 simp only [LocalTypeR.isContractive]
-                exact transBranches_isContractive_of_participatesAllBranches ((label, cont) :: rest) role hbranches
+                exact trans_branches_is_contractive_of_participates_all_branches ((label, cont) :: rest) role hbranches
         | false =>
             unfold participatesAllBranches at hpart
             simp [hpart_direct] at hpart
@@ -224,7 +224,7 @@ mutual
               rw [heq] at hpart_direct
               simp at hpart_direct
             rw [trans_comm_other sender receiver role ((label, cont) :: rest) hne_s hne_r]
-            exact trans_isContractive_of_participatesAllBranches cont role hpart
+            exact trans_is_contractive_of_participates_all_branches cont role hpart
     -- All-Branch Contractiveness: Delegate Case
     | .delegate p q sid r cont =>
         simp only [trans]
@@ -235,7 +235,7 @@ mutual
             unfold participatesAllBranches at hpart
             simp only [is_participant, hp, Bool.true_or, Bool.true_and, Bool.not_true, Bool.false_and,
               Bool.or_false] at hpart
-            exact trans_isContractive_of_participatesAllBranches cont role hpart
+            exact trans_is_contractive_of_participates_all_branches cont role hpart
         | false =>
             cases hq : role == q with
 /- ## Structured Block 2 -/
@@ -246,25 +246,25 @@ mutual
                 unfold participatesAllBranches at hpart
                 simp only [is_participant, hp, Bool.false_or, hq, Bool.true_and,
                   Bool.not_true, Bool.false_and, Bool.or_false] at hpart
-                exact trans_isContractive_of_participatesAllBranches cont role hpart
+                exact trans_is_contractive_of_participates_all_branches cont role hpart
             | false =>
                 -- Other role: follow continuation
                 simp only [Bool.false_eq_true, ↓reduceIte]
                 unfold participatesAllBranches at hpart
                 simp only [is_participant, hp, Bool.false_or, hq, Bool.false_and, Bool.false_or] at hpart
-                exact trans_isContractive_of_participatesAllBranches cont role hpart
+                exact trans_is_contractive_of_participates_all_branches cont role hpart
   termination_by sizeOf g
   decreasing_by
     all_goals
       simp_wf
       first
-      | exact sizeOf_body_lt_mu _ _
-      | exact sizeOf_bs_lt_comm _ _ _
-      | exact sizeOf_cont_lt_comm _ _ _ _ _
+      | exact size_of_body_lt_mu _ _
+      | exact size_of_bs_lt_comm _ _ _
+      | exact size_of_cont_lt_comm _ _ _ _ _
       | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
   -- transBranches Contractiveness from All-Branch Participation
-  theorem transBranches_isContractive_of_participatesAllBranches
+  theorem trans_branches_is_contractive_of_participates_all_branches
       (branches : List (Label × GlobalType)) (role : String)
       (hpart : participatesAllBranchesList role branches = true) :
       isContractiveBranches (transBranches branches role) = true := by
@@ -276,23 +276,23 @@ mutual
         unfold participatesAllBranchesList at hpart
         simp only [Bool.and_eq_true] at hpart
         constructor
-        · exact trans_isContractive_of_participatesAllBranches cont role hpart.1
-        · exact transBranches_isContractive_of_participatesAllBranches rest role hpart.2
+        · exact trans_is_contractive_of_participates_all_branches cont role hpart.1
+        · exact trans_branches_is_contractive_of_participates_all_branches rest role hpart.2
   termination_by sizeOf branches
   decreasing_by
     all_goals first
-      | exact sizeOf_cont_lt_cons _ _ _
-      | exact sizeOf_tail_lt_cons _ _
+      | exact size_of_cont_lt_cons _ _ _
+      | exact size_of_tail_lt_cons _ _
 end
 
 /-! ## Well-Formedness from All-Branch Participation -/
-theorem trans_preserves_WellFormed_allBranches (g : GlobalType) (role : String)
+theorem trans_preserves_well_formed_all_branches (g : GlobalType) (role : String)
     (hclosed : g.isClosed = true)
     (hpart : participatesAllBranches role g = true) :
     LocalTypeR.WellFormed (trans g role) := by
   constructor
-  · exact trans_isClosed_of_isClosed g role hclosed
-  · exact trans_isContractive_of_participatesAllBranches g role hpart
+  · exact trans_is_closed_of_is_closed g role hclosed
+  · exact trans_is_contractive_of_participates_all_branches g role hpart
 
 end Choreography.Projection.Trans
 
@@ -307,7 +307,7 @@ open SessionTypes.LocalTypeR
 
 mutual
   -- trans Contractiveness from Productivity
-  theorem trans_isContractive_of_isProductive
+  theorem trans_is_contractive_of_is_productive
       (g : GlobalType) (role : String) (hprod : g.isProductive = true) :
       (trans g role).isContractive = true := by
     match g with
@@ -319,11 +319,11 @@ mutual
         -- Mu case: reduce to body contractiveness.
         simp only [GlobalType.isProductive] at hprod
         have hbody_prod : body.isProductive = true := by
-          apply isProductive_mono body [] [t]
+          apply is_productive_mono body [] [t]
           · intro x hx; simp at hx
           · exact hprod
         have hbody : (trans body role).isContractive = true :=
-          trans_isContractive_of_isProductive body role hbody_prod
+          trans_is_contractive_of_is_productive body role hbody_prod
         by_cases hguard : (trans body role).isGuarded t
         · simp [trans, hguard, LocalTypeR.isContractive, hbody]
         · simp [trans, hguard, LocalTypeR.isContractive]
@@ -334,13 +334,13 @@ mutual
         by_cases hrs : role = sender
         · have hbranches :
             isContractiveBranches (transBranches branches role) = true :=
-            transBranches_isContractive_of_isProductive branches role hprod'
+            trans_branches_is_contractive_of_is_productive branches role hprod'
           have htrans := trans_comm_sender sender receiver role branches hrs
           simp [htrans, LocalTypeR.isContractive, hbranches]
         · by_cases hrr : role = receiver
           · have hbranches :
               isContractiveBranches (transBranches branches role) = true :=
-              transBranches_isContractive_of_isProductive branches role hprod'
+              trans_branches_is_contractive_of_is_productive branches role hprod'
             have htrans := trans_comm_receiver sender receiver role branches hrr hrs
             simp [htrans, LocalTypeR.isContractive, hbranches]
           · match branches with
@@ -351,35 +351,35 @@ mutual
                 have hpair : cont.isProductive = true ∧
                     isProductiveBranches tail [] = true := by
                   simpa [isProductiveBranches, Bool.and_eq_true] using hprod'
-                exact trans_isContractive_of_isProductive cont role hpair.1
+                exact trans_is_contractive_of_is_productive cont role hpair.1
     -- Productivity Contractiveness: Delegate Case
     | .delegate p q sid r cont =>
         -- Delegate is productive → cont is productive with [] unguarded
         have hcont_prod : cont.isProductive = true := by
           simp only [GlobalType.isProductive] at hprod
-          apply isProductive_mono cont [] []
+          apply is_productive_mono cont [] []
           · intro x hx; exact hx
           · exact hprod
 /- ## Structured Block 3 -/
         by_cases hp : role == p
         · simp [trans, hp, LocalTypeR.isContractive, isContractiveBranches]
-          exact trans_isContractive_of_isProductive cont role hcont_prod
+          exact trans_is_contractive_of_is_productive cont role hcont_prod
         · by_cases hq : role == q
           · simp [trans, hp, hq, LocalTypeR.isContractive, isContractiveBranches]
-            exact trans_isContractive_of_isProductive cont role hcont_prod
+            exact trans_is_contractive_of_is_productive cont role hcont_prod
           · simp [trans, hp, hq]
-            exact trans_isContractive_of_isProductive cont role hcont_prod
+            exact trans_is_contractive_of_is_productive cont role hcont_prod
   termination_by sizeOf g
   decreasing_by
     all_goals
       first
-      | exact sizeOf_body_lt_mu _ _
-      | exact sizeOf_bs_lt_comm _ _ _
-      | exact sizeOf_cont_lt_comm _ _ _ _ _
+      | exact size_of_body_lt_mu _ _
+      | exact size_of_bs_lt_comm _ _ _
+      | exact size_of_cont_lt_comm _ _ _ _ _
       | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
   -- transBranches Contractiveness from Productivity
-  theorem transBranches_isContractive_of_isProductive
+  theorem trans_branches_is_contractive_of_is_productive
       (branches : List (Label × GlobalType)) (role : String)
       (hprod : isProductiveBranches branches [] = true) :
       isContractiveBranches (transBranches branches role) = true := by
@@ -390,24 +390,24 @@ mutual
         simp only [transBranches, isContractiveBranches, Bool.and_eq_true]
         simp [isProductiveBranches, Bool.and_eq_true] at hprod
         constructor
-        · exact trans_isContractive_of_isProductive cont role hprod.1
-        · exact transBranches_isContractive_of_isProductive rest role hprod.2
+        · exact trans_is_contractive_of_is_productive cont role hprod.1
+        · exact trans_branches_is_contractive_of_is_productive rest role hprod.2
   termination_by sizeOf branches
   decreasing_by
     all_goals first
-      | exact sizeOf_cont_lt_cons _ _ _
-      | exact sizeOf_tail_lt_cons _ _
+      | exact size_of_cont_lt_cons _ _ _
+      | exact size_of_tail_lt_cons _ _
 end
 
 /-! ## Well-Formedness from Productivity -/
-theorem trans_wellFormed_of_wellFormed (g : GlobalType) (role : String)
+theorem trans_well_formed_of_well_formed (g : GlobalType) (role : String)
     (hwf : g.wellFormed = true) : LocalTypeR.WellFormed (trans g role) := by
-  have hclosed : g.isClosed = true := GlobalType.isClosed_of_wellFormed g hwf
+  have hclosed : g.isClosed = true := GlobalType.is_closed_of_well_formed g hwf
   have hprod : g.isProductive = true := by
     simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
     exact hwf.2
   have hcontr : (trans g role).isContractive = true :=
-    trans_isContractive_of_isProductive g role hprod
-  exact ⟨trans_isClosed_of_isClosed g role hclosed, hcontr⟩
+    trans_is_contractive_of_is_productive g role hprod
+  exact ⟨trans_is_closed_of_is_closed g role hclosed, hcontr⟩
 
 end Choreography.Projection.Trans

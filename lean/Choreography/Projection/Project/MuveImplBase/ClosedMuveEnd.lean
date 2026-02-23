@@ -16,7 +16,7 @@ def ClosedMuveRel : LocalTypeR → LocalTypeR → Prop := fun a b =>
   a = .end ∧ isMuve b = true ∧ isClosed b = true
 
 /-- Convert isClosed = true to freeVars = []. -/
-theorem isClosed_eq_true_iff (lt : LocalTypeR) :
+theorem is_closed_eq_true_iff (lt : LocalTypeR) :
     isClosed lt = true ↔ lt.freeVars = [] := by
   simp only [isClosed, beq_iff_eq]
 
@@ -29,25 +29,25 @@ theorem closed_muve_substitute_mu (t : String) (body : LocalTypeR)
     isClosed (body.substitute t (.mu t body)) = true := by
   -- Convert isClosed hypothesis to freeVars = []
   have hclosed_eq : (.mu t body : LocalTypeR).freeVars = [] :=
-    (isClosed_eq_true_iff _).mp hclosed
+    (is_closed_eq_true_iff _).mp hclosed
   constructor
   · -- muve preservation
     simp only [isMuve] at hmuve
-    apply isMuve_substitute
+    apply is_muve_substitute
     · exact hmuve
     · -- isMuve (.mu t body) requires isMuve body
       simp only [isMuve, hmuve]
   · -- closed preservation: use substitute_closed_when_only_var
-    rw [isClosed_eq_true_iff]
+    rw [is_closed_eq_true_iff]
     -- (.mu t body).freeVars = [] means body.freeVars.filter (· != t) = []
     -- This means all free vars in body are equal to t
-    have hbody_fv : ∀ x, x ∈ body.freeVars → x = t := mu_closed_body_freeVars t body hclosed_eq
+    have hbody_fv : ∀ x, x ∈ body.freeVars → x = t := mu_closed_body_free_vars t body hclosed_eq
     -- (.mu t body).freeVars = [] since isClosed
     exact substitute_closed_when_only_var body t (.mu t body) hbody_fv hclosed_eq
 
 /-- ClosedMuveRel is a post-fixpoint of EQ2F.
     This proves: if b is a closed muve type, then EQ2 .end b. -/
-theorem ClosedMuveRel_postfix :
+theorem closed_muve_rel_postfix :
     ∀ a b, ClosedMuveRel a b → EQ2F ClosedMuveRel a b := by
   intro a b ⟨ha, hmuve, hclosed⟩
   subst ha  -- a = .end

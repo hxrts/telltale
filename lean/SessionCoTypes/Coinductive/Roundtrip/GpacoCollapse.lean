@@ -42,7 +42,7 @@ theorem mu_paco_obs_to_gpaco {a b : LocalTypeC}
     ObservableRelC GpacoRel a b := by
   -- Step 1: obtain observability under EQ2C_mu_paco.
   have hobs : ObservableRelC EQ2C_mu_paco a b :=
-    EQ2C_mu_paco_to_obs ha hb h
+    eq2_c_mu_paco_to_obs ha hb h
   -- Step 2: lift the relation from EQ2C_mu_paco to GpacoRel.
   have hle : ∀ x y, EQ2C_mu_paco x y → GpacoRel x y := by
     intro x y hx
@@ -50,7 +50,7 @@ theorem mu_paco_obs_to_gpaco {a b : LocalTypeC}
     have h' := Paco.r_le_gpaco_clo EQ2CMono mu_clo EQ2C_mu_paco EQ2C_mu_paco x y hx
     simpa [Paco.gupaco_clo_def] using h'
   -- Step 3: apply monotonicity of ObservableRelC.
-  exact ObservableRelC_mono hle hobs
+  exact observable_rel_c_mono hle hobs
 
 /-! ## gpaco collapse under bisimulation -/
 
@@ -62,7 +62,7 @@ theorem mu_paco_to_gpaco {a b : LocalTypeC} (h : EQ2C_mu_paco a b) :
   simpa [Paco.gupaco_clo_def] using h'
 
 /-- Extract observability from an observable relation. -/
-lemma observable_of_ObservableRelC {R : LocalTypeC → LocalTypeC → Prop}
+lemma observable_of_observable_rel_c {R : LocalTypeC → LocalTypeC → Prop}
     {a b : LocalTypeC} (hrel : ObservableRelC R a b) :
     ObservableC a ∧ ObservableC b := by
   -- Each observable case witnesses observability on both sides.
@@ -85,7 +85,7 @@ theorem gpaco_to_paco_of_bisim
   rcases hbis x y hxy with ⟨obs_x, obs_y, hrel⟩
   -- Lift the relation into the paco step relation (R ⊔ ⊥).
   have hrel' : ObservableRelC (GpacoRel ⊔ ⊥) x y :=
-    ObservableRelC_mono (fun _ _ hr => Or.inl hr) hrel
+    observable_rel_c_mono (fun _ _ hr => Or.inl hr) hrel
   exact ⟨obs_x, obs_y, hrel'⟩
 
 /-- Collapse μ-paco to paco assuming GpacoRel is a bisimulation. -/
@@ -104,7 +104,7 @@ theorem mu_paco_le_paco_of_obs
   have hbis : IsBisimulationC GpacoRel := by
     intro x y hxy
     have hrel : ObservableRelC GpacoRel x y := gupaco_clo_obs_of_rr hrr hxy
-    have hobs := observable_of_ObservableRelC hrel
+    have hobs := observable_of_observable_rel_c hrel
     exact ⟨hobs.1, hobs.2, hrel⟩
   -- Collapse using the bisimulation.
   exact mu_paco_le_paco_of_bisim hbis h

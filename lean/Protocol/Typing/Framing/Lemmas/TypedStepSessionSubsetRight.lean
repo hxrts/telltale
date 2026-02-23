@@ -17,7 +17,7 @@ section
 -- Right-Frame Session Subset
 /-! ## Right Frame Subset -/
 
-theorem SessionsOf_subset_of_TypedStep_right_frame
+theorem sessions_of_subset_of_typed_step_right_frame
     {G₁ G₂ G G' D Ssh Sown store bufs P G₂' D' Sown' store' bufs' P'} :
     DisjointG G₁ G₂ →
     G = G₁ ++ G₂ →
@@ -33,28 +33,28 @@ theorem SessionsOf_subset_of_TypedStep_right_frame
         simpa [hEq] using hG
       have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ G₂' := by
         simpa [hEq, hEq'] using hGout.symm
-      exact SessionsOf_right_subset_of_update hLookup hUpd
+      exact sessions_of_right_subset_of_update hLookup hUpd
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
       have hLookup : lookupG (G₁ ++ G₂) e = some (.recv source T L) := by
         simpa [hEq] using hG
       have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ G₂' := by
         simpa [hEq, hEq'] using hGout.symm
-      exact SessionsOf_right_subset_of_update hLookup hUpd
+      exact sessions_of_right_subset_of_update hLookup hUpd
   | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
       have hLookup : lookupG (G₁ ++ G₂) e = some (.select target bs) := by
         simpa [hEq] using hG
       have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ G₂' := by
         simpa [hEq, hEq'] using hGout.symm
-      exact SessionsOf_right_subset_of_update hLookup hUpd
+      exact sessions_of_right_subset_of_update hLookup hUpd
   | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
       have hLookup : lookupG (G₁ ++ G₂) e = some (.branch source bs) := by
         simpa [hEq] using hG
       have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ G₂' := by
         simpa [hEq, hEq'] using hGout.symm
-      exact SessionsOf_right_subset_of_update hLookup hUpd
+      exact sessions_of_right_subset_of_update hLookup hUpd
   -- Structural Cases
   | assign =>
       intro s hs

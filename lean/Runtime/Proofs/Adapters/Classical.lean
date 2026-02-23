@@ -97,15 +97,15 @@ theorem foster_of_profile
     {State : Type v}
     (p : FosterProfile State) :
     Classical.Transport.FosterConclusion p.input := by
-  exact Classical.Transport.transported_fosterLyapunov (input := p.input)
+  exact Classical.Transport.transported_foster_lyapunov (input := p.input)
 
 /-- MaxWeight theorem derived from a MaxWeight profile. -/
-theorem maxWeight_of_profile
+theorem max_weight_of_profile
     (p : MaxWeightProfile) :
     @Classical.Transport.MaxWeightConclusion p.ι p.instFintype p.input := by
   letI : Fintype p.ι := p.instFintype
   simpa using
-    (Classical.Transport.transported_maxWeight (ι := p.ι) (input := p.input))
+    (Classical.Transport.transported_max_weight (ι := p.ι) (input := p.input))
 
 /-- LDP theorem derived from an LDP profile. -/
 theorem ldp_of_profile
@@ -114,16 +114,16 @@ theorem ldp_of_profile
   exact Classical.Transport.transported_ldp p.input
 
 /-- Mean-field theorem derived from a mean-field profile. -/
-theorem meanField_of_profile
+theorem mean_field_of_profile
     (p : MeanFieldProfile) :
     Classical.Transport.MeanFieldConclusion p.input := by
-  exact Classical.Transport.transported_meanField p.input
+  exact Classical.Transport.transported_mean_field p.input
 
 /-- Heavy-traffic theorem derived from a heavy-traffic profile. -/
-theorem heavyTraffic_of_profile
+theorem heavy_traffic_of_profile
     (p : HeavyTrafficProfile) :
     Classical.Transport.HeavyTrafficConclusion p.input := by
-  exact Classical.Transport.transported_heavyTraffic p.input
+  exact Classical.Transport.transported_heavy_traffic p.input
 
 /-- Mixing-time theorem derived from a mixing profile. -/
 theorem mixing_of_profile
@@ -135,7 +135,7 @@ theorem mixing_of_profile
 theorem fluid_of_profile
     (p : FluidProfile) :
     Classical.Transport.FluidConclusion p.input := by
-  exact Classical.Transport.transported_fluidLimit p.input
+  exact Classical.Transport.transported_fluid_limit p.input
 
 /-- Concentration theorem derived from a concentration profile. -/
 theorem concentration_of_profile
@@ -144,16 +144,16 @@ theorem concentration_of_profile
   exact Classical.Transport.transported_concentration p.input
 
 /-- Little's-law theorem derived from a Little's-law profile. -/
-theorem littlesLaw_of_profile
+theorem littles_law_of_profile
     (p : LittlesLawProfile) :
     Classical.Transport.LittlesLawConclusion p.input := by
-  exact Classical.Transport.transported_littlesLaw p.input
+  exact Classical.Transport.transported_littles_law p.input
 
 /-- Functional CLT theorem derived from a functional-CLT profile. -/
-theorem functionalCLT_of_profile
+theorem functional_clt_of_profile
     (p : FunctionalCLTProfile) :
     Classical.Transport.FunctionalCLTConclusion p.input := by
-  exact Classical.Transport.transported_functionalCLT p.input
+  exact Classical.Transport.transported_functional_clt p.input
 
 /-! ## Packaged Classical Artifacts -/
 
@@ -220,7 +220,7 @@ def fosterArtifactOfProfile
 def maxWeightArtifactOfProfile
     (p : MaxWeightProfile) : MaxWeightArtifact :=
   { profile := p
-  , proof := maxWeight_of_profile p
+  , proof := max_weight_of_profile p
   }
 
 def ldpArtifactOfProfile
@@ -234,13 +234,13 @@ def ldpArtifactOfProfile
 def meanFieldArtifactOfProfile
     (p : MeanFieldProfile) : MeanFieldArtifact :=
   { profile := p
-  , proof := meanField_of_profile p
+  , proof := mean_field_of_profile p
   }
 
 def heavyTrafficArtifactOfProfile
     (p : HeavyTrafficProfile) : HeavyTrafficArtifact :=
   { profile := p
-  , proof := heavyTraffic_of_profile p
+  , proof := heavy_traffic_of_profile p
   }
 
 def mixingArtifactOfProfile
@@ -264,13 +264,13 @@ def concentrationArtifactOfProfile
 def littlesLawArtifactOfProfile
     (p : LittlesLawProfile) : LittlesLawArtifact :=
   { profile := p
-  , proof := littlesLaw_of_profile p
+  , proof := littles_law_of_profile p
   }
 
 def functionalCLTArtifactOfProfile
     (p : FunctionalCLTProfile) : FunctionalCLTArtifact :=
   { profile := p
-  , proof := functionalCLT_of_profile p
+  , proof := functional_clt_of_profile p
   }
 
 /-! ## Optional Artifact Lifting -/

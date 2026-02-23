@@ -352,12 +352,12 @@ def maxBufferBound (S T : LocalTypeC) : Nat :=
     (AsyncTriple.initial S T).buffer = [] := rfl
 
 /-- In this model, `maxBufferBound` is exactly zero. -/
-@[simp] theorem maxBufferBound_eq_zero (S T : LocalTypeC) :
+@[simp] theorem max_buffer_bound_eq_zero (S T : LocalTypeC) :
     maxBufferBound S T = 0 := by
   simp [maxBufferBound, AsyncTriple.initial]
 
 /-- Any reachable triple respects `maxBufferBound` on buffer length. -/
-theorem reachable_buffer_le_maxBufferBound (S T : LocalTypeC)
+theorem reachable_buffer_le_max_buffer_bound (S T : LocalTypeC)
     {t : AsyncTriple}
     (ht : t ∈ reachableTriples (AsyncTriple.initial S T)) :
     t.buffer.length ≤ maxBufferBound S T := by

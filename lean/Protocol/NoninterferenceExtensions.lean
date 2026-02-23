@@ -26,7 +26,7 @@ section
 /-! ## Contextual Closure -/
 
 /-- Blind steps preserve CEquiv across the contextual Step relation. -/
-theorem blind_step_preserves_CEquiv {C C' : Config}
+theorem blind_step_preserves_c_equiv {C C' : Config}
     {s : SessionId} {r : Role}
     (hStep : Step C C')
     (hBlindSend : ∀ ep target T L, lookupG C.G ep = some (.send target T L) →
@@ -42,20 +42,20 @@ theorem blind_step_preserves_CEquiv {C C' : Config}
     C ≈[s, r] C' := by
   induction hStep with
   | base hBase =>
-      exact blind_step_preserves_CEquiv_single hBase hBlindSend hBlindSelect
+      exact blind_step_preserves_c_equiv_single hBase hBlindSend hBlindSelect
         hBlindRecv hBlindBranch hFreshBufs
   | seq_left hProc hSub ih =>
       rename_i Cmid P Q
       have h := ih hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs
-      exact CEquiv_ignore_proc (C':=Cmid) (P:=P) (Q:=.seq Cmid.proc Q) h
+      exact c_equiv_ignore_proc (C':=Cmid) (P:=P) (Q:=.seq Cmid.proc Q) h
   | par_left hProc hSub ih =>
       rename_i Cmid P Q nS nG nS' nG'
       have h := ih hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs
-      exact CEquiv_ignore_proc (C':=Cmid) (P:=P) (Q:=.par nS' nG' Cmid.proc Q) h
+      exact c_equiv_ignore_proc (C':=Cmid) (P:=P) (Q:=.par nS' nG' Cmid.proc Q) h
   | par_right hProc hSub ih =>
       rename_i Cmid P Q nS nG nS' nG'
       have h := ih hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs
-      exact CEquiv_ignore_proc (C':=Cmid) (P:=Q) (Q:=.par nS' nG' P Cmid.proc) h
+      exact c_equiv_ignore_proc (C':=Cmid) (P:=Q) (Q:=.par nS' nG' P Cmid.proc) h
 
 /-! ## Coherence Connection -/
 
@@ -64,7 +64,7 @@ theorem blind_step_preserves_CEquiv {C C' : Config}
 
     Note: For list-backed GEnv/DEnv, equal lookups don't imply list equality,
     but they do imply observational equivalence which suffices for Coherence. -/
-theorem CEquiv_all_implies_lookup_eq {C₁ C₂ : Config}
+theorem c_equiv_all_implies_lookup_eq {C₁ C₂ : Config}
     (hEquiv : ∀ s r, C₁ ≈[s, r] C₂) :
     (∀ ep, lookupG C₁.G ep = lookupG C₂.G ep) ∧
     (∀ e, lookupD C₁.D e = lookupD C₂.D e) := by
@@ -81,7 +81,7 @@ theorem CEquiv_all_implies_lookup_eq {C₁ C₂ : Config}
 /-! ## TypedStep Composition -/
 
 /-- Compose noninterference with subject reduction (TypedStep → Step). -/
-theorem blind_typed_step_preserves_CEquiv {n : SessionId}
+theorem blind_typed_step_preserves_c_equiv {n : SessionId}
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'}
     {s : SessionId} {r : Role}
     (hTS : TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P')
@@ -101,7 +101,7 @@ theorem blind_typed_step_preserves_CEquiv {n : SessionId}
   let C' : Config := { proc := P', store := store', bufs := bufs', G := G', D := D', nextSid := n }
   have hStep : Step C C' := subject_reduction (n:=n) hTS
   simpa [C, C'] using
-    (blind_step_preserves_CEquiv (C:=C) (C':=C') hStep
+    (blind_step_preserves_c_equiv (C:=C) (C':=C') hStep
       hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs)
 
 /-! ## Exactness Wrappers (Blindness ↔ Observational Invariance) -/
@@ -127,7 +127,7 @@ theorem blind_observational_invariance_single
     {s : SessionId} {r : Role} :
     BlindObservationalInvarianceSingle s r := by
   intro C C' hStep hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs
-  exact blind_step_preserves_CEquiv hStep hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs
+  exact blind_step_preserves_c_equiv hStep hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs
 
 /-- Strict counterexample witness interface for a non-blind step.
     This packages the witness expected by reverse-direction exactness arguments. -/
@@ -168,7 +168,7 @@ This module establishes noninterference for MPST:
    incoming buffers, incoming traces)
 2. **BlindTo**: When a role is neither sender nor receiver
 3. **Step locality**: Steps only affect participant state
-4. **blind_step_preserves_CEquiv**: The core noninterference theorem
+4. **blind_step_preserves_c_equiv**: The core noninterference theorem
 
 The proofs rely on the per-edge structure of MPST: since each edge is
 independent, steps on one edge cannot affect observations on unrelated edges.

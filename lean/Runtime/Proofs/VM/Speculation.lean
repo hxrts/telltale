@@ -11,7 +11,7 @@ universe u
 
 section
 
-theorem stepFork_depth_monotone_success
+theorem step_fork_depth_monotone_success
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -37,7 +37,7 @@ theorem stepFork_depth_monotone_success
     | succ _ =>
         simp
 
-theorem stepJoin_cleanup_when_reconciled
+theorem step_join_cleanup_when_reconciled
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -54,7 +54,7 @@ theorem stepJoin_cleanup_when_reconciled
     out.st.ghostSessions.checkpoints = st.ghostSessions.checkpoints.erase spec.ghostSid := by
   simp [stepJoin, hSpec, hMatch, pack, advancePc]
 
-theorem stepAbort_restores_scoped_checkpoint
+theorem step_abort_restores_scoped_checkpoint
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]

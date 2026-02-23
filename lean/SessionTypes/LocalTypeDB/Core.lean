@@ -200,7 +200,7 @@ private theorem lift_subst_cancel_at_depth_any (e : LocalTypeDB) (k : Nat) (s : 
 
 /-! ## Branch Lift/Subst Cancellation -/
 
-private theorem liftBranches_substBranches_cancel_at_depth_any
+private theorem lift_branches_subst_branches_cancel_at_depth_any
     (bs : List (Label × LocalTypeDB)) (k : Nat) (s : LocalTypeDB) :
     substBranches (liftBranches 1 (k + 1) bs) (k + 1) s = bs := by
   induction bs with
@@ -256,7 +256,7 @@ theorem lift_subst_cancel_at_depth (e : LocalTypeDB) (k : Nat) (t : LocalTypeDB)
   (e.lift 1 (k + 1)).subst (k + 1) (t.lift 1 k) = e := by
   exact lift_subst_cancel_at_depth_any e k (t.lift 1 k)
 
-theorem liftBranches_substBranches_cancel
+theorem lift_branches_subst_branches_cancel
   (bs : List (Label × LocalTypeDB)) (t : LocalTypeDB) :
   substBranches (liftBranches 1 0 bs) 0 t = bs := by
   induction bs with
@@ -267,9 +267,9 @@ theorem liftBranches_substBranches_cancel
       | mk l t' =>
           simp [liftBranches, substBranches, lift_subst_cancel, ih]
 
-theorem liftBranches_substBranches_cancel_at_depth
+theorem lift_branches_subst_branches_cancel_at_depth
   (bs : List (Label × LocalTypeDB)) (k : Nat) (t : LocalTypeDB) :
   substBranches (liftBranches 1 (k + 1) bs) (k + 1) (t.lift 1 k) = bs := by
-  exact liftBranches_substBranches_cancel_at_depth_any bs k (t.lift 1 k)
+  exact lift_branches_subst_branches_cancel_at_depth_any bs k (t.lift 1 k)
 
 end SessionTypes

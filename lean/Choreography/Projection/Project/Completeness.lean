@@ -8,9 +8,9 @@ Completeness and branch-coherence lemmas for projection.
 
 The following definitions form the semantic interface for proofs:
 
-- `CProject_implies_EQ2_trans`: CProject implies EQ2 to trans
-- `BranchesProjRel_implies_BranchesRel_EQ2`: branch-wise EQ2 coherence
-- `AllBranchesProj_implies_EQ2_trans`: non-participant branch coherence
+- `c_project_implies_eq2_trans`: CProject implies EQ2 to trans
+- `branches_proj_rel_implies_branches_rel_eq2`: branch-wise EQ2 coherence
+- `all_branches_proj_implies_eq2_trans`: non-participant branch coherence
 -/
 
 /-

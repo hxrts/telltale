@@ -17,13 +17,13 @@ open SessionTypes.LocalTypeR
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
 open Choreography.Projection.Project
-  (trans_comm_sender trans_comm_receiver trans_comm_other trans_wellFormed_of_wellFormed)
+  (trans_comm_sender trans_comm_receiver trans_comm_other trans_well_formed_of_well_formed)
 open Choreography.Projection.Project (ProjectableClosedWellFormed)
 open Choreography.Projection.Projectb (CProject)
 
 /-! ## Well-formedness Preservation for Steps -/
 
-private theorem allVarsBoundBranches_of_forall
+private theorem all_vars_bound_branches_of_forall
     (branches : List (Label × GlobalType)) (bound : List String)
     (h : ∀ b ∈ branches, b.2.allVarsBound bound = true) :
     allVarsBoundBranches branches bound = true := by
@@ -40,7 +40,7 @@ private theorem allVarsBoundBranches_of_forall
           have htail' := ih htail
           simp [allVarsBoundBranches, hhead, htail']
 
-private theorem allCommsNonEmptyBranches_of_forall
+private theorem all_comms_non_empty_branches_of_forall
     (branches : List (Label × GlobalType))
     (h : ∀ b ∈ branches, b.2.allCommsNonEmpty = true) :
     allCommsNonEmptyBranches branches = true := by
@@ -59,7 +59,7 @@ private theorem allCommsNonEmptyBranches_of_forall
 
 /-! ## Branch noSelfComm Aggregation -/
 
-private theorem noSelfCommBranches_of_forall
+private theorem no_self_comm_branches_of_forall
     (branches : List (Label × GlobalType))
     (h : ∀ b ∈ branches, b.2.noSelfComm = true) :
     noSelfCommBranches branches = true := by
@@ -78,7 +78,7 @@ private theorem noSelfCommBranches_of_forall
 
 /-! ## Branch Productivity Aggregation -/
 
-private theorem isProductiveBranches_of_forall
+private theorem is_productive_branches_of_forall
     (branches : List (Label × GlobalType)) (unguarded : List String)
     (h : ∀ b ∈ branches, b.2.isProductive unguarded = true) :
     isProductiveBranches branches unguarded = true := by
@@ -120,7 +120,7 @@ private lemma branches_wf_parts (branches : List (Label × GlobalType))
   · intro b hb; exact (hparts b hb).2.2.1
   · intro b hb; exact (hparts b hb).2.2.2
 
-private theorem comm_wellFormed_of_branches
+private theorem comm_well_formed_of_branches
     (sender receiver : String) (branches : List (Label × GlobalType))
     (hne : branches ≠ []) (hneq : sender ≠ receiver)
     (hbranches_wf : ∀ b ∈ branches, b.2.wellFormed = true) :
@@ -129,11 +129,11 @@ private theorem comm_wellFormed_of_branches
   obtain ⟨hvars_br, hallcomms_br, hnoself_br, hprod_br⟩ :=
     branches_wf_parts branches hbranches_wf
   have hvars : allVarsBoundBranches branches [] = true :=
-    allVarsBoundBranches_of_forall branches [] hvars_br
+    all_vars_bound_branches_of_forall branches [] hvars_br
   have hallcomms : allCommsNonEmptyBranches branches = true :=
-    allCommsNonEmptyBranches_of_forall branches hallcomms_br
-  have hnoself : noSelfCommBranches branches = true := noSelfCommBranches_of_forall branches hnoself_br
-  have hprod : isProductiveBranches branches [] = true := isProductiveBranches_of_forall branches [] hprod_br
+    all_comms_non_empty_branches_of_forall branches hallcomms_br
+  have hnoself : noSelfCommBranches branches = true := no_self_comm_branches_of_forall branches hnoself_br
+  have hprod : isProductiveBranches branches [] = true := is_productive_branches_of_forall branches [] hprod_br
   have hne' : branches.isEmpty = false := by
     cases hbranches : branches with
     | nil =>
@@ -168,7 +168,7 @@ private lemma comm_branches_nonempty_of_wf {sender receiver : String} {branches 
     simp [GlobalType.allCommsNonEmpty, Bool.and_eq_true] at hallcomms; simpa using hallcomms.1
   intro hnil; subst hnil; simp at hne'
 
-private theorem branchesStep_nonempty
+private theorem branches_step_nonempty
     {branches branches' : List (Label × GlobalType)} {act : GlobalActionR}
     (hstep : BranchesStep step branches act branches')
     (hne : branches ≠ []) : branches' ≠ [] := by
@@ -196,7 +196,7 @@ private theorem step_preserves_wf_comm_head
     (hwf_comm : (GlobalType.comm sender receiver branches).wellFormed = true) :
     cont.wellFormed = true := by
   -- Directly select a well-formed branch.
-  exact GlobalType.wellFormed_comm_branches sender receiver branches hwf_comm (label, cont) hmem
+  exact GlobalType.well_formed_comm_branches sender receiver branches hwf_comm (label, cont) hmem
 
 private theorem step_preserves_wf_comm_async
     (sender receiver : String) (branches branches' : List (Label × GlobalType)) (act : GlobalActionR)
@@ -211,12 +211,12 @@ private theorem step_preserves_wf_comm_async
     (GlobalType.comm sender receiver branches').wellFormed = true := by
   -- Comm/async: lift branch wellFormed and rebuild the comm node.
   have hbranches_wf : ∀ p ∈ branches, p.2.wellFormed = true :=
-    GlobalType.wellFormed_comm_branches sender receiver branches hwf_comm
+    GlobalType.well_formed_comm_branches sender receiver branches hwf_comm
   have hbranches'_wf : ∀ p ∈ branches', p.2.wellFormed = true := ih_bstep hbranches_wf
   have hneq : sender ≠ receiver := comm_sender_ne_receiver_of_wf hwf_comm
   have hne : branches ≠ [] := comm_branches_nonempty_of_wf hwf_comm
-  have hne' : branches' ≠ [] := branchesStep_nonempty hbstep hne
-  exact comm_wellFormed_of_branches sender receiver branches' hne' hneq hbranches'_wf
+  have hne' : branches' ≠ [] := branches_step_nonempty hbstep hne
+  exact comm_well_formed_of_branches sender receiver branches' hne' hneq hbranches'_wf
 
 private theorem step_preserves_wf_mu
     (t : String) (body : GlobalType) (act : GlobalActionR) (g' : GlobalType)
@@ -225,7 +225,7 @@ private theorem step_preserves_wf_mu
     (hwf_mu : (GlobalType.mu t body).wellFormed = true) : g'.wellFormed = true := by
   -- Push wellFormedness through mu-unfold then apply IH.
   have hsubst_wf : (body.substitute t (.mu t body)).wellFormed = true :=
-    wellFormed_mu_unfold t body hwf_mu
+    well_formed_mu_unfold t body hwf_mu
   exact ih_step hsubst_wf
 
 /-! ## Branch Constructor Cases -/
@@ -256,7 +256,7 @@ private theorem branches_wf_cons
 
 
 
-theorem step_preserves_wellFormed (g g' : GlobalType) (act : GlobalActionR)
+theorem step_preserves_well_formed (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hwf : g.wellFormed = true) : g'.wellFormed = true := by
   -- Recursor with constructor-specific helpers.
   refine @step.rec (motive_1 := StepWFMotive) (motive_2 := BranchWFMotive)

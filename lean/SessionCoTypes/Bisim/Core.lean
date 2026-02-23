@@ -119,11 +119,11 @@ theorem observable_of_closed_contractive {a : LocalTypeR}
     -- Since .mu t body is closed, and we're substituting the closed term (.mu t body)
     -- for the only potential free variable (t), the result is closed
     have hclosed_subst : (body.substitute t (.mu t body)).isClosed :=
-      LocalTypeR.isClosed_substitute_mu hclosed
+      LocalTypeR.is_closed_substitute_mu hclosed
 
     -- 3. Substitution preserves contractiveness for closed replacement
     have hsubst_contr : (body.substitute t (.mu t body)).isContractive = true :=
-      isContractive_substitute body t (.mu t body) hcontr_body hmu_contr hclosed
+      is_contractive_substitute body t (.mu t body) hcontr_body hmu_contr hclosed
     -- 4. Apply IH to get Observable for the substituted body
     have ih : Observable (body.substitute t (.mu t body)) :=
       observable_of_closed_contractive hclosed_subst hsubst_contr
@@ -140,7 +140,7 @@ termination_by a.muHeight
 decreasing_by
   -- mu case: substitution does not increase muHeight under guardedness
   simpa [LocalTypeR.muHeight, Nat.add_comm] using
-    Nat.lt_succ_of_le (muHeight_substitute_guarded t body (.mu t body) hguarded)
+    Nat.lt_succ_of_le (mu_height_substitute_guarded t body (.mu t body) hguarded)
 
 /-! ## Environment-Aware Observability -/
 
@@ -148,15 +148,15 @@ theorem observable_of_env_contractive {env : Env} {a : LocalTypeR}
     (hWF : EnvWellFormed env) (hclosed : ClosedUnder env a) (hcontr : a.isContractive = true) :
     Observable (Env.apply env a) := by
   have hclosed' : (Env.apply env a).isClosed :=
-    isClosed_apply_of_closed_env env a hWF hclosed
+    is_closed_apply_of_closed_env env a hWF hclosed
   have hcontr' : (Env.apply env a).isContractive = true :=
-    isContractive_apply_of_closed_env env a hWF hcontr
+    is_contractive_apply_of_closed_env env a hWF hcontr
   exact observable_of_closed_contractive hclosed' hcontr'
 
 theorem observable_of_active_env_contractive {a : LocalTypeR}
     (hclosed : ClosedUnderActive a) (hcontr : a.isContractive = true) :
     Observable (applyActiveEnv a) := by
-  have hWF : EnvWellFormed ActiveEnv := activeEnv_wellFormed
+  have hWF : EnvWellFormed ActiveEnv := active_env_well_formed
   simpa [applyActiveEnv] using
     (observable_of_env_contractive (env := ActiveEnv) hWF hclosed hcontr)
 
@@ -218,7 +218,7 @@ These lemmas establish the duality between `CanSendPathBounded` and `CanRecvPath
 allowing recv lemmas to be derived from send lemmas. -/
 
 /-- CanSendPathBounded on dual type gives CanRecvPathBounded. -/
-theorem CanSendPathBounded.to_CanRecvPathBounded_dual {n : ℕ} {p : String}
+theorem CanSendPathBounded.to_can_recv_path_bounded_dual {n : ℕ} {p : String}
     {bs : List BranchR} {a : LocalTypeR}
     (h : CanSendPathBounded n p bs a) :
     CanRecvPathBounded n p (dualBranches bs) a.dual := by
@@ -232,7 +232,7 @@ theorem CanSendPathBounded.to_CanRecvPathBounded_dual {n : ℕ} {p : String}
       exact CanRecvPathBounded.step ih
 
 /-- CanRecvPathBounded on dual type gives CanSendPathBounded. -/
-theorem CanRecvPathBounded.to_CanSendPathBounded_dual {n : ℕ} {p : String}
+theorem CanRecvPathBounded.to_can_send_path_bounded_dual {n : ℕ} {p : String}
     {bs : List BranchR} {a : LocalTypeR}
     (h : CanRecvPathBounded n p bs a) :
     CanSendPathBounded n p (dualBranches bs) a.dual := by
@@ -246,27 +246,27 @@ theorem CanRecvPathBounded.to_CanSendPathBounded_dual {n : ℕ} {p : String}
       exact CanSendPathBounded.step ih
 
 /-- CanRecvPathBounded is equivalent to CanSendPathBounded on dual type with dual branches. -/
-theorem CanRecvPathBounded_iff_CanSendPathBounded_dual {n : ℕ} {p : String}
+theorem can_recv_path_bounded_iff_can_send_path_bounded_dual {n : ℕ} {p : String}
     {bs : List BranchR} {a : LocalTypeR} :
     CanRecvPathBounded n p bs a ↔ CanSendPathBounded n p (dualBranches bs) a.dual := by
   constructor
-  · exact CanRecvPathBounded.to_CanSendPathBounded_dual
+  · exact CanRecvPathBounded.to_can_send_path_bounded_dual
   · intro h
-    have h' := CanSendPathBounded.to_CanRecvPathBounded_dual h
+    have h' := CanSendPathBounded.to_can_recv_path_bounded_dual h
     simp only [dualBranches_dualBranches, LocalTypeR.dual_dual] at h'
     exact h'
 
 /-! ## Conversions between bounded and unbounded predicates -/
 
 /-- Bounded end path implies unbounded. -/
-theorem UnfoldPathEndBounded.toUnfoldsToEnd {n : ℕ} {a : LocalTypeR}
+theorem UnfoldPathEndBounded.to_unfolds_to_end {n : ℕ} {a : LocalTypeR}
     (h : UnfoldPathEndBounded n a) : UnfoldsToEnd a := by
   induction h with
   | base => exact UnfoldsToEnd.base
   | step _ ih => exact UnfoldsToEnd.mu ih
 
 /-- Unbounded end unfold implies bounded (existentially). -/
-theorem UnfoldsToEnd.toBounded {a : LocalTypeR} (h : UnfoldsToEnd a) :
+theorem UnfoldsToEnd.to_bounded {a : LocalTypeR} (h : UnfoldsToEnd a) :
     ∃ n, UnfoldPathEndBounded n a := by
   refine UnfoldsToEnd.rec (motive := fun a _ => ∃ n, UnfoldPathEndBounded n a) ?base ?mu h
   · exact ⟨0, UnfoldPathEndBounded.base⟩
@@ -275,14 +275,14 @@ theorem UnfoldsToEnd.toBounded {a : LocalTypeR} (h : UnfoldsToEnd a) :
     exact ⟨n + 1, UnfoldPathEndBounded.step hn⟩
 
 /-- Bounded var path implies unbounded. -/
-theorem UnfoldPathVarBounded.toUnfoldsToVar {n : ℕ} {v : String} {a : LocalTypeR}
+theorem UnfoldPathVarBounded.to_unfolds_to_var {n : ℕ} {v : String} {a : LocalTypeR}
     (h : UnfoldPathVarBounded n v a) : UnfoldsToVar a v := by
   induction h with
   | base => exact UnfoldsToVar.base
   | step _ ih => exact UnfoldsToVar.mu ih
 
 /-- Unbounded var unfold implies bounded. -/
-theorem UnfoldsToVar.toBounded {v : String} {a : LocalTypeR} (h : UnfoldsToVar a v) :
+theorem UnfoldsToVar.to_bounded {v : String} {a : LocalTypeR} (h : UnfoldsToVar a v) :
     ∃ n, UnfoldPathVarBounded n v a := by
   refine UnfoldsToVar.rec (motive := fun a v _ => ∃ n, UnfoldPathVarBounded n v a) ?base ?mu h
   · exact ⟨0, UnfoldPathVarBounded.base⟩
@@ -293,7 +293,7 @@ theorem UnfoldsToVar.toBounded {v : String} {a : LocalTypeR} (h : UnfoldsToVar a
 /-! ## Send/Recv Boundedness Conversions -/
 
 /-- Bounded send path implies unbounded. -/
-theorem CanSendPathBounded.toCanSend {n : ℕ} {p : String}
+theorem CanSendPathBounded.to_can_send {n : ℕ} {p : String}
     {bs : List BranchR} {a : LocalTypeR}
     (h : CanSendPathBounded n p bs a) : CanSend a p bs := by
   induction h with
@@ -301,7 +301,7 @@ theorem CanSendPathBounded.toCanSend {n : ℕ} {p : String}
   | step _ ih => exact CanSend.mu ih
 
 /-- Unbounded send implies bounded. -/
-theorem CanSend.toBounded {p : String} {bs : List BranchR} {a : LocalTypeR}
+theorem CanSend.to_bounded {p : String} {bs : List BranchR} {a : LocalTypeR}
     (h : CanSend a p bs) : ∃ n, CanSendPathBounded n p bs a := by
   refine CanSend.rec (motive := fun a p bs _ => ∃ n, CanSendPathBounded n p bs a) ?base ?mu h
   · exact ⟨0, CanSendPathBounded.base⟩
@@ -310,25 +310,25 @@ theorem CanSend.toBounded {p : String} {bs : List BranchR} {a : LocalTypeR}
     exact ⟨n + 1, CanSendPathBounded.step hn⟩
 
 /-- Bounded recv path implies unbounded.
-    Derived from `CanSendPathBounded.toCanSend` via duality. -/
-theorem CanRecvPathBounded.toCanRecv {n : ℕ} {p : String}
+    Derived from `CanSendPathBounded.to_can_send` via duality. -/
+theorem CanRecvPathBounded.to_can_recv {n : ℕ} {p : String}
     {bs : List BranchR} {a : LocalTypeR}
     (h : CanRecvPathBounded n p bs a) : CanRecv a p bs := by
   -- Dualize to send, then dualize back.
   simpa [dualBranches_dualBranches, LocalTypeR.dual_dual] using
     (CanSend.dual
-      (CanSendPathBounded.toCanSend (CanRecvPathBounded.to_CanSendPathBounded_dual h)))
+      (CanSendPathBounded.to_can_send (CanRecvPathBounded.to_can_send_path_bounded_dual h)))
 
 /-- Unbounded recv implies bounded.
-    Derived from `CanSend.toBounded` via duality. -/
-theorem CanRecv.toBounded {p : String} {bs : List BranchR} {a : LocalTypeR}
+    Derived from `CanSend.to_bounded` via duality. -/
+theorem CanRecv.to_bounded {p : String} {bs : List BranchR} {a : LocalTypeR}
     (h : CanRecv a p bs) : ∃ n, CanRecvPathBounded n p bs a := by
   -- Dualize to send, bound, then dualize back.
   have hsend : CanSend a.dual p (dualBranches bs) := CanRecv.dual h
-  obtain ⟨n, hn⟩ := CanSend.toBounded hsend
+  obtain ⟨n, hn⟩ := CanSend.to_bounded hsend
   refine ⟨n, ?_⟩
   simpa [dualBranches_dualBranches, LocalTypeR.dual_dual] using
-    (CanSendPathBounded.to_CanRecvPathBounded_dual hn)
+    (CanSendPathBounded.to_can_recv_path_bounded_dual hn)
 
 /-! ## Concrete Unfold-Iteration Equalities -/
 
@@ -368,7 +368,7 @@ theorem CanRecvPathBounded.unfold_iter_eq {n : ℕ} {p : String}
   intro h
   -- Convert to send on the dual, then dualize the unfold equality.
   have heq : (LocalTypeR.unfold^[n] a).dual = .send p (dualBranches bs) := by
-    have hsend := CanRecvPathBounded.to_CanSendPathBounded_dual h
+    have hsend := CanRecvPathBounded.to_can_send_path_bounded_dual h
     simpa [unfold_iter_dual n a] using (CanSendPathBounded.unfold_iter_eq hsend)
   have hinv := congrArg LocalTypeR.dual heq
   simpa [LocalTypeR.dual_dual, LocalTypeR.dual, dualBranches_dualBranches] using hinv

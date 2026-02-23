@@ -70,49 +70,49 @@ inductive LocalTypeR.hasRecvFrom : LocalTypeR → String → Prop where
 /-! ## Mu Lifting Helpers -/
 
 /-- Lift send partner occurrence through mu. -/
-theorem LocalTypeR.hasSendTo_mu {t : String} {body : LocalTypeR} {partner : String}
+theorem LocalTypeR.has_send_to_mu {t : String} {body : LocalTypeR} {partner : String}
     (h : body.hasSendTo partner) : (LocalTypeR.mu t body).hasSendTo partner :=
   LocalTypeR.hasSendTo.mu h
 
 /-- Lift recv partner occurrence through mu. -/
-theorem LocalTypeR.hasRecvFrom_mu {t : String} {body : LocalTypeR} {partner : String}
+theorem LocalTypeR.has_recv_from_mu {t : String} {body : LocalTypeR} {partner : String}
     (h : body.hasRecvFrom partner) : (LocalTypeR.mu t body).hasRecvFrom partner :=
   LocalTypeR.hasRecvFrom.mu h
 
 /-! ## Direct Constructor Helpers -/
 
 /-- Direct send partner occurrence. -/
-theorem LocalTypeR.hasSendTo_send {partner : String} {branches : List BranchR} :
+theorem LocalTypeR.has_send_to_send {partner : String} {branches : List BranchR} :
     (LocalTypeR.send partner branches).hasSendTo partner :=
   LocalTypeR.hasSendTo.send
 
 /-- Direct recv partner occurrence. -/
-theorem LocalTypeR.hasRecvFrom_recv {partner : String} {branches : List BranchR} :
+theorem LocalTypeR.has_recv_from_recv {partner : String} {branches : List BranchR} :
     (LocalTypeR.recv partner branches).hasRecvFrom partner :=
   LocalTypeR.hasRecvFrom.recv
 
 /-! ## Branch Propagation Helpers -/
 
 /-- Propagate send partner occurrence through send branches. -/
-theorem LocalTypeR.hasSendTo_send_branch {receiver partner : String} {branches : List BranchR}
+theorem LocalTypeR.has_send_to_send_branch {receiver partner : String} {branches : List BranchR}
     {lb : BranchR} (hmem : lb ∈ branches) (h : lb.2.2.hasSendTo partner) :
     (LocalTypeR.send receiver branches).hasSendTo partner :=
   LocalTypeR.hasSendTo.send_branch hmem h
 
 /-- Propagate send partner occurrence through recv branches. -/
-theorem LocalTypeR.hasSendTo_recv_branch {sender partner : String} {branches : List BranchR}
+theorem LocalTypeR.has_send_to_recv_branch {sender partner : String} {branches : List BranchR}
     {lb : BranchR} (hmem : lb ∈ branches) (h : lb.2.2.hasSendTo partner) :
     (LocalTypeR.recv sender branches).hasSendTo partner :=
   LocalTypeR.hasSendTo.recv_branch hmem h
 
 /-- Propagate recv partner occurrence through send branches. -/
-theorem LocalTypeR.hasRecvFrom_send_branch {receiver partner : String} {branches : List BranchR}
+theorem LocalTypeR.has_recv_from_send_branch {receiver partner : String} {branches : List BranchR}
     {lb : BranchR} (hmem : lb ∈ branches) (h : lb.2.2.hasRecvFrom partner) :
     (LocalTypeR.send receiver branches).hasRecvFrom partner :=
   LocalTypeR.hasRecvFrom.send_branch hmem h
 
 /-- Propagate recv partner occurrence through recv branches. -/
-theorem LocalTypeR.hasRecvFrom_recv_branch {sender partner : String} {branches : List BranchR}
+theorem LocalTypeR.has_recv_from_recv_branch {sender partner : String} {branches : List BranchR}
     {lb : BranchR} (hmem : lb ∈ branches) (h : lb.2.2.hasRecvFrom partner) :
     (LocalTypeR.recv sender branches).hasRecvFrom partner :=
   LocalTypeR.hasRecvFrom.recv_branch hmem h
@@ -120,12 +120,12 @@ theorem LocalTypeR.hasRecvFrom_recv_branch {sender partner : String} {branches :
 /-! ## Noncontractive Fallback Helpers -/
 
 /-- Any noncontractive mu counts as sending to every partner. -/
-theorem LocalTypeR.hasSendTo_noncontractive {t : String} {body : LocalTypeR} {partner : String}
+theorem LocalTypeR.has_send_to_noncontractive {t : String} {body : LocalTypeR} {partner : String}
     (h : LocalTypeR.lcontractive body = false) : (LocalTypeR.mu t body).hasSendTo partner :=
   LocalTypeR.hasSendTo.noncontractive h
 
 /-- Any noncontractive mu counts as receiving from every partner. -/
-theorem LocalTypeR.hasRecvFrom_noncontractive {t : String} {body : LocalTypeR} {partner : String}
+theorem LocalTypeR.has_recv_from_noncontractive {t : String} {body : LocalTypeR} {partner : String}
     (h : LocalTypeR.lcontractive body = false) : (LocalTypeR.mu t body).hasRecvFrom partner :=
   LocalTypeR.hasRecvFrom.noncontractive h
 end SessionTypes.LocalTypeR

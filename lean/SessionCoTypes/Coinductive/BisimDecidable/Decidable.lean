@@ -9,7 +9,7 @@ API layer for regular-type equivalence decision.
 This exposes:
 - a finite-reachability checker (`regularTypeEqCheck`) based on `bisim`
 - a soundness theorem for the checker
-- a total decision wrapper with specification (`regularTypeEqDecide_spec`)
+- a total decision wrapper with specification (`regular_type_eq_decide_spec`)
 - a `Decidable` theorem for `EQ2C` on regular types
 -/
 
@@ -26,7 +26,7 @@ def regularTypeEqCheck
   bisim a b ha hb bound
 
 /-- Soundness: accepted pairs are `EQ2C`-equivalent. -/
-theorem regularTypeEqCheck_sound
+theorem regular_type_eq_check_sound
     {a b : LocalTypeC} {ha : Regular a} {hb : Regular b}
     (hcheck : regularTypeEqCheck a b ha hb = true) :
     EQ2C a b := by
@@ -44,12 +44,12 @@ def regularTypeEqDecide
     decide (EQ2C a b)
 
 /-- Correctness specification for the total decision wrapper. -/
-theorem regularTypeEqDecide_spec
+theorem regular_type_eq_decide_spec
     (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) :
     regularTypeEqDecide a b ha hb = true ↔ EQ2C a b := by
   unfold regularTypeEqDecide
   by_cases hcheck : regularTypeEqCheck a b ha hb = true
-  · simp [hcheck, regularTypeEqCheck_sound (ha := ha) (hb := hb) hcheck]
+  · simp [hcheck, regular_type_eq_check_sound (ha := ha) (hb := hb) hcheck]
   · simp [hcheck]
 
 /-- Regular coinductive type equivalence is decidable. -/
@@ -58,6 +58,6 @@ def regular_type_equivalence_decidable
     Decidable (EQ2C a b) := by
   exact
     decidable_of_iff (regularTypeEqDecide a b ha hb = true)
-      (regularTypeEqDecide_spec a b ha hb)
+      (regular_type_eq_decide_spec a b ha hb)
 
 end SessionCoTypes.Coinductive

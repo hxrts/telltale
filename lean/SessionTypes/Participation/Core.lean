@@ -212,13 +212,13 @@ theorem not_part_of_all2_var (role : String) (t : String) : ¬ part_of_all2 role
 
 /-! ## Size-Measure Helpers for Structural Recursion -/
 
-private theorem sizeOf_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
+private theorem size_of_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
     sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
   simp only [GlobalType.comm.sizeOf_spec]
   have h : 0 < 1 + sizeOf sender + sizeOf receiver := by omega
   omega
 
-private theorem sizeOf_elem_snd_lt_list {α β : Type _} [SizeOf α] [SizeOf β]
+private theorem size_of_elem_snd_lt_list {α β : Type _} [SizeOf α] [SizeOf β]
     (xs : List (α × β)) (x : α × β) (h : x ∈ xs) :
     sizeOf x.2 < sizeOf xs := by
   induction xs with
@@ -234,16 +234,16 @@ private theorem sizeOf_elem_snd_lt_list {α β : Type _} [SizeOf α] [SizeOf β]
           simp only [sizeOf, List._sizeOf_1] at *
           omega
 
-private theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
+private theorem size_of_elem_snd_lt_comm (sender receiver : String)
     (gbs : List (Label × GlobalType)) (gb : Label × GlobalType) (h : gb ∈ gbs) :
     sizeOf gb.2 < sizeOf (GlobalType.comm sender receiver gbs) := by
-  have h1 := sizeOf_elem_snd_lt_list gbs gb h
-  have h2 := sizeOf_bs_lt_comm sender receiver gbs
+  have h1 := size_of_elem_snd_lt_list gbs gb h
+  have h2 := size_of_bs_lt_comm sender receiver gbs
   omega
 
 /-! ## Mu-Body Size Helper -/
 
-private theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
+private theorem size_of_body_lt_mu (t : String) (body : GlobalType) :
     sizeOf body < sizeOf (GlobalType.mu t body) := by
   have hk : 0 < 1 + sizeOf t := by
     simp only [Nat.one_add]
@@ -316,7 +316,7 @@ decreasing_by
     simp_wf
     try
       (simpa [GlobalType.comm.sizeOf_spec] using
-        (sizeOf_elem_snd_lt_comm _ _ _ _ (by assumption)))
+        (size_of_elem_snd_lt_comm _ _ _ _ (by assumption)))
     try
       (simp only [sizeOf, GlobalType._sizeOf_1] at *; omega)
 

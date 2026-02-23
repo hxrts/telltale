@@ -40,13 +40,13 @@ theorem SubstRel.flatten {var : String} {repl : LocalTypeR}
   | unfold_left _ ih =>
     obtain ⟨a, b, hab, hbarA, hbarB, hx, hy⟩ := ih
     use a.unfold, b
-    refine ⟨EQ2_unfold_left hab, notBoundAt_unfold var a hbarA, hbarB, ?_, hy⟩
+    refine ⟨eq2_unfold_left hab, not_bound_at_unfold var a hbarA, hbarB, ?_, hy⟩
     rw [hx]
     exact unfold_subst_eq_subst_unfold a var repl hbarA hfresh hnomu
   | unfold_right _ ih =>
     obtain ⟨a, b, hab, hbarA, hbarB, hx, hy⟩ := ih
     use a, b.unfold
-    refine ⟨EQ2_unfold_right hab, hbarA, notBoundAt_unfold var b hbarB, hx, ?_⟩
+    refine ⟨eq2_unfold_right hab, hbarA, not_bound_at_unfold var b hbarB, hx, ?_⟩
     rw [hy]
     exact unfold_subst_eq_subst_unfold b var repl hbarB hfresh hnomu
 
@@ -76,38 +76,38 @@ theorem var_substitute_ne (v : String) (var : String) (repl : LocalTypeR)
 /-! ## EQ2F Reduction Lemmas -/
 
 /-- EQ2F reduction for mu-end case. -/
-@[simp] theorem EQ2F_mu_end (R : Rel) (t : String) (body : LocalTypeR) :
+@[simp] theorem eq2_f_mu_end (R : Rel) (t : String) (body : LocalTypeR) :
     EQ2F R (.mu t body) .end = R (body.substitute t (.mu t body)) .end := rfl
 
 /-- EQ2F reduction for mu-var case. -/
-@[simp] theorem EQ2F_mu_var (R : Rel) (t : String) (body : LocalTypeR) (v : String) :
+@[simp] theorem eq2_f_mu_var (R : Rel) (t : String) (body : LocalTypeR) (v : String) :
     EQ2F R (.mu t body) (.var v) = R (body.substitute t (.mu t body)) (.var v) := rfl
 
 /-- EQ2F reduction for mu-send case. -/
-@[simp] theorem EQ2F_mu_send (R : Rel) (t : String) (body : LocalTypeR) (p : String)
+@[simp] theorem eq2_f_mu_send (R : Rel) (t : String) (body : LocalTypeR) (p : String)
     (bs : List BranchR) :
     EQ2F R (.mu t body) (.send p bs) = R (body.substitute t (.mu t body)) (.send p bs) := rfl
 
 /-- EQ2F reduction for mu-recv case. -/
-@[simp] theorem EQ2F_mu_recv (R : Rel) (t : String) (body : LocalTypeR) (p : String)
+@[simp] theorem eq2_f_mu_recv (R : Rel) (t : String) (body : LocalTypeR) (p : String)
     (bs : List BranchR) :
     EQ2F R (.mu t body) (.recv p bs) = R (body.substitute t (.mu t body)) (.recv p bs) := rfl
 
 /-- EQ2F reduction for end-mu case. -/
-@[simp] theorem EQ2F_end_mu (R : Rel) (s : String) (body' : LocalTypeR) :
+@[simp] theorem eq2_f_end_mu (R : Rel) (s : String) (body' : LocalTypeR) :
     EQ2F R .end (.mu s body') = R .end (body'.substitute s (.mu s body')) := rfl
 
 /-- EQ2F reduction for var-mu case. -/
-@[simp] theorem EQ2F_var_mu (R : Rel) (v : String) (s : String) (body' : LocalTypeR) :
+@[simp] theorem eq2_f_var_mu (R : Rel) (v : String) (s : String) (body' : LocalTypeR) :
     EQ2F R (.var v) (.mu s body') = R (.var v) (body'.substitute s (.mu s body')) := rfl
 
 /-- EQ2F reduction for send-mu case. -/
-@[simp] theorem EQ2F_send_mu (R : Rel) (p : String) (bs : List BranchR)
+@[simp] theorem eq2_f_send_mu (R : Rel) (p : String) (bs : List BranchR)
     (s : String) (body' : LocalTypeR) :
     EQ2F R (.send p bs) (.mu s body') = R (.send p bs) (body'.substitute s (.mu s body')) := rfl
 
 /-- EQ2F reduction for recv-mu case. -/
-@[simp] theorem EQ2F_recv_mu (R : Rel) (p : String) (bs : List BranchR)
+@[simp] theorem eq2_f_recv_mu (R : Rel) (p : String) (bs : List BranchR)
     (s : String) (body' : LocalTypeR) :
     EQ2F R (.recv p bs) (.mu s body') = R (.recv p bs) (body'.substitute s (.mu s body')) := rfl
 

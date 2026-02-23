@@ -62,25 +62,25 @@ def condEntropy {α β : Type} [Fintype α] [Fintype β] [EntropyAPI.Model]
 /-! ## Core Law Wrappers -/
 
 /-- Shannon entropy is nonnegative for distributions. -/
-theorem shannonEntropy_nonneg {α : Type*} [Fintype α] [EntropyAPI.Laws]
+theorem shannon_entropy_nonneg {α : Type*} [Fintype α] [EntropyAPI.Laws]
     (p : α → ℝ) (hp_nn : ∀ a, 0 ≤ p a) (hp_sum : ∑ a, p a = 1) :
     0 ≤ shannonEntropy p := by
   -- Package the raw assumptions as an API distribution and reuse the API law.
   let d : Distribution α :=
     { pmf := p, nonneg := hp_nn, sum_one := hp_sum }
-  simpa [shannonEntropy, d] using EntropyAPI.shannonEntropy_nonneg d
+  simpa [shannonEntropy, d] using EntropyAPI.shannon_entropy_nonneg d
 
 /-- Shannon entropy is bounded by `log |α|`. -/
-theorem shannonEntropy_le_log_card {α : Type*} [Fintype α] [Nonempty α] [EntropyAPI.Laws]
+theorem shannon_entropy_le_log_card {α : Type*} [Fintype α] [Nonempty α] [EntropyAPI.Laws]
     (p : α → ℝ) (hp_nn : ∀ a, 0 ≤ p a) (hp_sum : ∑ a, p a = 1) :
     shannonEntropy p ≤ Real.log (Fintype.card α) := by
   -- Package the raw assumptions as an API distribution and reuse the API law.
   let d : Distribution α :=
     { pmf := p, nonneg := hp_nn, sum_one := hp_sum }
-  simpa [shannonEntropy, d] using EntropyAPI.shannonEntropy_le_log_card d
+  simpa [shannonEntropy, d] using EntropyAPI.shannon_entropy_le_log_card d
 
 /-- KL divergence is nonnegative (Gibbs inequality). -/
-theorem klDivergence_nonneg {α : Type*} [Fintype α] [EntropyAPI.Laws]
+theorem kl_divergence_nonneg {α : Type*} [Fintype α] [EntropyAPI.Laws]
     (p q : α → ℝ)
     (hp_nn : ∀ a, 0 ≤ p a) (hp_sum : ∑ a, p a = 1)
     (hq_nn : ∀ a, 0 ≤ q a) (hq_sum : ∑ a, q a = 1)
@@ -91,10 +91,10 @@ theorem klDivergence_nonneg {α : Type*} [Fintype α] [EntropyAPI.Laws]
     { pmf := p, nonneg := hp_nn, sum_one := hp_sum }
   let qd : Distribution α :=
     { pmf := q, nonneg := hq_nn, sum_one := hq_sum }
-  simpa [klDivergence, pd, qd] using EntropyAPI.klDivergence_nonneg pd qd habs
+  simpa [klDivergence, pd, qd] using EntropyAPI.kl_divergence_nonneg pd qd habs
 
 /-- KL divergence vanishes iff distributions are pointwise equal. -/
-theorem klDivergence_eq_zero_iff {α : Type*} [Fintype α] [EntropyAPI.Laws]
+theorem kl_divergence_eq_zero_iff {α : Type*} [Fintype α] [EntropyAPI.Laws]
     (p q : α → ℝ)
     (hp_nn : ∀ a, 0 ≤ p a) (hp_sum : ∑ a, p a = 1)
     (hq_nn : ∀ a, 0 ≤ q a) (hq_sum : ∑ a, q a = 1)
@@ -105,7 +105,7 @@ theorem klDivergence_eq_zero_iff {α : Type*} [Fintype α] [EntropyAPI.Laws]
     { pmf := p, nonneg := hp_nn, sum_one := hp_sum }
   let qd : Distribution α :=
     { pmf := q, nonneg := hq_nn, sum_one := hq_sum }
-  simpa [klDivergence, pd, qd] using EntropyAPI.klDivergence_eq_zero_iff pd qd habs
+  simpa [klDivergence, pd, qd] using EntropyAPI.kl_divergence_eq_zero_iff pd qd habs
 
 /-! ## Protocol Cost Combinators -/
 
@@ -115,18 +115,18 @@ def branchEntropy {L : Type*} [Fintype L] [EntropyAPI.Model]
   shannonEntropy labelDist
 
 /-- Branch entropy is nonnegative for distributions. -/
-theorem branchEntropy_nonneg {L : Type*} [Fintype L] [EntropyAPI.Laws]
+theorem branch_entropy_nonneg {L : Type*} [Fintype L] [EntropyAPI.Laws]
     (d : Distribution L) :
     0 ≤ branchEntropy d.pmf := by
   -- This is direct from Shannon entropy nonnegativity.
-  simpa [branchEntropy, shannonEntropy] using EntropyAPI.shannonEntropy_nonneg d
+  simpa [branchEntropy, shannonEntropy] using EntropyAPI.shannon_entropy_nonneg d
 
 /-- Branch entropy is bounded by `log |L|`. -/
-theorem branchEntropy_le_log_card {L : Type*} [Fintype L] [Nonempty L] [EntropyAPI.Laws]
+theorem branch_entropy_le_log_card {L : Type*} [Fintype L] [Nonempty L] [EntropyAPI.Laws]
     (d : Distribution L) :
     branchEntropy d.pmf ≤ Real.log (Fintype.card L) := by
   -- This is direct from the Shannon entropy cardinality bound.
-  simpa [branchEntropy, shannonEntropy] using EntropyAPI.shannonEntropy_le_log_card d
+  simpa [branchEntropy, shannonEntropy] using EntropyAPI.shannon_entropy_le_log_card d
 
 /-- Total select cost: computation cost plus entropy cost. -/
 def selectCost {L : Type*} [Fintype L] [EntropyAPI.Model]
@@ -150,7 +150,7 @@ def ProjectionMap.isConstant {L T : Type*} (p : ProjectionMap L T) : Prop :=
   ∃ t, ∀ l, p.proj l = t
 
 /-- Erasure-kernel formulation of zero mutual information. -/
-theorem mutualInfo_zero_of_erasure
+theorem mutual_info_zero_of_erasure
     {L O : Type} [Fintype L] [Fintype O] [DecidableEq O] [EntropyAPI.Laws]
     (labelDist : L → ℝ) (h_nn : ∀ l, 0 ≤ labelDist l) (h_sum : ∑ l, labelDist l = 1)
     (joint : L × O → ℝ)
@@ -158,10 +158,10 @@ theorem mutualInfo_zero_of_erasure
     mutualInfo joint = 0 := by
   -- This is exactly the API erasure law.
   simpa [mutualInfo] using
-    EntropyAPI.mutualInfo_zero_of_erasure labelDist h_nn h_sum joint hErase
+    EntropyAPI.mutual_info_zero_of_erasure labelDist h_nn h_sum joint hErase
 
 /-- Constant projection implies zero mutual information with observations. -/
-theorem mutualInfo_zero_of_constant_projection
+theorem mutual_info_zero_of_constant_projection
     {L T : Type} [Fintype L] [Fintype T] [DecidableEq T] [EntropyAPI.Laws]
     (p : ProjectionMap L T) (hConst : p.isConstant)
     (labelDist : L → ℝ) (h_nn : ∀ l, 0 ≤ labelDist l) (h_sum : ∑ l, labelDist l = 1) :
@@ -173,7 +173,7 @@ theorem mutualInfo_zero_of_constant_projection
     refine ⟨t0, ?_⟩
     intro lt
     simpa [ht0 lt.1, eq_comm]
-  exact mutualInfo_zero_of_erasure labelDist h_nn h_sum _ hErase
+  exact mutual_info_zero_of_erasure labelDist h_nn h_sum _ hErase
 
 /-! ## Constant-Projection Expectation Invariants -/
 /-- Constant local quantity has expectation equal to that constant. -/
@@ -242,7 +242,7 @@ def branchProjectionMap (branches : List (Label × GlobalType)) (role : String) 
   { proj := fun i => Choreography.Projection.Project.trans (branches.get i).2 role }
 
 /-- Blind communication implies constant projected local behavior for non-participants. -/
-theorem branchProjectionMap_isConstant_of_commBlindFor
+theorem branch_projection_map_is_constant_of_comm_blind_for
     {sender receiver role : String} {branches : List (Label × GlobalType)}
     (hblind : commBlindFor sender receiver branches = true)
     (hns : role ≠ sender) (hnr : role ≠ receiver) (hne : branches ≠ []) :
@@ -259,7 +259,7 @@ theorem branchProjectionMap_isConstant_of_commBlindFor
   simpa [branchProjectionMap] using huniform
 
 /-- `isBlind` on a communication implies constant projected local behavior. -/
-theorem branchProjectionMap_isConstant_of_isBlind_comm
+theorem branch_projection_map_is_constant_of_is_blind_comm
     {sender receiver role : String} {branches : List (Label × GlobalType)}
     (hblind : isBlind (GlobalType.comm sender receiver branches) = true)
     (hns : role ≠ sender) (hnr : role ≠ receiver) (hne : branches ≠ []) :
@@ -269,17 +269,17 @@ theorem branchProjectionMap_isConstant_of_isBlind_comm
     have hblind' := hblind
     simp [isBlind, Bool.and_eq_true] at hblind'
     exact hblind'.1
-  exact branchProjectionMap_isConstant_of_commBlindFor hcomm hns hnr hne
+  exact branch_projection_map_is_constant_of_comm_blind_for hcomm hns hnr hne
 
 /-! ## Blindness Cost Normalization -/
 /-- Information cost of blind observation is zero by definition. -/
 def blindObservationCost : ℝ := 0
 
 /-- Blind-observation cost simplifies to zero. -/
-theorem blindObservationCost_eq_zero : blindObservationCost = 0 := rfl
+theorem blind_observation_cost_eq_zero : blindObservationCost = 0 := rfl
 
 /-- Main bridge theorem from syntactic blindness to invariant local expectation. -/
-theorem isBlind_preserves_local_information
+theorem is_blind_preserves_local_information
     {sender receiver role : String} {branches : List (Label × GlobalType)}
     (hblind : isBlind (GlobalType.comm sender receiver branches) = true)
     (hns : role ≠ sender) (hnr : role ≠ receiver) (hne : branches ≠ [])
@@ -289,16 +289,16 @@ theorem isBlind_preserves_local_information
     (localInfo : LocalTypeR → ℝ) :
     let p := branchProjectionMap branches role
     ∑ l, labelDist l * localInfo (p.proj l) =
-      localInfo (Classical.choose (branchProjectionMap_isConstant_of_isBlind_comm
+      localInfo (Classical.choose (branch_projection_map_is_constant_of_is_blind_comm
         hblind hns hnr hne)) := by
   -- Combine blindness-induced constancy with the generic constant-projection lemma.
-  have hConst := branchProjectionMap_isConstant_of_isBlind_comm hblind hns hnr hne
+  have hConst := branch_projection_map_is_constant_of_is_blind_comm hblind hns hnr hne
   exact projection_preserves_local_information
     (branchProjectionMap branches role) hConst labelDist _h_nn h_sum localInfo
 
 /-! ## Blindness Implies Deterministic Local Projection -/
 /-- Corollary: blindness implies deterministic projected local type. -/
-theorem isBlind_implies_constant_local_type
+theorem is_blind_implies_constant_local_type
     {sender receiver role : String} {branches : List (Label × GlobalType)}
     (hblind : isBlind (GlobalType.comm sender receiver branches) = true)
     (hns : role ≠ sender) (hnr : role ≠ receiver) (hne : branches ≠ [])
@@ -306,7 +306,7 @@ theorem isBlind_implies_constant_local_type
     (branchProjectionMap branches role).proj i =
     (branchProjectionMap branches role).proj j := by
   -- Specialize the constant map witness at two branch indices.
-  have hConst := branchProjectionMap_isConstant_of_isBlind_comm hblind hns hnr hne
+  have hConst := branch_projection_map_is_constant_of_is_blind_comm hblind hns hnr hne
   obtain ⟨t, ht⟩ := hConst
   simp [ht]
 
@@ -320,7 +320,7 @@ def MutualInfoZeroImpliesErasureKernel
   mutualInfo joint = 0 → EntropyAPI.IsErasureKernel labelDist joint
 
 /-- Assumption-scoped exactness statement for projection erasure. -/
-theorem mutualInfo_zero_iff_erasureKernel_of_reverse
+theorem mutual_info_zero_iff_erasure_kernel_of_reverse
     {L O : Type} [Fintype L] [Fintype O] [DecidableEq O] [EntropyAPI.Laws]
     (labelDist : L → ℝ) (h_nn : ∀ l, 0 ≤ labelDist l) (h_sum : ∑ l, labelDist l = 1)
     (joint : L × O → ℝ)
@@ -329,7 +329,7 @@ theorem mutualInfo_zero_iff_erasureKernel_of_reverse
   constructor
   · exact hRev
   · intro hErase
-    exact mutualInfo_zero_of_erasure labelDist h_nn h_sum joint hErase
+    exact mutual_info_zero_of_erasure labelDist h_nn h_sum joint hErase
 
 /-- Explicit boundary-witness interface for degenerate model classes where
     reverse exactness may fail without additional assumptions. -/
@@ -380,7 +380,7 @@ def MutualInfoReverseAssumptionIndependence
 
 /-- Sharpness theorem: every indexed dropped-assumption case yields strict failure
     of the unscoped reverse implication. -/
-theorem mutualInfo_reverse_assumption_sharpness
+theorem mutual_info_reverse_assumption_sharpness
     {L O : Type} [Fintype L] [Fintype O] [DecidableEq O] [EntropyAPI.Laws]
     (hIndep : MutualInfoReverseAssumptionIndependence L O) :
     ∀ a : MutualInfoReverseAssumption,

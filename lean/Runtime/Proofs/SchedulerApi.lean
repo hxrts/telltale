@@ -87,7 +87,7 @@ def VMSchedulerBundle.profile {st₀ : VMState ι γ π ε ν}
   schedulerPolicyProfileOf bundle.policy
 
 /-- Bundle profile agrees with the pinned VM scheduler policy class. -/
-theorem scheduler_profilePinned_from_bundle {st₀ : VMState ι γ π ε ν}
+theorem scheduler_profile_pinned_from_bundle {st₀ : VMState ι γ π ε ν}
     (bundle : VMSchedulerBundle st₀) :
     schedulerPolicyProfileOf st₀.sched.policy = bundle.profile := by
   simp [VMSchedulerBundle.profile, schedulerPolicyProfileOf, bundle.policyPinned]
@@ -220,7 +220,7 @@ def validateVMSchedulerWithIris [Telltale.TelltaleIris]
 /-! ### Exported Scheduler Theorems -/
 
 /-- The pinned scheduler policy extracted from the scheduler bundle. -/
-theorem scheduler_policyPinned_from_bundle {st₀ : VMState ι γ π ε ν}
+theorem scheduler_policy_pinned_from_bundle {st₀ : VMState ι γ π ε ν}
     (bundle : VMSchedulerBundle st₀) :
     SchedulerPolicyPinned st₀ bundle.policy :=
   bundle.policyPinned
@@ -232,19 +232,19 @@ theorem scheduler_confluence_from_bundle {st₀ : VMState ι γ π ε ν}
   schedule_confluence_holds st₀
 
 /-- Starvation-freedom theorem instantiated from a scheduler bundle. -/
-theorem scheduler_starvationFree_from_bundle {st₀ : VMState ι γ π ε ν}
+theorem scheduler_starvation_free_from_bundle {st₀ : VMState ι γ π ε ν}
     (_bundle : VMSchedulerBundle st₀) :
     starvation_free st₀ :=
   starvation_free_holds st₀
 
 /-- Cooperative refinement theorem instantiated from a scheduler bundle. -/
-theorem scheduler_cooperativeRefinement_from_bundle {st₀ : VMState ι γ π ε ν}
+theorem scheduler_cooperative_refinement_from_bundle {st₀ : VMState ι γ π ε ν}
     (_bundle : VMSchedulerBundle st₀) :
     cooperative_refines_concurrent st₀ :=
   cooperative_refines_concurrent_holds st₀
 
 /-- Iris scheduler invariance theorem instantiated from a scheduler bundle. -/
-theorem scheduler_irisInvariant_from_bundle [Telltale.TelltaleIris]
+theorem scheduler_iris_invariant_from_bundle [Telltale.TelltaleIris]
     {st₀ : VMState ι γ π ε ν}
     (_bundle : VMSchedulerBundle st₀) :
     SchedulerIrisInvariant (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀ := by

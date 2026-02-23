@@ -48,13 +48,13 @@ structure ClassicalRegime (step : CoherenceState → CoherenceState → Prop) : 
 /-! ## Regime Characterization Theorems -/
 
 /-- Default correlation law from the established Coherence/ConfigEquiv theorem. -/
-theorem classicalCorrelations_default {C₁ C₂ : CoherenceState}
+theorem classical_correlations_default {C₁ C₂ : CoherenceState}
     (hEq : ConfigEquiv C₁ C₂) :
     (Coherent C₁.G C₁.D ↔ Coherent C₂.G C₂.D) :=
-  Coherent_respects_equiv hEq
+  coherent_respects_equiv hEq
 
 /-- Unfolded characterization form for `ClassicalRegime`. -/
-theorem classicalRegime_iff (step : CoherenceState → CoherenceState → Prop) :
+theorem classical_regime_iff (step : CoherenceState → CoherenceState → Prop) :
     ClassicalRegime step ↔
       (∀ {C₁ C₂ C₁'}, ConfigEquiv C₁ C₂ → step C₁ C₁' →
         ∃ C₂', step C₂ C₂' ∧ ConfigEquiv C₁' C₂') ∧

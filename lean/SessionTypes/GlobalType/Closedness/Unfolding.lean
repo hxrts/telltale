@@ -45,7 +45,7 @@ def GlobalType.fullUnfoldIter (g : GlobalType) : GlobalType :=
 abbrev GlobalType.fullUnfold (g : GlobalType) : GlobalType :=
   g.fullUnfoldIter
 
-theorem GlobalType.muHeight_non_mu :
+theorem GlobalType.mu_height_non_mu :
     ∀ g : GlobalType, (∀ (t : String) (body : GlobalType), g ≠ .mu t body) →
       g.muHeight = 0 := by
   intro g h
@@ -56,7 +56,7 @@ theorem GlobalType.muHeight_non_mu :
   | _ =>
       simp [GlobalType.muHeight]
 
-theorem GlobalType.fullUnfoldIter_muHeight_zero {g : GlobalType} (hmu : g.muHeight = 0) :
+theorem GlobalType.full_unfold_iter_mu_height_zero {g : GlobalType} (hmu : g.muHeight = 0) :
     GlobalType.fullUnfoldIter g = g := by
   simp [GlobalType.fullUnfoldIter, hmu]
 

@@ -37,7 +37,7 @@ structure EffectBisimContext {σ : Type u} {α : Type v}
 def CtxImageRel {σ : Type u} (ctx : σ → σ) (R : StateRel σ) : StateRel σ :=
   fun s t => ∃ a b, s = ctx a ∧ t = ctx b ∧ R a b
 
-private theorem ctxImage_postfixed {σ : Type u} {α : Type v}
+private theorem ctx_image_postfixed {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ) (ctx : σ → σ)
     (hCtx : EffectBisimContext obs step ctx)
     {R : StateRel σ}
@@ -67,17 +67,17 @@ private theorem ctxImage_postfixed {σ : Type u} {α : Type v}
 /-! ## Generic Congruence -/
 
 /-- Generic context congruence for effect bisimulation. -/
-theorem effectBisim_congr_context {σ : Type u} {α : Type v}
+theorem effect_bisim_congr_context {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ) (ctx : σ → σ)
     (hCtx : EffectBisimContext obs step ctx)
     {s t : σ} (h : EffectBisim obs step s t) :
     EffectBisim obs step (ctx s) (ctx t) := by
   have hPost : EffectBisim obs step ≤ EffectBisimF obs step (EffectBisim obs step) := by
     intro a b hab
-    exact effectBisim_unfold obs step hab
+    exact effect_bisim_unfold obs step hab
   have hImgPost : CtxImageRel ctx (EffectBisim obs step) ≤
       EffectBisimF obs step (CtxImageRel ctx (EffectBisim obs step)) :=
-    ctxImage_postfixed obs step ctx hCtx hPost
+    ctx_image_postfixed obs step ctx hCtx hPost
   have hImgLe : CtxImageRel ctx (EffectBisim obs step) ≤ EffectBisim obs step :=
     SessionCoTypes.CoinductiveRel.coind
       (F := EffectBisimF obs step)
@@ -87,40 +87,40 @@ theorem effectBisim_congr_context {σ : Type u} {α : Type v}
 /-! ## Named Congruence Corollaries -/
 
 /-- Sequence-context congruence. -/
-theorem effectBisim_congr_seq {σ : Type u} {α : Type v}
+theorem effect_bisim_congr_seq {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     (seqCtx : σ → σ)
     (hSeq : EffectBisimContext obs step seqCtx)
     {s t : σ} (h : EffectBisim obs step s t) :
     EffectBisim obs step (seqCtx s) (seqCtx t) :=
-  effectBisim_congr_context obs step seqCtx hSeq h
+  effect_bisim_congr_context obs step seqCtx hSeq h
 
 /-- Parallel-context congruence. -/
-theorem effectBisim_congr_par {σ : Type u} {α : Type v}
+theorem effect_bisim_congr_par {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     (parCtx : σ → σ)
     (hPar : EffectBisimContext obs step parCtx)
     {s t : σ} (h : EffectBisim obs step s t) :
     EffectBisim obs step (parCtx s) (parCtx t) :=
-  effectBisim_congr_context obs step parCtx hPar h
+  effect_bisim_congr_context obs step parCtx hPar h
 
 /-- Linking-context congruence. -/
-theorem effectBisim_congr_link {σ : Type u} {α : Type v}
+theorem effect_bisim_congr_link {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     (linkCtx : σ → σ)
     (hLink : EffectBisimContext obs step linkCtx)
     {s t : σ} (h : EffectBisim obs step s t) :
     EffectBisim obs step (linkCtx s) (linkCtx t) :=
-  effectBisim_congr_context obs step linkCtx hLink h
+  effect_bisim_congr_context obs step linkCtx hLink h
 
 /-- Handler-substitution congruence. -/
-theorem effectBisim_congr_handler_subst {σ : Type u} {α : Type v}
+theorem effect_bisim_congr_handler_subst {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     (handlerCtx : σ → σ)
     (hHandler : EffectBisimContext obs step handlerCtx)
     {s t : σ} (h : EffectBisim obs step s t) :
     EffectBisim obs step (handlerCtx s) (handlerCtx t) :=
-  effectBisim_congr_context obs step handlerCtx hHandler h
+  effect_bisim_congr_context obs step handlerCtx hHandler h
 
 end
 

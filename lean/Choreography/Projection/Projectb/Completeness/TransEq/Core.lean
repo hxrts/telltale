@@ -10,7 +10,7 @@ open SessionCoTypes.CoinductiveRel
 
 /-! # Choreography.Projection.Projectb.Completeness
 
-`trans_eq_of_CProject` and full completeness of `projectb`.
+`trans_eq_of_c_project` and full completeness of `projectb`.
 -/
 
 /-
@@ -19,7 +19,7 @@ some candidate, then `projectb` returns that candidate. This ensures the checker
 finds all valid projections, not just some of them.
 
 Solution Structure. The proof proceeds by coinduction on CProject:
-1. `trans_eq_of_CProject`: CProject implies trans computes the candidate
+1. `trans_eq_of_c_project`: CProject implies trans computes the candidate
 2. Case analysis on global type constructors (end, var, mu, comm)
 3. Branch helpers for send/recv cases with Forall₂ induction
 -/
@@ -27,7 +27,7 @@ Solution Structure. The proof proceeds by coinduction on CProject:
 /-! ## trans Branch Helper -/
 
 /-- Helper: compute `transBranches` from a BranchesProjRel witness. -/
-theorem transBranches_eq_of_BranchesProjRel
+theorem trans_branches_eq_of_branches_proj_rel
     (gbs : List (Label × GlobalType)) (role : String) (lbs : List BranchR)
     (hrel : BranchesProjRel CProject gbs role lbs)
     (hne : ∀ gb ∈ gbs, gb.2.allCommsNonEmpty = true)
@@ -63,17 +63,17 @@ theorem transBranches_eq_of_BranchesProjRel
 /-! ## trans_eq_of_CProject Base Constructors -/
 
 /-- Helper: `trans` equality for end case. -/
-theorem trans_eq_of_CProject_end (role : String) (cand : LocalTypeR)
+theorem trans_eq_of_c_project_end (role : String) (cand : LocalTypeR)
     (hproj : CProject .end role cand) : Trans.trans .end role = cand := by
   -- CProjectF for end only allows the end candidate.
-  have hf := CProject_destruct hproj
+  have hf := c_project_destruct hproj
   cases cand <;> simp [CProjectF, Trans.trans] at hf ⊢
 
 /-- Helper: `trans` equality for var case. -/
-theorem trans_eq_of_CProject_var (t : String) (role : String) (cand : LocalTypeR)
+theorem trans_eq_of_c_project_var (t : String) (role : String) (cand : LocalTypeR)
     (hproj : CProject (.var t) role cand) : Trans.trans (.var t) role = cand := by
   -- CProjectF forces matching variables, otherwise contradiction.
-  have hf := CProject_destruct hproj
+  have hf := c_project_destruct hproj
   cases cand with
   | var t' =>
       -- Variable case: use the equality extracted from CProjectF.
@@ -84,7 +84,7 @@ theorem trans_eq_of_CProject_var (t : String) (role : String) (cand : LocalTypeR
   | mu _ _ => simp [CProjectF] at hf
 
 /-- Helper: `trans` equality for mu case once the body trans is fixed. -/
-theorem trans_eq_of_CProject_mu
+theorem trans_eq_of_c_project_mu
     (t : String) (body : GlobalType) (role : String)
     (cand candBody : LocalTypeR)
     (hcase :
@@ -106,7 +106,7 @@ theorem trans_eq_of_CProject_mu
 /-! ## trans_eq_of_CProject Comm Constructor Helpers -/
 
 /-- Helper: sender comm case once branches are aligned. -/
-theorem trans_eq_of_CProject_comm_sender
+theorem trans_eq_of_c_project_comm_sender
     (sender receiver role : String) (branches : List (Label × GlobalType))
     (lbs : List BranchR) (hrs : role = sender)
     (htrans_branches : Trans.transBranches branches role = lbs) :
@@ -119,7 +119,7 @@ theorem trans_eq_of_CProject_comm_sender
   simp [htrans_comm, htrans_branches]
 
 /-- Helper: receiver comm case once branches are aligned. -/
-theorem trans_eq_of_CProject_comm_receiver
+theorem trans_eq_of_c_project_comm_receiver
     (sender receiver role : String) (branches : List (Label × GlobalType))
     (lbs : List BranchR) (hrr : role = receiver) (hrs : role ≠ sender)
     (htrans_branches : Trans.transBranches branches role = lbs) :
@@ -132,7 +132,7 @@ theorem trans_eq_of_CProject_comm_receiver
   simp [htrans_comm, htrans_branches]
 
 /-- Helper: non-participant comm case once the head branch is fixed. -/
-theorem trans_eq_of_CProject_comm_other
+theorem trans_eq_of_c_project_comm_other
     (sender receiver role : String) (branches : List (Label × GlobalType))
     (first : Label × GlobalType) (rest : List (Label × GlobalType)) (cand : LocalTypeR)
     (hrs : role ≠ sender) (hrr : role ≠ receiver) (hbranches_eq : branches = first :: rest)
@@ -148,7 +148,7 @@ theorem trans_eq_of_CProject_comm_other
 /-! ## trans_eq_of_CProject Comm Case: Sender/Receiver -/
 
 /-- Helper: sender comm case for send candidates. -/
-theorem trans_eq_of_CProject_comm_sender_send
+theorem trans_eq_of_c_project_comm_sender_send
     (sender receiver role : String) (branches : List (Label × GlobalType))
     (partner : String) (lbs : List BranchR) (hrs : role = sender)
     (hproj : CProject (GlobalType.comm sender receiver branches) role (.send partner lbs))
@@ -156,24 +156,24 @@ theorem trans_eq_of_CProject_comm_sender_send
     (ih : ∀ gb ∈ branches, ∀ lb, CProject gb.2 role lb → Trans.trans gb.2 role = lb) :
     Trans.trans (.comm sender receiver branches) role = .send partner lbs := by
   -- Extract branch projection and translate the branches.
-  have hf := CProject_destruct hproj
+  have hf := c_project_destruct hproj
   simp [CProjectF, hrs] at hf
   rcases hf with ⟨hpartner, hbranches⟩
   have hbranches' : BranchesProjRel CProject branches role lbs := by
     simpa [hrs] using hbranches
   have hne_branches :
       ∀ gb ∈ branches, gb.2.allCommsNonEmpty = true :=
-    GlobalType.allCommsNonEmpty_comm_branches sender receiver branches hne
+    GlobalType.all_comms_non_empty_comm_branches sender receiver branches hne
   have htrans_branches : Trans.transBranches branches role = lbs :=
-    transBranches_eq_of_BranchesProjRel branches role lbs hbranches' hne_branches
+    trans_branches_eq_of_branches_proj_rel branches role lbs hbranches' hne_branches
       (fun gb hmem lb hcp => ih gb hmem lb hcp)
   subst hpartner
   have htrans :=
-    trans_eq_of_CProject_comm_sender sender partner role branches lbs hrs htrans_branches
+    trans_eq_of_c_project_comm_sender sender partner role branches lbs hrs htrans_branches
   simpa using htrans
 
 /-- Helper: receiver comm case for recv candidates. -/
-theorem trans_eq_of_CProject_comm_receiver_recv
+theorem trans_eq_of_c_project_comm_receiver_recv
     (sender receiver role : String) (branches : List (Label × GlobalType))
     (partner : String) (lbs : List BranchR) (hrr : role = receiver)
     (hrs : role ≠ sender)
@@ -183,26 +183,26 @@ theorem trans_eq_of_CProject_comm_receiver_recv
     Trans.trans (.comm sender receiver branches) role = .recv partner lbs := by
   -- Extract branch projection and translate the branches.
   have hns : receiver ≠ sender := by simpa [hrr] using hrs
-  have hf := CProject_destruct hproj
+  have hf := c_project_destruct hproj
   simp [CProjectF, hrr, hns] at hf
   rcases hf with ⟨hpartner, hbranches⟩
   have hbranches' : BranchesProjRel CProject branches role lbs := by
     simpa [hrr] using hbranches
   have hne_branches :
       ∀ gb ∈ branches, gb.2.allCommsNonEmpty = true :=
-    GlobalType.allCommsNonEmpty_comm_branches sender receiver branches hne
+    GlobalType.all_comms_non_empty_comm_branches sender receiver branches hne
   have htrans_branches : Trans.transBranches branches role = lbs :=
-    transBranches_eq_of_BranchesProjRel branches role lbs hbranches' hne_branches
+    trans_branches_eq_of_branches_proj_rel branches role lbs hbranches' hne_branches
       (fun gb hmem lb hcp => ih gb hmem lb hcp)
   subst hpartner
   have htrans :=
-    trans_eq_of_CProject_comm_receiver partner receiver role branches lbs hrr hrs htrans_branches
+    trans_eq_of_c_project_comm_receiver partner receiver role branches lbs hrr hrs htrans_branches
   simpa using htrans
 
 /-! ## trans_eq_of_CProject Comm Case: Non-Participant -/
 
 /-- Helper: non-participant comm case on non-empty branches. -/
-theorem trans_eq_of_CProject_comm_other_nonempty
+theorem trans_eq_of_c_project_comm_other_nonempty
     (sender receiver role : String) (branches : List (Label × GlobalType))
     (first : Label × GlobalType) (rest : List (Label × GlobalType)) (cand : LocalTypeR)
     (hrs : role ≠ sender) (hrr : role ≠ receiver) (hbranches_eq : branches = first :: rest)
@@ -211,22 +211,22 @@ theorem trans_eq_of_CProject_comm_other_nonempty
     (ih : ∀ gb ∈ branches, ∀ lb, CProject gb.2 role lb → Trans.trans gb.2 role = lb) :
     Trans.trans (.comm sender receiver branches) role = cand := by
   -- Non-participants inherit the first branch projection.
-  have hf := CProject_destruct hproj
+  have hf := c_project_destruct hproj
   simp [CProjectF, hrs, hrr] at hf
   have hmem : first ∈ branches := by simp [hbranches_eq]
   have hproj_first : CProject first.2 role cand := hf first hmem
   have hne_branches :
       ∀ gb ∈ branches, gb.2.allCommsNonEmpty = true :=
-    GlobalType.allCommsNonEmpty_comm_branches sender receiver branches hne
+    GlobalType.all_comms_non_empty_comm_branches sender receiver branches hne
   have htrans_first : Trans.trans first.2 role = cand :=
     ih first hmem cand hproj_first
   have htrans :=
-    trans_eq_of_CProject_comm_other sender receiver role branches first rest cand hrs hrr
+    trans_eq_of_c_project_comm_other sender receiver role branches first rest cand hrs hrr
       hbranches_eq htrans_first
   simpa [hbranches_eq] using htrans
 
 /-- Helper: non-participant comm case dispatcher. -/
-theorem trans_eq_of_CProject_comm_other_case
+theorem trans_eq_of_c_project_comm_other_case
     (sender receiver role : String) (branches : List (Label × GlobalType)) (cand : LocalTypeR)
     (hrs : role ≠ sender) (hrr : role ≠ receiver)
     (hproj : CProject (GlobalType.comm sender receiver branches) role cand)
@@ -241,13 +241,13 @@ theorem trans_eq_of_CProject_comm_other_case
       exact this.elim
   | cons first rest =>
       subst hbranches_eq
-      exact trans_eq_of_CProject_comm_other_nonempty sender receiver role (first :: rest) first rest
+      exact trans_eq_of_c_project_comm_other_nonempty sender receiver role (first :: rest) first rest
         cand hrs hrr rfl hproj hne ih
 
 /-! ## trans_eq_of_CProject Comm Case Dispatchers -/
 
 /-- Helper: sender comm case dispatcher. -/
-theorem trans_eq_of_CProject_comm_sender_case
+theorem trans_eq_of_c_project_comm_sender_case
     (sender receiver role : String) (branches : List (Label × GlobalType)) (cand : LocalTypeR)
     (hrs : role = sender) (hproj : CProject (GlobalType.comm sender receiver branches) role cand)
     (hne : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true)
@@ -256,33 +256,33 @@ theorem trans_eq_of_CProject_comm_sender_case
   -- Only send candidates are possible for sender roles.
   cases cand with
   | send partner lbs =>
-      exact trans_eq_of_CProject_comm_sender_send sender receiver role branches partner lbs
+      exact trans_eq_of_c_project_comm_sender_send sender receiver role branches partner lbs
         hrs hproj hne ih
   | «end» =>
       have hf' : False := by
-        have hf := CProject_destruct hproj
+        have hf := c_project_destruct hproj
         simp [CProjectF, hrs] at hf
       exact hf'.elim
   | var _ =>
       have hf' : False := by
-        have hf := CProject_destruct hproj
+        have hf := c_project_destruct hproj
         simp [CProjectF, hrs] at hf
       exact hf'.elim
   | recv _ _ =>
       have hf' : False := by
-        have hf := CProject_destruct hproj
+        have hf := c_project_destruct hproj
         simp [CProjectF, hrs] at hf
       exact hf'.elim
   | mu _ _ =>
       have hf' : False := by
-        have hf := CProject_destruct hproj
+        have hf := c_project_destruct hproj
         simp [CProjectF, hrs] at hf
       exact hf'.elim
 
 /-! ## trans_eq_of_CProject Comm Case: Receiver Dispatcher -/
 
 /-- Helper: receiver comm case dispatcher. -/
-theorem trans_eq_of_CProject_comm_receiver_case
+theorem trans_eq_of_c_project_comm_receiver_case
     (sender receiver role : String) (branches : List (Label × GlobalType)) (cand : LocalTypeR)
     (hrr : role = receiver) (hrs : role ≠ sender)
     (hproj : CProject (GlobalType.comm sender receiver branches) role cand)
@@ -293,26 +293,26 @@ theorem trans_eq_of_CProject_comm_receiver_case
   have hns : receiver ≠ sender := by simpa [hrr] using hrs
   cases cand with
   | recv partner lbs =>
-      exact trans_eq_of_CProject_comm_receiver_recv sender receiver role branches partner lbs
+      exact trans_eq_of_c_project_comm_receiver_recv sender receiver role branches partner lbs
         hrr hrs hproj hne ih
   | «end» =>
       have hf' : False := by
-        have hf := CProject_destruct hproj
+        have hf := c_project_destruct hproj
         simp [CProjectF, hrr, hns] at hf
       exact hf'.elim
   | var _ =>
       have hf' : False := by
-        have hf := CProject_destruct hproj
+        have hf := c_project_destruct hproj
         simp [CProjectF, hrr, hns] at hf
       exact hf'.elim
   | send _ _ =>
       have hf' : False := by
-        have hf := CProject_destruct hproj
+        have hf := c_project_destruct hproj
         simp [CProjectF, hrr, hns] at hf
       exact hf'.elim
   | mu _ _ =>
       have hf' : False := by
-        have hf := CProject_destruct hproj
+        have hf := c_project_destruct hproj
         simp [CProjectF, hrr, hns] at hf
       exact hf'.elim
 

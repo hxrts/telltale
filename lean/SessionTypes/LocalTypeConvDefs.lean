@@ -53,7 +53,7 @@ def Context.indexOf (ctx : Context) (name : String) : Option Nat :=
   NameOnlyContext.indexOf ctx name
 
 @[simp]
-theorem Context.indexOf_eq (ctx : Context) (name : String) :
+theorem Context.index_of_eq (ctx : Context) (name : String) :
     Context.indexOf ctx name = NameOnlyContext.indexOf ctx name := rfl
 
 /-- Coverage: all free variables are in the context. -/
@@ -93,7 +93,7 @@ theorem Context.covers_of_mu_closed_singleton (t : String) (body : LocalTypeR) :
   · have hclosed' : (body.freeVars.filter (· != t)).isEmpty = true := by
       simpa only [LocalTypeR.isClosed, LocalTypeR.freeVars] using hclosed
     have hnil : body.freeVars.filter (· != t) = [] :=
-      (List.isEmpty_eq_true _).1 hclosed'
+      (List.is_empty_eq_true _).1 hclosed'
     have hfilter : v ∈ body.freeVars.filter (· != t) := by
       simpa [List.mem_filter, hv, hvt] using hv
     have : False := by

@@ -12,7 +12,7 @@ provides a safe interface for protocol execution.
 Solution Structure. We define:
 1. `MonitorState`: runtime state (GEnv, DEnv, buffers, linear context, supply)
 2. `MonStep`: judgment for valid monitor transitions
-3. `MonStep_preserves_WTMon`: preservation theorem
+3. `mon_step_preserves_wt_mon`: preservation theorem
 4. Capability token interface for untrusted code interaction
 -/
 
@@ -38,7 +38,7 @@ The `MonitorState` structure contains:
 `MonStep` is the judgment for valid monitor transitions. Each constructor
 corresponds to a protocol action (send, recv, select, branch, newSession).
 
-The key theorem `MonStep_preserves_WTMon` states that valid transitions
+The key theorem `mon_step_preserves_wt_mon` states that valid transitions
 preserve the well-typedness invariant.
 
 ## Untrusted Code Interface
@@ -245,12 +245,12 @@ def WTMonComplete (ms : MonitorState) : Prop :=
   WTMon ms ∧ RoleComplete ms.G
 
 /-- Extract the WTMon component. -/
-theorem WTMonComplete.toWTMon (ms : MonitorState) (h : WTMonComplete ms) : WTMon ms := by
+theorem WTMonComplete.to_wt_mon (ms : MonitorState) (h : WTMonComplete ms) : WTMon ms := by
   -- Project the well-typedness half.
   exact h.1
 
 /-- Extract the RoleComplete component. -/
-theorem WTMonComplete.toRoleComplete (ms : MonitorState) (h : WTMonComplete ms) :
+theorem WTMonComplete.to_role_complete (ms : MonitorState) (h : WTMonComplete ms) :
     RoleComplete ms.G := by
   -- Project the role-completeness half.
   exact h.2
@@ -258,19 +258,19 @@ theorem WTMonComplete.toRoleComplete (ms : MonitorState) (h : WTMonComplete ms) 
 -- Helper Lemmas for Linear Context
 
 /-- Membership in produceToken: new entry is at the head. -/
-theorem mem_produceToken_head (ctx : LinCtx) (e : Endpoint) (S : LocalType) :
+theorem mem_produce_token_head (ctx : LinCtx) (e : Endpoint) (S : LocalType) :
     (e, S) ∈ LinCtx.produceToken ctx e S := by
   simp only [LinCtx.produceToken, List.mem_cons, true_or]
 
 /-- Membership in produceToken: old entries are preserved. -/
-theorem mem_produceToken_tail (ctx : LinCtx) (e e' : Endpoint) (S S' : LocalType)
+theorem mem_produce_token_tail (ctx : LinCtx) (e e' : Endpoint) (S S' : LocalType)
     (h : (e', S') ∈ ctx) :
     (e', S') ∈ LinCtx.produceToken ctx e S := by
   simp only [LinCtx.produceToken, List.mem_cons]
   exact Or.inr h
 
 /-- If (e', S') ∈ ctx' after consuming e from ctx, then (e', S') ∈ ctx. -/
-theorem mem_of_consumeToken (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' : LocalType)
+theorem mem_of_consume_token (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' : LocalType)
     (hConsume : LinCtx.consumeToken ctx e = some (ctx', S))
     (hMem : (e', S') ∈ ctx') :
     (e', S') ∈ ctx := by
@@ -301,7 +301,7 @@ theorem mem_of_consumeToken (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' : LocalT
 -- consumeToken Preservation for Non-target Endpoints
 /-- consumeToken preserves other entries: if (e', S') was in ctx and e' ≠ e,
     then (e', S') is still in ctx' after consuming the token for e. -/
-theorem mem_consumeToken_preserved (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' : LocalType)
+theorem mem_consume_token_preserved (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' : LocalType)
     (hConsume : LinCtx.consumeToken ctx e = some (ctx', S))
     (hMem : (e', S') ∈ ctx)
     (hNe : e' ≠ e) :
@@ -342,7 +342,7 @@ theorem mem_consumeToken_preserved (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' :
 
 /-- If ctx has no duplicate endpoints and consumeToken succeeds,
     the consumed endpoint e is not in the result ctx'. -/
-theorem consumeToken_not_mem (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
+theorem consume_token_not_mem (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
     (hPairwise : ctx.Pairwise (fun a b => a.1 ≠ b.1))
     (hConsume : LinCtx.consumeToken ctx e = some (ctx', S)) :
     ∀ S', (e, S') ∉ ctx' := by
@@ -388,7 +388,7 @@ theorem consumeToken_not_mem (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
 
 -- Pairwise Preservation under consumeToken
 /-- consumeToken preserves the Pairwise property. -/
-theorem consumeToken_pairwise (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
+theorem consume_token_pairwise (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
     (hPairwise : ctx.Pairwise (fun a b => a.1 ≠ b.1))
     (hConsume : LinCtx.consumeToken ctx e = some (ctx', S)) :
     ctx'.Pairwise (fun a b => a.1 ≠ b.1) := by
@@ -417,13 +417,13 @@ theorem consumeToken_pairwise (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
         constructor
         · -- Show hd.1 ≠ every element in result.1
           intro a haMem
-          have haInTl : a ∈ tl := mem_of_consumeToken tl result.1 e a.1 result.2 a.2 hConsume' haMem
+          have haInTl : a ∈ tl := mem_of_consume_token tl result.1 e a.1 result.2 a.2 hConsume' haMem
           exact hAll a haInTl
         · exact ih result.1 hTlPairwise hConsume'
 
 -- Pairwise Preservation under produceToken
 /-- produceToken preserves Pairwise if the new endpoint wasn't in the context. -/
-theorem produceToken_pairwise (ctx : LinCtx) (e : Endpoint) (S : LocalType)
+theorem produce_token_pairwise (ctx : LinCtx) (e : Endpoint) (S : LocalType)
     (hPairwise : ctx.Pairwise (fun a b => a.1 ≠ b.1))
     (hNotIn : ∀ S', (e, S') ∉ ctx) :
     (LinCtx.produceToken ctx e S).Pairwise (fun a b => a.1 ≠ b.1) := by
@@ -442,7 +442,7 @@ theorem produceToken_pairwise (ctx : LinCtx) (e : Endpoint) (S : LocalType)
 
 -- consumeToken Membership Recovery
 /-- If consumeToken succeeds, the endpoint was in the original context. -/
-theorem consumeToken_endpoint_in_ctx (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
+theorem consume_token_endpoint_in_ctx (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
     (hConsume : LinCtx.consumeToken ctx e = some (ctx', S)) :
     (e, S) ∈ ctx := by
   induction ctx generalizing ctx' with
@@ -471,17 +471,17 @@ theorem consumeToken_endpoint_in_ctx (ctx ctx' : LinCtx) (e : Endpoint) (S : Loc
 -- Freshness Preservation for Token Operations
 /-- consumeToken preserves supply freshness: if all endpoints in ctx have sid < supply,
     then all endpoints in ctx' have sid < supply. -/
-theorem consumeToken_preserves_supply_fresh (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
+theorem consume_token_preserves_supply_fresh (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
     (supply : SessionId)
     (hFresh : ∀ e' S', (e', S') ∈ ctx → e'.sid < supply)
     (hConsume : LinCtx.consumeToken ctx e = some (ctx', S)) :
     ∀ e' S', (e', S') ∈ ctx' → e'.sid < supply := by
   intro e' S' hMem
-  have hInOrig : (e', S') ∈ ctx := mem_of_consumeToken _ _ _ _ _ _ hConsume hMem
+  have hInOrig : (e', S') ∈ ctx := mem_of_consume_token _ _ _ _ _ _ hConsume hMem
   exact hFresh e' S' hInOrig
 
 /-- produceToken preserves supply freshness when the produced endpoint is fresh. -/
-theorem produceToken_preserves_supply_fresh (ctx : LinCtx) (e : Endpoint) (S : LocalType)
+theorem produce_token_preserves_supply_fresh (ctx : LinCtx) (e : Endpoint) (S : LocalType)
     (supply : SessionId)
     (hFresh : ∀ e' S', (e', S') ∈ ctx → e'.sid < supply)
     (heFresh : e.sid < supply) :

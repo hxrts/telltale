@@ -21,12 +21,12 @@ This module provides a direct proof for composing EQ2 and CProjectTransRel throu
 The key insight: we don't need paco's coinduction machinery here because we're proving
 a single-step property (EQ2F). We can directly use:
 1. Monotonicity of EQ2F
-2. The existing CProjectTransRel_postfix theorem
+2. The existing c_project_trans_rel_postfix theorem
 3. The fact that CProjectTransRel ⊆ CProjectTransRelComp
 
 ## Main Result
 
-- `EQ2_CProjectTransRel_compose_through_mu`: Direct composition proof
+- `eq2_c_project_trans_rel_compose_through_mu`: Direct composition proof
 -/
 
 namespace Choreography.Projection.ProjectPaco
@@ -40,20 +40,20 @@ open Choreography.Projection.Project
 /-- Composing EQ2 and CProjectTransRel through a mu intermediate satisfies EQ2F.
 
     **Proof strategy**:
-    1. Use CProjectTransRel_postfix to get: EQ2F (EQ2_closure CProjectTransRel) (.mu v body) c
+    1. Use c_project_trans_rel_postfix to get: EQ2F (EQ2_closure CProjectTransRel) (.mu v body) c
     2. Use monotonicity to lift: EQ2_closure CProjectTransRel ⊆ EQ2_closure CProjectTransRelComp
        (since CProjectTransRel is the base case of CProjectTransRelComp)
     3. Apply EQ2F.mono to get the result
 
     This is simpler than using paco_coind because we're proving a single-step property,
     not a coinductive relation. -/
-theorem EQ2_CProjectTransRel_compose_through_mu
+theorem eq2_c_project_trans_rel_compose_through_mu
     {a c : LocalTypeR} {v : String} {body : LocalTypeR}
     (heq : EQ2 a (.mu v body))
     (hrel : CProjectTransRel (.mu v body) c)
     (hWFa : LocalTypeR.WellFormed a) (hWFc : LocalTypeR.WellFormed c) :
     EQ2F (EQ2_closure CProjectTransRelComp) a c := by
-  exact Choreography.Projection.Project.EQ2_CProjectTransRel_compose_through_mu
+  exact Choreography.Projection.Project.eq2_c_project_trans_rel_compose_through_mu
     heq hrel hWFa hWFc
 
 

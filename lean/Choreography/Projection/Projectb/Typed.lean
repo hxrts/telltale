@@ -43,7 +43,7 @@ def BranchesProjRelTyped (R : ProjRel)
 
 /-! ## Typed Monotonicity Helpers -/
 
-private theorem BranchesProjRelTyped_mono {R S : ProjRel}
+private theorem branches_proj_rel_typed_mono {R S : ProjRel}
     (h : ∀ g r c, R g r c → S g r c) :
     ∀ {gbs lbs role}, BranchesProjRelTyped R gbs role lbs →
       BranchesProjRelTyped S gbs role lbs := by
@@ -53,7 +53,7 @@ private theorem BranchesProjRelTyped_mono {R S : ProjRel}
   | cons hpair _ ih =>
       exact List.Forall₂.cons ⟨hpair.1, hpair.2.1, h _ _ _ hpair.2.2⟩ ih
 
-private theorem AllBranchesProj_mono {R S : ProjRel}
+private theorem all_branches_proj_mono {R S : ProjRel}
     (h : ∀ g r c, R g r c → S g r c) :
     ∀ {gbs role cand}, AllBranchesProj R gbs role cand → AllBranchesProj S gbs role cand := by
   intro gbs role cand hall gb hgb
@@ -104,7 +104,7 @@ def CProjectF_typed (R : ProjRel) : ProjRel := fun g role cand =>
 
 /-! ## Typed Generator Monotonicity -/
 
-private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
+private theorem c_project_f_typed_mono : Monotone CProjectF_typed := by
   intro R S h g role cand hrel
   cases g with
   | «end» =>
@@ -134,7 +134,7 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
         | send partner lbs =>
             simp [CProjectF_typed, hs] at hrel ⊢
             rcases hrel with ⟨h1, h2⟩
-            exact ⟨h1, BranchesProjRelTyped_mono h h2⟩
+            exact ⟨h1, branches_proj_rel_typed_mono h h2⟩
         | _ =>
             simp [CProjectF_typed, hs] at hrel ⊢
       · by_cases hr : role = receiver
@@ -145,11 +145,11 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
           | recv partner lbs =>
               simp [CProjectF_typed, hr, hns] at hrel ⊢
               rcases hrel with ⟨h1, h2⟩
-              exact ⟨h1, BranchesProjRelTyped_mono h h2⟩
+              exact ⟨h1, branches_proj_rel_typed_mono h h2⟩
           | _ =>
               simp [CProjectF_typed, hr, hns] at hrel ⊢
         · simp [CProjectF_typed, hs, hr] at hrel ⊢
-          exact AllBranchesProj_mono h hrel
+          exact all_branches_proj_mono h hrel
   -- CProjectF_typed_mono: Delegate Case
   | delegate p q sid r cont =>
       by_cases hp : role = p
@@ -208,18 +208,18 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
 
 /-! ## Coinductive Typed Projection -/
 
-instance : CoinductiveRel ProjRel CProjectF_typed := ⟨CProjectF_typed_mono⟩
+instance : CoinductiveRel ProjRel CProjectF_typed := ⟨c_project_f_typed_mono⟩
 
 /-- Coinductive typed projection relation. -/
 def CProjectTyped : ProjRel :=
-  (OrderHom.gfp ⟨CProjectF_typed, CProjectF_typed_mono⟩)
+  (OrderHom.gfp ⟨CProjectF_typed, c_project_f_typed_mono⟩)
 
 /-- Destruct CProjectTyped: if it holds, then CProjectF_typed holds. -/
-theorem CProjectTyped_destruct {g : GlobalType} {role : String} {cand : LocalTypeR}
+theorem c_project_typed_destruct {g : GlobalType} {role : String} {cand : LocalTypeR}
     (h : CProjectTyped g role cand) : CProjectF_typed CProjectTyped g role cand := by
   have hfix : CProjectF_typed CProjectTyped = CProjectTyped := by
-    change CProjectF_typed (OrderHom.gfp ⟨CProjectF_typed, CProjectF_typed_mono⟩) =
-      OrderHom.gfp ⟨CProjectF_typed, CProjectF_typed_mono⟩
+    change CProjectF_typed (OrderHom.gfp ⟨CProjectF_typed, c_project_f_typed_mono⟩) =
+      OrderHom.gfp ⟨CProjectF_typed, c_project_f_typed_mono⟩
     exact SessionCoTypes.CoinductiveRel.gfp_fixed (F := CProjectF_typed)
   exact Eq.mp (congrArg (fun R => R g role cand) hfix.symm) h
 
@@ -228,7 +228,7 @@ theorem CProjectTyped_destruct {g : GlobalType} {role : String} {cand : LocalTyp
 private def EraseRel : ProjRel := fun g role cand =>
   ∃ cand', CProjectTyped g role cand' ∧ cand = LocalTypeR.eraseValTypes cand'
 
-private theorem BranchesProjRelTyped_to_erase
+private theorem branches_proj_rel_typed_to_erase
     {gbs : List (Label × GlobalType)} {role : String} {lbs : List BranchR}
     (h : BranchesProjRelTyped CProjectTyped gbs role lbs) :
     BranchesProjRel EraseRel gbs role (eraseBranchValTypes lbs) := by
@@ -251,12 +251,12 @@ private theorem BranchesProjRelTyped_to_erase
                         | mk name sort =>
                             have hvt' : PayloadSort.toValType? sort = some (.chan sid r) := by
                               simpa using hvt.symm
-                            exact (False.elim (PayloadSort.toValType?_ne_chan sort sid r hvt'))
+                            exact (False.elim (PayloadSort.to_val_type?_ne_chan sort sid r hvt'))
                     | unit | bool | nat | string | prod _ _ => rfl
               refine List.Forall₂.cons ?_ ih
               exact ⟨hlab, hnone, ⟨cont, hproj, rfl⟩⟩
 
-private theorem AllBranchesProjTyped_to_erase
+private theorem all_branches_proj_typed_to_erase
     {gbs : List (Label × GlobalType)} {role : String} {cand : LocalTypeR}
     (h : AllBranchesProj CProjectTyped gbs role cand) :
     AllBranchesProj EraseRel gbs role (LocalTypeR.eraseValTypes cand) := by
@@ -265,11 +265,11 @@ private theorem AllBranchesProjTyped_to_erase
 
 /-! ## Erasure Bridge: Coinductive Postfix -/
 
-private theorem EraseRel_postfix :
+private theorem erase_rel_postfix :
     ∀ g role cand, EraseRel g role cand → CProjectF EraseRel g role cand := by
   intro g role cand hR
   rcases hR with ⟨cand', htyped, rfl⟩
-  have hdes := CProjectTyped_destruct htyped
+  have hdes := c_project_typed_destruct htyped
   cases g with
   | «end» =>
       cases cand' <;> simpa [CProjectF_typed, CProjectF, LocalTypeR.eraseValTypes] using hdes
@@ -307,7 +307,7 @@ private theorem EraseRel_postfix :
               simpa [hs] using hbranches
             have hbranches' :
                 BranchesProjRel EraseRel gbs role (eraseBranchValTypes lbs) :=
-              BranchesProjRelTyped_to_erase hbranches_role
+              branches_proj_rel_typed_to_erase hbranches_role
             simpa [CProjectF, hs, LocalTypeR.eraseValTypes] using
               And.intro hpartner hbranches'
         | _ =>
@@ -326,7 +326,7 @@ private theorem EraseRel_postfix :
                 simpa [hr] using hbranches
               have hbranches' :
                   BranchesProjRel EraseRel gbs role (eraseBranchValTypes lbs) :=
-                BranchesProjRelTyped_to_erase hbranches_role
+                branches_proj_rel_typed_to_erase hbranches_role
               simpa [CProjectF, hs, hr, hns, LocalTypeR.eraseValTypes] using
                 And.intro hpartner hbranches'
           | _ =>
@@ -334,7 +334,7 @@ private theorem EraseRel_postfix :
         · simp [CProjectF_typed, hs, hr] at hdes
           have hbranches' :
               AllBranchesProj EraseRel gbs role (LocalTypeR.eraseValTypes cand') :=
-            AllBranchesProjTyped_to_erase hdes
+            all_branches_proj_typed_to_erase hdes
           simpa [CProjectF, hs, hr, LocalTypeR.eraseValTypes] using hbranches'
   -- Erasure Bridge: Delegate Case
   | delegate p q sid r cont =>
@@ -407,11 +407,11 @@ private theorem EraseRel_postfix :
 /-! ## Typed-to-Erased Theorem -/
 
 /-- Typed projection implies erased projection on the payload-erased candidate. -/
-theorem CProjectTyped_implies_CProject_erase
+theorem c_project_typed_implies_c_project_erase
     {g : GlobalType} {role : String} {cand : LocalTypeR}
     (h : CProjectTyped g role cand) :
     CProject g role (LocalTypeR.eraseValTypes cand) := by
   have hrel : EraseRel g role (LocalTypeR.eraseValTypes cand) := ⟨cand, h, rfl⟩
-  exact CProject_coind EraseRel_postfix g role _ hrel
+  exact c_project_coind erase_rel_postfix g role _ hrel
 
 end Choreography.Projection.Projectb

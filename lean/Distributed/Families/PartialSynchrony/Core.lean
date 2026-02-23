@@ -159,7 +159,7 @@ theorem eventual_decision_of_assumptions
   exact ⟨n, v, hDec⟩
 
 /-- Bounded post-GST termination follows under the supplied assumptions/premises. -/
-theorem bounded_postGST_termination_of_assumptions
+theorem bounded_post_gst_termination_of_assumptions
     {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
     {M : Model State Value Event Party}
     (_a : Assumptions M)

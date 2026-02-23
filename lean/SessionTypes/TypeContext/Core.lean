@@ -121,14 +121,14 @@ theorem mem_names_extend_of_mem (ctx : TypeContext V T) (v w : V) (t : T)
 
 /-! ## IndexOf Lemmas -/
 
-theorem indexOf_extend_eq [DecidableEq V] (ctx : TypeContext V T) (v : V) (t : T) :
+theorem index_of_extend_eq [DecidableEq V] (ctx : TypeContext V T) (v : V) (t : T) :
     (ctx.extend v t).indexOf v = some 0 := by
   simp only [extend, indexOf, List.findIdx?]
   simp only [List.findIdx?.go, decide_eq_true_eq, ↓reduceIte]
 
 /-! ## Get Lemmas -/
 
-theorem getName?_lt (ctx : TypeContext V T) (i : Nat) (h : i < ctx.length) :
+theorem get_name?_lt (ctx : TypeContext V T) (i : Nat) (h : i < ctx.length) :
     ∃ v, ctx.getName? i = some v := by
   simp only [getName?, length] at *
   have hget : (ctx.bindings[i]?).isSome := by

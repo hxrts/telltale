@@ -39,7 +39,7 @@ private instance : Std.TransCmp (fun a b : Edge × Trace => compare a.1 b.1) whe
     intro a b c hab hbc
     simpa using (Std.TransOrd.isLE_trans (a := a.1) (b := b.1) (c := c.1) hab hbc)
 
-lemma edgeCmpLT_eq_lt {x y : Edge × Trace} (h : edgeCmpLT x y) :
+lemma edge_cmp_lt_eq_lt {x y : Edge × Trace} (h : edgeCmpLT x y) :
     compare x.1 y.1 = .lt := by
   simpa using
     (RBNode.cmpLT_iff (cmp := fun a b : Edge × Trace => compare a.1 b.1) (x := x) (y := y)).1 h
@@ -70,7 +70,7 @@ instance : EmptyCollection DEnv := ⟨DEnv.ofMap (∅ : RBMap Edge Trace compare
     (∅ : RBMap Edge Trace compare).find? e = none := by
   rfl
 
-@[simp] theorem DEnv_map_find?_empty (e : Edge) :
+@[simp] theorem d_env_map_find?_empty (e : Edge) :
     (∅ : DEnv).map.find? e = none := by
   rfl
 
@@ -139,7 +139,7 @@ theorem lookup_eq_some_of_mem_pairwise {l : List (Edge × Trace)} (h : l.Pairwis
             intro hEq
             have hEq' : compare hd.1 p.1 = .eq :=
               (Edge.compare_eq_iff_eq hd.1 p.1).2 hEq.symm
-            have hlt' : compare hd.1 p.1 = .lt := edgeCmpLT_eq_lt hlt
+            have hlt' : compare hd.1 p.1 = .lt := edge_cmp_lt_eq_lt hlt
             have : (.eq : Ordering) = .lt := by
               exact hEq'.symm.trans hlt'
             cases this
@@ -170,7 +170,7 @@ theorem find?_foldl_insert_of_pairwise
           intro hEq
           have hEq' : compare hd.1 p.1 = .eq :=
             (Edge.compare_eq_iff_eq hd.1 p.1).2 hEq.symm
-          have hlt' : compare hd.1 p.1 = .lt := edgeCmpLT_eq_lt hlt
+          have hlt' : compare hd.1 p.1 = .lt := edge_cmp_lt_eq_lt hlt
           have : (.eq : Ordering) = .lt := by
             exact hEq'.symm.trans hlt'
           cases this
@@ -191,20 +191,20 @@ theorem find?_foldl_insert_of_pairwise
           (ih (m := m.insert hd.1 hd.2) (h := h.2))
 
 /-! ## Canonical RBMap Construction Correctness -/
-theorem rbmap_find?_ofList_eq_lookup
+theorem rbmap_find?_of_list_eq_lookup
     (l : List (Edge × Trace)) (h : l.Pairwise edgeCmpLT) (k : Edge) :
     (rbmapOfList l).find? k = l.lookup k := by
   have h' := find?_foldl_insert_of_pairwise (l := l) (m := (∅ : RBMap Edge Trace compare)) h k
   cases hLookup : l.lookup k <;>
     simpa [rbmapOfList, rbmap_find?_empty, hLookup] using h'
 
-theorem DEnv_find?_eq_lookup (env : DEnv) (e : Edge) :
+theorem d_env_find?_eq_lookup (env : DEnv) (e : Edge) :
     env.find? e = env.list.lookup e := by
-  have h := rbmap_find?_ofList_eq_lookup (l := env.list) (h := env.sorted) (k := e)
+  have h := rbmap_find?_of_list_eq_lookup (l := env.list) (h := env.sorted) (k := e)
   simp [DEnv.find?, env.map_eq, h]
 
 /-! ## toList/find? Agreement -/
-theorem lookup_toList_eq_find? (m : RBMap Edge Trace compare) (e : Edge) :
+theorem lookup_to_list_eq_find? (m : RBMap Edge Trace compare) (e : Edge) :
     m.toList.lookup e = m.find? e := by
   cases h : m.find? e with
   | none =>
@@ -230,29 +230,29 @@ theorem lookup_toList_eq_find? (m : RBMap Edge Trace compare) (e : Edge) :
       simpa [h] using hLookup
 
 /-! ## DEnv.ofMap Lookup Characterization -/
-theorem rbmapOfList_toList_find? (m : RBMap Edge Trace compare) (e : Edge) :
+theorem rbmap_of_list_to_list_find? (m : RBMap Edge Trace compare) (e : Edge) :
     (rbmapOfList m.toList).find? e = m.find? e := by
   have hSorted : m.toList.Pairwise edgeCmpLT := by
     simpa [edgeCmpLT] using (RBMap.toList_sorted (t := m))
-  have hLookup := rbmap_find?_ofList_eq_lookup (l := m.toList) (h := hSorted) (k := e)
-  have hToList := lookup_toList_eq_find? (m := m) (e := e)
+  have hLookup := rbmap_find?_of_list_eq_lookup (l := m.toList) (h := hSorted) (k := e)
+  have hToList := lookup_to_list_eq_find? (m := m) (e := e)
   exact hLookup.trans hToList
 
-@[simp] theorem DEnv_find?_ofMap (m : RBMap Edge Trace compare) (e : Edge) :
+@[simp] theorem d_env_find?_of_map (m : RBMap Edge Trace compare) (e : Edge) :
     (DEnv.ofMap m).find? e = m.find? e := by
   have hSorted : m.toList.Pairwise edgeCmpLT := by
     simpa [edgeCmpLT] using (RBMap.toList_sorted (t := m))
-  have hLookup := rbmap_find?_ofList_eq_lookup (l := m.toList) (h := hSorted) (k := e)
-  have hToList := lookup_toList_eq_find? (m := m) (e := e)
+  have hLookup := rbmap_find?_of_list_eq_lookup (l := m.toList) (h := hSorted) (k := e)
+  have hToList := lookup_to_list_eq_find? (m := m) (e := e)
   simp [DEnv.find?, DEnv.ofMap, hLookup, hToList]
 
 /-! ## Pairwise Asymmetry Helper -/
-lemma edgeCmpLT_asymm {x y : Edge × Trace} (h : edgeCmpLT x y) : ¬ edgeCmpLT y x := by
-  have hlt : compare x.1 y.1 = .lt := edgeCmpLT_eq_lt h
+lemma edge_cmp_lt_asymm {x y : Edge × Trace} (h : edgeCmpLT x y) : ¬ edgeCmpLT y x := by
+  have hlt : compare x.1 y.1 = .lt := edge_cmp_lt_eq_lt h
   have hgt : compare y.1 x.1 = .gt :=
     (Std.OrientedCmp.gt_iff_lt).2 hlt
   intro h'
-  have hlt' : compare y.1 x.1 = .lt := edgeCmpLT_eq_lt h'
+  have hlt' : compare y.1 x.1 = .lt := edge_cmp_lt_eq_lt h'
   have : (.gt : Ordering) = .lt := by
     exact hgt.symm.trans hlt'
   cases this
@@ -289,12 +289,12 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
                   intro hEq
                   have hlt : edgeCmpLT a a := by
                     simpa [hEq] using hb_lt_a
-                  exact (edgeCmpLT_asymm hlt) hlt
+                  exact (edge_cmp_lt_asymm hlt) hlt
                 have hb_mem_all : b ∈ a :: l₁ := h₂₁ (List.mem_cons.mpr (Or.inl rfl))
                 have hb_mem : b ∈ l₁ := by
                   simpa [List.mem_cons, hba] using hb_mem_all
                 have ha_lt_b : edgeCmpLT a b := h₁'.1 _ hb_mem
-                exact False.elim ((edgeCmpLT_asymm ha_lt_b) hb_lt_a)
+                exact False.elim ((edge_cmp_lt_asymm ha_lt_b) hb_lt_a)
           subst hab
 
           -- Canonical List Extensionality: Tail Subset Transfer
@@ -307,7 +307,7 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
               intro hEq
               have hEq' : compare a.1 x.1 = .eq :=
                 (Edge.compare_eq_iff_eq a.1 x.1).2 (by simp [hEq])
-              have hlt' : compare a.1 x.1 = .lt := edgeCmpLT_eq_lt hlt
+              have hlt' : compare a.1 x.1 = .lt := edge_cmp_lt_eq_lt hlt
               have : (.eq : Ordering) = .lt := by
                 exact hEq'.symm.trans hlt'
               cases this
@@ -322,7 +322,7 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
               intro hEq
               have hEq' : compare a.1 x.1 = .eq :=
                 (Edge.compare_eq_iff_eq a.1 x.1).2 (by simp [hEq])
-              have hlt' : compare a.1 x.1 = .lt := edgeCmpLT_eq_lt hlt
+              have hlt' : compare a.1 x.1 = .lt := edge_cmp_lt_eq_lt hlt
               have : (.eq : Ordering) = .lt := by
                 exact hEq'.symm.trans hlt'
               cases this
@@ -332,7 +332,7 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
 
 /-! ## DEnv Extensional Equality -/
 /-- Two DEnvs with identical find? are equal. -/
-theorem DEnv_eq_of_find?_eq {D₁ D₂ : DEnv}
+theorem d_env_eq_of_find?_eq {D₁ D₂ : DEnv}
     (h : ∀ e, D₁.find? e = D₂.find? e) : D₁ = D₂ := by
   have hlist : D₁.list = D₂.list := by
     apply list_eq_of_subset_pairwise (h₁:=D₁.sorted) (h₂:=D₂.sorted)
@@ -340,25 +340,25 @@ theorem DEnv_eq_of_find?_eq {D₁ D₂ : DEnv}
       have hlookup : D₁.list.lookup p.1 = some p.2 :=
         lookup_eq_some_of_mem_pairwise (h:=D₁.sorted) hp
       have hfind : D₁.find? p.1 = some p.2 := by
-        have hEq := DEnv_find?_eq_lookup (env:=D₁) (e:=p.1)
+        have hEq := d_env_find?_eq_lookup (env:=D₁) (e:=p.1)
         simpa [hEq] using hlookup
       have hfind' : D₂.find? p.1 = some p.2 := by
         simpa [h p.1] using hfind
       have hlookup' : D₂.list.lookup p.1 = some p.2 := by
-        have hEq := DEnv_find?_eq_lookup (env:=D₂) (e:=p.1)
+        have hEq := d_env_find?_eq_lookup (env:=D₂) (e:=p.1)
         simpa [hEq] using hfind'
       exact lookup_mem hlookup'
     · intro p hp
       have hlookup : D₂.list.lookup p.1 = some p.2 :=
         lookup_eq_some_of_mem_pairwise (h:=D₂.sorted) hp
       have hfind : D₂.find? p.1 = some p.2 := by
-        have hEq := DEnv_find?_eq_lookup (env:=D₂) (e:=p.1)
+        have hEq := d_env_find?_eq_lookup (env:=D₂) (e:=p.1)
         simpa [hEq] using hlookup
       have hfind' : D₁.find? p.1 = some p.2 := by
         have hEq := h p.1
         simpa [hEq] using hfind
       have hlookup' : D₁.list.lookup p.1 = some p.2 := by
-        have hEq := DEnv_find?_eq_lookup (env:=D₁) (e:=p.1)
+        have hEq := d_env_find?_eq_lookup (env:=D₁) (e:=p.1)
         simpa [hEq] using hfind'
       exact lookup_mem hlookup'
   cases D₁ with
@@ -395,7 +395,7 @@ def updateD (env : DEnv) (e : Edge) (ts : List ValType) : DEnv :=
 
 /-! ## Lookup Preservation under Updates -/
 /-- Lookup after update on the same edge. -/
-theorem lookupD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
+theorem lookup_d_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
     lookupD (updateD env e ts) e = ts := by
   cases ts with
   | nil =>
@@ -403,7 +403,7 @@ theorem lookupD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
         simp
       let m := env.map.insert e []
       have hmap : (DEnv.ofMap m).map.find? e = m.find? e := by
-        simpa [DEnv.ofMap, m] using (rbmapOfList_toList_find? (m := m) (e := e))
+        simpa [DEnv.ofMap, m] using (rbmap_of_list_to_list_find? (m := m) (e := e))
       have hfind : m.find? e = some [] := by
         simpa [m] using
           (RBMap.find?_insert_of_eq (t := env.map) (k := e) (v := []) (k' := e) hEq)
@@ -413,7 +413,7 @@ theorem lookupD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
         simp
       let m := env.map.insert e (t :: ts')
       have hmap : (DEnv.ofMap m).map.find? e = m.find? e := by
-        simpa [DEnv.ofMap, m] using (rbmapOfList_toList_find? (m := m) (e := e))
+        simpa [DEnv.ofMap, m] using (rbmap_of_list_to_list_find? (m := m) (e := e))
       have hfind : m.find? e = some (t :: ts') := by
         simpa [m] using
           (RBMap.find?_insert_of_eq (t := env.map) (k := e) (v := t :: ts') (k' := e) hEq)
@@ -421,7 +421,7 @@ theorem lookupD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
 
 /-! ## Lookup Preservation on Distinct Edges -/
 /-- Lookup after update on a different edge. -/
-theorem lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
+theorem lookup_d_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
     lookupD (updateD env e ts) e' = lookupD env e' := by
   cases ts with
   | nil =>
@@ -430,7 +430,7 @@ theorem lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne :
         exact hne ((Edge.compare_eq_iff_eq e' e).1 hEq).symm
       let m := env.map.insert e []
       have hmap : (DEnv.ofMap m).map.find? e' = m.find? e' := by
-        simpa [DEnv.ofMap, m] using (rbmapOfList_toList_find? (m := m) (e := e'))
+        simpa [DEnv.ofMap, m] using (rbmap_of_list_to_list_find? (m := m) (e := e'))
       have hfind : m.find? e' = env.map.find? e' := by
         simpa [m] using
           (RBMap.find?_insert_of_ne (t := env.map) (k := e) (v := []) (k' := e') hne')
@@ -441,36 +441,36 @@ theorem lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne :
         exact hne ((Edge.compare_eq_iff_eq e' e).1 hEq).symm
       let m := env.map.insert e (t :: ts')
       have hmap : (DEnv.ofMap m).map.find? e' = m.find? e' := by
-        simpa [DEnv.ofMap, m] using (rbmapOfList_toList_find? (m := m) (e := e'))
+        simpa [DEnv.ofMap, m] using (rbmap_of_list_to_list_find? (m := m) (e := e'))
       have hfind : m.find? e' = env.map.find? e' := by
         simpa [m] using
           (RBMap.find?_insert_of_ne (t := env.map) (k := e) (v := t :: ts') (k' := e') hne')
       simp [lookupD, updateD, DEnv.find?, hmap, hfind, m]
 
-@[simp] theorem lookupD_empty (e : Edge) : lookupD (∅ : DEnv) e = [] := by
-  simp [lookupD, DEnv.find?, DEnv_map_find?_empty]
+@[simp] theorem lookup_d_empty (e : Edge) : lookupD (∅ : DEnv) e = [] := by
+  simp [lookupD, DEnv.find?, d_env_map_find?_empty]
 
 /-! ## find? Preservation under Updates -/
 /-- find? after update on the same edge. -/
-theorem find?_updateD_eq (env : DEnv) (e : Edge) (ts : List ValType) :
+theorem find?_update_d_eq (env : DEnv) (e : Edge) (ts : List ValType) :
     (updateD env e ts).find? e = some ts := by
   have hEq : compare e e = .eq := by simp
   let m := env.map.insert e ts
   have hmap : (DEnv.ofMap m).map.find? e = m.find? e := by
-    simpa [DEnv.ofMap, m] using (rbmapOfList_toList_find? (m := m) (e := e))
+    simpa [DEnv.ofMap, m] using (rbmap_of_list_to_list_find? (m := m) (e := e))
   have hfind : m.find? e = some ts := by
     simpa [m] using (RBMap.find?_insert_of_eq (t := env.map) (k := e) (v := ts) (k' := e) hEq)
   simp only [updateD, DEnv.find?, hmap, hfind, m]
 
 /-- find? after update on a different edge. -/
-theorem find?_updateD_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
+theorem find?_update_d_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
     (updateD env e ts).find? e' = env.find? e' := by
   have hne' : compare e' e ≠ .eq := by
     intro hEq
     exact hne ((Edge.compare_eq_iff_eq e' e).1 hEq).symm
   let m := env.map.insert e ts
   have hmap : (DEnv.ofMap m).map.find? e' = m.find? e' := by
-    simpa [DEnv.ofMap, m] using (rbmapOfList_toList_find? (m := m) (e := e'))
+    simpa [DEnv.ofMap, m] using (rbmap_of_list_to_list_find? (m := m) (e := e'))
   have hfind : m.find? e' = env.map.find? e' := by
     simpa [m] using (RBMap.find?_insert_of_ne (t := env.map) (k := e) (v := ts) (k' := e') hne')
   simp only [updateD, DEnv.find?, hmap, hfind, m]

@@ -89,7 +89,7 @@ def conformanceGate
   (lower kr).isSome
 
 /-- Conformance gate rejects operations that cannot be lowered to `OpCore`. -/
-theorem conformanceGate_rejects_nonlowerable
+theorem conformance_gate_rejects_nonlowerable
     {KRich : Type z} {OpTag : Type v} {Args : Type w}
     (lower : LowerToCore KRich OpTag Args) (kr : KRich)
     (h : lower kr = none) :
@@ -97,7 +97,7 @@ theorem conformanceGate_rejects_nonlowerable
   simp [conformanceGate, h]
 
 /-- Conformance gate accepts operations that lower to some `OpCore` payload. -/
-theorem conformanceGate_accepts_lowerable
+theorem conformance_gate_accepts_lowerable
     {KRich : Type z} {OpTag : Type v} {Args : Type w}
     (lower : LowerToCore KRich OpTag Args) (kr : KRich) (kc : OpCore OpTag Args)
     (h : lower kr = some kc) :
@@ -124,7 +124,7 @@ structure ErasurePremises
   lowerSound : ∀ kr kc, lower kr = some kc → kc = erase kr
 
 /-- Derive weakest-core erasure theorem from explicit erasure premises. -/
-theorem weakestOpCoreErasure_of_premises
+theorem weakest_op_core_erasure_of_premises
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     {KRich : Type z} {OpTag : Type v} {Args : Type w} {Enc : Type x}
@@ -133,7 +133,7 @@ theorem weakestOpCoreErasure_of_premises
   p.weakestWitness
 
 /-- Derive replay stability of `OpCore` evaluation from erasure premises. -/
-theorem opCoreReplayStable_of_premises
+theorem op_core_replay_stable_of_premises
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     {KRich : Type z} {OpTag : Type v} {Args : Type w} {Enc : Type x}
@@ -142,7 +142,7 @@ theorem opCoreReplayStable_of_premises
   p.replayStableWitness
 
 /-- Derive transport-serialization invariance from erasure premises. -/
-theorem opCoreSerializationInvariant_of_premises
+theorem op_core_serialization_invariant_of_premises
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     {KRich : Type z} {OpTag : Type v} {Args : Type w} {Enc : Type x}
@@ -153,7 +153,7 @@ theorem opCoreSerializationInvariant_of_premises
 /-! ## Premise-Derived Conformance Gate Lemma -/
 
 /-- Conformance-gate theorem from lowering evidence. -/
-theorem conformanceGate_of_loweringSound
+theorem conformance_gate_of_lowering_sound
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     {KRich : Type z} {OpTag : Type v} {Args : Type w} {Enc : Type x}
@@ -189,7 +189,7 @@ def UnsupportedSerializableConstruct
   p.lower kr = none
 
 /-- Least-expressiveness: any admissible serializable AST model factors through `OpCore`. -/
-theorem serializableAST_reducible_to_OpCore
+theorem serializable_ast_reducible_to_op_core
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     {KRich : Type z} {OpTag : Type v} {Args : Type w} {Enc : Type x}
@@ -200,10 +200,10 @@ theorem serializableAST_reducible_to_OpCore
         EqSafe M (evalCore p.interp (erase' kr) ctx s) (evalCore p.interp (p.erase kr) ctx s)) :
     ∃ normalize : OpCore OpTag Args → OpCore OpTag Args,
       ∀ kr, erase' kr = normalize (p.erase kr) := by
-  exact (weakestOpCoreErasure_of_premises p).2.2 erase' hObs
+  exact (weakest_op_core_erasure_of_premises p).2.2 erase' hObs
 
 /-- Classification theorem: rich constructs are either reducible to `OpCore` or rejected. -/
-theorem serializableAST_reducible_or_rejected
+theorem serializable_ast_reducible_or_rejected
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     {KRich : Type z} {OpTag : Type v} {Args : Type w} {Enc : Type x}
@@ -214,11 +214,11 @@ theorem serializableAST_reducible_or_rejected
   cases hLower : p.lower kr with
   | none =>
       right
-      exact ⟨hLower, conformanceGate_rejects_nonlowerable p.lower kr hLower⟩
+      exact ⟨hLower, conformance_gate_rejects_nonlowerable p.lower kr hLower⟩
   | some kc =>
       left
       have hSound : EqSafe M (p.evalRich kr ctx s) (evalCore p.interp (p.erase kr) ctx s) :=
-        (weakestOpCoreErasure_of_premises p).1 kr ctx s
+        (weakest_op_core_erasure_of_premises p).1 kr ctx s
       have hk : kc = p.erase kr := p.lowerSound kr kc hLower
       refine ⟨kc, rfl, ?_⟩
       simpa [hk] using hSound
@@ -252,7 +252,7 @@ def lowerCoreEquivalent
 /-! ## Core-Equivalent Erasure Proofs -/
 
 /-- Soundness for the core-equivalent erasure fragment. -/
-theorem erasureSoundness_coreEquivalent
+theorem erasure_soundness_core_equivalent
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     (M : Model State Op Context Obs Program)
     {OpTag : Type v} {Args : Type w}
@@ -264,7 +264,7 @@ theorem erasureSoundness_coreEquivalent
       rfl
 
 /-- Completeness for the core-equivalent erasure fragment. -/
-theorem erasureCompleteness_coreEquivalent
+theorem erasure_completeness_core_equivalent
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     (M : Model State Op Context Obs Program)
     {OpTag : Type v} {Args : Type w}
@@ -276,7 +276,7 @@ theorem erasureCompleteness_coreEquivalent
   rfl
 
 /-- Maximality for the core-equivalent erasure fragment. -/
-theorem erasureMaximality_coreEquivalent
+theorem erasure_maximality_core_equivalent
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     (M : Model State Op Context Obs Program)
     {OpTag : Type v} {Args : Type w}
@@ -291,19 +291,19 @@ theorem erasureMaximality_coreEquivalent
 /-! ## Core-Equivalent Weakest-Erasure Theorem -/
 
 /-- Weakest-core erasure theorem for the core-equivalent rich fragment. -/
-theorem weakestOpCoreErasure_coreEquivalent
+theorem weakest_op_core_erasure_core_equivalent
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     (M : Model State Op Context Obs Program)
     {OpTag : Type v} {Args : Type w}
     (interp : OpCoreInterpreter State Context OpTag Args) :
     WeakestOpCoreErasureTheorem M (evalRichCoreEquivalent interp) interp eraseCoreEquivalent := by
   refine ⟨?_, ?_, ?_⟩
-  · exact erasureSoundness_coreEquivalent M interp
-  · exact erasureCompleteness_coreEquivalent M interp
-  · exact erasureMaximality_coreEquivalent M interp
+  · exact erasure_soundness_core_equivalent M interp
+  · exact erasure_completeness_core_equivalent M interp
+  · exact erasure_maximality_core_equivalent M interp
 
 /-- Lowering soundness for the core-equivalent rich fragment. -/
-theorem lowerCoreEquivalent_sound
+theorem lower_core_equivalent_sound
     {OpTag : Type v} {Args : Type w}
     (kr : CoreEquivalentKRich OpTag Args) (kc : OpCore OpTag Args)
     (h : lowerCoreEquivalent kr = some kc) :
@@ -314,7 +314,7 @@ theorem lowerCoreEquivalent_sound
       simpa [eraseCoreEquivalent] using h.symm
 
 /-- Conformance gate accepts all core-equivalent rich continuations. -/
-theorem conformanceGate_coreEquivalent_true
+theorem conformance_gate_core_equivalent_true
     {OpTag : Type v} {Args : Type w}
     (kr : CoreEquivalentKRich OpTag Args) :
     conformanceGate lowerCoreEquivalent kr = true := by
@@ -348,7 +348,7 @@ def lowerCoreRepresentable
   fun kr => some (CoreRepresentableFamily.toCore kr)
 
 /-- Totality of lowering for core-representable rich families. -/
-theorem lowerCoreRepresentable_total
+theorem lower_core_representable_total
     {KRich : Type z} {OpTag : Type v} {Args : Type w}
     [CoreRepresentableFamily KRich OpTag Args] :
     ∀ kr : KRich, ∃ kc,
@@ -357,7 +357,7 @@ theorem lowerCoreRepresentable_total
   exact ⟨CoreRepresentableFamily.toCore kr, rfl⟩
 
 /-- Pointwise observational preservation for core-representable lowering. -/
-theorem stepObsPreserved_coreRepresentable
+theorem step_obs_preserved_core_representable
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     (M : Model State Op Context Obs Program)
     {KRich : Type z} {OpTag : Type v} {Args : Type w}
@@ -387,7 +387,7 @@ structure FamilyLoweringAdequacy
       EqSafe M (evalRich kr ctx s) (evalCore interp kc ctx s)
 
 /-- Run-level envelope preservation induced by pointwise lowering adequacy. -/
-theorem envelopePreserved_of_familyLowering
+theorem envelope_preserved_of_family_lowering
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     {KRich : Type z} {OpTag : Type v} {Args : Type w}
@@ -422,7 +422,7 @@ def FamilyEnvelopeAdequate
           (fun n => evalCore F.interp (runCore n) ctx (stateRun n)))
 
 /-- Every `FamilyLoweringAdequacy` witness yields `FamilyEnvelopeAdequate`. -/
-theorem familyEnvelopeAdequate_of_lowering
+theorem family_envelope_adequate_of_lowering
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     {KRich : Type z} {OpTag : Type v} {Args : Type w}
@@ -430,7 +430,7 @@ theorem familyEnvelopeAdequate_of_lowering
     FamilyEnvelopeAdequate M F := by
   refine ⟨F.totalLowering, F.stepObsPreserved, ?_⟩
   intro runRich runCore ctx stateRun hLower
-  exact envelopePreserved_of_familyLowering F runRich runCore ctx stateRun hLower
+  exact envelope_preserved_of_family_lowering F runRich runCore ctx stateRun hLower
 
 end CRDT
 end Distributed

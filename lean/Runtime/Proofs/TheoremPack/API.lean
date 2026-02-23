@@ -81,7 +81,7 @@ abbrev replayConformsToClasses :=
 
 /-- API alias: optimization-class bisim witness preserves observer behavior. -/
 abbrev transformationClassPreservesObserverBehavior :=
-  @Runtime.Proofs.transformationClass_preserves_observer_behavior
+  @Runtime.Proofs.transformation_class_preserves_observer_behavior
 
 /-- API alias for release conformance report versioning tag. -/
 abbrev releaseConformanceReportVersion :=
@@ -125,15 +125,15 @@ abbrev hasShardedEvidence :=
 
 /-- Theorem-pack API alias: successful fork decreases speculation depth. -/
 abbrev forkDepthMonotone :=
-  @stepFork_depth_monotone_success
+  @step_fork_depth_monotone_success
 
 /-- Theorem-pack API alias: reconciled join erases speculation session/checkpoint state. -/
 abbrev joinCleanupReconciled :=
-  @stepJoin_cleanup_when_reconciled
+  @step_join_cleanup_when_reconciled
 
 /-- Theorem-pack API alias: abort restores scoped checkpoint trace/nonce fields. -/
 abbrev abortRestoresScopedCheckpoint :=
-  @stepAbort_restores_scoped_checkpoint
+  @step_abort_restores_scoped_checkpoint
 
 /-! ## Proof-Space Composer -/
 

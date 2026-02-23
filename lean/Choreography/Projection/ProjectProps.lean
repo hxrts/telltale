@@ -10,7 +10,7 @@ should be equivalent up to EQ2.
 We must prove: if CProject g role e1 and CProject g role e2, then EQ2 e1 e2.
 This establishes determinism modulo observational equivalence.
 
-Solution Structure. Use trans_eq_of_CProject to relate both e1 and e2
+Solution Structure. Use trans_eq_of_c_project to relate both e1 and e2
 to trans g role, then conclude by equality and EQ2 reflexivity.
 -/
 
@@ -53,7 +53,7 @@ structure Claims where
 
 /-- Projection is deterministic up to EQ2 (assuming well-formed global types).
 
-Uses CProject_implies_EQ2_trans twice and composes via EQ2_trans_wf. -/
+Uses c_project_implies_eq2_trans twice and composes via eq2_trans_wf. -/
 theorem project_deterministic {g : GlobalType} {role : String} {e1 e2 : LocalTypeR}
     (hp1 : CProject g role e1) (hp2 : CProject g role e2)
     (hwf : g.wellFormed = true) : EQ2 e1 e2 := by
@@ -63,13 +63,13 @@ theorem project_deterministic {g : GlobalType} {role : String} {e1 e2 : LocalTyp
     simp [GlobalType.wellFormed, Bool.and_eq_true] at hwf'
     exact hwf'.1.1.2
   have htrans_eq : trans g role = e1 :=
-    trans_eq_of_CProject g role e1 hp1 hne
+    trans_eq_of_c_project g role e1 hp1 hne
   have htrans_eq2 : trans g role = e2 :=
-    trans_eq_of_CProject g role e2 hp2 hne
+    trans_eq_of_c_project g role e2 hp2 hne
   have hEq : e1 = e2 := by
     exact htrans_eq.symm.trans htrans_eq2
   subst hEq
-  exact EQ2_refl _
+  exact eq2_refl _
 
 /-! ## Branch Determinism Helper -/
 

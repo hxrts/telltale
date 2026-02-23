@@ -42,10 +42,10 @@ and the muve theory is in `Project/Muve.lean`.
 The following definitions form the semantic interface for proofs:
 
 - `projectR?`: proof-carrying projection (returns projection with CProject proof)
-- `projectR?_some_iff_CProject`: specification lemma
-- `projectR?_sound`: soundness (some implies CProject)
-- `projectR?_complete`: completeness (CProject implies some)
-- `EQ_end`: non-participants project to EEnd (EQ2-equivalent)
+- `project_r?_some_iff_c_project`: specification lemma
+- `project_r?_sound`: soundness (some implies CProject)
+- `project_r?_complete`: completeness (CProject implies some)
+- `eq_end`: non-participants project to EEnd (EQ2-equivalent)
 -/
 
 namespace Choreography.Projection.Project
@@ -67,13 +67,13 @@ These correspond to key lemmas from the Coq development:
 - `proj_proj`: if CProject g p e, then EQ2 e (trans g p)
 - `Project_EQ2`: if CProject g p e0 and EQ2 e0 e1, then CProject g p e1
 
-## CProject_implies_EQ2_trans Proof Strategy
+## c_project_implies_eq2_trans Proof Strategy
 
 The proof uses coinduction on EQ2 with the relation:
 `CProjectTransRel lt cand := ∃ g role, CProject g role lt ∧ cand = trans g role`
 
 For end, var, and participant comm cases, CProject and trans have matching structures.
-For non-participants, we use `part_of2_or_end` + `EQ_end` to show EQ2 lt .end ∧ EQ2 .end (trans g role).
+For non-participants, we use `part_of2_or_end` + `eq_end` to show EQ2 lt .end ∧ EQ2 .end (trans g role).
 The mu case requires coinduction up-to with substitution lemmas.
 
 See `subject_reduction/theories/Projection/indProj.v:221-260` for the Coq reference. -/
@@ -108,7 +108,7 @@ to avoid the semantic gap where body.allVarsBound [] cannot be proven from
 /-! ## Size and Membership Helpers -/
 
 /-- Helper: sizeOf a member continuation is smaller than the comm node. -/
-private theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
+private theorem size_of_elem_snd_lt_comm (sender receiver : String)
     {branches : List (Label × GlobalType)} {gb : Label × GlobalType}
     (h : gb ∈ branches) :
     sizeOf gb.2 < sizeOf (GlobalType.comm sender receiver branches) := by
@@ -133,7 +133,7 @@ private theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
 /-! ## Branch allCommsNonEmpty Helper -/
 
 /-- Helper: a branch membership inherits allCommsNonEmpty. -/
-private theorem allCommsNonEmpty_of_mem {branches : List (Label × GlobalType)}
+private theorem all_comms_non_empty_of_mem {branches : List (Label × GlobalType)}
     {pair : Label × GlobalType} (hmem : pair ∈ branches)
     (hne : allCommsNonEmptyBranches branches = true) :
     pair.2.allCommsNonEmpty = true := by
@@ -242,7 +242,7 @@ private theorem part_of_all2_implies_part_of2_aux (role : String) (g : GlobalTyp
           ∀ pair ∈ branches, part_of_all2 role pair.2 → part_of2 role pair.2 := by
         intro pair hmem hpoa
         have hne_pair : pair.2.allCommsNonEmpty = true :=
-          allCommsNonEmpty_of_mem hmem hne_branches
+          all_comms_non_empty_of_mem hmem hne_branches
         exact part_of_all2_implies_part_of2_aux role pair.2 hpoa hne_pair
       exact part_of_all2_implies_part_of2_aux_comm role sender receiver branches h hne ih
 termination_by sizeOf g
@@ -250,7 +250,7 @@ decreasing_by
   all_goals simp_wf
   · -- Mu case: sizeOf decreases to the body.
     simp only [sizeOf, GlobalType._sizeOf_1] at *; omega
-  · simpa using (sizeOf_elem_snd_lt_comm (sender := sender) (receiver := receiver)
+  · simpa using (size_of_elem_snd_lt_comm (sender := sender) (receiver := receiver)
       (branches := branches) (gb := pair) hmem)
 
 /-! ## part_of_all2 -> part_of2: Public Bridge -/
@@ -271,11 +271,11 @@ This uses the muve/closed infrastructure from EQ_end and part_of2_or_end.
 
 1. By `part_of2_or_end`, we get `part_of_all2 role g ∨ EQ2 lt .end`
 2. The Left case contradicts `hnotpart` via `part_of_all2_implies_part_of2`
-3. The Right case: chain `EQ2 lt .end` with `EQ2 .end (trans g role)` from `EQ_end` -/
+3. The Right case: chain `EQ2 lt .end` with `EQ2 .end (trans g role)` from `eq_end` -/
 
 /-! ## Nonparticipant Bridge: Left Contradiction -/
 
-private theorem CProject_implies_EQ2_trans_nonpart_left (g : GlobalType) (role : String)
+private theorem c_project_implies_eq2_trans_nonpart_left (g : GlobalType) (role : String)
     (hnotpart : ¬part_of2 role g) (hwf : g.wellFormed = true)
     (hpart_all : part_of_all2 role g) : False := by
   -- part_of_all2 implies part_of2, contradicting the non-participant hypothesis.
@@ -283,16 +283,16 @@ private theorem CProject_implies_EQ2_trans_nonpart_left (g : GlobalType) (role :
 
 /-! ## Nonparticipant Bridge: Right Chain -/
 
-private theorem CProject_implies_EQ2_trans_nonpart_right (g : GlobalType) (role : String)
+private theorem c_project_implies_eq2_trans_nonpart_right (g : GlobalType) (role : String)
     (lt : LocalTypeR) (hnotpart : ¬part_of2 role g) (hwf : g.wellFormed = true)
     (hlt_end : EQ2 lt .end) : EQ2 lt (trans g role) := by
   -- Chain EQ2 lt .end with EQ_end for trans.
-  have hend_trans := EQ_end role g hnotpart hwf
-  exact EQ2_trans_via_end hlt_end hend_trans
+  have hend_trans := eq_end role g hnotpart hwf
+  exact eq2_trans_via_end hlt_end hend_trans
 
 /-! ## Nonparticipant Bridge: Combined Lemma -/
 
-private theorem CProject_implies_EQ2_trans_nonpart (g : GlobalType) (role : String) (lt : LocalTypeR)
+private theorem c_project_implies_eq2_trans_nonpart (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt)
     (hnotpart : ¬part_of2 role g)
     (hwf : g.wellFormed = true) :
@@ -302,10 +302,10 @@ private theorem CProject_implies_EQ2_trans_nonpart (g : GlobalType) (role : Stri
   cases h_or with
   | inl hpart_all =>
       -- Contradiction: part_of_all2 implies part_of2.
-      exact (CProject_implies_EQ2_trans_nonpart_left g role hnotpart hwf hpart_all).elim
+      exact (c_project_implies_eq2_trans_nonpart_left g role hnotpart hwf hpart_all).elim
   | inr hlt_end =>
       -- Chain EQ2 lt .end with EQ_end.
-      exact CProject_implies_EQ2_trans_nonpart_right g role lt hnotpart hwf hlt_end
+      exact c_project_implies_eq2_trans_nonpart_right g role lt hnotpart hwf hlt_end
 
 /-! ## Main Theorem: CProject_implies_EQ2_trans
 
@@ -319,7 +319,7 @@ These lemmas package common CProjectF destruct patterns for the Project_EQ2 port
 
 /-! ## Candidate Inversion: End -/
 
-private theorem CProject_end_inv (role : String) (cand : LocalTypeR)
+private theorem c_project_end_inv (role : String) (cand : LocalTypeR)
     (hproj : CProject .end role cand) : cand = .end := by
   cases cand with
   | «end» => rfl
@@ -346,7 +346,7 @@ private theorem CProject_end_inv (role : String) (cand : LocalTypeR)
 
 /-! ## Candidate Inversion: Var -/
 
-private theorem CProject_var_inv (t role : String) (cand : LocalTypeR)
+private theorem c_project_var_inv (t role : String) (cand : LocalTypeR)
     (hproj : CProject (.var t) role cand) : cand = .var t := by
   cases cand with
   | var t' =>
@@ -377,7 +377,7 @@ private theorem CProject_var_inv (t role : String) (cand : LocalTypeR)
 
 /-! ## Candidate Inversion: Mu -/
 
-private theorem CProject_mu_inv (t : String) (gbody : GlobalType) (role : String) (cand : LocalTypeR)
+private theorem c_project_mu_inv (t : String) (gbody : GlobalType) (role : String) (cand : LocalTypeR)
     (hproj : CProject (.mu t gbody) role cand) :
     ∃ candBody, CProject gbody role candBody ∧
       ((candBody.isGuarded t = true ∧ cand = .mu t candBody) ∨
@@ -386,7 +386,7 @@ private theorem CProject_mu_inv (t : String) (gbody : GlobalType) (role : String
 
 /-! ## Candidate Inversion: Comm Sender -/
 
-private theorem CProject_comm_sender_inv (sender receiver : String)
+private theorem c_project_comm_sender_inv (sender receiver : String)
     (gbs : List (Label × GlobalType)) (role : String) (cand : LocalTypeR)
     (hrole : role = sender)
     (hproj : CProject (.comm sender receiver gbs) role cand) :
@@ -406,7 +406,7 @@ private theorem CProject_comm_sender_inv (sender receiver : String)
 
 /-! ## Candidate Inversion: Comm Receiver -/
 
-private theorem CProject_comm_receiver_inv (sender receiver : String)
+private theorem c_project_comm_receiver_inv (sender receiver : String)
     (gbs : List (Label × GlobalType)) (role : String) (cand : LocalTypeR)
     (hrole : role = receiver) (hns : sender ≠ receiver)
     (hproj : CProject (.comm sender receiver gbs) role cand) :
@@ -432,7 +432,7 @@ private theorem CProject_comm_receiver_inv (sender receiver : String)
 
 /-! ## Candidate Inversion: Comm Nonparticipant -/
 
-private theorem CProject_comm_other_inv (sender receiver : String)
+private theorem c_project_comm_other_inv (sender receiver : String)
     (gbs : List (Label × GlobalType)) (role : String) (cand : LocalTypeR)
     (hs : role ≠ sender) (hr : role ≠ receiver)
     (hproj : CProject (.comm sender receiver gbs) role cand) :
@@ -443,7 +443,7 @@ private theorem CProject_comm_other_inv (sender receiver : String)
 
 /-! ## FullUnfold Transfer: CProject Right -/
 
-private theorem CProject_fullUnfold_right_of_muHeight_zero
+private theorem c_project_full_unfold_right_of_mu_height_zero
     {g : GlobalType} {role : String} {cand : LocalTypeR}
     (hproj : CProject g role cand) (hmu : cand.muHeight = 0) :
     CProject g role cand.fullUnfold := by
@@ -451,7 +451,7 @@ private theorem CProject_fullUnfold_right_of_muHeight_zero
 
 /-! ## FullUnfold Transfer: CProject Left -/
 
-private theorem CProject_fullUnfold_left_of_muHeight_zero
+private theorem c_project_full_unfold_left_of_mu_height_zero
     {g : GlobalType} {role : String} {cand : LocalTypeR}
     (hproj : CProject g role cand.fullUnfold) (hmu : cand.muHeight = 0) :
     CProject g role cand := by
@@ -459,7 +459,7 @@ private theorem CProject_fullUnfold_left_of_muHeight_zero
 
 /-! ## FullUnfold Transfer: CProjectU Right -/
 
-private theorem CProjectU_fullUnfold_right_of_muHeight_zero
+private theorem c_project_u_full_unfold_right_of_mu_height_zero
     {g : GlobalType} {role : String} {cand : LocalTypeR}
     (hproj : CProjectU g role cand) (hmu : cand.muHeight = 0) :
     CProjectU g role cand.fullUnfold := by
@@ -467,7 +467,7 @@ private theorem CProjectU_fullUnfold_right_of_muHeight_zero
 
 /-! ## FullUnfold Transfer: CProjectU Left -/
 
-private theorem CProjectU_fullUnfold_left_of_muHeight_zero
+private theorem c_project_u_full_unfold_left_of_mu_height_zero
     {g : GlobalType} {role : String} {cand : LocalTypeR}
     (hproj : CProjectU g role cand.fullUnfold) (hmu : cand.muHeight = 0) :
     CProjectU g role cand := by

@@ -196,15 +196,15 @@ theorem bupd_frame_r (P Q : iProp) :
 def big_sepL {α : Type} (Φ : α → iProp) : List α → iProp :=
   fun l => l.foldr (fun a acc => iProp.sep (Φ a) acc) iProp.emp
 
-theorem big_sepL_nil {α : Type} (Φ : α → iProp) :
+theorem big_sep_l_nil {α : Type} (Φ : α → iProp) :
     iProp.entails (big_sepL Φ []) iProp.emp :=
   entails_refl _
 
-theorem big_sepL_cons {α : Type} (Φ : α → iProp) (x : α) (l : List α) :
+theorem big_sep_l_cons {α : Type} (Φ : α → iProp) (x : α) (l : List α) :
     iProp.entails (big_sepL Φ (x :: l)) (iProp.sep (Φ x) (big_sepL Φ l)) :=
   entails_refl _
 
-theorem big_sepL_app {α : Type} (Φ : α → iProp) (l₁ l₂ : List α) :
+theorem big_sep_l_app {α : Type} (Φ : α → iProp) (l₁ l₂ : List α) :
     iProp.entails (big_sepL Φ (l₁ ++ l₂))
       (iProp.sep (big_sepL Φ l₁) (big_sepL Φ l₂)) := by
   induction l₁ with

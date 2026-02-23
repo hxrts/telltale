@@ -49,17 +49,17 @@ theorem label_beq_refl (lbl : Label) : (lbl == lbl) = true := by
       simp [heq, payload_beq_refl sort]
 
 /-- noSelfComm propagates to mu body (trivially, by definition). -/
-theorem noSelfComm_mu_body {t : String} {body : GlobalType}
+theorem no_self_comm_mu_body {t : String} {body : GlobalType}
     (h : (GlobalType.mu t body).noSelfComm = true) : body.noSelfComm = true := h
 
 /-- noSelfComm propagates to delegate continuation. -/
-theorem noSelfComm_delegate_cont {p q : String} {sid : Nat} {r : String} {cont : GlobalType}
+theorem no_self_comm_delegate_cont {p q : String} {sid : Nat} {r : String} {cont : GlobalType}
     (h : (GlobalType.delegate p q sid r cont).noSelfComm = true) : cont.noSelfComm = true := by
   simp only [GlobalType.noSelfComm, Bool.and_eq_true, bne_iff_ne, ne_eq] at h
   exact h.2
 
 /-- Helper: noSelfCommBranches implies noSelfComm for each element. -/
-theorem noSelfComm_of_noSelfCommBranches {bs : List (Label × GlobalType)}
+theorem no_self_comm_of_no_self_comm_branches {bs : List (Label × GlobalType)}
     (h : noSelfCommBranches bs = true) :
     ∀ p ∈ bs, p.2.noSelfComm = true := by
   intro p hp
@@ -72,20 +72,20 @@ theorem noSelfComm_of_noSelfCommBranches {bs : List (Label × GlobalType)}
       | tail _ hmem => exact ih h.2 p hmem
 
 /-- noSelfComm propagates to comm branches. -/
-theorem noSelfComm_comm_branches {s r : String} {bs : List (Label × GlobalType)}
+theorem no_self_comm_comm_branches {s r : String} {bs : List (Label × GlobalType)}
     (h : (GlobalType.comm s r bs).noSelfComm = true) :
     ∀ p ∈ bs, p.2.noSelfComm = true := by
   simp only [GlobalType.noSelfComm, Bool.and_eq_true] at h
-  exact noSelfComm_of_noSelfCommBranches h.2
+  exact no_self_comm_of_no_self_comm_branches h.2
 
 /-! ## allCommsNonEmpty Propagation -/
 
 /-- allCommsNonEmpty propagates to mu body. -/
-theorem allCommsNonEmpty_mu_body {t : String} {body : GlobalType}
+theorem all_comms_non_empty_mu_body {t : String} {body : GlobalType}
     (h : (GlobalType.mu t body).allCommsNonEmpty = true) : body.allCommsNonEmpty = true := h
 
 /-- Helper: allCommsNonEmptyBranches implies allCommsNonEmpty for each element. -/
-theorem allCommsNonEmpty_of_allCommsNonEmptyBranches {bs : List (Label × GlobalType)}
+theorem all_comms_non_empty_of_all_comms_non_empty_branches {bs : List (Label × GlobalType)}
     (h : allCommsNonEmptyBranches bs = true) :
     ∀ p ∈ bs, p.2.allCommsNonEmpty = true := by
   intro p hp
@@ -98,20 +98,20 @@ theorem allCommsNonEmpty_of_allCommsNonEmptyBranches {bs : List (Label × Global
       | tail _ hmem => exact ih h.2 p hmem
 
 /-- allCommsNonEmpty propagates to comm branches. -/
-theorem allCommsNonEmpty_comm_branches {s r : String} {bs : List (Label × GlobalType)}
+theorem all_comms_non_empty_comm_branches {s r : String} {bs : List (Label × GlobalType)}
     (h : (GlobalType.comm s r bs).allCommsNonEmpty = true) :
     ∀ p ∈ bs, p.2.allCommsNonEmpty = true := by
   simp only [GlobalType.allCommsNonEmpty, Bool.and_eq_true] at h
-  exact allCommsNonEmpty_of_allCommsNonEmptyBranches h.2
+  exact all_comms_non_empty_of_all_comms_non_empty_branches h.2
 
 /-! ## isBlind Propagation -/
 
 /-- isBlind propagates to mu body. -/
-theorem isBlind_mu_body {t : String} {body : GlobalType}
+theorem is_blind_mu_body {t : String} {body : GlobalType}
     (h : isBlind (GlobalType.mu t body) = true) : isBlind body = true := h
 
 /-- Helper: isBlindBranches implies isBlind for each element. -/
-theorem isBlind_of_isBlindBranches {bs : List (Label × GlobalType)}
+theorem is_blind_of_is_blind_branches {bs : List (Label × GlobalType)}
     (h : isBlindBranches bs = true) :
     ∀ p ∈ bs, isBlind p.2 = true := by
   intro p hp
@@ -124,20 +124,20 @@ theorem isBlind_of_isBlindBranches {bs : List (Label × GlobalType)}
       | tail _ hmem => exact ih h.2 p hmem
 
 /-- isBlind propagates to comm branches. -/
-theorem isBlind_comm_branches {s r : String} {bs : List (Label × GlobalType)}
+theorem is_blind_comm_branches {s r : String} {bs : List (Label × GlobalType)}
     (h : isBlind (GlobalType.comm s r bs) = true) :
     ∀ p ∈ bs, isBlind p.2 = true := by
   simp only [isBlind, Bool.and_eq_true] at h
-  exact isBlind_of_isBlindBranches h.2
+  exact is_blind_of_is_blind_branches h.2
 
 /-- isBlind propagates to delegate continuation. -/
-theorem isBlind_delegate_cont {p q : String} {sid : Nat} {r : String} {cont : GlobalType}
+theorem is_blind_delegate_cont {p q : String} {sid : Nat} {r : String} {cont : GlobalType}
     (h : isBlind (GlobalType.delegate p q sid r cont) = true) : isBlind cont = true := h
 
 /-! ## Non-Empty Branch Lemmas -/
 
 /-- allCommsNonEmpty for a comm implies its branch list is non-empty. -/
-theorem comm_branches_nonempty_of_allCommsNonEmpty
+theorem comm_branches_nonempty_of_all_comms_non_empty
     {sender receiver : String} {branches : List (Label × GlobalType)}
     (hall : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true) :
     branches ≠ [] := by
@@ -151,7 +151,7 @@ theorem comm_branches_nonempty_of_allCommsNonEmpty
   exact hFalse.elim
 
 /-- wellFormed for a comm implies its branch list is non-empty. -/
-theorem comm_branches_nonempty_of_wellFormed
+theorem comm_branches_nonempty_of_well_formed
     {sender receiver : String} {branches : List (Label × GlobalType)}
     (hwf : (GlobalType.comm sender receiver branches).wellFormed = true) :
     branches ≠ [] := by
@@ -159,7 +159,7 @@ theorem comm_branches_nonempty_of_wellFormed
   simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
   have hall : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true :=
     hwf.1.1.2
-  exact comm_branches_nonempty_of_allCommsNonEmpty hall
+  exact comm_branches_nonempty_of_all_comms_non_empty hall
 
 /-! ## Branch Projection Lemmas -/
 
@@ -182,7 +182,7 @@ theorem all_eq_true_of_all {α : Type} {p : α → Bool} {xs : List α}
 
     Note: This follows by induction on branches. The base case is definitional,
     and the cons case uses the IH. Proof omitted due to mutual definition unfolding complexity. -/
-theorem projectbBranches_trans_of_all (branches : List (Label × GlobalType)) (role : String)
+theorem projectb_branches_trans_of_all (branches : List (Label × GlobalType)) (role : String)
     (_hbranches : ∀ p ∈ branches, projectb p.2 role (Trans.trans p.2 role) = true) :
     projectbBranches branches role (transBranches branches role) = true := by
   induction branches with
@@ -215,7 +215,7 @@ theorem projectbBranches_trans_of_all (branches : List (Label × GlobalType)) (r
     and each branch satisfies the IH.
 
     Note: This follows by induction on branches. Proof omitted due to mutual definition complexity. -/
-theorem projectbAllBranches_trans_of_all_uniform (branches : List (Label × GlobalType))
+theorem projectb_all_branches_trans_of_all_uniform (branches : List (Label × GlobalType))
     (role : String) (lt : LocalTypeR)
     (_huniform : ∀ p ∈ branches, Trans.trans p.2 role = lt)
     (_hvalid : ∀ p ∈ branches, projectb p.2 role (Trans.trans p.2 role) = true) :
@@ -279,7 +279,7 @@ theorem trans_uniform_for_nonparticipant
           | tail _ hp' =>
               have hdec := hrest p hp'
               have hpeq : Trans.trans p.2 role = Trans.trans cont role :=
-                localTypeRBEq_eq_true hdec
+                local_type_rb_eq_eq_true hdec
               simpa [hbranches] using hpeq
 
 

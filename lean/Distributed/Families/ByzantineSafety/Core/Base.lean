@@ -85,19 +85,19 @@ def EvidenceValid (ev : ByzantineEvidence) : Prop :=
   normalizeEvidence ev = ev
 
 /-- Normalization is idempotent. -/
-theorem normalizeEvidence_idempotent (ev : ByzantineEvidence) :
+theorem normalize_evidence_idempotent (ev : ByzantineEvidence) :
     normalizeEvidence (normalizeEvidence ev) = normalizeEvidence ev := by
   -- The normalizer is a stable projection, so a second pass is a no-op.
   rfl
 
 /-- Normalized evidence is always valid in this canonical representation. -/
-theorem evidenceValid_of_normalize (ev : ByzantineEvidence) :
+theorem evidence_valid_of_normalize (ev : ByzantineEvidence) :
     EvidenceValid (normalizeEvidence ev) := by
   -- Idempotence gives the required fixed-point equation.
-  simpa [EvidenceValid] using normalizeEvidence_idempotent ev
+  simpa [EvidenceValid] using normalize_evidence_idempotent ev
 
 /-- Event classification is deterministic under repeated evaluation. -/
-theorem eventClass_deterministic (ev : ByzantineEvent) :
+theorem event_class_deterministic (ev : ByzantineEvent) :
     eventClass ev = eventClass ev := by
   -- Determinism is definitional for this total classifier.
   rfl
@@ -237,7 +237,7 @@ def conflictExclusionFor
 /-! ## Exact Characterization Theorems -/
 
 /-- Soundness: certified-side characterization implies committed-side safety. -/
-theorem byzantineSafety_sound_of_characterization
+theorem byzantine_safety_sound_of_characterization
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs)
     (hChar : CharacterizationCondition M) :
@@ -249,7 +249,7 @@ theorem byzantineSafety_sound_of_characterization
   exact hChar s d₁ d₂ c₁ c₂ hCert₁ hCert₂
 
 /-- Completeness: committed-side safety implies certified-side characterization. -/
-theorem characterization_of_byzantineSafety
+theorem characterization_of_byzantine_safety
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs)
     (hSafe : ByzantineSafety M) :
@@ -259,49 +259,49 @@ theorem characterization_of_byzantineSafety
   exact hSafe s d₁ d₂ (M.commitmentFromCertificate hCert₁) (M.commitmentFromCertificate hCert₂)
 
 /-- Relative maximality follows from completeness for the chosen model. -/
-theorem byzantineSafety_maximality
+theorem byzantine_safety_maximality
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs) :
     ByzantineSafetyMaximality M := by
   -- Any context yielding committed-side safety also yields the characterization by completeness.
   intro C hImpliesSafety hC
-  exact characterization_of_byzantineSafety M (hImpliesSafety hC)
+  exact characterization_of_byzantine_safety M (hImpliesSafety hC)
 
 /-- Exact Byzantine safety characterization holds for the core model interface. -/
-theorem exact_byzantineSafety_characterization
+theorem exact_byzantine_safety_characterization
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs) :
     ExactByzantineSafetyCharacterization M := by
   -- Package soundness, completeness, and maximality into one theorem object.
   refine ⟨?_, ?_, ?_⟩
   · intro hChar
-    exact byzantineSafety_sound_of_characterization M hChar
+    exact byzantine_safety_sound_of_characterization M hChar
   · intro hSafe
-    exact characterization_of_byzantineSafety M hSafe
-  · exact byzantineSafety_maximality M
+    exact characterization_of_byzantine_safety M hSafe
+  · exact byzantine_safety_maximality M
 
 /-- Assumption-indexed safety corollary from the explicit safety-assumption bundle. -/
-theorem byzantineSafety_of_assumptions
+theorem byzantine_safety_of_assumptions
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs)
     (H : SafetyAssumptions M) :
     ByzantineSafety M := by
   -- The assumption bundle carries the characterization witness used by soundness.
-  exact byzantineSafety_sound_of_characterization M H.characterizationWitness
+  exact byzantine_safety_sound_of_characterization M H.characterizationWitness
 
 /-- Assumption-indexed exact characterization object for explicit-assumption workflows. -/
-theorem exact_byzantineSafety_characterization_of_assumptions
+theorem exact_byzantine_safety_characterization_of_assumptions
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs)
     (_H : SafetyAssumptions M) :
     ExactByzantineSafetyCharacterization M := by
   -- The core exactness theorem is reusable; assumptions are tracked at call sites.
-  exact exact_byzantineSafety_characterization M
+  exact exact_byzantine_safety_characterization M
 
 /-! ## Consensus-Family Regime Corollaries -/
 
 /-- BFT-space protocols satisfy intersection-style primitive assumptions. -/
-theorem intersectionPrimitive_of_inBFTSpace
+theorem intersection_primitive_of_in_bft_space
     (p : ProtocolSpec) (h : inBFTSpace p = true) :
     intersectionPrimitive p = true := by
   -- The classifier definition contains this primitive as a conjunct.
@@ -311,7 +311,7 @@ theorem intersectionPrimitive_of_inBFTSpace
   exact hAll.1.1.1.1.2
 
 /-- Nakamoto-space protocols satisfy additive-weight primitive assumptions. -/
-theorem additivePrimitive_of_inNakamotoSpace
+theorem additive_primitive_of_in_nakamoto_space
     (p : ProtocolSpec) (h : inNakamotoSpace p = true) :
     additivePrimitive p = true := by
   -- The classifier definition contains this primitive as a conjunct.
@@ -321,7 +321,7 @@ theorem additivePrimitive_of_inNakamotoSpace
   exact hAll.1.1.1.2
 
 /-- Hybrid-space protocols satisfy coupled primitive assumptions. -/
-theorem coupledPrimitive_of_inHybridSpace
+theorem coupled_primitive_of_in_hybrid_space
     (p : ProtocolSpec) (h : inHybridSpace p = true) :
     coupledPrimitive p = true := by
   -- The classifier definition contains this primitive as a conjunct.
@@ -351,7 +351,7 @@ def modelOfQuorumGeometry
     exact ⟨c, hCert⟩
 
 /-- BFT specialization: quorum-geometry safety yields Byzantine safety. -/
-theorem bft_specialization_of_quorumGeometry
+theorem bft_specialization_of_quorum_geometry
     (P : Distributed.QuorumGeometry.SafetyProtocol) :
     ByzantineSafety (modelOfQuorumGeometry P.model) := by
   -- Reuse the certified no-conflicting-commits theorem directly.
@@ -359,14 +359,14 @@ theorem bft_specialization_of_quorumGeometry
   exact P.noConflictingCommits hCommitted₁ hCommitted₂
 
 /-- BFT specialization also yields certified-side characterization. -/
-theorem bft_characterization_of_quorumGeometry
+theorem bft_characterization_of_quorum_geometry
     (P : Distributed.QuorumGeometry.SafetyProtocol) :
     CharacterizationCondition (modelOfQuorumGeometry P.model) := by
   -- Use completeness over the embedded model plus the BFT safety result.
-  exact characterization_of_byzantineSafety _ (bft_specialization_of_quorumGeometry P)
+  exact characterization_of_byzantine_safety _ (bft_specialization_of_quorum_geometry P)
 
 /-- Accountable-safety packaging: a safety violation yields explicit evidence. -/
-theorem accountableEvidence_of_safetyViolation
+theorem accountable_evidence_of_safety_violation
     (P : Distributed.AccountableSafety.AccountableProtocol)
     (hNotSafe : ¬ Distributed.AccountableSafety.SafetyHolds P.model) :
     Distributed.AccountableSafety.AccountableEvidenceExists P.model := by
@@ -376,7 +376,7 @@ theorem accountableEvidence_of_safetyViolation
   · exact hEvidence
 
 /-- Atomic-broadcast bridge extracted for Byzantine theorem composition. -/
-theorem atomicBroadcast_bridge_of_protocol
+theorem atomic_broadcast_bridge_of_protocol
     (P : Distributed.AtomicBroadcast.AtomicBroadcastProtocol) :
     Distributed.AtomicBroadcast.ConsensusAtomicBroadcastBridge P.model :=
   -- Reuse the protocol-level bridge theorem object.

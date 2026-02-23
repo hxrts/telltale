@@ -28,7 +28,7 @@ open SessionTypes.Participation
 
 /-! ## Comm Send/Recv Postfix Helpers -/
 
-private theorem CProjectTransRel_postfix_comm_send_sender
+private theorem c_project_trans_rel_postfix_comm_send_sender
     {sender receiver role partner : String}
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hrs : role = sender)
@@ -41,13 +41,13 @@ private theorem CProjectTransRel_postfix_comm_send_sender
   obtain ⟨hpartner, hbranches⟩ := hf
   have hwf_branches : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true := by
     intro gb hmem
-    exact GlobalType.wellFormed_comm_branches sender receiver gbs hwf gb hmem
+    exact GlobalType.well_formed_comm_branches sender receiver gbs hwf gb hmem
   subst htrans
   rw [hrs, trans_comm_sender sender receiver sender gbs rfl, hpartner]
-  exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl (Or.inl hr))
-    (branchesProjRel_to_branchesRel_CProjectTransRel gbs sender lbs hbranches hwf_branches)⟩
+  exact ⟨rfl, branches_rel_mono (fun _ _ hr => Or.inl (Or.inl hr))
+    (branches_proj_rel_to_branches_rel_c_project_trans_rel gbs sender lbs hbranches hwf_branches)⟩
 
-private theorem CProjectTransRel_postfix_comm_send_nonpart
+private theorem c_project_trans_rel_postfix_comm_send_nonpart
     {sender receiver role partner : String}
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.send partner lbs))
@@ -55,17 +55,17 @@ private theorem CProjectTransRel_postfix_comm_send_nonpart
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.send partner lbs) t := by
   -- Non-participant send: use the extracted comm witness from CProject_send_implies_trans_send.
-  have hexists := CProject_send_implies_trans_send
+  have hexists := c_project_send_implies_trans_send
     (GlobalType.comm sender receiver gbs) role partner lbs hproj hwf
   obtain ⟨gbs', htrans_send, hbranches', hwf_gbs'⟩ := hexists
   subst htrans
   rw [htrans_send]
-  exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl (Or.inl hr))
-    (branchesProjRel_to_branchesRel_CProjectTransRel gbs' role lbs hbranches' hwf_gbs')⟩
+  exact ⟨rfl, branches_rel_mono (fun _ _ hr => Or.inl (Or.inl hr))
+    (branches_proj_rel_to_branches_rel_c_project_trans_rel gbs' role lbs hbranches' hwf_gbs')⟩
 
 /-! ## Comm Recv Postfix Helpers -/
 
-private theorem CProjectTransRel_postfix_comm_recv_receiver
+private theorem c_project_trans_rel_postfix_comm_recv_receiver
     {sender receiver role partner : String}
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hrr : role = receiver) (hne : receiver ≠ sender)
@@ -78,13 +78,13 @@ private theorem CProjectTransRel_postfix_comm_recv_receiver
   obtain ⟨hpartner, hbranches⟩ := hf
   have hwf_branches : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true := by
     intro gb hmem
-    exact GlobalType.wellFormed_comm_branches sender receiver gbs hwf gb hmem
+    exact GlobalType.well_formed_comm_branches sender receiver gbs hwf gb hmem
   subst htrans
   rw [hrr, trans_comm_receiver sender receiver receiver gbs rfl hne, hpartner]
-  exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl (Or.inl hr))
-    (branchesProjRel_to_branchesRel_CProjectTransRel gbs receiver lbs hbranches hwf_branches)⟩
+  exact ⟨rfl, branches_rel_mono (fun _ _ hr => Or.inl (Or.inl hr))
+    (branches_proj_rel_to_branches_rel_c_project_trans_rel gbs receiver lbs hbranches hwf_branches)⟩
 
-private theorem CProjectTransRel_postfix_comm_recv_nonpart
+private theorem c_project_trans_rel_postfix_comm_recv_nonpart
     {sender receiver role partner : String}
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.recv partner lbs))
@@ -92,17 +92,17 @@ private theorem CProjectTransRel_postfix_comm_recv_nonpart
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.recv partner lbs) t := by
   -- Non-participant recv: use the extracted comm witness from CProject_recv_implies_trans_recv.
-  have hexists := CProject_recv_implies_trans_recv
+  have hexists := c_project_recv_implies_trans_recv
     (GlobalType.comm sender receiver gbs) role partner lbs hproj hwf
   obtain ⟨gbs', htrans_recv, hbranches', hwf_gbs'⟩ := hexists
   subst htrans
   rw [htrans_recv]
-  exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl (Or.inl hr))
-    (branchesProjRel_to_branchesRel_CProjectTransRel gbs' role lbs hbranches' hwf_gbs')⟩
+  exact ⟨rfl, branches_rel_mono (fun _ _ hr => Or.inl (Or.inl hr))
+    (branches_proj_rel_to_branches_rel_c_project_trans_rel gbs' role lbs hbranches' hwf_gbs')⟩
 
 /-! ## Comm Send/Recv Dispatchers -/
 
-private theorem CProjectTransRel_postfix_comm_send
+private theorem c_project_trans_rel_postfix_comm_send
     {sender receiver role partner : String}
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.send partner lbs))
@@ -112,15 +112,15 @@ private theorem CProjectTransRel_postfix_comm_send
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.send partner lbs) t := by
   -- Split on the role to select sender/non-participant cases.
   by_cases hrs : role = sender
-  · exact CProjectTransRel_postfix_comm_send_sender (t := t) hrs hf htrans hwf
+  · exact c_project_trans_rel_postfix_comm_send_sender (t := t) hrs hf htrans hwf
   · by_cases hrr : role = receiver
     ·
       have hne' : receiver ≠ sender := fun heq => hrs (hrr ▸ heq)
       have : False := by simpa [CProjectF, hrr, hne'] using hf
       exact this.elim
-    · exact CProjectTransRel_postfix_comm_send_nonpart (t := t) hproj htrans hwf
+    · exact c_project_trans_rel_postfix_comm_send_nonpart (t := t) hproj htrans hwf
 
-private theorem CProjectTransRel_postfix_comm_recv
+private theorem c_project_trans_rel_postfix_comm_recv
     {sender receiver role partner : String}
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.recv partner lbs))
@@ -135,12 +135,12 @@ private theorem CProjectTransRel_postfix_comm_recv
     exact this.elim
   · by_cases hrr : role = receiver
     · have hne' : receiver ≠ sender := fun heq => hrs (hrr ▸ heq)
-      exact CProjectTransRel_postfix_comm_recv_receiver (t := t) hrr hne' hf htrans hwf
-    · exact CProjectTransRel_postfix_comm_recv_nonpart (t := t) hproj htrans hwf
+      exact c_project_trans_rel_postfix_comm_recv_receiver (t := t) hrr hne' hf htrans hwf
+    · exact c_project_trans_rel_postfix_comm_recv_nonpart (t := t) hproj htrans hwf
 
 /-! ## Comm Constructor Cases -/
 
-private theorem CProjectTransRel_postfix_comm_end
+private theorem c_project_trans_rel_postfix_comm_end
     {sender receiver role : String}
     {gbs : List (Label × GlobalType)} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role LocalTypeR.end)
@@ -148,12 +148,12 @@ private theorem CProjectTransRel_postfix_comm_end
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role) :
     EQ2F (EQ2_closure CProjectTransRelComp) LocalTypeR.end t := by
   -- Non-participant projecting to .end via CProject_end_trans_end.
-  have htrans_end := CProject_end_trans_end (GlobalType.comm sender receiver gbs) role hproj hne
+  have htrans_end := c_project_end_trans_end (GlobalType.comm sender receiver gbs) role hproj hne
   subst htrans
   rw [htrans_end]
   simp [EQ2F]
 
-private theorem CProjectTransRel_postfix_comm_var
+private theorem c_project_trans_rel_postfix_comm_var
     {sender receiver role v : String}
     {gbs : List (Label × GlobalType)} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.var v))
@@ -161,12 +161,12 @@ private theorem CProjectTransRel_postfix_comm_var
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.var v) t := by
   -- Non-participant projecting to .var via CProject_var_trans_var.
-  have htrans_var := CProject_var_trans_var (GlobalType.comm sender receiver gbs) role v hproj hne
+  have htrans_var := c_project_var_trans_var (GlobalType.comm sender receiver gbs) role v hproj hne
   subst htrans
   rw [htrans_var]
   simp [EQ2F]
 
-private theorem CProjectTransRel_postfix_comm_mu
+private theorem c_project_trans_rel_postfix_comm_mu
     {sender receiver role ltvar : String} {gbs : List (Label × GlobalType)}
     {lbody t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.mu ltvar lbody))
@@ -175,7 +175,7 @@ private theorem CProjectTransRel_postfix_comm_mu
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.mu ltvar lbody) t := by
   -- Non-participant mu: extract body and apply the mu closure helper.
-  have hexists := CProject_mu_implies_trans_mu
+  have hexists := c_project_mu_implies_trans_mu
     (GlobalType.comm sender receiver gbs) role ltvar lbody hproj hne
   obtain ⟨gbody, htrans_mu, hcontr, hbody_proj, _hwf_body⟩ := hexists
   subst htrans
@@ -188,12 +188,12 @@ private theorem CProjectTransRel_postfix_comm_mu
           LocalTypeR.mu ltvar (trans gbody role) := by
       simpa using htrans_mu
     exact ⟨GlobalType.comm sender receiver gbs, role, hproj, htrans_mu'.symm, hwf⟩
-  simpa [htrans_mu] using CProjectTransRel_postfix_mu_closure hmu_rel
+  simpa [htrans_mu] using c_project_trans_rel_postfix_mu_closure hmu_rel
 
 /-! ## Global Constructor Case Helpers -/
 
 /-- Helper: g = .end cases for CProjectTransRel_postfix. -/
-private theorem CProjectTransRel_postfix_end_cases
+private theorem c_project_trans_rel_postfix_end_cases
     {role : String} {lt t : LocalTypeR}
     (hf : CProjectF CProject GlobalType.end role lt)
     (htrans : t = trans GlobalType.end role) :
@@ -201,7 +201,7 @@ private theorem CProjectTransRel_postfix_end_cases
   -- Only the .end candidate is possible.
   cases lt with
   | «end» =>
-      exact CProjectTransRel_postfix_end (role := role) (t := t) htrans
+      exact c_project_trans_rel_postfix_end (role := role) (t := t) htrans
   | var _ | send _ _ | recv _ _ | mu _ _ =>
       -- Other constructors contradict CProjectF for .end.
       have : False := by simpa [CProjectF] using hf
@@ -210,7 +210,7 @@ private theorem CProjectTransRel_postfix_end_cases
 /-! ## Constructor Case Helpers: var/mu/comm -/
 
 /-- Helper: g = .var cases for CProjectTransRel_postfix. -/
-private theorem CProjectTransRel_postfix_var_cases
+private theorem c_project_trans_rel_postfix_var_cases
     {vt : String} {role : String} {lt t : LocalTypeR}
     (hf : CProjectF CProject (GlobalType.var vt) role lt)
     (htrans : t = trans (GlobalType.var vt) role) :
@@ -218,14 +218,14 @@ private theorem CProjectTransRel_postfix_var_cases
   -- Only the .var candidate is possible.
   cases lt with
   | var vlt =>
-      exact CProjectTransRel_postfix_var (vt := vt) (vlt := vlt) hf htrans
+      exact c_project_trans_rel_postfix_var (vt := vt) (vlt := vlt) hf htrans
   | «end» | send _ _ | recv _ _ | mu _ _ =>
       -- Other constructors contradict CProjectF for .var.
       have : False := by simpa [CProjectF] using hf
       exact this.elim
 
 /-- Helper: g = .mu cases for CProjectTransRel_postfix. -/
-private theorem CProjectTransRel_postfix_mu_cases
+private theorem c_project_trans_rel_postfix_mu_cases
     {muvar : String} {gbody : GlobalType} {role : String} {lt t : LocalTypeR}
     (hproj : CProject (GlobalType.mu muvar gbody) role lt)
     (htrans : t = trans (GlobalType.mu muvar gbody) role)
@@ -236,9 +236,9 @@ private theorem CProjectTransRel_postfix_mu_cases
   -- Split on the local candidate shape.
   cases lt with
   | «end» =>
-      exact CProjectTransRel_postfix_mu_end (_hproj := hproj) (htrans := htrans) (hne := hne) hf
+      exact c_project_trans_rel_postfix_mu_end (_hproj := hproj) (htrans := htrans) (hne := hne) hf
   | mu ltvar lbody =>
-      exact CProjectTransRel_postfix_mu_mu (hproj := hproj) (htrans := htrans) (hwf := hwf)
+      exact c_project_trans_rel_postfix_mu_mu (hproj := hproj) (htrans := htrans) (hwf := hwf)
         (hne := hne) hf
   | var _ | send _ _ | recv _ _ =>
       -- These constructors contradict CProjectF for .mu.
@@ -246,7 +246,7 @@ private theorem CProjectTransRel_postfix_mu_cases
       exact this.elim
 
 /-- Helper: g = .comm cases for CProjectTransRel_postfix. -/
-private theorem CProjectTransRel_postfix_comm_cases
+private theorem c_project_trans_rel_postfix_comm_cases
     {sender receiver role : String} {gbs : List (Label × GlobalType)} {lt t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role lt)
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
@@ -257,20 +257,20 @@ private theorem CProjectTransRel_postfix_comm_cases
   -- Dispatch by candidate constructor.
   cases lt with
   | «end» =>
-      exact CProjectTransRel_postfix_comm_end (t := t) hproj hne htrans
+      exact c_project_trans_rel_postfix_comm_end (t := t) hproj hne htrans
   | send partner lbs =>
-      exact CProjectTransRel_postfix_comm_send (t := t) hproj htrans hwf hf
+      exact c_project_trans_rel_postfix_comm_send (t := t) hproj htrans hwf hf
   | recv partner lbs =>
-      exact CProjectTransRel_postfix_comm_recv (t := t) hproj htrans hwf hf
+      exact c_project_trans_rel_postfix_comm_recv (t := t) hproj htrans hwf hf
   | mu ltvar lbody =>
-      exact CProjectTransRel_postfix_comm_mu (t := t) hproj htrans hne hwf
+      exact c_project_trans_rel_postfix_comm_mu (t := t) hproj htrans hne hwf
   | var v =>
-      exact CProjectTransRel_postfix_comm_var (t := t) hproj hne htrans
+      exact c_project_trans_rel_postfix_comm_var (t := t) hproj hne htrans
 
 /-! ## Main Postfix Theorem -/
 
 /-- Postfix property for CProjectTransRel with EQ2_closure of the composite relation. -/
-theorem CProjectTransRel_postfix :
+theorem c_project_trans_rel_postfix :
     ∀ lt t, CProjectTransRel lt t → EQ2F (EQ2_closure CProjectTransRelComp) lt t := by
   intro lt t ⟨g, role, hproj, htrans, hwf⟩
   -- Proof strategy: reduce to CProjectF cases and dispatch by global constructor.
@@ -278,24 +278,24 @@ theorem CProjectTransRel_postfix :
     have hwf' := hwf
     simp [GlobalType.wellFormed, Bool.and_eq_true] at hwf'
     exact hwf'.1.1.2
-  have hf := CProject_destruct hproj
+  have hf := c_project_destruct hproj
   cases g with
   | «end» =>
-      exact CProjectTransRel_postfix_end_cases (lt := lt) hf htrans
+      exact c_project_trans_rel_postfix_end_cases (lt := lt) hf htrans
   | var vt =>
-      exact CProjectTransRel_postfix_var_cases (lt := lt) (vt := vt) hf htrans
+      exact c_project_trans_rel_postfix_var_cases (lt := lt) (vt := vt) hf htrans
   | mu muvar gbody =>
-      exact CProjectTransRel_postfix_mu_cases (lt := lt) (muvar := muvar) (gbody := gbody)
+      exact c_project_trans_rel_postfix_mu_cases (lt := lt) (muvar := muvar) (gbody := gbody)
         hproj htrans hwf hne hf
   | comm sender receiver gbs =>
-      exact CProjectTransRel_postfix_comm_cases (lt := lt) (sender := sender) (receiver := receiver)
+      exact c_project_trans_rel_postfix_comm_cases (lt := lt) (sender := sender) (receiver := receiver)
         (gbs := gbs) hproj htrans hne hwf hf
 
 /-! ## Composition Extensions -/
 
 /-- CProjectTransRelComp can be extended with EQ2 at the right to produce another CProjectTransRelComp.
-    This is the key lemma that allows the BranchesRel_trans_chain helper to work. -/
-theorem CProjectTransRelComp_extend_right
+    This is the key lemma that allows the branches_rel_trans_chain helper to work. -/
+theorem c_project_trans_rel_comp_extend_right
     (h1 : CProjectTransRelComp a b) (h2 : EQ2 b c)
     (_hWFa : LocalTypeR.WellFormed a)
     (hWFb : LocalTypeR.WellFormed b)
@@ -311,15 +311,15 @@ theorem CProjectTransRelComp_extend_right
     exact ⟨m, b, heq_am, hrel_mb, h2⟩
   · -- 2-hop suffix: CProjectTransRel a m ∧ EQ2 m b ∧ EQ2 b c → 2-hop suffix with combined EQ2
     right; right; left
-    have hWFm : LocalTypeR.WellFormed m := CProjectTransRel_wf_right hrel_am
-    exact ⟨m, hrel_am, EQ2_trans_wf heq_mb h2 hWFm hWFb hWFc⟩
+    have hWFm : LocalTypeR.WellFormed m := c_project_trans_rel_wf_right hrel_am
+    exact ⟨m, hrel_am, eq2_trans_wf heq_mb h2 hWFm hWFb hWFc⟩
   · -- 3-hop: EQ2 a m ∧ CProjectTransRel m m' ∧ EQ2 m' b ∧ EQ2 b c → 3-hop with combined EQ2
     right; right; right
-    have hWFm' : LocalTypeR.WellFormed m' := CProjectTransRel_wf_right hrel_mm'
-    exact ⟨m, m', heq_am, hrel_mm', EQ2_trans_wf heq_m'b h2 hWFm' hWFb hWFc⟩
+    have hWFm' : LocalTypeR.WellFormed m' := c_project_trans_rel_wf_right hrel_mm'
+    exact ⟨m, m', heq_am, hrel_mm', eq2_trans_wf heq_m'b h2 hWFm' hWFb hWFc⟩
 
 /-- Composing CProjectTransRel and EQ2 through a mu intermediate (suffix case). -/
-theorem CProjectTransRelComp_extend_left
+theorem c_project_trans_rel_comp_extend_left
     (h1 : EQ2 a b) (h2 : CProjectTransRelComp b c)
     (hWFa : LocalTypeR.WellFormed a)
     (hWFb : LocalTypeR.WellFormed b)
@@ -332,15 +332,15 @@ theorem CProjectTransRelComp_extend_left
     exact ⟨b, h1, hbase⟩
   · -- 2-hop prefix: EQ2 a b ∧ EQ2 b m ∧ CProjectTransRel m c → 2-hop prefix with combined EQ2
     right; left
-    have hWFm : LocalTypeR.WellFormed m := CProjectTransRel_wf_left hrel_mc
-    exact ⟨m, EQ2_trans_wf h1 heq_bm hWFa hWFb hWFm, hrel_mc⟩
+    have hWFm : LocalTypeR.WellFormed m := c_project_trans_rel_wf_left hrel_mc
+    exact ⟨m, eq2_trans_wf h1 heq_bm hWFa hWFb hWFm, hrel_mc⟩
   · -- 2-hop suffix: EQ2 a b ∧ CProjectTransRel b m ∧ EQ2 m c → 3-hop (a, c)
     right; right; right
     exact ⟨b, m, h1, hrel_bm, heq_mc⟩
   · -- 3-hop: EQ2 a b ∧ EQ2 b m ∧ CProjectTransRel m m' ∧ EQ2 m' c → 3-hop with combined EQ2
     right; right; right
-    have hWFm : LocalTypeR.WellFormed m := CProjectTransRel_wf_left hrel_mm'
-    exact ⟨m, m', EQ2_trans_wf h1 heq_bm hWFa hWFb hWFm, hrel_mm', heq_m'c⟩
+    have hWFm : LocalTypeR.WellFormed m := c_project_trans_rel_wf_left hrel_mm'
+    exact ⟨m, m', eq2_trans_wf h1 heq_bm hWFa hWFb hWFm, hrel_mm', heq_m'c⟩
 
 /-! ## Reverse Branch Relation Chaining -/
 
@@ -350,7 +350,7 @@ theorem CProjectTransRelComp_extend_left
 
     Requires an extension hypothesis: R can be extended with EQ2 at the left
     to produce another R. This is satisfied by CProjectTransRelComp. -/
-theorem BranchesRel_trans_chain_rev {R : Rel}
+theorem branches_rel_trans_chain_rev {R : Rel}
     (hextend : ∀ a b c, EQ2 a b → R b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
     {bs cs ds : List BranchR}
@@ -371,7 +371,7 @@ theorem BranchesRel_trans_chain_rev {R : Rel}
           cases hcd with
           | cons h2 hcd_tail =>
               constructor
-              · exact BranchesRel_trans_chain_rev_head hextend h1 h2
+              · exact branches_rel_trans_chain_rev_head hextend h1 h2
                   (hwf_bs lb_bs (by simp)) (hwf_cs lb_cs (by simp)) (hwf_ds lb_ds (by simp))
               · exact ih hcd_tail (wf_tail_of_cons hwf_bs)
                   (wf_tail_of_cons hwf_cs) (wf_tail_of_cons hwf_ds)

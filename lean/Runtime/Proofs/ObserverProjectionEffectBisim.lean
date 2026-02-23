@@ -42,7 +42,7 @@ def vmViewObs (cid : CoroutineId) : EffectObs (VMState ι γ π ε ν) (Option C
 def vmViewSilentStep : StateRel (VMState ι γ π ε ν) :=
   fun _ _ => False
 
-private theorem vmViewEq_postfixed (cid : CoroutineId) :
+private theorem vm_view_eq_postfixed (cid : CoroutineId) :
     (fun st₁ st₂ : VMState ι γ π ε ν => coroutineView st₁ cid = coroutineView st₂ cid) ≤
       EffectBisimF (vmViewObs (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid)
         (vmViewSilentStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν))
@@ -57,7 +57,7 @@ private theorem vmViewEq_postfixed (cid : CoroutineId) :
 /-! ## Bridge Theorems -/
 
 /-- Any direct coroutine-view equivalence yields silent effect bisimulation. -/
-theorem vmView_effectBisim_of_VMCEquiv
+theorem vm_view_effect_bisim_of_vmc_equiv
     (cid : CoroutineId)
     {st₁ st₂ : VMState ι γ π ε ν}
     (hEq : VMCEquiv st₁ st₂ cid) :
@@ -75,12 +75,12 @@ theorem vmView_effectBisim_of_VMCEquiv
         (vmViewObs (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid)
         (vmViewSilentStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)))
       (S := fun a b : VMState ι γ π ε ν => coroutineView a cid = coroutineView b cid)
-      (vmViewEq_postfixed (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid)
+      (vm_view_eq_postfixed (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid)
   exact hLift _ _ hEq
 
 /-- Any silent effect bisimulation at the view observer yields direct
     coroutine-view equivalence. -/
-theorem vmCEquiv_of_vmView_effectBisim
+theorem vm_c_equiv_of_vm_view_effect_bisim
     (cid : CoroutineId)
     {st₁ st₂ : VMState ι γ π ε ν}
     (hBisim :
@@ -89,19 +89,19 @@ theorem vmCEquiv_of_vmView_effectBisim
         (vmViewSilentStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν))
         st₁ st₂) :
     VMCEquiv st₁ st₂ cid := by
-  exact effectBisim_implies_observationalEquivalence
+  exact effect_bisim_implies_observational_equivalence
     (vmViewObs (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid)
     (vmViewSilentStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) hBisim
 
 /-! ## Topology Corollary via Bisimulation -/
 
 /-- Topology-change noninterference restated via the effect-bisimulation bridge. -/
-theorem topology_change_preserves_VMCEquiv_via_effectBisim
+theorem topology_change_preserves_vmc_equiv_via_effect_bisim
     (st : VMState ι γ π ε ν) (tc : TopologyChange (ι := ι)) (cid : CoroutineId) :
     VMCEquiv (applyTopologyChange st tc) st cid := by
   have hEq : VMCEquiv (applyTopologyChange st tc) st cid :=
-    topology_change_preserves_VMCEquiv st tc cid
-  have hBisim := vmView_effectBisim_of_VMCEquiv (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid hEq
-  exact vmCEquiv_of_vmView_effectBisim (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid hBisim
+    topology_change_preserves_vmc_equiv st tc cid
+  have hBisim := vm_view_effect_bisim_of_vmc_equiv (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid hEq
+  exact vm_c_equiv_of_vm_view_effect_bisim (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid hBisim
 
 end

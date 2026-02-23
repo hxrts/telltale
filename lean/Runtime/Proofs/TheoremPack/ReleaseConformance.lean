@@ -83,12 +83,12 @@ structure TransformationClassEffectBisimWitness
 
 /-- Any certified optimization class that carries an `EffectBisim` witness
 preserves observer behavior. -/
-theorem transformationClass_preserves_observer_behavior
+theorem transformation_class_preserves_observer_behavior
     {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     (w : TransformationClassEffectBisimWitness obs step) :
     ObservationalEq obs w.source w.transformed :=
-  effectBisim_implies_observationalEquivalence obs step w.bisim
+  effect_bisim_implies_observational_equivalence obs step w.bisim
 
 /-! ## Replay Conformance Over Certified Equivalence Classes -/
 

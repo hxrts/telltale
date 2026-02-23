@@ -33,7 +33,7 @@ private theorem projectb_trans_comm_sender_case
     (hbranches_proj : ∀ p ∈ branches, projectb p.2 role (Trans.trans p.2 role) = true) :
     projectb (.comm sender receiver branches) role
       (Trans.trans (.comm sender receiver branches) role) = true := by
-  have hproj_branches := projectbBranches_trans_of_all branches role hbranches_proj
+  have hproj_branches := projectb_branches_trans_of_all branches role hbranches_proj
   have hproj_branches' :
       projectbBranches branches sender (transBranches branches sender) = true := by
     simpa [hs] using hproj_branches
@@ -52,7 +52,7 @@ private theorem projectb_trans_comm_receiver_case
     (hbranches_proj : ∀ p ∈ branches, projectb p.2 role (Trans.trans p.2 role) = true) :
     projectb (.comm sender receiver branches) role
       (Trans.trans (.comm sender receiver branches) role) = true := by
-  have hproj_branches := projectbBranches_trans_of_all branches role hbranches_proj
+  have hproj_branches := projectb_branches_trans_of_all branches role hbranches_proj
   have hproj_branches' :
       projectbBranches branches receiver (transBranches branches receiver) = true := by
     simpa [hr] using hproj_branches
@@ -82,7 +82,7 @@ private theorem projectb_trans_comm_nonparticipant_cons
       (role := role) (branches := (label, cont) :: rest) hblind_comm hs hr hne
     intro p hp
     simpa using huniform' p hp
-  have hproj_all := projectbAllBranches_trans_of_all_uniform ((label, cont) :: rest) role
+  have hproj_all := projectb_all_branches_trans_of_all_uniform ((label, cont) :: rest) role
     (Trans.trans cont role) huniform hbranches_proj
   have hbs : (role == sender) = false := by simpa using (beq_false_of_ne hs)
   have hbr : (role == receiver) = false := by simpa using (beq_false_of_ne hr)
@@ -234,7 +234,7 @@ private theorem projectb_trans_delegate_case
     This is the heart of the proof - we only need noSelfComm (for comm cases)
     and isBlind (for non-participant uniformity). We don't need isClosed or
     the full wellFormed predicate. -/
-theorem projectb_trans_of_noSelfComm_blind (g : GlobalType) (role : String)
+theorem projectb_trans_of_no_self_comm_blind (g : GlobalType) (role : String)
     (hnoself : g.noSelfComm = true)
     (hblind : isBlind g = true) :
     projectb g role (Trans.trans g role) = true := by
@@ -248,22 +248,22 @@ theorem projectb_trans_of_noSelfComm_blind (g : GlobalType) (role : String)
       simp only [Trans.trans, projectb, beq_self_eq_true]
   | .mu t body =>
       unfold Trans.trans
-      have hnoself' := noSelfComm_mu_body hnoself
-      have hblind' := isBlind_mu_body hblind
+      have hnoself' := no_self_comm_mu_body hnoself
+      have hblind' := is_blind_mu_body hblind
       by_cases hguard : (Trans.trans body role).isGuarded t
       · simpa [hguard, projectb, beq_self_eq_true] using
-          projectb_trans_of_noSelfComm_blind body role hnoself' hblind'
+          projectb_trans_of_no_self_comm_blind body role hnoself' hblind'
       · simpa [hguard, projectb] using
-          projectb_trans_of_noSelfComm_blind body role hnoself' hblind'
+          projectb_trans_of_no_self_comm_blind body role hnoself' hblind'
   | .comm sender receiver branches =>
       have hne_sr : sender ≠ receiver := by
         have hnoself' := hnoself
         simp only [GlobalType.noSelfComm, Bool.and_eq_true, bne_iff_ne, ne_eq] at hnoself'
         exact hnoself'.1
       have hnoself_branches : ∀ p ∈ branches, p.2.noSelfComm = true :=
-        noSelfComm_comm_branches (s := sender) (r := receiver) (bs := branches) hnoself
+        no_self_comm_comm_branches (s := sender) (r := receiver) (bs := branches) hnoself
       have hblind_branches : ∀ p ∈ branches, isBlind p.2 = true :=
-        isBlind_comm_branches (s := sender) (r := receiver) (bs := branches) hblind
+        is_blind_comm_branches (s := sender) (r := receiver) (bs := branches) hblind
       have hblind_comm : commBlindFor sender receiver branches = true := by
         have hblind' := hblind
         simp [isBlind, Bool.and_eq_true] at hblind'
@@ -271,20 +271,20 @@ theorem projectb_trans_of_noSelfComm_blind (g : GlobalType) (role : String)
       have hbranches_proj :
           ∀ p ∈ branches, projectb p.2 role (Trans.trans p.2 role) = true := by
         intro p hp
-        exact projectb_trans_of_noSelfComm_blind p.2 role
+        exact projectb_trans_of_no_self_comm_blind p.2 role
           (hnoself_branches p hp) (hblind_branches p hp)
       exact projectb_trans_comm_case sender receiver role branches hne_sr hblind_comm hbranches_proj
   | .delegate p q sid r cont =>
-      have hnoself_cont : cont.noSelfComm = true := noSelfComm_delegate_cont hnoself
+      have hnoself_cont : cont.noSelfComm = true := no_self_comm_delegate_cont hnoself
       have hblind_cont : isBlind cont = true := by simpa [isBlind] using hblind
-      have hcont_proj := projectb_trans_of_noSelfComm_blind cont role hnoself_cont hblind_cont
+      have hcont_proj := projectb_trans_of_no_self_comm_blind cont role hnoself_cont hblind_cont
       exact projectb_trans_delegate_case p q role r sid cont hcont_proj
 termination_by g
 decreasing_by
   all_goals
     first
-    | exact sizeOf_body_lt_mu _ _
-    | apply sizeOf_elem_snd_lt_comm; assumption
+    | exact size_of_body_lt_mu _ _
+    | apply size_of_elem_snd_lt_comm; assumption
     | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
 end
@@ -292,7 +292,7 @@ end
 /-! ## wellFormed implies noSelfComm -/
 
 /-- wellFormed implies noSelfComm. -/
-theorem noSelfComm_of_wellFormed (g : GlobalType)
+theorem no_self_comm_of_well_formed (g : GlobalType)
     (hwf : g.wellFormed = true) : g.noSelfComm = true := by
   -- wellFormed = allVarsBound && allCommsNonEmpty && noSelfComm && isProductive
   -- This is left-associative: ((allVarsBound && allCommsNonEmpty) && noSelfComm) && isProductive
@@ -302,17 +302,17 @@ theorem noSelfComm_of_wellFormed (g : GlobalType)
 /-! ## Final Theorems -/
 
 /-- Wrapper: projectb succeeds on trans output for WellFormedBlind types. -/
-theorem projectb_trans_of_wellFormedBlind (g : GlobalType) (role : String)
+theorem projectb_trans_of_well_formed_blind (g : GlobalType) (role : String)
     (_hclosed : g.isClosed = true)
     (hwf : g.wellFormed = true)
     (hblind : isBlind g = true) :
     projectb g role (Trans.trans g role) = true :=
-  projectb_trans_of_noSelfComm_blind g role (noSelfComm_of_wellFormed g hwf) hblind
+  projectb_trans_of_no_self_comm_blind g role (no_self_comm_of_well_formed g hwf) hblind
 
 /-- Projectable from WellFormedBlind: removes the extra postulate.
 
     If a global type is closed, well-formed, and blind, then it is projectable. -/
-theorem projectable_of_wellFormedBlind (g : GlobalType)
+theorem projectable_of_well_formed_blind (g : GlobalType)
     (h : WellFormedBlind g = true) :
     ∀ role, ∃ lt, CProject g role lt := by
   intro role
@@ -323,7 +323,7 @@ theorem projectable_of_wellFormedBlind (g : GlobalType)
   have hwf : g.wellFormed = true := h.1.2
   have hblind : isBlind g = true := h.2
   use Trans.trans g role
-  have hproj := projectb_trans_of_wellFormedBlind g role hclosed hwf hblind
+  have hproj := projectb_trans_of_well_formed_blind g role hclosed hwf hblind
   exact projectb_sound g role (Trans.trans g role) hproj
 
 

@@ -24,7 +24,7 @@ section
 
 -- lookupD Swap Transport
 
-theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
+theorem lookup_d_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
     lookupD (swapDEnvRole s A B D) (swapEdgeRole s A B e) =
       if e.sid = s then (lookupD D e).map (swapValTypeRole s A B) else lookupD D e := by
   -- lookupD_swap: Reduce Goal to Fold Computation
@@ -91,9 +91,9 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                     by_cases hPsid : p.1.sid = s
                     · intro hEq
                       have hEq' : p.1 = hd.1 := by
-                        apply swapEdgeRole_inj (s:=s) (A:=A) (B:=B)
+                        apply swap_edge_role_inj (s:=s) (A:=A) (B:=B)
                         simpa [hPsid, hSidHd] using hEq
-                      have hlt : compare hd.1 p.1 = .lt := edgeCmpLT_eq_lt (hhd p hp)
+                      have hlt : compare hd.1 p.1 = .lt := edge_cmp_lt_eq_lt (hhd p hp)
                       have hEqCmp : compare hd.1 p.1 = .eq :=
                         (Edge.compare_eq_iff_eq hd.1 p.1).2 hEq'.symm
                       have : Ordering.lt = Ordering.eq := by
@@ -104,7 +104,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                       have hSidTarget : (swapEdgeRole s A B hd.1).sid = s := by
                         have hSidProp : hd.1.sid = s := hSidHd
                         simpa [hSidProp] using
-                          (swapEdgeRole_sid (s:=s) (A:=A) (B:=B) (e:=hd.1))
+                          (swap_edge_role_sid (s:=s) (A:=A) (B:=B) (e:=hd.1))
                       have hSidEq : p.1.sid = (swapEdgeRole s A B hd.1).sid :=
                         congrArg Edge.sid (by simpa [hPsid] using hEq)
 
@@ -125,11 +125,11 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                           (updateD acc (swapEdgeRole s A B hd.1)
                             (hd.2.map (swapValTypeRole s A B)))
                           (swapEdgeRole s A B hd.1) := by
-                    apply lookupD_foldl_update_neq_swap (s:=s) (A:=A) (B:=B)
+                    apply lookup_d_foldl_update_neq_swap (s:=s) (A:=A) (B:=B)
                     intro p hp
 /- ## Structured Block 3 -/
                     exact hne p hp
-                  simp [List.lookup, List.foldl, hSid, htail, lookupD_update_eq]
+                  simp [List.lookup, List.foldl, hSid, htail, lookup_d_update_eq]
                 -- lookupD_swap: Target Session, Distinct-Head Case
                 · -- e ≠ hd.1
                   have hne :
@@ -140,14 +140,14 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                       have hEqSwap' : swapEdgeRole s A B hd.1 = swapEdgeRole s A B e := by
                         simpa [hHdSid] using hEqSwap
                       have hEq' : hd.1 = e :=
-                        swapEdgeRole_inj (s:=s) (A:=A) (B:=B) (e1:=hd.1) (e2:=e) hEqSwap'
+                        swap_edge_role_inj (s:=s) (A:=A) (B:=B) (e1:=hd.1) (e2:=e) hEqSwap'
                       exact (hEq hEq'.symm).elim
                     · intro hEq
                       have hSidNe : hd.1.sid ≠ s := hHdSid
                       have hSidTarget : (swapEdgeRole s A B e).sid = s := by
                         have hSidProp : e.sid = s := hSid
                         simpa [hSidProp] using
-                          (swapEdgeRole_sid (s:=s) (A:=A) (B:=B) (e:=e))
+                          (swap_edge_role_sid (s:=s) (A:=A) (B:=B) (e:=e))
                       have hSidEq : hd.1.sid = (swapEdgeRole s A B e).sid :=
                         congrArg Edge.sid (by simpa [hHdSid] using hEq)
                       exact (hSidNe (by simpa [hSidTarget] using hSidEq)).elim
@@ -173,7 +173,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                           match List.lookup e tl with
                           | some ts => ts.map (swapValTypeRole s A B)
                           | none => lookupD acc (swapEdgeRole s A B e) := by
-                      simpa [hSid, lookupD_update_neq, hne'] using ih'
+                      simpa [hSid, lookup_d_update_neq, hne'] using ih'
                     dsimp [List.foldl]
                     simp [hSid, hHdSid, List.lookup, hbeq, ih'']
                   · have hne' : hd.1 ≠ swapEdgeRole s A B e := by
@@ -193,7 +193,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                           match List.lookup e tl with
                           | some ts => ts.map (swapValTypeRole s A B)
                           | none => lookupD acc (swapEdgeRole s A B e) := by
-                      simpa [hSid, lookupD_update_neq, hne'] using ih'
+                      simpa [hSid, lookup_d_update_neq, hne'] using ih'
                     dsimp [List.foldl]
                     simp [hSid, hHdSid, List.lookup, hbeq, ih'']
               -- lookupD_swap: Non-Target Session Edge Branch
@@ -211,7 +211,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                       have hSidTarget : (swapEdgeRole s A B p.1).sid = s := by
                         have hSidProp : p.1.sid = s := hPsid
                         simpa [hSidProp] using
-                          (swapEdgeRole_sid (s:=s) (A:=A) (B:=B) (e:=p.1))
+                          (swap_edge_role_sid (s:=s) (A:=A) (B:=B) (e:=p.1))
                       have hSidEq : (swapEdgeRole s A B p.1).sid = hd.1.sid :=
                         congrArg Edge.sid (by simpa [hPsid] using hEq)
                       have hSidEq' : hd.1.sid = s := by
@@ -220,7 +220,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                     · intro hEq
                       -- p.1.sid != s, key = p.1; use edgeCmpLT to show p.1 ≠ hd.1
                       have hEq' : p.1 = hd.1 := by simpa [hPsid] using hEq
-                      have hlt : compare hd.1 p.1 = .lt := edgeCmpLT_eq_lt (hhd p hp)
+                      have hlt : compare hd.1 p.1 = .lt := edge_cmp_lt_eq_lt (hhd p hp)
                       have hEqCmp : compare hd.1 p.1 = .eq :=
                         (Edge.compare_eq_iff_eq hd.1 p.1).2 hEq'.symm
                       have : Ordering.lt = Ordering.eq := by
@@ -239,13 +239,13 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                             (updateD acc hd.1 hd.2))
                           hd.1 =
                         lookupD (updateD acc hd.1 hd.2) hd.1 := by
-                    apply lookupD_foldl_update_neq_swap (s:=s) (A:=A) (B:=B)
+                    apply lookup_d_foldl_update_neq_swap (s:=s) (A:=A) (B:=B)
                     intro p hp
                     exact hne p hp
                   have hSwap : swapEdgeRole s A B hd.1 = hd.1 := by
                     simp [swapEdgeRole, hSidHd]
                   dsimp [List.foldl]
-                  simp [List.lookup, hSid, hSwap, htail, lookupD_update_eq]
+                  simp [List.lookup, hSid, hSwap, htail, lookup_d_update_eq]
                 -- lookupD_swap: Non-Target Session, Distinct-Head Case
                 · -- e ≠ hd.1
                   have hne :
@@ -255,7 +255,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                       have hSidTarget : (swapEdgeRole s A B hd.1).sid = s := by
                         have hSidProp : hd.1.sid = s := hHdSid
                         simpa [hSidProp] using
-                          (swapEdgeRole_sid (s:=s) (A:=A) (B:=B) (e:=hd.1))
+                          (swap_edge_role_sid (s:=s) (A:=A) (B:=B) (e:=hd.1))
                       have hSidEq : (swapEdgeRole s A B hd.1).sid = e.sid :=
                         congrArg Edge.sid (by simpa [hHdSid] using hEq)
                       have hSidNe : e.sid ≠ s := hSid
@@ -290,7 +290,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
 /- ## Structured Block 6 -/
                           | some ts => ts
                           | none => lookupD acc e := by
-                      simpa [hSid, hHdSid, swapEdgeRole, lookupD_update_neq, hne''] using ih'
+                      simpa [hSid, hHdSid, swapEdgeRole, lookup_d_update_neq, hne''] using ih'
                     dsimp [List.foldl]
                     simpa [List.lookup, hbeq, swapEdgeRole, hSid, hHdSid] using ih''
                   · have hne' : hd.1 ≠ e := by
@@ -309,7 +309,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                           match List.lookup e tl with
                           | some ts => ts
                           | none => lookupD acc e := by
-                      simpa [hSid, hHdSid, swapEdgeRole, lookupD_update_neq, hne'] using ih'
+                      simpa [hSid, hHdSid, swapEdgeRole, lookup_d_update_neq, hne'] using ih'
                     dsimp [List.foldl]
                     simpa [List.lookup, hbeq, swapEdgeRole, hSid, hHdSid] using ih''
         -- lookupD_swap: Instantiate Invariant at Empty Accumulator
@@ -337,13 +337,13 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
   -- lookupD_swap: Rewrite Back to lookupD
   rw [hfold]
   by_cases hSid : e.sid = s
-  · cases h : D.list.lookup e <;> simp [hSid, lookupD_eq_list_lookup, h]
-  · cases h : D.list.lookup e <;> simp [hSid, lookupD_eq_list_lookup, h]
+  · cases h : D.list.lookup e <;> simp [hSid, lookup_d_eq_list_lookup, h]
+  · cases h : D.list.lookup e <;> simp [hSid, lookup_d_eq_list_lookup, h]
 
 -- Consume Preservation for Role Swap
 
 /-- Consume a single step commutes with role swapping. -/
-theorem consumeOne_swap (s : SessionId) (A B : Role) (from_ : Role)
+theorem consume_one_swap (s : SessionId) (A B : Role) (from_ : Role)
 /- ## Structured Block 7 -/
     (T : ValType) (L L' : LocalType)
     (h : consumeOne from_ T L = some L') :
@@ -388,7 +388,7 @@ theorem consumeOne_swap (s : SessionId) (A B : Role) (from_ : Role)
 -- Consume_swap: Structural Recursion on Trace
 
 /-- Consume commutes with role swapping. -/
-theorem Consume_swap (s : SessionId) (A B : Role) (from_ : Role)
+theorem consume_swap (s : SessionId) (A B : Role) (from_ : Role)
     (L : LocalType) (ts : List ValType) (L' : LocalType)
     (h : Consume from_ L ts = some L') :
     Consume (swapRole A B from_) (swapLocalTypeRole s A B L)
@@ -410,7 +410,7 @@ theorem Consume_swap (s : SessionId) (A B : Role) (from_ : Role)
           have hTail : Consume from_ L1 ts = some L' := by
             simpa [hOne] using h
           have hRen :=
-            consumeOne_swap (s:=s) (A:=A) (B:=B) (from_:=from_) (T:=t) (L:=L) (L':=L1) hOne
+            consume_one_swap (s:=s) (A:=A) (B:=B) (from_:=from_) (T:=t) (L:=L) (L':=L1) hOne
           have hTailRen := ih (L:=L1) (L':=L') hTail
           simp [Consume, hRen, hTailRen]
 

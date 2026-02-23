@@ -17,8 +17,8 @@ The Problem. RegularSystem extracts a finite coalgebra from a regular coinductiv
 type. We need to prove that reconstructing from this system via SystemToCoind
 yields a bisimilar (hence equal) type.
 
-Solution Structure. Proves get_StateIndex correctly retrieves indexed states,
-RegularSystem_at_index shows system matches dest of state, defines RegularBisim
+Solution Structure. Proves get_state_index correctly retrieves indexed states,
+regular_system_at_index shows system matches dest of state, defines RegularBisim
 relating states to their reconstructions, and proves this satisfies IsBisimulation.
 -/
 
@@ -33,7 +33,7 @@ attribute [local instance] Classical.decEq
 -- State Index Retrieval
 
 /-- `StateIndex` returns the index witnessing membership in the reachable list. -/
-theorem get_StateIndex (t : LocalTypeC) (h : Regular t) (s : LocalTypeC)
+theorem get_state_index (t : LocalTypeC) (h : Regular t) (s : LocalTypeC)
     (hs : s ∈ ReachableList (witnessOfRegular h)) :
     (ReachableList (witnessOfRegular h)).get (StateIndex (witnessOfRegular h) s) = s := by
   let w := witnessOfRegular h
@@ -51,7 +51,7 @@ theorem get_StateIndex (t : LocalTypeC) (h : Regular t) (s : LocalTypeC)
 -- RegularSystem at Indexed States
 
 /-- One-step behavior of the regular system at a reachable state. -/
-theorem RegularSystem_at_index (t : LocalTypeC) (h : Regular t) (s : LocalTypeC)
+theorem regular_system_at_index (t : LocalTypeC) (h : Regular t) (s : LocalTypeC)
     (hs : s ∈ ReachableList (witnessOfRegular h)) :
     RegularSystem (witnessOfRegular h) (StateIndex (witnessOfRegular h) s) =
       match PFunctor.M.dest s with
@@ -74,7 +74,7 @@ theorem RegularSystem_at_index (t : LocalTypeC) (h : Regular t) (s : LocalTypeC)
         | ⟨.recv p labels, f⟩ =>
             ⟨.recv p labels, fun j => StateIndex w (f j)⟩
       unfold RegularSystem
-      rw [get_StateIndex t h s hs]
+      rw [get_state_index t h s hs]
       rfl
 
 -- RegularBisim Relation
@@ -88,7 +88,7 @@ def RegularBisim (t : LocalTypeC) (h : Regular t)
 -- RegularBisim Is a Bisimulation
 
 /-- The regular bisimulation is a bisimulation. -/
-theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
+theorem regular_bisim_is_bisimulation (t : LocalTypeC) (h : Regular t) :
     IsBisimulation (RegularBisim t h (RegularSystem (witnessOfRegular h))) := by
   classical
 /- ## Structured Block 2 -/
@@ -110,7 +110,7 @@ theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
         PFunctor.M.corec (RegularSystem w) ∘ fun x => PEmpty.elim x
       refine ⟨LocalTypeHead.end, f, g, ?_, ?_, ?_⟩
       · rfl
-      · have hsys := RegularSystem_at_index t h s1 hs
+      · have hsys := regular_system_at_index t h s1 hs
         simp [hdest] at hsys
         have hmap :=
           congrArg (LocalTypeF.map (PFunctor.M.corec (RegularSystem w))) hsys
@@ -123,7 +123,7 @@ theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
         PFunctor.M.corec (RegularSystem w) ∘ fun x => PEmpty.elim x
       refine ⟨LocalTypeHead.var v, f, g, ?_, ?_, ?_⟩
       · rfl
-      · have hsys := RegularSystem_at_index t h s1 hs
+      · have hsys := regular_system_at_index t h s1 hs
         simp [hdest] at hsys
         have hmap :=
           congrArg (LocalTypeF.map (PFunctor.M.corec (RegularSystem w))) hsys
@@ -136,7 +136,7 @@ theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
         PFunctor.M.corec (RegularSystem w) ∘ fun _ => StateIndex w (f ())
       refine ⟨LocalTypeHead.mu v, f, g, ?_, ?_, ?_⟩
       · rfl
-      · have hsys := RegularSystem_at_index t h s1 hs
+      · have hsys := regular_system_at_index t h s1 hs
         simp [hdest] at hsys
         have hmap :=
           congrArg (LocalTypeF.map (PFunctor.M.corec (RegularSystem w))) hsys
@@ -151,7 +151,7 @@ theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
         PFunctor.M.corec (RegularSystem w) ∘ fun i => StateIndex w (f i)
       refine ⟨LocalTypeHead.send p labels, f, g, ?_, ?_, ?_⟩
       · rfl
-      · have hsys := RegularSystem_at_index t h s1 hs
+      · have hsys := regular_system_at_index t h s1 hs
         simp [hdest] at hsys
         have hmap :=
           congrArg (LocalTypeF.map (PFunctor.M.corec (RegularSystem w))) hsys
@@ -164,7 +164,7 @@ theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
         PFunctor.M.corec (RegularSystem w) ∘ fun i => StateIndex w (f i)
       refine ⟨LocalTypeHead.recv p labels, f, g, ?_, ?_, ?_⟩
       · rfl
-      · have hsys := RegularSystem_at_index t h s1 hs
+      · have hsys := regular_system_at_index t h s1 hs
         simp [hdest] at hsys
         have hmap :=
           congrArg (LocalTypeF.map (PFunctor.M.corec (RegularSystem w))) hsys
@@ -175,7 +175,7 @@ theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
 -- Finite-System Extraction Theorems
 
 /-- Regular coinductive types are bisimilar to their finite-system presentation. -/
-theorem Regular_implies_System (t : LocalTypeC) (h : Regular t) :
+theorem regular_implies_system (t : LocalTypeC) (h : Regular t) :
     ∃ (n : Nat) (sys : FiniteSystem n) (start : Fin n),
       Bisim t (SystemToCoind sys start) := by
   classical
@@ -184,17 +184,17 @@ theorem Regular_implies_System (t : LocalTypeC) (h : Regular t) :
   let sys := RegularSystem w
   let start := StateIndex w t
   refine ⟨n, sys, start, ?_⟩
-  refine ⟨RegularBisim t h sys, RegularBisim_isBisimulation t h, ?_⟩
+  refine ⟨RegularBisim t h sys, regular_bisim_is_bisimulation t h, ?_⟩
   refine ⟨t, ?_, rfl, rfl⟩
   exact w.root_mem
 
 /-- Regular coinductive types coincide with their finite-system presentation. -/
-theorem Regular_implies_System_eq (t : LocalTypeC) (h : Regular t) :
+theorem regular_implies_system_eq (t : LocalTypeC) (h : Regular t) :
     ∃ (n : Nat) (sys : FiniteSystem n) (start : Fin n),
       t = SystemToCoind sys start := by
-  rcases Regular_implies_System t h with ⟨n, sys, start, hbisim⟩
+  rcases regular_implies_system t h with ⟨n, sys, start, hbisim⟩
   have hEq : t = SystemToCoind sys start :=
-    (Bisim_eq_iff t (SystemToCoind sys start)).1 hbisim
+    (bisim_eq_iff t (SystemToCoind sys start)).1 hbisim
   exact ⟨n, sys, start, hEq⟩
 
 end SessionCoTypes.Coinductive

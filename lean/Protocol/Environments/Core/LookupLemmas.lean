@@ -22,7 +22,7 @@ section
 
 /-! ## Environment Lemmas -/
 
-theorem lookupStr_update_eq (store : VarStore) (x : Var) (v : Value) :
+theorem lookup_str_update_eq (store : VarStore) (x : Var) (v : Value) :
     lookupStr (updateStr store x v) x = some v := by
   induction store with
   | nil =>
@@ -34,7 +34,7 @@ theorem lookupStr_update_eq (store : VarStore) (x : Var) (v : Value) :
       simp [updateStr, lookupStr, List.lookup, h, hne]
       simpa [lookupStr] using ih
 
-theorem lookupStr_update_neq (store : VarStore) (x y : Var) (v : Value) (hne : x ≠ y) :
+theorem lookup_str_update_neq (store : VarStore) (x y : Var) (v : Value) (hne : x ≠ y) :
     lookupStr (updateStr store x v) y = lookupStr store y := by
   induction store with
   | nil =>
@@ -53,7 +53,7 @@ theorem lookupStr_update_neq (store : VarStore) (x y : Var) (v : Value) (hne : x
         simpa [lookupStr] using ih
 
 /-! ## SEnv Lookup/Update Lemmas -/
-theorem lookupSEnv_update_eq (env : SEnv) (x : Var) (T : ValType) :
+theorem lookup_s_env_update_eq (env : SEnv) (x : Var) (T : ValType) :
     lookupSEnv (updateSEnv env x T) x = some T := by
   induction env with
   | nil =>
@@ -65,7 +65,7 @@ theorem lookupSEnv_update_eq (env : SEnv) (x : Var) (T : ValType) :
         simp [lookupSEnv, updateSEnv, List.lookup, h, hne]
         simpa [lookupSEnv] using ih
 
-theorem lookupSEnv_update_neq (env : SEnv) (x y : Var) (T : ValType) (hne : x ≠ y) :
+theorem lookup_s_env_update_neq (env : SEnv) (x y : Var) (T : ValType) (hne : x ≠ y) :
     lookupSEnv (updateSEnv env x T) y = lookupSEnv env y := by
   induction env with
   | nil =>
@@ -88,7 +88,7 @@ theorem lookupSEnv_update_neq (env : SEnv) (x y : Var) (T : ValType) (hne : x �
 
 /-! ## SEnv Append Interaction -/
 /-- When x is already in S₁, updateSEnv finds and replaces it before reaching S₂. -/
-theorem updateSEnv_append_left_of_mem {S₁ S₂ : SEnv} {x : Var} {T : ValType}
+theorem update_s_env_append_left_of_mem {S₁ S₂ : SEnv} {x : Var} {T : ValType}
     (h : ∃ T', lookupSEnv S₁ x = some T') :
     updateSEnv (S₁ ++ S₂) x T = updateSEnv S₁ x T ++ S₂ := by
   induction S₁ with
@@ -107,17 +107,17 @@ theorem updateSEnv_append_left_of_mem {S₁ S₂ : SEnv} {x : Var} {T : ValType}
         rw [ih ⟨T', hT''⟩]
 
 /-! ## GEnv Lookup/Update Core Lemmas -/
-theorem lookupG_update_eq (env : GEnv) (e : Endpoint) (L : LocalType) :
+theorem lookup_g_update_eq (env : GEnv) (e : Endpoint) (L : LocalType) :
     lookupG (updateG env e L) e = some L := by
-  exact lookupG_updateG_eq (env := env) (e := e) (L := L)
+  exact lookup_g_update_g_eq (env := env) (e := e) (L := L)
 
-theorem lookupG_update_neq (env : GEnv) (e e' : Endpoint) (L : LocalType) (hne : e ≠ e') :
+theorem lookup_g_update_neq (env : GEnv) (e e' : Endpoint) (L : LocalType) (hne : e ≠ e') :
     lookupG (updateG env e L) e' = lookupG env e' := by
-  simpa using (lookupG_updateG_ne (env := env) (e := e) (e' := e') (L := L) (Ne.symm hne))
+  simpa using (lookup_g_update_g_ne (env := env) (e := e) (e' := e') (L := L) (Ne.symm hne))
 
 /-! ## updateG Membership and Freshness Transfer -/
 /-- If (e', S') ∈ updateG env e L, then either (e' = e and S' = L), or (e', S') was in env. -/
-theorem updateG_mem_of (env : GEnv) (e : Endpoint) (L : LocalType) (e' : Endpoint) (S' : LocalType)
+theorem update_g_mem_of (env : GEnv) (e : Endpoint) (L : LocalType) (e' : Endpoint) (S' : LocalType)
     (h : (e', S') ∈ updateG env e L) :
     (e' = e ∧ S' = L) ∨ (e', S') ∈ env := by
   induction env with
@@ -145,13 +145,13 @@ theorem updateG_mem_of (env : GEnv) (e : Endpoint) (L : LocalType) (e' : Endpoin
 
 /-- updateG preserves supply_fresh: if all endpoints in env have sid < supply,
     and e.sid < supply, then all endpoints in (updateG env e L) have sid < supply. -/
-theorem updateG_preserves_supply_fresh (env : GEnv) (e : Endpoint) (L : LocalType)
+theorem update_g_preserves_supply_fresh (env : GEnv) (e : Endpoint) (L : LocalType)
     (supply : SessionId)
     (hFresh : ∀ e' S', (e', S') ∈ env → e'.sid < supply)
     (heFresh : e.sid < supply) :
     ∀ e' S', (e', S') ∈ updateG env e L → e'.sid < supply := by
   intro e' S' hMem
-  cases updateG_mem_of env e L e' S' hMem with
+  cases update_g_mem_of env e L e' S' hMem with
   | inl heq =>
     rw [heq.1]
     exact heFresh
@@ -160,7 +160,7 @@ theorem updateG_preserves_supply_fresh (env : GEnv) (e : Endpoint) (L : LocalTyp
 
 /-! ## lookupG Membership and Freshness Corollaries -/
 /-- If lookupG returns some L, then (e, L) is in the list. -/
-theorem lookupG_mem (env : GEnv) (e : Endpoint) (L : LocalType)
+theorem lookup_g_mem (env : GEnv) (e : Endpoint) (L : LocalType)
     (h : lookupG env e = some L) :
     (e, L) ∈ env := by
   simp only [lookupG] at h
@@ -182,22 +182,22 @@ theorem lookupG_mem (env : GEnv) (e : Endpoint) (L : LocalType)
       exact ih h
 
 /-- If lookupG returns some L, then e.sid < supply (using supply_fresh_G). -/
-theorem lookupG_supply_fresh (env : GEnv) (e : Endpoint) (L : LocalType)
+theorem lookup_g_supply_fresh (env : GEnv) (e : Endpoint) (L : LocalType)
     (supply : SessionId)
     (hFresh : ∀ e' S', (e', S') ∈ env → e'.sid < supply)
     (h : lookupG env e = some L) :
     e.sid < supply := by
-  have hMem := lookupG_mem env e L h
+  have hMem := lookup_g_mem env e L h
   exact hFresh e L hMem
 
 /-! ## Buffer Lookup/Update Lemmas -/
-theorem lookupBuf_update_eq (bufs : Buffers) (e : Edge) (buf : Buffer) :
+theorem lookup_buf_update_eq (bufs : Buffers) (e : Edge) (buf : Buffer) :
     lookupBuf (updateBuf bufs e buf) e = buf := by
-  exact lookupBuf_updateBuf_eq (bufs := bufs) (e := e) (buf := buf)
+  exact lookup_buf_update_buf_eq (bufs := bufs) (e := e) (buf := buf)
 
-theorem lookupBuf_update_neq (bufs : Buffers) (e e' : Edge) (buf : Buffer) (hne : e ≠ e') :
+theorem lookup_buf_update_neq (bufs : Buffers) (e e' : Edge) (buf : Buffer) (hne : e ≠ e') :
     lookupBuf (updateBuf bufs e buf) e' = lookupBuf bufs e' := by
-  simpa using (lookupBuf_updateBuf_ne (bufs := bufs) (e := e) (e' := e') (buf := buf) (Ne.symm hne))
+  simpa using (lookup_buf_update_buf_ne (bufs := bufs) (e := e) (e' := e') (buf := buf) (Ne.symm hne))
 
 -- lookupD lemmas are defined above near DEnv.
 

@@ -34,7 +34,7 @@ open SessionTypes.NameOnlyContext
 
 -- isGuarded Preservation from DB
 
-lemma isGuarded_fromDB_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : String)
+lemma is_guarded_from_db_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : String)
     (hget : NameContext.get? ctx i = some v)
     (huniq : ∀ j, NameContext.get? ctx j = some v → j = i)
     (hclosed : t.isClosedAt ctx.length = true)
@@ -70,7 +70,7 @@ lemma isGuarded_fromDB_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : S
         have hidx := huniq n (by simpa [hvw] using hgetn)
         exact hne hidx
       have hfrom : LocalTypeDB.fromDB ctx (.var n) hclosed = LocalTypeR.var w :=
-        fromDB_var_of_get ctx n hclosed w hgetn
+        from_db_var_of_get ctx n hclosed w hgetn
       simp [hfrom, LocalTypeR.isGuarded, hwne]
     · intro p bs hbs ctx i v hget huniq hclosed hguard
       simp [LocalTypeDB.fromDB, LocalTypeR.isGuarded]
@@ -116,7 +116,7 @@ lemma isGuarded_fromDB_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : S
 
 -- isGuarded Preservation at Fresh Binder
 
-lemma isGuarded_fromDB_fresh (t : LocalTypeDB) (ctx : NameContext)
+lemma is_guarded_from_db_fresh (t : LocalTypeDB) (ctx : NameContext)
     (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
     (hclosed : t.isClosedAt (ctx.length + 1) = true)
     (hguard : t.isGuarded 0 = true) :
@@ -142,11 +142,11 @@ lemma isGuarded_fromDB_fresh (t : LocalTypeDB) (ctx : NameContext)
     show t.isClosedAt (NameOnlyContext.cons fresh ctx).length = true
     simp only [NameOnlyContext.cons_length]
     exact hclosed
-  exact isGuarded_fromDB_at t ctx' 0 fresh hget huniq hclosed' hguard
+  exact is_guarded_from_db_at t ctx' 0 fresh hget huniq hclosed' hguard
 
 -- isContractive Preservation from DB
 
-theorem isContractive_fromDB (t : LocalTypeDB) (ctx : NameContext)
+theorem is_contractive_from_db (t : LocalTypeDB) (ctx : NameContext)
     (hfreshAll : ∀ c, NameContext.freshName c ∉ c) :
     t.isContractive = true →
     (hclosed : t.isClosedAt (ctx.length) = true) →
@@ -200,7 +200,7 @@ theorem isContractive_fromDB (t : LocalTypeDB) (ctx : NameContext)
       rcases hcontr with ⟨hguard, hbody_contr⟩
       have hclosed' : body.isClosedAt (ctx.length + 1) = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
-      have hguard' := isGuarded_fromDB_fresh body ctx hfreshAll hclosed' hguard
+      have hguard' := is_guarded_from_db_fresh body ctx hfreshAll hclosed' hguard
       have hbody' :=
         hbody (ctx := NameOnlyContext.cons (NameContext.freshName ctx) ctx) hfreshAll hbody_contr hclosed'
       simp [LocalTypeDB.fromDB, LocalTypeR.isContractive, hguard', hbody']

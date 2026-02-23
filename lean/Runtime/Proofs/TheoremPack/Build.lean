@@ -242,9 +242,9 @@ def buildVMTheoremPack
         some
           { protocol := p.protocol
           , exactCharacterization := p.protocol.exactCharacterization
-          , byzantineSafety := Distributed.ByzantineSafety.byzantineSafety_of_protocol p.protocol
+          , byzantineSafety := Distributed.ByzantineSafety.byzantine_safety_of_protocol p.protocol
           , characterization := Distributed.ByzantineSafety.characterization_of_protocol p.protocol
-          , assumptionsPassed := Distributed.ByzantineSafety.byzantineAssumptions_allPassed p.protocol
+          , assumptionsPassed := Distributed.ByzantineSafety.byzantine_assumptions_all_passed p.protocol
           }
   let consensusEnvelope? :=
 /- ## Structured Block 5 -/

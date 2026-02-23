@@ -155,12 +155,12 @@ def SessionState.lookupHandler {ν : Type u} [VerificationModel ν]
   -- Lookup the handler bound to a given edge.
   st.handlers.lookup edge
 
-@[simp] theorem SessionState.lookupBuffer_updateType {ν : Type u} [VerificationModel ν]
+@[simp] theorem SessionState.lookup_buffer_update_type {ν : Type u} [VerificationModel ν]
     (st : SessionState ν) (e : Endpoint) (L : LocalType) (edge : Edge) :
     (st.updateType e L).lookupBuffer edge = st.lookupBuffer edge := by
   simp [SessionState.updateType, SessionState.lookupBuffer]
 
-@[simp] theorem SessionState.lookupBuffer_updateTrace {ν : Type u} [VerificationModel ν]
+@[simp] theorem SessionState.lookup_buffer_update_trace {ν : Type u} [VerificationModel ν]
     (st : SessionState ν) (edge : Edge) (ts : List ValType) (edge' : Edge) :
     (st.updateTrace edge ts).lookupBuffer edge' = st.lookupBuffer edge' := by
   simp [SessionState.updateTrace, SessionState.lookupBuffer]
@@ -298,34 +298,34 @@ variable {ν : Type u} [VerificationModel ν]
 
 /-! ## SessionState-level lemmas -/
 
-@[simp] theorem SessionState.lookupType_updateType_eq {st : SessionState ν} {e : Endpoint} {L : LocalType} :
+@[simp] theorem SessionState.lookup_type_update_type_eq {st : SessionState ν} {e : Endpoint} {L : LocalType} :
     (st.updateType e L).lookupType e = some L := by
   simpa [SessionState.updateType, SessionState.lookupType, lookupG] using
-    (lookupG_updateG_eq (env := st.localTypes) (e := e) (L := L))
+    (lookup_g_update_g_eq (env := st.localTypes) (e := e) (L := L))
 
-theorem SessionState.lookupType_updateType_ne {st : SessionState ν} {e e' : Endpoint} {L : LocalType}
+theorem SessionState.lookup_type_update_type_ne {st : SessionState ν} {e e' : Endpoint} {L : LocalType}
     (hne : e' ≠ e) :
     (st.updateType e L).lookupType e' = st.lookupType e' := by
   simpa [SessionState.updateType, SessionState.lookupType, lookupG] using
-    (lookupG_updateG_ne (env := st.localTypes) (e := e) (e' := e') (L := L) hne)
+    (lookup_g_update_g_ne (env := st.localTypes) (e := e) (e' := e') (L := L) hne)
 
-@[simp] theorem SessionState.lookupTrace_updateTrace_eq {st : SessionState ν} {edge : Edge} {ts : List ValType} :
+@[simp] theorem SessionState.lookup_trace_update_trace_eq {st : SessionState ν} {edge : Edge} {ts : List ValType} :
     (st.updateTrace edge ts).lookupTrace edge = ts := by
-  simp only [SessionState.updateTrace, SessionState.lookupTrace, lookupD_update_eq]
+  simp only [SessionState.updateTrace, SessionState.lookupTrace, lookup_d_update_eq]
 
-theorem SessionState.lookupTrace_updateTrace_ne {st : SessionState ν} {edge edge' : Edge} {ts : List ValType}
+theorem SessionState.lookup_trace_update_trace_ne {st : SessionState ν} {edge edge' : Edge} {ts : List ValType}
     (hne : edge' ≠ edge) :
     (st.updateTrace edge ts).lookupTrace edge' = st.lookupTrace edge' := by
   simpa [SessionState.updateTrace, SessionState.lookupTrace] using
-    (lookupD_update_neq (env := st.traces) (e := edge) (e' := edge') (ts := ts) (Ne.symm hne))
+    (lookup_d_update_neq (env := st.traces) (e := edge) (e' := edge') (ts := ts) (Ne.symm hne))
 
 -- Type update doesn't affect traces
-@[simp] theorem SessionState.lookupTrace_updateType {st : SessionState ν} {e : Endpoint} {L : LocalType} {edge : Edge} :
+@[simp] theorem SessionState.lookup_trace_update_type {st : SessionState ν} {e : Endpoint} {L : LocalType} {edge : Edge} :
     (st.updateType e L).lookupTrace edge = st.lookupTrace edge := by
   simp only [SessionState.updateType, SessionState.lookupTrace]
 
 -- Trace update doesn't affect types
-@[simp] theorem SessionState.lookupType_updateTrace {st : SessionState ν} {edge : Edge} {ts : List ValType} {e : Endpoint} :
+@[simp] theorem SessionState.lookup_type_update_trace {st : SessionState ν} {edge : Edge} {ts : List ValType} {e : Endpoint} :
     (st.updateTrace edge ts).lookupType e = st.lookupType e := by
   simp only [SessionState.updateTrace, SessionState.lookupType]
 

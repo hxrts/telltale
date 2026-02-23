@@ -47,11 +47,11 @@ This module defines the abstract boundary consumed by the rest of the project:
   `EntropyAPI.shannonEntropy`, `EntropyAPI.klDivergence`,
   `EntropyAPI.mutualInfo`
 - entropy law wrappers:
-  `EntropyAPI.shannonEntropy_nonneg`,
-  `EntropyAPI.shannonEntropy_le_log_card`,
-  `EntropyAPI.klDivergence_nonneg`,
-  `EntropyAPI.klDivergence_eq_zero_iff`,
-  `EntropyAPI.mutualInfo_zero_of_erasure`
+  `EntropyAPI.shannon_entropy_nonneg`,
+  `EntropyAPI.shannon_entropy_le_log_card`,
+  `EntropyAPI.kl_divergence_nonneg`,
+  `EntropyAPI.kl_divergence_eq_zero_iff`,
+  `EntropyAPI.mutual_info_zero_of_erasure`
 - extended analysis interface:
   `EntropyAPI.AnalysisModel`, `EntropyAPI.AnalysisLaws`,
   `EntropyAPI.exponentialTail`, `EntropyAPI.fluctuationScale`,
@@ -203,11 +203,11 @@ abbrev MutualInfoZeroOfErasure (M : Model) : Prop :=
 
 /-- Law-bearing entropy interface used by downstream modules. -/
 class Laws extends Model where
-  shannonEntropy_nonneg : ShannonEntropyNonneg toModel
-  shannonEntropy_le_log_card : ShannonEntropyLeLogCard toModel
-  klDivergence_nonneg : KlDivergenceNonneg toModel
-  klDivergence_eq_zero_iff : KlDivergenceEqZeroIff toModel
-  mutualInfo_zero_of_erasure : MutualInfoZeroOfErasure toModel
+  shannon_entropy_nonneg : ShannonEntropyNonneg toModel
+  shannon_entropy_le_log_card : ShannonEntropyLeLogCard toModel
+  kl_divergence_nonneg : KlDivergenceNonneg toModel
+  kl_divergence_eq_zero_iff : KlDivergenceEqZeroIff toModel
+  mutual_info_zero_of_erasure : MutualInfoZeroOfErasure toModel
 
 /-- Promote `Laws` to `Model` so operation wrappers infer automatically. -/
 instance (priority := 100) lawsToModel [Laws] : Model :=
@@ -220,33 +220,33 @@ section Laws
 variable [Laws]
 
 /-- Re-export Shannon entropy nonnegativity from `Laws`. -/
-theorem shannonEntropy_nonneg {α : Type*} [Fintype α]
+theorem shannon_entropy_nonneg {α : Type*} [Fintype α]
     (d : Distribution α) :
     0 ≤ shannonEntropy d.pmf :=
-  Laws.shannonEntropy_nonneg (self := inferInstance) d
+  Laws.shannon_entropy_nonneg (self := inferInstance) d
 
 /-- Re-export Shannon entropy cardinality upper bound from `Laws`. -/
-theorem shannonEntropy_le_log_card {α : Type*} [Fintype α] [Nonempty α]
+theorem shannon_entropy_le_log_card {α : Type*} [Fintype α] [Nonempty α]
     (d : Distribution α) :
     shannonEntropy d.pmf ≤ Real.log (Fintype.card α) :=
-  Laws.shannonEntropy_le_log_card (self := inferInstance) d
+  Laws.shannon_entropy_le_log_card (self := inferInstance) d
 
 /-- Re-export KL nonnegativity from `Laws`. -/
-theorem klDivergence_nonneg {α : Type*} [Fintype α]
+theorem kl_divergence_nonneg {α : Type*} [Fintype α]
     (p q : Distribution α)
     (habs : ∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0) :
     0 ≤ klDivergence p.pmf q.pmf :=
-  Laws.klDivergence_nonneg (self := inferInstance) p q habs
+  Laws.kl_divergence_nonneg (self := inferInstance) p q habs
 
 /-- Re-export zero-KL characterization from `Laws`. -/
-theorem klDivergence_eq_zero_iff {α : Type*} [Fintype α]
+theorem kl_divergence_eq_zero_iff {α : Type*} [Fintype α]
     (p q : Distribution α)
     (habs : ∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0) :
     klDivergence p.pmf q.pmf = 0 ↔ p.pmf = q.pmf :=
-  Laws.klDivergence_eq_zero_iff (self := inferInstance) p q habs
+  Laws.kl_divergence_eq_zero_iff (self := inferInstance) p q habs
 
 /-- Re-export erasure-implies-zero-MI from `Laws`. -/
-theorem mutualInfo_zero_of_erasure {L O : Type}
+theorem mutual_info_zero_of_erasure {L O : Type}
     [Fintype L] [Fintype O] [DecidableEq O]
     (labelDist : L → ℝ)
     (h_nn : ∀ l, 0 ≤ labelDist l)
@@ -254,7 +254,7 @@ theorem mutualInfo_zero_of_erasure {L O : Type}
     (joint : L × O → ℝ)
     (hErase : IsErasureKernel labelDist joint) :
     mutualInfo joint = 0 :=
-  Laws.mutualInfo_zero_of_erasure
+  Laws.mutual_info_zero_of_erasure
     (self := inferInstance) labelDist h_nn h_sum joint hErase
 
 end Laws
@@ -356,28 +356,28 @@ These laws capture:
 - Spectral gap definition consistency -/
 class AnalysisLaws extends AnalysisModel where
   /-- Exponential tails are nonnegative (probability bound). -/
-  exponentialTail_nonneg :
+  exponential_tail_nonneg :
     ∀ (σ t : ℝ), 0 ≤ toAnalysisModel.exponentialTail σ t
   /-- At zero threshold, tail probability is 2 (two-sided bound covers all). -/
-  exponentialTail_zero :
+  exponential_tail_zero :
     ∀ (σ : ℝ), toAnalysisModel.exponentialTail σ 0 = 2
   /-- Fluctuation scale is positive for positive sample size. -/
-  fluctuationScale_pos :
+  fluctuation_scale_pos :
     ∀ {n : Nat}, 0 < n → 0 < toAnalysisModel.fluctuationScale n
   /-- Fluctuation scale squared equals sample size (√n property). -/
-  fluctuationScale_sq :
+  fluctuation_scale_sq :
     ∀ (n : Nat), (toAnalysisModel.fluctuationScale n) ^ 2 = n
   /-- Finite averages are permutation-invariant (exchangeability). -/
-  finiteAverage_perm :
+  finite_average_perm :
     ∀ {n : Nat}, (σ : Equiv.Perm (Fin n)) → (x : Fin n → ℝ) →
       toAnalysisModel.finiteAverage (fun i => x (σ i)) =
       toAnalysisModel.finiteAverage x
   /-- Average of a constant family is that constant. -/
-  finiteAverage_const :
+  finite_average_const :
     ∀ {n : Nat}, (c : ℝ) → n ≠ 0 →
       toAnalysisModel.finiteAverage (fun _ : Fin n => c) = c
   /-- Centered constant sequence has zero cumulative fluctuation. -/
-  normalizedCumulative_const_zero :
+  normalized_cumulative_const_zero :
     ∀ (c : ℝ) (N t : Nat), N ≠ 0 →
       toAnalysisModel.normalizedCumulative (fun _ => c) c N t = 0
   /-- Spectral gap is 1 minus the second eigenvalue modulus. -/
@@ -394,37 +394,37 @@ section AnalysisLaws
 variable [AnalysisLaws]
 
 /-- Re-export nonnegativity of the exponential-tail form. -/
-theorem exponentialTail_nonneg (σ t : ℝ) : 0 ≤ exponentialTail σ t :=
-  AnalysisLaws.exponentialTail_nonneg (self := inferInstance) σ t
+theorem exponential_tail_nonneg (σ t : ℝ) : 0 ≤ exponentialTail σ t :=
+  AnalysisLaws.exponential_tail_nonneg (self := inferInstance) σ t
 
 /-- Re-export normalization at zero threshold for the exponential-tail form. -/
-theorem exponentialTail_zero (σ : ℝ) : exponentialTail σ 0 = 2 :=
-  AnalysisLaws.exponentialTail_zero (self := inferInstance) σ
+theorem exponential_tail_zero (σ : ℝ) : exponentialTail σ 0 = 2 :=
+  AnalysisLaws.exponential_tail_zero (self := inferInstance) σ
 
 /-- Re-export positivity of fluctuation scale for positive index. -/
-theorem fluctuationScale_pos {n : Nat} (hn : 0 < n) :
+theorem fluctuation_scale_pos {n : Nat} (hn : 0 < n) :
     0 < fluctuationScale n :=
-  AnalysisLaws.fluctuationScale_pos (self := inferInstance) hn
+  AnalysisLaws.fluctuation_scale_pos (self := inferInstance) hn
 
 /-- Re-export squared-scale identity. -/
-theorem fluctuationScale_sq (n : Nat) :
+theorem fluctuation_scale_sq (n : Nat) :
     (fluctuationScale n) ^ 2 = n :=
-  AnalysisLaws.fluctuationScale_sq (self := inferInstance) n
+  AnalysisLaws.fluctuation_scale_sq (self := inferInstance) n
 
 /-- Re-export permutation invariance of finite averages. -/
-theorem finiteAverage_perm {n : Nat} (σ : Equiv.Perm (Fin n)) (x : Fin n → ℝ) :
+theorem finite_average_perm {n : Nat} (σ : Equiv.Perm (Fin n)) (x : Fin n → ℝ) :
     finiteAverage (fun i => x (σ i)) = finiteAverage x :=
-  AnalysisLaws.finiteAverage_perm (self := inferInstance) σ x
+  AnalysisLaws.finite_average_perm (self := inferInstance) σ x
 
 /-- Re-export constant-family identity for finite averages. -/
-theorem finiteAverage_const {n : Nat} (c : ℝ) (hn : n ≠ 0) :
+theorem finite_average_const {n : Nat} (c : ℝ) (hn : n ≠ 0) :
     finiteAverage (fun _ : Fin n => c) = c :=
-  AnalysisLaws.finiteAverage_const (self := inferInstance) c hn
+  AnalysisLaws.finite_average_const (self := inferInstance) c hn
 
 /-- Re-export zero fluctuation for centered constant cumulative process. -/
-theorem normalizedCumulative_const_zero (c : ℝ) (N t : Nat) (hN : N ≠ 0) :
+theorem normalized_cumulative_const_zero (c : ℝ) (N t : Nat) (hN : N ≠ 0) :
     normalizedCumulative (fun _ => c) c N t = 0 :=
-  AnalysisLaws.normalizedCumulative_const_zero (self := inferInstance) c N t hN
+  AnalysisLaws.normalized_cumulative_const_zero (self := inferInstance) c N t hN
 
 /-- Re-export relation between spectral gap and second spectral value. -/
 theorem spectral_gap_eq {State : Type*} [Fintype State] [DecidableEq State]

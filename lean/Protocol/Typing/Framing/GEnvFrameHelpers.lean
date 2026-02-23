@@ -21,21 +21,21 @@ section
 /-! ## Shared Helpers -/
 
 /-- Helper: updateG preserves disjointness against a framed GEnv. -/
-lemma disjointG_updateG_left
+lemma disjoint_g_update_g_left
     {G Gfr : GEnv} {e : Endpoint} {L L0 : LocalType} :
     lookupG G e = some L0 →
     DisjointG G Gfr →
     DisjointG (updateG G e L) Gfr := by
   -- Use session-of inclusion after update to keep disjointness.
   intro hG hDisj
-  have hEq := SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=L0) hG
+  have hEq := sessions_of_update_g_eq (G:=G) (e:=e) (L:=L) (L':=L0) hG
   have hSub : SessionsOf (updateG G e L) ⊆ SessionsOf G := by
     intro s hs
     simpa [hEq] using hs
-  exact DisjointG_of_subset_left hSub hDisj
+  exact disjoint_g_of_subset_left hSub hDisj
 
 /-- Helper: a par split inherits disjointness from the full GEnv. -/
-lemma disjointG_split_frame_right
+lemma disjoint_g_split_frame_right
     {Sown : OwnedEnv} {G Gfr : GEnv} (split : ParSplit Sown.left G) :
     DisjointG G Gfr →
     DisjointG split.G1 Gfr ∧ DisjointG split.G2 Gfr := by
@@ -43,8 +43,8 @@ lemma disjointG_split_frame_right
   intro hDisj
   have hSubG1 : SessionsOf split.G1 ⊆ SessionsOf G := by
     intro s hs
-    simpa [split.hG] using SessionsOf_append_left (G₂:=split.G2) hs
+    simpa [split.hG] using sessions_of_append_left (G₂:=split.G2) hs
   have hSubG2 : SessionsOf split.G2 ⊆ SessionsOf G := by
     intro s hs
-    simpa [split.hG] using SessionsOf_append_right (G₁:=split.G1) hs
-  exact ⟨DisjointG_of_subset_left hSubG1 hDisj, DisjointG_of_subset_left hSubG2 hDisj⟩
+    simpa [split.hG] using sessions_of_append_right (G₁:=split.G1) hs
+  exact ⟨disjoint_g_of_subset_left hSubG1 hDisj, disjoint_g_of_subset_left hSubG2 hDisj⟩

@@ -66,10 +66,10 @@ def SessionCoherentVM (store : SessionStore ν) (s : SessionId) : Prop :=
   SessionCoherent (SessionStore.toGEnv store) (SessionStore.toDEnv store) s
 
 /-- Global VM coherence decomposes per session. -/
-theorem CoherentVMState_iff_forall_session {store : SessionStore ν} :
+theorem coherent_vm_state_iff_forall_session {store : SessionStore ν} :
     CoherentVMState store ↔ ∀ s, SessionCoherentVM store s := by
   simp only [CoherentVMState, SessionCoherentVM]
-  exact VMCoherent_iff_forall_SessionCoherent
+  exact vm_coherent_iff_forall_session_coherent
 
 -- Instruction Enablement
 
@@ -117,19 +117,19 @@ def BranchEnabled (store : SessionStore ν) (ep : Endpoint) (source : Role) : Pr
 
     When we have Compatible and a sender with send type, the receiver can
     accept the message. This is the key lemma enabling sends. -/
-theorem sendReady_of_ProgressVMState {store : SessionStore ν}
+theorem send_ready_of_progress_vm_state {store : SessionStore ν}
     (hProg : ProgressVMState store) :
     SendReady (SessionStore.toGEnv store) (SessionStore.toDEnv store) :=
-  Compatible_to_SendReady hProg.compatible
+  compatible_to_send_ready hProg.compatible
 
 /-- SelectReady follows from ProgressVMState (specifically Compatible).
 
     Similar to SendReady, but for select/branch. -/
-theorem selectReady_of_ProgressVMState {store : SessionStore ν}
+theorem select_ready_of_progress_vm_state {store : SessionStore ν}
 /- ## Structured Block 2 -/
     (hProg : ProgressVMState store) :
     SelectReady (SessionStore.toGEnv store) (SessionStore.toDEnv store) :=
-  Compatible_to_SelectReady hProg.compatible
+  compatible_to_select_ready hProg.compatible
 
 -- Store/Environment Lookup Bridges
 
@@ -138,13 +138,13 @@ theorem selectReady_of_ProgressVMState {store : SessionStore ν}
     This connects SessionStore operations to Protocol-level environments.
     These bridge lemmas require store consistency invariants from Arena.lean.
     For now, we axiomatize them pending full integration. -/
-theorem store_lookupTrace_eq_lookupD {store : SessionStore ν} {edge : Edge}
+theorem store_lookup_trace_eq_lookup_d {store : SessionStore ν} {edge : Edge}
     (hWF : sessionStore_refines_envs store) :
     lookupD (SessionStore.toDEnv store) edge = SessionStore.lookupTrace store edge := by
   exact hWF.2.2.1 edge
 
 /-- Store lookups agree with environment projections for types. -/
-theorem store_lookupType_eq_lookupG {store : SessionStore ν} {ep : Endpoint}
+theorem store_lookup_type_eq_lookup_g {store : SessionStore ν} {ep : Endpoint}
     (hWF : sessionStore_refines_envs store) :
     lookupG (SessionStore.toGEnv store) ep = SessionStore.lookupType store ep := by
   exact hWF.2.1 ep
@@ -152,7 +152,7 @@ theorem store_lookupType_eq_lookupG {store : SessionStore ν} {ep : Endpoint}
 -- Session-Existence Transport Lemmas
 
 /-- If an endpoint lookup succeeds, the corresponding session exists in the store. -/
-private theorem exists_session_of_lookupType_some {store : SessionStore ν} {e : Endpoint} {L : LocalType}
+private theorem exists_session_of_lookup_type_some {store : SessionStore ν} {e : Endpoint} {L : LocalType}
     (hLookup : SessionStore.lookupType store e = some L) :
     ∃ st, (e.sid, st) ∈ store := by
   induction store with
@@ -169,7 +169,7 @@ private theorem exists_session_of_lookupType_some {store : SessionStore ν} {e :
         exact ⟨st', by simp [hMem']⟩
 
 /-- Session existence is preserved by `updateTrace` (possibly with updated session state). -/
-private theorem exists_session_after_updateTrace {store : SessionStore ν} {sid : SessionId}
+private theorem exists_session_after_update_trace {store : SessionStore ν} {sid : SessionId}
     {edge : Edge} {ts : List ValType}
     (hMem : ∃ st, (sid, st) ∈ store) :
     ∃ st', (sid, st') ∈ SessionStore.updateTrace store edge ts := by
@@ -206,7 +206,7 @@ private theorem exists_session_after_updateTrace {store : SessionStore ν} {sid 
 
     This is the key lemma enabling receives: HeadCoherent guarantees that
     when we expect to receive type T, the trace head (if any) is type T. -/
-theorem recv_has_data_of_HeadCoherent {store : SessionStore ν}
+theorem recv_has_data_of_head_coherent {store : SessionStore ν}
     {ep : Endpoint} {source : Role} {T : ValType} {L' : LocalType} {edge : Edge}
     (hWF : sessionStore_refines_envs store)
     (hHead : HeadCoherent (SessionStore.toGEnv store) (SessionStore.toDEnv store))
@@ -220,15 +220,15 @@ theorem recv_has_data_of_HeadCoherent {store : SessionStore ν}
   let D := SessionStore.toDEnv store
   -- Convert store lookup to GEnv lookup
   have hLookupG : lookupG G ep = some (.recv source T L') := by
-    rw [store_lookupType_eq_lookupG (hWF := hWF), hRecvType]
+    rw [store_lookup_type_eq_lookup_g (hWF := hWF), hRecvType]
   -- Get sender exists from RoleComplete
-  obtain ⟨L_sender, hSender⟩ := RoleComplete_recv hComplete hLookupG
+  obtain ⟨L_sender, hSender⟩ := role_complete_recv hComplete hLookupG
   -- The receiver endpoint in HeadCoherent
   have hRecvEp : Endpoint.mk edge.sid edge.receiver = ep := by
     subst hEdge; rfl
   -- Convert store trace to DEnv lookup
   have hTraceEq : lookupD D edge = SessionStore.lookupTrace store edge :=
-    store_lookupTrace_eq_lookupD (hWF := hWF)
+    store_lookup_trace_eq_lookup_d (hWF := hWF)
   -- Construct ActiveEdge: both endpoints exist in G
   have hActive : ActiveEdge G edge := by
     subst hEdge
@@ -264,9 +264,9 @@ theorem recv_has_data_of_HeadCoherent {store : SessionStore ν}
 
 /-- After a send update, HeadCoherent is preserved.
 
-    This lifts `HeadCoherent_send_preserved` to the `SessionStore` view by
+    This lifts `head_coherent_send_preserved` to the `SessionStore` view by
     using Arena bridge lemmas for `toGEnv`/`toDEnv` updates. -/
-theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
+theorem send_establishes_head_coherent {store store' : SessionStore ν}
     {ep : Endpoint} {target : Role} {T : ValType} {L' : LocalType}
     (hWF : sessionStore_refines_envs store)
     (hCons : store.consistent)
@@ -284,16 +284,16 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
     HeadCoherent (SessionStore.toGEnv store') (SessionStore.toDEnv store') := by
   let sendEdge : Edge := { sid := ep.sid, sender := ep.role, receiver := target }
   have hMem : ∃ st, (ep.sid, st) ∈ store :=
-    exists_session_of_lookupType_some (hLookup := hSendType)
+    exists_session_of_lookup_type_some (hLookup := hSendType)
   have hMemTrace :
       ∃ st, (ep.sid, st) ∈
         SessionStore.updateTrace store sendEdge (SessionStore.lookupTrace store sendEdge ++ [T]) :=
-    exists_session_after_updateTrace (hMem := hMem)
+    exists_session_after_update_trace (hMem := hMem)
   have hConsTrace :
       (SessionStore.updateTrace store sendEdge (SessionStore.lookupTrace store sendEdge ++ [T])).consistent :=
-    SessionStore.updateTrace_preserves_consistent (hCons := hCons) (hMem := hMem)
+    SessionStore.update_trace_preserves_consistent (hCons := hCons) (hMem := hMem)
   have hLookupSendG : lookupG (SessionStore.toGEnv store) ep = some (.send target T L') := by
-    simpa [store_lookupType_eq_lookupG (hWF := hWF)] using hSendType
+    simpa [store_lookup_type_eq_lookup_g (hWF := hWF)] using hSendType
   have hReadyAtSend :
       ∀ Lrecv, lookupG (SessionStore.toGEnv store) { sid := ep.sid, role := target } = some Lrecv →
         ∃ L'', Consume ep.role Lrecv (lookupD (SessionStore.toDEnv store) sendEdge) = some L'' ∧
@@ -302,14 +302,14 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
     exact hReady ep target T L' hLookupSendG Lrecv hRecv
   have hTraceLookup :
       lookupD (SessionStore.toDEnv store) sendEdge = SessionStore.lookupTrace store sendEdge := by
-    exact store_lookupTrace_eq_lookupD (hWF := hWF)
+    exact store_lookup_trace_eq_lookup_d (hWF := hWF)
   have hHeadUpd :
       HeadCoherent
         (updateG (SessionStore.toGEnv store) ep L')
         (updateD (SessionStore.toDEnv store) sendEdge
           (lookupD (SessionStore.toDEnv store) sendEdge ++ [T])) := by
     have h :=
-      HeadCoherent_send_preserved
+      head_coherent_send_preserved
         (G := SessionStore.toGEnv store) (D := SessionStore.toDEnv store)
         (senderEp := ep) (receiverRole := target) (T := T) (L := L')
         hHead hCoh hLookupSendG hReadyAtSend
@@ -341,9 +341,9 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
               (SessionStore.updateTrace store sendEdge (SessionStore.lookupTrace store sendEdge ++ [T])))
             ep L')
           e' := by
-            exact SessionStore.toGEnv_updateType (hMem := hMemTrace) (hCons := hConsTrace) e'
+            exact SessionStore.to_g_env_update_type (hMem := hMemTrace) (hCons := hConsTrace) e'
       _ = lookupG (updateG (SessionStore.toGEnv store) ep L') e' := by
-            simp [SessionStore.toGEnv_updateTrace]
+            simp [SessionStore.to_g_env_update_trace]
   -- DEnv Bridge Equalities
   have hDBridge :
       ∀ edge', lookupD
@@ -368,13 +368,13 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
         lookupD
           (SessionStore.toDEnv
             (SessionStore.updateTrace store sendEdge (SessionStore.lookupTrace store sendEdge ++ [T])))
-          edge' := by simp [SessionStore.toDEnv_updateType]
+          edge' := by simp [SessionStore.to_d_env_update_type]
       _ =
         lookupD
           (updateD (SessionStore.toDEnv store) sendEdge
             (SessionStore.lookupTrace store sendEdge ++ [T]))
           edge' :=
-            SessionStore.toDEnv_updateTrace (hMem := hMem) (hCons := hCons) edge'
+            SessionStore.to_d_env_update_trace (hMem := hMem) (hCons := hCons) edge'
       _ =
         lookupD
           (updateD (SessionStore.toDEnv store) sendEdge

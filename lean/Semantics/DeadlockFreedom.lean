@@ -11,8 +11,8 @@ without communication. We need a separate predicate `ReachesComm` that
 says the type can reach a communication constructor.
 
 Solution Structure. The proof separates two concerns:
-1. `reachesComm_implies_canStep`: types that reach a comm can step (global level)
-2. `canStep_implies_configStep`: configs with steppable global types can step
+1. `reaches_comm_implies_can_step`: types that reach a comm can step (global level)
+2. `can_step_implies_config_step`: configs with steppable global types can step
 3. `deadlock_free`: combines (1) and (2) for the main result
 
 This mirrors the Coq split between `gcontractive` (well-formedness) and
@@ -113,7 +113,7 @@ private theorem first_branch_mem {branches : List (Label × GlobalType)}
 
 This produces `SyncCanStep` derivations which can be stepped without async machinery.
 The derivation is always comm_head at the base, wrapped by mu unfoldings. -/
-theorem reachesComm_implies_syncCanStep (g : GlobalType)
+theorem reaches_comm_implies_sync_can_step (g : GlobalType)
     (_hwf : g.wellFormed = true)
     (hcomm : ReachesComm g) :
     ∃ act, SyncCanStep g act := by
@@ -125,7 +125,7 @@ theorem reachesComm_implies_syncCanStep (g : GlobalType)
              SyncCanStep.comm_head sender receiver branches label cont hmem⟩
   | mu t body _hbody ih =>
       -- Mu case: unfold and use IH.
-      have ⟨act, hcan⟩ := ih (wellFormed_mu_unfold t body _hwf)
+      have ⟨act, hcan⟩ := ih (well_formed_mu_unfold t body _hwf)
       exact ⟨act, SyncCanStep.mu t body act hcan⟩
 
 /-- Types that reach a communication can step.
@@ -137,12 +137,12 @@ theorem reachesComm_implies_syncCanStep (g : GlobalType)
 **Proof:** By induction on the `ReachesComm` derivation.
 - `comm`: Use `canStep.comm_head` with the first branch
 - `mu`: Use `canStep.mu` with IH on the unfolded body -/
-theorem reachesComm_implies_canStep (g : GlobalType)
+theorem reaches_comm_implies_can_step (g : GlobalType)
     (hwf : g.wellFormed = true)
     (hcomm : ReachesComm g) :
     ∃ act, canStep g act := by
   -- Get SyncCanStep, then convert to canStep.
-  have ⟨act, hsync⟩ := reachesComm_implies_syncCanStep g hwf hcomm
+  have ⟨act, hsync⟩ := reaches_comm_implies_sync_can_step g hwf hcomm
   exact ⟨act, hsync.toCanStep⟩
 
 /-! ## Configuration Progress
@@ -160,7 +160,7 @@ private def buildSteppedConfig (c : Configuration) (g' : GlobalType) : Configura
   }
 
 /-- Helper: the built configuration preserves roles (in ConfigStep order). -/
-private theorem buildSteppedConfig_roles (c : Configuration) (g' : GlobalType) :
+private theorem build_stepped_config_roles (c : Configuration) (g' : GlobalType) :
     c.processes.map Process.role = (buildSteppedConfig c g').processes.map Process.role := by
   -- Mapping preserves roles since we only update localType.
   simp only [buildSteppedConfig, List.map_map]
@@ -168,7 +168,7 @@ private theorem buildSteppedConfig_roles (c : Configuration) (g' : GlobalType) :
   rfl
 
 /-- Helper: the built configuration has correct projections. -/
-private theorem buildSteppedConfig_projections (c : Configuration) (g' : GlobalType) :
+private theorem build_stepped_config_projections (c : Configuration) (g' : GlobalType) :
     ∀ p' ∈ (buildSteppedConfig c g').processes,
       p'.localType = QLocalTypeR.ofLocal (trans g' p'.role) := by
   -- Each process has its localType set to the projection.
@@ -180,37 +180,37 @@ private theorem buildSteppedConfig_projections (c : Configuration) (g' : GlobalT
 /-- If a global type has SyncCanStep, a well-typed configuration can step.
 
 This version uses SyncCanStep which has a complete proof without async machinery. -/
-theorem syncCanStep_implies_configStep (c : Configuration) (act : GlobalActionR)
+theorem sync_can_step_implies_config_step (c : Configuration) (act : GlobalActionR)
     (_htyped : WellTypedConfig c)
     (hcan : SyncCanStep c.globalType act) :
     ∃ c', ConfigStep c c' act := by
   -- From SyncCanStep, we know there exists g' with step c.globalType act g'.
-  have ⟨g', hstep⟩ := syncCanStep_implies_step c.globalType act hcan
+  have ⟨g', hstep⟩ := sync_can_step_implies_step c.globalType act hcan
   -- Build the stepped configuration.
   let c' := buildSteppedConfig c g'
   refine ⟨c', ?_⟩
   constructor
   · exact hstep
-  · exact buildSteppedConfig_roles c g'
-  · exact buildSteppedConfig_projections c g'
+  · exact build_stepped_config_roles c g'
+  · exact build_stepped_config_projections c g'
 
 /-- If a global type can step, a well-typed configuration can step.
 
 This requires the environment to provide message delivery for the action.
 Under fair environment, pending messages are eventually delivered. -/
-theorem canStep_implies_configStep (c : Configuration) (act : GlobalActionR)
+theorem can_step_implies_config_step (c : Configuration) (act : GlobalActionR)
     (_htyped : WellTypedConfig c)
     (hcan : canStep c.globalType act) :
     ∃ c', ConfigStep c c' act := by
   -- From canStep, we know there exists g' with step c.globalType act g'.
-  have ⟨g', hstep⟩ := canStep_implies_step c.globalType act hcan
+  have ⟨g', hstep⟩ := can_step_implies_step c.globalType act hcan
   -- Build the stepped configuration.
   let c' := buildSteppedConfig c g'
   refine ⟨c', ?_⟩
   constructor
   · exact hstep
-  · exact buildSteppedConfig_roles c g'
-  · exact buildSteppedConfig_projections c g'
+  · exact build_stepped_config_roles c g'
+  · exact build_stepped_config_projections c g'
 
 /-! ## Deadlock Freedom Theorem
 
@@ -226,8 +226,8 @@ This mirrors Coq's `coherentG` which combines `gcontractive` and `goodG`. -/
 - Implicit: fair environment (not modeled explicitly)
 
 **Proof sketch:**
-1. By `reachesComm_implies_syncCanStep`, the global type has a sync step
-2. By `syncCanStep_implies_configStep`, the configuration can step
+1. By `reaches_comm_implies_sync_can_step`, the global type has a sync step
+2. By `sync_can_step_implies_config_step`, the configuration can step
 3. Therefore CanProgress holds
 
 Note: Uses SyncCanStep for a complete proof without async machinery. -/
@@ -237,9 +237,9 @@ theorem deadlock_free (c : Configuration)
     (hcomm : ReachesComm c.globalType) :
     CanProgress c := by
   -- Step 1: global type has sync canStep (from ReachesComm).
-  have ⟨act, hsync⟩ := reachesComm_implies_syncCanStep c.globalType hwf hcomm
+  have ⟨act, hsync⟩ := reaches_comm_implies_sync_can_step c.globalType hwf hcomm
   -- Step 2: configuration can step (using sync version for complete proof).
-  have ⟨c', hstep⟩ := syncCanStep_implies_configStep c act htyped hsync
+  have ⟨c', hstep⟩ := sync_can_step_implies_config_step c act htyped hsync
   -- Step 3: conclude CanProgress.
   exact ⟨c', act, hstep⟩
 

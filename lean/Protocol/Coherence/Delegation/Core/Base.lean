@@ -35,8 +35,8 @@ both types and traces undergo role renaming, so we must prove that Consume
 commutes with role renaming.
 
 Solution Structure. The proof decomposes into four helper theorems:
-1. `Consume_delegate`: Consume commutes with A→B renaming when sender is A
-2. `Consume_rename_unrelated`: Consume commutes with renaming for unrelated sender
+1. `consume_delegate`: Consume commutes with A→B renaming when sender is A
+2. `consume_rename_unrelated`: Consume commutes with renaming for unrelated sender
 3. `delegate_redirected_edge_coherent`: Redirected edges remain coherent
 4. `delegate_unrelated_edge_coherent`: Edges not involving A/B remain coherent
 -/
@@ -77,11 +77,11 @@ def redirectEdge (e : Edge) (s : SessionId) (A B : Role) : Edge :=
 def IsRedirectedEdge (e e' : Edge) (s : SessionId) (A B : Role) : Prop :=
   e' = redirectEdge e s A B
 
-theorem redirectEdge_other_session (e : Edge) (s : SessionId) (A B : Role)
+theorem redirect_edge_other_session (e : Edge) (s : SessionId) (A B : Role)
     (hSid : e.sid ≠ s) : redirectEdge e s A B = e := by
   simp [redirectEdge, hSid]
 
-theorem redirectEdge_no_A (e : Edge) (s : SessionId) (A B : Role)
+theorem redirect_edge_no_a (e : Edge) (s : SessionId) (A B : Role)
     (hSid : e.sid = s) (hSender : e.sender ≠ A) (hReceiver : e.receiver ≠ A) :
     redirectEdge e s A B = e := by
   have hS : (e.sender == A) = false := beq_eq_false_iff_ne.mpr hSender
@@ -93,12 +93,12 @@ theorem redirectEdge_no_A (e : Edge) (s : SessionId) (A B : Role)
       subst hSid'
       simp [redirectEdge, hS, hR]
 
-theorem IsRedirectedEdge_sender (s : SessionId) (A B C : Role) (hCA : C ≠ A) :
+theorem is_redirected_edge_sender (s : SessionId) (A B C : Role) (hCA : C ≠ A) :
     IsRedirectedEdge ⟨s, A, C⟩ ⟨s, B, C⟩ s A B := by
   have hC : (C == A) = false := beq_eq_false_iff_ne.mpr hCA
   simp [IsRedirectedEdge, redirectEdge, hC]
 
-theorem IsRedirectedEdge_receiver (s : SessionId) (A B C : Role) (hCA : C ≠ A) :
+theorem is_redirected_edge_receiver (s : SessionId) (A B C : Role) (hCA : C ≠ A) :
     IsRedirectedEdge ⟨s, C, A⟩ ⟨s, C, B⟩ s A B := by
   have hC : (C == A) = false := beq_eq_false_iff_ne.mpr hCA
   simp [IsRedirectedEdge, redirectEdge, hC]
@@ -122,7 +122,7 @@ theorem IsRedirectedEdge_receiver (s : SessionId) (A B C : Role) (hCA : C ≠ A)
     - Edges in other sessions are unchanged
 
     The simple case assumes B is not already in session s. The general case
-    (B already participates) requires type merging via Consume_mono (task 3.6). -/
+    (B already participates) requires type merging via consume_mono (task 3.6). -/
 structure DelegationStep (G G' : GEnv) (D D' : DEnv) (s : SessionId) (A B : Role) where
   /-- Well-formedness: A in session, B not in session, A ≠ B -/
   wf : DelegationWF G s A B
@@ -162,7 +162,7 @@ structure DelegationStep (G G' : GEnv) (D D' : DEnv) (s : SessionId) (A B : Role
 /-! ## Role-Renaming for Consume (Delegation) -/
 
 /-- If a consume step succeeds from A, it also succeeds after renaming A → B. -/
-theorem consumeOne_delegate (s : SessionId) (A B : Role) (T : ValType) (L L' : LocalType)
+theorem consume_one_delegate (s : SessionId) (A B : Role) (T : ValType) (L L' : LocalType)
     (h : consumeOne A T L = some L') :
     consumeOne B (renameValTypeRole s A B T) (renameLocalTypeRole s A B L) =
       some (renameLocalTypeRole s A B L') := by
@@ -196,7 +196,7 @@ theorem consumeOne_delegate (s : SessionId) (A B : Role) (T : ValType) (L L' : L
 /-! ## Delegation Renaming over Consume Traces -/
 
 /-- Delegation renaming preserves Consume success (A → B). -/
-theorem Consume_delegate (s : SessionId) (A B : Role) (L : LocalType) (ts : List ValType) (L' : LocalType)
+theorem consume_delegate (s : SessionId) (A B : Role) (L : LocalType) (ts : List ValType) (L' : LocalType)
     (h : Consume A L ts = some L') :
     Consume B (renameLocalTypeRole s A B L) (ts.map (renameValTypeRole s A B)) =
       some (renameLocalTypeRole s A B L') := by
@@ -214,7 +214,7 @@ theorem Consume_delegate (s : SessionId) (A B : Role) (L : LocalType) (ts : List
       | some L1 =>
           have hTail : Consume A L1 ts = some L' := by
             simpa [hOne] using h
-          have hRen := consumeOne_delegate (s:=s) (A:=A) (B:=B) (T:=t) (L:=L) (L':=L1) hOne
+          have hRen := consume_one_delegate (s:=s) (A:=A) (B:=B) (T:=t) (L:=L) (L':=L1) hOne
           have hTailRen := ih (L:=L1) (L':=L') hTail
           simp [Consume, hRen, hTailRen]
 
@@ -222,7 +222,7 @@ theorem Consume_delegate (s : SessionId) (A B : Role) (L : LocalType) (ts : List
 
 /-- If a consume step succeeds from `from_` and `from_` is unrelated to A/B,
     it also succeeds after renaming A → B. -/
-theorem consumeOne_rename_unrelated (s : SessionId) (A B : Role) (from_ : Role)
+theorem consume_one_rename_unrelated (s : SessionId) (A B : Role) (from_ : Role)
     (T : ValType) (L L' : LocalType)
     (hFromA : from_ ≠ A) (hFromB : from_ ≠ B)
     (h : consumeOne from_ T L = some L') :
@@ -274,7 +274,7 @@ theorem consumeOne_rename_unrelated (s : SessionId) (A B : Role) (from_ : Role)
 /-! ## Unrelated Sender Renaming over Consume Traces -/
 
 /-- Renaming preserves Consume success for an unrelated sender. -/
-theorem Consume_rename_unrelated (s : SessionId) (A B : Role) (from_ : Role)
+theorem consume_rename_unrelated (s : SessionId) (A B : Role) (from_ : Role)
     (L : LocalType) (ts : List ValType) (L' : LocalType)
     (hFromA : from_ ≠ A) (hFromB : from_ ≠ B)
     (h : Consume from_ L ts = some L') :
@@ -294,7 +294,7 @@ theorem Consume_rename_unrelated (s : SessionId) (A B : Role) (from_ : Role)
       | some L1 =>
           have hTail : Consume from_ L1 ts = some L' := by
             simpa [hOne] using h
-          have hRen := consumeOne_rename_unrelated (s:=s) (A:=A) (B:=B) (from_:=from_)
+          have hRen := consume_one_rename_unrelated (s:=s) (A:=A) (B:=B) (from_:=from_)
             (T:=t) (L:=L) (L':=L1) hFromA hFromB hOne
           have hTailRen := ih (L:=L1) (L':=L') hTail
           simp [Consume, hRen, hTailRen]
@@ -329,7 +329,7 @@ theorem delegate_redirected_edge_coherent
       rcases hCohOld' with ⟨Lsender0, hGsender0, hConsumeOld⟩
       -- Redirected trace.
       have hRedir : IsRedirectedEdge ⟨s, A, C⟩ ⟨s, B, C⟩ s A B := by
-        exact IsRedirectedEdge_sender s A B C (Ne.symm hAC)
+        exact is_redirected_edge_sender s A B C (Ne.symm hAC)
       have hTrace :
           lookupD D' ⟨s, B, C⟩ = (lookupD D ⟨s, A, C⟩).map (renameValTypeRole s A B) := by
         exact hDeleg.trace_preserved _ _ hRedir
@@ -344,7 +344,7 @@ theorem delegate_redirected_edge_coherent
             exact (False.elim this)
         | some L' =>
             have hRen :=
-              Consume_delegate (s:=s) (A:=A) (B:=B) (L:=Lrecv0)
+              consume_delegate (s:=s) (A:=A) (B:=B) (L:=Lrecv0)
                 (ts:=lookupD D ⟨s, A, C⟩) (L':=L') hCons
             simp [hRen]
       refine ⟨renameLocalTypeRole s A B hDeleg.A_type, hDeleg.B_added, ?_⟩
@@ -375,7 +375,7 @@ theorem delegate_redirected_edge_coherent_receiver
     simpa [hOther, hGsender0]
   -- Redirected trace for (C,A) → (C,B).
   have hRedir : IsRedirectedEdge ⟨s, C, A⟩ ⟨s, C, B⟩ s A B := by
-    exact IsRedirectedEdge_receiver s A B C hCA
+    exact is_redirected_edge_receiver s A B C hCA
   have hTrace :
       lookupD D' ⟨s, C, B⟩ = (lookupD D ⟨s, C, A⟩).map (renameValTypeRole s A B) := by
     exact hDeleg.trace_preserved _ _ hRedir
@@ -389,7 +389,7 @@ theorem delegate_redirected_edge_coherent_receiver
           simpa [hCons] using hConsumeOld
         exact (False.elim this)
     | some L' =>
-        have hRen := Consume_rename_unrelated (s:=s) (A:=A) (B:=B) (from_:=C)
+        have hRen := consume_rename_unrelated (s:=s) (A:=A) (B:=B) (from_:=C)
           (L:=hDeleg.A_type) (ts:=lookupD D ⟨s, C, A⟩) (L':=L') hCA hCB hCons
         simp [hRen]
   refine ⟨renameLocalTypeRole s A B Lsender0, hSenderLookup, ?_⟩
@@ -413,7 +413,7 @@ theorem delegate_redirected_edge_coherent_self
   -- Consume condition on the original self-edge.
   have hConsumeOld :
       (Consume A hDeleg.A_type (lookupD D ⟨s, A, A⟩)).isSome := by
-    exact EdgeCoherent_consume_of_receiver hCohOld hDeleg.A_lookup
+    exact edge_coherent_consume_of_receiver hCohOld hDeleg.A_lookup
   -- Redirected trace for (A,A) → (B,B).
   have hRedir : IsRedirectedEdge ⟨s, A, A⟩ ⟨s, B, B⟩ s A B := by
     simp [IsRedirectedEdge, redirectEdge]
@@ -431,7 +431,7 @@ theorem delegate_redirected_edge_coherent_self
         exact (False.elim this)
     | some L' =>
         have hRen :=
-          Consume_delegate (s:=s) (A:=A) (B:=B) (L:=hDeleg.A_type)
+          consume_delegate (s:=s) (A:=A) (B:=B) (L:=hDeleg.A_type)
             (ts:=lookupD D ⟨s, A, A⟩) (L':=L') hCons
         simp [hRen]
   refine ⟨renameLocalTypeRole s A B hDeleg.A_type, hDeleg.B_added, ?_⟩

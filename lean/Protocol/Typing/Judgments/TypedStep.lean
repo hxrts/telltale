@@ -29,7 +29,7 @@ open scoped Classical
 section
 
 -- Parallel Index Irrelevance
-theorem HasTypeProcPreOut_par_nG_irrel
+theorem has_type_proc_pre_out_par_n_g_irrel
     {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG nG'} :
     HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin Wfin Δfin →
     HasTypeProcPreOut Ssh Sown G (.par nS nG' P Q) Sfin Gfin Wfin Δfin := by
@@ -229,7 +229,7 @@ inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffe
 -- Parallel Inversion View
 
 /-- Inversion view for `TypedStep` on parallel processes. -/
-theorem TypedStep_par_inv
+theorem typed_step_par_inv
     {G D Ssh Sown store bufs P Q nS nG G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs (.par nS nG P Q) G' D' Sown' store' bufs' P' →
       (∃ pw : ParWitness Sown.left G nS, ∃ D₁ D₂ G₁' D₁' S₁' Pleft',

@@ -85,27 +85,27 @@ def sidLt (v : Value) (n : SessionId) : Prop :=
   ∀ sid, v.containsSid sid → sid < n
 
 /-- simdLt for unit is trivial. -/
-theorem sidLt_unit (n : SessionId) : Value.unit.sidLt n := by
+theorem sid_lt_unit (n : SessionId) : Value.unit.sidLt n := by
   intro sid hcontains
   simp only [containsSid, Bool.false_eq_true] at hcontains
 
 /-- sidLt for bool is trivial. -/
-theorem sidLt_bool (b : Bool) (n : SessionId) : (Value.bool b).sidLt n := by
+theorem sid_lt_bool (b : Bool) (n : SessionId) : (Value.bool b).sidLt n := by
   intro sid hcontains
   simp only [containsSid, Bool.false_eq_true] at hcontains
 
 /-- sidLt for nat is trivial. -/
-theorem sidLt_nat (m : Nat) (n : SessionId) : (Value.nat m).sidLt n := by
+theorem sid_lt_nat (m : Nat) (n : SessionId) : (Value.nat m).sidLt n := by
   intro sid hcontains
   simp only [containsSid, Bool.false_eq_true] at hcontains
 
 /-- sidLt for string is trivial. -/
-theorem sidLt_string (s : String) (n : SessionId) : (Value.string s).sidLt n := by
+theorem sid_lt_string (s : String) (n : SessionId) : (Value.string s).sidLt n := by
   intro sid hcontains
   simp only [containsSid, Bool.false_eq_true] at hcontains
 
 /-- sidLt for chan. -/
-theorem sidLt_chan (e : Endpoint) (n : SessionId) (h : e.sid < n) : (Value.chan e).sidLt n := by
+theorem sid_lt_chan (e : Endpoint) (n : SessionId) (h : e.sid < n) : (Value.chan e).sidLt n := by
   intro sid hcontains
   simp only [containsSid, beq_iff_eq] at hcontains
   rw [← hcontains]
@@ -182,11 +182,11 @@ end LinCtx
 def Buffer.sidLt (buf : List Value) (n : SessionId) : Prop :=
   ∀ v, v ∈ buf → v.sidLt n
 
-theorem Buffer.sidLt_nil (n : SessionId) : Buffer.sidLt [] n := by
+theorem Buffer.sid_lt_nil (n : SessionId) : Buffer.sidLt [] n := by
   intro v hv
   simp at hv
 
-theorem Buffer.sidLt_cons (v : Value) (buf : List Value) (n : SessionId)
+theorem Buffer.sid_lt_cons (v : Value) (buf : List Value) (n : SessionId)
     (hv : v.sidLt n) (hbuf : Buffer.sidLt buf n) : Buffer.sidLt (v :: buf) n := by
   intro w hw
   simp only [List.mem_cons] at hw
@@ -194,7 +194,7 @@ theorem Buffer.sidLt_cons (v : Value) (buf : List Value) (n : SessionId)
   | inl h => rw [h]; exact hv
   | inr h => exact hbuf w h
 
-theorem Buffer.sidLt_append (buf₁ buf₂ : List Value) (n : SessionId)
+theorem Buffer.sid_lt_append (buf₁ buf₂ : List Value) (n : SessionId)
     (h₁ : Buffer.sidLt buf₁ n) (h₂ : Buffer.sidLt buf₂ n) :
     Buffer.sidLt (buf₁ ++ buf₂) n := by
   intro v hv

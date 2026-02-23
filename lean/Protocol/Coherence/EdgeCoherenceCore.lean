@@ -47,7 +47,7 @@ For role p's view:
 
 ## Proof Technique: Edge Case Analysis
 
-The key preservation proofs (`Coherent_send_preserved`, `Coherent_recv_preserved`)
+The key preservation proofs (`coherent_send_preserved`, `coherent_recv_preserved`)
 proceed by case analysis on which edge we're checking coherence for:
 
 1. **e = updated edge**: The sender's/receiver's local type changed, trace changed
@@ -97,14 +97,14 @@ def Coherent (G : GEnv) (D : DEnv) : Prop :=
 /-! ## Small Helpers -/
 
 /-- ActiveEdge from concrete sender/receiver lookups. -/
-theorem ActiveEdge_of_endpoints {G : GEnv} {e : Edge} {Lsender Lrecv : LocalType}
+theorem active_edge_of_endpoints {G : GEnv} {e : Edge} {Lsender Lrecv : LocalType}
     (hGsender : lookupG G { sid := e.sid, role := e.sender } = some Lsender)
     (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
     ActiveEdge G e := by
   simp [ActiveEdge, hGsender, hGrecv]
 
 /-- If an edge is active after updating one endpoint, it was already active before. -/
-theorem ActiveEdge_updateG_inv {G : GEnv} {e : Edge} {ep : Endpoint} {L : LocalType} :
+theorem active_edge_update_g_inv {G : GEnv} {e : Edge} {ep : Endpoint} {L : LocalType} :
     ActiveEdge (updateG G ep L) e →
     (lookupG G ep).isSome →
     ActiveEdge G e := by
@@ -117,7 +117,7 @@ theorem ActiveEdge_updateG_inv {G : GEnv} {e : Edge} {ep : Endpoint} {L : LocalT
     · have hNe : ep ≠ { sid := e.sid, role := e.sender } := by
         exact Ne.symm hEq
       have hLs' : lookupG G { sid := e.sid, role := e.sender } = some Ls := by
-        simpa [lookupG_update_neq _ _ _ _ hNe] using hLs
+        simpa [lookup_g_update_neq _ _ _ _ hNe] using hLs
       exact (Option.isSome_iff_exists).2 ⟨Ls, hLs'⟩
   have hRecv' : (lookupG G { sid := e.sid, role := e.receiver }).isSome := by
     rcases (Option.isSome_iff_exists).1 hRecv with ⟨Lr, hLr⟩
@@ -126,30 +126,30 @@ theorem ActiveEdge_updateG_inv {G : GEnv} {e : Edge} {ep : Endpoint} {L : LocalT
     · have hNe : ep ≠ { sid := e.sid, role := e.receiver } := by
         exact Ne.symm hEq
       have hLr' : lookupG G { sid := e.sid, role := e.receiver } = some Lr := by
-        simpa [lookupG_update_neq _ _ _ _ hNe] using hLr
+        simpa [lookup_g_update_neq _ _ _ _ hNe] using hLr
       exact (Option.isSome_iff_exists).2 ⟨Lr, hLr'⟩
   exact ⟨hSender', hRecv'⟩
 
 /-! ## Coherence Extraction Lemmas -/
 
 /-- Extract EdgeCoherent from Coherent given sender/receiver lookups. -/
-theorem Coherent_edge_of_endpoints {G : GEnv} {D : DEnv} {e : Edge}
+theorem coherent_edge_of_endpoints {G : GEnv} {D : DEnv} {e : Edge}
     {Lsender Lrecv : LocalType}
     (hCoh : Coherent G D)
     (hGsender : lookupG G { sid := e.sid, role := e.sender } = some Lsender)
     (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
     EdgeCoherent G D e := by
-  exact hCoh e (ActiveEdge_of_endpoints hGsender hGrecv)
+  exact hCoh e (active_edge_of_endpoints hGsender hGrecv)
 
 /-- Coherent gives EdgeCoherent for any active edge. -/
-theorem Coherent_edge_any {G : GEnv} {D : DEnv} (hCoh : Coherent G D) {e : Edge}
+theorem coherent_edge_any {G : GEnv} {D : DEnv} (hCoh : Coherent G D) {e : Edge}
     (hActive : ActiveEdge G e) :
     EdgeCoherent G D e := by
   exact hCoh e hActive
 
 /-- Extract EdgeCoherent content from Coherent given receiver lookup and active edge.
     Returns sender exists and consume succeeds. -/
-theorem Coherent_edge_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
+theorem coherent_edge_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
     (hCoh : Coherent G D)
     (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv)
     (hActive : ActiveEdge G e := by simp [ActiveEdge, hGrecv, *]) :
@@ -159,7 +159,7 @@ theorem Coherent_edge_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : Loca
   exact hCoh e hActive Lrecv hGrecv
 
 /-- Extract the consume condition from `EdgeCoherent` given a receiver lookup. -/
-theorem EdgeCoherent_consume_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
+theorem edge_coherent_consume_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
     (hCoh : EdgeCoherent G D e)
     (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
     (Consume e.sender Lrecv (lookupD D e)).isSome := by
@@ -167,7 +167,7 @@ theorem EdgeCoherent_consume_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv
   exact hConsume
 
 /-- Extract the sender lookup guaranteed by `EdgeCoherent` given a receiver lookup. -/
-theorem EdgeCoherent_sender_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
+theorem edge_coherent_sender_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
     (hCoh : EdgeCoherent G D e)
     (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
     ∃ Lsender, lookupG G { sid := e.sid, role := e.sender } = some Lsender := by
@@ -315,7 +315,7 @@ def RoleComplete (G : GEnv) : Prop :=
     | none => True
 
 /-- Role-completeness specialized to recv types. -/
-theorem RoleComplete_recv
+theorem role_complete_recv
     {G : GEnv} {e : Endpoint} {r : Role} {T : ValType} {L : LocalType}
     (hComplete : RoleComplete G)
     (hG : lookupG G e = some (.recv r T L)) :
@@ -324,7 +324,7 @@ theorem RoleComplete_recv
   simpa [RoleComplete, LocalType.targetRole?] using hComplete e (.recv r T L) hG
 
 /-- Role-completeness specialized to branch types. -/
-theorem RoleComplete_branch
+theorem role_complete_branch
     {G : GEnv} {e : Endpoint} {r : Role} {bs : List (Label × LocalType)}
     (hComplete : RoleComplete G)
     (hG : lookupG G e = some (.branch r bs)) :

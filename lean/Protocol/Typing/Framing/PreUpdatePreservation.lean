@@ -27,7 +27,7 @@ section
 
 /-! ## Pre-Update Typing Preservation -/
 
-private lemma length_updateG_preserved_pu
+private lemma length_update_g_preserved_pu
     {G : GEnv} {e : Endpoint} {L L' : LocalType} :
     lookupG G e = some L →
     (updateG G e L').length = G.length := by
@@ -50,7 +50,7 @@ private lemma length_updateG_preserved_pu
 
 /-! ## TypedStep Preserves GEnv Length -/
 
-private lemma TypedStep_G_length_pu
+private lemma typed_step_g_length_pu
     {G G' : GEnv} {D D' : DEnv} {Ssh : SEnv} {Sown Sown' : OwnedEnv}
     {store store' : VarStore} {bufs bufs' : Buffers} {P P' : Process} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
@@ -61,25 +61,25 @@ private lemma TypedStep_G_length_pu
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
       have hLen :
           (updateG G e L).length = G.length :=
-        length_updateG_preserved_pu (G:=G) (e:=e) (L:=.send target T L) (L':=L) hG
+        length_update_g_preserved_pu (G:=G) (e:=e) (L:=.send target T L) (L':=L) hG
       simpa [hGout] using hLen
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
       have hLen :
           (updateG G e L).length = G.length :=
-        length_updateG_preserved_pu (G:=G) (e:=e) (L:=.recv source T L) (L':=L) hG
+        length_update_g_preserved_pu (G:=G) (e:=e) (L:=.recv source T L) (L':=L) hG
       simpa [hGout] using hLen
   | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
       have hLen :
           (updateG G e L).length = G.length :=
-        length_updateG_preserved_pu (G:=G) (e:=e) (L:=.select target bs) (L':=L) hG
+        length_update_g_preserved_pu (G:=G) (e:=e) (L:=.select target bs) (L':=L) hG
       simpa [hGout] using hLen
   | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
       have hLen :
           (updateG G e L).length = G.length :=
-        length_updateG_preserved_pu (G:=G) (e:=e) (L:=.branch source bs) (L':=L) hG
+        length_update_g_preserved_pu (G:=G) (e:=e) (L:=.branch source bs) (L':=L) hG
       simpa [hGout] using hLen
   | assign hv hSout hStoreOut =>
       simp
@@ -100,7 +100,7 @@ private lemma TypedStep_G_length_pu
 
 /-- Pre-out typing is preserved by a single TypedStep: the remaining process
     still leads to the same final environments. -/
-private theorem HasTypeProcPreOut_preserved_sub
+private theorem has_type_proc_pre_out_preserved_sub
     {Gstore G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
     HasTypeProcPreOut_preserved_sub_middle_frame_spec →
     StoreTyped Gstore (SEnvAll Ssh Sown) store →
@@ -112,11 +112,11 @@ private theorem HasTypeProcPreOut_preserved_sub
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G' P' Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
   intro hMiddle hStore hDisjShAll hOwnDisj hTS hPre hDisjRightFin
-  have hDisjFrame : DisjointG G ([] : GEnv) := DisjointG_right_empty G
+  have hDisjFrame : DisjointG G ([] : GEnv) := disjoint_g_right_empty G
   have hEq : G = G ++ ([] : GEnv) := by simp
   have hEq' : G' = G' ++ ([] : GEnv) := by simp
   simpa using
-    (HasTypeProcPreOut_preserved_sub_left_frame
+    (has_type_proc_pre_out_preserved_sub_left_frame
       (Gstore:=Gstore) (G₁:=G) (G₂:=[]) (G:=G) (G':=G') (G₁':=G')
       (D:=D) (Ssh:=Ssh) (Sown:=Sown) (store:=store) (bufs:=bufs) (P:=P)
       (D':=D') (Sown':=Sown') (store':=store') (bufs':=bufs') (P':=P')
@@ -127,7 +127,7 @@ private theorem HasTypeProcPreOut_preserved_sub
 
 /-- Pre-out typing is preserved by a single TypedStep: the remaining process
     still leads to the same final environments. -/
-theorem HasTypeProcPreOut_preserved
+theorem has_type_proc_pre_out_preserved
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
     HasTypeProcPreOut_preserved_sub_middle_frame_spec →
     StoreTyped G (SEnvAll Ssh Sown) store →
@@ -139,7 +139,7 @@ theorem HasTypeProcPreOut_preserved
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G' P' Sfin Gfin W' Δ' := by
   intro hMiddle hStore hDisjShAll hOwnDisj hTS hPre hDisjRightFin
   obtain ⟨W', Δ', hPre', _, _⟩ :=
-    HasTypeProcPreOut_preserved_sub hMiddle hStore hDisjShAll hOwnDisj hTS hPre hDisjRightFin
+    has_type_proc_pre_out_preserved_sub hMiddle hStore hDisjShAll hOwnDisj hTS hPre hDisjRightFin
   exact ⟨W', Δ', hPre'⟩
 
 

@@ -96,7 +96,7 @@ def renameGEnvRole (s : SessionId) (A B : Role) (G : GEnv) : GEnv :=
 /-- Session renaming commutes with role renaming on value types.
     The key insight is that session renaming changes session IDs while
     role renaming changes roles within a fixed session - these are orthogonal. -/
-theorem renameValType_renameValTypeRole_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (T : ValType) :
+theorem rename_val_type_rename_val_type_role_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (T : ValType) :
     renameValType ρ (renameValTypeRole s A B T) = renameValTypeRole (ρ.f s) A B (renameValType ρ T) := by
   induction T with
   | unit => rfl
@@ -118,7 +118,7 @@ theorem renameValType_renameValTypeRole_comm (ρ : SessionRenaming) (s : Session
 
 /-! ## Size Helper for Branch Recursion -/
 /-- Size lemma for branch list elements. -/
-private theorem sizeOf_lt_branch (l : Label) (L : LocalType) (tl : List (Label × LocalType)) :
+private theorem size_of_lt_branch (l : Label) (L : LocalType) (tl : List (Label × LocalType)) :
     sizeOf L < sizeOf ((l, L) :: tl) ∧ sizeOf tl < sizeOf ((l, L) :: tl) := by
   simp only [List.cons.sizeOf_spec, Prod.mk.sizeOf_spec]
   constructor <;> omega
@@ -127,28 +127,28 @@ mutual
 
 -- Local/Branch Commutation under Session+Role Renaming
 /-- Session renaming commutes with role renaming on local types. -/
-theorem renameLocalType_renameLocalTypeRole_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (L : LocalType) :
+theorem rename_local_type_rename_local_type_role_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (L : LocalType) :
     renameLocalType ρ (renameLocalTypeRole s A B L) =
       renameLocalTypeRole (ρ.f s) A B (renameLocalType ρ L) := by
   cases L with
   | send r T L =>
     simp only [renameLocalType, renameLocalTypeRole]
     congr 1
-    · exact renameValType_renameValTypeRole_comm ρ s A B T
-    · exact renameLocalType_renameLocalTypeRole_comm ρ s A B L
+    · exact rename_val_type_rename_val_type_role_comm ρ s A B T
+    · exact rename_local_type_rename_local_type_role_comm ρ s A B L
   | recv r T L =>
     simp only [renameLocalType, renameLocalTypeRole]
     congr 1
-    · exact renameValType_renameValTypeRole_comm ρ s A B T
-    · exact renameLocalType_renameLocalTypeRole_comm ρ s A B L
+    · exact rename_val_type_rename_val_type_role_comm ρ s A B T
+    · exact rename_local_type_rename_local_type_role_comm ρ s A B L
   | select r bs =>
     simp only [renameLocalType, renameLocalTypeRole]
     congr 1
-    exact renameBranches_renameBranchesRole_comm ρ s A B bs
+    exact rename_branches_rename_branches_role_comm ρ s A B bs
   | branch r bs =>
     simp only [renameLocalType, renameLocalTypeRole]
     congr 1
-    exact renameBranches_renameBranchesRole_comm ρ s A B bs
+    exact rename_branches_rename_branches_role_comm ρ s A B bs
   | end_ =>
     simp [renameLocalType, renameLocalTypeRole]
   | var n =>
@@ -156,11 +156,11 @@ theorem renameLocalType_renameLocalTypeRole_comm (ρ : SessionRenaming) (s : Ses
   | mu L =>
     simp only [renameLocalType, renameLocalTypeRole]
     congr 1
-    exact renameLocalType_renameLocalTypeRole_comm ρ s A B L
+    exact rename_local_type_rename_local_type_role_comm ρ s A B L
 termination_by sizeOf L
 
 /-- Session renaming commutes with role renaming on branches. -/
-theorem renameBranches_renameBranchesRole_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (bs : List (Label × LocalType)) :
+theorem rename_branches_rename_branches_role_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (bs : List (Label × LocalType)) :
     renameBranches ρ (renameBranchesRole s A B bs) =
       renameBranchesRole (ρ.f s) A B (renameBranches ρ bs) := by
   cases bs with
@@ -172,8 +172,8 @@ theorem renameBranches_renameBranchesRole_comm (ρ : SessionRenaming) (s : Sessi
       simp only [renameBranches, renameBranchesRole]
       congr 1
       · congr 1
-        exact renameLocalType_renameLocalTypeRole_comm ρ s A B L
-      · exact renameBranches_renameBranchesRole_comm ρ s A B tl
+        exact rename_local_type_rename_local_type_role_comm ρ s A B L
+      · exact rename_branches_rename_branches_role_comm ρ s A B tl
 /- ## Structured Block 1 -/
 termination_by sizeOf bs
 
@@ -181,7 +181,7 @@ end
 
 /-! ## Endpoint Commutation under Session+Role Renaming -/
 /-- Session renaming commutes with role renaming on endpoints. -/
-theorem renameEndpoint_renameEndpointRole_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (ep : Endpoint) :
+theorem rename_endpoint_rename_endpoint_role_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (ep : Endpoint) :
     renameEndpoint ρ (renameEndpointRole s A B ep) = renameEndpointRole (ρ.f s) A B (renameEndpoint ρ ep) := by
   simp only [renameEndpoint, renameEndpointRole]
   by_cases h : ep.sid = s
@@ -193,7 +193,7 @@ theorem renameEndpoint_renameEndpointRole_comm (ρ : SessionRenaming) (s : Sessi
 
 /-! ## Edge Commutation under Session+Role Renaming -/
 /-- Session renaming commutes with role renaming on edges. -/
-theorem renameEdge_renameEdgeRole_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (e : Edge) :
+theorem rename_edge_rename_edge_role_comm (ρ : SessionRenaming) (s : SessionId) (A B : Role) (e : Edge) :
     renameEdge ρ (renameEdgeRole s A B e) = renameEdgeRole (ρ.f s) A B (renameEdge ρ e) := by
   simp only [renameEdge, renameEdgeRole]
   by_cases h : e.sid = s

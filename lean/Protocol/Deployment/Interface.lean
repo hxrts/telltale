@@ -259,7 +259,7 @@ def initMonitorState (p : DeployedProtocol) : MonitorState where
   supply := p.sessionId + 1
 
 /-- The initial monitor state is well-typed. -/
-theorem initMonitorState_wellTyped (p : DeployedProtocol) :
+theorem init_monitor_state_well_typed (p : DeployedProtocol) :
     WTMon p.initMonitorState := by
   constructor
   · exact p.coherence_cert
@@ -281,10 +281,10 @@ theorem initMonitorState_wellTyped (p : DeployedProtocol) :
     simpa [DeployedProtocol.initMonitorState] using p.supply_fresh_G_cert e S hIn
 
 /-- The initial monitor state is well-typed and role-complete. -/
-theorem initMonitorState_wellTyped_complete (p : DeployedProtocol) :
+theorem init_monitor_state_well_typed_complete (p : DeployedProtocol) :
     WTMonComplete p.initMonitorState := by
   -- Combine the existing WTMon proof with the role-complete certificate.
-  refine ⟨initMonitorState_wellTyped p, ?_⟩
+  refine ⟨init_monitor_state_well_typed p, ?_⟩
   -- Role completeness follows directly from the deployment bundle.
   simpa [DeployedProtocol.initMonitorState] using p.roleComplete_cert
 
@@ -355,7 +355,7 @@ def mkDefaultInterface (roles : RoleSet) (sid : SessionId) (localTypes : Role �
 /-! ## Initial Environment Certificates -/
 
 /-- mkInitGEnv lookup returns the local type for roles in the set. -/
-theorem mkInitGEnv_lookup (roles : RoleSet) (sid : SessionId)
+theorem mk_init_g_env_lookup (roles : RoleSet) (sid : SessionId)
     (localTypes : Role → LocalType) (r : Role) (hMem : r ∈ roles) :
     lookupG (mkInitGEnv roles sid localTypes) { sid := sid, role := r } =
       some (localTypes r) := by
@@ -379,12 +379,12 @@ theorem mkInitGEnv_lookup (roles : RoleSet) (sid : SessionId)
       | inl h => exact absurd h.symm heq
       | inr h => exact ih h
 
-theorem mkInitGEnv_sessionsOf_of_mem (roles : RoleSet) (sid : SessionId)
+theorem mk_init_g_env_sessions_of_of_mem (roles : RoleSet) (sid : SessionId)
     (localTypes : Role → LocalType) (r : Role) (hMem : r ∈ roles) :
     sid ∈ SessionsOf (mkInitGEnv roles sid localTypes) :=
-  ⟨{ sid := sid, role := r }, localTypes r, mkInitGEnv_lookup roles sid localTypes r hMem, rfl⟩
+  ⟨{ sid := sid, role := r }, localTypes r, mk_init_g_env_lookup roles sid localTypes r hMem, rfl⟩
 
-theorem mkInitBufs_lookup_mem (roles : RoleSet) (sid : SessionId)
+theorem mk_init_bufs_lookup_mem (roles : RoleSet) (sid : SessionId)
     (e : Edge) (buf : Buffer)
     (h : (mkInitBufs roles sid).lookup e = some buf) :
     e ∈ RoleSet.allEdges sid roles := by
@@ -406,26 +406,26 @@ theorem mkInitBufs_lookup_mem (roles : RoleSet) (sid : SessionId)
 
 /-! ## Initial Consistency Certificates -/
 
-theorem mkInit_bConsistent (roles : RoleSet) (sid : SessionId)
+theorem mk_init_b_consistent (roles : RoleSet) (sid : SessionId)
     (localTypes : Role → LocalType) :
     BConsistent (mkInitGEnv roles sid localTypes) (mkInitBufs roles sid) := by
   intro e buf hLookup
   have hMem : e ∈ RoleSet.allEdges sid roles :=
-    mkInitBufs_lookup_mem (roles:=roles) (sid:=sid) (e:=e) (buf:=buf) hLookup
-  have hSid : e.sid = sid := RoleSet.allEdges_sid sid roles e hMem
-  have hSender : e.sender ∈ roles := RoleSet.allEdges_sender_mem sid roles e hMem
+    mk_init_bufs_lookup_mem (roles:=roles) (sid:=sid) (e:=e) (buf:=buf) hLookup
+  have hSid : e.sid = sid := RoleSet.all_edges_sid sid roles e hMem
+  have hSender : e.sender ∈ roles := RoleSet.all_edges_sender_mem sid roles e hMem
   have hSess : sid ∈ SessionsOf (mkInitGEnv roles sid localTypes) :=
-    mkInitGEnv_sessionsOf_of_mem roles sid localTypes e.sender hSender
+    mk_init_g_env_sessions_of_of_mem roles sid localTypes e.sender hSender
   simpa [hSid] using hSess
 
 
-theorem mkInit_bufsDom (roles : RoleSet) (sid : SessionId) :
+theorem mk_init_bufs_dom (roles : RoleSet) (sid : SessionId) :
     BufsDom (mkInitBufs roles sid) (mkInitDEnv roles sid) := by
   intro e _hNone
   simp [mkInitDEnv, initDEnv]
 
 
-theorem mkInit_dConsistent (roles : RoleSet) (sid : SessionId) :
+theorem mk_init_d_consistent (roles : RoleSet) (sid : SessionId) :
     DConsistent (mkInitGEnv roles sid (fun _ => LocalType.end_)) (mkInitDEnv roles sid) := by
   intro s hs
   rcases hs with ⟨e, ts, hFind, hSid⟩

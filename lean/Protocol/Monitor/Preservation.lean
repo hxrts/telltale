@@ -15,7 +15,7 @@ monitor to the metatheory.
 
 Solution Structure. We prove:
 1. `MonStep_preserves_coherent`: coherence preserved by monitor steps
-2. `MonStep_preserves_WTMon`: full well-typedness preservation
+2. `mon_step_preserves_wt_mon`: full well-typedness preservation
 3. Connection to TypedStep for soundness
 The proof uses the coherence preservation lemmas from Protocol.Coherence.
 -/
@@ -42,7 +42,7 @@ The `MonitorState` structure contains:
 `MonStep` is the judgment for valid monitor transitions. Each constructor
 corresponds to a protocol action (send, recv, select, branch, newSession).
 
-The key theorem `MonStep_preserves_WTMon` states that valid transitions
+The key theorem `mon_step_preserves_wt_mon` states that valid transitions
 preserve the well-typedness invariant.
 
 ## Untrusted Code Interface
@@ -86,14 +86,14 @@ private theorem lin_valid_after_consume_produce
       subst hS
       simp
   | inr hTail =>
-      have hOld : (e', S') ∈ Lin := mem_of_consumeToken Lin lin' e e' Lold S' hConsume hTail
+      have hOld : (e', S') ∈ Lin := mem_of_consume_token Lin lin' e e' Lold S' hConsume hTail
       have hLookupOld : lookupG G e' = some S' := hLinValid e' S' hOld
       have hNe : e' ≠ e := by
         intro hEq
         have hMemE : (e, S') ∈ lin' := by
           simpa [hEq] using hTail
-        exact consumeToken_not_mem Lin lin' e Lold hLinUnique hConsume S' hMemE
-      simpa [lookupG_update_neq G e e' Lnew hNe.symm] using hLookupOld
+        exact consume_token_not_mem Lin lin' e Lold hLinUnique hConsume S' hMemE
+      simpa [lookup_g_update_neq G e e' Lnew hNe.symm] using hLookupOld
 
 -- Linear Pairwise/Freshness Helper Lemmas
 private theorem lin_unique_after_consume_produce
@@ -102,18 +102,18 @@ private theorem lin_unique_after_consume_produce
     (hConsume : LinCtx.consumeToken Lin e = some (lin', Lold)) :
     (LinCtx.produceToken lin' e Lnew).Pairwise (fun a b => a.1 ≠ b.1) := by
   have hTailUnique : lin'.Pairwise (fun a b => a.1 ≠ b.1) :=
-    consumeToken_pairwise Lin lin' e Lold hLinUnique hConsume
+    consume_token_pairwise Lin lin' e Lold hLinUnique hConsume
   have hNotIn : ∀ S', (e, S') ∉ lin' := by
     intro S'
-    exact consumeToken_not_mem Lin lin' e Lold hLinUnique hConsume S'
-  exact produceToken_pairwise lin' e Lnew hTailUnique hNotIn
+    exact consume_token_not_mem Lin lin' e Lold hLinUnique hConsume S'
+  exact produce_token_pairwise lin' e Lnew hTailUnique hNotIn
 
 private theorem endpoint_sid_fresh_of_consume
     {Lin lin' : LinCtx} {e : Endpoint} {Lold : LocalType} {supply : SessionId}
     (hFresh : ∀ e' S', (e', S') ∈ Lin → e'.sid < supply)
     (hConsume : LinCtx.consumeToken Lin e = some (lin', Lold)) :
     e.sid < supply := by
-  have hIn : (e, Lold) ∈ Lin := consumeToken_endpoint_in_ctx Lin lin' e Lold hConsume
+  have hIn : (e, Lold) ∈ Lin := consume_token_endpoint_in_ctx Lin lin' e Lold hConsume
   exact hFresh e Lold hIn
 
 -- Linear Supply Freshness Transport
@@ -131,10 +131,10 @@ private theorem lin_supply_fresh_after_consume_produce
       subst hE
       exact endpoint_sid_fresh_of_consume hFresh hConsume
   | inr hTail =>
-      exact consumeToken_preserves_supply_fresh Lin lin' e Lold supply hFresh hConsume e' S' hTail
+      exact consume_token_preserves_supply_fresh Lin lin' e Lold supply hFresh hConsume e' S' hTail
 
 -- Main WTMon Preservation Theorem
-theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v : Value)
+theorem mon_step_preserves_wt_mon (ms ms' : MonitorState) (act : ProtoAction) (v : Value)
     (hStep : MonStep ms act v ms')
     (hWTc : WTMonComplete ms) :
     WTMon ms' := by
@@ -145,12 +145,12 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
   case send hG hRecvReady hConsume hv =>
       rename_i e target T L lin'
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-      · exact Coherent_send_preserved ms.G ms.D e target T L hCoh hG hRecvReady
-      · exact HeadCoherent_send_preserved ms.G ms.D e target T L hHead hCoh hG hRecvReady
+      · exact coherent_send_preserved ms.G ms.D e target T L hCoh hG hRecvReady
+      · exact head_coherent_send_preserved ms.G ms.D e target T L hHead hCoh hG hRecvReady
       ·
-        exact ValidLabels_send_preserved ms.G ms.D ms.bufs e target T L v
+        exact valid_labels_send_preserved ms.G ms.D ms.bufs e target T L v
           hValid hCoh hBT hG hRecvReady
-      · exact BuffersTyped_send_preserved ms.G ms.D ms.bufs e target T L v hBT hv hG
+      · exact buffers_typed_send_preserved ms.G ms.D ms.bufs e target T L v hBT hv hG
       ·
         intro e' S' hMem
         exact lin_valid_after_consume_produce
@@ -172,7 +172,7 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
           endpoint_sid_fresh_of_consume
             (Lin:=ms.Lin) (lin':=lin') (e:=e)
             (Lold:=.send target T L) (supply:=ms.supply) hSupplyFresh hConsume
-        exact updateG_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
+        exact update_g_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
   -- WTMon Preservation: Recv Case
   case recv hG hConsume hBuf hv =>
 /- ## Structured Block 2 -/
@@ -181,12 +181,12 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
           (lookupD ms.D { sid := e.sid, sender := source, receiver := e.role }).head? = some T := by
         exact trace_head_from_buffer hBuf hv (hBT { sid := e.sid, sender := source, receiver := e.role })
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-      · exact Coherent_recv_preserved ms.G ms.D e source T L hCoh hG hTrace
-      · exact HeadCoherent_recv_preserved ms.G ms.D e source T L hHead hCoh hG hTrace
+      · exact coherent_recv_preserved ms.G ms.D e source T L hCoh hG hTrace
+      · exact head_coherent_recv_preserved ms.G ms.D e source T L hHead hCoh hG hTrace
       ·
-        exact ValidLabels_recv_preserved ms.G ms.D ms.bufs e source T L v vs
+        exact valid_labels_recv_preserved ms.G ms.D ms.bufs e source T L v vs
           hValid hCoh hBT hBuf hv hG
-      · exact BuffersTyped_recv_preserved ms.G ms.D ms.bufs e source T L v vs hBT hBuf hv hG
+      · exact buffers_typed_recv_preserved ms.G ms.D ms.bufs e source T L v vs hBT hBuf hv hG
       ·
         intro e' S' hMem
         exact lin_valid_after_consume_produce
@@ -208,17 +208,17 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
           endpoint_sid_fresh_of_consume
             (Lin:=ms.Lin) (lin':=lin') (e:=e)
             (Lold:=.recv source T L) (supply:=ms.supply) hSupplyFresh hConsume
-        exact updateG_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
+        exact update_g_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
   -- WTMon Preservation: Select Case
   case select hG hFind hRecvReady hConsume =>
       rename_i e target bs ℓ L lin'
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-      · exact Coherent_select_preserved ms.G ms.D e target bs ℓ L hCoh hG hFind hRecvReady
-      · exact HeadCoherent_select_preserved ms.G ms.D e target bs ℓ L hHead hCoh hG hFind hRecvReady
+      · exact coherent_select_preserved ms.G ms.D e target bs ℓ L hCoh hG hFind hRecvReady
+      · exact head_coherent_select_preserved ms.G ms.D e target bs ℓ L hHead hCoh hG hFind hRecvReady
       ·
-        exact ValidLabels_select_preserved ms.G ms.D ms.bufs e target bs ℓ L
+        exact valid_labels_select_preserved ms.G ms.D ms.bufs e target bs ℓ L
           hValid hCoh hBT hG hFind hRecvReady
-      · exact BuffersTyped_select_preserved ms.G ms.D ms.bufs e target bs ℓ L hBT hG hFind
+      · exact buffers_typed_select_preserved ms.G ms.D ms.bufs e target bs ℓ L hBT hG hFind
       ·
         intro e' S' hMem
         exact lin_valid_after_consume_produce
@@ -241,7 +241,7 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
           endpoint_sid_fresh_of_consume
             (Lin:=ms.Lin) (lin':=lin') (e:=e)
             (Lold:=.select target bs) (supply:=ms.supply) hSupplyFresh hConsume
-        exact updateG_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
+        exact update_g_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
   -- WTMon Preservation: Branch Case
   case branch hG hBuf hFind hConsume =>
       rename_i e source bs ℓ L vs lin'
@@ -250,12 +250,12 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
         exact trace_head_from_buffer hBuf (HasTypeVal.string ℓ)
           (hBT { sid := e.sid, sender := source, receiver := e.role })
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-      · exact Coherent_branch_preserved ms.G ms.D e source bs ℓ L hCoh hG hFind hTrace
-      · exact HeadCoherent_branch_preserved ms.G ms.D e source bs ℓ L hHead hCoh hG hFind hTrace
+      · exact coherent_branch_preserved ms.G ms.D e source bs ℓ L hCoh hG hFind hTrace
+      · exact head_coherent_branch_preserved ms.G ms.D e source bs ℓ L hHead hCoh hG hFind hTrace
       ·
-        exact ValidLabels_branch_preserved ms.G ms.D ms.bufs e source bs ℓ L vs
+        exact valid_labels_branch_preserved ms.G ms.D ms.bufs e source bs ℓ L vs
           hValid hCoh hBT hG hFind hBuf
-      · exact BuffersTyped_branch_preserved ms.G ms.D ms.bufs e source bs ℓ L vs hBT hBuf hG hFind
+      · exact buffers_typed_branch_preserved ms.G ms.D ms.bufs e source bs ℓ L vs hBT hBuf hG hFind
       ·
         intro e' S' hMem
         exact lin_valid_after_consume_produce
@@ -277,7 +277,7 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
           endpoint_sid_fresh_of_consume
             (Lin:=ms.Lin) (lin':=lin') (e:=e)
             (Lold:=.branch source bs) (supply:=ms.supply) hSupplyFresh hConsume
-        exact updateG_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
+        exact update_g_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
 
 -- Token Removal Corollary
 theorem token_consumed_removed (ctx : LinCtx) (e : Endpoint) (ctx' : LinCtx) (S : LocalType)
@@ -292,12 +292,12 @@ theorem token_consumed_removed (ctx : LinCtx) (e : Endpoint) (ctx' : LinCtx) (S 
   obtain ⟨⟨e', S'⟩, hMem, hEq⟩ := hContains
   simp only [beq_iff_eq] at hEq
   subst hEq
-  exact consumeToken_not_mem ctx ctx' e S hPairwise h S' hMem
+  exact consume_token_not_mem ctx ctx' e S hPairwise h S' hMem
 
 -- Buffer and DEnv Consistency Helpers
 
 /-- If a session is not in G, buffers have no entry for it. -/
-theorem BConsistent_lookup_none_of_notin_sessions
+theorem b_consistent_lookup_none_of_notin_sessions
     {G : GEnv} {B : Buffers} {e : Edge}
     (hCons : BConsistent G B) (hNot : e.sid ∉ SessionsOf G) :
     B.lookup e = none := by
@@ -309,7 +309,7 @@ theorem BConsistent_lookup_none_of_notin_sessions
       exact (hNot hSid).elim
 
 /-- If a session is not in G, DEnv has no entry for it. -/
-theorem DEnv_find_none_of_notin_sessions
+theorem d_env_find_none_of_notin_sessions
     {G : GEnv} {D : DEnv} {e : Edge}
     (hCons : DConsistent G D) (hNot : e.sid ∉ SessionsOf G) :
     D.find? e = none := by
@@ -322,7 +322,7 @@ theorem DEnv_find_none_of_notin_sessions
       exact (hNot hSidG).elim
 
 /-- BufferTyped is preserved when extending GEnv without changing existing lookups. -/
-theorem BufferTyped_weakenG {G G' : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge} :
+theorem buffer_typed_weaken_g {G G' : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge} :
     BufferTyped G D bufs e →
     (∀ ep L, lookupG G ep = some L → lookupG G' ep = some L) →
     BufferTyped G' D bufs e := by
@@ -330,7 +330,7 @@ theorem BufferTyped_weakenG {G G' : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge}
   rcases hBT with ⟨hLen, hTyping⟩
   refine ⟨hLen, ?_⟩
   intro i hi
-  exact HasTypeVal_mono G G' _ _ (hTyping i hi) hMono
+  exact has_type_val_mono G G' _ _ (hTyping i hi) hMono
 
 -- Session Creation
 
@@ -446,6 +446,6 @@ def MonitorState.newSession (ms : MonitorState) (roles : RoleSet)
 
 /- NOTE:
 `MonitorState.newSession` is currently consumed through certified deployment
-paths (`DeployedProtocol.initMonitorState_wellTyped`), which provide explicit
+paths (`DeployedProtocol.init_monitor_state_well_typed`), which provide explicit
 proof artifacts for initialization. A generic preservation theorem over
 arbitrary `roles/localTypes` is intentionally omitted here. -/

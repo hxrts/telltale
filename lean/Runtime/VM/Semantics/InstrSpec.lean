@@ -38,7 +38,7 @@ section
           SendReady G D  (receiver can accept after consuming current trace)
     Post: G'[senderEp] = L'
           D'[sender→r] = D[sender→r] ++ [T]
-          Coherent G' D'  (from SendReady + Coherent_send_preserved) -/
+          Coherent G' D'  (from SendReady + coherent_send_preserved) -/
 structure SendSpec (G G' : GEnv) (D D' : DEnv)
     (senderEp : Endpoint) (receiverRole : Role) (T : ValType) where
   /-- Sender has the expected send type. -/
@@ -72,7 +72,7 @@ def SendFootprint (senderEp : Endpoint) : Set SessionId :=
           Coherent G D
     Post: G'[receiverEp] = L'
           D'[s→receiver] = rest
-          Coherent G' D'  (from Coherent_recv_preserved) -/
+          Coherent G' D'  (from coherent_recv_preserved) -/
 structure RecvSpec (G G' : GEnv) (D D' : DEnv)
     (receiverEp : Endpoint) (senderRole : Role) (T : ValType) where
   /-- Receiver has the expected recv type. -/

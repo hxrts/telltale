@@ -114,9 +114,9 @@ def diffusionScale [EntropyAPI.AnalysisModel] (n : Nat) : Real :=
 /-- The diffusion scale is positive for positive n.
 
     This ensures we can divide by the scale factor in normalization. -/
-theorem diffusionScale_pos [EntropyAPI.AnalysisLaws] {n : Nat} (hn : 0 < n) :
+theorem diffusion_scale_pos [EntropyAPI.AnalysisLaws] {n : Nat} (hn : 0 < n) :
     0 < diffusionScale n := by
-  simpa [diffusionScale] using EntropyAPI.fluctuationScale_pos hn
+  simpa [diffusionScale] using EntropyAPI.fluctuation_scale_pos hn
 
 /-- Centering commutes with scaling.
 
@@ -127,7 +127,7 @@ theorem centered_div_scale [EntropyAPI.AnalysisLaws] {n : Nat} (hn : 0 < n) (x �
     centered x μ / diffusionScale n = x / diffusionScale n - μ / diffusionScale n := by
   unfold centered
   have hscale : diffusionScale n ≠ 0 := by
-    exact ne_of_gt (diffusionScale_pos hn)
+    exact ne_of_gt (diffusion_scale_pos hn)
   field_simp [hscale]
 
 /-- Variance under diffusion scaling.
@@ -141,7 +141,7 @@ theorem centered_div_scale [EntropyAPI.AnalysisLaws] {n : Nat} (hn : 0 < n) (x �
 theorem variance_scaling [EntropyAPI.AnalysisLaws] (σ : Real) (n : Nat) :
     (σ * diffusionScale n) ^ 2 = σ ^ 2 * n := by
   have hsq : (diffusionScale n) ^ 2 = n := by
-    simpa [diffusionScale] using EntropyAPI.fluctuationScale_sq n
+    simpa [diffusionScale] using EntropyAPI.fluctuation_scale_sq n
   calc
     (σ * diffusionScale n) ^ 2 = σ ^ 2 * (diffusionScale n) ^ 2 := by ring
     _ = σ ^ 2 * n := by

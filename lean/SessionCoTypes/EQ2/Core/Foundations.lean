@@ -16,15 +16,15 @@ Coinductive equality (EQ2) for local types.
 The following definitions form the semantic interface for proofs:
 
 - `EQ2`: coinductive equality (greatest fixed point of EQ2F)
-- `EQ2_refl`: reflexivity of EQ2
-- `EQ2_symm`: symmetry of EQ2
-- `EQ2_trans_wf`: transitivity of EQ2 (via Bisim, in EQ2Props.lean)
+- `eq2_refl`: reflexivity of EQ2
+- `eq2_symm`: symmetry of EQ2
+- `eq2_trans_wf`: transitivity of EQ2 (via Bisim, in EQ2Props.lean)
 - `EQ2_equiv`: equivalence relation instance
-- `EQ2_trans_via_end` / `EQ2_trans_via_var`: constructor-based transitivity helpers
-- `EQ2_unfold_left`: left unfolding preserves EQ2
-- `EQ2_unfold_right`: right unfolding preserves EQ2
-- `EQ2_unfold`: bilateral unfolding preserves EQ2
-- `EQ2_coind`: coinduction principle
+- `eq2_trans_via_end` / `eq2_trans_via_var`: constructor-based transitivity helpers
+- `eq2_unfold_left`: left unfolding preserves EQ2
+- `eq2_unfold_right`: right unfolding preserves EQ2
+- `eq2_unfold`: bilateral unfolding preserves EQ2
+- `eq2_coind`: coinduction principle
 -/
 
 /-
@@ -36,7 +36,7 @@ one-step equality functor.
 Solution Structure. Defines `EQ2F` as the one-step generator matching constructors
 and requiring relation R on continuations. `EQ2` is the greatest fixed point.
 Proves reflexivity by structural induction, symmetry by swapping, and provides
-unfolding lemmas (EQ2_unfold_left/right) allowing mu-unwrapping.
+unfolding lemmas (eq2_unfold_left/right) allowing mu-unwrapping.
 -/
 
 namespace SessionCoTypes.EQ2
@@ -54,7 +54,7 @@ abbrev Rel := LocalTypeR → LocalTypeR → Prop
 def BranchesRel (R : Rel) (bs cs : List BranchR) : Prop :=
   List.Forall₂ (fun a b => a.1 = b.1 ∧ R a.2.2 b.2.2) bs cs
 
-private theorem BranchesRel_mono {R S : Rel}
+private theorem branches_rel_mono {R S : Rel}
     (h : ∀ a b, R a b → S a b) :
     ∀ {bs cs}, BranchesRel R bs cs → BranchesRel S bs cs := by
   intro bs cs hrel
@@ -75,7 +75,7 @@ def EQ2F (R : Rel) : Rel
   | a, .mu t body => R a (body.substitute t (.mu t body))
   | _, _ => False
 
-private theorem EQ2F_mono : Monotone EQ2F := by
+private theorem eq2_f_mono : Monotone EQ2F := by
   intro R S h a b hrel
   cases a <;> cases b <;> simp [EQ2F] at hrel ⊢
   all_goals
@@ -86,49 +86,49 @@ private theorem EQ2F_mono : Monotone EQ2F := by
       | intro h1 h2 =>
         first
         | exact ⟨h _ _ h1, h _ _ h2⟩
-        | exact ⟨h1, BranchesRel_mono (fun _ _ hr => h _ _ hr) h2⟩
-instance : CoinductiveRel Rel EQ2F := ⟨EQ2F_mono⟩
+        | exact ⟨h1, branches_rel_mono (fun _ _ hr => h _ _ hr) h2⟩
+instance : CoinductiveRel Rel EQ2F := ⟨eq2_f_mono⟩
 
 /-! ## Fixed-Point Interface -/
 
 /-- EQ2 as the greatest fixed point of EQ2F. -/
 def EQ2 : Rel :=
-  (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩)
+  (OrderHom.gfp ⟨EQ2F, eq2_f_mono⟩)
 
 /- Shared coinduction aliases (see `CoinductiveRel`). -/
 /-- Alias: EQ2 as gfp via CoinductiveRel. -/
-theorem EQ2_gfp : EQ2 = SessionCoTypes.CoinductiveRel.gfp (F := EQ2F) := rfl
+theorem eq2_gfp : EQ2 = SessionCoTypes.CoinductiveRel.gfp (F := EQ2F) := rfl
 
 /-- Alias: coinduction via CoinductiveRel. -/
-theorem EQ2_coind' {R : Rel} (h : R ≤ EQ2F R) : R ≤ EQ2 := by
+theorem eq2_coind' {R : Rel} (h : R ≤ EQ2F R) : R ≤ EQ2 := by
   simpa [EQ2] using (SessionCoTypes.CoinductiveRel.coind (F := EQ2F) h)
 
 /-- Alias: unfold via CoinductiveRel. -/
-theorem EQ2_unfold' : EQ2 ≤ EQ2F EQ2 := by
-  change (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩) ≤ EQ2F (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩)
+theorem eq2_unfold' : EQ2 ≤ EQ2F EQ2 := by
+  change (OrderHom.gfp ⟨EQ2F, eq2_f_mono⟩) ≤ EQ2F (OrderHom.gfp ⟨EQ2F, eq2_f_mono⟩)
   exact SessionCoTypes.CoinductiveRel.unfold (F := EQ2F)
 
 /-- Alias: fold via CoinductiveRel. -/
-theorem EQ2_fold' : EQ2F EQ2 ≤ EQ2 := by
-  change EQ2F (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩) ≤ (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩)
+theorem eq2_fold' : EQ2F EQ2 ≤ EQ2 := by
+  change EQ2F (OrderHom.gfp ⟨EQ2F, eq2_f_mono⟩) ≤ (OrderHom.gfp ⟨EQ2F, eq2_f_mono⟩)
   exact SessionCoTypes.CoinductiveRel.fold (F := EQ2F)
 
-theorem EQ2_fixed : EQ2F EQ2 = EQ2 := by
-  change EQ2F (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩) = (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩)
+theorem eq2_fixed : EQ2F EQ2 = EQ2 := by
+  change EQ2F (OrderHom.gfp ⟨EQ2F, eq2_f_mono⟩) = (OrderHom.gfp ⟨EQ2F, eq2_f_mono⟩)
   exact SessionCoTypes.CoinductiveRel.gfp_fixed (F := EQ2F)
 
-theorem EQ2_destruct {a b : LocalTypeR} (h : EQ2 a b) : EQ2F EQ2 a b := by
-  have hfix : EQ2F EQ2 = EQ2 := EQ2_fixed
+theorem eq2_destruct {a b : LocalTypeR} (h : EQ2 a b) : EQ2F EQ2 a b := by
+  have hfix : EQ2F EQ2 = EQ2 := eq2_fixed
   exact (Eq.mp (congrArg (fun R => R a b) hfix.symm) h)
 
 /-! ## Unfolding Lemmas -/
 
 /-- Unfold EQ2 on the left. -/
-theorem EQ2_unfold_left {a b : LocalTypeR} (h : EQ2 a b) :
+theorem eq2_unfold_left {a b : LocalTypeR} (h : EQ2 a b) :
     EQ2 (LocalTypeR.unfold a) b := by
   cases a with
   | mu t body =>
-      have h' : EQ2F EQ2 (.mu t body) b := EQ2_destruct h
+      have h' : EQ2F EQ2 (.mu t body) b := eq2_destruct h
       cases b with
       | mu s body' =>
           have hleft : EQ2 (body.substitute t (.mu t body)) (.mu s body') := by
@@ -140,11 +140,11 @@ theorem EQ2_unfold_left {a b : LocalTypeR} (h : EQ2 a b) :
       simpa [LocalTypeR.unfold] using h
 
 /-- Unfold EQ2 on the right. -/
-theorem EQ2_unfold_right {a b : LocalTypeR} (h : EQ2 a b) :
+theorem eq2_unfold_right {a b : LocalTypeR} (h : EQ2 a b) :
     EQ2 a (LocalTypeR.unfold b) := by
   cases b with
   | mu t body =>
-      have h' : EQ2F EQ2 a (.mu t body) := EQ2_destruct h
+      have h' : EQ2F EQ2 a (.mu t body) := eq2_destruct h
       cases a with
       | mu s body' =>
           have hright : EQ2 (.mu s body') (body.substitute t (.mu t body)) := by
@@ -156,57 +156,57 @@ theorem EQ2_unfold_right {a b : LocalTypeR} (h : EQ2 a b) :
       simpa [LocalTypeR.unfold] using h
 
 /-- Unfold EQ2 on the right for n steps. -/
-theorem EQ2_unfold_right_iter {a : LocalTypeR} :
+theorem eq2_unfold_right_iter {a : LocalTypeR} :
     ∀ {b : LocalTypeR}, EQ2 a b → ∀ n, EQ2 a ((LocalTypeR.unfold)^[n] b) := by
   intro b h n
   induction n generalizing b with
   | zero =>
       simpa [Function.iterate_zero, id_eq] using h
   | succ n ih =>
-      have h' : EQ2 a (LocalTypeR.unfold b) := EQ2_unfold_right h
+      have h' : EQ2 a (LocalTypeR.unfold b) := eq2_unfold_right h
       have hstep : EQ2 a ((LocalTypeR.unfold)^[n] (LocalTypeR.unfold b)) := ih h'
       simpa [Function.iterate_succ_apply] using hstep
 
 /-- Unfold EQ2 on both sides. -/
-theorem EQ2_unfold {a b : LocalTypeR} (h : EQ2 a b) :
+theorem eq2_unfold {a b : LocalTypeR} (h : EQ2 a b) :
     EQ2 (LocalTypeR.unfold a) (LocalTypeR.unfold b) := by
-  exact EQ2_unfold_right (EQ2_unfold_left h)
+  exact eq2_unfold_right (eq2_unfold_left h)
 
 /-! ## Coinduction Principle -/
 
 /-- Coinduction principle for EQ2: if R is a post-fixpoint of EQ2F, then R ⊆ EQ2. -/
-theorem EQ2_coind {R : Rel} (h : ∀ a b, R a b → EQ2F R a b) :
+theorem eq2_coind {R : Rel} (h : ∀ a b, R a b → EQ2F R a b) :
     ∀ a b, R a b → EQ2 a b := by
   intro a b hr
   have hle : R ≤ EQ2F R := fun x y hxy => h x y hxy
-  exact (EQ2_coind' hle) a b hr
+  exact (eq2_coind' hle) a b hr
 
 /-! ## Coinduction Up-To
 
 This section provides "coinduction up-to" infrastructure, allowing coinductive proofs
 to "borrow" from the EQ2 relation during intermediate steps. This is essential for
-proving congruence lemmas like EQ2_substitute and EQ2_dual.
+proving congruence lemmas like eq2_substitute and eq2_dual.
 
 The key insight is that if a relation R is a post-fixpoint of EQ2F when extended
 by EQ2, then R is still contained in EQ2. -/
 
 /-- Destruct EQ2 to get EQ2F EQ2 (public version for coinduction up-to proofs). -/
 theorem EQ2.destruct {a b : LocalTypeR} (h : EQ2 a b) : EQ2F EQ2 a b :=
-  EQ2_destruct h
+  eq2_destruct h
 
 /-- Construct EQ2 from EQ2F EQ2 (inverse of destruct). -/
 theorem EQ2.construct {a b : LocalTypeR} (h : EQ2F EQ2 a b) : EQ2 a b := by
-  have hfix : EQ2F EQ2 = EQ2 := EQ2_fixed
+  have hfix : EQ2F EQ2 = EQ2 := eq2_fixed
   exact Eq.mp (congrArg (fun R => R a b) hfix) h
 
 /-- EQ2F is monotone (public version for coinduction up-to proofs). -/
-theorem EQ2F.mono : Monotone EQ2F := EQ2F_mono
+theorem EQ2F.mono : Monotone EQ2F := eq2_f_mono
 
 /-- EQ2 closure of a relation: pairs in R or pairs in EQ2. -/
 def EQ2_closure (R : Rel) : Rel := fun a b => R a b ∨ EQ2 a b
 
 /-- EQ2 closure is monotone. -/
-theorem EQ2_closure_mono : Monotone EQ2_closure := by
+theorem eq2_closure_mono : Monotone EQ2_closure := by
   intro R S hrs a b h
   cases h with
   | inl hr => exact Or.inl (hrs a b hr)
@@ -217,7 +217,7 @@ theorem EQ2_closure_mono : Monotone EQ2_closure := by
 
     This allows the step case to appeal to either R or the already-established EQ2.
     Formally: if ∀ a b, R a b → EQ2F (R ∨ EQ2) a b, then R ⊆ EQ2. -/
-theorem EQ2_coind_upto {R : Rel} (h : ∀ a b, R a b → EQ2F (EQ2_closure R) a b) :
+theorem eq2_coind_upto {R : Rel} (h : ∀ a b, R a b → EQ2F (EQ2_closure R) a b) :
     ∀ a b, R a b → EQ2 a b := by
   intro a b hr
   -- Define the accumulated relation: R ∪ EQ2
@@ -231,12 +231,12 @@ theorem EQ2_coind_upto {R : Rel} (h : ∀ a b, R a b → EQ2F (EQ2_closure R) a 
         exact h x y hxr
     | inr hxeq =>
         -- x y in EQ2, so EQ2F EQ2 x y by fixed point
-        have hf : EQ2F EQ2 x y := EQ2_destruct hxeq
+        have hf : EQ2F EQ2 x y := eq2_destruct hxeq
         -- Lift EQ2F EQ2 to EQ2F S using monotonicity
-        exact EQ2F_mono (fun a b h => Or.inr h) x y hf
+        exact eq2_f_mono (fun a b h => Or.inr h) x y hf
   -- Apply standard coinduction with S
   have hinS : S a b := Or.inl hr
-  exact EQ2_coind hS_postfix a b hinS
+  exact eq2_coind hS_postfix a b hinS
 
 
 end SessionCoTypes.EQ2

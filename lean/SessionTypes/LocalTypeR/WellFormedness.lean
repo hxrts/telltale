@@ -34,12 +34,12 @@ theorem LocalTypeR.WellFormed.unfold {t : LocalTypeR} (h : LocalTypeR.WellFormed
       simpa [LocalTypeR.unfold] using h
   | mu t body =>
       have hclosed : (body.substitute t (.mu t body)).isClosed :=
-        LocalTypeR.isClosed_substitute_mu (t := t) (body := body) h.closed
+        LocalTypeR.is_closed_substitute_mu (t := t) (body := body) h.closed
       have hpair : body.isGuarded t = true ∧ body.isContractive = true := by
         simpa [LocalTypeR.isContractive, Bool.and_eq_true] using h.contractive
       have hbody_contr : body.isContractive = true := hpair.2
       have hcontr : (body.substitute t (.mu t body)).isContractive = true :=
-        LocalTypeR.isContractive_substitute body t (.mu t body) hbody_contr h.contractive h.closed
+        LocalTypeR.is_contractive_substitute body t (.mu t body) hbody_contr h.contractive h.closed
       exact ⟨hclosed, hcontr⟩
 
 /-- Iterated unfold preserves well-formedness. -/
@@ -53,13 +53,13 @@ private theorem LocalTypeR.WellFormed.unfold_iter {t : LocalTypeR} (h : LocalTyp
       simpa [Function.iterate_succ_apply'] using (LocalTypeR.WellFormed.unfold (t := (LocalTypeR.unfold)^[n] t) ih)
 
 /-- fullUnfold preserves well-formedness. -/
-theorem LocalTypeR.WellFormed.fullUnfold {t : LocalTypeR} (h : LocalTypeR.WellFormed t) :
+theorem LocalTypeR.WellFormed.full_unfold {t : LocalTypeR} (h : LocalTypeR.WellFormed t) :
     LocalTypeR.WellFormed t.fullUnfold := by
   simpa [LocalTypeR.fullUnfold] using (LocalTypeR.WellFormed.unfold_iter (t := t) h t.muHeight)
 
 /-! ## Branch Well-Formedness Extraction Helpers -/
 
-private theorem LocalTypeR.branches_wellFormed_of_closed_contractive
+private theorem LocalTypeR.branches_well_formed_of_closed_contractive
     (bs : List BranchR)
     (hclosed : freeVarsOfBranches bs = [])
     (hcontr : isContractiveBranches bs = true) :
@@ -78,7 +78,7 @@ private theorem LocalTypeR.branches_wellFormed_of_closed_contractive
               have hcont_nil : cont.freeVars = [] := (List.append_eq_nil_iff.mp happend).1
               have htail_nil : freeVarsOfBranches tail = [] := (List.append_eq_nil_iff.mp happend).2
               have hcont_closed : cont.isClosed := by
-                simp [LocalTypeR.isClosed, List.isEmpty_eq_true, hcont_nil]
+                simp [LocalTypeR.isClosed, List.is_empty_eq_true, hcont_nil]
               have hpair : cont.isContractive = true ∧ isContractiveBranches tail = true := by
                 simpa [isContractiveBranches, Bool.and_eq_true] using hcontr
               have hcont_wf : LocalTypeR.WellFormed cont := ⟨hcont_closed, hpair.1⟩
@@ -103,10 +103,10 @@ theorem LocalTypeR.WellFormed.branches_of_send {p : String} {bs : List BranchR}
   have hclosed : freeVarsOfBranches bs = [] := by
     have hclosed' : (freeVarsOfBranches bs).isEmpty = true := by
       simpa [LocalTypeR.isClosed, LocalTypeR.freeVars] using h.closed
-    exact (List.isEmpty_eq_true _).1 hclosed'
+    exact (List.is_empty_eq_true _).1 hclosed'
   have hcontr : isContractiveBranches bs = true := by
     simpa [LocalTypeR.isContractive] using h.contractive
-  exact LocalTypeR.branches_wellFormed_of_closed_contractive bs hclosed hcontr
+  exact LocalTypeR.branches_well_formed_of_closed_contractive bs hclosed hcontr
 
 /-- Well-formed recv branches are well-formed. -/
 theorem LocalTypeR.WellFormed.branches_of_recv {p : String} {bs : List BranchR}
@@ -115,15 +115,15 @@ theorem LocalTypeR.WellFormed.branches_of_recv {p : String} {bs : List BranchR}
   have hclosed : freeVarsOfBranches bs = [] := by
     have hclosed' : (freeVarsOfBranches bs).isEmpty = true := by
       simpa [LocalTypeR.isClosed, LocalTypeR.freeVars] using h.closed
-    exact (List.isEmpty_eq_true _).1 hclosed'
+    exact (List.is_empty_eq_true _).1 hclosed'
   have hcontr : isContractiveBranches bs = true := by
     simpa [LocalTypeR.isContractive] using h.contractive
-  exact LocalTypeR.branches_wellFormed_of_closed_contractive bs hclosed hcontr
+  exact LocalTypeR.branches_well_formed_of_closed_contractive bs hclosed hcontr
 
 /-! ## Branch Aggregation Helpers -/
 
 /-- If all branches are well-formed, then `freeVarsOfBranches` is empty. -/
-private theorem freeVarsOfBranches_of_wellFormed (bs : List BranchR)
+private theorem free_vars_of_branches_of_well_formed (bs : List BranchR)
     (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2) :
     freeVarsOfBranches bs = [] := by
   induction bs with
@@ -138,13 +138,13 @@ private theorem freeVarsOfBranches_of_wellFormed (bs : List BranchR)
                 fun lb hm => hWFbs lb (List.Mem.tail _ hm)
               have hcont_closed : cont.freeVars = [] := by
                 have h := hcont_wf.closed
-                simp [LocalTypeR.isClosed, List.isEmpty_eq_true] at h
+                simp [LocalTypeR.isClosed, List.is_empty_eq_true] at h
                 exact h
               have htail_nil := ih htail_wf
               simp [freeVarsOfBranches, hcont_closed, htail_nil]
 
 /-- If all branches are well-formed, then `isContractiveBranches` is true. -/
-private theorem isContractiveBranches_of_wellFormed (bs : List BranchR)
+private theorem is_contractive_branches_of_well_formed (bs : List BranchR)
     (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2) :
     isContractiveBranches bs = true := by
   induction bs with
@@ -162,28 +162,28 @@ private theorem isContractiveBranches_of_wellFormed (bs : List BranchR)
 /-! ## Reconstructing Well-Formed Send/Recv -/
 
 /-- Well-formed send: if all branches are well-formed, then the send type is well-formed. -/
-theorem LocalTypeR.WellFormed_send {p : String} {bs : List BranchR}
+theorem LocalTypeR.well_formed_send {p : String} {bs : List BranchR}
     (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2) :
     LocalTypeR.WellFormed (.send p bs) := by
   constructor
   · -- isClosed
-    simp [LocalTypeR.isClosed, LocalTypeR.freeVars, List.isEmpty_eq_true]
-    exact freeVarsOfBranches_of_wellFormed bs hWFbs
+    simp [LocalTypeR.isClosed, LocalTypeR.freeVars, List.is_empty_eq_true]
+    exact free_vars_of_branches_of_well_formed bs hWFbs
   · -- isContractive
     simp [LocalTypeR.isContractive]
-    exact isContractiveBranches_of_wellFormed bs hWFbs
+    exact is_contractive_branches_of_well_formed bs hWFbs
 
 /-- Well-formed recv: if all branches are well-formed, then the recv type is well-formed. -/
-theorem LocalTypeR.WellFormed_recv {p : String} {bs : List BranchR}
+theorem LocalTypeR.well_formed_recv {p : String} {bs : List BranchR}
     (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2) :
     LocalTypeR.WellFormed (.recv p bs) := by
   constructor
   · -- isClosed
-    simp [LocalTypeR.isClosed, LocalTypeR.freeVars, List.isEmpty_eq_true]
-    exact freeVarsOfBranches_of_wellFormed bs hWFbs
+    simp [LocalTypeR.isClosed, LocalTypeR.freeVars, List.is_empty_eq_true]
+    exact free_vars_of_branches_of_well_formed bs hWFbs
   · -- isContractive
     simp [LocalTypeR.isContractive]
-    exact isContractiveBranches_of_wellFormed bs hWFbs
+    exact is_contractive_branches_of_well_formed bs hWFbs
 
 /-! ## Unguarded Variable Theorem (Coq's `eguarded_test`)
 
@@ -218,11 +218,11 @@ theorem LocalTypeR.unfold_iter_double_subst (body : LocalTypeR)
     (h_free : body.isFreeIn v = true) (h_not_guarded : body.isGuarded v = false) :
     (LocalTypeR.unfold)^[body.muHeight] ((body.substitute t repl).substitute s (.mu s (body.substitute t repl))) = .var v := by
   -- For closed bodies this is vacuous: no free variables exist.
-  have hmem : v ∈ body.freeVars := isFreeIn_mem_freeVars body v h_free
+  have hmem : v ∈ body.freeVars := is_free_in_mem_free_vars body v h_free
   have hnil : body.freeVars = [] := by
     have : body.freeVars.isEmpty = true := by
       simpa [LocalTypeR.isClosed] using hclosed
-    exact (List.isEmpty_eq_true _).1 this
+    exact (List.is_empty_eq_true _).1 this
   have : False := by
     simpa [hnil] using hmem
   exact this.elim
@@ -244,11 +244,11 @@ theorem LocalTypeR.unfold_iter_subst_unguarded (e : LocalTypeR) (t : String) (re
     (h_free : e.isFreeIn v = true) (h_not_guarded : e.isGuarded v = false) :
     (LocalTypeR.unfold)^[e.muHeight] (e.substitute t repl) = .var v := by
   -- For closed types this is vacuous: no free variables exist.
-  have hmem : v ∈ e.freeVars := isFreeIn_mem_freeVars e v h_free
+  have hmem : v ∈ e.freeVars := is_free_in_mem_free_vars e v h_free
   have hnil : e.freeVars = [] := by
     have : e.freeVars.isEmpty = true := by
       simpa [LocalTypeR.isClosed] using hclosed
-    exact (List.isEmpty_eq_true _).1 this
+    exact (List.is_empty_eq_true _).1 this
   have : False := by
     simpa [hnil] using hmem
   exact this.elim
@@ -268,11 +268,11 @@ theorem LocalTypeR.unguarded_unfolds_to_var (lt : LocalTypeR) (v : String)
     (h_free : lt.isFreeIn v = true) (h_not_guarded : lt.isGuarded v = false) :
     lt.fullUnfold = .var v := by
   -- For closed types this is vacuous: no free variables exist.
-  have hmem : v ∈ lt.freeVars := isFreeIn_mem_freeVars lt v h_free
+  have hmem : v ∈ lt.freeVars := is_free_in_mem_free_vars lt v h_free
   have hnil : lt.freeVars = [] := by
     have : lt.freeVars.isEmpty = true := by
       simpa [LocalTypeR.isClosed] using hclosed
-    exact (List.isEmpty_eq_true _).1 this
+    exact (List.is_empty_eq_true _).1 this
   have : False := by
     simpa [hnil] using hmem
   exact this.elim
@@ -283,17 +283,17 @@ theorem LocalTypeR.unguarded_unfolds_to_var (lt : LocalTypeR) (v : String)
 
     This is the key property for proving observable_of_closed: closed types
     (with all bound variables guarded) unfold to send/recv/end. -/
-theorem LocalTypeR.guarded_fullUnfold_not_var (lt : LocalTypeR) (v : String)
+theorem LocalTypeR.guarded_full_unfold_not_var (lt : LocalTypeR) (v : String)
     (h_guarded : lt.isGuarded v = true) (hclosed : lt.isClosed) :
     ∀ w, lt.fullUnfold ≠ .var w ∨ lt.isFreeIn v = false := by
   intro w
   right
   by_cases h_free : lt.isFreeIn v = true
-  · have hmem : v ∈ lt.freeVars := isFreeIn_mem_freeVars lt v h_free
+  · have hmem : v ∈ lt.freeVars := is_free_in_mem_free_vars lt v h_free
     have hnil : lt.freeVars = [] := by
       have : lt.freeVars.isEmpty = true := by
         simpa [LocalTypeR.isClosed] using hclosed
-      exact (List.isEmpty_eq_true _).1 this
+      exact (List.is_empty_eq_true _).1 this
     have : False := by
       simpa [hnil] using hmem
     exact this.elim

@@ -13,7 +13,7 @@ appear at head position or inside communications.
 
 Solution Structure. Defines `muHeight` counting nested mus at head. `fullUnfold` iterates
 `unfold` muHeight-many times (Coq's `full_eunf` pattern). Proves `fullUnfold_mu` relating
-mu-unfolding to body substitution. `isFreeIn_mem_freeVars` and `isGuarded_of_closed` connect
+mu-unfolding to body substitution. `is_free_in_mem_free_vars` and `is_guarded_of_closed` connect
 membership predicates. Closed types have all variables guarded (vacuously).
 -/
 
@@ -43,13 +43,13 @@ def LocalTypeR.fullUnfold (lt : LocalTypeR) : LocalTypeR :=
 
     This is the only unconditional statement we can make without assuming
     guardedness/contractiveness. -/
-theorem LocalTypeR.fullUnfold_not_mu (lt : LocalTypeR) :
+theorem LocalTypeR.full_unfold_not_mu (lt : LocalTypeR) :
     lt.muHeight = 0 → ∀ t body, lt.fullUnfold ≠ .mu t body := by
   intro h t body
   cases lt <;> simp [fullUnfold, muHeight] at h ⊢
 
 /-- fullUnfold is idempotent when its result has no leading `mu`. -/
-theorem LocalTypeR.fullUnfold_idemp (lt : LocalTypeR) :
+theorem LocalTypeR.full_unfold_idemp (lt : LocalTypeR) :
     lt.fullUnfold.muHeight = 0 → lt.fullUnfold.fullUnfold = lt.fullUnfold := by
   intro h
   have h' : ((LocalTypeR.unfold)^[lt.muHeight] lt).muHeight = 0 := by
@@ -77,7 +77,7 @@ theorem LocalTypeR.unfold_mu (t : String) (body : LocalTypeR) :
     and Function.iterate_succ_apply: f^[n+1] x = f^[n] (f x).
 
     Corresponds to Coq's `full_eunf_subst`. -/
-theorem LocalTypeR.fullUnfold_mu (t : String) (body : LocalTypeR) :
+theorem LocalTypeR.full_unfold_mu (t : String) (body : LocalTypeR) :
     (.mu t body : LocalTypeR).fullUnfold =
       LocalTypeR.unfold^[body.muHeight] (body.substitute t (.mu t body)) := by
   -- fullUnfold (.mu t body) = unfold^[(.mu t body).muHeight] (.mu t body)
@@ -116,12 +116,12 @@ def LocalTypeR.classifyNonMu : LocalTypeR → FullUnfoldResult
   | .mu _ _ => .is_end  -- Shouldn't be called on mu, but need total function
 
 /-- For a type with muHeight 0 (non-mu at head), fullUnfold returns the type itself. -/
-theorem LocalTypeR.fullUnfold_muHeight_zero {lt : LocalTypeR} (h : lt.muHeight = 0) :
+theorem LocalTypeR.full_unfold_mu_height_zero {lt : LocalTypeR} (h : lt.muHeight = 0) :
     lt.fullUnfold = lt := by
   simp [fullUnfold, h]
 
 /-- Non-mu types have muHeight 0. -/
-theorem LocalTypeR.muHeight_non_mu :
+theorem LocalTypeR.mu_height_non_mu :
     ∀ (lt : LocalTypeR), (∀ t body, lt ≠ .mu t body) → lt.muHeight = 0 := by
   intro lt h
   cases lt with
@@ -150,7 +150,7 @@ theorem LocalTypeR.muHeight_non_mu :
     Note: This doesn't require contractiveness! Closedness alone ensures fullUnfold ≠ .var. -/
 -- Helper: isFreeIn v = true implies v ∈ freeVars
 mutual
-  theorem isFreeIn_mem_freeVars (lt : LocalTypeR) (v : String) :
+  theorem is_free_in_mem_free_vars (lt : LocalTypeR) (v : String) :
       lt.isFreeIn v = true → v ∈ lt.freeVars := by
     intro h
     cases hlt : lt with
@@ -164,12 +164,12 @@ mutual
     | send _ bs =>
         have h' : isFreeInBranches' v bs = true := by
           simpa [LocalTypeR.isFreeIn, hlt] using h
-        have hmem := isFreeInBranches'_mem_freeVarsOfBranches bs v h'
+        have hmem := is_free_in_branches'_mem_free_vars_of_branches bs v h'
         simpa [LocalTypeR.freeVars, hlt] using hmem
     | recv _ bs =>
         have h' : isFreeInBranches' v bs = true := by
           simpa [LocalTypeR.isFreeIn, hlt] using h
-        have hmem := isFreeInBranches'_mem_freeVarsOfBranches bs v h'
+        have hmem := is_free_in_branches'_mem_free_vars_of_branches bs v h'
         simpa [LocalTypeR.freeVars, hlt] using hmem
     | mu t body =>
         by_cases hvt : v = t
@@ -181,7 +181,7 @@ mutual
         · have hvne : (v == t) = false := beq_eq_false_iff_ne.mpr hvt
           have h' : body.isFreeIn v = true := by
             simpa [LocalTypeR.isFreeIn, hvne, hlt] using h
-          have hmem : v ∈ body.freeVars := isFreeIn_mem_freeVars body v h'
+          have hmem : v ∈ body.freeVars := is_free_in_mem_free_vars body v h'
           apply (List.mem_filter).2
           exact ⟨hmem, (bne_iff_ne).2 hvt⟩
   termination_by sizeOf lt
@@ -192,7 +192,7 @@ mutual
 
   -- Branch freeVars/isFreeIn Bridge
 
-  theorem isFreeInBranches'_mem_freeVarsOfBranches (bs : List BranchR) (v : String) :
+  theorem is_free_in_branches'_mem_free_vars_of_branches (bs : List BranchR) (v : String) :
       isFreeInBranches' v bs = true → v ∈ freeVarsOfBranches bs := by
     intro h
     cases hbs : bs with
@@ -208,10 +208,10 @@ mutual
               simpa [isFreeInBranches', hbs, hhead, Bool.or_eq_true] using h
             cases h' with
             | inl hcont =>
-                have hmem : v ∈ cont.freeVars := isFreeIn_mem_freeVars cont v hcont
+                have hmem : v ∈ cont.freeVars := is_free_in_mem_free_vars cont v hcont
                 simp [freeVarsOfBranches, hbs, hmem]
             | inr htail =>
-                have hmem := isFreeInBranches'_mem_freeVarsOfBranches tail v htail
+                have hmem := is_free_in_branches'_mem_free_vars_of_branches tail v htail
                 simp [freeVarsOfBranches, hbs, hmem]
   termination_by sizeOf bs
   decreasing_by
@@ -223,7 +223,7 @@ end
 /-! ## Guardedness from Non-Freeness -/
 
 /-- If `v` is not free in `lt`, then `v` is guarded in `lt`. -/
-theorem isGuarded_of_isFreeIn_false (lt : LocalTypeR) (v : String) :
+theorem is_guarded_of_is_free_in_false (lt : LocalTypeR) (v : String) :
     lt.isFreeIn v = false → lt.isGuarded v = true := by
   intro h
   cases lt with
@@ -247,27 +247,27 @@ theorem isGuarded_of_isFreeIn_false (lt : LocalTypeR) (v : String) :
       · have hvne : (v == t) = false := beq_eq_false_iff_ne.mpr hvt
         have hbody : body.isFreeIn v = false := by
           simpa [LocalTypeR.isFreeIn, hvne] using h
-        have hbody' := isGuarded_of_isFreeIn_false body v hbody
+        have hbody' := is_guarded_of_is_free_in_false body v hbody
         simp [LocalTypeR.isGuarded, hvne, hbody']
 termination_by sizeOf lt
 
 /-! ## Guardedness from Closedness -/
 
 /-- Closed types have all variables guarded (vacuously, since they have no free variables). -/
-theorem isGuarded_of_closed (lt : LocalTypeR) (v : String) :
+theorem is_guarded_of_closed (lt : LocalTypeR) (v : String) :
     lt.isClosed → lt.isGuarded v = true := by
   intro hclosed
   cases hfree : lt.isFreeIn v with
   | true =>
-      have hmem := isFreeIn_mem_freeVars lt v hfree
+      have hmem := is_free_in_mem_free_vars lt v hfree
       have hnil : lt.freeVars = [] := by
         have : lt.freeVars.isEmpty = true := by
           simpa [LocalTypeR.isClosed] using hclosed
-        exact (List.isEmpty_eq_true _).1 this
+        exact (List.is_empty_eq_true _).1 this
       have : False := by
         simpa [hnil] using hmem
       exact this.elim
   | false =>
-      exact isGuarded_of_isFreeIn_false lt v hfree
+      exact is_guarded_of_is_free_in_false lt v hfree
 
 end SessionTypes.LocalTypeR

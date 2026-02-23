@@ -205,14 +205,14 @@ def transportCatalogNecessityHardened
 
 /-- Theorem-form tag semantics: if every assumption in a profile is tagged
     `provenNecessary`, the profile is necessity-hardened. -/
-theorem profileNecessityHardened_of_allProvenNecessary
+theorem profile_necessity_hardened_of_all_proven_necessary
     (p : TransportNecessityProfile)
     (hAll : ∀ a, a ∈ p.assumptions → a.tag = .provenNecessary) :
     profileNecessityHardened p :=
   hAll
 
 /-- Catalog theorem-form lifting of profile hardening. -/
-theorem transportCatalogNecessityHardened_of_profiles
+theorem transport_catalog_necessity_hardened_of_profiles
     (catalog : List TransportNecessityProfile)
     (hAll : ∀ p, p ∈ catalog → profileNecessityHardened p) :
     transportCatalogNecessityHardened catalog :=
@@ -255,7 +255,7 @@ def transportCatalogMinimalBasis
 /-! ## Minimal-Basis Closure Theorems -/
 
 /-- Build profile-level minimal-basis closure from hardened tags + dropped-assumption oracle. -/
-theorem profileNecessityMinimalBasis_of_hardened_and_oracle
+theorem profile_necessity_minimal_basis_of_hardened_and_oracle
     (p : TransportNecessityProfile)
     (hHard : profileNecessityHardened p)
     (hOracle : TransportProfileMinimalityOracle p) :
@@ -265,20 +265,20 @@ theorem profileNecessityMinimalBasis_of_hardened_and_oracle
   exact hOracle a hIn (hHard a hIn)
 
 /-- Any minimal-basis profile is necessity-hardened. -/
-theorem profileNecessityHardened_of_minimalBasis
+theorem profile_necessity_hardened_of_minimal_basis
     (p : TransportNecessityProfile)
     (hMin : profileNecessityMinimalBasis p) :
     profileNecessityHardened p :=
   hMin.1
 
 /-- Build catalog-level minimal-basis closure from profile-level hardening + oracles. -/
-theorem transportCatalogMinimalBasis_of_hardened_and_oracles
+theorem transport_catalog_minimal_basis_of_hardened_and_oracles
     (catalog : List TransportNecessityProfile)
     (hHard : transportCatalogNecessityHardened catalog)
     (hOracle : ∀ p, p ∈ catalog → TransportProfileMinimalityOracle p) :
     transportCatalogMinimalBasis catalog := by
   intro p hIn
-  exact profileNecessityMinimalBasis_of_hardened_and_oracle
+  exact profile_necessity_minimal_basis_of_hardened_and_oracle
     p (hHard p hIn) (hOracle p hIn)
 
 /-! ## E4 Premise Bundle -/

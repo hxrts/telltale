@@ -61,7 +61,7 @@ structure StoreTypedStrong (G : GEnv) (S : SEnv) (store : VarStore) : Prop where
   typeCorr : StoreTyped G S store
 
 /-- StoreTypedStrong implies StoreTyped. -/
-theorem StoreTypedStrong.toStoreTyped {G : GEnv} {S : SEnv} {store : VarStore}
+theorem StoreTypedStrong.to_store_typed {G : GEnv} {S : SEnv} {store : VarStore}
     (h : StoreTypedStrong G S store) : StoreTyped G S store :=
   h.typeCorr
 
@@ -96,8 +96,8 @@ theorem store_value_typed {G : GEnv} {S : SEnv} {store : VarStore} {x : Var} {v 
 /-! ## EdgeCoherent Irrelevance Lemmas -/
 
 /-- Updating G at an endpoint not involved in edge e doesn't affect EdgeCoherent at e.
-    Reference: `work/effects/004.lean` EdgeCoherent_updateG_irrelevant -/
-theorem EdgeCoherent_updateG_irrelevant (G : GEnv) (D : DEnv) (e : Edge)
+    Reference: `work/effects/004.lean` edge_coherent_update_g_irrelevant -/
+theorem edge_coherent_update_g_irrelevant (G : GEnv) (D : DEnv) (e : Edge)
     (ep : Endpoint) (L : LocalType)
     (hNeSender : ep ≠ { sid := e.sid, role := e.sender })
     (hNeRecv : ep ≠ { sid := e.sid, role := e.receiver })
@@ -107,14 +107,14 @@ theorem EdgeCoherent_updateG_irrelevant (G : GEnv) (D : DEnv) (e : Edge)
   intro Lrecv hGrecv
   -- Use lookupG_update_neq since ep is different from both endpoints
   have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv := by
-    simpa [lookupG_update_neq _ _ _ _ hNeRecv] using hGrecv
+    simpa [lookup_g_update_neq _ _ _ _ hNeRecv] using hGrecv
   obtain ⟨Lsender, hGsender, hConsume⟩ := hCoh Lrecv hGrecv'
   refine ⟨Lsender, ?_, hConsume⟩
-  simpa [lookupG_update_neq _ _ _ _ hNeSender] using hGsender
+  simpa [lookup_g_update_neq _ _ _ _ hNeSender] using hGsender
 
 /-- Updating D at edge e' ≠ e doesn't affect EdgeCoherent at e.
-    Reference: `work/effects/004.lean` EdgeCoherent_updateD_irrelevant -/
-theorem EdgeCoherent_updateD_irrelevant (G : GEnv) (D : DEnv) (e e' : Edge)
+    Reference: `work/effects/004.lean` edge_coherent_update_d_irrelevant -/
+theorem edge_coherent_update_d_irrelevant (G : GEnv) (D : DEnv) (e e' : Edge)
     (ts : List ValType)
     (hNe : e' ≠ e)
     (hCoh : EdgeCoherent G D e) :
@@ -122,7 +122,7 @@ theorem EdgeCoherent_updateD_irrelevant (G : GEnv) (D : DEnv) (e e' : Edge)
   simp only [EdgeCoherent] at hCoh ⊢
   intro Lrecv hGrecv
   -- Use lookupD_update_neq since e' ≠ e
-  simp only [lookupD_update_neq _ _ _ _ hNe]
+  simp only [lookup_d_update_neq _ _ _ _ hNe]
   exact hCoh Lrecv hGrecv
 
 

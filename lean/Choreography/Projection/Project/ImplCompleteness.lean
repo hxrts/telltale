@@ -43,7 +43,7 @@ EQ2_CProject_Rel g role e1 := ∃ e0, CProject g role e0 ∧ EQ2 e0 e1
 - By induction on the participation path
 - For comm head: e0 = send/recv with some branches, e1 must have the same top-level
   form (by EQ2), so CProject transfers with BranchesRel from EQ2
-- For mu: EQ2_unfold gives EQ2 on unfolded types, apply IH
+- For mu: eq2_unfold gives EQ2 on unfolded types, apply IH
 
 **Non-participant case**:
 - CProject requires AllBranchesProj: all branch continuations project to e0
@@ -103,10 +103,10 @@ observation of e1 can be matched by the corresponding observation of e0.
 1. Define witness relation: `∃ e0, CProject g role e0 ∧ EQ2 e0 e1`
 2. Show it's a post-fixpoint of CProjectF
 3. Use extraction lemmas to convert EQ2 structure to constructor information about e1
-4. Apply CProject_coind
+4. Apply c_project_coind
 
 The proof requires case analysis on the global type `g` and using the appropriate
-EQ2 extraction lemmas (`EQ2.end_right_implies_UnfoldsToEnd`, etc.) to extract
+EQ2 extraction lemmas (`EQ2.end_right_implies_unfolds_to_end`, etc.) to extract
 the shape of `e1` from `EQ2 e0 e1`.
 
 **Challenge**: CProjectF requires exact constructor matching (e.g., `.end` matches `.end`),
@@ -120,18 +120,18 @@ but EQ2 allows mu-wrapping (e.g., `EQ2 .end (.mu t .end)`). The extraction lemma
 4. Prove auxiliary lemmas showing EQ2 preserves "canonical forms" for each constructor
 
 We now proceed without this EQ2-closed projection setup and rely on the
-`trans_eq_of_CProject` path for constructing `trans` projections. -/
+`trans_eq_of_c_project` path for constructing `trans` projections. -/
 
 /-- CProject implies EQ2 between the candidate and `trans` (wrapper lemma). -/
-theorem CProject_implies_EQ2_trans (g : GlobalType) (role : String) (lt : LocalTypeR)
+theorem c_project_implies_eq2_trans (g : GlobalType) (role : String) (lt : LocalTypeR)
     (h : CProject g role lt) (hwf : g.wellFormed = true) : EQ2 lt (trans g role) :=
-  CProject_implies_EQ2_trans_thm g role lt h hwf
+  c_project_implies_eq2_trans_thm g role lt h hwf
 
 /-- BranchesRel for EQ2 implies branch-wise EQ2.
 
 If BranchesProjRel CProject gbs role lbs holds, and gbs are transBranches'd,
 then the local branches are EQ2-related. -/
-private theorem BranchesProjRel_implies_BranchesRel_EQ2_cons
+private theorem branches_proj_rel_implies_branches_rel_eq2_cons
     {gLabel : Label} {gCont : GlobalType} {lLabel : Label} {lVt : Option ValType} {lCont : LocalTypeR}
     {gbs_tail : List (Label × GlobalType)} {lbs_tail : List BranchR}
     (role : String)
@@ -144,7 +144,7 @@ private theorem BranchesProjRel_implies_BranchesRel_EQ2_cons
   have hwf_head : (gLabel, gCont).2.wellFormed = true := by
     exact hwf (gLabel, gCont) (by simp)
   have heq : EQ2 lCont (trans gCont role) :=
-    CProject_implies_EQ2_trans _ _ _ hproj hwf_head
+    c_project_implies_eq2_trans _ _ _ hproj hwf_head
   have htail' :
       List.Forall₂ (fun a b => a.1 = b.1 ∧ EQ2 a.2.2 b.2.2)
         lbs_tail (transBranches gbs_tail role) := by
@@ -163,7 +163,7 @@ private theorem BranchesProjRel_implies_BranchesRel_EQ2_cons
 /-! ## Branch Projection EQ2 Transfer -/
 
 /-- BranchesProjRel implies branch-wise EQ2 on transBranches. -/
-theorem BranchesProjRel_implies_BranchesRel_EQ2
+theorem branches_proj_rel_implies_branches_rel_eq2
     (gbs : List (Label × GlobalType)) (role : String)
     (lbs : List BranchR) (hwf : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true)
     (h : BranchesProjRel CProject gbs role lbs) :
@@ -182,7 +182,7 @@ theorem BranchesProjRel_implies_BranchesRel_EQ2
             intro gb' hmem'
             exact hwf gb' (List.mem_cons_of_mem _ hmem')
           have htail : BranchesRel EQ2 lbs_tail (transBranches gbs_tail role) := ih hwf_tail
-          exact BranchesProjRel_implies_BranchesRel_EQ2_cons role hlab hnone hproj hwf htail
+          exact branches_proj_rel_implies_branches_rel_eq2_cons role hlab hnone hproj hwf htail
 
 /-! ## All-Branches EQ2 Transfer -/
 
@@ -190,7 +190,7 @@ theorem BranchesProjRel_implies_BranchesRel_EQ2
 
 For non-participants, AllBranchesProj CProject gbs role lt means all branches
 project to lt. The trans of the first branch should be EQ2 to lt. -/
-private theorem AllBranchesProj_implies_EQ2_trans_cons
+private theorem all_branches_proj_implies_eq2_trans_cons
     (sender receiver role : String) (first : Label × GlobalType) (rest : List (Label × GlobalType))
     (lt : LocalTypeR) (hns : role ≠ sender) (hnr : role ≠ receiver)
     (hall : AllBranchesProj CProject (first :: rest) role lt)
@@ -199,9 +199,9 @@ private theorem AllBranchesProj_implies_EQ2_trans_cons
   -- Use the head branch projection and relate it to trans.
   have hproj : CProject first.2 role lt := hall first (by simp)
   have hwf_first : first.2.wellFormed = true :=
-    GlobalType.wellFormed_comm_branches sender receiver (first :: rest) hwf first (by simp)
+    GlobalType.well_formed_comm_branches sender receiver (first :: rest) hwf first (by simp)
   have heq : EQ2 lt (trans first.2 role) :=
-    CProject_implies_EQ2_trans _ _ _ hproj hwf_first
+    c_project_implies_eq2_trans _ _ _ hproj hwf_first
   -- Non-participants project to the first branch.
   have htrans : trans (GlobalType.comm sender receiver (first :: rest)) role =
       trans first.2 role := by
@@ -209,7 +209,7 @@ private theorem AllBranchesProj_implies_EQ2_trans_cons
   simpa [htrans] using heq
 
 /-- AllBranchesProj on a non-empty comm list yields EQ2 with trans. -/
-theorem AllBranchesProj_implies_EQ2_trans
+theorem all_branches_proj_implies_eq2_trans
     (sender receiver role : String) (gbs : List (Label × GlobalType)) (lt : LocalTypeR)
     (hns : role ≠ sender) (hnr : role ≠ receiver)
     (hall : AllBranchesProj CProject gbs role lt)
@@ -220,7 +220,7 @@ theorem AllBranchesProj_implies_EQ2_trans
   cases gbs with
   | nil => exact (hne rfl).elim
   | cons first rest =>
-      exact AllBranchesProj_implies_EQ2_trans_cons sender receiver role first rest lt hns hnr hall hwf
+      exact all_branches_proj_implies_eq2_trans_cons sender receiver role first rest lt hns hnr hall hwf
 
 /-! ## Projection API Completeness -/
 
@@ -228,7 +228,7 @@ theorem AllBranchesProj_implies_EQ2_trans
 
 /-- trans produces a valid projection when CProject holds for some candidate.
 
-This follows from `trans_eq_of_CProject`: trans computes the same local type
+This follows from `trans_eq_of_c_project`: trans computes the same local type
 whenever CProject holds and all comms are non-empty.
 
 The key insight is that for non-participants in a choice, all branches must
@@ -237,7 +237,7 @@ projection as representative. Since all branches must agree (by the CProject
 constraint), this representative satisfies the projection relation.
 
 Requires `wellFormed` assumption (matching Coq's global invariants). -/
-theorem trans_CProject
+theorem trans_c_project
     (_hend : ∀ e, EQ2 .end e → e = .end)
     (_hvar : ∀ t e, EQ2 (.var t) e → e = .var t)
     (_hsend : ∀ p bs e, EQ2 (.send p bs) e →
@@ -252,7 +252,7 @@ theorem trans_CProject
   have hne : g.allCommsNonEmpty = true := by
     simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
     exact hwf.1.1.2
-  have htrans_eq : trans g role = lt := trans_eq_of_CProject g role lt h hne
+  have htrans_eq : trans g role = lt := trans_eq_of_c_project g role lt h hne
   simpa [htrans_eq] using h
 
 /-! ## Projection API Completeness: Boolean Success -/
@@ -276,14 +276,14 @@ theorem trans_is_projection
       simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
       exact hwf.1.1.2
     exact projectb_complete g role (trans g role)
-      (trans_CProject hend hvar hsend hrecv hmu g role lt h hwf) hne
+      (trans_c_project hend hvar hsend hrecv hmu g role lt h hwf) hne
 
 /-! ## Projection API Completeness: Option Completeness -/
 
 /-- Completeness: if CProject holds, then projectR? returns some.
 
 Requires `wellFormed` assumption (matching Coq's global invariants). -/
-theorem projectR?_complete
+theorem project_r?_complete
     (hend : ∀ e, EQ2 .end e → e = .end)
     (hvar : ∀ t e, EQ2 (.var t) e → e = .var t)
     (hsend : ∀ p bs e, EQ2 (.send p bs) e →
@@ -308,7 +308,7 @@ theorem projectR?_complete
 
 Note: The forward direction (some → CProject) requires no wellFormedness assumption.
 The reverse direction (CProject → some) requires `wellFormed`. -/
-theorem projectR?_some_iff_CProject
+theorem project_r?_some_iff_c_project
     (hend : ∀ e, EQ2 .end e → e = .end)
     (hvar : ∀ t e, EQ2 (.var t) e → e = .var t)
     (hsend : ∀ p bs e, EQ2 (.send p bs) e →
@@ -324,7 +324,7 @@ theorem projectR?_some_iff_CProject
   · intro ⟨result, _⟩
     exact ⟨result.val, result.property⟩
   · intro ⟨lt, h⟩
-    exact projectR?_complete hend hvar hsend hrecv hmu g role lt h hwf
+    exact project_r?_complete hend hvar hsend hrecv hmu g role lt h hwf
 
 
 end Choreography.Projection.Project

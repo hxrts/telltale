@@ -2,7 +2,7 @@ import SessionCoTypes.Bisim.Substitution
 
 /-! # SessionCoTypes.Bisim.UnfoldSubstitute
 
-Proves unfold_substitute_EQ2_via_Bisim: unfolding and substituting commute up to EQ2.
+Proves unfold_substitute_eq2_via_bisim: unfolding and substituting commute up to EQ2.
 -/
 
 /-
@@ -30,10 +30,10 @@ open SessionCoTypes.EQ2
 open SessionCoTypes.CoinductiveRel
 /-! ## Phase 5: Unfold/Substitute Commutation
 
-The goal is to prove `unfold_substitute_EQ2`:
+The goal is to prove `unfold_substitute_eq2`:
   EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl)
 
-This eliminates the `unfold_substitute_EQ2` dependency. -/
+This eliminates the `unfold_substitute_eq2` dependency. -/
 
 /-- Witness relation for unfold/substitute commutation.
     Related pairs are: (a.substitute var repl).unfold and (a.unfold).substitute var repl -/
@@ -63,7 +63,7 @@ def SubstUnfoldClosure (var : String) (repl : LocalTypeR) : Rel :=
   fun u v => SubstUnfoldRel var repl u v ∨ Bisim u v
 
 /-- BranchesRelBisim reflexivity for SubstUnfoldClosure when all branches are well-formed. -/
-private theorem BranchesRelBisim_SubstUnfoldClosure_refl (var : String) (repl : LocalTypeR)
+private theorem branches_rel_bisim_subst_unfold_closure_refl (var : String) (repl : LocalTypeR)
     (hWFrepl : LocalTypeR.WellFormed repl)
     (bs : List BranchR) (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2) :
     BranchesRelBisim (SubstUnfoldClosure var repl)
@@ -73,15 +73,15 @@ private theorem BranchesRelBisim_SubstUnfoldClosure_refl (var : String) (repl : 
   | nil => exact List.Forall₂.nil
   | cons b rest ih =>
       constructor
-      · exact ⟨rfl, Or.inr (Bisim_refl (b.2.2.substitute var repl)
-          (WellFormed_substitute var (hWFbs b (List.Mem.head _)) hWFrepl))⟩
+      · exact ⟨rfl, Or.inr (bisim_refl (b.2.2.substitute var repl)
+          (well_formed_substitute var (hWFbs b (List.Mem.head _)) hWFrepl))⟩
       · exact ih (fun lb hm => hWFbs lb (List.Mem.tail _ hm))
 
 -- Postfix Construction for `SubstUnfoldClosure`
 
 /-- SubstUnfoldClosure is a post-fixpoint of BisimF.
-    This is the key lemma for proving unfold_substitute_EQ2. -/
-theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
+    This is the key lemma for proving unfold_substitute_eq2. -/
+theorem subst_unfold_closure_postfix (var : String) (repl : LocalTypeR)
     (hWFrepl : LocalTypeR.WellFormed repl) :
     ∀ u v, SubstUnfoldClosure var repl u v →
       BisimF (SubstUnfoldClosure var repl) u v := by
@@ -111,7 +111,7 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
 /- ## Structured Block 1 -/
           LocalTypeR.WellFormed.unfold (t := repl) hWFrepl
         have hBisim : Bisim (LocalTypeR.unfold repl) repl :=
-          EQ2.toBisim (EQ2_unfold_left (EQ2_refl repl)) hWFrepl_unfold hWFrepl
+          EQ2.to_bisim (eq2_unfold_left (eq2_refl repl)) hWFrepl_unfold hWFrepl
         obtain ⟨R', hR'post, hxy⟩ := hBisim
         have hf : BisimF R' (LocalTypeR.unfold repl) repl :=
           hR'post (LocalTypeR.unfold repl) repl hxy
@@ -129,14 +129,14 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
       simp only [LocalTypeR.substitute, LocalTypeR.unfold] at hu hv
       subst hu hv
       apply BisimF.eq_send CanSend.base CanSend.base
-      exact BranchesRelBisim_SubstUnfoldClosure_refl var repl hWFrepl bs
+      exact branches_rel_bisim_subst_unfold_closure_refl var repl hWFrepl bs
         (LocalTypeR.WellFormed.branches_of_send (p := p) (bs := bs) hWFt)
     | recv p bs =>
       -- t = .recv p bs: both sides are .recv p (substituteBranches bs var repl)
       simp only [LocalTypeR.substitute, LocalTypeR.unfold] at hu hv
       subst hu hv
       apply BisimF.eq_recv CanRecv.base CanRecv.base
-      exact BranchesRelBisim_SubstUnfoldClosure_refl var repl hWFrepl bs
+      exact branches_rel_bisim_subst_unfold_closure_refl var repl hWFrepl bs
         (LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := bs) hWFt)
     -- Postfix: `SubstUnfoldRel` Mu Case
     | mu x body =>
@@ -156,7 +156,7 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
         -- Key insight: x is not free in body.substitute x (.mu x body) (isFreeIn_mu_unfold_false)
         have hnotfree : SessionCoTypes.SubstCommBarendregt.isFreeIn x
             (body.substitute x (.mu x body)) = false :=
-          isFreeIn_mu_unfold_false body x
+          is_free_in_mu_unfold_false body x
         -- Since x = var, we have: (body.substitute x (.mu x body)).substitute var repl
         -- = (body.substitute x (.mu x body)).substitute x repl (using hshadow)
         -- = body.substitute x (.mu x body) (by substitute_not_free)
@@ -170,7 +170,7 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
         have hWF_unfold : LocalTypeR.WellFormed (body.substitute x (.mu x body)) :=
           LocalTypeR.WellFormed.unfold (t := .mu x body) (by simpa using hWFt)
         have hBisim : Bisim (body.substitute x (.mu x body)) (body.substitute x (.mu x body)) :=
-          EQ2.toBisim (EQ2_refl _) hWF_unfold hWF_unfold
+          EQ2.to_bisim (eq2_refl _) hWF_unfold hWF_unfold
         obtain ⟨R', hR'post, hxy⟩ := hBisim
         have hf := hR'post _ _ hxy
         have hlift : ∀ a b, R' a b → SubstUnfoldClosure var repl a b :=
@@ -188,17 +188,17 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
         -- x ≠ var from hdiff
         have hxne : x ≠ var := by simp only [beq_eq_false_iff_ne] at hdiff; exact hdiff
         -- EQ2_subst_mu_comm gives: EQ2 LHS RHS
-        have heq := EQ2_subst_mu_comm body var x repl hxne hWFt
+        have heq := eq2_subst_mu_comm body var x repl hxne hWFt
         -- EQ2 implies Bisim (well-formedness from unfold + substitution)
         have hWFmu' : LocalTypeR.WellFormed (.mu x (body.substitute var repl)) :=
-          WellFormed_mu_substitute (x := x) (var := var) hWFt hWFrepl
+          well_formed_mu_substitute (x := x) (var := var) hWFt hWFrepl
         have hWFx : LocalTypeR.WellFormed
             ((body.substitute var repl).substitute x (.mu x (body.substitute var repl))) :=
           LocalTypeR.WellFormed.unfold (t := .mu x (body.substitute var repl)) hWFmu'
         have hWFy : LocalTypeR.WellFormed ((body.substitute x (.mu x body)).substitute var repl) :=
-          WellFormed_substitute (var := var)
+          well_formed_substitute (var := var)
             (LocalTypeR.WellFormed.unfold (t := .mu x body) (by simpa using hWFt)) hWFrepl
-        have hBisim := EQ2.toBisim heq hWFx hWFy
+        have hBisim := EQ2.to_bisim heq hWFx hWFy
         -- Extract witness relation from Bisim
         obtain ⟨R', hR'post, hxy⟩ := hBisim
         have hf : BisimF R' _ _ := hR'post _ _ hxy
@@ -220,25 +220,25 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
 
 /-- SubstUnfoldRel implies Bisim via the closure.
 
-    Once SubstUnfoldClosure_postfix is proven, this follows directly. -/
-theorem SubstUnfoldRel_implies_Bisim (var : String) (repl : LocalTypeR)
+    Once subst_unfold_closure_postfix is proven, this follows directly. -/
+theorem subst_unfold_rel_implies_bisim (var : String) (repl : LocalTypeR)
     (t : LocalTypeR) (hWFt : LocalTypeR.WellFormed t) (hWFrepl : LocalTypeR.WellFormed repl) :
     Bisim ((t.substitute var repl).unfold) ((t.unfold).substitute var repl) := by
   use SubstUnfoldClosure var repl
   constructor
-  · exact SubstUnfoldClosure_postfix var repl hWFrepl
+  · exact subst_unfold_closure_postfix var repl hWFrepl
   · exact Or.inl ⟨t, hWFt, rfl, rfl⟩
 
 /-- EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl).
 
-    This eliminates the unfold_substitute_EQ2 dependency.
+    This eliminates the unfold_substitute_eq2 dependency.
 
     Proof: SubstUnfoldRel is in SubstUnfoldClosure which is a bisimulation,
-    so the pair is in Bisim, and Bisim.toEQ2 gives us EQ2. -/
-theorem unfold_substitute_EQ2_via_Bisim (t : LocalTypeR) (var : String) (repl : LocalTypeR)
+    so the pair is in Bisim, and Bisim.to_eq2 gives us EQ2. -/
+theorem unfold_substitute_eq2_via_bisim (t : LocalTypeR) (var : String) (repl : LocalTypeR)
     (hWFt : LocalTypeR.WellFormed t) (hWFrepl : LocalTypeR.WellFormed repl) :
     EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl) := by
-  have hBisim := SubstUnfoldRel_implies_Bisim var repl t hWFt hWFrepl
-  exact Bisim.toEQ2 hBisim
+  have hBisim := subst_unfold_rel_implies_bisim var repl t hWFt hWFrepl
+  exact Bisim.to_eq2 hBisim
 
 end SessionCoTypes.Bisim

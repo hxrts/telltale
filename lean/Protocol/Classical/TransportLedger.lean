@@ -77,7 +77,7 @@ def appendixDDischargeSet : List TransportLedgerEntry :=
 def transportLedger : List TransportLedgerEntry :=
   mainTextExemplar :: appendixDDischargeSet
 
-theorem mainTextExemplar_in_ledger :
+theorem main_text_exemplar_in_ledger :
     mainTextExemplar ∈ transportLedger := by
   simp [transportLedger]
 

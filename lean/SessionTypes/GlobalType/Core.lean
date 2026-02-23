@@ -106,7 +106,7 @@ mutual
     | (_, g) :: rest => g.freeVars ++ freeVarsOfBranches rest
 end
 
-theorem freeVarsOfBranches_eq_flatMap (branches : List (Label × GlobalType)) :
+theorem free_vars_of_branches_eq_flat_map (branches : List (Label × GlobalType)) :
     freeVarsOfBranches branches = branches.flatMap (fun (_, g) => g.freeVars) := by
   induction branches with
   | nil => rfl
@@ -159,7 +159,7 @@ mutual
 end
 
 /-- Extract allVarsBound for individual branches from comm. -/
-theorem allVarsBound_comm_branches (sender receiver : String)
+theorem all_vars_bound_comm_branches (sender receiver : String)
     (branches : List (Label × GlobalType))
     (h : (GlobalType.comm sender receiver branches).allVarsBound = true) :
     ∀ b ∈ branches, b.2.allVarsBound = true := by
@@ -244,7 +244,7 @@ end
 def branchLabels (branches : List (Label × GlobalType)) : List Label :=
   branches.map Prod.fst
 
-private theorem label_mem_branchLabels_of_mem {label : Label} {cont : GlobalType}
+private theorem label_mem_branch_labels_of_mem {label : Label} {cont : GlobalType}
     {branches : List (Label × GlobalType)} (hmem : (label, cont) ∈ branches) :
     label ∈ branchLabels branches := by
   -- Lift pair membership into label membership.
@@ -266,7 +266,7 @@ private theorem mem_branch_unique_label_head
       cases hpair
       rfl
   | inr hmem_tail =>
-      have hlabel : label ∈ branchLabels rest := label_mem_branchLabels_of_mem hmem_tail
+      have hlabel : label ∈ branchLabels rest := label_mem_branch_labels_of_mem hmem_tail
       have hbad : head.1 ∈ branchLabels rest := by simpa [hhead] using hlabel
       exact (hnotmem hbad).elim
 
@@ -320,7 +320,7 @@ theorem mem_branch_unique_label {branches : List (Label × GlobalType)}
 /-! ## Branch Label Substitution Invariance -/
 
 /-- Substitution preserves branch labels: the labels of substituted branches are the same as original. -/
-theorem branchLabels_substituteBranches (branches : List (Label × GlobalType))
+theorem branch_labels_substitute_branches (branches : List (Label × GlobalType))
     (varName : String) (replacement : GlobalType) :
     branchLabels (substituteBranches branches varName replacement) = branchLabels branches := by
   induction branches with
@@ -335,7 +335,7 @@ mutual
   /-- uniqueBranchLabels is preserved by substitution on a global type.
 
   **Requires:** Both the original type `g` and the replacement have unique branch labels. -/
-  theorem GlobalType.uniqueBranchLabels_substitute (g : GlobalType)
+  theorem GlobalType.unique_branch_labels_substitute (g : GlobalType)
       (varName : String) (replacement : GlobalType)
       (huniq : g.uniqueBranchLabels = true)
       (huniq_repl : replacement.uniqueBranchLabels = true) :
@@ -352,17 +352,17 @@ mutual
         split
         · exact huniq
         · simp only [GlobalType.uniqueBranchLabels] at huniq ⊢
-          exact GlobalType.uniqueBranchLabels_substitute body varName replacement huniq huniq_repl
+          exact GlobalType.unique_branch_labels_substitute body varName replacement huniq huniq_repl
     | .comm sender receiver branches =>
         simp only [GlobalType.substitute, GlobalType.uniqueBranchLabels, Bool.and_eq_true,
-                   branchLabels_substituteBranches] at huniq ⊢
-        exact ⟨huniq.1, uniqueBranchLabelsBranches_substitute branches varName replacement huniq.2 huniq_repl⟩
+                   branch_labels_substitute_branches] at huniq ⊢
+        exact ⟨huniq.1, unique_branch_labels_branches_substitute branches varName replacement huniq.2 huniq_repl⟩
     | .delegate p q sid r cont =>
         simp only [GlobalType.substitute, GlobalType.uniqueBranchLabels] at huniq ⊢
-        exact GlobalType.uniqueBranchLabels_substitute cont varName replacement huniq huniq_repl
+        exact GlobalType.unique_branch_labels_substitute cont varName replacement huniq huniq_repl
 
   /-- uniqueBranchLabels is preserved by substitution on branches. -/
-  theorem uniqueBranchLabelsBranches_substitute (branches : List (Label × GlobalType))
+  theorem unique_branch_labels_branches_substitute (branches : List (Label × GlobalType))
       (varName : String) (replacement : GlobalType)
       (huniq : uniqueBranchLabelsBranches branches = true)
       (huniq_repl : replacement.uniqueBranchLabels = true) :
@@ -371,8 +371,8 @@ mutual
     | [] => rfl
     | (label, cont) :: rest =>
         simp only [substituteBranches, uniqueBranchLabelsBranches, Bool.and_eq_true] at huniq ⊢
-        exact ⟨GlobalType.uniqueBranchLabels_substitute cont varName replacement huniq.1 huniq_repl,
-               uniqueBranchLabelsBranches_substitute rest varName replacement huniq.2 huniq_repl⟩
+        exact ⟨GlobalType.unique_branch_labels_substitute cont varName replacement huniq.1 huniq_repl,
+               unique_branch_labels_branches_substitute rest varName replacement huniq.2 huniq_repl⟩
 end
 
 end SessionTypes.GlobalType

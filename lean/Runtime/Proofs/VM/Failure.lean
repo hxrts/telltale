@@ -11,7 +11,7 @@ Proof-only lemmas for deterministic recovery and retry bounds.
 universe u
 
 /-- Retry delay is bounded by the configured max-retry envelope. -/
-theorem retryBackoffDelay_bounded
+theorem retry_backoff_delay_bounded
     (policy : RecoveryPolicy)
     {attempt : Nat}
     (hAttempt : retryAllowed policy attempt) :
@@ -21,7 +21,7 @@ theorem retryBackoffDelay_bounded
   exact Nat.add_le_add_left (Nat.mul_le_mul_right _ hAttempt) _
 
 /-- `decideRecovery` is total: every input yields a concrete recovery action. -/
-theorem decideRecovery_total
+theorem decide_recovery_total
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -35,7 +35,7 @@ theorem decideRecovery_total
   exact ⟨decideRecovery st sid f evidence policy, rfl⟩
 
 /-- `decideRecovery` is deterministic: equal inputs imply equal chosen actions. -/
-theorem decideRecovery_deterministic
+theorem decide_recovery_deterministic
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]

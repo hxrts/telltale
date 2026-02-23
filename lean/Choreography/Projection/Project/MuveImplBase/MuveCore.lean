@@ -13,8 +13,8 @@ Muve (mu-var-end) infrastructure and non-participant projection results.
 The following definitions form the semantic interface for proofs:
 
 - `isMuve`: mu-var-end predicate on local types
-- `EQ_end`: non-participants project to EEnd (EQ2)
-- `CProject_muve_of_not_part_of2`: non-participant projections are muve
+- `eq_end`: non-participants project to EEnd (EQ2)
+- `c_project_muve_of_not_part_of2`: non-participant projections are muve
 - `part_of2_or_end`: participant-or-end classification
 -/
 
@@ -55,7 +55,7 @@ def isMuve : LocalTypeR → Bool
   | .recv _ _ => false
 
 /-- If a local type is unguarded at some variable, it must be a muve type. -/
-theorem isMuve_of_not_guarded : ∀ lt v, lt.isGuarded v = false → isMuve lt = true
+theorem is_muve_of_not_guarded : ∀ lt v, lt.isGuarded v = false → isMuve lt = true
   | .end, _, _ => by simp [isMuve]
   | .var _, _, _ => by simp [isMuve]
   | .send _ _, _, h => by
@@ -74,7 +74,7 @@ theorem isMuve_of_not_guarded : ∀ lt v, lt.isGuarded v = false → isMuve lt =
       · have hbody : body.isGuarded v = false := by
           simp [LocalTypeR.isGuarded, htv] at h
           exact h
-        have ih' := isMuve_of_not_guarded body v hbody
+        have ih' := is_muve_of_not_guarded body v hbody
         simp [isMuve, ih']
 
 /-- A local type is closed if it has no free variables. -/
@@ -82,13 +82,13 @@ def isClosed (lt : LocalTypeR) : Bool := lt.freeVars == []
 
 -- FreeVars lemmas for substitution
 -- Substitution Free-Variable Base Helpers
-private theorem freeVars_substitute_subset_end (varName : String) (repl : LocalTypeR)
+private theorem free_vars_substitute_subset_end (varName : String) (repl : LocalTypeR)
     (x : String) (hx : x ∈ (LocalTypeR.end.substitute varName repl).freeVars) :
     x ∈ repl.freeVars ∨ (x ∈ LocalTypeR.end.freeVars ∧ x ≠ varName) := by
   -- end has no free vars, so this case is impossible.
   simp only [LocalTypeR.substitute, LocalTypeR.freeVars, List.not_mem_nil] at hx
 
-private theorem freeVars_substitute_subset_var
+private theorem free_vars_substitute_subset_var
     (t varName : String) (repl : LocalTypeR) (x : String)
     (hx : x ∈ ((LocalTypeR.var t).substitute varName repl).freeVars) :
     x ∈ repl.freeVars ∨ (x ∈ (LocalTypeR.var t).freeVars ∧ x ≠ varName) := by
@@ -110,7 +110,7 @@ private theorem freeVars_substitute_subset_var
 /- ## Structured Block 1 -/
     · simpa [hx] using heq
 
-private theorem freeVars_substitute_subset_mu_shadow
+private theorem free_vars_substitute_subset_mu_shadow
     (t varName : String) (body repl : LocalTypeR) (x : String)
     (heq : (t == varName) = true)
     (hx : x ∈ body.freeVars.filter (fun v => v != t)) :
@@ -126,7 +126,7 @@ private theorem freeVars_substitute_subset_mu_shadow
   · simpa [htv] using hxne_t
 
 -- Substitution Under Mu (Shadowing Cases)
-private theorem freeVars_substitute_subset_mu_noshadow
+private theorem free_vars_substitute_subset_mu_noshadow
     (t varName : String) (body repl : LocalTypeR) (x : String)
     (hx : x ∈ (body.substitute varName repl).freeVars.filter (fun v => v != t))
     (ih : x ∈ repl.freeVars ∨ (x ∈ body.freeVars ∧ x ≠ varName)) :
@@ -152,9 +152,9 @@ private def freeVars_substitute_subset_aux (lt : LocalTypeR) (varName : String) 
   -- Reduce by cases on lt, delegating to focused helpers.
   match lt with
   | .end =>
-      freeVars_substitute_subset_end varName repl x hx
+      free_vars_substitute_subset_end varName repl x hx
   | .var t =>
-      freeVars_substitute_subset_var t varName repl x hx
+      free_vars_substitute_subset_var t varName repl x hx
   | .send _ branches => by
       simp only [LocalTypeR.substitute, LocalTypeR.freeVars] at hx ⊢;
         exact freeVars_substituteBranches_subset_aux branches varName repl x hx
@@ -168,13 +168,13 @@ private def freeVars_substitute_subset_aux (lt : LocalTypeR) (varName : String) 
           have hx' : x ∈ body.freeVars.filter (fun v => v != t) := by
 /- ## Structured Block 2 -/
             simpa [hbool, LocalTypeR.freeVars] using hx
-          exact freeVars_substitute_subset_mu_shadow t varName body repl x hbool hx'
+          exact free_vars_substitute_subset_mu_shadow t varName body repl x hbool hx'
         · have hbool : (t == varName) = false := (beq_eq_false_iff_ne).2 heq
           have hx' : x ∈ (body.substitute varName repl).freeVars.filter (fun v => v != t) := by
             simpa [hbool, LocalTypeR.freeVars] using hx
           have ih := freeVars_substitute_subset_aux body varName repl x (by
             exact (List.mem_filter.mp hx').1)
-          exact freeVars_substitute_subset_mu_noshadow t varName body repl x hx' ih
+          exact free_vars_substitute_subset_mu_noshadow t varName body repl x hx' ih
 termination_by sizeOf lt
 
 -- Branch Substitution Recursion
@@ -207,7 +207,7 @@ termination_by sizeOf branches
 end
 
 -- Substitution Free-Variable Superset Theorem
-theorem freeVars_substitute_subset (lt : LocalTypeR) (varName : String) (repl : LocalTypeR) :
+theorem free_vars_substitute_subset (lt : LocalTypeR) (varName : String) (repl : LocalTypeR) :
     ∀ x, x ∈ (lt.substitute varName repl).freeVars →
          x ∈ repl.freeVars ∨ (x ∈ lt.freeVars ∧ x ≠ varName) :=
   fun x hx => freeVars_substitute_subset_aux lt varName repl x hx
@@ -221,7 +221,7 @@ theorem substitute_closed_when_only_var (lt : LocalTypeR) (varName : String) (re
   rw [List.eq_nil_iff_forall_not_mem]
   intro x hx
   -- By freeVars_substitute_subset, x ∈ repl.freeVars ∨ (x ∈ lt.freeVars ∧ x ≠ varName)
-  have hsub := freeVars_substitute_subset lt varName repl x hx
+  have hsub := free_vars_substitute_subset lt varName repl x hx
   cases hsub with
   | inl hrepl_mem =>
       -- x ∈ repl.freeVars contradicts hrepl : repl.freeVars = []
@@ -234,7 +234,7 @@ theorem substitute_closed_when_only_var (lt : LocalTypeR) (varName : String) (re
       exact hpair.2 hxeq
 
 -- Closed Mu Body Variable Constraint
-theorem mu_closed_body_freeVars (t : String) (body : LocalTypeR)
+theorem mu_closed_body_free_vars (t : String) (body : LocalTypeR)
     (hclosed : (.mu t body : LocalTypeR).freeVars = []) :
     ∀ x, x ∈ body.freeVars → x = t := by
   intro x hx
@@ -313,7 +313,7 @@ termination_by sizeOf branches
 end
 
 /-- If all variables are bound with empty context, there are no free variables. -/
-theorem allVarsBound_nil_implies_freeVars_nil (g : GlobalType)
+theorem all_vars_bound_nil_implies_free_vars_nil (g : GlobalType)
     (h : g.allVarsBound [] = true) :
     g.freeVars = [] := by
   rw [List.eq_nil_iff_forall_not_mem]
@@ -322,7 +322,7 @@ theorem allVarsBound_nil_implies_freeVars_nil (g : GlobalType)
   simp only [List.not_mem_nil] at hmem
 
 -- Muve Preservation Under Substitution
-theorem isMuve_substitute (lt : LocalTypeR) (varName : String) (repl : LocalTypeR)
+theorem is_muve_substitute (lt : LocalTypeR) (varName : String) (repl : LocalTypeR)
     (hlt : isMuve lt = true) (hrepl : isMuve repl = true) :
     isMuve (lt.substitute varName repl) = true := by
   -- Follow the structure of lt and preserve the muve invariant.
@@ -336,7 +336,7 @@ theorem isMuve_substitute (lt : LocalTypeR) (varName : String) (repl : LocalType
       by_cases heq : t == varName
       · simp [LocalTypeR.substitute, heq, isMuve, hlt]
       · simp [LocalTypeR.substitute, heq, isMuve]
-        exact isMuve_substitute body varName repl hlt hrepl
+        exact is_muve_substitute body varName repl hlt hrepl
   | .send _ _ =>
       have : False := by
         simp [isMuve] at hlt
@@ -357,7 +357,7 @@ while allVarsBound does not (body.allVarsBound [t] doesn't imply body.allVarsBou
 This avoids the semantic gap that arises from using full wellFormed. -/
 
 -- Mu Structural Well-Formedness Helper
-private theorem wellFormed_mu_body (t : String) (body : GlobalType)
+private theorem well_formed_mu_body (t : String) (body : GlobalType)
     (hwf : (GlobalType.mu t body).wellFormed = true) :
     body.allCommsNonEmpty = true ∧ body.noSelfComm = true := by
   unfold GlobalType.wellFormed at hwf
@@ -365,7 +365,7 @@ private theorem wellFormed_mu_body (t : String) (body : GlobalType)
   simp_all only [and_self]
 
 -- Size Decrease Helper for Comm Branches
-private theorem sizeOf_pair_snd_lt_comm (sender receiver : String) (pair : Label × GlobalType)
+private theorem size_of_pair_snd_lt_comm (sender receiver : String) (pair : Label × GlobalType)
     (rest : List (Label × GlobalType)) :
     sizeOf pair.2 < sizeOf (GlobalType.comm sender receiver (pair :: rest)) := by
   -- sizeOf (comm s r bs) = 1 + sizeOf s + sizeOf r + sizeOf bs
@@ -381,7 +381,7 @@ private theorem sizeOf_pair_snd_lt_comm (sender receiver : String) (pair : Label
   omega
 
 -- Comm Branch Well-Formedness Helper
-private theorem wellFormed_comm_cont (sender receiver : String) (pair : Label × GlobalType)
+private theorem well_formed_comm_cont (sender receiver : String) (pair : Label × GlobalType)
     (rest : List (Label × GlobalType))
     (hwf : (GlobalType.comm sender receiver (pair :: rest)).wellFormed = true) :
     pair.2.wellFormed = true := by
@@ -482,8 +482,8 @@ decreasing_by
     first
 /- ## Structured Block 7 -/
     | omega
-    | exact sizeOf_body_lt_mu _ _
-    | simpa [GlobalType.comm.sizeOf_spec] using sizeOf_pair_snd_lt_comm _ _ _ _
+    | exact size_of_body_lt_mu _ _
+    | simpa [GlobalType.comm.sizeOf_spec] using size_of_pair_snd_lt_comm _ _ _ _
 
 -- Non-Participant Muve Projection Theorem
 theorem trans_muve_of_not_part_of2 (g : GlobalType) (role : String)

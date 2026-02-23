@@ -24,7 +24,7 @@ Additional challenges arise from branch processing in communications:
 Solution Structure. The module is organized into five main sections:
 1. Core definitions: trans, transBranches, lcontractive, and termination proofs
 2. Shape lemmas: trans_comm_sender, trans_comm_receiver, trans_comm_other
-3. Closedness preservation: trans_freeVars_subset and derived theorems
+3. Closedness preservation: trans_free_vars_subset and derived theorems
 4. Well-formedness: preservation of structure through projection
 5. Participation: relating contractiveness to participation properties
 -/
@@ -40,8 +40,8 @@ The following definitions form the semantic interface for proofs:
 - `trans`: candidate projection function
 - `transBranches`: helper for projecting branch lists
 - `lcontractive`: guardedness predicate for recursion
-- `trans_freeVars_subset`: free variables are preserved
-- `transBranches_freeVars_subset`: branch-wise free variable preservation
+- `trans_free_vars_subset`: free variables are preserved
+- `trans_branches_free_vars_subset`: branch-wise free variable preservation
 - `trans_comm_sender`: shape lemma for sender projection
 - `trans_comm_receiver`: shape lemma for receiver projection
 - `trans_comm_other`: shape lemma for non-participant projection
@@ -75,75 +75,75 @@ def lcontractive : GlobalType → Bool
 
 /-! ## Size-Of Lemmas for Termination -/
 
-private theorem sizeOf_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
+private theorem size_of_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf (x :: l) = 1 + sizeOf x + sizeOf l := by
   simp [sizeOf, List._sizeOf_1]
 
-private theorem sizeOf_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b : β) :
+private theorem size_of_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b : β) :
     sizeOf (a, b) = 1 + sizeOf a + sizeOf b := by
   simp [sizeOf, Prod._sizeOf_1]
 
-private theorem sizeOf_snd_lt_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b : β) :
+private theorem size_of_snd_lt_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b : β) :
     sizeOf b < sizeOf (a, b) := by
   simp only [sizeOf, Prod._sizeOf_1]
   omega
 
-private theorem sizeOf_head_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
+private theorem size_of_head_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf x < sizeOf (x :: l) := by
   simp only [sizeOf, List._sizeOf_1]
   omega
 
-private theorem sizeOf_tail_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
+private theorem size_of_tail_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf l < sizeOf (x :: l) := by
   simp only [sizeOf, List._sizeOf_1]
   omega
 
-private theorem sizeOf_head_snd_lt_cons (pair : Label × GlobalType) (rest : List (Label × GlobalType)) :
+private theorem size_of_head_snd_lt_cons (pair : Label × GlobalType) (rest : List (Label × GlobalType)) :
     sizeOf pair.2 < sizeOf (pair :: rest) := by
-  have h1 : sizeOf pair.2 < sizeOf pair := sizeOf_snd_lt_prod pair.1 pair.2
-  have h2 : sizeOf pair < sizeOf (pair :: rest) := sizeOf_head_lt_cons pair rest
+  have h1 : sizeOf pair.2 < sizeOf pair := size_of_snd_lt_prod pair.1 pair.2
+  have h2 : sizeOf pair < sizeOf (pair :: rest) := size_of_head_lt_cons pair rest
   exact Nat.lt_trans h1 h2
 
 /-! ## Size-Of Lemmas for Comm Cases -/
 
-private theorem sizeOf_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
+private theorem size_of_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
     sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
   simp only [GlobalType.comm.sizeOf_spec]
   have h : 0 < 1 + sizeOf sender + sizeOf receiver := by omega
   omega
 
-private theorem sizeOf_head_snd_lt_comm
+private theorem size_of_head_snd_lt_comm
     (sender receiver : String) (pair : Label × GlobalType) (rest : List (Label × GlobalType)) :
     sizeOf pair.2 < sizeOf (GlobalType.comm sender receiver (pair :: rest)) := by
-  have h1 : sizeOf pair.2 < sizeOf (pair :: rest) := sizeOf_head_snd_lt_cons pair rest
+  have h1 : sizeOf pair.2 < sizeOf (pair :: rest) := size_of_head_snd_lt_cons pair rest
   have h2 : sizeOf (pair :: rest) < sizeOf (GlobalType.comm sender receiver (pair :: rest)) :=
-    sizeOf_bs_lt_comm sender receiver (pair :: rest)
+    size_of_bs_lt_comm sender receiver (pair :: rest)
   exact Nat.lt_trans h1 h2
 
-private theorem sizeOf_cont_lt_comm
+private theorem size_of_cont_lt_comm
     (sender receiver : String) (label : Label) (cont : GlobalType) (rest : List (Label × GlobalType)) :
     sizeOf cont < sizeOf (GlobalType.comm sender receiver ((label, cont) :: rest)) := by
-  exact sizeOf_head_snd_lt_comm sender receiver (label, cont) rest
+  exact size_of_head_snd_lt_comm sender receiver (label, cont) rest
 
-private theorem sizeOf_cont_lt_comm_expanded (sender receiver : String)
+private theorem size_of_cont_lt_comm_expanded (sender receiver : String)
     (label : Label) (cont : GlobalType) (tail : List (Label × GlobalType)) :
     sizeOf cont <
       1 + sizeOf sender + sizeOf receiver + (1 + (1 + sizeOf label + sizeOf cont) + sizeOf tail) := by
   simp [sizeOf, List._sizeOf_1, Prod._sizeOf_1]
   omega
 
-private theorem sizeOf_branches_lt_comm_expanded (sender receiver : String)
+private theorem size_of_branches_lt_comm_expanded (sender receiver : String)
     (label : Label) (cont : GlobalType) (tail : List (Label × GlobalType)) :
     sizeOf ((label, cont) :: tail) <
       1 + sizeOf sender + sizeOf receiver + (1 + (1 + sizeOf label + sizeOf cont) + sizeOf tail) := by
   simp [sizeOf, List._sizeOf_1, Prod._sizeOf_1]
   omega
 
-private theorem sizeOf_cont_lt_cons (label : Label) (cont : GlobalType) (rest : List (Label × GlobalType)) :
+private theorem size_of_cont_lt_cons (label : Label) (cont : GlobalType) (rest : List (Label × GlobalType)) :
     sizeOf cont < sizeOf ((label, cont) :: rest) := by
-  exact sizeOf_head_snd_lt_cons (label, cont) rest
+  exact size_of_head_snd_lt_cons (label, cont) rest
 
-private theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
+private theorem size_of_body_lt_mu (t : String) (body : GlobalType) :
     sizeOf body < sizeOf (GlobalType.mu t body) := by
   have hk : 0 < 1 + sizeOf t := by
     simp only [Nat.one_add]
@@ -196,9 +196,9 @@ mutual
   decreasing_by
     all_goals
       first
-      | exact sizeOf_body_lt_mu _ _
-      | exact sizeOf_bs_lt_comm _ _ _
-      | exact sizeOf_cont_lt_comm _ _ _ _ _
+      | exact size_of_body_lt_mu _ _
+      | exact size_of_bs_lt_comm _ _ _
+      | exact size_of_cont_lt_comm _ _ _ _ _
       | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
   /-- Project branch continuations for `trans`. -/
@@ -211,8 +211,8 @@ mutual
   decreasing_by
     all_goals
       first
-      | exact sizeOf_cont_lt_cons _ _ _
-      | exact sizeOf_tail_lt_cons _ _
+      | exact size_of_cont_lt_cons _ _ _
+      | exact size_of_tail_lt_cons _ _
 end
 
 /-! ## Shape Lemmas for Communications -/
@@ -285,7 +285,7 @@ theorem trans_comm_other
 
 mutual
   /-- Free variables of `trans` are contained in global free variables. -/
-  theorem trans_freeVars_subset (role : String) :
+  theorem trans_free_vars_subset (role : String) :
       ∀ g x, x ∈ (trans g role).freeVars → x ∈ g.freeVars := by
     intro g x hx
     match g with
@@ -303,7 +303,7 @@ mutual
         ·
           simp only [hguard, ↓reduceIte, LocalTypeR.freeVars, List.mem_filter,
             bne_iff_ne, ne_eq] at hx
-          have hmem : x ∈ body.freeVars := trans_freeVars_subset role body x hx.1
+          have hmem : x ∈ body.freeVars := trans_free_vars_subset role body x hx.1
           simp only [GlobalType.freeVars, List.mem_filter, bne_iff_ne, ne_eq]
           exact ⟨hmem, hx.2⟩
         ·
@@ -319,15 +319,15 @@ mutual
                 have : False := by
                   unfold trans at hx
                   simp [hsender, ↓reduceIte, transBranches, LocalTypeR.freeVars,
-                    SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap, List.flatMap_nil] at hx
+                    SessionTypes.LocalTypeR.free_vars_of_branches_eq_flat_map, List.flatMap_nil] at hx
                 exact this.elim
             | cons head tail =>
                 cases head with
                 | mk label cont =>
                     simp only [trans, hsender, ↓reduceIte, LocalTypeR.freeVars,
-                      SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap] at hx
-                    have hmem := transBranches_freeVars_subset role ((label, cont) :: tail) x hx
-                    simpa [GlobalType.freeVars, SessionTypes.GlobalType.freeVarsOfBranches_eq_flatMap] using hmem
+                      SessionTypes.LocalTypeR.free_vars_of_branches_eq_flat_map] at hx
+                    have hmem := trans_branches_free_vars_subset role ((label, cont) :: tail) x hx
+                    simpa [GlobalType.freeVars, SessionTypes.GlobalType.free_vars_of_branches_eq_flat_map] using hmem
         -- FreeVars Subset: Receiver Communication
         | false =>
             cases hreceiver : role == receiver with
@@ -338,16 +338,16 @@ mutual
                       unfold trans at hx
                       simp [hsender, Bool.false_eq_true, ↓reduceIte, hreceiver, transBranches,
 /- ## Structured Block 1 -/
-                        LocalTypeR.freeVars, SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap,
+                        LocalTypeR.freeVars, SessionTypes.LocalTypeR.free_vars_of_branches_eq_flat_map,
                         List.flatMap_nil] at hx
                     exact this.elim
                 | cons head tail =>
                     cases head with
                     | mk label cont =>
                         simp only [trans, hsender, Bool.false_eq_true, ↓reduceIte, hreceiver,
-                          LocalTypeR.freeVars, SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap] at hx
-                        have hmem := transBranches_freeVars_subset role ((label, cont) :: tail) x hx
-                        simpa [GlobalType.freeVars, SessionTypes.GlobalType.freeVarsOfBranches_eq_flatMap] using hmem
+                          LocalTypeR.freeVars, SessionTypes.LocalTypeR.free_vars_of_branches_eq_flat_map] at hx
+                        have hmem := trans_branches_free_vars_subset role ((label, cont) :: tail) x hx
+                        simpa [GlobalType.freeVars, SessionTypes.GlobalType.free_vars_of_branches_eq_flat_map] using hmem
             -- FreeVars Subset: Non-Participant Communication
             | false =>
                 cases branches with
@@ -360,8 +360,8 @@ mutual
                     cases head with
                     | mk label cont =>
                         simp only [trans, hsender, Bool.false_eq_true, ↓reduceIte, hreceiver] at hx
-                        have hmem' : x ∈ cont.freeVars := trans_freeVars_subset role cont x hx
-                        simp [GlobalType.freeVars, SessionTypes.GlobalType.freeVarsOfBranches_eq_flatMap,
+                        have hmem' : x ∈ cont.freeVars := trans_free_vars_subset role cont x hx
+                        simp [GlobalType.freeVars, SessionTypes.GlobalType.free_vars_of_branches_eq_flat_map,
                           List.flatMap_cons, List.mem_append, hmem']
     -- FreeVars Subset: Delegation Case
     | .delegate p q sid r cont =>
@@ -369,18 +369,18 @@ mutual
         simp only [trans] at hx
         by_cases hp : role == p
         · simp only [hp, ↓reduceIte, LocalTypeR.freeVars,
-            SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap, List.flatMap,
+            SessionTypes.LocalTypeR.free_vars_of_branches_eq_flat_map, List.flatMap,
             List.append_nil, List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil] at hx
-          have hmem : x ∈ cont.freeVars := trans_freeVars_subset role cont x hx
+          have hmem : x ∈ cont.freeVars := trans_free_vars_subset role cont x hx
           simp [GlobalType.freeVars, hmem]
         · by_cases hq : role == q
           · simp only [hp, Bool.false_eq_true, ↓reduceIte, hq, LocalTypeR.freeVars,
-              SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap, List.flatMap,
+              SessionTypes.LocalTypeR.free_vars_of_branches_eq_flat_map, List.flatMap,
               List.append_nil, List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil] at hx
-            have hmem : x ∈ cont.freeVars := trans_freeVars_subset role cont x hx
+            have hmem : x ∈ cont.freeVars := trans_free_vars_subset role cont x hx
             simp [GlobalType.freeVars, hmem]
           · simp only [hp, Bool.false_eq_true, ↓reduceIte, hq] at hx
-            have hmem : x ∈ cont.freeVars := trans_freeVars_subset role cont x hx
+            have hmem : x ∈ cont.freeVars := trans_free_vars_subset role cont x hx
             simp [GlobalType.freeVars, hmem]
 
   termination_by g _ _ => sizeOf g
@@ -389,16 +389,16 @@ mutual
       simp_wf
       try (simp [*])
       first
-      | exact sizeOf_body_lt_mu _ _
-      | exact sizeOf_branches_lt_comm_expanded _ _ _ _ _
-      | exact sizeOf_cont_lt_comm_expanded _ _ _ _ _
+      | exact size_of_body_lt_mu _ _
+      | exact size_of_branches_lt_comm_expanded _ _ _ _ _
+      | exact size_of_cont_lt_comm_expanded _ _ _ _ _
 /- ## Structured Block 2 -/
-      | exact sizeOf_bs_lt_comm _ _ _
-      | exact sizeOf_cont_lt_comm _ _ _ _ _
+      | exact size_of_bs_lt_comm _ _ _
+      | exact size_of_cont_lt_comm _ _ _ _ _
       | omega
 
   -- FreeVars Subset: Branch Fold Lemma
-  theorem transBranches_freeVars_subset (role : String) :
+  theorem trans_branches_free_vars_subset (role : String) :
       ∀ branches y,
         y ∈ (transBranches branches role).flatMap (fun (_, _, t) => t.freeVars) →
           y ∈ branches.flatMap (fun (_, g) => g.freeVars) := by
@@ -410,19 +410,19 @@ mutual
         simp only [transBranches, List.flatMap_cons, List.mem_append] at hy
         cases hy with
         | inl hhead =>
-            have hmem : y ∈ cont.freeVars := trans_freeVars_subset role cont y hhead
+            have hmem : y ∈ cont.freeVars := trans_free_vars_subset role cont y hhead
             simp [List.flatMap_cons, List.mem_append, hmem]
         | inr htail =>
             have hmem : y ∈ tail.flatMap (fun (_, g) => g.freeVars) :=
-              transBranches_freeVars_subset role tail y htail
+              trans_branches_free_vars_subset role tail y htail
             simp [List.flatMap_cons, List.mem_append, hmem]
   termination_by branches _ _ => sizeOf branches
   decreasing_by
     all_goals
       simp_wf
       first
-      | exact sizeOf_cont_lt_cons _ _ _
-      | exact sizeOf_tail_lt_cons _ _
+      | exact size_of_cont_lt_cons _ _ _
+      | exact size_of_tail_lt_cons _ _
       | omega
 end
 
@@ -431,7 +431,7 @@ end
 These theorems establish that projection preserves closedness,
 which is the key insight from the Coq subject_reduction implementation.
 In Coq, this follows automatically from de Bruijn indices;
-here we prove it explicitly from `trans_freeVars_subset`. -/
+here we prove it explicitly from `trans_free_vars_subset`. -/
 
 /-- If a global type is closed, then its projection is also closed.
     This is the Coq-style theorem that sidesteps the allVarsBound semantic gap. -/
@@ -439,13 +439,13 @@ theorem trans_closed_of_closed (g : GlobalType) (role : String)
     (h : g.freeVars = []) : (trans g role).freeVars = [] := by
   have hsub : (trans g role).freeVars ⊆ g.freeVars := by
     intro x hx
-    exact trans_freeVars_subset role g x hx
+    exact trans_free_vars_subset role g x hx
   have hsubNil : (trans g role).freeVars ⊆ [] := by
     simpa [h] using hsub
   exact List.subset_nil.mp hsubNil
 
 /-- Corollary using the isClosed predicate. -/
-theorem trans_isClosed_of_isClosed (g : GlobalType) (role : String)
+theorem trans_is_closed_of_is_closed (g : GlobalType) (role : String)
     (h : g.isClosed = true) : (trans g role).isClosed = true := by
   simp only [LocalTypeR.isClosed, List.isEmpty_iff]
   simp only [GlobalType.isClosed, List.isEmpty_iff] at h
@@ -453,7 +453,7 @@ theorem trans_isClosed_of_isClosed (g : GlobalType) (role : String)
 
 /-- The result of trans on a closed global type has no free vars matching
     any specific variable name. This is useful for the mu case. -/
-theorem trans_freeVars_empty_of_closed (g : GlobalType) (role : String) (t : String)
+theorem trans_free_vars_empty_of_closed (g : GlobalType) (role : String) (t : String)
     (h : g.freeVars = []) : t ∉ (trans g role).freeVars := by
   have hclosed := trans_closed_of_closed g role h
   simp only [hclosed, List.mem_nil_iff, not_false_eq_true]
@@ -465,16 +465,16 @@ Projection preserves well-formedness under all-branch participation. -/
 open SessionTypes.Participation
 
 /-- Helper: .send and .recv types are guarded for any variable. -/
-private theorem isGuarded_send (p : String) (bs : List BranchR) (v : String) :
+private theorem is_guarded_send (p : String) (bs : List BranchR) (v : String) :
     (LocalTypeR.send p bs).isGuarded v = true := by
   simp [LocalTypeR.isGuarded]
 
-private theorem isGuarded_recv (p : String) (bs : List BranchR) (v : String) :
+private theorem is_guarded_recv (p : String) (bs : List BranchR) (v : String) :
     (LocalTypeR.recv p bs).isGuarded v = true := by
   simp [LocalTypeR.isGuarded]
 
 /-- Helper: .end is guarded for any variable. -/
-private theorem isGuarded_end (v : String) : LocalTypeR.end.isGuarded v = true := by
+private theorem is_guarded_end (v : String) : LocalTypeR.end.isGuarded v = true := by
   simp [LocalTypeR.isGuarded]
 
 end Choreography.Projection.Trans

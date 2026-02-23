@@ -30,18 +30,18 @@ structure ResponsiveProtocol where
       timeout_independent_latency_of_assumptions assumptions premises
 
 /-- Extract eventual-decision theorem from a certified protocol bundle. -/
-theorem eventualDecision_of_protocol (P : ResponsiveProtocol) :
+theorem eventual_decision_of_protocol (P : ResponsiveProtocol) :
     TerminatesOnAllFairRuns P.model P.premises.FairRun :=
   P.eventualDecision
 
 /-- Extract timeout-independent-latency theorem from a certified protocol bundle. -/
-theorem timeoutIndependentLatency_of_protocol (P : ResponsiveProtocol) :
+theorem timeout_independent_latency_of_protocol (P : ResponsiveProtocol) :
     TimeoutIndependentLatencyBound
       P.model P.premises.FairRun P.premises.gst P.premises.optimisticBound :=
   P.timeoutIndependentLatency
 
 /-- Core assumptions are always validated for a certified protocol. -/
-theorem coreAssumptions_allPassed (P : ResponsiveProtocol) :
+theorem core_assumptions_all_passed (P : ResponsiveProtocol) :
     (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
   rfl
 

@@ -35,7 +35,7 @@ def BuffersUnique (bufs : Buffers) : Prop :=
 /-! ## Buffer Lookup and Typing Helpers -/
 
 /-- If buffers are unique, membership determines lookupBuf. -/
-theorem lookupBuf_eq_of_mem_unique {bufs : Buffers} (hUniq : BuffersUnique bufs)
+theorem lookup_buf_eq_of_mem_unique {bufs : Buffers} (hUniq : BuffersUnique bufs)
     {e : Edge} {buf : Buffer} (hmem : (e, buf) ∈ bufs) :
     lookupBuf bufs e = buf := by
   -- Induct on the buffer list and use nodup to rule out duplicate keys.
@@ -85,12 +85,12 @@ theorem trace_length_le_depth_of_coherent {G : GEnv} {D : DEnv} {e : Edge}
   have hEdge := hCoh e hActive Lrecv hGrecv
   rcases hEdge with ⟨_, _hGsender, hConsume⟩
   rcases (Option.isSome_iff_exists).1 hConsume with ⟨L', hConsume'⟩
-  exact Consume_length_le_depth hConsume'
+  exact consume_length_le_depth hConsume'
 
 /-! ## Edge and Global Occupancy Bounds -/
 
 /-- Edge buffer occupancy is bounded by receiver depth on active edges. -/
-theorem edgeBufferOccupancy_le_receiver_depth {C : Config} {e : Edge}
+theorem edge_buffer_occupancy_le_receiver_depth {C : Config} {e : Edge}
     {Lrecv : LocalType} (hBT : BuffersTyped C.G C.D C.bufs) (hCoh : Coherent C.G C.D)
     (hActive : ActiveEdge C.G e)
     (hGrecv : lookupG C.G { sid := e.sid, role := e.receiver } = some Lrecv) :
@@ -103,7 +103,7 @@ theorem edgeBufferOccupancy_le_receiver_depth {C : Config} {e : Edge}
   simpa [hBuf] using hTrace
 
 /-- Edge buffer occupancy is bounded by totalTypeDepth on active edges. -/
-theorem edgeBufferOccupancy_le_totalTypeDepth {C : Config} {e : Edge}
+theorem edge_buffer_occupancy_le_total_type_depth {C : Config} {e : Edge}
     (hBT : BuffersTyped C.G C.D C.bufs) (hCoh : Coherent C.G C.D)
     (hActive : ActiveEdge C.G e) :
     edgeBufferOccupancy C e ≤ totalTypeDepth C := by
@@ -112,15 +112,15 @@ theorem edgeBufferOccupancy_le_totalTypeDepth {C : Config} {e : Edge}
   rcases hActive with ⟨_hSend, hRecv⟩
   rcases (Option.isSome_iff_exists).1 hRecv with ⟨Lrecv, hGrecv⟩
   have hOcc : edgeBufferOccupancy C e ≤ Lrecv.depth :=
-    edgeBufferOccupancy_le_receiver_depth (C:=C) (e:=e) hBT hCoh hActive' hGrecv
+    edge_buffer_occupancy_le_receiver_depth (C:=C) (e:=e) hBT hCoh hActive' hGrecv
   have hMem : ({ sid := e.sid, role := e.receiver }, Lrecv) ∈ C.G :=
-    lookupG_mem C.G _ _ hGrecv
+    lookup_g_mem C.G _ _ hGrecv
   have hDepth : Lrecv.depth ≤ totalTypeDepth C :=
-    depth_le_totalTypeDepth_of_mem C hMem
+    depth_le_total_type_depth_of_mem C hMem
   exact le_trans hOcc hDepth
 
 /-- Max buffer occupancy is bounded by totalTypeDepth under coherence. -/
-theorem maxBufferOccupancy_le_totalTypeDepth {C : Config}
+theorem max_buffer_occupancy_le_total_type_depth {C : Config}
     (hBT : BuffersTyped C.G C.D C.bufs) (hCoh : Coherent C.G C.D)
     (hActive : BuffersActive C.G C.bufs) (hUnique : BuffersUnique C.bufs) :
     maxBufferOccupancy C ≤ totalTypeDepth C := by
@@ -130,8 +130,8 @@ theorem maxBufferOccupancy_le_totalTypeDepth {C : Config}
   intro n hn
   rcases List.mem_map.mp hn with ⟨⟨e, buf⟩, hmem, rfl⟩
   have hAct : ActiveEdge C.G e := hActive e buf hmem
-  have hLookup : lookupBuf C.bufs e = buf := lookupBuf_eq_of_mem_unique hUnique hmem
-  have hLe := edgeBufferOccupancy_le_totalTypeDepth (C:=C) (e:=e) hBT hCoh hAct
+  have hLookup : lookupBuf C.bufs e = buf := lookup_buf_eq_of_mem_unique hUnique hmem
+  have hLe := edge_buffer_occupancy_le_total_type_depth (C:=C) (e:=e) hBT hCoh hAct
   simpa [edgeBufferOccupancy, hLookup] using hLe
 
 /-! ## Reachable Coherence Transport -/
@@ -154,7 +154,7 @@ theorem coherent_on_reachable (C₀ : Config)
     This is because session types discipline the communication: every send must
     eventually be matched by a receive, and the type structure bounds how many
     unmatched sends can accumulate. -/
-theorem coherent_implies_bddAbove (C₀ : Config)
+theorem coherent_implies_bdd_above (C₀ : Config)
     (hCoh : Coherent C₀.G C₀.D)
     (hPres : ∀ C C', UnboundedReachable C₀ C → Step C C' → Coherent C'.G C'.D)
     (hOccFromCoh : ∀ C, UnboundedReachable C₀ C → Coherent C.G C.D →
@@ -171,7 +171,7 @@ theorem coherent_implies_bddAbove (C₀ : Config)
   have hOccLeDepth : maxBufferOccupancy C ≤ totalTypeDepth C :=
     hOccFromCoh C hreach hCohC
   have hDepthLe : totalTypeDepth C ≤ C.G.length * d := by
-    apply totalTypeDepth_le_mul_of_depth_bound C d
+    apply total_type_depth_le_mul_of_depth_bound C d
     intro ep L hmem
     exact hDepth C ep L hreach hmem
   have hSizeLe : C.G.length * d ≤ m * d := Nat.mul_le_mul_right d (hSize C hreach)
@@ -190,7 +190,7 @@ theorem coherent_implies_global_occupancy_bound (C₀ : Config)
     (hGSizeBound : ∃ m, ∀ C, UnboundedReachable C₀ C → C.G.length ≤ m) :
     ∃ n : Nat, ∀ C, UnboundedReachable C₀ C → maxBufferOccupancy C ≤ n := by
   have hbdd : BddAbove (occupancySet C₀) :=
-    coherent_implies_bddAbove C₀ hCoh hPres hOccFromCoh hDepthBound hGSizeBound
+    coherent_implies_bdd_above C₀ hCoh hPres hOccFromCoh hDepthBound hGSizeBound
   rcases hbdd with ⟨bound, hbound⟩
   refine ⟨bound, ?_⟩
   intro C hreach
@@ -199,7 +199,7 @@ theorem coherent_implies_global_occupancy_bound (C₀ : Config)
 /-! ## Invariant-Packaged BddAbove -/
 
 /-- Coherence yields bounded occupancy under buffer-activity/uniqueness invariants. -/
-theorem coherent_implies_bddAbove_of_invariants (C₀ : Config)
+theorem coherent_implies_bdd_above_of_invariants (C₀ : Config)
     (hCoh : Coherent C₀.G C₀.D)
     (hPres : ∀ C C', UnboundedReachable C₀ C → Step C C' → Coherent C'.G C'.D)
     (hBT : ∀ C, UnboundedReachable C₀ C → BuffersTyped C.G C.D C.bufs)
@@ -211,12 +211,12 @@ theorem coherent_implies_bddAbove_of_invariants (C₀ : Config)
       ∀ C, UnboundedReachable C₀ C → Coherent C.G C.D →
         maxBufferOccupancy C ≤ totalTypeDepth C := by
     intro C hreach hCohC
-    exact maxBufferOccupancy_le_totalTypeDepth (C:=C)
+    exact max_buffer_occupancy_le_total_type_depth (C:=C)
       (hBT C hreach) hCohC (hActive C hreach) (hUnique C hreach)
   -- Depth/size bounds come from step monotonicity.
   have hDepthBound := depth_bound_of_reachable C₀
-  have hGSizeBound := G_length_bound_of_reachable C₀
-  exact coherent_implies_bddAbove C₀ hCoh hPres hOccFromCoh hDepthBound hGSizeBound
+  have hGSizeBound := g_length_bound_of_reachable C₀
+  exact coherent_implies_bdd_above C₀ hCoh hPres hOccFromCoh hDepthBound hGSizeBound
 
 /-! ## Phase Transition from Base Regime -/
 
@@ -258,11 +258,11 @@ def BoundedFIFO (B : Nat) : DeliveryModel where
   consume := Consume
 
 /-- Bounded FIFO satisfies the delivery model laws when buffers are bounded. -/
-theorem BoundedFIFO_laws (B : Nat) : DeliveryModelLaws (BoundedFIFO B) := {
+theorem bounded_fifo_laws (B : Nat) : DeliveryModelLaws (BoundedFIFO B) := {
   consume_nil := fun from_ L => rfl
-  consume_append := fun from_ L ts T {L'} hcons => Consume_append from_ L ts T hcons
-  consume_cons := fun from_ L T ts => Consume_cons from_ L T ts
-  consume_rename := fun ρ from_ L ts => Consume_rename ρ from_ L ts
+  consume_append := fun from_ L ts T {L'} hcons => consume_append from_ L ts T hcons
+  consume_cons := fun from_ L T ts => consume_cons from_ L T ts
+  consume_rename := fun ρ from_ L ts => consume_rename ρ from_ L ts
 }
 
 

@@ -12,8 +12,8 @@ but simpler cases where the intermediate term is `.end` or `.var v` can be prove
 directly by coinduction on specialized relations.
 
 Solution Structure. Defines `EndRel` pairing terms EQ2-related to `.end`. Proves
-`EndRel_postfix` showing it's a post-fixpoint of EQ2F. Similarly for `VarRel`.
-`EQ2_trans_via_end` and `EQ2_trans_via_var` use these to prove transitivity when
+`end_rel_postfix` showing it's a post-fixpoint of EQ2F. Similarly for `VarRel`.
+`eq2_trans_via_end` and `eq2_trans_via_var` use these to prove transitivity when
 the middle term is a base constructor, avoiding the full Bisim machinery.
 -/
 
@@ -39,7 +39,7 @@ set_option linter.unnecessarySimpa false
 
 private def EndRel : Rel := fun a b => EQ2 a .end ∧ EQ2 .end b
 
-private theorem EndRel_postfix : ∀ a b, EndRel a b → EQ2F EndRel a b := by
+private theorem end_rel_postfix : ∀ a b, EndRel a b → EQ2F EndRel a b := by
   intro a b h
   rcases h with ⟨ha, hb⟩
   cases a with
@@ -60,7 +60,7 @@ private theorem EndRel_postfix : ∀ a b, EndRel a b → EQ2F EndRel a b := by
             have hbF : EQ2F EQ2 .end (.mu t lbody) := EQ2.destruct hb
             simpa [EQ2F] using hbF
           have hrel : EndRel .end (lbody.substitute t (.mu t lbody)) :=
-            ⟨EQ2_refl .end, hb'⟩
+            ⟨eq2_refl .end, hb'⟩
           simpa [EQ2F] using hrel
   | var v =>
       have haF : EQ2F EQ2 (.var v) .end := EQ2.destruct ha
@@ -106,15 +106,15 @@ private theorem EndRel_postfix : ∀ a b, EndRel a b → EQ2F EndRel a b := by
             ⟨ha, hb'⟩
           simpa [EQ2F] using And.intro hleft hright
 
-theorem EQ2_trans_via_end {a b : LocalTypeR} (ha : EQ2 a .end) (hb : EQ2 .end b) : EQ2 a b := by
+theorem eq2_trans_via_end {a b : LocalTypeR} (ha : EQ2 a .end) (hb : EQ2 .end b) : EQ2 a b := by
   have hinR : EndRel a b := ⟨ha, hb⟩
-  exact EQ2_coind EndRel_postfix a b hinR
+  exact eq2_coind end_rel_postfix a b hinR
 
 /-! ## Variable Constructor Bridge -/
 
 private def VarRel (v : String) : Rel := fun a b => EQ2 a (.var v) ∧ EQ2 (.var v) b
 
-private theorem VarRel_postfix (v : String) :
+private theorem var_rel_postfix (v : String) :
     ∀ a b, VarRel v a b → EQ2F (VarRel v) a b := by
   intro a b h
   rcases h with ⟨ha, hb⟩
@@ -151,7 +151,7 @@ private theorem VarRel_postfix (v : String) :
             have hbF : EQ2F EQ2 (.var v') (.mu t lbody) := EQ2.destruct hb
             simpa [EQ2F] using hbF
           have hrel : VarRel v' (.var v') (lbody.substitute t (.mu t lbody)) :=
-            ⟨EQ2_refl (.var v'), hb'⟩
+            ⟨eq2_refl (.var v'), hb'⟩
           simpa [EQ2F] using hrel
   | send p bs =>
       have haF : EQ2F EQ2 (.send p bs) (.var v) := EQ2.destruct ha
@@ -177,7 +177,7 @@ private theorem VarRel_postfix (v : String) :
             simpa [EQ2F] using hbF
           subst hb'
           have hrel : VarRel v (lbody.substitute t (.mu t lbody)) (.var v) :=
-            ⟨ha', EQ2_refl (.var v)⟩
+            ⟨ha', eq2_refl (.var v)⟩
           simpa [EQ2F] using hrel
       | send p bs =>
           have hbF : EQ2F EQ2 (.var v) (.send p bs) := EQ2.destruct hb
@@ -195,10 +195,10 @@ private theorem VarRel_postfix (v : String) :
             ⟨ha, hb'⟩
           simpa [EQ2F] using And.intro hleft hright
 
-theorem EQ2_trans_via_var {a b : LocalTypeR} {v : String}
+theorem eq2_trans_via_var {a b : LocalTypeR} {v : String}
     (ha : EQ2 a (.var v)) (hb : EQ2 (.var v) b) : EQ2 a b := by
   have hinR : VarRel v a b := ⟨ha, hb⟩
-  exact EQ2_coind (VarRel_postfix v) a b hinR
+  exact eq2_coind (var_rel_postfix v) a b hinR
 
 set_option linter.unnecessarySimpa true
 

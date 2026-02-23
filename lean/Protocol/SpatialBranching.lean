@@ -46,7 +46,7 @@ def minCapacity (numLabels : Nat) : Nat :=
   Nat.clog 2 numLabels
 
 /-- minCapacity is sufficient. -/
-theorem minCapacity_sufficient (n : Nat) (_hn : 0 < n) :
+theorem min_capacity_sufficient (n : Nat) (_hn : 0 < n) :
     notConfusableByCapacity n (minCapacity n) := by
   simp only [notConfusableByCapacity, minCapacity]
   exact Nat.le_pow_clog (by omega) n
@@ -73,7 +73,7 @@ def ConfusabilityGraph.distinguishableBool {L : Type*} [DecidableEq L]
       l₁ = l₂ || g.confusable l₁ l₂ = false
 
 /-- Boolean distinguishability reflects the propositional version. -/
-theorem ConfusabilityGraph.distinguishableBool_iff {L : Type*} [DecidableEq L]
+theorem ConfusabilityGraph.distinguishable_bool_iff {L : Type*} [DecidableEq L]
     (g : ConfusabilityGraph L) :
     g.distinguishableBool = true ↔ g.distinguishable := by
   simp only [distinguishableBool, distinguishable, List.all_eq_true, Bool.or_eq_true]
@@ -206,7 +206,7 @@ theorem distinguishable_independence_eq_length {L : Type*} [DecidableEq L]
     (g : ConfusabilityGraph L) (h : g.distinguishable) :
     g.independenceNumber = g.labels.length := by
   simp only [ConfusabilityGraph.independenceNumber]
-  rw [if_pos (g.distinguishableBool_iff.mpr h)]
+  rw [if_pos (g.distinguishable_bool_iff.mpr h)]
 
 /-- The full label set is an independent set when the graph is distinguishable. -/
 theorem distinguishable_labels_independent {L : Type*} [DecidableEq L]
@@ -247,7 +247,7 @@ theorem branching_deployable_iff {L : Type*} [DecidableEq L]
       simp only [ConfusabilityGraph.independenceNumber] at hInd
       split_ifs at hInd with hDistBool
       · -- If distinguishableBool = true, use the equivalence
-        exact (g.distinguishableBool_iff.mp hDistBool) l₁ l₂ h₁ h₂ hne
+        exact (g.distinguishable_bool_iff.mp hDistBool) l₁ l₂ h₁ h₂ hne
       · -- If distinguishableBool = false, independenceNumber = 0
         -- So 0 ≥ b.labels.length means b.labels is empty
         -- But then g.labels = b.labels is empty, contradicting h₁

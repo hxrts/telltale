@@ -59,7 +59,7 @@ end
 
 /-! ## First-Branch Comm Helper -/
 
-private theorem participatesFirstBranch_imp_participates_comm
+private theorem participates_first_branch_imp_participates_comm
     (role sender receiver : String) (branches : List (Label × GlobalType))
     (h : participatesFirstBranch role (.comm sender receiver branches) = true)
     (ih : ∀ g : GlobalType, participatesFirstBranch role g = true →
@@ -84,7 +84,7 @@ private theorem participatesFirstBranch_imp_participates_comm
 
 /-! ## First-Branch Delegate Helper -/
 
-private theorem participatesFirstBranch_imp_participates_delegate
+private theorem participates_first_branch_imp_participates_delegate
     (role p q r : String) (sid : Nat) (cont : GlobalType)
     (h : participatesFirstBranch role (.delegate p q sid r cont) = true)
     (ih : ∀ g : GlobalType, participatesFirstBranch role g = true →
@@ -104,7 +104,7 @@ private theorem participatesFirstBranch_imp_participates_delegate
 /-! ## First-Branch Main Theorem -/
 
 /-- First-branch participation implies standard participation. -/
-theorem participatesFirstBranch_imp_participates (g : GlobalType) (role : String) :
+theorem participates_first_branch_imp_participates (g : GlobalType) (role : String) :
     participatesFirstBranch role g = true → SessionTypes.Participation.participates role g = true := by
   intro h
   match g with
@@ -114,7 +114,7 @@ theorem participatesFirstBranch_imp_participates (g : GlobalType) (role : String
       simp [participatesFirstBranch] at h
   | .mu t body =>
       simpa [participatesFirstBranch, SessionTypes.Participation.participates] using
-        (participatesFirstBranch_imp_participates body role h)
+        (participates_first_branch_imp_participates body role h)
   | .comm sender receiver branches =>
       unfold participatesFirstBranch at h
       unfold SessionTypes.Participation.participates
@@ -131,7 +131,7 @@ theorem participatesFirstBranch_imp_participates (g : GlobalType) (role : String
                   have hcont : participatesFirstBranch role cont = true := by
                     simpa [hpart, hbranches] using h
                   have hcont_part : SessionTypes.Participation.participates role cont = true :=
-                    participatesFirstBranch_imp_participates cont role hcont
+                    participates_first_branch_imp_participates cont role hcont
                   have hbranches_part :
                       SessionTypes.Participation.participatesBranches role ((label, cont) :: tail) = true := by
                     simp [SessionTypes.Participation.participatesBranches, hcont_part]
@@ -144,7 +144,7 @@ theorem participatesFirstBranch_imp_participates (g : GlobalType) (role : String
           simp
       | false =>
           have hcont_part : SessionTypes.Participation.participates role cont = true :=
-            participatesFirstBranch_imp_participates cont role (by simpa [hpart] using h)
+            participates_first_branch_imp_participates cont role (by simpa [hpart] using h)
           exact hcont_part
 termination_by sizeOf g
 decreasing_by
@@ -185,15 +185,15 @@ end
 
 /-! ## Guardedness Primitives -/
 
-private theorem isGuarded_send (p : String) (bs : List BranchR) (v : String) :
+private theorem is_guarded_send (p : String) (bs : List BranchR) (v : String) :
     (LocalTypeR.send p bs).isGuarded v = true := by
   simp [LocalTypeR.isGuarded]
 
-private theorem isGuarded_recv (p : String) (bs : List BranchR) (v : String) :
+private theorem is_guarded_recv (p : String) (bs : List BranchR) (v : String) :
     (LocalTypeR.recv p bs).isGuarded v = true := by
   simp [LocalTypeR.isGuarded]
 
-private theorem isGuarded_end (v : String) : (LocalTypeR.end).isGuarded v = true := by
+private theorem is_guarded_end (v : String) : (LocalTypeR.end).isGuarded v = true := by
   simp [LocalTypeR.isGuarded]
 
 /-! ## Comm Participant Guardedness -/
@@ -204,7 +204,7 @@ private theorem isGuarded_end (v : String) : (LocalTypeR.end).isGuarded v = true
     guards any variable. The guardedness propagates up through the structure.
 
     Note: This does NOT require closedness - participation alone is sufficient. -/
-private theorem trans_isGuarded_of_participatesFirstBranch_comm_participant
+private theorem trans_is_guarded_of_participates_first_branch_comm_participant
     (sender receiver : String) (branches : List (Label × GlobalType))
     (v : String) (role : String)
     (hpart : SessionTypes.Participation.is_participant role sender receiver = true) :
@@ -215,7 +215,7 @@ private theorem trans_isGuarded_of_participatesFirstBranch_comm_participant
   | true =>
       have heq : role = sender := beq_iff_eq.mp hrole_s
       rw [trans_comm_sender sender receiver role branches heq]
-      exact isGuarded_send receiver (transBranches branches role) v
+      exact is_guarded_send receiver (transBranches branches role) v
   | false =>
       simp only [hrole_s, Bool.false_or] at hpart
       have heq : role = receiver := beq_iff_eq.mp hpart
@@ -224,12 +224,12 @@ private theorem trans_isGuarded_of_participatesFirstBranch_comm_participant
         rw [heq'] at hrole_s
         simp at hrole_s
       rw [trans_comm_receiver sender receiver role branches heq hne]
-      exact isGuarded_recv sender (transBranches branches role) v
+      exact is_guarded_recv sender (transBranches branches role) v
 
 /-! ## Main Guardedness Theorem -/
 
 /-- If a role participates along the first-branch path, then its projection is guarded. -/
-theorem trans_isGuarded_of_participatesFirstBranch
+theorem trans_is_guarded_of_participates_first_branch
     (g : GlobalType) (v : String) (role : String)
     (hpart : participatesFirstBranch role g = true) :
     (trans g role).isGuarded v = true := by
@@ -249,14 +249,14 @@ theorem trans_isGuarded_of_participatesFirstBranch
         · simp [hvt]
         · have hvne : (v == t) = false := beq_eq_false_iff_ne.mpr hvt
           simp only [hvne, Bool.false_eq_true, ↓reduceIte]
-          exact trans_isGuarded_of_participatesFirstBranch body v role hpart
+          exact trans_is_guarded_of_participates_first_branch body v role hpart
       · simp [hguard, Bool.false_eq_true, ↓reduceIte, LocalTypeR.isGuarded]
   -- trans_isGuarded_of_participatesFirstBranch: Comm Case
   | .comm sender receiver branches =>
       -- Comm case: direct participant or follow the first branch.
       cases hpart_direct : SessionTypes.Participation.is_participant role sender receiver with
       | true =>
-          exact trans_isGuarded_of_participatesFirstBranch_comm_participant sender receiver branches v role
+          exact trans_is_guarded_of_participates_first_branch_comm_participant sender receiver branches v role
             hpart_direct
       | false =>
           unfold SessionTypes.Participation.is_participant at hpart_direct
@@ -271,7 +271,7 @@ theorem trans_isGuarded_of_participatesFirstBranch
           rw [trans_comm_other sender receiver role branches hne_s hne_r]
           cases branches with
           | nil =>
-              exact isGuarded_end v
+              exact is_guarded_end v
           | cons head tail =>
               cases head with
               | mk label cont =>
@@ -290,7 +290,7 @@ theorem trans_isGuarded_of_participatesFirstBranch
                         exact this.elim
                     | inr hright =>
                         exact hright
-                  exact trans_isGuarded_of_participatesFirstBranch cont v role hcont
+                  exact trans_is_guarded_of_participates_first_branch cont v role hcont
   -- trans_isGuarded_of_participatesFirstBranch: Delegate Case
   | .delegate p q sid r cont =>
       -- Delegate case: direct participant or follow the continuation.
@@ -325,6 +325,6 @@ theorem trans_isGuarded_of_participatesFirstBranch
           have hcont : participatesFirstBranch role cont = true := by
             simp [participatesFirstBranch, hpart_direct] at hpart
             exact hpart
-          exact trans_isGuarded_of_participatesFirstBranch cont v role hcont
+          exact trans_is_guarded_of_participates_first_branch cont v role hcont
 
 end Choreography.Projection.Trans

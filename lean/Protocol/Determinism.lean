@@ -115,7 +115,7 @@ same edge with the same value), the result is unique.
 - Which branch is selected in branch/select (determined by buffer contents)
 - Parallel composition (which side steps first)
 -/
-theorem stepBase_det_send {C C₁ C₂ : Config} {k x : Var} {e : Endpoint} {v : Value} {target : Role}
+theorem step_base_det_send {C C₁ C₂ : Config} {k x : Var} {e : Endpoint} {v : Value} {target : Role}
     {T : ValType} {L : LocalType}
     (_hProc : C.proc = .send k x)
     (_hk : lookupStr C.store k = some (.chan e))
@@ -129,7 +129,7 @@ theorem stepBase_det_send {C C₁ C₂ : Config} {k x : Var} {e : Endpoint} {v :
   rw [hC₁, hC₂]
 
 /-- Recv step is deterministic given the same buffer state. -/
-theorem stepBase_det_recv {C C₁ C₂ : Config} {k x : Var} {e : Endpoint} {source : Role}
+theorem step_base_det_recv {C C₁ C₂ : Config} {k x : Var} {e : Endpoint} {source : Role}
     {T : ValType} {L : LocalType}
     {v : Value} {vs : List Value}
     (_hProc : C.proc = .recv k x)
@@ -263,7 +263,7 @@ For local types, step determinism follows from unique branch labels.
 If a local type with unique branch labels steps to two results
 under the same action context, the results are equal.
 -/
-theorem localType_step_det {L₁ L₂ : LocalType} {_r : Role} {lbl : Label}
+theorem local_type_step_det {L₁ L₂ : LocalType} {_r : Role} {lbl : Label}
     {bs : List (Label × LocalType)}
     (huniq : uniqueBranchLabelsList bs = true)
     (hmem₁ : (lbl, L₁) ∈ bs)

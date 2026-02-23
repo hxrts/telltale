@@ -46,7 +46,7 @@ def branchesOf (t : LocalTypeC) : List (Label × LocalTypeC) :=
   | _ => []
 
 @[simp]
-lemma branchesOf_mkSend (p : String) (bs : List (Label × LocalTypeC)) :
+lemma branches_of_mk_send (p : String) (bs : List (Label × LocalTypeC)) :
     branchesOf (mkSend p bs) = bs := by
   simp only [branchesOf, mkSend, PFunctor.M.dest_mk]
   apply List.ext_getElem
@@ -56,7 +56,7 @@ lemma branchesOf_mkSend (p : String) (bs : List (Label × LocalTypeC)) :
     ext <;> simp [List.get_eq_getElem]
 
 @[simp]
-lemma branchesOf_mkRecv (p : String) (bs : List (Label × LocalTypeC)) :
+lemma branches_of_mk_recv (p : String) (bs : List (Label × LocalTypeC)) :
     branchesOf (mkRecv p bs) = bs := by
   simp only [branchesOf, mkRecv, PFunctor.M.dest_mk]
   apply List.ext_getElem
@@ -87,18 +87,18 @@ def CanRecvC (t : LocalTypeC) (p : String) (bs : List (Label × LocalTypeC)) : P
 
 /-! ## Base cases from head equality -/
 
-lemma UnfoldsToEndC_of_head {t : LocalTypeC} (h : head t = .end) : UnfoldsToEndC t := by
+lemma unfolds_to_end_c_of_head {t : LocalTypeC} (h : head t = .end) : UnfoldsToEndC t := by
   exact ⟨t, Relation.ReflTransGen.refl, h⟩
 
-lemma UnfoldsToVarC_of_head {t : LocalTypeC} {v : String} (h : head t = .var v) :
+lemma unfolds_to_var_c_of_head {t : LocalTypeC} {v : String} (h : head t = .var v) :
     UnfoldsToVarC t v := by
   exact ⟨t, Relation.ReflTransGen.refl, h⟩
 
-lemma CanSendC_of_head {t : LocalTypeC} {p : String} {labels : List Label}
+lemma can_send_c_of_head {t : LocalTypeC} {p : String} {labels : List Label}
     (h : head t = .send p labels) : CanSendC t p (branchesOf t) := by
   exact ⟨t, labels, Relation.ReflTransGen.refl, h, rfl⟩
 
-lemma CanRecvC_of_head {t : LocalTypeC} {p : String} {labels : List Label}
+lemma can_recv_c_of_head {t : LocalTypeC} {p : String} {labels : List Label}
     (h : head t = .recv p labels) : CanRecvC t p (branchesOf t) := by
   exact ⟨t, labels, Relation.ReflTransGen.refl, h, rfl⟩
 

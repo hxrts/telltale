@@ -130,7 +130,7 @@ def admitVMRuntime
     .admitted
 
 /-- Advanced-mode admission succeeds only when contracts are supplied. -/
-theorem admitVMRuntime_requires_contracts
+theorem admit_vm_runtime_requires_contracts
     (cfg : VMConfig ι γ π ε ν) {store₀ : SessionStore ν}
     (hReq : requiresVMRuntimeContracts cfg = true)
     (contracts? : Option (VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)) :
@@ -253,7 +253,7 @@ def SchedulerProfileContract.ofBundle {st₀ : VMState ι γ π ε ν}
     (bundle : VMSchedulerBundle st₀) :
     SchedulerProfileContract st₀ :=
   { bundle := bundle
-  , profilePinned := scheduler_profilePinned_from_bundle bundle
+  , profilePinned := scheduler_profile_pinned_from_bundle bundle
   }
 
 /-- Build a theorem-pack capability contract from a proof space. -/

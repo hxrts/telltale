@@ -170,7 +170,7 @@ inductive Step : Config → Config → Prop where
     Since target/source roles are now determined by G, the only source of
     non-determinism is `par skip skip` which can reduce via either
     `par_skip_left` or `par_skip_right`. -/
-theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : StepBase C C₂) :
+theorem step_base_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : StepBase C C₂) :
     C₁ = C₂ ∨ (∃ nS nG P Q, C.proc = .par nS nG P Q) := by
   cases h₁ with
   -- Determinism: send head step

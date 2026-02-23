@@ -47,15 +47,15 @@ end
 /-! ## Simplification Lemmas -/
 
 /-- Counting a leaf gives 1. -/
-@[simp] theorem countNodes_leaf (n : Nat) : countNodes (.leaf n) = 1 := by
+@[simp] theorem count_nodes_leaf (n : Nat) : countNodes (.leaf n) = 1 := by
   simp [countNodes]
 
 /-- Counting an empty list gives 0. -/
-@[simp] theorem countList_nil : countList ([] : List MT) = 0 := by
+@[simp] theorem count_list_nil : countList ([] : List MT) = 0 := by
   simp [countList]
 
 /-- Counting a cons distributes over the head and tail. -/
-@[simp] theorem countList_cons (x : MT) (xs : List MT) :
+@[simp] theorem count_list_cons (x : MT) (xs : List MT) :
     countList (x :: xs) = countNodes x + countList xs := by
   simp [countList]
 

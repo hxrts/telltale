@@ -28,7 +28,7 @@ private def silentStep : StateRel Nat :=
 private def parityObs : EffectObs Nat Bool where
   observe := fun n => n % 2 = 0
 
-private theorem parityEq_postfixed :
+private theorem parity_eq_postfixed :
     (fun n m : Nat => parityObs.observe n = parityObs.observe m) ≤
       EffectBisimF parityObs silentStep
         (fun n m : Nat => parityObs.observe n = parityObs.observe m) := by
@@ -40,7 +40,7 @@ private theorem parityEq_postfixed :
     cases hStep
 
 /-- With no transitions, matching parity observations are bisimilar. -/
-theorem parityEq_effectBisim_silent {n m : Nat}
+theorem parity_eq_effect_bisim_silent {n m : Nat}
     (hParity : parityObs.observe n = parityObs.observe m) :
     EffectBisim parityObs silentStep n m := by
   have hLift :
@@ -49,7 +49,7 @@ theorem parityEq_effectBisim_silent {n m : Nat}
     SessionCoTypes.CoinductiveRel.coind
       (F := EffectBisimF parityObs silentStep)
       (S := fun a b : Nat => parityObs.observe a = parityObs.observe b)
-      parityEq_postfixed
+      parity_eq_postfixed
   exact hLift _ _ hParity
 
 /-! ## Example 2: Increment step + unit observation -/
@@ -73,7 +73,7 @@ private theorem true_postfixed_inc :
 
 /-- Under unit observation and deterministic increment transitions,
     every pair of naturals is bisimilar. -/
-theorem allNat_effectBisim_inc (n m : Nat) :
+theorem all_nat_effect_bisim_inc (n m : Nat) :
     EffectBisim unitObs incStep n m := by
   have hLift : (fun _ _ : Nat => True) ≤ EffectBisim unitObs incStep :=
     SessionCoTypes.CoinductiveRel.coind

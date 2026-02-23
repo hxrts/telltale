@@ -33,7 +33,7 @@ open SessionTypes.NameOnlyContext
 /-! ## Substitution (Named → DB) -/
 
 /-- If a variable is not free, named substitution is a no-op and conversion is unchanged. -/
-theorem toDB?_substitute_not_free
+theorem to_db?_substitute_not_free
     (t repl : LocalTypeR) (ctx : Context) (x : String) (db : LocalTypeDB)
     (hdb : t.toDB? ctx = some db)
     (hfree : LocalTypeR.isFreeIn x t = false) :

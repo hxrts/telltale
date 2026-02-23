@@ -30,7 +30,7 @@ def configSilentStep : StateRel CoherenceConfig :=
 def configErasureObs : EffectObs CoherenceConfig (Quotient ConfigEquivSetoid) where
   observe := observationalErasure
 
-private theorem erasureEq_postfixed :
+private theorem erasure_eq_postfixed :
     (fun C₁ C₂ : CoherenceConfig => observationalErasure C₁ = observationalErasure C₂) ≤
       EffectBisimF configErasureObs configSilentStep
         (fun C₁ C₂ : CoherenceConfig => observationalErasure C₁ = observationalErasure C₂) := by
@@ -42,7 +42,7 @@ private theorem erasureEq_postfixed :
     cases hStep
 
 /-- `ConfigEquiv` implies silent effect bisimulation at the erasure observer. -/
-theorem configEquiv_effectBisim_silent {C₁ C₂ : CoherenceConfig}
+theorem config_equiv_effect_bisim_silent {C₁ C₂ : CoherenceConfig}
     (hEq : ConfigEquiv C₁ C₂) :
     EffectBisim configErasureObs configSilentStep C₁ C₂ := by
   have hLift :
@@ -51,27 +51,27 @@ theorem configEquiv_effectBisim_silent {C₁ C₂ : CoherenceConfig}
     SessionCoTypes.CoinductiveRel.coind
       (F := EffectBisimF configErasureObs configSilentStep)
       (S := fun A B : CoherenceConfig => observationalErasure A = observationalErasure B)
-      erasureEq_postfixed
+      erasure_eq_postfixed
   have hQuot : observationalErasure C₁ = observationalErasure C₂ := by
     change ConfigEquivSetoid.r C₁ C₂ at hEq
     exact Quotient.sound hEq
   exact hLift _ _ hQuot
 
 /-- Silent effect bisimulation at erasure observer implies `ConfigEquiv`. -/
-theorem configEquiv_of_effectBisim_silent {C₁ C₂ : CoherenceConfig}
+theorem config_equiv_of_effect_bisim_silent {C₁ C₂ : CoherenceConfig}
     (hBisim : EffectBisim configErasureObs configSilentStep C₁ C₂) :
     ConfigEquiv C₁ C₂ := by
   have hObs : observationalErasure C₁ = observationalErasure C₂ :=
-    effectBisim_observationalEq configErasureObs configSilentStep hBisim
+    effect_bisim_observational_eq configErasureObs configSilentStep hBisim
   exact Quotient.exact hObs
 
 /-- Quotient compatibility package: protocol `ConfigEquiv` iff silent
     effect bisimulation at the erasure observer. -/
-theorem configEquiv_iff_effectBisim_silent (C₁ C₂ : CoherenceConfig) :
+theorem config_equiv_iff_effect_bisim_silent (C₁ C₂ : CoherenceConfig) :
     ConfigEquiv C₁ C₂ ↔ EffectBisim configErasureObs configSilentStep C₁ C₂ := by
   constructor
-  · exact configEquiv_effectBisim_silent
-  · exact configEquiv_of_effectBisim_silent
+  · exact config_equiv_effect_bisim_silent
+  · exact config_equiv_of_effect_bisim_silent
 
 end
 

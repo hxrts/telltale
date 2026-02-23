@@ -24,7 +24,7 @@ def toLivenessBundle? {store₀ : SessionStore ν} {State : Type v}
 
 /-- Termination theorem instantiated from invariant-space evidence.
     Requires liveness bundle to be present. -/
-theorem vm_termination_from_invariantSpace
+theorem vm_termination_from_invariant_space
     {store₀ : SessionStore ν} {State : Type v}
     (space : VMInvariantSpace (ν := ν) store₀ State)
     (bundle : VMLivenessBundle store₀)
@@ -37,7 +37,7 @@ theorem vm_termination_from_invariantSpace
 
 /-- If the invariant space includes liveness with optional progress evidence,
     derive enabledness at the initial state under non-terminality. -/
-theorem vm_progress_from_invariantSpace
+theorem vm_progress_from_invariant_space
     {store₀ : SessionStore ν} {State : Type v}
     (space : VMInvariantSpace (ν := ν) store₀ State)
     (bundle : VMLivenessBundle store₀)

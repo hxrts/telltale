@@ -135,7 +135,7 @@ def scaledProcess [EntropyAPI.AnalysisModel] (x : Nat → Real) (μ : Real) (N t
 
     For independent observations, centering distributes over sums.
     This is the foundation for analyzing composite processes. -/
-theorem centeredIncrement_add (x y : Nat → Real) (μx μy : Real) (n : Nat) :
+theorem centered_increment_add (x y : Nat → Real) (μx μy : Real) (n : Nat) :
     centeredIncrement (fun k => x k + y k) (μx + μy) n =
       centeredIncrement x μx n + centeredIncrement y μy n := by
   unfold centeredIncrement
@@ -145,7 +145,7 @@ theorem centeredIncrement_add (x y : Nat → Real) (μx μy : Real) (n : Nat) :
 
     If every observation equals its mean, there are no fluctuations,
     so the cumulative deviation is zero. -/
-theorem partialSum_const_zero (c : Real) (t : Nat) :
+theorem partial_sum_const_zero (c : Real) (t : Nat) :
     partialSum (fun _ => c) c t = 0 := by
   unfold partialSum centeredIncrement
   simp
@@ -154,11 +154,11 @@ theorem partialSum_const_zero (c : Real) (t : Nat) :
 
     This is the base case: no randomness means no Brownian component.
     For protocols, a perfectly predictable execution has zero fluctuations. -/
-theorem scaledProcess_const_zero (c : Real) (N t : Nat) (hN : N ≠ 0) :
+theorem scaled_process_const_zero (c : Real) (N t : Nat) (hN : N ≠ 0) :
     [EntropyAPI.AnalysisLaws] →
     scaledProcess (fun _ => c) c N t = 0 := by
   intro _
-  simpa [scaledProcess] using EntropyAPI.normalizedCumulative_const_zero c N t hN
+  simpa [scaledProcess] using EntropyAPI.normalized_cumulative_const_zero c N t hN
 
 end FunctionalCLT
 end Classical

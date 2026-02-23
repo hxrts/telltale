@@ -142,7 +142,8 @@
 \newcommand{\Consume}{\ensuremath{\mathsf{Consume}}}
 \newcommand{\GEnv}{\ensuremath{\mathsf{GEnv}}}
 \newcommand{\DEnv}{\ensuremath{\mathsf{DEnv}}}
-\newcommand{\Hbyz}{\ensuremath{H_{\mathrm{byz}}}}
+\newcommand{\Hbyz}{\ensuremath{\mathsf{H}_{\mathrm{byz}}}}
+\newcommand{\DeliveryModel}{\ensuremath{\mathsf{DeliveryModel}}}
 \newcommand{\Obssafe}{\ensuremath{\mathsf{Obs}_{\mathrm{safe}}^{\mathrm{byz}}}}
 \newcommand{\Eqsafe}{\ensuremath{\mathsf{Eq}_{\mathrm{safe}}^{\mathrm{byz}}}}
 \newcommand{\Ebyz}{\ensuremath{\mathcal{E}_{\mathrm{byz}}}}
@@ -250,7 +251,7 @@ edges combine to yield global preservation. No global re-derivation is required.
 The core contribution is one operational kernel with two theorem-level lifts: typed-step preservation
 and subtype replacement. The shared kernel is edge-local checking with active-edge lifting.
 For typed transitions, this kernel is instantiated by a three-way edge split.
-For subtype replacement, it is instantiated by \nolinkurl{Consume_mono} under receive-compatibility.
+For subtype replacement, it is instantiated by \nolinkurl{consume_mono} under receive-compatibility.
 
 The local-to-global shape follows standard invariant methods from program logics (Reynolds, 2002;
 O'Hearn, 2007), while aligning with process-calculus decomposition tradition (Plotkin, 1981;
@@ -294,19 +295,19 @@ LaSalle, 1960).
 
 This paper has two central claims. The first is Coherence preservation through a three-way split that
 applies uniformly across transitions. The second is session evolution under subtype replacement via
-\nolinkurl{Consume_mono}, which we lift to global Coherence and progress-condition preservation under
+\nolinkurl{consume_mono}, which we lift to global Coherence and progress-condition preservation under
 compatibility premises.
 
 This paper starts a three-part series on asynchronous buffered semantics with
-\texttt{DeliveryModel} parameterization. It precisely defines the invariant kernel.
+\DeliveryModel parameterization. It precisely defines the invariant kernel.
 \emph{Computable Dynamics for Asynchronous MPST} develops quantitative bounds and decision procedures on that kernel.
 \emph{Harmony from Coherence in Asynchronous MPST} proves reconfiguration commutation and envelope exactness.
 
 In this paper, our contributions are as follows:
 \begin{enumerate}
 	\item A mechanized operational Coherence architecture with a reusable three-way edge split and typed-step wrappers that lift edge-local lemmas to preservation and progress interfaces.
-	\item A message-alignment proof kernel through \texttt{Consume} and the lemmas \nolinkurl{Consume_append} and \nolinkurl{Consume_cons}.
-	\item A subtype-replacement theorem stack from \nolinkurl{Consume_mono} that preserves edge Coherence, global Coherence, and progress-side conditions under receive-compatibility premises.
+	\item A message-alignment proof kernel through \Consume and the lemmas \nolinkurl{consume_append} and \nolinkurl{consume_cons}.
+	\item A subtype-replacement theorem stack from \nolinkurl{consume_mono} that preserves edge Coherence, global Coherence, and progress-side conditions under receive-compatibility premises.
 	\item A delivery-parametric and premise-parametric typed effect bridge profile at the VM boundary.
 \end{enumerate}
 
@@ -316,12 +317,12 @@ In this paper, our contributions are as follows:
 			\toprule
 			\thead{Symbol} & \thead{Meaning}                     \\
 			\midrule
-			$\Hbyz$         & Byzantine characterization bundle    \\
-			$\Obssafe$      & Byzantine safety-visible observation \\
-			$\Eqsafe$       & Byzantine safety-visible equality    \\
-				$\Ebyz$         & Byzantine determinism-envelope       \\
-				$\ByzChar$      & Byzantine characterization formula    \\
-				$\ByzSafe$      & Byzantine safety predicate            \\
+			\Hbyz         & Byzantine characterization bundle    \\
+			\Obssafe      & Byzantine safety-visible observation \\
+			\Eqsafe       & Byzantine safety-visible equality    \\
+				\Ebyz         & Byzantine determinism-envelope       \\
+				\ByzChar      & Byzantine characterization formula    \\
+				\ByzSafe      & Byzantine safety predicate            \\
 				\ByzIfaceWF     & Byzantine interface well-formedness   \\
 				\Coherent       & global active-edge compatibility     \\
 				\EdgeCoherent   & edge-local compatibility check       \\
@@ -331,7 +332,7 @@ In this paper, our contributions are as follows:
 				\DEnv           & edge-to-buffered-trace environment    \\
 			\ActiveEdge     & endpoint-presence guard              \\
 			\RecvCompatible & receive-side replacement compatibility \\
-			\texttt{DeliveryModel} & parametric delivery interface \\
+			\DeliveryModel & parametric delivery interface \\
 			\bottomrule
 		\end{tabularx}
 	\captionof{table}{Notation used in this paper.}
@@ -354,7 +355,7 @@ Configurations are represented by endpoint and edge environments. \GEnv{} maps e
 		asynchronous buffered semantics & required             \\
 		active-edge quantification      & required             \\
 		fair scheduling profile         & assumed where stated \\
-		\texttt{DeliveryModel} param.   & required             \\
+		\DeliveryModel param.   & required             \\
 		crash-stop and Byzantine claims & interface claim only \\
 		\bottomrule
 	\end{tabularx}
@@ -363,7 +364,7 @@ Configurations are represented by endpoint and edge environments. \GEnv{} maps e
 
 \begin{assumption}[Core Model Premises]
 	\label{assump:p1-core}
-	Core claims in this paper assume asynchronous buffered semantics, active-edge quantification, and \texttt{DeliveryModel} parameterization. Fair scheduling assumptions apply where stated.
+	Core claims in this paper assume asynchronous buffered semantics, active-edge quantification, and \DeliveryModel parameterization. Fair scheduling assumptions apply where stated.
 \end{assumption}
 
 \begin{definition}[Active Edge]
@@ -386,7 +387,7 @@ Configurations are represented by endpoint and edge environments. \GEnv{} maps e
 	$\ByzIfaceWF(G, D)$ is the interface predicate used for Byzantine-facing statements in this paper, and is mechanized as a definitional alias of $\Coherent(G, D)$.
 \end{definition}
 
-Delivery behavior is parameterized by \texttt{DeliveryModel}. This gives one theorem shape across FIFO, causal, and lossy instances.
+Delivery behavior is parameterized by \DeliveryModel. This gives one theorem shape across FIFO, causal, and lossy instances.
 \begin{equation}
 	\label{eq:p1-active-edge-boundary}
 	\begin{aligned}[t]
@@ -415,8 +416,8 @@ The key structural correspondence is compatibility. A coherence-space token corr
 		\thead{Coherence-space} & \thead{MPST operational}         \\
 		\midrule
 		token                    & directed edge with buffered trace \\
-		coherence relation       & \texttt{EdgeCoherent}             \\
-		clique                   & \texttt{Coherent} configuration   \\
+		coherence relation       & \EdgeCoherent             \\
+		clique                   & \Coherent configuration   \\
 		linear-map preservation  & step preservation theorem         \\
 		\bottomrule
 	\end{tabularx}
@@ -485,7 +486,7 @@ The example is used via the following derived rule instances.
 				}\hspace{0.75em}
 				\\[10pt]
 				\dfrac{
-					\Gamma \vdash (G_1,D_1)\ \wf \quad \mathsf{Consume\_append}
+					\Gamma \vdash (G_1,D_1)\ \wf \quad \text{\texttt{consume\_append}}
 				}{
 					(G_1,D_1){\to}(G_2,D_2) \land \Coherent(G_2,D_2)
 				}\hspace{0.75em}
@@ -568,7 +569,7 @@ For the step edge $u=(C,M)$ with stepped endpoint $ep_{\mathrm{step}}$, the case
 			      \item shared-endpoint edge ($e \neq e_{\mathrm{step}} \land \EdgeShares(e, ep_{\mathrm{step}})$),
 			      \item unrelated edge ($e \neq e_{\mathrm{step}} \land \neg \EdgeShares(e, ep_{\mathrm{step}})$).
 		      \end{itemize}
-		\item Updated-edge case: send/recv/select/branch obligations are discharged by rule-local preservation lemmas; message-to-type alignment is reduced to \nolinkurl{Consume_append} (enqueue-facing) or \nolinkurl{Consume_cons} (dequeue-facing).
+		\item Updated-edge case: send/recv/select/branch obligations are discharged by rule-local preservation lemmas; message-to-type alignment is reduced to \nolinkurl{consume_append} (enqueue-facing) or \nolinkurl{consume_cons} (dequeue-facing).
 		\item Shared-endpoint case: use store/buffer irrelevance lemmas to show unaffected projections are preserved; transport pre-state $\EdgeCoherent$ to post-state $\EdgeCoherent$.
 		\item Unrelated-edge case: apply frame-style transport (no touched endpoint, no touched buffer segment); conclude edge-local coherence is unchanged.
 		\item Reassemble all cases to obtain $\Coherent(G',D')$.
@@ -606,11 +607,11 @@ The three branches are discharged by updated-edge preservation, shared-endpoint 
 
 $\Consume$ is the proof kernel for message-type alignment. It removes most rule-specific structural complexity from preservation proofs.
 
-\begin{lemma}[Consume\_append]
+\begin{lemma}[consume\_append]
 	Consumption over concatenated traces factors through sequential consumption.
 \end{lemma}
 
-\begin{lemma}[Consume\_cons]
+\begin{lemma}[consume\_cons]
 	Head consumption reduces to one-step alignment plus recursive continuation alignment.
 \end{lemma}
 
@@ -618,15 +619,15 @@ $\Consume$ is the proof kernel for message-type alignment. It removes most rule-
 	The library is centered on $\consumeOne$ and structural recursion on trace shape.
 
 	\begin{enumerate}
-		\item \nolinkurl{Consume_append}: induction on trace prefix $ts$; base case $ts = []$ is immediate by simplification ($L' = L_r$); step case peels one $\consumeOne$ transition and applies induction hypothesis to the residual local type.
-		\item \nolinkurl{Consume_cons}: unfold one $\Consume$ step on head $T$; case split on $\consumeOne(\mathit{from}, T, L_r)$; resulting equation is definitional in both branches.
-		\item Preservation integration: send/select proofs use \nolinkurl{Consume_append} to justify extending buffered traces; recv/branch proofs use \nolinkurl{Consume_cons} to justify consuming the head message and continuing.
+		\item \nolinkurl{consume_append}: induction on trace prefix $ts$; base case $ts = []$ is immediate by simplification ($L' = L_r$); step case peels one $\consumeOne$ transition and applies induction hypothesis to the residual local type.
+		\item \nolinkurl{consume_cons}: unfold one $\Consume$ step on head $T$; case split on $\consumeOne(\mathit{from}, T, L_r)$; resulting equation is definitional in both branches.
+		\item Preservation integration: send/select proofs use \nolinkurl{consume_append} to justify extending buffered traces; recv/branch proofs use \nolinkurl{consume_cons} to justify consuming the head message and continuing.
 	\end{enumerate}
 
 	This isolates alignment complexity into two reusable lemmas rather than duplicating ad-hoc trace reasoning in each operational rule.
 \end{proof}
 
-For the worked example, \nolinkurl{Consume_cons} discharges the \texttt{Grant} receive step at \texttt{C} by reducing the obligation to continuation coherence after one aligned message.
+For the worked example, \nolinkurl{consume_cons} discharges the \texttt{Grant} receive step at \texttt{C} by reducing the obligation to continuation coherence after one aligned message.
 
 % ============================================================================
 \section{Session Evolution via Subtyping}
@@ -635,14 +636,14 @@ For the worked example, \nolinkurl{Consume_cons} discharges the \texttt{Grant} r
 
 Session evolution replaces one endpoint local type with a compatible refinement and asks whether coherence is preserved.
 
-This replacement argument follows a standard commutation intuition from trace-equivalence and commuting-conversion lines. The standard point is that local reorderings or local refinements should preserve observable behavior when compatibility conditions hold. What is new here is an operational criterion for asynchronous subtype replacement that is stated directly through \nolinkurl{Consume_mono} and discharged with edge-local coherence obligations.
+This replacement argument follows a standard commutation intuition from trace-equivalence and commuting-conversion lines. The standard point is that local reorderings or local refinements should preserve observable behavior when compatibility conditions hold. What is new here is an operational criterion for asynchronous subtype replacement that is stated directly through \nolinkurl{consume_mono} and discharged with edge-local coherence obligations.
 
 \begin{assumption}[Replacement Compatibility]
 	\label{assump:p1-replacement}
 	The subtype-evolution theorem assumes endpoint replacement at $ep$ satisfies typing-domain preservation, receive-side monotonicity side conditions, and environment consistency for unaffected endpoints.
 \end{assumption}
 
-\begin{theorem}[Session Evolution via \nolinkurl{Consume_mono}]
+\begin{theorem}[Session Evolution via \nolinkurl{consume_mono}]
 	\label{thm:session-evolution}
 	For all endpoints $ep$ and environments $G,D,G_{\mathrm{rep}}$, if Assumption Block~\ref{assump:p1-replacement} holds for replacement at $ep$, then
 	\begin{equation}
@@ -655,9 +656,9 @@ This replacement argument follows a standard commutation intuition from trace-eq
 	The replacement theorem is proved by a monotonicity-to-global-lift chain.
 
 	\begin{enumerate}
-		\item Local monotonicity: establish receive-compatibility ($\RecvCompatible$) between old and replacement local types; apply \nolinkurl{Consume_mono} to show every successful old consumption remains successful after replacement.
-		\item Edge lift: use \nolinkurl{EdgeCoherent_type_replacement} on edges targeting the replaced endpoint; for non-target edges, transport coherence by environment agreement.
-		\item Global lift: combine edge cases to derive \nolinkurl{Coherent_type_replacement}.
+		\item Local monotonicity: establish receive-compatibility ($\RecvCompatible$) between old and replacement local types; apply \nolinkurl{consume_mono} to show every successful old consumption remains successful after replacement.
+		\item Edge lift: use \nolinkurl{edge_coherent_type_replacement} on edges targeting the replaced endpoint; for non-target edges, transport coherence by environment agreement.
+		\item Global lift: combine edge cases to derive \nolinkurl{coherent_type_replacement}.
 		\item Progress compatibility: use liveness-side lemmas (\nolinkurl{progress_conditions_type_replacement}) to preserve operational side conditions.
 	\end{enumerate}
 
@@ -674,16 +675,9 @@ The subtype-replacement commutation principle and proof-lift chain are:
 	\end{aligned}
 \end{equation}
 \begin{equation}
-	\texttt{Consume\_mono}\ \Longrightarrow\ \text{edge lift}\ \Longrightarrow\ \text{global lift}.
+	\texttt{consume\_mono}\ \Longrightarrow\ \text{edge lift}\ \Longrightarrow\ \text{global lift}.
 \end{equation}
-with compatibility discharged by \nolinkurl{Consume_mono} and replacement side conditions.
-
-% ============================================================================
-\section{Mechanization Summary}
-\label{sec:mechanization}
-% ============================================================================
-
-Core theorem anchors and their source locations are listed in Table~\ref{tab:p1-anchor-registry} (Appendix~\ref{app:p1-anchor-registry}).
+with compatibility discharged by \nolinkurl{consume_mono} and replacement side conditions.
 
 % ============================================================================
 \section{Effect-Typed Bridge}
@@ -698,7 +692,7 @@ this section are conditional on explicit monitor and quotient-transport premises
 \end{proposition}
 
 \begin{proof}[Proof sketch]
-	Build the bundled bridge premises \texttt{VMBridgePremises} from \nolinkurl{monitor_sound},\allowbreak\ \nolinkurl{unified_monitor_preserves}, and the \nolinkurl{WellTypedInstr.wt_invoke} handler-typing witness. Lift handler typing from local obligations to short instruction fragments and then to VM-step form through \nolinkurl{handler_obligation_local},\allowbreak\ \nolinkurl{handler_fragment_typing_of_premises}, and \nolinkurl{handler_vm_step_typing}. Compose with \nolinkurl{configEquiv_iff_effectBisim_silent} and \nolinkurl{effectBisim_implies_observationalEquivalence} via \nolinkurl{vm_bridge_soundness_composed}. Therefore the runtime typing obligations and their observational transport both follow under the stated premises.
+	Build the bundled bridge premises \texttt{VMBridgePremises} from \nolinkurl{monitor_sound},\allowbreak\ \nolinkurl{unified_monitor_preserves}, and the \nolinkurl{WellTypedInstr.wt_invoke} handler-typing witness. Lift handler typing from local obligations to short instruction fragments and then to VM-step form through \nolinkurl{handler_obligation_local},\allowbreak\ \nolinkurl{handler_fragment_typing_of_premises}, and \nolinkurl{handler_vm_step_typing}. Compose with \nolinkurl{config_equiv_iff_effect_bisim_silent} and \nolinkurl{effect_bisim_implies_observational_equivalence} via \nolinkurl{vm_bridge_soundness_composed}. Therefore the runtime typing obligations and their observational transport both follow under the stated premises.
 \end{proof}
 
 \begin{table}[H]
@@ -718,7 +712,7 @@ this section are conditional on explicit monitor and quotient-transport premises
 
 \begin{assumption}[Byzantine Interface Premises]
 	\label{assump:p1-byzantine}
-	The interface statements in this section assume shared notation for $\Hbyz$, $\Obssafe$, $\Eqsafe$, and $\Ebyz$, plus theorem-pack capability naming consistency between abstract and runtime layers.
+	The interface statements in this section assume shared notation for \Hbyz, \Obssafe, \Eqsafe, and \Ebyz, plus theorem-pack capability naming consistency between abstract and runtime layers.
 \end{assumption}
 
 \begin{theorem}[Byzantine Interface Well-Formedness (BZ-1)]
@@ -726,11 +720,11 @@ this section are conditional on explicit monitor and quotient-transport premises
 \end{theorem}
 
 \begin{corollary}[Dropped-Assumption Witness Interface (BZ-1.1)]
-	Let $\mathcal{A}$ be any assumption class named in $\Hbyz$. If a later construction provides a witness violating $\ByzSafe$ when $\mathcal{A}$ is dropped, then that witness can be expressed against the same active-edge Coherence interface used in this paper.
+	Let $\mathcal{A}$ be any assumption class named in \Hbyz. If a later construction provides a witness violating \ByzSafe when $\mathcal{A}$ is dropped, then that witness can be expressed against the same active-edge Coherence interface used in this paper.
 \end{corollary}
 
 \begin{proposition}[Capability-Gated VM Interface (BZ-1.2)]
-	If a runtime profile includes Byzantine characterization and envelope-adherence capability evidence, then safety-visible runtime obligations are interpreted through $\Eqsafe$ modulo $\Ebyz$, and profile admission is blocked when required evidence is absent.
+	If a runtime profile includes Byzantine characterization and envelope-adherence capability evidence, then safety-visible runtime obligations are interpreted through \Eqsafe modulo \Ebyz, and profile admission is blocked when required evidence is absent.
 \end{proposition}
 
 % ============================================================================
@@ -744,7 +738,7 @@ This paper refines the established notion of coherence in MPST with an operation
 
 Local-first and rely/guarantee lines motivate alternatives to global-first checks (Scalas and Yoshida, 2018). Program-logical lines such as Actris target implementation proofs over protocol resources at a different verification layer (Hinrichsen et al., 2020). Event-structure and partial-order lines provide complementary macro semantics for concurrency (Castellan et al., 2023).
 
-Compared with these lines, this paper contributes a reusable proof kernel that combines a three-way edge split, \texttt{Consume}-based message alignment, subtype-replacement monotonicity, and delivery-parametric preservation under explicit premises. It also gives a premise-conditional VM bridge chain that composes monitor contracts with effect-bisimulation transport.
+Compared with these lines, this paper contributes a reusable proof kernel that combines a three-way edge split, \Consume{}-based message alignment, subtype-replacement monotonicity, and delivery-parametric preservation under explicit premises. It also gives a premise-conditional VM bridge chain that composes monitor contracts with effect-bisimulation transport.
 
 \begin{table}[H]
 	\centering
@@ -755,8 +749,8 @@ Compared with these lines, this paper contributes a reusable proof kernel that c
 		\midrule
 		preservation tied to global re-derivation & reusable edge-local skeleton             \\
 		weak theory/execution boundary            & explicit effect-typed bridge             \\
-		FIFO-centric semantics                    & one theorem under \texttt{DeliveryModel} \\
-		fragmented proof structure                & split kernel + \texttt{Consume} lemmas   \\
+		FIFO-centric semantics                    & one theorem under \DeliveryModel \\
+		fragmented proof structure                & split kernel + \Consume lemmas   \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Comparison with prior work.}
@@ -907,33 +901,33 @@ This appendix records compact proof skeletons for theorem-level claims and the e
 \begin{enumerate}
 	\item Partition each checked edge by \nolinkurl{edge_case_split}.
 	\item Discharge updated-edge obligations by rule-local preservation lemmas.
-	\item Discharge alignment obligations by \nolinkurl{Consume_append} and \nolinkurl{Consume_cons}.
-	\item Reassemble to global active-edge quantification for \texttt{Coherent}.
+	\item Discharge alignment obligations by \nolinkurl{consume_append} and \nolinkurl{consume_cons}.
+	\item Reassemble to global active-edge quantification for \Coherent.
 \end{enumerate}
 
 	\textbf{Exact Lean anchors.}
 	\nolinkurl{edge_case_split},
-	\nolinkurl{Coherent_send_preserved},
-	\nolinkurl{Coherent_recv_preserved},
-	\nolinkurl{Coherent_select_preserved},
-	\nolinkurl{Coherent_branch_preserved},
-	\nolinkurl{Consume_append},
-	\nolinkurl{Consume_cons}.
+	\nolinkurl{coherent_send_preserved},
+	\nolinkurl{coherent_recv_preserved},
+	\nolinkurl{coherent_select_preserved},
+	\nolinkurl{coherent_branch_preserved},
+	\nolinkurl{consume_append},
+	\nolinkurl{consume_cons}.
 
-\subsection{Theorem 6.1: Session Evolution via \texorpdfstring{\texttt{Consume\_mono}}{Consume_mono}}
+\subsection{Theorem 6.1: Session Evolution via \texorpdfstring{\texttt{consume\_mono}}{consume_mono}}
 
 \textbf{Lemma chain.}
 \begin{enumerate}
 	\item Establish receive-compatibility premise at the replacement endpoint.
-	\item Lift consumption success along replacement by \nolinkurl{Consume_mono}.
-	\item Lift edge-local replacement by \nolinkurl{EdgeCoherent_type_replacement}.
-	\item Lift globally by \nolinkurl{Coherent_type_replacement}; preserve progress side conditions.
+	\item Lift consumption success along replacement by \nolinkurl{consume_mono}.
+	\item Lift edge-local replacement by \nolinkurl{edge_coherent_type_replacement}.
+	\item Lift globally by \nolinkurl{coherent_type_replacement}; preserve progress side conditions.
 \end{enumerate}
 
 	\textbf{Exact Lean anchors.}
-	\nolinkurl{Consume_mono},
-	\nolinkurl{EdgeCoherent_type_replacement},
-	\nolinkurl{Coherent_type_replacement},
+	\nolinkurl{consume_mono},
+	\nolinkurl{edge_coherent_type_replacement},
+	\nolinkurl{coherent_type_replacement},
 	\nolinkurl{progress_conditions_type_replacement}.
 
 \subsection{Proposition 8.1: Bridge Soundness}
@@ -953,21 +947,21 @@ This appendix records compact proof skeletons for theorem-level claims and the e
 	\nolinkurl{handler_fragment_typing_of_premises},
 	\nolinkurl{handler_vm_step_typing},
 	\nolinkurl{vm_bridge_soundness_composed},
-	\nolinkurl{effectBisim_implies_observationalEquivalence},
-	\nolinkurl{configEquiv_iff_effectBisim_silent}.
+	\nolinkurl{effect_bisim_implies_observational_equivalence},
+	\nolinkurl{config_equiv_iff_effect_bisim_silent}.
 
 \subsection{Theorem BZ-1: Byzantine Interface Well-Formedness}
 
 \textbf{Lemma chain.}
 \begin{enumerate}
-	\item Expand \texttt{ByzIfaceWF} as definitional \texttt{Coherent}.
-	\item On each active edge, extract sender witness and \texttt{Consume} success.
+	\item Expand \ByzIfaceWF as definitional \Coherent.
+	\item On each active edge, extract sender witness and \Consume success.
 \end{enumerate}
 
 	\textbf{Exact Lean anchors.}
 	\texttt{ByzIfaceWF},
-	\nolinkurl{byzIfaceWF_iff_coherent},
-	\nolinkurl{bz1_byzantineInterfaceWellFormedness}.
+	\nolinkurl{byz_iface_wf_iff_coherent},
+	\nolinkurl{bz1_byzantine_interface_well_formedness}.
 
 \subsection{Proposition BZ-1.2: Capability-Gated VM Interface}
 
@@ -980,8 +974,8 @@ This appendix records compact proof skeletons for theorem-level claims and the e
 
 	\textbf{Exact Lean anchors.}
 	\texttt{canOperateUnderByzantineEnvelope},
-	\nolinkurl{vmByzantineEnvelopeAdherence_of_witness},
-	\nolinkurl{byzantineCrossTargetConformance_of_witnesses}.
+	\nolinkurl{vm_byzantine_envelope_adherence_of_witness},
+	\nolinkurl{byzantine_cross_target_conformance_of_witnesses}.
 
 \section{Delivery Parametricity and Runtime Bridge}
 \label{app:delivery}
@@ -995,37 +989,37 @@ Table~\ref{tab:p1-anchor-registry} maps theorem anchors to their source files.
 
 \begin{table}[H]
 	\centering
-	\footnotesize
-	\begin{tabularx}{\columnwidth}{@{}L{0.42\columnwidth}L{0.53\columnwidth}@{}}
+	\scriptsize
+	\begin{tabularx}{\columnwidth}{@{}L{0.475\columnwidth}L{0.475\columnwidth}@{}}
 		\toprule
 		\thead{Anchor} & \thead{Path (relative to \texttt{lean/})} \\
 		\midrule
 		\texttt{Consume} & \texttt{Protocol/Coherence/}\mbox{\texttt{Consume.lean}} \\
-		\texttt{Consume\_append} & \texttt{Protocol/Coherence/}\mbox{\texttt{Consume.lean}} \\
-		\texttt{Consume\_cons} & \texttt{Protocol/Coherence/}\mbox{\texttt{Consume.lean}} \\
-		\texttt{Consume\_mono} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacement*.lean}} \\
+		\texttt{consume\_append} & \texttt{Protocol/Coherence/}\mbox{\texttt{Consume.lean}} \\
+		\texttt{consume\_cons} & \texttt{Protocol/Coherence/}\mbox{\texttt{Consume.lean}} \\
+		\texttt{consume\_mono} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacement*.lean}} \\
 		\texttt{EdgeCoherent} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{EdgeCoherenceCore.lean}} \\
 		\texttt{Coherent} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{EdgeCoherenceCore.lean}} \\
 		\texttt{edge\_case\_split} & \texttt{Protocol/Coherence/}\mbox{\texttt{Unified.lean}} \\
-		\texttt{Coherent\_send\_preserved} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{Preservation*.lean}} \\
-		\texttt{Coherent\_recv\_preserved} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{PreservationRecv.lean}} \\
-		\texttt{Coherent\_select\_preserved} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SelectPreservation.lean}} \\
-		\texttt{Coherent\_branch\_preserved} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SelectPreservation.lean}} \\
-		\texttt{EdgeCoherent\_type\_replacement} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacement*.lean}} \\
-		\texttt{Coherent\_type\_replacement} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacement*.lean}} \\
+		\texttt{coherent\_send\_preserved} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{Preservation*.lean}} \\
+		\texttt{coherent\_recv\_preserved} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{PreservationRecv.lean}} \\
+		\texttt{coherent\_select\_preserved} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SelectPreservation.lean}} \\
+		\texttt{coherent\_branch\_preserved} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SelectPreservation.lean}} \\
+		\texttt{edge\_coherent\_type\_replacement} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacement*.lean}} \\
+		\texttt{coherent\_type\_replacement} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacement*.lean}} \\
 		\texttt{progress\_conditions\_type\_replacement} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacement*.lean}} \\
-		\texttt{FIFODelivery\_laws} & \texttt{Protocol/}\mbox{\texttt{DeliveryModel.lean}} \\
-		\texttt{CausalDelivery\_laws} & \texttt{Protocol/}\mbox{\texttt{DeliveryModel.lean}} \\
-		\texttt{LossyDelivery\_laws} & \texttt{Protocol/}\mbox{\texttt{DeliveryModel.lean}} \\
+		\texttt{fifo\_delivery\_laws} & \texttt{Protocol/}\mbox{\texttt{DeliveryModel.lean}} \\
+		\texttt{causal\_delivery\_laws} & \texttt{Protocol/}\mbox{\texttt{DeliveryModel.lean}} \\
+		\texttt{lossy\_delivery\_laws} & \texttt{Protocol/}\mbox{\texttt{DeliveryModel.lean}} \\
 		\texttt{monitor\_sound} & \texttt{Runtime/VM/Runtime/}\mbox{\texttt{Monitor.lean}} \\
 		\texttt{unified\_monitor\_preserves} & \texttt{Runtime/VM/Runtime/}\mbox{\texttt{Monitor.lean}} \\
 		\texttt{VMBridgePremises} & \texttt{Runtime/Proofs/VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}} \\
 		\texttt{handler\_obligation\_local} & \texttt{Runtime/Proofs/VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}} \\
 		\texttt{vm\_bridge\_soundness\_composed} & \texttt{Runtime/Proofs/VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}} \\
-		\texttt{effectBisim\_implies\_observationalEquivalence} & \texttt{Runtime/Proofs/EffectBisim/}\mbox{\texttt{Bridge.lean}} \\
-		\texttt{configEquiv\_iff\_effectBisim\_silent} & \texttt{Runtime/Proofs/EffectBisim/\allowbreak}\mbox{\texttt{ConfigEquivBridge.lean}} \\
+		\texttt{effect\_bisim\_implies\_observational\_equivalence} & \texttt{Runtime/Proofs/EffectBisim/}\mbox{\texttt{Bridge.lean}} \\
+		\texttt{config\_equiv\_iff\_effect\_bisim\_silent} & \texttt{Runtime/Proofs/EffectBisim/\allowbreak}\mbox{\texttt{ConfigEquivBridge.lean}} \\
 		\texttt{ByzIfaceWF} & \texttt{Runtime/Proofs/Adapters/Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
-		\texttt{byzIfaceWF\_iff\_coherent} & \texttt{Runtime/Proofs/Adapters/Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
+		\texttt{byz\_iface\_wf\_iff\_coherent} & \texttt{Runtime/Proofs/Adapters/Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
 		\texttt{canOperateUnderByzantineEnvelope} & \texttt{Runtime/Proofs/TheoremPack/}\mbox{\texttt{API.lean}} \\
 		\bottomrule
 	\end{tabularx}
@@ -1054,10 +1048,10 @@ Reproduction uses the repository-pinned Lean toolchain and manifest.
 		\toprule
 		\thead{Claim} & \thead{Sec.} & \thead{Assumption} & \thead{Anchor} \\
 		\midrule
-			Theorem 4.1    & \S4           & Core model premises (\ref{assump:p1-core})               & \texttt{Coherent\_*\_preserved}  \\
-			Theorem 6.1    & \S6           & Replacement compatibility (\ref{assump:p1-replacement})  & \texttt{Consume\_mono}  \\
+			Theorem 4.1    & \S4           & Core model premises (\ref{assump:p1-core})               & \texttt{coherent\_\*\_preserved}  \\
+			Theorem 6.1    & \S6           & Replacement compatibility (\ref{assump:p1-replacement})  & \texttt{consume\_mono}  \\
 			Prop.\ 8.1     & \S8           & Core model + bridge obligations                          & \texttt{vm\_bridge\_*}  \\
-			Thm.\ BZ-1     & \S8           & Byzantine interface premises (\ref{assump:p1-byzantine}) & \texttt{ByzIfaceWF}  \\
+			Thm.\ BZ-1     & \S8           & Byzantine interface premises (\ref{assump:p1-byzantine}) & \ByzIfaceWF  \\
 			Cor.\ BZ-1.1   & \S8           & Byzantine interface + witnesses                          & derived           \\
 			Prop.\ BZ-1.2  & \S8           & Byzantine interface + gate                               & \texttt{canOperate*}  \\
 			\bottomrule

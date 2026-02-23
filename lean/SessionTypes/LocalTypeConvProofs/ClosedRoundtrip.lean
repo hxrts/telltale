@@ -15,9 +15,9 @@ The Problem. Converting between named and de Bruijn representations must be corr
 fromDB should invert toDB for closed terms. Proving this requires showing that conversion
 preserves closedness and that roundtrips produce the original term.
 
-Solution Structure. Proves `fromDB?_eq_fromDB_all_ctx` showing the partial and total fromDB
-agree on closed terms. `freeVars_fromDB_subset_ctx` shows closedness is preserved. The
-roundtrip theorems `toDB_fromDB_roundtrip_generated` and `toDB_fromDB_roundtrip_closed`
+Solution Structure. Proves `from_db?_eq_from_db_all_ctx` showing the partial and total fromDB
+agree on closed terms. `free_vars_from_db_subset_ctx` shows closedness is preserved. The
+roundtrip theorems `to_db_from_db_roundtrip_generated` and `to_db_from_db_roundtrip_closed`
 prove that fromDB then toDB recovers the original de Bruijn term.
 -/
 
@@ -34,14 +34,14 @@ open SessionTypes.LocalTypeConv
 open SessionTypes.NameOnlyContext
 -- fromDB? correctness for closed terms
 
-lemma fromDB_var_of_get (ctx : NameContext) (n : Nat)
+lemma from_db_var_of_get (ctx : NameContext) (n : Nat)
     (hclosed : (LocalTypeDB.var n).isClosedAt ctx.length = true)
     (v : String) (hget : ctx.get? n = some v) :
     LocalTypeDB.fromDB ctx (.var n) hclosed = LocalTypeR.var v := by
   simp [LocalTypeDB.fromDB]
   simpa using (Option.get_of_eq_some (h := Option.isSome_of_eq_some hget) hget)
 
-theorem fromDB?_eq_fromDB_all_ctx (t : LocalTypeDB) (ctx : NameContext)
+theorem from_db?_eq_from_db_all_ctx (t : LocalTypeDB) (ctx : NameContext)
     (hclosed : t.isClosedAt ctx.length = true) :
     t.fromDB? ctx = some (t.fromDB ctx hclosed) := by
   let P1 : LocalTypeDB → Prop :=
@@ -69,7 +69,7 @@ theorem fromDB?_eq_fromDB_all_ctx (t : LocalTypeDB) (ctx : NameContext)
         simpa [LocalTypeDB.isClosedAt] using hclosed
       obtain ⟨v, hget⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
       have hfrom : LocalTypeDB.fromDB ctx (.var n) hclosed = LocalTypeR.var v :=
-        fromDB_var_of_get ctx n hclosed v hget
+        from_db_var_of_get ctx n hclosed v hget
       simp [LocalTypeDB.fromDB?, hget, hfrom]
     · intro p bs hbs ctx hclosed
       have hclosed' : isClosedAtBranches ctx.length bs = true := by
@@ -105,7 +105,7 @@ theorem fromDB?_eq_fromDB_all_ctx (t : LocalTypeDB) (ctx : NameContext)
 
 -- fromDB? = fromDB for Branch Lists
 
-theorem branchesFromDB?_eq_branchesFromDB (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
+theorem branches_from_db?_eq_branches_from_db (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
     (hclosed : isClosedAtBranches ctx.length bs = true) :
     branchesFromDB? ctx bs = some (branchesFromDB ctx bs hclosed) := by
   induction bs with
@@ -115,22 +115,22 @@ theorem branchesFromDB?_eq_branchesFromDB (bs : List (Label × LocalTypeDB)) (ct
       have hclosed' : t.isClosedAt ctx.length = true ∧
           isClosedAtBranches ctx.length tl = true := by
         simpa [isClosedAtBranches] using hclosed
-      have ht := fromDB?_eq_fromDB_all_ctx t ctx hclosed'.1
+      have ht := from_db?_eq_from_db_all_ctx t ctx hclosed'.1
       have htl := ih hclosed'.2
 /- ## Structured Block 3 -/
       simp [LocalTypeDB.branchesFromDB?, LocalTypeDB.branchesFromDB, ht, htl]
 
 -- fromDB? = fromDB at Empty Context
 
-theorem fromDB?_eq_fromDB_closed (t : LocalTypeDB) (_hclosed : t.isClosed = true) :
+theorem from_db?_eq_from_db_closed (t : LocalTypeDB) (_hclosed : t.isClosed = true) :
     ∀ hclosed' : t.isClosedAt (TypeContext.empty : NameContext).length = true,
       t.fromDB? TypeContext.empty = some (t.fromDB TypeContext.empty hclosed') := by
   intro hclosed'
-  exact fromDB?_eq_fromDB_all_ctx t TypeContext.empty hclosed'
+  exact from_db?_eq_from_db_all_ctx t TypeContext.empty hclosed'
 
 -- fromDB closedness
 
-lemma freeVars_fromDB_subset_ctx (t : LocalTypeDB) (ctx : NameContext)
+lemma free_vars_from_db_subset_ctx (t : LocalTypeDB) (ctx : NameContext)
     (hclosed : t.isClosedAt ctx.length = true) :
     ∀ v, v ∈ (t.fromDB ctx hclosed).freeVars → v ∈ ctx := by
   let P1 : LocalTypeDB → Prop :=
@@ -158,7 +158,7 @@ lemma freeVars_fromDB_subset_ctx (t : LocalTypeDB) (ctx : NameContext)
         simpa [LocalTypeDB.isClosedAt] using hclosed
       obtain ⟨name, hget⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
       have hfrom : LocalTypeDB.fromDB ctx (.var n) hclosed = LocalTypeR.var name :=
-        fromDB_var_of_get ctx n hclosed name hget
+        from_db_var_of_get ctx n hclosed name hget
       have hv' : v ∈ (LocalTypeR.var name).freeVars := by
         simpa [hfrom] using hv
       have hv'' : v = name := by
@@ -213,11 +213,11 @@ lemma freeVars_fromDB_subset_ctx (t : LocalTypeDB) (ctx : NameContext)
 
 -- fromDB Closedness at Empty Context
 
-theorem fromDB_closed (t : LocalTypeDB) (_hclosed : t.isClosed = true) :
+theorem from_db_closed (t : LocalTypeDB) (_hclosed : t.isClosed = true) :
     ∀ hclosed' : t.isClosedAt (TypeContext.empty : NameContext).length = true,
       (t.fromDB TypeContext.empty hclosed').isClosed = true := by
   intro hclosed'
-  have hsub := freeVars_fromDB_subset_ctx t TypeContext.empty hclosed'
+  have hsub := free_vars_from_db_subset_ctx t TypeContext.empty hclosed'
   have hnil : (t.fromDB TypeContext.empty hclosed').freeVars = [] := by
     apply (List.eq_nil_iff_forall_not_mem).2
     intro v hv
@@ -227,7 +227,7 @@ theorem fromDB_closed (t : LocalTypeDB) (_hclosed : t.isClosed = true) :
 
 -- toDB? succeeds for closed terms
 
-theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
+theorem to_db?_some_of_covers (t : LocalTypeR) (ctx : Context)
     (hcov : Context.Covers ctx t) :
     ∃ db, t.toDB? ctx = some db ∧ db.isClosedAt ctx.length = true := by
   let P1 : LocalTypeR → Prop :=
@@ -268,7 +268,7 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
             refine List.mem_flatMap.mpr ?_
             refine ⟨(l, _vt, t), hmem, ?_⟩
             simpa using hv
-          simpa [LocalTypeR.freeVarsOfBranches_eq_flatMap] using this
+          simpa [LocalTypeR.free_vars_of_branches_eq_flat_map] using this
         simpa [LocalTypeR.freeVars] using this
       obtain ⟨dbs, hdbs, hclosed⟩ := hbs ctx hcov'
       refine ⟨LocalTypeDB.send p dbs, ?_, ?_⟩
@@ -283,7 +283,7 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
             refine List.mem_flatMap.mpr ?_
             refine ⟨(l, _vt, t), hmem, ?_⟩
             simpa using hv
-          simpa [LocalTypeR.freeVarsOfBranches_eq_flatMap] using this
+          simpa [LocalTypeR.free_vars_of_branches_eq_flat_map] using this
         simpa [LocalTypeR.freeVars] using this
       obtain ⟨dbs, hdbs, hclosed⟩ := hbs ctx hcov'
       refine ⟨LocalTypeDB.recv p dbs, ?_, ?_⟩
@@ -312,12 +312,12 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
       have hv : v ∈ ctx := by
         apply hcov
         simp [LocalTypeR.freeVars]
-      obtain ⟨i, hidx⟩ := indexOf_eq_some_of_mem (ctx := ctx) (v := v) hv
+      obtain ⟨i, hidx⟩ := index_of_eq_some_of_mem (ctx := ctx) (v := v) hv
       refine ⟨LocalTypeDB.var i, ?_, ?_⟩
       · simp only [LocalTypeR.toDB?]
-        rw [Context.indexOf_eq] at hidx
+        rw [Context.index_of_eq] at hidx
         simp only [hidx, Option.map]
-      · have hlt := indexOf_lt_length (ctx := ctx) (v := v) (i := i) hidx
+      · have hlt := index_of_lt_length (ctx := ctx) (v := v) (i := i) hidx
         simp [LocalTypeDB.isClosedAt, hlt]
     · intro ctx hcov
       refine ⟨[], ?_, ?_⟩
@@ -341,7 +341,7 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
 
 -- toDB? Success for Branch Lists and Empty Context
 
-theorem branchesToDB?_some_of_covers (bs : List BranchR) (ctx : Context)
+theorem branches_to_db?_some_of_covers (bs : List BranchR) (ctx : Context)
     (hcov : ∀ l _vt t, (l, _vt, t) ∈ bs → Context.Covers ctx t) :
     ∃ dbs, LocalTypeR.branchesToDB? ctx bs = some dbs ∧
           isClosedAtBranches ctx.length dbs = true := by
@@ -356,23 +356,23 @@ theorem branchesToDB?_some_of_covers (bs : List BranchR) (ctx : Context)
       have hcov_t : Context.Covers ctx t := hcov l _vt t (by simp)
       have hcov_tl : ∀ l _vt t, (l, _vt, t) ∈ tl → Context.Covers ctx t :=
         fun l _vt t hmem => hcov l _vt t (List.mem_cons_of_mem _ hmem)
-      obtain ⟨db, hdb, hclosed⟩ := toDB?_some_of_covers t ctx hcov_t
+      obtain ⟨db, hdb, hclosed⟩ := to_db?_some_of_covers t ctx hcov_t
       obtain ⟨dbs, hdbs, hclosedbs⟩ := ih hcov_tl
       refine ⟨(l, db) :: dbs, ?_, ?_⟩
       · simp [LocalTypeR.branchesToDB?, hdb, hdbs]
       · simp [isClosedAtBranches, hclosed, hclosedbs]
 
-theorem toDB_closed (t : LocalTypeR) (hclosed : t.isClosed = true) :
+theorem to_db_closed (t : LocalTypeR) (hclosed : t.isClosed = true) :
     ∃ db, t.toDB? TypeContext.empty = some db ∧ db.isClosed = true := by
   have hcov : Context.Covers TypeContext.empty t := Context.covers_of_closed TypeContext.empty t hclosed
-  obtain ⟨db, hdb, hcloseddb⟩ := toDB?_some_of_covers t TypeContext.empty hcov
+  obtain ⟨db, hdb, hcloseddb⟩ := to_db?_some_of_covers t TypeContext.empty hcov
   refine ⟨db, hdb, ?_⟩
   simp only [LocalTypeDB.isClosed, TypeContext.length_empty] at hcloseddb ⊢
   exact hcloseddb
 
 -- Roundtrip (fromDB then toDB?)
 
-theorem toDB_fromDB_roundtrip_generated (t : LocalTypeDB) (ctx : NameContext)
+theorem to_db_from_db_roundtrip_generated (t : LocalTypeDB) (ctx : NameContext)
     (hgen : GeneratedContext ctx) (hclosed : t.isClosedAt ctx.length = true) :
     (t.fromDB ctx hclosed).toDB? ctx = some t := by
   let P1 : LocalTypeDB → Prop :=
@@ -403,11 +403,11 @@ theorem toDB_fromDB_roundtrip_generated (t : LocalTypeDB) (ctx : NameContext)
         simpa [LocalTypeDB.isClosedAt] using hclosed
       obtain ⟨v, hget⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
       have hnodup : ctx.Nodup := generated_nodup ctx hgen
-      have hidx : Context.indexOf ctx v = some n := get_indexOf_roundtrip ctx n v hnodup hget
+      have hidx : Context.indexOf ctx v = some n := get_index_of_roundtrip ctx n v hnodup hget
       have hfrom : LocalTypeDB.fromDB ctx (.var n) hclosed = LocalTypeR.var v :=
-        fromDB_var_of_get ctx n hclosed v hget
+        from_db_var_of_get ctx n hclosed v hget
       simp [hfrom, LocalTypeR.toDB?]
-      rw [Context.indexOf_eq] at hidx
+      rw [Context.index_of_eq] at hidx
       simp [hidx]
 
     -- Roundtrip: send/recv/μ Cases
@@ -445,7 +445,7 @@ theorem toDB_fromDB_roundtrip_generated (t : LocalTypeDB) (ctx : NameContext)
 
 -- Roundtrip for Branch Lists and Empty Context
 
-theorem branches_toDB_fromDB_roundtrip_generated (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
+theorem branches_to_db_from_db_roundtrip_generated (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
     (hgen : GeneratedContext ctx)
     (hclosed : isClosedAtBranches ctx.length bs = true) :
     LocalTypeR.branchesToDB? ctx (LocalTypeDB.branchesFromDB ctx bs hclosed) = some bs := by
@@ -456,23 +456,23 @@ theorem branches_toDB_fromDB_roundtrip_generated (bs : List (Label × LocalTypeD
       obtain ⟨l, t⟩ := hd
       have hclosed' : t.isClosedAt ctx.length = true ∧ isClosedAtBranches ctx.length tl = true := by
         simpa [isClosedAtBranches] using hclosed
-      have ht := toDB_fromDB_roundtrip_generated t ctx hgen hclosed'.1
+      have ht := to_db_from_db_roundtrip_generated t ctx hgen hclosed'.1
       have htl := ih hclosed'.2
       simp [LocalTypeDB.branchesFromDB, LocalTypeR.branchesToDB?, ht, htl]
 
-theorem toDB_fromDB_roundtrip_closed (t : LocalTypeDB) (_hclosed : t.isClosed = true) :
+theorem to_db_from_db_roundtrip_closed (t : LocalTypeDB) (_hclosed : t.isClosed = true) :
     ∀ hclosed' : t.isClosedAt (TypeContext.empty : NameContext).length = true,
       (t.fromDB TypeContext.empty hclosed').toDB? TypeContext.empty = some t := by
   intro hclosed'
-  exact toDB_fromDB_roundtrip_generated t TypeContext.empty GeneratedContext.empty hclosed'
+  exact to_db_from_db_roundtrip_generated t TypeContext.empty GeneratedContext.empty hclosed'
 
-theorem branches_toDB_fromDB_roundtrip_closed (bs : List (Label × LocalTypeDB))
+theorem branches_to_db_from_db_roundtrip_closed (bs : List (Label × LocalTypeDB))
     (_hclosed : isClosedAtBranches 0 bs = true) :
 /- ## Structured Block 9 -/
   ∀ hclosed' : isClosedAtBranches (TypeContext.empty : NameContext).length bs = true,
     LocalTypeR.branchesToDB? TypeContext.empty
       (LocalTypeDB.branchesFromDB TypeContext.empty bs hclosed') = some bs := by
   intro hclosed'
-  exact branches_toDB_fromDB_roundtrip_generated bs TypeContext.empty GeneratedContext.empty hclosed'
+  exact branches_to_db_from_db_roundtrip_generated bs TypeContext.empty GeneratedContext.empty hclosed'
 
 end SessionTypes.LocalTypeConvProofs

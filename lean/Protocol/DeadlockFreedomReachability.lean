@@ -97,13 +97,13 @@ def reachesCommDecide : LocalType → Bool
 /-! ## ReachesComm Stability Under Substitution -/
 
 /-- ReachesComm is preserved under unfolding. -/
-theorem reachesComm_unfold {L : LocalType} (h : ReachesComm (.mu L)) :
+theorem reaches_comm_unfold {L : LocalType} (h : ReachesComm (.mu L)) :
     ReachesComm L.unfold := by
   cases h with
   | mu h => exact h
 
 /-- Measure: count nested mu constructors at the top level.
-    This serves as a termination measure for reachesComm_body_implies_unfold. -/
+    This serves as a termination measure for reaches_comm_body_implies_unfold. -/
 def muDepth : LocalType → Nat
   | .mu L => 1 + muDepth L
   | _ => 0
@@ -120,7 +120,7 @@ constructors are preserved by subst, the result holds.
 NOTE: We use explicit `LocalType.subst n replacement L` syntax because the dot
 notation `L.subst n replacement` puts L in the replacement position (Lean inserts
 the receiver at the first matching type position). -/
-theorem subst_preserves_reachesCommDecide (n : Nat) (replacement : LocalType) (L : LocalType)
+theorem subst_preserves_reaches_comm_decide (n : Nat) (replacement : LocalType) (L : LocalType)
     (hL : reachesCommDecide L = true) :
     reachesCommDecide (LocalType.subst n replacement L) = true := by
   cases L with
@@ -153,12 +153,12 @@ theorem subst_preserves_reachesCommDecide (n : Nat) (replacement : LocalType) (L
     -- Now hL : reachesCommDecide L' = true
     -- Goal : reachesCommDecide (L'.subst (n+1) replacement) = true
     -- Use structural recursion (subst_preserves_reachesCommDecide is proved by structural recursion)
-    exact subst_preserves_reachesCommDecide (n + 1) replacement L' hL
+    exact subst_preserves_reaches_comm_decide (n + 1) replacement L' hL
 
 /-! ## Constructor-Level Reachability Helpers -/
 
 /-- Helper: for non-mu comm types, ReachesComm holds directly. -/
-private theorem reachesComm_of_comm (L : LocalType) (h : reachesCommDecide L = true)
+private theorem reaches_comm_of_comm (L : LocalType) (h : reachesCommDecide L = true)
     (hNotMu : ∀ L', L ≠ .mu L') : ReachesComm L := by
   cases L with
   | send => exact ReachesComm.send
@@ -175,7 +175,7 @@ private theorem reachesComm_of_comm (L : LocalType) (h : reachesCommDecide L = t
 
 /-- Key insight: subst preserves the top-level constructor for non-var types.
     For comm types (send/recv/select/branch), this lets us build ReachesComm. -/
-private theorem reachesComm_subst_comm (L : LocalType) (n : Nat) (r : LocalType)
+private theorem reaches_comm_subst_comm (L : LocalType) (n : Nat) (r : LocalType)
     (h : reachesCommDecide L = true) (hNotMu : ∀ L', L ≠ .mu L') (hNotVar : ∀ m, L ≠ .var m) :
     ReachesComm (LocalType.subst n r L) := by
   cases L with
@@ -196,7 +196,7 @@ private theorem reachesComm_subst_comm (L : LocalType) (n : Nat) (r : LocalType)
 /-! ## muDepth and Non-mu Unfold Helpers -/
 
 /-- Substitution preserves muDepth for types that can reach communication. -/
-private theorem muDepth_subst_of_decide (n : Nat) (r L : LocalType)
+private theorem mu_depth_subst_of_decide (n : Nat) (r L : LocalType)
     (h : reachesCommDecide L = true) :
     muDepth (LocalType.subst n r L) = muDepth L := by
   cases L with
@@ -215,11 +215,11 @@ private theorem muDepth_subst_of_decide (n : Nat) (r L : LocalType)
   | mu L' =>
       have h' : reachesCommDecide L' = true := by
         simpa [reachesCommDecide] using h
-      have ih := muDepth_subst_of_decide (n + 1) r L' h'
+      have ih := mu_depth_subst_of_decide (n + 1) r L' h'
       simp [LocalType.subst, muDepth, ih]
 
 /-- Non-mu case: unfold is identity, so ReachesComm follows from the decision. -/
-private theorem reachesComm_unfold_nonmu (L : LocalType) (h : reachesCommDecide L = true)
+private theorem reaches_comm_unfold_nonmu (L : LocalType) (h : reachesCommDecide L = true)
     (hNotMu : ∀ L', L ≠ .mu L') : ReachesComm L.unfold := by
   -- Unfold does not change non-mu types; use the direct constructors.
   cases L with
@@ -240,7 +240,7 @@ private theorem reachesComm_unfold_nonmu (L : LocalType) (h : reachesCommDecide 
 /-! ## Mu-Case Unfold Reachability -/
 
 /-- Arithmetic helper: strip two leading mu constructors. -/
-private theorem muDepth_le_of_mu_mu_le {L : LocalType} {fuel : Nat} :
+private theorem mu_depth_le_of_mu_mu_le {L : LocalType} {fuel : Nat} :
     muDepth (.mu (.mu L)) ≤ fuel.succ → muDepth L ≤ fuel := by
   -- Expand muDepth and solve the arithmetic side-goal.
   intro h
@@ -248,7 +248,7 @@ private theorem muDepth_le_of_mu_mu_le {L : LocalType} {fuel : Nat} :
   omega
 
 /-- Mu case: prove reachability by recursing on the unfolded body. -/
-private theorem reachesComm_unfold_mu (fuel : Nat) (L : LocalType)
+private theorem reaches_comm_unfold_mu (fuel : Nat) (L : LocalType)
     (hFuel : muDepth (LocalType.mu L) ≤ fuel.succ) (hBody : reachesCommDecide L = true)
     (ih : ∀ L, muDepth L ≤ fuel → reachesCommDecide L = true → ReachesComm L.unfold) :
     ReachesComm (LocalType.unfold (LocalType.mu L)) := by
@@ -282,14 +282,14 @@ private theorem reachesComm_unfold_mu (fuel : Nat) (L : LocalType)
       have hBody' : reachesCommDecide L' = true := by
         simpa [reachesCommDecide] using hBody
       have hFuel' : muDepth L' ≤ fuel :=
-        muDepth_le_of_mu_mu_le (L:=L') (fuel:=fuel) (by simpa using hFuel)
+        mu_depth_le_of_mu_mu_le (L:=L') (fuel:=fuel) (by simpa using hFuel)
       set L1 : LocalType := LocalType.subst 1 (.mu (.mu L')) L'
       have hEq : muDepth L1 = muDepth L' :=
-        muDepth_subst_of_decide (n:=1) (r:=.mu (.mu L')) (L:=L') hBody'
+        mu_depth_subst_of_decide (n:=1) (r:=.mu (.mu L')) (L:=L') hBody'
       have hFuel1 : muDepth L1 ≤ fuel := by
         simpa [hEq] using hFuel'
       have hDec1 : reachesCommDecide L1 = true :=
-        subst_preserves_reachesCommDecide (n:=1) (replacement:=.mu (.mu L')) (L:=L') hBody'
+        subst_preserves_reaches_comm_decide (n:=1) (replacement:=.mu (.mu L')) (L:=L') hBody'
       have hIH : ReachesComm L1.unfold := ih L1 hFuel1 hDec1
       have hMu : ReachesComm (.mu L1) := ReachesComm.mu hIH
       simpa [LocalType.unfold, LocalType.subst, L1] using hMu
@@ -297,7 +297,7 @@ private theorem reachesComm_unfold_mu (fuel : Nat) (L : LocalType)
 /-! ## Fuel-Based Unfold Reachability -/
 
 /-- Auxiliary: ReachesComm after unfolding, with explicit fuel for termination. -/
-private theorem reachesComm_body_implies_unfold_aux :
+private theorem reaches_comm_body_implies_unfold_aux :
     ∀ fuel L, muDepth L ≤ fuel → reachesCommDecide L = true → ReachesComm L.unfold
   | fuel, L, hFuel, hBody => by
       cases L with
@@ -336,19 +336,19 @@ private theorem reachesComm_body_implies_unfold_aux :
                 simpa [reachesCommDecide] using hBody
               have ih :
                   ∀ L, muDepth L ≤ fuel' → reachesCommDecide L = true → ReachesComm L.unfold :=
-                fun L hF hD => reachesComm_body_implies_unfold_aux fuel' L hF hD
-              exact reachesComm_unfold_mu (fuel:=fuel') (L:=L') (by simpa using hFuel) hBody' ih
+                fun L hF hD => reaches_comm_body_implies_unfold_aux fuel' L hF hD
+              exact reaches_comm_unfold_mu (fuel:=fuel') (L:=L') (by simpa using hFuel) hBody' ih
 
 /-! ## Public Unfold and Soundness Theorems -/
 
 /-- Helper: reachesCommDecide is monotonic under unfolding for guarded types. -/
-theorem reachesComm_body_implies_unfold (L : LocalType)
+theorem reaches_comm_body_implies_unfold (L : LocalType)
     (hBody : reachesCommDecide L = true) :
     ReachesComm L.unfold := by
-  exact reachesComm_body_implies_unfold_aux (muDepth L) L (by exact le_rfl) hBody
+  exact reaches_comm_body_implies_unfold_aux (muDepth L) L (by exact le_rfl) hBody
 
 /-- Soundness: if decidable checker returns true, the type reaches communication. -/
-theorem reachesCommDecide_sound (L : LocalType) (h : reachesCommDecide L = true) :
+theorem reaches_comm_decide_sound (L : LocalType) (h : reachesCommDecide L = true) :
     ReachesComm L := by
   cases L with
   | send r T L' =>
@@ -374,7 +374,7 @@ theorem reachesCommDecide_sound (L : LocalType) (h : reachesCommDecide L = true)
   | mu L' =>
       have hBody : reachesCommDecide L' = true := by
         simpa [reachesCommDecide] using h
-      exact ReachesComm.mu (reachesComm_body_implies_unfold L' hBody)
+      exact ReachesComm.mu (reaches_comm_body_implies_unfold L' hBody)
 
 
 end

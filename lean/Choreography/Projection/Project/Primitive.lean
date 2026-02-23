@@ -51,15 +51,15 @@ theorem trans_comm_other
     sender receiver role branches hneq_sender hneq_receiver
 
 /-- Canonical closedness preservation for projection. -/
-theorem trans_isClosed_of_isClosed (g : GlobalType) (role : String)
+theorem trans_is_closed_of_is_closed (g : GlobalType) (role : String)
     (hclosed : g.isClosed = true) :
     (trans g role).isClosed = true :=
-  Choreography.Projection.Trans.trans_isClosed_of_isClosed g role hclosed
+  Choreography.Projection.Trans.trans_is_closed_of_is_closed g role hclosed
 
 /-- Canonical local well-formedness preservation for projection. -/
-theorem trans_wellFormed_of_wellFormed (g : GlobalType) (role : String)
+theorem trans_well_formed_of_well_formed (g : GlobalType) (role : String)
     (hwf : g.wellFormed = true) :
     LocalTypeR.WellFormed (trans g role) :=
-  Choreography.Projection.Trans.trans_wellFormed_of_wellFormed g role hwf
+  Choreography.Projection.Trans.trans_well_formed_of_well_formed g role hwf
 
 end Choreography.Projection.Project

@@ -43,12 +43,12 @@ def emptyMonitor : SessionMonitor UnitGuard :=
   { step := fun sk => some sk }
 
 /-- The runner monitor satisfies the control-flow acceptance contract. -/
-theorem emptyMonitor_monitor_sound {ε : Type} [EffectRuntime ε] :
+theorem empty_monitor_monitor_sound {ε : Type} [EffectRuntime ε] :
     monitor_sound (γ:=UnitGuard) (ε:=ε) emptyMonitor := by
   simpa [emptyMonitor] using (monitor_sound_any (γ:=UnitGuard) (ε:=ε) emptyMonitor)
 
 /-- The runner monitor preserves protocol session ids. -/
-theorem emptyMonitor_unified_monitor_preserves :
+theorem empty_monitor_unified_monitor_preserves :
     unified_monitor_preserves emptyMonitor := by
   simpa [emptyMonitor] using (unified_monitor_preserves_identity (γ:=UnitGuard))
 

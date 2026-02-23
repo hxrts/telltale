@@ -40,27 +40,27 @@ The following definitions form the semantic interface for proofs:
 Coherence is now proven from first principles using participation structure, following Coq's proof strategy.
 
 **Mu-unfolding (from MuUnfoldLemmas.lean):**
-- `EQ2_mu_crossed_unfold_left`: **PROVEN** via proj_subst + EQ2_mu_self_unfold
-- `EQ2_mu_crossed_unfold_right`: **PROVEN** via proj_subst + EQ2_mu_to_unfold
-- `EQ2_mu_unguarded_to_end`: **PROVEN** (vacuously true - hypotheses contradict when s ≠ t)
-- `EQ2_end_to_mu_unguarded`: **PROVEN** (vacuously true for closed types)
+- `eq2_mu_crossed_unfold_left`: **PROVEN** via proj_subst + eq2_mu_self_unfold
+- `eq2_mu_crossed_unfold_right`: **PROVEN** via proj_subst + eq2_mu_to_unfold
+- `eq2_mu_unguarded_to_end`: **PROVEN** (vacuously true - hypotheses contradict when s ≠ t)
+- `eq2_end_to_mu_unguarded`: **PROVEN** (vacuously true for closed types)
 
 **Closedness theorems (PROVEN in GlobalType.lean):**
-- `GlobalType.isClosed_substitute_mu`: **PROVEN** - mu-unfolding preserves closedness
-- `GlobalType.isClosed_comm_branches`: **PROVEN** - closed comm has closed branches
+- `GlobalType.is_closed_substitute_mu`: **PROVEN** - mu-unfolding preserves closedness
+- `GlobalType.is_closed_comm_branches`: **PROVEN** - closed comm has closed branches
 
 **Proven coinductive theorems:**
 - `subst_end_unguarded_eq2_end`: **PROVEN** in SubstEndUnguarded.lean via UnfoldsToEnd induction
 - `trans_subst_comm`: **PROVEN** using paco coinduction (requires closedness)
-- `EQ2_trans_wf`: **PROVEN** via Bisim (EQ2Props.lean); used with explicit well-formedness witnesses
+- `eq2_trans_wf`: **PROVEN** via Bisim (EQ2Props.lean); used with explicit well-formedness witnesses
 
 **Remaining Assumptions:** None (sender/receiver lemmas proven via head-action predicate)
 
 **COHERENCE PROOF COMPLETE (modulo helper lemmas):**
-- `trans_branches_coherent_EQ2`: **PROVEN** using participation structure
-  - Case 1 (non-participant): Uses `EQ_end` - all branches project to .end
+- `trans_branches_coherent_eq2`: **PROVEN** using participation structure
+  - Case 1 (non-participant): Uses `eq_end` - all branches project to .end
   - Case 2 (participant): Uses `part_of_all2` - uniform participation (legacy extraction gaps)
-- `trans_produces_CProject`: Bridges trans to CProject (uses coherence)
+- `trans_produces_c_project`: Bridges trans to CProject (uses coherence)
 - `branches_project_coherent`: Extracts EQ2 equivalence from AllBranchesProj (legacy gaps)
 
 **Inherited from MuUnfoldLemmas.lean (via ProjSubst.lean):**
@@ -86,12 +86,12 @@ the new local types for each role.
 
 Lean's CProject definition ALREADY has Coq's coherence built-in via AllBranchesProj
 (Projectb.lean:204-206). The coherence requirement is structurally present; we just need
-to connect it to the trans function via CProject_implies_EQ2_trans.
+to connect it to the trans function via c_project_implies_eq2_trans.
 
 **Proof via wellFormedness** (outline):
 Given a well-formed comm node with branches and non-participant role:
 1. AllBranchesProj in CProject ensures all branches project to the same candidate
-2. CProject_implies_EQ2_trans connects CProject to trans
+2. c_project_implies_eq2_trans connects CProject to trans
 3. Transitivity gives us branch-to-branch EQ2 equivalence
 
 **Alternative: Direct proof** (without wellFormedness):
@@ -124,8 +124,8 @@ The proof proceeds by case analysis on the GlobalType witness:
     - Mismatched guardedness: requires showing unfold relates to .end [legacy gaps]
     - Both unguarded: both .end ✓
 - `.comm sender receiver branches`:
-  - role = sender: both .send, branches via transBranches_ProjSubstRel ✓
-  - role = receiver: both .recv, branches via transBranches_ProjSubstRel ✓
+  - role = sender: both .send, branches via trans_branches_proj_subst_rel ✓
+  - role = receiver: both .recv, branches via trans_branches_proj_subst_rel ✓
   - non-participant:
     - empty branches: both .end ✓
     - non-empty: recursive call on continuation subterm ✓
@@ -144,7 +144,7 @@ when fully unfolded.
 
 ## EQ2 transitivity + subst_end_unguarded_eq2_end
 
-EQ2 transitivity now uses `EQ2_trans_wf` from EQ2Props (Bisim detour).
+EQ2 transitivity now uses `eq2_trans_wf` from EQ2Props (Bisim detour).
 This replaces the prior `EQ2_trans` path and requires explicit
 well-formedness witnesses for intermediate types.
 
@@ -170,7 +170,7 @@ open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 open Choreography.Projection.Projectb
 open Choreography.Projection.Project
-  (EQ_end part_of2_or_end CProject_implies_EQ2_trans Projectable ProjectableClosedWellFormed)
+  (eq_end part_of2_or_end c_project_implies_eq2_trans Projectable ProjectableClosedWellFormed)
 open SessionTypes.Participation (part_of2 part_of_all2 part_of_all2_comm_inv not_part_of2_comm)
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
@@ -182,7 +182,7 @@ open Semantics.EnvStep
 
 abbrev projTrans := Choreography.Projection.Project.trans
 open Choreography.Projection.Project (trans_comm_sender trans_comm_receiver trans_comm_other
-  transBranches lcontractive trans_wellFormed_of_wellFormed)
+  transBranches lcontractive trans_well_formed_of_well_formed)
 
 /-! ## Claims Bundle -/
 
@@ -219,7 +219,7 @@ The trans function produces valid CProject proofs for well-formed types.
 This is the bridge between computational projection (trans) and relational projection (CProject). -/
 
 /-- Helper: wellFormed implies allCommsNonEmpty. -/
-private theorem allCommsNonEmpty_of_wf (g : GlobalType) (hwf : g.wellFormed = true) :
+private theorem all_comms_non_empty_of_wf (g : GlobalType) (hwf : g.wellFormed = true) :
     g.allCommsNonEmpty = true := by
   -- Unpack the wellFormed conjunction to reach allCommsNonEmpty.
   simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
@@ -227,28 +227,28 @@ private theorem allCommsNonEmpty_of_wf (g : GlobalType) (hwf : g.wellFormed = tr
   exact hne
 
 /-- Helper: CProject + wellFormed gives the exact trans candidate. -/
-private theorem trans_eq_of_CProject_wf (g : GlobalType) (role : String) (lt : LocalTypeR)
+private theorem trans_eq_of_c_project_wf (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt) (hwf : g.wellFormed = true) :
     projTrans g role = lt := by
   -- Use trans_eq_of_CProject after extracting allCommsNonEmpty.
-  have hne := allCommsNonEmpty_of_wf g hwf
-  simpa [projTrans] using (trans_eq_of_CProject g role lt hproj hne)
+  have hne := all_comms_non_empty_of_wf g hwf
+  simpa [projTrans] using (trans_eq_of_c_project g role lt hproj hne)
 
 /-- Helper: non-participant comms yield AllBranchesProj from CProject. -/
-private theorem allBranchesProj_of_comm_nonpart
+private theorem all_branches_proj_of_comm_nonpart
     (sender receiver : String) (branches : List (Label × GlobalType)) (role : String) (lt : LocalTypeR)
     (hns : role ≠ sender) (hnr : role ≠ receiver)
     (hproj : CProject (GlobalType.comm sender receiver branches) role lt) :
     AllBranchesProj CProject branches role lt := by
   -- Destructure the comm case in CProjectF and drop sender/receiver branches.
-  have hF := CProject_destruct hproj
+  have hF := c_project_destruct hproj
   simpa [CProjectF, hns, hnr] using hF
 
 /-- Branch coherence from participation structure.
 
 For well-formed communications where role is not a participant, all branch continuations
 project to EQ2-equivalent local types. This is proven using the participation infrastructure:
-- If role doesn't participate at all: all branches project to .end (via EQ_end)
+- If role doesn't participate at all: all branches project to .end (via eq_end)
 - If role participates through branches: all branches have part_of_all2 (uniform participation)
 
 This theorem eliminates the trans_branches_coherent assumption by proving coherence from
@@ -256,7 +256,7 @@ first principles, following Coq's proof strategy. -/
 
 /-! ## Participant Case -/
 
-private theorem trans_branches_coherent_EQ2_participant
+private theorem trans_branches_coherent_eq2_participant
     (sender receiver : String) (branches : List (Label × GlobalType)) (role : String)
     (hnp : role ≠ sender ∧ role ≠ receiver)
     (hne : branches ≠ [])
@@ -273,21 +273,21 @@ private theorem trans_branches_coherent_EQ2_participant
       have hproj_comm' : CProject (GlobalType.comm sender receiver (hd :: tl)) role lt := by
         simpa [hbranches] using hproj_comm
       have hall : AllBranchesProj CProject (hd :: tl) role lt :=
-        allBranchesProj_of_comm_nonpart sender receiver (hd :: tl) role lt hnp.1 hnp.2 hproj_comm'
+        all_branches_proj_of_comm_nonpart sender receiver (hd :: tl) role lt hnp.1 hnp.2 hproj_comm'
       have hproj_hd : CProject hd.2 role lt := hall hd (List.Mem.head tl)
       have hproj_b : CProject b.2 role lt := hall b hmem
       have hwf_hd : hd.2.wellFormed = true :=
-        GlobalType.wellFormed_comm_branches sender receiver (hd :: tl) hwf' hd (List.Mem.head tl)
+        GlobalType.well_formed_comm_branches sender receiver (hd :: tl) hwf' hd (List.Mem.head tl)
       have hwf_b : b.2.wellFormed = true :=
-        GlobalType.wellFormed_comm_branches sender receiver (hd :: tl) hwf' b hmem
-      have htrans_hd : projTrans hd.2 role = lt := trans_eq_of_CProject_wf hd.2 role lt hproj_hd hwf_hd
-      have htrans_b : projTrans b.2 role = lt := trans_eq_of_CProject_wf b.2 role lt hproj_b hwf_b
+        GlobalType.well_formed_comm_branches sender receiver (hd :: tl) hwf' b hmem
+      have htrans_hd : projTrans hd.2 role = lt := trans_eq_of_c_project_wf hd.2 role lt hproj_hd hwf_hd
+      have htrans_b : projTrans b.2 role = lt := trans_eq_of_c_project_wf b.2 role lt hproj_b hwf_b
       have hEq : projTrans b.2 role = projTrans hd.2 role := by simp [htrans_b, htrans_hd]
-      simpa [hbranches, List.head!, hEq] using (EQ2_refl (projTrans hd.2 role))
+      simpa [hbranches, List.head!, hEq] using (eq2_refl (projTrans hd.2 role))
 
 /-! ## Non-Participant Case -/
 
-private theorem trans_branches_coherent_EQ2_nonpart
+private theorem trans_branches_coherent_eq2_nonpart
     (sender receiver : String) (branches : List (Label × GlobalType)) (role : String)
     (hne : branches ≠ [])
     (hwf : (GlobalType.comm sender receiver branches).wellFormed = true)
@@ -303,17 +303,17 @@ private theorem trans_branches_coherent_EQ2_nonpart
       have hnopart_hd : ¬ part_of2 role hd.2 := hnotbranch hd hmem_hd
       have hnopart_b : ¬ part_of2 role b.2 := hnotbranch b hmem
       have hwf_hd : hd.2.wellFormed = true :=
-        GlobalType.wellFormed_comm_branches sender receiver branches hwf hd hmem_hd
+        GlobalType.well_formed_comm_branches sender receiver branches hwf hd hmem_hd
       have hwf_b : b.2.wellFormed = true :=
-        GlobalType.wellFormed_comm_branches sender receiver branches hwf b hmem
-      have hhd_end : EQ2 (projTrans hd.2 role) .end := EQ2_symm (EQ_end role hd.2 hnopart_hd hwf_hd)
-      have hb_end : EQ2 (projTrans b.2 role) .end := EQ2_symm (EQ_end role b.2 hnopart_b hwf_b)
-      simpa [hbranches, List.head!] using (EQ2_trans_via_end hb_end (EQ2_symm hhd_end))
+        GlobalType.well_formed_comm_branches sender receiver branches hwf b hmem
+      have hhd_end : EQ2 (projTrans hd.2 role) .end := eq2_symm (eq_end role hd.2 hnopart_hd hwf_hd)
+      have hb_end : EQ2 (projTrans b.2 role) .end := eq2_symm (eq_end role b.2 hnopart_b hwf_b)
+      simpa [hbranches, List.head!] using (eq2_trans_via_end hb_end (eq2_symm hhd_end))
 
 /-- All branch projections are EQ2-coherent with the head branch for non-participants. -/
 
 
-theorem trans_branches_coherent_EQ2
+theorem trans_branches_coherent_eq2
     (sender receiver : String) (branches : List (Label × GlobalType)) (role : String)
     (hnp : role ≠ sender ∧ role ≠ receiver)
     (hne : branches ≠ [])
@@ -324,13 +324,13 @@ theorem trans_branches_coherent_EQ2
   intro b hmem
   by_cases hpart : part_of2 role (.comm sender receiver branches)
   · rcases hproj_comm with ⟨lt, hproj⟩
-    exact trans_branches_coherent_EQ2_participant sender receiver branches role hnp hne hwf lt hproj b hmem
-  · exact trans_branches_coherent_EQ2_nonpart sender receiver branches role hne hwf hpart b hmem
+    exact trans_branches_coherent_eq2_participant sender receiver branches role hnp hne hwf lt hproj b hmem
+  · exact trans_branches_coherent_eq2_nonpart sender receiver branches role hne hwf hpart b hmem
 
 /-! ## BranchesProjRel Infrastructure -/
 
 /-- Helper: transBranches produces branches satisfying BranchesProjRel with the witness relation. -/
-private theorem transBranches_satisfies_BranchesProjRel
+private theorem trans_branches_satisfies_branches_proj_rel
     (gbs : List (Label × GlobalType)) (role : String)
     (hwf : ∀ gb ∈ gbs, gb.2.allCommsNonEmpty = true) :
     BranchesProjRel (fun g role cand => cand = projTrans g role ∧ g.allCommsNonEmpty = true)
@@ -358,7 +358,7 @@ private theorem transBranches_satisfies_BranchesProjRel
 /-! ## Branch Witness Extraction -/
 
 /-- Helper: extract per-branch CProject witnesses from BranchesProjRel. -/
-private theorem branchesProjRel_to_CProject
+private theorem branches_proj_rel_to_c_project
     (gbs : List (Label × GlobalType)) (role : String) (lbs : List BranchR)
     (h : BranchesProjRel CProject gbs role lbs) :
     ∀ p ∈ gbs, ∃ lt, CProject p.2 role lt := by
@@ -381,14 +381,14 @@ This theorem establishes that when CProject already holds (and g is wellFormed),
 the computational trans function produces the same candidate, hence also satisfies CProject.
 
 **Proof strategy:**
-It uses `trans_eq_of_CProject` to rewrite the candidate to `trans g role`. -/
+It uses `trans_eq_of_c_project` to rewrite the candidate to `trans g role`. -/
 
 
-theorem trans_produces_CProject (g : GlobalType) (role : String) (lt : LocalTypeR)
+theorem trans_produces_c_project (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt) (hwf : g.wellFormed = true) :
     CProject g role (projTrans g role) := by
   -- Reduce to the original candidate via trans_eq_of_CProject.
-  have htrans_eq : projTrans g role = lt := trans_eq_of_CProject_wf g role lt hproj hwf
+  have htrans_eq : projTrans g role = lt := trans_eq_of_c_project_wf g role lt hproj hwf
   simpa [htrans_eq] using hproj
 
 /-- Helper: derive equality of branch projections via a common CProject candidate. -/
@@ -404,7 +404,7 @@ private theorem branches_project_coherent_eq (sender receiver : String)
   -- Use CProject to get a common candidate and rewrite both branches to it.
   rcases hproj_comm with ⟨lt, hproj_comm⟩
   have hall : AllBranchesProj CProject ((first_label, first_cont) :: rest) role lt :=
-    allBranchesProj_of_comm_nonpart sender receiver ((first_label, first_cont) :: rest)
+    all_branches_proj_of_comm_nonpart sender receiver ((first_label, first_cont) :: rest)
       role lt hns hnr hproj_comm
   have hproj_first : CProject first_cont role lt :=
     hall (first_label, first_cont) (List.Mem.head rest)
@@ -413,9 +413,9 @@ private theorem branches_project_coherent_eq (sender receiver : String)
     hallwf_branches (first_label, first_cont) (List.Mem.head rest)
   have hwf_cont : cont.wellFormed = true := hallwf_branches (label, cont) hmem
   have htrans_first : projTrans first_cont role = lt :=
-    trans_eq_of_CProject_wf first_cont role lt hproj_first hwf_first
+    trans_eq_of_c_project_wf first_cont role lt hproj_first hwf_first
   have htrans_cont : projTrans cont role = lt :=
-    trans_eq_of_CProject_wf cont role lt hproj_cont hwf_cont
+    trans_eq_of_c_project_wf cont role lt hproj_cont hwf_cont
   simp [htrans_cont, htrans_first]
 
 /-! ## Branch Coherence Theorem -/
@@ -437,6 +437,6 @@ theorem branches_project_coherent (sender receiver : String)
   have hEq :=
     branches_project_coherent_eq sender receiver first_label first_cont rest label cont role
       hmem hns hnr hallwf_branches hproj_comm
-  simpa [hEq] using (EQ2_refl (projTrans cont role))
+  simpa [hEq] using (eq2_refl (projTrans cont role))
 
 end Choreography.Harmony

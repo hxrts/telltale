@@ -11,7 +11,7 @@ The Problem. For compositional progress, we need to show that a step
 in the middle portion of a framed GEnv preserves the left and right
 frame portions unchanged.
 
-Solution Structure. Prove `TypedStep_preserves_frames` by induction
+Solution Structure. Prove `typed_step_preserves_frames` by induction
 on `TypedStep`. Each constructor case shows the update stays within
 Gmid by endpoint locality, producing `G' = Gleft ++ Gmid' ++ Gright`.
 -/
@@ -28,7 +28,7 @@ section
 
 -- Frame Preservation Main Lemma
 
-lemma TypedStep_preserves_frames
+lemma typed_step_preserves_frames
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfull Gleft Gmid Gright : GEnv}
     {D : DEnv} {store : VarStore} {bufs : Buffers} {P : Process}
     {G' : GEnv} {D' : DEnv} {Sown' : OwnedEnv} {store' : VarStore} {bufs' : Buffers} {P' : Process}
@@ -50,25 +50,25 @@ lemma TypedStep_preserves_frames
   | send =>
       rename_i Gfull D Ssh Sown store bufs k x eStep target Tstep Lstep v sendEdge G' D' bufs'
         hkStr hxStr hGStep hS hv hRecvReady hEdge hGout hDout hBufsOut
-      exact TypedStep_preserves_frames_send (hGfull:=hGfull) (hDisjL:=hDisjL)
+      exact typed_step_preserves_frames_send (hGfull:=hGfull) (hDisjL:=hDisjL)
         (hStore:=hStore) hDisjShAll hOwnDisj (hOut:=hOut) hkStr hGout
   -- TypedStep Frame Preservation: Receive
   | recv =>
       rename_i Gfull D Ssh Sown store bufs k x eStep source Tstep Lstep v vs recvEdge G' D' Sown' store' bufs'
         hkStr hGStep hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut
-      exact TypedStep_preserves_frames_recv (hGfull:=hGfull) (hDisjL:=hDisjL)
+      exact typed_step_preserves_frames_recv (hGfull:=hGfull) (hDisjL:=hDisjL)
         (hStore:=hStore) hDisjShAll hOwnDisj (hOut:=hOut) hkStr hGout
   -- TypedStep Frame Preservation: Select
   | select =>
       rename_i Gfull D Ssh Sown store bufs k ℓ eStep target bsStep Lstep selectEdge G' D' bufs'
         hkStr hGStep hFind hTargetReady hEdge hGout hDout hBufsOut
-      exact TypedStep_preserves_frames_select (hGfull:=hGfull) (hDisjL:=hDisjL)
+      exact typed_step_preserves_frames_select (hGfull:=hGfull) (hDisjL:=hDisjL)
         (hStore:=hStore) hDisjShAll hOwnDisj (hOut:=hOut) hkStr hGout
   -- TypedStep Frame Preservation: Branch
   | branch =>
       rename_i Gfull D Ssh Sown store bufs k procs eStep source bsStep ℓ P Lstep vs branchEdge G' D' bufs'
         hkStr hGStep hEdge hBuf hFindP hFindBs hTrace hGout hDout hBufsOut
-      exact TypedStep_preserves_frames_branch (hGfull:=hGfull) (hDisjL:=hDisjL)
+      exact typed_step_preserves_frames_branch (hGfull:=hGfull) (hDisjL:=hDisjL)
         (hStore:=hStore) hDisjShAll hOwnDisj (hOut:=hOut) hkStr hGout
   -- TypedStep Frame Preservation: Assign
   | assign =>
@@ -109,7 +109,7 @@ lemma TypedStep_preserves_frames
           have hStoreSwap :
               StoreTypedStrong (Gleft ++ Gmid ++ Gright)
                 (SEnvAll (Ssh ++ Sown.right) (split.S2 ++ (split.S1 ++ (∅ : SEnv)))) store :=
-            StoreTypedStrong_swap_S_left_prefix (Ssh:=Ssh ++ Sown.right)
+            store_typed_strong_swap_s_left_prefix (Ssh:=Ssh ++ Sown.right)
               (S₁:=split.S1) (S₂:=split.S2) (S₃:=∅) hDisjS
               (by simpa [List.append_assoc] using hStoreBase)
           have hStoreL :
@@ -123,35 +123,35 @@ lemma TypedStep_preserves_frames
           -- Par Left: Derive GEnv Disjointness for Subsplits
           have hSubG1 : SessionsOf split.G1 ⊆ SessionsOf Gmid := by
             intro s hs
-            simpa [split.hG] using SessionsOf_append_left (G₂:=split.G2) hs
+            simpa [split.hG] using sessions_of_append_left (G₂:=split.G2) hs
           have hSubG2 : SessionsOf split.G2 ⊆ SessionsOf Gmid := by
             intro s hs
-            simpa [split.hG] using SessionsOf_append_right (G₁:=split.G1) hs
+            simpa [split.hG] using sessions_of_append_right (G₁:=split.G1) hs
           have hDisjGleftG1 : DisjointG Gleft split.G1 := by
-            have hSym : DisjointG Gmid Gleft := DisjointG_symm hDisjL
-            have hTmp : DisjointG split.G1 Gleft := DisjointG_of_subset_left hSubG1 hSym
-            exact DisjointG_symm hTmp
+            have hSym : DisjointG Gmid Gleft := disjoint_g_symm hDisjL
+            have hTmp : DisjointG split.G1 Gleft := disjoint_g_of_subset_left hSubG1 hSym
+            exact disjoint_g_symm hTmp
           have hDisjGleftG2 : DisjointG Gleft split.G2 := by
-            have hSym : DisjointG Gmid Gleft := DisjointG_symm hDisjL
+            have hSym : DisjointG Gmid Gleft := disjoint_g_symm hDisjL
 /- ## Structured Block 3 -/
-            have hTmp : DisjointG split.G2 Gleft := DisjointG_of_subset_left hSubG2 hSym
-            exact DisjointG_symm hTmp
+            have hTmp : DisjointG split.G2 Gleft := disjoint_g_of_subset_left hSubG2 hSym
+            exact disjoint_g_symm hTmp
           have hDisjG1Right : DisjointG split.G1 Gright :=
-            DisjointG_of_subset_left hSubG1 hDisjR
+            disjoint_g_of_subset_left hSubG1 hDisjR
           have hDisjG2Right : DisjointG split.G2 Gright :=
-            DisjointG_of_subset_left hSubG2 hDisjR
+            disjoint_g_of_subset_left hSubG2 hDisjR
           have hDisjLeftRight : DisjointG Gleft (split.G2 ++ Gright) := by
-            have hLeft : DisjointG split.G2 Gleft := DisjointG_symm hDisjGleftG2
-            have hRight : DisjointG Gright Gleft := DisjointG_symm hDisjLR
+            have hLeft : DisjointG split.G2 Gleft := disjoint_g_symm hDisjGleftG2
+            have hRight : DisjointG Gright Gleft := disjoint_g_symm hDisjLR
             have hCombined : DisjointG (split.G2 ++ Gright) Gleft :=
-              DisjointG_append_left hLeft hRight
-            exact DisjointG_symm hCombined
+              disjoint_g_append_left hLeft hRight
+            exact disjoint_g_symm hCombined
           have hDisjMidRight : DisjointG split.G1 (split.G2 ++ Gright) := by
-            have hLeft : DisjointG split.G2 split.G1 := DisjointG_symm hDisjG
-            have hRight : DisjointG Gright split.G1 := DisjointG_symm hDisjG1Right
+            have hLeft : DisjointG split.G2 split.G1 := disjoint_g_symm hDisjG
+            have hRight : DisjointG Gright split.G1 := disjoint_g_symm hDisjG1Right
             have hTmp : DisjointG (split.G2 ++ Gright) split.G1 :=
-              DisjointG_append_left hLeft hRight
-            exact DisjointG_symm hTmp
+              disjoint_g_append_left hLeft hRight
+            exact disjoint_g_symm hTmp
           have hGfull' : Gfull = Gleft ++ split.G1 ++ (split.G2 ++ Gright) := by
             calc
               Gfull = Gleft ++ Gmid ++ Gright := hGfull
@@ -190,15 +190,15 @@ lemma TypedStep_preserves_frames
                 (G₁' ++ splitFull.G2) (D₁' ++ D₂)
                 { right := Sown.right ++ split.S2, left := S₁' } store' bufs' P' := by
             simpa [hGfull'] using hStepP'
-          have hDisjShRight : DisjointS Ssh Sown.right := DisjointS_owned_right hDisjShAll
+          have hDisjShRight : DisjointS Ssh Sown.right := disjoint_s_owned_right hDisjShAll
           have hDisjShSplit : DisjointS Ssh split.S1 ∧ DisjointS Ssh split.S2 :=
-            DisjointS_split_from_owned_left split hDisjShAll
+            disjoint_s_split_from_owned_left split hDisjShAll
           have hDisjShSubL :
               DisjointS Ssh ({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) :=
-            DisjointS_owned_repack hDisjShRight hDisjShSplit.1 hDisjShSplit.2
+            disjoint_s_owned_repack hDisjShRight hDisjShSplit.1 hDisjShSplit.2
           have hOwnSubL :
               OwnedDisjoint ({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) :=
-            OwnedDisjoint_sub_left (Sown:=Sown) (split:=split) hOwnDisj hDisjS
+            owned_disjoint_sub_left (Sown:=Sown) (split:=split) hOwnDisj hDisjS
           have hDisjShSubL' :
               DisjointS Ssh ({ right := Sown.right ++ splitFull.S2, left := splitFull.S1 } : OwnedEnv) := by
             simpa [hS1Eq, hS2Eq] using hDisjShSubL
@@ -231,7 +231,7 @@ lemma TypedStep_preserves_frames
           have hStoreSwap :
               StoreTypedStrong (Gleft ++ Gmid ++ Gright)
                 (SEnvAll (Ssh ++ Sown.right) (split.S2 ++ (split.S1 ++ (∅ : SEnv)))) store :=
-            StoreTypedStrong_swap_S_left_prefix (Ssh:=Ssh ++ Sown.right)
+            store_typed_strong_swap_s_left_prefix (Ssh:=Ssh ++ Sown.right)
               (S₁:=split.S1) (S₂:=split.S2) (S₃:=∅) hDisjS
               (by simpa [List.append_assoc] using hStoreBase)
           have hStoreL :
@@ -246,26 +246,26 @@ lemma TypedStep_preserves_frames
           -- Par Right: Derive GEnv Disjointness for Subsplits
           have hSubG1 : SessionsOf split.G1 ⊆ SessionsOf Gmid := by
             intro s hs
-            simpa [split.hG] using SessionsOf_append_left (G₂:=split.G2) hs
+            simpa [split.hG] using sessions_of_append_left (G₂:=split.G2) hs
           have hSubG2 : SessionsOf split.G2 ⊆ SessionsOf Gmid := by
             intro s hs
-            simpa [split.hG] using SessionsOf_append_right (G₁:=split.G1) hs
+            simpa [split.hG] using sessions_of_append_right (G₁:=split.G1) hs
           have hDisjGleftG1 : DisjointG Gleft split.G1 := by
-            have hSym : DisjointG Gmid Gleft := DisjointG_symm hDisjL
-            have hTmp : DisjointG split.G1 Gleft := DisjointG_of_subset_left hSubG1 hSym
-            exact DisjointG_symm hTmp
+            have hSym : DisjointG Gmid Gleft := disjoint_g_symm hDisjL
+            have hTmp : DisjointG split.G1 Gleft := disjoint_g_of_subset_left hSubG1 hSym
+            exact disjoint_g_symm hTmp
           have hDisjGleftG2 : DisjointG Gleft split.G2 := by
-            have hSym : DisjointG Gmid Gleft := DisjointG_symm hDisjL
-            have hTmp : DisjointG split.G2 Gleft := DisjointG_of_subset_left hSubG2 hSym
-            exact DisjointG_symm hTmp
+            have hSym : DisjointG Gmid Gleft := disjoint_g_symm hDisjL
+            have hTmp : DisjointG split.G2 Gleft := disjoint_g_of_subset_left hSubG2 hSym
+            exact disjoint_g_symm hTmp
           have hDisjG1Right : DisjointG split.G1 Gright :=
-            DisjointG_of_subset_left hSubG1 hDisjR
+            disjoint_g_of_subset_left hSubG1 hDisjR
           have hDisjG2Right : DisjointG split.G2 Gright :=
-            DisjointG_of_subset_left hSubG2 hDisjR
+            disjoint_g_of_subset_left hSubG2 hDisjR
           have hDisjLeftMid : DisjointG (Gleft ++ split.G1) split.G2 :=
-            DisjointG_append_left hDisjGleftG2 hDisjG
+            disjoint_g_append_left hDisjGleftG2 hDisjG
           have hDisjLeftRight : DisjointG (Gleft ++ split.G1) Gright :=
-            DisjointG_append_left hDisjLR hDisjG1Right
+            disjoint_g_append_left hDisjLR hDisjG1Right
           have hGfull' : Gfull = (Gleft ++ split.G1) ++ split.G2 ++ Gright := by
             calc
               Gfull = Gleft ++ Gmid ++ Gright := hGfull
@@ -304,15 +304,15 @@ lemma TypedStep_preserves_frames
                 (splitFull.G1 ++ G₂') (D₁ ++ D₂')
                 { right := Sown.right ++ split.S1, left := S₂' } store' bufs' Q' := by
             simpa [hGfull'] using hStepQ'
-          have hDisjShRight : DisjointS Ssh Sown.right := DisjointS_owned_right hDisjShAll
+          have hDisjShRight : DisjointS Ssh Sown.right := disjoint_s_owned_right hDisjShAll
           have hDisjShSplit : DisjointS Ssh split.S1 ∧ DisjointS Ssh split.S2 :=
-            DisjointS_split_from_owned_left split hDisjShAll
+            disjoint_s_split_from_owned_left split hDisjShAll
           have hDisjShSubR :
               DisjointS Ssh ({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) :=
-            DisjointS_owned_repack hDisjShRight hDisjShSplit.2 hDisjShSplit.1
+            disjoint_s_owned_repack hDisjShRight hDisjShSplit.2 hDisjShSplit.1
           have hOwnSubR :
               OwnedDisjoint ({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) :=
-            OwnedDisjoint_sub_right (Sown:=Sown) (split:=split) hOwnDisj hDisjS
+            owned_disjoint_sub_right (Sown:=Sown) (split:=split) hOwnDisj hDisjS
           have hDisjShSubR' :
               DisjointS Ssh ({ right := Sown.right ++ splitFull.S1, left := splitFull.S2 } : OwnedEnv) := by
             simpa [hS1Eq, hS2Eq] using hDisjShSubR

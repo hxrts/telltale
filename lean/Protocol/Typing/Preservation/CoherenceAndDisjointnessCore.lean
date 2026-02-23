@@ -50,8 +50,8 @@ section
 /-- TypedStep preserves coherence.
 
     **Proof strategy**: Case analysis on TypedStep constructor:
-    - `send`: Use `Coherent_send_preserved` with hRecvReady derived from coherence
-    - `recv`: Use `Coherent_recv_preserved`
+    - `send`: Use `coherent_send_preserved` with hRecvReady derived from coherence
+    - `recv`: Use `coherent_recv_preserved`
     - `assign`: G and D unchanged
     - `seq_step`, `seq_skip`: IH or G/D unchanged
     - `par_*`: Disjoint resources remain coherent -/
@@ -64,25 +64,25 @@ theorem typed_step_preserves_coherence {G D Ssh Sown store bufs P G' D' Sown' st
     -- After rewriting with the equalities, Gout = updateG G e L and Dout = appendD D sendEdge T
     rw [hGout, hDout, hEdge]
     unfold appendD
-    exact @Coherent_send_preserved G D e target T L hCoh hG hRecvReady
+    exact @coherent_send_preserved G D e target T L hCoh hG hRecvReady
   | @TypedStep.recv G D Ssh Sown store bufs k x e source T L v vs recvEdge Gout Dout SownOut storeOut bufsOut hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut, hCoh => by
     -- Use Coherent_recv_preserved with explicit arguments
     rw [hGout, hDout]
     have hTrace' : (lookupD D { sid := e.sid, sender := source, receiver := e.role }).head? = some T := by
       rw [← hEdge]; exact hTrace
     rw [hEdge]
-    exact @Coherent_recv_preserved G D e source T L hCoh hG hTrace'
+    exact @coherent_recv_preserved G D e source T L hCoh hG hTrace'
   | @TypedStep.select G D Ssh Sown store bufs k ℓ e target bs L selectEdge Gout Dout bufsOut hk hG hFind hTargetReady hEdge hGout hDout hBufsOut, hCoh => by
     -- Use Coherent_select_preserved with explicit arguments
     rw [hGout, hDout, hEdge]
     unfold appendD
-    exact @Coherent_select_preserved G D e target bs ℓ L hCoh hG hFind hTargetReady
+    exact @coherent_select_preserved G D e target bs ℓ L hCoh hG hFind hTargetReady
   | @TypedStep.branch G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge Gout Dout bufsOut hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut, hCoh => by
     -- Use Coherent_branch_preserved with explicit arguments
     have hTrace' : (lookupD D { sid := e.sid, sender := source, receiver := e.role }).head? = some .string := by
       rw [← hEdge]; exact hTrace
     rw [hGout, hDout, hEdge]
-    exact @Coherent_branch_preserved G D e source bs ℓ L hCoh hG hFindT hTrace'
+    exact @coherent_branch_preserved G D e source bs ℓ L hCoh hG hFindT hTrace'
   | .assign _ _ _, hCoh => by
     -- G and D unchanged
     exact hCoh
@@ -114,7 +114,7 @@ theorem typed_step_preserves_coherence {G D Ssh Sown store bufs P G' D' Sown' st
 /-! ### SEnv Update Rewrites -/
 
 /- Updating a key already present in the left SEnv only affects the left side. -/
-theorem updateSEnv_append_left_of_left {S₁ S₂ : SEnv} {x : Var} {T T' : ValType}
+theorem update_s_env_append_left_of_left {S₁ S₂ : SEnv} {x : Var} {T T' : ValType}
     (hLeft : lookupSEnv S₁ x = some T') :
     updateSEnv (S₁ ++ S₂) x T = updateSEnv S₁ x T ++ S₂ := by
   induction S₁ with
@@ -135,37 +135,37 @@ theorem updateSEnv_append_left_of_left {S₁ S₂ : SEnv} {x : Var} {T T' : ValT
               simpa [lookupSEnv, List.lookup, hbeq] using hLeft
             have hLeftAll : lookupSEnv ((y, U) :: tl ++ S₂) x = some T' := by
               have hLeftAll' : lookupSEnv (tl ++ S₂) x = some T' :=
-                lookupSEnv_append_left hLeft'
+                lookup_s_env_append_left hLeft'
               have hbeq : (x == y) = false := beq_eq_false_iff_ne.mpr hxy
               simpa [lookupSEnv, List.lookup, hbeq] using hLeftAll'
             simp [updateSEnv, hxy, ih hLeft']
 
 /-! ### Lookup Preservation Across Updates -/
 
-lemma lookupSEnv_update_append_neq
+lemma lookup_s_env_update_append_neq
     {S₁ S₂ : SEnv} {x y : Var} {T : ValType} (hxy : y ≠ x) :
     lookupSEnv (updateSEnv S₁ x T ++ S₂) y = lookupSEnv (S₁ ++ S₂) y := by
   cases hL : lookupSEnv S₁ y with
   | some Ty =>
       have hL' : lookupSEnv (updateSEnv S₁ x T) y = some Ty := by
         simpa [hL] using
-          (lookupSEnv_update_neq (env:=S₁) (x:=x) (y:=y) (T:=T) (Ne.symm hxy))
+          (lookup_s_env_update_neq (env:=S₁) (x:=x) (y:=y) (T:=T) (Ne.symm hxy))
       have hLeft : lookupSEnv (updateSEnv S₁ x T ++ S₂) y = some Ty :=
-        lookupSEnv_append_left hL'
+        lookup_s_env_append_left hL'
       have hLeft' : lookupSEnv (S₁ ++ S₂) y = some Ty :=
-        lookupSEnv_append_left hL
+        lookup_s_env_append_left hL
       simpa [hLeft, hLeft'] 
   | none =>
       have hL' : lookupSEnv (updateSEnv S₁ x T) y = none := by
         simpa [hL] using
-          (lookupSEnv_update_neq (env:=S₁) (x:=x) (y:=y) (T:=T) (Ne.symm hxy))
+          (lookup_s_env_update_neq (env:=S₁) (x:=x) (y:=y) (T:=T) (Ne.symm hxy))
       have hRight : lookupSEnv (updateSEnv S₁ x T ++ S₂) y = lookupSEnv S₂ y :=
-        lookupSEnv_append_right hL'
+        lookup_s_env_append_right hL'
       have hRight' : lookupSEnv (S₁ ++ S₂) y = lookupSEnv S₂ y :=
-        lookupSEnv_append_right hL
+        lookup_s_env_append_right hL
       simpa [hRight'] using hRight
 
-lemma lookupSEnv_SEnvAll_update_neq
+lemma lookup_s_env_s_env_all_update_neq
     {Ssh Sown S₂ : SEnv} {x y : Var} {T : ValType} (hxy : y ≠ x) :
     lookupSEnv (SEnvAll Ssh (updateSEnv Sown x T ++ S₂)) y =
       lookupSEnv (SEnvAll Ssh (Sown ++ S₂)) y
@@ -175,46 +175,46 @@ lemma lookupSEnv_SEnvAll_update_neq
   | some Ty =>
       have hLeft :
           lookupSEnv (Ssh ++ (updateSEnv Sown x T ++ S₂)) y = some Ty :=
-        lookupSEnv_append_left hSh
+        lookup_s_env_append_left hSh
       have hRight : lookupSEnv (Ssh ++ (Sown ++ S₂)) y = some Ty :=
-        lookupSEnv_append_left hSh
+        lookup_s_env_append_left hSh
       simpa [hLeft, hRight]
   | none =>
       have hLeft :
           lookupSEnv (Ssh ++ (updateSEnv Sown x T ++ S₂)) y =
             lookupSEnv (updateSEnv Sown x T ++ S₂) y :=
-        lookupSEnv_append_right hSh
+        lookup_s_env_append_right hSh
       have hRight :
           lookupSEnv (Ssh ++ (Sown ++ S₂)) y = lookupSEnv (Sown ++ S₂) y :=
-        lookupSEnv_append_right hSh
+        lookup_s_env_append_right hSh
       have hUpd :
           lookupSEnv (updateSEnv Sown x T ++ S₂) y = lookupSEnv (Sown ++ S₂) y :=
-        lookupSEnv_update_append_neq (S₁:=Sown) (S₂:=S₂) (x:=x) (y:=y) (T:=T) hxy
+        lookup_s_env_update_append_neq (S₁:=Sown) (S₂:=S₂) (x:=x) (y:=y) (T:=T) hxy
       simpa [hRight] using hLeft.trans hUpd
 
 /-! ### Owned-Environment Disjoint Projections -/
 
-lemma DisjointS_owned_right {S₁ : SEnv} {Sown : OwnedEnv} :
+lemma disjoint_s_owned_right {S₁ : SEnv} {Sown : OwnedEnv} :
     DisjointS S₁ (Sown : SEnv) →
     DisjointS S₁ Sown.right := by
   intro hDisj
   have hSub : SEnvDomSubset Sown.right (Sown : SEnv) := by
     simpa [OwnedEnv.all] using
-      (SEnvDomSubset_append_left (S₁:=Sown.right) (S₂:=Sown.left))
-  exact DisjointS_of_domsubset_right hSub hDisj
+      (s_env_dom_subset_append_left (S₁:=Sown.right) (S₂:=Sown.left))
+  exact disjoint_s_of_domsubset_right hSub hDisj
 
-lemma DisjointS_owned_left {S₁ : SEnv} {Sown : OwnedEnv} :
+lemma disjoint_s_owned_left {S₁ : SEnv} {Sown : OwnedEnv} :
     DisjointS S₁ (Sown : SEnv) →
     DisjointS S₁ Sown.left := by
   intro hDisj
   have hSub : SEnvDomSubset Sown.left (Sown : SEnv) := by
     simpa [OwnedEnv.all] using
-      (SEnvDomSubset_append_right (S₁:=Sown.right) (S₂:=Sown.left))
-  exact DisjointS_of_domsubset_right hSub hDisj
+      (s_env_dom_subset_append_right (S₁:=Sown.right) (S₂:=Sown.left))
+  exact disjoint_s_of_domsubset_right hSub hDisj
 
 /-! ### Disjointness Under Point Updates -/
 
-lemma DisjointS_update_right {S₁ S₂ : SEnv} {x : Var} {T : ValType}
+lemma disjoint_s_update_right {S₁ S₂ : SEnv} {x : Var} {T : ValType}
     (hDisj : DisjointS S₁ S₂)
     (hNone : lookupSEnv S₁ x = none) :
     DisjointS S₁ (updateSEnv S₂ x T) := by
@@ -226,13 +226,13 @@ lemma DisjointS_update_right {S₁ S₂ : SEnv} {x : Var} {T : ValType}
     cases this
   ·
     have hL2' : lookupSEnv S₂ y = some T₂ := by
-      have hEq := lookupSEnv_update_neq (env:=S₂) (x:=x) (y:=y) (T:=T) (Ne.symm hxy)
+      have hEq := lookup_s_env_update_neq (env:=S₂) (x:=x) (y:=y) (T:=T) (Ne.symm hxy)
       simpa [hEq] using hL2
     exact hDisj y T₁ T₂ hL1 hL2'
 
 /-! ### Erase-Environment Lookup Facts -/
 
-lemma lookupSEnv_erase_eq
+lemma lookup_s_env_erase_eq
     {S : SEnv} {x : Var} :
     lookupSEnv (eraseSEnv S x) x = none := by
   induction S with
@@ -247,7 +247,7 @@ lemma lookupSEnv_erase_eq
           · have hbeq : (x == y) = false := beq_eq_false_iff_ne.mpr hxy
             simpa [eraseSEnv, hxy, lookupSEnv, List.lookup, hbeq] using ih
 
-lemma lookupSEnv_erase_ne
+lemma lookup_s_env_erase_ne
     {S : SEnv} {x y : Var} (hxy : y ≠ x) :
     lookupSEnv (eraseSEnv S x) y = lookupSEnv S y := by
   induction S generalizing x y with
@@ -269,59 +269,59 @@ lemma lookupSEnv_erase_ne
 
 /-! ### Owned Left-Update Disjointness -/
 
-lemma DisjointS_updateLeft {S₁ : SEnv} {Sown : OwnedEnv} {x : Var} {T : ValType}
+lemma disjoint_s_update_left {S₁ : SEnv} {Sown : OwnedEnv} {x : Var} {T : ValType}
     (hDisj : DisjointS S₁ (Sown : SEnv))
     (hNone : lookupSEnv S₁ x = none) :
     DisjointS S₁ (OwnedEnv.updateLeft Sown x T) := by
-  have hRight : DisjointS S₁ Sown.right := DisjointS_owned_right hDisj
-  have hLeft : DisjointS S₁ Sown.left := DisjointS_owned_left hDisj
+  have hRight : DisjointS S₁ Sown.right := disjoint_s_owned_right hDisj
+  have hLeft : DisjointS S₁ Sown.left := disjoint_s_owned_left hDisj
   have hLeft' : DisjointS S₁ (updateSEnv Sown.left x T) :=
-    DisjointS_update_right (S₁:=S₁) (S₂:=Sown.left) hLeft hNone
+    disjoint_s_update_right (S₁:=S₁) (S₂:=Sown.left) hLeft hNone
   have hRight' : DisjointS S₁ (eraseSEnv Sown.right x) := by
     intro y T₁ T₂ hL1 hL2
     by_cases hxy : y = x
     · subst hxy
       have hNoneErase : lookupSEnv (eraseSEnv Sown.right y) y = none :=
-        lookupSEnv_erase_eq (S:=Sown.right) (x:=y)
+        lookup_s_env_erase_eq (S:=Sown.right) (x:=y)
       have : (some T₂ : Option ValType) = none := by simpa [hNoneErase] using hL2
       cases this
     · have hR : lookupSEnv Sown.right y = some T₂ := by
-        have hEq := lookupSEnv_erase_ne (S:=Sown.right) (x:=x) (y:=y) hxy
+        have hEq := lookup_s_env_erase_ne (S:=Sown.right) (x:=x) (y:=y) hxy
         simpa [hEq] using hL2
       exact hRight y T₁ T₂ hL1 hR
   have hAll : DisjointS S₁ (eraseSEnv Sown.right x ++ updateSEnv Sown.left x T) :=
-    DisjointS_append_right hRight' hLeft'
+    disjoint_s_append_right hRight' hLeft'
   simpa [OwnedEnv.updateLeft] using hAll
 
 /-! ### Split-Disjointness Helpers -/
 
 /-- Disjointness against an append gives disjointness against the left part. -/
-lemma DisjointS_split_left {Ssh S₁ S₂ : SEnv} :
+lemma disjoint_s_split_left {Ssh S₁ S₂ : SEnv} :
     DisjointS Ssh (S₁ ++ S₂) → DisjointS Ssh S₁ := by
   -- Project through the left-append subset.
   intro hDisj
   have hSub : SEnvDomSubset S₁ (S₁ ++ S₂) := by
-    simpa using (SEnvDomSubset_append_left (S₁:=S₁) (S₂:=S₂))
-  exact DisjointS_of_domsubset_right hSub hDisj
+    simpa using (s_env_dom_subset_append_left (S₁:=S₁) (S₂:=S₂))
+  exact disjoint_s_of_domsubset_right hSub hDisj
 
 /-- Disjointness against an append gives disjointness against the right part. -/
-lemma DisjointS_split_right {Ssh S₁ S₂ : SEnv} :
+lemma disjoint_s_split_right {Ssh S₁ S₂ : SEnv} :
     DisjointS Ssh (S₁ ++ S₂) → DisjointS Ssh S₂ := by
   -- Project through the right-append subset.
   intro hDisj
   have hSub : SEnvDomSubset S₂ (S₁ ++ S₂) := by
-    simpa using (SEnvDomSubset_append_right (S₁:=S₁) (S₂:=S₂))
-  exact DisjointS_of_domsubset_right hSub hDisj
+    simpa using (s_env_dom_subset_append_right (S₁:=S₁) (S₂:=S₂))
+  exact disjoint_s_of_domsubset_right hSub hDisj
 
 /-- Disjointness against an append gives disjointness against both parts. -/
-lemma DisjointS_split_both {Ssh S₁ S₂ : SEnv} :
+lemma disjoint_s_split_both {Ssh S₁ S₂ : SEnv} :
     DisjointS Ssh (S₁ ++ S₂) → DisjointS Ssh S₁ ∧ DisjointS Ssh S₂ := by
   -- Project both sides using the split lemmas.
   intro hDisj
-  exact ⟨DisjointS_split_left hDisj, DisjointS_split_right hDisj⟩
+  exact ⟨disjoint_s_split_left hDisj, disjoint_s_split_right hDisj⟩
 
 /-- Extract disjointness against each split component of `Sown.left`. -/
-lemma DisjointS_split_from_owned_left
+lemma disjoint_s_split_from_owned_left
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv}
     (split : ParSplit Sown.left G) :
     DisjointS Ssh (Sown : SEnv) →
@@ -329,13 +329,13 @@ lemma DisjointS_split_from_owned_left
   -- Rewrite Sown.left via split.hS, then project each side.
   intro hDisj
   have hLeftAll : DisjointS Ssh (split.S1 ++ split.S2) := by
-    simpa [split.hS] using (DisjointS_owned_left (Sown:=Sown) hDisj)
-  exact ⟨DisjointS_split_left hLeftAll, DisjointS_split_right hLeftAll⟩
+    simpa [split.hS] using (disjoint_s_owned_left (Sown:=Sown) hDisj)
+  exact ⟨disjoint_s_split_left hLeftAll, disjoint_s_split_right hLeftAll⟩
 
 /-! ### Owned Repack and Finish Helpers -/
 
 /-- Repackage disjointness for an owned env with an extended right side. -/
-lemma DisjointS_owned_repack
+lemma disjoint_s_owned_repack
     {Ssh : SEnv} {Sright Sleft Smid : SEnv} :
     DisjointS Ssh Sright →
     DisjointS Ssh Sleft →
@@ -344,13 +344,13 @@ lemma DisjointS_owned_repack
   -- Combine right+mid+left disjointness via append.
   intro hRight hLeft hMid
   have hRight' : DisjointS Ssh (Sright ++ Smid) :=
-    DisjointS_append_right hRight hMid
+    disjoint_s_append_right hRight hMid
   have hAll : DisjointS Ssh ((Sright ++ Smid) ++ Sleft) :=
-    DisjointS_append_right hRight' hLeft
+    disjoint_s_append_right hRight' hLeft
   simpa [OwnedEnv.all, List.append_assoc] using hAll
 
 /-- Finish par-left disjointness using the inner owned env. -/
-lemma DisjointS_par_left_finish
+lemma disjoint_s_par_left_finish
     {Ssh : SEnv} {SownR S₂ S₁' : SEnv} :
     DisjointS Ssh SownR →
     DisjointS Ssh S₂ →
@@ -359,13 +359,13 @@ lemma DisjointS_par_left_finish
   -- Peel the left part and rebuild with appends.
   intro hDisjRight hDisjS2 hInnerRes
   have hDisjS1' : DisjointS Ssh S₁' :=
-    DisjointS_owned_left (Sown:={ right := SownR ++ S₂, left := S₁' }) hInnerRes
-  have hLeft : DisjointS Ssh (S₁' ++ S₂) := DisjointS_append_right hDisjS1' hDisjS2
-  have hAll : DisjointS Ssh (SownR ++ (S₁' ++ S₂)) := DisjointS_append_right hDisjRight hLeft
+    disjoint_s_owned_left (Sown:={ right := SownR ++ S₂, left := S₁' }) hInnerRes
+  have hLeft : DisjointS Ssh (S₁' ++ S₂) := disjoint_s_append_right hDisjS1' hDisjS2
+  have hAll : DisjointS Ssh (SownR ++ (S₁' ++ S₂)) := disjoint_s_append_right hDisjRight hLeft
   simpa [OwnedEnv.all, List.append_assoc] using hAll
 
 /-- Finish par-right disjointness using the inner owned env. -/
-lemma DisjointS_par_right_finish
+lemma disjoint_s_par_right_finish
     {Ssh : SEnv} {SownR S₁ S₂' : SEnv} :
     DisjointS Ssh SownR →
     DisjointS Ssh S₁ →
@@ -374,15 +374,15 @@ lemma DisjointS_par_right_finish
   -- Peel the left part and rebuild with appends.
   intro hDisjRight hDisjS1 hInnerRes
   have hDisjS2' : DisjointS Ssh S₂' :=
-    DisjointS_owned_left (Sown:={ right := SownR ++ S₁, left := S₂' }) hInnerRes
-  have hLeft : DisjointS Ssh (S₁ ++ S₂') := DisjointS_append_right hDisjS1 hDisjS2'
-  have hAll : DisjointS Ssh (SownR ++ (S₁ ++ S₂')) := DisjointS_append_right hDisjRight hLeft
+    disjoint_s_owned_left (Sown:={ right := SownR ++ S₁, left := S₂' }) hInnerRes
+  have hLeft : DisjointS Ssh (S₁ ++ S₂') := disjoint_s_append_right hDisjS1 hDisjS2'
+  have hAll : DisjointS Ssh (SownR ++ (S₁ ++ S₂')) := disjoint_s_append_right hDisjRight hLeft
   simpa [OwnedEnv.all, List.append_assoc] using hAll
 
 /-! ### Par Framing Helpers -/
 
 /-- Frame G on the right for a par-left subprocess. -/
-lemma HasTypeProcPreOut_frame_G_right_par
+lemma has_type_proc_pre_out_frame_g_right_par
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {split : ParSplit Sown.left G}
     {P : Process} {Sfin Gfin W Δ} :
     DisjointG split.G1 split.G2 →
@@ -391,13 +391,13 @@ lemma HasTypeProcPreOut_frame_G_right_par
   -- Frame on the right and rewrite G via split.hG.
   intro hDisjG hP
   have hP' :=
-    HasTypeProcPreOut_frame_G_right (Ssh:=Ssh)
+    has_type_proc_pre_out_frame_g_right (Ssh:=Ssh)
       (Sown:={ right := Sown.right ++ split.S2, left := split.S1 })
       (G:=split.G1) (Gfr:=split.G2) hDisjG hP
   simpa [split.hG] using hP'
 
 /-- Frame G on the left for a par-right subprocess. -/
-lemma HasTypeProcPreOut_frame_G_left_par
+lemma has_type_proc_pre_out_frame_g_left_par
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {split : ParSplit Sown.left G}
     {Q : Process} {Sfin Gfin W Δ} :
     DisjointG split.G1 split.G2 →
@@ -408,7 +408,7 @@ lemma HasTypeProcPreOut_frame_G_left_par
   -- Frame on the left and rewrite G via split.hG.
   intro hDisjG hDisjIn hQ hDisjOut
   have hQ' :=
-    HasTypeProcPreOut_frame_G_left (Ssh:=Ssh)
+    has_type_proc_pre_out_frame_g_left (Ssh:=Ssh)
       (Sown:={ right := Sown.right ++ split.S1, left := split.S2 })
       (G:=split.G2) (Gfr:=split.G1) hDisjG hDisjIn hQ hDisjOut
   simpa [split.hG] using hQ'

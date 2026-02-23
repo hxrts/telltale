@@ -50,14 +50,14 @@ lemma find?_mem_aux {r : Role} {L : LocalType} (types : List (Role × LocalType)
       intro hFind
       exact List.Mem.tail hd (ih hFind)
 
-lemma lookupType_mem {s : SessionState} {r : Role} {L : LocalType}
+lemma lookup_type_mem {s : SessionState} {r : Role} {L : LocalType}
     (h : s.lookupType r = some L) : (r, L) ∈ s.localTypes := by
   unfold SessionState.lookupType at h
   exact find?_mem_aux s.localTypes h
 
 -- # Buffer Lookup Membership
 
-lemma getBuffer_mem_aux {sender receiver : Role}
+lemma get_buffer_mem_aux {sender receiver : Role}
     (bufs : List (Role × Role × Nat)) :
     (match bufs.find? (fun x => x.1 == sender && x.2.1 == receiver) with
       | some (_, _, n) => n | none => 0) > 0 →
@@ -90,15 +90,15 @@ lemma getBuffer_mem_aux {sender receiver : Role}
       obtain ⟨n, hmem, heq⟩ := ih hFind
       exact ⟨n, List.Mem.tail _ hmem, heq⟩
 
-lemma getBuffer_mem_of_pos {s : SessionState} {sender receiver : Role}
+lemma get_buffer_mem_of_pos {s : SessionState} {sender receiver : Role}
     (hpos : s.getBuffer sender receiver > 0) :
     ∃ n, (sender, receiver, n) ∈ s.bufferSizes ∧ n = s.getBuffer sender receiver := by
   unfold SessionState.getBuffer at hpos ⊢
-  exact getBuffer_mem_aux s.bufferSizes hpos
+  exact get_buffer_mem_aux s.bufferSizes hpos
 
 -- # Buffer Sum Stability Without Matching Entry
 
-lemma sumBuffers_incr_eq_of_no_entry
+lemma sum_buffers_incr_eq_of_no_entry
     (s : SessionState) (actor partner : Role)
     (hmem : ¬ ∃ n, (actor, partner, n) ∈ s.bufferSizes) :
     sumBuffers (s.incrBuffer actor partner) = sumBuffers s := by
@@ -258,23 +258,23 @@ theorem sum_decr_unique {α : Type} [DecidableEq α]
 -- Buffer-Pair Translation Helpers
 
 /-- Convert buffer triples to pairs for sum_incr_unique. -/
-lemma bufferSizes_to_pairs (bufs : List (Role × Role × Nat)) :
+lemma buffer_sizes_to_pairs (bufs : List (Role × Role × Nat)) :
     (bufs.map fun (s', r', _) => (s', r')).Nodup ↔
     ((bufs.map fun (s', r', n) => ((s', r'), n)).map Prod.fst).Nodup := by
   simp only [List.map_map, Function.comp_def]
 
-lemma bufferSizes_mem_pairs (bufs : List (Role × Role × Nat))
+lemma buffer_sizes_mem_pairs (bufs : List (Role × Role × Nat))
 /- ## Structured Block 5 -/
     (actor partner : Role) (n : Nat)
     (hmem : (actor, partner, n) ∈ bufs) :
     ((actor, partner), n) ∈ bufs.map (fun (s', r', n) => ((s', r'), n)) := by
   exact List.mem_map_of_mem (f := fun (s', r', n) => ((s', r'), n)) hmem
 
-lemma bufferSizes_key_mem_pairs (bufs : List (Role × Role × Nat))
+lemma buffer_sizes_key_mem_pairs (bufs : List (Role × Role × Nat))
     (actor partner : Role) (n : Nat)
     (hmem : (actor, partner, n) ∈ bufs) :
     (actor, partner) ∈ (bufs.map (fun (s', r', n) => ((s', r'), n))).map Prod.fst := by
-  have h := bufferSizes_mem_pairs bufs actor partner n hmem
+  have h := buffer_sizes_mem_pairs bufs actor partner n hmem
   exact List.mem_map_of_mem (f := Prod.fst) h
 
 -- Session Buffer Increment/Decrement Equalities
@@ -285,7 +285,7 @@ lemma bufferSizes_key_mem_pairs (bufs : List (Role × Role × Nat))
     1. When the head matches (actor, partner), it gets incremented and the tail is unchanged
     2. When the head doesn't match, the IH applies to the tail
     The uniqueness hypothesis ensures exactly one entry is incremented. -/
-lemma sumBuffers_incr_eq_of_entry
+lemma sum_buffers_incr_eq_of_entry
     (s : SessionState) (actor partner : Role) (_n : Nat)
     (_hmem : (actor, partner, _n) ∈ s.bufferSizes)
     (_hunique : s.uniqueBuffers) :
@@ -295,10 +295,10 @@ lemma sumBuffers_incr_eq_of_entry
     s.bufferSizes.map (fun (s', r', n) => ((s', r'), n))
   have hunique_pairs : (pairs.map Prod.fst).Nodup := by
     dsimp [pairs]
-    exact (bufferSizes_to_pairs s.bufferSizes).1 _hunique
+    exact (buffer_sizes_to_pairs s.bufferSizes).1 _hunique
   have hkey_mem : (actor, partner) ∈ pairs.map Prod.fst := by
     dsimp [pairs]
-    exact bufferSizes_key_mem_pairs s.bufferSizes actor partner _n _hmem
+    exact buffer_sizes_key_mem_pairs s.bufferSizes actor partner _n _hmem
   have hsum_pairs :
       (pairs.map (fun (k, v) => if k == (actor, partner) then v + 1 else v)).foldl (· + ·) 0 =
       (pairs.map Prod.snd).foldl (· + ·) 0 + 1 := by
@@ -326,9 +326,9 @@ lemma sumBuffers_incr_eq_of_entry
 
 /-- Sum of buffers after decrement equals old sum minus 1 when entry exists.
 
-    Similar to sumBuffers_incr_eq_of_entry but for decrement.
+    Similar to sum_buffers_incr_eq_of_entry but for decrement.
     Requires the entry value to be positive. -/
-lemma sumBuffers_decr_eq_of_entry
+lemma sum_buffers_decr_eq_of_entry
     (s : SessionState) (actor partner : Role) (_n : Nat)
     (_hmem : (partner, actor, _n) ∈ s.bufferSizes)
     (_hunique : s.uniqueBuffers)
@@ -340,10 +340,10 @@ lemma sumBuffers_decr_eq_of_entry
     s.bufferSizes.map (fun (s', r', n) => ((s', r'), n))
   have hunique_pairs : (pairs.map Prod.fst).Nodup := by
     dsimp [pairs]
-    exact (bufferSizes_to_pairs s.bufferSizes).1 _hunique
+    exact (buffer_sizes_to_pairs s.bufferSizes).1 _hunique
   have hmem_pairs : ((partner, actor), _n) ∈ pairs := by
     dsimp [pairs]
-    exact bufferSizes_mem_pairs s.bufferSizes partner actor _n _hmem
+    exact buffer_sizes_mem_pairs s.bufferSizes partner actor _n _hmem
   have hsum_pairs :
       (pairs.map (fun (k, v) => if k == (partner, actor) then v - 1 else v)).foldl (· + ·) 0 + 1 =
       (pairs.map Prod.snd).foldl (· + ·) 0 := by
@@ -371,30 +371,30 @@ lemma sumBuffers_decr_eq_of_entry
 -- # Buffer Delta Bounds
 
 /-- Bound on buffer increment with uniqueness: sum increases by at most 1. -/
-lemma sumBuffers_incrBuffer_le (s : SessionState) (actor partner : Role)
+lemma sum_buffers_incr_buffer_le (s : SessionState) (actor partner : Role)
     (hunique : s.uniqueBuffers) :
     sumBuffers (s.incrBuffer actor partner) ≤ sumBuffers s + 1 := by
   -- Case split: either there's an entry or not
   by_cases h : ∃ n, (actor, partner, n) ∈ s.bufferSizes
-  · -- Entry exists: use sumBuffers_incr_eq_of_entry
+  · -- Entry exists: use sum_buffers_incr_eq_of_entry
     obtain ⟨n, hmem⟩ := h
-    have heq := sumBuffers_incr_eq_of_entry s actor partner n hmem hunique
+    have heq := sum_buffers_incr_eq_of_entry s actor partner n hmem hunique
     omega
   · -- No entry: buffer unchanged
-    have heq := sumBuffers_incr_eq_of_no_entry s actor partner h
+    have heq := sum_buffers_incr_eq_of_no_entry s actor partner h
     omega
 
 /-- When buffer entry exists, sum decreases by exactly 1 after decrement. -/
-lemma sumBuffers_decrBuffer_eq (s : SessionState) (actor partner : Role) (n : Nat)
+lemma sum_buffers_decr_buffer_eq (s : SessionState) (actor partner : Role) (n : Nat)
     (hmem : (partner, actor, n) ∈ s.bufferSizes)
     (hunique : s.uniqueBuffers)
     (hpos : n > 0) :
     sumBuffers (s.decrBuffer actor partner) + 1 = sumBuffers s :=
-  sumBuffers_decr_eq_of_entry s actor partner n hmem hunique hpos
+  sum_buffers_decr_eq_of_entry s actor partner n hmem hunique hpos
 
 -- # Type-Depth Rewrite Under Update
 
-lemma sumDepths_updateType
+lemma sum_depths_update_type
     (s : SessionState) (actor : Role) (old new : LocalType)
     (hlookup : s.lookupType actor = some old)
 /- ## Structured Block 7 -/
@@ -404,7 +404,7 @@ lemma sumDepths_updateType
   unfold sumDepths SessionState.updateType
   simp only
   -- Transform to sum_update_unique form
-  have hmem := lookupType_mem hlookup
+  have hmem := lookup_type_mem hlookup
   -- Create the mapped list of (Role, depth) pairs
   have hdepthList : s.localTypes.map (fun (_, L) => L.depth) =
       (s.localTypes.map (fun (r, L) => (r, L.depth))).map Prod.snd := by

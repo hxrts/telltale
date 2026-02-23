@@ -134,7 +134,7 @@ namespace SessionIso
 /-! ## Iso/Renaming Compatibility -/
 
 /-- `toRenaming` of the identity is the identity renaming. -/
-theorem toRenaming_id : SessionIso.toRenaming SessionIso.id = SessionRenaming.id := by
+theorem to_renaming_id : SessionIso.toRenaming SessionIso.id = SessionRenaming.id := by
   -- Definitional after unfolding.
   rfl
 
@@ -165,35 +165,35 @@ private theorem lt_add_of_pos_left_add_right_mid_succ (n k m : Nat) : n < 1 + (1
 
 /-! ## Size-Of Local-Type Constructors -/
 
-private theorem sizeOf_lt_send_expanded (r : Role) (T : ValType) (L : LocalType) :
+private theorem size_of_lt_send_expanded (r : Role) (T : ValType) (L : LocalType) :
     sizeOf L < 1 + sizeOf r + sizeOf T + sizeOf L := by
   have h : sizeOf L < 1 + (sizeOf r + sizeOf T + sizeOf L) := by
     simpa [Nat.add_assoc] using
       (lt_add_of_pos_left_add_right (n:=sizeOf L) (k:=sizeOf r + sizeOf T) (m:=0))
   simpa [Nat.add_assoc] using h
 
-private theorem sizeOf_lt_recv_expanded (r : Role) (T : ValType) (L : LocalType) :
+private theorem size_of_lt_recv_expanded (r : Role) (T : ValType) (L : LocalType) :
     sizeOf L < 1 + sizeOf r + sizeOf T + sizeOf L := by
   have h : sizeOf L < 1 + (sizeOf r + sizeOf T + sizeOf L) := by
     simpa [Nat.add_assoc] using
       (lt_add_of_pos_left_add_right (n:=sizeOf L) (k:=sizeOf r + sizeOf T) (m:=0))
   simpa [Nat.add_assoc] using h
 
-private theorem sizeOf_lt_select_expanded (r : Role) (bs : List (Label × LocalType)) :
+private theorem size_of_lt_select_expanded (r : Role) (bs : List (Label × LocalType)) :
     sizeOf bs < 1 + sizeOf r + sizeOf bs := by
   have h : sizeOf bs < 1 + (sizeOf r + sizeOf bs) := by
     simpa [Nat.add_assoc] using
       (lt_add_of_pos_left_add_right (n:=sizeOf bs) (k:=sizeOf r) (m:=0))
   simpa [Nat.add_assoc] using h
 
-private theorem sizeOf_lt_branch_expanded (r : Role) (bs : List (Label × LocalType)) :
+private theorem size_of_lt_branch_expanded (r : Role) (bs : List (Label × LocalType)) :
     sizeOf bs < 1 + sizeOf r + sizeOf bs := by
   have h : sizeOf bs < 1 + (sizeOf r + sizeOf bs) := by
     simpa [Nat.add_assoc] using
       (lt_add_of_pos_left_add_right (n:=sizeOf bs) (k:=sizeOf r) (m:=0))
   simpa [Nat.add_assoc] using h
 
-private theorem sizeOf_lt_mu_expanded (L : LocalType) :
+private theorem size_of_lt_mu_expanded (L : LocalType) :
     sizeOf L < 1 + sizeOf L := by
   have h : sizeOf L < 1 + (0 + sizeOf L) := by
     simpa [Nat.add_assoc] using
@@ -202,14 +202,14 @@ private theorem sizeOf_lt_mu_expanded (L : LocalType) :
 
 /-! ## Size-Of Branch Decomposition -/
 
-private theorem sizeOf_lt_branch_head_expanded (l : Label) (L : LocalType) (tl : List (Label × LocalType)) :
+private theorem size_of_lt_branch_head_expanded (l : Label) (L : LocalType) (tl : List (Label × LocalType)) :
     sizeOf L < 1 + (1 + sizeOf l + sizeOf L) + sizeOf tl := by
   have h : sizeOf L < 1 + (1 + (sizeOf l + (sizeOf L + sizeOf tl))) := by
     simpa [Nat.add_assoc] using
       (lt_add_of_pos_left_add_right_mid_succ (n:=sizeOf L) (k:=sizeOf l) (m:=sizeOf tl))
   simpa [Nat.add_assoc] using h
 
-private theorem sizeOf_lt_branch_tail_expanded (l : Label) (L : LocalType) (tl : List (Label × LocalType)) :
+private theorem size_of_lt_branch_tail_expanded (l : Label) (L : LocalType) (tl : List (Label × LocalType)) :
     sizeOf tl < 1 + (1 + sizeOf l + sizeOf L) + sizeOf tl := by
   have h : sizeOf tl < 1 + ((1 + sizeOf l) + (sizeOf L + sizeOf tl)) := by
     simpa [Nat.add_assoc] using
@@ -221,7 +221,7 @@ private theorem sizeOf_lt_branch_tail_expanded (l : Label) (L : LocalType) (tl :
 /-! ## Value-Type Renaming -/
 
 /-- Value-type renaming composes. -/
-theorem renameValType_comp (ρ₂ ρ₁ : SessionRenaming) :
+theorem rename_val_type_comp (ρ₂ ρ₁ : SessionRenaming) :
     ∀ T, renameValType (SessionRenaming.comp ρ₂ ρ₁) T =
       renameValType ρ₂ (renameValType ρ₁ T) := by
   -- Structural recursion on value types.
@@ -237,17 +237,17 @@ theorem renameValType_comp (ρ₂ ρ₁ : SessionRenaming) :
       simp [renameValType, SessionRenaming.comp]
 
 /-- Mapping value types with a composed renaming equals a single map. -/
-theorem map_renameValType_comp (ρ₂ ρ₁ : SessionRenaming) (ts : List ValType) :
+theorem map_rename_val_type_comp (ρ₂ ρ₁ : SessionRenaming) (ts : List ValType) :
     ts.map (renameValType ρ₂ ∘ renameValType ρ₁) =
       ts.map (renameValType (SessionRenaming.comp ρ₂ ρ₁)) := by
   -- Structural recursion on traces.
   induction ts with
   | nil => simp
   | cons t ts ih =>
-      simp [renameValType_comp, ih, Function.comp]
+      simp [rename_val_type_comp, ih, Function.comp]
 
 /-- Value-type renaming by identity is a no-op. -/
-theorem renameValType_id : ∀ T, renameValType SessionRenaming.id T = T := by
+theorem rename_val_type_id : ∀ T, renameValType SessionRenaming.id T = T := by
   -- Structural recursion on value types.
   intro T
   induction T with
@@ -261,44 +261,44 @@ theorem renameValType_id : ∀ T, renameValType SessionRenaming.id T = T := by
       simp [renameValType, SessionRenaming.id]
 
 /-- Renaming value types by identity is the identity function. -/
-theorem renameValType_id_fun : renameValType SessionRenaming.id = id := by
+theorem rename_val_type_id_fun : renameValType SessionRenaming.id = id := by
   funext T
-  exact renameValType_id T
+  exact rename_val_type_id T
 
 /-! ## Local-Type Renaming (Composition) -/
 
 mutual
 
 /-- Local-type renaming composes. -/
-theorem renameLocalType_comp (ρ₂ ρ₁ : SessionRenaming) :
+theorem rename_local_type_comp (ρ₂ ρ₁ : SessionRenaming) :
     ∀ L, renameLocalType (SessionRenaming.comp ρ₂ ρ₁) L =
       renameLocalType ρ₂ (renameLocalType ρ₁ L) := by
   -- Structural recursion on local types.
   intro L
   cases L with
   | send r T L =>
-      simp [renameLocalType, renameValType_comp,
-        renameLocalType_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) L]
+      simp [renameLocalType, rename_val_type_comp,
+        rename_local_type_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) L]
   | recv r T L =>
-      simp [renameLocalType, renameValType_comp,
-        renameLocalType_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) L]
+      simp [renameLocalType, rename_val_type_comp,
+        rename_local_type_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) L]
   | select r bs =>
-      simp [renameLocalType, renameBranches_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) bs]
+      simp [renameLocalType, rename_branches_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) bs]
   | branch r bs =>
-      simp [renameLocalType, renameBranches_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) bs]
+      simp [renameLocalType, rename_branches_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) bs]
   | end_ =>
       simp [renameLocalType]
   | var n =>
       simp [renameLocalType]
   | mu L =>
-      simp [renameLocalType, renameLocalType_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) L]
+      simp [renameLocalType, rename_local_type_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) L]
 termination_by L => sizeOf L
 decreasing_by
   all_goals
-    simpa using (sizeOf_lt_branch_head_expanded (l:=_) (L:=_) (tl:=_))
+    simpa using (size_of_lt_branch_head_expanded (l:=_) (L:=_) (tl:=_))
 
 /-- Branch renaming composes pointwise. -/
-theorem renameBranches_comp (ρ₂ ρ₁ : SessionRenaming) :
+theorem rename_branches_comp (ρ₂ ρ₁ : SessionRenaming) :
     ∀ bs, renameBranches (SessionRenaming.comp ρ₂ ρ₁) bs =
       renameBranches ρ₂ (renameBranches ρ₁ bs) := by
   -- Structural recursion on branch lists.
@@ -309,52 +309,52 @@ theorem renameBranches_comp (ρ₂ ρ₁ : SessionRenaming) :
   | cons hd tl =>
       cases hd with
       | mk l L =>
-          simp [renameBranches, renameLocalType_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) L,
-            renameBranches_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) tl]
+          simp [renameBranches, rename_local_type_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) L,
+            rename_branches_comp (ρ₂:=ρ₂) (ρ₁:=ρ₁) tl]
 termination_by bs => sizeOf bs
 decreasing_by
   all_goals
-    simpa using (sizeOf_lt_branch_head_expanded (l:=_) (L:=_) (tl:=_))
+    simpa using (size_of_lt_branch_head_expanded (l:=_) (L:=_) (tl:=_))
 
 end
 
 /-- Mapping local types with a composed renaming equals a single map. -/
-theorem map_renameLocalType_comp (ρ₂ ρ₁ : SessionRenaming) (o : Option LocalType) :
+theorem map_rename_local_type_comp (ρ₂ ρ₁ : SessionRenaming) (o : Option LocalType) :
     o.map (renameLocalType ρ₂ ∘ renameLocalType ρ₁) =
       o.map (renameLocalType (SessionRenaming.comp ρ₂ ρ₁)) := by
   -- Case split on the option.
-  cases o <;> simp [renameLocalType_comp, Function.comp]
+  cases o <;> simp [rename_local_type_comp, Function.comp]
 
 /-! ## Local-Type Renaming (Identity) -/
 
 mutual
 
 /-- Local-type renaming by identity is a no-op. -/
-theorem renameLocalType_id : ∀ L, renameLocalType SessionRenaming.id L = L := by
+theorem rename_local_type_id : ∀ L, renameLocalType SessionRenaming.id L = L := by
   -- Structural recursion on local types.
   intro L
   cases L with
   | send r T L =>
-      simp [renameLocalType, renameValType_id, renameLocalType_id L]
+      simp [renameLocalType, rename_val_type_id, rename_local_type_id L]
   | recv r T L =>
-      simp [renameLocalType, renameValType_id, renameLocalType_id L]
+      simp [renameLocalType, rename_val_type_id, rename_local_type_id L]
   | select r bs =>
-      simp [renameLocalType, renameBranches_id bs]
+      simp [renameLocalType, rename_branches_id bs]
   | branch r bs =>
-      simp [renameLocalType, renameBranches_id bs]
+      simp [renameLocalType, rename_branches_id bs]
   | end_ =>
       simp [renameLocalType]
   | var n =>
       simp [renameLocalType]
   | mu L =>
-      simp [renameLocalType, renameLocalType_id L]
+      simp [renameLocalType, rename_local_type_id L]
 termination_by L => sizeOf L
 decreasing_by
   all_goals
-    simpa using (sizeOf_lt_branch_head_expanded (l:=_) (L:=_) (tl:=_))
+    simpa using (size_of_lt_branch_head_expanded (l:=_) (L:=_) (tl:=_))
 
 /-- Branch renaming by identity is a no-op. -/
-theorem renameBranches_id : ∀ bs, renameBranches SessionRenaming.id bs = bs := by
+theorem rename_branches_id : ∀ bs, renameBranches SessionRenaming.id bs = bs := by
   -- Structural recursion on branch lists.
   intro bs
   cases bs with
@@ -363,46 +363,46 @@ theorem renameBranches_id : ∀ bs, renameBranches SessionRenaming.id bs = bs :=
   | cons hd tl =>
       cases hd with
       | mk l L =>
-          simp [renameBranches, renameLocalType_id L, renameBranches_id tl]
+          simp [renameBranches, rename_local_type_id L, rename_branches_id tl]
 termination_by bs => sizeOf bs
 decreasing_by
   all_goals
-    simpa using (sizeOf_lt_branch_head_expanded (l:=_) (L:=_) (tl:=_))
+    simpa using (size_of_lt_branch_head_expanded (l:=_) (L:=_) (tl:=_))
 
 end
 
 /-! ## Endpoint, Edge, and Value Renaming -/
 
 /-- Endpoint renaming composes. -/
-theorem renameEndpoint_comp (ρ₂ ρ₁ : SessionRenaming) (e : Endpoint) :
+theorem rename_endpoint_comp (ρ₂ ρ₁ : SessionRenaming) (e : Endpoint) :
     renameEndpoint (SessionRenaming.comp ρ₂ ρ₁) e =
       renameEndpoint ρ₂ (renameEndpoint ρ₁ e) := by
   -- By unfolding definitions of endpoint renaming.
   rfl
 
 /-- Endpoint renaming by identity is a no-op. -/
-theorem renameEndpoint_id (e : Endpoint) :
+theorem rename_endpoint_id (e : Endpoint) :
     renameEndpoint SessionRenaming.id e = e := by
   -- By case analysis on the endpoint.
   cases e
   rfl
 
 /-- Edge renaming composes. -/
-theorem renameEdge_comp (ρ₂ ρ₁ : SessionRenaming) (e : Edge) :
+theorem rename_edge_comp (ρ₂ ρ₁ : SessionRenaming) (e : Edge) :
     renameEdge (SessionRenaming.comp ρ₂ ρ₁) e =
       renameEdge ρ₂ (renameEdge ρ₁ e) := by
   -- By unfolding definitions of edge renaming.
   rfl
 
 /-- Edge renaming by identity is a no-op. -/
-theorem renameEdge_id (e : Edge) :
+theorem rename_edge_id (e : Edge) :
     renameEdge SessionRenaming.id e = e := by
   -- By case analysis on the edge.
   cases e
   rfl
 
 /-- Value renaming composes. -/
-theorem renameValue_comp (ρ₂ ρ₁ : SessionRenaming) :
+theorem rename_value_comp (ρ₂ ρ₁ : SessionRenaming) :
     ∀ v, renameValue (SessionRenaming.comp ρ₂ ρ₁) v =
       renameValue ρ₂ (renameValue ρ₁ v) := by
   -- Structural recursion on runtime values.
@@ -415,10 +415,10 @@ theorem renameValue_comp (ρ₂ ρ₁ : SessionRenaming) :
   | prod v1 v2 ih1 ih2 =>
       simp [renameValue, ih1, ih2]
   | chan e =>
-      simp [renameValue, renameEndpoint_comp]
+      simp [renameValue, rename_endpoint_comp]
 
 /-- Value renaming by identity is a no-op. -/
-theorem renameValue_id : ∀ v, renameValue SessionRenaming.id v = v := by
+theorem rename_value_id : ∀ v, renameValue SessionRenaming.id v = v := by
   -- Structural recursion on runtime values.
   intro v
   induction v with
@@ -432,7 +432,7 @@ theorem renameValue_id : ∀ v, renameValue SessionRenaming.id v = v := by
       simp [renameValue, SessionRenaming.id, renameEndpoint]
 
 /-- GEnv renaming composes. -/
-theorem renameGEnv_comp (ρ₂ ρ₁ : SessionRenaming) (G : GEnv) :
+theorem rename_g_env_comp (ρ₂ ρ₁ : SessionRenaming) (G : GEnv) :
     renameGEnv (SessionRenaming.comp ρ₂ ρ₁) G =
       renameGEnv ρ₂ (renameGEnv ρ₁ G) := by
   -- Pointwise map composition on the list representation.
@@ -441,7 +441,7 @@ theorem renameGEnv_comp (ρ₂ ρ₁ : SessionRenaming) (G : GEnv) :
   | cons hd tl ih =>
       cases hd with
       | mk e L =>
-          simp [renameGEnv, renameEndpoint_comp, renameLocalType_comp]
+          simp [renameGEnv, rename_endpoint_comp, rename_local_type_comp]
 
 
 end

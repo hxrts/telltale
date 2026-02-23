@@ -157,7 +157,7 @@ theorem step_preserves_wellformed {c c' : Configuration} {act : GlobalActionR}
     WellFormedEnv (projEnv c'.globalType) := by
   -- projEnv uses GlobalType.roles, which is always nodup.
   constructor
-  rw [projEnv_dom]
+  rw [proj_env_dom]
   -- GlobalType.roles always produces Nodup lists
   exact GlobalType.roles_nodup _
 
@@ -171,14 +171,14 @@ theorem sender_type_after_step (g g' : GlobalType) (act : GlobalActionR)
     (_hstep : step g act g') :
     EQ2 (trans g' act.sender) (trans g' act.sender) :=
   -- Reflexivity suffices since both sides are the same projection.
-  EQ2_refl _
+  eq2_refl _
 
 /-- After a step, the receiver's local type is EQ2-equivalent to its projection. -/
 theorem receiver_type_after_step (g g' : GlobalType) (act : GlobalActionR)
     (_hstep : step g act g') :
     EQ2 (trans g' act.receiver) (trans g' act.receiver) :=
   -- Reflexivity suffices since both sides are the same projection.
-  EQ2_refl _
+  eq2_refl _
 
 /-- Non-participants have unchanged types (up to EQ2) after a step.
 

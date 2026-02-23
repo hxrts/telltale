@@ -66,7 +66,7 @@ theorem delegate_unrelated_edge_coherent
         simpa [hSid] using hSenderLookup
       -- Unrelated-edge coherence: trace/consume transport.
       have hRedir : IsRedirectedEdge e e s A B := by
-        have hEq' := redirectEdge_no_A e s A B hSid hSenderA hReceiverA
+        have hEq' := redirect_edge_no_a e s A B hSid hSenderA hReceiverA
         simp [IsRedirectedEdge, hEq']
       have hTrace :
           lookupD D' e = (lookupD D e).map (renameValTypeRole s A B) := by
@@ -83,7 +83,7 @@ theorem delegate_unrelated_edge_coherent
             exact (False.elim this)
         | some L' =>
             have hRen :=
-              Consume_rename_unrelated (s:=s) (A:=A) (B:=B) (from_:=e.sender)
+              consume_rename_unrelated (s:=s) (A:=A) (B:=B) (from_:=e.sender)
                 (L:=Lrecv0) (ts:=lookupD D e) (L':=L') hSenderA hSenderB hCons
             simp [hRen]
       refine ⟨renameLocalTypeRole s A B Lsender0, hSenderLookup', ?_⟩

@@ -117,7 +117,7 @@ def maxBufferOccupancy (C : Config) : Nat :=
 def edgeBufferOccupancy (C : Config) (e : Edge) : Nat :=
   (lookupBuf C.bufs e).length
 
-theorem maxBufferOccupancy_ge_edge (C : Config) (e : Edge)
+theorem max_buffer_occupancy_ge_edge (C : Config) (e : Edge)
     (_h : ∃ buf, (e, buf) ∈ C.bufs) :
     maxBufferOccupancy C ≥ edgeBufferOccupancy C e := by
   simp only [maxBufferOccupancy, edgeBufferOccupancy, lookupBuf]
@@ -139,10 +139,10 @@ theorem maxBufferOccupancy_ge_edge (C : Config) (e : Edge)
 /-! ## Buffer Occupancy Monotonicity Helpers -/
 
 /-- Any edge occupancy is bounded by the global max occupancy. -/
-theorem edgeBufferOccupancy_le_maxBufferOccupancy (C : Config) (e : Edge) :
+theorem edge_buffer_occupancy_le_max_buffer_occupancy (C : Config) (e : Edge) :
     edgeBufferOccupancy C e ≤ maxBufferOccupancy C := by
   by_cases hmem : ∃ buf, (e, buf) ∈ C.bufs
-  · exact maxBufferOccupancy_ge_edge C e hmem
+  · exact max_buffer_occupancy_ge_edge C e hmem
   · cases hlook : C.bufs.lookup e with
     | none =>
       simp [edgeBufferOccupancy, lookupBuf, hlook]
@@ -153,7 +153,7 @@ theorem edgeBufferOccupancy_le_maxBufferOccupancy (C : Config) (e : Edge) :
 /-! ## updateBuf Membership Cases -/
 
 /-- Membership in `updateBuf` comes either from the updated edge or from the old list. -/
-theorem mem_updateBuf_cases {bufs : Buffers} {e e' : Edge} {buf buf' : Buffer}
+theorem mem_update_buf_cases {bufs : Buffers} {e e' : Edge} {buf buf' : Buffer}
     (hmem : (e', buf') ∈ updateBuf bufs e buf) :
     (e' = e ∧ buf' = buf) ∨ (e', buf') ∈ bufs := by
   induction bufs with
@@ -200,7 +200,7 @@ theorem foldl_max_le_of_all_le_local {l : List Nat} {B : Nat}
 /-! ## updateBuf Occupancy Bound -/
 
 /-- Updating one edge with a buffer no longer than before cannot increase max occupancy. -/
-theorem maxBufferOccupancy_updateBuf_le_of_le
+theorem max_buffer_occupancy_update_buf_le_of_le
     (C : Config) (e : Edge) (buf : Buffer)
     (hbuf : buf.length ≤ edgeBufferOccupancy C e) :
     maxBufferOccupancy { C with bufs := updateBuf C.bufs e buf } ≤ maxBufferOccupancy C := by
@@ -210,13 +210,13 @@ theorem maxBufferOccupancy_updateBuf_le_of_le
   simp only [List.mem_map] at hn
   rcases hn with ⟨⟨e', buf'⟩, hmem', hn⟩
   subst n
-  have hCases := mem_updateBuf_cases (bufs := C.bufs) (e := e) (e' := e') (buf := buf)
+  have hCases := mem_update_buf_cases (bufs := C.bufs) (e := e) (e' := e') (buf := buf)
     (buf' := buf') hmem'
   cases hCases with
   | inl hnew =>
     rcases hnew with ⟨heq, hbuf'⟩
     subst e' buf'
-    exact le_trans hbuf (edgeBufferOccupancy_le_maxBufferOccupancy C e)
+    exact le_trans hbuf (edge_buffer_occupancy_le_max_buffer_occupancy C e)
   | inr hold =>
     have hmap : buf'.length ∈ C.bufs.map (fun x => x.2.length) := by
       simp only [List.mem_map]
@@ -225,7 +225,7 @@ theorem maxBufferOccupancy_updateBuf_le_of_le
 
 /-! ## Empty-Buffer Occupancy Base Case -/
 
-theorem maxBufferOccupancy_zero_of_empty (C : Config) (h : C.bufs = []) :
+theorem max_buffer_occupancy_zero_of_empty (C : Config) (h : C.bufs = []) :
     maxBufferOccupancy C = 0 := by
   simp [maxBufferOccupancy, h]
 
@@ -266,13 +266,13 @@ def occupancySet (C₀ : Config) : Set Nat :=
   { n | ∃ C, UnboundedReachable C₀ C ∧ maxBufferOccupancy C = n }
 
 /-- The occupancy set is always nonempty: it contains the initial occupancy. -/
-theorem occupancySet_nonempty (C₀ : Config) : (occupancySet C₀).Nonempty := by
+theorem occupancy_set_nonempty (C₀ : Config) : (occupancySet C₀).Nonempty := by
   refine ⟨maxBufferOccupancy C₀, ?_⟩
   exact ⟨C₀, Relation.ReflTransGen.refl, rfl⟩
 
 /-- A global occupancy bound along unbounded executions yields `BddAbove` for
     the occupancy set. -/
-theorem occupancySet_bddAbove_of_global_bound (C₀ : Config)
+theorem occupancy_set_bdd_above_of_global_bound (C₀ : Config)
     (hfinite : ∃ n : Nat, ∀ C, UnboundedReachable C₀ C → maxBufferOccupancy C ≤ n) :
     BddAbove (occupancySet C₀) := by
   rcases hfinite with ⟨bound, hbound⟩
@@ -305,28 +305,28 @@ def BoundedStuck (B : Nat) (C : Config) : Prop :=
 /-! ## Key Lemmas -/
 
 /-- Bounded step implies unbounded step. -/
-theorem BoundedStep_implies_Step {B : Nat} {C C' : Config}
+theorem bounded_step_implies_step {B : Nat} {C C' : Config}
     (h : BoundedStep B C C') : Step C C' := by
   cases h with
   | send hstep _ => exact hstep
   | recv hstep _ => exact hstep
 
 /-- A deadlocked config is bounded-stuck for any B. -/
-theorem Deadlocked_implies_BoundedStuck {C : Config} (hD : Deadlocked C) (B : Nat) :
+theorem deadlocked_implies_bounded_stuck {C : Config} (hD : Deadlocked C) (B : Nat) :
     BoundedStuck B C := by
   constructor
   · exact hD.1
   · intro ⟨C', hstep⟩
-    exact hD.2 ⟨C', BoundedStep_implies_Step hstep⟩
+    exact hD.2 ⟨C', bounded_step_implies_step hstep⟩
 
 /-- Bounded reachability implies unbounded reachability. -/
-theorem BoundedReachable_implies_UnboundedReachable {B : Nat} {C₀ C : Config}
+theorem bounded_reachable_implies_unbounded_reachable {B : Nat} {C₀ C : Config}
     (h : BoundedReachable B C₀ C) : UnboundedReachable C₀ C := by
   induction h with
   | refl => exact Relation.ReflTransGen.refl
   | tail _ hstep ih =>
     apply Relation.ReflTransGen.tail ih
-    exact BoundedStep_implies_Step hstep
+    exact bounded_step_implies_step hstep
 
 /-! ## Reachability Closure under Safe Bound -/
 
@@ -357,7 +357,7 @@ theorem bounded_reachability_of_unbounded_le (C₀ : Config) (B : Nat)
 
 /-- Any reachable configuration has buffer occupancy ≤ critical buffer size,
     assuming the occupancy set is bounded above. -/
-theorem maxBufferOccupancy_le_critical {C₀ C : Config}
+theorem max_buffer_occupancy_le_critical {C₀ C : Config}
     (hreach : UnboundedReachable C₀ C)
     (hbdd : BddAbove (occupancySet C₀)) :
     maxBufferOccupancy C ≤ criticalBufferSize C₀ := by
@@ -375,7 +375,7 @@ theorem unbounded_step_within_bound {C₀ C C' : Config}
     maxBufferOccupancy C' ≤ B := by
   have hreach' : UnboundedReachable C₀ C' := Relation.ReflTransGen.tail hreach hstep
   have hle : maxBufferOccupancy C' ≤ criticalBufferSize C₀ :=
-    maxBufferOccupancy_le_critical hreach' hbdd
+    max_buffer_occupancy_le_critical hreach' hbdd
   exact le_trans hle hB
 
 

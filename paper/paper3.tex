@@ -139,7 +139,8 @@
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
 \newcommand{\thead}[1]{\textbf{\raisebox{0pt}[2.2ex][0.8ex]{#1}}}
 
-\newcommand{\Hbyz}{\ensuremath{H_{\mathrm{byz}}}}
+\newcommand{\Hbyz}{\ensuremath{\mathsf{H}_{\mathrm{byz}}}}
+\newcommand{\DeliveryModel}{\ensuremath{\mathsf{DeliveryModel}}}
 \newcommand{\Obssafe}{\ensuremath{\mathsf{Obs}_{\mathrm{safe}}^{\mathrm{byz}}}}
 \newcommand{\Eqsafe}{\ensuremath{\mathsf{Eq}_{\mathrm{safe}}^{\mathrm{byz}}}}
 \newcommand{\Ebyz}{\ensuremath{\mathcal{E}_{\mathrm{byz}}}}
@@ -350,10 +351,10 @@ Our contributions are as follows:
 			\toprule
 			\thead{Symbol}   & \thead{Meaning}                      \\
 			\midrule
-			$\Hbyz$          & Byzantine characterization bundle    \\
-			$\Obssafe$       & Byzantine safety-visible observation \\
-			$\Eqsafe$        & Byzantine safety-visible equality    \\
-			$\Ebyz$          & Byzantine determinism-envelope       \\
+			\Hbyz            & Byzantine characterization bundle    \\
+			\Obssafe         & Byzantine safety-visible observation \\
+			\Eqsafe          & Byzantine safety-visible equality    \\
+			\Ebyz            & Byzantine determinism-envelope       \\
 			\Coherent        & global active-edge coherence predicate \\
 			\Harmony         & reconfiguration commutation invariant \\
 			$\Admissible(I)$ & candidate invariant admissibility    \\
@@ -387,7 +388,7 @@ Assume the base model from \emph{Coherence for Asynchronous Buffered MPST} and \
 	\item asynchronous buffered steps,
 	\item active-edge Coherence,
 	\item fair scheduling assumptions stated per theorem,
-	\item \texttt{DeliveryModel} parametricity,
+	\item \DeliveryModel parametricity,
 	\item crash-stop setting for fault claims.
 \end{itemize}
 
@@ -425,7 +426,7 @@ The paper distinguishes:
 \end{itemize}
 
 Representative mechanized anchors are in the deployment-composition layer, the delegation-preservation
-layer, and the higher-order graph-delta layer. Appendix~\ref{app:mechanization} provides the file-level mapping.
+layer, and the higher-order graph-delta layer. Appendix~\ref{app:p3-anchor-registry} provides the file-level mapping.
 
 \subsection{Dynamic Participant Sets}
 
@@ -704,8 +705,8 @@ The proof has two components.
 \end{enumerate}
 
 At the effect-observation boundary, the coinductive bridge supplies the composition-facing
-congruence and quotient lift used by this section: \nolinkurl{effectBisim_congr_link} and
-\nolinkurl{configEquiv_iff_effectBisim_silent}.
+congruence and quotient lift used by this section: \nolinkurl{effect_bisim_congr_link} and
+\nolinkurl{config_equiv_iff_effect_bisim_silent}.
 
 Side-condition necessity is explicit. Dropped-condition counterexample interfaces are part
 of the reconfiguration bridge layer.
@@ -728,7 +729,7 @@ of the reconfiguration bridge layer.
 		      \end{itemize}
 		\item Quotient/effect boundary:
 		      \begin{itemize}
-			      \item use effect-bisim congruence under link and quotient bridge (\nolinkurl{effectBisim_congr_link},\allowbreak\ \nolinkurl{configEquiv_iff_effectBisim_silent}) to align protocol and observational views.
+			      \item use effect-bisim congruence under link and quotient bridge (\nolinkurl{effect_bisim_congr_link},\allowbreak\ \nolinkurl{config_equiv_iff_effect_bisim_silent}) to align protocol and observational views.
 		      \end{itemize}
 	\end{enumerate}
 
@@ -822,10 +823,10 @@ This theorem gives the formal content of the quotient-first claim: erasure is no
 
 Mechanized anchors:
 \begin{itemize}
-	\item \nolinkurl{safeDelegation_local_necessity}
-	\item \nolinkurl{safeDelegation_to_footprint}
-	\item \nolinkurl{footprint_to_safeDelegation}
-	\item \nolinkurl{safeDelegation_iff_footprint}
+	\item \nolinkurl{safe_delegation_local_necessity}
+	\item \nolinkurl{safe_delegation_to_footprint}
+	\item \nolinkurl{footprint_to_safe_delegation}
+	\item \nolinkurl{safe_delegation_iff_footprint}
 \end{itemize}
 
 These lemmas are grouped in the erasure-characterization layer.
@@ -841,7 +842,7 @@ These lemmas are grouped in the erasure-characterization layer.
 \end{proof}
 
 \begin{proof}[Proof sketch]
-	For the forward direction, instantiate Theorem~\ref{thm:delegation} and project its obligations to the declared delegation footprint. For the reverse direction, apply \nolinkurl{footprint_to_safeDelegation} to reconstruct global safety from footprint obligations, then use strictness witnesses to show necessity of the side conditions. Combining both implications yields the stated equivalence.
+	For the forward direction, instantiate Theorem~\ref{thm:delegation} and project its obligations to the declared delegation footprint. For the reverse direction, apply \nolinkurl{footprint_to_safe_delegation} to reconstruct global safety from footprint obligations, then use strictness witnesses to show necessity of the side conditions. Combining both implications yields the stated equivalence.
 \end{proof}
 
 % ============================================================================
@@ -1040,7 +1041,7 @@ Mechanized envelope bridge layers include core foundations, admission logic, and
 		      \end{itemize}
 	\end{enumerate}
 
-	Core formal structures come from envelope foundations (\texttt{LocalExactEnvelopeCharacterization}, \texttt{ShardedExactEnvelopeCharacterization}) and profile-level extraction theorems (\nolinkurl{consensusEnvelope_exact_of_profile},\allowbreak\ \nolinkurl{failureEnvelope_maximality_of_profile}).
+	Core formal structures come from envelope foundations (\texttt{LocalExactEnvelopeCharacterization}, \texttt{ShardedExactEnvelopeCharacterization}) and profile-level extraction theorems (\nolinkurl{consensus_envelope_exact_of_profile},\allowbreak\ \nolinkurl{failure_envelope_maximality_of_profile}).
 \end{proof}
 
 \begin{corollary}[Finite-Erasure Transportability Boundary]
@@ -1119,8 +1120,8 @@ This is a symmetry-reduction statement. Different concrete traces can represent 
 
 Mechanized anchors in the bridge layer include:
 \begin{itemize}
-	\item \nolinkurl{exchangeNormalization_of_e1BridgePremises}
-	\item \nolinkurl{spatialSubtypingMonotonicity_of_e1BridgePremises}
+	\item \nolinkurl{exchange_normalization_of_e1_bridge_premises}
+	\item \nolinkurl{spatial_subtyping_monotonicity_of_e1_bridge_premises}
 \end{itemize}
 
 This theorem sharpens what ``determinism modulo envelope'' means operationally.
@@ -1129,8 +1130,8 @@ This theorem sharpens what ``determinism modulo envelope'' means operationally.
 	Instantiate reconfiguration-bridge theorem forms with exchange and spatial premises.
 
 	\begin{enumerate}
-		\item Exchange normalization follows from bridge theorem \nolinkurl{exchangeNormalization_of_e1BridgePremises}.
-		\item Spatial monotonicity follows from \nolinkurl{spatialSubtypingMonotonicity_of_e1BridgePremises}.
+		\item Exchange normalization follows from bridge theorem \nolinkurl{exchange_normalization_of_e1_bridge_premises}.
+		\item Spatial monotonicity follows from \nolinkurl{spatial_subtyping_monotonicity_of_e1_bridge_premises}.
 		\item Combine both to obtain determinism modulo envelope classes rather than raw traces.
 	\end{enumerate}
 \end{proof}
@@ -1181,11 +1182,11 @@ Mechanized anchors:
 
 Coinductive adequacy bridge pack used here:
 \begin{itemize}
-	\item \nolinkurl{protocolOutcome_effectBisim_of_observationalEq}
-	\item \nolinkurl{compile_refines_observationalEq_of_effectBisim}
-	\item \nolinkurl{vmView_effectBisim_of_VMCEquiv}
-	\item \nolinkurl{vmCEquiv_of_vmView_effectBisim}
-	\item \nolinkurl{topology_change_preserves_VMCEquiv_via_effectBisim}
+	\item \nolinkurl{protocol_outcome_effect_bisim_of_observational_eq}
+	\item \nolinkurl{compile_refines_observational_eq_of_effect_bisim}
+	\item \nolinkurl{vm_view_effect_bisim_of_vmc_equiv}
+	\item \nolinkurl{vmc_equiv_of_vm_view_effect_bisim}
+	\item \nolinkurl{topology_change_preserves_vmc_equiv_via_effect_bisim}
 \end{itemize}
 
 Runtime consequence: proof-carrying conformance between claimed profile bits and available theorem-pack evidence.
@@ -1200,15 +1201,15 @@ Runtime consequence: proof-carrying conformance between claimed profile bits and
 	\begin{enumerate}
 		\item Protocol outcome bridge:
 		      \begin{itemize}
-			      \item connect observational equality and effect-bisim (\nolinkurl{protocolOutcome_effectBisim_of_observationalEq}).
+			      \item connect observational equality and effect-bisim (\nolinkurl{protocol_outcome_effect_bisim_of_observational_eq}).
 		      \end{itemize}
 		\item Compile/runtime refinement bridge:
 		      \begin{itemize}
-			      \item lift effect-bisim to compile-time observational refinement (\nolinkurl{compile_refines_observationalEq_of_effectBisim}).
+			      \item lift effect-bisim to compile-time observational refinement (\nolinkurl{compile_refines_observational_eq_of_effect_bisim}).
 		      \end{itemize}
 		\item VM view bridge:
 		      \begin{itemize}
-			      \item connect VM configuration equivalence and effect-bisim (\nolinkurl{vmView_effectBisim_of_VMCEquiv},\allowbreak\ converse, and topology-preservation lemmas).
+			      \item connect VM configuration equivalence and effect-bisim (\nolinkurl{vm_view_effect_bisim_of_vmc_equiv},\allowbreak\ converse, and topology-preservation lemmas).
 		      \end{itemize}
 	\end{enumerate}
 
@@ -1226,7 +1227,7 @@ Runtime consequence: proof-carrying conformance between claimed profile bits and
 
 \begin{assumptions}[Byzantine]
 	\label{assump:p3-byzantine}
-	Byzantine characterization assumes explicit bundle $\Hbyz$ with fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions.
+	Byzantine characterization assumes explicit bundle \Hbyz with fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions.
 \end{assumptions}
 
 Define
@@ -1251,17 +1252,17 @@ where each conjunct names the corresponding requirement class in Assumption Bloc
 \end{theorem}
 
 \begin{proof}[Proof sketch]
-	Instantiate the Byzantine profile package under Assumption Block~\ref{assump:p3-byzantine} and apply \nolinkurl{byzantineSafety_exact_of_profile} to obtain \texttt{ExactByzantineSafetyCharacterization} for the profile model. Project soundness, completeness, and maximality from that package, and interpret soundness/completeness through the same safety-visible envelope observation interface used in Theorem~\ref{thm:adequacy}. This yields the stated exact interface characterization for the declared Byzantine profile.
+	Instantiate the Byzantine profile package under Assumption Block~\ref{assump:p3-byzantine} and apply \nolinkurl{byzantine_safety_exact_of_profile} to obtain \texttt{ExactByzantineSafetyCharacterization} for the profile model. Project soundness, completeness, and maximality from that package, and interpret soundness/completeness through the same safety-visible envelope observation interface used in Theorem~\ref{thm:adequacy}. This yields the stated exact interface characterization for the declared Byzantine profile.
 \end{proof}
 
 \begin{corollary}[Converse Counterexample Families]
 	\label{cor:byzantine-converse}
-	If any required class in Assumption Block~\ref{assump:p3-byzantine} is dropped, there exists a counterexample family violating $\ByzSafe$. Covered dropped classes are quorum or intersection obligations, authentication or evidence-validity obligations, adversarial-budget obligations, and primitive-consistency obligations.
+	If any required class in Assumption Block~\ref{assump:p3-byzantine} is dropped, there exists a counterexample family violating \ByzSafe. Covered dropped classes are quorum or intersection obligations, authentication or evidence-validity obligations, adversarial-budget obligations, and primitive-consistency obligations.
 \end{corollary}
 
 \begin{proposition}[Byzantine VM Adherence and Admission Gating]
 	\label{prop:byzantine-vm}
-	For runtime profile $(P,\Pi)$, if theorem-pack capability bits include Byzantine safety characterization and VM envelope adherence evidence, then admitted executions satisfy $\Eqsafe$ modulo $\Ebyz$ and rejected requests correspond to failed assumptions or missing evidence.
+	For runtime profile $(P,\Pi)$, if theorem-pack capability bits include Byzantine safety characterization and VM envelope adherence evidence, then admitted executions satisfy \Eqsafe modulo \Ebyz and rejected requests correspond to failed assumptions or missing evidence.
 \end{proposition}
 
 % ============================================================================
@@ -1666,20 +1667,20 @@ Table~\ref{tab:p3-anchor-registry} maps theorem anchors to their source files.
 
 \begin{table}[H]
 	\centering
-	\footnotesize
-	\begin{tabularx}{\columnwidth}{@{}L{0.47\columnwidth}L{0.48\columnwidth}@{}}
+	\scriptsize
+	\begin{tabularx}{\columnwidth}{@{}L{0.475\columnwidth}L{0.475\columnwidth}@{}}
 		\toprule
 		\thead{Anchor} & \thead{Path (relative to \texttt{lean/})} \\
 		\midrule
-		\texttt{link\_harmony\_through\_link} & \texttt{Protocol/Deployment/\allowbreak}\mbox{\texttt{LinkingCore.lean}} \\
+		\texttt{link\_harmony\_through\_link} & \texttt{Protocol/Deployment/\allowbreak}\mbox{\texttt{LinkingTheorems.lean}} \\
 		\texttt{coherent\_erasure\_stable} & \texttt{Protocol/Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}} \\
 		\texttt{flagship\_composed\_system\_conservation} & \texttt{Protocol/Deployment/\allowbreak}\mbox{\texttt{LinkingTheorems.lean}} \\
-		\texttt{consensusEnvelope\_exact\_of\_profile} & \texttt{Runtime/Adequacy/\allowbreak EnvelopeCore/}\mbox{\texttt{*.lean}} \\
+		\texttt{consensus\_envelope\_exact\_of\_profile} & \texttt{Runtime/Proofs/Adapters/\allowbreak Distributed/}\mbox{\texttt{EnvelopeTheorems.lean}} \\
 		\texttt{vm\_adequacy\_of\_trace\_consistency} & \texttt{Runtime/Adequacy/}\mbox{\texttt{Adequacy.lean}} \\
-		\texttt{byzantineSafety\_exact\_of\_profile} & \texttt{Runtime/Proofs/Adapters/\allowbreak Distributed/}\mbox{\texttt{EnvelopeTheorems.lean}} \\
+		\texttt{byzantine\_safety\_exact\_of\_profile} & \texttt{Runtime/Proofs/Adapters/\allowbreak Distributed/}\mbox{\texttt{EnvelopeTheorems.lean}} \\
 		\texttt{canOperateUnderByzantineEnvelope} & \texttt{Runtime/Proofs/TheoremPack/}\mbox{\texttt{*.lean}} \\
-		\texttt{effectBisim\_congruence} & \texttt{Runtime/Proofs/EffectBisim/\allowbreak}\mbox{\texttt{Congruence.lean}} \\
-		\texttt{lyapunov\_descent} & \texttt{Runtime/Proofs/}\mbox{\texttt{Lyapunov.lean}} \\
+		\texttt{effect\_bisim\_congr\_link} & \texttt{Runtime/Proofs/EffectBisim/\allowbreak}\mbox{\texttt{Congruence.lean}} \\
+		\texttt{lyapunov\_conserved\_under\_balanced\_delegation} & \texttt{Runtime/Proofs/}\mbox{\texttt{Lyapunov.lean}} \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Anchor registry.}

@@ -59,12 +59,12 @@ lemma preserved_sub_middle_select
           have hMid : lookupG Gmid e = some (.select q bsMid) := by
             simpa [hEqE] using hGmid
           have hNoneLeft : lookupG Gleft e = none :=
-            lookupG_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
+            lookup_g_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
           have hFullMid : lookupG G e = some (.select q bsMid) := by
             calc
               lookupG G e = lookupG (Gleft ++ Gmid ++ Gright) e := by simpa [hEqG]
               _ = some (.select q bsMid) :=
-                lookupG_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+                lookup_g_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
                   (e:=e) (L0:=.select q bsMid) hNoneLeft hMid
           have hSelEq : LocalType.select target bs = LocalType.select q bsMid := by
             exact Option.some.inj (by simpa [hGstep] using hFullMid)
@@ -81,11 +81,11 @@ lemma preserved_sub_middle_select
           have hGupd' : G' = updateG (Gleft ++ Gmid ++ Gright) e L := by
             simpa [hEqG] using hGupd
           obtain ⟨Gmid', hEqG', hMid'⟩ :=
-            updateG_middle_witness (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+            update_g_middle_witness (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
               (G':=G') (e:=e) (L0:=.select q bsMid) (L:=L) hNoneLeft hMid hGupd'
           have hSubSess : SessionsOf Gmid' ⊆ SessionsOf Gmid := by
             rw [hMid']
-            exact SessionsOf_subset_middle_update (Gmid:=Gmid) (e:=e)
+            exact sessions_of_subset_middle_update (Gmid:=Gmid) (e:=e)
               (L0:=.select q bsMid) (L:=L) hMid
           -- Select Case: Final Framed Post-State Witness
           refine ⟨Gmid', [], ∅, hEqG', hSubSess, ?_, ?_, ?_⟩
@@ -139,12 +139,12 @@ lemma preserved_sub_middle_recv
           have hMid : lookupG Gmid e = some (.recv p Tmid Lmid) := by
             simpa [hEqE] using hGmid
           have hNoneLeft : lookupG Gleft e = none :=
-            lookupG_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
+            lookup_g_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
           have hFullMid : lookupG G e = some (.recv p Tmid Lmid) := by
             calc
               lookupG G e = lookupG (Gleft ++ Gmid ++ Gright) e := by simpa [hEqG]
               _ = some (.recv p Tmid Lmid) :=
-                lookupG_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+                lookup_g_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
                   (e:=e) (L0:=.recv p Tmid Lmid) hNoneLeft hMid
           -- Recv Case (`recv_new`): Align Step Payload and Continuation
           have hRecvEq : LocalType.recv source T L = LocalType.recv p Tmid Lmid := by
@@ -158,11 +158,11 @@ lemma preserved_sub_middle_recv
           have hGupd' : G' = updateG (Gleft ++ Gmid ++ Gright) e L := by
             simpa [hEqG] using hGupd
           obtain ⟨Gmid', hEqG', hMid'⟩ :=
-            updateG_middle_witness (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+            update_g_middle_witness (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
               (G':=G') (e:=e) (L0:=.recv p Tmid Lmid) (L:=L) hNoneLeft hMid hGupd'
           have hSubSess : SessionsOf Gmid' ⊆ SessionsOf Gmid := by
             rw [hMid']
-            exact SessionsOf_subset_middle_update (Gmid:=Gmid) (e:=e)
+            exact sessions_of_subset_middle_update (Gmid:=Gmid) (e:=e)
               (L0:=.recv p Tmid Lmid) (L:=L) hMid
           -- Recv Case (`recv_new`): Final Framed Witness
           refine ⟨Gmid', [], ∅, hEqG', hSubSess, ?_, ?_, ?_⟩
@@ -192,12 +192,12 @@ lemma preserved_sub_middle_recv
           have hMid : lookupG Gmid e = some (.recv p Tmid Lmid) := by
             simpa [hEqE] using hGmid
           have hNoneLeft : lookupG Gleft e = none :=
-            lookupG_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
+            lookup_g_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
           have hFullMid : lookupG G e = some (.recv p Tmid Lmid) := by
             calc
               lookupG G e = lookupG (Gleft ++ Gmid ++ Gright) e := by simpa [hEqG]
               _ = some (.recv p Tmid Lmid) :=
-                lookupG_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+                lookup_g_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
                   (e:=e) (L0:=.recv p Tmid Lmid) hNoneLeft hMid
           have hRecvEq : LocalType.recv source T L = LocalType.recv p Tmid Lmid := by
             exact Option.some.inj (by simpa [hGstep] using hFullMid)
@@ -210,11 +210,11 @@ lemma preserved_sub_middle_recv
           have hGupd' : G' = updateG (Gleft ++ Gmid ++ Gright) e L := by
             simpa [hEqG] using hGupd
           obtain ⟨Gmid', hEqG', hMid'⟩ :=
-            updateG_middle_witness (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+            update_g_middle_witness (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
               (G':=G') (e:=e) (L0:=.recv p Tmid Lmid) (L:=L) hNoneLeft hMid hGupd'
           have hSubSess : SessionsOf Gmid' ⊆ SessionsOf Gmid := by
             rw [hMid']
-            exact SessionsOf_subset_middle_update (Gmid:=Gmid) (e:=e)
+            exact sessions_of_subset_middle_update (Gmid:=Gmid) (e:=e)
               (L0:=.recv p Tmid Lmid) (L:=L) hMid
           -- Recv Case (`recv_old`): Final Framed Witness
           refine ⟨Gmid', [], ∅, hEqG', hSubSess, ?_, ?_, ?_⟩
@@ -274,13 +274,13 @@ lemma preserved_sub_middle_branch
           have hMid : lookupG Gmid e = some (.branch p bsMid) := by
             simpa [hEqE] using hGmid
           have hNoneLeft : lookupG Gleft e = none :=
-            lookupG_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
+            lookup_g_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
           -- Branch Case: Align Middle Lookup with Framed Global Lookup
           have hFullMid : lookupG G e = some (.branch p bsMid) := by
             calc
               lookupG G e = lookupG (Gleft ++ Gmid ++ Gright) e := by simpa [hEqG]
               _ = some (.branch p bsMid) :=
-                lookupG_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+                lookup_g_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
                   (e:=e) (L0:=.branch p bsMid) hNoneLeft hMid
           have hBranchEq : LocalType.branch source bs = LocalType.branch p bsMid := by
             exact Option.some.inj (by simpa [hGstep] using hFullMid)
@@ -295,15 +295,15 @@ lemma preserved_sub_middle_branch
           have hGupd' : G' = updateG (Gleft ++ Gmid ++ Gright) e L := by
             simpa [hEqG] using hGupd
           obtain ⟨Gmid', hEqG', hMid'⟩ :=
-            updateG_middle_witness (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+            update_g_middle_witness (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
               (G':=G') (e:=e) (L0:=.branch p bsMid) (L:=L) hNoneLeft hMid hGupd'
           -- Branch Case: Package Framed Post-State Witness
           have hSubSess : SessionsOf Gmid' ⊆ SessionsOf Gmid := by
             rw [hMid']
-            exact SessionsOf_subset_middle_update (Gmid:=Gmid) (e:=e)
+            exact sessions_of_subset_middle_update (Gmid:=Gmid) (e:=e)
               (L0:=.branch p bsMid) (L:=L) hMid
           -- Branch Case: Final Framed Witness
-          refine ⟨Gmid', W, Δ, hEqG', hSubSess, ?_, FootprintSubset_refl, SEnvDomSubset_refl⟩
+          refine ⟨Gmid', W, Δ, hEqG', hSubSess, ?_, footprint_subset_refl, s_env_dom_subset_refl⟩
           have hGmidEq : Gmid' = updateG Gmid eMid L := by
             simpa [hEqE] using hMid'
           simpa [hGmidEq] using hPre'
@@ -336,17 +336,17 @@ lemma preserved_sub_middle_assign
           rename_i Tpre
           have hvG : HasTypeVal G v Tstep := hvStep
           have hvGmid : HasTypeVal G v Tpre := by
-            refine HasTypeVal_mono Gmid G v Tpre hvMid ?_
+            refine has_type_val_mono Gmid G v Tpre hvMid ?_
             intro e L hLookMid
             have hNoneLeft : lookupG Gleft e = none :=
-              lookupG_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hLookMid
+              lookup_g_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hLookMid
             have hLookFull :
                 lookupG (Gleft ++ Gmid ++ Gright) e = some L :=
-              lookupG_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+              lookup_g_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
                 (e:=e) (L0:=L) hNoneLeft hLookMid
 /- ## Structured Block 7 -/
             simpa [hEqG] using hLookFull
-          have hEqT : Tpre = Tstep := HasTypeVal_unique hvGmid hvG
+          have hEqT : Tpre = Tstep := has_type_val_unique hvGmid hvG
           have hSownEq : Sown' = OwnedEnv.updateLeft Sown x Tpre := by
             calc
               Sown' = OwnedEnv.updateLeft Sown x Tstep := hSownUpd
@@ -363,16 +363,16 @@ lemma preserved_sub_middle_assign
           rename_i Tpre Told
           have hvG : HasTypeVal G v Tstep := hvStep
           have hvGmid : HasTypeVal G v Tpre := by
-            refine HasTypeVal_mono Gmid G v Tpre hvMid ?_
+            refine has_type_val_mono Gmid G v Tpre hvMid ?_
             intro e L hLookMid
             have hNoneLeft : lookupG Gleft e = none :=
-              lookupG_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hLookMid
+              lookup_g_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hLookMid
             have hLookFull :
                 lookupG (Gleft ++ Gmid ++ Gright) e = some L :=
-              lookupG_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+              lookup_g_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
                 (e:=e) (L0:=L) hNoneLeft hLookMid
             simpa [hEqG] using hLookFull
-          have hEqT : Tpre = Tstep := HasTypeVal_unique hvGmid hvG
+          have hEqT : Tpre = Tstep := has_type_val_unique hvGmid hvG
           have hSownEq : Sown' = OwnedEnv.updateLeft Sown x Tpre := by
             calc
               Sown' = OwnedEnv.updateLeft Sown x Tstep := hSownUpd
@@ -413,8 +413,8 @@ lemma preserved_sub_middle_seq_skip
           · intro s hs
             exact hs
           · simpa using hQ
-          · simpa using (FootprintSubset_refl (W:=W₂))
-          · simpa using (SEnvDomSubset_append_right (S₁:=∅) (S₂:=Δ₂))
+          · simpa using (footprint_subset_refl (W:=W₂))
+          · simpa using (s_env_dom_subset_append_right (S₁:=∅) (S₂:=Δ₂))
 
 -- Sequential Case: `seq_step` via Recursive Middle Goal
 
@@ -444,9 +444,9 @@ lemma preserved_sub_middle_seq_step
   cases hPre with
   | seq hP hQ =>
       rename_i S₁ G₁ W₁ W₂ Δ₁ Δ₂
-      have hDomQ : SEnvDomSubset S₁.left Sfin.left := HasTypeProcPreOut_domsubset hQ
+      have hDomQ : SEnvDomSubset S₁.left Sfin.left := has_type_proc_pre_out_domsubset hQ
       have hDisjRightMid : DisjointS Sown.right S₁.left :=
-        DisjointS_of_domsubset_right hDomQ hDisjRightFin
+        disjoint_s_of_domsubset_right hDomQ hDisjRightFin
       obtain ⟨Gmid₁, W₁', Δ₁', hEqG₁, hSubSess, hP', hSubW, hSubΔ⟩ :=
         hMiddle
           (Gstore:=Gstore) (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
@@ -456,8 +456,8 @@ lemma preserved_sub_middle_seq_step
       refine ⟨Gmid₁, W₁' ++ W₂, Δ₁' ++ Δ₂, hEqG₁, hSubSess, ?_, ?_, ?_⟩
       · exact HasTypeProcPreOut.seq hP' hQ
 /- ## Structured Block 9 -/
-      · exact FootprintSubset_append_left hSubW
-      · exact SEnvDomSubset_append_left_of_domsubset hSubΔ
+      · exact footprint_subset_append_left hSubW
+      · exact s_env_dom_subset_append_left_of_domsubset hSubΔ
 
 -- Parallel Helper Lemmas
 
@@ -473,7 +473,7 @@ lemma ParSplit.sides_eq_of_len
       _ = split₂.S1 ++ split₂.S2 := by simpa [split₂.hS]
   exact ⟨List.append_inj_left hSeq hLen, List.append_inj_right hSeq hLen⟩
 
-lemma StoreTyped_par_left_inner
+lemma store_typed_par_left_inner
     {Gstore : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv}
     {split : ParSplit Sown.left G} {store : VarStore} :
     DisjointS split.S1 split.S2 →
@@ -484,7 +484,7 @@ lemma StoreTyped_par_left_inner
       lookupSEnv (SEnvAll (Ssh ++ Sown.right) (split.S2 ++ (split.S1 ++ ([] : SEnv)))) x = some T := by
     simpa [SEnvAll, List.append_assoc] using hLookup
   have hSwap :=
-    lookupSEnv_swap_left_prefix
+    lookup_s_env_swap_left_prefix
       (Ssh:=Ssh ++ Sown.right) (S₁:=split.S1) (S₂:=split.S2) (S₃:=[]) hDisj x
   have hSwap' :
       lookupSEnv (Ssh ++ (Sown.right ++ (split.S1 ++ split.S2))) x =

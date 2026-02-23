@@ -25,13 +25,13 @@ set_option linter.unnecessarySeqFocus false
 /-! ## SoundRel Postfix Helpers -/
 
 /-! ## SoundRel Postfix End Case -/
-theorem SoundRel_postfix_end (role : String) (cand : LocalTypeR)
+theorem sound_rel_postfix_end (role : String) (cand : LocalTypeR)
     (h : SoundRel .end role cand) : CProjectF SoundRel .end role cand := by
   -- Reduce to the projectb definition for end.
   cases cand <;> simp [SoundRel, projectb, CProjectF] at h ⊢
 
 /-! ## SoundRel Postfix Var Case -/
-theorem SoundRel_postfix_var (t : String) (role : String) (cand : LocalTypeR)
+theorem sound_rel_postfix_var (t : String) (role : String) (cand : LocalTypeR)
     (h : SoundRel (.var t) role cand) : CProjectF SoundRel (.var t) role cand := by
   -- Extract equality from projectb for the var/var case; other cases contradict.
   cases cand with
@@ -49,7 +49,7 @@ theorem SoundRel_postfix_var (t : String) (role : String) (cand : LocalTypeR)
       simp [SoundRel, projectb] at h
 
 /-! ## SoundRel Postfix Mu-to-End Case -/
-theorem SoundRel_postfix_mu_end (t : String) (body : GlobalType) (role : String)
+theorem sound_rel_postfix_mu_end (t : String) (body : GlobalType) (role : String)
     (h : SoundRel (.mu t body) role .end) : CProjectF SoundRel (.mu t body) role .end := by
   -- Extract the projected body witness from the projectb branch.
   simp [SoundRel, projectb] at h
@@ -63,7 +63,7 @@ theorem SoundRel_postfix_mu_end (t : String) (body : GlobalType) (role : String)
     exact ⟨candBody, hbody, Or.inr ⟨by simp [hguard], rfl⟩⟩
 
 /-! ## SoundRel Postfix Mu-to-Mu Case -/
-theorem SoundRel_postfix_mu_mu
+theorem sound_rel_postfix_mu_mu
     (t t' : String) (body : GlobalType) (candBody : LocalTypeR) (role : String)
     (h : SoundRel (.mu t body) role (.mu t' candBody)) :
     CProjectF SoundRel (.mu t body) role (.mu t' candBody) := by
@@ -86,7 +86,7 @@ theorem SoundRel_postfix_mu_mu
     exact hfalse.elim
 
 /-! ## SoundRel Postfix Mu Other-Candidate Contradiction -/
-theorem SoundRel_postfix_mu_other
+theorem sound_rel_postfix_mu_other
     (t : String) (body : GlobalType) (role : String) (cand : LocalTypeR)
     (h : SoundRel (.mu t body) role cand)
     (hneq : cand ≠ .end) (hneq' : ∀ t' body', cand ≠ .mu t' body') :
@@ -97,25 +97,25 @@ theorem SoundRel_postfix_mu_other
   · exact hneq' _ _ rfl
 
 /-! ## SoundRel Postfix Mu Dispatcher -/
-theorem SoundRel_postfix_mu (t : String) (body : GlobalType) (role : String)
+theorem sound_rel_postfix_mu (t : String) (body : GlobalType) (role : String)
     (cand : LocalTypeR) (h : SoundRel (.mu t body) role cand) :
     CProjectF SoundRel (.mu t body) role cand := by
   -- Split on the candidate shape to select the appropriate helper.
   cases cand with
-  | «end» => exact SoundRel_postfix_mu_end t body role h
-  | mu t' candBody => exact SoundRel_postfix_mu_mu t t' body candBody role h
+  | «end» => exact sound_rel_postfix_mu_end t body role h
+  | mu t' candBody => exact sound_rel_postfix_mu_mu t t' body candBody role h
   | var v =>
-      have hfalse := SoundRel_postfix_mu_other t body role (.var v) h (by simp) (by intro; simp)
+      have hfalse := sound_rel_postfix_mu_other t body role (.var v) h (by simp) (by intro; simp)
       exact (False.elim hfalse)
   | send p bs =>
-      have hfalse := SoundRel_postfix_mu_other t body role (.send p bs) h (by simp) (by intro; simp)
+      have hfalse := sound_rel_postfix_mu_other t body role (.send p bs) h (by simp) (by intro; simp)
       exact (False.elim hfalse)
   | recv p bs =>
-      have hfalse := SoundRel_postfix_mu_other t body role (.recv p bs) h (by simp) (by intro; simp)
+      have hfalse := sound_rel_postfix_mu_other t body role (.recv p bs) h (by simp) (by intro; simp)
       exact (False.elim hfalse)
 
 /-! ## Sender Comm Helper (Send Candidate) -/
-theorem SoundRel_postfix_comm_sender_send
+theorem sound_rel_postfix_comm_sender_send
     (sender receiver role : String) (gbs : List (Label × GlobalType))
     (partner : String) (lbs : List BranchR) (hs : role = sender)
     (h : SoundRel (.comm sender receiver gbs) role (.send partner lbs)) :
@@ -128,7 +128,7 @@ theorem SoundRel_postfix_comm_sender_send
   · have hbranches : projectbBranches gbs role lbs = true := by
       simpa [hpartner] using h'
     have hbranches' : BranchesProjRel SoundRel gbs sender lbs := by
-      simpa [hs] using projectbBranches_to_SoundRel gbs role lbs hbranches
+      simpa [hs] using projectb_branches_to_sound_rel gbs role lbs hbranches
     have hpartner_eq : partner = receiver := string_beq_eq_true_to_eq hpartner
     simpa [CProjectF, hs] using ⟨hpartner_eq, hbranches'⟩
   · have hfalse : False := by
@@ -136,7 +136,7 @@ theorem SoundRel_postfix_comm_sender_send
     exact hfalse.elim
 
 /-! ## SoundRel Postfix Comm Sender Case -/
-theorem SoundRel_postfix_comm_sender
+theorem sound_rel_postfix_comm_sender
     (sender receiver role : String) (gbs : List (Label × GlobalType))
     (cand : LocalTypeR) (hs : role = sender)
     (h : SoundRel (.comm sender receiver gbs) role cand) :
@@ -145,7 +145,7 @@ theorem SoundRel_postfix_comm_sender
   cases cand with
   | send partner lbs =>
       -- Delegate to the specialized send-case helper.
-      exact SoundRel_postfix_comm_sender_send sender receiver role gbs partner lbs hs h
+      exact sound_rel_postfix_comm_sender_send sender receiver role gbs partner lbs hs h
   | «end» =>
       simp [SoundRel, projectb, hs] at h
   | var _ =>
@@ -156,7 +156,7 @@ theorem SoundRel_postfix_comm_sender
       simp [SoundRel, projectb, hs] at h
 
 /-! ## Receiver Comm Helper (Recv Candidate) -/
-theorem SoundRel_postfix_comm_receiver_recv
+theorem sound_rel_postfix_comm_receiver_recv
     (sender receiver role : String) (gbs : List (Label × GlobalType))
     (partner : String) (lbs : List BranchR) (hr : role = receiver)
     (hs : role ≠ sender)
@@ -173,7 +173,7 @@ theorem SoundRel_postfix_comm_receiver_recv
   · have hbranches : projectbBranches gbs role lbs = true := by
       simpa [hpartner] using h'
     have hbranches' : BranchesProjRel SoundRel gbs receiver lbs := by
-      simpa [hr] using projectbBranches_to_SoundRel gbs role lbs hbranches
+      simpa [hr] using projectb_branches_to_sound_rel gbs role lbs hbranches
     have hpartner_eq : partner = sender := string_beq_eq_true_to_eq hpartner
     have hns : receiver ≠ sender := by
       simpa [hr] using hs
@@ -183,7 +183,7 @@ theorem SoundRel_postfix_comm_receiver_recv
     exact hfalse.elim
 
 /-! ## SoundRel Postfix Comm Receiver Case -/
-theorem SoundRel_postfix_comm_receiver
+theorem sound_rel_postfix_comm_receiver
     (sender receiver role : String) (gbs : List (Label × GlobalType))
     (cand : LocalTypeR) (hr : role = receiver) (hs : role ≠ sender)
     (h : SoundRel (.comm sender receiver gbs) role cand) :
@@ -192,7 +192,7 @@ theorem SoundRel_postfix_comm_receiver
   cases cand with
   | recv partner lbs =>
       -- Delegate to the specialized recv-case helper.
-      exact SoundRel_postfix_comm_receiver_recv sender receiver role gbs partner lbs hr hs h
+      exact sound_rel_postfix_comm_receiver_recv sender receiver role gbs partner lbs hr hs h
   | «end» =>
       -- projectb reduces to false for non-recv candidates under receiver role.
       have hsender' : (receiver == sender) = false := by
@@ -212,7 +212,7 @@ theorem SoundRel_postfix_comm_receiver
       simp [SoundRel, projectb, hr, hsender'] at h
 
 /-! ## SoundRel Postfix Comm Non-Participant Case -/
-theorem SoundRel_postfix_comm_other
+theorem sound_rel_postfix_comm_other
     (sender receiver role : String) (gbs : List (Label × GlobalType))
     (cand : LocalTypeR) (hs : role ≠ sender) (hr : role ≠ receiver)
     (h : SoundRel (.comm sender receiver gbs) role cand) :
@@ -224,11 +224,11 @@ theorem SoundRel_postfix_comm_other
   dsimp [SoundRel] at h'
   unfold projectb at h'
   simp [hsender, hreceiver] at h'
-  have hbranches := projectbAllBranches_to_SoundRel gbs role cand h'
+  have hbranches := projectb_all_branches_to_sound_rel gbs role cand h'
   simpa [CProjectF, hs, hr] using hbranches
 
 /-! ## Delegate Postfix Delegator Case -/
-theorem SoundRel_postfix_delegate_delegator
+theorem sound_rel_postfix_delegate_delegator
     (p q : String) (sid : Nat) (r : String) (cont : GlobalType)
     (role : String) (cand : LocalTypeR)
     (hp : role = p) (h : SoundRel (.delegate p q sid r cont) role cand) :
@@ -258,7 +258,7 @@ theorem SoundRel_postfix_delegate_delegator
                       rcases htmp with ⟨hpartner, hlbl, hvt, hcont⟩
                       have hpartner_eq : partner = q := string_beq_eq_true_to_eq hpartner
                       have hlbl_eq : lbl = ⟨"_delegate", .unit⟩ := label_beq_eq_true_to_eq hlbl
-                      have hvt_eq : vt = some (.chan sid r) := optionValType_beq_eq_true_to_eq hvt
+                      have hvt_eq : vt = some (.chan sid r) := option_val_type_beq_eq_true_to_eq hvt
                       have hcont' : SoundRel cont role contCand := hcont
                       have hcont'' : SoundRel cont p contCand := by
                         simpa [hp] using hcont'
@@ -296,7 +296,7 @@ theorem SoundRel_postfix_delegate_delegator
       exact hfalse.elim
 
 /-! ## Delegate Postfix Delegatee Case -/
-theorem SoundRel_postfix_delegate_delegatee
+theorem sound_rel_postfix_delegate_delegatee
     (p q : String) (sid : Nat) (r : String) (cont : GlobalType)
     (role : String) (cand : LocalTypeR)
     (hqeq : role = q) (hp : role ≠ p) (h : SoundRel (.delegate p q sid r cont) role cand) :
@@ -330,7 +330,7 @@ theorem SoundRel_postfix_delegate_delegatee
                         simpa [SoundRel, projectb, hqeq, hqf, hpf, hqp] using h
                       rcases htmp with ⟨hpartner_eq, hlbl, hvt, hcont⟩
                       have hlbl_eq : lbl = ⟨"_delegate", .unit⟩ := label_beq_eq_true_to_eq hlbl
-                      have hvt_eq : vt = some (.chan sid r) := optionValType_beq_eq_true_to_eq hvt
+                      have hvt_eq : vt = some (.chan sid r) := option_val_type_beq_eq_true_to_eq hvt
                       have hcont' : SoundRel cont role contCand := hcont
                       have hcont'' : SoundRel cont q contCand := by
                         simpa [hqeq] using hcont'
@@ -368,7 +368,7 @@ theorem SoundRel_postfix_delegate_delegatee
       exact hfalse.elim
 
 /-! ## Delegate Postfix Non-Participant Case -/
-theorem SoundRel_postfix_delegate_other
+theorem sound_rel_postfix_delegate_other
     (p q : String) (sid : Nat) (r : String) (cont : GlobalType)
     (role : String) (cand : LocalTypeR)
     (hp : role ≠ p) (hq : role ≠ q)
@@ -389,36 +389,36 @@ theorem SoundRel_postfix_delegate_other
   exact h
 
 /-! ## SoundRel Postfix Theorem -/
-theorem SoundRel_postfix :
+theorem sound_rel_postfix :
     ∀ g role cand, SoundRel g role cand → CProjectF SoundRel g role cand := by
   intro g role cand h
   -- Dispatch on the global constructor and role case.
   cases g with
-  | «end» => exact SoundRel_postfix_end role cand h
-  | var t => exact SoundRel_postfix_var t role cand h
-  | mu t body => exact SoundRel_postfix_mu t body role cand h
+  | «end» => exact sound_rel_postfix_end role cand h
+  | var t => exact sound_rel_postfix_var t role cand h
+  | mu t body => exact sound_rel_postfix_mu t body role cand h
   | comm sender receiver gbs =>
       by_cases hs : role = sender
-      · exact SoundRel_postfix_comm_sender sender receiver role gbs cand hs h
+      · exact sound_rel_postfix_comm_sender sender receiver role gbs cand hs h
       · by_cases hr : role = receiver
-        · exact SoundRel_postfix_comm_receiver sender receiver role gbs cand hr hs h
-        · exact SoundRel_postfix_comm_other sender receiver role gbs cand hs hr h
+        · exact sound_rel_postfix_comm_receiver sender receiver role gbs cand hr hs h
+        · exact sound_rel_postfix_comm_other sender receiver role gbs cand hs hr h
   | delegate p q sid r cont =>
       by_cases hp : role = p
-      · exact SoundRel_postfix_delegate_delegator p q sid r cont role cand hp h
+      · exact sound_rel_postfix_delegate_delegator p q sid r cont role cand hp h
       · by_cases hq : role = q
-        · exact SoundRel_postfix_delegate_delegatee p q sid r cont role cand hq hp h
-        · exact SoundRel_postfix_delegate_other p q sid r cont role cand hp hq h
+        · exact sound_rel_postfix_delegate_delegatee p q sid r cont role cand hq hp h
+        · exact sound_rel_postfix_delegate_other p q sid r cont role cand hp hq h
 
 /-! ## Checker-to-Relation Soundness -/
 theorem projectb_sound (g : GlobalType) (role : String) (cand : LocalTypeR)
     (h : projectb g role cand = true) : CProject g role cand := by
   -- Use the SoundRel post-fixpoint and coinduction.
   have hinR : SoundRel g role cand := h
-  exact CProject_coind SoundRel_postfix g role cand hinR
+  exact c_project_coind sound_rel_postfix g role cand hinR
 
 /-! ## BranchesProjRel to projectbBranches Helper -/
-theorem BranchesProjRel_to_projectbBranches
+theorem branches_proj_rel_to_projectb_branches
     (gbs : List (Label × GlobalType)) (role : String) (lbs : List BranchR)
     (hrel : BranchesProjRel CProject gbs role lbs)
     (ih : ∀ gb ∈ gbs, ∀ lb, CProject gb.2 role lb → projectb gb.2 role lb = true) :
@@ -445,7 +445,7 @@ theorem BranchesProjRel_to_projectbBranches
       · exact ihrest (fun gb hmem lb hcp => ih gb (List.Mem.tail ghd hmem) lb hcp)
 
 /-! ## AllBranchesProj to projectbAllBranches Helper -/
-theorem AllBranchesProj_to_projectbAllBranches
+theorem all_branches_proj_to_projectb_all_branches
     (gbs : List (Label × GlobalType)) (role : String) (cand : LocalTypeR)
     (hall : AllBranchesProj CProject gbs role cand)
     (ih : ∀ gb ∈ gbs, CProject gb.2 role cand → projectb gb.2 role cand = true) :

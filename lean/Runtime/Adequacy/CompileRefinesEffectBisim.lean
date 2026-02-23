@@ -24,7 +24,7 @@ open Runtime.Proofs.EffectBisim
 /-- Compile/refinement-adjacent corollary: once a comparison context is
     established and states are effect-bisimilar, observational equivalence
     follows directly from the bisimulation bridge. -/
-theorem compile_refines_observationalEq_of_effectBisim
+theorem compile_refines_observational_eq_of_effect_bisim
     {γ ε ν : Type} [GuardLayer γ] [EffectRuntime ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     (p : Process) (roles : RoleSet) (types : Role → LocalType) (chain : GuardChain γ)
@@ -34,6 +34,6 @@ theorem compile_refines_observationalEq_of_effectBisim
     {s t : σ}
     (hBisim : EffectBisim obs step s t) :
     ObservationalEq obs s t :=
-  effectBisim_implies_observationalEquivalence obs step hBisim
+  effect_bisim_implies_observational_equivalence obs step hBisim
 
 end

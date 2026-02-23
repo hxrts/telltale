@@ -28,7 +28,7 @@ namespace SessionCoTypes.Coinductive
 /-! ## Relating childRel to children -/
 
 /-- Convert a childRel witness to a child index. -/
-lemma childRel_to_children {t c : LocalTypeC} (h : childRel t c) :
+lemma child_rel_to_children {t c : LocalTypeC} (h : childRel t c) :
     ∃ i : LocalTypeChild (head t), children t i = c := by
   rcases h with ⟨s, f, i, hdest, hchild⟩
   have hhead : head t = s := by simp [head, hdest]
@@ -47,7 +47,7 @@ lemma reachable_decomp {t u : LocalTypeC} (h : u ∈ Reachable t) :
       cases ih with
       | inl hb =>
           subst hb
-          rcases childRel_to_children hstep with ⟨i, hchild⟩
+          rcases child_rel_to_children hstep with ⟨i, hchild⟩
           refine Or.inr ⟨i, ?_⟩
           simpa [Reachable, hchild] using Relation.ReflTransGen.refl
       | inr hchild =>
@@ -74,7 +74,7 @@ private def childIndices (s : LocalTypeHead) : List (LocalTypeChild s) :=
   | .recv _ ls => List.finRange ls.length
 
 /-- Every child index is contained in `childIndices`. -/
-private theorem mem_childIndices (s : LocalTypeHead) (i : LocalTypeChild s) :
+private theorem mem_child_indices (s : LocalTypeHead) (i : LocalTypeChild s) :
     i ∈ childIndices s := by
   cases s
   · cases i
@@ -103,8 +103,8 @@ def regular_of_children (t : LocalTypeC)
   cases hx' with
   | inl hxt =>
       cases hxt
-      rcases childRel_to_children hchild with ⟨i, hi⟩
-      have hi_mem : i ∈ childIndices (head t) := mem_childIndices (head t) i
+      rcases child_rel_to_children hchild with ⟨i, hi⟩
+      have hi_mem : i ∈ childIndices (head t) := mem_child_indices (head t) i
       have hc_mem_child : c ∈ childWitnessStates t h := by
         refine List.mem_flatMap.2 ?_
         refine ⟨i, hi_mem, ?_⟩
@@ -121,7 +121,7 @@ def regular_of_children (t : LocalTypeC)
 /-- Regularity is preserved under bisimilarity.
     Since bisimilarity equals equality, this is immediate. -/
 def regular_of_bisim {x y : LocalTypeC} (h : Bisim x y) (hx : Regular x) : Regular y := by
-  have hxy : x = y := (Bisim_eq_iff x y).1 h
+  have hxy : x = y := (bisim_eq_iff x y).1 h
   simpa [hxy] using hx
 
 end SessionCoTypes.Coinductive

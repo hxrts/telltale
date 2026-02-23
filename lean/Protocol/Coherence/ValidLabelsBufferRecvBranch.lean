@@ -53,7 +53,7 @@ private theorem buffer_empty_of_typed_trace_empty
 
 -- GEnv Weakening Helpers
 
-private theorem HasTypeVal_updateG_weaken {G : GEnv} {ep : Endpoint} {Lnew : LocalType}
+private theorem has_type_val_update_g_weaken {G : GEnv} {ep : Endpoint} {Lnew : LocalType}
     {v : Value} {T : ValType} :
     HasTypeVal G v T →
     HasTypeVal (updateG G ep Lnew) v T := by
@@ -64,19 +64,19 @@ private theorem HasTypeVal_updateG_weaken {G : GEnv} {ep : Endpoint} {Lnew : Loc
   | nat n => exact HasTypeVal.nat n
   | string s => exact HasTypeVal.string s
   | prod h₁ h₂ =>
-    exact HasTypeVal.prod (HasTypeVal_updateG_weaken h₁) (HasTypeVal_updateG_weaken h₂)
+    exact HasTypeVal.prod (has_type_val_update_g_weaken h₁) (has_type_val_update_g_weaken h₂)
   | chan h =>
     rename_i e' L'
     by_cases heq : e' = ep
     · subst heq
       apply HasTypeVal.chan
-      exact lookupG_update_eq G e' Lnew
+      exact lookup_g_update_eq G e' Lnew
 /- ## Structured Block 2 -/
     · apply HasTypeVal.chan
-      rw [lookupG_update_neq G ep e' Lnew (Ne.symm heq)]
+      rw [lookup_g_update_neq G ep e' Lnew (Ne.symm heq)]
       exact h
 
-private theorem BuffersTyped_updateG_weaken {G : GEnv} {D : DEnv} {bufs : Buffers}
+private theorem buffers_typed_update_g_weaken {G : GEnv} {D : DEnv} {bufs : Buffers}
     {e : Endpoint} {L : LocalType} :
     BuffersTyped G D bufs →
     BuffersTyped (updateG G e L) D bufs := by
@@ -84,11 +84,11 @@ private theorem BuffersTyped_updateG_weaken {G : GEnv} {D : DEnv} {bufs : Buffer
   rcases hBT a with ⟨hLen, hTyping⟩
   refine ⟨hLen, ?_⟩
   intro i hi
-  exact HasTypeVal_updateG_weaken (hTyping i hi)
+  exact has_type_val_update_g_weaken (hTyping i hi)
 
 -- Local Buffer Update Preservations
 
-private theorem BuffersTyped_enqueue_local {G : GEnv} {D : DEnv} {bufs : Buffers}
+private theorem buffers_typed_enqueue_local {G : GEnv} {D : DEnv} {bufs : Buffers}
     {e : Edge} {v : Value} {T : ValType}
     (hBT : BuffersTyped G D bufs)
     (hv : HasTypeVal G v T) :
@@ -101,7 +101,7 @@ private theorem BuffersTyped_enqueue_local {G : GEnv} {D : DEnv} {bufs : Buffers
     unfold BufferTyped at hOrig
     obtain ⟨hLen, hTyping⟩ := hOrig
     subst ha
-    simp only [enqueueBuf, lookupBuf_update_eq, lookupD_update_eq]
+    simp only [enqueueBuf, lookup_buf_update_eq, lookup_d_update_eq]
     have hNewLen : (lookupBuf bufs a ++ [v]).length = (lookupD D a ++ [T]).length := by
       simp [List.length_append]
       omega
@@ -121,7 +121,7 @@ private theorem BuffersTyped_enqueue_local {G : GEnv} {D : DEnv} {bufs : Buffers
         convert hTyping i hOld using 2
       have hGoal' : HasTypeVal G (lookupBuf bufs a ++ [v])[i] (lookupD D a ++ [T])[i] := by
         simpa [hBufGet, hTraceGet] using hGoal
-      simpa [lookupBuf_update_eq, lookupD_update_eq] using hGoal'
+      simpa [lookup_buf_update_eq, lookup_d_update_eq] using hGoal'
     · -- i = old length: the newly added element
       have hLe : (lookupBuf bufs a).length ≤ i := Nat.le_of_not_lt hOld
       have hLe' : i ≤ (lookupBuf bufs a).length := by
@@ -145,19 +145,19 @@ private theorem BuffersTyped_enqueue_local {G : GEnv} {D : DEnv} {bufs : Buffers
           (List.getElem_append_right (as := lookupD D a) (bs := [T]) (i := i) hLe (h₂ := hiTrace))
       have hGoal' : HasTypeVal G (lookupBuf bufs a ++ [v])[i] (lookupD D a ++ [T])[i] := by
         simpa [hBufGet, hTraceGet] using hv
-      simpa [lookupBuf_update_eq, lookupD_update_eq] using hGoal'
+      simpa [lookup_buf_update_eq, lookup_d_update_eq] using hGoal'
   -- enqueue_local: Unaffected Edge Case
   · -- a ≠ e: unaffected edge
     have hOrig := hBT a
     have hBufEq : lookupBuf (updateBuf bufs e (lookupBuf bufs e ++ [v])) a = lookupBuf bufs a := by
-      exact lookupBuf_update_neq _ _ _ _ (Ne.symm ha)
+      exact lookup_buf_update_neq _ _ _ _ (Ne.symm ha)
     have hTraceEq : lookupD (updateD D e (lookupD D e ++ [T])) a = lookupD D a := by
-      exact lookupD_update_neq _ _ _ _ (Ne.symm ha)
+      exact lookup_d_update_neq _ _ _ _ (Ne.symm ha)
     simpa [BufferTyped, hBufEq, hTraceEq, enqueueBuf] using hOrig
 
 -- Local Buffer Dequeue Preservation
 
-private theorem BuffersTyped_dequeue_local {G : GEnv} {D : DEnv} {bufs : Buffers}
+private theorem buffers_typed_dequeue_local {G : GEnv} {D : DEnv} {bufs : Buffers}
     {recvEdge : Edge} {v : Value} {vs : List Value} {T : ValType} :
     BuffersTyped G D bufs →
     lookupBuf bufs recvEdge = v :: vs →
@@ -179,13 +179,13 @@ private theorem BuffersTyped_dequeue_local {G : GEnv} {D : DEnv} {bufs : Buffers
         have hLen' : vs.length = ts.length := by
           simpa [hBuf, hTrace] using hLen
         have hBufEq : lookupBuf (updateBuf bufs recvEdge vs) recvEdge = vs := by
-          exact lookupBuf_update_eq _ _ _
+          exact lookup_buf_update_eq _ _ _
         have hTraceEq :
             lookupD (updateD D recvEdge (lookupD D recvEdge).tail) recvEdge = ts := by
 /- ## Structured Block 4 -/
-          simp [lookupD_update_eq, hTrace]
+          simp [lookup_d_update_eq, hTrace]
         refine ⟨?_, ?_⟩
-        · simp [lookupD_update_eq, hLen']
+        · simp [lookup_d_update_eq, hLen']
         · intro i hi
           have hi' : i < vs.length := by
             simpa [hBufEq] using hi
@@ -195,14 +195,14 @@ private theorem BuffersTyped_dequeue_local {G : GEnv} {D : DEnv} {bufs : Buffers
           have hTypedIdx := hTyping (i + 1) hi_succ
           have hTypedIdx' : HasTypeVal G vs[i] ts[i] := by
             simpa [List.get_eq_getElem, hBuf, hTrace, List.getElem_cons_succ] using hTypedIdx
-          simpa [hBufEq, lookupD_update_eq] using hTypedIdx'
+          simpa [hBufEq, lookup_d_update_eq] using hTypedIdx'
   · -- a ≠ recvEdge: unaffected edge
     have hOrig := hBT a
     have hBufEq : lookupBuf (updateBuf bufs recvEdge vs) a = lookupBuf bufs a := by
-      exact lookupBuf_update_neq _ _ _ _ (Ne.symm ha)
+      exact lookup_buf_update_neq _ _ _ _ (Ne.symm ha)
     have hTraceEq :
         lookupD (updateD D recvEdge (lookupD D recvEdge).tail) a = lookupD D a := by
-      exact lookupD_update_neq _ _ _ _ (Ne.symm ha)
+      exact lookup_d_update_neq _ _ _ _ (Ne.symm ha)
     simpa [BufferTyped, hBufEq, hTraceEq] using hOrig
 
 -- BuffersTyped Step Preservation
@@ -211,7 +211,7 @@ private theorem BuffersTyped_dequeue_local {G : GEnv} {D : DEnv} {bufs : Buffers
     Send appends v to buffer and T to trace at the send edge.
     For i < original length: buf[i] : trace[i] preserved.
     For i = original length: buf[i] = v, trace[i] = T, and hv : v : T. -/
-theorem BuffersTyped_send_preserved
+theorem buffers_typed_send_preserved
     (G : GEnv) (D : DEnv) (bufs : Buffers)
     (senderEp : Endpoint) (receiverRole : Role) (T : ValType) (L : LocalType) (v : Value)
     (hTyped : BuffersTyped G D bufs)
@@ -224,17 +224,17 @@ theorem BuffersTyped_send_preserved
   have hBT' :
       BuffersTyped G (updateD D sendEdge (lookupD D sendEdge ++ [T]))
         (enqueueBuf bufs sendEdge v) :=
-    BuffersTyped_enqueue_local (G:=G) (D:=D) (bufs:=bufs) (e:=sendEdge) (v:=v) (T:=T) hTyped hv
+    buffers_typed_enqueue_local (G:=G) (D:=D) (bufs:=bufs) (e:=sendEdge) (v:=v) (T:=T) hTyped hv
   have hBT'' :
       BuffersTyped (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T]))
         (enqueueBuf bufs sendEdge v) :=
-    BuffersTyped_updateG_weaken (e:=senderEp) (L:=L) hBT'
+    buffers_typed_update_g_weaken (e:=senderEp) (L:=L) hBT'
   simpa [enqueueBuf] using hBT''
 
 /-- BuffersTyped is preserved when receiving.
     Recv removes head from buffer and trace at the recv edge.
     For all i: buf'[i] = buf[i+1], trace'[i] = trace[i+1], preserved from original. -/
-theorem BuffersTyped_recv_preserved
+theorem buffers_typed_recv_preserved
     (G : GEnv) (D : DEnv) (bufs : Buffers)
     (receiverEp : Endpoint) (senderRole : Role) (T : ValType) (L : LocalType) (v : Value) (vs : List Value)
     (hTyped : BuffersTyped G D bufs)
@@ -252,12 +252,12 @@ theorem BuffersTyped_recv_preserved
   have hBT' :
       BuffersTyped G (updateD D recvEdge (lookupD D recvEdge).tail)
         (updateBuf bufs recvEdge vs) :=
-    BuffersTyped_dequeue_local (G:=G) (D:=D) (bufs:=bufs) (recvEdge:=recvEdge) (v:=v) (vs:=vs) (T:=T)
+    buffers_typed_dequeue_local (G:=G) (D:=D) (bufs:=bufs) (recvEdge:=recvEdge) (v:=v) (vs:=vs) (T:=T)
       hTyped hBuf hTrace
   have hBT'' :
       BuffersTyped (updateG G receiverEp L) (updateD D recvEdge (lookupD D recvEdge).tail)
         (updateBuf bufs recvEdge vs) :=
-    BuffersTyped_updateG_weaken (e:=receiverEp) (L:=L) hBT'
+    buffers_typed_update_g_weaken (e:=receiverEp) (L:=L) hBT'
   exact hBT''
 
 -- BuffersTyped Label-Step Preservation
@@ -265,7 +265,7 @@ theorem BuffersTyped_recv_preserved
 /-- BuffersTyped is preserved when selecting (sending a label).
     Select appends label string to buffer and .string to trace.
     Similar to send but with label type. -/
-theorem BuffersTyped_select_preserved
+theorem buffers_typed_select_preserved
     (G : GEnv) (D : DEnv) (bufs : Buffers)
     (selectorEp : Endpoint) (targetRole : Role)
     (bs : List (String × LocalType)) (ℓ : String) (L : LocalType)
@@ -280,18 +280,18 @@ theorem BuffersTyped_select_preserved
   have hBT' :
       BuffersTyped G (updateD D selectEdge (lookupD D selectEdge ++ [.string]))
         (enqueueBuf bufs selectEdge (.string ℓ)) :=
-    BuffersTyped_enqueue_local (G:=G) (D:=D) (bufs:=bufs) (e:=selectEdge) (v:=.string ℓ) (T:=.string)
+    buffers_typed_enqueue_local (G:=G) (D:=D) (bufs:=bufs) (e:=selectEdge) (v:=.string ℓ) (T:=.string)
       hTyped hv
   have hBT'' :
       BuffersTyped (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string]))
         (enqueueBuf bufs selectEdge (.string ℓ)) :=
-    BuffersTyped_updateG_weaken (e:=selectorEp) (L:=L) hBT'
+    buffers_typed_update_g_weaken (e:=selectorEp) (L:=L) hBT'
   simpa [enqueueBuf] using hBT''
 
 /-- BuffersTyped is preserved when branching (receiving a label).
     Branch removes label string from buffer HEAD and .string from trace HEAD.
     Similar to recv but with label type. -/
-theorem BuffersTyped_branch_preserved
+theorem buffers_typed_branch_preserved
     (G : GEnv) (D : DEnv) (bufs : Buffers)
     (brancherEp : Endpoint) (senderRole : Role)
     (bs : List (String × LocalType)) (ℓ : String) (L : LocalType) (vs : List Value)
@@ -311,17 +311,17 @@ theorem BuffersTyped_branch_preserved
   have hBT' :
       BuffersTyped G (updateD D branchEdge (lookupD D branchEdge).tail)
         (updateBuf bufs branchEdge vs) :=
-    BuffersTyped_dequeue_local (G:=G) (D:=D) (bufs:=bufs) (recvEdge:=branchEdge) (v:=.string ℓ) (vs:=vs) (T:=.string)
+    buffers_typed_dequeue_local (G:=G) (D:=D) (bufs:=bufs) (recvEdge:=branchEdge) (v:=.string ℓ) (vs:=vs) (T:=.string)
       hTyped hBuf hTrace
   have hBT'' :
       BuffersTyped (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail)
         (updateBuf bufs branchEdge vs) :=
-    BuffersTyped_updateG_weaken (e:=brancherEp) (L:=L) hBT'
+    buffers_typed_update_g_weaken (e:=brancherEp) (L:=L) hBT'
   exact hBT''
 
 -- ValidLabels Preservation (recv/branch)
 
-theorem ValidLabels_recv_preserved
+theorem valid_labels_recv_preserved
     (G : GEnv) (D : DEnv) (bufs : Buffers)
     (receiverEp : Endpoint) (senderRole : Role) (T : ValType) (L : LocalType)
     (v : Value) (vs : List Value)
@@ -337,24 +337,24 @@ theorem ValidLabels_recv_preserved
   intro recvEdge e source bs hActive hBranch
   let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
   have hActiveOrig : ActiveEdge G e :=
-    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=receiverEp) (L:=L) hActive (by simpa [hG])
+    active_edge_update_g_inv (G:=G) (e:=e) (ep:=receiverEp) (L:=L) hActive (by simpa [hG])
   have hTypedEdge := hBT recvEdge
   have hTrace : (lookupD D recvEdge).head? = some T :=
     trace_head_from_buffer hBuf hv hTypedEdge
-  have hCoh' := Coherent_recv_preserved G D receiverEp senderRole T L hCoh hG hTrace
+  have hCoh' := coherent_recv_preserved G D receiverEp senderRole T L hCoh hG hTrace
   have hBT' :=
-    BuffersTyped_recv_preserved G D bufs receiverEp senderRole T L v vs hBT hBuf hv hG
+    buffers_typed_recv_preserved G D bufs receiverEp senderRole T L v vs hBT hBuf hv hG
   by_cases hRecvEq : recvEp = receiverEp
   · -- Receiver is the updated endpoint; if L is branch, traces must be empty.
     have hTraceEmpty : lookupD (updateD D recvEdge (lookupD D recvEdge).tail) e = [] :=
-      trace_empty_when_branch_receiver (Coherent_edge_any hCoh' hActive) hBranch
+      trace_empty_when_branch_receiver (coherent_edge_any hCoh' hActive) hBranch
     have hBufEmpty : lookupBuf (updateBuf bufs recvEdge vs) e = [] :=
       buffer_empty_of_typed_trace_empty hBT' hTraceEmpty
     simp [hBufEmpty]
   · -- Receiver endpoint unchanged: use original ValidLabels.
     have hBranchOld : lookupG G recvEp = some (.branch source bs) := by
       have hBranch' := hBranch
-      rw [lookupG_update_neq G receiverEp recvEp L (Ne.symm hRecvEq)] at hBranch'
+      rw [lookup_g_update_neq G receiverEp recvEp L (Ne.symm hRecvEq)] at hBranch'
       exact hBranch'
     have hNe : e ≠ recvEdge := by
       intro hEq
@@ -363,13 +363,13 @@ theorem ValidLabels_recv_preserved
       subst hEq
       rfl
     have hBufEq : lookupBuf (updateBuf bufs recvEdge vs) e = lookupBuf bufs e := by
-      exact lookupBuf_update_neq _ _ _ _ (Ne.symm hNe)
+      exact lookup_buf_update_neq _ _ _ _ (Ne.symm hNe)
     have hValidOld := hValid e source bs hActiveOrig hBranchOld
     simpa [hBufEq] using hValidOld
 
 -- ValidLabels Preservation (branch)
 
-theorem ValidLabels_branch_preserved
+theorem valid_labels_branch_preserved
     (G : GEnv) (D : DEnv) (bufs : Buffers)
     (brancherEp : Endpoint) (senderRole : Role)
     (branchOptions : List (String × LocalType)) (ℓ : String) (L : LocalType) (vs : List Value)
@@ -385,25 +385,25 @@ theorem ValidLabels_branch_preserved
   intro branchEdge e source bs hActive hBranch
   let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
   have hActiveOrig : ActiveEdge G e :=
-    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=brancherEp) (L:=L) hActive (by simpa [hG])
+    active_edge_update_g_inv (G:=G) (e:=e) (ep:=brancherEp) (L:=L) hActive (by simpa [hG])
   have hv : HasTypeVal G (.string ℓ) .string := HasTypeVal.string ℓ
   have hTypedEdge := hBT branchEdge
   have hTrace : (lookupD D branchEdge).head? = some .string :=
     trace_head_from_buffer hBufEq hv hTypedEdge
-  have hCoh' := Coherent_branch_preserved G D brancherEp senderRole branchOptions ℓ L hCoh hG hFind hTrace
+  have hCoh' := coherent_branch_preserved G D brancherEp senderRole branchOptions ℓ L hCoh hG hFind hTrace
   have hBT' :=
-    BuffersTyped_branch_preserved G D bufs brancherEp senderRole branchOptions ℓ L vs hBT hBufEq hG hFind
+    buffers_typed_branch_preserved G D bufs brancherEp senderRole branchOptions ℓ L vs hBT hBufEq hG hFind
   by_cases hRecvEq : recvEp = brancherEp
   · -- Receiver is the updated endpoint; if L is branch, traces must be empty.
     have hTraceEmpty : lookupD (updateD D branchEdge (lookupD D branchEdge).tail) e = [] :=
-      trace_empty_when_branch_receiver (Coherent_edge_any hCoh' hActive) hBranch
+      trace_empty_when_branch_receiver (coherent_edge_any hCoh' hActive) hBranch
     have hBufEmpty : lookupBuf (updateBuf bufs branchEdge vs) e = [] :=
       buffer_empty_of_typed_trace_empty hBT' hTraceEmpty
     simp [hBufEmpty]
   · -- Receiver endpoint unchanged: use original ValidLabels.
     have hBranchOld : lookupG G recvEp = some (.branch source bs) := by
       have hBranch' := hBranch
-      rw [lookupG_update_neq G brancherEp recvEp L (Ne.symm hRecvEq)] at hBranch'
+      rw [lookup_g_update_neq G brancherEp recvEp L (Ne.symm hRecvEq)] at hBranch'
       exact hBranch'
     have hNe : e ≠ branchEdge := by
       intro hEq
@@ -411,7 +411,7 @@ theorem ValidLabels_branch_preserved
       subst hEq
       rfl
     have hBufEq' : lookupBuf (updateBuf bufs branchEdge vs) e = lookupBuf bufs e := by
-      exact lookupBuf_update_neq _ _ _ _ (Ne.symm hNe)
+      exact lookup_buf_update_neq _ _ _ _ (Ne.symm hNe)
     have hValidOld := hValid e source bs hActiveOrig hBranchOld
 /- ## Structured Block 8 -/
     simpa [hBufEq'] using hValidOld
@@ -419,7 +419,7 @@ theorem ValidLabels_branch_preserved
 -- Initialization Lemma
 
 /-- Empty environments are coherent. -/
-theorem Coherent_empty : Coherent [] (∅ : DEnv) := by
+theorem coherent_empty : Coherent [] (∅ : DEnv) := by
   intro e hActive
   -- No receiver exists in the empty environment
   have : False := by
@@ -435,7 +435,7 @@ def initSession (sid : SessionId) (roles : RoleSet) (localTypes : Role → Local
   (G, D, bufs)
 
 /-- Initialized session environments are coherent (when types are projections). -/
-theorem initSession_coherent (sid : SessionId) (roles : RoleSet) (localTypes : Role → LocalType)
+theorem init_session_coherent (sid : SessionId) (roles : RoleSet) (localTypes : Role → LocalType)
     (hSenders :
       ∀ (e : Edge) (Lrecv : LocalType),
         lookupG (roles.map fun r => ({ sid := sid, role := r }, localTypes r))
@@ -454,9 +454,9 @@ theorem initSession_coherent (sid : SessionId) (roles : RoleSet) (localTypes : R
   -- All traces are empty in initDEnv.
   have hTrace : lookupD (initDEnv sid roles) e = [] := by
     by_cases hMem : e ∈ RoleSet.allEdges sid roles
-    · exact initDEnv_lookup_mem sid roles e hMem
+    · exact init_d_env_lookup_mem sid roles e hMem
     · have hFind : (initDEnv sid roles).find? e = none :=
-        initDEnv_find?_none_of_notin sid roles e hMem
+        init_d_env_find?_none_of_notin sid roles e hMem
       simp [lookupD, hFind]
   -- Consume with empty trace always succeeds.
   simp [hTrace, Consume]

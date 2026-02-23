@@ -23,18 +23,18 @@ section
 universe u v
 
 /-- Primary bridge theorem: effect bisimulation implies observational equality. -/
-theorem effectBisim_implies_observationalEquivalence {σ : Type u} {α : Type v}
+theorem effect_bisim_implies_observational_equivalence {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     {s t : σ} (h : EffectBisim obs step s t) :
     ObservationalEq obs s t :=
-  effectBisim_observationalEq obs step h
+  effect_bisim_observational_eq obs step h
 
 /-- Bidirectional packaging for self-contained API use. -/
-theorem observationalEquivalence_of_effectBisim {σ : Type u} {α : Type v}
+theorem observational_equivalence_of_effect_bisim {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     (s t : σ) :
     EffectBisim obs step s t → ObservationalEq obs s t :=
-  effectBisim_implies_observationalEquivalence obs step
+  effect_bisim_implies_observational_equivalence obs step
 
 end
 

@@ -41,7 +41,7 @@ theorem bounded_equiv_unbounded (C₀ : Config)
       apply BoundedStep.send _ _ hstep
       exact unbounded_step_within_bound hreach' hstep B hB hbdd
   · -- Bounded → Unbounded: just forget the bound
-    exact BoundedReachable_implies_UnboundedReachable
+    exact bounded_reachable_implies_unbounded_reachable
 
 /-! ## Lower Bound Helpers -/
 
@@ -80,13 +80,13 @@ theorem bounded_step_eq_succ
     ∀ {C'}, BoundedStep B Cpre C' → C' = Csucc := by
   -- Determinism collapses all bounded steps to the same successor.
   intro C' hB
-  have hStep' : Step Cpre C' := BoundedStep_implies_Step hB
+  have hStep' : Step Cpre C' := bounded_step_implies_step hB
   exact hDet _ _ _ hStep' hstep
 
 /-! ## Receive-Step Occupancy Monotonicity -/
 
 /-- A concrete recv step cannot increase the max buffer occupancy. -/
-theorem recv_step_nonincrease_maxBufferOccupancy
+theorem recv_step_nonincrease_max_buffer_occupancy
     {C C' : Config}
     (hstep : Step C C')
     (hRecv : ∃ x source, C.proc = .recv x source) :
@@ -106,7 +106,7 @@ theorem recv_step_nonincrease_maxBufferOccupancy
                 { C with
                     bufs := updateBuf C.bufs recvEdge (lookupBuf C.bufs recvEdge).tail } ≤
               maxBufferOccupancy C := by
-            exact maxBufferOccupancy_updateBuf_le_of_le C
+            exact max_buffer_occupancy_update_buf_le_of_le C
               recvEdge (lookupBuf C.bufs recvEdge).tail hTailLe
           -- Simplify recvStep at this non-empty buffer.
           simpa [recvStep, dequeueBuf, recvEdge, hBuf] using hLeUpdate
@@ -144,7 +144,7 @@ theorem step_deterministic_of_base_regime
   intro C C₁ C₂ hStep₁ hStep₂
   have hBase₁ : StepBase C C₁ := hBase hStep₁
   have hBase₂ : StepBase C C₂ := hBase hStep₂
-  rcases stepBase_deterministic hBase₁ hBase₂ with hEq | hPar
+  rcases step_base_deterministic hBase₁ hBase₂ with hEq | hPar
   · exact hEq
   · rcases hPar with ⟨nS, nG, P, Q, hProc⟩
     exact False.elim (hNoPar C nS nG P Q hProc)
@@ -193,7 +193,7 @@ theorem bounded_stuck_below_critical (C₀ : Config)
     ∃ C, BoundedReachable B C₀ C ∧ BoundedStuck B C := by
   -- Extract a reachable configuration whose occupancy exceeds B.
   have hlt : B < sSup (occupancySet C₀) := hB
-  obtain ⟨n, hn, hnB⟩ := exists_lt_of_lt_csSup (occupancySet_nonempty C₀) hlt
+  obtain ⟨n, hn, hnB⟩ := exists_lt_of_lt_csSup (occupancy_set_nonempty C₀) hlt
   obtain ⟨Cmax, hreachMax, hoccMax⟩ := hn
   have hCmaxOcc : maxBufferOccupancy Cmax > B := by
     simpa [hoccMax] using hnB
@@ -206,7 +206,7 @@ theorem bounded_stuck_below_critical (C₀ : Config)
   have hNoBounded : ¬∃ C', BoundedStep B Cpre C' :=
     no_bounded_step_of_overflow hDet
       (fun C C' hstep hRecv =>
-        recv_step_nonincrease_maxBufferOccupancy (C := C) (C' := C') hstep hRecv)
+        recv_step_nonincrease_max_buffer_occupancy (C := C) (C' := C') hstep hRecv)
       Csucc hstepPre hPreLe hSuccGt
   exact ⟨Cpre, hBreachPre, ⟨hNotTerm, hNoBounded⟩⟩
 
@@ -230,7 +230,7 @@ theorem phase_transition_sharp (C₀ : Config)
       (∀ B, B ≥ Bc → ∀ C, BoundedReachable B C₀ C → ¬Deadlocked C) ∧
       (∀ B, B < Bc → ∃ C, BoundedReachable B C₀ C ∧ BoundedStuck B C) := by
   have hbdd : BddAbove (occupancySet C₀) :=
-    occupancySet_bddAbove_of_global_bound C₀ hfinite
+    occupancy_set_bdd_above_of_global_bound C₀ hfinite
   use criticalBufferSize C₀
   constructor
   · -- For B ≥ B_c, bounded reachability = unbounded, and unbounded is safe
@@ -330,7 +330,7 @@ theorem foldl_max_le_of_all_le {l : List Nat} {B : Nat}
   foldl_max_le_of_all_le_aux (Nat.zero_le B) h
 
 /-- If a configuration is bounded-coherent, max buffer occupancy ≤ B. -/
-theorem BoundedCoherent_maxBufferOccupancy {B : Nat} {C : Config}
+theorem bounded_coherent_max_buffer_occupancy {B : Nat} {C : Config}
     (h : BoundedCoherent B C.G C.D C.bufs) :
     maxBufferOccupancy C ≤ B := by
   simp only [maxBufferOccupancy]
@@ -369,7 +369,7 @@ theorem foldl_add_shift (l : List Nat) (n : Nat) :
 /-! ## Total-Depth Decomposition and Summation Bounds -/
 
 /-- Total depth for a non-empty GEnv is head depth plus tail depth. -/
-theorem totalTypeDepthG_cons (ep : Endpoint) (L : LocalType) (rest : GEnv) :
+theorem total_type_depth_g_cons (ep : Endpoint) (L : LocalType) (rest : GEnv) :
     totalTypeDepthG ((ep, L) :: rest) = L.depth + totalTypeDepthG rest := by
   -- Expand map + foldl, then use the foldl shift lemma.
   unfold totalTypeDepthG
@@ -403,7 +403,7 @@ theorem foldl_add_le_of_all_le {l : List Nat} {B : Nat}
 /-! ## Total-Depth Bound from Endpoint Depth Bound -/
 
 /-- Bounded per-endpoint depth yields a bound on total depth. -/
-theorem totalTypeDepth_le_mul_of_depth_bound (C : Config) (d : Nat)
+theorem total_type_depth_le_mul_of_depth_bound (C : Config) (d : Nat)
     (hDepth : ∀ ep L, (ep, L) ∈ C.G → L.depth ≤ d) :
     totalTypeDepth C ≤ C.G.length * d := by
   unfold totalTypeDepth totalTypeDepthG

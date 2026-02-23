@@ -114,38 +114,38 @@ def mkRecv (p : String) (bs : List (Label × LocalTypeC)) : LocalTypeC :=
 
 /-! ## Head Extraction Lemmas -/
 
-@[simp] theorem head_mkEnd : head mkEnd = .end := rfl
-@[simp] theorem head_mkVar (x : String) : head (mkVar x) = .var x := rfl
-@[simp] theorem head_mkMu (x : String) (body : LocalTypeC) : head (mkMu x body) = .mu x := rfl
-@[simp] theorem head_mkSend (p : String) (bs : List (Label × LocalTypeC)) :
+@[simp] theorem head_mk_end : head mkEnd = .end := rfl
+@[simp] theorem head_mk_var (x : String) : head (mkVar x) = .var x := rfl
+@[simp] theorem head_mk_mu (x : String) (body : LocalTypeC) : head (mkMu x body) = .mu x := rfl
+@[simp] theorem head_mk_send (p : String) (bs : List (Label × LocalTypeC)) :
     head (mkSend p bs) = .send p (bs.map Prod.fst) := rfl
-@[simp] theorem head_mkRecv (p : String) (bs : List (Label × LocalTypeC)) :
+@[simp] theorem head_mk_recv (p : String) (bs : List (Label × LocalTypeC)) :
     head (mkRecv p bs) = .recv p (bs.map Prod.fst) := rfl
 
 /-! ## Children Access Lemmas -/
 
-@[simp] lemma children_mkSend (p : String) (bs : List (Label × LocalTypeC))
+@[simp] lemma children_mk_send (p : String) (bs : List (Label × LocalTypeC))
     (i : Fin (bs.map Prod.fst).length) :
     children (mkSend p bs) i = (bs.get (castFin (by simp) i)).2 := by
   simp [children, mkSend]
 
-@[simp] lemma children_mkRecv (p : String) (bs : List (Label × LocalTypeC))
+@[simp] lemma children_mk_recv (p : String) (bs : List (Label × LocalTypeC))
     (i : Fin (bs.map Prod.fst).length) :
     children (mkRecv p bs) i = (bs.get (castFin (by simp) i)).2 := by
   simp [children, mkRecv]
 
 /-! ## Injectivity and Distinctness -/
 
-@[simp] theorem mkVar_inj {x y : String} (h : mkVar x = mkVar y) : x = y := by
+@[simp] theorem mk_var_inj {x y : String} (h : mkVar x = mkVar y) : x = y := by
   have h' := congrArg head h; cases h'; rfl
 
-@[simp] theorem mkMu_inj {x y : String} {a b : LocalTypeC} (h : mkMu x a = mkMu y b) : x = y := by
+@[simp] theorem mk_mu_inj {x y : String} {a b : LocalTypeC} (h : mkMu x a = mkMu y b) : x = y := by
   have h' := congrArg head h; cases h'; rfl
 
-@[simp] theorem mkEnd_ne_mkVar (x : String) : mkEnd ≠ mkVar x := by
+@[simp] theorem mk_end_ne_mk_var (x : String) : mkEnd ≠ mkVar x := by
   intro h; have h' := congrArg head h; cases h'
 
-@[simp] theorem mkSend_ne_mkRecv (p q : String) (bs cs : List (Label × LocalTypeC)) :
+@[simp] theorem mk_send_ne_mk_recv (p q : String) (bs cs : List (Label × LocalTypeC)) :
     mkSend p bs ≠ mkRecv q cs := by
   intro h; have h' := congrArg head h; cases h'
 

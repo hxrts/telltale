@@ -27,7 +27,7 @@ Free variables of a substituted term are bounded by original free vars (minus t)
 This is the key structural lemma for closedness preservation.
 
 **Coq reference:** `gType_fv_subst` in `coGlobal.v` (line 753). -/
-private theorem freeVars_substituteBranches_subset_aux_head
+private theorem free_vars_substitute_branches_subset_aux_head
     {n : Nat} {t : String} {repl : GlobalType}
     (ih : ∀ g' : GlobalType, sizeOf g' < n →
           ∀ v, v ∈ (g'.substitute t repl).freeVars →
@@ -51,7 +51,7 @@ private theorem freeVars_substituteBranches_subset_aux_head
 /- Helper: tail case for freeVars_substituteBranches_subset_aux. -/
 /-! ## Branch Helper: Tail Case -/
 
-private theorem freeVars_substituteBranches_subset_aux_tail
+private theorem free_vars_substitute_branches_subset_aux_tail
     {n : Nat} {t : String} {repl : GlobalType}
     (_ih : ∀ g' : GlobalType, sizeOf g' < n →
           ∀ v, v ∈ (g'.substitute t repl).freeVars →
@@ -92,17 +92,17 @@ private def freeVars_substituteBranches_subset_aux
       cases hv with
       | inl hv_head =>
           have hsize_head : sizeOf head.2 < n := hsize head List.mem_cons_self
-          exact freeVars_substituteBranches_subset_aux_head ih head tail hsize_head v hv_head
+          exact free_vars_substitute_branches_subset_aux_head ih head tail hsize_head v hv_head
       | inr hv_tail =>
           have hsize_tail : ∀ p ∈ tail, sizeOf p.2 < n := fun p hp =>
             hsize p (List.mem_cons_of_mem head hp)
           have hsub := freeVars_substituteBranches_subset_aux ih tail hsize_tail v hv_tail
-          exact freeVars_substituteBranches_subset_aux_tail ih head tail v hsub
+          exact free_vars_substitute_branches_subset_aux_tail ih head tail v hsub
 
 /-! ## Strong-Induction Size Bounds -/
 
 /-- Strong induction principle for freeVars_substitute_subset. -/
-private theorem sizeOf_snd_lt_comm_of_mem (sender receiver : String)
+private theorem size_of_snd_lt_comm_of_mem (sender receiver : String)
     {branches : List (Label × GlobalType)} {p : Label × GlobalType} (hp : p ∈ branches) :
     sizeOf p.2 < sizeOf (GlobalType.comm sender receiver branches) := by
   -- Size decreases from comm to any continuation.
@@ -125,14 +125,14 @@ private theorem sizeOf_snd_lt_comm_of_mem (sender receiver : String)
 
 /-! ## Strong-Induction Cases: end/var/mu-shadowed -/
 
-private theorem freeVars_substitute_subset_strong_end
+private theorem free_vars_substitute_subset_strong_end
     {t : String} {repl : GlobalType} {v : String}
     (hv : v ∈ (GlobalType.end.substitute t repl).freeVars) :
     (v ∈ GlobalType.end.freeVars ∧ v ≠ t) ∨ v ∈ repl.freeVars := by
   -- end has no free vars, so the hypothesis is impossible.
   simp [GlobalType.substitute, GlobalType.freeVars] at hv
 
-private theorem freeVars_substitute_subset_strong_var
+private theorem free_vars_substitute_subset_strong_var
     {t : String} {repl : GlobalType} {v w : String}
     (hv : v ∈ ((GlobalType.var w).substitute t repl).freeVars) :
     (v ∈ (GlobalType.var w).freeVars ∧ v ≠ t) ∨ v ∈ repl.freeVars := by
@@ -147,7 +147,7 @@ private theorem freeVars_substitute_subset_strong_var
     · simp [hv', GlobalType.freeVars]
     · simpa [hv'] using hwt
 
-private theorem freeVars_substitute_subset_strong_mu_shadowed
+private theorem free_vars_substitute_subset_strong_mu_shadowed
     {t : String} {repl : GlobalType} {v : String}
     (s : String) (inner : GlobalType) (hst : s = t)
     (hv : v ∈ ((GlobalType.mu s inner).substitute t repl).freeVars) :
@@ -164,7 +164,7 @@ private theorem freeVars_substitute_subset_strong_mu_shadowed
 
 /-! ## Strong-Induction Cases: mu/comm -/
 
-private theorem freeVars_substitute_subset_strong_mu_unshadowed
+private theorem free_vars_substitute_subset_strong_mu_unshadowed
     {n : Nat} {t : String} {repl : GlobalType} {v : String}
     (ih : ∀ g' : GlobalType, sizeOf g' < n →
           ∀ v, v ∈ (g'.substitute t repl).freeVars →
@@ -192,7 +192,7 @@ private theorem freeVars_substitute_subset_strong_mu_unshadowed
       right
       exact hmem
 
-private theorem freeVars_substitute_subset_strong_mu
+private theorem free_vars_substitute_subset_strong_mu
     {n : Nat} {t : String} {repl : GlobalType} {v : String}
     (ih : ∀ g' : GlobalType, sizeOf g' < n →
           ∀ v, v ∈ (g'.substitute t repl).freeVars →
@@ -202,12 +202,12 @@ private theorem freeVars_substitute_subset_strong_mu
     (v ∈ (GlobalType.mu s inner).freeVars ∧ v ≠ t) ∨ v ∈ repl.freeVars := by
   -- mu case splits on whether substitution is shadowed.
   by_cases hst : s = t
-  · exact freeVars_substitute_subset_strong_mu_shadowed s inner hst hv
-  · exact freeVars_substitute_subset_strong_mu_unshadowed ih s inner hsize hst hv
+  · exact free_vars_substitute_subset_strong_mu_shadowed s inner hst hv
+  · exact free_vars_substitute_subset_strong_mu_unshadowed ih s inner hsize hst hv
 
 /-! ## Strong-Induction Case: comm -/
 
-private theorem freeVars_substitute_subset_strong_comm
+private theorem free_vars_substitute_subset_strong_comm
     {n : Nat} {t : String} {repl : GlobalType} {v : String}
     (ih : ∀ g' : GlobalType, sizeOf g' < n →
           ∀ v, v ∈ (g'.substitute t repl).freeVars →
@@ -219,7 +219,7 @@ private theorem freeVars_substitute_subset_strong_comm
   -- comm case reduces to the branch helper.
   have hbranch_sizes : ∀ p ∈ branches, sizeOf p.2 < n := by
     intro p hp
-    exact Nat.lt_of_lt_of_le (sizeOf_snd_lt_comm_of_mem sender receiver hp) hsize
+    exact Nat.lt_of_lt_of_le (size_of_snd_lt_comm_of_mem sender receiver hp) hsize
   have hsub := freeVars_substituteBranches_subset_aux ih branches hbranch_sizes v hv
   cases hsub with
   | inl hcase =>
@@ -231,7 +231,7 @@ private theorem freeVars_substitute_subset_strong_comm
 
 /-! ## Strong-Induction Driver -/
 
-private theorem freeVars_substitute_subset_strong (n : Nat) :
+private theorem free_vars_substitute_subset_strong (n : Nat) :
     ∀ body : GlobalType, sizeOf body ≤ n →
     ∀ t repl v, v ∈ (body.substitute t repl).freeVars →
     (v ∈ body.freeVars ∧ v ≠ t) ∨ v ∈ repl.freeVars := by
@@ -245,13 +245,13 @@ private theorem freeVars_substitute_subset_strong (n : Nat) :
         intro g' hg' v' hv'
         exact ih (sizeOf g') hg' g' (Nat.le_refl _) t repl v' hv'
       match body with
-      | .end => exact freeVars_substitute_subset_strong_end (t:=t) (repl:=repl) (v:=v) hv
-      | .var w => exact freeVars_substitute_subset_strong_var (t:=t) (repl:=repl) (v:=v) (w:=w) hv
+      | .end => exact free_vars_substitute_subset_strong_end (t:=t) (repl:=repl) (v:=v) hv
+      | .var w => exact free_vars_substitute_subset_strong_var (t:=t) (repl:=repl) (v:=v) (w:=w) hv
       | .mu s inner =>
-          exact freeVars_substitute_subset_strong_mu ih' s inner hsize (t:=t) (repl:=repl) (v:=v) hv
+          exact free_vars_substitute_subset_strong_mu ih' s inner hsize (t:=t) (repl:=repl) (v:=v) hv
       | .comm sender receiver branches =>
           simp [GlobalType.substitute, GlobalType.freeVars] at hv
-          exact freeVars_substitute_subset_strong_comm ih' sender receiver branches hsize hv
+          exact free_vars_substitute_subset_strong_comm ih' sender receiver branches hsize hv
       | .delegate p q sid r cont =>
           -- Delegate case: freeVars of delegate = freeVars of cont
           simp [GlobalType.substitute, GlobalType.freeVars] at hv
@@ -264,18 +264,18 @@ private theorem freeVars_substitute_subset_strong (n : Nat) :
 /-! ## Substitution Free-Variable Subset Corollaries -/
 
 /-- Main theorem: free vars of substituted type are bounded. -/
-theorem freeVars_substitute_subset (body : GlobalType) (t : String) (repl : GlobalType)
+theorem free_vars_substitute_subset (body : GlobalType) (t : String) (repl : GlobalType)
     (v : String) (hv : v ∈ (body.substitute t repl).freeVars) :
     (v ∈ body.freeVars ∧ v ≠ t) ∨ v ∈ repl.freeVars :=
-  freeVars_substitute_subset_strong (sizeOf body) body (Nat.le_refl _) t repl v hv
+  free_vars_substitute_subset_strong (sizeOf body) body (Nat.le_refl _) t repl v hv
 
-private theorem freeVars_substituteBranches_subset_head
+private theorem free_vars_substitute_branches_subset_head
     (head : Label × GlobalType) (tail : List (Label × GlobalType))
     (t : String) (repl : GlobalType) (v : String)
     (hv : v ∈ (head.2.substitute t repl).freeVars) :
     (v ∈ freeVarsOfBranches (head :: tail) ∧ v ≠ t) ∨ v ∈ repl.freeVars := by
   -- Head case: lift the single-type lemma into the branch list.
-  have hsub := freeVars_substitute_subset head.2 t repl v hv
+  have hsub := free_vars_substitute_subset head.2 t repl v hv
   cases hsub with
   | inl hcase =>
       left
@@ -287,7 +287,7 @@ private theorem freeVars_substituteBranches_subset_head
       exact hmem
 
 /-- Corollary for branches: free vars of substituted branches are bounded. -/
-theorem freeVars_substituteBranches_subset (branches : List (Label × GlobalType))
+theorem free_vars_substitute_branches_subset (branches : List (Label × GlobalType))
     (t : String) (repl : GlobalType) (v : String)
     (hv : v ∈ freeVarsOfBranches (substituteBranches branches t repl)) :
     (v ∈ freeVarsOfBranches branches ∧ v ≠ t) ∨ v ∈ repl.freeVars := by
@@ -299,9 +299,9 @@ theorem freeVars_substituteBranches_subset (branches : List (Label × GlobalType
       simp only [substituteBranches, freeVarsOfBranches, List.mem_append] at hv
       cases hv with
       | inl hv_head =>
-          exact freeVars_substituteBranches_subset_head head tail t repl v hv_head
+          exact free_vars_substitute_branches_subset_head head tail t repl v hv_head
       | inr hv_tail =>
-          have hsub := freeVars_substituteBranches_subset tail t repl v hv_tail
+          have hsub := free_vars_substitute_branches_subset tail t repl v hv_tail
           cases hsub with
           | inl hcase =>
               left
@@ -322,7 +322,7 @@ This is the precise property needed for mu-unfolding: if `(mu t body).isClosed`,
 Therefore `(body.substitute t repl).isClosed`.
 
 **Coq reference:** Follows from `gType_fv_subst` in `coGlobal.v`. -/
-theorem GlobalType.isClosed_substitute_of_closed' (body : GlobalType) (t : String) (repl : GlobalType)
+theorem GlobalType.is_closed_substitute_of_closed' (body : GlobalType) (t : String) (repl : GlobalType)
     (hrepl_closed : repl.isClosed = true)
     (hbody_only_t : ∀ v ∈ body.freeVars, v = t) :
     (body.substitute t repl).isClosed = true := by
@@ -330,7 +330,7 @@ theorem GlobalType.isClosed_substitute_of_closed' (body : GlobalType) (t : Strin
   simp only [GlobalType.isClosed, List.isEmpty_iff] at hrepl_closed
   by_contra hne
   have ⟨v, hv⟩ := List.exists_mem_of_ne_nil _ hne
-  have hsub := freeVars_substitute_subset body t repl v hv
+  have hsub := free_vars_substitute_subset body t repl v hv
   cases hsub with
   | inl h =>
       -- v is in body.freeVars and v ≠ t
@@ -346,7 +346,7 @@ theorem GlobalType.isClosed_substitute_of_closed' (body : GlobalType) (t : Strin
 /-- Mu type closedness implies body has only the bound variable free.
 
 If `(mu t body).isClosed = true`, then `body.freeVars ⊆ [t]`. -/
-theorem GlobalType.isClosed_mu_body_freeVars (t : String) (body : GlobalType)
+theorem GlobalType.is_closed_mu_body_free_vars (t : String) (body : GlobalType)
     (hclosed : (GlobalType.mu t body).isClosed = true) :
     ∀ v ∈ body.freeVars, v = t := by
   simp only [GlobalType.isClosed, GlobalType.freeVars, List.isEmpty_iff] at hclosed
@@ -367,15 +367,15 @@ theorem GlobalType.isClosed_mu_body_freeVars (t : String) (body : GlobalType)
 This is the key property needed for the mu case in step induction.
 It combines:
 1. `(mu t body).isClosed` → `mu t body` has no free vars
-2. `(mu t body).isClosed` → body has only `t` as free var (`isClosed_mu_body_freeVars`)
-3. Substitution doesn't add free vars beyond repl's vars (`isClosed_substitute_of_closed'`)
+2. `(mu t body).isClosed` → body has only `t` as free var (`is_closed_mu_body_free_vars`)
+3. Substitution doesn't add free vars beyond repl's vars (`is_closed_substitute_of_closed'`)
 
 **Coq reference:** Follows from `gType_fv_subst` in `coGlobal.v`. -/
-theorem GlobalType.isClosed_substitute_mu (t : String) (body : GlobalType)
+theorem GlobalType.is_closed_substitute_mu (t : String) (body : GlobalType)
     (hclosed : (GlobalType.mu t body).isClosed = true) :
     (body.substitute t (GlobalType.mu t body)).isClosed = true := by
-  apply isClosed_substitute_of_closed' body t (.mu t body) hclosed
-  exact isClosed_mu_body_freeVars t body hclosed
+  apply is_closed_substitute_of_closed' body t (.mu t body) hclosed
+  exact is_closed_mu_body_free_vars t body hclosed
 
 
 end SessionTypes.GlobalType

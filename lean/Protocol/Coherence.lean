@@ -45,7 +45,7 @@ For role p's view:
 
 ## Proof Technique: Edge Case Analysis
 
-The key preservation proofs (`Coherent_send_preserved`, `Coherent_recv_preserved`)
+The key preservation proofs (`coherent_send_preserved`, `coherent_recv_preserved`)
 proceed by case analysis on which edge we're checking coherence for:
 
 1. **e = updated edge**: The sender's/receiver's local type changed, trace changed

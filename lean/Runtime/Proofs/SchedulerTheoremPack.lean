@@ -123,10 +123,10 @@ def buildVMSchedulerArtifact {st₀ : VMState ι γ π ε ν}
           { pinned := pinned }
   { policy := bundle.policy
   , profile := bundle.profile
-  , policyPinned := scheduler_policyPinned_from_bundle bundle
+  , policyPinned := scheduler_policy_pinned_from_bundle bundle
   , scheduleConfluence := scheduler_confluence_from_bundle bundle
-  , starvationFree := scheduler_starvationFree_from_bundle bundle
-  , cooperativeRefinement := scheduler_cooperativeRefinement_from_bundle bundle
+  , starvationFree := scheduler_starvation_free_from_bundle bundle
+  , cooperativeRefinement := scheduler_cooperative_refinement_from_bundle bundle
   , roundRobin? := roundRobin?
   , cooperative? := cooperative?
   , priority? := priority?
@@ -180,19 +180,19 @@ def protocolProofInventory
   ] ++ Runtime.Proofs.TheoremPackAPI.capabilities (space := proofSpace.profiles) pack.theorems
 
 /-- Iris scheduler invariance extracted from protocol proof-space scheduler evidence. -/
-theorem scheduler_irisInvariant_from_protocolSpace [Telltale.TelltaleIris]
+theorem scheduler_iris_invariant_from_protocol_space [Telltale.TelltaleIris]
     {store₀ : SessionStore ν}
     (proofSpace : VMProtocolProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
     SchedulerIrisInvariant (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) proofSpace.st₀ :=
-  scheduler_irisInvariant_from_bundle proofSpace.scheduler
+  scheduler_iris_invariant_from_bundle proofSpace.scheduler
 
 /-- Iris scheduler invariance extracted from a built protocol proof pack. -/
-theorem scheduler_irisInvariant_from_protocolPack [Telltale.TelltaleIris]
+theorem scheduler_iris_invariant_from_protocol_pack [Telltale.TelltaleIris]
     {store₀ : SessionStore ν}
     {proofSpace : VMProtocolProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀}
     (_pack : VMProtocolProofPack (proofSpace := proofSpace)) :
     SchedulerIrisInvariant (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) proofSpace.st₀ :=
-  scheduler_irisInvariant_from_bundle proofSpace.scheduler
+  scheduler_iris_invariant_from_bundle proofSpace.scheduler
 
 end
 

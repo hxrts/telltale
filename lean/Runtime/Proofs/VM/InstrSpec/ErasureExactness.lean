@@ -74,7 +74,7 @@ def InstructionBasisExactness
   InstructionBasisMinimality declared representable
 
 /-- Build exactness from separately provided completeness/minimality witnesses. -/
-theorem instructionBasisExactness_of_components
+theorem instruction_basis_exactness_of_components
     {declared : List InstrClass}
     {representable : InstrClass → Prop}
     (hComplete : InstructionBasisCompleteness declared representable)
@@ -114,13 +114,13 @@ def instrClassWitnessId : InstrClass → String
   | .regControl => "missing-regControl"
 
 /-- Concrete completeness witness for the canonical VM class basis. -/
-theorem canonicalInstrBasis_completeness :
+theorem canonical_instr_basis_completeness :
     InstructionBasisCompleteness canonicalInstrBasis canonicalRepresentable := by
   intro c hIn
   exact hIn
 
 /-- Concrete drop-one-class minimality witnesses for the canonical basis. -/
-theorem canonicalInstrBasis_minimality :
+theorem canonical_instr_basis_minimality :
     InstructionBasisMinimality canonicalInstrBasis canonicalRepresentable := by
   intro c hIn
   refine ⟨{ missingClass := c
@@ -131,11 +131,11 @@ theorem canonicalInstrBasis_minimality :
   exact hRep.1 rfl
 
 /-- Concrete end-to-end exactness theorem for the canonical VM class basis. -/
-theorem canonicalInstrBasis_exactness :
+theorem canonical_instr_basis_exactness :
     InstructionBasisExactness canonicalInstrBasis canonicalRepresentable := by
-  exact instructionBasisExactness_of_components
-    canonicalInstrBasis_completeness
-    canonicalInstrBasis_minimality
+  exact instruction_basis_exactness_of_components
+    canonical_instr_basis_completeness
+    canonical_instr_basis_minimality
 
 /-! ## VM <-> Classical-Erasure Exact Correspondence -/
 
@@ -203,12 +203,12 @@ def uniqueErasureOfClass : InstrClass → ClassicalErasure
   | .regControl => .history
 
 /-- Every class realizes its designated unique erasure witness. -/
-theorem class_realizes_uniqueErasure (c : InstrClass) :
+theorem class_realizes_unique_erasure (c : InstrClass) :
     classRealizesErasure c (uniqueErasureOfClass c) := by
   cases c <;> simp [uniqueErasureOfClass, classRealizesErasure]
 
 /-- A class realizing another class's unique erasure must be that same class. -/
-theorem eq_of_realizes_uniqueErasure {c c' : InstrClass}
+theorem eq_of_realizes_unique_erasure {c c' : InstrClass}
     (hReal : classRealizesErasure c' (uniqueErasureOfClass c)) :
     c' = c := by
   cases c <;> cases c' <;> simp [uniqueErasureOfClass, classRealizesErasure] at hReal ⊢
@@ -216,7 +216,7 @@ theorem eq_of_realizes_uniqueErasure {c c' : InstrClass}
 /-! ## Canonical Coverage and Irredundancy Proofs -/
 
 /-- Concrete coverage proof for the canonical VM class basis. -/
-theorem canonicalInstrBasis_erasureCoverage :
+theorem canonical_instr_basis_erasure_coverage :
     VMErasureCoverage canonicalInstrBasis := by
   intro e
   cases e with
@@ -246,18 +246,18 @@ theorem canonicalInstrBasis_erasureCoverage :
       exact ⟨.regControl, by simp [canonicalInstrBasis], by simp [classRealizesErasure]⟩
 
 /-- Concrete irredundancy proof for the canonical VM class basis. -/
-theorem canonicalInstrBasis_erasureIrredundancy :
+theorem canonical_instr_basis_erasure_irredundancy :
     VMErasureIrredundancy canonicalInstrBasis := by
   intro c hIn
-  refine ⟨uniqueErasureOfClass c, class_realizes_uniqueErasure c, ?_⟩
+  refine ⟨uniqueErasureOfClass c, class_realizes_unique_erasure c, ?_⟩
   intro c' hIn' hNe hReal
-  have hEq : c' = c := eq_of_realizes_uniqueErasure hReal
+  have hEq : c' = c := eq_of_realizes_unique_erasure hReal
   exact hNe hEq
 
 /-- Concrete VM <-> erasure exact correspondence theorem. -/
-theorem canonicalInstrBasis_vmErasureExactCorrespondence :
+theorem canonical_instr_basis_vm_erasure_exact_correspondence :
     VMErasureExactCorrespondence canonicalInstrBasis := by
-  exact ⟨canonicalInstrBasis_erasureCoverage, canonicalInstrBasis_erasureIrredundancy⟩
+  exact ⟨canonical_instr_basis_erasure_coverage, canonical_instr_basis_erasure_irredundancy⟩
 
 /-! ## Erasure-Basis Isomorphism -/
 
@@ -270,7 +270,7 @@ def VMErasureBasisIsomorphic
       (∃ c : InstrClass, c ∈ declared₂ ∧ classRealizesErasure c e)
 
 /-- Any two bases with full erasure coverage are isomorphic in erasure expressivity. -/
-theorem vmErasureBasisIsomorphic_of_coverages
+theorem vm_erasure_basis_isomorphic_of_coverages
     {declared₁ declared₂ : List InstrClass}
     (hCov₁ : VMErasureCoverage declared₁)
     (hCov₂ : VMErasureCoverage declared₂) :
@@ -286,11 +286,11 @@ theorem vmErasureBasisIsomorphic_of_coverages
 
 /-- Canonical uniqueness closure (up to erasure isomorphism):
     any basis with exact VM↔erasure correspondence is equivalent to the canonical basis. -/
-theorem canonicalInstrBasis_uniqueUpToErasureIsomorphism
+theorem canonical_instr_basis_unique_up_to_erasure_isomorphism
     {declared : List InstrClass}
     (hExact : VMErasureExactCorrespondence declared) :
     VMErasureBasisIsomorphic declared canonicalInstrBasis := by
-  exact vmErasureBasisIsomorphic_of_coverages hExact.1 canonicalInstrBasis_erasureCoverage
+  exact vm_erasure_basis_isomorphic_of_coverages hExact.1 canonical_instr_basis_erasure_coverage
 
 /-! ## Canonical Morphism Generation -/
 
@@ -328,7 +328,7 @@ def SafeClassicalErasure (e : ClassicalErasure) : Prop :=
 
 /-- Full exactness form for the classical-erasure boundary:
     safe erasures are exactly those generated by canonical VM/ConfigEquiv morphisms. -/
-theorem safeClassicalErasure_iff_generatedByCanonicalMorphisms
+theorem safe_classical_erasure_iff_generated_by_canonical_morphisms
     (e : ClassicalErasure) :
     SafeClassicalErasure e ↔ GeneratedByCanonicalMorphisms e := by
   constructor
@@ -346,10 +346,10 @@ theorem safeClassicalErasure_iff_generatedByCanonicalMorphisms
         exact Or.inr hReal
 
 /-- Every tracked classical erasure is generated by canonical morphisms. -/
-theorem all_classicalErasures_generatedByCanonicalMorphisms :
+theorem all_classical_erasures_generated_by_canonical_morphisms :
     ∀ e : ClassicalErasure, GeneratedByCanonicalMorphisms e := by
   intro e
-  have hCov := canonicalInstrBasis_erasureCoverage e
+  have hCov := canonical_instr_basis_erasure_coverage e
   rcases hCov with ⟨c, hIn, hReal⟩
   exact ⟨.instrClass c, hIn, hReal⟩
 

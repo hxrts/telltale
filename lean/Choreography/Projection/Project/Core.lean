@@ -15,9 +15,9 @@ The following definitions form the semantic interface for proofs:
 - `ProjectableClosedWellFormed`: closed/wellFormed + projectable bundle
 - `ProjectableClosedWellFormedBlind`: assumption-free version using blindness
 - `projectR?`: proof-carrying projection
-- `projectR?_some_implies_projectb`: inversion lemma for projectR?
-- `projectR?_sound`: soundness of projectR?
-- `CProject_unguarded_trans`: helper for mu-unguarded case
+- `project_r?_some_implies_projectb`: inversion lemma for projectR?
+- `project_r?_sound`: soundness of projectR?
+- `c_project_unguarded_trans`: helper for mu-unguarded case
 -/
 
 /-
@@ -58,7 +58,7 @@ def ProjectableClosedWellFormedBlind (g : GlobalType) : Prop :=
 
 /-- ProjectableClosedWellFormedBlind implies ProjectableClosedWellFormed.
     This uses the blindness theorem to derive projectability without axioms. -/
-theorem ProjectableClosedWellFormedBlind_implies_ProjectableClosedWellFormed
+theorem projectable_closed_well_formed_blind_implies_projectable_closed_well_formed
     {g : GlobalType} (h : ProjectableClosedWellFormedBlind g) :
     ProjectableClosedWellFormed g := by
   obtain ⟨hclosed, hwf, hblind⟩ := h
@@ -67,22 +67,22 @@ theorem ProjectableClosedWellFormedBlind_implies_ProjectableClosedWellFormed
   have hwfb : Blind.WellFormedBlind g = true := by
     simp only [Blind.WellFormedBlind, Bool.and_eq_true]
     exact ⟨⟨hclosed, hwf⟩, hblind⟩
-  exact Blind.projectable_of_wellFormedBlind g hwfb
+  exact Blind.projectable_of_well_formed_blind g hwfb
 
 /-- Extract the Projectable component from ProjectableClosedWellFormedBlind. -/
-theorem Projectable_of_ProjectableClosedWellFormedBlind
+theorem projectable_of_projectable_closed_well_formed_blind
     {g : GlobalType} (h : ProjectableClosedWellFormedBlind g) :
     Projectable g :=
-  (ProjectableClosedWellFormedBlind_implies_ProjectableClosedWellFormed h).2.2
+  (projectable_closed_well_formed_blind_implies_projectable_closed_well_formed h).2.2
 
 /-! ## Core Projection API -/
 
 /-- Unguardedness preservation for trans (under non-empty comms). -/
-theorem CProject_unguarded_trans {g : GlobalType} {role : String} {lt : LocalTypeR} {v : String}
+theorem c_project_unguarded_trans {g : GlobalType} {role : String} {lt : LocalTypeR} {v : String}
     (hproj : CProject g role lt) (hne : g.allCommsNonEmpty = true) (hguard : lt.isGuarded v = false) :
     (trans g role).isGuarded v = false := by
   -- Collapse the CProject witness to equality with trans, then rewrite.
-  have htrans : trans g role = lt := trans_eq_of_CProject g role lt hproj hne
+  have htrans : trans g role = lt := trans_eq_of_c_project g role lt hproj hne
   simpa [htrans] using hguard
 
 /-- Proof-carrying projection: returns the local type with a proof that CProject holds.
@@ -99,7 +99,7 @@ def projectR? (g : GlobalType) (role : String) : Option { lt : LocalTypeR // CPr
     none
 
 /-- Inversion lemma: if projectR? returns some, then projectb was true. -/
-theorem projectR?_some_implies_projectb {g : GlobalType} {role : String}
+theorem project_r?_some_implies_projectb {g : GlobalType} {role : String}
     {result : { lt : LocalTypeR // CProject g role lt }}
     (hsome : projectR? g role = some result) :
     projectb g role result.val = true := by
@@ -117,7 +117,7 @@ theorem projectR?_some_implies_projectb {g : GlobalType} {role : String}
     exact nomatch hsome
 
 /-- Soundness: if projectR? returns some, then CProject holds. -/
-theorem projectR?_sound {g : GlobalType} {role : String}
+theorem project_r?_sound {g : GlobalType} {role : String}
     {result : { lt : LocalTypeR // CProject g role lt }}
     (_h : projectR? g role = some result) :
     CProject g role result.val := by

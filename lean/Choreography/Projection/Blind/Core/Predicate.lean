@@ -11,7 +11,7 @@ The Problem. Define a "blindness" predicate that captures when non-participants
 see the same projection in all branches of a choice. This bridges the gap between
 structural well-formedness and projectability.
 
-Solution Structure. The key theorem `projectable_of_wellFormedBlind` shows that
+Solution Structure. The key theorem `projectable_of_well_formed_blind` shows that
 if a global type is: (1) closed, (2) well-formed, and (3) blind, then it is
 projectable. The proof proceeds by:
 1. Defining `isBlind` as a decidable predicate on global types
@@ -53,23 +53,23 @@ end
 /-! ## Local-Type Equality Reflexivity -/
 mutual
   /-- Reflexivity of the local-type equality checker. -/
-  theorem localTypeRBEq_refl : ∀ x : LocalTypeR, localTypeRBEq x x = true
+  theorem local_type_rb_eq_refl : ∀ x : LocalTypeR, localTypeRBEq x x = true
     | .end => rfl
     | .var _ => by simp [localTypeRBEq]
-    | .mu _ body => by simp [localTypeRBEq, localTypeRBEq_refl body]
-    | .send _ bs => by simp [localTypeRBEq, branchRListBEq_refl bs]
-    | .recv _ bs => by simp [localTypeRBEq, branchRListBEq_refl bs]
+    | .mu _ body => by simp [localTypeRBEq, local_type_rb_eq_refl body]
+    | .send _ bs => by simp [localTypeRBEq, branch_r_list_b_eq_refl bs]
+    | .recv _ bs => by simp [localTypeRBEq, branch_r_list_b_eq_refl bs]
 
   /-- Reflexivity of branch-list checker. -/
-  private theorem branchRListBEq_refl : ∀ xs : List BranchR, branchRListBEq xs xs = true
+  private theorem branch_r_list_b_eq_refl : ∀ xs : List BranchR, branchRListBEq xs xs = true
     | [] => rfl
     | (l, t, c) :: xs => by
-        simp [branchRListBEq, localTypeRBEq_refl c, branchRListBEq_refl xs]
+        simp [branchRListBEq, local_type_rb_eq_refl c, branch_r_list_b_eq_refl xs]
 end
 /-! ## Local-Type Equality Soundness -/
 mutual
   /-- Soundness: local type equality checker returning `true` implies equality. -/
-  theorem localTypeRBEq_eq_true :
+  theorem local_type_rb_eq_eq_true :
       ∀ {x y : LocalTypeR}, localTypeRBEq x y = true → x = y
     | .end, .end, _ => rfl
     | .var t₁, .var t₂, h => by
@@ -77,19 +77,19 @@ mutual
     | .mu t₁ b₁, .mu t₂ b₂, h => by
         simp only [localTypeRBEq, Bool.and_eq_true] at h
         have ht : t₁ = t₂ := of_decide_eq_true h.1
-        have hb : b₁ = b₂ := localTypeRBEq_eq_true h.2
+        have hb : b₁ = b₂ := local_type_rb_eq_eq_true h.2
         subst ht hb
         rfl
     | .send r₁ bs₁, .send r₂ bs₂, h => by
         simp only [localTypeRBEq, Bool.and_eq_true] at h
         have hr : r₁ = r₂ := of_decide_eq_true h.1
-        have hbs : bs₁ = bs₂ := branchRListBEq_eq_true h.2
+        have hbs : bs₁ = bs₂ := branch_r_list_b_eq_eq_true h.2
         subst hr hbs
         rfl
     | .recv r₁ bs₁, .recv r₂ bs₂, h => by
         simp only [localTypeRBEq, Bool.and_eq_true] at h
         have hr : r₁ = r₂ := of_decide_eq_true h.1
-        have hbs : bs₁ = bs₂ := branchRListBEq_eq_true h.2
+        have hbs : bs₁ = bs₂ := branch_r_list_b_eq_eq_true h.2
         subst hr hbs
         rfl
     | .end, .var _, h | .end, .mu _ _, h | .end, .send _ _, h | .end, .recv _ _, h
@@ -100,7 +100,7 @@ mutual
         cases h
 
   /-- Soundness: branch-list checker returning `true` implies equality. -/
-  private theorem branchRListBEq_eq_true :
+  private theorem branch_r_list_b_eq_eq_true :
       ∀ {xs ys : List BranchR}, branchRListBEq xs ys = true → xs = ys
     | [], [], _ => rfl
     | (l₁, t₁, c₁) :: xs, (l₂, t₂, c₂) :: ys, h => by
@@ -108,21 +108,21 @@ mutual
         rcases h with ⟨⟨⟨hl', ht'⟩, hc⟩, hrestBool⟩
         have hlEq : l₁ = l₂ := of_decide_eq_true hl'
         have htEq : t₁ = t₂ := of_decide_eq_true ht'
-        have hc' : c₁ = c₂ := localTypeRBEq_eq_true hc
-        have hrest' : xs = ys := branchRListBEq_eq_true hrestBool
+        have hc' : c₁ = c₂ := local_type_rb_eq_eq_true hc
+        have hrest' : xs = ys := branch_r_list_b_eq_eq_true hrestBool
         subst hlEq htEq hc' hrest'
         rfl
     | [], _ :: _, h => by cases h
     | _ :: _, [], h => by cases h
 end
 /-! ## Local-Type Equality Equivalence -/
-theorem localTypeRBEq_eq_true_iff (x y : LocalTypeR) :
+theorem local_type_rb_eq_eq_true_iff (x y : LocalTypeR) :
     localTypeRBEq x y = true ↔ x = y := by
   constructor
-  · exact localTypeRBEq_eq_true
+  · exact local_type_rb_eq_eq_true
   · intro h
     subst h
-    exact localTypeRBEq_refl x
+    exact local_type_rb_eq_refl x
 /-! ## Branch Role Collection -/
 
 mutual
@@ -162,7 +162,7 @@ def maxRoleLen : List String → Nat
 def freshRole (taken : List String) : String :=
   String.ofList (List.replicate (maxRoleLen taken + 1) 'a')
 
-theorem role_len_le_maxRoleLen {taken : List String} {r : String}
+theorem role_len_le_max_role_len {taken : List String} {r : String}
     (hmem : r ∈ taken) : r.length ≤ maxRoleLen taken := by
   induction taken with
   | nil => cases hmem
@@ -174,15 +174,15 @@ theorem role_len_le_maxRoleLen {taken : List String} {r : String}
       | tail _ htl =>
           exact Nat.le_trans (ih htl) (Nat.le_max_right _ _)
 
-theorem freshRole_not_mem (taken : List String) : freshRole taken ∉ taken := by
+theorem fresh_role_not_mem (taken : List String) : freshRole taken ∉ taken := by
   intro hmem
-  have hlen_le : (freshRole taken).length ≤ maxRoleLen taken := role_len_le_maxRoleLen hmem
+  have hlen_le : (freshRole taken).length ≤ maxRoleLen taken := role_len_le_max_role_len hmem
   have hlen_fresh : (freshRole taken).length = maxRoleLen taken + 1 := by
     simp [freshRole, String.length_ofList, List.length_replicate]
   omega
 /-! ## Role-Mention Transport -/
 
-theorem roleMentions_notin_implies_trans_eq
+theorem role_mentions_notin_implies_trans_eq
     (g : GlobalType) (role₁ role₂ : String)
     (h₁ : role₁ ∉ roleMentions g) (h₂ : role₂ ∉ roleMentions g) :
     Trans.trans g role₁ = Trans.trans g role₂ := by
@@ -191,7 +191,7 @@ theorem roleMentions_notin_implies_trans_eq
   | .mu _ body =>
       have h₁_body : role₁ ∉ roleMentions body := by simpa [roleMentions] using h₁
       have h₂_body : role₂ ∉ roleMentions body := by simpa [roleMentions] using h₂
-      have hbody := roleMentions_notin_implies_trans_eq body role₁ role₂ h₁_body h₂_body
+      have hbody := role_mentions_notin_implies_trans_eq body role₁ role₂ h₁_body h₂_body
       simp [Trans.trans, hbody]
   | .comm sender receiver branches =>
       have hs₁ : role₁ ≠ sender := by intro heq; exact h₁ (by simp [roleMentions, heq])
@@ -207,7 +207,7 @@ theorem roleMentions_notin_implies_trans_eq
           | mk label cont =>
               have h₁_cont : role₁ ∉ roleMentions cont := by intro hmem; exact h₁ (by simp [roleMentions, rolesFromBranches, hmem])
               have h₂_cont : role₂ ∉ roleMentions cont := by intro hmem; exact h₂ (by simp [roleMentions, rolesFromBranches, hmem])
-              have hcont := roleMentions_notin_implies_trans_eq cont role₁ role₂ h₁_cont h₂_cont
+              have hcont := role_mentions_notin_implies_trans_eq cont role₁ role₂ h₁_cont h₂_cont
               simp [Trans.trans, beq_false_of_ne hs₁, beq_false_of_ne hr₁,
                 beq_false_of_ne hs₂, beq_false_of_ne hr₂, hcont]
   | .delegate p q _ _ cont =>
@@ -217,18 +217,18 @@ theorem roleMentions_notin_implies_trans_eq
       have hq₂ : role₂ ≠ q := by intro heq; exact h₂ (by simp [roleMentions, heq])
       have h₁_cont : role₁ ∉ roleMentions cont := by intro hmem; exact h₁ (by simp [roleMentions, hmem])
       have h₂_cont : role₂ ∉ roleMentions cont := by intro hmem; exact h₂ (by simp [roleMentions, hmem])
-      have hcont := roleMentions_notin_implies_trans_eq cont role₁ role₂ h₁_cont h₂_cont
+      have hcont := role_mentions_notin_implies_trans_eq cont role₁ role₂ h₁_cont h₂_cont
       simp [Trans.trans, beq_false_of_ne hp₁, beq_false_of_ne hq₁,
         beq_false_of_ne hp₂, beq_false_of_ne hq₂, hcont]
 termination_by sizeOf g
 decreasing_by
   all_goals
     first
-    | (subst_vars; exact sizeOf_body_lt_mu _ _)
+    | (subst_vars; exact size_of_body_lt_mu _ _)
     | (subst_vars; simp only [sizeOf, GlobalType._sizeOf_1]; omega)
 /-! ## Uniformity Preservation Helpers -/
 
-theorem branchesUniformTail_notin_eq (rest : List (Label × GlobalType)) (cont : GlobalType)
+theorem branches_uniform_tail_notin_eq (rest : List (Label × GlobalType)) (cont : GlobalType)
     (role₁ role₂ : String) (hcont_eq : Trans.trans cont role₁ = Trans.trans cont role₂)
     (h₁ : role₁ ∉ rolesFromBranches rest) (h₂ : role₂ ∉ rolesFromBranches rest) :
     rest.all (fun p => localTypeRBEq (Trans.trans p.2 role₁) (Trans.trans cont role₁)) = rest.all
@@ -243,7 +243,7 @@ theorem branchesUniformTail_notin_eq (rest : List (Label × GlobalType)) (cont :
           have h₂_g : role₂ ∉ roleMentions g := by intro hmem; exact h₂ (by simp [rolesFromBranches, hmem])
           have hg_eq :
               Trans.trans g role₁ = Trans.trans g role₂ :=
-            roleMentions_notin_implies_trans_eq g role₁ role₂ h₁_g h₂_g
+            role_mentions_notin_implies_trans_eq g role₁ role₂ h₁_g h₂_g
           have h₁_tl : role₁ ∉ rolesFromBranches tl := by intro hmem; exact h₁ (by simp [rolesFromBranches, hmem])
           have h₂_tl : role₂ ∉ rolesFromBranches tl := by intro hmem; exact h₂ (by simp [rolesFromBranches, hmem])
           have hprop :
@@ -258,23 +258,23 @@ theorem branchesUniformTail_notin_eq (rest : List (Label × GlobalType)) (cont :
               try rfl
             · exfalso
               have hEqR : Trans.trans g role₂ = Trans.trans cont role₂ :=
-                (localTypeRBEq_eq_true_iff _ _).1 hR
+                (local_type_rb_eq_eq_true_iff _ _).1 hR
               have hEqL : Trans.trans g role₁ = Trans.trans cont role₁ := hprop.mpr hEqR
               have hLtrue : localTypeRBEq (Trans.trans g role₁) (Trans.trans cont role₁) = true :=
-                (localTypeRBEq_eq_true_iff _ _).2 hEqL
+                (local_type_rb_eq_eq_true_iff _ _).2 hEqL
               simp [hL] at hLtrue
             · exfalso
               have hEqL : Trans.trans g role₁ = Trans.trans cont role₁ :=
-                (localTypeRBEq_eq_true_iff _ _).1 hL
+                (local_type_rb_eq_eq_true_iff _ _).1 hL
               have hEqR : Trans.trans g role₂ = Trans.trans cont role₂ := hprop.mp hEqL
               have hRtrue : localTypeRBEq (Trans.trans g role₂) (Trans.trans cont role₂) = true :=
-                (localTypeRBEq_eq_true_iff _ _).2 hEqR
+                (local_type_rb_eq_eq_true_iff _ _).2 hEqR
               simp [hR] at hRtrue
           simp [hdec, ih h₁_tl h₂_tl]
 
 /-! ## Uniformity Preservation: Branch Wrapper -/
 
-theorem branchesUniformFor_notin_eq
+theorem branches_uniform_for_notin_eq
     (branches : List (Label × GlobalType)) (role₁ role₂ : String)
     (h₁ : role₁ ∉ rolesFromBranches branches)
     (h₂ : role₂ ∉ rolesFromBranches branches) :
@@ -291,7 +291,7 @@ theorem branchesUniformFor_notin_eq
         exact h₂ (by simp [rolesFromBranches, hmem])
       have hcont_eq :
           Trans.trans cont role₁ = Trans.trans cont role₂ :=
-        roleMentions_notin_implies_trans_eq cont role₁ role₂ h₁_cont h₂_cont
+        role_mentions_notin_implies_trans_eq cont role₁ role₂ h₁_cont h₂_cont
       have h₁_rest : role₁ ∉ rolesFromBranches rest := by
         intro hmem
         exact h₁ (by simp [rolesFromBranches, hmem])
@@ -300,7 +300,7 @@ theorem branchesUniformFor_notin_eq
         exact h₂ (by simp [rolesFromBranches, hmem])
       unfold branchesUniformFor
       simpa using
-        branchesUniformTail_notin_eq rest cont role₁ role₂ hcont_eq h₁_rest h₂_rest
+        branches_uniform_tail_notin_eq rest cont role₁ role₂ hcont_eq h₁_rest h₂_rest
 
 /-! ## Finite Checker -/
 
@@ -328,7 +328,7 @@ theorem list_all_true_of_all_eq_true {α : Type} {p : α → Bool} {xs : List α
       | tail _ hmem => exact ih h.2 x hmem
 /-! ## Checker Correctness: Soundness -/
 
-theorem commBlindForCheck_implies_uniform
+theorem comm_blind_for_check_implies_uniform
     {sender receiver : String} {branches : List (Label × GlobalType)}
     (hcheck : commBlindForCheck sender receiver branches = true) :
     ∀ role, role ≠ sender → role ≠ receiver → branchesUniformFor branches role = true := by
@@ -356,18 +356,18 @@ theorem commBlindForCheck_implies_uniform
       intro hm
       exact hmem (by simp [hw, hm])
     have hOutWitness : outsider ∉ witnesses := by
-      have hFresh : freshRole witnesses ∉ witnesses := freshRole_not_mem witnesses
+      have hFresh : freshRole witnesses ∉ witnesses := fresh_role_not_mem witnesses
       simpa [ho] using hFresh
     have hOutBranches : outsider ∉ rolesFromBranches branches := by
       intro hm
       exact hOutWitness (by simp [hw, hm])
     have hEq :
         branchesUniformFor branches role = branchesUniformFor branches outsider :=
-      branchesUniformFor_notin_eq branches role outsider hRoleBranches hOutBranches
+      branches_uniform_for_notin_eq branches role outsider hRoleBranches hOutBranches
     simpa [hEq] using hOut
 /-! ## Checker Correctness: Completeness -/
 
-theorem commBlindForCheck_of_uniform
+theorem comm_blind_for_check_of_uniform
     {sender receiver : String} {branches : List (Label × GlobalType)}
     (huniform : ∀ role, role ≠ sender → role ≠ receiver →
       branchesUniformFor branches role = true) :
@@ -390,13 +390,13 @@ theorem commBlindForCheck_of_uniform
   have hOutNeSender : outsider ≠ sender := by
     intro hEq
     have hOutWitness : outsider ∉ witnesses := by
-      have hFresh : freshRole witnesses ∉ witnesses := freshRole_not_mem witnesses
+      have hFresh : freshRole witnesses ∉ witnesses := fresh_role_not_mem witnesses
       simpa [ho] using hFresh
     exact hOutWitness (by simp [hw, hEq])
   have hOutNeReceiver : outsider ≠ receiver := by
     intro hEq
     have hOutWitness : outsider ∉ witnesses := by
-      have hFresh : freshRole witnesses ∉ witnesses := freshRole_not_mem witnesses
+      have hFresh : freshRole witnesses ∉ witnesses := fresh_role_not_mem witnesses
       simpa [ho] using hFresh
     exact hOutWitness (by simp [hw, hEq])
   have hOut : branchesUniformFor branches outsider = true :=
@@ -412,7 +412,7 @@ private instance commBlindForPropDecidable
       branchesUniformFor branches role = true) :=
   decidable_of_iff
     (commBlindForCheck sender receiver branches = true)
-    ⟨commBlindForCheck_implies_uniform, commBlindForCheck_of_uniform⟩
+    ⟨comm_blind_for_check_implies_uniform, comm_blind_for_check_of_uniform⟩
 
 /-- Check blindness for a communication: non-participants see same projection. -/
 def commBlindFor (sender receiver : String) (branches : List (Label × GlobalType)) : Bool :=

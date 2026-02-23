@@ -47,11 +47,11 @@ def labelsSubset (bs1 bs2 : List BranchR) : Prop :=
 
 -- Basic Lookup Lemmas
 
-private theorem labelIn_head (lbl : Label) (vt : Option SessionTypes.ValType) (t : LocalTypeR) (rest : List BranchR) :
+private theorem label_in_head (lbl : Label) (vt : Option SessionTypes.ValType) (t : LocalTypeR) (rest : List BranchR) :
     labelIn lbl ((lbl, vt, t) :: rest) := by
   unfold labelIn lookupBranch
   simp
-theorem labelIn_tail_of_ne {lbl l : Label} {vt : Option SessionTypes.ValType} {t : LocalTypeR}
+theorem label_in_tail_of_ne {lbl l : Label} {vt : Option SessionTypes.ValType} {t : LocalTypeR}
     {rest : List BranchR} (h : l ≠ lbl) :
     labelIn lbl ((l, vt, t) :: rest) ↔ labelIn lbl rest := by
   cases rest with
@@ -60,7 +60,7 @@ theorem labelIn_tail_of_ne {lbl l : Label} {vt : Option SessionTypes.ValType} {t
   | cons head tail =>
       simp [labelIn, lookupBranch, h]
 /-- lookupBranch success implies membership. -/
-theorem mem_of_lookupBranch {lbl : Label} {t : LocalTypeR} {bs : List BranchR}
+theorem mem_of_lookup_branch {lbl : Label} {t : LocalTypeR} {bs : List BranchR}
     (h : lookupBranch lbl bs = some t) : ∃ vt, (lbl, vt, t) ∈ bs := by
   induction bs with
   | nil =>
@@ -79,7 +79,7 @@ theorem mem_of_lookupBranch {lbl : Label} {t : LocalTypeR} {bs : List BranchR}
 -- Subset Coherence
 
 /-- sameLabels from both subset directions. -/
-theorem sameLabels_of_subsets {bs1 bs2 : List BranchR}
+theorem same_labels_of_subsets {bs1 bs2 : List BranchR}
     (h12 : labelsSubset bs1 bs2) (h21 : labelsSubset bs2 bs1) :
 /- ## Structured Block 2 -/
     sameLabels bs1 bs2 := by
@@ -88,7 +88,7 @@ theorem sameLabels_of_subsets {bs1 bs2 : List BranchR}
   · intro h; exact h12 lbl h
   · intro h; exact h21 lbl h
 /-- labelsSubsetb implies labelsSubset. -/
-theorem labelsSubset_of_labelsSubsetb {bs1 bs2 : List BranchR}
+theorem labels_subset_of_labels_subsetb {bs1 bs2 : List BranchR}
     (h : labelsSubsetb bs1 bs2 = true) :
     labelsSubset bs1 bs2 := by
   induction bs1 with
@@ -113,12 +113,12 @@ theorem labelsSubset_of_labelsSubsetb {bs1 bs2 : List BranchR}
             simp [labelIn, hlookup2]
       ·
         have hIn_tail : labelIn lbl tail :=
-          (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt) (t := t) (rest := tail) hlt).1 hIn
+          (label_in_tail_of_ne (lbl := lbl) (l := l) (vt := vt) (t := t) (rest := tail) hlt).1 hIn
         exact ih h'.2 lbl hIn_tail
 
 -- appendMissing Lemmas
 
-theorem appendMissing_nil (bs : List BranchR) :
+theorem append_missing_nil (bs : List BranchR) :
     appendMissing bs [] = bs := by
   induction bs with
   | nil => rfl
@@ -126,13 +126,13 @@ theorem appendMissing_nil (bs : List BranchR) :
       cases head with
       | mk lbl t =>
           simp [appendMissing, labelInb, lookupBranch, ih]
-private theorem labelInb_of_lookup_none {lbl : Label} {bs : List BranchR}
+private theorem label_inb_of_lookup_none {lbl : Label} {bs : List BranchR}
     (h : lookupBranch lbl bs = none) : labelInb lbl bs = false := by
   simp [labelInb, h]
 
 -- appendMissing Lookup Preservation
 
-private theorem lookupBranch_appendMissing_of_not_in
+private theorem lookup_branch_append_missing_of_not_in
     {lbl : Label} {bs2 bs1 : List BranchR}
     (hnot : lookupBranch lbl bs1 = none) :
     lookupBranch lbl (appendMissing bs2 bs1) = lookupBranch lbl bs2 := by
@@ -145,7 +145,7 @@ private theorem lookupBranch_appendMissing_of_not_in
           by_cases hlt : l = lbl
           ·
             have hfalse : labelInb lbl bs1 = false := by
-              simpa [hlt] using (labelInb_of_lookup_none (lbl := lbl) hnot)
+              simpa [hlt] using (label_inb_of_lookup_none (lbl := lbl) hnot)
             simp [appendMissing, hfalse, lookupBranch, hlt]
           · by_cases hIn : labelInb l bs1 = true
             ·
@@ -184,7 +184,7 @@ private def lookupBranchEq (lbl : Label) :
         | none => none
         | some ⟨t', h'⟩ => some ⟨t', by simpa [lookupBranch, h] using h'⟩
 
-private lemma lookupBranchEq_none {lbl : Label} :
+private lemma lookup_branch_eq_none {lbl : Label} :
     ∀ bs, lookupBranchEq lbl bs = none → lookupBranch lbl bs = none
   | [] => by
       intro _
@@ -200,7 +200,7 @@ private lemma lookupBranchEq_none {lbl : Label} :
       ·
         cases hrest : lookupBranchEq lbl rest with
         | none =>
-            have hrest' := lookupBranchEq_none rest hrest
+            have hrest' := lookup_branch_eq_none rest hrest
             simp [lookupBranch, hl, hrest']
         | some ht =>
             have : False := by
@@ -241,8 +241,8 @@ mutual
   decreasing_by
     all_goals
       first
-      | exact Nat.add_lt_add (sizeOf_body_lt_sizeOf_mu _ _) (sizeOf_body_lt_sizeOf_mu _ _)
-      | exact Nat.add_lt_add (sizeOf_branches_lt_sizeOf_send _ _) (sizeOf_branches_lt_sizeOf_send _ _)
+      | exact Nat.add_lt_add (size_of_body_lt_size_of_mu _ _) (size_of_body_lt_size_of_mu _ _)
+      | exact Nat.add_lt_add (size_of_branches_lt_size_of_send _ _) (size_of_branches_lt_size_of_send _ _)
 
   -- Send-Branch Merge
 
@@ -262,17 +262,17 @@ mutual
   decreasing_by
     all_goals
       first
-      | exact Nat.add_lt_add_right (sizeOf_tail_lt_sizeOf_branches (head := (lbl, vt1, t1)) (tail := rest)) _
+      | exact Nat.add_lt_add_right (size_of_tail_lt_size_of_branches (head := (lbl, vt1, t1)) (tail := rest)) _
       | -- merge call on branch continuations
         have hlookup' : lookupBranch lbl bs2 = some t2 := _hlookup
-        have hmem2 : ∃ vt, (lbl, vt, t2) ∈ bs2 := mem_of_lookupBranch hlookup'
+        have hmem2 : ∃ vt, (lbl, vt, t2) ∈ bs2 := mem_of_lookup_branch hlookup'
         obtain ⟨vt2, hmem2'⟩ := hmem2
         have hlt1 : sizeOf t1 < sizeOf ((lbl, vt1, t1) :: rest) :=
-          sizeOf_cont_lt_sizeOf_branches lbl vt1 t1 rest
+          size_of_cont_lt_size_of_branches lbl vt1 t1 rest
         have hmem2_cont : t2 ∈ bs2.map BranchR.cont := by
           exact List.mem_map.2 ⟨(lbl, vt2, t2), hmem2', rfl⟩
         have hlt2 : sizeOf t2 < sizeOf bs2 :=
-          sizeOf_cont_lt_sizeOf_branches_mem hmem2_cont
+          size_of_cont_lt_size_of_branches_mem hmem2_cont
         exact Nat.add_lt_add hlt1 hlt2
 
   -- Recv-Branch Merge
@@ -295,23 +295,23 @@ mutual
   decreasing_by
     all_goals
       first
-      | exact Nat.add_lt_add_right (sizeOf_tail_lt_sizeOf_branches (head := (lbl, vt1, t1)) (tail := rest)) _
+      | exact Nat.add_lt_add_right (size_of_tail_lt_size_of_branches (head := (lbl, vt1, t1)) (tail := rest)) _
       | -- merge call on branch continuations
         have hlookup' : lookupBranch lbl bs2 = some t2 := _hlookup
-        have hmem2 : ∃ vt, (lbl, vt, t2) ∈ bs2 := mem_of_lookupBranch hlookup'
+        have hmem2 : ∃ vt, (lbl, vt, t2) ∈ bs2 := mem_of_lookup_branch hlookup'
         obtain ⟨vt2, hmem2'⟩ := hmem2
         have hlt1 : sizeOf t1 < sizeOf ((lbl, vt1, t1) :: rest) :=
-          sizeOf_cont_lt_sizeOf_branches lbl vt1 t1 rest
+          size_of_cont_lt_size_of_branches lbl vt1 t1 rest
         have hmem2_cont : t2 ∈ bs2.map BranchR.cont := by
           exact List.mem_map.2 ⟨(lbl, vt2, t2), hmem2', rfl⟩
         have hlt2 : sizeOf t2 < sizeOf bs2 :=
-          sizeOf_cont_lt_sizeOf_branches_mem hmem2_cont
+          size_of_cont_lt_size_of_branches_mem hmem2_cont
         exact Nat.add_lt_add hlt1 hlt2
 end
 
 -- Inversion Lemmas
 
-theorem mergeBranchesSend_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValType} {t1 : LocalTypeR}
+theorem merge_branches_send_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValType} {t1 : LocalTypeR}
     {rest bs2 bs : List BranchR}
 /- ## Structured Block 6 -/
     (h : mergeBranchesSend ((lbl, vt1, t1) :: rest) bs2 = some bs) :
@@ -343,7 +343,7 @@ theorem mergeBranchesSend_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValTy
 
 -- Recv Inversion
 
-theorem mergeBranchesRecv_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValType} {t1 : LocalTypeR}
+theorem merge_branches_recv_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValType} {t1 : LocalTypeR}
     {rest bs2 bs : List BranchR}
     (h : mergeBranchesRecv ((lbl, vt1, t1) :: rest) bs2 = some bs) :
     (lookupBranch lbl bs2 = none ∧
@@ -363,7 +363,7 @@ theorem mergeBranchesRecv_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValTy
           simp [mergeBranchesRecv, hlookupEq, hrest] at h
           left
           refine ⟨?_, rest', ?_, ?_⟩
-          · exact lookupBranchEq_none (lbl := lbl) bs2 hlookupEq
+          · exact lookup_branch_eq_none (lbl := lbl) bs2 hlookupEq
           · rfl
           · cases h; rfl
   | some ht =>

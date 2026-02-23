@@ -98,7 +98,7 @@ This connects the enabledness predicate to the step relation. -/
 /-- If canStep g act holds via comm_head, then step g act cont for the continuation.
 
 This specialized lemma handles the synchronous case directly. -/
-theorem canStep_comm_head_implies_step (sender receiver : String)
+theorem can_step_comm_head_implies_step (sender receiver : String)
     (branches : List (Label × GlobalType)) (label : Label) (cont : GlobalType)
     (hmem : (label, cont) ∈ branches) :
     step (.comm sender receiver branches) { sender, receiver, label } cont :=
@@ -118,7 +118,7 @@ inductive SyncCanStep : GlobalType → GlobalActionR → Prop where
       SyncCanStep (.mu t body) act
 
 /-- SyncCanStep implies canStep. -/
-theorem SyncCanStep.toCanStep {g : GlobalType} {act : GlobalActionR}
+theorem SyncCanStep.to_can_step {g : GlobalType} {act : GlobalActionR}
     (h : SyncCanStep g act) : canStep g act := by
   induction h with
   | comm_head sender receiver branches label cont hmem =>
@@ -129,7 +129,7 @@ theorem SyncCanStep.toCanStep {g : GlobalType} {act : GlobalActionR}
 /-- SyncCanStep implies step (no async case needed).
 
 This is the specialized version for derivations from ReachesComm. -/
-theorem syncCanStep_implies_step (g : GlobalType) (act : GlobalActionR)
+theorem sync_can_step_implies_step (g : GlobalType) (act : GlobalActionR)
     (hcan : SyncCanStep g act) :
     ∃ g', step g act g' := by
   induction hcan with
@@ -144,7 +144,7 @@ theorem syncCanStep_implies_step (g : GlobalType) (act : GlobalActionR)
 /-! ## canStep implies step (mutual with BranchesCanStep) -/
 
 /-- If canStep g act, then there exists g' such that step g act g'. -/
-theorem canStep_implies_step (g : GlobalType) (act : GlobalActionR)
+theorem can_step_implies_step (g : GlobalType) (act : GlobalActionR)
     (hcan : canStep g act) :
     ∃ g', step g act g' := by
   refine (canStep.rec
@@ -169,7 +169,7 @@ theorem canStep_implies_step (g : GlobalType) (act : GlobalActionR)
       BranchesStep.cons label g g' rest rest' act hstep hrest_step⟩
 
 /-- If every branch can step with act, then branches can step in lockstep. -/
-theorem branchesCanStep_implies_branchesStep
+theorem branches_can_step_implies_branches_step
     (branches : List (Label × GlobalType)) (act : GlobalActionR)
     (hcan : BranchesCanStep branches act) :
     ∃ branches', BranchesStep step branches act branches' := by
@@ -219,7 +219,7 @@ decreasing_by
   exact Nat.lt_succ_of_le (List.length_filter_le _ xs)
 
 /-- Elements of eraseDups are elements of the original list. -/
-theorem mem_of_mem_eraseDups {a : String} {l : List String}
+theorem mem_of_mem_erase_dups {a : String} {l : List String}
     (h : a ∈ l.eraseDups) : a ∈ l :=
   mem_of_mem_eraseDups_aux a l h
 
@@ -253,7 +253,7 @@ decreasing_by
   exact Nat.lt_succ_of_le (List.length_filter_le _ xs)
 
 /-- Elements of the original list are in eraseDups. -/
-theorem mem_eraseDups_of_mem {a : String} {l : List String}
+theorem mem_erase_dups_of_mem {a : String} {l : List String}
     (h : a ∈ l) : a ∈ l.eraseDups :=
   mem_eraseDups_of_mem_aux a l h
 
@@ -281,7 +281,7 @@ decreasing_by
   exact Nat.lt_succ_of_le (List.length_filter_le _ xs)
 
 /-- eraseDups produces a list with no duplicates. -/
-theorem nodup_eraseDups {α : Type*} [BEq α] [LawfulBEq α] (l : List α) :
+theorem nodup_erase_dups {α : Type*} [BEq α] [LawfulBEq α] (l : List α) :
     l.eraseDups.Nodup :=
   nodup_eraseDups_aux l
 
@@ -292,8 +292,8 @@ def GlobalType.roles_nodup : (g : GlobalType) → g.roles.Nodup
   | .end => List.Pairwise.nil
   | .var _ => List.Pairwise.nil
   | .mu _ body => GlobalType.roles_nodup body
-  | .comm _ _ _ => nodup_eraseDups _
-  | .delegate _ _ _ _ _ => nodup_eraseDups _
+  | .comm _ _ _ => nodup_erase_dups _
+  | .delegate _ _ _ _ _ => nodup_erase_dups _
 
 /-! ## Substitution preserves role containment
 
@@ -307,18 +307,18 @@ mutual
     -- Comm case: split into head roles and branch roles.
     intro p hp
     simp only [GlobalType.substitute, GlobalType.roles] at hp ⊢
-    have hp' := mem_of_mem_eraseDups hp
+    have hp' := mem_of_mem_erase_dups hp
     simp only [List.mem_append] at hp'
     cases hp' with
     | inl hsr =>
         left
-        exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inl hsr))
+        exact mem_erase_dups_of_mem (List.mem_append.mpr (Or.inl hsr))
     | inr hbranches =>
-        have ih := substituteBranches_roles_subset branches t repl p hbranches
+        have ih := substitute_branches_roles_subset branches t repl p hbranches
         cases ih with
         | inl horiginal =>
             left
-            exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inr horiginal))
+            exact mem_erase_dups_of_mem (List.mem_append.mpr (Or.inr horiginal))
         | inr hrepl => right; exact hrepl
 
   /-- Substitution can only introduce roles from the replacement type. -/
@@ -343,23 +343,23 @@ mutual
         exact substitute_roles_subset_comm sender receiver branches t repl p hp
     | .delegate delegator delegatee sid role cont => fun p hp => by
         simp only [GlobalType.substitute, GlobalType.roles] at hp ⊢
-        have hp' := mem_of_mem_eraseDups hp
+        have hp' := mem_of_mem_erase_dups hp
         simp only [List.mem_append] at hp'
         cases hp' with
         | inl hpq =>
             left
-            exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inl hpq))
+            exact mem_erase_dups_of_mem (List.mem_append.mpr (Or.inl hpq))
         | inr hcont =>
             have ih := substitute_roles_subset cont t repl p hcont
             cases ih with
 /- ## Structured Block 1 -/
             | inl horiginal =>
                 left
-                exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inr horiginal))
+                exact mem_erase_dups_of_mem (List.mem_append.mpr (Or.inr horiginal))
             | inr hrepl => right; exact hrepl
 
   /-- Branch substitution preserves role containment. -/
-  theorem substituteBranches_roles_subset (branches : List (Label × GlobalType))
+  theorem substitute_branches_roles_subset (branches : List (Label × GlobalType))
       (t : String) (repl : GlobalType) :
       ∀ p, p ∈ rolesOfBranches (substituteBranches branches t repl) →
            p ∈ rolesOfBranches branches ∨ p ∈ repl.roles :=
@@ -374,7 +374,7 @@ mutual
             | inl hcont => left; left; exact hcont
             | inr hrepl => right; exact hrepl
         | inr hr =>
-            have ih := substituteBranches_roles_subset rest t repl p hr
+            have ih := substitute_branches_roles_subset rest t repl p hr
             cases ih with
             | inl hrest => left; right; exact hrest
             | inr hrepl => right; exact hrepl

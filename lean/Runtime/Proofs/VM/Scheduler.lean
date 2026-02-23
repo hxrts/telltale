@@ -80,7 +80,7 @@ theorem policy_selection_deterministic_holds {ι γ π ε ν : Type u} [Identity
 
 /-! ## Queue Extraction Helpers -/
 
-private theorem takeOut_some_of_mem (queue : SchedQueue) (p : CoroutineId → Bool)
+private theorem take_out_some_of_mem (queue : SchedQueue) (p : CoroutineId → Bool)
     (cid : CoroutineId) (hmem : cid ∈ queue) (hp : p cid = true) :
     ∃ cid' rest, takeOut queue p = some (cid', rest) := by
   induction queue with
@@ -99,7 +99,7 @@ private theorem takeOut_some_of_mem (queue : SchedQueue) (p : CoroutineId → Bo
 
 /-! ## Best-Candidate Helpers -/
 
-private theorem bestCandidate_some_of_exists (queue : SchedQueue) (score : CoroutineId → Nat)
+private theorem best_candidate_some_of_exists (queue : SchedQueue) (score : CoroutineId → Nat)
     (p : CoroutineId → Bool)
     (hExists : ∃ cid, cid ∈ queue ∧ p cid = true) :
     ∃ cid, bestCandidate queue score p = some cid := by
@@ -133,17 +133,17 @@ private theorem bestCandidate_some_of_exists (queue : SchedQueue) (score : Corou
 
 /-! ## Priority Pick Helpers -/
 
-private theorem pickBest_some_of_exists (queue : SchedQueue) (score : CoroutineId → Nat)
+private theorem pick_best_some_of_exists (queue : SchedQueue) (score : CoroutineId → Nat)
     (p : CoroutineId → Bool)
     (hExists : ∃ cid, cid ∈ queue ∧ p cid = true) :
     ∃ cid rest, pickBest queue score p = some (cid, rest) := by
-  rcases bestCandidate_some_of_exists queue score p hExists with ⟨cid, hBest⟩
+  rcases best_candidate_some_of_exists queue score p hExists with ⟨cid, hBest⟩
   refine ⟨cid, removeFirst cid queue, ?_⟩
   simp [pickBest, hBest]
 
 /-! ## Runnable Pick In Queue -/
 
-private theorem pickRunnableInQueue_some_of_mem_runnable
+private theorem pick_runnable_in_queue_some_of_mem_runnable
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -154,19 +154,19 @@ private theorem pickRunnableInQueue_some_of_mem_runnable
   cases policy with
   | roundRobin =>
       simpa [pickRunnableInQueue, pickRoundRobinInQueue] using
-        takeOut_some_of_mem queue (fun cid' => isRunnable st cid') cid hmem hrun
+        take_out_some_of_mem queue (fun cid' => isRunnable st cid') cid hmem hrun
   | cooperative =>
       simpa [pickRunnableInQueue, pickRoundRobinInQueue] using
-        takeOut_some_of_mem queue (fun cid' => isRunnable st cid') cid hmem hrun
+        take_out_some_of_mem queue (fun cid' => isRunnable st cid') cid hmem hrun
   | priority f =>
       have hExists : ∃ cid', cid' ∈ queue ∧ isRunnable st cid' = true := ⟨cid, hmem, hrun⟩
       simpa [pickRunnableInQueue, pickPriorityInQueue] using
-        pickBest_some_of_exists queue f (fun cid' => isRunnable st cid') hExists
+        pick_best_some_of_exists queue f (fun cid' => isRunnable st cid') hExists
   | progressAware =>
       cases hTok : takeOut queue (fun cid' => isRunnable st cid' && hasProgress st cid') with
       | none =>
           obtain ⟨found, rest, hRR⟩ :=
-            takeOut_some_of_mem queue (fun cid' => isRunnable st cid') cid hmem hrun
+            take_out_some_of_mem queue (fun cid' => isRunnable st cid') cid hmem hrun
           refine ⟨found, rest, ?_⟩
           simp [pickRunnableInQueue, pickProgressInQueue, hTok, hRR, pickRoundRobinInQueue]
       | some pair =>
@@ -175,7 +175,7 @@ private theorem pickRunnableInQueue_some_of_mem_runnable
 
 /-! ## Runnable Pick From Scheduler -/
 
-private theorem pickRunnableFromSched_some_of_mem_runnable
+private theorem pick_runnable_from_sched_some_of_mem_runnable
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -185,7 +185,7 @@ private theorem pickRunnableFromSched_some_of_mem_runnable
     ∃ found rest, pickRunnableFromSched policy st sched = some (found, rest) := by
   have hQueue :
       ∃ found rest, pickRunnableInQueue policy st sched.readyQueue = some (found, rest) :=
-    pickRunnableInQueue_some_of_mem_runnable policy st sched.readyQueue cid hmem hrun
+    pick_runnable_in_queue_some_of_mem_runnable policy st sched.readyQueue cid hmem hrun
   unfold pickRunnableFromSched
   set lanes : List LaneId := orderedLaneIds sched
   set start : Nat := if lanes.isEmpty then 0 else (sched.stepCount + 1) % lanes.length
@@ -214,7 +214,7 @@ private theorem pickRunnableFromSched_some_of_mem_runnable
 
 /-! ## Runnable Pick From VM State -/
 
-private theorem pickRunnable_some_of_mem_runnable
+private theorem pick_runnable_some_of_mem_runnable
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -230,7 +230,7 @@ private theorem pickRunnable_some_of_mem_runnable
     simp [st', isRunnable, getCoro] at hrun ⊢
     exact hrun
   obtain ⟨found, rest, hFromSched⟩ :=
-    pickRunnableFromSched_some_of_mem_runnable st'.sched.policy st' sched cid hmem' hrun'
+    pick_runnable_from_sched_some_of_mem_runnable st'.sched.policy st' sched cid hmem' hrun'
   refine ⟨found, rest, ?_⟩
   unfold pickRunnable
   simpa [sched, st'] using hFromSched
@@ -257,7 +257,7 @@ theorem starvation_free_holds {ι γ π ε ν : Type u} [IdentityModel ι] [Guar
       simpa [stNorm, syncLaneViews] using hmem
     have hrunNorm : isRunnable stNorm cid = true := by
       simpa [stNorm, isRunnable, getCoro] using hrun
-    obtain ⟨found, rest, hPick⟩ := pickRunnable_some_of_mem_runnable stNorm cid hmemNorm hrunNorm
+    obtain ⟨found, rest, hPick⟩ := pick_runnable_some_of_mem_runnable stNorm cid hmemNorm hrunNorm
     have hsched : ∃ st', schedule st = some (found, st') := by
       unfold schedule
       simp [stNorm, hPick]

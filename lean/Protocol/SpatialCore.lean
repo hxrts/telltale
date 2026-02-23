@@ -173,7 +173,7 @@ def satisfiesBool (topo : Topology) : SpatialReq → Bool
   | .bot => false
 
 /-- Boolean satisfaction reflects propositional satisfaction. -/
-theorem satisfiesBool_iff_Satisfies (topo : Topology) (req : SpatialReq) :
+theorem satisfies_bool_iff_satisfies (topo : Topology) (req : SpatialReq) :
     satisfiesBool topo req = true ↔ Satisfies topo req := by
   induction req with
   | netCapable s => simp [satisfiesBool, Satisfies]

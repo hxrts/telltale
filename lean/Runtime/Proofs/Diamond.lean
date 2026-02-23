@@ -11,7 +11,7 @@ VM states that are equivalent modulo trace ordering (`VMStateEqModTrace`).
 ## Main definitions
 
 - `VMStateEqModTrace`: State equivalence ignoring `obsTrace` ordering
-- `updateCoro_comm`: Setting distinct coroutine array indices commutes
+- `update_coro_comm`: Setting distinct coroutine array indices commutes
 - `cross_session_diamond`: The diamond property statement
 - `cross_session_diamond_holds`: The main theorem
 
@@ -44,7 +44,7 @@ Naive case analysis over instruction pairs would require 21+ cases.
 
 Solution Structure. Uses the frame rule: session-local operations only affect their
 footprint, and disjoint footprints imply commutativity. Defines `VMStateEqModTrace`
-for state equivalence modulo trace ordering, proves `updateCoro_comm` for array
+for state equivalence modulo trace ordering, proves `update_coro_comm` for array
 operations, then derives the diamond property from the frame rule.
 -/
 
@@ -90,7 +90,7 @@ theorem VMStateEqModTrace.of_eq {ι γ π ε ν : Type u} [IdentityModel ι] [Gu
 /-! ## Array.set Commutativity -/
 
 /-- Setting two distinct indices in an array commutes. -/
-theorem Array_set_set_comm {α : Type u} (a : Array α)
+theorem array_set_set_comm {α : Type u} (a : Array α)
     (i j : Nat) (vi vj : α)
     (hi : i < a.size) (hj : j < a.size) (hne : i ≠ j) :
     (a.set i vi hi).set j vj (by simp [Array.size_set]; exact hj) =
@@ -105,7 +105,7 @@ theorem Array_set_set_comm {α : Type u} (a : Array α)
 /-- Updating two distinct coroutine entries commutes. This is the core frame
     lemma: when c1 ≠ c2, writing back c1's modified coroutine and c2's modified
     coroutine produces the same array regardless of order. -/
-theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem update_coro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -119,13 +119,13 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
   unfold updateCoro
   simp only [Array.size_set, h1, h2, ↓reduceDIte]
   congr 1
-  exact Array_set_set_comm _ _ _ _ _ h1 h2 hne
+  exact array_set_set_comm _ _ _ _ _ h1 h2 hne
 
 /-! ## updateCoro Preservation Lemmas -/
 
 /-! ## updateCoro Core Field Preservation -/
 
-@[simp] theorem updateCoro_programs {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+@[simp] theorem update_coro_programs {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -135,7 +135,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     (updateCoro st c co).programs = st.programs := by
   unfold updateCoro; split <;> rfl
 
-@[simp] theorem updateCoro_config {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+@[simp] theorem update_coro_config {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -145,7 +145,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     (updateCoro st c co).config = st.config := by
   unfold updateCoro; split <;> rfl
 
-@[simp] theorem updateCoro_monitor {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+@[simp] theorem update_coro_monitor {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -155,7 +155,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     (updateCoro st c co).monitor = st.monitor := by
   unfold updateCoro; split <;> rfl
 
-@[simp] theorem updateCoro_clock {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+@[simp] theorem update_coro_clock {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -167,7 +167,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
 
 /-! ## updateCoro Data Preservation -/
 
-@[simp] theorem updateCoro_sessions {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+@[simp] theorem update_coro_sessions {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -177,7 +177,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     (updateCoro st c co).sessions = st.sessions := by
   unfold updateCoro; split <;> rfl
 
-@[simp] theorem updateCoro_buffers {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+@[simp] theorem update_coro_buffers {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -187,7 +187,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     (updateCoro st c co).buffers = st.buffers := by
   unfold updateCoro; split <;> rfl
 
-@[simp] theorem updateCoro_obsTrace {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+@[simp] theorem update_coro_obs_trace {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -197,7 +197,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     (updateCoro st c co).obsTrace = st.obsTrace := by
   unfold updateCoro; split <;> rfl
 
-@[simp] theorem updateCoro_coroutines_size {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+@[simp] theorem update_coro_coroutines_size {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -210,7 +210,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
 /-! ## updateCoro Entry Access -/
 
 /-- updateCoro at c1 doesn't affect the coroutine entry at c2 ≠ c1. -/
-theorem updateCoro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem update_coro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -230,7 +230,7 @@ theorem updateCoro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
 
 /-! ## appendEvent Trivial Cases -/
 
-@[simp] theorem appendEvent_none {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+@[simp] theorem append_event_none {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -239,7 +239,7 @@ theorem updateCoro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     (st : VMState ι γ π ε ν) : appendEvent st none = st := by
   simp [appendEvent]
 
-@[simp] theorem appendEvent_internal {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+@[simp] theorem append_event_internal {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -252,7 +252,7 @@ theorem updateCoro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
 /-! ## appendEvent Core-Preservation Skeleton -/
 
 /-- appendEvent only modifies obsTrace — all other fields are preserved. -/
-theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem append_event_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -269,7 +269,7 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
 
 /-! ## appendEvent Runtime Field Preservation -/
 
-@[simp] theorem appendEvent_preserves_coroutines {ι γ π ε ν : Type u}
+@[simp] theorem append_event_preserves_coroutines {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -286,7 +286,7 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
 
 /-! ## appendEvent Static-Field Preservation -/
 
-@[simp] theorem appendEvent_preserves_programs {ι γ π ε ν : Type u}
+@[simp] theorem append_event_preserves_programs {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -301,7 +301,7 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
     | internal => simp [appendEvent]
     | obs o => simp [appendEvent]
 
-@[simp] theorem appendEvent_preserves_config {ι γ π ε ν : Type u}
+@[simp] theorem append_event_preserves_config {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -316,7 +316,7 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
     | internal => simp [appendEvent]
     | obs o => simp [appendEvent]
 
-@[simp] theorem appendEvent_preserves_monitor {ι γ π ε ν : Type u}
+@[simp] theorem append_event_preserves_monitor {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -333,7 +333,7 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
 
 /-! ## appendEvent Session/Buffer Preservation -/
 
-@[simp] theorem appendEvent_preserves_sessions {ι γ π ε ν : Type u}
+@[simp] theorem append_event_preserves_sessions {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -348,7 +348,7 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
     | internal => simp [appendEvent]
     | obs o => simp [appendEvent]
 
-@[simp] theorem appendEvent_preserves_buffers {ι γ π ε ν : Type u}
+@[simp] theorem append_event_preserves_buffers {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -404,7 +404,7 @@ def cross_session_diamond {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
 /-! ## execInstr Characterization Lemmas -/
 
 /-- When a coroutine is not found, `execInstr` returns the state unchanged. -/
-theorem execInstr_not_found {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem exec_instr_not_found {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -417,7 +417,7 @@ theorem execInstr_not_found {ι γ π ε ν : Type u} [IdentityModel ι] [GuardL
   simp [h]
 
 /-- When a coroutine is done, `execAtPC` returns the state unchanged. -/
-theorem execAtPC_done {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem exec_at_pc_done {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -430,7 +430,7 @@ theorem execAtPC_done {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
   simp [hd]
 
 /-- When a coroutine is faulted, `execAtPC` returns the state unchanged. -/
-theorem execAtPC_faulted {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem exec_at_pc_faulted {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -460,7 +460,7 @@ The Protocol-level infrastructure is in:
 
 The proof strategy:
 1. For operations on disjoint sessions, neither affects the other's session state
-2. `updateCoro_comm` handles coroutine array writes
+2. `update_coro_comm` handles coroutine array writes
 3. Trace events permute (order doesn't matter for observational equivalence)
 
 The frame rule (`session_local_op_preserves_other`) gives us the key property:

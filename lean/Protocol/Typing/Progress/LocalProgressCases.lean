@@ -43,11 +43,11 @@ lemma progress_send
   | send hk hG hx =>
       rename_i e q T L
       obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_visible_lookup hStore hDisjShAll hOwnDisj hk
-      have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
+      have hkChan : vk = .chan e := has_type_val_chan_inv hkTyped
       subst hkChan
       obtain ⟨v, hxStr, hv⟩ := store_lookup_of_visible_lookup hStore hDisjShAll hOwnDisj hx
       have hxAll : lookupSEnv (SEnvAll Ssh Sown) x = some T :=
-        lookupSEnv_all_of_visible (Ssh:=Ssh) (Sown:=Sown) (x:=x) (T:=T) hDisjShAll hOwnDisj hx
+        lookup_s_env_all_of_visible (Ssh:=Ssh) (Sown:=Sown) (x:=x) (T:=T) hDisjShAll hOwnDisj hx
       have hRecvReady := hReady e q T L hG
       exact ⟨_, _, _, _, _, _, TypedStep.send hkStr hxStr hG hxAll hv hRecvReady rfl rfl rfl rfl⟩
 
@@ -70,15 +70,15 @@ lemma progress_recv
   | recv_new hk hG hNoSh hNoOwnL =>
       rename_i e p T L
       obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_visible_lookup hStore hDisjShAll hOwnDisj hk
-      have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
+      have hkChan : vk = .chan e := has_type_val_chan_inv hkTyped
       subst hkChan
       set recvEdge : Edge := { sid := e.sid, sender := p, receiver := e.role }
       have hActiveRecv : ActiveEdge G recvEdge := by
         have hGrecv : lookupG G { sid := recvEdge.sid, role := recvEdge.receiver } = some (.recv p T L) := by
           simpa [recvEdge] using hG
 /- ## Structured Block 2 -/
-        rcases RoleComplete_recv hComplete hG with ⟨Lsender, hGsender⟩
-        exact ActiveEdge_of_endpoints (e:=recvEdge) hGsender hGrecv
+        rcases role_complete_recv hComplete hG with ⟨Lsender, hGsender⟩
+        exact active_edge_of_endpoints (e:=recvEdge) hGsender hGrecv
       cases hBuf : lookupBuf bufs recvEdge with
       | nil =>
           right
@@ -114,14 +114,14 @@ lemma progress_recv
   | recv_old hk hG hNoSh hOwn =>
       rename_i e p T L T'
       obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_visible_lookup hStore hDisjShAll hOwnDisj hk
-      have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
+      have hkChan : vk = .chan e := has_type_val_chan_inv hkTyped
       subst hkChan
       set recvEdge : Edge := { sid := e.sid, sender := p, receiver := e.role }
       have hActiveRecv : ActiveEdge G recvEdge := by
         have hGrecv : lookupG G { sid := recvEdge.sid, role := recvEdge.receiver } = some (.recv p T L) := by
           simpa [recvEdge] using hG
-        rcases RoleComplete_recv hComplete hG with ⟨Lsender, hGsender⟩
-        exact ActiveEdge_of_endpoints (e:=recvEdge) hGsender hGrecv
+        rcases role_complete_recv hComplete hG with ⟨Lsender, hGsender⟩
+        exact active_edge_of_endpoints (e:=recvEdge) hGsender hGrecv
       cases hBuf : lookupBuf bufs recvEdge with
       | nil =>
           right
@@ -170,7 +170,7 @@ lemma progress_select
   | select hk hG hbs =>
       rename_i e q bs L
       obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_visible_lookup hStore hDisjShAll hOwnDisj hk
-      have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
+      have hkChan : vk = .chan e := has_type_val_chan_inv hkTyped
       subst hkChan
       have hTargetReady := hSelectReady e q bs ℓ L hG hbs
       exact ⟨_, _, _, _, _, _, TypedStep.select hkStr hG hbs hTargetReady rfl rfl rfl rfl⟩
@@ -196,15 +196,15 @@ lemma progress_branch
   | branch hk hG hLen hLabels hBodies hOutLbl hSess hDom hRight =>
       rename_i e p bs
       obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_visible_lookup hStore hDisjShAll hOwnDisj hk
-      have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
+      have hkChan : vk = .chan e := has_type_val_chan_inv hkTyped
       subst hkChan
       set branchEdge : Edge := { sid := e.sid, sender := p, receiver := e.role }
       have hActiveBranch : ActiveEdge G branchEdge := by
         have hGrecv : lookupG G { sid := branchEdge.sid, role := branchEdge.receiver } =
             some (.branch p bs) := by
           simpa [branchEdge] using hG
-        rcases RoleComplete_branch hComplete hG with ⟨Lsender, hGsender⟩
-        exact ActiveEdge_of_endpoints (e:=branchEdge) hGsender hGrecv
+        rcases role_complete_branch hComplete hG with ⟨Lsender, hGsender⟩
+        exact active_edge_of_endpoints (e:=branchEdge) hGsender hGrecv
       cases hBuf : lookupBuf bufs branchEdge with
       | nil =>
           right
@@ -243,7 +243,7 @@ lemma progress_branch
                   | mk lbl' L =>
                       -- Branch Progress: Label Alignment and Step Construction
                       have hLbl : lbl' = lbl :=
-                        findLabel_eq (xs := bs) (lbl := lbl) (lbl' := lbl') (v := L) hFindBs
+                        find_label_eq (xs := bs) (lbl := lbl) (lbl' := lbl') (v := L) hFindBs
                       subst lbl'
                       have hMemBs : (lbl, L) ∈ bs := List.mem_of_find?_eq_some hFindBs
                       rcases (List.mem_iff_getElem).1 hMemBs with ⟨i, hi, hGetBs⟩
@@ -268,7 +268,7 @@ lemma progress_branch
                       cases bP with
                       | mk lblP P =>
                           have hLblP : lblP = lbl :=
-                            findLabel_eq (xs := procs) (lbl := lbl) (lbl' := lblP) (v := P) hFindP
+                            find_label_eq (xs := procs) (lbl := lbl) (lbl' := lblP) (v := P) hFindP
                           subst hLblP
                           have hTraceHead : (lookupD D branchEdge).head? = some .string := by
                             simp [hTrace, hEq]

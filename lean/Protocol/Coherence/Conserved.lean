@@ -86,7 +86,7 @@ def SameConservedQuantities (C₁ C₂ : CoherenceConfig) : Prop :=
 /-! ## Conserved/Profile Equivalence (`ConfigEquiv`) -/
 
 /-- `ConfigEquiv` implies equality of conserved profiles. -/
-theorem sameConserved_of_ConfigEquiv {C₁ C₂ : CoherenceConfig}
+theorem same_conserved_of_config_equiv {C₁ C₂ : CoherenceConfig}
     (hEq : ConfigEquiv C₁ C₂) :
     SameConservedQuantities C₁ C₂ := by
   rcases hEq with ⟨σ, hG, hD⟩
@@ -125,7 +125,7 @@ theorem sameConserved_of_ConfigEquiv {C₁ C₂ : CoherenceConfig}
 /-! ## Reconstructing `ConfigEquiv` from Conserved Profiles -/
 
 /-- Equality of conserved profiles implies `ConfigEquiv`. -/
-theorem ConfigEquiv_of_sameConserved {C₁ C₂ : CoherenceConfig}
+theorem config_equiv_of_same_conserved {C₁ C₂ : CoherenceConfig}
     (hSame : SameConservedQuantities C₁ C₂) :
     ConfigEquiv C₁ C₂ := by
   rcases hSame with ⟨σ, hBuf, _hSess, hType⟩
@@ -140,11 +140,11 @@ theorem ConfigEquiv_of_sameConserved {C₁ C₂ : CoherenceConfig}
     simpa [conservedOf] using hBuf e
 
 /-- Main quotient theorem for the conserved-profile package. -/
-theorem configEquiv_iff_sameConservedQuantities (C₁ C₂ : CoherenceConfig) :
+theorem config_equiv_iff_same_conserved_quantities (C₁ C₂ : CoherenceConfig) :
     ConfigEquiv C₁ C₂ ↔ SameConservedQuantities C₁ C₂ := by
   constructor
-  · exact sameConserved_of_ConfigEquiv
-  · exact ConfigEquiv_of_sameConserved
+  · exact same_conserved_of_config_equiv
+  · exact config_equiv_of_same_conserved
 
 /-! ## Symmetry Action and Noether-Style Conservation -/
 
@@ -162,14 +162,14 @@ theorem noether_coherence_conservation :
     ConservedUnderSymmetry (fun C => Coherent C.G C.D) := by
   intro σ C hCoh
   simpa [symmetryAction] using
-    (CoherentRenaming (ρ := SessionIso.toRenaming σ) (G := C.G) (D := C.D) hCoh)
+    (coherent_renaming (ρ := SessionIso.toRenaming σ) (G := C.G) (D := C.D) hCoh)
 
 /-! ## Observational Erasure and Quotient Invariance -/
 
 /-- Setoid for observational erasure by `ConfigEquiv`. -/
 def ConfigEquivSetoid : Setoid CoherenceConfig where
   r := ConfigEquiv
-  iseqv := ConfigEquiv_equivalence
+  iseqv := config_equiv_equivalence
 
 /-- Observational erasure: configuration modulo `ConfigEquiv`. -/
 def observationalErasure (C : CoherenceConfig) : Quotient ConfigEquivSetoid :=
@@ -179,9 +179,9 @@ def observationalErasure (C : CoherenceConfig) : Quotient ConfigEquivSetoid :=
 def identityErasure : CoherenceConfig → CoherenceConfig := id
 
 /-- Identity erasure stays in the same `ConfigEquiv` class. -/
-theorem identityErasure_equiv (C : CoherenceConfig) :
+theorem identity_erasure_equiv (C : CoherenceConfig) :
     ConfigEquiv C (identityErasure C) := by
-  simpa [identityErasure] using ConfigEquiv_refl C
+  simpa [identityErasure] using config_equiv_refl C
 
 /-- Observable invariance under the quotient relation `ConfigEquiv`. -/
 def ConfigEquivInvariantObservable {α : Type} (F : CoherenceConfig → α) : Prop :=
@@ -195,7 +195,7 @@ def FactorsThroughObservationalErasure {α : Type} (F : CoherenceConfig → α) 
 
 /-- Any observable that factors through `observationalErasure`
     is `ConfigEquiv`-invariant. -/
-theorem configEquivInvariant_of_factorsThroughObservationalErasure
+theorem config_equiv_invariant_of_factors_through_observational_erasure
     {α : Type} {F : CoherenceConfig → α}
     (hFactor : FactorsThroughObservationalErasure F) :
     ConfigEquivInvariantObservable F := by
@@ -209,7 +209,7 @@ theorem configEquivInvariant_of_factorsThroughObservationalErasure
     _ = F C₂ := (hFq C₂).symm
 
 /-- Any `ConfigEquiv`-invariant observable factors through `observationalErasure`. -/
-theorem factorsThroughObservationalErasure_of_configEquivInvariant
+theorem factors_through_observational_erasure_of_config_equiv_invariant
     {α : Type} {F : CoherenceConfig → α}
     (hInv : ConfigEquivInvariantObservable F) :
     FactorsThroughObservationalErasure F := by
@@ -221,12 +221,12 @@ theorem factorsThroughObservationalErasure_of_configEquivInvariant
 
 /-- Quotient universality for coherence observables:
     factorization through `observationalErasure` iff `ConfigEquiv`-invariance. -/
-theorem factorsThroughObservationalErasure_iff_configEquivInvariant
+theorem factors_through_observational_erasure_iff_config_equiv_invariant
     {α : Type} (F : CoherenceConfig → α) :
     FactorsThroughObservationalErasure F ↔ ConfigEquivInvariantObservable F := by
   constructor
-  · exact configEquivInvariant_of_factorsThroughObservationalErasure
-  · exact factorsThroughObservationalErasure_of_configEquivInvariant
+  · exact config_equiv_invariant_of_factors_through_observational_erasure
+  · exact factors_through_observational_erasure_of_config_equiv_invariant
 
 /-! ## Session-Projection Helpers -/
 
@@ -242,13 +242,13 @@ def projectSessionConserved (Q : ConservedQuantities) (sid₀ : SessionId) : Con
     typeTraceConsistency := fun e => if e.sid = sid₀ then Q.typeTraceConsistency e else emptyEdgeTypeTrace }
 
 /-- Locality: projected buffers outside the chosen session are empty. -/
-theorem projectSessionConserved_local_buffers (Q : ConservedQuantities) (sid₀ : SessionId)
+theorem project_session_conserved_local_buffers (Q : ConservedQuantities) (sid₀ : SessionId)
     {e : Edge} (hSid : e.sid ≠ sid₀) :
     (projectSessionConserved Q sid₀).perEdgeBufferCompatibility e = [] := by
   simp [projectSessionConserved, hSid]
 
 /-- Locality: projected type/trace snapshots outside the chosen session are empty. -/
-theorem projectSessionConserved_local_types (Q : ConservedQuantities) (sid₀ : SessionId)
+theorem project_session_conserved_local_types (Q : ConservedQuantities) (sid₀ : SessionId)
     {e : Edge} (hSid : e.sid ≠ sid₀) :
     (projectSessionConserved Q sid₀).typeTraceConsistency e = emptyEdgeTypeTrace := by
   simp [projectSessionConserved, hSid]
@@ -260,7 +260,7 @@ def edgeResourceMass (Q : ConservedQuantities) (e : Edge) : Nat :=
   (Q.perEdgeBufferCompatibility e).length
 
 /-- Resource conservation under `SameConservedQuantities`: edge masses commute with renaming. -/
-theorem resource_conservation_of_sameConserved {C₁ C₂ : CoherenceConfig}
+theorem resource_conservation_of_same_conserved {C₁ C₂ : CoherenceConfig}
     (hSame : SameConservedQuantities C₁ C₂) :
     ∃ σ : SessionIso,
       ∀ e,

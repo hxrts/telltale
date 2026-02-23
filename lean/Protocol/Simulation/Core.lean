@@ -157,18 +157,18 @@ private def procSize : Process → Nat
   | .newSession _ _ _ => 1
   | .assign _ _ => 0
 
-private lemma procSize_lt_seq_left (P Q : Process) : procSize P < procSize (.seq P Q) := by
+private lemma proc_size_lt_seq_left (P Q : Process) : procSize P < procSize (.seq P Q) := by
   have hpos : 0 < procSize Q + 1 := Nat.succ_pos _
   have h := Nat.lt_add_of_pos_right (n := procSize P) hpos
   simp [procSize, Nat.add_assoc]
 
-private lemma procSize_lt_par_left (nS nG : Nat) (P Q : Process) :
+private lemma proc_size_lt_par_left (nS nG : Nat) (P Q : Process) :
     procSize P < procSize (.par nS nG P Q) := by
   have hpos : 0 < procSize Q + 1 := Nat.succ_pos _
   have h := Nat.lt_add_of_pos_right (n := procSize P) hpos
   simp [procSize, Nat.add_assoc]
 
-private lemma procSize_lt_par_right (nS nG : Nat) (P Q : Process) :
+private lemma proc_size_lt_par_right (nS nG : Nat) (P Q : Process) :
     procSize Q < procSize (.par nS nG P Q) := by
   have hpos : 0 < procSize P + 1 := Nat.succ_pos _
   have h := Nat.lt_add_of_pos_left (n := procSize Q) hpos
@@ -215,9 +215,9 @@ termination_by
 decreasing_by
   all_goals
     first
-      | simpa using procSize_lt_seq_left _ _
-      | simpa using procSize_lt_par_left _ _ _ _
-      | simpa using procSize_lt_par_right _ _ _ _
+      | simpa using proc_size_lt_seq_left _ _
+      | simpa using proc_size_lt_par_left _ _ _ _
+      | simpa using proc_size_lt_par_right _ _ _ _
 
 def stepDecide (C : Config) : Option Config :=
   stepDecideAux C.proc C

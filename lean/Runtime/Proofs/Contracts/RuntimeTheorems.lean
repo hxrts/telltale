@@ -58,7 +58,7 @@ def effects_refines_schedStep : Prop :=
     [IdentityVerificationBridge ι ν],
     ∀ st : VMState ι γ π ε ν, schedule_confluence st ∧ cooperative_refines_concurrent st
 
-theorem effects_refines_schedStep_holds : effects_refines_schedStep := by
+theorem effects_refines_sched_step_holds : effects_refines_schedStep := by
   exact fun {ι} {γ} {π} {ε} {ν} _ _ _ _ _ _ _ _ _ _ _ _ st =>
     ⟨schedule_confluence_holds st, cooperative_refines_concurrent_holds st⟩
 
@@ -73,7 +73,7 @@ def schedStep_refines_failure : Prop :=
     [IdentityVerificationBridge ι ν],
     ∀ st : VMState ι γ π ε ν, starvation_free st
 
-theorem schedStep_refines_failure_holds : schedStep_refines_failure := by
+theorem sched_step_refines_failure_holds : schedStep_refines_failure := by
   exact fun {ι} {γ} {π} {ε} {ν} _ _ _ _ _ _ _ _ _ _ _ _ st =>
     starvation_free_holds st
 
@@ -288,37 +288,37 @@ private def speculationDivergence {L : Type*} [Fintype L] [EntropyAPI.Model]
   EntropyAPI.klDivergence specDist commitDist
 
 /-- Local branch-entropy nonnegativity wrapper. -/
-private theorem branchEntropy_nonneg {L : Type*} [Fintype L] [EntropyAPI.Laws]
+private theorem branch_entropy_nonneg {L : Type*} [Fintype L] [EntropyAPI.Laws]
     (d : EntropyAPI.Distribution L) :
     0 ≤ branchEntropy d.pmf := by
   -- Delegate to Shannon entropy nonnegativity through the local alias.
-  simpa [branchEntropy] using EntropyAPI.shannonEntropy_nonneg d
+  simpa [branchEntropy] using EntropyAPI.shannon_entropy_nonneg d
 
 /-- Local branch-entropy upper-bound wrapper. -/
-private theorem branchEntropy_le_log_card
+private theorem branch_entropy_le_log_card
     {L : Type*} [Fintype L] [Nonempty L] [EntropyAPI.Laws]
     (d : EntropyAPI.Distribution L) :
     branchEntropy d.pmf ≤ Real.log (Fintype.card L) := by
   -- Delegate to Shannon entropy max-entropy bound through the local alias.
-  simpa [branchEntropy] using EntropyAPI.shannonEntropy_le_log_card d
+  simpa [branchEntropy] using EntropyAPI.shannon_entropy_le_log_card d
 
 /-- Local speculation-divergence nonnegativity wrapper. -/
-private theorem speculationDivergence_nonneg
+private theorem speculation_divergence_nonneg
     {L : Type*} [Fintype L] [EntropyAPI.Laws]
     (p q : EntropyAPI.Distribution L)
     (habs : ∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0) :
     0 ≤ speculationDivergence p.pmf q.pmf := by
   -- Delegate to KL nonnegativity through the local alias.
-  simpa [speculationDivergence] using EntropyAPI.klDivergence_nonneg p q habs
+  simpa [speculationDivergence] using EntropyAPI.kl_divergence_nonneg p q habs
 
 /-- Local speculation-divergence zero characterization wrapper. -/
-private theorem speculationDivergence_eq_zero_iff
+private theorem speculation_divergence_eq_zero_iff
     {L : Type*} [Fintype L] [EntropyAPI.Laws]
     (p q : EntropyAPI.Distribution L)
     (habs : ∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0) :
     speculationDivergence p.pmf q.pmf = 0 ↔ p.pmf = q.pmf := by
   -- Delegate to KL zero characterization through the local alias.
-  simpa [speculationDivergence] using EntropyAPI.klDivergence_eq_zero_iff p q habs
+  simpa [speculationDivergence] using EntropyAPI.kl_divergence_eq_zero_iff p q habs
 
 /-! ## Credit Soundness And Budget Bounds -/
 
@@ -388,7 +388,7 @@ def send_cost_plus_flow [EntropyAPI.Laws] : Prop :=
 
 theorem send_cost_plus_flow_holds [EntropyAPI.Laws] : send_cost_plus_flow := by
   intro L _ _ d
-  exact ⟨branchEntropy_nonneg d, branchEntropy_le_log_card d⟩
+  exact ⟨branch_entropy_nonneg d, branch_entropy_le_log_card d⟩
 
 /-! ## Cost Frame Preservation -/
 
@@ -434,9 +434,9 @@ theorem cost_speculation_bounded_holds [EntropyAPI.Laws] : cost_speculation_boun
   by
     refine ⟨?_, ?_⟩
     · intro L _ p q habs
-      exact speculationDivergence_nonneg p q habs
+      exact speculation_divergence_nonneg p q habs
     · intro L _ p q habs
-      exact speculationDivergence_eq_zero_iff p q habs
+      exact speculation_divergence_eq_zero_iff p q habs
 
 /-! ## Aura Instantiation Baselines
 

@@ -28,13 +28,13 @@ open SessionCoTypes.SubstCommBarendregt in
 
     This version is proven via the Barendregt commutation proof in
     `SubstCommBarendregt.lean` and removes the DB bridge assumption. -/
-theorem EQ2_substitute_via_Bisim {a b : LocalTypeR} {var : String} {repl : LocalTypeR}
+theorem eq2_substitute_via_bisim {a b : LocalTypeR} {var : String} {repl : LocalTypeR}
     (h : EQ2 a b)
     (hbarA : notBoundAt var a = true)
     (hbarB : notBoundAt var b = true)
     (hfresh : ∀ t, isFreeIn t repl = false)
     (hnomu : ∀ t body, repl ≠ .mu t body) :
     EQ2 (a.substitute var repl) (b.substitute var repl) := by
-  exact EQ2_substitute_barendregt a b var repl h hbarA hbarB hfresh hnomu
+  exact eq2_substitute_barendregt a b var repl h hbarA hbarB hfresh hnomu
 
 end SessionCoTypes.Bisim

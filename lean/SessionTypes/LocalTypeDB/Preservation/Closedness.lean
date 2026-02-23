@@ -9,10 +9,10 @@ The Problem. Operations on de Bruijn types (lift, subst, unfold) must preserve c
 and contractiveness invariants. Without these preservation theorems, we cannot ensure that
 derived types remain well-formed after transformation.
 
-Solution Structure. Proves `isClosedAt_lift` and `isClosedAt_subst` showing closedness
-is preserved. For guardedness, proves `isGuarded_lift_lt/ge` and `isGuarded_subst_lt`
-handling index relationships. `isContractive_subst` and `isContractive_unfold` show
-contractiveness is preserved, culminating in `isContractive_fullUnfold` for full mu-unfolding.
+Solution Structure. Proves `is_closed_at_lift` and `is_closed_at_subst` showing closedness
+is preserved. For guardedness, proves `is_guarded_lift_lt/ge` and `is_guarded_subst_lt`
+handling index relationships. `is_contractive_subst` and `is_contractive_unfold` show
+contractiveness is preserved, culminating in `is_contractive_full_unfold` for full mu-unfolding.
 -/
 
 /-! # LocalTypeDB Preservation
@@ -24,7 +24,7 @@ namespace SessionTypes
 open SessionTypes.GlobalType
 -- Closedness Preservation
 
-private theorem isClosedAt_lift_at (t : LocalTypeDB) (c k d : Nat) :
+private theorem is_closed_at_lift_at (t : LocalTypeDB) (c k d : Nat) :
     t.isClosedAt d = true → (t.lift c k).isClosedAt (d + c) = true := by
   intro h
   let P1 : LocalTypeDB → Prop :=
@@ -82,7 +82,7 @@ private theorem isClosedAt_lift_at (t : LocalTypeDB) (c k d : Nat) :
 
 -- Closedness Lift: Branches
 
-private theorem isClosedAt_lift_at_branches (bs : List (Label × LocalTypeDB)) (c k d : Nat) :
+private theorem is_closed_at_lift_at_branches (bs : List (Label × LocalTypeDB)) (c k d : Nat) :
 /- ## Structured Block 2 -/
     isClosedAtBranches d bs = true →
     isClosedAtBranches (d + c) (liftBranches c k bs) = true := by
@@ -94,28 +94,28 @@ private theorem isClosedAt_lift_at_branches (bs : List (Label × LocalTypeDB)) (
       simp [isClosedAtBranches, liftBranches, Bool.and_eq_true] at h ⊢
       rcases h with ⟨ht, hrest⟩
       constructor
-      · exact isClosedAt_lift_at t c k d ht
+      · exact is_closed_at_lift_at t c k d ht
       · exact ih hrest
 
 -- Closedness Lift: Public API
 
 /-- Lifting preserves closedness: if `t` is closed at `k`, then `t.lift c k` is closed at `k + c`. -/
-theorem isClosedAt_lift (t : LocalTypeDB) (c k : Nat) :
+theorem is_closed_at_lift (t : LocalTypeDB) (c k : Nat) :
   t.isClosedAt k = true → (t.lift c k).isClosedAt (k + c) = true := by
   intro h
-  exact isClosedAt_lift_at t c k k h
+  exact is_closed_at_lift_at t c k k h
 
-theorem isClosedAt_lift_branches (bs : List (Label × LocalTypeDB)) (c k : Nat) :
+theorem is_closed_at_lift_branches (bs : List (Label × LocalTypeDB)) (c k : Nat) :
   isClosedAtBranches k bs = true →
   isClosedAtBranches (k + c) (liftBranches c k bs) = true := by
   intro h
-  exact isClosedAt_lift_at_branches bs c k k h
+  exact is_closed_at_lift_at_branches bs c k k h
 
 -- Closedness Substitution
 
 /-- Substitution preserves closedness: if `t` is closed at `k+1` and `e` is closed at `k`,
     then `t.subst k e` is closed at `k`. -/
-theorem isClosedAt_subst (t e : LocalTypeDB) (k : Nat) :
+theorem is_closed_at_subst (t e : LocalTypeDB) (k : Nat) :
     t.isClosedAt (k + 1) = true → e.isClosedAt k = true →
     (t.subst k e).isClosedAt k = true := by
   intro ht he
@@ -159,7 +159,7 @@ theorem isClosedAt_subst (t e : LocalTypeDB) (k : Nat) :
     · intro body hbody e k ht he
       simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt] at ht ⊢
       have h_lift : (e.lift 1 0).isClosedAt (k + 1) = true :=
-        isClosedAt_lift_at e 1 0 k he
+        is_closed_at_lift_at e 1 0 k he
       exact hbody (e.lift 1 0) (k + 1) ht h_lift
     -- nil case
     · intro e k hbs he
@@ -179,7 +179,7 @@ theorem isClosedAt_subst (t e : LocalTypeDB) (k : Nat) :
 
 -- Closedness Substitution: Branches
 
-theorem isClosedAt_subst_branches (bs : List (Label × LocalTypeDB)) (e : LocalTypeDB) (k : Nat) :
+theorem is_closed_at_subst_branches (bs : List (Label × LocalTypeDB)) (e : LocalTypeDB) (k : Nat) :
     isClosedAtBranches (k + 1) bs = true → e.isClosedAt k = true →
     isClosedAtBranches k (substBranches bs k e) = true := by
   intro hbs he
@@ -190,7 +190,7 @@ theorem isClosedAt_subst_branches (bs : List (Label × LocalTypeDB)) (e : LocalT
       simp [isClosedAtBranches, substBranches, Bool.and_eq_true] at hbs ⊢
       rcases hbs with ⟨ht, hrest⟩
       constructor
-      · exact isClosedAt_subst t e k ht he
+      · exact is_closed_at_subst t e k ht he
       · exact ih hrest
 
 

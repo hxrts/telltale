@@ -11,7 +11,7 @@ The Problem. Progress proofs need to extract concrete values from the
 store based on typing. Typing uses `SEnvVisible` but store typing uses
 `SEnvAll`. We need inversion lemmas relating these.
 
-Solution Structure. Prove `lookupSEnv_all_of_visible_prog` showing that
+Solution Structure. Prove `lookup_s_env_all_of_visible_prog` showing that
 visible lookup implies full lookup under disjointness. Use this to
 bridge typing judgments to store access in progress proofs.
 -/
@@ -28,7 +28,7 @@ section
 
 -- Visible to Full Lookup
 
-lemma lookupSEnv_all_of_visible_prog
+lemma lookup_s_env_all_of_visible_prog
     {Ssh : SEnv} {Sown : OwnedEnv} {x : Var} {T : ValType}
     (hDisjShAll : DisjointS Ssh (Sown : SEnv))
     (hOwnDisj : OwnedDisjoint Sown)
@@ -38,50 +38,50 @@ lemma lookupSEnv_all_of_visible_prog
   | some Tsh =>
       have hEqT : Tsh = T := by
         have hShVis : lookupSEnv (Ssh ++ Sown.left) x = some Tsh :=
-          lookupSEnv_append_left (S₁:=Ssh) (S₂:=Sown.left) (x:=x) (T:=Tsh) hSh
+          lookup_s_env_append_left (S₁:=Ssh) (S₂:=Sown.left) (x:=x) (T:=Tsh) hSh
         exact Option.some.inj (by simpa [hVis] using hShVis.symm)
       have hOwnNone : lookupSEnv (Sown : SEnv) x = none := by
-        exact lookupSEnv_none_of_disjoint_left
+        exact lookup_s_env_none_of_disjoint_left
           (S₁:=(Sown : SEnv)) (S₂:=Ssh) (x:=x) (T:=Tsh)
-          (DisjointS_symm hDisjShAll) hSh
+          (disjoint_s_symm hDisjShAll) hSh
       have hRightNone : lookupSEnv Sown.right x = none := by
         cases hR : lookupSEnv Sown.right x with
         | none => exact rfl
         | some Tr =>
             have hOwnSome : lookupSEnv (Sown : SEnv) x = some Tr := by
               simpa [OwnedEnv.all] using
-                (lookupSEnv_append_left (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) (T:=Tr) hR)
+                (lookup_s_env_append_left (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) (T:=Tr) hR)
             have hOwnNone' : lookupSEnv (Sown.right ++ Sown.left) x = none := by
               simpa [OwnedEnv.all] using hOwnNone
             have hContra : False := by
               simpa [OwnedEnv.all, hOwnNone'] using hOwnSome
             cases hContra
       have hPrefixSh : lookupSEnv (Ssh ++ Sown.right) x = some Tsh := by
-        have hPrefix := lookupSEnv_append_left (S₁:=Ssh) (S₂:=Sown.right) (x:=x) (T:=Tsh) hSh
+        have hPrefix := lookup_s_env_append_left (S₁:=Ssh) (S₂:=Sown.right) (x:=x) (T:=Tsh) hSh
         simpa [hRightNone] using hPrefix
       have hAllSh :
           lookupSEnv ((Ssh ++ Sown.right) ++ Sown.left) x = some Tsh :=
-        lookupSEnv_append_left (S₁:=Ssh ++ Sown.right) (S₂:=Sown.left) (x:=x) (T:=Tsh) hPrefixSh
+        lookup_s_env_append_left (S₁:=Ssh ++ Sown.right) (S₂:=Sown.left) (x:=x) (T:=Tsh) hPrefixSh
       simpa [SEnvAll, List.append_assoc, hEqT] using hAllSh
   -- Visible-to-Full Lookup: Shared-Miss Case
   | none =>
       have hLeftSome : lookupSEnv Sown.left x = some T := by
-        have hVisRight := lookupSEnv_append_right (S₁:=Ssh) (S₂:=Sown.left) (x:=x) hSh
+        have hVisRight := lookup_s_env_append_right (S₁:=Ssh) (S₂:=Sown.left) (x:=x) hSh
         simpa [hVisRight] using hVis
       have hRightNone : lookupSEnv Sown.right x = none := by
-        exact lookupSEnv_none_of_disjoint_left
+        exact lookup_s_env_none_of_disjoint_left
           (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) (T:=T)
           hOwnDisj hLeftSome
       have hOwnSome : lookupSEnv (Sown : SEnv) x = some T := by
 /- ## Structured Block 2 -/
-        have hOwnRight := lookupSEnv_append_right (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) hRightNone
+        have hOwnRight := lookup_s_env_append_right (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) hRightNone
         simpa [hOwnRight] using hLeftSome
       have hAll :
           lookupSEnv (SEnvAll Ssh Sown) x = some T := by
-        have hAllRight := lookupSEnv_append_right (S₁:=Ssh) (S₂:=(Sown : SEnv)) (x:=x) hSh
+        have hAllRight := lookup_s_env_append_right (S₁:=Ssh) (S₂:=(Sown : SEnv)) (x:=x) hSh
         calc
           lookupSEnv (SEnvAll Ssh Sown) x = lookupSEnv (Sown : SEnv) x := by
-            simpa [SEnvAll_all] using hAllRight
+            simpa [s_env_all_all] using hAllRight
           _ = some T := hOwnSome
       exact hAll
 
@@ -96,15 +96,15 @@ lemma store_lookup_of_visible_lookup
     (hVis : lookupSEnv (Ssh ++ Sown.left) x = some T) :
     ∃ v, lookupStr store x = some v ∧ HasTypeVal G v T := by
   have hStoreVis : StoreTypedStrongVisible G Ssh Sown store :=
-    StoreTypedStrongVisible_of_allStrong (G:=G) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+    store_typed_strong_visible_of_all_strong (G:=G) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
       hStore hDisjShAll hOwnDisj
   simpa [SEnvVisible] using
-    (store_lookup_of_visible_lookup_strongVisible (G:=G) (Ssh:=Ssh) (Sown:=Sown)
+    (store_lookup_of_visible_lookup_strong_visible (G:=G) (Ssh:=Ssh) (Sown:=Sown)
       (store:=store) (x:=x) (T:=T) hStoreVis hVis)
 
 -- Owned-Environment Disjointness Reframing
 
-lemma OwnedDisjoint_sub_left
+lemma owned_disjoint_sub_left
     {Sown : OwnedEnv} {G : GEnv} (split : ParSplit Sown.left G) :
     OwnedDisjoint Sown →
     DisjointS split.S1 split.S2 →
@@ -112,13 +112,13 @@ lemma OwnedDisjoint_sub_left
   intro hOwn hDisjS
   have hOwnLeftAll : DisjointS Sown.right (split.S1 ++ split.S2) := by
     simpa [OwnedDisjoint, split.hS] using hOwn
-  have hR1 : DisjointS Sown.right split.S1 := DisjointS_split_left hOwnLeftAll
-  have hS2S1 : DisjointS split.S2 split.S1 := DisjointS_symm hDisjS
+  have hR1 : DisjointS Sown.right split.S1 := disjoint_s_split_left hOwnLeftAll
+  have hS2S1 : DisjointS split.S2 split.S1 := disjoint_s_symm hDisjS
   have hAll : DisjointS (Sown.right ++ split.S2) split.S1 :=
-    DisjointS_append_left hR1 hS2S1
+    disjoint_s_append_left hR1 hS2S1
   simpa [OwnedDisjoint, OwnedEnv.all] using hAll
 
-lemma OwnedDisjoint_sub_right
+lemma owned_disjoint_sub_right
     {Sown : OwnedEnv} {G : GEnv} (split : ParSplit Sown.left G) :
     OwnedDisjoint Sown →
     DisjointS split.S1 split.S2 →
@@ -126,10 +126,10 @@ lemma OwnedDisjoint_sub_right
   intro hOwn hDisjS
   have hOwnLeftAll : DisjointS Sown.right (split.S1 ++ split.S2) := by
     simpa [OwnedDisjoint, split.hS] using hOwn
-  have hR2 : DisjointS Sown.right split.S2 := DisjointS_split_right hOwnLeftAll
+  have hR2 : DisjointS Sown.right split.S2 := disjoint_s_split_right hOwnLeftAll
   have hS1S2 : DisjointS split.S1 split.S2 := hDisjS
   have hAll : DisjointS (Sown.right ++ split.S1) split.S2 :=
-    DisjointS_append_left hR2 hS1S2
+    disjoint_s_append_left hR2 hS1S2
   simpa [OwnedDisjoint, OwnedEnv.all] using hAll
 
 -- Endpoint Equality from Store Typing
@@ -146,7 +146,7 @@ lemma channel_endpoint_eq_of_store_visible
     e' = e := by
   obtain ⟨vk, hkStr', hkTyped⟩ :=
     store_lookup_of_visible_lookup hStore hDisjShAll hOwnDisj hk
-  have hkChan : vk = Value.chan e := HasTypeVal_chan_inv hkTyped
+  have hkChan : vk = Value.chan e := has_type_val_chan_inv hkTyped
   have hkStr'' : lookupStr store k = some (Value.chan e) := by
     simpa [hkChan] using hkStr'
   have hEqOpt : some (Value.chan e') = some (Value.chan e) := by
@@ -157,7 +157,7 @@ lemma channel_endpoint_eq_of_store_visible
 
 -- GEnv Framing for Pre-Out Typing
 
-lemma HasTypeProcPreOut_send_inv
+lemma has_type_proc_pre_out_send_inv
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
     HasTypeProcPreOut Ssh Sown G (.send k x) Sfin Gfin W Δ →
@@ -168,7 +168,7 @@ lemma HasTypeProcPreOut_send_inv
   cases h with
   | send hk hG hx => exact ⟨_, _, _, _, hk, hG⟩
 
-lemma HasTypeProcPreOut_recv_inv
+lemma has_type_proc_pre_out_recv_inv
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
     HasTypeProcPreOut Ssh Sown G (.recv k x) Sfin Gfin W Δ →
@@ -180,7 +180,7 @@ lemma HasTypeProcPreOut_recv_inv
   | recv_new hk hG hNoSh hNoOwnL => exact ⟨_, _, _, _, hk, hG⟩
   | recv_old hk hG hNoSh hOwn => exact ⟨_, _, _, _, hk, hG⟩
 
-lemma HasTypeProcPreOut_select_inv
+lemma has_type_proc_pre_out_select_inv
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {l : Label}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
     HasTypeProcPreOut Ssh Sown G (.select k l) Sfin Gfin W Δ →
@@ -192,7 +192,7 @@ lemma HasTypeProcPreOut_select_inv
   | select hk hG hbs => exact ⟨_, _, _, hk, hG⟩
 
 /- ## Structured Block 4 -/
-lemma HasTypeProcPreOut_branch_inv
+lemma has_type_proc_pre_out_branch_inv
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {procs : List (Label × Process)}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
     HasTypeProcPreOut Ssh Sown G (.branch k procs) Sfin Gfin W Δ →
@@ -205,7 +205,7 @@ lemma HasTypeProcPreOut_branch_inv
 
 -- GEnv Update Framing
 
-lemma updateG_full_eq_updateG_mid
+lemma update_g_full_eq_update_g_mid
     {Gfull Gleft Gmid Gright : GEnv} {e : Endpoint} {L L' : LocalType} {G' : GEnv} :
     Gfull = Gleft ++ Gmid ++ Gright →
     DisjointG Gleft Gmid →
@@ -214,14 +214,14 @@ lemma updateG_full_eq_updateG_mid
     G' = Gleft ++ updateG Gmid e L' ++ Gright := by
   intro hGfull hDisjL hG hGout
   have hNoneLeft : lookupG Gleft e = none :=
-    DisjointG_lookup_left (G₁:=Gmid) (G₂:=Gleft) (DisjointG_symm hDisjL) hG
+    disjoint_g_lookup_left (G₁:=Gmid) (G₂:=Gleft) (disjoint_g_symm hDisjL) hG
   have hLookupMid : lookupG (Gleft ++ Gmid) e = some L := by
-    have hEq' := lookupG_append_right (G₁:=Gleft) (G₂:=Gmid) (e:=e) hNoneLeft
+    have hEq' := lookup_g_append_right (G₁:=Gleft) (G₂:=Gmid) (e:=e) hNoneLeft
     simpa [hEq'] using hG
   have hUpdRight :=
-    updateG_append_left_hit (G₁:=Gleft ++ Gmid) (G₂:=Gright) (e:=e) (L':=L') hLookupMid
+    update_g_append_left_hit (G₁:=Gleft ++ Gmid) (G₂:=Gright) (e:=e) (L':=L') hLookupMid
   have hUpdLeft :=
-    updateG_append_left (G₁:=Gleft) (G₂:=Gmid) (e:=e) (L:=L') hNoneLeft
+    update_g_append_left (G₁:=Gleft) (G₂:=Gmid) (e:=e) (L:=L') hNoneLeft
   have hGout' : G' = updateG ((Gleft ++ Gmid) ++ Gright) e L' := by
     simpa [hGfull, List.append_assoc] using hGout
   calc
@@ -232,7 +232,7 @@ lemma updateG_full_eq_updateG_mid
 
 -- Typed-Step Frame Preservation (Communication Cases)
 
-lemma TypedStep_preserves_frames_send
+lemma typed_step_preserves_frames_send
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfull Gleft Gmid Gright : GEnv}
     {store : VarStore}
     {k x : Var} {eStep : Endpoint} {Lstep : LocalType}
@@ -247,18 +247,18 @@ lemma TypedStep_preserves_frames_send
     (hGout : G' = updateG Gfull eStep Lstep) →
     ∃ Gmid', G' = Gleft ++ Gmid' ++ Gright := by
   intro hGfull hDisjL hStore hDisjShAll hOwnDisj hOut hkStr hGout
-  rcases HasTypeProcPreOut_send_inv hOut with ⟨eOut, qOut, TOut, LOut, hk, hG⟩
+  rcases has_type_proc_pre_out_send_inv hOut with ⟨eOut, qOut, TOut, LOut, hk, hG⟩
 /- ## Structured Block 5 -/
   have hEq : eStep = eOut :=
     channel_endpoint_eq_of_store_visible (hStore:=hStore) (k:=k) (e:=eOut) (e':=eStep)
       hDisjShAll hOwnDisj hk hkStr
   subst hEq
   refine ⟨updateG Gmid eStep Lstep, ?_⟩
-  exact updateG_full_eq_updateG_mid hGfull hDisjL hG hGout
+  exact update_g_full_eq_update_g_mid hGfull hDisjL hG hGout
 
 -- Typed-Step Frame Preservation (Receive Case)
 
-lemma TypedStep_preserves_frames_recv
+lemma typed_step_preserves_frames_recv
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfull Gleft Gmid Gright : GEnv}
     {store : VarStore}
     {k x : Var} {eStep : Endpoint} {Lstep : LocalType}
@@ -273,17 +273,17 @@ lemma TypedStep_preserves_frames_recv
     (hGout : G' = updateG Gfull eStep Lstep) →
     ∃ Gmid', G' = Gleft ++ Gmid' ++ Gright := by
   intro hGfull hDisjL hStore hDisjShAll hOwnDisj hOut hkStr hGout
-  rcases HasTypeProcPreOut_recv_inv hOut with ⟨eOut, pOut, TOut, LOut, hk, hG⟩
+  rcases has_type_proc_pre_out_recv_inv hOut with ⟨eOut, pOut, TOut, LOut, hk, hG⟩
   have hEq : eStep = eOut :=
     channel_endpoint_eq_of_store_visible (hStore:=hStore) (k:=k) (e:=eOut) (e':=eStep)
       hDisjShAll hOwnDisj hk hkStr
   subst hEq
   refine ⟨updateG Gmid eStep Lstep, ?_⟩
-  exact updateG_full_eq_updateG_mid hGfull hDisjL hG hGout
+  exact update_g_full_eq_update_g_mid hGfull hDisjL hG hGout
 
 -- Typed-Step Frame Preservation (Select Case)
 
-lemma TypedStep_preserves_frames_select
+lemma typed_step_preserves_frames_select
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfull Gleft Gmid Gright : GEnv}
     {store : VarStore}
     {k : Var} {ℓ : Label} {eStep : Endpoint} {Lstep : LocalType}
@@ -298,18 +298,18 @@ lemma TypedStep_preserves_frames_select
     (hGout : G' = updateG Gfull eStep Lstep) →
     ∃ Gmid', G' = Gleft ++ Gmid' ++ Gright := by
   intro hGfull hDisjL hStore hDisjShAll hOwnDisj hOut hkStr hGout
-  rcases HasTypeProcPreOut_select_inv hOut with ⟨eOut, qOut, bsOut, hk, hG⟩
+  rcases has_type_proc_pre_out_select_inv hOut with ⟨eOut, qOut, bsOut, hk, hG⟩
   have hEq : eStep = eOut :=
     channel_endpoint_eq_of_store_visible (hStore:=hStore) (k:=k) (e:=eOut) (e':=eStep)
       hDisjShAll hOwnDisj hk hkStr
   subst hEq
   refine ⟨updateG Gmid eStep Lstep, ?_⟩
-  exact updateG_full_eq_updateG_mid hGfull hDisjL hG hGout
+  exact update_g_full_eq_update_g_mid hGfull hDisjL hG hGout
 
 -- Typed-Step Frame Preservation (Branch Case)
 
 /- ## Structured Block 6 -/
-lemma TypedStep_preserves_frames_branch
+lemma typed_step_preserves_frames_branch
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfull Gleft Gmid Gright : GEnv}
     {store : VarStore}
     {k : Var} {procs : List (Label × Process)} {eStep : Endpoint} {Lstep : LocalType}
@@ -324,13 +324,13 @@ lemma TypedStep_preserves_frames_branch
     (hGout : G' = updateG Gfull eStep Lstep) →
     ∃ Gmid', G' = Gleft ++ Gmid' ++ Gright := by
   intro hGfull hDisjL hStore hDisjShAll hOwnDisj hOut hkStr hGout
-  rcases HasTypeProcPreOut_branch_inv hOut with ⟨eOut, pOut, bsOut, hk, hG⟩
+  rcases has_type_proc_pre_out_branch_inv hOut with ⟨eOut, pOut, bsOut, hk, hG⟩
   have hEq : eStep = eOut :=
     channel_endpoint_eq_of_store_visible (hStore:=hStore) (k:=k) (e:=eOut) (e':=eStep)
       hDisjShAll hOwnDisj hk hkStr
   subst hEq
   refine ⟨updateG Gmid eStep Lstep, ?_⟩
-  exact updateG_full_eq_updateG_mid hGfull hDisjL hG hGout
+  exact update_g_full_eq_update_g_mid hGfull hDisjL hG hGout
 
 -- Use HasTypeProcPreOut_frame_G_right/left from Protocol.Typing.Framing.
 

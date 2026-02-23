@@ -123,14 +123,14 @@ theorem local_step_det {lt lt₁ lt₂ : LocalTypeR} {act : LocalActionR}
       | send huniq₂ hp₂ hmem₂ =>
           obtain ⟨vt₁, hmem₁'⟩ := hmem₁
           obtain ⟨vt₂, hmem₂'⟩ := hmem₂
-          have := mem_branchL_unique_label huniq₁ hmem₁' hmem₂'
+          have := mem_branch_l_unique_label huniq₁ hmem₁' hmem₂'
           exact congrArg Prod.snd this
   | recv huniq₁ hp₁ hmem₁ =>
       cases h₂ with
       | recv huniq₂ hp₂ hmem₂ =>
           obtain ⟨vt₁, hmem₁'⟩ := hmem₁
           obtain ⟨vt₂, hmem₂'⟩ := hmem₂
-          have := mem_branchL_unique_label huniq₁ hmem₁' hmem₂'
+          have := mem_branch_l_unique_label huniq₁ hmem₁' hmem₂'
           exact congrArg Prod.snd this
   | mu hstep₁ ih =>
       cases h₂ with

@@ -35,7 +35,7 @@ def ReachablePairs (a b : LocalTypeC) : Set (LocalTypeC × LocalTypeC) :=
   { p | p.1 ∈ Reachable a ∧ p.2 ∈ Reachable b }
 
 /-- For regular types, the reachable pairs are finite. -/
-lemma reachablePairs_finite {a b : LocalTypeC} (ha : Regular a) (hb : Regular b) :
+lemma reachable_pairs_finite {a b : LocalTypeC} (ha : Regular a) (hb : Regular b) :
     Set.Finite (ReachablePairs a b) := by
   have hprod : Set.Finite (Reachable a ×ˢ Reachable b) := Set.Finite.prod ha hb
   exact Set.Finite.subset hprod (fun ⟨x, y⟩ ⟨hx, hy⟩ => ⟨hx, hy⟩)
@@ -43,7 +43,7 @@ lemma reachablePairs_finite {a b : LocalTypeC} (ha : Regular a) (hb : Regular b)
 /-- Convert finite reachable pairs to Finset. -/
 def reachablePairsFinset (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) :
     Finset (LocalTypeC × LocalTypeC) :=
-  (reachablePairs_finite ha hb).toFinset
+  (reachable_pairs_finite ha hb).toFinset
 
 -- Measure for Termination
 
@@ -53,7 +53,7 @@ def pairMeasure (all : Finset (LocalTypeC × LocalTypeC))
   all.card - visited.card
 
 /-- Measure decreases when we visit a new pair that's in the reachable set. -/
-lemma pairMeasure_lt {all visited : Finset (LocalTypeC × LocalTypeC)}
+lemma pair_measure_lt {all visited : Finset (LocalTypeC × LocalTypeC)}
     {p : LocalTypeC × LocalTypeC}
     (h_in_all : p ∈ all) (h_not_visited : p ∉ visited) (h_sub : visited ⊆ all) :
     pairMeasure all (insert p visited) < pairMeasure all visited := by
@@ -83,50 +83,50 @@ def bisim (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) (bound : Nat) : B
 -- Soundness Helpers: Observable Extraction
 
 /-- Helper: obsMatch true with end kind implies both unfold to end. -/
-lemma obsMatch_end_implies_UnfoldsToEndC {bound : Nat} {a b : LocalTypeC}
+lemma obs_match_end_implies_unfolds_to_end_c {bound : Nat} {a b : LocalTypeC}
     (hobs : obsMatch bound a b = true)
     (hk : obsKindOf (fullUnfoldN bound a) = some .obs_end) :
     UnfoldsToEndC a ∧ UnfoldsToEndC b := by
-  have ⟨k, hk1, hk2⟩ := obsMatch_true_implies_same_kind hobs
-  have hhead_a := obsKindOf_end_iff.mp hk
+  have ⟨k, hk1, hk2⟩ := obs_match_true_implies_same_kind hobs
+  have hhead_a := obs_kind_of_end_iff.mp hk
   -- k = .obs_end since hk1 and hk both give obsKindOf (fullUnfoldN bound a)
   have heq : k = .obs_end := by simp_all
   rw [heq] at hk2
-  have hhead_b := obsKindOf_end_iff.mp hk2
+  have hhead_b := obs_kind_of_end_iff.mp hk2
   constructor
-  · exact ⟨fullUnfoldN bound a, fullUnfoldN_UnfoldsToC bound a, hhead_a⟩
-  · exact ⟨fullUnfoldN bound b, fullUnfoldN_UnfoldsToC bound b, hhead_b⟩
+  · exact ⟨fullUnfoldN bound a, full_unfold_n_unfolds_to_c bound a, hhead_a⟩
+  · exact ⟨fullUnfoldN bound b, full_unfold_n_unfolds_to_c bound b, hhead_b⟩
 
 /-- Helper: obsKindOf send implies CanSendC -/
-lemma obsKindOf_send_implies_CanSendC {t : LocalTypeC} {p : String} {labels : List Label}
+lemma obs_kind_of_send_implies_can_send_c {t : LocalTypeC} {p : String} {labels : List Label}
     (hk : obsKindOf t = some (.obs_send p labels)) :
 /- ## Structured Block 2 -/
     CanSendC t p (branchesOf t) := by
-  have hhead := obsKindOf_send_iff.mp hk
+  have hhead := obs_kind_of_send_iff.mp hk
   exact ⟨t, labels, Relation.ReflTransGen.refl, hhead, rfl⟩
 
 /-- Helper: obsKindOf recv implies CanRecvC -/
-lemma obsKindOf_recv_implies_CanRecvC {t : LocalTypeC} {p : String} {labels : List Label}
+lemma obs_kind_of_recv_implies_can_recv_c {t : LocalTypeC} {p : String} {labels : List Label}
     (hk : obsKindOf t = some (.obs_recv p labels)) :
     CanRecvC t p (branchesOf t) := by
-  have hhead := obsKindOf_recv_iff.mp hk
+  have hhead := obs_kind_of_recv_iff.mp hk
   exact ⟨t, labels, Relation.ReflTransGen.refl, hhead, rfl⟩
 
 /-- Helper: fullUnfoldN with send head gives CanSendC via unfolding -/
-lemma fullUnfoldN_send_implies_CanSendC {bound : Nat} {t : LocalTypeC}
+lemma full_unfold_n_send_implies_can_send_c {bound : Nat} {t : LocalTypeC}
     {p : String} {labels : List Label}
     (hk : obsKindOf (fullUnfoldN bound t) = some (.obs_send p labels)) :
     CanSendC t p (branchesOf (fullUnfoldN bound t)) := by
-  have hhead := obsKindOf_send_iff.mp hk
-  exact ⟨fullUnfoldN bound t, labels, fullUnfoldN_UnfoldsToC bound t, hhead, rfl⟩
+  have hhead := obs_kind_of_send_iff.mp hk
+  exact ⟨fullUnfoldN bound t, labels, full_unfold_n_unfolds_to_c bound t, hhead, rfl⟩
 
 /-- Helper: fullUnfoldN with recv head gives CanRecvC via unfolding -/
-lemma fullUnfoldN_recv_implies_CanRecvC {bound : Nat} {t : LocalTypeC}
+lemma full_unfold_n_recv_implies_can_recv_c {bound : Nat} {t : LocalTypeC}
     {p : String} {labels : List Label}
     (hk : obsKindOf (fullUnfoldN bound t) = some (.obs_recv p labels)) :
     CanRecvC t p (branchesOf (fullUnfoldN bound t)) := by
-  have hhead := obsKindOf_recv_iff.mp hk
-  exact ⟨fullUnfoldN bound t, labels, fullUnfoldN_UnfoldsToC bound t, hhead, rfl⟩
+  have hhead := obs_kind_of_recv_iff.mp hk
+  exact ⟨fullUnfoldN bound t, labels, full_unfold_n_unfolds_to_c bound t, hhead, rfl⟩
 
 -- Soundness Helpers: Matching Labels from `obsMatch`
 
@@ -138,47 +138,47 @@ lemma fullUnfoldN_recv_implies_CanRecvC {bound : Nat} {t : LocalTypeC}
 
     The proof unfolds obsMatch, obsKindOf, and uses the definitional equality of ObsKind.
     We defer this to focus on the main soundness theorem structure. -/
-lemma obsMatch_send_implies_same_labels {bound : Nat} {a b : LocalTypeC}
+lemma obs_match_send_implies_same_labels {bound : Nat} {a b : LocalTypeC}
     {p : String} {labels : List Label}
     (hobs : obsMatch bound a b = true)
     (hk : obsKindOf (fullUnfoldN bound a) = some (.obs_send p labels)) :
     obsKindOf (fullUnfoldN bound b) = some (.obs_send p labels) := by
-  have ⟨k, hk1, hk2⟩ := obsMatch_true_implies_same_kind hobs
+  have ⟨k, hk1, hk2⟩ := obs_match_true_implies_same_kind hobs
   have heq : k = .obs_send p labels := by simp_all
   rw [heq] at hk2
   exact hk2
 
 /-- obsMatch with recv implies same participant and labels (needed for BranchesRelC). -/
-lemma obsMatch_recv_implies_same_labels {bound : Nat} {a b : LocalTypeC}
+lemma obs_match_recv_implies_same_labels {bound : Nat} {a b : LocalTypeC}
     {p : String} {labels : List Label}
     (hobs : obsMatch bound a b = true)
     (hk : obsKindOf (fullUnfoldN bound a) = some (.obs_recv p labels)) :
     obsKindOf (fullUnfoldN bound b) = some (.obs_recv p labels) := by
-  have ⟨k, hk1, hk2⟩ := obsMatch_true_implies_same_kind hobs
+  have ⟨k, hk1, hk2⟩ := obs_match_true_implies_same_kind hobs
   have heq : k = .obs_recv p labels := by simp_all
   rw [heq] at hk2
   exact hk2
 
 /-- Helper: obsMatch true with var kind implies both unfold to same var. -/
-lemma obsMatch_var_implies_UnfoldsToVarC {bound : Nat} {a b : LocalTypeC} {v : String}
+lemma obs_match_var_implies_unfolds_to_var_c {bound : Nat} {a b : LocalTypeC} {v : String}
     (hobs : obsMatch bound a b = true)
     (hk : obsKindOf (fullUnfoldN bound a) = some (.obs_var v)) :
     UnfoldsToVarC a v ∧ UnfoldsToVarC b v := by
-  have ⟨k, hk1, hk2⟩ := obsMatch_true_implies_same_kind hobs
-  have hhead_a := obsKindOf_var_iff.mp hk
+  have ⟨k, hk1, hk2⟩ := obs_match_true_implies_same_kind hobs
+  have hhead_a := obs_kind_of_var_iff.mp hk
   -- k = .obs_var v since hk1 and hk both give obsKindOf (fullUnfoldN bound a)
   have heq : k = .obs_var v := by simp_all
   rw [heq] at hk2
-  have hhead_b := obsKindOf_var_iff.mp hk2
+  have hhead_b := obs_kind_of_var_iff.mp hk2
   constructor
-  · exact ⟨fullUnfoldN bound a, fullUnfoldN_UnfoldsToC bound a, hhead_a⟩
-  · exact ⟨fullUnfoldN bound b, fullUnfoldN_UnfoldsToC bound b, hhead_b⟩
+  · exact ⟨fullUnfoldN bound a, full_unfold_n_unfolds_to_c bound a, hhead_a⟩
+  · exact ⟨fullUnfoldN bound b, full_unfold_n_unfolds_to_c bound b, hhead_b⟩
 
 -- Soundness Helpers: Post-Fixpoint Lifting
 
 /-- EQ2C is a post-fixpoint of EQ2CMono.F (needed for BisimRel_postfixpoint). -/
 /- ## Structured Block 3 -/
-lemma EQ2C_postfixpoint : ∀ a b, EQ2C a b → EQ2CMono.F EQ2C a b := by
+lemma eq2_c_postfixpoint : ∀ a b, EQ2C a b → EQ2CMono.F EQ2C a b := by
   intro a b heq
   rcases heq with ⟨R, hR, hab⟩
   have hstep := hR a b hab
@@ -186,7 +186,7 @@ lemma EQ2C_postfixpoint : ∀ a b, EQ2C a b → EQ2CMono.F EQ2C a b := by
   refine ⟨obs_a, obs_b, ?_⟩
   -- R ≤ EQ2C (any bisimulation is contained in the greatest)
   have hR_le : R ≤ EQ2C := fun x y hxy => ⟨R, hR, hxy⟩
-  exact ObservableRelC_mono hR_le hrel
+  exact observable_rel_c_mono hR_le hrel
 
 /-- BisimRel is a post-fixpoint of EQ2CMono.F (for paco coinduction).
 
@@ -195,9 +195,9 @@ lemma EQ2C_postfixpoint : ∀ a b, EQ2C a b → EQ2CMono.F EQ2C a b := by
     - EQ2C: already known to be equivalent
 
     The proof handles these cases separately:
-    - For EQ2C: use EQ2C_postfixpoint and monotonicity
+    - For EQ2C: use eq2_c_postfixpoint and monotonicity
     - For BisimRelCore: analyze bisimAux computation -/
-theorem BisimRel_postfixpoint (bound : Nat) :
+theorem bisim_rel_postfixpoint (bound : Nat) :
     ∀ a b, BisimRel bound a b → EQ2CMono.F (BisimRel bound ⊔ ⊥) a b := by
   intro a b h
   simp only [Paco.Rel.sup_bot]
@@ -207,12 +207,12 @@ theorem BisimRel_postfixpoint (bound : Nat) :
   -- Case 1: EQ2C (including visited pairs via hvisited)
   case inr =>
     -- EQ2C is a post-fixpoint, lift to BisimRel by monotonicity
-    have hstep := EQ2C_postfixpoint a b heq
+    have hstep := eq2_c_postfixpoint a b heq
     rcases hstep with ⟨obs_a, obs_b, hrel⟩
     refine ⟨obs_a, obs_b, ?_⟩
     -- EQ2C ⊆ BisimRel (right disjunct)
     have hEQ2C_le : EQ2C ≤ BisimRel bound := fun x y hxy => Or.inr hxy
-    exact ObservableRelC_mono hEQ2C_le hrel
+    exact observable_rel_c_mono hEQ2C_le hrel
   -- `BisimRel_postfixpoint`: Core Checker Branch
   -- Case 2: BisimRelCore (bisimAux returns true)
   case inl =>
@@ -229,25 +229,25 @@ theorem BisimRel_postfixpoint (bound : Nat) :
         · -- Already visited: use hvisited to get EQ2C
           have heq' : EQ2C a b := hvisited (a, b) hmem
           -- Reduce to the EQ2C case
-          have hstep := EQ2C_postfixpoint a b heq'
+          have hstep := eq2_c_postfixpoint a b heq'
           rcases hstep with ⟨obs_a, obs_b, hrel⟩
           refine ⟨obs_a, obs_b, ?_⟩
           have hEQ2C_le : EQ2C ≤ BisimRel bound := fun x y hxy => Or.inr hxy
-          exact ObservableRelC_mono hEQ2C_le hrel
+          exact observable_rel_c_mono hEQ2C_le hrel
         · -- Not visited: extract obsMatch and bisimAll
           simp only [hmem, ↓reduceIte] at hbisim
           have ⟨hobs, hchildren⟩ := Bool.and_eq_true_iff.mp hbisim
-          have ⟨k, hk1, hk2⟩ := obsMatch_true_implies_same_kind hobs
+          have ⟨k, hk1, hk2⟩ := obs_match_true_implies_same_kind hobs
           -- `BisimRel_postfixpoint`: Observable Kind Split
           -- Case split on observable kind k
           match k with
           | .obs_end =>
-              have ⟨ha, hb⟩ := obsMatch_end_implies_UnfoldsToEndC hobs hk1
+              have ⟨ha, hb⟩ := obs_match_end_implies_unfolds_to_end_c hobs hk1
               have obs_a := ObservableC.is_end ha
               have obs_b := ObservableC.is_end hb
               exact ⟨obs_a, obs_b, ObservableRelC.is_end ha hb⟩
           | .obs_var v =>
-              have ⟨ha, hb⟩ := obsMatch_var_implies_UnfoldsToVarC hobs hk1
+              have ⟨ha, hb⟩ := obs_match_var_implies_unfolds_to_var_c hobs hk1
               have obs_a := ObservableC.is_var v ha
               have obs_b := ObservableC.is_var v hb
               exact ⟨obs_a, obs_b, ObservableRelC.is_var v ha hb⟩
@@ -255,12 +255,12 @@ theorem BisimRel_postfixpoint (bound : Nat) :
           | .obs_send p labels =>
               -- For send, children come from bisimAll = true
               have hk_a := hk1
-              have hk_b := obsMatch_send_implies_same_labels hobs hk1
+              have hk_b := obs_match_send_implies_same_labels hobs hk1
               -- Extract CanSendC witnesses
-              have ha_send := fullUnfoldN_send_implies_CanSendC hk_a
-              have hb_send := fullUnfoldN_send_implies_CanSendC hk_b
+              have ha_send := full_unfold_n_send_implies_can_send_c hk_a
+              have hb_send := full_unfold_n_send_implies_can_send_c hk_b
               -- Get BranchesRelC from bisimAll
-              have hbr := obsMatch_send_bisimAll_to_BranchesRelC hk_a hk_b hchildren hvisited
+              have hbr := obs_match_send_bisim_all_to_branches_rel_c hk_a hk_b hchildren hvisited
               -- Construct ObservableRelC
               have obs_a := ObservableC.is_send p (branchesOf (fullUnfoldN bound a)) ha_send
               have obs_b := ObservableC.is_send p (branchesOf (fullUnfoldN bound b)) hb_send
@@ -268,10 +268,10 @@ theorem BisimRel_postfixpoint (bound : Nat) :
           | .obs_recv p labels =>
               -- Similar to send case
               have hk_a := hk1
-              have hk_b := obsMatch_recv_implies_same_labels hobs hk1
-              have ha_recv := fullUnfoldN_recv_implies_CanRecvC hk_a
-              have hb_recv := fullUnfoldN_recv_implies_CanRecvC hk_b
-              have hbr := obsMatch_recv_bisimAll_to_BranchesRelC hk_a hk_b hchildren hvisited
+              have hk_b := obs_match_recv_implies_same_labels hobs hk1
+              have ha_recv := full_unfold_n_recv_implies_can_recv_c hk_a
+              have hb_recv := full_unfold_n_recv_implies_can_recv_c hk_b
+              have hbr := obs_match_recv_bisim_all_to_branches_rel_c hk_a hk_b hchildren hvisited
               have obs_a := ObservableC.is_recv p (branchesOf (fullUnfoldN bound a)) ha_recv
               have obs_b := ObservableC.is_recv p (branchesOf (fullUnfoldN bound b)) hb_recv
               exact ⟨obs_a, obs_b, ObservableRelC.is_recv p _ _ ha_recv hb_recv hbr⟩
@@ -280,7 +280,7 @@ theorem BisimRel_postfixpoint (bound : Nat) :
 
     Uses paco coinduction: BisimRel is a post-fixpoint of EQ2CMono.F,
     so by paco_coind, BisimRel ≤ EQ2C_paco = EQ2C. -/
-theorem bisimAux_sound {fuel bound : Nat} {visited : Finset (LocalTypeC × LocalTypeC)}
+theorem bisim_aux_sound {fuel bound : Nat} {visited : Finset (LocalTypeC × LocalTypeC)}
     {p : LocalTypeC × LocalTypeC}
     (hvisited : ∀ q ∈ visited, EQ2C q.1 q.2)
     (hbisim : bisimAux fuel bound visited p = true) :
@@ -291,18 +291,18 @@ theorem bisimAux_sound {fuel bound : Nat} {visited : Finset (LocalTypeC × Local
   -- Use paco coinduction: BisimRel_postfixpoint shows BisimRel is a post-fixpoint
   -- By paco_coind', BisimRel ≤ paco EQ2CMono ⊥ = EQ2C_paco
   have hle : BisimRel bound ≤ EQ2C_paco :=
-    Paco.paco_coind' EQ2CMono ⊥ (BisimRel bound) (BisimRel_postfixpoint bound)
+    Paco.paco_coind' EQ2CMono ⊥ (BisimRel bound) (bisim_rel_postfixpoint bound)
   -- Apply to get EQ2C_paco p.1 p.2
   have hPaco := hle p.1 p.2 hBisim
   -- Convert to EQ2C
-  exact paco_to_EQ2C hPaco
+  exact paco_to_eq2_c hPaco
 
 /-- Soundness: bisim = true implies EQ2C. -/
 theorem bisim_sound {a b : LocalTypeC} {ha : Regular a} {hb : Regular b} {bound : Nat}
     (hbisim : bisim a b ha hb bound = true) :
     EQ2C a b := by
   unfold bisim at hbisim
-  exact bisimAux_sound (fun _ h => (Finset.notMem_empty _ h).elim) hbisim
+  exact bisim_aux_sound (fun _ h => (Finset.notMem_empty _ h).elim) hbisim
 
 -- Maximum Unfolding Depth
 
@@ -311,23 +311,23 @@ def maxUnfoldDepth (t : LocalTypeC) : Nat := by
   -- Use classical choice to decide observability for the bounded unfolding depth.
   classical
   exact if hobs : ObservableC t then
-    Classical.choose (hasNonMuHead_fullUnfoldN_of_observable hobs)
+    Classical.choose (has_non_mu_head_full_unfold_n_of_observable hobs)
   else
     0
 
 -- Maximum Depth: Stability and Head Agreement
 
-lemma hasNonMuHead_fullUnfoldN_maxUnfoldDepth {t : LocalTypeC} (hobs : ObservableC t) :
+lemma has_non_mu_head_full_unfold_n_max_unfold_depth {t : LocalTypeC} (hobs : ObservableC t) :
     hasNonMuHead (fullUnfoldN (maxUnfoldDepth t) t) = true := by
   unfold maxUnfoldDepth
   classical
-  simp [hobs, Classical.choose_spec (hasNonMuHead_fullUnfoldN_of_observable hobs)]
+  simp [hobs, Classical.choose_spec (has_non_mu_head_full_unfold_n_of_observable hobs)]
 
-lemma head_fullUnfoldN_eq_of_unfoldsToC {t u : LocalTypeC} {bound : Nat}
+lemma head_full_unfold_n_eq_of_unfolds_to_c {t u : LocalTypeC} {bound : Nat}
     (hunf : UnfoldsToC t u) (hnomu : ¬ (∃ x, head u = .mu x))
     (hobs : ObservableC t) (hbound : bound ≥ maxUnfoldDepth t) :
     head (fullUnfoldN bound t) = head u := by
-  have hmax := hasNonMuHead_fullUnfoldN_maxUnfoldDepth (t := t) hobs
+  have hmax := has_non_mu_head_full_unfold_n_max_unfold_depth (t := t) hobs
 /- ## Structured Block 5 -/
   have hnomu' : ¬ (∃ x, head (fullUnfoldN (maxUnfoldDepth t) t) = .mu x) := by
     intro hx
@@ -335,14 +335,14 @@ lemma head_fullUnfoldN_eq_of_unfoldsToC {t u : LocalTypeC} {bound : Nat}
     have hmax' : hasNonMuHead (fullUnfoldN (maxUnfoldDepth t) t) = true := hmax
     simp [hasNonMuHead, hx] at hmax'
   have hdet :=
-    observable_head_deterministic hunf (fullUnfoldN_UnfoldsToC (maxUnfoldDepth t) t) hnomu hnomu'
+    observable_head_deterministic hunf (full_unfold_n_unfolds_to_c (maxUnfoldDepth t) t) hnomu hnomu'
   have hge : fullUnfoldN bound t = fullUnfoldN (maxUnfoldDepth t) t :=
-    fullUnfoldN_eq_of_ge hbound hmax
+    full_unfold_n_eq_of_ge hbound hmax
   simpa [hge] using hdet.symm
 
 -- `obsMatch` Soundness from EQ2C
 
-lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
+lemma obs_match_of_eq2_c {a b : LocalTypeC} {bound : Nat}
     (heq : EQ2C a b) (hbound : bound ≥ maxUnfoldDepth a ∧ bound ≥ maxUnfoldDepth b) :
     obsMatch bound a b = true := by
   rcases heq with ⟨R, hR, hab⟩
@@ -354,11 +354,11 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
       rcases hb with ⟨ub, hunf_b, hhead_b⟩
       have hhead_a' : head (fullUnfoldN bound a) = .end := by
         have hnomu : ¬ (∃ x, head ua = .mu x) := by simp [hhead_a]
-        have := head_fullUnfoldN_eq_of_unfoldsToC (bound := bound) hunf_a hnomu obs_a hbound.1
+        have := head_full_unfold_n_eq_of_unfolds_to_c (bound := bound) hunf_a hnomu obs_a hbound.1
         simpa [hhead_a] using this
       have hhead_b' : head (fullUnfoldN bound b) = .end := by
         have hnomu : ¬ (∃ x, head ub = .mu x) := by simp [hhead_b]
-        have := head_fullUnfoldN_eq_of_unfoldsToC (bound := bound) hunf_b hnomu obs_b hbound.2
+        have := head_full_unfold_n_eq_of_unfolds_to_c (bound := bound) hunf_b hnomu obs_b hbound.2
         simpa [hhead_b] using this
       simp [obsMatch, obsKindOf, hhead_a', hhead_b']
   -- `obsMatch_of_EQ2C`: Var Case
@@ -367,11 +367,11 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
       rcases hb with ⟨ub, hunf_b, hhead_b⟩
       have hhead_a' : head (fullUnfoldN bound a) = .var v := by
         have hnomu : ¬ (∃ x, head ua = .mu x) := by simp [hhead_a]
-        have := head_fullUnfoldN_eq_of_unfoldsToC (bound := bound) hunf_a hnomu obs_a hbound.1
+        have := head_full_unfold_n_eq_of_unfolds_to_c (bound := bound) hunf_a hnomu obs_a hbound.1
         simpa [hhead_a] using this
       have hhead_b' : head (fullUnfoldN bound b) = .var v := by
         have hnomu : ¬ (∃ x, head ub = .mu x) := by simp [hhead_b]
-        have := head_fullUnfoldN_eq_of_unfoldsToC (bound := bound) hunf_b hnomu obs_b hbound.2
+        have := head_full_unfold_n_eq_of_unfolds_to_c (bound := bound) hunf_b hnomu obs_b hbound.2
         simpa [hhead_b] using this
       simp [obsMatch, obsKindOf, hhead_a', hhead_b']
   -- `obsMatch_of_EQ2C`: Send Case
@@ -380,21 +380,21 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
       rcases hb with ⟨ub, labels_b, hunf_b, hhead_b, hbs_b⟩
       have hhead_a' : head (fullUnfoldN bound a) = .send p labels_a := by
         have hnomu : ¬ (∃ x, head ua = .mu x) := by simp [hhead_a]
-        have := head_fullUnfoldN_eq_of_unfoldsToC (bound := bound) hunf_a hnomu obs_a hbound.1
+        have := head_full_unfold_n_eq_of_unfolds_to_c (bound := bound) hunf_a hnomu obs_a hbound.1
         simpa [hhead_a] using this
       have hhead_b' : head (fullUnfoldN bound b) = .send p labels_b := by
         have hnomu : ¬ (∃ x, head ub = .mu x) := by simp [hhead_b]
-        have := head_fullUnfoldN_eq_of_unfoldsToC (bound := bound) hunf_b hnomu obs_b hbound.2
+        have := head_full_unfold_n_eq_of_unfolds_to_c (bound := bound) hunf_b hnomu obs_b hbound.2
 /- ## Structured Block 6 -/
         simpa [hhead_b] using this
       have hlabels_a : labelsOfBranches bs = labels_a := by
-        simpa [hbs_a] using (branchesOf_labels_eq (t := ua) (p := p) (labels := labels_a) hhead_a)
+        simpa [hbs_a] using (branches_of_labels_eq (t := ua) (p := p) (labels := labels_a) hhead_a)
       have hlabels_b : labelsOfBranches cs = labels_b := by
-        simpa [hbs_b] using (branchesOf_labels_eq (t := ub) (p := p) (labels := labels_b) hhead_b)
+        simpa [hbs_b] using (branches_of_labels_eq (t := ub) (p := p) (labels := labels_b) hhead_b)
       have hlabels_eq : labels_a = labels_b := by
         calc
           labels_a = labelsOfBranches bs := hlabels_a.symm
-          _ = labelsOfBranches cs := labelsOfBranches_eq_of_BranchesRelC hbr
+          _ = labelsOfBranches cs := labels_of_branches_eq_of_branches_rel_c hbr
           _ = labels_b := hlabels_b
       simp [obsMatch, obsKindOf, hhead_a', hhead_b', hlabels_eq]
   -- `obsMatch_of_EQ2C`: Recv Case
@@ -403,20 +403,20 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
       rcases hb with ⟨ub, labels_b, hunf_b, hhead_b, hbs_b⟩
       have hhead_a' : head (fullUnfoldN bound a) = .recv p labels_a := by
         have hnomu : ¬ (∃ x, head ua = .mu x) := by simp [hhead_a]
-        have := head_fullUnfoldN_eq_of_unfoldsToC (bound := bound) hunf_a hnomu obs_a hbound.1
+        have := head_full_unfold_n_eq_of_unfolds_to_c (bound := bound) hunf_a hnomu obs_a hbound.1
         simpa [hhead_a] using this
       have hhead_b' : head (fullUnfoldN bound b) = .recv p labels_b := by
         have hnomu : ¬ (∃ x, head ub = .mu x) := by simp [hhead_b]
-        have := head_fullUnfoldN_eq_of_unfoldsToC (bound := bound) hunf_b hnomu obs_b hbound.2
+        have := head_full_unfold_n_eq_of_unfolds_to_c (bound := bound) hunf_b hnomu obs_b hbound.2
         simpa [hhead_b] using this
       have hlabels_a : labelsOfBranches bs = labels_a := by
-        simpa [hbs_a] using (branchesOf_labels_eq_recv (t := ua) (p := p) (labels := labels_a) hhead_a)
+        simpa [hbs_a] using (branches_of_labels_eq_recv (t := ua) (p := p) (labels := labels_a) hhead_a)
       have hlabels_b : labelsOfBranches cs = labels_b := by
-        simpa [hbs_b] using (branchesOf_labels_eq_recv (t := ub) (p := p) (labels := labels_b) hhead_b)
+        simpa [hbs_b] using (branches_of_labels_eq_recv (t := ub) (p := p) (labels := labels_b) hhead_b)
       have hlabels_eq : labels_a = labels_b := by
         calc
           labels_a = labelsOfBranches bs := hlabels_a.symm
-          _ = labelsOfBranches cs := labelsOfBranches_eq_of_BranchesRelC hbr
+          _ = labelsOfBranches cs := labels_of_branches_eq_of_branches_rel_c hbr
           _ = labels_b := hlabels_b
       simp [obsMatch, obsKindOf, hhead_a', hhead_b', hlabels_eq]
 

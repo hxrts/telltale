@@ -12,8 +12,8 @@ entries, we need to show value typing (`HasTypeVal`) and process typing
 (`HasTypeProcPre`) are preserved. The key challenge is lifting lookups
 through the appended environment.
 
-Solution Structure. Prove `HasTypeVal_frame_left` by induction on value
-typing. For channel values, use `DisjointG_lookup_left` to show the
+Solution Structure. Prove `has_type_val_frame_left` by induction on value
+typing. For channel values, use `disjoint_g_lookup_left` to show the
 original lookup is preserved. Extend to `HasTypeProcPre` for each
 process constructor.
 -/
@@ -30,7 +30,7 @@ section
 
 -- Value Typing Under Framing
 
-theorem HasTypeVal_frame_left {G₁ G₂ : GEnv} {v : Value} {T : ValType} :
+theorem has_type_val_frame_left {G₁ G₂ : GEnv} {v : Value} {T : ValType} :
     DisjointG G₁ G₂ →
     HasTypeVal G₂ v T →
     HasTypeVal (G₁ ++ G₂) v T := by
@@ -41,19 +41,19 @@ theorem HasTypeVal_frame_left {G₁ G₂ : GEnv} {v : Value} {T : ValType} :
   | nat n => exact HasTypeVal.nat n
   | string s => exact HasTypeVal.string s
   | prod h₁ h₂ =>
-      exact HasTypeVal.prod (HasTypeVal_frame_left hDisj h₁) (HasTypeVal_frame_left hDisj h₂)
+      exact HasTypeVal.prod (has_type_val_frame_left hDisj h₁) (has_type_val_frame_left hDisj h₂)
   | chan h =>
       rename_i e L
-      have hDisjSym := DisjointG_symm hDisj
+      have hDisjSym := disjoint_g_symm hDisj
       have hNone : lookupG G₁ e = none :=
-        DisjointG_lookup_left (G₁:=G₂) (G₂:=G₁) hDisjSym h
+        disjoint_g_lookup_left (G₁:=G₂) (G₂:=G₁) hDisjSym h
       have hLookup : lookupG (G₁ ++ G₂) e = some L := by
-        simpa [lookupG_append_right hNone] using h
+        simpa [lookup_g_append_right hNone] using h
       exact HasTypeVal.chan hLookup
 
 /-- Pre-update typing is stable under framing on the left of G (no S changes). -/
 -- Process Branch Framing on the Left
-theorem HasTypeProcPre_frame_G_branch
+theorem has_type_proc_pre_frame_g_branch
     {Ssh : SEnv} {Sown : OwnedEnv} {G₁ G : GEnv} {k : Var} {procs : List (Label × Process)}
     {e : Endpoint} {p : Role} {bs : List (Label × LocalType)} :
     DisjointG G₁ G →
@@ -81,9 +81,9 @@ theorem HasTypeProcPre_frame_G_branch
     have : e.sid ∈ (∅ : Set SessionId) := by
       simpa [hEmpty] using hInter
     exact this.elim
-  have hNone : lookupG G₁ e = none := lookupG_none_of_not_session (G:=G₁) hNot
+  have hNone : lookupG G₁ e = none := lookup_g_none_of_not_session (G:=G₁) hNot
   have hG' : lookupG (G₁ ++ G) e = some (.branch p bs) := by
-    simpa [lookupG_append_right hNone] using hG
+    simpa [lookup_g_append_right hNone] using hG
   -- Process Branch Framing: Body Lifting
   have hProcs' :
       ∀ i (hi : i < bs.length) (hip : i < procs.length),
@@ -99,27 +99,27 @@ theorem HasTypeProcPre_frame_G_branch
         simpa [hSid'] using hSid
       · have hLookup' : lookupG G e' = some L' := by
           have h :=
-            lookupG_update_neq (env:=G) (e:=e) (e':=e') (L:= (bs.get ⟨i, hi⟩).2) (Ne.symm hEq)
+            lookup_g_update_neq (env:=G) (e:=e) (e':=e') (L:= (bs.get ⟨i, hi⟩).2) (Ne.symm hEq)
           rw [h] at hLookup
           exact hLookup
         exact ⟨e', L', hLookup', hSid'⟩
     have hDisj' : DisjointG G₁ (updateG G e (bs.get ⟨i, hi⟩).2) := by
-      have hDisjSym := DisjointG_symm hDisj
+      have hDisjSym := disjoint_g_symm hDisj
       have hDisj'' :=
-        DisjointG_of_subset_left (G₁:=G) (G₁':=updateG G e (bs.get ⟨i, hi⟩).2)
+        disjoint_g_of_subset_left (G₁:=G) (G₁':=updateG G e (bs.get ⟨i, hi⟩).2)
           (G₂:=G₁) hSub hDisjSym
-      exact DisjointG_symm hDisj''
+      exact disjoint_g_symm hDisj''
     have hPre' := ih i hi hip (G₁':=G₁) hDisj'
     have hUpd :
         updateG (G₁ ++ G) e (bs.get ⟨i, hi⟩).2 =
           G₁ ++ updateG G e (bs.get ⟨i, hi⟩).2 :=
-      updateG_append_left (G₁:=G₁) (G₂:=G) (e:=e) (L:= (bs.get ⟨i, hi⟩).2) hNone
+      update_g_append_left (G₁:=G₁) (G₂:=G) (e:=e) (L:= (bs.get ⟨i, hi⟩).2) hNone
     rw [hUpd.symm] at hPre'
     exact hPre'
   exact HasTypeProcPre.branch hk hG' hLen hLbl hProcs'
 
 -- Process Framing on the Left
-theorem HasTypeProcPre_frame_G {Ssh : SEnv} {Sown : OwnedEnv} {G₁ G₂ : GEnv} {P : Process} :
+theorem has_type_proc_pre_frame_g {Ssh : SEnv} {Sown : OwnedEnv} {G₁ G₂ : GEnv} {P : Process} :
     DisjointG G₁ G₂ →
     HasTypeProcPre Ssh Sown G₂ P →
     HasTypeProcPre Ssh Sown (G₁ ++ G₂) P := by
@@ -132,27 +132,27 @@ theorem HasTypeProcPre_frame_G {Ssh : SEnv} {Sown : OwnedEnv} {G₁ G₂ : GEnv}
       rename_i Sown G k x e q T L
       have hNone : lookupG G₁ e = none :=
 /- ## Structured Block 3 -/
-        DisjointG_lookup_left (G₁:=G) (G₂:=G₁) (DisjointG_symm hDisj) hG
+        disjoint_g_lookup_left (G₁:=G) (G₂:=G₁) (disjoint_g_symm hDisj) hG
       have hG' : lookupG (G₁ ++ G) e = some (.send q T L) := by
-        simpa [lookupG_append_right hNone] using hG
+        simpa [lookup_g_append_right hNone] using hG
       exact HasTypeProcPre.send hk hG' hx
   | recv hk hG hNoSh =>
       rename_i Sown G k x e p T L
       have hNone : lookupG G₁ e = none :=
-        DisjointG_lookup_left (G₁:=G) (G₂:=G₁) (DisjointG_symm hDisj) hG
+        disjoint_g_lookup_left (G₁:=G) (G₂:=G₁) (disjoint_g_symm hDisj) hG
       have hG' : lookupG (G₁ ++ G) e = some (.recv p T L) := by
-        simpa [lookupG_append_right hNone] using hG
+        simpa [lookup_g_append_right hNone] using hG
       exact HasTypeProcPre.recv hk hG' hNoSh
   | select hk hG hbs =>
       rename_i Sown G k l e q bs L
       have hNone : lookupG G₁ e = none :=
-        DisjointG_lookup_left (G₁:=G) (G₂:=G₁) (DisjointG_symm hDisj) hG
+        disjoint_g_lookup_left (G₁:=G) (G₂:=G₁) (disjoint_g_symm hDisj) hG
       have hG' : lookupG (G₁ ++ G) e = some (.select q bs) := by
-        simpa [lookupG_append_right hNone] using hG
+        simpa [lookup_g_append_right hNone] using hG
       exact HasTypeProcPre.select hk hG' hbs
   | branch hk hG hLen hLbl hProcs ih =>
       rename_i Sown G k procs e p bs
-      exact HasTypeProcPre_frame_G_branch (G₁:=G₁) (G:=G) (k:=k) (procs:=procs)
+      exact has_type_proc_pre_frame_g_branch (G₁:=G₁) (G:=G) (k:=k) (procs:=procs)
         (e:=e) (p:=p) (bs:=bs)
         hDisj hk hG hLen hLbl hProcs
         (by
@@ -163,24 +163,24 @@ theorem HasTypeProcPre_frame_G {Ssh : SEnv} {Sown : OwnedEnv} {G₁ G₂ : GEnv}
   | par hDisjS hSplit hP hQ ihP ihQ =>
       exact HasTypeProcPre.par hDisjS hSplit (ihP hDisj) (ihQ hDisj)
   | assign hNoSh hv =>
-      exact HasTypeProcPre.assign hNoSh (HasTypeVal_frame_left hDisj hv)
+      exact HasTypeProcPre.assign hNoSh (has_type_val_frame_left hDisj hv)
 
 -- Left-Frame Wrapper and SEnv Transport
 /-- Frame a disjoint GEnv on the left of pre-typing. -/
-lemma HasTypeProcPre_frame_G_left {Ssh : SEnv} {Sown : OwnedEnv} {Gfr G : GEnv} {P : Process} :
+lemma has_type_proc_pre_frame_g_left {Ssh : SEnv} {Sown : OwnedEnv} {Gfr G : GEnv} {P : Process} :
     DisjointG Gfr G →
     HasTypeProcPre Ssh Sown G P →
     HasTypeProcPre Ssh Sown (Gfr ++ G) P :=
-  HasTypeProcPre_frame_G
+  has_type_proc_pre_frame_g
 
 /-- Any SEnv is domain-included in its right-framed extension. -/
-theorem SEnvDomSubset_into_right_frame {Sbase Sframe : SEnv} :
+theorem s_env_dom_subset_into_right_frame {Sbase Sframe : SEnv} :
     SEnvDomSubset Sbase (Sbase ++ Sframe) := by
   intro x T hLookup
-  exact ⟨T, lookupSEnv_append_left (S₁:=Sbase) (S₂:=Sframe) (x:=x) (T:=T) hLookup⟩
+  exact ⟨T, lookup_s_env_append_left (S₁:=Sbase) (S₂:=Sframe) (x:=x) (T:=T) hLookup⟩
 
 /-- Dom-subset transports lookup absence from a right frame back to the source. -/
-theorem lookupSEnv_none_of_domsubset_right
+theorem lookup_s_env_none_of_domsubset_right
     {Sframe Sright : SEnv} {x : Var} :
     SEnvDomSubset Sframe Sright →
     lookupSEnv Sright x = none →
@@ -198,23 +198,23 @@ theorem lookupSEnv_none_of_domsubset_right
 -- DisjointS Append Decomposition
 
 /-- Disjointness with an appended SEnv implies disjointness with the left side. -/
-theorem DisjointS_of_append_left {S₁ S₂ S₃ : SEnv} :
+theorem disjoint_s_of_append_left {S₁ S₂ S₃ : SEnv} :
     DisjointS S₁ (S₂ ++ S₃) → DisjointS S₁ S₂ := by
   -- Shrink the right side using domain subset.
   intro hDisj
-  have hDom : SEnvDomSubset S₂ (S₂ ++ S₃) := SEnvDomSubset_append_left (S₁:=S₂) (S₂:=S₃)
-  exact DisjointS_of_domsubset_right hDom hDisj
+  have hDom : SEnvDomSubset S₂ (S₂ ++ S₃) := s_env_dom_subset_append_left (S₁:=S₂) (S₂:=S₃)
+  exact disjoint_s_of_domsubset_right hDom hDisj
 
 /-- Disjointness with an appended SEnv implies disjointness with the right side. -/
-theorem DisjointS_of_append_right {S₁ S₂ S₃ : SEnv} :
+theorem disjoint_s_of_append_right {S₁ S₂ S₃ : SEnv} :
     DisjointS S₁ (S₂ ++ S₃) → DisjointS S₁ S₃ := by
   -- Shrink the right side using domain subset.
   intro hDisj
-  have hDom : SEnvDomSubset S₃ (S₂ ++ S₃) := SEnvDomSubset_append_right (S₁:=S₂) (S₂:=S₃)
-  exact DisjointS_of_domsubset_right hDom hDisj
+  have hDom : SEnvDomSubset S₃ (S₂ ++ S₃) := s_env_dom_subset_append_right (S₁:=S₂) (S₂:=S₃)
+  exact disjoint_s_of_domsubset_right hDom hDisj
 
 /-- Disjointness distributes over right appends. -/
-theorem DisjointS_append_right
+theorem disjoint_s_append_right
     {Ssh S₁ S₂ : SEnv} :
     DisjointS Ssh S₁ →
     DisjointS Ssh S₂ →
@@ -224,11 +224,11 @@ theorem DisjointS_append_right
   cases hL1 : lookupSEnv S₁ x with
   | some T₁' =>
       have hEq : T₁' = T₂ := by
-        have hLeft := lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) (x:=x) (T:=T₁') hL1
+        have hLeft := lookup_s_env_append_left (S₁:=S₁) (S₂:=S₂) (x:=x) (T:=T₁') hL1
         exact Option.some.inj (by simpa [hLeft] using hL12)
       exact hDisj1 x T₁ T₁' hLsh (by simpa [hEq] using hL1)
   | none =>
-      have hRight := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hL1
+      have hRight := lookup_s_env_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hL1
       have hL2 : lookupSEnv S₂ x = some T₂ := by
         simpa [hRight] using hL12
       exact hDisj2 x T₁ T₂ hLsh hL2
@@ -236,7 +236,7 @@ theorem DisjointS_append_right
 -- DisjointG Append Composition
 
 /-- DisjointG distributes over right appends. -/
-theorem DisjointG_append_right {G₁ G₂ G₃ : GEnv} :
+theorem disjoint_g_append_right {G₁ G₂ G₃ : GEnv} :
     DisjointG G₁ G₂ →
     DisjointG G₁ G₃ →
     DisjointG G₁ (G₂ ++ G₃) := by
@@ -245,7 +245,7 @@ theorem DisjointG_append_right {G₁ G₂ G₃ : GEnv} :
   intro s hs
   rcases hs with ⟨h1, h23⟩
   have h23' : s ∈ SessionsOf G₂ ∪ SessionsOf G₃ :=
-    SessionsOf_append_subset (G₁:=G₂) (G₂:=G₃) h23
+    sessions_of_append_subset (G₁:=G₂) (G₂:=G₃) h23
   cases h23' with
   | inl h2 =>
       have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj12
@@ -262,7 +262,7 @@ theorem DisjointG_append_right {G₁ G₂ G₃ : GEnv} :
       exact this.elim
 
 -- Empty-Right and Append Projection Lemmas
-lemma SessionsOf_empty : SessionsOf ([] : GEnv) = (∅ : Set SessionId) := by
+lemma sessions_of_empty : SessionsOf ([] : GEnv) = (∅ : Set SessionId) := by
   apply Set.eq_empty_iff_forall_notMem.mpr
   intro s hs
   rcases hs with ⟨e, L, hLookup, _⟩
@@ -270,44 +270,44 @@ lemma SessionsOf_empty : SessionsOf ([] : GEnv) = (∅ : Set SessionId) := by
     simpa [lookupG] using hLookup
   exact this.elim
 
-lemma DisjointG_right_empty (G : GEnv) : DisjointG G ([] : GEnv) := by
-  simp [DisjointG, GEnvDisjoint, SessionsOf_empty]
+lemma disjoint_g_right_empty (G : GEnv) : DisjointG G ([] : GEnv) := by
+  simp [DisjointG, GEnvDisjoint, sessions_of_empty]
 
 /-- DisjointG with an appended GEnv implies disjointness with the left side. -/
-theorem DisjointG_of_append_left {G₁ G₂ G₃ : GEnv} :
+theorem disjoint_g_of_append_left {G₁ G₂ G₃ : GEnv} :
     DisjointG G₁ (G₂ ++ G₃) → DisjointG G₁ G₂ := by
   -- Shrink the right side using session subset.
   intro hDisj
-  have hDisjSym := DisjointG_symm hDisj
-  have hSub : SessionsOf G₂ ⊆ SessionsOf (G₂ ++ G₃) := SessionsOf_append_left (G₁:=G₂) (G₂:=G₃)
-  have hDisj' := DisjointG_of_subset_left hSub hDisjSym
-  exact DisjointG_symm hDisj'
+  have hDisjSym := disjoint_g_symm hDisj
+  have hSub : SessionsOf G₂ ⊆ SessionsOf (G₂ ++ G₃) := sessions_of_append_left (G₁:=G₂) (G₂:=G₃)
+  have hDisj' := disjoint_g_of_subset_left hSub hDisjSym
+  exact disjoint_g_symm hDisj'
 
 /-- DisjointG with an appended GEnv implies disjointness with the right side. -/
-theorem DisjointG_of_append_right {G₁ G₂ G₃ : GEnv} :
+theorem disjoint_g_of_append_right {G₁ G₂ G₃ : GEnv} :
     DisjointG G₁ (G₂ ++ G₃) → DisjointG G₁ G₃ := by
   -- Shrink the right side using session subset.
   intro hDisj
-  have hDisjSym := DisjointG_symm hDisj
-  have hSub : SessionsOf G₃ ⊆ SessionsOf (G₂ ++ G₃) := SessionsOf_append_right (G₁:=G₂) (G₂:=G₃)
-  have hDisj' := DisjointG_of_subset_left hSub hDisjSym
-  exact DisjointG_symm hDisj'
+  have hDisjSym := disjoint_g_symm hDisj
+  have hSub : SessionsOf G₃ ⊆ SessionsOf (G₂ ++ G₃) := sessions_of_append_right (G₁:=G₂) (G₂:=G₃)
+  have hDisj' := disjoint_g_of_subset_left hSub hDisjSym
+  exact disjoint_g_symm hDisj'
 
 -- Lookup and Update Preservation Under Disjoint Framing
 
 /-- Lift a GEnv lookup across a left frame using disjointness. -/
-theorem lookupG_frame_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
+theorem lookup_g_frame_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
     DisjointG G₁ G₂ →
     lookupG G₂ e = some L →
     lookupG (G₁ ++ G₂) e = some L := by
   intro hDisj hLookup
-  have hDisjSym := DisjointG_symm hDisj
+  have hDisjSym := disjoint_g_symm hDisj
   have hNone : lookupG G₁ e = none :=
-    DisjointG_lookup_left (G₁:=G₂) (G₂:=G₁) hDisjSym hLookup
-  simpa [lookupG_append_right hNone] using hLookup
+    disjoint_g_lookup_left (G₁:=G₂) (G₂:=G₁) hDisjSym hLookup
+  simpa [lookup_g_append_right hNone] using hLookup
 
 /-- GEnv disjointness is preserved when updating an existing endpoint on the right. -/
-theorem DisjointG_updateG_left
+theorem disjoint_g_update_g_right
     {G₁ G₂ : GEnv} {e : Endpoint} {L L' : LocalType} :
     DisjointG G₁ G₂ →
     lookupG G₂ e = some L →
@@ -323,16 +323,16 @@ theorem DisjointG_updateG_left
       exact ⟨e', L, hLookup'', hSid⟩
     · have hLookup'' : lookupG G₂ e' = some L'' := by
 /- ## Structured Block 6 -/
-        have h := lookupG_update_neq (env:=G₂) (e:=e) (e':=e') (L:=L') (Ne.symm hEq)
+        have h := lookup_g_update_neq (env:=G₂) (e:=e) (e':=e') (L:=L') (Ne.symm hEq)
         simpa [h] using hLookup'
       exact ⟨e', L'', hLookup'', hSid⟩
-  have hDisjSym := DisjointG_symm hDisj
+  have hDisjSym := disjoint_g_symm hDisj
   have hDisj' :=
-    DisjointG_of_subset_left (G₁:=G₂) (G₁':=updateG G₂ e L') (G₂:=G₁) hSub hDisjSym
-  exact DisjointG_symm hDisj'
+    disjoint_g_of_subset_left (G₁:=G₂) (G₁':=updateG G₂ e L') (G₂:=G₁) hSub hDisjSym
+  exact disjoint_g_symm hDisj'
 
 -- Disjoint Lookup Elimination
-lemma lookupG_none_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
+lemma lookup_g_none_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
     {e : Endpoint} {L : LocalType} (hLookup : lookupG G₂ e = some L) :
     lookupG G₁ e = none := by
   by_cases hNone : lookupG G₁ e = none

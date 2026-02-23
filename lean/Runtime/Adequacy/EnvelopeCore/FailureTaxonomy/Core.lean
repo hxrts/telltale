@@ -369,7 +369,7 @@ def RestartRefinementStructuredErrorAdequacy {State : Type u}
   StructuredErrorAdequacyAfterRestart structuredErrors checkpoint restart
 
 /-- Identity restart/checkpoint trivially satisfies restart+structured-error adequacy. -/
-theorem restartStructuredErrorAdequacy_identity
+theorem restart_structured_error_adequacy_identity
     {State : Type u}
     (structuredErrors : StructuredErrorProjection State) :
     RestartRefinementStructuredErrorAdequacy

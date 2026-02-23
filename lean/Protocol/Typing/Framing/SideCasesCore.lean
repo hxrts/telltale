@@ -47,7 +47,7 @@ lemma preserved_sub_frame_branch_cont
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown G P Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
   intro h
-  exact ⟨W, Δ, h, FootprintSubset_refl, SEnvDomSubset_refl⟩
+  exact ⟨W, Δ, h, footprint_subset_refl, s_env_dom_subset_refl⟩
 
 /-! ## Assign Case Core (Left Frame) -/
 
@@ -67,7 +67,7 @@ lemma preserved_sub_frame_assign_left_core
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' Gbase' .skip Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
   intro hEq hEq' hv hvPre hSout hSfin hGfin
-  have hT := HasTypeVal_unique hvPre hv
+  have hT := has_type_val_unique hvPre hv
   cases hT
   have hEqG : Gbase' ++ Gframe = Gbase ++ Gframe := by
     have hEq0 : Gbase' ++ Gframe = G := by simpa using hEq'.symm
@@ -98,7 +98,7 @@ lemma preserved_sub_frame_assign_right_core
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' Gbase' .skip Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
   intro hEq hEq' hv hvPre hSout hSfin hGfin
-  have hT := HasTypeVal_unique hvPre hv
+  have hT := has_type_val_unique hvPre hv
   cases hT
   have hEqG : Gframe ++ Gbase' = Gframe ++ Gbase := by
     have hEq0 : Gframe ++ Gbase' = G := by simpa using hEq'.symm

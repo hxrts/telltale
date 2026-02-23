@@ -12,7 +12,7 @@ and a relational specification (`StepBase`). We need soundness (if the
 function returns `some C'`, then `StepBase C C'` holds) and completeness
 (if `StepBase C C'`, then the function returns `some C'`).
 
-Solution Structure. Prove `stepBaseDecide_sound` by case analysis on
+Solution Structure. Prove `step_base_decide_sound` by case analysis on
 process form, matching each function branch to its `StepBase` constructor.
 Use helper lemmas to extract label equalities from list finds.
 -/
@@ -29,7 +29,7 @@ section
 -- Simulation Properties
 
 /-- Extract the matched label from a `find?` with label predicate. -/
-private theorem findLabel_eq {α : Type} {lbl lbl' : Label} {xs : List (Label × α)} {v : α}
+private theorem find_label_eq {α : Type} {lbl lbl' : Label} {xs : List (Label × α)} {v : α}
     (h : xs.find? (fun b => b.1 == lbl) = some (lbl', v)) : lbl' = lbl := by
   have hPred : (lbl' == lbl) := (List.find?_eq_some_iff_append (xs := xs)
     (p := fun b => b.1 == lbl) (b := (lbl', v))).1 h |>.1
@@ -38,7 +38,7 @@ private theorem findLabel_eq {α : Type} {lbl lbl' : Label} {xs : List (Label ×
   exact (beq_iff_eq).1 hPred'
 
 /-- If stepBaseDecide returns some, then StepBase holds. -/
-theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
+theorem step_base_decide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
     StepBase C C' := by
   cases hProc : C.proc with
   -- Base-Decide Soundness: skip case
@@ -102,7 +102,7 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
               case some pair =>
                 cases pair with
                 | mk lbl L =>
-                  have hLbl : lbl = ℓ := findLabel_eq (xs := branches) (v := L) hFind
+                  have hLbl : lbl = ℓ := find_label_eq (xs := branches) (v := L) hFind
                   have hFind' :
                       branches.find? (fun b => b.1 == ℓ) = some (ℓ, L) := by
                     simpa [hLbl] using hFind
@@ -147,8 +147,8 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
                           case some pairDeq =>
                             cases pairDeq with
                             | mk bufs' ts =>
-                              have hLblP : lblP = ℓ := findLabel_eq (xs := procBranches) (v := P) hFindP
-                              have hLblT : lblT = ℓ := findLabel_eq (xs := typeBranches) (v := L) hFindT
+                              have hLblP : lblP = ℓ := find_label_eq (xs := procBranches) (v := P) hFindP
+                              have hLblT : lblT = ℓ := find_label_eq (xs := typeBranches) (v := L) hFindT
                               have hFindP' :
                                   procBranches.find? (fun b => b.1 == ℓ) = some (ℓ, P) := by
                                 simpa [hLblP] using hFindP
@@ -215,7 +215,7 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
               simp [stepBaseDecide, hProc, hP, hQ] at h
 
 /-- If stepDecide returns some, then Step holds (soundness). -/
-theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
+theorem step_decide_sound {C C' : Config} (h : stepDecide C = some C') :
     Step C C' := by
   classical
   have wf := (measure (fun C : Config => procSize C.proc)).wf
@@ -254,7 +254,7 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
               simpa [stepDecide, stepDecideAux, hProc, hPskip, hsub'] using hstep.symm
             subst hC'
             have hlt : procSize ({ C with proc := P }.proc) < procSize C.proc := by
-              simpa [hProc] using procSize_lt_seq_left P Q
+              simpa [hProc] using proc_size_lt_seq_left P Q
             have hStepSub : Step { C with proc := P } C0 := by
               exact ih _ hlt _ hsub
             exact Step.seq_left hProc hStepSub
@@ -280,7 +280,7 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
                 simpa [stepDecide, stepDecideAux, hProc, hPskip, hQskip, hsub'] using hstep.symm
               subst hC'
               have hlt : procSize ({ C with proc := P }.proc) < procSize C.proc := by
-                simpa [hProc] using procSize_lt_par_left nS nG P Q
+                simpa [hProc] using proc_size_lt_par_left nS nG P Q
               have hStepSub : Step { C with proc := P } C0 := by
                 exact ih _ hlt _ hsub
               exact Step.par_left hProc hStepSub
@@ -296,7 +296,7 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
                   subst hC'
                   have hlt : procSize ({ C with proc := Q }.proc) < procSize C.proc := by
 /- ## Structured Block 6 -/
-                    simpa [hProc] using procSize_lt_par_right nS nG P Q
+                    simpa [hProc] using proc_size_lt_par_right nS nG P Q
                   have hStepSub : Step { C with proc := Q } C0 := by
                     exact ih _ hlt _ hsubR
                   exact Step.par_right hProc hStepSub
@@ -312,35 +312,35 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
   | send k x =>
       have hBase : stepBaseDecide C = some C' := by
         simpa [stepDecide, stepDecideAux, hProc] using hstep
-      exact Step.base (stepBaseDecide_sound hBase)
+      exact Step.base (step_base_decide_sound hBase)
   -- Contextual Soundness: base recv case
   | recv k x =>
       have hBase : stepBaseDecide C = some C' := by
         simpa [stepDecide, stepDecideAux, hProc] using hstep
-      exact Step.base (stepBaseDecide_sound hBase)
+      exact Step.base (step_base_decide_sound hBase)
   -- Contextual Soundness: base select case
   | select k ℓ =>
       have hBase : stepBaseDecide C = some C' := by
         simpa [stepDecide, stepDecideAux, hProc] using hstep
-      exact Step.base (stepBaseDecide_sound hBase)
+      exact Step.base (step_base_decide_sound hBase)
   -- Contextual Soundness: base branch case
   | branch k bs =>
       have hBase : stepBaseDecide C = some C' := by
         simpa [stepDecide, stepDecideAux, hProc] using hstep
-      exact Step.base (stepBaseDecide_sound hBase)
+      exact Step.base (step_base_decide_sound hBase)
   -- Contextual Soundness: base newSession case
   | newSession roles f P =>
       have hBase : stepBaseDecide C = some C' := by
         simpa [stepDecide, stepDecideAux, hProc] using hstep
-      exact Step.base (stepBaseDecide_sound hBase)
+      exact Step.base (step_base_decide_sound hBase)
   -- Contextual Soundness: base assign case
   | assign x v =>
       have hBase : stepBaseDecide C = some C' := by
         simpa [stepDecide, stepDecideAux, hProc] using hstep
-      exact Step.base (stepBaseDecide_sound hBase)
+      exact Step.base (step_base_decide_sound hBase)
 
 /-- If Step holds for decidable cases, stepDecide returns some (completeness for decidable subset). -/
-theorem stepDecide_complete_base {C C' : Config} (_ : StepBase C C')
+theorem step_decide_complete_base {C C' : Config} (_ : StepBase C C')
     (_ : stepBaseDecide C = some C') :
     True := by
   trivial

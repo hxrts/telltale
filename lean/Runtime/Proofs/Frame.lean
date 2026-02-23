@@ -80,12 +80,12 @@ theorem session_local_op_compose {s : SessionId}
 /-! ## Example: Role Swap Frame -/
 
 /-- Example use of the frame rule: role swap preserves coherence for other sessions. -/
-theorem swapRoles_frame_example {s sOther : SessionId} {A B : Role}
+theorem swap_roles_frame_example {s sOther : SessionId} {A B : Role}
     {G : GEnv} {D : DEnv} (hDiff : sOther ≠ s)
     (hCoh : SessionCoherent G D sOther) :
     let (G', D') := swapRolesOp s A B (G, D)
     SessionCoherent G' D' sOther := by
-  exact swapRoles_preserves_other_sessions (s:=s) (sOther:=sOther) (A:=A) (B:=B) hDiff hCoh
+  exact swap_roles_preserves_other_sessions (s:=s) (sOther:=sOther) (A:=A) (B:=B) hDiff hCoh
 
 /-- Operations on disjoint sessions preserve coherence for "unrelated" sessions.
     The third-session case: if s ∉ {s₁, s₂}, coherence for s is preserved. -/
@@ -119,7 +119,7 @@ theorem disjoint_sessions_independent {s₁ s₂ : SessionId}
     (hCoh : Coherent G D) :
     -- Coherence for s₁ is independent of changes to s₂ and vice versa
     SessionCoherent G D s₁ ∧ SessionCoherent G D s₂ := by
-  rw [VMCoherent_iff_forall_SessionCoherent] at hCoh
+  rw [vm_coherent_iff_forall_session_coherent] at hCoh
   exact ⟨hCoh s₁, hCoh s₂⟩
 
 /-! ## VM-Level Footprint and Frame Interfaces -/

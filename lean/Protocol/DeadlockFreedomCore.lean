@@ -169,7 +169,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     simp only [affectsSession, stepSessionId, hProc, hk] at hAffects
     simp only [sendStep, enqueueBuf]
     symm
-    apply lookupBuf_update_neq
+    apply lookup_buf_update_neq
     intro heq
     -- heq: modified edge = query edge, so their sids are equal
     have h1 : (_ : Edge).sid = queryEdge.sid := congrArg Edge.sid heq
@@ -186,7 +186,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     simp only [recvStep, dequeueBuf, hBufLookup]
     -- Now goal is: lookup C.bufs = lookup (updateBuf C.bufs edge _) queryEdge
     symm
-    apply lookupBuf_update_neq
+    apply lookup_buf_update_neq
 /- ## Structured Block 3 -/
     intro heq
     have h1 : (_ : Edge).sid = queryEdge.sid := congrArg Edge.sid heq
@@ -200,7 +200,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     simp only [affectsSession, stepSessionId, hProc, hk] at hAffects
     simp only [sendStep, enqueueBuf]
     symm
-    apply lookupBuf_update_neq
+    apply lookup_buf_update_neq
     intro heq
     have h1 : (_ : Edge).sid = queryEdge.sid := congrArg Edge.sid heq
     simp only [queryEdge] at h1
@@ -221,7 +221,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
     have hBufsEq : _ = bufs'_ := congrArg Prod.fst hdq
     rw [← hBufsEq]
     symm
-    apply lookupBuf_update_neq
+    apply lookup_buf_update_neq
     intro heq
     have h1 : (_ : Edge).sid = queryEdge.sid := congrArg Edge.sid heq
     simp only [queryEdge] at h1
@@ -242,7 +242,7 @@ theorem session_isolation (C C' : Config) (s1 s2 : SessionId) (r : Role)
       simp only [queryEdge, hep]
       rw [hSidEq]
       exact Ne.symm hNeq
-    have hLookupNone := initBuffers_lookup_none C.nextSid theRoles queryEdge hSidNe
+    have hLookupNone := init_buffers_lookup_none C.nextSid theRoles queryEdge hSidNe
     rw [hLookupNone]
     simp only [Option.none_or]
   -- session_isolation: Buffer-Preserving Structural Cases

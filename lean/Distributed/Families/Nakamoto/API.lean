@@ -31,22 +31,22 @@ structure SecurityProtocol where
       liveness_under_churn_of_assumptions assumptions premises
 
 /-- Extract probabilistic-safety theorem from a certified protocol bundle. -/
-theorem probabilisticSafety_of_protocol (P : SecurityProtocol) :
+theorem probabilistic_safety_of_protocol (P : SecurityProtocol) :
     ProbabilisticSafety P.model P.premises.AdmissibleRun P.premises.ε :=
   P.probabilisticSafety
 
 /-- Extract settlement-finality theorem from a certified protocol bundle. -/
-theorem settlementFinality_of_protocol (P : SecurityProtocol) :
+theorem settlement_finality_of_protocol (P : SecurityProtocol) :
     SettlementDepthFinality P.model P.premises.AdmissibleRun P.premises.settlementDepth :=
   P.settlementFinality
 
 /-- Extract churn-liveness theorem from a certified protocol bundle. -/
-theorem livenessUnderChurn_of_protocol (P : SecurityProtocol) :
+theorem liveness_under_churn_of_protocol (P : SecurityProtocol) :
     LivenessUnderChurn P.model P.premises.AdmissibleRun P.premises.churnBudget :=
   P.livenessUnderChurn
 
 /-- Core assumptions are always validated for a certified protocol. -/
-theorem coreAssumptions_allPassed (P : SecurityProtocol) :
+theorem core_assumptions_all_passed (P : SecurityProtocol) :
     (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
   rfl
 

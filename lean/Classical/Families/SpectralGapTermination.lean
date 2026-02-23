@@ -60,7 +60,7 @@ def spectralGap (mc : MarkovChain State) : ℝ :=
 def SpectralGapNonneg (mc : MarkovChain State) : Prop :=
   secondLargestEigenvalue mc ≤ 1
 
-theorem spectralGap_nonneg (mc : MarkovChain State) (h : SpectralGapNonneg mc) :
+theorem spectral_gap_nonneg (mc : MarkovChain State) (h : SpectralGapNonneg mc) :
     0 ≤ spectralGap mc := by
   unfold spectralGap SpectralGapNonneg at *
   linarith
@@ -110,7 +110,7 @@ theorem cheeger_inequality (mc : MarkovChain State)
 def SpectralGapPos (mc : MarkovChain State) : Prop :=
   secondLargestEigenvalue mc < 1
 
-theorem spectralGap_pos (mc : MarkovChain State) (h : SpectralGapPos mc) :
+theorem spectral_gap_pos (mc : MarkovChain State) (h : SpectralGapPos mc) :
     0 < spectralGap mc := by
   unfold spectralGap SpectralGapPos at *
   linarith

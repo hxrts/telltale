@@ -25,7 +25,7 @@ open SessionTypes.GlobalType
 -- Guardedness Under Lift (Below Cutoff)
 
 /-- Guardedness is preserved by lifting when the index is below the cutoff. -/
-theorem isGuarded_lift_lt (t : LocalTypeDB) (i c k : Nat) :
+theorem is_guarded_lift_lt (t : LocalTypeDB) (i c k : Nat) :
     i < k → t.isGuarded i = true → (t.lift c k).isGuarded i = true := by
   intro hik hguard
   let P1 : LocalTypeDB → Prop :=
@@ -71,7 +71,7 @@ theorem isGuarded_lift_lt (t : LocalTypeDB) (i c k : Nat) :
 -- Guardedness Under Lift (At/Above Cutoff)
 
 /-- Guardedness is preserved by lifting when the index is at or above the cutoff (shifted). -/
-theorem isGuarded_lift_ge (t : LocalTypeDB) (i c k : Nat) :
+theorem is_guarded_lift_ge (t : LocalTypeDB) (i c k : Nat) :
     k ≤ i → t.isGuarded i = true → (t.lift c k).isGuarded (i + c) = true := by
   intro hik hguard
   let P1 : LocalTypeDB → Prop :=
@@ -122,7 +122,7 @@ theorem isGuarded_lift_ge (t : LocalTypeDB) (i c k : Nat) :
 -- Guardedness Lift Gap
 
 /-- After lifting by 1 at cutoff k, index k cannot appear (it's in a gap). -/
-theorem isGuarded_lift_at_cutoff (t : LocalTypeDB) (k : Nat) :
+theorem is_guarded_lift_at_cutoff (t : LocalTypeDB) (k : Nat) :
     (t.lift 1 k).isGuarded k = true := by
   let P1 : LocalTypeDB → Prop := fun t => ∀ k, (t.lift 1 k).isGuarded k = true
   let P2 : List (Label × LocalTypeDB) → Prop := fun _ => True
@@ -164,13 +164,13 @@ theorem isGuarded_lift_at_cutoff (t : LocalTypeDB) (k : Nat) :
   exact hrec k
 
 /-- Lifting by 1 at cutoff 0 always guards index 0. -/
-theorem isGuarded_lift_zero (t : LocalTypeDB) : (t.lift 1 0).isGuarded 0 = true :=
-  isGuarded_lift_at_cutoff t 0
+theorem is_guarded_lift_zero (t : LocalTypeDB) : (t.lift 1 0).isGuarded 0 = true :=
+  is_guarded_lift_at_cutoff t 0
 
 -- Guardedness Under Substitution
 
 /-- Substitution preserves guardedness when the index is below the substitution point. -/
-theorem isGuarded_subst_lt (t e : LocalTypeDB) (i k : Nat) :
+theorem is_guarded_subst_lt (t e : LocalTypeDB) (i k : Nat) :
     i < k → t.isGuarded i = true → e.isGuarded i = true →
     (t.subst k e).isGuarded i = true := by
   intro hik hguard heguard
@@ -208,7 +208,7 @@ theorem isGuarded_subst_lt (t e : LocalTypeDB) (i k : Nat) :
       simp [LocalTypeDB.isGuarded] at hguard
       have hik' : i + 1 < k + 1 := Nat.succ_lt_succ hik
       have heguard' : (e.lift 1 0).isGuarded (i + 1) = true := by
-        have hge := isGuarded_lift_ge e i 1 0 (Nat.zero_le i) heguard
+        have hge := is_guarded_lift_ge e i 1 0 (Nat.zero_le i) heguard
         simpa using hge
       have hsub := hbody (e.lift 1 0) (i + 1) (k + 1) hik' hguard heguard'
       simpa [LocalTypeDB.subst, LocalTypeDB.isGuarded] using hsub
@@ -222,7 +222,7 @@ theorem isGuarded_subst_lt (t e : LocalTypeDB) (i k : Nat) :
 
 -- Contractiveness Under Lift
 
-private theorem isContractive_lift (t : LocalTypeDB) (c k : Nat) :
+private theorem is_contractive_lift (t : LocalTypeDB) (c k : Nat) :
 /- ## Structured Block 4 -/
     t.isContractive = true → (t.lift c k).isContractive = true := by
   intro h
@@ -260,7 +260,7 @@ private theorem isContractive_lift (t : LocalTypeDB) (c k : Nat) :
         simpa [LocalTypeDB.isContractive, Bool.and_eq_true] using h
       rcases hpair with ⟨hguard, hcontr⟩
       have hguard' : (body.lift c (k + 1)).isGuarded 0 = true :=
-        isGuarded_lift_lt body 0 c (k + 1) (Nat.succ_pos k) hguard
+        is_guarded_lift_lt body 0 c (k + 1) (Nat.succ_pos k) hguard
       have hcontr' : (body.lift c (k + 1)).isContractive = true := hbody c (k + 1) hcontr
       simp [LocalTypeDB.isContractive, LocalTypeDB.lift, hguard', hcontr']
     -- nil case
@@ -281,7 +281,7 @@ private theorem isContractive_lift (t : LocalTypeDB) (c k : Nat) :
 
 -- Contractiveness Lift: Branches
 
-private theorem isContractiveBranches_lift (bs : List (Label × LocalTypeDB)) (c k : Nat) :
+private theorem is_contractive_branches_lift (bs : List (Label × LocalTypeDB)) (c k : Nat) :
     isContractiveBranches bs = true → isContractiveBranches (liftBranches c k bs) = true := by
   intro h
   induction bs with
@@ -292,13 +292,13 @@ private theorem isContractiveBranches_lift (bs : List (Label × LocalTypeDB)) (c
       simp [isContractiveBranches, liftBranches, Bool.and_eq_true] at h ⊢
       rcases h with ⟨ht, hrest⟩
       constructor
-      · exact isContractive_lift t c k ht
+      · exact is_contractive_lift t c k ht
       · exact ih hrest
 
 -- Contractiveness Under Substitution
 
 /-- Substitution preserves contractiveness. -/
-theorem isContractive_subst (body e : LocalTypeDB) (k : Nat) :
+theorem is_contractive_subst (body e : LocalTypeDB) (k : Nat) :
     body.isContractive = true → e.isContractive = true →
     (body.subst k e).isContractive = true := by
   intro hbody he
@@ -340,11 +340,11 @@ theorem isContractive_subst (body e : LocalTypeDB) (k : Nat) :
       have hpair : body.isGuarded 0 = true ∧ body.isContractive = true := by
         simpa [LocalTypeDB.isContractive, Bool.and_eq_true] using hbody
       rcases hpair with ⟨hguard, hcontr⟩
-      have he_lift : (e.lift 1 0).isContractive = true := isContractive_lift e 1 0 he
+      have he_lift : (e.lift 1 0).isContractive = true := is_contractive_lift e 1 0 he
       have hguard_subst : (body.subst (k + 1) (e.lift 1 0)).isGuarded 0 = true := by
         have hlt : 0 < k + 1 := Nat.succ_pos k
-        have he_guard : (e.lift 1 0).isGuarded 0 = true := isGuarded_lift_zero e
-        exact isGuarded_subst_lt body (e.lift 1 0) 0 (k + 1) hlt hguard he_guard
+        have he_guard : (e.lift 1 0).isGuarded 0 = true := is_guarded_lift_zero e
+        exact is_guarded_subst_lt body (e.lift 1 0) 0 (k + 1) hlt hguard he_guard
       have hcontr_subst : (body.subst (k + 1) (e.lift 1 0)).isContractive = true :=
         hbody_ih (e.lift 1 0) (k + 1) hcontr he_lift
 /- ## Structured Block 6 -/
@@ -367,7 +367,7 @@ theorem isContractive_subst (body e : LocalTypeDB) (k : Nat) :
 
 -- Contractiveness Substitution: Branches
 
-theorem isContractive_subst_branches (bs : List (Label × LocalTypeDB)) (e : LocalTypeDB) (k : Nat) :
+theorem is_contractive_subst_branches (bs : List (Label × LocalTypeDB)) (e : LocalTypeDB) (k : Nat) :
     isContractiveBranches bs = true → e.isContractive = true →
     isContractiveBranches (substBranches bs k e) = true := by
   intro hbs he
@@ -378,20 +378,20 @@ theorem isContractive_subst_branches (bs : List (Label × LocalTypeDB)) (e : Loc
       simp [isContractiveBranches, substBranches, Bool.and_eq_true] at hbs ⊢
       rcases hbs with ⟨ht, hrest⟩
       constructor
-      · exact isContractive_subst t e k ht he
+      · exact is_contractive_subst t e k ht he
       · exact ih hrest
 
 -- Contractiveness Under Unfolding
 
 /-- Substituting a mu into its body preserves contractiveness (mu-unfolding case). -/
-theorem isContractive_subst_mu (body : LocalTypeDB) :
+theorem is_contractive_subst_mu (body : LocalTypeDB) :
   body.isContractive = true → (LocalTypeDB.mu body).isContractive = true →
   (body.subst 0 (LocalTypeDB.mu body)).isContractive = true := by
   intro hbody hmu
-  exact isContractive_subst body (LocalTypeDB.mu body) 0 hbody hmu
+  exact is_contractive_subst body (LocalTypeDB.mu body) 0 hbody hmu
 
 /-- Unfolding preserves contractiveness. -/
-theorem isContractive_unfold (t : LocalTypeDB) :
+theorem is_contractive_unfold (t : LocalTypeDB) :
   t.isContractive = true → t.unfold.isContractive = true := by
   intro h
   cases t with
@@ -400,7 +400,7 @@ theorem isContractive_unfold (t : LocalTypeDB) :
         have hpair : body.isGuarded 0 = true ∧ body.isContractive = true := by
           simpa [LocalTypeDB.isContractive, Bool.and_eq_true] using h
         exact hpair.2
-      simpa [LocalTypeDB.unfold] using isContractive_subst body (LocalTypeDB.mu body) 0 hbody h
+      simpa [LocalTypeDB.unfold] using is_contractive_subst body (LocalTypeDB.mu body) 0 hbody h
   | «end» =>
       simpa [LocalTypeDB.unfold] using h
   | var n =>
@@ -411,7 +411,7 @@ theorem isContractive_unfold (t : LocalTypeDB) :
       simpa [LocalTypeDB.unfold] using h
 
 /-- Iterated unfolding preserves contractiveness. -/
-theorem isContractive_iter_unfold (k : Nat) (t : LocalTypeDB) :
+theorem is_contractive_iter_unfold (k : Nat) (t : LocalTypeDB) :
 /- ## Structured Block 7 -/
   t.isContractive = true → ((LocalTypeDB.unfold)^[k] t).isContractive = true := by
   induction k generalizing t with
@@ -420,15 +420,15 @@ theorem isContractive_iter_unfold (k : Nat) (t : LocalTypeDB) :
       simpa using h
   | succ k ih =>
       intro h
-      have h' : t.unfold.isContractive = true := isContractive_unfold t h
+      have h' : t.unfold.isContractive = true := is_contractive_unfold t h
       simpa [Function.iterate_succ] using ih (t := t.unfold) h'
 
 /-- Full unfolding preserves contractiveness. -/
-theorem isContractive_fullUnfold (t : LocalTypeDB) :
+theorem is_contractive_full_unfold (t : LocalTypeDB) :
   t.isContractive = true → t.fullUnfold.isContractive = true := by
   intro h
   simpa [LocalTypeDB.fullUnfold] using
-    isContractive_iter_unfold (k := t.muHeight) t h
+    is_contractive_iter_unfold (k := t.muHeight) t h
 
 
 end SessionTypes

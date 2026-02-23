@@ -60,7 +60,7 @@ applies:
    via mean-field approximations, simplifying capacity planning.
 
 The `empiricalMean` function computes the average over sessions, and
-`empiricalMean_perm` proves this average is invariant under relabeling.
+`empirical_mean_perm` proves this average is invariant under relabeling.
 This exchangeability is the mathematical signature of "chaos": sessions
 are statistically interchangeable.
 
@@ -134,7 +134,7 @@ def empiricalMean [EntropyAPI.AnalysisModel] (x : Fin n → Real) : Real :=
 
     Relabeling sessions does not change the aggregate. This is the
     foundation of exchangeability: sessions are statistically equivalent. -/
-theorem empiricalTotal_perm (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
+theorem empirical_total_perm (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
     empiricalTotal (fun i => x (σ i)) = empiricalTotal x := by
   simpa [empiricalTotal] using
     (Fintype.sum_equiv σ (fun i => x (σ i)) x (by intro i; rfl))
@@ -148,11 +148,11 @@ theorem empiricalTotal_perm (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
 
     For Coherence: this justifies analyzing "typical" session behavior
     without tracking which specific sessions we are examining. -/
-theorem empiricalMean_perm (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
+theorem empirical_mean_perm (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
     [EntropyAPI.AnalysisLaws] →
     empiricalMean (fun i => x (σ i)) = empiricalMean x := by
   intro _
-  simpa [empiricalMean] using EntropyAPI.finiteAverage_perm σ x
+  simpa [empiricalMean] using EntropyAPI.finite_average_perm σ x
 
 /-- The empirical mean of a constant is that constant.
 
@@ -162,11 +162,11 @@ theorem empiricalMean_perm (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
 
     For protocols: if all sessions are in identical states, the
     aggregate behavior equals the individual behavior. -/
-theorem empiricalMean_const (c : Real) :
+theorem empirical_mean_const (c : Real) :
     [EntropyAPI.AnalysisLaws] →
     ∀ hn : n ≠ 0, empiricalMean (fun _ : Fin n => c) = c := by
   intro _ hn
-  simpa [empiricalMean] using EntropyAPI.finiteAverage_const c hn
+  simpa [empiricalMean] using EntropyAPI.finite_average_const c hn
 
 end PropagationOfChaos
 end Classical

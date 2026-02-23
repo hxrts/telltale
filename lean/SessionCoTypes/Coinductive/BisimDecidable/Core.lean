@@ -106,7 +106,7 @@ def hasNonMuHead (t : LocalTypeC) : Bool :=
   | .mu _ => false
   | _ => true
 
-lemma fullUnfoldN_of_unfoldsToC {t u : LocalTypeC} (h : UnfoldsToC t u) :
+lemma full_unfold_n_of_unfolds_to_c {t u : LocalTypeC} (h : UnfoldsToC t u) :
     ∃ n, fullUnfoldN n t = u := by
   refine Relation.ReflTransGen.head_induction_on h ?refl ?head
   · exact ⟨0, rfl⟩
@@ -117,39 +117,39 @@ lemma fullUnfoldN_of_unfoldsToC {t u : LocalTypeC} (h : UnfoldsToC t u) :
     simp [fullUnfoldN, hdest, hn]
 
 /-- If a type is observable, then bounded unfolding reaches a non-mu head. -/
-lemma hasNonMuHead_fullUnfoldN_of_observable {t : LocalTypeC} (hobs : ObservableC t) :
+lemma has_non_mu_head_full_unfold_n_of_observable {t : LocalTypeC} (hobs : ObservableC t) :
     ∃ n, hasNonMuHead (fullUnfoldN n t) = true := by
   cases hobs with
   | is_end h =>
       rcases h with ⟨u, hunf, hhead⟩
-      rcases fullUnfoldN_of_unfoldsToC hunf with ⟨n, hn⟩
+      rcases full_unfold_n_of_unfolds_to_c hunf with ⟨n, hn⟩
       refine ⟨n, ?_⟩
       simp [hasNonMuHead, hn, hhead]
   | is_var v h =>
       rcases h with ⟨u, hunf, hhead⟩
-      rcases fullUnfoldN_of_unfoldsToC hunf with ⟨n, hn⟩
+      rcases full_unfold_n_of_unfolds_to_c hunf with ⟨n, hn⟩
       refine ⟨n, ?_⟩
       simp [hasNonMuHead, hn, hhead]
   | is_send p bs h =>
       rcases h with ⟨u, labels, hunf, hhead, _hbs⟩
-      rcases fullUnfoldN_of_unfoldsToC hunf with ⟨n, hn⟩
+      rcases full_unfold_n_of_unfolds_to_c hunf with ⟨n, hn⟩
       refine ⟨n, ?_⟩
       simp [hasNonMuHead, hn, hhead]
   | is_recv p bs h =>
       rcases h with ⟨u, labels, hunf, hhead, _hbs⟩
-      rcases fullUnfoldN_of_unfoldsToC hunf with ⟨n, hn⟩
+      rcases full_unfold_n_of_unfolds_to_c hunf with ⟨n, hn⟩
       refine ⟨n, ?_⟩
       simp [hasNonMuHead, hn, hhead]
 
 /-! ## Connection between fullUnfoldN and UnfoldsToC -/
 
 /-- One step unfolding: if dest gives mu, we have UnfoldsC. -/
-lemma unfoldsC_of_dest_mu {t : LocalTypeC} {x : String} {f : Unit → LocalTypeC}
+lemma unfolds_c_of_dest_mu {t : LocalTypeC} {x : String} {f : Unit → LocalTypeC}
     (hdest : PFunctor.M.dest t = ⟨LocalTypeHead.mu x, f⟩) :
     UnfoldsC t (f ()) := ⟨x, f, hdest, rfl⟩
 
 /-- fullUnfoldN produces a chain of UnfoldsC steps. -/
-lemma fullUnfoldN_UnfoldsToC (n : Nat) (t : LocalTypeC) :
+lemma full_unfold_n_unfolds_to_c (n : Nat) (t : LocalTypeC) :
     UnfoldsToC t (fullUnfoldN n t) := by
   induction n generalizing t with
   | zero => exact Relation.ReflTransGen.refl
@@ -157,7 +157,7 @@ lemma fullUnfoldN_UnfoldsToC (n : Nat) (t : LocalTypeC) :
       simp only [fullUnfoldN]
       match hdest : PFunctor.M.dest t with
       | ⟨LocalTypeHead.mu x, f⟩ =>
-          have hstep : UnfoldsC t (f ()) := unfoldsC_of_dest_mu hdest
+          have hstep : UnfoldsC t (f ()) := unfolds_c_of_dest_mu hdest
           exact Relation.ReflTransGen.head hstep (ih (f ()))
       | ⟨LocalTypeHead.end, _⟩ => exact Relation.ReflTransGen.refl
       | ⟨LocalTypeHead.var _, _⟩ => exact Relation.ReflTransGen.refl
@@ -167,7 +167,7 @@ lemma fullUnfoldN_UnfoldsToC (n : Nat) (t : LocalTypeC) :
 /-! ## Stability and Additivity of Bounded Unfolding -/
 
 /-- If a type already has a non-mu head, unfolding does nothing. -/
-lemma fullUnfoldN_of_hasNonMuHead {t : LocalTypeC} (h : hasNonMuHead t = true) :
+lemma full_unfold_n_of_has_non_mu_head {t : LocalTypeC} (h : hasNonMuHead t = true) :
     ∀ n, fullUnfoldN n t = t := by
   intro n
   induction n with
@@ -188,7 +188,7 @@ lemma fullUnfoldN_of_hasNonMuHead {t : LocalTypeC} (h : hasNonMuHead t = true) :
           | recv p labels =>
               simp [fullUnfoldN, hdest]
 
-lemma fullUnfoldN_add (n m : Nat) (t : LocalTypeC) :
+lemma full_unfold_n_add (n m : Nat) (t : LocalTypeC) :
     fullUnfoldN (n + m) t = fullUnfoldN m (fullUnfoldN n t) := by
   induction n generalizing t with
   | zero => simp [fullUnfoldN]
@@ -201,27 +201,27 @@ lemma fullUnfoldN_add (n m : Nat) (t : LocalTypeC) :
               simp [ih]
           | «end» =>
               have hnonmu : hasNonMuHead t = true := by simp [hasNonMuHead, head, hdest]
-              simp [fullUnfoldN_of_hasNonMuHead hnonmu]
+              simp [full_unfold_n_of_has_non_mu_head hnonmu]
           | var v =>
               have hnonmu : hasNonMuHead t = true := by simp [hasNonMuHead, head, hdest]
-              simp [fullUnfoldN_of_hasNonMuHead hnonmu]
+              simp [full_unfold_n_of_has_non_mu_head hnonmu]
           | send p labels =>
               have hnonmu : hasNonMuHead t = true := by simp [hasNonMuHead, head, hdest]
-              simp [fullUnfoldN_of_hasNonMuHead hnonmu]
+              simp [full_unfold_n_of_has_non_mu_head hnonmu]
           | recv p labels =>
               have hnonmu : hasNonMuHead t = true := by simp [hasNonMuHead, head, hdest]
-              simp [fullUnfoldN_of_hasNonMuHead hnonmu]
+              simp [full_unfold_n_of_has_non_mu_head hnonmu]
 
 /-! ## Stabilization Beyond a Non-mu Cutoff -/
 
-lemma fullUnfoldN_eq_of_ge {t : LocalTypeC} {n m : Nat}
+lemma full_unfold_n_eq_of_ge {t : LocalTypeC} {n m : Nat}
     (hge : m ≥ n) (h : hasNonMuHead (fullUnfoldN n t) = true) :
     fullUnfoldN m t = fullUnfoldN n t := by
   obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le hge
   subst hk
   have hstable : ∀ k, fullUnfoldN k (fullUnfoldN n t) = fullUnfoldN n t :=
-    fullUnfoldN_of_hasNonMuHead h
-  simpa [fullUnfoldN_add] using (hstable k)
+    full_unfold_n_of_has_non_mu_head h
+  simpa [full_unfold_n_add] using (hstable k)
 
 /-! ## Observable Kind Classification -/
 
@@ -243,7 +243,7 @@ def obsKindOf (t : LocalTypeC) : Option ObsKind :=
   | .mu _ => none
 
 /-- If obsKindOf gives Some, the type is observable. -/
-lemma obsKindOf_some_implies_observable {t : LocalTypeC} {k : ObsKind}
+lemma obs_kind_of_some_implies_observable {t : LocalTypeC} {k : ObsKind}
     (hk : obsKindOf t = some k) : ObservableC t := by
   simp only [obsKindOf] at hk
   match hhead : head t with
@@ -271,18 +271,18 @@ def childrenOf (t : LocalTypeC) : List LocalTypeC :=
 def childrenAfterUnfold (n : Nat) (t : LocalTypeC) : List LocalTypeC :=
   childrenOf (fullUnfoldN n t)
 
-lemma childRel_of_unfoldsC {t u : LocalTypeC} (h : UnfoldsC t u) : childRel t u := by
+lemma child_rel_of_unfolds_c {t u : LocalTypeC} (h : UnfoldsC t u) : childRel t u := by
   rcases h with ⟨x, f, hdest, rfl⟩
   exact ⟨LocalTypeHead.mu x, f, (), hdest, rfl⟩
 
-lemma UnfoldsToC_reachable {t u : LocalTypeC} (h : UnfoldsToC t u) :
+lemma unfolds_to_c_reachable {t u : LocalTypeC} (h : UnfoldsToC t u) :
     u ∈ Reachable t := by
   induction h with
   | refl => exact Relation.ReflTransGen.refl
   | tail hrest hstep ih =>
-      exact Relation.ReflTransGen.tail ih (childRel_of_unfoldsC hstep)
+      exact Relation.ReflTransGen.tail ih (child_rel_of_unfolds_c hstep)
 
-lemma childRel_of_mem_childrenOf {t c : LocalTypeC} (h : c ∈ childrenOf t) : childRel t c := by
+lemma child_rel_of_mem_children_of {t c : LocalTypeC} (h : c ∈ childrenOf t) : childRel t c := by
   cases hdest : PFunctor.M.dest t with
   | mk hhead f =>
       cases hhead with
@@ -309,12 +309,12 @@ lemma childRel_of_mem_childrenOf {t c : LocalTypeC} (h : c ∈ childrenOf t) : c
           subst hi
           exact ⟨LocalTypeHead.recv p labels, f, i, hdest, rfl⟩
 
-lemma mem_childrenOf_fullUnfoldN_reachable {t : LocalTypeC} {n : Nat} {c : LocalTypeC}
+lemma mem_children_of_full_unfold_n_reachable {t : LocalTypeC} {n : Nat} {c : LocalTypeC}
     (hmem : c ∈ childrenOf (fullUnfoldN n t)) :
     c ∈ Reachable t := by
   have hreach : fullUnfoldN n t ∈ Reachable t :=
-    UnfoldsToC_reachable (fullUnfoldN_UnfoldsToC n t)
-  have hchild : childRel (fullUnfoldN n t) c := childRel_of_mem_childrenOf hmem
+    unfolds_to_c_reachable (full_unfold_n_unfolds_to_c n t)
+  have hchild : childRel (fullUnfoldN n t) c := child_rel_of_mem_children_of hmem
   exact reachable_step hreach hchild
 
 /-! ## Pair Operations -/
@@ -342,7 +342,7 @@ def obsMatch (n : Nat) (t1 t2 : LocalTypeC) : Bool :=
 /-! ## Observable Match Lemmas -/
 
 /-- If obsMatch returns true, both types have the same observable kind after unfolding. -/
-lemma obsMatch_true_implies_same_kind {n : Nat} {t1 t2 : LocalTypeC}
+lemma obs_match_true_implies_same_kind {n : Nat} {t1 t2 : LocalTypeC}
     (h : obsMatch n t1 t2 = true) :
     ∃ k, obsKindOf (fullUnfoldN n t1) = some k ∧ obsKindOf (fullUnfoldN n t2) = some k := by
   -- This follows from the definition of obsMatch: it returns true only when
@@ -353,7 +353,7 @@ lemma obsMatch_true_implies_same_kind {n : Nat} {t1 t2 : LocalTypeC}
 /-! ## ObsKind Helper Lemmas -/
 
 /-- Helper: observable kind end means head is end -/
-lemma obsKindOf_end_iff {t : LocalTypeC} :
+lemma obs_kind_of_end_iff {t : LocalTypeC} :
     obsKindOf t = some .obs_end ↔ head t = .end := by
   simp only [obsKindOf]
   constructor
@@ -366,7 +366,7 @@ lemma obsKindOf_end_iff {t : LocalTypeC} :
   · intro h; simp [h]
 
 /-- Helper: observable kind var means head is var with same name -/
-lemma obsKindOf_var_iff {t : LocalTypeC} {v : String} :
+lemma obs_kind_of_var_iff {t : LocalTypeC} {v : String} :
     obsKindOf t = some (.obs_var v) ↔ head t = .var v := by
   simp only [obsKindOf]
   constructor
@@ -379,7 +379,7 @@ lemma obsKindOf_var_iff {t : LocalTypeC} {v : String} :
   · intro h; simp [h]
 
 /-- Helper: observable kind send means head is send -/
-lemma obsKindOf_send_iff {t : LocalTypeC} {p : String} {labels : List Label} :
+lemma obs_kind_of_send_iff {t : LocalTypeC} {p : String} {labels : List Label} :
     obsKindOf t = some (.obs_send p labels) ↔ head t = .send p labels := by
   simp only [obsKindOf]
   constructor
@@ -392,7 +392,7 @@ lemma obsKindOf_send_iff {t : LocalTypeC} {p : String} {labels : List Label} :
   · intro h; simp [h]
 
 /-- Helper: observable kind recv means head is recv -/
-lemma obsKindOf_recv_iff {t : LocalTypeC} {p : String} {labels : List Label} :
+lemma obs_kind_of_recv_iff {t : LocalTypeC} {p : String} {labels : List Label} :
     obsKindOf t = some (.obs_recv p labels) ↔ head t = .recv p labels := by
   simp only [obsKindOf]
   constructor

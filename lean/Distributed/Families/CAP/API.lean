@@ -35,7 +35,7 @@ theorem impossibility_of_protocol (P : ImpossibilityProtocol) :
   P.impossibility
 
 /-- FLP-style summary: core CAP assumptions are validated for a certified protocol. -/
-theorem coreAssumptions_allPassed (P : ImpossibilityProtocol) :
+theorem core_assumptions_all_passed (P : ImpossibilityProtocol) :
     (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
   rfl
 

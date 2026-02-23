@@ -25,12 +25,12 @@ structure AccountableProtocol where
       accountable_safety_of_assumptions assumptions premises
 
 /-- Extract accountable-safety theorem from a certified protocol bundle. -/
-theorem accountableSafety_of_protocol (P : AccountableProtocol) :
+theorem accountable_safety_of_protocol (P : AccountableProtocol) :
     AccountableSafety P.model :=
   P.accountableSafety
 
 /-- Core assumptions are always validated for a certified protocol. -/
-theorem coreAssumptions_allPassed (P : AccountableProtocol) :
+theorem core_assumptions_all_passed (P : AccountableProtocol) :
     (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
   rfl
 

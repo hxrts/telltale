@@ -25,12 +25,12 @@ the new local types for each role.
 
 Lean's CProject definition ALREADY has Coq's coherence built-in via AllBranchesProj
 (Projectb.lean:204-206). The coherence requirement is structurally present; we just need
-to connect it to the trans function via CProject_implies_EQ2_trans.
+to connect it to the trans function via c_project_implies_eq2_trans.
 
 **Proof via wellFormedness** (outline):
 Given a well-formed comm node with branches and non-participant role:
 1. AllBranchesProj in CProject ensures all branches project to the same candidate
-2. CProject_implies_EQ2_trans connects CProject to trans
+2. c_project_implies_eq2_trans connects CProject to trans
 3. Transitivity gives us branch-to-branch EQ2 equivalence
 
 **Alternative: Direct proof** (without wellFormedness):
@@ -63,8 +63,8 @@ The proof proceeds by case analysis on the GlobalType witness:
     - Mismatched guardedness: requires showing unfold relates to .end [legacy gaps]
     - Both unguarded: both .end ✓
 - `.comm sender receiver branches`:
-  - role = sender: both .send, branches via transBranches_ProjSubstRel ✓
-  - role = receiver: both .recv, branches via transBranches_ProjSubstRel ✓
+  - role = sender: both .send, branches via trans_branches_proj_subst_rel ✓
+  - role = receiver: both .recv, branches via trans_branches_proj_subst_rel ✓
   - non-participant:
     - empty branches: both .end ✓
     - non-empty: recursive call on continuation subterm ✓
@@ -83,7 +83,7 @@ when fully unfolded.
 
 ## EQ2 transitivity + subst_end_unguarded_eq2_end
 
-EQ2 transitivity now uses `EQ2_trans_wf` from EQ2Props (Bisim detour).
+EQ2 transitivity now uses `eq2_trans_wf` from EQ2Props (Bisim detour).
 This replaces the prior `EQ2_trans` path and requires explicit
 well-formedness witnesses for intermediate types.
 
@@ -121,27 +121,27 @@ The following definitions form the semantic interface for proofs:
 Coherence is now proven from first principles using participation structure, following Coq's proof strategy.
 
 **Mu-unfolding (from MuUnfoldLemmas.lean):**
-- `EQ2_mu_crossed_unfold_left`: **PROVEN** via proj_subst + EQ2_mu_self_unfold
-- `EQ2_mu_crossed_unfold_right`: **PROVEN** via proj_subst + EQ2_mu_to_unfold
-- `EQ2_mu_unguarded_to_end`: **PROVEN** (vacuously true - hypotheses contradict when s ≠ t)
-- `EQ2_end_to_mu_unguarded`: **PROVEN** (vacuously true for closed types)
+- `eq2_mu_crossed_unfold_left`: **PROVEN** via proj_subst + eq2_mu_self_unfold
+- `eq2_mu_crossed_unfold_right`: **PROVEN** via proj_subst + eq2_mu_to_unfold
+- `eq2_mu_unguarded_to_end`: **PROVEN** (vacuously true - hypotheses contradict when s ≠ t)
+- `eq2_end_to_mu_unguarded`: **PROVEN** (vacuously true for closed types)
 
 **Closedness theorems (PROVEN in GlobalType.lean):**
-- `GlobalType.isClosed_substitute_mu`: **PROVEN** - mu-unfolding preserves closedness
-- `GlobalType.isClosed_comm_branches`: **PROVEN** - closed comm has closed branches
+- `GlobalType.is_closed_substitute_mu`: **PROVEN** - mu-unfolding preserves closedness
+- `GlobalType.is_closed_comm_branches`: **PROVEN** - closed comm has closed branches
 
 **Proven coinductive theorems:**
 - `subst_end_unguarded_eq2_end`: **PROVEN** in SubstEndUnguarded.lean via UnfoldsToEnd induction
 - `trans_subst_comm`: **PROVEN** using paco coinduction (requires closedness)
-- `EQ2_trans_wf`: **PROVEN** via Bisim (EQ2Props.lean); used with explicit well-formedness witnesses
+- `eq2_trans_wf`: **PROVEN** via Bisim (EQ2Props.lean); used with explicit well-formedness witnesses
 
 **Remaining Assumptions:** None (sender/receiver lemmas proven via head-action predicate)
 
 **COHERENCE PROOF COMPLETE (modulo helper lemmas):**
-- `trans_branches_coherent_EQ2`: **PROVEN** using participation structure
-  - Case 1 (non-participant): Uses `EQ_end` - all branches project to .end
+- `trans_branches_coherent_eq2`: **PROVEN** using participation structure
+  - Case 1 (non-participant): Uses `eq_end` - all branches project to .end
   - Case 2 (participant): Uses `part_of_all2` - uniform participation (legacy extraction gaps)
-- `trans_produces_CProject`: Bridges trans to CProject (uses coherence)
+- `trans_produces_c_project`: Bridges trans to CProject (uses coherence)
 - `branches_project_coherent`: Extracts EQ2 equivalence from AllBranchesProj (legacy gaps)
 
 **Inherited from MuUnfoldLemmas.lean (via ProjSubst.lean):**

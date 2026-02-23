@@ -269,7 +269,7 @@ theorem inversion_branch {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {pr
       exact ⟨_, _, _, hk, hG, hLen, hLabels, hBodies⟩
 
 /-- `HasTypeProcPre` is insensitive to the right par index `nG`. -/
-theorem HasTypeProcPre_par_nG_irrel
+theorem has_type_proc_pre_par_n_g_irrel
     {Ssh Sown G P Q nS nG nG'} :
     HasTypeProcPre Ssh Sown G (.par nS nG P Q) →
     HasTypeProcPre Ssh Sown G (.par nS nG' P Q) := by
@@ -294,7 +294,7 @@ intrinsic to the typing judgment.
 
 1. **Preservation**: Trivial (the judgment itself proves it)
 2. **Progress**: Structured case analysis on configuration
-3. **Coherence**: Uses existing `Coherent_send_preserved`, `Coherent_recv_preserved`
+3. **Coherence**: Uses existing `coherent_send_preserved`, `coherent_recv_preserved`
 4. **Soundness**: TypedStep refines Step -/
 
 -- Pre-Update Typing with Post Environments
@@ -431,7 +431,7 @@ theorem ParSplit.sides_eq_of_witness
 -- Parallel Inversion
 
 /-- Inversion for parallel pre-out typing with explicit environment splits. -/
-theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
+theorem has_type_proc_pre_out_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
     HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin Wfin Δfin →
     ∃ S₁ S₂ G₁ G₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂,
       Sown.left = (S₁ ++ S₂) ∧
@@ -469,7 +469,7 @@ theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
 -- Witness-Form Parallel Inversion
 
 /-- Witness-oriented inversion for parallel pre-out typing. -/
-theorem HasTypeProcPreOut_par_inv_witness {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
+theorem has_type_proc_pre_out_par_inv_witness {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
     HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin Wfin Δfin →
     ∃ pw : ParWitness Sown.left G nS, ∃ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂,
       Sfin = { right := Sown.right, left := S₁' ++ S₂' } ∧

@@ -27,7 +27,7 @@ section
 -- Single-Swap Coherence Theorem
 
 /-- Coherence is preserved under swapping two roles within a session. -/
-theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
+theorem coherent_role_swap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
     (hCoh : Coherent G D) :
     Coherent (swapGEnvRole s A B G) (swapDEnvRole s A B D) := by
   intro e hActive Lrecv hGrecv
@@ -40,9 +40,9 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
     let recvEp' : Endpoint := { sid := e'.sid, role := e'.receiver }
     let senderEp' : Endpoint := { sid := e'.sid, role := e'.sender }
     have hRecvEp : swapEndpointRole s A B recvEp' = recvEp := by
-      simp [recvEp, recvEp', e', swapEdgeRole, swapEndpointRole, hSid, swapRole_involutive]
+      simp [recvEp, recvEp', e', swapEdgeRole, swapEndpointRole, hSid, swap_role_involutive]
     have hSenderEp : swapEndpointRole s A B senderEp' = senderEp := by
-      simp [senderEp, senderEp', e', swapEdgeRole, swapEndpointRole, hSid, swapRole_involutive]
+      simp [senderEp, senderEp', e', swapEdgeRole, swapEndpointRole, hSid, swap_role_involutive]
     -- CoherentRoleSwap: Translate Endpoint Lookups
     have hLookupRecvMap :
         lookupG (swapGEnvRole s A B G) recvEp =
@@ -50,7 +50,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
       have hSid' : recvEp'.sid = s := by
         simp [recvEp', e', swapEdgeRole, hSid]
       simpa [hRecvEp, hSid'] using
-        (lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=recvEp'))
+        (lookup_g_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=recvEp'))
     have hLookupRecvEq :
         (lookupG G recvEp').map (swapLocalTypeRole s A B) = some Lrecv := by
       calc
@@ -78,7 +78,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
 /- ## Structured Block 2 -/
             simp [senderEp', e', swapEdgeRole, hSid]
           simpa [hSenderEp, hSid'] using
-            (lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=senderEp'))
+            (lookup_g_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=senderEp'))
         rcases (Option.isSome_iff_exists).1 hActive.1 with ⟨LsenderSwapped, hGsenderSwapped⟩
         have hLookupSenderEq :
             (lookupG G senderEp').map (swapLocalTypeRole s A B) =
@@ -100,7 +100,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
         rcases hGsender0 with ⟨Lsender0, hGsender0⟩
         -- CoherentRoleSwap: Pull Back Coherence Witness
         have hActive' : ActiveEdge G e' :=
-          ActiveEdge_of_endpoints (e:=e') hGsender0 hGrecv0
+          active_edge_of_endpoints (e:=e') hGsender0 hGrecv0
         have hCoh' := hCoh e' hActive' Lrecv0 hGrecv0
         rcases hCoh' with ⟨Lsender1, hGsender1, hConsume⟩
         have hLookupSender' :
@@ -121,21 +121,21 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
             Consume (swapRole A B e'.sender) (swapLocalTypeRole s A B Lrecv0)
                 ((lookupD D e').map (swapValTypeRole s A B)) =
               some (swapLocalTypeRole s A B Lafter) := by
-          exact Consume_swap (s:=s) (A:=A) (B:=B) (from_:=e'.sender)
+          exact consume_swap (s:=s) (A:=A) (B:=B) (from_:=e'.sender)
             (L:=Lrecv0) (ts:=lookupD D e') (L':=Lafter) hConsumeEq
         have hTrace :
             lookupD (swapDEnvRole s A B D) e =
               (lookupD D e').map (swapValTypeRole s A B) := by
           have hLookup :=
-            lookupD_swap (s:=s) (A:=A) (B:=B) (D:=D) (e:=e')
+            lookup_d_swap (s:=s) (A:=A) (B:=B) (D:=D) (e:=e')
 /- ## Structured Block 3 -/
           have hSwap : swapEdgeRole s A B e' = e := by
-            simp [e', swapEdgeRole_involutive]
+            simp [e', swap_edge_role_involutive]
           have hSid' : e'.sid = s := by
             simp [e', swapEdgeRole, hSid]
           simpa [hSwap, hSid'] using hLookup
         have hSenderEq : e.sender = swapRole A B e'.sender := by
-          simp [e', swapEdgeRole, hSid, swapRole_involutive]
+          simp [e', swapEdgeRole, hSid, swap_role_involutive]
         have hConsumeSwapped :
             Consume e.sender Lrecv (lookupD (swapDEnvRole s A B D) e) =
               some (swapLocalTypeRole s A B Lafter) := by
@@ -153,7 +153,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
       simp [swapEndpointRole, senderEp, hSid]
     have hGrecv' : lookupG G recvEp = some Lrecv := by
       have hLookup :=
-        lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=recvEp)
+        lookup_g_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=recvEp)
       have hMap : lookupG (swapGEnvRole s A B G) recvEp =
           lookupG G recvEp := by
         simpa [hSid, hSwapRecv, recvEp] using hLookup
@@ -165,7 +165,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
           simpa using hGrecv
     have hActive' : ActiveEdge G e := by
       have hLookupSender :=
-        lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=senderEp)
+        lookup_g_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=senderEp)
       have hMap :
           lookupG (swapGEnvRole s A B G) senderEp =
             lookupG G senderEp := by
@@ -181,12 +181,12 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
         lookupG (swapGEnvRole s A B G) senderEp = some Lsender := by
       have hLookup :=
 /- ## Structured Block 4 -/
-        lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=senderEp)
+        lookup_g_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=senderEp)
       simpa [hSid, hSwapSender, hGsender, senderEp] using hLookup
     have hTrace :
         lookupD (swapDEnvRole s A B D) e = lookupD D e := by
       have hLookup :=
-        lookupD_swap (s:=s) (A:=A) (B:=B) (D:=D) (e:=e)
+        lookup_d_swap (s:=s) (A:=A) (B:=B) (D:=D) (e:=e)
       have hSwap : swapEdgeRole s A B e = e := by
         simp [swapEdgeRole, hSid]
       simpa [hSid, hSwap] using hLookup
@@ -208,7 +208,7 @@ def swapDEnvRoleList (s : SessionId) (pairs : List (Role × Role)) (D : DEnv) : 
   pairs.foldl (fun acc p => swapDEnvRole s p.1 p.2 acc) D
 
 /-- Coherence is preserved under any finite sequence of role swaps in a session. -/
-theorem CoherentRoleSwap_list (s : SessionId) (pairs : List (Role × Role)) (G : GEnv) (D : DEnv)
+theorem coherent_role_swap_list (s : SessionId) (pairs : List (Role × Role)) (G : GEnv) (D : DEnv)
     (hCoh : Coherent G D) :
     Coherent (swapGEnvRoleList s pairs G) (swapDEnvRoleList s pairs D) := by
   induction pairs generalizing G D with
@@ -216,14 +216,14 @@ theorem CoherentRoleSwap_list (s : SessionId) (pairs : List (Role × Role)) (G :
       simpa [swapGEnvRoleList, swapDEnvRoleList] using hCoh
   | cons hd tl ih =>
       have hCoh' : Coherent (swapGEnvRole s hd.1 hd.2 G) (swapDEnvRole s hd.1 hd.2 D) :=
-        CoherentRoleSwap (s:=s) (A:=hd.1) (B:=hd.2) (G:=G) (D:=D) hCoh
+        coherent_role_swap (s:=s) (A:=hd.1) (B:=hd.2) (G:=G) (D:=D) hCoh
       simpa [swapGEnvRoleList, swapDEnvRoleList, List.foldl] using
         ih (G:=swapGEnvRole s hd.1 hd.2 G) (D:=swapDEnvRole s hd.1 hd.2 D) hCoh'
 
 /-- Exchangeability corollary: any finite swap sequence preserves coherence. -/
-theorem Coherent_exchangeable (s : SessionId) (pairs : List (Role × Role)) (G : GEnv) (D : DEnv)
+theorem coherent_exchangeable (s : SessionId) (pairs : List (Role × Role)) (G : GEnv) (D : DEnv)
     (hCoh : Coherent G D) :
     Coherent (swapGEnvRoleList s pairs G) (swapDEnvRoleList s pairs D) := by
-  simpa using CoherentRoleSwap_list (s := s) (pairs := pairs) (G := G) (D := D) hCoh
+  simpa using coherent_role_swap_list (s := s) (pairs := pairs) (G := G) (D := D) hCoh
 
 end

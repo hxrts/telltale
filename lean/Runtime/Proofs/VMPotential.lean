@@ -85,7 +85,7 @@ def vmPotential {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
 
 /-! ## Topology-Change Invariance -/
 
-theorem vmWorkMeasure_applyTopologyChange_eq {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem vm_work_measure_apply_topology_change_eq {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -103,7 +103,7 @@ theorem vmWorkMeasure_applyTopologyChange_eq {ι γ π ε ν : Type u} [Identity
   | heal edges =>
       simp [applyTopologyChange, reconnectEdges, vmWorkMeasure, totalTypeDepth, totalTraceLoad]
 
-theorem vmCreditBank_applyTopologyChange_eq {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem vm_credit_bank_apply_topology_change_eq {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -130,7 +130,7 @@ theorem topology_change_nonincreasing_potential {ι γ π ε ν : Type u} [Ident
     [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (tc : TopologyChange (ι := ι)) :
     vmPotential (applyTopologyChange st tc) ≤ vmPotential st := by
-  simp [vmPotential, vmWorkMeasure_applyTopologyChange_eq, vmCreditBank_applyTopologyChange_eq]
+  simp [vmPotential, vm_work_measure_apply_topology_change_eq, vm_credit_bank_apply_topology_change_eq]
 
 /-! ## Productive-Step Work Decrease -/
 
@@ -167,7 +167,7 @@ def paper2WorkMeasure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
     (st : VMState ι γ π ε ν) : Nat :=
   vmWorkMeasure st
 
-theorem vmWorkMeasure_eq_paper2WorkMeasure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem vm_work_measure_eq_paper2_work_measure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -176,7 +176,7 @@ theorem vmWorkMeasure_eq_paper2WorkMeasure {ι γ π ε ν : Type u} [IdentityMo
     (st : VMState ι γ π ε ν) :
     vmWorkMeasure st = paper2WorkMeasure st := rfl
 
-theorem vmPotential_extends_paper2WorkMeasure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem vm_potential_extends_paper2_work_measure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -245,7 +245,7 @@ def vmFosterInput {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
 
 /-! ### Transported Foster Conclusions -/
 
-theorem vm_transported_fosterLyapunov {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem vm_transported_foster_lyapunov {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -255,7 +255,7 @@ theorem vm_transported_fosterLyapunov {ι γ π ε ν : Type u} [IdentityModel �
     (h : VMFosterAssumptions step)
     (w : Runtime.Proofs.ClassicalTransportWitness (VMState ι γ π ε ν)) :
     Classical.Transport.FosterConclusion (vmFosterInput step h w) := by
-  exact Classical.Transport.transported_fosterLyapunov (input := vmFosterInput step h w)
+  exact Classical.Transport.transported_foster_lyapunov (input := vmFosterInput step h w)
 
 theorem r7_vm_potential_integration {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -268,4 +268,4 @@ theorem r7_vm_potential_integration {ι γ π ε ν : Type u} [IdentityModel ι]
     (w : Runtime.Proofs.ClassicalTransportWitness (VMState ι γ π ε ν)) :
     ∀ st n, vmPotential ((step^[n]) st) ≤ vmPotential st := by
   intro st n
-  exact vm_transported_fosterLyapunov step h w st n
+  exact vm_transported_foster_lyapunov step h w st n

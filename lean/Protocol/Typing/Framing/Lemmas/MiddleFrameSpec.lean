@@ -62,14 +62,14 @@ def MiddleFrameGoal
 
 -- Visible-to-Full Environment Alignment
 /-- Lift a visible lookup (`Ssh ++ Sown.left`) into `SEnvAll` under owned disjointness. -/
-lemma lookupSEnv_all_of_visible_owned
+lemma lookup_s_env_all_of_visible_owned
     {Ssh : SEnv} {Sown : OwnedEnv} {x : Var} {T : ValType} :
     OwnedDisjoint Sown →
     lookupSEnv (SEnvVisible Ssh Sown) x = some T →
     lookupSEnv (SEnvAll Ssh Sown) x = some T := by
   intro hOwn hVis
   simpa [SEnvVisible] using
-    (lookupSEnv_all_frame_prefix_ofLeft
+    (lookup_s_env_all_frame_prefix_of_left
       (Ssh:=Ssh) (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) (T:=T)
       hOwn (by simpa [SEnvVisible] using hVis))
 
@@ -85,19 +85,19 @@ lemma endpoint_eq_of_store_visible_all
     e = e' := by
   intro hStore hOwn hkStore hkVis
   have hkAll : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) :=
-    lookupSEnv_all_of_visible_owned (Ssh:=Ssh) (Sown:=Sown) (x:=k)
+    lookup_s_env_all_of_visible_owned (Ssh:=Ssh) (Sown:=Sown) (x:=k)
       (T:=.chan e'.sid e'.role) hOwn hkVis
   have hChanTy : HasTypeVal Gstore (.chan e) (.chan e'.sid e'.role) :=
     hStore k (.chan e) (.chan e'.sid e'.role) hkStore hkAll
   have hValEq : (Value.chan e) = Value.chan ⟨e'.sid, e'.role⟩ := by
-    simpa using (HasTypeVal_chan_inv hChanTy)
+    simpa using (has_type_val_chan_inv hChanTy)
   cases e
   cases e'
   cases hValEq
   rfl
 
 -- Update-Length and Left-Side Session Bounds
-lemma length_updateG_hit {G : GEnv} {e : Endpoint} {L L' : LocalType} :
+lemma length_update_g_hit {G : GEnv} {e : Endpoint} {L L' : LocalType} :
     lookupG G e = some L →
     (updateG G e L').length = G.length := by
   intro hLookup
@@ -118,7 +118,7 @@ lemma length_updateG_hit {G : GEnv} {e : Endpoint} {L L' : LocalType} :
             simp [updateG, hEq, ih h']
 
 -- Left-Side Session Projection Under Update
-lemma SessionsOf_left_subset_of_update
+lemma sessions_of_left_subset_of_update
     {G₁ G₂ : GEnv} {e : Endpoint} {L L0 : LocalType} {G₁' : GEnv} :
     lookupG (G₁ ++ G₂) e = some L0 →
     updateG (G₁ ++ G₂) e L = G₁' ++ G₂ →
@@ -127,16 +127,16 @@ lemma SessionsOf_left_subset_of_update
   by_cases hLeft : lookupG G₁ e = none
   · have hUpd' :
         updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L :=
-        updateG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hLeft
+        update_g_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hLeft
     have hEq : G₁' ++ G₂ = G₁ ++ updateG G₂ e L := by
       simpa [hUpd'] using hUpd.symm
 /- ## Structured Block 3 -/
     have hLookupG2 : lookupG G₂ e = some L0 := by
       have hLookup' :=
-        lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
+        lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
       simpa [hLookup'] using hLookup
     have hLenG2 : (updateG G₂ e L).length = G₂.length :=
-      length_updateG_hit (G:=G₂) (e:=e) (L:=L0) (L':=L) hLookupG2
+      length_update_g_hit (G:=G₂) (e:=e) (L:=L0) (L':=L) hLookupG2
     have hLen : G₁'.length = G₁.length := by
       have hLen' := congrArg List.length hEq
       simp [List.length_append, hLenG2] at hLen'
@@ -149,7 +149,7 @@ lemma SessionsOf_left_subset_of_update
     | some L1 =>
         have hUpd' :
             updateG (G₁ ++ G₂) e L = updateG G₁ e L ++ G₂ :=
-          updateG_append_left_hit (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L1) (L':=L) hSome
+          update_g_append_left_hit (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L1) (L':=L) hSome
         have hEq : G₁' ++ G₂ = updateG G₁ e L ++ G₂ := by
           simpa [hUpd'] using hUpd.symm
         have hLen : G₁'.length = (updateG G₁ e L).length := by
@@ -159,14 +159,14 @@ lemma SessionsOf_left_subset_of_update
         have hG₁' : G₁' = updateG G₁ e L := List.append_inj_left hEq hLen
         have hSess :
             SessionsOf (updateG G₁ e L) = SessionsOf G₁ :=
-          SessionsOf_updateG_eq (G:=G₁) (e:=e) (L:=L) (L':=L1) hSome
+          sessions_of_update_g_eq (G:=G₁) (e:=e) (L:=L) (L':=L1) hSome
         intro s hs
         have hs' : s ∈ SessionsOf (updateG G₁ e L) := by
           simpa [hG₁'] using hs
         simpa [hSess] using hs'
 
 -- Update-Length and Right-Side Session Bounds
-lemma SessionsOf_right_subset_of_update
+lemma sessions_of_right_subset_of_update
     {G₁ G₂ : GEnv} {e : Endpoint} {L L0 : LocalType} {G₂' : GEnv} :
     lookupG (G₁ ++ G₂) e = some L0 →
     updateG (G₁ ++ G₂) e L = G₁ ++ G₂' →
@@ -175,19 +175,19 @@ lemma SessionsOf_right_subset_of_update
   by_cases hLeft : lookupG G₁ e = none
   · have hUpd' :
         updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L :=
-        updateG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hLeft
+        update_g_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hLeft
     have hEq : G₁ ++ G₂' = G₁ ++ updateG G₂ e L := by
       simpa [hUpd'] using hUpd.symm
     have hG₂' : G₂' = updateG G₂ e L :=
       List.append_inj_right hEq rfl
     have hLookupG2 : lookupG G₂ e = some L0 := by
       have hLookup' :=
-        lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
+        lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
 /- ## Structured Block 4 -/
       simpa [hLookup'] using hLookup
     have hSess :
         SessionsOf (updateG G₂ e L) = SessionsOf G₂ :=
-      SessionsOf_updateG_eq (G:=G₂) (e:=e) (L:=L) (L':=L0) hLookupG2
+      sessions_of_update_g_eq (G:=G₂) (e:=e) (L:=L) (L':=L0) hLookupG2
     intro s hs
     have hs' : s ∈ SessionsOf (updateG G₂ e L) := by
       simpa [hG₂'] using hs
@@ -197,11 +197,11 @@ lemma SessionsOf_right_subset_of_update
     | some L1 =>
         have hUpd' :
             updateG (G₁ ++ G₂) e L = updateG G₁ e L ++ G₂ :=
-          updateG_append_left_hit (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L1) (L':=L) hSome
+          update_g_append_left_hit (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L1) (L':=L) hSome
         have hEq : G₁ ++ G₂' = updateG G₁ e L ++ G₂ := by
           simpa [hUpd'] using hUpd.symm
         have hLenG1 : (updateG G₁ e L).length = G₁.length :=
-          length_updateG_hit (G:=G₁) (e:=e) (L:=L1) (L':=L) hSome
+          length_update_g_hit (G:=G₁) (e:=e) (L:=L1) (L':=L) hSome
         have hG₂' : G₂' = G₂ :=
           List.append_inj_right hEq hLenG1.symm
         intro s hs
@@ -222,7 +222,7 @@ lemma append_right_eq_of_eq {α : Type} {l r1 r2 : List α} (h : l ++ r1 = l ++ 
 
 -- Middle-Frame Update Decomposition Helpers
 /-- Updating an endpoint known to live in the middle segment preserves outer frames. -/
-lemma updateG_append_middle_hit
+lemma update_g_append_middle_hit
     {Gleft Gmid Gright : GEnv} {e : Endpoint} {L0 L : LocalType} :
     lookupG Gleft e = none →
     lookupG Gmid e = some L0 →
@@ -232,10 +232,10 @@ lemma updateG_append_middle_hit
   have hOut :
       updateG (Gleft ++ (Gmid ++ Gright)) e L =
         Gleft ++ updateG (Gmid ++ Gright) e L :=
-    updateG_append_left (G₁:=Gleft) (G₂:=Gmid ++ Gright) (e:=e) (L:=L) hNoneLeft
+    update_g_append_left (G₁:=Gleft) (G₂:=Gmid ++ Gright) (e:=e) (L:=L) hNoneLeft
   have hMid :
       updateG (Gmid ++ Gright) e L = updateG Gmid e L ++ Gright :=
-    updateG_append_left_hit (G₁:=Gmid) (G₂:=Gright) (e:=e) (L:=L0) (L':=L) hSomeMid
+    update_g_append_left_hit (G₁:=Gmid) (G₂:=Gright) (e:=e) (L:=L0) (L':=L) hSomeMid
   calc
     updateG (Gleft ++ Gmid ++ Gright) e L
         = updateG (Gleft ++ (Gmid ++ Gright)) e L := by simp [List.append_assoc]
@@ -245,14 +245,14 @@ lemma updateG_append_middle_hit
     _ = Gleft ++ updateG Gmid e L ++ Gright := by simp [List.append_assoc]
 
 /-- Extract the middle segment from an updated three-way append. -/
-lemma updateG_append_middle_cancel
+lemma update_g_append_middle_cancel
     {Gleft Gmid Gright Gmid' : GEnv} {e : Endpoint} {L0 L : LocalType} :
     lookupG Gleft e = none →
     lookupG Gmid e = some L0 →
     updateG (Gleft ++ Gmid ++ Gright) e L = Gleft ++ Gmid' ++ Gright →
     Gmid' = updateG Gmid e L := by
   intro hNoneLeft hSomeMid hEq
-  have hUpd := updateG_append_middle_hit (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+  have hUpd := update_g_append_middle_hit (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
     (e:=e) (L0:=L0) (L:=L) hNoneLeft hSomeMid
   have hEq' : Gleft ++ (Gmid' ++ Gright) = Gleft ++ (updateG Gmid e L ++ Gright) := by
     calc
@@ -266,18 +266,18 @@ lemma updateG_append_middle_cancel
 
 -- Middle Segment Session and Lookup Facts
 /-- Session set of a middle update remains within the original middle segment. -/
-lemma SessionsOf_subset_middle_update
+lemma sessions_of_subset_middle_update
     {Gmid : GEnv} {e : Endpoint} {L0 L : LocalType} :
     lookupG Gmid e = some L0 →
     SessionsOf (updateG Gmid e L) ⊆ SessionsOf Gmid := by
   intro hSome s hs
   have hEqSess :
       SessionsOf (updateG Gmid e L) = SessionsOf Gmid :=
-    SessionsOf_updateG_eq (G:=Gmid) (e:=e) (L:=L) (L':=L0) hSome
+    sessions_of_update_g_eq (G:=Gmid) (e:=e) (L:=L) (L':=L0) hSome
   simpa [hEqSess] using hs
 
 /-- Lift a middle-segment lookup into the full framed environment. -/
-lemma lookupG_middle_to_full
+lemma lookup_g_middle_to_full
     {Gleft Gmid Gright : GEnv} {e : Endpoint} {L0 : LocalType} :
     lookupG Gleft e = none →
     lookupG Gmid e = some L0 →
@@ -285,20 +285,20 @@ lemma lookupG_middle_to_full
   intro hNoneLeft hSomeMid
   have hStep :
       lookupG (Gleft ++ Gmid) e = some L0 := by
-    exact lookupG_append_right (G₁:=Gleft) (G₂:=Gmid) (e:=e) hNoneLeft |>.trans hSomeMid
-  exact lookupG_append_left (G₁:=Gleft ++ Gmid) (G₂:=Gright) (e:=e) hStep
+    exact lookup_g_append_right (G₁:=Gleft) (G₂:=Gmid) (e:=e) hNoneLeft |>.trans hSomeMid
+  exact lookup_g_append_left (G₁:=Gleft ++ Gmid) (G₂:=Gright) (e:=e) hStep
 
 /-- A lookup in the middle segment is absent from any disjoint right frame. -/
-lemma lookupG_middle_none_right
+lemma lookup_g_middle_none_right
     {Gmid Gright : GEnv} {e : Endpoint} {L0 : LocalType} :
     DisjointG Gmid Gright →
     lookupG Gmid e = some L0 →
     lookupG Gright e = none := by
   intro hDisj hSomeMid
-  exact lookupG_none_of_disjoint (G₁:=Gright) (G₂:=Gmid) (DisjointG_symm hDisj) hSomeMid
+  exact lookup_g_none_of_disjoint (G₁:=Gright) (G₂:=Gmid) (disjoint_g_symm hDisj) hSomeMid
 
 /-- Package middle update output as a framed decomposition witness. -/
-lemma updateG_middle_witness
+lemma update_g_middle_witness
     {Gleft Gmid Gright G' : GEnv} {e : Endpoint} {L0 L : LocalType} :
     lookupG Gleft e = none →
     lookupG Gmid e = some L0 →
@@ -310,7 +310,7 @@ lemma updateG_middle_witness
   calc
     G' = updateG (Gleft ++ Gmid ++ Gright) e L := hG'
     _ = Gleft ++ updateG Gmid e L ++ Gright :=
-      updateG_append_middle_hit (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+      update_g_append_middle_hit (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
         (e:=e) (L0:=L0) (L:=L) hNoneLeft hSomeMid
 
 -- Pre-Out Lookup Recovery (By Constructor)
@@ -420,15 +420,15 @@ lemma middle_send_update_decompose
   intro hDisjLM hEq hMid hUpd
   have hNoneLeft : lookupG Gleft e = none :=
 /- ## Structured Block 8 -/
-    lookupG_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
+    lookup_g_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
   refine ⟨updateG Gmid e L, ?_, ?_, rfl⟩
   · calc
       G' = updateG G e L := hUpd
       _ = updateG (Gleft ++ Gmid ++ Gright) e L := by simpa [hEq]
       _ = Gleft ++ updateG Gmid e L ++ Gright :=
-        updateG_append_middle_hit (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+        update_g_append_middle_hit (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
           (e:=e) (L0:=.send q Tmid Lmid) (L:=L) hNoneLeft hMid
-  · exact SessionsOf_subset_middle_update (Gmid:=Gmid) (e:=e)
+  · exact sessions_of_subset_middle_update (Gmid:=Gmid) (e:=e)
       (L0:=.send q Tmid Lmid) (L:=L) hMid
 
 -- Send-Step Constructive Preservation Theorem
@@ -465,12 +465,12 @@ lemma preserved_sub_middle_send
           have hMid : lookupG Gmid e = some (.send q Tmid Lmid) := by
             simpa [hEqE] using hGmid
           have hNoneLeft : lookupG Gleft e = none :=
-            lookupG_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
+            lookup_g_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
           have hFullMid : lookupG G e = some (.send q Tmid Lmid) := by
             calc
               lookupG G e = lookupG (Gleft ++ Gmid ++ Gright) e := by simpa [hEqG]
               _ = some (.send q Tmid Lmid) :=
-                lookupG_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+                lookup_g_middle_to_full (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
                   (e:=e) (L0:=.send q Tmid Lmid) hNoneLeft hMid
           have hSendEq : LocalType.send target T L = LocalType.send q Tmid Lmid := by
 /- ## Structured Block 9 -/

@@ -30,7 +30,7 @@ open SessionTypes.LocalTypeR
 
 /-! ## Branch relation helpers (ofFn) -/
 
-lemma toCoindBranches_ofFn {n : Nat} (f : Fin n → BranchR) :
+lemma to_coind_branches_of_fn {n : Nat} (f : Fin n → BranchR) :
     toCoindBranches (List.ofFn f) =
       List.ofFn (fun i =>
         match f i with
@@ -41,7 +41,7 @@ lemma toCoindBranches_ofFn {n : Nat} (f : Fin n → BranchR) :
   | succ n ih =>
       simp [List.ofFn_succ, toCoindBranches, ih]
 
-lemma BranchesRelCE_ofFn {R : Rel} {ρ : EnvPair} {n : Nat}
+lemma branches_rel_ce_of_fn {R : Rel} {ρ : EnvPair} {n : Nat}
     {f g : Fin n → (Label × LocalTypeC)}
     (h : ∀ i, (f i).1 = (g i).1 ∧ R ρ (f i).2 (g i).2) :
     BranchesRelCE R ρ (List.ofFn f) (List.ofFn g) := by
@@ -57,7 +57,7 @@ lemma BranchesRelCE_ofFn {R : Rel} {ρ : EnvPair} {n : Nat}
       simp [List.ofFn_succ, BranchesRelCE]
       exact ⟨⟨hlabel, hrel⟩, ih h'⟩
 
-lemma BranchesRelC_ofFn {n : Nat} {f g : Fin n → (Label × LocalTypeC)}
+lemma branches_rel_c_of_fn {n : Nat} {f g : Fin n → (Label × LocalTypeC)}
     (h : ∀ i, (f i).1 = (g i).1 ∧ EQ2C (f i).2 (g i).2) :
     BranchesRelC EQ2C (List.ofFn f) (List.ofFn g) := by
   induction n with
@@ -97,7 +97,7 @@ lemma observable_of_head_recv {t : LocalTypeC} {p : String} {labels : List Label
 /-! ## EQ2C head lemmas -/
 
 /-- Two types with end heads are EQ2C-equivalent. -/
-lemma EQ2C_end_head {a b : LocalTypeC}
+lemma eq2_c_end_head {a b : LocalTypeC}
     (ha : head a = .end) (hb : head b = .end) : EQ2C a b := by
   let R : LocalTypeC → LocalTypeC → Prop := fun x y => head x = .end ∧ head y = .end
   have hR : IsBisimulationC R := by
@@ -110,7 +110,7 @@ lemma EQ2C_end_head {a b : LocalTypeC}
   exact ⟨R, hR, ⟨ha, hb⟩⟩
 
 /-- Two types with matching var heads are EQ2C-equivalent. -/
-lemma EQ2C_var_head {a b : LocalTypeC} {v : String}
+lemma eq2_c_var_head {a b : LocalTypeC} {v : String}
     (ha : head a = .var v) (hb : head b = .var v) : EQ2C a b := by
   let R : LocalTypeC → LocalTypeC → Prop := fun x y => head x = .var v ∧ head y = .var v
   have hR : IsBisimulationC R := by
@@ -125,7 +125,7 @@ lemma EQ2C_var_head {a b : LocalTypeC} {v : String}
 /-! ## EQ2C Head Lemmas: Send/Recv Cases -/
 
 /-- Two types with matching send heads and related branches are EQ2C-equivalent. -/
-lemma EQ2C_send_head {a b : LocalTypeC} {p : String} {labels labels' : List Label}
+lemma eq2_c_send_head {a b : LocalTypeC} {p : String} {labels labels' : List Label}
     (ha : head a = .send p labels) (hb : head b = .send p labels')
     (hbr : BranchesRelC EQ2C (branchesOf a) (branchesOf b)) : EQ2C a b := by
   let R' : LocalTypeC → LocalTypeC → Prop :=
@@ -137,7 +137,7 @@ lemma EQ2C_send_head {a b : LocalTypeC} {p : String} {labels labels' : List Labe
         rcases hEQ with ⟨R, hR, hrel⟩
         obtain ⟨obs_x, obs_y, hobs⟩ := hR x y hrel
         have hobs' : ObservableRelC R' x y :=
-          ObservableRelC_mono (fun _ _ hr => Or.inr ⟨R, hR, hr⟩) hobs
+          observable_rel_c_mono (fun _ _ hr => Or.inr ⟨R, hR, hr⟩) hobs
         exact ⟨obs_x, obs_y, hobs'⟩
     | inl hpair =>
         rcases hpair with ⟨hx, hy⟩
@@ -148,7 +148,7 @@ lemma EQ2C_send_head {a b : LocalTypeC} {p : String} {labels labels' : List Labe
         have obs_x : ObservableC x := observable_of_head_send hx'
         have obs_y : ObservableC y := observable_of_head_send hy'
         have hbr0 : BranchesRelC R' (branchesOf a) (branchesOf b) :=
-          BranchesRelC_mono (fun _ _ hr => Or.inr hr) hbr
+          branches_rel_c_mono (fun _ _ hr => Or.inr hr) hbr
         have hbr' : BranchesRelC R' (branchesOf x) (branchesOf y) := by
           simpa [hx, hy] using hbr0
         have ha_send : CanSendC x p (branchesOf x) :=
@@ -162,7 +162,7 @@ lemma EQ2C_send_head {a b : LocalTypeC} {p : String} {labels labels' : List Labe
 /-! ## EQ2C Head Lemmas: Recv Case -/
 
 /-- Two types with matching recv heads and related branches are EQ2C-equivalent. -/
-lemma EQ2C_recv_head {a b : LocalTypeC} {p : String} {labels labels' : List Label}
+lemma eq2_c_recv_head {a b : LocalTypeC} {p : String} {labels labels' : List Label}
     (ha : head a = .recv p labels) (hb : head b = .recv p labels')
     (hbr : BranchesRelC EQ2C (branchesOf a) (branchesOf b)) : EQ2C a b := by
   let R' : LocalTypeC → LocalTypeC → Prop :=
@@ -174,7 +174,7 @@ lemma EQ2C_recv_head {a b : LocalTypeC} {p : String} {labels labels' : List Labe
         rcases hEQ with ⟨R, hR, hrel⟩
         obtain ⟨obs_x, obs_y, hobs⟩ := hR x y hrel
         have hobs' : ObservableRelC R' x y :=
-          ObservableRelC_mono (fun _ _ hr => Or.inr ⟨R, hR, hr⟩) hobs
+          observable_rel_c_mono (fun _ _ hr => Or.inr ⟨R, hR, hr⟩) hobs
         exact ⟨obs_x, obs_y, hobs'⟩
     | inl hpair =>
         rcases hpair with ⟨hx, hy⟩
@@ -185,7 +185,7 @@ lemma EQ2C_recv_head {a b : LocalTypeC} {p : String} {labels labels' : List Labe
         have obs_x : ObservableC x := observable_of_head_recv hx'
         have obs_y : ObservableC y := observable_of_head_recv hy'
         have hbr0 : BranchesRelC R' (branchesOf a) (branchesOf b) :=
-          BranchesRelC_mono (fun _ _ hr => Or.inr hr) hbr
+          branches_rel_c_mono (fun _ _ hr => Or.inr hr) hbr
         have hbr' : BranchesRelC R' (branchesOf x) (branchesOf y) := by
           simpa [hx, hy] using hbr0
         have ha_recv : CanRecvC x p (branchesOf x) :=
@@ -224,106 +224,106 @@ lemma mu_eta {b : LocalTypeC} {x : String} {k : Unit → LocalTypeC}
 /-! ## EQ2CE → EQ2C erasure -/
 
 /-- Convert an EQ2CE step to EQ2C given environment resolution. -/
-lemma EQ2CE_step_to_EQ2C {R : Rel} {ρ : EnvPair} {a b : LocalTypeC}
+lemma eq2_ce_step_to_eq2_c {R : Rel} {ρ : EnvPair} {a b : LocalTypeC}
     (hR : ∀ ρ a b, R ρ a b → EQ2C a b)
     (hEnv : EnvResolves ρ)
     (hstep : EQ2CE_step R ρ a b) : EQ2C a b := by
   cases hstep with
   | «end» ha hb =>
-      exact EQ2C_end_head ha hb
+      exact eq2_c_end_head ha hb
   | var ha hb =>
-      exact EQ2C_var_head ha hb
+      exact eq2_c_var_head ha hb
   | send ha hb hbr =>
       have hbr0 : BranchesRelC (fun x y => R ρ x y) (branchesOf a) (branchesOf b) :=
-        BranchesRelCE_to_C_fixed hbr
+        branches_rel_ce_to_c_fixed hbr
       have hbr' : BranchesRelC EQ2C (branchesOf a) (branchesOf b) :=
-        BranchesRelC_mono (fun x y hxy => hR ρ _ _ hxy) hbr0
-      exact EQ2C_send_head ha hb hbr'
+        branches_rel_c_mono (fun x y hxy => hR ρ _ _ hxy) hbr0
+      exact eq2_c_send_head ha hb hbr'
   | recv ha hb hbr =>
       have hbr0 : BranchesRelC (fun x y => R ρ x y) (branchesOf a) (branchesOf b) :=
-        BranchesRelCE_to_C_fixed hbr
+        branches_rel_ce_to_c_fixed hbr
       have hbr' : BranchesRelC EQ2C (branchesOf a) (branchesOf b) :=
-        BranchesRelC_mono (fun x y hxy => hR ρ _ _ hxy) hbr0
-      exact EQ2C_recv_head ha hb hbr'
+        branches_rel_c_mono (fun x y hxy => hR ρ _ _ hxy) hbr0
+      exact eq2_c_recv_head ha hb hbr'
   | var_left ha hmem =>
       rename_i x
       have hvar : EQ2C a (mkVar x) := by
         have hb : head (mkVar x) = .var x := by simp
-        exact EQ2C_var_head ha hb
-      exact EQ2C_trans hvar (hEnv.1 _ _ hmem)
+        exact eq2_c_var_head ha hb
+      exact eq2_c_trans hvar (hEnv.1 _ _ hmem)
   | var_right hb hmem =>
       rename_i x
       have hvar : EQ2C (mkVar x) b := by
         have ha : head (mkVar x) = .var x := by simp
-        exact EQ2C_var_head ha hb
-      exact EQ2C_trans (hEnv.2 _ _ hmem) hvar
+        exact eq2_c_var_head ha hb
+      exact eq2_c_trans (hEnv.2 _ _ hmem) hvar
   | mu_left ha hmem hrel =>
       rename_i x f
       have hrec : EQ2C (f ()) b := hR _ _ _ hrel
-      have hmu : EQ2C (mkMu x (f ())) b := EQ2C_unfold_left hrec x
+      have hmu : EQ2C (mkMu x (f ())) b := eq2_c_unfold_left hrec x
       have ha' : a = mkMu x (f ()) := mu_eta (b := a) (x := x) (k := f) ha
       simpa [ha'] using hmu
   | mu_right hb hrel =>
       rename_i x f
       have hrec : EQ2C a (f ()) := hR _ _ _ hrel
-      have hmu : EQ2C a (mkMu x (f ())) := EQ2C_unfold_right hrec x
+      have hmu : EQ2C a (mkMu x (f ())) := eq2_c_unfold_right hrec x
       have hb' : b = mkMu x (f ()) := mu_eta (b := b) (x := x) (k := f) hb
       simpa [hb'] using hmu
 
 /-! ## EQ2CE → EQ2C Erasure Variants -/
 
 /-- Variant using EnvResolvesL and EnvVarR. -/
-lemma EQ2CE_step_to_EQ2C_varR {R : Rel} {ρ : EnvPair} {a b : LocalTypeC}
+lemma eq2_ce_step_to_eq2_c_var_r {R : Rel} {ρ : EnvPair} {a b : LocalTypeC}
     (hR : ∀ ρ a b, R ρ a b → EQ2C a b)
     (hEnvL : EnvResolvesL ρ) (hVarR : EnvVarR ρ)
     (hstep : EQ2CE_step R ρ a b) : EQ2C a b := by
-  have hEnv : EnvResolves ρ := EnvResolves_of_left_varR hEnvL hVarR
-  exact EQ2CE_step_to_EQ2C (hR := hR) hEnv hstep
+  have hEnv : EnvResolves ρ := env_resolves_of_left_var_r hEnvL hVarR
+  exact eq2_ce_step_to_eq2_c (hR := hR) hEnv hstep
 
 /-! ## EQ2CE → EQ2C with Left-Only Environment -/
 
 /-- Variant with explicit no-right-var constraint. -/
-lemma EQ2CE_step_to_EQ2C_left {R : Rel} {ρ : EnvPair} {a b : LocalTypeC}
+lemma eq2_ce_step_to_eq2_c_left {R : Rel} {ρ : EnvPair} {a b : LocalTypeC}
     (hR : ∀ ρ a b, R ρ a b → EQ2C a b)
     (hEnv : EnvResolvesL ρ)
     (hNoRight : ∀ x, head b = .var x → a ∈ envR ρ x → False)
     (hstep : EQ2CE_step R ρ a b) : EQ2C a b := by
   cases hstep with
   | «end» ha hb =>
-      exact EQ2C_end_head ha hb
+      exact eq2_c_end_head ha hb
   | var ha hb =>
-      exact EQ2C_var_head ha hb
+      exact eq2_c_var_head ha hb
   | send ha hb hbr =>
       have hbr0 : BranchesRelC (fun x y => R ρ x y) (branchesOf a) (branchesOf b) :=
-        BranchesRelCE_to_C_fixed hbr
+        branches_rel_ce_to_c_fixed hbr
       have hbr' : BranchesRelC EQ2C (branchesOf a) (branchesOf b) :=
-        BranchesRelC_mono (fun x y hxy => hR ρ _ _ hxy) hbr0
-      exact EQ2C_send_head ha hb hbr'
+        branches_rel_c_mono (fun x y hxy => hR ρ _ _ hxy) hbr0
+      exact eq2_c_send_head ha hb hbr'
   | recv ha hb hbr =>
       have hbr0 : BranchesRelC (fun x y => R ρ x y) (branchesOf a) (branchesOf b) :=
-        BranchesRelCE_to_C_fixed hbr
+        branches_rel_ce_to_c_fixed hbr
       have hbr' : BranchesRelC EQ2C (branchesOf a) (branchesOf b) :=
-        BranchesRelC_mono (fun x y hxy => hR ρ _ _ hxy) hbr0
-      exact EQ2C_recv_head ha hb hbr'
+        branches_rel_c_mono (fun x y hxy => hR ρ _ _ hxy) hbr0
+      exact eq2_c_recv_head ha hb hbr'
   | var_left ha hmem =>
       rename_i x
       have hvar : EQ2C a (mkVar x) := by
         have hb : head (mkVar x) = .var x := by simp
-        exact EQ2C_var_head ha hb
-      exact EQ2C_trans hvar (hEnv _ _ hmem)
+        exact eq2_c_var_head ha hb
+      exact eq2_c_trans hvar (hEnv _ _ hmem)
   | var_right hb hmem =>
       rename_i x
       exact (hNoRight x hb hmem).elim
   | mu_left ha hmem hrel =>
       rename_i x f
       have hrec : EQ2C (f ()) b := hR _ _ _ hrel
-      have hmu : EQ2C (mkMu x (f ())) b := EQ2C_unfold_left hrec x
+      have hmu : EQ2C (mkMu x (f ())) b := eq2_c_unfold_left hrec x
       have ha' : a = mkMu x (f ()) := mu_eta (b := a) (x := x) (k := f) ha
       simpa [ha'] using hmu
   | mu_right hb hrel =>
       rename_i x f
       have hrec : EQ2C a (f ()) := hR _ _ _ hrel
-      have hmu : EQ2C a (mkMu x (f ())) := EQ2C_unfold_right hrec x
+      have hmu : EQ2C a (mkMu x (f ())) := eq2_c_unfold_right hrec x
       have hb' : b = mkMu x (f ()) := mu_eta (b := b) (x := x) (k := f) hb
       simpa [hb'] using hmu
 

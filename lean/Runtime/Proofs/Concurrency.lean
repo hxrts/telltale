@@ -54,7 +54,7 @@ theorem state_interp_invariant {ι γ π ε ν : Type} [IdentityModel ι] [Guard
 /-! ## Scheduler invariance helpers -/
 
 omit [Telltale.TelltaleIris] in
-private lemma schedRound_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+private lemma sched_round_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -70,7 +70,7 @@ private lemma schedRound_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [Gu
       simp [schedRound]
 
 omit [Telltale.TelltaleIris] in
-private lemma runScheduled_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+private lemma run_scheduled_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -84,10 +84,10 @@ private lemma runScheduled_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [
       simp [runScheduled]
   | succ fuel ih =>
       -- Inductive step: normalize the round count to one.
-      simp [runScheduled, schedRound_eq_one (n:=n) (st:=_) hn, ih]
+      simp [runScheduled, sched_round_eq_one (n:=n) (st:=_) hn, ih]
 
 omit [Telltale.TelltaleIris] in
-private lemma runScheduled_policy_eq {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+private lemma run_scheduled_policy_eq {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -111,7 +111,7 @@ private lemma runScheduled_policy_eq {ι γ π ε ν : Type u} [IdentityModel ι
 /-! ## Per-session trace invariance -/
 
 omit [Telltale.TelltaleIris] in
-theorem per_session_trace_N_invariant {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem per_session_trace_n_invariant {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -123,8 +123,8 @@ theorem per_session_trace_N_invariant {ι γ π ε ν : Type u} [IdentityModel �
     filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel n1 st).obsTrace) =
     filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel n2 st).obsTrace) := by
   -- Reduce both schedules to the single-round form.
-  have h1 := runScheduled_eq_one (fuel:=fuel) (n:=n1) (st:=st) hn1
-  have h2 := runScheduled_eq_one (fuel:=fuel) (n:=n2) (st:=st) hn2
+  have h1 := run_scheduled_eq_one (fuel:=fuel) (n:=n1) (st:=st) hn1
+  have h2 := run_scheduled_eq_one (fuel:=fuel) (n:=n2) (st:=st) hn2
   simp [h1, h2]
 
 omit [Telltale.TelltaleIris] in
@@ -141,5 +141,5 @@ theorem per_session_trace_policy_invariant {ι γ π ε ν : Type u} [IdentityMo
     filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel concurrency
       { st with sched := { st.sched with policy := .roundRobin } }).obsTrace) := by
   -- Round-robin normalization is idempotent.
-  have h := runScheduled_policy_eq (fuel:=fuel) (n:=concurrency) (st:=st) hpol
+  have h := run_scheduled_policy_eq (fuel:=fuel) (n:=concurrency) (st:=st) hpol
   simp [h]

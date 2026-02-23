@@ -81,7 +81,7 @@ end
 
 /-! ## Closedness and Well-Formedness Lemmas -/
 
-private theorem allVarsBound_nil_implies_freeVars_nil (g : GlobalType)
+private theorem all_vars_bound_nil_implies_free_vars_nil (g : GlobalType)
     (h : g.allVarsBound [] = true) :
     g.freeVars = [] := by
   rw [List.eq_nil_iff_forall_not_mem]
@@ -90,12 +90,12 @@ private theorem allVarsBound_nil_implies_freeVars_nil (g : GlobalType)
   simp only [List.not_mem_nil] at hmem
 
 /-- Well-formed globals are closed (no free variables). -/
-theorem GlobalType.isClosed_of_wellFormed (g : GlobalType)
+theorem GlobalType.is_closed_of_well_formed (g : GlobalType)
     (hwf : g.wellFormed = true) : g.isClosed = true := by
   -- wellFormed = (((allVarsBound && allCommsNonEmpty) && noSelfComm) && isProductive)
   simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
   have hbound : g.allVarsBound = true := hwf.1.1.1
-  have hfree : g.freeVars = [] := allVarsBound_nil_implies_freeVars_nil g hbound
+  have hfree : g.freeVars = [] := all_vars_bound_nil_implies_free_vars_nil g hbound
   simp [GlobalType.isClosed, hfree]
 
 /-! ## Closedness Lemmas
@@ -106,7 +106,7 @@ in `coGlobal.v` and `coLocal.v`. The key insight is that:
 - Substitution with a closed term doesn't introduce new free variables -/
 
 /-- Helper: if a list is empty, all appended sublists must be empty. -/
-private theorem freeVarsOfBranches_nil_iff (branches : List (Label × GlobalType)) :
+private theorem free_vars_of_branches_nil_iff (branches : List (Label × GlobalType)) :
     freeVarsOfBranches branches = [] ↔ ∀ p ∈ branches, p.2.freeVars = [] := by
   induction branches with
   | nil =>
@@ -127,12 +127,12 @@ If `(comm sender receiver branches).isClosed = true`, then each branch continuat
 This follows directly from the definition: freeVars of comm is the concatenation of branch freeVars.
 
 **Coq reference:** Follows from `gType_fv` definition in `coGlobal.v`. -/
-theorem GlobalType.isClosed_comm_branches (sender receiver : String)
+theorem GlobalType.is_closed_comm_branches (sender receiver : String)
     (branches : List (Label × GlobalType))
     (hclosed : (GlobalType.comm sender receiver branches).isClosed = true) :
     ∀ p ∈ branches, p.2.isClosed = true := by
   simp only [GlobalType.isClosed, GlobalType.freeVars, List.isEmpty_iff] at hclosed
-  have hbranches := freeVarsOfBranches_nil_iff branches
+  have hbranches := free_vars_of_branches_nil_iff branches
   intro p hp
   simp only [GlobalType.isClosed, List.isEmpty_iff]
   exact (hbranches.mp hclosed) p hp
@@ -140,7 +140,7 @@ theorem GlobalType.isClosed_comm_branches (sender receiver : String)
 /-! ## allCommsNonEmpty Branch Lifting -/
 
 /-- Helper: allCommsNonEmptyBranches ensures each branch has allCommsNonEmpty. -/
-private theorem allCommsNonEmptyBranches_forall (branches : List (Label × GlobalType))
+private theorem all_comms_non_empty_branches_forall (branches : List (Label × GlobalType))
     (h : allCommsNonEmptyBranches branches = true) :
     ∀ p ∈ branches, p.2.allCommsNonEmpty = true := by
   induction branches with
@@ -157,16 +157,16 @@ private theorem allCommsNonEmptyBranches_forall (branches : List (Label × Globa
 If `(comm sender receiver branches).allCommsNonEmpty = true`, then each branch continuation
 has `allCommsNonEmpty = true`. This follows from the definition: allCommsNonEmpty of comm
 requires allCommsNonEmptyBranches, which recursively checks each branch. -/
-theorem GlobalType.allCommsNonEmpty_comm_branches (sender receiver : String)
+theorem GlobalType.all_comms_non_empty_comm_branches (sender receiver : String)
     (branches : List (Label × GlobalType))
     (hallcomms : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true) :
     ∀ p ∈ branches, p.2.allCommsNonEmpty = true := by
   simp only [GlobalType.allCommsNonEmpty, Bool.and_eq_true] at hallcomms
-  exact allCommsNonEmptyBranches_forall branches hallcomms.2
+  exact all_comms_non_empty_branches_forall branches hallcomms.2
 
 /-! ## noSelfComm Branch Lifting -/
 
-private theorem noSelfCommBranches_forall (branches : List (Label × GlobalType))
+private theorem no_self_comm_branches_forall (branches : List (Label × GlobalType))
     (h : noSelfCommBranches branches = true) :
     ∀ p ∈ branches, p.2.noSelfComm = true := by
   induction branches with
@@ -179,16 +179,16 @@ private theorem noSelfCommBranches_forall (branches : List (Label × GlobalType)
       | tail _ hmem => exact ih h.2 p hmem
 
 /-- A comm with noSelfComm has all branch continuations with noSelfComm. -/
-theorem GlobalType.noSelfComm_comm_branches (sender receiver : String)
+theorem GlobalType.no_self_comm_comm_branches (sender receiver : String)
     (branches : List (Label × GlobalType))
     (hns : (GlobalType.comm sender receiver branches).noSelfComm = true) :
     ∀ p ∈ branches, p.2.noSelfComm = true := by
   simp only [GlobalType.noSelfComm, Bool.and_eq_true] at hns
-  exact noSelfCommBranches_forall branches hns.2
+  exact no_self_comm_branches_forall branches hns.2
 
 /-! ## Productivity and Well-Formed Branch Lifting -/
 
-private theorem isProductiveBranches_forall (branches : List (Label × GlobalType))
+private theorem is_productive_branches_forall (branches : List (Label × GlobalType))
     (unguarded : List String)
     (h : isProductiveBranches branches unguarded = true) :
     ∀ p ∈ branches, p.2.isProductive unguarded = true := by
@@ -202,15 +202,15 @@ private theorem isProductiveBranches_forall (branches : List (Label × GlobalTyp
       | tail _ hmem => exact ih h.2 p hmem
 
 /-- A comm that is productive has productive branch continuations. -/
-theorem GlobalType.isProductive_comm_branches (sender receiver : String)
+theorem GlobalType.is_productive_comm_branches (sender receiver : String)
     (branches : List (Label × GlobalType))
     (hprod : (GlobalType.comm sender receiver branches).isProductive = true) :
     ∀ p ∈ branches, p.2.isProductive = true := by
   simp only [GlobalType.isProductive] at hprod
-  exact isProductiveBranches_forall branches [] hprod
+  exact is_productive_branches_forall branches [] hprod
 
 /-- A well-formed comm has well-formed branch continuations. -/
-theorem GlobalType.wellFormed_comm_branches (sender receiver : String)
+theorem GlobalType.well_formed_comm_branches (sender receiver : String)
     (branches : List (Label × GlobalType))
     (hwf : (GlobalType.comm sender receiver branches).wellFormed = true) :
     ∀ b ∈ branches, b.2.wellFormed = true := by
@@ -218,13 +218,13 @@ theorem GlobalType.wellFormed_comm_branches (sender receiver : String)
   simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
   obtain ⟨⟨⟨hvars, hallcomms⟩, hnoself⟩, hprod⟩ := hwf
   have hvars_b : b.2.allVarsBound = true :=
-    allVarsBound_comm_branches sender receiver branches hvars b hb
+    all_vars_bound_comm_branches sender receiver branches hvars b hb
   have hallcomms_b : b.2.allCommsNonEmpty = true :=
-    GlobalType.allCommsNonEmpty_comm_branches sender receiver branches hallcomms b hb
+    GlobalType.all_comms_non_empty_comm_branches sender receiver branches hallcomms b hb
   have hnoself_b : b.2.noSelfComm = true :=
-    GlobalType.noSelfComm_comm_branches sender receiver branches hnoself b hb
+    GlobalType.no_self_comm_comm_branches sender receiver branches hnoself b hb
   have hprod_b : b.2.isProductive = true :=
-    GlobalType.isProductive_comm_branches sender receiver branches hprod b hb
+    GlobalType.is_productive_comm_branches sender receiver branches hprod b hb
   simp [GlobalType.wellFormed, hvars_b, hallcomms_b, hnoself_b, hprod_b]
 
 

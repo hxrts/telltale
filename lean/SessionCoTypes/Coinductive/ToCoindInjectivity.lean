@@ -17,8 +17,8 @@ The Problem. The toCoind embedding from inductive to coinductive types should
 be injective: distinct inductive types map to distinct coinductive types.
 This is essential for round-trip correctness.
 
-Solution Structure. Proves toCoind_injective by case analysis over constructors,
-toCoindBranches_injective for branch list injectivity (mutually recursive),
+Solution Structure. Proves to_coind_injective by case analysis over constructors,
+to_coind_branches_injective for branch list injectivity (mutually recursive),
 and indexing lemmas for toCoindBranches (length, get).
 -/
 
@@ -30,7 +30,7 @@ open SessionTypes.LocalTypeR
 -- toCoind Injectivity
 
 mutual
-  theorem toCoind_injective : ∀ {t u : LocalTypeR}, toCoind t = toCoind u → t = u
+  theorem to_coind_injective : ∀ {t u : LocalTypeR}, toCoind t = toCoind u → t = u
     | .end, .end, _ => rfl
     | .end, .var _, h => by cases (congrArg head h)
     | .end, .mu _ _, h => by cases (congrArg head h)
@@ -39,7 +39,7 @@ mutual
     | .var _, .end, h => by cases (congrArg head h)
     | .var x, .var y, h => by
         have hhead := congrArg head h
-        have hx : x = y := by simpa [head_mkVar] using hhead
+        have hx : x = y := by simpa [head_mk_var] using hhead
         subst hx; rfl
     | .var _, .mu _ _, h => by cases (congrArg head h)
     | .var _, .send _ _, h => by cases (congrArg head h)
@@ -56,7 +56,7 @@ mutual
           exact eq_of_heq hxhy.2
         have hchild : toCoind body = toCoind body' := by
           simpa using congrArg (fun f => f ()) hfun
-        exact congrArg (LocalTypeR.mu x) (toCoind_injective hchild)
+        exact congrArg (LocalTypeR.mu x) (to_coind_injective hchild)
     | .mu _ _, .send _ _, h => by cases (congrArg head h)
     | .mu _ _, .recv _ _, h => by cases (congrArg head h)
     -- toCoind Injectivity: Send/Recv Constructor Cases
@@ -67,13 +67,13 @@ mutual
         have hhead := congrArg head h
         have hhead' : p = q ∧ (toCoindBranches bs).map Prod.fst =
             (toCoindBranches cs).map Prod.fst := by
-          simpa [toCoind, head_mkSend] using hhead
+          simpa [toCoind, head_mk_send] using hhead
         have hpq : p = q := hhead'.1
         subst hpq
         have hbranches : toCoindBranches bs = toCoindBranches cs := by
           have h' := congrArg branchesOf h
-          simpa [toCoind, branchesOf_mkSend] using h'
-        have hbs : bs = cs := toCoindBranches_injective hbranches
+          simpa [toCoind, branches_of_mk_send] using h'
+        have hbs : bs = cs := to_coind_branches_injective hbranches
         subst hbs; rfl
     | .send _ _, .recv _ _, h => by cases (congrArg head h)
 /- ## Structured Block 2 -/
@@ -85,18 +85,18 @@ mutual
         have hhead := congrArg head h
         have hhead' : p = q ∧ (toCoindBranches bs).map Prod.fst =
             (toCoindBranches cs).map Prod.fst := by
-          simpa [toCoind, head_mkRecv] using hhead
+          simpa [toCoind, head_mk_recv] using hhead
         have hpq : p = q := hhead'.1
         subst hpq
         have hbranches : toCoindBranches bs = toCoindBranches cs := by
           have h' := congrArg branchesOf h
-          simpa [toCoind, branchesOf_mkRecv] using h'
-        have hbs : bs = cs := toCoindBranches_injective hbranches
+          simpa [toCoind, branches_of_mk_recv] using h'
+        have hbs : bs = cs := to_coind_branches_injective hbranches
         subst hbs; rfl
 
   -- toCoindBranches Injectivity
 
-  theorem toCoindBranches_injective :
+  theorem to_coind_branches_injective :
       ∀ {bs cs : List BranchR}, toCoindBranches bs = toCoindBranches cs → bs = cs
     | [], [], _ => rfl
     | [], _ :: _, h => by simp [toCoindBranches] at h
@@ -108,23 +108,23 @@ mutual
           simpa [toCoindBranches] using h
         rcases hcons with ⟨hhead, htail⟩
         have hlabel : lb = lc := congrArg Prod.fst hhead
-        have ht : t = u := toCoind_injective (congrArg Prod.snd hhead)
+        have ht : t = u := to_coind_injective (congrArg Prod.snd hhead)
         have hvt : vt = wt := by simpa [toCoindBranches] using h
         subst hlabel; subst ht; subst hvt
-        have hrest : bs = cs := toCoindBranches_injective htail
+        have hrest : bs = cs := to_coind_branches_injective htail
         subst hrest; rfl
 end
 
 -- toCoindBranches Indexing
 
-lemma toCoindBranches_length (bs : List BranchR) :
+lemma to_coind_branches_length (bs : List BranchR) :
     (toCoindBranches bs).length = bs.length := by
   induction bs with
   | nil => rfl
   | cons _ _ ih => simp [toCoindBranches, ih]
 
-lemma toCoindBranches_get {bs : List BranchR} (i : Fin bs.length) :
-    (toCoindBranches bs).get (castFin (toCoindBranches_length bs).symm i) =
+lemma to_coind_branches_get {bs : List BranchR} (i : Fin bs.length) :
+    (toCoindBranches bs).get (castFin (to_coind_branches_length bs).symm i) =
       ((bs.get i).1, toCoind (bs.get i).2.2) := by
   induction bs with
   | nil => exact (Fin.elim0 i)
@@ -132,14 +132,14 @@ lemma toCoindBranches_get {bs : List BranchR} (i : Fin bs.length) :
       cases i using Fin.cases with
       | zero =>
           cases b with
-          | mk label rest => cases rest with | mk vt cont => simp [toCoindBranches, castFin, toCoindBranches_length]
-      | succ i => simpa [castFin, toCoindBranches_length] using ih i
+          | mk label rest => cases rest with | mk vt cont => simp [toCoindBranches, castFin, to_coind_branches_length]
+      | succ i => simpa [castFin, to_coind_branches_length] using ih i
 
 /- ## Structured Block 3 -/
-lemma toCoindBranches_get_snd {bs : List BranchR} (i : Fin bs.length) :
-    ((toCoindBranches bs).get (castFin (toCoindBranches_length bs).symm i)).2 =
+lemma to_coind_branches_get_snd {bs : List BranchR} (i : Fin bs.length) :
+    ((toCoindBranches bs).get (castFin (to_coind_branches_length bs).symm i)).2 =
       toCoind (bs.get i).2.2 := by
-  simpa using congrArg Prod.snd (toCoindBranches_get (bs := bs) i)
+  simpa using congrArg Prod.snd (to_coind_branches_get (bs := bs) i)
 
 lemma labels_get_eq {bs : List BranchR} (i : Fin (bs.map Prod.fst).length) :
     (bs.map Prod.fst).get i = (bs.get (castFin (by simp) i)).1 := by

@@ -241,7 +241,7 @@ structure Premises
 /-! ## Envelope and Adequacy Derivations -/
 
 /-- Exact envelope characterization follows from assumptions + premises. -/
-theorem exactEnvelope_of_assumptions
+theorem exact_envelope_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (_a : Assumptions M)
@@ -259,7 +259,7 @@ theorem adequacy_of_assumptions
   p.adequacyWitness
 
 /-- Principal capability theorem follows from assumptions + premises. -/
-theorem principalCapability_of_assumptions
+theorem principal_capability_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (_a : Assumptions M)
@@ -270,7 +270,7 @@ theorem principalCapability_of_assumptions
 /-! ## Admission and Equivalence Derivations -/
 
 /-- Admission soundness theorem follows from assumptions + premises. -/
-theorem admissionSoundness_of_assumptions
+theorem admission_soundness_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (_a : Assumptions M)
@@ -279,7 +279,7 @@ theorem admissionSoundness_of_assumptions
   p.admissionSoundnessWitness
 
 /-- Admission completeness theorem follows from assumptions + premises. -/
-theorem admissionCompleteness_of_assumptions
+theorem admission_completeness_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (_a : Assumptions M)
@@ -288,7 +288,7 @@ theorem admissionCompleteness_of_assumptions
   p.admissionCompletenessWitness
 
 /-- Op/state equivalence theorem follows from assumptions + premises. -/
-theorem opStateEquivalence_of_assumptions
+theorem op_state_equivalence_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (_a : Assumptions M)
@@ -297,7 +297,7 @@ theorem opStateEquivalence_of_assumptions
   p.opStateEquivalenceWitness
 
 /-- GC safety iff causal dominance follows from assumptions + premises. -/
-theorem gcSafetyIff_of_assumptions
+theorem gc_safety_iff_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (_a : Assumptions M)
@@ -308,7 +308,7 @@ theorem gcSafetyIff_of_assumptions
 /-! ## Approximation and Limit Derivations -/
 
 /-- Bounded-metadata approximation bound follows from assumptions + premises. -/
-theorem boundedApproximation_of_assumptions
+theorem bounded_approximation_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (_a : Assumptions M)
@@ -318,7 +318,7 @@ theorem boundedApproximation_of_assumptions
   p.boundedApproximationWitness
 
 /-- Approximation monotonicity theorem follows from assumptions + premises. -/
-theorem approximationMonotone_of_assumptions
+theorem approximation_monotone_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (_a : Assumptions M)
@@ -328,7 +328,7 @@ theorem approximationMonotone_of_assumptions
   p.approximationMonotoneWitness
 
 /-- Exact-SEC recovery-as-limit theorem follows from assumptions + premises. -/
-theorem exactSECAsLimit_of_assumptions
+theorem exact_sec_as_limit_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (_a : Assumptions M)
@@ -339,7 +339,7 @@ theorem exactSECAsLimit_of_assumptions
 /-! ## Derived Bundle Projections -/
 
 /-- `H_crdt_core` from CRDT assumptions. -/
-theorem hcrdtCore_of_assumptions
+theorem hcrdt_core_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (a : Assumptions M) :
@@ -347,7 +347,7 @@ theorem hcrdtCore_of_assumptions
   ⟨a.semilatticeCoreClass, a.opContextLayerClass⟩
 
 /-- `H_crdt_foundation` from CRDT assumptions. -/
-theorem hcrdtFoundation_of_assumptions
+theorem hcrdt_foundation_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (a : Assumptions M) :
@@ -355,7 +355,7 @@ theorem hcrdtFoundation_of_assumptions
   ⟨a.minimalOpStateEquivalenceAssumptions, a.canonicalConvergenceDistanceClass⟩
 
 /-- `H_crdt_dynamics` from CRDT assumptions. -/
-theorem hcrdtDynamics_of_assumptions
+theorem hcrdt_dynamics_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (a : Assumptions M) :
@@ -363,7 +363,7 @@ theorem hcrdtDynamics_of_assumptions
   ⟨a.mixingTimeControlledClass, a.hotspotSlowModesClass, a.driftDecayClass⟩
 
 /-- `H_crdt_extensions` from CRDT assumptions. -/
-theorem hcrdtExtensions_of_assumptions
+theorem hcrdt_extensions_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (a : Assumptions M) :
@@ -372,7 +372,7 @@ theorem hcrdtExtensions_of_assumptions
     a.boundedMetadataApproxClass, a.multiscaleObservablesClass⟩
 
 /-- `H_crdt_limits` from CRDT assumptions. -/
-theorem hcrdtLimits_of_assumptions
+theorem hcrdt_limits_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (a : Assumptions M) :

@@ -14,7 +14,7 @@ representations (name-only for conversion, type-carrying for substitution).
 Solution Structure. Defines `Env` as binding lists with `Env.apply` for sequential substitution.
 `ClosedUnder` captures when all free variables are bound. `sigmaOfVars` builds canonical
 environments mapping variables to `.end`. `ActiveEnv` provides a fixed abstraction point.
-Proves `freeVars_substitute_subset` and `freeVars_unfold_subset` for closedness propagation.
+Proves `free_vars_substitute_subset` and `free_vars_unfold_subset` for closedness propagation.
 -/
 
 /-! # SessionTypes.LocalTypeR.Environments
@@ -67,7 +67,7 @@ parametric substitution environment used to swap in a sigma context. -/
 def sigmaOfVars (S : List String) : Env :=
   S.map (fun v => (v, LocalTypeR.end))
 
-theorem sigmaOfVars_dom (S : List String) :
+theorem sigma_of_vars_dom (S : List String) :
     Env.dom (sigmaOfVars S) = S := by
   induction S with
   | nil => simp [sigmaOfVars, Env.dom]
@@ -75,7 +75,7 @@ theorem sigmaOfVars_dom (S : List String) :
       simp [sigmaOfVars, Env.dom]
       simpa [sigmaOfVars] using ih
 
-theorem sigmaOfVars_wf (S : List String) : EnvWellFormed (sigmaOfVars S) := by
+theorem sigma_of_vars_wf (S : List String) : EnvWellFormed (sigmaOfVars S) := by
   induction S with
   | nil => simp [sigmaOfVars, EnvWellFormed]
   | cons v rest ih =>
@@ -83,12 +83,12 @@ theorem sigmaOfVars_wf (S : List String) : EnvWellFormed (sigmaOfVars S) := by
         simpa [sigmaOfVars] using ih
       simp [sigmaOfVars, EnvWellFormed, LocalTypeR.isClosed, LocalTypeR.isContractive, LocalTypeR.freeVars, ih']
 
-theorem closedUnder_sigmaOfVars {S : List String} {lt : LocalTypeR}
+theorem closed_under_sigma_of_vars {S : List String} {lt : LocalTypeR}
     (hsubset : ∀ v, v ∈ lt.freeVars → v ∈ S) :
     ClosedUnder (sigmaOfVars S) lt := by
   intro v hv
   have hvS : v ∈ S := hsubset v hv
-  simpa [sigmaOfVars_dom S] using hvS
+  simpa [sigma_of_vars_dom S] using hvS
 
 def ActiveVars : List String := []
 
@@ -99,19 +99,19 @@ abbrev ClosedUnderActive (lt : LocalTypeR) : Prop := ClosedUnder ActiveEnv lt
 def applyActiveEnv (lt : LocalTypeR) : LocalTypeR :=
   Env.apply ActiveEnv lt
 
-theorem closedUnderActive_of_closed (lt : LocalTypeR) :
+theorem closed_under_active_of_closed (lt : LocalTypeR) :
     lt.isClosed → ClosedUnderActive lt := by
   intro h v hv
   have hnil : lt.freeVars = [] := by
     have : lt.freeVars.isEmpty = true := by
       simpa [LocalTypeR.isClosed] using h
-    exact (List.isEmpty_eq_true _).1 this
+    exact (List.is_empty_eq_true _).1 this
   have : False := by
     simpa [hnil] using hv
   exact this.elim
 
-theorem activeEnv_wellFormed : EnvWellFormed ActiveEnv := by
-  simpa [ActiveEnv] using (sigmaOfVars_wf ActiveVars)
+theorem active_env_well_formed : EnvWellFormed ActiveEnv := by
+  simpa [ActiveEnv] using (sigma_of_vars_wf ActiveVars)
 
 /-! ## SubstContext: Unified Substitution Environment
 
@@ -148,13 +148,13 @@ def toEnv (ctx : SubstContext) : Env := ctx.bindings
 def ofEnv (env : Env) : SubstContext := ⟨env⟩
 
 @[simp]
-theorem toEnv_ofEnv (env : Env) : (ofEnv env).toEnv = env := rfl
+theorem to_env_of_env (env : Env) : (ofEnv env).toEnv = env := rfl
 
 @[simp]
-theorem ofEnv_toEnv (ctx : SubstContext) : ofEnv ctx.toEnv = ctx := by
+theorem of_env_to_env (ctx : SubstContext) : ofEnv ctx.toEnv = ctx := by
   cases ctx; rfl
 
-theorem dom_eq_Env_dom (ctx : SubstContext) : ctx.dom = Env.dom ctx.toEnv := by
+theorem dom_eq_env_dom (ctx : SubstContext) : ctx.dom = Env.dom ctx.toEnv := by
   simp only [dom, toEnv, TypeContext.names]
   induction ctx.bindings with
   | nil => rfl
@@ -164,7 +164,7 @@ end SubstContext
 
 /-! ## ClosedUnder for the empty environment -/
 
-theorem closedUnder_nil_iff_isClosed (lt : LocalTypeR) :
+theorem closed_under_nil_iff_is_closed (lt : LocalTypeR) :
     ClosedUnder ([] : Env) lt ↔ lt.isClosed := by
   constructor
   · intro h
@@ -173,12 +173,12 @@ theorem closedUnder_nil_iff_isClosed (lt : LocalTypeR) :
       intro v hv
       have hv' : v ∈ Env.dom ([] : Env) := h v hv
       simp [Env.dom] at hv'
-    simpa [LocalTypeR.isClosed, hnil] using (List.isEmpty_eq_true _).2 hnil
+    simpa [LocalTypeR.isClosed, hnil] using (List.is_empty_eq_true _).2 hnil
   · intro h v hv
     have hnil : lt.freeVars = [] := by
       have : lt.freeVars.isEmpty = true := by
         simpa [LocalTypeR.isClosed] using h
-      exact (List.isEmpty_eq_true _).1 this
+      exact (List.is_empty_eq_true _).1 this
     have : False := by
       simpa [hnil] using hv
     exact this.elim
@@ -195,7 +195,7 @@ mutual
       x ∈ repl.freeVars ∨ (x ∈ lt.freeVars ∧ x ≠ varName) :=
     match lt with
     | .end => by
-        simp [LocalTypeR.substitute, LocalTypeR.freeVars, -substituteBranches_eq_map] at hx
+        simp [LocalTypeR.substitute, LocalTypeR.freeVars, -substitute_branches_eq_map] at hx
     | .var t => by
         by_cases h : t = varName
         · subst h
@@ -213,7 +213,7 @@ mutual
           · exact h
     | .send _ bs | .recv _ bs => by
         -- Send/recv cases share the same branch substitution behavior.
-        simp [LocalTypeR.substitute, LocalTypeR.freeVars, -substituteBranches_eq_map] at hx
+        simp [LocalTypeR.substitute, LocalTypeR.freeVars, -substitute_branches_eq_map] at hx
         exact freeVars_substituteBranches_subset_aux bs varName repl x hx
     -- Free Vars Substitution: Local-Type Mu Case
     | .mu t body => by
@@ -259,7 +259,7 @@ mutual
     | [] => by
         simp [substituteBranches, freeVarsOfBranches] at hx
     | (label, _vt, cont) :: rest => by
-        simp [substituteBranches, freeVarsOfBranches, List.mem_append, -substituteBranches_eq_map] at hx
+        simp [substituteBranches, freeVarsOfBranches, List.mem_append, -substitute_branches_eq_map] at hx
         cases hx with
         | inl hxcont =>
             have ih := freeVars_substitute_subset_aux cont varName repl x hxcont
@@ -282,30 +282,30 @@ end
 
 /-! ## Free Vars Substitution: Public Subset Lemmas -/
 
-theorem freeVars_substitute_subset (lt : LocalTypeR) (varName : String) (repl : LocalTypeR) :
+theorem free_vars_substitute_subset (lt : LocalTypeR) (varName : String) (repl : LocalTypeR) :
     ∀ x, x ∈ (lt.substitute varName repl).freeVars →
          x ∈ repl.freeVars ∨ (x ∈ lt.freeVars ∧ x ≠ varName) :=
   fun x hx => freeVars_substitute_subset_aux lt varName repl x hx
 
 /-! ## Free Vars Substitution: Closed Replacement Lemmas -/
 
-theorem freeVars_substitute_closed (body : LocalTypeR) (t : String) (e : LocalTypeR) :
+theorem free_vars_substitute_closed (body : LocalTypeR) (t : String) (e : LocalTypeR) :
     e.isClosed → ∀ v, v ∈ (body.substitute t e).freeVars → v ∈ body.freeVars ∧ v ≠ t := by
   intro hclosed v hv
-  have h := freeVars_substitute_subset body t e v hv
+  have h := free_vars_substitute_subset body t e v hv
   cases h with
   | inl hrepl =>
       have hnil : e.freeVars = [] := by
         have : e.freeVars.isEmpty = true := by
           simpa [LocalTypeR.isClosed] using hclosed
-        exact (List.isEmpty_eq_true _).1 this
+        exact (List.is_empty_eq_true _).1 this
       have : False := by
         simpa [hnil] using hrepl
       exact this.elim
   | inr hpair =>
       exact hpair
 
-theorem freeVars_substituteBranches_closed (bs : List BranchR) (t : String) (e : LocalTypeR) :
+theorem free_vars_substitute_branches_closed (bs : List BranchR) (t : String) (e : LocalTypeR) :
     e.isClosed → ∀ v, v ∈ freeVarsOfBranches (substituteBranches bs t e) →
       v ∈ freeVarsOfBranches bs ∧ v ≠ t := by
   intro hclosed v hmem
@@ -325,7 +325,7 @@ theorem freeVars_substituteBranches_closed (bs : List BranchR) (t : String) (e :
                 simpa [freeVarsOfBranches, substituteBranches, List.mem_append] using hmem
               cases hmem' with
               | inl hcont =>
-                  have hres := freeVars_substitute_closed cont t e hclosed v hcont
+                  have hres := free_vars_substitute_closed cont t e hclosed v hcont
                   -- v appears in head branch
                   have hmem_head : v ∈ freeVarsOfBranches ((label, _vt, cont) :: tail) := by
                     simp [freeVarsOfBranches, hres.1]
@@ -338,7 +338,7 @@ theorem freeVars_substituteBranches_closed (bs : List BranchR) (t : String) (e :
 
 /-! ## Unfolding does not introduce new free variables -/
 
-theorem freeVars_unfold_subset (lt : LocalTypeR) (v : String) :
+theorem free_vars_unfold_subset (lt : LocalTypeR) (v : String) :
     v ∈ lt.unfold.freeVars → v ∈ lt.freeVars := by
   cases lt with
   | «end» | var _ | send _ _ | recv _ _ =>
@@ -347,7 +347,7 @@ theorem freeVars_unfold_subset (lt : LocalTypeR) (v : String) :
   | mu t body =>
       intro hmem
       -- unfold = body.substitute t (.mu t body)
-      have hsub := freeVars_substitute_subset body t (.mu t body) v (by simpa [LocalTypeR.unfold] using hmem)
+      have hsub := free_vars_substitute_subset body t (.mu t body) v (by simpa [LocalTypeR.unfold] using hmem)
       cases hsub with
       | inl hrepl =>
           -- repl.freeVars = body.freeVars.filter (· != t)
@@ -360,7 +360,7 @@ theorem freeVars_unfold_subset (lt : LocalTypeR) (v : String) :
             exact ⟨hpair.1, (bne_iff_ne).2 hpair.2⟩
           simpa [LocalTypeR.freeVars] using hmem'
 
-theorem freeVars_iter_unfold_subset (k : Nat) (lt : LocalTypeR) (v : String) :
+theorem free_vars_iter_unfold_subset (k : Nat) (lt : LocalTypeR) (v : String) :
     v ∈ ((LocalTypeR.unfold)^[k] lt).freeVars → v ∈ lt.freeVars := by
   induction k generalizing lt with
   | zero =>
@@ -371,6 +371,6 @@ theorem freeVars_iter_unfold_subset (k : Nat) (lt : LocalTypeR) (v : String) :
       have hmem' : v ∈ ((LocalTypeR.unfold)^[k] lt.unfold).freeVars := by
         simpa [Function.iterate_succ_apply] using hmem
       have hmem'' := ih (lt := lt.unfold) hmem'
-      exact freeVars_unfold_subset lt v hmem''
+      exact free_vars_unfold_subset lt v hmem''
 
 end SessionTypes.LocalTypeR

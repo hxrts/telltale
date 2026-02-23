@@ -11,8 +11,8 @@ or mu_unfold substituting), we need blindness to be preserved. Without this,
 the projectability guarantee from blindness would not extend through execution.
 
 Solution Structure. We prove preservation lemmas for each step kind:
-1. `isBlind_step_comm_head`: stepping into a branch preserves blindness
-2. `isBlind_substitute`: substitution (for mu-unfolding) preserves blindness
+1. `is_blind_step_comm_head`: stepping into a branch preserves blindness
+2. `is_blind_substitute`: substitution (for mu-unfolding) preserves blindness
 The key insight is that substitution is uniform across branches.
 -/
 
@@ -29,26 +29,26 @@ open Classical
 /-! ## Step Preservation Helpers -/
 
 /-- Blindness propagates to branch continuations. -/
-theorem isBlind_of_mem_branches {sender receiver : String} {branches : List (Label × GlobalType)}
+theorem is_blind_of_mem_branches {sender receiver : String} {branches : List (Label × GlobalType)}
     (hblind : isBlind (GlobalType.comm sender receiver branches) = true)
     {label : Label} {cont : GlobalType} (hmem : (label, cont) ∈ branches) :
     isBlind cont = true := by
-  have hblind_branches := isBlind_comm_branches hblind
+  have hblind_branches := is_blind_comm_branches hblind
   exact hblind_branches (label, cont) hmem
 
 /-- comm_head step preserves blindness: stepping to a branch continuation. -/
-theorem isBlind_step_comm_head {sender receiver : String} {branches : List (Label × GlobalType)}
+theorem is_blind_step_comm_head {sender receiver : String} {branches : List (Label × GlobalType)}
     {label : Label} {cont : GlobalType}
     (hblind : isBlind (GlobalType.comm sender receiver branches) = true)
     (hmem : (label, cont) ∈ branches) :
     isBlind cont = true :=
-  isBlind_of_mem_branches hblind hmem
+  is_blind_of_mem_branches hblind hmem
 
 /-! ## Substitution Preservation: Branch Auxiliary -/
 
 /-- Helper: isBlindBranches is preserved by substitution.
     Uses well-founded recursion on branch list size. -/
-private theorem isBlindBranches_substitute_aux (bs : List (Label × GlobalType))
+private theorem is_blind_branches_substitute_aux (bs : List (Label × GlobalType))
     (t : String) (repl : GlobalType) (hrepl : isBlind repl = true)
     (hrepl_closed : repl.isClosed = true)
     (hbs : isBlindBranches bs = true)
@@ -69,7 +69,7 @@ private theorem isBlindBranches_substitute_aux (bs : List (Label × GlobalType))
           intro g hg
           simp only [List.cons.sizeOf_spec, Prod.mk.sizeOf_spec]
           omega
-        exact isBlindBranches_substitute_aux rest t repl hrepl hrepl_closed hbs.2
+        exact is_blind_branches_substitute_aux rest t repl hrepl hrepl_closed hbs.2
           (fun g hg hblind => ih g (hrest_size g hg) hblind)
 
 /-! ## Substitution Preservation: Uniformity Helpers -/
@@ -77,7 +77,7 @@ private theorem isBlindBranches_substitute_aux (bs : List (Label × GlobalType))
 /-! ## Uniformity Helper: Rest -/
 
 /-- Uniformity over branch tails is preserved by substitution. -/
-private theorem branchesUniformFor_substitute_rest
+private theorem branches_uniform_for_substitute_rest
     (rest : List (Label × GlobalType)) (cont : GlobalType)
     (role t : String) (repl : GlobalType)
     (hrepl_closed : repl.isClosed = true)
@@ -92,9 +92,9 @@ private theorem branchesUniformFor_substitute_rest
       simp only [SessionTypes.GlobalType.substituteBranches, List.all, Bool.and_eq_true]
       simp only [List.all, Bool.and_eq_true] at hrest_uniform
       constructor
-      · apply (localTypeRBEq_eq_true_iff _ _).2
+      · apply (local_type_rb_eq_eq_true_iff _ _).2
         have heq : Trans.trans rhd.2 role = Trans.trans cont role :=
-          localTypeRBEq_eq_true hrest_uniform.1
+          local_type_rb_eq_eq_true hrest_uniform.1
         have h1 : Trans.trans (rhd.2.substitute t repl) role =
             (Trans.trans rhd.2 role).substitute t (Trans.trans repl role) :=
           ProjSubst.proj_subst rhd.2 t repl role hrepl_closed
@@ -107,7 +107,7 @@ private theorem branchesUniformFor_substitute_rest
 /-! ## Uniformity Helper: Branches -/
 
 /-- Uniformity on branches is preserved by substitution. -/
-private theorem branchesUniformFor_substitute
+private theorem branches_uniform_for_substitute
     (branches : List (Label × GlobalType))
     (role t : String) (repl : GlobalType)
     (hrepl_closed : repl.isClosed = true)
@@ -124,12 +124,12 @@ private theorem branchesUniformFor_substitute
               rest.all (fun p => localTypeRBEq (Trans.trans p.2 role) (Trans.trans cont role)) = true := by
             simpa [branchesUniformFor] using horiginal
           simpa [SessionTypes.GlobalType.substituteBranches] using
-            branchesUniformFor_substitute_rest rest cont role t repl hrepl_closed hrest_uniform
+            branches_uniform_for_substitute_rest rest cont role t repl hrepl_closed hrest_uniform
 
 /-! ## Uniformity Helper: commBlindFor -/
 
 /-- commBlindFor is preserved by uniform substitution in branches. -/
-private theorem commBlindFor_substitute
+private theorem comm_blind_for_substitute
     (sender receiver : String) (branches : List (Label × GlobalType))
     (t : String) (repl : GlobalType)
     (hcomm : commBlindFor sender receiver branches = true)
@@ -140,7 +140,7 @@ private theorem commBlindFor_substitute
   intro role hns hnr
   have horiginal : branchesUniformFor branches role = true := by
     exact (of_decide_eq_true hcomm) role hns hnr
-  exact branchesUniformFor_substitute branches role t repl hrepl_closed horiginal
+  exact branches_uniform_for_substitute branches role t repl hrepl_closed horiginal
 
 /-! ## Substitution Preservation: Main Theorem -/
 
@@ -152,7 +152,7 @@ private theorem commBlindFor_substitute
 
     Requires `repl.isClosed = true` for the proj_subst theorem used in the
     uniformity preservation argument. This matches the actual use case (mu unfolding). -/
-theorem isBlind_substitute (g : GlobalType) (t : String) (repl : GlobalType)
+theorem is_blind_substitute (g : GlobalType) (t : String) (repl : GlobalType)
     (hg : isBlind g = true) (hrepl : isBlind repl = true)
     (hrepl_closed : repl.isClosed = true) :
     isBlind (g.substitute t repl) = true := by
@@ -169,14 +169,14 @@ theorem isBlind_substitute (g : GlobalType) (t : String) (repl : GlobalType)
       split
       · exact hg
       · simp only [isBlind]
-        have hbody : isBlind body = true := isBlind_mu_body hg
-        exact isBlind_substitute body t repl hbody hrepl hrepl_closed
+        have hbody : isBlind body = true := is_blind_mu_body hg
+        exact is_blind_substitute body t repl hbody hrepl hrepl_closed
   | .comm sender receiver branches =>
       simp only [GlobalType.substitute, isBlind, Bool.and_eq_true]
       have hblind_comm := hg
       simp only [isBlind, Bool.and_eq_true] at hblind_comm
       constructor
-      · exact commBlindFor_substitute sender receiver branches t repl hblind_comm.1 hrepl_closed
+      · exact comm_blind_for_substitute sender receiver branches t repl hblind_comm.1 hrepl_closed
       · have hsize : ∀ g, sizeOf g < sizeOf branches →
             isBlind g = true → isBlind (g.substitute t repl) = true := by
           intro g hg_size hg_blind
@@ -185,12 +185,12 @@ theorem isBlind_substitute (g : GlobalType) (t : String) (repl : GlobalType)
             omega
           have htotal : sizeOf g < sizeOf (GlobalType.comm sender receiver branches) := by
             omega
-          exact isBlind_substitute g t repl hg_blind hrepl hrepl_closed
-        exact isBlindBranches_substitute_aux branches t repl hrepl hrepl_closed hblind_comm.2 hsize
+          exact is_blind_substitute g t repl hg_blind hrepl hrepl_closed
+        exact is_blind_branches_substitute_aux branches t repl hrepl hrepl_closed hblind_comm.2 hsize
   | .delegate p q sid r cont =>
       simp only [GlobalType.substitute, isBlind]
-      have hcont : isBlind cont = true := isBlind_delegate_cont hg
-      exact isBlind_substitute cont t repl hcont hrepl hrepl_closed
+      have hcont : isBlind cont = true := is_blind_delegate_cont hg
+      exact is_blind_substitute cont t repl hcont hrepl hrepl_closed
 termination_by g
 
 /-! ## Step Preservation on Branch Lists -/
@@ -199,7 +199,7 @@ termination_by g
 
     If all branches are blind and they all step via BranchesStep,
     then the resulting branches are also all blind. -/
-theorem isBlindBranches_step {branches branches' : List (Label × GlobalType)} {act : GlobalActionR}
+theorem is_blind_branches_step {branches branches' : List (Label × GlobalType)} {act : GlobalActionR}
     (hstep : BranchesStep step branches act branches')
     (hblind : isBlindBranches branches = true)
     (ih : ∀ g g', step g act g' → isBlind g = true → isBlind g' = true) :

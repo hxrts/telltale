@@ -81,7 +81,7 @@ def EffectBisim {σ : Type u} {α : Type v}
 /-! ## Unfold and Fold Laws -/
 
 /-- Unfold law for `EffectBisim`. -/
-theorem effectBisim_unfold {σ : Type u} {α : Type v}
+theorem effect_bisim_unfold {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     {s t : σ} (h : EffectBisim obs step s t) :
     EffectBisimF obs step (EffectBisim obs step) s t := by
@@ -96,7 +96,7 @@ theorem effectBisim_unfold {σ : Type u} {α : Type v}
   simpa [EffectBisim] using this
 
 /-- Fold law for `EffectBisim`. -/
-theorem effectBisim_fold {σ : Type u} {α : Type v}
+theorem effect_bisim_fold {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     {s t : σ} (h : EffectBisimF obs step (EffectBisim obs step) s t) :
     EffectBisim obs step s t := by
@@ -113,11 +113,11 @@ theorem effectBisim_fold {σ : Type u} {α : Type v}
 /-! ## Core Consequences -/
 
 /-- Bisimilar states are observationally equivalent. -/
-theorem effectBisim_observationalEq {σ : Type u} {α : Type v}
+theorem effect_bisim_observational_eq {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     {s t : σ} (h : EffectBisim obs step s t) :
     ObservationalEq obs s t := by
-  exact (effectBisim_unfold obs step h).1
+  exact (effect_bisim_unfold obs step h).1
 
 /-! ### Reflexivity -/
 
@@ -133,7 +133,7 @@ private theorem eq_postfixed {σ : Type u} {α : Type v}
     exact ⟨t', hStep, rfl⟩
 
 /-- `EffectBisim` is reflexive. -/
-theorem effectBisim_refl {σ : Type u} {α : Type v}
+theorem effect_bisim_refl {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ) (s : σ) :
     EffectBisim obs step s s := by
   have hEqLe : (fun a b : σ => a = b) ≤ EffectBisim obs step :=
@@ -142,7 +142,7 @@ theorem effectBisim_refl {σ : Type u} {α : Type v}
 
 /-! ### Symmetry -/
 
-private theorem relInv_postfixed {σ : Type u} {α : Type v}
+private theorem rel_inv_postfixed {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     {R : StateRel σ}
     (hPost : R ≤ EffectBisimF obs step R) :
@@ -159,16 +159,16 @@ private theorem relInv_postfixed {σ : Type u} {α : Type v}
     exact ⟨s', hStep', hRel⟩
 
 /-- `EffectBisim` is symmetric. -/
-theorem effectBisim_symm {σ : Type u} {α : Type v}
+theorem effect_bisim_symm {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     {s t : σ} (h : EffectBisim obs step s t) :
     EffectBisim obs step t s := by
   have hPost : EffectBisim obs step ≤ EffectBisimF obs step (EffectBisim obs step) := by
     intro a b hab
-    exact effectBisim_unfold obs step hab
+    exact effect_bisim_unfold obs step hab
   have hInvPost : RelInv (EffectBisim obs step) ≤
       EffectBisimF obs step (RelInv (EffectBisim obs step)) :=
-    relInv_postfixed obs step hPost
+    rel_inv_postfixed obs step hPost
   have hInvLe : RelInv (EffectBisim obs step) ≤ EffectBisim obs step :=
     coind (F := EffectBisimF obs step)
       (S := RelInv (EffectBisim obs step)) hInvPost
@@ -176,7 +176,7 @@ theorem effectBisim_symm {σ : Type u} {α : Type v}
 
 /-! ### Transitivity -/
 
-private theorem relComp_postfixed {σ : Type u} {α : Type v}
+private theorem rel_comp_postfixed {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     {R S : StateRel σ}
     (hRPost : R ≤ EffectBisimF obs step R)
@@ -197,7 +197,7 @@ private theorem relComp_postfixed {σ : Type u} {α : Type v}
     exact ⟨s', hsStep, ⟨t', hRs', hSt'⟩⟩
 
 /-- `EffectBisim` is transitive. -/
-theorem effectBisim_trans {σ : Type u} {α : Type v}
+theorem effect_bisim_trans {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ)
     {s t u : σ}
     (h₁₂ : EffectBisim obs step s t)
@@ -205,11 +205,11 @@ theorem effectBisim_trans {σ : Type u} {α : Type v}
     EffectBisim obs step s u := by
   have hPost : EffectBisim obs step ≤ EffectBisimF obs step (EffectBisim obs step) := by
     intro a b hab
-    exact effectBisim_unfold obs step hab
+    exact effect_bisim_unfold obs step hab
   have hCompPost :
       RelComp (EffectBisim obs step) (EffectBisim obs step) ≤
         EffectBisimF obs step (RelComp (EffectBisim obs step) (EffectBisim obs step)) :=
-    relComp_postfixed obs step hPost hPost
+    rel_comp_postfixed obs step hPost hPost
   have hCompLe :
       RelComp (EffectBisim obs step) (EffectBisim obs step) ≤ EffectBisim obs step :=
     coind (F := EffectBisimF obs step)
@@ -217,14 +217,14 @@ theorem effectBisim_trans {σ : Type u} {α : Type v}
   exact hCompLe _ _ ⟨t, h₁₂, h₂₃⟩
 
 /-- Equivalence packaging for `EffectBisim`. -/
-theorem effectBisim_equivalence {σ : Type u} {α : Type v}
+theorem effect_bisim_equivalence {σ : Type u} {α : Type v}
     (obs : EffectObs σ α) (step : StateRel σ) :
     Equivalence (EffectBisim obs step) := by
-  refine ⟨effectBisim_refl obs step, ?_, ?_⟩
+  refine ⟨effect_bisim_refl obs step, ?_, ?_⟩
   · intro s t h
-    exact effectBisim_symm obs step h
+    exact effect_bisim_symm obs step h
   · intro s t u h₁₂ h₂₃
-    exact effectBisim_trans obs step h₁₂ h₂₃
+    exact effect_bisim_trans obs step h₁₂ h₂₃
 
 end
 

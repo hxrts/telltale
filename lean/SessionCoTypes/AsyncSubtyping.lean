@@ -20,8 +20,8 @@ appropriate subtyping relation for asynchronous message-passing systems.
 - `AsyncSubtypeRel` : Coinductive async subtyping relation
 - `reachable_triples_finite` : Finiteness for regular types
 - `checkAsync` : Decision algorithm
-- `checkAsync_sound` : Soundness theorem
-- `checkAsync_complete` : Completeness theorem
+- `check_async_sound` : Soundness theorem
+- `check_async_complete` : Completeness theorem
 - `async_subtype_decidable_constructive` : Decidable instance
 
 ## Usage

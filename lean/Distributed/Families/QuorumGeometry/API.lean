@@ -39,7 +39,7 @@ structure SafetyProtocol where
         exact safe_finality_of_assumptions assumptions hFinalized d' hCommitted
 
 /-- Extract no-conflicting-commits theorem from a certified protocol bundle. -/
-theorem noConflictingCommits_of_protocol (P : SafetyProtocol) :
+theorem no_conflicting_commits_of_protocol (P : SafetyProtocol) :
     ∀ {s d₁ d₂},
       Committed P.model s d₁ →
       Committed P.model s d₂ →
@@ -47,19 +47,19 @@ theorem noConflictingCommits_of_protocol (P : SafetyProtocol) :
   P.noConflictingCommits
 
 /-- Extract fork-exclusion theorem from a certified protocol bundle. -/
-theorem forkExclusion_of_protocol (P : SafetyProtocol) :
+theorem fork_exclusion_of_protocol (P : SafetyProtocol) :
     ∀ s, ¬ Forked P.model s :=
   P.forkExclusion
 
 /-- Extract safe-finality theorem from a certified protocol bundle. -/
-theorem safeFinality_of_protocol (P : SafetyProtocol) :
+theorem safe_finality_of_protocol (P : SafetyProtocol) :
     ∀ {s d},
       Finalized P.model s d →
       ∀ d', Committed P.model s d' → ¬ P.model.conflicts d d' :=
   P.safeFinality
 
 /-- Core assumptions are always validated for a certified protocol. -/
-theorem coreAssumptions_allPassed (P : SafetyProtocol) :
+theorem core_assumptions_all_passed (P : SafetyProtocol) :
     (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
   rfl
 

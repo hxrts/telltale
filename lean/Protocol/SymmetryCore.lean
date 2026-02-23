@@ -100,7 +100,7 @@ def renameDEnvPR (σ : ProtocolRenaming) (D : DEnv) : DEnv :=
 /-! ## Lookup Lemmas -/
 
 /-- Endpoint equality under protocol renaming is injective. -/
-theorem renameEndpointPR_inj (σ : ProtocolRenaming) (e₁ e₂ : Endpoint) :
+theorem rename_endpoint_pr_inj (σ : ProtocolRenaming) (e₁ e₂ : Endpoint) :
     renameEndpointPR σ e₁ = renameEndpointPR σ e₂ → e₁ = e₂ := by
   intro h
   simp only [renameEndpointPR, Endpoint.mk.injEq] at h
@@ -110,7 +110,7 @@ theorem renameEndpointPR_inj (σ : ProtocolRenaming) (e₁ e₂ : Endpoint) :
   exact ⟨hsid, σ.roleMap_inj _ _ hrole⟩
 
 /-- Edge equality under protocol renaming is injective. -/
-theorem renameEdgePR_inj (σ : ProtocolRenaming) (e₁ e₂ : Edge) :
+theorem rename_edge_pr_inj (σ : ProtocolRenaming) (e₁ e₂ : Edge) :
     renameEdgePR σ e₁ = renameEdgePR σ e₂ → e₁ = e₂ := by
   intro h
   simp only [renameEdgePR, Edge.mk.injEq] at h
@@ -120,7 +120,7 @@ theorem renameEdgePR_inj (σ : ProtocolRenaming) (e₁ e₂ : Edge) :
   exact ⟨hsid, σ.roleMap_inj _ _ hsender, σ.roleMap_inj _ _ hrecv⟩
 
 /-- Lookup in renamed GEnv: renaming commutes with lookup. -/
-theorem lookupG_renamePR (σ : ProtocolRenaming) (G : GEnv) (ep : Endpoint) :
+theorem lookup_g_rename_pr (σ : ProtocolRenaming) (G : GEnv) (ep : Endpoint) :
     lookupG (renameGEnvPR σ G) (renameEndpointPR σ ep) =
       (lookupG G ep).map (renameLocalTypePR σ) := by
   induction G with
@@ -132,7 +132,7 @@ theorem lookupG_renamePR (σ : ProtocolRenaming) (G : GEnv) (ep : Endpoint) :
         simp [renameGEnvPR, lookupG, List.lookup, renameEndpointPR]
       · have hne : renameEndpointPR σ ep ≠ renameEndpointPR σ hd.1 := by
           intro h
-          exact heq (renameEndpointPR_inj σ _ _ h)
+          exact heq (rename_endpoint_pr_inj σ _ _ h)
         have hbeq1 : (ep == hd.1) = false := beq_eq_false_iff_ne.mpr heq
         have hbeq2 : (renameEndpointPR σ ep == renameEndpointPR σ hd.1) = false :=
           beq_eq_false_iff_ne.mpr hne
@@ -143,7 +143,7 @@ theorem lookupG_renamePR (σ : ProtocolRenaming) (G : GEnv) (ep : Endpoint) :
 /-- Lookup in renamed GEnv: the preimage exists.
     For any endpoint in the renamed environment, there exists a corresponding
     endpoint in the original environment. -/
-theorem lookupG_renamePR_inv (σ : ProtocolRenaming) (G : GEnv) (ep' : Endpoint) (L' : LocalType) :
+theorem lookup_g_rename_pr_inv (σ : ProtocolRenaming) (G : GEnv) (ep' : Endpoint) (L' : LocalType) :
     lookupG (renameGEnvPR σ G) ep' = some L' →
     ∃ ep L, lookupG G ep = some L ∧
       ep' = renameEndpointPR σ ep ∧ L' = renameLocalTypePR σ L := by

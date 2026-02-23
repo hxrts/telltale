@@ -16,8 +16,8 @@ Many predicates in the library are decidable when restricted to finite domains:
 ## Soundness Theorems
 
 For each boolean decision procedure, we provide soundness theorems:
-- `reachesCommDecide_sound`: if true, then ReachesComm holds
-- `satisfiesBool_iff_Satisfies`: boolean iff propositional
+- `reaches_comm_decide_sound`: if true, then ReachesComm holds
+- `satisfies_bool_iff_satisfies`: boolean iff propositional
 -/
 
 set_option linter.mathlibStandardSet false
@@ -35,9 +35,9 @@ section
    a complete false-branch theorem is established for `reachesCommDecide`. -/
 
 /-- Alternative: use reachesCommDecide directly for proof by decide. -/
-theorem reachesComm_of_decide {L : LocalType} (h : reachesCommDecide L = true) :
+theorem reaches_comm_of_decide {L : LocalType} (h : reachesCommDecide L = true) :
     ReachesComm L :=
-  reachesCommDecide_sound L h
+  reaches_comm_decide_sound L h
 
 /-! ## Spatial Satisfaction Decidability -/
 
@@ -45,14 +45,14 @@ theorem reachesComm_of_decide {L : LocalType} (h : reachesCommDecide L = true) :
 instance instDecidableSatisfies (topo : Topology) (req : SpatialReq) :
     Decidable (Satisfies topo req) :=
   if h : satisfiesBool topo req = true then
-    isTrue ((satisfiesBool_iff_Satisfies topo req).mp h)
+    isTrue ((satisfies_bool_iff_satisfies topo req).mp h)
   else
-    isFalse (fun hsat => h ((satisfiesBool_iff_Satisfies topo req).mpr hsat))
+    isFalse (fun hsat => h ((satisfies_bool_iff_satisfies topo req).mpr hsat))
 
 /-- Use satisfiesBool for proof. -/
 theorem satisfies_of_bool {topo : Topology} {req : SpatialReq}
     (h : satisfiesBool topo req = true) : Satisfies topo req :=
-  (satisfiesBool_iff_Satisfies topo req).mp h
+  (satisfies_bool_iff_satisfies topo req).mp h
 
 /-! ## EdgeCoherent for Empty Traces -/
 
@@ -60,7 +60,7 @@ theorem satisfies_of_bool {topo : Topology} {req : SpatialReq}
 
 This is because `Consume from L [] = some L` for any L, so `.isSome` is true.
 -/
-theorem edgeCoherent_empty_trace (G : GEnv) (D : DEnv) (e : Edge)
+theorem edge_coherent_empty_trace (G : GEnv) (D : DEnv) (e : Edge)
     (hTrace : lookupD D e = [])
     (hSender : ∀ Lrecv, lookupG G { sid := e.sid, role := e.receiver } = some Lrecv →
       ∃ Lsender, lookupG G { sid := e.sid, role := e.sender } = some Lsender) :
@@ -78,12 +78,12 @@ theorem coherent_all_empty (G : GEnv) (D : DEnv)
       ∃ Lsender, lookupG G { sid := e.sid, role := e.sender } = some Lsender) :
     Coherent G D := by
   intro e hActive
-  exact edgeCoherent_empty_trace G D e (hAll e) (hSenders e)
+  exact edge_coherent_empty_trace G D e (hAll e) (hSenders e)
 
 /-! ## BufferTyped for Empty Buffers -/
 
 /-- When buffer and trace are both empty, BufferTyped holds. -/
-theorem bufferTyped_empty (G : GEnv) (D : DEnv) (bufs : Buffers) (e : Edge)
+theorem buffer_typed_empty (G : GEnv) (D : DEnv) (bufs : Buffers) (e : Edge)
     (hBuf : lookupBuf bufs e = [])
     (hTrace : lookupD D e = []) :
     BufferTyped G D bufs e := by
@@ -93,11 +93,11 @@ theorem bufferTyped_empty (G : GEnv) (D : DEnv) (bufs : Buffers) (e : Edge)
   exact ⟨trivial, fun i hi => (Nat.not_lt_zero i hi).elim⟩
 
 /-- For environments where all buffers and traces are empty, BuffersTyped holds. -/
-theorem buffersTyped_all_empty (G : GEnv) (D : DEnv) (bufs : Buffers)
+theorem buffers_typed_all_empty (G : GEnv) (D : DEnv) (bufs : Buffers)
     (hBufs : ∀ e, lookupBuf bufs e = [])
     (hTraces : ∀ e, lookupD D e = []) :
     BuffersTyped G D bufs := by
   intro e
-  exact bufferTyped_empty G D bufs e (hBufs e) (hTraces e)
+  exact buffer_typed_empty G D bufs e (hBufs e) (hTraces e)
 
 end

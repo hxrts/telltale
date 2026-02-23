@@ -59,9 +59,9 @@ inductive CoherenceTransform (C C' : GEnv × DEnv) : Prop where
 /-- Unified coherence preservation for evolution + delegation.
 
     This packages the shared transform story:
-    - evolution/type replacement uses the `Consume_mono` path (`RecvCompatible`)
+    - evolution/type replacement uses the `consume_mono` path (`RecvCompatible`)
     - delegation uses the delegation preservation theorem. -/
-theorem CoherenceTransform_preserves_coherent
+theorem coherence_transform_preserves_coherent
     {G D G' D' : _}
     (hCoh : Coherent G D)
     (hT : CoherenceTransform (G, D) (G', D')) :
@@ -72,7 +72,7 @@ theorem CoherenceTransform_preserves_coherent
       simpa using hCoh
   | replace hLookup hCompat hEq =>
       cases hEq
-      simpa using Coherent_type_replacement (G:=G) (D:=D) hCoh hLookup hCompat
+      simpa using coherent_type_replacement (G:=G) (D:=D) hCoh hLookup hCompat
   | delegate hDeleg =>
       exact delegation_preserves_coherent _ _ _ _ _ _ _ hCoh hDeleg
 
@@ -89,7 +89,7 @@ Subtype replacement composes with the existing metatheory:
     If the original type had HeadCoherent and the replacement is recv-compatible,
     HeadCoherent is preserved. This is important for liveness: recv operations
     remain enabled after type replacement. -/
-theorem HeadCoherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
+theorem head_coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
     {L₁ L₂ : LocalType}
     (hHead : HeadCoherent G D)
     (hLookup : lookupG G ep = some L₁)
@@ -98,7 +98,7 @@ theorem HeadCoherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
   intro e hActive
   -- Active edge before update (ep exists in G)
   have hActivePre : ActiveEdge G e := by
-    apply ActiveEdge_updateG_inv hActive
+    apply active_edge_update_g_inv hActive
     simp [hLookup]
   -- Case split on whether ep is the receiver of e
   by_cases hRecv : ep = { sid := e.sid, role := e.receiver }
@@ -106,7 +106,7 @@ theorem HeadCoherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
     -- Reduce goal using shape compatibility of L₁/L₂.
     have hShape := (hCompat (default : Role)).2
     cases L₁ <;> cases L₂ <;>
-      simp [ShapeCompatible, lookupG_updateG_eq] at hShape ⊢
+      simp [ShapeCompatible, lookup_g_update_g_eq] at hShape ⊢
     case pos.recv.recv r₁ T₁ L₁ r₂ T₂ L₂ =>
       rcases hShape with ⟨hRole, hT⟩
       subst hRole
@@ -120,14 +120,14 @@ theorem HeadCoherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
     have hLookupRecv :
         lookupG (updateG G ep L₂) { sid := e.sid, role := e.receiver } =
         lookupG G { sid := e.sid, role := e.receiver } := by
-      apply lookupG_updateG_ne
+      apply lookup_g_update_g_ne
       intro hEq
       exact hRecv hEq.symm
     simpa [hLookupRecv] using hHead e hActivePre
 
 -- ValidLabels helpers
 
-private lemma find?_isSome_of_label_mem {bs : List (Label × LocalType)} {ℓ : Label}
+private lemma find?_is_some_of_label_mem {bs : List (Label × LocalType)} {ℓ : Label}
     (hMem : ℓ ∈ List.map Prod.fst bs) :
     (bs.find? (fun b => b.1 == ℓ)).isSome := by
   rcases List.mem_map.mp hMem with ⟨b, hMemB, hLbl⟩
@@ -135,7 +135,7 @@ private lemma find?_isSome_of_label_mem {bs : List (Label × LocalType)} {ℓ : 
     simp [hLbl]
   exact List.find?_isSome.mpr ⟨b, hMemB, hPred⟩
 
-private lemma ValidLabels_branch_transfer {bufs : Buffers} {e : Edge}
+private lemma valid_labels_branch_transfer {bufs : Buffers} {e : Edge}
     {bs bs₁ : List (Label × LocalType)}
     (hLabels : List.map Prod.fst bs₁ = List.map Prod.fst bs)
     (hOrig :
@@ -168,7 +168,7 @@ private lemma ValidLabels_branch_transfer {bufs : Buffers} {e : Edge}
           have hMemLbl₂ : ℓ ∈ List.map Prod.fst bs := by
             simpa [hLabels] using hMemLbl₁
           have hSome₂ : (bs.find? (fun b => b.1 == ℓ)).isSome :=
-            find?_isSome_of_label_mem hMemLbl₂
+            find?_is_some_of_label_mem hMemLbl₂
           simpa [hBuf] using hSome₂
 
 -- ValidLabels Preservation Under Replacement
@@ -176,7 +176,7 @@ private lemma ValidLabels_branch_transfer {bufs : Buffers} {e : Edge}
 /-- ValidLabels is preserved under compatible type replacement.
 
     Branch labels remain valid after type replacement. -/
-theorem ValidLabels_type_replacement {G : GEnv} {D : DEnv} {bufs : Buffers}
+theorem valid_labels_type_replacement {G : GEnv} {D : DEnv} {bufs : Buffers}
     {ep : Endpoint} {L₁ L₂ : LocalType}
     (hValid : ValidLabels G D bufs)
     (hLookup : lookupG G ep = some L₁)
@@ -184,7 +184,7 @@ theorem ValidLabels_type_replacement {G : GEnv} {D : DEnv} {bufs : Buffers}
     ValidLabels (updateG G ep L₂) D bufs := by
   intro e source bs hActive hBranch
   have hActivePre : ActiveEdge G e := by
-    apply ActiveEdge_updateG_inv hActive
+    apply active_edge_update_g_inv hActive
     simp [hLookup]
   -- Case split: is ep the receiver of e?
   by_cases hRecv : ep = { sid := e.sid, role := e.receiver }
@@ -192,7 +192,7 @@ theorem ValidLabels_type_replacement {G : GEnv} {D : DEnv} {bufs : Buffers}
     subst hRecv
     -- L₂ is the receiver type
     have hBranch' : L₂ = .branch source bs := by
-      simpa [lookupG_updateG_eq] using hBranch
+      simpa [lookup_g_update_g_eq] using hBranch
     have hShape := (hCompat source).2
     -- ValidLabels Replacement: Receiver-Updated Shape Analysis
     -- L₁ must also be a matching branch with the same labels.
@@ -232,14 +232,14 @@ theorem ValidLabels_type_replacement {G : GEnv} {D : DEnv} {bufs : Buffers}
             lookupG G { sid := e.sid, role := e.receiver } = some (.branch source bs₁) := by
           simpa using hLookup
         have hOrig := hValid e source bs₁ hActivePre hLookup₁
-        exact ValidLabels_branch_transfer hLabels hOrig
+        exact valid_labels_branch_transfer hLabels hOrig
   -- ValidLabels Replacement: Receiver Unchanged Case
   case neg =>
     -- ep is not receiver: lookup unchanged
     have hLookupRecv :
         lookupG (updateG G ep L₂) { sid := e.sid, role := e.receiver } =
         lookupG G { sid := e.sid, role := e.receiver } := by
-      apply lookupG_updateG_ne
+      apply lookup_g_update_g_ne
       intro hEq
       exact hRecv hEq.symm
     have hBranch' : lookupG G { sid := e.sid, role := e.receiver } = some (.branch source bs) := by
@@ -251,7 +251,7 @@ theorem ValidLabels_type_replacement {G : GEnv} {D : DEnv} {bufs : Buffers}
 /-- RecvCompatible preserves target role structure.
 
     If RecvCompatible for all roles, then the targetRole? is preserved. -/
-private lemma ShapeCompatible_targetRole {L₁ L₂ : LocalType}
+private lemma shape_compatible_target_role {L₁ L₂ : LocalType}
     (hShape : ShapeCompatible L₁ L₂) :
     LocalType.targetRole? L₁ = LocalType.targetRole? L₂ := by
   cases L₁ <;> cases L₂
@@ -266,18 +266,18 @@ private lemma ShapeCompatible_targetRole {L₁ L₂ : LocalType}
   case select.select r₁ bs₁ r₂ bs₂ =>
     exact hShape.1
 
-theorem RecvCompatible_targetRole {L₁ L₂ : LocalType}
+theorem recv_compatible_target_role {L₁ L₂ : LocalType}
 /- ## Structured Block 3 -/
     (hCompat : ∀ r : Role, RecvCompatible r L₁ L₂) :
     LocalType.targetRole? L₁ = LocalType.targetRole? L₂ := by
-  exact ShapeCompatible_targetRole (hCompat (default : Role)).2
+  exact shape_compatible_target_role (hCompat (default : Role)).2
 
 -- RoleComplete Preservation Under Replacement
 
 /-- RoleComplete is preserved under type replacement.
 
     If the original GEnv was role-complete, updating one endpoint preserves this. -/
-theorem RoleComplete_type_replacement {G : GEnv} {ep : Endpoint} {L₁ L₂ : LocalType}
+theorem role_complete_type_replacement {G : GEnv} {ep : Endpoint} {L₁ L₂ : LocalType}
     (hComplete : RoleComplete G)
     (hLookup : lookupG G ep = some L₁)
     (hCompat : ∀ r : Role, RecvCompatible r L₁ L₂) :
@@ -286,12 +286,12 @@ theorem RoleComplete_type_replacement {G : GEnv} {ep : Endpoint} {L₁ L₂ : Lo
   by_cases h : e = ep
   · -- e = ep: L₂ is the new type, check its target role
     subst h
-    simp only [lookupG_updateG_eq] at hLookupE
+    simp only [lookup_g_update_g_eq] at hLookupE
     simp only [Option.some.injEq] at hLookupE
     subst hLookupE
     -- L₂ has same targetRole? as L₁ due to RecvCompatible
     have hSameTarget : LocalType.targetRole? L₁ = LocalType.targetRole? L₂ :=
-      RecvCompatible_targetRole hCompat
+      recv_compatible_target_role hCompat
     cases hTarget : LocalType.targetRole? L₂ with
     | none => trivial
     | some r =>
@@ -306,15 +306,15 @@ theorem RoleComplete_type_replacement {G : GEnv} {ep : Endpoint} {L₁ L₂ : Lo
       · -- Peer is self: L₂ is there
         use L₂
         rw [hPeer]
-        exact lookupG_updateG_eq
+        exact lookup_g_update_g_eq
       · -- Peer is not self: unchanged
         use L'
-        rw [lookupG_updateG_ne hPeer]
+        rw [lookup_g_update_g_ne hPeer]
         exact hL'
   -- RoleComplete Replacement: Non-Replaced Endpoint Case
   · -- e ≠ ep: lookup unchanged
     have hUnchanged : lookupG (updateG G ep L₂) e = lookupG G e := by
-      apply lookupG_updateG_ne h
+      apply lookup_g_update_g_ne h
     rw [hUnchanged] at hLookupE
     have hOrig := hComplete e L hLookupE
     cases hTarget : LocalType.targetRole? L with
@@ -327,11 +327,11 @@ theorem RoleComplete_type_replacement {G : GEnv} {ep : Endpoint} {L₁ L₂ : Lo
       · -- Target is ep: L₂ is there
         use L₂
         subst hTarget'
-        exact lookupG_updateG_eq
+        exact lookup_g_update_g_eq
       · -- Target is not ep: unchanged
 /- ## Structured Block 4 -/
         use L'
-        rw [lookupG_updateG_ne hTarget']
+        rw [lookup_g_update_g_ne hTarget']
         exact hL'
 
 -- Progress Conditions Bundle
@@ -352,9 +352,9 @@ theorem progress_conditions_type_replacement {G : GEnv} {D : DEnv} {bufs : Buffe
     HeadCoherent (updateG G ep L₂) D ∧
     RoleComplete (updateG G ep L₂) ∧
     ValidLabels (updateG G ep L₂) D bufs :=
-  ⟨HeadCoherent_type_replacement hHead hLookup hCompat,
-   RoleComplete_type_replacement hComplete hLookup hCompat,
-   ValidLabels_type_replacement hValid hLookup hCompat⟩
+  ⟨head_coherent_type_replacement hHead hLookup hCompat,
+   role_complete_type_replacement hComplete hLookup hCompat,
+   valid_labels_type_replacement hValid hLookup hCompat⟩
 
 
 end

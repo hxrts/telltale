@@ -94,7 +94,7 @@ theorem step_to_envstep (g g' : GlobalType) (act : GlobalActionR)
   EnvStep.of_global g g' act hstep
 
 /-- projEnv produces an environment with the same domain as g.roles. -/
-theorem projEnv_dom (g : GlobalType) :
+theorem proj_env_dom (g : GlobalType) :
     (projEnv g).map Prod.fst = g.roles := by
   simp only [projEnv, List.map_map, Function.comp_def, List.map_id']
 
@@ -124,15 +124,15 @@ theorem step_roles_subset (g g' : GlobalType) (act : GlobalActionR)
             cases hmem with
             | head => left; simp_all
             | tail _ htail => right; exact ih htail
-      exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inr hp')))
+      exact mem_erase_dups_of_mem (List.mem_append.mpr (Or.inr hp')))
     -- comm_async case
     (fun sender receiver branches branches' act label cont _hns _hcond _hmem _hcan _hbstep ih_bstep p hp => by
       simp only [GlobalType.roles] at hp ⊢
-      have hp' := mem_of_mem_eraseDups hp
+      have hp' := mem_of_mem_erase_dups hp
       simp only [List.mem_append] at hp'
       cases hp' with
-      | inl hsr => exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inl hsr))
-      | inr hr => exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inr (ih_bstep p hr))))
+      | inl hsr => exact mem_erase_dups_of_mem (List.mem_append.mpr (Or.inl hsr))
+      | inr hr => exact mem_erase_dups_of_mem (List.mem_append.mpr (Or.inr (ih_bstep p hr))))
     -- mu case
     (fun t body act g' _hstep ih_step p hp => by
       simp only [GlobalType.roles]
@@ -158,7 +158,7 @@ def projEnvOnto (g : GlobalType) (S : List String) : ProjectedEnv :=
   S.map fun role => (role, QLocalTypeR.ofLocal (trans g role))
 
 /-- projEnvOnto produces an environment with domain S. -/
-theorem projEnvOnto_dom (g : GlobalType) (S : List String) :
+theorem proj_env_onto_dom (g : GlobalType) (S : List String) :
     (projEnvOnto g S).map Prod.fst = S := by
   simp only [projEnvOnto, List.map_map, Function.comp_def, List.map_id']
 
@@ -177,12 +177,12 @@ inductive EnvStepOnto (S : List String) :
 
 The domain remains S throughout execution, even as the active roles
 in the global type may shrink. -/
-theorem envstepOnto_preserves_dom {S : List String} {env env' : ProjectedEnv}
+theorem envstep_onto_preserves_dom {S : List String} {env env' : ProjectedEnv}
     {act : GlobalActionR} (hstep : EnvStepOnto S env act env') :
     env.map Prod.fst = env'.map Prod.fst := by
   cases hstep with
   | of_global g g' _ _ _ =>
-      simp only [projEnvOnto_dom]
+      simp only [proj_env_onto_dom]
 
 /-! ## Legacy API (deprecated)
 

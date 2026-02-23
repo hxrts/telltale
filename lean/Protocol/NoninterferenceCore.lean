@@ -17,7 +17,7 @@ Solution Structure.
 1. Define CEquiv: configuration equivalence from a role's perspective
 2. Define BlindTo: when a role doesn't participate in a communication
 3. Prove step locality: steps only modify participant state
-4. Prove blind_step_preserves_CEquiv: the main noninterference theorem
+4. Prove blind_step_preserves_c_equiv: the main noninterference theorem
 5. Lift to traces: blind roles see deterministic traces
 -/
 
@@ -30,7 +30,7 @@ was selected. Ported from Aristotle file 01 (185 lines, no proof holes).
 
 - `CEquiv` : configuration equivalence for a role
 - `BlindTo` : role is neither sender nor receiver
-- `blind_step_preserves_CEquiv` : the main noninterference theorem -/
+- `blind_step_preserves_c_equiv` : the main noninterference theorem -/
 
 /- ## Structured Block 1 -/
 set_option linter.mathlibStandardSet false
@@ -98,15 +98,15 @@ theorem BlindTo.comm {r sender receiver : Role}
 
 /-- Send step only changes G at the sender's endpoint.
     Other endpoints are unaffected. -/
-theorem send_G_locality {C : Config} {ep : Endpoint} {target : Role}
+theorem send_g_locality {C : Config} {ep : Endpoint} {target : Role}
     {v : Value} {T : ValType} {L : LocalType}
     (ep' : Endpoint) (hne : ep' ≠ ep) :
     lookupG (sendStep C ep ⟨ep.sid, ep.role, target⟩ v T L).G ep' = lookupG C.G ep' := by
   simp only [sendStep]
-  exact lookupG_updateG_ne hne
+  exact lookup_g_update_g_ne hne
 
 /-- Recv step only changes G at the receiver's endpoint. -/
-theorem recv_G_locality {C : Config} {ep : Endpoint} {edge : Edge}
+theorem recv_g_locality {C : Config} {ep : Endpoint} {edge : Edge}
     {x : Var} {v : Value} {L : LocalType}
     (ep' : Endpoint) (hne : ep' ≠ ep) :
     lookupG (recvStep C ep edge x v L).G ep' = lookupG C.G ep' := by
@@ -115,7 +115,7 @@ theorem recv_G_locality {C : Config} {ep : Endpoint} {edge : Edge}
     simp [recvStep, hdq]
   | some p =>
     simp [recvStep, hdq]
-    exact lookupG_updateG_ne hne
+    exact lookup_g_update_g_ne hne
 
 -- Step Locality: Buffers
 
@@ -128,7 +128,7 @@ theorem send_buf_locality {C : Config} {ep : Endpoint} {target : Role}
     lookupBuf C.bufs edge := by
 /- ## Structured Block 2 -/
   simp only [sendStep]
-  exact lookupBuf_enqueueBuf_ne hne
+  exact lookup_buf_enqueue_buf_ne hne
 
 /-- Recv step only dequeues from the source→receiver buffer. -/
 theorem recv_buf_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
@@ -140,22 +140,22 @@ theorem recv_buf_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
     simp [recvStep, hdq]
   | some p =>
     simp [recvStep, hdq]
-    exact lookupBuf_dequeueBuf_ne hdq hne
+    exact lookup_buf_dequeue_buf_ne hdq hne
 
 -- Step Locality: Traces
 
 /-- Send step only extends the sender→receiver trace.
     Other traces are unaffected. -/
-theorem send_D_locality {C : Config} {ep : Endpoint} {target : Role}
+theorem send_d_locality {C : Config} {ep : Endpoint} {target : Role}
     {v : Value} {T : ValType} {L : LocalType}
     (edge : Edge) (hne : edge ≠ ⟨ep.sid, ep.role, target⟩) :
     lookupD (sendStep C ep ⟨ep.sid, ep.role, target⟩ v T L).D edge =
     lookupD C.D edge := by
   simp only [sendStep]
-  exact lookupD_update_neq C.D ⟨ep.sid, ep.role, target⟩ edge (lookupD C.D _ ++ [T]) hne.symm
+  exact lookup_d_update_neq C.D ⟨ep.sid, ep.role, target⟩ edge (lookupD C.D _ ++ [T]) hne.symm
 
 /-- Recv step only shortens the source→receiver trace. -/
-theorem recv_D_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
+theorem recv_d_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
     {x : Var} {v : Value} {L : LocalType}
     (hne : edge' ≠ edge) :
     lookupD (recvStep C ep edge x v L).D edge' = lookupD C.D edge' := by
@@ -164,28 +164,28 @@ theorem recv_D_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
     simp [recvStep, hdq]
   | some p =>
     simp [recvStep, hdq]
-    exact lookupD_update_neq C.D edge edge' (lookupD C.D edge).tail hne.symm
+    exact lookup_d_update_neq C.D edge edge' (lookupD C.D edge).tail hne.symm
 
 -- Noninterference Theorem
 
 -- CEquiv and Process Independence
 
 /-- Changing only the process does not affect CEquiv. -/
-theorem CEquiv_ignore_proc {C C' : Config} {s : SessionId} {r : Role}
+theorem c_equiv_ignore_proc {C C' : Config} {s : SessionId} {r : Role}
     {P Q : Process} (h : { C with proc := P } ≈[s, r] C') :
     C ≈[s, r] { C' with proc := Q } := by
   simpa [CEquiv] using h
 
 -- Blind Locality Helpers for Send Steps
 /-- Helper: blind role's G is unchanged by send step. -/
-private theorem send_blind_G_unchanged {C : Config} {ep : Endpoint} {target : Role}
+private theorem send_blind_g_unchanged {C : Config} {ep : Endpoint} {target : Role}
     {v : Value} {T : ValType} {L : LocalType}
     {s : SessionId} {r : Role} (hBlind : BlindTo r ep.role target)
     (_hSid : ep.sid = s) :
     lookupG (sendStep C ep ⟨ep.sid, ep.role, target⟩ v T L).G ⟨s, r⟩ =
     lookupG C.G ⟨s, r⟩ := by
   -- r ≠ sender, so r's endpoint is different from ep.
-  apply send_G_locality
+  apply send_g_locality
   -- Show ⟨s, r⟩ ≠ ep.
   intro heq
   -- heq : ⟨s, r⟩ = ep, extract that r = ep.role.
@@ -209,13 +209,13 @@ private theorem send_blind_bufs_unchanged {C : Config} {ep : Endpoint} {target :
   exact hBlind.2 heq.2.2
 
 /-- Helper: blind role's incoming traces unchanged by send step. -/
-private theorem send_blind_D_unchanged {C : Config} {ep : Endpoint} {target : Role}
+private theorem send_blind_d_unchanged {C : Config} {ep : Endpoint} {target : Role}
     {v : Value} {T : ValType} {L : LocalType}
     {s : SessionId} {r : Role} (hBlind : BlindTo r ep.role target)
     (hSid : ep.sid = s) (sender : Role) :
     lookupD (sendStep C ep ⟨ep.sid, ep.role, target⟩ v T L).D ⟨s, sender, r⟩ =
     lookupD C.D ⟨s, sender, r⟩ := by
-  apply send_D_locality
+  apply send_d_locality
   intro heq
   subst hSid
   simp only [Edge.mk.injEq] at heq
@@ -233,7 +233,7 @@ def BlindToRecv (r : Role) (source receiver : Role) : Prop :=
 -- CEquiv Preservation for Primitive Communication Steps
 /-- Send step preserves CEquiv for blind roles.
     The observable state of a role r is unchanged if r is neither sender nor target. -/
-theorem send_preserves_CEquiv {C : Config} {ep : Endpoint} {target : Role}
+theorem send_preserves_c_equiv {C : Config} {ep : Endpoint} {target : Role}
     {v : Value} {T : ValType} {L : LocalType}
     {s : SessionId} {r : Role}
     (hSid : ep.sid = s)
@@ -243,7 +243,7 @@ theorem send_preserves_CEquiv {C : Config} {ep : Endpoint} {target : Role}
   constructor
   · -- G at r's endpoint unchanged
     apply Eq.symm
-    apply send_G_locality
+    apply send_g_locality
     intro heq
     have hr : r = ep.role := congrArg Endpoint.role heq
     exact hBlind.1 hr
@@ -259,7 +259,7 @@ theorem send_preserves_CEquiv {C : Config} {ep : Endpoint} {target : Role}
   · -- Traces to r unchanged
     intro sender'
     apply Eq.symm
-    apply send_D_locality
+    apply send_d_locality
     intro heq
     simp only [Edge.mk.injEq] at heq
     subst hSid
@@ -268,7 +268,7 @@ theorem send_preserves_CEquiv {C : Config} {ep : Endpoint} {target : Role}
 -- CEquiv Preservation for Primitive Recv Steps
 /-- Recv step preserves CEquiv for blind roles. -/
 /- ## Structured Block 4 -/
-theorem recv_preserves_CEquiv {C : Config} {ep : Endpoint} {source : Role}
+theorem recv_preserves_c_equiv {C : Config} {ep : Endpoint} {source : Role}
     {x : Var} {v : Value} {L : LocalType}
     {s : SessionId} {r : Role}
     (hBlind : BlindToRecv r source ep.role) :
@@ -277,7 +277,7 @@ theorem recv_preserves_CEquiv {C : Config} {ep : Endpoint} {source : Role}
   constructor
   · -- G unchanged
     apply Eq.symm
-    apply recv_G_locality
+    apply recv_g_locality
     intro heq
     have hr : r = ep.role := congrArg Endpoint.role heq
     exact hBlind.2 hr
@@ -292,7 +292,7 @@ theorem recv_preserves_CEquiv {C : Config} {ep : Endpoint} {source : Role}
   · -- Traces unchanged
     intro sender'
     apply Eq.symm
-    apply recv_D_locality
+    apply recv_d_locality
     intro heq
     simp only [Edge.mk.injEq] at heq
     exact hBlind.2 heq.2.2
@@ -306,7 +306,7 @@ theorem recv_preserves_CEquiv {C : Config} {ep : Endpoint} {source : Role}
     **Proof strategy**: Case analysis on StepBase. For each communication step,
     use the corresponding locality lemmas. Control-flow steps (seq, par, assign)
     don't affect G, bufs, or D. -/
-theorem blind_step_preserves_CEquiv_single {C C' : Config}
+theorem blind_step_preserves_c_equiv_single {C C' : Config}
     {s : SessionId} {r : Role}
     (hStep : StepBase C C')
     (hBlindSend : ∀ ep target T L, lookupG C.G ep = some (.send target T L) →
@@ -326,48 +326,48 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
     -- Send step: extract endpoint from store lookup
     rename_i k x e v target T L
     by_cases hsid : e.sid = s
-    · exact send_preserves_CEquiv hsid (hBlindSend e target T L hG hsid)
+    · exact send_preserves_c_equiv hsid (hBlindSend e target T L hG hsid)
     · -- Different session, trivially unchanged
       unfold CEquiv
       constructor
 /- ## Structured Block 5 -/
-      · apply Eq.symm; apply send_G_locality; intro heq
+      · apply Eq.symm; apply send_g_locality; intro heq
         have : e.sid = s := congrArg Endpoint.sid heq.symm
         exact hsid this
       constructor <;> intro sender'
       · apply Eq.symm; apply send_buf_locality; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
-      · apply Eq.symm; apply send_D_locality; intro heq
+      · apply Eq.symm; apply send_d_locality; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
   -- Blind-step Theorem: Recv Case
   | recv hProc hk hG hBuf =>
     rename_i k x e v source T L
     by_cases hsid : e.sid = s
-    · exact recv_preserves_CEquiv (hBlindRecv e source T L hG hsid)
+    · exact recv_preserves_c_equiv (hBlindRecv e source T L hG hsid)
     · unfold CEquiv
       constructor
-      · apply Eq.symm; apply recv_G_locality; intro heq
+      · apply Eq.symm; apply recv_g_locality; intro heq
         have : e.sid = s := congrArg Endpoint.sid heq.symm
         exact hsid this
       constructor <;> intro sender'
       · apply Eq.symm; apply recv_buf_locality; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
-      · apply Eq.symm; apply recv_D_locality; intro heq
+      · apply Eq.symm; apply recv_d_locality; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
   -- Blind-step Theorem: Select Case
   | select hProc hk hG hFind =>
     rename_i k e ℓ target branches L
     by_cases hsid : e.sid = s
-    · exact send_preserves_CEquiv hsid (hBlindSelect e target branches hG hsid)
+    · exact send_preserves_c_equiv hsid (hBlindSelect e target branches hG hsid)
     · unfold CEquiv
       constructor
-      · apply Eq.symm; apply send_G_locality; intro heq
+      · apply Eq.symm; apply send_g_locality; intro heq
         have : e.sid = s := congrArg Endpoint.sid heq.symm
         exact hsid this
       constructor <;> intro sender'
       · apply Eq.symm; apply send_buf_locality; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
-      · apply Eq.symm; apply send_D_locality; intro heq
+      · apply Eq.symm; apply send_d_locality; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
   -- Blind-step Theorem: Branch Case
   | branch hProc hk hG hBuf hPFind hTFind hDq =>
@@ -378,7 +378,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
       constructor
       · -- G at r unchanged (r ≠ receiver)
         apply Eq.symm
-        apply lookupG_updateG_ne
+        apply lookup_g_update_g_ne
         intro heq
         have hr : r = e.role := congrArg Endpoint.role heq
         exact hb.2 hr
@@ -387,7 +387,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
 /- ## Structured Block 6 -/
         intro sender'
         apply Eq.symm
-        apply lookupBuf_dequeueBuf_ne hDq
+        apply lookup_buf_dequeue_buf_ne hDq
         intro heq
         simp only [Edge.mk.injEq] at heq
         -- lookupBuf_dequeueBuf_ne has e' ≠ e, so heq.2.2 : r = e.role
@@ -395,7 +395,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
       · -- Traces to r unchanged
         intro sender'
         apply Eq.symm
-        apply lookupD_update_neq
+        apply lookup_d_update_neq
         intro heq
         simp only [Edge.mk.injEq] at heq
         -- lookupD_update_neq has e ≠ e', so heq : e.sid = s ∧ ... ∧ e.role = r
@@ -403,16 +403,16 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
     · -- Different session
       unfold CEquiv
       constructor
-      · apply Eq.symm; apply lookupG_updateG_ne; intro heq
+      · apply Eq.symm; apply lookup_g_update_g_ne; intro heq
         have : e.sid = s := congrArg Endpoint.sid heq.symm
         exact hsid this
       constructor
       · intro sender'; apply Eq.symm
-        apply lookupBuf_dequeueBuf_ne hDq; intro heq
+        apply lookup_buf_dequeue_buf_ne hDq; intro heq
         -- lookupBuf_dequeueBuf_ne has e' ≠ e, so heq : s = e.sid ∧ ...
         have hs : e.sid = s := (congrArg Edge.sid heq).symm
         exact hsid hs
-      · intro sender'; apply Eq.symm; apply lookupD_update_neq; intro heq
+      · intro sender'; apply Eq.symm; apply lookup_d_update_neq; intro heq
         -- lookupD_update_neq has e ≠ e', so heq : e.sid = s ∧ ...
         have hs : e.sid = s := congrArg Edge.sid heq
         exact hsid hs
@@ -434,21 +434,21 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
           by_cases hMem : ⟨C.nextSid, sender', r⟩ ∈ RoleSet.allEdges C.nextSid roles
           · have hLookup :
               (initBuffers C.nextSid roles).lookup ⟨C.nextSid, sender', r⟩ = some [] :=
-              initBuffers_lookup_mem C.nextSid roles ⟨C.nextSid, sender', r⟩ hMem
+              init_buffers_lookup_mem C.nextSid roles ⟨C.nextSid, sender', r⟩ hMem
             have hFresh' :
                 (List.lookup ⟨C.nextSid, sender', r⟩ C.bufs).getD [] = [] := by
               simpa [lookupBuf] using hFresh
             simpa [newSessionStep, lookupBuf, List.lookup_append, hLookup] using hFresh'
           · have hLookup :
               (initBuffers C.nextSid roles).lookup ⟨C.nextSid, sender', r⟩ = none :=
-              initBuffers_lookup_none_of_notin C.nextSid roles ⟨C.nextSid, sender', r⟩ hMem
+              init_buffers_lookup_none_of_notin C.nextSid roles ⟨C.nextSid, sender', r⟩ hMem
 /- ## Structured Block 7 -/
             simp [newSessionStep, lookupBuf, List.lookup_append, hLookup]
         · have hne : (⟨s, sender', r⟩ : Edge).sid ≠ C.nextSid := by
             simpa using hsid'
           have hLookup :
             (initBuffers C.nextSid roles).lookup ⟨s, sender', r⟩ = none :=
-            initBuffers_lookup_none C.nextSid roles ⟨s, sender', r⟩ hne
+            init_buffers_lookup_none C.nextSid roles ⟨s, sender', r⟩ hne
           simp [newSessionStep, lookupBuf, List.lookup_append, hLookup]
       · -- D is unchanged
         intro _

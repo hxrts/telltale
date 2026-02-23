@@ -90,7 +90,7 @@ lemma roundtrip_hpost_body_case
                   have hchild : childRel b (f ()) := ⟨.mu x, f, (), hdest, rfl⟩
                   have hchild_mem : f () ∈ all := mem_of_closed_child h_closed h_current hchild
                   refine ⟨Insert.insert b visited, subset_insert_of_mem h_current h_visited,
-                    hchild_mem, ?_, EnvOfSub_insertR x (mkVar x) hsub'⟩
+                    hchild_mem, ?_, env_of_sub_insert_r x (mkVar x) hsub'⟩
                   have hcore_mu :
                       a =
                         toCoind
@@ -123,7 +123,7 @@ lemma roundtrip_hpost_body_case
                 have hlabels : List.ofFn (fun i => (fR i).1) = labels := by
                   simp [fR]
                 have ha' : head a = .send p (List.ofFn fun i => (fR i).1) := by
-                  simpa [hcore_send] using (head_toCoind_send_ofFn (p := p) fR)
+                  simpa [hcore_send] using (head_to_coind_send_of_fn (p := p) fR)
                 have ha : head a = .send p labels := by
                   simpa [hlabels] using ha'
                 have hb : head b = .send p labels := by
@@ -132,12 +132,12 @@ lemma roundtrip_hpost_body_case
                     branchesOf a =
 /- ## Structured Block 3 -/
                       List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)) := by
-                  simpa [hcore_send] using (branchesOf_toCoind_send_ofFn (p := p) fR)
+                  simpa [hcore_send] using (branches_of_to_coind_send_of_fn (p := p) fR)
                 have hbr' :
                     BranchesRelCE R ρ
                       (List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)))
                       (List.ofFn (fun i => (labels[i], f i))) := by
-                  refine BranchesRelCE_ofFn ?_
+                  refine branches_rel_ce_of_fn ?_
                   intro i
                   constructor
                   · simp [fR]
@@ -172,7 +172,7 @@ lemma roundtrip_hpost_body_case
                 have hlabels : List.ofFn (fun i => (fR i).1) = labels := by
                   simp [fR]
                 have ha' : head a = .recv p (List.ofFn fun i => (fR i).1) := by
-                  simpa [hcore_recv] using (head_toCoind_recv_ofFn (p := p) fR)
+                  simpa [hcore_recv] using (head_to_coind_recv_of_fn (p := p) fR)
                 have ha : head a = .recv p labels := by
                   simpa [hlabels] using ha'
                 have hb : head b = .recv p labels := by
@@ -180,13 +180,13 @@ lemma roundtrip_hpost_body_case
                 have hbranches_a :
                     branchesOf a =
                       List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)) := by
-                  simpa [hcore_recv] using (branchesOf_toCoind_recv_ofFn (p := p) fR)
+                  simpa [hcore_recv] using (branches_of_to_coind_recv_of_fn (p := p) fR)
                 have hbr' :
 /- ## Structured Block 4 -/
                     BranchesRelCE R ρ
                       (List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)))
                       (List.ofFn (fun i => (labels[i], f i))) := by
-                  refine BranchesRelCE_ofFn ?_
+                  refine branches_rel_ce_of_fn ?_
                   intro i
                   constructor
                   · simp [fR]

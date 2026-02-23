@@ -30,7 +30,7 @@ private def ProjSubstRel (t : String) (G : GlobalType) (role : String) : Rel := 
 /-! ## Remaining Lemmas for Legacy Gaps
 
 The following lemmas capture the semantic properties needed for the remaining cases.
-They are eliminable using the fullUnfold infrastructure once `EQ2_of_fullUnfold_eq`
+They are eliminable using the fullUnfold infrastructure once `eq2_of_full_unfold_eq`
 and related lemmas are proven. -/
 
 /-- Mu-mu crossed unfold: left unfold relates to right mu.
@@ -45,10 +45,10 @@ their mu-wrappers and s-unfolds are EQ2-related.
 - hR_pre : (trans inner role) is guarded for s (pre-substitution)
 
 **Proof:** Uses `proj_subst` to rewrite both occurrences of `trans (inner.substitute t G) role`
-to `(trans inner role).substitute t (trans G role)`, then applies `EQ2_mu_self_unfold`.
+to `(trans inner role).substitute t (trans G role)`, then applies `eq2_mu_self_unfold`.
 
 **Proven in:** MuUnfoldLemmas.lean -/
-private theorem EQ2_mu_crossed_unfold_left
+private theorem eq2_mu_crossed_unfold_left
     {s t : String} {inner G : GlobalType} {role : String}
     (hGclosed : G.isClosed = true)
     (hL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = true)
@@ -57,18 +57,18 @@ private theorem EQ2_mu_crossed_unfold_left
            (.mu s (Choreography.Projection.Project.trans (inner.substitute t G) role)))
         (.mu s ((Choreography.Projection.Project.trans inner role).substitute t
                  (Choreography.Projection.Project.trans G role))) :=
-  MuUnfoldLemmas.EQ2_mu_crossed_unfold_left' hGclosed hL hR_pre
+  MuUnfoldLemmas.eq2_mu_crossed_unfold_left' hGclosed hL hR_pre
 
 /-! ## Mu Crossed Unfold: Right -/
 
 /-- Mu-mu crossed unfold: left mu relates to right unfold.
 
-Symmetric to `EQ2_mu_crossed_unfold_left`.
+Symmetric to `eq2_mu_crossed_unfold_left`.
 
-**Proof:** Uses `proj_subst` to rewrite, then applies `EQ2_mu_to_unfold`.
+**Proof:** Uses `proj_subst` to rewrite, then applies `eq2_mu_to_unfold`.
 
 **Proven in:** MuUnfoldLemmas.lean -/
-private theorem EQ2_mu_crossed_unfold_right
+private theorem eq2_mu_crossed_unfold_right
     {s t : String} {inner G : GlobalType} {role : String}
     (hGclosed : G.isClosed = true)
     (hL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = true)
@@ -78,7 +78,7 @@ private theorem EQ2_mu_crossed_unfold_right
            (Choreography.Projection.Project.trans G role)).substitute s
           (.mu s ((Choreography.Projection.Project.trans inner role).substitute t
                    (Choreography.Projection.Project.trans G role)))) :=
-  MuUnfoldLemmas.EQ2_mu_crossed_unfold_right' hGclosed hL hR_pre
+  MuUnfoldLemmas.eq2_mu_crossed_unfold_right' hGclosed hL hR_pre
 
 /-! ## Mu Guardedness Mismatch -/
 
@@ -92,7 +92,7 @@ The LHS mu, when unfolded, must also eventually reach .end because both represen
 projections of related global types.
 
 **Status:** PROVEN (via vacuous contradiction when s ≠ t, from MuUnfoldLemmas.lean). -/
-private theorem EQ2_mu_unguarded_to_end
+private theorem eq2_mu_unguarded_to_end
     {s t : String} {inner G : GlobalType} {role : String}
     (hsne : s ≠ t)
     (hGclosed : G.isClosed = true)
@@ -101,14 +101,14 @@ private theorem EQ2_mu_unguarded_to_end
     EQ2 ((Choreography.Projection.Project.trans (inner.substitute t G) role).substitute s
            (.mu s (Choreography.Projection.Project.trans (inner.substitute t G) role)))
         .end :=
-  MuUnfoldLemmas.EQ2_mu_unguarded_to_end' hsne hGclosed hL hR_pre
+  MuUnfoldLemmas.eq2_mu_unguarded_to_end' hsne hGclosed hL hR_pre
 
 /-- Mismatched guardedness: end relates to guarded mu unfold.
 
-Symmetric to `EQ2_mu_unguarded_to_end`.
+Symmetric to `eq2_mu_unguarded_to_end`.
 
 **Status:** PROVEN (vacuously true when G is closed, from MuUnfoldLemmas.lean). -/
-private theorem EQ2_end_to_mu_unguarded
+private theorem eq2_end_to_mu_unguarded
     {s t : String} {inner G : GlobalType} {role : String}
     (hGclosed : G.isClosed = true)
     (hL_pre : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = false)
@@ -118,7 +118,7 @@ private theorem EQ2_end_to_mu_unguarded
           (Choreography.Projection.Project.trans G role)).substitute s
          (.mu s ((Choreography.Projection.Project.trans inner role).substitute t
                   (Choreography.Projection.Project.trans G role)))) :=
-  MuUnfoldLemmas.EQ2_end_to_mu_unguarded' hGclosed hL_pre hR
+  MuUnfoldLemmas.eq2_end_to_mu_unguarded' hGclosed hL_pre hR
 
 /-! ## Size and Branch Helpers -/
 
@@ -127,7 +127,7 @@ private abbrev gSubstBranches := SessionTypes.GlobalType.substituteBranches -- g
 private abbrev lSubstBranches := SessionTypes.LocalTypeR.substituteBranches -- local branch subst
 private abbrev projTransBranches := Choreography.Projection.Project.transBranches
 
-private theorem sizeOf_head_snd_lt_cons (pair : Label × GlobalType)
+private theorem size_of_head_snd_lt_cons (pair : Label × GlobalType)
     (rest : List (Label × GlobalType)) :
     sizeOf pair.2 < sizeOf (pair :: rest) := by
   -- Compare sizeOf via the pair and then the cons.
@@ -139,7 +139,7 @@ private theorem sizeOf_head_snd_lt_cons (pair : Label × GlobalType)
     omega
   exact Nat.lt_trans h1 h2
 
-private theorem sizeOf_bs_lt_comm (sender receiver : String)
+private theorem size_of_bs_lt_comm (sender receiver : String)
     (bs : List (Label × GlobalType)) :
     sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
   -- comm adds a constructor on top of the branch list size.
@@ -147,20 +147,20 @@ private theorem sizeOf_bs_lt_comm (sender receiver : String)
   have h : 0 < 1 + sizeOf sender + sizeOf receiver := by omega
   omega
 
-private theorem sizeOf_cont_lt_comm
+private theorem size_of_cont_lt_comm
     (sender receiver : String) (label : Label) (cont : GlobalType) (rest : List (Label × GlobalType)) :
     sizeOf cont < sizeOf (GlobalType.comm sender receiver ((label, cont) :: rest)) := by
   have h1 : sizeOf cont < sizeOf ((label, cont) :: rest) :=
-    sizeOf_head_snd_lt_cons (label, cont) rest
+    size_of_head_snd_lt_cons (label, cont) rest
   have h2 : sizeOf ((label, cont) :: rest) <
       sizeOf (GlobalType.comm sender receiver ((label, cont) :: rest)) :=
-    sizeOf_bs_lt_comm sender receiver ((label, cont) :: rest)
+    size_of_bs_lt_comm sender receiver ((label, cont) :: rest)
   exact Nat.lt_trans h1 h2
 
 /-! ## Branch Relation Helper -/
 
 -- Helper: BranchesRel for ProjSubstRel on transBranches/substituteBranches
-private theorem transBranches_ProjSubstRel (t : String) (G : GlobalType) (role : String)
+private theorem trans_branches_proj_subst_rel (t : String) (G : GlobalType) (role : String)
     (branches : List (Label × GlobalType)) :
     BranchesRel (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
       (projTransBranches (gSubstBranches branches t G) role)
@@ -171,14 +171,14 @@ private theorem transBranches_ProjSubstRel (t : String) (G : GlobalType) (role :
         Choreography.Projection.Project.transBranches,
         SessionTypes.GlobalType.substituteBranches,
         SessionTypes.LocalTypeR.substituteBranches,
-        -SessionTypes.LocalTypeR.substituteBranches_eq_map]
+        -SessionTypes.LocalTypeR.substitute_branches_eq_map]
   | cons hd tl ih =>
       obtain ⟨label, cont⟩ := hd
       simp [BranchesRel, gSubstBranches, lSubstBranches, projTransBranches,
         Choreography.Projection.Project.transBranches,
         SessionTypes.GlobalType.substituteBranches,
         SessionTypes.LocalTypeR.substituteBranches,
-        -SessionTypes.LocalTypeR.substituteBranches_eq_map]
+        -SessionTypes.LocalTypeR.substitute_branches_eq_map]
       constructor
       · -- head relation
         exact Or.inl ⟨cont, rfl, rfl⟩
@@ -187,12 +187,12 @@ private theorem transBranches_ProjSubstRel (t : String) (G : GlobalType) (role :
           Choreography.Projection.Project.transBranches,
           SessionTypes.GlobalType.substituteBranches,
           SessionTypes.LocalTypeR.substituteBranches,
-          -SessionTypes.LocalTypeR.substituteBranches_eq_map] using ih
+          -SessionTypes.LocalTypeR.substitute_branches_eq_map] using ih
 
 /-! ## EQ2F Base Cases -/
 
 /-- Helper: EQ2F for projection-substitution on `.end`. -/
-private theorem ProjSubstRel_EQ2F_end (t : String) (G : GlobalType) (role : String) :
+private theorem proj_subst_rel_eq2_f_end (t : String) (G : GlobalType) (role : String) :
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
       (projTrans (GlobalType.end.substitute t G) role)
       ((projTrans GlobalType.end role).substitute t (projTrans G role)) := by
@@ -200,7 +200,7 @@ private theorem ProjSubstRel_EQ2F_end (t : String) (G : GlobalType) (role : Stri
   simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans, EQ2F]
 
 /-- Helper: EQ2F for projection-substitution on `.var`. -/
-private theorem ProjSubstRel_EQ2F_var (v t : String) (G : GlobalType) (role : String) :
+private theorem proj_subst_rel_eq2_f_var (v t : String) (G : GlobalType) (role : String) :
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
       (projTrans ((GlobalType.var v).substitute t G) role)
       ((projTrans (GlobalType.var v) role).substitute t (projTrans G role)) := by
@@ -208,7 +208,7 @@ private theorem ProjSubstRel_EQ2F_var (v t : String) (G : GlobalType) (role : St
   by_cases hvt : v = t
   · subst hvt
     simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans]
-    exact EQ2F.mono (fun _ _ h => Or.inr h) _ _ (EQ2.destruct (EQ2_refl _))
+    exact EQ2F.mono (fun _ _ h => Or.inr h) _ _ (EQ2.destruct (eq2_refl _))
   · have hvt' : (v == t) = false := beq_eq_false_iff_ne.mpr hvt
     simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans, hvt']
     rfl
@@ -216,7 +216,7 @@ private theorem ProjSubstRel_EQ2F_var (v t : String) (G : GlobalType) (role : St
 /-! ## EQ2F Mu Shadow Case -/
 
 /-- Helper: mu case with shadowed substitution (s = t). -/
-private theorem ProjSubstRel_EQ2F_mu_shadow
+private theorem proj_subst_rel_eq2_f_mu_shadow
     (s t : String) (inner G : GlobalType) (role : String) (hst : s = t) :
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
       (projTrans ((GlobalType.mu s inner).substitute t G) role)
@@ -232,7 +232,7 @@ private theorem ProjSubstRel_EQ2F_mu_shadow
     have hF : EQ2F EQ2
         (LocalTypeR.mu s (Choreography.Projection.Project.trans inner role))
         (LocalTypeR.mu s (Choreography.Projection.Project.trans inner role)) :=
-      EQ2.destruct (EQ2_refl _)
+      EQ2.destruct (eq2_refl _)
     have hF' : EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
         (LocalTypeR.mu s (Choreography.Projection.Project.trans inner role))
         (LocalTypeR.mu s (Choreography.Projection.Project.trans inner role)) :=
@@ -243,7 +243,7 @@ private theorem ProjSubstRel_EQ2F_mu_shadow
 /-! ## EQ2F Mu Cases -/
 
 /-- Helper: mu case, s ≠ t, both projections guarded. -/
-private theorem ProjSubstRel_EQ2F_mu_noshadow_guarded
+private theorem proj_subst_rel_eq2_f_mu_noshadow_guarded
     (s t : String) (inner G : GlobalType) (role : String)
     (hsne : s ≠ t) (hGclosed : G.isClosed = true)
     (hguardL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = true)
@@ -255,13 +255,13 @@ private theorem ProjSubstRel_EQ2F_mu_noshadow_guarded
   simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR]
   simp [LocalTypeR.substitute, beq_eq_false_iff_ne.mpr hsne]
   constructor
-  · exact Or.inr (EQ2_mu_crossed_unfold_left hGclosed hguardL hguardR)
-  · exact Or.inr (EQ2_mu_crossed_unfold_right hGclosed hguardL hguardR)
+  · exact Or.inr (eq2_mu_crossed_unfold_left hGclosed hguardL hguardR)
+  · exact Or.inr (eq2_mu_crossed_unfold_right hGclosed hguardL hguardR)
 
 /-! ## Guarded/End Crossover -/
 
 /-- Helper: mu case, s ≠ t, LHS guarded and RHS unguarded. -/
-private theorem ProjSubstRel_EQ2F_mu_noshadow_guarded_end
+private theorem proj_subst_rel_eq2_f_mu_noshadow_guarded_end
     (s t : String) (inner G : GlobalType) (role : String)
     (hsne : s ≠ t) (hGclosed : G.isClosed = true)
     (hguardL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = true)
@@ -271,12 +271,12 @@ private theorem ProjSubstRel_EQ2F_mu_noshadow_guarded_end
       ((projTrans (GlobalType.mu s inner) role).substitute t (projTrans G role)) := by
   -- Guarded mu relates to end via the mismatched guardedness lemma.
   simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR]
-  exact Or.inr (EQ2_mu_unguarded_to_end hsne hGclosed hguardL hguardR)
+  exact Or.inr (eq2_mu_unguarded_to_end hsne hGclosed hguardL hguardR)
 
 /-! ## End/Guarded Crossover -/
 
 /-- Helper: mu case, s ≠ t, LHS unguarded and RHS guarded. -/
-private theorem ProjSubstRel_EQ2F_mu_noshadow_end_guarded
+private theorem proj_subst_rel_eq2_f_mu_noshadow_end_guarded
     (s t : String) (inner G : GlobalType) (role : String)
     (hsne : s ≠ t) (hGclosed : G.isClosed = true)
     (hguardL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = false)
@@ -287,12 +287,12 @@ private theorem ProjSubstRel_EQ2F_mu_noshadow_end_guarded
   -- End relates to guarded mu via the mismatched guardedness lemma.
   simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR]
   simp [LocalTypeR.substitute, beq_eq_false_iff_ne.mpr hsne]
-  exact Or.inr (EQ2_end_to_mu_unguarded hGclosed hguardL hguardR)
+  exact Or.inr (eq2_end_to_mu_unguarded hGclosed hguardL hguardR)
 
 /-! ## Both Unguarded -/
 
 /-- Helper: mu case, s ≠ t, both unguarded. -/
-private theorem ProjSubstRel_EQ2F_mu_noshadow_end_end
+private theorem proj_subst_rel_eq2_f_mu_noshadow_end_end
     (s t : String) (inner G : GlobalType) (role : String)
     (_hsne : s ≠ t)
     (hguardL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = false)
@@ -306,7 +306,7 @@ private theorem ProjSubstRel_EQ2F_mu_noshadow_end_end
 /-! ## Guardedness Dispatch -/
 
 /-- Helper: mu case, s ≠ t, dispatch on guardedness. -/
-private theorem ProjSubstRel_EQ2F_mu_noshadow
+private theorem proj_subst_rel_eq2_f_mu_noshadow
     (s t : String) (inner G : GlobalType) (role : String)
     (hGclosed : G.isClosed = true) (hsne : s ≠ t) :
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
@@ -320,20 +320,20 @@ private theorem ProjSubstRel_EQ2F_mu_noshadow
   | true =>
       cases hguardR : (Choreography.Projection.Project.trans inner role).isGuarded s with
       | true =>
-          exact ProjSubstRel_EQ2F_mu_noshadow_guarded s t inner G role hsne hGclosed hguardL hguardR
+          exact proj_subst_rel_eq2_f_mu_noshadow_guarded s t inner G role hsne hGclosed hguardL hguardR
       | false =>
-          exact ProjSubstRel_EQ2F_mu_noshadow_guarded_end s t inner G role hsne hGclosed hguardL hguardR
+          exact proj_subst_rel_eq2_f_mu_noshadow_guarded_end s t inner G role hsne hGclosed hguardL hguardR
   | false =>
       cases hguardR : (Choreography.Projection.Project.trans inner role).isGuarded s with
       | true =>
-          exact ProjSubstRel_EQ2F_mu_noshadow_end_guarded s t inner G role hsne hGclosed hguardL hguardR
+          exact proj_subst_rel_eq2_f_mu_noshadow_end_guarded s t inner G role hsne hGclosed hguardL hguardR
       | false =>
-          exact ProjSubstRel_EQ2F_mu_noshadow_end_end s t inner G role hsne hguardL hguardR
+          exact proj_subst_rel_eq2_f_mu_noshadow_end_end s t inner G role hsne hguardL hguardR
 
 /-! ## EQ2F Comm Cases (Sender/Receiver) -/
 
 /-- Helper: comm case when role is sender. -/
-private theorem ProjSubstRel_EQ2F_comm_sender
+private theorem proj_subst_rel_eq2_f_comm_sender
     (sender receiver : String) (branches : List (Label × GlobalType))
     (t : String) (G : GlobalType) (role : String) (hrs : role = sender) :
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
@@ -350,13 +350,13 @@ private theorem ProjSubstRel_EQ2F_comm_sender
     trans_comm_sender sender receiver role branches hrs
   rw [hLHS, hRHS_proj]
   simp [LocalTypeR.substitute, EQ2F]
-  simpa [lSubstBranches, SessionTypes.LocalTypeR.substituteBranches_eq_map] using
-    (transBranches_ProjSubstRel t G role branches)
+  simpa [lSubstBranches, SessionTypes.LocalTypeR.substitute_branches_eq_map] using
+    (trans_branches_proj_subst_rel t G role branches)
 
 /-! ## EQ2F Comm Cases (Other Role) -/
 
 /-- Helper: comm case when role is receiver. -/
-private theorem ProjSubstRel_EQ2F_comm_receiver
+private theorem proj_subst_rel_eq2_f_comm_receiver
     (sender receiver : String) (branches : List (Label × GlobalType))
     (t : String) (G : GlobalType) (role : String) (hrr : role = receiver) (hrs : role ≠ sender) :
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
@@ -373,13 +373,13 @@ private theorem ProjSubstRel_EQ2F_comm_receiver
     trans_comm_receiver sender receiver role branches hrr hrs
   rw [hLHS, hRHS_proj]
   simp [LocalTypeR.substitute, EQ2F]
-  simpa [lSubstBranches, SessionTypes.LocalTypeR.substituteBranches_eq_map] using
-    (transBranches_ProjSubstRel t G role branches)
+  simpa [lSubstBranches, SessionTypes.LocalTypeR.substitute_branches_eq_map] using
+    (trans_branches_proj_subst_rel t G role branches)
 
 /-! ## Non-Participant Branch Cases -/
 
 /-- Helper: comm case, non-participant and empty branches. -/
-private theorem ProjSubstRel_EQ2F_comm_other_nil
+private theorem proj_subst_rel_eq2_f_comm_other_nil
     (sender receiver : String) (t : String) (G : GlobalType) (role : String)
     (hrs : role ≠ sender) (hrr : role ≠ receiver) :
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
@@ -396,7 +396,7 @@ private theorem ProjSubstRel_EQ2F_comm_other_nil
   simp [LocalTypeR.substitute, EQ2F]
 
 /-- Helper: comm case, non-participant and non-empty branches. -/
-private theorem ProjSubstRel_EQ2F_comm_other_cons
+private theorem proj_subst_rel_eq2_f_comm_other_cons
     (sender receiver : String) (label : Label) (cont : GlobalType) (rest : List (Label × GlobalType))
     (t : String) (G : GlobalType) (role : String) (hrs : role ≠ sender) (hrr : role ≠ receiver)
     (ih :
@@ -426,53 +426,53 @@ private theorem ProjSubstRel_EQ2F_comm_other_cons
 
 This allows recursive calls on subterms (e.g., comm continuations), which the
 simple match-based proof cannot handle. -/
-private theorem ProjSubstRel_EQ2F_of_witness (g : GlobalType) (t : String) (G : GlobalType) (role : String)
+private theorem proj_subst_rel_eq2_f_of_witness (g : GlobalType) (t : String) (G : GlobalType) (role : String)
     (hGclosed : G.isClosed = true) :
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y) (projTrans (g.substitute t G) role)
       ((projTrans g role).substitute t (projTrans G role)) := by
   match g with
-  | .end => exact ProjSubstRel_EQ2F_end t G role
-  | .var v => exact ProjSubstRel_EQ2F_var v t G role
+  | .end => exact proj_subst_rel_eq2_f_end t G role
+  | .var v => exact proj_subst_rel_eq2_f_var v t G role
   | .mu s inner =>
       by_cases hst : s = t
-      · exact ProjSubstRel_EQ2F_mu_shadow s t inner G role hst
-      · exact ProjSubstRel_EQ2F_mu_noshadow s t inner G role hGclosed hst
+      · exact proj_subst_rel_eq2_f_mu_shadow s t inner G role hst
+      · exact proj_subst_rel_eq2_f_mu_noshadow s t inner G role hGclosed hst
   | .comm sender receiver branches =>
       by_cases hrs : role = sender
-      · exact ProjSubstRel_EQ2F_comm_sender sender receiver branches t G role hrs
+      · exact proj_subst_rel_eq2_f_comm_sender sender receiver branches t G role hrs
       · by_cases hrr : role = receiver
-        · exact ProjSubstRel_EQ2F_comm_receiver sender receiver branches t G role hrr hrs
+        · exact proj_subst_rel_eq2_f_comm_receiver sender receiver branches t G role hrr hrs
         · cases branches with
-          | nil => exact ProjSubstRel_EQ2F_comm_other_nil sender receiver t G role hrs hrr
+          | nil => exact proj_subst_rel_eq2_f_comm_other_nil sender receiver t G role hrs hrr
           | cons head rest =>
               cases head with
               | mk label cont =>
-                  have ih := ProjSubstRel_EQ2F_of_witness cont t G role hGclosed
-                  exact ProjSubstRel_EQ2F_comm_other_cons
+                  have ih := proj_subst_rel_eq2_f_of_witness cont t G role hGclosed
+                  exact proj_subst_rel_eq2_f_comm_other_cons
                     sender receiver label cont rest t G role hrs hrr ih
 termination_by sizeOf g
 decreasing_by
   all_goals
-    simp_wf; first | simpa [GlobalType.comm.sizeOf_spec] using (sizeOf_cont_lt_comm sender receiver label cont rest)
+    simp_wf; first | simpa [GlobalType.comm.sizeOf_spec] using (size_of_cont_lt_comm sender receiver label cont rest)
 
 /-! ## Postfix and Paco Bridge -/
 
 /-- ProjSubstRel is a post-fixpoint of EQ2F (wrapper around well-founded induction). -/
-private theorem ProjSubstRel_postfix (t : String) (G : GlobalType) (role : String)
+private theorem proj_subst_rel_postfix (t : String) (G : GlobalType) (role : String)
     (hGclosed : G.isClosed = true) :
     ∀ a b, ProjSubstRel t G role a b → EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y) a b := by
   intro a b ⟨g, ha, hb⟩
   subst ha hb
-  exact ProjSubstRel_EQ2F_of_witness g t G role hGclosed
+  exact proj_subst_rel_eq2_f_of_witness g t G role hGclosed
 
 /-- paco with EQ2 accumulator implies EQ2. -/
-private theorem paco_EQ2_to_EQ2 {x y : LocalTypeR}
+private theorem paco_eq2_to_eq2 {x y : LocalTypeR}
     (h : Paco.paco EQ2FMono (toPacoRel EQ2) x y) : EQ2 x y := by
   -- paco F (paco F ⊥) ≤ paco F ⊥ by paco_acc
-  rw [EQ2_eq_paco_bot]
+  rw [eq2_eq_paco_bot]
   have heq : toPacoRel EQ2 = Paco.paco EQ2FMono ⊥ := by
     ext a b
-    simp only [toPacoRel, ← EQ2_eq_paco_bot]
+    simp only [toPacoRel, ← eq2_eq_paco_bot]
   rw [heq] at h
   exact Paco.paco_acc EQ2FMono ⊥ x y h
 
@@ -485,7 +485,7 @@ private theorem trans_subst_comm_paco (g : GlobalType) (t : String) (G : GlobalT
       (projTrans (g.substitute t G) role)
       ((projTrans g role).substitute t (projTrans G role)) := by
   -- Use paco coinduction with ProjSubstRel as witness and EQ2 as accumulator.
-  apply EQ2_paco_coind (ProjSubstRel t G role) EQ2 (ProjSubstRel_postfix t G role hGclosed)
+  apply eq2_paco_coind (ProjSubstRel t G role) EQ2 (proj_subst_rel_postfix t G role hGclosed)
   exact ⟨g, rfl, rfl⟩
 
 /-- Projection commutes with substitution up to EQ2. -/
@@ -493,6 +493,6 @@ theorem trans_subst_comm (g : GlobalType) (t : String) (G : GlobalType) (role : 
     (hGclosed : G.isClosed = true) :
     EQ2 (projTrans (g.substitute t G) role) ((projTrans g role).substitute t (projTrans G role)) := by
   -- Reduce to the paco witness, then convert to EQ2.
-  exact paco_EQ2_to_EQ2 (trans_subst_comm_paco g t G role hGclosed)
+  exact paco_eq2_to_eq2 (trans_subst_comm_paco g t G role hGclosed)
 
 end Choreography.Harmony

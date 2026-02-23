@@ -28,7 +28,7 @@ The `MonitorState` structure contains:
 `MonStep` is the judgment for valid monitor transitions. Each constructor
 corresponds to a protocol action (send, recv, select, branch, newSession).
 
-The key theorem `MonStep_preserves_WTMon` states that valid transitions
+The key theorem `mon_step_preserves_wt_mon` states that valid transitions
 preserve the well-typedness invariant.
 
 ## Untrusted Code Interface

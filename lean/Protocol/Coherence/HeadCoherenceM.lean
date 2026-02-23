@@ -21,7 +21,7 @@ section
 def HeadCoherentM (_M : DeliveryModel) (G : GEnv) (D : DEnv) : Prop :=
   HeadCoherent G D
 
-@[simp] theorem HeadCoherentM_fifo_eq (G : GEnv) (D : DEnv) :
+@[simp] theorem head_coherent_m_fifo_eq (G : GEnv) (D : DEnv) :
     HeadCoherentM DeliveryModel.fifo G D = HeadCoherent G D := by
   rfl
 

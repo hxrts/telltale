@@ -15,7 +15,7 @@ we need a corecursive definition of duality and a proof that it is involutive
 
 Solution Structure. Defines dualHead to swap send/recv in tags, dualStep as
 the one-step coalgebra, and dualC as the corecursive dual operation. Proves
-destructor lemmas for each constructor case and dualC_involutive via bisimulation.
+destructor lemmas for each constructor case and dual_c_involutive via bisimulation.
 -/
 
 namespace SessionCoTypes.Coinductive
@@ -45,27 +45,27 @@ def dualC : LocalTypeC → LocalTypeC :=
 
 /-! ## Destructor Lemmas -/
 
-private theorem dest_dualC_end (f : LocalTypeF.B .end → LocalTypeC) :
+private theorem dest_dual_c_end (f : LocalTypeF.B .end → LocalTypeC) :
     PFunctor.M.dest (dualC (PFunctor.M.mk ⟨.end, f⟩)) = ⟨.end, PEmpty.elim⟩ := by
   simp only [dualC, PFunctor.M.dest_corec, dualStep, PFunctor.M.dest_mk, PFunctor.map]
   congr 1; funext x; cases x
 
-private theorem dest_dualC_var (x : String) (f : LocalTypeF.B (.var x) → LocalTypeC) :
+private theorem dest_dual_c_var (x : String) (f : LocalTypeF.B (.var x) → LocalTypeC) :
     PFunctor.M.dest (dualC (PFunctor.M.mk ⟨.var x, f⟩)) = ⟨.var x, PEmpty.elim⟩ := by
   simp only [dualC, PFunctor.M.dest_corec, dualStep, PFunctor.M.dest_mk, PFunctor.map]
   congr 1; funext y; cases y
 
-private theorem dest_dualC_mu (x : String) (f : LocalTypeF.B (.mu x) → LocalTypeC) :
+private theorem dest_dual_c_mu (x : String) (f : LocalTypeF.B (.mu x) → LocalTypeC) :
     PFunctor.M.dest (dualC (PFunctor.M.mk ⟨.mu x, f⟩)) = ⟨.mu x, fun _ => dualC (f ())⟩ := by
   simp only [dualC, PFunctor.M.dest_corec, dualStep, PFunctor.M.dest_mk]; rfl
 
-private theorem dest_dualC_send (p : String) (labels : List SessionTypes.GlobalType.Label)
+private theorem dest_dual_c_send (p : String) (labels : List SessionTypes.GlobalType.Label)
     (f : LocalTypeF.B (.send p labels) → LocalTypeC) :
     PFunctor.M.dest (dualC (PFunctor.M.mk ⟨.send p labels, f⟩)) =
       ⟨.recv p labels, fun i => dualC (f i)⟩ := by
   simp only [dualC, PFunctor.M.dest_corec, dualStep, PFunctor.M.dest_mk]; rfl
 
-private theorem dest_dualC_recv (p : String) (labels : List SessionTypes.GlobalType.Label)
+private theorem dest_dual_c_recv (p : String) (labels : List SessionTypes.GlobalType.Label)
     (f : LocalTypeF.B (.recv p labels) → LocalTypeC) :
     PFunctor.M.dest (dualC (PFunctor.M.mk ⟨.recv p labels, f⟩)) =
       ⟨.send p labels, fun i => dualC (f i)⟩ := by
@@ -73,41 +73,41 @@ private theorem dest_dualC_recv (p : String) (labels : List SessionTypes.GlobalT
 
 /-! ## Double Dual Lemmas -/
 
-private theorem dest_dualC_twice_end (f : LocalTypeF.B .end → LocalTypeC) :
+private theorem dest_dual_c_twice_end (f : LocalTypeF.B .end → LocalTypeC) :
     PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.end, f⟩))) = ⟨.end, PEmpty.elim⟩ := by
   conv_lhs => arg 1; arg 1; rw [← PFunctor.M.mk_dest (dualC (PFunctor.M.mk ⟨.end, f⟩))]
-  rw [dest_dualC_end, dest_dualC_end]
+  rw [dest_dual_c_end, dest_dual_c_end]
 
-private theorem dest_dualC_twice_var (x : String) (f : LocalTypeF.B (.var x) → LocalTypeC) :
+private theorem dest_dual_c_twice_var (x : String) (f : LocalTypeF.B (.var x) → LocalTypeC) :
     PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.var x, f⟩))) = ⟨.var x, PEmpty.elim⟩ := by
   conv_lhs => arg 1; arg 1; rw [← PFunctor.M.mk_dest (dualC (PFunctor.M.mk ⟨.var x, f⟩))]
-  rw [dest_dualC_var, dest_dualC_var]
+  rw [dest_dual_c_var, dest_dual_c_var]
 
-private theorem dest_dualC_twice_mu (x : String) (f : LocalTypeF.B (.mu x) → LocalTypeC) :
+private theorem dest_dual_c_twice_mu (x : String) (f : LocalTypeF.B (.mu x) → LocalTypeC) :
     PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.mu x, f⟩))) =
       ⟨.mu x, fun _ => dualC (dualC (f ()))⟩ := by
   conv_lhs => arg 1; arg 1; rw [← PFunctor.M.mk_dest (dualC (PFunctor.M.mk ⟨.mu x, f⟩))]
-  rw [dest_dualC_mu, dest_dualC_mu]
+  rw [dest_dual_c_mu, dest_dual_c_mu]
 
-private theorem dest_dualC_twice_send (p : String) (labels : List SessionTypes.GlobalType.Label)
+private theorem dest_dual_c_twice_send (p : String) (labels : List SessionTypes.GlobalType.Label)
     (f : LocalTypeF.B (.send p labels) → LocalTypeC) :
     PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.send p labels, f⟩))) =
       ⟨.send p labels, fun i => dualC (dualC (f i))⟩ := by
   conv_lhs => arg 1; arg 1; rw [← PFunctor.M.mk_dest (dualC (PFunctor.M.mk ⟨.send p labels, f⟩))]
-  rw [dest_dualC_send, dest_dualC_recv]
+  rw [dest_dual_c_send, dest_dual_c_recv]
 
-private theorem dest_dualC_twice_recv (p : String) (labels : List SessionTypes.GlobalType.Label)
+private theorem dest_dual_c_twice_recv (p : String) (labels : List SessionTypes.GlobalType.Label)
     (f : LocalTypeF.B (.recv p labels) → LocalTypeC) :
     PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.recv p labels, f⟩))) =
       ⟨.recv p labels, fun i => dualC (dualC (f i))⟩ := by
   conv_lhs => arg 1; arg 1; rw [← PFunctor.M.mk_dest (dualC (PFunctor.M.mk ⟨.recv p labels, f⟩))]
-  rw [dest_dualC_recv, dest_dualC_send]
+  rw [dest_dual_c_recv, dest_dual_c_send]
 
 /-! ## Involution -/
 
 /-- Duality is involutive: dual(dual(t)) = t.
     Proof by bisimulation with R x y := x = dualC (dualC y). -/
-theorem dualC_involutive (t : LocalTypeC) : dualC (dualC t) = t := by
+theorem dual_c_involutive (t : LocalTypeC) : dualC (dualC t) = t := by
   refine (PFunctor.M.bisim (P := LocalTypeF) (R := fun x y => x = dualC (dualC y)) ?_) _ _ rfl
   intro x y hxy
   subst hxy
@@ -119,19 +119,19 @@ theorem dualC_involutive (t : LocalTypeC) : dualC (dualC t) = t := by
           have heq : (fun i : LocalTypeF.B .end => dualC (dualC (f i))) = PEmpty.elim := by
             funext i; cases i
           refine ⟨.end, fun i => dualC (dualC (f i)), f, ?_, rfl, fun i => i.elim⟩
-          rw [heq]; exact dest_dualC_twice_end f
+          rw [heq]; exact dest_dual_c_twice_end f
       | var x =>
           have heq : (fun i : LocalTypeF.B (.var x) => dualC (dualC (f i))) = PEmpty.elim := by
             funext i; cases i
           refine ⟨.var x, fun i => dualC (dualC (f i)), f, ?_, rfl, fun i => i.elim⟩
-          rw [heq]; exact dest_dualC_twice_var x f
+          rw [heq]; exact dest_dual_c_twice_var x f
       | mu x =>
-          exact ⟨.mu x, fun _ => dualC (dualC (f ())), f, dest_dualC_twice_mu x f, rfl, fun _ => rfl⟩
+          exact ⟨.mu x, fun _ => dualC (dualC (f ())), f, dest_dual_c_twice_mu x f, rfl, fun _ => rfl⟩
       | send p labels =>
           exact ⟨.send p labels, fun i => dualC (dualC (f i)), f,
-                 dest_dualC_twice_send p labels f, rfl, fun _ => rfl⟩
+                 dest_dual_c_twice_send p labels f, rfl, fun _ => rfl⟩
       | recv p labels =>
           exact ⟨.recv p labels, fun i => dualC (dualC (f i)), f,
-                 dest_dualC_twice_recv p labels f, rfl, fun _ => rfl⟩
+                 dest_dual_c_twice_recv p labels f, rfl, fun _ => rfl⟩
 
 end SessionCoTypes.Coinductive

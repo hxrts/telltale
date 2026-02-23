@@ -13,7 +13,7 @@ private lemma foldl_max_ge_start (xs : List Nat) (start : Nat) :
       simp [List.foldl]
       exact Nat.le_trans (Nat.le_max_left start x) (ih (Nat.max start x))
 
-private lemma nextFreshSessionId_ge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+private lemma next_fresh_session_id_ge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -29,7 +29,7 @@ private lemma nextFreshSessionId_ge {ι γ π ε ν : Type u} [IdentityModel ι]
       (foldl_max_ge_start (existingSessionIds st) st.nextSessionId)
       (Nat.le_succ _)
 
-theorem loadChoreography_snd_ge_nextSessionId
+theorem load_choreography_snd_ge_next_session_id
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -51,7 +51,7 @@ theorem loadChoreography_snd_ge_nextSessionId
           · split at hRes'
             · cases hRes'
             · cases hRes'
-              simpa using (nextFreshSessionId_ge st)
+              simpa using (next_fresh_session_id_ge st)
       simpa [loadChoreography, hRes] using hFresh
   | validationFailed _ =>
       simp [loadChoreography, hRes]
@@ -60,7 +60,7 @@ theorem loadChoreography_snd_ge_nextSessionId
   | tooManyCoroutines _ =>
       simp [loadChoreography, hRes]
 
-theorem loadChoreography_disjoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem load_choreography_disjoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -74,7 +74,7 @@ theorem loadChoreography_disjoint {ι γ π ε ν : Type u} [IdentityModel ι] [
   intro sid' hMem
   change (loadChoreography st image).2 ≠ sid'
   have hGe : st.nextSessionId ≤ (loadChoreography st image).2 :=
-    loadChoreography_snd_ge_nextSessionId st image
+    load_choreography_snd_ge_next_session_id st image
   simp only [existingSessionIds, List.mem_map] at hMem
   obtain ⟨⟨sid'', sess⟩, hIn, rfl⟩ := hMem
   have hSess : ∀ s ∈ st.sessions, s.fst < st.nextSessionId := _hwf.2.1

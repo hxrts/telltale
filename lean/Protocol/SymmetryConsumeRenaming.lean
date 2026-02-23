@@ -23,7 +23,7 @@ section
 -- Consume Renaming
 
 /-- Renaming value types is injective. -/
-theorem renameValTypePR_inj (σ : ProtocolRenaming) :
+theorem rename_val_type_pr_inj (σ : ProtocolRenaming) :
     Function.Injective (renameValTypePR σ) := by
   intro T1 T2 h
   induction T1 generalizing T2 with
@@ -103,7 +103,7 @@ theorem renameValTypePR_inj (σ : ProtocolRenaming) :
         rfl
 
 /-- Role equality is preserved under protocol renaming. -/
-theorem roleMap_beq (σ : ProtocolRenaming) (a b : Role) :
+theorem role_map_beq (σ : ProtocolRenaming) (a b : Role) :
     (σ.roleMap a == σ.roleMap b) = (a == b) := by
   by_cases h : a = b
   · simp [h]
@@ -115,28 +115,28 @@ theorem roleMap_beq (σ : ProtocolRenaming) (a b : Role) :
     simp [hbeq, hbeq']
 
 /-- Value-type equality is preserved under protocol renaming. -/
-theorem renameValTypePR_beq (σ : ProtocolRenaming) (T T' : ValType) :
+theorem rename_val_type_pr_beq (σ : ProtocolRenaming) (T T' : ValType) :
     (renameValTypePR σ T == renameValTypePR σ T') = (T == T') := by
   by_cases h : T = T'
   · simp [h]
   · have h' : renameValTypePR σ T ≠ renameValTypePR σ T' := by
       intro hEq
-      exact h (renameValTypePR_inj σ hEq)
+      exact h (rename_val_type_pr_inj σ hEq)
     have hbeq : (T == T') = false := beq_eq_false_iff_ne.mpr h
     have hbeq' : (renameValTypePR σ T == renameValTypePR σ T') = false :=
       beq_eq_false_iff_ne.mpr h'
     simp [hbeq, hbeq']
 
 /-- Renaming commutes with a single consume step. -/
-theorem consumeOne_renamePR (σ : ProtocolRenaming) (from_ : Role) (T : ValType) (L : LocalType) :
+theorem consume_one_rename_pr (σ : ProtocolRenaming) (from_ : Role) (T : ValType) (L : LocalType) :
     consumeOne (σ.roleMap from_) (renameValTypePR σ T) (renameLocalTypePR σ L) =
       (consumeOne from_ T L).map (renameLocalTypePR σ) := by
 /- ## Structured Block 3 -/
   cases L <;>
-    simp [consumeOne, renameLocalTypePR, roleMap_beq, renameValTypePR_beq]
+    simp [consumeOne, renameLocalTypePR, role_map_beq, rename_val_type_pr_beq]
 
 /-- Renaming commutes with Consume over a trace. -/
-theorem Consume_renamePR (σ : ProtocolRenaming) (from_ : Role) (L : LocalType) (ts : List ValType) :
+theorem consume_rename_pr (σ : ProtocolRenaming) (from_ : Role) (L : LocalType) (ts : List ValType) :
     Consume (σ.roleMap from_) (renameLocalTypePR σ L) (ts.map (renameValTypePR σ)) =
       (Consume from_ L ts).map (renameLocalTypePR σ) := by
   induction ts generalizing L with
@@ -146,9 +146,9 @@ theorem Consume_renamePR (σ : ProtocolRenaming) (from_ : Role) (L : LocalType) 
       simp [Consume]
       cases h : consumeOne from_ t L with
       | none =>
-          simp [consumeOne_renamePR, h]
+          simp [consume_one_rename_pr, h]
       | some L' =>
-          simp [consumeOne_renamePR, h, ih]
+          simp [consume_one_rename_pr, h, ih]
 
 -- Branch Symmetry Consequences
 
@@ -209,7 +209,7 @@ theorem branches_length_preserved (σ : ProtocolRenaming) (bs : List (Label × L
           simp [renameBranchesPR, ih]
 
 /-- Lookup in renamed DEnv: renaming commutes with lookup. -/
-private theorem lookupD_renamePR_foldl (σ : ProtocolRenaming) :
+private theorem lookup_d_rename_pr_foldl (σ : ProtocolRenaming) :
     ∀ (l : List (Edge × Trace)) (acc : DEnv) (e : Edge)
       (hNodup : List.Nodup (List.map Prod.fst l)),
       lookupD
@@ -248,12 +248,12 @@ private theorem lookupD_renamePR_foldl (σ : ProtocolRenaming) :
           ih (acc:=updateD acc (renameEdgePR σ hd.1) (hd.2.map (renameValTypePR σ)))
             (e:=hd.1) hNodupTl
         -- Simplify using tail lookup = none.
-        simp [hLookupTl, lookupD_update_eq] at hIH
+        simp [hLookupTl, lookup_d_update_eq] at hIH
         simpa [List.lookup] using hIH
       -- DEnv Lookup/Fold: miss head edge
       · have hEq' : renameEdgePR σ e ≠ renameEdgePR σ hd.1 := by
           intro hcontra
-          exact hEq (renameEdgePR_inj σ _ _ hcontra)
+          exact hEq (rename_edge_pr_inj σ _ _ hcontra)
 /- ## Structured Block 5 -/
         have hEq'' : renameEdgePR σ hd.1 ≠ renameEdgePR σ e := Ne.symm hEq'
         have hIH :=
@@ -263,12 +263,12 @@ private theorem lookupD_renamePR_foldl (σ : ProtocolRenaming) :
         have hAcc :
             lookupD (updateD acc (renameEdgePR σ hd.1) (hd.2.map (renameValTypePR σ)))
               (renameEdgePR σ e) = lookupD acc (renameEdgePR σ e) := by
-          exact lookupD_update_neq _ _ _ _ hEq''
+          exact lookup_d_update_neq _ _ _ _ hEq''
         have hbeq : (e == hd.1) = false := beq_eq_false_iff_ne.mpr hEq
         simpa [List.foldl, List.lookup, hbeq, hAcc] using hIH
 
 /-- Lookup in renamed DEnv: renaming commutes with lookup. -/
-theorem lookupD_renamePR (σ : ProtocolRenaming) (D : DEnv) (e : Edge) :
+theorem lookup_d_rename_pr (σ : ProtocolRenaming) (D : DEnv) (e : Edge) :
     lookupD (renameDEnvPR σ D) (renameEdgePR σ e) =
       (lookupD D e).map (renameValTypePR σ) := by
   -- DEnv Lookup Renaming: nodup keys
@@ -292,7 +292,7 @@ theorem lookupD_renamePR (σ : ProtocolRenaming) (D : DEnv) (e : Edge) :
           have hLt : edgeCmpLT hd p := hHd p hp
           have hNe : hd.1 ≠ p.1 := by
             intro hEq
-            have hlt : compare hd.1 p.1 = .lt := edgeCmpLT_eq_lt hLt
+            have hlt : compare hd.1 p.1 = .lt := edge_cmp_lt_eq_lt hLt
             have hEqCmp : compare hd.1 p.1 = .eq :=
               (Edge.compare_eq_iff_eq hd.1 p.1).2 hEq
             have : (Ordering.lt : Ordering) = .eq := hlt.symm.trans hEqCmp
@@ -303,13 +303,13 @@ theorem lookupD_renamePR (σ : ProtocolRenaming) (D : DEnv) (e : Edge) :
   -- DEnv Lookup Renaming: foldl transport
   -- Use foldl lookup lemma on the underlying list.
   have hFold :=
-    lookupD_renamePR_foldl (σ:=σ) (l:=D.list) (acc:=(∅ : DEnv)) (e:=e) hNodup
+    lookup_d_rename_pr_foldl (σ:=σ) (l:=D.list) (acc:=(∅ : DEnv)) (e:=e) hNodup
   -- Rewrite lookupD D e using list lookup.
   have hLookup : lookupD D e =
       match D.list.lookup e with
       | some ts => ts
       | none => [] := by
-    cases h : D.list.lookup e <;> simp [lookupD, DEnv_find?_eq_lookup, h]
+    cases h : D.list.lookup e <;> simp [lookupD, d_env_find?_eq_lookup, h]
   -- DEnv Lookup Renaming: finish by cases
   -- Finish by rewriting the match.
   cases h : D.list.lookup e with
@@ -333,7 +333,7 @@ theorem coherence_protocol_renaming_preserved (σ : ProtocolRenaming) (G : GEnv)
   intro e hActive Lrecv hGrecv
   -- Receiver preimage
   obtain ⟨recvEp, Lrecv0, hRecvLookup, hRecvEq, hLrecvEq⟩ :=
-    lookupG_renamePR_inv σ G { sid := e.sid, role := e.receiver } Lrecv hGrecv
+    lookup_g_rename_pr_inv σ G { sid := e.sid, role := e.receiver } Lrecv hGrecv
   have hRecvSid : recvEp.sid = e.sid := by
     have := congrArg Endpoint.sid hRecvEq
     simp [renameEndpointPR] at this
@@ -347,7 +347,7 @@ theorem coherence_protocol_renaming_preserved (σ : ProtocolRenaming) (G : GEnv)
   rcases hActive with ⟨hSenderSome, _⟩
   rcases (Option.isSome_iff_exists).1 hSenderSome with ⟨LsenderRen, hGsenderRen⟩
   obtain ⟨sendEp, Lsender0, hSendLookup, hSendEq, hLsenderEq⟩ :=
-    lookupG_renamePR_inv σ G { sid := e.sid, role := e.sender } LsenderRen hGsenderRen
+    lookup_g_rename_pr_inv σ G { sid := e.sid, role := e.sender } LsenderRen hGsenderRen
   have hSendSid : sendEp.sid = e.sid := by
     have := congrArg Endpoint.sid hSendEq
     simp [renameEndpointPR] at this
@@ -370,7 +370,7 @@ theorem coherence_protocol_renaming_preserved (σ : ProtocolRenaming) (G : GEnv)
         cases hRecvSid
         rfl
   have hActive0 : ActiveEdge G e0 :=
-    ActiveEdge_of_endpoints (G:=G) (e:=e0) (Lsender:=Lsender0) (Lrecv:=Lrecv0)
+    active_edge_of_endpoints (G:=G) (e:=e0) (Lsender:=Lsender0) (Lrecv:=Lrecv0)
       (by
         -- sender lookup
         have hEq : ({ sid := e0.sid, role := e0.sender } : Endpoint) = sendEp := by
@@ -396,7 +396,7 @@ theorem coherence_protocol_renaming_preserved (σ : ProtocolRenaming) (G : GEnv)
     have hEq : renameEndpointPR σ { sid := e.sid, role := sendEp.role } =
         ({ sid := e.sid, role := e.sender } : Endpoint) := by
       simp [renameEndpointPR, hSendRole]
-    have hLookup := lookupG_renamePR σ G { sid := e.sid, role := sendEp.role }
+    have hLookup := lookup_g_rename_pr σ G { sid := e.sid, role := sendEp.role }
     simpa [hEq, hSender0''] using hLookup
   -- Coherence Under Renaming: trace lookup transport
   -- Trace lookup after renaming
@@ -405,14 +405,14 @@ theorem coherence_protocol_renaming_preserved (σ : ProtocolRenaming) (G : GEnv)
   have hTrace :
       lookupD (renameDEnvPR σ D) e =
         (lookupD D e0).map (renameValTypePR σ) := by
-    simpa [hEdgeEq] using (lookupD_renamePR (σ:=σ) (D:=D) (e:=e0))
+    simpa [hEdgeEq] using (lookup_d_rename_pr (σ:=σ) (D:=D) (e:=e0))
   -- Coherence Under Renaming: consume transport
   -- Consume preserved by renaming
   have hConsumeRen :
       (Consume e.sender Lrecv (lookupD (renameDEnvPR σ D) e)).isSome := by
     -- Use Consume_renamePR on the preimage data
     have hCons :=
-      Consume_renamePR (σ:=σ) (from_:=sendEp.role) (L:=Lrecv0) (ts:=lookupD D e0)
+      consume_rename_pr (σ:=σ) (from_:=sendEp.role) (L:=Lrecv0) (ts:=lookupD D e0)
     -- Rewrite roles/types/traces
     have hSenderEq : σ.roleMap sendEp.role = e.sender := hSendRole
     have hRecvEq : Lrecv = renameLocalTypePR σ Lrecv0 := by

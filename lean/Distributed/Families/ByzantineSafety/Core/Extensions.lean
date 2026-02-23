@@ -51,7 +51,7 @@ structure PrimitiveMismatchCounterexample
   witness : SafetyContradictionWitness M
 
 /-- Any contradiction witness refutes certified-side characterization immediately. -/
-theorem contradictionWitness_refutes_characterization
+theorem contradiction_witness_refutes_characterization
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     {M : Model State Decision Certificate Obs}
     (w : SafetyContradictionWitness M) :
@@ -119,40 +119,40 @@ def primitiveMismatchCounterexample_of_droppedAssumption
 /-! ### Minimality Refuters -/
 
 /-- Minimality form: every no-quorum counterexample refutes characterization. -/
-theorem noQuorumCounterexample_minimal
+theorem no_quorum_counterexample_minimal
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     {M : Model State Decision Certificate Obs}
     (cex : NoQuorumCounterexample M) :
     ¬ CharacterizationCondition M := by
   -- Any packaged contradiction witness immediately refutes characterization.
-  exact contradictionWitness_refutes_characterization cex.witness
+  exact contradiction_witness_refutes_characterization cex.witness
 
 /-- Minimality form: every invalid-auth counterexample refutes characterization. -/
-theorem invalidAuthCounterexample_minimal
+theorem invalid_auth_counterexample_minimal
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     {M : Model State Decision Certificate Obs}
     (cex : InvalidAuthCounterexample M) :
     ¬ CharacterizationCondition M := by
   -- The contradiction witness, not the payload shape, is the minimal refuter.
-  exact contradictionWitness_refutes_characterization cex.witness
+  exact contradiction_witness_refutes_characterization cex.witness
 
 /-- Minimality form: every threshold-budget counterexample refutes characterization. -/
-theorem thresholdBudgetCounterexample_minimal
+theorem threshold_budget_counterexample_minimal
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     {M : Model State Decision Certificate Obs}
     (cex : ThresholdBudgetCounterexample M) :
     ¬ CharacterizationCondition M := by
   -- The contradiction witness is sufficient to refute characterization.
-  exact contradictionWitness_refutes_characterization cex.witness
+  exact contradiction_witness_refutes_characterization cex.witness
 
 /-- Minimality form: every primitive-mismatch counterexample refutes characterization. -/
-theorem primitiveMismatchCounterexample_minimal
+theorem primitive_mismatch_counterexample_minimal
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     {M : Model State Decision Certificate Obs}
     (cex : PrimitiveMismatchCounterexample M) :
     ¬ CharacterizationCondition M := by
   -- The contradiction witness is sufficient to refute characterization.
-  exact contradictionWitness_refutes_characterization cex.witness
+  exact contradiction_witness_refutes_characterization cex.witness
 
 /-! ## Weight-Based and Coupled Specializations -/
 
@@ -177,7 +177,7 @@ def modelOfNakamoto
       }
 
 /-- Nakamoto specialization: security protocol induces Byzantine committed-side safety. -/
-theorem nakamoto_specialization_of_securityProtocol
+theorem nakamoto_specialization_of_security_protocol
     (P : Distributed.Nakamoto.SecurityProtocol) :
     ByzantineSafety (modelOfNakamoto P.model) := by
   -- Conflicts are inequality; both commitments identify the same observed chain.
@@ -189,11 +189,11 @@ theorem nakamoto_specialization_of_securityProtocol
     _ = d₂ := hCommitted₂.symm
 
 /-- Nakamoto specialization also yields certified-side characterization. -/
-theorem nakamoto_characterization_of_securityProtocol
+theorem nakamoto_characterization_of_security_protocol
     (P : Distributed.Nakamoto.SecurityProtocol) :
     CharacterizationCondition (modelOfNakamoto P.model) := by
   -- Reuse completeness over the embedded Nakamoto model.
-  exact characterization_of_byzantineSafety _ (nakamoto_specialization_of_securityProtocol P)
+  exact characterization_of_byzantine_safety _ (nakamoto_specialization_of_security_protocol P)
 
 /-- Coupled/hybrid specialization: characterization implies safety under hybrid-space tag. -/
 theorem hybrid_specialization_of_characterization
@@ -204,13 +204,13 @@ theorem hybrid_specialization_of_characterization
     (hChar : CharacterizationCondition M) :
     ByzantineSafety M := by
   -- Hybrid-space classification pins the coupled regime; safety follows from soundness.
-  have _ : coupledPrimitive p = true := coupledPrimitive_of_inHybridSpace p hHybrid
-  exact byzantineSafety_sound_of_characterization M hChar
+  have _ : coupledPrimitive p = true := coupled_primitive_of_in_hybrid_space p hHybrid
+  exact byzantine_safety_sound_of_characterization M hChar
 
 /-! ## Validator-Consistency Bridges -/
 
 /-- Core bridge: if all byzantine checks pass, the default byzantine assumption gate passes. -/
-theorem byzantineAssumptions_allPassed_of_coreChecks
+theorem byzantine_assumptions_all_passed_of_core_checks
     (p : ProtocolSpec)
     (hFault : p.faultModel = .byzantine)
     (hEvidence : evidencePrimitiveConsistentCheck p = true)
@@ -223,25 +223,25 @@ theorem byzantineAssumptions_allPassed_of_coreChecks
   -- Convert each check into the corresponding validator atom.
   have hByz :
       (validateAssumption p .byzantineFaultModel).passed = true := by
-    exact (validateAssumption_byzantineFaultModel_passed_iff p).2 hFault
+    exact (validate_assumption_byzantine_fault_model_passed_iff p).2 hFault
   have hEv :
       (validateAssumption p .evidencePrimitiveConsistent).passed = true := by
-    exact (validateAssumption_evidencePrimitiveConsistent_passed_iff p).2 hEvidence
+    exact (validate_assumption_evidence_primitive_consistent_passed_iff p).2 hEvidence
   have hCx :
       (validateAssumption p .conflictExclusionPrimitiveConsistent).passed = true := by
-    exact (validateAssumption_conflictExclusionPrimitiveConsistent_passed_iff p).2 hConflict
+    exact (validate_assumption_conflict_exclusion_primitive_consistent_passed_iff p).2 hConflict
   have hFin :
       (validateAssumption p .finalizationWitnessPrimitiveConsistent).passed = true := by
-    exact (validateAssumption_finalizationWitnessPrimitiveConsistent_passed_iff p).2 hFinality
+    exact (validate_assumption_finalization_witness_primitive_consistent_passed_iff p).2 hFinality
   have hQ :
       (validateAssumption p .quorumIntersectionWitnessed).passed = true := by
-    exact (validateAssumption_quorumIntersectionWitnessed_passed_iff p).2 hQuorum
+    exact (validate_assumption_quorum_intersection_witnessed_passed_iff p).2 hQuorum
   have hT :
       (validateAssumption p .timingAuthCompatible).passed = true := by
-    exact (validateAssumption_timingAuthCompatible_passed_iff p).2 hTiming
+    exact (validate_assumption_timing_auth_compatible_passed_iff p).2 hTiming
   have hB :
       (validateAssumption p .adversarialBudgetBounded).passed = true := by
-    exact (validateAssumption_adversarialBudgetBounded_passed_iff p).2 hBudget
+    exact (validate_assumption_adversarial_budget_bounded_passed_iff p).2 hBudget
   -- Fold the pointwise checks into the list-level all-passed summary.
   simpa [runAssumptionValidation, allPassed, validateAssumptions, byzantineSafetyAssumptions] using
     And.intro hByz <|
@@ -254,7 +254,7 @@ theorem byzantineAssumptions_allPassed_of_coreChecks
 /-! ### Additive-Weight Regime Bridge -/
 
 /-- Additive-weight bridge: all required additive checks imply regime-aware gate success. -/
-theorem byzantineAssumptionsFor_allPassed_of_additiveChecks
+theorem byzantine_assumptions_for_all_passed_of_additive_checks
     (p : ProtocolSpec)
     (hMode : p.evidenceAccumulation = .additiveWeight)
     (hFault : p.faultModel = .byzantine)
@@ -267,22 +267,22 @@ theorem byzantineAssumptionsFor_allPassed_of_additiveChecks
   -- Convert each required additive check into validator atoms.
   have hByz :
       (validateAssumption p .byzantineFaultModel).passed = true := by
-    exact (validateAssumption_byzantineFaultModel_passed_iff p).2 hFault
+    exact (validate_assumption_byzantine_fault_model_passed_iff p).2 hFault
   have hEv :
       (validateAssumption p .evidencePrimitiveConsistent).passed = true := by
-    exact (validateAssumption_evidencePrimitiveConsistent_passed_iff p).2 hEvidence
+    exact (validate_assumption_evidence_primitive_consistent_passed_iff p).2 hEvidence
   have hCx :
       (validateAssumption p .conflictExclusionPrimitiveConsistent).passed = true := by
-    exact (validateAssumption_conflictExclusionPrimitiveConsistent_passed_iff p).2 hConflict
+    exact (validate_assumption_conflict_exclusion_primitive_consistent_passed_iff p).2 hConflict
   have hFin :
       (validateAssumption p .finalizationWitnessPrimitiveConsistent).passed = true := by
-    exact (validateAssumption_finalizationWitnessPrimitiveConsistent_passed_iff p).2 hFinality
+    exact (validate_assumption_finalization_witness_primitive_consistent_passed_iff p).2 hFinality
   have hT :
       (validateAssumption p .timingAuthCompatible).passed = true := by
-    exact (validateAssumption_timingAuthCompatible_passed_iff p).2 hTiming
+    exact (validate_assumption_timing_auth_compatible_passed_iff p).2 hTiming
   have hB :
       (validateAssumption p .adversarialBudgetBounded).passed = true := by
-    exact (validateAssumption_adversarialBudgetBounded_passed_iff p).2 hBudget
+    exact (validate_assumption_adversarial_budget_bounded_passed_iff p).2 hBudget
   -- Regime-aware assumption list removes the quorum obligation in additive mode.
   simpa [runAssumptionValidation, allPassed, validateAssumptions,
     byzantineSafetyAssumptionsFor, hMode] using
@@ -318,10 +318,10 @@ structure FamilySpecializationBundle where
 
 /-- Canonical specialization bundle built from theorems in this module. -/
 def familySpecializationBundle : FamilySpecializationBundle where
-  bftSafety := bft_specialization_of_quorumGeometry
-  bftCharacterization := bft_characterization_of_quorumGeometry
-  nakamotoSafety := nakamoto_specialization_of_securityProtocol
-  nakamotoCharacterization := nakamoto_characterization_of_securityProtocol
+  bftSafety := bft_specialization_of_quorum_geometry
+  bftCharacterization := bft_characterization_of_quorum_geometry
+  nakamotoSafety := nakamoto_specialization_of_security_protocol
+  nakamotoCharacterization := nakamoto_characterization_of_security_protocol
   hybridSafety := hybrid_specialization_of_characterization
 
 /-! ## Admission and Capability Gating -/
@@ -363,20 +363,20 @@ def AdmissionPrincipality_byz (p : ProtocolSpec) : Prop :=
 /-! ### Admission Metatheorems -/
 
 /-- Principality theorem for Byzantine capability inference. -/
-theorem admissionPrincipality_inferred_byz (p : ProtocolSpec) :
+theorem admission_principality_inferred_byz (p : ProtocolSpec) :
     AdmissionPrincipality_byz p := by
   -- Inferred and certified budgets are definitionally aligned in this layer.
   rfl
 
 /-- Admission soundness theorem for Byzantine capability inference. -/
-theorem admissionSoundness_inferred_byz (p : ProtocolSpec) :
+theorem admission_soundness_inferred_byz (p : ProtocolSpec) :
     AdmissionSoundness_byz p := by
   -- Budget containment directly implies admissibility by definition.
   intro dUser hContained
   exact hContained
 
 /-- Admission completeness theorem for Byzantine capability inference. -/
-theorem admissionCompleteness_inferred_byz (p : ProtocolSpec) :
+theorem admission_completeness_inferred_byz (p : ProtocolSpec) :
     AdmissionCompleteness_byz p := by
   -- Both directions reduce to the same budget order relation.
   intro dUser
@@ -394,7 +394,7 @@ def byzantineAdmissionFailures (p : ProtocolSpec) : List AssumptionResult :=
     (fun r => !r.passed)
 
 /-- Diagnostics soundness: every listed failure corresponds to a failed check. -/
-theorem byzantineAdmissionDiagnostics_sound
+theorem byzantine_admission_diagnostics_sound
     (p : ProtocolSpec) {r : AssumptionResult}
     (hMem : r ∈ byzantineAdmissionFailures p) :
     r.passed = false := by
@@ -408,7 +408,7 @@ theorem byzantineAdmissionDiagnostics_sound
       simp [hPassed] at hFailedBool
 
 /-- Diagnostics completeness: every failed check is listed by the diagnostics view. -/
-theorem byzantineAdmissionDiagnostics_complete
+theorem byzantine_admission_diagnostics_complete
     (p : ProtocolSpec) {r : AssumptionResult}
     (hMem : r ∈ (runAssumptionValidation p (byzantineSafetyAssumptionsFor p)).results)
     (hFailed : r.passed = false) :

@@ -79,7 +79,7 @@ def coroutineProjectionAt {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
   | none => none
   | some coro => some (coroutineProjection st coro)
 
-theorem coroutineView_eq_projection {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem coroutine_view_eq_projection {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -101,7 +101,7 @@ def VMCEquiv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     (st₁ st₂ : VMState ι γ π ε ν) (cid : CoroutineId) : Prop :=
   coroutineView st₁ cid = coroutineView st₂ cid
 
-theorem vmCEquiv_refl {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem vm_c_equiv_refl {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -110,7 +110,7 @@ theorem vmCEquiv_refl {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
     (st : VMState ι γ π ε ν) (cid : CoroutineId) :
     VMCEquiv st st cid := rfl
 
-theorem vmCEquiv_symm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem vm_c_equiv_symm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -120,7 +120,7 @@ theorem vmCEquiv_symm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
     (h : VMCEquiv st₁ st₂ cid) :
     VMCEquiv st₂ st₁ cid := Eq.symm h
 
-theorem vmCEquiv_trans {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem vm_c_equiv_trans {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -133,7 +133,7 @@ theorem vmCEquiv_trans {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
 /-! ## Topology-Change Noninterference -/
 
 /-- Topology-only failure events are blind to coroutine-local projections. -/
-theorem topology_change_preserves_coroutineView {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem topology_change_preserves_coroutine_view {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -163,7 +163,7 @@ theorem topology_change_preserves_coroutineView {ι γ π ε ν : Type u} [Ident
           simp [applyTopologyChange, reconnectEdges, hco, coroutineProjection]
 
 /-- VM-level noninterference: topology changes preserve observer equivalence. -/
-theorem topology_change_preserves_VMCEquiv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem topology_change_preserves_vmc_equiv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -171,7 +171,7 @@ theorem topology_change_preserves_VMCEquiv {ι γ π ε ν : Type u} [IdentityMo
     [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (tc : TopologyChange (ι := ι)) (cid : CoroutineId) :
     VMCEquiv (applyTopologyChange st tc) st cid := by
-  exact topology_change_preserves_coroutineView st tc cid
+  exact topology_change_preserves_coroutine_view st tc cid
 
 /-! ## Information-Theoretic VM Bridge -/
 
@@ -187,7 +187,7 @@ def vmViewJoint (L : Type*) {ι γ π ε ν : Type u} [IdentityModel ι] [GuardL
     (labelDist : L → ℝ) : L × Option CoroutineView → ℝ :=
   fun lo => if coroutineView (states lo.1) cid = lo.2 then labelDist lo.1 else 0
 
-theorem vm_mutualInfo_zero_of_erasure
+theorem vm_mutual_info_zero_of_erasure
     {L : Type} [Fintype L] [Fintype (Option CoroutineView)] [DecidableEq (Option CoroutineView)]
     [EntropyAPI.Laws]
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -201,6 +201,6 @@ theorem vm_mutualInfo_zero_of_erasure
     EntropyAPI.IsErasureKernel labelDist (vmViewJoint L states cid labelDist) →
     EntropyAPI.mutualInfo (vmViewJoint L states cid labelDist) = 0 := by
   intro hErase
-  exact EntropyAPI.Laws.mutualInfo_zero_of_erasure
+  exact EntropyAPI.Laws.mutual_info_zero_of_erasure
     (self := inferInstance) (L := L) (O := Option CoroutineView)
     labelDist h_nn h_sum (vmViewJoint L states cid labelDist) hErase

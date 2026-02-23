@@ -23,13 +23,13 @@ section
 
 -- Disjointness Lemmas
 
-theorem DisjointS_symm {S₁ S₂ : SEnv} :
+theorem disjoint_s_symm {S₁ S₂ : SEnv} :
     DisjointS S₁ S₂ →
     DisjointS S₂ S₁ := by
   intro hDisj x T₁ T₂ hL1 hL2
   exact hDisj x T₂ T₁ hL2 hL1
 
-theorem lookupSEnv_none_of_disjoint_left {S₁ S₂ : SEnv} {x : Var} {T : ValType} :
+theorem lookup_s_env_none_of_disjoint_left {S₁ S₂ : SEnv} {x : Var} {T : ValType} :
     DisjointS S₁ S₂ →
     lookupSEnv S₂ x = some T →
     lookupSEnv S₁ x = none := by
@@ -57,22 +57,22 @@ def RightGaugeEq (S₁ S₂ : OwnedEnv) : Prop :=
   S₁.left = S₂.left
 
 /-- Right-gauge equivalence is reflexive. -/
-theorem RightGaugeEq_refl (S : OwnedEnv) : RightGaugeEq S S := by
+theorem right_gauge_eq_refl (S : OwnedEnv) : RightGaugeEq S S := by
   rfl
 
 /-- Right-gauge equivalence is symmetric. -/
-theorem RightGaugeEq_symm {S₁ S₂ : OwnedEnv} :
+theorem right_gauge_eq_symm {S₁ S₂ : OwnedEnv} :
     RightGaugeEq S₁ S₂ → RightGaugeEq S₂ S₁ := by
   intro h
   simpa [RightGaugeEq] using h.symm
 
 /-- Right-gauge equivalence is transitive. -/
-theorem RightGaugeEq_trans {S₁ S₂ S₃ : OwnedEnv} :
+theorem right_gauge_eq_trans {S₁ S₂ S₃ : OwnedEnv} :
     RightGaugeEq S₁ S₂ → RightGaugeEq S₂ S₃ → RightGaugeEq S₁ S₃ := by
   intro h12 h23
   simpa [RightGaugeEq] using h12.trans h23
 
-@[simp] theorem RightGaugeEq_iff_left_eq {S₁ S₂ : OwnedEnv} :
+@[simp] theorem right_gauge_eq_iff_left_eq {S₁ S₂ : OwnedEnv} :
     RightGaugeEq S₁ S₂ ↔ S₁.left = S₂.left := by
   rfl
 
@@ -86,7 +86,7 @@ def StoreTypedVisible (G : GEnv) (Ssh : SEnv) (Sown : OwnedEnv) (store : VarStor
   StoreTyped G (SEnvVisible Ssh Sown) store
 
 -- Strong Visible Store Typing
-@[simp] theorem StoreTypedVisible_reframe_right
+@[simp] theorem store_typed_visible_reframe_right
     (G : GEnv) (Ssh R R' L : SEnv) (store : VarStore) :
     StoreTypedVisible G Ssh { right := R, left := L } store ↔
       StoreTypedVisible G Ssh { right := R', left := L } store := by
@@ -102,7 +102,7 @@ structure StoreTypedStrongVisible (G : GEnv) (Ssh : SEnv) (Sown : OwnedEnv)
   typeCorrVisible : StoreTypedVisible G Ssh Sown store
 
 /-- Forget the strong visible structure to plain visible store typing. -/
-theorem StoreTypedStrongVisible.toStoreTypedVisible
+theorem StoreTypedStrongVisible.to_store_typed_visible
     {G : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : VarStore}
     (h : StoreTypedStrongVisible G Ssh Sown store) :
     StoreTypedVisible G Ssh Sown store :=
@@ -110,47 +110,47 @@ theorem StoreTypedStrongVisible.toStoreTypedVisible
 
 /-- Visible bindings are domain-included in the full environment (`shared ++ right ++ left`). -/
 -- Visible-to-Full Domain Bridge
-theorem SEnvDomSubset_visible_all {Ssh : SEnv} {Sown : OwnedEnv} :
+theorem s_env_dom_subset_visible_all {Ssh : SEnv} {Sown : OwnedEnv} :
     SEnvDomSubset (SEnvVisible Ssh Sown) (SEnvAll Ssh Sown) := by
   intro x T hVis
   cases hSh : lookupSEnv Ssh x with
   | some Tsh =>
       have hAllSh : lookupSEnv (SEnvAll Ssh Sown) x = some Tsh := by
         have hLeft :=
-          lookupSEnv_append_left (S₁:=Ssh) (S₂:=Sown.right ++ Sown.left) (x:=x) (T:=Tsh) hSh
+          lookup_s_env_append_left (S₁:=Ssh) (S₂:=Sown.right ++ Sown.left) (x:=x) (T:=Tsh) hSh
         simpa [SEnvAll, List.append_assoc] using hLeft
       exact ⟨Tsh, hAllSh⟩
   | none =>
       have hLeft : lookupSEnv Sown.left x = some T := by
-        have hEq := lookupSEnv_append_right (S₁:=Ssh) (S₂:=Sown.left) (x:=x) hSh
+        have hEq := lookup_s_env_append_right (S₁:=Ssh) (S₂:=Sown.left) (x:=x) hSh
         simpa [SEnvVisible, hEq] using hVis
       cases hR : lookupSEnv Sown.right x with
       | some Tr =>
           have hOwn : lookupSEnv (Sown.right ++ Sown.left) x = some Tr :=
 /- ## Structured Block 1 -/
-            lookupSEnv_append_left (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) (T:=Tr) hR
+            lookup_s_env_append_left (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) (T:=Tr) hR
           have hAll : lookupSEnv (SEnvAll Ssh Sown) x = some Tr := by
-            have hEq := lookupSEnv_append_right (S₁:=Ssh) (S₂:=Sown.right ++ Sown.left) (x:=x) hSh
+            have hEq := lookup_s_env_append_right (S₁:=Ssh) (S₂:=Sown.right ++ Sown.left) (x:=x) hSh
             simpa [SEnvAll, List.append_assoc, hEq] using hOwn
           exact ⟨Tr, hAll⟩
       | none =>
           have hOwn : lookupSEnv (Sown.right ++ Sown.left) x = some T := by
-            have hEqR := lookupSEnv_append_right (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) hR
+            have hEqR := lookup_s_env_append_right (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) hR
             simpa [hEqR] using hLeft
           have hAll : lookupSEnv (SEnvAll Ssh Sown) x = some T := by
-            have hEq := lookupSEnv_append_right (S₁:=Ssh) (S₂:=Sown.right ++ Sown.left) (x:=x) hSh
+            have hEq := lookup_s_env_append_right (S₁:=Ssh) (S₂:=Sown.right ++ Sown.left) (x:=x) hSh
             simpa [SEnvAll, List.append_assoc, hEq] using hOwn
           exact ⟨T, hAll⟩
 
 /-- Strong-visible store typing gives runtime lookup for any visible static lookup. -/
 -- Visible Lookup Extraction
-theorem store_lookup_of_visible_lookup_strongVisible
+theorem store_lookup_of_visible_lookup_strong_visible
     {G : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : VarStore} {x : Var} {T : ValType}
     (hStore : StoreTypedStrongVisible G Ssh Sown store)
     (hVis : lookupSEnv (SEnvVisible Ssh Sown) x = some T) :
     ∃ v, lookupStr store x = some v ∧ HasTypeVal G v T := by
   have hSub : SEnvDomSubset (SEnvVisible Ssh Sown) (SEnvAll Ssh Sown) :=
-    SEnvDomSubset_visible_all (Ssh:=Ssh) (Sown:=Sown)
+    s_env_dom_subset_visible_all (Ssh:=Ssh) (Sown:=Sown)
   obtain ⟨T', hAll⟩ := hSub hVis
   have hInStore : (lookupStr store x).isSome := by
     have hDom := hStore.sameDomainAll x
@@ -159,13 +159,13 @@ theorem store_lookup_of_visible_lookup_strongVisible
   exact ⟨v, hv, hStore.typeCorrVisible x v T hv hVis⟩
 
 -- Visible Environment Reframing Lemmas
-@[simp] theorem SEnvVisible_reframe_right
+@[simp] theorem s_env_visible_reframe_right
     (Ssh R R' L : SEnv) :
     SEnvVisible Ssh { right := R, left := L } =
       SEnvVisible Ssh { right := R', left := L } := by
   simp [SEnvVisible]
 
-theorem SEnvVisible_updateLeft_of_shared_none
+theorem s_env_visible_update_left_of_shared_none
     {Ssh : SEnv} {Sown : OwnedEnv} {x : Var} {T : ValType}
     (hNoSh : lookupSEnv Ssh x = none) :
     SEnvVisible Ssh (Sown.updateLeft x T) =
@@ -184,28 +184,28 @@ theorem SEnvVisible_updateLeft_of_shared_none
               simpa [lookupSEnv, hxy] using hNoSh
             simpa [SEnvVisible, OwnedEnv.updateLeft, updateSEnv, hxy] using ih hNoTl
 
-theorem SEnvVisible_congr_rightGauge {Ssh : SEnv} {S₁ S₂ : OwnedEnv} :
+theorem s_env_visible_congr_right_gauge {Ssh : SEnv} {S₁ S₂ : OwnedEnv} :
     RightGaugeEq S₁ S₂ →
 /- ## Structured Block 2 -/
     SEnvVisible Ssh S₁ = SEnvVisible Ssh S₂ := by
   intro h
   simpa [RightGaugeEq, SEnvVisible, h]
 
-@[simp] theorem lookupSEnv_SEnvVisible_reframe_right
+@[simp] theorem lookup_s_env_s_env_visible_reframe_right
     (Ssh R R' L : SEnv) (x : Var) :
     lookupSEnv (SEnvVisible Ssh { right := R, left := L }) x =
       lookupSEnv (SEnvVisible Ssh { right := R', left := L }) x := by
   simp [SEnvVisible]
 
-@[simp] theorem SEnvVisible_ofLeft (Ssh S : SEnv) :
+@[simp] theorem s_env_visible_of_left (Ssh S : SEnv) :
     SEnvVisible Ssh (S : OwnedEnv) = Ssh ++ S := by
   simp [SEnvVisible]
 
-@[simp] theorem SEnvAll_ofLeft (Ssh S : SEnv) :
+@[simp] theorem s_env_all_of_left (Ssh S : SEnv) :
     SEnvAll Ssh (S : OwnedEnv) = Ssh ++ S := by
   simp [SEnvAll]
 
-@[simp] theorem SEnvAll_all (Ssh : SEnv) (Sown : OwnedEnv) :
+@[simp] theorem s_env_all_all (Ssh : SEnv) (Sown : OwnedEnv) :
     SEnvAll Ssh Sown = Ssh ++ (Sown : SEnv) := by
   simp [SEnvAll, OwnedEnv.all, List.append_assoc]
 
@@ -214,7 +214,7 @@ def OwnedDisjoint (Sown : OwnedEnv) : Prop :=
   DisjointS Sown.right Sown.left
 
 -- SEnv and GEnv Update Transport
-theorem updateSEnv_append_left {Ssh Sown : SEnv} {x : Var} {T : ValType}
+theorem update_s_env_append_left {Ssh Sown : SEnv} {x : Var} {T : ValType}
     (h : lookupSEnv Ssh x = none) :
     updateSEnv (Ssh ++ Sown) x T = Ssh ++ updateSEnv Sown x T := by
   induction Ssh with
@@ -231,7 +231,7 @@ theorem updateSEnv_append_left {Ssh Sown : SEnv} {x : Var} {T : ValType}
             simp [updateSEnv, hxy, ih htl]
 
 -- GEnv Update Transport
-theorem updateG_append_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType}
+theorem update_g_append_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType}
     (h : lookupG G₁ e = none) :
     updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L := by
   induction G₁ with
@@ -257,7 +257,7 @@ theorem updateG_append_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType}
             simp [updateG, hxe, ih h']
 
 /-- Updating a key that is already in the left GEnv only affects the left portion. -/
-theorem updateG_append_left_hit {G₁ G₂ : GEnv} {e : Endpoint} {L L' : LocalType}
+theorem update_g_append_left_hit {G₁ G₂ : GEnv} {e : Endpoint} {L L' : LocalType}
     (h : lookupG G₁ e = some L) :
     updateG (G₁ ++ G₂) e L' = updateG G₁ e L' ++ G₂ := by
   -- Find the matching endpoint in the left list and rebuild the append.

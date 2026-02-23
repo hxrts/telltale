@@ -43,18 +43,18 @@ structure TransportFramework where
 def stepRel (fw : TransportFramework) : CoherenceState → CoherenceState → Prop :=
   fun C C' => C' = fw.step C
 
-theorem stepRel_total (fw : TransportFramework) : Total (stepRel fw) := by
+theorem step_rel_total (fw : TransportFramework) : Total (stepRel fw) := by
   intro C
   exact ⟨fw.step C, rfl⟩
 
-theorem stepRel_deterministic (fw : TransportFramework) : Deterministic (stepRel fw) := by
+theorem step_rel_deterministic (fw : TransportFramework) : Deterministic (stepRel fw) := by
   intro C C₁ C₂ h₁ h₂
   rw [h₁, h₂]
 
 /-! ## Classical-Regime Induction -/
 
 /-- Function-style framework induces the Phase 6 classical-regime relation. -/
-theorem inducedClassicalRegime (fw : TransportFramework)
+theorem induced_classical_regime (fw : TransportFramework)
     (hLocalInteraction :
       ∀ {C C'}, stepRel fw C C' →
         ∀ e, ¬ ActiveEdge C.G e → lookupD C'.D e = lookupD C.D e) :
@@ -62,7 +62,7 @@ theorem inducedClassicalRegime (fw : TransportFramework)
   refine
     { exchangeability := ?_
       localInteraction := hLocalInteraction
-      wellPosedDynamics := ⟨stepRel_total fw, stepRel_deterministic fw⟩
+      wellPosedDynamics := ⟨step_rel_total fw, step_rel_deterministic fw⟩
       classicalCorrelations := ?_
       classicalStateSpace := fw.finiteCoherentStateSpace }
   · intro C₁ C₂ C₁' hEq hStep
@@ -70,7 +70,7 @@ theorem inducedClassicalRegime (fw : TransportFramework)
     cases hStep
     simpa using fw.harmony hEq
   · intro C₁ C₂ hEq
-    exact classicalCorrelations_default hEq
+    exact classical_correlations_default hEq
 
 /-! ## Transport Context Construction -/
 
@@ -92,11 +92,11 @@ def mkFosterInput (fw : TransportFramework)
 
 /-! ## Foster-Lyapunov Transport -/
 
-theorem transport_fosterLyapunov (fw : TransportFramework)
+theorem transport_foster_lyapunov (fw : TransportFramework)
     (system : Classical.FosterLyapunovHarris.DriftSystem CoherenceState)
     (hStep : system.step = fw.step) :
     Classical.Transport.FosterConclusion (mkFosterInput fw system hStep) := by
-  exact Classical.Transport.transported_fosterLyapunov
+  exact Classical.Transport.transported_foster_lyapunov
     (input := mkFosterInput fw system hStep)
 
 /-! ## Transport Input Aliases -/
@@ -113,40 +113,40 @@ abbrev FunctionalCLTInput := Classical.Transport.FunctionalCLTInput
 /-! ## Transport API Wrappers -/
 
 /-- Transport API wrappers re-exported from the protocol-facing framework. -/
-theorem transport_maxWeight {ι : Type} [Fintype ι] (input : MaxWeightInput ι) :
+theorem transport_max_weight {ι : Type} [Fintype ι] (input : MaxWeightInput ι) :
     Classical.Transport.MaxWeightConclusion input :=
-  Classical.Transport.transported_maxWeight input
+  Classical.Transport.transported_max_weight input
 
 theorem transport_ldp (input : LDPInput) :
     Classical.Transport.LDPConclusion input :=
   Classical.Transport.transported_ldp input
 
-theorem transport_meanField {n : Nat} (input : MeanFieldInput n) :
+theorem transport_mean_field {n : Nat} (input : MeanFieldInput n) :
     Classical.Transport.MeanFieldConclusion input :=
-  Classical.Transport.transported_meanField input
+  Classical.Transport.transported_mean_field input
 
-theorem transport_heavyTraffic (input : HeavyTrafficInput) :
+theorem transport_heavy_traffic (input : HeavyTrafficInput) :
     Classical.Transport.HeavyTrafficConclusion input :=
-  Classical.Transport.transported_heavyTraffic input
+  Classical.Transport.transported_heavy_traffic input
 
 theorem transport_mixing (input : MixingInput) :
     Classical.Transport.MixingConclusion input :=
   Classical.Transport.transported_mixing input
 
-theorem transport_fluidLimit (input : FluidInput) :
+theorem transport_fluid_limit (input : FluidInput) :
     Classical.Transport.FluidConclusion input :=
-  Classical.Transport.transported_fluidLimit input
+  Classical.Transport.transported_fluid_limit input
 
 theorem transport_concentration (input : Classical.Transport.ConcentrationInput) :
     Classical.Transport.ConcentrationConclusion input :=
   Classical.Transport.transported_concentration input
 
-theorem transport_littlesLaw (input : LittlesLawInput) :
+theorem transport_littles_law (input : LittlesLawInput) :
     Classical.Transport.LittlesLawConclusion input :=
-  Classical.Transport.transported_littlesLaw input
+  Classical.Transport.transported_littles_law input
 
-theorem transport_functionalCLT (input : FunctionalCLTInput) :
+theorem transport_functional_clt (input : FunctionalCLTInput) :
     Classical.Transport.FunctionalCLTConclusion input :=
-  Classical.Transport.transported_functionalCLT input
+  Classical.Transport.transported_functional_clt input
 
 end ProtocolClassical

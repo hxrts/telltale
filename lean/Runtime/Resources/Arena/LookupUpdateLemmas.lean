@@ -35,7 +35,7 @@ def SessionStore.findSession (store : SessionStore ν) (sid : SessionId) : Optio
 /-! ### Type Lookup Laws for `updateType` -/
 
 /-- Updating type at endpoint e, then looking up e, gives the new type. -/
-@[simp] theorem SessionStore.lookupType_updateType_eq {store : SessionStore ν} {e : Endpoint} {L : LocalType}
+@[simp] theorem SessionStore.lookup_type_update_type_eq {store : SessionStore ν} {e : Endpoint} {L : LocalType}
     (hMem : ∃ st, (e.sid, st) ∈ store) :
     SessionStore.lookupType (store.updateType e L) e = some L := by
   induction store with
@@ -44,7 +44,7 @@ def SessionStore.findSession (store : SessionStore ν) (sid : SessionId) : Optio
     obtain ⟨sid, st⟩ := hd
     by_cases hsid : sid = e.sid
     · simp [SessionStore.updateType, SessionStore.lookupType, hsid,
-        SessionState.lookupType_updateType_eq]
+        SessionState.lookup_type_update_type_eq]
     · have hMem' : ∃ st, (e.sid, st) ∈ tl := by
         obtain ⟨st', hst'⟩ := hMem
         cases hst' with
@@ -56,7 +56,7 @@ def SessionStore.findSession (store : SessionStore ν) (sid : SessionId) : Optio
       exact ih hMem'
 
 /-- Updating type at endpoint e doesn't affect lookups at other endpoints. -/
-theorem SessionStore.lookupType_updateType_ne {store : SessionStore ν} {e e' : Endpoint} {L : LocalType}
+theorem SessionStore.lookup_type_update_type_ne {store : SessionStore ν} {e e' : Endpoint} {L : LocalType}
     (hne : e' ≠ e) :
     SessionStore.lookupType (store.updateType e L) e' = SessionStore.lookupType store e' := by
   induction store with
@@ -66,7 +66,7 @@ theorem SessionStore.lookupType_updateType_ne {store : SessionStore ν} {e e' : 
     by_cases hsid : sid = e.sid
     · by_cases hsid' : sid = e'.sid
       · simp [SessionStore.updateType, SessionStore.lookupType, hsid,
-          SessionState.lookupType_updateType_ne hne]
+          SessionState.lookup_type_update_type_ne hne]
       · have hsid_ne : e.sid ≠ e'.sid := by
           simpa [hsid] using hsid'
         simp [SessionStore.updateType, SessionStore.lookupType, hsid, hsid_ne]
@@ -79,7 +79,7 @@ theorem SessionStore.lookupType_updateType_ne {store : SessionStore ν} {e e' : 
 /-! ### Trace Lookup Laws under `updateType`/`updateTrace` -/
 
 /-- Updating type at endpoint doesn't affect trace lookups. -/
-@[simp] theorem SessionStore.lookupTrace_updateType {store : SessionStore ν} {e : Endpoint} {L : LocalType} {edge : Edge} :
+@[simp] theorem SessionStore.lookup_trace_update_type {store : SessionStore ν} {e : Endpoint} {L : LocalType} {edge : Edge} :
     SessionStore.lookupTrace (store.updateType e L) edge = SessionStore.lookupTrace store edge := by
   induction store with
   | nil => rfl
@@ -92,7 +92,7 @@ theorem SessionStore.lookupType_updateType_ne {store : SessionStore ν} {e e' : 
             edge.sid = sid := hsid_edge.symm
             _ = e.sid := hsid
         simp [SessionStore.updateType, SessionStore.lookupTrace, hsid, heq,
-          SessionState.lookupTrace_updateType]
+          SessionState.lookup_trace_update_type]
       · have hsid_ne : edge.sid ≠ e.sid := by
           intro h
           apply hsid_edge
@@ -113,7 +113,7 @@ theorem SessionStore.lookupType_updateType_ne {store : SessionStore ν} {e e' : 
 /-! #### `updateTrace` read-after-write at same edge -/
 
 /-- Updating trace at edge, then looking up that edge, gives the new trace. -/
-@[simp] theorem SessionStore.lookupTrace_updateTrace_eq {store : SessionStore ν} {edge : Edge} {ts : List ValType}
+@[simp] theorem SessionStore.lookup_trace_update_trace_eq {store : SessionStore ν} {edge : Edge} {ts : List ValType}
     (hMem : ∃ st, (edge.sid, st) ∈ store) :
     SessionStore.lookupTrace (store.updateTrace edge ts) edge = ts := by
   induction store with
@@ -122,7 +122,7 @@ theorem SessionStore.lookupType_updateType_ne {store : SessionStore ν} {e e' : 
     obtain ⟨sid, st⟩ := hd
     by_cases hsid : sid = edge.sid
     · simp [SessionStore.updateTrace, SessionStore.lookupTrace, hsid,
-        SessionState.lookupTrace_updateTrace_eq]
+        SessionState.lookup_trace_update_trace_eq]
     · have hMem' : ∃ st, (edge.sid, st) ∈ tl := by
         obtain ⟨st', hst'⟩ := hMem
         cases hst' with
@@ -136,7 +136,7 @@ theorem SessionStore.lookupType_updateType_ne {store : SessionStore ν} {e e' : 
 /-! #### `updateTrace` non-interference at distinct edges -/
 
 /-- Updating trace at edge doesn't affect lookups at other edges. -/
-theorem SessionStore.lookupTrace_updateTrace_ne {store : SessionStore ν} {edge edge' : Edge} {ts : List ValType}
+theorem SessionStore.lookup_trace_update_trace_ne {store : SessionStore ν} {edge edge' : Edge} {ts : List ValType}
     (hne : edge' ≠ edge) :
     SessionStore.lookupTrace (store.updateTrace edge ts) edge' = SessionStore.lookupTrace store edge' := by
   induction store with
@@ -146,7 +146,7 @@ theorem SessionStore.lookupTrace_updateTrace_ne {store : SessionStore ν} {edge 
     by_cases hsid : sid = edge.sid
     · by_cases hsid' : sid = edge'.sid
       · simp [SessionStore.updateTrace, SessionStore.lookupTrace, hsid,
-          SessionState.lookupTrace_updateTrace_ne hne]
+          SessionState.lookup_trace_update_trace_ne hne]
       · have hsid_ne : edge.sid ≠ edge'.sid := by
           simpa [hsid] using hsid'
         simp [SessionStore.updateTrace, SessionStore.lookupTrace, hsid, hsid_ne]
@@ -159,7 +159,7 @@ theorem SessionStore.lookupTrace_updateTrace_ne {store : SessionStore ν} {edge 
 /-! ### Cross-Domain Lookup Invariance -/
 
 /-- Updating trace doesn't affect type lookups. -/
-@[simp] theorem SessionStore.lookupType_updateTrace {store : SessionStore ν} {edge : Edge} {ts : List ValType} {e : Endpoint} :
+@[simp] theorem SessionStore.lookup_type_update_trace {store : SessionStore ν} {edge : Edge} {ts : List ValType} {e : Endpoint} :
     SessionStore.lookupType (store.updateTrace edge ts) e = SessionStore.lookupType store e := by
   induction store with
   | nil => rfl
@@ -168,7 +168,7 @@ theorem SessionStore.lookupTrace_updateTrace_ne {store : SessionStore ν} {edge 
     by_cases hsid_edge : sid = edge.sid
     · by_cases hsid_e : sid = e.sid
       · simp [SessionStore.updateTrace, SessionStore.lookupType, hsid_edge,
-          SessionState.lookupType_updateTrace]
+          SessionState.lookup_type_update_trace]
       · have hsid_ne : e.sid ≠ edge.sid := by
           intro h
           apply hsid_e
@@ -189,7 +189,7 @@ theorem SessionStore.lookupTrace_updateTrace_ne {store : SessionStore ν} {edge 
 /-! ### Buffer Lookup Invariance under Updates -/
 
 /-- Updating type doesn't affect buffer lookups. -/
-@[simp] theorem SessionStore.lookupBuffer_updateType {store : SessionStore ν} {e : Endpoint} {L : LocalType} {edge : Edge} :
+@[simp] theorem SessionStore.lookup_buffer_update_type {store : SessionStore ν} {e : Endpoint} {L : LocalType} {edge : Edge} :
     SessionStore.lookupBuffer (store.updateType e L) edge = SessionStore.lookupBuffer store edge := by
   induction store with
   | nil => rfl
@@ -223,7 +223,7 @@ theorem SessionStore.lookupTrace_updateTrace_ne {store : SessionStore ν} {edge 
 /-! #### Buffer lookup invariance under `updateTrace` -/
 
 /-- Updating trace doesn't affect buffer lookups. -/
-@[simp] theorem SessionStore.lookupBuffer_updateTrace {store : SessionStore ν} {edge : Edge} {ts : List ValType} {edge' : Edge} :
+@[simp] theorem SessionStore.lookup_buffer_update_trace {store : SessionStore ν} {edge : Edge} {ts : List ValType} {edge' : Edge} :
     SessionStore.lookupBuffer (store.updateTrace edge ts) edge' = SessionStore.lookupBuffer store edge' := by
   induction store with
   | nil => rfl
@@ -267,13 +267,13 @@ def SessionStore.consistent {ν : Type u} [VerificationModel ν] (store : Sessio
   ∀ sid st, (sid, st) ∈ store → st.sid = sid ∧ st.consistent
 
 /-- If a session state is consistent and an endpoint has different sid, it's not in localTypes. -/
-theorem SessionState.lookupG_none_of_sid_ne {st : SessionState ν} {e : Endpoint}
+theorem SessionState.lookup_g_none_of_sid_ne {st : SessionState ν} {e : Endpoint}
     (hCons : st.consistent) (hne : e.sid ≠ st.sid) :
     lookupG st.localTypes e = none := by
   by_contra h
   push_neg at h
   obtain ⟨L, hL⟩ := Option.isSome_iff_exists.mp (Option.ne_none_iff_isSome.mp h)
-  have hMem := lookupG_mem st.localTypes e L hL
+  have hMem := lookup_g_mem st.localTypes e L hL
   have hEq := hCons.1 e L hMem
   exact hne hEq
 
@@ -289,7 +289,7 @@ theorem SessionState.traces_find?_none_of_sid_ne {st : SessionState ν} {edge : 
 
 /-! ### Pointwise `find?` behavior under `updateD` -/
 
-theorem DEnv_find?_updateD_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
+theorem d_env_find?_update_d_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
     (updateD env e ts).find? e' = env.find? e' := by
   have hne' : compare e' e ≠ .eq := by
     intro hEq
@@ -309,13 +309,13 @@ theorem DEnv_find?_updateD_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (h
 /-! ### SessionState Consistency Preservation -/
 
 /-- updateType preserves session consistency. -/
-theorem SessionState.updateType_preserves_consistent {st : SessionState ν} {e : Endpoint} {L : LocalType}
+theorem SessionState.update_type_preserves_consistent {st : SessionState ν} {e : Endpoint} {L : LocalType}
     (hCons : st.consistent) (hSid : e.sid = st.sid) :
     (st.updateType e L).consistent := by
   constructor
   · intro e' L' hMem
     simp only [SessionState.updateType] at hMem
-    cases updateG_mem_of st.localTypes e L e' L' hMem with
+    cases update_g_mem_of st.localTypes e L e' L' hMem with
     | inl heq => exact heq.1 ▸ hSid
     | inr hmem => exact hCons.1 e' L' hmem
   · intro edge h
@@ -323,7 +323,7 @@ theorem SessionState.updateType_preserves_consistent {st : SessionState ν} {e :
     exact hCons.2 edge h
 
 /-- updateTrace preserves session consistency. -/
-theorem SessionState.updateTrace_preserves_consistent {st : SessionState ν} {edge : Edge} {ts : List ValType}
+theorem SessionState.update_trace_preserves_consistent {st : SessionState ν} {edge : Edge} {ts : List ValType}
     (hCons : st.consistent) (hSid : edge.sid = st.sid) :
     (st.updateTrace edge ts).consistent := by
   constructor
@@ -336,7 +336,7 @@ theorem SessionState.updateTrace_preserves_consistent {st : SessionState ν} {ed
     · exact he ▸ hSid
     · -- edge' ≠ edge, so find? is unchanged
       have hNe : edge ≠ edge' := Ne.symm he
-      have hEq := DEnv_find?_updateD_neq (env := st.traces) (e := edge) (e' := edge') (ts := ts) hNe
+      have hEq := d_env_find?_update_d_neq (env := st.traces) (e := edge) (e' := edge') (ts := ts) hNe
       have hOrig : st.traces.find? edge' ≠ none := by
         intro hnone
         apply h
@@ -346,15 +346,15 @@ theorem SessionState.updateTrace_preserves_consistent {st : SessionState ν} {ed
 /-! ### SessionStore Consistency Preservation -/
 
 /-- SessionState.updateType preserves sid field. -/
-@[simp] theorem SessionState.updateType_sid {st : SessionState ν} {e : Endpoint} {L : LocalType} :
+@[simp] theorem SessionState.update_type_sid {st : SessionState ν} {e : Endpoint} {L : LocalType} :
     (st.updateType e L).sid = st.sid := rfl
 
 /-- SessionState.updateTrace preserves sid field. -/
-@[simp] theorem SessionState.updateTrace_sid {st : SessionState ν} {edge : Edge} {ts : List ValType} :
+@[simp] theorem SessionState.update_trace_sid {st : SessionState ν} {edge : Edge} {ts : List ValType} :
     (st.updateTrace edge ts).sid = st.sid := rfl
 
 /-- SessionStore.updateType preserves store consistency. -/
-theorem SessionStore.updateType_preserves_consistent {store : SessionStore ν} {e : Endpoint} {L : LocalType}
+theorem SessionStore.update_type_preserves_consistent {store : SessionStore ν} {e : Endpoint} {L : LocalType}
     (hCons : store.consistent)
     (hMem : ∃ st, (e.sid, st) ∈ store) :
     (store.updateType e L).consistent := by
@@ -387,7 +387,7 @@ theorem SessionStore.updateType_preserves_consistent {store : SessionStore ν} {
           have hSidEq : e.sid = st'.sid := by
             rw [← hsid]
             exact hOrigCons.1.symm
-          exact SessionState.updateType_preserves_consistent hOrigCons.2 hSidEq
+          exact SessionState.update_type_preserves_consistent hOrigCons.2 hSidEq
       | inr hmem =>
         -- tail case: (sid, st) ∈ tl
         have hTlCons : SessionStore.consistent tl := fun sid'' st'' h =>
@@ -425,7 +425,7 @@ theorem SessionStore.updateType_preserves_consistent {store : SessionStore ν} {
         exact ih hTlCons hTlMem hmem
 
 /-- SessionStore.updateTrace preserves store consistency. -/
-theorem SessionStore.updateTrace_preserves_consistent {store : SessionStore ν} {edge : Edge} {ts : List ValType}
+theorem SessionStore.update_trace_preserves_consistent {store : SessionStore ν} {edge : Edge} {ts : List ValType}
     (hCons : store.consistent)
     (hMem : ∃ st, (edge.sid, st) ∈ store) :
     (store.updateTrace edge ts).consistent := by
@@ -455,7 +455,7 @@ theorem SessionStore.updateTrace_preserves_consistent {store : SessionStore ν} 
           have hSidEq : edge.sid = st'.sid := by
             rw [← hsid]
             exact hOrigCons.1.symm
-          exact SessionState.updateTrace_preserves_consistent hOrigCons.2 hSidEq
+          exact SessionState.update_trace_preserves_consistent hOrigCons.2 hSidEq
       | inr hmem =>
         -- tail case
         have hTlCons : SessionStore.consistent tl := fun sid'' st'' h =>

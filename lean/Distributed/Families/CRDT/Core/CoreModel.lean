@@ -203,7 +203,7 @@ def evalCore
     s
 
 /-- Determinism of `evalCore` (functionality/uniqueness of result). -/
-theorem evalCore_deterministic
+theorem eval_core_deterministic
     {State : Type u} {Context : Type v} {OpTag : Type w} {Args : Type x}
     (interp : OpCoreInterpreter State Context OpTag Args)
     (k : OpCore OpTag Args) (ctx : Context) (s out₁ out₂ : State)
@@ -225,7 +225,7 @@ def DeltaIdempotent
   ∀ tag args s, interp.delta tag args (interp.delta tag args s) = interp.delta tag args s
 
 /-- `evalCore` replay stability follows when `delta` is idempotent. -/
-theorem replayStable_of_deltaIdempotent
+theorem replay_stable_of_delta_idempotent
     {State : Type u} {Context : Type v} {OpTag : Type w} {Args : Type x}
     (interp : OpCoreInterpreter State Context OpTag Args)
     (hIdem : DeltaIdempotent interp) :
@@ -253,7 +253,7 @@ def TransportSerializationInvariant
   SerializationRoundTrip encode decode
 
 /-- Roundtrip serialization immediately yields transport-serialization invariance. -/
-theorem transportSerializationInvariant_of_roundTrip
+theorem transport_serialization_invariant_of_round_trip
     {OpTag : Type v} {Args : Type w} {Enc : Type x}
     (encode : OpCore OpTag Args → Enc)
     (decode : Enc → Option (OpCore OpTag Args))
@@ -307,7 +307,7 @@ def implRunNoGuardDenied : Run Nat :=
   fun n => if n = 0 then evalCoreNoGuard interpDeniedIncrement unitOpCore () 0 else 0
 
 /-- Removing `causalGuard` admits an observable envelope violation. -/
-theorem envelopeCounterexample_without_causalGuard :
+theorem envelope_counterexample_without_causal_guard :
     ¬ Envelope natUnitModel refRunDenied implRunNoGuardDenied := by
   intro hEnv
   have h0 : EqSafe natUnitModel (refRunDenied 0) (implRunNoGuardDenied 0) := hEnv 0
@@ -338,7 +338,7 @@ theorem nondeterministic_step_exists_distinct :
   · simp [evalCoreNondet]
 
 /-- Nondeterministic divergent branch violates the envelope against deterministic reference. -/
-theorem envelopeCounterexample_without_determinism :
+theorem envelope_counterexample_without_determinism :
     evalCoreNondet 0 (implRunNondetOne 0) ∧
       ¬ Envelope natUnitModel refRunDetZero implRunNondetOne := by
   refine ⟨?_, ?_⟩
@@ -370,7 +370,7 @@ def implRunDuplicateDelivery : Run Nat :=
       0
 
 /-- Without replay/duplication discipline, replay stability can fail. -/
-theorem replayStable_fails_without_replayDiscipline :
+theorem replay_stable_fails_without_replay_discipline :
     ¬ ReplayStableCoreEval interpReplayUnsafe := by
   intro hReplay
   have hAt0 := hReplay unitOpCore () 0
@@ -379,7 +379,7 @@ theorem replayStable_fails_without_replayDiscipline :
   exact (by decide : (2 : Nat) ≠ 1) hEq
 
 /-- Duplicate delivery under non-idempotent deltas violates the envelope. -/
-theorem envelopeCounterexample_without_replayDiscipline :
+theorem envelope_counterexample_without_replay_discipline :
     ¬ Envelope natUnitModel refRunSingleDelivery implRunDuplicateDelivery := by
   intro hEnv
   have h0 : EqSafe natUnitModel (refRunSingleDelivery 0) (implRunDuplicateDelivery 0) := hEnv 0
@@ -389,16 +389,16 @@ theorem envelopeCounterexample_without_replayDiscipline :
   exact (by decide : (1 : Nat) ≠ 2) hEq
 
 /-- Combined OpCore boundary/minimality witness suite for removed components. -/
-theorem opCore_boundary_minimality_counterexamples :
+theorem op_core_boundary_minimality_counterexamples :
     (¬ Envelope natUnitModel refRunDenied implRunNoGuardDenied) ∧
       (evalCoreNondet 0 (implRunNondetOne 0) ∧
         ¬ Envelope natUnitModel refRunDetZero implRunNondetOne) ∧
       (¬ ReplayStableCoreEval interpReplayUnsafe ∧
         ¬ Envelope natUnitModel refRunSingleDelivery implRunDuplicateDelivery) := by
-  refine ⟨envelopeCounterexample_without_causalGuard, ?_, ?_⟩
-  · exact envelopeCounterexample_without_determinism
-  · exact ⟨replayStable_fails_without_replayDiscipline,
-      envelopeCounterexample_without_replayDiscipline⟩
+  refine ⟨envelope_counterexample_without_causal_guard, ?_, ?_⟩
+  · exact envelope_counterexample_without_determinism
+  · exact ⟨replay_stable_fails_without_replay_discipline,
+      envelope_counterexample_without_replay_discipline⟩
 
 end CRDT
 end Distributed

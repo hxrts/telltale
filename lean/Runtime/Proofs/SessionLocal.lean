@@ -15,7 +15,7 @@ the frame rule and cross-session diamond proofs at the VM level.
 
 ## Key Theorems
 
-- `VMCoherent_iff_forall_SessionCoherent`: Global coherence decomposes per-session
+- `vm_coherent_iff_forall_session_coherent`: Global coherence decomposes per-session
 - `footprint_grows_on_delegation`: Receiving delegated endpoint adds to footprint
 - `session_local_op_preserves_other`: Frame property for session-local operations
 
@@ -51,7 +51,7 @@ reasoning: operations on session s should not affect coherence of session s'.
 This requires decomposing coherence as a separating conjunction over sessions.
 
 Solution Structure. Defines `SessionCoherent s` restricting coherence to edges
-within session s. Proves `VMCoherent_iff_forall_SessionCoherent` showing global
+within session s. Proves `vm_coherent_iff_forall_session_coherent` showing global
 coherence = conjunction of per-session coherence. The key lemma
 `session_local_op_preserves_other` establishes the frame property.
 -/
@@ -73,26 +73,26 @@ def SessionCoherent (G : GEnv) (D : DEnv) (s : SessionId) : Prop :=
   ∀ e : Edge, e.sid = s → ActiveEdge G e → EdgeCoherent G D e
 
 /-- Global coherence implies per-session coherence. -/
-theorem Coherent_implies_SessionCoherent {G : GEnv} {D : DEnv} {s : SessionId}
+theorem coherent_implies_session_coherent {G : GEnv} {D : DEnv} {s : SessionId}
     (hCoh : Coherent G D) : SessionCoherent G D s := by
   intro e _ hActive
   exact hCoh e hActive
 
 /-- Per-session coherence for all sessions implies global coherence. -/
-theorem SessionCoherent_forall_implies_Coherent {G : GEnv} {D : DEnv}
+theorem session_coherent_forall_implies_coherent {G : GEnv} {D : DEnv}
     (h : ∀ s, SessionCoherent G D s) : Coherent G D := by
   intro e hActive
   exact h e.sid e rfl hActive
 
 /-- **Global coherence decomposes as conjunction over sessions.**
     This is the key structural lemma enabling the frame rule. -/
-theorem VMCoherent_iff_forall_SessionCoherent {G : GEnv} {D : DEnv} :
+theorem vm_coherent_iff_forall_session_coherent {G : GEnv} {D : DEnv} :
     Coherent G D ↔ ∀ s, SessionCoherent G D s := by
   constructor
   · intro hCoh s
-    exact Coherent_implies_SessionCoherent hCoh
+    exact coherent_implies_session_coherent hCoh
   · intro h
-    exact SessionCoherent_forall_implies_Coherent h
+    exact session_coherent_forall_implies_coherent h
 
 /-! ## Abstract SessionFootprint
 
@@ -225,7 +225,7 @@ theorem delegation_recv_preserves_other_sessions
   -- Use the theorem to get global coherence after delegation
   have hCoh' : Coherent G' D' := delegation_preserves_coherent G G' D D' s A B hCoh hDeleg
   -- Extract per-session coherence
-  exact Coherent_implies_SessionCoherent hCoh'
+  exact coherent_implies_session_coherent hCoh'
 
 /-! ## Delegation Boundary Blindness -/
 
@@ -264,7 +264,7 @@ theorem delegation_blind_trace_lookup
 /-! ## Delegation Active-Edge Transport -/
 
 /-- For non-delegated sessions, active-edge membership is unchanged by delegation. -/
-theorem delegation_blind_activeEdge_iff
+theorem delegation_blind_active_edge_iff
     {G G' : GEnv} {D D' : DEnv} {s sOther : SessionId} {A B : Role}
     (hDeleg : DelegationStep G G' D D' s A B)
     (hDiff : sOther ≠ s)
@@ -303,7 +303,7 @@ theorem delegation_harmony_split
     SessionCoherent G' D' s ∧
     (∀ sOther, sOther ≠ s → SessionCoherent G' D' sOther) := by
   constructor
-  · exact Coherent_implies_SessionCoherent
+  · exact coherent_implies_session_coherent
       (delegation_preserves_coherent G G' D D' s A B hCoh hDeleg)
   · intro sOther hDiff
     exact delegation_recv_preserves_other_sessions
@@ -317,7 +317,7 @@ theorem delegation_preserves_exchangeability
     (hCoh : Coherent G D)
     (hDeleg : DelegationStep G G' D D' s A B) :
     Coherent (swapGEnvRoleList s pairs G') (swapDEnvRoleList s pairs D') := by
-  exact Coherent_exchangeable (s:=s) (pairs:=pairs) (G:=G') (D:=D')
+  exact coherent_exchangeable (s:=s) (pairs:=pairs) (G:=G') (D:=D')
     (delegation_preserves_coherent G G' D D' s A B hCoh hDeleg)
 
 /-! ## Delegation Footprint Growth -/
@@ -378,7 +378,7 @@ theorem session_local_op_preserves_other {s : SessionId}
   have hGsenderOrig0 : lookupG G ⟨e.sid, e.sender⟩ = some Lsender0 := by
     simpa [hEp ⟨e.sid, e.sender⟩ hSendSid] using hGsenderNew0
   have hActiveOrig : ActiveEdge G e :=
-    ActiveEdge_of_endpoints (G:=G) (e:=e) hGsenderOrig0 hGrecvOrig
+    active_edge_of_endpoints (G:=G) (e:=e) hGsenderOrig0 hGrecvOrig
   -- Get coherence from original state
   have hEdgeCoh := hCoh e hSid hActiveOrig
   rcases hEdgeCoh Lrecv hGrecvOrig with ⟨Lsender, hGsender, hConsume⟩
@@ -401,7 +401,7 @@ def swapRolesOp (s : SessionId) (A B : Role) : GEnv × DEnv → GEnv × DEnv
   | (G, D) => (swapGEnvRole s A B G, swapDEnvRole s A B D)
 
 /-- Role swap is session-local: other sessions are unaffected. -/
-theorem swapRoles_session_local (s : SessionId) (A B : Role) :
+theorem swap_roles_session_local (s : SessionId) (A B : Role) :
     SessionLocalOp s (swapRolesOp s A B) := by
   intro G D s' hDiff
   constructor
@@ -412,7 +412,7 @@ theorem swapRoles_session_local (s : SessionId) (A B : Role) :
       calc
         s' = ep.sid := by symm; exact hSid
         _ = s := hEq
-    have hLookup := lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=ep)
+    have hLookup := lookup_g_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=ep)
     -- swapEndpointRole is identity when ep.sid ≠ s
     have hSwap : swapEndpointRole s A B ep = ep := by
       simp [swapEndpointRole, hSidNe]
@@ -425,26 +425,26 @@ theorem swapRoles_session_local (s : SessionId) (A B : Role) :
       calc
         s' = e.sid := by symm; exact hSid
         _ = s := hEq
-    have hLookup := lookupD_swap (s:=s) (A:=A) (B:=B) (D:=D) (e:=e)
+    have hLookup := lookup_d_swap (s:=s) (A:=A) (B:=B) (D:=D) (e:=e)
     have hSwap : swapEdgeRole s A B e = e := by
       simp [swapEdgeRole, hSidNe]
     simpa [swapRolesOp, hSwap, hSidNe] using hLookup
 
 /-- Role swap preserves global coherence. -/
-theorem swapRoles_preserves_coherent {G : GEnv} {D : DEnv}
+theorem swap_roles_preserves_coherent {G : GEnv} {D : DEnv}
     (s : SessionId) (A B : Role) (hCoh : Coherent G D) :
     Coherent (swapGEnvRole s A B G) (swapDEnvRole s A B D) := by
-  exact CoherentRoleSwap (s:=s) (A:=A) (B:=B) (G:=G) (D:=D) hCoh
+  exact coherent_role_swap (s:=s) (A:=A) (B:=B) (G:=G) (D:=D) hCoh
 
 /-- Role swap preserves coherence for sessions other than s. -/
-theorem swapRoles_preserves_other_sessions {G : GEnv} {D : DEnv}
+theorem swap_roles_preserves_other_sessions {G : GEnv} {D : DEnv}
     (s sOther : SessionId) (A B : Role)
     (hDiff : sOther ≠ s)
     (hCoh : SessionCoherent G D sOther) :
     let (G', D') := swapRolesOp s A B (G, D)
     SessionCoherent G' D' sOther := by
   exact session_local_op_preserves_other (s:=s) (f:=swapRolesOp s A B)
-    (hLocal:=swapRoles_session_local (s:=s) (A:=A) (B:=B)) sOther hDiff hCoh
+    (hLocal:=swap_roles_session_local (s:=s) (A:=A) (B:=B)) sOther hDiff hCoh
 
 /-! ## VM Integration Notes
 

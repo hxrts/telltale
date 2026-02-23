@@ -205,58 +205,58 @@ def SessionState.decrBuffer (s : SessionState) (actor partner : Role) : SessionS
       if s' == partner && r' == actor then (s', r', n - 1) else (s', r', n) }
 
 /-- updateType doesn't change bufferSizes. -/
-@[simp] lemma SessionState.updateType_bufferSizes (s : SessionState) (actor : Role) (L : LocalType) :
+@[simp] lemma SessionState.update_type_buffer_sizes (s : SessionState) (actor : Role) (L : LocalType) :
     (s.updateType actor L).bufferSizes = s.bufferSizes := rfl
 
 /-- incrBuffer doesn't change localTypes. -/
-@[simp] lemma SessionState.incrBuffer_localTypes (s : SessionState) (actor partner : Role) :
+@[simp] lemma SessionState.incr_buffer_local_types (s : SessionState) (actor partner : Role) :
     (s.incrBuffer actor partner).localTypes = s.localTypes := rfl
 
 /-- decrBuffer doesn't change localTypes. -/
-@[simp] lemma SessionState.decrBuffer_localTypes (s : SessionState) (actor partner : Role) :
+@[simp] lemma SessionState.decr_buffer_local_types (s : SessionState) (actor partner : Role) :
     (s.decrBuffer actor partner).localTypes = s.localTypes := rfl
 
 /-- sumDepths only depends on localTypes. -/
-lemma sumDepths_eq_of_localTypes_eq {s₁ s₂ : SessionState}
+lemma sum_depths_eq_of_local_types_eq {s₁ s₂ : SessionState}
     (h : s₁.localTypes = s₂.localTypes) : sumDepths s₁ = sumDepths s₂ := by
   unfold sumDepths; rw [h]
 
 /-- sumBuffers only depends on bufferSizes. -/
-lemma sumBuffers_eq_of_bufferSizes_eq {s₁ s₂ : SessionState}
+lemma sum_buffers_eq_of_buffer_sizes_eq {s₁ s₂ : SessionState}
     (h : s₁.bufferSizes = s₂.bufferSizes) : sumBuffers s₁ = sumBuffers s₂ := by
   unfold sumBuffers; rw [h]
 
 /-- sumDepths after updateType then incrBuffer equals sumDepths after updateType. -/
-lemma sumDepths_updateType_incrBuffer (s : SessionState) (actor : Role) (L : LocalType)
+lemma sum_depths_update_type_incr_buffer (s : SessionState) (actor : Role) (L : LocalType)
     (partner : Role) :
     sumDepths ((s.updateType actor L).incrBuffer actor partner) =
     sumDepths (s.updateType actor L) := by
-  apply sumDepths_eq_of_localTypes_eq
-  simp only [SessionState.incrBuffer_localTypes]
+  apply sum_depths_eq_of_local_types_eq
+  simp only [SessionState.incr_buffer_local_types]
 
 /-- sumBuffers after updateType then incrBuffer equals sumBuffers after incrBuffer. -/
-lemma sumBuffers_updateType_incrBuffer (s : SessionState) (actor : Role) (L : LocalType)
+lemma sum_buffers_update_type_incr_buffer (s : SessionState) (actor : Role) (L : LocalType)
     (partner : Role) :
     sumBuffers ((s.updateType actor L).incrBuffer actor partner) =
     sumBuffers (s.incrBuffer actor partner) := by
-  apply sumBuffers_eq_of_bufferSizes_eq
-  simp only [SessionState.incrBuffer, SessionState.updateType_bufferSizes]
+  apply sum_buffers_eq_of_buffer_sizes_eq
+  simp only [SessionState.incrBuffer, SessionState.update_type_buffer_sizes]
 
 /-- sumDepths after updateType then decrBuffer equals sumDepths after updateType. -/
-lemma sumDepths_updateType_decrBuffer (s : SessionState) (actor : Role) (L : LocalType)
+lemma sum_depths_update_type_decr_buffer (s : SessionState) (actor : Role) (L : LocalType)
     (partner : Role) :
     sumDepths ((s.updateType actor L).decrBuffer actor partner) =
     sumDepths (s.updateType actor L) := by
-  apply sumDepths_eq_of_localTypes_eq
-  simp only [SessionState.decrBuffer_localTypes]
+  apply sum_depths_eq_of_local_types_eq
+  simp only [SessionState.decr_buffer_local_types]
 
 /-- sumBuffers after updateType then decrBuffer equals sumBuffers after decrBuffer. -/
-lemma sumBuffers_updateType_decrBuffer (s : SessionState) (actor : Role) (L : LocalType)
+lemma sum_buffers_update_type_decr_buffer (s : SessionState) (actor : Role) (L : LocalType)
     (partner : Role) :
     sumBuffers ((s.updateType actor L).decrBuffer actor partner) =
     sumBuffers (s.decrBuffer actor partner) := by
-  apply sumBuffers_eq_of_bufferSizes_eq
-  simp only [SessionState.decrBuffer, SessionState.updateType_bufferSizes]
+  apply sum_buffers_eq_of_buffer_sizes_eq
+  simp only [SessionState.decrBuffer, SessionState.update_type_buffer_sizes]
 
 /-! ## Concrete Session Semantics -/
 
@@ -275,7 +275,7 @@ def applyStepConcrete (cfg : MultiConfig) (step : SessionStep) (newType : LocalT
   { sessions := cfg.sessions.map fun s =>
       if s.sid == step.sid then applySessionStepConcrete s step newType else s }
 
-lemma applyStepConcrete_isolation
+lemma apply_step_concrete_isolation
     (cfg : MultiConfig) (step : SessionStep) (newType : LocalType)
     (s : SessionState) (hs : s ∈ cfg.sessions) (hne : s.sid ≠ step.sid) :
     s ∈ (applyStepConcrete cfg step newType).sessions := by
@@ -292,10 +292,10 @@ instance : SessionSemantics where
   applyStep := applyStepConcrete
   applySessionStep := applySessionStepConcrete
   applyStep_map _ _ _ := rfl
-  step_isolation := applyStepConcrete_isolation
+  step_isolation := apply_step_concrete_isolation
   step_nonincreasing_other := by
     intro cfg step newType s hs hne
-    refine ⟨s, applyStepConcrete_isolation cfg step newType s hs hne, rfl, le_rfl⟩
+    refine ⟨s, apply_step_concrete_isolation cfg step newType s hs hne, rfl, le_rfl⟩
 
 /-! ## Sum-Update Helper Lemmas -/
 

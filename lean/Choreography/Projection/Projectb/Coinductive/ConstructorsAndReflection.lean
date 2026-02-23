@@ -10,8 +10,8 @@ The Problem. Building coinductive projection proofs requires unfolding
 the fixed-point definition `CProject` for each global type constructor.
 Direct `CProjectF`-to-`CProject` coercion is verbose and repetitive.
 
-Solution Structure. Provide constructor theorems (`CProject_end`,
-`CProject_var`, `CProject_mu`, `CProject_comm_send`, etc.) that encapsulate
+Solution Structure. Provide constructor theorems (`c_project_end`,
+`c_project_var`, `c_project_mu`, `c_project_comm_send`, etc.) that encapsulate
 the fixed-point unfolding. Reflection lemmas extract components from
 existing `CProject` proofs for use in larger derivations.
 -/
@@ -30,23 +30,23 @@ set_option linter.unusedSimpArgs false
 These lemmas allow building CProject proofs by cases on the global type. -/
 
 /-- CProject for end-end. -/
-theorem CProject_end (role : String) : CProject .end role .end := by
-  have hfix : CProjectF CProject = CProject := CProject_fixed
+theorem c_project_end (role : String) : CProject .end role .end := by
+  have hfix : CProjectF CProject = CProject := c_project_fixed
   have hf : CProjectF CProject .end role .end := by simp only [CProjectF]
   exact Eq.mp (congrFun (congrFun (congrFun hfix .end) role) .end) hf
 
 /-- CProject for var-var. -/
-theorem CProject_var (t : String) (role : String) : CProject (.var t) role (.var t) := by
-  have hfix : CProjectF CProject = CProject := CProject_fixed
+theorem c_project_var (t : String) (role : String) : CProject (.var t) role (.var t) := by
+  have hfix : CProjectF CProject = CProject := c_project_fixed
   have hf : CProjectF CProject (.var t) role (.var t) := by simp only [CProjectF]
   exact Eq.mp (congrFun (congrFun (congrFun hfix (.var t)) role) (.var t)) hf
 
 /-- CProject for mu-mu.
     Now requires candBody.isGuarded t to match new trans semantics. -/
-theorem CProject_mu (t : String) (body : GlobalType) (candBody : LocalTypeR) (role : String)
+theorem c_project_mu (t : String) (body : GlobalType) (candBody : LocalTypeR) (role : String)
     (hguard : candBody.isGuarded t = true) (hbody : CProject body role candBody) :
     CProject (.mu t body) role (.mu t candBody) := by
-  have hfix : CProjectF CProject = CProject := CProject_fixed
+  have hfix : CProjectF CProject = CProject := c_project_fixed
   have hf : CProjectF CProject (.mu t body) role (.mu t candBody) := by
     dsimp only [CProjectF]
     refine ⟨candBody, hbody, Or.inl ?_⟩
@@ -56,11 +56,11 @@ theorem CProject_mu (t : String) (body : GlobalType) (candBody : LocalTypeR) (ro
 /-! ## Constructor Lemmas: Communication Cases -/
 
 /-- CProject for comm-send (role is sender). -/
-theorem CProject_comm_send (sender receiver : String)
+theorem c_project_comm_send (sender receiver : String)
     (gbs : List (Label × GlobalType)) (lbs : List BranchR)
     (hbranches : BranchesProjRel CProject gbs sender lbs) :
     CProject (.comm sender receiver gbs) sender (.send receiver lbs) := by
-  have hfix : CProjectF CProject = CProject := CProject_fixed
+  have hfix : CProjectF CProject = CProject := c_project_fixed
   have hf : CProjectF CProject (.comm sender receiver gbs) sender (.send receiver lbs) := by
     dsimp only [CProjectF]
     split_ifs with h h'
@@ -71,12 +71,12 @@ theorem CProject_comm_send (sender receiver : String)
     (.send receiver lbs)) hf
 
 /-- CProject for comm-recv (role is receiver). -/
-theorem CProject_comm_recv (sender receiver : String)
+theorem c_project_comm_recv (sender receiver : String)
     (gbs : List (Label × GlobalType)) (lbs : List BranchR)
     (hns : sender ≠ receiver)
     (hbranches : BranchesProjRel CProject gbs receiver lbs) :
     CProject (.comm sender receiver gbs) receiver (.recv sender lbs) := by
-  have hfix : CProjectF CProject = CProject := CProject_fixed
+  have hfix : CProjectF CProject = CProject := c_project_fixed
   have hf : CProjectF CProject (.comm sender receiver gbs) receiver (.recv sender lbs) := by
     dsimp only [CProjectF]
     -- The if structure is: if receiver = sender then ... else if receiver = receiver then ... else ...
@@ -91,12 +91,12 @@ theorem CProject_comm_recv (sender receiver : String)
     (.recv sender lbs)) hf
 
 /-- CProject for comm-other (role is non-participant). -/
-theorem CProject_comm_other (sender receiver role : String)
+theorem c_project_comm_other (sender receiver role : String)
     (gbs : List (Label × GlobalType)) (cand : LocalTypeR)
     (hns : role ≠ sender) (hnr : role ≠ receiver)
     (hall : AllBranchesProj CProject gbs role cand) :
     CProject (.comm sender receiver gbs) role cand := by
-  have hfix : CProjectF CProject = CProject := CProject_fixed
+  have hfix : CProjectF CProject = CProject := c_project_fixed
   have hf : CProjectF CProject (.comm sender receiver gbs) role cand := by
     unfold CProjectF
     simp only [hns, hnr, ite_false]

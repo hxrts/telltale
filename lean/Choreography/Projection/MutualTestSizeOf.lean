@@ -30,19 +30,19 @@ deriving Repr, Inhabited
 /-! ## Size Lemmas -/
 
 /-- The head of a cons is smaller than the whole list. -/
-private theorem sizeOf_head_lt_cons {α : Type} [SizeOf α] (x : α) (xs : List α) :
+private theorem size_of_head_lt_cons {α : Type} [SizeOf α] (x : α) (xs : List α) :
     sizeOf x < sizeOf (x :: xs) := by
   simp only [sizeOf, List._sizeOf_1]
   omega
 
 /-- The tail of a cons is smaller than the whole list. -/
-private theorem sizeOf_tail_lt_cons {α : Type} [SizeOf α] (x : α) (xs : List α) :
+private theorem size_of_tail_lt_cons {α : Type} [SizeOf α] (x : α) (xs : List α) :
     sizeOf xs < sizeOf (x :: xs) := by
   simp only [sizeOf, List._sizeOf_1]
   omega
 
 /-- The children list is smaller than the node containing it. -/
-private theorem sizeOf_list_lt_node (xs : List MT2) :
+private theorem size_of_list_lt_node (xs : List MT2) :
     sizeOf xs < sizeOf (MT2.node xs) := by
   simp only [MT2.node.sizeOf_spec]
   omega
@@ -58,7 +58,7 @@ mutual
   decreasing_by
     all_goals
       first
-      | exact sizeOf_list_lt_node _
+      | exact size_of_list_lt_node _
 
   /-- Count total nodes across a list of trees. -/
   def countList : List MT2 → Nat
@@ -68,22 +68,22 @@ mutual
   decreasing_by
     all_goals
       first
-      | exact sizeOf_head_lt_cons _ _
-      | exact sizeOf_tail_lt_cons _ _
+      | exact size_of_head_lt_cons _ _
+      | exact size_of_tail_lt_cons _ _
 end
 
 /-! ## Simplification Lemmas -/
 
 /-- Counting a leaf gives 1. -/
-@[simp] theorem countNodes_leaf (n : Nat) : countNodes (.leaf n) = 1 := by
+@[simp] theorem count_nodes_leaf (n : Nat) : countNodes (.leaf n) = 1 := by
   simp [countNodes]
 
 /-- Counting an empty list gives 0. -/
-@[simp] theorem countList_nil : countList ([] : List MT2) = 0 := by
+@[simp] theorem count_list_nil : countList ([] : List MT2) = 0 := by
   simp [countList]
 
 /-- Counting a cons distributes over the head and tail. -/
-@[simp] theorem countList_cons (x : MT2) (xs : List MT2) :
+@[simp] theorem count_list_cons (x : MT2) (xs : List MT2) :
     countList (x :: xs) = countNodes x + countList xs := by
   simp [countList]
 

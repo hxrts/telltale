@@ -40,15 +40,15 @@ the same observable behavior (just with different representation).
 /-! ## End Source Cases -/
 
 /-- End cannot be CProjectTransRelComp-related to var. -/
-theorem CProjectTransRelComp_end_not_var
+theorem c_project_trans_rel_comp_end_not_var
     {v : String} (h : CProjectTransRelComp .end (.var v))
     (hWFa : LocalTypeR.WellFormed .end) (hWFc : LocalTypeR.WellFormed (.var v)) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
-  · cases (CProjectTransRel_source_end (b := .var v) hbase)
+  · cases (c_project_trans_rel_source_end (b := .var v) hbase)
 
   · cases b with
     | «end» =>
-        cases (CProjectTransRel_source_end (b := .var v) hrel)
+        cases (c_project_trans_rel_source_end (b := .var v) hrel)
     | var _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | send _ _ =>
@@ -56,27 +56,27 @@ theorem CProjectTransRelComp_end_not_var
     | recv _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | mu t body =>
-        rcases CProjectTransRel_source_mu (v := t) (body := body) (b := .var v) hrel with ⟨body', hEq⟩
+        rcases c_project_trans_rel_source_mu (v := t) (body := body) (b := .var v) hrel with ⟨body', hEq⟩
         cases hEq
-  · have hb : b = .end := CProjectTransRel_source_end hrel
+  · have hb : b = .end := c_project_trans_rel_source_end hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .end) (c := .var v) heq hrel heq'
+    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .end) (c := .var v) heq hrel heq'
         hWFa hWFc
       simpa [EQ2F] using hcomp
 
 /-! ## End Source Cases (Send/Recv Targets) -/
 
 /-- End cannot be CProjectTransRelComp-related to send. -/
-theorem CProjectTransRelComp_end_not_send
+theorem c_project_trans_rel_comp_end_not_send
     {p : String} {bs : List BranchR}
     (h : CProjectTransRelComp .end (.send p bs))
     (hWFa : LocalTypeR.WellFormed .end) (hWFc : LocalTypeR.WellFormed (.send p bs)) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
-  · cases (CProjectTransRel_source_end (b := .send p bs) hbase)
+  · cases (c_project_trans_rel_source_end (b := .send p bs) hbase)
   · cases b with
     | «end» =>
-        cases (CProjectTransRel_source_end (b := .send p bs) hrel)
+        cases (c_project_trans_rel_source_end (b := .send p bs) hrel)
     | var _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | send _ _ =>
@@ -84,25 +84,25 @@ theorem CProjectTransRelComp_end_not_send
     | recv _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | mu t body =>
-        rcases CProjectTransRel_source_mu (v := t) (body := body) (b := .send p bs) hrel with ⟨body', hEq⟩
+        rcases c_project_trans_rel_source_mu (v := t) (body := body) (b := .send p bs) hrel with ⟨body', hEq⟩
         cases hEq
-  · have hb : b = .end := CProjectTransRel_source_end hrel
+  · have hb : b = .end := c_project_trans_rel_source_end hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .end) (c := .send p bs) heq hrel heq'
+  · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .end) (c := .send p bs) heq hrel heq'
       hWFa hWFc
     simpa [EQ2F] using hcomp
 
 /-- End cannot be CProjectTransRelComp-related to recv. -/
-theorem CProjectTransRelComp_end_not_recv
+theorem c_project_trans_rel_comp_end_not_recv
     {p : String} {bs : List BranchR}
     (h : CProjectTransRelComp .end (.recv p bs))
     (hWFa : LocalTypeR.WellFormed .end) (hWFc : LocalTypeR.WellFormed (.recv p bs)) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
-  · cases (CProjectTransRel_source_end (b := .recv p bs) hbase)
+  · cases (c_project_trans_rel_source_end (b := .recv p bs) hbase)
   · cases b with
     | «end» =>
-        cases (CProjectTransRel_source_end (b := .recv p bs) hrel)
+        cases (c_project_trans_rel_source_end (b := .recv p bs) hrel)
     | var _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | send _ _ =>
@@ -110,105 +110,105 @@ theorem CProjectTransRelComp_end_not_recv
     | recv _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | mu t body =>
-        rcases CProjectTransRel_source_mu (v := t) (body := body) (b := .recv p bs) hrel with ⟨body', hEq⟩
+        rcases c_project_trans_rel_source_mu (v := t) (body := body) (b := .recv p bs) hrel with ⟨body', hEq⟩
         cases hEq
-  · have hb : b = .end := CProjectTransRel_source_end hrel
+  · have hb : b = .end := c_project_trans_rel_source_end hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .end) (c := .recv p bs) heq hrel heq'
+    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .end) (c := .recv p bs) heq hrel heq'
         hWFa hWFc
       simpa [EQ2F] using hcomp
 
 /-! ## Var Source Cases -/
 
 /-- Var cannot be CProjectTransRelComp-related to end. -/
-theorem CProjectTransRelComp_var_not_end
+theorem c_project_trans_rel_comp_var_not_end
     {v : String} (h : CProjectTransRelComp (.var v) .end)
     (hWFa : LocalTypeR.WellFormed (.var v)) (hWFc : LocalTypeR.WellFormed .end) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
-  · cases (CProjectTransRel_source_var (v := v) (b := .end) hbase)
+  · cases (c_project_trans_rel_source_var (v := v) (b := .end) hbase)
   · cases b with
     | «end» =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | var v' =>
-        cases (CProjectTransRel_source_var (v := v') (b := .end) hrel)
+        cases (c_project_trans_rel_source_var (v := v') (b := .end) hrel)
     | send _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | recv _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | mu t body =>
-        rcases CProjectTransRel_source_mu (v := t) (body := body) (b := .end) hrel with ⟨body', hEq⟩
+        rcases c_project_trans_rel_source_mu (v := t) (body := body) (b := .end) hrel with ⟨body', hEq⟩
         cases hEq
-  · have hb : b = .var v := CProjectTransRel_source_var (v := v) hrel
+  · have hb : b = .var v := c_project_trans_rel_source_var (v := v) hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .var v) (c := .end) heq hrel heq'
+    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .var v) (c := .end) heq hrel heq'
         hWFa hWFc
       simpa [EQ2F] using hcomp
 
 /-! ## Var Source Cases (Send/Recv Targets) -/
 
 /-- Var cannot be CProjectTransRelComp-related to send. -/
-theorem CProjectTransRelComp_var_not_send
+theorem c_project_trans_rel_comp_var_not_send
     {v : String} {p : String} {bs : List BranchR}
     (h : CProjectTransRelComp (.var v) (.send p bs))
     (hWFa : LocalTypeR.WellFormed (.var v)) (hWFc : LocalTypeR.WellFormed (.send p bs)) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
-  · cases (CProjectTransRel_source_var (v := v) (b := .send p bs) hbase)
+  · cases (c_project_trans_rel_source_var (v := v) (b := .send p bs) hbase)
   · cases b with
     | «end» =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | var v' =>
-        cases (CProjectTransRel_source_var (v := v') (b := .send p bs) hrel)
+        cases (c_project_trans_rel_source_var (v := v') (b := .send p bs) hrel)
     | send _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | recv _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | mu t body =>
-        rcases CProjectTransRel_source_mu (v := t) (body := body) (b := .send p bs) hrel with ⟨body', hEq⟩
+        rcases c_project_trans_rel_source_mu (v := t) (body := body) (b := .send p bs) hrel with ⟨body', hEq⟩
         cases hEq
-  · have hb : b = .var v := CProjectTransRel_source_var (v := v) hrel
+  · have hb : b = .var v := c_project_trans_rel_source_var (v := v) hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-  · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .var v) (c := .send p bs) heq hrel heq'
+  · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .var v) (c := .send p bs) heq hrel heq'
       hWFa hWFc
     simpa [EQ2F] using hcomp
 
 /-- Var cannot be CProjectTransRelComp-related to recv. -/
-theorem CProjectTransRelComp_var_not_recv
+theorem c_project_trans_rel_comp_var_not_recv
     {v : String} {p : String} {bs : List BranchR}
     (h : CProjectTransRelComp (.var v) (.recv p bs))
     (hWFa : LocalTypeR.WellFormed (.var v)) (hWFc : LocalTypeR.WellFormed (.recv p bs)) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
-  · cases (CProjectTransRel_source_var (v := v) (b := .recv p bs) hbase)
+  · cases (c_project_trans_rel_source_var (v := v) (b := .recv p bs) hbase)
   · cases b with
     | «end» =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | var v' =>
-        cases (CProjectTransRel_source_var (v := v') (b := .recv p bs) hrel)
+        cases (c_project_trans_rel_source_var (v := v') (b := .recv p bs) hrel)
     | send _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | recv _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | mu t body =>
-        rcases CProjectTransRel_source_mu (v := t) (body := body) (b := .recv p bs) hrel with ⟨body', hEq⟩
+        rcases c_project_trans_rel_source_mu (v := t) (body := body) (b := .recv p bs) hrel with ⟨body', hEq⟩
         cases hEq
-  · have hb : b = .var v := CProjectTransRel_source_var (v := v) hrel
+  · have hb : b = .var v := c_project_trans_rel_source_var (v := v) hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .var v) (c := .recv p bs) heq hrel heq'
+    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .var v) (c := .recv p bs) heq hrel heq'
         hWFa hWFc
       simpa [EQ2F] using hcomp
 
 /-! ## Send Source Cases -/
 
 /-- Send cannot be CProjectTransRelComp-related to end. -/
-theorem CProjectTransRelComp_send_not_end
+theorem c_project_trans_rel_comp_send_not_end
     {p : String} {bs : List BranchR}
     (h : CProjectTransRelComp (.send p bs) .end)
     (hWFa : LocalTypeR.WellFormed (.send p bs)) (hWFc : LocalTypeR.WellFormed .end) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
-  · cases (CProjectTransRel_source_send (p := p) (bs := bs) (b := .end) hbase) with
+  · cases (c_project_trans_rel_source_send (p := p) (bs := bs) (b := .end) hbase) with
     | intro cs hEq => cases hEq
   · cases b with
     | «end» =>
@@ -216,29 +216,29 @@ theorem CProjectTransRelComp_send_not_end
     | var _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | send p' bs' =>
-        cases (CProjectTransRel_source_send (p := p') (bs := bs') (b := .end) hrel) with
+        cases (c_project_trans_rel_source_send (p := p') (bs := bs') (b := .end) hrel) with
         | intro cs hEq => cases hEq
     | recv _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | mu t body =>
-        rcases CProjectTransRel_source_mu (v := t) (body := body) (b := .end) hrel with ⟨body', hEq⟩
+        rcases c_project_trans_rel_source_mu (v := t) (body := body) (b := .end) hrel with ⟨body', hEq⟩
         cases hEq
-  · rcases CProjectTransRel_source_send (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
+  · rcases c_project_trans_rel_source_send (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .send p bs) (c := .end) heq hrel heq'
+    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .send p bs) (c := .end) heq hrel heq'
         hWFa hWFc
       simpa [EQ2F] using hcomp
 
 /-! ## Send Source Cases (Var/Recv Targets) -/
 
 /-- Send cannot be CProjectTransRelComp-related to var. -/
-theorem CProjectTransRelComp_send_not_var
+theorem c_project_trans_rel_comp_send_not_var
     {p : String} {bs : List BranchR} {v : String}
     (h : CProjectTransRelComp (.send p bs) (.var v))
     (hWFa : LocalTypeR.WellFormed (.send p bs)) (hWFc : LocalTypeR.WellFormed (.var v)) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
-  · cases (CProjectTransRel_source_send (p := p) (bs := bs) (b := .var v) hbase) with
+  · cases (c_project_trans_rel_source_send (p := p) (bs := bs) (b := .var v) hbase) with
     | intro cs hEq => cases hEq
   · cases b with
     | «end» =>
@@ -246,31 +246,31 @@ theorem CProjectTransRelComp_send_not_var
     | var _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | send p' bs' =>
-        cases (CProjectTransRel_source_send (p := p') (bs := bs') (b := .var v) hrel) with
+        cases (c_project_trans_rel_source_send (p := p') (bs := bs') (b := .var v) hrel) with
         | intro cs hEq => cases hEq
     | recv _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | mu t body =>
-        rcases CProjectTransRel_source_mu (v := t) (body := body) (b := .var v) hrel with ⟨body', hEq⟩
+        rcases c_project_trans_rel_source_mu (v := t) (body := body) (b := .var v) hrel with ⟨body', hEq⟩
         cases hEq
-  · rcases CProjectTransRel_source_send (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
+  · rcases c_project_trans_rel_source_send (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .send p bs) (c := .var v) heq hrel heq'
+    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .send p bs) (c := .var v) heq hrel heq'
         hWFa hWFc
       simpa [EQ2F] using hcomp
 
 /-! ## Send Source Cases (Recv Target) -/
 
 /-- Send cannot be CProjectTransRelComp-related to recv. -/
-theorem CProjectTransRelComp_send_not_recv
+theorem c_project_trans_rel_comp_send_not_recv
     {p1 : String} {bs1 : List BranchR}
     {p2 : String} {bs2 : List BranchR}
     (h : CProjectTransRelComp (.send p1 bs1) (.recv p2 bs2))
     (hWFa : LocalTypeR.WellFormed (.send p1 bs1)) (hWFc : LocalTypeR.WellFormed (.recv p2 bs2)) :
     False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
-  · cases (CProjectTransRel_source_send (p := p1) (bs := bs1) (b := .recv p2 bs2) hbase) with
+  · cases (c_project_trans_rel_source_send (p := p1) (bs := bs1) (b := .recv p2 bs2) hbase) with
     | intro cs hEq => cases hEq
   · cases b with
     | «end» =>
@@ -278,29 +278,29 @@ theorem CProjectTransRelComp_send_not_recv
     | var _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | send p' bs' =>
-        cases (CProjectTransRel_source_send (p := p') (bs := bs') (b := .recv p2 bs2) hrel) with
+        cases (c_project_trans_rel_source_send (p := p') (bs := bs') (b := .recv p2 bs2) hrel) with
         | intro cs hEq => cases hEq
     | recv _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | mu t body =>
-        rcases CProjectTransRel_source_mu (v := t) (body := body) (b := .recv p2 bs2) hrel with ⟨body', hEq⟩
+        rcases c_project_trans_rel_source_mu (v := t) (body := body) (b := .recv p2 bs2) hrel with ⟨body', hEq⟩
         cases hEq
-  · rcases CProjectTransRel_source_send (p := p1) (bs := bs1) hrel with ⟨cs, hEq⟩
+  · rcases c_project_trans_rel_source_send (p := p1) (bs := bs1) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .send p1 bs1) (c := .recv p2 bs2) heq hrel heq'
+    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .send p1 bs1) (c := .recv p2 bs2) heq hrel heq'
         hWFa hWFc
       simpa [EQ2F] using hcomp
 
 /-! ## Recv Source Cases -/
 
 /-- Recv cannot be CProjectTransRelComp-related to end. -/
-theorem CProjectTransRelComp_recv_not_end
+theorem c_project_trans_rel_comp_recv_not_end
     {p : String} {bs : List BranchR}
     (h : CProjectTransRelComp (.recv p bs) .end)
     (hWFa : LocalTypeR.WellFormed (.recv p bs)) (hWFc : LocalTypeR.WellFormed .end) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
-  · cases (CProjectTransRel_source_recv (p := p) (bs := bs) (b := .end) hbase) with
+  · cases (c_project_trans_rel_source_recv (p := p) (bs := bs) (b := .end) hbase) with
     | intro cs hEq => cases hEq
   · cases b with
     | «end» =>
@@ -310,27 +310,27 @@ theorem CProjectTransRelComp_recv_not_end
     | send _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | recv p' bs' =>
-        cases (CProjectTransRel_source_recv (p := p') (bs := bs') (b := .end) hrel) with
+        cases (c_project_trans_rel_source_recv (p := p') (bs := bs') (b := .end) hrel) with
         | intro cs hEq => cases hEq
     | mu t body =>
-        rcases CProjectTransRel_source_mu (v := t) (body := body) (b := .end) hrel with ⟨body', hEq⟩
+        rcases c_project_trans_rel_source_mu (v := t) (body := body) (b := .end) hrel with ⟨body', hEq⟩
         cases hEq
-  · rcases CProjectTransRel_source_recv (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
+  · rcases c_project_trans_rel_source_recv (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .recv p bs) (c := .end) heq hrel heq'
+    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .recv p bs) (c := .end) heq hrel heq'
         hWFa hWFc
       simpa [EQ2F] using hcomp
 
 /-! ## Recv Source Cases (Var/Send Targets) -/
 
 /-- Recv cannot be CProjectTransRelComp-related to var. -/
-theorem CProjectTransRelComp_recv_not_var
+theorem c_project_trans_rel_comp_recv_not_var
     {p : String} {bs : List BranchR} {v : String}
     (h : CProjectTransRelComp (.recv p bs) (.var v))
     (hWFa : LocalTypeR.WellFormed (.recv p bs)) (hWFc : LocalTypeR.WellFormed (.var v)) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
-  · cases (CProjectTransRel_source_recv (p := p) (bs := bs) (b := .var v) hbase) with
+  · cases (c_project_trans_rel_source_recv (p := p) (bs := bs) (b := .var v) hbase) with
     | intro cs hEq => cases hEq
   · cases b with
     | «end» =>
@@ -340,29 +340,29 @@ theorem CProjectTransRelComp_recv_not_var
     | send _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | recv p' bs' =>
-        cases (CProjectTransRel_source_recv (p := p') (bs := bs') (b := .var v) hrel) with
+        cases (c_project_trans_rel_source_recv (p := p') (bs := bs') (b := .var v) hrel) with
         | intro cs hEq => cases hEq
     | mu t body =>
-        rcases CProjectTransRel_source_mu (v := t) (body := body) (b := .var v) hrel with ⟨body', hEq⟩
+        rcases c_project_trans_rel_source_mu (v := t) (body := body) (b := .var v) hrel with ⟨body', hEq⟩
         cases hEq
-  · rcases CProjectTransRel_source_recv (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
+  · rcases c_project_trans_rel_source_recv (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := EQ2_CProjectTransRel_EQ2_compose (a := .recv p bs) (c := .var v) heq hrel heq'
+    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .recv p bs) (c := .var v) heq hrel heq'
         hWFa hWFc
       simpa [EQ2F] using hcomp
 
 /-! ## Recv Source Cases (Send Target) -/
 
 /-- Recv cannot be CProjectTransRelComp-related to send. -/
-theorem CProjectTransRelComp_recv_not_send
+theorem c_project_trans_rel_comp_recv_not_send
     {p1 : String} {bs1 : List BranchR}
     {p2 : String} {bs2 : List BranchR}
     (h : CProjectTransRelComp (.recv p1 bs1) (.send p2 bs2))
     (hWFa : LocalTypeR.WellFormed (.recv p1 bs1)) (hWFc : LocalTypeR.WellFormed (.send p2 bs2)) :
     False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
-  · cases (CProjectTransRel_source_recv (p := p1) (bs := bs1) (b := .send p2 bs2) hbase) with
+  · cases (c_project_trans_rel_source_recv (p := p1) (bs := bs1) (b := .send p2 bs2) hbase) with
     | intro cs hEq => cases hEq
   · cases b with
     | «end» =>
@@ -372,15 +372,15 @@ theorem CProjectTransRelComp_recv_not_send
     | send _ _ =>
         simpa [EQ2F] using (EQ2.destruct heq)
     | recv p' bs' =>
-        cases (CProjectTransRel_source_recv (p := p') (bs := bs') (b := .send p2 bs2) hrel) with
+        cases (c_project_trans_rel_source_recv (p := p') (bs := bs') (b := .send p2 bs2) hrel) with
         | intro cs hEq => cases hEq
     | mu t body =>
-        rcases CProjectTransRel_source_mu (v := t) (body := body) (b := .send p2 bs2) hrel with ⟨body', hEq⟩
+        rcases c_project_trans_rel_source_mu (v := t) (body := body) (b := .send p2 bs2) hrel with ⟨body', hEq⟩
         cases hEq
-  · rcases CProjectTransRel_source_recv (p := p1) (bs := bs1) hrel with ⟨cs, hEq⟩;
+  · rcases c_project_trans_rel_source_recv (p := p1) (bs := bs1) hrel with ⟨cs, hEq⟩;
       cases hEq; simpa [EQ2F] using (EQ2.destruct heq)
   · simpa [EQ2F] using
-      (EQ2_CProjectTransRel_EQ2_compose (a := .recv p1 bs1) (c := .send p2 bs2) heq hrel heq'
+      (eq2_c_project_trans_rel_eq2_compose (a := .recv p1 bs1) (c := .send p2 bs2) heq hrel heq'
         hWFa hWFc)
 
 

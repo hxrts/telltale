@@ -13,7 +13,7 @@ The Problem. The middle-frame specification requires proving that any
 the structure: the step produces `G' = Gleft ++ Gmid' ++ Gright` with
 appropriate subset and typing properties.
 
-Solution Structure. Prove `HasTypeProcPreOut_preserved_sub_middle_frame`
+Solution Structure. Prove `has_type_proc_pre_out_preserved_sub_middle_frame`
 by induction on `TypedStep`. Dispatch each constructor to its case lemma
 from `MiddleFrameCases`. Handle recursive cases (seq, par) by invoking
 the induction hypothesis.
@@ -31,7 +31,7 @@ section
 
 -- Main Theorem
 
-theorem HasTypeProcPreOut_preserved_sub_middle_frame :
+theorem has_type_proc_pre_out_preserved_sub_middle_frame :
     HasTypeProcPreOut_preserved_sub_middle_frame_spec := by
   intro Gstore Gleft Gmid Gright G D Ssh Sown store bufs P
     G' D' Sown' store' bufs' P' Sfin Gfin W Δ
@@ -88,7 +88,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       obtain ⟨pw, S₁_fin, S₂_fin, G₁_fin, G₂_fin, W₁, W₂, Δ₁, Δ₂,
           hSfin, hGfin, hW, hΔ, hDisjG_mid, hDisjS_mid, hDisjS_left_mid, hDisjS_right_mid,
           hDisjS_fin, hDisjW, hDisjΔ, hP_pre, hQ_pre⟩ :=
-        HasTypeProcPreOut_par_inv_witness hPre
+        has_type_proc_pre_out_par_inv_witness hPre
       let splitMid : ParSplit Sown0.left Gmid := pw.split
       have hSlenEq : split.S1.length = splitMid.S1.length := by
         calc
@@ -100,49 +100,49 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       -- `par_left`: Build Inner Framing Context
       have hStoreInner :
           StoreTyped Gstore (SEnvAll Ssh0 { right := Sown0.right ++ split.S2, left := split.S1 }) store0 :=
-        StoreTyped_par_left_inner (split:=split) hDisjS hStore
+        store_typed_par_left_inner (split:=split) hDisjS hStore
       have hShAll :
           DisjointS Ssh0 (Sown0.right ++ (split.S1 ++ split.S2)) := by
         simpa [OwnedEnv.all, split.hS, List.append_assoc] using hDisjShAll
-      have hShR : DisjointS Ssh0 Sown0.right := DisjointS_of_append_left hShAll
-      have hSh12 : DisjointS Ssh0 (split.S1 ++ split.S2) := DisjointS_of_append_right hShAll
-      have hShS1 : DisjointS Ssh0 split.S1 := DisjointS_of_append_left hSh12
-      have hShS2 : DisjointS Ssh0 split.S2 := DisjointS_of_append_right hSh12
+      have hShR : DisjointS Ssh0 Sown0.right := disjoint_s_of_append_left hShAll
+      have hSh12 : DisjointS Ssh0 (split.S1 ++ split.S2) := disjoint_s_of_append_right hShAll
+      have hShS1 : DisjointS Ssh0 split.S1 := disjoint_s_of_append_left hSh12
+      have hShS2 : DisjointS Ssh0 split.S2 := disjoint_s_of_append_right hSh12
       have hDisjShInner :
           DisjointS Ssh0 ({ right := Sown0.right ++ split.S2, left := split.S1 } : OwnedEnv) := by
         have hTmp : DisjointS Ssh0 ((Sown0.right ++ split.S2) ++ split.S1) :=
-          DisjointS_append_right (DisjointS_append_right hShR hShS2) hShS1
+          disjoint_s_append_right (disjoint_s_append_right hShR hShS2) hShS1
         simpa [OwnedEnv.all, List.append_assoc] using hTmp
       have hOwnAll : DisjointS Sown0.right (split.S1 ++ split.S2) := by
         simpa [OwnedDisjoint, split.hS] using hOwn
-      have hDisjRightS1 : DisjointS Sown0.right split.S1 := DisjointS_of_append_left hOwnAll
-      have hDisjRightS2 : DisjointS Sown0.right split.S2 := DisjointS_of_append_right hOwnAll
+      have hDisjRightS1 : DisjointS Sown0.right split.S1 := disjoint_s_of_append_left hOwnAll
+      have hDisjRightS2 : DisjointS Sown0.right split.S2 := disjoint_s_of_append_right hOwnAll
       have hOwnInner :
           OwnedDisjoint ({ right := Sown0.right ++ split.S2, left := split.S1 } : OwnedEnv) :=
-        DisjointS_append_left hDisjRightS1 (DisjointS_symm hDisjS)
+        disjoint_s_append_left hDisjRightS1 (disjoint_s_symm hDisjS)
       -- `par_left`: Session/Disjointness Projections
       have hSubG1 : SessionsOf splitMid.G1 ⊆ SessionsOf Gmid := by
         intro s hs
         simpa [splitMid, splitMid.hG] using
-          (SessionsOf_append_left (G₁:=splitMid.G1) (G₂:=splitMid.G2) hs)
+          (sessions_of_append_left (G₁:=splitMid.G1) (G₂:=splitMid.G2) hs)
       have hSubG2 : SessionsOf splitMid.G2 ⊆ SessionsOf Gmid := by
         intro s hs
         simpa [splitMid, splitMid.hG] using
-          (SessionsOf_append_right (G₁:=splitMid.G1) (G₂:=splitMid.G2) hs)
+          (sessions_of_append_right (G₁:=splitMid.G1) (G₂:=splitMid.G2) hs)
       have hDisjLeftG1 : DisjointG Gleft splitMid.G1 := by
-        have hSym : DisjointG Gmid Gleft := DisjointG_symm hDisjLM
-        have hTmp : DisjointG splitMid.G1 Gleft := DisjointG_of_subset_left hSubG1 hSym
+        have hSym : DisjointG Gmid Gleft := disjoint_g_symm hDisjLM
+        have hTmp : DisjointG splitMid.G1 Gleft := disjoint_g_of_subset_left hSubG1 hSym
 /- ## Structured Block 3 -/
-        exact DisjointG_symm hTmp
+        exact disjoint_g_symm hTmp
       have hDisjLeftG2 : DisjointG Gleft splitMid.G2 := by
-        have hSym : DisjointG Gmid Gleft := DisjointG_symm hDisjLM
-        have hTmp : DisjointG splitMid.G2 Gleft := DisjointG_of_subset_left hSubG2 hSym
-        exact DisjointG_symm hTmp
-      have hDisjG1Right : DisjointG splitMid.G1 Gright := DisjointG_of_subset_left hSubG1 hDisjMR
+        have hSym : DisjointG Gmid Gleft := disjoint_g_symm hDisjLM
+        have hTmp : DisjointG splitMid.G2 Gleft := disjoint_g_of_subset_left hSubG2 hSym
+        exact disjoint_g_symm hTmp
+      have hDisjG1Right : DisjointG splitMid.G1 Gright := disjoint_g_of_subset_left hSubG1 hDisjMR
       have hDisjLeftRightInner : DisjointG Gleft (splitMid.G2 ++ Gright) :=
-        DisjointG_append_right hDisjLeftG2 hDisjLR
+        disjoint_g_append_right hDisjLeftG2 hDisjLR
       have hDisjMidRightInner : DisjointG splitMid.G1 (splitMid.G2 ++ Gright) :=
-        DisjointG_append_right hDisjG_mid hDisjG1Right
+        disjoint_g_append_right hDisjG_mid hDisjG1Right
       have hEqInner : G0 = Gleft ++ splitMid.G1 ++ (splitMid.G2 ++ Gright) := by
         calc
           G0 = Gleft ++ Gmid ++ Gright := hEqG
@@ -155,9 +155,9 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       have hDisjRightFinAll : DisjointS Sown0.right (S₁_fin ++ S₂_fin) := by
         simpa [hSfin] using hDisjRightFin
       have hDisjRightS1Fin : DisjointS Sown0.right S₁_fin :=
-        DisjointS_of_append_left hDisjRightFinAll
+        disjoint_s_of_append_left hDisjRightFinAll
       have hDisjOutP : DisjointS (Sown0.right ++ split.S2) S₁_fin :=
-        DisjointS_append_left hDisjRightS1Fin (DisjointS_symm hDisjS_left)
+        disjoint_s_append_left hDisjRightS1Fin (disjoint_s_symm hDisjS_left)
       have hP0 :
           HasTypeProcPreOut Ssh0 { right := Sown0.right ++ split.S2, left := split.S1 } splitMid.G1 P0
             { right := Sown0.right ++ split.S2, left := S₁_fin } G₁_fin W₁ Δ₁ := by
@@ -170,22 +170,22 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
           hStoreInner hDisjShInner hOwnInner hDisjLeftG1 hDisjLeftRightInner hDisjMidRightInner
           hEqInner hDisjOutP hP0
       have hDomStep : SEnvDomSubset S₁_step S₁_fin := by
-        simpa using (HasTypeProcPreOut_domsubset hP')
+        simpa using (has_type_proc_pre_out_domsubset hP')
       have hStepS2 : DisjointS S₁_step split.S2 := by
         have hTmp : DisjointS split.S2 S₁_step :=
-          DisjointS_of_domsubset_right hDomStep (DisjointS_symm hDisjS_left)
-        exact DisjointS_symm hTmp
+          disjoint_s_of_domsubset_right hDomStep (disjoint_s_symm hDisjS_left)
+        exact disjoint_s_symm hTmp
       have hStepS2fin : DisjointS S₁_step S₂_fin := by
         have hTmp : DisjointS S₂_fin S₁_step :=
-          DisjointS_of_domsubset_right hDomStep (DisjointS_symm hDisjS_fin)
-        exact DisjointS_symm hTmp
+          disjoint_s_of_domsubset_right hDomStep (disjoint_s_symm hDisjS_fin)
+        exact disjoint_s_symm hTmp
       have hDisjRightS2Fin : DisjointS Sown0.right S₂_fin :=
-        DisjointS_of_append_right hDisjRightFinAll
+        disjoint_s_of_append_right hDisjRightFinAll
       have hDisjInQNew : DisjointS (Sown0.right ++ S₁_step) split.S2 :=
-        DisjointS_append_left hDisjRightS2 hStepS2
+        disjoint_s_append_left hDisjRightS2 hStepS2
       have hDisjOutQNew : DisjointS (Sown0.right ++ S₁_step) S₂_fin :=
 /- ## Structured Block 4 -/
-        DisjointS_append_left hDisjRightS2Fin hStepS2fin
+        disjoint_s_append_left hDisjRightS2Fin hStepS2fin
       have hQ0 :
           HasTypeProcPreOut Ssh0 { right := Sown0.right ++ split.S1, left := split.S2 } splitMid.G2 Q0
             { right := Sown0.right ++ split.S1, left := S₂_fin } G₂_fin W₂ Δ₂ := by
@@ -196,7 +196,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
         have hTmp :
             HasTypeProcPreOut Ssh0 { right := Sown0.right ++ S₁_step, left := split.S2 } splitMid.G2 Q0
               { right := Sown0.right ++ S₁_step, left := S₂_fin } G₂_fin W₂ Δ₂ :=
-          HasTypeProcPreOut_reframe_right
+          has_type_proc_pre_out_reframe_right
             (R:=Sown0.right ++ split.S1) (R':=Sown0.right ++ S₁_step)
             (L:=split.S2) (L':=S₂_fin) (G:=splitMid.G2) (P:=Q0)
             hDisjInQNew hDisjOutQNew hQ0
@@ -208,13 +208,13 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
         simpa [splitMid, hS2Eq] using hP'
       -- `par_left`: Final Packing And Subsets
       have hDisjGFinal : DisjointG G₁_mid' splitMid.G2 :=
-        DisjointG_of_subset_left hSubSess1 hDisjG_mid
+        disjoint_g_of_subset_left hSubSess1 hDisjG_mid
       have hStepS2mid : DisjointS S₁_step splitMid.S2 := by
         simpa [splitMid, hS2Eq] using hStepS2
       have hDisjS1FinS2 : DisjointS S₁_fin splitMid.S2 := by
         simpa [splitMid] using hDisjS_left_mid
-      have hDisjW' : DisjointW W₁' W₂ := DisjointW_of_subset_left hSubW1 hDisjW
-      have hDisjΔ' : DisjointS Δ₁' Δ₂ := DisjointS_of_domsubset_left hSubΔ1 hDisjΔ
+      have hDisjW' : DisjointW W₁' W₂ := disjoint_w_of_subset_left hSubW1 hDisjW
+      have hDisjΔ' : DisjointS Δ₁' Δ₂ := disjoint_s_of_domsubset_left hSubΔ1 hDisjΔ
       let splitOut : ParSplit ({ right := Sown0.right, left := S₁_step ++ splitMid.S2 } : OwnedEnv).left
           (G₁_mid' ++ splitMid.G2) :=
         { S1 := S₁_step
@@ -234,23 +234,23 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
         simpa [List.append_assoc] using hEqShape
       have hSubSessFinal : SessionsOf (G₁_mid' ++ splitMid.G2) ⊆ SessionsOf Gmid := by
         intro s hs
-        have hs' := SessionsOf_append_subset (G₁:=G₁_mid') (G₂:=splitMid.G2) hs
+        have hs' := sessions_of_append_subset (G₁:=G₁_mid') (G₂:=splitMid.G2) hs
         cases hs' with
         | inl hsL =>
 /- ## Structured Block 5 -/
             have hsMid1 : s ∈ SessionsOf splitMid.G1 := hSubSess1 hsL
             simpa [splitMid, splitMid.hG] using
-              (SessionsOf_append_left (G₁:=splitMid.G1) (G₂:=splitMid.G2) hsMid1)
+              (sessions_of_append_left (G₁:=splitMid.G1) (G₂:=splitMid.G2) hsMid1)
         | inr hsR =>
             simpa [splitMid, splitMid.hG] using
-              (SessionsOf_append_right (G₁:=splitMid.G1) (G₂:=splitMid.G2) hsR)
+              (sessions_of_append_right (G₁:=splitMid.G1) (G₂:=splitMid.G2) hsR)
       have hSubWFinal : FootprintSubset (W₁' ++ W₂) W := by
         have hSubW12 : FootprintSubset (W₁' ++ W₂) (W₁ ++ W₂) :=
-          FootprintSubset_append_left hSubW1
+          footprint_subset_append_left hSubW1
         simpa [hW] using hSubW12
       have hSubΔFinal : SEnvDomSubset (Δ₁' ++ Δ₂) Δ := by
         have hSubΔ12 : SEnvDomSubset (Δ₁' ++ Δ₂) (Δ₁ ++ Δ₂) :=
-          SEnvDomSubset_append_left_of_domsubset hSubΔ1
+          s_env_dom_subset_append_left_of_domsubset hSubΔ1
         simpa [hΔ] using hSubΔ12
       refine ⟨G₁_mid' ++ splitMid.G2, W₁' ++ W₂, Δ₁' ++ Δ₂, ?_, hSubSessFinal, ?_, hSubWFinal, hSubΔFinal⟩
       · simpa [hEqGFinal]
@@ -262,7 +262,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       obtain ⟨pw, S₁_fin, S₂_fin, G₁_fin, G₂_fin, W₁, W₂, Δ₁, Δ₂,
           hSfin, hGfin, hW, hΔ, hDisjG_mid, hDisjS_mid, hDisjS_left_mid, hDisjS_right_mid,
           hDisjS_fin, hDisjW, hDisjΔ, hP_pre, hQ_pre⟩ :=
-        HasTypeProcPreOut_par_inv_witness hPre
+        has_type_proc_pre_out_par_inv_witness hPre
       let splitMid : ParSplit Sown0.left Gmid := pw.split
       have hSlenEq : split.S1.length = splitMid.S1.length := by
         calc
@@ -283,35 +283,35 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
         simpa [OwnedEnv.all, List.append_assoc] using hShAll
       have hOwnAll : DisjointS Sown0.right (split.S1 ++ split.S2) := by
         simpa [OwnedDisjoint, split.hS] using hOwn
-      have hDisjRightS1 : DisjointS Sown0.right split.S1 := DisjointS_of_append_left hOwnAll
-      have hDisjRightS2 : DisjointS Sown0.right split.S2 := DisjointS_of_append_right hOwnAll
+      have hDisjRightS1 : DisjointS Sown0.right split.S1 := disjoint_s_of_append_left hOwnAll
+      have hDisjRightS2 : DisjointS Sown0.right split.S2 := disjoint_s_of_append_right hOwnAll
       have hOwnInner :
           OwnedDisjoint ({ right := Sown0.right ++ split.S1, left := split.S2 } : OwnedEnv) :=
-        DisjointS_append_left hDisjRightS2 hDisjS
+        disjoint_s_append_left hDisjRightS2 hDisjS
       -- `par_right`: Session/Disjointness Projections
       have hSubG1 : SessionsOf splitMid.G1 ⊆ SessionsOf Gmid := by
         intro s hs
 /- ## Structured Block 6 -/
         simpa [splitMid, splitMid.hG] using
-          (SessionsOf_append_left (G₁:=splitMid.G1) (G₂:=splitMid.G2) hs)
+          (sessions_of_append_left (G₁:=splitMid.G1) (G₂:=splitMid.G2) hs)
       have hSubG2 : SessionsOf splitMid.G2 ⊆ SessionsOf Gmid := by
         intro s hs
         simpa [splitMid, splitMid.hG] using
-          (SessionsOf_append_right (G₁:=splitMid.G1) (G₂:=splitMid.G2) hs)
+          (sessions_of_append_right (G₁:=splitMid.G1) (G₂:=splitMid.G2) hs)
       have hDisjLeftG1 : DisjointG Gleft splitMid.G1 := by
-        have hSym : DisjointG Gmid Gleft := DisjointG_symm hDisjLM
-        have hTmp : DisjointG splitMid.G1 Gleft := DisjointG_of_subset_left hSubG1 hSym
-        exact DisjointG_symm hTmp
+        have hSym : DisjointG Gmid Gleft := disjoint_g_symm hDisjLM
+        have hTmp : DisjointG splitMid.G1 Gleft := disjoint_g_of_subset_left hSubG1 hSym
+        exact disjoint_g_symm hTmp
       have hDisjLeftG2 : DisjointG Gleft splitMid.G2 := by
-        have hSym : DisjointG Gmid Gleft := DisjointG_symm hDisjLM
-        have hTmp : DisjointG splitMid.G2 Gleft := DisjointG_of_subset_left hSubG2 hSym
-        exact DisjointG_symm hTmp
-      have hDisjG1Right : DisjointG splitMid.G1 Gright := DisjointG_of_subset_left hSubG1 hDisjMR
-      have hDisjG2Right : DisjointG splitMid.G2 Gright := DisjointG_of_subset_left hSubG2 hDisjMR
+        have hSym : DisjointG Gmid Gleft := disjoint_g_symm hDisjLM
+        have hTmp : DisjointG splitMid.G2 Gleft := disjoint_g_of_subset_left hSubG2 hSym
+        exact disjoint_g_symm hTmp
+      have hDisjG1Right : DisjointG splitMid.G1 Gright := disjoint_g_of_subset_left hSubG1 hDisjMR
+      have hDisjG2Right : DisjointG splitMid.G2 Gright := disjoint_g_of_subset_left hSubG2 hDisjMR
       have hDisjLeftMidInner : DisjointG (Gleft ++ splitMid.G1) splitMid.G2 :=
-        DisjointG_append_left hDisjLeftG2 hDisjG_mid
+        disjoint_g_append_left hDisjLeftG2 hDisjG_mid
       have hDisjLeftRightInner : DisjointG (Gleft ++ splitMid.G1) Gright :=
-        DisjointG_append_left hDisjLR hDisjG1Right
+        disjoint_g_append_left hDisjLR hDisjG1Right
       have hEqInner : G0 = (Gleft ++ splitMid.G1) ++ splitMid.G2 ++ Gright := by
         calc
           G0 = Gleft ++ Gmid ++ Gright := hEqG
@@ -324,9 +324,9 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       have hDisjRightFinAll : DisjointS Sown0.right (S₁_fin ++ S₂_fin) := by
         simpa [hSfin] using hDisjRightFin
       have hDisjRightS2Fin : DisjointS Sown0.right S₂_fin :=
-        DisjointS_of_append_right hDisjRightFinAll
+        disjoint_s_of_append_right hDisjRightFinAll
       have hDisjOutQ : DisjointS (Sown0.right ++ split.S1) S₂_fin :=
-        DisjointS_append_left hDisjRightS2Fin hDisjS_right
+        disjoint_s_append_left hDisjRightS2Fin hDisjS_right
       have hQ0 :
           HasTypeProcPreOut Ssh0 { right := Sown0.right ++ split.S1, left := split.S2 } splitMid.G2 Q0
             { right := Sown0.right ++ split.S1, left := S₂_fin } G₂_fin W₂ Δ₂ := by
@@ -339,22 +339,22 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
           hStoreInner hDisjShInner hOwnInner hDisjLeftMidInner hDisjLeftRightInner hDisjG2Right
           hEqInner hDisjOutQ hQ0
       have hDomStep : SEnvDomSubset S₂_step S₂_fin := by
-        simpa using (HasTypeProcPreOut_domsubset hQ')
+        simpa using (has_type_proc_pre_out_domsubset hQ')
       have hStepS1 : DisjointS S₂_step split.S1 := by
         have hTmp : DisjointS split.S1 S₂_step :=
-          DisjointS_of_domsubset_right hDomStep hDisjS_right
+          disjoint_s_of_domsubset_right hDomStep hDisjS_right
 /- ## Structured Block 7 -/
-        exact DisjointS_symm hTmp
+        exact disjoint_s_symm hTmp
       have hStepS1fin : DisjointS S₂_step S₁_fin := by
         have hTmp : DisjointS S₁_fin S₂_step :=
-          DisjointS_of_domsubset_right hDomStep hDisjS_fin
-        exact DisjointS_symm hTmp
+          disjoint_s_of_domsubset_right hDomStep hDisjS_fin
+        exact disjoint_s_symm hTmp
       have hDisjRightS1Fin : DisjointS Sown0.right S₁_fin :=
-        DisjointS_of_append_left hDisjRightFinAll
+        disjoint_s_of_append_left hDisjRightFinAll
       have hDisjInPNew : DisjointS (Sown0.right ++ S₂_step) split.S1 :=
-        DisjointS_append_left hDisjRightS1 hStepS1
+        disjoint_s_append_left hDisjRightS1 hStepS1
       have hDisjOutPNew : DisjointS (Sown0.right ++ S₂_step) S₁_fin :=
-        DisjointS_append_left hDisjRightS1Fin hStepS1fin
+        disjoint_s_append_left hDisjRightS1Fin hStepS1fin
       have hP0 :
           HasTypeProcPreOut Ssh0 { right := Sown0.right ++ split.S2, left := split.S1 } splitMid.G1 P0
             { right := Sown0.right ++ split.S2, left := S₁_fin } G₁_fin W₁ Δ₁ := by
@@ -365,7 +365,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
         have hTmp :
             HasTypeProcPreOut Ssh0 { right := Sown0.right ++ S₂_step, left := split.S1 } splitMid.G1 P0
               { right := Sown0.right ++ S₂_step, left := S₁_fin } G₁_fin W₁ Δ₁ :=
-          HasTypeProcPreOut_reframe_right
+          has_type_proc_pre_out_reframe_right
             (R:=Sown0.right ++ split.S2) (R':=Sown0.right ++ S₂_step)
             (L:=split.S1) (L':=S₁_fin) (G:=splitMid.G1) (P:=P0)
             hDisjInPNew hDisjOutPNew hP0
@@ -378,14 +378,14 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       -- `par_right`: Final Packing And Subsets
       have hDisjGFinal : DisjointG splitMid.G1 G₂_mid' := by
         have hTmp : DisjointG G₂_mid' splitMid.G1 :=
-          DisjointG_of_subset_left hSubSess2 (DisjointG_symm hDisjG_mid)
-        exact DisjointG_symm hTmp
+          disjoint_g_of_subset_left hSubSess2 (disjoint_g_symm hDisjG_mid)
+        exact disjoint_g_symm hTmp
       have hStepS1mid : DisjointS splitMid.S1 S₂_step := by
-        simpa [splitMid, hS1Eq] using (DisjointS_symm hStepS1)
+        simpa [splitMid, hS1Eq] using (disjoint_s_symm hStepS1)
       have hDisjS1FinStep : DisjointS S₁_fin S₂_step := by
-        simpa using (DisjointS_symm hStepS1fin)
-      have hDisjW' : DisjointW W₁ W₂' := DisjointW_of_subset_right hSubW2 hDisjW
-      have hDisjΔ' : DisjointS Δ₁ Δ₂' := DisjointS_of_domsubset_right hSubΔ2 hDisjΔ
+        simpa using (disjoint_s_symm hStepS1fin)
+      have hDisjW' : DisjointW W₁ W₂' := disjoint_w_of_subset_right hSubW2 hDisjW
+      have hDisjΔ' : DisjointS Δ₁ Δ₂' := disjoint_s_of_domsubset_right hSubΔ2 hDisjΔ
       let splitOut : ParSplit ({ right := Sown0.right, left := splitMid.S1 ++ S₂_step } : OwnedEnv).left
           (splitMid.G1 ++ G₂_mid') :=
         { S1 := splitMid.S1
@@ -406,22 +406,22 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
         simpa [List.append_assoc] using hEqShape
       have hSubSessFinal : SessionsOf (splitMid.G1 ++ G₂_mid') ⊆ SessionsOf Gmid := by
         intro s hs
-        have hs' := SessionsOf_append_subset (G₁:=splitMid.G1) (G₂:=G₂_mid') hs
+        have hs' := sessions_of_append_subset (G₁:=splitMid.G1) (G₂:=G₂_mid') hs
         cases hs' with
         | inl hsL =>
             simpa [splitMid, splitMid.hG] using
-              (SessionsOf_append_left (G₁:=splitMid.G1) (G₂:=splitMid.G2) hsL)
+              (sessions_of_append_left (G₁:=splitMid.G1) (G₂:=splitMid.G2) hsL)
         | inr hsR =>
             have hsMid2 : s ∈ SessionsOf splitMid.G2 := hSubSess2 hsR
             simpa [splitMid, splitMid.hG] using
-              (SessionsOf_append_right (G₁:=splitMid.G1) (G₂:=splitMid.G2) hsMid2)
+              (sessions_of_append_right (G₁:=splitMid.G1) (G₂:=splitMid.G2) hsMid2)
       have hSubWFinal : FootprintSubset (W₁ ++ W₂') W := by
         have hSubW12 : FootprintSubset (W₁ ++ W₂') (W₁ ++ W₂) :=
-          FootprintSubset_append_right_of_subset hSubW2
+          footprint_subset_append_right_of_subset hSubW2
         simpa [hW] using hSubW12
       have hSubΔFinal : SEnvDomSubset (Δ₁ ++ Δ₂') Δ := by
         have hSubΔ12 : SEnvDomSubset (Δ₁ ++ Δ₂') (Δ₁ ++ Δ₂) :=
-          SEnvDomSubset_append_right_of_domsubset hSubΔ2
+          s_env_dom_subset_append_right_of_domsubset hSubΔ2
         simpa [hΔ] using hSubΔ12
       refine ⟨splitMid.G1 ++ G₂_mid', W₁ ++ W₂', Δ₁ ++ Δ₂', ?_, hSubSessFinal, ?_, hSubWFinal, hSubΔFinal⟩
       · simpa [hEqGFinal]

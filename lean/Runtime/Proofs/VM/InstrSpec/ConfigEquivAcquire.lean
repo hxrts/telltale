@@ -38,7 +38,7 @@ def AcquireSpec_respects_renaming (ρ : SessionRenaming)
   receiver_type := by
     obtain ⟨L', hLookup⟩ := hSpec.receiver_type
     refine ⟨renameLocalType ρ L', ?_⟩
-    rw [lookupG_rename]
+    rw [lookup_g_rename]
     simp only [hLookup, Option.map_some, renameLocalType, renameValType]
   buffer_has_capability := by
     obtain ⟨rest, hLookup⟩ := hSpec.buffer_has_capability
@@ -48,7 +48,7 @@ def AcquireSpec_respects_renaming (ρ : SessionRenaming)
     have hEdge : { sid := (renameEndpoint ρ ep).sid, sender := r, receiver := (renameEndpoint ρ ep).role } =
                  renameEdge ρ { sid := ep.sid, sender := r, receiver := ep.role } := by
       simp only [renameEndpoint, renameEdge]
-    rw [hEdge, lookupD_rename, hLookup]
+    rw [hEdge, lookup_d_rename, hLookup]
     simp only [List.map_cons, renameValType]
 
   -- AcquireSpec Renaming: Type-Update Case
@@ -57,7 +57,7 @@ def AcquireSpec_respects_renaming (ρ : SessionRenaming)
     intro L' hLookup'
     -- L' is the continuation in the renamed space
     -- We need to find the original continuation and apply type_updated
-    rw [lookupG_rename] at hLookup'
+    rw [lookup_g_rename] at hLookup'
     cases hOrig : lookupG G ep with
     | none => simp [hOrig] at hLookup'
     | some Lorig =>
@@ -79,7 +79,7 @@ def AcquireSpec_respects_renaming (ρ : SessionRenaming)
           have hLookupOrig : lookupG G ep = some (.recv r (.chan delegatedSession delegatedRole) L'_orig) := by
             simp only [hOrig, ← hr, ← hSid, ← hT'.2]
           have hUpd := hSpec.type_updated L'_orig hLookupOrig
-          rw [hUpd, renameGEnv_updateG]
+          rw [hUpd, rename_g_env_update_g]
           simp only [← hL]
         | unit => simp only [renameValType] at hT; nomatch hT
         | bool => simp only [renameValType] at hT; nomatch hT
@@ -100,7 +100,7 @@ def AcquireSpec_respects_renaming (ρ : SessionRenaming)
     DelegationStep_respects_renaming ρ hSpec.delegation_applied
 
 /-- Acquire respects `ConfigEquiv` constructively. -/
-theorem AcquireSpec_respects_ConfigEquiv
+theorem acquire_spec_respects_config_equiv
     {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
     {ep : Endpoint} {r : Role} {delegatedSession : SessionId} {delegatedRole : Role}
     (hEquiv : ConfigEquiv ⟨G₁, D₁⟩ ⟨G₂, D₂⟩)
@@ -160,7 +160,7 @@ theorem AcquireSpec_respects_ConfigEquiv
           simp only [Option.map_some]
           rw [hATypeEq]
           congr 1
-          exact (renameLocalType_renameLocalTypeRole_comm ρ delegatedSession r ep.role hDeleg₁.A_type).symm
+          exact (rename_local_type_rename_local_type_role_comm ρ delegatedSession r ep.role hDeleg₁.A_type).symm
         · have hOther₁ := hDeleg₁.other_roles_G e hSid hA hB
           have hSidRen : (renameEndpoint ρ e).sid = ρ.f delegatedSession := by
             simp only [renameEndpoint, hSid]
@@ -169,7 +169,7 @@ theorem AcquireSpec_respects_ConfigEquiv
           simp only [Option.map_map]
           congr 1
           funext L
-          exact (renameLocalType_renameLocalTypeRole_comm ρ delegatedSession r ep.role L).symm
+          exact (rename_local_type_rename_local_type_role_comm ρ delegatedSession r ep.role L).symm
     · have hSidRen : (renameEndpoint ρ e).sid ≠ ρ.f delegatedSession := by
         simp only [renameEndpoint]
         intro hEq
@@ -202,7 +202,7 @@ theorem AcquireSpec_respects_ConfigEquiv
           exact hInc (Or.inr hEq)
         have hRedir₁ : IsRedirectedEdge e e delegatedSession r ep.role := by
           rw [IsRedirectedEdge]
-          exact (redirectEdge_no_A e delegatedSession r ep.role hSid hSenderNe hReceiverNe).symm
+          exact (redirect_edge_no_a e delegatedSession r ep.role hSid hSenderNe hReceiverNe).symm
         have hD₁' :
             lookupD D₁' e =
 /- ## Structured Block 4 -/
@@ -217,7 +217,7 @@ theorem AcquireSpec_respects_ConfigEquiv
         have hRedir₂ :
             IsRedirectedEdge (renameEdge ρ e) (renameEdge ρ e) (ρ.f delegatedSession) r ep.role := by
           rw [IsRedirectedEdge]
-          exact (redirectEdge_no_A (renameEdge ρ e) (ρ.f delegatedSession) r ep.role
+          exact (redirect_edge_no_a (renameEdge ρ e) (ρ.f delegatedSession) r ep.role
             hSidRen hSenderNeRen hReceiverNeRen).symm
         have hD₂' :
             lookupD D₂' (renameEdge ρ e) =
@@ -227,7 +227,7 @@ theorem AcquireSpec_respects_ConfigEquiv
         simp only [List.map_map]
         congr 1
         funext T
-        exact (renameValType_renameValTypeRole_comm ρ delegatedSession r ep.role T).symm
+        exact (rename_val_type_rename_val_type_role_comm ρ delegatedSession r ep.role T).symm
     · have hSidRen : (renameEdge ρ e).sid ≠ ρ.f delegatedSession := by
         simp only [renameEdge]
         intro hEq

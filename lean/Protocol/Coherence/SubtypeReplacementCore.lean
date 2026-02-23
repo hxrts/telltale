@@ -57,7 +57,7 @@ theorem RecvCompatible.refl (from_ : Role) (L : LocalType) : RecvCompatible from
 If L₁ and L₂ are recv-compatible and Consume succeeds for L₁, it also succeeds
 for L₂. This follows directly from the first component of `RecvCompatible`. -/
 
-theorem Consume_mono {from_ : Role} {L₁ L₂ : LocalType} {ts : List ValType} {L₁' : LocalType}
+theorem consume_mono {from_ : Role} {L₁ L₂ : LocalType} {ts : List ValType} {L₁' : LocalType}
     (hCompat : RecvCompatible from_ L₁ L₂)
     (hConsume : Consume from_ L₁ ts = some L₁') :
     ∃ L₂', Consume from_ L₂ ts = some L₂' := by
@@ -76,7 +76,7 @@ theorem Consume_mono {from_ : Role} {L₁ L₂ : LocalType} {ts : List ValType} 
     If the original receiver type L₁ satisfies EdgeCoherent (Consume succeeds),
     and we replace it with L₂ where RecvCompatible from_ L₁ L₂, then
     EdgeCoherent still holds for the updated configuration. -/
-theorem EdgeCoherent_type_replacement {G : GEnv} {D : DEnv} {e : Edge}
+theorem edge_coherent_type_replacement {G : GEnv} {D : DEnv} {e : Edge}
     {L₁ L₂ : LocalType}
     (hEdgeCoh : EdgeCoherent G D e)
     (hRecv : lookupG G { sid := e.sid, role := e.receiver } = some L₁)
@@ -84,7 +84,7 @@ theorem EdgeCoherent_type_replacement {G : GEnv} {D : DEnv} {e : Edge}
     EdgeCoherent (updateG G { sid := e.sid, role := e.receiver } L₂) D e := by
   intro Lrecv hLookupRecv
   -- After update, lookupG gives L₂
-  simp only [lookupG_updateG_eq] at hLookupRecv
+  simp only [lookup_g_update_g_eq] at hLookupRecv
   simp only [Option.some.injEq] at hLookupRecv
   subst hLookupRecv
   -- Get original EdgeCoherent result
@@ -97,7 +97,7 @@ theorem EdgeCoherent_type_replacement {G : GEnv} {D : DEnv} {e : Edge}
         lookupG (updateG G { sid := e.sid, role := e.receiver } L₂)
           { sid := e.sid, role := e.sender } = some L₂ := by
       rw [hEq]
-      exact lookupG_updateG_eq
+      exact lookup_g_update_g_eq
     use L₂
     constructor
     · exact hLookupSender'
@@ -108,7 +108,7 @@ theorem EdgeCoherent_type_replacement {G : GEnv} {D : DEnv} {e : Edge}
         lookupG (updateG G { sid := e.sid, role := e.receiver } L₂)
           { sid := e.sid, role := e.sender } =
         lookupG G { sid := e.sid, role := e.sender } := by
-      apply lookupG_updateG_ne
+      apply lookup_g_update_g_ne
       intro hEp
       apply hEq
       simpa [Endpoint.mk.injEq] using hEp
@@ -123,7 +123,7 @@ theorem EdgeCoherent_type_replacement {G : GEnv} {D : DEnv} {e : Edge}
 
     If G, D is coherent and we replace a receiver's type with a recv-compatible type,
     the result is still coherent. -/
-theorem Coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
+theorem coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
     {L₁ L₂ : LocalType}
     (hCoh : Coherent G D)
     (hLookup : lookupG G ep = some L₁)

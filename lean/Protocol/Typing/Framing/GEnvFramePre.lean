@@ -38,7 +38,7 @@ private lemma pre_frame_right_branch_bodies
   -- Reframe each branch body by rewriting the update across the right frame.
   intro hG ihBodies i hi hip
   have hBody' := ihBodies i hi hip
-  have hUpd := updateG_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
+  have hUpd := update_g_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
     (L:=.branch p bs) (L':=(bs.get ⟨i, hi⟩).2) hG
   rw [hUpd]
   exact hBody'
@@ -46,7 +46,7 @@ private lemma pre_frame_right_branch_bodies
 /-! ## Pre Framing (Right): Main Theorem -/
 
 /-- Frame a disjoint GEnv on the right of pre-typing. -/
-lemma HasTypeProcPre_frame_G_right
+lemma has_type_proc_pre_frame_g_right
     {Ssh : SEnv} {Sown : OwnedEnv} {G Gfr : GEnv} {P : Process} :
     HasTypeProcPre Ssh Sown G P →
     HasTypeProcPre Ssh Sown (G ++ Gfr) P := by
@@ -58,19 +58,19 @@ lemma HasTypeProcPre_frame_G_right
       simpa using (HasTypeProcPre.skip (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr))
   | send hk hG hx =>
       rename_i Sown G k x e q T L
-      have hG' := lookupG_append_left (G₂:=Gfr) hG
+      have hG' := lookup_g_append_left (G₂:=Gfr) hG
       exact HasTypeProcPre.send hk hG' hx
   | recv hk hG hNoSh =>
       rename_i Sown G k x e p T L
-      have hG' := lookupG_append_left (G₂:=Gfr) hG
+      have hG' := lookup_g_append_left (G₂:=Gfr) hG
       exact HasTypeProcPre.recv hk hG' hNoSh
   | select hk hG hbs =>
       rename_i Sown G k l e q bs L
-      have hG' := lookupG_append_left (G₂:=Gfr) hG
+      have hG' := lookup_g_append_left (G₂:=Gfr) hG
       exact HasTypeProcPre.select hk hG' hbs
   | branch hk hG hLen hLabels hBodies ihBodies =>
       rename_i Sown G k procs e p bs
-      have hG' := lookupG_append_left (G₂:=Gfr) hG
+      have hG' := lookup_g_append_left (G₂:=Gfr) hG
       have hBodies' := pre_frame_right_branch_bodies (G:=G) (Gfr:=Gfr) hG ihBodies
       exact HasTypeProcPre.branch hk hG' hLen hLabels hBodies'
   | seq hP hQ ihP ihQ =>
@@ -79,5 +79,5 @@ lemma HasTypeProcPre_frame_G_right
       exact HasTypeProcPre.par hDisjS hSsplit ihP ihQ
   | assign hNoSh hv =>
       rename_i Sown G x v T
-      have hv' := HasTypeVal_frame_right (G₁:=G) (G₂:=Gfr) hv
+      have hv' := has_type_val_frame_right (G₁:=G) (G₂:=Gfr) hv
       exact HasTypeProcPre.assign hNoSh hv'

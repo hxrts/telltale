@@ -12,8 +12,8 @@ The Problem. We need subject reduction: well-typed configurations remain
 well-typed after stepping. This is the core safety theorem for MPST.
 
 Solution Structure. We prove preservation by case analysis on step kind:
-1. Send: use `Coherent_send_preserved` + `BuffersTyped_enqueue`
-2. Recv: use `Coherent_recv_preserved` + buffer dequeue lemma
+1. Send: use `coherent_send_preserved` + `buffers_typed_enqueue`
+2. Recv: use `coherent_recv_preserved` + buffer dequeue lemma
 3. Select/Branch: similar to send/recv for labels
 4. NewSession: use freshness invariants (`SupplyInv_newSession`)
 -/
@@ -37,11 +37,11 @@ which align with the pre-update typing discipline. -/
 The proof proceeds by case analysis on the step relation:
 
 1. **Send**: The sender's local type advances, the directed edge trace grows
-   - Use `Coherent_send_preserved` for coherence
-   - Use `BuffersTyped_enqueue` for buffer typing
+   - Use `coherent_send_preserved` for coherence
+   - Use `buffers_typed_enqueue` for buffer typing
 
 2. **Recv**: The receiver's local type advances, the directed edge trace shrinks
-   - Use `Coherent_recv_preserved` for coherence
+   - Use `coherent_recv_preserved` for coherence
    - Use buffer dequeue lemma for buffer typing
 
 3. **Select/Branch**: Similar to send/recv but for labels
@@ -81,7 +81,7 @@ abbrev HasTypeProcPre1 (S : SEnv) (G : GEnv) (P : Process) : Prop :=
 -- Helper Lemmas
 
 /-- StoreTyped is preserved when updating a non-channel variable. -/
-theorem StoreTyped_update_nonChan {G : GEnv} {S : SEnv} {store : VarStore}
+theorem store_typed_update_non_chan {G : GEnv} {S : SEnv} {store : VarStore}
     {x : Var} {v : Value} {T : ValType}
     (hST : StoreTyped G S store)
     (hv : HasTypeVal G v T)
@@ -91,31 +91,31 @@ theorem StoreTyped_update_nonChan {G : GEnv} {S : SEnv} {store : VarStore}
   by_cases hyx : y = x
   · -- y = x: use the new value
     subst hyx
-    rw [lookupStr_update_eq] at hy
-    rw [lookupSEnv_update_eq] at hU
+    rw [lookup_str_update_eq] at hy
+    rw [lookup_s_env_update_eq] at hU
     have hw : w = v := Option.some_injective _ hy.symm
     have hUT : U = T := Option.some_injective _ hU.symm
     subst hw hUT
     exact hv
   · -- y ≠ x: use the original typing
     have hyx' : x ≠ y := Ne.symm hyx
-    rw [lookupStr_update_neq _ _ _ _ hyx'] at hy
-    rw [lookupSEnv_update_neq _ _ _ _ hyx'] at hU
+    rw [lookup_str_update_neq _ _ _ _ hyx'] at hy
+    rw [lookup_s_env_update_neq _ _ _ _ hyx'] at hU
     exact hST y w U hy hU
 
 /-- BuffersTyped is preserved when enqueuing a well-typed value. -/
-theorem BuffersTyped_enqueue_old {G : GEnv} {D : DEnv} {bufs : Buffers}
+theorem buffers_typed_enqueue_old {G : GEnv} {D : DEnv} {bufs : Buffers}
     {e : Edge} {v : Value} {T : ValType}
     (hBT : BuffersTyped G D bufs)
     (hv : HasTypeVal G v T) :
     BuffersTyped G (updateD D e (lookupD D e ++ [T])) (enqueueBuf bufs e v) := by
   -- Directly reuse the newer enqueue lemma.
   simpa using
-    (BuffersTyped_enqueue (G := G) (D := D) (bufs := bufs) (e := e) (v := v) (T := T) hBT hv)
+    (buffers_typed_enqueue (G := G) (D := D) (bufs := bufs) (e := e) (v := v) (T := T) hBT hv)
 
 -- Preservation Support
 
-theorem SessionsOf_eq_of_TypedStep
+theorem sessions_of_eq_of_typed_step
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     SessionsOf G' = SessionsOf G := by
@@ -124,23 +124,23 @@ theorem SessionsOf_eq_of_TypedStep
   | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
       have hEq : SessionsOf (updateG G e L) = SessionsOf G :=
-        SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.send target T L) hG
+        sessions_of_update_g_eq (G:=G) (e:=e) (L:=L) (L':=.send target T L) hG
       simp [hGout, hEq]
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
       have hEq : SessionsOf (updateG G e L) = SessionsOf G :=
 /- ## Structured Block 1 -/
-        SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.recv source T L) hG
+        sessions_of_update_g_eq (G:=G) (e:=e) (L:=L) (L':=.recv source T L) hG
       simp [hGout, hEq]
   | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
       have hEq : SessionsOf (updateG G e L) = SessionsOf G :=
-        SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.select target bs) hG
+        sessions_of_update_g_eq (G:=G) (e:=e) (L:=L) (L':=.select target bs) hG
       simp [hGout, hEq]
   | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
       have hEq : SessionsOf (updateG G e L) = SessionsOf G :=
-        SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.branch source bs) hG
+        sessions_of_update_g_eq (G:=G) (e:=e) (L:=L) (L':=.branch source bs) hG
       simp [hGout, hEq]
   | assign =>
       simp
@@ -158,14 +158,14 @@ theorem SessionsOf_eq_of_TypedStep
       simp
 
 -- DEnv Consistency Preservation
-theorem DConsistent_preserved
+theorem d_consistent_preserved
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     DConsistent G D →
     DConsistent G' D' := by
   intro hTS hCons s hs
-  have hEq : SessionsOf G' = SessionsOf G := SessionsOf_eq_of_TypedStep hTS
-  have hs' := SessionsOfD_subset_of_TypedStep hTS hs
+  have hEq : SessionsOf G' = SessionsOf G := sessions_of_eq_of_typed_step hTS
+  have hs' := sessions_of_d_subset_of_typed_step hTS hs
   cases hs' with
   | inl hD =>
       have hG : s ∈ SessionsOf G := hCons hD
@@ -175,7 +175,7 @@ theorem DConsistent_preserved
 
 -- Buffer/Coherence Rewrites
 
-theorem Coherent_rewriteD
+theorem coherent_rewrite_d
     {G : GEnv} {D D' : DEnv} :
     (∀ e, lookupD D e = lookupD D' e) →
     Coherent G D →
@@ -188,28 +188,28 @@ theorem Coherent_rewriteD
 
 -- Owned Environment Disjointness Update Lemma
 /- ## Structured Block 2 -/
-theorem OwnedDisjoint_updateLeft
+theorem owned_disjoint_update_left
     {Sown : OwnedEnv} {x : Var} {T : ValType} :
     OwnedDisjoint Sown →
     OwnedDisjoint (OwnedEnv.updateLeft Sown x T) := by
   intro hOwn y Ty1 Ty2 hR hL
   by_cases hxy : y = x
   · subst hxy
-    have hNone : lookupSEnv (eraseSEnv Sown.right y) y = none := lookupSEnv_erase_eq (S:=Sown.right) (x:=y)
+    have hNone : lookupSEnv (eraseSEnv Sown.right y) y = none := lookup_s_env_erase_eq (S:=Sown.right) (x:=y)
     have : (some Ty1 : Option ValType) = none := by
       have hR' := hR
       simp [OwnedEnv.updateLeft, hNone] at hR'
     cases this
   · have hR' : lookupSEnv Sown.right y = some Ty1 := by
-      have hEq := lookupSEnv_erase_ne (S:=Sown.right) (x:=x) (y:=y) hxy
+      have hEq := lookup_s_env_erase_ne (S:=Sown.right) (x:=x) (y:=y) hxy
       simpa [OwnedEnv.updateLeft, hEq] using hR
     have hL' : lookupSEnv Sown.left y = some Ty2 := by
-      have hEq := lookupSEnv_update_neq (env:=Sown.left) (x:=x) (y:=y) (T:=T) (Ne.symm hxy)
+      have hEq := lookup_s_env_update_neq (env:=Sown.left) (x:=x) (y:=y) (T:=T) (Ne.symm hxy)
       simpa [OwnedEnv.updateLeft, hEq] using hL
     exact hOwn y Ty1 Ty2 hR' hL'
 
 -- TypedStep Right-Domain Subset
-theorem TypedStep_right_domsubset
+theorem typed_step_right_domsubset
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
@@ -217,38 +217,38 @@ theorem TypedStep_right_domsubset
   intro hTS hPre
   induction hTS generalizing Sfin Gfin W Δ with
   | send =>
-      exact SEnvDomSubset_refl
+      exact s_env_dom_subset_refl
   | recv =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
         hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut
       subst hSout
-      simpa [OwnedEnv.updateLeft] using (SEnvDomSubset_erase (S:=Sown.right) (x:=x))
+      simpa [OwnedEnv.updateLeft] using (s_env_dom_subset_erase (S:=Sown.right) (x:=x))
   | select =>
-      exact SEnvDomSubset_refl
+      exact s_env_dom_subset_refl
   | branch =>
-      exact SEnvDomSubset_refl
+      exact s_env_dom_subset_refl
   | assign =>
       rename_i G D Ssh Sown store bufs x v T S' store' hv hSout hStoreOut
       subst hSout
-      simpa [OwnedEnv.updateLeft] using (SEnvDomSubset_erase (S:=Sown.right) (x:=x))
+      simpa [OwnedEnv.updateLeft] using (s_env_dom_subset_erase (S:=Sown.right) (x:=x))
   | seq_step _ ih =>
       cases hPre with
       | seq hP hQ =>
           exact ih hP
   | seq_skip =>
-      exact SEnvDomSubset_refl
+      exact s_env_dom_subset_refl
   | par_left =>
-      exact SEnvDomSubset_refl
+      exact s_env_dom_subset_refl
   | par_right =>
 /- ## Structured Block 3 -/
-      exact SEnvDomSubset_refl
+      exact s_env_dom_subset_refl
   | par_skip_left =>
-      exact SEnvDomSubset_refl
+      exact s_env_dom_subset_refl
   | par_skip_right =>
-      exact SEnvDomSubset_refl
+      exact s_env_dom_subset_refl
 
 -- Owned Disjointness Preservation across TypedStep
-theorem OwnedDisjoint_preserved_TypedStep
+theorem owned_disjoint_preserved_typed_step
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
@@ -263,7 +263,7 @@ theorem OwnedDisjoint_preserved_TypedStep
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
         hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut
       subst hSout
-      exact OwnedDisjoint_updateLeft hOwn
+      exact owned_disjoint_update_left hOwn
   | select =>
       simpa [OwnedDisjoint] using hOwn
   | branch =>
@@ -271,12 +271,12 @@ theorem OwnedDisjoint_preserved_TypedStep
   | assign =>
       rename_i G D Ssh Sown store bufs x v T S' store' hv hSout hStoreOut
       subst hSout
-      exact OwnedDisjoint_updateLeft hOwn
+      exact owned_disjoint_update_left hOwn
   | seq_step _ ih =>
       cases hPre with
       | seq hP hQ =>
-          have hDomQ := HasTypeProcPreOut_domsubset hQ
-          have hDisjRightMid := DisjointS_of_domsubset_right hDomQ hDisjRightFin
+          have hDomQ := has_type_proc_pre_out_domsubset hQ
+          have hDisjRightMid := disjoint_s_of_domsubset_right hDomQ hDisjRightFin
           exact ih hP hOwn hDisjRightMid
   | seq_skip =>
       simpa [OwnedDisjoint] using hOwn
@@ -292,7 +292,7 @@ theorem OwnedDisjoint_preserved_TypedStep
         intro x T hL
         exact ⟨T, hL⟩
       have hLeftDisj : DisjointS Sown.right (S₁' ++ split.S2) :=
-        DisjointS_preserved_TypedStep_left (Sframe:=Sown.right) hTS' hPre
+        disjoint_s_preserved_typed_step_left (Sframe:=Sown.right) hTS' hPre
           hOwn hDom hOwn hDisjRightFin rfl
 /- ## Structured Block 4 -/
       simpa [OwnedDisjoint] using hLeftDisj
@@ -307,7 +307,7 @@ theorem OwnedDisjoint_preserved_TypedStep
         intro x T hL
         exact ⟨T, hL⟩
       have hLeftDisj : DisjointS Sown.right (split.S1 ++ S₂') :=
-        DisjointS_preserved_TypedStep_left (Sframe:=Sown.right) hTS' hPre
+        disjoint_s_preserved_typed_step_left (Sframe:=Sown.right) hTS' hPre
           hOwn hDom hOwn hDisjRightFin rfl
       simpa [OwnedDisjoint] using hLeftDisj
   | par_skip_left =>
@@ -316,7 +316,7 @@ theorem OwnedDisjoint_preserved_TypedStep
       simpa [OwnedDisjoint] using hOwn
 
 -- Coherence/ValidLabels Monotonicity
-theorem Coherent_mono {G G' : GEnv} {D : DEnv} :
+theorem coherent_mono {G G' : GEnv} {D : DEnv} :
     (∀ e, lookupG G e = lookupG G' e) →
     Coherent G D →
     Coherent G' D := by
@@ -334,7 +334,7 @@ theorem Coherent_mono {G G' : GEnv} {D : DEnv} :
     simpa [hEq _] using hGsender
   exact ⟨Lsender, hGsender', hConsume⟩
 
-theorem ValidLabels_mono {G G' : GEnv} {D : DEnv} {bufs : Buffers} :
+theorem valid_labels_mono {G G' : GEnv} {D : DEnv} {bufs : Buffers} :
     (∀ e, lookupG G e = lookupG G' e) →
     ValidLabels G D bufs →
     ValidLabels G' D bufs := by

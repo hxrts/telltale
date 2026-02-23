@@ -38,8 +38,8 @@ Worklist exploration with visited set:
 
 ## Main Results
 
-- `checkAsync_sound` : Acceptance implies AsyncSubtypeRel
-- `checkAsync_complete` : AsyncSubtypeRel implies acceptance (with enough fuel) -/
+- `check_async_sound` : Acceptance implies AsyncSubtypeRel
+- `check_async_complete` : AsyncSubtypeRel implies acceptance (with enough fuel) -/
 
 set_option linter.dupNamespace false
 
@@ -327,7 +327,7 @@ By coinduction. The visited set forms a consistent set.
 Every triple in a consistent set satisfies AsyncSubtypeRel:
 - Base cases satisfy by .done
 - Non-base cases satisfy by .step with successors in the set -/
-theorem checkAsync_sound {S T : LocalTypeC} {unfoldBound fuel : Nat}
+theorem check_async_sound {S T : LocalTypeC} {unfoldBound fuel : Nat}
     (h : checkAsync S T unfoldBound fuel = .accepted) :
     S ≤ₐ T := by
   classical
@@ -349,7 +349,7 @@ Every triple in the AsyncSubtypeRel derivation is reachable.
 For regular types, reachable triples are finite.
 With fuel ≥ |reachable triples|, the algorithm visits all of them.
 Since the relation holds, no triple causes rejection. -/
-theorem checkAsync_complete {S T : LocalTypeC}
+theorem check_async_complete {S T : LocalTypeC}
     (_hS : Regular S) (_hT : Regular T)
     (hRel : S ≤ₐ T) :
     ∃ unfoldBound fuel,
@@ -370,11 +370,11 @@ def decideAsyncSubtype (S T : LocalTypeC)
   let fuel := sufficientFuel S T
   match hResult : checkAsync S T ub fuel with
   | .accepted =>
-      exact isTrue (checkAsync_sound hResult)
+      exact isTrue (check_async_sound hResult)
   | .rejected =>
       exact isFalse (by
         intro hRel
-        have ⟨ub', fuel', hacc⟩ := checkAsync_complete hS hT hRel
+        have ⟨ub', fuel', hacc⟩ := check_async_complete hS hT hRel
         -- Any bounds accept when the relation holds (due checkAsync first branch).
         have hacc' : checkAsync S T ub fuel = .accepted := by
           simp [checkAsync, hRel]

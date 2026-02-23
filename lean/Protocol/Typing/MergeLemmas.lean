@@ -10,7 +10,7 @@ The Problem. Typing for merged environments (used in parallel composition and
 linking) requires lemmas about disjoint lookups and session isolation.
 
 Solution Structure. We prove:
-1. `lookupG_none_of_disjoint`: disjoint GEnvs have non-overlapping lookups
+1. `lookup_g_none_of_disjoint`: disjoint GEnvs have non-overlapping lookups
 2. `sid_not_in_right_of_left`: session isolation across splits
 3. Branch processing helpers for branch/select typing
 -/
@@ -20,7 +20,7 @@ Solution Structure. We prove:
 /-! ## Disjoint Lookup Basics -/
 
 /-- DisjointG: endpoints from the right are absent on the left. -/
-private theorem lookupG_none_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
+private theorem lookup_g_none_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
     {e : Endpoint} {L : LocalType} (hLookup : lookupG G₂ e = some L) :
     lookupG G₁ e = none := by
   -- Use disjoint session IDs to rule out any left lookup.
@@ -53,7 +53,7 @@ private theorem sid_not_in_right_of_left {G₁ G₂ : GEnv} (hDisj : DisjointG G
 /-! ## Trace-Environment Disjointness Helpers -/
 
 /-- DConsistent: a missing session in G implies no edge entry in D. -/
-private theorem DEnv_find_none_of_notin_sessions {G : GEnv} {D : DEnv} (hCons : DConsistent G D)
+private theorem d_env_find_none_of_notin_sessions {G : GEnv} {D : DEnv} (hCons : DConsistent G D)
     {e : Edge} (hNot : e.sid ∉ SessionsOf G) : D.find? e = none := by
   -- If there were an entry, it would witness membership in SessionsOfD.
   by_cases hNone : D.find? e = none
@@ -66,7 +66,7 @@ private theorem DEnv_find_none_of_notin_sessions {G : GEnv} {D : DEnv} (hCons : 
         exact (hNot hSidG).elim
 
 /-- DisjointD: a left edge entry forbids a right entry at the same edge. -/
-private theorem DEnv_find_none_of_disjoint_left {D₁ D₂ : DEnv} (hDisj : DisjointD D₁ D₂)
+private theorem d_env_find_none_of_disjoint_left {D₁ D₂ : DEnv} (hDisj : DisjointD D₁ D₂)
     {e : Edge} {ts : List ValType} (hFind : D₁.find? e = some ts) : D₂.find? e = none := by
   -- Use disjoint session IDs to rule out any right entry.
   have hSid : e.sid ∈ SessionsOfD D₁ := ⟨e, ts, hFind, rfl⟩
@@ -89,7 +89,7 @@ private theorem DEnv_find_none_of_disjoint_left {D₁ D₂ : DEnv} (hDisj : Disj
 /-! ## Buffer Typing Rewrites and Lifts -/
 
 /-- BufferTyped is preserved when extending GEnv with compatible endpoints. -/
-private theorem BufferTyped_weakenG {G G' : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge} :
+private theorem buffer_typed_weaken_g {G G' : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge} :
     BufferTyped G D bufs e →
     (∀ ep L, lookupG G ep = some L → lookupG G' ep = some L) →
     BufferTyped G' D bufs e := by
@@ -98,10 +98,10 @@ private theorem BufferTyped_weakenG {G G' : GEnv} {D : DEnv} {bufs : Buffers} {e
   rcases hBT with ⟨hLen, hTyping⟩
   refine ⟨hLen, ?_⟩
   intro i hi
-  exact HasTypeVal_mono G G' _ _ (hTyping i hi) hMono
+  exact has_type_val_mono G G' _ _ (hTyping i hi) hMono
 
 /-- BufferTyped is stable under rewriting the trace at a fixed edge. -/
-private theorem BufferTyped_rewriteD {G : GEnv} {D D' : DEnv} {bufs : Buffers} {e : Edge} :
+private theorem buffer_typed_rewrite_d {G : GEnv} {D D' : DEnv} {bufs : Buffers} {e : Edge} :
     lookupD D' e = lookupD D e →
     BufferTyped G D bufs e →
     BufferTyped G D' bufs e := by
@@ -114,32 +114,32 @@ private theorem BufferTyped_rewriteD {G : GEnv} {D D' : DEnv} {bufs : Buffers} {
     simpa [hEq] using hTyping i hi
 
 /-- BufferTyped lifts from the left GEnv into the merged environment. -/
-private theorem BufferTyped_lift_left {G₁ G₂ : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge} :
+private theorem buffer_typed_lift_left {G₁ G₂ : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge} :
     BufferTyped G₁ D bufs e →
     BufferTyped (G₁ ++ G₂) D bufs e := by
   -- Use lookupG_append_left to lift HasTypeVal.
   intro hBT
-  apply BufferTyped_weakenG hBT
+  apply buffer_typed_weaken_g hBT
   intro ep L hLookup
-  exact lookupG_append_left (G₁:=G₁) (G₂:=G₂) hLookup
+  exact lookup_g_append_left (G₁:=G₁) (G₂:=G₂) hLookup
 
 /-- BufferTyped lifts from the right GEnv into the merged environment. -/
-private theorem BufferTyped_lift_right {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
+private theorem buffer_typed_lift_right {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
     {D : DEnv} {bufs : Buffers} {e : Edge} :
     BufferTyped G₂ D bufs e →
     BufferTyped (G₁ ++ G₂) D bufs e := by
   -- Use disjointness to route lookups through the right.
   intro hBT
-  apply BufferTyped_weakenG hBT
+  apply buffer_typed_weaken_g hBT
   intro ep L hLookup
-  have hNone : lookupG G₁ ep = none := lookupG_none_of_disjoint hDisj hLookup
-  have hEq := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=ep) hNone
+  have hNone : lookupG G₁ ep = none := lookup_g_none_of_disjoint hDisj hLookup
+  have hEq := lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:=ep) hNone
   simpa [hEq] using hLookup
 
 /-! ## Store and Buffer Merge Theorems -/
 
 /-- StoreTyped merges when SEnv is split and endpoints are disjoint. -/
-theorem StoreTyped_merge {G₁ G₂ : GEnv} {S₁ S₂ : SEnv} {store : VarStore}
+theorem store_typed_merge {G₁ G₂ : GEnv} {S₁ S₂ : SEnv} {store : VarStore}
     (hDisj : DisjointG G₁ G₂) :
     StoreTyped G₁ S₁ store →
     StoreTyped G₂ S₂ store →
@@ -148,27 +148,27 @@ theorem StoreTyped_merge {G₁ G₂ : GEnv} {S₁ S₂ : SEnv} {store : VarStore
   intro hST1 hST2 x v T hStore hLookup
   by_cases hLeft : lookupSEnv S₁ x = none
   · have hLookup' : lookupSEnv S₂ x = some T := by
-      simpa [lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hLeft] using hLookup
+      simpa [lookup_s_env_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hLeft] using hLookup
     have hVal : HasTypeVal G₂ v T := hST2 x v T hStore hLookup'
-    exact HasTypeVal_prepend G₁ G₂ v T hVal (by
+    exact has_type_val_prepend G₁ G₂ v T hVal (by
       intro ep L hLookup
-      have hNone := lookupG_none_of_disjoint (G₁:=G₁) (G₂:=G₂) hDisj hLookup
+      have hNone := lookup_g_none_of_disjoint (G₁:=G₁) (G₂:=G₂) hDisj hLookup
       simpa [lookupG] using hNone)
   · cases hSome : lookupSEnv S₁ x with
     | none => exact (hLeft hSome).elim
     | some T₁ =>
         have hEq : T₁ = T := by
           have hLeft' : lookupSEnv (S₁ ++ S₂) x = some T₁ :=
-            lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) hSome
+            lookup_s_env_append_left (S₁:=S₁) (S₂:=S₂) hSome
           have : some T₁ = some T := by simpa [hLeft'] using hLookup
           exact Option.some.inj this
         have hVal : HasTypeVal G₁ v T := by
           simpa [hEq] using (hST1 x v T₁ hStore hSome)
-        exact HasTypeVal_mono G₁ (G₁ ++ G₂) v T hVal (by
-          intro ep L hL; exact lookupG_append_left (G₁:=G₁) (G₂:=G₂) hL)
+        exact has_type_val_mono G₁ (G₁ ++ G₂) v T hVal (by
+          intro ep L hL; exact lookup_g_append_left (G₁:=G₁) (G₂:=G₂) hL)
 
 /-- BuffersTyped merges when traces are disjoint by session. -/
-theorem BuffersTyped_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} {bufs : Buffers}
+theorem buffers_typed_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} {bufs : Buffers}
     (hDisjG : DisjointG G₁ G₂) (hDisjD : DisjointD D₁ D₂) :
     BuffersTyped G₁ D₁ bufs →
     BuffersTyped G₂ D₂ bufs →
@@ -177,22 +177,22 @@ theorem BuffersTyped_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} {bufs : Buffers
   intro hBT1 hBT2 e
   by_cases hNone : D₁.find? e = none
   · have hEq : lookupD (D₁ ++ D₂) e = lookupD D₂ e :=
-      lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hNone
-    have hBT2' : BufferTyped (G₁ ++ G₂) D₂ bufs e := BufferTyped_lift_right hDisjG (hBT2 e)
-    exact BufferTyped_rewriteD hEq hBT2'
+      lookup_d_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hNone
+    have hBT2' : BufferTyped (G₁ ++ G₂) D₂ bufs e := buffer_typed_lift_right hDisjG (hBT2 e)
+    exact buffer_typed_rewrite_d hEq hBT2'
   · cases hSome : D₁.find? e with
     | none => exact (hNone hSome).elim
     | some ts =>
-        have hD2none : D₂.find? e = none := DEnv_find_none_of_disjoint_left hDisjD hSome
+        have hD2none : D₂.find? e = none := d_env_find_none_of_disjoint_left hDisjD hSome
         have hEq : lookupD (D₁ ++ D₂) e = lookupD D₁ e :=
-          lookupD_append_left_of_right_none (D₁:=D₁) (D₂:=D₂) (e:=e) hD2none
-        have hBT1' : BufferTyped (G₁ ++ G₂) D₁ bufs e := BufferTyped_lift_left (hBT1 e)
-        exact BufferTyped_rewriteD hEq hBT1'
+          lookup_d_append_left_of_right_none (D₁:=D₁) (D₂:=D₂) (e:=e) hD2none
+        have hBT1' : BufferTyped (G₁ ++ G₂) D₁ bufs e := buffer_typed_lift_left (hBT1 e)
+        exact buffer_typed_rewrite_d hEq hBT1'
 
 /-! ## Coherence Merge Side Lemmas -/
 
 /-- EdgeCoherent: receiver from the left implies left coherence is enough. -/
-private theorem EdgeCoherent_merge_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
+private theorem edge_coherent_merge_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     (hC₁ : Coherent G₁ D₁) (hDisjG : DisjointG G₁ G₂) (hCons₂ : DConsistent G₂ D₂)
     {e : Edge} {Lrecv : LocalType}
     (hGrecvL : lookupG G₁ { sid := e.sid, role := e.receiver } = some Lrecv)
@@ -208,11 +208,11 @@ private theorem EdgeCoherent_merge_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
     exact ⟨recvEp, Lrecv, hGrecvL, rfl⟩
   have hSidNotInG2 : e.sid ∉ SessionsOf G₂ := sid_not_in_right_of_left hDisjG hSidInG1
-  have hSenderNoneG2 : lookupG G₂ senderEp = none := lookupG_none_of_not_session hSidNotInG2
+  have hSenderNoneG2 : lookupG G₂ senderEp = none := lookup_g_none_of_not_session hSidNotInG2
   -- Extract sender lookup from ActiveEdge in merged environment
   have hSenderSomeMerged : (lookupG (G₁ ++ G₂) senderEp).isSome := hActive.1
   rcases Option.isSome_iff_exists.mp hSenderSomeMerged with ⟨Ls, hLsMerged⟩
-  have hInv := lookupG_append_inv (G₁:=G₁) (G₂:=G₂) (e:=senderEp) (L:=Ls) hLsMerged
+  have hInv := lookup_g_append_inv (G₁:=G₁) (G₂:=G₂) (e:=senderEp) (L:=Ls) hLsMerged
   have hSenderSomeG1 : (lookupG G₁ senderEp).isSome := by
     cases hInv with
     | inl h => rw [h]; trivial
@@ -221,22 +221,22 @@ private theorem EdgeCoherent_merge_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
           simpa [hSenderNoneG2] using h.2
         cases h'
   have hActiveG1 : ActiveEdge G₁ e := ⟨hSenderSomeG1, by rw [hGrecvL]; trivial⟩
-  have hCoh := Coherent_edge_of_receiver (G:=G₁) (D:=D₁) (e:=e) hC₁ hGrecvL hActiveG1
+  have hCoh := coherent_edge_of_receiver (G:=G₁) (D:=D₁) (e:=e) hC₁ hGrecvL hActiveG1
   rcases hCoh with ⟨Lsender, hGsender, hConsume⟩
   have hSid : e.sid ∈ SessionsOf G₁ := ⟨senderEp, Lsender, hGsender, rfl⟩
   have hNot : e.sid ∉ SessionsOf G₂ := sid_not_in_right_of_left hDisjG hSid
-  have hD2none : D₂.find? e = none := DEnv_find_none_of_notin_sessions (G:=G₂) (D:=D₂) hCons₂ hNot
+  have hD2none : D₂.find? e = none := d_env_find_none_of_notin_sessions (G:=G₂) (D:=D₂) hCons₂ hNot
   have hEq : lookupD (D₁ ++ D₂) e = lookupD D₁ e :=
-    lookupD_append_left_of_right_none (D₁:=D₁) (D₂:=D₂) (e:=e) hD2none
+    lookup_d_append_left_of_right_none (D₁:=D₁) (D₂:=D₂) (e:=e) hD2none
   have hGsender' : lookupG (G₁ ++ G₂) senderEp = some Lsender :=
-    lookupG_append_left (G₁:=G₁) (G₂:=G₂) hGsender
+    lookup_g_append_left (G₁:=G₁) (G₂:=G₂) hGsender
   refine ⟨Lsender, hGsender', ?_⟩
   simpa [hEq] using hConsume
 
 /-! ## Coherence Merge Side Lemmas (Right Receiver) -/
 
 /-- EdgeCoherent: receiver from the right implies right coherence is enough. -/
-private theorem EdgeCoherent_merge_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
+private theorem edge_coherent_merge_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     (hC₂ : Coherent G₂ D₂) (hDisjG : DisjointG G₁ G₂) (hCons₁ : DConsistent G₁ D₁)
     {e : Edge} {Lrecv : LocalType}
     (hGrecvR : lookupG G₂ { sid := e.sid, role := e.receiver } = some Lrecv)
@@ -251,27 +251,27 @@ private theorem EdgeCoherent_merge_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
   have hSidInG2 : e.sid ∈ SessionsOf G₂ := by
     let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
     exact ⟨recvEp, Lrecv, hGrecvR, rfl⟩
-  have hDisjG' : DisjointG G₂ G₁ := DisjointG_symm hDisjG
+  have hDisjG' : DisjointG G₂ G₁ := disjoint_g_symm hDisjG
   have hSidNotInG1 : e.sid ∉ SessionsOf G₁ := sid_not_in_right_of_left hDisjG' hSidInG2
-  have hSenderNoneG1 : lookupG G₁ senderEp = none := lookupG_none_of_not_session hSidNotInG1
+  have hSenderNoneG1 : lookupG G₁ senderEp = none := lookup_g_none_of_not_session hSidNotInG1
   -- Extract sender lookup from ActiveEdge in merged environment
   have hSenderSomeMerged : (lookupG (G₁ ++ G₂) senderEp).isSome := hActive.1
   rcases Option.isSome_iff_exists.mp hSenderSomeMerged with ⟨Ls, hLsMerged⟩
-  have hInv := lookupG_append_inv (G₁:=G₁) (G₂:=G₂) (e:=senderEp) (L:=Ls) hLsMerged
+  have hInv := lookup_g_append_inv (G₁:=G₁) (G₂:=G₂) (e:=senderEp) (L:=Ls) hLsMerged
   have hSenderSomeG2 : (lookupG G₂ senderEp).isSome := by
     cases hInv with
     | inl h => rw [hSenderNoneG1] at h; cases h
     | inr h => rw [h.2]; trivial
   have hActiveG2 : ActiveEdge G₂ e := ⟨hSenderSomeG2, by rw [hGrecvR]; trivial⟩
-  have hCoh := Coherent_edge_of_receiver (G:=G₂) (D:=D₂) (e:=e) hC₂ hGrecvR hActiveG2
+  have hCoh := coherent_edge_of_receiver (G:=G₂) (D:=D₂) (e:=e) hC₂ hGrecvR hActiveG2
   rcases hCoh with ⟨Lsender, hGsender, hConsume⟩
   have hSid : e.sid ∈ SessionsOf G₂ := ⟨senderEp, Lsender, hGsender, rfl⟩
   have hNot : e.sid ∉ SessionsOf G₁ := sid_not_in_right_of_left hDisjG' hSid
-  have hD1none : D₁.find? e = none := DEnv_find_none_of_notin_sessions (G:=G₁) (D:=D₁) hCons₁ hNot
+  have hD1none : D₁.find? e = none := d_env_find_none_of_notin_sessions (G:=G₁) (D:=D₁) hCons₁ hNot
   have hEq : lookupD (D₁ ++ D₂) e = lookupD D₂ e :=
-    lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hD1none
-  have hNoneSender : lookupG G₁ senderEp = none := lookupG_none_of_disjoint hDisjG hGsender
-  have hEqSender := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=senderEp) hNoneSender
+    lookup_d_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hD1none
+  have hNoneSender : lookupG G₁ senderEp = none := lookup_g_none_of_disjoint hDisjG hGsender
+  have hEqSender := lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:=senderEp) hNoneSender
   have hGsender' : lookupG (G₁ ++ G₂) senderEp = some Lsender := by
     simpa [hEqSender] using hGsender
   refine ⟨Lsender, hGsender', ?_⟩
@@ -280,24 +280,24 @@ private theorem EdgeCoherent_merge_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
 /-! ## Coherence Merge Theorem -/
 
 /-- Coherence merges when sessions are disjoint and traces follow their owners. -/
-theorem Coherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
+theorem coherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     (hC₁ : Coherent G₁ D₁) (hC₂ : Coherent G₂ D₂)
     (hDisjG : DisjointG G₁ G₂) (hCons₁ : DConsistent G₁ D₁) (hCons₂ : DConsistent G₂ D₂) :
     Coherent (G₁ ++ G₂) (D₁ ++ D₂) := by
   -- Split on which side provides the receiver endpoint.
   intro e hActive Lrecv hGrecv
-  have hInv := lookupG_append_inv (G₁:=G₁) (G₂:=G₂)
+  have hInv := lookup_g_append_inv (G₁:=G₁) (G₂:=G₂)
     (e:={ sid := e.sid, role := e.receiver }) hGrecv
   cases hInv with
   | inl hLeft =>
-      exact EdgeCoherent_merge_left hC₁ hDisjG hCons₂ hLeft hActive
+      exact edge_coherent_merge_left hC₁ hDisjG hCons₂ hLeft hActive
   | inr hRight =>
-      exact EdgeCoherent_merge_right hC₂ hDisjG hCons₁ hRight.2 hActive
+      exact edge_coherent_merge_right hC₂ hDisjG hCons₁ hRight.2 hActive
 
 /-! ## Session-Set Preservation Helpers -/
 
 /-- Updating an existing endpoint preserves the set of sessions. -/
-theorem SessionsOf_updateG_eq {G : GEnv} {e : Endpoint} {L L' : LocalType}
+theorem sessions_of_update_g_eq {G : GEnv} {e : Endpoint} {L L' : LocalType}
     (hLookup : lookupG G e = some L') :
     SessionsOf (updateG G e L) = SessionsOf G := by
   ext s; constructor
@@ -307,21 +307,21 @@ theorem SessionsOf_updateG_eq {G : GEnv} {e : Endpoint} {L L' : LocalType}
     · cases heq
       exact ⟨e, L', hLookup, hSid⟩
     · have hLookup'' : lookupG G e' = some L'' := by
-        simpa [lookupG_update_neq _ _ _ _ (Ne.symm heq)] using hLookup'
+        simpa [lookup_g_update_neq _ _ _ _ (Ne.symm heq)] using hLookup'
       exact ⟨e', L'', hLookup'', hSid⟩
   · intro hs
     rcases hs with ⟨e', L'', hLookup', hSid⟩
     by_cases heq : e' = e
     · cases heq
-      exact ⟨e, L, lookupG_update_eq G e L, hSid⟩
+      exact ⟨e, L, lookup_g_update_eq G e L, hSid⟩
     · have hLookup'' : lookupG (updateG G e L) e' = some L'' := by
-        simpa [lookupG_update_neq _ _ _ _ (Ne.symm heq)] using hLookup'
+        simpa [lookup_g_update_neq _ _ _ _ (Ne.symm heq)] using hLookup'
       exact ⟨e', L'', hLookup'', hSid⟩
 
 /-! ## Session-Set Monotonicity under TypedStep -/
 
 /-- Sessions only shrink under TypedStep (no new sessions introduced). -/
-theorem SessionsOf_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
+theorem sessions_of_subset_of_typed_step {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     SessionsOf G' ⊆ SessionsOf G := by
   intro hTS
@@ -329,22 +329,22 @@ theorem SessionsOf_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' st
   | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
       have hEq : SessionsOf (updateG G e L) = SessionsOf G :=
-        SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.send target T L) hG
+        sessions_of_update_g_eq (G:=G) (e:=e) (L:=L) (L':=.send target T L) hG
       simp [hGout, hEq]
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
       have hEq : SessionsOf (updateG G e L) = SessionsOf G :=
-        SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.recv source T L) hG
+        sessions_of_update_g_eq (G:=G) (e:=e) (L:=L) (L':=.recv source T L) hG
       simp [hGout, hEq]
   | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
       have hEq : SessionsOf (updateG G e L) = SessionsOf G :=
-        SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.select target bs) hG
+        sessions_of_update_g_eq (G:=G) (e:=e) (L:=L) (L':=.select target bs) hG
       simp [hGout, hEq]
   | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
       have hEq : SessionsOf (updateG G e L) = SessionsOf G :=
-        SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.branch source bs) hG
+        sessions_of_update_g_eq (G:=G) (e:=e) (L:=L) (L':=.branch source bs) hG
       simp [hGout, hEq]
   | assign =>
       simp

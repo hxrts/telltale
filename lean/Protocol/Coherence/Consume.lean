@@ -42,7 +42,7 @@ For role p's view:
 
 ## Proof Technique: Edge Case Analysis
 
-The key preservation proofs (`Coherent_send_preserved`, `Coherent_recv_preserved`)
+The key preservation proofs (`coherent_send_preserved`, `coherent_recv_preserved`)
 proceed by case analysis on which edge we're checking coherence for:
 
 1. **e = updated edge**: The sender's/receiver's local type changed, trace changed
@@ -111,17 +111,17 @@ def Consume (from_ : Role) : LocalType → List ValType → Option LocalType
     | none => none
 
 /-- Consume for end type with empty queue. -/
-theorem Consume_end_nil (from_ : Role) : Consume from_ .end_ [] = some .end_ := rfl
+theorem consume_end_nil (from_ : Role) : Consume from_ .end_ [] = some .end_ := rfl
 
 /-- Consume for recv with matching type. -/
-theorem Consume_recv_cons (from_ : Role) (T : ValType) (L : LocalType) (ts : List ValType) :
+theorem consume_recv_cons (from_ : Role) (T : ValType) (L : LocalType) (ts : List ValType) :
     Consume from_ (.recv from_ T L) (T :: ts) = Consume from_ L ts := by
   simp only [Consume, consumeOne, beq_self_eq_true, Bool.and_true, ↓reduceIte]
 
 /-! ## Consume Depth/Length Bounds -/
 
 /-- If consumeOne succeeds, the local type depth strictly decreases. -/
-theorem consumeOne_depth_lt {from_ : Role} {T : ValType} {L L' : LocalType}
+theorem consume_one_depth_lt {from_ : Role} {T : ValType} {L L' : LocalType}
     (h : consumeOne from_ T L = some L') : L'.depth < L.depth := by
   -- Only `.recv` can consume; all other cases are contradictions.
   cases L with
@@ -142,7 +142,7 @@ theorem consumeOne_depth_lt {from_ : Role} {T : ValType} {L L' : LocalType}
       simp [consumeOne] at h
 
 /-- Consuming a trace never exceeds the receiver's depth. -/
-theorem Consume_length_le_depth {from_ : Role} {L L' : LocalType} {ts : List ValType}
+theorem consume_length_le_depth {from_ : Role} {L L' : LocalType} {ts : List ValType}
     (h : Consume from_ L ts = some L') : ts.length ≤ L.depth := by
   -- Induct on the trace to count consumed steps.
   induction ts generalizing L with
@@ -160,7 +160,7 @@ theorem Consume_length_le_depth {from_ : Role} {L L' : LocalType} {ts : List Val
           have hTail : Consume from_ L1 ts = some L' := by
             simpa [Consume, hStep] using h
           have hLen : ts.length ≤ L1.depth := ih hTail
-          have hLt : L1.depth < L.depth := consumeOne_depth_lt hStep
+          have hLt : L1.depth < L.depth := consume_one_depth_lt hStep
           have hLe1 : ts.length + 1 ≤ L1.depth + 1 := Nat.succ_le_succ hLen
           have hLe2 : L1.depth + 1 ≤ L.depth := Nat.succ_le_of_lt hLt
           simpa [Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using le_trans hLe1 hLe2
@@ -170,8 +170,8 @@ theorem Consume_length_le_depth {from_ : Role} {L L' : LocalType} {ts : List Val
 /-- Consume associativity for append: consuming ts then [T] equals consuming ts ++ [T].
     This is the key lemma for send preservation - appending to trace end
     corresponds to receiver eventually receiving that type.
-    Reference: `work/effects/004.lean` Consume_append -/
-theorem Consume_append (from_ : Role) (Lr : LocalType) (ts : List ValType) (T : ValType) {L' : LocalType} :
+    Reference: `work/effects/004.lean` consume_append -/
+theorem consume_append (from_ : Role) (Lr : LocalType) (ts : List ValType) (T : ValType) {L' : LocalType} :
     Consume from_ Lr ts = some L' →
     Consume from_ Lr (ts ++ [T]) = Consume from_ L' [T] := by
   intro h
@@ -195,8 +195,8 @@ theorem Consume_append (from_ : Role) (Lr : LocalType) (ts : List ValType) (T : 
 
 /-- Consume decomposition: consuming T::ts equals consuming T then ts.
     This is the key lemma for recv preservation.
-    Reference: `work/effects/004.lean` Consume_cons -/
-theorem Consume_cons (from_ : Role) (Lr : LocalType) (T : ValType) (ts : List ValType) :
+    Reference: `work/effects/004.lean` consume_cons -/
+theorem consume_cons (from_ : Role) (Lr : LocalType) (T : ValType) (ts : List ValType) :
     Consume from_ Lr (T :: ts) =
     match Consume from_ Lr [T] with
     | some L' => Consume from_ L' ts
@@ -209,13 +209,13 @@ theorem Consume_cons (from_ : Role) (Lr : LocalType) (T : ValType) (ts : List Va
 /-! ## Consume Renaming Lemmas -/
 
 /-- Renaming commutes with a single consume step. -/
-theorem consumeOne_rename (ρ : SessionRenaming) (from_ : Role) (T : ValType) (L : LocalType) :
+theorem consume_one_rename (ρ : SessionRenaming) (from_ : Role) (T : ValType) (L : LocalType) :
     consumeOne from_ (renameValType ρ T) (renameLocalType ρ L) =
       (consumeOne from_ T L).map (renameLocalType ρ) := by
-  cases L <;> simp [consumeOne, renameLocalType, renameValType_beq]
+  cases L <;> simp [consumeOne, renameLocalType, rename_val_type_beq]
 
 /-- Renaming commutes with Consume over a trace. -/
-theorem Consume_rename (ρ : SessionRenaming) (from_ : Role) (L : LocalType) (ts : List ValType) :
+theorem consume_rename (ρ : SessionRenaming) (from_ : Role) (L : LocalType) (ts : List ValType) :
     Consume from_ (renameLocalType ρ L) (ts.map (renameValType ρ)) =
       (Consume from_ L ts).map (renameLocalType ρ) := by
   induction ts generalizing L with
@@ -225,14 +225,14 @@ theorem Consume_rename (ρ : SessionRenaming) (from_ : Role) (L : LocalType) (ts
     simp [Consume]
     cases h : consumeOne from_ t L with
     | none =>
-        simp [consumeOne_rename, h]
+        simp [consume_one_rename, h]
     | some L' =>
-        simp [consumeOne_rename, h, ih]
+        simp [consume_one_rename, h, ih]
 
 /-! ## Consume Inversion Lemmas -/
 
 /-- Corollary: If Consume succeeds on [T] for a recv type from the same sender, the types match. -/
-theorem Consume_single_recv_match {from_ : Role} {T T' : ValType} {L L' : LocalType}
+theorem consume_single_recv_match {from_ : Role} {T T' : ValType} {L L' : LocalType}
     (h : Consume from_ (.recv from_ T' L) [T] = some L') :
     T = T' := by
   simp only [Consume, consumeOne, beq_self_eq_true, Bool.true_and] at h
@@ -242,7 +242,7 @@ theorem Consume_single_recv_match {from_ : Role} {T T' : ValType} {L L' : LocalT
 /-! ## Consume Empty-Trace Consequences -/
 
 /-- Corollary: If Consume succeeds on [T] for a branch type from the same sender, T must be .string. -/
-theorem Consume_single_branch_string {from_ : Role} {bs : List (String × LocalType)} {T : ValType} {L' : LocalType}
+theorem consume_single_branch_string {from_ : Role} {bs : List (String × LocalType)} {T : ValType} {L' : LocalType}
     (h : Consume from_ (.branch from_ bs) [T] = some L') :
     T = .string := by
   simp only [Consume, consumeOne] at h
@@ -252,7 +252,7 @@ theorem Consume_single_branch_string {from_ : Role} {bs : List (String × LocalT
 
 /-- For non-recv/branch types, Consume only succeeds on empty trace.
     This is because consumeOne only handles recv and branch. -/
-theorem Consume_non_recv_empty {from_ : Role} {L : LocalType} {ts : List ValType} {L' : LocalType}
+theorem consume_non_recv_empty {from_ : Role} {L : LocalType} {ts : List ValType} {L' : LocalType}
     (hNotRecv : ∀ r T L'', L ≠ .recv r T L'')
     (hNotBranch : ∀ r bs, L ≠ .branch r bs)
     (h : Consume from_ L ts = some L') :
@@ -272,8 +272,8 @@ theorem Consume_non_recv_empty {from_ : Role} {L : LocalType} {ts : List ValType
     | branch r bs => exact absurd rfl (hNotBranch r bs)
 
 /-- If sender ≠ role in recv type, trace must be empty for consumption to succeed.
-    Reference: `work/effects/004.lean` Consume_other_empty -/
-theorem Consume_other_empty {from_ r : Role} {T : ValType} {L : LocalType}
+    Reference: `work/effects/004.lean` consume_other_empty -/
+theorem consume_other_empty {from_ r : Role} {T : ValType} {L : LocalType}
     {ts : List ValType} {L' : LocalType}
     (hNe : from_ ≠ r)
     (h : Consume from_ (.recv r T L) ts = some L') :
@@ -294,7 +294,7 @@ theorem Consume_other_empty {from_ r : Role} {T : ValType} {L : LocalType}
     1. sender matches the recv's role AND trace head matches expected type, OR
     2. It fails (contradiction).
     This lemma extracts the trace head = expected type constraint. -/
-theorem Consume_recv_head_match {from_ r : Role} {T : ValType} {L : LocalType}
+theorem consume_recv_head_match {from_ r : Role} {T : ValType} {L : LocalType}
     {t : ValType} {ts : List ValType} {L' : LocalType}
     (hConsume : Consume from_ (.recv r T L) (t :: ts) = some L') :
     from_ = r ∧ t = T := by
@@ -311,7 +311,7 @@ theorem Consume_recv_head_match {from_ r : Role} {T : ValType} {L : LocalType}
 
 /-- For branch type: Consume on non-empty trace always fails because consumeOne
     doesn't handle branch type. This lemma extracts the contradiction. -/
-theorem Consume_branch_nonempty_false {from_ : Role} {r : Role} {bs : List (String × LocalType)}
+theorem consume_branch_nonempty_false {from_ : Role} {r : Role} {bs : List (String × LocalType)}
     {t : ValType} {ts : List ValType} {L' : LocalType}
     (hConsume : Consume from_ (.branch r bs) (t :: ts) = some L') : False := by
   simp only [Consume, consumeOne] at hConsume

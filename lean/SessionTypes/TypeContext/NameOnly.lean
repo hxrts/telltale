@@ -42,14 +42,14 @@ def freshName (ctx : NameOnlyContext) : String :=
 /-! ## Lemmas -/
 
 @[simp]
-theorem toList_fromList (l : List String) : (fromList l).toList = l := by
+theorem to_list_from_list (l : List String) : (fromList l).toList = l := by
   simp only [fromList, toList, TypeContext.names, List.map_map, Function.comp_def]
   induction l with
   | nil => rfl
   | cons hd tl ih => simp only [List.map_cons, ih]
 
 @[simp]
-theorem length_fromList (l : List String) : (fromList l).length = l.length := by
+theorem length_from_list (l : List String) : (fromList l).length = l.length := by
   simp only [fromList, TypeContext.length, List.length_map]
 
 /-! ## Cons-like operation for easy context extension -/
@@ -71,7 +71,7 @@ instance : Coe NameOnlyContext (List String) where
 /-- When we coerce `x :: ctx.toList`, we get `cons x ctx` after fromList.
     This bridges the List syntax to NameOnlyContext operations. -/
 @[simp]
-theorem fromList_cons_toList (x : String) (ctx : NameOnlyContext) :
+theorem from_list_cons_to_list (x : String) (ctx : NameOnlyContext) :
     fromList (x :: ctx.toList) = cons x ctx := by
   simp only [fromList, toList, TypeContext.names, cons, TypeContext.extend]
   congr 1
@@ -93,10 +93,10 @@ def indexOf (ctx : NameOnlyContext) (v : String) : Option Nat :=
 
 /-- Empty context as list notation. -/
 @[simp]
-theorem empty_toList : toList (TypeContext.empty : NameOnlyContext) = [] := rfl
+theorem empty_to_list : toList (TypeContext.empty : NameOnlyContext) = [] := rfl
 
 @[simp]
-theorem cons_toList (v : String) (ctx : NameOnlyContext) :
+theorem cons_to_list (v : String) (ctx : NameOnlyContext) :
     (cons v ctx).toList = v :: ctx.toList := by
   simp only [cons, toList, TypeContext.names_extend]
 
@@ -168,20 +168,20 @@ theorem append_bindings (ctx1 ctx2 : NameOnlyContext) :
 
 /-! ## Nodup Lemmas -/
 
-theorem Nodup_empty : (TypeContext.empty : NameOnlyContext).Nodup := by
+theorem nodup_empty : (TypeContext.empty : NameOnlyContext).Nodup := by
   simp [TypeContext.Nodup, TypeContext.names_empty, List.nodup_nil]
 
-theorem Nodup_cons {v : String} {ctx : NameOnlyContext}
+theorem nodup_cons {v : String} {ctx : NameOnlyContext}
     (hv : v ∉ ctx.names) (hnd : ctx.Nodup) : (cons v ctx).Nodup := by
   simp only [TypeContext.Nodup, cons_names]
   exact List.nodup_cons.mpr ⟨hv, hnd⟩
 
-theorem Nodup_tail {v : String} {ctx : NameOnlyContext}
+theorem nodup_tail {v : String} {ctx : NameOnlyContext}
     (h : (cons v ctx).Nodup) : ctx.Nodup := by
   simp only [TypeContext.Nodup, cons_names] at h
   exact h.tail
 
-theorem notMem_of_Nodup_cons {v : String} {ctx : NameOnlyContext}
+theorem not_mem_of_nodup_cons {v : String} {ctx : NameOnlyContext}
     (h : (cons v ctx).Nodup) : v ∉ ctx.names := by
   simp only [TypeContext.Nodup, cons_names] at h
   exact (List.nodup_cons.mp h).1
@@ -231,7 +231,7 @@ theorem get?_lt {ctx : NameOnlyContext} {i : Nat} (h : i < ctx.length) :
 
 /-! ## IndexOf Lemmas -/
 
-private theorem findIdx?_go_succ (p : String × Unit → Bool) (l : List (String × Unit)) (i : Nat) :
+private theorem find_idx?_go_succ (p : String × Unit → Bool) (l : List (String × Unit)) (i : Nat) :
     List.findIdx?.go p l (i + 1) = Option.map Nat.succ (List.findIdx?.go p l i) := by
   induction l generalizing i with
   | nil => rfl
@@ -245,31 +245,31 @@ private theorem findIdx?_go_succ (p : String × Unit → Bool) (l : List (String
 
 /-! ## IndexOf Constructor Cases -/
 
-theorem indexOf_cons_eq (v : String) (ctx : NameOnlyContext) :
+theorem index_of_cons_eq (v : String) (ctx : NameOnlyContext) :
     (cons v ctx).indexOf v = some 0 := by
   simp only [indexOf, cons_bindings, List.findIdx?, List.findIdx?.go]
   simp only [beq_self_eq_true, ↓reduceIte]
 
-theorem indexOf_cons_ne {v a : String} (ctx : NameOnlyContext) (hne : a ≠ v) :
+theorem index_of_cons_ne {v a : String} (ctx : NameOnlyContext) (hne : a ≠ v) :
     (cons a ctx).indexOf v = Option.map Nat.succ (ctx.indexOf v) := by
   simp only [indexOf, cons_bindings, List.findIdx?, List.findIdx?.go]
   have hneq : (a == v) = false := by simp [hne]
   simp only [hneq]
-  exact findIdx?_go_succ (fun w => w.1 == v) ctx.bindings 0
+  exact find_idx?_go_succ (fun w => w.1 == v) ctx.bindings 0
 
 /-! ## IndexOf/Get Correspondence -/
 
-theorem indexOf_get? {ctx : NameOnlyContext} {v : String} {i : Nat}
+theorem index_of_get? {ctx : NameOnlyContext} {v : String} {i : Nat}
     (h : ctx.indexOf v = some i) : ctx.get? i = some v := by
   induction ctx using induction generalizing i with
   | h_empty => simp [indexOf, List.findIdx?, List.findIdx?.go] at h
   | h_cons a ctx ih =>
       by_cases hav : a = v
       · subst hav
-        simp only [indexOf_cons_eq] at h
+        simp only [index_of_cons_eq] at h
         cases h
         simp [get?_cons_zero]
-      · simp only [indexOf_cons_ne ctx hav] at h
+      · simp only [index_of_cons_ne ctx hav] at h
         cases hi : ctx.indexOf v with
         | none => simp [hi] at h
         | some j =>
@@ -280,17 +280,17 @@ theorem indexOf_get? {ctx : NameOnlyContext} {v : String} {i : Nat}
 
 /-! ## IndexOf Bounds and None Characterization -/
 
-theorem indexOf_lt {ctx : NameOnlyContext} {v : String} {i : Nat}
+theorem index_of_lt {ctx : NameOnlyContext} {v : String} {i : Nat}
     (h : ctx.indexOf v = some i) : i < ctx.length := by
   induction ctx using induction generalizing i with
   | h_empty => simp [indexOf, List.findIdx?, List.findIdx?.go] at h
   | h_cons a ctx ih =>
       by_cases hav : a = v
       · subst hav
-        simp only [indexOf_cons_eq] at h
+        simp only [index_of_cons_eq] at h
         cases h
         simp [cons_length]
-      · simp only [indexOf_cons_ne ctx hav] at h
+      · simp only [index_of_cons_ne ctx hav] at h
         cases hi : ctx.indexOf v with
         | none => simp [hi] at h
         | some j =>
@@ -299,7 +299,7 @@ theorem indexOf_lt {ctx : NameOnlyContext} {v : String} {i : Nat}
             simp only [cons_length]
             exact Nat.succ_lt_succ (ih hi)
 
-theorem indexOf_eq_none_iff {ctx : NameOnlyContext} {v : String} :
+theorem index_of_eq_none_iff {ctx : NameOnlyContext} {v : String} :
     ctx.indexOf v = none ↔ v ∉ ctx.names := by
   induction ctx using induction with
   | h_empty => simp [indexOf, List.findIdx?, List.findIdx?.go]
@@ -307,10 +307,10 @@ theorem indexOf_eq_none_iff {ctx : NameOnlyContext} {v : String} :
       simp only [cons_names, List.mem_cons]
       by_cases hav : a = v
       · subst hav
-        simp only [indexOf_cons_eq, Option.some_ne_none, true_or, not_true_eq_false]
+        simp only [index_of_cons_eq, Option.some_ne_none, true_or, not_true_eq_false]
       · constructor
         · intro h
-          simp only [indexOf_cons_ne ctx hav] at h
+          simp only [index_of_cons_ne ctx hav] at h
           cases hctx : ctx.indexOf v with
           | none =>
               push_neg
@@ -319,18 +319,18 @@ theorem indexOf_eq_none_iff {ctx : NameOnlyContext} {v : String} :
               simp [hctx] at h
         · intro h
           push_neg at h
-          simp only [indexOf_cons_ne ctx hav]
+          simp only [index_of_cons_ne ctx hav]
           cases hctx : ctx.indexOf v with
           | none => rfl
           | some i =>
               have hmem : v ∈ ctx.names := by
-                have hget := indexOf_get? hctx
+                have hget := index_of_get? hctx
                 exact get?_mem hget
               exact (h.2 hmem).elim
 
 /-! ## IndexOf Existence from Membership -/
 
-theorem indexOf_mem {ctx : NameOnlyContext} {v : String} (hmem : v ∈ ctx.names) :
+theorem index_of_mem {ctx : NameOnlyContext} {v : String} (hmem : v ∈ ctx.names) :
     ∃ i, ctx.indexOf v = some i := by
   by_contra h
   push_neg at h
@@ -338,7 +338,7 @@ theorem indexOf_mem {ctx : NameOnlyContext} {v : String} (hmem : v ∈ ctx.names
     cases hctx : ctx.indexOf v with
     | none => rfl
     | some i => exact (h i hctx).elim
-  exact (indexOf_eq_none_iff.mp hnone) hmem
+  exact (index_of_eq_none_iff.mp hnone) hmem
 
 /-! ## Membership instance -/
 
@@ -350,7 +350,7 @@ instance instMembershipStringNameOnlyContext : Membership String NameOnlyContext
 
 /-- Roundtrip: fromList ∘ toList = id -/
 @[simp]
-theorem fromList_toList (ctx : NameOnlyContext) : fromList ctx.toList = ctx := by
+theorem from_list_to_list (ctx : NameOnlyContext) : fromList ctx.toList = ctx := by
   simp only [fromList, toList, TypeContext.names]
   congr 1
   induction ctx.bindings with
@@ -359,13 +359,13 @@ theorem fromList_toList (ctx : NameOnlyContext) : fromList ctx.toList = ctx := b
 
 /-- toList distributes over append -/
 @[simp]
-theorem toList_append (ctx1 ctx2 : NameOnlyContext) :
+theorem to_list_append (ctx1 ctx2 : NameOnlyContext) :
     (ctx1 ++ ctx2).toList = ctx1.toList ++ ctx2.toList := by
   simp only [toList, TypeContext.names, append_bindings, List.map_append]
 
 /-- fromList distributes over append -/
 @[simp]
-theorem fromList_append (xs ys : List String) :
+theorem from_list_append (xs ys : List String) :
     fromList (xs ++ ys) = fromList xs ++ fromList ys := by
   show (⟨_⟩ : NameOnlyContext) = _
   congr 1
@@ -373,7 +373,7 @@ theorem fromList_append (xs ys : List String) :
 
 /-- cons of (toList) simplifies -/
 @[simp]
-theorem fromList_cons (x : String) (xs : List String) :
+theorem from_list_cons (x : String) (xs : List String) :
     fromList (x :: xs) = cons x (fromList xs) := by
   simp only [fromList, cons, TypeContext.extend, List.map_cons]
 

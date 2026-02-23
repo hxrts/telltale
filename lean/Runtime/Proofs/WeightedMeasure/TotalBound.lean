@@ -42,15 +42,15 @@ theorem send_step_decreases
   -- Relate depths
   have hDepth : sumDepths ((s.updateType actor L).incrBuffer actor partner) + (1 + L.depth) =
                 sumDepths s + L.depth := by
-    rw [sumDepths_updateType_incrBuffer]
+    rw [sum_depths_update_type_incr_buffer]
     have hdepthEq : (LocalType.send partner T L).depth = 1 + L.depth := rfl
-    have h := sumDepths_updateType s actor (.send partner T L) L hlookup hunique_roles
+    have h := sum_depths_update_type s actor (.send partner T L) L hlookup hunique_roles
     simp only [hdepthEq] at h
     exact h
   -- Bound on buffer increase
   have hBuffer : sumBuffers ((s.updateType actor L).incrBuffer actor partner) ≤ sumBuffers s + 1 := by
-    rw [sumBuffers_updateType_incrBuffer]
-    exact sumBuffers_incrBuffer_le s actor partner hunique_buffers
+    rw [sum_buffers_update_type_incr_buffer]
+    exact sum_buffers_incr_buffer_le s actor partner hunique_buffers
   -- Combine
   omega
 
@@ -81,16 +81,16 @@ theorem recv_step_decreases
   -- Relate depths
   have hDepth : sumDepths ((s.updateType actor L).decrBuffer actor partner) + (1 + L.depth) =
                 sumDepths s + L.depth := by
-    rw [sumDepths_updateType_decrBuffer]
+    rw [sum_depths_update_type_decr_buffer]
     have hdepthEq : (LocalType.recv partner T L).depth = 1 + L.depth := rfl
-    have h := sumDepths_updateType s actor (.recv partner T L) L hlookup hunique_roles
+    have h := sum_depths_update_type s actor (.recv partner T L) L hlookup hunique_roles
     simp only [hdepthEq] at h
     exact h
   -- Buffer decreases by 1
-  obtain ⟨n, hmem, hn⟩ := getBuffer_mem_of_pos hbuf
+  obtain ⟨n, hmem, hn⟩ := get_buffer_mem_of_pos hbuf
   have hBuffer : sumBuffers ((s.updateType actor L).decrBuffer actor partner) + 1 = sumBuffers s := by
-    rw [sumBuffers_updateType_decrBuffer]
-    exact sumBuffers_decrBuffer_eq s actor partner n hmem hunique_buffers (by omega : n > 0)
+    rw [sum_buffers_update_type_decr_buffer]
+    exact sum_buffers_decr_buffer_eq s actor partner n hmem hunique_buffers (by omega : n > 0)
   -- Combine
   omega
 
@@ -125,20 +125,20 @@ theorem select_step_decreases
   -- hdepthLt : L.depth < (LocalType.select partner branches).depth
   have hDepth : sumDepths ((s.updateType actor L).incrBuffer actor partner) + L.depth + 1 ≤
                 sumDepths s + L.depth := by
-    rw [sumDepths_updateType_incrBuffer]
-    have h := sumDepths_updateType s actor (.select partner branches) L hlookup hunique_roles
+    rw [sum_depths_update_type_incr_buffer]
+    have h := sum_depths_update_type s actor (.select partner branches) L hlookup hunique_roles
     -- h : sumDepths (s.updateType actor L) + (select).depth = sumDepths s + L.depth
     have hdepthSelect : (LocalType.select partner branches).depth = 1 + LocalType.depthList branches := rfl
     simp only [hdepthSelect] at h
     -- h : sumDepths (s.updateType actor L) + (1 + depthList branches) = sumDepths s + L.depth
     -- We need: sumDepths (s.updateType actor L) + L.depth + 1 ≤ sumDepths s + L.depth
     -- From depthList_mem_le: L.depth ≤ depthList branches
-    have hle := LocalType.depthList_mem_le ℓ L branches hmem
+    have hle := LocalType.depth_list_mem_le ℓ L branches hmem
     omega
   -- Bound on buffer increase
   have hBuffer : sumBuffers ((s.updateType actor L).incrBuffer actor partner) ≤ sumBuffers s + 1 := by
-    rw [sumBuffers_updateType_incrBuffer]
-    exact sumBuffers_incrBuffer_le s actor partner hunique_buffers
+    rw [sum_buffers_update_type_incr_buffer]
+    exact sum_buffers_incr_buffer_le s actor partner hunique_buffers
   -- Combine
   omega
 
@@ -174,17 +174,17 @@ theorem branch_step_decreases
   -- hdepthLt : L.depth < (LocalType.branch partner branches).depth
   have hDepth : sumDepths ((s.updateType actor L).decrBuffer actor partner) + L.depth + 1 ≤
                 sumDepths s + L.depth := by
-    rw [sumDepths_updateType_decrBuffer]
-    have h := sumDepths_updateType s actor (.branch partner branches) L hlookup hunique_roles
+    rw [sum_depths_update_type_decr_buffer]
+    have h := sum_depths_update_type s actor (.branch partner branches) L hlookup hunique_roles
     have hdepthBranch : (LocalType.branch partner branches).depth = 1 + LocalType.depthList branches := rfl
     simp only [hdepthBranch] at h
-    have hle := LocalType.depthList_mem_le ℓ L branches hmem
+    have hle := LocalType.depth_list_mem_le ℓ L branches hmem
     omega
   -- Buffer decreases by 1
-  obtain ⟨n, hmemBuf, hn⟩ := getBuffer_mem_of_pos hbuf
+  obtain ⟨n, hmemBuf, hn⟩ := get_buffer_mem_of_pos hbuf
   have hBuffer : sumBuffers ((s.updateType actor L).decrBuffer actor partner) + 1 = sumBuffers s := by
-    rw [sumBuffers_updateType_decrBuffer]
-    exact sumBuffers_decrBuffer_eq s actor partner n hmemBuf hunique_buffers (by omega : n > 0)
+    rw [sum_buffers_update_type_decr_buffer]
+    exact sum_buffers_decr_buffer_eq s actor partner n hmemBuf hunique_buffers (by omega : n > 0)
   -- Combine
   omega
 

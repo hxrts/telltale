@@ -124,7 +124,7 @@ proof follows the standard argument from Cover & Thomas (2006).
 Negating the sum of nonpositive terms yields a nonnegative result.
 
 **Reference**: Cover & Thomas Theorem 2.1.1. -/
-theorem shannonEntropy_nonneg {α : Type*} [Fintype α]
+theorem shannon_entropy_nonneg {α : Type*} [Fintype α]
     (p : α → ℝ) (hp_nn : ∀ a, 0 ≤ p a) (hp_sum : ∑ a, p a = 1) :
     0 ≤ shannonEntropy p := by
   -- Each term `p(a) * log p(a)` is nonpositive on `[0, 1]`, so the negated sum is nonnegative.
@@ -163,7 +163,7 @@ then sum over a:
   ∑ₐ p(a) log(p(a)/q(a)) ≥ ∑ₐ p(a)(1 - q(a)/p(a)) = ∑ₐ(p(a) - q(a)) = 1 - 1 = 0
 
 **Reference**: Cover & Thomas Theorem 2.6.3; Kullback & Leibler (1951). -/
-theorem klDivergence_nonneg {α : Type*} [Fintype α]
+theorem kl_divergence_nonneg {α : Type*} [Fintype α]
     (p q : α → ℝ)
     (hp_nn : ∀ a, 0 ≤ p a) (hp_sum : ∑ a, p a = 1)
     (hq_nn : ∀ a, 0 ≤ q a) (hq_sum : ∑ a, q a = 1)
@@ -238,7 +238,7 @@ private theorem kl_uniform_eq {α : Type*} [Fintype α] [Nonempty α]
 /-! ## Shannon Entropy Upper Bound -/
 
 /-- Shannon entropy is bounded by `log |α|`. -/
-theorem shannonEntropy_le_log_card {α : Type*} [Fintype α] [Nonempty α]
+theorem shannon_entropy_le_log_card {α : Type*} [Fintype α] [Nonempty α]
     (p : α → ℝ) (hp_nn : ∀ a, 0 ≤ p a) (hp_sum : ∑ a, p a = 1) :
     shannonEntropy p ≤ Real.log (Fintype.card α) := by
   -- Reduce to nonnegativity of KL divergence against the uniform distribution.
@@ -249,14 +249,14 @@ theorem shannonEntropy_le_log_card {α : Type*} [Fintype α] [Nonempty α]
     simp [Finset.card_univ]
   have habs : ∀ a : α, p a ≠ 0 → (1 : ℝ) / Fintype.card α ≠ 0 :=
     fun _ _ => ne_of_gt (div_pos one_pos hcard)
-  have hkl := klDivergence_nonneg p _ hp_nn hp_sum hunif_nn hunif_sum habs
+  have hkl := kl_divergence_nonneg p _ hp_nn hp_sum hunif_nn hunif_sum habs
   rw [kl_uniform_eq p hp_nn hp_sum] at hkl
   linarith
 
 /-! ## KL Zero Baseline -/
 
 /-- KL divergence of a distribution with itself is zero. -/
-private theorem klDivergence_self_eq_zero {α : Type*} [Fintype α]
+private theorem kl_divergence_self_eq_zero {α : Type*} [Fintype α]
     (p : α → ℝ) (_hp_nn : ∀ a, 0 ≤ p a) :
     klDivergence p p = 0 := by
   -- Every term is either zero-by-branch or `p * log 1`.
@@ -322,7 +322,7 @@ private theorem kl_term_eq_diff_of_zero {α : Type*} [Fintype α]
 /-! ## KL Zero Implies Pointwise Equality -/
 
 /-- Zero KL divergence implies pointwise equality. -/
-private theorem klDivergence_eq_zero_imp_eq {α : Type*} [Fintype α]
+private theorem kl_divergence_eq_zero_imp_eq {α : Type*} [Fintype α]
     (p q : α → ℝ) (hp_nn : ∀ a, 0 ≤ p a) (hp_sum : ∑ a, p a = 1)
     (hq_nn : ∀ a, 0 ≤ q a) (hq_sum : ∑ a, q a = 1)
     (habs : ∀ a, p a ≠ 0 → q a ≠ 0)
@@ -355,17 +355,17 @@ private theorem klDivergence_eq_zero_imp_eq {α : Type*} [Fintype α]
 /-! ## KL Zero Characterization -/
 
 /-- KL divergence vanishes iff the two distributions are pointwise equal. -/
-theorem klDivergence_eq_zero_iff {α : Type*} [Fintype α]
+theorem kl_divergence_eq_zero_iff {α : Type*} [Fintype α]
     (p q : α → ℝ)
     (hp_nn : ∀ a, 0 ≤ p a) (hp_sum : ∑ a, p a = 1)
     (hq_nn : ∀ a, 0 ≤ q a) (hq_sum : ∑ a, q a = 1)
     (habs : ∀ a, p a ≠ 0 → q a ≠ 0) :
     klDivergence p q = 0 ↔ p = q := by
   constructor
-  · exact klDivergence_eq_zero_imp_eq p q hp_nn hp_sum hq_nn hq_sum habs
+  · exact kl_divergence_eq_zero_imp_eq p q hp_nn hp_sum hq_nn hq_sum habs
   · intro heq
     subst heq
-    exact klDivergence_self_eq_zero p hp_nn
+    exact kl_divergence_self_eq_zero p hp_nn
 
 /-! ## Erasure Law
 
@@ -401,7 +401,7 @@ private theorem sum_ite_eq_single {α : Type*} [Fintype α] [DecidableEq α]
 /-! ## Erasure First Marginal -/
 
 /-- Erasure form fixes the first marginal to the original label distribution. -/
-private theorem marginalFst_of_erasure
+private theorem marginal_fst_of_erasure
     {L O : Type} [Fintype L] [Fintype O] [DecidableEq O]
     (labelDist : L → ℝ)
     (joint : L × O → ℝ)
@@ -419,7 +419,7 @@ private theorem marginalFst_of_erasure
 /-! ## Erasure Second Marginal -/
 
 /-- Erasure form makes the second marginal a point mass. -/
-private theorem marginalSnd_of_erasure
+private theorem marginal_snd_of_erasure
     {L O : Type} [Fintype L] [Fintype O] [DecidableEq O]
     (labelDist : L → ℝ)
     (h_sum : ∑ l, labelDist l = 1)
@@ -449,9 +449,9 @@ private theorem joint_eq_prod_of_erasure
   classical
   rcases hErase with ⟨o0, hJoint⟩
   have hfst : marginalFst joint = labelDist :=
-    marginalFst_of_erasure labelDist joint ⟨o0, hJoint⟩
+    marginal_fst_of_erasure labelDist joint ⟨o0, hJoint⟩
   have hsnd : marginalSnd joint = fun o => if o = o0 then 1 else 0 := by
-    simpa using marginalSnd_of_erasure labelDist h_sum joint o0 hJoint
+    simpa using marginal_snd_of_erasure labelDist h_sum joint o0 hJoint
   funext lo
   rcases lo with ⟨l, o⟩
   by_cases ho : o = o0
@@ -462,7 +462,7 @@ private theorem joint_eq_prod_of_erasure
 /-! ## Mutual Information Blindness -/
 
 /-- Erasure implies zero mutual information in the concrete model. -/
-theorem mutualInfo_zero_of_erasure
+theorem mutual_info_zero_of_erasure
     {L O : Type} [Fintype L] [Fintype O] [DecidableEq O]
     (labelDist : L → ℝ)
     (h_nn : ∀ l, 0 ≤ labelDist l)
@@ -482,7 +482,7 @@ theorem mutualInfo_zero_of_erasure
       (fun lo => marginalFst joint lo.1 * marginalSnd joint lo.2) = joint := by
     simpa using (joint_eq_prod_of_erasure labelDist h_sum joint hErase).symm
   unfold mutualInfo
-  simpa [hEq] using klDivergence_self_eq_zero joint hJointNonneg
+  simpa [hEq] using kl_divergence_self_eq_zero joint hJointNonneg
 
 end RealConcrete
 

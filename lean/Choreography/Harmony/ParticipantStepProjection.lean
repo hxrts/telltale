@@ -25,7 +25,7 @@ open SessionTypes.LocalTypeR
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
 open Choreography.Projection.Project
-  (trans_comm_sender trans_comm_receiver trans_comm_other trans_wellFormed_of_wellFormed)
+  (trans_comm_sender trans_comm_receiver trans_comm_other trans_well_formed_of_well_formed)
 open Choreography.Projection.Project (ProjectableClosedWellFormed)
 open Choreography.Projection.Projectb (CProject)
 
@@ -40,7 +40,7 @@ private def action_pred (g : GlobalType) (act : GlobalActionR) : Prop :=
       GlobalActionR.sender act = sender ∧ GlobalActionR.receiver act = receiver
   | _ => False
 
-private theorem mem_transBranches_of_mem (branches : List (Label × GlobalType))
+private theorem mem_trans_branches_of_mem (branches : List (Label × GlobalType))
     (label : Label) (cont : GlobalType) (role : String)
     (hmem : (label, cont) ∈ branches) :
     (label, projTrans cont role) ∈ projTransBranches branches role := by
@@ -71,9 +71,9 @@ private theorem proj_trans_sender_step_comm_head
   refine ⟨projTransBranches branches sender, projTrans g' sender, ?_, ?_, ?_⟩
   · simpa [projTrans] using (trans_comm_sender sender receiver sender branches rfl)
   · have hmem' : (label, projTrans g' sender) ∈ projTransBranches branches sender :=
-      mem_transBranches_of_mem branches label g' sender hmem
+      mem_trans_branches_of_mem branches label g' sender hmem
     simpa using hmem'
-  · simp [projTrans, EQ2_refl]
+  · simp [projTrans, eq2_refl]
 
 /-- Sender-side projection for head steps in the original harmony statement. -/
 
@@ -122,9 +122,9 @@ private theorem proj_trans_receiver_step_comm_head
   refine ⟨projTransBranches branches receiver, projTrans g' receiver, ?_, ?_, ?_⟩
   · simpa [projTrans] using (trans_comm_receiver sender receiver receiver branches rfl hne)
   · have hmem' : (label, projTrans g' receiver) ∈ projTransBranches branches receiver :=
-      mem_transBranches_of_mem branches label g' receiver hmem
+      mem_trans_branches_of_mem branches label g' receiver hmem
     simpa using hmem'
-  · simp [projTrans, EQ2_refl]
+  · simp [projTrans, eq2_refl]
 
 /-- Receiver-side projection for head steps in the original harmony statement. -/
 
@@ -180,9 +180,9 @@ private theorem proj_trans_other_step_comm_head_nonempty
   have hproj_comm : ∃ lt, CProject (GlobalType.comm sender receiver ((fl, fc) :: rest)) role lt :=
     cproject_of_projectable _ role hproj
   have hclosed_branches : ∀ b ∈ ((fl, fc) :: rest), b.2.isClosed = true :=
-    GlobalType.isClosed_comm_branches sender receiver ((fl, fc) :: rest) hclosed
+    GlobalType.is_closed_comm_branches sender receiver ((fl, fc) :: rest) hclosed
   have hallwf_branches : ∀ b ∈ ((fl, fc) :: rest), b.2.wellFormed = true :=
-    GlobalType.wellFormed_comm_branches sender receiver ((fl, fc) :: rest) hwf
+    GlobalType.well_formed_comm_branches sender receiver ((fl, fc) :: rest) hwf
   -- Apply branch coherence and rewrite with trans_comm_other.
   have hcoherent :=
     branches_project_coherent sender receiver fl fc rest label cont role hmem
@@ -287,7 +287,7 @@ private theorem proj_trans_other_step_comm_async_other
   cases hbstep with
   | nil =>
       simp [projTrans, trans_comm_other, hrs, hrr]
-      exact EQ2_refl _
+      exact eq2_refl _
   | cons label cont cont' rest rest' _act _hstep _hbstep =>
       -- Reuse the cons/cons helper (labels are preserved by BranchesStep).
       have hbranch_rel' :
@@ -317,9 +317,9 @@ theorem proj_trans_other_step_comm_async
         (projTrans (GlobalType.comm sender receiver branches) role) := by
   -- Derive branch invariants and the BranchesRel IH.
   have hbranches_closed : ∀ p ∈ branches, p.2.isClosed = true :=
-    GlobalType.isClosed_comm_branches sender receiver branches hclosed
+    GlobalType.is_closed_comm_branches sender receiver branches hclosed
   have hbranches_wf : ∀ p ∈ branches, p.2.wellFormed = true :=
-    GlobalType.wellFormed_comm_branches sender receiver branches hwf
+    GlobalType.well_formed_comm_branches sender receiver branches hwf
   have hbranch_rel := ih_bstep hbranches_closed hbranches_wf role hns hnr
   -- Split on participation in the outer comm.
   by_cases hrs : role = sender

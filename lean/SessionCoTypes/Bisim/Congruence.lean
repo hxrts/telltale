@@ -69,7 +69,7 @@ theorem BranchesRelBisim.map_image {f : LocalTypeR → LocalTypeR} {R : Rel}
 /-- Compatible functions are congruences for Bisim.
 
     If f is compatible, then Bisim x y implies Bisim (f x) (f y).
-    This is the main theorem that enables proving EQ2_substitute via Bisim. -/
+    This is the main theorem that enables proving eq2_substitute via Bisim. -/
 theorem Bisim.congr (f : LocalTypeR → LocalTypeR) (hf : Compatible f)
     {x y : LocalTypeR} (h : Bisim x y) : Bisim (f x) (f y) := by
   obtain ⟨R, hRpost, hxy⟩ := h
@@ -99,7 +99,7 @@ theorem dual_compatible : Compatible LocalTypeR.dual := by
       have hy' : CanRecv y.dual p (dualBranches bsb) := CanSend.dual hy
       have hbr' : BranchesRelBisim (RelImage LocalTypeR.dual R)
           (dualBranches bsa) (dualBranches bsb) := by
-        simpa [dualBranches_eq_map] using
+        simpa [dual_branches_eq_map] using
           (BranchesRelBisim.map_image (f := LocalTypeR.dual) hbr)
       exact BisimF.eq_recv hx' hy' hbr'
   | eq_recv hx hy hbr =>
@@ -109,7 +109,7 @@ theorem dual_compatible : Compatible LocalTypeR.dual := by
 /- ## Structured Block 1 -/
       have hbr' : BranchesRelBisim (RelImage LocalTypeR.dual R)
           (dualBranches bsa) (dualBranches bsb) := by
-        simpa [dualBranches_eq_map] using
+        simpa [dual_branches_eq_map] using
           (BranchesRelBisim.map_image (f := LocalTypeR.dual) hbr)
       exact BisimF.eq_send hx' hy' hbr'
 
@@ -117,7 +117,7 @@ theorem dual_compatible : Compatible LocalTypeR.dual := by
 
 /-! ## Substitute Compatibility
 
-To prove `EQ2_substitute` we need to show that substitution is compatible.
+To prove `eq2_substitute` we need to show that substitution is compatible.
 This requires showing that substitution preserves observable behavior. -/
 
 open SessionCoTypes.SubstCommBarendregt in
@@ -126,15 +126,15 @@ open SessionCoTypes.SubstCommBarendregt in
     This is because `.mu t body` binds `t`, so any free occurrence of `t` in the
     original type gets replaced by something where `t` is bound.
 
-    Proven in SubstCommBarendregt.lean using the more general isFreeIn_subst_self_general. -/
-theorem isFreeIn_mu_unfold_false (body : LocalTypeR) (t : String) :
+    Proven in SubstCommBarendregt.lean using the more general is_free_in_subst_self_general. -/
+theorem is_free_in_mu_unfold_false (body : LocalTypeR) (t : String) :
     isFreeIn t (body.substitute t (.mu t body)) = false :=
-  isFreeIn_subst_mu_self body t
+  is_free_in_subst_mu_self body t
 
 open SessionCoTypes.SubstCommBarendregt in
 /-- If a variable is not free in a type, substituting for it is the identity on branches.
 
-    This is used for the shadowed case in substitute_preserves_CanSend/CanRecv. -/
+    This is used for the shadowed case in substitute_preserves_can_send/CanRecv. -/
 theorem map_substitute_eq_self_of_not_free {bs : List BranchR} {var : String} {repl : LocalTypeR}
     (hnot_free : ∀ (l : Label) (_vt : Option SessionTypes.ValType) (c : LocalTypeR),
       (l, _vt, c) ∈ bs → isFreeIn var c = false) :
@@ -177,21 +177,21 @@ Barendregt conditions or a fragile coinduction-up-to argument.
     the `var` substitution is a no-op, so both sides are definitionally equal.
 
     Proof: closed mu types make the `var` substitution a no-op, so both sides
-    are definitionally equal; use EQ2_refl (see `CoTypes.DBBridge`). -/
-theorem EQ2_subst_mu_comm (body : LocalTypeR) (var t : String) (repl : LocalTypeR)
+    are definitionally equal; use eq2_refl (see `CoTypes.DBBridge`). -/
+theorem eq2_subst_mu_comm (body : LocalTypeR) (var t : String) (repl : LocalTypeR)
     (htne : t ≠ var) (hWFmu : LocalTypeR.WellFormed (.mu t body)) :
     EQ2 ((body.substitute var repl).substitute t (.mu t (body.substitute var repl)))
         ((body.substitute t (.mu t body)).substitute var repl) := by
-  exact SessionCoTypes.EQ2_subst_mu_comm_via_DB body var t repl htne hWFmu
+  exact SessionCoTypes.eq2_subst_mu_comm_via_db body var t repl htne hWFmu
 
 -- Transfer through EQ2
 
 /-- Transfer UnfoldsToEnd through EQ2 equivalence.
 
     If `a` unfolds to end and `a` is EQ2-equivalent to `b`, then `b` unfolds to end. -/
-theorem UnfoldsToEnd_of_EQ2 {a b : LocalTypeR} (ha : UnfoldsToEnd a) (heq : EQ2 a b)
+theorem unfolds_to_end_of_eq2 {a b : LocalTypeR} (ha : UnfoldsToEnd a) (heq : EQ2 a b)
     (hWFb : LocalTypeR.WellFormed b) : UnfoldsToEnd b := by
-  exact UnfoldsToEnd_transfer ha heq hWFb
+  exact unfolds_to_end_transfer ha heq hWFb
 
 -- Substitution Preserves UnfoldsToEnd (WF)
 
@@ -209,7 +209,7 @@ theorem UnfoldsToEnd_of_EQ2 {a b : LocalTypeR} (ha : UnfoldsToEnd a) (heq : EQ2 
     Note: The full proof requires Barendregt conditions. We prove the simplified
     version that handles the base case and the shadowed mu case. The non-shadowed
     mu case requires substitution commutation which needs additional assumptions. -/
-theorem substitute_preserves_UnfoldsToEnd {a : LocalTypeR} {var : String} {repl : LocalTypeR}
+theorem substitute_preserves_unfolds_to_end {a : LocalTypeR} {var : String} {repl : LocalTypeR}
     (h : UnfoldsToEnd a) (hWFa : LocalTypeR.WellFormed a)
     (hWFrepl : LocalTypeR.WellFormed repl) :
     UnfoldsToEnd (a.substitute var repl) ∨
@@ -231,7 +231,7 @@ theorem substitute_preserves_UnfoldsToEnd {a : LocalTypeR} {var : String} {repl 
     left
     have hclosed : (LocalTypeR.mu t body).isClosed := hWFa.closed
     have hnotfree : LocalTypeR.isFreeIn var (.mu t body) = false :=
-      isFreeIn_false_of_closed (.mu t body) var hclosed
+      is_free_in_false_of_closed (.mu t body) var hclosed
     have hsubst : (LocalTypeR.mu t body).substitute var repl = .mu t body :=
       substitute_not_free (.mu t body) var repl hnotfree
     rw [hsubst]
@@ -247,7 +247,7 @@ open SessionCoTypes.SubstCommBarendregt in
     - `hfresh`: repl is closed (no free variables)
 
     These conditions ensure substitution commutativity in the mu case. -/
-theorem substitute_preserves_UnfoldsToEnd_barendregt {a : LocalTypeR} {var : String} {repl : LocalTypeR}
+theorem substitute_preserves_unfolds_to_end_barendregt {a : LocalTypeR} {var : String} {repl : LocalTypeR}
     (h : UnfoldsToEnd a)
     (hbar : notBoundAt var a = true)
     (hfresh : ∀ w, isFreeIn w repl = false) :
@@ -283,7 +283,7 @@ theorem substitute_preserves_UnfoldsToEnd_barendregt {a : LocalTypeR} {var : Str
     rw [hcomm]
     -- Now goal: UnfoldsToEnd ((body.substitute t (.mu t body)).substitute var repl)
     have hbar_unfold : notBoundAt var (body.substitute t (.mu t body)) = true :=
-      notBoundAt_unfold var (.mu t body) (by simp [notBoundAt, hvt, hbar_body])
+      not_bound_at_unfold var (.mu t body) (by simp [notBoundAt, hvt, hbar_body])
     exact ih hbar_unfold hfresh
 
 -- Substitution Preserves UnfoldsToVar (Barendregt)
@@ -296,7 +296,7 @@ open SessionCoTypes.SubstCommBarendregt in
     - `hfresh`: repl is closed (no free variables)
 
     These conditions ensure substitution commutativity in the mu case. -/
-theorem substitute_preserves_UnfoldsToVar {a : LocalTypeR} {var v : String} {repl : LocalTypeR}
+theorem substitute_preserves_unfolds_to_var {a : LocalTypeR} {var v : String} {repl : LocalTypeR}
     (h : UnfoldsToVar a v) (hne : v ≠ var)
     (hbar : notBoundAt var a = true)
     (hfresh : ∀ w, isFreeIn w repl = false) :
@@ -322,7 +322,7 @@ theorem substitute_preserves_UnfoldsToVar {a : LocalTypeR} {var v : String} {rep
       rename_i htvar
       simp only [beq_iff_eq] at htvar
       have hnotfree : isFreeIn t (body.substitute t (.mu t body)) = false :=
-        isFreeIn_mu_unfold_false body t
+        is_free_in_mu_unfold_false body t
       have hnotfree' : isFreeIn var (body.substitute t (.mu t body)) = false := by
         rw [← htvar]; exact hnotfree
       have hsame : (body.substitute t (.mu t body)).substitute var repl =
@@ -330,7 +330,7 @@ theorem substitute_preserves_UnfoldsToVar {a : LocalTypeR} {var v : String} {rep
         substitute_not_free _ var repl hnotfree'
       -- Get notBoundAt for the unfolded body
       have hbar_unfold : notBoundAt var (body.substitute t (.mu t body)) = true :=
-        notBoundAt_unfold var (.mu t body) hbar
+        not_bound_at_unfold var (.mu t body) hbar
       have ih' := ih hne hbar_unfold hfresh
       rw [hsame] at ih'
       exact UnfoldsToVar.mu ih'
@@ -348,7 +348,7 @@ theorem substitute_preserves_UnfoldsToVar {a : LocalTypeR} {var v : String} {rep
       have hcomm := subst_mu_comm body var t repl hbar hfresh htne
       -- Get notBoundAt for the unfolded body
       have hbar_unfold : notBoundAt var (body.substitute t (.mu t body)) = true :=
-        notBoundAt_unfold var (.mu t body) (by simp [notBoundAt, hbne, hbar])
+        not_bound_at_unfold var (.mu t body) (by simp [notBoundAt, hbne, hbar])
       have ih' := ih hne hbar_unfold hfresh
       rw [← hcomm] at ih'
       exact UnfoldsToVar.mu ih'
@@ -364,10 +364,10 @@ open SessionCoTypes.SubstCommBarendregt in
       `isFreeIn v (body.substitute t (.mu t body)) = false` implies
       `¬UnfoldsToVar (body.substitute t (.mu t body)) v`, which contradicts the premise.
 
-    This lemma is key for proving that the `t = var` case in `UnfoldsToVar_substitute_EQ2`
-    is impossible: by `isFreeIn_subst_mu_self`, the bound variable is not free after unfolding,
+    This lemma is key for proving that the `t = var` case in `unfolds_to_var_substitute_eq2`
+    is impossible: by `is_free_in_subst_mu_self`, the bound variable is not free after unfolding,
     so `UnfoldsToVar (body.substitute t (.mu t body)) t` cannot hold. -/
-theorem not_UnfoldsToVar_of_not_isFreeIn {x : LocalTypeR} {v : String}
+theorem not_unfolds_to_var_of_not_is_free_in {x : LocalTypeR} {v : String}
     (h : isFreeIn v x = false) : ¬UnfoldsToVar x v := by
   intro hunf
   refine UnfoldsToVar.rec (motive := fun x v _ => isFreeIn v x = false → False) ?base ?mu hunf h
@@ -385,7 +385,7 @@ theorem not_UnfoldsToVar_of_not_isFreeIn {x : LocalTypeR} {v : String}
     · -- v == t case: use isFreeIn_subst_mu_self
       simp only [beq_iff_eq] at hvt
       subst hvt
-      have hnotfree := isFreeIn_subst_mu_self body v
+      have hnotfree := is_free_in_subst_mu_self body v
       exact ih hnotfree
     · -- v ≠ t case: isFreeIn v (.mu t body) = isFreeIn v body = false
       simp only [hvt, Bool.false_eq_true, ↓reduceIte] at h
@@ -394,7 +394,7 @@ theorem not_UnfoldsToVar_of_not_isFreeIn {x : LocalTypeR} {v : String}
       have hmu_notfree : isFreeIn v (.mu t body) = false := by
         simp only [isFreeIn, hvt, Bool.false_eq_true, ↓reduceIte, h]
       -- By isFreeIn_subst_preserves: v not free in body ∧ v not free in repl → v not free in result
-      have hsubst_notfree := isFreeIn_subst_preserves body v t (.mu t body) h hmu_notfree
+      have hsubst_notfree := is_free_in_subst_preserves body v t (.mu t body) h hmu_notfree
       exact ih hsubst_notfree
 
 end SessionCoTypes.Bisim

@@ -31,7 +31,7 @@ section
     Send appends a value to the buffer, but ValidLabels checks branch labels
     which are only relevant when receiver has branch type.
     Self-send and branch-receiver cases are ruled out by `hRecvReady`. -/
-theorem ValidLabels_send_preserved
+theorem valid_labels_send_preserved
     (G : GEnv) (D : DEnv) (bufs : Buffers)
     (senderEp : Endpoint) (receiverRole : Role) (T : ValType) (L : LocalType) (v : Value)
     (hValid : ValidLabels G D bufs)
@@ -47,7 +47,7 @@ theorem ValidLabels_send_preserved
   intro sendEdge e source bs hActive hBranch
   let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
   have hActiveOrig : ActiveEdge G e :=
-    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=senderEp) (L:=L) hActive (by simpa [hG])
+    active_edge_update_g_inv (G:=G) (e:=e) (ep:=senderEp) (L:=L) hActive (by simpa [hG])
   -- Send ValidLabels: Updated Receiver vs Unchanged Receiver
   by_cases hRecvEq : recvEp = senderEp
   · -- Receiver is the updated endpoint: original type is .send, so buffers must be empty.
@@ -70,7 +70,7 @@ theorem ValidLabels_send_preserved
     have hSend : lookupG G recvEp = some (.send receiverRole T L) := by
       simpa [hRecvEq] using hG
     have hTraceEmpty : lookupD D e = [] :=
-      trace_empty_when_send_receiver (Coherent_edge_any hCoh hActiveOrig) hSend
+      trace_empty_when_send_receiver (coherent_edge_any hCoh hActiveOrig) hSend
     have hBufEmpty : lookupBuf bufs e = [] := by
       rcases hBT e with ⟨hLen, _⟩
       cases hBuf : lookupBuf bufs e with
@@ -90,7 +90,7 @@ theorem ValidLabels_send_preserved
     have hBufEq :
         lookupBuf (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v])) e =
           lookupBuf bufs e := by
-      exact lookupBuf_update_neq _ _ _ _ (Ne.symm hNe)
+      exact lookup_buf_update_neq _ _ _ _ (Ne.symm hNe)
     have hBuf' :
         lookupBuf (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v])) e = [] := by
       simpa [hBufEq, hBufEmpty]
@@ -99,7 +99,7 @@ theorem ValidLabels_send_preserved
   · -- Receiver endpoint unchanged: use original ValidLabels and buffer update facts.
     have hBranchOld : lookupG G recvEp = some (.branch source bs) := by
       have hBranch' := hBranch
-      rw [lookupG_update_neq G senderEp recvEp L (Ne.symm hRecvEq)] at hBranch'
+      rw [lookup_g_update_neq G senderEp recvEp L (Ne.symm hRecvEq)] at hBranch'
       exact hBranch'
     by_cases hEdge : e = sendEdge
     · -- If receiver is branch at sendEdge, hRecvReady is inconsistent.
@@ -121,7 +121,7 @@ theorem ValidLabels_send_preserved
       have hBufEq :
           lookupBuf (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v])) e =
             lookupBuf bufs e := by
-        exact lookupBuf_update_neq _ _ _ _ (Ne.symm hEdge)
+        exact lookup_buf_update_neq _ _ _ _ (Ne.symm hEdge)
       have hValidOld := hValid e source bs hActiveOrig hBranchOld
       simpa [hBufEq] using hValidOld
 
@@ -130,7 +130,7 @@ theorem ValidLabels_send_preserved
 /-- ValidLabels is preserved when selecting (sending a label).
     Select appends label to buffer END, so HEAD unchanged.
     Self-select and branch-receiver cases are ruled out by `hRecvReady`. -/
-theorem ValidLabels_select_preserved
+theorem valid_labels_select_preserved
     (G : GEnv) (D : DEnv) (bufs : Buffers)
     (selectorEp : Endpoint) (targetRole : Role)
     (selectBranches : List (String × LocalType)) (ℓ : String) (L : LocalType)
@@ -149,7 +149,7 @@ theorem ValidLabels_select_preserved
   intro selectEdge e source bs hActive hBranch
   let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
   have hActiveOrig : ActiveEdge G e :=
-    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=selectorEp) (L:=L) hActive (by simpa [hG])
+    active_edge_update_g_inv (G:=G) (e:=e) (ep:=selectorEp) (L:=L) hActive (by simpa [hG])
   -- Select ValidLabels: Updated Receiver vs Unchanged Receiver
   by_cases hRecvEq : recvEp = selectorEp
   · -- Receiver is the updated endpoint: original type is .select, so buffers must be empty.
@@ -172,7 +172,7 @@ theorem ValidLabels_select_preserved
     have hSelect : lookupG G recvEp = some (.select targetRole selectBranches) := by
       simpa [hRecvEq] using hG
     have hTraceEmpty : lookupD D e = [] :=
-      trace_empty_when_select_receiver (Coherent_edge_any hCoh hActiveOrig) hSelect
+      trace_empty_when_select_receiver (coherent_edge_any hCoh hActiveOrig) hSelect
     have hBufEmpty : lookupBuf bufs e = [] := by
       rcases hBT e with ⟨hLen, _⟩
       cases hBuf : lookupBuf bufs e with
@@ -192,7 +192,7 @@ theorem ValidLabels_select_preserved
     have hBufEq :
         lookupBuf (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ])) e =
           lookupBuf bufs e := by
-      exact lookupBuf_update_neq _ _ _ _ (Ne.symm hNe)
+      exact lookup_buf_update_neq _ _ _ _ (Ne.symm hNe)
     have hBuf' :
         lookupBuf (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ])) e = [] := by
       simpa [hBufEq, hBufEmpty]
@@ -201,7 +201,7 @@ theorem ValidLabels_select_preserved
   · -- Receiver endpoint unchanged: use original ValidLabels and buffer update facts.
     have hBranchOld : lookupG G recvEp = some (.branch source bs) := by
       have hBranch' := hBranch
-      rw [lookupG_update_neq G selectorEp recvEp L (Ne.symm hRecvEq)] at hBranch'
+      rw [lookup_g_update_neq G selectorEp recvEp L (Ne.symm hRecvEq)] at hBranch'
       exact hBranch'
     by_cases hEdge : e = selectEdge
     · -- If receiver is branch at selectEdge, hRecvReady is inconsistent.
@@ -223,7 +223,7 @@ theorem ValidLabels_select_preserved
       have hBufEq :
           lookupBuf (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ])) e =
             lookupBuf bufs e := by
-        exact lookupBuf_update_neq _ _ _ _ (Ne.symm hEdge)
+        exact lookup_buf_update_neq _ _ _ _ (Ne.symm hEdge)
       have hValidOld := hValid e source bs hActiveOrig hBranchOld
       simpa [hBufEq] using hValidOld
 

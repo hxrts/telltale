@@ -25,8 +25,8 @@ open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
-open Choreography.Projection.Project (trans_wellFormed_of_wellFormed)
-open Choreography.Projection.Blind (isBlind isBlind_mu_body isBlind_substitute)
+open Choreography.Projection.Project (trans_well_formed_of_well_formed)
+open Choreography.Projection.Blind (isBlind is_blind_mu_body is_blind_substitute)
 
 /-! ## Mu Case Helpers -/
 
@@ -39,11 +39,11 @@ private theorem proj_trans_other_step_mu_chain
   -- Unfold-substitute chain with well-formedness witnesses.
   have h2 := trans_substitute_unfold t body role hclosed
   have h3 : EQ2 (projTrans (.mu t body) role).unfold (projTrans (.mu t body) role) := by
-    exact EQ2_symm (EQ2_unfold_right (EQ2_refl (projTrans (.mu t body) role)))
-  have hWFb := trans_wellFormed_of_wellFormed (body.substitute t (.mu t body)) role hsubst_wf
-  have hWFc := trans_wellFormed_of_wellFormed (.mu t body) role hwf
+    exact eq2_symm (eq2_unfold_right (eq2_refl (projTrans (.mu t body) role)))
+  have hWFb := trans_well_formed_of_well_formed (body.substitute t (.mu t body)) role hsubst_wf
+  have hWFc := trans_well_formed_of_well_formed (.mu t body) role hwf
   have hWFunfold := LocalTypeR.WellFormed.unfold hWFc
-  exact EQ2_trans_wf h2 h3 hWFb hWFunfold hWFc
+  exact eq2_trans_wf h2 h3 hWFb hWFunfold hWFc
 
 /-- Helper: mu case for non-participants. -/
 
@@ -64,19 +64,19 @@ theorem proj_trans_other_step_mu
     EQ2 (projTrans g' role) (projTrans (GlobalType.mu t body) role) := by
   -- Chain IH with trans_substitute_unfold and the unfold lemma.
   have hsubst_closed : (body.substitute t (.mu t body)).isClosed = true :=
-    GlobalType.isClosed_substitute_mu t body hclosed
+    GlobalType.is_closed_substitute_mu t body hclosed
   have hsubst_wf : (body.substitute t (.mu t body)).wellFormed = true :=
-    wellFormed_mu_unfold t body hwf
+    well_formed_mu_unfold t body hwf
   have hsubst_blind : isBlind (body.substitute t (.mu t body)) = true :=
-    isBlind_substitute body t (.mu t body) (isBlind_mu_body hblind) hblind hclosed
-  have hWFg' : g'.wellFormed = true := step_preserves_wellFormed _ _ _ hstep_sub hsubst_wf
+    is_blind_substitute body t (.mu t body) (is_blind_mu_body hblind) hblind hclosed
+  have hWFg' : g'.wellFormed = true := step_preserves_well_formed _ _ _ hstep_sub hsubst_wf
   have h1 : EQ2 (projTrans g' role) (projTrans (body.substitute t (.mu t body)) role) :=
     ih_step hsubst_closed hsubst_wf hsubst_blind role hns hnr
   have h23 := proj_trans_other_step_mu_chain t body role hclosed hsubst_wf hwf
-  have hWFa := trans_wellFormed_of_wellFormed g' role hWFg'
-  have hWFb := trans_wellFormed_of_wellFormed (body.substitute t (.mu t body)) role hsubst_wf
-  have hWFc := trans_wellFormed_of_wellFormed (.mu t body) role hwf
-  exact EQ2_trans_wf h1 h23 hWFa hWFb hWFc
+  have hWFa := trans_well_formed_of_well_formed g' role hWFg'
+  have hWFb := trans_well_formed_of_well_formed (body.substitute t (.mu t body)) role hsubst_wf
+  have hWFc := trans_well_formed_of_well_formed (.mu t body) role hwf
+  exact eq2_trans_wf h1 h23 hWFa hWFb hWFc
 
 /-! ## Branch-Step Helpers -/
 

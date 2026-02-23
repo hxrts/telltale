@@ -2,17 +2,17 @@ import SessionCoTypes.SubstCommBarendregt.SubstRel
 
 /-! # SubstRel Standard Case Analysis and Main Theorem
 
-Proves `SubstRel_postfix_standard` and `EQ2_substitute_barendregt`.
+Proves `subst_rel_postfix_standard` and `eq2_substitute_barendregt`.
 -/
 
 /-
-The Problem. The main theorem `EQ2_substitute_barendregt` requires showing SubstRel
+The Problem. The main theorem `eq2_substitute_barendregt` requires showing SubstRel
 is a post-fixpoint of EQ2F. This involves case analysis on all type constructors
 with careful handling of the mu case under Barendregt conditions.
 
-Solution Structure. Proves `BranchesRel_substitute` lifting branch relations through
-substitution. `SubstRel_postfix_standard` handles case analysis on EQ2F, using
-`bne_of_notBoundAt_mu` for mu cases. The main theorem `EQ2_substitute_barendregt`
+Solution Structure. Proves `branches_rel_substitute` lifting branch relations through
+substitution. `subst_rel_postfix_standard` handles case analysis on EQ2F, using
+`bne_of_not_bound_at_mu` for mu cases. The main theorem `eq2_substitute_barendregt`
 follows by coinduction using SubstRel as the witness relation.
 -/
 
@@ -23,7 +23,7 @@ open SessionTypes.GlobalType
 /-! ## Standard Case Analysis -/
 
 /-- Helper: lift BranchesRel through substitution. -/
-theorem BranchesRel_substitute (var : String) (repl : LocalTypeR)
+theorem branches_rel_substitute (var : String) (repl : LocalTypeR)
     (bs cs : List BranchR)
     (hbranches : BranchesRel EQ2 bs cs)
     (hbarBs : notBoundAtBranches var bs = true)
@@ -45,7 +45,7 @@ theorem BranchesRel_substitute (var : String) (repl : LocalTypeR)
     · exact ih hbarAs hbarBs'
 
 /-- Helper to convert htvar/hsvar proofs to the expected form. -/
-private theorem bne_of_notBoundAt_mu {v t : String} {body : LocalTypeR}
+private theorem bne_of_not_bound_at_mu {v t : String} {body : LocalTypeR}
     (hbar : notBoundAt v (.mu t body) = true) :
     (t == v) = false := by
   unfold notBoundAt at hbar

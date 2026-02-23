@@ -18,7 +18,7 @@ the Protocol coherence invariant. Each instruction has a spec defining pre/post
 conditions that need to be connected to the coherence preservation theorems.
 
 Solution Structure. For each instruction type, defines a preservation theorem
-(e.g., `SendSpec_preserves_Coherent`) that extracts preconditions from the spec
+(e.g., `send_spec_preserves_coherent`) that extracts preconditions from the spec
 and applies the corresponding Protocol-level preservation lemma. Uses SendReady,
 buffer head evidence, and label matching to satisfy preconditions.
 -/
@@ -32,8 +32,8 @@ section
 /-- Send preserves Coherence when SendReady holds.
 
     The proof extracts the sender type from the spec and constructs the
-    receiver-readiness evidence required by `Coherent_send_preserved`. -/
-theorem SendSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
+    receiver-readiness evidence required by `coherent_send_preserved`. -/
+theorem send_spec_preserves_coherent {G G' : GEnv} {D D' : DEnv}
     {senderEp : Endpoint} {receiverRole : Role} {T : ValType}
     (hSpec : SendSpec G G' D D' senderEp receiverRole T)
     (hCoh : Coherent G D)
@@ -50,7 +50,7 @@ theorem SendSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
     exact hReady senderEp receiverRole T L' hSenderType Lrecv hLrecv
   -- The spec tells us G' and D' are the result of the update
   -- Apply Protocol-level preservation
-  have hResult := Coherent_send_preserved G D senderEp receiverRole T L' hCoh hSenderType hRecvReady
+  have hResult := coherent_send_preserved G D senderEp receiverRole T L' hCoh hSenderType hRecvReady
   -- Need to show G' = updateG G senderEp L' and D' = updateD D edge (trace ++ [T])
   have hGUpdate : G' = updateG G senderEp L' := hSpec.type_updated L' hSenderType
   rw [hGUpdate, hSpec.trace_extended]
@@ -61,8 +61,8 @@ theorem SendSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
 /-- Receive preserves Coherence.
 
     The proof uses the buffer head evidence from the spec to satisfy
-    the precondition of `Coherent_recv_preserved`. -/
-theorem RecvSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
+    the precondition of `coherent_recv_preserved`. -/
+theorem recv_spec_preserves_coherent {G G' : GEnv} {D D' : DEnv}
     {receiverEp : Endpoint} {senderRole : Role} {T : ValType}
     (hSpec : RecvSpec G G' D D' receiverEp senderRole T)
     (hCoh : Coherent G D) :
@@ -75,7 +75,7 @@ theorem RecvSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
   have hTraceHead : (lookupD D edge).head? = some T := by
     simp only [edge, hBuffer, List.head?_cons]
   -- Apply Protocol-level preservation
-  have hResult := Coherent_recv_preserved G D receiverEp senderRole T L' hCoh hRecvType hTraceHead
+  have hResult := coherent_recv_preserved G D receiverEp senderRole T L' hCoh hRecvType hTraceHead
   -- The spec tells us G' and D' are the result of the update
   have hGUpdate : G' = updateG G receiverEp L' := hSpec.type_updated L' hRecvType
   obtain ⟨rest', hTraceEq, hDUpdate⟩ := hSpec.trace_consumed
@@ -95,7 +95,7 @@ theorem RecvSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
 
     Similar to send, but uses SelectReady for the receiver's ability
     to accept a label message. -/
-theorem SelectSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
+theorem select_spec_preserves_coherent {G G' : GEnv} {D D' : DEnv}
     {senderEp : Endpoint} {receiverRole : Role} {chosen : Label}
     (hSpec : SelectSpec G G' D D' senderEp receiverRole chosen)
     (hCoh : Coherent G D)
@@ -111,7 +111,7 @@ theorem SelectSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
     intro Ltarget hLtarget
     exact hReady senderEp receiverRole branches chosen L' hSenderType hFind Ltarget hLtarget
   -- Apply Protocol-level preservation
-  have hResult := Coherent_select_preserved G D senderEp receiverRole branches chosen L'
+  have hResult := coherent_select_preserved G D senderEp receiverRole branches chosen L'
     hCoh hSenderType hFind hTargetReady
   -- The spec tells us G' and D' are the result of the update
   have hGUpdate : G' = updateG G senderEp L' := hSpec.type_updated branches L' hSenderType hFind
@@ -123,7 +123,7 @@ theorem SelectSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
 /-- Branch preserves Coherence.
 
     Similar to receive, but the buffer head is a label (.string) value. -/
-theorem BranchSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
+theorem branch_spec_preserves_coherent {G G' : GEnv} {D D' : DEnv}
     {receiverEp : Endpoint} {senderRole : Role} {received : Label}
     (hSpec : BranchSpec G G' D D' receiverEp senderRole received)
     (hCoh : Coherent G D) :
@@ -136,7 +136,7 @@ theorem BranchSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
   have hTraceHead : (lookupD D edge).head? = some .string := by
     simp only [edge, hBuffer, List.head?_cons]
   -- Apply Protocol-level preservation
-  have hResult := Coherent_branch_preserved G D receiverEp senderRole branches received L'
+  have hResult := coherent_branch_preserved G D receiverEp senderRole branches received L'
     hCoh hRecvType hFind hTraceHead
   -- The spec tells us G' and D' are the result of the update
   have hGUpdate : G' = updateG G receiverEp L' := hSpec.type_updated branches L' hRecvType hFind
@@ -157,7 +157,7 @@ theorem BranchSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
     The key insight is that:
     1. Old edges (in sessions ≠ s) are unchanged by the frame property
     2. New edges (in session s) have empty traces, so Consume L [] = some L -/
-theorem OpenSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
+theorem open_spec_preserves_coherent {G G' : GEnv} {D D' : DEnv}
     {s : SessionId} {roles : List Role}
     (hSpec : OpenSpec G G' D D' s roles)
     (hCoh : Coherent G D) :
@@ -223,7 +223,7 @@ private lemma close_target_removed_contra {G G' : GEnv} {D : DEnv}
 
     Removing an endpoint at `End` with empty traces makes edges involving
     that endpoint inactive (no receiver in G'), so they're skipped in Coherent. -/
-theorem CloseSpec_preserves_Coherent {G G' : GEnv} {D : DEnv}
+theorem close_spec_preserves_coherent {G G' : GEnv} {D : DEnv}
     {ep : Endpoint}
     (hSpec : CloseSpec G G' D ep)
     (hCoh : Coherent G D) :
@@ -276,7 +276,7 @@ theorem CloseSpec_preserves_Coherent {G G' : GEnv} {D : DEnv}
 
     The spec includes a DelegationStep, which directly provides coherence
     preservation via the proved `delegation_preserves_coherent` theorem. -/
-theorem AcquireSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
+theorem acquire_spec_preserves_coherent {G G' : GEnv} {D D' : DEnv}
     {receiverEp : Endpoint} {senderRole : Role}
     {delegatedSession : SessionId} {delegatedRole : Role}
     (hSpec : AcquireSpec G G' D D' receiverEp senderRole delegatedSession delegatedRole)

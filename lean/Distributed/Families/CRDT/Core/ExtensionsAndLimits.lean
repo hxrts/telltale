@@ -40,7 +40,7 @@ def ActorIdRecyclingSafeRun (ids : Run Nat) : Prop :=
   ∀ t, ids (t + 1) ≠ ids t
 
 /-- Approximation-envelope semantics: zero distance implies safety-visible equality. -/
-theorem boundedApproximation_zeroBudget_implies_envelope
+theorem bounded_approximation_zero_budget_implies_envelope
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     (hZeroDistanceSafe : ∀ s₁ s₂, M.distance s₁ s₂ = 0 → EqSafe M s₁ s₂)
@@ -106,7 +106,7 @@ def structuredMultiScaleModel : Model (Nat × Nat) Unit Unit (Nat × Nat) Unit w
 /-! ## Extension Counterexample Theorems -/
 
 /-- Constant id issue stream refutes strict sequence-subclass criteria. -/
-theorem sequenceIdCriterion_counterexample :
+theorem sequence_id_criterion_counterexample :
     ¬ SequenceIdSubclassCriterion sequenceIdIssuerConstant := by
   intro hMono
   have hLt : sequenceIdIssuerConstant 0 < sequenceIdIssuerConstant 1 :=
@@ -114,29 +114,29 @@ theorem sequenceIdCriterion_counterexample :
   simp [sequenceIdIssuerConstant] at hLt
 
 /-- Constant actor-id stream refutes recycling safety. -/
-theorem actorIdRecycling_counterexample :
+theorem actor_id_recycling_counterexample :
     ¬ ActorIdRecyclingSafeRun recycledActorRun := by
   intro hSafe
   exact hSafe 0 (by simp [recycledActorRun])
 
 /-- Single-scale observables can miss structured differences. -/
-theorem singleScale_observables_not_sufficient :
+theorem single_scale_observables_not_sufficient :
     EqSafe structuredSingleScaleModel (0, 0) (0, 1) := by
   simp [EqSafe, structuredSingleScaleModel]
 
 /-- Multi-scale observables recover the missing structured distinction. -/
-theorem multiScale_observables_distinguish :
+theorem multi_scale_observables_distinguish :
     ¬ EqSafe structuredMultiScaleModel (0, 0) (0, 1) := by
   simp [EqSafe, structuredMultiScaleModel]
 
 /-- Extension-counterexample bundle for sequence ids, actor recycling, and observability scale. -/
-theorem hcrdtExtensions_counterexample_bundle :
+theorem hcrdt_extensions_counterexample_bundle :
     ¬ SequenceIdSubclassCriterion sequenceIdIssuerConstant ∧
       ¬ ActorIdRecyclingSafeRun recycledActorRun ∧
       EqSafe structuredSingleScaleModel (0, 0) (0, 1) ∧
       ¬ EqSafe structuredMultiScaleModel (0, 0) (0, 1) := by
-  exact ⟨sequenceIdCriterion_counterexample, actorIdRecycling_counterexample,
-    singleScale_observables_not_sufficient, multiScale_observables_distinguish⟩
+  exact ⟨sequence_id_criterion_counterexample, actor_id_recycling_counterexample,
+    single_scale_observables_not_sufficient, multi_scale_observables_distinguish⟩
 
 /-! ## Limit Predicates and Frontier Witnesses -/
 
@@ -160,7 +160,7 @@ def implRunMetadataFrontier : Run Nat :=
   fun t => if t = 0 then 1 else 0
 
 /-- Frontier witness: bounded metadata approximation can hold while exact envelope fails. -/
-theorem metadataVsSEC_frontier_counterexample :
+theorem metadata_vs_sec_frontier_counterexample :
     BoundedMetadataApproximation natUnitModel metadataFrontierPolicy 0 0
       refRunMetadataFrontier implRunMetadataFrontier ∧
       ¬ Envelope natUnitModel refRunMetadataFrontier implRunMetadataFrontier := by
@@ -187,7 +187,7 @@ def causalDominanceZero : Nat → Prop :=
   fun s => s = 0
 
 /-- GC safety iff causal dominance concrete witness. -/
-theorem gcSafetyIff_causalDominanceZero :
+theorem gc_safety_iff_causal_dominance_zero :
     GCSafetyIffCausalDominance gcSafeZero causalDominanceZero := by
   intro s
   rfl
@@ -197,12 +197,12 @@ def StabilizationDelayTailLowerBound (fairness churn tail : Nat) : Prop :=
   churn - fairness ≤ tail
 
 /-- No-fairness specialization: tail lower bound is at least churn. -/
-theorem stabilizationTail_noFairness_lowerBound (churn : Nat) :
+theorem stabilization_tail_no_fairness_lower_bound (churn : Nat) :
     StabilizationDelayTailLowerBound 0 churn churn := by
   simp [StabilizationDelayTailLowerBound]
 
 /-- If churn exceeds fairness, any valid delay tail must be positive. -/
-theorem stabilizationTail_positive_when_churn_exceeds_fairness
+theorem stabilization_tail_positive_when_churn_exceeds_fairness
     {fairness churn tail : Nat}
     (hGap : fairness < churn)
     (hTail : StabilizationDelayTailLowerBound fairness churn tail) :
@@ -211,7 +211,7 @@ theorem stabilizationTail_positive_when_churn_exceeds_fairness
   exact Nat.lt_of_lt_of_le hPos hTail
 
 /-- Existence form of the stabilization-delay lower-bound theorem. -/
-theorem stabilizationTail_lowerBound_exists
+theorem stabilization_tail_lower_bound_exists
     {fairness churn : Nat}
     (hGap : fairness < churn) :
     ∃ tail, StabilizationDelayTailLowerBound fairness churn tail ∧ 0 < tail := by
@@ -220,16 +220,16 @@ theorem stabilizationTail_lowerBound_exists
 /-! ## Limits Witness Bundle -/
 
 /-- `H_crdt_limits` witness bundle: frontier, GC iff dominance, and churn/fairness lower bound. -/
-theorem hcrdtLimits_witness_bundle :
+theorem hcrdt_limits_witness_bundle :
     (BoundedMetadataApproximation natUnitModel metadataFrontierPolicy 0 0
       refRunMetadataFrontier implRunMetadataFrontier ∧
       ¬ Envelope natUnitModel refRunMetadataFrontier implRunMetadataFrontier) ∧
       GCSafetyIffCausalDominance gcSafeZero causalDominanceZero ∧
       (∀ fairness churn, fairness < churn →
         ∃ tail, StabilizationDelayTailLowerBound fairness churn tail ∧ 0 < tail) := by
-  refine ⟨metadataVsSEC_frontier_counterexample, gcSafetyIff_causalDominanceZero, ?_⟩
+  refine ⟨metadata_vs_sec_frontier_counterexample, gc_safety_iff_causal_dominance_zero, ?_⟩
   intro fairness churn hGap
-  exact stabilizationTail_lowerBound_exists hGap
+  exact stabilization_tail_lower_bound_exists hGap
 
 end CRDT
 end Distributed

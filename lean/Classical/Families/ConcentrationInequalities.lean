@@ -117,9 +117,9 @@ def subGaussianTail [EntropyAPI.AnalysisModel] (σ t : Real) : Real :=
 
     Probabilities are always in [0, 1], but sub-Gaussian bounds can exceed 1
     for small t. This theorem just confirms the bound is at least 0. -/
-theorem subGaussianTail_nonneg [EntropyAPI.AnalysisLaws] (σ t : Real) :
+theorem sub_gaussian_tail_nonneg [EntropyAPI.AnalysisLaws] (σ t : Real) :
     0 ≤ subGaussianTail σ t := by
-  simpa [subGaussianTail] using EntropyAPI.exponentialTail_nonneg σ t
+  simpa [subGaussianTail] using EntropyAPI.exponential_tail_nonneg σ t
 
 /-- A `ConcentrationWitness` certifies that a tail function has sub-Gaussian decay.
 
@@ -145,7 +145,7 @@ theorem at_zero_bound [EntropyAPI.AnalysisLaws] {p : Real → Real}
   calc
     p 0 ≤ subGaussianTail h.σ 0 := h0
     _ = 2 := by
-      simpa [subGaussianTail] using EntropyAPI.exponentialTail_zero h.σ
+      simpa [subGaussianTail] using EntropyAPI.exponential_tail_zero h.σ
 
 end ConcentrationInequalities
 end Classical

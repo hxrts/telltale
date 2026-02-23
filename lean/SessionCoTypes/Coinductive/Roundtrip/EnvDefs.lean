@@ -45,11 +45,11 @@ def envOf (all : Finset LocalTypeC) (_visited : Finset LocalTypeC) : EnvPair :=
 def EnvOfSub (all : Finset LocalTypeC) (ρ : EnvPair) : Prop :=
   ∀ x c, c ∈ all → nameOf c all = x → c ∈ envL ρ x
 
-lemma envOf_sub (all visited : Finset LocalTypeC) : EnvOfSub all (envOf all visited) := by
+lemma env_of_sub (all visited : Finset LocalTypeC) : EnvOfSub all (envOf all visited) := by
   intro x c hmem hname
   simp [envOf, envL, hmem, hname]
 
-lemma EnvOfSub_insertL {all : Finset LocalTypeC} {ρ : EnvPair} (x : String) (v : LocalTypeC)
+lemma env_of_sub_insert_l {all : Finset LocalTypeC} {ρ : EnvPair} (x : String) (v : LocalTypeC)
     (hsub : EnvOfSub all ρ) : EnvOfSub all (envInsertL ρ x v) := by
   intro y c hmem hname
   have hc : c ∈ envL ρ y := hsub y c hmem hname
@@ -60,17 +60,17 @@ lemma EnvOfSub_insertL {all : Finset LocalTypeC} {ρ : EnvPair} (x : String) (v 
     simpa [envInsertL, envL, Env.insert] using h'
   · simpa [envInsertL, envL, Env.insert, hy] using hc
 
-lemma EnvOfSub_insertR {all : Finset LocalTypeC} {ρ : EnvPair} (x : String) (v : LocalTypeC)
+lemma env_of_sub_insert_r {all : Finset LocalTypeC} {ρ : EnvPair} (x : String) (v : LocalTypeC)
     (hsub : EnvOfSub all ρ) : EnvOfSub all (envInsertR ρ x v) := by
   intro y c hmem hname
   have hc : c ∈ envL ρ y := hsub y c hmem hname
   simpa [envInsertR, envL] using hc
 
-lemma EnvOfSub_mem {all : Finset LocalTypeC} {ρ : EnvPair} {c : LocalTypeC}
+lemma env_of_sub_mem {all : Finset LocalTypeC} {ρ : EnvPair} {c : LocalTypeC}
     (hsub : EnvOfSub all ρ) (hmem : c ∈ all) : c ∈ envL ρ (nameOf c all) :=
   hsub (nameOf c all) c hmem rfl
 
-lemma nameOf_ne_var_of_head_var {all : Finset LocalTypeC} {b : LocalTypeC} {x : String}
+lemma name_of_ne_var_of_head_var {all : Finset LocalTypeC} {b : LocalTypeC} {x : String}
     (hb : head b = .var x) (hmem : b ∈ all) : nameOf b all ≠ x := by
   classical
   have hname : nameOf b all = nameFor b all := by
@@ -84,23 +84,23 @@ lemma nameOf_ne_var_of_head_var {all : Finset LocalTypeC} {b : LocalTypeC} {x : 
     simpa [hname] using h_eq
   have hx' : nameFor b all ∈ namesIn all := by
     simpa [h_eq'] using hx
-  exact (nameFor_not_mem_namesIn b all) hx'
+  exact (name_for_not_mem_names_in b all) hx'
 
 /-! ## toCoind Branch and Head Helpers -/
 
-lemma branchesOf_toCoind_send_ofFn {p : String} {n : Nat}
+lemma branches_of_to_coind_send_of_fn {p : String} {n : Nat}
     (f : Fin n → (Label × LocalTypeR)) :
     branchesOf (toCoind (.send p (List.ofFn f))) =
       List.ofFn (fun i => ((f i).1, toCoind (f i).2)) := by
-  simp [branchesOf_mkSend, toCoindBranches_ofFn]
+  simp [branches_of_mk_send, to_coind_branches_of_fn]
 
-lemma branchesOf_toCoind_recv_ofFn {p : String} {n : Nat}
+lemma branches_of_to_coind_recv_of_fn {p : String} {n : Nat}
     (f : Fin n → (Label × LocalTypeR)) :
     branchesOf (toCoind (.recv p (List.ofFn f))) =
       List.ofFn (fun i => ((f i).1, toCoind (f i).2)) := by
-  simp [branchesOf_mkRecv, toCoindBranches_ofFn]
+  simp [branches_of_mk_recv, to_coind_branches_of_fn]
 
-lemma head_toCoind_send_ofFn {p : String} {n : Nat}
+lemma head_to_coind_send_of_fn {p : String} {n : Nat}
     (f : Fin n → (Label × LocalTypeR)) :
     head (toCoind (.send p (List.ofFn f))) =
       .send p (List.ofFn fun i => (f i).1) := by
@@ -108,9 +108,9 @@ lemma head_toCoind_send_ofFn {p : String} {n : Nat}
       (Prod.fst ∘ fun i => ((f i).1, toCoind (f i).2)) = fun i => (f i).1 := by
     funext i
     rfl
-  simp [head_mkSend, toCoindBranches_ofFn, List.map_ofFn, hcomp]
+  simp [head_mk_send, to_coind_branches_of_fn, List.map_ofFn, hcomp]
 
-lemma head_toCoind_recv_ofFn {p : String} {n : Nat}
+lemma head_to_coind_recv_of_fn {p : String} {n : Nat}
     (f : Fin n → (Label × LocalTypeR)) :
     head (toCoind (.recv p (List.ofFn f))) =
       .recv p (List.ofFn fun i => (f i).1) := by
@@ -118,15 +118,15 @@ lemma head_toCoind_recv_ofFn {p : String} {n : Nat}
       (Prod.fst ∘ fun i => ((f i).1, toCoind (f i).2)) = fun i => (f i).1 := by
     funext i
     rfl
-  simp [head_mkRecv, toCoindBranches_ofFn, List.map_ofFn, hcomp]
+  simp [head_mk_recv, to_coind_branches_of_fn, List.map_ofFn, hcomp]
 
 /-! ## envOf Resolution Lemmas -/
 
-lemma envOf_varR (all visited : Finset LocalTypeC) : EnvVarR (envOf all visited) := by
+lemma env_of_var_r (all visited : Finset LocalTypeC) : EnvVarR (envOf all visited) := by
   intro x c hmem
   simpa [envOf] using hmem
 
-lemma envOf_resolvesL_of_backedge {all visited : Finset LocalTypeC}
+lemma env_of_resolves_l_of_backedge {all visited : Finset LocalTypeC}
     (hback : ∀ c ∈ all, EQ2C (mkVar (nameOf c all)) c) :
     EnvResolvesL (envOf all visited) := by
   intro x c hmem
@@ -136,11 +136,11 @@ lemma envOf_resolvesL_of_backedge {all visited : Finset LocalTypeC}
   have h := hback c hmem_all
   simpa [hname] using h
 
-lemma envOf_resolves_of_backedge {all visited : Finset LocalTypeC}
+lemma env_of_resolves_of_backedge {all visited : Finset LocalTypeC}
     (hback : ∀ c ∈ all, EQ2C (mkVar (nameOf c all)) c) :
     EnvResolves (envOf all visited) :=
-  EnvResolves_of_left_varR (envOf_resolvesL_of_backedge (all := all) (visited := visited) hback)
-    (envOf_varR all visited)
+  env_resolves_of_left_var_r (env_of_resolves_l_of_backedge (all := all) (visited := visited) hback)
+    (env_of_var_r all visited)
 
 /-! ## toInductive body helper -/
 
@@ -180,7 +180,7 @@ def toInductiveBody (root : LocalTypeC) (all visited : Finset LocalTypeC)
 
 /-! ## toInductiveBody Expansion Lemma -/
 
-lemma toInductiveBody_eq_match (root : LocalTypeC) (all visited : Finset LocalTypeC)
+lemma to_inductive_body_eq_match (root : LocalTypeC) (all visited : Finset LocalTypeC)
     (current : LocalTypeC)
     (h_closed : IsClosedSet all)
     (h_visited : visited ⊆ all) (h_current : current ∈ all) :

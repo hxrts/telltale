@@ -54,7 +54,7 @@ namespace Choreography.Projection.ProjSubst
 
 open SessionTypes.GlobalType (GlobalType Label)
 open SessionTypes.LocalTypeR (LocalTypeR BranchR)
-open SessionCoTypes.EQ2 (EQ2 EQ2_refl)
+open SessionCoTypes.EQ2 (EQ2 eq2_refl)
 
 -- Aliases to avoid name collision with _root_.trans
 abbrev projTrans := Choreography.Projection.Trans.trans
@@ -62,12 +62,12 @@ abbrev projTransBranches := Choreography.Projection.Trans.transBranches
 
 /-! ## Size Lemmas (for termination) -/
 
-private theorem sizeOf_tail_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
+private theorem size_of_tail_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf l < sizeOf (x :: l) := by
   simp only [sizeOf, List._sizeOf_1]
   omega
 
-private theorem sizeOf_head_snd_lt_cons (pair : Label × GlobalType)
+private theorem size_of_head_snd_lt_cons (pair : Label × GlobalType)
     (rest : List (Label × GlobalType)) :
     sizeOf pair.2 < sizeOf (pair :: rest) := by
   have h1 : sizeOf pair.2 < sizeOf pair := by
@@ -78,32 +78,32 @@ private theorem sizeOf_head_snd_lt_cons (pair : Label × GlobalType)
     omega
   exact Nat.lt_trans h1 h2
 
-private theorem sizeOf_bs_lt_comm (sender receiver : String)
+private theorem size_of_bs_lt_comm (sender receiver : String)
     (bs : List (Label × GlobalType)) :
     sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
   simp only [GlobalType.comm.sizeOf_spec]
   have h : 0 < 1 + sizeOf sender + sizeOf receiver := by omega
   omega
 
-private theorem sizeOf_head_snd_lt_comm
+private theorem size_of_head_snd_lt_comm
     (sender receiver : String) (pair : Label × GlobalType) (rest : List (Label × GlobalType)) :
     sizeOf pair.2 < sizeOf (GlobalType.comm sender receiver (pair :: rest)) := by
-  have h1 : sizeOf pair.2 < sizeOf (pair :: rest) := sizeOf_head_snd_lt_cons pair rest
+  have h1 : sizeOf pair.2 < sizeOf (pair :: rest) := size_of_head_snd_lt_cons pair rest
   have h2 : sizeOf (pair :: rest) < sizeOf (GlobalType.comm sender receiver (pair :: rest)) :=
-    sizeOf_bs_lt_comm sender receiver (pair :: rest)
+    size_of_bs_lt_comm sender receiver (pair :: rest)
   exact Nat.lt_trans h1 h2
 
-private theorem sizeOf_cont_lt_comm
+private theorem size_of_cont_lt_comm
     (sender receiver : String) (label : Label) (cont : GlobalType) (rest : List (Label × GlobalType)) :
     sizeOf cont < sizeOf (GlobalType.comm sender receiver ((label, cont) :: rest)) := by
-  exact sizeOf_head_snd_lt_comm sender receiver (label, cont) rest
+  exact size_of_head_snd_lt_comm sender receiver (label, cont) rest
 
-private theorem sizeOf_cont_lt_cons (label : Label) (cont : GlobalType)
+private theorem size_of_cont_lt_cons (label : Label) (cont : GlobalType)
     (rest : List (Label × GlobalType)) :
     sizeOf cont < sizeOf ((label, cont) :: rest) := by
-  exact sizeOf_head_snd_lt_cons (label, cont) rest
+  exact size_of_head_snd_lt_cons (label, cont) rest
 
-private theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
+private theorem size_of_body_lt_mu (t : String) (body : GlobalType) :
     sizeOf body < sizeOf (GlobalType.mu t body) := by
   have hk : 0 < 1 + sizeOf t := by
     simp only [Nat.one_add]
@@ -119,7 +119,7 @@ These lemmas establish that guardedness is preserved through substitution,
 which is needed for the mu case of proj_subst. -/
 
 /-- Helper: mu case for guardedness preservation under substitution. -/
-private theorem isGuarded_substitute_preserved_mu
+private theorem is_guarded_substitute_preserved_mu
     (s : String) (body : LocalTypeR)
     (ih : ∀ t v repl, body.isGuarded v = true → repl.isGuarded v = true →
       (body.substitute t repl).isGuarded v = true)
@@ -143,7 +143,7 @@ private theorem isGuarded_substitute_preserved_mu
 /-! ## Guardedness Preservation: Var Helper -/
 
 /-- Helper: var case for guardedness preservation under substitution. -/
-private theorem isGuarded_substitute_preserved_var
+private theorem is_guarded_substitute_preserved_var
     (w t v : String) (repl : LocalTypeR)
     (hbody : (LocalTypeR.var w).isGuarded v = true) (hrepl : repl.isGuarded v = true) :
     ((LocalTypeR.var w).substitute t repl).isGuarded v = true := by
@@ -160,27 +160,27 @@ private theorem isGuarded_substitute_preserved_var
 /-- If body is guarded for v, and repl is guarded for v, then substitution preserves guardedness.
 
     **PROVABLE**: By induction on body. -/
-theorem isGuarded_substitute_preserved (body : LocalTypeR) (t v : String) (repl : LocalTypeR)
+theorem is_guarded_substitute_preserved (body : LocalTypeR) (t v : String) (repl : LocalTypeR)
     (hbody : body.isGuarded v = true) (hrepl : repl.isGuarded v = true) :
     (body.substitute t repl).isGuarded v = true := by
   cases body with
   | «end» =>
       simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
   | var w =>
-      exact isGuarded_substitute_preserved_var w t v repl hbody hrepl
+      exact is_guarded_substitute_preserved_var w t v repl hbody hrepl
   | send p bs =>
       simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
   | recv p bs =>
       simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
   | mu s body =>
-      exact isGuarded_substitute_preserved_mu s body
-        (fun t' v' repl' hb hr => isGuarded_substitute_preserved body t' v' repl' hb hr)
+      exact is_guarded_substitute_preserved_mu s body
+        (fun t' v' repl' hb hr => is_guarded_substitute_preserved body t' v' repl' hb hr)
         t v repl hbody hrepl
 
 /-! ## Guardedness Preservation: Mu Unguarded Helper -/
 
 /-- Helper: mu case for unguarded substitution. -/
-private theorem isGuarded_substitute_unguarded_mu
+private theorem is_guarded_substitute_unguarded_mu
     (s : String) (body : LocalTypeR)
     (ih : ∀ t v repl, body.isGuarded v = false → t ≠ v →
       (body.substitute t repl).isGuarded v = false)
@@ -203,7 +203,7 @@ private theorem isGuarded_substitute_unguarded_mu
 /-! ## Guardedness Preservation: Var Unguarded Helper -/
 
 /-- Helper: var case for unguarded substitution. -/
-private theorem isGuarded_substitute_unguarded_var
+private theorem is_guarded_substitute_unguarded_var
     (w t v : String) (repl : LocalTypeR)
     (hbody : (LocalTypeR.var w).isGuarded v = false) (hneq : t ≠ v) :
     ((LocalTypeR.var w).substitute t repl).isGuarded v = false := by
@@ -224,21 +224,21 @@ private theorem isGuarded_substitute_unguarded_var
     for t doesn't change guardedness for v.
 
     **PROVABLE**: By induction on body. -/
-theorem isGuarded_substitute_unguarded (body : LocalTypeR) (t v : String) (repl : LocalTypeR)
+theorem is_guarded_substitute_unguarded (body : LocalTypeR) (t v : String) (repl : LocalTypeR)
     (hbody : body.isGuarded v = false) (hneq : t ≠ v) :
     (body.substitute t repl).isGuarded v = false := by
   cases body with
   | «end» =>
       simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
   | var w =>
-      exact isGuarded_substitute_unguarded_var w t v repl hbody hneq
+      exact is_guarded_substitute_unguarded_var w t v repl hbody hneq
   | send p bs =>
       simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
   | recv p bs =>
       simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
   | mu s body =>
-      exact isGuarded_substitute_unguarded_mu s body
-        (fun t' v' repl' hb hne => isGuarded_substitute_unguarded body t' v' repl' hb hne)
+      exact is_guarded_substitute_unguarded_mu s body
+        (fun t' v' repl' hb hne => is_guarded_substitute_unguarded body t' v' repl' hb hne)
         t v repl hbody hneq
 /-! ## Main Axiom: Projection-Substitution Commutation -/
 
@@ -319,9 +319,9 @@ mutual
               LocalTypeR.substitute, hguard]
         · have hrepl_closed : (projTrans G role).isClosed = true :=
 /- ## Structured Block 1 -/
-            Choreography.Projection.Project.trans_isClosed_of_isClosed G role hclosed
+            Choreography.Projection.Project.trans_is_closed_of_is_closed G role hclosed
           have hrepl_guarded : (projTrans G role).isGuarded s = true :=
-            SessionTypes.LocalTypeR.isGuarded_of_closed (projTrans G role) s (by simpa using hrepl_closed)
+            SessionTypes.LocalTypeR.is_guarded_of_closed (projTrans G role) s (by simpa using hrepl_closed)
           have hproj : projTrans (body.substitute t G) role =
               (projTrans body role).substitute t (projTrans G role) :=
             proj_subst body t G role hclosed
@@ -332,12 +332,12 @@ mutual
           cases hguard : e.isGuarded s with
           | true =>
               have hguard' : (e.substitute t repl).isGuarded s = true :=
-                isGuarded_substitute_preserved e t s repl hguard hrepl_guarded
+                is_guarded_substitute_preserved e t s repl hguard hrepl_guarded
               simp [GlobalType.substitute, hst, projTrans, Choreography.Projection.Trans.trans,
                 LocalTypeR.substitute, hproj', e, repl, hguard, hguard']
           | false =>
               have hguard' : (e.substitute t repl).isGuarded s = false :=
-                isGuarded_substitute_unguarded e t s repl hguard (Ne.symm hst)
+                is_guarded_substitute_unguarded e t s repl hguard (Ne.symm hst)
               simp [GlobalType.substitute, hst, projTrans, Choreography.Projection.Trans.trans,
                 hproj', e, repl, hguard, hguard']
 
@@ -360,9 +360,9 @@ mutual
   decreasing_by
     all_goals
       first
-      | exact sizeOf_body_lt_mu _ _
-      | exact sizeOf_bs_lt_comm _ _ _
-      | exact sizeOf_cont_lt_comm _ _ _ _ _
+      | exact size_of_body_lt_mu _ _
+      | exact size_of_bs_lt_comm _ _ _
+      | exact size_of_cont_lt_comm _ _ _ _ _
       | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
   -- proj_subst_branches Theorem
@@ -386,19 +386,19 @@ mutual
   decreasing_by
     all_goals
       first
-      | exact sizeOf_tail_lt_cons _ _
-      | exact sizeOf_cont_lt_cons _ _ _
+      | exact size_of_tail_lt_cons _ _
+      | exact size_of_cont_lt_cons _ _ _
 end
 
 /-! ## Corollaries -/
 
 /-- proj_subst lifted to EQ2 (trivially, via equality). -/
-theorem proj_subst_EQ2 (g : GlobalType) (t : String) (G : GlobalType) (role : String)
+theorem proj_subst_eq2 (g : GlobalType) (t : String) (G : GlobalType) (role : String)
     (hclosed : G.isClosed = true) :
     EQ2 (projTrans (g.substitute t G) role)
         ((projTrans g role).substitute t (projTrans G role)) := by
   rw [proj_subst g t G role hclosed]
-  exact EQ2_refl _
+  exact eq2_refl _
 
 /-- Specialized version: substituting mu into its body commutes with projection.
 
@@ -414,11 +414,11 @@ theorem proj_subst_mu_self (t : String) (body : GlobalType) (role : String)
   proj_subst body t (.mu t body) role hclosed
 
 /-- EQ2 version of mu-self substitution. -/
-theorem proj_subst_mu_self_EQ2 (t : String) (body : GlobalType) (role : String)
+theorem proj_subst_mu_self_eq2 (t : String) (body : GlobalType) (role : String)
     (hclosed : (GlobalType.mu t body).isClosed = true) :
     EQ2 (projTrans (body.substitute t (.mu t body)) role)
         ((projTrans body role).substitute t (projTrans (.mu t body) role)) := by
   rw [proj_subst_mu_self t body role hclosed]
-  exact EQ2_refl _
+  exact eq2_refl _
 
 end Choreography.Projection.ProjSubst

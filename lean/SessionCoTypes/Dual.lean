@@ -15,8 +15,8 @@ proofs for send have symmetric recv cases. We need duality lemmas that allow
 proving one direction and deriving the other via duality.
 
 Solution Structure. Proves `dual_involutive` (duality is its own inverse),
-`muHeight_dual` (duality preserves mu-height), `unfold_dual` (duality commutes
-with unfolding), and `fullUnfold_dual` (duality commutes with full unfolding).
+`mu_height_dual` (duality preserves mu-height), `unfold_dual` (duality commutes
+with unfolding), and `full_unfold_dual` (duality commutes with full unfolding).
 These enable reducing send/recv case duplication in proofs.
 -/
 
@@ -29,7 +29,7 @@ theorem dual_involutive (t : LocalTypeR) : t.dual.dual = t :=
   LocalTypeR.dual_dual t
 
 /-- dualBranches as a map (helper for branch proofs). -/
-theorem dualBranches_eq_map (bs : List BranchR) :
+theorem dual_branches_eq_map (bs : List BranchR) :
     dualBranches bs = bs.map (fun b => (b.1, b.2.1, b.2.2.dual)) := by
   induction bs with
   | nil => rfl
@@ -41,20 +41,20 @@ theorem dualBranches_eq_map (bs : List BranchR) :
               simp [dualBranches, ih]
 
 /-- Duality on branches is an involution (theorem alias). -/
-theorem dualBranches_involutive (bs : List BranchR) :
+theorem dual_branches_involutive (bs : List BranchR) :
     dualBranches (dualBranches bs) = bs :=
   dualBranches_dualBranches bs
 
 /-! ## μ-Height and Unfolding Compatibility -/
 
 /-- Duality preserves muHeight. -/
-theorem muHeight_dual : (t : LocalTypeR) → t.dual.muHeight = t.muHeight
+theorem mu_height_dual : (t : LocalTypeR) → t.dual.muHeight = t.muHeight
   | .end => rfl
   | .var _ => rfl
   | .send _ _ => rfl
   | .recv _ _ => rfl
   | .mu _ body => by
-      simp [LocalTypeR.dual, LocalTypeR.muHeight, muHeight_dual body]
+      simp [LocalTypeR.dual, LocalTypeR.muHeight, mu_height_dual body]
 
 /-- Duality commutes with one unfold step. -/
 theorem unfold_dual (t : LocalTypeR) : (t.unfold).dual = (t.dual).unfold := by
@@ -69,9 +69,9 @@ theorem unfold_iter_dual : ∀ n, ∀ t : LocalTypeR,
       simp [Nat.iterate, unfold_dual, unfold_iter_dual n (t.unfold)]
 
 /-- Duality commutes with fullUnfold. -/
-theorem fullUnfold_dual (t : LocalTypeR) : t.dual.fullUnfold = (t.fullUnfold).dual := by
+theorem full_unfold_dual (t : LocalTypeR) : t.dual.fullUnfold = (t.fullUnfold).dual := by
   -- Reduce to iterated unfold with the same muHeight.
-  simp [LocalTypeR.fullUnfold, muHeight_dual]
+  simp [LocalTypeR.fullUnfold, mu_height_dual]
   exact (unfold_iter_dual t.muHeight t).symm
 
 /-! ## Free Variable Invariants -/
@@ -79,20 +79,20 @@ theorem fullUnfold_dual (t : LocalTypeR) : t.dual.fullUnfold = (t.fullUnfold).du
 
 mutual
   /-- Duality preserves free variables. -/
-  theorem freeVars_dual : (t : LocalTypeR) → t.dual.freeVars = t.freeVars := by
+  theorem free_vars_dual : (t : LocalTypeR) → t.dual.freeVars = t.freeVars := by
     intro t
     cases t with
     | «end» => rfl
     | var v => rfl
     | send p bs =>
-        simp [LocalTypeR.dual, LocalTypeR.freeVars, freeVarsOfBranches_dual]
+        simp [LocalTypeR.dual, LocalTypeR.freeVars, free_vars_of_branches_dual]
     | recv p bs =>
-        simp [LocalTypeR.dual, LocalTypeR.freeVars, freeVarsOfBranches_dual]
+        simp [LocalTypeR.dual, LocalTypeR.freeVars, free_vars_of_branches_dual]
     | mu v body =>
-        simp [LocalTypeR.dual, LocalTypeR.freeVars, freeVars_dual]
+        simp [LocalTypeR.dual, LocalTypeR.freeVars, free_vars_dual]
 
   /-- Duality preserves freeVarsOfBranches. -/
-  theorem freeVarsOfBranches_dual : (bs : List BranchR) →
+  theorem free_vars_of_branches_dual : (bs : List BranchR) →
       freeVarsOfBranches (dualBranches bs) = freeVarsOfBranches bs := by
     intro bs
     cases bs with
@@ -102,17 +102,17 @@ mutual
         | mk l rest =>
             cases rest with
             | mk _vt t =>
-                simp [dualBranches, freeVarsOfBranches, freeVars_dual, freeVarsOfBranches_dual]
+                simp [dualBranches, freeVarsOfBranches, free_vars_dual, free_vars_of_branches_dual]
 end
 
 /-- Duality preserves closedness. -/
-theorem dual_isClosed (t : LocalTypeR) : t.isClosed = t.dual.isClosed := by
-  simp [LocalTypeR.isClosed, freeVars_dual]
+theorem dual_is_closed (t : LocalTypeR) : t.isClosed = t.dual.isClosed := by
+  simp [LocalTypeR.isClosed, free_vars_dual]
 
 /-! ## Guardedness Invariance -/
 
 /-- Duality preserves guardedness. -/
-theorem dual_isGuarded : (t : LocalTypeR) → (v : String) →
+theorem dual_is_guarded : (t : LocalTypeR) → (v : String) →
     t.dual.isGuarded v = t.isGuarded v
   | .end, _ => rfl
   | .var w, v => by simp [LocalTypeR.dual, LocalTypeR.isGuarded]
@@ -121,26 +121,26 @@ theorem dual_isGuarded : (t : LocalTypeR) → (v : String) →
   | .mu t body, v => by
       by_cases hv : v == t
       · simp [LocalTypeR.dual, LocalTypeR.isGuarded, hv]
-      · simp [LocalTypeR.dual, LocalTypeR.isGuarded, hv, dual_isGuarded body v]
+      · simp [LocalTypeR.dual, LocalTypeR.isGuarded, hv, dual_is_guarded body v]
 
 /-! ## Contractiveness Invariants -/
 
 mutual
   /-- Duality preserves contractiveness. -/
-  theorem dual_isContractive : (t : LocalTypeR) → t.dual.isContractive = t.isContractive := by
+  theorem dual_is_contractive : (t : LocalTypeR) → t.dual.isContractive = t.isContractive := by
     intro t
     cases t with
     | «end» => rfl
     | var v => rfl
     | send p bs =>
-        simp [LocalTypeR.dual, LocalTypeR.isContractive, dual_isContractiveBranches]
+        simp [LocalTypeR.dual, LocalTypeR.isContractive, dual_is_contractive_branches]
     | recv p bs =>
-        simp [LocalTypeR.dual, LocalTypeR.isContractive, dual_isContractiveBranches]
+        simp [LocalTypeR.dual, LocalTypeR.isContractive, dual_is_contractive_branches]
     | mu v body =>
-        simp [LocalTypeR.dual, LocalTypeR.isContractive, dual_isGuarded, dual_isContractive]
+        simp [LocalTypeR.dual, LocalTypeR.isContractive, dual_is_guarded, dual_is_contractive]
 
 /-- Duality preserves contractiveness of branches. -/
-  theorem dual_isContractiveBranches : (bs : List BranchR) →
+  theorem dual_is_contractive_branches : (bs : List BranchR) →
       isContractiveBranches (dualBranches bs) = isContractiveBranches bs := by
     intro bs
     cases bs with
@@ -150,7 +150,7 @@ mutual
         | mk l rest =>
             cases rest with
             | mk _vt t =>
-                simp [dualBranches, isContractiveBranches, dual_isContractive, dual_isContractiveBranches]
+                simp [dualBranches, isContractiveBranches, dual_is_contractive, dual_is_contractive_branches]
 end
 
 /-! ## Well-Formedness Preservation -/
@@ -160,9 +160,9 @@ theorem WellFormed.dual {t : LocalTypeR} (h : LocalTypeR.WellFormed t) :
     LocalTypeR.WellFormed t.dual := by
   -- Closedness and contractiveness are invariant under dual.
   refine ⟨?_, ?_⟩
-  · have hclosed : t.dual.isClosed = t.isClosed := (dual_isClosed t).symm
+  · have hclosed : t.dual.isClosed = t.isClosed := (dual_is_closed t).symm
     simpa [hclosed] using h.closed
-  · have hcontr : t.dual.isContractive = t.isContractive := dual_isContractive t
+  · have hcontr : t.dual.isContractive = t.isContractive := dual_is_contractive t
     simpa [hcontr] using h.contractive
 
 end SessionTypes.LocalTypeR
@@ -184,7 +184,7 @@ private def DualRel : Rel := fun a' b' =>
   ∃ a b, EQ2 a b ∧ a' = a.dual ∧ b' = b.dual
 
 /-- BranchesRel lifts through dualBranches. -/
-private theorem BranchesRel_dualBranches {bs cs : List BranchR}
+private theorem branches_rel_dual_branches {bs cs : List BranchR}
     (h : BranchesRel EQ2 bs cs) :
     BranchesRel DualRel (dualBranches bs) (dualBranches cs) := by
   induction h with
@@ -197,7 +197,7 @@ private theorem BranchesRel_dualBranches {bs cs : List BranchR}
 /-! ## DualRel Branch-Lifting to Closure -/
 
 /-- Convert BranchesRel DualRel to BranchesRel (EQ2_closure DualRel). -/
-private theorem BranchesRel_DualRel_to_closure {bs cs : List BranchR}
+private theorem branches_rel_dual_rel_to_closure {bs cs : List BranchR}
     (h : BranchesRel DualRel bs cs) :
     BranchesRel (EQ2_closure DualRel) bs cs := by
   exact List.Forall₂.imp (fun _ _ hxy => ⟨hxy.1, Or.inl hxy.2⟩) h
@@ -205,25 +205,25 @@ private theorem BranchesRel_DualRel_to_closure {bs cs : List BranchR}
 /-! ## DualRel Postfix Helpers: Send/Recv -/
 
 /-- Helper: send.send case for DualRel postfixpoint. -/
-private theorem DualRel_postfix_send_send {p q : String}
+private theorem dual_rel_postfix_send_send {p q : String}
     {bs cs : List BranchR}
     (hp : p = q) (hbranches : BranchesRel EQ2 bs cs) :
     EQ2F (EQ2_closure DualRel) (LocalTypeR.send p bs).dual (LocalTypeR.send q cs).dual := by
   simp only [LocalTypeR.dual]
-  exact ⟨hp, BranchesRel_DualRel_to_closure (BranchesRel_dualBranches hbranches)⟩
+  exact ⟨hp, branches_rel_dual_rel_to_closure (branches_rel_dual_branches hbranches)⟩
 
 /-- Helper: recv.recv case for DualRel postfixpoint. -/
-private theorem DualRel_postfix_recv_recv {p q : String}
+private theorem dual_rel_postfix_recv_recv {p q : String}
     {bs cs : List BranchR}
     (hp : p = q) (hbranches : BranchesRel EQ2 bs cs) :
     EQ2F (EQ2_closure DualRel) (LocalTypeR.recv p bs).dual (LocalTypeR.recv q cs).dual := by
   simp only [LocalTypeR.dual]
-  exact ⟨hp, BranchesRel_DualRel_to_closure (BranchesRel_dualBranches hbranches)⟩
+  exact ⟨hp, branches_rel_dual_rel_to_closure (branches_rel_dual_branches hbranches)⟩
 
 /-! ## DualRel Postfix Helper: μ/μ Case -/
 
 /-- Helper: mu.mu case for DualRel postfixpoint. -/
-private theorem DualRel_postfix_mu_mu {t s : String} {body body' : LocalTypeR}
+private theorem dual_rel_postfix_mu_mu {t s : String} {body body' : LocalTypeR}
     (hleft : EQ2 (body.substitute t (LocalTypeR.mu t body)) (LocalTypeR.mu s body'))
     (hright : EQ2 (LocalTypeR.mu t body) (body'.substitute s (LocalTypeR.mu s body'))) :
     EQ2F (EQ2_closure DualRel) (LocalTypeR.mu t body).dual (LocalTypeR.mu s body').dual := by
@@ -241,17 +241,17 @@ private theorem DualRel_postfix_mu_mu {t s : String} {body body' : LocalTypeR}
 /-! ## DualRel Postfixpoint Proof -/
 
 /-- DualRel is a post-fixpoint of EQ2F up to EQ2 closure. -/
-private theorem DualRel_postfix_upto :
+private theorem dual_rel_postfix_upto :
     ∀ a' b', DualRel a' b' → EQ2F (EQ2_closure DualRel) a' b' := by
   intro a' b' ⟨a, b, hab, ha', hb'⟩; subst ha' hb'
   have hf : EQ2F EQ2 a b := EQ2.destruct hab
   cases a <;> cases b <;> simp only [EQ2F] at hf ⊢ <;> try exact hf
   case send.send p bs q cs =>
-    obtain ⟨hp, hbranches⟩ := hf; exact DualRel_postfix_send_send hp hbranches
+    obtain ⟨hp, hbranches⟩ := hf; exact dual_rel_postfix_send_send hp hbranches
   case recv.recv p bs q cs =>
-    obtain ⟨hp, hbranches⟩ := hf; exact DualRel_postfix_recv_recv hp hbranches
+    obtain ⟨hp, hbranches⟩ := hf; exact dual_rel_postfix_recv_recv hp hbranches
   case mu.mu t body s body' =>
-    obtain ⟨hleft, hright⟩ := hf; exact DualRel_postfix_mu_mu hleft hright
+    obtain ⟨hleft, hright⟩ := hf; exact dual_rel_postfix_mu_mu hleft hright
 
 /-! ## DualRel Postfixpoint Proof: Asymmetric μ Cases -/
 
@@ -299,8 +299,8 @@ private theorem DualRel_postfix_upto :
 /-! ## EQ2 Duality Theorem -/
 
 /-- Duality respects EQ2: if two types are EQ2-equivalent, their duals are too. -/
-theorem EQ2_dual {a b : LocalTypeR} (h : EQ2 a b) : EQ2 a.dual b.dual := by
-  apply EQ2_coind_upto DualRel_postfix_upto
+theorem eq2_dual {a b : LocalTypeR} (h : EQ2 a b) : EQ2 a.dual b.dual := by
+  apply eq2_coind_upto dual_rel_postfix_upto
   exact ⟨a, b, h, rfl, rfl⟩
 
 end SessionCoTypes.EQ2

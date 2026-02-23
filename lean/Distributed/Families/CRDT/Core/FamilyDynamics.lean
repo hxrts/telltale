@@ -13,7 +13,7 @@ for uniform VM execution. We need adequacy theorems ensuring the lowering
 preserves observable behavior and stays within the CRDT envelope.
 
 Solution Structure. Define `InScopeFamiliesAdequacy` bundling lowering
-adequacy for each family. Prove `inScopeFamilies_adequate` combining
+adequacy for each family. Prove `in_scope_families_adequate` combining
 individual adequacy witnesses. Provide `CoreRepresentableFamily` instances
 for uniform interface.
 -/
@@ -38,7 +38,7 @@ structure InScopeFamiliesAdequacy
 
 /-- Main adequacy theorem: every in-scope family lowers to `OpCore` with
 observable and envelope preservation. -/
-theorem inScopeFamilies_adequate
+theorem in_scope_families_adequate
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     {RegisterRich CounterRich ORSetRich : Type z}
@@ -47,9 +47,9 @@ theorem inScopeFamilies_adequate
     FamilyEnvelopeAdequate M A.register ∧
     FamilyEnvelopeAdequate M A.counter ∧
     FamilyEnvelopeAdequate M A.orset := by
-  refine ⟨familyEnvelopeAdequate_of_lowering A.register, ?_⟩
-  exact ⟨familyEnvelopeAdequate_of_lowering A.counter,
-    familyEnvelopeAdequate_of_lowering A.orset⟩
+  refine ⟨family_envelope_adequate_of_lowering A.register, ?_⟩
+  exact ⟨family_envelope_adequate_of_lowering A.counter,
+    family_envelope_adequate_of_lowering A.orset⟩
 
 /-! ## Rich Family Fragments -/
 
@@ -112,8 +112,8 @@ def registerLoweringAdequacy
   { interp := interp
   , evalRich := evalRichCoreRepresentable interp
   , lower := lowerCoreRepresentable
-  , totalLowering := lowerCoreRepresentable_total
-  , stepObsPreserved := stepObsPreserved_coreRepresentable M interp
+  , totalLowering := lower_core_representable_total
+  , stepObsPreserved := step_obs_preserved_core_representable M interp
   }
 
 /-- Lowering adequacy witness for in-scope counter family. -/
@@ -126,8 +126,8 @@ def counterLoweringAdequacy
   { interp := interp
   , evalRich := evalRichCoreRepresentable interp
   , lower := lowerCoreRepresentable
-  , totalLowering := lowerCoreRepresentable_total
-  , stepObsPreserved := stepObsPreserved_coreRepresentable M interp
+  , totalLowering := lower_core_representable_total
+  , stepObsPreserved := step_obs_preserved_core_representable M interp
   }
 
 /-- Lowering adequacy witness for in-scope OR-Set family. -/
@@ -140,8 +140,8 @@ def orsetLoweringAdequacy
   { interp := interp
   , evalRich := evalRichCoreRepresentable interp
   , lower := lowerCoreRepresentable
-  , totalLowering := lowerCoreRepresentable_total
-  , stepObsPreserved := stepObsPreserved_coreRepresentable M interp
+  , totalLowering := lower_core_representable_total
+  , stepObsPreserved := step_obs_preserved_core_representable M interp
   }
 
 /-- Concrete in-scope adequacy bundle for register/counter/OR-set families. -/
@@ -161,7 +161,7 @@ def inScopeFamiliesAdequacyCoreRepresentable
 /-! ## In-Scope Adequacy Theorem -/
 
 /-- Concrete adequacy theorem for representative in-scope CRDT families. -/
-theorem inScopeFamilies_adequate_coreRepresentable
+theorem in_scope_families_adequate_core_representable
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
     {OpTag : Type v} {Args : Type w}
@@ -172,7 +172,7 @@ theorem inScopeFamilies_adequate_coreRepresentable
       FamilyEnvelopeAdequate M A.counter ∧
       FamilyEnvelopeAdequate M A.orset := by
   intro A
-  exact inScopeFamilies_adequate A
+  exact in_scope_families_adequate A
 
 /-! ## Core Hypothesis Analysis (`H_crdt_core`) -/
 
@@ -195,7 +195,7 @@ def OpContextPrimitiveAlgebra
   M.opContextLayerClass
 
 /-- Adequacy theorem: `H_crdt_core` is exactly semilattice + op-context primitive algebra. -/
-theorem hcrdtCore_iff_semilattice_plus_opContext
+theorem hcrdt_core_iff_semilattice_plus_op_context
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program} :
     HcrdtCore M ↔
@@ -243,13 +243,13 @@ def semilatticeOnlyNoOpContextModel : Model Nat Unit Unit Nat Unit where
   stabilizationLowerBoundClass := True
 
 /-- Refutation witness: semilattice-only foundations do not imply op-context algebra. -/
-theorem semilatticeOnly_not_sufficient_for_opContext :
+theorem semilattice_only_not_sufficient_for_op_context :
     SemilatticeOnlyFoundation semilatticeOnlyNoOpContextModel ∧
       ¬ OpContextPrimitiveAlgebra semilatticeOnlyNoOpContextModel := by
   simp [SemilatticeOnlyFoundation, OpContextPrimitiveAlgebra, semilatticeOnlyNoOpContextModel]
 
 /-- Universal refutation of deriving op-context from semilattice-only assumptions. -/
-theorem hcrdtCore_refute_semilatticeOnly_derivation :
+theorem hcrdt_core_refute_semilattice_only_derivation :
     ¬ (∀ M : Model Nat Unit Unit Nat Unit,
       SemilatticeOnlyFoundation M → OpContextPrimitiveAlgebra M) := by
   intro hDerive
@@ -262,7 +262,7 @@ theorem hcrdtCore_refute_semilatticeOnly_derivation :
 /-! ## Core Analysis Reconstruction -/
 
 /-- Distinct op-context primitive algebra is sufficient together with semilattice core. -/
-theorem hcrdtCore_of_semilattice_plus_opContext
+theorem hcrdt_core_of_semilattice_plus_op_context
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program} :
     SemilatticeOnlyFoundation M ∧ OpContextPrimitiveAlgebra M → HcrdtCore M := by
@@ -344,7 +344,7 @@ theorem dconv_noncanonicity_counterexample :
   simp [foundationModelDistance01, foundationModelDistance02]
 
 /-- Refutation: minimal op/state assumptions alone do not force canonical `d_conv`. -/
-theorem hcrdtFoundation_refute_canonical_from_minimal :
+theorem hcrdt_foundation_refute_canonical_from_minimal :
     ¬ (∀ M : Model Nat Unit Unit Nat Unit, MinimalOpStateConditions M → CanonicalDConv M) := by
   intro hDerive
   have hMin : MinimalOpStateConditions foundationModelDistance01 := by
@@ -378,7 +378,7 @@ def unboundedCounterexampleRun : Run Nat :=
   fun t => t
 
 /-- Counterexample: the unbounded run does not satisfy mixing-time stabilization. -/
-theorem unboundedRun_not_mixingTimeControlled :
+theorem unbounded_run_not_mixing_time_controlled :
     ¬ MixingTimeControlledRun unboundedCounterexampleRun := by
   intro hMix
   rcases hMix with ⟨τ, hτ⟩
@@ -389,7 +389,7 @@ theorem unboundedRun_not_mixingTimeControlled :
   exact Nat.succ_ne_self τ hContra
 
 /-- Counterexample: the unbounded run violates hotspot boundedness. -/
-theorem unboundedRun_not_hotspotBounded :
+theorem unbounded_run_not_hotspot_bounded :
     ¬ HotspotSlowModeBoundedRun unboundedCounterexampleRun := by
   intro hBounded
   rcases hBounded with ⟨B, hB⟩
@@ -399,7 +399,7 @@ theorem unboundedRun_not_hotspotBounded :
   exact Nat.not_succ_le_self B hContra
 
 /-- Counterexample: the unbounded run does not satisfy drift decay. -/
-theorem unboundedRun_not_driftDecay :
+theorem unbounded_run_not_drift_decay :
     ¬ DriftDecayRun unboundedCounterexampleRun := by
   intro hDecay
   rcases hDecay with ⟨τ, hτ⟩
@@ -410,12 +410,12 @@ theorem unboundedRun_not_driftDecay :
   exact Nat.not_succ_le_self τ hContra
 
 /-- Refutation bundle for `H_crdt_dynamics` without explicit dissemination/fairness assumptions. -/
-theorem hcrdtDynamics_counterexample_traces :
+theorem hcrdt_dynamics_counterexample_traces :
     ¬ MixingTimeControlledRun unboundedCounterexampleRun ∧
       ¬ HotspotSlowModeBoundedRun unboundedCounterexampleRun ∧
       ¬ DriftDecayRun unboundedCounterexampleRun := by
-  exact ⟨unboundedRun_not_mixingTimeControlled,
-    unboundedRun_not_hotspotBounded, unboundedRun_not_driftDecay⟩
+  exact ⟨unbounded_run_not_mixing_time_controlled,
+    unbounded_run_not_hotspot_bounded, unbounded_run_not_drift_decay⟩
 
 end CRDT
 end Distributed

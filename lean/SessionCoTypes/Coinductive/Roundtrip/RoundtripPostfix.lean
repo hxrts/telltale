@@ -45,7 +45,7 @@ lemma roundtrip_hpost
     intro ρ a b hR
     rcases hR with ⟨visited, h_visited, h_current, hcase, hsub⟩
     have hsub' : EnvOfSub all ρ := hsub
-    have hmem_env : b ∈ envL ρ (nameOf b all) := EnvOfSub_mem hsub' h_current
+    have hmem_env : b ∈ envL ρ (nameOf b all) := env_of_sub_mem hsub' h_current
     -- `roundtrip_hpost`: Wrap vs Body Cases
     cases hcase with
     -- `roundtrip_hpost`: Wrap Case (`toInductiveAux`)
@@ -115,12 +115,12 @@ lemma roundtrip_hpost
                   have ha : PFunctor.M.dest a = ⟨LocalTypeHead.mu x, fun _ =>
                       toCoind (toInductiveBody t all visited b h_closed h_visited h_current)⟩ := by
                       rw [haux]
-                      simp [haux_mu, toCoind_mu, mkMu, PFunctor.M.dest_mk]
+                      simp [haux_mu, to_coind_mu, mkMu, PFunctor.M.dest_mk]
                   have hmem' : b ∈ envL ρ x := by
                     simpa [nameOf, head, hdest] using hmem_env
                   have hcore : R (envInsertL ρ x b)
                       (toCoind (toInductiveBody t all visited b h_closed h_visited h_current)) b := by
-                    refine ⟨visited, h_visited, h_current, ?_, EnvOfSub_insertL x b hsub'⟩
+                    refine ⟨visited, h_visited, h_current, ?_, env_of_sub_insert_l x b hsub'⟩
                     exact Or.inr ⟨hmem, rfl⟩
                   exact EQ2CE_step.mu_left ha hmem' hcore
               -- Fresh Wrap: `send` Head
@@ -184,13 +184,13 @@ lemma roundtrip_hpost
                     -- Fresh Wrap Send Mu: Construct Left `mu` Step
                     have ha : PFunctor.M.dest a = ⟨LocalTypeHead.mu (nameOf b all),
                         fun _ => toCoind (toInductiveBody t all visited b h_closed h_visited h_current)⟩ := by
-                      simp [haux, haux_mu, toCoind_mu, mkMu, PFunctor.M.dest_mk]
+                      simp [haux, haux_mu, to_coind_mu, mkMu, PFunctor.M.dest_mk]
                     have hmem' : b ∈ envL ρ (nameOf b all) := hmem_env
 /- ## Structured Block 4 -/
                     have hcore : R (envInsertL ρ (nameOf b all) b)
                         (toCoind (toInductiveBody t all visited b h_closed h_visited h_current)) b := by
                       refine ⟨visited, h_visited, h_current, ?_,
-                        EnvOfSub_insertL (nameOf b all) b hsub'⟩
+                        env_of_sub_insert_l (nameOf b all) b hsub'⟩
                       exact Or.inr ⟨hmem, rfl⟩
                     exact EQ2CE_step.mu_left ha hmem' hcore
                   -- Fresh Wrap Send: Plain Send
@@ -245,19 +245,19 @@ lemma roundtrip_hpost
                     have hlabels : List.ofFn (fun i => (fR i).1) = labels := by
                       simp [fR]
                     have ha' : head a = .send p (List.ofFn fun i => (fR i).1) := by
-                      simpa [haux_send_coind] using (head_toCoind_send_ofFn (p := p) fR)
+                      simpa [haux_send_coind] using (head_to_coind_send_of_fn (p := p) fR)
                     have ha : head a = .send p labels := by
                       simpa [hlabels] using ha'
                     have hbranches_a :
                         branchesOf a =
                           List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)) := by
-                      simpa [haux_send_coind] using (branchesOf_toCoind_send_ofFn (p := p) fR)
+                      simpa [haux_send_coind] using (branches_of_to_coind_send_of_fn (p := p) fR)
                     -- Fresh Wrap Send Plain: Branch Relation Construction
                     have hbr' :
                         BranchesRelCE R ρ
                           (List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)))
                           (List.ofFn (fun i => (labels[i], f i))) := by
-                      refine BranchesRelCE_ofFn ?_
+                      refine branches_rel_ce_of_fn ?_
                       intro i
                       constructor
                       · simp [fR]
@@ -338,14 +338,14 @@ lemma roundtrip_hpost
                         simp [head, PFunctor.M.dest_mk]
                         simp [nameOf, head, PFunctor.M.dest_mk]
                         rw [if_pos hcond]
-                        simp [toInductiveBody_eq_match, PFunctor.M.dest_mk]
+                        simp [to_inductive_body_eq_match, PFunctor.M.dest_mk]
                       -- Fresh Wrap Recv Mu: Construct Left `mu` Step
-                      simp [haux, haux_mu, toCoind_mu, mkMu, PFunctor.M.dest_mk]
+                      simp [haux, haux_mu, to_coind_mu, mkMu, PFunctor.M.dest_mk]
                     have hmem' : b ∈ envL ρ (nameOf b all) := hmem_env
                     have hcore : R (envInsertL ρ (nameOf b all) b)
                         (toCoind (toInductiveBody t all visited b h_closed h_visited h_current)) b := by
                       refine ⟨visited, h_visited, h_current, ?_,
-                        EnvOfSub_insertL (nameOf b all) b hsub'⟩
+                        env_of_sub_insert_l (nameOf b all) b hsub'⟩
                       exact Or.inr ⟨hmem, rfl⟩
 /- ## Structured Block 7 -/
                     exact EQ2CE_step.mu_left ha hmem' hcore
@@ -401,18 +401,18 @@ lemma roundtrip_hpost
                         simp [fR]
                       have ha' : head a = .recv p (List.ofFn fun i => (fR i).1) := by
 /- ## Structured Block 8 -/
-                        simpa [haux_recv_coind] using (head_toCoind_recv_ofFn (p := p) fR)
+                        simpa [haux_recv_coind] using (head_to_coind_recv_of_fn (p := p) fR)
                       simpa [hlabels] using ha'
                     have hbranches_a :
                         branchesOf a =
                           List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)) := by
-                      simpa [haux_recv_coind] using (branchesOf_toCoind_recv_ofFn (p := p) fR)
+                      simpa [haux_recv_coind] using (branches_of_to_coind_recv_of_fn (p := p) fR)
                     -- Fresh Wrap Recv Plain: Branch Relation Construction
                     have hbr' :
                         BranchesRelCE R ρ
                           (List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)))
                           (List.ofFn (fun i => (labels[i], f i))) := by
-                      refine BranchesRelCE_ofFn ?_
+                      refine branches_rel_ce_of_fn ?_
                       intro i
                       constructor
                       · simp [fR]

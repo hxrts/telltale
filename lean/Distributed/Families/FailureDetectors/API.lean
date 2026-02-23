@@ -27,17 +27,17 @@ structure BoundaryProtocol where
       impossibility_boundary_of_assumptions assumptions premises
 
 /-- Extract solvability boundary theorem from a certified protocol bundle. -/
-theorem solvabilityBoundary_of_protocol (P : BoundaryProtocol) :
+theorem solvability_boundary_of_protocol (P : BoundaryProtocol) :
     SolvableBoundary P.model P.premises.detector :=
   P.solvabilityBoundary
 
 /-- Extract impossibility boundary theorem from a certified protocol bundle. -/
-theorem impossibilityBoundary_of_protocol (P : BoundaryProtocol) :
+theorem impossibility_boundary_of_protocol (P : BoundaryProtocol) :
     ImpossibilityBoundary P.model P.premises.detector :=
   P.impossibilityBoundary
 
 /-- Core assumptions are always validated for a certified protocol. -/
-theorem coreAssumptions_allPassed (P : BoundaryProtocol) :
+theorem core_assumptions_all_passed (P : BoundaryProtocol) :
     (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
   rfl
 

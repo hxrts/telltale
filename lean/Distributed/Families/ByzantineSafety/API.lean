@@ -27,22 +27,22 @@ structure SafetyProtocol where
       protocolSpec (byzantineSafetyAssumptionsFor protocolSpec)).allPassed = true
   exactCharacterization :
     ExactByzantineSafetyCharacterization model :=
-      exact_byzantineSafety_characterization model
+      exact_byzantine_safety_characterization model
 
 /-- Extract exact-characterization theorem from a certified protocol bundle. -/
-theorem exactCharacterization_of_protocol (P : SafetyProtocol) :
+theorem exact_characterization_of_protocol (P : SafetyProtocol) :
     ExactByzantineSafetyCharacterization P.model :=
   P.exactCharacterization
 
 /-- Certified protocols expose the full assumption-summary pass gate. -/
-theorem byzantineAssumptions_allPassed (P : SafetyProtocol) :
+theorem byzantine_assumptions_all_passed (P : SafetyProtocol) :
     (runAssumptionValidation
       P.protocolSpec (byzantineSafetyAssumptionsFor P.protocolSpec)).allPassed = true := by
   -- The package stores the full gate witness directly.
   exact P.assumptionsPassed
 
 /-- Certified protocols expose committed-side Byzantine safety directly. -/
-theorem byzantineSafety_of_protocol (P : SafetyProtocol) :
+theorem byzantine_safety_of_protocol (P : SafetyProtocol) :
     ByzantineSafety P.model := by
   -- Project the soundness branch from the packaged exact characterization.
   exact P.exactCharacterization.1 P.safetyAssumptions.characterizationWitness

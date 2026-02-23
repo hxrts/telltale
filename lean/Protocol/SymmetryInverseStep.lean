@@ -24,7 +24,7 @@ section
 
 /-- Helper: branch membership under renaming.
     If (l', L') is in the renamed branches, there exists an original (l, L). -/
-theorem mem_renameBranchesPR_inv (σ : ProtocolRenaming)
+theorem mem_rename_branches_pr_inv (σ : ProtocolRenaming)
     (bs : List (Label × LocalType)) (l' : Label) (L' : LocalType) :
     (l', L') ∈ renameBranchesPR σ bs →
     ∃ l L, (l, L) ∈ bs ∧ l' = σ.labelMap l ∧ L' = renameLocalTypePR σ L := by
@@ -59,7 +59,7 @@ theorem inverse_step_send_exists (σ : ProtocolRenaming)
       lookupG G ⟨sid, s⟩ = some (.send r T L) ∧
       L' = renameLocalTypePR σ L := by
   -- Use lookupG_renamePR_inv to get preimage, then case split on local type
-  obtain ⟨ep, L, hep, hep', hLfull⟩ := lookupG_renamePR_inv σ G _ _ hG'
+  obtain ⟨ep, L, hep, hep', hLfull⟩ := lookup_g_rename_pr_inv σ G _ _ hG'
   have hsid : ep.sid = sid := by
     have := congrArg Endpoint.sid hep'
     simp [renameEndpointPR] at this
@@ -130,7 +130,7 @@ theorem inverse_step_select_exists (σ : ProtocolRenaming)
       (l, L) ∈ bs ∧
       L' = renameLocalTypePR σ L := by
   -- Use lookupG_renamePR_inv + mem_renameBranchesPR_inv
-  obtain ⟨ep, Lep, hep, hep', hLfull⟩ := lookupG_renamePR_inv σ G _ _ hG'
+  obtain ⟨ep, Lep, hep, hep', hLfull⟩ := lookup_g_rename_pr_inv σ G _ _ hG'
   have hsid : ep.sid = sid := by
     have := congrArg Endpoint.sid hep'
     simp [renameEndpointPR] at this
@@ -151,7 +151,7 @@ theorem inverse_step_select_exists (σ : ProtocolRenaming)
       simp only [renameLocalTypePR, LocalType.select.injEq] at hLfull
       obtain ⟨hr', hbs'⟩ := hLfull
       rw [hbs'] at hIn'
-      obtain ⟨l, L, hl, hlmap, hLmap⟩ := mem_renameBranchesPR_inv σ bs l' L' hIn'
+      obtain ⟨l, L, hl, hlmap, hLmap⟩ := mem_rename_branches_pr_inv σ bs l' L' hIn'
       have hLookup : lookupG G { sid := sid, role := ep.role } = some (.select r bs) := by
         simpa [hEqEp, hL] using hep
       refine ⟨ep.role, r, bs, l, L, hrole, hr'.symm, hlmap.symm, hLookup, hl, hLmap⟩
@@ -204,7 +204,7 @@ theorem inverse_step_branch_exists (σ : ProtocolRenaming)
       (l, L) ∈ bs ∧
       L' = renameLocalTypePR σ L := by
   -- Use lookupG_renamePR_inv + mem_renameBranchesPR_inv
-  obtain ⟨ep, Lep, hep, hep', hLfull⟩ := lookupG_renamePR_inv σ G _ _ hG'
+  obtain ⟨ep, Lep, hep, hep', hLfull⟩ := lookup_g_rename_pr_inv σ G _ _ hG'
   have hsid : ep.sid = sid := by
     have := congrArg Endpoint.sid hep'
     simp [renameEndpointPR] at this
@@ -224,7 +224,7 @@ theorem inverse_step_branch_exists (σ : ProtocolRenaming)
       simp only [renameLocalTypePR, LocalType.branch.injEq] at hLfull
       obtain ⟨hs', hbs'⟩ := hLfull
       rw [hbs'] at hIn'
-      obtain ⟨l, L, hl, hlmap, hLmap⟩ := mem_renameBranchesPR_inv σ bs l' L' hIn'
+      obtain ⟨l, L, hl, hlmap, hLmap⟩ := mem_rename_branches_pr_inv σ bs l' L' hIn'
       have hLookup : lookupG G { sid := sid, role := ep.role } = some (.branch s bs) := by
         simpa [hEqEp, hL] using hep
       refine ⟨s, ep.role, bs, l, L, hs'.symm, hrole, hlmap.symm, hLookup, hl, hLmap⟩

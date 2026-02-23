@@ -63,7 +63,7 @@ def ErasureStableInvariant (I : CoherenceConfig → Prop) : Prop :=
 theorem coherent_erasure_stable :
     ErasureStableInvariant (fun C => Coherent C.G C.D) := by
   intro C₁ C₂ hEq
-  exact Coherent_respects_equiv hEq
+  exact coherent_respects_equiv hEq
 
 /-- Erasure characterization: coherence at `C` iff all erasure-equivalent views are coherent. -/
 theorem coherence_erasure_characterization (C : CoherenceConfig) :
@@ -71,9 +71,9 @@ theorem coherence_erasure_characterization (C : CoherenceConfig) :
       ∀ C', ConfigEquiv C C' → Coherent C'.G C'.D := by
   constructor
   · intro hCoh C' hEq
-    exact (Coherent_respects_equiv hEq).1 hCoh
+    exact (coherent_respects_equiv hEq).1 hCoh
   · intro hAll
-    exact hAll C (ConfigEquiv_refl C)
+    exact hAll C (config_equiv_refl C)
 
 /-- Safety contract for delegation from `G,D` to `G',D'`. -/
 def SafeDelegation
@@ -90,7 +90,7 @@ theorem delegation_sufficiency
   exact delegation_preserves_coherent G G' D D' s A B hCoh hDeleg
 
 /-- Local necessity: any safe delegation carries the original coherence and WF side conditions. -/
-theorem safeDelegation_local_necessity
+theorem safe_delegation_local_necessity
     {G G' : GEnv} {D D' : DEnv} {s : SessionId} {A B : Role}
     (hSafe : SafeDelegation G G' D D' s A B) :
     Coherent G D ∧ DelegationWF G s A B := by
@@ -107,7 +107,7 @@ def SafeDelegationFootprint
     Nonempty (DelegationStep G G' D D' s A B) ∧ Coherent G' D'
 
 /-- Forward map: `SafeDelegation` gives the footprint contract. -/
-theorem safeDelegation_to_footprint
+theorem safe_delegation_to_footprint
     {G G' : GEnv} {D D' : DEnv} {s : SessionId} {A B : Role}
     (hSafe : SafeDelegation G G' D D' s A B) :
     SafeDelegationFootprint G G' D D' s A B := by
@@ -117,7 +117,7 @@ theorem safeDelegation_to_footprint
 
 /-- Backward map: footprint contract implies `SafeDelegation` (WF retained as
     explicit side condition for exactness-level packaging). -/
-theorem footprint_to_safeDelegation
+theorem footprint_to_safe_delegation
     {G G' : GEnv} {D D' : DEnv} {s : SessionId} {A B : Role}
     (hFoot : SafeDelegationFootprint G G' D D' s A B) :
     SafeDelegation G G' D D' s A B := by
@@ -125,13 +125,13 @@ theorem footprint_to_safeDelegation
   exact ⟨hCoh, hStep, hPost⟩
 
 /-- Iff-style packaged exactness at delegation-footprint scope. -/
-theorem safeDelegation_iff_footprint
+theorem safe_delegation_iff_footprint
     {G G' : GEnv} {D D' : DEnv} {s : SessionId} {A B : Role} :
     SafeDelegation G G' D D' s A B ↔
       SafeDelegationFootprint G G' D D' s A B := by
   constructor
-  · exact safeDelegation_to_footprint
-  · exact footprint_to_safeDelegation
+  · exact safe_delegation_to_footprint
+  · exact footprint_to_safe_delegation
 
 /-- Counterexample interface for dropped side conditions at delegation footprint scope. -/
 structure DroppedDelegationConditionCounterexample
@@ -180,7 +180,7 @@ structure DelegationWFClauseCounterexample
 /-! ## Clause-Dropped Implications -/
 
 /-- If any single `DelegationWF` clause is dropped, `DelegationWF` itself fails. -/
-theorem not_delegationWF_of_clause_dropped
+theorem not_delegation_wf_of_clause_dropped
     {G : GEnv} {s : SessionId} {A B : Role}
     {clause : DelegationWFClause}
     (hDropped : DelegationWFClauseDropped G s A B clause) :
@@ -208,7 +208,7 @@ theorem not_delegationWF_of_clause_dropped
       exact hWF.A_ne_B hDropped
 
 /-- Any clause-level witness certifies footprint-level strictness. -/
-theorem delegationWF_clause_counterexample_not_footprint_safe
+theorem delegation_wf_clause_counterexample_not_footprint_safe
     {G G' : GEnv} {D D' : DEnv} {s : SessionId} {A B : Role}
     (w : DelegationWFClauseCounterexample G G' D D' s A B) :
     ¬ SafeDelegationFootprint G G' D D' s A B :=
@@ -224,7 +224,7 @@ def DelegationWFClauseIndependence
 
 /-- Decomposition theorem: if clause-independence oracle is available, each
     side condition is independently necessary at delegation-footprint scope. -/
-theorem delegationWF_clause_independence_strictness
+theorem delegation_wf_clause_independence_strictness
     {G G' : GEnv} {D D' : DEnv} {s : SessionId} {A B : Role}
     (hIndep : DelegationWFClauseIndependence G G' D D' s A B) :
     ∀ clause : DelegationWFClause,
@@ -304,7 +304,7 @@ structure Admissible (I : CoherenceInvariant) : Prop where
 def CoherenceInvariantCore : CoherenceInvariant := fun C => Coherent C.G C.D
 
 /-- `CoherenceInvariantCore` satisfies delegation adequacy directly. -/
-theorem coherenceInvariantCore_delegationAdequacy
+theorem coherence_invariant_core_delegation_adequacy
     {G G' : GEnv} {D D' : DEnv} {s : SessionId} {A B : Role}
     (hI : CoherenceInvariantCore ⟨G, D⟩)
     (_hWF : DelegationWF G s A B)
@@ -315,7 +315,7 @@ theorem coherenceInvariantCore_delegationAdequacy
 
 /-- Admissibility closure: Coherence itself is admissible (with locality/frame
     obligations explicitly assumption-scoped). -/
-theorem coherenceInvariantCore_admissible
+theorem coherence_invariant_core_admissible
     (hLocality : LocalityOnDelegationFootprints CoherenceInvariantCore)
     (hFrameStable : FrameStableOnDisjointSteps CoherenceInvariantCore) :
     Admissible CoherenceInvariantCore := by
@@ -326,17 +326,17 @@ theorem coherenceInvariantCore_admissible
       delegationAdequacy := ?_ }
   · exact coherent_erasure_stable
   · intro G G' D D' s A B hI hWF hStep hPost
-    exact coherenceInvariantCore_delegationAdequacy hI hWF hStep hPost
+    exact coherence_invariant_core_delegation_adequacy hI hWF hStep hPost
 
 /-- Packaged Theorem D tightness form: minimality hypothesis plus coherence
     closure into admissibility. -/
-theorem theoremD_tightness_closure
+theorem theorem_d_tightness_closure
     (hMinimal : ∀ I : CoherenceInvariant, Admissible I → ConservativeToCoherence I)
     (hLocality : LocalityOnDelegationFootprints CoherenceInvariantCore)
     (hFrameStable : FrameStableOnDisjointSteps CoherenceInvariantCore) :
     Admissible CoherenceInvariantCore ∧
       (∀ I : CoherenceInvariant, Admissible I → ConservativeToCoherence I) := by
-  refine ⟨coherenceInvariantCore_admissible hLocality hFrameStable, hMinimal⟩
+  refine ⟨coherence_invariant_core_admissible hLocality hFrameStable, hMinimal⟩
 
 /-! ## D/F Exact-Boundary Duality Packaging -/
 
@@ -361,7 +361,7 @@ structure ExactAdmissibilityBoundaryPair
 
 /-- Duality bridge theorem:
     Theorem D minimality + closure and Theorem F maximality form one exact boundary pair. -/
-theorem theoremDF_exact_boundary_duality
+theorem theorem_df_exact_boundary_duality
     {α : Type}
     {AdmitRel : BehaviorRelation α → Prop}
     {Envelope : BehaviorRelation α}
@@ -371,7 +371,7 @@ theorem theoremDF_exact_boundary_duality
     (hFMax : TheoremFMaximality AdmitRel Envelope) :
     ExactAdmissibilityBoundaryPair α AdmitRel Envelope := by
   refine
-    { d_core_admissible := coherenceInvariantCore_admissible hLocality hFrameStable
+    { d_core_admissible := coherence_invariant_core_admissible hLocality hFrameStable
       d_minimal := hDMinimal
       f_maximal := hFMax }
 
@@ -410,7 +410,7 @@ def phase7_theorem_package : Phase7TheoremPackage :=
       exact delegation_sufficiency hCoh hDeleg
     local_necessity := by
       intro G G' D D' s A B hSafe
-      exact safeDelegation_local_necessity hSafe
+      exact safe_delegation_local_necessity hSafe
     relative_minimality := by
       intro I hCons hComp C
       exact relative_minimality I hCons hComp C

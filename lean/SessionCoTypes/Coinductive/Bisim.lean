@@ -38,7 +38,7 @@ def Bisim (x y : LocalTypeC) : Prop :=
 /-! ## Bisimilarity is an Equivalence -/
 
 /-- Bisimilarity is reflexive: every type is bisimilar to itself. -/
-theorem Bisim_refl : ∀ x : LocalTypeC, Bisim x x := by
+theorem bisim_refl : ∀ x : LocalTypeC, Bisim x x := by
   intro x
   refine ⟨fun a b => a = b, ?_, rfl⟩
   intro a b h
@@ -47,7 +47,7 @@ theorem Bisim_refl : ∀ x : LocalTypeC, Bisim x x := by
   exact ⟨s, f, f, rfl, rfl, fun _ => rfl⟩
 
 /-- Bisimilarity is symmetric: flip the relation. -/
-theorem Bisim_symm : ∀ x y : LocalTypeC, Bisim x y → Bisim y x := by
+theorem bisim_symm : ∀ x y : LocalTypeC, Bisim x y → Bisim y x := by
   rintro x y ⟨R, hR, hxy⟩
   refine ⟨fun a b => R b a, ?_, hxy⟩
   intro a b hba
@@ -55,7 +55,7 @@ theorem Bisim_symm : ∀ x y : LocalTypeC, Bisim x y → Bisim y x := by
   exact ⟨s, g, f, hy, hx, hfg⟩
 
 /-- Bisimilarity is transitive: compose witnesses via an intermediate state. -/
-theorem Bisim_trans : ∀ x y z : LocalTypeC, Bisim x y → Bisim y z → Bisim x z := by
+theorem bisim_trans : ∀ x y z : LocalTypeC, Bisim x y → Bisim y z → Bisim x z := by
   rintro x y z ⟨R, hR, hxy⟩ ⟨S, hS, hyz⟩
   let T : LocalTypeC → LocalTypeC → Prop := fun a c => ∃ b, R a b ∧ S b c
   refine ⟨T, ?_, ⟨y, hxy, hyz⟩⟩
@@ -70,7 +70,7 @@ theorem Bisim_trans : ∀ x y z : LocalTypeC, Bisim x y → Bisim y z → Bisim 
 
 /-- Bisimilarity coincides with equality for LocalTypeC.
     This is the fundamental property of M-types: they are extensional. -/
-theorem Bisim_eq_iff (x y : LocalTypeC) : Bisim x y ↔ x = y := by
+theorem bisim_eq_iff (x y : LocalTypeC) : Bisim x y ↔ x = y := by
   constructor
   · rintro ⟨R, hR, hxy⟩
     apply PFunctor.M.bisim R
@@ -80,6 +80,6 @@ theorem Bisim_eq_iff (x y : LocalTypeC) : Bisim x y ↔ x = y := by
     · exact hxy
   · intro h
     subst h
-    exact Bisim_refl _
+    exact bisim_refl _
 
 end SessionCoTypes.Coinductive

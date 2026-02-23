@@ -164,7 +164,7 @@ def CompositionalEnvelopeBound_consensus
 /-! ## Compositional Committee Bounds: Theorems -/
 
 /-- Cross-committee interaction sum collapses to zero under explicit non-interference. -/
-theorem crossCommitteeBoundSum_eq_zero_of_nonInterference
+theorem cross_committee_bound_sum_eq_zero_of_non_interference
     {State : Type u}
     (pairs : List (CommitteeId × CommitteeId))
     (interaction : CrossCommitteeEnvelopeBound (State := State))
@@ -187,7 +187,7 @@ theorem crossCommitteeBoundSum_eq_zero_of_nonInterference
       simp [crossCommitteeBoundSum, hHeadZero, hTailZero]
 
 /-- Compositional exactness under explicit cross-committee/shard non-interference. -/
-theorem compositionalExactness_under_nonInterference_consensus
+theorem compositional_exactness_under_non_interference_consensus
     {State : Type u}
     (committees : List CommitteeId)
     (pairs : List (CommitteeId × CommitteeId))
@@ -203,7 +203,7 @@ theorem compositionalExactness_under_nonInterference_consensus
   intro ref impl
   have hInteractionZero :
       crossCommitteeBoundSum pairs interaction ref impl = 0 :=
-    crossCommitteeBoundSum_eq_zero_of_nonInterference pairs interaction hPairs hNI ref impl
+    cross_committee_bound_sum_eq_zero_of_non_interference pairs interaction hPairs hNI ref impl
   have hTotal := hComp ref impl
   simpa [hInteractionZero] using hTotal
 
@@ -246,7 +246,7 @@ structure DIntTheoremObject (protocol : ProtocolSpec) where
   declared : protocol.interactiveDistanceDeclared = true
 
 /-- Generic lower<=upper bound proof for `d_int` representatives. -/
-theorem dIntLower_le_dIntUpper (p : ProtocolSpec) :
+theorem d_int_lower_le_d_int_upper (p : ProtocolSpec) :
     dIntLowerBound p ≤ dIntUpperBound p := by
   cases hClass : consensusModelClassOf p <;>
     simp [dIntLowerBound, dIntUpperBound, hClass, Nat.le_add_left]
@@ -259,20 +259,20 @@ def mkDIntTheoremObject
   modelClass := consensusModelClassOf p
   lower := dIntLowerBound p
   upper := dIntUpperBound p
-  lowerLEUpper := dIntLower_le_dIntUpper p
+  lowerLEUpper := d_int_lower_le_d_int_upper p
   declared := hDeclared
 
 /-! ## `d_int` Bounds and Theorem Objects: Family Cases -/
 
 /-- Representative class theorem: quorum model `d_int` bounds. -/
-theorem dIntBounds_quorum
+theorem d_int_bounds_quorum
     (p : ProtocolSpec)
     (hCert : p.certificate = .quorum) :
     dIntLowerBound p = p.f + 1 ∧ dIntUpperBound p = p.n + (p.f + 1) := by
   simp [dIntLowerBound, dIntUpperBound, consensusModelClassOf, hCert]
 
 /-- Representative class theorem: work model `d_int` bounds. -/
-theorem dIntBounds_work
+theorem d_int_bounds_work
     (p : ProtocolSpec)
     (hCert : p.certificate = .work) :
     dIntLowerBound p = p.adversarialWeightPermille + 1 ∧
@@ -280,7 +280,7 @@ theorem dIntBounds_work
   simp [dIntLowerBound, dIntUpperBound, consensusModelClassOf, hCert]
 
 /-- Representative class theorem: coupled model `d_int` bounds. -/
-theorem dIntBounds_coupled
+theorem d_int_bounds_coupled
     (p : ProtocolSpec)
     (hCert : p.certificate = .hybrid) :
     dIntLowerBound p = p.f + p.adversarialWeightPermille + 1 ∧
@@ -320,18 +320,18 @@ def inferConsensusCapability (p : ProtocolSpec) : DiffBudget :=
   capabilityForSpace (classify p)
 
 /-- Principal-capability theorem for consensus profile inference. -/
-theorem principalCapability_inferred_consensus (p : ProtocolSpec) :
+theorem principal_capability_inferred_consensus (p : ProtocolSpec) :
     PrincipalCapability_consensus (inferConsensusCapability p) (capabilityForSpace (classify p)) := by
   rfl
 
 /-- Admission soundness for canonical consensus capability inference. -/
-theorem admissionSoundness_inferred_consensus (p : ProtocolSpec) :
+theorem admission_soundness_inferred_consensus (p : ProtocolSpec) :
     AdmissionSoundness_consensus (inferConsensusCapability p) (capabilityForSpace (classify p)) := by
   intro dUser hLe
   exact hLe
 
 /-- Admission completeness for canonical consensus capability inference. -/
-theorem admissionCompleteness_inferred_consensus (p : ProtocolSpec) :
+theorem admission_completeness_inferred_consensus (p : ProtocolSpec) :
     AdmissionCompleteness_consensus (inferConsensusCapability p) (capabilityForSpace (classify p)) := by
   intro dUser
   constructor
@@ -385,7 +385,7 @@ structure Premises
 /-! ## Premise Bundles and Certified Package: Derived Theorems -/
 
 /-- Exact envelope characterization follows from protocol-aligned premises. -/
-theorem exactEnvelope_consensus_of_premises
+theorem exact_envelope_consensus_of_premises
     {State : Type u} {Obs : Type v}
     {observe : State → Obs}
     (p : Premises observe) :
@@ -403,7 +403,7 @@ theorem adequacy_consensus_of_premises
   p.adequacyWitness
 
 /-- `d_int` lower/upper bound witness extraction from consensus premises. -/
-theorem dIntBounds_of_premises
+theorem d_int_bounds_of_premises
     {State : Type u} {Obs : Type v}
     {observe : State → Obs}
     (p : Premises observe) :
@@ -420,7 +420,7 @@ structure ConsensusEnvelopeProtocol where
   premises : Premises observe
   exactEnvelope :
     ExactEnvelopeCharacterization_consensus observe premises.RefRun premises.ImplRun :=
-      exactEnvelope_consensus_of_premises premises
+      exact_envelope_consensus_of_premises premises
   adequacy :
     ObservationalAdequacyModuloEnvelope_consensus observe premises.RefRun premises.ImplRun :=
       adequacy_consensus_of_premises premises
@@ -435,7 +435,7 @@ structure ConsensusEnvelopeProtocol where
       premises.admissionCompletenessWitness
   dIntBounds :
     premises.dIntTheorem.lower ≤ premises.dIntTheorem.upper :=
-      dIntBounds_of_premises premises
+      d_int_bounds_of_premises premises
 
 end ConsensusEnvelope
 end Distributed

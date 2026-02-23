@@ -12,7 +12,7 @@ but we need to prove it produces a valid `Erases` witness. This connects the
 algorithmic merge to the semantic erasure relation.
 
 Solution Structure. We prove soundness by structural induction:
-1. `mergeBranchesSend_sound`: branch merging preserves label subsets and erasure
+1. `merge_branches_send_sound`: branch merging preserves label subsets and erasure
 2. `merge_sound`: the main merge function produces valid Erases witnesses
 The key insight is that merge only succeeds when the types are compatible.
 -/
@@ -24,7 +24,7 @@ section
 open Classical
 -- Merge Soundness Helpers
 
-private theorem mergeBranchesSend_sound
+private theorem merge_branches_send_sound
     (m : Nat)
     (hmerge : ∀ a b c, sizeOf a + sizeOf b < m → merge a b = some c → Erases a b c)
     {bs1 bs2 bs : List BranchR}
@@ -71,13 +71,13 @@ private theorem mergeBranchesSend_sound
 
   | cons head tail ih =>
       obtain ⟨l, vt1, t1⟩ := head
-      rcases mergeBranchesSend_eq_some (lbl := l) (vt1 := vt1) (t1 := t1)
+      rcases merge_branches_send_eq_some (lbl := l) (vt1 := vt1) (t1 := t1)
           (rest := tail) (bs2 := bs2) (bs := bs) h with
         ⟨t2, t, rest', hlookup, hmerge', hrest, rfl⟩
       have hm_tail : sizeOf tail + sizeOf bs2 < m := by
 /- ## Structured Block 2 -/
         have htail : sizeOf tail < sizeOf ((l, vt1, t1) :: tail) := by
-          simpa using (sizeOf_tail_lt_sizeOf_branches (head := (l, vt1, t1)) (tail := tail))
+          simpa using (size_of_tail_lt_size_of_branches (head := (l, vt1, t1)) (tail := tail))
         have hsum : sizeOf tail + sizeOf bs2 < sizeOf ((l, vt1, t1) :: tail) + sizeOf bs2 :=
           Nat.add_lt_add_right htail _
         exact Nat.lt_trans hsum hm
@@ -92,7 +92,7 @@ private theorem mergeBranchesSend_sound
           simp [labelIn, hlookup']
         ·
           have hIn_tail : labelIn lbl tail :=
-            (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t1) (rest := tail) hlt).1 hIn
+            (label_in_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t1) (rest := tail) hlt).1 hIn
           exact hsub12 lbl hIn_tail
       · intro lbl hIn
         by_cases hlt : l = lbl
@@ -100,18 +100,18 @@ private theorem mergeBranchesSend_sound
           simp [labelIn, lookupBranch, hlt]
         ·
           have hIn_tail : labelIn lbl tail :=
-            (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t1) (rest := tail) hlt).1 hIn
+            (label_in_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t1) (rest := tail) hlt).1 hIn
           have hIn_rest' := hsub1b lbl hIn_tail
-          exact (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t) (rest := rest') hlt).2 hIn_rest'
+          exact (label_in_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t) (rest := rest') hlt).2 hIn_rest'
       · intro lbl hIn
         by_cases hlt : l = lbl
         ·
           simp [labelIn, lookupBranch, hlt]
         ·
           have hIn_rest' : labelIn lbl rest' :=
-            (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t) (rest := rest') hlt).1 hIn
+            (label_in_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t) (rest := rest') hlt).1 hIn
           have hIn_tail := hsubb1 lbl hIn_rest'
-          exact (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t1) (rest := tail) hlt).2 hIn_tail
+          exact (label_in_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t1) (rest := tail) hlt).2 hIn_tail
 
       -- mergeBranchesSend Cons Branch Erasure Case
 
@@ -122,13 +122,13 @@ private theorem mergeBranchesSend_sound
           cases h1
           have hlookup' : lookupBranch lbl bs2 = some t2 := by
             simpa [hlt] using hlookup
-          obtain ⟨vt2, hmem2'⟩ := mem_of_lookupBranch hlookup'
+          obtain ⟨vt2, hmem2'⟩ := mem_of_lookup_branch hlookup'
           have hmem2_cont : t2 ∈ bs2.map BranchR.cont := by
             exact List.mem_map.2 ⟨(lbl, vt2, t2), hmem2', rfl⟩
           have hlt1 : sizeOf t1 < sizeOf ((lbl, vt1, t1) :: tail) :=
-            sizeOf_cont_lt_sizeOf_branches lbl vt1 t1 tail
+            size_of_cont_lt_size_of_branches lbl vt1 t1 tail
           have hlt2 : sizeOf t2 < sizeOf bs2 :=
-            sizeOf_cont_lt_sizeOf_branches_mem hmem2_cont
+            size_of_cont_lt_size_of_branches_mem hmem2_cont
 /- ## Structured Block 3 -/
           have hsum :
               sizeOf t1 + sizeOf t2 < sizeOf ((lbl, vt1, t1) :: tail) + sizeOf bs2 :=
@@ -151,7 +151,7 @@ private theorem mergeBranchesSend_sound
 
 -- mergeBranchesRecv Soundness
 
-private theorem mergeBranchesRecv_sound
+private theorem merge_branches_recv_sound
     (m : Nat)
     (hmerge : ∀ a b c, sizeOf a + sizeOf b < m → merge a b = some c → Erases a b c)
     {bs1 bs2 bs : List BranchR}
@@ -183,7 +183,7 @@ private theorem mergeBranchesRecv_sound
       · intro lbl t1 h1 _
         simp [lookupBranch] at h1
       · intro lbl t2 h1 h2
-        simp [appendMissing_nil] at h2 ⊢
+        simp [append_missing_nil] at h2 ⊢
         exact h2
 
   -- mergeBranchesRecv Cons Case
@@ -191,7 +191,7 @@ private theorem mergeBranchesRecv_sound
   | cons head tail ih =>
 /- ## Structured Block 4 -/
       obtain ⟨l, vt1, t1⟩ := head
-      rcases mergeBranchesRecv_eq_some (lbl := l) (vt1 := vt1) (t1 := t1)
+      rcases merge_branches_recv_eq_some (lbl := l) (vt1 := vt1) (t1 := t1)
           (rest := tail) (bs2 := bs2) (bs := bs) h with
         hnone | hsome
 
@@ -200,7 +200,7 @@ private theorem mergeBranchesRecv_sound
       · rcases hnone with ⟨hlookup, rest', hrest, rfl⟩
         have hm_tail : sizeOf tail + sizeOf bs2 < m := by
           have htail : sizeOf tail < sizeOf ((l, vt1, t1) :: tail) := by
-            simpa using (sizeOf_tail_lt_sizeOf_branches (head := (l, vt1, t1)) (tail := tail))
+            simpa using (size_of_tail_lt_size_of_branches (head := (l, vt1, t1)) (tail := tail))
           have hsum : sizeOf tail + sizeOf bs2 < sizeOf ((l, vt1, t1) :: tail) + sizeOf bs2 :=
             Nat.add_lt_add_right htail _
           exact Nat.lt_trans hsum hm
@@ -245,7 +245,7 @@ private theorem mergeBranchesRecv_sound
       · rcases hsome with ⟨t2, t, rest', hlookup, hmerge', hrest, rfl⟩
         have hm_tail : sizeOf tail + sizeOf bs2 < m := by
           have htail : sizeOf tail < sizeOf ((l, vt1, t1) :: tail) := by
-            simpa using (sizeOf_tail_lt_sizeOf_branches (head := (l, vt1, t1)) (tail := tail))
+            simpa using (size_of_tail_lt_size_of_branches (head := (l, vt1, t1)) (tail := tail))
 /- ## Structured Block 5 -/
           have hsum : sizeOf tail + sizeOf bs2 < sizeOf ((l, vt1, t1) :: tail) + sizeOf bs2 :=
             Nat.add_lt_add_right htail _
@@ -260,13 +260,13 @@ private theorem mergeBranchesRecv_sound
             cases h1'
             have hlookup' : lookupBranch lbl bs2 = some t2 := by
               simpa [hlt] using hlookup
-            obtain ⟨vt2, hmem2'⟩ := mem_of_lookupBranch hlookup'
+            obtain ⟨vt2, hmem2'⟩ := mem_of_lookup_branch hlookup'
             have hmem2_cont : t2 ∈ bs2.map BranchR.cont := by
               exact List.mem_map.2 ⟨(lbl, vt2, t2), hmem2', rfl⟩
             have hlt1 : sizeOf t1 < sizeOf ((lbl, vt1, t1) :: tail) :=
-              sizeOf_cont_lt_sizeOf_branches lbl vt1 t1 tail
+              size_of_cont_lt_size_of_branches lbl vt1 t1 tail
             have hlt2 : sizeOf t2 < sizeOf bs2 :=
-              sizeOf_cont_lt_sizeOf_branches_mem hmem2_cont
+              size_of_cont_lt_size_of_branches_mem hmem2_cont
             have hsum :
                 sizeOf t1 + sizeOf t2 < sizeOf ((lbl, vt1, t1) :: tail) + sizeOf bs2 :=
               Nat.add_lt_add hlt1 hlt2
@@ -377,8 +377,8 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                     simp [h'] at h
                     cases h
                     have hlt : sizeOf a' + sizeOf b' < m := by
-                      have h1 : sizeOf a' < sizeOf (LocalTypeR.mu v a') := sizeOf_body_lt_sizeOf_mu v a'
-                      have h2 : sizeOf b' < sizeOf (LocalTypeR.mu w b') := sizeOf_body_lt_sizeOf_mu w b'
+                      have h1 : sizeOf a' < sizeOf (LocalTypeR.mu v a') := size_of_body_lt_size_of_mu v a'
+                      have h2 : sizeOf b' < sizeOf (LocalTypeR.mu w b') := size_of_body_lt_size_of_mu w b'
                       have hsum :
                           sizeOf a' + sizeOf b' < sizeOf (LocalTypeR.mu v a') + sizeOf (LocalTypeR.mu w b') :=
                         Nat.add_lt_add h1 h2
@@ -410,21 +410,21 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                       cases h
                       have hm : sizeOf bs + sizeOf bs' < m := by
                         have h1 : sizeOf bs < sizeOf (LocalTypeR.send p bs) :=
-                          sizeOf_branches_lt_sizeOf_send p bs
+                          size_of_branches_lt_size_of_send p bs
                         have h2 : sizeOf bs' < sizeOf (LocalTypeR.send p bs') :=
-                          sizeOf_branches_lt_sizeOf_send p bs'
+                          size_of_branches_lt_size_of_send p bs'
                         have hsum :
                             sizeOf bs + sizeOf bs' < sizeOf (LocalTypeR.send p bs) + sizeOf (LocalTypeR.send p bs') :=
                           Nat.add_lt_add h1 h2
                         simpa [m] using hsum
                       have hsend :=
-                        mergeBranchesSend_sound m hmerge (bs1 := bs) (bs2 := bs') (bs := bs'') hm hmerge'
+                        merge_branches_send_sound m hmerge (bs1 := bs) (bs2 := bs') (bs := bs'') hm hmerge'
                       rcases hsend with ⟨hsub12, hsub1b, hsubb1, hper⟩
                       have hsub21 : labelsSubset bs' bs :=
-                        labelsSubset_of_labelsSubsetb (bs1 := bs') (bs2 := bs) hsubset
+                        labels_subset_of_labels_subsetb (bs1 := bs') (bs2 := bs) hsubset
 /- ## Structured Block 8 -/
-                      have h1 : sameLabels bs bs' := sameLabels_of_subsets hsub12 hsub21
-                      have h2 : sameLabels bs bs'' := sameLabels_of_subsets hsub1b hsubb1
+                      have h1 : sameLabels bs bs' := same_labels_of_subsets hsub12 hsub21
+                      have h2 : sameLabels bs bs'' := same_labels_of_subsets hsub1b hsubb1
                       exact Erases.send h1 h2 hper
                     · simp [hmerge', hsubset] at h
               · simp [merge, hp] at h
@@ -449,15 +449,15 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                     cases h
                     have hm : sizeOf bs + sizeOf bs' < m := by
                       have h1 : sizeOf bs < sizeOf (LocalTypeR.recv p bs) :=
-                        sizeOf_branches_lt_sizeOf_recv p bs
+                        size_of_branches_lt_size_of_recv p bs
                       have h2 : sizeOf bs' < sizeOf (LocalTypeR.recv p bs') :=
-                        sizeOf_branches_lt_sizeOf_recv p bs'
+                        size_of_branches_lt_size_of_recv p bs'
                       have hsum :
                           sizeOf bs + sizeOf bs' < sizeOf (LocalTypeR.recv p bs) + sizeOf (LocalTypeR.recv p bs') :=
                         Nat.add_lt_add h1 h2
                       simpa [m] using hsum
                     have hrecv :=
-                      mergeBranchesRecv_sound m hmerge (bs1 := bs) (bs2 := bs') (bs := bs'') hm hmerge'
+                      merge_branches_recv_sound m hmerge (bs1 := bs) (bs2 := bs') (bs := bs'') hm hmerge'
                     rcases hrecv with ⟨hper, hleft, hright⟩
                     exact Erases.recv hper hleft hright
               · simp [merge, hp] at h
@@ -469,7 +469,7 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
 -- mergeAll Soundness
 
 /-- mergeAll is sound w.r.t. ErasesAll. -/
-theorem mergeAll_sound {ts : List LocalTypeR} {t : LocalTypeR}
+theorem merge_all_sound {ts : List LocalTypeR} {t : LocalTypeR}
     (h : mergeAll ts = some t) : ErasesAll ts t := by
   induction ts generalizing t with
   | nil => simp [mergeAll] at h

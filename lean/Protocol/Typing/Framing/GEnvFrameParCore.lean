@@ -13,14 +13,14 @@ section
 
 /-- Shared core: par typing is independent of the ambient `nG` index once the
 framed typing judgment is established. -/
-lemma frame_par_nG_irrel_core
+lemma frame_par_n_g_irrel_core
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {P Q : Process}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv}
     {nS nG nG' : Nat} :
     HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin W Δ →
     HasTypeProcPreOut Ssh Sown G (.par nS nG' P Q) Sfin Gfin W Δ := by
   intro hPar
-  exact HasTypeProcPreOut_par_nG_irrel hPar
+  exact has_type_proc_pre_out_par_n_g_irrel hPar
 
 end
 

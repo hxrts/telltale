@@ -94,28 +94,28 @@ structure VMShardedEnvelopeHypotheses (State : Type u) (Obs : Type v) where
     ShardedExchangeNormalization shardedEnvelope certifiedExchange
 
 /-- E3: extract VM local adherence from local hypothesis bundle assumptions. -/
-theorem vmLocalAdherence_of_hypotheses
+theorem vm_local_adherence_of_hypotheses
     {State : Type u} {Obs : Type v}
     (h : VMLocalEnvelopeHypotheses State Obs) :
     LocalEnvelopeSoundness h.localEnvelope h.refRun h.vmRun :=
   h.adherenceWitness
 
 /-- E3: extract VM sharded adherence from sharded hypothesis bundle assumptions. -/
-theorem vmShardedAdherence_of_hypotheses
+theorem vm_sharded_adherence_of_hypotheses
     {State : Type u} {Obs : Type v}
     (h : VMShardedEnvelopeHypotheses State Obs) :
     ShardedEnvelopeSoundness h.shardedEnvelope h.refRun h.vmRun :=
   h.adherenceWitness
 
 /-- E3: extract scheduler determinism modulo certified exchange (local). -/
-theorem schedulerDeterminismLocal_of_hypotheses
+theorem scheduler_determinism_local_of_hypotheses
     {State : Type u} {Obs : Type v}
     (h : VMLocalEnvelopeHypotheses State Obs) :
     ExchangeNormalization h.localEnvelope h.certifiedExchange :=
   h.schedulerDeterminismWitness
 
 /-- E3: extract scheduler determinism modulo certified exchange (sharded). -/
-theorem schedulerDeterminismSharded_of_hypotheses
+theorem scheduler_determinism_sharded_of_hypotheses
     {State : Type u} {Obs : Type v}
     (h : VMShardedEnvelopeHypotheses State Obs) :
     ShardedExchangeNormalization h.shardedEnvelope h.certifiedExchange :=
@@ -189,7 +189,7 @@ structure VMEnvelopeAdherencePremises
 -- Premise Projections
 
 /-- E3: extract local observational adequacy modulo envelope from VM premises. -/
-theorem vmLocalAdequacy_of_premises
+theorem vm_local_adequacy_of_premises
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
     (p : VMEnvelopeAdherencePremises State Obs Placement) :
     VMObservationalAdequacyModuloEnvelope
@@ -198,7 +198,7 @@ theorem vmLocalAdequacy_of_premises
   p.localAdequacyWitness
 
 /-- E3: extract sharded observational adequacy modulo envelope from VM premises. -/
-theorem vmShardedAdequacy_of_premises
+theorem vm_sharded_adequacy_of_premises
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
     (p : VMEnvelopeAdherencePremises State Obs Placement) :
     VMObservationalAdequacyModuloEnvelope
@@ -207,7 +207,7 @@ theorem vmShardedAdequacy_of_premises
   p.shardedAdequacyWitness
 
 /-- E3: extract local full-abstraction/adequacy witness from VM premises. -/
-theorem vmLocalFullAbstraction_of_premises
+theorem vm_local_full_abstraction_of_premises
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
     (p : VMEnvelopeAdherencePremises State Obs Placement) :
     EnvelopeFullAbstraction
@@ -216,7 +216,7 @@ theorem vmLocalFullAbstraction_of_premises
   p.localFullAbstractionWitness
 
 /-- E3: extract sharded full-abstraction/adequacy witness from VM premises. -/
-theorem vmShardedFullAbstraction_of_premises
+theorem vm_sharded_full_abstraction_of_premises
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
     (p : VMEnvelopeAdherencePremises State Obs Placement) :
     EnvelopeFullAbstraction
@@ -225,7 +225,7 @@ theorem vmShardedFullAbstraction_of_premises
   p.shardedFullAbstractionWitness
 
 /-- E3: extract VM adherence monotonicity under spatial refinement. -/
-theorem vmAdherenceMonotonicity_of_premises
+theorem vm_adherence_monotonicity_of_premises
 /- ## Structured Block 4 -/
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
     (p : VMEnvelopeAdherencePremises State Obs Placement) :
@@ -235,7 +235,7 @@ theorem vmAdherenceMonotonicity_of_premises
 -- Capability-Monotonicity Projection
 
 /-- E3: extract capability monotonicity theorem from VM premises. -/
-theorem vmCapabilityMonotonicity_of_premises
+theorem vm_capability_monotonicity_of_premises
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
     (p : VMEnvelopeAdherencePremises State Obs Placement) :
     p.guarantee p.weakCapability → p.guarantee p.strongCapability := by
@@ -256,42 +256,42 @@ structure VMEnvelopeAdherenceProtocol where
       premises.localHypotheses.localEnvelope
       premises.localHypotheses.refRun
       premises.localHypotheses.vmRun :=
-        vmLocalAdherence_of_hypotheses premises.localHypotheses
+        vm_local_adherence_of_hypotheses premises.localHypotheses
   shardedAdherence :
     ShardedEnvelopeSoundness
       premises.shardedHypotheses.shardedEnvelope
       premises.shardedHypotheses.refRun
       premises.shardedHypotheses.vmRun :=
-        vmShardedAdherence_of_hypotheses premises.shardedHypotheses
+        vm_sharded_adherence_of_hypotheses premises.shardedHypotheses
   schedulerDeterminismLocal :
     ExchangeNormalization
       premises.localHypotheses.localEnvelope
       premises.localHypotheses.certifiedExchange :=
-        schedulerDeterminismLocal_of_hypotheses premises.localHypotheses
+        scheduler_determinism_local_of_hypotheses premises.localHypotheses
   schedulerDeterminismSharded :
     ShardedExchangeNormalization
       premises.shardedHypotheses.shardedEnvelope
       premises.shardedHypotheses.certifiedExchange :=
-        schedulerDeterminismSharded_of_hypotheses premises.shardedHypotheses
+        scheduler_determinism_sharded_of_hypotheses premises.shardedHypotheses
 
   -- Packaged VM Adherence Protocol: Adequacy Fields
 
   monotonicity :
     SpatialSubtypingMonotonicity premises.subtype premises.obligation :=
-      vmAdherenceMonotonicity_of_premises premises
+      vm_adherence_monotonicity_of_premises premises
   localAdequacy :
     VMObservationalAdequacyModuloEnvelope
       (EqEnvLocal premises.localHypotheses.localEnvelope)
       premises.localHypotheses.refRun
       premises.localHypotheses.vmRun :=
-        vmLocalAdequacy_of_premises premises
+        vm_local_adequacy_of_premises premises
   shardedAdequacy :
     VMObservationalAdequacyModuloEnvelope
       (EqEnvShard premises.shardedHypotheses.shardedEnvelope)
 /- ## Structured Block 5 -/
       premises.shardedHypotheses.refRun
       premises.shardedHypotheses.vmRun :=
-        vmShardedAdequacy_of_premises premises
+        vm_sharded_adequacy_of_premises premises
 
   -- Packaged VM Adherence Protocol: Full-Abstraction Fields
 
@@ -299,16 +299,16 @@ structure VMEnvelopeAdherenceProtocol where
     EnvelopeFullAbstraction
       premises.localHypotheses.localEnvelope.toEnvelope.observe
       (EqEnvLocal premises.localHypotheses.localEnvelope) :=
-        vmLocalFullAbstraction_of_premises premises
+        vm_local_full_abstraction_of_premises premises
   shardedFullAbstraction :
     EnvelopeFullAbstraction
       premises.shardedHypotheses.shardedEnvelope.toEnvelope.observe
       (EqEnvShard premises.shardedHypotheses.shardedEnvelope) :=
-        vmShardedFullAbstraction_of_premises premises
+        vm_sharded_full_abstraction_of_premises premises
   capabilityMonotonicity :
     premises.guarantee premises.weakCapability →
     premises.guarantee premises.strongCapability :=
-      vmCapabilityMonotonicity_of_premises premises
+      vm_capability_monotonicity_of_premises premises
 
 end Adequacy
 end Runtime

@@ -26,13 +26,13 @@ section
 -- Session and Disjointness Lemmas
 
 /-- Right sessions embed into appended GEnv sessions. -/
-theorem SessionsOf_append_right {G₁ G₂ : GEnv} :
+theorem sessions_of_append_right {G₁ G₂ : GEnv} :
     SessionsOf G₂ ⊆ SessionsOf (G₁ ++ G₂) := by
   intro s hs
-  exact SessionsOf_append_right_subset (G₁:=G₁) (G₂:=G₂) hs
+  exact sessions_of_append_right_subset (G₁:=G₁) (G₂:=G₂) hs
 
 /-- Disjointness is preserved when the left sessions shrink. -/
-theorem DisjointG_of_subset_left {G₁ G₁' G₂ : GEnv} :
+theorem disjoint_g_of_subset_left {G₁ G₁' G₂ : GEnv} :
     SessionsOf G₁' ⊆ SessionsOf G₁ →
     DisjointG G₁ G₂ →
     DisjointG G₁' G₂ := by
@@ -48,20 +48,20 @@ theorem DisjointG_of_subset_left {G₁ G₁' G₂ : GEnv} :
   exact this.elim
 
 /-- DisjointG is symmetric. -/
-theorem DisjointG_symm {G₁ G₂ : GEnv} :
+theorem disjoint_g_symm {G₁ G₂ : GEnv} :
     DisjointG G₁ G₂ →
     DisjointG G₂ G₁ := by
   intro hDisj
   simpa [DisjointG, GEnvDisjoint, Set.inter_comm] using hDisj
 
-theorem DisjointG_append_left {G₁ G₁' G₂ : GEnv} :
+theorem disjoint_g_append_left {G₁ G₁' G₂ : GEnv} :
     DisjointG G₁ G₂ →
     DisjointG G₁' G₂ →
     DisjointG (G₁ ++ G₁') G₂ := by
   intro hDisj hDisj'
   apply Set.eq_empty_iff_forall_notMem.2
   intro s hs
-  have hSub := SessionsOf_append_subset (G₁:=G₁) (G₂:=G₁') hs.1
+  have hSub := sessions_of_append_subset (G₁:=G₁) (G₂:=G₁') hs.1
   cases hSub with
   | inl hIn1 =>
       have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = ∅ := by
@@ -79,7 +79,7 @@ theorem DisjointG_append_left {G₁ G₁' G₂ : GEnv} :
 
 -- DEnv Append Lookup Facts
 
-theorem lookupD_append_left {D₁ D₂ : DEnv} {e : Edge} :
+theorem lookup_d_append_left {D₁ D₂ : DEnv} {e : Edge} :
     lookupD D₁ e ≠ [] →
     lookupD (D₁ ++ D₂) e = lookupD D₁ e := by
   intro hne
@@ -90,27 +90,27 @@ theorem lookupD_append_left {D₁ D₂ : DEnv} {e : Edge} :
       exact (hne hlookup).elim
   | some ts =>
       have hleft :=
-        findD_append_left (D₁:=D₁) (D₂:=D₂) (e:=e) (ts:=ts) hfind
+        find_d_append_left (D₁:=D₁) (D₂:=D₂) (e:=e) (ts:=ts) hfind
       have hlookup : lookupD D₁ e = ts := by
         simp [lookupD, hfind]
       have hlookup' : lookupD (D₁ ++ D₂) e = ts := by
         simp [lookupD, hleft]
       simpa [hlookup] using hlookup'
 
-theorem lookupD_append_right {D₁ D₂ : DEnv} {e : Edge} :
+theorem lookup_d_append_right {D₁ D₂ : DEnv} {e : Edge} :
     D₁.find? e = none →
     lookupD (D₁ ++ D₂) e = lookupD D₂ e := by
   intro hfind
-  have h := findD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hfind
+  have h := find_d_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hfind
   simp [lookupD, h]
 
-theorem lookupD_append_left_of_right_none {D₁ D₂ : DEnv} {e : Edge} :
+theorem lookup_d_append_left_of_right_none {D₁ D₂ : DEnv} {e : Edge} :
     D₂.find? e = none →
     lookupD (D₁ ++ D₂) e = lookupD D₁ e := by
   intro hRight
   cases hfind : D₁.find? e with
   | none =>
-      have h := findD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hfind
+      have h := find_d_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hfind
       have hlookup : lookupD D₁ e = [] := by
         simp [lookupD, hfind]
       have hlookup' : lookupD (D₁ ++ D₂) e = [] := by
@@ -118,7 +118,7 @@ theorem lookupD_append_left_of_right_none {D₁ D₂ : DEnv} {e : Edge} :
       simpa [hlookup] using hlookup'
   | some ts =>
       have hleft :=
-        findD_append_left (D₁:=D₁) (D₂:=D₂) (e:=e) (ts:=ts) hfind
+        find_d_append_left (D₁:=D₁) (D₂:=D₂) (e:=e) (ts:=ts) hfind
       have hlookup : lookupD D₁ e = ts := by
         simp [lookupD, hfind]
       have hlookup' : lookupD (D₁ ++ D₂) e = ts := by
@@ -127,40 +127,40 @@ theorem lookupD_append_left_of_right_none {D₁ D₂ : DEnv} {e : Edge} :
 
 -- SEnv Domain Inclusion Under Append
 
-theorem SEnvDomSubset_append_left {S₁ S₂ : SEnv} :
+theorem s_env_dom_subset_append_left {S₁ S₂ : SEnv} :
     SEnvDomSubset S₁ (S₁ ++ S₂) := by
   intro x T hLookup
-  exact ⟨T, lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) hLookup⟩
+  exact ⟨T, lookup_s_env_append_left (S₁:=S₁) (S₂:=S₂) hLookup⟩
 
-theorem SEnvDomSubset_append_right {S₁ S₂ : SEnv} :
+theorem s_env_dom_subset_append_right {S₁ S₂ : SEnv} :
     SEnvDomSubset S₂ (S₁ ++ S₂) := by
 /- ## Structured Block 3 -/
   intro x T hLookup
   cases hLeft : lookupSEnv S₁ x with
   | some T₁ =>
-      exact ⟨T₁, lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) hLeft⟩
+      exact ⟨T₁, lookup_s_env_append_left (S₁:=S₁) (S₂:=S₂) hLeft⟩
   | none =>
-      have hEq := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hLeft
+      have hEq := lookup_s_env_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hLeft
       exact ⟨T, by simpa [hEq] using hLookup⟩
 
 -- Framed SEnv Lookup Transport
 
-theorem lookupSEnv_all_frame_left {Ssh S₁ S₂ : SEnv} {x : Var} {T : ValType} :
+theorem lookup_s_env_all_frame_left {Ssh S₁ S₂ : SEnv} {x : Var} {T : ValType} :
     DisjointS S₁ S₂ →
     lookupSEnv (Ssh ++ S₂) x = some T →
     lookupSEnv (Ssh ++ (S₁ ++ S₂)) x = some T := by
   intro hDisj hLookup
   cases hSsh : lookupSEnv Ssh x with
   | some Tsh =>
-      have hLeft := lookupSEnv_append_left (S₁:=Ssh) (S₂:=S₂) hSsh
+      have hLeft := lookup_s_env_append_left (S₁:=Ssh) (S₂:=S₂) hSsh
       have hEq : Tsh = T := by
         have : some Tsh = some T := by simpa [hLeft] using hLookup
         cases this
         rfl
-      have hLeft' := lookupSEnv_append_left (S₁:=Ssh) (S₂:=S₁ ++ S₂) hSsh
+      have hLeft' := lookup_s_env_append_left (S₁:=Ssh) (S₂:=S₁ ++ S₂) hSsh
       simpa [hEq] using hLeft'
   | none =>
-      have hEq := lookupSEnv_append_right (S₁:=Ssh) (S₂:=S₂) (x:=x) hSsh
+      have hEq := lookup_s_env_append_right (S₁:=Ssh) (S₂:=S₂) (x:=x) hSsh
       have hS2 : lookupSEnv S₂ x = some T := by
         simpa [hEq] using hLookup
       have hS1 : lookupSEnv S₁ x = none := by
@@ -171,34 +171,34 @@ theorem lookupSEnv_all_frame_left {Ssh S₁ S₂ : SEnv} {x : Var} {T : ValType}
           | some T₁ =>
               have hContra := hDisj x T₁ T hS1' hS2
               exact hContra.elim
-      have hEq' := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hS1
+      have hEq' := lookup_s_env_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hS1
       have hIn : lookupSEnv (S₁ ++ S₂) x = some T := by
         simpa [hEq'] using hS2
-      have hEq'' := lookupSEnv_append_right (S₁:=Ssh) (S₂:=S₁ ++ S₂) (x:=x) hSsh
+      have hEq'' := lookup_s_env_append_right (S₁:=Ssh) (S₂:=S₁ ++ S₂) (x:=x) hSsh
       simpa [hEq''] using hIn
 
 -- HasTypeProcPreOut Domain Monotonicity
 
-theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
+theorem has_type_proc_pre_out_domsubset {Ssh Sown G P Sown' G' W Δ} :
     HasTypeProcPreOut Ssh Sown G P Sown' G' W Δ →
     SEnvDomSubset Sown.left Sown'.left := by
   intro h
   induction h with
   | skip =>
-      exact SEnvDomSubset_refl
+      exact s_env_dom_subset_refl
   | send =>
-      exact SEnvDomSubset_refl
+      exact s_env_dom_subset_refl
   | recv_new =>
-      exact SEnvDomSubset_update_left
+      exact s_env_dom_subset_update_left
   | recv_old =>
 /- ## Structured Block 4 -/
-      exact SEnvDomSubset_update_left
+      exact s_env_dom_subset_update_left
   | select =>
-      exact SEnvDomSubset_refl
+      exact s_env_dom_subset_refl
   | branch _ _ _ _ _ _ _ hDom _ =>
       exact hDom
   | seq hP hQ ihP ihQ =>
-      exact SEnvDomSubset_trans ihP ihQ
+      exact s_env_dom_subset_trans ihP ihQ
   -- HasTypeProcPreOut Domain Monotonicity: parallel case
   | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
       hDisjW hDisjΔ hP hQ ihP ihQ =>
@@ -209,7 +209,7 @@ theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
         simpa [split.hS] using hLookup
       by_cases hLeftNone : lookupSEnv split.S1 x = none
       · have hRight : lookupSEnv split.S2 x = some T := by
-          have hEq := lookupSEnv_append_right (S₁:=split.S1) (S₂:=split.S2) (x:=x) hLeftNone
+          have hEq := lookup_s_env_append_right (S₁:=split.S1) (S₂:=split.S2) (x:=x) hLeftNone
           simpa [hEq] using hLookupS
         obtain ⟨T', hRight'⟩ := ihQ hRight
         have hLeftNone' : lookupSEnv S₁' x = none := by
@@ -219,7 +219,7 @@ theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
             | none => exact (hSome hSome').elim
             | some T₁ =>
                 exact (hDisjS' x T₁ T' hSome' hRight').elim
-        have hEq := lookupSEnv_append_right (S₁:=S₁') (S₂:=S₂') (x:=x) hLeftNone'
+        have hEq := lookup_s_env_append_right (S₁:=S₁') (S₂:=S₂') (x:=x) hLeftNone'
         have hAppend : lookupSEnv (S₁' ++ S₂') x = some T' := by
           simpa [hEq] using hRight'
         exact ⟨T', by simpa [hSfin] using hAppend⟩
@@ -228,7 +228,7 @@ theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
         | some T₁ =>
             have hLeftAppend :
                 lookupSEnv (split.S1 ++ split.S2) x = some T₁ :=
-              lookupSEnv_append_left (S₁:=split.S1) (S₂:=split.S2) hLeftSome
+              lookup_s_env_append_left (S₁:=split.S1) (S₂:=split.S2) hLeftSome
             have hEqT : T₁ = T := by
               have : some T₁ = some T := by
                 simpa [hLeftAppend] using hLookupS
@@ -236,28 +236,28 @@ theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
             have hLeftSome' : lookupSEnv split.S1 x = some T := by
               simpa [hEqT] using hLeftSome
             obtain ⟨T', hLeft'⟩ := ihP hLeftSome'
-            have hAppend := lookupSEnv_append_left (S₁:=S₁') (S₂:=S₂') hLeft'
+            have hAppend := lookup_s_env_append_left (S₁:=S₁') (S₂:=S₂') hLeft'
             exact ⟨T', by simpa [hSfin] using hAppend⟩
   -- HasTypeProcPreOut Domain Monotonicity: assignment cases
   | assign_new =>
-      exact SEnvDomSubset_update_left
+      exact s_env_dom_subset_update_left
   | assign_old =>
-      exact SEnvDomSubset_update_left
+      exact s_env_dom_subset_update_left
 
 -- StoreTyped Split Transport
 
 /-- StoreTyped splits to the left portion of SEnv. -/
-theorem StoreTyped_split_left {G : GEnv} {S₁ S₂ : SEnv} {store : VarStore} :
+theorem store_typed_split_left {G : GEnv} {S₁ S₂ : SEnv} {store : VarStore} :
     StoreTyped G (S₁ ++ S₂) store →
 /- ## Structured Block 5 -/
     StoreTyped G S₁ store := by
   intro hST x v T hStore hS
   have hS' : lookupSEnv (S₁ ++ S₂) x = some T :=
-    lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) hS
+    lookup_s_env_append_left (S₁:=S₁) (S₂:=S₂) hS
   exact hST x v T hStore hS'
 
 /-- StoreTyped splits to the right portion of SEnv (requires disjointness). -/
-theorem StoreTyped_split_right {G : GEnv} {S₁ S₂ : SEnv} {store : VarStore}
+theorem store_typed_split_right {G : GEnv} {S₁ S₂ : SEnv} {store : VarStore}
     (hDisj : DisjointS S₁ S₂) :
     StoreTyped G (S₁ ++ S₂) store →
     StoreTyped G S₂ store := by
@@ -270,21 +270,21 @@ theorem StoreTyped_split_right {G : GEnv} {S₁ S₂ : SEnv} {store : VarStore}
       | some T₁ =>
           exact (hDisj x T₁ T hS1' hS).elim
   have hS' : lookupSEnv (S₁ ++ S₂) x = some T := by
-    have h := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hNone
+    have h := lookup_s_env_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hNone
     simpa [hS] using h
   exact hST x v T hStore hS'
 
 -- Coherence Split Transport
 
 /-- Coherence splits to the left portion of G/D. -/
-theorem Coherent_split_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
+theorem coherent_split_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     Coherent (G₁ ++ G₂) (D₁ ++ D₂) →
     DisjointG G₁ G₂ →
     Coherent G₁ D₁ := by
   intro hCoh hDisj e hActive Lrecv hGrecv
   let senderEp : Endpoint := { sid := e.sid, role := e.sender }
   let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
-  have hGrecv' : lookupG (G₁ ++ G₂) recvEp = some Lrecv := lookupG_append_left hGrecv
+  have hGrecv' : lookupG (G₁ ++ G₂) recvEp = some Lrecv := lookup_g_append_left hGrecv
   have hActive' : ActiveEdge (G₁ ++ G₂) e := by
     simp only [ActiveEdge]
     constructor
@@ -292,7 +292,7 @@ theorem Coherent_split_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
       have hS := hActive.1
       simp only [Option.isSome_iff_exists] at hS ⊢
       obtain ⟨Ls, hLs⟩ := hS
-      exact ⟨Ls, lookupG_append_left hLs⟩
+      exact ⟨Ls, lookup_g_append_left hLs⟩
     · -- Receiver isSome in G₁ ++ G₂
       rw [hGrecv']; trivial
   have hCoh' := hCoh e hActive' Lrecv hGrecv'
@@ -306,10 +306,10 @@ theorem Coherent_split_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     have : e.sid ∈ (∅ : Set SessionId) := by
       simpa [hEmpty] using hInter
     exact this.elim
-  have hG2none_sender : lookupG G₂ senderEp = none := lookupG_none_of_not_session hNot
+  have hG2none_sender : lookupG G₂ senderEp = none := lookup_g_none_of_not_session hNot
 /- ## Structured Block 6 -/
   have hGsender : lookupG G₁ senderEp = some Lsender := by
-    cases lookupG_append_inv (G₁:=G₁) (G₂:=G₂) (e:=senderEp) hGsenderMerged with
+    cases lookup_g_append_inv (G₁:=G₁) (G₂:=G₂) (e:=senderEp) hGsenderMerged with
     | inl hLeft => exact hLeft
     | inr hRight =>
         have hRight' : lookupG G₂ senderEp = some Lsender := hRight.2
@@ -319,7 +319,7 @@ theorem Coherent_split_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
   · refine ⟨Lsender, hGsender, ?_⟩
     simp [hTrace, Consume]
   · have hTrace' : lookupD (D₁ ++ D₂) e = lookupD D₁ e :=
-      lookupD_append_left (e := e) hTrace
+      lookup_d_append_left (e := e) hTrace
     refine ⟨Lsender, hGsender, ?_⟩
     simpa [hTrace'] using hConsume
 

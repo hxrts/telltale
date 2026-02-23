@@ -136,7 +136,8 @@
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
 \newcommand{\thead}[1]{\textbf{\raisebox{0pt}[2.2ex][0.8ex]{#1}}}
 
-\newcommand{\Hbyz}{\ensuremath{H_{\mathrm{byz}}}}
+\newcommand{\Hbyz}{\ensuremath{\mathsf{H}_{\mathrm{byz}}}}
+\newcommand{\DeliveryModel}{\ensuremath{\mathsf{DeliveryModel}}}
 \newcommand{\Obssafe}{\ensuremath{\mathsf{Obs}_{\mathrm{safe}}^{\mathrm{byz}}}}
 \newcommand{\Eqsafe}{\ensuremath{\mathsf{Eq}_{\mathrm{safe}}^{\mathrm{byz}}}}
 \newcommand{\Ebyz}{\ensuremath{\mathcal{E}_{\mathrm{byz}}}}
@@ -265,7 +266,7 @@ envelope theorems.
 
 Scope is restricted to regular finite-reachability fragments for decision claims and explicit
 scheduler profiles for total-step bounds. Fault claims in this paper include crash-stop exactness
-and an explicit Byzantine safety characterization under a separate assumption bundle $\Hbyz$, in
+and an explicit Byzantine safety characterization under a separate assumption bundle \Hbyz, in
 the broader distributed-fault context of FLP-style impossibility, partial synchrony, and
 failure-detector stratification (Fischer et al., 1985; Dwork, Lynch, and Stockmeyer, 1988; Chandra
 and Toueg, 1996), plus distributed-algorithm baselines (Lynch, 1996) and Byzantine baselines
@@ -370,23 +371,23 @@ Related liveness lines often emphasize qualitative progress in session-typed set
 			\toprule
 			\thead{Symbol}         & \thead{Meaning}                      \\
 			\midrule
-			$\Hbyz$                & Byzantine characterization bundle    \\
-			$\Obssafe$             & Byzantine safety-visible observation \\
-			$\Eqsafe$              & Byzantine safety-visible equality    \\
-			$\Ebyz$                & Byzantine determinism-envelope       \\
+			\Hbyz                & Byzantine characterization bundle    \\
+			\Obssafe             & Byzantine safety-visible observation \\
+			\Eqsafe              & Byzantine safety-visible equality    \\
+			\Ebyz                & Byzantine determinism-envelope       \\
 			\Coherent              & inherited operational coherence predicate \\
 			$W$                    & weighted measure on state            \\
 			$W_0$                  & initial weighted measure             \\
 			$\Delta W$             & one-step change in weighted measure  \\
 			$P(\tau)$              & productive-step count on trace $\tau$ \\
 			$T(\tau)$              & total-step count on trace $\tau$     \\
-			\Profile$(\sigma)$     & scheduler profile predicate          \\
+			$\Profile(\sigma)$     & scheduler profile predicate          \\
 			$\kappa_\sigma$        & scheduler-lift factor for profile $\sigma$ \\
-			\Phase$(B)$            & low/critical/high phase at buffer level $B$ \\
+			$\Phase(B)$            & low/critical/high phase at buffer level $B$ \\
 			$\Bc$                  & critical capacity threshold          \\
-			$\ByzChar$             & Byzantine characterization formula   \\
-			$\ByzSafe$             & Byzantine safety predicate           \\
-			\texttt{DeliveryModel} & parametric delivery interface        \\
+			\ByzChar             & Byzantine characterization formula   \\
+			\ByzSafe             & Byzantine safety predicate           \\
+			\DeliveryModel & parametric delivery interface        \\
 			\bottomrule
 		\end{tabularx}
 	\caption{Notation used in this paper.}
@@ -398,7 +399,7 @@ Related liveness lines often emphasize qualitative progress in session-typed set
 \label{sec:model}
 % ============================================================================
 
-The model uses asynchronous buffered semantics with active-edge Coherence from \emph{Coherence for Asynchronous Buffered MPST}. Delivery behavior is parameterized by \texttt{DeliveryModel}.
+The model uses asynchronous buffered semantics with active-edge Coherence from \emph{Coherence for Asynchronous Buffered MPST}. Delivery behavior is parameterized by \DeliveryModel.
 
 Table~\ref{tab:p2-assumptions} records the assumptions used for exact statements in this paper.
 
@@ -414,7 +415,7 @@ Table~\ref{tab:p2-assumptions} records the assumptions used for exact statements
 		regular finite-reachability & req.\ for decidability     \\
 		fairness profile            & req.\ for scheduler bounds \\
 		crash-stop fault model      & req.\ for Theorem~\ref{thm:crash} \\
-		Byzantine bundle $\Hbyz$    & req.\ for Thm.~\ref{thm:byzantine}, Cor.~\ref{cor:converse} \\
+		Byzantine bundle \Hbyz    & req.\ for Thm.~\ref{thm:byzantine}, Cor.~\ref{cor:converse} \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Assumptions for exact statements.}
@@ -626,13 +627,13 @@ The rule-local descent pattern lifted to global productive-step bounds is:
 	In particular, asynchronous subtyping and regular type equivalence are decidable on the regular fragment.
 \end{theorem}
 
-Coinductive boundary note: effect-level transport is restricted to the witness-carrying rational subclass via \nolinkurl{rationalEffect_transport_bridge}; witness-check soundness/completeness is provided by \nolinkurl{checkRationalEffectWitness_sound} and \nolinkurl{checkRationalEffectWitness_complete}; strict outside non-transportability is witnessed by \nolinkurl{strict_boundary_witness_effect}. These do not alter Theorem~\ref{thm:algorithmic} assumptions and are used in the \emph{Harmony from Coherence in Asynchronous MPST} boundary layer.
+Coinductive boundary note: effect-level transport is restricted to the witness-carrying rational subclass via \nolinkurl{rational_effect_transport_bridge}; witness-check soundness/completeness is provided by \nolinkurl{check_rational_effect_witness_sound} and \nolinkurl{check_rational_effect_witness_complete}; strict outside non-transportability is witnessed by \nolinkurl{strict_boundary_witness_effect}. These do not alter Theorem~\ref{thm:algorithmic} assumptions and are used in the \emph{Harmony from Coherence in Asynchronous MPST} boundary layer.
 
 \begin{proof}[Proof sketch]
-	The argument is uniform. Build finite reachable triple/pair structures from regularity (\nolinkurl{reachable_triples_finite},\allowbreak\ \nolinkurl{reachablePairs_finite}), run terminating exploration/checkers, and prove soundness/completeness for each reduction. Instantiating this schema yields deciders for async subtyping and regular equivalence (\nolinkurl{async_subtype_decidable},\allowbreak\ \nolinkurl{regularTypeEqDecide_spec}).
+	The argument is uniform. Build finite reachable triple/pair structures from regularity (\nolinkurl{reachable_triples_finite},\allowbreak\ \nolinkurl{reachable_pairs_finite}), run terminating exploration/checkers, and prove soundness/completeness for each reduction. Instantiating this schema yields deciders for async subtyping and regular equivalence (\nolinkurl{async_subtype_decidable},\allowbreak\ \nolinkurl{regular_type_eq_decide_spec}).
 \end{proof}
 
-Async subtyping instantiation appears through \nolinkurl{reachable_triples_finite} and \nolinkurl{async_subtype_decidable}. Regular type-equivalence instantiation appears through \nolinkurl{regularTypeEqCheck_sound} and \nolinkurl{regularTypeEqDecide_spec}.
+Async subtyping instantiation appears through \nolinkurl{reachable_triples_finite} and \nolinkurl{async_subtype_decidable}. Regular type-equivalence instantiation appears through \nolinkurl{regular_type_eq_check_sound} and \nolinkurl{regular_type_eq_decide_spec}.
 
 Equation~\ref{eq:p2-algorithmic-workflow} records the generic workflow.
 \begin{equation}
@@ -687,12 +688,12 @@ Equation~\ref{eq:p2-algorithmic-workflow} records the generic workflow.
 \end{theorem}
 
 \begin{proof}[Proof sketch]
-	Construct the residual graph after removing crashed roles and edges, and define \texttt{crashTolerantDec} as reachability over that residual object. Soundness is provided by \nolinkurl{crashTolerantDec_sound}, which turns a positive decider result into crash tolerance. Completeness and exact characterization come from \nolinkurl{crash_tolerance_iff}, and witness families are obtained by topology perturbations that cross the connectivity boundary.
+	Construct the residual graph after removing crashed roles and edges, and define \texttt{crashTolerantDec} as reachability over that residual object. Soundness is provided by \nolinkurl{crash_tolerant_dec_sound}, which turns a positive decider result into crash tolerance. Completeness and exact characterization come from \nolinkurl{crash_tolerance_iff}, and witness families are obtained by topology perturbations that cross the connectivity boundary.
 \end{proof}
 
 \begin{assumption}[Byzantine Characterization Premises]
 	\label{assump:p2-byzantine}
-	Byzantine characterization assumes explicit bundle $\Hbyz$ with fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions.
+	Byzantine characterization assumes explicit bundle \Hbyz with fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions.
 \end{assumption}
 
 Define
@@ -704,7 +705,7 @@ Define
 		              & \land \mathsf{ByzPrimitiveConsistent}.
 	\end{aligned}
 \end{equation}
-where each conjunct names the corresponding requirement class in $\Hbyz$.
+where each conjunct names the corresponding requirement class in \Hbyz.
 
 \begin{theorem}[Exact Byzantine Safety Characterization]
 	\label{thm:byzantine}
@@ -716,12 +717,12 @@ where each conjunct names the corresponding requirement class in $\Hbyz$.
 	\end{theorem}
 
 \begin{proof}[Proof sketch]
-	Fix the Byzantine assumption bundle as a typed profile and apply \nolinkurl{byzantineSafety_exact_of_profile} to obtain \texttt{ExactByzantineSafetyCharacterization} for the profile model.
+	Fix the Byzantine assumption bundle as a typed profile and apply \nolinkurl{byzantine_safety_exact_of_profile} to obtain \texttt{ExactByzantineSafetyCharacterization} for the profile model.
 
 	\begin{enumerate}
-		\item Pin the Byzantine assumption bundle as a typed profile ($\Hbyz$ components).
+		\item Pin the Byzantine assumption bundle as a typed profile (\Hbyz components).
 		\item Project soundness, completeness, and maximality from the extracted exact-characterization object.
-		\item Interpret soundness and completeness as the two interface implications between $\ByzChar$ and $\ByzSafe$ in this paper's model scope.
+		\item Interpret soundness and completeness as the two interface implications between \ByzChar and \ByzSafe in this paper's model scope.
 		\item Record explicit assumption classes for converse sharpness (Corollary~\ref{cor:converse}).
 	\end{enumerate}
 
@@ -730,7 +731,7 @@ where each conjunct names the corresponding requirement class in $\Hbyz$.
 
 \begin{corollary}[Converse Counterexample Families]
 	\label{cor:converse}
-	If any required class in $\Hbyz$ is dropped, there exists a counterexample family that violates $\ByzSafe$. The dropped classes are quorum or intersection obligations, authentication or evidence-validity obligations, adversarial-budget obligations, and primitive-consistency obligations.
+	If any required class in \Hbyz is dropped, there exists a counterexample family that violates \ByzSafe. The dropped classes are quorum or intersection obligations, authentication or evidence-validity obligations, adversarial-budget obligations, and primitive-consistency obligations.
 \end{corollary}
 
 \begin{proof}[Proof sketch]
@@ -739,14 +740,14 @@ where each conjunct names the corresponding requirement class in $\Hbyz$.
 
 \begin{proposition}[Byzantine VM-Bridge Interface]
 	\label{prop:vm-bridge}
-	If theorem-pack capabilities include Byzantine characterization and VM envelope-adherence evidence, then runtime profile claims are constrained by $\Eqsafe$ under $\Ebyz$, and claims lacking required capability evidence are rejected by profile admission.
+	If theorem-pack capabilities include Byzantine characterization and VM envelope-adherence evidence, then runtime profile claims are constrained by \Eqsafe under \Ebyz, and claims lacking required capability evidence are rejected by profile admission.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
-	The proof proceeds by capability-gated extraction. First, theorem-pack/profile APIs check the Byzantine premise bits required by the profile. Second, admitted profiles are interpreted through the VM Byzantine envelope layer, which gives the safety-visible relation $\Eqsafe$. Third, admission and conformance theorems ensure that claims without required evidence are rejected. Thus the interface is executable and proof-carrying.
+	The proof proceeds by capability-gated extraction. First, theorem-pack/profile APIs check the Byzantine premise bits required by the profile. Second, admitted profiles are interpreted through the VM Byzantine envelope layer, which gives the safety-visible relation \Eqsafe. Third, admission and conformance theorems ensure that claims without required evidence are rejected. Thus the interface is executable and proof-carrying.
 \end{proof}
 
-Core crash-tolerance lemmas include \nolinkurl{crash_tolerance_iff} and \nolinkurl{crashTolerantDec_sound}. Branching feasibility appears through \nolinkurl{branching_iff_chromatic_capacity}.
+Core crash-tolerance lemmas include \nolinkurl{crash_tolerance_iff} and \nolinkurl{crash_tolerant_dec_sound}. Branching feasibility appears through \nolinkurl{branching_iff_chromatic_capacity}.
 
 Table~\ref{tab:p2-decidability-summary} summarizes the decidability results.
 
@@ -895,22 +896,6 @@ Dependency sketch:
 \end{enumerate}
 
 % ============================================================================
-\section{Mechanization Summary}
-\label{sec:mechanization}
-% ============================================================================
-
-Core theorem anchors and their source locations are listed in Table~\ref{tab:p2-anchor-registry} (Appendix~\ref{app:p2-anchor-registry}).
-
-\begin{proposition}[Mechanization Coverage Soundness]
-	\label{prop:coverage}
-	For any anchor in Table~\ref{tab:p2-anchor-registry}, if the corresponding Appendix~\ref{app:reproducibility} checks pass, then there exists a mechanized theorem object within this paper's assumption scope.
-\end{proposition}
-
-\begin{proof}[Proof sketch]
-	Anchors in Table~\ref{tab:p2-anchor-registry} are defined by explicit theorem names and file paths. Appendix~\ref{app:reproducibility} rebuild checks certify that these declarations resolve and typecheck under the pinned toolchain. Therefore a passing check witnesses existence of a theorem object for each anchor.
-\end{proof}
-
-% ============================================================================
 \section{Related Work}
 \label{sec:related}
 % ============================================================================
@@ -936,7 +921,7 @@ This paper differs in structure. It unifies quantitative bounds and algorithmic 
 
 Quantitative bounds require the Assumption Block~\ref{assump:p2-quantitative} premises: well-typed asynchronous buffered transitions, active-edge Coherence preservation, non-negativity of $W$, and an explicit scheduler profile when total-step lifting is claimed. Scheduler-lifted totals remain conservative profile-dependent bounds rather than exact universal runtime counts.
 
-Crash-stop characterization is exact only under Assumption Block~\ref{assump:p2-crash}, with crash-stop faults, finite role graph, and residual-graph side conditions. Byzantine results are exact safety characterizations only under Assumption Block~\ref{assump:p2-byzantine}, with $\Hbyz$ fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions, and they do not imply Byzantine liveness.
+Crash-stop characterization is exact only under Assumption Block~\ref{assump:p2-crash}, with crash-stop faults, finite role graph, and residual-graph side conditions. Byzantine results are exact safety characterizations only under Assumption Block~\ref{assump:p2-byzantine}, with \Hbyz fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions, and they do not imply Byzantine liveness.
 
 Decidability and finite exploration require the Assumption Block~\ref{assump:p2-regular} regular finite-reachability premises. Non-regular fragments and stronger adversarial models require different constructions.
 
@@ -1101,7 +1086,7 @@ This explains why the paper reports complexity in explored-graph size, not in ra
 
 \begin{enumerate}
 	\item Async subtyping: reachable triple graph (\nolinkurl{reachable_triples_finite},\allowbreak\ \nolinkurl{async_subtype_decidable}).
-	\item Regular equivalence: reachable pair/bisim graph (\nolinkurl{regularTypeEqCheck_sound},\allowbreak\ \nolinkurl{regularTypeEqDecide_spec}).
+	\item Regular equivalence: reachable pair/bisim graph (\nolinkurl{regular_type_eq_check_sound},\allowbreak\ \nolinkurl{regular_type_eq_decide_spec}).
 \end{enumerate}
 
 \section{Instantiated Decision Theorems}
@@ -1179,20 +1164,20 @@ Table~\ref{tab:p2-anchor-registry} maps theorem anchors to their source files.
 
 \begin{table}[H]
 	\centering
-	\footnotesize
-	\begin{tabularx}{\columnwidth}{@{}L{0.42\columnwidth}L{0.53\columnwidth}@{}}
+	\scriptsize
+	\begin{tabularx}{\columnwidth}{@{}L{0.475\columnwidth}L{0.475\columnwidth}@{}}
 		\toprule
 		\thead{Anchor} & \thead{Path (relative to \texttt{lean/})} \\
 		\midrule
 		\texttt{weightedMeasure} & \texttt{Runtime/Proofs/\allowbreak WeightedMeasure/}\mbox{\texttt{*.lean}} \\
-		\texttt{total\_measure\_decreasing} & \texttt{Runtime/Proofs/}\mbox{\texttt{Lyapunov.lean}} \\
+		\texttt{total\_measure\_decreasing} & \texttt{Runtime/Proofs/WeightedMeasure/}\mbox{\texttt{TotalBound.lean}} \\
 		\texttt{reachable\_triples\_finite} & \texttt{SessionCoTypes/AsyncSubtyping/}\mbox{\texttt{*.lean}} \\
 		\texttt{async\_subtype\_decidable} & \texttt{SessionCoTypes/AsyncSubtyping/}\mbox{\texttt{*.lean}} \\
-		\texttt{regularTypeEqDecide\_spec} & \texttt{SessionCoTypes/Coinductive/\allowbreak BisimDecidable/}\mbox{\texttt{*.lean}} \\
+		\texttt{regular\_type\_eq\_decide\_spec} & \texttt{SessionCoTypes/Coinductive/\allowbreak BisimDecidable/}\mbox{\texttt{*.lean}} \\
 		\texttt{crash\_tolerance\_iff} & \texttt{Protocol/}\mbox{\texttt{CrashTolerance.lean}} \\
-		\texttt{branching\_iff\_chromatic\_capacity} & \texttt{Protocol/BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}} \\
+		\texttt{branching\_iff\_chromatic\_capacity} & \texttt{Protocol/}\mbox{\texttt{SpatialBranching.lean}} \\
 		\texttt{phase\_transition\_sharp} & \texttt{Protocol/BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}} \\
-		\texttt{byzantineSafety\_exact\_of\_profile} & \texttt{Runtime/Proofs/Adapters/Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
+		\texttt{byzantine\_safety\_exact\_of\_profile} & \texttt{Runtime/Proofs/Adapters/Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} \\
 		\texttt{canOperateUnderByzantineEnvelope} & \texttt{Runtime/Proofs/TheoremPack/}\mbox{\texttt{*.lean}} \\
 		\bottomrule
 	\end{tabularx}
@@ -1233,9 +1218,9 @@ Table~\ref{tab:p2-anchor-registry} maps theorem anchors to their source files.
 Reproduction uses the pinned Lean toolchain and manifest.
 
 \begin{enumerate}
-	\item Build module families listed in Appendix~\ref{app:mechanization}.
+	\item Build module families listed in Appendix~\ref{app:p2-anchor-registry}.
 	\item Run \texttt{just escape} and \texttt{just verify-protocols}.
-	\item Confirm Appendix~\ref{app:mechanization} theorem anchors resolve and typecheck.
+	\item Confirm Appendix~\ref{app:p2-anchor-registry} theorem anchors resolve and typecheck.
 \end{enumerate}
 
 Expected checks: Finite-reachability and decision modules compile, weighted-measure descent and scheduler modules compile, crash and branching and threshold modules compile, and theorem-pack and profile-bridge modules compile.
@@ -1261,7 +1246,6 @@ Expected checks: Finite-reachability and decision modules compile, weighted-meas
 			Cor.~\ref{cor:capacity}        & \S7 & regular + threshold assumptions       & \texttt{phase\_*} \\
 			Thm.~\ref{thm:app-p2-branching} & App.\ C & regular + branch profile & \texttt{branching*} \\
 			Prop.~\ref{prop:vm-bridge}     & \S6 & pack + adherence                      & \texttt{canOperate*} \\
-			Prop.~\ref{prop:coverage}      & \S9 & anchor registry + App.~\ref{app:reproducibility} checks & \S9 \\
 		\bottomrule
 	\end{tabularx}
 	}

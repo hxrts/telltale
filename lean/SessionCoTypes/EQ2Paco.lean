@@ -15,16 +15,16 @@ coinduction framework. This enables:
 ## Main Results
 
 - `EQ2FMono`: EQ2F as a Paco.MonoRel
-- `EQ2_eq_paco_bot`: EQ2 equals paco EQ2FMono ⊥
-- `EQ2_paco_coind`: Parametrized coinduction for EQ2
-- `EQ2_paco_coind_acc`: Coinduction with accumulated hypotheses
+- `eq2_eq_paco_bot`: EQ2 equals paco EQ2FMono ⊥
+- `eq2_paco_coind`: Parametrized coinduction for EQ2
+- `eq2_paco_coind_acc`: Coinduction with accumulated hypotheses
 
 ## Usage
 
 ```lean
 -- Prove EQ2 a b using paco with witness relation R and accumulator r
 theorem my_eq2_proof : EQ2 a b := by
-  rw [EQ2_eq_paco_bot]
+  rw [eq2_eq_paco_bot]
   apply Paco.paco_coind EQ2FMono MyWitness ⊥
   · intro x y hxy
     -- Show MyWitness is a post-fixpoint of EQ2F
@@ -38,9 +38,9 @@ The Problem. Standard coinduction for EQ2 is limited: we can't accumulate
 hypotheses or use up-to techniques. Paco (parametrized coinduction) provides
 these features but requires connecting EQ2 to its framework.
 
-Solution Structure. Wraps EQ2F as `EQ2FMono : Paco.MonoRel`. Proves `EQ2_eq_paco_bot`
-showing EQ2 equals the paco greatest fixed point. Provides `EQ2_paco_coind` for
-parametrized coinduction and `EQ2_paco_coind_acc` for coinduction with accumulated
+Solution Structure. Wraps EQ2F as `EQ2FMono : Paco.MonoRel`. Proves `eq2_eq_paco_bot`
+showing EQ2 equals the paco greatest fixed point. Provides `eq2_paco_coind` for
+parametrized coinduction and `eq2_paco_coind_acc` for coinduction with accumulated
 hypotheses. Enables transitivity via accumulation and compatible closures.
 -/
 
@@ -64,14 +64,14 @@ def EQ2F_paco (R : Paco.Rel LocalTypeR) : Paco.Rel LocalTypeR :=
   EQ2F (fromPacoRel R)
 
 /-- Local copy of BranchesRel_mono (since the original is private). -/
-private theorem BranchesRel_mono' {R S : EQ2.Rel}
+private theorem branches_rel_mono' {R S : EQ2.Rel}
     (h : ∀ a b, R a b → S a b) :
     ∀ {bs cs}, BranchesRel R bs cs → BranchesRel S bs cs := by
   intro bs cs hrel
   exact List.Forall₂.imp (fun a b hab => ⟨hab.1, h _ _ hab.2⟩) hrel
 
 /-- Monotonicity of EQ2F in the Paco framework. -/
-theorem EQ2F_paco_mono : Paco.Monotone2 EQ2F_paco := by
+theorem eq2_f_paco_mono : Paco.Monotone2 EQ2F_paco := by
   intro R S hRS x y hxy
   simp only [EQ2F_paco, fromPacoRel] at *
   cases x <;> cases y <;> simp only [EQ2F] at hxy ⊢
@@ -83,17 +83,17 @@ theorem EQ2F_paco_mono : Paco.Monotone2 EQ2F_paco := by
       first
       | exact ⟨hRS _ _ h1, hRS _ _ h2⟩
       | refine ⟨h1, ?_⟩
-        exact BranchesRel_mono' (fun _ _ hr => hRS _ _ hr) h2
+        exact branches_rel_mono' (fun _ _ hr => hRS _ _ hr) h2
 
 /-- EQ2F as a bundled monotone relation transformer for paco. -/
 def EQ2FMono : Paco.MonoRel LocalTypeR where
   F := EQ2F_paco
-  mono := EQ2F_paco_mono
+  mono := eq2_f_paco_mono
 
 /-! ## Equivalence between EQ2 and paco EQ2FMono ⊥ -/
 
 /-- EQ2 implies paco EQ2FMono ⊥. -/
-theorem EQ2_le_paco_bot : EQ2 ≤ paco EQ2FMono ⊥ := by
+theorem eq2_le_paco_bot : EQ2 ≤ paco EQ2FMono ⊥ := by
   intro x y h
   -- We use EQ2 itself as the witness relation
   refine ⟨toPacoRel EQ2, ?_, h⟩
@@ -107,7 +107,7 @@ theorem EQ2_le_paco_bot : EQ2 ≤ paco EQ2FMono ⊥ := by
   exact EQ2.destruct hab
 
 /-- paco EQ2FMono ⊥ implies EQ2. -/
-theorem paco_bot_le_EQ2 : paco EQ2FMono ⊥ ≤ EQ2 := by
+theorem paco_bot_le_eq2 : paco EQ2FMono ⊥ ≤ EQ2 := by
   intro x y ⟨R, hR, hxy⟩
   -- R is a post-fixpoint: R ⊆ EQ2F_paco (R ⊔ ⊥) = EQ2F_paco R = EQ2F R
   -- By standard coinduction, R ⊆ EQ2
@@ -117,11 +117,11 @@ theorem paco_bot_le_EQ2 : paco EQ2FMono ⊥ ≤ EQ2 := by
     have h := hR a b hab
     -- h : EQ2FMono.F R a b = EQ2F_paco R a b = EQ2F R a b
     exact h
-  exact EQ2_coind hpost x y hxy
+  exact eq2_coind hpost x y hxy
 
 /-- EQ2 equals paco EQ2FMono ⊥. -/
-theorem EQ2_eq_paco_bot : EQ2 = paco EQ2FMono ⊥ :=
-  Paco.Rel.le_antisymm EQ2_le_paco_bot paco_bot_le_EQ2
+theorem eq2_eq_paco_bot : EQ2 = paco EQ2FMono ⊥ :=
+  Paco.Rel.le_antisymm eq2_le_paco_bot paco_bot_le_eq2
 
 /-! ## Parametrized Coinduction for EQ2
 
@@ -135,7 +135,7 @@ To prove EQ2 a b, provide a witness relation R and show:
 2. R a b holds
 
 The parameter r can accumulate hypotheses during the proof. -/
-theorem EQ2_paco_coind (R : EQ2.Rel) (r : EQ2.Rel)
+theorem eq2_paco_coind (R : EQ2.Rel) (r : EQ2.Rel)
     (hpost : ∀ a b, R a b → EQ2F (fun x y => R x y ∨ r x y) a b)
     {x y : LocalTypeR} (hxy : R x y) :
     paco EQ2FMono (toPacoRel r) x y := by
@@ -151,11 +151,11 @@ theorem EQ2_paco_coind (R : EQ2.Rel) (r : EQ2.Rel)
   · exact hxy
 
 /-- Convert paco result back to EQ2 when parameter is empty. -/
-theorem paco_to_EQ2 {x y : LocalTypeR} (h : paco EQ2FMono ⊥ x y) : EQ2 x y :=
-  paco_bot_le_EQ2 x y h
+theorem paco_to_eq2 {x y : LocalTypeR} (h : paco EQ2FMono ⊥ x y) : EQ2 x y :=
+  paco_bot_le_eq2 x y h
 
 /-- Coinduction with accumulation: use previously proven facts. -/
-theorem EQ2_paco_coind_acc (R : EQ2.Rel) (r : EQ2.Rel)
+theorem eq2_paco_coind_acc (R : EQ2.Rel) (r : EQ2.Rel)
     (hpost : ∀ a b, R a b → EQ2F (fun x y => R x y ∨ (paco EQ2FMono (toPacoRel r) x y ∨ r x y)) a b)
     {x y : LocalTypeR} (hxy : R x y) :
     paco EQ2FMono (toPacoRel r) x y := by
@@ -169,7 +169,7 @@ theorem EQ2_paco_coind_acc (R : EQ2.Rel) (r : EQ2.Rel)
   · exact hxy
 
 /-- Parametrized coinduction for EQ2 using gpaco (guarded accumulator). -/
-theorem EQ2_gpaco_coind (R r g : EQ2.Rel)
+theorem eq2_gpaco_coind (R r g : EQ2.Rel)
     (hpost : ∀ a b, R a b →
       EQ2F (fun x y => R x y ∨ gupaco EQ2FMono (toPacoRel r) (toPacoRel g) x y) a b ∨ r a b)
     {x y : LocalTypeR} (hxy : R x y) :
@@ -182,7 +182,7 @@ theorem EQ2_gpaco_coind (R r g : EQ2.Rel)
   · exact hxy
 
 /-- gpaco without base case (R must always make one-step progress). -/
-theorem EQ2_gpaco_coind' (R r g : EQ2.Rel)
+theorem eq2_gpaco_coind' (R r g : EQ2.Rel)
     (hpost : ∀ a b, R a b →
       EQ2F (fun x y => R x y ∨ gupaco EQ2FMono (toPacoRel r) (toPacoRel g) x y) a b) :
     R ≤ gpaco EQ2FMono (toPacoRel r) (toPacoRel g) := by
@@ -204,10 +204,10 @@ def TransRelPacoWF : EQ2.Rel := fun a c =>
   LocalTypeR.WellFormed a ∧ LocalTypeR.WellFormed b ∧ LocalTypeR.WellFormed c
 
 /-- TransRelPacoWF with LocalTypeR.WellFormed hypotheses can use EQ2_trans_via_Bisim. -/
-theorem TransRelPacoWF_to_paco {a c : LocalTypeR} (h : TransRelPacoWF a c) :
+theorem trans_rel_paco_wf_to_paco {a c : LocalTypeR} (h : TransRelPacoWF a c) :
     paco EQ2FMono (toPacoRel EQ2) a c := by
   obtain ⟨b, hab, hbc, hWFa, hWFb, hWFc⟩ := h
-  have heq : EQ2 a c := EQ2_trans_via_Bisim hab hbc hWFa hWFb hWFc
+  have heq : EQ2 a c := eq2_trans_via_bisim hab hbc hWFa hWFb hWFc
   refine ⟨toPacoRel EQ2, ?_, heq⟩
   intro x y hxy
   have h' := EQ2.destruct hxy
@@ -218,13 +218,13 @@ theorem TransRelPacoWF_to_paco {a c : LocalTypeR} (h : TransRelPacoWF a c) :
 /-- Transitivity for EQ2 via paco (requires WellFormed).
 
 This version includes explicit LocalTypeR.WellFormed hypotheses and delegates to
-EQ2_trans_via_Bisim from Bisim.lean. For transitivity without WellFormed,
-use specialized lemmas like EQ2_trans_via_end or EQ2_trans_via_var. -/
-theorem EQ2_trans_via_paco {a b c : LocalTypeR}
+eq2_trans_via_bisim from Bisim.lean. For transitivity without WellFormed,
+use specialized lemmas like eq2_trans_via_end or eq2_trans_via_var. -/
+theorem eq2_trans_via_paco {a b c : LocalTypeR}
     (hab : EQ2 a b) (hbc : EQ2 b c)
     (hWFa : LocalTypeR.WellFormed a) (hWFb : LocalTypeR.WellFormed b)
     (hWFc : LocalTypeR.WellFormed c) : EQ2 a c :=
-  EQ2_trans_via_Bisim hab hbc hWFa hWFb hWFc
+  eq2_trans_via_bisim hab hbc hWFa hWFb hWFc
 
 /-! ## Up-To Techniques
 

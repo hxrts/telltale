@@ -12,7 +12,7 @@ in `G` lifts to `G ++ Gfr`. For branch bodies, we also need to show
 update operations commute with the append.
 
 Solution Structure. Prove `pre_frame_right_branch_bodies_local` for
-branch body transport. Prove `HasTypeProcPre_frame_G_right_local` for
+branch body transport. Prove `has_type_proc_pre_frame_g_right_local` for
 general right-framing by induction on pre-typing.
 -/
 
@@ -42,7 +42,7 @@ lemma pre_frame_right_branch_bodies_local
           (procs.get ⟨i, hip⟩).2) := by
   intro hG ihBodies i hi hip
   have hBody' := ihBodies i hi hip
-  have hUpd := updateG_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
+  have hUpd := update_g_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
     (L:=.branch p bs) (L':=(bs.get ⟨i, hi⟩).2) hG
   rw [hUpd]
   exact hBody'
@@ -50,7 +50,7 @@ lemma pre_frame_right_branch_bodies_local
 -- Pre-Typing Right-Frame Transport
 
 /-- Local right-frame transport for `HasTypeProcPre`. -/
-lemma HasTypeProcPre_frame_G_right_local
+lemma has_type_proc_pre_frame_g_right_local
     {Ssh : SEnv} {Sown : OwnedEnv} {G Gfr : GEnv} {P : Process} :
     HasTypeProcPre Ssh Sown G P →
     HasTypeProcPre Ssh Sown (G ++ Gfr) P := by
@@ -61,17 +61,17 @@ lemma HasTypeProcPre_frame_G_right_local
       simpa using (HasTypeProcPre.skip (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr))
   | send hk hG hx =>
       rename_i Sown G k x e q T L
-      exact HasTypeProcPre.send hk (lookupG_append_left (G₂:=Gfr) hG) hx
+      exact HasTypeProcPre.send hk (lookup_g_append_left (G₂:=Gfr) hG) hx
   | recv hk hG hNoSh =>
       rename_i Sown G k x e p T L
-      exact HasTypeProcPre.recv hk (lookupG_append_left (G₂:=Gfr) hG) hNoSh
+      exact HasTypeProcPre.recv hk (lookup_g_append_left (G₂:=Gfr) hG) hNoSh
   | select hk hG hbs =>
       rename_i Sown G k l e q bs L
-      exact HasTypeProcPre.select hk (lookupG_append_left (G₂:=Gfr) hG) hbs
+      exact HasTypeProcPre.select hk (lookup_g_append_left (G₂:=Gfr) hG) hbs
   | branch hk hG hLen hLabels hBodies ihBodies =>
       rename_i Sown G k procs e p bs
       have hBodies' := pre_frame_right_branch_bodies_local (G:=G) (Gfr:=Gfr) hG ihBodies
-      exact HasTypeProcPre.branch hk (lookupG_append_left (G₂:=Gfr) hG) hLen hLabels hBodies'
+      exact HasTypeProcPre.branch hk (lookup_g_append_left (G₂:=Gfr) hG) hLen hLabels hBodies'
   | seq hP hQ ihP ihQ =>
       exact HasTypeProcPre.seq ihP ihQ
   | par hDisjS hSsplit hP hQ ihP ihQ =>
@@ -79,7 +79,7 @@ lemma HasTypeProcPre_frame_G_right_local
 /- ## Structured Block 2 -/
   | assign hNoSh hv =>
       rename_i Sown G x v T
-      exact HasTypeProcPre.assign hNoSh (HasTypeVal_frame_right (G₁:=G) (G₂:=Gfr) hv)
+      exact HasTypeProcPre.assign hNoSh (has_type_val_frame_right (G₁:=G) (G₂:=Gfr) hv)
 
 -- Pre-Out Branch Helpers
 
@@ -98,8 +98,8 @@ lemma frame_right_branch_bodies_local
           (procs.get ⟨i, hip⟩).2) := by
   intro hG hBodies i hi hip
   have hBody := hBodies i hi hip
-  have hBody' := HasTypeProcPre_frame_G_right_local (Gfr:=Gfr) hBody
-  have hUpd := updateG_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
+  have hBody' := has_type_proc_pre_frame_g_right_local (Gfr:=Gfr) hBody
+  have hUpd := update_g_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
     (L:=.branch p bs) (L':=(bs.get ⟨i, hi⟩).2) hG
   rw [hUpd]
   exact hBody'
@@ -122,9 +122,9 @@ lemma frame_right_branch_out_local
         HasTypeProcPreOut Ssh Sown (updateG (G ++ Gfr) e L) P Sfin (Gfin ++ Gfr) W Δ) := by
   intro hG ihOutLbl hDisj lbl P L hFindP hFindB
   have hDisj' : DisjointG (updateG G e L) Gfr :=
-    disjointG_updateG_left (e:=e) (L:=L) (L0:=.branch p bs) hG hDisj
+    disjoint_g_update_g_left (e:=e) (L:=L) (L0:=.branch p bs) hG hDisj
   have hOut' := ihOutLbl lbl P L hFindP hFindB hDisj'
-  have hUpd := updateG_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e) (L:=.branch p bs) (L':=L) hG
+  have hUpd := update_g_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e) (L:=.branch p bs) (L':=L) hG
   simpa [hUpd] using hOut'
 
 -- Parallel Case Helper
@@ -168,13 +168,13 @@ lemma frame_pre_out_right_par_local
       hG := by simpa [split.hG, List.append_assoc] }
   -- Derived Disjointness And Reconstruction
   have hDisjG1fr : DisjointG split.G1 Gfr :=
-    (disjointG_split_frame_right (split:=split) hDisj).1
+    (disjoint_g_split_frame_right (split:=split) hDisj).1
   have hDisjG2fr : DisjointG split.G2 Gfr :=
-    (disjointG_split_frame_right (split:=split) hDisj).2
+    (disjoint_g_split_frame_right (split:=split) hDisj).2
   have hDisjGOut : DisjointG splitOut.G1 splitOut.G2 := by
     have hDisjG' : DisjointG (split.G2 ++ Gfr) split.G1 :=
-      DisjointG_append_left (DisjointG_symm hDisjG) (DisjointG_symm hDisjG1fr)
-    exact DisjointG_symm (by simpa [splitOut] using hDisjG')
+      disjoint_g_append_left (disjoint_g_symm hDisjG) (disjoint_g_symm hDisjG1fr)
+    exact disjoint_g_symm (by simpa [splitOut] using hDisjG')
   have hQ' := ihQ hDisjG2fr
   have hGfin' : (G₁' ++ G₂') ++ Gfr = G₁' ++ (G₂' ++ Gfr) := by
     simp [List.append_assoc]
@@ -190,7 +190,7 @@ lemma frame_pre_out_right_par_local
 -- Pre-Out Right-Frame Transport
 
 /-- Local right-frame transport for `HasTypeProcPreOut`. -/
-lemma HasTypeProcPreOut_frame_G_right_local
+lemma has_type_proc_pre_out_frame_g_right_local
     {Ssh : SEnv} {Sown : OwnedEnv} {G Gfr : GEnv} {P : Process}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
 /- ## Structured Block 4 -/
@@ -205,32 +205,32 @@ lemma HasTypeProcPreOut_frame_G_right_local
       simpa using (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr))
   | send hk hG hx =>
       rename_i Sown G k x e q T L
-      have hUpd := updateG_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
+      have hUpd := update_g_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
         (L:=.send q T L) (L':=L) hG
       simpa [hUpd] using
         (HasTypeProcPreOut.send (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr)
-          hk (lookupG_append_left (G₂:=Gfr) hG) hx)
+          hk (lookup_g_append_left (G₂:=Gfr) hG) hx)
   | recv_new hk hG hNoSh hNoOwnL =>
       rename_i Sown G k x e p T L
-      have hUpd := updateG_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
+      have hUpd := update_g_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
         (L:=.recv p T L) (L':=L) hG
       simpa [hUpd] using
         (HasTypeProcPreOut.recv_new (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr)
-          hk (lookupG_append_left (G₂:=Gfr) hG) hNoSh hNoOwnL)
+          hk (lookup_g_append_left (G₂:=Gfr) hG) hNoSh hNoOwnL)
   | recv_old hk hG hNoSh hOwn =>
       rename_i Sown G k x e p T L T'
-      have hUpd := updateG_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
+      have hUpd := update_g_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
         (L:=.recv p T L) (L':=L) hG
       simpa [hUpd] using
         (HasTypeProcPreOut.recv_old (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr)
-          hk (lookupG_append_left (G₂:=Gfr) hG) hNoSh hOwn)
+          hk (lookup_g_append_left (G₂:=Gfr) hG) hNoSh hOwn)
   | select hk hG hbs =>
       rename_i Sown G k l e q bs L
-      have hUpd := updateG_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
+      have hUpd := update_g_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
         (L:=.select q bs) (L':=L) hG
       simpa [hUpd] using
         (HasTypeProcPreOut.select (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr)
-          hk (lookupG_append_left (G₂:=Gfr) hG) hbs)
+          hk (lookup_g_append_left (G₂:=Gfr) hG) hbs)
   -- Branch Case Transport
   | branch hk hG hLen hLabels hBodies hOutLbl hSess hDom hRight ihOutLbl =>
       rename_i Sown G k procs e p bs Sfin Gfin W Δ
@@ -238,21 +238,21 @@ lemma HasTypeProcPreOut_frame_G_right_local
       have hOutLbl' := frame_right_branch_out_local (G:=G) (Gfr:=Gfr) hG ihOutLbl hDisj
       have hSess' : SessionsOf (Gfin ++ Gfr) ⊆ SessionsOf (G ++ Gfr) := by
         intro s hs
-        have hs' := SessionsOf_append_subset (G₁:=Gfin) (G₂:=Gfr) hs
+        have hs' := sessions_of_append_subset (G₁:=Gfin) (G₂:=Gfr) hs
         cases hs' with
         | inl hsL =>
-            exact SessionsOf_append_left (G₂:=Gfr) (hSess hsL)
+            exact sessions_of_append_left (G₂:=Gfr) (hSess hsL)
         | inr hsR =>
-            exact SessionsOf_append_right (G₁:=G) hsR
+            exact sessions_of_append_right (G₁:=G) hsR
       exact HasTypeProcPreOut.branch (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr)
-        hk (lookupG_append_left (G₂:=Gfr) hG) hLen hLabels hBodies' hOutLbl' hSess' hDom hRight
+        hk (lookup_g_append_left (G₂:=Gfr) hG) hLen hLabels hBodies' hOutLbl' hSess' hDom hRight
   -- Sequential And Parallel Cases
 /- ## Structured Block 5 -/
   | seq hP hQ ihP ihQ =>
       rename_i Sown G P Q S₁ G₁ S₂ G₂ W₁ W₂ Δ₁ Δ₂
       have hP' := ihP hDisj
-      have hSubG1 : SessionsOf G₁ ⊆ SessionsOf G := SessionsOf_subset_of_HasTypeProcPreOut hP
-      have hDisjG1fr : DisjointG G₁ Gfr := DisjointG_of_subset_left hSubG1 hDisj
+      have hSubG1 : SessionsOf G₁ ⊆ SessionsOf G := sessions_of_subset_of_has_type_proc_pre_out hP
+      have hDisjG1fr : DisjointG G₁ Gfr := disjoint_g_of_subset_left hSubG1 hDisj
       exact HasTypeProcPreOut.seq hP' (ihQ hDisjG1fr)
   | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
       hDisjW hDisjΔ hP hQ ihP ihQ =>
@@ -263,10 +263,10 @@ lemma HasTypeProcPreOut_frame_G_right_local
   -- Assignment Cases
   | assign_new hNoSh hNoOwnL hv =>
       rename_i Sown G x v T
-      exact HasTypeProcPreOut.assign_new hNoSh hNoOwnL (HasTypeVal_frame_right (G₁:=G) (G₂:=Gfr) hv)
+      exact HasTypeProcPreOut.assign_new hNoSh hNoOwnL (has_type_val_frame_right (G₁:=G) (G₂:=Gfr) hv)
   | assign_old hNoSh hOwn hv =>
       rename_i Sown G x v T T'
-      exact HasTypeProcPreOut.assign_old hNoSh hOwn (HasTypeVal_frame_right (G₁:=G) (G₂:=Gfr) hv)
+      exact HasTypeProcPreOut.assign_old hNoSh hOwn (has_type_val_frame_right (G₁:=G) (G₂:=Gfr) hv)
 
 -- Local G-Frame Transport (Left)
 

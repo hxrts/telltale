@@ -22,7 +22,7 @@ complex. Swaps are simpler and compose to form any permutation.
 
 Solution Structure. We prove:
 1. `swapRole`: bijective swap of two roles A ↔ B
-2. `swapRole_involutive`: swap is its own inverse
+2. `swap_role_involutive`: swap is its own inverse
 3. Lifting lemmas for endpoints, edges, value types
 4. `swapCoherent`: coherence preserved under role swap
 -/
@@ -42,7 +42,7 @@ section
 def swapRole (A B : Role) (r : Role) : Role :=
   if r == A then B else if r == B then A else r
 
-theorem swapRole_involutive (A B : Role) (r : Role) :
+theorem swap_role_involutive (A B : Role) (r : Role) :
     swapRole A B (swapRole A B r) = r := by
   by_cases hA : r == A
   · have hA' : r = A := beq_iff_eq.1 hA
@@ -111,45 +111,45 @@ def swapEdgeRole (s : SessionId) (A B : Role) (e : Edge) : Edge :=
 
 -- Endpoint and Edge Swap Properties
 
-theorem swapEndpointRole_sid (s : SessionId) (A B : Role) (ep : Endpoint) :
+theorem swap_endpoint_role_sid (s : SessionId) (A B : Role) (ep : Endpoint) :
     (swapEndpointRole s A B ep).sid = ep.sid := by
   by_cases hSid : ep.sid = s
   · simp [swapEndpointRole, hSid]
   · simp [swapEndpointRole, hSid]
 
-theorem swapEdgeRole_sid (s : SessionId) (A B : Role) (e : Edge) :
+theorem swap_edge_role_sid (s : SessionId) (A B : Role) (e : Edge) :
     (swapEdgeRole s A B e).sid = e.sid := by
   by_cases hSid : e.sid = s
   · simp [swapEdgeRole, hSid]
   · simp [swapEdgeRole, hSid]
 
-theorem swapEndpointRole_involutive (s : SessionId) (A B : Role) (ep : Endpoint) :
+theorem swap_endpoint_role_involutive (s : SessionId) (A B : Role) (ep : Endpoint) :
     swapEndpointRole s A B (swapEndpointRole s A B ep) = ep := by
   cases ep with
   | mk sid role =>
       by_cases hSid : sid = s
-      · simp [swapEndpointRole, hSid, swapRole_involutive]
+      · simp [swapEndpointRole, hSid, swap_role_involutive]
       · simp [swapEndpointRole, hSid]
 
-theorem swapEdgeRole_involutive (s : SessionId) (A B : Role) (e : Edge) :
+theorem swap_edge_role_involutive (s : SessionId) (A B : Role) (e : Edge) :
     swapEdgeRole s A B (swapEdgeRole s A B e) = e := by
   cases e with
   | mk sid sender receiver =>
       by_cases hSid : sid = s
-      · simp [swapEdgeRole, hSid, swapRole_involutive]
+      · simp [swapEdgeRole, hSid, swap_role_involutive]
       · simp [swapEdgeRole, hSid]
 
-theorem swapEndpointRole_inj (s : SessionId) (A B : Role) (e1 e2 : Endpoint) :
+theorem swap_endpoint_role_inj (s : SessionId) (A B : Role) (e1 e2 : Endpoint) :
     swapEndpointRole s A B e1 = swapEndpointRole s A B e2 → e1 = e2 := by
   intro h
   have h' := congrArg (swapEndpointRole s A B) h
-  simpa [swapEndpointRole_involutive] using h'
+  simpa [swap_endpoint_role_involutive] using h'
 
-theorem swapEdgeRole_inj (s : SessionId) (A B : Role) (e1 e2 : Edge) :
+theorem swap_edge_role_inj (s : SessionId) (A B : Role) (e1 e2 : Edge) :
     swapEdgeRole s A B e1 = swapEdgeRole s A B e2 → e1 = e2 := by
   intro h
   have h' := congrArg (swapEdgeRole s A B) h
-  simpa [swapEdgeRole_involutive] using h'
+  simpa [swap_edge_role_involutive] using h'
 
 -- Environment Swap Lifts
 
@@ -174,11 +174,11 @@ def swapDEnvRole (s : SessionId) (A B : Role) (D : DEnv) : DEnv :=
 
 -- Lookup Lemmas
 
-lemma lookupD_eq_list_lookup (D : DEnv) (e : Edge) :
+lemma lookup_d_eq_list_lookup (D : DEnv) (e : Edge) :
     lookupD D e = match D.list.lookup e with
       | some ts => ts
       | none => [] := by
-  have hfind := DEnv_find?_eq_lookup (env := D) (e := e)
+  have hfind := d_env_find?_eq_lookup (env := D) (e := e)
   cases h : D.list.lookup e with
   | none =>
       simp [lookupD, hfind, h]
@@ -187,7 +187,7 @@ lemma lookupD_eq_list_lookup (D : DEnv) (e : Edge) :
 
 -- Fold/Update Stability for Non-Target Edges
 
-lemma lookupD_foldl_update_neq_swap (s : SessionId) (A B : Role) :
+lemma lookup_d_foldl_update_neq_swap (s : SessionId) (A B : Role) :
     ∀ (l : List (Edge × Trace)) (acc : DEnv) (edge : Edge),
       (∀ p ∈ l,
         (if p.1.sid = s then swapEdgeRole s A B p.1 else p.1) ≠ edge) →
@@ -257,7 +257,7 @@ lemma lookupD_foldl_update_neq_swap (s : SessionId) (A B : Role) :
                 (List.map (swapValTypeRole s A B) hd.2))
               edge := ih''
           _ = lookupD acc edge :=
-            lookupD_update_neq (env:=acc) (e:=swapEdgeRole s A B hd.1) (e':=edge)
+            lookup_d_update_neq (env:=acc) (e:=swapEdgeRole s A B hd.1) (e':=edge)
               (ts:=hd.2.map (swapValTypeRole s A B)) hneEdge
       · have hneEdge : hd.1 ≠ edge := by
           simpa [hSid] using hhd
@@ -290,12 +290,12 @@ lemma lookupD_foldl_update_neq_swap (s : SessionId) (A B : Role) :
               edge =
             lookupD (updateD acc hd.1 hd.2) edge := ih''
           _ = lookupD acc edge :=
-            lookupD_update_neq (env:=acc) (e:=hd.1) (e':=edge) (ts:=hd.2) hneEdge
+            lookup_d_update_neq (env:=acc) (e:=hd.1) (e':=edge) (ts:=hd.2) hneEdge
 
 -- Lookup Behavior Through GEnv Role Swap
 
 /-- Looking up a swapped endpoint in a swapped GEnv. -/
-theorem lookupG_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
+theorem lookup_g_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
     lookupG (swapGEnvRole s A B G) (swapEndpointRole s A B e) =
       if e.sid = s then (lookupG G e).map (swapLocalTypeRole s A B) else lookupG G e := by
   induction G with
@@ -320,7 +320,7 @@ theorem lookupG_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
           by_cases hHdSid : hd.1.sid = s
           · intro hEq
             apply heq
-            apply swapEndpointRole_inj s A B
+            apply swap_endpoint_role_inj s A B
             simpa [hHdSid] using hEq
           · have hHdSidNe : hd.1.sid ≠ s := hHdSid
             by_cases hSid : e.sid = s
@@ -330,7 +330,7 @@ theorem lookupG_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
               have hSidEq : (swapEndpointRole s A B e).sid = hd.1.sid :=
                 congrArg Endpoint.sid hEq'
               have hSidL : (swapEndpointRole s A B e).sid = e.sid := by
-                simpa using (swapEndpointRole_sid (s:=s) (A:=A) (B:=B) (ep:=e))
+                simpa using (swap_endpoint_role_sid (s:=s) (A:=A) (B:=B) (ep:=e))
               have hSidEq' : e.sid = hd.1.sid := by simpa [hSidL] using hSidEq
               have hSidEq'' : hd.1.sid = s := by
 /- ## Structured Block 6 -/

@@ -26,7 +26,7 @@ open SessionTypes.LocalTypeR (LocalTypeR BranchR substituteBranches substitute_s
 open SessionTypes.GlobalType (Label)
 open SessionCoTypes.EQ2
 open SessionCoTypes.Observable
-open SessionCoTypes.Bisim (UnfoldsToEnd.toEQ2)
+open SessionCoTypes.Bisim (UnfoldsToEnd.to_eq2)
 
 -- Use the isFreeIn from SubstCommBarendregt
 open SessionCoTypes.SubstCommBarendregt (isFreeIn isFreeInBranches substitute_not_free)
@@ -34,21 +34,21 @@ open SessionCoTypes.SubstCommBarendregt (isFreeIn isFreeInBranches substitute_no
 /-! ## Helper lemmas for termination -/
 
 /-- sizeOf of second component is less than sizeOf of the pair. -/
-private theorem sizeOf_snd_lt_sizeOf_pair (hd : BranchR) :
+private theorem size_of_snd_lt_size_of_pair (hd : BranchR) :
     sizeOf hd.2.2 < sizeOf hd := by
   -- sizeOf (a, (b, c)) = 1 + sizeOf a + (1 + sizeOf b + sizeOf c)
   show sizeOf hd.2.2 < 1 + sizeOf hd.1 + sizeOf hd.2
   omega
 
 /-- sizeOf of element is less than sizeOf of cons list. -/
-private theorem sizeOf_snd_lt_sizeOf_cons (hd : BranchR) (tl : List BranchR) :
+private theorem size_of_snd_lt_size_of_cons (hd : BranchR) (tl : List BranchR) :
     sizeOf hd.2.2 < sizeOf (hd :: tl) := by
-  have h1 : sizeOf hd.2.2 < sizeOf hd := sizeOf_snd_lt_sizeOf_pair hd
+  have h1 : sizeOf hd.2.2 < sizeOf hd := size_of_snd_lt_size_of_pair hd
   -- sizeOf (hd :: tl) = 1 + sizeOf hd + sizeOf tl
   show sizeOf hd.2.2 < 1 + sizeOf hd + sizeOf tl
   omega
 
-private theorem sizeOf_tl_lt_sizeOf_cons (hd : BranchR) (tl : List BranchR) :
+private theorem size_of_tl_lt_size_of_cons (hd : BranchR) (tl : List BranchR) :
     sizeOf tl < sizeOf (hd :: tl) := by
   -- sizeOf (hd :: tl) = 1 + sizeOf hd + sizeOf tl
   show sizeOf tl < 1 + sizeOf hd + sizeOf tl
@@ -57,7 +57,7 @@ private theorem sizeOf_tl_lt_sizeOf_cons (hd : BranchR) (tl : List BranchR) :
 /-! ## Key Lemma: Free variables preserved through substitution for other variable -/
 
 /-- Helper: var case for isFreeIn_subst_other. -/
-private theorem isFreeIn_subst_other_var (v t w : String) (repl : LocalTypeR)
+private theorem is_free_in_subst_other_var (v t w : String) (repl : LocalTypeR)
     (hvt : v ≠ t) (hfree : isFreeIn v (LocalTypeR.var w) = true) :
     isFreeIn v ((LocalTypeR.var w).substitute t repl) = true := by
   -- Reduce to the beq split on w == t.
@@ -73,19 +73,19 @@ mutual
 /-- Free variables are preserved through substitution when not the substituted variable. -/
 
 
-theorem isFreeIn_subst_other (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
+theorem is_free_in_subst_other (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
     (hvt : v ≠ t) (hfree : isFreeIn v e = true) :
     isFreeIn v (e.substitute t repl) = true := by
   -- Proceed by cases on the local type constructor.
   match e with
   | .end => cases hfree
-  | .var w => exact isFreeIn_subst_other_var v t w repl hvt hfree
+  | .var w => exact is_free_in_subst_other_var v t w repl hvt hfree
   | .send _ bs =>
       simp only [substitute_send, isFreeIn] at hfree ⊢
-      exact isFreeInBranches_subst_other bs v t repl hvt hfree
+      exact is_free_in_branches_subst_other bs v t repl hvt hfree
   | .recv _ bs =>
       simp only [substitute_recv, isFreeIn] at hfree ⊢
-      exact isFreeInBranches_subst_other bs v t repl hvt hfree
+      exact is_free_in_branches_subst_other bs v t repl hvt hfree
   | .mu s body =>
       -- Split on shadowing s == t, then on v == s.
       unfold LocalTypeR.substitute
@@ -96,7 +96,7 @@ theorem isFreeIn_subst_other (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
         · simp only [hvs, ↓reduceIte] at hfree
           cases hfree
         · simp only [hvs, Bool.false_eq_true, ↓reduceIte] at hfree ⊢
-          exact isFreeIn_subst_other body v t repl hvt hfree
+          exact is_free_in_subst_other body v t repl hvt hfree
 termination_by sizeOf e
 
 /-! ## Free Variables in Branch Lists -/
@@ -104,7 +104,7 @@ termination_by sizeOf e
 /-- Free variables in branches preserved through substitution. -/
 
 
-theorem isFreeInBranches_subst_other (bs : List BranchR) (v t : String)
+theorem is_free_in_branches_subst_other (bs : List BranchR) (v t : String)
     (repl : LocalTypeR) (hvt : v ≠ t) (hfree : isFreeInBranches v bs = true) :
     isFreeInBranches v (substituteBranches bs t repl) = true := by
   -- Recurse over branches, preserving the witness from the head or tail.
@@ -114,14 +114,14 @@ theorem isFreeInBranches_subst_other (bs : List BranchR) (v t : String)
       simp only [substituteBranches, isFreeInBranches]
       simp only [isFreeInBranches] at hfree
       cases Bool.or_eq_true_iff.mp hfree with
-      | inl h => exact Bool.or_eq_true_iff.mpr (Or.inl (isFreeIn_subst_other hd.2.2 v t repl hvt h))
-      | inr h => exact Bool.or_eq_true_iff.mpr (Or.inr (isFreeInBranches_subst_other tl v t repl hvt h))
+      | inl h => exact Bool.or_eq_true_iff.mpr (Or.inl (is_free_in_subst_other hd.2.2 v t repl hvt h))
+      | inr h => exact Bool.or_eq_true_iff.mpr (Or.inr (is_free_in_branches_subst_other tl v t repl hvt h))
 termination_by sizeOf bs
 decreasing_by
   all_goals
     first
-    | exact sizeOf_snd_lt_sizeOf_cons hd tl
-    | exact sizeOf_tl_lt_sizeOf_cons hd tl
+    | exact size_of_snd_lt_size_of_cons hd tl
+    | exact size_of_tl_lt_size_of_cons hd tl
 end
 
 /-! ## Key Lemma: UnfoldsToEnd implies no free variables -/
@@ -129,7 +129,7 @@ end
 /-- Types satisfying UnfoldsToEnd have no free variables. -/
 
 
-theorem UnfoldsToEnd_no_free_vars (lt : LocalTypeR) (h : UnfoldsToEnd lt) (v : String) :
+theorem unfolds_to_end_no_free_vars (lt : LocalTypeR) (h : UnfoldsToEnd lt) (v : String) :
     isFreeIn v lt = false := by
   induction h with
   | base => rfl
@@ -144,17 +144,17 @@ theorem UnfoldsToEnd_no_free_vars (lt : LocalTypeR) (h : UnfoldsToEnd lt) (v : S
         simp only [Bool.not_eq_true] at hvt
         have hvt_ne : v ≠ t := beq_eq_false_iff_ne.mp hvt
         have h_still_free : isFreeIn v (body.substitute t (.mu t body)) = true :=
-          isFreeIn_subst_other body v t (.mu t body) hvt_ne h_free
+          is_free_in_subst_other body v t (.mu t body) hvt_ne h_free
         exact absurd h_still_free (ih ▸ Bool.false_ne_true)
 
 /-- Substitution into a term satisfying UnfoldsToEnd is a no-op. -/
 
 
-theorem substitute_UnfoldsToEnd_eq (lt : LocalTypeR) (h : UnfoldsToEnd lt)
+theorem substitute_unfolds_to_end_eq (lt : LocalTypeR) (h : UnfoldsToEnd lt)
     (v : String) (repl : LocalTypeR) :
     lt.substitute v repl = lt := by
   -- No free variables means substitution is identity.
-  have h_no_free := UnfoldsToEnd_no_free_vars lt h v
+  have h_no_free := unfolds_to_end_no_free_vars lt h v
   exact substitute_not_free lt v repl h_no_free
 
 /-! ## Core Lemma: mu preserves UnfoldsToEnd -/
@@ -166,7 +166,7 @@ theorem mu_preserves_unfolds_to_end (t : String) (body : LocalTypeR)
     (h : UnfoldsToEnd body) : UnfoldsToEnd (.mu t body) := by
   -- Unfold once and reuse the body witness.
   apply UnfoldsToEnd.mu
-  rw [substitute_UnfoldsToEnd_eq body h t (.mu t body)]
+  rw [substitute_unfolds_to_end_eq body h t (.mu t body)]
   exact h
 
 /-! ## Main Theorem -/
@@ -259,6 +259,6 @@ theorem subst_end_unguarded_eq2_end (lt : LocalTypeR) (v : String)
     EQ2 (lt.substitute v .end) .end := by
   -- Reduce to UnfoldsToEnd, then convert to EQ2.
   have h := substitute_end_unguarded_unfolds_to_end lt v hnotguard
-  exact UnfoldsToEnd.toEQ2 h
+  exact UnfoldsToEnd.to_eq2 h
 
 end Choreography.Harmony.SubstEndUnguarded

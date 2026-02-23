@@ -32,28 +32,28 @@ def initDEnv (_sid : SessionId) (_roles : RoleSet) : DEnv :=
   ∅
 
 /-- Empty DEnv lookup via `find?` always returns none. -/
-@[simp] theorem DEnv_find?_empty (e : Edge) :
+@[simp] theorem d_env_find?_empty (e : Edge) :
     (∅ : DEnv).find? e = none := by
-  simp [DEnv.find?, DEnv_map_find?_empty]
+  simp [DEnv.find?, d_env_map_find?_empty]
 
 /-! ## DEnvUnion Identity Laws -/
-theorem DEnvUnion_empty_right (D : DEnv) : DEnvUnion D (∅ : DEnv) = D := by
-  apply DEnv_eq_of_find?_eq
+theorem d_env_union_empty_right (D : DEnv) : DEnvUnion D (∅ : DEnv) = D := by
+  apply d_env_eq_of_find?_eq
   intro e
-  simp only [DEnvUnion, DEnv_find?_ofMap]
+  simp only [DEnvUnion, d_env_find?_of_map]
   rw [RBMap.foldl_eq_foldl_toList]
   have : (∅ : DEnv).map.toList = [] := rfl
   rw [this, List.foldl_nil]
   simp [DEnv.find?]
 
-theorem DEnvUnion_empty_left (D : DEnv) : DEnvUnion (∅ : DEnv) D = D := by
-  apply DEnv_eq_of_find?_eq
+theorem d_env_union_empty_left (D : DEnv) : DEnvUnion (∅ : DEnv) D = D := by
+  apply d_env_eq_of_find?_eq
   intro e
   -- (DEnvUnion ∅ D).find? e = D.find? e
   -- DEnvUnion folds D.map into (∅).map with conditional insert.
   -- Starting from empty, every key is new, so all inserts happen.
   -- The result has the same find? as D.map.
-  simp only [DEnvUnion, DEnv_find?_ofMap]
+  simp only [DEnvUnion, d_env_find?_of_map]
   rw [RBMap.foldl_eq_foldl_toList]
   -- Goal: (DEnv.ofMap (D.map.toList.foldl f (∅).map)).find? e = D.find? e
   -- where f is the conditional insert.
@@ -71,7 +71,7 @@ theorem DEnvUnion_empty_left (D : DEnv) : DEnvUnion (∅ : DEnv) D = D := by
           | none => acc.insert p.1 p.2) (∅ : DEnv).map).find? e =
           (rbmapOfList D.map.toList).find? e := by
       exact congrArg (fun m => m.find? e) hFold
-    exact hFoldFind.trans (rbmapOfList_toList_find? D.map e)
+    exact hFoldFind.trans (rbmap_of_list_to_list_find? D.map e)
   -- Empty-Left Proof: Pairwise Fold Alignment
   -- Since we start from empty, acc.find? is always none for unseen keys.
   -- With unique keys (from sorted), every key is unseen.
@@ -102,7 +102,7 @@ theorem DEnvUnion_empty_left (D : DEnv) : DEnvUnion (∅ : DEnv) D = D := by
     intro q hq
     have hNoneQ := hNone q (List.mem_cons_of_mem p hq)
     have hLT := hPW'.1 q hq
-    have hCmpLT := edgeCmpLT_eq_lt hLT
+    have hCmpLT := edge_cmp_lt_eq_lt hLT
     have hNe : compare q.1 p.1 ≠ .eq := by
       intro heq
       have := Std.OrientedCmp.eq_swap (cmp := compare) (a := q.1) (b := p.1)
@@ -112,14 +112,14 @@ theorem DEnvUnion_empty_left (D : DEnv) : DEnvUnion (∅ : DEnv) D = D := by
 
 /-! ## DEnvUnion Lookup when Key is in Left -/
 /-- DEnvUnion find? when key is in left. -/
-theorem DEnvUnion_find?_left {D1 D2 : DEnv} {e : Edge} {ts : Trace}
+theorem d_env_union_find?_left {D1 D2 : DEnv} {e : Edge} {ts : Trace}
     (h : D1.find? e = some ts) :
     (D1 ++ D2).find? e = some ts := by
   -- Key in D1.map means conditional fold won't overwrite it
   have h0 : D1.map.find? e = some ts := by
     simpa [DEnv.find?] using h
   change (DEnvUnion D1 D2).find? e = some ts
-  simp only [DEnvUnion, DEnv_find?_ofMap]
+  simp only [DEnvUnion, d_env_find?_of_map]
   rw [RBMap.foldl_eq_foldl_toList]
   -- Fold over D2.map.toList preserves existing keys in D1.map.
   let f := fun (acc : RBMap Edge Trace compare) (p : Edge × Trace) =>
@@ -160,14 +160,14 @@ theorem DEnvUnion_find?_left {D1 D2 : DEnv} {e : Edge} {ts : Trace}
 
 /-! ## DEnvUnion Lookup when Key is Absent from Left -/
 /-- DEnvUnion find? when key not in left. -/
-theorem DEnvUnion_find?_right {D1 D2 : DEnv} {e : Edge}
+theorem d_env_union_find?_right {D1 D2 : DEnv} {e : Edge}
     (h : D1.find? e = none) :
     (D1 ++ D2).find? e = D2.find? e := by
   -- Key not in D1.map means it can only come from D2
   have h0 : D1.map.find? e = none := by
     simpa [DEnv.find?] using h
   change (DEnvUnion D1 D2).find? e = D2.find? e
-  simp only [DEnvUnion, DEnv_find?_ofMap]
+  simp only [DEnvUnion, d_env_find?_of_map]
   rw [RBMap.foldl_eq_foldl_toList]
   let f := fun (acc : RBMap Edge Trace compare) (p : Edge × Trace) =>
     match acc.find? p.1 with
@@ -241,7 +241,7 @@ theorem DEnvUnion_find?_right {D1 D2 : DEnv} {e : Edge}
       (by simpa [hEmpty] using h0)
   have hEmptyUnion :
       (DEnvUnion (∅ : DEnv) D2).find? e = D2.find? e := by
-    simpa using congrArg (fun D => D.find? e) (DEnvUnion_empty_left (D := D2))
+    simpa using congrArg (fun D => D.find? e) (d_env_union_empty_left (D := D2))
   have hEmptyFold :
       (D2.map.toList.foldl f (∅ : RBMap Edge Trace compare)).find? e = D2.find? e := by
     have hEmptyUnion' :
@@ -250,16 +250,16 @@ theorem DEnvUnion_find?_right {D1 D2 : DEnv} {e : Edge}
           | some _ => acc
           | none => acc.insert k v) (∅ : RBMap Edge Trace compare) D2.map).find? e =
         D2.find? e := by
-      simpa [DEnvUnion, DEnv_find?_ofMap] using hEmptyUnion
+      simpa [DEnvUnion, d_env_find?_of_map] using hEmptyUnion
     simpa [RBMap.foldl_eq_foldl_toList] using hEmptyUnion'
   exact hEqFold.trans hEmptyFold
 
 /-! ## updateD Distribution over DEnvUnion -/
 /-- updateD distributes over DEnvUnion when key not in left. -/
-theorem updateD_DEnvUnion_right {D1 D2 : DEnv} {e : Edge} {ts : List ValType}
+theorem update_d_d_env_union_right {D1 D2 : DEnv} {e : Edge} {ts : List ValType}
     (h : D1.find? e = none) :
     updateD (D1 ++ D2) e ts = D1 ++ updateD D2 e ts := by
-  apply DEnv_eq_of_find?_eq
+  apply d_env_eq_of_find?_eq
   intro e'
   by_cases he' : e' = e
   · subst e'
@@ -269,18 +269,18 @@ theorem updateD_DEnvUnion_right {D1 D2 : DEnv} {e : Edge} {ts : List ValType}
       have hfind : ((D1 ++ D2).map.insert e ts).find? e = some ts := by
         simpa using
           (RBMap.find?_insert_of_eq (t := (D1 ++ D2).map) (k := e) (v := ts) (k' := e) hEq)
-      simpa [updateD, DEnv_find?_ofMap] using hfind
+      simpa [updateD, d_env_find?_of_map] using hfind
     have hRight :
         (D1 ++ updateD D2 e ts).find? e = some ts := by
       have hnone : D1.find? e = none := h
-      have hRight' := DEnvUnion_find?_right (D1 := D1) (D2 := updateD D2 e ts) (e := e) hnone
+      have hRight' := d_env_union_find?_right (D1 := D1) (D2 := updateD D2 e ts) (e := e) hnone
       -- reduce to updateD on right
       have hEq : compare e e = .eq := by simp
       have hUpd : (updateD D2 e ts).find? e = some ts := by
         have hfind : (D2.map.insert e ts).find? e = some ts := by
           simpa using
             (RBMap.find?_insert_of_eq (t := D2.map) (k := e) (v := ts) (k' := e) hEq)
-        simpa [updateD, DEnv_find?_ofMap] using hfind
+        simpa [updateD, d_env_find?_of_map] using hfind
       simpa [hUpd] using hRight'
     simp [hLeft, hRight]
   -- updateD Distribution: Non-updated Keys
@@ -294,19 +294,19 @@ theorem updateD_DEnvUnion_right {D1 D2 : DEnv} {e : Edge} {ts : List ValType}
           ((D1 ++ D2).map.insert e ts).find? e' = (D1 ++ D2).map.find? e' := by
         simpa using
           (RBMap.find?_insert_of_ne (t := (D1 ++ D2).map) (k := e) (v := ts) (k' := e') hne')
-      simpa [updateD, DEnv_find?_ofMap] using hfind
+      simpa [updateD, d_env_find?_of_map] using hfind
     cases hfind : D1.find? e' with
     | some ts' =>
         -- key in left; both unions agree on left value
-        have hLeftUnion := DEnvUnion_find?_left (D1 := D1) (D2 := D2) (e := e') (ts := ts') hfind
+        have hLeftUnion := d_env_union_find?_left (D1 := D1) (D2 := D2) (e := e') (ts := ts') hfind
         have hRightUnion :=
-          DEnvUnion_find?_left (D1 := D1) (D2 := updateD D2 e ts) (e := e') (ts := ts') hfind
+          d_env_union_find?_left (D1 := D1) (D2 := updateD D2 e ts) (e := e') (ts := ts') hfind
         simp [hLeft, hLeftUnion, hRightUnion]
     | none =>
         -- key not in left; reduce to right
-        have hLeftUnion := DEnvUnion_find?_right (D1 := D1) (D2 := D2) (e := e') hfind
+        have hLeftUnion := d_env_union_find?_right (D1 := D1) (D2 := D2) (e := e') hfind
         have hRightUnion :=
-          DEnvUnion_find?_right (D1 := D1) (D2 := updateD D2 e ts) (e := e') hfind
+          d_env_union_find?_right (D1 := D1) (D2 := updateD D2 e ts) (e := e') hfind
         -- updateD doesn't affect e' (since e' ≠ e)
         have hUpd :
             (updateD D2 e ts).find? e' = D2.find? e' := by
@@ -318,49 +318,49 @@ theorem updateD_DEnvUnion_right {D1 D2 : DEnv} {e : Edge} {ts : List ValType}
               (D2.map.insert e ts).find? e' = D2.map.find? e' := by
             simpa using
               (RBMap.find?_insert_of_ne (t := D2.map) (k := e) (v := ts) (k' := e') hne')
-          simpa [updateD, DEnv_find?_ofMap] using hfind
+          simpa [updateD, d_env_find?_of_map] using hfind
         simp [hLeft, hLeftUnion, hRightUnion, hUpd]
 
 /-! ## DEnvUnion Associativity -/
 /-- DEnvUnion is associative. -/
-theorem DEnvUnion_assoc (D1 D2 D3 : DEnv) : (D1 ++ D2) ++ D3 = D1 ++ (D2 ++ D3) := by
-  apply DEnv_eq_of_find?_eq
+theorem d_env_union_assoc (D1 D2 D3 : DEnv) : (D1 ++ D2) ++ D3 = D1 ++ (D2 ++ D3) := by
+  apply d_env_eq_of_find?_eq
   intro e
   cases h1 : D1.find? e with
   | some ts =>
       -- in left, both sides pick left
       have hLeft :=
-        DEnvUnion_find?_left (D1 := D1 ++ D2) (D2 := D3) (e := e) (ts := ts)
-          (DEnvUnion_find?_left (D1 := D1) (D2 := D2) (e := e) (ts := ts) h1)
+        d_env_union_find?_left (D1 := D1 ++ D2) (D2 := D3) (e := e) (ts := ts)
+          (d_env_union_find?_left (D1 := D1) (D2 := D2) (e := e) (ts := ts) h1)
       have hRight :=
-        DEnvUnion_find?_left (D1 := D1) (D2 := D2 ++ D3) (e := e) (ts := ts) h1
+        d_env_union_find?_left (D1 := D1) (D2 := D2 ++ D3) (e := e) (ts := ts) h1
       simp [hLeft, hRight]
   | none =>
       -- not in left; reduce to D2/D3
       have hD1none : D1.find? e = none := by simpa using h1
       have hD12 : (D1 ++ D2).find? e = D2.find? e :=
-        DEnvUnion_find?_right (D1 := D1) (D2 := D2) (e := e) hD1none
+        d_env_union_find?_right (D1 := D1) (D2 := D2) (e := e) hD1none
       cases h2 : D2.find? e with
       | some ts =>
           have hLeft :=
-            DEnvUnion_find?_left (D1 := D1 ++ D2) (D2 := D3) (e := e) (ts := ts) (by simp [hD12, h2])
+            d_env_union_find?_left (D1 := D1 ++ D2) (D2 := D3) (e := e) (ts := ts) (by simp [hD12, h2])
           have hRight1 :=
-            DEnvUnion_find?_right (D1 := D1) (D2 := D2 ++ D3) (e := e) hD1none
+            d_env_union_find?_right (D1 := D1) (D2 := D2 ++ D3) (e := e) hD1none
           have hRight2 :=
-            DEnvUnion_find?_left (D1 := D2) (D2 := D3) (e := e) (ts := ts) h2
+            d_env_union_find?_left (D1 := D2) (D2 := D3) (e := e) (ts := ts) h2
           simp [hLeft, hRight1, hRight2]
       | none =>
           have hLeft :=
-            DEnvUnion_find?_right (D1 := D1 ++ D2) (D2 := D3) (e := e) (by simp [hD12, h2])
+            d_env_union_find?_right (D1 := D1 ++ D2) (D2 := D3) (e := e) (by simp [hD12, h2])
           have hRight1 :=
-            DEnvUnion_find?_right (D1 := D1) (D2 := D2 ++ D3) (e := e) hD1none
+            d_env_union_find?_right (D1 := D1) (D2 := D2 ++ D3) (e := e) hD1none
           have hRight2 :=
-            DEnvUnion_find?_right (D1 := D2) (D2 := D3) (e := e) h2
+            d_env_union_find?_right (D1 := D2) (D2 := D3) (e := e) h2
           simp [hLeft, hRight1, hRight2]
 
 /-! ## initBuffers Membership Lookup -/
 /-- Looking up an edge in initBuffers returns empty if edge is in allEdges. -/
-theorem initBuffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
+theorem init_buffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hMem : e ∈ RoleSet.allEdges sid roles) :
     (initBuffers sid roles).lookup e = some [] := by
   simp only [initBuffers]
@@ -384,30 +384,30 @@ theorem initBuffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
 
 /-! ## initDEnv Trivial Lookup Lemmas -/
 /-- Looking up an edge in initDEnv returns empty if edge is in allEdges. -/
-theorem initDEnv_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
+theorem init_d_env_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
     (_hMem : e ∈ RoleSet.allEdges sid roles) :
     lookupD (initDEnv sid roles) e = [] := by
   simp [initDEnv, lookupD]
 
 /-- Looking up an edge with a different sid in initDEnv returns none. -/
-theorem initDEnv_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
+theorem init_d_env_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
     (_hne : e.sid ≠ sid) :
     lookupD (initDEnv sid roles) e = [] := by
   simp [initDEnv, lookupD]
 
 /-! ## initBuffers Non-membership from Lookup None -/
 /-- If initBuffers returns none, the edge is not in the role edges. -/
-theorem initBuffers_not_mem_of_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
+theorem init_buffers_not_mem_of_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
     (h : (initBuffers sid roles).lookup e = none) :
     e ∉ RoleSet.allEdges sid roles := by
   -- Any edge in allEdges would be found with an empty buffer.
   intro hMem
-  have hSome := initBuffers_lookup_mem sid roles e hMem
+  have hSome := init_buffers_lookup_mem sid roles e hMem
   exact Option.noConfusion (hSome.symm.trans h)
 
 /-! ## initBuffers Lookup None for Non-members -/
 /-- initBuffers returns none for edges not in allEdges. -/
-theorem initBuffers_lookup_none_of_notin (sid : SessionId) (roles : RoleSet) (e : Edge)
+theorem init_buffers_lookup_none_of_notin (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hNot : e ∉ RoleSet.allEdges sid roles) :
     (initBuffers sid roles).lookup e = none := by
   simp only [initBuffers]
@@ -425,14 +425,14 @@ theorem initBuffers_lookup_none_of_notin (sid : SessionId) (roles : RoleSet) (e 
 
 /-! ## initBuffers Session-Mismatch Lookup None -/
 /-- Looking up an edge with a different sid in initBuffers returns none. -/
-theorem initBuffers_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
+theorem init_buffers_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hne : e.sid ≠ sid) :
     (initBuffers sid roles).lookup e = none := by
   simp only [initBuffers]
   -- Every edge in allEdges has .sid = sid, so e cannot be in the list
   have hNotIn : e ∉ RoleSet.allEdges sid roles := by
     intro hmem
-    exact hne (RoleSet.allEdges_sid sid roles e hmem)
+    exact hne (RoleSet.all_edges_sid sid roles e hmem)
   -- Use induction with the membership constraint carried through
   generalize hlist : RoleSet.allEdges sid roles = edges at hNotIn
   clear hlist
@@ -448,10 +448,10 @@ theorem initBuffers_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
 
 /-! ## initDEnv Non-membership Lookup None -/
 /-- initDEnv has no entry for edges outside allEdges. -/
-theorem initDEnv_find?_none_of_notin (sid : SessionId) (roles : RoleSet) (e : Edge)
+theorem init_d_env_find?_none_of_notin (sid : SessionId) (roles : RoleSet) (e : Edge)
     (_hNot : e ∉ RoleSet.allEdges sid roles) :
     (initDEnv sid roles).find? e = none := by
-  simp [initDEnv, DEnv.find?, DEnv_map_find?_empty]
+  simp [initDEnv, DEnv.find?, d_env_map_find?_empty]
 
 
 end

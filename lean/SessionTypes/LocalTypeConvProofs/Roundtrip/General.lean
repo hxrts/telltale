@@ -16,9 +16,9 @@ requires showing that guardedness and contractiveness are preserved across conve
 This is essential for verifying that well-formed named types convert to well-formed de Bruijn
 types and vice versa.
 
-Solution Structure. Proves `toDB_fromDB_roundtrip` for arbitrary nodup contexts with fresh
-name generation. `isGuarded_toDB` shows that guardedness in named representation implies
-guardedness in de Bruijn. `isContractive_toDB` and `isContractive_fromDB` prove that
+Solution Structure. Proves `to_db_from_db_roundtrip` for arbitrary nodup contexts with fresh
+name generation. `is_guarded_to_db` shows that guardedness in named representation implies
+guardedness in de Bruijn. `is_contractive_to_db` and `is_contractive_from_db` prove that
 contractiveness is preserved in both directions, enabling well-formedness preservation.
 -/
 
@@ -35,7 +35,7 @@ open SessionTypes.LocalTypeConv
 open SessionTypes.NameOnlyContext
 -- General roundtrip with adequate context
 
-theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
+theorem to_db_from_db_roundtrip (t : LocalTypeDB) (ctx : NameContext)
     (hnodup : ctx.Nodup)
     (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
     (hclosed : t.isClosedAt ctx.length = true) :
@@ -67,11 +67,11 @@ theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
       have hlt : n < ctx.length := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
       obtain ⟨v, hget⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
-      have hidx : Context.indexOf ctx v = some n := get_indexOf_roundtrip ctx n v hnodup hget
+      have hidx : Context.indexOf ctx v = some n := get_index_of_roundtrip ctx n v hnodup hget
       have hfrom : LocalTypeDB.fromDB ctx (.var n) hclosed = LocalTypeR.var v :=
-        fromDB_var_of_get ctx n hclosed v hget
+        from_db_var_of_get ctx n hclosed v hget
       simp [hfrom, LocalTypeR.toDB?]
-      rw [Context.indexOf_eq] at hidx
+      rw [Context.index_of_eq] at hidx
       simp [hidx]
 
     -- General Roundtrip: send/recv/μ and branch Cases
@@ -110,7 +110,7 @@ theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
 
 -- General Roundtrip: Branch Lists
 
-theorem branches_toDB_fromDB_roundtrip (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
+theorem branches_to_db_from_db_roundtrip (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
     (hnodup : ctx.Nodup)
     (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
     (hclosed : isClosedAtBranches ctx.length bs = true) :
@@ -121,13 +121,13 @@ theorem branches_toDB_fromDB_roundtrip (bs : List (Label × LocalTypeDB)) (ctx :
       obtain ⟨l, t⟩ := hd
       have hclosed' : t.isClosedAt ctx.length = true ∧ isClosedAtBranches ctx.length tl = true := by
         simpa [isClosedAtBranches] using hclosed
-      have ht := toDB_fromDB_roundtrip t ctx hnodup hfreshAll hclosed'.1
+      have ht := to_db_from_db_roundtrip t ctx hnodup hfreshAll hclosed'.1
       have htl := ih hclosed'.2
       simp [LocalTypeDB.branchesFromDB, LocalTypeR.branchesToDB?, ht, htl]
 
 -- Guardedness / contractiveness preservation
 
-theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x : String) (i : Nat)
+theorem is_guarded_to_db_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x : String) (i : Nat)
     (db : LocalTypeDB) :
     Context.indexOf ctx x = some i →
     t.toDB? (pref ++ x :: ctx) = some db →
@@ -163,7 +163,7 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
           subst hdb
           simp [LocalTypeDB.isGuarded]
     · intro p bs hbs pref ctx i db hidx hdb
-      simp only [fromList_cons_toList] at hdb
+      simp only [from_list_cons_to_list] at hdb
       cases hdbs : LocalTypeR.branchesToDB? (pref ++ NameOnlyContext.cons x ctx) bs with
       | none =>
           simp [LocalTypeR.toDB?, hdbs] at hdb
@@ -172,7 +172,7 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
           subst hdb
           simp [LocalTypeDB.isGuarded]
     · intro y body hbody pref ctx i db hidx hdb
-      simp only [fromList_toList, fromList_cons] at hdb
+      simp only [from_list_to_list, from_list_cons] at hdb
       cases hbody_db : body.toDB? (cons y (pref ++ cons x ctx)) with
       | none =>
           simp [LocalTypeR.toDB?, hbody_db, Option.map] at hdb
@@ -184,7 +184,7 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
           have hguard' :
               db'.isGuarded (i + (cons y pref).length + 1) = true := by
             have hbody' : body.toDB? ((cons y pref) ++ fromList (x :: toList ctx)) = some db' := by
-              simp only [fromList_cons_toList]
+              simp only [from_list_cons_to_list]
               simpa using hbody_db
             exact hbody (pref := cons y pref) (ctx := ctx) (i := i) (db := db') hidx hbody'
           have hguard'' : db'.isGuarded (i + pref.length + 1 + 1) = true := by
@@ -197,7 +197,7 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
     -- Shadowed Prefix Guardedness: Variable Case
 
     · intro v pref ctx i db hidx hdb
-      simp only [LocalTypeR.toDB?, fromList_cons_toList] at hdb
+      simp only [LocalTypeR.toDB?, from_list_cons_to_list] at hdb
       cases hj : NameOnlyContext.indexOf (pref ++ NameOnlyContext.cons x ctx) v with
       | none => simp [hj] at hdb
       | some j =>
@@ -208,7 +208,7 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
           -- heq: j = i + pref.length + 1
           -- Need to derive contradiction by showing j ≤ pref.length or j = pref.length + 1 + k for some k ≠ i
           -- Use indexOf_append_x_le to show x appears at position ≤ pref.length
-          have ⟨k, hk, hkle⟩ := indexOf_append_x_le pref ctx x
+          have ⟨k, hk, hkle⟩ := index_of_append_x_le pref ctx x
           simp only [Context.indexOf] at hk hj
           -- If v = x, then j = k ≤ pref.length < i + pref.length + 1, contradiction
           -- If v ≠ x, then j > pref.length (since x appears first), and j = pref.length + 1 + m
@@ -223,10 +223,10 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
               subst hvx
               have hjk : j = k := Option.some.inj (hj.symm.trans hk)
               omega
-            have hctx := indexOf_append_suffix hvx (by simp only [Context.indexOf]; exact hj) hjle
+            have hctx := index_of_append_suffix hvx (by simp only [Context.indexOf]; exact hj) hjle
             have heq' : j - pref.length - 1 = i := by omega
             simp only [heq'] at hctx
-            have hvx' := indexOf_inj (ctx := ctx) hctx hidx
+            have hvx' := index_of_inj (ctx := ctx) hctx hidx
             exact hvx hvx'
     · exact True.intro
     · intro _ _ _ _
@@ -239,7 +239,7 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
 
 -- Guardedness Preservation to DB
 
-theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (db : LocalTypeDB) :
+theorem is_guarded_to_db (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (db : LocalTypeDB) :
     t.isGuarded x = true →
     ctx.indexOf x = some i →
     t.toDB? ctx = some db →
@@ -299,9 +299,9 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
             -- Use isGuarded_toDB_shadowed_prefix with empty prefix
             subst hxy
             have hbody' : body.toDB? (TypeContext.empty ++ (x :: (ctx : List String) : Context)) = some db' := by
-              simp only [empty_append_eq, fromList_cons_toList]
+              simp only [empty_append_eq, from_list_cons_to_list]
               exact hbody_db
-            have hguard' := isGuarded_toDB_shadowed_prefix body TypeContext.empty ctx x i db' hidx hbody'
+            have hguard' := is_guarded_to_db_shadowed_prefix body TypeContext.empty ctx x i db' hidx hbody'
             simp only [TypeContext.length_empty, Nat.add_zero] at hguard'
             exact hguard'
           · -- Case x ≠ y: use IH on body
@@ -313,7 +313,7 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
 /- ## Structured Block 6 -/
             have hidx' : (NameOnlyContext.cons y ctx).indexOf x = some (i + 1) := by
               show NameOnlyContext.indexOf (NameOnlyContext.cons y ctx) x = some (i + 1)
-              rw [NameOnlyContext.indexOf_cons_ne ctx (Ne.symm hxy)]
+              rw [NameOnlyContext.index_of_cons_ne ctx (Ne.symm hxy)]
               show Option.map Nat.succ (NameOnlyContext.indexOf ctx x) = some (i + 1)
               have hidx'' : NameOnlyContext.indexOf ctx x = some i := hidx
               rw [hidx'']
@@ -338,7 +338,7 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
           intro hjei
           have hjei' : Context.indexOf ctx v = some i := by
             simp only [Context.indexOf, hj, hjei]
-          have hvx' := indexOf_inj hjei' hidx
+          have hvx' := index_of_inj hjei' hidx
           exact hvx hvx'
     · exact True.intro
     · intro _ _ _ _
@@ -351,7 +351,7 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
 
 -- Contractiveness Preservation to DB
 
-theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
+theorem is_contractive_to_db (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
     t.isContractive = true →
     t.toDB? ctx = some db →
     db.isContractive = true := by
@@ -420,8 +420,8 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
           constructor
           · -- Show db'.isGuarded 0 = true
             have hidx : (NameOnlyContext.cons x ctx).indexOf x = some 0 := by
-              simp only [NameOnlyContext.indexOf_cons_eq]
-            exact isGuarded_toDB body (NameOnlyContext.cons x ctx) x 0 db' hguard hidx hbody_db
+              simp only [NameOnlyContext.index_of_cons_eq]
+            exact is_guarded_to_db body (NameOnlyContext.cons x ctx) x 0 db' hguard hidx hbody_db
           · -- Show db'.isContractive = true using IH
             exact hbody (NameOnlyContext.cons x ctx) db' hbody_contr hbody_db
 

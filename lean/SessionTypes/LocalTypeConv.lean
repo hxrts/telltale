@@ -9,7 +9,7 @@ Conversions between named variables (LocalTypeR) and de Bruijn indices (LocalTyp
 **All LocalTypeConv assumptions eliminated (11/11).**
 - Closedness + roundtrip lemmas are proved in `LocalTypeConvProofs.lean`.
 - Guardedness/contractiveness preservation is proved (with explicit context assumptions).
-- Substitution contractiveness bridge is derived from `LocalTypeR.isContractive_substitute`.
+- Substitution contractiveness bridge is derived from `LocalTypeR.is_contractive_substitute`.
 
 General roundtrip/contractiveness results require explicit assumptions about context
 adequacy (e.g., `Nodup` and a fresh-name predicate).
@@ -44,39 +44,39 @@ open SessionTypes.LocalTypeConvProofs
 /-- For closed DB terms, the safe conversion succeeds and matches the total conversion.
 
 **Proven** in LocalTypeConvProofs.lean -/
-theorem fromDB?_eq_fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
+theorem from_db?_eq_from_db_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
   t.fromDB? TypeContext.empty =
     some (t.fromDB TypeContext.empty (by
       simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using hclosed)) :=
-  LocalTypeConvProofs.fromDB?_eq_fromDB_closed t hclosed (by
+  LocalTypeConvProofs.from_db?_eq_from_db_closed t hclosed (by
     simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using hclosed)
 
 /-- Closed DB term converts to closed named term.
 
 **Proven** in LocalTypeConvProofs.lean -/
-theorem fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
+theorem from_db_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
   (t.fromDB TypeContext.empty (by
       simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using hclosed)).isClosed = true :=
-  LocalTypeConvProofs.fromDB_closed t hclosed (by
+  LocalTypeConvProofs.from_db_closed t hclosed (by
     simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using hclosed)
 
 /-- Closed named term converts to closed DB term.
 
 **Proven** in LocalTypeConvProofs.lean -/
-theorem toDB_closed (t : LocalTypeR) (hclosed : t.isClosed = true) :
+theorem to_db_closed (t : LocalTypeR) (hclosed : t.isClosed = true) :
   ∃ db, t.toDB? TypeContext.empty = some db ∧ db.isClosed = true :=
-  LocalTypeConvProofs.toDB_closed t hclosed
+  LocalTypeConvProofs.to_db_closed t hclosed
 
 /-- Round-trip for closed DB terms: fromDB then toDB gives original.
 
 This is the key property enabling DB-based proofs: we can convert to DB, prove something,
 then convert back, knowing we get the same term.
 
-**Status**: Proven infrastructure exists (get_indexOf_roundtrip), full proof pending. -/
-theorem toDB_fromDB_roundtrip_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
+**Status**: Proven infrastructure exists (get_index_of_roundtrip), full proof pending. -/
+theorem to_db_from_db_roundtrip_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
   (t.fromDB TypeContext.empty (by
       simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using hclosed)).toDB? TypeContext.empty = some t :=
-  LocalTypeConvProofs.toDB_fromDB_roundtrip_closed t hclosed (by
+  LocalTypeConvProofs.to_db_from_db_roundtrip_closed t hclosed (by
     simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using hclosed)
 
 /-! ## General Conversion Properties (require adequate context)
@@ -90,80 +90,80 @@ all free variables. -/
 **Warning**: This assumes `ctx.Nodup` and a global freshness predicate
 (`∀ c, freshName c ∉ c`), plus `isClosedAt` for the current depth. Without these
 guarantees, this property may not hold. -/
-theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
+theorem to_db_from_db_roundtrip (t : LocalTypeDB) (ctx : NameContext)
     (h_nodup : ctx.Nodup) (h_fresh : ∀ c, NameContext.freshName c ∉ c)
     (hclosed : t.isClosedAt ctx.length = true) :
   (t.fromDB ctx hclosed).toDB? ctx = some t :=
-  LocalTypeConvProofs.toDB_fromDB_roundtrip t ctx h_nodup h_fresh hclosed
+  LocalTypeConvProofs.to_db_from_db_roundtrip t ctx h_nodup h_fresh hclosed
 
 /-- Branch version of round-trip. -/
-theorem branches_toDB_fromDB_roundtrip (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
+theorem branches_to_db_from_db_roundtrip (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
     (h_nodup : ctx.Nodup) (h_fresh : ∀ c, NameContext.freshName c ∉ c)
     (hclosed : isClosedAtBranches ctx.length bs = true) :
   LocalTypeR.branchesToDB? ctx (LocalTypeDB.branchesFromDB ctx bs hclosed) = some bs :=
-  LocalTypeConvProofs.branches_toDB_fromDB_roundtrip bs ctx h_nodup h_fresh hclosed
+  LocalTypeConvProofs.branches_to_db_from_db_roundtrip bs ctx h_nodup h_fresh hclosed
 
 /-! ## Guardedness and Contractiveness Preservation
 
 These properties show that structural predicates are preserved across conversions.
 -/
 
-theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (db : LocalTypeDB) :
+theorem is_guarded_to_db (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (db : LocalTypeDB) :
   t.isGuarded x = true →
   ctx.indexOf x = some i →
   t.toDB? ctx = some db →
   db.isGuarded i = true :=
-  LocalTypeConvProofs.isGuarded_toDB t ctx x i db
+  LocalTypeConvProofs.is_guarded_to_db t ctx x i db
 
-theorem isGuarded_fromDB (t : LocalTypeDB) (ctx : NameContext) (i : Nat) :
+theorem is_guarded_from_db (t : LocalTypeDB) (ctx : NameContext) (i : Nat) :
   t.isClosedAt (ctx.length) = true →
   t.isGuarded i = true →
   True := by
   intro _ _; exact True.intro
 
-theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
+theorem is_contractive_to_db (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
   t.isContractive = true →
   t.toDB? ctx = some db →
   db.isContractive = true :=
-  LocalTypeConvProofs.isContractive_toDB t ctx db
+  LocalTypeConvProofs.is_contractive_to_db t ctx db
 
-theorem isContractive_fromDB (t : LocalTypeDB) (ctx : NameContext)
+theorem is_contractive_from_db (t : LocalTypeDB) (ctx : NameContext)
     (h_fresh : ∀ c, NameContext.freshName c ∉ c) :
   t.isContractive = true →
   (hclosed : t.isClosedAt (ctx.length) = true) →
   (t.fromDB ctx hclosed).isContractive = true := by
   intro hcontr hclosed
-  exact LocalTypeConvProofs.isContractive_fromDB t ctx h_fresh hcontr hclosed
+  exact LocalTypeConvProofs.is_contractive_from_db t ctx h_fresh hcontr hclosed
 
 /-! ## Substitution Bridge (Named → DB) -/
 
 /-- If a variable is not free, named substitution is a no-op and conversion is unchanged. -/
-theorem toDB?_substitute_not_free
+theorem to_db?_substitute_not_free
     (t repl : LocalTypeR) (ctx : Context) (x : String) (db : LocalTypeDB)
     (hdb : t.toDB? ctx = some db)
     (hfree : LocalTypeR.isFreeIn x t = false) :
     (t.substitute x repl).toDB? ctx = some db :=
-  LocalTypeConvProofs.toDB?_substitute_not_free t repl ctx x db hdb hfree
+  LocalTypeConvProofs.to_db?_substitute_not_free t repl ctx x db hdb hfree
 
 /-- Bridge theorem: preserve contractiveness for mu-substitution via DB.
 
 This enables proving substitution properties at the DB level, then transporting
 the result back to LocalTypeR. -/
-theorem isContractive_substitute_mu_via_DB (body : LocalTypeR) (t : String)
+theorem is_contractive_substitute_mu_via_db (body : LocalTypeR) (t : String)
     (hcov : Context.Covers [t] body)
     (h_body : body.isContractive = true)
     (h_mu : (LocalTypeR.mu t body).isContractive = true) :
     (body.substitute t (.mu t body)).isContractive = true := by
   -- mu t body is closed since all free vars are covered by [t]
   have hclosed : (LocalTypeR.mu t body).isClosed := by
-    apply (List.isEmpty_eq_true _).2
+    apply (List.is_empty_eq_true _).2
     apply List.eq_nil_iff_forall_not_mem.mpr
     intro v hv
     have hv' : v ∈ body.freeVars ∧ v ≠ t := by
       simpa [LocalTypeR.freeVars] using hv
     have : v ∈ ([t] : List String) := hcov v hv'.1
     exact (hv'.2 (by simpa using this)).elim
-  exact LocalTypeR.isContractive_substitute body t (.mu t body) h_body h_mu hclosed
+  exact LocalTypeR.is_contractive_substitute body t (.mu t body) h_body h_mu hclosed
 
 /-! ## Safe Conversion Helpers for Closed Terms
 
@@ -176,7 +176,7 @@ def toDB_closed_safe (t : LocalTypeR) (_hclosed : t.isClosed = true) : LocalType
   | some db => db
   | none =>
       False.elim <| by
-        rcases toDB_closed t _hclosed with ⟨db, hSome, _⟩
+        rcases to_db_closed t _hclosed with ⟨db, hSome, _⟩
         simp [hdb] at hSome
 
 /-- Convert closed DB term to named (safe version). -/

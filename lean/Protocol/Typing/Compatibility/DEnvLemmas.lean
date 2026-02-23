@@ -24,7 +24,7 @@ section
 
 /-! ## Fold and Lookup Compatibility -/
 
-private theorem lookupSEnv_foldl_insertPairS
+private theorem lookup_s_env_foldl_insert_pair_s
     {L : List (Var × ValType)} {env : SEnv} {x : Var} {v : Option ValType}
     (hlookup : lookupSEnv env x = v)
     (hNot : ∀ T, (x, T) ∈ L → False) :
@@ -42,7 +42,7 @@ private theorem lookupSEnv_foldl_insertPairS
             intro hEq
             exact hNot T' (by simpa [hEq])
           have hlookup' : lookupSEnv (updateSEnv env x' T') x = v := by
-            have h := lookupSEnv_update_neq (env:=env) (x:=x') (y:=x) (T:=T') hneq
+            have h := lookup_s_env_update_neq (env:=env) (x:=x') (y:=x) (T:=T') hneq
             simpa [hlookup] using h
           simpa [List.foldl, insertPairS] using
             (ih (env := updateSEnv env x' T') (hlookup := hlookup') (hNot := hNot'))
@@ -124,7 +124,7 @@ theorem rbmap_foldl_none
 
 /-! ## DEnv Append Lookup -/
 
-theorem findD_append_left {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType} :
+theorem find_d_append_left {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType} :
     D₁.find? e = some ts →
     (D₁ ++ D₂).find? e = some ts := by
   intro hfind
@@ -139,7 +139,7 @@ theorem findD_append_left {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType} :
   change (DEnvUnion D₁ D₂).find? e = some ts
   simpa [DEnvUnion, insertIfMissing] using hfold
 
-theorem findD_append_right {D₁ D₂ : DEnv} {e : Edge} :
+theorem find_d_append_right {D₁ D₂ : DEnv} {e : Edge} :
     D₁.find? e = none →
     (D₁ ++ D₂).find? e = D₂.find? e := by
   intro hfind
@@ -154,7 +154,7 @@ theorem findD_append_right {D₁ D₂ : DEnv} {e : Edge} :
         D₂.map.toList.lookup e := by
     simpa [RBMap.foldl_eq_foldl_toList] using hfold_list
   have hlookup : D₂.map.toList.lookup e = D₂.map.find? e :=
-    lookup_toList_eq_find? (m := D₂.map) (e := e)
+    lookup_to_list_eq_find? (m := D₂.map) (e := e)
   have hfold' :
       (RBMap.foldl (fun acc k v => insertIfMissing acc k v) D₁.map D₂.map).find? e =
         D₂.map.find? e := by
@@ -164,24 +164,24 @@ theorem findD_append_right {D₁ D₂ : DEnv} {e : Edge} :
 
 /-! ## DEnv Session-Set Consequences -/
 
-theorem SessionsOfD_append_left {D₁ D₂ : DEnv} :
+theorem sessions_of_d_append_left {D₁ D₂ : DEnv} :
     SessionsOfD D₁ ⊆ SessionsOfD (D₁ ++ D₂) := by
   intro s hs
   rcases hs with ⟨e, ts, hFind, hSid⟩
-  exact ⟨e, ts, findD_append_left (D₁:=D₁) (D₂:=D₂) (e:=e) (ts:=ts) hFind, hSid⟩
+  exact ⟨e, ts, find_d_append_left (D₁:=D₁) (D₂:=D₂) (e:=e) (ts:=ts) hFind, hSid⟩
 
-theorem SessionsOfD_append_right {D₁ D₂ : DEnv} :
+theorem sessions_of_d_append_right {D₁ D₂ : DEnv} :
     SessionsOfD D₂ ⊆ SessionsOfD (D₁ ++ D₂) := by
   intro s hs
   rcases hs with ⟨e, ts, hFind, hSid⟩
   cases hLeft : D₁.find? e with
   | some ts₁ =>
-      exact ⟨e, ts₁, findD_append_left (D₁:=D₁) (D₂:=D₂) (e:=e) (ts:=ts₁) hLeft, hSid⟩
+      exact ⟨e, ts₁, find_d_append_left (D₁:=D₁) (D₂:=D₂) (e:=e) (ts:=ts₁) hLeft, hSid⟩
   | none =>
-      have hFind' := findD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hLeft
+      have hFind' := find_d_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hLeft
       exact ⟨e, ts, by simpa [hFind'] using hFind, hSid⟩
 
-theorem SessionsOfD_append_subset {D₁ D₂ : DEnv} :
+theorem sessions_of_d_append_subset {D₁ D₂ : DEnv} :
     SessionsOfD (D₁ ++ D₂) ⊆ SessionsOfD D₁ ∪ SessionsOfD D₂ := by
   intro s hs
   rcases hs with ⟨e, ts, hFind, hSid⟩
@@ -190,7 +190,7 @@ theorem SessionsOfD_append_subset {D₁ D₂ : DEnv} :
       have hIn : s ∈ SessionsOfD D₁ := ⟨e, ts₁, hLeft, hSid⟩
       exact Or.inl hIn
   | none =>
-      have hRight := findD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hLeft
+      have hRight := find_d_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hLeft
       have hFind' : D₂.find? e = some ts := by
         simpa [hRight] using hFind
       have hIn : s ∈ SessionsOfD D₂ := ⟨e, ts, hFind', hSid⟩
@@ -198,7 +198,7 @@ theorem SessionsOfD_append_subset {D₁ D₂ : DEnv} :
 
 /-! ## DEnv Session-Set Under updateD -/
 
-theorem SessionsOfD_updateD_subset {D : DEnv} {e : Edge} {ts : List ValType} :
+theorem sessions_of_d_update_d_subset {D : DEnv} {e : Edge} {ts : List ValType} :
     SessionsOfD (updateD D e ts) ⊆ SessionsOfD D ∪ {e.sid} := by
   intro s hs
   rcases hs with ⟨e', ts', hFind, hSid⟩
@@ -209,11 +209,11 @@ theorem SessionsOfD_updateD_subset {D : DEnv} {e : Edge} {ts : List ValType} :
   · left
     have hFind' : D.find? e' = some ts' := by
       have h' : (updateD D e ts).find? e' = D.find? e' :=
-        findD_update_neq D e e' ts (Ne.symm hEq)
+        find_d_update_neq D e e' ts (Ne.symm hEq)
       simpa [h'] using hFind
     exact ⟨e', ts', hFind', hSid⟩
 
-theorem lookupD_entry_of_nonempty {D : DEnv} {e : Edge} :
+theorem lookup_d_entry_of_nonempty {D : DEnv} {e : Edge} :
     lookupD D e ≠ [] →
     ∃ ts, D.find? e = some ts := by
   intro hne
@@ -228,7 +228,7 @@ theorem lookupD_entry_of_nonempty {D : DEnv} {e : Edge} :
 /-! ## GEnv Append Lookup -/
 
 /-- Lookup in appended GEnv prefers the left. -/
-theorem lookupG_append_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
+theorem lookup_g_append_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
     lookupG G₁ e = some L →
     lookupG (G₁ ++ G₂) e = some L := by
   intro hLookup
@@ -248,7 +248,7 @@ theorem lookupG_append_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
           simpa [lookupG, List.lookup, hEq] using ih'
 
 /-- Lookup in appended GEnv falls back to the right when left is missing. -/
-theorem lookupG_append_right {G₁ G₂ : GEnv} {e : Endpoint} :
+theorem lookup_g_append_right {G₁ G₂ : GEnv} {e : Endpoint} :
     lookupG G₁ e = none →
     lookupG (G₁ ++ G₂) e = lookupG G₂ e := by
   intro hLookup
@@ -270,14 +270,14 @@ theorem lookupG_append_right {G₁ G₂ : GEnv} {e : Endpoint} :
 /-! ## GEnv Append Lookup Inversion -/
 
 /-- Invert lookup in an appended GEnv. -/
-theorem lookupG_append_inv {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
+theorem lookup_g_append_inv {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
     lookupG (G₁ ++ G₂) e = some L →
     lookupG G₁ e = some L ∨ (lookupG G₁ e = none ∧ lookupG G₂ e = some L) := by
   intro hLookup
   cases hLeft : lookupG G₁ e with
   | some L₁ =>
       left
-      have hLeft' := lookupG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L₁) hLeft
+      have hLeft' := lookup_g_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L₁) hLeft
       have hEq : L₁ = L := by
         have : some L₁ = some L := by simpa [hLeft'] using hLookup
         cases this
@@ -285,26 +285,26 @@ theorem lookupG_append_inv {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
       simpa [hEq] using hLeft
   | none =>
       right
-      have hRight := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
+      have hRight := lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
       have hLookup' : lookupG G₂ e = some L := by
         simpa [hRight] using hLookup
       exact ⟨by simpa [hLeft], hLookup'⟩
 
 /-! ## GEnv Session-Set Consequences -/
 
-theorem SessionsOf_append_right_subset {G₁ G₂ : GEnv} :
+theorem sessions_of_append_right_subset {G₁ G₂ : GEnv} :
     SessionsOf G₂ ⊆ SessionsOf (G₁ ++ G₂) := by
   intro s hs
   rcases hs with ⟨e, L, hLookup, hSid⟩
   cases hLeft : lookupG G₁ e with
   | some L₁ =>
-      exact ⟨e, L₁, lookupG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L₁) hLeft, hSid⟩
+      exact ⟨e, L₁, lookup_g_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L₁) hLeft, hSid⟩
   | none =>
-      have hRight := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
+      have hRight := lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
       exact ⟨e, L, by simpa [hRight] using hLookup, hSid⟩
 
 /-- Sessions in an appended GEnv are contained in the union of sessions. -/
-theorem SessionsOf_append_subset {G₁ G₂ : GEnv} :
+theorem sessions_of_append_subset {G₁ G₂ : GEnv} :
     SessionsOf (G₁ ++ G₂) ⊆ SessionsOf G₁ ∪ SessionsOf G₂ := by
   intro s hs
   rcases hs with ⟨e, L, hLookup, hSid⟩
@@ -312,16 +312,16 @@ theorem SessionsOf_append_subset {G₁ G₂ : GEnv} :
   | some L₁ =>
       exact Or.inl ⟨e, L₁, hLeft, hSid⟩
   | none =>
-      have hRight := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
+      have hRight := lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
       have hLookup' : lookupG G₂ e = some L := by
         simpa [hRight] using hLookup
       exact Or.inr ⟨e, L, hLookup', hSid⟩
 
 /-- Left sessions embed into appended GEnv sessions. -/
-theorem SessionsOf_append_left {G₁ G₂ : GEnv} :
+theorem sessions_of_append_left {G₁ G₂ : GEnv} :
     SessionsOf G₁ ⊆ SessionsOf (G₁ ++ G₂) := by
   intro s hs
   rcases hs with ⟨e, L, hLookup, hSid⟩
-  exact ⟨e, L, lookupG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hLookup, hSid⟩
+  exact ⟨e, L, lookup_g_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hLookup, hSid⟩
 
 end

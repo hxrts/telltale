@@ -59,7 +59,7 @@ theorem step_diamond_symm {g₁ g₂ g₃ : GlobalType} {act₁ act₂ : GlobalA
 
 /-- BranchesStep preserves membership: if (l, g) ∈ bs and BranchesStep bs act bs',
     then there exists g' such that step g act g' and (l, g') ∈ bs'. -/
-theorem BranchesStep_mem {bs bs' : List (Label × GlobalType)} {act : GlobalActionR}
+theorem branches_step_mem {bs bs' : List (Label × GlobalType)} {act : GlobalActionR}
     {l : Label} {g : GlobalType}
     (hbs : BranchesStep step bs act bs')
     (hmem : (l, g) ∈ bs) :
@@ -78,7 +78,7 @@ theorem BranchesStep_mem {bs bs' : List (Label × GlobalType)} {act : GlobalActi
 
 /-- Inverse of BranchesStep_mem: if (l, g') ∈ bs' after BranchesStep bs act bs',
     then there exists g such that (l, g) ∈ bs and step g act g'. -/
-theorem BranchesStep_mem_inv {bs bs' : List (Label × GlobalType)} {act : GlobalActionR}
+theorem branches_step_mem_inv {bs bs' : List (Label × GlobalType)} {act : GlobalActionR}
     {l : Label} {g' : GlobalType}
     (hbs : BranchesStep step bs act bs')
     (hmem : (l, g') ∈ bs') :
@@ -94,7 +94,7 @@ theorem BranchesStep_mem_inv {bs bs' : List (Label × GlobalType)} {act : Global
           exact ⟨g, hstep, .tail _ hmem''⟩
 
 /-- BranchesStep matches the length and labels of the input list. -/
-theorem BranchesStep_labels {bs bs' : List (Label × GlobalType)} {act : GlobalActionR}
+theorem branches_step_labels {bs bs' : List (Label × GlobalType)} {act : GlobalActionR}
     (hbs : BranchesStep step bs act bs') :
     bs.map Prod.fst = bs'.map Prod.fst := by
   induction hbs with
@@ -104,7 +104,7 @@ theorem BranchesStep_labels {bs bs' : List (Label × GlobalType)} {act : GlobalA
       rw [ih]
 
 /-- canStep for an action on a type requires the action to be enabled somewhere in the type. -/
-theorem canStep_comm_head {s r : String} {branches : List (Label × GlobalType)}
+theorem can_step_comm_head {s r : String} {branches : List (Label × GlobalType)}
     {l : Label} {cont : GlobalType}
     (hmem : (l, cont) ∈ branches) :
     canStep (.comm s r branches) { sender := s, receiver := r, label := l } := by
@@ -114,7 +114,7 @@ theorem canStep_comm_head {s r : String} {branches : List (Label × GlobalType)}
 
 
 /-- uniqueBranchLabelsBranches implies each continuation has uniqueBranchLabels. -/
-theorem uniqueBranchLabelsBranches_mem {branches : List (Label × GlobalType)} {lbl : Label} {g : GlobalType}
+theorem unique_branch_labels_branches_mem {branches : List (Label × GlobalType)} {lbl : Label} {g : GlobalType}
     (huniq : uniqueBranchLabelsBranches branches = true)
     (hmem : (lbl, g) ∈ branches) :
     g.uniqueBranchLabels = true := by
@@ -127,7 +127,7 @@ theorem uniqueBranchLabelsBranches_mem {branches : List (Label × GlobalType)} {
       | tail _ hmem' => exact ih huniq.2 hmem'
 
 /-- BranchesStep preserves uniqueBranchLabelsBranches. -/
-theorem BranchesStep_preserves_uniqueBranchLabelsBranches {bs bs' : List (Label × GlobalType)} {act : GlobalActionR}
+theorem branches_step_preserves_unique_branch_labels_branches {bs bs' : List (Label × GlobalType)} {act : GlobalActionR}
     (huniq : uniqueBranchLabelsBranches bs = true)
     (hbs : BranchesStep step bs act bs')
     (ih : ∀ g g', g.uniqueBranchLabels = true → step g act g' → g'.uniqueBranchLabels = true) :
@@ -141,7 +141,7 @@ theorem BranchesStep_preserves_uniqueBranchLabelsBranches {bs bs' : List (Label 
       · exact ih_rest huniq.2 ih
 
 /-- BranchesStep preserves branchLabels (the list of labels doesn't change). -/
-theorem BranchesStep_preserves_branchLabels {bs bs' : List (Label × GlobalType)} {act : GlobalActionR}
+theorem branches_step_preserves_branch_labels {bs bs' : List (Label × GlobalType)} {act : GlobalActionR}
     (hbs : BranchesStep step bs act bs') :
     branchLabels bs' = branchLabels bs := by
   induction hbs with
@@ -168,16 +168,16 @@ private abbrev UniqueBranchMotive (bs : List (Label × GlobalType)) (act : Globa
 
 /-! #### Commutative/mu uniqueness lemmas -/
 
-private theorem uniqueBranchLabels_preserved_comm_head
+private theorem unique_branch_labels_preserved_comm_head
     (sender receiver : String) (branches : List (Label × GlobalType)) (label : Label) (cont : GlobalType)
     (hmem : (label, cont) ∈ branches)
     (huniq : (GlobalType.comm sender receiver branches).uniqueBranchLabels = true) :
     cont.uniqueBranchLabels = true := by
   -- The continuation inherits uniqueness from the branch list.
   simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true] at huniq
-  exact uniqueBranchLabelsBranches_mem huniq.2 hmem
+  exact unique_branch_labels_branches_mem huniq.2 hmem
 
-private theorem uniqueBranchLabels_preserved_comm_async
+private theorem unique_branch_labels_preserved_comm_async
     (sender receiver : String) (branches branches' : List (Label × GlobalType)) (act' : GlobalActionR)
     (label : Label) (cont : GlobalType) (_hns : act'.sender ≠ receiver)
     (_hcond : act'.sender = sender → act'.receiver ≠ receiver)
@@ -193,7 +193,7 @@ private theorem uniqueBranchLabels_preserved_comm_async
   · rw [hlabels]; exact huniq.1
   · exact huniq_bs'
 
-private theorem uniqueBranchLabels_preserved_mu
+private theorem unique_branch_labels_preserved_mu
     (t : String) (body : GlobalType) (act' : GlobalActionR) (g'' : GlobalType)
     (hstep : step (body.substitute t (.mu t body)) act' g'')
     (ih : UniqueStepMotive (body.substitute t (.mu t body)) act' g'' hstep)
@@ -207,13 +207,13 @@ private theorem uniqueBranchLabels_preserved_mu
 
 /-! #### Branch-step uniqueness lemmas -/
 
-private theorem uniqueBranchLabels_preserved_branches_nil
+private theorem unique_branch_labels_preserved_branches_nil
     (_act' : GlobalActionR) (_huniq : uniqueBranchLabelsBranches [] = true) :
     uniqueBranchLabelsBranches [] = true ∧ branchLabels [] = branchLabels [] := by
   -- Nil case: trivial.
   exact ⟨rfl, rfl⟩
 
-private theorem uniqueBranchLabels_preserved_branches_cons
+private theorem unique_branch_labels_preserved_branches_cons
     (lbl : Label) (gHead gHead' : GlobalType) (restTail restTail' : List (Label × GlobalType))
     (act' : GlobalActionR) (hstep : step gHead act' gHead')
     (hbstep : BranchesStep step restTail act' restTail')
@@ -230,24 +230,24 @@ private theorem uniqueBranchLabels_preserved_branches_cons
   · simpa [branchLabels] using congrArg (fun xs => lbl :: xs) hlabels_rest
 
 /-- Unique branch labels are preserved by a single step. -/
-theorem uniqueBranchLabels_preserved_by_step {g g' : GlobalType} {act : GlobalActionR}
+theorem unique_branch_labels_preserved_by_step {g g' : GlobalType} {act : GlobalActionR}
     (huniq : g.uniqueBranchLabels = true)
     (hstep : step g act g') :
     g'.uniqueBranchLabels = true :=
   (@step.rec
     (motive_1 := UniqueStepMotive)
     (motive_2 := UniqueBranchMotive)
-    uniqueBranchLabels_preserved_comm_head
-    uniqueBranchLabels_preserved_comm_async
-    uniqueBranchLabels_preserved_mu
-    uniqueBranchLabels_preserved_branches_nil
-    uniqueBranchLabels_preserved_branches_cons
+    unique_branch_labels_preserved_comm_head
+    unique_branch_labels_preserved_comm_async
+    unique_branch_labels_preserved_mu
+    unique_branch_labels_preserved_branches_nil
+    unique_branch_labels_preserved_branches_cons
     (t := hstep)) huniq
 
 /-! ### Step/canStep bridge -/
 
 /-- Every step corresponds to a canStep. -/
-theorem step_implies_canStep {g g' : GlobalType} {act : GlobalActionR}
+theorem step_implies_can_step {g g' : GlobalType} {act : GlobalActionR}
     (h : step g act g') : canStep g act :=
   @step.rec
     (motive_1 := fun g act _ _ => canStep g act)
@@ -305,7 +305,7 @@ private theorem diamond_comm_head {act₂ : GlobalActionR}
       simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true] at huniq'
       refine ⟨cont₁', hstep_cont, ?_, ?_⟩
       · exact step.comm_head sender receiver branches' label₁ cont₁' hmem₁'
-      · exact uniqueBranchLabels_preserved_by_step (uniqueBranchLabelsBranches_mem huniq'.2 hmem₁) hstep_cont
+      · exact unique_branch_labels_preserved_by_step (unique_branch_labels_branches_mem huniq'.2 hmem₁) hstep_cont
 
 private theorem diamond_comm_async_head {act₂ : GlobalActionR}
     (sender receiver : String) (branches branches₁ : List (Label × GlobalType)) (act₁' : GlobalActionR)
@@ -324,18 +324,18 @@ private theorem diamond_comm_async_head {act₂ : GlobalActionR}
   simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true] at huniq'
   refine ⟨cont₂', ?_, hstep_cont, ?_⟩
     · simpa [hact₂] using (step.comm_head sender receiver branches₁ label₂ cont₂' hmem₂')
-    exact uniqueBranchLabels_preserved_by_step (uniqueBranchLabelsBranches_mem huniq'.2 hmem₂) hstep_cont
+    exact unique_branch_labels_preserved_by_step (unique_branch_labels_branches_mem huniq'.2 hmem₂) hstep_cont
 
 /-! #### Async-async and mu cases -/
 
-private theorem canStep_of_branchesStep_mem
+private theorem can_step_of_branches_step_mem
     {bs bs' : List (Label × GlobalType)} {act : GlobalActionR}
     {label : Label} {cont : GlobalType}
     (hbs : BranchesStep step bs act bs') (hmem : (label, cont) ∈ bs) :
     canStep cont act := by
   -- Extract the step from BranchesStep, then use step_implies_canStep.
     obtain ⟨_, hstep, _⟩ := BranchesStep_mem hbs hmem
-    exact step_implies_canStep hstep
+    exact step_implies_can_step hstep
 
 /-! #### Async composition helpers -/
 
@@ -348,8 +348,8 @@ private theorem comm_unique_from_branches_step {act₁' act₂ : GlobalActionR}
     (GlobalType.comm sender receiver branches₃).uniqueBranchLabels = true := by
   -- Branch labels are preserved along BranchesStep; reuse the original head uniqueness.
   simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true]
-  have hlabels₃ := BranchesStep_preserves_branchLabels hbs₁_to_3
-  have hlabels₁ := BranchesStep_preserves_branchLabels hbs₁
+  have hlabels₃ := branches_step_preserves_branch_labels hbs₁_to_3
+  have hlabels₁ := branches_step_preserves_branch_labels hbs₁
   rw [hlabels₃, hlabels₁]
   exact ⟨huniq'.1, huniq_bs₃⟩
 
@@ -374,8 +374,8 @@ private theorem diamond_comm_async_async {act₂ : GlobalActionR}
   obtain ⟨branches₃, hbs₁_to_3, hbs₂_to_3, huniq_bs₃⟩ := ih_bs huniq'.2 hind' branches₂ hbs₂
   obtain ⟨cont₂', hstep_cont₂, hmem₂_in_bs₁⟩ := BranchesStep_mem hbs₁ hmem₂
   obtain ⟨cont₁', hstep_cont₁, hmem₁_in_bs₂⟩ := BranchesStep_mem hbs₂ hmem₁
-  have hcan₂' : canStep cont₂' act₂ := canStep_of_branchesStep_mem hbs₁_to_3 hmem₂_in_bs₁
-  have hcan₁' : canStep cont₁' act₁' := canStep_of_branchesStep_mem hbs₂_to_3 hmem₁_in_bs₂
+  have hcan₂' : canStep cont₂' act₂ := can_step_of_branches_step_mem hbs₁_to_3 hmem₂_in_bs₁
+  have hcan₁' : canStep cont₁' act₁' := can_step_of_branches_step_mem hbs₂_to_3 hmem₁_in_bs₂
   refine ⟨.comm sender receiver branches₃,
       step.comm_async sender receiver branches₁ branches₃ act₂ label₂ cont₂' hns₂ hcond₂ hmem₂_in_bs₁ hcan₂' hbs₁_to_3,
       step.comm_async sender receiver branches₂ branches₃ act₁' label₁ cont₁' hns₁ hcond₁ hmem₁_in_bs₂ hcan₁' hbs₂_to_3, ?_⟩
@@ -486,8 +486,8 @@ theorem diamond_independent {c c₁ c₂ : Configuration} {act₁ act₂ : Globa
   -- Use the global-level diamond lemma
   obtain ⟨g₃, hg₁_to_g₃, hg₂_to_g₃, huniq₃⟩ := step_diamond_independent hind huniq₁ hstep₁ hstep₂
   -- Get uniqueBranchLabels for intermediate states
-  have huniq_g₁ := uniqueBranchLabels_preserved_by_step huniq₁ hstep₁
-  have huniq_g₂ := uniqueBranchLabels_preserved_by_step huniq₁ hstep₂
+  have huniq_g₁ := unique_branch_labels_preserved_by_step huniq₁ hstep₁
+  have huniq_g₂ := unique_branch_labels_preserved_by_step huniq₁ hstep₂
   -- Construct the common configuration
   let c₃ : Configuration := ⟨g₃, c.env⟩
   use c₃

@@ -33,41 +33,41 @@ structure CRDTProtocol where
   premises : Premises model
   exactEnvelope :
     ExactEnvelopeCharacterization model premises.RefRun premises.ImplRun :=
-      exactEnvelope_of_assumptions assumptions premises
+      exact_envelope_of_assumptions assumptions premises
   adequacy :
     ObservationalAdequacyModuloEnvelope model premises.RefRun premises.ImplRun :=
       adequacy_of_assumptions assumptions premises
   principalCapability :
     PrincipalCapability premises.inferredBudget premises.envelopeBudget :=
-      principalCapability_of_assumptions assumptions premises
+      principal_capability_of_assumptions assumptions premises
   admissionSoundness :
     AdmissionSoundness premises.inferredBudget premises.envelopeBudget :=
-      admissionSoundness_of_assumptions assumptions premises
+      admission_soundness_of_assumptions assumptions premises
   admissionCompleteness :
     AdmissionCompleteness premises.inferredBudget premises.envelopeBudget :=
-      admissionCompleteness_of_assumptions assumptions premises
+      admission_completeness_of_assumptions assumptions premises
   opStateEquivalence :
     OpStateEquivalence model premises.opRun premises.stateRun :=
-      opStateEquivalence_of_assumptions assumptions premises
+      op_state_equivalence_of_assumptions assumptions premises
   gcSafetyIffCausalDominance :
     GCSafetyIffCausalDominance premises.GCSafe premises.CausalDominanceEstablished :=
-      gcSafetyIff_of_assumptions assumptions premises
+      gc_safety_iff_of_assumptions assumptions premises
   boundedApproximation :
     BoundedMetadataApproximation model premises.approxPolicy premises.horizon
       premises.epsilon premises.referenceRun premises.deployedRun :=
-      boundedApproximation_of_assumptions assumptions premises
+      bounded_approximation_of_assumptions assumptions premises
   approximationMonotonicity :
     ApproximationMonotoneUnderPolicyTightening model premises.approxPolicy premises.approxPolicy
       premises.horizon premises.epsilon premises.referenceRun premises.deployedRun :=
-      approximationMonotone_of_assumptions assumptions premises
+      approximation_monotone_of_assumptions assumptions premises
   exactSECAsLimit :
     ExactSECRecoveryAsLimit model premises.approxPolicy premises.referenceRun premises.deployedRun :=
-      exactSECAsLimit_of_assumptions assumptions premises
-  hcrdtCore : HcrdtCore model := hcrdtCore_of_assumptions assumptions
-  hcrdtFoundation : HcrdtFoundation model := hcrdtFoundation_of_assumptions assumptions
-  hcrdtDynamics : HcrdtDynamics model := hcrdtDynamics_of_assumptions assumptions
-  hcrdtExtensions : HcrdtExtensions model := hcrdtExtensions_of_assumptions assumptions
-  hcrdtLimits : HcrdtLimits model := hcrdtLimits_of_assumptions assumptions
+      exact_sec_as_limit_of_assumptions assumptions premises
+  hcrdtCore : HcrdtCore model := hcrdt_core_of_assumptions assumptions
+  hcrdtFoundation : HcrdtFoundation model := hcrdt_foundation_of_assumptions assumptions
+  hcrdtDynamics : HcrdtDynamics model := hcrdt_dynamics_of_assumptions assumptions
+  hcrdtExtensions : HcrdtExtensions model := hcrdt_extensions_of_assumptions assumptions
+  hcrdtLimits : HcrdtLimits model := hcrdt_limits_of_assumptions assumptions
 
 /-! ## Certified Erasure Bundle -/
 
@@ -86,16 +86,16 @@ structure CRDTErasureProtocol where
   premises : ErasurePremises model KRich OpTag Args Enc
   weakestOpCoreErasure :
     WeakestOpCoreErasureTheorem model premises.evalRich premises.interp premises.erase :=
-      weakestOpCoreErasure_of_premises premises
+      weakest_op_core_erasure_of_premises premises
   replayStable :
     ReplayStableCoreEval premises.interp :=
-      opCoreReplayStable_of_premises premises
+      op_core_replay_stable_of_premises premises
   serializationInvariant :
     TransportSerializationInvariant premises.encode premises.decode :=
-      opCoreSerializationInvariant_of_premises premises
+      op_core_serialization_invariant_of_premises premises
   conformanceGateIffLowered :
     ∀ kr, conformanceGate premises.lower kr = true ↔ ∃ kc, premises.lower kr = some kc :=
-      conformanceGate_of_loweringSound premises
+      conformance_gate_of_lowering_sound premises
 
 /-! ## Canonical Premise Constructor -/
 
@@ -116,18 +116,18 @@ def coreEquivalentErasurePremises
   , lower := lowerCoreEquivalent
   , encode := encode
   , decode := decode
-  , weakestWitness := weakestOpCoreErasure_coreEquivalent M interp
+  , weakestWitness := weakest_op_core_erasure_core_equivalent M interp
   , replayStableWitness := hReplay
   , serializationWitness := hSerial
   , lowerSound := by
       intro kr kc hk
-      exact lowerCoreEquivalent_sound kr kc hk
+      exact lower_core_equivalent_sound kr kc hk
   }
 
 /-! ## Validation Convenience Theorem -/
 
 /-- Core assumptions are always validated for a certified CRDT protocol. -/
-theorem coreAssumptions_allPassed (P : CRDTProtocol) :
+theorem core_assumptions_all_passed (P : CRDTProtocol) :
     (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
   rfl
 

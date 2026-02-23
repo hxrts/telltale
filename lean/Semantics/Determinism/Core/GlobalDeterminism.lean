@@ -143,7 +143,7 @@ end
 /-! ## Unique Branch Labels -/
 
 /-- Helper: extract head/tail facts from uniqueBranchLabelsBranchesL. -/
-private theorem uniqueBranchLabelsBranchesL_cons {hd : BranchR}
+private theorem unique_branch_labels_branches_l_cons {hd : BranchR}
     {tl : List BranchR} (huniq : uniqueBranchLabelsBranchesL (hd :: tl) = true) :
     (tl.map Prod.fst).contains hd.1 = false ∧ uniqueBranchLabelsBranchesL tl = true := by
   -- Unfold only the boolean structure, keeping contains as a Bool.
@@ -188,14 +188,14 @@ private theorem contains_false_contradiction {lbl : Label} {rest : Option ValTyp
   cases hnodup
 
 /-- If branches have unique labels, then membership determines the continuation. -/
-theorem mem_branchL_unique_label {lbl : Label} {rest₁ rest₂ : Option ValType × LocalTypeR}
+theorem mem_branch_l_unique_label {lbl : Label} {rest₁ rest₂ : Option ValType × LocalTypeR}
     {branches : List BranchR} (huniq : uniqueBranchLabelsBranchesL branches = true)
     (hmem₁ : (lbl, rest₁) ∈ branches) (hmem₂ : (lbl, rest₂) ∈ branches) : rest₁ = rest₂ := by
   -- Induct on the branch list and use the head/ tail contradiction.
   induction branches with
   | nil => cases hmem₁
   | cons hd tl ih =>
-      have hsplit := uniqueBranchLabelsBranchesL_cons (hd := hd) (tl := tl) huniq
+      have hsplit := unique_branch_labels_branches_l_cons (hd := hd) (tl := tl) huniq
       have hnodup := hsplit.1
       have htl_uniq := hsplit.2
       cases hmem₁ with
@@ -322,7 +322,7 @@ private theorem global_step_det_mu
   | mu _ _ _ _ hstep₂ =>
       simp only [GlobalType.uniqueBranchLabels] at huniq
       have huniq_sub : (body.substitute t (GlobalType.mu t body)).uniqueBranchLabels = true :=
-        GlobalType.uniqueBranchLabels_substitute body t (.mu t body) huniq huniq
+        GlobalType.unique_branch_labels_substitute body t (.mu t body) huniq huniq
       exact ih huniq_sub g₂ hstep₂
 
 /-! ### Branch-step determinism lemmas -/

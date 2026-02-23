@@ -52,12 +52,12 @@ def maxLen (avoid : Finset String) : Nat :=
 
 @[simp] lemma sup_eq_max (a b : Nat) : a ⊔ b = max a b := rfl
 
-lemma maxLen_insert {avoid : Finset String} {s : String} :
+lemma max_len_insert {avoid : Finset String} {s : String} :
     maxLen (insert s avoid) = max (maxLen avoid) s.length := by
   classical
   simp [maxLen, Finset.image_insert, Finset.sup_insert, max_comm]
 
-lemma length_le_maxLen {avoid : Finset String} {x : String} (hs : x ∈ avoid) :
+lemma length_le_max_len {avoid : Finset String} {x : String} (hs : x ∈ avoid) :
     x.length ≤ maxLen avoid := by
   classical
   have hx : x.length ∈ (avoid.image String.length) := Finset.mem_image.2 ⟨x, hs, rfl⟩
@@ -78,12 +78,12 @@ def nameFor (t : LocalTypeC) (all : Finset LocalTypeC) : String :=
   base ++ "_" ++ String.replicate suffixLen 'a'
 
 /-- The generated name is guaranteed fresh (not in namesIn). -/
-lemma nameFor_not_mem_namesIn (t : LocalTypeC) (all : Finset LocalTypeC) :
+lemma name_for_not_mem_names_in (t : LocalTypeC) (all : Finset LocalTypeC) :
     nameFor t all ∉ namesIn all := by
   classical
   intro hmem
   have hlen : (nameFor t all).length ≤ maxLen (namesIn all) :=
-    length_le_maxLen (avoid := namesIn all) hmem
+    length_le_max_len (avoid := namesIn all) hmem
   have hgt : maxLen (namesIn all) < (nameFor t all).length := by
     have h_underscore : ("_" : String).length = 1 := by decide
     have hlen_name : (nameFor t all).length =

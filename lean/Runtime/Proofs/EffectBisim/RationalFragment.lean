@@ -51,7 +51,7 @@ structure EffectFiniteWitness {σ : Type u} (enc : EffectEncoding σ) (s : σ) w
   bisim : Bisim (enc.encode s) (SystemToCoind sys start)
 
 /-- Rational fragment members admit explicit finite witnesses. -/
-theorem rationalEffect_has_finiteWitness {σ : Type u}
+theorem rational_effect_has_finite_witness {σ : Type u}
     (enc : EffectEncoding σ) (s : σ)
     (hRat : RationalEffectFragment enc s) :
     Nonempty (EffectFiniteWitness enc s) := by
@@ -59,30 +59,30 @@ theorem rationalEffect_has_finiteWitness {σ : Type u}
   exact ⟨⟨n, sys, start, hBisim⟩⟩
 
 /-- Any finite witness certifies effect-level finite-erasure transportability. -/
-theorem finiteWitness_transportable {σ : Type u}
+theorem finite_witness_transportable {σ : Type u}
     {enc : EffectEncoding σ} {s : σ}
     (w : EffectFiniteWitness enc s) :
     EffectFiniteTransportable enc s :=
   ⟨w.n, w.sys, w.start, w.bisim⟩
 
 /-- Finite witnesses are adequate for rational-fragment membership. -/
-theorem finiteWitness_rational {σ : Type u}
+theorem finite_witness_rational {σ : Type u}
     {enc : EffectEncoding σ} {s : σ}
     (w : EffectFiniteWitness enc s) :
     RationalEffectFragment enc s :=
-  finite_erasure_transportable_implies_rational (enc.encode s) (finiteWitness_transportable w)
+  finite_erasure_transportable_implies_rational (enc.encode s) (finite_witness_transportable w)
 
 /-! ## Transport Bridge into Existing Pipeline -/
 
 /-- Rational effect states transport into finite-erasure transportability. -/
-theorem rationalEffect_transport_bridge {σ : Type u}
+theorem rational_effect_transport_bridge {σ : Type u}
     (enc : EffectEncoding σ) (s : σ)
     (hRat : RationalEffectFragment enc s) :
     EffectFiniteTransportable enc s :=
   (rational_iff_finite_erasure_transportable (enc.encode s)).1 hRat
 
 /-- Rational effect states admit a finite-system bisimulation witness. -/
-theorem rationalEffect_transport_to_regularSystem {σ : Type u}
+theorem rational_effect_transport_to_regular_system {σ : Type u}
     (enc : EffectEncoding σ) (s : σ)
     (hRat : RationalEffectFragment enc s) :
     ∃ (n : Nat) (sys : FiniteSystem n) (start : Fin n),
@@ -98,7 +98,7 @@ def checkRationalEffectWitness {σ : Type u}
   candidate.isSome
 
 /-- Soundness: accepted witness payloads certify rational-fragment membership. -/
-theorem checkRationalEffectWitness_sound {σ : Type u}
+theorem check_rational_effect_witness_sound {σ : Type u}
     {enc : EffectEncoding σ} {s : σ}
     {candidate : Option (EffectFiniteWitness enc s)}
     (hCheck : checkRationalEffectWitness candidate = true) :
@@ -107,15 +107,15 @@ theorem checkRationalEffectWitness_sound {σ : Type u}
   | none =>
       simp [checkRationalEffectWitness] at hCheck
   | some w =>
-      simpa [checkRationalEffectWitness] using finiteWitness_rational (w := w)
+      simpa [checkRationalEffectWitness] using finite_witness_rational (w := w)
 
 /-- Completeness: every rational-fragment member has an accepted witness payload. -/
-theorem checkRationalEffectWitness_complete {σ : Type u}
+theorem check_rational_effect_witness_complete {σ : Type u}
     (enc : EffectEncoding σ) (s : σ)
     (hRat : RationalEffectFragment enc s) :
     ∃ candidate : Option (EffectFiniteWitness enc s),
       checkRationalEffectWitness candidate = true := by
-  rcases rationalEffect_has_finiteWitness enc s hRat with ⟨w⟩
+  rcases rational_effect_has_finite_witness enc s hRat with ⟨w⟩
   exact ⟨some w, rfl⟩
 
 /-! ## Strict Boundary Witness -/

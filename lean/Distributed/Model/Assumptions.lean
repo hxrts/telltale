@@ -341,7 +341,7 @@ def runAssumptionValidation (p : ProtocolSpec) (hs : List Assumption) :
 /-! ## Byzantine Bool-to-Prop Bridge Lemmas -/
 
 /-- Validator bridge: byzantine-fault-model check is exact. -/
-theorem validateAssumption_byzantineFaultModel_passed_iff
+theorem validate_assumption_byzantine_fault_model_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .byzantineFaultModel).passed = true ↔
       p.faultModel = .byzantine := by
@@ -350,7 +350,7 @@ theorem validateAssumption_byzantineFaultModel_passed_iff
     validateAssumptionFaultModel?, mkAssumptionResult]
 
 /-- Validator bridge: evidence-primitive consistency check is exact. -/
-theorem validateAssumption_evidencePrimitiveConsistent_passed_iff
+theorem validate_assumption_evidence_primitive_consistent_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .evidencePrimitiveConsistent).passed = true ↔
       evidencePrimitiveConsistentCheck p = true := by
@@ -359,7 +359,7 @@ theorem validateAssumption_evidencePrimitiveConsistent_passed_iff
     validateAssumptionPrimitiveCoherence?, mkAssumptionResult]
 
 /-- Validator bridge: conflict-exclusion primitive check is exact. -/
-theorem validateAssumption_conflictExclusionPrimitiveConsistent_passed_iff
+theorem validate_assumption_conflict_exclusion_primitive_consistent_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .conflictExclusionPrimitiveConsistent).passed = true ↔
       conflictExclusionPrimitiveConsistentCheck p = true := by
@@ -368,7 +368,7 @@ theorem validateAssumption_conflictExclusionPrimitiveConsistent_passed_iff
     validateAssumptionPrimitiveCoherence?, mkAssumptionResult]
 
 /-- Validator bridge: finalization-witness primitive check is exact. -/
-theorem validateAssumption_finalizationWitnessPrimitiveConsistent_passed_iff
+theorem validate_assumption_finalization_witness_primitive_consistent_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .finalizationWitnessPrimitiveConsistent).passed = true ↔
       finalizationWitnessPrimitiveConsistentCheck p = true := by
@@ -377,7 +377,7 @@ theorem validateAssumption_finalizationWitnessPrimitiveConsistent_passed_iff
     validateAssumptionPrimitiveCoherence?, mkAssumptionResult]
 
 /-- Validator bridge: quorum-intersection witness check is exact. -/
-theorem validateAssumption_quorumIntersectionWitnessed_passed_iff
+theorem validate_assumption_quorum_intersection_witnessed_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .quorumIntersectionWitnessed).passed = true ↔
       quorumIntersectionWitnessedCheck p = true := by
@@ -386,7 +386,7 @@ theorem validateAssumption_quorumIntersectionWitnessed_passed_iff
     validateAssumptionPrimitiveCoherence?, mkAssumptionResult]
 
 /-- Validator bridge: timing/auth compatibility check is exact. -/
-theorem validateAssumption_timingAuthCompatible_passed_iff
+theorem validate_assumption_timing_auth_compatible_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .timingAuthCompatible).passed = true ↔
       timingAuthCompatibleCheck p = true := by
@@ -395,7 +395,7 @@ theorem validateAssumption_timingAuthCompatible_passed_iff
     validateAssumptionPrimitiveCoherence?, mkAssumptionResult]
 
 /-- Validator bridge: adversarial-budget check is exact. -/
-theorem validateAssumption_adversarialBudgetBounded_passed_iff
+theorem validate_assumption_adversarial_budget_bounded_passed_iff
     (p : ProtocolSpec) :
     (validateAssumption p .adversarialBudgetBounded).passed = true ↔
       adversarialBudgetBoundedCheck p = true := by

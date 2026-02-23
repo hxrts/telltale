@@ -24,11 +24,11 @@ section PositiveProfiles
 
 example (P : Distributed.QuorumGeometry.SafetyProtocol) :
     ByzantineSafety (modelOfQuorumGeometry P.model) :=
-  bft_specialization_of_quorumGeometry P
+  bft_specialization_of_quorum_geometry P
 
 example (P : Distributed.Nakamoto.SecurityProtocol) :
     ByzantineSafety (modelOfNakamoto P.model) :=
-  nakamoto_specialization_of_securityProtocol P
+  nakamoto_specialization_of_security_protocol P
 
 example
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
@@ -51,7 +51,7 @@ example
     (w : SafetyContradictionWitness M) :
     ¬ CharacterizationCondition M := by
   let cex := noQuorumCounterexample_of_droppedAssumption H hDrop w
-  exact noQuorumCounterexample_minimal cex
+  exact no_quorum_counterexample_minimal cex
 
 example
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
@@ -63,7 +63,7 @@ example
     (hBad : ¬ EvidenceValid bad) :
     ¬ CharacterizationCondition M := by
   let cex := invalidAuthCounterexample_of_droppedAssumption H hDrop w bad hBad
-  exact invalidAuthCounterexample_minimal cex
+  exact invalid_auth_counterexample_minimal cex
 
 example
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
@@ -74,7 +74,7 @@ example
     ¬ CharacterizationCondition M := by
 /- ## Structured Block 2 -/
   let cex := thresholdBudgetCounterexample_of_droppedAssumption H hDrop w
-  exact thresholdBudgetCounterexample_minimal cex
+  exact threshold_budget_counterexample_minimal cex
 
 example
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
@@ -86,7 +86,7 @@ example
     (w : SafetyContradictionWitness M) :
     ¬ CharacterizationCondition M := by
   let cex := primitiveMismatchCounterexample_of_droppedAssumption H hDrop w
-  exact primitiveMismatchCounterexample_minimal cex
+  exact primitive_mismatch_counterexample_minimal cex
 
 end CounterexampleRegression
 
@@ -94,15 +94,15 @@ section AdmissionRegression
 
 example (p : ProtocolSpec) :
     AdmissionPrincipality_byz p :=
-  admissionPrincipality_inferred_byz p
+  admission_principality_inferred_byz p
 
 example (p : ProtocolSpec) :
     AdmissionSoundness_byz p :=
-  admissionSoundness_inferred_byz p
+  admission_soundness_inferred_byz p
 
 example (p : ProtocolSpec) :
     AdmissionCompleteness_byz p :=
-  admissionCompleteness_inferred_byz p
+  admission_completeness_inferred_byz p
 
 end AdmissionRegression
 

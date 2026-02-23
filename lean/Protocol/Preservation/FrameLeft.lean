@@ -44,21 +44,21 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
           set sendEdge : Edge := { sid := e.sid, sender := e.role, receiver := target }
           have hSid : e.sid ∈ SessionsOf Ccfg.G := ⟨e, .send target T L, hG, rfl⟩
           have hDfrNone : Dfr.find? sendEdge = none :=
-            lookupD_none_of_disjointG (G₁:=Ccfg.G) (G₂:=Gfr) (D₂:=Dfr) (DisjointG_symm hDisj) hCons hSid
+            lookup_d_none_of_disjoint_g (G₁:=Ccfg.G) (G₂:=Gfr) (D₂:=Dfr) (disjoint_g_symm hDisj) hCons hSid
           have hLookupD :
               lookupD (Dfr ++ Ccfg.D) sendEdge = lookupD Ccfg.D sendEdge :=
-            lookupD_append_right (D₁:=Dfr) (D₂:=Ccfg.D) (e:=sendEdge) hDfrNone
+            lookup_d_append_right (D₁:=Dfr) (D₂:=Ccfg.D) (e:=sendEdge) hDfrNone
           have hGfrNone : lookupG Gfr e = none :=
-            lookupG_none_of_disjoint (G₁:=Gfr) (G₂:=Ccfg.G) hDisj (e:=e) (L:=.send target T L) hG
+            lookup_g_none_of_disjoint (G₁:=Gfr) (G₂:=Ccfg.G) hDisj (e:=e) (L:=.send target T L) hG
           have hLookupG :
               lookupG (Gfr ++ Ccfg.G) e = some (.send target T L) := by
-            simpa [lookupG_append_right (G₁:=Gfr) (G₂:=Ccfg.G) (e:=e) hGfrNone] using hG
+            simpa [lookup_g_append_right (G₁:=Gfr) (G₂:=Ccfg.G) (e:=e) hGfrNone] using hG
           have hUpdG : updateG (Gfr ++ Ccfg.G) e L = Gfr ++ updateG Ccfg.G e L :=
-            updateG_append_right_hit hGfrNone
+            update_g_append_right_hit hGfrNone
           have hUpdD :
               updateD (Dfr ++ Ccfg.D) sendEdge (lookupD Ccfg.D sendEdge ++ [T]) =
                 Dfr ++ updateD Ccfg.D sendEdge (lookupD Ccfg.D sendEdge ++ [T]) := by
-            exact updateD_append_right (D₁:=Dfr) (D:=Ccfg.D) (e:=sendEdge)
+            exact update_d_append_right (D₁:=Dfr) (D:=Ccfg.D) (e:=sendEdge)
               (ts:=lookupD Ccfg.D sendEdge ++ [T]) hDfrNone
           have hStep' :
               StepBase (frameConfigLeft Ccfg Gfr Dfr)
@@ -81,21 +81,21 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
           set recvEdge : Edge := { sid := e.sid, sender := source, receiver := e.role }
           have hSid : e.sid ∈ SessionsOf Ccfg.G := ⟨e, .recv source T L, hG, rfl⟩
           have hDfrNone : Dfr.find? recvEdge = none :=
-            lookupD_none_of_disjointG (G₁:=Ccfg.G) (G₂:=Gfr) (D₂:=Dfr) (DisjointG_symm hDisj) hCons hSid
+            lookup_d_none_of_disjoint_g (G₁:=Ccfg.G) (G₂:=Gfr) (D₂:=Dfr) (disjoint_g_symm hDisj) hCons hSid
           have hLookupD :
               lookupD (Dfr ++ Ccfg.D) recvEdge = lookupD Ccfg.D recvEdge :=
-            lookupD_append_right (D₁:=Dfr) (D₂:=Ccfg.D) (e:=recvEdge) hDfrNone
+            lookup_d_append_right (D₁:=Dfr) (D₂:=Ccfg.D) (e:=recvEdge) hDfrNone
           have hGfrNone : lookupG Gfr e = none :=
-            lookupG_none_of_disjoint (G₁:=Gfr) (G₂:=Ccfg.G) hDisj (e:=e) (L:=.recv source T L) hG
+            lookup_g_none_of_disjoint (G₁:=Gfr) (G₂:=Ccfg.G) hDisj (e:=e) (L:=.recv source T L) hG
           have hLookupG :
               lookupG (Gfr ++ Ccfg.G) e = some (.recv source T L) := by
-            simpa [lookupG_append_right (G₁:=Gfr) (G₂:=Ccfg.G) (e:=e) hGfrNone] using hG
+            simpa [lookup_g_append_right (G₁:=Gfr) (G₂:=Ccfg.G) (e:=e) hGfrNone] using hG
           have hUpdG : updateG (Gfr ++ Ccfg.G) e L = Gfr ++ updateG Ccfg.G e L :=
-            updateG_append_right_hit hGfrNone
+            update_g_append_right_hit hGfrNone
           have hUpdD :
               updateD (Dfr ++ Ccfg.D) recvEdge (lookupD Ccfg.D recvEdge).tail =
                 Dfr ++ updateD Ccfg.D recvEdge (lookupD Ccfg.D recvEdge).tail := by
-            exact updateD_append_right (D₁:=Dfr) (D:=Ccfg.D) (e:=recvEdge)
+            exact update_d_append_right (D₁:=Dfr) (D:=Ccfg.D) (e:=recvEdge)
               (ts:=(lookupD Ccfg.D recvEdge).tail) hDfrNone
           have hStep' :
               StepBase (frameConfigLeft Ccfg Gfr Dfr)
@@ -116,22 +116,22 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
           set selEdge : Edge := { sid := e.sid, sender := e.role, receiver := target }
           have hSid : e.sid ∈ SessionsOf Ccfg.G := ⟨e, .select target branches, hG, rfl⟩
           have hDfrNone : Dfr.find? selEdge = none :=
-            lookupD_none_of_disjointG (G₁:=Ccfg.G) (G₂:=Gfr) (D₂:=Dfr) (DisjointG_symm hDisj) hCons hSid
+            lookup_d_none_of_disjoint_g (G₁:=Ccfg.G) (G₂:=Gfr) (D₂:=Dfr) (disjoint_g_symm hDisj) hCons hSid
           have hLookupD :
               lookupD (Dfr ++ Ccfg.D) selEdge = lookupD Ccfg.D selEdge :=
-            lookupD_append_right (D₁:=Dfr) (D₂:=Ccfg.D) (e:=selEdge) hDfrNone
+            lookup_d_append_right (D₁:=Dfr) (D₂:=Ccfg.D) (e:=selEdge) hDfrNone
           have hGfrNone : lookupG Gfr e = none :=
-            lookupG_none_of_disjoint (G₁:=Gfr) (G₂:=Ccfg.G) hDisj (e:=e) (L:=.select target branches) hG
+            lookup_g_none_of_disjoint (G₁:=Gfr) (G₂:=Ccfg.G) hDisj (e:=e) (L:=.select target branches) hG
           have hLookupG :
               lookupG (Gfr ++ Ccfg.G) e = some (.select target branches) := by
-            simpa [lookupG_append_right (G₁:=Gfr) (G₂:=Ccfg.G) (e:=e) hGfrNone] using hG
+            simpa [lookup_g_append_right (G₁:=Gfr) (G₂:=Ccfg.G) (e:=e) hGfrNone] using hG
           have hUpdG : updateG (Gfr ++ Ccfg.G) e L = Gfr ++ updateG Ccfg.G e L :=
-            updateG_append_right_hit hGfrNone
+            update_g_append_right_hit hGfrNone
 /- ## Structured Block 3 -/
           have hUpdD :
               updateD (Dfr ++ Ccfg.D) selEdge (lookupD Ccfg.D selEdge ++ [.string]) =
                 Dfr ++ updateD Ccfg.D selEdge (lookupD Ccfg.D selEdge ++ [.string]) := by
-            exact updateD_append_right (D₁:=Dfr) (D:=Ccfg.D) (e:=selEdge)
+            exact update_d_append_right (D₁:=Dfr) (D:=Ccfg.D) (e:=selEdge)
               (ts:=lookupD Ccfg.D selEdge ++ [.string]) hDfrNone
           have hStep' :
               StepBase (frameConfigLeft Ccfg Gfr Dfr)
@@ -153,21 +153,21 @@ lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
           set brEdge : Edge := { sid := e.sid, sender := source, receiver := e.role }
           have hSid : e.sid ∈ SessionsOf Ccfg.G := ⟨e, .branch source typeBranches, hG, rfl⟩
           have hDfrNone : Dfr.find? brEdge = none :=
-            lookupD_none_of_disjointG (G₁:=Ccfg.G) (G₂:=Gfr) (D₂:=Dfr) (DisjointG_symm hDisj) hCons hSid
+            lookup_d_none_of_disjoint_g (G₁:=Ccfg.G) (G₂:=Gfr) (D₂:=Dfr) (disjoint_g_symm hDisj) hCons hSid
           have hLookupD :
               lookupD (Dfr ++ Ccfg.D) brEdge = lookupD Ccfg.D brEdge :=
-            lookupD_append_right (D₁:=Dfr) (D₂:=Ccfg.D) (e:=brEdge) hDfrNone
+            lookup_d_append_right (D₁:=Dfr) (D₂:=Ccfg.D) (e:=brEdge) hDfrNone
           have hGfrNone : lookupG Gfr e = none :=
-            lookupG_none_of_disjoint (G₁:=Gfr) (G₂:=Ccfg.G) hDisj (e:=e) (L:=.branch source typeBranches) hG
+            lookup_g_none_of_disjoint (G₁:=Gfr) (G₂:=Ccfg.G) hDisj (e:=e) (L:=.branch source typeBranches) hG
           have hLookupG :
               lookupG (Gfr ++ Ccfg.G) e = some (.branch source typeBranches) := by
-            simpa [lookupG_append_right (G₁:=Gfr) (G₂:=Ccfg.G) (e:=e) hGfrNone] using hG
+            simpa [lookup_g_append_right (G₁:=Gfr) (G₂:=Ccfg.G) (e:=e) hGfrNone] using hG
           have hUpdG : updateG (Gfr ++ Ccfg.G) e L = Gfr ++ updateG Ccfg.G e L :=
-            updateG_append_right_hit hGfrNone
+            update_g_append_right_hit hGfrNone
           have hUpdD :
               updateD (Dfr ++ Ccfg.D) brEdge (lookupD Ccfg.D brEdge).tail =
                 Dfr ++ updateD Ccfg.D brEdge (lookupD Ccfg.D brEdge).tail := by
-            exact updateD_append_right (D₁:=Dfr) (D:=Ccfg.D) (e:=brEdge)
+            exact update_d_append_right (D₁:=Dfr) (D:=Ccfg.D) (e:=brEdge)
               (ts:=(lookupD Ccfg.D brEdge).tail) hDfrNone
           -- Left Frame Branch Case: Lifted Step Construction
           have hStep' :

@@ -50,7 +50,7 @@ By induction on `step g act g'`:
    or branches step in lockstep with BranchesRel EQ2.
 
 3. **mu**: Unfolding - use IH on substituted body and connect via
-   `EQ2_unfold_right`.
+   `eq2_unfold_right`.
 -/
 
 namespace Choreography.Harmony.StepProjection
@@ -70,7 +70,7 @@ abbrev projTrans := trans
 /-- If `(label, cont) ∈ branches`, then `(label, none, trans cont role) ∈ transBranches branches role`. -/
 
 
-theorem mem_transBranches_of_mem (branches : List (Label × GlobalType))
+theorem mem_trans_branches_of_mem (branches : List (Label × GlobalType))
     (label : Label) (cont : GlobalType) (role : String)
     (hmem : (label, cont) ∈ branches) :
     (label, none, trans cont role) ∈ transBranches branches role := by
@@ -155,8 +155,8 @@ private theorem proj_trans_sender_step_v2_comm_head
   exact ⟨transBranches branches sender,
          projTrans g' sender,
          proj_trans_comm_sender_is_send sender receiver branches,
-         mem_transBranches_of_mem branches label g' sender hmem,
-         EQ2_refl _⟩
+         mem_trans_branches_of_mem branches label g' sender hmem,
+         eq2_refl _⟩
 
 private theorem proj_trans_sender_step_v2_comm_async
     (sender receiver : String) (branches branches' : List (Label × GlobalType))
@@ -233,8 +233,8 @@ private theorem proj_trans_receiver_step_comm_head
   exact ⟨transBranches branches receiver,
          projTrans g' receiver,
          proj_trans_comm_receiver_is_recv sender receiver branches hne,
-         mem_transBranches_of_mem branches label g' receiver hmem,
-         EQ2_refl _⟩
+         mem_trans_branches_of_mem branches label g' receiver hmem,
+         eq2_refl _⟩
 
 private theorem proj_trans_receiver_step_mu
     (t : String) (body : GlobalType) (act : GlobalActionR) (g' : GlobalType)

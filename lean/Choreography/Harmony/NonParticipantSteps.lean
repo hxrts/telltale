@@ -24,8 +24,8 @@ open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
 open Choreography.Projection.Project
   (ProjectableClosedWellFormed ProjectableClosedWellFormedBlind
-   ProjectableClosedWellFormedBlind_implies_ProjectableClosedWellFormed)
-open Choreography.Projection.Blind (isBlind isBlind_comm_branches)
+   projectable_closed_well_formed_blind_implies_projectable_closed_well_formed)
+open Choreography.Projection.Blind (isBlind is_blind_comm_branches)
 open Semantics.EnvStep
 
 /-! ## Core Step Recursor -/
@@ -43,13 +43,13 @@ private theorem proj_trans_other_step_core (g g' : GlobalType) (act : GlobalActi
       (motive_2 := BranchMotive)
       (fun sender receiver branches label cont hmem hclosed hwf hblind role hns hnr =>
         have hproj_comm : ProjectableClosedWellFormed (GlobalType.comm sender receiver branches) :=
-          ProjectableClosedWellFormedBlind_implies_ProjectableClosedWellFormed ⟨hclosed, hwf, hblind⟩
+          projectable_closed_well_formed_blind_implies_projectable_closed_well_formed ⟨hclosed, hwf, hblind⟩
         proj_trans_other_step_comm_head sender receiver branches label cont role hmem hclosed hwf hns hnr
           hproj_comm)
       (fun sender receiver branches branches' act _label _cont _hns_cond _hcond _hmem _hcan hbstep
           ih_bstep hclosed hwf hblind role hns hnr =>
         have hblind_branches : ∀ p ∈ branches, isBlind p.2 = true :=
-          isBlind_comm_branches hblind
+          is_blind_comm_branches hblind
         proj_trans_other_step_comm_async sender receiver branches branches' act hbstep
           (fun hc hw role hns hnr => ih_bstep hc hw hblind_branches role hns hnr)
           hclosed hwf role hns hnr)
@@ -152,7 +152,7 @@ theorem envstep_dom_subset {env env' : ProjectedEnv} {act : GlobalActionR}
   cases h with
   | of_global g g' _ hstep =>
       intro p hp
-      simp only [projEnv_dom] at hp ⊢
+      simp only [proj_env_dom] at hp ⊢
       exact step_roles_subset g g' _ hstep p hp
 
 /-- Build the claims bundle from proven theorems. -/

@@ -30,7 +30,7 @@ structure LowerBoundProtocol where
   premises : LowerBoundPremises model
   lowerBound :
     ∃ run, premises.FairRun run ∧ ∀ n, premises.Uncommitted (run n) :=
-      lowerBound_of_assumptions assumptions premises
+      lower_bound_of_assumptions assumptions premises
 
 /-- Stronger protocol package: includes premises sufficient to derive
 the full FLP impossibility (negation of universal fair-run termination). -/
@@ -44,7 +44,7 @@ structure ImpossibilityProtocol where
   premises : ImpossibilityPremises model
   lowerBound :
     ∃ run, premises.FairRun run ∧ ∀ n, premises.Uncommitted (run n) :=
-      lowerBound_of_assumptions assumptions premises.toLowerBoundPremises
+      lower_bound_of_assumptions assumptions premises.toLowerBoundPremises
   impossibility :
     ¬ TerminatesOnAllFairRuns model premises.FairRun :=
       impossibility_of_assumptions assumptions premises
@@ -52,7 +52,7 @@ structure ImpossibilityProtocol where
 /-! ## Certified Bundle Extractors -/
 
 /-- Extract the FLP lower-bound theorem from a certified protocol bundle. -/
-theorem lowerBound_of_protocol (P : LowerBoundProtocol) :
+theorem lower_bound_of_protocol (P : LowerBoundProtocol) :
     ∃ run, P.premises.FairRun run ∧ ∀ n, P.premises.Uncommitted (run n) :=
   P.lowerBound
 
@@ -75,12 +75,12 @@ theorem certify (P : LowerBoundProtocol) : Nonempty (LowerBoundCertificate P) :=
   · exact (Classical.choose_spec P.lowerBound).2
 
 /-- FLP core assumptions are always validated for a certified protocol. -/
-theorem coreAssumptions_allPassed (P : LowerBoundProtocol) :
+theorem core_assumptions_all_passed (P : LowerBoundProtocol) :
     (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
   rfl
 
 /-- FLP core assumptions are always validated for a certified full protocol. -/
-theorem coreAssumptions_allPassed_impossibility (P : ImpossibilityProtocol) :
+theorem core_assumptions_all_passed_impossibility (P : ImpossibilityProtocol) :
     (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
   rfl
 

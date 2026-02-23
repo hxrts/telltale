@@ -130,7 +130,7 @@ def TightSchedule (k : Nat) (i : Nat) : Nat :=
   if (i + 1) % k == 0 then 0 else 1
 
 /-- TightSchedule is k-fair for TightSystem. -/
-theorem TightSystem_KFair (k : Nat) (hk : k ≥ 1) : KFair TightSystem (TightSchedule k) k := by
+theorem tight_system_k_fair (k : Nat) (hk : k ≥ 1) : KFair TightSystem (TightSchedule k) k := by
   intro block_start r hr
   have hr0 : r = 0 := by
     have hr' : r < 1 := by simpa [TightSystem] using hr
@@ -181,7 +181,7 @@ theorem TightSystem_KFair (k : Nat) (hk : k ≥ 1) : KFair TightSystem (TightSch
 -- Tightness Witness: Execution Trace
 
 /-- Execution trace for TightSystem with TightSchedule 2. -/
-lemma TightSystem_execution_trace :
+lemma tight_system_execution_trace :
     execute TightSystem 1 (TightSchedule 2) 0 = 1 ∧
     execute TightSystem 1 (TightSchedule 2) 1 = 1 ∧
     execute TightSystem 1 (TightSchedule 2) 2 = 0 := by
@@ -209,10 +209,10 @@ theorem bound_is_tight :
   · -- k ≥ numRoles: 2 ≥ 1
     decide
   · -- KFair
-    exact TightSystem_KFair 2 (by norm_num)
+    exact tight_system_k_fair 2 (by norm_num)
   · -- Termination at 2 * 1 = 2
     -- execute TightSystem 1 (TightSchedule 2) 2 = 0, and isTerminal 0 = true
-    have h := TightSystem_execution_trace.2.2
+    have h := tight_system_execution_trace.2.2
     -- 2 * TightSystem.progressMeasure 1 = 2 * 1 = 2
     have hprog : TightSystem.progressMeasure 1 = 1 := rfl
     rw [hprog]
@@ -222,7 +222,7 @@ theorem bound_is_tight :
     rfl
   · -- Non-termination at 2 * 1 - 1 = 1
     intro _
-    have h := TightSystem_execution_trace.2.1
+    have h := tight_system_execution_trace.2.1
     have hprog : TightSystem.progressMeasure 1 = 1 := rfl
     rw [hprog]
     -- 2 * 1 - 1 = 1

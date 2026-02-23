@@ -43,7 +43,7 @@ def WeakCoherent (G : GEnv) (D : DEnv) : Prop :=
   ∀ e, ActiveEdge G e → BlockedEdge G e → EdgeCoherent G D e
 
 /-- Coherence implies weak coherence. -/
-theorem Coherent_implies_WeakCoherent (G : GEnv) (D : DEnv) :
+theorem coherent_implies_weak_coherent (G : GEnv) (D : DEnv) :
     Coherent G D -> WeakCoherent G D := by
   intro hCoh e hActive _hBlocked
   exact hCoh e hActive
@@ -71,24 +71,24 @@ def minimalityEdgeAB : Edge := { sid := 0, sender := "A", receiver := "B" }
 /-! ## Witness Lookup Lemmas -/
 
 /-- The witness has no blocked receivers at all. -/
-theorem lookup_minimalityCounterexample_B :
+theorem lookup_minimality_counterexample_b :
     lookupG minimalityCounterexampleG minimalityBEndpoint = some minimalityBType := by
   simp [minimalityCounterexampleG, minimalityBEndpoint, minimalityBType]
 
-theorem lookup_minimalityCounterexample_A :
+theorem lookup_minimality_counterexample_a :
     lookupG minimalityCounterexampleG minimalityAEndpoint = some .end_ := by
   unfold minimalityCounterexampleG
   have hNe : minimalityAEndpoint ≠ minimalityBEndpoint := by
     decide
   simpa [minimalityAEndpoint] using
-    (lookupG_updateG_ne
+    (lookup_g_update_g_ne
       (env := updateG (∅ : GEnv) minimalityAEndpoint .end_)
       (e := minimalityBEndpoint)
       (e' := minimalityAEndpoint)
       (L := minimalityBType)
       hNe)
 
-theorem lookup_minimalityCounterexample_other (ep : Endpoint)
+theorem lookup_minimality_counterexample_other (ep : Endpoint)
     (hA : ep ≠ minimalityAEndpoint) (hB : ep ≠ minimalityBEndpoint) :
     lookupG minimalityCounterexampleG ep = none := by
   unfold minimalityCounterexampleG
@@ -98,7 +98,7 @@ theorem lookup_minimalityCounterexample_other (ep : Endpoint)
           ep =
         lookupG (updateG (∅ : GEnv) minimalityAEndpoint .end_) ep := by
     exact
-      lookupG_updateG_ne
+      lookup_g_update_g_ne
         (env := updateG (∅ : GEnv) minimalityAEndpoint .end_)
         (e := minimalityBEndpoint)
         (e' := ep)
@@ -108,7 +108,7 @@ theorem lookup_minimalityCounterexample_other (ep : Endpoint)
   have hStep2 :
       lookupG (updateG (∅ : GEnv) minimalityAEndpoint .end_) ep = lookupG (∅ : GEnv) ep := by
     exact
-      lookupG_updateG_ne
+      lookup_g_update_g_ne
         (env := (∅ : GEnv))
         (e := minimalityAEndpoint)
         (e' := ep)
@@ -119,7 +119,7 @@ theorem lookup_minimalityCounterexample_other (ep : Endpoint)
 
 /-! ## No Blocked Receivers -/
 
-theorem minimalityCounterexample_no_blocked (e : Edge) :
+theorem minimality_counterexample_no_blocked (e : Edge) :
     ¬ BlockedEdge minimalityCounterexampleG e := by
   let ep : Endpoint := { sid := e.sid, role := e.receiver }
   by_cases hA : ep = minimalityAEndpoint
@@ -127,7 +127,7 @@ theorem minimalityCounterexample_no_blocked (e : Edge) :
       calc
         lookupG minimalityCounterexampleG ep
             = lookupG minimalityCounterexampleG minimalityAEndpoint := by simpa [hA]
-        _ = some .end_ := lookup_minimalityCounterexample_A
+        _ = some .end_ := lookup_minimality_counterexample_a
     have hLookup' :
         lookupG minimalityCounterexampleG { sid := e.sid, role := e.receiver } = some .end_ := by
       simpa [ep] using hLookup
@@ -137,12 +137,12 @@ theorem minimalityCounterexample_no_blocked (e : Edge) :
         calc
           lookupG minimalityCounterexampleG ep
               = lookupG minimalityCounterexampleG minimalityBEndpoint := by simpa [hB]
-          _ = some minimalityBType := lookup_minimalityCounterexample_B
+          _ = some minimalityBType := lookup_minimality_counterexample_b
       have hLookup' :
           lookupG minimalityCounterexampleG { sid := e.sid, role := e.receiver } = some minimalityBType := by
         simpa [ep] using hLookup
       simpa [BlockedEdge, isBlockedLocal, minimalityBType, hLookup']
-    · have hLookup := lookup_minimalityCounterexample_other ep hA hB
+    · have hLookup := lookup_minimality_counterexample_other ep hA hB
       have hLookup' :
           lookupG minimalityCounterexampleG { sid := e.sid, role := e.receiver } = none := by
         simpa [ep] using hLookup
@@ -151,26 +151,26 @@ theorem minimalityCounterexample_no_blocked (e : Edge) :
 /-! ## Weak Coherence Holds Vacuously -/
 
 /-- The witness satisfies weak coherence (vacuously, since no receiver is blocked). -/
-theorem minimalityCounterexample_WeakCoherent :
+theorem minimality_counterexample_weak_coherent :
     WeakCoherent minimalityCounterexampleG minimalityCounterexampleD := by
   intro e _hActive hBlocked
-  exact (False.elim ((minimalityCounterexample_no_blocked e) hBlocked))
+  exact (False.elim ((minimality_counterexample_no_blocked e) hBlocked))
 
 /-! ## Witness Violates Full Coherence -/
 
 /-- The witness is not coherent: edge A -> B cannot consume its non-empty trace. -/
-theorem minimalityCounterexample_not_Coherent :
+theorem minimality_counterexample_not_coherent :
     ¬ Coherent minimalityCounterexampleG minimalityCounterexampleD := by
   intro hCoh
   have hActive : ActiveEdge minimalityCounterexampleG minimalityEdgeAB := by
     have hSender :
         lookupG minimalityCounterexampleG
             { sid := minimalityEdgeAB.sid, role := minimalityEdgeAB.sender } = some .end_ := by
-      simpa [minimalityEdgeAB, minimalityAEndpoint] using lookup_minimalityCounterexample_A
+      simpa [minimalityEdgeAB, minimalityAEndpoint] using lookup_minimality_counterexample_a
     have hReceiver :
         lookupG minimalityCounterexampleG
             { sid := minimalityEdgeAB.sid, role := minimalityEdgeAB.receiver } = some minimalityBType := by
-      simpa [minimalityEdgeAB, minimalityBEndpoint] using lookup_minimalityCounterexample_B
+      simpa [minimalityEdgeAB, minimalityBEndpoint] using lookup_minimality_counterexample_b
     refine ⟨?_, ?_⟩
     · simpa [hSender] using congrArg Option.isSome hSender
     · simpa [hReceiver] using congrArg Option.isSome hReceiver
@@ -179,11 +179,11 @@ theorem minimalityCounterexample_not_Coherent :
       lookupG minimalityCounterexampleG { sid := 0, role := "B" } =
         some minimalityBType := by
     simpa [minimalityBEndpoint, minimalityBType] using
-      lookup_minimalityCounterexample_B
+      lookup_minimality_counterexample_b
   rcases hEdge _ hRecv with ⟨_Lsender, _hSender, hConsume⟩
   have hTrace :
       lookupD minimalityCounterexampleD minimalityEdgeAB = [.unit] := by
-    simp [minimalityCounterexampleD, minimalityEdgeAB, lookupD_update_eq]
+    simp [minimalityCounterexampleD, minimalityEdgeAB, lookup_d_update_eq]
   have : False := by
     have hConsumeBool :
         (Consume "A" minimalityBType [.unit]).isSome = true := by
@@ -197,16 +197,16 @@ theorem minimalityCounterexample_not_Coherent :
 theorem coherence_minimal_witness :
     ∃ G D, WeakCoherent G D ∧ ¬ Coherent G D := by
   refine ⟨minimalityCounterexampleG, minimalityCounterexampleD, ?_, ?_⟩
-  · exact minimalityCounterexample_WeakCoherent
-  · exact minimalityCounterexample_not_Coherent
+  · exact minimality_counterexample_weak_coherent
+  · exact minimality_counterexample_not_coherent
 
 /-! ## Delegation Consequence -/
 
 /-- The strictness witness satisfies delegation side conditions for A -> C in session 0. -/
-theorem minimalityCounterexample_delegationWF :
+theorem minimality_counterexample_delegation_wf :
     DelegationWF minimalityCounterexampleG 0 "A" "C" := by
   have hAin : lookupG minimalityCounterexampleG { sid := 0, role := "A" } = some .end_ := by
-    simpa [minimalityAEndpoint] using lookup_minimalityCounterexample_A
+    simpa [minimalityAEndpoint] using lookup_minimality_counterexample_a
   refine
     { A_in_session := ?_
       B_not_in_session := ?_
@@ -216,12 +216,12 @@ theorem minimalityCounterexample_delegationWF :
       decide
     have hB : ({ sid := 0, role := "C" } : Endpoint) ≠ minimalityBEndpoint := by
       decide
-    simpa using lookup_minimalityCounterexample_other { sid := 0, role := "C" } hA hB
+    simpa using lookup_minimality_counterexample_other { sid := 0, role := "C" } hA hB
   · decide
 
 /-- Delegation connection:
     weak coherence (plus WF side conditions) is not enough to establish safe delegation. -/
-theorem weakCoherent_not_sufficient_for_safeDelegation :
+theorem weak_coherent_not_sufficient_for_safe_delegation :
     WeakCoherent minimalityCounterexampleG minimalityCounterexampleD ∧
       DelegationWF minimalityCounterexampleG 0 "A" "C" ∧
       (∀ G' D',
@@ -229,9 +229,9 @@ theorem weakCoherent_not_sufficient_for_safeDelegation :
           minimalityCounterexampleG G'
           minimalityCounterexampleD D'
           0 "A" "C") := by
-  refine ⟨minimalityCounterexample_WeakCoherent, minimalityCounterexample_delegationWF, ?_⟩
+  refine ⟨minimality_counterexample_weak_coherent, minimality_counterexample_delegation_wf, ?_⟩
   intro G' D' hSafe
-  exact minimalityCounterexample_not_Coherent hSafe.1
+  exact minimality_counterexample_not_coherent hSafe.1
 
 /-! ## Invariant Non-Conservativeness -/
 
@@ -239,13 +239,13 @@ theorem weakCoherent_not_sufficient_for_safeDelegation :
 def WeakInvariant : CoherenceInvariant :=
   fun C => WeakCoherent C.G C.D
 
-theorem WeakInvariant_not_conservative :
+theorem weak_invariant_not_conservative :
     ¬ ConservativeToCoherence WeakInvariant := by
   intro hConservative
   have hWeak : WeakInvariant ⟨minimalityCounterexampleG, minimalityCounterexampleD⟩ :=
-    minimalityCounterexample_WeakCoherent
+    minimality_counterexample_weak_coherent
   have hCoh : Coherent minimalityCounterexampleG minimalityCounterexampleD :=
     hConservative ⟨minimalityCounterexampleG, minimalityCounterexampleD⟩ hWeak
-  exact minimalityCounterexample_not_Coherent hCoh
+  exact minimality_counterexample_not_coherent hCoh
 
 end

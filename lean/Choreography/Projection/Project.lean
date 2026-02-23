@@ -18,10 +18,10 @@ This module re-exports the projection implementation from `Project.Impl`.
 The following definitions form the semantic interface for proofs:
 
 - `projectR?`: proof-carrying projection (returns projection with CProject proof)
-- `projectR?_some_iff_CProject`: specification lemma
-- `projectR?_sound`: soundness (some implies CProject)
-- `projectR?_complete`: completeness (CProject implies some)
-- `EQ_end`: non-participants project to EEnd (EQ2-equivalent)
+- `project_r?_some_iff_c_project`: specification lemma
+- `project_r?_sound`: soundness (some implies CProject)
+- `project_r?_complete`: completeness (CProject implies some)
+- `eq_end`: non-participants project to EEnd (EQ2-equivalent)
 -/
 
 /- 

@@ -6,7 +6,7 @@ Proves Bisim implies EQ2 and establishes EQ2 incompatibility lemmas.
 The Problem. The Bisim relation is designed for easier proofs, but we need to
 connect it back to EQ2 (the standard coinductive equality). We must prove
 Bisim ↔ EQ2 to transfer properties between formulations.
-Solution Structure. Proves `BranchesRelBisim_to_BranchesRel` and its inverse
+Solution Structure. Proves `branches_rel_bisim_to_branches_rel` and its inverse
 for converting branch relations. Then shows Bisim implies EQ2 by translating
 membership predicates to EQ2F structure. The reverse follows from EQ2's
 observable characterization. This enables deriving EQ2_trans from Bisim.trans.
@@ -24,7 +24,7 @@ The membership predicates in BisimF correspond to unfolding behavior in EQ2F.
 We prove Bisim ↔ EQ2, which enables deriving EQ2_trans from Bisim.trans. -/
 
 /-- Convert BranchesRelBisim to BranchesRel (same structure, different namespace). -/
-theorem BranchesRelBisim_to_BranchesRel {R : Rel}
+theorem branches_rel_bisim_to_branches_rel {R : Rel}
     {bs cs : List BranchR} (h : BranchesRelBisim R bs cs) :
     BranchesRel R bs cs := by
   induction h with
@@ -32,14 +32,14 @@ theorem BranchesRelBisim_to_BranchesRel {R : Rel}
   | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1, hbc.2⟩ ih
 
 /-- Convert BranchesRel to BranchesRelBisim (same structure, different namespace). -/
-theorem BranchesRel_to_BranchesRelBisim {R : Rel}
+theorem branches_rel_to_branches_rel_bisim {R : Rel}
     {bs cs : List BranchR} (h : BranchesRel R bs cs) :
     BranchesRelBisim R bs cs := by
   induction h with
   | nil => exact List.Forall₂.nil
   | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1, hbc.2⟩ ih
 
-private theorem BranchesRel_to_BranchesRelBisim_EQ2WF
+private theorem branches_rel_to_branches_rel_bisim_eq2_wf
     {bs cs : List BranchR} (h : BranchesRel EQ2 bs cs)
     (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2)
     (hWFcs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2.2) :
@@ -64,7 +64,7 @@ Send and receive witness constructors share the same relation shape. -/
 
     The proof constructs a witness relation that includes the pair plus all
     continuation pairs from Bisim. -/
-theorem Bisim_of_same_send {a b : LocalTypeR} {p : String}
+theorem bisim_of_same_send {a b : LocalTypeR} {p : String}
     {bsa bsb : List BranchR}
     (ha : CanSend a p bsa) (hb : CanSend b p bsb)
     (hbr : BranchesRelBisim Bisim bsa bsb) : Bisim a b := by
@@ -103,7 +103,7 @@ theorem Bisim_of_same_send {a b : LocalTypeR} {p : String}
 
 /-- If two types can both recv from the same partner with Bisim-related branches,
     they are Bisim equivalent. -/
-theorem Bisim_of_same_recv {a b : LocalTypeR} {p : String}
+theorem bisim_of_same_recv {a b : LocalTypeR} {p : String}
     {bsa bsb : List BranchR}
     (ha : CanRecv a p bsa) (hb : CanRecv b p bsb)
     (hbr : BranchesRelBisim Bisim bsa bsb) : Bisim a b := by
@@ -142,52 +142,52 @@ theorem Bisim_of_same_recv {a b : LocalTypeR} {p : String}
 
 /-- Helper: unfolds-to-end implies EQ2 to .end through unfolding.
     If a unfolds to end, then EQ2 a .end (since unfolding preserves EQ2). -/
-theorem UnfoldsToEnd.toEQ2 {a : LocalTypeR} (h : UnfoldsToEnd a) :
+theorem UnfoldsToEnd.to_eq2 {a : LocalTypeR} (h : UnfoldsToEnd a) :
     EQ2 a .end := by
   induction h with
-  | base => exact EQ2_refl _
+  | base => exact eq2_refl _
   | mu hinner ih =>
     exact EQ2.construct (by simpa [EQ2F] using ih)
 
 /-- Helper: unfolds-to-var implies EQ2 to that var. -/
-theorem UnfoldsToVar.toEQ2 {a : LocalTypeR} {v : String} (h : UnfoldsToVar a v) :
+theorem UnfoldsToVar.to_eq2 {a : LocalTypeR} {v : String} (h : UnfoldsToVar a v) :
     EQ2 a (.var v) := by
   induction h with
-  | base => exact EQ2_refl _
+  | base => exact eq2_refl _
   | mu hinner ih =>
     exact EQ2.construct (by simpa [EQ2F] using ih)
 
 /-- Duality is compatible with EQ2. -/
-theorem EQ2_dual_compat {a b : LocalTypeR} (h : EQ2 a b) : EQ2 a.dual b.dual :=
-  EQ2_dual h
+theorem eq2_dual_compat {a b : LocalTypeR} (h : EQ2 a b) : EQ2 a.dual b.dual :=
+  eq2_dual h
 
 /-- Helper: can-send implies EQ2 to the corresponding send type. -/
-theorem CanSend.toEQ2 {a : LocalTypeR} {p : String} {bs : List BranchR}
+theorem CanSend.to_eq2 {a : LocalTypeR} {p : String} {bs : List BranchR}
     (h : CanSend a p bs) : EQ2 a (.send p bs) := by
   refine CanSend.rec (motive := fun a p bs _ => EQ2 a (.send p bs)) ?base ?mu h
-  · exact EQ2_refl _
+  · exact eq2_refl _
   · intro t body p bs h' ih
     exact EQ2.construct (by simpa [EQ2F] using ih)
 
 /-- Helper: can-recv implies EQ2 to the corresponding recv type. -/
-theorem CanRecv.toEQ2 {a : LocalTypeR} {p : String} {bs : List BranchR}
+theorem CanRecv.to_eq2 {a : LocalTypeR} {p : String} {bs : List BranchR}
     (h : CanRecv a p bs) : EQ2 a (.recv p bs) := by
   -- Reduce recv to send via duality, then dualize the EQ2 witness.
   have hsend : CanSend a.dual p (dualBranches bs) := CanRecv.dual h
-  have hsend_eq : EQ2 a.dual (.send p (dualBranches bs)) := CanSend.toEQ2 hsend
-  have hdual := EQ2_dual_compat hsend_eq
+  have hsend_eq : EQ2 a.dual (.send p (dualBranches bs)) := CanSend.to_eq2 hsend
+  have hdual := eq2_dual_compat hsend_eq
   simpa [LocalTypeR.dual, LocalTypeR.dual_dual, dualBranches_dualBranches] using hdual
 
 /-- Helper: CanRecvD implies EQ2 to the corresponding recv type. -/
-theorem CanRecvD.toEQ2 {a : LocalTypeR} {p : String} {bs : List BranchR}
+theorem CanRecvD.to_eq2 {a : LocalTypeR} {p : String} {bs : List BranchR}
     (h : CanRecvD a p bs) : EQ2 a (.recv p bs) := by
   -- Convert the alias to CanRecv, then reuse CanRecv.toEQ2.
-  exact CanRecv.toEQ2 ((CanRecvD_iff_CanRecv).1 h)
+  exact CanRecv.to_eq2 ((can_recv_d_iff_can_recv).1 h)
 
 -- Branch Relation Lifting to EQ2
 
 /-- Convert BranchesRelBisim to BranchesRel EQ2 when the underlying relation implies EQ2. -/
-theorem BranchesRelBisim.toEQ2 {R : Rel} (hR : ∀ a b, R a b → EQ2 a b)
+theorem BranchesRelBisim.to_eq2 {R : Rel} (hR : ∀ a b, R a b → EQ2 a b)
     {bs cs : List BranchR} (h : BranchesRelBisim R bs cs) :
     BranchesRel EQ2 bs cs := by
   induction h with
@@ -207,10 +207,10 @@ theorem BranchesRelBisim.toEQ2 {R : Rel} (hR : ∀ a b, R a b → EQ2 a b)
     - Show that Bisim is a post-fixpoint of EQ2F
     - Case on BisimF to determine observable behavior
     - Use the toEQ2 helpers to convert membership predicates to EQ2 proofs
-    - Apply EQ2_coind -/
-theorem Bisim.toEQ2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
+    - Apply eq2_coind -/
+theorem Bisim.to_eq2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
   -- Use EQ2_coind_upto which allows using EQ2 directly in the post-fixpoint proof
-  apply EQ2_coind_upto (R := Bisim)
+  apply eq2_coind_upto (R := Bisim)
   · -- Show: ∀ x y, Bisim x y → EQ2F (EQ2_closure Bisim) x y
     intro x y hBisim
     obtain ⟨R, hRpost, hxy⟩ := hBisim
@@ -220,19 +220,19 @@ theorem Bisim.toEQ2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
     -- Bisim.toEQ2: End Case
     | eq_end hx hy =>
       -- Both unfold to end, so both are EQ2 to .end
-      have hxeq : EQ2 x .end := UnfoldsToEnd.toEQ2 hx
-      have hyeq : EQ2 y .end := UnfoldsToEnd.toEQ2 hy
+      have hxeq : EQ2 x .end := UnfoldsToEnd.to_eq2 hx
+      have hyeq : EQ2 y .end := UnfoldsToEnd.to_eq2 hy
       -- EQ2 x y follows by coinduction through the end constructor
-      have hxy_eq2 : EQ2 x y := EQ2_trans_via_end hxeq (EQ2_symm hyeq)
+      have hxy_eq2 : EQ2 x y := eq2_trans_via_end hxeq (eq2_symm hyeq)
       -- Lift EQ2F EQ2 to EQ2F (EQ2_closure Bisim) using monotonicity
       have hf_eq2 : EQ2F EQ2 x y := EQ2.destruct hxy_eq2
       exact EQ2F.mono (fun _ _ h => Or.inr h) x y hf_eq2
     -- Bisim.toEQ2: Var Case
     | eq_var hx hy =>
       -- Both unfold to the same var
-      have hxeq : EQ2 x (.var _) := UnfoldsToVar.toEQ2 hx
-      have hyeq : EQ2 y (.var _) := UnfoldsToVar.toEQ2 hy
-      have hxy_eq2 : EQ2 x y := EQ2_trans_via_var hxeq (EQ2_symm hyeq)
+      have hxeq : EQ2 x (.var _) := UnfoldsToVar.to_eq2 hx
+      have hyeq : EQ2 y (.var _) := UnfoldsToVar.to_eq2 hy
+      have hxy_eq2 : EQ2 x y := eq2_trans_via_var hxeq (eq2_symm hyeq)
       have hf_eq2 : EQ2F EQ2 x y := EQ2.destruct hxy_eq2
       exact EQ2F.mono (fun _ _ h => Or.inr h) x y hf_eq2
     -- Bisim.toEQ2: Send Case
@@ -244,7 +244,7 @@ theorem Bisim.toEQ2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
         BranchesRelBisim.mono (fun a b h => Or.inl (hR_to_Bisim a b h)) hbr
       -- Convert to BranchesRel for EQ2F (extracted as helper to avoid induction scope issues)
       have hbr_rel : BranchesRel (EQ2_closure Bisim) bsa bsb :=
-        BranchesRelBisim_to_BranchesRel hbr_closure
+        branches_rel_bisim_to_branches_rel hbr_closure
       -- Case on the actual constructors of x and y
       -- Lift branch relation to Bisim for use in Bisim_of_same_send/recv
       have hbr_bisim : BranchesRelBisim Bisim bsa bsb :=
@@ -264,7 +264,7 @@ theorem Bisim.toEQ2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
           -- which is: closure (send partner bsa) (body.substitute s (mu s body))
           simp only [EQ2F, EQ2_closure]
           -- Both can send to partner with related branches, so they're Bisim
-          have hBisim := Bisim_of_same_send CanSend.base hinner hbr_bisim
+          have hBisim := bisim_of_same_send CanSend.base hinner hbr_bisim
           exact Or.inl hBisim
       | mu hinner =>
         -- x = mu t body, need EQ2F closure (mu t body) y
@@ -273,17 +273,17 @@ theorem Bisim.toEQ2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
         | base =>
           -- y = send partner bsb
           simp only [EQ2F, EQ2_closure]
-          have hBisim := Bisim_of_same_send hinner CanSend.base hbr_bisim
+          have hBisim := bisim_of_same_send hinner CanSend.base hbr_bisim
           exact Or.inl hBisim
         | mu hinner' =>
           -- y = mu s body'
           -- EQ2F at (mu, mu) = closure pair ∧ closure pair
           simp only [EQ2F, EQ2_closure]
           constructor
-          · have hBisim := Bisim_of_same_send hinner (CanSend.mu hinner') hbr_bisim
+          · have hBisim := bisim_of_same_send hinner (CanSend.mu hinner') hbr_bisim
             exact Or.inl hBisim
 /- ## Structured Block 3 -/
-          · have hBisim := Bisim_of_same_send (CanSend.mu hinner) hinner' hbr_bisim
+          · have hBisim := bisim_of_same_send (CanSend.mu hinner) hinner' hbr_bisim
             exact Or.inl hBisim
     -- Bisim.toEQ2: Receive Case
     | @eq_recv _ _ partner bsa bsb hx hy hbr =>
@@ -292,7 +292,7 @@ theorem Bisim.toEQ2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
       have hbr_closure : BranchesRelBisim (EQ2_closure Bisim) bsa bsb :=
         BranchesRelBisim.mono (fun a b h => Or.inl (hR_to_Bisim a b h)) hbr
       have hbr_rel : BranchesRel (EQ2_closure Bisim) bsa bsb :=
-        BranchesRelBisim_to_BranchesRel hbr_closure
+        branches_rel_bisim_to_branches_rel hbr_closure
       have hbr_bisim : BranchesRelBisim Bisim bsa bsb :=
         BranchesRelBisim.mono (fun a b h => hR_to_Bisim a b h) hbr
       cases hx with
@@ -303,7 +303,7 @@ theorem Bisim.toEQ2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
           exact ⟨trivial, hbr_rel⟩
         | mu hinner =>
           simp only [EQ2F, EQ2_closure]
-          have hBisim := Bisim_of_same_recv CanRecv.base hinner hbr_bisim
+          have hBisim := bisim_of_same_recv CanRecv.base hinner hbr_bisim
           exact Or.inl hBisim
       | mu hinner =>
         -- x = mu t body, need EQ2F closure (mu t body) y
@@ -312,16 +312,16 @@ theorem Bisim.toEQ2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
         | base =>
           -- y = recv partner bsb
           simp only [EQ2F, EQ2_closure]
-          have hBisim := Bisim_of_same_recv hinner CanRecv.base hbr_bisim
+          have hBisim := bisim_of_same_recv hinner CanRecv.base hbr_bisim
           exact Or.inl hBisim
         | mu hinner' =>
           -- y = mu s body'
           -- EQ2F at (mu, mu) = closure pair ∧ closure pair
           simp only [EQ2F, EQ2_closure]
           constructor
-          · have hBisim := Bisim_of_same_recv hinner (CanRecv.mu hinner') hbr_bisim
+          · have hBisim := bisim_of_same_recv hinner (CanRecv.mu hinner') hbr_bisim
             exact Or.inl hBisim
-          · have hBisim := Bisim_of_same_recv (CanRecv.mu hinner) hinner' hbr_bisim
+          · have hBisim := bisim_of_same_recv (CanRecv.mu hinner) hinner' hbr_bisim
             exact Or.inl hBisim
   · exact h
 
@@ -334,7 +334,7 @@ other than `UnfoldsToEnd`. The proofs use induction on the observable predicates
 
     Proof by induction on CanSend. Each constructor exposes a communication head
     that contradicts `EQ2F EQ2 .end _` = False for sends. -/
-theorem EQ2_end_not_CanSend {x : LocalTypeR} {p : String} {bs : List BranchR}
+theorem eq2_end_not_can_send {x : LocalTypeR} {p : String} {bs : List BranchR}
     (hcan : CanSend x p bs) (heq : EQ2 .end x) : False := by
   revert heq
   refine CanSend.rec (motive := fun x p bs _ => EQ2 .end x → False) ?base ?mu hcan
@@ -344,19 +344,19 @@ theorem EQ2_end_not_CanSend {x : LocalTypeR} {p : String} {bs : List BranchR}
   · intro t body p bs h ih heq
     -- x = .mu t body, unfold the EQ2 on the right
     exact ih (by
-      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .end) (b := .mu t body) heq))
+      simpa [LocalTypeR.unfold] using (eq2_unfold_right (a := .end) (b := .mu t body) heq))
 
 /-- `EQ2 .end x` is incompatible with `CanRecv x p bs`. -/
-theorem EQ2_end_not_CanRecv {x : LocalTypeR} {p : String} {bs : List BranchR}
+theorem eq2_end_not_can_recv {x : LocalTypeR} {p : String} {bs : List BranchR}
     (hcan : CanRecv x p bs) (heq : EQ2 .end x) : False := by
   have hcan' : CanSend x.dual p (dualBranches bs) := CanRecv.dual hcan
   have heq' : EQ2 .end x.dual := by
-    have h' := EQ2_dual_compat (a := .end) (b := x) heq
+    have h' := eq2_dual_compat (a := .end) (b := x) heq
     simpa [LocalTypeR.dual] using h'
-  exact EQ2_end_not_CanSend hcan' heq'
+  exact eq2_end_not_can_send hcan' heq'
 
 /-- `EQ2 .end x` is incompatible with `UnfoldsToVar x v`. -/
-theorem EQ2_end_not_UnfoldsToVar {x : LocalTypeR} {v : String}
+theorem eq2_end_not_unfolds_to_var {x : LocalTypeR} {v : String}
     (hunf : UnfoldsToVar x v) (heq : EQ2 .end x) : False := by
   revert heq
   refine UnfoldsToVar.rec (motive := fun x v _ => EQ2 .end x → False) ?base ?mu hunf
@@ -366,14 +366,14 @@ theorem EQ2_end_not_UnfoldsToVar {x : LocalTypeR} {v : String}
   · intro t body v h ih heq
     -- x = .mu t body, unfold the EQ2 on the right
     have heq' : EQ2 .end (body.substitute t (.mu t body)) := by
-      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .end) (b := .mu t body) heq)
+      simpa [LocalTypeR.unfold] using (eq2_unfold_right (a := .end) (b := .mu t body) heq)
     exact ih heq'
 
 -- EQ2 Incompatibility: Send/Recv vs UnfoldsTo*
 
 -- EQ2 Incompatibility: Send vs Observable Behaviors
 
-theorem EQ2_send_not_UnfoldsToEnd {x : LocalTypeR} {p : String} {bs : List BranchR}
+theorem eq2_send_not_unfolds_to_end {x : LocalTypeR} {p : String} {bs : List BranchR}
     (hunf : UnfoldsToEnd x) (heq : EQ2 (.send p bs) x) : False := by
   revert heq
   refine UnfoldsToEnd.rec (motive := fun x _ => EQ2 (.send p bs) x → False) ?base ?mu hunf
@@ -381,10 +381,10 @@ theorem EQ2_send_not_UnfoldsToEnd {x : LocalTypeR} {p : String} {bs : List Branc
     simpa [EQ2F] using (EQ2.destruct heq)
   · intro t body h ih heq
     have heq' : EQ2 (.send p bs) (body.substitute t (.mu t body)) := by
-      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .send p bs) (b := .mu t body) heq)
+      simpa [LocalTypeR.unfold] using (eq2_unfold_right (a := .send p bs) (b := .mu t body) heq)
     exact ih heq'
 
-theorem EQ2_send_not_UnfoldsToVar {x : LocalTypeR} {p : String} {bs : List BranchR}
+theorem eq2_send_not_unfolds_to_var {x : LocalTypeR} {p : String} {bs : List BranchR}
     {v : String} (hunf : UnfoldsToVar x v) (heq : EQ2 (.send p bs) x) : False := by
   revert heq
   refine UnfoldsToVar.rec (motive := fun x v _ => EQ2 (.send p bs) x → False) ?base ?mu hunf
@@ -392,10 +392,10 @@ theorem EQ2_send_not_UnfoldsToVar {x : LocalTypeR} {p : String} {bs : List Branc
     simpa [EQ2F] using (EQ2.destruct heq)
   · intro t body v h ih heq
     have heq' : EQ2 (.send p bs) (body.substitute t (.mu t body)) := by
-      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .send p bs) (b := .mu t body) heq)
+      simpa [LocalTypeR.unfold] using (eq2_unfold_right (a := .send p bs) (b := .mu t body) heq)
     exact ih heq'
 
-theorem EQ2_recv_not_UnfoldsToEnd {x : LocalTypeR} {p : String} {bs : List BranchR}
+theorem eq2_recv_not_unfolds_to_end {x : LocalTypeR} {p : String} {bs : List BranchR}
     (hunf : UnfoldsToEnd x) (heq : EQ2 (.recv p bs) x) : False := by
   revert heq
   refine UnfoldsToEnd.rec (motive := fun x _ => EQ2 (.recv p bs) x → False) ?base ?mu hunf
@@ -404,10 +404,10 @@ theorem EQ2_recv_not_UnfoldsToEnd {x : LocalTypeR} {p : String} {bs : List Branc
     simpa [EQ2F] using (EQ2.destruct heq)
   · intro t body h ih heq
     have heq' : EQ2 (.recv p bs) (body.substitute t (.mu t body)) := by
-      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .recv p bs) (b := .mu t body) heq)
+      simpa [LocalTypeR.unfold] using (eq2_unfold_right (a := .recv p bs) (b := .mu t body) heq)
     exact ih heq'
 
-theorem EQ2_recv_not_UnfoldsToVar {x : LocalTypeR} {p : String} {bs : List BranchR}
+theorem eq2_recv_not_unfolds_to_var {x : LocalTypeR} {p : String} {bs : List BranchR}
     {v : String} (hunf : UnfoldsToVar x v) (heq : EQ2 (.recv p bs) x) : False := by
   revert heq
   refine UnfoldsToVar.rec (motive := fun x v _ => EQ2 (.recv p bs) x → False) ?base ?mu hunf
@@ -415,11 +415,11 @@ theorem EQ2_recv_not_UnfoldsToVar {x : LocalTypeR} {p : String} {bs : List Branc
     simpa [EQ2F] using (EQ2.destruct heq)
   · intro t body v h ih heq
     have heq' : EQ2 (.recv p bs) (body.substitute t (.mu t body)) := by
-      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .recv p bs) (b := .mu t body) heq)
+      simpa [LocalTypeR.unfold] using (eq2_unfold_right (a := .recv p bs) (b := .mu t body) heq)
     exact ih heq'
 
 -- EQ2 Incompatibility: Send/Recv Cross-Mode
-theorem EQ2_recv_not_CanSend {x : LocalTypeR} {p : String} {bs : List BranchR}
+theorem eq2_recv_not_can_send {x : LocalTypeR} {p : String} {bs : List BranchR}
     {q : String} {cs : List BranchR} (hcan : CanSend x q cs)
     (heq : EQ2 (.recv p bs) x) : False := by
   revert heq
@@ -428,25 +428,25 @@ theorem EQ2_recv_not_CanSend {x : LocalTypeR} {p : String} {bs : List BranchR}
     simpa [EQ2F] using (EQ2.destruct heq)
   · intro t body q cs h ih heq
     have heq' : EQ2 (.recv p bs) (body.substitute t (.mu t body)) := by
-      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .recv p bs) (b := .mu t body) heq)
+      simpa [LocalTypeR.unfold] using (eq2_unfold_right (a := .recv p bs) (b := .mu t body) heq)
     exact ih heq'
 
-theorem EQ2_send_not_CanRecv {x : LocalTypeR} {p : String} {bs : List BranchR}
+theorem eq2_send_not_can_recv {x : LocalTypeR} {p : String} {bs : List BranchR}
     {q : String} {cs : List BranchR} (hcan : CanRecv x q cs)
     (heq : EQ2 (.send p bs) x) : False := by
   -- Dualize the problem and use the recv-vs-send incompatibility.
   have hcan' : CanSend x.dual q (dualBranches cs) := CanRecv.dual hcan
   have heq' : EQ2 (.recv p (dualBranches bs)) x.dual := by
     -- Dual of send is recv with dualized branches.
-    have h' := EQ2_dual_compat (a := .send p bs) (b := x) heq
+    have h' := eq2_dual_compat (a := .send p bs) (b := x) heq
     simpa [LocalTypeR.dual] using h'
-  exact EQ2_recv_not_CanSend (x := x.dual) (p := p)
+  exact eq2_recv_not_can_send (x := x.dual) (p := p)
     (bs := dualBranches bs) (q := q) (cs := dualBranches cs) hcan' heq'
 
 -- EQ2 Incompatibility: Var vs Observables
 
 /-- `EQ2 (.var v) x` is incompatible with `UnfoldsToEnd x`. -/
-theorem EQ2_var_not_UnfoldsToEnd {x : LocalTypeR} {v : String}
+theorem eq2_var_not_unfolds_to_end {x : LocalTypeR} {v : String}
     (hunf : UnfoldsToEnd x) (heq : EQ2 (.var v) x) : False := by
   revert heq
   refine UnfoldsToEnd.rec (motive := fun x _ => EQ2 (.var v) x → False) ?base ?mu hunf
@@ -455,11 +455,11 @@ theorem EQ2_var_not_UnfoldsToEnd {x : LocalTypeR} {v : String}
     simpa [EQ2F] using (EQ2.destruct heq)
   · intro t body h ih heq
     have heq' : EQ2 (.var v) (body.substitute t (.mu t body)) := by
-      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .var v) (b := .mu t body) heq)
+      simpa [LocalTypeR.unfold] using (eq2_unfold_right (a := .var v) (b := .mu t body) heq)
     exact ih heq'
 
 /-- `EQ2 (.var v) x` is incompatible with `UnfoldsToVar x w` when w ≠ v. -/
-theorem EQ2_var_not_UnfoldsToVar_diff {x : LocalTypeR} {v w : String}
+theorem eq2_var_not_unfolds_to_var_diff {x : LocalTypeR} {v w : String}
     (hunf : UnfoldsToVar x w) (heq : EQ2 (.var v) x) (hne : w ≠ v) : False := by
   revert heq hne
   refine UnfoldsToVar.rec (motive := fun x w _ => EQ2 (.var v) x → w ≠ v → False) ?base ?mu hunf
@@ -471,11 +471,11 @@ theorem EQ2_var_not_UnfoldsToVar_diff {x : LocalTypeR} {v w : String}
     exact hne hv.symm
   · intro t body w h ih heq hne
     have heq' : EQ2 (.var v) (body.substitute t (.mu t body)) := by
-      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .var v) (b := .mu t body) heq)
+      simpa [LocalTypeR.unfold] using (eq2_unfold_right (a := .var v) (b := .mu t body) heq)
     exact ih heq' hne
 
 /-- `EQ2 (.var v) x` is incompatible with `CanSend x p bs`. -/
-theorem EQ2_var_not_CanSend {x : LocalTypeR} {v : String} {p : String}
+theorem eq2_var_not_can_send {x : LocalTypeR} {v : String} {p : String}
     {bs : List BranchR}
     (hcan : CanSend x p bs) (heq : EQ2 (.var v) x) : False := by
   revert heq
@@ -484,17 +484,17 @@ theorem EQ2_var_not_CanSend {x : LocalTypeR} {v : String} {p : String}
     simpa [EQ2F] using (EQ2.destruct heq)
   · intro t body p bs h ih heq
     have heq' : EQ2 (.var v) (body.substitute t (.mu t body)) := by
-      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .var v) (b := .mu t body) heq)
+      simpa [LocalTypeR.unfold] using (eq2_unfold_right (a := .var v) (b := .mu t body) heq)
     exact ih heq'
 
 /-- `EQ2 (.var v) x` is incompatible with `CanRecv x p bs`. -/
-theorem EQ2_var_not_CanRecv {x : LocalTypeR} {v : String} {p : String}
+theorem eq2_var_not_can_recv {x : LocalTypeR} {v : String} {p : String}
     {bs : List BranchR}
     (hcan : CanRecv x p bs) (heq : EQ2 (.var v) x) : False := by
   have hcan' : CanSend x.dual p (dualBranches bs) := CanRecv.dual hcan
   have heq' : EQ2 (.var v) x.dual := by
-    have h' := EQ2_dual_compat (a := .var v) (b := x) heq
+    have h' := eq2_dual_compat (a := .var v) (b := x) heq
     simpa [LocalTypeR.dual] using h'
-  exact EQ2_var_not_CanSend hcan' heq'
+  exact eq2_var_not_can_send hcan' heq'
 
 end SessionCoTypes.Bisim

@@ -54,7 +54,7 @@ def AllBranchesProjC (R : ProjRelC) (gbs : List (Label × GlobalType)) (role : S
     (cand : LocalTypeC) : Prop :=
   ∀ gb ∈ gbs, R gb.2 role cand
 
-private lemma BranchesProjRelC_mono {R S : ProjRelC}
+private lemma branches_proj_rel_c_mono {R S : ProjRelC}
     (h : ∀ g role cand, R g role cand → S g role cand) :
     ∀ {gbs lbs role}, BranchesProjRelC R gbs role lbs → BranchesProjRelC S gbs role lbs := by
   intro gbs lbs role hrel
@@ -64,7 +64,7 @@ private lemma BranchesProjRelC_mono {R S : ProjRelC}
       refine List.Forall₂.cons ?_ ih
       exact ⟨hhead.1, h _ _ _ hhead.2⟩
 
-private lemma AllBranchesProjC_mono {R S : ProjRelC}
+private lemma all_branches_proj_c_mono {R S : ProjRelC}
     (h : ∀ g role cand, R g role cand → S g role cand) :
     ∀ {gbs role cand}, AllBranchesProjC R gbs role cand → AllBranchesProjC S gbs role cand := by
   intro gbs role cand hall gb hmem
@@ -84,7 +84,7 @@ private def ProjectC_comm (R : ProjRelC) (sender receiver : String)
         BranchesProjRelC R gbs role (branchesOf l')) ∨
   (role ≠ sender ∧ role ≠ receiver ∧ AllBranchesProjC R gbs role l')
 
-private lemma ProjectC_comm_mono {R S : ProjRelC}
+private lemma project_c_comm_mono {R S : ProjRelC}
     (h : ∀ g role cand, R g role cand → S g role cand) :
     ∀ {sender receiver gbs role l'},
       ProjectC_comm R sender receiver gbs role l' →
@@ -93,16 +93,16 @@ private lemma ProjectC_comm_mono {R S : ProjRelC}
   cases hcomm with
   | inl hsender =>
       rcases hsender with ⟨hrole, labels, hhead, hbr⟩
-      exact Or.inl ⟨hrole, labels, hhead, BranchesProjRelC_mono h hbr⟩
+      exact Or.inl ⟨hrole, labels, hhead, branches_proj_rel_c_mono h hbr⟩
   | inr hrest =>
       cases hrest with
 /- ## Structured Block 2 -/
       | inl hreceiver =>
           rcases hreceiver with ⟨hrole, labels, hhead, hbr⟩
-          exact Or.inr (Or.inl ⟨hrole, labels, hhead, BranchesProjRelC_mono h hbr⟩)
+          exact Or.inr (Or.inl ⟨hrole, labels, hhead, branches_proj_rel_c_mono h hbr⟩)
       | inr hother =>
           rcases hother with ⟨hns, hnr, hall⟩
-          exact Or.inr (Or.inr ⟨hns, hnr, AllBranchesProjC_mono h hall⟩)
+          exact Or.inr (Or.inr ⟨hns, hnr, all_branches_proj_c_mono h hall⟩)
 
 -- # Step Operator Definition
 
@@ -117,7 +117,7 @@ def ProjectC_step (R : ProjRelC) : ProjRelC := fun g role cand =>
 
 -- # Step Operator Monotonicity
 
-private theorem ProjectC_step_mono : Monotone ProjectC_step := by
+private theorem project_c_step_mono : Monotone ProjectC_step := by
   intro R S h g role cand hrel
   rcases hrel with ⟨g', l', hg, hl, hstep⟩
   refine ⟨g', l', hg, hl, ?_⟩
@@ -132,17 +132,17 @@ private theorem ProjectC_step_mono : Monotone ProjectC_step := by
       cases hstep with
       | inl hsender =>
           rcases hsender with ⟨hrole, labels, hhead, hbr⟩
-          exact Or.inl ⟨hrole, labels, hhead, BranchesProjRelC_mono h hbr⟩
+          exact Or.inl ⟨hrole, labels, hhead, branches_proj_rel_c_mono h hbr⟩
       | inr hrest =>
           cases hrest with
           | inl hreceiver =>
               rcases hreceiver with ⟨hrole, labels, hhead, hbr⟩
-              exact Or.inr (Or.inl ⟨hrole, labels, hhead, BranchesProjRelC_mono h hbr⟩)
+              exact Or.inr (Or.inl ⟨hrole, labels, hhead, branches_proj_rel_c_mono h hbr⟩)
           | inr hother =>
               rcases hother with ⟨hns, hnr, hall⟩
-              exact Or.inr (Or.inr ⟨hns, hnr, AllBranchesProjC_mono h hall⟩)
+              exact Or.inr (Or.inr ⟨hns, hnr, all_branches_proj_c_mono h hall⟩)
 
-instance : CoinductiveRel ProjRelC ProjectC_step := ⟨ProjectC_step_mono⟩
+instance : CoinductiveRel ProjRelC ProjectC_step := ⟨project_c_step_mono⟩
 
 -- # Greatest Fixed Point
 
@@ -153,13 +153,13 @@ def ProjectC : ProjRelC :=
 
 -- Fixed-point helpers
 
-theorem ProjectC_destruct {g : GlobalType} {role : String} {cand : LocalTypeC}
+theorem project_c_destruct {g : GlobalType} {role : String} {cand : LocalTypeC}
     (h : ProjectC g role cand) : ProjectC_step ProjectC g role cand := by
   have hle : ProjectC ≤ ProjectC_step ProjectC :=
     (SessionCoTypes.CoinductiveRel.unfold (F := ProjectC_step))
   exact hle _ _ _ h
 
-theorem ProjectC_fold {g : GlobalType} {role : String} {cand : LocalTypeC}
+theorem project_c_fold {g : GlobalType} {role : String} {cand : LocalTypeC}
     (h : ProjectC_step ProjectC g role cand) : ProjectC g role cand := by
   have hle : ProjectC_step ProjectC ≤ ProjectC :=
     (SessionCoTypes.CoinductiveRel.fold (F := ProjectC_step))
@@ -168,14 +168,14 @@ theorem ProjectC_fold {g : GlobalType} {role : String} {cand : LocalTypeC}
 -- Unfolding utilities
 
 /- ## Structured Block 3 -/
-private lemma UnfoldsG_rightUnique : Relator.RightUnique UnfoldsG := by
+private lemma unfolds_g_right_unique : Relator.RightUnique UnfoldsG := by
   intro a b c hab hac
   rcases hab with ⟨t1, body1, rfl, rfl⟩
   rcases hac with ⟨t2, body2, hmu, rfl⟩
   cases hmu
   rfl
 
-private lemma UnfoldsToG_eq_of_nonmu {g g' : GlobalType} (h : UnfoldsToG g g')
+private lemma unfolds_to_g_eq_of_nonmu {g g' : GlobalType} (h : UnfoldsToG g g')
     (hn : ∀ t body, g ≠ .mu t body) : g' = g := by
   induction h with
   | refl => rfl
@@ -184,22 +184,22 @@ private lemma UnfoldsToG_eq_of_nonmu {g g' : GlobalType} (h : UnfoldsToG g g')
       rcases hstep with ⟨t, body, hmu, _⟩
       exact (False.elim (hn t body hmu))
 
-private lemma UnfoldsToG_compare_nonmu {g g1 g' : GlobalType} (hg1 : UnfoldsToG g g1)
+private lemma unfolds_to_g_compare_nonmu {g g1 g' : GlobalType} (hg1 : UnfoldsToG g g1)
     (hg' : UnfoldsToG g g') (hn : ∀ t body, g1 ≠ .mu t body) : UnfoldsToG g' g1 := by
-  have htot := Relation.ReflTransGen.total_of_right_unique (U := UnfoldsG_rightUnique) hg1 hg'
+  have htot := Relation.ReflTransGen.total_of_right_unique (U := unfolds_g_right_unique) hg1 hg'
   cases htot with
   | inl h1 =>
-      have hEq : g' = g1 := UnfoldsToG_eq_of_nonmu h1 hn
+      have hEq : g' = g1 := unfolds_to_g_eq_of_nonmu h1 hn
       cases hEq
       exact Relation.ReflTransGen.refl
   | inr h2 => exact h2
 
-private lemma UnfoldsC_head_mu {t u : LocalTypeC} (h : UnfoldsC t u) : ∃ x, head t = .mu x := by
+private lemma unfolds_c_head_mu {t u : LocalTypeC} (h : UnfoldsC t u) : ∃ x, head t = .mu x := by
   rcases h with ⟨x, f, hdest, _⟩
   refine ⟨x, ?_⟩
   simp [head, hdest]
 
-private lemma UnfoldsC_rightUnique : Relator.RightUnique UnfoldsC := by
+private lemma unfolds_c_right_unique : Relator.RightUnique UnfoldsC := by
   intro a b c hab hac
   rcases hab with ⟨x, f, hdest, rfl⟩
   rcases hac with ⟨y, g, hdest', rfl⟩
@@ -210,46 +210,46 @@ private lemma UnfoldsC_rightUnique : Relator.RightUnique UnfoldsC := by
   cases hpair
   rfl
 
-private lemma UnfoldsToC_eq_of_head_ne_mu {l l' : LocalTypeC} (h : UnfoldsToC l l')
+private lemma unfolds_to_c_eq_of_head_ne_mu {l l' : LocalTypeC} (h : UnfoldsToC l l')
     (hn : ∀ x, head l ≠ .mu x) : l' = l := by
   rcases (Relation.ReflTransGen.cases_head h) with (hEq | hstep)
   · cases hEq
     rfl
   · rcases hstep with ⟨c, hstep, _⟩
-    rcases UnfoldsC_head_mu hstep with ⟨x, hmu⟩
+    rcases unfolds_c_head_mu hstep with ⟨x, hmu⟩
     exact (False.elim (hn x hmu))
 
-private lemma UnfoldsToC_total {l l1 l2 : LocalTypeC} (h1 : UnfoldsToC l l1) (h2 : UnfoldsToC l l2) :
+private lemma unfolds_to_c_total {l l1 l2 : LocalTypeC} (h1 : UnfoldsToC l l1) (h2 : UnfoldsToC l l2) :
     UnfoldsToC l1 l2 ∨ UnfoldsToC l2 l1 :=
-  Relation.ReflTransGen.total_of_right_unique (U := UnfoldsC_rightUnique) h1 h2
+  Relation.ReflTransGen.total_of_right_unique (U := unfolds_c_right_unique) h1 h2
 
 -- Unfolding stability
 
 -- ProjectC Stability under Global Unfolding
 
-theorem ProjectC_unfoldG {g g' : GlobalType} {role : String} {l : LocalTypeC}
+theorem project_c_unfold_g {g g' : GlobalType} {role : String} {l : LocalTypeC}
     (hproj : ProjectC g role l) (hg : UnfoldsToG g g') : ProjectC g' role l := by
 /- ## Structured Block 4 -/
-  rcases ProjectC_destruct hproj with ⟨g1, l1, hg1, hl1, hmatch⟩
+  rcases project_c_destruct hproj with ⟨g1, l1, hg1, hl1, hmatch⟩
   cases g1 with
   | mu t body =>
       cases hmatch
   | «end» =>
       have hcomp : UnfoldsToG g' .end :=
-        UnfoldsToG_compare_nonmu hg1 hg (by intro t body hmu; cases hmu)
-      exact ProjectC_fold ⟨.end, l1, hcomp, hl1, by simpa using hmatch⟩
+        unfolds_to_g_compare_nonmu hg1 hg (by intro t body hmu; cases hmu)
+      exact project_c_fold ⟨.end, l1, hcomp, hl1, by simpa using hmatch⟩
   | var t =>
       have hcomp : UnfoldsToG g' (.var t) :=
-        UnfoldsToG_compare_nonmu hg1 hg (by intro t' body hmu; cases hmu)
-      exact ProjectC_fold ⟨.var t, l1, hcomp, hl1, by simpa using hmatch⟩
+        unfolds_to_g_compare_nonmu hg1 hg (by intro t' body hmu; cases hmu)
+      exact project_c_fold ⟨.var t, l1, hcomp, hl1, by simpa using hmatch⟩
   | comm sender receiver gbs =>
       have hcomp : UnfoldsToG g' (.comm sender receiver gbs) :=
-        UnfoldsToG_compare_nonmu hg1 hg (by intro t body hmu; cases hmu)
-      exact ProjectC_fold ⟨.comm sender receiver gbs, l1, hcomp, hl1, by simpa using hmatch⟩
+        unfolds_to_g_compare_nonmu hg1 hg (by intro t body hmu; cases hmu)
+      exact project_c_fold ⟨.comm sender receiver gbs, l1, hcomp, hl1, by simpa using hmatch⟩
 
 -- ProjectC Stability under Local Unfolding
 
-theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
+theorem project_c_unfold_c {g : GlobalType} {role : String} {l l' : LocalTypeC}
     (hproj : ProjectC g role l) (hl : UnfoldsToC l l') : ProjectC g role l' := by
   let R : ProjRelC := fun g role cand => ∃ l, ProjectC g role l ∧ UnfoldsToC l cand
   have hinc : ∀ g role cand, ProjectC g role cand → R g role cand := by
@@ -258,8 +258,8 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
   have hpost : ∀ g role cand, R g role cand → ProjectC_step R g role cand := by
     intro g role cand hR
     rcases hR with ⟨l0, hproj0, hstep0⟩
-    rcases ProjectC_destruct hproj0 with ⟨g1, l1, hg1, hl1, hmatch⟩
-    have hcomp := UnfoldsToC_total hl1 hstep0
+    rcases project_c_destruct hproj0 with ⟨g1, l1, hg1, hl1, hmatch⟩
+    have hcomp := unfolds_to_c_total hl1 hstep0
     cases hcomp with
     -- Local Unfolding: Candidate Already Unfolds to Witness
     | inr h_cand_l1 =>
@@ -272,7 +272,7 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
         | var t =>
             simpa using hmatch
         | comm sender receiver gbs =>
-            exact ProjectC_comm_mono hinc hmatch
+            exact project_c_comm_mono hinc hmatch
     -- Local Unfolding: Witness Unfolds to Candidate
     | inl h_l1_cand =>
         cases g1 with
@@ -282,7 +282,7 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
             have hne : ∀ x, head l1 ≠ .mu x := by
               intro x hx
               simp_all
-            have hEq : cand = l1 := UnfoldsToC_eq_of_head_ne_mu h_l1_cand hne
+            have hEq : cand = l1 := unfolds_to_c_eq_of_head_ne_mu h_l1_cand hne
             subst cand
             exact ⟨.end, l1, hg1, Relation.ReflTransGen.refl, by simpa using hmatch⟩
 /- ## Structured Block 5 -/
@@ -290,7 +290,7 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
             have hne : ∀ x, head l1 ≠ .mu x := by
               intro x hx
               simp_all
-            have hEq : cand = l1 := UnfoldsToC_eq_of_head_ne_mu h_l1_cand hne
+            have hEq : cand = l1 := unfolds_to_c_eq_of_head_ne_mu h_l1_cand hne
             subst cand
             exact ⟨.var t, l1, hg1, Relation.ReflTransGen.refl, by simpa using hmatch⟩
         -- Local Unfolding: Communication Subcases
@@ -301,10 +301,10 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
                 have hne : ∀ x, head l1 ≠ .mu x := by
                   intro x hx
                   simp_all
-                have hEq : cand = l1 := UnfoldsToC_eq_of_head_ne_mu h_l1_cand hne
+                have hEq : cand = l1 := unfolds_to_c_eq_of_head_ne_mu h_l1_cand hne
                 subst cand
                 refine ⟨.comm sender receiver gbs, l1, hg1, Relation.ReflTransGen.refl, ?_⟩
-                exact Or.inl ⟨hrole, labels, hhead, BranchesProjRelC_mono hinc hbr⟩
+                exact Or.inl ⟨hrole, labels, hhead, branches_proj_rel_c_mono hinc hbr⟩
             | inr hrest =>
                 cases hrest with
                 | inl hreceiver =>
@@ -312,10 +312,10 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
                     have hne : ∀ x, head l1 ≠ .mu x := by
                       intro x hx
                       simp_all
-                    have hEq : cand = l1 := UnfoldsToC_eq_of_head_ne_mu h_l1_cand hne
+                    have hEq : cand = l1 := unfolds_to_c_eq_of_head_ne_mu h_l1_cand hne
                     subst cand
                     refine ⟨.comm sender receiver gbs, l1, hg1, Relation.ReflTransGen.refl, ?_⟩
-                    exact Or.inr (Or.inl ⟨hrole, labels, hhead, BranchesProjRelC_mono hinc hbr⟩)
+                    exact Or.inr (Or.inl ⟨hrole, labels, hhead, branches_proj_rel_c_mono hinc hbr⟩)
                 | inr hother =>
                     rcases hother with ⟨hns, hnr, hall⟩
                     have hall' : AllBranchesProjC R gbs role cand := by
@@ -330,11 +330,11 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
     simpa [ProjectC] using (SessionCoTypes.CoinductiveRel.coind (F := ProjectC_step) hle)
   exact hco _ _ _ ⟨l, hproj, hl⟩
 
-theorem ProjectC_mu_lift {g : GlobalType} {role : String} {x : String} {body : LocalTypeC}
+theorem project_c_mu_lift {g : GlobalType} {role : String} {x : String} {body : LocalTypeC}
     (hproj : ProjectC g role (mkMu x body)) : ProjectC g role body := by
   have hstep : UnfoldsC (mkMu x body) body := by
     refine ⟨x, (fun _ => body), ?_, rfl⟩
     simp [mkMu, PFunctor.M.dest_mk]
-  exact ProjectC_unfoldC hproj (Relation.ReflTransGen.single hstep)
+  exact project_c_unfold_c hproj (Relation.ReflTransGen.single hstep)
 
 end SessionCoTypes.Coinductive

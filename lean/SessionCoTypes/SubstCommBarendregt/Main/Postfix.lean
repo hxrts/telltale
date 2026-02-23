@@ -3,7 +3,7 @@ import SessionCoTypes.SubstCommBarendregt.Main.StandardCase
 
 /-! # SessionCoTypes.SubstCommBarendregt.Main.Postfix
 
-Standard constructor case analysis for `SubstRel_postfix_standard`.
+Standard constructor case analysis for `subst_rel_postfix_standard`.
 -/
 
 /-
@@ -19,7 +19,7 @@ open SessionTypes.GlobalType
 
 -- Standard Case Analysis
 
-theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
+theorem subst_rel_postfix_standard (var : String) (repl : LocalTypeR)
     (a b : LocalTypeR) (_hab : EQ2 a b)
     (hbarA : notBoundAt var a = true) (hbarB : notBoundAt var b = true)
     (hfresh : ∀ t, isFreeIn t repl = false)
@@ -43,7 +43,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
       · -- y == var, both become repl
         simp only [hy, ite_true]
         -- Goal: EQ2F (EQ2_closure (SubstRel var repl)) repl repl
-        have hf' : EQ2F EQ2 repl repl := EQ2.destruct (EQ2_refl repl)
+        have hf' : EQ2F EQ2 repl repl := EQ2.destruct (eq2_refl repl)
         exact EQ2F.mono (fun _ _ h => Or.inr h) repl repl hf'
       · -- y != var, x == var but hf says x = y
         simp only [hy, Bool.false_eq_true, ite_false]
@@ -63,14 +63,14 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     unfold EQ2F at hf ⊢
     unfold notBoundAt at hbarA hbarB
     obtain ⟨hp, hbranches⟩ := hf
-    exact ⟨hp, BranchesRel_substitute var repl bs cs hbranches hbarA hbarB hfresh⟩
+    exact ⟨hp, branches_rel_substitute var repl bs cs hbranches hbarA hbarB hfresh⟩
   -- recv-recv
   case recv.recv p bs q cs =>
     unfold LocalTypeR.substitute
     unfold EQ2F at hf ⊢
     unfold notBoundAt at hbarA hbarB
     obtain ⟨hp, hbranches⟩ := hf
-    exact ⟨hp, BranchesRel_substitute var repl bs cs hbranches hbarA hbarB hfresh⟩
+    exact ⟨hp, branches_rel_substitute var repl bs cs hbranches hbarA hbarB hfresh⟩
   -- Recursive Pair Case: `mu` vs `mu`
   -- mu-mu
 /- ## Structured Block 2 -/
@@ -98,7 +98,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
       apply Or.inl
       rw [← hb_subst]
       exact SubstRel.base _ _ hleft
-        (notBoundAt_subst var t body (.mu t body) hbarBody hmu_t_bar)
+        (not_bound_at_subst var t body (.mu t body) hbarBody hmu_t_bar)
         hmu_s_bar
     · -- Right goal: SubstRel ((mu t body).subst var repl) ((body'.subst s (mu s body')).subst var repl)
       rw [subst_mu_comm body' var s repl hbarBody' hfresh hsne]
@@ -106,11 +106,11 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
       rw [← ha_subst]
       exact SubstRel.base _ _ hright
         hmu_t_bar
-        (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
+        (not_bound_at_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
   -- Mixed Case: `mu` vs `end`
   -- mu-end (unfolding on left)
   case mu.end t body =>
-    have htvar := bne_of_notBoundAt_mu hbarA
+    have htvar := bne_of_not_bound_at_mu hbarA
     unfold notBoundAt at hbarA
     have ⟨hvart, hbarBody⟩ := Bool.and_eq_true_iff.mp hbarA
     have htne : t ≠ var := by simp only [bne_iff_ne, ne_eq] at hvart; exact fun h => hvart h.symm
@@ -122,18 +122,18 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     rw [subst_mu_comm body var t repl hbarBody hfresh htne]
     apply Or.inl
     exact SubstRel.base _ _ hf
-      (notBoundAt_subst var t body (.mu t body) hbarBody hmu_t_bar)
+      (not_bound_at_subst var t body (.mu t body) hbarBody hmu_t_bar)
       (by rfl)
   -- Mixed Case: `mu` vs `var`
   case mu.var t body v =>
-    have htvar := bne_of_notBoundAt_mu hbarA
+    have htvar := bne_of_not_bound_at_mu hbarA
     unfold notBoundAt at hbarA
     have ⟨hvart, hbarBody⟩ := Bool.and_eq_true_iff.mp hbarA
 /- ## Structured Block 3 -/
     have htne : t ≠ var := by simp only [bne_iff_ne, ne_eq] at hvart; exact fun h => hvart h.symm
     have hmu_t_bar : notBoundAt var (.mu t body) = true := by
       unfold notBoundAt; exact Bool.and_eq_true_iff.mpr ⟨hvart, hbarBody⟩
-    simp only [EQ2F_mu_var] at hf
+    simp only [eq2_f_mu_var] at hf
     have ha_subst := mu_substitute_ne t body var repl htvar
     rw [ha_subst]
     -- `mu.var`: Split on Whether `v = var`
@@ -143,47 +143,47 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
       rw [hb_subst]
       cases repl with
       | «end» =>
-        simp only [EQ2F_mu_end]
+        simp only [eq2_f_mu_end]
         rw [subst_mu_comm body var t (.end) hbarBody (by intro t'; exact hfresh t') htne]
         apply Or.inl
         have hsr : SubstRel var .end ((body.substitute t (.mu t body)).substitute var .end)
             ((LocalTypeR.var v).substitute var .end) :=
           SubstRel.base (body.substitute t (.mu t body)) (LocalTypeR.var v) hf
-            (notBoundAt_subst var t body (.mu t body) hbarBody hmu_t_bar)
+            (not_bound_at_subst var t body (.mu t body) hbarBody hmu_t_bar)
             (by rfl : notBoundAt var (.var v) = true)
         rw [var_substitute_eq v var .end hv] at hsr
         exact hsr
       | var w =>
-        simp only [EQ2F_mu_var]
+        simp only [eq2_f_mu_var]
         rw [subst_mu_comm body var t (.var w) hbarBody (by intro t'; exact hfresh t') htne]
         apply Or.inl
         have hsr : SubstRel var (.var w) ((body.substitute t (.mu t body)).substitute var (.var w))
             ((LocalTypeR.var v).substitute var (.var w)) :=
           SubstRel.base (body.substitute t (.mu t body)) (LocalTypeR.var v) hf
-            (notBoundAt_subst var t body (.mu t body) hbarBody hmu_t_bar)
+            (not_bound_at_subst var t body (.mu t body) hbarBody hmu_t_bar)
             (by rfl : notBoundAt var (.var v) = true)
         rw [var_substitute_eq v var (.var w) hv] at hsr
         exact hsr
       | send p bs =>
-        simp only [EQ2F_mu_send]
+        simp only [eq2_f_mu_send]
         rw [subst_mu_comm body var t (.send p bs) hbarBody (by intro t'; exact hfresh t') htne]
         apply Or.inl
         have hsr : SubstRel var (.send p bs) ((body.substitute t (.mu t body)).substitute var (.send p bs))
             ((LocalTypeR.var v).substitute var (.send p bs)) :=
           SubstRel.base (body.substitute t (.mu t body)) (LocalTypeR.var v) hf
-            (notBoundAt_subst var t body (.mu t body) hbarBody hmu_t_bar)
+            (not_bound_at_subst var t body (.mu t body) hbarBody hmu_t_bar)
             (by rfl : notBoundAt var (.var v) = true)
         rw [var_substitute_eq v var (.send p bs) hv] at hsr
         exact hsr
       | recv p bs =>
-        simp only [EQ2F_mu_recv]
+        simp only [eq2_f_mu_recv]
         rw [subst_mu_comm body var t (.recv p bs) hbarBody (by intro t'; exact hfresh t') htne]
         apply Or.inl
         have hsr : SubstRel var (.recv p bs) ((body.substitute t (.mu t body)).substitute var (.recv p bs))
             ((LocalTypeR.var v).substitute var (.recv p bs)) :=
           SubstRel.base (body.substitute t (.mu t body)) (LocalTypeR.var v) hf
 /- ## Structured Block 4 -/
-            (notBoundAt_subst var t body (.mu t body) hbarBody hmu_t_bar)
+            (not_bound_at_subst var t body (.mu t body) hbarBody hmu_t_bar)
             (by rfl : notBoundAt var (.var v) = true)
         rw [var_substitute_eq v var (.recv p bs) hv] at hsr
         exact hsr
@@ -197,7 +197,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
           have hsr : SubstRel var (.mu s body') ((body.substitute t (.mu t body)).substitute var (.mu s body'))
               ((LocalTypeR.var v).substitute var (.mu s body')) :=
             SubstRel.base (body.substitute t (.mu t body)) (LocalTypeR.var v) hf
-              (notBoundAt_subst var t body (.mu t body) hbarBody hmu_t_bar)
+              (not_bound_at_subst var t body (.mu t body) hbarBody hmu_t_bar)
               (by rfl : notBoundAt var (.var v) = true)
           rw [var_substitute_eq v var (.mu s body') hv] at hsr
           exact hsr
@@ -205,7 +205,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
           apply Or.inl
           have hab : EQ2 (.mu t body) (.var v) := by
             apply EQ2.construct
-            simp only [EQ2F_mu_var]
+            simp only [eq2_f_mu_var]
             exact hf
           have hsr_base : SubstRel var (LocalTypeR.mu s body')
               ((LocalTypeR.mu t body).substitute var (LocalTypeR.mu s body'))
@@ -237,19 +237,19 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
       have hb_subst := var_substitute_ne v var repl hv'
       rw [hb_subst]
 /- ## Structured Block 5 -/
-      simp only [EQ2F_mu_var]
+      simp only [eq2_f_mu_var]
       rw [subst_mu_comm body var t repl hbarBody hfresh htne]
       apply Or.inl
       have hsr : SubstRel var repl ((body.substitute t (.mu t body)).substitute var repl)
           ((LocalTypeR.var v).substitute var repl) :=
         SubstRel.base (body.substitute t (.mu t body)) (LocalTypeR.var v) hf
-          (notBoundAt_subst var t body (.mu t body) hbarBody hmu_t_bar)
+          (not_bound_at_subst var t body (.mu t body) hbarBody hmu_t_bar)
           (by rfl : notBoundAt var (.var v) = true)
       rw [hb_subst] at hsr
       exact hsr
   -- Mixed Case: `mu` vs `send`
   case mu.send t body p bs =>
-    have htvar := bne_of_notBoundAt_mu hbarA
+    have htvar := bne_of_not_bound_at_mu hbarA
     have hbarB_orig := hbarB  -- Save before unfolding
     unfold notBoundAt at hbarA hbarB
     have ⟨hvart, hbarBody⟩ := Bool.and_eq_true_iff.mp hbarA
@@ -259,20 +259,20 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     have ha_subst := mu_substitute_ne t body var repl htvar
     have hb_subst : (LocalTypeR.send p bs).substitute var repl = .send p (SessionTypes.LocalTypeR.substituteBranches bs var repl) := rfl
     -- Use EQ2F reduction lemma
-    simp only [EQ2F_mu_send] at hf
-    simp only [ha_subst, hb_subst, EQ2F_mu_send]
+    simp only [eq2_f_mu_send] at hf
+    simp only [ha_subst, hb_subst, eq2_f_mu_send]
     rw [subst_mu_comm body var t repl hbarBody hfresh htne]
     apply Or.inl
     have hsr : SubstRel var repl ((body.substitute t (.mu t body)).substitute var repl)
         ((LocalTypeR.send p bs).substitute var repl) :=
       SubstRel.base (body.substitute t (.mu t body)) (LocalTypeR.send p bs) hf
-        (notBoundAt_subst var t body (.mu t body) hbarBody hmu_t_bar)
+        (not_bound_at_subst var t body (.mu t body) hbarBody hmu_t_bar)
         hbarB_orig
     rw [hb_subst] at hsr
     exact hsr
   -- Mixed Case: `mu` vs `recv`
   case mu.recv t body p bs =>
-    have htvar := bne_of_notBoundAt_mu hbarA
+    have htvar := bne_of_not_bound_at_mu hbarA
     have hbarB_orig := hbarB  -- Save before unfolding
     unfold notBoundAt at hbarA hbarB
     have ⟨hvart, hbarBody⟩ := Bool.and_eq_true_iff.mp hbarA
@@ -282,14 +282,14 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     have ha_subst := mu_substitute_ne t body var repl htvar
     have hb_subst : (LocalTypeR.recv p bs).substitute var repl = .recv p (SessionTypes.LocalTypeR.substituteBranches bs var repl) := rfl
     -- Use EQ2F reduction lemma
-    simp only [EQ2F_mu_recv] at hf
-    simp only [ha_subst, hb_subst, EQ2F_mu_recv]
+    simp only [eq2_f_mu_recv] at hf
+    simp only [ha_subst, hb_subst, eq2_f_mu_recv]
     rw [subst_mu_comm body var t repl hbarBody hfresh htne]
     apply Or.inl
     have hsr : SubstRel var repl ((body.substitute t (.mu t body)).substitute var repl)
         ((LocalTypeR.recv p bs).substitute var repl) :=
       SubstRel.base (body.substitute t (.mu t body)) (LocalTypeR.recv p bs) hf
-        (notBoundAt_subst var t body (.mu t body) hbarBody hmu_t_bar)
+        (not_bound_at_subst var t body (.mu t body) hbarBody hmu_t_bar)
         hbarB_orig
 /- ## Structured Block 6 -/
     rw [hb_subst] at hsr
@@ -297,7 +297,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
   -- Mixed Case: `end` vs `mu`
   -- end-mu (unfolding on right)
   case end.mu s body' =>
-    have hsvar := bne_of_notBoundAt_mu hbarB
+    have hsvar := bne_of_not_bound_at_mu hbarB
     unfold notBoundAt at hbarB
     have ⟨hvars, hbarBody'⟩ := Bool.and_eq_true_iff.mp hbarB
     have hsne : s ≠ var := by simp only [bne_iff_ne, ne_eq] at hvars; exact fun h => hvars h.symm
@@ -306,27 +306,27 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     have ha_subst : LocalTypeR.end.substitute var repl = .end := rfl
     have hb_subst := mu_substitute_ne s body' var repl hsvar
     -- Use EQ2F reduction lemma
-    simp only [EQ2F_end_mu] at hf
-    simp only [ha_subst, hb_subst, EQ2F_end_mu]
+    simp only [eq2_f_end_mu] at hf
+    simp only [ha_subst, hb_subst, eq2_f_end_mu]
     rw [subst_mu_comm body' var s repl hbarBody' hfresh hsne]
     apply Or.inl
     have hsr : SubstRel var repl (LocalTypeR.end.substitute var repl)
         ((body'.substitute s (.mu s body')).substitute var repl) :=
       SubstRel.base LocalTypeR.end (body'.substitute s (.mu s body')) hf
         (by rfl : notBoundAt var LocalTypeR.end = true)
-        (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
+        (not_bound_at_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
     rw [ha_subst] at hsr
     exact hsr
   -- Mixed Case: `var` vs `mu`
   case var.mu v s body' =>
-    have hsvar := bne_of_notBoundAt_mu hbarB
+    have hsvar := bne_of_not_bound_at_mu hbarB
     unfold notBoundAt at hbarB
     have ⟨hvars, hbarBody'⟩ := Bool.and_eq_true_iff.mp hbarB
     have hsne : s ≠ var := by simp only [bne_iff_ne, ne_eq] at hvars; exact fun h => hvars h.symm
     have hmu_s_bar : notBoundAt var (.mu s body') = true := by
       unfold notBoundAt; exact Bool.and_eq_true_iff.mpr ⟨hvars, hbarBody'⟩
     have hb_subst := mu_substitute_ne s body' var repl hsvar
-    simp only [EQ2F_var_mu] at hf
+    simp only [eq2_f_var_mu] at hf
     -- `var.mu`: Split on Whether `v = var`
     by_cases hv : v == var
     -- `var.mu`: `v = var`, Analyze `repl` Shape
@@ -334,18 +334,18 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
       have ha_subst := var_substitute_eq v var repl hv
       cases repl with
       | «end» =>
-        simp only [ha_subst, hb_subst, EQ2F_end_mu]
+        simp only [ha_subst, hb_subst, eq2_f_end_mu]
         rw [subst_mu_comm body' var s (.end) hbarBody' (by intro t'; exact hfresh t') hsne]
         apply Or.inl
         have hsr : SubstRel var .end ((LocalTypeR.var v).substitute var .end)
             ((body'.substitute s (.mu s body')).substitute var .end) :=
           SubstRel.base (LocalTypeR.var v) (body'.substitute s (.mu s body')) hf
             (by rfl : notBoundAt var (LocalTypeR.var v) = true)
-            (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
+            (not_bound_at_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
         rw [var_substitute_eq v var .end hv] at hsr
         exact hsr
       | var w =>
-        simp only [ha_subst, hb_subst, EQ2F_var_mu]
+        simp only [ha_subst, hb_subst, eq2_f_var_mu]
         rw [subst_mu_comm body' var s (.var w) hbarBody' (by intro t'; exact hfresh t') hsne]
         apply Or.inl
 /- ## Structured Block 7 -/
@@ -353,29 +353,29 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
             ((body'.substitute s (.mu s body')).substitute var (.var w)) :=
           SubstRel.base (LocalTypeR.var v) (body'.substitute s (.mu s body')) hf
             (by rfl : notBoundAt var (LocalTypeR.var v) = true)
-            (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
+            (not_bound_at_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
         rw [var_substitute_eq v var (.var w) hv] at hsr
         exact hsr
       | send p bs =>
-        simp only [ha_subst, hb_subst, EQ2F_send_mu]
+        simp only [ha_subst, hb_subst, eq2_f_send_mu]
         rw [subst_mu_comm body' var s (.send p bs) hbarBody' (by intro t'; exact hfresh t') hsne]
         apply Or.inl
         have hsr : SubstRel var (.send p bs) ((LocalTypeR.var v).substitute var (.send p bs))
             ((body'.substitute s (.mu s body')).substitute var (.send p bs)) :=
           SubstRel.base (LocalTypeR.var v) (body'.substitute s (.mu s body')) hf
             (by rfl : notBoundAt var (LocalTypeR.var v) = true)
-            (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
+            (not_bound_at_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
         rw [var_substitute_eq v var (.send p bs) hv] at hsr
         exact hsr
       | recv p bs =>
-        simp only [ha_subst, hb_subst, EQ2F_recv_mu]
+        simp only [ha_subst, hb_subst, eq2_f_recv_mu]
         rw [subst_mu_comm body' var s (.recv p bs) hbarBody' (by intro t'; exact hfresh t') hsne]
         apply Or.inl
         have hsr : SubstRel var (.recv p bs) ((LocalTypeR.var v).substitute var (.recv p bs))
             ((body'.substitute s (.mu s body')).substitute var (.recv p bs)) :=
           SubstRel.base (LocalTypeR.var v) (body'.substitute s (.mu s body')) hf
             (by rfl : notBoundAt var (LocalTypeR.var v) = true)
-            (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
+            (not_bound_at_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
         rw [var_substitute_eq v var (.recv p bs) hv] at hsr
         exact hsr
       -- `var.mu`: `v = var`, `repl = mu`
@@ -386,7 +386,7 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
           apply Or.inl
           have hab : EQ2 (.var v) (.mu s body') := by
             apply EQ2.construct
-            simp only [EQ2F_var_mu]
+            simp only [eq2_f_var_mu]
             exact hf
           have hsr_base : SubstRel var (LocalTypeR.mu t body)
               ((LocalTypeR.var v).substitute var (LocalTypeR.mu t body))
@@ -421,26 +421,26 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
               ((body'.substitute s (.mu s body')).substitute var (.mu t body)) :=
             SubstRel.base (LocalTypeR.var v) (body'.substitute s (.mu s body')) hf
               (by rfl : notBoundAt var (LocalTypeR.var v) = true)
-              (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
+              (not_bound_at_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
           rw [var_substitute_eq v var (.mu t body) hv] at hsr
           exact hsr
     -- `var.mu`: `v ≠ var`
     ·
       have hv' : (v == var) = false := by cases h : v == var <;> simp_all
       have ha_subst := var_substitute_ne v var repl hv'
-      simp only [ha_subst, hb_subst, EQ2F_var_mu]
+      simp only [ha_subst, hb_subst, eq2_f_var_mu]
       rw [subst_mu_comm body' var s repl hbarBody' hfresh hsne]
       apply Or.inl
       have hsr : SubstRel var repl ((LocalTypeR.var v).substitute var repl)
           ((body'.substitute s (LocalTypeR.mu s body')).substitute var repl) :=
         SubstRel.base (LocalTypeR.var v) (body'.substitute s (LocalTypeR.mu s body')) hf
           (by rfl : notBoundAt var (LocalTypeR.var v) = true)
-          (notBoundAt_subst var s body' (LocalTypeR.mu s body') hbarBody' hmu_s_bar)
+          (not_bound_at_subst var s body' (LocalTypeR.mu s body') hbarBody' hmu_s_bar)
       rw [ha_subst] at hsr
       exact hsr
   -- Mixed Case: `send` vs `mu`
   case send.mu p bs s body' =>
-    have hsvar := bne_of_notBoundAt_mu hbarB
+    have hsvar := bne_of_not_bound_at_mu hbarB
     have hbarA_orig := hbarA  -- Save original before unfolding
     unfold notBoundAt at hbarA hbarB
     have ⟨hvars, hbarBody'⟩ := Bool.and_eq_true_iff.mp hbarB
@@ -450,8 +450,8 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     have ha_subst : (LocalTypeR.send p bs).substitute var repl = .send p (SessionTypes.LocalTypeR.substituteBranches bs var repl) := rfl
     have hb_subst := mu_substitute_ne s body' var repl hsvar
     -- Use EQ2F reduction lemma
-    simp only [EQ2F_send_mu] at hf
-    simp only [ha_subst, hb_subst, EQ2F_send_mu]
+    simp only [eq2_f_send_mu] at hf
+    simp only [ha_subst, hb_subst, eq2_f_send_mu]
     rw [subst_mu_comm body' var s repl hbarBody' hfresh hsne]
     apply Or.inl
     have hsr : SubstRel var repl ((LocalTypeR.send p bs).substitute var repl)
@@ -459,12 +459,12 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
         ((body'.substitute s (.mu s body')).substitute var repl) :=
       SubstRel.base (LocalTypeR.send p bs) (body'.substitute s (.mu s body')) hf
         hbarA_orig
-        (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
+        (not_bound_at_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
     rw [ha_subst] at hsr
     exact hsr
   -- Mixed Case: `recv` vs `mu`
   case recv.mu p bs s body' =>
-    have hsvar := bne_of_notBoundAt_mu hbarB
+    have hsvar := bne_of_not_bound_at_mu hbarB
     have hbarA_orig := hbarA  -- Save original before unfolding
     unfold notBoundAt at hbarA hbarB
     have ⟨hvars, hbarBody'⟩ := Bool.and_eq_true_iff.mp hbarB
@@ -474,15 +474,15 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     have ha_subst : (LocalTypeR.recv p bs).substitute var repl = .recv p (SessionTypes.LocalTypeR.substituteBranches bs var repl) := rfl
     have hb_subst := mu_substitute_ne s body' var repl hsvar
     -- Use EQ2F reduction lemma
-    simp only [EQ2F_recv_mu] at hf
-    simp only [ha_subst, hb_subst, EQ2F_recv_mu]
+    simp only [eq2_f_recv_mu] at hf
+    simp only [ha_subst, hb_subst, eq2_f_recv_mu]
     rw [subst_mu_comm body' var s repl hbarBody' hfresh hsne]
     apply Or.inl
     have hsr : SubstRel var repl ((LocalTypeR.recv p bs).substitute var repl)
         ((body'.substitute s (.mu s body')).substitute var repl) :=
       SubstRel.base (LocalTypeR.recv p bs) (body'.substitute s (.mu s body')) hf
         hbarA_orig
-        (notBoundAt_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
+        (not_bound_at_subst var s body' (.mu s body') hbarBody' hmu_s_bar)
     rw [ha_subst] at hsr
     exact hsr
   -- Constructor-Incompatible Cases

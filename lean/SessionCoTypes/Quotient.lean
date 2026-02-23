@@ -15,14 +15,14 @@ The following definitions form the semantic interface for proofs:
 - `QLocalTypeR.ofLocal`: inject local type into quotient
 - `QLocalTypeR.unfold`: lifted unfold operation
 - `QLocalTypeR.dual`: lifted duality
-- `EQ2_dual`: duality respects EQ2
+- `eq2_dual`: duality respects EQ2
 
 ## Imports from Substitute Module
 
 The following are imported from `SessionCoTypes.Substitute`:
 
-- `EQ2_substitute`: substitution respects EQ2
-- `unfold_substitute_EQ2`: unfold/substitute confluence
+- `eq2_substitute`: substitution respects EQ2
+- `unfold_substitute_eq2`: unfold/substitute confluence
 -/
 
 namespace SessionCoTypes.Quotient
@@ -43,17 +43,17 @@ def QLocalTypeR.ofLocal (t : LocalTypeR) : QLocalTypeR :=
 def QLocalTypeR.unfold : QLocalTypeR → QLocalTypeR :=
   Quot.map LocalTypeR.unfold (by
     intro a b h
-    exact EQ2_unfold h)
+    exact eq2_unfold h)
 
 /-- Unfolding agrees with representatives. -/
-theorem QLocalTypeR.unfold_ofLocal (t : LocalTypeR) :
+theorem QLocalTypeR.unfold_of_local (t : LocalTypeR) :
     QLocalTypeR.unfold (QLocalTypeR.ofLocal t) =
       QLocalTypeR.ofLocal (LocalTypeR.unfold t) := by
   rfl
 
 /-! ## Substitution Congruence (Deferred)
 
-Substitution on the quotient is deferred because the current EQ2_substitute proof
+Substitution on the quotient is deferred because the current eq2_substitute proof
 requires Barendregt side conditions (notBoundAt + repl closed).
 -/
 
@@ -62,18 +62,18 @@ requires Barendregt side conditions (notBoundAt + repl closed).
 -- EQ2_dual is proved in CoTypes.Dual; we re-export a local alias here.
 /-- Duality respects EQ2: if two types are EQ2-equivalent, their duals
     are also EQ2-equivalent. -/
-theorem EQ2_dual (a b : LocalTypeR)
+theorem eq2_dual (a b : LocalTypeR)
     (h : EQ2 a b) : EQ2 a.dual b.dual := by
-  simpa using (SessionCoTypes.EQ2.EQ2_dual h)
+  simpa using (SessionCoTypes.EQ2.eq2_dual h)
 
 /-- Dual on the quotient (well-defined by EQ2_dual). -/
 def QLocalTypeR.dual : QLocalTypeR → QLocalTypeR :=
   Quot.map LocalTypeR.dual (by
     intro a b h
-    exact EQ2_dual a b h)
+    exact eq2_dual a b h)
 
 /-- Duality agrees with representatives. -/
-theorem QLocalTypeR.dual_ofLocal (t : LocalTypeR) :
+theorem QLocalTypeR.dual_of_local (t : LocalTypeR) :
     QLocalTypeR.dual (QLocalTypeR.ofLocal t) =
       QLocalTypeR.ofLocal t.dual := by
   rfl
@@ -81,7 +81,7 @@ theorem QLocalTypeR.dual_ofLocal (t : LocalTypeR) :
 /-! ## Rewriting Lemmas -/
 
 /-- Quotient equality from EQ2. -/
-theorem QLocalTypeR.eq_of_EQ2 {a b : LocalTypeR} (h : EQ2 a b) :
+theorem QLocalTypeR.eq_of_eq2 {a b : LocalTypeR} (h : EQ2 a b) :
     QLocalTypeR.ofLocal a = QLocalTypeR.ofLocal b :=
   Quot.sound h
 

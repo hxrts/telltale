@@ -61,23 +61,23 @@ end
 
 mutual
   /-- isFreeIn is invariant under duality. -/
-  theorem isFreeIn_dual (v : String) (t : LocalTypeR) :
+  theorem is_free_in_dual (v : String) (t : LocalTypeR) :
       isFreeIn v t.dual = isFreeIn v t := by
     -- Structural recursion; send/recv share the branch case.
     cases t with
     | «end» => rfl
     | var w => rfl
     | send p bs =>
-        simp [LocalTypeR.dual, isFreeIn, isFreeInBranches_dual]
+        simp [LocalTypeR.dual, isFreeIn, is_free_in_branches_dual]
     | recv p bs =>
-        simp [LocalTypeR.dual, isFreeIn, isFreeInBranches_dual]
+        simp [LocalTypeR.dual, isFreeIn, is_free_in_branches_dual]
     | mu t body =>
         by_cases hv : v == t
         · simp [LocalTypeR.dual, isFreeIn, hv]
-        · simp [LocalTypeR.dual, isFreeIn, hv, isFreeIn_dual v body]
+        · simp [LocalTypeR.dual, isFreeIn, hv, is_free_in_dual v body]
 
   /-- isFreeInBranches is invariant under duality. -/
-  theorem isFreeInBranches_dual (v : String) (bs : List BranchR) :
+  theorem is_free_in_branches_dual (v : String) (bs : List BranchR) :
       isFreeInBranches v (dualBranches bs) = isFreeInBranches v bs := by
     -- Recurse over branches, dualizing continuations.
     cases bs with
@@ -87,7 +87,7 @@ mutual
         | mk l rest =>
             cases rest with
             | mk vt t =>
-                simp [dualBranches, isFreeInBranches, isFreeIn_dual, isFreeInBranches_dual]
+                simp [dualBranches, isFreeInBranches, is_free_in_dual, is_free_in_branches_dual]
 /- ## Structured Block 2 -/
 end
 
@@ -95,21 +95,21 @@ end
 
 mutual
   /-- notBoundAt is invariant under duality. -/
-  theorem notBoundAt_dual (v : String) (t : LocalTypeR) :
+  theorem not_bound_at_dual (v : String) (t : LocalTypeR) :
       notBoundAt v t.dual = notBoundAt v t := by
     -- Structural recursion; send/recv share the branch case.
     cases t with
     | «end» => rfl
     | var w => rfl
     | send p bs =>
-        simp [LocalTypeR.dual, notBoundAt, notBoundAtBranches_dual]
+        simp [LocalTypeR.dual, notBoundAt, not_bound_at_branches_dual]
     | recv p bs =>
-        simp [LocalTypeR.dual, notBoundAt, notBoundAtBranches_dual]
+        simp [LocalTypeR.dual, notBoundAt, not_bound_at_branches_dual]
     | mu t body =>
-        simp [LocalTypeR.dual, notBoundAt, notBoundAt_dual v body]
+        simp [LocalTypeR.dual, notBoundAt, not_bound_at_dual v body]
 
   /-- notBoundAtBranches is invariant under duality. -/
-  theorem notBoundAtBranches_dual (v : String) (bs : List BranchR) :
+  theorem not_bound_at_branches_dual (v : String) (bs : List BranchR) :
       notBoundAtBranches v (dualBranches bs) = notBoundAtBranches v bs := by
     -- Recurse over branches; dual does not affect binders.
     cases bs with
@@ -119,14 +119,14 @@ mutual
         | mk l rest =>
             cases rest with
             | mk vt t =>
-                simp [dualBranches, notBoundAtBranches, notBoundAt_dual, notBoundAtBranches_dual]
+                simp [dualBranches, notBoundAtBranches, not_bound_at_dual, not_bound_at_branches_dual]
 end
 
 -- notBoundAt Substitution Preservation
 
 mutual
   /-- notBoundAt is preserved through substitution when repl also satisfies it. -/
-  theorem notBoundAt_subst (v var : String) (a repl : LocalTypeR)
+  theorem not_bound_at_subst (v var : String) (a repl : LocalTypeR)
       (hbar : notBoundAt v a = true)
       (hvarRepl : notBoundAt v repl = true) :
       notBoundAt v (a.substitute var repl) = true := by
@@ -139,10 +139,10 @@ mutual
         · simp only [hwvar, Bool.false_eq_true, ↓reduceIte, notBoundAt]
     | send p bs =>
         simp only [LocalTypeR.substitute, notBoundAt]
-        exact notBoundAt_subst_branches v var bs repl (by unfold notBoundAt at hbar; exact hbar) hvarRepl
+        exact not_bound_at_subst_branches v var bs repl (by unfold notBoundAt at hbar; exact hbar) hvarRepl
     | recv p bs =>
         simp only [LocalTypeR.substitute, notBoundAt]
-        exact notBoundAt_subst_branches v var bs repl (by unfold notBoundAt at hbar; exact hbar) hvarRepl
+        exact not_bound_at_subst_branches v var bs repl (by unfold notBoundAt at hbar; exact hbar) hvarRepl
     | mu t body =>
         simp only [LocalTypeR.substitute]
         by_cases htvar : t == var
@@ -153,11 +153,11 @@ mutual
           unfold notBoundAt at hbar
 /- ## Structured Block 3 -/
           have ⟨hvt, hbarBody⟩ := Bool.and_eq_true_iff.mp hbar
-          exact Bool.and_eq_true_iff.mpr ⟨hvt, notBoundAt_subst v var body repl hbarBody hvarRepl⟩
+          exact Bool.and_eq_true_iff.mpr ⟨hvt, not_bound_at_subst v var body repl hbarBody hvarRepl⟩
   termination_by sizeOf a
 
   /-- notBoundAt for branches is preserved through substitution. -/
-  theorem notBoundAt_subst_branches (v var : String) (bs : List BranchR) (repl : LocalTypeR)
+  theorem not_bound_at_subst_branches (v var : String) (bs : List BranchR) (repl : LocalTypeR)
       (hbar : notBoundAtBranches v bs = true)
       (hvarRepl : notBoundAt v repl = true) :
       notBoundAtBranches v (SessionTypes.LocalTypeR.substituteBranches bs var repl) = true :=
@@ -167,8 +167,8 @@ mutual
         simp only [SessionTypes.LocalTypeR.substituteBranches, notBoundAtBranches]
         unfold notBoundAtBranches at hbar
         have ⟨hbarHd, hbarTl⟩ := Bool.and_eq_true_iff.mp hbar
-        exact Bool.and_eq_true_iff.mpr ⟨notBoundAt_subst v var hd.2.2 repl hbarHd hvarRepl,
-          notBoundAt_subst_branches v var tl repl hbarTl hvarRepl⟩
+        exact Bool.and_eq_true_iff.mpr ⟨not_bound_at_subst v var hd.2.2 repl hbarHd hvarRepl,
+          not_bound_at_subst_branches v var tl repl hbarTl hvarRepl⟩
   termination_by sizeOf bs
   decreasing_by
     all_goals simp_wf
@@ -176,7 +176,7 @@ mutual
     case _ =>
       -- Destructure hd : BranchR = Label × Option ValType × LocalTypeR
       obtain ⟨label, vt, cont⟩ := hd
-      exact sizeOf_cont_lt_sizeOf_branches label vt cont tl
+      exact size_of_cont_lt_size_of_branches label vt cont tl
     -- 0 < 1 + sizeOf hd is trivial
     case _ => omega
 end
@@ -185,7 +185,7 @@ end
 
 /-- notBoundAt is preserved through unfolding. -/
 @[simp]
-theorem notBoundAt_unfold (v : String) (a : LocalTypeR)
+theorem not_bound_at_unfold (v : String) (a : LocalTypeR)
     (hbar : notBoundAt v a = true) :
     notBoundAt v a.unfold = true := by
   cases a with
@@ -200,7 +200,7 @@ theorem notBoundAt_unfold (v : String) (a : LocalTypeR)
       unfold notBoundAt at hbar
       have ⟨hvt, hbarBody⟩ := Bool.and_eq_true_iff.mp hbar
       -- Apply notBoundAt_subst: need notBoundAt v body and notBoundAt v (.mu t body)
-      apply notBoundAt_subst v t body (.mu t body) hbarBody
+      apply not_bound_at_subst v t body (.mu t body) hbarBody
       -- Need: notBoundAt v (.mu t body) = true
       unfold notBoundAt
       exact Bool.and_eq_true_iff.mpr ⟨hvt, hbarBody⟩
@@ -225,12 +225,12 @@ mutual
         simp only [LocalTypeR.substitute]
         congr 1
         simp only [isFreeIn] at hnot_free
-        exact substituteBranches_not_free bs x rx hnot_free
+        exact substitute_branches_not_free bs x rx hnot_free
     | recv p bs =>
         simp only [LocalTypeR.substitute]
         congr 1
         simp only [isFreeIn] at hnot_free
-        exact substituteBranches_not_free bs x rx hnot_free
+        exact substitute_branches_not_free bs x rx hnot_free
     | mu t body =>
         simp only [LocalTypeR.substitute]
         by_cases hxt : t == x
@@ -247,7 +247,7 @@ mutual
   -- Substitute-Not-Free: Branch Version
 
   /-- If x is not free in any branch, substituting for x leaves branches unchanged. -/
-  theorem substituteBranches_not_free (bs : List BranchR) (x : String) (rx : LocalTypeR)
+  theorem substitute_branches_not_free (bs : List BranchR) (x : String) (rx : LocalTypeR)
       (hnot_free : isFreeInBranches x bs = false) :
       SessionTypes.LocalTypeR.substituteBranches bs x rx = bs := by
     match bs with
@@ -256,7 +256,7 @@ mutual
         simp only [SessionTypes.LocalTypeR.substituteBranches]
         simp only [isFreeInBranches, Bool.or_eq_false_iff] at hnot_free
         have h1 : cont.substitute x rx = cont := substitute_not_free cont x rx hnot_free.1
-        have h2 : SessionTypes.LocalTypeR.substituteBranches rest x rx = rest := substituteBranches_not_free rest x rx hnot_free.2
+        have h2 : SessionTypes.LocalTypeR.substituteBranches rest x rx = rest := substitute_branches_not_free rest x rx hnot_free.2
         simp only [h1, h2]
   termination_by sizeOf bs
   decreasing_by
@@ -274,7 +274,7 @@ theorem substitute_closed (e : LocalTypeR) (x : String) (rx : LocalTypeR)
 
 /-- A variable bound by mu is not free in the mu type. -/
 @[simp]
-theorem isFreeIn_mu_self (t : String) (body : LocalTypeR) :
+theorem is_free_in_mu_self (t : String) (body : LocalTypeR) :
     isFreeIn t (.mu t body) = false := by
   simp only [isFreeIn, beq_self_eq_true, ↓reduceIte]
 
@@ -285,7 +285,7 @@ mutual
 
       Key insight: Every occurrence of t in e gets replaced by repl,
       and t is not free in repl, so t cannot be free in the result. -/
-  theorem isFreeIn_subst_self_general (e : LocalTypeR) (t : String) (repl : LocalTypeR)
+  theorem is_free_in_subst_self_general (e : LocalTypeR) (t : String) (repl : LocalTypeR)
       (hrepl : isFreeIn t repl = false) :
 /- ## Structured Block 5 -/
       isFreeIn t (e.substitute t repl) = false := by
@@ -303,10 +303,10 @@ mutual
           exact fun h => hwt (beq_iff_eq.mpr h.symm)
     | send p bs =>
         simp only [LocalTypeR.substitute, isFreeIn]
-        exact isFreeInBranches_subst_self_general bs t repl hrepl
+        exact is_free_in_branches_subst_self_general bs t repl hrepl
     | recv p bs =>
         simp only [LocalTypeR.substitute, isFreeIn]
-        exact isFreeInBranches_subst_self_general bs t repl hrepl
+        exact is_free_in_branches_subst_self_general bs t repl hrepl
     | mu s inner =>
         simp only [LocalTypeR.substitute]
         by_cases hst : s == t
@@ -319,21 +319,21 @@ mutual
           have hts : (t == s) = false := by
             simp only [beq_eq_false_iff_ne, ne_eq]; exact fun h => hst (beq_iff_eq.mpr h.symm)
           simp only [hts, Bool.false_eq_true, ↓reduceIte]
-          exact isFreeIn_subst_self_general inner t repl hrepl
+          exact is_free_in_subst_self_general inner t repl hrepl
   termination_by sizeOf e
 
   -- Substitution Self-Elimination: Branch Version
 
   /-- Branch version of isFreeIn_subst_self_general. -/
-  theorem isFreeInBranches_subst_self_general (bs : List BranchR) (t : String)
+  theorem is_free_in_branches_subst_self_general (bs : List BranchR) (t : String)
       (repl : LocalTypeR) (hrepl : isFreeIn t repl = false) :
       isFreeInBranches t (SessionTypes.LocalTypeR.substituteBranches bs t repl) = false := by
     match bs with
     | [] => simp only [SessionTypes.LocalTypeR.substituteBranches, isFreeInBranches]
     | (label, _vt, cont) :: rest =>
         simp only [SessionTypes.LocalTypeR.substituteBranches, isFreeInBranches, Bool.or_eq_false_iff]
-        exact ⟨isFreeIn_subst_self_general cont t repl hrepl,
-               isFreeInBranches_subst_self_general rest t repl hrepl⟩
+        exact ⟨is_free_in_subst_self_general cont t repl hrepl,
+               is_free_in_branches_subst_self_general rest t repl hrepl⟩
   termination_by sizeOf bs
   decreasing_by
     all_goals simp_wf
@@ -343,12 +343,12 @@ end
 
 /-- After substituting t with (mu t body), the variable t is not free.
 
-    This is a special case of isFreeIn_subst_self_general where repl = .mu t body. -/
+    This is a special case of is_free_in_subst_self_general where repl = .mu t body. -/
 @[simp]
-theorem isFreeIn_subst_mu_self (body : LocalTypeR) (t : String) :
+theorem is_free_in_subst_mu_self (body : LocalTypeR) (t : String) :
 /- ## Structured Block 6 -/
     isFreeIn t (body.substitute t (.mu t body)) = false :=
-  isFreeIn_subst_self_general body t (.mu t body) (isFreeIn_mu_self t body)
+  is_free_in_subst_self_general body t (.mu t body) (is_free_in_mu_self t body)
 
 -- Substitution Preservation for Other Variables
 
@@ -360,7 +360,7 @@ mutual
       - New occurrences: only from repl copies, but v not free in repl
 
       This handles the case v ≠ t (v not being the substituted variable). -/
-  theorem isFreeIn_subst_preserves (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
+  theorem is_free_in_subst_preserves (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
       (hv_e : isFreeIn v e = false) (hv_repl : isFreeIn v repl = false) :
       isFreeIn v (e.substitute t repl) = false := by
     cases e with
@@ -377,11 +377,11 @@ mutual
     | send p bs =>
         simp only [LocalTypeR.substitute, isFreeIn]
         simp only [isFreeIn] at hv_e
-        exact isFreeInBranches_subst_preserves bs v t repl hv_e hv_repl
+        exact is_free_in_branches_subst_preserves bs v t repl hv_e hv_repl
     | recv p bs =>
         simp only [LocalTypeR.substitute, isFreeIn]
         simp only [isFreeIn] at hv_e
-        exact isFreeInBranches_subst_preserves bs v t repl hv_e hv_repl
+        exact is_free_in_branches_subst_preserves bs v t repl hv_e hv_repl
     | mu s body =>
         simp only [LocalTypeR.substitute]
         by_cases hst : s == t
@@ -396,13 +396,13 @@ mutual
             simp only [hvs, ↓reduceIte]
           · -- v != s
             simp only [hvs, Bool.false_eq_true, ↓reduceIte] at hv_e ⊢
-            exact isFreeIn_subst_preserves body v t repl hv_e hv_repl
+            exact is_free_in_subst_preserves body v t repl hv_e hv_repl
   termination_by sizeOf e
 
   -- Substitution Preservation: Branch Version
 
   /-- Branch version of isFreeIn_subst_preserves. -/
-  theorem isFreeInBranches_subst_preserves (bs : List BranchR) (v t : String)
+  theorem is_free_in_branches_subst_preserves (bs : List BranchR) (v t : String)
       (repl : LocalTypeR)
       (hv_bs : isFreeInBranches v bs = false) (hv_repl : isFreeIn v repl = false) :
       isFreeInBranches v (SessionTypes.LocalTypeR.substituteBranches bs t repl) = false := by
@@ -412,8 +412,8 @@ mutual
         simp only [SessionTypes.LocalTypeR.substituteBranches, isFreeInBranches, Bool.or_eq_false_iff]
         simp only [isFreeInBranches, Bool.or_eq_false_iff] at hv_bs
 /- ## Structured Block 7 -/
-        exact ⟨isFreeIn_subst_preserves cont v t repl hv_bs.1 hv_repl,
-               isFreeInBranches_subst_preserves rest v t repl hv_bs.2 hv_repl⟩
+        exact ⟨is_free_in_subst_preserves cont v t repl hv_bs.1 hv_repl,
+               is_free_in_branches_subst_preserves rest v t repl hv_bs.2 hv_repl⟩
   termination_by sizeOf bs
   decreasing_by
     all_goals simp_wf

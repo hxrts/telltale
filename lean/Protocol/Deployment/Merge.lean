@@ -56,7 +56,7 @@ private theorem sid_not_in_right_of_left {G₁ G₂ : GEnv} (hDisj : DisjointG G
   exact this.elim
 
 /-- If a session is not in G, buffers have no entries for it. -/
-private theorem BConsistent_lookup_none_of_notin_sessions_local
+private theorem b_consistent_lookup_none_of_notin_sessions_local
     {G : GEnv} {B : Buffers} {e : Edge}
     (hCons : BConsistent G B) (hNot : e.sid ∉ SessionsOf G) :
     B.lookup e = none := by
@@ -69,7 +69,7 @@ private theorem BConsistent_lookup_none_of_notin_sessions_local
       exact (hNot hSid)
 
 /-- If a session is not in G, DEnv has no entry for it. -/
-private theorem DEnv_find_none_of_notin_sessions_local
+private theorem d_env_find_none_of_notin_sessions_local
     {G : GEnv} {D : DEnv} {e : Edge}
     (hCons : DConsistent G D) (hNot : e.sid ∉ SessionsOf G) :
     D.find? e = none := by
@@ -85,7 +85,7 @@ private theorem DEnv_find_none_of_notin_sessions_local
 /-! ## Merge Lookup Lemmas -/
 
 /-- Lookup in merged GEnv prefers the left environment. -/
-theorem MergeGEnv_Left (G₁ G₂ : GEnv) (e : Endpoint) (L : LocalType) :
+theorem merge_g_env_left (G₁ G₂ : GEnv) (e : Endpoint) (L : LocalType) :
     lookupG G₁ e = some L →
     lookupG (mergeGEnv G₁ G₂) e = some L := by
   intro h
@@ -99,7 +99,7 @@ theorem MergeGEnv_Left (G₁ G₂ : GEnv) (e : Endpoint) (L : LocalType) :
             simp [hLookup]
 
 /-- Lookup in merged GEnv falls back to the right when left is missing. -/
-theorem MergeGEnv_Right (G₁ G₂ : GEnv) (e : Endpoint) :
+theorem merge_g_env_right (G₁ G₂ : GEnv) (e : Endpoint) :
     lookupG G₁ e = none →
     lookupG (mergeGEnv G₁ G₂) e = lookupG G₂ e := by
   intro h
@@ -113,7 +113,7 @@ theorem MergeGEnv_Right (G₁ G₂ : GEnv) (e : Endpoint) :
             simp [hLookup, lookupG]
 
 /-- Invert lookup in a merged GEnv. -/
-theorem MergeGEnv_inv {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
+theorem merge_g_env_inv {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
     lookupG (mergeGEnv G₁ G₂) e = some L →
     lookupG G₁ e = some L ∨ (lookupG G₁ e = none ∧ lookupG G₂ e = some L) := by
   -- Decide whether the left lookup succeeds.
@@ -134,24 +134,24 @@ theorem MergeGEnv_inv {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
 
 /-! ## Right-Side Witness Lemma -/
 /-- Right lookup in a merged GEnv always yields some entry. -/
-theorem MergeGEnv_some_of_right (G₁ G₂ : GEnv) (e : Endpoint) {L : LocalType} :
+theorem merge_g_env_some_of_right (G₁ G₂ : GEnv) (e : Endpoint) {L : LocalType} :
     lookupG G₂ e = some L →
     ∃ L', lookupG (mergeGEnv G₁ G₂) e = some L' := by
   -- If the left is empty we use the right; otherwise the left wins.
   intro hRight
   by_cases hLeft : lookupG G₁ e = none
   · refine ⟨L, ?_⟩
-    simpa [MergeGEnv_Right G₁ G₂ e hLeft] using hRight
+    simpa [merge_g_env_right G₁ G₂ e hLeft] using hRight
   · cases hLeft' : lookupG G₁ e with
     | none => exact (hLeft hLeft').elim
     | some L₁ =>
         refine ⟨L₁, ?_⟩
-        exact MergeGEnv_Left G₁ G₂ e L₁ hLeft'
+        exact merge_g_env_left G₁ G₂ e L₁ hLeft'
 
 /-! ## Role Completeness -/
 
 /-- RoleComplete is preserved by GEnv merge. -/
-theorem RoleComplete_mergeGEnv (G₁ G₂ : GEnv)
+theorem role_complete_merge_g_env (G₁ G₂ : GEnv)
     (hC₁ : RoleComplete G₁) (hC₂ : RoleComplete G₂) :
     RoleComplete (mergeGEnv G₁ G₂) := by
   -- Split on which side supplied the lookup.
@@ -161,36 +161,36 @@ theorem RoleComplete_mergeGEnv (G₁ G₂ : GEnv)
       -- No target role: the obligation is trivial.
       simp
   | some r =>
-      have hInv := MergeGEnv_inv (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hLookup
+      have hInv := merge_g_env_inv (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hLookup
       cases hInv with
       | inl hLeft =>
           -- Left case: use role-completeness of G₁.
           have hComp : ∃ L', lookupG G₁ ⟨e.sid, r⟩ = some L' := by
             simpa [RoleComplete, hTarget] using hC₁ e L hLeft
           rcases hComp with ⟨L', hL'⟩
-          exact ⟨L', MergeGEnv_Left G₁ G₂ ⟨e.sid, r⟩ L' hL'⟩
+          exact ⟨L', merge_g_env_left G₁ G₂ ⟨e.sid, r⟩ L' hL'⟩
       | inr hRight =>
           -- Right case: use role-completeness of G₂.
           have hComp : ∃ L', lookupG G₂ ⟨e.sid, r⟩ = some L' := by
             simpa [RoleComplete, hTarget] using hC₂ e L hRight.2
           rcases hComp with ⟨L', hL'⟩
-          exact MergeGEnv_some_of_right G₁ G₂ ⟨e.sid, r⟩ hL'
+          exact merge_g_env_some_of_right G₁ G₂ ⟨e.sid, r⟩ hL'
 
 /-! ## DEnv and Buffer Merge Lookup Lemmas -/
-theorem MergeDEnv_Left (D₁ D₂ : DEnv) (edge : Edge) :
+theorem merge_d_env_left (D₁ D₂ : DEnv) (edge : Edge) :
     lookupD D₁ edge ≠ [] →
     lookupD (mergeDEnv D₁ D₂) edge = lookupD D₁ edge := by
   intro h
-  simpa [mergeDEnv] using (lookupD_append_left (D₁:=D₁) (D₂:=D₂) (e:=edge) h)
+  simpa [mergeDEnv] using (lookup_d_append_left (D₁:=D₁) (D₂:=D₂) (e:=edge) h)
 
-theorem MergeDEnv_Right (D₁ D₂ : DEnv) (edge : Edge) :
+theorem merge_d_env_right (D₁ D₂ : DEnv) (edge : Edge) :
     D₁.find? edge = none →
     lookupD (mergeDEnv D₁ D₂) edge = lookupD D₂ edge := by
   intro h
-  simpa [mergeDEnv] using (lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=edge) h)
+  simpa [mergeDEnv] using (lookup_d_append_right (D₁:=D₁) (D₂:=D₂) (e:=edge) h)
 
 /-- Lookup in merged buffers prefers the left environment when it provides a buffer. -/
-theorem MergeBufs_Left (B₁ B₂ : Buffers) (edge : Edge) :
+theorem merge_bufs_left (B₁ B₂ : Buffers) (edge : Edge) :
     lookupBuf B₁ edge ≠ [] →
     lookupBuf (mergeBufs B₁ B₂) edge = lookupBuf B₁ edge := by
   intro h
@@ -204,7 +204,7 @@ theorem MergeBufs_Left (B₁ B₂ : Buffers) (edge : Edge) :
       simp [List.lookup_append, hLookup]
 
 /-- Lookup in merged buffers falls back to the right when the left has no entry. -/
-theorem MergeBufs_Right (B₁ B₂ : Buffers) (edge : Edge) :
+theorem merge_bufs_right (B₁ B₂ : Buffers) (edge : Edge) :
     B₁.lookup edge = none →
     lookupBuf (mergeBufs B₁ B₂) edge = lookupBuf B₂ edge := by
   intro h
@@ -212,43 +212,43 @@ theorem MergeBufs_Right (B₁ B₂ : Buffers) (edge : Edge) :
 
 /-! ## Session-Disjoint Lookup Transport Lemmas -/
 /-- Merged DEnv follows the left when the session is absent on the right. -/
-private theorem lookupD_merge_left_of_notin_right
+private theorem lookup_d_merge_left_of_notin_right
     {G₂ : GEnv} {D₁ D₂ : DEnv} {e : Edge}
     (hCons₂ : DConsistent G₂ D₂) (hNot : e.sid ∉ SessionsOf G₂) :
     lookupD (mergeDEnv D₁ D₂) e = lookupD D₁ e := by
   -- Exclude the right entry via DConsistent, then use left-biased lookup.
   have hNone : D₂.find? e = none :=
-    DEnv_find_none_of_notin_sessions_local (G:=G₂) (D:=D₂) hCons₂ hNot
-  exact lookupD_append_left_of_right_none (D₁:=D₁) (D₂:=D₂) (e:=e) hNone
+    d_env_find_none_of_notin_sessions_local (G:=G₂) (D:=D₂) hCons₂ hNot
+  exact lookup_d_append_left_of_right_none (D₁:=D₁) (D₂:=D₂) (e:=e) hNone
 
 /-- Merged DEnv follows the right when the session is absent on the left. -/
-private theorem lookupD_merge_right_of_notin_left
+private theorem lookup_d_merge_right_of_notin_left
     {G₁ : GEnv} {D₁ D₂ : DEnv} {e : Edge}
     (hCons₁ : DConsistent G₁ D₁) (hNot : e.sid ∉ SessionsOf G₁) :
     lookupD (mergeDEnv D₁ D₂) e = lookupD D₂ e := by
   -- Exclude the left entry via DConsistent, then use right-biased lookup.
   have hNone : D₁.find? e = none :=
-    DEnv_find_none_of_notin_sessions_local (G:=G₁) (D:=D₁) hCons₁ hNot
-  exact lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hNone
+    d_env_find_none_of_notin_sessions_local (G:=G₁) (D:=D₁) hCons₁ hNot
+  exact lookup_d_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hNone
 
 /-- Merged buffers follow the left when the session is absent on the right. -/
-private theorem lookupBuf_merge_left_of_notin_right
+private theorem lookup_buf_merge_left_of_notin_right
     {G₂ : GEnv} {B₁ B₂ : Buffers} {e : Edge}
     (hCons₂ : BConsistent G₂ B₂) (hNot : e.sid ∉ SessionsOf G₂) :
     lookupBuf (mergeBufs B₁ B₂) e = lookupBuf B₁ e := by
   -- Exclude the right buffer entry, then simplify lookup on append.
   have hNone : B₂.lookup e = none :=
-    BConsistent_lookup_none_of_notin_sessions_local (G:=G₂) (B:=B₂) hCons₂ hNot
+    b_consistent_lookup_none_of_notin_sessions_local (G:=G₂) (B:=B₂) hCons₂ hNot
   simp [lookupBuf, mergeBufs, List.lookup_append, hNone]
 
 /-- Merged buffers follow the right when the session is absent on the left. -/
-private theorem lookupBuf_merge_right_of_notin_left
+private theorem lookup_buf_merge_right_of_notin_left
     {G₁ : GEnv} {B₁ B₂ : Buffers} {e : Edge}
     (hCons₁ : BConsistent G₁ B₁) (hNot : e.sid ∉ SessionsOf G₁) :
     lookupBuf (mergeBufs B₁ B₂) e = lookupBuf B₂ e := by
   -- Exclude the left buffer entry, then simplify lookup on append.
   have hNone : B₁.lookup e = none :=
-    BConsistent_lookup_none_of_notin_sessions_local (G:=G₁) (B:=B₁) hCons₁ hNot
+    b_consistent_lookup_none_of_notin_sessions_local (G:=G₁) (B:=B₁) hCons₁ hNot
   simp [lookupBuf, mergeBufs, List.lookup_append, hNone]
 
 /-- Full linking judgment (6.7.2): Propositional version with all conditions.
@@ -270,12 +270,12 @@ def LinkOKFull (p₁ p₂ : DeployedProtocol) : Prop :=
   Coherent (mergeGEnv p₁.initGEnv p₂.initGEnv) (mergeDEnv p₁.initDEnv p₂.initDEnv)
 
 /-- LinkOKFull implies the basic LinkOK (useful for backwards compatibility). -/
-theorem LinkOKFull_implies_disjoint (p₁ p₂ : DeployedProtocol)
+theorem link_ok_full_implies_disjoint (p₁ p₂ : DeployedProtocol)
     (h : LinkOKFull p₁ p₂) :
     InterfaceType.DisjointSessions p₁.interface p₂.interface := h.1
 
 /-- LinkOKFull gives us merged coherence directly. -/
-theorem LinkOKFull_coherent (p₁ p₂ : DeployedProtocol)
+theorem link_ok_full_coherent (p₁ p₂ : DeployedProtocol)
     (h : LinkOKFull p₁ p₂) :
     Coherent (mergeGEnv p₁.initGEnv p₂.initGEnv) (mergeDEnv p₁.initDEnv p₂.initDEnv) := h.2.2.2
 

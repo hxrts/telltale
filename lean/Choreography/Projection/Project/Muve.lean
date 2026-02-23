@@ -10,7 +10,7 @@ The following definitions form the semantic interface for proofs:
 
 - `isMuve`: mu-var-end chain predicate
 - `ClosedMuveRel`: closed muve relation for EQ2 coinduction
-- `EQ_end`: non-participants project to EEnd (EQ2-equivalent)
+- `eq_end`: non-participants project to EEnd (EQ2-equivalent)
 -/
 
 /-

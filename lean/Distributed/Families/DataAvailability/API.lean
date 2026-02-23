@@ -37,7 +37,7 @@ theorem retrievability_of_protocol (P : DAProtocol) :
   P.retrievability
 
 /-- Core assumptions are always validated for a certified protocol. -/
-theorem coreAssumptions_allPassed (P : DAProtocol) :
+theorem core_assumptions_all_passed (P : DAProtocol) :
     (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
   rfl
 

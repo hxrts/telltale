@@ -41,7 +41,7 @@ The following definitions form the semantic interface for proofs:
 - `projectbAllBranches`: single candidate check for non-participants
 - `CProjectF`: one-step generator for coinductive projection
 - `CProject`: coinductive projection relation (greatest fixed point of CProjectF)
-- `CProject_coind`: coinduction principle for CProject
+- `c_project_coind`: coinduction principle for CProject
 - `BranchesProjRel`: branch-wise projection for send/recv
 - `AllBranchesProj`: all branches project to same candidate
 - `projectb_end_end`: reflection lemma for end-end
@@ -60,49 +60,49 @@ open Choreography.Projection.Trans (lcontractive)
 
 /-! ## Size-Of Lemmas for Termination -/
 
-private theorem sizeOf_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
+private theorem size_of_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf (x :: l) = 1 + sizeOf x + sizeOf l := by
   simp [sizeOf, List._sizeOf_1]
 
-private theorem sizeOf_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b : β) :
+private theorem size_of_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b : β) :
     sizeOf (a, b) = 1 + sizeOf a + sizeOf b := by
   simp [sizeOf, Prod._sizeOf_1]
 
-private theorem sizeOf_snd_lt_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b : β) :
+private theorem size_of_snd_lt_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b : β) :
     sizeOf b < sizeOf (a, b) := by
   simp only [sizeOf, Prod._sizeOf_1]
   omega
 
-private theorem sizeOf_head_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
+private theorem size_of_head_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf x < sizeOf (x :: l) := by
   simp only [sizeOf, List._sizeOf_1]
   omega
 
-private theorem sizeOf_tail_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
+private theorem size_of_tail_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf l < sizeOf (x :: l) := by
   simp only [sizeOf, List._sizeOf_1]
   omega
 
-private theorem sizeOf_head_snd_lt_cons (pair : Label × GlobalType) (rest : List (Label × GlobalType)) :
+private theorem size_of_head_snd_lt_cons (pair : Label × GlobalType) (rest : List (Label × GlobalType)) :
     sizeOf pair.2 < sizeOf (pair :: rest) := by
-  have h1 : sizeOf pair.2 < sizeOf pair := sizeOf_snd_lt_prod pair.1 pair.2
-  have h2 : sizeOf pair < sizeOf (pair :: rest) := sizeOf_head_lt_cons pair rest
+  have h1 : sizeOf pair.2 < sizeOf pair := size_of_snd_lt_prod pair.1 pair.2
+  have h2 : sizeOf pair < sizeOf (pair :: rest) := size_of_head_lt_cons pair rest
   exact Nat.lt_trans h1 h2
 
-private theorem sizeOf_cont_lt_branch_cons (label : Label) (cont : GlobalType)
+private theorem size_of_cont_lt_branch_cons (label : Label) (cont : GlobalType)
     (rest : List (Label × GlobalType)) :
     sizeOf cont < sizeOf ((label, cont) :: rest) := by
-  have h : sizeOf cont < sizeOf (label, cont) := sizeOf_snd_lt_prod label cont
+  have h : sizeOf cont < sizeOf (label, cont) := size_of_snd_lt_prod label cont
   have h2 : sizeOf (label, cont) < sizeOf ((label, cont) :: rest) :=
-    sizeOf_head_lt_cons (label, cont) rest
+    size_of_head_lt_cons (label, cont) rest
   exact Nat.lt_trans h h2
 
-private theorem sizeOf_rest_lt_branch_cons (label : Label) (cont : GlobalType)
+private theorem size_of_rest_lt_branch_cons (label : Label) (cont : GlobalType)
     (rest : List (Label × GlobalType)) :
     sizeOf rest < sizeOf ((label, cont) :: rest) :=
-  sizeOf_tail_lt_cons (label, cont) rest
+  size_of_tail_lt_cons (label, cont) rest
 
-theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
+theorem size_of_body_lt_mu (t : String) (body : GlobalType) :
     sizeOf body < sizeOf (GlobalType.mu t body) := by
   have hk : 0 < 1 + sizeOf t := by
     simp only [Nat.one_add]
@@ -114,13 +114,13 @@ theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
 
 /-! ## Size-Of Lemmas for Branch/Comm Cases -/
 
-private theorem sizeOf_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
+private theorem size_of_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
     sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
   simp only [GlobalType.comm.sizeOf_spec]
   have h : 0 < 1 + sizeOf sender + sizeOf receiver := by omega
   omega
 
-private theorem sizeOf_elem_snd_lt_list {α β : Type _} [SizeOf α] [SizeOf β]
+private theorem size_of_elem_snd_lt_list {α β : Type _} [SizeOf α] [SizeOf β]
     (xs : List (α × β)) (x : α × β) (h : x ∈ xs) :
     sizeOf x.2 < sizeOf xs := by
   induction xs with
@@ -130,11 +130,11 @@ private theorem sizeOf_elem_snd_lt_list {α β : Type _} [SizeOf α] [SizeOf β]
       | head => simp only [sizeOf, List._sizeOf_1, Prod._sizeOf_1]; omega
       | tail _ hmem => have := ih hmem; simp only [sizeOf, List._sizeOf_1] at *; omega
 
-theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
+theorem size_of_elem_snd_lt_comm (sender receiver : String)
     (gbs : List (Label × GlobalType)) (gb : Label × GlobalType) (h : gb ∈ gbs) :
     sizeOf gb.2 < sizeOf (GlobalType.comm sender receiver gbs) := by
-  have h1 := sizeOf_elem_snd_lt_list gbs gb h
-  have h2 := sizeOf_bs_lt_comm sender receiver gbs
+  have h1 := size_of_elem_snd_lt_list gbs gb h
+  have h2 := size_of_bs_lt_comm sender receiver gbs
   omega
 
 /-! ## Boolean Projection Checker -/
@@ -205,8 +205,8 @@ mutual
   decreasing_by
     all_goals
       first
-      | exact sizeOf_body_lt_mu _ _
-      | exact sizeOf_bs_lt_comm _ _ _
+      | exact size_of_body_lt_mu _ _
+      | exact size_of_bs_lt_comm _ _ _
       | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
   -- Boolean Checker: Participant Branches
@@ -230,8 +230,8 @@ mutual
   decreasing_by
     all_goals
       first
-      | exact sizeOf_cont_lt_branch_cons _ _ _
-      | exact sizeOf_rest_lt_branch_cons _ _ _
+      | exact size_of_cont_lt_branch_cons _ _ _
+      | exact size_of_rest_lt_branch_cons _ _ _
 
   -- Boolean Checker: Non-Participant Branches
 
@@ -247,8 +247,8 @@ mutual
   decreasing_by
     all_goals
       first
-      | exact sizeOf_cont_lt_branch_cons _ _ _
-      | exact sizeOf_rest_lt_branch_cons _ _ _
+      | exact size_of_cont_lt_branch_cons _ _ _
+      | exact size_of_rest_lt_branch_cons _ _ _
 end
 
 end Choreography.Projection.Projectb

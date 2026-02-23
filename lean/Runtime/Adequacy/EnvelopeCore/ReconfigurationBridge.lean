@@ -98,7 +98,7 @@ def NonInterferenceConverseOracle {State : Type u}
     Nonempty (NonInterferenceConverseWitness component₁ component₂ interaction total)
 
 /-- Exactness follows when the composed bound is exact and interaction vanishes. -/
-theorem compositionalExactness_of_zeroInteraction
+theorem compositional_exactness_of_zero_interaction
     {State : Type u}
     {component₁ component₂ interaction total : EnvelopeBound State}
     (hComp : CompositionalEnvelopeBound component₁ component₂ interaction total) :
@@ -107,7 +107,7 @@ theorem compositionalExactness_of_zeroInteraction
   simpa [hZero ref impl] using hComp ref impl
 
 /-- Any strict converse witness certifies that unconditional compositional exactness fails. -/
-theorem not_compositionalExactnessConclusion_of_nonInterferenceConverseWitness
+theorem not_compositional_exactness_conclusion_of_non_interference_converse_witness
     {State : Type u}
     {component₁ component₂ interaction total : EnvelopeBound State}
     (w : NonInterferenceConverseWitness component₁ component₂ interaction total) :
@@ -118,14 +118,14 @@ theorem not_compositionalExactnessConclusion_of_nonInterferenceConverseWitness
 /-- Converse strictness packaging used by S2:
     if non-interference is absent and a witness oracle is available,
     the exactness conclusion is not derivable. -/
-theorem nonInterference_converse_strictness_of_oracle
+theorem non_interference_converse_strictness_of_oracle
     {State : Type u}
     {component₁ component₂ interaction total : EnvelopeBound State}
     (hOracle : NonInterferenceConverseOracle component₁ component₂ interaction total)
     (hNotNI : ¬ NonInterference component₁ component₂) :
     ¬ CompositionalExactnessConclusion component₁ component₂ total := by
   rcases hOracle hNotNI with ⟨w⟩
-  exact not_compositionalExactnessConclusion_of_nonInterferenceConverseWitness w
+  exact not_compositional_exactness_conclusion_of_non_interference_converse_witness w
 
 /-! ## Reconfiguration Harmony Side-Condition Necessity -/
 
@@ -168,7 +168,7 @@ def HarmonySideConditionNecessityOracle {State : Type u} {Obs : Type v}
 /-! ## Harmony Necessity Theorems -/
 
 /-- Any dropped-condition witness certifies Harmony failure. -/
-theorem not_reconfigurationHarmony_of_dropped_condition_counterexample
+theorem not_reconfiguration_harmony_of_dropped_condition_counterexample
     {State : Type u} {Obs : Type v}
     {project : State → Obs}
     {globalStep : State → State → Prop}
@@ -181,7 +181,7 @@ theorem not_reconfigurationHarmony_of_dropped_condition_counterexample
 
 /-- Side-condition necessity decomposition for Harmony:
     dropping any indexed condition yields a strict non-Harmony witness. -/
-theorem reconfigurationHarmony_side_condition_necessity
+theorem reconfiguration_harmony_side_condition_necessity
     {State : Type u} {Obs : Type v}
     {project : State → Obs}
     {globalStep : State → State → Prop}
@@ -192,7 +192,7 @@ theorem reconfigurationHarmony_side_condition_necessity
       ¬ ReconfigurationHarmony project globalStep localStep := by
   intro c hDropped
   rcases hOracle c hDropped with ⟨w⟩
-  exact not_reconfigurationHarmony_of_dropped_condition_counterexample w
+  exact not_reconfiguration_harmony_of_dropped_condition_counterexample w
 
 /-! ## E1 Envelope Bridge Interfaces -/
 
@@ -255,7 +255,7 @@ structure EnvelopePhaseE1BridgePremises
 /-! ## E1 Bridge Premise Projections -/
 
 /-- Extract role-equivalence invariance from E1 bridge premises. -/
-theorem roleEquivalenceInvariant_of_e1BridgePremises
+theorem role_equivalence_invariant_of_e1_bridge_premises
     {Role : Type u} {State : Type v} {Obs : Type (max u v)}
     [RoleRenamableState Role State]
     (p : EnvelopePhaseE1BridgePremises Role State Obs) :
@@ -263,7 +263,7 @@ theorem roleEquivalenceInvariant_of_e1BridgePremises
   p.roleInvarianceWitness
 
 /-- Extract compositional envelope bound from E1 bridge premises. -/
-theorem compositionalEnvelopeBound_of_e1BridgePremises
+theorem compositional_envelope_bound_of_e1_bridge_premises
     {Role : Type u} {State : Type v} {Obs : Type (max u v)}
     [RoleRenamableState Role State]
     (p : EnvelopePhaseE1BridgePremises Role State Obs) :
@@ -271,7 +271,7 @@ theorem compositionalEnvelopeBound_of_e1BridgePremises
   p.compositionalBoundWitness
 
 /-- Extract delegation-preserves-envelope from E1 bridge premises. -/
-theorem delegationPreservesEnvelope_of_e1BridgePremises
+theorem delegation_preserves_envelope_of_e1_bridge_premises
     {Role : Type u} {State : Type v} {Obs : Type (max u v)}
     [RoleRenamableState Role State]
     (p : EnvelopePhaseE1BridgePremises Role State Obs) :
@@ -279,7 +279,7 @@ theorem delegationPreservesEnvelope_of_e1BridgePremises
   p.delegationWitness
 
 /-- Extract spatial-subtyping monotonicity from E1 bridge premises. -/
-theorem spatialSubtypingMonotonicity_of_e1BridgePremises
+theorem spatial_subtyping_monotonicity_of_e1_bridge_premises
     {Role : Type u} {State : Type v} {Obs : Type (max u v)}
     [RoleRenamableState Role State]
     (p : EnvelopePhaseE1BridgePremises Role State Obs) :
@@ -287,7 +287,7 @@ theorem spatialSubtypingMonotonicity_of_e1BridgePremises
   p.spatialMonotonicityWitness
 
 /-- Extract exchange-normalization theorem from E1 bridge premises. -/
-theorem exchangeNormalization_of_e1BridgePremises
+theorem exchange_normalization_of_e1_bridge_premises
     {Role : Type u} {State : Type v} {Obs : Type (max u v)}
     [RoleRenamableState Role State]
     (p : EnvelopePhaseE1BridgePremises Role State Obs) :
@@ -412,7 +412,7 @@ structure ProtocolEnvelopeBridgePremises
 /-! ## Protocol Bridge Theorem Projections -/
 
 /-- Extract E2 role-renaming invariance from protocol bridge premises. -/
-theorem protocolRoleRenamingInvariant_of_premises
+theorem protocol_role_renaming_invariant_of_premises
     {Protocol : Type u} {Placement : Type v}
     {Deployment : Type (max u v)}
     {State : Type (max u v)} {Obs : Type (max u v)}
@@ -421,7 +421,7 @@ theorem protocolRoleRenamingInvariant_of_premises
   p.roleRenamingInvariantWitness
 
 /-- Extract E2 compositional-envelope theorem from protocol bridge premises. -/
-theorem protocolCompositionalEnvelope_of_premises
+theorem protocol_compositional_envelope_of_premises
     {Protocol : Type u} {Placement : Type v}
     {Deployment : Type (max u v)}
     {State : Type (max u v)} {Obs : Type (max u v)}
@@ -431,7 +431,7 @@ theorem protocolCompositionalEnvelope_of_premises
   p.compositionalEnvelopeWitness
 
 /-- Extract E2 delegation-preserves-envelope from protocol bridge premises. -/
-theorem protocolDelegationPreserves_of_premises
+theorem protocol_delegation_preserves_of_premises
     {Protocol : Type u} {Placement : Type v}
     {Deployment : Type (max u v)}
     {State : Type (max u v)} {Obs : Type (max u v)}
@@ -440,7 +440,7 @@ theorem protocolDelegationPreserves_of_premises
   p.delegationPreservesWitness
 
 /-- Extract E2 spatial-monotonicity instantiation from protocol bridge premises. -/
-theorem protocolSpatialMonotonicity_of_premises
+theorem protocol_spatial_monotonicity_of_premises
     {Protocol : Type u} {Placement : Type v}
     {Deployment : Type (max u v)}
     {State : Type (max u v)} {Obs : Type (max u v)}
@@ -449,7 +449,7 @@ theorem protocolSpatialMonotonicity_of_premises
   p.spatialMonotonicityWitness
 
 /-- Extract E2 exchange-normalization instantiation from protocol bridge premises. -/
-theorem protocolExchangeNormalization_of_premises
+theorem protocol_exchange_normalization_of_premises
     {Protocol : Type u} {Placement : Type v}
     {Deployment : Type (max u v)}
     {State : Type (max u v)} {Obs : Type (max u v)}
@@ -458,7 +458,7 @@ theorem protocolExchangeNormalization_of_premises
   p.exchangeNormalizationWitness
 
 /-- Extract E2 shard-cut preservation theorem from protocol bridge premises. -/
-theorem protocolShardCutPreservation_of_premises
+theorem protocol_shard_cut_preservation_of_premises
     {Protocol : Type u} {Placement : Type v}
     {Deployment : Type (max u v)}
     {State : Type (max u v)} {Obs : Type (max u v)}
@@ -476,24 +476,24 @@ structure ProtocolEnvelopeBridgeBundle
   premises : ProtocolEnvelopeBridgePremises Protocol Placement Deployment State Obs
   roleRenamingInvariant :
     ProtocolRoleRenamingEnvelopeInvariant premises.localEnvelope premises.roleRenaming :=
-      protocolRoleRenamingInvariant_of_premises premises
+      protocol_role_renaming_invariant_of_premises premises
   compositionalEnvelope :
     ProtocolCompositionalEnvelope
       premises.component₁ premises.component₂
       premises.interaction premises.total premises.composition :=
-      protocolCompositionalEnvelope_of_premises premises
+      protocol_compositional_envelope_of_premises premises
   delegationPreserves :
     ProtocolDelegationPreservesEnvelope premises.localEnvelope premises.delegation :=
-      protocolDelegationPreserves_of_premises premises
+      protocol_delegation_preserves_of_premises premises
   spatialMonotonicity :
     ProtocolSpatialMonotonicity premises.spatial premises.obligation :=
-      protocolSpatialMonotonicity_of_premises premises
+      protocol_spatial_monotonicity_of_premises premises
   exchangeNormalization :
     ProtocolExchangeNormalization premises.localEnvelope premises.exchange :=
-      protocolExchangeNormalization_of_premises premises
+      protocol_exchange_normalization_of_premises premises
   shardCutPreservation :
     ProtocolShardCutPreservation premises.shardedEnvelope premises.shardCut :=
-      protocolShardCutPreservation_of_premises premises
+      protocol_shard_cut_preservation_of_premises premises
 
 end Adequacy
 end Runtime

@@ -232,7 +232,7 @@ theorem depth_advance_recv (r : Role) (T : ValType) (L : LocalType) :
 
 /-! ## DepthList Branch Bounds -/
 /-- A branch continuation has depth at most the depthList. -/
-theorem depthList_mem_le (ℓ : Label) (L : LocalType) (bs : List (Label × LocalType))
+theorem depth_list_mem_le (ℓ : Label) (L : LocalType) (bs : List (Label × LocalType))
     (h : (ℓ, L) ∈ bs) :
     L.depth ≤ LocalType.depthList bs := by
   induction bs with
@@ -253,7 +253,7 @@ theorem depth_advance_select (r : Role) (bs : List (Label × LocalType))
     (ℓ : Label) (L : LocalType) (h : (ℓ, L) ∈ bs) :
     L.depth < (LocalType.select r bs).depth := by
   show L.depth < 1 + LocalType.depthList bs
-  have := depthList_mem_le ℓ L bs h
+  have := depth_list_mem_le ℓ L bs h
   omega
 
 /-- Branching strictly decreases depth. -/
@@ -261,7 +261,7 @@ theorem depth_advance_branch (r : Role) (bs : List (Label × LocalType))
     (ℓ : Label) (L : LocalType) (h : (ℓ, L) ∈ bs) :
     L.depth < (LocalType.branch r bs).depth := by
   show L.depth < 1 + LocalType.depthList bs
-  have := depthList_mem_le ℓ L bs h
+  have := depth_list_mem_le ℓ L bs h
   omega
 
 end LocalType

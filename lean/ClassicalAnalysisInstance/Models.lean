@@ -35,41 +35,41 @@ noncomputable def realModel : Model where
 /-! ## Law Helpers -/
 
 /-- Shannon entropy nonnegativity for the concrete model. -/
-private theorem shannonEntropy_nonneg_real {α : Type*} [Fintype α]
+private theorem shannon_entropy_nonneg_real {α : Type*} [Fintype α]
     (d : Distribution α) :
     0 ≤ RealConcrete.shannonEntropy d.pmf := by
   -- Forward to the concrete theorem with unpacked distribution obligations.
   simpa using
-    RealConcrete.shannonEntropy_nonneg d.pmf d.nonneg d.sum_one
+    RealConcrete.shannon_entropy_nonneg d.pmf d.nonneg d.sum_one
 
 /-- Shannon entropy `log |α|` upper bound for the concrete model. -/
-private theorem shannonEntropy_le_log_card_real {α : Type*} [Fintype α] [Nonempty α]
+private theorem shannon_entropy_le_log_card_real {α : Type*} [Fintype α] [Nonempty α]
     (d : Distribution α) :
     RealConcrete.shannonEntropy d.pmf ≤ Real.log (Fintype.card α) := by
   -- Forward to the concrete theorem with unpacked distribution obligations.
   simpa using
-    RealConcrete.shannonEntropy_le_log_card d.pmf d.nonneg d.sum_one
+    RealConcrete.shannon_entropy_le_log_card d.pmf d.nonneg d.sum_one
 
 /-- KL nonnegativity for the concrete model. -/
-private theorem klDivergence_nonneg_real {α : Type*} [Fintype α]
+private theorem kl_divergence_nonneg_real {α : Type*} [Fintype α]
     (p q : Distribution α)
     (habs : ∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0) :
     0 ≤ RealConcrete.klDivergence p.pmf q.pmf := by
   -- Forward to the concrete theorem with unpacked distribution obligations.
-  exact RealConcrete.klDivergence_nonneg
+  exact RealConcrete.kl_divergence_nonneg
     p.pmf q.pmf p.nonneg p.sum_one q.nonneg q.sum_one habs
 
 /-- KL zero characterization for the concrete model. -/
-private theorem klDivergence_eq_zero_iff_real {α : Type*} [Fintype α]
+private theorem kl_divergence_eq_zero_iff_real {α : Type*} [Fintype α]
     (p q : Distribution α)
     (habs : ∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0) :
     RealConcrete.klDivergence p.pmf q.pmf = 0 ↔ p.pmf = q.pmf := by
   -- Forward to the concrete theorem with unpacked distribution obligations.
-  exact RealConcrete.klDivergence_eq_zero_iff
+  exact RealConcrete.kl_divergence_eq_zero_iff
     p.pmf q.pmf p.nonneg p.sum_one q.nonneg q.sum_one habs
 
 /-- Erasure law for concrete mutual information. -/
-private theorem mutualInfo_zero_of_erasure_real
+private theorem mutual_info_zero_of_erasure_real
     {L O : Type} [Fintype L] [Fintype O] [DecidableEq O]
     (labelDist : L → ℝ)
     (h_nn : ∀ l, 0 ≤ labelDist l)
@@ -78,7 +78,7 @@ private theorem mutualInfo_zero_of_erasure_real
     (hErase : IsErasureKernel labelDist joint) :
     RealConcrete.mutualInfo joint = 0 := by
   -- Forward directly to the concrete erasure theorem.
-  exact RealConcrete.mutualInfo_zero_of_erasure
+  exact RealConcrete.mutual_info_zero_of_erasure
     labelDist h_nn h_sum joint hErase
 
 /-! ## Real-Valued Laws Instance -/
@@ -86,27 +86,27 @@ private theorem mutualInfo_zero_of_erasure_real
 /-- Noncomputable concrete laws witnessing `EntropyAPI.Laws`. -/
 noncomputable instance realLaws : Laws where
   toModel := realModel
-  shannonEntropy_nonneg := by
+  shannon_entropy_nonneg := by
     -- Discharge this field using the specialized helper theorem.
     intro α _ d
-    simpa [realModel] using shannonEntropy_nonneg_real d
-  shannonEntropy_le_log_card := by
+    simpa [realModel] using shannon_entropy_nonneg_real d
+  shannon_entropy_le_log_card := by
     -- Discharge this field using the specialized helper theorem.
     intro α _ _ d
-    simpa [realModel] using shannonEntropy_le_log_card_real d
-  klDivergence_nonneg := by
+    simpa [realModel] using shannon_entropy_le_log_card_real d
+  kl_divergence_nonneg := by
     -- Discharge this field using the specialized helper theorem.
     intro α _ p q habs
-    simpa [realModel] using klDivergence_nonneg_real p q habs
-  klDivergence_eq_zero_iff := by
+    simpa [realModel] using kl_divergence_nonneg_real p q habs
+  kl_divergence_eq_zero_iff := by
     -- Discharge this field using the specialized helper theorem.
     intro α _ p q habs
-    simpa [realModel] using klDivergence_eq_zero_iff_real p q habs
-  mutualInfo_zero_of_erasure := by
+    simpa [realModel] using kl_divergence_eq_zero_iff_real p q habs
+  mutual_info_zero_of_erasure := by
     -- Discharge this field using the specialized helper theorem.
     intro L O _ _ _ labelDist h_nn h_sum joint hErase
     simpa [realModel] using
-      mutualInfo_zero_of_erasure_real labelDist h_nn h_sum joint hErase
+      mutual_info_zero_of_erasure_real labelDist h_nn h_sum joint hErase
 
 /-! ## Extended Real-Analysis Model -/
 
@@ -134,21 +134,21 @@ noncomputable def realAnalysisModel : AnalysisModel where
 
 noncomputable instance realAnalysisLaws : AnalysisLaws where
   toAnalysisModel := realAnalysisModel
-  exponentialTail_nonneg := by
+  exponential_tail_nonneg := by
     -- Exponential tails are nonnegative because `exp` is positive.
     intro σ t
     simp [realAnalysisModel]
     positivity
-  exponentialTail_zero := by
+  exponential_tail_zero := by
     -- At zero threshold, the tail form evaluates to `2`.
     intro σ
     simp [realAnalysisModel]
-  fluctuationScale_pos := by
+  fluctuation_scale_pos := by
     -- Square roots of positive reals are positive.
     intro n hn
     change 0 < Real.sqrt n
     exact Real.sqrt_pos.2 (Nat.cast_pos.2 hn)
-  fluctuationScale_sq := by
+  fluctuation_scale_sq := by
     -- `(sqrt n)^2 = n` for `n : Nat` cast to `ℝ`.
     intro n
     change (Real.sqrt n) ^ 2 = n
@@ -158,7 +158,7 @@ noncomputable instance realAnalysisLaws : AnalysisLaws where
 
   -- Extended Laws: Finite Averages and Cumulative Sums
 
-  finiteAverage_perm := by
+  finite_average_perm := by
     -- Finite sums are invariant under permutation of finite indices.
     intro n σ x
     change
@@ -171,14 +171,14 @@ noncomputable instance realAnalysisLaws : AnalysisLaws where
           simpa using
             (Fintype.sum_equiv σ (fun i => x (σ i)) x (by intro i; rfl))
       simp [h, hsum]
-  finiteAverage_const := by
+  finite_average_const := by
     -- The average of a constant family is that constant.
     intro n c hn
 /- ## Structured Block 1 -/
     change (if h : n = 0 then 0 else (∑ _ : Fin n, c) / (n : ℝ)) = c
     have hnR : (n : ℝ) ≠ 0 := by exact_mod_cast hn
     simp [hn, hnR]
-  normalizedCumulative_const_zero := by
+  normalized_cumulative_const_zero := by
     -- Centering a constant sequence gives zero increments.
     intro c N t hN
     change

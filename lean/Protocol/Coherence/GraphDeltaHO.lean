@@ -27,7 +27,7 @@ section
 /-! ## Realizability Preservation -/
 
 /-- Realizability is preserved under composition. -/
-theorem GraphDelta_realizable_compose (d1 d2 : GraphDelta) (env : SessionEnv) :
+theorem graph_delta_realizable_compose (d1 d2 : GraphDelta) (env : SessionEnv) :
     d1.realizable env → d2.realizable env → (d1.compose d2).realizable env := by
   intro h1 h2
   constructor
@@ -45,7 +45,7 @@ theorem GraphDelta_realizable_compose (d1 d2 : GraphDelta) (env : SessionEnv) :
     | inr he2 => exact h2.2 e he2
 
 /-- consumeOneHO produces realizable deltas when the channel is well-formed. -/
-lemma consumeOneHO_realizable (from_ receiver : Role) (T : ValType) (L : LocalType)
+lemma consume_one_ho_realizable (from_ receiver : Role) (T : ValType) (L : LocalType)
     (env : SessionEnv)
     (hT : match T with
       | .chan sid role => env.hasRole sid role ∧ env.hasRole sid receiver
@@ -81,7 +81,7 @@ lemma consumeOneHO_realizable (from_ receiver : Role) (T : ValType) (L : LocalTy
 
 /-- If ConsumeHO succeeds and the session environment is well-formed,
     the resulting delta is realizable. -/
-theorem ConsumeHO_realizable (from_ receiver : Role) (L : LocalType)
+theorem consume_ho_realizable (from_ receiver : Role) (L : LocalType)
     (ts : List ValType) (env : SessionEnv)
     (hWF : ∀ T ∈ ts, match T with
       | .chan sid role => env.hasRole sid role ∧ env.hasRole sid receiver
@@ -108,8 +108,8 @@ theorem ConsumeHO_realizable (from_ receiver : Role) (L : LocalType)
         simp only [hRest] at h
         cases h
         -- Compose realizability of head delta and tail delta
-        apply GraphDelta_realizable_compose
-        · exact consumeOneHO_realizable from_ receiver t L env
+        apply graph_delta_realizable_compose
+        · exact consume_one_ho_realizable from_ receiver t L env
             (hWF t (List.mem_cons_self)) res hOne
         · exact ih res.residual (fun T hT => hWF T (List.mem_cons_of_mem t hT))
             p.1 p.2 hRest
@@ -141,7 +141,7 @@ def CoherentHO (G : GEnv) (D : DEnv) (env : SessionEnv) : Prop :=
 
 /-- When the trace has no channel types, EdgeCoherentHO implies EdgeCoherent.
     This is the "collapse" direction of the conservative extension. -/
-theorem EdgeCoherentHO_implies_EdgeCoherent_no_channels
+theorem edge_coherent_ho_implies_edge_coherent_no_channels
     (G : GEnv) (D : DEnv) (env : SessionEnv) (e : Edge)
     (hNoChans : hasNoChannels (lookupD D e) = true)
     (hHO : EdgeCoherentHO G D env e) :
@@ -151,7 +151,7 @@ theorem EdgeCoherentHO_implies_EdgeCoherent_no_channels
   obtain ⟨Lsender, L', delta, hGsender, hConsume, _⟩ := hHO Lrecv hGrecv
   refine ⟨Lsender, hGsender, ?_⟩
   -- ConsumeHO agrees with Consume when no channels
-  have hConservative := ConsumeHO_conservative e.sender e.receiver Lrecv (lookupD D e) hNoChans
+  have hConservative := consume_ho_conservative e.sender e.receiver Lrecv (lookupD D e) hNoChans
   -- Extract that Consume succeeds from HO success
   simp only [hConsume, Option.map] at hConservative
   rw [← hConservative]
@@ -159,7 +159,7 @@ theorem EdgeCoherentHO_implies_EdgeCoherent_no_channels
 
 /-- When the trace has no channel types, EdgeCoherent implies EdgeCoherentHO.
     This is the "lift" direction of the conservative extension. -/
-theorem EdgeCoherent_implies_EdgeCoherentHO_no_channels
+theorem edge_coherent_implies_edge_coherent_ho_no_channels
     (G : GEnv) (D : DEnv) (env : SessionEnv) (e : Edge)
     (hNoChans : hasNoChannels (lookupD D e) = true)
     (hFO : EdgeCoherent G D e) :
@@ -168,7 +168,7 @@ theorem EdgeCoherent_implies_EdgeCoherentHO_no_channels
   -- Apply FO coherence to get the sender and consumption result
   obtain ⟨Lsender, hGsender, hConsume⟩ := hFO Lrecv hGrecv
   -- ConsumeHO agrees with Consume when no channels
-  have hConservative := ConsumeHO_conservative e.sender e.receiver Lrecv (lookupD D e) hNoChans
+  have hConservative := consume_ho_conservative e.sender e.receiver Lrecv (lookupD D e) hNoChans
   -- Extract L' from the successful Consume
   obtain ⟨L', hConsumeEq⟩ := Option.isSome_iff_exists.mp hConsume
   -- ConsumeHO must also succeed with the same L'
@@ -186,7 +186,7 @@ theorem EdgeCoherent_implies_EdgeCoherentHO_no_channels
       rw [hPEq]
   obtain ⟨delta, hConsumeHO⟩ := hHOSuccess
   -- The delta is empty (no channels), hence trivially realizable
-  have hEmpty := ConsumeHO_no_channels_empty_delta e.sender e.receiver Lrecv
+  have hEmpty := consume_ho_no_channels_empty_delta e.sender e.receiver Lrecv
       (lookupD D e) hNoChans L' delta hConsumeHO
   refine ⟨Lsender, L', delta, hGsender, hConsumeHO, ?_⟩
   -- Empty delta is realizable
@@ -199,11 +199,11 @@ theorem EdgeCoherent_implies_EdgeCoherentHO_no_channels
 
 /-- When no channels in trace, EdgeCoherentHO is equivalent to EdgeCoherent.
     This is the full conservative extension theorem for edge coherence. -/
-theorem EdgeCoherentHO_iff_EdgeCoherent_no_channels
+theorem edge_coherent_ho_iff_edge_coherent_no_channels
     (G : GEnv) (D : DEnv) (env : SessionEnv) (e : Edge)
     (hNoChans : hasNoChannels (lookupD D e) = true) :
     EdgeCoherentHO G D env e ↔ EdgeCoherent G D e :=
-  ⟨EdgeCoherentHO_implies_EdgeCoherent_no_channels G D env e hNoChans,
-   EdgeCoherent_implies_EdgeCoherentHO_no_channels G D env e hNoChans⟩
+  ⟨edge_coherent_ho_implies_edge_coherent_no_channels G D env e hNoChans,
+   edge_coherent_implies_edge_coherent_ho_no_channels G D env e hNoChans⟩
 
 end

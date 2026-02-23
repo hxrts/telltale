@@ -104,7 +104,7 @@ end
 NOTE: These theorems are moved to after the isFreeIn definition below.
 -/
 
-theorem freeVarsOfBranches_eq_flatMap (branches : List BranchR) :
+theorem free_vars_of_branches_eq_flat_map (branches : List BranchR) :
     freeVarsOfBranches branches = branches.flatMap (fun (_, _, t) => t.freeVars) := by
   induction branches with
   | nil => rfl
@@ -119,64 +119,64 @@ theorem freeVarsOfBranches_eq_flatMap (branches : List BranchR) :
 /-! ## Size Lemmas: Primitive Constructors -/
 
 @[simp]
-lemma sizeOf_cont_lt_sizeOf_branches (label : Label) (vt : Option ValType) (cont : LocalTypeR)
+lemma size_of_cont_lt_size_of_branches (label : Label) (vt : Option ValType) (cont : LocalTypeR)
     (tail : List BranchR) :
     sizeOf cont < sizeOf ((label, vt, cont) :: tail) := by
   simp +arith
 
 @[simp]
-lemma sizeOf_tail_lt_sizeOf_branches (head : BranchR)
+lemma size_of_tail_lt_size_of_branches (head : BranchR)
     (tail : List BranchR) :
     sizeOf tail < sizeOf (head :: tail) := by
   simp +arith
 
 @[simp]
-lemma sizeOf_branches_lt_sizeOf_send (p : String) (bs : List BranchR) :
+lemma size_of_branches_lt_size_of_send (p : String) (bs : List BranchR) :
     sizeOf bs < sizeOf (LocalTypeR.send p bs) := by
   simp +arith
 
 @[simp]
-lemma sizeOf_branches_lt_sizeOf_recv (p : String) (bs : List BranchR) :
+lemma size_of_branches_lt_size_of_recv (p : String) (bs : List BranchR) :
     sizeOf bs < sizeOf (LocalTypeR.recv p bs) := by
   simp +arith
 
 @[simp]
-lemma sizeOf_body_lt_sizeOf_mu (t : String) (body : LocalTypeR) :
+lemma size_of_body_lt_size_of_mu (t : String) (body : LocalTypeR) :
     sizeOf body < sizeOf (LocalTypeR.mu t body) := by
   simp +arith
 
 /-! ## Size Lemmas: Equality Rewrites -/
-@[simp] lemma sizeOf_branches_lt_of_send_eq {lt : LocalTypeR} {p : String}
+@[simp] lemma size_of_branches_lt_of_send_eq {lt : LocalTypeR} {p : String}
     {bs : List BranchR} (h : lt = LocalTypeR.send p bs) :
     sizeOf bs < sizeOf lt := by
-  simpa [h] using sizeOf_branches_lt_sizeOf_send p bs
+  simpa [h] using size_of_branches_lt_size_of_send p bs
 
-@[simp] lemma sizeOf_branches_lt_of_recv_eq {lt : LocalTypeR} {p : String}
+@[simp] lemma size_of_branches_lt_of_recv_eq {lt : LocalTypeR} {p : String}
     {bs : List BranchR} (h : lt = LocalTypeR.recv p bs) :
     sizeOf bs < sizeOf lt := by
-  simpa [h] using sizeOf_branches_lt_sizeOf_recv p bs
+  simpa [h] using size_of_branches_lt_size_of_recv p bs
 
-@[simp] lemma sizeOf_body_lt_of_mu_eq {lt : LocalTypeR} {t : String} {body : LocalTypeR}
+@[simp] lemma size_of_body_lt_of_mu_eq {lt : LocalTypeR} {t : String} {body : LocalTypeR}
     (h : lt = LocalTypeR.mu t body) :
     sizeOf body < sizeOf lt := by
-  simpa [h] using sizeOf_body_lt_sizeOf_mu t body
+  simpa [h] using size_of_body_lt_size_of_mu t body
 
-@[simp] lemma sizeOf_tail_lt_of_cons_eq {bs : List BranchR}
+@[simp] lemma size_of_tail_lt_of_cons_eq {bs : List BranchR}
     {head : BranchR} {tail : List BranchR}
     (h : bs = head :: tail) :
     sizeOf tail < sizeOf bs := by
-  simpa [h] using sizeOf_tail_lt_sizeOf_branches head tail
+  simpa [h] using size_of_tail_lt_size_of_branches head tail
 
-@[simp] lemma sizeOf_cont_lt_of_head_eq {bs : List BranchR}
+@[simp] lemma size_of_cont_lt_of_head_eq {bs : List BranchR}
     {head : BranchR} {tail : List BranchR}
     {label : Label} {vt : Option ValType} {cont : LocalTypeR}
     (hbs : bs = head :: tail) (hhead : head = (label, vt, cont)) :
     sizeOf cont < sizeOf bs := by
-  simpa [hbs, hhead] using sizeOf_cont_lt_sizeOf_branches label vt cont tail
+  simpa [hbs, hhead] using size_of_cont_lt_size_of_branches label vt cont tail
 
 /-! ## Size Lemmas: Membership Bound -/
 /-- Size of continuation is less than size of branch list when the continuation is in the list. -/
-lemma sizeOf_cont_lt_sizeOf_branches_mem {cont : LocalTypeR}
+lemma size_of_cont_lt_size_of_branches_mem {cont : LocalTypeR}
     {bs : List BranchR} (hmem : cont ∈ bs.map BranchR.cont) :
     sizeOf cont < sizeOf bs := by
   induction bs with
@@ -190,10 +190,10 @@ lemma sizeOf_cont_lt_sizeOf_branches_mem {cont : LocalTypeR}
           | mk l rest =>
               cases rest with
               | mk vt c =>
-                  exact sizeOf_cont_lt_sizeOf_branches l vt c tl
+                  exact size_of_cont_lt_size_of_branches l vt c tl
       | inr hmem' =>
           have h1 := ih hmem'
-          exact Nat.lt_trans h1 (sizeOf_tail_lt_sizeOf_branches hd tl)
+          exact Nat.lt_trans h1 (size_of_tail_lt_size_of_branches hd tl)
 
 /-! ## Substitution Core -/
 mutual
@@ -221,7 +221,7 @@ end
 
 /-- substituteBranches is equivalent to mapping substitute over the continuations. -/
 @[simp]
-theorem substituteBranches_eq_map (bs : List BranchR) (var : String) (repl : LocalTypeR) :
+theorem substitute_branches_eq_map (bs : List BranchR) (var : String) (repl : LocalTypeR) :
     substituteBranches bs var repl = bs.map (fun (l, vt, c) => (l, vt, c.substitute var repl)) := by
   induction bs with
   | nil => rfl
@@ -310,13 +310,13 @@ mutual
           exact congrArg (LocalTypeR.mu v) (LocalTypeR.dual_substitute body var repl)
     | .send p bs, var, repl => by
         simp only [LocalTypeR.substitute, LocalTypeR.dual]
-        exact congrArg (LocalTypeR.recv p) (dualBranches_substituteBranches bs var repl)
+        exact congrArg (LocalTypeR.recv p) (dual_branches_substitute_branches bs var repl)
     | .recv p bs, var, repl => by
         simp only [LocalTypeR.substitute, LocalTypeR.dual]
-        exact congrArg (LocalTypeR.send p) (dualBranches_substituteBranches bs var repl)
+        exact congrArg (LocalTypeR.send p) (dual_branches_substitute_branches bs var repl)
 
   /-- Dual and substitute commute for branch lists. -/
-  theorem dualBranches_substituteBranches : (bs : List BranchR) →
+  theorem dual_branches_substitute_branches : (bs : List BranchR) →
       (var : String) → (repl : LocalTypeR) →
       dualBranches (substituteBranches bs var repl) =
         substituteBranches (dualBranches bs) var repl.dual
@@ -325,7 +325,7 @@ mutual
         simp only [substituteBranches, dualBranches]
         exact congrArg₂ List.cons
           (congrArg₂ Prod.mk rfl (congrArg₂ Prod.mk rfl (LocalTypeR.dual_substitute cont var repl)))
-          (dualBranches_substituteBranches rest var repl)
+          (dual_branches_substitute_branches rest var repl)
 end
 
 /-! ## Closedness Predicate (Coq-style `eclosed`)
@@ -333,7 +333,7 @@ end
 A local type is closed if it has no free type variables.
 This matches Coq's `eclosed e := forall n, n \notin lType_fv e`. -/
 
-theorem List.isEmpty_eq_true {α : Type} (l : List α) : l.isEmpty = true ↔ l = [] := by
+theorem List.is_empty_eq_true {α : Type} (l : List α) : l.isEmpty = true ↔ l = [] := by
   cases l <;> simp
 
 /-- A local type is closed if it has no free type variables. -/
@@ -363,7 +363,7 @@ end
 
 /-! ## freeVars / isFreeIn bridge lemmas -/
 mutual
-  theorem mem_freeVars_isFreeIn (lt : LocalTypeR) (v : String) :
+  theorem mem_free_vars_is_free_in (lt : LocalTypeR) (v : String) :
       v ∈ lt.freeVars → lt.isFreeIn v = true := by
     intro hmem
     cases hlt : lt with
@@ -378,7 +378,7 @@ mutual
         -- Send and recv cases are identical (symmetric under duality)
         have h' : v ∈ freeVarsOfBranches bs := by
           simpa [LocalTypeR.freeVars, hlt] using hmem
-        have hmem' := mem_freeVarsOfBranches_isFreeInBranches' bs v h'
+        have hmem' := mem_free_vars_of_branches_is_free_in_branches' bs v h'
         simpa [LocalTypeR.isFreeIn, hlt] using hmem'
     | mu t body =>
         have h' : v ∈ body.freeVars.filter (· != t) := by
@@ -386,7 +386,7 @@ mutual
         have hpair : v ∈ body.freeVars ∧ (v != t) = true := by
           simpa [List.mem_filter] using h'
         have hvne : v ≠ t := (bne_iff_ne).1 hpair.2
-        have hbody : body.isFreeIn v = true := mem_freeVars_isFreeIn body v hpair.1
+        have hbody : body.isFreeIn v = true := mem_free_vars_is_free_in body v hpair.1
         have hvne' : (v == t) = false := beq_eq_false_iff_ne.mpr hvne
         simpa [LocalTypeR.isFreeIn, hvne', hlt] using hbody
   termination_by sizeOf lt
@@ -395,7 +395,7 @@ mutual
     all_goals
       simp [*] <;> omega
 
-  theorem mem_freeVarsOfBranches_isFreeInBranches' (bs : List BranchR) (v : String) :
+  theorem mem_free_vars_of_branches_is_free_in_branches' (bs : List BranchR) (v : String) :
       v ∈ freeVarsOfBranches bs → isFreeInBranches' v bs = true := by
     intro hmem
     cases hbs : bs with
@@ -410,10 +410,10 @@ mutual
                   simpa [freeVarsOfBranches, hbs, hhead, hrest, List.mem_append] using hmem
                 cases hmem' with
                 | inl hcont =>
-                    have hfree : cont.isFreeIn v = true := mem_freeVars_isFreeIn cont v hcont
+                    have hfree : cont.isFreeIn v = true := mem_free_vars_is_free_in cont v hcont
                     simp [isFreeInBranches', hbs, hhead, hrest, hfree]
                 | inr htail =>
-                    have hfree := mem_freeVarsOfBranches_isFreeInBranches' tail v htail
+                    have hfree := mem_free_vars_of_branches_is_free_in_branches' tail v htail
 /- ## Structured Block 1 -/
                     simp [isFreeInBranches', hbs, hhead, hrest, hfree]
   termination_by sizeOf bs
@@ -440,7 +440,7 @@ def LocalTypeR.isGuarded (v : String) : LocalTypeR → Bool
   | .recv _ _ => true  -- Any occurrence of v in branches is guarded (inside comm)
   | .mu t body => if v == t then true else body.isGuarded v
 
-@[simp] theorem isGuarded_eraseValTypes :
+@[simp] theorem is_guarded_erase_val_types :
     ∀ (lt : LocalTypeR) (v : String),
       (LocalTypeR.eraseValTypes lt).isGuarded v = lt.isGuarded v
   | .end, _ => rfl
@@ -451,7 +451,7 @@ def LocalTypeR.isGuarded (v : String) : LocalTypeR → Bool
       simp only [LocalTypeR.eraseValTypes, LocalTypeR.isGuarded]
       split_ifs
       · rfl
-      · exact isGuarded_eraseValTypes body v
+      · exact is_guarded_erase_val_types body v
   termination_by lt _ => sizeOf lt
   decreasing_by
     simp_wf
@@ -483,7 +483,7 @@ structure LocalTypeR.WellFormed (t : LocalTypeR) : Prop where
   contractive : t.isContractive = true
 
 /-- `.end` is well-formed. -/
-theorem LocalTypeR.WellFormed_end : LocalTypeR.WellFormed .end :=
+theorem LocalTypeR.well_formed_end : LocalTypeR.WellFormed .end :=
   ⟨by simp [LocalTypeR.isClosed, LocalTypeR.freeVars],
    by simp [LocalTypeR.isContractive]⟩
 end SessionTypes.LocalTypeR

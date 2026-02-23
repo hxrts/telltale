@@ -30,11 +30,11 @@ unfolding.
 
 /-! ## Key Results
 
-- `progressMeasure_nonincreasing_wt`: well-typed instruction steps do not
+- `progress_measure_nonincreasing_wt`: well-typed instruction steps do not
   increase the progress measure on local types.
 - `progressMeasure_decrease_send/recv/offer`: communication steps strictly
   decrease the measure.
-- `progressMeasure_pos_of_decide`: types that reach communication have
+- `progress_measure_pos_of_decide`: types that reach communication have
   positive measure.
 - `ProgressMeasureData`: abstract framework for discrete Lyapunov arguments,
   giving deadlock freedom and bounded termination from a single measure.
@@ -84,56 +84,56 @@ where
 
 /-! ## Zero and positivity -/
 
-@[simp] theorem progressMeasure_end : LocalType.progressMeasure .end_ = 0 := rfl
-@[simp] theorem progressMeasure_var (n : Nat) : (LocalType.var n).progressMeasure = 0 := rfl
+@[simp] theorem progress_measure_end : LocalType.progressMeasure .end_ = 0 := rfl
+@[simp] theorem progress_measure_var (n : Nat) : (LocalType.var n).progressMeasure = 0 := rfl
 
-theorem progressMeasure_send_pos (r : Role) (T : ValType) (L : LocalType) :
+theorem progress_measure_send_pos (r : Role) (T : ValType) (L : LocalType) :
     0 < (LocalType.send r T L).progressMeasure := by
   simp [LocalType.progressMeasure]
 
-theorem progressMeasure_recv_pos (r : Role) (T : ValType) (L : LocalType) :
+theorem progress_measure_recv_pos (r : Role) (T : ValType) (L : LocalType) :
     0 < (LocalType.recv r T L).progressMeasure := by
   simp [LocalType.progressMeasure]
 
-theorem progressMeasure_select_pos (r : Role) (bs : List (Label × LocalType)) :
+theorem progress_measure_select_pos (r : Role) (bs : List (Label × LocalType)) :
     0 < (LocalType.select r bs).progressMeasure := by
   simp [LocalType.progressMeasure]
 
-theorem progressMeasure_branch_pos (r : Role) (bs : List (Label × LocalType)) :
+theorem progress_measure_branch_pos (r : Role) (bs : List (Label × LocalType)) :
     0 < (LocalType.branch r bs).progressMeasure := by
   simp [LocalType.progressMeasure]
 
 /-- Positive progress measure from the decidable reachability checker.
     Types that can reach communication have positive measure. -/
-theorem progressMeasure_pos_of_decide :
+theorem progress_measure_pos_of_decide :
     ∀ (L : LocalType), reachesCommDecide L = true → 0 < L.progressMeasure
-  | .send r T L', _ => progressMeasure_send_pos r T L'
-  | .recv r T L', _ => progressMeasure_recv_pos r T L'
-  | .select r bs, _ => progressMeasure_select_pos r bs
-  | .branch r bs, _ => progressMeasure_branch_pos r bs
+  | .send r T L', _ => progress_measure_send_pos r T L'
+  | .recv r T L', _ => progress_measure_recv_pos r T L'
+  | .select r bs, _ => progress_measure_select_pos r bs
+  | .branch r bs, _ => progress_measure_branch_pos r bs
   | .end_, h => by simp [reachesCommDecide] at h
   | .var _, h => by simp [reachesCommDecide] at h
   | .mu L', h => by
       simp only [LocalType.progressMeasure]
-      exact progressMeasure_pos_of_decide L' (by simp [reachesCommDecide] at h; exact h)
+      exact progress_measure_pos_of_decide L' (by simp [reachesCommDecide] at h; exact h)
 
 /-! ## Decrease under communication -/
 
 /-- Sending strictly decreases the progress measure. -/
-theorem progressMeasure_advance_send (r : Role) (T : ValType) (L : LocalType) :
+theorem progress_measure_advance_send (r : Role) (T : ValType) (L : LocalType) :
     L.progressMeasure < (LocalType.send r T L).progressMeasure := by
   show L.progressMeasure < 1 + L.progressMeasure
   omega
 
 /-- Receiving strictly decreases the progress measure. -/
-theorem progressMeasure_advance_recv (r : Role) (T : ValType) (L : LocalType) :
+theorem progress_measure_advance_recv (r : Role) (T : ValType) (L : LocalType) :
     L.progressMeasure < (LocalType.recv r T L).progressMeasure := by
   show L.progressMeasure < 1 + L.progressMeasure
   omega
 
 /-- The sum of branch measures is an upper bound on each individual branch.
     This is the key lemma connecting branch selection to measure decrease. -/
-theorem sumBranches_mem_le (l : Label) (L : LocalType) (bs : List (Label × LocalType))
+theorem sum_branches_mem_le (l : Label) (L : LocalType) (bs : List (Label × LocalType))
     (h : (l, L) ∈ bs) :
     L.progressMeasure ≤ LocalType.progressMeasure.sumBranches bs := by
   induction bs with
@@ -147,11 +147,11 @@ theorem sumBranches_mem_le (l : Label) (L : LocalType) (bs : List (Label × Loca
     · have := ih hmem; omega
 
 /-- Selecting a branch strictly decreases the progress measure. -/
-theorem progressMeasure_advance_select (r : Role) (bs : List (Label × LocalType))
+theorem progress_measure_advance_select (r : Role) (bs : List (Label × LocalType))
     (l : Label) (L : LocalType) (h : (l, L) ∈ bs) :
     L.progressMeasure < (LocalType.select r bs).progressMeasure := by
   show L.progressMeasure < 1 + LocalType.progressMeasure.sumBranches bs
-  have := sumBranches_mem_le l L bs h
+  have := sum_branches_mem_le l L bs h
   omega
 
 /-! ## Nonincreasing under well-typed steps -/
@@ -159,24 +159,24 @@ theorem progressMeasure_advance_select (r : Role) (bs : List (Label × LocalType
 /-- Well-typed instruction steps do not increase the progress measure.
     This is the discrete analogue of Gibbs's `V_decreasing` property:
     the Lyapunov function is non-increasing along system trajectories. -/
-theorem progressMeasure_nonincreasing_wt {γ ε : Type}
+theorem progress_measure_nonincreasing_wt {γ ε : Type}
     [GuardLayer γ] [EffectRuntime ε] [EffectSpec ε]
     (i : Instr γ ε) (sk : SessionKind γ) (L L' : LocalType)
     (h : WellTypedInstr i sk L L') :
     L'.progressMeasure ≤ L.progressMeasure := by
   cases h with
   | wt_send _ _ _ r T L' =>
-    exact Nat.le_of_lt (progressMeasure_advance_send r T L')
+    exact Nat.le_of_lt (progress_measure_advance_send r T L')
   | wt_receive _ _ _ r T L' =>
-    exact Nat.le_of_lt (progressMeasure_advance_recv r T L')
+    exact Nat.le_of_lt (progress_measure_advance_recv r T L')
   | wt_offer _ _ r choices lbl L' hmem =>
-    exact Nat.le_of_lt (progressMeasure_advance_select r choices lbl L' hmem)
+    exact Nat.le_of_lt (progress_measure_advance_select r choices lbl L' hmem)
   | wt_choose => exact le_refl _
   | wt_acquire => exact le_refl _
   | wt_release => exact le_refl _
   | wt_invoke =>
     show (LocalType.end_).progressMeasure ≤ (EffectSpec.handlerType _).progressMeasure
-    simp [progressMeasure_end]
+    simp [progress_measure_end]
   | wt_open => exact le_refl _
   | wt_close => exact le_refl _
   | wt_fork => exact le_refl _
@@ -185,21 +185,21 @@ theorem progressMeasure_nonincreasing_wt {γ ε : Type}
   | wt_noop => exact le_refl _
 
 /-- Communication steps strictly decrease the progress measure. -/
-theorem progressMeasure_decrease_of_wt_send {γ ε : Type} [GuardLayer γ] [EffectRuntime ε]
+theorem progress_measure_decrease_of_wt_send {γ ε : Type} [GuardLayer γ] [EffectRuntime ε]
     (_sid : SessionId) (_chan _val : Reg) (r : Role) (T : ValType) (L' : LocalType) :
     L'.progressMeasure < (LocalType.send r T L').progressMeasure :=
-  progressMeasure_advance_send r T L'
+  progress_measure_advance_send r T L'
 
-theorem progressMeasure_decrease_of_wt_recv {γ ε : Type} [GuardLayer γ] [EffectRuntime ε]
+theorem progress_measure_decrease_of_wt_recv {γ ε : Type} [GuardLayer γ] [EffectRuntime ε]
     (_sid : SessionId) (_chan _dst : Reg) (r : Role) (T : ValType) (L' : LocalType) :
     L'.progressMeasure < (LocalType.recv r T L').progressMeasure :=
-  progressMeasure_advance_recv r T L'
+  progress_measure_advance_recv r T L'
 
-theorem progressMeasure_decrease_of_wt_offer {γ ε : Type} [GuardLayer γ] [EffectRuntime ε]
+theorem progress_measure_decrease_of_wt_offer {γ ε : Type} [GuardLayer γ] [EffectRuntime ε]
     (_sid : SessionId) (_chan : Reg) (r : Role) (choices : List (Label × LocalType))
     (lbl : Label) (L' : LocalType) (hmem : (lbl, L') ∈ choices) :
     L'.progressMeasure < (LocalType.select r choices).progressMeasure :=
-  progressMeasure_advance_select r choices lbl L' hmem
+  progress_measure_advance_select r choices lbl L' hmem
 
 /-! ## Abstract Progress Measure Framework -/
 
@@ -297,7 +297,7 @@ def productiveStepBoundTight {State : Type}
 
 /-- Tightness closure: a saturating witness upgrades the productive-step bound
     from an upper bound to an exact bound at `s`. -/
-theorem StrictProgressMeasureData.productive_steps_bound_exact_of_tightWitness
+theorem StrictProgressMeasureData.productive_steps_bound_exact_of_tight_witness
     {State : Type}
     (D : StrictProgressMeasureData State) (s : State)
     (hTight : productiveStepBoundTight D s) :
@@ -316,15 +316,15 @@ theorem StrictProgressMeasureData.productive_steps_bound_exact_of_tightWitness
 def bufferProgressMeasure {α : Type} (buf : List α) : Nat := buf.length
 
 /-- Dequeuing strictly decreases the buffer measure. -/
-theorem bufferProgressMeasure_dequeue {α : Type} (v : α) (rest : List α) :
+theorem buffer_progress_measure_dequeue {α : Type} (v : α) (rest : List α) :
     bufferProgressMeasure rest < bufferProgressMeasure (v :: rest) := by
   simp [bufferProgressMeasure]
 
-@[simp] theorem bufferProgressMeasure_nil {α : Type} :
+@[simp] theorem buffer_progress_measure_nil {α : Type} :
     bufferProgressMeasure ([] : List α) = 0 := rfl
 
 /-- Enqueuing increases the buffer measure by one. -/
-theorem bufferProgressMeasure_enqueue {α : Type} (buf : List α) (v : α) :
+theorem buffer_progress_measure_enqueue {α : Type} (buf : List α) (v : α) :
     bufferProgressMeasure (buf ++ [v]) = bufferProgressMeasure buf + 1 := by
   simp [bufferProgressMeasure]
 
@@ -378,7 +378,7 @@ private theorem foldl_add_shift (l : List Nat) (n : Nat) :
         _ = n + (h + t.foldl (· + ·) 0) := by ring
         _ = n + t.foldl (· + ·) h := by rw [← ih2]
 
-theorem systemLyapunov_append (ms₁ ms₂ : List SessionProgressMeasure) :
+theorem system_lyapunov_append (ms₁ ms₂ : List SessionProgressMeasure) :
     systemLyapunov (ms₁ ++ ms₂) = systemLyapunov ms₁ + systemLyapunov ms₂ := by
   unfold systemLyapunov
   rw [List.map_append, List.foldl_append]
@@ -421,7 +421,7 @@ def VMAdmitsProgressMeasure {ι γ π ε ν : Type} [IdentityModel ι] [GuardLay
 /-! ## VM Deadlock Freedom via Progress Measure -/
 
 /-- Helper: if the scheduler selects a coroutine, schedStep produces a result. -/
-theorem schedStep_some_of_schedule {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+theorem sched_step_some_of_schedule {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -466,6 +466,6 @@ theorem vm_deadlock_free_via_progress_holds : vm_deadlock_free_via_progress := b
   | some c =>
     simp only [hcoro] at hstatus hcid
     obtain ⟨cid', st', hsched⟩ := hcid hstatus
-    exact schedStep_some_of_schedule st cid' st' hsched
+    exact sched_step_some_of_schedule st cid' st' hsched
 
 end

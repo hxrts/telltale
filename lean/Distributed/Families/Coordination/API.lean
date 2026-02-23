@@ -29,19 +29,19 @@ theorem characterization_of_protocol (P : CoordinationProtocol) :
   P.characterization
 
 /-- Monotone side of the characterization. -/
-theorem coordinationFree_of_monotone (P : CoordinationProtocol)
+theorem coordination_free_of_monotone (P : CoordinationProtocol)
     (hMono : P.model.monotoneUpdateClass) :
     CoordinationFreeSafety P.model :=
   P.characterization.1 hMono
 
 /-- Non-monotone side of the characterization. -/
-theorem coordinationRequired_of_nonMonotone (P : CoordinationProtocol)
+theorem coordination_required_of_non_monotone (P : CoordinationProtocol)
     (hNonMono : ¬ P.model.monotoneUpdateClass) :
     CoordinationRequired P.model :=
   P.characterization.2 hNonMono
 
 /-- Core assumptions are always validated for a certified protocol. -/
-theorem coreAssumptions_allPassed (P : CoordinationProtocol) :
+theorem core_assumptions_all_passed (P : CoordinationProtocol) :
     (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
   rfl
 

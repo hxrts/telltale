@@ -6,7 +6,7 @@ proofs that traverse mu types. Additionally, a decidable `participates` function
 efficient classification of roles as participants or non-participants.
 
 Solution Structure. Proves `part_of2_substitute` showing participation is preserved through
-variable substitution. `part_of2_unfold` and `part_of2_fullUnfoldIter` extend this to mu-unfolding.
+variable substitution. `part_of2_unfold` and `part_of2_full_unfold_iter` extend this to mu-unfolding.
 Defines `participates` as a Boolean function with mutual recursion over global types and branches.
 `part_of2_iff_participates` establishes equivalence with the inductive predicate.
 -/
@@ -25,13 +25,13 @@ useful for reasoning about `fullUnfoldIter` in projection proofs. -/
 
 /-! ## Structural Size Helpers -/
 
-private theorem sizeOf_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
+private theorem size_of_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
     sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
   simp only [GlobalType.comm.sizeOf_spec]
   have h : 0 < 1 + sizeOf sender + sizeOf receiver := by omega
   omega
 
-private theorem sizeOf_elem_snd_lt_list {α β : Type _} [SizeOf α] [SizeOf β]
+private theorem size_of_elem_snd_lt_list {α β : Type _} [SizeOf α] [SizeOf β]
     (xs : List (α × β)) (x : α × β) (h : x ∈ xs) :
     sizeOf x.2 < sizeOf xs := by
   induction xs with
@@ -47,16 +47,16 @@ private theorem sizeOf_elem_snd_lt_list {α β : Type _} [SizeOf α] [SizeOf β]
           simp only [sizeOf, List._sizeOf_1] at *
           omega
 
-private theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
+private theorem size_of_elem_snd_lt_comm (sender receiver : String)
     (gbs : List (Label × GlobalType)) (gb : Label × GlobalType) (h : gb ∈ gbs) :
     sizeOf gb.2 < sizeOf (GlobalType.comm sender receiver gbs) := by
-  have h1 := sizeOf_elem_snd_lt_list gbs gb h
-  have h2 := sizeOf_bs_lt_comm sender receiver gbs
+  have h1 := size_of_elem_snd_lt_list gbs gb h
+  have h2 := size_of_bs_lt_comm sender receiver gbs
   omega
 
 /-! ## Branch-Membership Rewriting for substituteBranches -/
 
-private theorem mem_substituteBranches_iff_forward
+private theorem mem_substitute_branches_iff_forward
     {branches : List (Label × GlobalType)} {t : String} {repl : GlobalType}
     {label : Label} {cont' : GlobalType}
     (hmem : (label, cont') ∈ GlobalType.substituteBranches branches t repl) :
@@ -82,7 +82,7 @@ private theorem mem_substituteBranches_iff_forward
 
 /-! ## Branch-Membership Rewriting: Backward Direction -/
 
-private theorem mem_substituteBranches_iff_backward
+private theorem mem_substitute_branches_iff_backward
     {branches : List (Label × GlobalType)} {t : String} {repl : GlobalType}
     {label : Label} {cont' : GlobalType}
     (hmem : ∃ cont, cont' = cont.substitute t repl ∧ (label, cont) ∈ branches) :
@@ -110,15 +110,15 @@ private theorem mem_substituteBranches_iff_backward
 
 /-! ## Branch-Membership Rewriting: Equivalence -/
 
-private theorem mem_substituteBranches_iff
+private theorem mem_substitute_branches_iff
     {branches : List (Label × GlobalType)} {t : String} {repl : GlobalType}
     {label : Label} {cont' : GlobalType} :
     (label, cont') ∈ GlobalType.substituteBranches branches t repl ↔
       ∃ cont, cont' = cont.substitute t repl ∧ (label, cont) ∈ branches := by
   -- Combine forward/backward directions.
   constructor
-  · exact mem_substituteBranches_iff_forward
-  · exact mem_substituteBranches_iff_backward
+  · exact mem_substitute_branches_iff_forward
+  · exact mem_substitute_branches_iff_backward
 
 /-! ## Substitution Preservation: Constructor Cases -/
 
@@ -145,7 +145,7 @@ private theorem part_of2_substitute_comm (role : String) (sender receiver : Stri
       exact .intro _ (.comm_direct _ _ _ hpart)
   | inr hbranch =>
       rcases hbranch with ⟨label, cont', hmem, hcont'⟩
-      rcases (mem_substituteBranches_iff.mp hmem) with ⟨cont, hcont_eq, hmem'⟩
+      rcases (mem_substitute_branches_iff.mp hmem) with ⟨cont, hcont_eq, hmem'⟩
       have hcont_subst : part_of2 role (cont.substitute t repl) := by
         simpa [hcont_eq] using hcont'
       cases ih cont hcont_subst with
@@ -200,7 +200,7 @@ theorem part_of2_substitute (role : String) :
           exact .intro _ (.comm_direct _ _ _ hpart)
       | inr hbranch =>
           rcases hbranch with ⟨label, cont', hmem, hcont'⟩
-          rcases (mem_substituteBranches_iff.mp hmem) with ⟨cont, hcont_eq, hmem'⟩
+          rcases (mem_substitute_branches_iff.mp hmem) with ⟨cont, hcont_eq, hmem'⟩
           have hcont_subst : part_of2 role (cont.substitute t repl) := by
             simpa [hcont_eq] using hcont'
           have hih := part_of2_substitute role cont t repl hcont_subst
@@ -252,7 +252,7 @@ decreasing_by
     all_goals
       first
       | (simpa [GlobalType.comm.sizeOf_spec] using
-          (sizeOf_elem_snd_lt_comm _ _ _ _ (by assumption)))
+          (size_of_elem_snd_lt_comm _ _ _ _ (by assumption)))
       | (simp only [sizeOf, GlobalType._sizeOf_1] at *; omega)
 
 /-! ## Unfolding Preservation for Participation -/
@@ -298,15 +298,15 @@ theorem part_of2_unfold_iter (role : String) (g : GlobalType) :
         part_of2_unfold role (Nat.rec g (fun _ acc => GlobalType.unfold acc) n) h'
       exact ih (g := g) h''
 
-theorem part_of2_fullUnfoldIter (role : String) (g : GlobalType) :
+theorem part_of2_full_unfold_iter (role : String) (g : GlobalType) :
     part_of2 role (GlobalType.fullUnfoldIter g) → part_of2 role g := by
   simpa [GlobalType.fullUnfoldIter] using
     (part_of2_unfold_iter role g g.muHeight)
 
-theorem not_part_of2_fullUnfoldIter (role : String) (g : GlobalType)
+theorem not_part_of2_full_unfold_iter (role : String) (g : GlobalType)
     (h : ¬ part_of2 role g) : ¬ part_of2 role (GlobalType.fullUnfoldIter g) := by
   intro hfull
-  exact h (part_of2_fullUnfoldIter role g hfull)
+  exact h (part_of2_full_unfold_iter role g hfull)
 
 /-! ## Classification: participant or non-participant
 
@@ -382,7 +382,7 @@ mutual
                   participatesBranches role branches = true := by
                 have hexists : ∃ pair, pair ∈ branches ∧ part_of2 role pair.2 :=
                   ⟨(label, cont), hmem, hcont⟩
-                exact (participatesBranches_iff_part_of2 role branches).2 hexists
+                exact (participates_branches_iff_part_of2 role branches).2 hexists
               simp [participates, hbranches]
         · intro h
           simp [participates] at h
@@ -395,7 +395,7 @@ mutual
               have hexists :
                   ∃ pair, pair ∈ branches ∧ part_of2 role pair.2 :=
 /- ## Structured Block 2 -/
-                (participatesBranches_iff_part_of2 role branches).1 hbranches
+                (participates_branches_iff_part_of2 role branches).1 hbranches
               obtain ⟨pair, hmem, hcont⟩ := hexists
               exact .intro _ (.comm_branch _ _ pair.1 pair.2 _ hmem hcont)
     -- Delegate case.
@@ -424,7 +424,7 @@ mutual
   -- Branch-level boolean/inductive equivalence.
 
   /-- `participatesBranches` is equivalent to existence of a participating branch. -/
-  theorem participatesBranches_iff_part_of2 (role : String) :
+  theorem participates_branches_iff_part_of2 (role : String) :
       ∀ branches,
         participatesBranches role branches = true ↔
           ∃ pair, pair ∈ branches ∧ part_of2 role pair.2 := by
@@ -444,7 +444,7 @@ mutual
               exact ⟨(label, cont), by simp, hpo⟩
           | inr hrest =>
               have hrest' :=
-                (participatesBranches_iff_part_of2 role tl).1 hrest
+                (participates_branches_iff_part_of2 role tl).1 hrest
               obtain ⟨pair, hmem, hpo⟩ := hrest'
               exact ⟨pair, by simp [hmem], hpo⟩
         · intro h
@@ -461,7 +461,7 @@ mutual
           | inr hmemTail =>
               have hrest :
                   participatesBranches role tl = true :=
-                (participatesBranches_iff_part_of2 role tl).2 ⟨pair, hmemTail, hpo⟩
+                (participates_branches_iff_part_of2 role tl).2 ⟨pair, hmemTail, hpo⟩
               exact Or.inr hrest
 end
 

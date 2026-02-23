@@ -49,7 +49,7 @@ lemma preserved_sub_middle_par_skip_left
   obtain ⟨pw, S₁_fin, S₂_fin, G₁_fin, G₂_fin, W₁, W₂, Δ₁, Δ₂,
       hSfin, hGfin, hW, hΔ, hDisjG_mid, hDisjS_mid, hDisjS_left_mid, hDisjS_right_mid,
       hDisjS_fin, hDisjW, hDisjΔ, hP_pre, hQ_pre⟩ :=
-    HasTypeProcPreOut_par_inv_witness hPre
+    has_type_proc_pre_out_par_inv_witness hPre
   let splitMid : ParSplit Sown.left Gmid := pw.split
   have hSlenEq : split.S1.length = splitMid.S1.length := by
     calc
@@ -85,7 +85,7 @@ lemma preserved_sub_middle_par_skip_left
       HasTypeProcPreOut Ssh Sown Gmid Q
         { right := Sown.right, left := S₂_fin } (splitMid.G1 ++ G₂_fin) W₂ Δ₂ := by
     have hTmp :=
-      HasTypeProcPreOut_frame_G_left_local
+      has_type_proc_pre_out_frame_g_left_local
         (Ssh:=Ssh) (Sown:=Sown) (Gfr:=splitMid.G1) (G:=splitMid.G2)
         (P:=Q) (Sfin:={ right := Sown.right, left := S₂_fin }) (Gfin:=G₂_fin)
         (W:=W₂) (Δ:=Δ₂) hDisjG_mid hDisjRightIn0 hQ0 hDisjRightOut0
@@ -107,8 +107,8 @@ lemma preserved_sub_middle_par_skip_left
   · intro s hs
     exact hs
   · simpa [hSfinQ, hGfinQ] using hQfull
-  · simpa [hWQ] using (FootprintSubset_refl (W:=W₂))
-  · simpa [hΔQ] using (SEnvDomSubset_refl (S:=Δ₂))
+  · simpa [hWQ] using (footprint_subset_refl (W:=W₂))
+  · simpa [hΔQ] using (s_env_dom_subset_refl (S:=Δ₂))
 
 -- `par_skip_right` Branch
 
@@ -131,7 +131,7 @@ lemma preserved_sub_middle_par_skip_right
   obtain ⟨pw, S₁_fin, S₂_fin, G₁_fin, G₂_fin, W₁, W₂, Δ₁, Δ₂,
       hSfin, hGfin, hW, hΔ, hDisjG_mid, hDisjS_mid, hDisjS_left_mid, hDisjS_right_mid,
       hDisjS_fin, hDisjW, hDisjΔ, hP_pre, hQ_pre⟩ :=
-    HasTypeProcPreOut_par_inv_witness hPre
+    has_type_proc_pre_out_par_inv_witness hPre
 /- ## Structured Block 3 -/
   let splitMid : ParSplit Sown.left Gmid := pw.split
   have hSlenEq : split.S1.length = splitMid.S1.length := by
@@ -161,7 +161,7 @@ lemma preserved_sub_middle_par_skip_right
       HasTypeProcPreOut Ssh Sown Gmid P
         { right := Sown.right, left := S₁_fin } (G₁_fin ++ splitMid.G2) W₁ Δ₁ := by
     have hTmp :=
-      HasTypeProcPreOut_frame_G_right_local
+      has_type_proc_pre_out_frame_g_right_local
         (Ssh:=Ssh) (Sown:=Sown) (G:=splitMid.G1) (Gfr:=splitMid.G2)
         (P:=P) (Sfin:={ right := Sown.right, left := S₁_fin }) (Gfin:=G₁_fin)
         (W:=W₁) (Δ:=Δ₁) hDisjG_mid hP0
@@ -183,8 +183,8 @@ lemma preserved_sub_middle_par_skip_right
   · intro s hs
     exact hs
   · simpa [hSfinP, hGfinP] using hPfull
-  · simpa [hWP] using (FootprintSubset_refl (W:=W₁))
-  · simpa [hΔP] using (SEnvDomSubset_refl (S:=Δ₁))
+  · simpa [hWP] using (footprint_subset_refl (W:=W₁))
+  · simpa [hΔP] using (s_env_dom_subset_refl (S:=Δ₁))
 
 /- ## Structured Block 4 -/
 end

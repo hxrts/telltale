@@ -11,7 +11,7 @@ The Problem. The main preservation theorem requires showing that all
 components of a typed configuration (GEnv, DEnv, SEnv, store, buffers)
 are preserved through typed steps in a framed context.
 
-Solution Structure. Prove `BuffersTyped_preserved_frame_left` by
+Solution Structure. Prove `buffers_typed_preserved_frame_left` by
 induction on `TypedStep`. Dispatch each constructor to its specific
 preservation lemma from the component-level files.
 -/
@@ -29,7 +29,7 @@ section
 -- Buffer Preservation Under Framing
 
 set_option maxHeartbeats 2000000 in
-theorem BuffersTyped_preserved_frame_left
+theorem buffers_typed_preserved_frame_left
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'}
     {G₂ : GEnv} {D₂ : DEnv} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
@@ -44,7 +44,7 @@ theorem BuffersTyped_preserved_frame_left
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
         hk hx hG hS hv hRecvReady hEdge hGout hDout hBufsOut
       have hBT' :=
-        BuffersTyped_send_frame_left (G:=G) (D:=D) (G₂:=G₂) (D₂:=D₂)
+        buffers_typed_send_frame_left (G:=G) (D:=D) (G₂:=G₂) (D₂:=D₂)
           (e:=e) (target:=target) (T:=T) (L:=L) (v:=v) (sendEdge:=sendEdge)
           hG hv hEdge hDisj hCons hBT
       have hEq : ∀ e', lookupD (updateD (D ++ D₂) sendEdge (lookupD D sendEdge ++ [T])) e' =
@@ -52,9 +52,9 @@ theorem BuffersTyped_preserved_frame_left
           intro e'
           unfold appendD
           exact
-            lookupD_updateD_append_left (D:=D) (D₂:=D₂) (e:=sendEdge) (e':=e')
+            lookup_d_update_d_append_left (D:=D) (D₂:=D₂) (e:=sendEdge) (e':=e')
               (ts:=lookupD D sendEdge ++ [T])
-      have hBT'' := BuffersTyped_rewriteD hEq hBT'
+      have hBT'' := buffers_typed_rewrite_d hEq hBT'
       cases hGout
       cases hDout
       cases hBufsOut
@@ -64,17 +64,17 @@ theorem BuffersTyped_preserved_frame_left
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
         hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut
       have hBT' :=
-        BuffersTyped_recv_frame_left (G:=G) (D:=D) (G₂:=G₂) (D₂:=D₂)
+        buffers_typed_recv_frame_left (G:=G) (D:=D) (G₂:=G₂) (D₂:=D₂)
           (e:=e) (source:=source) (T:=T) (L:=L) (v:=v) (vs:=vs) (recvEdge:=recvEdge)
           hG hBuf hTrace hEdge hDisj hCons hBT
       have hEq : ∀ e', lookupD (updateD (D ++ D₂) recvEdge (lookupD D recvEdge).tail) e' =
         lookupD (updateD D recvEdge (lookupD D recvEdge).tail ++ D₂) e' := by
           intro e'
           exact
-            lookupD_updateD_append_left (D:=D) (D₂:=D₂) (e:=recvEdge) (e':=e')
+            lookup_d_update_d_append_left (D:=D) (D₂:=D₂) (e:=recvEdge) (e':=e')
               (ts:=(lookupD D recvEdge).tail)
 /- ## Structured Block 2 -/
-      have hBT'' := BuffersTyped_rewriteD hEq hBT'
+      have hBT'' := buffers_typed_rewrite_d hEq hBT'
       cases hGout
       cases hDout
       cases hBufsOut
@@ -84,7 +84,7 @@ theorem BuffersTyped_preserved_frame_left
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
         hk hG hFind hTargetReady hEdge hGout hDout hBufsOut
       have hBT' :=
-        BuffersTyped_select_frame_left (G:=G) (D:=D) (G₂:=G₂) (D₂:=D₂)
+        buffers_typed_select_frame_left (G:=G) (D:=D) (G₂:=G₂) (D₂:=D₂)
           (e:=e) (target:=target) (bs:=bs) (ℓ:=ℓ) (L:=L) (selectEdge:=selectEdge)
           hG hFind hEdge hDisj hCons hBT
       have hEq : ∀ e', lookupD (updateD (D ++ D₂) selectEdge (lookupD D selectEdge ++ [.string])) e' =
@@ -92,9 +92,9 @@ theorem BuffersTyped_preserved_frame_left
           intro e'
           unfold appendD
           exact
-            lookupD_updateD_append_left (D:=D) (D₂:=D₂) (e:=selectEdge) (e':=e')
+            lookup_d_update_d_append_left (D:=D) (D₂:=D₂) (e:=selectEdge) (e':=e')
               (ts:=lookupD D selectEdge ++ [.string])
-      have hBT'' := BuffersTyped_rewriteD hEq hBT'
+      have hBT'' := buffers_typed_rewrite_d hEq hBT'
       cases hGout
       cases hDout
       cases hBufsOut
@@ -104,16 +104,16 @@ theorem BuffersTyped_preserved_frame_left
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
         hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut
       have hBT' :=
-        BuffersTyped_branch_frame_left (G:=G) (D:=D) (G₂:=G₂) (D₂:=D₂)
+        buffers_typed_branch_frame_left (G:=G) (D:=D) (G₂:=G₂) (D₂:=D₂)
           (e:=e) (source:=source) (bs:=bs) (ℓ:=ℓ) (L:=L) (vs:=vs) (branchEdge:=branchEdge)
           hG hFindT hBuf hTrace hEdge hDisj hCons hBT
       have hEq : ∀ e', lookupD (updateD (D ++ D₂) branchEdge (lookupD D branchEdge).tail) e' =
         lookupD (updateD D branchEdge (lookupD D branchEdge).tail ++ D₂) e' := by
           intro e'
           exact
-            lookupD_updateD_append_left (D:=D) (D₂:=D₂) (e:=branchEdge) (e':=e')
+            lookup_d_update_d_append_left (D:=D) (D₂:=D₂) (e:=branchEdge) (e':=e')
               (ts:=(lookupD D branchEdge).tail)
-      have hBT'' := BuffersTyped_rewriteD hEq hBT'
+      have hBT'' := buffers_typed_rewrite_d hEq hBT'
       cases hGout
       cases hDout
       cases hBufsOut
@@ -139,7 +139,7 @@ theorem BuffersTyped_preserved_frame_left
 -- Buffer Preservation Under Right Framing
 
 set_option maxHeartbeats 2000000 in
-theorem BuffersTyped_preserved_frame_right
+theorem buffers_typed_preserved_frame_right
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'}
     {G₁ : GEnv} {D₁ : DEnv} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
@@ -154,23 +154,23 @@ theorem BuffersTyped_preserved_frame_right
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
         hk hx hG hS hv hRecvReady hEdge hGout hDout hBufsOut
       have hBT' :=
-        BuffersTyped_send_frame_right (G:=G) (D:=D) (G₁:=G₁) (D₁:=D₁)
+        buffers_typed_send_frame_right (G:=G) (D:=D) (G₁:=G₁) (D₁:=D₁)
           (e:=e) (target:=target) (T:=T) (L:=L) (v:=v) (sendEdge:=sendEdge)
           hG hv hEdge hDisj hCons hBT
       have hSid : sendEdge.sid ∈ SessionsOf G := by
         rcases hEdge with rfl
         exact ⟨e, .send target T L, hG, rfl⟩
       have hNone : D₁.find? sendEdge = none :=
-        lookupD_none_of_disjointG (G₁:=G) (G₂:=G₁) (D₂:=D₁) (DisjointG_symm hDisj) hCons
+        lookup_d_none_of_disjoint_g (G₁:=G) (G₂:=G₁) (D₂:=D₁) (disjoint_g_symm hDisj) hCons
           hSid
       have hEq : ∀ e', lookupD (updateD (D₁ ++ D) sendEdge (lookupD D sendEdge ++ [T])) e' =
         lookupD (D₁ ++ appendD D sendEdge T) e' := by
           intro e'
           unfold appendD
           exact
-            lookupD_updateD_append_right (D₁:=D₁) (D:=D) (e:=sendEdge) (e':=e')
+            lookup_d_update_d_append_right (D₁:=D₁) (D:=D) (e:=sendEdge) (e':=e')
               (ts:=lookupD D sendEdge ++ [T]) hNone
-      have hBT'' := BuffersTyped_rewriteD hEq hBT'
+      have hBT'' := buffers_typed_rewrite_d hEq hBT'
       cases hGout
       cases hDout
       cases hBufsOut
@@ -180,7 +180,7 @@ theorem BuffersTyped_preserved_frame_right
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
         hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut
       have hBT' :=
-        BuffersTyped_recv_frame_right (G:=G) (D:=D) (G₁:=G₁) (D₁:=D₁)
+        buffers_typed_recv_frame_right (G:=G) (D:=D) (G₁:=G₁) (D₁:=D₁)
           (e:=e) (source:=source) (T:=T) (L:=L) (v:=v) (vs:=vs) (recvEdge:=recvEdge)
           hG hBuf hTrace hEdge hDisj hCons hBT
 /- ## Structured Block 4 -/
@@ -188,15 +188,15 @@ theorem BuffersTyped_preserved_frame_right
         rcases hEdge with rfl
         exact ⟨e, .recv source T L, hG, rfl⟩
       have hNone : D₁.find? recvEdge = none :=
-        lookupD_none_of_disjointG (G₁:=G) (G₂:=G₁) (D₂:=D₁) (DisjointG_symm hDisj) hCons
+        lookup_d_none_of_disjoint_g (G₁:=G) (G₂:=G₁) (D₂:=D₁) (disjoint_g_symm hDisj) hCons
           hSid
       have hEq : ∀ e', lookupD (updateD (D₁ ++ D) recvEdge (lookupD D recvEdge).tail) e' =
         lookupD (D₁ ++ updateD D recvEdge (lookupD D recvEdge).tail) e' := by
           intro e'
           exact
-            lookupD_updateD_append_right (D₁:=D₁) (D:=D) (e:=recvEdge) (e':=e')
+            lookup_d_update_d_append_right (D₁:=D₁) (D:=D) (e:=recvEdge) (e':=e')
               (ts:=(lookupD D recvEdge).tail) hNone
-      have hBT'' := BuffersTyped_rewriteD hEq hBT'
+      have hBT'' := buffers_typed_rewrite_d hEq hBT'
       cases hGout
       cases hDout
       cases hBufsOut
@@ -206,23 +206,23 @@ theorem BuffersTyped_preserved_frame_right
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
         hk hG hFind hTargetReady hEdge hGout hDout hBufsOut
       have hBT' :=
-        BuffersTyped_select_frame_right (G:=G) (D:=D) (G₁:=G₁) (D₁:=D₁)
+        buffers_typed_select_frame_right (G:=G) (D:=D) (G₁:=G₁) (D₁:=D₁)
           (e:=e) (target:=target) (bs:=bs) (ℓ:=ℓ) (L:=L) (selectEdge:=selectEdge)
           hG hFind hEdge hDisj hCons hBT
       have hSid : selectEdge.sid ∈ SessionsOf G := by
         rcases hEdge with rfl
         exact ⟨e, .select target bs, hG, rfl⟩
       have hNone : D₁.find? selectEdge = none :=
-        lookupD_none_of_disjointG (G₁:=G) (G₂:=G₁) (D₂:=D₁) (DisjointG_symm hDisj) hCons
+        lookup_d_none_of_disjoint_g (G₁:=G) (G₂:=G₁) (D₂:=D₁) (disjoint_g_symm hDisj) hCons
           hSid
       have hEq : ∀ e', lookupD (updateD (D₁ ++ D) selectEdge (lookupD D selectEdge ++ [.string])) e' =
         lookupD (D₁ ++ appendD D selectEdge .string) e' := by
           intro e'
           unfold appendD
           exact
-            lookupD_updateD_append_right (D₁:=D₁) (D:=D) (e:=selectEdge) (e':=e')
+            lookup_d_update_d_append_right (D₁:=D₁) (D:=D) (e:=selectEdge) (e':=e')
               (ts:=lookupD D selectEdge ++ [.string]) hNone
-      have hBT'' := BuffersTyped_rewriteD hEq hBT'
+      have hBT'' := buffers_typed_rewrite_d hEq hBT'
       cases hGout
       cases hDout
       cases hBufsOut
@@ -232,7 +232,7 @@ theorem BuffersTyped_preserved_frame_right
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
         hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut
       have hBT' :=
-        BuffersTyped_branch_frame_right (G:=G) (D:=D) (G₁:=G₁) (D₁:=D₁)
+        buffers_typed_branch_frame_right (G:=G) (D:=D) (G₁:=G₁) (D₁:=D₁)
           (e:=e) (source:=source) (bs:=bs) (ℓ:=ℓ) (L:=L) (vs:=vs) (branchEdge:=branchEdge)
           hG hFindT hBuf hTrace hEdge hDisj hCons hBT
       have hSid : branchEdge.sid ∈ SessionsOf G := by
@@ -240,15 +240,15 @@ theorem BuffersTyped_preserved_frame_right
         rcases hEdge with rfl
         exact ⟨e, .branch source bs, hG, rfl⟩
       have hNone : D₁.find? branchEdge = none :=
-        lookupD_none_of_disjointG (G₁:=G) (G₂:=G₁) (D₂:=D₁) (DisjointG_symm hDisj) hCons
+        lookup_d_none_of_disjoint_g (G₁:=G) (G₂:=G₁) (D₂:=D₁) (disjoint_g_symm hDisj) hCons
           hSid
       have hEq : ∀ e', lookupD (updateD (D₁ ++ D) branchEdge (lookupD D branchEdge).tail) e' =
         lookupD (D₁ ++ updateD D branchEdge (lookupD D branchEdge).tail) e' := by
           intro e'
           exact
-            lookupD_updateD_append_right (D₁:=D₁) (D:=D) (e:=branchEdge) (e':=e')
+            lookup_d_update_d_append_right (D₁:=D₁) (D:=D) (e:=branchEdge) (e':=e')
               (ts:=(lookupD D branchEdge).tail) hNone
-      have hBT'' := BuffersTyped_rewriteD hEq hBT'
+      have hBT'' := buffers_typed_rewrite_d hEq hBT'
       cases hGout
       cases hDout
       cases hBufsOut
@@ -271,19 +271,19 @@ theorem BuffersTyped_preserved_frame_right
 
 -- Empty-Trace Helpers and Unframed Corollary
 
-lemma SessionsOfD_empty : SessionsOfD (∅ : DEnv) = ∅ := by
+lemma sessions_of_d_empty : SessionsOfD (∅ : DEnv) = ∅ := by
   ext s; constructor
   · intro h
     rcases h with ⟨e, ts, hFind, hSid⟩
     have : (∅ : DEnv).find? e = none := by
-      simp [DEnv.find?, DEnv_map_find?_empty]
+      simp [DEnv.find?, d_env_map_find?_empty]
     cases hFind
   · intro h; cases h
 
-lemma DConsistent_empty (G : GEnv) : DConsistent G (∅ : DEnv) := by
-  simp [DConsistent, SessionsOfD_empty]
+lemma d_consistent_empty (G : GEnv) : DConsistent G (∅ : DEnv) := by
+  simp [DConsistent, sessions_of_d_empty]
 
-theorem BuffersTyped_preserved
+theorem buffers_typed_preserved
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     Coherent G D →
@@ -294,28 +294,28 @@ theorem BuffersTyped_preserved
     intro e
     have hNone : (∅ : DEnv).find? e = none := by
 /- ## Structured Block 6 -/
-      simp [DEnv.find?, DEnv_map_find?_empty]
-    exact lookupD_append_left_of_right_none (D₁:=D) (D₂:=∅) (e:=e) hNone
+      simp [DEnv.find?, d_env_map_find?_empty]
+    exact lookup_d_append_left_of_right_none (D₁:=D) (D₂:=∅) (e:=e) hNone
   have hBT' :
       BuffersTyped (G ++ []) (D ++ (∅ : DEnv)) bufs := by
     have hBTD : BuffersTyped G (D ++ (∅ : DEnv)) bufs :=
-      BuffersTyped_rewriteD (D:=D) (D':=D ++ (∅ : DEnv)) (by
+      buffers_typed_rewrite_d (D:=D) (D':=D ++ (∅ : DEnv)) (by
         intro e; symm; exact hEqD e) hBT
-    apply BuffersTyped_mono (G:=G) (G':=G ++ []) (D:=D ++ (∅ : DEnv)) (bufs:=bufs)
+    apply buffers_typed_mono (G:=G) (G':=G ++ []) (D:=D ++ (∅ : DEnv)) (bufs:=bufs)
     · intro ep L hLookup
-      exact lookupG_append_left (G₁:=G) (G₂:=[]) hLookup
+      exact lookup_g_append_left (G₁:=G) (G₂:=[]) hLookup
     · exact hBTD
-  have hDisj : DisjointG G ([] : GEnv) := DisjointG_right_empty G
-  have hCons : DConsistent ([] : GEnv) (∅ : DEnv) := DConsistent_empty []
+  have hDisj : DisjointG G ([] : GEnv) := disjoint_g_right_empty G
+  have hCons : DConsistent ([] : GEnv) (∅ : DEnv) := d_consistent_empty []
   have hBT'' :=
-    BuffersTyped_preserved_frame_left (G₂:=[]) (D₂:=∅) hTS hDisj hCons hBT'
+    buffers_typed_preserved_frame_left (G₂:=[]) (D₂:=∅) hTS hDisj hCons hBT'
   have hBT''' : BuffersTyped G' (D' ++ (∅ : DEnv)) bufs' := by
     simpa [List.append_nil] using hBT''
   have hEqD' : ∀ e, lookupD (D' ++ (∅ : DEnv)) e = lookupD D' e := by
     intro e
     have hNone : (∅ : DEnv).find? e = none := by
-      simp [DEnv.find?, DEnv_map_find?_empty]
-    exact lookupD_append_left_of_right_none (D₁:=D') (D₂:=∅) (e:=e) hNone
-  exact BuffersTyped_rewriteD (D:=D' ++ (∅ : DEnv)) (D':=D') hEqD' hBT'''
+      simp [DEnv.find?, d_env_map_find?_empty]
+    exact lookup_d_append_left_of_right_none (D₁:=D') (D₂:=∅) (e:=e) hNone
+  exact buffers_typed_rewrite_d (D:=D' ++ (∅ : DEnv)) (D':=D') hEqD' hBT'''
 
 end

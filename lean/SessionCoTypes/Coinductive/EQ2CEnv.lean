@@ -67,23 +67,23 @@ def EnvVarR (ρ : EnvPair) : Prop :=
 
 /-! ## Unfolding from environment membership -/
 
-lemma EnvResolves_unfolds_left {ρ : EnvPair} {x : String} {c : LocalTypeC}
+lemma env_resolves_unfolds_left {ρ : EnvPair} {x : String} {c : LocalTypeC}
     (hρ : EnvResolves ρ) (hmem : c ∈ envL ρ x) : UnfoldsToVarC c x := by
-  exact EQ2C_mkVar_left_unfolds (hρ.1 _ _ hmem)
+  exact eq2_c_mk_var_left_unfolds (hρ.1 _ _ hmem)
 
-lemma EnvResolves_unfolds_right {ρ : EnvPair} {x : String} {c : LocalTypeC}
+lemma env_resolves_unfolds_right {ρ : EnvPair} {x : String} {c : LocalTypeC}
     (hρ : EnvResolves ρ) (hmem : c ∈ envR ρ x) : UnfoldsToVarC c x := by
-  exact EQ2C_mkVar_right_unfolds (hρ.2 _ _ hmem)
+  exact eq2_c_mk_var_right_unfolds (hρ.2 _ _ hmem)
 
-lemma EnvResolvesL_unfolds {ρ : EnvPair} {x : String} {c : LocalTypeC}
+lemma env_resolves_l_unfolds {ρ : EnvPair} {x : String} {c : LocalTypeC}
     (hρ : EnvResolvesL ρ) (hmem : c ∈ envL ρ x) : UnfoldsToVarC c x := by
-  exact EQ2C_mkVar_left_unfolds (hρ _ _ hmem)
+  exact eq2_c_mk_var_left_unfolds (hρ _ _ hmem)
 
 /-! ## EnvResolves preservation under insert -/
 
 /-! ### Core Insert Preservation -/
 
-lemma EnvResolves_insertL {ρ : EnvPair} {x : String} {b : LocalTypeC}
+lemma env_resolves_insert_l {ρ : EnvPair} {x : String} {b : LocalTypeC}
     (hρ : EnvResolves ρ) (hvar : EQ2C (mkVar x) b) :
     EnvResolves (envInsertL ρ x b) := by
   constructor
@@ -104,7 +104,7 @@ lemma EnvResolves_insertL {ρ : EnvPair} {x : String} {b : LocalTypeC}
     simp only [envInsertL, envR] at hmem
     exact hρ.2 _ _ hmem
 
-lemma EnvResolves_insertR {ρ : EnvPair} {x : String} {a : LocalTypeC}
+lemma env_resolves_insert_r {ρ : EnvPair} {x : String} {a : LocalTypeC}
     (hρ : EnvResolves ρ) (hvar : EQ2C a (mkVar x)) :
     EnvResolves (envInsertR ρ x a) := by
   constructor
@@ -127,28 +127,28 @@ lemma EnvResolves_insertR {ρ : EnvPair} {x : String} {a : LocalTypeC}
 
 /-! ### Derived Insert Corollaries -/
 
-lemma EnvResolves_insertL_mem {ρ : EnvPair} {x : String} {b : LocalTypeC}
+lemma env_resolves_insert_l_mem {ρ : EnvPair} {x : String} {b : LocalTypeC}
     (hρ : EnvResolves ρ) (hmem : b ∈ envL ρ x) :
     EnvResolves (envInsertL ρ x b) := by
-  exact EnvResolves_insertL (ρ := ρ) (x := x) (b := b) hρ (hρ.1 _ _ hmem)
+  exact env_resolves_insert_l (ρ := ρ) (x := x) (b := b) hρ (hρ.1 _ _ hmem)
 
-lemma EnvResolves_insertR_mem {ρ : EnvPair} {x : String} {a : LocalTypeC}
+lemma env_resolves_insert_r_mem {ρ : EnvPair} {x : String} {a : LocalTypeC}
     (hρ : EnvResolves ρ) (hmem : a ∈ envR ρ x) :
     EnvResolves (envInsertR ρ x a) := by
-  exact EnvResolves_insertR (ρ := ρ) (x := x) (a := a) hρ (hρ.2 _ _ hmem)
+  exact env_resolves_insert_r (ρ := ρ) (x := x) (a := a) hρ (hρ.2 _ _ hmem)
 
-lemma EnvResolves_insertR_var {ρ : EnvPair} {x : String}
+lemma env_resolves_insert_r_var {ρ : EnvPair} {x : String}
     (hρ : EnvResolves ρ) : EnvResolves (envInsertR ρ x (mkVar x)) := by
-  exact EnvResolves_insertR (ρ := ρ) (x := x) (a := mkVar x) hρ (EQ2C_var x)
+  exact env_resolves_insert_r (ρ := ρ) (x := x) (a := mkVar x) hρ (eq2_c_var x)
 
-lemma EnvResolves_envInsertR {ρ : EnvPair} {x : String} {a : LocalTypeC}
+lemma env_resolves_env_insert_r {ρ : EnvPair} {x : String} {a : LocalTypeC}
     (hρ : EnvResolves ρ) (hvar : EQ2C a (mkVar x)) :
     EnvResolves (envInsertR ρ x a) := by
-  exact EnvResolves_insertR (ρ := ρ) (x := x) (a := a) hρ hvar
+  exact env_resolves_insert_r (ρ := ρ) (x := x) (a := a) hρ hvar
 
 /-! ### Left-Projection Preservation -/
 
-lemma EnvResolvesL_insertR {ρ : EnvPair} {x : String} {a : LocalTypeC}
+lemma env_resolves_l_insert_r {ρ : EnvPair} {x : String} {a : LocalTypeC}
     (hρ : EnvResolvesL ρ) : EnvResolvesL (envInsertR ρ x a) := by
   intro y c hmem
   have hmem' : c ∈ envL ρ y := by
@@ -157,13 +157,13 @@ lemma EnvResolvesL_insertR {ρ : EnvPair} {x : String} {a : LocalTypeC}
 
 /-! ## EnvVarR preservation -/
 
-lemma EnvVarR_insertL {ρ : EnvPair} {x : String} {b : LocalTypeC}
+lemma env_var_r_insert_l {ρ : EnvPair} {x : String} {b : LocalTypeC}
     (hρ : EnvVarR ρ) : EnvVarR (envInsertL ρ x b) := by
   intro y c hmem
   simp only [envInsertL, envR] at hmem
   exact hρ _ _ hmem
 
-lemma EnvVarR_insertR_var {ρ : EnvPair} {x : String}
+lemma env_var_r_insert_r_var {ρ : EnvPair} {x : String}
     (hρ : EnvVarR ρ) : EnvVarR (envInsertR ρ x (mkVar x)) := by
   intro y c hmem
   by_cases hy : y = x
@@ -179,16 +179,16 @@ lemma EnvVarR_insertR_var {ρ : EnvPair} {x : String}
       simpa [envInsertR, envR, Env.insert, hy, Set.mem_singleton_iff, false_or] using hmem
     exact hρ _ _ hmem'
 
-lemma EnvResolves_of_left_varR {ρ : EnvPair}
+lemma env_resolves_of_left_var_r {ρ : EnvPair}
     (hL : EnvResolvesL ρ) (hR : EnvVarR ρ) : EnvResolves ρ := by
   constructor
   · exact hL
   · intro x c hmem
     have hc : c = mkVar x := hR _ _ hmem
     subst hc
-    exact EQ2C_var x
+    exact eq2_c_var x
 
-lemma EnvResolvesL_insertL_mem {ρ : EnvPair} {x : String} {b : LocalTypeC}
+lemma env_resolves_l_insert_l_mem {ρ : EnvPair} {x : String} {b : LocalTypeC}
     (hρ : EnvResolvesL ρ) (hmem : b ∈ envL ρ x) :
     EnvResolvesL (envInsertL ρ x b) := by
   intro y c hmem'
@@ -220,7 +220,7 @@ def toPacoRel (R : Rel) : StateRel :=
 def fromPacoRel (R : StateRel) : Rel :=
   fun ρ a b => R (ρ, a, b) (ρ, a, b)
 
-@[simp] lemma fromPacoRel_toPacoRel (R : Rel) :
+@[simp] lemma from_paco_rel_to_paco_rel (R : Rel) :
     fromPacoRel (toPacoRel R) = R := by
   funext ρ a b
   simp [fromPacoRel, toPacoRel]
@@ -229,12 +229,12 @@ def BranchesRelCE (R : Rel) (ρ : EnvPair)
     (bs cs : List (Label × LocalTypeC)) : Prop :=
   List.Forall₂ (fun b c => b.1 = c.1 ∧ R ρ b.2 c.2) bs cs
 
-lemma BranchesRelCE_mono {R S : Rel} (h : ∀ ρ a b, R ρ a b → S ρ a b) :
+lemma branches_rel_ce_mono {R S : Rel} (h : ∀ ρ a b, R ρ a b → S ρ a b) :
     ∀ {ρ bs cs}, BranchesRelCE R ρ bs cs → BranchesRelCE S ρ bs cs := by
   intro ρ bs cs hrel
   exact List.Forall₂.imp (fun a b hab => ⟨hab.1, h _ _ _ hab.2⟩) hrel
 
-lemma BranchesRelCE_to_C_fixed {R : Rel} {ρ : EnvPair} {bs cs : List (Label × LocalTypeC)}
+lemma branches_rel_ce_to_c_fixed {R : Rel} {ρ : EnvPair} {bs cs : List (Label × LocalTypeC)}
     (h : BranchesRelCE R ρ bs cs) :
     BranchesRelC (fun a b => R ρ a b) bs cs := by
   refine List.Forall₂.imp ?_ h
@@ -284,7 +284,7 @@ def EQ2CE_step_paco (R : StateRel) : StateRel :=
 
 /-! ## EQ2CE Paco Monotonicity -/
 
-lemma EQ2CE_step_mono : Paco.Monotone2 EQ2CE_step_paco := by
+lemma eq2_ce_step_mono : Paco.Monotone2 EQ2CE_step_paco := by
   intro R S h s t hrel
   rcases hrel with ⟨hst, hstep⟩
   subst hst
@@ -292,9 +292,9 @@ lemma EQ2CE_step_mono : Paco.Monotone2 EQ2CE_step_paco := by
   cases hstep with
   | «end» ha hb => exact EQ2CE_step.«end» ha hb
   | send ha hb hbr =>
-      exact EQ2CE_step.send ha hb (BranchesRelCE_mono (fun ρ a b hr => h _ _ hr) hbr)
+      exact EQ2CE_step.send ha hb (branches_rel_ce_mono (fun ρ a b hr => h _ _ hr) hbr)
   | recv ha hb hbr =>
-      exact EQ2CE_step.recv ha hb (BranchesRelCE_mono (fun ρ a b hr => h _ _ hr) hbr)
+      exact EQ2CE_step.recv ha hb (branches_rel_ce_mono (fun ρ a b hr => h _ _ hr) hbr)
   | var ha hb =>
       exact EQ2CE_step.var ha hb
   | var_left ha hmem =>
@@ -308,7 +308,7 @@ lemma EQ2CE_step_mono : Paco.Monotone2 EQ2CE_step_paco := by
 
 def EQ2CEFMono : Paco.MonoRel State where
   F := EQ2CE_step_paco
-  mono := EQ2CE_step_mono
+  mono := eq2_ce_step_mono
 
 /-! ## Environment-aware coinductive equality (paco) -/
 
@@ -316,30 +316,30 @@ def EQ2CE (ρ : EnvPair) (a b : LocalTypeC) : Prop :=
   Paco.paco EQ2CEFMono ⊥ (ρ, a, b) (ρ, a, b)
 
 /-- fromPacoRel (paco EQ2CEFMono ⊥) equals EQ2CE by definition. -/
-lemma fromPacoRel_paco_eq_EQ2CE :
+lemma from_paco_rel_paco_eq_eq2_ce :
     fromPacoRel (Paco.paco EQ2CEFMono ⊥) = EQ2CE := by
   funext ρ a b
   rfl
 
-lemma EQ2CE_unfold {ρ : EnvPair} {a b : LocalTypeC} (h : EQ2CE ρ a b) :
+lemma eq2_ce_unfold {ρ : EnvPair} {a b : LocalTypeC} (h : EQ2CE ρ a b) :
     EQ2CE_step EQ2CE ρ a b := by
   have h' := Paco.paco_unfold EQ2CEFMono ⊥ (ρ, a, b) (ρ, a, b) h
   rcases h' with ⟨_, hstep⟩
   -- upaco ⊥ = paco ⊥
   simp only [Paco.upaco_bot] at hstep
   -- fromPacoRel (paco ...) = EQ2CE
-  rw [fromPacoRel_paco_eq_EQ2CE] at hstep
+  rw [from_paco_rel_paco_eq_eq2_ce] at hstep
   exact hstep
 
 /-! ## Coinduction helpers -/
 
 /-- fromPacoRel (toPacoRel R ⊔ ⊥) = R -/
-@[simp] lemma fromPacoRel_toPacoRel_sup_bot (R : Rel) :
+@[simp] lemma from_paco_rel_to_paco_rel_sup_bot (R : Rel) :
     fromPacoRel (toPacoRel R ⊔ ⊥) = R := by
   funext ρ a b
   simp only [fromPacoRel, toPacoRel, sup_bot_eq, true_and]
 
-theorem EQ2CE_coind {R : Rel}
+theorem eq2_ce_coind {R : Rel}
     (hpost : ∀ ρ a b, R ρ a b → EQ2CE_step R ρ a b) :
     ∀ ρ a b, R ρ a b → EQ2CE ρ a b := by
   intro ρ a b hR
@@ -351,7 +351,7 @@ theorem EQ2CE_coind {R : Rel}
     have hstep := hpost _ _ _ hrel
     -- EQ2CEFMono.F (toPacoRel R ⊔ ⊥) s s = s = s ∧ EQ2CE_step (fromPacoRel (toPacoRel R ⊔ ⊥)) ...
     -- Since fromPacoRel (toPacoRel R ⊔ ⊥) = R, we can use hstep
-    simp only [EQ2CEFMono, EQ2CE_step_paco, fromPacoRel_toPacoRel_sup_bot]
+    simp only [EQ2CEFMono, EQ2CE_step_paco, from_paco_rel_to_paco_rel_sup_bot]
     exact ⟨trivial, hstep⟩
   · exact hR'
 

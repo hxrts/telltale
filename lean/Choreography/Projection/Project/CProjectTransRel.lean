@@ -10,9 +10,9 @@ The following definitions form the semantic interface for proofs:
 
 - `CProjectTransRel`: witness relation for coinduction
 - `CProjectTransRelComp`: composition closure of the witness relation
-- `CProjectTransRelComp_postfix`: postfix proof for the closure
-- `CProject_implies_EQ2_trans`: CProject implies EQ2 to trans
-- `CProject_implies_EQ2_trans_thm`: internal coinductive proof
+- `c_project_trans_rel_comp_postfix`: postfix proof for the closure
+- `c_project_implies_eq2_trans`: CProject implies EQ2 to trans
+- `c_project_implies_eq2_trans_thm`: internal coinductive proof
 -/
 
 /-

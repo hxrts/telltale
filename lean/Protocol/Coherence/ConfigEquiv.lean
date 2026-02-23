@@ -45,21 +45,21 @@ def ConfigEquiv (C₁ C₂ : CoherenceConfig) : Prop :=
         (lookupD C₁.D e).map (renameValType (SessionIso.toRenaming σ)))
 
 /-- ConfigEquiv is reflexive. -/
-theorem ConfigEquiv_refl (C : CoherenceConfig) : ConfigEquiv C C := by
+theorem config_equiv_refl (C : CoherenceConfig) : ConfigEquiv C C := by
   -- Identity renaming witnesses reflexivity.
   refine ⟨SessionIso.id, ?_, ?_⟩
   · intro e
     -- Case split on the lookup to avoid rewriting mismatches.
     cases h : lookupG C.G e <;>
-      simp [SessionIso.toRenaming_id, renameEndpoint_id, renameLocalType_id, h]
+      simp [SessionIso.to_renaming_id, rename_endpoint_id, rename_local_type_id, h]
   · intro e
     -- Case split on the lookup to avoid rewriting mismatches.
     cases h : lookupD C.D e <;>
-      simp [SessionIso.toRenaming_id, renameEdge_id, renameValType_id_fun, h]
+      simp [SessionIso.to_renaming_id, rename_edge_id, rename_val_type_id_fun, h]
 
 /-! ## Symmetry Helpers -/
 
-private theorem ConfigEquiv_symm_G (σ : SessionIso) (C₁ C₂ : CoherenceConfig)
+private theorem config_equiv_symm_g (σ : SessionIso) (C₁ C₂ : CoherenceConfig)
     (hG : ∀ e,
       lookupG C₂.G (renameEndpoint (SessionIso.toRenaming σ) e) =
         (lookupG C₁.G e).map (renameLocalType (SessionIso.toRenaming σ))) :
@@ -78,13 +78,13 @@ private theorem ConfigEquiv_symm_G (σ : SessionIso) (C₁ C₂ : CoherenceConfi
       lookupG C₁.G e' := by
     -- Case split on the preimage lookup.
     cases h : lookupG C₁.G e' <;>
-      simp [hFwd, h, renameLocalType_left_inv]
+      simp [hFwd, h, rename_local_type_left_inv]
   have hLhs : lookupG C₁.G (renameEndpoint (SessionIso.invRenaming σ) e) =
       lookupG C₁.G e' := by
     simp [renameEndpoint, SessionIso.invRenaming, e']
   simpa [hLhs] using hMap.symm
 
-private theorem ConfigEquiv_symm_D (σ : SessionIso) (C₁ C₂ : CoherenceConfig)
+private theorem config_equiv_symm_d (σ : SessionIso) (C₁ C₂ : CoherenceConfig)
     (hD : ∀ e,
       lookupD C₂.D (renameEdge (SessionIso.toRenaming σ) e) =
         (lookupD C₁.D e).map (renameValType (SessionIso.toRenaming σ))) :
@@ -103,7 +103,7 @@ private theorem ConfigEquiv_symm_D (σ : SessionIso) (C₁ C₂ : CoherenceConfi
       lookupD C₁.D e' := by
     -- Case split on the preimage lookup.
     cases h : lookupD C₁.D e' <;>
-      simp [hFwd, h, List.map_map, map_renameValType_left_inv, renameValType_left_inv]
+      simp [hFwd, h, List.map_map, map_rename_val_type_left_inv, rename_val_type_left_inv]
   have hLhs : lookupD C₁.D (renameEdge (SessionIso.invRenaming σ) e) =
       lookupD C₁.D e' := by
     simp [renameEdge, SessionIso.invRenaming, e']
@@ -112,20 +112,20 @@ private theorem ConfigEquiv_symm_D (σ : SessionIso) (C₁ C₂ : CoherenceConfi
 /-! ## Symmetry and Transitivity Theorems -/
 
 /-- ConfigEquiv is symmetric. -/
-theorem ConfigEquiv_symm {C₁ C₂ : CoherenceConfig} :
+theorem config_equiv_symm {C₁ C₂ : CoherenceConfig} :
     ConfigEquiv C₁ C₂ → ConfigEquiv C₂ C₁ := by
   -- Use the inverse isomorphism to flip the equivalence.
   intro h
   rcases h with ⟨σ, hG, hD⟩
   refine ⟨SessionIso.symm σ, ?_, ?_⟩
   · simpa [SessionIso.symm, SessionIso.toRenaming] using
-      (ConfigEquiv_symm_G (σ:=σ) (C₁:=C₁) (C₂:=C₂) hG)
+      (config_equiv_symm_g (σ:=σ) (C₁:=C₁) (C₂:=C₂) hG)
   · simpa [SessionIso.symm, SessionIso.toRenaming] using
-      (ConfigEquiv_symm_D (σ:=σ) (C₁:=C₁) (C₂:=C₂) hD)
+      (config_equiv_symm_d (σ:=σ) (C₁:=C₁) (C₂:=C₂) hD)
 
 /-! ## Transitivity Helpers -/
 
-private theorem ConfigEquiv_trans_G
+private theorem config_equiv_trans_g
     (σ₂ σ₁ : SessionIso) (C₁ C₂ C₃ : CoherenceConfig)
     (hG₁ : ∀ e,
       lookupG C₂.G (renameEndpoint (SessionIso.toRenaming σ₁) e) =
@@ -152,12 +152,12 @@ private theorem ConfigEquiv_trans_G
         (renameLocalType (SessionRenaming.comp
           (SessionIso.toRenaming σ₂) (SessionIso.toRenaming σ₁))) := by
     -- Collapse the two-step map on options.
-    simpa [map_renameLocalType_comp] using hComp
-  simpa [renameEndpoint_comp, SessionIso.comp, SessionIso.toRenaming] using hMap
+    simpa [map_rename_local_type_comp] using hComp
+  simpa [rename_endpoint_comp, SessionIso.comp, SessionIso.toRenaming] using hMap
 
 /-! ## Transitivity Helper on D Lookups -/
 
-private theorem ConfigEquiv_trans_D
+private theorem config_equiv_trans_d
     (σ₂ σ₁ : SessionIso) (C₁ C₂ C₃ : CoherenceConfig)
     (hD₁ : ∀ e,
       lookupD C₂.D (renameEdge (SessionIso.toRenaming σ₁) e) =
@@ -184,33 +184,33 @@ private theorem ConfigEquiv_trans_D
         (renameValType (SessionRenaming.comp
           (SessionIso.toRenaming σ₂) (SessionIso.toRenaming σ₁))) := by
     -- Collapse the two-step map on traces.
-    simpa [map_renameValType_comp] using hComp
-  simpa [renameEdge_comp, SessionIso.comp, SessionIso.toRenaming] using hMap
+    simpa [map_rename_val_type_comp] using hComp
+  simpa [rename_edge_comp, SessionIso.comp, SessionIso.toRenaming] using hMap
 
 /-! ## Transitivity and Equivalence Packaging -/
 
 /-- ConfigEquiv is transitive. -/
-theorem ConfigEquiv_trans {C₁ C₂ C₃ : CoherenceConfig} :
+theorem config_equiv_trans {C₁ C₂ C₃ : CoherenceConfig} :
     ConfigEquiv C₁ C₂ → ConfigEquiv C₂ C₃ → ConfigEquiv C₁ C₃ := by
   -- Compose the witnessing isomorphisms.
   intro h12 h23
   rcases h12 with ⟨σ₁, hG₁, hD₁⟩
   rcases h23 with ⟨σ₂, hG₂, hD₂⟩
   refine ⟨SessionIso.comp σ₂ σ₁, ?_, ?_⟩
-  · exact ConfigEquiv_trans_G (σ₂:=σ₂) (σ₁:=σ₁) (C₁:=C₁) (C₂:=C₂) (C₃:=C₃) hG₁ hG₂
-  · exact ConfigEquiv_trans_D (σ₂:=σ₂) (σ₁:=σ₁) (C₁:=C₁) (C₂:=C₂) (C₃:=C₃) hD₁ hD₂
+  · exact config_equiv_trans_g (σ₂:=σ₂) (σ₁:=σ₁) (C₁:=C₁) (C₂:=C₂) (C₃:=C₃) hG₁ hG₂
+  · exact config_equiv_trans_d (σ₂:=σ₂) (σ₁:=σ₁) (C₁:=C₁) (C₂:=C₂) (C₃:=C₃) hD₁ hD₂
 
 /-- ConfigEquiv is an equivalence relation. -/
-theorem ConfigEquiv_equivalence : Equivalence ConfigEquiv := by
+theorem config_equiv_equivalence : Equivalence ConfigEquiv := by
   -- Pack reflexivity, symmetry, and transitivity.
-  refine ⟨ConfigEquiv_refl, ?_, ?_⟩
-  · intro C₁ C₂ h; exact ConfigEquiv_symm h
-  · intro C₁ C₂ C₃ h12 h23; exact ConfigEquiv_trans h12 h23
+  refine ⟨config_equiv_refl, ?_, ?_⟩
+  · intro C₁ C₂ h; exact config_equiv_symm h
+  · intro C₁ C₂ C₃ h12 h23; exact config_equiv_trans h12 h23
 
 /-! ## Coherence Respects Equivalence -/
 
 /-- EdgeCoherent depends only on lookups. -/
-theorem EdgeCoherent_congr {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} (e : Edge)
+theorem edge_coherent_congr {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} (e : Edge)
     (hG : ∀ e, lookupG G₁ e = lookupG G₂ e)
     (hD : ∀ e, lookupD D₁ e = lookupD D₂ e) :
     EdgeCoherent G₁ D₁ e ↔ EdgeCoherent G₂ D₂ e := by
@@ -218,7 +218,7 @@ theorem EdgeCoherent_congr {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} (e : Edge)
   simp [EdgeCoherent, hG, hD]
 
 /-- Coherent depends only on lookups. -/
-theorem Coherent_congr {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
+theorem coherent_congr {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     (hG : ∀ e, lookupG G₁ e = lookupG G₂ e)
     (hD : ∀ e, lookupD D₁ e = lookupD D₂ e) :
     Coherent G₁ D₁ ↔ Coherent G₂ D₂ := by
@@ -227,7 +227,7 @@ theorem Coherent_congr {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
 
 /-! ## Lookup Congruence Under ConfigEquiv Witnesses -/
 
-private theorem ConfigEquiv_lookupG_eq (σ : SessionIso) (C₁ C₂ : CoherenceConfig)
+private theorem config_equiv_lookup_g_eq (σ : SessionIso) (C₁ C₂ : CoherenceConfig)
     (hG : ∀ e,
       lookupG C₂.G (renameEndpoint (SessionIso.toRenaming σ) e) =
         (lookupG C₁.G e).map (renameLocalType (SessionIso.toRenaming σ))) :
@@ -239,13 +239,13 @@ private theorem ConfigEquiv_lookupG_eq (σ : SessionIso) (C₁ C₂ : CoherenceC
     simp [renameEndpoint, SessionIso.toRenaming, e', σ.right_inv]
   have hRen : lookupG (renameGEnv (SessionIso.toRenaming σ) C₁.G) e =
       (lookupG C₁.G e').map (renameLocalType (SessionIso.toRenaming σ)) := by
-    simpa [hEq] using (lookupG_rename (ρ:=SessionIso.toRenaming σ) (G:=C₁.G) (e:=e'))
+    simpa [hEq] using (lookup_g_rename (ρ:=SessionIso.toRenaming σ) (G:=C₁.G) (e:=e'))
   have hCfg : lookupG C₂.G e =
       (lookupG C₁.G e').map (renameLocalType (SessionIso.toRenaming σ)) := by
     simpa [hEq] using hG e'
   exact hRen.trans hCfg.symm
 
-private theorem ConfigEquiv_lookupD_eq (σ : SessionIso) (C₁ C₂ : CoherenceConfig)
+private theorem config_equiv_lookup_d_eq (σ : SessionIso) (C₁ C₂ : CoherenceConfig)
     (hD : ∀ e,
       lookupD C₂.D (renameEdge (SessionIso.toRenaming σ) e) =
         (lookupD C₁.D e).map (renameValType (SessionIso.toRenaming σ))) :
@@ -257,7 +257,7 @@ private theorem ConfigEquiv_lookupD_eq (σ : SessionIso) (C₁ C₂ : CoherenceC
     simp [renameEdge, SessionIso.toRenaming, e', σ.right_inv]
   have hRen : lookupD (renameDEnv (SessionIso.toRenaming σ) C₁.D) e =
       (lookupD C₁.D e').map (renameValType (SessionIso.toRenaming σ)) := by
-    simpa [hEq] using (lookupD_rename (ρ:=SessionIso.toRenaming σ) (D:=C₁.D) (e:=e'))
+    simpa [hEq] using (lookup_d_rename (ρ:=SessionIso.toRenaming σ) (D:=C₁.D) (e:=e'))
   have hCfg : lookupD C₂.D e =
       (lookupD C₁.D e').map (renameValType (SessionIso.toRenaming σ)) := by
     simpa [hEq] using hD e'
@@ -266,26 +266,26 @@ private theorem ConfigEquiv_lookupD_eq (σ : SessionIso) (C₁ C₂ : CoherenceC
 /-! ## Coherence Preservation Under ConfigEquiv -/
 
 /-- Coherence is preserved under ConfigEquiv. -/
-private theorem Coherent_of_ConfigEquiv {C₁ C₂ : CoherenceConfig} :
+private theorem coherent_of_config_equiv {C₁ C₂ : CoherenceConfig} :
     ConfigEquiv C₁ C₂ → Coherent C₁.G C₁.D → Coherent C₂.G C₂.D := by
   -- Reduce to renaming preservation plus lookup congruence.
   intro h hCoh
   rcases h with ⟨σ, hG, hD⟩
-  have hG' := ConfigEquiv_lookupG_eq (σ:=σ) (C₁:=C₁) (C₂:=C₂) hG
-  have hD' := ConfigEquiv_lookupD_eq (σ:=σ) (C₁:=C₁) (C₂:=C₂) hD
-  have hRen := CoherentRenaming (ρ:=SessionIso.toRenaming σ) (G:=C₁.G) (D:=C₁.D) hCoh
-  exact (Coherent_congr (G₁:=renameGEnv (SessionIso.toRenaming σ) C₁.G)
+  have hG' := config_equiv_lookup_g_eq (σ:=σ) (C₁:=C₁) (C₂:=C₂) hG
+  have hD' := config_equiv_lookup_d_eq (σ:=σ) (C₁:=C₁) (C₂:=C₂) hD
+  have hRen := coherent_renaming (ρ:=SessionIso.toRenaming σ) (G:=C₁.G) (D:=C₁.D) hCoh
+  exact (coherent_congr (G₁:=renameGEnv (SessionIso.toRenaming σ) C₁.G)
     (D₁:=renameDEnv (SessionIso.toRenaming σ) C₁.D) (G₂:=C₂.G) (D₂:=C₂.D) hG' hD').mp hRen
 
 /-- Coherence is preserved under ConfigEquiv. -/
-theorem Coherent_respects_equiv {C₁ C₂ : CoherenceConfig} :
+theorem coherent_respects_equiv {C₁ C₂ : CoherenceConfig} :
     ConfigEquiv C₁ C₂ → (Coherent C₁.G C₁.D ↔ Coherent C₂.G C₂.D) := by
   -- Combine the forward direction with symmetry.
   intro h
   constructor
-  · exact Coherent_of_ConfigEquiv h
+  · exact coherent_of_config_equiv h
   · intro hCoh
-    have hSymm := ConfigEquiv_symm (C₁:=C₁) (C₂:=C₂) h
-    exact Coherent_of_ConfigEquiv hSymm hCoh
+    have hSymm := config_equiv_symm (C₁:=C₁) (C₂:=C₂) h
+    exact coherent_of_config_equiv hSymm hCoh
 
 end

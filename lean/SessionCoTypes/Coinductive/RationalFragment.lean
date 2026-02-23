@@ -30,7 +30,7 @@ attribute [local instance] Classical.decEq
 /-- Rational fragment of coinductive local types (finite reachable subterm graph). -/
 def RationalC (t : LocalTypeC) : Prop := Nonempty (Regular t)
 
-@[simp] lemma rationalC_iff_regular (t : LocalTypeC) : RationalC t ↔ Nonempty (Regular t) := Iff.rfl
+@[simp] lemma rational_c_iff_regular (t : LocalTypeC) : RationalC t ↔ Nonempty (Regular t) := Iff.rfl
 
 /-- Erasure-transportability through finite coalgebra extraction. -/
 def FiniteErasureTransportable (t : LocalTypeC) : Prop :=
@@ -40,7 +40,7 @@ def FiniteErasureTransportable (t : LocalTypeC) : Prop :=
 /-! ## Finite-System Image Closure -/
 
 /-- Child-closure of the finite-system image under one unfolding step. -/
-private lemma systemToCoind_child_closed {n : Nat} (sys : FiniteSystem n)
+private lemma system_to_coind_child_closed {n : Nat} (sys : FiniteSystem n)
     {x c : LocalTypeC}
     (hx : ∃ i : Fin n, x = SystemToCoind sys i)
     (hchild : childRel x c) :
@@ -69,7 +69,7 @@ private lemma reachable_subset_system_image {n : Nat} (sys : FiniteSystem n) (st
   | refl =>
       exact ⟨start, rfl⟩
   | tail hreach hchild ih =>
-      exact systemToCoind_child_closed sys ih hchild
+      exact system_to_coind_child_closed sys ih hchild
 
 /-! ## Finite-System Regularity -/
 
@@ -83,7 +83,7 @@ def systemToCoind_regular {n : Nat} (sys : FiniteSystem n) (start : Fin n) :
   · exact List.mem_ofFn.2 ⟨start, rfl⟩
   · intro x hx c hchild
     rcases List.mem_ofFn.1 hx with ⟨i, rfl⟩
-    rcases systemToCoind_child_closed sys (hx := ⟨i, rfl⟩) hchild with ⟨j, hj⟩
+    rcases system_to_coind_child_closed sys (hx := ⟨i, rfl⟩) hchild with ⟨j, hj⟩
     exact List.mem_ofFn.2 ⟨j, hj.symm⟩
 
 /-! ## Rational-to-Finite Bisimulation -/
@@ -94,7 +94,7 @@ theorem rational_has_finite_bisimulation (t : LocalTypeC) (h : RationalC t) :
       Bisim t (SystemToCoind sys start) :=
   by
     rcases h with ⟨hr⟩
-    exact Regular_implies_System t hr
+    exact regular_implies_system t hr
 
 /-! ## Finite Transport Implies Rationality -/
 
@@ -103,7 +103,7 @@ theorem finite_erasure_transportable_implies_rational (t : LocalTypeC)
     (h : FiniteErasureTransportable t) : RationalC t := by
   rcases h with ⟨n, sys, start, hb⟩
   have hregSys : Regular (SystemToCoind sys start) := systemToCoind_regular sys start
-  have hsymm : Bisim (SystemToCoind sys start) t := Bisim_symm _ _ hb
+  have hsymm : Bisim (SystemToCoind sys start) t := bisim_symm _ _ hb
   exact ⟨regular_of_bisim hsymm hregSys⟩
 
 /-- Exact characterization of the rational fragment via finite erasure transport. -/
@@ -133,7 +133,7 @@ theorem rational_principal_witness (t : LocalTypeC) (h : Regular t) :
       (StateIndex (witnessOfRegular h) t)) := by
   let w := witnessOfRegular h
   let sys := RegularSystem w
-  refine ⟨RegularBisim t h sys, RegularBisim_isBisimulation t h, ?_⟩
+  refine ⟨RegularBisim t h sys, regular_bisim_is_bisimulation t h, ?_⟩
   refine ⟨t, w.root_mem, rfl, rfl⟩
 
 /-- Any finite witness factors through the principal witness up to bisimulation. -/
@@ -144,7 +144,7 @@ theorem finite_witness_factors_through_principal
     Bisim (SystemToCoind (RegularSystem (witnessOfRegular h))
       (StateIndex (witnessOfRegular h) t))
       (SystemToCoind sys start) := by
-  exact Bisim_trans _ _ _ (Bisim_symm _ _ (rational_principal_witness t h)) hw
+  exact bisim_trans _ _ _ (bisim_symm _ _ (rational_principal_witness t h)) hw
 
 /-! ## Witness Invariance -/
 
@@ -156,7 +156,7 @@ theorem finite_erasure_witness_invariant
     (h₁ : Bisim t (SystemToCoind sys₁ start₁))
     (h₂ : Bisim t (SystemToCoind sys₂ start₂)) :
     Bisim (SystemToCoind sys₁ start₁) (SystemToCoind sys₂ start₂) := by
-  exact Bisim_trans _ _ _ (Bisim_symm _ _ h₁) h₂
+  exact bisim_trans _ _ _ (bisim_symm _ _ h₁) h₂
 
 /-- Extensional witness invariance (equality form). -/
 theorem finite_erasure_witness_invariant_eq
@@ -166,7 +166,7 @@ theorem finite_erasure_witness_invariant_eq
     (h₁ : Bisim t (SystemToCoind sys₁ start₁))
   (h₂ : Bisim t (SystemToCoind sys₂ start₂)) :
   SystemToCoind sys₁ start₁ = SystemToCoind sys₂ start₂ :=
-  (Bisim_eq_iff _ _).1 (finite_erasure_witness_invariant t h₁ h₂)
+  (bisim_eq_iff _ _).1 (finite_erasure_witness_invariant t h₁ h₂)
 
 /-! ## Bisimulation Closure -/
 
@@ -182,14 +182,14 @@ theorem finite_erasure_transportable_closed_under_bisim_left
     {a b : LocalTypeC} (hab : Bisim a b)
     (hb : FiniteErasureTransportable b) : FiniteErasureTransportable a := by
   rcases hb with ⟨n, sys, start, hsys⟩
-  exact ⟨n, sys, start, Bisim_trans _ _ _ hab hsys⟩
+  exact ⟨n, sys, start, bisim_trans _ _ _ hab hsys⟩
 
 /-- Finite erasure transportability is stable under bisimulation on the right. -/
 theorem finite_erasure_transportable_closed_under_bisim_right
     {a b : LocalTypeC} (hab : Bisim a b)
     (ha : FiniteErasureTransportable a) : FiniteErasureTransportable b := by
   rcases ha with ⟨n, sys, start, hsys⟩
-  exact ⟨n, sys, start, Bisim_trans _ _ _ (Bisim_symm _ _ hab) hsys⟩
+  exact ⟨n, sys, start, bisim_trans _ _ _ (bisim_symm _ _ hab) hsys⟩
 
 /-! ## Principal Witness Adequacy -/
 
@@ -199,11 +199,11 @@ theorem rational_principal_witness_adequacy (t : LocalTypeC) (h : Regular t) :
       (StateIndex (witnessOfRegular h) t) = t := by
   have heq : t = SystemToCoind (RegularSystem (witnessOfRegular h))
       (StateIndex (witnessOfRegular h) t) :=
-    (Bisim_eq_iff _ _).1 (rational_principal_witness t h)
+    (bisim_eq_iff _ _).1 (rational_principal_witness t h)
   exact heq.symm
 
 /-- Syntax-bridge exactness on inductive embeddings. -/
-theorem toCoind_image_exact
+theorem to_coind_image_exact
   (r : SessionTypes.LocalTypeR.LocalTypeR) :
   RationalC (toCoind r) ↔ FiniteErasureTransportable (toCoind r) :=
   rational_iff_finite_erasure_transportable (toCoind r)
@@ -216,7 +216,7 @@ theorem rational_has_finite_representation (t : LocalTypeC) (h : RationalC t) :
       t = SystemToCoind sys start :=
   by
     rcases h with ⟨hr⟩
-    exact Regular_implies_System_eq t hr
+    exact regular_implies_system_eq t hr
 
 /-! ## Strict Boundary Witness -/
 
@@ -231,57 +231,57 @@ private def muStreamStep (n : Nat) : LocalTypeF.Obj Nat :=
 private def muStream (n : Nat) : LocalTypeC :=
   PFunctor.M.corec muStreamStep n
 
-private lemma muStream_dest (n : Nat) :
+private lemma mu_stream_dest (n : Nat) :
     PFunctor.M.dest (muStream n) =
       ⟨.mu (muStreamName n), PFunctor.M.corec muStreamStep ∘ (fun _ => n + 1)⟩ := by
   simp [muStream, muStreamStep, PFunctor.M.dest_corec]
 
-private lemma muStream_head (n : Nat) :
+private lemma mu_stream_head (n : Nat) :
     head (muStream n) = .mu (muStreamName n) := by
-  simp [head, muStream_dest]
+  simp [head, mu_stream_dest]
 
-private lemma muStream_child (n : Nat) :
+private lemma mu_stream_child (n : Nat) :
     childRel (muStream n) (muStream (n + 1)) := by
   refine ⟨.mu (muStreamName n), (PFunctor.M.corec muStreamStep ∘ (fun _ => n + 1)), (), ?_, ?_⟩
-  exact muStream_dest n
+  exact mu_stream_dest n
   simp [muStream, Function.comp]
 
-private lemma muStream_reachable : ∀ n, muStream n ∈ Reachable (muStream 0)
+private lemma mu_stream_reachable : ∀ n, muStream n ∈ Reachable (muStream 0)
   | 0 => Relation.ReflTransGen.refl
-  | n + 1 => reachable_step (muStream_reachable n) (muStream_child n)
+  | n + 1 => reachable_step (mu_stream_reachable n) (mu_stream_child n)
 
-private lemma muStreamName_injective : Function.Injective muStreamName := by
+private lemma mu_stream_name_injective : Function.Injective muStreamName := by
   intro m n h
   have hlen : m = n := by
     have hlenEq := congrArg String.length h
     simpa [muStreamName, String.length_replicate] using hlenEq
   exact hlen
 
-private lemma muStream_injective : Function.Injective muStream := by
+private lemma mu_stream_injective : Function.Injective muStream := by
   intro m n h
   have hhead := congrArg head h
   have hname : muStreamName m = muStreamName n := by
-    simpa [muStream_head] using hhead
-  exact muStreamName_injective hname
+    simpa [mu_stream_head] using hhead
+  exact mu_stream_name_injective hname
 
-private lemma muStream_not_rational : ¬ RationalC (muStream 0) := by
+private lemma mu_stream_not_rational : ¬ RationalC (muStream 0) := by
   intro hreg
   rcases hreg with ⟨hreg⟩
   have hsubset : Set.range muStream ⊆ Reachable (muStream 0) := by
     intro c hc
     rcases hc with ⟨n, rfl⟩
-    exact muStream_reachable n
+    exact mu_stream_reachable n
   have hfiniteRange : (Set.range muStream).Finite := (finite_of_regular hreg).subset hsubset
   have hinfRange : (Set.range muStream).Infinite :=
-    Set.infinite_range_of_injective muStream_injective
+    Set.infinite_range_of_injective mu_stream_injective
   exact hfiniteRange.not_infinite hinfRange
 
 /-- Strict boundary witness: there exist coinductive types outside the rational fragment,
     hence outside finite erasure transportability as well. -/
 theorem strict_boundary_witness :
     ∃ t : LocalTypeC, ¬ RationalC t ∧ ¬ FiniteErasureTransportable t := by
-  refine ⟨muStream 0, muStream_not_rational, ?_⟩
+  refine ⟨muStream 0, mu_stream_not_rational, ?_⟩
   intro htransport
-  exact muStream_not_rational (finite_erasure_transportable_implies_rational _ htransport)
+  exact mu_stream_not_rational (finite_erasure_transportable_implies_rational _ htransport)
 
 end SessionCoTypes.Coinductive

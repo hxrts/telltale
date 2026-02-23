@@ -216,7 +216,7 @@ structure ImpossibilityPremises
 
 /-- FLP lower-bound shape from reusable assumptions + valency premises.
 This theorem is the reusable endpoint consumed by concrete FLP instantiations. -/
-theorem lowerBound_of_assumptions
+theorem lower_bound_of_assumptions
     {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
     {M : Model State Value Event Party}
     (_a : Assumptions M)
@@ -227,7 +227,7 @@ theorem lowerBound_of_assumptions
   exact ⟨run, hFair, hAll⟩
 
 /-- Construct a fair initial run that never decides, from full FLP premises. -/
-theorem nonterminatingRun_of_assumptions
+theorem nonterminating_run_of_assumptions
     {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
     {M : Model State Value Event Party}
     (_a : Assumptions M)
@@ -249,7 +249,7 @@ theorem impossibility_of_assumptions
     (p : ImpossibilityPremises M) :
     ¬ TerminatesOnAllFairRuns M p.FairRun := by
   intro hTerm
-  rcases nonterminatingRun_of_assumptions a p with ⟨run, hFair, hInit, hNone⟩
+  rcases nonterminating_run_of_assumptions a p with ⟨run, hFair, hInit, hNone⟩
   rcases hTerm run hFair hInit with ⟨n, v, hDec⟩
   have hNoDec : M.decide (run n) = none := hNone n
   rw [hNoDec] at hDec

@@ -12,14 +12,14 @@ namespace SessionCoTypes
 open SessionTypes.LocalTypeR
 open SessionCoTypes.EQ2
 
-theorem EQ2_subst_mu_comm_via_DB (body : LocalTypeR) (var t : String) (repl : LocalTypeR)
+theorem eq2_subst_mu_comm_via_db (body : LocalTypeR) (var t : String) (repl : LocalTypeR)
     (htne : t ≠ var) (hWFmu : LocalTypeR.WellFormed (.mu t body)) :
     EQ2 ((body.substitute var repl).substitute t (.mu t (body.substitute var repl)))
         ((body.substitute t (.mu t body)).substitute var repl) := by
   -- Closed mu types have no free vars except the binder.
   have hclosed : (LocalTypeR.mu t body).isClosed := hWFmu.closed
   have hnotfree_mu : LocalTypeR.isFreeIn var (.mu t body) = false :=
-    isFreeIn_false_of_closed (.mu t body) var hclosed
+    is_free_in_false_of_closed (.mu t body) var hclosed
   have hvne : var ≠ t := htne.symm
   have hbeq : (var == t) = false := beq_eq_false_iff_ne.mpr hvne
   have hnotfree_body : LocalTypeR.isFreeIn var body = false := by
@@ -27,9 +27,9 @@ theorem EQ2_subst_mu_comm_via_DB (body : LocalTypeR) (var t : String) (repl : Lo
   have hsubst_body : body.substitute var repl = body :=
     substitute_not_free body var repl hnotfree_body
   have hclosed_unfold : (body.substitute t (.mu t body)).isClosed :=
-    LocalTypeR.isClosed_substitute_mu (t := t) (body := body) hclosed
+    LocalTypeR.is_closed_substitute_mu (t := t) (body := body) hclosed
   have hnotfree_unfold : LocalTypeR.isFreeIn var (body.substitute t (.mu t body)) = false :=
-    isFreeIn_false_of_closed (body.substitute t (.mu t body)) var hclosed_unfold
+    is_free_in_false_of_closed (body.substitute t (.mu t body)) var hclosed_unfold
   have hsubst_rhs : (body.substitute t (.mu t body)).substitute var repl =
       (body.substitute t (.mu t body)) :=
     substitute_not_free (body.substitute t (.mu t body)) var repl hnotfree_unfold
@@ -45,6 +45,6 @@ theorem EQ2_subst_mu_comm_via_DB (body : LocalTypeR) (var t : String) (repl : Lo
         exact hsubst_rhs
   -- Equality gives EQ2 by reflexivity.
   simpa [hEq] using
-    (EQ2_refl ((body.substitute t (.mu t body)).substitute var repl))
+    (eq2_refl ((body.substitute t (.mu t body)).substitute var repl))
 
 end SessionCoTypes

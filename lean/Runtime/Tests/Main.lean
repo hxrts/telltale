@@ -156,7 +156,7 @@ def collectSchedulePicks (fuel : Nat)
           let sched' := updateAfterStep st'.sched cid .continue
           collectSchedulePicks fuel' { st' with sched := sched' } (cid :: acc)
 
-theorem schedRoundOne_eq_schedRound_one
+theorem sched_round_one_eq_sched_round_one
     (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify) :
     schedRoundOne st = schedRound 1 st := by
   simp [schedRound]
@@ -615,7 +615,7 @@ def main : IO Unit := do
     "handoff evidence must be replay-stable and auditable"
 
   -- Test 37: shared canonical one-step helper is covered by
-  -- `schedRoundOne_eq_schedRound_one` above.
+  -- `sched_round_one_eq_sched_round_one` above.
 
   -- Test 38: transfer fault helper emits normalized transfer target fault message.
   let transferEp : Endpoint := { sid := 9, role := "A" }

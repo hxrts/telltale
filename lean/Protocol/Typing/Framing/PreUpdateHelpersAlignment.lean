@@ -37,7 +37,7 @@ lemma send_localtype_eq
   intro hEq hG₁e hG
   have hG'' : lookupG G e = some (.send q T' L') := by
     have hLookup : lookupG (G₁ ++ G₂) e = some (.send q T' L') :=
-      lookupG_append_left (G₁:=G₁) (G₂:=G₂) hG₁e
+      lookup_g_append_left (G₁:=G₁) (G₂:=G₂) hG₁e
     simpa [hEq] using hLookup
   have : some (LocalType.send target T L) = some (LocalType.send q T' L') := by
     simpa [hG] using hG''
@@ -56,7 +56,7 @@ lemma recv_types_eq
   intro hEq hG₁e hG
   have hG'' : lookupG G e = some (.recv p T' L') := by
     have hLookup : lookupG (G₁ ++ G₂) e = some (.recv p T' L') :=
-      lookupG_append_left (G₁:=G₁) (G₂:=G₂) hG₁e
+      lookup_g_append_left (G₁:=G₁) (G₂:=G₂) hG₁e
     simpa [hEq] using hLookup
   have : some (LocalType.recv source T L) = some (LocalType.recv p T' L') := by
     simpa [hG] using hG''
@@ -77,7 +77,7 @@ lemma select_branches_eq
   intro hEq hG₁e hG
   have hG'' : lookupG G e = some (.select q bs') := by
     have hLookup : lookupG (G₁ ++ G₂) e = some (.select q bs') :=
-      lookupG_append_left (G₁:=G₁) (G₂:=G₂) hG₁e
+      lookup_g_append_left (G₁:=G₁) (G₂:=G₂) hG₁e
     simpa [hEq] using hLookup
   have : some (LocalType.select target bs) = some (LocalType.select q bs') := by
     simpa [hG] using hG''
@@ -96,7 +96,7 @@ lemma branch_branches_eq
   intro hEq hG₁e hG
   have hG'' : lookupG G e = some (.branch p bs') := by
     have hLookup : lookupG (G₁ ++ G₂) e = some (.branch p bs') :=
-      lookupG_append_left (G₁:=G₁) (G₂:=G₂) hG₁e
+      lookup_g_append_left (G₁:=G₁) (G₂:=G₂) hG₁e
     simpa [hEq] using hLookup
   have : some (LocalType.branch source bs) = some (LocalType.branch p bs') := by
     simpa [hG] using hG''
@@ -143,9 +143,9 @@ lemma send_localtype_eq_right
     L' = L := by
   -- Rewrite the global lookup through the right frame and compare constructors.
   intro hDisj hEq hG₂e hG
-  have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+  have hNone : lookupG G₁ e = none := lookup_g_none_of_disjoint hDisj hG₂e
   have hLookup : lookupG (G₁ ++ G₂) e = some (.send q T' L') := by
-    have hEqG := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
+    have hEqG := lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
     simpa [hEqG] using hG₂e
   have hG'' : lookupG G e = some (.send q T' L') := by
     simpa [hEq] using hLookup
@@ -165,9 +165,9 @@ lemma recv_types_eq_right
     T' = T ∧ L' = L := by
   -- Rewrite the global lookup through the right frame and compare constructors.
   intro hDisj hEq hG₂e hG
-  have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+  have hNone : lookupG G₁ e = none := lookup_g_none_of_disjoint hDisj hG₂e
   have hLookup : lookupG (G₁ ++ G₂) e = some (.recv p T' L') := by
-    have hEqG := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
+    have hEqG := lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
     simpa [hEqG] using hG₂e
   have hG'' : lookupG G e = some (.recv p T' L') := by
     simpa [hEq] using hLookup
@@ -189,9 +189,9 @@ lemma select_branches_eq_right
     bs' = bs := by
   -- Rewrite the global lookup through the right frame and compare constructors.
   intro hDisj hEq hG₂e hG
-  have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+  have hNone : lookupG G₁ e = none := lookup_g_none_of_disjoint hDisj hG₂e
   have hLookup : lookupG (G₁ ++ G₂) e = some (.select q bs') := by
-    have hEqG := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
+    have hEqG := lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
     simpa [hEqG] using hG₂e
   have hG'' : lookupG G e = some (.select q bs') := by
     simpa [hEq] using hLookup
@@ -211,9 +211,9 @@ lemma branch_branches_eq_right
     bs' = bs := by
   -- Rewrite the global lookup through the right frame and compare constructors.
   intro hDisj hEq hG₂e hG
-  have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+  have hNone : lookupG G₁ e = none := lookup_g_none_of_disjoint hDisj hG₂e
   have hLookup : lookupG (G₁ ++ G₂) e = some (.branch p bs') := by
-    have hEqG := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
+    have hEqG := lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
     simpa [hEqG] using hG₂e
   have hG'' : lookupG G e = some (.branch p bs') := by
     simpa [hEq] using hLookup
@@ -225,7 +225,7 @@ lemma branch_branches_eq_right
 /-! ## Right-Frame Update And Store Helpers -/
 
 /-- Helper: pull a right update out of a left-framed G. -/
-lemma updateG_right_of_step
+lemma update_g_right_of_step
     {G₁ G₂ G G' G₂' : GEnv} {e : Endpoint} {L L0 : LocalType} :
     DisjointG G₁ G₂ →
     G = G₁ ++ G₂ →
@@ -235,9 +235,9 @@ lemma updateG_right_of_step
     G₂' = updateG G₂ e L := by
   -- Rewrite the update and cancel the shared left frame.
   intro hDisj hEq hEq' hG₂e hGout
-  have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+  have hNone : lookupG G₁ e = none := lookup_g_none_of_disjoint hDisj hG₂e
   have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L :=
-    updateG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hNone
+    update_g_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hNone
   apply append_right_eq_of_eq
   calc
     G₁ ++ G₂' = updateG (G₁ ++ G₂) e L := by
@@ -256,8 +256,8 @@ lemma store_typed_left_swap
       lookupSEnv (Ssh ++ (Sown.right ++ (S2 ++ S1))) x = some T := by
     simpa [SEnvAll, List.append_assoc] using hLookup
   have hSwap :=
-    lookupSEnv_swap_left_prefix (Ssh:=Ssh ++ Sown.right) (S₁:=S2) (S₂:=S1) (S₃:=(∅ : SEnv))
-      (DisjointS_symm hDisj) x
+    lookup_s_env_swap_left_prefix (Ssh:=Ssh ++ Sown.right) (S₁:=S2) (S₂:=S1) (S₃:=(∅ : SEnv))
+      (disjoint_s_symm hDisj) x
   have hSwap' :
       lookupSEnv (Ssh ++ (Sown.right ++ (S2 ++ S1))) x =
         lookupSEnv (Ssh ++ (Sown.right ++ (S1 ++ S2))) x := by

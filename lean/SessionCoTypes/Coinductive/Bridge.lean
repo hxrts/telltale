@@ -41,13 +41,13 @@ end
 
 /-! ## Simp Lemmas -/
 
-@[simp] theorem toCoind_end : toCoind .end = mkEnd := rfl
-@[simp] theorem toCoind_var (x : String) : toCoind (.var x) = mkVar x := rfl
-@[simp] theorem toCoind_mu (x : String) (body : LocalTypeR) :
+@[simp] theorem to_coind_end : toCoind .end = mkEnd := rfl
+@[simp] theorem to_coind_var (x : String) : toCoind (.var x) = mkVar x := rfl
+@[simp] theorem to_coind_mu (x : String) (body : LocalTypeR) :
     toCoind (.mu x body) = mkMu x (toCoind body) := rfl
-@[simp] theorem toCoind_send (p : String) (bs : List BranchR) :
+@[simp] theorem to_coind_send (p : String) (bs : List BranchR) :
     toCoind (.send p bs) = mkSend p (toCoindBranches bs) := rfl
-@[simp] theorem toCoind_recv (p : String) (bs : List BranchR) :
+@[simp] theorem to_coind_recv (p : String) (bs : List BranchR) :
     toCoind (.recv p bs) = mkRecv p (toCoindBranches bs) := rfl
 
 end SessionCoTypes.Coinductive

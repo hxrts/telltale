@@ -7,8 +7,8 @@ The Problem. Demonstrating how to use the de Bruijn infrastructure for proofs th
 require clean substitution reasoning. Users need concrete examples of contractiveness
 preservation, unfold preservation, and iterated unfolding using the DB representation.
 
-Solution Structure. Provides worked examples for substitution preservation (`isContractive_subst`),
-unfold preservation (`isContractive_unfold`), iterated unfolds (`isContractive_iter_unfold`),
+Solution Structure. Provides worked examples for substitution preservation (`is_contractive_subst`),
+unfold preservation (`is_contractive_unfold`), iterated unfolds (`is_contractive_iter_unfold`),
 and bridge theorems connecting de Bruijn proofs back to named variables. Shows direct DB
 construction and nested mu handling.
 -/
@@ -39,24 +39,24 @@ open SessionTypes.GlobalType
 /-- Example: Substituting a contractive term preserves contractiveness. -/
 example (body e : LocalTypeDB) (h1 : body.isContractive = true) (h2 : e.isContractive = true) :
     (body.subst 0 e).isContractive = true :=
-  isContractive_subst body e 0 h1 h2
+  is_contractive_subst body e 0 h1 h2
 
 /-- Example: Unfolding a contractive mu preserves contractiveness. -/
 example (body : LocalTypeDB) (h : (LocalTypeDB.mu body).isContractive = true) :
     (LocalTypeDB.unfold (LocalTypeDB.mu body)).isContractive = true :=
-  isContractive_unfold (LocalTypeDB.mu body) h
+  is_contractive_unfold (LocalTypeDB.mu body) h
 
 /-! ## Example 2: Full Unfolding Chain -/
 
 /-- Example: After multiple unfolds, contractiveness is still preserved. -/
 example (t : LocalTypeDB) (k : Nat) (h : t.isContractive = true) :
     ((LocalTypeDB.unfold)^[k] t).isContractive = true :=
-  isContractive_iter_unfold k t h
+  is_contractive_iter_unfold k t h
 
 /-- Example: Full unfolding (to observable form) preserves contractiveness. -/
 example (t : LocalTypeDB) (h : t.isContractive = true) :
     t.fullUnfold.isContractive = true :=
-  isContractive_fullUnfold t h
+  is_contractive_full_unfold t h
 
 /-! ## Example 3: Complex Nesting -/
 
@@ -64,7 +64,7 @@ example (t : LocalTypeDB) (h : t.isContractive = true) :
 example (body : LocalTypeDB) (h_body : body.isContractive = true)
     (h_mu : (LocalTypeDB.mu body).isContractive = true) :
     (body.subst 0 (LocalTypeDB.mu body)).isContractive = true :=
-  isContractive_subst_mu body h_body h_mu
+  is_contractive_subst_mu body h_body h_mu
 
 /-! ## Example 4: Chain of Operations -/
 
@@ -78,8 +78,8 @@ example (body : LocalTypeDB) (h : (LocalTypeDB.mu body).isContractive = true) :
   simp [LocalTypeDB.isContractive, Bool.and_eq_true] at h_contr
   obtain ⟨_h_guard, h_body⟩ := h_contr
   have h_unfolded : (body.subst 0 (LocalTypeDB.mu body)).isContractive = true :=
-    isContractive_subst_mu body h_body h
-  exact isContractive_subst (body.subst 0 (LocalTypeDB.mu body)) (LocalTypeDB.mu body) 0 h_unfolded h
+    is_contractive_subst_mu body h_body h
+  exact is_contractive_subst (body.subst 0 (LocalTypeDB.mu body)) (LocalTypeDB.mu body) 0 h_unfolded h
 
 /-! ## Example 5: Using Bridge Theorems (Partial)
 
@@ -97,7 +97,7 @@ example (body : LocalTypeR) (t : String)
     (h_mu : (LocalTypeR.mu t body).isContractive = true) :
     (body.substitute t (LocalTypeR.mu t body)).isContractive = true := by
   -- This uses the DB bridge theorem (via LocalTypeRDBBridge).
-  exact LocalTypeR.isContractive_substitute_mu body t hcov h_body h_mu
+  exact LocalTypeR.is_contractive_substitute_mu body t hcov h_body h_mu
 
 /-- Example: Closedness discharges coverage automatically. -/
 example (body : LocalTypeR) (t : String)
@@ -105,7 +105,7 @@ example (body : LocalTypeR) (t : String)
     (h_body : body.isContractive = true)
     (h_mu : (LocalTypeR.mu t body).isContractive = true) :
     (body.substitute t (LocalTypeR.mu t body)).isContractive = true := by
-  exact LocalTypeR.isContractive_substitute_mu_closed body t hclosed h_body h_mu
+  exact LocalTypeR.is_contractive_substitute_mu_closed body t hclosed h_body h_mu
 
 /-- Example: Mu-closedness discharges coverage automatically. -/
 example (body : LocalTypeR) (t : String)
@@ -113,7 +113,7 @@ example (body : LocalTypeR) (t : String)
     (h_body : body.isContractive = true)
     (h_mu : (LocalTypeR.mu t body).isContractive = true) :
     (body.substitute t (LocalTypeR.mu t body)).isContractive = true := by
-  exact LocalTypeR.isContractive_substitute_mu_muClosed body t hclosed h_body h_mu
+  exact LocalTypeR.is_contractive_substitute_mu_mu_closed body t hclosed h_body h_mu
 
 /-! ## Example 6: Direct DB Construction
 
@@ -133,7 +133,7 @@ example : example_mu.isContractive = true := by
 /-- Unfolding preserves contractiveness. -/
 example : example_mu.unfold.isContractive = true := by
   unfold example_mu
-  apply isContractive_unfold
+  apply is_contractive_unfold
   simp [LocalTypeDB.isContractive, LocalTypeDB.isGuarded,
         isContractiveBranches]
 

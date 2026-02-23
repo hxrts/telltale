@@ -140,7 +140,7 @@ theorem CanRecv.dual {t : LocalTypeR} {p : String} {bs : List BranchR}
         (branches := dualBranches bs') ih')
 
 /-- Duality swaps CanSend and CanRecv. -/
-theorem CanSend.dual_iff_CanRecv {t : LocalTypeR} {p : String} {bs : List BranchR} :
+theorem CanSend.dual_iff_can_recv {t : LocalTypeR} {p : String} {bs : List BranchR} :
     CanSend t p bs ↔ CanRecv t.dual p (dualBranches bs) := by
   -- Both directions are by dualizing twice.
   constructor
@@ -153,7 +153,7 @@ theorem CanSend.dual_iff_CanRecv {t : LocalTypeR} {p : String} {bs : List Branch
 /-! ### Duality Equivalence Corollaries -/
 
 /-- Duality swaps CanRecv and CanSend. -/
-theorem CanRecv.dual_iff_CanSend {t : LocalTypeR} {p : String} {bs : List BranchR} :
+theorem CanRecv.dual_iff_can_send {t : LocalTypeR} {p : String} {bs : List BranchR} :
     CanRecv t p bs ↔ CanSend t.dual p (dualBranches bs) := by
   -- Both directions are by dualizing twice.
   constructor
@@ -167,23 +167,23 @@ theorem CanRecv.dual_iff_CanSend {t : LocalTypeR} {p : String} {bs : List Branch
 
 /-- CanRecvD is equivalent to CanRecv (by duality). -/
 @[simp]
-theorem CanRecvD_iff_CanRecv {t : LocalTypeR} {p : String} {bs : List BranchR} :
+theorem can_recv_d_iff_can_recv {t : LocalTypeR} {p : String} {bs : List BranchR} :
     CanRecvD t p bs ↔ CanRecv t p bs := by
   -- Flip CanRecv.dual_iff_CanSend to match the alias shape.
   simpa [CanRecvD] using
-    (CanRecv.dual_iff_CanSend (t := t) (p := p) (bs := bs)).symm
+    (CanRecv.dual_iff_can_send (t := t) (p := p) (bs := bs)).symm
 
 /-- Convenience: CanRecvD implies CanRecv. -/
-theorem CanRecvD.to_CanRecv {t : LocalTypeR} {p : String} {bs : List BranchR}
+theorem CanRecvD.to_can_recv {t : LocalTypeR} {p : String} {bs : List BranchR}
     (h : CanRecvD t p bs) : CanRecv t p bs := by
   -- Use the equivalence lemma for conversion.
-  exact (CanRecvD_iff_CanRecv).1 h
+  exact (can_recv_d_iff_can_recv).1 h
 
 /-- Convenience: CanRecv implies CanRecvD. -/
-theorem CanRecv.to_CanRecvD {t : LocalTypeR} {p : String} {bs : List BranchR}
+theorem CanRecv.to_can_recv_d {t : LocalTypeR} {p : String} {bs : List BranchR}
     (h : CanRecv t p bs) : CanRecvD t p bs := by
   -- Use the equivalence lemma for conversion.
-  exact (CanRecvD_iff_CanRecv).2 h
+  exact (can_recv_d_iff_can_recv).2 h
 
 /-! ## One-Step Inversion Lemmas
 

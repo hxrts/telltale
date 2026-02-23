@@ -53,7 +53,7 @@ lemma get?_some_of_lt {ctx : NameContext} {i : Nat} (h : i < ctx.length) :
     ∃ v, NameContext.get? ctx i = some v :=
   SessionTypes.NameOnlyContext.get?_lt h
 
-lemma findIdx?_go_succ {α : Type} (p : α → Bool) (l : List α) (i : Nat) :
+lemma find_idx?_go_succ {α : Type} (p : α → Bool) (l : List α) (i : Nat) :
     List.findIdx?.go p l (i + 1) = Option.map Nat.succ (List.findIdx?.go p l i) := by
   induction l generalizing i with
   | nil => simp [List.findIdx?.go]
@@ -66,35 +66,35 @@ lemma findIdx?_go_succ {α : Type} (p : α → Bool) (l : List α) (i : Nat) :
 /-! ## IndexOf helpers -/
 
 
-lemma indexOf_cons (a : String) (ctx : Context) (v : String) :
+lemma index_of_cons (a : String) (ctx : Context) (v : String) :
     Context.indexOf (NameOnlyContext.cons a ctx) v =
       (if a == v then some 0 else Option.map Nat.succ (Context.indexOf ctx v)) := by
   by_cases h : a = v
   · subst h
-    simp [Context.indexOf, NameOnlyContext.indexOf_cons_eq]
+    simp [Context.indexOf, NameOnlyContext.index_of_cons_eq]
   · have hne : (a == v) = false := beq_eq_false_iff_ne.mpr h
     simp only [hne, Context.indexOf]
-    exact NameOnlyContext.indexOf_cons_ne ctx h
+    exact NameOnlyContext.index_of_cons_ne ctx h
 
-lemma indexOf_eq_none_iff_not_mem (ctx : Context) (v : String) :
+lemma index_of_eq_none_iff_not_mem (ctx : Context) (v : String) :
     Context.indexOf ctx v = none ↔ v ∉ ctx := by
   simp only [Context.indexOf, NameOnlyContext.mem_iff_mem_names]
-  exact NameOnlyContext.indexOf_eq_none_iff
+  exact NameOnlyContext.index_of_eq_none_iff
 
-lemma indexOf_lt_length {ctx : Context} {v : String} {i : Nat}
+lemma index_of_lt_length {ctx : Context} {v : String} {i : Nat}
     (h : Context.indexOf ctx v = some i) : i < ctx.length := by
   simp only [Context.indexOf] at h
-  exact NameOnlyContext.indexOf_lt h
+  exact NameOnlyContext.index_of_lt h
 
-lemma indexOf_get? {ctx : Context} {v : String} {i : Nat}
+lemma index_of_get? {ctx : Context} {v : String} {i : Nat}
     (h : Context.indexOf ctx v = some i) : NameContext.get? ctx i = some v := by
   simp only [Context.indexOf, NameContext.get?] at h ⊢
-  exact NameOnlyContext.indexOf_get? h
+  exact NameOnlyContext.index_of_get? h
 
-lemma indexOf_eq_some_of_mem {ctx : Context} {v : String} (hmem : v ∈ ctx) :
+lemma index_of_eq_some_of_mem {ctx : Context} {v : String} (hmem : v ∈ ctx) :
     ∃ i, Context.indexOf ctx v = some i := by
   by_cases hnone : Context.indexOf ctx v = none
-  · have : v ∉ ctx := (indexOf_eq_none_iff_not_mem _ _).1 hnone
+  · have : v ∉ ctx := (index_of_eq_none_iff_not_mem _ _).1 hnone
     contradiction
   · cases hidx : Context.indexOf ctx v with
     | none => exact (hnone hidx).elim
@@ -115,33 +115,33 @@ lemma get?_inj_of_nodup {ctx : NameContext} (hnd : ctx.Nodup) {i j : Nat} {v : S
         subst hv
         simp only [NameContext.get?, NameOnlyContext.get?_cons_succ] at hj
         have : a ∈ ctx := get?_mem hj
-        have hnotmem := NameOnlyContext.notMem_of_Nodup_cons hnd
+        have hnotmem := NameOnlyContext.not_mem_of_nodup_cons hnd
         exact (hnotmem this).elim
       · simp only [NameContext.get?, NameOnlyContext.get?_cons_zero] at hj
         have hv : a = v := Option.some.inj hj
         subst hv
         simp only [NameContext.get?, NameOnlyContext.get?_cons_succ] at hi
         have : a ∈ ctx := get?_mem hi
-        have hnotmem := NameOnlyContext.notMem_of_Nodup_cons hnd
+        have hnotmem := NameOnlyContext.not_mem_of_nodup_cons hnd
         exact (hnotmem this).elim
       · simp only [NameContext.get?, NameOnlyContext.get?_cons_succ] at hi hj
-        have hnd' : ctx.Nodup := NameOnlyContext.Nodup_tail hnd
+        have hnd' : ctx.Nodup := NameOnlyContext.nodup_tail hnd
         exact congrArg Nat.succ (ih hnd' hi hj)
 
-lemma get_indexOf_roundtrip (ctx : NameContext) (i : Nat) (v : String)
+lemma get_index_of_roundtrip (ctx : NameContext) (i : Nat) (v : String)
     (h_nodup : ctx.Nodup) (h_get : NameContext.get? ctx i = some v) :
     Context.indexOf ctx v = some i := by
   have hmem : v ∈ ctx := get?_mem h_get
-  obtain ⟨j, hidx⟩ := indexOf_eq_some_of_mem (ctx := ctx) (v := v) hmem
-  have hget_j := indexOf_get? (ctx := ctx) (v := v) (i := j) hidx
+  obtain ⟨j, hidx⟩ := index_of_eq_some_of_mem (ctx := ctx) (v := v) hmem
+  have hget_j := index_of_get? (ctx := ctx) (v := v) (i := j) hidx
   have hij := get?_inj_of_nodup h_nodup h_get hget_j
   subst hij
   exact hidx
 
-lemma indexOf_inj {ctx : Context} {x y : String} {i : Nat}
+lemma index_of_inj {ctx : Context} {x y : String} {i : Nat}
     (hx : Context.indexOf ctx x = some i) (hy : Context.indexOf ctx y = some i) : x = y := by
-  have hx' := indexOf_get? (ctx := ctx) (v := x) (i := i) hx
-  have hy' := indexOf_get? (ctx := ctx) (v := y) (i := i) hy
+  have hx' := index_of_get? (ctx := ctx) (v := x) (i := i) hx
+  have hy' := index_of_get? (ctx := ctx) (v := y) (i := i) hy
   have heq : some x = some y := hx'.symm.trans hy'
   exact Option.some.inj heq
 
@@ -175,33 +175,33 @@ lemma empty_append_eq (suffix : NameOnlyContext) :
 
 /-! ## Appended-Context Index Bounds -/
 
-lemma indexOf_append_x_le (pref ctx : Context) (x : String) :
+lemma index_of_append_x_le (pref ctx : Context) (x : String) :
     ∃ k, Context.indexOf (pref ++ NameOnlyContext.cons x ctx) x = some k ∧ k ≤ pref.length := by
   induction pref using NameOnlyContext.induction with
   | h_empty =>
       refine ⟨0, ?_, by simp⟩
       simp only [Context.indexOf]
       rw [empty_append_eq]
-      exact NameOnlyContext.indexOf_cons_eq x ctx
+      exact NameOnlyContext.index_of_cons_eq x ctx
   | h_cons a pref ih =>
       by_cases hax : a = x
       · subst hax
         refine ⟨0, ?_, by simp⟩
         simp only [Context.indexOf]
         rw [cons_append_eq_cons]
-        exact NameOnlyContext.indexOf_cons_eq a (pref ++ NameOnlyContext.cons a ctx)
+        exact NameOnlyContext.index_of_cons_eq a (pref ++ NameOnlyContext.cons a ctx)
       · obtain ⟨k, hk, hkle⟩ := ih
         refine ⟨k + 1, ?_, ?_⟩
         · simp only [Context.indexOf] at hk ⊢
           rw [cons_append_eq_cons]
-          rw [NameOnlyContext.indexOf_cons_ne _ hax, hk]
+          rw [NameOnlyContext.index_of_cons_ne _ hax, hk]
           rfl
         · exact Nat.succ_le_succ hkle
 
 /-! ## Appended-Context Suffix Extraction -/
 
 /-- If v ≠ x and j > pref.length, then v was found in ctx and we can extract its index -/
-lemma indexOf_append_suffix {pref ctx : Context} {x v : String} {j : Nat}
+lemma index_of_append_suffix {pref ctx : Context} {x v : String} {j : Nat}
     (hvx : v ≠ x)
     (hj : Context.indexOf (pref ++ NameOnlyContext.cons x ctx) v = some j)
     (hjgt : j > pref.length) :
@@ -214,7 +214,7 @@ lemma indexOf_append_suffix {pref ctx : Context} {x v : String} {j : Nat}
       -- hj : (cons x ctx).indexOf v = some j, hjgt : j > 0
       -- Since v ≠ x, v must be found in ctx at position j - 1
       -- indexOf_cons_ne requires x ≠ v (the element at cons position ≠ the lookup key)
-      rw [NameOnlyContext.indexOf_cons_ne ctx (Ne.symm hvx)] at hj
+      rw [NameOnlyContext.index_of_cons_ne ctx (Ne.symm hvx)] at hj
       -- hj : Option.map Nat.succ (ctx.indexOf v) = some j
       cases hctx : NameOnlyContext.indexOf ctx v with
       | none => simp [hctx] at hj
@@ -230,11 +230,11 @@ lemma indexOf_append_suffix {pref ctx : Context} {x v : String} {j : Nat}
       rw [cons_append_eq_cons] at hj
       by_cases hav : a = v
       · subst hav
-        simp only [NameOnlyContext.indexOf_cons_eq] at hj
+        simp only [NameOnlyContext.index_of_cons_eq] at hj
         cases hj
         simp only [NameOnlyContext.cons_length] at hjgt
         omega
-      · rw [NameOnlyContext.indexOf_cons_ne _ hav] at hj
+      · rw [NameOnlyContext.index_of_cons_ne _ hav] at hj
         cases hpref : NameOnlyContext.indexOf (pref ++ NameOnlyContext.cons x ctx) v with
         | none => simp [hpref] at hj
         | some k =>
@@ -253,18 +253,18 @@ lemma indexOf_append_suffix {pref ctx : Context} {x v : String} {j : Nat}
 
 /-! ## String / Nat helpers for fresh-name proofs -/
 
-lemma String_data_append (s1 s2 : String) : (s1 ++ s2).toList = s1.toList ++ s2.toList := by
-  simp [String.toList_append]
+lemma string_data_append (s1 s2 : String) : (s1 ++ s2).toList = s1.toList ++ s2.toList := by
+  simp [String.to_list_append]
 
-theorem String_append_left_cancel (p s1 s2 : String) : p ++ s1 = p ++ s2 → s1 = s2 := by
+theorem string_append_left_cancel (p s1 s2 : String) : p ++ s1 = p ++ s2 → s1 = s2 := by
   intro h
   have h_list : p.toList ++ s1.toList = p.toList ++ s2.toList := by
-    simpa [String.toList_append] using (congrArg String.toList h)
+    simpa [String.to_list_append] using (congrArg String.toList h)
   have h_cancel : s1.toList = s2.toList :=
     List.append_cancel_left h_list
   exact String.toList_injective h_cancel
 
-lemma digitChar_inj_of_lt_10 {n m : Nat} (hn : n < 10) (hm : m < 10) :
+lemma digit_char_inj_of_lt_10 {n m : Nat} (hn : n < 10) (hm : m < 10) :
   Nat.digitChar n = Nat.digitChar m → n = m := by
   intro h
   revert h
@@ -272,7 +272,7 @@ lemma digitChar_inj_of_lt_10 {n m : Nat} (hn : n < 10) (hm : m < 10) :
 
 /-! ## Decimal Digit Expansion Helpers -/
 
-lemma toDigits_eq_reverse_digits_map (n : Nat) (h : n > 0) :
+lemma to_digits_eq_reverse_digits_map (n : Nat) (h : n > 0) :
   Nat.toDigits 10 n = (Nat.digits 10 n).reverse.map Nat.digitChar := by
   -- strong recursion on n to align toDigits with little-endian digits
   revert h
@@ -316,7 +316,7 @@ lemma toDigits_eq_reverse_digits_map (n : Nat) (h : n > 0) :
 
 /-! ## Digit-List Injectivity -/
 
-lemma digits_10_map_digitChar_inj {l1 l2 : List Nat}
+lemma digits_10_map_digit_char_inj {l1 l2 : List Nat}
   (h1 : ∀ d ∈ l1, d < 10) (h2 : ∀ d ∈ l2, d < 10)
   (h_eq : l1.map Nat.digitChar = l2.map Nat.digitChar) :
   l1 = l2 := by
@@ -331,7 +331,7 @@ lemma digits_10_map_digitChar_inj {l1 l2 : List Nat}
     case cons head2 tail2 =>
       simp at h_eq
       have h_head : head = head2 := by
-        apply digitChar_inj_of_lt_10
+        apply digit_char_inj_of_lt_10
         · apply h1; simp
         · apply h2; simp
         · exact h_eq.1
@@ -344,7 +344,7 @@ lemma digits_10_map_digitChar_inj {l1 l2 : List Nat}
 
 /-! ## Nat.toString Injectivity via Digits -/
 
-lemma toDigits_eq_singleton_zero_iff (n : Nat) : Nat.toDigits 10 n = ['0'] ↔ n = 0 := by
+lemma to_digits_eq_singleton_zero_iff (n : Nat) : Nat.toDigits 10 n = ['0'] ↔ n = 0 := by
   constructor
   · intro h
     by_cases hn : n = 0
@@ -352,9 +352,9 @@ lemma toDigits_eq_singleton_zero_iff (n : Nat) : Nat.toDigits 10 n = ['0'] ↔ n
     · have hn_pos : 0 < n := Nat.pos_of_ne_zero hn
       have hrev :
           (Nat.digits 10 n).reverse.map Nat.digitChar = ['0'] := by
-        simpa [toDigits_eq_reverse_digits_map n hn_pos] using h
+        simpa [to_digits_eq_reverse_digits_map n hn_pos] using h
       have hrev' : (Nat.digits 10 n).reverse = [0] := by
-        apply digits_10_map_digitChar_inj
+        apply digits_10_map_digit_char_inj
         · intro d hd
           exact Nat.digits_lt_base (b := 10) (m := n) (hb := by decide) (List.mem_reverse.mp hd)
         · intro d hd
@@ -371,14 +371,14 @@ lemma toDigits_eq_singleton_zero_iff (n : Nat) : Nat.toDigits 10 n = ['0'] ↔ n
     subst h
     simp [Nat.toDigits_zero]
 
-lemma toDigits_ne_zero_of_pos (n : Nat) (h : n > 0) : Nat.toDigits 10 n ≠ ['0'] := by
+lemma to_digits_ne_zero_of_pos (n : Nat) (h : n > 0) : Nat.toDigits 10 n ≠ ['0'] := by
   intro h_eq
-  have hzero : n = 0 := (toDigits_eq_singleton_zero_iff n).1 h_eq
+  have hzero : n = 0 := (to_digits_eq_singleton_zero_iff n).1 h_eq
   exact (Nat.ne_of_gt h) hzero
 
 /-! ## Nat.toString Injectivity -/
 
-theorem Nat_toString_inj (n m : Nat) : toString n = toString m → n = m := by
+theorem nat_to_string_inj (n m : Nat) : toString n = toString m → n = m := by
   intro h
   have hdigits : Nat.toDigits 10 n = Nat.toDigits 10 m := by
     have h' : String.ofList (Nat.toDigits 10 n) = String.ofList (Nat.toDigits 10 m) := by
@@ -389,22 +389,22 @@ theorem Nat_toString_inj (n m : Nat) : toString n = toString m → n = m := by
     have hm : m = 0 := by
       have : Nat.toDigits 10 m = ['0'] := by
         simpa [Nat.toDigits_zero] using hdigits.symm
-      exact (toDigits_eq_singleton_zero_iff m).1 this
+      exact (to_digits_eq_singleton_zero_iff m).1 this
     simp [hm]
   · by_cases hm : m = 0
     · subst hm
       have : Nat.toDigits 10 n = ['0'] := by
         have : Nat.toDigits 10 n = Nat.toDigits 10 0 := by simpa using hdigits
         simpa [Nat.toDigits_zero] using this
-      exact (hn ((toDigits_eq_singleton_zero_iff n).1 this)).elim
+      exact (hn ((to_digits_eq_singleton_zero_iff n).1 this)).elim
     · have hn_pos : 0 < n := Nat.pos_of_ne_zero hn
       have hm_pos : 0 < m := Nat.pos_of_ne_zero hm
       have hrev :
           (Nat.digits 10 n).reverse.map Nat.digitChar =
             (Nat.digits 10 m).reverse.map Nat.digitChar := by
-        simpa [toDigits_eq_reverse_digits_map n hn_pos, toDigits_eq_reverse_digits_map m hm_pos] using hdigits
+        simpa [to_digits_eq_reverse_digits_map n hn_pos, to_digits_eq_reverse_digits_map m hm_pos] using hdigits
       have hrev' : (Nat.digits 10 n).reverse = (Nat.digits 10 m).reverse := by
-        apply digits_10_map_digitChar_inj
+        apply digits_10_map_digit_char_inj
         · intro d hd
           exact Nat.digits_lt_base (b := 10) (m := n) (hb := by decide) (List.mem_reverse.mp hd)
         · intro d hd
@@ -445,16 +445,16 @@ theorem fresh_not_in_generated (ctx : NameContext) (h : GeneratedContext ctx) :
   obtain ⟨n, hn_lt, hn_eq⟩ := generated_elements ctx h _ h_in
   simp only [NameContext.freshName, NameOnlyContext.freshName] at hn_eq
   have h_len_eq : toString ctx.length = toString n := by
-    apply String_append_left_cancel "_db" _ _ hn_eq
-  have h_n_eq : ctx.length = n := Nat_toString_inj _ _ h_len_eq
+    apply string_append_left_cancel "_db" _ _ hn_eq
+  have h_n_eq : ctx.length = n := nat_to_string_inj _ _ h_len_eq
   omega
 
 theorem generated_nodup (ctx : NameContext) (h : GeneratedContext ctx) :
     ctx.Nodup := by
   induction h with
-  | empty => exact NameOnlyContext.Nodup_empty
+  | empty => exact NameOnlyContext.nodup_empty
   | @cons inner_ctx h_ctx ih =>
-      apply NameOnlyContext.Nodup_cons
+      apply NameOnlyContext.nodup_cons
       · exact fresh_not_in_generated _ h_ctx
       · exact ih
 

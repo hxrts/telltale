@@ -180,13 +180,13 @@ instance : CoinductiveRel Rel BisimF := ⟨BisimF.mono⟩
 /-- Greatest fixed point of BisimF (coinductive bisimulation). -/
 def Bisim_gfp : Rel := SessionCoTypes.CoinductiveRel.gfp (F := BisimF)
 
-theorem Bisim_gfp_coind {R : Rel} (h : R ≤ BisimF R) : R ≤ Bisim_gfp := by
+theorem bisim_gfp_coind {R : Rel} (h : R ≤ BisimF R) : R ≤ Bisim_gfp := by
   exact SessionCoTypes.CoinductiveRel.coind (F := BisimF) h
 
-theorem Bisim_gfp_unfold : Bisim_gfp ≤ BisimF Bisim_gfp := by
+theorem bisim_gfp_unfold : Bisim_gfp ≤ BisimF Bisim_gfp := by
   exact SessionCoTypes.CoinductiveRel.unfold (F := BisimF)
 
-theorem Bisim_gfp_fold : BisimF Bisim_gfp ≤ Bisim_gfp := by
+theorem bisim_gfp_fold : BisimF Bisim_gfp ≤ Bisim_gfp := by
   exact SessionCoTypes.CoinductiveRel.fold (F := BisimF)
 
 -- Existential Bisimulation Predicate

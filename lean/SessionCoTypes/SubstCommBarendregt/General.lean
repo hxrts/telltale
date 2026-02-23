@@ -205,7 +205,7 @@ theorem unfold_non_mu_eq_self (lt : LocalTypeR) (hnomu : ∀ t body, lt ≠ .mu 
 
     The precondition `hnomu` requires `repl` to not be a mu type at the top level.
     This is needed for the var case where we substitute to `repl` and need
-    `repl.unfold = repl`. For mu-typed `repl`, use `unfold_substitute_EQ2_via_Bisim`
+    `repl.unfold = repl`. For mu-typed `repl`, use `unfold_substitute_eq2_via_bisim`
     which gives EQ2 equivalence instead of syntactic equality. -/
 theorem unfold_subst_eq_subst_unfold (a : LocalTypeR) (var : String) (repl : LocalTypeR)
     (hbar : notBoundAt var a = true) (hfresh : ∀ t, isFreeIn t repl = false)

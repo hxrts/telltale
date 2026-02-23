@@ -2,7 +2,7 @@ import Choreography.Projection.Projectb.Completeness.TransEq.Core
 
 /-! # Choreography.Projection.Projectb.Completeness.TransEq.CommCases
 
-Communication-case lemmas for `trans_eq_of_CProject`.
+Communication-case lemmas for `trans_eq_of_c_project`.
 -/
 
 /-
@@ -10,7 +10,7 @@ The Problem. The comm-case proof for trans-equality is sizable and easier to
 maintain separately from the constructor-base helpers.
 
 Solution Structure. Contains comm-case helper lemmas and finishes
-`trans_eq_of_CProject`.
+`trans_eq_of_c_project`.
 -/
 
 namespace Choreography.Projection.Projectb
@@ -21,7 +21,7 @@ open SessionCoTypes.CoinductiveRel
 
 /-! ## Communication Cases -/
 
-theorem trans_eq_of_CProject_comm_case
+theorem trans_eq_of_c_project_comm_case
     (sender receiver role : String) (branches : List (Label × GlobalType)) (cand : LocalTypeR)
     (hproj : CProject (.comm sender receiver branches) role cand)
     (hne : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true)
@@ -29,43 +29,43 @@ theorem trans_eq_of_CProject_comm_case
     Trans.trans (.comm sender receiver branches) role = cand := by
   -- Route to sender/receiver/non-participant handlers.
   by_cases hrs : role = sender
-  · exact trans_eq_of_CProject_comm_sender_case sender receiver role branches cand hrs hproj hne ih
+  · exact trans_eq_of_c_project_comm_sender_case sender receiver role branches cand hrs hproj hne ih
   · by_cases hrr : role = receiver
-    · exact trans_eq_of_CProject_comm_receiver_case sender receiver role branches cand hrr hrs hproj hne ih
-    · exact trans_eq_of_CProject_comm_other_case sender receiver role branches cand hrs hrr hproj hne ih
+    · exact trans_eq_of_c_project_comm_receiver_case sender receiver role branches cand hrr hrs hproj hne ih
+    · exact trans_eq_of_c_project_comm_other_case sender receiver role branches cand hrs hrr hproj hne ih
 
 /-! ## trans_eq_of_CProject Main Recursion -/
 
 /-- If CProject holds and all comms are non-empty, `trans` must return the same candidate. -/
-theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR)
+theorem trans_eq_of_c_project (g : GlobalType) (role : String) (cand : LocalTypeR)
     (hproj : CProject g role cand) (hne : g.allCommsNonEmpty = true) :
     Trans.trans g role = cand := by
   -- Dispatch on the global constructor and reuse helper lemmas.
   cases g with
-  | «end» => exact trans_eq_of_CProject_end role cand hproj
-  | var t => exact trans_eq_of_CProject_var t role cand hproj
+  | «end» => exact trans_eq_of_c_project_end role cand hproj
+  | var t => exact trans_eq_of_c_project_var t role cand hproj
   | mu t body =>
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       simp [CProjectF] at hf
       rcases hf with ⟨candBody, hbody, hcase⟩
       have hne_body : body.allCommsNonEmpty = true := by
         simpa [GlobalType.allCommsNonEmpty] using hne
       have htrans_body : Trans.trans body role = candBody :=
-        trans_eq_of_CProject body role candBody hbody hne_body
-      exact trans_eq_of_CProject_mu t body role cand candBody hcase htrans_body
+        trans_eq_of_c_project body role candBody hbody hne_body
+      exact trans_eq_of_c_project_mu t body role cand candBody hcase htrans_body
   -- trans_eq_of_CProject: Comm Branch
   | comm sender receiver branches =>
       have hne_branches :
           ∀ gb ∈ branches, gb.2.allCommsNonEmpty = true :=
-        GlobalType.allCommsNonEmpty_comm_branches sender receiver branches hne
+        GlobalType.all_comms_non_empty_comm_branches sender receiver branches hne
       have ih :
           ∀ gb ∈ branches, ∀ lb, CProject gb.2 role lb → Trans.trans gb.2 role = lb :=
-        fun gb hmem lb hcp => trans_eq_of_CProject gb.2 role lb hcp (hne_branches gb hmem)
-      exact trans_eq_of_CProject_comm_case sender receiver role branches cand hproj hne ih
+        fun gb hmem lb hcp => trans_eq_of_c_project gb.2 role lb hcp (hne_branches gb hmem)
+      exact trans_eq_of_c_project_comm_case sender receiver role branches cand hproj hne ih
   -- trans_eq_of_CProject: Delegate Branch
   | delegate p q sid r cont =>
       by_cases hp : role = p
-      · have hf := CProject_destruct hproj
+      · have hf := c_project_destruct hproj
         cases cand with
         | send partner lbs =>
             cases lbs with
@@ -83,7 +83,7 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
                             have hne_cont : cont.allCommsNonEmpty = true := by
                               simpa [GlobalType.allCommsNonEmpty] using hne
                             have hcont' : Trans.trans cont p = contCand :=
-                              trans_eq_of_CProject cont p contCand hcont hne_cont
+                              trans_eq_of_c_project cont p contCand hcont hne_cont
                             subst hpartner
                             subst hlbl
                             subst hvt
@@ -105,7 +105,7 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
         · have hnp : q ≠ p := by
             intro hqp
             exact hp (hq.trans hqp)
-          have hf := CProject_destruct hproj
+          have hf := c_project_destruct hproj
           cases cand with
           | recv partner lbs =>
               cases lbs with
@@ -126,7 +126,7 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
                               have hne_cont : cont.allCommsNonEmpty = true := by
                                 simpa [GlobalType.allCommsNonEmpty] using hne
                               have hcont' : Trans.trans cont q = contCand :=
-                                trans_eq_of_CProject cont q contCand hcont hne_cont
+                                trans_eq_of_c_project cont q contCand hcont hne_cont
                               subst hpartner
                               subst hlbl
                               subst hvt
@@ -151,19 +151,19 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
               simp [CProjectF, hq, hnp] at hf
         -- trans_eq_of_CProject: Delegate Non-Participant
         · -- non-participant: follow continuation
-          have hf := CProject_destruct hproj
+          have hf := c_project_destruct hproj
           simp [CProjectF, hp, hq] at hf
           have hne_cont : cont.allCommsNonEmpty = true := by
             simpa [GlobalType.allCommsNonEmpty] using hne
           have hcont' : Trans.trans cont role = cand :=
-            trans_eq_of_CProject cont role cand hf hne_cont
+            trans_eq_of_c_project cont role cand hf hne_cont
           simp [Trans.trans, hp, hq, hcont']
 termination_by g
 decreasing_by
   all_goals
     first
-    | (subst_vars; exact sizeOf_body_lt_mu _ _)
-    | (subst_vars; apply sizeOf_elem_snd_lt_comm; assumption)
+    | (subst_vars; exact size_of_body_lt_mu _ _)
+    | (subst_vars; apply size_of_elem_snd_lt_comm; assumption)
     | (subst_vars; simp only [sizeOf, GlobalType._sizeOf_1]; omega)
 
 /-! ## projectb Completeness Helpers -/
@@ -175,13 +175,13 @@ decreasing_by
 theorem projectb_complete_end (role : String) (cand : LocalTypeR)
     (h : CProject .end role cand) : projectb .end role cand = true := by
   -- Only the end candidate is consistent with CProject for end.
-  have hF := CProject_destruct h
+  have hF := c_project_destruct h
   cases cand <;> simp [CProjectF, projectb] at hF ⊢
 
 theorem projectb_complete_var (t : String) (role : String) (cand : LocalTypeR)
     (h : CProject (.var t) role cand) : projectb (.var t) role cand = true := by
   -- CProject forces the variable name to match.
-  have hF := CProject_destruct h
+  have hF := c_project_destruct h
   cases cand <;> simp [CProjectF, projectb] at hF ⊢
   · subst hF; simp
 

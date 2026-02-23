@@ -11,7 +11,7 @@ The Problem. To compose typed configurations, we need `HasTypeProcPre P`
 for a sub-environment to lift to `HasTypeProcPre P` for the framed
 environment `G₁ ++ G₂` with extended SEnv.
 
-Solution Structure. Prove `HasTypeProcPre_frame_left` by induction on
+Solution Structure. Prove `has_type_proc_pre_frame_left` by induction on
 the typing derivation. For each constructor, lift lookups using
 disjointness and reassemble the typing judgment.
 -/
@@ -28,7 +28,7 @@ section
 
 -- Main Left Frame Theorem
 
-theorem HasTypeProcPre_frame_left
+theorem has_type_proc_pre_frame_left
     {Ssh : SEnv} {Sown : OwnedEnv} {Sframe : SEnv} {G₁ G₂ : GEnv} {P : Process} :
     DisjointS Sframe Sown.right →
     DisjointS Sframe Sown.left →
@@ -51,7 +51,7 @@ theorem HasTypeProcPre_frame_left
           lookupSEnv (SEnvVisible Ssh { right := Sframe ++ Sown.right, left := Sown.left }) k =
             some (.chan e.sid e.role) := by
         simpa [SEnvVisible, List.append_assoc] using hk
-      have hG' := lookupG_frame_left hDisjG hG
+      have hG' := lookup_g_frame_left hDisjG hG
       have hx' :
           lookupSEnv (SEnvVisible Ssh { right := Sframe ++ Sown.right, left := Sown.left }) x = some T := by
         simpa [SEnvVisible, List.append_assoc] using hx
@@ -63,7 +63,7 @@ theorem HasTypeProcPre_frame_left
           lookupSEnv (SEnvVisible Ssh { right := Sframe ++ Sown.right, left := Sown.left }) k =
             some (.chan e.sid e.role) := by
         simpa [SEnvVisible, List.append_assoc] using hk
-      have hG' := lookupG_frame_left hDisjG hG
+      have hG' := lookup_g_frame_left hDisjG hG
       exact HasTypeProcPre.recv hk' hG' hNoSh
   | select hk hG hFind =>
       rename_i Sown G k l e q bs L
@@ -71,7 +71,7 @@ theorem HasTypeProcPre_frame_left
           lookupSEnv (SEnvVisible Ssh { right := Sframe ++ Sown.right, left := Sown.left }) k =
             some (.chan e.sid e.role) := by
         simpa [SEnvVisible, List.append_assoc] using hk
-      have hG' := lookupG_frame_left hDisjG hG
+      have hG' := lookup_g_frame_left hDisjG hG
       exact HasTypeProcPre.select hk' hG' hFind
   -- Left Frame: branch case
   | branch hk hG hLen hLbl hProcs ih =>
@@ -81,20 +81,20 @@ theorem HasTypeProcPre_frame_left
           lookupSEnv (SEnvVisible Ssh { right := Sframe ++ Sown.right, left := Sown.left }) k =
             some (.chan e.sid e.role) := by
         simpa [SEnvVisible, List.append_assoc] using hk
-      have hG' := lookupG_frame_left hDisjG hG
-      have hDisjSym := DisjointG_symm hDisjG
+      have hG' := lookup_g_frame_left hDisjG hG
+      have hDisjSym := disjoint_g_symm hDisjG
       have hNone : lookupG G₁ e = none :=
-        DisjointG_lookup_left (G₁:=G) (G₂:=G₁) hDisjSym hG
+        disjoint_g_lookup_left (G₁:=G) (G₂:=G₁) hDisjSym hG
       have hProcs' :
           ∀ i (hi : i < bs.length) (hip : i < procs.length),
             HasTypeProcPre Ssh { right := Sframe ++ Sown.right, left := Sown.left }
               (updateG (G₁ ++ G) e (bs.get ⟨i, hi⟩).2) (procs.get ⟨i, hip⟩).2 := by
         intro i hi hip
         have hDisj' : DisjointG G₁ (updateG G e (bs.get ⟨i, hi⟩).2) :=
-          DisjointG_updateG_left (G₁:=G₁) (G₂:=G) (e:=e)
+          disjoint_g_update_g_right (G₁:=G₁) (G₂:=G) (e:=e)
             (L:=.branch p bs) (L':=(bs.get ⟨i, hi⟩).2) hDisjG hG
         have hBody := ih i hi hip hDisjR hDisjL hDisj'
-        have hUpd := updateG_append_left (G₁:=G₁) (G₂:=G) (e:=e)
+        have hUpd := update_g_append_left (G₁:=G₁) (G₂:=G) (e:=e)
           (L:=(bs.get ⟨i, hi⟩).2) hNone
         have hBody' := hBody
         rw [← hUpd] at hBody'
@@ -107,14 +107,14 @@ theorem HasTypeProcPre_frame_left
       rename_i Sown G P Q S₁ S₂ nS nG
       have hDisjS1 : DisjointS Sframe S₁ := by
         have hDisjL' : DisjointS Sframe (S₁ ++ S₂) := by simpa [hS] using hDisjL
-        exact DisjointS_of_append_left hDisjL'
+        exact disjoint_s_of_append_left hDisjL'
       have hDisjS2 : DisjointS Sframe S₂ := by
         have hDisjL' : DisjointS Sframe (S₁ ++ S₂) := by simpa [hS] using hDisjL
-        exact DisjointS_of_append_right hDisjL'
+        exact disjoint_s_of_append_right hDisjL'
       have hDisjRP : DisjointS Sframe (Sown.right ++ S₂) :=
-        DisjointS_append_right hDisjR hDisjS2
+        disjoint_s_append_right hDisjR hDisjS2
       have hDisjRQ : DisjointS Sframe (Sown.right ++ S₁) :=
-        DisjointS_append_right hDisjR hDisjS1
+        disjoint_s_append_right hDisjR hDisjS1
       have hP' := ihP hDisjRP hDisjS1 hDisjG
       have hQ' := ihQ hDisjRQ hDisjS2 hDisjG
       exact HasTypeProcPre.par hDisjS (by simpa [hS] using hS)
@@ -122,12 +122,12 @@ theorem HasTypeProcPre_frame_left
         (by simpa [List.append_assoc] using hQ')
   -- Left Frame: assign case
   | assign hNoSh hv =>
-      exact HasTypeProcPre.assign hNoSh (HasTypeVal_frame_left hDisjG hv)
+      exact HasTypeProcPre.assign hNoSh (has_type_val_frame_left hDisjG hv)
 
 -- Gauge Reframing of Pre-Typing
 
 /-- Pre-typing is invariant under right-gauge reframe of the owned environment. -/
-theorem HasTypeProcPre_reframe_right
+theorem has_type_proc_pre_reframe_right
     {Ssh : SEnv} {Sown Sown' : OwnedEnv} {G : GEnv} {P : Process} :
     Sown'.left = Sown.left →
     HasTypeProcPre Ssh Sown G P →
@@ -192,36 +192,36 @@ theorem HasTypeProcPre_reframe_right
 -- Session-Subset Transport Under Updates
 
 /-- Sessions only shrink under pre-out typing (no new sessions introduced). -/
-theorem SessionsOf_subset_update_send
+theorem sessions_of_subset_update_send
     {G : GEnv} {e : Endpoint} {q : Role} {T : ValType} {L : LocalType} :
     lookupG G e = some (.send q T L) →
     SessionsOf (updateG G e L) ⊆ SessionsOf G := by
   intro hG s hs
   have hEq : SessionsOf (updateG G e L) = SessionsOf G :=
-    SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.send q T L) hG
+    sessions_of_update_g_eq (G:=G) (e:=e) (L:=L) (L':=.send q T L) hG
   simpa [hEq] using hs
 
-theorem SessionsOf_subset_update_recv
+theorem sessions_of_subset_update_recv
     {G : GEnv} {e : Endpoint} {p : Role} {T : ValType} {L : LocalType} :
     lookupG G e = some (.recv p T L) →
     SessionsOf (updateG G e L) ⊆ SessionsOf G := by
   intro hG s hs
   have hEq : SessionsOf (updateG G e L) = SessionsOf G :=
-    SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.recv p T L) hG
+    sessions_of_update_g_eq (G:=G) (e:=e) (L:=L) (L':=.recv p T L) hG
   simpa [hEq] using hs
 
-theorem SessionsOf_subset_update_select
+theorem sessions_of_subset_update_select
     {G : GEnv} {e : Endpoint} {q : Role} {bs : List (Label × LocalType)} {L : LocalType} :
     lookupG G e = some (.select q bs) →
     SessionsOf (updateG G e L) ⊆ SessionsOf G := by
   intro hG s hs
   have hEq : SessionsOf (updateG G e L) = SessionsOf G :=
-    SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.select q bs) hG
+    sessions_of_update_g_eq (G:=G) (e:=e) (L:=L) (L':=.select q bs) hG
   simpa [hEq] using hs
 
 -- Session-Subset of Pre-Out Derivations
 
-theorem SessionsOf_subset_of_HasTypeProcPreOut
+theorem sessions_of_subset_of_has_type_proc_pre_out
     {Ssh Sown G P Sown' G' W Δ} :
     HasTypeProcPreOut Ssh Sown G P Sown' G' W Δ →
     SessionsOf G' ⊆ SessionsOf G := by
@@ -231,13 +231,13 @@ theorem SessionsOf_subset_of_HasTypeProcPreOut
       intro s hs
       simpa using hs
   | send hk hG hx =>
-      exact SessionsOf_subset_update_send hG
+      exact sessions_of_subset_update_send hG
   | recv_new hk hG hNoSh hNoOwnL =>
-      exact SessionsOf_subset_update_recv hG
+      exact sessions_of_subset_update_recv hG
   | recv_old hk hG hNoSh hOwn =>
-      exact SessionsOf_subset_update_recv hG
+      exact sessions_of_subset_update_recv hG
   | select hk hG hFind =>
-      exact SessionsOf_subset_update_select hG
+      exact sessions_of_subset_update_select hG
   | branch _ _ _ _ _ _ hSess _ =>
       exact hSess
   | seq hP hQ ihP ihQ =>
@@ -248,12 +248,12 @@ theorem SessionsOf_subset_of_HasTypeProcPreOut
       intro s hs
 /- ## Structured Block 5 -/
       cases hGfin
-      have hs' := SessionsOf_append_subset hs
+      have hs' := sessions_of_append_subset hs
       cases hs' with
       | inl hsL =>
-          simpa [split.hG] using (SessionsOf_append_left (G₂:=split.G2) (ihP hsL))
+          simpa [split.hG] using (sessions_of_append_left (G₂:=split.G2) (ihP hsL))
       | inr hsR =>
-          simpa [split.hG] using (SessionsOf_append_right (G₁:=split.G1) (ihQ hsR))
+          simpa [split.hG] using (sessions_of_append_right (G₁:=split.G1) (ihQ hsR))
   | assign_new =>
       intro s hs
       simpa using hs
@@ -264,20 +264,20 @@ theorem SessionsOf_subset_of_HasTypeProcPreOut
 -- Right-Frame Lookup and Value Transport
 
 /-- Lift SEnvAll lookups across a right frame (left-biased). -/
-theorem lookupSEnv_all_frame_right
+theorem lookup_s_env_all_frame_right
     {Ssh S₁ S₂ : SEnv} {x : Var} {T : ValType} :
     lookupSEnv (SEnvAll Ssh S₁) x = some T →
     lookupSEnv (SEnvAll Ssh (S₁ ++ S₂)) x = some T := by
   -- Appending on the right preserves existing left-biased lookups.
   intro hLookup
   have hLeft :=
-    lookupSEnv_append_left (S₁:=Ssh ++ S₁) (S₂:=S₂) (x:=x) (T:=T) (by
-      simpa [SEnvAll_ofLeft] using hLookup)
-  have hEq := lookupSEnv_append_assoc (S₁:=Ssh) (S₂:=S₁) (S₃:=S₂) (x:=x)
-  simpa [SEnvAll_ofLeft, SEnvAll, hEq] using hLeft
+    lookup_s_env_append_left (S₁:=Ssh ++ S₁) (S₂:=S₂) (x:=x) (T:=T) (by
+      simpa [s_env_all_of_left] using hLookup)
+  have hEq := lookup_s_env_append_assoc (S₁:=Ssh) (S₂:=S₁) (S₃:=S₂) (x:=x)
+  simpa [s_env_all_of_left, SEnvAll, hEq] using hLeft
 
 /-- Right framing preserves HasTypeVal without extra disjointness. -/
-theorem HasTypeVal_frame_right {G₁ G₂ : GEnv} {v : Value} {T : ValType} :
+theorem has_type_val_frame_right {G₁ G₂ : GEnv} {v : Value} {T : ValType} :
     HasTypeVal G₁ v T →
     HasTypeVal (G₁ ++ G₂) v T := by
   -- The left environment dominates lookups.
@@ -289,12 +289,12 @@ theorem HasTypeVal_frame_right {G₁ G₂ : GEnv} {v : Value} {T : ValType} :
   | string s => exact HasTypeVal.string s
   | prod h₁ h₂ ih₁ ih₂ => exact HasTypeVal.prod ih₁ ih₂
   | chan h =>
-      exact HasTypeVal.chan (lookupG_append_left h)
+      exact HasTypeVal.chan (lookup_g_append_left h)
 
 -- Auxiliary Disjointness and Update Helpers
 
 /-- If the right frame is disjoint from a lookup on the left, the right lookup is none. -/
-theorem lookupSEnv_none_of_disjoint_right {S₁ S₂ : SEnv} {x : Var} {T : ValType} :
+theorem lookup_s_env_none_of_disjoint_right {S₁ S₂ : SEnv} {x : Var} {T : ValType} :
     DisjointS S₂ S₁ →
     lookupSEnv S₁ x = some T →
     lookupSEnv S₂ x = none := by
@@ -307,23 +307,23 @@ theorem lookupSEnv_none_of_disjoint_right {S₁ S₂ : SEnv} {x : Var} {T : ValT
     | some T₂ => exact (hDisj x T₂ T hRight hLeft).elim
 
 /-- Empty SEnv is disjoint from any environment. -/
-theorem DisjointS_left_empty (S : SEnv) : DisjointS (∅ : SEnv) S := by
+theorem disjoint_s_left_empty (S : SEnv) : DisjointS (∅ : SEnv) S := by
   -- Empty lookup is never `some`, so disjointness is trivial.
   intro x T₁ T₂ hLeft hRight
   cases hLeft
 
 /-- Appending the empty SEnv on the right is a no-op. -/
-theorem SEnv_append_empty_right (S : SEnv) : S ++ (∅ : SEnv) = S := by
+theorem s_env_append_empty_right (S : SEnv) : S ++ (∅ : SEnv) = S := by
   simpa using (List.append_nil S)
 
 /-- When x is in S₁, update distributes over append.
     NOTE: This was previously an unsound assumption. The theorem requires x ∈ S₁.
-    Uses Core.updateSEnv_append_left_of_mem. -/
+    Uses Core.update_s_env_append_left_of_mem. -/
 /- ## Structured Block 6 -/
-theorem updateSEnv_append_left' {S₁ S₂ : SEnv} {x : Var} {T : ValType}
+theorem update_s_env_append_left' {S₁ S₂ : SEnv} {x : Var} {T : ValType}
     (h : ∃ T', lookupSEnv S₁ x = some T') :
     updateSEnv (S₁ ++ S₂) x T = updateSEnv S₁ x T ++ S₂ :=
-  updateSEnv_append_left_of_mem h
+  update_s_env_append_left_of_mem h
 
 /-- Shorthand for left-framing on pre-out typing. -/
 abbrev FrameLeft (Ssh S₁ S₂ : SEnv) (G₁ G₂ : GEnv) (P : Process) : Prop :=

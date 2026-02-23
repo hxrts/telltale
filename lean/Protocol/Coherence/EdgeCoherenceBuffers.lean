@@ -46,7 +46,7 @@ Reference: `work/effects/008.lean:313-324, 521-524` -/
 
 /-- If a value has channel type, it must be a channel value with matching endpoint.
     Reference: `work/effects/008.lean:313-318` -/
-theorem HasTypeVal_chan_inv {G : GEnv} {v : Value} {sid : SessionId} {role : Role}
+theorem has_type_val_chan_inv {G : GEnv} {v : Value} {sid : SessionId} {role : Role}
     (h : HasTypeVal G v (.chan sid role)) :
     v = .chan ⟨sid, role⟩ := by
   cases h with
@@ -54,34 +54,34 @@ theorem HasTypeVal_chan_inv {G : GEnv} {v : Value} {sid : SessionId} {role : Rol
 
 /-- If a value has string type, it must be a string value.
     Reference: `work/effects/008.lean:521-524` -/
-theorem HasTypeVal_string_inv {G : GEnv} {v : Value}
+theorem has_type_val_string_inv {G : GEnv} {v : Value}
     (h : HasTypeVal G v .string) :
     ∃ s, v = .string s := by
   cases h with
   | string s => exact ⟨s, rfl⟩
 
 /-- If a value has bool type, it must be a bool value. -/
-theorem HasTypeVal_bool_inv {G : GEnv} {v : Value}
+theorem has_type_val_bool_inv {G : GEnv} {v : Value}
     (h : HasTypeVal G v .bool) :
     ∃ b, v = .bool b := by
   cases h with
   | bool b => exact ⟨b, rfl⟩
 
 /-- If a value has nat type, it must be a nat value. -/
-theorem HasTypeVal_nat_inv {G : GEnv} {v : Value}
+theorem has_type_val_nat_inv {G : GEnv} {v : Value}
     (h : HasTypeVal G v .nat) :
     ∃ n, v = .nat n := by
   cases h with
   | nat n => exact ⟨n, rfl⟩
 
 /-- If a value has unit type, it must be unit. -/
-theorem HasTypeVal_unit_inv {G : GEnv} {v : Value}
+theorem has_type_val_unit_inv {G : GEnv} {v : Value}
     (h : HasTypeVal G v .unit) :
     v = .unit := by
   cases h; rfl
 
 /-- If a value has product type, it must be a product value. -/
-theorem HasTypeVal_prod_inv {G : GEnv} {v : Value} {T₁ T₂ : ValType}
+theorem has_type_val_prod_inv {G : GEnv} {v : Value} {T₁ T₂ : ValType}
     (h : HasTypeVal G v (.prod T₁ T₂)) :
     ∃ v₁ v₂, v = .prod v₁ v₂ ∧ HasTypeVal G v₁ T₁ ∧ HasTypeVal G v₂ T₂ := by
   cases h with
@@ -91,7 +91,7 @@ theorem HasTypeVal_prod_inv {G : GEnv} {v : Value} {T₁ T₂ : ValType}
 
 /-- HasTypeVal is deterministic: each value has exactly one type.
     This is essential for deriving trace types from buffer values. -/
-theorem HasTypeVal_unique {G : GEnv} {v : Value} {T₁ T₂ : ValType}
+theorem has_type_val_unique {G : GEnv} {v : Value} {T₁ T₂ : ValType}
     (h₁ : HasTypeVal G v T₁) (h₂ : HasTypeVal G v T₂) : T₁ = T₂ := by
   induction h₁ generalizing T₂ with
   | unit => cases h₂; rfl
@@ -104,7 +104,7 @@ theorem HasTypeVal_unique {G : GEnv} {v : Value} {T₁ T₂ : ValType}
   | chan _ => cases h₂; rfl
 
 /-- HasTypeVal is preserved when extending GEnv if channel endpoints are preserved. -/
-theorem HasTypeVal_mono (G G' : GEnv) (v : Value) (T : ValType)
+theorem has_type_val_mono (G G' : GEnv) (v : Value) (T : ValType)
     (hHas : HasTypeVal G v T)
     (hMono : ∀ e L, lookupG G e = some L → lookupG G' e = some L) :
     HasTypeVal G' v T := by
@@ -117,11 +117,11 @@ theorem HasTypeVal_mono (G G' : GEnv) (v : Value) (T : ValType)
   | chan hLookup => exact HasTypeVal.chan (hMono _ _ hLookup)
 
 /-- HasTypeVal is preserved when prepending disjoint endpoints to GEnv. -/
-theorem HasTypeVal_prepend (G1 G2 : GEnv) (v : Value) (T : ValType)
+theorem has_type_val_prepend (G1 G2 : GEnv) (v : Value) (T : ValType)
     (hHas : HasTypeVal G2 v T)
     (hDisjoint : ∀ e L, lookupG G2 e = some L → G1.lookup e = none) :
     HasTypeVal (G1 ++ G2) v T := by
-  apply HasTypeVal_mono G2 (G1 ++ G2) v T hHas
+  apply has_type_val_mono G2 (G1 ++ G2) v T hHas
   intro e L hLookup
   simp only [lookupG, List.lookup_append]
   have hNone := hDisjoint e L hLookup
@@ -168,7 +168,7 @@ end List
     Key lemma for deriving trace head in recv case.
     Proof strategy: BufferTyped gives buf[i] : trace[i] for all i.
     At i=0, buf[0]=v has type trace[0]. Since hv says v:T, by
-    HasTypeVal_unique, trace[0]=T, so trace.head? = some T. -/
+    has_type_val_unique, trace[0]=T, so trace.head? = some T. -/
 theorem trace_head_from_buffer {G : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge}
     {v : Value} {vs : List Value} {T : ValType}
     (hBuf : lookupBuf bufs e = v :: vs)
@@ -195,7 +195,7 @@ theorem trace_head_from_buffer {G : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge}
   | cons t ts =>
       have hTypeTrace0 : HasTypeVal G v t := by
         simpa [hTrace] using hTyped0'
-      have hEq : T = t := HasTypeVal_unique hv hTypeTrace0
+      have hEq : T = t := has_type_val_unique hv hTypeTrace0
       -- head? is the first element of the trace.
       simp [hEq]
 

@@ -26,21 +26,21 @@ structure LivenessProtocol where
       eventual_decision_of_assumptions assumptions premises
   boundedPostGST :
     BoundedTerminationAfterGST model premises.FairRun premises.gst premises.postGSTBound :=
-      bounded_postGST_termination_of_assumptions assumptions premises
+      bounded_post_gst_termination_of_assumptions assumptions premises
 
 /-- Extract eventual-decision theorem from a certified protocol bundle. -/
-theorem eventualDecision_of_protocol (P : LivenessProtocol) :
+theorem eventual_decision_of_protocol (P : LivenessProtocol) :
     TerminatesOnAllFairRuns P.model P.premises.FairRun :=
   P.eventualDecision
 
 /-- Extract bounded post-GST termination theorem from a certified protocol bundle. -/
-theorem boundedPostGST_of_protocol (P : LivenessProtocol) :
+theorem bounded_post_gst_of_protocol (P : LivenessProtocol) :
     BoundedTerminationAfterGST
       P.model P.premises.FairRun P.premises.gst P.premises.postGSTBound :=
   P.boundedPostGST
 
 /-- Core assumptions are always validated for a certified protocol. -/
-theorem coreAssumptions_allPassed (P : LivenessProtocol) :
+theorem core_assumptions_all_passed (P : LivenessProtocol) :
     (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
   rfl
 

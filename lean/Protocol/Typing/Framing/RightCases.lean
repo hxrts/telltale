@@ -56,7 +56,7 @@ lemma preserved_sub_right_frame_send
           (target:=target) (q:=q') (T:=T) (T':=T') (L:=L) (L':=L')
           hDisj hEq hG₂e hG
       have hG₂' : G₂' = updateG G₂ e L :=
-        updateG_right_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₂':=G₂') (e:=e)
+        update_g_right_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₂':=G₂') (e:=e)
           (L:=L) (L0:=.send q' T' L') hDisj hEq hEq' hG₂e hGout.symm
       refine ⟨[], ∅, ?_, ?_, ?_⟩
       · simpa [hG₂', hL, hEqE] using
@@ -94,7 +94,7 @@ lemma preserved_sub_right_frame_recv_new
     recv_types_eq_right (G₁:=G₁) (G₂:=G₂) (G:=G) (e:=e) (source:=source) (p:=p')
       (T:=T) (T':=T') (L:=L) (L':=L') hDisj hEq hG₂e hG
   have hG₂' : G₂' = updateG G₂ e L :=
-    updateG_right_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₂':=G₂') (e:=e)
+    update_g_right_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₂':=G₂') (e:=e)
       (L:=L) (L0:=.recv p' T' L') hDisj hEq hEq' hG₂e hGout.symm
   refine ⟨[], ∅, ?_, ?_, ?_⟩
   · subst hSout
@@ -133,7 +133,7 @@ lemma preserved_sub_right_frame_recv_old
     recv_types_eq_right (G₁:=G₁) (G₂:=G₂) (G:=G) (e:=e) (source:=source) (p:=p')
       (T:=T) (T':=T') (L:=L) (L':=L') hDisj hEq hG₂e hG
   have hG₂' : G₂' = updateG G₂ e L :=
-    updateG_right_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₂':=G₂') (e:=e)
+    update_g_right_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₂':=G₂') (e:=e)
       (L:=L) (L0:=.recv p' T' L') hDisj hEq hEq' hG₂e hGout.symm
   refine ⟨[], ∅, ?_, ?_, ?_⟩
   · subst hSout
@@ -173,7 +173,7 @@ lemma preserved_sub_right_frame_select
       have hL : L' = L :=
         select_label_eq (bs:=bs) (bs':=bs') (ℓ:=ℓ) (L:=L) (L':=L') hBs hFind' hFind
       have hG₂' : G₂' = updateG G₂ e L :=
-        updateG_right_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₂':=G₂') (e:=e)
+        update_g_right_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₂':=G₂') (e:=e)
           (L:=L) (L0:=.select q' bs') hDisj hEq hEq' hG₂e hGout.symm
       refine ⟨[], ∅, ?_, ?_, ?_⟩
       · simpa [hG₂', hL, hEqE] using
@@ -214,9 +214,9 @@ lemma preserved_sub_right_frame_branch
         branch_find_eq (bs:=bs) (bs':=bs') (ℓ:=ℓ) (L:=L) hBs hFindT
       have hPre' := hPost _ _ _ hFindP hFindT'
       have hG₂' : G₂' = updateG G₂ e L :=
-        updateG_right_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₂':=G₂') (e:=e)
+        update_g_right_of_step (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G') (G₂':=G₂') (e:=e)
           (L:=L) (L0:=.branch p' bs') hDisj hEq hEq' hG₂e hGout.symm
-      refine ⟨W, Δ, ?_, FootprintSubset_refl, SEnvDomSubset_refl⟩
+      refine ⟨W, Δ, ?_, footprint_subset_refl, s_env_dom_subset_refl⟩
       simpa [hG₂', hEqE] using hPre'
 
 /-! ## Right-Frame Assignment Cases -/
@@ -240,14 +240,14 @@ lemma preserved_sub_right_frame_assign_new
   intro hDisj hEq hEq' hv hSout hSfin hGfin hSsh hSownL hv'
   have hv'' : HasTypeVal G v T_pre := by
     -- Strengthen the typing to the framed global environment.
-    refine HasTypeVal_mono G₂ G v T_pre hv' ?_
+    refine has_type_val_mono G₂ G v T_pre hv' ?_
     intro e L hLookup
-    have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hLookup
-    have hEqG := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
+    have hNone : lookupG G₁ e = none := lookup_g_none_of_disjoint hDisj hLookup
+    have hEqG := lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
     have hLookup' : lookupG (G₁ ++ G₂) e = some L := by
       simpa [hEqG] using hLookup
     simpa [hEq] using hLookup'
-  have hT := HasTypeVal_unique hv'' hv
+  have hT := has_type_val_unique hv'' hv
   cases hT
   have hEqG : G₁ ++ G₂' = G₁ ++ G₂ := by
     have hEqG0 : G₁ ++ G₂' = G := by
@@ -282,14 +282,14 @@ lemma preserved_sub_right_frame_assign_old
   intro hDisj hEq hEq' hv hSout hSfin hGfin hSsh hSownL hv'
   have hv'' : HasTypeVal G v T_pre := by
     -- Strengthen the typing to the framed global environment.
-    refine HasTypeVal_mono G₂ G v T_pre hv' ?_
+    refine has_type_val_mono G₂ G v T_pre hv' ?_
     intro e L hLookup
-    have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hLookup
-    have hEqG := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
+    have hNone : lookupG G₁ e = none := lookup_g_none_of_disjoint hDisj hLookup
+    have hEqG := lookup_g_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
     have hLookup' : lookupG (G₁ ++ G₂) e = some L := by
       simpa [hEqG] using hLookup
     simpa [hEq] using hLookup'
-  have hT := HasTypeVal_unique hv'' hv
+  have hT := has_type_val_unique hv'' hv
   cases hT
   have hEqG : G₁ ++ G₂' = G₁ ++ G₂ := by
     have hEqG0 : G₁ ++ G₂' = G := by

@@ -43,7 +43,7 @@ example (bundle : VMLivenessBundle store₀)
     ProgressEnabled store₀ := by
   let space : VMInvariantSpace (ν := ν) store₀ State :=
     VMInvariantSpace.mk (some bundle) none none
-  exact Adapters.vm_progress_from_invariantSpace
+  exact Adapters.vm_progress_from_invariant_space
     (space := space)
     (bundle := bundle)
     (hLiveness := rfl)

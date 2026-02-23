@@ -20,7 +20,7 @@ the extended trace using its recv type.
 
 Solution Structure. We prove head preservation by:
 1. Showing the sent type matches the receiver's expected recv type
-2. Proving Consume succeeds on the extended trace via `Consume_append`
+2. Proving Consume succeeds on the extended trace via `consume_append`
 3. Handling the 3-way edge case split (updated, related, unrelated)
 -/
 
@@ -50,7 +50,7 @@ For role p's view:
 
 ## Proof Technique: Edge Case Analysis
 
-The key preservation proofs (`Coherent_send_preserved`, `Coherent_recv_preserved`)
+The key preservation proofs (`coherent_send_preserved`, `coherent_recv_preserved`)
 proceed by case analysis on which edge we're checking coherence for:
 
 1. **e = updated edge**: The sender's/receiver's local type changed, trace changed
@@ -74,7 +74,7 @@ section
 -- HeadCoherent Preservation Lemmas
 
 /-- Helper: Consume on a self-recv head succeeds iff the tail does. -/
-private theorem Consume_tail_of_self_recv
+private theorem consume_tail_of_self_recv
     {from_ : Role} {T : ValType} {L : LocalType} {ts : List ValType} :
     (Consume from_ (.recv from_ T L) (T :: ts)).isSome →
     (Consume from_ L ts).isSome := by
@@ -83,22 +83,22 @@ private theorem Consume_tail_of_self_recv
   simpa [Consume, consumeOne, beq_self_eq_true, Bool.true_and] using hConsume
 
 /-- Helper: If Consume succeeds on a recv head, the head type matches. -/
-private theorem Consume_head_eq_of_recv
+private theorem consume_head_eq_of_recv
     {from_ r : Role} {T : ValType} {L : LocalType} {t : ValType} {ts : List ValType} :
     (Consume from_ (.recv r T L) (t :: ts)).isSome → t = T := by
   -- Extract a witness and apply the recv-head matching lemma.
   intro hConsume
   rcases (Option.isSome_iff_exists).1 hConsume with ⟨L', hEq⟩
-  exact (Consume_recv_head_match (from_:=from_) (r:=r) (T:=T) (L:=L) (t:=t) (ts:=ts) hEq).2
+  exact (consume_recv_head_match (from_:=from_) (r:=r) (T:=T) (L:=L) (t:=t) (ts:=ts) hEq).2
 
 /-- Helper: Consume on a branch with a non-empty trace is impossible. -/
-private theorem Consume_branch_nonempty_isSome_false
+private theorem consume_branch_nonempty_is_some_false
     {from_ r : Role} {bs : List (String × LocalType)} {t : ValType} {ts : List ValType} :
     (Consume from_ (.branch r bs) (t :: ts)).isSome → False := by
   -- Turn isSome into an equality and use the existing contradiction lemma.
   intro hConsume
   rcases (Option.isSome_iff_exists).1 hConsume with ⟨L', hEq⟩
-  exact Consume_branch_nonempty_false (from_:=from_) (r:=r) (bs:=bs) (t:=t) (ts:=ts) (L':=L') hEq
+  exact consume_branch_nonempty_false (from_:=from_) (r:=r) (bs:=bs) (t:=t) (ts:=ts) (L':=L') hEq
 
 /-- HeadCoherent is preserved when sending.
     Send action appends to trace END, so the HEAD is unchanged.
@@ -106,7 +106,7 @@ private theorem Consume_branch_nonempty_isSome_false
     (unless sender = receiver, which is handled separately).
     Reference: `work/effects/004.lean` proof structure -/
 -- Main Send Preservation Theorem
-theorem HeadCoherent_send_preserved
+theorem head_coherent_send_preserved
     (G : GEnv) (D : DEnv) (senderEp : Endpoint) (receiverRole : Role) (T : ValType) (L : LocalType)
     (hHead : HeadCoherent G D)
     (hCoh : Coherent G D)
@@ -120,7 +120,7 @@ theorem HeadCoherent_send_preserved
   intro sendEdge e hActive  -- The edge we check HeadCoherent for
   simp only [HeadCoherent] at hHead ⊢
   have hActiveOrig : ActiveEdge G e :=
-    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=senderEp) (L:=L) hActive (by simp [hG])
+    active_edge_update_g_inv (G:=G) (e:=e) (ep:=senderEp) (L:=L) hActive (by simp [hG])
   -- Case Split on Updated Edge
   -- Case split: is e the send edge or not?
   by_cases heq : e = sendEdge
@@ -134,7 +134,7 @@ theorem HeadCoherent_send_preserved
       -- sendEdge = { sid := senderEp.sid, sender := senderEp.role, receiver := senderEp.role }
       -- Receiver endpoint = senderEp, so receiver type in updated G is L
       have hRecvEp : { sid := sendEdge.sid, role := sendEdge.receiver : Endpoint } = senderEp := rfl
-      simp only [hRecvEp, lookupG_update_eq, lookupD_update_eq]
+      simp only [hRecvEp, lookup_g_update_eq, lookup_d_update_eq]
       -- Case on continuation type L
       cases L with
       | end_ => exact True.intro
@@ -185,16 +185,16 @@ theorem HeadCoherent_send_preserved
         have : senderEp.role = receiverRole := congrArg Endpoint.role h
         exact hRecvIsSender this.symm
       -- Receiver's type unchanged
-      rw [lookupG_update_neq _ _ _ _ hRecvNeq]
+      rw [lookup_g_update_neq _ _ _ _ hRecvNeq]
       -- Trace was ts, now ts ++ [T]
-      simp only [lookupD_update_eq]
+      simp only [lookup_d_update_eq]
       -- Case on receiver's type in original G
       cases hRecvType : lookupG G { sid := senderEp.sid, role := receiverRole } with
       | none => trivial
       | some Lr =>
         -- Original HeadCoherent at sendEdge (sender and receiver exist)
         have hActiveOrig : ActiveEdge G sendEdge :=
-          ActiveEdge_of_endpoints (G:=G) (e:=sendEdge) hG hRecvType
+          active_edge_of_endpoints (G:=G) (e:=sendEdge) hG hRecvType
         have hOrigHead := hHead sendEdge hActiveOrig
         cases Lr with
         | end_ => trivial
@@ -274,9 +274,9 @@ theorem HeadCoherent_send_preserved
     -- Unchanged Edge with Receiver Endpoint Replaced
     · -- Receiver endpoint is senderEp, type changed from SEND to L
       subst hRecvMatch
-      rw [lookupG_update_eq]
+      rw [lookup_g_update_eq]
       have hNeSymm : sendEdge ≠ e := Ne.symm heq
-      rw [lookupD_update_neq _ _ _ _ hNeSymm]
+      rw [lookup_d_update_neq _ _ _ _ hNeSymm]
       -- L replaces .send at senderEp, check HeadCoherent for L
       cases hL : L with
       | end_ => trivial
@@ -289,7 +289,7 @@ theorem HeadCoherent_send_preserved
         -- HeadCoherent for recv: check if trace head matches T'
         -- Key insight: Original G[senderEp] = .send, so by trace_empty_when_send_receiver, D[e] = []
         -- After update, D'[e] = D[e] = [] (since e ≠ sendEdge), so HeadCoherent is trivially True
-        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh hActiveOrig
+        have hEdgeCoh : EdgeCoherent G D e := coherent_edge_any hCoh hActiveOrig
         -- e.receiver = senderEp.role, and G[senderEp] = .send receiverRole T L
         have hRecvType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.send receiverRole T L) := by
           simp only [hG]  -- e.receiver = senderEp.role after subst
@@ -298,7 +298,7 @@ theorem HeadCoherent_send_preserved
         trivial
       | branch source bs' =>
         -- HeadCoherent for branch: same reasoning - original D[e] = [] because sender type is .send
-        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh hActiveOrig
+        have hEdgeCoh : EdgeCoherent G D e := coherent_edge_any hCoh hActiveOrig
         have hRecvType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.send receiverRole T L) := by
           simp only [hG]
         have hTraceEmpty := trace_empty_when_send_receiver hEdgeCoh hRecvType'
@@ -307,10 +307,10 @@ theorem HeadCoherent_send_preserved
     -- Unchanged Edge with Unchanged Receiver Endpoint
     · -- Receiver endpoint unchanged
       have hRecvNoMatch : senderEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
-      rw [lookupG_update_neq _ _ _ _ hRecvNoMatch]
+      rw [lookup_g_update_neq _ _ _ _ hRecvNoMatch]
       -- Trace at e unchanged
       have hNeSymm : sendEdge ≠ e := Ne.symm heq
-      rw [lookupD_update_neq _ _ _ _ hNeSymm]
+      rw [lookup_d_update_neq _ _ _ _ hNeSymm]
       -- Original HeadCoherent at e
       exact hHead e hActiveOrig
 

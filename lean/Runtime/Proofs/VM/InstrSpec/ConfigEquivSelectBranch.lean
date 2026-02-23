@@ -11,8 +11,8 @@ The Problem. Select and branch instructions involve label lookup in
 branch lists. For configuration equivalence, we need to show the
 renamed specs preserve label matching and type updates.
 
-Solution Structure. Prove `SelectSpec_respects_renaming` and
-`BranchSpec_respects_renaming` using `find_renameBranches` to show
+Solution Structure. Prove `select_spec_respects_renaming` and
+`branch_spec_respects_renaming` using `find_rename_branches` to show
 label lookup commutes with branch list renaming.
 -/
 
@@ -26,7 +26,7 @@ section
 
 -- Select Renaming Equivariance
 
-theorem SelectSpec_respects_renaming (ρ : SessionRenaming)
+theorem select_spec_respects_renaming (ρ : SessionRenaming)
     {G G' : GEnv} {D D' : DEnv} {ep : Endpoint} {r : Role} {chosen : Label}
     (hSpec : SelectSpec G G' D D' ep r chosen) :
     SelectSpec (renameGEnv ρ G) (renameGEnv ρ G') (renameDEnv ρ D) (renameDEnv ρ D')
@@ -35,13 +35,13 @@ theorem SelectSpec_respects_renaming (ρ : SessionRenaming)
     obtain ⟨branches, L', hSender, hFind⟩ := hSpec.sender_type
     use renameBranches ρ branches, renameLocalType ρ L'
     constructor
-    · rw [lookupG_rename, hSender]
+    · rw [lookup_g_rename, hSender]
       simp only [Option.map_some, renameLocalType]
-    · rw [find_renameBranches, hFind]
+    · rw [find_rename_branches, hFind]
       simp
   type_updated := by
     intro branches_renamed L'_renamed hSender_renamed hFind_renamed
-    rw [lookupG_rename] at hSender_renamed
+    rw [lookup_g_rename] at hSender_renamed
     obtain ⟨branches, L', hSender, hFind⟩ := hSpec.sender_type
     rw [hSender] at hSender_renamed
     simp only [Option.map_some, renameLocalType] at hSender_renamed
@@ -49,11 +49,11 @@ theorem SelectSpec_respects_renaming (ρ : SessionRenaming)
       cases hSender_renamed
       rfl
     have hL'_eq : L'_renamed = renameLocalType ρ L' := by
-      rw [hBranches_eq, find_renameBranches, hFind] at hFind_renamed
+      rw [hBranches_eq, find_rename_branches, hFind] at hFind_renamed
       simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hFind_renamed
       exact hFind_renamed.2.symm
     have hG' := hSpec.type_updated branches L' hSender hFind
-    rw [hG', renameGEnv_updateG, hL'_eq]
+    rw [hG', rename_g_env_update_g, hL'_eq]
 
   -- Select Renaming Equivariance: Trace and Frame Clauses
 
@@ -61,10 +61,10 @@ theorem SelectSpec_respects_renaming (ρ : SessionRenaming)
     have hD' := hSpec.trace_extended
     simp only at hD'
     simp only [renameEndpoint]
-    rw [hD', renameDEnv_updateD]
+    rw [hD', rename_d_env_update_d]
     simp only [renameEdge]
     congr 1
-    have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := ep.role, receiver := r })
+    have hLookup := lookup_d_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := ep.role, receiver := r })
     simp only [renameEdge] at hLookup
     rw [List.map_append, List.map, hLookup, renameValType]
     simp
@@ -72,8 +72,8 @@ theorem SelectSpec_respects_renaming (ρ : SessionRenaming)
     intro ep' hne
     obtain ⟨branches, L', hSender, hFind⟩ := hSpec.sender_type
     have hG' := hSpec.type_updated branches L' hSender hFind
-    rw [hG', renameGEnv_updateG]
-    exact lookupG_update_neq (renameGEnv ρ G) (renameEndpoint ρ ep) ep'
+    rw [hG', rename_g_env_update_g]
+    exact lookup_g_update_neq (renameGEnv ρ G) (renameEndpoint ρ ep) ep'
       (renameLocalType ρ L') hne.symm
 /- ## Structured Block 2 -/
   frame_D := by
@@ -81,9 +81,9 @@ theorem SelectSpec_respects_renaming (ρ : SessionRenaming)
     have hD' := hSpec.trace_extended
     simp only at hD'
     simp only [renameEndpoint] at hne ⊢
-    rw [hD', renameDEnv_updateD]
+    rw [hD', rename_d_env_update_d]
     simp only [renameEdge]
-    exact lookupD_update_neq (renameDEnv ρ D)
+    exact lookup_d_update_neq (renameDEnv ρ D)
       { sid := ρ.f ep.sid, sender := ep.role, receiver := r } e
       ((lookupD D { sid := ep.sid, sender := ep.role, receiver := r } ++ [ValType.string]).map (renameValType ρ))
       hne.symm
@@ -91,7 +91,7 @@ theorem SelectSpec_respects_renaming (ρ : SessionRenaming)
 -- Select ConfigEquiv Preservation
 
 /-- Select respects ConfigEquiv. -/
-theorem SelectSpec_respects_ConfigEquiv
+theorem select_spec_respects_config_equiv
     {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
     {ep : Endpoint} {r : Role} {chosen : Label}
     (hEquiv : ConfigEquiv ⟨G₁, D₁⟩ ⟨G₂, D₂⟩)
@@ -128,23 +128,23 @@ theorem SelectSpec_respects_ConfigEquiv
       -- Get L'₂ = renameLocalType ρ L'₁ from find correspondence
       have hL'₂_eq : L'₂ = renameLocalType ρ L'₁ := by
         subst hBranches₂_eq
-        rw [find_renameBranches, hFind₁] at hFind₂
+        rw [find_rename_branches, hFind₁] at hFind₂
         simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hFind₂
         exact hFind₂.2.symm
       -- Compute both sides
       calc lookupG G₂' (renameEndpoint ρ e')
           = lookupG G₂' (renameEndpoint ρ ep) := by rw [he]
         _ = lookupG (updateG G₂ (renameEndpoint ρ ep) L'₂) (renameEndpoint ρ ep) := by rw [hG₂']
-        _ = some L'₂ := lookupG_update_eq _ _ _
+        _ = some L'₂ := lookup_g_update_eq _ _ _
         _ = some (renameLocalType ρ L'₁) := by rw [hL'₂_eq]
         _ = (some L'₁).map (renameLocalType ρ) := by simp only [Option.map_some]
-        _ = (lookupG (updateG G₁ ep L'₁) ep).map (renameLocalType ρ) := by rw [lookupG_update_eq]
+        _ = (lookupG (updateG G₁ ep L'₁) ep).map (renameLocalType ρ) := by rw [lookup_g_update_eq]
         _ = (lookupG G₁' ep).map (renameLocalType ρ) := by rw [← hG₁']
         _ = (lookupG G₁' e').map (renameLocalType ρ) := by rw [← he]
 /- ## Structured Block 3 -/
     · -- Case: e' ≠ ep (frame)
       have hne₂ : renameEndpoint ρ e' ≠ renameEndpoint ρ ep := by
-        intro heq; exact he (renameEndpoint_inj ρ e' ep heq)
+        intro heq; exact he (rename_endpoint_inj ρ e' ep heq)
       rw [hSpec₁.frame_G e' he, hSpec₂.frame_G (renameEndpoint ρ e') hne₂]
       exact hG_equiv e'
 
@@ -163,12 +163,12 @@ theorem SelectSpec_respects_ConfigEquiv
       -- Rewrite goal: lookupD D₂' (renameEdge ρ e') = (lookupD D₁' e').map (renameValType ρ)
       rw [he]
       simp only [renameEdge]
-      rw [hD₁', hD₂', lookupD_update_eq, lookupD_update_eq]
+      rw [hD₁', hD₂', lookup_d_update_eq, lookup_d_update_eq]
       -- Goal: lookupD D₂ (...) ++ [string] = (lookupD D₁ sendEdge ++ [string]).map (renameValType ρ)
       rw [List.map_append, List.map_singleton, renameValType, hTrace]
     · -- Case: e' ≠ sendEdge (frame)
       have hne₂ : renameEdge ρ e' ≠ renameEdge ρ sendEdge := by
-        intro heq; exact he (renameEdge_inj ρ e' sendEdge heq)
+        intro heq; exact he (rename_edge_inj ρ e' sendEdge heq)
       simp only [renameEdge] at hne₂
       rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
       exact hD_equiv e'
@@ -176,7 +176,7 @@ theorem SelectSpec_respects_ConfigEquiv
 -- Branch Renaming Equivariance
 
 /-- Branch is equivariant under session renaming. -/
-theorem BranchSpec_respects_renaming (ρ : SessionRenaming)
+theorem branch_spec_respects_renaming (ρ : SessionRenaming)
     {G G' : GEnv} {D D' : DEnv} {ep : Endpoint} {r : Role} {received : Label}
     (hSpec : BranchSpec G G' D D' ep r received) :
     BranchSpec (renameGEnv ρ G) (renameGEnv ρ G') (renameDEnv ρ D) (renameDEnv ρ D')
@@ -185,21 +185,21 @@ theorem BranchSpec_respects_renaming (ρ : SessionRenaming)
     obtain ⟨branches, L', hRecv, hFind⟩ := hSpec.receiver_type
     use renameBranches ρ branches, renameLocalType ρ L'
     constructor
-    · rw [lookupG_rename, hRecv]
+    · rw [lookup_g_rename, hRecv]
       simp only [Option.map_some, renameLocalType]
-    · rw [find_renameBranches, hFind]
+    · rw [find_rename_branches, hFind]
       simp
   buffer_has_label := by
     obtain ⟨rest, hBuffer⟩ := hSpec.buffer_has_label
     use rest.map (renameValType ρ)
     simp only [renameEndpoint]
-    have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := r, receiver := ep.role })
+    have hLookup := lookup_d_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := r, receiver := ep.role })
     simp only [renameEdge] at hLookup
     rw [hLookup, hBuffer]
     simp only [List.map_cons, renameValType]
   type_updated := by
     intro branches_renamed L'_renamed hRecv_renamed hFind_renamed
-    rw [lookupG_rename] at hRecv_renamed
+    rw [lookup_g_rename] at hRecv_renamed
     obtain ⟨branches, L', hRecv, hFind⟩ := hSpec.receiver_type
     rw [hRecv] at hRecv_renamed
 /- ## Structured Block 4 -/
@@ -208,11 +208,11 @@ theorem BranchSpec_respects_renaming (ρ : SessionRenaming)
       cases hRecv_renamed
       rfl
     have hL'_eq : L'_renamed = renameLocalType ρ L' := by
-      rw [hBranches_eq, find_renameBranches, hFind] at hFind_renamed
+      rw [hBranches_eq, find_rename_branches, hFind] at hFind_renamed
       simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hFind_renamed
       exact hFind_renamed.2.symm
     have hG' := hSpec.type_updated branches L' hRecv hFind
-    rw [hG', renameGEnv_updateG, hL'_eq]
+    rw [hG', rename_g_env_update_g, hL'_eq]
 
   -- Branch Renaming Equivariance: Trace and Frame Clauses
 
@@ -220,34 +220,34 @@ theorem BranchSpec_respects_renaming (ρ : SessionRenaming)
     obtain ⟨rest, hBuffer, hD'⟩ := hSpec.trace_consumed
     use rest.map (renameValType ρ)
     simp only [renameEndpoint]
-    have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := r, receiver := ep.role })
+    have hLookup := lookup_d_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := r, receiver := ep.role })
     simp only [renameEdge] at hLookup
     constructor
     · rw [hLookup, hBuffer]
       simp only [List.map_cons, renameValType]
-    · rw [hD', renameDEnv_updateD]
+    · rw [hD', rename_d_env_update_d]
       simp only [renameEdge]
   frame_G := by
     intro ep' hne
     obtain ⟨branches, L', hRecv, hFind⟩ := hSpec.receiver_type
     have hG' := hSpec.type_updated branches L' hRecv hFind
-    rw [hG', renameGEnv_updateG]
-    exact lookupG_update_neq (renameGEnv ρ G) (renameEndpoint ρ ep) ep'
+    rw [hG', rename_g_env_update_g]
+    exact lookup_g_update_neq (renameGEnv ρ G) (renameEndpoint ρ ep) ep'
       (renameLocalType ρ L') hne.symm
   frame_D := by
     intro e hne
     obtain ⟨rest, _, hD'⟩ := hSpec.trace_consumed
     simp only [renameEndpoint] at hne ⊢
-    rw [hD', renameDEnv_updateD]
+    rw [hD', rename_d_env_update_d]
     simp only [renameEdge]
-    exact lookupD_update_neq (renameDEnv ρ D)
+    exact lookup_d_update_neq (renameDEnv ρ D)
       { sid := ρ.f ep.sid, sender := r, receiver := ep.role } e
       (rest.map (renameValType ρ)) hne.symm
 
 -- Branch ConfigEquiv Preservation
 
 /-- Branch respects ConfigEquiv. -/
-theorem BranchSpec_respects_ConfigEquiv
+theorem branch_spec_respects_config_equiv
     {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
     {ep : Endpoint} {r : Role} {received : Label}
     (hEquiv : ConfigEquiv ⟨G₁, D₁⟩ ⟨G₂, D₂⟩)
@@ -285,22 +285,22 @@ theorem BranchSpec_respects_ConfigEquiv
       -- Get L'₂ = renameLocalType ρ L'₁ from find correspondence
       have hL'₂_eq : L'₂ = renameLocalType ρ L'₁ := by
         subst hBranches₂_eq
-        rw [find_renameBranches, hFind₁] at hFind₂
+        rw [find_rename_branches, hFind₁] at hFind₂
         simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hFind₂
         exact hFind₂.2.symm
       -- Compute both sides
       calc lookupG G₂' (renameEndpoint ρ e')
           = lookupG G₂' (renameEndpoint ρ ep) := by rw [he]
         _ = lookupG (updateG G₂ (renameEndpoint ρ ep) L'₂) (renameEndpoint ρ ep) := by rw [hG₂']
-        _ = some L'₂ := lookupG_update_eq _ _ _
+        _ = some L'₂ := lookup_g_update_eq _ _ _
         _ = some (renameLocalType ρ L'₁) := by rw [hL'₂_eq]
         _ = (some L'₁).map (renameLocalType ρ) := by simp only [Option.map_some]
-        _ = (lookupG (updateG G₁ ep L'₁) ep).map (renameLocalType ρ) := by rw [lookupG_update_eq]
+        _ = (lookupG (updateG G₁ ep L'₁) ep).map (renameLocalType ρ) := by rw [lookup_g_update_eq]
         _ = (lookupG G₁' ep).map (renameLocalType ρ) := by rw [← hG₁']
         _ = (lookupG G₁' e').map (renameLocalType ρ) := by rw [← he]
     · -- Case: e' ≠ ep (frame)
       have hne₂ : renameEndpoint ρ e' ≠ renameEndpoint ρ ep := by
-        intro heq; exact he (renameEndpoint_inj ρ e' ep heq)
+        intro heq; exact he (rename_endpoint_inj ρ e' ep heq)
       rw [hSpec₁.frame_G e' he, hSpec₂.frame_G (renameEndpoint ρ e') hne₂]
       exact hG_equiv e'
 
@@ -319,7 +319,7 @@ theorem BranchSpec_respects_ConfigEquiv
       -- Rewrite goal
       rw [he]
       simp only [renameEdge]
-      rw [hD₁', hD₂', lookupD_update_eq, lookupD_update_eq]
+      rw [hD₁', hD₂', lookup_d_update_eq, lookup_d_update_eq]
       -- rest₁ and rest₂ are the tails after consuming the label
       -- From hBuf₁: lookupD D₁ recvEdge = label :: rest₁
       -- From hTrace: lookupD D₂ (rename recvEdge) = (lookupD D₁ recvEdge).map rename
@@ -332,7 +332,7 @@ theorem BranchSpec_respects_ConfigEquiv
       rw [hTrace.2]
     · -- Case: e' ≠ recvEdge (frame)
       have hne₂ : renameEdge ρ e' ≠ renameEdge ρ recvEdge := by
-        intro heq; exact he (renameEdge_inj ρ e' recvEdge heq)
+        intro heq; exact he (rename_edge_inj ρ e' recvEdge heq)
 /- ## Structured Block 6 -/
       simp only [renameEdge] at hne₂
       rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]

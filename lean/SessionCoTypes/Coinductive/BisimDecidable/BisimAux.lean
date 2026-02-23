@@ -83,7 +83,7 @@ def labelsOfBranches (bs : List (Label × LocalTypeC)) : List Label :=
   bs.map (·.1)
 
 /-- BranchesRelC preserves the list of labels. -/
-lemma labelsOfBranches_eq_of_BranchesRelC {R : LocalTypeC → LocalTypeC → Prop}
+lemma labels_of_branches_eq_of_branches_rel_c {R : LocalTypeC → LocalTypeC → Prop}
     {bs cs : List (Label × LocalTypeC)} (h : BranchesRelC R bs cs) :
     labelsOfBranches bs = labelsOfBranches cs := by
   induction h with
@@ -93,7 +93,7 @@ lemma labelsOfBranches_eq_of_BranchesRelC {R : LocalTypeC → LocalTypeC → Pro
       simpa [labelsOfBranches, hlab] using ih
 
 /-- Helper: childrenOf for send equals the second components of branchesOf. -/
-lemma childrenOf_send_eq_snd_branchesOf {t : LocalTypeC} {p : String} {labels : List Label}
+lemma children_of_send_eq_snd_branches_of {t : LocalTypeC} {p : String} {labels : List Label}
     (hhead : head t = .send p labels) :
     childrenOf t = (branchesOf t).map (·.2) := by
   simp only [childrenOf, branchesOf, head] at hhead ⊢
@@ -109,7 +109,7 @@ lemma childrenOf_send_eq_snd_branchesOf {t : LocalTypeC} {p : String} {labels : 
   | ⟨LocalTypeHead.mu _, _⟩ => simp_all
 
 /-- Helper: childrenOf for recv equals the second components of branchesOf. -/
-lemma childrenOf_recv_eq_snd_branchesOf {t : LocalTypeC} {p : String} {labels : List Label}
+lemma children_of_recv_eq_snd_branches_of {t : LocalTypeC} {p : String} {labels : List Label}
 /- ## Structured Block 2 -/
     (hhead : head t = .recv p labels) :
     childrenOf t = (branchesOf t).map (·.2) := by
@@ -129,7 +129,7 @@ lemma childrenOf_recv_eq_snd_branchesOf {t : LocalTypeC} {p : String} {labels : 
 
 /-- Helper: if bisimAll succeeds on zipped children, construct BranchesRelC.
     This requires showing that the branches have matching labels. -/
-lemma bisimAll_to_BranchesRelC {R : LocalTypeC → LocalTypeC → Prop}
+lemma bisim_all_to_branches_rel_c {R : LocalTypeC → LocalTypeC → Prop}
     {bs cs : List (Label × LocalTypeC)}
     (hlen : bs.length = cs.length)
     (hlabels : ∀ i : Fin bs.length, (bs.get i).1 = (cs.get ⟨i.val, hlen ▸ i.isLt⟩).1)
@@ -182,7 +182,7 @@ lemma bisimAll_to_BranchesRelC {R : LocalTypeC → LocalTypeC → Prop}
 -- Branch Label Reconstruction (Send)
 
 /-- Helper: branchesOf preserves label structure. -/
-lemma branchesOf_labels_eq {t : LocalTypeC} {p : String} {labels : List Label}
+lemma branches_of_labels_eq {t : LocalTypeC} {p : String} {labels : List Label}
     (hhead : head t = .send p labels) :
     labelsOfBranches (branchesOf t) = labels := by
   simp only [labelsOfBranches, branchesOf, head] at hhead ⊢
@@ -202,7 +202,7 @@ lemma branchesOf_labels_eq {t : LocalTypeC} {p : String} {labels : List Label}
 -- Branch Label Reconstruction (Recv)
 
 /-- Helper: branchesOf preserves label structure for recv. -/
-lemma branchesOf_labels_eq_recv {t : LocalTypeC} {p : String} {labels : List Label}
+lemma branches_of_labels_eq_recv {t : LocalTypeC} {p : String} {labels : List Label}
     (hhead : head t = .recv p labels) :
     labelsOfBranches (branchesOf t) = labels := by
   simp only [labelsOfBranches, branchesOf, head] at hhead ⊢
@@ -223,7 +223,7 @@ lemma branchesOf_labels_eq_recv {t : LocalTypeC} {p : String} {labels : List Lab
 
 /-- Key lemma: if obsMatch succeeds with send and bisimAll succeeds on nextPairs,
     then we have BranchesRelC relating the branches. -/
-lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
+lemma obs_match_send_bisim_all_to_branches_rel_c {n : Nat} {a b : LocalTypeC}
     {fuel : Nat} {visited_any : Finset (LocalTypeC × LocalTypeC)}
     {p : String} {labels : List Label}
     (hk_a : obsKindOf (fullUnfoldN n a) = some (.obs_send p labels))
@@ -234,12 +234,12 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     BranchesRelC (BisimRel n)
       (branchesOf (fullUnfoldN n a))
       (branchesOf (fullUnfoldN n b)) := by
-  have hhead_a := obsKindOf_send_iff.mp hk_a
-  have hhead_b := obsKindOf_send_iff.mp hk_b
+  have hhead_a := obs_kind_of_send_iff.mp hk_a
+  have hhead_b := obs_kind_of_send_iff.mp hk_b
   let bs := branchesOf (fullUnfoldN n a)
   let cs := branchesOf (fullUnfoldN n b)
-  have hlabels_a := branchesOf_labels_eq hhead_a
-  have hlabels_b := branchesOf_labels_eq hhead_b
+  have hlabels_a := branches_of_labels_eq hhead_a
+  have hlabels_b := branches_of_labels_eq hhead_b
   have hlen : bs.length = cs.length := by
     simp only [labelsOfBranches] at hlabels_a hlabels_b
     have ha : bs.length = labels.length := by
@@ -251,7 +251,7 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
       simp only [List.length_map] at this
       exact this
     omega
-  apply bisimAll_to_BranchesRelC hlen
+  apply bisim_all_to_branches_rel_c hlen
   -- `obsMatch_send_bisimAll_to_BranchesRelC`: Label Alignment
   · intro i
     have hlen_a : bs.length = labels.length := by
@@ -293,8 +293,8 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     -- Children are in BisimRel: extract from bisimAll on nextPairs
     simp only [nextPairs, zipChildren, bisimAll, List.all_eq_true] at hchildren
     -- Get child equality lemmas
-    have hchildren_eq_a := childrenOf_send_eq_snd_branchesOf hhead_a
-    have hchildren_eq_b := childrenOf_send_eq_snd_branchesOf hhead_b
+    have hchildren_eq_a := children_of_send_eq_snd_branches_of hhead_a
+    have hchildren_eq_b := children_of_send_eq_snd_branches_of hhead_b
     -- The children are the second components
     have ha_child : (bs.get i).2 = (List.map (·.2) bs).get ⟨i.val, by simp only [List.length_map]; exact i.isLt⟩ := by
       exact (List.get_map' (·.2) bs i).symm
@@ -322,7 +322,7 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
 
 /-- Key lemma: if obsMatch succeeds with recv and bisimAll succeeds on nextPairs,
     then we have BranchesRelC relating the branches. -/
-lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
+lemma obs_match_recv_bisim_all_to_branches_rel_c {n : Nat} {a b : LocalTypeC}
     {fuel : Nat} {visited_any : Finset (LocalTypeC × LocalTypeC)}
     {p : String} {labels : List Label}
     (hk_a : obsKindOf (fullUnfoldN n a) = some (.obs_recv p labels))
@@ -332,12 +332,12 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     BranchesRelC (BisimRel n)
       (branchesOf (fullUnfoldN n a))
       (branchesOf (fullUnfoldN n b)) := by
-  have hhead_a := obsKindOf_recv_iff.mp hk_a
-  have hhead_b := obsKindOf_recv_iff.mp hk_b
+  have hhead_a := obs_kind_of_recv_iff.mp hk_a
+  have hhead_b := obs_kind_of_recv_iff.mp hk_b
   let bs := branchesOf (fullUnfoldN n a)
   let cs := branchesOf (fullUnfoldN n b)
-  have hlabels_a := branchesOf_labels_eq_recv hhead_a
-  have hlabels_b := branchesOf_labels_eq_recv hhead_b
+  have hlabels_a := branches_of_labels_eq_recv hhead_a
+  have hlabels_b := branches_of_labels_eq_recv hhead_b
   have hlen : bs.length = cs.length := by
     simp only [labelsOfBranches] at hlabels_a hlabels_b
     have ha : bs.length = labels.length := by
@@ -350,7 +350,7 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
       simp only [List.length_map] at this
       exact this
     omega
-  apply bisimAll_to_BranchesRelC hlen
+  apply bisim_all_to_branches_rel_c hlen
   -- `obsMatch_recv_bisimAll_to_BranchesRelC`: Label Alignment
   · intro i
     have hlen_a : bs.length = labels.length := by
@@ -390,8 +390,8 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
   · intro i
     -- Children are in BisimRel (same proof as send case)
     simp only [nextPairs, zipChildren, bisimAll, List.all_eq_true] at hchildren
-    have hchildren_eq_a := childrenOf_recv_eq_snd_branchesOf hhead_a
-    have hchildren_eq_b := childrenOf_recv_eq_snd_branchesOf hhead_b
+    have hchildren_eq_a := children_of_recv_eq_snd_branches_of hhead_a
+    have hchildren_eq_b := children_of_recv_eq_snd_branches_of hhead_b
     have ha_child : (bs.get i).2 = (List.map (·.2) bs).get ⟨i.val, by simp only [List.length_map]; exact i.isLt⟩ := by
       exact (List.get_map' (·.2) bs i).symm
     have hb_child : (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2 = (List.map (·.2) cs).get ⟨i.val, by simp only [List.length_map]; omega⟩ := by

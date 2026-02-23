@@ -163,7 +163,7 @@ def allEdges (sid : SessionId) (rs : RoleSet) : List Edge :=
     if p ≠ q then some { sid := sid, sender := p, receiver := q } else none
 
 /-- All edges in allEdges have the specified session ID. -/
-theorem allEdges_sid (sid : SessionId) (rs : RoleSet) :
+theorem all_edges_sid (sid : SessionId) (rs : RoleSet) :
     ∀ e ∈ allEdges sid rs, e.sid = sid := by
   intro e he
   simp only [allEdges, List.mem_flatMap, List.mem_filterMap] at he
@@ -174,7 +174,7 @@ theorem allEdges_sid (sid : SessionId) (rs : RoleSet) :
   · exact Option.noConfusion hite
 
 /-- Edges in allEdges have senders in the role set. -/
-theorem allEdges_sender_mem (sid : SessionId) (rs : RoleSet) :
+theorem all_edges_sender_mem (sid : SessionId) (rs : RoleSet) :
     ∀ e ∈ allEdges sid rs, e.sender ∈ rs := by
   -- Unpack the flatMap/filterMap witness and rewrite the sender.
   intro e he

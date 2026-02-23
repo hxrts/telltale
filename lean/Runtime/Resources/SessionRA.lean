@@ -31,7 +31,7 @@ def encodeEndpoint (e : Endpoint) : Positive :=
   [Iris.Countable.encode e.sid, Iris.Countable.encode e.role]
 
 /-- Decode is left inverse of encode. -/
-theorem encodeEndpoint_inj : Function.Injective encodeEndpoint := by
+theorem encode_endpoint_inj : Function.Injective encodeEndpoint := by
   intro ⟨sid1, role1⟩ ⟨sid2, role2⟩ h
   simp only [encodeEndpoint, List.cons.injEq, and_true] at h
   simp only [Iris.Countable.encode_inj h.1, Iris.Countable.encode_inj h.2]

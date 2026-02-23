@@ -25,7 +25,7 @@ def PayloadSort.toValType? : PayloadSort → Option ValType
       | some va, some vb => some (.prod va vb)
       | _, _ => none
 
-theorem PayloadSort.toValType?_ne_chan (s : PayloadSort) (sid : Nat) (r : String) :
+theorem PayloadSort.to_val_type?_ne_chan (s : PayloadSort) (sid : Nat) (r : String) :
     PayloadSort.toValType? s ≠ some (.chan sid r) := by
   induction s with
   | unit | nat | bool | string | real | vector _ =>

@@ -112,12 +112,12 @@ def protocolFosterInput
     step_agrees := rfl }
 
 /-- 3.9.1: call transported Foster-Lyapunov theorem on protocol instantiation. -/
-theorem protocol_transported_fosterLyapunov
+theorem protocol_transported_foster_lyapunov
     (step : FStep) (μ : ProgressMeasureComponents)
     (h : FosterLivenessAssumptions step μ)
     (hSide : ProtocolFosterSideConditions) :
     Classical.Transport.FosterConclusion (protocolFosterInput step μ h hSide) := by
-  exact Classical.Transport.transported_fosterLyapunov
+  exact Classical.Transport.transported_foster_lyapunov
     (input := protocolFosterInput step μ h hSide)
 
 /-! ## Foster Iterate Bound (R.7) -/
@@ -129,7 +129,7 @@ theorem r7_lyapunov_potential_integration
     (hSide : ProtocolFosterSideConditions) :
     ∀ st n, protocolV μ ((step^[n]) st) ≤ protocolV μ st := by
   intro st n
-  exact protocol_transported_fosterLyapunov step μ h hSide st n
+  exact protocol_transported_foster_lyapunov step μ h hSide st n
 
 /-! ## MaxWeight Instantiation -/
 
@@ -166,7 +166,7 @@ def mkProtocolMaxWeightInput {ι : Type} [Fintype ι]
     choice := protocolMaxWeightChoice (queueWeightsFromBuffers bufferOccupancy) sched hOptimal }
 
 /-- MaxWeight scheduling optimality for protocol queue weights. -/
-theorem protocol_maxWeight_optimality
+theorem protocol_max_weight_optimality
     {ι : Type} [Fintype ι]
     (bufferOccupancy : ι → Nat)
     (sched : ProtocolSchedule ι)
@@ -181,7 +181,7 @@ theorem protocol_maxWeight_optimality
   exact hOptimal ν
 
 /-- 3.9.2: instantiate `MaxWeightInput` and call transported theorem. -/
-theorem protocol_transported_maxWeight
+theorem protocol_transported_max_weight
     {ι : Type} [Fintype ι]
     (bufferOccupancy : ι → Nat)
     (sched : ProtocolSchedule ι)
@@ -191,7 +191,7 @@ theorem protocol_transported_maxWeight
           Classical.MaxWeightBackpressure.weight (queueWeightsFromBuffers bufferOccupancy) sched) :
     Classical.Transport.MaxWeightConclusion
       (mkProtocolMaxWeightInput bufferOccupancy sched hOptimal) := by
-  exact transport_maxWeight (mkProtocolMaxWeightInput bufferOccupancy sched hOptimal)
+  exact transport_max_weight (mkProtocolMaxWeightInput bufferOccupancy sched hOptimal)
 
 /-! ## Large-Deviation and Heavy-Traffic Instantiation -/
 
@@ -244,11 +244,11 @@ def mkProtocolHeavyTrafficInput
     n := n }
 
 /-- 3.9.4: variance scaling law in near-capacity operation. -/
-theorem protocol_heavyTraffic_variance_scaling
+theorem protocol_heavy_traffic_variance_scaling
     (arrivalRate serviceRate : Real) (n : Nat) :
     Classical.Transport.HeavyTrafficConclusion
       (mkProtocolHeavyTrafficInput arrivalRate serviceRate n) := by
-  exact transport_heavyTraffic (mkProtocolHeavyTrafficInput arrivalRate serviceRate n)
+  exact transport_heavy_traffic (mkProtocolHeavyTrafficInput arrivalRate serviceRate n)
 
 /-- Protocol-side constructor for the main-text LDP exemplar input. -/
 def mkProtocolLDPInput (p : Nat → Real)
@@ -256,7 +256,7 @@ def mkProtocolLDPInput (p : Nat → Real)
   { p := p, witness := w }
 
 /-- Main-text discharged exemplar (SLA tails) via transported LDP theorem. -/
-theorem mainText_ldp_sla_tail
+theorem main_text_ldp_sla_tail
     (p : Nat → Real)
     (w : Classical.LargeDeviationPrinciple.LDPWitness p) :
     ∀ n,

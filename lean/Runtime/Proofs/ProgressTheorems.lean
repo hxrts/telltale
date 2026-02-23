@@ -65,9 +65,9 @@ theorem vm_progress {store : SessionStore ν}
     EnabledInstruction store := by
   intro hFrontier
   have hSendReady : SendReady (SessionStore.toGEnv store) (SessionStore.toDEnv store) :=
-    sendReady_of_ProgressVMState hWF.progress
+    send_ready_of_progress_vm_state hWF.progress
   have hSelectReady : SelectReady (SessionStore.toGEnv store) (SessionStore.toDEnv store) :=
-    selectReady_of_ProgressVMState hWF.progress
+    select_ready_of_progress_vm_state hWF.progress
   rcases hFrontier with hSend | hRecv | hSelect | hBranch
   · rcases hSend with ⟨ep, target, T, L', hTy⟩
     left
@@ -157,7 +157,7 @@ theorem vm_termination_under_fairness {store₀ : SessionStore ν}
 
     This is the frame property for HeadCoherent: if an instruction only
     affects session s, HeadCoherent is preserved for all other sessions. -/
-theorem instr_preserves_HeadCoherent_other {store store' : SessionStore ν}
+theorem instr_preserves_head_coherent_other {store store' : SessionStore ν}
     {s : SessionId}
     (hWF : sessionStore_refines_envs store)
     (hWF' : sessionStore_refines_envs store')
@@ -187,22 +187,22 @@ theorem instr_preserves_HeadCoherent_other {store store' : SessionStore ν}
       lookupG (SessionStore.toGEnv store) senderEp := by
     calc
       lookupG (SessionStore.toGEnv store') senderEp
-          = SessionStore.lookupType store' senderEp := store_lookupType_eq_lookupG (hWF := hWF')
+          = SessionStore.lookupType store' senderEp := store_lookup_type_eq_lookup_g (hWF := hWF')
       _ = SessionStore.lookupType store senderEp := by
             symm
             exact hFrame senderEp (by simpa [senderEp] using hSidNe)
       _ = lookupG (SessionStore.toGEnv store) senderEp :=
-            (store_lookupType_eq_lookupG (hWF := hWF)).symm
+            (store_lookup_type_eq_lookup_g (hWF := hWF)).symm
   have hReceiverEq : lookupG (SessionStore.toGEnv store') receiverEp =
       lookupG (SessionStore.toGEnv store) receiverEp := by
     calc
       lookupG (SessionStore.toGEnv store') receiverEp
-          = SessionStore.lookupType store' receiverEp := store_lookupType_eq_lookupG (hWF := hWF')
+          = SessionStore.lookupType store' receiverEp := store_lookup_type_eq_lookup_g (hWF := hWF')
       _ = SessionStore.lookupType store receiverEp := by
             symm
             exact hFrame receiverEp (by simpa [receiverEp] using hSidNe)
       _ = lookupG (SessionStore.toGEnv store) receiverEp :=
-            (store_lookupType_eq_lookupG (hWF := hWF)).symm
+            (store_lookup_type_eq_lookup_g (hWF := hWF)).symm
 
   -- # Trace Lookup Equality
 
@@ -210,12 +210,12 @@ theorem instr_preserves_HeadCoherent_other {store store' : SessionStore ν}
       lookupD (SessionStore.toDEnv store) e := by
     calc
       lookupD (SessionStore.toDEnv store') e
-          = SessionStore.lookupTrace store' e := store_lookupTrace_eq_lookupD (hWF := hWF')
+          = SessionStore.lookupTrace store' e := store_lookup_trace_eq_lookup_d (hWF := hWF')
       _ = SessionStore.lookupTrace store e := by
             symm
             exact hFrameD e hSidNe
       _ = lookupD (SessionStore.toDEnv store) e :=
-            (store_lookupTrace_eq_lookupD (hWF := hWF)).symm
+            (store_lookup_trace_eq_lookup_d (hWF := hWF)).symm
 
   -- # ActiveEdge and HeadCoherent Transfer
 

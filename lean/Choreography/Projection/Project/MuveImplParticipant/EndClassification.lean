@@ -15,7 +15,7 @@ private def ClosedMuveRelSym : LocalTypeR → LocalTypeR → Prop := fun a b =>
   isMuve a = true ∧ isClosed a = true ∧ b = .end
 
 /-- Helper: ClosedMuveRelSym is a postfixpoint of EQ2F. -/
-private theorem ClosedMuveRelSym_postfix :
+private theorem closed_muve_rel_sym_postfix :
     ∀ a b, ClosedMuveRelSym a b → EQ2F ClosedMuveRelSym a b := by
   intro a b ⟨hmuve_a, hclosed_a, hb⟩
   -- The relation forces b = .end, then EQ2F reduces by cases on a.
@@ -41,10 +41,10 @@ private theorem part_of2_or_end_nonpart (role : String) (g : GlobalType) (lt : L
     (hpart : ¬ part_of2 role g) :
     EQ2 lt .end := by
   have hmuve : isMuve lt = true :=
-    CProject_muve_of_not_part_of2 g role lt hproj hpart hwf  -- use closed muve coinduction
-  have hclosed : isClosed lt = true := CProject_closed_of_not_part_of2 g role lt hproj hpart hwf
+    c_project_muve_of_not_part_of2 g role lt hproj hpart hwf  -- use closed muve coinduction
+  have hclosed : isClosed lt = true := c_project_closed_of_not_part_of2 g role lt hproj hpart hwf
   have hinR : ClosedMuveRelSym lt .end := ⟨hmuve, hclosed, rfl⟩
-  exact EQ2_coind ClosedMuveRelSym_postfix lt .end hinR
+  exact eq2_coind closed_muve_rel_sym_postfix lt .end hinR
 
 /-- Classification: either participates or projects to EEnd. -/
 theorem part_of2_or_end (role : String) (g : GlobalType) (lt : LocalTypeR)
@@ -54,7 +54,7 @@ theorem part_of2_or_end (role : String) (g : GlobalType) (lt : LocalTypeR)
   -- Case split on participation.
   by_cases hpart : part_of2 role g
   · left
-    exact CProject_part_of2_implies_part_of_all2 g role lt hproj hpart hwf
+    exact c_project_part_of2_implies_part_of_all2 g role lt hproj hpart hwf
   · right
     exact part_of2_or_end_nonpart role g lt hproj hwf hpart
 

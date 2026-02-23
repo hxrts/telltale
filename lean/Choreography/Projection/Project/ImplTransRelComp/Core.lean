@@ -27,14 +27,14 @@ open Paco
 open SessionTypes.Participation
 
 /-- Local copy of BranchesRel_mono (since the original is private in EQ2.lean). -/
-theorem BranchesRel_mono {R S : Rel}
+theorem branches_rel_mono {R S : Rel}
     (h : ∀ a b, R a b → S a b) :
     ∀ {bs cs}, BranchesRel R bs cs → BranchesRel S bs cs := by
   intro bs cs hrel
   exact List.Forall₂.imp (fun a b hab => ⟨hab.1, h _ _ hab.2⟩) hrel
 
 /-- Monotonicity of EQ2F over relations. -/
-theorem EQ2F_mono {R S : Rel}
+theorem eq2_f_mono {R S : Rel}
     (h : ∀ a b, R a b → S a b) :
     ∀ {a b}, EQ2F R a b → EQ2F S a b := by
   intro a b hrel
@@ -47,7 +47,7 @@ theorem EQ2F_mono {R S : Rel}
       | intro h1 h2 =>
         first
         | exact ⟨h _ _ h1, h _ _ h2⟩
-        | exact ⟨h1, BranchesRel_mono h h2⟩
+        | exact ⟨h1, branches_rel_mono h h2⟩
 
 /- NOTE: EQ2 transitivity is used with explicit LocalTypeR.WellFormed witnesses. -/
 
@@ -61,7 +61,7 @@ theorem wf_tail_of_cons
   intro lb' hmem
   exact hwf lb' (by simp [hmem])
 
-private theorem BranchesRel_trans_chain_head {R : Rel}
+private theorem branches_rel_trans_chain_head {R : Rel}
     (hextend : ∀ a b c, R a b → EQ2 b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
     {lb_bs lb_cs lb_ds : BranchR}
@@ -76,9 +76,9 @@ private theorem BranchesRel_trans_chain_head {R : Rel}
   · exact h1.1.trans h2.1
   · cases h1.2 with
     | inl hr => exact Or.inl (hextend _ _ _ hr h2.2 hWFa hWFb hWFc)
-    | inr heq => exact Or.inr (EQ2_trans_wf heq h2.2 hWFa hWFb hWFc)
+    | inr heq => exact Or.inr (eq2_trans_wf heq h2.2 hWFa hWFb hWFc)
 
-theorem BranchesRel_trans_chain_rev_head {R : Rel}
+theorem branches_rel_trans_chain_rev_head {R : Rel}
     (hextend : ∀ a b c, EQ2 a b → R b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
     {lb_bs lb_cs lb_ds : BranchR}
@@ -93,7 +93,7 @@ theorem BranchesRel_trans_chain_rev_head {R : Rel}
   · exact h1.1.trans h2.1
   · cases h2.2 with
     | inl hr => exact Or.inl (hextend _ _ _ h1.2 hr hWFa hWFb hWFc)
-    | inr heq => exact Or.inr (EQ2_trans_wf h1.2 heq hWFa hWFb hWFc)
+    | inr heq => exact Or.inr (eq2_trans_wf h1.2 heq hWFa hWFb hWFc)
 
 /-! ## Branch Relation Chaining -/
 
@@ -103,7 +103,7 @@ theorem BranchesRel_trans_chain_rev_head {R : Rel}
 
     Requires an extension hypothesis: R can be extended with EQ2 at the right
     to produce another R. This is satisfied by CProjectTransRelComp. -/
-theorem BranchesRel_trans_chain {R : Rel}
+theorem branches_rel_trans_chain {R : Rel}
     (hextend : ∀ a b c, R a b → EQ2 b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
     {bs cs ds : List BranchR}
@@ -122,7 +122,7 @@ theorem BranchesRel_trans_chain {R : Rel}
           cases hcd with
           | cons h2 hcd_tail =>
               constructor
-              · exact BranchesRel_trans_chain_head hextend h1 h2
+              · exact branches_rel_trans_chain_head hextend h1 h2
                   (hwf_bs lb_bs (by simp)) (hwf_cs lb_cs (by simp)) (hwf_ds lb_ds (by simp))
               · exact ih hcd_tail (wf_tail_of_cons hwf_bs)
                   (wf_tail_of_cons hwf_cs) (wf_tail_of_cons hwf_ds)
@@ -136,7 +136,7 @@ def CProjectTransRel : Rel := fun lt t =>
   ∃ g role, CProject g role lt ∧ t = trans g role ∧ g.wellFormed = true
 
 /-- CProject preserves well-formedness under well-formed globals. -/
-theorem CProject_wellFormed_of_wellFormed {g : GlobalType} {role : String} {lt : LocalTypeR}
+theorem c_project_well_formed_of_well_formed {g : GlobalType} {role : String} {lt : LocalTypeR}
     (hproj : CProject g role lt) (hwf : g.wellFormed = true) :
     LocalTypeR.WellFormed lt := by
   have hne : g.allCommsNonEmpty = true := by
@@ -148,13 +148,13 @@ theorem CProject_wellFormed_of_wellFormed {g : GlobalType} {role : String} {lt :
   simpa [htrans] using hWFtrans
 
 /-- Left endpoint of CProjectTransRel is well-formed. -/
-theorem CProjectTransRel_wf_left {a b : LocalTypeR} (h : CProjectTransRel a b) :
+theorem c_project_trans_rel_wf_left {a b : LocalTypeR} (h : CProjectTransRel a b) :
     LocalTypeR.WellFormed a := by
   rcases h with ⟨g, role, hproj, _htrans, hwf⟩
-  exact CProject_wellFormed_of_wellFormed (g := g) (role := role) (lt := a) hproj hwf
+  exact c_project_well_formed_of_well_formed (g := g) (role := role) (lt := a) hproj hwf
 
 /-- Right endpoint of CProjectTransRel is well-formed. -/
-theorem CProjectTransRel_wf_right {a b : LocalTypeR} (h : CProjectTransRel a b) :
+theorem c_project_trans_rel_wf_right {a b : LocalTypeR} (h : CProjectTransRel a b) :
     LocalTypeR.WellFormed b := by
   rcases h with ⟨g, role, _hproj, htrans, hwf⟩
   have hWF := trans_wellFormed_of_wellFormed g role hwf
@@ -181,16 +181,16 @@ def CProjectTransRelCompWF : Rel := fun a c =>
   CProjectTransRelComp a c ∧ LocalTypeR.WellFormed a ∧ LocalTypeR.WellFormed c
 
 /-- Lift a base CProjectTransRel witness into the well-formed composition wrapper. -/
-theorem CProjectTransRelCompWF_of_CProjectTransRel {a c : LocalTypeR}
+theorem c_project_trans_rel_comp_wf_of_c_project_trans_rel {a c : LocalTypeR}
     (h : CProjectTransRel a c) : CProjectTransRelCompWF a c := by
   -- Lift a base CProjectTransRel witness into the well-formed composition wrapper.
-  have hWFa : LocalTypeR.WellFormed a := CProjectTransRel_wf_left h
-  have hWFc : LocalTypeR.WellFormed c := CProjectTransRel_wf_right h
+  have hWFa : LocalTypeR.WellFormed a := c_project_trans_rel_wf_left h
+  have hWFc : LocalTypeR.WellFormed c := c_project_trans_rel_wf_right h
   exact ⟨Or.inl h, hWFa, hWFc⟩
 
 /-! ## Branch Projection Lift to CProjectTransRel -/
 
-private theorem allCommsNonEmpty_of_mem_branch
+private theorem all_comms_non_empty_of_mem_branch
     (gbs : List (Label × GlobalType)) (label : Label) (cont : GlobalType)
     (hmem : (label, cont) ∈ gbs)
     (hwf : allCommsNonEmptyBranches gbs = true) :
@@ -205,7 +205,7 @@ private theorem allCommsNonEmpty_of_mem_branch
 
 /- Helper: BranchesProjRel implies transBranches produces branch-wise related pairs.
     Requires wellFormedness of branch continuations to build CProjectTransRel witnesses. -/
-theorem branchesProjRel_to_branchesRel_CProjectTransRel
+theorem branches_proj_rel_to_branches_rel_c_project_trans_rel
     (gbs : List (Label × GlobalType)) (role : String)
     (lbs : List BranchR)
     (h : BranchesProjRel CProject gbs role lbs) (hwf : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true) :
@@ -234,7 +234,7 @@ theorem branchesProjRel_to_branchesRel_CProjectTransRel
             exact ih hwf_tail
 /-! ## Postfix Base Constructors -/
 
-theorem CProjectTransRel_postfix_mu_closure
+theorem c_project_trans_rel_postfix_mu_closure
     {v : String} {lbody t' : LocalTypeR}
     (hmu_rel : CProjectTransRel (LocalTypeR.mu v lbody) (LocalTypeR.mu v t')) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.mu v lbody) (LocalTypeR.mu v t') := by
@@ -252,7 +252,7 @@ theorem CProjectTransRel_postfix_mu_closure
   · left; right; right; left
     exact ⟨LocalTypeR.mu v t', hmu_rel, heq_unfold_right⟩
 
-theorem CProjectTransRel_postfix_end
+theorem c_project_trans_rel_postfix_end
     {role : String} {t : LocalTypeR}
     (htrans : t = trans GlobalType.end role) :
     EQ2F (EQ2_closure CProjectTransRelComp) LocalTypeR.end t := by
@@ -260,7 +260,7 @@ theorem CProjectTransRel_postfix_end
   subst htrans
   simp [trans, EQ2F]
 
-theorem CProjectTransRel_postfix_var
+theorem c_project_trans_rel_postfix_var
     {vt vlt : String} {role : String} {t : LocalTypeR}
     (hf : CProjectF CProject (GlobalType.var vt) role (LocalTypeR.var vlt))
     (htrans : t = trans (GlobalType.var vt) role) :
@@ -273,7 +273,7 @@ theorem CProjectTransRel_postfix_var
 /-! ## Postfix Mu Constructors -/
 
 /-- Helper: guarded mu/mu case for CProjectTransRel_postfix_mu_mu. -/
-private theorem CProjectTransRel_postfix_mu_mu_guarded
+private theorem c_project_trans_rel_postfix_mu_mu_guarded
     {muvar : String} {gbody : GlobalType} {lbody t : LocalTypeR} {role : String}
     (hbody_proj : CProject gbody role lbody)
     (hguard : lbody.isGuarded muvar = true)
@@ -299,9 +299,9 @@ private theorem CProjectTransRel_postfix_mu_mu_guarded
       CProject_mu muvar gbody lbody role hguard hbody_proj
     exact ⟨GlobalType.mu muvar gbody, role, hmu_proj, htrans_mu.symm, hwf⟩
   subst htrans
-  simpa [htrans_mu] using CProjectTransRel_postfix_mu_closure hmu_rel
+  simpa [htrans_mu] using c_project_trans_rel_postfix_mu_closure hmu_rel
 
-theorem CProjectTransRel_postfix_mu_mu
+theorem c_project_trans_rel_postfix_mu_mu
     {muvar ltvar : String} {gbody : GlobalType} {lbody t : LocalTypeR} {role : String}
     (hproj : CProject (GlobalType.mu muvar gbody) role (LocalTypeR.mu ltvar lbody))
     (htrans : t = trans (GlobalType.mu muvar gbody) role)
@@ -315,14 +315,14 @@ theorem CProjectTransRel_postfix_mu_mu
   rcases hcase with ⟨hguard, hmu_eq⟩ | ⟨_hguard, hend_eq⟩
   · -- Guarded case: rewrite lbody and defer to the helper.
     cases hmu_eq
-    exact CProjectTransRel_postfix_mu_mu_guarded hbody_proj hguard htrans hwf hne
+    exact c_project_trans_rel_postfix_mu_mu_guarded hbody_proj hguard htrans hwf hne
   · -- Unguarded case contradicts the mu candidate.
     have : False := by simpa using hend_eq
     exact this.elim
 
 /-! ## Postfix Case Dispatchers -/
 
-theorem CProjectTransRel_postfix_mu_end
+theorem c_project_trans_rel_postfix_mu_end
     {muvar : String} {gbody : GlobalType} {t : LocalTypeR} {role : String}
     (_hproj : CProject (GlobalType.mu muvar gbody) role LocalTypeR.end)
     (htrans : t = trans (GlobalType.mu muvar gbody) role)

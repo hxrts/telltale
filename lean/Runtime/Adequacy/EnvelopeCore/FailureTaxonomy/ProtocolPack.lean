@@ -15,7 +15,7 @@ universe u v
 /-! ## Premise Projection Theorems I -/
 
 /-- Extract cross-target failure-envelope conformance theorem from failure premises. -/
-theorem crossTargetFailureConformance_of_failurePremises
+theorem cross_target_failure_conformance_of_failure_premises
     {State : Type u} {Obs : Type v}
     (p : FailureEnvelopePremises State Obs) :
     CrossTargetFailureConformance
@@ -23,28 +23,28 @@ theorem crossTargetFailureConformance_of_failurePremises
   p.crossTargetConformanceWitness
 
 /-- Extract abstract recovery-action safety theorem from failure premises. -/
-theorem recoveryActionSafety_of_failurePremises
+theorem recovery_action_safety_of_failure_premises
     {State : Type u} {Obs : Type v}
     (p : FailureEnvelopePremises State Obs) :
     RecoveryActionSafety p.Safe p.recoveryStep :=
   p.recoveryActionSafetyWitness
 
 /-- Extract abstract no-harmful-replay theorem from failure premises. -/
-theorem noUnsafeReplay_of_failurePremises
+theorem no_unsafe_replay_of_failure_premises
     {State : Type u} {Obs : Type v}
     (p : FailureEnvelopePremises State Obs) :
     NoUnsafeReplay p.Safe p.replayPre p.replay :=
   p.noUnsafeReplayWitness
 
 /-- Extract checkpoint-restart refinement theorem from failure premises. -/
-theorem checkpointRestartRefinement_of_failurePremises
+theorem checkpoint_restart_refinement_of_failure_premises
     {State : Type u} {Obs : Type v}
     (p : FailureEnvelopePremises State Obs) :
     CheckpointRestartRefinement p.Refines p.checkpoint p.restart :=
   p.checkpointRestartRefinementWitness
 
 /-- Extract restart-refinement + structured-error adequacy from failure premises. -/
-theorem restartStructuredErrorAdequacy_of_failurePremises
+theorem restart_structured_error_adequacy_of_failure_premises
     {State : Type u} {Obs : Type v}
     (p : FailureEnvelopePremises State Obs) :
     RestartRefinementStructuredErrorAdequacy
@@ -54,7 +54,7 @@ theorem restartStructuredErrorAdequacy_of_failurePremises
 /-! ## Premise Projection Theorems II -/
 
 /-- Extract failure-envelope soundness extension theorem from failure premises. -/
-theorem failureEnvelopeSoundness_of_failurePremises
+theorem failure_envelope_soundness_of_failure_premises
     {State : Type u} {Obs : Type v}
     (p : FailureEnvelopePremises State Obs) :
     FailureEnvelopeSoundnessExtension
@@ -62,7 +62,7 @@ theorem failureEnvelopeSoundness_of_failurePremises
   p.failureEnvelopeSoundnessWitness
 
 /-- Extract failure-envelope maximality extension theorem from failure premises. -/
-theorem failureEnvelopeMaximality_of_failurePremises
+theorem failure_envelope_maximality_of_failure_premises
     {State : Type u} {Obs : Type v}
     (p : FailureEnvelopePremises State Obs) :
     FailureEnvelopeMaximalityExtension
@@ -82,29 +82,29 @@ structure FailureEnvelopeProtocol where
       premises.singleThreadRun
       premises.multiThreadRun
       premises.shardedRun :=
-      crossTargetFailureConformance_of_failurePremises premises
+      cross_target_failure_conformance_of_failure_premises premises
   recoveryActionSafety :
     RecoveryActionSafety premises.Safe premises.recoveryStep :=
-      recoveryActionSafety_of_failurePremises premises
+      recovery_action_safety_of_failure_premises premises
   noUnsafeReplay :
     NoUnsafeReplay premises.Safe premises.replayPre premises.replay :=
-      noUnsafeReplay_of_failurePremises premises
+      no_unsafe_replay_of_failure_premises premises
   checkpointRestartRefinement :
     CheckpointRestartRefinement
       premises.Refines premises.checkpoint premises.restart :=
-      checkpointRestartRefinement_of_failurePremises premises
+      checkpoint_restart_refinement_of_failure_premises premises
   restartStructuredErrorAdequacy :
     RestartRefinementStructuredErrorAdequacy
       premises.Refines premises.checkpoint premises.restart premises.structuredErrors :=
-      restartStructuredErrorAdequacy_of_failurePremises premises
+      restart_structured_error_adequacy_of_failure_premises premises
   failureEnvelopeSoundness :
     FailureEnvelopeSoundnessExtension
       premises.localEnvelope premises.RefRun premises.ImplRun premises.injectFailure :=
-      failureEnvelopeSoundness_of_failurePremises premises
+      failure_envelope_soundness_of_failure_premises premises
   failureEnvelopeMaximality :
     FailureEnvelopeMaximalityExtension
       premises.localEnvelope premises.RefRun premises.ImplRun premises.injectFailure :=
-      failureEnvelopeMaximality_of_failurePremises premises
+      failure_envelope_maximality_of_failure_premises premises
 
 
 

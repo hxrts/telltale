@@ -17,7 +17,7 @@ The following definitions form the semantic interface for proofs:
 - `projectbAllBranches`: single candidate check for non-participants
 - `CProjectF`: one-step generator for coinductive projection
 - `CProject`: coinductive projection relation (greatest fixed point of CProjectF)
-- `CProject_coind`: coinduction principle for CProject
+- `c_project_coind`: coinduction principle for CProject
 - `BranchesProjRel`: branch-wise projection for send/recv
 - `AllBranchesProj`: all branches project to same candidate
 - `projectb_end_end`: reflection lemma for end-end

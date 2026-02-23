@@ -21,14 +21,14 @@ open scoped Classical
 
 section
 
-theorem DisjointS_of_subset_right {S₁ S₂ S₂' : SEnv} :
+theorem disjoint_s_of_subset_right {S₁ S₂ S₂' : SEnv} :
     SEnvSubset S₂' S₂ →
     DisjointS S₁ S₂ →
     DisjointS S₁ S₂' := by
   intro hSub hDisj x T₁ T₂ hL1 hL2
   exact hDisj x T₁ T₂ hL1 (hSub hL2)
 
-theorem DisjointS_of_domsubset_right {S₁ S₂ S₂' : SEnv} :
+theorem disjoint_s_of_domsubset_right {S₁ S₂ S₂' : SEnv} :
     SEnvDomSubset S₂' S₂ →
     DisjointS S₁ S₂ →
     DisjointS S₁ S₂' := by
