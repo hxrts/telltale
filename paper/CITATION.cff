@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this paper supplement, cite the relevant paper(s) below."
+title: "Telltale MPST Paper Supplement"
+type: dataset
+authors:
+  - family-names: Berman
+    given-names: Sam Hart
+    email: sam@hxrts.com
+repository-code: "https://github.com/hxrts/telltale"
+license: MIT
+abstract: >-
+  Reproducibility supplement for the three-paper asynchronous buffered MPST series:
+  Coherence, Computable Dynamics, and Harmony.
+keywords:
+  - multiparty session types
+  - asynchronous semantics
+  - mechanized metatheory
+  - Lean
+identifiers:
+  - type: doi
+    value: DOI-UNSET
+    description: Set to the minted archival supplement DOI before submission.
+references:
+  - type: article
+    title: "Coherence for Asynchronous Buffered MPST"
+    year: 2026
+  - type: article
+    title: "Computable Dynamics for Asynchronous MPST"
+    year: 2026
+  - type: article
+    title: "Harmony from Coherence in Asynchronous MPST"
+    year: 2026

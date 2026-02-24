@@ -1272,8 +1272,11 @@ liveness or eventual delivery.
 \section{Reproducibility}
 \label{app:reproducibility}
 
-Reproduction uses the repository-pinned Lean toolchain and manifest.
-The Lean statistics row is generated from \texttt{bash paper/lean\_stats.sh --latex-row}.
+Reproduction workflow and expected outputs are documented in
+\texttt{ARTIFACT.md}. The one-command supplement check is
+\texttt{just artifact-check}. Pinned-commit, DOI, and Lean-statistics rows are
+synchronized via
+\texttt{bash scripts/paper\_repro\_rows.sh --sync paper/paper1.tex paper/paper2.tex paper/paper3.tex}.
 
 \begin{table}[H]
 	\centering
@@ -1283,8 +1286,8 @@ The Lean statistics row is generated from \texttt{bash paper/lean\_stats.sh --la
 		\thead{Artifact Field} & \thead{Value} \\
 		\midrule
 		Repository & \url{https://github.com/hxrts/telltale} \\
-		Pinned commit & \texttt{c3a6eec66380d8fe}\allowbreak\texttt{d287219af4f1baea}\allowbreak\texttt{d669ebb1} \\
-		Archival DOI & \texttt{DOI pending artifact snapshot minting (replace before submission)} \\
+		Pinned commit & \texttt{557ffa07300ab088}\allowbreak\texttt{005b68516b8c9475}\allowbreak\texttt{f9cc9625} \\
+		Archival DOI & \texttt{DOI-UNSET} \\
 		Lean source statistics & 1299 files, 205754 LOC, axioms: 0, unresolved proof holes (\texttt{sorry}): 0 \\
 		\bottomrule
 	\end{tabularx}
@@ -1292,10 +1295,8 @@ The Lean statistics row is generated from \texttt{bash paper/lean\_stats.sh --la
 \end{table}
 
 \begin{enumerate}
-	\item Build paper modules via \texttt{lake build}.
-	\item Run project checks \texttt{just escape} and \texttt{just verify-protocols}.
-	\item Run pre-submit drift check: \texttt{bash paper/lean\_stats.sh --check paper/paper1.tex paper/paper2.tex paper/paper3.tex}.
-	\item Confirm theorem anchors resolve in the built environment.
+	\item Run \texttt{just artifact-check}. This runs reproducibility row checks, \texttt{just escape}, \texttt{just verify-protocols}, paper builds, and manifest generation.
+	\item Before camera-ready submission, set DOI in \texttt{paper/artifact\_metadata.env} and run \texttt{just paper-repro-check-strict}.
 \end{enumerate}
 
 \clearpage

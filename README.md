@@ -4,6 +4,10 @@ Telltale is a framework for choreographic programming with multiparty session ty
 
 The Rust implementation provides a DSL, compiler, effect handler system, and transport abstraction. A parallel Lean 4 formalization verifies projection correctness, proves safety properties (subject reduction, deadlock freedom, determinism), and models an Iris-backed session-type VM with resource algebras and separation logic.
 
+## For Reviewers
+
+Run `just artifact-check`, then inspect `paper/artifact_manifest.json` for commit/toolchain/hash provenance.
+
 ## Example
 
 ```rust

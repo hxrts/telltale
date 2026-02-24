@@ -518,7 +518,9 @@ Central invariant replacing traditional duality for multiparty async settings.
 |------|-------|-------------|
 | Preservation.lean | 1,933 | `preservation_typed`, `progress_*`, `subject_reduction` |
 | Determinism.lean | 359 | `stepBase_det`, `diamond_independent`, `session_isolation` |
-| DeadlockFreedom.lean | 632 | `Guarded`, `ReachesComm`, `deadlock_free`, `not_stuck` |
+| DeadlockFreedom.lean | 7 | Re-export wrapper for DeadlockFreedomCore and DeadlockFreedomReachability |
+| DeadlockFreedomCore.lean | 291 | `Guarded`, `ReachesComm`, core deadlock freedom definitions |
+| DeadlockFreedomReachability.lean | 380 | `deadlock_free`, `not_stuck`, reachability-based proofs |
 
 ### Runtime Monitoring
 
@@ -539,14 +541,21 @@ Central invariant replacing traditional duality for multiparty async settings.
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Spatial.lean | 515 | `SpatialReq`, `Topology`, `Satisfies`, `spatial_le_sound`, `ConfusabilityGraph`, branching feasibility |
-| Symmetry.lean | 863 | Symmetry properties, role-symmetric protocols, symmetry-preserving operations |
+| Spatial.lean | 7 | Re-export wrapper for SpatialCore and SpatialBranching |
+| SpatialCore.lean | 351 | `SpatialReq`, `Topology`, `Satisfies`, `spatial_le_sound` |
+| SpatialBranching.lean | 306 | `ConfusabilityGraph`, branching feasibility |
+| Symmetry.lean | 8 | Re-export wrapper for Symmetry* modules |
+| SymmetryCore.lean | 216 | Core symmetry properties and role-symmetric protocols |
+| SymmetryConsumeRenaming.lean | 451 | Consume renaming under role bijections |
+| SymmetryInverseStep.lean | 265 | Symmetry-preserving step operations |
 | BufferBoundedness.lean | 1,217 | Buffer boundedness analysis, depth bounds, capacity constraints |
 | Simulation.lean | 540 | `stepDecide`, `runSteps`, `traceSteps`, soundness/completeness |
 | Decidability.lean | 108 | DecidableEq instances |
 | Examples.lean | 19 | Protocol examples (stubbed) |
 | CrashTolerance.lean | 225 | `CommGraph`, `CrashTolerant`, `Critical`, crash tolerance predicates |
-| Noninterference.lean | 552 | `CEquiv`, `BlindTo`, `blind_step_preserves_CEquiv` noninterference theorem |
+| Noninterference.lean | 8 | Re-export wrapper for Noninterference* modules |
+| NoninterferenceCore.lean | 471 | `CEquiv`, `BlindTo`, core noninterference definitions |
+| NoninterferenceExtensions.lean | 178 | `blind_step_preserves_CEquiv` and extended noninterference proofs |
 | DeliveryModel.lean | 214 | `DeliveryModel` typeclass, FIFO/causal/lossy instances |
 | CoherenceM.lean | 15 | Model-parametric coherence re-export wrapper |
 | InformationCost.lean | 1050 | `ProjectionMap`, entropy, mutual information, blind projection |
@@ -572,11 +581,15 @@ Protocol-specific instantiation of the classical transport framework.
 
 ### Iris Bridge (iris-lean integration)
 
-Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` keys with encoding. Contains 10 axioms for WP/invariant rules.
+Consolidated interface to iris-lean separation logic via the Entropy trust boundary layer. Ghost maps use `Positive` keys with encoding.
 
 | File | Lines | Description |
 |------|------:|-------------|
-| IrisBridge.lean | 545 | `TelltaleIris` typeclass, iProp, sep logic connectives, ghost_map/ghost_var, invariants, WP rules |
+| IrisExtractionAPI.lean | 173 | Pure API: `TelltaleIris` parameter bundle, iProp, GhostName, Mask, Namespace typeclasses |
+| IrisExtractionInstance/Core.lean | 427 | Core iris-lean integration with WP rules |
+| IrisExtractionInstance/GhostAndProgramLogic.lean | 230 | Ghost state and program logic wiring |
+
+See [Entropy](#entropy) section for full trust boundary documentation.
 
 ### VM Model (VM/Model/)
 
@@ -605,7 +618,7 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 | ExecOwnership.lean | 162 | Ownership transfer and capability operations |
 | ExecControl.lean | 103 | Control flow (jump, call, return, halt) |
 | ExecGuardEffect.lean | 111 | Guard chain evaluation and effect dispatch |
-| ExecSpeculation.lean | 66 | V2: Speculative execution semantics (fork/join/abort with checkpoint store) |
+| ExecSpeculation.lean | 197 | V2: Speculative execution semantics (fork/join/abort with checkpoint store) |
 | ExecSteps.lean | 54 | Multi-step execution wrapper |
 | InstrSpec.lean | 324 | Denotational specs for 8 instruction types |
 
@@ -618,9 +631,9 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 |------|------:|-------------|
 | Loader.lean | 234 | Dynamic choreography loading into running VM state (result-typed admission + compatibility API) |
 | Runner.lean | 104 | N-concurrent scheduler-driven execution loop |
-| ThreadedRunner.lean | ~200 | V2: Deterministic threaded execution with wave planning |
+| ThreadedRunner.lean | 445 | V2: Deterministic threaded execution with wave planning |
 | Scheduler.lean | 294 | Process scheduler with fairness and priority |
-| SchedulerHelpers.lean | ~150 | Shared scheduler utility functions |
+| SchedulerHelpers.lean | 386 | Shared scheduler utility functions |
 | Monitor.lean | 181 | SessionKind, WellTypedInstr judgment, unified session monitor (executable monitor only) |
 | Failure.lean | 40 | Failure runtime facade (executable symbols only) |
 | Failure/Core.lean | 418 | Failure modes (crash/partition/heal/corrupt/timeout), ingress updates, deterministic recovery actions |
@@ -679,80 +692,88 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | Proofs/VM/Failure.lean | 53 | Retry/deterministic recovery lemmas moved from failure runtime modules |
 | Proofs/VM/FailurePredicates.lean | 135 | Recovery predicate vocabulary (proof-only) moved from VM failure runtime |
 | Proofs/VM/ProgramWitnesses.lean | 21 | Proof-only verified image witnesses moved from `Runtime.VM.Model.Program` |
-| Proofs/VM/Speculation.lean | ~200 | V2: Speculation correctness (depth monotonicity, abort restore, join cleanup) |
-| Proofs/VM/InstrSpec/ConfigEquivSendRecv.lean | ~150 | V2: Send/recv configuration equivalence |
-| Proofs/VM/InstrSpec/ConfigEquivSelectBranch.lean | ~150 | V2: Select/branch configuration equivalence |
-| Proofs/VM/InstrSpec/ConfigEquivAcquire.lean | ~100 | V2: Acquire configuration equivalence |
-| Proofs/VM/InstrSpec/ConfigEquivOpenCloseTransfer.lean | ~200 | V2: Open/close/transfer configuration equivalence |
-| Proofs/VM/InstrSpec/ErasureExactness.lean | ~150 | V2: Erasure exactness proofs |
-| Proofs/VM/InstrSpec/Preservation.lean | ~200 | V2: Instruction preservation proofs |
+| Proofs/VM/Speculation.lean | 84 | V2: Speculation correctness (depth monotonicity, abort restore, join cleanup) |
+| Proofs/VM/InstrSpec/ConfigEquivSendRecv.lean | 338 | V2: Send/recv configuration equivalence |
+| Proofs/VM/InstrSpec/ConfigEquivSelectBranch.lean | 341 | V2: Select/branch configuration equivalence |
+| Proofs/VM/InstrSpec/ConfigEquivAcquire.lean | 240 | V2: Acquire configuration equivalence |
+| Proofs/VM/InstrSpec/ConfigEquivOpenCloseTransfer.lean | 493 | V2: Open/close/transfer configuration equivalence |
+| Proofs/VM/InstrSpec/ErasureExactness.lean | 357 | V2: Erasure exactness proofs |
+| Proofs/VM/InstrSpec/Preservation.lean | 290 | V2: Instruction preservation proofs |
 
 ### Adequacy (V2 Envelope-Based)
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Adequacy/Adequacy.lean | 168 | Adequacy theorem connecting WP to execution |
-| Adequacy/CompileRefinesEffectBisim.lean | ~100 | Compilation refinement via effect bisimulation |
-| Adequacy/EnvelopeCore.lean | ~50 | V2: Envelope core re-exports |
-| Adequacy/EnvelopeCore/CoreFoundations.lean | ~200 | V2: Core envelope definitions and axioms |
-| Adequacy/EnvelopeCore/AdmissionLogic.lean | ~150 | V2: Runtime admission checks and capability gates |
-| Adequacy/EnvelopeCore/VMAdherence.lean | ~200 | V2: VM adherence proofs for determinism envelope |
-| Adequacy/EnvelopeCore/ReconfigurationBridge.lean | ~150 | V2: Reconfiguration integration with coherence |
-| Adequacy/EnvelopeCore/FailureTaxonomy.lean | ~100 | V2: Failure taxonomy re-exports |
-| Adequacy/EnvelopeCore/FailureTaxonomy/Core.lean | ~150 | V2: Core failure classification |
-| Adequacy/EnvelopeCore/FailureTaxonomy/ProtocolPack.lean | ~100 | V2: Protocol-specific failure handling |
+| Adequacy/Adequacy.lean | 297 | Adequacy theorem connecting WP to execution |
+| Adequacy/CompileRefinesEffectBisim.lean | 39 | Compilation refinement via effect bisimulation |
+| Adequacy/EnvelopeCore.lean | 54 | V2: Envelope core re-exports |
+| Adequacy/EnvelopeCore/CoreFoundations.lean | 267 | V2: Core envelope definitions and axioms |
+| Adequacy/EnvelopeCore/AdmissionLogic.lean | 379 | V2: Runtime admission checks and capability gates |
+| Adequacy/EnvelopeCore/VMAdherence.lean | 314 | V2: VM adherence proofs for determinism envelope |
+| Adequacy/EnvelopeCore/ReconfigurationBridge.lean | 499 | V2: Reconfiguration integration with coherence |
+| Adequacy/EnvelopeCore/FailureTaxonomy.lean | 7 | V2: Failure taxonomy re-exports |
+| Adequacy/EnvelopeCore/FailureTaxonomy/Core.lean | 451 | V2: Core failure classification |
+| Adequacy/EnvelopeCore/FailureTaxonomy/ProtocolPack.lean | 112 | V2: Protocol-specific failure handling |
 
 ### Proofs
 | Proofs/Contracts/RuntimeTheorems.lean | 493 | Runtime theorem facade unifying proof exports |
 | Proofs/Contracts/DeterminismApi.lean | 105 | Determinism profile artifacts and hypothesis bundles for runtime gating |
 | Proofs/Contracts/RuntimeContracts.lean | 274 | Runtime admission/capability contract surfaces for theorem-guided VM policy |
 | Proofs/Concurrency.lean | 109 | Iris-backed N-invariance and policy-invariance proofs |
-| Proofs/ConcurrencyThreaded.lean | ~200 | V2: Threaded concurrency proofs with wave certification |
-| Proofs/SchedulerTheoremPack.lean | ~150 | V2: Scheduler theorem bundle for runtime admission |
+| Proofs/ConcurrencyThreaded.lean | 102 | V2: Threaded concurrency proofs with wave certification |
+| Proofs/SchedulerTheoremPack.lean | 200 | V2: Scheduler theorem bundle for runtime admission |
+| Proofs/SchedulerApi.lean | 257 | Scheduler API surface for runtime admission |
 | Proofs/CompileLocalTypeRCorrectness.lean | 53 | Compiler correctness stubs (nonempty, ends with halt/jmp) |
 | Proofs/SessionLocal.lean | 337 | `SessionSlice`, `SessionCoherent`, session-local frame infrastructure |
 | Proofs/Frame.lean | 128 | `session_local_op_preserves_other`, `disjoint_ops_preserve_unrelated` |
 | Proofs/Delegation.lean | 6 | Re-export wrapper importing `Protocol.Coherence.Delegation` |
-| Proofs/Progress.lean | 607 | `CoherentVMState`, `ProgressVMState`, `vm_progress`, instruction enablement |
-| Proofs/ProgressApi.lean | 181 | Bundle-oriented liveness API and optional progress hypothesis surface |
+| Proofs/Progress.lean | 7 | Re-export wrapper for Progress* modules |
+| Proofs/ProgressCore.lean | 395 | `CoherentVMState`, `ProgressVMState`, core progress definitions |
+| Proofs/ProgressTheorems.lean | 233 | `vm_progress`, instruction enablement theorems |
+| Proofs/ProgressApi.lean | 185 | Bundle-oriented liveness API and optional progress hypothesis surface |
+| Proofs/ObserverProjection.lean | 206 | Observer projection for trace equivalence |
+| Proofs/ObserverProjectionEffectBisim.lean | 107 | Effect bisimulation for observer projection |
+| Proofs/HandlerEquivalence.lean | 145 | Handler equivalence proofs |
 | Proofs/InvariantSpace.lean | 61 | Proof-carrying invariant-space bundle for VM theorem derivation |
 | Proofs/Adapters/Progress.lean | 50 | Invariant-space adapters for liveness/progress theorems |
 | Proofs/Adapters/Classical.lean | 416 | Invariant-space adapters for classical transport profiles and artifacts |
-| Proofs/Adapters/Distributed.lean | ~100 | V2: Distributed adapter re-exports |
-| Proofs/Adapters/Distributed/CoreProfiles.lean | ~150 | V2: Distributed profile definitions |
-| Proofs/Adapters/Distributed/ProfileSetters.lean | ~100 | V2: Profile configuration utilities |
-| Proofs/Adapters/Distributed/ProfileWrappers.lean | ~100 | V2: Profile wrapper types |
-| Proofs/Adapters/Distributed/ProfileExtractionTheorems.lean | ~200 | V2: Profile extraction theorems |
-| Proofs/Adapters/Distributed/EnvelopeTheorems.lean | ~100 | V2: Envelope theorem re-exports |
-| Proofs/Adapters/Distributed/EnvelopeTheorems/AdmissionAndBridge.lean | ~150 | V2: Admission and bridge theorems |
+| Proofs/Adapters/Distributed.lean | 87 | V2: Distributed adapter re-exports |
+| Proofs/Adapters/Distributed/CoreProfiles.lean | 10 | V2: Distributed profile definitions |
+| Proofs/Adapters/Distributed/ProfileSetters.lean | 223 | V2: Profile configuration utilities |
+| Proofs/Adapters/Distributed/ProfileWrappers.lean | 180 | V2: Profile wrapper types |
+| Proofs/Adapters/Distributed/ProfileExtractionTheorems.lean | 217 | V2: Profile extraction theorems |
+| Proofs/Adapters/Distributed/EnvelopeTheorems.lean | 488 | V2: Envelope theorem facade |
+| Proofs/Adapters/Distributed/EnvelopeTheoremsAdmissionBridge.lean | 133 | V2: Admission and bridge theorems |
 
 ### Proofs/TheoremPack (V2 Theorem Bundle Infrastructure)
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Proofs/TheoremPack/API.lean | ~100 | V2: Public theorem pack interface |
-| Proofs/TheoremPack/Build.lean | ~150 | V2: Theorem pack construction |
-| Proofs/TheoremPack/Artifacts.lean | ~100 | V2: Artifact generation for release gates |
-| Proofs/TheoremPack/Profiles.lean | ~100 | V2: Determinism profile definitions |
-| Proofs/TheoremPack/Inventory.lean | ~100 | V2: Capability inventory management |
-| Proofs/TheoremPack/ReleaseConformance.lean | ~100 | V2: Release gate conformance checking |
+| Proofs/TheoremPack/API.lean | 267 | V2: Public theorem pack interface |
+| Proofs/TheoremPack/Build.lean | 371 | V2: Theorem pack construction |
+| Proofs/TheoremPack/Artifacts.lean | 426 | V2: Artifact generation for release gates |
+| Proofs/TheoremPack/Profiles.lean | 287 | V2: Determinism profile definitions |
+| Proofs/TheoremPack/Inventory.lean | 66 | V2: Capability inventory management |
+| Proofs/TheoremPack/ReleaseConformance.lean | 299 | V2: Release gate conformance checking |
 
 ### Proofs/EffectBisim (V2 Handler Equivalence)
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Proofs/EffectBisim/Core.lean | ~150 | V2: Effect bisimulation definition |
-| Proofs/EffectBisim/Bridge.lean | ~100 | V2: Bridge to protocol coherence |
-| Proofs/EffectBisim/ConfigEquivBridge.lean | ~150 | V2: Configuration equivalence integration |
-| Proofs/EffectBisim/Congruence.lean | ~100 | V2: Congruence properties |
-| Proofs/EffectBisim/RationalFragment.lean | ~100 | V2: Rational fragment handling |
-| Proofs/EffectBisim/Examples.lean | ~50 | V2: Usage examples |
+| Proofs/EffectBisim/Core.lean | 231 | V2: Effect bisimulation definition |
+| Proofs/EffectBisim/Bridge.lean | 41 | V2: Bridge to protocol coherence |
+| Proofs/EffectBisim/ConfigEquivBridge.lean | 78 | V2: Configuration equivalence integration |
+| Proofs/EffectBisim/Congruence.lean | 127 | V2: Congruence properties |
+| Proofs/EffectBisim/RationalFragment.lean | 138 | V2: Rational fragment handling |
+| Proofs/EffectBisim/Examples.lean | 87 | V2: Usage examples |
 
 ### Proofs (Additional V2 Files)
 | Proofs/Lyapunov.lean | 381 | `progressMeasure`, weighted measure W = 2·depth + buffer |
 | Proofs/VMPotential.lean | 266 | VM potential integration and transported Foster bridge |
 | Proofs/WeightedMeasure.lean | 1,198 | Lyapunov measure infrastructure, step decrease theorems |
-| Proofs/SchedulingBound.lean | 670 | k-fair scheduler termination bounds, round-robin corollary |
+| Proofs/SchedulingBound.lean | 7 | Re-export wrapper for SchedulingBound* modules |
+| Proofs/SchedulingBoundCore.lean | 424 | Core k-fair scheduler termination bounds |
+| Proofs/SchedulingBoundTightness.lean | 328 | Tightness proofs and round-robin corollary |
 | Proofs/Diamond.lean | 468 | Cross-session diamond lemmas and main confluence theorem |
 | Proofs/Examples/DistributedProfiles.lean | 115 | End-to-end VM examples: profile attachment auto-materializes distributed theorem artifacts |
 | Proofs/Examples/InvariantBundle.lean | 74 | One-shot invariant-bundle examples for liveness/progress, FLP/CAP, and classical artifact derivation |
@@ -764,6 +785,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | Examples/SimpleProtocol.lean | 127 | Simple two-party protocol example |
 | Examples/Aura.lean | 133 | Aura instantiation example |
 | Tests/Main.lean | 98 | Runtime test harness |
+| Tests/SimulatorParity.lean | 54 | Lean/Rust simulator parity tests |
 | Tests/VMRunner.lean | 116 | JSON-driven VM runner (stdin choreographies, stdout traces) |
 
 ---
@@ -816,11 +838,12 @@ telltale (package)
 
 ### Executables
 
-Three executables defined in lakefile.lean:
+Four executables defined in lakefile.lean:
 
 | Executable | Root Module | Purpose |
 |------------|-------------|---------|
 | `runtime_tests` | `Runtime.Tests.Main` | VM example tests |
+| `simulator_parity_tests` | `Runtime.Tests.SimulatorParity` | Lean/Rust simulator parity tests |
 | `vm_runner` | `Runtime.Tests.VMRunner` | Execute choreographies, emit observable traces |
 | `telltale_validator` | `Choreography.Projection.Validator` | Projection validator (default target) |
 
