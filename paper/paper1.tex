@@ -195,9 +195,9 @@
 \maketitle
 
 \begin{abstract}
-	Classical MPST uses coherence and projectability on global types to justify local safety. We define
-	an operational coherence invariant, $\Coherent(G,D)$, over projected local environments and buffered
-	traces, and show that this invariant is sufficient for preservation in asynchronous semantics. The
+	Standard MPST uses coherence and projectability on global types to justify local safety. We define
+	an operational coherence invariant $\Coherent(G,D)$ over local-type environment $G$ and buffered-trace
+	environment $D$, and show that this invariant is sufficient for preservation in asynchronous semantics. The
 	operational coherence invariant yields a reusable three-way edge split that avoids per-step global
 	re-derivation. Lean~4 mechanization confirms our results under parameterized delivery semantics.
 \end{abstract}
@@ -219,7 +219,7 @@ choreography to local session types. A global type specifies the full protocol, 
 extracts the local view for each participant. Safety means that local executions remain consistent
 with their projected types.
 
-Classically, MPST coherence and projectability conditions are formulated at the global-type level (Honda,
+Traditionally, MPST coherence and projectability conditions are formulated at the global-type level (Honda,
 Yoshida, and Carbone, 2008; Honda et al., 2016; Castagna et al., 2012), with later work
 refining projection criteria (Majumdar et al., 2021).
 
@@ -237,7 +237,7 @@ bottleneck. We confirm this result via Lean 4 mechanization.
 \subsection{Insight}
 
 Projection defines a quotient, it erases global structure while preserving safety-relevant information.
-The question is then: what exact invariant survives this erasure? We isolate an operational form of
+The question is: what exact invariant survives this erasure? We isolate an operational form of
 coherence, $\Coherent(G,D)$, as the invariant required by our preservation proofs.
 Binary session types use duality for two-party compatibility. This formulation instantiates n-ary
 compatibility as receiver-buffer alignment at each active edge (Carbone et al., 2015).
@@ -250,8 +250,8 @@ edges combine to yield global preservation. No global re-derivation is required.
 
 The core contribution is one operational kernel with two theorem-level lifts: typed-step preservation
 and subtype replacement. The shared kernel is edge-local checking with active-edge lifting.
-For typed transitions, this kernel is instantiated by a three-way edge split.
-For subtype replacement, it is instantiated by \nolinkurl{consume_mono} under receive-compatibility.
+For typed transitions, this kernel uses a three-way edge split.
+For subtype replacement, it relies on \nolinkurl{consume_mono} under receive-compatibility.
 
 The local-to-global shape follows standard invariant methods from program logics (Reynolds, 2002;
 O'Hearn, 2007), while aligning with process-calculus decomposition tradition (Plotkin, 1981;
@@ -262,30 +262,30 @@ LaSalle, 1960).
 	\centering
 	\begin{tikzpicture}[figfont, x=1mm, y=1mm]
 		% State space boundary
-		\draw[rounded corners=3pt] (-38,-14) rectangle (38,18);
+		\draw[rounded corners=6pt] (-38,-14) rectangle (38,18);
 		\node at (0,15) {\textbf{Operational state space}};
 
 		% Coherent invariant region
-		\draw[rounded corners=6pt, fill=gray!10] (-32,-8) rectangle (32,12);
+		\draw[rounded corners=6pt, fill=gray!10] (-35,-11) rectangle (35,12);
 		\node at (0,9) {\textbf{\textsf{Coherent} invariant region}};
 
 		% Typed-step trajectory
-		\fill (-20,2) circle (1.4pt);
-		\fill (-6,2) circle (1.4pt);
-		\draw[figarrowstrong] (-20,2) -- (-6,2);
-		\node[anchor=south] at (-13,3) {typed step};
+		\fill (-24,0) circle (1.4pt);
+		\fill (-10,0) circle (1.4pt);
+		\draw[figarrowstrong] (-24,0) -- (-10,0);
+		\node[anchor=south] at (-17,1) {typed step};
 
 		% Subtype-replacement trajectory
-		\fill (6,2) circle (1.4pt);
-		\fill (20,2) circle (1.4pt);
-		\draw[figarrowstrong] (6,2) -- (20,2);
-		\node[anchor=south] at (13,3) {subtype replacement};
+		\fill (9,0) circle (1.4pt);
+		\fill (23,0) circle (1.4pt);
+		\draw[figarrowstrong] (9,0) -- (23,0);
+		\node[anchor=south] at (16,1) {subtype replacement};
 
 		% Symbolic statement
-		\node[align=center] at (0,-4)
-		{$\Coherent \xrightarrow{\;\text{step}\;} \Coherent
-		\qquad
-		\Coherent \xrightarrow{\;\text{repl.}\;} \Coherent$};
+		\node[align=center] at (0,-6)
+		{$\Coherent \xrightarrow{\text{\tiny \hphantom{en}step\hphantom{en}}} \Coherent
+				\quad
+				\Coherent \xrightarrow{\!\text{\tiny replacement}\!} \Coherent$};
 	\end{tikzpicture}
 	\caption{Invariant-geometric view of preservation and subtype evolution.}
 	\label{fig:p1-operational-kernel}
@@ -298,43 +298,42 @@ applies uniformly across transitions. The second is session evolution under subt
 \nolinkurl{consume_mono}, which we lift to global Coherence and progress-condition preservation under
 compatibility premises.
 
-This paper starts a three-part series on asynchronous buffered semantics with
-\DeliveryModel parameterization. It precisely defines the invariant kernel.
+This paper is the first in a three-part series on asynchronous buffered semantics with \DeliveryModel\ parameterization, and precisely defines the invariant kernel.
 \emph{Computable Dynamics for Asynchronous MPST} develops quantitative bounds and decision procedures on that kernel.
 \emph{Harmony from Coherence in Asynchronous MPST} proves reconfiguration commutation and envelope exactness.
 
-In this paper, our contributions are as follows:
+More precisely, our contributions in this paper are as follows:
 \begin{enumerate}
 	\item A mechanized operational Coherence architecture with a reusable three-way edge split and typed-step wrappers that lift edge-local lemmas to preservation and progress interfaces.
-	\item A message-alignment proof kernel through \Consume and the lemmas \nolinkurl{consume_append} and \nolinkurl{consume_cons}.
+	\item A message-alignment proof kernel based on \Consume, with lemmas \nolinkurl{consume_append} and \nolinkurl{consume_cons}.
 	\item A subtype-replacement theorem stack from \nolinkurl{consume_mono} that preserves edge Coherence, global Coherence, and progress-side conditions under receive-compatibility premises.
-	\item A delivery-parametric and premise-parametric typed effect bridge profile at the VM boundary.
+	\item A typed effect bridge connecting protocol semantics to runtime execution, parametric in delivery model and premises.
 \end{enumerate}
 
 \begin{center}
 	\small
-			\begin{tabularx}{\columnwidth}{@{}L{0.36\columnwidth}L{0.59\columnwidth}@{}}
-			\toprule
-			\thead{Symbol} & \thead{Meaning}                     \\
-			\midrule
-			\Hbyz         & Byzantine characterization bundle    \\
-			\Obssafe      & Byzantine safety-visible observation \\
-			\Eqsafe       & Byzantine safety-visible equality    \\
-				\Ebyz         & Byzantine determinism-envelope       \\
-				\ByzChar      & Byzantine characterization formula    \\
-				\ByzSafe      & Byzantine safety predicate            \\
-				\ByzIfaceWF     & Byzantine interface well-formedness   \\
-				\Coherent       & global active-edge compatibility     \\
-				\EdgeCoherent   & edge-local compatibility check       \\
-				\EdgeShares     & edge-to-endpoint incidence predicate \\
-				\Consume        & trace-to-type alignment function     \\
-				\GEnv           & endpoint-to-local-type environment    \\
-				\DEnv           & edge-to-buffered-trace environment    \\
-			\ActiveEdge     & endpoint-presence guard              \\
-			\RecvCompatible & receive-side replacement compatibility \\
-			\DeliveryModel & parametric delivery interface \\
-			\bottomrule
-		\end{tabularx}
+	\begin{tabularx}{\columnwidth}{@{}L{0.36\columnwidth}L{0.59\columnwidth}@{}}
+		\toprule
+		\thead{Symbol}  & \thead{Meaning}                        \\
+		\midrule
+		\Hbyz           & Byzantine characterization bundle      \\
+		\Obssafe        & Byzantine safety-visible observation   \\
+		\Eqsafe         & Byzantine safety-visible equality      \\
+		\Ebyz           & Byzantine determinism-envelope         \\
+		\ByzChar        & Byzantine characterization formula     \\
+		\ByzSafe        & Byzantine safety predicate             \\
+		\ByzIfaceWF     & Byzantine interface well-formedness    \\
+		\Coherent       & global active-edge compatibility       \\
+		\EdgeCoherent   & edge-local compatibility check         \\
+		\EdgeShares     & edge-to-endpoint incidence predicate   \\
+		\Consume        & trace-to-type alignment function       \\
+		\GEnv           & endpoint-to-local-type environment     \\
+		\DEnv           & edge-to-buffered-trace environment     \\
+		\ActiveEdge     & endpoint-presence guard                \\
+		\RecvCompatible & receive-side replacement compatibility \\
+		\DeliveryModel  & parametric delivery interface          \\
+		\bottomrule
+	\end{tabularx}
 	\captionof{table}{Notation used in this paper.}
 \end{center}
 
@@ -343,19 +342,19 @@ In this paper, our contributions are as follows:
 \label{sec:model}
 % ============================================================================
 
-Configurations are represented by endpoint and edge environments. \GEnv{} maps endpoints to local types. \DEnv{} maps directed edges to buffered type traces. \texttt{Buffers} maps directed edges to runtime payload queues.
+Configurations are represented by endpoint and edge environments. \GEnv{} maps endpoints to local types, \DEnv{} maps directed edges to buffered type traces, and \texttt{Buffers} maps directed edges to runtime payload queues.
 
 \begin{table}[H]
 	\centering
 	\small
 	\begin{tabularx}{\columnwidth}{@{}L{0.55\columnwidth}L{0.4\columnwidth}@{}}
 		\toprule
-		\thead{Assumption}             & \thead{Status}      \\
+		\thead{Assumption}              & \thead{Status}       \\
 		\midrule
 		asynchronous buffered semantics & required             \\
 		active-edge quantification      & required             \\
 		fair scheduling profile         & assumed where stated \\
-		\DeliveryModel param.   & required             \\
+		\DeliveryModel param.           & required             \\
 		crash-stop and Byzantine claims & interface claim only \\
 		\bottomrule
 	\end{tabularx}
@@ -413,12 +412,12 @@ The key structural correspondence is compatibility. A coherence-space token corr
 	\small
 	\begin{tabularx}{\columnwidth}{@{}L{0.38\columnwidth}L{0.57\columnwidth}@{}}
 		\toprule
-		\thead{Coherence-space} & \thead{MPST operational}         \\
+		\thead{Coherence-space} & \thead{MPST operational}          \\
 		\midrule
-		token                    & directed edge with buffered trace \\
-		coherence relation       & \EdgeCoherent             \\
-		clique                   & \Coherent configuration   \\
-		linear-map preservation  & step preservation theorem         \\
+		token                   & directed edge with buffered trace \\
+		coherence relation      & \EdgeCoherent                     \\
+		clique                  & \Coherent configuration           \\
+		linear-map preservation & step preservation theorem         \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Coherence-space correspondence.}
@@ -477,22 +476,22 @@ The active-edge obligation is:
 \end{equation}
 The example is used via the following derived rule instances.
 
-		{\footnotesize
-			\begin{gather}
-				\dfrac{
-					\Gamma \vdash (G_0,D_0)\ \wf \quad D_0(P,C){=}[\mathrm{Grant}(k)]
-				}{
-					(G_0,D_0){\to}(G_1,D_1) \land \Coherent(G_1,D_1)
-				}\hspace{0.75em}
-				\\[10pt]
-				\dfrac{
-					\Gamma \vdash (G_1,D_1)\ \wf \quad \text{\texttt{consume\_append}}
-				}{
-					(G_1,D_1){\to}(G_2,D_2) \land \Coherent(G_2,D_2)
-				}\hspace{0.75em}
-				\\[10pt]
-				\dfrac{
-					\Coherent(G_0,D_0) \quad \RecvCompatible(G_0,G'_0)
+	{\footnotesize
+		\begin{gather}
+			\dfrac{
+				\Gamma \vdash (G_0,D_0)\ \wf \quad D_0(P,C){=}[\mathrm{Grant}(k)]
+			}{
+				(G_0,D_0){\to}(G_1,D_1) \land \Coherent(G_1,D_1)
+			}\hspace{0.75em}
+			\\[10pt]
+			\dfrac{
+				\Gamma \vdash (G_1,D_1)\ \wf \quad \text{\texttt{consume\_append}}
+			}{
+				(G_1,D_1){\to}(G_2,D_2) \land \Coherent(G_2,D_2)
+			}\hspace{0.75em}
+			\\[10pt]
+			\dfrac{
+				\Coherent(G_0,D_0) \quad \RecvCompatible(G_0,G'_0)
 			}{
 				\Coherent(G'_0,D_0)
 			}\hspace{0.75em}
@@ -593,8 +592,8 @@ The case partition used by \nolinkurl{edge_case_split} is:
 Here $S(e):=\EdgeShares(e,ep_{\mathrm{step}})$.
 \begin{equation}
 	\begin{aligned}
-		\mathsf{updated}   & :\ e=u;\\
-		\mathsf{shared}    & :\ e\neq u\land S(e);\\
+		\mathsf{updated}   & :\ e=u;                    \\
+		\mathsf{shared}    & :\ e\neq u\land S(e);      \\
 		\mathsf{unrelated} & :\ e\neq u\land \neg S(e).
 	\end{aligned}
 \end{equation}
@@ -701,7 +700,7 @@ this section are conditional on explicit monitor and quotient-transport premises
 	\small
 	\begin{tabularx}{\columnwidth}{@{}L{0.45\columnwidth}L{0.5\columnwidth}@{}}
 		\toprule
-		\thead{Bridge item}    & \thead{Role}               \\
+		\thead{Bridge item}     & \thead{Role}                \\
 		\midrule
 		choreography obligation & source protocol obligation  \\
 		effect handler typing   & typed executable obligation \\
@@ -749,10 +748,10 @@ Compared with these lines, this paper contributes a reusable proof kernel that c
 	\small
 	\begin{tabularx}{\columnwidth}{@{}L{0.47\columnwidth}L{0.48\columnwidth}@{}}
 		\toprule
-		\thead{Prior limitation}                 & \thead{Contribution}                    \\
+		\thead{Prior limitation}                  & \thead{Contribution}             \\
 		\midrule
-		preservation tied to global re-derivation & reusable edge-local skeleton             \\
-		weak theory/execution boundary            & explicit effect-typed bridge             \\
+		preservation tied to global re-derivation & reusable edge-local skeleton     \\
+		weak theory/execution boundary            & explicit effect-typed bridge     \\
 		FIFO-centric semantics                    & one theorem under \DeliveryModel \\
 		fragmented proof structure                & split kernel + \Consume lemmas   \\
 		\bottomrule
@@ -966,65 +965,65 @@ Table~\ref{tab:p1-index} maps paper claims to their Lean anchors and source file
 	\setlength{\extrarowheight}{2pt}
 	\begin{tabularx}{\textwidth}{L{0.27\textwidth}L{0.37\textwidth}L{0.06\textwidth}>{\raggedright\arraybackslash}X}
 		\toprule
-		\thead{Anchor} & \thead{Path (relative to \texttt{lean/})} & \thead{Sec.} & \thead{Claims} \\
+		\thead{Anchor}                                                            & \thead{Path (relative to \texttt{lean/})}                                                                                         & \thead{Sec.}             & \thead{Claims}                        \\
 		\midrule
-		\multicolumn{4}{@{}l}{\textit{Definitions \& Structures}} \\
+		\multicolumn{4}{@{}l}{\textit{Definitions \& Structures}}                                                                                                                                                                                                                        \\
 		\rowcolor{gray!8}
-		\texttt{Consume} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Consume.lean}} & \S\ref{sec:consume} & --- \\
-		\texttt{EdgeCoherent} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{EdgeCoherenceCore.lean}} & \S\ref{sec:model} & --- \\
+		\texttt{Consume}                                                          & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Consume.lean}}                                                   & \S\ref{sec:consume}      & ---                                   \\
+		\texttt{EdgeCoherent}                                                     & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{EdgeCoherenceCore.lean}}                                         & \S\ref{sec:model}        & ---                                   \\
 		\rowcolor{gray!8}
-		\texttt{Coherent} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{EdgeCoherenceCore.lean}} & \S\ref{sec:model} & --- \\
-		\texttt{VMBridgePremises} & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}} & \S\ref{sec:bridge} & --- \\
+		\texttt{Coherent}                                                         & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{EdgeCoherenceCore.lean}}                                         & \S\ref{sec:model}        & ---                                   \\
+		\texttt{VMBridgePremises}                                                 & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & ---                                   \\
 		\rowcolor{gray!8}
-		\texttt{ByzIfaceWF} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge} & Thm.~\ref{thm:bz1} \\
-		\texttt{WellTypedInstr} & \texttt{Runtime/\allowbreak VM/\allowbreak Runtime/\allowbreak}\mbox{\texttt{Monitor.lean}} & \S\ref{sec:bridge} & Prop.~\ref{prop:bridge-soundness} \\
+		\texttt{ByzIfaceWF}                                                       & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge}       & Thm.~\ref{thm:bz1}                    \\
+		\texttt{WellTypedInstr}                                                   & \texttt{Runtime/\allowbreak VM/\allowbreak Runtime/\allowbreak}\mbox{\texttt{Monitor.lean}}                                       & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness}     \\
 		\midrule
-		\multicolumn{4}{@{}l}{\textit{Predicates}} \\
+		\multicolumn{4}{@{}l}{\textit{Predicates}}                                                                                                                                                                                                                                       \\
 		\rowcolor{gray!8}
-		\texttt{monitor\_sound} & \texttt{Runtime/\allowbreak VM/\allowbreak Runtime/\allowbreak}\mbox{\texttt{Monitor.lean}} & \S\ref{sec:bridge} & Prop.~\ref{prop:bridge-soundness} \\
-		\texttt{unified\_monitor\_\allowbreak preserves} & \texttt{Runtime/\allowbreak VM/\allowbreak Runtime/\allowbreak}\mbox{\texttt{Monitor.lean}} & \S\ref{sec:bridge} & Prop.~\ref{prop:bridge-soundness} \\
+		\texttt{monitor\_sound}                                                   & \texttt{Runtime/\allowbreak VM/\allowbreak Runtime/\allowbreak}\mbox{\texttt{Monitor.lean}}                                       & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness}     \\
+		\texttt{unified\_monitor\_\allowbreak preserves}                          & \texttt{Runtime/\allowbreak VM/\allowbreak Runtime/\allowbreak}\mbox{\texttt{Monitor.lean}}                                       & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness}     \\
 		\midrule
-		\multicolumn{4}{@{}l}{\textit{Theorems}} \\
+		\multicolumn{4}{@{}l}{\textit{Theorems}}                                                                                                                                                                                                                                         \\
 		\rowcolor{gray!8}
-		\texttt{consume\_append} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Consume.lean}} & \S\ref{sec:consume} & Thm.~\ref{thm:coherence-preservation} \\
-		\texttt{consume\_cons} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Consume.lean}} & \S\ref{sec:consume} & Thm.~\ref{thm:coherence-preservation} \\
+		\texttt{consume\_append}                                                  & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Consume.lean}}                                                   & \S\ref{sec:consume}      & Thm.~\ref{thm:coherence-preservation} \\
+		\texttt{consume\_cons}                                                    & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Consume.lean}}                                                   & \S\ref{sec:consume}      & Thm.~\ref{thm:coherence-preservation} \\
 		\rowcolor{gray!8}
-		\texttt{consume\_mono} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacementCore.lean}} & \S\ref{sec:evolution} & Thm.~\ref{thm:session-evolution} \\
-		\texttt{edge\_case\_split} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Unified.lean}} & \S\ref{sec:preservation} & Thm.~\ref{thm:coherence-preservation} \\
+		\texttt{consume\_mono}                                                    & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacementCore.lean}}                                    & \S\ref{sec:evolution}    & Thm.~\ref{thm:session-evolution}      \\
+		\texttt{edge\_case\_split}                                                & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Unified.lean}}                                                   & \S\ref{sec:preservation} & Thm.~\ref{thm:coherence-preservation} \\
 		\rowcolor{gray!8}
-		\texttt{coherent\_send\_\allowbreak preserved} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Preservation.lean}} & \S\ref{sec:preservation} & Thm.~\ref{thm:coherence-preservation} \\
-		\texttt{coherent\_recv\_\allowbreak preserved} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{PreservationRecv.lean}} & \S\ref{sec:preservation} & Thm.~\ref{thm:coherence-preservation} \\
+		\texttt{coherent\_send\_\allowbreak preserved}                            & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Preservation.lean}}                                              & \S\ref{sec:preservation} & Thm.~\ref{thm:coherence-preservation} \\
+		\texttt{coherent\_recv\_\allowbreak preserved}                            & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{PreservationRecv.lean}}                                          & \S\ref{sec:preservation} & Thm.~\ref{thm:coherence-preservation} \\
 		\rowcolor{gray!8}
-		\texttt{coherent\_select\_\allowbreak preserved} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SelectPreservation.lean}} & \S\ref{sec:preservation} & Thm.~\ref{thm:coherence-preservation} \\
-		\texttt{coherent\_branch\_\allowbreak preserved} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SelectPreservation.lean}} & \S\ref{sec:preservation} & Thm.~\ref{thm:coherence-preservation} \\
+		\texttt{coherent\_select\_\allowbreak preserved}                          & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SelectPreservation.lean}}                                        & \S\ref{sec:preservation} & Thm.~\ref{thm:coherence-preservation} \\
+		\texttt{coherent\_branch\_\allowbreak preserved}                          & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SelectPreservation.lean}}                                        & \S\ref{sec:preservation} & Thm.~\ref{thm:coherence-preservation} \\
 		\rowcolor{gray!8}
-		\texttt{edge\_coherent\_type\_\allowbreak replacement} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacementCore.lean}} & \S\ref{sec:evolution} & Thm.~\ref{thm:session-evolution} \\
-		\texttt{coherent\_type\_\allowbreak replacement} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacementCore.lean}} & \S\ref{sec:evolution} & Thm.~\ref{thm:session-evolution} \\
+		\texttt{edge\_coherent\_type\_\allowbreak replacement}                    & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacementCore.lean}}                                    & \S\ref{sec:evolution}    & Thm.~\ref{thm:session-evolution}      \\
+		\texttt{coherent\_type\_\allowbreak replacement}                          & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacementCore.lean}}                                    & \S\ref{sec:evolution}    & Thm.~\ref{thm:session-evolution}      \\
 		\rowcolor{gray!8}
-		\texttt{progress\_conditions\_\allowbreak type\_replacement} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacementLiveness.lean}} & \S\ref{sec:evolution} & Thm.~\ref{thm:session-evolution} \\
-		\texttt{fifo\_delivery\_laws} & \texttt{Protocol/\allowbreak}\mbox{\texttt{DeliveryModel.lean}} & \S\ref{sec:model} & --- \\
+		\texttt{progress\_conditions\_\allowbreak type\_replacement}              & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacementLiveness.lean}}                                & \S\ref{sec:evolution}    & Thm.~\ref{thm:session-evolution}      \\
+		\texttt{fifo\_delivery\_laws}                                             & \texttt{Protocol/\allowbreak}\mbox{\texttt{DeliveryModel.lean}}                                                                   & \S\ref{sec:model}        & ---                                   \\
 		\rowcolor{gray!8}
-		\texttt{causal\_delivery\_laws} & \texttt{Protocol/\allowbreak}\mbox{\texttt{DeliveryModel.lean}} & \S\ref{sec:model} & --- \\
-		\texttt{lossy\_delivery\_laws} & \texttt{Protocol/\allowbreak}\mbox{\texttt{DeliveryModel.lean}} & \S\ref{sec:model} & --- \\
+		\texttt{causal\_delivery\_laws}                                           & \texttt{Protocol/\allowbreak}\mbox{\texttt{DeliveryModel.lean}}                                                                   & \S\ref{sec:model}        & ---                                   \\
+		\texttt{lossy\_delivery\_laws}                                            & \texttt{Protocol/\allowbreak}\mbox{\texttt{DeliveryModel.lean}}                                                                   & \S\ref{sec:model}        & ---                                   \\
 		\rowcolor{gray!8}
-		\texttt{handler\_obligation\_\allowbreak local} & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}} & \S\ref{sec:bridge} & Prop.~\ref{prop:bridge-soundness} \\
-		\texttt{handler\_fragment\_typing\_\allowbreak of\_premises} & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}} & \S\ref{sec:bridge} & Prop.~\ref{prop:bridge-soundness} \\
+		\texttt{handler\_obligation\_\allowbreak local}                           & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness}     \\
+		\texttt{handler\_fragment\_typing\_\allowbreak of\_premises}              & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness}     \\
 		\rowcolor{gray!8}
-		\texttt{handler\_vm\_step\_typing} & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}} & \S\ref{sec:bridge} & Prop.~\ref{prop:bridge-soundness} \\
-		\texttt{vm\_bridge\_soundness\_\allowbreak composed} & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}} & \S\ref{sec:bridge} & Prop.~\ref{prop:bridge-soundness} \\
+		\texttt{handler\_vm\_step\_typing}                                        & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness}     \\
+		\texttt{vm\_bridge\_soundness\_\allowbreak composed}                      & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness}     \\
 		\rowcolor{gray!8}
-		\texttt{effect\_bisim\_implies\_\allowbreak observational\_equivalence} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{Bridge.lean}} & \S\ref{sec:bridge} & Prop.~\ref{prop:bridge-soundness} \\
-		\texttt{config\_equiv\_iff\_\allowbreak effect\_bisim\_silent} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{ConfigEquivBridge.lean}} & \S\ref{sec:bridge} & Prop.~\ref{prop:bridge-soundness} \\
+		\texttt{effect\_bisim\_implies\_\allowbreak observational\_equivalence}   & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{Bridge.lean}}                                & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness}     \\
+		\texttt{config\_equiv\_iff\_\allowbreak effect\_bisim\_silent}            & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{ConfigEquivBridge.lean}}                     & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness}     \\
 		\rowcolor{gray!8}
-		\texttt{byz\_iface\_wf\_iff\_\allowbreak coherent} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge} & Thm.~\ref{thm:bz1} \\
-		\texttt{bz1\_byzantine\_interface\_\allowbreak well\_formedness} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge} & Thm.~\ref{thm:bz1} \\
+		\texttt{byz\_iface\_wf\_iff\_\allowbreak coherent}                        & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge}       & Thm.~\ref{thm:bz1}                    \\
+		\texttt{bz1\_byzantine\_interface\_\allowbreak well\_formedness}          & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge}       & Thm.~\ref{thm:bz1}                    \\
 		\rowcolor{gray!8}
-		\texttt{vm\_byzantine\_envelope\_\allowbreak adherence\_of\_witness} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge} & Prop.~\ref{prop:bz1-2} \\
-		\texttt{byzantine\_cross\_target\_\allowbreak conformance\_of\_witnesses} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge} & Prop.~\ref{prop:bz1-2} \\
+		\texttt{vm\_byzantine\_envelope\_\allowbreak adherence\_of\_witness}      & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge}       & Prop.~\ref{prop:bz1-2}                \\
+		\texttt{byzantine\_cross\_target\_\allowbreak conformance\_of\_witnesses} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge}       & Prop.~\ref{prop:bz1-2}                \\
 		\midrule
-		\multicolumn{4}{@{}l}{\textit{Runtime Gates}} \\
+		\multicolumn{4}{@{}l}{\textit{Runtime Gates}}                                                                                                                                                                                                                                    \\
 		\rowcolor{gray!8}
-		\texttt{canOperateUnder\allowbreak ByzantineEnvelope} & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{API.lean}} & \S\ref{sec:bridge} & Prop.~\ref{prop:bz1-2} \\
+		\texttt{canOperateUnder\allowbreak ByzantineEnvelope}                     & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{API.lean}}                                   & \S\ref{sec:bridge}       & Prop.~\ref{prop:bz1-2}                \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Anchor index.}
