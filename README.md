@@ -1,92 +1,65 @@
 # Telltale
 
-Telltale is a framework for choreographic programming with multiparty session types. Protocols are written from a global viewpoint and automatically projected to local types for each participant. Session types guarantee the absence of deadlocks and communication errors at compile time.
-
-The Rust implementation provides a DSL, compiler, effect handler system, and transport abstraction. A parallel Lean 4 formalization verifies projection correctness, proves safety properties (subject reduction, deadlock freedom, determinism), and models an Iris-backed session-type VM with resource algebras and separation logic.
+This repo contains three related projects. A functional Rust library for writing composable multiparty session-typed choreographies. It includes a extensible Lean proof system. And a paper + artifact supplement for a three-paper MPST series detailing theoretical contributions.
 
 ## For Reviewers
 
-Run `just artifact-check`, then inspect `paper/artifact_manifest.json` for commit/toolchain/hash provenance.
+Run `just artifact-check`. Then inspect `paper/artifact_manifest.json` and [Artifact Reproduction Guide](ARTIFACT.md).
 
-## Example
+## Project Surfaces
 
-```rust
-use telltale_choreography::choreography;
+### 1) Rust Library
 
-choreography! {
-    protocol PingPong = {
-        roles Alice, Bob
-        Alice -> Bob: Ping
-        Bob -> Alice: Pong
-    }
-}
-```
+The Rust project implements the operational model from the paper series. It includes the choreography pipeline, VM runtime behavior, admission checks, and simulation tooling.
 
-The macro generates role types, message types, and session types. Protocol logic is decoupled from transport through effect handlers. `InMemoryHandler` runs protocols in tests. `TelltaleHandler` connects to real transports (WebSockets, QUIC, or custom sink/stream pairs).
+- Choreographic DSL with projection and compiler pipeline.
+- VM execution model for asynchronous buffered protocols.
+- Runtime theorem-pack and capability-gated admission interfaces.
+- Reconfiguration-facing checks for link, delegation, and transition steps.
+- Simulation and cross-target conformance tooling for Rust VM and Lean reference traces.
 
-```rust
-let program = Program::new()
-    .send(Role::Bob, Message::Ping)
-    .recv::<Message>(Role::Bob)
-    .end();
+Main code is in `rust/`. Workspace configuration is in `Cargo.toml`. A typical health check is `cargo test --workspace --all-targets --all-features`.
 
-let result = interpret(&mut handler, &mut endpoint, program).await?;
-```
+### 2) Lean Proof System
 
-## Rust Crates
+The Lean project is an active mechanized proof stack. It covers session foundations, semantics, protocol coherence, runtime adequacy, and bridge theorems. Main code is in `lean/`. The toolchain pin is `lean-toolchain`. A typical proof-facing gate is `just verify-protocols`.
 
-All Rust source lives in `rust/`.
+### 3) Paper + Artifact Supplement
 
-**`telltale`** is the facade crate with session type primitives (`Send`, `Receive`, `Select`, `Branch`, `End`) and async channel abstractions.
+The paper project contains the three manuscripts and submission-focused reproducibility tooling. The sources are `paper/paper1.tex`, `paper/paper2.tex`, and `paper/paper3.tex`. The reproducibility guide is [Artifact Reproduction Guide](ARTIFACT.md). Citation metadata is in `paper/CITATION.cff`.
 
-**`telltale-types`** defines `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort` with content addressing. These definitions match the Lean formalization exactly.
-
-**`telltale-theory`** implements projection, merge, duality, sync/async subtyping, and bounded recursion.
-
-**`telltale-choreography`** contains the DSL parser, compiler, effect handlers, middleware (tracing, retry, metrics, fault injection), simulation infrastructure, topology configuration, and WebAssembly support.
-
-**`telltale-macros`** provides the `choreography!` macro and derive macros for roles and messages.
-
-**`telltale-lean-bridge`** converts between Rust session types and Lean-compatible JSON. The `exporter` feature serializes choreography ASTs for the Lean verification pipeline.
-
-**`telltale-vm`** is the bytecode VM execution engine, the single source of truth for protocol scheduling.
-
-**`telltale-simulator`** provides VM-backed simulation with deterministic middleware for network, faults, and property testing.
-
-## Lean Formalization
-
-The `lean/` directory contains eight libraries organized by concern.
-
-**SessionTypes** defines the inductive global and local type structures.
-
-**SessionCoTypes** develops coinductive equality, bisimulation, duality, and the inductive/coinductive roundtrip bridge.
-
-**Choreography** implements projection from global to local types and proves harmony (the projection correctness theorem).
-
-**Semantics** defines operational rules, typing judgments, and metatheory including determinism, deadlock freedom, and subject reduction.
-
-**Protocol** models async buffered multiparty sessions with coherence, preservation, monitors, deployment, and spatial reasoning.
-
-**Runtime** is the session-type bytecode VM verified with Iris separation logic. It covers resource algebras, cancelable invariants, a cooperative scheduler, WP rules for each instruction, and an adequacy theorem connecting the VM to observable traces. Iris primitives are axiomatized as shims that retire as the upstream iris-lean library matures.
-
-The verification pipeline runs with `just telltale-lean-check` (requires Nix).
-
-## WebAssembly
-
-The core session types and choreography system compile to WebAssembly. Effect handlers and the platform abstraction layer work in browser environments. See `examples/wasm-ping-pong/` for a working example.
+## Quick Commands
 
 ```bash
-cd examples/wasm-ping-pong && wasm-pack build --target web
+# Rust library health
+cargo test --workspace --all-targets --all-features
+
+# Lean/proof-facing protocol verification lane
+just verify-protocols
+
+# Paper supplement reproducibility + paper build + manifest
+just artifact-check
 ```
 
-## Building
+This command set validates the Rust library, proof-facing protocol checks, and paper supplement workflow.
 
-```bash
-cargo build --workspace --all-targets --all-features   # build
-cargo test --workspace --all-targets --all-features     # test
-cargo clippy --workspace --all-targets --all-features -- -D warnings  # lint
-cd lean && lake build                                   # lean (requires nix develop)
-```
+## Repository Layout
+
+| Path | Purpose |
+|---|---|
+| `rust/` | Rust library and runtime system |
+| `lean/` | Lean proof development and verification stack |
+| `paper/` | Paper sources, supplement metadata, citation |
+| `scripts/` | Verification/repro automation scripts |
+| `docs/` | Extended technical documentation |
+
+## Reproducibility and Submission Metadata
+
+Use [Artifact Reproduction Guide](ARTIFACT.md) for the end-to-end supplement workflow and expected outputs. Set archival DOI metadata in `paper/artifact_metadata.env`. Generated provenance and hash output is written to `paper/artifact_manifest.json`. Citation metadata for the supplement is in `paper/CITATION.cff`.
+
+## Build Environment
+
+Nix is the recommended environment (`flake.nix`) for aligned toolchains and paper build dependencies.
 
 ## License
 
