@@ -70,7 +70,8 @@ pub trait ChoreoHandler: Send {
 }
 ```
 
-The trait defines four core methods and a timeout hook.
+The trait defines send, receive, choice, and timeout operations.
+It also provides default `broadcast` and `parallel_send` helpers.
 
 The `send` method transmits a message to another role. The `recv` method waits for a message from another role. The `choose` method makes a branch selection. The `offer` method receives a branch selection.
 
@@ -158,7 +159,7 @@ The Trace middleware is located in `rust/choreography/src/effects/middleware/tra
 Usage example shows wrapping a handler.
 
 ```rust
-use telltale_choreography::middleware::Trace;
+use telltale_choreography::Trace;
 
 let base_handler = InMemoryHandler::new(role);
 let mut handler = Trace::with_prefix(base_handler, "Alice");
@@ -173,7 +174,7 @@ The Metrics middleware is located in `rust/choreography/src/effects/middleware/m
 Usage example shows metrics collection.
 
 ```rust
-use telltale_choreography::middleware::Metrics;
+use telltale_choreography::Metrics;
 
 let base_handler = InMemoryHandler::new(role);
 let mut handler = Metrics::new(base_handler);
@@ -190,7 +191,7 @@ The Retry middleware is located in `rust/choreography/src/effects/middleware/ret
 Usage example configures retry behavior.
 
 ```rust
-use telltale_choreography::middleware::Retry;
+use telltale_choreography::Retry;
 use std::time::Duration;
 
 let base_handler = InMemoryHandler::new(role);
@@ -206,7 +207,7 @@ The FaultInjection middleware is located in `rust/choreography/src/effects/middl
 Usage example configures fault injection.
 
 ```rust
-use telltale_choreography::middleware::FaultInjection;
+use telltale_choreography::effects::middleware::FaultInjection;
 use std::time::Duration;
 
 let base_handler = InMemoryHandler::new(role);
@@ -310,7 +311,7 @@ pub trait ChoreographicAdapter: Sized {
     fn family_size(&self, family: &str) -> Result<usize, Self::Error>;
 
     /// Broadcast a message to all roles in the list.
-    async fn broadcast<M: Message>(&mut self, to: &[Self::Role], msg: M)
+    async fn broadcast<M: Message + Clone>(&mut self, to: &[Self::Role], msg: M)
         -> Result<(), Self::Error>;
 
     /// Collect messages from all roles in the list.

@@ -203,7 +203,8 @@ LocalType::Send {
 }
 ```
 
-Operations are merged sequentially. Order is non-deterministic at runtime.
+Operations are merged into one local type in a deterministic traversal order.
+This merged order is a projection artifact rather than a scheduling guarantee.
 
 Conflicting parallel composition causes errors.
 
@@ -256,102 +257,18 @@ When a role appears in zero branches, the projection is `End`. When a role appea
 
 ### 6. Dynamic Role Projection
 
-Dynamic roles require special handling during projection. The system supports runtime-determined role counts and range-based selection.
+The default `project()` entry point does not resolve runtime role families on its own.
+Unresolved symbolic, wildcard, or runtime role parameters return projection errors.
 
-The global protocol uses dynamic roles.
+The projection error surface includes:
+- `ProjectionError::DynamicRoleProjection`
+- `ProjectionError::UnboundSymbolic`
+- `ProjectionError::WildcardProjection`
+- `ProjectionError::RangeProjection`
 
-```rust
-Protocol::Send {
-    from: coordinator,
-    to: workers, // workers.param = RoleParam::Dynamic
-    message: Task,
-    continuation: End,
-}
-```
-
-Coordinator sends to all workers.
-
-Coordinator's projection shows broadcast to dynamic set.
-
-```rust
-LocalType::Send {
-    to: workers, // Dynamic role reference
-    message: Task,
-    continuation: End,
-}
-```
-
-The coordinator sends to all worker instances at runtime.
-
-Workers' projection shows receive.
-
-```rust
-LocalType::Receive {
-    from: coordinator,
-    message: Task,
-    continuation: End,
-}
-```
-
-Each worker instance receives the task.
-
-Range-based selection targets subsets.
-
-```rust
-Protocol::Send {
-    from: workers, // With range [0..threshold]
-    to: coordinator,
-    message: Response,
-    continuation: End,
-}
-```
-
-Only workers in range respond.
-
-Projection for workers in range shows send.
-
-```rust
-LocalType::Send {
-    to: coordinator,
-    message: Response,
-    continuation: End,
-}
-```
-
-Workers outside range have no operation.
-
-```rust
-LocalType::End
-```
-
-Role indexing uses symbolic parameters.
-
-```rust
-Protocol::Send {
-    from: workers, // With index [i]
-    to: database,
-    message: Query,
-    continuation: End,
-}
-```
-
-Each worker instance acts independently.
-
-Workers' projection preserves index semantics.
-
-```rust
-LocalType::Send {
-    to: database,
-    message: Query,
-    continuation: End,
-}
-```
-
-Each instance executes independently with its own index.
-
-Dynamic role projection has these constraints. Wildcard broadcast `Workers[*]` requires all instances. Range selection `Workers[0..n]` requires subset determination at runtime.
-
-Index semantics `Workers[i]` preserve independence. Validation ensures safe dynamic role usage. Code generation includes runtime checks.
+Dynamic family resolution is handled in generated runner code with a `ChoreographicAdapter`.
+This runtime layer resolves role families through methods such as `resolve_family()` and `resolve_range()`.
+Projection still enforces core structural rules before code generation.
 
 ## Implementation Notes
 
@@ -378,6 +295,6 @@ Each variant represents a different local type pattern.
 
 ### Code Generation
 
-The `generate_type_expr` function in `codegen.rs` handles all variants. This includes `LocalChoice`, `Loop`, and `Timeout`. Code generation transforms local types into Rust session types. Timeout annotations are currently ignored in the type expression.
+The `generate_type_expr` function in `rust/choreography/src/compiler/codegen/mod.rs` handles all variants. This includes `LocalChoice`, `Loop`, and `Timeout`. Code generation transforms local types into Rust session types. Timeout annotations are currently ignored in the type expression.
 
 Dynamic roles use specialized code generation via `generate_choreography_code_with_dynamic_roles`. This function includes runtime role binding. Validation occurs at choreography initialization. Generated code supports dynamic role counts.

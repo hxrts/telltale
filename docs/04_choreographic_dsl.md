@@ -2,7 +2,7 @@
 
 ## Overview
 
-The parser translates protocol specifications from a layout-sensitive, PureScript or Elm inspired DSL into the internal AST (`Choreography` + `Protocol`). The DSL is direct style. Statements are newline separated. Indentation defines blocks.
+The parser translates a layout-sensitive DSL into the internal AST (`Choreography` and `Protocol`). The DSL is direct style. Statements are newline separated. Indentation defines blocks.
 
 Empty blocks must use `{}`. The DSL does not use an explicit `end` keyword. A protocol ends when its block ends.
 
@@ -48,6 +48,7 @@ protocol ThresholdProtocol =
 ```
 
 Multiple modules can coexist in separate files. Inside the `choreography!` macro you typically omit the module header, but it is supported in string-based parsing.
+`import` declarations are parsed for completeness, but import resolution is not currently applied during compilation.
 
 ### Supported Constructs
 
@@ -444,7 +445,7 @@ The parser builds the AST for projection, validation, and code generation.
 3. Build statements and normalize branch adjacency to `Parallel`.
 4. Resolve `call` references and lower VM-core statements to `Protocol::Extension`.
 5. Build `Choreography` and attach typed proof-bundle metadata.
-6. Run optional semantic checks with `choreography.validate()`.
+6. Run semantic checks with `choreography.validate()` when required by your integration.
 
 ## API
 

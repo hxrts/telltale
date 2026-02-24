@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `TelltaleHandler` provides a production-ready implementation of choreographic effects using session-typed channels. This guide covers everything you need to know to use it effectively in your applications.
+`TelltaleHandler` implements choreographic effects over session-typed channels. This guide documents setup patterns, API surface, and operational behavior.
 
 ## Quick Start
 

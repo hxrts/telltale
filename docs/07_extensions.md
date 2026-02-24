@@ -6,7 +6,12 @@ This document explains how to extend the choreography DSL with runtime effects a
 
 The extension system has two parts. Runtime extensions add type-safe effects that can be inserted into `Program` sequences. Syntax extensions add new grammar rules and statement parsers to the DSL.
 
-Extensions are projected to roles during compilation and dispatched by `interpret_extensible` at runtime.
+Runtime effect extensions are projected to roles during compilation and dispatched by `interpret_extensible` at runtime.
+Syntax extensions are registered through the parser and grammar composition APIs.
+
+The repository contains two extension registries with the same name:
+- `effects::registry::ExtensionRegistry<E, R>` for runtime extension effect handlers.
+- `extensions::ExtensionRegistry` for DSL grammar and parser extensions.
 
 ## Simulator Integration for Extensions
 
@@ -212,7 +217,7 @@ The registry tracks rule conflicts and supports dependency checks. Use `get_deta
 
 ```rust
 let mut composer = GrammarComposer::new();
-composer.register_extension(MyGrammarExtension);
+composer.register_extension(MyGrammarExtension)?;
 let grammar = composer.compose()?;
 ```
 
@@ -224,7 +229,7 @@ The cache avoids recomposing the grammar when the extension set has not changed.
 
 ```rust
 let mut parser = ExtensionParser::new();
-parser.register_extension(MyGrammarExtension, MyStatementParser);
+parser.register_extension(MyGrammarExtension, MyStatementParser)?;
 let choreography = parser.parse_with_extensions(source)?;
 ```
 
@@ -252,11 +257,11 @@ Add the choreography crate and an async runtime.
 
 ```toml
 [dependencies]
-telltale-choreography = { path = "../rust/choreography" }
+telltale-choreography = "0.9.1"
 tokio = { version = "1", features = ["full"] }
 ```
 
-Use a path dependency inside this workspace. For external projects, pin to the published crate version.
+Use a path dependency only for local workspace development. External projects should pin to a release version.
 
 ### Step 2: Define Roles and Messages
 
@@ -310,11 +315,11 @@ impl DomainHandler {
     fn new() -> Self {
         let mut registry = ExtensionRegistry::new();
         registry
-            .register::<ValidateCapability, _>(|_ep, ext| {
+            .register::<ValidateCapability<Role>, _>(|_ep, ext| {
                 Box::pin(async move {
                     let validate = ext
                         .as_any()
-                        .downcast_ref::<ValidateCapability>()
+                        .downcast_ref::<ValidateCapability<Role>>()
                         .ok_or(ExtensionError::TypeMismatch {
                             expected: "ValidateCapability",
                             actual: ext.type_name(),

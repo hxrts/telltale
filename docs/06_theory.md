@@ -215,7 +215,9 @@ Delegation allows dynamic changes to participant sets during protocol execution.
 
 ### The Problem
 
-Static MPST assumes a fixed set of participants. The global type names all roles at the start. But real distributed systems often need dynamic topology. New participants join. Existing participants leave. Capabilities transfer between parties.
+Static MPST assumes a fixed set of participants. The global type names all roles at the start. Real distributed systems often need dynamic topology.
+
+New participants can join over time. Existing participants can leave. Capabilities can transfer between parties.
 
 ### Delegation Operations
 
@@ -290,9 +292,9 @@ This protocol repeats forever. The variable X refers back to the enclosing μ.
 
 ### De Bruijn Indices
 
-Internally, Telltale uses de Bruijn indices for recursion. Instead of names, variables are represented by their binding depth. This simplifies substitution and avoids name capture issues.
+The Lean formalization uses de Bruijn indices in foundational proofs. This avoids name capture during substitution.
 
-The index 0 refers to the innermost binder. The index 1 refers to the next enclosing binder. This representation is used in the Lean formalization and the Rust core types.
+The index `0` refers to the innermost binder. The index `1` refers to the next enclosing binder. Rust core protocol types currently keep named recursion variables (`String`) for ergonomic construction and serialization.
 
 ## Telltale Implementation
 
@@ -300,11 +302,11 @@ Telltale implements these concepts in Rust with formal verification in Lean.
 
 ### Rust Types
 
-The `telltale-types` crate defines `GlobalType` and `LocalTypeR` matching the theory. The `telltale-theory` crate implements projection, merge, duality, and subtyping algorithms.
+The `telltale-types` crate defines `GlobalType` and `LocalTypeR` for protocol structure. The `telltale-theory` crate implements projection, merge, duality, and subtyping algorithms.
 
 ### Lean Formalization
 
-The Lean formalization in `lean/` proves preservation, progress, and coherence theorems. The formalization covers 610 files and approximately 126,000 lines of verified code.
+The Lean formalization in `lean/` proves preservation, progress, and coherence theorems. Current library metrics are tracked in [Lean Verification Code Map](../lean/CODE_MAP.md) and should be treated as the source of truth.
 
 Key libraries include:
 - `SessionTypes` and `SessionCoTypes` for type definitions and bisimulation
@@ -312,7 +314,7 @@ Key libraries include:
 - `Protocol` for coherence and preservation
 - `Runtime` for VM correctness
 
-See `lean/CODE_MAP.md` for detailed documentation of the proof structure.
+See [Lean Verification Code Map](../lean/CODE_MAP.md) for detailed documentation of the proof structure.
 
 ## Further Reading
 
