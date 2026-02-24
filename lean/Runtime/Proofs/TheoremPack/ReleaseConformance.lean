@@ -7,6 +7,14 @@ Release-gate helper surfaces for optimization classes, replay conformance, and
 failure-envelope witness requirements.
 -/
 
+/-
+The Problem. Release gates need deterministic checks over theorem-pack inventory
+and replay evidence, but callers should not depend on theorem-pack internals.
+
+Solution Structure. Define transformation/replay classifiers first, then expose
+release witness gates and report builders as a small API layer.
+-/
+
 set_option autoImplicit false
 
 namespace Runtime
@@ -106,6 +114,8 @@ def defaultCertifiedReplayClasses : List CertifiedReplayEquivalenceClass :=
       , certificateRef := "certified/" ++ reprStr cls
       })
 
+/-! ### Replay Signature Utilities -/
+
 private def traceSessionIds {ε : Type u} [EffectRuntime ε]
     (trace : List (TickedObsEvent ε)) : List SessionId :=
   trace.foldl
@@ -141,6 +151,8 @@ private def replaySessionSignature {ε : Type u} [EffectRuntime ε]
   sids.map (fun sid =>
     let tags := (filterBySid sid normalized).map (fun ev => obsTag ev.event)
     (sid, tags))
+
+/-! ### Replay Class Gates -/
 
 /-- A certified replay class is usable only when its transformation class is
 inventory-admissible and it carries a non-empty certificate reference. -/
@@ -207,6 +219,8 @@ def hasShardedEvidence
     (pack : VMTheoremPack (space := space)) : Bool :=
   pack.failureEnvelope?.isSome
 
+/-! ### Release Conformance Report -/
+
 /-- Stable version tag for exported release-conformance reports. -/
 def releaseConformanceReportVersion : String :=
   "v2.release.conformance.v1"
@@ -262,6 +276,8 @@ def buildReleaseConformanceReport {ε : Type w} [EffectRuntime ε]
   , shardedEvidence := shardedEvidence
   , releaseReady := releaseReady
   }
+
+/-! ### Build Gate -/
 
 /-- Release-tagged build gate derived from the report. -/
 def releaseBuildGate {ε : Type w} [EffectRuntime ε]

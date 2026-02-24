@@ -329,6 +329,8 @@ private def typedTransferTransitionAllowed {γ : Type u}
   | none => true
   | some ownerLane => ownerLane = fromLane
 
+/-! ### Cross-Lane Transfer Recording -/
+
 private def recordCrossLaneTransfer {γ : Type u}
     (sched : SchedState γ) (fromCoro : CoroutineId) (endpoint : Endpoint)
     (toCoro : CoroutineId) : SchedState γ :=
@@ -346,6 +348,8 @@ private def recordCrossLaneTransfer {γ : Type u}
       , reason := transferReason endpoint
       , delegationWitness := delegationWitness fromCoro toCoro endpoint }
     { sched with crossLaneHandoffs := sched.crossLaneHandoffs ++ [handoff] }
+
+/-! ### Scheduler Transition Update -/
 
 def updateAfterStep {γ : Type u} (sched : SchedState γ) (cid : CoroutineId)
     (status : ExecStatus γ) : SchedState γ :=

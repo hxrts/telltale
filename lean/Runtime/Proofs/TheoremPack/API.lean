@@ -10,6 +10,14 @@ Downstream modules should prefer this API layer over directly importing
 builder/artifact internals.
 -/
 
+/-
+The Problem. Downstream runtime modules need stable access to theorem-pack
+capabilities without depending on builder internals or release-pack wiring.
+
+Solution Structure. Expose narrow API aliases first, then separate proof-space
+composition helpers from runtime capability gates and inventory helpers.
+-/
+
 set_option autoImplicit false
 
 namespace Runtime
@@ -180,6 +188,8 @@ def composeProofSpaces
   match output? with
   | some w => withOutputCondition (space := s₃) w
   | none => s₃
+
+/-! ### Runtime Capability Gates -/
 
 /-- Runtime gate: shard-placement admission requires protocol-envelope bridge evidence. -/
 def canAdmitShardPlacement

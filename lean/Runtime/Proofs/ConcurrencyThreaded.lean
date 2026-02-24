@@ -21,6 +21,8 @@ variable [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
 variable [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
 variable [IdentityVerificationBridge ι ν]
 
+/-! ## Concurrency-1 Equivalence -/
+
 /-- Threaded round and canonical round coincide at concurrency `1`. -/
 theorem sched_round_threaded_one_eq_sched_round_one
     (st : VMState ι γ π ε ν) :
@@ -54,6 +56,8 @@ theorem sched_round_threaded_refines_canonical_of_certified_round
   unfold schedRoundThreaded executeCertifiedRound executeThreadedRoundPlan
   simp [hN0, hN1, planThreadedRound, checkThreadedRoundPlan, hCert, hRefine]
 
+/-! ## Conditional Refinement Premises -/
+
 /-- Premise bundle for conditional threaded-to-canonical round refinement. -/
 structure ThreadedRoundRefinementPremises (n : Nat) where
   round_refines_canonical :
@@ -73,6 +77,8 @@ theorem run_scheduled_threaded_refines_canonical_of_round
   | succ fuel ih =>
       have hround := premises.round_refines_canonical
       simp [runScheduledThreaded, runScheduled, hround, ih]
+
+/-! ## Per-Session Trace Corollaries -/
 
 /-- Session-filtered normalized traces are equal for threaded and canonical
 runners at concurrency `1`. -/

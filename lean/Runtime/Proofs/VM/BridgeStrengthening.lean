@@ -8,6 +8,14 @@ import Runtime.Proofs.EffectBisim.ConfigEquivBridge
 Strengthened VM bridge statements with explicit premise bundling.
 -/
 
+/-
+The Problem. VM bridge theorems rely on several monitor/typing obligations that
+are easy to scatter across files, making transport assumptions hard to audit.
+
+Solution Structure. Bundle bridge premises in one structure, derive local handler
+obligations from that bundle, then compose with ConfigEquiv/EffectBisim transport.
+-/
+
 set_option autoImplicit false
 set_option linter.unnecessarySimpa false
 
@@ -18,6 +26,8 @@ section
 universe u
 
 variable {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] [EffectSpec ε]
+
+/-! ## Bridge Premises and Local Obligations -/
 
 /-- Canonical handler-typing obligation at the VM boundary. -/
 def handler_invoke_typed
@@ -75,6 +85,8 @@ theorem handler_fragment_typing_of_premises
   intro action hMem
   exact handler_obligation_local (γ:=γ) (ε:=ε) hPrem action hsid
 
+/-! ## VM-Step Typing Bridge -/
+
 /-- VM-step level bridge fact for handler steps.
     The theorem states explicit pre and post typing judgments and monitor sid preservation. -/
 theorem handler_vm_step_typing
@@ -89,6 +101,8 @@ theorem handler_vm_step_typing
   cases hHandler
   refine ⟨handler_obligation_local (γ:=γ) (ε:=ε) hPrem action hsid, ?_⟩
   exact hPrem.monitorPreserves _ _ hStep
+
+/-! ## Composed Observational Bridge -/
 
 /-- End-to-end bridge theorem used by paper-level bridge statements.
     Handler typing obligations are transported together with observational equivalence. -/
@@ -113,6 +127,8 @@ theorem vm_bridge_soundness_composed
 end
 
 section
+
+/-! ## Regression Audit Witnesses -/
 
 /-- Intentionally non-conforming monitor for premise-audit regression tests.
     It rewrites protocol session ids and therefore breaks sid preservation. -/

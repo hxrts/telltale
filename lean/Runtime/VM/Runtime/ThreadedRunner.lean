@@ -6,9 +6,20 @@ Extended round semantics that can execute multiple scheduler picks per round.
 The canonical runner in `Runner.lean` remains the reference semantics.
 -/
 
+/-
+The Problem. We need a deterministic threaded execution path that can run multiple
+eligible scheduler picks per round while preserving the canonical single-step fallback.
+
+Solution Structure. Build wave-level footprint/session guards, deterministically plan
+waves, certify plans with boolean checkers, and execute with explicit fallback to the
+canonical scheduler when certificates fail.
+-/
+
 set_option autoImplicit false
 
 universe u
+
+/-! ## Footprint Utilities -/
 
 /-- One footprint atom used for wave-level disjointness checks. -/
 abbrev FootprintAtom := SessionId × Role
@@ -27,6 +38,8 @@ private def roleFootprintSummary {γ ε : Type u} [GuardLayer γ] [EffectRuntime
   match prog.metadata.footprintSummary.find? (fun p => p.1 = role) with
   | some (_, roles) => roles
   | none => []
+
+/-! ### Ownership Index and Normalization -/
 
 private def buildOwnershipIndex {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -52,6 +65,8 @@ private def normalizeThreadedState {ι γ π ε ν : Type u} [IdentityModel ι] 
   let st' := { st with sched := sched' }
   let ownership := buildOwnershipIndex st'
   { st' with sched := { st'.sched with ownershipIndex := ownership } }
+
+/-! ### Coroutine Footprint Queries -/
 
 /-- Endpoint footprint carried by one coroutine. -/
 def coroFootprintAtoms {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -86,6 +101,8 @@ def coroPrimarySession? {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
   | none => none
   | some c => c.ownedEndpoints.head?.map (fun ep => ep.sid)
 
+/-! ### Wave Admissibility Predicate -/
+
 /-- Two footprints are disjoint when no atom occurs in both lists. -/
 def waveFootprintDisjoint (left right : List FootprintAtom) : Prop :=
   (∀ atom, atom ∈ left → atom ∉ right) ∧
@@ -116,6 +133,8 @@ def waveAdmissible {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   (∀ c1 c2,
       c1 ∈ picked → c2 ∈ picked → c1 ≠ c2 →
       waveFootprintDisjoint (coroFootprintAtoms st c1) (coroFootprintAtoms st c2))
+
+/-! ## Boolean Compatibility Checks -/
 
 private def waveSessionDisjointB {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -149,6 +168,8 @@ private def compatibleWithWave {ι γ π ε ν : Type u} [IdentityModel ι] [Gua
       eligible cid other && eligible other cid &&
       (waveSessionDisjointB st cid other || fpDisjoint) &&
       fpDisjoint)
+
+/-! ## Deterministic Wave Planning -/
 
 private def planWavePass {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -205,6 +226,8 @@ def planDeterministicWaves {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     (st : VMState ι γ π ε ν) : List (List CoroutineId) :=
   planDeterministicWavesEligible st (fun _ _ => true)
 
+/-! ## Wave Chunking and Execution -/
+
 private def chunkWave (width : Nat) (wave : List CoroutineId) : List (List CoroutineId) :=
   let rec go (remaining : List CoroutineId) (acc : List (List CoroutineId)) (fuel : Nat) :
       List (List CoroutineId) :=
@@ -253,6 +276,8 @@ def executePlannedWaves {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     (st : VMState ι γ π ε ν) (waves : List (List CoroutineId)) : VMState ι γ π ε ν :=
   waves.foldl executeWave st
 
+/-! ## Plan Certificates -/
+
 /-- Certificate artifact for a deterministic wave plan. -/
 structure WaveCertificate where
   waves : List (List CoroutineId)
@@ -263,6 +288,8 @@ structure WaveCertificate where
 structure ThreadedRoundPlan where
   certificate : WaveCertificate
   deriving Repr
+
+/-! ## Certificate Checkers -/
 
 private def waveReadyRunnableB {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -316,6 +343,8 @@ def checkWaveCertificate {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
   let picks := cert.waves.foldl (fun acc wave => acc ++ wave) []
   noDupB picks && cert.waves.all (checkWaveAdmissible st)
 
+/-! ## Plan Builders -/
+
 /-- Build a deterministic certificate for a threaded round width. -/
 def plannedWaveCertificate {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -348,6 +377,8 @@ def checkThreadedRoundPlan {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     (st : VMState ι γ π ε ν) (plan : ThreadedRoundPlan) : Bool :=
   checkWaveCertificate st plan.certificate
 
+/-! ## Certified Threaded Round -/
+
 /-- Execute one validated threaded plan with canonical fallback. -/
 def executeThreadedRoundPlan {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -372,6 +403,8 @@ def executeCertifiedRound {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     (n : Nat) (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
   executeThreadedRoundPlan st (planThreadedRound n st)
 
+/-! ## Threaded Scheduling API -/
+
 /-- Threaded phase-2 executor over deterministic preplanned waves. -/
 def schedRoundThreaded {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -386,6 +419,8 @@ def schedRoundThreaded {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     schedRoundOne st
   else
     executeCertifiedRound n st
+
+/-! ## Fuel-Bounded Threaded Runner -/
 
 /-- Threaded fuel-bounded runner: same outer control as canonical runner, but
 rounds may execute more than one scheduler step. -/

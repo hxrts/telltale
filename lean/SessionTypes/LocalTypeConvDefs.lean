@@ -228,6 +228,8 @@ mutual
   termination_by
     t => sizeOf t
 
+  /- ## Branch Conversion with Closedness Witness -/
+
   def branchesFromDB (ctx : SessionTypes.LocalTypeConv.NameContext) :
       (bs : List (Label × SessionTypes.LocalTypeDB)) →
       isClosedAtBranches ctx.length bs = true →

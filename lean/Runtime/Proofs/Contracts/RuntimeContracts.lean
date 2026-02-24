@@ -18,6 +18,15 @@ runtime architecture plan:
 - theorem-pack capability inventory exposure.
 -/
 
+/-
+The Problem. Runtime admission and capability gating need one Lean-facing contract
+surface that runtime code can query without importing internal proof-pack modules.
+
+Solution Structure. This file defines small contract records and gate functions,
+then groups API-level checks (admission, migration, autoscaling, determinism) in
+separate sections so the runtime boundary is explicit.
+-/
+
 namespace Runtime
 namespace Proofs
 
@@ -139,6 +148,8 @@ theorem admit_vm_runtime_requires_contracts
   simp [hReq]
   cases contracts? <;> simp
 
+/-! ### Capability-Gated Runtime APIs -/
+
 /-- Live migration request payload. -/
 structure LiveMigrationRequest where
   sid : SessionId
@@ -174,6 +185,8 @@ def requestLiveMigration
     (contracts : VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)
     (req : LiveMigrationRequest) : Option LiveMigrationRequest :=
   if canUseLiveMigration contracts then some req else none
+
+/-! ### Scaling and Placement Gates -/
 
 /-- Autoscale/repartition request payload. -/
 structure AutoscaleRequest where
@@ -220,6 +233,8 @@ def runtimeCapabilitySnapshot
     , ("placement_refinement", canUsePlacementRefinement contracts)
     , ("relaxed_reordering", canUseRelaxedReordering contracts)
     ]
+
+/-! ### Determinism Profile Gates -/
 
 /-- Artifact check for one runtime determinism profile. -/
 def determinismProfileSupported

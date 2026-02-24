@@ -4,6 +4,8 @@ set_option autoImplicit false
 
 universe u
 
+/-! ## Fresh-Session Lower Bounds -/
+
 private lemma foldl_max_ge_start (xs : List Nat) (start : Nat) :
     start ≤ xs.foldl Nat.max start := by
   induction xs generalizing start with
@@ -28,6 +30,8 @@ private lemma next_fresh_session_id_ge {ι γ π ε ν : Type u} [IdentityModel 
     exact Nat.le_trans
       (foldl_max_ge_start (existingSessionIds st) st.nextSessionId)
       (Nat.le_succ _)
+
+/-! ## Loader Monotonicity -/
 
 theorem load_choreography_snd_ge_next_session_id
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -59,6 +63,8 @@ theorem load_choreography_snd_ge_next_session_id
       simp [loadChoreography, hRes]
   | tooManyCoroutines _ =>
       simp [loadChoreography, hRes]
+
+/-! ## Session Disjointness -/
 
 theorem load_choreography_disjoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]

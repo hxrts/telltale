@@ -192,6 +192,8 @@ def ghost_speculation_resources {ι γ π ε ν : Type u}
   sepList (st.ghostSessions.sessions.toList.map
     (fun p => speculation_session_inv γsp p.snd.realSid))
 
+/-! ### Session-State Interpretation -/
+
 def session_state_interp {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -209,6 +211,8 @@ def session_state_interp {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer 
                 (iProp.sep (coroutine_progress_resources γp st.coroutines)
                   (iProp.sep (coroutine_knowledge_resources γk st.coroutines)
                     (ghost_speculation_resources γsp st)))))
+
+/-! ### Adequacy Statement -/
 
 def vm_adequacy {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]

@@ -13,11 +13,22 @@ state. Checkpoint/restore and reconciliation semantics remain deferred to later
 V2 phases.
 -/
 
+/-
+The Problem. Speculation instructions must enforce runtime gates (feature flag,
+depth bounds, active-speculation requirements) while keeping checkpoint behavior
+deterministic for replay and proof transport.
+
+Solution Structure. Define structural snapshot comparators first, then specify
+`stepFork`, `stepJoin`, and `stepAbort` as separate guarded transitions.
+-/
+
 set_option autoImplicit false
 
 universe u
 
 /-! ## Speculation semantics -/
+
+/-! ### Snapshot Matching Utilities -/
 
 mutual
 
@@ -71,6 +82,8 @@ def matchesRealState {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
   | some ghost =>
       localTypeSnapshotMatches ghost.projectedLocalTypes (localTypesForSid st ghost.realSid)
 
+/-! ### Fork Transition -/
+
 def stepFork {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -118,6 +131,9 @@ def stepFork {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
           faultPack st coro (.typeViolation .nat (valTypeOf v)) "bad fork operand"
       | none =>
           faultPack st coro .outOfRegisters "missing fork operand"
+
+/-! ### Join Transition -/
+
 def stepJoin {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -140,6 +156,7 @@ def stepJoin {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
       else
         faultPack st coro (.specFault "join reconciliation predicate failed") "join reconciliation mismatch"
 
+/-! ### Abort Transition -/
 
 def stepAbort {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
