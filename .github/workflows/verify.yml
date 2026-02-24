@@ -52,6 +52,11 @@ jobs:
           mkdir -p artifacts
           just check-parity | tee artifacts/check-parity.log
 
+      - name: Run docs drift checks
+        run: |
+          mkdir -p artifacts
+          just check-docs-drift | tee artifacts/check-docs-drift.log
+
       - name: Run capability gate checks
         run: |
           mkdir -p artifacts
@@ -126,6 +131,11 @@ jobs:
         run: |
           mkdir -p artifacts
           just check-parity | tee artifacts/check-parity.log
+
+      - name: Run docs drift checks
+        run: |
+          mkdir -p artifacts
+          just check-docs-drift | tee artifacts/check-docs-drift.log
 
       - name: Run capability gate checks
         run: |

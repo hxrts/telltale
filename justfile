@@ -17,6 +17,7 @@ ci-dry-run:
     just check-lean-dependency-pins
     just check-capability-gates
     just check-release-conformance
+    just check-docs-drift
     just v2-baseline check
     just check-vm-placeholders
     just check-parity
@@ -87,6 +88,10 @@ check-vm-placeholders:
 # Consolidated Lean/Rust parity checks (types, suite, conformance)
 check-parity mode="--all":
     ./scripts/check-parity.sh {{ mode }}
+
+# Check crate and feature references in docs/00-03 against Cargo metadata.
+check-docs-drift:
+    ./scripts/check-docs-drift.sh
 
 # Refresh generated Lean metrics in docs
 sync-lean-metrics:

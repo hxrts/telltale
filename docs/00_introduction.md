@@ -41,7 +41,7 @@ Telltale includes a Lean 4 formalization that verifies the core type system. The
 
 Deadlock-freedom claims are assumption-scoped. Typical premises include well-typedness, progress reachability, and fair scheduling. The Lean development separates structural well-formedness from progress predicates. This makes theorem statements precise about what conditions are required.
 
-The Rust type definitions in `telltale-types` match the Lean definitions exactly. The `telltale-lean-bridge` crate provides JSON export and import for cross-validation. See `lean/CODE_MAP.md` for detailed documentation of the Lean codebase.
+Core constructors in `telltale-types` align with the Lean definitions. Lean currently includes a `delegate` global constructor that Rust does not yet expose. The `telltale-lean-bridge` crate provides JSON export and import for cross-validation. See [Lean Verification Code Map](../lean/CODE_MAP.md) for details on the Lean codebase.
 
 ## Choreographic Programming
 
@@ -68,7 +68,9 @@ A good place to start learning more about choreographic programming is [Introduc
 
 Algebraic effects separate what a program does from how it does it. The effect algebra defines a set of abstract operations that a program can perform. Handlers provide concrete implementations of these operations. This separation allows the same program to run with different implementations.
 
-In Telltale, communication operations are effects. Sending and receiving messages are abstract operations. Different handlers implement these operations differently. An in-memory handler passes messages through local channels. A network handler sends messages over TCP or WebSocket connections.
+In Telltale, communication operations are effects. Sending and receiving messages are abstract operations. Different handlers implement these operations differently.
+
+An in-memory handler passes messages through local channels. A network handler sends messages over TCP or WebSocket connections.
 
 ```rust
 let program = Program::new()
@@ -85,9 +87,13 @@ The program specifies what messages to send and receive. The handler determines 
 
 ## Integration in Telltale
 
-Telltale combines these concepts into a practical system. Choreographies define distributed protocols globally. The type system ensures protocol safety through MPST. Effect handlers provide flexible execution strategies. The choreography macro parses protocol definitions, generates role and message types automatically, and creates session types for each participant through projection.
+Telltale combines these concepts into a practical system. Choreographies define distributed protocols globally. The type system enforces protocol safety through MPST. Effect handlers provide flexible execution strategies.
 
-The effect system decouples protocol logic from transport mechanisms. Handlers interpret send and receive operations. Middleware can add logging, retry logic, or fault injection. The same choreography works across different deployment scenarios. Content addressing assigns cryptographic identities to all protocol artifacts, enabling memoization and structural sharing.
+The choreography macro parses protocol definitions. It generates role and message types automatically. It also creates per-role session types through projection.
+
+The effect system decouples protocol logic from transport mechanisms. Handlers interpret send and receive operations. Middleware can add logging, retry logic, or fault injection.
+
+The same choreography works across different deployment scenarios. Content addressing assigns cryptographic identities to protocol artifacts. This supports memoization and structural sharing.
 
 A bytecode VM provides an alternative execution model. The VM compiles local types to bytecode instructions and manages scheduling, buffers, and session lifecycle. The concurrency parameter N controls how many coroutines advance per scheduling round. Per-session traces are invariant over N, enabling testing at high concurrency and deployment at lower concurrency.
 

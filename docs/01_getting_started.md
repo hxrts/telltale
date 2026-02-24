@@ -6,15 +6,30 @@ Add Telltale to your project dependencies.
 
 ```toml
 [dependencies]
-telltale = "*"
-telltale-choreography = "*"
+telltale = "0.9.1"
+telltale-choreography = "0.9.1"
 ```
 
-This adds the facade crate and the choreographic programming layer.
+This adds the facade crate and the choreographic programming layer. Pinning versions keeps builds reproducible.
+
+### Which Crate Should You Use
+
+| If you need | Use |
+|-------------|-----|
+| Core session types plus facade APIs | `telltale` |
+| Choreography DSL, parser, and effect handlers | `telltale-choreography` |
+| Projection, merge, and subtyping algorithms | `telltale-theory` |
+| Bytecode execution with schedulers | `telltale-vm` |
+| Deterministic simulation and scenario middleware | `telltale-simulator` |
+| Lean JSON import, export, and validation tools | `telltale-lean-bridge` |
+
+This table is a quick entry point for crate selection. Use it before reading the full crate descriptions.
 
 ### Understanding the Crates
 
-Telltale is organized as a Cargo workspace with several crates. The crate structure mirrors the Lean formalization for verified correspondence. The `telltale-types` crate contains core type definitions (`GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`) that match Lean exactly. The `telltale-theory` crate contains pure algorithms for projection, merge, subtyping, and well-formedness checks.
+Telltale is organized as a Cargo workspace with several crates. The layout tracks the Lean formalization for shared protocol concepts. The `telltale-types` crate contains core type definitions such as `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`.
+
+Lean includes a `delegate` constructor that is not yet exposed in Rust. The `telltale-theory` crate contains pure algorithms for projection, merge, subtyping, and well-formedness checks.
 
 The `telltale-choreography` crate is the choreographic programming layer that provides the DSL parser, effect handlers, and code generation. The `telltale-vm` crate provides the bytecode VM execution engine. The `telltale-simulator` crate wraps the VM with deterministic middleware for testing. The `telltale-lean-bridge` crate enables cross-validation with Lean through JSON import and export functions.
 
@@ -48,6 +63,7 @@ The workspace provides granular feature flags to control dependencies and functi
 | `sync-subtyping` | yes | Synchronous subtyping |
 | `semantics` | yes | Async step semantics from ECOOP 2025 |
 | `coherence` | yes | Coherence predicates |
+| `full` | no | Enable all optional features |
 
 #### Choreography Crate (`telltale-choreography`)
 
@@ -69,7 +85,7 @@ The workspace provides granular feature flags to control dependencies and functi
 
 ```toml
 # Just the core runtime, no algorithms
-telltale = { version = "*", default-features = false }
+telltale = { version = "0.9.1", default-features = false }
 ```
 
 This keeps the dependency surface small while enabling the core runtime.
@@ -78,7 +94,7 @@ This keeps the dependency surface small while enabling the core runtime.
 
 ```toml
 # Everything enabled
-telltale = { version = "*", features = ["full"] }
+telltale = { version = "0.9.1", features = ["full"] }
 ```
 
 This enables all optional features for the facade crate.
@@ -86,7 +102,7 @@ This enables all optional features for the facade crate.
 For WASM support, enable the wasm feature on the choreography crate.
 
 ```toml
-telltale-choreography = { version = "*", features = ["wasm"] }
+telltale-choreography = { version = "0.9.1", features = ["wasm"] }
 ```
 
 This enables compilation to WebAssembly targets.

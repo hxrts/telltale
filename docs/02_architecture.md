@@ -180,17 +180,30 @@ pub fn generate_choreography_code_with_dynamic_roles(
     local_types: &[(Role, LocalType)],
 ) -> TokenStream
 pub fn generate_choreography_code_with_namespacing(
-    choreography: &Choreography,
+    choreo: &Choreography,
     local_types: &[(Role, LocalType)],
 ) -> TokenStream
 pub fn generate_choreography_code_with_annotations(
+    name: &str,
+    roles: &[Role],
+    local_types: &[(Role, LocalType)],
+    choreo: &Choreography,
+) -> TokenStream
+pub fn generate_choreography_code_with_topology(
     choreography: &Choreography,
     local_types: &[(Role, LocalType)],
+    inline_topologies: &[InlineTopology],
 ) -> TokenStream
-pub fn generate_choreography_code_with_topology(choreography: &Choreography, local_types: &[(Role, LocalType)]) -> TokenStream
 pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
-pub fn generate_role_implementations(roles: &[Role]) -> TokenStream
-pub fn generate_topology_integration(choreography: &Choreography) -> TokenStream
+pub fn generate_role_implementations(
+    role: &Role,
+    local_type: &LocalType,
+    protocol_name: &str,
+) -> TokenStream
+pub fn generate_topology_integration(
+    choreography: &Choreography,
+    inline_topologies: &[InlineTopology],
+) -> TokenStream
 pub fn generate_helpers(name: &str, messages: &[MessageType]) -> TokenStream
 ```
 
@@ -330,7 +343,7 @@ Effect handlers provide runtime flexibility. Test handlers use in-memory communi
 
 Session types provide compile-time guarantees about protocol compliance. The Rust type system enforces that each role follows their protocol correctly.
 
-Type checking prevents common distributed systems errors. Deadlocks and protocol violations are caught at compile time.
+Type checking prevents common distributed systems errors. Message ordering and payload-shape violations are caught at compile time. Global deadlock claims remain assumption-scoped in the theory results.
 
 ### Platform Abstraction
 
@@ -358,7 +371,7 @@ Add new code generation backends to target different session type libraries. The
 
 ## Workspace Organization
 
-Telltale is organized as a Cargo workspace with multiple crates. All Rust code is located in the `rust/` directory. The crate structure mirrors the Lean formalization.
+Telltale is organized as a Cargo workspace with multiple crates. All Rust code is located in the `rust/` directory. The layout tracks the Lean formalization for shared protocol concepts.
 
 ```
 telltale/
@@ -390,7 +403,7 @@ telltale/
 │   │       └── runner.rs   Lean binary invocation
 │   ├── vm/                 Bytecode VM engine (telltale-vm)
 │   ├── simulator/          Deterministic simulation (telltale-simulator)
-│   ├── transport/          Production transports (telltale-transport)
+│   ├── effect-scaffold/    Internal scaffold crate (workspace member)
 │   └── macros/             Procedural macros (telltale-macros)
 ├── lean/                   Lean 4 verification code
 ├── examples/               Example protocols
@@ -398,10 +411,13 @@ telltale/
 ```
 
 This tree outlines the workspace layout and crate locations. It helps map each crate name to its directory.
+The `rust/transport/` crate also exists in the repository, but it is not currently listed as a workspace member in the root `Cargo.toml`.
 
 ### Crate Responsibilities
 
-The `telltale-types` crate contains core type definitions (`GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`) that match Lean exactly. The `telltale-theory` crate contains pure algorithms for projection, merge, duality, subtyping, and well-formedness checks. This crate depends only on `telltale-types`.
+The `telltale-types` crate contains core type definitions such as `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`. The shared constructors are aligned with Lean. Lean still includes a `delegate` constructor that Rust does not yet expose.
+
+The `telltale-theory` crate contains pure algorithms for projection, merge, duality, subtyping, and well-formedness checks. This crate depends only on `telltale-types`.
 
 The `telltale-choreography` crate is the choreographic programming layer including the DSL parser, effect handlers, code generation, and runtime support. The `telltale-lean-bridge` crate provides Lean integration through JSON export and import with a runner for invoking the verification binary.
 

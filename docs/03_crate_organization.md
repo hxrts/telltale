@@ -21,45 +21,53 @@ graph TB
     subgraph Runtime
         vm["telltale-vm<br/>Bytecode VM & scheduler"]
         simulator["telltale-simulator<br/>VM-based simulation"]
-        transport["telltale-transport<br/>Production transports"]
     end
 
     subgraph Application
         choreo["telltale-choreography<br/>DSL, parsing & code generation"]
         macros["telltale-macros<br/>Proc macros"]
+        scaffold["effect-scaffold<br/>Scaffold generator"]
     end
 
     subgraph Facade
         main["telltale<br/>Main crate, re-exports"]
     end
 
+    subgraph Auxiliary
+        transport["telltale-transport<br/>Production transports<br/>(not workspace member)"]
+    end
+
     types --> theory
-    types --> lean
+    types --> main
     types --> choreo
+    types --> lean
     types --> vm
     types --> simulator
 
-    theory --> choreo
+    theory --> main
     theory --> vm
+    theory --> choreo
+    theory --> lean
 
     vm --> simulator
 
-    choreo --> macros
+    macros --> main
+    macros --> choreo
+    main --> choreo
 
-    theory --> main
-    choreo --> main
-    lean --> main
-    vm --> main
-    simulator --> main
+    choreo --> lean
+
+    types --> transport
+    choreo --> transport
 ```
 
-This diagram shows the dependency relationships between crates. Arrows indicate dependency direction. The `telltale-types` crate serves as the foundation for all other crates.
+This diagram shows direct crate dependencies. Arrows point from dependency to dependent crate. Some edges are feature-gated, such as `telltale-theory` and `telltale-choreography` support in `telltale-lean-bridge`.
 
 ## Crate Descriptions
 
 ### telltale-types
 
-This crate is located in `rust/types/`. It contains all core type definitions that match Lean exactly. It has no dependencies on other workspace crates.
+This crate is located in `rust/types/`. It contains core type definitions shared with Lean for global and local protocol representations. Lean includes a `delegate` constructor that is not yet exposed in Rust. The crate has no dependencies on other workspace crates.
 
 The crate defines `GlobalType` for global protocol views. It defines `LocalTypeR` for local participant views. It also defines `Label` for message labels with payload sorts, `PayloadSort` for type classification, and `Action` for send and receive actions.
 
@@ -89,7 +97,9 @@ This crate is located in `rust/theory/`. It implements pure algorithms for sessi
 
 The `projection` module handles `GlobalType` to `LocalTypeR` projection with merging. The `merge` module implements branch merging with distinct semantics for send and receive. Send merge requires identical label sets while receive merge unions labels. This matches Lean's `mergeSendSorted` and `mergeRecvSorted` functions.
 
-The `subtyping/sync` module provides synchronous subtyping. The `subtyping/async` module provides asynchronous subtyping via SISO decomposition. The `well_formedness` module contains validation predicates. The `duality` module computes dual types. The `bounded` module implements bounded recursion strategies.
+The `subtyping/sync` module provides synchronous subtyping. The `subtyping/async` module provides asynchronous subtyping via SISO decomposition. The `well_formedness` module contains validation predicates.
+
+The `duality` module computes dual types. The `bounded` module implements bounded recursion strategies.
 
 Projection memoization uses the content store in `telltale-types` to cache by content ID. See [Content Addressing](16_content_addressing.md) for details.
 
@@ -126,9 +136,13 @@ These commands generate samples, validate round-trips, and import JSON respectiv
 
 This crate is located in `rust/vm/`. It provides a bytecode VM for executing session type protocols. The VM is the core engine used by the simulator and can also be embedded directly.
 
-The `instr` module defines the bytecode instruction set. Communication instructions include `Send`, `Receive`, `Offer`, and `Choose`. Session lifecycle uses `Open` and `Close`. Effect and guard execution uses `Invoke`, `Acquire`, and `Release`. Speculation and ownership support uses `Fork`, `Join`, `Abort`, `Transfer`, `Tag`, and `Check`. Control flow uses `Set`, `Move`, `Jump`, `Spawn`, `Yield`, and `Halt`.
+The `instr` module defines the bytecode instruction set. Communication instructions include `Send`, `Receive`, `Offer`, and `Choose`. Session lifecycle uses `Open` and `Close`.
 
-The `coroutine` module defines lightweight execution units. Each coroutine has a program counter, register file, and status. Each coroutine stores its session ID, role, and bytecode program. The `scheduler` module implements scheduling policies. Available policies are `Cooperative`, `RoundRobin`, `Priority`, and `ProgressAware`.
+Effect and guard execution uses `Invoke`, `Acquire`, and `Release`. Speculation and ownership support uses `Fork`, `Join`, `Abort`, `Transfer`, `Tag`, and `Check`. Control flow uses `Set`, `Move`, `Jump`, `Spawn`, `Yield`, and `Halt`.
+
+The `coroutine` module defines lightweight execution units. Each coroutine has a program counter, register file, and status. Each coroutine stores its session ID, role, and bytecode program.
+
+The `scheduler` module implements scheduling policies. Available policies are `Cooperative`, `RoundRobin`, `Priority`, and `ProgressAware`.
 
 The `session` module manages session state and type advancement. The `buffer` module provides bounded message buffers. Buffer modes include `Fifo` and `LatestValue`. Backpressure policies include `Block`, `Drop`, `Error`, and `Resize`.
 
@@ -178,7 +192,7 @@ Use `just sim-run <config>` for a single config file execution path.
 
 ### telltale-choreography
 
-This crate is located in `rust/choreography/`. It provides DSL and parsing for choreographic programming. It depends on `telltale-types` and `telltale-theory`.
+This crate is located in `rust/choreography/`. It provides DSL and parsing for choreographic programming. It depends on `telltale`, `telltale-macros`, `telltale-types`, and `telltale-theory`.
 
 The `ast/` directory contains extended AST types including `Protocol`, `LocalType`, and `Role`. The `compiler/parser` module handles DSL parsing. The `compiler/projection` module handles choreography to `LocalType` projection. The `compiler/codegen` module handles Rust code generation.
 
@@ -200,17 +214,21 @@ The `effects/` directory contains the effect system and handlers. The `extension
 
 The `topology/` directory provides deployment configuration. See [Topology](20_topology.md) for the separation between protocol logic and deployment. The `heap/` directory provides explicit resource management. See [Resource Heap](17_resource_heap.md) for nullifier-based consumption tracking.
 
+### effect-scaffold
+
+This crate is located in `rust/effect-scaffold/`. It is an internal helper tool that generates deterministic effect-handler integration stubs and test scaffolds. The package is marked `publish = false` and is intended for repository workflows rather than library consumers.
+
 ### telltale-transport
 
-This crate is located in `rust/transport/`. It provides production transport implementations for session types. The crate depends on `telltale-choreography` and `telltale-types`.
+This crate is located in `rust/transport/`. It provides production transport implementations for session types. The crate depends on `telltale-choreography` and `telltale-types`. It currently exists outside the workspace member list in the root `Cargo.toml`.
 
 The crate implements TCP-based transports with async networking via tokio. Future features include TLS support. The transport layer integrates with the effect handler system from `telltale-choreography`.
 
 ### telltale
 
-This crate is located in `rust/src/`. It is the main facade crate that re-exports from all other crates.
+This crate is defined at the repository root and uses `rust/src/` as its library source path. It re-exports core APIs from `telltale-types`, `telltale-macros`, and optional `telltale-theory` features.
 
-The crate supports several feature flags. The `theory` feature includes `telltale-theory` algorithms. The `full` feature enables all optional features. See [Getting Started](01_getting_started.md) for the complete feature flag reference.
+The crate supports several feature flags. The `theory` feature enables `telltale-theory` algorithms. The `full` feature enables all optional root features. See [Getting Started](01_getting_started.md) for the complete feature flag reference.
 
 ```rust
 use telltale::prelude::*;
@@ -283,7 +301,7 @@ From local types, three paths are available. Code generation produces session ty
 
 ## Lean Correspondence
 
-The types crate mirrors Lean definitions exactly. The following table shows the correspondence.
+The shared constructor set is aligned between `telltale-types` and Lean for core protocol terms. The table below shows the correspondence for constructors that are present in both implementations.
 
 | Lean Type | Rust Type | File |
 |-----------|-----------|------|

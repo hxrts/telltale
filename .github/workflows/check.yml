@@ -40,6 +40,8 @@ jobs:
         run: ./scripts/check-vm-placeholders.sh
       - name: Run parity checks
         run: ./scripts/check-parity.sh --all
+      - name: Check docs drift
+        run: ./scripts/check-docs-drift.sh
       - name: Run linter
         uses: actions-rs/cargo@v1
         with:
