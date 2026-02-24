@@ -1,0 +1,49 @@
+# Glossary and Notation Index
+
+This page defines shared terms and symbols used across the docs and paper-aligned pages.
+Use it as a stable lookup for terminology and notation.
+
+## Core Terms
+
+| Term | Meaning | Primary Docs |
+|---|---|---|
+| coherence | Session-wide compatibility invariant between local type state, buffers, and global structure. | [Theory](06_theory.md), [Theorem Program](26_theorem_program.md) |
+| harmony | Projection and protocol evolution commute under declared premises. | [Theory](06_theory.md), [Theorem Program](26_theorem_program.md) |
+| projection | Mapping from global choreography to per-role local session types. | [Choreographic Projection Patterns](05_projection.md) |
+| local type | Per-role protocol view used for runtime typing and progression. | [Theory](06_theory.md), [Session Lifecycle](13_session_lifecycle.md) |
+| effect handler | Runtime boundary that interprets VM or choreography actions. | [Choreography Effect Handlers](08_effect_handlers.md), [Effect Handlers and Session Types](10_effect_session_bridge.md) |
+| theorem-pack | Lean-exported capability inventory used by runtime admission gates. | [Lean Verification](18_lean_verification.md), [Capability and Admission](25_capability_admission.md) |
+| admission | Runtime gate process that checks contracts and capability evidence. | [Capability and Admission](25_capability_admission.md) |
+| envelope | Declared refinement boundary for higher-concurrency and profile-scoped behavior. | [VM Architecture](11_vm_architecture.md), [VM Parity](15_vm_parity.md) |
+| determinism profile | Runtime trace-equivalence contract mode such as `Full` or `Replay`. | [VM Architecture](11_vm_architecture.md), [VM Parity](15_vm_parity.md) |
+
+## Symbol and Notation Index
+
+| Symbol or Form | Meaning | Primary Docs |
+|---|---|---|
+| `G` | Global protocol type. | [Theory](06_theory.md) |
+| `L` or `LocalTypeR` | Local role protocol type. | [Theory](06_theory.md), [Bytecode Instructions](12_bytecode_instructions.md) |
+| `project(G, R)` | Projection of global type `G` for role `R`. | [Theory](06_theory.md), [Choreographic Projection Patterns](05_projection.md) |
+| `μX. ... X` | Recursive protocol form with bound variable `X`. | [Theory](06_theory.md) |
+| `⊕{...}` | Internal choice at the selecting endpoint. | [Theory](06_theory.md) |
+| `&{...}` | External choice at the receiving endpoint. | [Theory](06_theory.md) |
+| `!T.S` | Send `T`, then continue as `S`. | [Theory](06_theory.md) |
+| `?T.S` | Receive `T`, then continue as `S`. | [Theory](06_theory.md) |
+| `end` | Session termination state. | [Theory](06_theory.md) |
+| `Consume` | Recursive receiver-side trace alignment kernel used in coherence proofs. | [Theory](06_theory.md), [Theorem Program](26_theorem_program.md) |
+| `n = 1` | Canonical single-step concurrency regime for exact parity. | [VM Architecture](11_vm_architecture.md), [VM Parity](15_vm_parity.md) |
+| `n > 1` | Higher-concurrency regime admitted under envelope and premise-scoped constraints. | [VM Architecture](11_vm_architecture.md), [VM Parity](15_vm_parity.md) |
+| `Full`, `ModuloEffects`, `ModuloCommutativity`, `Replay` | Runtime determinism profiles. | [VM Architecture](11_vm_architecture.md), [VM Parity](15_vm_parity.md) |
+
+## Notation Consistency Rules
+
+Use one symbol for one concept in a local section.
+Reintroduce symbols when crossing between theory and runtime notation.
+Prefer existing symbols from this index unless precision requires a different one.
+
+## Related Docs
+
+- [Theory](06_theory.md)
+- [VM Architecture](11_vm_architecture.md)
+- [VM Parity](15_vm_parity.md)
+- [Theorem Program](26_theorem_program.md)

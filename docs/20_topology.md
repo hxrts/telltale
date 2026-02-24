@@ -166,6 +166,8 @@ let prod = MyProtocol::topology::topologies::prod_handler(Role::Alice)?;
 let custom = MyProtocol::topology::with_topology(custom_topology, Role::Alice)?;
 ```
 
+This pattern shows local default setup, named topology setup, and custom topology setup in one place.
+
 ## Transport Selection
 
 Transport selection is based on role locations.

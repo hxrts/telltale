@@ -78,3 +78,4 @@ Rust admission paths in `rust/vm/src/runtime_contracts.rs` and `rust/vm/src/comp
 - [Lean Verification](18_lean_verification.md)
 - [Capability and Admission](25_capability_admission.md)
 - [Distributed and Classical Families](27_distributed_classical_families.md)
+- [Glossary and Notation Index](28_glossary_notation.md)

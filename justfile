@@ -18,6 +18,7 @@ ci-dry-run:
     just check-capability-gates
     just check-release-conformance
     just check-docs-drift
+    just check-doc-quality
     just v2-baseline check
     just check-vm-placeholders
     just check-parity
@@ -89,9 +90,17 @@ check-vm-placeholders:
 check-parity mode="--all":
     ./scripts/check-parity.sh {{ mode }}
 
+# Enforce parity type ledger plus deviation registry presence/shape.
+check-parity-ledger:
+    ./scripts/check-parity-ledger.sh
+
 # Check crate and feature references in docs/00-03 against Cargo metadata.
 check-docs-drift:
     ./scripts/check-docs-drift.sh
+
+# Enforce documentation style, link integrity, and command/reference validity.
+check-doc-quality:
+    ./scripts/check-doc-quality.sh
 
 # Refresh generated Lean metrics in docs
 sync-lean-metrics:

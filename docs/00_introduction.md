@@ -1,6 +1,8 @@
 # Background
 
 This document introduces the theory behind Telltale. It covers multiparty session types, choreographic programming, and algebraic effects. These concepts explain how the system enforces type-safe distributed programming.
+Use [Start Here by Role](00_start_here.md) for role-specific reading paths.
+Use [Documentation Map](00_docs_map.md) for guide vs reference classification and normative status.
 
 ## Session Types
 
@@ -101,6 +103,7 @@ Topology configuration separates deployment concerns from protocol logic. Resour
 
 ## Further Reading
 
+See [Glossary and Notation Index](28_glossary_notation.md) for shared terminology and notation.
 See [Architecture](02_architecture.md) for system design details. See [Choreographic DSL](04_choreographic_dsl.md) for the choreography language. See [Choreography Effect Handlers](08_effect_handlers.md) for the choreography handler system.
 
 See [Content Addressing](16_content_addressing.md) for cryptographic protocol identities. See [Topology](20_topology.md) for deployment configuration. See [Resource Heap](17_resource_heap.md) for explicit state management. See [VM Architecture](11_vm_architecture.md) for the bytecode execution model.
