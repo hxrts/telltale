@@ -360,14 +360,33 @@ and Toueg, 1996), plus distributed-algorithm baselines (Lynch, 1996) and Byzanti
 (Lamport et al., 1982; Castro and Liskov, 1999). Reconfiguration commutation and determinism-envelope
 maximality are deferred to \emph{Harmony from Coherence in Asynchronous MPST}.
 
+\begin{table}[H]
+	\centering
+	\scriptsize
+	\begin{tabularx}{\columnwidth}{@{}L{0.23\columnwidth}L{0.72\columnwidth}@{}}
+		\toprule
+		\thead{Result} & \thead{Imported Dependencies and Use} \\
+		\midrule
+		Quantitative & Imports Paper 1 Theorem 4.1 and uses preserved Coherence for weighted descent and scheduler lifting. \\
+		Algorithmic & Imports the Paper 1 model kernel (Definitions 2.1--2.4) to fix state semantics for finite reachable constructions and deciders. \\
+		Crash & Imports the Paper 1 active-edge Coherence boundary to keep residual-graph checks in the same safety interface. \\
+		Byzantine & Imports the Paper 1 BZ interface set (BZ-1, BZ-1.1, BZ-1.2) and lifts these obligations to profile checks and capability-gated runtime admission. \\
+		\bottomrule
+	\end{tabularx}
+	\caption{Series dependency map for Paper 2.}
+	\label{tab:p2-series-dependencies}
+\end{table}
+
+In Table~\ref{tab:p2-series-dependencies}, Quantitative, Algorithmic, Crash, and Byzantine correspond to Theorem~\ref{thm:quantitative}, Theorem~\ref{thm:algorithmic}, Theorem~\ref{thm:crash}, and Theorem~\ref{thm:byzantine} with Corollary~\ref{cor:converse} and Proposition~\ref{prop:vm-bridge}.
+
 Our contributions in this paper are as follows:
 \begin{enumerate}
 	\item A quantitative descent theorem with explicit productive-step and scheduler-lifted total-step bounds from one weighted measure.
 	\item A uniform algorithmic schema that turns regular finite reachability into reusable decidability procedures.
 	\item A crash-stop tolerance characterization with decision and residual-graph exactness under stated side conditions.
 	\item A Byzantine safety characterization interface with exact iff form, converse counterexample families, and VM-bridge handoff obligations.
-		\item A mechanized architecture that shares one operational kernel while making branch-specific premises explicit (weighted-descent premises for quantitative claims, regular finite reachability premises for decision claims).
-	\end{enumerate}
+	\item A mechanized architecture that shares one operational kernel while making branch-specific premises explicit (weighted-descent premises for quantitative claims, regular finite reachability premises for decision claims).
+\end{enumerate}
 
 Main text proofs are proof sketches; full machine-checked derivations are provided by the Lean anchors indexed in Appendix~\ref{app:index}.
 
@@ -441,6 +460,8 @@ Table~\ref{tab:p2-assumptions} records the assumptions used for exact statements
 	Core claims in this paper assume asynchronous buffered semantics, active-edge Coherence, regular finite reachability for decision results, and the stated fairness profile for scheduler-lifted bounds.
 \end{assumption}
 
+Assumption-block inheritance policy. Assumption blocks do not inherit implicitly. If a theorem does not name a block, it uses Assumption Block~\ref{assump:p2-core} only.
+
 \begin{definition}[Productive Step]
 	For the one-step transition relation $s \to s'$, a step is productive iff $W(s') < W(s)$, where $W$ is Definition~\ref{def:p2-weighted-measure}.
 \end{definition}
@@ -450,7 +471,32 @@ Table~\ref{tab:p2-assumptions} records the assumptions used for exact statements
 	For a session state $s$, $W(s) = 2 \cdot \Sigma\text{depth}(s) + \Sigma\text{buffer}(s)$. In the mechanization this function is \texttt{weightedMeasure}.
 \end{definition}
 
-The factor two is required for strict decrease on send and select steps where one enqueue occurs. The same definition is used for global lifts and scheduler bounds.
+\begin{definition}[Depth Component]
+	Let $\mathsf{depthLoc}$ be the constructor count on one-step unfolded local types:
+	\[
+		\mathsf{depthLoc}(\mathsf{end}) = 0.
+	\]
+	\[
+		\mathsf{depthLoc}(\mathsf{send}\ r\ T\ L) = 1 + \mathsf{depthLoc}(L),
+	\]
+	\[
+		\mathsf{depthLoc}(\mathsf{recv}\ r\ T\ L) = 1 + \mathsf{depthLoc}(L),
+	\]
+		\[
+			\begin{aligned}[t]
+				\mathsf{depthLoc}(\mathsf{select}\ r\ \{l_i:L_i\}_i) & = 1 + \max_i d_i, \\
+				\mathsf{depthLoc}(\mathsf{branch}\ r\ \{l_i:L_i\}_i) & = 1 + \max_i d_i,
+			\end{aligned}
+		\]
+		where $d_i := \mathsf{depthLoc}(L_i)$.
+	\[
+		\mathsf{depthLoc}(\mu L) = \mathsf{depthLoc}(\mathsf{unfold}(\mu L)).
+	\]
+	For state $s$, $\Sigma\mathsf{depth}(s)$ is the sum of $\mathsf{depthLoc}$ over active endpoints.
+	Guarded recursion premises ensure this quantity is finite on reachable states.
+\end{definition}
+
+Coefficient choice. For $W_c(s):=c\cdot\Sigma\mathsf{depth}(s)+\Sigma\mathsf{buffer}(s)$, one productive send or select step satisfies $\Delta W_c \le -c + 1$. Strict decrease requires $c>1$. This paper fixes integer coefficient $c=2$, which is the smallest integer that satisfies this requirement. The same coefficient is used for global lifts and scheduler bounds.
 
 Table~\ref{tab:p2-scheduler-profiles} lists scheduler profiles used by the bound statements.
 
@@ -469,6 +515,13 @@ Table~\ref{tab:p2-scheduler-profiles} lists scheduler profiles used by the bound
 	\caption{Scheduler profiles.}
 	\label{tab:p2-scheduler-profiles}
 \end{table}
+
+Lift-constant extraction rules.
+\begin{enumerate}
+	\item Round-robin profile: $\kappa_\sigma = N_{\max}$, where $N_{\max}$ is the profile bound on enabled roles between productive steps.
+	\item $k$-fair profile: $\kappa_\sigma = k$.
+	\item Adversarial-fair profile: fairness guarantees eventual scheduling of enabled productive steps, but does not bound non-productive interleavings. This paper therefore uses productive exactness only and does not assume a finite total-step lift constant for this row.
+\end{enumerate}
 
 % ============================================================================
 \section{Worked Example}
@@ -524,6 +577,7 @@ The quantitative facts are used through the following derivation forms.
 		\forall \tau,\ T(\tau)\le \kappa_\sigma W_0 = 50
 	}
 \end{equation}
+For this witness, $T(\tau_{\mathrm{ex}})=4$, so the scheduler-lift upper bound gap is $50-4=46$. This illustrates the conservative profile-dependent margin.
 \eqnote{Example derivation: phase boundary, using the phase function from Theorem~\ref{thm:app-p2-sharp-capacity}}
 \begin{equation}
 	\dfrac{
@@ -576,7 +630,7 @@ Table~\ref{tab:p2-delta-w} records the per-rule $\Delta W$ facts used in this wi
 	\begin{equation}
 		T(\tau) \le \kappa_\sigma \cdot W_0.
 	\end{equation}
-	The productive bound is exact under the model assumptions. The scheduler-lifted bound is conservative and profile-dependent.
+	The productive bound is exact as a tight upper bound. Equality is attained under the conditions stated below. The scheduler-lifted bound is conservative and profile-dependent.
 \end{theorem}
 
 \begin{proof}
@@ -626,6 +680,24 @@ Table~\ref{tab:p2-delta-w} records the per-rule $\Delta W$ facts used in this wi
 		T(\tau)\le \kappa_\sigma\,W_0.
 	\]
 	Therefore both claimed inequalities hold.
+	\end{proof}
+
+\begin{proposition}[Productive-Bound Equality Conditions]
+	\label{prop:p2-productive-equality}
+	Under Assumption Block~\ref{assump:p2-quantitative}, if a trace $\tau$ satisfies all of the following, then $P(\tau)=W_0$.
+	\begin{enumerate}
+		\item Every productive step has unit drop, $W(s_i)-W(s_{i+1})=1$.
+		\item The terminal state has $W(s_n)=0$.
+	\end{enumerate}
+	These conditions give the witness shape for bound attainment.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+	The theorem proof gives
+	\[
+		P(\tau)\le W(s_0)-W(s_n).
+	\]
+	Under unit-drop and terminal-zero conditions, the telescoping sum over productive steps equals $W_0$. Hence $P(\tau)=W_0$.
 \end{proof}
 
 The weighted-measure decomposition used by Theorem~\ref{thm:quantitative} is:
@@ -670,6 +742,17 @@ The rule-local descent pattern lifted to global productive-step bounds is:
 	\label{assump:p2-regular}
 	The decision schema assumes regularity hypotheses that produce finite reachable-state spaces and effective predicate reductions to terminating finite-state checks on those spaces.
 \end{assumption}
+
+\begin{definition}[Regular Fragment Criteria]
+	A state belongs to the regular fragment when all of the following hold.
+	\begin{enumerate}
+		\item The role graph and message alphabet are finite.
+		\item Local types use guarded recursion and finite branch-label sets.
+		\item The closure of one-step unfolding and transition successors is finite.
+	\end{enumerate}
+\end{definition}
+
+Expressiveness note. This fragment includes finite-control request response workflows, guarded loop protocols, and finite branch families. It excludes unguarded recursion and constructions that generate unbounded fresh control states.
 
 \begin{theorem}[Algorithmic Dynamics Schema]
 	\label{thm:algorithmic}
@@ -751,6 +834,17 @@ Equation~\ref{eq:p2-algorithmic-workflow} records the generic workflow.
 	Byzantine characterization assumes explicit bundle \Hbyz with fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions.
 \end{assumption}
 
+\begin{definition}[Byzantine Bundle Component Meanings]
+	At this paper interface:
+	\begin{enumerate}
+		\item $\mathsf{ByzQuorumOK}$: quorum and intersection constraints hold for the declared fault budget. The standard threshold instantiation is $n>3f$ with quorum intersection witnesses.
+		\item $\mathsf{ByzAuthEvidenceOK}$: every accepted Byzantine-relevant action carries valid authentication and evidence objects required by the profile.
+		\item $\mathsf{ByzBudgetOK}$: adversarial actions stay within the declared budget envelope.
+		\item $\mathsf{ByzPrimitiveConsistent}$: conflict-exclusion and primitive-level consistency obligations hold for certified transitions.
+	\end{enumerate}
+	$\ByzSafe$ means safety-visible non-conflict at the paper interface. No two admitted executions produce contradictory certified outcomes in \Obssafe for the same certified decision point.
+\end{definition}
+
 Define
 \begin{equation}
 	\begin{aligned}
@@ -771,6 +865,8 @@ where each conjunct names the corresponding requirement class in \Hbyz.
 	with relative maximality for the same characterization relation.
 \end{theorem}
 
+Series scope note. This theorem is the dynamics-layer Byzantine safety interface. \emph{Harmony from Coherence in Asynchronous MPST} reuses the same bundle and extends it to envelope-level maximality and adherence transport.
+
 \begin{proof}[Proof sketch]
 	Fix the Byzantine assumption bundle as a typed profile and apply \nolinkurl{byzantine_safety_exact_of_profile} to obtain \texttt{ExactByzantineSafetyCharacterization} for the profile model.
 
@@ -786,7 +882,7 @@ where each conjunct names the corresponding requirement class in \Hbyz.
 
 \begin{corollary}[Converse Counterexample Families]
 	\label{cor:converse}
-	If any required class in \Hbyz is dropped, there exists a counterexample family that violates \ByzSafe. The dropped classes are quorum or intersection obligations, authentication or evidence-validity obligations, adversarial-budget obligations, and primitive-consistency obligations.
+	Under Assumption Block~\ref{assump:p2-byzantine}, if any required class in \Hbyz is dropped, there exists a counterexample family that violates \ByzSafe. The dropped classes are quorum or intersection obligations, authentication or evidence-validity obligations, adversarial-budget obligations, and primitive-consistency obligations.
 \end{corollary}
 
 \begin{proof}[Proof sketch]
@@ -795,12 +891,14 @@ where each conjunct names the corresponding requirement class in \Hbyz.
 
 \begin{proposition}[Byzantine VM-Bridge Interface]
 	\label{prop:vm-bridge}
-	If theorem-pack capabilities include Byzantine characterization and VM envelope-adherence evidence, then runtime profile claims are constrained by \Eqsafe under \Ebyz, and claims lacking required capability evidence are rejected by profile admission.
+	Under Assumption Block~\ref{assump:p2-byzantine}, if theorem-pack capabilities include Byzantine characterization and VM envelope-adherence evidence, then runtime profile claims are constrained by \Eqsafe under \Ebyz, and claims lacking required capability evidence are rejected by profile admission.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
 	The proof proceeds by capability-gated extraction. First, \texttt{canOperateUnderByzantineEnvelope} checks that the theorem pack has both Byzantine safety and VM envelope adherence evidence. Second, admitted profiles are interpreted through the VM Byzantine envelope layer, which gives the safety-visible relation \Eqsafe. Third, admission and conformance theorems ensure that claims without required evidence are rejected. Thus the interface is executable and proof-carrying.
 \end{proof}
+
+VM instruction-layer note. This paper reuses the instruction-form interface and \texttt{WellTypedInstr} mapping from the Effect-Typed Bridge in \emph{Coherence for Asynchronous Buffered MPST} (Section 7, Proposition 7.1). At this interface, \texttt{send}/\texttt{select} carry sender-continuation obligations, \texttt{recv}/\texttt{branch} carry consume-alignment obligations, and \texttt{invoke} carries handler-fragment lift obligations. The contribution here is computable profile extraction and safety-interface packaging on top of that shared VM typing layer.
 
 Table~\ref{tab:p2-decidability-summary} summarizes the decidability results.
 
@@ -841,6 +939,8 @@ Table~\ref{tab:p2-complexity-envelopes} summarizes complexity envelopes for the 
 	\label{tab:p2-complexity-envelopes}
 \end{table}
 
+Complexity context. For this fragment, any sound complete checker must inspect the finite reachable object, so linear graph-traversal cost is a baseline lower bound in explored-graph size. The polynomial envelopes in Table~\ref{tab:p2-complexity-envelopes} are therefore fragment-local bounds. Outside the regular finite-reachability fragment, known communicating-automata style analyses can lose decidability (Brand and Zafiropulo, 1983).
+
 % ============================================================================
 \section{Quantitative Corollaries}
 \label{sec:corollaries}
@@ -858,8 +958,10 @@ Table~\ref{tab:p2-complexity-envelopes} summarizes complexity envelopes for the 
 
 \begin{corollary}[Critical Capacity Boundary]
 	\label{cor:capacity}
-	There exists a computable threshold $\Bc$ such that the declared phase classifier over buffer capacity is exact at the theorem interface under the stated assumptions.
+	Under Assumption Block~\ref{assump:p2-quantitative}, there exists a computable threshold $\Bc$ such that the declared phase classifier over buffer capacity is exact at the theorem interface.
 \end{corollary}
+
+Operational interpretation. $\Phase(B)=\mathsf{Low}$ means capacity is below the certified boundary and profile-side branch obligations are not all realizable. $\Phase(B)=\mathsf{Critical}$ means capacity is exactly at the certified boundary. $\Phase(B)=\mathsf{High}$ means capacity is above the boundary and the same obligations remain realizable with slack.
 
 \begin{proof}[Proof sketch]
 	Corollary~\ref{cor:productive} is the first clause of Theorem~\ref{thm:quantitative} with notation specialized to productive-step count. Instantiating Theorem~\ref{thm:quantitative} at the same trace and premises yields the stated inequality directly.
@@ -870,7 +972,7 @@ Table~\ref{tab:p2-complexity-envelopes} summarizes complexity envelopes for the 
 \end{proof}
 
 \begin{proof}[Proof sketch]
-	\nolinkurl{critical_buffer_computable} provides existence of a computable boundary value $\Bc$, and \nolinkurl{phase_transition_sharp} proves exact classifier behavior on each side of that boundary. Composing these two lemmas yields the stated theorem-level threshold characterization.
+	\nolinkurl{critical_buffer_computable} provides a computable witness value $\Bc$ from the capacity predicate over \texttt{ConfGraph}. \nolinkurl{phase_transition_sharp} proves exact classifier behavior below, at, and above that boundary. Composing these two lemmas yields the stated threshold characterization.
 \end{proof}
 
 Table~\ref{tab:p2-exact-vs-conservative} separates exact and conservative consequences.
@@ -1042,7 +1144,10 @@ For configuration $s$, write $W(s)$ for the sum of local/session contributions. 
 \end{lemma}
 
 \begin{proof}[Proof sketch]
-	Unfold the weighted measure into depth and buffer components. A productive send or select step consumes one protocol constructor, contributing $-2$ to depth, and enqueues at most one message, contributing $+1$ to buffers. Summing contributions gives $\Delta W \le -1$.
+	Use the coefficient family $W_c = c\cdot\Sigma\mathsf{depth} + \Sigma\mathsf{buffer}$.
+	A productive send or select step consumes one protocol constructor, so depth contributes
+	$-c$. The same step enqueues at most one message, so buffer contributes at most $+1$.
+	Hence $\Delta W_c \le -c + 1$. For $c=2$, this gives $\Delta W \le -1$.
 \end{proof}
 
 \begin{lemma}[Recv/Branch Decrease]
@@ -1227,6 +1332,22 @@ Under Assumption Block~\ref{assump:p2-byzantine}, this paper provides the exact 
 
 Reproduction uses the pinned Lean toolchain and manifest.
 
+\begin{table}[H]
+	\centering
+	\footnotesize
+	\begin{tabularx}{\columnwidth}{@{}L{0.34\columnwidth}L{0.61\columnwidth}@{}}
+		\toprule
+		\thead{Artifact Field} & \thead{Value} \\
+		\midrule
+		Repository & \url{https://github.com/hxrts/telltale} \\
+		Pinned commit & \texttt{c3a6eec66380d8fe}\allowbreak\texttt{d287219af4f1baea}\allowbreak\texttt{d669ebb1} \\
+		Archival DOI & \texttt{DOI pending artifact snapshot minting (replace before submission)} \\
+		Lean source statistics & 1299 files, 205752 LOC, axioms: 0, unresolved proof holes (\texttt{sorry}): 0 \\
+		\bottomrule
+	\end{tabularx}
+	\caption{Artifact identity and verification statistics for this draft snapshot.}
+\end{table}
+
 \begin{enumerate}
 	\item Build anchors listed in Table~\ref{tab:p2-index}.
 	\item Run \texttt{just escape} and \texttt{just verify-protocols}.
@@ -1234,6 +1355,24 @@ Reproduction uses the pinned Lean toolchain and manifest.
 \end{enumerate}
 
 Expected checks: Finite-reachability and decision modules compile, weighted-measure descent and scheduler modules compile, crash and branching and threshold modules compile, and theorem-pack and profile-bridge modules compile.
+
+\subsection{Theorem-to-Assumption Map}
+
+\begin{table}[H]
+	\centering
+	\footnotesize
+	\begin{tabularx}{\columnwidth}{@{}L{0.54\columnwidth}L{0.41\columnwidth}@{}}
+		\toprule
+		\thead{Claim} & \thead{Assumption Block(s)} \\
+		\midrule
+		Theorem~\ref{thm:quantitative}, Corollaries~\ref{cor:productive}--\ref{cor:capacity}, Proposition~\ref{prop:p2-productive-equality} & \ref{assump:p2-quantitative} \\
+		Theorem~\ref{thm:algorithmic} & \ref{assump:p2-regular} \\
+		Theorem~\ref{thm:crash} & \ref{assump:p2-crash} \\
+		Theorem~\ref{thm:byzantine}, Corollary~\ref{cor:converse}, Proposition~\ref{prop:vm-bridge} & \ref{assump:p2-byzantine} \\
+		\bottomrule
+	\end{tabularx}
+	\caption{Main claims and their assumption blocks.}
+\end{table}
 
 % Full-width index on its own page
 \clearpage

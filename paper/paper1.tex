@@ -373,6 +373,8 @@ Configurations are represented by endpoint and edge environments. \GEnv{} maps e
 	Core claims in this paper assume asynchronous buffered semantics, active-edge quantification, and \DeliveryModel parameterization. Fair scheduling assumptions apply where stated.
 \end{assumption}
 
+Assumption-block inheritance policy. Assumption blocks do not inherit implicitly. If a theorem does not name a block, it uses Assumption Block~\ref{assump:p1-core} only.
+
 \begin{definition}[Active Edge]
 	$\ActiveEdge(G, e)$ holds when both endpoints of edge $e$ are present in $G$.
 \end{definition}
@@ -386,14 +388,32 @@ Configurations are represented by endpoint and edge environments. \GEnv{} maps e
 \end{definition}
 
 \begin{definition}[Consume]
-	$\Consume$ is the recursive alignment function that interprets buffered traces against receiver expectations.
+	For source role $r$, receiver local type $L$, and buffered trace $ts$:
+\noindent\begin{minipage}{\columnwidth}
+\begin{lstlisting}
+Consume r L [] := some L
+Consume r L (T :: ts) :=
+  match consumeOne r T L with
+  | some L' => Consume r L' ts
+  | none    => none
+\end{lstlisting}
+\end{minipage}
+	The recursion is structural on trace length.
 \end{definition}
+
+Termination argument. Every recursive call consumes one trace head, so
+$|ts|$ strictly decreases. The recursion stops at $[]$.
+
+Recursive local types. If $L$ has constructor $\mu L_0$, then $\consumeOne$
+matches on one-step unfolding before checking the current message constructor.
+Unfolding does not create extra $\Consume$ recursion depth because recursive
+calls are still indexed only by remaining trace length.
 
 \begin{definition}[Byzantine Interface Well-Formedness]
 	$\ByzIfaceWF(G, D)$ is the interface predicate used for Byzantine-facing statements in this paper, and is mechanized as a definitional alias of $\Coherent(G, D)$.
 \end{definition}
 
-Delivery behavior is parameterized by \DeliveryModel. This gives one theorem shape across FIFO, causal, and lossy instances.
+Delivery behavior is parameterized by \DeliveryModel. This gives one theorem shape across FIFO, causal, and lossy instances. The interface laws and instance examples appear in Appendix~\ref{app:delivery}.
 \begin{equation}
 	\label{eq:p1-active-edge-boundary}
 	\begin{aligned}[t]
@@ -565,7 +585,7 @@ For the step edge $u=(C,M)$ with stepped endpoint $ep_{\mathrm{step}}$, the case
 
 \begin{theorem}[Coherence Preservation]
 	\label{thm:coherence-preservation}
-	For all environments $G,D,G',D'$, if $(G,D) \to (G',D')$ is a well-typed step in the send and recv and select and branch fragment, then
+	Under Assumption Block~\ref{assump:p1-core}, for all environments $G,D,G',D'$, if $(G,D) \to (G',D')$ is a well-typed step in the send and recv and select and branch fragment, then
 	\begin{equation}
 		\Coherent(G,D) \implies \Coherent(G',D').
 	\end{equation}
@@ -636,7 +656,40 @@ The quotienting step should be read as symmetry reduction. Distinct interleaving
 	q(\mathsf{step}(G,D))\ =\ \mathsf{step}_{/ \sim}(q(G,D)).
 \end{equation}
 Here $q$ is the quotient projection map and $\sim$ is the coherence-preserving equivalence relation used by the bridge layer.
-The square states the commuting condition used across these three papers. This paper establishes the preservation side needed to make the quotient dynamics well-defined.
+The square states the commuting condition used across these three papers.
+
+\begin{lemma}[Step Congruence Under $\sim$]
+	\label{lem:p1-quotient-congruence}
+	For coherent pre-states $(G_1,D_1)$ and $(G_2,D_2)$, if
+	\[
+		(G_1,D_1)\sim(G_2,D_2)
+	\]
+	and
+	\[
+		(G_1,D_1)\to(G_1',D_1'),
+	\]
+	then there exists $(G_2',D_2')$ such that
+	\[
+		(G_2,D_2)\to(G_2',D_2')
+	\]
+	and
+	\[
+		(G_1',D_1')\sim(G_2',D_2').
+	\]
+\end{lemma}
+
+\begin{proof}[Proof sketch]
+	Use the configuration-equivalence and effect-bisimulation bridge
+	(\nolinkurl{config_equiv_iff_effect_bisim_silent} and
+	\nolinkurl{effect_bisim_implies_observational_equivalence}) to transport one
+	step across $\sim$-equivalent pre-states. Then apply
+	Theorem~\ref{thm:coherence-preservation} to keep post-states in the coherent
+	domain of the quotient relation.
+\end{proof}
+
+The commuting equation above is therefore read as preservation plus
+Lemma~\ref{lem:p1-quotient-congruence}, which makes $\mathsf{step}_{/\sim}$
+well-defined on quotient classes.
 
 The case partition used by \nolinkurl{edge_case_split} is:
 \eqnote{Case partition for checked edge}
@@ -734,32 +787,61 @@ with compatibility discharged by \nolinkurl{consume_mono} and replacement side c
 \label{sec:bridge}
 % ============================================================================
 
-\texttt{EffectSpec.handlerType} records typed effect obligations at the VM boundary. Bridge results in
-this section are conditional on explicit monitor and quotient-transport premises.
-
-\begin{proposition}[Bridge Soundness]
-	\label{prop:bridge-soundness}
-	For any selected handler $h$, if choreography obligations for $h$ are discharged, \texttt{EffectSpec.handlerType} holds for $h$, \nolinkurl{monitor_sound} and \nolinkurl{unified_monitor_preserves} hold for the active monitor, and the configuration-equivalence/effect-bisimulation bridge assumptions hold, then VM-side typing obligations generated from $h$ are satisfied in the corresponding runtime instruction layer and transport to the observational interface.
-\end{proposition}
-
-\begin{proof}[Proof sketch]
-	Build the bundled bridge premises \texttt{VMBridgePremises} from \nolinkurl{monitor_sound},\allowbreak\ \nolinkurl{unified_monitor_preserves}, and the \nolinkurl{WellTypedInstr.wt_invoke} handler-typing witness. Lift handler typing from local obligations to short instruction fragments and then to VM-step form through \nolinkurl{handler_obligation_local},\allowbreak\ \nolinkurl{handler_fragment_typing_of_premises}, and \nolinkurl{handler_vm_step_typing}. Compose with \nolinkurl{config_equiv_iff_effect_bisim_silent} and \nolinkurl{effect_bisim_implies_observational_equivalence} via \nolinkurl{vm_bridge_soundness_composed}. Therefore the runtime typing obligations and their observational transport both follow under the stated premises.
-\end{proof}
+\texttt{EffectSpec.handlerType} records typed effect obligations at the VM boundary.
+The VM instruction layer used in this paper has \texttt{send}, \texttt{recv}, \texttt{select},
+\texttt{branch}, and \texttt{invoke} forms. \texttt{WellTypedInstr} maps each instruction form to a
+session-side obligation. Send and select forms use sender-side continuation obligations. Receive and
+branch forms use \Consume-side alignment obligations. Invoke form lifts handler obligations to instruction fragments.
+Write this mapping as
+\begin{equation}
+	\begin{aligned}[t]
+		\mathsf{WTObl}(\texttt{send})   & = \mathsf{SendCont},         \\
+		\mathsf{WTObl}(\texttt{recv})   & = \mathsf{RecvConsumeCont},  \\
+		\mathsf{WTObl}(\texttt{select}) & = \mathsf{SelectBranchCont}, \\
+		\mathsf{WTObl}(\texttt{branch}) & = \mathsf{BranchCaseCont},   \\
+		\mathsf{WTObl}(\texttt{invoke}) & = \mathsf{InvokeLift}.
+	\end{aligned}
+\end{equation}
+where each right-hand side names the corresponding session obligation family in \texttt{WellTypedInstr}.
 
 \begin{table}[H]
 	\centering
-	\small
-	\begin{tabularx}{\columnwidth}{@{}L{0.45\columnwidth}L{0.5\columnwidth}@{}}
+	\scriptsize
+	\begin{tabularx}{\columnwidth}{@{}L{0.24\columnwidth}L{0.71\columnwidth}@{}}
 		\toprule
-		\thead{Bridge item}     & \thead{Role}                \\
+		\thead{Instruction Form} & \thead{Session-Side Typing Obligation} \\
 		\midrule
-		choreography obligation & source protocol obligation  \\
-		effect handler typing   & typed executable obligation \\
-		VM runtime typing check & enforcement layer           \\
+		\texttt{send} & continuation typing with enqueue witness \\
+		\texttt{recv} & \Consume-alignment witness with continuation typing \\
+		\texttt{select}, \texttt{branch} & label agreement with branch-continuation typing \\
+		\texttt{invoke} & handler-obligation lift to typed VM fragment \\
 		\bottomrule
 	\end{tabularx}
-	\caption{Bridge intent.}
+	\caption{VM instruction-layer summary used by the bridge theorem.}
 \end{table}
+
+\begin{proposition}[Bridge Soundness]
+	\label{prop:bridge-soundness}
+	Under Assumption Block~\ref{assump:p1-core}, for any selected handler $h$, if choreography obligations for $h$ are discharged, \texttt{EffectSpec.handlerType} holds for $h$, \nolinkurl{monitor_sound} and \nolinkurl{unified_monitor_preserves} hold for the active monitor, and the configuration-equivalence/effect-bisimulation bridge assumptions hold, then VM-side typing obligations generated from $h$ are satisfied in the corresponding runtime instruction layer and transport to the observational interface.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+	The bridge composition has three steps.
+	\begin{enumerate}
+		\item Build \texttt{VMBridgePremises} from \nolinkurl{monitor_sound}, \nolinkurl{unified_monitor_preserves}, and the \nolinkurl{WellTypedInstr.wt_invoke} witness.
+		\item Lift choreography obligations to instruction fragments and VM-step typing through \nolinkurl{handler_obligation_local}, \nolinkurl{handler_fragment_typing_of_premises}, and \nolinkurl{handler_vm_step_typing}.
+		\item Transport typed VM steps to observations via \nolinkurl{vm_bridge_soundness_composed}, \nolinkurl{config_equiv_iff_effect_bisim_silent}, and \nolinkurl{effect_bisim_implies_observational_equivalence}.
+	\end{enumerate}
+	Equivalently, with $\mathsf{BridgePrem}(h)$ abbreviating the listed premises,
+	\[
+		\begin{aligned}[t]
+			\mathsf{BridgePrem}(h)
+			 & \Longrightarrow \mathsf{InstrTyped}(h) \\
+			 & \land \mathsf{ObsTransport}(h).
+		\end{aligned}
+	\]
+	Therefore runtime typing obligations and observational transport both hold under the stated premises.
+\end{proof}
 
 \begin{assumption}[Byzantine Interface Premises]
 	\label{assump:p1-byzantine}
@@ -773,12 +855,12 @@ this section are conditional on explicit monitor and quotient-transport premises
 
 \begin{corollary}[Dropped-Assumption Witness Interface (BZ-1.1)]
 	\label{cor:bz1-1}
-	Let $\mathcal{A}$ be any assumption class named in \Hbyz. If a later construction provides a witness violating \ByzSafe when $\mathcal{A}$ is dropped, then that witness can be expressed against the same active-edge Coherence interface used in this paper.
+	Under Assumption Block~\ref{assump:p1-byzantine}, let $\mathcal{A}$ be any assumption class named in \Hbyz. If a later construction provides a witness violating \ByzSafe when $\mathcal{A}$ is dropped, then that witness can be expressed against the same active-edge Coherence interface used in this paper.
 \end{corollary}
 
 \begin{proposition}[Capability-Gated VM Interface (BZ-1.2)]
 	\label{prop:bz1-2}
-	If a runtime profile includes Byzantine characterization and envelope-adherence capability evidence, then safety-visible runtime obligations are interpreted through \Eqsafe modulo \Ebyz, and profile admission is blocked when required evidence is absent.
+	Under Assumption Block~\ref{assump:p1-byzantine}, if a runtime profile includes Byzantine characterization and envelope-adherence capability evidence, then safety-visible runtime obligations are interpreted through \Eqsafe modulo \Ebyz, and profile admission is blocked when required evidence is absent.
 \end{proposition}
 
 % ============================================================================
@@ -988,18 +1070,88 @@ This appendix records compact proof skeletons for theorem-level claims. Each ste
 \section{Delivery Parametricity and Runtime Bridge}
 \label{app:delivery}
 
-Preservation is parametric over \texttt{ConsumeM} laws. Required laws are: \texttt{nil}, \texttt{append}, \texttt{cons}, and renaming stability under endpoint-preserving renamings.
+Preservation is parametric over a delivery interface \DeliveryModel with a model-indexed
+alignment function $\Consume_M$.
+
+\subsection{DeliveryModel Interface}
+
+For each delivery instance $M$, the proof uses the following laws.
+
+\begin{table}[H]
+	\centering
+	\footnotesize
+	\begin{tabularx}{\columnwidth}{@{}L{0.20\columnwidth}L{0.75\columnwidth}@{}}
+		\toprule
+		\thead{Law} & \thead{Required Statement} \\
+		\midrule
+		\texttt{nil} & $\Consume_M(r,L,[]) = \mathsf{some}(L)$ \\
+		\texttt{cons} & One-step head law through $\consumeOne$ for $T::ts$ \\
+		\texttt{append} & Sequential composition on concatenated traces $ts_1 ++ ts_2$ \\
+		\texttt{rename} & Stability under endpoint-preserving renamings \\
+		\bottomrule
+	\end{tabularx}
+	\caption{Delivery interface laws used by preservation proofs.}
+\end{table}
+
+The \texttt{cons} and \texttt{append} laws are the only places where delivery
+discipline enters the \Consume-based proof kernel.
+
+\subsection{Instance Examples}
+
+FIFO instance. Delivered traces keep send order on each edge. This instance is
+provided by \nolinkurl{fifo_delivery_laws}.
+
+Lossy instance. Delivered traces are order-preserving subsequences of sent traces
+on each edge. This instance is provided by \nolinkurl{lossy_delivery_laws}.
+
+Safety scope under message loss. Coherence-preservation claims are stated on the
+post-step delayed-trace environment $D'$. If a delivery instance drops a message,
+the dropped message is absent from $D'$. The proof checks \Consume obligations on
+that actual $D'$. This preserves the same safety statement and does not claim
+liveness or eventual delivery.
 
 \section{Reproducibility}
 \label{app:reproducibility}
 
 Reproduction uses the repository-pinned Lean toolchain and manifest.
 
+\begin{table}[H]
+	\centering
+	\footnotesize
+	\begin{tabularx}{\columnwidth}{@{}L{0.34\columnwidth}L{0.61\columnwidth}@{}}
+		\toprule
+		\thead{Artifact Field} & \thead{Value} \\
+		\midrule
+		Repository & \url{https://github.com/hxrts/telltale} \\
+		Pinned commit & \texttt{c3a6eec66380d8fe}\allowbreak\texttt{d287219af4f1baea}\allowbreak\texttt{d669ebb1} \\
+		Archival DOI & \texttt{DOI pending artifact snapshot minting (replace before submission)} \\
+		Lean source statistics & 1299 files, 205752 LOC, axioms: 0, unresolved proof holes (\texttt{sorry}): 0 \\
+		\bottomrule
+	\end{tabularx}
+	\caption{Artifact identity and verification statistics for this draft snapshot.}
+\end{table}
+
 \begin{enumerate}
 	\item Build paper modules via \texttt{lake build}.
 	\item Run project checks \texttt{just escape} and \texttt{just verify-protocols}.
 	\item Confirm theorem anchors resolve in the built environment.
 \end{enumerate}
+
+\subsection{Theorem-to-Assumption Map}
+
+\begin{table}[H]
+	\centering
+	\footnotesize
+	\begin{tabularx}{\columnwidth}{@{}L{0.50\columnwidth}L{0.45\columnwidth}@{}}
+		\toprule
+		\thead{Claim} & \thead{Assumption Block(s)} \\
+		\midrule
+		Theorem~\ref{thm:coherence-preservation}, Theorem~\ref{thm:session-evolution}, Proposition~\ref{prop:bridge-soundness} & \ref{assump:p1-core}, \ref{assump:p1-replacement} as cited per claim \\
+		Theorem~\ref{thm:bz1}, Corollary~\ref{cor:bz1-1}, Proposition~\ref{prop:bz1-2} & \ref{assump:p1-byzantine} \\
+		\bottomrule
+	\end{tabularx}
+	\caption{Main claims and their assumption blocks.}
+\end{table}
 
 \clearpage
 \onecolumn

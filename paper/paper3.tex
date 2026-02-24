@@ -243,6 +243,11 @@ et al., 2017), and data-certification extensions remain in the same global-proje
 (Toninho and Yoshida, 2017). In this paper, as in \emph{Coherence for Asynchronous Buffered MPST}, $\Coherent$ denotes
 the inherited operational invariant on local environments and buffered traces.
 
+This manuscript is intended for companion review and publication with
+\emph{Coherence for Asynchronous Buffered MPST} and
+\emph{Computable Dynamics for Asynchronous MPST}. Cross-paper references in this
+text use companion-series dependencies.
+
 \subsection{Contribution}
 
 This paper addresses the reconfiguration gap with a commutation theorem, in the broader process-semantic tradition of operational correspondence and mobility (Hoare, 1985; Plotkin, 1981; Milner et al., 1992; Milner, 1999).
@@ -340,14 +345,33 @@ procedures. This paper supplies reconfiguration commutation and envelope-level r
 Scope is confined to asynchronous buffered semantics with explicit reconfiguration conditions,
 crash-stop fault assumptions where fault claims are stated, and declared envelope-admission profiles.
 
+\begin{table}[H]
+	\centering
+	\scriptsize
+	\begin{tabularx}{\columnwidth}{@{}L{0.27\columnwidth}L{0.68\columnwidth}@{}}
+		\toprule
+		\thead{Result} & \thead{Imported Dependencies and Use} \\
+		\midrule
+		Harmony & Imports the Paper 1 Coherence preservation and replacement stack, and Paper 2 computable-step premises, then proves projection commutation under link and delegation updates. \\
+		Minimality and Conservation & Imports the Paper 1 active-edge Coherence kernel, and Paper 2 transition-side quantitative premises, then fixes invariant minimality and conservation under declared reconfiguration premises. \\
+		Envelope family & Imports the Paper 1 quotient-facing Coherence boundary, and Paper 2 profile extraction interfaces, then lifts the safety core to envelope exactness, normalization, and VM adherence claims. \\
+		Byzantine family & Imports the Paper 2 Byzantine safety interface and converse packaging, then extends this interface to envelope-level maximality and adherence transport. \\
+		\bottomrule
+	\end{tabularx}
+	\caption{Series dependency map for Paper 3.}
+	\label{tab:p3-series-dependencies}
+\end{table}
+
+In Table~\ref{tab:p3-series-dependencies}, Harmony corresponds to Theorem~\ref{thm:harmony}. Minimality and Conservation correspond to Theorems~\ref{thm:minimality} and~\ref{thm:conservation}. Envelope family corresponds to Theorems~\ref{thm:envelope}, \ref{thm:normalization}, and~\ref{thm:adequacy}. Byzantine family corresponds to Theorem~\ref{thm:byzantine}, Corollary~\ref{cor:byzantine-converse}, and Proposition~\ref{prop:byzantine-vm}.
+
 Our contributions are as follows:
 \begin{enumerate}
 	\item A reconfiguration commutation theorem that covers both static composition and dynamic delegation.
 	\item An exact characterization of Coherence by active-edge erasure realizability and a relative-minimality theorem over admissible invariants.
 	\item A determinism-envelope theory with soundness, realizability, maximality, and exchange and spatial normalization consequences.
 	\item An abstract-to-VM adequacy bridge that ties profile claims to theorem-pack capability evidence.
-		\item A Byzantine envelope extension with exact characterization, converse counterexample families, and capability-gated VM adherence.
-	\end{enumerate}
+	\item A Byzantine envelope extension with exact characterization, converse counterexample families, and capability-gated VM adherence.
+\end{enumerate}
 
 Main text proofs are proof sketches; full machine-checked derivations are provided by the Lean anchors indexed in Appendix~\ref{app:index}.
 
@@ -422,6 +446,8 @@ Assume the base model from \emph{Coherence for Asynchronous Buffered MPST} and \
 	Crash-stop premises apply where fault-side claims are stated.
 \end{assumptions}
 
+Assumption-block inheritance policy. Assumption blocks do not inherit implicitly. If a theorem does not name a block, it uses Assumption Block~\ref{assump:p3-core} only.
+
 \subsection{Reconfiguration Operators}
 
 The paper distinguishes static composition (\texttt{link}) in deployment-level composition from dynamic delegation (endpoint/capability transfer during execution). Representative mechanized anchors are in the deployment-composition layer, the delegation-preservation layer, and the higher-order graph-delta layer. Appendix~\ref{app:index} provides the file-level mapping.
@@ -441,6 +467,11 @@ configuration $C$, and $\Obs$ for the safety-visible observation map.
 	\begin{equation}
 		\Coherent(C) := \Coherent(\envG(C), \envD(C)).
 	\end{equation}
+\end{definition}
+
+\begin{definition}[Projection Operator]
+	\label{def:p3-project}
+	$\mathsf{project}$ is the canonical projection from reconfiguration configurations to local-step configurations used by the Harmony square. The mechanized definition is \texttt{project} in \texttt{Runtime/\allowbreak Adequacy/\allowbreak EnvelopeCore/\allowbreak ReconfigurationBridge.lean}.
 \end{definition}
 
 \begin{definition}[Harmony]
@@ -509,16 +540,33 @@ Figure~\ref{fig:p3-commuting-square} gives the explicit commuting-square instanc
 		\item Locality: $I$ is checkable from edge-local obligations on active edges.
 		\item Erasure stability: $I$ is preserved under \ConfigEquiv classes.
 		\item Frame stability: untouched edges/endpoints preserve $I$ under context extension.
-		\item Delegation adequacy: $I$ entails the local obligations required for safe delegation.
+		\item Delegation-footprint adequacy: for each delegation step $\rho_{\mathsf{del}}$, $I$ entails the footprint-local update obligations used by Equation~\ref{eq:p3-delegation-footprint} together with the declared $\mathsf{WF}_{\rho_{\mathsf{del}}}$ side conditions.
 	\end{enumerate}
 \end{definition}
 
+Admissibility is defined by these obligations only. It does not assume \Coherent.
+
 \begin{definition}[Envelope Predicates]
-	$\EnvelopeRel(S_{\mathrm{vm}}, S_{\mathrm{ref}})$ is the envelope relation between VM and
-	reference states. $\EnvelopeExact(C)$ is exactness of the declared envelope (soundness and
+	Write
+	\[
+		\begin{aligned}[t]
+			\EnvelopeRel(S_{\mathrm{vm}}, S_{\mathrm{ref}})
+			 & := \mathsf{ObsEq}(S_{\mathrm{vm}}, S_{\mathrm{ref}}) \\
+			 & \land \mathsf{CertStepAlign}(S_{\mathrm{vm}}, S_{\mathrm{ref}}) \\
+			 & \land \mathsf{ProfileAlign}(S_{\mathrm{vm}}, S_{\mathrm{ref}}).
+		\end{aligned}
+	\]
+	$\mathsf{ObsEq}$ means safety-visible observations agree.
+	$\mathsf{CertStepAlign}$ means every admitted VM step has the declared certified-step witness in the reference layer.
+	$\mathsf{ProfileAlign}$ means both states satisfy the same profile-side admission obligations.
+	$\EnvelopeExact(C)$ is exactness of the declared envelope (soundness and
 	realizability and maximality) at configuration $C$. $\EnvelopeOK(C)$ means $C$ satisfies
 	the envelope-admission obligations used in Theorems~\ref{thm:envelope}--\ref{thm:normalization}.
 \end{definition}
+
+Concrete example. Let $S_{\mathrm{ref}}$ be a reference execution prefix for the running example up to $\rho_2$. Let $S_{\mathrm{vm}}$ be a VM execution prefix with the same admitted external events, plus internal monitor bookkeeping steps. If the bookkeeping steps are silent at $\Obs$, certified-step witnesses map each admitted VM step to the same reference prefix, and both prefixes satisfy the same profile obligations, then $\EnvelopeRel(S_{\mathrm{vm}}, S_{\mathrm{ref}})$ holds.
+
+Construction recipe. To instantiate $\EnvelopeRel$ for a new protocol, first fix the safety-visible observation map $\Obs$. Second, define the certified-step witness relation used by the admission checker. Third, define profile-side admission obligations and use their conjunction with observation equality and certified-step alignment.
 
 	\begin{definition}[Capability/Adherence Predicates]
 		$\HasProfileCapabilities(p,\Pi)$ means profile $(p,\Pi)$ is backed by required theorem-pack
@@ -527,8 +575,32 @@ Figure~\ref{fig:p3-commuting-square} gives the explicit commuting-square instanc
 	\end{definition}
 
 \begin{definition}[Normalization Relations]
-	$\ExchangeEq(C_1,C_2)$ is exchange equivalence modulo admissible reordering.
+	$\ExchangeEq$ is the least equivalence relation generated by adjacent swaps of independent reconfiguration steps. A swap is admissible when two enabled steps $\rho_a,\rho_b$ from the same pre-state $C$ satisfy all of the following.
+	\begin{enumerate}
+		\item Footprints are disjoint:
+		      $\mathsf{Footprint}(\rho_a)\cap\mathsf{Footprint}(\rho_b)=\varnothing$.
+		\item Both orders are enabled from $C$ under declared $\mathsf{WF}_\rho$ side conditions.
+		\item Diamond commutation holds at the update boundary:
+		      \[
+			      C \xrightarrow{\rho_a} C_a \xrightarrow{\rho_b} C_{ab},
+			      \qquad
+			      C \xrightarrow{\rho_b} C_b \xrightarrow{\rho_a} C_{ba},
+		      \]
+		      and $C_{ab}\ \ConfigEquiv\ C_{ba}$.
+	\end{enumerate}
+	Then $\ExchangeEq(C_1,C_2)$ holds when $C_1$ and $C_2$ are connected by a finite sequence of such admissible swaps plus \ConfigEquiv closure.
 	$C \sqsubseteq_{\mathsf{sp}} C'$ is the spatial-subtyping preorder used in Theorem~\ref{thm:normalization}.
+\end{definition}
+
+Concrete exchange example. Suppose $C$ has two enabled reconfiguration steps with disjoint footprints, one \texttt{link} step and one delegation step on a different session edge. If both orders are well-formed and produce \ConfigEquiv post-states, then the two resulting configurations are exchange-equivalent.
+
+\begin{definition}[Non-Interference Across Composition]
+	$\mathsf{NonInterf}(C_1,C_2)$ holds iff all of the following hold.
+	\begin{enumerate}
+		\item Footprint disjointness: boundary write footprints of enabled steps from $C_1$ and $C_2$ are disjoint.
+		\item Boundary commutation: if one enabled step from each component can fire, both execution orders are defined and preserve the same safety-visible observation.
+		\item Witness factorization: certified-step witnesses for composed traces factor into component witnesses without cross-boundary dependencies.
+	\end{enumerate}
 \end{definition}
 
 Equation~\ref{eq:p3-delegation-footprint} states the delegation-footprint update discipline.
@@ -690,6 +762,18 @@ coordinated mode with preserved envelope obligations.
 	Equivalently, the reconfiguration square commutes at the projection boundary.
 \end{theorem}
 
+\begin{lemma}[Delegation Projection Preservation Shape]
+	\label{lem:p3-deleg-proj-shape}
+	Under Assumption Block~\ref{assump:p3-reconfiguration}, let $\rho_{\mathsf{del}}$ be a well-formed delegation step from $C$ with footprint $F$ and post-state $C'=\mathsf{step}_{\mathsf{reconfig}}(C,\rho_{\mathsf{del}})$. If the update discipline of Equation~\ref{eq:p3-delegation-footprint} holds, then
+	\begin{equation}
+		\mathsf{project}(C')
+		=
+		\mathsf{localStep}_{\mathsf{reconfig}}(\mathsf{project}(C),\rho_{\mathsf{del}}).
+	\end{equation}
+\end{lemma}
+
+The lemma packages the delegate case used in Theorem~\ref{thm:harmony}. On footprint edges $e\in F$, projection follows delegation update witnesses. On non-footprint edges $e\notin F$, projection follows frame preservation. These two clauses are exactly the commutation link from update discipline to projected-step equality.
+
 The proof has two components: static Harmony via \texttt{link}, where composition-level commutation and coherence preservation are established in deployment theorems such as \nolinkurl{link_harmony_through_link} and \nolinkurl{link_preserves_coherent}; and dynamic Harmony via delegation, where delegation preservation and footprint lemmas establish commutation for topology-changing transfers. At the effect-observation boundary, the coinductive bridge supplies the composition-facing
 congruence and quotient lift used by this section: \nolinkurl{effect_bisim_congr_link} and
 \nolinkurl{config_equiv_iff_effect_bisim_silent}.
@@ -722,16 +806,7 @@ of the reconfiguration bridge layer.
 	Let $F:=\mathsf{Footprint}(\rho_{\mathsf{del}})$ and write
 	$C':=\mathsf{step}_{\mathsf{reconfig}}(C,\rho_{\mathsf{del}})$.
 	Delegation well-formedness gives the side conditions required by the delegation-preservation layer.
-	By the footprint update discipline (Equation~\ref{eq:p3-delegation-footprint}),
-	only edges in $F$ are rewritten, while non-footprint edges are frame-preserved.
-	Using delegation-preservation/footprint lemmas, projection of the rewritten footprint equals the
-	corresponding local delegated update, and frame preservation identifies unchanged projected components.
-	Hence
-	\[
-		\mathsf{project}(C')
-		=
-		\mathsf{localStep}_{\mathsf{reconfig}}(\mathsf{project}(C),\rho_{\mathsf{del}}),
-	\]
+	Apply Lemma~\ref{lem:p3-deleg-proj-shape} to the same $C,\rho_{\mathsf{del}},F$,
 	i.e. $\ProjStep{C}{\mathsf{delegate}}=\LocStep{C}{\mathsf{delegate}}$.
 
 	\textbf{Boundary transport.}
@@ -761,7 +836,7 @@ Equation~\ref{eq:p3-commutation-instances} separates static-link and dynamic-del
 
 \begin{theorem}[Erasure Characterization of Coherence]
 	\label{thm:erasure}
-	For all configurations $C$,
+	Under Assumption Block~\ref{assump:p3-core}, for all configurations $C$,
 	\begin{equation}
 		\begin{aligned}[t]
 			\Coherent(C)
@@ -804,7 +879,7 @@ This theorem gives the formal content of the quotient-first claim: erasure is no
 
 \begin{theorem}[Safe Delegation Sufficiency]
 	\label{thm:delegation}
-	For all configurations $C$ and delegation operations $\rho_{\mathsf{del}}$,
+	Under Assumption Block~\ref{assump:p3-reconfiguration}, for all configurations $C$ and delegation operations $\rho_{\mathsf{del}}$,
 	\begin{equation}
 		\begin{aligned}[t]
 			\Coherent(C) \land \mathsf{DelegationWF}(C,\rho_{\mathsf{del}})
@@ -816,7 +891,7 @@ This theorem gives the formal content of the quotient-first claim: erasure is no
 
 \begin{corollary}[Footprint Exactness Packaging]
 	\label{cor:footprint}
-	For all $C,\rho_{\mathsf{del}}$ satisfying the stated step and well-formedness side conditions,
+	Under Assumption Block~\ref{assump:p3-reconfiguration}, for all $C,\rho_{\mathsf{del}}$ satisfying the stated step and well-formedness side conditions,
 	\begin{equation}
 		\begin{aligned}[t]
 			\mathsf{SafeDelegation}(C,\rho_{\mathsf{del}})
@@ -848,7 +923,7 @@ This theorem gives the formal content of the quotient-first claim: erasure is no
 
 \begin{theorem}[Relative Minimality]
 	\label{thm:minimality}
-	For all invariants $I$,
+	Under Assumption Block~\ref{assump:p3-reconfiguration}, for all invariants $I$,
 	\begin{equation}
 		\begin{aligned}[t]
 			\Admissible(I)
@@ -860,6 +935,7 @@ This theorem gives the formal content of the quotient-first claim: erasure is no
 \end{theorem}
 
 This theorem prevents ``stronger-than-needed'' invariant inflation and pins down the architectural core.
+It is a characterization-style minimality theorem relative to the admissibility class above.
 
 \begin{proof}[Proof sketch]
 	Assume any invariant $I$ satisfying $\Admissible(I)$.
@@ -896,7 +972,7 @@ Equation~\ref{eq:p3-admissible-order} summarizes the admissible-invariant order 
 
 \begin{theorem}[Composed-System Conservation]
 	\label{thm:conservation}
-	For all configurations $C$ and reconfiguration operators $\rho$, if $\mathsf{WF}_\rho(C)$ and $\Coherent(C)$ hold, then
+	Under Assumption Block~\ref{assump:p3-reconfiguration}, for all configurations $C$ and reconfiguration operators $\rho$, if $\mathsf{WF}_\rho(C)$ and $\Coherent(C)$ hold, then
 	\begin{equation}
 		\Coherent(\mathsf{step}_{\mathsf{reconfig}}(C,\rho)).
 	\end{equation}
@@ -945,7 +1021,7 @@ This theorem combines composition, delegation, and quantitative invariants in on
 
 \begin{corollary}[Compositional Exactness Under Non-Interference]
 	\label{cor:compositional}
-	For all compositions $C_1 \otimes C_2$, if Assumption Block~\ref{assump:p3-envelope} holds for both components and non-interference premises hold across the composition boundary, then envelope exactness is preserved by composition:
+	For all compositions $C_1 \otimes C_2$, if Assumption Block~\ref{assump:p3-envelope} holds for both components and $\mathsf{NonInterf}(C_1,C_2)$ holds, then envelope exactness is preserved by composition:
 	\begin{equation}
 		\begin{aligned}
 			\EnvelopeExact(C_1) \land \EnvelopeExact(C_2)
@@ -957,8 +1033,10 @@ This theorem combines composition, delegation, and quantitative invariants in on
 \end{corollary}
 
 \begin{proof}[Proof sketch]
-	Non-interference gives a factorization of composed traces into component traces with no cross-boundary interference steps. Apply envelope exactness to each component and recompose to obtain exactness of the composition. For strictness, use the dropped-assumption witness family to exhibit an interfering trace that violates factorization and therefore exactness.
+	$\mathsf{NonInterf}(C_1,C_2)$ gives a check criterion through footprint disjointness and boundary commutation, and a semantic criterion through witness factorization. These clauses factor composed traces into component traces with no cross-boundary interference steps. Apply envelope exactness to each component and recompose to obtain exactness of the composition. For strictness, use the dropped-assumption witness family to exhibit an interfering trace that violates factorization and therefore exactness.
 \end{proof}
+
+Interference example. If both components perform delegation rewrites that target the same boundary edge in one macro-step window, footprint disjointness fails. The two execution orders can then induce different certified boundary traces, so composed exactness can fail.
 
 Equation~\ref{eq:p3-quantitative-split} summarizes the quantitative split.
 Write $S_\rho(C):=\mathsf{step}_{\mathsf{reconfig}}(C,\rho)$.
@@ -1027,7 +1105,7 @@ Conceptually, this is dual to Theorem~\ref{thm:minimality}:
 
 \begin{corollary}[Finite-Erasure Transportability Boundary]
 	\label{cor:transportability}
-	Under stated model assumptions,
+	Under Assumption Block~\ref{assump:p3-envelope},
 	\begin{equation}
 		\begin{aligned}[t]
 			\forall t,\ \mathsf{FiniteErasureTransportable}(t)
@@ -1039,7 +1117,7 @@ Conceptually, this is dual to Theorem~\ref{thm:minimality}:
 
 \begin{corollary}[Strict Boundary Witness]
 	\label{cor:boundary}
-	There exists $t$ such that
+	Under Assumption Block~\ref{assump:p3-envelope}, there exists $t$ such that
 	\begin{equation}
 		\begin{aligned}[t]
 			\neg \mathsf{RationalFiniteState}(t)
@@ -1051,7 +1129,7 @@ Conceptually, this is dual to Theorem~\ref{thm:minimality}:
 
 \begin{corollary}[Inductive-Embedding Exactness]
 	\label{cor:embedding}
-	For all inductive states $x$, exact envelope characterization is preserved under \texttt{toCoind}:
+	Under Assumption Block~\ref{assump:p3-envelope}, for all inductive states $x$, exact envelope characterization is preserved under \texttt{toCoind}:
 	\begin{equation}
 		\begin{aligned}[t]
 			\EnvelopeExact_{\mathrm{ind}}(x)
@@ -1070,7 +1148,7 @@ Appendices~\ref{app:regimes} and~\ref{app:consequences} provide the detailed wit
 
 \begin{theorem}[Exchange-Normalized Determinism and Spatial Monotonicity]
 	\label{thm:normalization}
-	For all configurations under envelope premises, the following properties hold:
+	Under Assumption Block~\ref{assump:p3-envelope}, for all configurations, the following properties hold:
 	\begin{enumerate}
 		\item Exchange normalization:
 		      \begin{equation}
@@ -1143,9 +1221,11 @@ This theorem sharpens what ``determinism modulo envelope'' means operationally.
 	Local and sharded variants are recovered as profile-specific instances under explicit collapse assumptions.
 \end{theorem}
 
+VM instruction-layer note. This section reuses the instruction-form interface and \texttt{WellTypedInstr} mapping from the Effect-Typed Bridge in \emph{Coherence for Asynchronous Buffered MPST} (Section 7, Proposition 7.1). At this interface, \texttt{send}/\texttt{select} carry sender-continuation obligations, \texttt{recv}/\texttt{branch} carry consume-alignment obligations, and \texttt{invoke} carries handler-fragment lift obligations. The novelty here is envelope-indexed adequacy and adherence transport over that shared VM typing layer.
+
 \begin{proposition}[Capability-Bit Soundness]
 	\label{prop:capability}
-	For all runtime profiles $q$ and capability bits $b$, if $q$ advertises $b$, then there exists a corresponding theorem-pack object $a_b$ such that $a_b$ satisfies the same envelope-premise profile used by Theorem~\ref{thm:adequacy}.
+	Under Assumption Block~\ref{assump:p3-adequacy}, for all runtime profiles $q$ and capability bits $b$, if $q$ advertises $b$, then there exists a corresponding theorem-pack object $a_b$ such that $a_b$ satisfies the same envelope-premise profile used by Theorem~\ref{thm:adequacy}.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
@@ -1175,7 +1255,7 @@ This theorem sharpens what ``determinism modulo envelope'' means operationally.
 
 	\begin{corollary}[Principal Capability and Admission Completeness]
 		\label{cor:principal}
-		Let $D_{\text{user}}$ be a requested envelope capability and let $D_{\text{prog}}$ be inferred from program and deployment profile. Under the admission premises, we have
+		Under Assumption Block~\ref{assump:p3-adequacy}, let $D_{\text{user}}$ be a requested envelope capability and let $D_{\text{prog}}$ be inferred from program and deployment profile. We have
 		\[
 			\mathsf{Cap}_{\mathcal{E}} := \{\, d \mid \mathsf{CapOK}_{\EnvelopeRel}(d)\,\},
 		\]
@@ -1190,6 +1270,17 @@ This theorem sharpens what ``determinism modulo envelope'' means operationally.
 	\label{assump:p3-byzantine}
 	Byzantine characterization assumes explicit bundle \Hbyz with fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions.
 \end{assumptions}
+
+\begin{definition}[Byzantine Bundle Component Meanings]
+	At the envelope interface in this paper:
+	\begin{enumerate}
+		\item $\mathsf{ByzQuorumOK}$: quorum and intersection constraints hold for the declared fault budget. The standard threshold instantiation is $n>3f$ with quorum intersection witnesses.
+		\item $\mathsf{ByzAuthEvidenceOK}$: accepted Byzantine-relevant actions carry valid authentication and evidence for envelope admission.
+		\item $\mathsf{ByzBudgetOK}$: adversarial actions satisfy the declared budget envelope used by profile admission.
+		\item $\mathsf{ByzPrimitiveConsistent}$: primitive-level conflict exclusion and consistency obligations hold for certified transitions.
+	\end{enumerate}
+	$\ByzSafe$ is the operational safety predicate at this interface. It means admitted executions preserve non-conflicting safety-visible outcomes in \Obssafe modulo \Ebyz.
+\end{definition}
 
 Define
 \begin{equation}
@@ -1223,7 +1314,7 @@ where each conjunct names the corresponding requirement class in Assumption Bloc
 
 \begin{proposition}[Byzantine VM Adherence and Admission Gating]
 	\label{prop:byzantine-vm}
-	For runtime profile $(p,\Pi)$, if theorem-pack capability bits include Byzantine safety characterization and VM envelope adherence evidence, then admitted executions satisfy \Eqsafe modulo \Ebyz and rejected requests correspond to failed assumptions or missing evidence.
+	Under Assumption Blocks~\ref{assump:p3-adequacy} and~\ref{assump:p3-byzantine}, for runtime profile $(p,\Pi)$, if theorem-pack capability bits include Byzantine safety characterization and VM envelope adherence evidence, then admitted executions satisfy \Eqsafe modulo \Ebyz and rejected requests correspond to failed assumptions or missing evidence.
 \end{proposition}
 
 % ============================================================================
@@ -1254,6 +1345,10 @@ Concrete modules for these packages:
 	      \texttt{Protocol/\allowbreak Coherence/\allowbreak Delegation/\allowbreak Core/\allowbreak *.lean},
 	      \texttt{Protocol/\allowbreak Coherence/\allowbreak Delegation/\allowbreak Preservation.lean}.
 \end{enumerate}
+
+Channel-payload cross-reference. The formal channel-payload objects and rewrite rules are the definitions in \texttt{GraphDelta.lean} and \texttt{GraphDeltaHO.lean}. The anchor mapping is listed in Appendix~\ref{app:index}.
+
+Higher-order Coherence lift. For a payload-carrying edge, coherence requires two checks. The control trace must satisfy the same \texttt{Consume}-style alignment obligation as the first-order case. The transferred payload-channel capability graph must satisfy the graph-delta compatibility obligations used by the delegation-preservation layer. Projected local types therefore mention payload channels only through admitted capability transfers. If no channel payloads are present, the payload clause is vacuous and the theorem statements collapse to the first-order form.
 
 % ============================================================================
 \section{Worked Transport in Main Body}
@@ -1424,8 +1519,8 @@ Open item: Byzantine liveness under weaker timing assumptions remains future wor
 	\item Milner, R., Parrow, J., and Walker, D. (1992). A Calculus of Mobile Processes, I and II. Information and Computation, 100(1), 1--77.
 	\item Plotkin, G. D. (1981). A Structural Approach to Operational Semantics. DAIMI FN-19.
 	\item Shannon, C. E. (1948). A Mathematical Theory of Communication. Bell System Technical Journal, 27(3), 379--423 and 27(4), 623--656.
-	\item Telltale Project. (2026). Coherence for Asynchronous Buffered MPST. Project manuscript.
-	\item Telltale Project. (2026). Computable Dynamics for Asynchronous MPST. Project manuscript.
+		\item Companion Series Paper I. (2026). \emph{Coherence for Asynchronous Buffered MPST}. Companion manuscript reviewed with this paper.
+		\item Companion Series Paper II. (2026). \emph{Computable Dynamics for Asynchronous MPST}. Companion manuscript reviewed with this paper.
 	\item Tirore, L., Bengtson, J., and Carbone, M. (2025). Mechanized MPST metatheory with subject-reduction robustness analysis. ECOOP 2025.
 	\item Toninho, B., and Yoshida, N. (2017). Certifying Data in Multiparty Session Types. Journal of Logical and Algebraic Methods in Programming, 90, 61--83.
 	\item Wadler, P. (2012). Propositions as Sessions. ICFP 2012.
@@ -1636,6 +1731,22 @@ This prevents hidden strengthening of either side.
 
 Reproduction uses the pinned Lean toolchain and manifest.
 
+\begin{table}[H]
+	\centering
+	\footnotesize
+	\begin{tabularx}{\columnwidth}{@{}L{0.34\columnwidth}L{0.61\columnwidth}@{}}
+		\toprule
+		\thead{Artifact Field} & \thead{Value} \\
+		\midrule
+		Repository & \url{https://github.com/hxrts/telltale} \\
+		Pinned commit & \texttt{c3a6eec66380d8fe}\allowbreak\texttt{d287219af4f1baea}\allowbreak\texttt{d669ebb1} \\
+		Archival DOI & \texttt{DOI pending artifact snapshot minting (replace before submission)} \\
+		Lean source statistics & 1299 files, 205752 LOC, axioms: 0, unresolved proof holes (\texttt{sorry}): 0 \\
+		\bottomrule
+	\end{tabularx}
+	\caption{Artifact identity and verification statistics for this draft snapshot.}
+\end{table}
+
 \begin{enumerate}
 	\item Build anchors listed in Table~\ref{tab:p3-index}.
 	\item Run \texttt{just escape} and \texttt{just verify-protocols}.
@@ -1643,6 +1754,24 @@ Reproduction uses the pinned Lean toolchain and manifest.
 \end{enumerate}
 
 Expected outcome: Full theorem-dependency compilation for Theorems~\ref{thm:harmony}--\ref{thm:adequacy}, Corollary~\ref{cor:principal}, Theorem~\ref{thm:byzantine}, and Corollary~\ref{cor:byzantine-converse} succeeds, profile extraction and admission modules compile, and bridge and adequacy modules compile under the pinned toolchain.
+
+\subsection{Theorem-to-Assumption Map}
+
+\begin{table}[H]
+	\centering
+	\footnotesize
+	\begin{tabularx}{\columnwidth}{@{}L{0.53\columnwidth}L{0.42\columnwidth}@{}}
+		\toprule
+		\thead{Claim} & \thead{Assumption Block(s)} \\
+		\midrule
+		Theorems~\ref{thm:harmony}--\ref{thm:conservation}, Corollary~\ref{cor:footprint} & \ref{assump:p3-reconfiguration} \\
+		Theorems~\ref{thm:envelope}, \ref{thm:normalization}; Corollaries~\ref{cor:compositional}--\ref{cor:embedding} & \ref{assump:p3-envelope} \\
+		Theorem~\ref{thm:adequacy}, Proposition~\ref{prop:capability}, Corollary~\ref{cor:principal} & \ref{assump:p3-adequacy} \\
+		Theorem~\ref{thm:byzantine}, Corollary~\ref{cor:byzantine-converse}, Proposition~\ref{prop:byzantine-vm} & \ref{assump:p3-byzantine}, plus \ref{assump:p3-adequacy} for VM-adherence claims \\
+		\bottomrule
+	\end{tabularx}
+	\caption{Main claims and their assumption blocks.}
+\end{table}
 
 % Full-width index on its own page
 \clearpage
