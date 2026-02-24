@@ -136,6 +136,7 @@ let mut handler = FaultInjection::new(base, 0.1);
 ```
 
 Use this to validate retry behavior and error handling.
+Enable this by adding `features = ["test-utils"]` on `telltale-choreography` in test builds.
 
 ## Running Examples
 

@@ -8,7 +8,7 @@ The `telltale-choreography` crate supports WASM targets. Core effects, handlers,
 
 ## What Works
 
-In WASM builds you can use `Program`, `interpret`, and the effect handlers. `InMemoryHandler` and `TelltaleHandler` are WASM compatible for local or custom transports. Middleware such as `Trace`, `Metrics`, `Retry`, and `FaultInjection` uses `wasm-timer` for delays.
+In WASM builds you can use `Program`, `interpret`, and effect handlers. `InMemoryHandler` and `TelltaleHandler` are WASM compatible for local or custom transports. Middleware such as `Trace`, `Metrics`, and `Retry` is WASM compatible. `FaultInjection` is available with the `test-utils` feature.
 
 ## Limitations
 
@@ -20,12 +20,13 @@ Enable the `wasm` feature on the choreography crate.
 
 ```toml
 [dependencies]
-telltale-choreography = { path = "../rust/choreography", features = ["wasm"] }
+telltale-choreography = { version = "0.9.1", features = ["wasm"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 ```
 
 The `wasm` feature enables `getrandom` support and pulls in the WASM runtime dependencies.
+Use a path dependency only for local workspace development.
 
 Build with `wasm-pack` or `cargo` targets.
 
@@ -129,11 +130,11 @@ For multi role tests, share channels by using `InMemoryHandler::with_channels` a
 use telltale_choreography::{SimpleChannel, TelltaleEndpoint, TelltaleHandler};
 
 let (alice_ch, bob_ch) = SimpleChannel::pair();
-let mut alice_ep = TelltaleEndpoint::new(Role::Alice);
-let mut bob_ep = TelltaleEndpoint::new(Role::Bob);
+let mut alice_ep = TelltaleEndpoint::new(Role::Client);
+let mut bob_ep = TelltaleEndpoint::new(Role::Server);
 
-alice_ep.register_channel(Role::Bob, alice_ch);
-bob_ep.register_channel(Role::Alice, bob_ch);
+alice_ep.register_channel(Role::Server, alice_ch);
+bob_ep.register_channel(Role::Client, bob_ch);
 
 let mut handler = TelltaleHandler::<Role, Message>::new();
 ```

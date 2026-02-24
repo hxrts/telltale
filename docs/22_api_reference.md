@@ -14,7 +14,7 @@ Key exports:
 - `Role`, `Roles`, `Message` derive macros
 - Channel traits and session state types
 
-See `rust/src/lib.rs` for the full list of re exports.
+See `rust/src/lib.rs` for the full list of re-exports.
 
 ### `telltale-types`
 
@@ -26,7 +26,7 @@ Key exports:
 - `ContentId`, `Sha256Hasher`, `ContentStore`, `KeyedContentStore`
 - Merge and projection helpers in `rust/types/src`
 
-See `rust/types/src/lib.rs` for re exports.
+See `rust/types/src/lib.rs` for re-exports.
 
 ### `telltale-choreography`
 
@@ -90,4 +90,4 @@ See [Lean-Rust Bridge](19_lean_rust_bridge.md) for details.
 
 ## Guidance
 
-When you need an exact signature, open the crate `lib.rs` and follow re exports to the module definition. This keeps the reference accurate as the API evolves.
+When you need an exact signature, open the crate `lib.rs` and follow re-exports to the module definition. This keeps the reference accurate as the API evolves.

@@ -85,12 +85,12 @@ These categories are intended for machine-visible reporting and CI gate failures
 
 Admission and capability drift are controlled by repository lanes.
 
-| Check | Script |
+| Check | Command |
 |---|---|
-| runtime contract gate shape | `scripts/check-runtime-contract-gates.sh` |
-| theorem-pack release conformance | `scripts/check-release-conformance.sh` |
-| VM parity suite | `scripts/check-vm-parity-suite.sh` |
-| parity ledger policy | `scripts/check-parity-ledger.sh` |
+| runtime capability gate shape | `just check-capability-gates` |
+| theorem-pack release conformance | `just check-release-conformance` |
+| VM parity suite | `just check-parity --suite` |
+| parity type and schema policy | `just check-parity --types` |
 
 ## Related Docs
 
