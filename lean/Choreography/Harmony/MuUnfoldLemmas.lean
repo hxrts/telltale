@@ -3,7 +3,7 @@ import SessionTypes.LocalTypeR
 import Choreography.Projection.ProjSubst
 import SessionCoTypes.EQ2
 
-/- 
+/-
 The Problem. Harmony proofs need mu-unfold equivalences that line up projected
 substitution with coinductive local-type equality.
 
@@ -273,7 +273,7 @@ theorem eq2_end_to_mu_unguarded'
   -- For closed local types, all variables are guarded
   have hProjGguarded : (projTrans G role).isGuarded s = true :=
     is_guarded_of_closed (projTrans G role) s hProjGclosed
-  -- By is_guarded_substitute (LocalTypeR.lean:1242), guardedness is preserved under substitution
+  -- By is_guarded_substitute (LocalTypeR.lean), guardedness is preserved under substitution
   -- when the replacement is closed.
   have hSubstGuarded : ((projTrans inner role).substitute t (projTrans G role)).isGuarded s = true :=
     is_guarded_substitute (projTrans inner role) t s (projTrans G role) hR hProjGclosed
