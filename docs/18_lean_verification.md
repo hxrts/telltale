@@ -8,11 +8,11 @@ Verification scale and proof-hole status are tracked by generated reports.
 
 | Source | Purpose |
 |---|---|
-| `lean/CODE_MAP.md` | generated library map with file counts and module inventory |
-| `work/status.md` | current project status and theorem progress table |
+| [Lean Verification Code Map](../lean/CODE_MAP.md) | generated library map with file counts and module inventory |
+| [Status Dashboard](../work/status.md) | current project status and theorem progress table |
 | `just escape` | machine check for axiom and sorry budget |
 
-Current reported scale is 610 files and about 126,260 lines with zero axioms and zero sorries.
+Current scale and proof-hole status are tracked in these generated artifacts.
 
 ## Library Layers
 
@@ -78,15 +78,15 @@ Classical transport families include Foster-Lyapunov, MaxWeight, large deviation
 
 ## Runtime Alignment Lanes
 
-Lean and Rust alignment is checked by scripted lanes.
+Lean and Rust alignment is checked by automation lanes.
 
-| Lane | Script |
+| Lane | Command |
 |---|---|
-| Runtime contract gates | `scripts/check-runtime-contract-gates.sh` |
-| Speculation and WP surfaces | `scripts/check-speculation-wp-surface.sh` |
-| Release conformance | `scripts/check-release-conformance.sh` |
-| VM parity suite | `scripts/check-vm-parity-suite.sh` |
-| Deviation ledger enforcement | `scripts/check-parity-ledger.sh` |
+| Runtime capability gates | `just check-capability-gates` |
+| Release conformance | `just check-release-conformance` |
+| VM parity suite | `just check-parity --suite` |
+| Type and schema parity | `just check-parity --types` |
+| Consolidated parity lane | `just check-parity --all` |
 
 ## Related Docs
 

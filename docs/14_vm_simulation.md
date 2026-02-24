@@ -357,12 +357,16 @@ That tool resumes from a serialized VM checkpoint and re-applies scenario middle
 `PropertyMonitor` performs online checks during simulation.
 The monitor only scans newly appended events on each call.
 
+Built-in monitor checks include:
+
 - `NoFaults`
 - `Simplex`
 - `SendRecvLiveness { sid, bound }`
 - `TypeMonotonicity { sid }`
 - `BufferBound { sid, max }`
 - `Liveness { name, precondition, goal, bound }`
+
+Predicate and invariant syntax includes:
 
 - `no_faults`
 - `simplex`

@@ -258,8 +258,8 @@ Most Lean-dependent tests skip when Lean binaries are missing.
 - `property_tests.rs`
 - `vm_composition_stress_tests.rs`
 
-These lanes are aligned with repository parity and release gate scripts.
-Examples include `scripts/check-parity-ledger.sh`, `scripts/check-vm-parity-suite.sh`, and `scripts/check-runtime-contract-gates.sh`.
+These lanes are aligned with repository parity and release-gate lanes.
+Examples include `just check-parity --types`, `just check-parity --suite`, and `just check-capability-gates`.
 
 ## Current Limits and Behaviors
 

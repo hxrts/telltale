@@ -50,7 +50,7 @@ Each wave is checked against a `WaveCertificate`. If certificate validation fail
 | `n = 1` | Exact canonical parity | `threaded_equivalence.rs` |
 | `n > 1` | Envelope-bounded parity with declared `EnvelopeDiff` | `parity_fixtures_v2.rs` |
 | Invalid wave certificate | Mandatory fallback to canonical one-step | `threaded_lane_runtime.rs` |
-| Undocumented deviation | Active deviation coverage required | `scripts/check-parity-ledger.sh` |
+| Undocumented deviation | Active deviation coverage required | `just check-parity --types` |
 
 The regression lane validates both regimes. The test `canonical_parity_is_exact_at_concurrency_one` enforces exact equality. The test `envelope_bounded_parity_holds_for_n_gt_1` enforces envelope-bounded behavior.
 
@@ -63,7 +63,7 @@ Runtime mode admission and profile selection are capability gated.
 | Advanced mode admission | `requires_vm_runtime_contracts` and `admit_vm_runtime` | `rust/vm/src/runtime_contracts.rs`, `rust/vm/src/composition.rs` |
 | Determinism profile validation | `request_determinism_profile` | `rust/vm/src/runtime_contracts.rs`, `rust/vm/src/composition.rs` |
 | Threaded certified-wave fallback | `WaveCertificate` check with one-step degrade | `rust/vm/src/threaded.rs` |
-| Deviation registry enforcement | Undocumented parity drift rejection | `scripts/check-parity-ledger.sh` |
+| Deviation registry enforcement | Undocumented parity drift rejection | `just check-parity --types` |
 
 ## Capability Gate Architecture
 
@@ -107,7 +107,7 @@ These interfaces are intentionally explicit. They are not claimed as uncondition
 
 ## Release and CI Conformance
 
-Release conformance surfaces are exported through theorem-pack APIs and enforced by `scripts/check-release-conformance.sh`. Parity and drift governance are enforced by `scripts/check-vm-parity-suite.sh` and `scripts/check-parity-ledger.sh`.
+Release conformance surfaces are exported through theorem-pack APIs and enforced by `just check-release-conformance`. Parity and drift governance are enforced by `just check-parity --all`.
 
 ## Related Docs
 

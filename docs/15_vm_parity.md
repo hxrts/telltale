@@ -19,7 +19,7 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 | `ProgressToken` fields | `Runtime/VM/Model/State.lean` | `rust/vm/src/coroutine.rs` | Aligned |
 | Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | no executable admission gate in baseline Lean runner | `rust/vm/src/vm.rs` | Runtime-only extension (documented deviation) |
 
-These checks are automated by `scripts/check-parity-ledger.sh`.
+These checks are automated by `just check-parity --types`.
 
 ## Behavior Contract
 
@@ -30,7 +30,7 @@ These checks are automated by `scripts/check-parity-ledger.sh`.
 | Failure-visible artifacts | Snapshot parity within declared failure envelope class |
 | Speculation | No sentinel fallback behavior for join/abort with deterministic gated semantics |
 
-These checks are automated by `scripts/check-vm-parity-suite.sh`.
+These checks are automated by `just check-parity --suite`.
 
 ## State Schema
 
@@ -123,7 +123,7 @@ Any intentional parity break must be recorded in the deviation table below befor
 
 **Reason:** VMConfig now exposes `threaded_round_semantics` and defaults to canonical one-step semantics aligned with Lean.
 
-**Impact:** No active parity divergence remains for default threaded execution; multi-pick wave mode is now an explicit opt-in extension.
+**Impact:** No active parity divergence remains for default threaded execution. Multi-pick wave mode is now an explicit opt-in extension.
 
 **Alternatives considered:** Keeping wave-parallel semantics as default was rejected because it kept parity drift in the baseline runner path.
 
@@ -155,13 +155,13 @@ Any intentional parity break must be recorded in the deviation table below befor
 
 ## CI Gates
 
-The minimum parity governance gates are `scripts/check-parity-ledger.sh`, `scripts/check-vm-parity-suite.sh`, and workflow gates in `.github/workflows/verify.yml` and `.github/workflows/check.yml`.
+The minimum parity governance gates are `just check-parity --all`, `just check-release-conformance`, and workflow gates in `.github/workflows/verify.yml` and `.github/workflows/check.yml`.
 
 If any gate fails, parity drift is treated as a release blocker.
 
 ## Performance SLA
 
-Runtime performance governance enforces explicit thresholds from `artifacts/v2/benchmark_matrix/summary.json` in `scripts/check-runtime-performance-governance.sh`.
+Runtime performance governance enforces explicit thresholds from `artifacts/v2/benchmark_matrix/summary.json` through `just v2-baseline sla`.
 
 - `TT_SLA_THROUGHPUT_RATIO_MIN` (default `1.0`)
 - `TT_SLA_P99_REGRESSION_MAX_PERCENT` (default `15.0`)
