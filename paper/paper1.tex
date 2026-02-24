@@ -233,8 +233,11 @@ well-formedness conditions. This paper refines coherence at the operational leve
 $\Coherent(G,D)$ over local environments and buffered traces. Our operational formulation makes
 preservation local and compositional and removes the long-standing per-step global re-derivation
 bottleneck. We confirm this result via Lean 4 mechanization.
+Terminology note: throughout this paper, ``coherence'' denotes the operational predicate
+$\Coherent(G,D)$, not the classical global-type projectability notion. Section~2 positions this
+usage explicitly relative to prior MPST coherence traditions.
 
-\subsection{Insight}
+\subsection{Contribution}
 
 Projection defines a quotient, it erases global structure while preserving safety-relevant information.
 The question is: what exact invariant survives this erasure? We isolate an operational form of
@@ -245,8 +248,6 @@ compatibility as receiver-buffer alignment at each active edge (Carbone et al., 
 $\Coherent(G,D)$ captures exactly what projection preserves for this proof architecture. It is
 neither too strong nor too weak, and this exactness enables compositionality. Local proofs on individual
 edges combine to yield global preservation. No global re-derivation is required.
-
-\subsection{Technical Approach}
 
 The core contribution is one operational kernel with two theorem-level lifts: typed-step preservation
 and subtype replacement. The shared kernel is edge-local checking with active-edge lifting.
@@ -262,36 +263,36 @@ LaSalle, 1960).
 	\centering
 	\begin{tikzpicture}[figfont, x=1mm, y=1mm]
 		% State space boundary
-		\draw[rounded corners=6pt] (-38,-14) rectangle (38,18);
-		\node at (0,15) {\textbf{Operational state space}};
+		\draw[rounded corners=6pt] (-35,-30) rectangle (35,30);
+		\node at (0,27) {\textbf{Operational state space}};
 
 		% Coherent invariant region
-		\draw[rounded corners=6pt, fill=gray!10] (-35,-11) rectangle (35,12);
-		\node at (0,9) {\textbf{\textsf{Coherent} invariant region}};
+		\draw[rounded corners=6pt, fill=gray!10] (-32,-26) rectangle (32,24);
+		\node at (0,21) {\textbf{\textsf{Coherent} invariant region}};
 
-		% Typed-step trajectory
-		\fill (-24,0) circle (1.4pt);
-		\fill (-10,0) circle (1.4pt);
-		\draw[figarrowstrong] (-24,0) -- (-10,0);
-		\node[anchor=south] at (-17,1) {typed step};
+		% Typed-step trajectory (top)
+		\fill (-18,11.5) circle (1.4pt);
+		\fill (18,11.5) circle (1.4pt);
+		\draw[figarrowstrong] (-18,11.5) -- (18,11.5);
+		\node[font=\scriptsize, anchor=north] at (-18,10.7) {$s_0$};
+		\node[font=\scriptsize, anchor=north] at (18,10.7) {$s_1$};
+		\node[anchor=south] at (0,12.0) {typed step};
+		\node at (0,3.5) {$\Coherent(G,D) \xrightarrow{\text{\tiny \hphantom{en}step\hphantom{en}}} \Coherent(G',D')$};
 
-		% Subtype-replacement trajectory
-		\fill (9,0) circle (1.4pt);
-		\fill (23,0) circle (1.4pt);
-		\draw[figarrowstrong] (9,0) -- (23,0);
-		\node[anchor=south] at (16,1) {subtype replacement};
-
-		% Symbolic statement
-		\node[align=center] at (0,-6)
-		{$\Coherent \xrightarrow{\text{\tiny \hphantom{en}step\hphantom{en}}} \Coherent
-				\quad
-				\Coherent \xrightarrow{\!\text{\tiny replacement}\!} \Coherent$};
+		% Subtype-replacement trajectory (bottom)
+		\fill (-18,-12.5) circle (1.4pt);
+		\fill (18,-12.5) circle (1.4pt);
+		\draw[figarrowstrong] (-18,-12.5) -- (18,-12.5);
+		\node[font=\scriptsize, anchor=north] at (-18,-13.3) {$s_0$};
+		\node[font=\scriptsize, anchor=north] at (18,-13.3) {$s_0^{\mathrm{rep}}$};
+		\node[anchor=south] at (0,-12.0) {subtype replacement};
+		\node at (0,-20.5) {$\Coherent(G,D) \xrightarrow{\!\text{\tiny replacement}\!} \Coherent(G_{\mathrm{rep}},D)$};
 	\end{tikzpicture}
 	\caption{Invariant-geometric view of preservation and subtype evolution.}
 	\label{fig:p1-operational-kernel}
 \end{figure}
 
-\subsection{Scope and Claims}
+\subsection{Scope}
 
 This paper has two central claims. The first is Coherence preservation through a three-way split that
 applies uniformly across transitions. The second is session evolution under subtype replacement via
@@ -310,28 +311,34 @@ More precisely, our contributions in this paper are as follows:
 	\item A typed effect bridge connecting protocol semantics to runtime execution, parametric in delivery model and premises.
 \end{enumerate}
 
+Main text proofs are proof sketches; full machine-checked derivations are provided by the Lean anchors indexed in Appendix~\ref{app:index}.
+
 \begin{center}
 	\small
 	\begin{tabularx}{\columnwidth}{@{}L{0.36\columnwidth}L{0.59\columnwidth}@{}}
 		\toprule
-		\thead{Symbol}  & \thead{Meaning}                        \\
+		\thead{Symbol}  & \thead{Meaning}                                                  \\
 		\midrule
-		\Hbyz           & Byzantine characterization bundle      \\
-		\Obssafe        & Byzantine safety-visible observation   \\
-		\Eqsafe         & Byzantine safety-visible equality      \\
-		\Ebyz           & Byzantine determinism-envelope         \\
-		\ByzChar        & Byzantine characterization formula     \\
-		\ByzSafe        & Byzantine safety predicate             \\
-		\ByzIfaceWF     & Byzantine interface well-formedness    \\
-		\Coherent       & global active-edge compatibility       \\
-		\EdgeCoherent   & edge-local compatibility check         \\
-		\EdgeShares     & edge-to-endpoint incidence predicate   \\
-		\Consume        & trace-to-type alignment function       \\
-		\GEnv           & endpoint-to-local-type environment     \\
-		\DEnv           & edge-to-buffered-trace environment     \\
-		\ActiveEdge     & endpoint-presence guard                \\
-		\RecvCompatible & receive-side replacement compatibility \\
-		\DeliveryModel  & parametric delivery interface          \\
+		\Hbyz           & Byzantine characterization bundle                                \\
+		\Obssafe        & Byzantine safety-visible observation                             \\
+		\Eqsafe         & Byzantine safety-visible equality                                \\
+		\Ebyz           & Byzantine determinism-envelope                                   \\
+		\ByzChar        & Byzantine characterization formula                               \\
+		\ByzSafe        & Byzantine safety predicate                                       \\
+		\ByzIfaceWF     & Byzantine interface well-formedness                              \\
+		\Coherent       & global active-edge compatibility                                 \\
+		\EdgeCoherent   & edge-local compatibility check                                   \\
+		\EdgeShares     & edge-to-endpoint incidence predicate                             \\
+		\Consume        & trace-to-type alignment function                                 \\
+			\GEnv           & endpoint-to-local-type environment                               \\
+			\DEnv           & edge-to-buffered-trace environment                               \\
+			$(G,D)$         & configuration pair of local-type and buffered-trace environments \\
+			$s_i$           & illustrative configuration states in traces/figures              \\
+			$q$             & quotient projection to symmetry classes                          \\
+			$\sim$          & coherence-preserving symmetry/equivalence relation               \\
+			\ActiveEdge     & endpoint-presence guard                                          \\
+			\RecvCompatible & receive-side replacement compatibility                           \\
+			\DeliveryModel  & parametric delivery interface                                    \\
 		\bottomrule
 	\end{tabularx}
 	\captionof{table}{Notation used in this paper.}
@@ -397,36 +404,44 @@ Delivery behavior is parameterized by \DeliveryModel. This gives one theorem sha
 \end{equation}
 Edges incident to absent endpoints are excluded by $\ActiveEdge$.
 
-\subsection{Why Coherence}
+\subsection{Operational Coherence}
 
-The term follows the linear-logic compatibility tradition from coherence-space semantics and session typing foundations, including Girard (1987), Caires and Pfenning (2010), and Wadler (2012). Usage in this paper is operational rather than denotational.
+In this paper, ``coherence'' means the operational invariant
+$\Coherent(G,D)$ from Equation~\ref{eq:p1-active-edge-boundary}: every active edge must satisfy
+$\EdgeCoherent$.
 
-This operational usage is aligned with, but distinct from, classical MPST global coherence and projectability (Honda et al., 2008; Honda et al., 2016; Castagna et al., 2012) and logical n-ary coherence accounts (Carbone et al., 2015; Carbone et al., 2016; Carbone et al., 2017).
+This is aligned with, but distinct from, classical MPST coherence/projectability on global types
+(Honda et al., 2008; Honda et al., 2016; Castagna et al., 2012; Majumdar et al., 2021) and logical
+n-ary coherence accounts (Carbone et al., 2015; Carbone et al., 2016; Carbone et al., 2017).
+The present claim is operational and proof-architectural, not a denotational identification of models.
 
-Operationally, our edge-local notion also sits in the lineage connecting session typing, subtyping, and communicating-automata views (Gay and Hole, 2005; Deni\'{e}lou and Yoshida, 2012; Brand and Zafiropulo, 1983).
-
-The key structural correspondence is compatibility. A coherence-space token corresponds to an edge-local communication view, and a clique corresponds to a globally coherent configuration over active edges.
+The compatibility intuition follows coherence-space/session-logic lineages (Girard, 1987; Caires and
+Pfenning, 2010; Wadler, 2012) and the communicating-automata compatibility tradition
+(Gay and Hole, 2005; Deni\'{e}lou and Yoshida, 2012; Brand and Zafiropulo, 1983): local compatibility
+obligations aggregate into one global invariant used by preservation.
 
 \begin{table}[H]
 	\centering
-	\small
-	\begin{tabularx}{\columnwidth}{@{}L{0.38\columnwidth}L{0.57\columnwidth}@{}}
+	\footnotesize
+	\begin{tabularx}{\columnwidth}{@{}L{0.34\columnwidth}L{0.54\columnwidth}@{}}
 		\toprule
-		\thead{Coherence-space} & \thead{MPST operational}          \\
+		\thead{Coherence-space} & \thead{Operational in This Paper}                     \\
 		\midrule
-		token                   & directed edge with buffered trace \\
-		coherence relation      & \EdgeCoherent                     \\
-		clique                  & \Coherent configuration           \\
-		linear-map preservation & step preservation theorem         \\
+		token                          & active-edge obligation for directed edge $e$         \\
+		coherence relation             & $\EdgeCoherent(G,D,e)$                               \\
+		clique                         & $\Coherent(G,D)$ over all active edges               \\
+		preservation of compatibility  & one-step preservation (Thm.~\ref{thm:coherence-preservation}) \\
 		\bottomrule
 	\end{tabularx}
-	\caption{Coherence-space correspondence.}
+	\caption{Compatibility correspondence used as operational intuition (not a formal embedding claim).}
 \end{table}
 
 % ============================================================================
 \section{Worked Example}
 \label{sec:example}
 % ============================================================================
+
+We illustrate coherence preservation through a three-role protocol that exercises the key proof obligations. These include active-edge checks, buffer compatibility via \Consume, and the three-way edge split for typed steps. The configuration includes a non-empty buffer to demonstrate how in-flight messages interact with local-type advancement.
 
 \noindent\begingroup\raggedright
 \textbf{Running example.} Roles are \texttt{C} (client), \texttt{P} (pool), and \texttt{M} (monitor), with global interaction:
@@ -557,24 +572,59 @@ For the step edge $u=(C,M)$ with stepped endpoint $ep_{\mathrm{step}}$, the case
 	This claim is exact for one-step preservation in the stated core rule fragment.
 \end{theorem}
 
-\begin{proof}[Proof sketch]
-	The argument is a reusable case-analysis pipeline over edges.
+\begin{proof}
+	Fix a well-typed one-step transition
+	\[
+		(G,D)\to(G',D')
+	\]
+	in the send/recv/select/branch fragment, and assume $\Coherent(G,D)$.
+	To prove $\Coherent(G',D')$, let $e$ be arbitrary and assume $\ActiveEdge(G',e)$.
+	It suffices to show $\EdgeCoherent(G',D',e)$.
 
-	\begin{enumerate}
-		\item Fix a typed one-step transition and an arbitrary edge $e$ that is active after the step.
-		\item Apply \nolinkurl{edge_case_split} to partition $e$ into:
-		      \begin{itemize}
-			      \item updated edge ($e = e_{\mathrm{step}}$),
-			      \item shared-endpoint edge ($e \neq e_{\mathrm{step}} \land \EdgeShares(e, ep_{\mathrm{step}})$),
-			      \item unrelated edge ($e \neq e_{\mathrm{step}} \land \neg \EdgeShares(e, ep_{\mathrm{step}})$).
-		      \end{itemize}
-		\item Updated-edge case: send/recv/select/branch obligations are discharged by rule-local preservation lemmas; message-to-type alignment is reduced to \nolinkurl{consume_append} (enqueue-facing) or \nolinkurl{consume_cons} (dequeue-facing).
-		\item Shared-endpoint case: use store/buffer irrelevance lemmas to show unaffected projections are preserved; transport pre-state $\EdgeCoherent$ to post-state $\EdgeCoherent$.
-		\item Unrelated-edge case: apply frame-style transport (no touched endpoint, no touched buffer segment); conclude edge-local coherence is unchanged.
-		\item Reassemble all cases to obtain $\Coherent(G',D')$.
-	\end{enumerate}
+	Apply \nolinkurl{edge_case_split} to $e$ with respect to the stepped edge $e_{\mathrm{step}}$
+		and stepped endpoint $ep_{\mathrm{step}}$. Exactly one of the following holds:
+		\[
+			\begin{aligned}[t]
+				e & = e_{\mathrm{step}}, \\
+				e & \neq e_{\mathrm{step}}\land \EdgeShares(e,ep_{\mathrm{step}}), \\
+				e & \neq e_{\mathrm{step}}\land \neg\EdgeShares(e,ep_{\mathrm{step}}).
+			\end{aligned}
+		\]
 
-	The same skeleton is used uniformly across send/recv/select/branch, which is the main proof-reuse gain in this paper.
+	\textbf{Case 1 (updated edge).}
+	Here $e=e_{\mathrm{step}}$.
+	The post-step edge obligation is discharged by the rule-local preservation theorem corresponding
+	to the operational rule used by $(G,D)\to(G',D')$:
+	send/recv/select/branch map to
+	\nolinkurl{coherent_send_preserved},
+	\nolinkurl{coherent_recv_preserved},
+	\nolinkurl{coherent_select_preserved},
+	\nolinkurl{coherent_branch_preserved}.
+	The message/type-alignment subgoal is reduced to $\Consume$ lemmas:
+	send/select use \nolinkurl{consume_append} for enqueue extension, recv/branch use
+	\nolinkurl{consume_cons} for aligned head-consumption and continuation alignment.
+	Hence $\EdgeCoherent(G',D',e)$.
+
+	\textbf{Case 2 (shared endpoint, not updated edge).}
+	Assume
+	$e\neq e_{\mathrm{step}}\land \EdgeShares(e,ep_{\mathrm{step}})$.
+	From pre-state coherence and active-edge premises on unchanged incident structure, we have
+	$\EdgeCoherent(G,D,e)$. The shared-endpoint transport lemmas preserve receiver projection and the
+	relevant buffered segment on $e$, so the same consumption witness transports to the post-state.
+	Therefore $\EdgeCoherent(G',D',e)$.
+
+	\textbf{Case 3 (unrelated edge).}
+	Assume
+	$e\neq e_{\mathrm{step}}\land \neg\EdgeShares(e,ep_{\mathrm{step}})$.
+	No endpoint or buffer component of $e$ is touched by the step; frame transport gives
+	invariance of edge-local coherence on $e$ between $(G,D)$ and $(G',D')$. Since
+	$\Coherent(G,D)$, we obtain $\EdgeCoherent(G',D',e)$.
+
+	All cases yield $\EdgeCoherent(G',D',e)$ for arbitrary active $e$, hence
+	\[
+		\forall e,\ \ActiveEdge(G',e)\to \EdgeCoherent(G',D',e),
+	\]
+	which is $\Coherent(G',D')$.
 \end{proof}
 
 The split operator is implemented by \nolinkurl{edge_case_split}. Rule-level preservation lemmas are grouped by send, recv, select, and branch cases. Table~\ref{tab:p1-index} gives the anchor-to-file mapping, and \cref{app:chains} records theorem-to-lemma chains.
@@ -583,8 +633,9 @@ The architecture is quotient-first. The concrete step relation induces dynamics 
 
 The quotienting step should be read as symmetry reduction. Distinct interleavings that are equivalent under the symmetry relation are identified as one observable class. Formally, the induced square is:
 \begin{equation}
-	q(\mathsf{step}(C))\ =\ \mathsf{step}_{/ \sim}(q(C)).
+	q(\mathsf{step}(G,D))\ =\ \mathsf{step}_{/ \sim}(q(G,D)).
 \end{equation}
+Here $q$ is the quotient projection map and $\sim$ is the coherence-preserving equivalence relation used by the bridge layer.
 The square states the commuting condition used across these three papers. This paper establishes the preservation side needed to make the quotient dynamics well-defined.
 
 The case partition used by \nolinkurl{edge_case_split} is:
@@ -764,14 +815,15 @@ Compared with these lines, this paper contributes a reusable proof kernel that c
 \label{sec:limitations}
 % ============================================================================
 
-This paper proves preservation and progress for the typed asynchronous core rule family through the
-operational Coherence architecture. It also proves subtype replacement stability for edge Coherence,
+This paper proves preservation and progress-side condition preservation for the typed asynchronous core rule family through the
+operational Coherence architecture. We also prove subtype replacement stability for edge Coherence,
 global Coherence, and progress-side conditions when replacement preserves typing domains, satisfies
 receive-side monotonicity, and keeps unaffected endpoints environment-consistent. VM bridge claims are
 conditional on explicit monitor and quotient-transport premises rather than unconditional runtime
 metatheorems.
 
-Quantitative, fault-characterization, and envelope-level claims are proved in later papers within this series.
+Byzantine material in this paper is interface-layer only (Theorem~\ref{thm:bz1} and its corollary/proposition wrappers), not a full fault-characterization envelope theorem.
+Quantitative, full fault-characterization, and envelope-level claims are proved in later papers within this series.
 
 % ============================================================================
 \section{Conclusion}
