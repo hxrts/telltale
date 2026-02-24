@@ -80,6 +80,7 @@ The Rust surfaces are in `rust/vm/src/runtime_contracts.rs` and `rust/vm/src/com
 | Regime | Lean Surface | Rust Surface | Status |
 |---|---|---|---|
 | `n = 1` exact refinement | `runScheduledThreaded_one_eq_runScheduled` | `threaded_equivalence.rs::test_threaded_matches_cooperative` | Aligned |
+| Spawn step parity (`n = 1`) | `Runtime/VM/Semantics/ExecControl.lean`, `Runtime/VM/Semantics/ExecSteps.lean` | `differential_step_corpus.rs::threaded_matches_cooperative_step_corpus_control_spawn` | Aligned |
 | Certified-wave fallback | `executeCertifiedRound` | `threaded.rs` wave certificate check with one-step fallback | Aligned |
 | `n > 1` envelope-bounded parity | `ThreadedRoundRefinementPremises` (premise-scoped) | `parity_fixtures_v2.rs::envelope_bounded_parity_holds_for_n_gt_1` | Aligned under envelope contract |
 
