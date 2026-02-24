@@ -71,9 +71,9 @@
 \setlength{\emergencystretch}{2em}      % Reduce overfull lines in narrow columns
 \setlength{\columnsep}{16pt}            % Slightly wider gutter for two-column reading
 \setlength{\parskip}{0pt plus 1pt}      % Flexible paragraph spacing
-\setlength{\floatsep}{10pt plus 2pt minus 2pt}
-\setlength{\textfloatsep}{12pt plus 2pt minus 2pt}
-\setlength{\intextsep}{10pt plus 2pt minus 2pt}
+\setlength{\floatsep}{12pt plus 3pt minus 2pt}
+\setlength{\textfloatsep}{14pt plus 3pt minus 2pt}
+\setlength{\intextsep}{12pt plus 3pt minus 2pt}
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.08}
 \renewcommand{\topfraction}{0.85}       % Allow more floats at top
@@ -104,13 +104,13 @@
 % ============================================================================
 
 \newtheoremstyle{paperplain}%
-{3pt}{3pt}{\itshape\raggedright}{}{\bfseries}{}{0pt}%
+{6pt}{6pt}{\itshape\raggedright}{}{\bfseries}{}{0pt}%
 {\thmname{#1}\thmnumber{ #2}\thmnote{. #3}.\hfill\break}
 \newtheoremstyle{paperdef}%
-{3pt}{3pt}{\normalfont\raggedright}{}{\bfseries}{}{0pt}%
+{6pt}{6pt}{\normalfont\raggedright}{}{\bfseries}{}{0pt}%
 {\thmname{#1}\thmnumber{ #2}\thmnote{. #3}.\hfill\break}
 \newtheoremstyle{paperremark}%
-{3pt}{3pt}{\normalfont\raggedright}{}{\itshape}{}{0pt}%
+{6pt}{6pt}{\normalfont\raggedright}{}{\itshape}{}{0pt}%
 {\thmname{#1}\thmnumber{ #2}\thmnote{. #3}.\hfill\break}
 
 \theoremstyle{paperdef}
@@ -155,7 +155,7 @@
 \newcommand{\EdgeShares}{\ensuremath{\mathsf{EdgeShares}}}
 \newcommand{\ByzIfaceWF}{\ensuremath{\mathsf{ByzIfaceWF}}}
 \newcommand{\pathref}[1]{\texttt{#1}}
-\newcommand{\eqnote}[1]{\par\noindent\textit{#1.}\par\vspace{-2pt}}
+\newcommand{\eqnote}[1]{\par\noindent\textit{#1.}\par\vspace{2pt}}
 
 \newenvironment{citelist}{%
   \begin{list}{}{%
@@ -177,8 +177,8 @@
   framerule=3pt,
   framesep=1em,
   columns=fullflexible,
-  aboveskip=5pt,
-  belowskip=5pt,
+  aboveskip=8pt,
+  belowskip=8pt,
   xleftmargin=1.5em,
   literate={->}{$\to$\ }2 {forall}{$\forall$}1 {:=}{$\coloneqq$}2
 }
@@ -387,6 +387,29 @@ Assumption-block inheritance policy. Assumption blocks do not inherit implicitly
 	$\Coherent(G, D)$ holds when every active edge is edge coherent.
 \end{definition}
 
+\begin{definition}[Well-Typed Configuration and Step]
+	Write $\Gamma \vdash (G,D)\ \wf$ for configuration typing and
+	$\Gamma \vdash (G,D)\to(G',D')$ for one-step typing in the operational
+	fragment used by this paper.
+\end{definition}
+
+Role split. Well-typedness constrains rule formation and environment-domain
+consistency. Coherence constrains edge-local message and type compatibility.
+
+\begin{definition}[consumeOne]
+	For source role $r$, value type $T$, and local type $L$:
+	\[
+		\consumeOne(r,T,L)=
+		\begin{cases}
+			\mathsf{some}(L') & \text{if } L=\mathsf{recv}(r,T,L'), \\
+			\mathsf{none}     & \text{if } L\in\{\mathsf{send},\mathsf{select},\mathsf{branch},\mathsf{end},\mathsf{var}\}, \\
+			\mathsf{none}     & \text{if } L=\mu L_0 \text{ at this layer.}
+		\end{cases}
+	\]
+	Head checks are therefore constructor-local. Recursive unfolding is handled by
+	the local-type normalization layer before this head check.
+\end{definition}
+
 \begin{definition}[Consume]
 	For source role $r$, receiver local type $L$, and buffered trace $ts$:
 \noindent\begin{minipage}{\columnwidth}
@@ -401,13 +424,31 @@ Consume r L (T :: ts) :=
 	The recursion is structural on trace length.
 \end{definition}
 
-Termination argument. Every recursive call consumes one trace head, so
-$|ts|$ strictly decreases. The recursion stops at $[]$.
+\begin{definition}[Guarded Recursion Premise]
+	A recursive local type satisfies $\mathsf{GuardedMu}$ when every bound-variable
+	occurrence in a $\mu$-body appears under a communication constructor. This
+	excludes unguarded heads that can unfold forever without consuming input.
+\end{definition}
 
-Recursive local types. If $L$ has constructor $\mu L_0$, then $\consumeOne$
-matches on one-step unfolding before checking the current message constructor.
-Unfolding does not create extra $\Consume$ recursion depth because recursive
-calls are still indexed only by remaining trace length.
+Termination measure. Define
+\[
+	\mu_{\Consume}(L,ts) := |ts|.
+\]
+If a recursive call is taken, the argument changes from $(L,T::ts)$ to
+$(L',ts)$, so $\mu_{\Consume}$ strictly decreases by one. Hence recursion is
+well-founded on natural numbers.
+
+Recursive local types. For $\mu$-types, unfolding is handled in the
+normalization layer and does not add recursive depth to $\Consume$ itself,
+because $\Consume$ recursion is indexed only by trace length. Under
+$\mathsf{GuardedMu}$, normalization cannot generate infinite head-unfolding
+chains in the well-typed fragment used here.
+
+Mechanized anchors for this block are
+\nolinkurl{consume_one_depth_lt},
+\nolinkurl{consume_length_le_depth},
+\nolinkurl{LocalTypeR.guarded_full_unfold_not_var}, and
+\nolinkurl{mu_height_substitute_guarded}.
 
 \begin{definition}[Byzantine Interface Well-Formedness]
 	$\ByzIfaceWF(G, D)$ is the interface predicate used for Byzantine-facing statements in this paper, and is mechanized as a definitional alias of $\Coherent(G, D)$.
@@ -541,6 +582,9 @@ For the step edge $u=(C,M)$ with stepped endpoint $ep_{\mathrm{step}}$, the case
 \label{sec:preservation}
 % ============================================================================
 
+Running-example thread. Section~\ref{sec:example} instantiates this theorem on
+the baseline C/P/M trace and its one-step send-recv transitions.
+
 \begin{figure}[H]
 	\centering
 	\resizebox{\columnwidth}{!}{%
@@ -579,7 +623,10 @@ For the step edge $u=(C,M)$ with stepped endpoint $ep_{\mathrm{step}}$, the case
 			\node[font=\scriptsize, fill=white, inner sep=2pt] at (unrel |- label-y-bot) {$\neg\EdgeShares \to \EdgeCoherent$};
 		\end{tikzpicture}
 	}%
-	\caption{Three-way edge split used by the preservation proof.}
+	\caption{Three-way edge split used by the preservation proof. Top node is the
+	typed step $(G,D)\to(G',D')$. Middle nodes are the exhaustive edge classes
+	(updated, adjacent/shared-endpoint, disjoint). Bottom node is the global
+	post-step invariant. Arrow labels state the obligation discharged per class.}
 	\label{fig:p1-preservation-architecture}
 \end{figure}
 
@@ -591,6 +638,35 @@ For the step edge $u=(C,M)$ with stepped endpoint $ep_{\mathrm{step}}$, the case
 	\end{equation}
 	This claim is exact for one-step preservation in the stated core rule fragment.
 \end{theorem}
+
+Premise roles. In Theorem~\ref{thm:coherence-preservation}, well-typedness
+selects the applicable operational rule and preserves structural side
+conditions, while Coherence provides the edge obligations transported by the
+three-way split.
+
+Running-example instantiation. In Section~\ref{sec:example}, each checked
+transition in the baseline protocol is one of the send/recv/select/branch
+steps covered by this theorem.
+
+\begin{lemma}[Three-Way Edge-Split Exhaustiveness]
+	\label{lem:p1-edge-split-exhaustive}
+	Fix stepped edge $u$ and stepped endpoint $ep_{\mathrm{step}}$. For any edge $e$,
+	exactly one of the following holds:
+	\[
+		e=u,\qquad
+		e\neq u\land \EdgeShares(e,ep_{\mathrm{step}}),\qquad
+		e\neq u\land \neg\EdgeShares(e,ep_{\mathrm{step}}).
+	\]
+\end{lemma}
+
+\begin{proof}[Proof sketch]
+	Case-split first on $e=u$. If false, split on the Boolean incidence predicate
+	$\EdgeShares(e,ep_{\mathrm{step}})$. This yields the two remaining cases and
+	excludes overlap by propositional contradiction. Graph-theoretically, this is
+	the partition of all non-updated edges into those incident to the stepped
+	endpoint and those not incident to it. The mechanized splitter is
+	\nolinkurl{edge_case_split}.
+\end{proof}
 
 \begin{proof}
 	Fix a well-typed one-step transition
@@ -624,6 +700,8 @@ For the step edge $u=(C,M)$ with stepped endpoint $ep_{\mathrm{step}}$, the case
 	send/select use \nolinkurl{consume_append} for enqueue extension, recv/branch use
 	\nolinkurl{consume_cons} for aligned head-consumption and continuation alignment.
 	Hence $\EdgeCoherent(G',D',e)$.
+	In the running example (Section~\ref{sec:example}), this is the direct case
+	for the currently stepped channel edge.
 
 	\textbf{Case 2 (shared endpoint, not updated edge).}
 	Assume
@@ -732,10 +810,23 @@ $\Consume$ is the proof kernel for message-type alignment. It removes most rule-
 
 For the worked example, \nolinkurl{consume_cons} discharges the \texttt{Grant} receive step at \texttt{C} by reducing the obligation to continuation coherence after one aligned message.
 
+Complexity note. Under constant-time constructor tests in \consumeOne, one
+\Consume check on edge trace $ts_e$ costs $O(|ts_e|)$. Therefore one full
+active-edge Coherence check costs
+\[
+	O\!\Big(\sum_{e\in E_{\mathrm{active}}}|ts_e|\Big),
+\]
+which is $O(|E_{\mathrm{active}}|\cdot m_{\max})$ for
+$m_{\max}:=\max_e |ts_e|$. The dominant runtime term is buffered-trace scan
+length, not endpoint-map lookup.
+
 % ============================================================================
 \section{Session Evolution via Subtyping}
 \label{sec:evolution}
 % ============================================================================
+
+Running-example thread. Section~\ref{sec:example} gives the concrete endpoint
+state that is refined by this replacement theorem.
 
 Session evolution replaces one endpoint local type with a compatible refinement and asks whether coherence is preserved.
 
@@ -755,6 +846,9 @@ This replacement argument follows a standard commutation intuition from trace-eq
 	This claim is exact for type replacement steps covered by Assumption Block~\ref{assump:p1-replacement}.
 \end{theorem}
 
+Running-example instantiation. In Section~\ref{sec:example}, replacing one
+receiver continuation by a compatible subtype is an instance of this theorem.
+
 \begin{proof}[Proof sketch]
 	The replacement theorem is proved by a monotonicity-to-global-lift chain.
 
@@ -764,6 +858,8 @@ This replacement argument follows a standard commutation intuition from trace-eq
 		\item Global lift: combine edge cases to derive \nolinkurl{coherent_type_replacement}.
 		\item Progress compatibility: use liveness-side lemmas (\nolinkurl{progress_conditions_type_replacement}) to preserve operational side conditions.
 	\end{enumerate}
+	In the running example, this appears as refining the continuation after the
+	first request/grant exchange while preserving all edge checks.
 
 	Hence compatible subtype replacement preserves Coherence without re-running global derivations.
 \end{proof}
@@ -803,6 +899,12 @@ Write this mapping as
 	\end{aligned}
 \end{equation}
 where each right-hand side names the corresponding session obligation family in \texttt{WellTypedInstr}.
+
+Effect-bisimulation primer. Two configurations are effect-bisimilar when they
+match on the same observable effect trace up to silent internal steps. In this
+paper, effect-bisimulation is the bridge quotient because bridge soundness is
+an observational claim, and silent monitor-internal variation should not change
+that claim.
 
 \begin{table}[H]
 	\centering
@@ -907,6 +1009,15 @@ metatheorems.
 Byzantine material in this paper is interface-layer only (Theorem~\ref{thm:bz1} and its corollary/proposition wrappers), not a full fault-characterization envelope theorem.
 Quantitative, full fault-characterization, and envelope-level claims are proved in later papers within this series.
 
+Excluded protocol classes in this paper include unguarded recursive local types,
+non-typed reconfiguration operators, and liveness claims under adversarial loss
+or Byzantine scheduling.
+
+Implementation pointer. The theorem-facing interfaces map to
+\texttt{Protocol/Coherence/*.lean} for the core invariant and
+\texttt{Runtime/Proofs/VM/BridgeStrengthening.lean} with
+\texttt{Runtime/VM/Runtime/Monitor.lean} for VM bridge obligations.
+
 % ============================================================================
 \section{Conclusion}
 \label{sec:conclusion}
@@ -961,7 +1072,7 @@ The resulting kernel is small, compositional, and extensible. It supports subtyp
 \clearpage
 \appendix
 \noindent{\Large\bfseries Appendix}
-\vspace{0.5em}
+\vspace{1em}
 % ============================================================================
 
 \section{Syntax and Judgments}
@@ -1148,6 +1259,7 @@ Reproduction uses the repository-pinned Lean toolchain and manifest.
 		\midrule
 		Theorem~\ref{thm:coherence-preservation}, Theorem~\ref{thm:session-evolution}, Proposition~\ref{prop:bridge-soundness} & \ref{assump:p1-core}, \ref{assump:p1-replacement} as cited per claim \\
 		Theorem~\ref{thm:bz1}, Corollary~\ref{cor:bz1-1}, Proposition~\ref{prop:bz1-2} & \ref{assump:p1-byzantine} \\
+		Fairness-dependent claims & none at this paper theorem layer; fairness is consumed in later-series quantitative lifts \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Main claims and their assumption blocks.}
@@ -1160,6 +1272,12 @@ Reproduction uses the repository-pinned Lean toolchain and manifest.
 \label{app:index}
 
 Table~\ref{tab:p1-index} maps paper claims to their Lean anchors and source files. Anchors marked with --- are infrastructure lemmas used in proofs but not tied to a single claim.
+Functional categories in the table are: Definitions \& Structures, Predicates,
+Theorems, and Runtime Gates. Reading guide for long names:
+\texttt{handler\_fragment\_typing\_of\_premises} lifts handler premises to typed
+VM fragments; \texttt{config\_equiv\_iff\_effect\_bisim\_silent} is the bridge
+equivalence law; \texttt{progress\_conditions\_type\_replacement} preserves
+liveness-side side conditions under subtype replacement.
 
 \begin{table}[H]
 	\centering
@@ -1191,6 +1309,12 @@ Table~\ref{tab:p1-index} maps paper claims to their Lean anchors and source file
 		\rowcolor{gray!8}
 		\texttt{consume\_append}                                                  & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Consume.lean}}                                                   & \S\ref{sec:consume}      & Thm.~\ref{thm:coherence-preservation} \\
 		\texttt{consume\_cons}                                                    & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Consume.lean}}                                                   & \S\ref{sec:consume}      & Thm.~\ref{thm:coherence-preservation} \\
+		\rowcolor{gray!8}
+		\texttt{consume\_one\_depth\_lt}                                          & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Consume.lean}}                                                   & \S\ref{sec:model}        & Consume well-foundedness              \\
+		\texttt{consume\_length\_le\_depth}                                       & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Consume.lean}}                                                   & \S\ref{sec:model}        & Consume well-foundedness              \\
+		\rowcolor{gray!8}
+		\texttt{LocalTypeR.\allowbreak guarded\_full\_unfold\_not\_var}          & \texttt{SessionTypes/\allowbreak LocalTypeR/\allowbreak}\mbox{\texttt{WellFormedness.lean}}                                       & \S\ref{sec:model}        & Guarded recursion premise             \\
+		\texttt{mu\_height\_\allowbreak substitute\_guarded}                     & \texttt{SessionTypes/\allowbreak LocalTypeR/\allowbreak}\mbox{\texttt{Substitution.lean}}                                         & \S\ref{sec:model}        & Guarded recursion premise             \\
 		\rowcolor{gray!8}
 		\texttt{consume\_mono}                                                    & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{SubtypeReplacementCore.lean}}                                    & \S\ref{sec:evolution}    & Thm.~\ref{thm:session-evolution}      \\
 		\texttt{edge\_case\_split}                                                & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{Unified.lean}}                                                   & \S\ref{sec:preservation} & Thm.~\ref{thm:coherence-preservation} \\

@@ -71,9 +71,9 @@
 \setlength{\emergencystretch}{2em}      % Reduce overfull lines in narrow columns
 \setlength{\columnsep}{16pt}            % Slightly wider gutter for two-column reading
 \setlength{\parskip}{0pt plus 1pt}      % Flexible paragraph spacing
-\setlength{\floatsep}{10pt plus 2pt minus 2pt}
-\setlength{\textfloatsep}{12pt plus 2pt minus 2pt}
-\setlength{\intextsep}{10pt plus 2pt minus 2pt}
+\setlength{\floatsep}{12pt plus 3pt minus 2pt}
+\setlength{\textfloatsep}{14pt plus 3pt minus 2pt}
+\setlength{\intextsep}{12pt plus 3pt minus 2pt}
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.08}
 \renewcommand{\topfraction}{0.85}       % Allow more floats at top
@@ -104,13 +104,13 @@
 % ============================================================================
 
 \newtheoremstyle{paperplain}%
-{3pt}{3pt}{\itshape\raggedright}{}{\bfseries}{}{0pt}%
+{6pt}{6pt}{\itshape\raggedright}{}{\bfseries}{}{0pt}%
 {\thmname{#1}\thmnumber{ #2}\thmnote{. #3}.\hfill\break}
 \newtheoremstyle{paperdef}%
-{3pt}{3pt}{\normalfont\raggedright}{}{\bfseries}{}{0pt}%
+{6pt}{6pt}{\normalfont\raggedright}{}{\bfseries}{}{0pt}%
 {\thmname{#1}\thmnumber{ #2}\thmnote{. #3}.\hfill\break}
 \newtheoremstyle{paperremark}%
-{3pt}{3pt}{\normalfont\raggedright}{}{\itshape}{}{0pt}%
+{6pt}{6pt}{\normalfont\raggedright}{}{\itshape}{}{0pt}%
 {\thmname{#1}\thmnumber{ #2}\thmnote{. #3}.\hfill\break}
 
 \theoremstyle{paperdef}
@@ -149,7 +149,7 @@
 \newcommand{\Profile}{\ensuremath{\mathsf{Profile}}}
 \newcommand{\Phase}{\ensuremath{\mathsf{Phase}}}
 \newcommand{\pathref}[1]{\texttt{#1}}
-\newcommand{\eqnote}[1]{\par\noindent\textit{#1.}\par\vspace{-2pt}}
+\newcommand{\eqnote}[1]{\par\noindent\textit{#1.}\par\vspace{2pt}}
 
 \newenvironment{citelist}{%
   \begin{list}{}{%
@@ -171,8 +171,8 @@
   framerule=3pt,
   framesep=1em,
   columns=fullflexible,
-  aboveskip=5pt,
-  belowskip=5pt,
+  aboveskip=8pt,
+  belowskip=8pt,
   xleftmargin=1.5em,
   literate={->}{$\to$\ }2 {forall}{$\forall$}1 {:=}{$\coloneqq$}2
 }
@@ -462,6 +462,16 @@ Table~\ref{tab:p2-assumptions} records the assumptions used for exact statements
 
 Assumption-block inheritance policy. Assumption blocks do not inherit implicitly. If a theorem does not name a block, it uses Assumption Block~\ref{assump:p2-core} only.
 
+\begin{definition}[Well-Typed State and Step]
+	Write $\Gamma \vdash s\ \wf$ for state typing and
+	$\Gamma \vdash s \to s'$ for one-step typing in the asynchronous buffered
+	kernel reused from Paper 1.
+\end{definition}
+
+Role split. Well-typedness gives rule admissibility and side-condition
+soundness for each step. Coherence gives the edge-local compatibility invariant
+transported across those typed steps.
+
 \begin{definition}[Productive Step]
 	For the one-step transition relation $s \to s'$, a step is productive iff $W(s') < W(s)$, where $W$ is Definition~\ref{def:p2-weighted-measure}.
 \end{definition}
@@ -615,6 +625,9 @@ Table~\ref{tab:p2-delta-w} records the per-rule $\Delta W$ facts used in this wi
 \label{sec:theorem1}
 % ============================================================================
 
+Running-example thread. Section~\ref{sec:example} instantiates this section
+with witness trace $\tau_{\mathrm{ex}}$ and explicit per-step $\Delta W$ facts.
+
 \begin{assumption}[Quantitative Descent Premises]
 	\label{assump:p2-quantitative}
 	The descent theorem assumes well-typed asynchronous buffered transitions, active-edge Coherence preservation from \emph{Coherence for Asynchronous Buffered MPST}, non-negativity of $W$, and a scheduler profile from Table~\ref{tab:p2-scheduler-profiles} when total-step lifting is claimed.
@@ -626,12 +639,24 @@ Table~\ref{tab:p2-delta-w} records the per-rule $\Delta W$ facts used in this wi
 	\begin{equation}
 		P(\tau) \le W(s_0) = W_0.
 	\end{equation}
-	If the selected scheduler profile provides lift constant $\kappa_\sigma$, then
+	If the selected scheduler profile (fairness-required) provides lift constant $\kappa_\sigma$, then
 	\begin{equation}
 		T(\tau) \le \kappa_\sigma \cdot W_0.
 	\end{equation}
 	The productive bound is exact as a tight upper bound. Equality is attained under the conditions stated below. The scheduler-lifted bound is conservative and profile-dependent.
 \end{theorem}
+
+Fairness-required clause. The productive bound is fairness-independent. The
+scheduler-lifted total-step clause requires the declared fairness profile used
+to extract $\kappa_\sigma$.
+
+Premise roles. In Theorem~\ref{thm:quantitative}, well-typedness determines the
+rule-local $\Delta W$ lemma applied at each step, and Coherence provides the
+invariant interface inherited from Paper 1.
+
+Running-example instantiation. In Section~\ref{sec:example}, the witness trace
+$\tau_{\mathrm{ex}}$ realizes this theorem with $W_0=25$, productive count
+$P(\tau_{\mathrm{ex}})=4$, and scheduler-lift gap reporting.
 
 \begin{proof}
 	Write the trace as
@@ -679,6 +704,9 @@ Table~\ref{tab:p2-delta-w} records the per-rule $\Delta W$ facts used in this wi
 	\[
 		T(\tau)\le \kappa_\sigma\,W_0.
 	\]
+	For the running witness from Section~\ref{sec:example}, this gives
+	$T(\tau_{\mathrm{ex}})=4 \le 2\cdot 25 = 50$, matching the conservative-gap
+	calculation.
 	Therefore both claimed inequalities hold.
 	\end{proof}
 
@@ -701,6 +729,8 @@ Table~\ref{tab:p2-delta-w} records the per-rule $\Delta W$ facts used in this wi
 \end{proof}
 
 The weighted-measure decomposition used by Theorem~\ref{thm:quantitative} is:
+The next displays first separate state components in $W$, then restate the
+rule-family descent pattern that drives the global bound.
 \begin{equation}
 	\label{eq:p2-weighted-decomposition}
 	\begin{array}{c}
@@ -738,6 +768,9 @@ The rule-local descent pattern lifted to global productive-step bounds is:
 \label{sec:theorem2}
 % ============================================================================
 
+Running-example thread. Section~\ref{sec:example} provides a finite witness
+trace inside the regular fragment used by this schema.
+
 \begin{assumption}[Regular Finite-Reachability Premises]
 	\label{assump:p2-regular}
 	The decision schema assumes regularity hypotheses that produce finite reachable-state spaces and effective predicate reductions to terminating finite-state checks on those spaces.
@@ -766,6 +799,10 @@ Expressiveness note. This fragment includes finite-control request response work
 	\end{equation}
 	In particular, asynchronous subtyping and regular type equivalence are decidable on the regular fragment.
 \end{theorem}
+
+Running-example instantiation. The request/grant/report witness in
+Section~\ref{sec:example} is an instance where the finite-state checker side of
+this theorem is directly realizable.
 
 Coinductive boundary note: effect-level transport is restricted to the witness-carrying rational subclass via \nolinkurl{rational_effect_transport_bridge}; witness-check soundness/completeness is provided by \nolinkurl{check_rational_effect_witness_sound} and \nolinkurl{check_rational_effect_witness_complete}; strict outside non-transportability is witnessed by \nolinkurl{strict_boundary_witness_effect}. These do not alter Theorem~\ref{thm:algorithmic} assumptions and are used in the \emph{Harmony from Coherence in Asynchronous MPST} boundary layer.
 
@@ -798,6 +835,9 @@ Equation~\ref{eq:p2-algorithmic-workflow} records the generic workflow.
 \label{sec:decidability}
 % ============================================================================
 
+Running-example thread. Section~\ref{sec:example} anchors the same protocol
+family used for crash and Byzantine interface readings in this section.
+
 \begin{assumption}[Crash-Stop Characterization Premises]
 	\label{assump:p2-crash}
 	Crash-tolerance characterization assumes crash-stop faults, finite role graphs, and the residual-graph side conditions used by the decision profile.
@@ -824,6 +864,10 @@ Equation~\ref{eq:p2-algorithmic-workflow} records the generic workflow.
 	\end{equation}
 	The theorem also includes witness families where topology changes flip tolerance outcomes within the stated side-condition class.
 \end{theorem}
+
+Running-example instantiation. For the running protocol shape in
+Section~\ref{sec:example}, crash removal is read as residual reachability over
+the same finite role graph.
 
 \begin{proof}[Proof sketch]
 	Construct the residual graph after removing crashed roles and edges, and define \texttt{crashTolerantDec} as reachability over that residual object. Soundness is provided by \nolinkurl{crash_tolerant_dec_sound}, which turns a positive decider result into crash tolerance. Completeness and exact characterization come from \nolinkurl{crash_tolerance_iff}, and witness families are obtained by topology perturbations that cross the connectivity boundary.
@@ -864,6 +908,10 @@ where each conjunct names the corresponding requirement class in \Hbyz.
 	\end{equation}
 	with relative maximality for the same characterization relation.
 \end{theorem}
+
+Running-example instantiation. In Section~\ref{sec:example}, the same trace
+skeleton is interpreted through profile-side Byzantine obligations when this
+characterization is enabled.
 
 Series scope note. This theorem is the dynamics-layer Byzantine safety interface. \emph{Harmony from Coherence in Asynchronous MPST} reuses the same bundle and extends it to envelope-level maximality and adherence transport.
 
@@ -951,10 +999,13 @@ Complexity context. For this fragment, any sound complete checker must inspect t
 	For any trace $\tau$ satisfying Assumption Block~\ref{assump:p2-quantitative}, $P(\tau) \le W_0$.
 \end{corollary}
 
-\begin{corollary}[Scheduler-Lifted Total Bound]
+\begin{corollary}[Scheduler-Lifted Total Bound (Fairness-Required)]
 	\label{cor:scheduler}
 	For any trace $\tau$ satisfying Assumption Block~\ref{assump:p2-quantitative} and scheduler profile $\sigma$ with lift constant $\kappa_\sigma$, $T(\tau) \le \kappa_\sigma \cdot W_0$.
 \end{corollary}
+
+Fairness-required. Corollary~\ref{cor:scheduler} depends on the declared
+scheduler fairness profile through $\kappa_\sigma$.
 
 \begin{corollary}[Critical Capacity Boundary]
 	\label{cor:capacity}
@@ -1067,6 +1118,15 @@ Decidability and finite exploration require the Assumption Block~\ref{assump:p2-
 
 Reconfiguration commutation and envelope maximality claims are out of scope for this paper and handled separately in the series.
 
+Excluded protocol classes in this paper include non-regular infinite-state
+families, unguarded recursion patterns that violate finite-reachability
+criteria, and Byzantine liveness claims under weaker timing assumptions.
+
+Implementation pointer. Quantitative kernels are in
+\texttt{Runtime/Proofs/WeightedMeasure/*.lean}, decision kernels are in
+\texttt{SessionCoTypes/AsyncSubtyping/*.lean}, and capability-gated Byzantine
+interfaces are exposed via \texttt{Runtime/Proofs/TheoremPack/API.lean}.
+
 % ============================================================================
 \section{Conclusion}
 \label{sec:conclusion}
@@ -1116,7 +1176,7 @@ Byzantine contribution in this paper is the exact safety-characterization interf
 \clearpage
 \appendix
 \noindent{\Large\bfseries Appendix}
-\vspace{0.5em}
+\vspace{1em}
 % ============================================================================
 
 \section{Deferred Quantitative Proofs}
@@ -1369,6 +1429,7 @@ Expected checks: Finite-reachability and decision modules compile, weighted-meas
 		Theorem~\ref{thm:algorithmic} & \ref{assump:p2-regular} \\
 		Theorem~\ref{thm:crash} & \ref{assump:p2-crash} \\
 		Theorem~\ref{thm:byzantine}, Corollary~\ref{cor:converse}, Proposition~\ref{prop:vm-bridge} & \ref{assump:p2-byzantine} \\
+		Fairness-dependent claims & Theorem~\ref{thm:quantitative} total-step clause and Corollary~\ref{cor:scheduler} use declared scheduler profile premises \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Main claims and their assumption blocks.}
@@ -1382,6 +1443,15 @@ Expected checks: Finite-reachability and decision modules compile, weighted-meas
 \label{app:index}
 
 Table~\ref{tab:p2-index} maps paper claims to their Lean anchors and source files. Anchors marked with --- are infrastructure lemmas used in proofs but not tied to a single claim.
+Functional categories in the table are: Definitions, Theorems, and Runtime
+Gates. Reading guide for long names:
+\texttt{total\_measure\_decreasing} is the global productive-descent lift from
+rule-local $\Delta W$ lemmas; \texttt{regular\_type\_eq\_decide\_spec} states
+checker iff semantics for regular-type equivalence;
+\texttt{check\_rational\_effect\_witness\_complete} is completeness of the
+rational witness checker for the transport boundary; and
+\texttt{byzantine\_safety\_exact\_of\_profile} is the profile-indexed exactness
+bridge for Byzantine safety claims.
 
 \begin{table}[H]
 	\centering
