@@ -44,11 +44,10 @@ Normative status is per document.
 | [WASM Guide](29_wasm_guide.md) | Guide | Informative |
 | [API Reference](30_api_reference.md) | Reference | Informative |
 | [Examples](28_examples.md) | Guide | Informative |
-| [Physical Analogies for the Telltale Runtime](31_physical_analogy.md) | Concept | Informative |
 | [Capability and Admission](25_capability_admission.md) | Reference | Normative |
 | [Theorem Program](26_theorem_program.md) | Concept | Mixed |
 | [Distributed and Classical Families](27_distributed_classical_families.md) | Reference | Mixed |
-| [Glossary and Notation Index](32_glossary_notation.md) | Reference | Informative |
+| [Glossary and Notation Index](31_glossary_notation.md) | Reference | Informative |
 
 ## Paths by Role
 
@@ -70,10 +69,10 @@ Continue with [Capability and Admission](25_capability_admission.md), [Theorem P
 ### Paper Reviewer
 
 Start with [Background](01_introduction.md), [Architecture](03_architecture.md), and [Theory](05_theory.md).
-Then read [Theorem Program](26_theorem_program.md) and [Glossary and Notation Index](32_glossary_notation.md).
+Then read [Theorem Program](26_theorem_program.md) and [Glossary and Notation Index](31_glossary_notation.md).
 
 ## Reading Notes
 
 Guide-first readers should prioritize Guide docs, then selective Reference docs.
 Integrator and verifier readers should prioritize Normative Reference docs.
-Use [Glossary and Notation Index](32_glossary_notation.md) to normalize terminology across tracks.
+Use [Glossary and Notation Index](31_glossary_notation.md) to normalize terminology across tracks.

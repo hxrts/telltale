@@ -102,7 +102,7 @@ Topology configuration separates deployment concerns from protocol logic. Resour
 
 ## Further Reading
 
-See [Glossary and Notation Index](32_glossary_notation.md) for shared terminology and notation.
+See [Glossary and Notation Index](31_glossary_notation.md) for shared terminology and notation.
 See [Architecture](03_architecture.md) for system design details. See [Choreographic DSL](06_choreographic_dsl.md) for the choreography language. See [Choreography Effect Handlers](09_effect_handlers.md) for the choreography handler system.
 
 See [Content Addressing](20_content_addressing.md) for cryptographic protocol identities. See [Topology](22_topology.md) for deployment configuration. See [Resource Heap](21_resource_heap.md) for explicit state management. See [VM Architecture](12_vm_architecture.md) for the bytecode execution model.
