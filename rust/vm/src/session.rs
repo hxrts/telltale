@@ -24,6 +24,13 @@ pub type SessionId = usize;
 /// Handler identifier for edge-bound runtime dispatch.
 pub type HandlerId = String;
 
+/// Built-in fallback handler id used when no edge-specific binding exists.
+pub const DEFAULT_HANDLER_ID: &str = "default_handler";
+
+fn default_handler_id() -> HandlerId {
+    DEFAULT_HANDLER_ID.to_string()
+}
+
 /// Edge between two roles in a session (directed: sender → receiver).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Edge {
@@ -125,6 +132,9 @@ pub struct SessionState {
     pub auth_roots: BTreeMap<Edge, Hash>,
     /// Optional handler binding per edge.
     pub edge_handlers: BTreeMap<Edge, HandlerId>,
+    /// Session-wide fallback handler id.
+    #[serde(default = "default_handler_id")]
+    pub default_handler: HandlerId,
     /// Coherence trace by edge.
     pub edge_traces: BTreeMap<Edge, Vec<ValType>>,
     /// Current status.
@@ -304,6 +314,7 @@ impl SessionStore {
             auth_trees: BTreeMap::new(),
             auth_roots: BTreeMap::new(),
             edge_handlers: BTreeMap::new(),
+            default_handler: default_handler_id(),
             edge_traces: BTreeMap::new(),
             status: SessionStatus::Active,
             epoch: 0,
@@ -441,10 +452,17 @@ impl SessionStore {
         self.sessions.get(&edge.sid)?.edge_handlers.get(edge)
     }
 
-    /// Lookup a default handler id for a session, if any edge binding exists.
+    /// Lookup a default handler id for a session.
     #[must_use]
     pub fn default_handler_for_session(&self, sid: SessionId) -> Option<&HandlerId> {
-        self.sessions.get(&sid)?.edge_handlers.values().next()
+        Some(&self.sessions.get(&sid)?.default_handler)
+    }
+
+    /// Set the default handler id for a session.
+    pub fn set_default_handler_for_session(&mut self, sid: SessionId, handler: HandlerId) {
+        if let Some(session) = self.sessions.get_mut(&sid) {
+            session.default_handler = handler;
+        }
     }
 
     /// Update edge-bound handler id.

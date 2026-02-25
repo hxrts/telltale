@@ -38,6 +38,7 @@ impl ThreadedVM {
             label_symbols: SymbolTable::new(),
             clock: SimClock::new(tick_duration),
             next_coro_id: 0,
+            non_terminal_coroutines: 0,
             pool,
             workers: worker_count,
             lane_count: worker_count,
@@ -78,17 +79,10 @@ impl ThreadedVM {
         Ok(())
     }
 
-    fn bind_default_handlers_for_session(&mut self, sid: SessionId, roles: &[String]) {
+    fn bind_default_handlers_for_session(&mut self, sid: SessionId) {
         if let Some(session) = self.sessions.get(sid) {
             let mut session_guard = session.lock().expect("session lock poisoned");
-            for sender in roles {
-                for receiver in roles {
-                    session_guard.edge_handlers.insert(
-                        Edge::new(sid, sender.clone(), receiver.clone()),
-                        "default_handler".to_string(),
-                    );
-                }
-            }
+            session_guard.default_handler = crate::session::DEFAULT_HANDLER_ID.to_string();
         }
     }
 
@@ -124,6 +118,7 @@ impl ThreadedVM {
         }
         self.scheduler.add_ready(coro_id);
         self.coroutines.push(Arc::new(Mutex::new(coro)));
+        self.non_terminal_coroutines = self.non_terminal_coroutines.saturating_add(1);
         Ok(())
     }
 
@@ -145,7 +140,7 @@ impl ThreadedVM {
             &self.config.buffer_config,
             &image.local_types,
         );
-        self.bind_default_handlers_for_session(sid, &roles);
+        self.bind_default_handlers_for_session(sid);
         self.resource_states
             .lock()
             .expect("resource state lock poisoned")
@@ -289,6 +284,12 @@ impl ThreadedVM {
             programs: &self.programs,
             step: step_ctx,
         };
+        if picks.len() == 1 {
+            let pick = picks.into_iter().next().expect("single pick exists");
+            let result = exec_instr(&pick.coro, &pick.session, &exec_ctx);
+            return self.commit_pick_result(pick, result, tick, &handler_identity);
+        }
+
         let results: Vec<Result<(StepPack, Option<OutputConditionHint>), Fault>> =
             self.pool.install(|| {
                 picks
@@ -299,64 +300,78 @@ impl ThreadedVM {
 
         let mut progressed = false;
         for (pick, result) in picks.into_iter().zip(results.into_iter()) {
-            match result {
-                Ok((pack, output_hint)) => {
-                    progressed = true;
-                    match self.commit_pack(
-                        &pick.coro,
-                        &pick.session,
-                        pack,
-                        output_hint,
-                        &handler_identity,
-                    ) {
-                        Ok(outcome) => match outcome {
-                            ExecOutcome::Continue => {
-                                self.scheduler.reschedule(pick.coro_id);
-                            }
-                            ExecOutcome::Blocked(reason) => {
-                                self.scheduler.mark_blocked(pick.coro_id, reason);
-                            }
-                            ExecOutcome::Halted => {
-                                self.scheduler.mark_done(pick.coro_id);
-                                self.trace.push(ObsEvent::Halted {
-                                    tick,
-                                    coro_id: pick.coro_id,
-                                });
-                            }
-                        },
-                        Err(fault) => {
-                            self.trace.push(ObsEvent::Faulted {
-                                tick,
-                                coro_id: pick.coro_id,
-                                fault: fault.clone(),
-                            });
-                            let mut coro = pick.coro.lock().expect("coroutine lock poisoned");
-                            coro.status = CoroStatus::Faulted(fault.clone());
-                            self.scheduler.mark_done(pick.coro_id);
-                            return Err(VMError::Fault {
-                                coro_id: pick.coro_id,
-                                fault,
-                            });
-                        }
-                    }
-                }
-                Err(fault) => {
-                    self.trace.push(ObsEvent::Faulted {
-                        tick,
-                        coro_id: pick.coro_id,
-                        fault: fault.clone(),
-                    });
-                    let mut coro = pick.coro.lock().expect("coroutine lock poisoned");
-                    coro.status = CoroStatus::Faulted(fault.clone());
-                    self.scheduler.mark_done(pick.coro_id);
-                    return Err(VMError::Fault {
-                        coro_id: pick.coro_id,
-                        fault,
-                    });
-                }
-            }
+            progressed |= self.commit_pick_result(pick, result, tick, &handler_identity)?;
         }
         Ok(progressed)
+    }
+
+    fn commit_pick_result(
+        &mut self,
+        pick: Picked,
+        result: Result<(StepPack, Option<OutputConditionHint>), Fault>,
+        tick: u64,
+        handler_identity: &str,
+    ) -> Result<bool, VMError> {
+        match result {
+            Ok((pack, output_hint)) => {
+                match self.commit_pack(
+                    &pick.coro,
+                    &pick.session,
+                    pack,
+                    output_hint,
+                    handler_identity,
+                ) {
+                    Ok(outcome) => match outcome {
+                        ExecOutcome::Continue => {
+                            self.scheduler.reschedule(pick.coro_id);
+                        }
+                        ExecOutcome::Blocked(reason) => {
+                            self.scheduler.mark_blocked(pick.coro_id, reason);
+                        }
+                        ExecOutcome::Halted => {
+                            self.scheduler.mark_done(pick.coro_id);
+                            self.trace.push(ObsEvent::Halted {
+                                tick,
+                                coro_id: pick.coro_id,
+                            });
+                        }
+                    },
+                    Err(fault) => {
+                        self.trace.push(ObsEvent::Faulted {
+                            tick,
+                            coro_id: pick.coro_id,
+                            fault: fault.clone(),
+                        });
+                        let mut coro = pick.coro.lock().expect("coroutine lock poisoned");
+                        let was_terminal = coro.is_terminal();
+                        coro.status = CoroStatus::Faulted(fault.clone());
+                        self.note_status_transition(was_terminal, coro.is_terminal());
+                        self.scheduler.mark_done(pick.coro_id);
+                        return Err(VMError::Fault {
+                            coro_id: pick.coro_id,
+                            fault,
+                        });
+                    }
+                }
+                Ok(true)
+            }
+            Err(fault) => {
+                self.trace.push(ObsEvent::Faulted {
+                    tick,
+                    coro_id: pick.coro_id,
+                    fault: fault.clone(),
+                });
+                let mut coro = pick.coro.lock().expect("coroutine lock poisoned");
+                let was_terminal = coro.is_terminal();
+                coro.status = CoroStatus::Faulted(fault.clone());
+                self.note_status_transition(was_terminal, coro.is_terminal());
+                self.scheduler.mark_done(pick.coro_id);
+                Err(VMError::Fault {
+                    coro_id: pick.coro_id,
+                    fault,
+                })
+            }
+        }
     }
 
     fn record_lane_trace(&mut self, picks: &[Picked], tick: u64, wave: u64) {
@@ -424,7 +439,7 @@ impl ThreadedVM {
                 return false;
             }
             for endpoint in &guard.owned_endpoints {
-                let key = (endpoint.sid, endpoint.role.clone());
+                let key = (endpoint.sid, role_fingerprint(&endpoint.role));
                 if !footprint.insert(key) {
                     return false;
                 }

@@ -5,15 +5,11 @@ impl VM {
         Self::new_with_models(config)
     }
 
-    fn bind_default_handlers_for_session(&mut self, sid: SessionId, roles: &[String]) {
-        for sender in roles {
-            for receiver in roles {
-                self.sessions.update_handler(
-                    &Edge::new(sid, sender.clone(), receiver.clone()),
-                    "default_handler".to_string(),
-                );
-            }
-        }
+    fn bind_default_handlers_for_session(&mut self, sid: SessionId) {
+        self.sessions.set_default_handler_for_session(
+            sid,
+            crate::session::DEFAULT_HANDLER_ID.to_string(),
+        );
     }
 
     fn ensure_session_capacity(&self) -> Result<(), VMError> {
@@ -38,7 +34,7 @@ impl VM {
             &image.local_types,
         );
         self.next_session_id = self.sessions.next_session_id();
-        self.bind_default_handlers_for_session(sid, &roles);
+        self.bind_default_handlers_for_session(sid);
         self.monitor.set_kind(sid, SessionKind::Peer);
         self.resource_states
             .entry(sid)
@@ -152,18 +148,10 @@ impl VM {
         self.prune_expired_timeouts();
         self.try_unblock_receivers();
 
-        let progress_ids: BTreeSet<usize> = self
-            .coroutines
-            .iter()
-            .filter(|c| !c.progress_tokens.is_empty())
-            .map(|c| c.id)
-            .collect();
-
         let paused_roles = &self.paused_roles;
         let crashed_sites = &self.crashed_sites;
         let timed_out_sites = &self.timed_out_sites;
         let coroutines = &self.coroutines;
-        let progress_ids = &progress_ids;
         let has_eligible = self.sched.any_ready(|id| {
             coroutines
                 .get(id)
@@ -179,7 +167,12 @@ impl VM {
         }
         let Some(coro_id) = VMKernel::select_ready_eligible(
             &mut self.sched,
-            |id| progress_ids.contains(&id),
+            |id| {
+                coroutines
+                    .get(id)
+                    .map(|c| !c.progress_tokens.is_empty())
+                    .unwrap_or(false)
+            },
             |id| {
                 coroutines
                     .get(id)
@@ -200,7 +193,7 @@ impl VM {
             Ok(ExecOutcome::Continue) => {
                 self.last_sched_step = Some(SchedStepDebug {
                     selected_coro: coro_id,
-                    exec_status: "continue".to_string(),
+                    exec_status: SchedExecStatus::Continue,
                 });
                 self.sched.reschedule(coro_id);
             }
@@ -209,9 +202,9 @@ impl VM {
                 self.last_sched_step = Some(SchedStepDebug {
                     selected_coro: coro_id,
                     exec_status: if yielded {
-                        "yielded".to_string()
+                        SchedExecStatus::Yielded
                     } else {
-                        "blocked".to_string()
+                        SchedExecStatus::Blocked
                     },
                 });
                 if yielded {
@@ -223,7 +216,7 @@ impl VM {
             Ok(ExecOutcome::Halted) => {
                 self.last_sched_step = Some(SchedStepDebug {
                     selected_coro: coro_id,
-                    exec_status: "halted".to_string(),
+                    exec_status: SchedExecStatus::Halted,
                 });
                 self.sched.mark_done(coro_id);
                 self.obs_trace.push(ObsEvent::Halted {
@@ -234,7 +227,7 @@ impl VM {
             Err(fault) => {
                 self.last_sched_step = Some(SchedStepDebug {
                     selected_coro: coro_id,
-                    exec_status: "faulted".to_string(),
+                    exec_status: SchedExecStatus::Faulted,
                 });
                 self.obs_trace.push(ObsEvent::Faulted {
                     tick: self.clock.tick,

@@ -37,9 +37,14 @@ telltale-theory = { path = "../theory", version = "0.9.1" }
 telltale-lean-bridge = { path = "../lean-bridge", version = "0.9.1" }
 assert_matches = { workspace = true }
 wasm-bindgen-test = "0.3"
+criterion = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 proptest = { workspace = true }
 
 [lints]
 workspace = true
+
+[[bench]]
+name = "vm_runtime_bench"
+harness = false

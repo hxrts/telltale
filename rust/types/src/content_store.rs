@@ -291,25 +291,36 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
         }
     }
 
-    /// Get a cached value by content key and extra key.
-    pub fn get(&self, key: &K, extra: &E) -> Result<Option<&V>, ContentableError> {
-        let cid = key.content_id::<H>()?;
-        match self.store.get(&(cid, extra.clone())) {
+    /// Get a cached value by precomputed content id and extra key.
+    #[must_use]
+    pub fn get_with_content_id(&self, cid: &ContentId<H>, extra: &E) -> Option<&V> {
+        match self.store.get(&(cid.clone(), extra.clone())) {
             Some(v) => {
                 self.hits.fetch_add(1, Ordering::Relaxed);
-                Ok(Some(v))
+                Some(v)
             }
             None => {
                 self.misses.fetch_add(1, Ordering::Relaxed);
-                Ok(None)
+                None
             }
         }
+    }
+
+    /// Get a cached value by content key and extra key.
+    pub fn get(&self, key: &K, extra: &E) -> Result<Option<&V>, ContentableError> {
+        let cid = key.content_id::<H>()?;
+        Ok(self.get_with_content_id(&cid, extra))
+    }
+
+    /// Insert a value by precomputed content id and extra key.
+    pub fn insert_with_content_id(&mut self, cid: ContentId<H>, extra: E, value: V) -> Option<V> {
+        self.store.insert((cid, extra), value)
     }
 
     /// Insert a value into the store.
     pub fn insert(&mut self, key: &K, extra: E, value: V) -> Result<Option<V>, ContentableError> {
         let cid = key.content_id::<H>()?;
-        Ok(self.store.insert((cid, extra), value))
+        Ok(self.insert_with_content_id(cid, extra, value))
     }
 
     /// Get or compute a value.
@@ -334,7 +345,13 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     /// Check if a key pair exists in the store.
     pub fn contains(&self, key: &K, extra: &E) -> Result<bool, ContentableError> {
         let cid = key.content_id::<H>()?;
-        Ok(self.store.contains_key(&(cid, extra.clone())))
+        Ok(self.contains_with_content_id(&cid, extra))
+    }
+
+    /// Check if a precomputed content id + extra key exists.
+    #[must_use]
+    pub fn contains_with_content_id(&self, cid: &ContentId<H>, extra: &E) -> bool {
+        self.store.contains_key(&(cid.clone(), extra.clone()))
     }
 
     /// Remove a value from the store.

@@ -372,7 +372,7 @@ fn step_invoke(
             return Err(Fault::OutOfRegisters);
         }
     }
-    if session.edge_handlers.is_empty() {
+    if session.edge_handlers.is_empty() && session.default_handler.is_empty() {
         return Err(Fault::Invoke {
             message: "no handler bound".to_string(),
         });
@@ -572,4 +572,3 @@ fn step_fork(
         }],
     })
 }
-

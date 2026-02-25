@@ -341,11 +341,25 @@ pub enum RunStatus {
 }
 
 /// Debug metadata for the most recent scheduler-dispatched step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SchedExecStatus {
+    /// Instruction continued execution.
+    Continue,
+    /// Instruction yielded cooperative control.
+    Yielded,
+    /// Instruction blocked.
+    Blocked,
+    /// Coroutine halted normally.
+    Halted,
+    /// Coroutine faulted.
+    Faulted,
+}
+
+/// Debug metadata for the most recent scheduler-dispatched step.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SchedStepDebug {
     /// Selected coroutine id.
     pub selected_coro: usize,
     /// Instruction-step execution status.
-    pub exec_status: String,
+    pub exec_status: SchedExecStatus,
 }
-

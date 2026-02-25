@@ -44,7 +44,10 @@
 
 use crate::limits::{CacheEntries, DEFAULT_PROJECTOR_CACHE_ENTRIES};
 use crate::merge::{merge_all, MergeError};
+use std::sync::Arc;
+use telltale_types::content_id::Sha256Hasher;
 use telltale_types::content_store::{CacheMetrics, KeyedContentStore};
+use telltale_types::contentable::Contentable;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use thiserror::Error;
 
@@ -247,7 +250,7 @@ pub fn project_all(global: &GlobalType) -> Result<Vec<(String, LocalTypeR)>, Pro
 /// ```
 #[derive(Debug, Clone)]
 pub struct MemoizedProjector {
-    cache: KeyedContentStore<GlobalType, String, Result<LocalTypeR, ProjectionError>>,
+    cache: KeyedContentStore<GlobalType, String, Result<Arc<LocalTypeR>, ProjectionError>>,
     max_entries: CacheEntries,
 }
 
@@ -290,25 +293,36 @@ impl MemoizedProjector {
     /// On cache miss, computes the projection and caches the result.
     /// On cache hit, returns the cached result directly.
     pub fn project(&mut self, global: &GlobalType, role: &str) -> ProjectionResult {
+        self.project_shared(global, role)
+            .map(|local| (*local).clone())
+    }
+
+    /// Project a global type onto a role, returning shared local-type storage.
+    ///
+    /// This avoids cloning large local types across repeated cache hits.
+    pub fn project_shared(
+        &mut self,
+        global: &GlobalType,
+        role: &str,
+    ) -> Result<Arc<LocalTypeR>, ProjectionError> {
         let role_key = role.to_string();
+        let cid = global
+            .content_id::<Sha256Hasher>()
+            .map_err(|e| ProjectionError::ContentAddressing(e.to_string()))?;
 
         // Check if already cached
-        if let Some(result) = self
-            .cache
-            .get(global, &role_key)
-            .map_err(|e| ProjectionError::ContentAddressing(e.to_string()))?
-        {
+        if let Some(result) = self.cache.get_with_content_id(&cid, &role_key) {
             return result.clone();
         }
 
         // Compute and cache
         let result = project(global, role);
+        let shared = result.map(Arc::new);
         if self.cache.len() < self.max_entries.as_usize() {
             self.cache
-                .insert(global, role_key, result.clone())
-                .map_err(|e| ProjectionError::ContentAddressing(e.to_string()))?;
+                .insert_with_content_id(cid, role_key, shared.clone());
         }
-        result
+        shared
     }
 
     /// Project a global type onto all its roles, using cached results.

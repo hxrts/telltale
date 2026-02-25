@@ -260,7 +260,16 @@ fn run_rust_step_states(
             step_index: step_index as u64,
             status,
             selected_coro: step_meta.as_ref().map(|m| m.selected_coro as u64),
-            exec_status: step_meta.as_ref().map(|m| m.exec_status.clone()),
+            exec_status: step_meta.as_ref().map(|m| {
+                match m.exec_status {
+                    telltale_vm::vm::SchedExecStatus::Continue => "continue",
+                    telltale_vm::vm::SchedExecStatus::Yielded => "yielded",
+                    telltale_vm::vm::SchedExecStatus::Blocked => "blocked",
+                    telltale_vm::vm::SchedExecStatus::Halted => "halted",
+                    telltale_vm::vm::SchedExecStatus::Faulted => "faulted",
+                }
+                .to_string()
+            }),
             event,
             pre_session_type_counts: before_counts,
             session_type_counts: after_counts,

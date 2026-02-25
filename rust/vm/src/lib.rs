@@ -156,7 +156,7 @@ pub use verification::{
 };
 pub use vm::{
     EffectTraceCaptureMode, MonitorMode, PayloadValidationMode, Program, RuntimeTuningProfile,
-    SchedStepDebug, ThreadedRoundSemantics, VMConfig, VMState, VM,
+    SchedExecStatus, SchedStepDebug, ThreadedRoundSemantics, VMConfig, VMState, VM,
 };
 #[cfg(target_arch = "wasm32")]
 pub use wasm::WasmVM;

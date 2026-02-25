@@ -22,6 +22,7 @@ thiserror = { workspace = true }
 proptest = { workspace = true }
 assert_matches = { workspace = true }
 telltale-lean-bridge = { path = "../lean-bridge", version = "0.9.1" }
+criterion = { workspace = true }
 
 [features]
 default = ["projection", "duality", "merge", "well-formedness", "bounded", "async-subtyping", "sync-subtyping", "semantics", "coherence"]
@@ -41,3 +42,7 @@ bounded = []           # Bounded recursion strategies
 
 # All features
 full = ["projection", "duality", "merge", "well-formedness", "async-subtyping", "sync-subtyping", "bounded", "semantics", "coherence"]
+
+[[bench]]
+name = "theory_algorithms_bench"
+harness = false

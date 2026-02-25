@@ -36,6 +36,11 @@
             .expect("session exists")
             .edge_handlers
             .clear();
+        vm.sessions_mut()
+            .get_mut(sid)
+            .expect("session exists")
+            .default_handler
+            .clear();
         let handler = PassthroughHandler;
 
         let err = vm
@@ -543,4 +548,3 @@
             .count();
         assert!(closed_count >= 1, "expected at least one Closed event");
     }
-

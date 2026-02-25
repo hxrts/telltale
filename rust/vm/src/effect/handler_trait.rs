@@ -5,7 +5,7 @@
 pub trait EffectHandler: Send + Sync {
     /// Stable identifier for effect-trace attribution.
     fn handler_identity(&self) -> String {
-        "default_handler".to_string()
+        crate::session::DEFAULT_HANDLER_ID.to_string()
     }
 
     /// Compute the payload for a send instruction.
@@ -257,4 +257,3 @@ impl<T: EffectHandler + ?Sized> EffectHandler for &T {
         (**self).output_condition_hint(sid, role, state)
     }
 }
-

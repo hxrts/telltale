@@ -205,7 +205,11 @@ impl VM {
             }
         }
         let sid = self.coroutines[coro_idx].session_id;
-        if self.sessions.default_handler_for_session(sid).is_none() {
+        if self
+            .sessions
+            .default_handler_for_session(sid)
+            .is_none_or(String::is_empty)
+        {
             return Err(Fault::Invoke {
                 message: "no handler bound".to_string(),
             });

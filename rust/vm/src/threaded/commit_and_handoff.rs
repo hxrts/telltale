@@ -35,6 +35,7 @@ impl ThreadedVM {
         }
 
         let mut coro_guard = coro.lock().expect("coroutine lock poisoned");
+        let was_terminal = coro_guard.is_terminal();
 
         match pack.coro_update {
             CoroUpdate::AdvancePc => {
@@ -85,11 +86,14 @@ impl ThreadedVM {
                 }
                 self.scheduler.add_ready(new_id);
                 self.coroutines.push(Arc::new(Mutex::new(child)));
+                self.non_terminal_coroutines = self.non_terminal_coroutines.saturating_add(1);
 
                 coro_guard.pc += 1;
                 coro_guard.status = CoroStatus::Ready;
             }
         }
+        let is_terminal = coro_guard.is_terminal();
+        self.note_status_transition(was_terminal, is_terminal);
 
         if let Some((ep, update)) = pack.type_update {
             let mut session_guard = session.lock().expect("session lock poisoned");

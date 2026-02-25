@@ -89,6 +89,10 @@ pub struct Scheduler {
     #[serde(default)]
     lane_queues: BTreeMap<LaneId, VecDeque<usize>>,
     #[serde(default)]
+    lane_order: Vec<LaneId>,
+    #[serde(default)]
+    lane_cursor: usize,
+    #[serde(default)]
     lane_ready_set: BTreeMap<LaneId, BTreeSet<usize>>,
     #[serde(default)]
     lane_blocked: BTreeMap<LaneId, BTreeMap<usize, BlockReason>>,
@@ -117,6 +121,8 @@ impl Scheduler {
             blocked_set: BTreeMap::new(),
             lane_of: BTreeMap::new(),
             lane_queues,
+            lane_order: vec![0],
+            lane_cursor: 0,
             lane_ready_set: BTreeMap::new(),
             lane_blocked,
             cross_lane_handoffs: Vec::new(),
@@ -125,11 +131,21 @@ impl Scheduler {
         }
     }
 
+    fn register_lane(&mut self, lane: LaneId) {
+        self.lane_queues.entry(lane).or_default();
+        self.lane_ready_set.entry(lane).or_default();
+        self.lane_blocked.entry(lane).or_default();
+        if let Err(pos) = self.lane_order.binary_search(&lane) {
+            self.lane_order.insert(pos, lane);
+        }
+    }
+
     fn lane_for_or_default(&self, coro_id: usize) -> LaneId {
         self.lane_of.get(&coro_id).copied().unwrap_or(0)
     }
 
     fn lane_queue_push(&mut self, lane: LaneId, coro_id: usize) {
+        self.register_lane(lane);
         let ready = self.lane_ready_set.entry(lane).or_default();
         if ready.insert(coro_id) {
             self.lane_queues.entry(lane).or_default().push_back(coro_id);
@@ -162,19 +178,24 @@ impl Scheduler {
         self.ready_set.remove(&coro_id);
     }
 
-    fn next_lane_with_ready(&self) -> Option<LaneId> {
-        let lanes: Vec<LaneId> = self.lane_queues.keys().copied().collect();
-        if lanes.is_empty() {
+    fn next_lane_with_ready(&mut self) -> Option<LaneId> {
+        if self.lane_order.is_empty() {
+            self.lane_order = self.lane_queues.keys().copied().collect();
+        }
+        if self.lane_order.is_empty() {
             return None;
         }
-        let start = self.step_count % lanes.len();
-        for offset in 0..lanes.len() {
-            let lane = lanes[(start + offset) % lanes.len()];
+        let lane_count = self.lane_order.len();
+        let start = self.lane_cursor % lane_count;
+        for offset in 0..lane_count {
+            let idx = (start + offset) % lane_count;
+            let lane = self.lane_order[idx];
             if self
                 .lane_ready_set
                 .get(&lane)
                 .is_some_and(|ready| !ready.is_empty())
             {
+                self.lane_cursor = (idx + 1) % lane_count;
                 return Some(lane);
             }
         }
@@ -242,6 +263,9 @@ impl Scheduler {
     where
         F: Fn(usize) -> bool,
     {
+        if self.lane_order.is_empty() {
+            self.lane_order = self.lane_queues.keys().copied().collect();
+        }
         let lane = self.next_lane_with_ready()?;
         let policy = self.policy.clone();
         let picked = match policy {
@@ -447,6 +471,7 @@ impl Scheduler {
 
     /// Assign a coroutine to a specific lane.
     pub fn assign_lane(&mut self, coro_id: usize, lane: LaneId) {
+        self.register_lane(lane);
         let prior_lane = self.lane_of.insert(coro_id, lane).unwrap_or(0);
         if prior_lane != lane {
             self.lane_queue_remove(prior_lane, coro_id);

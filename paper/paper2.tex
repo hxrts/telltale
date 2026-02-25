@@ -182,7 +182,7 @@
 % ============================================================================
 
 \title{Computable Dynamics for Asynchronous MPST:\\Lyapunov Descent, Critical Capacity, and Decision Procedures}
-\author{S. H. Berman}
+\author{Sam Hart Berman}
 \date{\empty}
 
 \begin{document}
@@ -269,7 +269,7 @@ The paper presents a single operational kernel with two branch-specific lifts. E
 	\label{eq:p2-proof-split}
 	\begin{aligned}
 		\mathcal{K}_{\mathrm{q}} & \Longrightarrow W\text{-descent}
-		\Longrightarrow \text{bounds},            \\
+		\Longrightarrow \text{bounds},                                       \\
 		\mathcal{K}_{\mathrm{a}} & \Longrightarrow \text{finite exploration}
 		\Longrightarrow \text{deciders}.
 	\end{aligned}
@@ -365,12 +365,12 @@ maximality are deferred to \emph{Harmony from Coherence in Asynchronous MPST}.
 	\scriptsize
 	\begin{tabularx}{\columnwidth}{@{}L{0.23\columnwidth}L{0.72\columnwidth}@{}}
 		\toprule
-		\thead{Result} & \thead{Imported Dependencies and Use} \\
+		\thead{Result} & \thead{Imported Dependencies and Use}                                                                                                             \\
 		\midrule
-		Quantitative & Imports Paper 1 Theorem 4.1 and uses preserved Coherence for weighted descent and scheduler lifting. \\
-		Algorithmic & Imports the Paper 1 model kernel (Definitions 2.1--2.4) to fix state semantics for finite reachable constructions and deciders. \\
-		Crash & Imports the Paper 1 active-edge Coherence boundary to keep residual-graph checks in the same safety interface. \\
-		Byzantine & Imports the Paper 1 BZ interface set (BZ-1, BZ-1.1, BZ-1.2) and lifts these obligations to profile checks and capability-gated runtime admission. \\
+		Quantitative   & Imports Paper 1 Theorem 4.1 and uses preserved Coherence for weighted descent and scheduler lifting.                                              \\
+		Algorithmic    & Imports the Paper 1 model kernel (Definitions 2.1--2.4) to fix state semantics for finite reachable constructions and deciders.                   \\
+		Crash          & Imports the Paper 1 active-edge Coherence boundary to keep residual-graph checks in the same safety interface.                                    \\
+		Byzantine      & Imports the Paper 1 BZ interface set (BZ-1, BZ-1.1, BZ-1.2) and lifts these obligations to profile checks and capability-gated runtime admission. \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Series dependency map for Paper 2.}
@@ -404,34 +404,34 @@ Related liveness lines often emphasize qualitative progress in session-typed set
 	\small
 	\begin{tabularx}{\columnwidth}{@{}L{0.33\columnwidth}L{0.62\columnwidth}@{}}
 		\toprule
-		\thead{Symbol}     & \thead{Meaning}                                                                                \\
+		\thead{Symbol}       & \thead{Meaning}                                                                                \\
 		\midrule
-		\Hbyz              & Byzantine characterization bundle                                                              \\
-		\Obssafe           & Byzantine safety-visible observation                                                           \\
-		\Eqsafe            & Byzantine safety-visible equality                                                              \\
-		\Ebyz              & Byzantine determinism-envelope                                                                 \\
-		\Coherent          & inherited operational coherence predicate                                                      \\
-		$K$                & regular kernel fragment (shared source object in Fig.~\ref{fig:p2-computable-dynamics-claims}) \\
-		$\mathsf{project}_W$  & projection from kernel fragment to weighted trajectory/readout                                 \\
-		$\mathsf{project}_Q$  & projection from kernel fragment to finite quotient exploration/readout                         \\
-		$Q_K$              & finite quotient graph induced by kernel fragment $K$                                           \\
-		$W$                & weighted measure on state                                                                      \\
-		$W_0$              & initial weighted measure                                                                       \\
-		$\Delta W$         & one-step change in weighted measure                                                            \\
-		$s,\ s_i$          & configuration state(s) used in traces and bound statements                                    \\
-		$P(\tau)$          & productive-step count on trace $\tau$                                                          \\
-		$T(\tau)$          & total-step count on trace $\tau$                                                               \\
-		$\Profile(\sigma)$ & scheduler profile predicate                                                                    \\
-		$\kappa_\sigma$    & scheduler-lift factor for profile $\sigma$                                                     \\
-		$\Phase(B)$        & low/critical/high phase at buffer level $B$                                                    \\
-		$\Bc$              & critical capacity threshold                                                                    \\
-		$N_s$              & explored state count in finite checker objects                                                \\
-		$N_e$              & explored transition-edge count in finite checker objects                                      \\
-		$L_{\max}$         & maximum active-edge buffered trace length                                                     \\
-		$W_{\max}$         & maximum size of checked witness/certificate object                                            \\
-		\ByzChar           & Byzantine characterization formula                                                             \\
-		\ByzSafe           & Byzantine safety predicate                                                                     \\
-		\DeliveryModel     & parametric delivery interface                                                                  \\
+		\Hbyz                & Byzantine characterization bundle                                                              \\
+		\Obssafe             & Byzantine safety-visible observation                                                           \\
+		\Eqsafe              & Byzantine safety-visible equality                                                              \\
+		\Ebyz                & Byzantine determinism-envelope                                                                 \\
+		\Coherent            & inherited operational coherence predicate                                                      \\
+		$K$                  & regular kernel fragment (shared source object in Fig.~\ref{fig:p2-computable-dynamics-claims}) \\
+		$\mathsf{project}_W$ & projection from kernel fragment to weighted trajectory/readout                                 \\
+		$\mathsf{project}_Q$ & projection from kernel fragment to finite quotient exploration/readout                         \\
+		$Q_K$                & finite quotient graph induced by kernel fragment $K$                                           \\
+		$W$                  & weighted measure on state                                                                      \\
+		$W_0$                & initial weighted measure                                                                       \\
+		$\Delta W$           & one-step change in weighted measure                                                            \\
+		$s,\ s_i$            & configuration state(s) used in traces and bound statements                                     \\
+		$P(\tau)$            & productive-step count on trace $\tau$                                                          \\
+		$T(\tau)$            & total-step count on trace $\tau$                                                               \\
+		$\Profile(\sigma)$   & scheduler profile predicate                                                                    \\
+		$\kappa_\sigma$      & scheduler-lift factor for profile $\sigma$                                                     \\
+		$\Phase(B)$          & low/critical/high phase at buffer level $B$                                                    \\
+		$\Bc$                & critical capacity threshold                                                                    \\
+		$N_s$                & explored state count in finite checker objects                                                 \\
+		$N_e$                & explored transition-edge count in finite checker objects                                       \\
+		$L_{\max}$           & maximum active-edge buffered trace length                                                      \\
+		$W_{\max}$           & maximum size of checked witness/certificate object                                             \\
+		\ByzChar             & Byzantine characterization formula                                                             \\
+		\ByzSafe             & Byzantine safety predicate                                                                     \\
+		\DeliveryModel       & parametric delivery interface                                                                  \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Notation used in this paper.}
@@ -508,13 +508,13 @@ it discharges administrative/profile obligations without decreasing $W$
 	\[
 		\mathsf{depthLoc}(\mathsf{recv}\ r\ T\ L) = 1 + \mathsf{depthLoc}(L),
 	\]
-		\[
-			\begin{aligned}[t]
-				\mathsf{depthLoc}(\mathsf{select}\ r\ \{l_i:L_i\}_i) & = 1 + \max_i d_i, \\
-				\mathsf{depthLoc}(\mathsf{branch}\ r\ \{l_i:L_i\}_i) & = 1 + \max_i d_i,
-			\end{aligned}
-		\]
-		where $d_i := \mathsf{depthLoc}(L_i)$.
+	\[
+		\begin{aligned}[t]
+			\mathsf{depthLoc}(\mathsf{select}\ r\ \{l_i:L_i\}_i) & = 1 + \max_i d_i, \\
+			\mathsf{depthLoc}(\mathsf{branch}\ r\ \{l_i:L_i\}_i) & = 1 + \max_i d_i,
+		\end{aligned}
+	\]
+	where $d_i := \mathsf{depthLoc}(L_i)$.
 	\[
 		\mathsf{depthLoc}(\mu L) = \mathsf{depthLoc}(\mathsf{unfold}(\mu L)).
 	\]
@@ -629,10 +629,10 @@ Table~\ref{tab:p2-delta-w} records the per-rule $\Delta W$ facts used in this wi
 		\toprule
 		\thead{Rule instance}    & $\Delta W$    \\
 		\midrule
-			send \texttt{Report}     & $-2 + 1 = -1$ \\
-			receive \texttt{Request} & $-1$          \\
-			send \texttt{Grant}      & $-2 + 1 = -1$ \\
-			receive \texttt{Grant}   & $-1$          \\
+		send \texttt{Report}     & $-2 + 1 = -1$ \\
+		receive \texttt{Request} & $-1$          \\
+		send \texttt{Grant}      & $-2 + 1 = -1$ \\
+		receive \texttt{Grant}   & $-1$          \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Per-rule $\Delta W$ facts.}
@@ -698,14 +698,14 @@ $P(\tau_{\mathrm{ex}})=4$, and scheduler-lift gap reporting.
 	\[
 		W(s_i)-W(s_{i+1})\ge 1.
 	\]
-		Summing over productive indices gives
-		\[
-			\begin{aligned}[t]
-				|I_{\mathrm{prod}}|
-				 & \le \sum_{i\in I_{\mathrm{prod}}}\big(W(s_i)-W(s_{i+1})\big) \\
-				 & \le W(s_0)-W(s_n).
-			\end{aligned}
-		\]
+	Summing over productive indices gives
+	\[
+		\begin{aligned}[t]
+			|I_{\mathrm{prod}}|
+			 & \le \sum_{i\in I_{\mathrm{prod}}}\big(W(s_i)-W(s_{i+1})\big) \\
+			 & \le W(s_0)-W(s_n).
+		\end{aligned}
+	\]
 	Because Assumption Block~\ref{assump:p2-quantitative} includes non-negativity of $W$,
 	$W(s_n)\ge 0$, hence
 	\[
@@ -727,7 +727,7 @@ $P(\tau_{\mathrm{ex}})=4$, and scheduler-lift gap reporting.
 	$T(\tau_{\mathrm{ex}})=4 \le 2\cdot 25 = 50$, matching the conservative-gap
 	calculation.
 	Therefore both claimed inequalities hold.
-	\end{proof}
+\end{proof}
 
 \begin{proposition}[Productive-Bound Equality Conditions]
 	\label{prop:p2-productive-equality}
@@ -761,8 +761,8 @@ rule-family descent pattern that drives the global bound.
 		\Downarrow
 		\\
 		\begin{aligned}[t]
-			\mathsf{DepthTot}(s)  & := \Sigma\mathrm{depth}(s);  \\
-			\mathsf{BufferTot}(s) & := \Sigma\mathrm{buffer}(s); \\
+			\mathsf{DepthTot}(s)  & := \Sigma\mathrm{depth}(s);                      \\
+			\mathsf{BufferTot}(s) & := \Sigma\mathrm{buffer}(s);                     \\
 			W(s)                  & = 2\,\mathsf{DepthTot}(s)+\mathsf{BufferTot}(s).
 		\end{aligned}
 	\end{array}
@@ -873,9 +873,9 @@ into this theorem.
 \end{proof}
 
 Equation~\ref{eq:p2-algorithmic-workflow} records the generic workflow.
-	\begin{equation}
-		\label{eq:p2-algorithmic-workflow}
-		\begin{array}{c}
+\begin{equation}
+	\label{eq:p2-algorithmic-workflow}
+	\begin{array}{c}
 		\text{regularity assumptions}
 		\\
 		\Downarrow
@@ -884,13 +884,13 @@ Equation~\ref{eq:p2-algorithmic-workflow} records the generic workflow.
 		\\
 		\Downarrow
 		\\
-			\text{terminating checker } \mathsf{dec}_{\mathcal{P}}
-			\\
-			\Downarrow
-			\\
-			\mathsf{dec}_{\mathcal{P}}(x)=\mathsf{true}\ \Longleftrightarrow\ \mathcal{P}(x).
-		\end{array}
-	\end{equation}
+		\text{terminating checker } \mathsf{dec}_{\mathcal{P}}
+		\\
+		\Downarrow
+		\\
+		\mathsf{dec}_{\mathcal{P}}(x)=\mathsf{true}\ \Longleftrightarrow\ \mathcal{P}(x).
+	\end{array}
+\end{equation}
 
 % ============================================================================
 \section{Decidability Layer}
@@ -1064,11 +1064,11 @@ Table~\ref{tab:p2-complexity-envelopes} summarizes complexity envelopes for the 
 	\footnotesize
 	\begin{tabularx}{\columnwidth}{@{}L{0.27\columnwidth}L{0.36\columnwidth}L{0.27\columnwidth}@{}}
 		\toprule
-		\thead{Predicate}   & \thead{Driver}        & \thead{Complexity}   \\
+		\thead{Predicate}   & \thead{Driver}        & \thead{Complexity}                                \\
 		\midrule
-		async subtyping     & reachable triples     & checker: $\mathrm{poly}(N_s+N_e)$ \\
-		regular type equiv. & finite bisim graph    & checker: $\mathrm{poly}(N_s+N_e)$ \\
-		crash-stop toler.   & residual connectivity & checker: $O(N_s+N_e)$ \\
+		async subtyping     & reachable triples     & checker: $\mathrm{poly}(N_s+N_e)$                 \\
+		regular type equiv. & finite bisim graph    & checker: $\mathrm{poly}(N_s+N_e)$                 \\
+		crash-stop toler.   & residual connectivity & checker: $O(N_s+N_e)$                             \\
 		branching feasib.   & coloring checks       & checker: $\mathrm{poly}(N_s+N_e)$ (fixed profile) \\
 		\bottomrule
 	\end{tabularx}
@@ -1131,16 +1131,16 @@ Table~\ref{tab:p2-exact-vs-conservative} separates exact and conservative conseq
 	\small
 	\begin{tabularx}{\columnwidth}{@{}L{0.70\columnwidth}L{0.25\columnwidth}@{}}
 		\toprule
-			\thead{Result}                    & \thead{Class} \\
-			\midrule
-			productive-step decrease          & exact         \\
-			productive-step bound by $W_0$    & exact         \\
-			scheduler-lifted total-step bound & conservative  \\
-			threshold under stated profile assumptions & exact \\
-			\bottomrule
-		\end{tabularx}
-		\caption{Exact vs conservative results.}
-		\label{tab:p2-exact-vs-conservative}
+		\thead{Result}                             & \thead{Class} \\
+		\midrule
+		productive-step decrease                   & exact         \\
+		productive-step bound by $W_0$             & exact         \\
+		scheduler-lifted total-step bound          & conservative  \\
+		threshold under stated profile assumptions & exact         \\
+		\bottomrule
+	\end{tabularx}
+	\caption{Exact vs conservative results.}
+	\label{tab:p2-exact-vs-conservative}
 \end{table}
 
 Table~\ref{tab:p2-worked-values} gives worked values used in the worked example.
@@ -1233,7 +1233,7 @@ bundle evidence classes.
 
 Implementation pointer. Quantitative kernels are in
 \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak
-*.lean}, decision kernels are in
+	*.lean}, decision kernels are in
 \texttt{SessionCoTypes/\allowbreak AsyncSubtyping/\allowbreak *.lean}, and
 capability-gated Byzantine interfaces are exposed via
 \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak API.lean}.
@@ -1530,12 +1530,12 @@ synchronized via
 	\footnotesize
 	\begin{tabularx}{\columnwidth}{@{}L{0.34\columnwidth}L{0.61\columnwidth}@{}}
 		\toprule
-		\thead{Artifact Field} & \thead{Value} \\
+		\thead{Artifact Field} & \thead{Value}                                                                             \\
 		\midrule
-		Repository & \url{https://github.com/hxrts/telltale} \\
-		Pinned commit & \texttt{557ffa07300ab088}\allowbreak\texttt{005b68516b8c9475}\allowbreak\texttt{f9cc9625} \\
-		Archival DOI & \texttt{DOI-UNSET} \\
-		Lean source statistics & 1299 files, 205754 LOC, axioms: 0, unresolved proof holes (\texttt{sorry}): 0 \\
+		Repository             & \url{https://github.com/hxrts/telltale}                                                   \\
+		Pinned commit          & \texttt{557ffa07300ab088}\allowbreak\texttt{005b68516b8c9475}\allowbreak\texttt{f9cc9625} \\
+		Archival DOI           & \texttt{DOI-UNSET}                                                                        \\
+		Lean source statistics & 1299 files, 205754 LOC, axioms: 0, unresolved proof holes (\texttt{sorry}): 0             \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Artifact identity and verification statistics for this draft snapshot.}
@@ -1581,45 +1581,45 @@ packaging vs checker-specification theorems.
 	\setlength{\extrarowheight}{2pt}
 	\begin{tabularx}{\textwidth}{L{0.27\textwidth}L{0.37\textwidth}L{0.06\textwidth}>{\raggedright\arraybackslash}X}
 		\toprule
-		\thead{Anchor}                                                  & \thead{Path (relative to \texttt{lean/})}                                                                                         & \thead{Sec.}             & \thead{Claims}                                                               \\
+		\thead{Anchor}                                                  & \thead{Path (relative to \texttt{lean/})}                                                                                         & \thead{Sec.}             & \thead{Claims}                                                                    \\
 		\midrule
-		\multicolumn{4}{@{}l}{\textit{Definitions}}                                                                                                                                                                                                                                                                   \\
+		\multicolumn{4}{@{}l}{\textit{Definitions}}                                                                                                                                                                                                                                                                        \\
 		\rowcolor{gray!8}
-		\texttt{weightedMeasure}                                        & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{Core.lean}}                              & \S\ref{sec:theorem1}     & ---                                                                          \\
+		\texttt{weightedMeasure}                                        & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{Core.lean}}                              & \S\ref{sec:theorem1}     & ---                                                                               \\
 		\midrule
-		\multicolumn{4}{@{}l}{\textit{Theorems}}                                                                                                                                                                                                                                                                      \\
+		\multicolumn{4}{@{}l}{\textit{Theorems}}                                                                                                                                                                                                                                                                           \\
 		\rowcolor{gray!8}
-		\texttt{send\_step\_decreases}                                  & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}}                        & \S\ref{sec:theorem1}     & ---                                                                          \\
-		\texttt{recv\_step\_decreases}                                  & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}}                        & \S\ref{sec:theorem1}     & ---                                                                          \\
+		\texttt{send\_step\_decreases}                                  & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}}                        & \S\ref{sec:theorem1}     & ---                                                                               \\
+		\texttt{recv\_step\_decreases}                                  & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}}                        & \S\ref{sec:theorem1}     & ---                                                                               \\
 		\rowcolor{gray!8}
-		\texttt{select\_step\_decreases}                                & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}}                        & \S\ref{sec:theorem1}     & ---                                                                          \\
-		\texttt{branch\_step\_decreases}                                & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}}                        & \S\ref{sec:theorem1}     & ---                                                                          \\
+		\texttt{select\_step\_decreases}                                & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}}                        & \S\ref{sec:theorem1}     & ---                                                                               \\
+		\texttt{branch\_step\_decreases}                                & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}}                        & \S\ref{sec:theorem1}     & ---                                                                               \\
 		\rowcolor{gray!8}
 		\texttt{total\_measure\_\allowbreak decreasing}                 & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}}                        & \S\ref{sec:theorem1}     & Thm.~\ref{thm:quantitative}, Cors.~\ref{cor:productive}--\ref{cor:scheduler} [A1] \\
-		\texttt{reachable\_triples\_\allowbreak finite}                 & \texttt{SessionCoTypes/\allowbreak AsyncSubtyping/\allowbreak}\mbox{\texttt{Core.lean}}                                           & \S\ref{sec:theorem2}     & ---                                                                          \\
+		\texttt{reachable\_triples\_\allowbreak finite}                 & \texttt{SessionCoTypes/\allowbreak AsyncSubtyping/\allowbreak}\mbox{\texttt{Core.lean}}                                           & \S\ref{sec:theorem2}     & ---                                                                               \\
 		\rowcolor{gray!8}
 		\texttt{async\_subtype\_\allowbreak decidable}                  & \texttt{SessionCoTypes/\allowbreak AsyncSubtyping/\allowbreak}\mbox{\texttt{Core.lean}}                                           & \S\ref{sec:theorem2}     & Thm.~\ref{thm:algorithmic} [A2]                                                   \\
-		\texttt{reachable\_pairs\_\allowbreak finite}                   & \texttt{SessionCoTypes/\allowbreak Coinductive/\allowbreak BisimDecidable/\allowbreak}\mbox{\texttt{Correctness.lean}}            & \S\ref{sec:theorem2}     & ---                                                                          \\
+		\texttt{reachable\_pairs\_\allowbreak finite}                   & \texttt{SessionCoTypes/\allowbreak Coinductive/\allowbreak BisimDecidable/\allowbreak}\mbox{\texttt{Correctness.lean}}            & \S\ref{sec:theorem2}     & ---                                                                               \\
 		\rowcolor{gray!8}
-		\texttt{regular\_type\_eq\_\allowbreak check\_sound}            & \texttt{SessionCoTypes/\allowbreak Coinductive/\allowbreak BisimDecidable/\allowbreak}\mbox{\texttt{Decidable.lean}}              & \S\ref{sec:theorem2}     & ---                                                                          \\
+		\texttt{regular\_type\_eq\_\allowbreak check\_sound}            & \texttt{SessionCoTypes/\allowbreak Coinductive/\allowbreak BisimDecidable/\allowbreak}\mbox{\texttt{Decidable.lean}}              & \S\ref{sec:theorem2}     & ---                                                                               \\
 		\texttt{regular\_type\_eq\_\allowbreak decide\_spec}            & \texttt{SessionCoTypes/\allowbreak Coinductive/\allowbreak BisimDecidable/\allowbreak}\mbox{\texttt{Decidable.lean}}              & \S\ref{sec:theorem2}     & Thm.~\ref{thm:algorithmic} [A2]                                                   \\
 		\rowcolor{gray!8}
-		\texttt{rational\_effect\_\allowbreak transport\_bridge}        & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}}                      & \S\ref{sec:theorem2}     & ---                                                                          \\
-		\texttt{check\_rational\_effect\_\allowbreak witness\_sound}    & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}}                      & \S\ref{sec:theorem2}     & ---                                                                          \\
+		\texttt{rational\_effect\_\allowbreak transport\_bridge}        & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}}                      & \S\ref{sec:theorem2}     & ---                                                                               \\
+		\texttt{check\_rational\_effect\_\allowbreak witness\_sound}    & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}}                      & \S\ref{sec:theorem2}     & ---                                                                               \\
 		\rowcolor{gray!8}
-		\texttt{check\_rational\_effect\_\allowbreak witness\_complete} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}}                      & \S\ref{sec:theorem2}     & ---                                                                          \\
-		\texttt{strict\_boundary\_\allowbreak witness\_effect}          & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}}                      & \S\ref{sec:theorem2}     & ---                                                                          \\
+		\texttt{check\_rational\_effect\_\allowbreak witness\_complete} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}}                      & \S\ref{sec:theorem2}     & ---                                                                               \\
+		\texttt{strict\_boundary\_\allowbreak witness\_effect}          & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}}                      & \S\ref{sec:theorem2}     & ---                                                                               \\
 		\rowcolor{gray!8}
-		\texttt{crash\_tolerant\_\allowbreak dec\_sound}                & \texttt{Protocol/\allowbreak}\mbox{\texttt{CrashTolerance.lean}}                                                                  & \S\ref{sec:decidability} & ---                                                                          \\
+		\texttt{crash\_tolerant\_\allowbreak dec\_sound}                & \texttt{Protocol/\allowbreak}\mbox{\texttt{CrashTolerance.lean}}                                                                  & \S\ref{sec:decidability} & ---                                                                               \\
 		\texttt{crash\_tolerance\_iff}                                  & \texttt{Protocol/\allowbreak}\mbox{\texttt{CrashTolerance.lean}}                                                                  & \S\ref{sec:decidability} & Thm.~\ref{thm:crash} [A3]                                                         \\
 		\rowcolor{gray!8}
 		\texttt{byzantine\_safety\_\allowbreak exact\_of\_profile}      & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:decidability} & Thm.~\ref{thm:byzantine}, Cor.~\ref{cor:converse} [A4]                            \\
-		\texttt{branching\_iff\_\allowbreak chromatic\_capacity}        & \texttt{Protocol/\allowbreak}\mbox{\texttt{SpatialBranching.lean}}                                                                & \S\ref{app:instantiated} & Thm.~\ref{thm:app-p2-branching}                                              \\
+		\texttt{branching\_iff\_\allowbreak chromatic\_capacity}        & \texttt{Protocol/\allowbreak}\mbox{\texttt{SpatialBranching.lean}}                                                                & \S\ref{app:instantiated} & Thm.~\ref{thm:app-p2-branching}                                                   \\
 		\rowcolor{gray!8}
-		\texttt{critical\_buffer\_\allowbreak computable}               & \texttt{Protocol/\allowbreak BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}}                                    & \S\ref{sec:corollaries}  & ---                                                                          \\
+		\texttt{critical\_buffer\_\allowbreak computable}               & \texttt{Protocol/\allowbreak BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}}                                    & \S\ref{sec:corollaries}  & ---                                                                               \\
 		\texttt{phase\_transition\_sharp}                               & \texttt{Protocol/\allowbreak BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}}                                    & \S\ref{sec:corollaries}  & Cor.~\ref{cor:capacity} [A1]                                                      \\
 		\midrule
-		\multicolumn{4}{@{}l}{\textit{Runtime Gates}}                                                                                                                                                                                                                                                                 \\
+		\multicolumn{4}{@{}l}{\textit{Runtime Gates}}                                                                                                                                                                                                                                                                      \\
 		\rowcolor{gray!8}
 		\texttt{canOperateUnder\allowbreak ByzantineEnvelope}           & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{API.lean}}                                   & \S\ref{sec:decidability} & Prop.~\ref{prop:vm-bridge} [A4]                                                   \\
 		\bottomrule

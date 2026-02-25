@@ -106,10 +106,16 @@ impl ThreadedVM {
         coro_id % self.lane_count.max(1)
     }
 
+    fn note_status_transition(&mut self, was_terminal: bool, is_terminal: bool) {
+        if !was_terminal && is_terminal {
+            self.non_terminal_coroutines = self.non_terminal_coroutines.saturating_sub(1);
+        } else if was_terminal && !is_terminal {
+            self.non_terminal_coroutines = self.non_terminal_coroutines.saturating_add(1);
+        }
+    }
+
     fn all_done(&self) -> bool {
-        self.coroutines
-            .iter()
-            .all(|coro| coro.lock().expect("coroutine lock poisoned").is_terminal())
+        self.non_terminal_coroutines == 0
     }
 
     fn duration_to_ticks(&self, duration: Duration) -> u64 {
@@ -153,6 +159,7 @@ impl ThreadedVM {
         }
 
         let mut faulted = Vec::new();
+        let mut newly_terminal = 0_usize;
         for coro in &self.coroutines {
             let mut guard = coro.lock().expect("coroutine lock poisoned");
             if guard.role == site && !guard.is_terminal() {
@@ -160,9 +167,13 @@ impl ThreadedVM {
                     message: reason.clone(),
                 };
                 guard.status = CoroStatus::Faulted(fault.clone());
+                newly_terminal = newly_terminal.saturating_add(1);
                 faulted.push((guard.id, fault));
             }
         }
+        self.non_terminal_coroutines = self
+            .non_terminal_coroutines
+            .saturating_sub(newly_terminal);
         for (coro_id, fault) in faulted {
             self.scheduler.mark_done(coro_id);
             self.trace.push(ObsEvent::Faulted {
