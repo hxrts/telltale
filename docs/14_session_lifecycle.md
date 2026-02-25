@@ -56,6 +56,6 @@ Close emits `Closed` and `EpochAdvanced` observable events. There is no automati
 
 ## Related Docs
 
-- [Bytecode Instructions](12_bytecode_instructions.md)
-- [VM Architecture](11_vm_architecture.md)
-- [VM Parity](15_vm_parity.md)
+- [Bytecode Instructions](13_bytecode_instructions.md)
+- [VM Architecture](12_vm_architecture.md)
+- [VM Parity](19_vm_parity.md)

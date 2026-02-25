@@ -242,7 +242,7 @@ pub trait ChoreoHandler: Send {
 ```
 
 Handlers implement this trait to provide different execution strategies. This async handler is distinct from the synchronous `telltale_vm::effect::EffectHandler` used by the VM.
-Use [Effect Handlers and Session Types](10_effect_session_bridge.md) for VM integration guidance.
+Use [Effect Handlers and Session Types](11_effect_session_bridge.md) for VM integration guidance.
 
 ### VM Execution Layer
 
@@ -250,7 +250,7 @@ The VM provides a bytecode execution model for local types. The `telltale-vm` cr
 
 The VM maintains session state with bounded message buffers. Each coroutine references its assigned program by ID. The scheduler policies are observationally equivalent per the Lean model. Nested VMs can be hosted inside a coroutine for hierarchical simulation.
 
-See [VM Architecture](11_vm_architecture.md) for details on the bytecode VM architecture.
+See [VM Architecture](12_vm_architecture.md) for details on the bytecode VM architecture.
 
 ## Data Flow
 
@@ -355,7 +355,7 @@ This abstraction makes the core library portable. The same code runs on servers 
 
 ### Custom Handlers
 
-Implement `ChoreoHandler` to add new transport mechanisms. See [Choreography Effect Handlers](08_effect_handlers.md) for details.
+Implement `ChoreoHandler` to add new transport mechanisms. See [Choreography Effect Handlers](09_effect_handlers.md) for details.
 
 ### Middleware
 

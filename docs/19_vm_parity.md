@@ -181,7 +181,7 @@ These wrappers intentionally keep Lean-facing casing and therefore retain focuse
 
 ## Related Docs
 
-- [VM Architecture](11_vm_architecture.md)
-- [Bytecode Instructions](12_bytecode_instructions.md)
-- [Lean Verification](18_lean_verification.md)
+- [VM Architecture](12_vm_architecture.md)
+- [Bytecode Instructions](13_bytecode_instructions.md)
+- [Lean Verification](23_lean_verification.md)
 - [Capability and Admission](25_capability_admission.md)

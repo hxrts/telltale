@@ -57,7 +57,7 @@ Key exports:
 - `VMBackend` and `NestedVMHandler`
 
 See `rust/vm/src/lib.rs` for the full API.
-See [Effect Handlers and Session Types](10_effect_session_bridge.md) for integration-boundary guidance.
+See [Effect Handlers and Session Types](11_effect_session_bridge.md) for integration-boundary guidance.
 
 ### `telltale-simulator`
 
@@ -86,7 +86,7 @@ Key exports:
 - `global_to_json`, `local_to_json`, `json_to_global`, `json_to_local`
 - `LeanRunner`, `Validator`, `ValidationResult`
 
-See [Lean-Rust Bridge](19_lean_rust_bridge.md) for details.
+See [Lean-Rust Bridge](24_lean_rust_bridge.md) for details.
 
 ## Guidance
 

@@ -88,6 +88,6 @@ The compiler is intentionally simple. Full ISA coverage is provided by direct by
 
 ## Related Docs
 
-- [VM Architecture](11_vm_architecture.md)
-- [Session Lifecycle](13_session_lifecycle.md)
-- [Lean-Rust Bridge](19_lean_rust_bridge.md)
+- [VM Architecture](12_vm_architecture.md)
+- [Session Lifecycle](14_session_lifecycle.md)
+- [Lean-Rust Bridge](24_lean_rust_bridge.md)

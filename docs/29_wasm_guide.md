@@ -167,4 +167,4 @@ wasm_bindgen_test_configure!(run_in_browser);
 
 Run tests with `wasm-pack test --headless --chrome`.
 
-See [Choreography Effect Handlers](08_effect_handlers.md) for handler details and [Using Telltale Handlers](09_telltale_handler.md) for the channel based API.
+See [Choreography Effect Handlers](09_effect_handlers.md) for handler details and [Using Telltale Handlers](10_telltale_handler.md) for the channel based API.

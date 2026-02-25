@@ -6,7 +6,7 @@ The boundary is the VM `EffectHandler` interface.
 ## Scope
 
 Use this document when integrating Telltale into another execution environment.
-Use [Choreography Effect Handlers](08_effect_handlers.md) when implementing async handlers for generated choreography code.
+Use [Choreography Effect Handlers](09_effect_handlers.md) when implementing async handlers for generated choreography code.
 
 ## Three-Layer Contract
 
@@ -137,7 +137,7 @@ let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
 ```
 
-This lane validates runtime behavior without reimplementing VM checks in the host project. See [VM Simulation](14_vm_simulation_overview.md) for harness config fields and preset helpers.
+This lane validates runtime behavior without reimplementing VM checks in the host project. See [VM Simulation](15_vm_simulation_overview.md) for harness config fields and preset helpers.
 
 ## Performance and Diagnostics Controls
 
@@ -191,7 +191,7 @@ This split is in `lean/Runtime/VM/Model/TypeClasses.lean`.
 
 ## Related Docs
 
-- [Choreography Effect Handlers](08_effect_handlers.md)
-- [VM Architecture](11_vm_architecture.md)
-- [Lean Verification](18_lean_verification.md)
-- [Lean-Rust Bridge](19_lean_rust_bridge.md)
+- [Choreography Effect Handlers](09_effect_handlers.md)
+- [VM Architecture](12_vm_architecture.md)
+- [Lean Verification](23_lean_verification.md)
+- [Lean-Rust Bridge](24_lean_rust_bridge.md)

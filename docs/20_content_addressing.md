@@ -91,4 +91,4 @@ if let Some(cached) = cache.get(&key) {
 
 This avoids repeated projection work when the same global type appears multiple times.
 
-See [Choreographic Projection Patterns](05_projection.md) for the projection pipeline and [Resource Heap](17_resource_heap.md) for higher-level storage patterns.
+See [Choreographic Projection Patterns](07_projection.md) for the projection pipeline and [Resource Heap](21_resource_heap.md) for higher-level storage patterns.

@@ -49,7 +49,7 @@ It does not write arbitrary scenario output files by itself.
 
 ## Related Docs
 
-- [VM Simulation](14_vm_simulation_overview.md)
-- [VM Simulation Runner](14_vm_simulation_runner.md)
-- [VM Simulation Scenarios](14_vm_simulation_scenarios.md)
-- [VM Parity](15_vm_parity.md)
+- [VM Simulation](15_vm_simulation_overview.md)
+- [VM Simulation Runner](16_vm_simulation_runner.md)
+- [VM Simulation Scenarios](17_vm_simulation_scenarios.md)
+- [VM Parity](19_vm_parity.md)

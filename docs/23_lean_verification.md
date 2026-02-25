@@ -90,8 +90,8 @@ Lean and Rust alignment is checked by automation lanes.
 
 ## Related Docs
 
-- [VM Architecture](11_vm_architecture.md)
-- [VM Parity](15_vm_parity.md)
-- [Lean-Rust Bridge](19_lean_rust_bridge.md)
+- [VM Architecture](12_vm_architecture.md)
+- [VM Parity](19_vm_parity.md)
+- [Lean-Rust Bridge](24_lean_rust_bridge.md)
 - [Capability and Admission](25_capability_admission.md)
 - [Distributed and Classical Families](27_distributed_classical_families.md)

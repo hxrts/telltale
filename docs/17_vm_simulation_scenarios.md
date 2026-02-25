@@ -99,6 +99,6 @@ It then runs the same middleware and property loop for selected rounds.
 
 ## Related Docs
 
-- [VM Simulation](14_vm_simulation_overview.md)
-- [VM Simulation Runner](14_vm_simulation_runner.md)
-- [VM Simulation Materials](14_vm_simulation_materials.md)
+- [VM Simulation](15_vm_simulation_overview.md)
+- [VM Simulation Runner](16_vm_simulation_runner.md)
+- [VM Simulation Materials](18_vm_simulation_materials.md)

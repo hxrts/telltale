@@ -4,7 +4,7 @@
 
 This page documents the choreography-layer handler surface in `telltale-choreography`.
 This surface is `ChoreoHandler`.
-For VM host integration, see [Effect Handlers and Session Types](10_effect_session_bridge.md).
+For VM host integration, see [Effect Handlers and Session Types](11_effect_session_bridge.md).
 
 `ChoreoHandler` decouples protocol logic from transport implementation.
 Handlers interpret choreographic effects into concrete communication operations.
@@ -119,7 +119,7 @@ The TelltaleHandler is located in `rust/choreography/src/effects/handlers/tellta
 
 This handler enforces session types at runtime. It provides strong guarantees about protocol compliance.
 
-See [Using Telltale Handlers](09_telltale_handler.md) for complete documentation.
+See [Using Telltale Handlers](10_telltale_handler.md) for complete documentation.
 
 ### RecordingHandler
 
@@ -285,7 +285,7 @@ Use middleware to add logging, metrics, retries, or fault injection. Middleware 
 
 InMemoryHandler and TelltaleHandler both work in WASM environments. They use futures channels for communication.
 
-For WASM network communication, implement a custom handler. Use web-sys WebSocket or fetch APIs. See [WASM Guide](21_wasm_guide.md) for details.
+For WASM network communication, implement a custom handler. Use web-sys WebSocket or fetch APIs. See [WASM Guide](29_wasm_guide.md) for details.
 
 ## Role Family Resolution
 

@@ -101,7 +101,7 @@ The `subtyping/sync` module provides synchronous subtyping. The `subtyping/async
 
 The `duality` module computes dual types. The `bounded` module implements bounded recursion strategies.
 
-Projection memoization uses the content store in `telltale-types` to cache by content ID. See [Content Addressing](16_content_addressing.md) for details.
+Projection memoization uses the content store in `telltale-types` to cache by content ID. See [Content Addressing](20_content_addressing.md) for details.
 
 ```rust
 use telltale_theory::{project, merge, sync_subtype, async_subtype};
@@ -118,7 +118,7 @@ The `project` function computes the local type for a given role. The `sync_subty
 
 ### telltale-lean-bridge
 
-This crate is located in `rust/lean-bridge/`. It provides bidirectional conversion between Rust types and Lean-compatible JSON. See [Lean-Rust Bridge](19_lean_rust_bridge.md) for detailed documentation.
+This crate is located in `rust/lean-bridge/`. It provides bidirectional conversion between Rust types and Lean-compatible JSON. See [Lean-Rust Bridge](24_lean_rust_bridge.md) for detailed documentation.
 
 The `export` module converts Rust types to JSON for Lean. The `import` module converts Lean JSON back to Rust types. The `validate` module provides cross-validation between Rust and Lean.
 
@@ -208,11 +208,11 @@ The parser supports first-class combinators (`handshake`, `retry`, `quorum_colle
 
 Lowering diagnostics are exposed through `explain_lowering` and `choreo-fmt --explain-lowering`. Lint output includes fix suggestions and an LSP-style JSON rendering helper.
 
-Validation in this crate now includes bundle and capability checks. It rejects duplicate bundle declarations, missing required bundles, and missing capability coverage for VM-core statements. See [Choreographic DSL](04_choreographic_dsl.md) for syntax details.
+Validation in this crate now includes bundle and capability checks. It rejects duplicate bundle declarations, missing required bundles, and missing capability coverage for VM-core statements. See [Choreographic DSL](06_choreographic_dsl.md) for syntax details.
 
 The `effects/` directory contains the effect system and handlers. The `extensions/` directory contains the DSL extension system. The `runtime/` directory contains platform abstraction.
 
-The `topology/` directory provides deployment configuration. See [Topology](20_topology.md) for the separation between protocol logic and deployment. The `heap/` directory provides explicit resource management. See [Resource Heap](17_resource_heap.md) for nullifier-based consumption tracking.
+The `topology/` directory provides deployment configuration. See [Topology](22_topology.md) for the separation between protocol logic and deployment. The `heap/` directory provides explicit resource management. See [Resource Heap](21_resource_heap.md) for nullifier-based consumption tracking.
 
 ### effect-scaffold
 
@@ -228,7 +228,7 @@ The crate implements TCP-based transports with async networking via tokio. Futur
 
 This crate is defined at the repository root and uses `rust/src/` as its library source path. It re-exports core APIs from `telltale-types`, `telltale-macros`, and optional `telltale-theory` features.
 
-The crate supports several feature flags. The `theory` feature enables `telltale-theory` algorithms. The `full` feature enables all optional root features. See [Getting Started](01_getting_started.md) for the complete feature flag reference.
+The crate supports several feature flags. The `theory` feature enables `telltale-theory` algorithms. The `full` feature enables all optional root features. See [Getting Started](02_getting_started.md) for the complete feature flag reference.
 
 ```rust
 use telltale::prelude::*;
@@ -370,4 +370,4 @@ impl Validator {
 }
 ```
 
-Custom validation methods can implement domain-specific comparison rules. See [Lean-Rust Bridge](19_lean_rust_bridge.md) for more details.
+Custom validation methods can implement domain-specific comparison rules. See [Lean-Rust Bridge](24_lean_rust_bridge.md) for more details.
