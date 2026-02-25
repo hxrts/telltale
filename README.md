@@ -8,7 +8,7 @@ Run `just artifact-check`. Then inspect `paper/artifact_manifest.json` and [Arti
 
 ## Project Surfaces
 
-### 1) Rust Library
+### 1. Rust Library
 
 The Rust project implements the operational model from the paper series. It includes the choreography pipeline, VM runtime behavior, admission checks, and simulation tooling.
 
@@ -20,15 +20,15 @@ The Rust project implements the operational model from the paper series. It incl
 
 Main code is in `rust/`. Workspace configuration is in `Cargo.toml`. A typical health check is `cargo test --workspace --all-targets --all-features`.
 
-### 2) Lean Proof System
+### 2. Lean Proof System
 
 The Lean project is an active mechanized proof stack. It covers session foundations, semantics, protocol coherence, runtime adequacy, and bridge theorems. Main code is in `lean/`. The toolchain pin is `lean-toolchain`. A typical proof-facing gate is `just verify-protocols`.
 
-### 3) Paper + Artifact Supplement
+### 3. Paper + Artifact Supplement
 
 The paper project contains the three manuscripts and submission-focused reproducibility tooling. The sources are `paper/paper1.tex`, `paper/paper2.tex`, and `paper/paper3.tex`. The reproducibility guide is [Artifact Reproduction Guide](ARTIFACT.md). Citation metadata is in `paper/CITATION.cff`.
 
-## Quick Commands
+## Quick Start
 
 ```bash
 # Rust library health
@@ -53,13 +53,9 @@ This command set validates the Rust library, proof-facing protocol checks, and p
 | `scripts/` | Verification/repro automation scripts |
 | `docs/` | Extended technical documentation |
 
-## Reproducibility and Submission Metadata
+## Reproducibility
 
-Use [Artifact Reproduction Guide](ARTIFACT.md) for the end-to-end supplement workflow and expected outputs. Set archival DOI metadata in `paper/artifact_metadata.env`. Generated provenance and hash output is written to `paper/artifact_manifest.json`. Citation metadata for the supplement is in `paper/CITATION.cff`.
-
-## Build Environment
-
-Nix is the recommended environment (`flake.nix`) for aligned toolchains and paper build dependencies.
+Use Nix (`flake.nix`) for reproducible builds with pinned toolchains. See [Artifact Reproduction Guide](ARTIFACT.md) for the full workflow and expected outputs.
 
 ## License
 
