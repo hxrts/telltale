@@ -1,0 +1,4 @@
+# Override GitHub Linguist language detection
+
+# Rust code templates (not Go templates)
+*.rs.tmpl linguist-language=Rust
