@@ -344,6 +344,76 @@ if [[ -n "${serde_files}" ]]; then
 fi
 print_hits "warning" "usize in serde-derived struct/enum definitions" "${serde_usize_hits}" "For serialized/persisted schema fields, replace usize with explicit-width integers (u32/u64), and reserve usize for in-memory indexing only."
 
+print_section "File and Block Size Checks"
+
+# Files over 600 lines (should be split into modules).
+large_file_hits=""
+while IFS= read -r file; do
+  [[ -z "${file}" ]] && continue
+  lines="$(wc -l < "${file}" | tr -d ' ')"
+  if [[ "${lines}" -gt 600 ]]; then
+    large_file_hits+="${file}:${lines} lines"$'\n'
+  fi
+done < <(find "${RUST_DIR}" -name '*.rs' -type f | grep -v '/target/' | grep -v '/tests/' | grep -v '/benches/')
+print_hits "warning" "files over 600 lines (split into modules)" "${large_file_hits}" "Extract cohesive subsystems into separate modules (e.g., foo.rs -> foo/mod.rs + foo/bar.rs). Group by abstraction boundary, not arbitrary line count."
+
+# Functions/blocks over 60 lines (should be refactored).
+scan_large_blocks() {
+  local file="$1"
+  awk -v file="$file" '
+    function count_braces(s,   tmp, opens, closes) {
+      tmp = s
+      opens = gsub(/\{/, "{", tmp)
+      tmp = s
+      closes = gsub(/\}/, "}", tmp)
+      return opens - closes
+    }
+
+    BEGIN {
+      in_fn = 0
+      fn_start = 0
+      fn_name = ""
+      brace_depth = 0
+    }
+
+    # Match function definitions (pub/pub(crate)/async/const/unsafe fn name)
+    !in_fn && /^[[:space:]]*(pub(\([^)]*\))?[[:space:]]*)?(async[[:space:]]+)?(const[[:space:]]+)?(unsafe[[:space:]]+)?fn[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/ {
+      in_fn = 1
+      fn_start = NR
+      # Extract function name
+      fn_name = $0
+      sub(/.*fn[[:space:]]+/, "", fn_name)
+      sub(/[^A-Za-z0-9_].*/, "", fn_name)
+      brace_depth = count_braces($0)
+      if (brace_depth <= 0 && $0 ~ /\{/) {
+        brace_depth = 1
+      }
+      next
+    }
+
+    in_fn {
+      brace_depth += count_braces($0)
+      if (brace_depth <= 0) {
+        fn_len = NR - fn_start + 1
+        if (fn_len > 60) {
+          printf "%s:%d: fn %s (%d lines)\n", file, fn_start, fn_name, fn_len
+        }
+        in_fn = 0
+        fn_name = ""
+      }
+    }
+  ' "$file"
+}
+
+large_block_hits=""
+while IFS= read -r file; do
+  [[ -z "${file}" ]] && continue
+  blocks="$(scan_large_blocks "${file}")"
+  [[ -z "${blocks}" ]] && continue
+  large_block_hits+="${blocks}"$'\n'
+done < <(find "${RUST_DIR}" -name '*.rs' -type f | grep -v '/target/' | grep -v '/tests/' | grep -v '/benches/')
+print_hits "warning" "functions over 60 lines (refactor into smaller units)" "${large_block_hits}" "Extract logical steps into helper functions. Each function should do one thing. Compose small functions to build complex behavior."
+
 print_section "Numeric Safety Checks"
 
 # 8) Fixed-point policy: use only telltale_types::FixedQ32 wrapper API.
