@@ -12,7 +12,7 @@ use crate::driver::WasmCooperativeDriver;
 use crate::effect::EffectHandler;
 use crate::loader::CodeImage;
 use crate::trace::{normalize_trace, strict_trace};
-use crate::vm::{ObsEvent, StepResult, VMConfig};
+use crate::vm::{ObsEvent, RunStatus, StepResult, VMConfig};
 
 #[derive(Debug, Deserialize)]
 struct WasmChoreoSpec {
@@ -106,11 +106,18 @@ impl WasmVM {
     }
 
     /// Run the VM for at most `max_rounds` with concurrency `n`.
-    pub fn run(&mut self, max_rounds: usize, n: usize) -> Result<(), JsValue> {
+    pub fn run(&mut self, max_rounds: usize, n: usize) -> Result<String, JsValue> {
         let handler = NoOpHandler;
-        self.inner
+        let status = self
+            .inner
             .run(&handler, max_rounds, n)
-            .map_err(|e| JsValue::from_str(&e.to_string()))
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let label = match status {
+            RunStatus::AllDone => "all_done",
+            RunStatus::Stuck => "stuck",
+            RunStatus::MaxRoundsExceeded => "max_rounds_exceeded",
+        };
+        Ok(label.to_string())
     }
 
     /// Get the raw observable trace as JSON.

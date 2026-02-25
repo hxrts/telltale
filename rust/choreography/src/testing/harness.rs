@@ -6,7 +6,7 @@
 use crate::effects::ChoreographyError;
 use crate::runtime::ChoreographicAdapter;
 use crate::testing::RecordingObserver;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -136,7 +136,7 @@ pub struct TestResult {
     /// Errors encountered during the test.
     pub errors: Vec<ChoreographyError>,
     /// Role-specific outputs (as serialized bytes).
-    pub outputs: HashMap<String, Vec<u8>>,
+    pub outputs: BTreeMap<String, Vec<u8>>,
     /// Message trace (if enabled).
     pub messages: Vec<MessageRecord>,
     /// Phase events (if enabled).
@@ -151,7 +151,7 @@ impl TestResult {
         Self {
             success: true,
             errors: Vec::new(),
-            outputs: HashMap::new(),
+            outputs: BTreeMap::new(),
             messages: Vec::new(),
             phases: Vec::new(),
             duration: Duration::ZERO,
@@ -163,7 +163,7 @@ impl TestResult {
         Self {
             success: false,
             errors,
-            outputs: HashMap::new(),
+            outputs: BTreeMap::new(),
             messages: Vec::new(),
             phases: Vec::new(),
             duration: Duration::ZERO,

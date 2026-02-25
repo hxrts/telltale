@@ -5,7 +5,7 @@
 use crate::effect::EffectHandler;
 use crate::loader::CodeImage;
 use crate::session::SessionId;
-use crate::vm::{ObsEvent, StepResult, VMError, VM};
+use crate::vm::{ObsEvent, RunStatus, StepResult, VMError, VM};
 
 /// Common VM backend interface.
 pub trait VMBackend {
@@ -28,7 +28,8 @@ pub trait VMBackend {
     /// # Errors
     ///
     /// Returns a `VMError` if any coroutine faults.
-    fn run(&mut self, handler: &dyn EffectHandler, max_rounds: usize) -> Result<(), VMError>;
+    fn run(&mut self, handler: &dyn EffectHandler, max_rounds: usize)
+        -> Result<RunStatus, VMError>;
 
     /// Get the observable trace (cloned).
     #[must_use]
@@ -44,7 +45,11 @@ impl VMBackend for VM {
         self.step_round(handler, n)
     }
 
-    fn run(&mut self, handler: &dyn EffectHandler, max_rounds: usize) -> Result<(), VMError> {
+    fn run(
+        &mut self,
+        handler: &dyn EffectHandler,
+        max_rounds: usize,
+    ) -> Result<RunStatus, VMError> {
         self.run_concurrent(handler, max_rounds, 1)
     }
 
@@ -66,7 +71,11 @@ impl VMBackend for ThreadedVM {
         self.step_round(handler, n)
     }
 
-    fn run(&mut self, handler: &dyn EffectHandler, max_rounds: usize) -> Result<(), VMError> {
+    fn run(
+        &mut self,
+        handler: &dyn EffectHandler,
+        max_rounds: usize,
+    ) -> Result<RunStatus, VMError> {
         self.run(handler, max_rounds)
     }
 

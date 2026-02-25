@@ -4,7 +4,7 @@
 //! All policies produce observably equivalent results per the
 //! `schedule_confluence` theorem.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use serde::{Deserialize, Serialize};
 
@@ -81,11 +81,15 @@ pub struct CrossLaneHandoff {
 pub struct Scheduler {
     policy: SchedPolicy,
     ready_queue: VecDeque<usize>,
+    #[serde(default)]
+    ready_set: BTreeSet<usize>,
     blocked_set: BTreeMap<usize, BlockReason>,
     #[serde(default)]
     lane_of: BTreeMap<usize, LaneId>,
     #[serde(default)]
     lane_queues: BTreeMap<LaneId, VecDeque<usize>>,
+    #[serde(default)]
+    lane_ready_set: BTreeMap<LaneId, BTreeSet<usize>>,
     #[serde(default)]
     lane_blocked: BTreeMap<LaneId, BTreeMap<usize, BlockReason>>,
     #[serde(default)]
@@ -109,9 +113,11 @@ impl Scheduler {
         Self {
             policy,
             ready_queue: VecDeque::new(),
+            ready_set: BTreeSet::new(),
             blocked_set: BTreeMap::new(),
             lane_of: BTreeMap::new(),
             lane_queues,
+            lane_ready_set: BTreeMap::new(),
             lane_blocked,
             cross_lane_handoffs: Vec::new(),
             timeslice: default_timeslice(),
@@ -124,26 +130,36 @@ impl Scheduler {
     }
 
     fn lane_queue_push(&mut self, lane: LaneId, coro_id: usize) {
-        let queue = self.lane_queues.entry(lane).or_default();
-        if !queue.contains(&coro_id) {
-            queue.push_back(coro_id);
+        let ready = self.lane_ready_set.entry(lane).or_default();
+        if ready.insert(coro_id) {
+            self.lane_queues.entry(lane).or_default().push_back(coro_id);
         }
     }
 
     fn lane_queue_remove(&mut self, lane: LaneId, coro_id: usize) {
-        if let Some(queue) = self.lane_queues.get_mut(&lane) {
-            queue.retain(|id| *id != coro_id);
+        if let Some(ready) = self.lane_ready_set.get_mut(&lane) {
+            ready.remove(&coro_id);
         }
     }
 
     fn lane_queue_pop_front(&mut self, lane: LaneId) -> Option<usize> {
-        self.lane_queues
-            .get_mut(&lane)
-            .and_then(VecDeque::pop_front)
+        loop {
+            let coro_id = self
+                .lane_queues
+                .get_mut(&lane)
+                .and_then(VecDeque::pop_front)?;
+            if self
+                .lane_ready_set
+                .get_mut(&lane)
+                .is_some_and(|ready| ready.remove(&coro_id))
+            {
+                return Some(coro_id);
+            }
+        }
     }
 
     fn remove_from_global_ready(&mut self, coro_id: usize) {
-        self.ready_queue.retain(|id| *id != coro_id);
+        self.ready_set.remove(&coro_id);
     }
 
     fn next_lane_with_ready(&self) -> Option<LaneId> {
@@ -155,9 +171,9 @@ impl Scheduler {
         for offset in 0..lanes.len() {
             let lane = lanes[(start + offset) % lanes.len()];
             if self
-                .lane_queues
+                .lane_ready_set
                 .get(&lane)
-                .is_some_and(|queue| !queue.is_empty())
+                .is_some_and(|ready| !ready.is_empty())
             {
                 return Some(lane);
             }
@@ -169,7 +185,7 @@ impl Scheduler {
     pub fn add_ready(&mut self, coro_id: usize) {
         let lane = self.lane_for_or_default(coro_id);
         self.lane_of.entry(coro_id).or_insert(lane);
-        if !self.ready_queue.contains(&coro_id) {
+        if self.ready_set.insert(coro_id) {
             self.ready_queue.push_back(coro_id);
         }
         self.lane_queue_push(lane, coro_id);
@@ -205,7 +221,9 @@ impl Scheduler {
     /// Unblock a coroutine (move from blocked to ready).
     pub fn unblock(&mut self, coro_id: usize) {
         if self.blocked_set.remove(&coro_id).is_some() {
-            self.ready_queue.push_back(coro_id);
+            if self.ready_set.insert(coro_id) {
+                self.ready_queue.push_back(coro_id);
+            }
             let lane = self.lane_for_or_default(coro_id);
             self.lane_queue_push(lane, coro_id);
             if let Some(blocked) = self.lane_blocked.get_mut(&lane) {
@@ -234,11 +252,25 @@ impl Scheduler {
                 if let Some(pos) = self
                     .lane_queues
                     .get(&lane)
-                    .and_then(|queue| queue.iter().position(|id| has_progress(*id)))
+                    .and_then(|queue| {
+                        queue.iter().position(|id| {
+                            self.lane_ready_set
+                                .get(&lane)
+                                .is_some_and(|ready| ready.contains(id))
+                                && has_progress(*id)
+                        })
+                    })
                 {
-                    self.lane_queues
+                    let picked = self
+                        .lane_queues
                         .get_mut(&lane)
-                        .and_then(|queue| queue.remove(pos))
+                        .and_then(|queue| queue.remove(pos));
+                    if let Some(coro_id) = picked {
+                        self.lane_queue_remove(lane, coro_id);
+                        Some(coro_id)
+                    } else {
+                        None
+                    }
                 } else {
                     self.lane_queue_pop_front(lane)
                 }
@@ -273,7 +305,9 @@ impl Scheduler {
 
     /// Re-enqueue a coroutine that yielded or completed an instruction.
     pub fn reschedule(&mut self, coro_id: usize) {
-        self.ready_queue.push_back(coro_id);
+        if self.ready_set.insert(coro_id) {
+            self.ready_queue.push_back(coro_id);
+        }
         let lane = self.lane_for_or_default(coro_id);
         self.lane_queue_push(lane, coro_id);
     }
@@ -281,13 +315,40 @@ impl Scheduler {
     /// Number of ready coroutines.
     #[must_use]
     pub fn ready_count(&self) -> usize {
-        self.ready_queue.len()
+        self.ready_set.len()
     }
 
     /// Snapshot of the current global ready queue order.
     #[must_use]
     pub fn ready_snapshot(&self) -> Vec<usize> {
-        self.ready_queue.iter().copied().collect()
+        let mut seen = BTreeSet::new();
+        self.ready_queue
+            .iter()
+            .filter_map(|id| {
+                if self.ready_set.contains(id) && seen.insert(*id) {
+                    Some(*id)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Snapshot of current ready coroutine IDs as a set.
+    #[must_use]
+    pub fn ready_set_snapshot(&self) -> BTreeSet<usize> {
+        self.ready_set.clone()
+    }
+
+    /// Return whether any ready coroutine satisfies `predicate`.
+    pub fn any_ready<F>(&self, mut predicate: F) -> bool
+    where
+        F: FnMut(usize) -> bool,
+    {
+        let mut seen = BTreeSet::new();
+        self.ready_queue.iter().copied().any(|coro_id| {
+            self.ready_set.contains(&coro_id) && seen.insert(coro_id) && predicate(coro_id)
+        })
     }
 
     /// Number of blocked coroutines.
@@ -299,7 +360,7 @@ impl Scheduler {
     /// Whether all coroutines are either done or blocked (no progress possible).
     #[must_use]
     pub fn is_stuck(&self) -> bool {
-        self.ready_queue.is_empty()
+        self.ready_set.is_empty()
     }
 
     /// Total steps executed.
@@ -350,6 +411,13 @@ impl Scheduler {
         let queue = self.lane_queues.get(&lane)?;
         let mut best: Option<(usize, usize)> = None;
         for (pos, id) in queue.iter().copied().enumerate() {
+            if !self
+                .lane_ready_set
+                .get(&lane)
+                .is_some_and(|ready| ready.contains(&id))
+            {
+                continue;
+            }
             let score = match policy {
                 PriorityPolicy::FixedMap(priorities) => priorities.get(&id).copied().unwrap_or(0),
                 PriorityPolicy::Aging => queue.len().saturating_sub(pos),
@@ -369,9 +437,16 @@ impl Scheduler {
             }
         }
         let pos = best.map(|(pos, _)| pos)?;
-        self.lane_queues
+        let picked = self
+            .lane_queues
             .get_mut(&lane)
-            .and_then(|lane_queue| lane_queue.remove(pos))
+            .and_then(|lane_queue| lane_queue.remove(pos));
+        if let Some(coro_id) = picked {
+            self.lane_queue_remove(lane, coro_id);
+            Some(coro_id)
+        } else {
+            None
+        }
     }
 
     /// Assign a coroutine to a specific lane.
@@ -390,7 +465,7 @@ impl Scheduler {
                     .insert(coro_id, reason);
             }
         }
-        if self.ready_queue.contains(&coro_id) {
+        if self.ready_set.contains(&coro_id) {
             self.lane_queue_push(lane, coro_id);
         }
     }

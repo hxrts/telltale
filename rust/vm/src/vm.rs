@@ -15,12 +15,14 @@ use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::marker::PhantomData;
+use std::sync::Arc;
 use std::time::Duration;
 use telltale_types::{LocalTypeR, ValType};
 
 use crate::bridge::{IdentityGuardBridge, IdentityVerificationBridge};
 use crate::buffer::{BufferConfig, EnqueueResult};
 use crate::clock::SimClock;
+use crate::commit_common::{apply_output_condition_gate, effect_trace_entry_for_event};
 use crate::coroutine::{
     BlockReason, CoroStatus, Coroutine, Fault, KnowledgeFact, ProgressToken, Value,
 };
@@ -43,9 +45,7 @@ use crate::instruction_semantics::{
 use crate::intern::{StringId, SymbolTable};
 use crate::kernel::{KernelMachine, VMKernel};
 use crate::loader::CodeImage;
-use crate::output_condition::{
-    verify_output_condition, OutputConditionCheck, OutputConditionMeta, OutputConditionPolicy,
-};
+use crate::output_condition::{OutputConditionCheck, OutputConditionPolicy};
 use crate::persistence::{NoopPersistence, PersistenceModel};
 use crate::scheduler::{SchedPolicy, Scheduler};
 use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragmentV1};
@@ -318,9 +318,6 @@ pub struct SiteTimeout {
     site: SiteId,
     until_tick: u64,
 }
-
-/// Synthetic session scope used for topology-only edges.
-const TOPOLOGY_EDGE_SID: SessionId = usize::MAX;
 
 /// Guard layer configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -935,6 +932,17 @@ pub enum StepResult {
     AllDone,
 }
 
+/// Terminal status returned by bounded VM run APIs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RunStatus {
+    /// All coroutines reached terminal states.
+    AllDone,
+    /// No runnable coroutines remain (blocked/stuck).
+    Stuck,
+    /// `max_rounds`/`max_steps` budget was exhausted before termination.
+    MaxRoundsExceeded,
+}
+
 /// Debug metadata for the most recent scheduler-dispatched step.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SchedStepDebug {
@@ -1096,7 +1104,7 @@ where
     coroutines: Vec<Coroutine>,
     sessions: SessionStore,
     arena: Arena,
-    resource_states: Vec<(ScopeId, ResourceState)>,
+    resource_states: BTreeMap<ScopeId, ResourceState>,
     sched: Scheduler,
     monitor: SessionMonitor,
     obs_trace: Vec<ObsEvent>,
@@ -1110,10 +1118,10 @@ where
     effect_trace: Vec<EffectTraceEntry>,
     next_effect_id: u64,
     output_condition_checks: Vec<OutputConditionCheck>,
-    crashed_sites: Vec<SiteId>,
-    partitioned_edges: Vec<Edge>,
-    corrupted_edges: Vec<CorruptedEdge>,
-    timed_out_sites: Vec<SiteTimeout>,
+    crashed_sites: BTreeSet<SiteId>,
+    partitioned_edges: BTreeSet<(SiteId, SiteId)>,
+    corrupted_edges: BTreeMap<(SiteId, SiteId), CorruptionType>,
+    timed_out_sites: BTreeMap<SiteId, u64>,
     last_sched_step: Option<SchedStepDebug>,
     handler_identity_anchor: Option<String>,
 }
@@ -1152,7 +1160,7 @@ where
             coroutines: Vec::new(),
             sessions: SessionStore::new(),
             arena: Arena::default(),
-            resource_states: Vec::new(),
+            resource_states: BTreeMap::new(),
             sched,
             monitor: SessionMonitor::default(),
             obs_trace: Vec::new(),
@@ -1171,10 +1179,10 @@ where
             effect_trace: Vec::new(),
             next_effect_id: 0,
             output_condition_checks: Vec::new(),
-            crashed_sites: Vec::new(),
-            partitioned_edges: Vec::new(),
-            corrupted_edges: Vec::new(),
-            timed_out_sites: Vec::new(),
+            crashed_sites: BTreeSet::new(),
+            partitioned_edges: BTreeSet::new(),
+            corrupted_edges: BTreeMap::new(),
+            timed_out_sites: BTreeMap::new(),
             last_sched_step: None,
             handler_identity_anchor: None,
         }
@@ -1274,17 +1282,19 @@ impl VM {
         }
 
         let roles = image.roles();
-        let sid = self.next_session_id;
-        self.next_session_id = self.next_session_id.saturating_add(1);
+        let sid = self.sessions.next_session_id();
         self.sessions.open_with_sid(
             sid,
             roles.clone(),
             &self.config.buffer_config,
             &image.local_types,
         );
+        self.next_session_id = self.sessions.next_session_id();
         self.bind_default_handlers_for_session(sid, &roles);
         self.monitor.set_kind(sid, SessionKind::Peer);
-        self.resource_states.push((sid, ResourceState::default()));
+        self.resource_states
+            .entry(sid)
+            .or_insert_with(ResourceState::default);
         self.apply_open_delta(sid)
             .map_err(VMError::PersistenceError)?;
 
@@ -1374,13 +1384,13 @@ impl VM {
         let timed_out_sites = &self.timed_out_sites;
         let coroutines = &self.coroutines;
         let progress_ids = &progress_ids;
-        let has_eligible = self.sched.ready_snapshot().into_iter().any(|id| {
+        let has_eligible = self.sched.any_ready(|id| {
             coroutines
                 .get(id)
                 .map(|c| {
                     !paused_roles.contains(&c.role)
-                        && !crashed_sites.iter().any(|site| site == &c.role)
-                        && !timed_out_sites.iter().any(|timeout| timeout.site == c.role)
+                        && !crashed_sites.contains(&c.role)
+                        && !timed_out_sites.contains_key(&c.role)
                 })
                 .unwrap_or(false)
         });
@@ -1395,8 +1405,8 @@ impl VM {
                     .get(id)
                     .map(|c| {
                         !paused_roles.contains(&c.role)
-                            && !crashed_sites.iter().any(|site| site == &c.role)
-                            && !timed_out_sites.iter().any(|timeout| timeout.site == c.role)
+                            && !crashed_sites.contains(&c.role)
+                            && !timed_out_sites.contains_key(&c.role)
                     })
                     .unwrap_or(false)
             },
@@ -1503,7 +1513,7 @@ impl VM {
         handler: &dyn EffectHandler,
         max_rounds: usize,
         concurrency: usize,
-    ) -> Result<(), VMError> {
+    ) -> Result<RunStatus, VMError> {
         VMKernel::run_concurrent(self, handler, max_rounds, concurrency)
     }
 
@@ -1514,7 +1524,11 @@ impl VM {
     /// # Errors
     ///
     /// Returns a `VMError` if any coroutine faults.
-    pub fn run(&mut self, handler: &dyn EffectHandler, max_steps: usize) -> Result<(), VMError> {
+    pub fn run(
+        &mut self,
+        handler: &dyn EffectHandler,
+        max_steps: usize,
+    ) -> Result<RunStatus, VMError> {
         VMKernel::run(self, handler, max_steps)
     }
 
@@ -1531,8 +1545,29 @@ impl VM {
         fallback: &dyn EffectHandler,
         replay_trace: &[EffectTraceEntry],
         max_steps: usize,
-    ) -> Result<(), VMError> {
-        let replay = ReplayEffectHandler::with_fallback(replay_trace.to_vec(), fallback);
+    ) -> Result<RunStatus, VMError> {
+        self.run_replay_shared(
+            fallback,
+            Arc::<[EffectTraceEntry]>::from(replay_trace),
+            max_steps,
+        )
+    }
+
+    /// Run with replayed effect outcomes using shared trace storage.
+    ///
+    /// Accepts an `Arc`-backed trace to avoid cloning when callers already hold
+    /// shared replay buffers.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `VMError` if replay data is exhausted/mismatched or a coroutine faults.
+    pub fn run_replay_shared(
+        &mut self,
+        fallback: &dyn EffectHandler,
+        replay_trace: Arc<[EffectTraceEntry]>,
+        max_steps: usize,
+    ) -> Result<RunStatus, VMError> {
+        let replay = ReplayEffectHandler::with_fallback(replay_trace, fallback);
         self.run(&replay, max_steps)
     }
 
@@ -1547,8 +1582,28 @@ impl VM {
         replay_trace: &[EffectTraceEntry],
         max_rounds: usize,
         concurrency: usize,
-    ) -> Result<(), VMError> {
-        let replay = ReplayEffectHandler::with_fallback(replay_trace.to_vec(), fallback);
+    ) -> Result<RunStatus, VMError> {
+        self.run_concurrent_replay_shared(
+            fallback,
+            Arc::<[EffectTraceEntry]>::from(replay_trace),
+            max_rounds,
+            concurrency,
+        )
+    }
+
+    /// Run concurrently with replayed outcomes using shared trace storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `VMError` if replay data is exhausted/mismatched or a coroutine faults.
+    pub fn run_concurrent_replay_shared(
+        &mut self,
+        fallback: &dyn EffectHandler,
+        replay_trace: Arc<[EffectTraceEntry]>,
+        max_rounds: usize,
+        concurrency: usize,
+    ) -> Result<RunStatus, VMError> {
+        let replay = ReplayEffectHandler::with_fallback(replay_trace, fallback);
         self.run_concurrent(&replay, max_rounds, concurrency)
     }
 
@@ -1603,7 +1658,7 @@ impl VM {
     /// Next session identifier reserved for allocation.
     #[must_use]
     pub fn next_session_id(&self) -> SessionId {
-        self.next_session_id
+        self.sessions.next_session_id()
     }
 
     /// Number of active sessions in the VM.
@@ -1630,27 +1685,22 @@ impl VM {
         let partitioned_edges = self
             .partitioned_edges
             .iter()
-            .map(|edge| (edge.sender.clone(), edge.receiver.clone()))
+            .cloned()
             .collect();
         let corrupted_edges = self
             .corrupted_edges
             .iter()
-            .map(|entry| {
-                (
-                    (entry.edge.sender.clone(), entry.edge.receiver.clone()),
-                    entry.corruption.clone(),
-                )
-            })
+            .map(|(edge, corruption)| (edge.clone(), corruption.clone()))
             .collect();
         let timed_out_sites = self
             .timed_out_sites
             .iter()
-            .map(|timeout| (timeout.site.clone(), timeout.until_tick))
+            .map(|(site, until_tick)| (site.clone(), *until_tick))
             .collect();
         canonical_replay_fragment_v1(
             &self.obs_trace,
             &self.effect_trace,
-            self.crashed_sites.clone(),
+            self.crashed_sites.iter().cloned().collect(),
             partitioned_edges,
             corrupted_edges,
             timed_out_sites,
@@ -1660,25 +1710,25 @@ impl VM {
 
     /// Crashed sites currently active in topology state.
     #[must_use]
-    pub fn crashed_sites(&self) -> &[SiteId] {
+    pub fn crashed_sites(&self) -> &BTreeSet<SiteId> {
         &self.crashed_sites
     }
 
     /// Partitioned site-links currently active in topology state.
     #[must_use]
-    pub fn partitioned_edges(&self) -> &[Edge] {
+    pub fn partitioned_edges(&self) -> &BTreeSet<(SiteId, SiteId)> {
         &self.partitioned_edges
     }
 
     /// Corrupted directed edges currently active in topology state.
     #[must_use]
-    pub fn corrupted_edges(&self) -> &[CorruptedEdge] {
+    pub fn corrupted_edges(&self) -> &BTreeMap<(SiteId, SiteId), CorruptionType> {
         &self.corrupted_edges
     }
 
     /// Active site timeouts.
     #[must_use]
-    pub fn timed_out_sites(&self) -> &[SiteTimeout] {
+    pub fn timed_out_sites(&self) -> &BTreeMap<SiteId, u64> {
         &self.timed_out_sites
     }
 
@@ -2112,30 +2162,26 @@ impl VM {
     fn prune_expired_timeouts(&mut self) {
         let tick = self.clock.tick;
         self.timed_out_sites
-            .retain(|timeout| timeout.until_tick > tick);
+            .retain(|_, until_tick| *until_tick > tick);
     }
 
     fn is_site_timed_out(&self, site: &str) -> bool {
-        self.timed_out_sites
-            .iter()
-            .any(|timeout| timeout.site == site)
+        self.timed_out_sites.contains_key(site)
     }
 
     fn is_site_crashed(&self, site: &str) -> bool {
-        self.crashed_sites.iter().any(|crashed| crashed == site)
+        self.crashed_sites.contains(site)
     }
 
     fn is_edge_partitioned(&self, from: &str, to: &str) -> bool {
         self.partitioned_edges
-            .iter()
-            .any(|edge| edge.sid == TOPOLOGY_EDGE_SID && edge.sender == from && edge.receiver == to)
+            .contains(&(from.to_string(), to.to_string()))
     }
 
     fn edge_corruption(&self, edge: &Edge) -> Option<CorruptionType> {
         self.corrupted_edges
-            .iter()
-            .find(|entry| entry.edge == *edge)
-            .map(|entry| entry.corruption.clone())
+            .get(&(edge.sender.clone(), edge.receiver.clone()))
+            .cloned()
     }
 
     fn apply_corruption(value: Value, corruption: CorruptionType) -> Value {
@@ -2163,23 +2209,7 @@ impl VM {
         }
     }
 
-    fn normalize_topology_state(&mut self) {
-        self.crashed_sites.sort_unstable();
-        self.crashed_sites.dedup();
-
-        self.partitioned_edges
-            .sort_by(|lhs, rhs| (&lhs.sender, &lhs.receiver).cmp(&(&rhs.sender, &rhs.receiver)));
-        self.partitioned_edges.dedup();
-
-        self.corrupted_edges.sort_by(|lhs, rhs| {
-            (&lhs.edge.sender, &lhs.edge.receiver).cmp(&(&rhs.edge.sender, &rhs.edge.receiver))
-        });
-        self.corrupted_edges
-            .dedup_by(|lhs, rhs| lhs.edge == rhs.edge && lhs.corruption == rhs.corruption);
-
-        self.timed_out_sites
-            .sort_by(|lhs, rhs| (&lhs.site, lhs.until_tick).cmp(&(&rhs.site, rhs.until_tick)));
-    }
+    fn normalize_topology_state(&mut self) {}
 
     fn apply_site_failure(&mut self, site: &str) {
         let reason = format!("site {site} crashed");
@@ -2286,55 +2316,33 @@ impl VM {
     fn apply_topology_event(&mut self, event: &TopologyPerturbation) {
         match event {
             TopologyPerturbation::Crash { site } => {
-                if !self.crashed_sites.iter().any(|s| s == site) {
-                    self.crashed_sites.push(site.clone());
-                }
+                self.crashed_sites.insert(site.clone());
                 self.apply_site_failure(site);
             }
             TopologyPerturbation::Partition { from, to } => {
-                let forward = Edge::new(TOPOLOGY_EDGE_SID, from.clone(), to.clone());
-                if !self.partitioned_edges.iter().any(|edge| edge == &forward) {
-                    self.partitioned_edges.push(forward);
-                }
-                let reverse = Edge::new(TOPOLOGY_EDGE_SID, to.clone(), from.clone());
-                if !self.partitioned_edges.iter().any(|edge| edge == &reverse) {
-                    self.partitioned_edges.push(reverse);
-                }
+                self.partitioned_edges.insert((from.clone(), to.clone()));
+                self.partitioned_edges.insert((to.clone(), from.clone()));
             }
             TopologyPerturbation::Heal { from, to } => {
-                self.partitioned_edges.retain(|edge| {
-                    edge.sid != TOPOLOGY_EDGE_SID
-                        || !((edge.sender == *from && edge.receiver == *to)
-                            || (edge.sender == *to && edge.receiver == *from))
-                });
-                self.corrupted_edges.retain(|entry| {
-                    !((entry.edge.sender == *from && entry.edge.receiver == *to)
-                        || (entry.edge.sender == *to && entry.edge.receiver == *from))
-                });
+                self.partitioned_edges.remove(&(from.clone(), to.clone()));
+                self.partitioned_edges.remove(&(to.clone(), from.clone()));
+                self.corrupted_edges.remove(&(from.clone(), to.clone()));
+                self.corrupted_edges.remove(&(to.clone(), from.clone()));
             }
             TopologyPerturbation::Corrupt {
                 from,
                 to,
                 corruption,
             } => {
-                let edge = Edge::new(TOPOLOGY_EDGE_SID, from.clone(), to.clone());
                 self.corrupted_edges
-                    .retain(|entry| entry.edge.sender != *from || entry.edge.receiver != *to);
-                self.corrupted_edges.push(CorruptedEdge {
-                    edge,
-                    corruption: corruption.clone(),
-                });
+                    .insert((from.clone(), to.clone()), corruption.clone());
             }
             TopologyPerturbation::Timeout { site, duration } => {
                 let until_tick = self
                     .clock
                     .tick
                     .saturating_add(self.duration_to_ticks(*duration));
-                self.timed_out_sites.retain(|timeout| timeout.site != *site);
-                self.timed_out_sites.push(SiteTimeout {
-                    site: site.clone(),
-                    until_tick,
-                });
+                self.timed_out_sites.insert(site.clone(), until_tick);
             }
         }
         self.normalize_topology_state();
@@ -2558,11 +2566,7 @@ impl VM {
         }
 
         // Enqueue into per-edge signed session buffer (if delivered).
-        let maybe_corruption = self.edge_corruption(&Edge::new(
-            TOPOLOGY_EDGE_SID,
-            role.to_string(),
-            partner.clone(),
-        ));
+        let maybe_corruption = self.edge_corruption(&edge);
         if let SendDecision::Deliver(payload) = &decision {
             self.validate_payload(
                 role,
@@ -2912,17 +2916,11 @@ impl VM {
                 self.guard_layer
                     .resources
                     .insert(layer_id, evidence.clone());
-                if let Some((_, state)) = self
+                let state = self
                     .resource_states
-                    .iter_mut()
-                    .find(|(scope, _)| *scope == input.sid)
-                {
-                    let _commitment = state.commit(&evidence);
-                } else {
-                    let mut state = ResourceState::default();
-                    let _commitment = state.commit(&evidence);
-                    self.resource_states.push((input.sid, state));
-                }
+                    .entry(input.sid)
+                    .or_insert_with(ResourceState::default);
+                let _commitment = state.commit(&evidence);
                 Ok(StepPack {
                     coro_update: CoroUpdate::AdvancePcWriteReg {
                         reg: input.dst,
@@ -2986,11 +2984,7 @@ impl VM {
                 layer: input.layer.to_string(),
                 message: e,
             })?;
-        if let Some((_, state)) = self
-            .resource_states
-            .iter_mut()
-            .find(|(scope, _)| *scope == input.sid)
-        {
+        if let Some(state) = self.resource_states.get_mut(&input.sid) {
             state.consume(&ev).map_err(|e| Fault::Acquire {
                 layer: input.layer.to_string(),
                 message: e,
@@ -3508,7 +3502,7 @@ impl VM {
         self.apply_close_delta(sid)
             .map_err(|e| Fault::Close { message: e })?;
         self.monitor.remove_kind(sid);
-        self.resource_states.retain(|(scope, _)| *scope != sid);
+        self.resource_states.remove(&sid);
         let epoch = self.sessions.get(sid).map_or(0, |session| session.epoch);
 
         Ok(StepPack {
@@ -3587,7 +3581,8 @@ impl VM {
         let initial_types: BTreeMap<String, LocalTypeR> = local_types.iter().cloned().collect();
         let sid = self
             .sessions
-            .open(open_roles.clone(), &BufferConfig::default(), &initial_types);
+            .open(open_roles.clone(), &self.config.buffer_config, &initial_types);
+        self.next_session_id = self.sessions.next_session_id();
         for ((sender, receiver), handler_id) in handlers {
             self.sessions.update_handler(
                 &Edge::new(sid, sender.clone(), receiver.clone()),
@@ -3595,7 +3590,9 @@ impl VM {
             );
         }
         self.monitor.set_kind(sid, SessionKind::Peer);
-        self.resource_states.push((sid, ResourceState::default()));
+        self.resource_states
+            .entry(sid)
+            .or_insert_with(ResourceState::default);
         self.apply_open_delta(sid).map_err(|e| Fault::Transfer {
             message: format!("open persistence delta failed: {e}"),
         })?;
@@ -3646,27 +3643,13 @@ impl VM {
     ) -> Result<ExecOutcome, Fault> {
         // Output-condition gate: any observable output must pass the configured verifier.
         if !pack.events.is_empty() {
-            let digest = "vm.output_digest.unspecified".to_string();
-            let meta = match output_hint {
-                Some(h) => OutputConditionMeta::from_hint(h, digest),
-                None => OutputConditionMeta::default_observable(digest),
-            };
-            let passed = verify_output_condition(&self.config.output_condition_policy, &meta);
-            self.output_condition_checks.push(OutputConditionCheck {
-                meta: meta.clone(),
-                passed,
-            });
-            self.obs_trace.push(ObsEvent::OutputConditionChecked {
-                tick: self.clock.tick,
-                predicate_ref: meta.predicate_ref.clone(),
-                witness_ref: meta.witness_ref.clone(),
-                output_digest: meta.output_digest.clone(),
-                passed,
-            });
-            if !passed {
-                let fault = Fault::OutputCondition {
-                    predicate_ref: meta.predicate_ref,
-                };
+            if let Err(fault) = apply_output_condition_gate(
+                &self.config.output_condition_policy,
+                &mut self.output_condition_checks,
+                &mut self.obs_trace,
+                self.clock.tick,
+                output_hint,
+            ) {
                 self.coroutines[coro_idx].status = CoroStatus::Faulted(fault.clone());
                 return Err(fault);
             }
@@ -3674,97 +3657,12 @@ impl VM {
 
         for ev in &pack.events {
             self.intern_obs_event(ev);
-            let maybe_entry = match ev {
-                ObsEvent::Sent {
-                    session,
-                    from,
-                    to,
-                    label,
-                    ..
-                } => Some(EffectTraceEntry {
-                    effect_id: self.next_effect_id,
-                    effect_kind: "send_decision".to_string(),
-                    inputs: json!({
-                        "session": session,
-                        "from": from,
-                        "to": to,
-                        "label": label,
-                    }),
-                    outputs: json!({"committed": true}),
-                    handler_identity: handler_identity.to_string(),
-                    ordering_key: self.clock.tick,
-                    topology: None,
-                }),
-                ObsEvent::Received {
-                    session,
-                    from,
-                    to,
-                    label,
-                    ..
-                } => Some(EffectTraceEntry {
-                    effect_id: self.next_effect_id,
-                    effect_kind: "handle_recv".to_string(),
-                    inputs: json!({
-                        "session": session,
-                        "from": from,
-                        "to": to,
-                        "label": label,
-                    }),
-                    outputs: json!({"committed": true}),
-                    handler_identity: handler_identity.to_string(),
-                    ordering_key: self.clock.tick,
-                    topology: None,
-                }),
-                ObsEvent::Invoked { coro_id, role, .. } => Some(EffectTraceEntry {
-                    effect_id: self.next_effect_id,
-                    effect_kind: "invoke_step".to_string(),
-                    inputs: json!({
-                        "coro_id": coro_id,
-                        "role": role,
-                    }),
-                    outputs: json!({"ok": true}),
-                    handler_identity: handler_identity.to_string(),
-                    ordering_key: self.clock.tick,
-                    topology: None,
-                }),
-                ObsEvent::Acquired {
-                    session,
-                    role,
-                    layer,
-                    ..
-                } => Some(EffectTraceEntry {
-                    effect_id: self.next_effect_id,
-                    effect_kind: "handle_acquire".to_string(),
-                    inputs: json!({
-                        "session": session,
-                        "role": role,
-                        "layer": layer,
-                    }),
-                    outputs: json!({"granted": true}),
-                    handler_identity: handler_identity.to_string(),
-                    ordering_key: self.clock.tick,
-                    topology: None,
-                }),
-                ObsEvent::Released {
-                    session,
-                    role,
-                    layer,
-                    ..
-                } => Some(EffectTraceEntry {
-                    effect_id: self.next_effect_id,
-                    effect_kind: "handle_release".to_string(),
-                    inputs: json!({
-                        "session": session,
-                        "role": role,
-                        "layer": layer,
-                    }),
-                    outputs: json!({"ok": true}),
-                    handler_identity: handler_identity.to_string(),
-                    ordering_key: self.clock.tick,
-                    topology: None,
-                }),
-                _ => None,
-            };
+            let maybe_entry = effect_trace_entry_for_event(
+                ev,
+                self.next_effect_id,
+                handler_identity,
+                self.clock.tick,
+            );
             if let Some(entry) = maybe_entry {
                 if self.should_capture_effect_kind(&entry.effect_kind) {
                     self.effect_trace.push(entry);
@@ -4762,11 +4660,131 @@ mod tests {
         assert!(matches!(second, StepResult::AllDone));
     }
 
+    #[test]
+    fn test_run_status_reports_all_done_stuck_and_max_rounds_exceeded() {
+        let all_done_image = CodeImage {
+            programs: {
+                let mut m = BTreeMap::new();
+                m.insert("A".to_string(), vec![Instr::Halt]);
+                m
+            },
+            global_type: GlobalType::End,
+            local_types: {
+                let mut m = BTreeMap::new();
+                m.insert("A".to_string(), LocalTypeR::End);
+                m
+            },
+        };
+        let mut all_done_vm = VM::new(VMConfig::default());
+        all_done_vm
+            .load_choreography(&all_done_image)
+            .expect("load all-done choreography");
+        let all_done = all_done_vm
+            .run(&PassthroughHandler, 8)
+            .expect("all-done run must succeed");
+        assert_eq!(all_done, RunStatus::AllDone);
+
+        let stuck_image = CodeImage {
+            programs: {
+                let mut m = BTreeMap::new();
+                m.insert("A".to_string(), vec![Instr::Receive { chan: 0, dst: 1 }]);
+                m
+            },
+            global_type: GlobalType::End,
+            local_types: {
+                let mut m = BTreeMap::new();
+                m.insert(
+                    "A".to_string(),
+                    LocalTypeR::recv("B", Label::new("m"), LocalTypeR::End),
+                );
+                m
+            },
+        };
+        let mut stuck_vm = VM::new(VMConfig::default());
+        stuck_vm
+            .load_choreography(&stuck_image)
+            .expect("load stuck choreography");
+        let stuck = stuck_vm
+            .run(&PassthroughHandler, 8)
+            .expect("stuck run must return status, not fault");
+        assert_eq!(stuck, RunStatus::Stuck);
+
+        let max_image = CodeImage {
+            programs: {
+                let mut m = BTreeMap::new();
+                m.insert("A".to_string(), vec![Instr::Jump { target: 0 }]);
+                m
+            },
+            global_type: GlobalType::End,
+            local_types: {
+                let mut m = BTreeMap::new();
+                m.insert("A".to_string(), LocalTypeR::End);
+                m
+            },
+        };
+        let mut max_vm = VM::new(VMConfig::default());
+        max_vm
+            .load_choreography(&max_image)
+            .expect("load loop choreography");
+        let exhausted = max_vm
+            .run(&PassthroughHandler, 8)
+            .expect("bounded loop run must return status");
+        assert_eq!(exhausted, RunStatus::MaxRoundsExceeded);
+    }
+
     fn open_test_image(open_instr: Instr) -> CodeImage {
         let mut local_types = BTreeMap::new();
         local_types.insert("A".to_string(), LocalTypeR::End);
         let mut programs = BTreeMap::new();
         programs.insert("A".to_string(), vec![open_instr, Instr::Halt]);
+        CodeImage {
+            programs,
+            global_type: GlobalType::End,
+            local_types,
+        }
+    }
+
+    fn open_buffer_pressure_image() -> CodeImage {
+        let full_handlers = vec![
+            (("A".to_string(), "A".to_string()), "hAA".to_string()),
+            (("A".to_string(), "B".to_string()), "hAB".to_string()),
+            (("B".to_string(), "A".to_string()), "hBA".to_string()),
+            (("B".to_string(), "B".to_string()), "hBB".to_string()),
+        ];
+        let send_twice = LocalTypeR::send(
+            "B",
+            Label::new("m"),
+            LocalTypeR::send("B", Label::new("m"), LocalTypeR::End),
+        );
+        let recv_twice = LocalTypeR::recv(
+            "A",
+            Label::new("m"),
+            LocalTypeR::recv("A", Label::new("m"), LocalTypeR::End),
+        );
+        let mut local_types = BTreeMap::new();
+        local_types.insert("A".to_string(), LocalTypeR::End);
+        let mut programs = BTreeMap::new();
+        programs.insert(
+            "A".to_string(),
+            vec![
+                Instr::Open {
+                    roles: vec!["A".to_string(), "B".to_string()],
+                    local_types: vec![
+                        ("A".to_string(), send_twice),
+                        ("B".to_string(), recv_twice),
+                    ],
+                    handlers: full_handlers,
+                    dsts: vec![("A".to_string(), 1), ("B".to_string(), 2)],
+                },
+                Instr::Set {
+                    dst: 3,
+                    val: crate::instr::ImmValue::Nat(7),
+                },
+                Instr::Send { chan: 1, val: 3 },
+                Instr::Send { chan: 1, val: 3 },
+                Instr::Halt,
+            ],
+        );
         CodeImage {
             programs,
             global_type: GlobalType::End,
@@ -4872,6 +4890,71 @@ mod tests {
         let coro = vm.coroutine(0).expect("coroutine exists");
         assert!(matches!(coro.regs[0], Value::Endpoint(_)));
         assert!(matches!(coro.regs[1], Value::Endpoint(_)));
+    }
+
+    #[test]
+    fn test_runtime_open_uses_configured_buffer_capacity_for_new_sessions() {
+        let image = open_buffer_pressure_image();
+        let cfg = VMConfig {
+            buffer_config: BufferConfig {
+                mode: crate::buffer::BufferMode::Fifo,
+                initial_capacity: 1,
+                policy: crate::buffer::BackpressurePolicy::Error,
+            },
+            ..VMConfig::default()
+        };
+        let mut vm = VM::new(cfg);
+        vm.load_choreography(&image).expect("load choreography");
+        let err = vm
+            .run(&PassthroughHandler, 32)
+            .expect_err("second open-session send must fault with capacity=1,error policy");
+        match err {
+            VMError::Fault {
+                fault: Fault::BufferFull { .. },
+                ..
+            } => {}
+            other => panic!("expected BufferFull fault, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_runtime_open_allocates_session_id_after_loaded_session_without_collision() {
+        let full_handlers = vec![
+            (("A".to_string(), "A".to_string()), "hAA".to_string()),
+            (("A".to_string(), "B".to_string()), "hAB".to_string()),
+            (("B".to_string(), "A".to_string()), "hBA".to_string()),
+            (("B".to_string(), "B".to_string()), "hBB".to_string()),
+        ];
+        let image = open_test_image(Instr::Open {
+            roles: vec!["A".to_string(), "B".to_string()],
+            local_types: vec![
+                ("A".to_string(), LocalTypeR::End),
+                ("B".to_string(), LocalTypeR::End),
+            ],
+            handlers: full_handlers,
+            dsts: vec![("A".to_string(), 0), ("B".to_string(), 1)],
+        });
+
+        let mut vm = VM::new(VMConfig::default());
+        let sid0 = vm.load_choreography(&image).expect("load choreography");
+        assert_eq!(sid0, 0);
+
+        let handler = PassthroughHandler;
+        let result = vm.step_round(&handler, 1).expect("open step");
+        assert!(matches!(result, StepResult::Continue));
+
+        let opened: Vec<SessionId> = vm
+            .trace()
+            .iter()
+            .filter_map(|event| match event {
+                ObsEvent::Opened { session, .. } => Some(*session),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(opened, vec![0, 1], "expected monotonic opened sessions");
+        assert!(vm.sessions().get(0).is_some(), "bootstrap session must remain");
+        assert!(vm.sessions().get(1).is_some(), "runtime-open session must exist");
+        assert_eq!(vm.next_session_id(), 2);
     }
 
     #[test]
@@ -5635,7 +5718,7 @@ mod tests {
 
         let handler = PassthroughHandler;
         // Don't unwrap — just run to completion
-        vm.run(&handler, 500).unwrap_or(());
+        let _ = vm.run(&handler, 500);
 
         let faults: Vec<_> = vm
             .obs_trace

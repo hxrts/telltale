@@ -118,6 +118,9 @@ pub struct SessionState {
     pub buffers: BTreeMap<Edge, SignedBuffer<Signature>>,
     /// Per-edge authenticated leaves for Merkle-auth tracking.
     pub auth_leaves: BTreeMap<Edge, Vec<Hash>>,
+    /// Per-edge Merkle trees for incremental authenticated updates.
+    #[serde(default)]
+    pub auth_trees: BTreeMap<Edge, AuthTree>,
     /// Per-edge Merkle roots for signed-buffer history.
     pub auth_roots: BTreeMap<Edge, Hash>,
     /// Optional handler binding per edge.
@@ -134,9 +137,12 @@ impl SessionState {
     fn update_auth_tree(&mut self, edge: &Edge, signed: &SignedValue<Signature>) {
         let bytes = serde_json::to_vec(signed).unwrap_or_default();
         let leaf = DefaultVerificationModel::hash(HashTag::MerkleLeaf, &bytes);
-        let leaves = self.auth_leaves.entry(edge.clone()).or_default();
-        leaves.push(leaf);
-        let tree = AuthTree::new(leaves.clone());
+        self.auth_leaves.entry(edge.clone()).or_default().push(leaf);
+        let tree = self
+            .auth_trees
+            .entry(edge.clone())
+            .or_insert_with(|| AuthTree::new(Vec::new()));
+        tree.append_leaf(leaf);
         self.auth_roots.insert(edge.clone(), tree.root());
     }
 
@@ -252,7 +258,7 @@ impl SessionStore {
 
     /// Open a new session with an externally supplied session id.
     ///
-    /// This is used by VM state machines that own `next_session_id`.
+    /// Callers should source ids from `SessionStore::next_session_id()`.
     pub fn open_with_sid(
         &mut self,
         sid: SessionId,
@@ -295,6 +301,7 @@ impl SessionStore {
             local_types,
             buffers,
             auth_leaves: BTreeMap::new(),
+            auth_trees: BTreeMap::new(),
             auth_roots: BTreeMap::new(),
             edge_handlers: BTreeMap::new(),
             edge_traces: BTreeMap::new(),

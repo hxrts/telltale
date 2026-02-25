@@ -181,7 +181,7 @@ fn prop_compile_execute_reaches_end() {
             }
 
             let handler = PassthroughHandler;
-            vm.run(&handler, 500).unwrap_or(());
+            let _ = vm.run(&handler, 500);
 
             // No faults should have occurred.
             let faults: Vec<_> = vm

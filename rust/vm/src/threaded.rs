@@ -18,6 +18,7 @@ use telltale_types::{LocalTypeR, ValType};
 
 use crate::buffer::{BoundedBuffer, BufferConfig, EnqueueResult};
 use crate::clock::SimClock;
+use crate::commit_common::{apply_output_condition_gate, effect_trace_entry_for_event};
 use crate::coroutine::{BlockReason, CoroStatus, Coroutine, Fault, ProgressToken, Value};
 use crate::effect::{
     CorruptionType, EffectHandler, EffectTraceEntry, ReplayEffectHandler, SendDecision,
@@ -33,7 +34,7 @@ use crate::intern::{StringId, SymbolTable};
 use crate::kernel::{KernelMachine, VMKernel};
 use crate::loader::CodeImage;
 use crate::output_condition::{
-    verify_output_condition, OutputConditionCheck, OutputConditionHint, OutputConditionMeta,
+    OutputConditionCheck, OutputConditionHint,
 };
 use crate::scheduler::Scheduler;
 use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragmentV1};
@@ -43,7 +44,7 @@ use crate::session::{
 use crate::transfer_semantics::{decode_transfer_request, move_endpoint_bundle};
 use crate::vm::{
     runtime_value_matches_val_type, runtime_value_val_type, runtime_value_wire_size_bytes,
-    EffectTraceCaptureMode, MonitorMode, ObsEvent, Program, ResourceState, StepResult,
+    EffectTraceCaptureMode, MonitorMode, ObsEvent, Program, ResourceState, RunStatus, StepResult,
     ThreadedRoundSemantics, VMConfig, VMError,
 };
 
@@ -251,6 +252,7 @@ impl ThreadedSessionStore {
             local_types,
             buffers,
             auth_leaves: BTreeMap::new(),
+            auth_trees: BTreeMap::new(),
             auth_roots: BTreeMap::new(),
             edge_handlers: BTreeMap::new(),
             edge_traces: BTreeMap::new(),
@@ -309,6 +311,8 @@ enum CoroUpdate {
     Halt,
     /// Advance PC by 1, write a value to a register, status = Ready.
     AdvancePcWriteReg { reg: u16, val: Value },
+    /// Advance PC by 1 and spawn a child coroutine.
+    AdvancePcSpawnChild { target: PC, args: Vec<u16> },
 }
 
 /// Type update action for commit.
@@ -585,8 +589,7 @@ impl ThreadedVM {
     ) -> Result<Option<PlannedWave>, VMError> {
         self.contention_metrics
             .observe_ready_depth(self.scheduler.ready_count());
-        let ready_before_pick: BTreeSet<usize> =
-            self.scheduler.ready_snapshot().into_iter().collect();
+        let ready_before_pick = self.scheduler.ready_set_snapshot();
         let picks = self.pick_ready(budget)?;
         if picks.is_empty() {
             return Ok(None);
@@ -803,7 +806,11 @@ impl ThreadedVM {
     /// # Errors
     ///
     /// Returns a `VMError` if any coroutine faults.
-    pub fn run(&mut self, handler: &dyn EffectHandler, max_rounds: usize) -> Result<(), VMError> {
+    pub fn run(
+        &mut self,
+        handler: &dyn EffectHandler,
+        max_rounds: usize,
+    ) -> Result<RunStatus, VMError> {
         self.run_concurrent(handler, max_rounds, self.workers.max(1))
     }
 
@@ -817,8 +824,26 @@ impl ThreadedVM {
         fallback: &dyn EffectHandler,
         replay_trace: &[EffectTraceEntry],
         max_rounds: usize,
-    ) -> Result<(), VMError> {
-        let replay = ReplayEffectHandler::with_fallback(replay_trace.to_vec(), fallback);
+    ) -> Result<RunStatus, VMError> {
+        self.run_replay_shared(
+            fallback,
+            Arc::<[EffectTraceEntry]>::from(replay_trace),
+            max_rounds,
+        )
+    }
+
+    /// Run the VM with replayed outcomes using shared trace storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `VMError` if replay data is exhausted/mismatched or any coroutine faults.
+    pub fn run_replay_shared(
+        &mut self,
+        fallback: &dyn EffectHandler,
+        replay_trace: Arc<[EffectTraceEntry]>,
+        max_rounds: usize,
+    ) -> Result<RunStatus, VMError> {
+        let replay = ReplayEffectHandler::with_fallback(replay_trace, fallback);
         self.run(&replay, max_rounds)
     }
 
@@ -832,7 +857,7 @@ impl ThreadedVM {
         handler: &dyn EffectHandler,
         max_rounds: usize,
         concurrency: usize,
-    ) -> Result<(), VMError> {
+    ) -> Result<RunStatus, VMError> {
         VMKernel::run_concurrent(self, handler, max_rounds, concurrency)
     }
 
@@ -852,8 +877,28 @@ impl ThreadedVM {
         replay_trace: &[EffectTraceEntry],
         max_rounds: usize,
         concurrency: usize,
-    ) -> Result<(), VMError> {
-        let replay = ReplayEffectHandler::with_fallback(replay_trace.to_vec(), fallback);
+    ) -> Result<RunStatus, VMError> {
+        self.run_concurrent_replay_shared(
+            fallback,
+            Arc::<[EffectTraceEntry]>::from(replay_trace),
+            max_rounds,
+            concurrency,
+        )
+    }
+
+    /// Run with explicit concurrency and replayed outcomes using shared trace storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `VMError` if replay data is exhausted/mismatched or any coroutine faults.
+    pub fn run_concurrent_replay_shared(
+        &mut self,
+        fallback: &dyn EffectHandler,
+        replay_trace: Arc<[EffectTraceEntry]>,
+        max_rounds: usize,
+        concurrency: usize,
+    ) -> Result<RunStatus, VMError> {
+        let replay = ReplayEffectHandler::with_fallback(replay_trace, fallback);
         self.run_concurrent(&replay, max_rounds, concurrency)
     }
 
@@ -1358,123 +1403,23 @@ impl ThreadedVM {
         handler_identity: &str,
     ) -> Result<ExecOutcome, Fault> {
         if !pack.events.is_empty() {
-            let digest = "vm.output_digest.unspecified".to_string();
-            let meta = match output_hint {
-                Some(h) => OutputConditionMeta::from_hint(h, digest),
-                None => OutputConditionMeta::default_observable(digest),
-            };
-            let passed = verify_output_condition(&self.config.output_condition_policy, &meta);
-            self.output_condition_checks.push(OutputConditionCheck {
-                meta: meta.clone(),
-                passed,
-            });
-            self.trace.push(ObsEvent::OutputConditionChecked {
-                tick: self.clock.tick,
-                predicate_ref: meta.predicate_ref.clone(),
-                witness_ref: meta.witness_ref.clone(),
-                output_digest: meta.output_digest.clone(),
-                passed,
-            });
-            if !passed {
-                return Err(Fault::OutputCondition {
-                    predicate_ref: meta.predicate_ref,
-                });
-            }
+            apply_output_condition_gate(
+                &self.config.output_condition_policy,
+                &mut self.output_condition_checks,
+                &mut self.trace,
+                self.clock.tick,
+                output_hint,
+            )?;
         }
 
         for ev in &pack.events {
             self.intern_obs_event(ev);
-            let maybe_entry = match ev {
-                ObsEvent::Sent {
-                    session,
-                    from,
-                    to,
-                    label,
-                    ..
-                } => Some(EffectTraceEntry {
-                    effect_id: self.next_effect_id,
-                    effect_kind: "send_decision".to_string(),
-                    inputs: json!({
-                        "session": session,
-                        "from": from,
-                        "to": to,
-                        "label": label,
-                    }),
-                    outputs: json!({"committed": true}),
-                    handler_identity: handler_identity.to_string(),
-                    ordering_key: self.clock.tick,
-                    topology: None,
-                }),
-                ObsEvent::Received {
-                    session,
-                    from,
-                    to,
-                    label,
-                    ..
-                } => Some(EffectTraceEntry {
-                    effect_id: self.next_effect_id,
-                    effect_kind: "handle_recv".to_string(),
-                    inputs: json!({
-                        "session": session,
-                        "from": from,
-                        "to": to,
-                        "label": label,
-                    }),
-                    outputs: json!({"committed": true}),
-                    handler_identity: handler_identity.to_string(),
-                    ordering_key: self.clock.tick,
-                    topology: None,
-                }),
-                ObsEvent::Invoked { coro_id, role, .. } => Some(EffectTraceEntry {
-                    effect_id: self.next_effect_id,
-                    effect_kind: "invoke_step".to_string(),
-                    inputs: json!({
-                        "coro_id": coro_id,
-                        "role": role,
-                    }),
-                    outputs: json!({"ok": true}),
-                    handler_identity: handler_identity.to_string(),
-                    ordering_key: self.clock.tick,
-                    topology: None,
-                }),
-                ObsEvent::Acquired {
-                    session,
-                    role,
-                    layer,
-                    ..
-                } => Some(EffectTraceEntry {
-                    effect_id: self.next_effect_id,
-                    effect_kind: "handle_acquire".to_string(),
-                    inputs: json!({
-                        "session": session,
-                        "role": role,
-                        "layer": layer,
-                    }),
-                    outputs: json!({"granted": true}),
-                    handler_identity: handler_identity.to_string(),
-                    ordering_key: self.clock.tick,
-                    topology: None,
-                }),
-                ObsEvent::Released {
-                    session,
-                    role,
-                    layer,
-                    ..
-                } => Some(EffectTraceEntry {
-                    effect_id: self.next_effect_id,
-                    effect_kind: "handle_release".to_string(),
-                    inputs: json!({
-                        "session": session,
-                        "role": role,
-                        "layer": layer,
-                    }),
-                    outputs: json!({"ok": true}),
-                    handler_identity: handler_identity.to_string(),
-                    ordering_key: self.clock.tick,
-                    topology: None,
-                }),
-                _ => None,
-            };
+            let maybe_entry = effect_trace_entry_for_event(
+                ev,
+                self.next_effect_id,
+                handler_identity,
+                self.clock.tick,
+            );
             if let Some(entry) = maybe_entry {
                 if self.should_capture_effect_kind(&entry.effect_kind) {
                     self.effect_trace.push(entry);
@@ -1502,6 +1447,42 @@ impl ThreadedVM {
             }
             CoroUpdate::AdvancePcWriteReg { reg, ref val } => {
                 coro_guard.regs[usize::from(reg)] = val.clone();
+                coro_guard.pc += 1;
+                coro_guard.status = CoroStatus::Ready;
+            }
+            CoroUpdate::AdvancePcSpawnChild {
+                target,
+                ref args,
+            } => {
+                if self.coroutines.len() >= self.config.max_coroutines {
+                    return Err(Fault::Speculation {
+                        message: "max coroutines exceeded".to_string(),
+                    });
+                }
+                let new_id = self.next_coro_id;
+                self.next_coro_id = self.next_coro_id.saturating_add(1);
+
+                let mut child = Coroutine::new(
+                    new_id,
+                    coro_guard.program_id,
+                    coro_guard.session_id,
+                    coro_guard.role.clone(),
+                    self.config.num_registers,
+                    self.config.initial_cost_budget,
+                );
+                child.pc = target;
+                child.effect_ctx = coro_guard.effect_ctx.clone();
+                for (dst_idx, src_reg) in args.iter().enumerate() {
+                    if dst_idx >= child.regs.len() {
+                        break;
+                    }
+                    if let Some(value) = coro_guard.regs.get(usize::from(*src_reg)).cloned() {
+                        child.regs[dst_idx] = value;
+                    }
+                }
+                self.scheduler.add_ready(new_id);
+                self.coroutines.push(Arc::new(Mutex::new(child)));
+
                 coro_guard.pc += 1;
                 coro_guard.status = CoroStatus::Ready;
             }
@@ -1808,13 +1789,16 @@ fn exec_instr(
         return Err(Fault::PcOutOfBounds);
     }
     let instr = program[pc].clone();
+    let role = coro_guard.role.clone();
+    let sid = coro_guard.session_id;
     let ep = coro_guard
         .owned_endpoints
         .first()
         .cloned()
-        .ok_or(Fault::PcOutOfBounds)?;
-    let role = coro_guard.role.clone();
-    let sid = coro_guard.session_id;
+        .unwrap_or(Endpoint {
+            sid,
+            role: role.clone(),
+        });
 
     monitor_precheck(ctx.step.config.monitor_mode, session, &ep, &role, &instr)?;
     if coro_guard.cost_budget < ctx.step.config.instruction_cost {
@@ -1824,26 +1808,10 @@ fn exec_instr(
 
     let pack = match instr {
         Instr::Send { chan, val } => {
-            let mut session_guard = session.lock().expect("session lock poisoned");
-            step_send(
-                &mut coro_guard,
-                &mut session_guard,
-                &role,
-                chan,
-                val,
-                &ctx.step,
-            )
+            step_send(&mut coro_guard, session, &role, chan, val, &ctx.step)
         }
         Instr::Receive { chan, dst } => {
-            let mut session_guard = session.lock().expect("session lock poisoned");
-            step_recv(
-                &mut coro_guard,
-                &mut session_guard,
-                &role,
-                chan,
-                dst,
-                &ctx.step,
-            )
+            step_recv(&mut coro_guard, session, &role, chan, dst, &ctx.step)
         }
         Instr::Halt => {
             let mut session_guard = session.lock().expect("session lock poisoned");
@@ -1972,9 +1940,7 @@ fn exec_instr(
                 &ctx.step,
             )
         }
-        Instr::Spawn { .. } => Err(Fault::Speculation {
-            message: "spawn not implemented in threaded VM".to_string(),
-        }),
+        Instr::Spawn { target, ref args } => Ok(step_spawn(target, args)),
         Instr::Close {
             session: session_reg,
         } => {
@@ -1996,6 +1962,7 @@ fn exec_instr(
             &mut coro_guard,
             &role,
             ctx.store,
+            &ctx.step.config.buffer_config,
             roles,
             local_types,
             handlers,
@@ -2179,15 +2146,22 @@ fn validate_payload(
     }
 }
 
-#[allow(clippy::too_many_lines)]
-fn step_send(
-    coro: &mut Coroutine,
-    session: &mut SessionState,
+struct SendPrepared {
+    ep: Endpoint,
+    sid: SessionId,
+    partner: String,
+    label: String,
+    expected_type: Option<ValType>,
+    continuation: LocalTypeR,
+    original: LocalTypeR,
+}
+
+fn step_send_prepare(
+    coro: &Coroutine,
+    session: &SessionState,
     role: &str,
     chan: u16,
-    val_reg: u16,
-    ctx: &ThreadedStepCtx<'_>,
-) -> Result<StepPack, Fault> {
+) -> Result<SendPrepared, Fault> {
     let ep = endpoint_from_reg(coro, chan)?;
     if !coro.owned_endpoints.contains(&ep) {
         return Err(Fault::ChannelClosed {
@@ -2195,18 +2169,13 @@ fn step_send(
         });
     }
     let sid = ep.sid;
-    let local_type = session
-        .local_types
-        .get(&ep)
-        .ok_or_else(|| Fault::TypeViolation {
-            expected: telltale_types::ValType::Unit,
-            actual: telltale_types::ValType::Unit,
-            message: format!("{role}: no type registered"),
-        })?
-        .current
-        .clone();
+    let type_entry = session.local_types.get(&ep).ok_or_else(|| Fault::TypeViolation {
+        expected: telltale_types::ValType::Unit,
+        actual: telltale_types::ValType::Unit,
+        message: format!("{role}: no type registered"),
+    })?;
 
-    let (partner, branches) = match &local_type {
+    let (partner, branches) = match &type_entry.current {
         LocalTypeR::Send {
             partner, branches, ..
         } => (partner.clone(), branches.clone()),
@@ -2215,26 +2184,54 @@ fn step_send(
                 expected: telltale_types::ValType::Unit,
                 actual: telltale_types::ValType::Unit,
                 message: format!("{role}: expected Send, got {other:?}"),
-            })
+            });
         }
     };
 
-    let (label, expected_type, continuation) = branches
-        .first()
-        .ok_or_else(|| Fault::TypeViolation {
+    let (label, expected_type, continuation) =
+        branches.first().ok_or_else(|| Fault::TypeViolation {
             expected: telltale_types::ValType::Unit,
             actual: telltale_types::ValType::Unit,
             message: format!("{role}: send has no branches"),
-        })?
-        .clone();
+        })?;
+
+    Ok(SendPrepared {
+        ep,
+        sid,
+        partner,
+        label: label.name.clone(),
+        expected_type: expected_type.clone(),
+        continuation: continuation.clone(),
+        original: type_entry.original.clone(),
+    })
+}
+
+#[allow(clippy::too_many_lines)]
+fn step_send(
+    coro: &mut Coroutine,
+    session: &Arc<Mutex<SessionState>>,
+    role: &str,
+    chan: u16,
+    val_reg: u16,
+    ctx: &ThreadedStepCtx<'_>,
+) -> Result<StepPack, Fault> {
+    let prepared = {
+        let session_guard = session.lock().expect("session lock poisoned");
+        step_send_prepare(coro, &session_guard, role, chan)?
+    };
 
     let send_payload = coro
         .regs
         .get(usize::from(val_reg))
         .cloned()
         .ok_or(Fault::OutOfRegisters)?;
-    let fast_path =
-        SendDecisionFastPathInput::new(sid, role, &partner, &label.name, Some(&send_payload));
+    let fast_path = SendDecisionFastPathInput::new(
+        prepared.sid,
+        role,
+        &prepared.partner,
+        &prepared.label,
+        Some(&send_payload),
+    );
     let decision = if let Some(decision) =
         ctx.handler
             .send_decision_fast_path(fast_path, &coro.regs, Some(&send_payload))
@@ -2243,10 +2240,10 @@ fn step_send(
     } else {
         ctx.handler
             .send_decision(SendDecisionInput {
-                sid,
+                sid: prepared.sid,
                 role,
-                partner: &partner,
-                label: &label.name,
+                partner: &prepared.partner,
+                label: &prepared.label,
                 state: &coro.regs,
                 payload: Some(send_payload),
             })
@@ -2254,16 +2251,16 @@ fn step_send(
     };
 
     if ctx.crashed_sites.contains(role)
-        || ctx.crashed_sites.contains(&partner)
+        || ctx.crashed_sites.contains(&prepared.partner)
         || ctx.timed_out_sites.contains_key(role)
-        || ctx.timed_out_sites.contains_key(&partner)
+        || ctx.timed_out_sites.contains_key(&prepared.partner)
         || ctx
             .partitioned_edges
-            .contains(&(role.to_string(), partner.clone()))
+            .contains(&(role.to_string(), prepared.partner.clone()))
     {
         return Ok(StepPack {
             coro_update: CoroUpdate::Block(BlockReason::Send {
-                edge: Edge::new(sid, role.to_string(), partner.clone()),
+                edge: Edge::new(prepared.sid, role.to_string(), prepared.partner.clone()),
             }),
             type_update: None,
             events: vec![],
@@ -2272,15 +2269,15 @@ fn step_send(
 
     let maybe_corruption = ctx
         .corrupted_edges
-        .get(&(role.to_string(), partner.clone()))
+        .get(&(role.to_string(), prepared.partner.clone()))
         .cloned();
     if let SendDecision::Deliver(payload) = &decision {
         validate_payload(
             ctx.config,
             role,
             "send",
-            &label.name,
-            expected_type.as_ref(),
+            &prepared.label,
+            prepared.expected_type.as_ref(),
             payload,
             true,
         )?;
@@ -2292,8 +2289,9 @@ fn step_send(
             } else {
                 payload
             };
-            session
-                .send(role, &partner, payload)
+            let mut session_guard = session.lock().expect("session lock poisoned");
+            session_guard
+                .send(role, &prepared.partner, payload)
                 .map_err(|e| Fault::Invoke { message: e })?
         }
         SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
@@ -2304,7 +2302,7 @@ fn step_send(
         EnqueueResult::WouldBlock => {
             return Ok(StepPack {
                 coro_update: CoroUpdate::Block(BlockReason::Send {
-                    edge: Edge::new(sid, role.to_string(), partner.clone()),
+                    edge: Edge::new(prepared.sid, role.to_string(), prepared.partner.clone()),
                 }),
                 type_update: None,
                 events: vec![],
@@ -2312,41 +2310,45 @@ fn step_send(
         }
         EnqueueResult::Full => {
             return Err(Fault::BufferFull {
-                endpoint: ep.clone(),
+                endpoint: prepared.ep.clone(),
             });
         }
         EnqueueResult::Dropped => {}
     }
 
-    let original = session
-        .local_types
-        .get(&ep)
-        .map(|entry| &entry.original)
-        .unwrap_or(&LocalTypeR::End);
-    let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);
+    let (_resolved, type_update) =
+        resolve_type_update(&prepared.continuation, &prepared.original, &prepared.ep);
 
     Ok(StepPack {
         coro_update: CoroUpdate::AdvancePc,
         type_update,
         events: vec![ObsEvent::Sent {
             tick: ctx.tick,
-            edge: Edge::new(sid, role.to_string(), partner.clone()),
-            session: sid,
+            edge: Edge::new(prepared.sid, role.to_string(), prepared.partner.clone()),
+            session: prepared.sid,
             from: role.to_string(),
-            to: partner,
-            label: label.name.clone(),
+            to: prepared.partner,
+            label: prepared.label,
         }],
     })
 }
 
-fn step_recv(
-    coro: &mut Coroutine,
-    session: &mut SessionState,
+struct RecvPrepared {
+    ep: Endpoint,
+    sid: SessionId,
+    partner: String,
+    label: String,
+    expected_type: Option<ValType>,
+    continuation: LocalTypeR,
+    original: LocalTypeR,
+}
+
+fn step_recv_prepare(
+    coro: &Coroutine,
+    session: &SessionState,
     role: &str,
     chan: u16,
-    dst_reg: u16,
-    ctx: &ThreadedStepCtx<'_>,
-) -> Result<StepPack, Fault> {
+) -> Result<RecvPrepared, Fault> {
     let ep = endpoint_from_reg(coro, chan)?;
     if !coro.owned_endpoints.contains(&ep) {
         return Err(Fault::ChannelClosed {
@@ -2355,18 +2357,13 @@ fn step_recv(
     }
     let sid = ep.sid;
 
-    let local_type = session
-        .local_types
-        .get(&ep)
-        .ok_or_else(|| Fault::TypeViolation {
-            expected: telltale_types::ValType::Unit,
-            actual: telltale_types::ValType::Unit,
-            message: format!("{role}: no type registered"),
-        })?
-        .current
-        .clone();
+    let type_entry = session.local_types.get(&ep).ok_or_else(|| Fault::TypeViolation {
+        expected: telltale_types::ValType::Unit,
+        actual: telltale_types::ValType::Unit,
+        message: format!("{role}: no type registered"),
+    })?;
 
-    let (partner, branches) = match &local_type {
+    let (partner, branches) = match &type_entry.current {
         LocalTypeR::Recv {
             partner, branches, ..
         } => (partner.clone(), branches.clone()),
@@ -2375,61 +2372,79 @@ fn step_recv(
                 expected: telltale_types::ValType::Unit,
                 actual: telltale_types::ValType::Unit,
                 message: format!("{role}: expected Recv, got {other:?}"),
-            })
+            });
         }
     };
 
-    let (label, expected_type, continuation) = branches
-        .first()
-        .ok_or_else(|| Fault::TypeViolation {
+    let (label, expected_type, continuation) =
+        branches.first().ok_or_else(|| Fault::TypeViolation {
             expected: telltale_types::ValType::Unit,
             actual: telltale_types::ValType::Unit,
             message: format!("{role}: recv has no branches"),
-        })?
-        .clone();
-
-    if !session.has_message(&partner, role) {
-        return Ok(StepPack {
-            coro_update: CoroUpdate::Block(BlockReason::Recv {
-                edge: Edge::new(sid, partner.clone(), role.to_string()),
-                token: ProgressToken::for_endpoint(ep.clone()),
-            }),
-            type_update: None,
-            events: vec![],
-        });
-    }
-
-    let edge = Edge::new(sid, partner.clone(), role.to_string());
-    let val = session
-        .recv_verified(&partner, role)
-        .map_err(|message| Fault::VerificationFailed {
-            edge: edge.clone(),
-            message,
-        })?
-        .ok_or_else(|| Fault::ChannelClosed {
-            endpoint: ep.clone(),
         })?;
+
+    Ok(RecvPrepared {
+        ep,
+        sid,
+        partner,
+        label: label.name.clone(),
+        expected_type: expected_type.clone(),
+        continuation: continuation.clone(),
+        original: type_entry.original.clone(),
+    })
+}
+
+fn step_recv(
+    coro: &mut Coroutine,
+    session: &Arc<Mutex<SessionState>>,
+    role: &str,
+    chan: u16,
+    dst_reg: u16,
+    ctx: &ThreadedStepCtx<'_>,
+) -> Result<StepPack, Fault> {
+    let (prepared, edge, val) = {
+        let mut session_guard = session.lock().expect("session lock poisoned");
+        let prepared = step_recv_prepare(coro, &session_guard, role, chan)?;
+        if !session_guard.has_message(&prepared.partner, role) {
+            return Ok(StepPack {
+                coro_update: CoroUpdate::Block(BlockReason::Recv {
+                    edge: Edge::new(prepared.sid, prepared.partner.clone(), role.to_string()),
+                    token: ProgressToken::for_endpoint(prepared.ep.clone()),
+                }),
+                type_update: None,
+                events: vec![],
+            });
+        }
+
+        let edge = Edge::new(prepared.sid, prepared.partner.clone(), role.to_string());
+        let val = session_guard
+            .recv_verified(&prepared.partner, role)
+            .map_err(|message| Fault::VerificationFailed {
+                edge: edge.clone(),
+                message,
+            })?
+            .ok_or_else(|| Fault::ChannelClosed {
+                endpoint: prepared.ep.clone(),
+            })?;
+        (prepared, edge, val)
+    };
 
     validate_payload(
         ctx.config,
         role,
         "receive",
-        &label.name,
-        expected_type.as_ref(),
+        &prepared.label,
+        prepared.expected_type.as_ref(),
         &val,
         true,
     )?;
 
     ctx.handler
-        .handle_recv(role, &partner, &label.name, &mut coro.regs, &val)
+        .handle_recv(role, &prepared.partner, &prepared.label, &mut coro.regs, &val)
         .map_err(|e| Fault::Invoke { message: e })?;
 
-    let original = session
-        .local_types
-        .get(&ep)
-        .map(|entry| &entry.original)
-        .unwrap_or(&LocalTypeR::End);
-    let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);
+    let (_resolved, type_update) =
+        resolve_type_update(&prepared.continuation, &prepared.original, &prepared.ep);
 
     Ok(StepPack {
         coro_update: CoroUpdate::AdvancePcWriteReg { reg: dst_reg, val },
@@ -2437,10 +2452,10 @@ fn step_recv(
         events: vec![ObsEvent::Received {
             tick: ctx.tick,
             edge,
-            session: sid,
-            from: partner,
+            session: prepared.sid,
+            from: prepared.partner,
             to: role.to_string(),
-            label: label.name.clone(),
+            label: prepared.label,
         }],
     })
 }
@@ -2456,6 +2471,17 @@ fn step_halt(session: &mut SessionState, ep: &Endpoint, _tick: u64) -> Result<St
         type_update: Some((ep.clone(), TypeUpdate::Remove)),
         events: vec![],
     })
+}
+
+fn step_spawn(target: PC, args: &[u16]) -> StepPack {
+    StepPack {
+        coro_update: CoroUpdate::AdvancePcSpawnChild {
+            target,
+            args: args.to_vec(),
+        },
+        type_update: None,
+        events: vec![],
+    }
 }
 
 fn step_invoke(
@@ -3105,6 +3131,7 @@ fn step_open(
     coro: &mut Coroutine,
     _role: &str,
     store: &ThreadedSessionStore,
+    buffer_config: &BufferConfig,
     roles: &[String],
     local_types: &[(String, LocalTypeR)],
     handlers: &[((String, String), String)],
@@ -3159,7 +3186,7 @@ fn step_open(
     }
 
     let initial_types: BTreeMap<String, LocalTypeR> = local_types.iter().cloned().collect();
-    let sid = store.open(open_roles.clone(), &BufferConfig::default(), &initial_types);
+    let sid = store.open(open_roles.clone(), buffer_config, &initial_types);
     let session = store.get(sid).ok_or_else(|| Fault::Close {
         message: "open session missing after allocation".to_string(),
     })?;
@@ -3210,7 +3237,6 @@ mod tests {
     use crate::buffer::BufferConfig;
     use crate::coroutine::KnowledgeFact;
     use crate::effect::{EffectHandler, SendDecision, SendDecisionInput};
-    use crate::session::SessionStore;
     use crate::verification::{Hash, Signature, VerifyingKey};
     use crate::vm::{FlowPolicy, FlowPredicate};
     use std::collections::{BTreeMap, BTreeSet};
@@ -3352,6 +3378,67 @@ mod tests {
     }
 
     #[test]
+    fn threaded_open_uses_configured_buffer_capacity() {
+        let mut coro = Coroutine::new(0, 0, 0, "A".to_string(), 8, usize::MAX);
+        let store = ThreadedSessionStore::new();
+        let handlers = vec![
+            (("A".to_string(), "A".to_string()), "hAA".to_string()),
+            (("A".to_string(), "B".to_string()), "hAB".to_string()),
+            (("B".to_string(), "A".to_string()), "hBA".to_string()),
+            (("B".to_string(), "B".to_string()), "hBB".to_string()),
+        ];
+        let cfg = BufferConfig {
+            mode: crate::buffer::BufferMode::Fifo,
+            initial_capacity: 1,
+            policy: crate::buffer::BackpressurePolicy::Error,
+        };
+        let pack = step_open(
+            &mut coro,
+            "A",
+            &store,
+            &cfg,
+            &["A".to_string(), "B".to_string()],
+            &[("A".to_string(), LocalTypeR::End), ("B".to_string(), LocalTypeR::End)],
+            &handlers,
+            &[("A".to_string(), 1), ("B".to_string(), 2)],
+            1,
+        )
+        .expect("open should succeed");
+        let sid = match pack.events.first() {
+            Some(ObsEvent::Opened { session, .. }) => *session,
+            other => panic!("expected opened event, got {other:?}"),
+        };
+        let session = store.get(sid).expect("session exists");
+        let guard = session.lock().expect("session lock poisoned");
+        for buffer in guard.buffers.values() {
+            assert_eq!(buffer.capacity(), 1);
+        }
+    }
+
+    #[test]
+    fn threaded_run_reports_max_rounds_exhaustion_status() {
+        let image = CodeImage {
+            programs: {
+                let mut m = BTreeMap::new();
+                m.insert("A".to_string(), vec![Instr::Jump { target: 0 }]);
+                m
+            },
+            global_type: GlobalType::End,
+            local_types: {
+                let mut m = BTreeMap::new();
+                m.insert("A".to_string(), LocalTypeR::End);
+                m
+            },
+        };
+        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 1);
+        vm.load_choreography(&image).expect("load choreography");
+        let status = vm
+            .run(&NoopHandler, 8)
+            .expect("run should return bounded status");
+        assert_eq!(status, RunStatus::MaxRoundsExceeded);
+    }
+
+    #[test]
     fn threaded_recv_reports_verification_fault_for_tampered_signature() {
         let mut local_types = BTreeMap::new();
         local_types.insert(
@@ -3363,23 +3450,27 @@ mod tests {
             LocalTypeR::recv("A", Label::new("m"), LocalTypeR::End),
         );
 
-        let mut store = SessionStore::new();
+        let store = ThreadedSessionStore::new();
         let sid = store.open(
             vec!["A".to_string(), "B".to_string()],
             &BufferConfig::default(),
             &local_types,
         );
-        let session = store.get_mut(sid).expect("session exists");
-        let tampered = crate::buffer::SignedValue {
-            payload: Value::Nat(9),
-            signature: Signature {
-                signer: VerifyingKey([0_u8; 32]),
-                digest: Hash([7_u8; 32]),
-            },
-        };
-        session
-            .send_signed("A", "B", &tampered)
-            .expect("inject signed payload");
+        {
+            let session = store.get(sid).expect("session exists");
+            let mut session = session.lock().expect("session lock poisoned");
+            let tampered = crate::buffer::SignedValue {
+                payload: Value::Nat(9),
+                signature: Signature {
+                    signer: VerifyingKey([0_u8; 32]),
+                    digest: Hash([7_u8; 32]),
+                },
+            };
+            session
+                .send_signed("A", "B", &tampered)
+                .expect("inject signed payload");
+        }
+        let session = store.get(sid).expect("session exists");
 
         let mut coro = Coroutine::new(0, 0, sid, "B".to_string(), 8, usize::MAX);
         let endpoint = Endpoint {
@@ -3407,7 +3498,7 @@ mod tests {
             handler: &NoopHandler,
             tick: 1,
         };
-        let err = match step_recv(&mut coro, session, "B", 0, 1, &step_ctx) {
+        let err = match step_recv(&mut coro, &session, "B", 0, 1, &step_ctx) {
             Ok(_) => panic!("tampered signature must fault"),
             Err(err) => err,
         };

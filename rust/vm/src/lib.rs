@@ -49,6 +49,7 @@ pub mod backend;
 pub mod bridge;
 pub mod buffer;
 pub mod clock;
+pub mod commit_common;
 pub mod compiler;
 pub mod composition;
 pub mod coroutine;

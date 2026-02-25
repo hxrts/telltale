@@ -6,8 +6,11 @@ mod helpers;
 
 use helpers::{simple_send_recv_image, PassthroughHandler};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::time::Duration;
-use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput, TopologyPerturbation};
+use telltale_vm::effect::{
+    EffectHandler, EffectTraceEntry, SendDecision, SendDecisionInput, TopologyPerturbation,
+};
 #[cfg(feature = "multi-thread")]
 use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::trace::normalize_trace_v1;
@@ -223,4 +226,109 @@ fn normalize_trace_v1_emits_versioned_payload() {
     let normalized = normalize_trace_v1(&trace);
     assert_eq!(normalized.schema_version, 1);
     assert_eq!(normalized.events.len(), 1);
+}
+
+#[test]
+fn run_replay_shared_accepts_arc_backed_trace() {
+    let image = simple_send_recv_image("A", "B", "m");
+    let handler = PassthroughHandler;
+
+    let mut baseline = VM::new(VMConfig::default());
+    baseline.load_choreography(&image).expect("load baseline");
+    baseline.run(&handler, 64).expect("run baseline");
+    let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
+    let baseline_effect_semantics: Vec<_> = baseline
+        .effect_trace()
+        .iter()
+        .map(|entry| {
+            (
+                entry.effect_kind.clone(),
+                entry.inputs.clone(),
+                entry.outputs.clone(),
+                entry.ordering_key,
+            )
+        })
+        .collect();
+    let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(baseline.effect_trace());
+
+    let mut replay_vm = VM::new(VMConfig::default());
+    replay_vm.load_choreography(&image).expect("load replay VM");
+    replay_vm
+        .run_replay_shared(&handler, replay_trace, 64)
+        .expect("run replay VM");
+    let replay_obs = replay_vm.canonical_replay_fragment().obs_trace;
+    let replay_effect_semantics: Vec<_> = replay_vm
+        .effect_trace()
+        .iter()
+        .map(|entry| {
+            (
+                entry.effect_kind.clone(),
+                entry.inputs.clone(),
+                entry.outputs.clone(),
+                entry.ordering_key,
+            )
+        })
+        .collect();
+
+    assert_eq!(
+        baseline_obs, replay_obs,
+        "arc-backed replay must preserve deterministic observable outputs"
+    );
+    assert_eq!(
+        baseline_effect_semantics, replay_effect_semantics,
+        "arc-backed replay must preserve effect semantics (excluding handler identity)"
+    );
+}
+
+#[cfg(feature = "multi-thread")]
+#[test]
+fn threaded_run_replay_shared_accepts_arc_backed_trace() {
+    let image = simple_send_recv_image("A", "B", "m");
+    let handler = PassthroughHandler;
+
+    let mut baseline = ThreadedVM::with_workers(VMConfig::default(), 2);
+    baseline.load_choreography(&image).expect("load baseline");
+    baseline.run(&handler, 64).expect("run baseline");
+    let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
+    let baseline_effect_semantics: Vec<_> = baseline
+        .effect_trace()
+        .iter()
+        .map(|entry| {
+            (
+                entry.effect_kind.clone(),
+                entry.inputs.clone(),
+                entry.outputs.clone(),
+                entry.ordering_key,
+            )
+        })
+        .collect();
+    let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(baseline.effect_trace());
+
+    let mut replay_vm = ThreadedVM::with_workers(VMConfig::default(), 2);
+    replay_vm.load_choreography(&image).expect("load replay VM");
+    replay_vm
+        .run_replay_shared(&handler, replay_trace, 64)
+        .expect("run replay VM");
+    let replay_obs = replay_vm.canonical_replay_fragment().obs_trace;
+    let replay_effect_semantics: Vec<_> = replay_vm
+        .effect_trace()
+        .iter()
+        .map(|entry| {
+            (
+                entry.effect_kind.clone(),
+                entry.inputs.clone(),
+                entry.outputs.clone(),
+                entry.ordering_key,
+            )
+        })
+        .collect();
+
+    assert_eq!(
+        baseline_obs, replay_obs,
+        "threaded arc-backed replay must preserve deterministic observable outputs"
+    );
+    assert_eq!(
+        baseline_effect_semantics, replay_effect_semantics,
+        "threaded arc-backed replay must preserve effect semantics (excluding handler identity)"
+    );
 }

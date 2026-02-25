@@ -163,8 +163,7 @@ fn cooperative_vm_ingests_topology_events_before_instruction_effects() {
     assert!(vm.crashed_sites().iter().any(|site| site == "A"));
     assert!(vm
         .partitioned_edges()
-        .iter()
-        .any(|edge| edge.sender == "A" && edge.receiver == "B"));
+        .contains(&("A".to_string(), "B".to_string())));
     let effects = vm.effect_trace();
     assert!(
         effects

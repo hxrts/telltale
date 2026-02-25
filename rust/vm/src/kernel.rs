@@ -7,7 +7,7 @@
 
 use crate::effect::EffectHandler;
 use crate::scheduler::Scheduler;
-use crate::vm::{StepResult, VMError};
+use crate::vm::{RunStatus, StepResult, VMError};
 
 /// Runtime machine that can execute one kernel scheduler round.
 pub trait KernelMachine {
@@ -76,14 +76,15 @@ impl VMKernel {
         handler: &dyn EffectHandler,
         max_rounds: usize,
         concurrency: usize,
-    ) -> Result<(), VMError> {
+    ) -> Result<RunStatus, VMError> {
         for _ in 0..max_rounds {
             match Self::step_round(vm, handler, concurrency)? {
-                StepResult::AllDone | StepResult::Stuck => return Ok(()),
+                StepResult::AllDone => return Ok(RunStatus::AllDone),
+                StepResult::Stuck => return Ok(RunStatus::Stuck),
                 StepResult::Continue => {}
             }
         }
-        Ok(())
+        Ok(RunStatus::MaxRoundsExceeded)
     }
 
     /// Run with single-lane cooperative scheduling via the kernel.
@@ -95,7 +96,7 @@ impl VMKernel {
         vm: &mut M,
         handler: &dyn EffectHandler,
         max_steps: usize,
-    ) -> Result<(), VMError> {
+    ) -> Result<RunStatus, VMError> {
         Self::run_concurrent(vm, handler, max_steps, 1)
     }
 }

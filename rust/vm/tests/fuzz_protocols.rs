@@ -66,7 +66,7 @@ fn fuzz_random_protocol_compile_execute() {
         }
 
         let handler = PassthroughHandler;
-        vm.run(&handler, 1000).unwrap_or(());
+        let _ = vm.run(&handler, 1000);
 
         // No faults.
         let faults: Vec<_> = vm
@@ -193,7 +193,7 @@ fn fuzz_multi_session_interleave() {
         };
 
         let handler = PassthroughHandler;
-        vm.run(&handler, 1000).unwrap_or(());
+        let _ = vm.run(&handler, 1000);
 
         // No faults.
         let faults: Vec<_> = vm
@@ -245,7 +245,7 @@ fn fuzz_recursive_protocols_bounded() {
 
         let handler = PassthroughHandler;
         // Run for bounded steps — recursive protocols don't terminate.
-        vm.run(&handler, 500).unwrap_or(());
+        let _ = vm.run(&handler, 500);
 
         // No faults.
         let faults: Vec<_> = vm

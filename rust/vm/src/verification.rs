@@ -276,6 +276,44 @@ impl AuthTree {
         Self { leaves, levels }
     }
 
+    /// Append one leaf and update levels incrementally.
+    pub fn append_leaf(&mut self, leaf: Hash) {
+        if self.leaves.is_empty() {
+            *self = Self::new(vec![leaf]);
+            return;
+        }
+        self.leaves.push(leaf);
+        self.levels[0].push(leaf);
+        let mut idx = self.levels[0].len() - 1;
+        let mut level_idx = 0;
+        loop {
+            let level = &self.levels[level_idx];
+            let pair_start = idx & !1;
+            let left = level[pair_start];
+            let right = if pair_start + 1 < level.len() {
+                level[pair_start + 1]
+            } else {
+                left
+            };
+            let parent = merge_hash_pair(left, right);
+            let parent_idx = pair_start / 2;
+            if self.levels.len() == level_idx + 1 {
+                self.levels.push(Vec::new());
+            }
+            let next = &mut self.levels[level_idx + 1];
+            if parent_idx < next.len() {
+                next[parent_idx] = parent;
+            } else {
+                next.push(parent);
+            }
+            if parent_idx == 0 && next.len() == 1 {
+                break;
+            }
+            idx = parent_idx;
+            level_idx += 1;
+        }
+    }
+
     /// Root hash of the tree.
     #[must_use]
     pub fn root(&self) -> Hash {
@@ -367,5 +405,22 @@ mod tests {
         let tree = AuthTree::new(leaves.clone());
         let proof = tree.prove(1).expect("proof for valid index");
         assert!(AuthTree::verify(tree.root(), leaves[1], &proof));
+    }
+
+    #[test]
+    fn auth_tree_incremental_append_matches_rebuild() {
+        let leaves = vec![
+            hash_bytes_with_tag(HashTag::MerkleLeaf, b"a"),
+            hash_bytes_with_tag(HashTag::MerkleLeaf, b"b"),
+            hash_bytes_with_tag(HashTag::MerkleLeaf, b"c"),
+            hash_bytes_with_tag(HashTag::MerkleLeaf, b"d"),
+            hash_bytes_with_tag(HashTag::MerkleLeaf, b"e"),
+        ];
+        let mut incremental = AuthTree::new(vec![leaves[0]]);
+        for leaf in leaves.iter().skip(1) {
+            incremental.append_leaf(*leaf);
+        }
+        let rebuilt = AuthTree::new(leaves);
+        assert_eq!(incremental.root(), rebuilt.root());
     }
 }

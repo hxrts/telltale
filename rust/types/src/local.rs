@@ -379,7 +379,9 @@ impl LocalTypeR {
     pub fn partners(&self) -> Vec<String> {
         let mut result = HashSet::new();
         self.collect_partners(&mut result);
-        result.into_iter().collect()
+        let mut partners: Vec<_> = result.into_iter().collect();
+        partners.sort();
+        partners
     }
 
     fn collect_partners(&self, partners: &mut HashSet<String>) {

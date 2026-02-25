@@ -3,7 +3,7 @@
 use super::{Protocol, Role, ValidationError};
 use proc_macro2::Ident;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 const ATTR_PROOF_BUNDLES: &str = "dsl.proof_bundles";
 const ATTR_REQUIRED_PROOF_BUNDLES: &str = "dsl.required_proof_bundles";
@@ -314,9 +314,9 @@ impl Choreography {
             .unwrap_or_default()
     }
 
-    fn required_bundle_capabilities(&self) -> HashSet<String> {
+    fn required_bundle_capabilities(&self) -> BTreeSet<String> {
         let required = self.required_proof_bundles();
-        let required_set: HashSet<&str> = required.iter().map(String::as_str).collect();
+        let required_set: BTreeSet<&str> = required.iter().map(String::as_str).collect();
         self.proof_bundles()
             .into_iter()
             .filter(|bundle| required_set.contains(bundle.name.as_str()))
@@ -324,8 +324,8 @@ impl Choreography {
             .collect()
     }
 
-    fn required_vm_core_capabilities(&self) -> HashSet<String> {
-        fn collect(protocol: &Protocol, out: &mut HashSet<String>) {
+    fn required_vm_core_capabilities(&self) -> BTreeSet<String> {
+        fn collect(protocol: &Protocol, out: &mut BTreeSet<String>) {
             if let Some(cap) = protocol.get_annotation("required_capability") {
                 out.insert(cap);
             }
@@ -348,7 +348,7 @@ impl Choreography {
             }
         }
 
-        let mut out = HashSet::new();
+        let mut out = BTreeSet::new();
         collect(&self.protocol, &mut out);
         out
     }

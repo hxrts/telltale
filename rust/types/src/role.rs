@@ -4,7 +4,7 @@
 //! Each role has a unique name and optionally an index for parameterized protocols.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 /// A role (participant) in a multiparty session.
 ///
@@ -19,7 +19,7 @@ use std::collections::HashSet;
 /// assert_eq!(client.name(), "Client");
 /// assert_eq!(server.full_name(), "Worker_0");
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Role {
     /// The base name of the role
     name: String,
@@ -97,7 +97,7 @@ impl From<String> for Role {
 /// Provides convenient operations for working with collections of roles.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RoleSet {
-    roles: HashSet<Role>,
+    roles: BTreeSet<Role>,
 }
 
 impl RoleSet {
@@ -105,7 +105,7 @@ impl RoleSet {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            roles: HashSet::new(),
+            roles: BTreeSet::new(),
         }
     }
 
@@ -167,7 +167,7 @@ impl RoleSet {
 
 impl IntoIterator for RoleSet {
     type Item = Role;
-    type IntoIter = std::collections::hash_set::IntoIter<Role>;
+    type IntoIter = std::collections::btree_set::IntoIter<Role>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.roles.into_iter()
@@ -176,7 +176,7 @@ impl IntoIterator for RoleSet {
 
 impl<'a> IntoIterator for &'a RoleSet {
     type Item = &'a Role;
-    type IntoIter = std::collections::hash_set::Iter<'a, Role>;
+    type IntoIter = std::collections::btree_set::Iter<'a, Role>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.roles.iter()

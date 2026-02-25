@@ -298,7 +298,7 @@ fn test_lean_transport_fifo() {
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 200).unwrap_or(());
+    let _ = vm.run(&handler, 200);
 
     // Collect send/recv events per edge.
     let mut sent_order: Vec<String> = Vec::new();
@@ -916,10 +916,10 @@ fn test_lean_abort_policy_is_deterministic_and_scoped() {
         ); // fork
 
         let before_effect_len = vm.effect_trace().len();
-        let before_crashed = vm.crashed_sites().to_vec();
-        let before_partitioned = vm.partitioned_edges().to_vec();
-        let before_corrupted = vm.corrupted_edges().to_vec();
-        let before_timed_out = vm.timed_out_sites().to_vec();
+        let before_crashed = vm.crashed_sites().clone();
+        let before_partitioned = vm.partitioned_edges().clone();
+        let before_corrupted = vm.corrupted_edges().clone();
+        let before_timed_out = vm.timed_out_sites().clone();
         let before_trace_len = vm.trace().len();
 
         assert_matches!(
@@ -942,10 +942,10 @@ fn test_lean_abort_policy_is_deterministic_and_scoped() {
             before_effect_len,
             "abort should not mutate effect trace"
         );
-        assert_eq!(vm.crashed_sites(), before_crashed.as_slice());
-        assert_eq!(vm.partitioned_edges(), before_partitioned.as_slice());
-        assert_eq!(vm.corrupted_edges(), before_corrupted.as_slice());
-        assert_eq!(vm.timed_out_sites(), before_timed_out.as_slice());
+        assert_eq!(vm.crashed_sites(), &before_crashed);
+        assert_eq!(vm.partitioned_edges(), &before_partitioned);
+        assert_eq!(vm.corrupted_edges(), &before_corrupted);
+        assert_eq!(vm.timed_out_sites(), &before_timed_out);
         assert!(
             vm.trace().len() > before_trace_len,
             "abort step should append at least one observable event"
@@ -1150,7 +1150,7 @@ fn test_lean_fifo_consistency() {
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 200).unwrap_or(());
+    let _ = vm.run(&handler, 200);
 
     let mut sent_labels: Vec<String> = Vec::new();
     let mut recv_labels: Vec<String> = Vec::new();

@@ -128,7 +128,7 @@ fn mutated_programs_are_deterministically_rejected() {
         vm.load_choreography(&image).expect("load mutated image");
         let result = vm.run(&PassthroughHandler, 32);
         let tag = match result {
-            Ok(()) => "ok",
+            Ok(_) => "ok",
             Err(ref err) => fault_name(err).unwrap_or("non_fault_error"),
         };
         observed.push((name, tag));

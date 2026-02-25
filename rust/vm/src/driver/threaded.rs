@@ -4,7 +4,7 @@ use crate::effect::EffectHandler;
 use crate::loader::CodeImage;
 use crate::session::SessionId;
 use crate::threaded::ThreadedVM;
-use crate::vm::{ObsEvent, StepResult, VMConfig, VMError};
+use crate::vm::{ObsEvent, RunStatus, StepResult, VMConfig, VMError};
 
 /// Native threaded runtime driver.
 pub struct NativeThreadedDriver {
@@ -67,7 +67,11 @@ impl NativeThreadedDriver {
     /// # Errors
     ///
     /// Returns a `VMError` if a coroutine faults.
-    pub fn run(&mut self, handler: &dyn EffectHandler, max_rounds: usize) -> Result<(), VMError> {
+    pub fn run(
+        &mut self,
+        handler: &dyn EffectHandler,
+        max_rounds: usize,
+    ) -> Result<RunStatus, VMError> {
         self.vm.run(handler, max_rounds)
     }
 

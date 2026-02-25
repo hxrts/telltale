@@ -4,7 +4,7 @@ use super::limits::CHANNEL_BUFFER_SIZE_DEFAULT;
 use super::transport::{InMemoryChannelTransport, Transport, TransportError};
 use crate::{QueueCapacity, RoleName};
 use async_trait::async_trait;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -33,7 +33,7 @@ pub trait TransportFactory: Send + Sync {
 #[derive(Debug)]
 pub struct InMemoryTransportFactory {
     buffer_size: QueueCapacity,
-    transports: Arc<Mutex<HashMap<RoleName, Arc<InMemoryChannelTransport>>>>,
+    transports: Arc<Mutex<BTreeMap<RoleName, Arc<InMemoryChannelTransport>>>>,
 }
 
 impl InMemoryTransportFactory {
@@ -41,7 +41,7 @@ impl InMemoryTransportFactory {
     pub fn new() -> Self {
         Self {
             buffer_size: QueueCapacity::new(CHANNEL_BUFFER_SIZE_DEFAULT),
-            transports: Arc::new(Mutex::new(HashMap::new())),
+            transports: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -49,7 +49,7 @@ impl InMemoryTransportFactory {
     pub fn with_buffer_size(buffer_size: QueueCapacity) -> Self {
         Self {
             buffer_size,
-            transports: Arc::new(Mutex::new(HashMap::new())),
+            transports: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -81,7 +81,7 @@ impl InMemoryTransportFactory {
     }
 
     /// Get all created transports.
-    pub async fn transports(&self) -> HashMap<RoleName, Arc<InMemoryChannelTransport>> {
+    pub async fn transports(&self) -> BTreeMap<RoleName, Arc<InMemoryChannelTransport>> {
         self.transports.lock().await.clone()
     }
 

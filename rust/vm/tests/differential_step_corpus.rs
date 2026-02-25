@@ -551,3 +551,22 @@ fn threaded_matches_cooperative_step_corpus_choice() {
         "threaded did not terminate"
     );
 }
+
+#[cfg(feature = "multi-thread")]
+#[test]
+fn threaded_matches_cooperative_step_corpus_control_spawn() {
+    let image = control_spawn_fixture_image();
+    let handler = PassthroughHandler;
+    let coop = run_cooperative_snaps(&image, &handler, 32);
+    let threaded = run_threaded_snaps(&image, &handler, 32);
+
+    assert_eq!(
+        coop, threaded,
+        "threaded backend diverged on control/spawn step corpus"
+    );
+    assert_eq!(
+        threaded.last().map(|s| s.result),
+        Some("all_done"),
+        "threaded did not terminate"
+    );
+}

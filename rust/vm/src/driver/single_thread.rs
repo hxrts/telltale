@@ -4,7 +4,7 @@ use crate::effect::EffectHandler;
 use crate::kernel::VMKernel;
 use crate::loader::CodeImage;
 use crate::session::SessionId;
-use crate::vm::{ObsEvent, StepResult, VMConfig, VMError, VM};
+use crate::vm::{ObsEvent, RunStatus, StepResult, VMConfig, VMError, VM};
 
 /// Native cooperative runtime driver backed by the canonical VM kernel.
 #[derive(Debug)]
@@ -65,7 +65,7 @@ impl NativeSingleThreadDriver {
         handler: &dyn EffectHandler,
         max_rounds: usize,
         n: usize,
-    ) -> Result<(), VMError> {
+    ) -> Result<RunStatus, VMError> {
         VMKernel::run_concurrent(&mut self.vm, handler, max_rounds, n)
     }
 

@@ -138,6 +138,7 @@ impl DistributedSimulation {
     pub fn run(&mut self, max_rounds: usize) -> Result<(), VMError> {
         self.outer_vm
             .run_concurrent(&self.handler, max_rounds, self.outer_concurrency)
+            .map(|_| ())
     }
 
     /// Access the outer VM.

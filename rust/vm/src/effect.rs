@@ -27,7 +27,7 @@ use serde_json::json;
 use serde_json::Value as JsonValue;
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// Message corruption flavor for topology perturbations.
@@ -547,7 +547,7 @@ impl<'a> RecordingEffectHandler<'a> {
 
 /// A replay-mode handler that serves recorded effect outcomes in order.
 pub struct ReplayEffectHandler<'a> {
-    entries: Vec<EffectTraceEntry>,
+    entries: Arc<[EffectTraceEntry]>,
     cursor: Mutex<usize>,
     fallback: Option<&'a dyn EffectHandler>,
 }
@@ -555,9 +555,12 @@ pub struct ReplayEffectHandler<'a> {
 impl<'a> ReplayEffectHandler<'a> {
     /// Build a replay handler without fallback behavior.
     #[must_use]
-    pub fn new(entries: Vec<EffectTraceEntry>) -> Self {
+    pub fn new<E>(entries: E) -> Self
+    where
+        E: Into<Arc<[EffectTraceEntry]>>,
+    {
         Self {
-            entries,
+            entries: entries.into(),
             cursor: Mutex::new(0),
             fallback: None,
         }
@@ -565,9 +568,12 @@ impl<'a> ReplayEffectHandler<'a> {
 
     /// Build a replay handler with fallback behavior for unsupported entries.
     #[must_use]
-    pub fn with_fallback(entries: Vec<EffectTraceEntry>, fallback: &'a dyn EffectHandler) -> Self {
+    pub fn with_fallback<E>(entries: E, fallback: &'a dyn EffectHandler) -> Self
+    where
+        E: Into<Arc<[EffectTraceEntry]>>,
+    {
         Self {
-            entries,
+            entries: entries.into(),
             cursor: Mutex::new(0),
             fallback: Some(fallback),
         }
