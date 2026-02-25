@@ -558,4 +558,19 @@ mod tests {
         assert!(recv.is_recv());
         assert!(!recv.is_send());
     }
+
+    #[test]
+    fn test_partners_are_sorted() {
+        let lt = LocalTypeR::send(
+            "Zed",
+            Label::new("outer"),
+            LocalTypeR::recv(
+                "Alice",
+                Label::new("mid"),
+                LocalTypeR::send("Bob", Label::new("inner"), LocalTypeR::End),
+            ),
+        );
+
+        assert_eq!(lt.partners(), vec!["Alice", "Bob", "Zed"]);
+    }
 }
