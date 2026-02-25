@@ -15,6 +15,22 @@ categories = ["asynchronous", "concurrency"]
 bench = false
 path = "rust/src/lib.rs"
 
+[[test]]
+name = "message_tests"
+path = "rust/tests/message_tests.rs"
+
+[[test]]
+name = "role_tests"
+path = "rust/tests/role_tests.rs"
+
+[[test]]
+name = "seal_tests"
+path = "rust/tests/seal_tests.rs"
+
+[[test]]
+name = "session_tests"
+path = "rust/tests/session_tests.rs"
+
 [lints]
 workspace = true
 
