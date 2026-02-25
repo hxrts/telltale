@@ -9,7 +9,6 @@ Verification scale and proof-hole status are tracked by generated reports.
 | Source | Purpose |
 |---|---|
 | [Lean Verification Code Map](../lean/CODE_MAP.md) | generated library map with file counts and module inventory |
-| [Status Dashboard](../work/status.md) | current project status and theorem progress table |
 | `just escape` | machine check for axiom and sorry budget |
 
 Current scale and proof-hole status are tracked in these generated artifacts.
