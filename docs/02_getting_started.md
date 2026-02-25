@@ -6,8 +6,8 @@ Add Telltale to your project dependencies.
 
 ```toml
 [dependencies]
-telltale = "0.1.0"
-telltale-choreography = "0.1.0"
+telltale = "1.0.0"
+telltale-choreography = "1.0.0"
 ```
 
 This adds the facade crate and the choreographic programming layer. Pinning versions keeps builds reproducible.
@@ -85,7 +85,7 @@ The workspace provides granular feature flags to control dependencies and functi
 
 ```toml
 # Just the core runtime, no algorithms
-telltale = { version = "0.9.1", default-features = false }
+telltale = { version = "1.0.0", default-features = false }
 ```
 
 This keeps the dependency surface small while enabling the core runtime.
@@ -94,7 +94,7 @@ This keeps the dependency surface small while enabling the core runtime.
 
 ```toml
 # Everything enabled
-telltale = { version = "0.9.1", features = ["full"] }
+telltale = { version = "1.0.0", features = ["full"] }
 ```
 
 This enables all optional features for the facade crate.
@@ -102,7 +102,7 @@ This enables all optional features for the facade crate.
 For WASM support, enable the wasm feature on the choreography crate.
 
 ```toml
-telltale-choreography = { version = "0.9.1", features = ["wasm"] }
+telltale-choreography = { version = "1.0.0", features = ["wasm"] }
 ```
 
 This enables compilation to WebAssembly targets.

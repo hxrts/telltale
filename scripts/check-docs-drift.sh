@@ -11,17 +11,24 @@ DOC_FILES=(
   "docs/04_crate_organization.md"
 )
 
+VERSION_CHECK_PATHS=(
+  "docs"
+  "rust/transport/README.md"
+)
+
 tmp_metadata="$(mktemp)"
 tmp_doc_features="$(mktemp)"
 tmp_doc_features_filtered="$(mktemp)"
 tmp_actual_features="$(mktemp)"
 tmp_missing_in_docs="$(mktemp)"
 tmp_extra_in_docs="$(mktemp)"
-trap 'rm -f "$tmp_metadata" "$tmp_doc_features" "$tmp_doc_features_filtered" "$tmp_actual_features" "$tmp_missing_in_docs" "$tmp_extra_in_docs"' EXIT
+tmp_doc_version_hits="$(mktemp)"
+trap 'rm -f "$tmp_metadata" "$tmp_doc_features" "$tmp_doc_features_filtered" "$tmp_actual_features" "$tmp_missing_in_docs" "$tmp_extra_in_docs" "$tmp_doc_version_hits"' EXIT
 
 cargo metadata --no-deps --format-version 1 >"$tmp_metadata"
 
 declare -A workspace_crates=()
+declare -A workspace_versions=()
 while IFS= read -r crate; do
   workspace_crates["$crate"]=1
 done < <(
@@ -31,6 +38,19 @@ done < <(
     | $m.packages[]
     | select(.id == $wid)
     | .name
+  ' "$tmp_metadata" | sort -u
+)
+
+while IFS=$'\t' read -r crate version; do
+  workspace_versions["$crate"]="$version"
+done < <(
+  jq -r '
+    . as $m
+    | $m.workspace_members[] as $wid
+    | $m.packages[]
+    | select(.id == $wid)
+    | [.name, .version]
+    | @tsv
   ' "$tmp_metadata" | sort -u
 )
 
@@ -138,6 +158,32 @@ if [[ -s "$tmp_extra_in_docs" ]]; then
   sed 's/^/  - /' "$tmp_extra_in_docs" >&2
   status=1
 fi
+
+rg -n '^\s*(telltale(-[a-z0-9]+)?|effect-scaffold)\s*=\s*("[^"]+"|\{[^}]*version\s*=\s*"[^"]+")' "${VERSION_CHECK_PATHS[@]}" \
+  >"$tmp_doc_version_hits" || true
+
+while IFS= read -r hit; do
+  file="${hit%%:*}"
+  rest="${hit#*:}"
+  line_no="${rest%%:*}"
+  line="${rest#*:}"
+
+  crate="$(sed -E 's/^[[:space:]]*([a-z0-9-]+)[[:space:]]*=.*/\1/' <<<"$line")"
+  declared_version="$(sed -nE 's/^[[:space:]]*[a-z0-9-]+[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' <<<"$line")"
+  if [[ -z "$declared_version" ]]; then
+    declared_version="$(sed -nE 's/.*version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' <<<"$line")"
+  fi
+  expected_version="${workspace_versions[$crate]:-}"
+
+  if [[ -z "$expected_version" ]]; then
+    continue
+  fi
+
+  if [[ "$declared_version" != "$expected_version" ]]; then
+    echo "error: $file:$line_no has $crate version $declared_version (expected $expected_version)" >&2
+    status=1
+  fi
+done <"$tmp_doc_version_hits"
 
 if [[ "$status" -eq 0 ]]; then
   echo "docs drift check passed"
