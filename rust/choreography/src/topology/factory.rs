@@ -185,4 +185,20 @@ mod tests {
         // factory2 should see Alice's transport
         assert_eq!(factory2.transports().await.len(), 1);
     }
+
+    #[tokio::test]
+    async fn test_in_memory_factory_transports_are_sorted_by_role() {
+        let factory = InMemoryTransportFactory::new();
+        factory.get_or_create(&RoleName::from_static("Zed")).await;
+        factory.get_or_create(&RoleName::from_static("Alice")).await;
+        factory.get_or_create(&RoleName::from_static("Bob")).await;
+
+        let roles: Vec<_> = factory
+            .transports()
+            .await
+            .keys()
+            .map(ToString::to_string)
+            .collect();
+        assert_eq!(roles, vec!["Alice", "Bob", "Zed"]);
+    }
 }

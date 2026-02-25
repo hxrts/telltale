@@ -241,4 +241,23 @@ mod tests {
         assert_eq!(set.len(), 3);
         assert!(set.contains_name("X"));
     }
+
+    #[test]
+    fn test_role_set_names_are_sorted() {
+        let mut set = RoleSet::new();
+        set.insert(Role::new("Worker"));
+        set.insert(Role::new("Alpha"));
+        set.insert(Role::indexed("Node", 2));
+        set.insert(Role::indexed("Node", 1));
+
+        assert_eq!(
+            set.names(),
+            vec![
+                "Alpha".to_string(),
+                "Node_1".to_string(),
+                "Node_2".to_string(),
+                "Worker".to_string()
+            ]
+        );
+    }
 }
