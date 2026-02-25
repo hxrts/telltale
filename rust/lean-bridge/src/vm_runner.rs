@@ -20,8 +20,8 @@ use crate::vm_trace::{
 #[path = "vm_runner_json_parsing.rs"]
 mod parsing;
 use parsing::{
-    parse_sim_run_output, parse_sim_trace_validation,
-    parse_structured_errors, simulation_trace_payload,
+    parse_sim_run_output, parse_sim_trace_validation, parse_structured_errors,
+    simulation_trace_payload,
 };
 
 /// Errors from Lean VM runner operations.

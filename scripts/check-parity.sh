@@ -186,7 +186,7 @@ enum_checks = [
         "label": "FlowPolicy",
         "lean_file": root / "lean/Runtime/VM/Model/Knowledge.lean",
         "lean_type": "FlowPolicy",
-        "rust_file": root / "rust/vm/src/vm.rs",
+        "rust_file": root / "rust/vm/src/vm/runtime_value_and_resource_state.rs",
         "rust_type": "FlowPolicy",
         "map": {
             "allowAll": "AllowAll",
@@ -201,7 +201,7 @@ enum_checks = [
         "label": "FlowPredicate",
         "lean_file": root / "lean/Runtime/VM/Model/Knowledge.lean",
         "lean_type": "FlowPredicate",
-        "rust_file": root / "rust/vm/src/vm.rs",
+        "rust_file": root / "rust/vm/src/vm/runtime_value_and_resource_state.rs",
         "rust_type": "FlowPredicate",
         "map": {
             "targetRolePrefix": "TargetRolePrefix",

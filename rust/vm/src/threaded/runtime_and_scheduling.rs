@@ -60,15 +60,6 @@ impl ThreadedVM {
         }
     }
 
-    /// Load a choreography into the VM.
-    ///
-    /// # Errors
-    ///
-    /// Returns a `VMError` if session or coroutine limits are exceeded.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a session lock is poisoned.
     fn ensure_session_capacity(&self) -> Result<(), VMError> {
         if self.sessions.active_count() >= self.config.max_sessions {
             return Err(VMError::TooManySessions {
@@ -136,6 +127,15 @@ impl ThreadedVM {
         Ok(())
     }
 
+    /// Load a choreography into the threaded VM.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`VMError`] when session/coroutine limits are exceeded.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the shared resource-state lock is poisoned.
     pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
         self.ensure_session_capacity()?;
 
@@ -565,7 +565,7 @@ impl ThreadedVM {
         let corrupted_edges = self
             .corrupted_edges
             .iter()
-            .map(|(edge, corruption)| (edge.clone(), corruption.clone()))
+            .map(|(edge, corruption)| (edge.clone(), *corruption))
             .collect();
         let timed_out_sites = self
             .timed_out_sites

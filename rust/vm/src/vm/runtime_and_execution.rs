@@ -1,4 +1,6 @@
 impl VM {
+    /// Create a VM instance from configuration.
+    #[must_use]
     pub fn new(config: VMConfig) -> Self {
         Self::new_with_models(config)
     }
@@ -40,7 +42,7 @@ impl VM {
         self.monitor.set_kind(sid, SessionKind::Peer);
         self.resource_states
             .entry(sid)
-            .or_insert_with(ResourceState::default);
+            .or_default();
         self.apply_open_delta(sid)
             .map_err(VMError::PersistenceError)?;
         self.obs_trace.push(ObsEvent::Opened {
@@ -464,7 +466,7 @@ impl VM {
         let corrupted_edges = self
             .corrupted_edges
             .iter()
-            .map(|(edge, corruption)| (edge.clone(), corruption.clone()))
+            .map(|(edge, corruption)| (edge.clone(), *corruption))
             .collect();
         let timed_out_sites = self
             .timed_out_sites
@@ -505,5 +507,4 @@ impl VM {
     pub fn timed_out_sites(&self) -> &BTreeMap<SiteId, u64> {
         &self.timed_out_sites
     }
-
 }

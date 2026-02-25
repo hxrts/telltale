@@ -13,14 +13,14 @@ mod test_support;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
-use test_support::{
-    choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,
-};
 use telltale_lean_bridge::export::global_to_json;
 use telltale_lean_bridge::runner::{ChoreographyJson, LeanRunner, LeanRunnerError};
 use telltale_lean_bridge::{default_schema_version, partition_by_session, NormalizedEvent};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::{ObsEvent, VMConfig, VMError, VM};
+use test_support::{
+    choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,
+};
 
 fn vm_runner_path() -> Option<PathBuf> {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");

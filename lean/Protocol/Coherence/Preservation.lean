@@ -99,6 +99,7 @@ section
 
     The `hRecvReady` hypothesis is required. Without it, the theorem is FALSE.
     We cannot guarantee the receiver can handle T after consuming the current buffer.
+-/
 
 -- Send Preservation: Edge Case Analysis
 theorem coherent_send_preserved

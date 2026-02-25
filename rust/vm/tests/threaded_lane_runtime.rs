@@ -9,7 +9,6 @@ mod test_support;
 
 use std::collections::BTreeMap;
 
-use test_support::ScenarioSpec;
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::EffectHandler;
@@ -17,6 +16,7 @@ use telltale_vm::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::threaded::{ContentionMetrics, ThreadedVM};
 use telltale_vm::vm::{StepResult, ThreadedRoundSemantics, VMConfig};
+use test_support::ScenarioSpec;
 
 #[derive(Debug, Clone, Copy)]
 struct RuntimeHandler;

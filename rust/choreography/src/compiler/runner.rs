@@ -38,13 +38,13 @@ use std::collections::BTreeSet;
 
 mod body;
 
+#[cfg(test)]
+pub(crate) use body::generate_range_exprs;
+#[cfg(test)]
+pub(crate) use body::generate_role_id;
 pub(crate) use body::{
     generate_runner_body, generate_runner_body_with_hints, HintCounters, RecursionContext,
 };
-#[cfg(test)]
-pub(crate) use body::generate_role_id;
-#[cfg(test)]
-pub(crate) use body::generate_range_exprs;
 
 /// Generate a runner function for a single role.
 ///

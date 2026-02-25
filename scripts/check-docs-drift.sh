@@ -5,10 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 DOC_FILES=(
-  "docs/00_introduction.md"
-  "docs/01_getting_started.md"
-  "docs/02_architecture.md"
-  "docs/03_crate_organization.md"
+  "docs/01_introduction.md"
+  "docs/02_getting_started.md"
+  "docs/03_architecture.md"
+  "docs/04_crate_organization.md"
 )
 
 tmp_metadata="$(mktemp)"
@@ -88,7 +88,7 @@ awk '
       in_table = 0
     }
   }
-' docs/01_getting_started.md | sort -u >"$tmp_doc_features"
+' docs/02_getting_started.md | sort -u >"$tmp_doc_features"
 
 target_crates=(
   "telltale"
@@ -128,13 +128,13 @@ comm -23 "$tmp_actual_features" "$tmp_doc_features_filtered" >"$tmp_missing_in_d
 comm -13 "$tmp_actual_features" "$tmp_doc_features_filtered" >"$tmp_extra_in_docs" || true
 
 if [[ -s "$tmp_missing_in_docs" ]]; then
-  echo "error: missing documented features in docs/01_getting_started.md:" >&2
+  echo "error: missing documented features in docs/02_getting_started.md:" >&2
   sed 's/^/  - /' "$tmp_missing_in_docs" >&2
   status=1
 fi
 
 if [[ -s "$tmp_extra_in_docs" ]]; then
-  echo "error: stale features documented in docs/01_getting_started.md:" >&2
+  echo "error: stale features documented in docs/02_getting_started.md:" >&2
   sed 's/^/  - /' "$tmp_extra_in_docs" >&2
   status=1
 fi

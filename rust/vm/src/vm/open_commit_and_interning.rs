@@ -70,7 +70,7 @@ impl VM {
         self.monitor.set_kind(sid, SessionKind::Peer);
         self.resource_states
             .entry(sid)
-            .or_insert_with(ResourceState::default);
+            .or_default();
         self.apply_open_delta(sid).map_err(|e| Fault::Transfer {
             message: format!("open persistence delta failed: {e}"),
         })?;

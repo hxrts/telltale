@@ -36,7 +36,7 @@ check "optimization envelope classes are defined" \
    rg -q 'def transformationClassEligible' '${RELEASE_FILE}'"
 
 check "effect-bisim bridge theorem for transformation classes exists" \
-  "rg -q 'theorem transformationClass_preserves_observer_behavior' '${RELEASE_FILE}'"
+  "rg -q 'theorem transformation(_class|Class)_preserves_observer_behavior' '${RELEASE_FILE}'"
 
 check "certified replay conformance helpers exist" \
   "rg -q 'structure CertifiedReplayEquivalenceClass' '${RELEASE_FILE}' && \

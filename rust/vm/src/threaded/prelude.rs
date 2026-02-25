@@ -1,3 +1,4 @@
+/// Logical lane identifier used by threaded scheduler records.
 pub type LaneId = usize;
 
 /// Deterministic lane selection record for one scheduled coroutine.
@@ -350,4 +351,3 @@ impl WavePlannerState {
         self.conflict_events = self.conflict_events.saturating_add(1);
     }
 }
-

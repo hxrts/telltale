@@ -75,7 +75,8 @@ impl<R: RoleId + 'static> ChoreoHandler for MockHandler<R> {
         self.recorded_operations.push(MockOperation::Recv { from });
 
         if let Some(MockResponse::Message(bytes)) = self.scripted_responses.pop_front() {
-            bincode::deserialize(&bytes).map_err(|e| ChoreographyError::Serialization(e.to_string()))
+            bincode::deserialize(&bytes)
+                .map_err(|e| ChoreographyError::Serialization(e.to_string()))
         } else {
             Err(ChoreographyError::Transport(
                 "No scripted response available".into(),

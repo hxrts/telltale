@@ -5,7 +5,6 @@
 #[path = "support/mod.rs"]
 mod test_support;
 
-use test_support::{simple_send_recv_image, PassthroughHandler};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -16,6 +15,7 @@ use telltale_vm::effect::{
 use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::trace::normalize_trace_v1;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use test_support::{simple_send_recv_image, PassthroughHandler};
 
 #[derive(Debug, Clone)]
 struct OrderedTopologyHandler {

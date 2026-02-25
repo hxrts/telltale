@@ -10,7 +10,6 @@ mod test_support;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use test_support::{PassthroughHandler, ScenarioSpec};
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput, TopologyPerturbation};
@@ -22,6 +21,7 @@ use telltale_vm::{
     EffectDeterminismTier, EnvelopeDiffArtifactV1, FailureVisibleDiffClass,
     SchedulerPermutationClass,
 };
+use test_support::{PassthroughHandler, ScenarioSpec};
 
 fn threaded_wave_config() -> VMConfig {
     VMConfig {

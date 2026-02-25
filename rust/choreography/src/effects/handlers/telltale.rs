@@ -18,13 +18,13 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, fmt::Debug, marker::PhantomData, time::Duration};
 
 use crate::effects::{ChoreoHandler, ChoreoResult, ChoreographyError, LabelId, RoleId};
-use telltale::{
-    Message, Role,
-};
+use telltale::{Message, Role};
 
 #[path = "telltale_session.rs"]
 mod session;
-pub use session::{SessionMetadata, SessionTypeDynamic, SessionUpdate, SimpleChannel, TelltaleSession};
+pub use session::{
+    SessionMetadata, SessionTypeDynamic, SessionUpdate, SimpleChannel, TelltaleSession,
+};
 
 enum ChannelState {
     Simple(SimpleChannel),

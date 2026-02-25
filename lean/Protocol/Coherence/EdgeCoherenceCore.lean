@@ -282,6 +282,7 @@ HeadCoherent is a refinement of Coherent that ensures the buffer head
 matches the expected receive type. This is needed for progress because
 plain Coherent only says the receiver can *eventually* consume all messages,
 not that the *immediate* buffer head matches.
+-/
 
 
 /-- Buffer head type matches expected receive type at receiver.
@@ -335,6 +336,7 @@ theorem role_complete_branch
 
 When the receiver is at a branch type and the buffer contains a string label,
 that label must be one of the valid branch options.
+-/
 
 def ValidLabels (G : GEnv) (_D : DEnv) (bufs : Buffers) : Prop :=
   ∀ (e : Edge) (source : Role) (bs : List (Label × LocalType)),

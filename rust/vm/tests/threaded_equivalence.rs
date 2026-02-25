@@ -10,9 +10,6 @@ mod test_support;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use test_support::{
-    choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,
-};
 use telltale_vm::coroutine::Fault;
 use telltale_vm::coroutine::Value;
 use telltale_vm::determinism::{replay_consistent, DeterminismMode};
@@ -20,6 +17,9 @@ use telltale_vm::effect::{EffectHandler, RecordingEffectHandler, SendDecision, S
 use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::vm::{ObsEvent, VMConfig, VMError, VM};
 use telltale_vm::OutputConditionPolicy;
+use test_support::{
+    choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,
+};
 
 type Normalized = (String, String, String, String);
 

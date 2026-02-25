@@ -9,7 +9,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(feature = "multi-thread")]
 use std::{collections::BTreeMap, time::Duration};
 
-use test_support::simple_send_recv_image;
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput, TopologyPerturbation};
 #[cfg(feature = "multi-thread")]
@@ -17,6 +16,7 @@ use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::vm::{VMConfig, VM};
 #[cfg(feature = "multi-thread")]
 use telltale_vm::CorruptionType;
+use test_support::simple_send_recv_image;
 
 #[derive(Debug)]
 struct TopologyBurstHandler {

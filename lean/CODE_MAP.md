@@ -1,7 +1,7 @@
 # Lean Verification Code Map
 
 <!-- GENERATED_METRICS:BEGIN -->
-**Last Updated:** 2026-02-24
+**Last Updated:** 2026-02-25
 <!-- GENERATED_METRICS:END -->
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
@@ -41,10 +41,10 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | Classical      |    16 |   2,193 | Transported theorems (queueing, large deviations, mixing)  |
 | ClassicalAnalysis |     3 |   1,128 | Real analysis concrete models for classical transport      |
 | Distributed    |    59 |   7,266 | Distributed assumptions, validation, FLP/CAP theorem packaging |
-| Protocol       |   170 |  40,104 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   146 |  28,005 | VM, Iris backend via iris-lean, resource algebras, WP      |
+| Protocol       |   170 |  40,082 | Async buffered MPST, coherence, preservation, monitoring   |
+| Runtime        |   146 |  28,001 | VM, Iris backend via iris-lean, resource algebras, WP      |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **619** | **126,520** |                                                            |
+| **Total**      | **619** | **126,494** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**

@@ -1,5 +1,5 @@
-use super::*;
 use super::types::VmCoreOp;
+use super::*;
 
 fn linear_usage_error(input: &str, message: impl Into<String>) -> ParseError {
     ParseError::Syntax {

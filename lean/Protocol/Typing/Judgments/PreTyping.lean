@@ -113,7 +113,7 @@ theorem recv_typed_inv {n : SessionId} {S : SEnv} {G : GEnv} {D : DEnv} {k x : V
   | recv hk hG => exact ⟨_, _, _, _, _, _, hk, hG, rfl, rfl⟩
 
 /-- Inversion for select typing.
-    Note: The select constructor produces a judgment with updated G.
+    Note: The select constructor produces a judgment with updated G. -/
 theorem select_typed_inv {n : SessionId} {S : SEnv} {G : GEnv} {D : DEnv} {k : Var} {l : Label}
     (h : HasTypeProcN n S G D (.select k l)) :
     ∃ e q bs L G',
@@ -124,7 +124,7 @@ theorem select_typed_inv {n : SessionId} {S : SEnv} {G : GEnv} {D : DEnv} {k : V
   cases h with
   | select hk hG hbs => exact ⟨_, _, _, _, _, hk, hG, hbs, rfl⟩
 
-/-- Inversion for branch typing.
+/-- Inversion for branch typing. -/
 theorem branch_typed_inv {n : SessionId} {S : SEnv} {G : GEnv} {D : DEnv}
     {k : Var} {procs : List (Label × Process)}
 /- ## Structured Block 1 -/
@@ -145,6 +145,7 @@ theorem branch_typed_inv {n : SessionId} {S : SEnv} {G : GEnv} {D : DEnv}
 
 For the progress theorem, we need a typing relation that uses "pre-update"
 environments (the actual runtime state), not "post-update" environments.
+-/
 
 
 /-- Pre-update style process typing for progress theorem.
@@ -213,8 +214,9 @@ inductive HasTypeProcPre : SEnv → OwnedEnv → GEnv → Process → Prop where
 /-! ## Inversion Lemmas for Pre-Update Typing
 
 These lemmas directly extract type information from pre-update typing judgments.
+-/
 
-/-- Inversion for send (pre-update style).
+/-- Inversion for send (pre-update style). -/
 theorem inversion_send {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var}
     (h : HasTypeProcPre Ssh Sown G (.send k x)) :
     ∃ e q T L,
@@ -224,7 +226,7 @@ theorem inversion_send {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var}
   cases h with
   | send hk hG hx => exact ⟨_, _, _, _, hk, hG, hx⟩
 
-/-- Inversion for recv (pre-update style).
+/-- Inversion for recv (pre-update style). -/
 theorem inversion_recv {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var}
     (h : HasTypeProcPre Ssh Sown G (.recv k x)) :
     ∃ e p T L,
@@ -234,7 +236,7 @@ theorem inversion_recv {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var}
   cases h with
   | recv hk hG hx => exact ⟨_, _, _, _, hk, hG, hx⟩
 
-/-- Inversion for select (pre-update style).
+/-- Inversion for select (pre-update style). -/
 theorem inversion_select {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {l : Label}
     (h : HasTypeProcPre Ssh Sown G (.select k l)) :
     ∃ e q bs L,
@@ -244,7 +246,7 @@ theorem inversion_select {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {l 
   cases h with
   | select hk hG hbs => exact ⟨_, _, _, _, hk, hG, hbs⟩
 
-/-- Inversion for branch (pre-update style).
+/-- Inversion for branch (pre-update style). -/
 theorem inversion_branch {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {procs : List (Label × Process)}
     (h : HasTypeProcPre Ssh Sown G (.branch k procs)) :
     ∃ e p bs,

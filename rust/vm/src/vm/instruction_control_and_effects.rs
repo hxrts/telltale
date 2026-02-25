@@ -284,7 +284,7 @@ impl VM {
                 let state = self
                     .resource_states
                     .entry(input.sid)
-                    .or_insert_with(ResourceState::default);
+                    .or_default();
                 let _commitment = state.commit(&evidence);
                 Ok(StepPack {
                     coro_update: CoroUpdate::AdvancePcWriteReg {

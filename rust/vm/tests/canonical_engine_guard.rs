@@ -5,8 +5,6 @@
 #[path = "support/mod.rs"]
 mod test_support;
 
-#[cfg(feature = "multi-thread")]
-use test_support::{simple_send_recv_image, PassthroughHandler};
 use telltale_vm::architecture::{EngineRole, CANONICAL_ENGINE, ENGINE_OWNERSHIP};
 #[cfg(feature = "multi-thread")]
 use telltale_vm::threaded::ThreadedVM;
@@ -14,6 +12,8 @@ use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::trace::{normalize_trace, with_tick};
 #[cfg(feature = "multi-thread")]
 use telltale_vm::vm::{VMConfig, VM};
+#[cfg(feature = "multi-thread")]
+use test_support::{simple_send_recv_image, PassthroughHandler};
 
 #[test]
 fn canonical_engine_declaration_is_unique_and_adapters_defer_semantics() {

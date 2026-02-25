@@ -96,8 +96,7 @@ fn commit_pack_contains_commit_owned_mutation_sites() {
 #[wasm_bindgen_test(unsupported = test)]
 fn commit_pack_is_only_owner_of_type_state_mutations() {
     let src = vm_impl_source();
-    let (commit_start, commit_end) =
-        span(&src, "fn commit_pack(", "\n    fn intern_obs_event(");
+    let (commit_start, commit_end) = span(&src, "fn commit_pack(", "\n    fn intern_obs_event(");
     let patterns = [
         "self.sessions.update_type(",
         "self.sessions.update_original(",

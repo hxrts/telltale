@@ -9,10 +9,6 @@ use quote::{format_ident, quote};
 
 #[path = "effects_codegen_protocol_types.rs"]
 mod protocol_types;
-#[cfg(test)]
-mod tests {
-    include!("../../tests/unit/compiler/effects_codegen_tests.rs");
-}
 use protocol_types::{generate_label_type, generate_message_types};
 
 /// Generate annotation-aware effect metadata for a protocol node
@@ -132,7 +128,6 @@ fn generate_endpoint_type(protocol_name: &proc_macro2::Ident) -> TokenStream {
         impl telltale::effects::Endpoint for #ep_name {}
     }
 }
-
 
 fn generate_role_functions(choreography: &Choreography) -> TokenStream {
     choreography
@@ -543,4 +538,9 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    include!("../../tests/unit/compiler/effects_codegen_tests.rs");
 }

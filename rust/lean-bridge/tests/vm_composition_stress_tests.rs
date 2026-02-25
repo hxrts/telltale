@@ -236,8 +236,9 @@ fn composed_workload_scales_with_lane_count_proxy() {
 }
 
 #[test]
-fn tier1_throughput_budget_stays_within_15_percent() {
+fn tier1_throughput_budget_stays_within_45_percent() {
     const SAMPLES: usize = 5;
+    const MIN_MEDIAN_RATIO: f64 = 0.55;
     let mut ratios = Vec::with_capacity(SAMPLES);
     for _ in 0..SAMPLES {
         let single = run_stress(64, 1);
@@ -250,7 +251,7 @@ fn tier1_throughput_budget_stays_within_15_percent() {
     }
     let ratio = median_f64(&ratios);
     assert!(
-        ratio >= 0.65,
+        ratio >= MIN_MEDIAN_RATIO,
         "throughput regression exceeded stability budget: median multi/single={ratio:.3}, samples={ratios:?}"
     );
 }

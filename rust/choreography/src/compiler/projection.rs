@@ -440,5 +440,4 @@ impl<'a> ProjectionContext<'a> {
             }
         }
     }
-
 }

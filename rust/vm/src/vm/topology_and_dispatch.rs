@@ -185,7 +185,7 @@ impl VM {
                 corruption,
             } => {
                 self.corrupted_edges
-                    .insert((from.clone(), to.clone()), corruption.clone());
+                    .insert((from.clone(), to.clone()), *corruption);
             }
             TopologyPerturbation::Timeout { site, duration } => {
                 let until_tick = self

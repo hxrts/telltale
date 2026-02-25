@@ -69,9 +69,9 @@ check_byzantine() {
     "rg -q 'def canOperateUnderByzantineEnvelope' '${THEOREMPACK_API_FILE}' && \
      rg -q 'pack\\.byzantineSafety\\?\\.isSome && pack\\.vmEnvelopeAdherence\\?\\.isSome' '${THEOREMPACK_API_FILE}'"
   check "positive profile test: BFT specialization theorem is covered" \
-    "rg -q 'bft_specialization_of_quorumGeometry' '${TEST_FILE}'"
+    "rg -q 'bft_specialization_of_quorum(_geometry|Geometry)' '${TEST_FILE}'"
   check "positive profile test: Nakamoto specialization theorem is covered" \
-    "rg -q 'nakamoto_specialization_of_securityProtocol' '${TEST_FILE}'"
+    "rg -q 'nakamoto_specialization_of_security(_protocol|Protocol)' '${TEST_FILE}'"
   check "positive profile test: hybrid specialization theorem is covered" \
     "rg -q 'hybrid_specialization_of_characterization' '${TEST_FILE}'"
 
@@ -228,7 +228,7 @@ check_failure() {
      rg -q 'def errorCodeOfRustFaultTag' '${ENVELOPE_FILE}'"
 
   check "phase-2 gate: deterministic recovery + checkpoint/idempotency mechanisms are present" \
-    "rg -q 'theorem decideRecovery_deterministic' '${FAILURE_PROOFS_FILE}' && \
+    "rg -q 'theorem decide(Recovery|_recovery)_deterministic' '${FAILURE_PROOFS_FILE}' && \
      rg -q 'checkpointLog' '${STATE_FILE}' && \
      rg -q 'nextEffectNonce' '${STATE_FILE}'"
 
@@ -264,7 +264,7 @@ check_contracts() {
   check "admission API requires runtime contracts for advanced modes" \
     "rg -q 'def requiresVMRuntimeContracts' '${CONTRACTS_FILE}' && \
      rg -q 'def admitVMRuntime' '${CONTRACTS_FILE}' && \
-     rg -q 'theorem admitVMRuntime_requires_contracts' '${CONTRACTS_FILE}'"
+     rg -q 'theorem admit(_vm_runtime|VMRuntime)_requires_contracts' '${CONTRACTS_FILE}'"
 
   check "determinism profile selection is capability-gated and validated" \
     "rg -q 'def determinismProfileSupported' '${CONTRACTS_FILE}' && \

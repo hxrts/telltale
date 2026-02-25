@@ -166,10 +166,13 @@ where
     fn recv(&mut self) -> BoxFuture<'_, ChoreoResult<SessionUpdate<Vec<u8>>>> {
         let receiver = &mut self.receiver;
         Box::pin(async move {
-            let bytes = receiver.next().await.ok_or(ChoreographyError::ChannelClosed {
-                channel_type: "SinkStream",
-                operation: "receive",
-            })?;
+            let bytes = receiver
+                .next()
+                .await
+                .ok_or(ChoreographyError::ChannelClosed {
+                    channel_type: "SinkStream",
+                    operation: "receive",
+                })?;
             Ok(SessionUpdate::new(bytes).with_description("Recv"))
         })
     }
@@ -198,10 +201,13 @@ where
     fn offer(&mut self) -> BoxFuture<'_, ChoreoResult<SessionUpdate<String>>> {
         let receiver = &mut self.receiver;
         Box::pin(async move {
-            let bytes = receiver.next().await.ok_or(ChoreographyError::ChannelClosed {
-                channel_type: "SinkStream",
-                operation: "offer",
-            })?;
+            let bytes = receiver
+                .next()
+                .await
+                .ok_or(ChoreographyError::ChannelClosed {
+                    channel_type: "SinkStream",
+                    operation: "offer",
+                })?;
             let label: String = bincode::deserialize(&bytes).map_err(|e| {
                 ChoreographyError::LabelSerializationFailed {
                     operation: "deserialization",
@@ -248,10 +254,13 @@ impl SessionTypeDynamic for SimpleSession {
     fn recv(&mut self) -> BoxFuture<'_, ChoreoResult<SessionUpdate<Vec<u8>>>> {
         let channel = &mut self.channel;
         Box::pin(async move {
-            let bytes = channel.recv().await.map_err(|_| ChoreographyError::ChannelClosed {
-                channel_type: "SimpleSession",
-                operation: "receive",
-            })?;
+            let bytes = channel
+                .recv()
+                .await
+                .map_err(|_| ChoreographyError::ChannelClosed {
+                    channel_type: "SimpleSession",
+                    operation: "receive",
+                })?;
             Ok(SessionUpdate::new(bytes).with_description("Recv"))
         })
     }
@@ -280,10 +289,13 @@ impl SessionTypeDynamic for SimpleSession {
     fn offer(&mut self) -> BoxFuture<'_, ChoreoResult<SessionUpdate<String>>> {
         let channel = &mut self.channel;
         Box::pin(async move {
-            let bytes = channel.recv().await.map_err(|_| ChoreographyError::ChannelClosed {
-                channel_type: "SimpleSession",
-                operation: "offer",
-            })?;
+            let bytes = channel
+                .recv()
+                .await
+                .map_err(|_| ChoreographyError::ChannelClosed {
+                    channel_type: "SimpleSession",
+                    operation: "offer",
+                })?;
             let label: String = bincode::deserialize(&bytes).map_err(|e| {
                 ChoreographyError::LabelSerializationFailed {
                     operation: "deserialization",

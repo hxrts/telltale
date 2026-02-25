@@ -103,7 +103,7 @@ private theorem consume_branch_nonempty_is_some_false
 /-- HeadCoherent is preserved when sending.
     Send action appends to trace END, so the HEAD is unchanged.
     The sender's G entry changes, but receiver's G entry is unchanged
-    (unless sender = receiver, which is handled separately).
+    (unless sender = receiver, which is handled separately). -/
 -- Main Send Preservation Theorem
 theorem head_coherent_send_preserved
     (G : GEnv) (D : DEnv) (senderEp : Endpoint) (receiverRole : Role) (T : ValType) (L : LocalType)

@@ -215,12 +215,13 @@ inductive MonStep : MonitorState → ProtoAction → Value → MonitorState → 
     7. All session IDs are below supply (freshness)
 
     HeadCoherent and ValidLabels are refinements needed for progress.
+-/
 structure WTMon (ms : MonitorState) : Prop where
   /-- G and D are coherent -/
   coherent : Coherent ms.G ms.D
-  /-- Buffer head types match expected receive types (for progress).
+  /-- Buffer head types match expected receive types (for progress). -/
   headCoherent : HeadCoherent ms.G ms.D
-  /-- Branch labels in buffers are valid (for progress).
+  /-- Branch labels in buffers are valid (for progress). -/
   validLabels : ValidLabels ms.G ms.D ms.bufs
   /-- Buffers match type traces -/
   buffers_typed : BuffersTyped ms.G ms.D ms.bufs

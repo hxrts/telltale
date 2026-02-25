@@ -277,7 +277,7 @@
         let session = vm.sessions.get(sid).expect("session exists");
         assert!(matches!(session.status, SessionStatus::Faulted { .. }));
         assert!(!vm.monitor.session_kinds.contains_key(&sid));
-        assert!(vm.crashed_sites.contains(&"A".to_string()));
+        assert!(vm.crashed_sites.contains("A"));
     }
 
     #[test]

@@ -110,7 +110,7 @@ impl TopologyPerturbation {
                 from,
                 to,
                 corruption,
-            } => Some((from.as_str(), to.as_str(), corruption.clone())),
+            } => Some((from.as_str(), to.as_str(), *corruption)),
             _ => None,
         }
     }

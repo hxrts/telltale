@@ -1,6 +1,6 @@
+use super::merge::{merge_labeled_local_types, LabeledLocalType};
 use super::*;
 use proc_macro2::Ident;
-use super::merge::{merge_labeled_local_types, LabeledLocalType};
 
 impl<'a> ProjectionContext<'a> {
     pub(super) fn merge_parallel_projections(
