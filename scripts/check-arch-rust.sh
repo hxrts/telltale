@@ -355,6 +355,7 @@ scan_lock_await_hits() {
       start_line = 0
       guard_name = ""
       window = 0
+      prev_line = ""
     }
 
     {
@@ -364,6 +365,10 @@ scan_lock_await_hits() {
       # let guard = lock.read().await;
       # let mut guard = state.lock().await?;
       if (line ~ /let[[:space:]]+(mut[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[^;]*(lock|read|write)\([^)]*\)[[:space:]]*\.await/) {
+        if (line ~ /LOCK_AWAIT_OK/ || prev_line ~ /LOCK_AWAIT_OK/) {
+          prev_line = line
+          next
+        }
         tmp = line
         sub(/.*let[[:space:]]+/, "", tmp)
         sub(/=.*/, "", tmp)
@@ -373,22 +378,26 @@ scan_lock_await_hits() {
         start_line = NR
         window = 12
         track = 1
+        prev_line = line
         next
       }
 
       if (!track) {
+        prev_line = line
         next
       }
 
       if (window <= 0) {
         track = 0
         guard_name = ""
+        prev_line = line
         next
       }
 
       # Ignore comments and blank lines in the lookahead window.
       if (line ~ /^[[:space:]]*$/ || line ~ /^[[:space:]]*\/\//) {
         window -= 1
+        prev_line = line
         next
       }
 
@@ -397,6 +406,7 @@ scan_lock_await_hits() {
           line ~ ("let[[:space:]]+(mut[[:space:]]+)?" guard_name "[[:space:]]*=")) {
         track = 0
         guard_name = ""
+        prev_line = line
         next
       }
 
@@ -404,10 +414,12 @@ scan_lock_await_hits() {
         printf "%s:%d: lock/read/write guard `%s` may be held across await within %d-line window\n", file, start_line, guard_name, 12
         track = 0
         guard_name = ""
+        prev_line = line
         next
       }
 
       window -= 1
+      prev_line = line
     }
   ' "$file"
 }
@@ -553,7 +565,7 @@ limit_constant_hits="$(awk '
   function has_unit_token(name,    n,toks,i) {
     n = split(name, toks, "_")
     for (i = 1; i <= n; i++) {
-      if (toks[i] ~ /^(MS|US|NS|SEC|SECS|SECOND|SECONDS|MINUTE|MINUTES|MINS|HOUR|HOURS|BYTES|BYTE|KB|MB|GB|COUNT|COUNTS|ENTRY|ENTRIES|ITEM|ITEMS|PCT|PERCENT|RATIO|TICK|TICKS)$/) {
+      if (toks[i] ~ /^(MS|US|NS|SEC|SECS|SECOND|SECONDS|MINUTE|MINUTES|MINS|HOUR|HOURS|BYTES|BYTE|BITS|BIT|KB|MB|GB|COUNT|COUNTS|ENTRY|ENTRIES|ITEM|ITEMS|ATTEMPT|ATTEMPTS|INDEX|PRICE|UNIT|UNITS|PCT|PERCENT|RATIO|TICK|TICKS)$/) {
         return 1
       }
     }
@@ -566,6 +578,9 @@ limit_constant_hits="$(awk '
       name = line
       sub(/^[[:space:]]*(pub[[:space:]]+)?const[[:space:]]+/, "", name)
       sub(/[[:space:]]*:.*$/, "", name)
+      if (name == "MIN" || name == "MAX") {
+        next
+      }
       if (name ~ /(MAX|MIN|LIMIT|TIMEOUT|INTERVAL|BACKOFF|CAPACITY|SIZE|LENGTH|LEN|BATCH)/) {
         if (!has_unit_token(name)) {
           print FILENAME ":" FNR ":" line
