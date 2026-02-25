@@ -1590,7 +1590,6 @@ dependencies = [
  "rand_chacha 0.3.1",
  "serde",
  "serde_json",
- "telltale-lean-bridge",
  "telltale-theory",
  "telltale-types",
  "telltale-vm",
@@ -1604,7 +1603,6 @@ dependencies = [
  "assert_matches",
  "criterion",
  "proptest",
- "telltale-lean-bridge",
  "telltale-types",
  "thiserror",
 ]
@@ -1648,7 +1646,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "telltale-lean-bridge",
  "telltale-theory",
  "telltale-types",
  "thiserror",

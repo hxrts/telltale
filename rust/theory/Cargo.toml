@@ -21,8 +21,8 @@ thiserror = { workspace = true }
 [dev-dependencies]
 proptest = { workspace = true }
 assert_matches = { workspace = true }
-telltale-lean-bridge = { path = "../lean-bridge", version = "1.0.0" }
 criterion = { workspace = true }
+# telltale-lean-bridge dev-dep restored after publishing
 
 [features]
 default = ["projection", "duality", "merge", "well-formedness", "bounded", "async-subtyping", "sync-subtyping", "semantics", "coherence"]
