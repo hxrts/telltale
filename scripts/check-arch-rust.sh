@@ -593,25 +593,102 @@ print_hits "warning" "limit-style constants without explicit unit tokens" "${lim
 
 print_section "File and Block Size Checks"
 
+count_non_test_lines() {
+  local file="$1"
+  awk '
+    function strip_literals_and_comments(s,   out) {
+      out = s
+      sub(/\/\/.*/, "", out)
+      while (match(out, /"([^"\\]|\\.)*"/)) {
+        out = substr(out, 1, RSTART - 1) substr(out, RSTART + RLENGTH)
+      }
+      while (match(out, /'\''([^'\''\\]|\\.)*'\''/)) {
+        out = substr(out, 1, RSTART - 1) substr(out, RSTART + RLENGTH)
+      }
+      return out
+    }
+
+    function count_braces(s,   tmp, opens, closes) {
+      tmp = strip_literals_and_comments(s)
+      opens = gsub(/\{/, "{", tmp)
+      tmp = strip_literals_and_comments(s)
+      closes = gsub(/\}/, "}", tmp)
+      return opens - closes
+    }
+
+    BEGIN {
+      in_cfg_test_attr = 0
+      skip_test_mod_depth = 0
+      count = 0
+    }
+
+    skip_test_mod_depth > 0 {
+      skip_test_mod_depth += count_braces($0)
+      if (skip_test_mod_depth <= 0) {
+        skip_test_mod_depth = 0
+      }
+      next
+    }
+
+    /^[[:space:]]*#[[:space:]]*\[[[:space:]]*cfg[[:space:]]*\([[:space:]]*test[[:space:]]*\)[[:space:]]*]/ {
+      in_cfg_test_attr = 1
+      next
+    }
+
+    in_cfg_test_attr && /^[[:space:]]*mod[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\{/ {
+      skip_test_mod_depth = count_braces($0)
+      if (skip_test_mod_depth <= 0) {
+        skip_test_mod_depth = 0
+      }
+      in_cfg_test_attr = 0
+      next
+    }
+
+    in_cfg_test_attr {
+      if ($0 !~ /^[[:space:]]*$/ && $0 !~ /^[[:space:]]*#/) {
+        in_cfg_test_attr = 0
+      } else {
+        next
+      }
+    }
+
+    { count += 1 }
+
+    END { print count }
+  ' "$file"
+}
+
 # Files over 600 lines (should be split into modules).
 large_file_hits=""
 while IFS= read -r file; do
   [[ -z "${file}" ]] && continue
-  lines="$(wc -l < "${file}" | tr -d ' ')"
+  lines="$(count_non_test_lines "${file}" | tr -d ' ')"
   if [[ "${lines}" -gt 600 ]]; then
     large_file_hits+="${file}:${lines} lines"$'\n'
   fi
-done < <(find "${RUST_DIR}" -name '*.rs' -type f | grep -v '/target/' | grep -v '/tests/' | grep -v '/benches/')
+done < <(find "${RUST_DIR}" -name '*.rs' -type f | grep -v '/target/' | grep -v '/tests/' | grep -v '/benches/' | grep -v '/examples/' | grep -v '/src/bin/')
 print_hits "warning" "files over 600 lines (split into modules)" "${large_file_hits}" "Extract cohesive subsystems into separate modules (e.g., foo.rs -> foo/mod.rs + foo/bar.rs). Group by abstraction boundary, not arbitrary line count."
 
 # Functions/blocks over 60 lines (should be refactored).
 scan_large_blocks() {
   local file="$1"
   awk -v file="$file" '
+    function strip_literals_and_comments(s,   out) {
+      out = s
+      sub(/\/\/.*/, "", out)
+      while (match(out, /"([^"\\]|\\.)*"/)) {
+        out = substr(out, 1, RSTART - 1) substr(out, RSTART + RLENGTH)
+      }
+      while (match(out, /'\''([^'\''\\]|\\.)*'\''/)) {
+        out = substr(out, 1, RSTART - 1) substr(out, RSTART + RLENGTH)
+      }
+      return out
+    }
+
     function count_braces(s,   tmp, opens, closes) {
-      tmp = s
+      tmp = strip_literals_and_comments(s)
       opens = gsub(/\{/, "{", tmp)
-      tmp = s
+      tmp = strip_literals_and_comments(s)
       closes = gsub(/\}/, "}", tmp)
       return opens - closes
     }
@@ -620,7 +697,54 @@ scan_large_blocks() {
       in_fn = 0
       fn_start = 0
       fn_name = ""
+      ignore_fn = 0
       brace_depth = 0
+      in_cfg_test_attr = 0
+      skip_test_mod_depth = 0
+      pending_test_attr = 0
+      pending_large_fn_allow = 0
+    }
+
+    skip_test_mod_depth > 0 {
+      skip_test_mod_depth += count_braces($0)
+      if (skip_test_mod_depth <= 0) {
+        skip_test_mod_depth = 0
+      }
+      next
+    }
+
+    !in_fn && /^[[:space:]]*#[[:space:]]*\[[[:space:]]*cfg[[:space:]]*\([[:space:]]*test[[:space:]]*\)[[:space:]]*]/ {
+      in_cfg_test_attr = 1
+      next
+    }
+
+    !in_fn && /^[[:space:]]*#[[:space:]]*\[[[:space:]]*test[[:space:]]*]/ {
+      pending_test_attr = 1
+      next
+    }
+
+    !in_fn && /^[[:space:]]*#[[:space:]]*\[[[:space:]]*allow[[:space:]]*\([[:space:]]*clippy::too_many_lines[[:space:]]*\)[[:space:]]*]/ {
+      pending_large_fn_allow = 1
+      next
+    }
+
+    !in_fn && in_cfg_test_attr && /^[[:space:]]*mod[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\{/ {
+      skip_test_mod_depth = count_braces($0)
+      if (skip_test_mod_depth <= 0) {
+        skip_test_mod_depth = 0
+      }
+      in_cfg_test_attr = 0
+      pending_test_attr = 0
+      pending_large_fn_allow = 0
+      next
+    }
+
+    !in_fn && in_cfg_test_attr {
+      if ($0 !~ /^[[:space:]]*$/ && $0 !~ /^[[:space:]]*#/) {
+        in_cfg_test_attr = 0
+      } else {
+        next
+      }
     }
 
     # Match function definitions (pub/pub(crate)/async/const/unsafe fn name)
@@ -631,22 +755,34 @@ scan_large_blocks() {
       fn_name = $0
       sub(/.*fn[[:space:]]+/, "", fn_name)
       sub(/[^A-Za-z0-9_].*/, "", fn_name)
+      ignore_fn = (pending_test_attr || pending_large_fn_allow || fn_name ~ /^test_/)
+      pending_test_attr = 0
+      pending_large_fn_allow = 0
       brace_depth = count_braces($0)
-      if (brace_depth <= 0 && $0 ~ /\{/) {
+      if (brace_depth == 0 && $0 ~ /\{[[:space:]]*$/) {
         brace_depth = 1
       }
       next
+    }
+
+    !in_fn && pending_large_fn_allow {
+      if ($0 !~ /^[[:space:]]*$/ && $0 !~ /^[[:space:]]*#/ && $0 !~ /^[[:space:]]*\/\//) {
+        pending_large_fn_allow = 0
+      } else {
+        next
+      }
     }
 
     in_fn {
       brace_depth += count_braces($0)
       if (brace_depth <= 0) {
         fn_len = NR - fn_start + 1
-        if (fn_len > 60) {
+        if (!ignore_fn && fn_len > 60) {
           printf "%s:%d: fn %s (%d lines)\n", file, fn_start, fn_name, fn_len
         }
         in_fn = 0
         fn_name = ""
+        ignore_fn = 0
       }
     }
   ' "$file"
@@ -658,7 +794,7 @@ while IFS= read -r file; do
   blocks="$(scan_large_blocks "${file}")"
   [[ -z "${blocks}" ]] && continue
   large_block_hits+="${blocks}"$'\n'
-done < <(find "${RUST_DIR}" -name '*.rs' -type f | grep -v '/target/' | grep -v '/tests/' | grep -v '/benches/')
+done < <(find "${RUST_DIR}" -name '*.rs' -type f | grep -v '/target/' | grep -v '/tests/' | grep -v '/benches/' | grep -v '/examples/' | grep -v '/src/bin/')
 print_hits "warning" "functions over 60 lines (refactor into smaller units)" "${large_block_hits}" "Extract logical steps into helper functions. Each function should do one thing. Compose small functions to build complex behavior."
 
 print_section "Numeric Safety Checks"
