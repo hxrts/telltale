@@ -98,12 +98,12 @@ impl Clock for MockClock {
 
     fn advance(&self, duration: Duration) {
         let delta = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
-        // fetch_update with a closure that always returns Some always succeeds
-        let _ = self
-            .offset_ns
+        // Closure always returns Some, so fetch_update always succeeds.
+        self.offset_ns
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
                 Some(current.saturating_add(delta))
-            });
+            })
+            .expect("closure always returns Some");
     }
 }
 

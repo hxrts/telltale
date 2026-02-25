@@ -7,11 +7,12 @@ use crate::config::TcpTransportConfig;
 const ROLE_NAME_LEN_MAX_BYTES: usize = 1024;
 use crate::error::{TcpResult, TcpTransportError};
 use async_trait::async_trait;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
-use telltale_choreography::topology::{Message, TransportError, TransportResult};
-use telltale_choreography::{MessageLenBytes, QueueCapacity, RoleName, Transport};
+use telltale_choreography::{
+    MessageLenBytes, QueueCapacity, RoleName, Transport, TransportError, TransportResult,
+};
 use telltale_types::FixedQ32;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -64,11 +65,11 @@ pub struct TcpTransport {
     /// Current state.
     state: Arc<RwLock<TransportState>>,
     /// Outgoing connections (role -> stream).
-    outgoing: Arc<RwLock<HashMap<String, Arc<Mutex<TcpStream>>>>>,
+    outgoing: Arc<RwLock<BTreeMap<String, Arc<Mutex<TcpStream>>>>>,
     /// Incoming message queues (role -> receiver).
-    incoming: Arc<Mutex<HashMap<String, mpsc::Receiver<Vec<u8>>>>>,
+    incoming: Arc<Mutex<BTreeMap<String, mpsc::Receiver<Vec<u8>>>>>,
     /// Senders for incoming messages (used by accept loop).
-    incoming_senders: Arc<Mutex<HashMap<String, mpsc::Sender<Vec<u8>>>>>,
+    incoming_senders: Arc<Mutex<BTreeMap<String, mpsc::Sender<Vec<u8>>>>>,
     /// Shutdown signal sender.
     shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
 }
@@ -79,9 +80,9 @@ impl TcpTransport {
         Self {
             config,
             state: Arc::new(RwLock::new(TransportState::Created)),
-            outgoing: Arc::new(RwLock::new(HashMap::new())),
-            incoming: Arc::new(Mutex::new(HashMap::new())),
-            incoming_senders: Arc::new(Mutex::new(HashMap::new())),
+            outgoing: Arc::new(RwLock::new(BTreeMap::new())),
+            incoming: Arc::new(Mutex::new(BTreeMap::new())),
+            incoming_senders: Arc::new(Mutex::new(BTreeMap::new())),
             shutdown_tx: Arc::new(Mutex::new(None)),
         }
     }
@@ -235,7 +236,7 @@ impl TcpTransport {
 /// Handle an incoming TCP connection.
 async fn handle_connection(
     mut stream: TcpStream,
-    senders: Arc<Mutex<HashMap<String, mpsc::Sender<Vec<u8>>>>>,
+    senders: Arc<Mutex<BTreeMap<String, mpsc::Sender<Vec<u8>>>>>,
     local_role: &str,
     _buffer_size: QueueCapacity,
 ) -> TcpResult<()> {
@@ -296,66 +297,49 @@ async fn handle_connection(
 #[async_trait]
 impl Transport for TcpTransport {
     #[instrument(skip(self, message), fields(role = %self.config.role, to = %to_role, msg_len = message.len()))]
-    async fn send(&self, to_role: &RoleName, message: Message) -> TransportTcpResult<()> {
+    async fn send(&self, to_role: &RoleName, message: Vec<u8>) -> TransportResult<()> {
         let role_str = to_role.as_str();
         let stream = {
             let outgoing = self.outgoing.read().await;
             outgoing
                 .get(role_str)
                 .cloned()
-                .ok_or_else(|| TransportError::UnknownRole {
-                    role: to_role.clone(),
-                })?
+                .ok_or_else(|| TransportError::UnknownRole(to_role.clone()))?
         };
 
         let mut stream = stream.lock().await;
-        let bytes = message.as_bytes();
 
         // Write length prefix
         let len =
-            MessageLenBytes::try_from(bytes.len()).map_err(|e| TransportError::SendFailed {
-                role: to_role.clone(),
-                reason: e.to_string(),
-            })?;
+            MessageLenBytes::try_from(message.len()).map_err(|e| TransportError::SendFailed(e.to_string()))?;
         stream
             .write_all(&len.get().to_be_bytes())
             .await
-            .map_err(|e| TransportError::SendFailed {
-                role: to_role.clone(),
-                reason: e.to_string(),
-            })?;
+            .map_err(|e| TransportError::SendFailed(e.to_string()))?;
 
         // Write payload
         stream
-            .write_all(bytes)
+            .write_all(&message)
             .await
-            .map_err(|e| TransportError::SendFailed {
-                role: to_role.clone(),
-                reason: e.to_string(),
-            })?;
+            .map_err(|e| TransportError::SendFailed(e.to_string()))?;
         stream
             .flush()
             .await
-            .map_err(|e| TransportError::SendFailed {
-                role: to_role.clone(),
-                reason: e.to_string(),
-            })?;
+            .map_err(|e| TransportError::SendFailed(e.to_string()))?;
 
-        debug!(msg_len = bytes.len(), "Message sent");
+        debug!(msg_len = message.len(), "Message sent");
         Ok(())
     }
 
     #[instrument(skip(self), fields(role = %self.config.role, from = %from_role))]
-    async fn recv(&self, from_role: &RoleName) -> TransportResult<Message> {
+    async fn recv(&self, from_role: &RoleName) -> TransportResult<Vec<u8>> {
         let role_str = from_role.as_str();
         let role_key = role_str.to_string();
         let mut receiver = {
             let mut incoming = self.incoming.lock().await;
             incoming
                 .remove(&role_key)
-                .ok_or_else(|| TransportError::UnknownRole {
-                    role: from_role.clone(),
-                })?
+                .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?
         };
 
         let msg = receiver.recv().await;
@@ -365,30 +349,21 @@ impl Transport for TcpTransport {
             incoming.insert(role_key, receiver);
         }
 
-        let bytes = msg.ok_or(TransportError::ChannelClosed {
-            role: from_role.clone(),
-        })?;
-
-        // Create message from received bytes (trusted internal source)
-        let message = Message::new(bytes).map_err(|e| TransportError::ReceiveFailed {
-            role: from_role.clone(),
-            reason: e.to_string(),
-        })?;
-
-        debug!(msg_len = message.len(), "Message received");
-        Ok(message)
+        let bytes = msg.ok_or(TransportError::ChannelClosed)?;
+        debug!(msg_len = bytes.len(), "Message received");
+        Ok(bytes)
     }
 
     fn is_connected(&self, role: &RoleName) -> bool {
         self.config.peers.contains_key(role.as_str())
     }
 
-    async fn close(&self) -> TransportTcpResult<()> {
+    async fn close(&self) -> TransportResult<()> {
         *self.state.write().await = TransportState::ShuttingDown;
 
-        // Send shutdown signal - ignore failure since receiver may be dropped during shutdown
+        // Send shutdown signal - receiver may be dropped during shutdown.
         if let Some(tx) = self.shutdown_tx.lock().await.take() {
-            drop(tx.send(()).await);
+            let _ = tx.send(()).await; // Intentional: send failure ok during shutdown.
         }
 
         // Close all connections

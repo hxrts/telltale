@@ -58,6 +58,7 @@ impl ProtocolExtension for VmCoreOpExtension {
         quote::quote! {
             {
                 let _vm_core_op: &str = #op;
+                // Intentional discard: suppress unused warning in generated code.
                 let _ = _vm_core_op;
             }
         }
@@ -113,6 +114,7 @@ impl ProtocolExtension for DslCombinatorExtension {
         quote::quote! {
             {
                 let _dsl_combinator_kind: &str = #kind;
+                // Intentional discard: suppress unused warning in generated code.
                 let _ = _dsl_combinator_kind;
             }
         }

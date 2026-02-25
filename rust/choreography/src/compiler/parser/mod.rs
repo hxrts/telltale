@@ -29,7 +29,6 @@ use pest_derive::Parser;
 use proc_macro2::{Span, TokenStream};
 use quote::format_ident;
 use std::collections::{HashMap, HashSet};
-use std::fmt::Write as _;
 
 use conversion::{convert_statements_to_protocol, inline_calls};
 use role::parse_roles_from_pair;
@@ -911,6 +910,8 @@ pub fn render_lsp_lint_diagnostics(choreography: &Choreography, level: LintLevel
 
 /// Produce a canonical lowering report for a DSL snippet.
 pub fn explain_lowering(input: &str) -> std::result::Result<String, ParseError> {
+    use std::fmt::Write;
+    // Note: All writeln! calls below use String's fmt::Write impl, which is infallible.
     fn render_protocol(protocol: &Protocol, depth: usize, out: &mut String) {
         let indent = "  ".repeat(depth);
         match protocol {
@@ -921,13 +922,7 @@ pub fn explain_lowering(input: &str) -> std::result::Result<String, ParseError> 
                 continuation,
                 ..
             } => {
-                let _ = writeln!(
-                    out,
-                    "{indent}- send {} -> {} : {}",
-                    from.name(),
-                    to.name(),
-                    message.name
-                );
+                writeln!(out, "{indent}- send {} -> {} : {}", from.name(), to.name(), message.name).unwrap();
                 render_protocol(continuation, depth + 1, out);
             }
             Protocol::Broadcast {
@@ -936,38 +931,33 @@ pub fn explain_lowering(input: &str) -> std::result::Result<String, ParseError> 
                 continuation,
                 ..
             } => {
-                let _ = writeln!(
-                    out,
-                    "{indent}- broadcast {} ->* : {}",
-                    from.name(),
-                    message.name
-                );
+                writeln!(out, "{indent}- broadcast {} ->* : {}", from.name(), message.name).unwrap();
                 render_protocol(continuation, depth + 1, out);
             }
             Protocol::Choice { role, branches, .. } => {
-                let _ = writeln!(out, "{indent}- choice at {}", role.name());
+                writeln!(out, "{indent}- choice at {}", role.name()).unwrap();
                 for branch in branches {
-                    let _ = writeln!(out, "{indent}  branch {}", branch.label);
+                    writeln!(out, "{indent}  branch {}", branch.label).unwrap();
                     render_protocol(&branch.protocol, depth + 2, out);
                 }
             }
             Protocol::Loop { body, .. } => {
-                let _ = writeln!(out, "{indent}- loop");
+                writeln!(out, "{indent}- loop").unwrap();
                 render_protocol(body, depth + 1, out);
             }
             Protocol::Parallel { protocols } => {
-                let _ = writeln!(out, "{indent}- parallel");
+                writeln!(out, "{indent}- parallel").unwrap();
                 for (idx, branch) in protocols.iter().enumerate() {
-                    let _ = writeln!(out, "{indent}  branch#{idx}");
+                    writeln!(out, "{indent}  branch#{idx}").unwrap();
                     render_protocol(branch, depth + 2, out);
                 }
             }
             Protocol::Rec { label, body } => {
-                let _ = writeln!(out, "{indent}- rec {label}");
+                writeln!(out, "{indent}- rec {label}").unwrap();
                 render_protocol(body, depth + 1, out);
             }
             Protocol::Var(label) => {
-                let _ = writeln!(out, "{indent}- continue {label}");
+                writeln!(out, "{indent}- continue {label}").unwrap();
             }
             Protocol::Extension {
                 annotations,
@@ -978,58 +968,49 @@ pub fn explain_lowering(input: &str) -> std::result::Result<String, ParseError> 
                     .custom("vm_core_op")
                     .or_else(|| annotations.custom("dsl_combinator"))
                     .unwrap_or("extension");
-                let _ = writeln!(out, "{indent}- extension {kind}");
+                writeln!(out, "{indent}- extension {kind}").unwrap();
                 render_protocol(continuation, depth + 1, out);
             }
             Protocol::End => {
-                let _ = writeln!(out, "{indent}- end");
+                writeln!(out, "{indent}- end").unwrap();
             }
         }
     }
 
     let choreography = parse_choreography_str(input)?;
     let mut out = String::new();
-    let _ = writeln!(out, "Protocol: {}", choreography.qualified_name());
-    let _ = writeln!(
+    writeln!(out, "Protocol: {}", choreography.qualified_name()).unwrap();
+    writeln!(
         out,
         "Roles: {}",
-        choreography
-            .roles
-            .iter()
-            .map(|r| r.name().to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+        choreography.roles.iter().map(|r| r.name().to_string()).collect::<Vec<_>>().join(", ")
+    ).unwrap();
     let bundles = choreography.proof_bundles();
     if !bundles.is_empty() {
-        let _ = writeln!(
+        writeln!(
             out,
             "Proof bundles: {}",
-            bundles
-                .iter()
-                .map(|b| b.name.clone())
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+            bundles.iter().map(|b| b.name.clone()).collect::<Vec<_>>().join(", ")
+        ).unwrap();
     }
     let required = choreography.required_proof_bundles();
     if !required.is_empty() {
-        let _ = writeln!(out, "Required bundles: {}", required.join(", "));
+        writeln!(out, "Required bundles: {}", required.join(", ")).unwrap();
     }
     let inferred = choreography.inferred_required_proof_bundles();
     if !inferred.is_empty() {
-        let _ = writeln!(out, "Inferred bundles: {}", inferred.join(", "));
+        writeln!(out, "Inferred bundles: {}", inferred.join(", ")).unwrap();
     }
-    let _ = writeln!(out, "Lowering:");
+    writeln!(out, "Lowering:").unwrap();
     render_protocol(&choreography.protocol, 1, &mut out);
 
     let lints = collect_dsl_lints(&choreography, LintLevel::Warn);
     if !lints.is_empty() {
-        let _ = writeln!(out, "Lints:");
+        writeln!(out, "Lints:").unwrap();
         for lint in lints {
-            let _ = writeln!(out, "- [{}] {}", lint.code, lint.message);
+            writeln!(out, "- [{}] {}", lint.code, lint.message).unwrap();
             if let Some(fix) = lint.suggestion {
-                let _ = writeln!(out, "  fix: {fix}");
+                writeln!(out, "  fix: {fix}").unwrap();
             }
         }
     }

@@ -96,6 +96,7 @@ impl GuardLayer for InMemoryGuardLayer {
         if !self.resources.contains_key(layer) {
             return Err(format!("unknown guard layer {}", layer.0));
         }
+        // Evidence intentionally unused in this stub (future: validate close evidence).
         let _ = evidence;
         Ok(())
     }

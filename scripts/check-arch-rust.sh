@@ -48,6 +48,12 @@ VM_KERNEL_SCOPE=(
   "${RUST_DIR}/vm/src/exec/helpers.rs"
 )
 
+CORE_RUNTIME_SCOPE=(
+  "${RUST_DIR}/vm/src"
+  "${RUST_DIR}/simulator/src"
+  "${RUST_DIR}/choreography/src"
+)
+
 print_section() {
   echo ""
   echo -e "${BLUE}== $1 ==${NC}"
@@ -272,6 +278,75 @@ scan_serde_derived_usize_hits() {
   ' "$file"
 }
 
+scan_recursive_function_calls() {
+  local file="$1"
+  awk -v file="$file" '
+    function count_braces(s,   tmp, opens, closes) {
+      tmp = s
+      opens = gsub(/\{/, "{", tmp)
+      tmp = s
+      closes = gsub(/\}/, "}", tmp)
+      return opens - closes
+    }
+
+    BEGIN {
+      in_fn = 0
+      fn_name = ""
+      fn_start = 0
+      fn_body = ""
+      brace_depth = 0
+      suppress_fn = 0
+      prev_line = ""
+    }
+
+    {
+      line = $0
+
+      if (!in_fn) {
+        if (line ~ /^[[:space:]]*(pub(\([^)]*\))?[[:space:]]*)?(async[[:space:]]+)?(const[[:space:]]+)?(unsafe[[:space:]]+)?fn[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/) {
+          fn_name = line
+          sub(/.*fn[[:space:]]+/, "", fn_name)
+          sub(/[^A-Za-z0-9_].*/, "", fn_name)
+          fn_start = NR
+          fn_body = ""
+          brace_depth = count_braces(line)
+          in_fn = 1
+          suppress_fn = (prev_line ~ /(RECURSION_SAFE|RECURSION_OK|bounded recursion)/)
+
+          # Trait signatures and extern declarations end with a semicolon and have no body.
+          if (brace_depth <= 0 && line ~ /;[[:space:]]*$/) {
+            in_fn = 0
+            fn_name = ""
+            suppress_fn = 0
+          }
+
+          prev_line = line
+          next
+        }
+
+        prev_line = line
+        next
+      }
+
+      fn_body = fn_body "\n" line
+      brace_depth += count_braces(line)
+      if (brace_depth <= 0) {
+        if (!suppress_fn) {
+          pattern = "(^|[^A-Za-z0-9_])" fn_name "[[:space:]]*\\("
+          if (fn_body ~ pattern) {
+            printf "%s:%d: fn %s appears recursive (add bound/invariant comment if intentional)\n", file, fn_start, fn_name
+          }
+        }
+        in_fn = 0
+        fn_name = ""
+        suppress_fn = 0
+      }
+
+      prev_line = line
+    }
+  ' "$file"
+}
+
 print_section "Rust Architectural Style Checks"
 echo "Scanning: ${RUST_DIR}"
 
@@ -284,17 +359,31 @@ bool_param_hits="$(rg -n --pcre2 'pub\s+fn\s+\w+\s*\([^)]*:\s*bool\b' "${RUST_DI
 print_hits "warning" "public API bool parameters (prefer enums/options)" "${bool_param_hits}" "Replace bool parameters with a small enum or options struct so call sites are self-describing."
 
 # 3) let _ = ... ignored results (only flag if no explanatory comment on same or preceding line).
+# Also exclude inline #[test] functions and #[cfg(test)] modules.
 ignored_result_raw="$(rg -n --pcre2 -B1 'let\s+_\s*=\s*' "${RUST_DIR}" -g '*.rs' | rg -v '/tests?/|/benches?/' || true)"
-# Filter out instances with an explanatory comment
+# Filter out instances with an explanatory comment (preceding line or same line).
+# Recognized patterns: ignore, unused, intentional, discard, infallible, ok to fail,
+# always succeeds, cannot fail, best-effort, fire-and-forget, side effect only.
+# Also filter out lines that appear to be in test context (preceded by #[test]).
 ignored_result_hits="$(printf '%s\n' "${ignored_result_raw}" | awk '
-  # Comment on preceding line explaining the ignore
-  /\/\/.*[Ii]gnore|\/\/.*unused|\/\/.*intentional|\/\/.*discard/ {
+  # Skip #[test] or #[cfg(test)] markers and the next let _ =
+  /#\[(test|cfg\(test\))\]/ {
     skip_next = 1
     next
   }
-  # The actual let _ = line
+  # Comment on preceding line explaining the ignore
+  /\/\/.*([Ii]gnor|[Uu]nused|[Ii]ntentional|[Dd]iscard|[Ii]nfallible|ok to fail|always succeed|cannot fail|best.effort|fire.and.forget|side.effect|not needed|value discarded)/ {
+    skip_next = 1
+    next
+  }
+  # The actual let _ = line - check for same-line comment too
   /let\s+_\s*=/ {
     if (!skip_next) {
+      # Check if the line itself has an explanatory trailing comment
+      if ($0 ~ /\/\/.*([Ii]gnor|[Uu]nused|[Ii]ntentional|[Dd]iscard|[Ii]nfallible|ok to fail|always succeed|cannot fail|best.effort|fire.and.forget|side.effect|not needed|value discarded)/) {
+        skip_next = 0
+        next
+      }
       print
     }
     skip_next = 0
@@ -302,7 +391,25 @@ ignored_result_hits="$(printf '%s\n' "${ignored_result_raw}" | awk '
   }
   { skip_next = 0 }
 ' || true)"
-print_hits "warning" "ignored results via let _ =" "${ignored_result_hits}" "Handle the Result explicitly (match/if let), or document intentional discard with an inline reason comment."
+
+# Post-filter: exclude matches inside #[cfg(test)] modules by checking file context.
+filter_out_test_modules() {
+  while IFS= read -r line; do
+    [[ -z "${line}" ]] && continue
+    file="$(echo "${line}" | cut -d: -f1)"
+    lineno="$(echo "${line}" | cut -d: -f2)"
+    # Find the line number where #[cfg(test)] mod tests starts
+    test_mod_start="$(rg -n '#\[cfg\(test\)\]' "${file}" 2>/dev/null | head -1 | cut -d: -f1 || true)"
+    if [[ -n "${test_mod_start}" ]] && [[ "${lineno}" -gt "${test_mod_start}" ]]; then
+      # This line is inside the test module, skip it
+      continue
+    fi
+    echo "${line}"
+  done
+}
+ignored_result_hits="$(printf '%s\n' "${ignored_result_hits}" | filter_out_test_modules || true)"
+
+print_hits "warning" "ignored results via let _ =" "${ignored_result_hits}" "Handle the Result explicitly, or add a comment with: ignore, discard, infallible, side-effect, best-effort, etc."
 
 # 4) Potentially unbounded loops (only flag if not preceded by a bound/loop comment).
 loop_hits_raw="$(rg -n --pcre2 -B1 '^\s*loop\s*\{' "${RUST_DIR}" -g '*.rs' | rg -v '/tests?/|/benches?/' || true)"
@@ -312,7 +419,7 @@ loop_hits="$(printf '%s\n' "${loop_hits_raw}" | awk '
     skip_next = 1
     next
   }
-  /^\s*loop\s*\{/ {
+  /^[[:space:]]*loop[[:space:]]*\{/ {
     if (!skip_next) {
       print
     }
@@ -323,15 +430,37 @@ loop_hits="$(printf '%s\n' "${loop_hits_raw}" | awk '
 ' || true)"
 print_hits "warning" "potentially unbounded loop blocks (document invariant/bound)" "${loop_hits}" "Add an explicit bound or a nearby invariant comment explaining termination/forever-loop intent."
 
-# 5) TODO/FIXME/HACK markers in source.
+# 4b) while true loops should be documented like loop{}.
+while_true_hits_raw="$(rg -n --pcre2 -B1 '^\s*while\s+true\s*\{' "${RUST_DIR}" -g '*.rs' | rg -v '/tests?/|/benches?/' || true)"
+while_true_hits="$(printf '%s\n' "${while_true_hits_raw}" | awk '
+  /BOUND:|Forever|Termination:|exits on|until .* signal|until .* closed|terminates when/ {
+    skip_next = 1
+    next
+  }
+  /^[[:space:]]*while[[:space:]]+true[[:space:]]*\{/ {
+    if (!skip_next) {
+      print
+    }
+    skip_next = 0
+    next
+  }
+  { skip_next = 0 }
+' || true)"
+print_hits "warning" "while true loops without bound/invariant notes" "${while_true_hits}" "Prefer bounded loops. If intentional, add a preceding invariant comment describing termination/forever-loop intent."
+
+# 5) Avoid compound assertions in one assert call.
+compound_assert_hits="$(rg -n --pcre2 '\b(debug_)?assert!\s*\([^)]*(&&|\|\|)[^)]*\)' "${RUST_DIR}" -g '*.rs' | rg -v '/tests?/|/benches?/' || true)"
+print_hits "warning" "compound assertions in a single assert! call" "${compound_assert_hits}" "Split asserts into one invariant per assert! call so failures are precise and easier to diagnose."
+
+# 6) TODO/FIXME/HACK markers in source.
 todo_hits="$(rg -n --pcre2 '\b(TODO|FIXME|HACK|XXX)\b' "${RUST_DIR}" -g '*.rs' | rg -v '/tests?/|/benches?/' || true)"
 print_hits "warning" "technical-debt markers in source" "${todo_hits}" "Resolve the marker or convert it into a tracked issue reference with a concrete follow-up plan."
 
-# 6) Large magic-number comparisons.
+# 7) Large magic-number comparisons.
 magic_hits="$(rg -n --pcre2 '(<=|>=|<|>)\s*[0-9]{3,}\b' "${RUST_DIR}" -g '*.rs' | rg -v '/tests?/|/benches?/' || true)"
 print_hits "warning" "large magic-number comparisons (prefer named constants)" "${magic_hits}" "Extract the numeric threshold into a named constant with units (for example, *_MS, *_BYTES, *_MAX)."
 
-# 7) usize in serde-derived struct/enum definitions.
+# 8) usize in serde-derived struct/enum definitions.
 serde_files="$(rg -l --pcre2 '(Serialize|Deserialize)' "${RUST_DIR}" -g '*.rs' | rg '/src/' || true)"
 serde_usize_hits=""
 if [[ -n "${serde_files}" ]]; then
@@ -343,6 +472,44 @@ if [[ -n "${serde_files}" ]]; then
   done <<< "${serde_files}"
 fi
 print_hits "warning" "usize in serde-derived struct/enum definitions" "${serde_usize_hits}" "For serialized/persisted schema fields, replace usize with explicit-width integers (u32/u64), and reserve usize for in-memory indexing only."
+
+# 9) Recursive functions in core runtime scope should be explicitly justified.
+recursive_hits=""
+while IFS= read -r file; do
+  [[ -z "${file}" ]] && continue
+  blocks="$(scan_recursive_function_calls "${file}")"
+  [[ -z "${blocks}" ]] && continue
+  recursive_hits+="${blocks}"$'\n'
+done < <(find "${CORE_RUNTIME_SCOPE[@]}" -name '*.rs' -type f 2>/dev/null | grep -v '/tests/' | grep -v '/benches/')
+print_hits "warning" "potential recursion in core runtime modules" "${recursive_hits}" "Prefer iterative control flow. If recursion is intentional and bounded, add a nearby comment such as RECURSION_SAFE with the bound/invariant."
+
+# 10) Limit-style constants should encode units in names.
+limit_constant_hits="$(awk '
+  function has_unit_token(name,    n,toks,i) {
+    n = split(name, toks, "_")
+    for (i = 1; i <= n; i++) {
+      if (toks[i] ~ /^(MS|US|NS|SEC|SECS|SECOND|SECONDS|MINUTE|MINUTES|MINS|HOUR|HOURS|BYTES|BYTE|KB|MB|GB|COUNT|COUNTS|ENTRY|ENTRIES|ITEM|ITEMS|PCT|PERCENT|RATIO|TICK|TICKS)$/) {
+        return 1
+      }
+    }
+    return 0
+  }
+
+  {
+    line = $0
+    if (line ~ /^[[:space:]]*(pub[[:space:]]+)?const[[:space:]]+[A-Z][A-Z0-9_]*[[:space:]]*:[[:space:]]*[ui][0-9]+/) {
+      name = line
+      sub(/^[[:space:]]*(pub[[:space:]]+)?const[[:space:]]+/, "", name)
+      sub(/[[:space:]]*:.*$/, "", name)
+      if (name ~ /(MAX|MIN|LIMIT|TIMEOUT|INTERVAL|BACKOFF|CAPACITY|SIZE|LENGTH|LEN|BATCH)/) {
+        if (!has_unit_token(name)) {
+          print FILENAME ":" FNR ":" line
+        }
+      }
+    }
+  }
+' $(find "${RUST_DIR}" -name '*.rs' -type f | grep -v '/tests/' | grep -v '/benches/' ) || true)"
+print_hits "warning" "limit-style constants without explicit unit tokens" "${limit_constant_hits}" "Rename constants to include units (for example, *_MS, *_BYTES, *_COUNT, *_TICKS) so bounds are unambiguous."
 
 print_section "File and Block Size Checks"
 
@@ -416,15 +583,15 @@ print_hits "warning" "functions over 60 lines (refactor into smaller units)" "${
 
 print_section "Numeric Safety Checks"
 
-# 8) Fixed-point policy: use only telltale_types::FixedQ32 wrapper API.
+# 11) Fixed-point policy: use only telltale_types::FixedQ32 wrapper API.
 raw_fixed_hits="$(rg -n --pcre2 '\bfixed::' "${RUST_DIR}" -g '*.rs' | rg -v '/types/src/fixed_q32.rs:' || true)"
 print_hits "error" "raw fixed crate usage outside FixedQ32 wrapper" "${raw_fixed_hits}" "Use telltale_types::FixedQ32 (and its checked constructors/ops). Do not import fixed:: types directly outside rust/types/src/fixed_q32.rs."
 
-# 9) Strict config schema policy: no float-typed config fields.
+# 12) Strict config schema policy: no float-typed config fields.
 config_float_field_hits="$(rg -n --pcre2 'pub\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*(Option<\s*)?f(32|64)\b' "${RUST_DIR}" -g '*config*.rs' -g '*invariants*.rs' || true)"
 print_hits "error" "float-typed fields in config/schema definitions" "${config_float_field_hits}" "Replace float config/schema fields with FixedQ32 or explicit integer-scaled types so serialized config remains deterministic."
 
-# 10) Strict fixed-point config decoding: FixedQ32 must not accept float tokens.
+# 13) Strict fixed-point config decoding: FixedQ32 must not accept float tokens.
 fixed_q32_float_decode_hits="$(rg -n --pcre2 'visit_f(32|64)\s*\(' "${RUST_DIR}/types/src/fixed_q32.rs" || true)"
 print_hits "error" "FixedQ32 float-token deserialization path" "${fixed_q32_float_decode_hits}" "Reject JSON float tokens for FixedQ32 deserialization; accept deterministic encodings only (decimal strings or explicit fixed-point integer forms)."
 
@@ -442,13 +609,13 @@ for path in "${DETERMINISM_TEST_SCOPE[@]}"; do
   fi
 done
 
-# 11) Floating-point types in deterministic runtime/simulation scope.
+# 14) Floating-point types in deterministic runtime/simulation scope.
 float_type_hits="$(scan_scope_hits '\b(f32|f64)\b' "${DETERMINISM_RUNTIME_SCOPE[@]}" "${DETERMINISM_TEST_SCOPE[@]}")"
 float_type_hits="$(filter_float_matches_to_code_tokens "${float_type_hits}")"
 float_type_hits="$(filter_out_paths "${float_type_hits}" '/vm/tests/helpers/')"
 print_hits "error" "floating-point types in deterministic VM/simulation scope" "${float_type_hits}" "Replace floating-point values with deterministic fixed-point or integer representations (for example, scaled i64/u64 newtypes)."
 
-# 12) Direct host nondeterminism must not appear in deterministic scope.
+# 15) Direct host nondeterminism must not appear in deterministic scope.
 # Note: MockClock's Instant::now() is documented as unavoidable - Rust's Instant
 # cannot be constructed synthetically. Only the offset matters for determinism.
 nondet_hits="$(scan_scope_hits 'SystemTime::now\(|Instant::now\(|UNIX_EPOCH|rand::thread_rng\(|thread_rng\(|rand::random\(|getrandom\(|from_entropy\(|OsRng\b|Utc::now\(|Local::now\(' "${DETERMINISM_RUNTIME_SCOPE[@]}" "${DETERMINISM_TEST_SCOPE[@]}")"
@@ -457,15 +624,19 @@ nondet_hits="$(filter_out_paths "${nondet_hits}" 'simulation/clock.rs:.*start: I
 nondet_hits="$(filter_out_comments "${nondet_hits}")"
 print_hits "error" "direct host nondeterminism in deterministic VM/simulation scope" "${nondet_hits}" "Route entropy and wall-clock access through explicit effect injection APIs; keep core runtime logic pure and replayable."
 
-# 13) VM kernel must not touch host I/O/process/env APIs directly.
+# 16) Potential lock-held-across-await patterns.
+lock_await_hits="$(rg -n --pcre2 -U 'let\s+[A-Za-z_][A-Za-z0-9_]*\s*=\s*[^;\n]*(lock|read|write)\s*\([^;\n]*\)[^;\n]*;\n(?:.*\n){0,12}?.*\.await' "${RUST_DIR}" -g '*.rs' | rg -v '/tests?/|/benches?/' || true)"
+print_hits "warning" "potential lock-held-across-await patterns" "${lock_await_hits}" "Avoid holding lock guards across .await boundaries. Narrow lock scope or clone needed data before awaiting."
+
+# 17) VM kernel must not touch host I/O/process/env APIs directly.
 kernel_side_effect_hits="$(scan_scope_hits 'std::fs::|std::net::|std::env::var\(|std::process::Command|tokio::fs::|tokio::net::|tokio::process::Command' "${VM_KERNEL_SCOPE[@]}")"
 print_hits "error" "direct host side effects in VM kernel sources" "${kernel_side_effect_hits}" "Move host I/O, process, network, and environment reads behind the VM effect layer and inject handles at the boundary."
 
-# 14) HashMap/HashSet in deterministic scope can destabilize iteration order.
+# 18) HashMap/HashSet in deterministic scope can destabilize iteration order.
 hash_collection_hits="$(scan_scope_hits '\b(HashMap|HashSet)\b' "${DETERMINISM_RUNTIME_SCOPE[@]}")"
 print_hits "warning" "hash-based collections in deterministic VM/simulation scope" "${hash_collection_hits}" "Prefer BTreeMap/BTreeSet for stable ordering, or enforce deterministic ordering before iterating/emitting externally visible results."
 
-# 15) Thread scheduling/time sleeps in deterministic scope.
+# 19) Thread scheduling/time sleeps in deterministic scope.
 thread_nondet_hits="$(scan_scope_hits 'std::thread::spawn\(|std::thread::sleep\(|tokio::spawn\(|tokio::time::sleep\(' "${DETERMINISM_RUNTIME_SCOPE[@]}" "${DETERMINISM_TEST_SCOPE[@]}")"
 print_hits "error" "direct thread scheduling/timer calls in deterministic VM/simulation scope" "${thread_nondet_hits}" "Model scheduling and timers as explicit scheduler/effect inputs so replay behavior is controlled and cross-target equivalent."
 

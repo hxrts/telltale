@@ -33,9 +33,7 @@ use crate::instruction_semantics::{decode_endpoint_fact, endpoint_from_reg};
 use crate::intern::{StringId, SymbolTable};
 use crate::kernel::{KernelMachine, VMKernel};
 use crate::loader::CodeImage;
-use crate::output_condition::{
-    OutputConditionCheck, OutputConditionHint,
-};
+use crate::output_condition::{OutputConditionCheck, OutputConditionHint};
 use crate::scheduler::Scheduler;
 use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragmentV1};
 use crate::session::{
@@ -1450,10 +1448,7 @@ impl ThreadedVM {
                 coro_guard.pc += 1;
                 coro_guard.status = CoroStatus::Ready;
             }
-            CoroUpdate::AdvancePcSpawnChild {
-                target,
-                ref args,
-            } => {
+            CoroUpdate::AdvancePcSpawnChild { target, ref args } => {
                 if self.coroutines.len() >= self.config.max_coroutines {
                     return Err(Fault::Speculation {
                         message: "max coroutines exceeded".to_string(),
@@ -1705,6 +1700,7 @@ impl ThreadedVM {
         if owners == vec![expected_owner] {
             return Ok(());
         }
+        // Intentional discard: values available for debugging but not in error message.
         let _ = (endpoint, owners, expected_owner);
         Err(transfer_fault_delegation_guard_violation("for handoff"))
     }
@@ -2169,11 +2165,14 @@ fn step_send_prepare(
         });
     }
     let sid = ep.sid;
-    let type_entry = session.local_types.get(&ep).ok_or_else(|| Fault::TypeViolation {
-        expected: telltale_types::ValType::Unit,
-        actual: telltale_types::ValType::Unit,
-        message: format!("{role}: no type registered"),
-    })?;
+    let type_entry = session
+        .local_types
+        .get(&ep)
+        .ok_or_else(|| Fault::TypeViolation {
+            expected: telltale_types::ValType::Unit,
+            actual: telltale_types::ValType::Unit,
+            message: format!("{role}: no type registered"),
+        })?;
 
     let (partner, branches) = match &type_entry.current {
         LocalTypeR::Send {
@@ -2357,11 +2356,14 @@ fn step_recv_prepare(
     }
     let sid = ep.sid;
 
-    let type_entry = session.local_types.get(&ep).ok_or_else(|| Fault::TypeViolation {
-        expected: telltale_types::ValType::Unit,
-        actual: telltale_types::ValType::Unit,
-        message: format!("{role}: no type registered"),
-    })?;
+    let type_entry = session
+        .local_types
+        .get(&ep)
+        .ok_or_else(|| Fault::TypeViolation {
+            expected: telltale_types::ValType::Unit,
+            actual: telltale_types::ValType::Unit,
+            message: format!("{role}: no type registered"),
+        })?;
 
     let (partner, branches) = match &type_entry.current {
         LocalTypeR::Recv {
@@ -2440,7 +2442,13 @@ fn step_recv(
     )?;
 
     ctx.handler
-        .handle_recv(role, &prepared.partner, &prepared.label, &mut coro.regs, &val)
+        .handle_recv(
+            role,
+            &prepared.partner,
+            &prepared.label,
+            &mut coro.regs,
+            &val,
+        )
         .map_err(|e| Fault::Invoke { message: e })?;
 
     let (_resolved, type_update) =
@@ -3398,7 +3406,10 @@ mod tests {
             &store,
             &cfg,
             &["A".to_string(), "B".to_string()],
-            &[("A".to_string(), LocalTypeR::End), ("B".to_string(), LocalTypeR::End)],
+            &[
+                ("A".to_string(), LocalTypeR::End),
+                ("B".to_string(), LocalTypeR::End),
+            ],
             &handlers,
             &[("A".to_string(), 1), ("B".to_string(), 2)],
             1,

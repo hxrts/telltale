@@ -1682,11 +1682,7 @@ impl VM {
     /// Canonical replay/state fragment for deterministic diffing and snapshots.
     #[must_use]
     pub fn canonical_replay_fragment(&self) -> CanonicalReplayFragmentV1 {
-        let partitioned_edges = self
-            .partitioned_edges
-            .iter()
-            .cloned()
-            .collect();
+        let partitioned_edges = self.partitioned_edges.iter().cloned().collect();
         let corrupted_edges = self
             .corrupted_edges
             .iter()
@@ -2893,8 +2889,7 @@ impl VM {
                 .resources
                 .insert(layer_id.clone(), Value::Unit);
         }
-        let _ = self
-            .guard_layer
+        self.guard_layer
             .open_(&layer_id)
             .map_err(|e| Fault::Acquire {
                 layer: input.layer.to_string(),
@@ -3579,9 +3574,11 @@ impl VM {
         }
 
         let initial_types: BTreeMap<String, LocalTypeR> = local_types.iter().cloned().collect();
-        let sid = self
-            .sessions
-            .open(open_roles.clone(), &self.config.buffer_config, &initial_types);
+        let sid = self.sessions.open(
+            open_roles.clone(),
+            &self.config.buffer_config,
+            &initial_types,
+        );
         self.next_session_id = self.sessions.next_session_id();
         for ((sender, receiver), handler_id) in handlers {
             self.sessions.update_handler(
@@ -4769,10 +4766,7 @@ mod tests {
             vec![
                 Instr::Open {
                     roles: vec!["A".to_string(), "B".to_string()],
-                    local_types: vec![
-                        ("A".to_string(), send_twice),
-                        ("B".to_string(), recv_twice),
-                    ],
+                    local_types: vec![("A".to_string(), send_twice), ("B".to_string(), recv_twice)],
                     handlers: full_handlers,
                     dsts: vec![("A".to_string(), 1), ("B".to_string(), 2)],
                 },
@@ -4952,8 +4946,14 @@ mod tests {
             })
             .collect();
         assert_eq!(opened, vec![0, 1], "expected monotonic opened sessions");
-        assert!(vm.sessions().get(0).is_some(), "bootstrap session must remain");
-        assert!(vm.sessions().get(1).is_some(), "runtime-open session must exist");
+        assert!(
+            vm.sessions().get(0).is_some(),
+            "bootstrap session must remain"
+        );
+        assert!(
+            vm.sessions().get(1).is_some(),
+            "runtime-open session must exist"
+        );
         assert_eq!(vm.next_session_id(), 2);
     }
 

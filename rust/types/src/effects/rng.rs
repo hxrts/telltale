@@ -149,9 +149,8 @@ impl Rng for SeededRng {
     fn fork(&mut self) -> Self {
         // Use the next value as the seed for the forked RNG
         let fork_seed = self.next_u64();
-        // Advance parent again so parent and child produce different sequences
-        // (otherwise both have the same state after fork)
-        let _ = self.next_u64();
+        // Advance parent state so parent and child diverge (value discarded).
+        self.next_u64();
         Self::new(fork_seed)
     }
 }
