@@ -1,8 +1,7 @@
 # Background
 
 This document introduces the theory behind Telltale. It covers multiparty session types, choreographic programming, and algebraic effects. These concepts explain how the system enforces type-safe distributed programming.
-Use [Start Here by Role](00_start_here.md) for role-specific reading paths.
-Use [Documentation Map](00_docs_map.md) for guide vs reference classification and normative status.
+See [Documentation Map](00_docs_map.md) for role-based reading paths and document classification.
 
 ## Session Types
 

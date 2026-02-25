@@ -137,7 +137,7 @@ let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
 ```
 
-This lane validates runtime behavior without reimplementing VM checks in the host project. See [VM Simulation](14_vm_simulation.md) for harness config fields and preset helpers.
+This lane validates runtime behavior without reimplementing VM checks in the host project. See [VM Simulation](14_vm_simulation_overview.md) for harness config fields and preset helpers.
 
 ## Performance and Diagnostics Controls
 

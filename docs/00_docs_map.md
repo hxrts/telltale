@@ -1,7 +1,6 @@
 # Documentation Map
 
-This page classifies docs by purpose and normative status.
-Use [Start Here by Role](00_start_here.md) for onboarding paths.
+This page classifies docs by purpose and normative status, and provides role-based reading paths.
 
 ## Classification Model
 
@@ -18,7 +17,6 @@ Normative status is per document.
 
 | Document | Type | Normative Status |
 |---|---|---|
-| [Start Here by Role](00_start_here.md) | Guide | Informative |
 | [Background](00_introduction.md) | Concept | Informative |
 | [Getting Started](01_getting_started.md) | Guide | Informative |
 | [Architecture](02_architecture.md) | Concept | Mixed |
@@ -33,7 +31,7 @@ Normative status is per document.
 | [VM Architecture](11_vm_architecture.md) | Reference | Normative |
 | [Bytecode Instructions](12_bytecode_instructions.md) | Reference | Normative |
 | [Session Lifecycle](13_session_lifecycle.md) | Reference | Normative |
-| [VM Simulation](14_vm_simulation.md) | Guide | Mixed |
+| [VM Simulation](14_vm_simulation_overview.md) | Guide | Mixed |
 | [VM Simulation Runner](14_vm_simulation_runner.md) | Reference | Normative |
 | [VM Simulation Scenarios](14_vm_simulation_scenarios.md) | Guide | Mixed |
 | [VM Simulation Materials](14_vm_simulation_materials.md) | Reference | Informative |
@@ -52,7 +50,29 @@ Normative status is per document.
 | [Distributed and Classical Families](27_distributed_classical_families.md) | Reference | Mixed |
 | [Glossary and Notation Index](28_glossary_notation.md) | Reference | Informative |
 
-## Quick Views
+## Paths by Role
+
+### Library User
+
+Start with [Background](00_introduction.md), then [Getting Started](01_getting_started.md), then [Choreographic DSL](04_choreographic_dsl.md).
+Continue with [Examples](23_examples.md) and [API Reference](22_api_reference.md).
+
+### VM Integrator
+
+Start with [Architecture](02_architecture.md), then [Effect Handlers and Session Types](10_effect_session_bridge.md), then [VM Architecture](11_vm_architecture.md).
+Continue with [Bytecode Instructions](12_bytecode_instructions.md), [Session Lifecycle](13_session_lifecycle.md), and [VM Simulation](14_vm_simulation_overview.md).
+
+### Lean and Proof Reader
+
+Start with [Theory](06_theory.md), then [Lean Verification](18_lean_verification.md), then [Lean-Rust Bridge](19_lean_rust_bridge.md).
+Continue with [Capability and Admission](25_capability_admission.md), [Theorem Program](26_theorem_program.md), and [Distributed and Classical Families](27_distributed_classical_families.md).
+
+### Paper Reviewer
+
+Start with [Background](00_introduction.md), [Architecture](02_architecture.md), and [Theory](06_theory.md).
+Then read [Theorem Program](26_theorem_program.md) and [Glossary and Notation Index](28_glossary_notation.md).
+
+## Reading Notes
 
 Guide-first readers should prioritize Guide docs, then selective Reference docs.
 Integrator and verifier readers should prioritize Normative Reference docs.

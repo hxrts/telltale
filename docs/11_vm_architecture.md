@@ -113,7 +113,7 @@ Release conformance surfaces are exported through theorem-pack APIs and enforced
 
 - [Bytecode Instructions](12_bytecode_instructions.md)
 - [Session Lifecycle](13_session_lifecycle.md)
-- [VM Simulation](14_vm_simulation.md)
+- [VM Simulation](14_vm_simulation_overview.md)
 - [VM Parity](15_vm_parity.md)
 - [Effect Handlers and Session Types](10_effect_session_bridge.md)
 - [Lean Verification](18_lean_verification.md)

@@ -112,7 +112,7 @@ Record ordering is stable within each sampling pass for role snapshots.
 
 ## Related Docs
 
-- [VM Simulation](14_vm_simulation.md)
+- [VM Simulation](14_vm_simulation_overview.md)
 - [VM Simulation Scenarios](14_vm_simulation_scenarios.md)
 - [VM Simulation Materials](14_vm_simulation_materials.md)
 - [VM Parity](15_vm_parity.md)
