@@ -12,11 +12,11 @@ Run `just artifact-check`. Then inspect `paper/artifact_manifest.json` and [Arti
 
 The Rust project implements the operational model from the paper series. It includes the choreography pipeline, VM runtime behavior, admission checks, and simulation tooling.
 
-- Choreographic DSL with projection and compiler pipeline.
-- VM execution model for asynchronous buffered protocols.
-- Runtime theorem-pack and capability-gated admission interfaces.
-- Reconfiguration-facing checks for link, delegation, and transition steps.
-- Simulation and cross-target conformance tooling for Rust VM and Lean reference traces.
+- Choreographic DSL with projection and compiler pipeline
+- Virtual machine for safe execution of asynchronous buffered protocols
+- Runtime theorem-pack and capability-guarded admission interfaces
+- Reconfiguration-facing checks for link, delegation, and transition steps
+- Simulation and cross-target conformance tooling for Rust VM and Lean reference traces
 
 Main code is in `rust/`. Workspace configuration is in `Cargo.toml`. A typical health check is `cargo test --workspace --all-targets --all-features`.
 
