@@ -332,7 +332,7 @@ scan_recursive_function_calls() {
       brace_depth += count_braces(line)
       if (brace_depth <= 0) {
         if (!suppress_fn) {
-          pattern = "(^|[^A-Za-z0-9_])" fn_name "[[:space:]]*\\("
+          pattern = "(^|[^A-Za-z0-9_:.])" fn_name "[[:space:]]*\\("
           if (fn_body ~ pattern) {
             printf "%s:%d: fn %s appears recursive (add bound/invariant comment if intentional)\n", file, fn_start, fn_name
           }
@@ -343,6 +343,71 @@ scan_recursive_function_calls() {
       }
 
       prev_line = line
+    }
+  ' "$file"
+}
+
+scan_lock_await_hits() {
+  local file="$1"
+  awk -v file="$file" '
+    BEGIN {
+      track = 0
+      start_line = 0
+      guard_name = ""
+      window = 0
+    }
+
+    {
+      line = $0
+
+      # Track statements like:
+      # let guard = lock.read().await;
+      # let mut guard = state.lock().await?;
+      if (line ~ /let[[:space:]]+(mut[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[^;]*(lock|read|write)\([^)]*\)[[:space:]]*\.await/) {
+        tmp = line
+        sub(/.*let[[:space:]]+/, "", tmp)
+        sub(/=.*/, "", tmp)
+        gsub(/[[:space:]]+/, "", tmp)
+        gsub(/^mut/, "", tmp)
+        guard_name = tmp
+        start_line = NR
+        window = 12
+        track = 1
+        next
+      }
+
+      if (!track) {
+        next
+      }
+
+      if (window <= 0) {
+        track = 0
+        guard_name = ""
+        next
+      }
+
+      # Ignore comments and blank lines in the lookahead window.
+      if (line ~ /^[[:space:]]*$/ || line ~ /^[[:space:]]*\/\//) {
+        window -= 1
+        next
+      }
+
+      # Explicit drop/rebind ends the hold window.
+      if (line ~ ("drop[[:space:]]*\\([[:space:]]*" guard_name "[[:space:]]*\\)") ||
+          line ~ ("let[[:space:]]+(mut[[:space:]]+)?" guard_name "[[:space:]]*=")) {
+        track = 0
+        guard_name = ""
+        next
+      }
+
+      if (line ~ /\.await/) {
+        printf "%s:%d: lock/read/write guard `%s` may be held across await within %d-line window\n", file, start_line, guard_name, 12
+        track = 0
+        guard_name = ""
+        next
+      }
+
+      window -= 1
     }
   ' "$file"
 }
@@ -625,7 +690,13 @@ nondet_hits="$(filter_out_comments "${nondet_hits}")"
 print_hits "error" "direct host nondeterminism in deterministic VM/simulation scope" "${nondet_hits}" "Route entropy and wall-clock access through explicit effect injection APIs; keep core runtime logic pure and replayable."
 
 # 16) Potential lock-held-across-await patterns.
-lock_await_hits="$(rg -n --pcre2 -U 'let\s+[A-Za-z_][A-Za-z0-9_]*\s*=\s*[^;\n]*(lock|read|write)\s*\([^;\n]*\)[^;\n]*;\n(?:.*\n){0,12}?.*\.await' "${RUST_DIR}" -g '*.rs' | rg -v '/tests?/|/benches?/' || true)"
+lock_await_hits=""
+while IFS= read -r file; do
+  [[ -z "${file}" ]] && continue
+  lines="$(scan_lock_await_hits "${file}")"
+  [[ -z "${lines}" ]] && continue
+  lock_await_hits+="${lines}"$'\n'
+done < <(find "${RUST_DIR}" -name '*.rs' -type f | grep -v '/tests/' | grep -v '/benches/')
 print_hits "warning" "potential lock-held-across-await patterns" "${lock_await_hits}" "Avoid holding lock guards across .await boundaries. Narrow lock scope or clone needed data before awaiting."
 
 # 17) VM kernel must not touch host I/O/process/env APIs directly.

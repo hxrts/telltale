@@ -9,7 +9,7 @@ use super::{
 use crate::identifiers::RoleName;
 use crate::runtime::sync::RwLock;
 use crate::{read_lock, write_lock};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -43,7 +43,7 @@ pub struct TopologyHandler {
     /// The role this handler represents.
     role: RoleName,
     /// Transports for each peer role.
-    transports: Arc<RwLock<HashMap<RoleName, Box<dyn Transport>>>>,
+    transports: Arc<RwLock<BTreeMap<RoleName, Box<dyn Transport>>>>,
     /// Whether the handler is initialized.
     initialized: Arc<RwLock<bool>>,
 }
@@ -54,7 +54,7 @@ impl TopologyHandler {
         Self {
             topology,
             role,
-            transports: Arc::new(RwLock::new(HashMap::new())),
+            transports: Arc::new(RwLock::new(BTreeMap::new())),
             initialized: Arc::new(RwLock::new(false)),
         }
     }

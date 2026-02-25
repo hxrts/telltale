@@ -8,7 +8,7 @@
 #![allow(clippy::expect_used)]
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use telltale_choreography::{
@@ -109,8 +109,8 @@ fn test_message_types() {
 
 #[wasm_bindgen_test]
 fn test_handler_creation() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let handler = InMemoryHandler::with_channels(TestRole::Alice, channels, choice_channels);
 
@@ -173,8 +173,8 @@ fn test_program_parallel() {
 #[wasm_bindgen_test]
 async fn test_simple_send_recv() {
     // Create shared channels for Alice and Bob
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     // Alice's handler
     let mut alice_handler =

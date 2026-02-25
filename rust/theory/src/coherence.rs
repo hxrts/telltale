@@ -17,7 +17,6 @@ use crate::merge::can_merge;
 use crate::projection::MemoizedProjector;
 use crate::semantics::{can_step, step, GlobalAction};
 use crate::well_formedness::unique_labels;
-use std::collections::HashSet;
 use telltale_types::GlobalType;
 
 /// Coherence bundle for global types.
@@ -150,7 +149,7 @@ pub fn projectable(g: &GlobalType) -> bool {
     // Check that projection would succeed for each role
     // For now, we check structural properties that ensure projection succeeds
     for role in &roles {
-        if !can_project_role(g, role, &mut HashSet::new(), &mut projector) {
+        if !can_project_role(g, role, &mut Vec::new(), &mut projector) {
             return false;
         }
     }
@@ -164,13 +163,13 @@ pub fn projectable(g: &GlobalType) -> bool {
 fn can_project_role(
     g: &GlobalType,
     role: &str,
-    visited: &mut HashSet<GlobalType>,
+    visited: &mut Vec<GlobalType>,
     projector: &mut MemoizedProjector,
 ) -> bool {
     if visited.contains(g) {
         return true; // Assume projectable for cycles
     }
-    visited.insert(g.clone());
+    visited.push(g.clone());
 
     match g {
         GlobalType::End => true,
@@ -244,10 +243,10 @@ fn can_project_role(
 /// a step must exist (step returns Some).
 #[must_use]
 pub fn good_g(g: &GlobalType) -> bool {
-    good_g_fuel(g, 100, &mut HashSet::new())
+    good_g_fuel(g, 100, &mut Vec::new())
 }
 
-fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut HashSet<GlobalType>) -> bool {
+fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut Vec<GlobalType>) -> bool {
     if fuel == 0 {
         return true; // Assume good if we run out of fuel
     }
@@ -255,7 +254,7 @@ fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut HashSet<GlobalType>) -
     if visited.contains(g) {
         return true; // Avoid infinite loops
     }
-    visited.insert(g.clone());
+    visited.push(g.clone());
 
     match g {
         GlobalType::End => true,

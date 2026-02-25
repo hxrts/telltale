@@ -40,7 +40,7 @@
 //!   message regardless of which branch was taken.
 
 use crate::{Label, LocalTypeR};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use thiserror::Error;
 
 /// Errors that can occur during type merging
@@ -300,7 +300,7 @@ fn merge_recv_branches(
     branches1: &[(Label, Option<crate::ValType>, LocalTypeR)],
     branches2: &[(Label, Option<crate::ValType>, LocalTypeR)],
 ) -> Result<Vec<(Label, Option<crate::ValType>, LocalTypeR)>, MergeError> {
-    let mut result: HashMap<String, (Label, Option<crate::ValType>, LocalTypeR)> = HashMap::new();
+    let mut result: BTreeMap<String, (Label, Option<crate::ValType>, LocalTypeR)> = BTreeMap::new();
 
     // Add all branches from the first set
     for (label, vt, cont) in branches1 {
@@ -334,11 +334,7 @@ fn merge_recv_branches(
         }
     }
 
-    // Convert back to vector, sorted by label name for determinism
-    let mut branches: Vec<_> = result.into_values().collect();
-    branches.sort_by(|a, b| a.0.name.cmp(&b.0.name));
-
-    Ok(branches)
+    Ok(result.into_values().collect())
 }
 
 /// Merge multiple local types.

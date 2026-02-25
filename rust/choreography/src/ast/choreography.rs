@@ -3,7 +3,7 @@
 use super::{Protocol, Role, ValidationError};
 use proc_macro2::Ident;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 const ATTR_PROOF_BUNDLES: &str = "dsl.proof_bundles";
 const ATTR_REQUIRED_PROOF_BUNDLES: &str = "dsl.required_proof_bundles";
@@ -103,7 +103,7 @@ impl Choreography {
 
     fn validate_proof_bundles(&self) -> Result<(), ValidationError> {
         let bundles = self.proof_bundles();
-        let mut declared: HashSet<String> = HashSet::new();
+        let mut declared: BTreeSet<String> = BTreeSet::new();
         for bundle in &bundles {
             if !declared.insert(bundle.name.clone()) {
                 return Err(ValidationError::DuplicateProofBundle(bundle.name.clone()));

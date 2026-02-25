@@ -6,7 +6,7 @@
 
 use super::{ExtensionRegistry, GrammarExtension, ParseError};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 /// Extension metadata for discovery and versioning
@@ -37,7 +37,7 @@ pub struct ExtensionPackage {
 /// Registry for extension discovery and management
 #[derive(Debug, Default)]
 pub struct ExtensionDiscovery {
-    discovered_extensions: HashMap<String, ExtensionPackage>,
+    discovered_extensions: BTreeMap<String, ExtensionPackage>,
     search_paths: Vec<PathBuf>,
 }
 
@@ -89,7 +89,7 @@ impl ExtensionDiscovery {
     }
 
     /// Get all discovered extensions
-    pub fn get_extensions(&self) -> &HashMap<String, ExtensionPackage> {
+    pub fn get_extensions(&self) -> &BTreeMap<String, ExtensionPackage> {
         &self.discovered_extensions
     }
 
@@ -113,15 +113,15 @@ impl ExtensionDiscovery {
         extension_names: &[String],
     ) -> Result<Vec<String>, ParseError> {
         let mut resolved = Vec::new();
-        let mut visited = std::collections::HashSet::new();
-        let mut visiting = std::collections::HashSet::new(); // For cycle detection
+        let mut visited = BTreeSet::new();
+        let mut visiting = BTreeSet::new(); // For cycle detection
 
         // Helper function for DFS topological sort
         fn visit(
             name: &str,
-            extensions: &HashMap<String, ExtensionPackage>,
-            visited: &mut std::collections::HashSet<String>,
-            visiting: &mut std::collections::HashSet<String>,
+            extensions: &BTreeMap<String, ExtensionPackage>,
+            visited: &mut BTreeSet<String>,
+            visiting: &mut BTreeSet<String>,
             resolved: &mut Vec<String>,
         ) -> Result<(), ParseError> {
             if visited.contains(name) {

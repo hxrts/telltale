@@ -16,7 +16,7 @@
 
 use crate::{Label, ValType};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 /// Core local type matching Lean's `LocalTypeR`.
 ///
@@ -123,12 +123,12 @@ impl LocalTypeR {
     #[must_use]
     pub fn free_vars(&self) -> Vec<String> {
         let mut result = Vec::new();
-        let mut bound = HashSet::new();
+        let mut bound = BTreeSet::new();
         self.collect_free_vars(&mut result, &mut bound);
         result
     }
 
-    fn collect_free_vars(&self, free: &mut Vec<String>, bound: &mut HashSet<String>) {
+    fn collect_free_vars(&self, free: &mut Vec<String>, bound: &mut BTreeSet<String>) {
         match self {
             LocalTypeR::End => {}
             LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
@@ -252,10 +252,10 @@ impl LocalTypeR {
     /// Corresponds to Lean's `LocalTypeR.allVarsBound`.
     #[must_use]
     pub fn all_vars_bound(&self) -> bool {
-        self.check_vars_bound(&HashSet::new())
+        self.check_vars_bound(&BTreeSet::new())
     }
 
-    fn check_vars_bound(&self, bound: &HashSet<String>) -> bool {
+    fn check_vars_bound(&self, bound: &BTreeSet<String>) -> bool {
         match self {
             LocalTypeR::End => true,
             LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => branches
@@ -377,14 +377,12 @@ impl LocalTypeR {
     /// Corresponds to Lean's `LocalTypeR.partners`.
     #[must_use]
     pub fn partners(&self) -> Vec<String> {
-        let mut result = HashSet::new();
+        let mut result = BTreeSet::new();
         self.collect_partners(&mut result);
-        let mut partners: Vec<_> = result.into_iter().collect();
-        partners.sort();
-        partners
+        result.into_iter().collect()
     }
 
-    fn collect_partners(&self, partners: &mut HashSet<String>) {
+    fn collect_partners(&self, partners: &mut BTreeSet<String>) {
         match self {
             LocalTypeR::End | LocalTypeR::Var(_) => {}
             LocalTypeR::Send { partner, branches } | LocalTypeR::Recv { partner, branches } => {

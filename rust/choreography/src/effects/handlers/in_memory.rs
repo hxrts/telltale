@@ -8,40 +8,58 @@ use async_trait::async_trait;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::StreamExt;
 use serde::{de::DeserializeOwned, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use crate::effects::{ChoreoHandler, ChoreoResult, ChoreographyError, RoleId};
+use crate::RoleName;
 
 type MessageChannelPair = (UnboundedSender<Vec<u8>>, UnboundedReceiver<Vec<u8>>);
 type ChoiceChannelPair<L> = (UnboundedSender<L>, UnboundedReceiver<L>);
-type MessageChannelMap<R> = std::sync::Arc<std::sync::Mutex<HashMap<(R, R), MessageChannelPair>>>;
-type ChoiceChannelMap<R, L> =
-    std::sync::Arc<std::sync::Mutex<HashMap<(R, R), ChoiceChannelPair<L>>>>;
+type MessageChannelMap =
+    std::sync::Arc<std::sync::Mutex<BTreeMap<(RoleKey, RoleKey), MessageChannelPair>>>;
+type ChoiceChannelMap<L> =
+    std::sync::Arc<std::sync::Mutex<BTreeMap<(RoleKey, RoleKey), ChoiceChannelPair<L>>>>;
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct RoleKey {
+    name: RoleName,
+    index: Option<u32>,
+}
+
+impl RoleKey {
+    fn from_role<R: RoleId>(role: R) -> Self {
+        Self {
+            name: role.role_name(),
+            index: role.role_index(),
+        }
+    }
+}
 
 /// In-memory handler for testing - uses tokio channels
 pub struct InMemoryHandler<R: RoleId> {
     role: R,
     // Channel map for sending/receiving messages between roles
-    channels: MessageChannelMap<R>,
+    channels: MessageChannelMap,
     // Choice channel for broadcasting/receiving choice labels
-    choice_channels: ChoiceChannelMap<R, R::Label>,
+    choice_channels: ChoiceChannelMap<R::Label>,
 }
 
 impl<R: RoleId> InMemoryHandler<R> {
     pub fn new(role: R) -> Self {
         Self {
             role,
-            channels: std::sync::Arc::new(std::sync::Mutex::new(HashMap::new())),
-            choice_channels: std::sync::Arc::new(std::sync::Mutex::new(HashMap::new())),
+            channels: std::sync::Arc::new(std::sync::Mutex::new(BTreeMap::new())),
+            choice_channels: std::sync::Arc::new(std::sync::Mutex::new(BTreeMap::new())),
         }
     }
 
     /// Create a new handler with shared channels for coordinated testing
     pub fn with_channels(
         role: R,
-        channels: MessageChannelMap<R>,
-        choice_channels: ChoiceChannelMap<R, R::Label>,
+        channels: MessageChannelMap,
+        choice_channels: ChoiceChannelMap<R::Label>,
     ) -> Self {
         Self {
             role,
@@ -56,11 +74,8 @@ impl<R: RoleId> InMemoryHandler<R> {
             .channels
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        channels
-            .entry((from, to))
-            .or_insert_with(unbounded)
-            .0
-            .clone()
+        let key = (RoleKey::from_role(from), RoleKey::from_role(to));
+        channels.entry(key).or_insert_with(unbounded).0.clone()
     }
 
     /// Get receiver for a channel pair
@@ -69,7 +84,8 @@ impl<R: RoleId> InMemoryHandler<R> {
             .channels
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        channels.remove(&(from, to)).map(|(_, rx)| rx)
+        let key = (RoleKey::from_role(from), RoleKey::from_role(to));
+        channels.remove(&key).map(|(_, rx)| rx)
     }
 
     /// Get or create a choice channel pair for broadcasting choices
@@ -78,11 +94,8 @@ impl<R: RoleId> InMemoryHandler<R> {
             .choice_channels
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        channels
-            .entry((from, to))
-            .or_insert_with(unbounded)
-            .0
-            .clone()
+        let key = (RoleKey::from_role(from), RoleKey::from_role(to));
+        channels.entry(key).or_insert_with(unbounded).0.clone()
     }
 
     /// Get choice receiver for a channel pair
@@ -91,7 +104,8 @@ impl<R: RoleId> InMemoryHandler<R> {
             .choice_channels
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        channels.remove(&(from, to)).map(|(_, rx)| rx)
+        let key = (RoleKey::from_role(from), RoleKey::from_role(to));
+        channels.remove(&key).map(|(_, rx)| rx)
     }
 }
 
@@ -146,8 +160,9 @@ impl<R: RoleId + 'static> ChoreoHandler for InMemoryHandler<R> {
                 .channels
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if let Some((tx, _)) = channels.remove(&(from, self.role)) {
-                channels.insert((from, self.role), (tx, receiver));
+            let key = (RoleKey::from_role(from), RoleKey::from_role(self.role));
+            if let Some((tx, _)) = channels.remove(&key) {
+                channels.insert(key, (tx, receiver));
             }
         }
 
@@ -204,8 +219,9 @@ impl<R: RoleId + 'static> ChoreoHandler for InMemoryHandler<R> {
                 .choice_channels
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if let Some((tx, _)) = channels.remove(&(from, self.role)) {
-                channels.insert((from, self.role), (tx, receiver));
+            let key = (RoleKey::from_role(from), RoleKey::from_role(self.role));
+            if let Some((tx, _)) = channels.remove(&key) {
+                channels.insert(key, (tx, receiver));
             }
         }
 

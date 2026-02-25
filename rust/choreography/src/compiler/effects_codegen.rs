@@ -132,6 +132,25 @@ fn generate_message_types(protocol: &Protocol) -> TokenStream {
     // Collect unique message types from protocol
     collect_message_types(protocol, &mut message_types);
 
+    let mut message_types: Vec<_> = message_types.into_iter().collect();
+    message_types.sort_by(|left, right| {
+        left.name
+            .to_string()
+            .cmp(&right.name.to_string())
+            .then_with(|| {
+                left.type_annotation
+                    .as_ref()
+                    .map(ToString::to_string)
+                    .cmp(&right.type_annotation.as_ref().map(ToString::to_string))
+            })
+            .then_with(|| {
+                left.payload
+                    .as_ref()
+                    .map(ToString::to_string)
+                    .cmp(&right.payload.as_ref().map(ToString::to_string))
+            })
+    });
+
     let message_structs: Vec<_> = message_types
         .into_iter()
         .map(|msg_type| {
@@ -707,7 +726,7 @@ fn infer_content_type(message_type: &str) -> TokenStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{Protocol, Role};
+    use crate::ast::{Annotations, MessageType, Protocol, Role};
 
     #[test]
     fn test_generate_simple_protocol() {
@@ -730,5 +749,42 @@ mod tests {
         assert!(code_str.contains("Server"));
         assert!(code_str.contains("run_client"));
         assert!(code_str.contains("run_server"));
+    }
+
+    #[test]
+    fn test_message_codegen_is_deterministic_and_sorted() {
+        let alice = Role::new(format_ident!("Alice")).unwrap();
+        let bob = Role::new(format_ident!("Bob")).unwrap();
+
+        let protocol = Protocol::Send {
+            from: alice.clone(),
+            to: bob.clone(),
+            message: MessageType {
+                name: format_ident!("Zeta"),
+                type_annotation: None,
+                payload: None,
+            },
+            continuation: Box::new(Protocol::Send {
+                from: alice,
+                to: bob,
+                message: MessageType {
+                    name: format_ident!("Alpha"),
+                    type_annotation: None,
+                    payload: None,
+                },
+                continuation: Box::new(Protocol::End),
+                annotations: Annotations::new(),
+                from_annotations: Annotations::new(),
+                to_annotations: Annotations::new(),
+            }),
+            annotations: Annotations::new(),
+            from_annotations: Annotations::new(),
+            to_annotations: Annotations::new(),
+        };
+
+        let code = generate_message_types(&protocol).to_string();
+        let alpha_idx = code.find("struct Alpha").unwrap();
+        let zeta_idx = code.find("struct Zeta").unwrap();
+        assert!(alpha_idx < zeta_idx);
     }
 }

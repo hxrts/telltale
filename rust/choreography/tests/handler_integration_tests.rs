@@ -11,7 +11,7 @@
 #![allow(clippy::expect_used)]
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use telltale_choreography::effects::{
     algebra::{InterpreterState, Program},
@@ -306,8 +306,8 @@ async fn test_trace_middleware_choose_offer() {
 
 #[tokio::test]
 async fn test_in_memory_handler_bidirectional_protocol() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut alice =
         InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());
@@ -352,8 +352,8 @@ async fn test_in_memory_handler_bidirectional_protocol() {
 // The choose() method sends the label through the choice channel, and offer() receives it.
 #[tokio::test]
 async fn test_in_memory_handler_choice_protocol() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut alice =
         InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());
@@ -377,8 +377,8 @@ async fn test_in_memory_handler_choice_protocol() {
 
 #[tokio::test]
 async fn test_in_memory_handler_three_party_protocol() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut alice =
         InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());
@@ -440,8 +440,8 @@ async fn test_in_memory_handler_three_party_protocol() {
 
 #[tokio::test]
 async fn test_traced_in_memory_handler() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let alice_inner =
         InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());

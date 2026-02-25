@@ -11,7 +11,7 @@
 #![allow(clippy::expect_used)]
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use telltale_choreography::effects::{
     handlers::in_memory::InMemoryHandler, ChoreoHandler, LabelId, RoleId,
@@ -91,8 +91,8 @@ struct LabelMessage {
 #[tokio::test]
 async fn test_basic_send_recv() {
     // Create shared channel maps
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     // Create handlers for Alice and Bob
     let mut alice =
@@ -118,8 +118,8 @@ async fn test_basic_send_recv() {
 
 #[tokio::test]
 async fn test_complex_message_serialization() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut alice =
         InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());
@@ -160,8 +160,8 @@ async fn test_multiple_independent_exchanges() {
     // by creating fresh handlers for each exchange
 
     for i in 0..5 {
-        let channels = Arc::new(Mutex::new(HashMap::new()));
-        let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+        let channels = Arc::new(Mutex::new(BTreeMap::new()));
+        let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
         let mut alice = InMemoryHandler::with_channels(
             TestRole::Alice,
@@ -192,8 +192,8 @@ async fn test_multiple_independent_exchanges() {
 #[tokio::test]
 async fn test_interleaved_bidirectional_exchange() {
     // Test that bidirectional communication works when interleaved
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut alice =
         InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());
@@ -252,8 +252,8 @@ async fn test_label_with_special_characters() {
 
     // Test each case with fresh channels
     for expected in &test_cases {
-        let channels = Arc::new(Mutex::new(HashMap::new()));
-        let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+        let channels = Arc::new(Mutex::new(BTreeMap::new()));
+        let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
         let mut alice = InMemoryHandler::with_channels(
             TestRole::Alice,
@@ -290,8 +290,8 @@ async fn test_label_with_special_characters() {
 
 #[tokio::test]
 async fn test_channel_isolation_two_party() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut alice =
         InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());
@@ -334,8 +334,8 @@ async fn test_channel_isolation_two_party() {
 
 #[tokio::test]
 async fn test_channel_isolation_three_party() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut alice =
         InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());
@@ -387,8 +387,8 @@ async fn test_channel_isolation_three_party() {
 
 #[tokio::test]
 async fn test_empty_data() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut alice =
         InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());
@@ -411,8 +411,8 @@ async fn test_empty_data() {
 
 #[tokio::test]
 async fn test_large_message() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut alice =
         InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());
@@ -448,8 +448,8 @@ async fn test_handler_new_constructor() {
 
 #[tokio::test]
 async fn test_multiple_handlers_same_channels() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     // Create two handlers for Alice (simulating reconnection scenario)
     let mut alice1 =

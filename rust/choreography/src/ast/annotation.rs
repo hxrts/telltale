@@ -483,7 +483,9 @@ impl Annotations {
         }
 
         // Process other annotations
-        for (key, value) in map {
+        let mut entries: Vec<_> = map.iter().collect();
+        entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+        for (key, value) in entries {
             // Skip timed_choice keys - already handled above
             if key == "timed_choice" || key == "timeout_ms" {
                 continue;

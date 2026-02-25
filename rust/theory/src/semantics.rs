@@ -21,7 +21,6 @@
 //! - `step` ↔ Lean's `step` inductive
 //! - `ConsumeResult` ↔ Lean's `ConsumeResult` inductive
 
-use std::collections::HashSet;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 /// Direction of a local action (send or receive).
@@ -548,14 +547,14 @@ fn reduces_fuel(g: &GlobalType, g_prime: &GlobalType, fuel: usize) -> bool {
 /// Corresponds to Lean's `GlobalTypeReducesStar`.
 #[must_use]
 pub fn reduces_star(global: &GlobalType, target: &GlobalType) -> bool {
-    reduces_star_fuel(global, target, 100, &mut HashSet::new())
+    reduces_star_fuel(global, target, 100, &mut Vec::new())
 }
 
 fn reduces_star_fuel(
     g: &GlobalType,
     g_prime: &GlobalType,
     fuel: usize,
-    visited: &mut HashSet<GlobalType>,
+    visited: &mut Vec<GlobalType>,
 ) -> bool {
     if fuel == 0 {
         return false;
@@ -570,7 +569,7 @@ fn reduces_star_fuel(
     if visited.contains(g) {
         return false;
     }
-    visited.insert(g.clone());
+    visited.push(g.clone());
 
     // Try all possible one-step reductions
     match g {
@@ -596,10 +595,10 @@ fn reduces_star_fuel(
 /// For well-formed types, if `can_step(g, act)` then `step(g, act).is_some()`.
 #[must_use]
 pub fn good_g(global: &GlobalType) -> bool {
-    good_g_fuel(global, 100, &mut HashSet::new())
+    good_g_fuel(global, 100, &mut Vec::new())
 }
 
-fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut HashSet<GlobalType>) -> bool {
+fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut Vec<GlobalType>) -> bool {
     if fuel == 0 {
         return true; // Assume good if we run out of fuel
     }
@@ -607,7 +606,7 @@ fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut HashSet<GlobalType>) -
     if visited.contains(g) {
         return true; // Avoid infinite loops
     }
-    visited.insert(g.clone());
+    visited.push(g.clone());
 
     match g {
         GlobalType::End => true,

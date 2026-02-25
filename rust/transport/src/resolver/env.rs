@@ -1,11 +1,10 @@
 //! Environment variable based endpoint resolver.
 
 use async_trait::async_trait;
-use telltale_choreography::{
-    EndpointResolver, ResolutionFailureReason, ResolverError, RoleName,
-};
-use telltale_choreography::topology::Endpoint;
+use telltale_choreography::{RoleName, TopologyEndpoint};
 use thiserror::Error;
+
+use crate::resolver::{EndpointResolver, ResolutionFailureReason, ResolverError};
 
 /// Error configuring the environment resolver.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -36,7 +35,8 @@ pub enum EnvResolverConfigError {
 ///
 /// ```rust,no_run
 /// use telltale_transport::EnvResolver;
-/// use telltale_choreography::{EndpointResolver, RoleName};
+/// use telltale_transport::EndpointResolver;
+/// use telltale_choreography::RoleName;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let resolver = EnvResolver::with_default_prefix();
@@ -48,6 +48,40 @@ pub enum EnvResolverConfigError {
 #[derive(Debug, Clone)]
 pub struct EnvResolver {
     prefix: String,
+}
+
+fn parse_endpoint_parts(endpoint: &str) -> Result<(String, u16), String> {
+    let endpoint = endpoint.trim();
+    if endpoint.is_empty() {
+        return Err("endpoint cannot be empty".to_string());
+    }
+
+    if let Some(rest) = endpoint.strip_prefix('[') {
+        let (host, port_text) = rest.split_once("]:").ok_or_else(|| {
+            "invalid IPv6 endpoint format; expected [address]:port".to_string()
+        })?;
+        if host.is_empty() {
+            return Err("endpoint host cannot be empty".to_string());
+        }
+        let port = port_text
+            .parse::<u16>()
+            .map_err(|e| format!("invalid port: {e}"))?;
+        return Ok((host.to_string(), port));
+    }
+
+    let (host, port_text) = endpoint
+        .rsplit_once(':')
+        .ok_or_else(|| "endpoint must be in host:port format".to_string())?;
+    if host.is_empty() {
+        return Err("endpoint host cannot be empty".to_string());
+    }
+    if host.contains(':') {
+        return Err("IPv6 endpoints must use bracket notation".to_string());
+    }
+    let port = port_text
+        .parse::<u16>()
+        .map_err(|e| format!("invalid port: {e}"))?;
+    Ok((host.to_string(), port))
 }
 
 impl EnvResolver {
@@ -100,10 +134,7 @@ impl EnvResolver {
 
 #[async_trait]
 impl EndpointResolver for EnvResolver {
-    async fn resolve(
-        &self,
-        role: &RoleName,
-    ) -> Result<Endpoint, ResolverError> {
+    async fn resolve(&self, role: &RoleName) -> Result<TopologyEndpoint, ResolverError> {
         let var_name = self.env_var_name(role);
 
         let value = std::env::var(&var_name).map_err(|_| ResolverError::ResolutionFailed {
@@ -113,7 +144,12 @@ impl EndpointResolver for EnvResolver {
             },
         })?;
 
-        Endpoint::parse(&value).map_err(|e| ResolverError::ResolutionFailed {
+        parse_endpoint_parts(&value).map_err(|details| ResolverError::ResolutionFailed {
+            role: role.clone(),
+            reason: ResolutionFailureReason::InvalidAddress { details },
+        })?;
+
+        TopologyEndpoint::new(value).map_err(|e| ResolverError::ResolutionFailed {
             role: role.clone(),
             reason: ResolutionFailureReason::InvalidAddress {
                 details: e.to_string(),
@@ -189,8 +225,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(endpoint.host(), "127.0.0.1");
-        assert_eq!(endpoint.port(), 8080);
+        let (host, port) = parse_endpoint_parts(endpoint.as_str()).unwrap();
+        assert_eq!(host, "127.0.0.1");
+        assert_eq!(port, 8080);
 
         std::env::remove_var("TEST_ALICE_ENDPOINT");
     }
@@ -255,8 +292,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(endpoint.host(), "::1");
-        assert_eq!(endpoint.port(), 8080);
+        let (host, port) = parse_endpoint_parts(endpoint.as_str()).unwrap();
+        assert_eq!(host, "::1");
+        assert_eq!(port, 8080);
         assert_eq!(endpoint.to_string(), "[::1]:8080");
 
         std::env::remove_var("IPV6LO_ALICE_ENDPOINT");
@@ -272,8 +310,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(endpoint.host(), "2001:db8::1");
-        assert_eq!(endpoint.port(), 9000);
+        let (host, port) = parse_endpoint_parts(endpoint.as_str()).unwrap();
+        assert_eq!(host, "2001:db8::1");
+        assert_eq!(port, 9000);
         assert_eq!(endpoint.to_string(), "[2001:db8::1]:9000");
 
         std::env::remove_var("IPV6_ALICE_ENDPOINT");
@@ -308,8 +347,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(endpoint.host(), "::");
-        assert_eq!(endpoint.port(), 3000);
+        let (host, port) = parse_endpoint_parts(endpoint.as_str()).unwrap();
+        assert_eq!(host, "::");
+        assert_eq!(port, 3000);
         assert_eq!(endpoint.to_string(), "[::]:3000");
 
         std::env::remove_var("IPV6ANY_SERVER_ENDPOINT");

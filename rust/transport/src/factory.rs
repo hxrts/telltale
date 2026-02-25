@@ -1,12 +1,10 @@
 //! TCP transport factory.
 
 use crate::config::TcpTransportConfig;
+use crate::resolver::EndpointResolver;
 use crate::TcpTransport;
-use async_trait::async_trait;
-use telltale_choreography::{
-    EndpointResolver, RoleName, Transport, TransportError, TransportFactory,
-};
 use std::sync::Arc;
+use telltale_choreography::{RoleName, Transport, TransportError};
 
 /// Factory that creates TCP transports using an endpoint resolver.
 ///
@@ -17,7 +15,7 @@ use std::sync::Arc;
 ///
 /// ```rust,no_run
 /// use telltale_transport::{EnvResolver, TcpTransportFactory, TcpTransportConfig};
-/// use telltale_choreography::{TransportFactory, RoleName};
+/// use telltale_choreography::RoleName;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// // Create factory with environment-based discovery
@@ -70,21 +68,20 @@ impl<R: EndpointResolver> Clone for TcpTransportFactory<R> {
     }
 }
 
-#[async_trait]
-impl<R: EndpointResolver + 'static> TransportFactory for TcpTransportFactory<R> {
-    async fn create(&self, role: &RoleName) -> Result<Box<dyn Transport>, TransportError> {
+impl<R: EndpointResolver + 'static> TcpTransportFactory<R> {
+    /// Create a transport instance for the given role.
+    pub async fn create(&self, role: &RoleName) -> Result<Box<dyn Transport>, TransportError> {
         // Resolve the endpoint for this role
-        let endpoint = self.resolver.resolve(role).await.map_err(|e| {
-            TransportError::ConnectionFailed {
-                role: role.clone(),
-                reason: format!("failed to resolve endpoint: {}", e),
-            }
-        })?;
+        let endpoint = self
+            .resolver
+            .resolve(role)
+            .await
+            .map_err(|e| TransportError::ConnectionFailed(format!("failed to resolve endpoint: {e}")))?;
 
         // Create TCP transport configuration for this role
         let transport_config = crate::config::TcpTransportConfig::new(
             role.as_str(),
-            &format!("{}:{}", endpoint.host(), endpoint.port()),
+            endpoint.as_str(),
         )
         .with_retry(self.config.retry.clone())
         .with_buffer_size(self.config.buffer_size);
@@ -97,14 +94,14 @@ impl<R: EndpointResolver + 'static> TransportFactory for TcpTransportFactory<R> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use telltale_choreography::StaticResolver;
-    use telltale_choreography::topology::Endpoint;
+    use crate::resolver::StaticResolver;
+    use telltale_choreography::TopologyEndpoint;
 
     #[tokio::test]
     async fn test_factory_creates_transport() {
         let resolver = StaticResolver::from_mappings([(
             RoleName::from_static("Alice"),
-            Endpoint::parse("127.0.0.1:8080").unwrap(),
+            TopologyEndpoint::new("127.0.0.1:8080").unwrap(),
         )]);
 
         let factory = TcpTransportFactory::with_resolver(resolver);
@@ -137,7 +134,7 @@ mod tests {
     fn test_factory_accessors() {
         let resolver = StaticResolver::from_mappings([(
             RoleName::from_static("Alice"),
-            Endpoint::parse("127.0.0.1:8080").unwrap(),
+            TopologyEndpoint::new("127.0.0.1:8080").unwrap(),
         )]);
 
         let config = TcpTransportConfig::default();

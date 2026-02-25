@@ -7,7 +7,7 @@
 use crate::ast::{LocalType, Role};
 use crate::compiler::projection::ProjectionError;
 use std::any::{Any, TypeId};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 
 /// Documentation for an extension
@@ -131,15 +131,15 @@ pub trait ProtocolExtension: Send + Sync + Debug {
 /// Registry for managing DSL extensions with conflict resolution
 #[derive(Debug, Default)]
 pub struct ExtensionRegistry {
-    grammar_extensions: HashMap<String, Box<dyn GrammarExtension>>,
-    statement_parsers: HashMap<String, Box<dyn StatementParser>>,
-    rule_to_parser: HashMap<String, String>,
+    grammar_extensions: BTreeMap<String, Box<dyn GrammarExtension>>,
+    statement_parsers: BTreeMap<String, Box<dyn StatementParser>>,
+    rule_to_parser: BTreeMap<String, String>,
     /// Track rule conflicts for resolution
-    rule_conflicts: HashMap<String, Vec<String>>,
+    rule_conflicts: BTreeMap<String, Vec<String>>,
     /// Extension dependencies
-    extension_dependencies: HashMap<String, Vec<String>>,
+    extension_dependencies: BTreeMap<String, Vec<String>>,
     /// Extension version information for compatibility checking
-    extension_versions: HashMap<String, String>,
+    extension_versions: BTreeMap<String, String>,
 }
 
 impl ExtensionRegistry {
@@ -230,10 +230,14 @@ impl ExtensionRegistry {
         let mut composed = base_grammar.to_string();
 
         // Sort extensions by priority (highest first)
-        let mut extensions: Vec<_> = self.grammar_extensions.values().collect();
-        extensions.sort_by_key(|b| std::cmp::Reverse(b.priority()));
+        let mut extensions: Vec<_> = self.grammar_extensions.iter().collect();
+        extensions.sort_by(|(id_a, ext_a), (id_b, ext_b)| {
+            std::cmp::Reverse(ext_a.priority())
+                .cmp(&std::cmp::Reverse(ext_b.priority()))
+                .then_with(|| id_a.cmp(id_b))
+        });
 
-        for extension in extensions {
+        for (_, extension) in extensions {
             composed.push('\n');
             composed.push_str(extension.grammar_rules());
         }
@@ -262,7 +266,9 @@ impl ExtensionRegistry {
 
     /// Get all grammar extensions
     pub fn grammar_extensions(&self) -> impl Iterator<Item = &dyn GrammarExtension> {
-        self.grammar_extensions.values().map(|e| e.as_ref())
+        let mut ordered: Vec<_> = self.grammar_extensions.iter().collect();
+        ordered.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(id_b));
+        ordered.into_iter().map(|(_, e)| e.as_ref())
     }
 
     /// Check if a specific extension is registered
@@ -304,7 +310,7 @@ impl ExtensionRegistry {
     }
 
     /// Get all rule conflicts for debugging
-    pub fn get_conflicts(&self) -> &HashMap<String, Vec<String>> {
+    pub fn get_conflicts(&self) -> &BTreeMap<String, Vec<String>> {
         &self.rule_conflicts
     }
 
@@ -313,7 +319,10 @@ impl ExtensionRegistry {
         let mut details = Vec::new();
         let unknown_ext = "unknown".to_string();
 
-        for (rule, conflicting_extensions) in &self.rule_conflicts {
+        let mut conflicts: Vec<_> = self.rule_conflicts.iter().collect();
+        conflicts.sort_by(|(rule_a, _), (rule_b, _)| rule_a.cmp(rule_b));
+
+        for (rule, conflicting_extensions) in conflicts {
             if !conflicting_extensions.is_empty() {
                 let active_extension = self.rule_to_parser.get(rule).unwrap_or(&unknown_ext);
                 let active_priority = self
@@ -322,7 +331,10 @@ impl ExtensionRegistry {
                     .map(|e| e.priority())
                     .unwrap_or(0);
 
-                for conflicting in conflicting_extensions {
+                let mut conflicting_extensions = conflicting_extensions.clone();
+                conflicting_extensions.sort();
+
+                for conflicting in &conflicting_extensions {
                     let conflicting_priority = self
                         .grammar_extensions
                         .get(conflicting)
@@ -344,7 +356,7 @@ impl ExtensionRegistry {
     /// Check extension compatibility
     pub fn check_compatibility(&self, extension_ids: &[&str]) -> Result<(), ParseError> {
         // Check for direct conflicts between the specified extensions
-        let mut rules_used = HashMap::new();
+        let mut rules_used = BTreeMap::new();
 
         for &extension_id in extension_ids {
             if let Some(extension) = self.grammar_extensions.get(extension_id) {
@@ -386,8 +398,9 @@ impl ExtensionRegistry {
 
     /// List all registered extensions with versions
     pub fn list_extensions_with_versions(&self) -> Vec<(String, String)> {
-        self.grammar_extensions
-            .keys()
+        let mut ids: Vec<_> = self.grammar_extensions.keys().collect();
+        ids.sort();
+        ids.into_iter()
             .map(|id| {
                 let version = self
                     .extension_versions
@@ -418,7 +431,10 @@ impl ExtensionRegistry {
     pub fn generate_docs(&self) -> String {
         let mut docs = String::from("# Extension Documentation\n\n");
 
-        for (id, extension) in &self.grammar_extensions {
+        let mut entries: Vec<_> = self.grammar_extensions.iter().collect();
+        entries.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(id_b));
+
+        for (id, extension) in entries {
             docs.push_str(&format!("## {}\n\n", id));
             docs.push_str(&format!("**Priority:** {}\n\n", extension.priority()));
             docs.push_str(&format!(
@@ -725,6 +741,52 @@ mod tests {
         assert!(extensions
             .iter()
             .any(|(name, version)| name == "mock_timeout" && version == "1.0.0"));
+    }
+
+    #[test]
+    fn test_compose_grammar_is_stable_for_equal_priorities() {
+        #[derive(Debug)]
+        struct AlphaExt;
+        impl GrammarExtension for AlphaExt {
+            fn grammar_rules(&self) -> &'static str {
+                "alpha_stmt = { \"alpha\" }"
+            }
+            fn statement_rules(&self) -> Vec<&'static str> {
+                vec!["alpha_stmt"]
+            }
+            fn priority(&self) -> u32 {
+                100
+            }
+            fn extension_id(&self) -> &'static str {
+                "alpha_ext"
+            }
+        }
+
+        #[derive(Debug)]
+        struct BetaExt;
+        impl GrammarExtension for BetaExt {
+            fn grammar_rules(&self) -> &'static str {
+                "beta_stmt = { \"beta\" }"
+            }
+            fn statement_rules(&self) -> Vec<&'static str> {
+                vec!["beta_stmt"]
+            }
+            fn priority(&self) -> u32 {
+                100
+            }
+            fn extension_id(&self) -> &'static str {
+                "beta_ext"
+            }
+        }
+
+        let mut registry = ExtensionRegistry::new();
+        registry.register_grammar(BetaExt).unwrap();
+        registry.register_grammar(AlphaExt).unwrap();
+
+        let composed = registry.compose_grammar("base = { \"x\" }");
+        let alpha_idx = composed.find("alpha_stmt").unwrap();
+        let beta_idx = composed.find("beta_stmt").unwrap();
+        assert!(alpha_idx < beta_idx);
     }
 
     #[test]

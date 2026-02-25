@@ -1,6 +1,6 @@
 //! Configuration for TCP transport.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::time::Duration;
 use telltale_choreography::QueueCapacity;
 use telltale_types::FixedQ32;
@@ -13,7 +13,7 @@ pub struct TcpTransportConfig {
     /// Address this role listens on.
     pub listen_addr: String,
     /// Map of peer role names to their addresses.
-    pub peers: HashMap<String, String>,
+    pub peers: BTreeMap<String, String>,
     /// Connection retry settings.
     pub retry: RetryConfig,
     /// Channel buffer size for incoming messages.
@@ -50,7 +50,7 @@ impl Default for TcpTransportConfig {
         Self {
             role: String::new(),
             listen_addr: String::new(),
-            peers: HashMap::new(),
+            peers: BTreeMap::new(),
             retry: RetryConfig::default(),
             buffer_size: QueueCapacity::new(32),
         }
@@ -68,7 +68,7 @@ impl TcpTransportConfig {
         Self {
             role: role.into(),
             listen_addr: listen_addr.into(),
-            peers: HashMap::new(),
+            peers: BTreeMap::new(),
             retry: RetryConfig::default(),
             buffer_size: QueueCapacity::new(32),
         }

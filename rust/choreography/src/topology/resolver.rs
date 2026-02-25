@@ -3,7 +3,7 @@
 use super::{Endpoint, Location, Topology};
 use crate::RoleName;
 use async_trait::async_trait;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt;
 use thiserror::Error;
 
@@ -92,7 +92,7 @@ pub trait EndpointResolver: Send + Sync {
 /// endpoint resolution for roles that have [`Location::Remote`] entries.
 #[derive(Debug, Clone)]
 pub struct StaticResolver {
-    endpoints: HashMap<RoleName, Endpoint>,
+    endpoints: BTreeMap<RoleName, Endpoint>,
 }
 
 impl StaticResolver {
@@ -101,7 +101,7 @@ impl StaticResolver {
     /// Extracts all `Remote` locations from the topology and stores
     /// them for resolution. Local and colocated roles are not included.
     pub fn from_topology(topology: &Topology) -> Self {
-        let mut endpoints = HashMap::with_capacity(topology.locations.len());
+        let mut endpoints = BTreeMap::new();
         for (role, location) in &topology.locations {
             if let Location::Remote(endpoint) = location {
                 endpoints.insert(role.clone(), endpoint.clone());
@@ -122,7 +122,7 @@ impl StaticResolver {
     /// Create an empty static resolver.
     pub fn empty() -> Self {
         Self {
-            endpoints: HashMap::new(),
+            endpoints: BTreeMap::new(),
         }
     }
 

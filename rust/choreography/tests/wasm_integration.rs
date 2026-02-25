@@ -8,7 +8,7 @@
 #![allow(clippy::expect_used)]
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use telltale_choreography::{
@@ -66,8 +66,8 @@ enum Message {
 #[wasm_bindgen_test]
 async fn test_full_request_response_protocol() {
     // Setup shared channels
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     // Client side
     let mut client_handler =
@@ -129,8 +129,8 @@ async fn test_full_request_response_protocol() {
 /// Test protocol with multiple message exchanges
 #[wasm_bindgen_test]
 async fn test_multi_message_protocol() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     // Client sends multiple requests
     let mut client =
@@ -167,8 +167,8 @@ async fn test_multi_message_protocol() {
 /// Test protocol with choice/offer
 #[wasm_bindgen_test]
 async fn test_protocol_with_branching() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut sender =
         InMemoryHandler::with_channels(Role::Client, channels.clone(), choice_channels.clone());
@@ -219,8 +219,8 @@ async fn test_protocol_with_timeout() {
 /// Test error message handling
 #[wasm_bindgen_test]
 async fn test_error_message_protocol() {
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut sender =
         InMemoryHandler::with_channels(Role::Server, channels.clone(), choice_channels.clone());
@@ -329,11 +329,11 @@ fn test_parallel_program_structure() {
 /// Test handler state independence
 #[wasm_bindgen_test]
 fn test_handler_independence() {
-    let channels1 = Arc::new(Mutex::new(HashMap::new()));
-    let choice1 = Arc::new(Mutex::new(HashMap::new()));
+    let channels1 = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice1 = Arc::new(Mutex::new(BTreeMap::new()));
 
-    let channels2 = Arc::new(Mutex::new(HashMap::new()));
-    let choice2 = Arc::new(Mutex::new(HashMap::new()));
+    let channels2 = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice2 = Arc::new(Mutex::new(BTreeMap::new()));
 
     let handler1 = InMemoryHandler::with_channels(Role::Client, channels1.clone(), choice1.clone());
 

@@ -28,8 +28,11 @@ pub(crate) fn generate_annotation_docs(annotations: &HashMap<String, String>) ->
         return quote! {};
     }
 
-    let doc_lines: Vec<TokenStream> = annotations
-        .iter()
+    let mut entries: Vec<_> = annotations.iter().collect();
+    entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+
+    let doc_lines: Vec<TokenStream> = entries
+        .into_iter()
         .map(|(key, value)| {
             if value == "true" {
                 quote! { #[doc = concat!("@", #key)] }
@@ -51,7 +54,7 @@ pub(crate) fn generate_annotation_metadata(
         return quote! {};
     }
 
-    let supported: Vec<(&str, &String)> = annotations
+    let mut supported: Vec<(&str, &String)> = annotations
         .iter()
         .filter_map(|(key, value)| {
             let normalized = key.to_lowercase();
@@ -62,6 +65,7 @@ pub(crate) fn generate_annotation_metadata(
             }
         })
         .collect();
+    supported.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
     if supported.is_empty() {
         return quote! {};
     }
@@ -144,8 +148,11 @@ pub(crate) fn generate_runtime_annotation_access(name: &str, protocol: &Protocol
 
     // Convert to legacy map for code generation
     let legacy_map = all_annotations.to_legacy_map();
-    let annotation_map: Vec<TokenStream> = legacy_map
-        .iter()
+    let mut legacy_entries: Vec<_> = legacy_map.iter().collect();
+    legacy_entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+
+    let annotation_map: Vec<TokenStream> = legacy_entries
+        .into_iter()
         .map(|(key, value)| {
             quote! { map.insert(#key.to_string(), #value.to_string()); }
         })

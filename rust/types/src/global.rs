@@ -14,7 +14,7 @@
 
 use crate::Label;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 /// Payload sort types for message payloads.
 ///
@@ -181,12 +181,12 @@ impl GlobalType {
     /// Corresponds to Lean's `GlobalType.roles`.
     #[must_use]
     pub fn roles(&self) -> Vec<String> {
-        let mut result = HashSet::new();
+        let mut result = BTreeSet::new();
         self.collect_roles(&mut result);
         result.into_iter().collect()
     }
 
-    fn collect_roles(&self, roles: &mut HashSet<String>) {
+    fn collect_roles(&self, roles: &mut BTreeSet<String>) {
         match self {
             GlobalType::End => {}
             GlobalType::Comm {
@@ -211,12 +211,12 @@ impl GlobalType {
     #[must_use]
     pub fn free_vars(&self) -> Vec<String> {
         let mut result = Vec::new();
-        let mut bound = HashSet::new();
+        let mut bound = BTreeSet::new();
         self.collect_free_vars(&mut result, &mut bound);
         result
     }
 
-    fn collect_free_vars(&self, free: &mut Vec<String>, bound: &mut HashSet<String>) {
+    fn collect_free_vars(&self, free: &mut Vec<String>, bound: &mut BTreeSet<String>) {
         match self {
             GlobalType::End => {}
             GlobalType::Comm { branches, .. } => {
@@ -296,10 +296,10 @@ impl GlobalType {
     /// Corresponds to Lean's `GlobalType.allVarsBound`.
     #[must_use]
     pub fn all_vars_bound(&self) -> bool {
-        self.check_vars_bound(&HashSet::new())
+        self.check_vars_bound(&BTreeSet::new())
     }
 
-    fn check_vars_bound(&self, bound: &HashSet<String>) -> bool {
+    fn check_vars_bound(&self, bound: &BTreeSet<String>) -> bool {
         match self {
             GlobalType::End => true,
             GlobalType::Comm { branches, .. } => branches
@@ -539,5 +539,19 @@ mod tests {
         );
         assert!(guarded.is_guarded());
         assert!(guarded.well_formed()); // Guarded recursion should pass well_formed()
+    }
+
+    #[test]
+    fn test_roles_are_sorted() {
+        let g = GlobalType::comm(
+            "Zed",
+            "Alice",
+            vec![(
+                Label::new("start"),
+                GlobalType::send("Bob", "Carol", Label::new("next"), GlobalType::End),
+            )],
+        );
+
+        assert_eq!(g.roles(), vec!["Alice", "Bob", "Carol", "Zed"]);
     }
 }

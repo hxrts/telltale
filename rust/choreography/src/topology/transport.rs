@@ -12,7 +12,7 @@ use crate::runtime::sync::{mpsc, Mutex};
 use async_trait::async_trait;
 #[cfg(target_arch = "wasm32")]
 use futures::{SinkExt, StreamExt};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -96,9 +96,9 @@ pub struct InMemoryChannelTransport {
     /// Role this transport belongs to.
     role: RoleName,
     /// Sender channels to other roles (role -> sender).
-    senders: Arc<Mutex<HashMap<RoleName, mpsc::Sender<Vec<u8>>>>>,
+    senders: Arc<Mutex<BTreeMap<RoleName, mpsc::Sender<Vec<u8>>>>>,
     /// Receiver channels from other roles (role -> receiver).
-    receivers: Arc<Mutex<HashMap<RoleName, mpsc::Receiver<Vec<u8>>>>>,
+    receivers: Arc<Mutex<BTreeMap<RoleName, mpsc::Receiver<Vec<u8>>>>>,
 }
 
 impl InMemoryChannelTransport {
@@ -106,8 +106,8 @@ impl InMemoryChannelTransport {
     pub fn new(role: RoleName) -> Self {
         Self {
             role,
-            senders: Arc::new(Mutex::new(HashMap::new())),
-            receivers: Arc::new(Mutex::new(HashMap::new())),
+            senders: Arc::new(Mutex::new(BTreeMap::new())),
+            receivers: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 

@@ -249,18 +249,14 @@ impl Scheduler {
                 self.pick_priority_candidate_in_lane(lane, &priority, has_progress)
             }
             SchedPolicy::ProgressAware => {
-                if let Some(pos) = self
-                    .lane_queues
-                    .get(&lane)
-                    .and_then(|queue| {
-                        queue.iter().position(|id| {
-                            self.lane_ready_set
-                                .get(&lane)
-                                .is_some_and(|ready| ready.contains(id))
-                                && has_progress(*id)
-                        })
+                if let Some(pos) = self.lane_queues.get(&lane).and_then(|queue| {
+                    queue.iter().position(|id| {
+                        self.lane_ready_set
+                            .get(&lane)
+                            .is_some_and(|ready| ready.contains(id))
+                            && has_progress(*id)
                     })
-                {
+                }) {
                     let picked = self
                         .lane_queues
                         .get_mut(&lane)

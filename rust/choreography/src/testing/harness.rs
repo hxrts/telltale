@@ -6,7 +6,7 @@
 use crate::effects::ChoreographyError;
 use crate::runtime::ChoreographicAdapter;
 use crate::testing::RecordingObserver;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -267,7 +267,7 @@ pub struct ProtocolTestBuilder {
     /// Protocol name.
     protocol_name: String,
     /// Role bindings (role name -> list of bindings for indexed roles).
-    role_bindings: HashMap<String, Vec<RoleBinding>>,
+    role_bindings: BTreeMap<String, Vec<RoleBinding>>,
     /// Expected phases to complete.
     expected_phases: Vec<String>,
     /// Test configuration.
@@ -281,7 +281,7 @@ impl ProtocolTestBuilder {
     pub fn new(protocol_name: impl Into<String>) -> Self {
         Self {
             protocol_name: protocol_name.into(),
-            role_bindings: HashMap::new(),
+            role_bindings: BTreeMap::new(),
             expected_phases: Vec::new(),
             config: TestConfig::default(),
             params: None,
@@ -360,7 +360,7 @@ pub struct ProtocolTest {
     /// Protocol name.
     protocol_name: String,
     /// Role bindings.
-    role_bindings: HashMap<String, Vec<RoleBinding>>,
+    role_bindings: BTreeMap<String, Vec<RoleBinding>>,
     /// Expected phases.
     expected_phases: Vec<String>,
     /// Configuration.
@@ -385,7 +385,7 @@ impl ProtocolTest {
 
     /// Get the role bindings.
     #[must_use]
-    pub fn role_bindings(&self) -> &HashMap<String, Vec<RoleBinding>> {
+    pub fn role_bindings(&self) -> &BTreeMap<String, Vec<RoleBinding>> {
         &self.role_bindings
     }
 
@@ -434,8 +434,8 @@ impl ProtocolTest {
 
         // Collect observer events
         // Track phase start times for duration calculation
-        let mut phase_start_times: HashMap<(String, String, String), std::time::Instant> =
-            HashMap::new();
+        let mut phase_start_times: BTreeMap<(String, String, String), std::time::Instant> =
+            BTreeMap::new();
 
         let observer = self.observer.lock().unwrap();
         for event in observer.events() {

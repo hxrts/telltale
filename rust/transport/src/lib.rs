@@ -18,7 +18,7 @@
 //!
 //! ```no_run
 //! use telltale_transport::{TcpTransport, TcpTransportConfig, EnvResolver, TcpTransportFactory};
-//! use telltale_choreography::{RoleName, Transport, TransportFactory};
+//! use telltale_choreography::{RoleName, Transport};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -101,13 +101,14 @@ pub use error::{TcpResult, TcpTransportError};
 pub use factory::TcpTransportFactory;
 
 // Resolver
-pub use resolver::{EnvResolver, EnvResolverConfigError};
+pub use resolver::{
+    EndpointResolver, EnvResolver, EnvResolverConfigError, ResolutionFailureReason, ResolverError,
+    StaticResolver,
+};
 
 // Transport
 pub use transport::{TcpTransport, TransportState};
 
 // Re-export core traits and types for convenience
-pub use telltale_choreography::topology::{
-    Message, Transport, TransportError, TransportFactory, TransportResult,
-};
-pub use telltale_choreography::{EndpointResolver, RoleName, StaticResolver};
+pub use telltale_choreography::topology::{Transport, TransportError, TransportResult};
+pub use telltale_choreography::RoleName;

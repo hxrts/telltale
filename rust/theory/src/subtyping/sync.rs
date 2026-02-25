@@ -16,7 +16,7 @@
 //! - `?p{lᵢ.Sᵢ} <: ?p{l'ⱼ.T'ⱼ}` if `{lᵢ} ⊆ {l'ⱼ}` and `Sᵢ <: T'ᵢ` for matching labels
 //! - `μt.S <: μt.T` if `S <: T` (under assumption `t <: t`)
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use telltale_types::LocalTypeR;
 use thiserror::Error;
 
@@ -77,13 +77,13 @@ pub enum SyncSubtypeError {
 /// assert!(sync_subtype(&sub, &sup).is_ok());
 /// ```
 pub fn sync_subtype(sub: &LocalTypeR, sup: &LocalTypeR) -> Result<(), SyncSubtypeError> {
-    sync_subtype_with_assumptions(sub, sup, &mut HashSet::new())
+    sync_subtype_with_assumptions(sub, sup, &mut BTreeSet::new())
 }
 
 fn sync_subtype_with_assumptions(
     sub: &LocalTypeR,
     sup: &LocalTypeR,
-    assumptions: &mut HashSet<(String, String)>,
+    assumptions: &mut BTreeSet<(String, String)>,
 ) -> Result<(), SyncSubtypeError> {
     // Fast path: identical types
     if sub == sup {
@@ -113,7 +113,7 @@ fn sync_subtype_with_assumptions(
             }
 
             // Subtype must have all labels of supertype
-            let sub_labels: HashMap<_, _> = b1.iter().map(|(l, _vt, c)| (&l.name, c)).collect();
+            let sub_labels: BTreeMap<_, _> = b1.iter().map(|(l, _vt, c)| (&l.name, c)).collect();
 
             for (label, _vt, sup_cont) in b2 {
                 match sub_labels.get(&label.name) {
@@ -154,8 +154,8 @@ fn sync_subtype_with_assumptions(
             }
 
             // Supertype must have all labels of subtype (contravariance)
-            let sup_labels: HashMap<_, _> = b2.iter().map(|(l, _vt, c)| (&l.name, c)).collect();
-            let sub_labels: HashMap<_, _> = b1.iter().map(|(l, _vt, c)| (&l.name, c)).collect();
+            let sup_labels: BTreeMap<_, _> = b2.iter().map(|(l, _vt, c)| (&l.name, c)).collect();
+            let sub_labels: BTreeMap<_, _> = b1.iter().map(|(l, _vt, c)| (&l.name, c)).collect();
 
             // Check subtype doesn't have extra labels
             for (label, _vt, _) in b1 {
