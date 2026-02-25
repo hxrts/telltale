@@ -1,100 +1,98 @@
 # telltale-transport
 
-Production transport implementations for the Telltale session types library.
+TCP transport implementations for the Telltale session types runtime.
 
 ## Overview
 
-This crate provides production-ready transport implementations that implement the `Transport` trait from `telltale-choreography`. It enables session-typed protocols to communicate over TCP between separate processes or machines.
+`telltale-transport` provides a TCP implementation of the `Transport` interface from `telltale-choreography`. It is intended for multi-process and multi-host deployments where roles communicate over network sockets. The crate includes endpoint resolution from environment variables and a factory API for runtime construction.
 
 ## Features
 
-- **TCP transport**: Length-prefixed framing for reliable message boundaries
-- **IPv4 and IPv6 support**: Full dual-stack networking capability
-- **Environment resolver**: Endpoint discovery via environment variables
-- **Transport factory**: Factory pattern for easy transport instantiation
-- **Automatic retry**: Configurable connection retry with exponential backoff
-- **Role-based routing**: Each role has a unique address
-- **Tracing integration**: Built-in observability with the `tracing` crate
-- **Graceful shutdown**: Clean connection teardown
+The transport uses length-prefixed message framing, role-addressed routing, and retry with exponential backoff. It supports IPv4 and IPv6 endpoints. It also provides `EnvResolver` and `TcpTransportFactory` for environment-driven configuration.
 
 ## Installation
 
-Add to your `Cargo.toml`:
+Add these dependencies to `Cargo.toml`.
 
 ```toml
 [dependencies]
-telltale-transport = "*"
-telltale-choreography = "*"
+telltale-transport = "1.0.0"
+telltale-choreography = "1.0.0"
 tokio = { version = "1", features = ["full"] }
 ```
+
+This configuration gives access to the transport types, role identifiers, and Tokio runtime support used by the examples below.
 
 ## Usage
 
 ### Direct Configuration
 
-```rust
-use telltale_transport::{TcpTransport, TcpTransportConfig, Message, Transport};
+```rust,no_run
 use telltale_choreography::RoleName;
+use telltale_transport::{TcpTransport, TcpTransportConfig, Transport};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Configure Alice's transport
     let config = TcpTransportConfig::new("Alice", "127.0.0.1:8080")
         .with_peer("Bob", "127.0.0.1:8081");
 
-    // Create and start
     let transport = TcpTransport::new(config);
     transport.start().await?;
 
-    // Connect to Bob
     let bob = RoleName::from_static("Bob");
     transport.connect_to(bob.as_str()).await?;
 
-    // Use the Transport trait with Message type
-    let msg = Message::new(b"Hello, Bob!".to_vec())?;
-    transport.send(&bob, msg).await?;
+    transport.send(&bob, b"Hello, Bob!".to_vec()).await?;
     let response = transport.recv(&bob).await?;
 
-    println!("Received: {:?}", String::from_utf8_lossy(response.as_bytes()));
+    println!("Received: {}", String::from_utf8_lossy(&response));
 
     transport.close().await?;
     Ok(())
 }
 ```
 
+This example constructs a transport directly, starts its listener, connects to a peer, and uses `send` and `recv` with raw byte payloads.
+
 ### Using Factory with Environment Resolver
 
-The `EnvResolver` discovers endpoints from environment variables:
+The resolver reads endpoints from environment variables with the shape `{PREFIX}_{ROLE}_ENDPOINT`.
 
-```rust
-use telltale_transport::{EnvResolver, TcpTransportFactory, TcpTransportConfig};
-use telltale_choreography::{TransportFactory, RoleName};
+```bash
+export TELLTALE_ALICE_ENDPOINT=127.0.0.1:8080
+export TELLTALE_BOB_ENDPOINT=127.0.0.1:8081
+```
+
+These variables define role endpoints that the factory can resolve at runtime.
+
+```rust,no_run
+use telltale_choreography::RoleName;
+use telltale_transport::{EnvResolver, TcpTransportConfig, TcpTransportFactory};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Set environment variables:
-    //   TELLTALE_ALICE_ENDPOINT=127.0.0.1:8080
-    //   TELLTALE_BOB_ENDPOINT=127.0.0.1:8081
-
     let resolver = EnvResolver::with_default_prefix();
-    let config = TcpTransportConfig::default();
-    let factory = TcpTransportFactory::new(resolver, config);
+    let base_config = TcpTransportConfig::default();
+    let factory = TcpTransportFactory::new(resolver, base_config);
 
-    // Create transport for Alice
     let transport = factory.create(&RoleName::from_static("Alice")).await?;
+    transport.close().await?;
 
     Ok(())
 }
 ```
+
+This flow is useful when role endpoints are injected by deployment tooling instead of hardcoded in application code.
 
 ### Custom Environment Prefix
 
 ```rust
 use telltale_transport::EnvResolver;
 
-// Use custom prefix: MYAPP_ALICE_ENDPOINT, MYAPP_BOB_ENDPOINT, etc.
 let resolver = EnvResolver::new("MYAPP")?;
 ```
+
+This produces variable names such as `MYAPP_ALICE_ENDPOINT` and `MYAPP_BOB_ENDPOINT`.
 
 ### Legacy Configuration from Environment
 
@@ -109,17 +107,21 @@ use telltale_transport::TcpTransportConfig;
 let config = TcpTransportConfig::from_env()?;
 ```
 
+This entry point supports existing deployments that already use the `ROLE`, `LISTEN_ADDR`, and `PEER_*` naming scheme.
+
 ### Custom Retry Configuration
 
 ```rust
 use telltale_transport::{TcpTransportConfig, RetryConfig};
+use telltale_types::FixedQ32;
 use std::time::Duration;
 
 let retry = RetryConfig {
     max_attempts: 10,
     initial_delay: Duration::from_millis(200),
     max_delay: Duration::from_secs(30),
-    backoff_multiplier: 2.0,
+    backoff_multiplier: FixedQ32::from_ratio(2, 1)
+        .expect("ratio 2/1 must be representable"),
 };
 
 let config = TcpTransportConfig::new("Alice", "127.0.0.1:8080")
@@ -127,100 +129,47 @@ let config = TcpTransportConfig::new("Alice", "127.0.0.1:8080")
     .with_retry(retry);
 ```
 
+The retry policy controls connection attempts in `connect_to` and `connect_all`, including exponential backoff behavior.
+
 ## IPv6 Support
 
-The transport supports both IPv4 and IPv6 addresses. Use bracket notation for IPv6:
-
-### IPv6 Configuration
+Use bracket notation for IPv6 addresses.
 
 ```rust
 use telltale_transport::TcpTransportConfig;
 
-// IPv6 loopback
 let config = TcpTransportConfig::new("Server", "[::1]:8080")
     .with_peer("Client", "[::1]:8081");
 
-// IPv6 any address (dual-stack on most platforms)
 let dual_stack = TcpTransportConfig::new("Server", "[::]:8080");
 
-// Full IPv6 addresses
 let production = TcpTransportConfig::new("Server", "[2001:db8::1]:8080")
     .with_peer("Client", "[2001:db8::2]:8081");
 ```
 
-### Mixed IPv4/IPv6 Peers
-
-```rust
-use telltale_transport::TcpTransportConfig;
-
-// Gateway connecting IPv4 and IPv6 peers
-let config = TcpTransportConfig::new("Gateway", "0.0.0.0:8080")
-    .with_peer("LegacyService", "192.168.1.100:8081")
-    .with_peer("ModernService", "[2001:db8::1]:8082");
-```
-
-### IPv6 Environment Variables
+This syntax is required for parser correctness when an endpoint contains multiple colons.
 
 ```bash
-# IPv6 loopback
 export TELLTALE_ALICE_ENDPOINT=[::1]:8080
-
-# Full IPv6 address
 export TELLTALE_BOB_ENDPOINT=[2001:db8::1]:8081
-
-# Dual-stack binding
 export TELLTALE_SERVER_ENDPOINT=[::]:3000
 ```
 
-## Multi-Process Deployment
-
-For production deployments where each role runs in a separate process:
-
-```bash
-# Terminal 1: Run Alice
-export TELLTALE_ALICE_ENDPOINT=127.0.0.1:8080
-export TELLTALE_BOB_ENDPOINT=127.0.0.1:8081
-cargo run --bin my_protocol -- --role Alice
-
-# Terminal 2: Run Bob
-export TELLTALE_ALICE_ENDPOINT=127.0.0.1:8080
-export TELLTALE_BOB_ENDPOINT=127.0.0.1:8081
-cargo run --bin my_protocol -- --role Bob
-```
-
-## Message Type
-
-Messages use the `Message` type from `telltale-choreography` which validates size limits:
-
-```rust
-use telltale_transport::Message;
-
-// Create a message (validates size)
-let msg = Message::new(b"Hello".to_vec())?;
-
-// Access bytes
-let bytes: &[u8] = msg.as_bytes();
-let owned: Vec<u8> = msg.into_bytes();
-```
+These values can be consumed by `EnvResolver` in the same way as IPv4 endpoints.
 
 ## Message Framing
 
-All messages are framed with a 4-byte big-endian length prefix:
+All payloads are sent with a 4-byte big-endian length prefix.
 
-```
+```text
 +------------------+-------------------+
 | Length (4 bytes) | Payload (N bytes) |
 | Big-endian u32   |                   |
 +------------------+-------------------+
 ```
 
+This framing preserves message boundaries over TCP streams and allows deterministic decoding on receive.
+
 ## Connection Handshake
 
-When a connection is established:
-1. The connecting peer sends its role name (length-prefixed)
-2. The accepting peer reads the role name
-3. Both sides can now route messages by role
-
-## License
-
-MIT OR Apache-2.0
+On connection setup, the initiating peer sends its role name using the same length-prefix format. The receiving side validates this name and binds the socket to the corresponding role channel for routing.
