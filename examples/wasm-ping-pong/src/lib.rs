@@ -9,7 +9,7 @@ use telltale_choreography::{
 };
 use serde::{Serialize, Deserialize};
 use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// Initialize panic hook for better error messages in browser console
 #[wasm_bindgen(start)]
@@ -73,8 +73,8 @@ pub async fn run_alice(message: String) -> Result<String, JsValue> {
     tracing::info!("Alice: Starting ping-pong protocol");
 
     // Create shared channels for communication
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     // Create handler for Alice
     let mut handler = InMemoryHandler::with_channels(
@@ -109,8 +109,8 @@ pub async fn run_bob() -> Result<String, JsValue> {
     tracing::info!("Bob: Starting ping-pong protocol");
 
     // Create shared channels for communication
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     // Create handler for Bob
     let mut handler = InMemoryHandler::with_channels(
@@ -184,8 +184,8 @@ mod tests {
         init();
 
         // Test that handlers can be created with shared channels
-        let channels = Arc::new(Mutex::new(HashMap::new()));
-        let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+        let channels = Arc::new(Mutex::new(BTreeMap::new()));
+        let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
         let alice = InMemoryHandler::with_channels(
             Role::Alice,
