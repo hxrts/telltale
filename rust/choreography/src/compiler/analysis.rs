@@ -118,18 +118,7 @@ impl<'a> Analyzer<'a> {
                 message,
                 continuation,
                 ..
-            } => {
-                if let Some(stats) = self.role_stats.get_mut(from) {
-                    stats.sends += 1;
-                }
-                if let Some(stats) = self.role_stats.get_mut(to) {
-                    stats.receives += 1;
-                }
-                self.comm_graph
-                    .edges
-                    .push((from.clone(), to.clone(), message.name.to_string()));
-                self.analyze_protocol(continuation);
-            }
+            } => self.analyze_send(from, to, &message.name.to_string(), continuation),
 
             Protocol::Broadcast {
                 from,
@@ -137,49 +126,9 @@ impl<'a> Analyzer<'a> {
                 message,
                 continuation,
                 ..
-            } => {
-                if let Some(stats) = self.role_stats.get_mut(from) {
-                    stats.sends += to_all.len();
-                }
-                for to in to_all {
-                    if let Some(stats) = self.role_stats.get_mut(to) {
-                        stats.receives += 1;
-                    }
-                    self.comm_graph.edges.push((
-                        from.clone(),
-                        to.clone(),
-                        format!("{} (broadcast)", message.name),
-                    ));
-                }
-                self.analyze_protocol(continuation);
-            }
+            } => self.analyze_broadcast(from, to_all, &message.name.to_string(), continuation),
 
-            Protocol::Choice { role, branches, .. } => {
-                if let Some(stats) = self.role_stats.get_mut(role) {
-                    stats.choices += 1;
-                }
-
-                // Check for asymmetric choices
-                let recipients: HashSet<_> = branches
-                    .iter()
-                    .filter_map(|branch| {
-                        if let Protocol::Send { to, .. } = &branch.protocol {
-                            Some(to.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-
-                if recipients.len() > 1 {
-                    self.warnings
-                        .push(AnalysisWarning::AsymmetricChoice(role.clone()));
-                }
-
-                for branch in branches {
-                    self.analyze_protocol(&branch.protocol);
-                }
-            }
+            Protocol::Choice { role, branches, .. } => self.analyze_choice(role, branches),
 
             Protocol::Loop { body, .. } => {
                 self.analyze_protocol(body);
@@ -200,6 +149,74 @@ impl<'a> Analyzer<'a> {
             Protocol::Extension { continuation, .. } => {
                 self.analyze_protocol(continuation);
             }
+        }
+    }
+
+    fn analyze_send(
+        &mut self,
+        from: &Role,
+        to: &Role,
+        message_name: &str,
+        continuation: &Protocol,
+    ) {
+        if let Some(stats) = self.role_stats.get_mut(from) {
+            stats.sends += 1;
+        }
+        if let Some(stats) = self.role_stats.get_mut(to) {
+            stats.receives += 1;
+        }
+        self.comm_graph
+            .edges
+            .push((from.clone(), to.clone(), message_name.to_string()));
+        self.analyze_protocol(continuation);
+    }
+
+    fn analyze_broadcast(
+        &mut self,
+        from: &Role,
+        to_all: &crate::ast::NonEmptyVec<Role>,
+        message_name: &str,
+        continuation: &Protocol,
+    ) {
+        if let Some(stats) = self.role_stats.get_mut(from) {
+            stats.sends += to_all.len();
+        }
+        for to in to_all {
+            if let Some(stats) = self.role_stats.get_mut(to) {
+                stats.receives += 1;
+            }
+            self.comm_graph.edges.push((
+                from.clone(),
+                to.clone(),
+                format!("{message_name} (broadcast)"),
+            ));
+        }
+        self.analyze_protocol(continuation);
+    }
+
+    fn analyze_choice(
+        &mut self,
+        role: &Role,
+        branches: &crate::ast::NonEmptyVec<crate::ast::Branch>,
+    ) {
+        if let Some(stats) = self.role_stats.get_mut(role) {
+            stats.choices += 1;
+        }
+
+        let recipients: HashSet<_> = branches
+            .iter()
+            .filter_map(|branch| match &branch.protocol {
+                Protocol::Send { to, .. } => Some(to.clone()),
+                _ => None,
+            })
+            .collect();
+        if recipients.len() > 1 {
+            self.warnings
+                .push(AnalysisWarning::AsymmetricChoice(role.clone()));
+        }
+
+        for branch in branches {
+            self.analyze_protocol(&branch.protocol);
         }
     }
 

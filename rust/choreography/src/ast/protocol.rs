@@ -4,6 +4,10 @@ use super::annotation::Annotations;
 use super::{MessageType, NonEmptyVec, Role, ValidationError};
 use proc_macro2::{Ident, TokenStream};
 
+#[path = "protocol_validation.rs"]
+mod validation;
+use validation::{ensure_declared_role, validate_choice_branches};
+
 /// Protocol specification using choreographic constructs
 #[derive(Debug)]
 pub enum Protocol {
@@ -135,9 +139,6 @@ impl Protocol {
     }
 
     pub(crate) fn validate(&self, roles: &[Role]) -> Result<(), ValidationError> {
-        // Helper to check if a role instance matches any declared role family
-        let role_is_declared = |r: &Role| roles.iter().any(|declared| r.matches_family(declared));
-
         match self {
             Protocol::Send {
                 from,
@@ -145,12 +146,8 @@ impl Protocol {
                 continuation,
                 ..
             } => {
-                if !role_is_declared(from) {
-                    return Err(ValidationError::UndefinedRole(from.name().to_string()));
-                }
-                if !role_is_declared(to) {
-                    return Err(ValidationError::UndefinedRole(to.name().to_string()));
-                }
+                ensure_declared_role(roles, from)?;
+                ensure_declared_role(roles, to)?;
                 continuation.validate(roles)
             }
             Protocol::Broadcast {
@@ -159,30 +156,15 @@ impl Protocol {
                 continuation,
                 ..
             } => {
-                if !role_is_declared(from) {
-                    return Err(ValidationError::UndefinedRole(from.name().to_string()));
-                }
+                ensure_declared_role(roles, from)?;
                 for to in to_all {
-                    if !role_is_declared(to) {
-                        return Err(ValidationError::UndefinedRole(to.name().to_string()));
-                    }
+                    ensure_declared_role(roles, to)?;
                 }
                 continuation.validate(roles)
             }
             Protocol::Choice { role, branches, .. } => {
-                if !role_is_declared(role) {
-                    return Err(ValidationError::UndefinedRole(role.name().to_string()));
-                }
-                // Validate each branch starts with the choosing role sending
-                for branch in branches {
-                    if let Protocol::Send { from, .. } = &branch.protocol {
-                        if from != role {
-                            return Err(ValidationError::InvalidChoice(role.name().to_string()));
-                        }
-                    } else {
-                        return Err(ValidationError::InvalidChoice(role.name().to_string()));
-                    }
-                }
+                ensure_declared_role(roles, role)?;
+                validate_choice_branches(role, branches)?;
                 Ok(())
             }
             Protocol::Loop { body, .. } => body.validate(roles),

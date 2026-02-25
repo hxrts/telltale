@@ -72,19 +72,15 @@ impl<R: EndpointResolver + 'static> TcpTransportFactory<R> {
     /// Create a transport instance for the given role.
     pub async fn create(&self, role: &RoleName) -> Result<Box<dyn Transport>, TransportError> {
         // Resolve the endpoint for this role
-        let endpoint = self
-            .resolver
-            .resolve(role)
-            .await
-            .map_err(|e| TransportError::ConnectionFailed(format!("failed to resolve endpoint: {e}")))?;
+        let endpoint = self.resolver.resolve(role).await.map_err(|e| {
+            TransportError::ConnectionFailed(format!("failed to resolve endpoint: {e}"))
+        })?;
 
         // Create TCP transport configuration for this role
-        let transport_config = crate::config::TcpTransportConfig::new(
-            role.as_str(),
-            endpoint.as_str(),
-        )
-        .with_retry(self.config.retry.clone())
-        .with_buffer_size(self.config.buffer_size);
+        let transport_config =
+            crate::config::TcpTransportConfig::new(role.as_str(), endpoint.as_str())
+                .with_retry(self.config.retry.clone())
+                .with_buffer_size(self.config.buffer_size);
 
         let transport = TcpTransport::new(transport_config);
         Ok(Box::new(transport))
@@ -141,7 +137,9 @@ mod tests {
         let factory = TcpTransportFactory::new(resolver, config);
 
         // Can access resolver and config
-        assert!(factory.resolver().can_resolve(&RoleName::from_static("Alice")));
+        assert!(factory
+            .resolver()
+            .can_resolve(&RoleName::from_static("Alice")));
         assert_eq!(factory.config().buffer_size.as_usize(), 32);
     }
 }

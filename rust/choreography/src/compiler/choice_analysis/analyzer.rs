@@ -206,11 +206,7 @@ impl ChoiceAnalyzer {
                 continuation,
                 ..
             } => {
-                messages.push(MessageInfo {
-                    from: from.name().to_string(),
-                    to: to.name().to_string(),
-                    message_type: message.name.to_string(),
-                });
+                self.push_send_message(messages, from, to, &message.name.to_string());
                 self.collect_messages_from_protocol(continuation, messages);
             }
             Protocol::Broadcast {
@@ -220,31 +216,11 @@ impl ChoiceAnalyzer {
                 continuation,
                 ..
             } => {
-                for to in to_all {
-                    messages.push(MessageInfo {
-                        from: from.name().to_string(),
-                        to: to.name().to_string(),
-                        message_type: message.name.to_string(),
-                    });
-                }
+                self.push_broadcast_messages(messages, from, to_all, &message.name.to_string());
                 self.collect_messages_from_protocol(continuation, messages);
             }
             Protocol::Choice { branches, .. } => {
-                // Don't descend into nested choices - they're analyzed separately
-                // But we do need to track messages before the nested choice
-                for branch in branches {
-                    // Only take the first message from each branch for initial analysis
-                    if let Protocol::Send {
-                        from, to, message, ..
-                    } = &branch.protocol
-                    {
-                        messages.push(MessageInfo {
-                            from: from.name().to_string(),
-                            to: to.name().to_string(),
-                            message_type: message.name.to_string(),
-                        });
-                    }
-                }
+                self.collect_nested_choice_messages(branches, messages);
             }
             Protocol::Loop { body, .. } => {
                 self.collect_messages_from_protocol(body, messages);
@@ -261,6 +237,47 @@ impl ChoiceAnalyzer {
                 self.collect_messages_from_protocol(continuation, messages);
             }
             Protocol::Var(_) | Protocol::End => {}
+        }
+    }
+
+    fn push_send_message(
+        &self,
+        messages: &mut Vec<MessageInfo>,
+        from: &Role,
+        to: &Role,
+        message_type: &str,
+    ) {
+        messages.push(MessageInfo {
+            from: from.name().to_string(),
+            to: to.name().to_string(),
+            message_type: message_type.to_string(),
+        });
+    }
+
+    fn push_broadcast_messages(
+        &self,
+        messages: &mut Vec<MessageInfo>,
+        from: &Role,
+        to_all: &crate::ast::NonEmptyVec<Role>,
+        message_type: &str,
+    ) {
+        for to in to_all {
+            self.push_send_message(messages, from, to, message_type);
+        }
+    }
+
+    fn collect_nested_choice_messages(
+        &self,
+        branches: &crate::ast::NonEmptyVec<Branch>,
+        messages: &mut Vec<MessageInfo>,
+    ) {
+        for branch in branches {
+            if let Protocol::Send {
+                from, to, message, ..
+            } = &branch.protocol
+            {
+                self.push_send_message(messages, from, to, &message.name.to_string());
+            }
         }
     }
 
@@ -454,67 +471,9 @@ impl ChoiceAnalyzer {
             choice.choice_id.chooser, role
         ));
 
-        // Show which branches the role participates in using branch_participation
-        let present_branches: Vec<&String> = choice
-            .branch_participation
-            .iter()
-            .filter(|(_label, roles)| roles.contains(role))
-            .map(|(label, _)| label)
-            .collect();
-        let absent_branches: Vec<&String> = choice
-            .branch_participation
-            .iter()
-            .filter(|(_label, roles)| !roles.contains(role))
-            .map(|(label, _)| label)
-            .collect();
-
-        if !present_branches.is_empty() && !absent_branches.is_empty() {
-            diagnostic.notes.push(format!(
-                "'{}' participates in branch(es): {} but NOT in: {}",
-                role,
-                present_branches
-                    .iter()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                absent_branches
-                    .iter()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-        } else if !present_branches.is_empty() {
-            diagnostic.notes.push(format!(
-                "'{}' participates in: {}",
-                role,
-                present_branches
-                    .iter()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-        }
-
-        // Add note about which roles are informed
-        if !choice.informed_roles.is_empty() {
-            let informed_list: Vec<String> = choice
-                .informed_roles
-                .iter()
-                .map(|(r, src)| format!("{} ({})", r, src.description()))
-                .collect();
-            diagnostic
-                .notes
-                .push(format!("Informed roles: {}", informed_list.join(", ")));
-        }
-
-        // Check if role might be a typo
-        if let Some(suggestion) = self.find_similar_role(role) {
-            diagnostic
-                .suggestions
-                .push(format!("Did you mean '{}'?", suggestion));
-        }
-
-        // Add note about branches
+        self.add_branch_participation_notes(&mut diagnostic, choice, role);
+        self.add_informed_roles_note(&mut diagnostic, choice);
+        self.add_typo_suggestion(&mut diagnostic, role);
         diagnostic
             .notes
             .push(format!("Choice branches: {:?}", choice.branches));
@@ -524,6 +483,63 @@ impl ChoiceAnalyzer {
         }
 
         self.diagnostics.add(diagnostic);
+    }
+
+    fn add_branch_participation_notes(
+        &self,
+        diagnostic: &mut Diagnostic,
+        choice: &ChoiceKnowledge,
+        role: &str,
+    ) {
+        let present_branches: Vec<&str> = choice
+            .branch_participation
+            .iter()
+            .filter(|(_label, roles)| roles.contains(role))
+            .map(|(label, _)| label.as_str())
+            .collect();
+        let absent_branches: Vec<&str> = choice
+            .branch_participation
+            .iter()
+            .filter(|(_label, roles)| !roles.contains(role))
+            .map(|(label, _)| label.as_str())
+            .collect();
+
+        if !present_branches.is_empty() && !absent_branches.is_empty() {
+            diagnostic.notes.push(format!(
+                "'{}' participates in branch(es): {} but NOT in: {}",
+                role,
+                present_branches.join(", "),
+                absent_branches.join(", ")
+            ));
+        } else if !present_branches.is_empty() {
+            diagnostic.notes.push(format!(
+                "'{}' participates in: {}",
+                role,
+                present_branches.join(", ")
+            ));
+        }
+    }
+
+    fn add_informed_roles_note(&self, diagnostic: &mut Diagnostic, choice: &ChoiceKnowledge) {
+        if choice.informed_roles.is_empty() {
+            return;
+        }
+        let informed_list: Vec<String> = choice
+            .informed_roles
+            .iter()
+            .map(|(r, src)| format!("{} ({})", r, src.description()))
+            .collect();
+        diagnostic
+            .notes
+            .push(format!("Informed roles: {}", informed_list.join(", ")));
+    }
+
+    fn add_typo_suggestion(&self, diagnostic: &mut Diagnostic, role: &str) {
+        if let Some(suggestion) = self.find_similar_role(role) {
+            diagnostic
+                .suggestions
+                .push(format!("Did you mean '{}'?", suggestion));
+        }
     }
 
     /// Find a similar role name (for typo suggestions)

@@ -140,6 +140,90 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
     Ok(quote!(#input #output))
 }
 
+fn collect_enum_variants(
+    input: &mut ItemEnum,
+    exclude: &HashSet<Ident>,
+) -> Result<(Vec<Ident>, Vec<Type>, Vec<Type>)> {
+    let mut idents = Vec::with_capacity(input.variants.len());
+    let mut labels = Vec::with_capacity(input.variants.len());
+    let mut tys = Vec::with_capacity(input.variants.len());
+
+    for variant in &mut input.variants {
+        idents.push(variant.ident.clone());
+        let fields = match &mut variant.fields {
+            Fields::Unnamed(fields) => Ok(&mut fields.unnamed),
+            fields => Err(Error::new_spanned(fields, "expected tuple variants")),
+        }?;
+        if fields.len() != 2 {
+            return Err(Error::new_spanned(
+                fields,
+                "expected exactly two fields per variant",
+            ));
+        }
+
+        let mut fields = fields.iter_mut();
+        let label = fields.next().unwrap().ty.clone();
+        let ty = &mut fields.next().unwrap().ty;
+        augment_type(ty, exclude);
+
+        labels.push(label);
+        tys.push(ty.clone());
+    }
+
+    Ok((idents, labels, tys))
+}
+
+fn generate_choice_impls(
+    ident: &Ident,
+    impl_generics: &impl ToTokens,
+    ty_generics: &impl ToTokens,
+    where_clause: Option<&syn::WhereClause>,
+    labels: &[Type],
+    tys: &[Type],
+) -> TokenStream {
+    let mut output = TokenStream::new();
+    for (label, ty) in labels.iter().zip(tys) {
+        output.extend(quote! {
+            impl #impl_generics ::telltale::Choice<'__r, #label> for #ident #ty_generics #where_clause {
+                type Session = #ty;
+            }
+        });
+    }
+    output
+}
+
+fn generate_choices_impl(input: &mut ItemEnum, idents: &[Ident], labels: &[Type]) -> TokenStream {
+    punctuated_prepend(
+        &mut input.generics.params,
+        parse_quote!('__r, __R: ::telltale::Role),
+    );
+    let (impl_generics, ty_generics, _) = input.generics.split_for_impl();
+
+    let mut generics = input.generics.clone();
+    generics.make_where_clause().predicates.push(parse_quote! {
+        __R::Message: #(::telltale::Message<#labels> +)*
+    });
+    let (_, _, where_clause) = generics.split_for_impl();
+    let ident = &input.ident;
+
+    quote! {
+        impl #impl_generics ::telltale::Choices<'__r> for #ident #ty_generics #where_clause {
+            type Role = __R;
+
+            fn downcast(
+                state: ::telltale::State<'__r, Self::Role>,
+                message: <Self::Role as Role>::Message,
+            ) -> ::core::result::Result<Self, <Self::Role as Role>::Message> {
+                #(let message = match ::telltale::Message::downcast(message) {
+                    Ok(label) => return Ok(Self::#idents(label, ::telltale::FromState::from_state(state))),
+                    Err(message) => message
+                };)*
+                Err(message)
+            }
+        }
+    }
+}
+
 /// Transforms an enum into a choice type with necessary trait implementations.
 fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
     if input.variants.is_empty() {
@@ -147,7 +231,7 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
         return Err(Error::new_spanned(&input.variants, message));
     }
 
-    let ident = &input.ident;
+    let ident = input.ident.clone();
     let exclude = idents_set(&input.generics.params);
 
     let mut generics = input.generics.clone();
@@ -164,75 +248,16 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
     );
     let (_, ty_generics, where_clause) = generics.split_for_impl();
 
-    let mut idents = Vec::with_capacity(input.variants.len());
-    let mut labels = Vec::with_capacity(input.variants.len());
-    let mut tys = Vec::with_capacity(input.variants.len());
-
-    for variant in &mut input.variants {
-        idents.push(&variant.ident);
-        let fields = match &mut variant.fields {
-            Fields::Unnamed(fields) => Ok(&mut fields.unnamed),
-            fields => Err(Error::new_spanned(fields, "expected tuple variants")),
-        }?;
-
-        if fields.len() != 2 {
-            let message = "expected exactly two fields per variant";
-            return Err(Error::new_spanned(fields, message));
-        }
-
-        let mut fields = fields.iter_mut();
-
-        let label = &fields.next().unwrap().ty;
-        labels.push(label);
-
-        let ty = &mut fields.next().unwrap().ty;
-        augment_type(ty, &exclude);
-        tys.push(&*ty);
-    }
-
-    let mut output = TokenStream::new();
-    for (label, ty) in labels.iter().zip(&tys) {
-        output.extend(quote! {
-            impl #impl_generics ::telltale::Choice<'__r, #label> for #ident #ty_generics #where_clause {
-                type Session = #ty;
-            }
-        });
-    }
-
-    punctuated_prepend(
-        &mut input.generics.params,
-        parse_quote!('__r, __R: ::telltale::Role),
+    let (idents, labels, tys) = collect_enum_variants(&mut input, &exclude)?;
+    let mut output = generate_choice_impls(
+        &ident,
+        &impl_generics,
+        &ty_generics,
+        where_clause,
+        &labels,
+        &tys,
     );
-    let (impl_generics, ty_generics, _) = input.generics.split_for_impl();
-
-    let mut generics = input.generics.clone();
-    generics.make_where_clause().predicates.push(parse_quote! {
-        __R::Message: #(::telltale::Message<#labels> +)*
-    });
-
-    let (_, _, where_clause) = generics.split_for_impl();
-    output.extend(quote! {
-        impl #impl_generics ::telltale::Choices<'__r> for #ident #ty_generics #where_clause {
-            type Role = __R;
-
-            fn downcast(
-                state: ::telltale::State<'__r, Self::Role>,
-                message: <Self::Role as Role>::Message,
-            ) -> ::core::result::Result<Self, <Self::Role as Role>::Message> {
-                #(let message = match ::telltale::Message::downcast(message) {
-                    Ok(label) => {
-                        return Ok(Self::#idents(
-                            label,
-                            ::telltale::FromState::from_state(state)
-                        ));
-                    }
-                    Err(message) => message
-                };)*
-
-                Err(message)
-            }
-        }
-    });
+    output.extend(generate_choices_impl(&mut input, &idents, &labels));
 
     Ok(quote!(#input #output))
 }

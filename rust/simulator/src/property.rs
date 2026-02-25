@@ -304,6 +304,7 @@ impl PropertyMonitor {
     }
 
     /// Check all properties against the current VM context.
+    #[allow(clippy::too_many_lines)]
     pub fn check(&mut self, ctx: &PropertyContext<'_>) {
         let new_events = ctx.trace.get(self.last_trace_len..).unwrap_or(&[]);
         let mut new_events_local = Vec::with_capacity(new_events.len());

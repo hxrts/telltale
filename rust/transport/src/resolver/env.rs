@@ -57,9 +57,9 @@ fn parse_endpoint_parts(endpoint: &str) -> Result<(String, u16), String> {
     }
 
     if let Some(rest) = endpoint.strip_prefix('[') {
-        let (host, port_text) = rest.split_once("]:").ok_or_else(|| {
-            "invalid IPv6 endpoint format; expected [address]:port".to_string()
-        })?;
+        let (host, port_text) = rest
+            .split_once("]:")
+            .ok_or_else(|| "invalid IPv6 endpoint format; expected [address]:port".to_string())?;
         if host.is_empty() {
             return Err("endpoint host cannot be empty".to_string());
         }
@@ -235,9 +235,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_not_set() {
         let resolver = EnvResolver::new("NONEXISTENT_PREFIX_12345").unwrap();
-        let result = resolver
-            .resolve(&RoleName::from_static("Alice"))
-            .await;
+        let result = resolver.resolve(&RoleName::from_static("Alice")).await;
 
         assert!(matches!(
             result,
@@ -325,9 +323,7 @@ mod tests {
         let resolver = EnvResolver::new("IPV6F").unwrap();
         // Note: Zone IDs like %eth0 may not parse correctly with standard parsing
         // This tests that the endpoint at least attempts to parse
-        let result = resolver
-            .resolve(&RoleName::from_static("Bob"))
-            .await;
+        let result = resolver.resolve(&RoleName::from_static("Bob")).await;
 
         // Zone IDs are platform-specific, so we just check it doesn't crash
         std::env::remove_var("IPV6F_BOB_ENDPOINT");

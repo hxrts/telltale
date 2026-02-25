@@ -51,126 +51,20 @@ fn generate_type_expr(local_type: &LocalType) -> TokenStream {
             to,
             message,
             continuation,
-        } => {
-            let to_name = to.name();
-            let msg_name = &message.name;
-            let cont = generate_type_expr(continuation);
-
-            quote! {
-                Send<#to_name, #msg_name, #cont>
-            }
-        }
-
+        } => generate_send_type_expr(to, message, continuation),
         LocalType::Receive {
             from,
             message,
             continuation,
-        } => {
-            let from_name = from.name();
-            let msg_name = &message.name;
-            let cont = generate_type_expr(continuation);
-
-            quote! {
-                Receive<#from_name, #msg_name, #cont>
-            }
-        }
-
-        LocalType::Select { to, branches } => {
-            let to_name = to.name();
-            let choice_type = generate_choice_enum(branches, true);
-
-            quote! {
-                Select<#to_name, #choice_type>
-            }
-        }
-
-        LocalType::Branch { from, branches } => {
-            let from_name = from.name();
-            let choice_type = generate_choice_enum(branches, false);
-
-            quote! {
-                Branch<#from_name, #choice_type>
-            }
-        }
-
-        LocalType::LocalChoice { branches } => {
-            let choice_type = generate_choice_enum(branches, true);
-
-            quote! {
-                LocalChoice<#choice_type>
-            }
-        }
-
-        LocalType::Loop { condition, body } => {
-            let body_expr = generate_type_expr(body);
-
-            // Generate Loop type with condition information
-            // The condition affects the loop semantics but is typically
-            // enforced at runtime rather than in the type system
-            match condition {
-                Some(crate::ast::Condition::Count(_n)) => {
-                    // Fixed iteration count - can be encoded in type comments
-                    // The count is enforced at runtime in the effect algebra
-                    quote! {
-                        Loop<#body_expr>
-                    }
-                }
-                Some(crate::ast::Condition::RoleDecides(_role)) => {
-                    // Role-based loop control - runtime behavior
-                    quote! {
-                        // Loop controlled by role decision
-                        Loop<#body_expr>
-                    }
-                }
-                Some(crate::ast::Condition::Custom(_expr)) => {
-                    // Custom condition - runtime evaluation
-                    quote! {
-                        // Loop with custom condition
-                        Loop<#body_expr>
-                    }
-                }
-                Some(crate::ast::Condition::Fuel(_n)) => {
-                    // Fuel-based bounding - max iterations
-                    quote! {
-                        // Loop with fuel bounding
-                        Loop<#body_expr>
-                    }
-                }
-                Some(crate::ast::Condition::YieldAfter(_n)) => {
-                    // Yield after N steps
-                    quote! {
-                        // Loop with yield-after bounding
-                        Loop<#body_expr>
-                    }
-                }
-                Some(crate::ast::Condition::YieldWhen(_condition)) => {
-                    // Yield when condition met
-                    quote! {
-                        // Loop with yield-when bounding
-                        Loop<#body_expr>
-                    }
-                }
-                None => {
-                    // No condition specified - simple loop
-                    quote! {
-                        Loop<#body_expr>
-                    }
-                }
-            }
-        }
-
+        } => generate_receive_type_expr(from, message, continuation),
+        LocalType::Select { to, branches } => generate_select_type_expr(to, branches),
+        LocalType::Branch { from, branches } => generate_branch_type_expr(from, branches),
+        LocalType::LocalChoice { branches } => generate_local_choice_type_expr(branches),
+        LocalType::Loop { condition, body } => generate_loop_type_expr(condition, body),
         LocalType::Rec {
             label: _label,
             body,
-        } => {
-            // Generate a recursive type using the label as the type name
-            // This prevents infinite expansion by creating a named recursive type
-            let body_expr = generate_type_expr(body);
-            quote! {
-                // Recursive type
-                #body_expr
-            }
-        }
+        } => generate_rec_type_expr(body),
 
         LocalType::Var(label) => {
             // Reference to recursive type variable
@@ -188,6 +82,66 @@ fn generate_type_expr(local_type: &LocalType) -> TokenStream {
             generate_type_expr(body)
         }
     }
+}
+
+fn generate_send_type_expr(
+    to: &Role,
+    message: &MessageType,
+    continuation: &LocalType,
+) -> TokenStream {
+    let to_name = to.name();
+    let msg_name = &message.name;
+    let cont = generate_type_expr(continuation);
+    quote! { Send<#to_name, #msg_name, #cont> }
+}
+
+fn generate_receive_type_expr(
+    from: &Role,
+    message: &MessageType,
+    continuation: &LocalType,
+) -> TokenStream {
+    let from_name = from.name();
+    let msg_name = &message.name;
+    let cont = generate_type_expr(continuation);
+    quote! { Receive<#from_name, #msg_name, #cont> }
+}
+
+fn generate_select_type_expr(to: &Role, branches: &[(Ident, LocalType)]) -> TokenStream {
+    let to_name = to.name();
+    let choice_type = generate_choice_enum(branches, true);
+    quote! { Select<#to_name, #choice_type> }
+}
+
+fn generate_branch_type_expr(from: &Role, branches: &[(Ident, LocalType)]) -> TokenStream {
+    let from_name = from.name();
+    let choice_type = generate_choice_enum(branches, false);
+    quote! { Branch<#from_name, #choice_type> }
+}
+
+fn generate_local_choice_type_expr(branches: &[(Ident, LocalType)]) -> TokenStream {
+    let choice_type = generate_choice_enum(branches, true);
+    quote! { LocalChoice<#choice_type> }
+}
+
+fn generate_loop_type_expr(
+    condition: &Option<crate::ast::Condition>,
+    body: &LocalType,
+) -> TokenStream {
+    let body_expr = generate_type_expr(body);
+    match condition {
+        Some(crate::ast::Condition::Count(_)) => quote! { Loop<#body_expr> },
+        Some(crate::ast::Condition::RoleDecides(_)) => quote! { Loop<#body_expr> },
+        Some(crate::ast::Condition::Custom(_)) => quote! { Loop<#body_expr> },
+        Some(crate::ast::Condition::Fuel(_)) => quote! { Loop<#body_expr> },
+        Some(crate::ast::Condition::YieldAfter(_)) => quote! { Loop<#body_expr> },
+        Some(crate::ast::Condition::YieldWhen(_)) => quote! { Loop<#body_expr> },
+        None => quote! { Loop<#body_expr> },
+    }
+}
+
+fn generate_rec_type_expr(body: &LocalType) -> TokenStream {
+    let body_expr = generate_type_expr(body);
+    quote! { #body_expr }
 }
 
 /// Generate a choice enum for Select/Branch
@@ -384,51 +338,18 @@ fn generate_implementation_body(local_type: &LocalType) -> TokenStream {
             message,
             continuation,
             ..
-        } => {
-            let msg_name = &message.name;
-            let cont_impl = generate_implementation_body(continuation);
-
-            quote! {
-                let s = s.send(#msg_name(/* ... */)).await?;
-                #cont_impl
-            }
-        }
+        } => generate_send_impl(&message.name, continuation),
 
         LocalType::Receive {
             message,
             continuation,
             ..
-        } => {
-            let msg_name = &message.name;
-            let cont_impl = generate_implementation_body(continuation);
+        } => generate_recv_impl(&message.name, continuation),
 
-            quote! {
-                let (#msg_name(value), s) = s.receive().await?;
-                #cont_impl
-            }
-        }
-
-        LocalType::Select { branches, .. } => {
-            // Generate match on user choice
-            let first_branch = &branches[0];
-            let label = &first_branch.0;
-            let cont_impl = generate_implementation_body(&first_branch.1);
-
-            quote! {
-                let s = s.select(#label(/* ... */)).await?;
-                #cont_impl
-            }
-        }
+        LocalType::Select { branches, .. } => generate_select_impl(branches),
 
         LocalType::Branch { branches, .. } => {
-            let match_arms = branches.iter().map(|(label, local_type)| {
-                let impl_body = generate_implementation_body(local_type);
-                quote! {
-                    Choice::#label(value, s) => {
-                        #impl_body
-                    }
-                }
-            });
+            let match_arms = branches.iter().map(generate_branch_match_arm);
 
             quote! {
                 let s = match s.branch().await? {
@@ -440,6 +361,42 @@ fn generate_implementation_body(local_type: &LocalType) -> TokenStream {
         LocalType::End => quote! {},
 
         _ => quote! { /* recursive types need special handling */ },
+    }
+}
+
+fn generate_send_impl(msg_name: &Ident, continuation: &LocalType) -> TokenStream {
+    let cont_impl = generate_implementation_body(continuation);
+    quote! {
+        let s = s.send(#msg_name(/* ... */)).await?;
+        #cont_impl
+    }
+}
+
+fn generate_recv_impl(msg_name: &Ident, continuation: &LocalType) -> TokenStream {
+    let cont_impl = generate_implementation_body(continuation);
+    quote! {
+        let (#msg_name(value), s) = s.receive().await?;
+        #cont_impl
+    }
+}
+
+fn generate_select_impl(branches: &[(Ident, LocalType)]) -> TokenStream {
+    let first_branch = &branches[0];
+    let label = &first_branch.0;
+    let cont_impl = generate_implementation_body(&first_branch.1);
+    quote! {
+        let s = s.select(#label(/* ... */)).await?;
+        #cont_impl
+    }
+}
+
+fn generate_branch_match_arm(branch: &(Ident, LocalType)) -> TokenStream {
+    let (label, local_type) = branch;
+    let impl_body = generate_implementation_body(local_type);
+    quote! {
+        Choice::#label(value, s) => {
+            #impl_body
+        }
     }
 }
 

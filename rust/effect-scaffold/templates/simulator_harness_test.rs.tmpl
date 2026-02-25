@@ -1,0 +1,57 @@
+use std::collections::BTreeMap;
+
+use telltale_simulator::contracts::{assert_contracts, ContractCheckConfig};
+use telltale_simulator::harness::{DirectAdapter, HarnessSpec, SimulationHarness};
+use telltale_simulator::material::{MaterialParams, MeanFieldParams};
+use telltale_simulator::scenario::{OutputConfig, Scenario};
+use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
+
+use crate::effect_handler::{{STRUCT_NAME}};
+
+fn simulator_smoke_spec() -> HarnessSpec {
+    let mut local_types = BTreeMap::new();
+    local_types.insert(
+        "A".to_string(),
+        LocalTypeR::Send {
+            partner: "B".into(),
+            branches: vec![(Label::new("msg"), None, LocalTypeR::End)],
+        },
+    );
+    local_types.insert(
+        "B".to_string(),
+        LocalTypeR::Recv {
+            partner: "A".into(),
+            branches: vec![(Label::new("msg"), None, LocalTypeR::End)],
+        },
+    );
+
+    let global_type = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+    let scenario = Scenario {
+        name: "scaffold_sim_smoke".to_string(),
+        roles: vec!["A".to_string(), "B".to_string()],
+        steps: 8,
+        concurrency: 1,
+        seed: 0,
+        network: None,
+        material: MaterialParams::MeanField(MeanFieldParams {
+            beta: FixedQ32::one(),
+            species: vec!["up".into(), "down".into()],
+            initial_state: vec![FixedQ32::half(), FixedQ32::half()],
+            step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
+        }),
+        events: Vec::new(),
+        properties: None,
+        checkpoint_interval: None,
+        output: OutputConfig::default(),
+    };
+
+    HarnessSpec::new(local_types, global_type, scenario)
+}
+
+#[test]
+fn simulator_harness_contract_smoke_test() {
+    let adapter = DirectAdapter::new(&{{STRUCT_NAME}});
+    let harness = SimulationHarness::new(&adapter);
+    let result = harness.run(&simulator_smoke_spec()).expect("harness run should succeed");
+    assert_contracts(&result, &ContractCheckConfig::default()).expect("contracts should pass");
+}

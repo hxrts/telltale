@@ -23,6 +23,12 @@
 
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
+mod reduction;
+#[cfg(test)]
+mod tests;
+
+pub use reduction::{good_g, reduces, reduces_star};
+
 /// Direction of a local action (send or receive).
 ///
 /// Corresponds to Lean's `LocalKind`.
@@ -361,11 +367,9 @@ fn local_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> Option<Lo
     }
 
     match lt {
-        LocalTypeR::End => None,
-        LocalTypeR::Var(_) => None,
+        LocalTypeR::End | LocalTypeR::Var(_) => None,
         LocalTypeR::Send { partner, branches } => {
             if act.kind == LocalKind::Send {
-                // send_head: direct match
                 if partner == &act.partner {
                     for (l, _vt, cont) in branches {
                         if l.name == act.label.name {
@@ -374,7 +378,6 @@ fn local_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> Option<Lo
                     }
                 }
 
-                // send_async: skip if different partner
                 if act.partner != *partner {
                     let enabled = branches
                         .iter()
@@ -399,7 +402,6 @@ fn local_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> Option<Lo
             None
         }
         LocalTypeR::Recv { partner, branches } => {
-            // recv_head: direct match only (recv blocks)
             if act.kind == LocalKind::Recv && partner == &act.partner {
                 for (l, _vt, cont) in branches {
                     if l.name == act.label.name {
@@ -410,7 +412,6 @@ fn local_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> Option<Lo
             None
         }
         LocalTypeR::Mu { var, body } => {
-            // Unfold and step
             let unfolded = body.substitute(var, lt);
             local_step_fuel(&unfolded, act, fuel - 1)
         }
@@ -506,300 +507,5 @@ fn consume_with_proof_fuel(
             })
         }
         _ => None,
-    }
-}
-
-/// Check if a global type reduces to another via one communication.
-///
-/// Corresponds to Lean's `GlobalTypeReduces` relation.
-/// G ⟹ G' means G can reduce to G' by performing one communication.
-#[must_use]
-pub fn reduces(global: &GlobalType, target: &GlobalType) -> bool {
-    reduces_fuel(global, target, 100)
-}
-
-fn reduces_fuel(g: &GlobalType, g_prime: &GlobalType, fuel: usize) -> bool {
-    if fuel == 0 {
-        return false;
-    }
-
-    match g {
-        GlobalType::Comm { branches, .. } => {
-            // Direct reduction: g_prime is one of the continuations
-            for (_, cont) in branches {
-                if cont == g_prime {
-                    return true;
-                }
-            }
-            false
-        }
-        GlobalType::Mu { var, body } => {
-            // Reduce under μ-unfolding
-            let unfolded = body.substitute(var, g);
-            reduces_fuel(&unfolded, g_prime, fuel - 1)
-        }
-        _ => false,
-    }
-}
-
-/// Check if g reduces to g_prime in zero or more steps.
-///
-/// Corresponds to Lean's `GlobalTypeReducesStar`.
-#[must_use]
-pub fn reduces_star(global: &GlobalType, target: &GlobalType) -> bool {
-    reduces_star_fuel(global, target, 100, &mut Vec::new())
-}
-
-fn reduces_star_fuel(
-    g: &GlobalType,
-    g_prime: &GlobalType,
-    fuel: usize,
-    visited: &mut Vec<GlobalType>,
-) -> bool {
-    if fuel == 0 {
-        return false;
-    }
-
-    // Reflexive case
-    if g == g_prime {
-        return true;
-    }
-
-    // Avoid cycles
-    if visited.contains(g) {
-        return false;
-    }
-    visited.push(g.clone());
-
-    // Try all possible one-step reductions
-    match g {
-        GlobalType::Comm { branches, .. } => {
-            for (_, cont) in branches {
-                if reduces_star_fuel(cont, g_prime, fuel - 1, visited) {
-                    return true;
-                }
-            }
-            false
-        }
-        GlobalType::Mu { var, body } => {
-            let unfolded = body.substitute(var, g);
-            reduces_star_fuel(&unfolded, g_prime, fuel - 1, visited)
-        }
-        _ => false,
-    }
-}
-
-/// Check if an action is enabled implies a step exists.
-///
-/// This is the "good global" condition from the ECOOP 2025 paper.
-/// For well-formed types, if `can_step(g, act)` then `step(g, act).is_some()`.
-#[must_use]
-pub fn good_g(global: &GlobalType) -> bool {
-    good_g_fuel(global, 100, &mut Vec::new())
-}
-
-fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut Vec<GlobalType>) -> bool {
-    if fuel == 0 {
-        return true; // Assume good if we run out of fuel
-    }
-
-    if visited.contains(g) {
-        return true; // Avoid infinite loops
-    }
-    visited.push(g.clone());
-
-    match g {
-        GlobalType::End => true,
-        GlobalType::Var(_) => true,
-        GlobalType::Comm {
-            sender,
-            receiver,
-            branches,
-        } => {
-            // Check all head actions have steps
-            for (l, cont) in branches {
-                let act = GlobalAction::new(sender, receiver, l.clone());
-                if can_step(g, &act) && step(g, &act).is_none() {
-                    return false;
-                }
-                // Recursively check continuations
-                if !good_g_fuel(cont, fuel - 1, visited) {
-                    return false;
-                }
-            }
-            true
-        }
-        GlobalType::Mu { var, body } => {
-            // Check the unfolded type
-            let unfolded = body.substitute(var, g);
-            good_g_fuel(&unfolded, fuel - 1, visited)
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_can_step_head() {
-        // A -> B: msg. end
-        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
-        let act = GlobalAction::new("A", "B", Label::new("msg"));
-        assert!(can_step(&g, &act));
-    }
-
-    #[test]
-    fn test_can_step_wrong_action() {
-        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
-        let wrong = GlobalAction::new("B", "A", Label::new("msg"));
-        assert!(!can_step(&g, &wrong));
-    }
-
-    #[test]
-    fn test_can_step_wrong_label() {
-        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
-        let wrong = GlobalAction::new("A", "B", Label::new("other"));
-        assert!(!can_step(&g, &wrong));
-    }
-
-    #[test]
-    fn test_can_step_async() {
-        // A -> B: m1. (C -> D: m2. end)
-        // Action C -> D can skip A -> B since D ≠ B
-        let inner = GlobalType::send("C", "D", Label::new("m2"), GlobalType::End);
-        let g = GlobalType::send("A", "B", Label::new("m1"), inner);
-
-        let act = GlobalAction::new("C", "D", Label::new("m2"));
-        assert!(can_step(&g, &act));
-    }
-
-    #[test]
-    fn test_can_step_async_blocked() {
-        // A -> B: m1. (C -> B: m2. end)
-        // Action C -> B CANNOT skip A -> B since B == B (receiver conflict)
-        let inner = GlobalType::send("C", "B", Label::new("m2"), GlobalType::End);
-        let g = GlobalType::send("A", "B", Label::new("m1"), inner);
-
-        let act = GlobalAction::new("C", "B", Label::new("m2"));
-        assert!(!can_step(&g, &act));
-    }
-
-    #[test]
-    fn test_can_step_mu() {
-        // μt. A -> B: msg. t
-        let g = GlobalType::mu(
-            "t",
-            GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("t")),
-        );
-        let act = GlobalAction::new("A", "B", Label::new("msg"));
-        assert!(can_step(&g, &act));
-    }
-
-    #[test]
-    fn test_step_head() {
-        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
-        let act = GlobalAction::new("A", "B", Label::new("msg"));
-        assert_eq!(step(&g, &act), Some(GlobalType::End));
-    }
-
-    #[test]
-    fn test_step_async() {
-        // A -> B: m1. (C -> D: m2. end)
-        // Step C -> D results in: A -> B: m1. end
-        let inner = GlobalType::send("C", "D", Label::new("m2"), GlobalType::End);
-        let g = GlobalType::send("A", "B", Label::new("m1"), inner);
-
-        let act = GlobalAction::new("C", "D", Label::new("m2"));
-        let result = step(&g, &act);
-
-        let expected = GlobalType::send("A", "B", Label::new("m1"), GlobalType::End);
-        assert_eq!(result, Some(expected));
-    }
-
-    #[test]
-    fn test_step_mu() {
-        let g = GlobalType::mu(
-            "t",
-            GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("t")),
-        );
-        let act = GlobalAction::new("A", "B", Label::new("msg"));
-        let result = step(&g, &act);
-
-        // Result should be the recursive type again
-        assert_eq!(result, Some(g));
-    }
-
-    #[test]
-    fn test_local_can_step_send() {
-        let lt = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
-        let act = LocalAction::send("B", Label::new("msg"));
-        assert!(local_can_step(&lt, &act));
-    }
-
-    #[test]
-    fn test_local_can_step_recv() {
-        let lt = LocalTypeR::recv("A", Label::new("msg"), LocalTypeR::End);
-        let act = LocalAction::recv("A", Label::new("msg"));
-        assert!(local_can_step(&lt, &act));
-    }
-
-    #[test]
-    fn test_local_can_step_async() {
-        // !B{m1. !C{m2. end}}
-        // Action !C{m2} can skip !B{m1} since C ≠ B
-        let inner = LocalTypeR::send("C", Label::new("m2"), LocalTypeR::End);
-        let lt = LocalTypeR::send("B", Label::new("m1"), inner);
-
-        let act = LocalAction::send("C", Label::new("m2"));
-        assert!(local_can_step(&lt, &act));
-    }
-
-    #[test]
-    fn test_local_step_send() {
-        let lt = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
-        let act = LocalAction::send("B", Label::new("msg"));
-        assert_eq!(local_step(&lt, &act), Some(LocalTypeR::End));
-    }
-
-    #[test]
-    fn test_consume_with_proof() {
-        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
-        let result = consume_with_proof(&g, "A", "B", &Label::new("msg"));
-
-        assert!(result.is_some());
-        let proof = result.unwrap();
-        assert_eq!(proof.continuation(), &GlobalType::End);
-    }
-
-    #[test]
-    fn test_reduces() {
-        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
-        assert!(reduces(&g, &GlobalType::End));
-    }
-
-    #[test]
-    fn test_reduces_star() {
-        let g1 = GlobalType::send(
-            "A",
-            "B",
-            Label::new("m1"),
-            GlobalType::send("B", "C", Label::new("m2"), GlobalType::End),
-        );
-        assert!(reduces_star(&g1, &GlobalType::End));
-    }
-
-    #[test]
-    fn test_good_g() {
-        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
-        assert!(good_g(&g));
-    }
-
-    #[test]
-    fn test_local_action_to_global() {
-        let act = LocalAction::send("B", Label::new("msg"));
-        let global = act.to_global("A");
-        assert_eq!(global.sender, "A");
-        assert_eq!(global.receiver, "B");
     }
 }

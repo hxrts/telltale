@@ -56,67 +56,23 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
             message,
             continuation,
             ..
-        } => {
-            let line = format!(
-                "{} -> {} : {}",
-                format_role_ref(from),
-                format_role_ref(to),
-                format_message(message)
-            );
-            write_line(out, indent, &line);
-            format_protocol(continuation, indent, config, out);
-        }
+        } => format_send_protocol(from, to, message, continuation, indent, config, out),
         Protocol::Broadcast {
             from,
             message,
             continuation,
             ..
-        } => {
-            let line = format!(
-                "{} ->* : {}",
-                format_role_ref(from),
-                format_message(message)
-            );
-            write_line(out, indent, &line);
-            format_protocol(continuation, indent, config, out);
-        }
+        } => format_broadcast_protocol(from, message, continuation, indent, config, out),
         Protocol::Choice { role, branches, .. } => {
-            write_line(
-                out,
-                indent,
-                &format!("case choose {} of", format_role_ref(role)),
-            );
-            for branch in branches {
-                format_branch(branch, indent + config.indent, config, out);
-            }
+            format_choice_protocol(role, branches, indent, config, out)
         }
         Protocol::Loop { condition, body } => {
-            let header = format_loop_header(condition);
-            if is_end(body) {
-                write_line(out, indent, &format!("{} {{}}", header));
-            } else {
-                write_line(out, indent, &header);
-                format_protocol(body, indent + config.indent, config, out);
-            }
+            format_loop_protocol(condition, body, indent, config, out)
         }
         Protocol::Parallel { protocols } => {
-            for branch in protocols {
-                if is_end(branch) {
-                    write_line(out, indent, "branch {}");
-                } else {
-                    write_line(out, indent, "branch");
-                    format_protocol(branch, indent + config.indent, config, out);
-                }
-            }
+            format_parallel_protocol(protocols, indent, config, out)
         }
-        Protocol::Rec { label, body } => {
-            if is_end(body) {
-                write_line(out, indent, &format!("rec {} {{}}", label));
-            } else {
-                write_line(out, indent, &format!("rec {}", label));
-                format_protocol(body, indent + config.indent, config, out);
-            }
-        }
+        Protocol::Rec { label, body } => format_rec_protocol(label, body, indent, config, out),
         Protocol::Var(label) => {
             write_line(out, indent, &format!("continue {}", label));
         }
@@ -124,15 +80,119 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
             extension,
             continuation,
             ..
-        } => {
-            write_line(
-                out,
-                indent,
-                &format!("// extension: {}", extension.type_name()),
-            );
-            format_protocol(continuation, indent, config, out);
+        } => format_extension_protocol(extension.type_name(), continuation, indent, config, out),
+    }
+}
+
+fn format_send_protocol(
+    from: &Role,
+    to: &Role,
+    message: &MessageType,
+    continuation: &Protocol,
+    indent: usize,
+    config: &PrettyConfig,
+    out: &mut String,
+) {
+    let line = format!(
+        "{} -> {} : {}",
+        format_role_ref(from),
+        format_role_ref(to),
+        format_message(message)
+    );
+    write_line(out, indent, &line);
+    format_protocol(continuation, indent, config, out);
+}
+
+fn format_broadcast_protocol(
+    from: &Role,
+    message: &MessageType,
+    continuation: &Protocol,
+    indent: usize,
+    config: &PrettyConfig,
+    out: &mut String,
+) {
+    let line = format!(
+        "{} ->* : {}",
+        format_role_ref(from),
+        format_message(message)
+    );
+    write_line(out, indent, &line);
+    format_protocol(continuation, indent, config, out);
+}
+
+fn format_choice_protocol(
+    role: &Role,
+    branches: &[Branch],
+    indent: usize,
+    config: &PrettyConfig,
+    out: &mut String,
+) {
+    write_line(
+        out,
+        indent,
+        &format!("case choose {} of", format_role_ref(role)),
+    );
+    for branch in branches {
+        format_branch(branch, indent + config.indent, config, out);
+    }
+}
+
+fn format_loop_protocol(
+    condition: &Option<Condition>,
+    body: &Protocol,
+    indent: usize,
+    config: &PrettyConfig,
+    out: &mut String,
+) {
+    let header = format_loop_header(condition);
+    if is_end(body) {
+        write_line(out, indent, &format!("{} {{}}", header));
+    } else {
+        write_line(out, indent, &header);
+        format_protocol(body, indent + config.indent, config, out);
+    }
+}
+
+fn format_parallel_protocol(
+    protocols: &[Protocol],
+    indent: usize,
+    config: &PrettyConfig,
+    out: &mut String,
+) {
+    for branch in protocols {
+        if is_end(branch) {
+            write_line(out, indent, "branch {}");
+        } else {
+            write_line(out, indent, "branch");
+            format_protocol(branch, indent + config.indent, config, out);
         }
     }
+}
+
+fn format_rec_protocol(
+    label: &proc_macro2::Ident,
+    body: &Protocol,
+    indent: usize,
+    config: &PrettyConfig,
+    out: &mut String,
+) {
+    if is_end(body) {
+        write_line(out, indent, &format!("rec {} {{}}", label));
+    } else {
+        write_line(out, indent, &format!("rec {}", label));
+        format_protocol(body, indent + config.indent, config, out);
+    }
+}
+
+fn format_extension_protocol(
+    extension_type_name: &str,
+    continuation: &Protocol,
+    indent: usize,
+    config: &PrettyConfig,
+    out: &mut String,
+) {
+    write_line(out, indent, &format!("// extension: {extension_type_name}"));
+    format_protocol(continuation, indent, config, out);
 }
 
 fn format_branch(branch: &Branch, indent: usize, config: &PrettyConfig, out: &mut String) {

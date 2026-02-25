@@ -42,6 +42,49 @@ struct LineScan {
     end_state: ScanState,
 }
 
+fn advance_if_in_block_comment(chars: &[char], st: &mut ScanState, idx: usize) -> Option<usize> {
+    if !st.in_block_comment {
+        return None;
+    }
+    if chars[idx] == '-' && chars.get(idx + 1).copied() == Some('}') {
+        st.in_block_comment = false;
+        return Some(idx + 2);
+    }
+    Some(idx + 1)
+}
+
+fn advance_if_in_string(chars: &[char], st: &mut ScanState, idx: usize) -> Option<usize> {
+    if !st.in_string {
+        return None;
+    }
+    if st.escape {
+        st.escape = false;
+        return Some(idx + 1);
+    }
+    match chars[idx] {
+        '\\' => {
+            st.escape = true;
+            Some(idx + 1)
+        }
+        '"' => {
+            st.in_string = false;
+            Some(idx + 1)
+        }
+        _ => Some(idx + 1),
+    }
+}
+
+fn update_code_and_depth(ch: char, has_code: &mut bool, depth_delta: &mut i32) {
+    if !ch.is_whitespace() {
+        *has_code = true;
+    }
+    match ch {
+        '{' | '(' => *depth_delta += 1,
+        '}' | ')' => *depth_delta -= 1,
+        _ => {}
+    }
+}
+
 fn scan_line(line: &str, state: &ScanState) -> LineScan {
     let mut st = state.clone();
     let mut has_code = false;
@@ -50,40 +93,18 @@ fn scan_line(line: &str, state: &ScanState) -> LineScan {
     let mut i = 0usize;
 
     while i < chars.len() {
+        if let Some(next_idx) = advance_if_in_block_comment(&chars, &mut st, i) {
+            i = next_idx;
+            continue;
+        }
+        if let Some(next_idx) = advance_if_in_string(&chars, &mut st, i) {
+            i = next_idx;
+            continue;
+        }
+
         let ch = chars[i];
         let next = chars.get(i + 1).copied();
-
-        if st.in_block_comment {
-            if ch == '-' && next == Some('}') {
-                st.in_block_comment = false;
-                i += 2;
-                continue;
-            }
-            i += 1;
-            continue;
-        }
-
-        if st.in_string {
-            if st.escape {
-                st.escape = false;
-                i += 1;
-                continue;
-            }
-            if ch == '\\' {
-                st.escape = true;
-                i += 1;
-                continue;
-            }
-            if ch == '"' {
-                st.in_string = false;
-            }
-            i += 1;
-            continue;
-        }
-
-        // Not in string or block comment.
         if ch == '-' && next == Some('-') {
-            // Line comment; ignore remainder.
             break;
         }
         if ch == '{' && next == Some('-') {
@@ -97,16 +118,7 @@ fn scan_line(line: &str, state: &ScanState) -> LineScan {
             continue;
         }
 
-        if !ch.is_whitespace() {
-            has_code = true;
-        }
-
-        match ch {
-            '{' | '(' => depth_delta += 1,
-            '}' | ')' => depth_delta -= 1,
-            _ => {}
-        }
-
+        update_code_and_depth(ch, &mut has_code, &mut depth_delta);
         i += 1;
     }
 
@@ -135,6 +147,50 @@ fn leading_indent(line: &str, line_no: usize) -> Result<usize, LayoutError> {
     Ok(indent)
 }
 
+fn adjust_indent_stack(
+    indent_stack: &mut Vec<usize>,
+    current: usize,
+    line_no: usize,
+    column: usize,
+) -> Result<String, LayoutError> {
+    let mut prefix = String::new();
+    let last = *indent_stack.last().unwrap_or(&0);
+    if current > last {
+        indent_stack.push(current);
+        prefix.push_str("{ ");
+        return Ok(prefix);
+    }
+    if current < last {
+        while current < *indent_stack.last().unwrap_or(&0) {
+            indent_stack.pop();
+            prefix.push_str("} ");
+        }
+        if current != *indent_stack.last().unwrap_or(&0) {
+            return Err(LayoutError::new(
+                line_no,
+                column,
+                "Inconsistent indentation",
+            ));
+        }
+    }
+    Ok(prefix)
+}
+
+fn close_remaining_layout_blocks(out_lines: &mut Vec<String>, open_blocks: usize) {
+    if open_blocks == 0 {
+        return;
+    }
+    let mut tail = String::new();
+    for _ in 0..open_blocks {
+        tail.push_str("} ");
+    }
+    if let Some(last) = out_lines.last_mut() {
+        last.push_str(&tail);
+    } else {
+        out_lines.push(tail);
+    }
+}
+
 /// Convert indentation into braces for parsing.
 ///
 /// Notes:
@@ -159,24 +215,12 @@ pub fn preprocess_layout(input: &str) -> Result<String, LayoutError> {
         let mut prefix = String::new();
 
         if layout_enabled && scan.has_code {
-            let current = indent;
-            let last = *indent_stack.last().unwrap_or(&0);
-            if current > last {
-                indent_stack.push(current);
-                prefix.push_str("{ ");
-            } else if current < last {
-                while current < *indent_stack.last().unwrap_or(&0) {
-                    indent_stack.pop();
-                    prefix.push_str("} ");
-                }
-                if current != *indent_stack.last().unwrap_or(&0) {
-                    return Err(LayoutError::new(
-                        line_no,
-                        indent + 1,
-                        "Inconsistent indentation",
-                    ));
-                }
-            }
+            prefix.push_str(&adjust_indent_stack(
+                &mut indent_stack,
+                indent,
+                line_no,
+                indent + 1,
+            )?);
         }
 
         let mut out_line = String::new();
@@ -194,19 +238,7 @@ pub fn preprocess_layout(input: &str) -> Result<String, LayoutError> {
         }
     }
 
-    // Close any remaining layout blocks at EOF.
-    if indent_stack.len() > 1 {
-        let mut tail = String::new();
-        for _ in 1..indent_stack.len() {
-            tail.push_str("} ");
-        }
-
-        if let Some(last) = out_lines.last_mut() {
-            last.push_str(&tail);
-        } else {
-            out_lines.push(tail);
-        }
-    }
+    close_remaining_layout_blocks(&mut out_lines, indent_stack.len().saturating_sub(1));
 
     Ok(out_lines.join("\n"))
 }

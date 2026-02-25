@@ -282,112 +282,24 @@ fn generate_topology_builder(topology: &Topology, _role_names: &[String]) -> Tok
 
     // Add mode if specified
     if let Some(ref mode) = topology.mode {
-        let mode_call = match mode {
-            TopologyMode::Local => quote! { .mode(TopologyMode::Local) },
-            TopologyMode::PerRole => quote! { .mode(TopologyMode::PerRole) },
-            TopologyMode::Kubernetes(ns) => {
-                let ns_literal = ns.as_str();
-                quote! { .mode(TopologyMode::Kubernetes(Namespace::new(#ns_literal).unwrap())) }
-            }
-            TopologyMode::Consul(dc) => {
-                let dc_literal = dc.as_str();
-                quote! { .mode(TopologyMode::Consul(Datacenter::new(#dc_literal).unwrap())) }
-            }
-        };
-        builder_calls.push(mode_call);
+        builder_calls.push(generate_mode_builder_call(mode));
     }
 
     // Add role locations
     for (role, location) in &topology.locations {
-        let role_literal = role.as_str();
-        let location_call = match location {
-            Location::Local => quote! { .local_role(RoleName::from_static(#role_literal)) },
-            Location::Remote(endpoint) => {
-                let endpoint_literal = endpoint.as_str();
-                quote! {
-                    .remote_role(
-                        RoleName::from_static(#role_literal),
-                        TopologyEndpoint::new(#endpoint_literal).unwrap()
-                    )
-                }
-            }
-            Location::Colocated(peer) => {
-                let peer_literal = peer.as_str();
-                quote! {
-                    .colocated_role(
-                        RoleName::from_static(#role_literal),
-                        RoleName::from_static(#peer_literal)
-                    )
-                }
-            }
-        };
-        builder_calls.push(location_call);
+        builder_calls.push(generate_location_builder_call(role, location));
     }
 
     // Add constraints
     for constraint in &topology.constraints {
-        let constraint_call = match constraint {
-            TopologyConstraint::Colocated(r1, r2) => {
-                let r1_literal = r1.as_str();
-                let r2_literal = r2.as_str();
-                quote! {
-                    .colocated(
-                        RoleName::from_static(#r1_literal),
-                        RoleName::from_static(#r2_literal)
-                    )
-                }
-            }
-            TopologyConstraint::Separated(r1, r2) => {
-                let r1_literal = r1.as_str();
-                let r2_literal = r2.as_str();
-                quote! {
-                    .separated(
-                        RoleName::from_static(#r1_literal),
-                        RoleName::from_static(#r2_literal)
-                    )
-                }
-            }
-            TopologyConstraint::Pinned(role, loc) => {
-                let role_literal = role.as_str();
-                let loc_expr = match loc {
-                    Location::Local => quote! { Location::Local },
-                    Location::Remote(ep) => {
-                        let ep_literal = ep.as_str();
-                        quote! { Location::Remote(TopologyEndpoint::new(#ep_literal).unwrap()) }
-                    }
-                    Location::Colocated(p) => {
-                        let p_literal = p.as_str();
-                        quote! { Location::Colocated(RoleName::from_static(#p_literal)) }
-                    }
-                };
-                quote! { .pinned(RoleName::from_static(#role_literal), #loc_expr) }
-            }
-            TopologyConstraint::Region(role, region) => {
-                let role_literal = role.as_str();
-                let region_literal = region.as_str();
-                quote! {
-                    .region(
-                        RoleName::from_static(#role_literal),
-                        Region::new(#region_literal).unwrap()
-                    )
-                }
-            }
-        };
-        builder_calls.push(constraint_call);
+        builder_calls.push(generate_constraint_builder_call(constraint));
     }
 
     // Add channel capacities
     for ((sender, receiver), capacity) in &topology.channel_capacities {
-        let sender_literal = sender.as_str();
-        let receiver_literal = receiver.as_str();
-        let capacity_value = capacity.get();
-        builder_calls.push(quote! {
-            .channel_capacity(
-                RoleName::from_static(#sender_literal),
-                RoleName::from_static(#receiver_literal),
-                ChannelCapacity::new(#capacity_value)
-            )
-        });
+        builder_calls.push(generate_channel_capacity_builder_call(
+            sender, receiver, capacity,
+        ));
     }
 
     if builder_calls.is_empty() {
@@ -400,6 +312,120 @@ fn generate_topology_builder(topology: &Topology, _role_names: &[String]) -> Tok
                 #(#builder_calls)*
                 .build()
         }
+    }
+}
+
+fn generate_mode_builder_call(mode: &TopologyMode) -> TokenStream {
+    match mode {
+        TopologyMode::Local => quote! { .mode(TopologyMode::Local) },
+        TopologyMode::PerRole => quote! { .mode(TopologyMode::PerRole) },
+        TopologyMode::Kubernetes(ns) => {
+            let ns_literal = ns.as_str();
+            quote! { .mode(TopologyMode::Kubernetes(Namespace::new(#ns_literal).unwrap())) }
+        }
+        TopologyMode::Consul(dc) => {
+            let dc_literal = dc.as_str();
+            quote! { .mode(TopologyMode::Consul(Datacenter::new(#dc_literal).unwrap())) }
+        }
+    }
+}
+
+fn generate_location_builder_call(
+    role: &crate::identifiers::RoleName,
+    location: &Location,
+) -> TokenStream {
+    let role_literal = role.as_str();
+    match location {
+        Location::Local => quote! { .local_role(RoleName::from_static(#role_literal)) },
+        Location::Remote(endpoint) => {
+            let endpoint_literal = endpoint.as_str();
+            quote! {
+                .remote_role(
+                    RoleName::from_static(#role_literal),
+                    TopologyEndpoint::new(#endpoint_literal).unwrap()
+                )
+            }
+        }
+        Location::Colocated(peer) => {
+            let peer_literal = peer.as_str();
+            quote! {
+                .colocated_role(
+                    RoleName::from_static(#role_literal),
+                    RoleName::from_static(#peer_literal)
+                )
+            }
+        }
+    }
+}
+
+fn generate_pinned_location_expr(location: &Location) -> TokenStream {
+    match location {
+        Location::Local => quote! { Location::Local },
+        Location::Remote(endpoint) => {
+            let endpoint_literal = endpoint.as_str();
+            quote! { Location::Remote(TopologyEndpoint::new(#endpoint_literal).unwrap()) }
+        }
+        Location::Colocated(peer) => {
+            let peer_literal = peer.as_str();
+            quote! { Location::Colocated(RoleName::from_static(#peer_literal)) }
+        }
+    }
+}
+
+fn generate_constraint_builder_call(constraint: &TopologyConstraint) -> TokenStream {
+    match constraint {
+        TopologyConstraint::Colocated(r1, r2) => {
+            let r1_literal = r1.as_str();
+            let r2_literal = r2.as_str();
+            quote! {
+                .colocated(
+                    RoleName::from_static(#r1_literal),
+                    RoleName::from_static(#r2_literal)
+                )
+            }
+        }
+        TopologyConstraint::Separated(r1, r2) => {
+            let r1_literal = r1.as_str();
+            let r2_literal = r2.as_str();
+            quote! {
+                .separated(
+                    RoleName::from_static(#r1_literal),
+                    RoleName::from_static(#r2_literal)
+                )
+            }
+        }
+        TopologyConstraint::Pinned(role, location) => {
+            let role_literal = role.as_str();
+            let location_expr = generate_pinned_location_expr(location);
+            quote! { .pinned(RoleName::from_static(#role_literal), #location_expr) }
+        }
+        TopologyConstraint::Region(role, region) => {
+            let role_literal = role.as_str();
+            let region_literal = region.as_str();
+            quote! {
+                .region(
+                    RoleName::from_static(#role_literal),
+                    Region::new(#region_literal).unwrap()
+                )
+            }
+        }
+    }
+}
+
+fn generate_channel_capacity_builder_call(
+    sender: &crate::identifiers::RoleName,
+    receiver: &crate::identifiers::RoleName,
+    capacity: &crate::ChannelCapacity,
+) -> TokenStream {
+    let sender_literal = sender.as_str();
+    let receiver_literal = receiver.as_str();
+    let capacity_value = capacity.get();
+    quote! {
+        .channel_capacity(
+            RoleName::from_static(#sender_literal),
+            RoleName::from_static(#receiver_literal),
+            ChannelCapacity::new(#capacity_value)
+        )
     }
 }
 

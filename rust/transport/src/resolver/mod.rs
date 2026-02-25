@@ -63,9 +63,7 @@ pub struct StaticResolver {
 
 impl StaticResolver {
     /// Create a resolver from explicit mappings.
-    pub fn from_mappings(
-        mappings: impl IntoIterator<Item = (RoleName, TopologyEndpoint)>,
-    ) -> Self {
+    pub fn from_mappings(mappings: impl IntoIterator<Item = (RoleName, TopologyEndpoint)>) -> Self {
         Self {
             endpoints: mappings.into_iter().collect(),
         }

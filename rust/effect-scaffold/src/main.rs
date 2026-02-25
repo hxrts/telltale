@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 const DEFAULT_OUT_DIR: &str = "target/effect_handler_scaffold";
 const DEFAULT_STRUCT_NAME: &str = "HostEffectHandler";
 const DEFAULT_WITH_SIMULATOR: bool = true;
+const STRUCT_NAME_TEMPLATE_TOKEN: &str = "{{STRUCT_NAME}}";
 
 fn main() {
     if let Err(error) = run() {
@@ -82,83 +83,92 @@ struct ParsedArgs {
 }
 
 fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
-    let mut out_dir = DEFAULT_OUT_DIR.to_string();
-    let mut struct_name = DEFAULT_STRUCT_NAME.to_string();
-    let mut with_simulator = DEFAULT_WITH_SIMULATOR;
-    let mut help = false;
+    let mut parsed = ParsedArgs {
+        out_dir: DEFAULT_OUT_DIR.to_string(),
+        struct_name: DEFAULT_STRUCT_NAME.to_string(),
+        with_simulator: DEFAULT_WITH_SIMULATOR,
+        help: false,
+    };
     let mut positionals = Vec::new();
 
     let mut i = 0;
     while i < args.len() {
-        let token = args[i].as_str();
-        match token {
-            "-h" | "--help" => {
-                help = true;
-                i += 1;
-            }
-            "--out" => {
-                let Some(next) = args.get(i + 1) else {
-                    return Err("missing value after --out".to_string());
-                };
-                out_dir = next.clone();
-                i += 2;
-            }
-            "--name" => {
-                let Some(next) = args.get(i + 1) else {
-                    return Err("missing value after --name".to_string());
-                };
-                struct_name = next.clone();
-                i += 2;
-            }
-            "--with-simulator" => {
-                with_simulator = true;
-                i += 1;
-            }
-            "--no-simulator" => {
-                with_simulator = false;
-                i += 1;
-            }
-            _ if token.starts_with("out=") => {
-                out_dir = token.trim_start_matches("out=").to_string();
-                i += 1;
-            }
-            _ if token.starts_with("name=") => {
-                struct_name = token.trim_start_matches("name=").to_string();
-                i += 1;
-            }
-            _ if token.starts_with("simulator=") => {
-                let value = token.trim_start_matches("simulator=");
-                with_simulator = parse_bool_token(value)?;
-                i += 1;
-            }
-            _ if token.starts_with('-') => {
-                return Err(format!("unknown flag: {token}"));
-            }
-            _ => {
-                positionals.push(token.to_string());
-                i += 1;
-            }
-        }
+        let consumed = parse_arg_token(&mut parsed, &mut positionals, args, i)?;
+        i += consumed;
     }
 
-    if !positionals.is_empty() {
-        out_dir = positionals[0].clone();
+    apply_positional_args(&mut parsed, &positionals)?;
+    Ok(parsed)
+}
+
+fn parse_arg_token(
+    parsed: &mut ParsedArgs,
+    positionals: &mut Vec<String>,
+    args: &[String],
+    idx: usize,
+) -> Result<usize, String> {
+    let token = args[idx].as_str();
+    match token {
+        "-h" | "--help" => {
+            parsed.help = true;
+            Ok(1)
+        }
+        "--out" => {
+            parsed.out_dir = required_flag_value(args, idx, "--out")?.to_string();
+            Ok(2)
+        }
+        "--name" => {
+            parsed.struct_name = required_flag_value(args, idx, "--name")?.to_string();
+            Ok(2)
+        }
+        "--with-simulator" => {
+            parsed.with_simulator = true;
+            Ok(1)
+        }
+        "--no-simulator" => {
+            parsed.with_simulator = false;
+            Ok(1)
+        }
+        _ if token.starts_with("out=") => {
+            parsed.out_dir = token.trim_start_matches("out=").to_string();
+            Ok(1)
+        }
+        _ if token.starts_with("name=") => {
+            parsed.struct_name = token.trim_start_matches("name=").to_string();
+            Ok(1)
+        }
+        _ if token.starts_with("simulator=") => {
+            let value = token.trim_start_matches("simulator=");
+            parsed.with_simulator = parse_bool_token(value)?;
+            Ok(1)
+        }
+        _ if token.starts_with('-') => Err(format!("unknown flag: {token}")),
+        _ => {
+            positionals.push(token.to_string());
+            Ok(1)
+        }
     }
-    if positionals.len() > 1 {
-        struct_name = positionals[1].clone();
-    }
+}
+
+fn required_flag_value<'a>(args: &'a [String], idx: usize, flag: &str) -> Result<&'a str, String> {
+    args.get(idx + 1)
+        .map(std::string::String::as_str)
+        .ok_or_else(|| format!("missing value after {flag}"))
+}
+
+fn apply_positional_args(parsed: &mut ParsedArgs, positionals: &[String]) -> Result<(), String> {
     if positionals.len() > 2 {
         return Err(
             "too many positional arguments; expected at most: <out_dir> <struct_name>".to_string(),
         );
     }
-
-    Ok(ParsedArgs {
-        out_dir,
-        struct_name,
-        with_simulator,
-        help,
-    })
+    if let Some(out_dir) = positionals.first() {
+        parsed.out_dir = out_dir.clone();
+    }
+    if let Some(struct_name) = positionals.get(1) {
+        parsed.struct_name = struct_name.clone();
+    }
+    Ok(())
 }
 
 fn parse_bool_token(input: &str) -> Result<bool, String> {
@@ -219,225 +229,28 @@ fn is_valid_rust_identifier(input: &str) -> bool {
 }
 
 fn render_handler_template(struct_name: &str) -> String {
-    format!(
-        "use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{{
-    AcquireDecision, EffectHandler, SendDecision, SendDecisionFastPathInput, SendDecisionInput,
-    TopologyPerturbation,
-}};
-use telltale_vm::output_condition::OutputConditionHint;
-use telltale_vm::session::SessionId;
-
-/// Deterministic host integration scaffold.
-pub struct {struct_name};
-
-impl EffectHandler for {struct_name} {{
-    fn handler_identity(&self) -> String {{
-        \"{struct_name}\".to_string()
-    }}
-
-    fn handle_send(
-        &self,
-        _role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &[Value],
-    ) -> Result<Value, String> {{
-        Ok(Value::Unit)
-    }}
-
-    fn send_decision_fast_path(
-        &self,
-        _fast_path: SendDecisionFastPathInput<'_>,
-        _state: &[Value],
-        _payload: Option<&Value>,
-    ) -> Option<Result<SendDecision, String>> {{
-        None
-    }}
-
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {{
-        Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
-    }}
-
-    fn handle_recv(
-        &self,
-        _role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &mut Vec<Value>,
-        _payload: &Value,
-    ) -> Result<(), String> {{
-        Ok(())
-    }}
-
-    fn handle_choose(
-        &self,
-        _role: &str,
-        _partner: &str,
-        labels: &[String],
-        _state: &[Value],
-    ) -> Result<String, String> {{
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| \"no labels available\".to_string())
-    }}
-
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {{
-        Ok(())
-    }}
-
-    fn handle_acquire(
-        &self,
-        _sid: SessionId,
-        _role: &str,
-        _layer: &str,
-        _state: &[Value],
-    ) -> Result<AcquireDecision, String> {{
-        Ok(AcquireDecision::Grant(Value::Unit))
-    }}
-
-    fn handle_release(
-        &self,
-        _sid: SessionId,
-        _role: &str,
-        _layer: &str,
-        _evidence: &Value,
-        _state: &[Value],
-    ) -> Result<(), String> {{
-        Ok(())
-    }}
-
-    fn topology_events(&self, _tick: u64) -> Result<Vec<TopologyPerturbation>, String> {{
-        Ok(Vec::new())
-    }}
-
-    fn output_condition_hint(
-        &self,
-        _sid: SessionId,
-        _role: &str,
-        _state: &[Value],
-    ) -> Option<OutputConditionHint> {{
-        None
-    }}
-}}
-
-// Integration checklist:
-// - [ ] Keep all callback results deterministic for equal inputs.
-// - [ ] Keep handler_identity stable for the full runtime lifetime.
-// - [ ] Do not mutate shared host state outside explicit callback boundaries.
-// - [ ] Validate host assumptions for topology ordering and session ownership.
-"
+    render_struct_name_template(
+        include_str!("../templates/effect_handler.rs.tmpl"),
+        struct_name,
     )
 }
 
 fn render_test_template(struct_name: &str) -> String {
-    format!(
-        "use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{{EffectTraceCaptureMode, VMConfig, VM}};
-use telltale_types::{{GlobalType, Label, LocalTypeR}};
-
-use std::collections::BTreeMap;
-
-use crate::effect_handler::{struct_name};
-
-fn simple_send_recv_image() -> CodeImage {{
-    let mut local_types = BTreeMap::new();
-    local_types.insert(
-        \"A\".to_string(),
-        LocalTypeR::Send {{
-            partner: \"B\".into(),
-            branches: vec![(Label::new(\"msg\"), None, LocalTypeR::End)],
-        }},
-    );
-    local_types.insert(
-        \"B\".to_string(),
-        LocalTypeR::Recv {{
-            partner: \"A\".into(),
-            branches: vec![(Label::new(\"msg\"), None, LocalTypeR::End)],
-        }},
-    );
-
-    let global = GlobalType::send(\"A\", \"B\", Label::new(\"msg\"), GlobalType::End);
-    CodeImage::from_local_types(&local_types, &global)
-}}
-
-#[test]
-fn host_handler_smoke_test() {{
-    let image = simple_send_recv_image();
-    let mut vm = VM::new(VMConfig {{
-        effect_trace_capture_mode: EffectTraceCaptureMode::Full,
-        host_contract_assertions: true,
-        ..VMConfig::default()
-    }});
-    vm.load_choreography(&image).expect(\"load choreography\");
-    vm.run(&{struct_name}, 100).expect(\"run should succeed\");
-}}
-"
+    render_struct_name_template(
+        include_str!("../templates/effect_handler_test.rs.tmpl"),
+        struct_name,
     )
 }
 
 fn render_simulator_test_template(struct_name: &str) -> String {
-    format!(
-        "use std::collections::BTreeMap;
-
-use telltale_simulator::contracts::{{assert_contracts, ContractCheckConfig}};
-use telltale_simulator::harness::{{DirectAdapter, HarnessSpec, SimulationHarness}};
-use telltale_simulator::material::{{MaterialParams, MeanFieldParams}};
-use telltale_simulator::scenario::{{OutputConfig, Scenario}};
-use telltale_types::{{FixedQ32, GlobalType, Label, LocalTypeR}};
-
-use crate::effect_handler::{struct_name};
-
-fn simulator_smoke_spec() -> HarnessSpec {{
-    let mut local_types = BTreeMap::new();
-    local_types.insert(
-        \"A\".to_string(),
-        LocalTypeR::Send {{
-            partner: \"B\".into(),
-            branches: vec![(Label::new(\"msg\"), None, LocalTypeR::End)],
-        }},
-    );
-    local_types.insert(
-        \"B\".to_string(),
-        LocalTypeR::Recv {{
-            partner: \"A\".into(),
-            branches: vec![(Label::new(\"msg\"), None, LocalTypeR::End)],
-        }},
-    );
-
-    let global_type = GlobalType::send(\"A\", \"B\", Label::new(\"msg\"), GlobalType::End);
-    let scenario = Scenario {{
-        name: \"scaffold_sim_smoke\".to_string(),
-        roles: vec![\"A\".to_string(), \"B\".to_string()],
-        steps: 8,
-        concurrency: 1,
-        seed: 0,
-        network: None,
-        material: MaterialParams::MeanField(MeanFieldParams {{
-            beta: FixedQ32::one(),
-            species: vec![\"up\".into(), \"down\".into()],
-            initial_state: vec![FixedQ32::half(), FixedQ32::half()],
-            step_size: FixedQ32::from_ratio(1, 100).expect(\"0.01\"),
-        }}),
-        events: Vec::new(),
-        properties: None,
-        checkpoint_interval: None,
-        output: OutputConfig::default(),
-    }};
-
-    HarnessSpec::new(local_types, global_type, scenario)
-}}
-
-#[test]
-fn simulator_harness_contract_smoke_test() {{
-    let adapter = DirectAdapter::new(&{struct_name});
-    let harness = SimulationHarness::new(&adapter);
-    let result = harness.run(&simulator_smoke_spec()).expect(\"harness run should succeed\");
-    assert_contracts(&result, &ContractCheckConfig::default()).expect(\"contracts should pass\");
-}}
-"
+    render_struct_name_template(
+        include_str!("../templates/simulator_harness_test.rs.tmpl"),
+        struct_name,
     )
+}
+
+fn render_struct_name_template(template: &str, struct_name: &str) -> String {
+    template.replace(STRUCT_NAME_TEMPLATE_TOKEN, struct_name)
 }
 
 fn render_readme_template(struct_name: &str, with_simulator: bool) -> String {

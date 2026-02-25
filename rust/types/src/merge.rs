@@ -116,23 +116,17 @@ pub type MergeResult = Result<LocalTypeR, MergeError>;
 /// // merged = ?A{yes.end, no.end}
 /// ```
 pub fn merge(t1: &LocalTypeR, t2: &LocalTypeR) -> MergeResult {
-    // Fast path: identical types
     if t1 == t2 {
         return Ok(t1.clone());
     }
 
     match (t1, t2) {
-        // Rule 1: end ⊔ end = end
         (LocalTypeR::End, LocalTypeR::End) => Ok(LocalTypeR::End),
 
-        // End with non-End is an error
         (LocalTypeR::End, other) | (other, LocalTypeR::End) => {
             Err(MergeError::EndMismatch(other.clone()))
         }
 
-        // Rule 2: !q{branches₁} ⊔ !q{branches₂} requires IDENTICAL label sets
-        // This matches Lean's `mergeSendSorted` - a non-participant cannot choose
-        // different outgoing messages based on a choice it didn't observe.
         (
             LocalTypeR::Send {
                 partner: p1,
@@ -142,23 +136,8 @@ pub fn merge(t1: &LocalTypeR, t2: &LocalTypeR) -> MergeResult {
                 partner: p2,
                 branches: b2,
             },
-        ) => {
-            if p1 != p2 {
-                return Err(MergeError::PartnerMismatch {
-                    expected: p1.clone(),
-                    found: p2.clone(),
-                });
-            }
-            let merged_branches = merge_send_branches(b1, b2)?;
-            Ok(LocalTypeR::Send {
-                partner: p1.clone(),
-                branches: merged_branches,
-            })
-        }
+        ) => merge_send_pair(p1, b1, p2, b2),
 
-        // Rule 3: ?p{branches₁} ⊔ ?p{branches₂} = ?p{branches₁ ∪ branches₂} unions labels
-        // This matches Lean's `mergeRecvSorted` - a non-participant can handle
-        // any incoming message regardless of which branch was taken.
         (
             LocalTypeR::Recv {
                 partner: p1,
@@ -168,21 +147,8 @@ pub fn merge(t1: &LocalTypeR, t2: &LocalTypeR) -> MergeResult {
                 partner: p2,
                 branches: b2,
             },
-        ) => {
-            if p1 != p2 {
-                return Err(MergeError::PartnerMismatch {
-                    expected: p1.clone(),
-                    found: p2.clone(),
-                });
-            }
-            let merged_branches = merge_recv_branches(b1, b2)?;
-            Ok(LocalTypeR::Recv {
-                partner: p1.clone(),
-                branches: merged_branches,
-            })
-        }
+        ) => merge_recv_pair(p1, b1, p2, b2),
 
-        // Rule 4: μt.T₁ ⊔ μt.T₂ = μt.(T₁ ⊔ T₂)
         (
             LocalTypeR::Mu {
                 var: v1,
@@ -192,38 +158,77 @@ pub fn merge(t1: &LocalTypeR, t2: &LocalTypeR) -> MergeResult {
                 var: v2,
                 body: body2,
             },
-        ) => {
-            if v1 != v2 {
-                return Err(MergeError::RecursiveVariableMismatch {
-                    expected: v1.clone(),
-                    found: v2.clone(),
-                });
-            }
-            let merged_body = merge(body1, body2)?;
-            Ok(LocalTypeR::Mu {
-                var: v1.clone(),
-                body: Box::new(merged_body),
-            })
-        }
+        ) => merge_recursive_pair(v1, body1, v2, body2),
 
-        // Rule 5: t ⊔ t = t
-        (LocalTypeR::Var(v1), LocalTypeR::Var(v2)) => {
-            if v1 != v2 {
-                return Err(MergeError::VariableMismatch {
-                    expected: v1.clone(),
-                    found: v2.clone(),
-                });
-            }
-            Ok(LocalTypeR::Var(v1.clone()))
-        }
+        (LocalTypeR::Var(v1), LocalTypeR::Var(v2)) => merge_var_pair(v1, v2),
 
-        // Send ⊔ Recv is an error
         (LocalTypeR::Send { .. }, LocalTypeR::Recv { .. })
         | (LocalTypeR::Recv { .. }, LocalTypeR::Send { .. }) => Err(MergeError::DirectionMismatch),
 
-        // All other combinations are incompatible
         _ => Err(MergeError::IncompatibleTypes),
     }
+}
+
+fn merge_send_pair(
+    p1: &str,
+    b1: &[(Label, Option<crate::ValType>, LocalTypeR)],
+    p2: &str,
+    b2: &[(Label, Option<crate::ValType>, LocalTypeR)],
+) -> MergeResult {
+    if p1 != p2 {
+        return Err(MergeError::PartnerMismatch {
+            expected: p1.to_string(),
+            found: p2.to_string(),
+        });
+    }
+    let merged_branches = merge_send_branches(b1, b2)?;
+    Ok(LocalTypeR::Send {
+        partner: p1.to_string(),
+        branches: merged_branches,
+    })
+}
+
+fn merge_recv_pair(
+    p1: &str,
+    b1: &[(Label, Option<crate::ValType>, LocalTypeR)],
+    p2: &str,
+    b2: &[(Label, Option<crate::ValType>, LocalTypeR)],
+) -> MergeResult {
+    if p1 != p2 {
+        return Err(MergeError::PartnerMismatch {
+            expected: p1.to_string(),
+            found: p2.to_string(),
+        });
+    }
+    let merged_branches = merge_recv_branches(b1, b2)?;
+    Ok(LocalTypeR::Recv {
+        partner: p1.to_string(),
+        branches: merged_branches,
+    })
+}
+
+fn merge_recursive_pair(v1: &str, body1: &LocalTypeR, v2: &str, body2: &LocalTypeR) -> MergeResult {
+    if v1 != v2 {
+        return Err(MergeError::RecursiveVariableMismatch {
+            expected: v1.to_string(),
+            found: v2.to_string(),
+        });
+    }
+    let merged_body = merge(body1, body2)?;
+    Ok(LocalTypeR::Mu {
+        var: v1.to_string(),
+        body: Box::new(merged_body),
+    })
+}
+
+fn merge_var_pair(v1: &str, v2: &str) -> MergeResult {
+    if v1 != v2 {
+        return Err(MergeError::VariableMismatch {
+            expected: v1.to_string(),
+            found: v2.to_string(),
+        });
+    }
+    Ok(LocalTypeR::Var(v1.to_string()))
 }
 
 /// Merge two sets of send branches (internal choice).

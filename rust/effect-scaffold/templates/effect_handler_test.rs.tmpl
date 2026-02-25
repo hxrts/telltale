@@ -1,0 +1,40 @@
+use telltale_vm::loader::CodeImage;
+use telltale_vm::vm::{EffectTraceCaptureMode, VMConfig, VM};
+use telltale_types::{GlobalType, Label, LocalTypeR};
+
+use std::collections::BTreeMap;
+
+use crate::effect_handler::{{STRUCT_NAME}};
+
+fn simple_send_recv_image() -> CodeImage {
+    let mut local_types = BTreeMap::new();
+    local_types.insert(
+        "A".to_string(),
+        LocalTypeR::Send {
+            partner: "B".into(),
+            branches: vec![(Label::new("msg"), None, LocalTypeR::End)],
+        },
+    );
+    local_types.insert(
+        "B".to_string(),
+        LocalTypeR::Recv {
+            partner: "A".into(),
+            branches: vec![(Label::new("msg"), None, LocalTypeR::End)],
+        },
+    );
+
+    let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+    CodeImage::from_local_types(&local_types, &global)
+}
+
+#[test]
+fn host_handler_smoke_test() {
+    let image = simple_send_recv_image();
+    let mut vm = VM::new(VMConfig {
+        effect_trace_capture_mode: EffectTraceCaptureMode::Full,
+        host_contract_assertions: true,
+        ..VMConfig::default()
+    });
+    vm.load_choreography(&image).expect("load choreography");
+    vm.run(&{{STRUCT_NAME}}, 100).expect("run should succeed");
+}

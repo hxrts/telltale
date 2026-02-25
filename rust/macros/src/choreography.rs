@@ -114,6 +114,75 @@ struct ChoiceBranch {
     interactions: Vec<Interaction>,
 }
 
+fn parse_header_roles(input: ParseStream) -> Result<Option<Vec<RoleDef>>> {
+    if !input.peek(syn::token::Paren) {
+        return Ok(None);
+    }
+
+    let content;
+    parenthesized!(content in input);
+    let mut roles = Vec::new();
+    while !content.is_empty() {
+        let role_name: Ident = content.parse()?;
+        roles.push(RoleDef {
+            name: role_name,
+            params: None,
+        });
+        if content.peek(Token![,]) {
+            let _: Token![,] = content.parse()?;
+        } else {
+            break;
+        }
+    }
+    Ok(Some(roles))
+}
+
+fn parse_roles_block(
+    content: ParseStream,
+    header_roles: Option<Vec<RoleDef>>,
+) -> Result<Vec<RoleDef>> {
+    if let Some(roles) = header_roles {
+        return Ok(roles);
+    }
+    if !content.peek(syn::Ident) {
+        return Ok(Vec::new());
+    }
+
+    let roles_ident: Ident = content.parse()?;
+    if roles_ident != "roles" {
+        return Err(Error::new(roles_ident.span(), "expected 'roles'"));
+    }
+    if content.peek(Token![:]) {
+        let _: Token![:] = content.parse()?;
+    }
+
+    let mut roles = Vec::new();
+    loop {
+        let role_name: Ident = content.parse()?;
+        roles.push(RoleDef {
+            name: role_name,
+            params: None,
+        });
+        if content.peek(Token![,]) {
+            let _: Token![,] = content.parse()?;
+            continue;
+        }
+        if content.peek(Token![;]) {
+            let _: Token![;] = content.parse()?;
+        }
+        break;
+    }
+    Ok(roles)
+}
+
+fn parse_interactions(content: ParseStream) -> Result<Vec<Interaction>> {
+    let mut interactions = Vec::new();
+    while !content.is_empty() {
+        interactions.push(parse_interaction(content)?);
+    }
+    Ok(interactions)
+}
+
 impl Parse for ProtocolDef {
     fn parse(input: ParseStream) -> Result<Self> {
         // Parse: protocol Name (Roles)? (=)? { ... }
@@ -123,26 +192,7 @@ impl Parse for ProtocolDef {
         }
         let name: Ident = input.parse()?;
 
-        // Optional header roles: protocol Name(A, B)
-        let mut roles_from_header: Option<Vec<RoleDef>> = None;
-        if input.peek(syn::token::Paren) {
-            let content;
-            parenthesized!(content in input);
-            let mut roles = Vec::new();
-            while !content.is_empty() {
-                let role_name: Ident = content.parse()?;
-                roles.push(RoleDef {
-                    name: role_name,
-                    params: None,
-                });
-                if content.peek(Token![,]) {
-                    let _: Token![,] = content.parse()?;
-                } else {
-                    break;
-                }
-            }
-            roles_from_header = Some(roles);
-        }
+        let roles_from_header = parse_header_roles(input)?;
 
         // Optional '=' before the block
         if input.peek(Token![=]) {
@@ -152,43 +202,8 @@ impl Parse for ProtocolDef {
         let content;
         braced!(content in input);
 
-        // Parse roles
-        let mut roles = Vec::new();
-        if let Some(header_roles) = roles_from_header {
-            roles = header_roles;
-        } else if content.peek(syn::Ident) {
-            let roles_ident: Ident = content.parse()?;
-            if roles_ident != "roles" {
-                return Err(Error::new(roles_ident.span(), "expected 'roles'"));
-            }
-            if content.peek(Token![:]) {
-                let _: Token![:] = content.parse()?;
-            }
-
-            // BOUND: consumes input tokens, exits when semicolon or end-of-input reached
-            loop {
-                let role_name: Ident = content.parse()?;
-                roles.push(RoleDef {
-                    name: role_name,
-                    params: None,
-                });
-
-                if content.peek(Token![,]) {
-                    let _: Token![,] = content.parse()?;
-                } else if content.peek(Token![;]) {
-                    let _: Token![;] = content.parse()?;
-                    break;
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // Parse interactions
-        let mut interactions = Vec::new();
-        while !content.is_empty() {
-            interactions.push(parse_interaction(&content)?);
-        }
+        let roles = parse_roles_block(&content, roles_from_header)?;
+        let interactions = parse_interactions(&content)?;
 
         Ok(ProtocolDef {
             name,
@@ -341,115 +356,111 @@ fn generate_session_types(protocol: &ProtocolDef) -> Result<TokenStream> {
     Ok(types)
 }
 
+fn apply_send_recv_projection(
+    role_name: &Ident,
+    from: &Ident,
+    to: &Ident,
+    message: &Ident,
+    continuation: TokenStream,
+) -> TokenStream {
+    if from == role_name {
+        quote! { ::telltale::Send<#to, #message, #continuation> }
+    } else if to == role_name {
+        quote! { ::telltale::Receive<#from, #message, #continuation> }
+    } else {
+        continuation
+    }
+}
+
+fn project_branch_sequence(
+    role_name: &Ident,
+    interactions: &[Interaction],
+    continuation: &TokenStream,
+) -> TokenStream {
+    let mut branch_type = continuation.clone();
+    for branch_interaction in interactions.iter().rev() {
+        if let Interaction::Send {
+            from, to, message, ..
+        } = branch_interaction
+        {
+            branch_type = apply_send_recv_projection(role_name, from, to, message, branch_type);
+        }
+    }
+    branch_type
+}
+
+fn chooser_choice_type(
+    role_name: &Ident,
+    branches: &[ChoiceBranch],
+    continuation: &TokenStream,
+) -> Option<TokenStream> {
+    let branch_types: Vec<TokenStream> = branches
+        .iter()
+        .map(|branch| {
+            let branch_type =
+                project_branch_sequence(role_name, &branch.interactions, continuation);
+            let label = &branch.label;
+            quote! { ::telltale::Choose<#label, #branch_type> }
+        })
+        .collect();
+
+    if branch_types.is_empty() {
+        None
+    } else {
+        branch_types
+            .into_iter()
+            .fold(None, |acc, branch| match acc {
+                None => Some(branch),
+                Some(prev) => Some(quote! { ::telltale::Branch<#prev, #branch> }),
+            })
+    }
+}
+
+fn offer_choice_type(
+    role_name: &Ident,
+    choosing_role: &Ident,
+    branches: &[ChoiceBranch],
+    continuation: &TokenStream,
+) -> Option<TokenStream> {
+    let branch_types: Vec<TokenStream> = branches
+        .iter()
+        .map(|branch| {
+            let branch_type =
+                project_branch_sequence(role_name, &branch.interactions, continuation);
+            let label = &branch.label;
+            quote! { #label => #branch_type }
+        })
+        .collect();
+
+    if branch_types.is_empty() {
+        None
+    } else {
+        Some(quote! { ::telltale::Offer<#choosing_role, { #(#branch_types),* }> })
+    }
+}
+
 /// Project the protocol to a specific role's session type
 fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStream {
     let mut type_expr = quote! { ::telltale::End };
+    let role_name = &role.name;
 
     // Process interactions in reverse order to build the type
     for interaction in protocol.interactions.iter().rev() {
         match interaction {
             Interaction::Send {
                 from, to, message, ..
-            } => {
-                if from == &role.name {
-                    // This role sends
-                    type_expr = quote! {
-                        ::telltale::Send<#to, #message, #type_expr>
-                    };
-                } else if to == &role.name {
-                    // This role receives
-                    type_expr = quote! {
-                        ::telltale::Receive<#from, #message, #type_expr>
-                    };
-                }
-                // Otherwise, this role doesn't participate
-            }
+            } => type_expr = apply_send_recv_projection(role_name, from, to, message, type_expr),
             Interaction::Choice {
                 role: choosing_role,
                 branches,
             } => {
-                // Handle choice: the choosing role offers branches, others receive the choice
-                if choosing_role == &role.name {
-                    // This role makes the choice
-                    // Generate: Choose<Label1, S1> + Choose<Label2, S2> + ...
-                    let branch_types: Vec<TokenStream> = branches
-                        .iter()
-                        .map(|branch| {
-                            let label = &branch.label;
-                            // Project each branch's interactions for this role
-                            let mut branch_type = type_expr.clone();
-                            for branch_interaction in branch.interactions.iter().rev() {
-                                match branch_interaction {
-                                    Interaction::Send {
-                                        from, to, message, ..
-                                    } => {
-                                        if from == &role.name {
-                                            branch_type = quote! {
-                                                ::telltale::Send<#to, #message, #branch_type>
-                                            };
-                                        } else if to == &role.name {
-                                            branch_type = quote! {
-                                                ::telltale::Receive<#from, #message, #branch_type>
-                                            };
-                                        }
-                                    }
-                                    Interaction::Choice { .. } => {
-                                        // Nested choices - recursively handle
-                                    }
-                                }
-                            }
-                            quote! { ::telltale::Choose<#label, #branch_type> }
-                        })
-                        .collect();
-
-                    // Combine branches into a choice type (sum type)
-                    if !branch_types.is_empty() {
-                        type_expr = branch_types
-                            .into_iter()
-                            .fold(None, |acc, branch| match acc {
-                                None => Some(branch),
-                                Some(prev) => Some(quote! { ::telltale::Branch<#prev, #branch> }),
-                            })
-                            .unwrap();
-                    }
+                let next = if choosing_role == role_name {
+                    chooser_choice_type(role_name, branches, &type_expr)
                 } else {
-                    // This role offers (receives the choice from choosing_role)
-                    // Generate: Offer<Role, { Label1 => S1, Label2 => S2, ... }>
-                    let branch_types: Vec<TokenStream> = branches
-                        .iter()
-                        .map(|branch| {
-                            let label = &branch.label;
-                            // Project each branch's interactions for this role
-                            let mut branch_type = type_expr.clone();
-                            for branch_interaction in branch.interactions.iter().rev() {
-                                match branch_interaction {
-                                    Interaction::Send {
-                                        from, to, message, ..
-                                    } => {
-                                        if from == &role.name {
-                                            branch_type = quote! {
-                                                ::telltale::Send<#to, #message, #branch_type>
-                                            };
-                                        } else if to == &role.name {
-                                            branch_type = quote! {
-                                                ::telltale::Receive<#from, #message, #branch_type>
-                                            };
-                                        }
-                                    }
-                                    Interaction::Choice { .. } => {
-                                        // Nested choices - recursively handle
-                                    }
-                                }
-                            }
-                            quote! { #label => #branch_type }
-                        })
-                        .collect();
-
-                    if !branch_types.is_empty() {
-                        type_expr = quote! {
-                            ::telltale::Offer<#choosing_role, { #(#branch_types),* }>
-                        };
-                    }
+                    offer_choice_type(role_name, choosing_role, branches, &type_expr)
+                };
+                if let Some(next) = next {
+                    type_expr = next;
                 }
             }
         }

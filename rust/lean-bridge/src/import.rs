@@ -67,9 +67,11 @@ fn parse_global_branches(branches: &[Value]) -> Result<Vec<(Label, GlobalType)>,
                 .get("label")
                 .ok_or_else(|| ImportError::MissingField("label in branch".to_string()))?,
         )?;
-        let cont = json_to_global(branch.get("continuation").ok_or_else(|| {
-            ImportError::MissingField("continuation in branch".to_string())
-        })?)?;
+        let cont = json_to_global(
+            branch
+                .get("continuation")
+                .ok_or_else(|| ImportError::MissingField("continuation in branch".to_string()))?,
+        )?;
         parsed.push((label, cont));
     }
     Ok(parsed)
@@ -122,9 +124,11 @@ fn parse_local_branches(
                 .get("label")
                 .ok_or_else(|| ImportError::MissingField("label in branch".to_string()))?,
         )?;
-        let cont = json_to_local(branch.get("continuation").ok_or_else(|| {
-            ImportError::MissingField("continuation in branch".to_string())
-        })?)?;
+        let cont = json_to_local(
+            branch
+                .get("continuation")
+                .ok_or_else(|| ImportError::MissingField("continuation in branch".to_string()))?,
+        )?;
         parsed.push((label, None, cont));
     }
     Ok(parsed)

@@ -372,6 +372,104 @@ pub struct ProtocolTest {
 }
 
 impl ProtocolTest {
+    fn validate_bindings(&self) -> Result<(), ChoreographyError> {
+        if self.role_bindings.is_empty() {
+            return Err(ChoreographyError::ExecutionError(
+                "No role bindings provided".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn handle_observer_event(
+        &self,
+        event: &crate::testing::observer::ProtocolEvent,
+        result: &mut TestResult,
+        phase_start_times: &mut BTreeMap<(String, String, String), std::time::Instant>,
+    ) {
+        match event {
+            crate::testing::observer::ProtocolEvent::Send {
+                from,
+                to,
+                msg_type,
+                size,
+            } => {
+                if self.config.trace_messages {
+                    result.messages.push(MessageRecord {
+                        from: from.clone(),
+                        to: to.clone(),
+                        message_type: msg_type.clone(),
+                        size: *size,
+                        timestamp: std::time::Instant::now(),
+                    });
+                }
+            }
+            crate::testing::observer::ProtocolEvent::PhaseStart {
+                protocol,
+                role,
+                phase,
+            } => {
+                let key = (protocol.clone(), role.clone(), phase.clone());
+                phase_start_times.insert(key, std::time::Instant::now());
+            }
+            crate::testing::observer::ProtocolEvent::PhaseEnd {
+                protocol,
+                role,
+                phase,
+            } => {
+                if self.config.trace_phases {
+                    let key = (protocol.clone(), role.clone(), phase.clone());
+                    let duration = phase_start_times
+                        .remove(&key)
+                        .map(|start| start.elapsed())
+                        .unwrap_or(Duration::ZERO);
+
+                    result.phases.push(PhaseRecord {
+                        protocol: protocol.clone(),
+                        role: role.clone(),
+                        phase: phase.clone(),
+                        completed: true,
+                        duration,
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn collect_observer_events(&self, result: &mut TestResult) {
+        let mut phase_start_times: BTreeMap<(String, String, String), std::time::Instant> =
+            BTreeMap::new();
+        let observer = self.observer.lock().unwrap();
+        for event in observer.events() {
+            self.handle_observer_event(event, result, &mut phase_start_times);
+        }
+    }
+
+    fn verify_expected_phases(&self, result: &mut TestResult) {
+        if self.expected_phases.is_empty() {
+            return;
+        }
+
+        let completed_phases: Vec<_> = result
+            .phases
+            .iter()
+            .filter(|phase| phase.completed)
+            .map(|phase| phase.phase.as_str())
+            .collect();
+
+        for expected in &self.expected_phases {
+            if !completed_phases.contains(&expected.as_str()) {
+                result
+                    .errors
+                    .push(ChoreographyError::ExecutionError(format!(
+                        "Expected phase '{}' was not completed",
+                        expected
+                    )));
+            }
+        }
+    }
+
     /// Create a new test builder.
     pub fn builder(protocol_name: impl Into<String>) -> ProtocolTestBuilder {
         ProtocolTestBuilder::new(protocol_name)
@@ -420,97 +518,13 @@ impl ProtocolTest {
     /// The actual execution logic is provided by generated protocol code.
     pub async fn run(self) -> Result<TestResult, ChoreographyError> {
         let start = std::time::Instant::now();
-
-        // Validate bindings
-        if self.role_bindings.is_empty() {
-            return Err(ChoreographyError::ExecutionError(
-                "No role bindings provided".to_string(),
-            ));
-        }
+        self.validate_bindings()?;
 
         // Create result
         let mut result = TestResult::success();
         result.duration = start.elapsed();
-
-        // Collect observer events
-        // Track phase start times for duration calculation
-        let mut phase_start_times: BTreeMap<(String, String, String), std::time::Instant> =
-            BTreeMap::new();
-
-        let observer = self.observer.lock().unwrap();
-        for event in observer.events() {
-            match event {
-                crate::testing::observer::ProtocolEvent::Send {
-                    from,
-                    to,
-                    msg_type,
-                    size,
-                } => {
-                    if self.config.trace_messages {
-                        result.messages.push(MessageRecord {
-                            from: from.clone(),
-                            to: to.clone(),
-                            message_type: msg_type.clone(),
-                            size: *size,
-                            timestamp: std::time::Instant::now(),
-                        });
-                    }
-                }
-                crate::testing::observer::ProtocolEvent::PhaseStart {
-                    protocol,
-                    role,
-                    phase,
-                } => {
-                    // Record phase start time
-                    let key = (protocol.clone(), role.clone(), phase.clone());
-                    phase_start_times.insert(key, std::time::Instant::now());
-                }
-                crate::testing::observer::ProtocolEvent::PhaseEnd {
-                    protocol,
-                    role,
-                    phase,
-                } => {
-                    if self.config.trace_phases {
-                        // Calculate duration from phase start
-                        let key = (protocol.clone(), role.clone(), phase.clone());
-                        let duration = phase_start_times
-                            .remove(&key)
-                            .map(|start| start.elapsed())
-                            .unwrap_or(Duration::ZERO);
-
-                        result.phases.push(PhaseRecord {
-                            protocol: protocol.clone(),
-                            role: role.clone(),
-                            phase: phase.clone(),
-                            completed: true,
-                            duration,
-                        });
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        // Verify expected phases
-        if !self.expected_phases.is_empty() {
-            let completed_phases: Vec<_> = result
-                .phases
-                .iter()
-                .filter(|p| p.completed)
-                .map(|p| p.phase.as_str())
-                .collect();
-
-            for expected in &self.expected_phases {
-                if !completed_phases.contains(&expected.as_str()) {
-                    result
-                        .errors
-                        .push(ChoreographyError::ExecutionError(format!(
-                            "Expected phase '{}' was not completed",
-                            expected
-                        )));
-                }
-            }
-        }
+        self.collect_observer_events(&mut result);
+        self.verify_expected_phases(&mut result);
 
         result.success = result.errors.is_empty();
         Ok(result)

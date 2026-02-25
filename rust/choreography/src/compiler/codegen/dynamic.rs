@@ -4,18 +4,14 @@
 //! including role binding validation, device mapping, and symbolic resolution.
 
 use crate::ast::Choreography;
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
 use super::generate_choreography_code;
 
 /// Generate dynamic role support structures for runtime role management
 pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream {
-    let dynamic_roles: Vec<_> = choreography
-        .roles
-        .iter()
-        .filter(|role| role.is_dynamic() || role.is_symbolic())
-        .collect();
+    let dynamic_roles = collect_dynamic_roles(choreography);
 
     if dynamic_roles.is_empty() {
         return quote! {};
@@ -23,85 +19,104 @@ pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
 
     let choreo_name = &choreography.name;
     let runtime_struct_name = format_ident!("{}Runtime", choreo_name);
+    let validation_functions = generate_validation_functions(&dynamic_roles);
+    let mapping_functions = generate_mapping_functions(&dynamic_roles);
+    let runtime_struct = generate_runtime_struct(
+        &runtime_struct_name,
+        &validation_functions,
+        &mapping_functions,
+    );
+    let device_id_type = generate_device_id_alias();
 
-    // Generate DeviceId type alias (assuming this exists in the runtime)
-    let device_id_type = quote! {
-        type DeviceId = String; // This should be imported from the runtime system
-    };
+    quote! { #runtime_struct #device_id_type }
+}
 
-    // Generate role binding validation functions
-    let validation_functions = dynamic_roles.iter().map(|role| {
-        let role_name = role.name();
-        let validation_fn_name =
-            format_ident!("validate_{}_count", role_name.to_string().to_lowercase());
+fn collect_dynamic_roles(choreography: &Choreography) -> Vec<&crate::ast::Role> {
+    choreography
+        .roles
+        .iter()
+        .filter(|role| role.is_dynamic() || role.is_symbolic())
+        .collect()
+}
 
-        quote! {
-            /// Validate role count for runtime bounds checking
-            pub fn #validation_fn_name(count: u32) -> Result<(), String> {
-                const MAX_ROLE_COUNT: u32 = 1024;
+fn generate_validation_functions(dynamic_roles: &[&crate::ast::Role]) -> Vec<TokenStream> {
+    dynamic_roles
+        .iter()
+        .map(|role| {
+            let role_name = role.name();
+            let validation_fn_name =
+                format_ident!("validate_{}_count", role_name.to_string().to_lowercase());
 
-                if count > MAX_ROLE_COUNT {
-                    return Err(format!("Role count {} exceeds maximum {}", count, MAX_ROLE_COUNT));
-                }
-
-                if count == 0 {
-                    return Err("Role count cannot be zero".to_string());
-                }
-
-                Ok(())
-            }
-        }
-    });
-
-    // Generate role mapping functions
-    let mapping_functions = dynamic_roles.iter().map(|role| {
-        let role_name = role.name();
-        let map_fn_name = format_ident!("map_{}_instances", role_name.to_string().to_lowercase());
-        let get_fn_name = format_ident!("get_{}_device", role_name.to_string().to_lowercase());
-
-        quote! {
-            /// Map role instances to device IDs
-            pub fn #map_fn_name(&mut self, instances: Vec<DeviceId>) -> Result<(), String> {
-                let role_name = stringify!(#role_name);
-
-                // Validate instance count
-                if let Some(expected_count) = self.role_counts.get(role_name) {
-                    if instances.len() != *expected_count as usize {
-                        return Err(format!(
-                            "Expected {} instances for role {}, got {}",
-                            expected_count, role_name, instances.len()
-                        ));
+            quote! {
+                /// Validate role count for runtime bounds checking
+                pub fn #validation_fn_name(count: u32) -> Result<(), String> {
+                    const MAX_ROLE_COUNT: u32 = 1024;
+                    if count > MAX_ROLE_COUNT {
+                        return Err(format!("Role count {} exceeds maximum {}", count, MAX_ROLE_COUNT));
                     }
+                    if count == 0 {
+                        return Err("Role count cannot be zero".to_string());
+                    }
+                    Ok(())
+                }
+            }
+        })
+        .collect()
+}
+
+fn generate_mapping_functions(dynamic_roles: &[&crate::ast::Role]) -> Vec<TokenStream> {
+    dynamic_roles
+        .iter()
+        .map(|role| {
+            let role_name = role.name();
+            let map_fn_name =
+                format_ident!("map_{}_instances", role_name.to_string().to_lowercase());
+            let get_fn_name = format_ident!("get_{}_device", role_name.to_string().to_lowercase());
+
+            quote! {
+                /// Map role instances to device IDs
+                pub fn #map_fn_name(&mut self, instances: Vec<DeviceId>) -> Result<(), String> {
+                    let role_name = stringify!(#role_name);
+
+                    if let Some(expected_count) = self.role_counts.get(role_name) {
+                        if instances.len() != *expected_count as usize {
+                            return Err(format!(
+                                "Expected {} instances for role {}, got {}",
+                                expected_count, role_name, instances.len()
+                            ));
+                        }
+                    }
+
+                    const MAX_ROLE_INDEX: usize = 1023;
+                    for (index, device_id) in instances.into_iter().enumerate() {
+                        if index > MAX_ROLE_INDEX {
+                            return Err(format!("Role index {} exceeds maximum", index));
+                        }
+                        let key = format!("{}[{}]", role_name, index);
+                        self.role_mappings.insert(key, device_id);
+                    }
+                    Ok(())
                 }
 
-                const MAX_ROLE_INDEX: usize = 1023;
-
-                // Store mappings with bounds checking
-                for (index, device_id) in instances.into_iter().enumerate() {
+                /// Get device ID for a specific role instance
+                pub fn #get_fn_name(&self, index: u32) -> Option<&DeviceId> {
+                    const MAX_ROLE_INDEX: u32 = 1023;
                     if index > MAX_ROLE_INDEX {
-                        return Err(format!("Role index {} exceeds maximum", index));
+                        return None;
                     }
-
-                    let key = format!("{}[{}]", role_name, index);
-                    self.role_mappings.insert(key, device_id);
+                    let key = format!("{}[{}]", stringify!(#role_name), index);
+                    self.role_mappings.get(&key)
                 }
-
-                Ok(())
             }
+        })
+        .collect()
+}
 
-            /// Get device ID for a specific role instance
-            pub fn #get_fn_name(&self, index: u32) -> Option<&DeviceId> {
-                const MAX_ROLE_INDEX: u32 = 1023;
-                if index > MAX_ROLE_INDEX {
-                    return None;
-                }
-
-                let key = format!("{}[{}]", stringify!(#role_name), index);
-                self.role_mappings.get(&key)
-            }
-        }
-    });
-
+fn generate_runtime_struct(
+    runtime_struct_name: &Ident,
+    validation_functions: &[TokenStream],
+    mapping_functions: &[TokenStream],
+) -> TokenStream {
     quote! {
         /// Dynamic protocol runtime for managing role bindings and device mappings
         pub struct #runtime_struct_name {
@@ -126,16 +141,12 @@ pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
             /// Bind a symbolic role parameter to a concrete count
             pub fn bind_role_count(&mut self, role_name: &str, count: u32) -> Result<(), String> {
                 const MAX_ROLE_COUNT: u32 = 1024;
-
-                // Validate count bounds
                 if count > MAX_ROLE_COUNT {
                     return Err(format!("Role count {} exceeds maximum {}", count, MAX_ROLE_COUNT));
                 }
-
                 if count == 0 {
                     return Err("Role count cannot be zero".to_string());
                 }
-
                 self.role_counts.insert(role_name.to_string(), count);
                 Ok(())
             }
@@ -143,11 +154,9 @@ pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
             /// Bind a symbolic index variable to a concrete value
             pub fn bind_index(&mut self, var_name: &str, value: u32) -> Result<(), String> {
                 const MAX_ROLE_INDEX: u32 = 1023;
-
                 if value > MAX_ROLE_INDEX {
                     return Err(format!("Index {} exceeds maximum {}", value, MAX_ROLE_INDEX));
                 }
-
                 self.index_bindings.insert(var_name.to_string(), value);
                 Ok(())
             }
@@ -164,11 +173,8 @@ pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
 
             /// Resolve a role expression to concrete device IDs
             pub fn resolve_role_targets(&self, role_expr: &str) -> Result<Vec<DeviceId>, String> {
-                // Parse role expression like "Worker[*]", "Worker[0..3]", "Worker[i]"
                 if let Some(wildcard_pos) = role_expr.find("[*]") {
                     let role_name = &role_expr[..wildcard_pos];
-
-                    // Get all instances of this role
                     if let Some(count) = self.role_counts.get(role_name) {
                         let mut targets = Vec::new();
                         for i in 0..*count {
@@ -179,9 +185,6 @@ pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
                         return Ok(targets);
                     }
                 }
-
-                // Handle range expressions, concrete indices, symbolic variables, etc.
-                // This is a simplified implementation - a full parser would be more robust
                 Err(format!("Unsupported role expression: {}", role_expr))
             }
 
@@ -200,9 +203,11 @@ pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
                 Self::new()
             }
         }
-
-        #device_id_type
     }
+}
+
+fn generate_device_id_alias() -> TokenStream {
+    quote! { type DeviceId = String; }
 }
 
 /// Generate enhanced choreography code with dynamic role support

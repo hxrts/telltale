@@ -60,6 +60,7 @@ pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
     out
 }
 
+#[allow(clippy::too_many_lines)]
 fn set_obs_event_tick(out: &mut ObsEvent, tick: u64) {
     match out {
         ObsEvent::Sent {

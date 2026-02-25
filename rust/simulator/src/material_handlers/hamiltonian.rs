@@ -162,16 +162,6 @@ impl EffectHandler for HamiltonianHandler {
         let dt = self.params.step_size;
         let mass = self.params.mass;
 
-        // Get the received force from peer.
-        let received_force = self
-            .peer_forces
-            .lock()
-            .expect("hamiltonian handler lock poisoned")
-            .get(role)
-            .copied()
-            .unwrap_or_else(FixedQ32::zero);
-
-        // Get peer position for own force computation.
         let peer_pos = self
             .peer_positions
             .lock()
@@ -180,9 +170,6 @@ impl EffectHandler for HamiltonianHandler {
             .copied()
             .unwrap_or_else(FixedQ32::zero);
 
-        // Use own force computation (from received peer position).
-        // The received_force is the peer's force on itself, not on us.
-        let _unused_peer_force = received_force;
         let force = self.force(vals[0], peer_pos);
 
         let two = FixedQ32::from_ratio(2, 1).expect("2 must be representable");
