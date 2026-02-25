@@ -160,6 +160,7 @@ fn vm_op_operands(op: &VmCoreOp) -> String {
 }
 
 /// Convert statements to protocol AST
+// RECURSION_SAFE: recursion consumes finite nested statement blocks.
 pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[Role]) -> Protocol {
     if statements.is_empty() {
         return Protocol::End;

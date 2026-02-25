@@ -59,7 +59,7 @@ pub use non_empty::{NonEmptyError, NonEmptyVec};
 pub use protocol::{Branch, Condition, Protocol};
 pub use role::{
     RangeExpr, Role, RoleBoundsChecker, RoleIndex, RoleParam, RoleRange, RoleValidationError,
-    RoleValidationResult, MAX_RANGE_SIZE, MAX_ROLE_COUNT, MAX_ROLE_INDEX,
+    RoleValidationResult, MAX_RANGE_COUNT, MAX_ROLE_COUNT, MAX_ROLE_INDEX,
 };
 pub use validation::ValidationError;
 

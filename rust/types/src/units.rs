@@ -10,11 +10,11 @@ pub const MAX_LOOP_COUNT: u32 = 1_000_000;
 /// Maximum on-wire message length in bytes (16 MiB).
 pub const MAX_MESSAGE_LEN_BYTES: u32 = 16 * 1024 * 1024;
 /// Maximum queue capacity (entries).
-pub const MAX_QUEUE_CAPACITY: u32 = 65_536;
+pub const MAX_QUEUE_CAPACITY_COUNT: u32 = 65_536;
 /// Maximum channel capacity (bits).
 pub const MAX_CHANNEL_CAPACITY_BITS: u32 = 1_024;
 /// Maximum content store capacity (entries).
-pub const MAX_STORE_CAPACITY: u32 = 1_000_000;
+pub const MAX_STORE_CAPACITY_COUNT: u32 = 1_000_000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CountError {
@@ -159,7 +159,7 @@ define_count!(
     QueueCapacity,
     "Queue capacity (entries).",
     min = 1,
-    max = MAX_QUEUE_CAPACITY
+    max = MAX_QUEUE_CAPACITY_COUNT
 );
 define_count!(
     ChannelCapacity,
@@ -171,5 +171,5 @@ define_count!(
     StoreCapacity,
     "Content store capacity (entries).",
     min = 1,
-    max = MAX_STORE_CAPACITY
+    max = MAX_STORE_CAPACITY_COUNT
 );

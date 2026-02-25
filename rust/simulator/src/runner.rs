@@ -27,6 +27,7 @@ type CoroInfo = Vec<(usize, String)>;
 // (adapter removed; simulator handlers implement VM EffectHandler directly)
 
 /// Count active (Send/Recv) nodes per role in one Mu body traversal.
+// RECURSION_SAFE: follows one finite local-type branch after mu unfolding.
 fn active_per_role(lt: &LocalTypeR) -> usize {
     match lt {
         LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {

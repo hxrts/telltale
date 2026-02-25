@@ -44,6 +44,7 @@ pub fn generate_session_type(
 }
 
 /// Generate the type expression for a local type
+// RECURSION_SAFE: structural recursion over finite projected local types.
 fn generate_type_expr(local_type: &LocalType) -> TokenStream {
     match local_type {
         LocalType::Send {
@@ -376,6 +377,7 @@ pub fn generate_role_implementations(
 }
 
 /// Generate the implementation body for a local type
+// RECURSION_SAFE: structural recursion over finite projected local types.
 fn generate_implementation_body(local_type: &LocalType) -> TokenStream {
     match local_type {
         LocalType::Send {

@@ -1,6 +1,6 @@
 //! Transport factory trait and implementations.
 
-use super::limits::CHANNEL_BUFFER_SIZE_DEFAULT;
+use super::limits::CHANNEL_BUFFER_SIZE_COUNT_DEFAULT;
 use super::transport::{InMemoryChannelTransport, Transport, TransportError};
 use crate::{QueueCapacity, RoleName};
 use async_trait::async_trait;
@@ -40,7 +40,7 @@ impl InMemoryTransportFactory {
     /// Create a new factory with default buffer size.
     pub fn new() -> Self {
         Self {
-            buffer_size: QueueCapacity::new(CHANNEL_BUFFER_SIZE_DEFAULT),
+            buffer_size: QueueCapacity::new(CHANNEL_BUFFER_SIZE_COUNT_DEFAULT),
             transports: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }

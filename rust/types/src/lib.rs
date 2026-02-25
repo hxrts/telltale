@@ -47,7 +47,7 @@ pub use merge::{can_merge, merge, merge_all, MergeError, MergeResult};
 pub use role::{Role, RoleSet};
 pub use units::{
     ChannelCapacity, LoopCount, MessageLenBytes, QueueCapacity, RoleIndex, StoreCapacity,
-    MAX_CHANNEL_CAPACITY_BITS, MAX_LOOP_COUNT, MAX_MESSAGE_LEN_BYTES, MAX_QUEUE_CAPACITY,
-    MAX_ROLE_INDEX, MAX_STORE_CAPACITY,
+    MAX_CHANNEL_CAPACITY_BITS, MAX_LOOP_COUNT, MAX_MESSAGE_LEN_BYTES, MAX_QUEUE_CAPACITY_COUNT,
+    MAX_ROLE_INDEX, MAX_STORE_CAPACITY_COUNT,
 };
 pub use val_type::ValType;

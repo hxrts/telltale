@@ -481,6 +481,7 @@ fn fault_expiry(tick: u64, fault: &Fault, scheduled: Option<usize>) -> Option<u6
     duration.map(|d| tick.saturating_add(d as u64))
 }
 
+// RECURSION_SAFE: recurses only through finite product value nesting.
 fn corrupt_value(val: Value) -> Value {
     match val {
         Value::Unit => Value::Unit,

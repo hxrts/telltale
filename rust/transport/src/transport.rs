@@ -97,40 +97,31 @@ impl TcpTransport {
         *self.state.read().await
     }
 
-    /// Start the transport (begin listening for connections).
-    #[instrument(skip(self), fields(role = %self.config.role))]
-    pub async fn start(&self) -> TcpResult<()> {
-        // Check state
-        {
-            let mut state = self.state.write().await;
-            if *state != TransportState::Created {
-                return Err(TcpTransportError::AlreadyStarted);
-            }
-            *state = TransportState::Running;
+    async fn ensure_created_and_mark_running(&self) -> TcpResult<()> {
+        let mut state = self.state.write().await;
+        if *state != TransportState::Created {
+            return Err(TcpTransportError::AlreadyStarted);
         }
+        *state = TransportState::Running;
+        drop(state);
+        Ok(())
+    }
 
-        // Bind listener
-        let listener = TcpListener::bind(&self.config.listen_addr)
-            .await
-            .map_err(|e| TcpTransportError::ConnectionFailed {
-                peer: "listener".to_string(),
-                reason: e.to_string(),
-            })?;
-
-        info!(addr = %self.config.listen_addr, "TCP transport listening");
-
-        // Initialize incoming channels for each peer
+    async fn initialize_incoming_channels(&self) {
         for peer in self.config.peers.keys() {
             let (tx, rx) = mpsc::channel(self.config.buffer_size.as_usize());
             self.incoming_senders.lock().await.insert(peer.clone(), tx);
             self.incoming.lock().await.insert(peer.clone(), rx);
         }
+    }
 
-        // Create shutdown channel
-        let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
+    async fn install_shutdown_channel(&self) -> mpsc::Receiver<()> {
+        let (shutdown_tx, shutdown_rx) = mpsc::channel::<()>(1);
         *self.shutdown_tx.lock().await = Some(shutdown_tx);
+        shutdown_rx
+    }
 
-        // Spawn accept loop
+    fn spawn_accept_loop(&self, listener: TcpListener, mut shutdown_rx: mpsc::Receiver<()>) {
         let incoming_senders = Arc::clone(&self.incoming_senders);
         let state = Arc::clone(&self.state);
         let role = self.config.role.clone();
@@ -165,6 +156,27 @@ impl TcpTransport {
             }
             *state.write().await = TransportState::Stopped;
         });
+    }
+
+    /// Start the transport (begin listening for connections).
+    #[instrument(skip(self), fields(role = %self.config.role))]
+    pub async fn start(&self) -> TcpResult<()> {
+        self.ensure_created_and_mark_running().await?;
+
+        // Bind listener
+        let listener = TcpListener::bind(&self.config.listen_addr)
+            .await
+            .map_err(|e| TcpTransportError::ConnectionFailed {
+                peer: "listener".to_string(),
+                reason: e.to_string(),
+            })?;
+
+        info!(addr = %self.config.listen_addr, "TCP transport listening");
+
+        self.initialize_incoming_channels().await;
+
+        let shutdown_rx = self.install_shutdown_channel().await;
+        self.spawn_accept_loop(listener, shutdown_rx);
 
         Ok(())
     }
@@ -278,8 +290,10 @@ async fn handle_connection(
 
         // Forward to channel without holding the lock across await.
         let sender = {
-            let senders = senders.lock().await;
-            senders.get(&peer_role).cloned()
+            let senders_guard = senders.lock().await;
+            let sender = senders_guard.get(&peer_role).cloned();
+            drop(senders_guard);
+            sender
         };
         if let Some(sender) = sender {
             if sender.send(payload).await.is_err() {
@@ -307,11 +321,12 @@ impl Transport for TcpTransport {
                 .ok_or_else(|| TransportError::UnknownRole(to_role.clone()))?
         };
 
+        // LOCK_AWAIT_OK: stream writes must be serialized per peer connection.
         let mut stream = stream.lock().await;
 
         // Write length prefix
-        let len =
-            MessageLenBytes::try_from(message.len()).map_err(|e| TransportError::SendFailed(e.to_string()))?;
+        let len = MessageLenBytes::try_from(message.len())
+            .map_err(|e| TransportError::SendFailed(e.to_string()))?;
         stream
             .write_all(&len.get().to_be_bytes())
             .await
@@ -337,9 +352,11 @@ impl Transport for TcpTransport {
         let role_key = role_str.to_string();
         let mut receiver = {
             let mut incoming = self.incoming.lock().await;
-            incoming
+            let receiver = incoming
                 .remove(&role_key)
-                .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?
+                .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?;
+            drop(incoming);
+            receiver
         };
 
         let msg = receiver.recv().await;

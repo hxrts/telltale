@@ -12,7 +12,7 @@
 use telltale_choreography::{
     ast::{
         Annotations, Choreography, LocalType, MessageType, Protocol, RangeExpr, Role, RoleIndex,
-        RoleParam, RoleRange, RoleValidationError, MAX_RANGE_SIZE, MAX_ROLE_COUNT, MAX_ROLE_INDEX,
+        RoleParam, RoleRange, RoleValidationError, MAX_RANGE_COUNT, MAX_ROLE_COUNT, MAX_ROLE_INDEX,
     },
     compiler::{
         codegen::{generate_choreography_code_with_dynamic_roles, generate_dynamic_role_support},
@@ -80,7 +80,7 @@ fn test_role_range_validation() {
     assert!(result.is_ok());
 
     // Test range size limits
-    let result = Role::safe_range(format_ident!("Worker"), 0, MAX_RANGE_SIZE + 1);
+    let result = Role::safe_range(format_ident!("Worker"), 0, MAX_RANGE_COUNT + 1);
     assert!(matches!(
         result,
         Err(RoleValidationError::RangeSizeOverflow { .. })
@@ -357,10 +357,10 @@ fn test_security_constraints() {
     ));
 
     // Test range size limits
-    let max_range = RoleRange::safe_concrete(0, MAX_RANGE_SIZE);
+    let max_range = RoleRange::safe_concrete(0, MAX_RANGE_COUNT);
     assert!(max_range.is_ok());
 
-    let over_max_range = RoleRange::safe_concrete(0, MAX_RANGE_SIZE + 1);
+    let over_max_range = RoleRange::safe_concrete(0, MAX_RANGE_COUNT + 1);
     assert!(matches!(
         over_max_range,
         Err(RoleValidationError::RangeSizeOverflow { .. })

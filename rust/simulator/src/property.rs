@@ -533,6 +533,7 @@ fn distance_to_equilibrium(ctx: &PropertyContext<'_>) -> Option<FixedQ32> {
     max_dist
 }
 
+// RECURSION_SAFE: structural recursion over a finite local type tree.
 fn contains_recursion(lt: &LocalTypeR) -> bool {
     match lt {
         LocalTypeR::Mu { body, .. } => contains_recursion(body),
@@ -544,6 +545,7 @@ fn contains_recursion(lt: &LocalTypeR) -> bool {
     }
 }
 
+// RECURSION_SAFE: structural recursion over a finite local type tree.
 fn type_depth(lt: &LocalTypeR) -> usize {
     match lt {
         LocalTypeR::End | LocalTypeR::Var(_) => 0,

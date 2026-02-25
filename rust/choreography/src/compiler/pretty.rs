@@ -46,6 +46,7 @@ pub fn format_choreography_str(input: &str) -> Result<String, crate::compiler::p
     Ok(format_choreography(&choreo))
 }
 
+// RECURSION_SAFE: structural recursion over finite protocol AST depth.
 fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, out: &mut String) {
     match protocol {
         Protocol::End => {}

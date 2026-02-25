@@ -9,10 +9,10 @@ pub const MAX_MESSAGE_SIZE_BYTES: u32 = 16 * 1024 * 1024;
 pub const MAX_ROLE_NAME_LEN: usize = 256;
 
 /// Default channel buffer size for in-memory transport.
-pub const CHANNEL_BUFFER_SIZE_DEFAULT: u32 = 32;
+pub const CHANNEL_BUFFER_SIZE_COUNT_DEFAULT: u32 = 32;
 
 /// Maximum retry attempts for connection.
-pub const RETRY_ATTEMPTS_MAX: u32 = 10;
+pub const RETRY_ATTEMPT_COUNT_MAX: u32 = 10;
 
 /// Initial retry backoff delay in milliseconds.
 pub const RETRY_BACKOFF_INITIAL_MS: u64 = 100;

@@ -1055,6 +1055,7 @@ pub fn generate_all_runners(
     }
 }
 
+// RECURSION_SAFE: structural recursion over finite local-type AST depth.
 fn collect_branch_labels(local_type: &LocalType, labels: &mut BTreeSet<String>) {
     match local_type {
         LocalType::Select { branches, .. }

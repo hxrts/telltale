@@ -134,7 +134,7 @@ fn test_complex_dynamic_role_overflow_scenarios() {
     "#,
         MAX_ROLE_COUNT / 2,
         MAX_ROLE_COUNT / 2,
-        MAX_RANGE_SIZE / 2
+        MAX_RANGE_COUNT / 2
     );
 
     let choreo = parse_choreography_str(&protocol).expect("Should parse valid counts");
@@ -164,14 +164,14 @@ fn test_role_index_overflow_protection() {
 #[test]
 fn test_range_size_overflow_protection() {
     // Test that range sizes are protected against overflow
-    let result = RoleRange::safe_concrete(0, MAX_RANGE_SIZE + 10);
+    let result = RoleRange::safe_concrete(0, MAX_RANGE_COUNT + 10);
     assert!(matches!(
         result,
         Err(RoleValidationError::RangeSizeOverflow { .. })
     ));
 
     // Test valid range at boundary
-    let result = RoleRange::safe_concrete(0, MAX_RANGE_SIZE - 1);
+    let result = RoleRange::safe_concrete(0, MAX_RANGE_COUNT - 1);
     assert!(result.is_ok());
 }
 
@@ -209,7 +209,7 @@ fn test_range_boundary_conditions() {
         }}
     "#,
         MAX_ROLE_COUNT,
-        MAX_RANGE_SIZE - 1
+        MAX_RANGE_COUNT - 1
     );
 
     let result = parse_choreography_str(&protocol);
@@ -225,7 +225,7 @@ fn test_range_boundary_conditions() {
         }}
     "#,
         MAX_ROLE_COUNT,
-        MAX_RANGE_SIZE + 100
+        MAX_RANGE_COUNT + 100
     );
 
     let result = parse_choreography_str(&protocol);

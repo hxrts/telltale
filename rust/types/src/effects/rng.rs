@@ -208,7 +208,8 @@ mod tests {
 
         for _ in 0..100 {
             let d = rng.duration_between(min, max);
-            assert!(d >= min && d < max);
+            assert!(d >= min);
+            assert!(d < max);
         }
     }
 

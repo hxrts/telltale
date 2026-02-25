@@ -354,6 +354,7 @@ fn dfs_cycle(
     false
 }
 
+// RECURSION_SAFE: structural recursion over finite protocol AST depth.
 fn has_communication(protocol: &Protocol) -> bool {
     match protocol {
         Protocol::Send { .. } | Protocol::Broadcast { .. } => true,

@@ -84,6 +84,7 @@ type BranchList = Vec<(
     LocalTypeR,
 )>;
 
+// RECURSION_SAFE: structural recursion over a finite runtime value tree.
 pub(crate) fn runtime_value_val_type(value: &Value) -> ValType {
     match value {
         Value::Unit => ValType::Unit,
@@ -101,6 +102,7 @@ pub(crate) fn runtime_value_val_type(value: &Value) -> ValType {
     }
 }
 
+// RECURSION_SAFE: structural recursion over a finite runtime value tree.
 pub(crate) fn runtime_value_wire_size_bytes(value: &Value) -> usize {
     match value {
         Value::Unit => 1,
@@ -116,6 +118,7 @@ pub(crate) fn runtime_value_wire_size_bytes(value: &Value) -> usize {
     }
 }
 
+// RECURSION_SAFE: structural recursion over finite value/type trees.
 pub(crate) fn runtime_value_matches_val_type(value: &Value, expected: &ValType) -> bool {
     match (value, expected) {
         (Value::Unit, ValType::Unit) => true,

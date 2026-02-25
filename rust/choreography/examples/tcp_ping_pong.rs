@@ -246,8 +246,13 @@ async fn handle_incoming_connection(
         stream.read_exact(&mut payload).await?;
 
         // Forward to the appropriate channel
-        let senders = senders.lock().await;
-        if let Some(sender) = senders.get(&peer_role) {
+        let sender = {
+            let senders_guard = senders.lock().await;
+            let sender = senders_guard.get(&peer_role).cloned();
+            drop(senders_guard);
+            sender
+        };
+        if let Some(sender) = sender {
             if sender.send(payload).await.is_err() {
                 println!("[{}] Receiver dropped for {}", local_role, peer_role);
                 break;
@@ -263,11 +268,17 @@ async fn handle_incoming_connection(
 #[async_trait]
 impl Transport for TcpTransport {
     async fn send(&self, to_role: &RoleName, message: Vec<u8>) -> TransportResult<()> {
-        let outgoing = self.outgoing.read().await;
-        let stream = outgoing
-            .get(to_role)
-            .ok_or_else(|| TransportError::UnknownRole(to_role.clone()))?;
+        let stream = {
+            let outgoing_guard = self.outgoing.read().await;
+            let stream = outgoing_guard
+                .get(to_role)
+                .cloned()
+                .ok_or_else(|| TransportError::UnknownRole(to_role.clone()))?;
+            drop(outgoing_guard);
+            stream
+        };
 
+        // LOCK_AWAIT_OK: stream writes must be serialized per peer connection.
         let mut stream = stream.lock().await;
 
         // Write length prefix
@@ -282,12 +293,24 @@ impl Transport for TcpTransport {
     }
 
     async fn recv(&self, from_role: &RoleName) -> TransportResult<Vec<u8>> {
-        let mut incoming = self.incoming.lock().await;
-        let receiver = incoming
-            .get_mut(from_role)
-            .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?;
+        let role_key = from_role.clone();
+        let mut receiver = {
+            let mut incoming = self.incoming.lock().await;
+            let receiver = incoming
+                .remove(&role_key)
+                .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?;
+            drop(incoming);
+            receiver
+        };
 
-        receiver.recv().await.ok_or(TransportError::ChannelClosed)
+        let msg = receiver.recv().await.ok_or(TransportError::ChannelClosed)?;
+
+        {
+            let mut incoming = self.incoming.lock().await;
+            incoming.insert(role_key, receiver);
+        }
+
+        Ok(msg)
     }
 
     fn is_connected(&self, role: &RoleName) -> bool {

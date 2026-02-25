@@ -872,6 +872,7 @@ fn merge_labeled_local_types(
 ///
 /// This is a simplified merge operation for the extended LocalType.
 /// For the full merge algorithm, see the `merge` module which works with `LocalTypeR`.
+// RECURSION_SAFE: structural recursion over finite local-type pairs.
 pub fn merge_local_types(t1: &LocalType, t2: &LocalType) -> Result<LocalType, ProjectionError> {
     // Fast path: identical types
     if t1 == t2 {

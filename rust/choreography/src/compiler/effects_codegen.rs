@@ -235,6 +235,7 @@ fn generate_label_type(protocol: &Protocol) -> TokenStream {
     }
 }
 
+// RECURSION_SAFE: structural recursion over finite protocol AST depth.
 fn collect_message_types(protocol: &Protocol, message_types: &mut HashSet<MessageType>) {
     match protocol {
         Protocol::Send {
@@ -277,6 +278,7 @@ fn collect_message_types(protocol: &Protocol, message_types: &mut HashSet<Messag
     }
 }
 
+// RECURSION_SAFE: structural recursion over finite protocol AST depth.
 fn collect_choice_labels(protocol: &Protocol, labels: &mut HashSet<String>) {
     match protocol {
         Protocol::Choice { branches, .. } => {
@@ -352,6 +354,7 @@ fn generate_program_builder(protocol: &Protocol, role: &Role) -> TokenStream {
 }
 
 /// Generate effect builder calls for a protocol
+// RECURSION_SAFE: structural recursion over finite protocol AST depth.
 fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
     match protocol {
         Protocol::End => {

@@ -147,7 +147,7 @@ impl VerificationModel for DefaultVerificationModel {
     }
 
     fn sign_value(payload: &Value, key: &Self::SigningKey) -> Self::Signature {
-        sign_value(payload, key)
+        crate::verification::sign_value(payload, key)
     }
 
     fn verify_signed_value(

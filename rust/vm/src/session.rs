@@ -478,6 +478,7 @@ impl SessionStore {
 ///
 /// Recursively strips `Mu` constructors to reach the first action.
 #[must_use]
+// RECURSION_SAFE: each step unwraps one Mu node from a finite local type tree.
 pub fn unfold_mu(lt: &LocalTypeR) -> LocalTypeR {
     match lt {
         LocalTypeR::Mu { body, .. } => unfold_mu(body),

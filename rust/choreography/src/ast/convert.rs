@@ -78,6 +78,7 @@ pub fn choreography_to_global(choreography: &Choreography) -> ConversionResult<G
 /// # Errors
 ///
 /// Returns `UnsupportedFeature` for: Broadcast, Loop, Parallel, Extension
+// RECURSION_SAFE: structural recursion over finite protocol AST depth.
 pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCore> {
     match protocol {
         Protocol::End => Ok(GlobalTypeCore::End),
@@ -232,6 +233,7 @@ fn message_to_label(message: &MessageType) -> Label {
 /// # Errors
 ///
 /// Returns error for: `LocalChoice`, `Loop` (DSL-only features)
+// RECURSION_SAFE: structural recursion over finite local-type AST depth.
 pub fn local_to_local_r(local: &LocalType) -> ConversionResult<LocalTypeR> {
     match local {
         LocalType::End => Ok(LocalTypeR::End),
@@ -341,6 +343,7 @@ pub fn local_to_local_r(local: &LocalType) -> ConversionResult<LocalTypeR> {
 ///
 /// This compares the structure, ignoring payload sorts (which are often Unit
 /// in DSL-generated types).
+// RECURSION_SAFE: synchronized structural recursion over finite type trees.
 pub fn local_types_equivalent(lt1: &LocalTypeR, lt2: &LocalTypeR) -> bool {
     match (lt1, lt2) {
         (LocalTypeR::End, LocalTypeR::End) => true,

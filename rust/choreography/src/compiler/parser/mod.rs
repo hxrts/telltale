@@ -424,6 +424,7 @@ fn validate_linear_vm_assets(statements: &[Statement], input: &str) -> Result<()
     validate_block(statements, &HashSet::new(), input).map(|_| ())
 }
 
+// RECURSION_SAFE: recursion consumes finite nested statement blocks.
 fn collect_vm_required_capabilities(statements: &[Statement], out: &mut HashSet<String>) {
     for statement in statements {
         match statement {
@@ -922,7 +923,14 @@ pub fn explain_lowering(input: &str) -> std::result::Result<String, ParseError> 
                 continuation,
                 ..
             } => {
-                writeln!(out, "{indent}- send {} -> {} : {}", from.name(), to.name(), message.name).unwrap();
+                writeln!(
+                    out,
+                    "{indent}- send {} -> {} : {}",
+                    from.name(),
+                    to.name(),
+                    message.name
+                )
+                .unwrap();
                 render_protocol(continuation, depth + 1, out);
             }
             Protocol::Broadcast {
@@ -931,7 +939,13 @@ pub fn explain_lowering(input: &str) -> std::result::Result<String, ParseError> 
                 continuation,
                 ..
             } => {
-                writeln!(out, "{indent}- broadcast {} ->* : {}", from.name(), message.name).unwrap();
+                writeln!(
+                    out,
+                    "{indent}- broadcast {} ->* : {}",
+                    from.name(),
+                    message.name
+                )
+                .unwrap();
                 render_protocol(continuation, depth + 1, out);
             }
             Protocol::Choice { role, branches, .. } => {
@@ -983,15 +997,26 @@ pub fn explain_lowering(input: &str) -> std::result::Result<String, ParseError> 
     writeln!(
         out,
         "Roles: {}",
-        choreography.roles.iter().map(|r| r.name().to_string()).collect::<Vec<_>>().join(", ")
-    ).unwrap();
+        choreography
+            .roles
+            .iter()
+            .map(|r| r.name().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+    .unwrap();
     let bundles = choreography.proof_bundles();
     if !bundles.is_empty() {
         writeln!(
             out,
             "Proof bundles: {}",
-            bundles.iter().map(|b| b.name.clone()).collect::<Vec<_>>().join(", ")
-        ).unwrap();
+            bundles
+                .iter()
+                .map(|b| b.name.clone())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+        .unwrap();
     }
     let required = choreography.required_proof_bundles();
     if !required.is_empty() {

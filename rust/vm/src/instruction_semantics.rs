@@ -4,6 +4,7 @@ use crate::coroutine::Fault;
 use crate::coroutine::{Coroutine, Value};
 use crate::instr::Endpoint;
 
+// RECURSION_SAFE: structural recursion over a finite value tree.
 fn val_type_of(value: &Value) -> telltale_types::ValType {
     use telltale_types::ValType;
     match value {

@@ -9,7 +9,7 @@ pub const MAX_ROLE_COUNT: u32 = 10_000;
 pub const MAX_ROLE_INDEX: u32 = MAX_ROLE_COUNT - 1;
 
 /// Maximum allowed range size for role ranges
-pub const MAX_RANGE_SIZE: u32 = 1_000;
+pub const MAX_RANGE_COUNT: u32 = 1_000;
 
 /// Validation errors for dynamic role operations
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -530,10 +530,10 @@ impl RoleRange {
             }
 
             let range_size = end - start;
-            if range_size > MAX_RANGE_SIZE {
+            if range_size > MAX_RANGE_COUNT {
                 return Err(RoleValidationError::RangeSizeOverflow {
                     size: range_size,
-                    max: MAX_RANGE_SIZE,
+                    max: MAX_RANGE_COUNT,
                 });
             }
         }
@@ -633,10 +633,10 @@ impl RoleBoundsChecker {
         }
 
         let range_size = end - start;
-        if range_size > MAX_RANGE_SIZE {
+        if range_size > MAX_RANGE_COUNT {
             return Err(RoleValidationError::RangeSizeOverflow {
                 size: range_size,
-                max: MAX_RANGE_SIZE,
+                max: MAX_RANGE_COUNT,
             });
         }
 
