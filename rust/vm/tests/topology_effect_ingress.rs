@@ -2,13 +2,14 @@
 //! Topology perturbations must ingress through effect handlers.
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(feature = "multi-thread")]
 use std::{collections::BTreeMap, time::Duration};
 
-use helpers::simple_send_recv_image;
+use test_support::simple_send_recv_image;
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput, TopologyPerturbation};
 #[cfg(feature = "multi-thread")]

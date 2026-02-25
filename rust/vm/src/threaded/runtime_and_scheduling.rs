@@ -1,4 +1,6 @@
 impl ThreadedVM {
+    /// Create with thread pool sized to available OS parallelism.
+    #[must_use]
     pub fn auto(config: VMConfig) -> Self {
         let workers = std::thread::available_parallelism()
             .map(|n| n.get())
@@ -547,4 +549,49 @@ impl ThreadedVM {
 
     /// Get the observable trace.
     #[must_use]
+    pub fn trace(&self) -> &[ObsEvent] {
+        &self.trace
+    }
+
+    /// Get recorded effect-trace entries.
+    #[must_use]
+    pub fn effect_trace(&self) -> &[EffectTraceEntry] {
+        &self.effect_trace
+    }
+
+    /// Canonical replay/state fragment for deterministic diffing and snapshots.
+    #[must_use]
+    pub fn canonical_replay_fragment(&self) -> CanonicalReplayFragmentV1 {
+        let corrupted_edges = self
+            .corrupted_edges
+            .iter()
+            .map(|(edge, corruption)| (edge.clone(), corruption.clone()))
+            .collect();
+        let timed_out_sites = self
+            .timed_out_sites
+            .iter()
+            .map(|(site, until_tick)| (site.clone(), *until_tick))
+            .collect();
+        canonical_replay_fragment_v1(
+            &self.trace,
+            &self.effect_trace,
+            self.crashed_sites.iter().cloned().collect(),
+            self.partitioned_edges.iter().cloned().collect(),
+            corrupted_edges,
+            timed_out_sites,
+            self.config.effect_determinism_tier,
+        )
+    }
+
+    /// Get recorded output-condition verification checks.
+    #[must_use]
+    pub fn output_condition_checks(&self) -> &[OutputConditionCheck] {
+        &self.output_condition_checks
+    }
+
+    /// Crashed sites currently active in topology state.
+    #[must_use]
+    pub fn crashed_sites(&self) -> &BTreeSet<String> {
+        &self.crashed_sites
+    }
 }

@@ -2,7 +2,8 @@
 //! Monitor precheck and deterministic cost-budget tests.
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 use assert_matches::assert_matches;
 use telltale_vm::coroutine::Fault;
@@ -11,11 +12,11 @@ use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::vm::{MonitorMode, VMConfig, VMError, VM};
 
-use helpers::PassthroughHandler;
+use test_support::PassthroughHandler;
 
 #[test]
 fn cooperative_monitor_precheck_catches_mismatched_instr_shape() {
-    let mut image = helpers::simple_send_recv_image("A", "B", "msg");
+    let mut image = test_support::simple_send_recv_image("A", "B", "msg");
     image.programs.insert(
         "A".to_string(),
         vec![Instr::Receive { chan: 0, dst: 0 }, Instr::Halt],
@@ -44,7 +45,7 @@ fn cooperative_monitor_precheck_catches_mismatched_instr_shape() {
 
 #[test]
 fn cooperative_monitor_precheck_bypasses_control_flow_instrs() {
-    let mut image = helpers::simple_send_recv_image("A", "B", "msg");
+    let mut image = test_support::simple_send_recv_image("A", "B", "msg");
     image.programs.insert(
         "A".to_string(),
         vec![
@@ -74,7 +75,7 @@ fn cooperative_monitor_precheck_bypasses_control_flow_instrs() {
 
 #[test]
 fn cooperative_monitor_offer_passes_on_send_state() {
-    let mut image = helpers::simple_send_recv_image("A", "Z", "msg");
+    let mut image = test_support::simple_send_recv_image("A", "Z", "msg");
     image.programs.insert(
         "A".to_string(),
         vec![
@@ -98,7 +99,7 @@ fn cooperative_monitor_offer_passes_on_send_state() {
 
 #[test]
 fn cooperative_monitor_offer_rejects_recv_state() {
-    let mut image = helpers::simple_send_recv_image("Z", "A", "msg");
+    let mut image = test_support::simple_send_recv_image("Z", "A", "msg");
     image.programs.insert(
         "A".to_string(),
         vec![
@@ -133,7 +134,7 @@ fn cooperative_monitor_offer_rejects_recv_state() {
 
 #[test]
 fn cooperative_monitor_choose_passes_on_recv_state() {
-    let mut image = helpers::simple_send_recv_image("Z", "A", "msg");
+    let mut image = test_support::simple_send_recv_image("Z", "A", "msg");
     image.programs.insert(
         "A".to_string(),
         vec![
@@ -157,7 +158,7 @@ fn cooperative_monitor_choose_passes_on_recv_state() {
 
 #[test]
 fn cooperative_monitor_choose_rejects_send_state() {
-    let mut image = helpers::simple_send_recv_image("A", "Z", "msg");
+    let mut image = test_support::simple_send_recv_image("A", "Z", "msg");
     image.programs.insert(
         "A".to_string(),
         vec![
@@ -192,7 +193,7 @@ fn cooperative_monitor_choose_rejects_send_state() {
 
 #[test]
 fn cooperative_out_of_credits_faults_before_dispatch() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig {
         initial_cost_budget: 0,
         instruction_cost: 1,
@@ -215,7 +216,7 @@ fn cooperative_out_of_credits_faults_before_dispatch() {
 #[cfg(feature = "multi-thread")]
 #[test]
 fn threaded_out_of_credits_faults_before_dispatch() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = ThreadedVM::with_workers(
         VMConfig {
             initial_cost_budget: 0,
@@ -241,7 +242,7 @@ fn threaded_out_of_credits_faults_before_dispatch() {
 #[cfg(feature = "multi-thread")]
 #[test]
 fn threaded_monitor_precheck_catches_mismatched_instr_shape() {
-    let mut image = helpers::simple_send_recv_image("A", "B", "msg");
+    let mut image = test_support::simple_send_recv_image("A", "B", "msg");
     image.programs.insert(
         "A".to_string(),
         vec![Instr::Receive { chan: 0, dst: 0 }, Instr::Halt],
@@ -274,7 +275,7 @@ fn threaded_monitor_precheck_catches_mismatched_instr_shape() {
 #[cfg(feature = "multi-thread")]
 #[test]
 fn threaded_monitor_precheck_bypasses_control_flow_instrs() {
-    let mut image = helpers::simple_send_recv_image("A", "B", "msg");
+    let mut image = test_support::simple_send_recv_image("A", "B", "msg");
     image.programs.insert(
         "A".to_string(),
         vec![

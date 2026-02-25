@@ -1,4 +1,5 @@
 impl ThreadedVM {
+    #[allow(clippy::too_many_lines)]
     fn commit_pack(
         &mut self,
         coro: &Arc<Mutex<Coroutine>>,
@@ -311,6 +312,4 @@ impl ThreadedVM {
         let _ = (endpoint, owners, expected_owner);
         Err(transfer_fault_delegation_guard_violation("for handoff"))
     }
-}
-
 }

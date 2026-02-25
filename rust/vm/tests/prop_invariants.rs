@@ -8,7 +8,8 @@
 )]
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
@@ -23,7 +24,7 @@ use telltale_vm::loader::CodeImage;
 use telltale_vm::session::{unfold_if_var, unfold_mu};
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
 
-use helpers::{
+use test_support::{
     code_image_from_global, role_pair_strategy, value_strategy, well_formed_global_strategy,
     PassthroughHandler, SEED,
 };
@@ -122,7 +123,7 @@ fn prop_recv_advances_to_continuation() {
 
 #[test]
 fn prop_choose_advances_to_selected_branch() {
-    let image = helpers::choice_image("A", "B", &["yes", "no"]);
+    let image = test_support::choice_image("A", "B", &["yes", "no"]);
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -139,7 +140,7 @@ fn prop_choose_advances_to_selected_branch() {
 
 #[test]
 fn prop_offer_advances_to_received_label() {
-    let image = helpers::choice_image("A", "B", &["yes", "no"]);
+    let image = test_support::choice_image("A", "B", &["yes", "no"]);
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -321,8 +322,8 @@ fn prop_buffer_latest_value_overwrites() {
 
 #[test]
 fn prop_multi_session_no_cross_talk() {
-    let image1 = helpers::simple_send_recv_image("A", "B", "msg");
-    let image2 = helpers::simple_send_recv_image("A", "B", "data");
+    let image1 = test_support::simple_send_recv_image("A", "B", "msg");
+    let image2 = test_support::simple_send_recv_image("A", "B", "data");
 
     let mut vm = VM::new(VMConfig::default());
     let sid1 = vm.load_choreography(&image1).unwrap();
@@ -348,8 +349,8 @@ fn prop_multi_session_no_cross_talk() {
 
 #[test]
 fn prop_session_type_independence() {
-    let image1 = helpers::simple_send_recv_image("A", "B", "msg");
-    let image2 = helpers::simple_send_recv_image("A", "B", "data");
+    let image1 = test_support::simple_send_recv_image("A", "B", "msg");
+    let image2 = test_support::simple_send_recv_image("A", "B", "data");
 
     let mut vm = VM::new(VMConfig::default());
     let _sid1 = vm.load_choreography(&image1).unwrap();
@@ -393,7 +394,7 @@ fn prop_session_type_independence() {
 #[test]
 fn prop_block_preserves_type() {
     // B tries to recv before A sends → blocks → type unchanged.
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -418,7 +419,7 @@ fn prop_block_preserves_type() {
 
 #[test]
 fn prop_block_preserves_pc() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 

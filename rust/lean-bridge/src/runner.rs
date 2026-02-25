@@ -21,7 +21,7 @@ use std::process::{Command, Output};
 use tempfile::NamedTempFile;
 use thiserror::Error;
 
-#[path = "runner_projection.rs"]
+#[path = "runner_projection_export.rs"]
 mod projection;
 
 /// Errors from Lean runner operations.

@@ -425,4 +425,6 @@ fn runtime_role_enum_tokens(
 }
 
 #[cfg(test)]
-mod tests;
+mod tests {
+    include!("../../tests/unit/compiler/runner_tests.rs");
+}

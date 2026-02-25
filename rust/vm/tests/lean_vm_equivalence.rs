@@ -3,7 +3,8 @@
 #![allow(clippy::needless_collect)]
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 use telltale_lean_bridge::{
     default_schema_version, global_to_json, ChoreographyJson, VmRunInput, VmRunner,
@@ -12,7 +13,7 @@ use telltale_types::{GlobalType, Label};
 use telltale_vm::trace::normalize_trace;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
 
-use helpers::PassthroughHandler;
+use test_support::PassthroughHandler;
 
 #[test]
 fn test_lean_vm_trace_matches_rust() {
@@ -62,7 +63,7 @@ fn test_lean_vm_trace_matches_rust() {
         return;
     }
 
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let handler = PassthroughHandler;
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).expect("load image");

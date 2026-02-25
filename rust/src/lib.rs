@@ -539,4 +539,5 @@ mod private {
 }
 
 #[cfg(test)]
+#[path = "../tests/channel_unit_tests.rs"]
 mod channel_test;

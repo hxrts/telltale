@@ -7,9 +7,12 @@ use crate::ast::{Choreography, Condition, Protocol, Role};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
+#[path = "effects_codegen_protocol_types.rs"]
 mod protocol_types;
 #[cfg(test)]
-mod tests;
+mod tests {
+    include!("../../tests/unit/compiler/effects_codegen_tests.rs");
+}
 use protocol_types::{generate_label_type, generate_message_types};
 
 /// Generate annotation-aware effect metadata for a protocol node

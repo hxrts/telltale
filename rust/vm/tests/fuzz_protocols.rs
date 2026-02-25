@@ -9,7 +9,8 @@
 )]
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 use std::collections::BTreeMap;
 
@@ -21,7 +22,7 @@ use telltale_vm::buffer::{BackpressurePolicy, BoundedBuffer, BufferConfig, Buffe
 use telltale_vm::coroutine::Value;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
 
-use helpers::{
+use test_support::{
     code_image_from_global, well_formed_global_strategy, FailingHandler, PassthroughHandler, SEED,
 };
 

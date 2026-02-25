@@ -20,7 +20,21 @@ mod role;
 mod statement;
 mod stmt_parsers;
 #[cfg(test)]
-mod tests;
+mod tests {
+    use super::*;
+
+    mod core_syntax_and_decide_loops {
+        include!("../../../tests/unit/compiler/parser/core_syntax_and_decide_loops.rs");
+    }
+
+    mod annotations_and_parallel {
+        include!("../../../tests/unit/compiler/parser/annotations_and_parallel.rs");
+    }
+
+    mod proof_bundles_and_predicates {
+        include!("../../../tests/unit/compiler/parser/proof_bundles_and_predicates.rs");
+    }
+}
 mod types;
 
 // Re-export public API

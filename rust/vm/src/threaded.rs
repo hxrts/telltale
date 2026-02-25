@@ -42,21 +42,21 @@ use crate::session::{
 use crate::transfer_semantics::{decode_transfer_request, move_endpoint_bundle};
 use crate::vm::{
     runtime_value_matches_val_type, runtime_value_val_type, runtime_value_wire_size_bytes,
-    EffectTraceCaptureMode, MonitorMode, ObsEvent, Program, ResourceState, RunStatus, StepResult,
-    ThreadedRoundSemantics, VMConfig, VMError,
+    EffectTraceCaptureMode, MonitorMode, ObsEvent, Program, ResourceState, RunStatus, SiteId,
+    StepResult, ThreadedRoundSemantics, VMConfig, VMError,
 };
 
-/// Lane identifier in the threaded runtime.
+// Lane identifier in the threaded runtime.
 
 include!("threaded/prelude.rs");
-include!("threaded/impl_part1.rs");
-include!("threaded/impl_part2.rs");
-include!("threaded/impl_part3.rs");
-include!("threaded/free_part1.rs");
-include!("threaded/free_part2.rs");
-include!("threaded/free_part3.rs");
+include!("threaded/runtime_and_scheduling.rs");
+include!("threaded/topology_and_planner.rs");
+include!("threaded/commit_and_handoff.rs");
+include!("threaded/exec_and_validation.rs");
+include!("threaded/instructions_send_recv_control.rs");
+include!("threaded/instructions_choice_and_session.rs");
 
 #[cfg(test)]
 mod tests {
-    include!("threaded/tests.rs");
+    include!("../tests/unit/threaded_runtime_tests.rs");
 }

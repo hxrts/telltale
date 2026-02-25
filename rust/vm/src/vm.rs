@@ -56,23 +56,23 @@ use crate::transfer_semantics::{
 use crate::verification::{DefaultVerificationModel, VerificationModel};
 
 
-include!("vm/prelude1.rs");
-include!("vm/prelude2.rs");
-include!("vm/prelude3.rs");
-include!("vm/impl_part1.rs");
-include!("vm/impl_part2.rs");
-include!("vm/impl_part3.rs");
-include!("vm/impl_part4.rs");
-include!("vm/impl_part5.rs");
-include!("vm/impl_part6.rs");
+include!("vm/runtime_value_and_resource_state.rs");
+include!("vm/vm_config_and_observability.rs");
+include!("vm/vm_error_and_step_pack.rs");
+include!("vm/runtime_and_execution.rs");
+include!("vm/introspection_and_validation.rs");
+include!("vm/topology_and_dispatch.rs");
+include!("vm/instruction_control_and_effects.rs");
+include!("vm/instruction_choice_and_session.rs");
+include!("vm/open_commit_and_interning.rs");
 include!("vm/kernel_impl.rs");
 
 #[cfg(test)]
 mod tests {
-    include!("vm/tests_support1.rs");
-    include!("vm/tests_support2.rs");
-    include!("vm/tests_part1.rs");
-    include!("vm/tests_part2.rs");
-    include!("vm/tests_part3.rs");
-    include!("vm/tests_part4.rs");
+    include!("../tests/unit/vm/tests_effect_handlers_core.rs");
+    include!("../tests/unit/vm/tests_effect_handlers_edge_cases.rs");
+    include!("../tests/unit/vm/tests_runtime_progress.rs");
+    include!("../tests/unit/vm/tests_monitor_and_persistence.rs");
+    include!("../tests/unit/vm/tests_compiler_and_topology.rs");
+    include!("../tests/unit/vm/tests_flow_policy_and_faults.rs");
 }

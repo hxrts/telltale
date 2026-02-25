@@ -6,6 +6,18 @@
 
 use wasm_bindgen_test::wasm_bindgen_test;
 
+fn vm_impl_source() -> String {
+    [
+        include_str!("../src/vm/runtime_and_execution.rs"),
+        include_str!("../src/vm/introspection_and_validation.rs"),
+        include_str!("../src/vm/topology_and_dispatch.rs"),
+        include_str!("../src/vm/instruction_control_and_effects.rs"),
+        include_str!("../src/vm/instruction_choice_and_session.rs"),
+        include_str!("../src/vm/open_commit_and_interning.rs"),
+    ]
+    .join("\n")
+}
+
 fn between<'a>(src: &'a str, start: &str, end: &str) -> &'a str {
     let start_idx = src.find(start).expect("start marker must exist");
     let end_idx = src.find(end).expect("end marker must exist");
@@ -22,9 +34,9 @@ fn span(src: &str, start: &str, end: &str) -> (usize, usize) {
 
 #[wasm_bindgen_test(unsupported = test)]
 fn canonical_step_section_does_not_mutate_commit_owned_state() {
-    let src = include_str!("../src/vm.rs");
+    let src = vm_impl_source();
     let step_section = between(
-        src,
+        &src,
         "// ---- Per-instruction step functions",
         "fn commit_pack(",
     );
@@ -56,8 +68,8 @@ fn canonical_step_section_does_not_mutate_commit_owned_state() {
 
 #[wasm_bindgen_test(unsupported = test)]
 fn commit_pack_contains_commit_owned_mutation_sites() {
-    let src = include_str!("../src/vm.rs");
-    let commit_section = between(src, "fn commit_pack(", "\n}\n\n#[cfg(test)]");
+    let src = vm_impl_source();
+    let commit_section = between(&src, "fn commit_pack(", "\n    fn intern_obs_event(");
 
     let required_patterns = [
         "self.sessions.update_type(",
@@ -83,8 +95,9 @@ fn commit_pack_contains_commit_owned_mutation_sites() {
 
 #[wasm_bindgen_test(unsupported = test)]
 fn commit_pack_is_only_owner_of_type_state_mutations() {
-    let src = include_str!("../src/vm.rs");
-    let (commit_start, commit_end) = span(src, "fn commit_pack(", "\n}\n\n#[cfg(test)]");
+    let src = vm_impl_source();
+    let (commit_start, commit_end) =
+        span(&src, "fn commit_pack(", "\n    fn intern_obs_event(");
     let patterns = [
         "self.sessions.update_type(",
         "self.sessions.update_original(",

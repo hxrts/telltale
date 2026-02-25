@@ -3,7 +3,8 @@
 #![allow(clippy::needless_collect, clippy::let_underscore_must_use)]
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 use std::collections::BTreeMap;
 
@@ -17,7 +18,7 @@ use telltale_vm::instr::Endpoint;
 use telltale_vm::session::{SessionStatus, SessionStore};
 use telltale_vm::vm::{VMConfig, VM};
 
-use helpers::PassthroughHandler;
+use test_support::PassthroughHandler;
 
 // ============================================================================
 // Session Lifecycle
@@ -25,7 +26,7 @@ use helpers::PassthroughHandler;
 
 #[test]
 fn test_session_active_to_closed() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -234,8 +235,8 @@ fn test_buffer_resize_preserves_order() {
 
 #[test]
 fn test_two_sessions_independent_types() {
-    let image1 = helpers::simple_send_recv_image("A", "B", "msg");
-    let image2 = helpers::simple_send_recv_image("A", "B", "data");
+    let image1 = test_support::simple_send_recv_image("A", "B", "msg");
+    let image2 = test_support::simple_send_recv_image("A", "B", "data");
 
     let mut vm = VM::new(VMConfig::default());
     let sid1 = vm.load_choreography(&image1).unwrap();
@@ -292,7 +293,7 @@ fn test_two_sessions_independent_buffers() {
 
 #[test]
 fn test_three_sessions_complete_independently() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
 
     let mut vm = VM::new(VMConfig::default());
     let sid1 = vm.load_choreography(&image).unwrap();

@@ -5,7 +5,8 @@
 //! observable events), not only final traces.
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 use std::collections::BTreeMap;
 
@@ -18,7 +19,7 @@ use telltale_vm::loader::CodeImage;
 use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::vm::{ObsEvent, StepResult, VMConfig, VM};
 
-use helpers::PassthroughHandler;
+use test_support::PassthroughHandler;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct StepSnap {
@@ -173,7 +174,7 @@ fn transfer_fixture_image() -> CodeImage {
 }
 
 fn tag_check_fixture_image() -> CodeImage {
-    let mut image = helpers::simple_send_recv_image("A", "B", "msg");
+    let mut image = test_support::simple_send_recv_image("A", "B", "msg");
     image.programs.insert(
         "A".to_string(),
         vec![Instr::Send { chan: 0, val: 1 }, Instr::Halt],
@@ -339,7 +340,7 @@ fn run_threaded_snaps(
 
 #[test]
 fn cooperative_step_corpus_send_recv_shape() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let handler = PassthroughHandler;
     let snaps = run_cooperative_snaps(&image, &handler, 16);
     assert!(snaps.len() >= 3, "expected multiple steps, got {snaps:?}");
@@ -366,7 +367,7 @@ fn cooperative_step_corpus_send_recv_shape() {
 
 #[test]
 fn cooperative_step_corpus_offer_choose_shape() {
-    let image = helpers::choice_image("A", "B", &["yes", "no"]);
+    let image = test_support::choice_image("A", "B", &["yes", "no"]);
     let handler = PassthroughHandler;
     let snaps = run_cooperative_snaps(&image, &handler, 16);
     let events = flatten_events(&snaps);
@@ -488,7 +489,7 @@ fn cooperative_step_corpus_speculation_shape() {
 #[cfg(feature = "multi-thread")]
 #[test]
 fn threaded_matches_cooperative_step_corpus_send_recv() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let handler = PassthroughHandler;
     let coop = run_cooperative_snaps(&image, &handler, 16);
     let threaded = run_threaded_snaps(&image, &handler, 16);
@@ -520,7 +521,7 @@ fn threaded_matches_cooperative_step_corpus_send_recv() {
 #[cfg(feature = "multi-thread")]
 #[test]
 fn threaded_matches_cooperative_step_corpus_choice() {
-    let image = helpers::choice_image("A", "B", &["yes", "no"]);
+    let image = test_support::choice_image("A", "B", &["yes", "no"]);
     let handler = PassthroughHandler;
     let coop = run_cooperative_snaps(&image, &handler, 16);
     let threaded = run_threaded_snaps(&image, &handler, 16);

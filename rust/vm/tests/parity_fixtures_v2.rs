@@ -4,12 +4,13 @@
 //! Lean/Rust parity fixtures for speculation, scheduler, and failure-envelope scenarios.
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use helpers::{PassthroughHandler, ScenarioSpec};
+use test_support::{PassthroughHandler, ScenarioSpec};
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput, TopologyPerturbation};

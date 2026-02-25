@@ -2,15 +2,16 @@
 //! Strict tick equality regression tests.
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 use telltale_vm::vm::{VMConfig, VM};
 
-use helpers::PassthroughHandler;
+use test_support::PassthroughHandler;
 
 #[test]
 fn test_strict_tick_equality_same_engine() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let handler = PassthroughHandler;
 
     let mut vm1 = VM::new(VMConfig::default());

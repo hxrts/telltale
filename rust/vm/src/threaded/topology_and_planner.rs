@@ -1,50 +1,4 @@
 impl ThreadedVM {
-    pub fn trace(&self) -> &[ObsEvent] {
-        &self.trace
-    }
-
-    /// Get recorded effect-trace entries.
-    #[must_use]
-    pub fn effect_trace(&self) -> &[EffectTraceEntry] {
-        &self.effect_trace
-    }
-
-    /// Canonical replay/state fragment for deterministic diffing and snapshots.
-    #[must_use]
-    pub fn canonical_replay_fragment(&self) -> CanonicalReplayFragmentV1 {
-        let corrupted_edges = self
-            .corrupted_edges
-            .iter()
-            .map(|(edge, corruption)| (edge.clone(), corruption.clone()))
-            .collect();
-        let timed_out_sites = self
-            .timed_out_sites
-            .iter()
-            .map(|(site, until_tick)| (site.clone(), *until_tick))
-            .collect();
-        canonical_replay_fragment_v1(
-            &self.trace,
-            &self.effect_trace,
-            self.crashed_sites.iter().cloned().collect(),
-            self.partitioned_edges.iter().cloned().collect(),
-            corrupted_edges,
-            timed_out_sites,
-            self.config.effect_determinism_tier,
-        )
-    }
-
-    /// Get recorded output-condition verification checks.
-    #[must_use]
-    pub fn output_condition_checks(&self) -> &[OutputConditionCheck] {
-        &self.output_condition_checks
-    }
-
-    /// Crashed sites currently active in topology state.
-    #[must_use]
-    pub fn crashed_sites(&self) -> &BTreeSet<String> {
-        &self.crashed_sites
-    }
-
     /// Partitioned site-links currently active in topology state.
     #[must_use]
     pub fn partitioned_edges(&self) -> &BTreeSet<(String, String)> {
@@ -476,26 +430,28 @@ impl ThreadedVM {
 
     fn pick_ready(&mut self, n: usize) -> Result<Vec<Picked>, VMError> {
         let mut picks = Vec::new();
-        let coros = &self.coroutines;
         let mut planner = WavePlannerState::new(
             self.lane_count.max(1),
             self.config.footprint_guided_wave_widening,
         );
 
         while picks.len() < n {
-            let Some(coro_id) = VMKernel::select_ready_eligible(
-                &mut self.scheduler,
-                |id| coro_has_progress(coros, id),
-                |id| {
-                    Self::planner_eligible(
-                        &mut planner,
-                        coros,
-                        &self.crashed_sites,
-                        &self.timed_out_sites,
-                        id,
-                    )
-                },
-            ) else {
+            let Some(coro_id) = ({
+                let coros = &self.coroutines;
+                VMKernel::select_ready_eligible(
+                    &mut self.scheduler,
+                    |id| coro_has_progress(coros, id),
+                    |id| {
+                        Self::planner_eligible(
+                            &mut planner,
+                            coros,
+                            &self.crashed_sites,
+                            &self.timed_out_sites,
+                            id,
+                        )
+                    },
+                )
+            }) else {
                 break;
             };
 
@@ -510,6 +466,4 @@ impl ThreadedVM {
 
         Ok(picks)
     }
-
-    #[allow(clippy::too_many_lines)]
 }

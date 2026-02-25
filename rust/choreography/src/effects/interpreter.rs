@@ -470,7 +470,10 @@ pub trait ChoreoHandlerExt: ChoreoHandler + Sized {
 // Blanket implementation for all ChoreoHandlers
 impl<T: ChoreoHandler> ChoreoHandlerExt for T {}
 /// Utilities for testing and simulation
+#[path = "interpreter_testing.rs"]
 pub mod testing;
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
-mod tests;
+mod tests {
+    include!("../../tests/unit/effects/interpreter_tests.rs");
+}

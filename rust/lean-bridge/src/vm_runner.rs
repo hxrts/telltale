@@ -17,7 +17,7 @@ use crate::vm_trace::{
     normalize_vm_trace, traces_equivalent, EffectTraceEvent, OutputConditionTraceEvent,
 };
 
-#[path = "vm_runner_parsing.rs"]
+#[path = "vm_runner_json_parsing.rs"]
 mod parsing;
 use parsing::{
     parse_sim_run_output, parse_sim_trace_validation,

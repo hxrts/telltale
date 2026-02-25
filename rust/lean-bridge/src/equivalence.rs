@@ -43,7 +43,7 @@ use telltale_theory::projection::{project, ProjectionError};
 use telltale_types::GlobalType;
 use thiserror::Error;
 
-#[path = "equivalence_golden.rs"]
+#[path = "equivalence_golden_cases.rs"]
 mod golden;
 
 /// Errors from equivalence checking operations.

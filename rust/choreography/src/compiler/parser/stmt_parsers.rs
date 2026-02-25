@@ -13,9 +13,9 @@ use super::statement::{parse_block, parse_duration};
 use super::types::{ChoiceBranch, PredicateExpr, Statement};
 use super::Rule;
 
-mod misc;
+mod control_flow;
 mod vm;
-pub(super) use misc::{
+pub(super) use control_flow::{
     parse_call_stmt, parse_continue_stmt, parse_handshake_stmt, parse_quorum_collect_stmt,
     parse_rec_stmt, parse_retry_stmt,
 };

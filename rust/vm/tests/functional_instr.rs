@@ -7,7 +7,8 @@
 )]
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 use std::collections::BTreeMap;
 
@@ -19,7 +20,7 @@ use telltale_vm::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::{ObsEvent, StepResult, VMConfig, VMError, VM};
 
-use helpers::{FailingHandler, PassthroughHandler, RecordingHandler};
+use test_support::{FailingHandler, PassthroughHandler, RecordingHandler};
 
 // ============================================================================
 // Send
@@ -27,7 +28,7 @@ use helpers::{FailingHandler, PassthroughHandler, RecordingHandler};
 
 #[test]
 fn test_send_success() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -104,7 +105,7 @@ fn test_send_type_mismatch() {
 #[test]
 fn test_send_no_type() {
     // Create image, then remove the type for A before stepping.
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -280,7 +281,7 @@ fn test_send_buffer_full_drop() {
 
 #[test]
 fn test_send_handler_error() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).unwrap();
 
@@ -301,7 +302,7 @@ fn test_send_handler_error() {
 
 #[test]
 fn test_recv_success() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).unwrap();
 
@@ -317,7 +318,7 @@ fn test_recv_success() {
 
 #[test]
 fn test_recv_blocks_when_empty() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -391,7 +392,7 @@ fn test_recv_type_mismatch() {
 #[test]
 fn test_recv_unblocks_on_send() {
     // Standard send/recv: B blocks, A sends, B unblocks.
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -413,7 +414,7 @@ fn test_recv_unblocks_on_send() {
 
 #[test]
 fn test_choose_success() {
-    let image = helpers::choice_image("A", "B", &["yes", "no"]);
+    let image = test_support::choice_image("A", "B", &["yes", "no"]);
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).unwrap();
 
@@ -574,7 +575,7 @@ fn test_choose_type_not_send() {
 
 #[test]
 fn test_offer_recv_mode_success() {
-    let image = helpers::choice_image("A", "B", &["yes", "no"]);
+    let image = test_support::choice_image("A", "B", &["yes", "no"]);
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).unwrap();
 
@@ -591,7 +592,7 @@ fn test_offer_recv_mode_success() {
 #[test]
 fn test_offer_recv_mode_blocks() {
     // B Choose before A Offer → B blocks until A sends label.
-    let image = helpers::choice_image("A", "B", &["go"]);
+    let image = test_support::choice_image("A", "B", &["go"]);
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).unwrap();
 
@@ -787,7 +788,7 @@ fn test_close_empty_buffers() {
 
 #[test]
 fn test_open_creates_session() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -804,7 +805,7 @@ fn test_open_creates_session() {
 
 #[test]
 fn test_invoke_calls_step() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).unwrap();
 
@@ -1019,7 +1020,7 @@ fn test_yield_advances_pc_and_reschedules() {
 
 #[test]
 fn test_halt_sets_done_removes_type() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -1056,7 +1057,7 @@ fn test_max_sessions_exceeded() {
     };
     let mut vm = VM::new(config);
 
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     vm.load_choreography(&image).unwrap();
 
     let result = vm.load_choreography(&image);
@@ -1071,7 +1072,7 @@ fn test_max_coroutines_exceeded() {
     };
     let mut vm = VM::new(config);
 
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let result = vm.load_choreography(&image);
     assert_matches!(result, Err(VMError::TooManyCoroutines { .. }));
 }

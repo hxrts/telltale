@@ -8,9 +8,10 @@ use telltale_vm::trace::normalize_trace;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
-use helpers::PassthroughHandler;
+use test_support::PassthroughHandler;
 
 type CommEvent = (String, String, String, String);
 
@@ -56,9 +57,9 @@ fn run_for_policy(policy: SchedPolicy) -> Vec<Vec<CommEvent>> {
         sched_policy: policy,
         ..VMConfig::default()
     });
-    vm.load_choreography(&helpers::simple_send_recv_image("A", "B", "m1"))
+    vm.load_choreography(&test_support::simple_send_recv_image("A", "B", "m1"))
         .expect("load image m1");
-    vm.load_choreography(&helpers::simple_send_recv_image("A", "B", "m2"))
+    vm.load_choreography(&test_support::simple_send_recv_image("A", "B", "m2"))
         .expect("load image m2");
     vm.run_concurrent(&PassthroughHandler, 256, 2)
         .expect("run under scheduler policy");

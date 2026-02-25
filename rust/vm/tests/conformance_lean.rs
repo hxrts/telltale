@@ -6,7 +6,8 @@
 //! `lean/Runtime/VM/` specification files.
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 use std::collections::{BTreeMap, HashSet};
 
@@ -20,7 +21,7 @@ use telltale_vm::output_condition::OutputConditionHint;
 use telltale_vm::session::{SessionStatus, SessionStore};
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
 
-use helpers::PassthroughHandler;
+use test_support::PassthroughHandler;
 
 fn single_role_end_image(
     program: Vec<telltale_vm::instr::Instr>,
@@ -165,7 +166,7 @@ impl EffectHandler for HintedInvokeHandler {
 /// After each instruction, endpoint type matches protocol state.
 #[test]
 fn test_lean_session_coherent() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -202,8 +203,8 @@ fn test_lean_session_coherent() {
 /// Two sessions have independent type namespaces.
 #[test]
 fn test_lean_session_ns_disjoint() {
-    let image1 = helpers::simple_send_recv_image("A", "B", "msg");
-    let image2 = helpers::simple_send_recv_image("A", "B", "data");
+    let image1 = test_support::simple_send_recv_image("A", "B", "msg");
+    let image2 = test_support::simple_send_recv_image("A", "B", "data");
 
     let mut vm = VM::new(VMConfig::default());
     let sid1 = vm.load_choreography(&image1).unwrap();
@@ -228,7 +229,7 @@ fn test_lean_session_ns_disjoint() {
 /// Type entry count is not changed by send/recv (only by Halt/Close).
 #[test]
 fn test_lean_conservation_inv_preserved() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -272,7 +273,7 @@ fn test_lean_close_empty() {
 /// Halt removes one endpoint; others remain valid.
 #[test]
 fn test_lean_leave_preserves_coherent() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -293,7 +294,7 @@ fn test_lean_leave_preserves_coherent() {
 /// Sent events per edge appear in same order as Received events.
 #[test]
 fn test_lean_transport_fifo() {
-    let image = helpers::recursive_send_recv_image("A", "B", "msg");
+    let image = test_support::recursive_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -338,7 +339,7 @@ fn test_lean_transport_fifo() {
 /// Each Sent event has at most one matching Received.
 #[test]
 fn test_lean_transport_no_dup() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -363,7 +364,7 @@ fn test_lean_transport_no_dup() {
 /// No Received event without prior Sent on same edge.
 #[test]
 fn test_lean_transport_no_create() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -406,7 +407,7 @@ fn test_lean_transport_no_create() {
 /// Lean VM comm semantics: receive must verify transport signatures.
 #[test]
 fn test_lean_send_receive_signature_verification() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
     let handler = PassthroughHandler;
@@ -450,7 +451,7 @@ fn test_lean_send_receive_signature_verification() {
 /// Lean VM comm semantics: choose consumes exactly the offered label branch.
 #[test]
 fn test_lean_offer_choose_label_alignment() {
-    let image = helpers::choice_image("A", "B", &["yes", "no"]);
+    let image = test_support::choice_image("A", "B", &["yes", "no"]);
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -596,7 +597,7 @@ fn test_lean_tag_check_epistemic_behavior() {
     use telltale_vm::coroutine::Value;
     use telltale_vm::instr::{ImmValue, Instr};
 
-    let mut image = helpers::simple_send_recv_image("A", "B", "msg");
+    let mut image = test_support::simple_send_recv_image("A", "B", "msg");
     image.programs.insert(
         "A".to_string(),
         vec![Instr::Send { chan: 0, val: 1 }, Instr::Halt],
@@ -979,7 +980,7 @@ fn test_lean_abort_policy_is_deterministic_and_scoped() {
 fn test_lean_schedule_confluence() {
     use telltale_vm::SchedPolicy;
 
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
 
     let run_with_policy = |policy: SchedPolicy| -> HashSet<String> {
         let config = VMConfig {
@@ -1013,7 +1014,7 @@ fn test_lean_schedule_confluence() {
 fn test_lean_cooperative_refines_concurrent() {
     use telltale_vm::SchedPolicy;
 
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
 
     let run_with_policy = |policy: SchedPolicy| -> bool {
         let config = VMConfig {
@@ -1039,7 +1040,7 @@ fn test_lean_cooperative_refines_concurrent() {
 /// Send instruction with matching Send type does not fault.
 #[test]
 fn test_lean_monitor_sound_send() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).unwrap();
 
@@ -1058,7 +1059,7 @@ fn test_lean_monitor_sound_send() {
 /// Recv instruction with matching Recv type does not fault.
 #[test]
 fn test_lean_monitor_sound_recv() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).unwrap();
 
@@ -1077,7 +1078,7 @@ fn test_lean_monitor_sound_recv() {
 /// Choose with matching label does not fault.
 #[test]
 fn test_lean_monitor_sound_choose() {
-    let image = helpers::choice_image("A", "B", &["yes", "no"]);
+    let image = test_support::choice_image("A", "B", &["yes", "no"]);
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).unwrap();
 
@@ -1096,7 +1097,7 @@ fn test_lean_monitor_sound_choose() {
 /// Offer with matching label does not fault.
 #[test]
 fn test_lean_monitor_sound_offer() {
-    let image = helpers::choice_image("A", "B", &["yes", "no"]);
+    let image = test_support::choice_image("A", "B", &["yes", "no"]);
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).unwrap();
 
@@ -1119,7 +1120,7 @@ fn test_lean_monitor_sound_offer() {
 /// Every Received event preceded by Sent event on same edge.
 #[test]
 fn test_lean_causal_consistency() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -1145,7 +1146,7 @@ fn test_lean_causal_consistency() {
 /// Send order = receive order per edge in trace.
 #[test]
 fn test_lean_fifo_consistency() {
-    let image = helpers::recursive_send_recv_image("A", "B", "msg");
+    let image = test_support::recursive_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
@@ -1190,7 +1191,7 @@ fn test_lean_fifo_consistency() {
 /// Every trace event corresponds to an instruction execution.
 #[test]
 fn test_lean_no_phantom_events() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).unwrap();
 
@@ -1243,7 +1244,7 @@ fn test_lean_no_phantom_events() {
 /// PC always in [0, program.len()) when coroutine is Ready.
 #[test]
 fn test_lean_wf_pc_bounds() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).unwrap();
 
@@ -1279,7 +1280,7 @@ fn test_lean_wf_pc_bounds() {
 /// No two coroutines own the same endpoint.
 #[test]
 fn test_lean_endpoint_ownership_unique() {
-    let image = helpers::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 

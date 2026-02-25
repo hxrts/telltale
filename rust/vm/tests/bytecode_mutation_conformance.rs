@@ -9,9 +9,10 @@ use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::{VMConfig, VMError, VM};
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
-use helpers::PassthroughHandler;
+use test_support::PassthroughHandler;
 
 fn fault_name(err: &VMError) -> Option<&'static str> {
     match err {
@@ -29,7 +30,7 @@ fn fault_name(err: &VMError) -> Option<&'static str> {
 }
 
 fn base_image() -> CodeImage {
-    helpers::simple_send_recv_image("A", "B", "m")
+    test_support::simple_send_recv_image("A", "B", "m")
 }
 
 fn single_role_end_image(program: Vec<Instr>) -> CodeImage {

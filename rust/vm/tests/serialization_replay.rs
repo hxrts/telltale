@@ -2,9 +2,10 @@
 #![allow(missing_docs)]
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
-use helpers::{simple_send_recv_image, PassthroughHandler};
+use test_support::{simple_send_recv_image, PassthroughHandler};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;

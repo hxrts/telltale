@@ -2,10 +2,11 @@
 //! Canonical-engine ownership guardrails.
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 #[cfg(feature = "multi-thread")]
-use helpers::{simple_send_recv_image, PassthroughHandler};
+use test_support::{simple_send_recv_image, PassthroughHandler};
 use telltale_vm::architecture::{EngineRole, CANONICAL_ENGINE, ENGINE_OWNERSHIP};
 #[cfg(feature = "multi-thread")]
 use telltale_vm::threaded::ThreadedVM;

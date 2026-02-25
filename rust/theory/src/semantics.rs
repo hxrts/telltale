@@ -23,9 +23,12 @@
 
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
+#[path = "semantics_reduction.rs"]
 mod reduction;
 #[cfg(test)]
-mod tests;
+mod tests {
+    include!("../tests/unit/semantics_tests.rs");
+}
 
 pub use reduction::{good_g, reduces, reduces_star};
 

@@ -4,11 +4,12 @@
 //! Threaded lane runtime tests: partitioning, handoff, and progress.
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 use std::collections::BTreeMap;
 
-use helpers::ScenarioSpec;
+use test_support::ScenarioSpec;
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::EffectHandler;

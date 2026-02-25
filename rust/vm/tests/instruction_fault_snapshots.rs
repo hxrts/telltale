@@ -9,9 +9,10 @@ use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::{VMConfig, VMError, VM};
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
-use helpers::PassthroughHandler;
+use test_support::PassthroughHandler;
 
 fn fault_name(fault: &Fault) -> &'static str {
     match fault {

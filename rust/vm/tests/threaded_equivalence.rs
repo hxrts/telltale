@@ -4,12 +4,13 @@
 #![cfg(feature = "multi-thread")]
 
 #[allow(dead_code, unreachable_pub)]
-mod helpers;
+#[path = "support/mod.rs"]
+mod test_support;
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use helpers::{
+use test_support::{
     choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,
 };
 use telltale_vm::coroutine::Fault;
