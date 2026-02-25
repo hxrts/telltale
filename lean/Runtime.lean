@@ -40,6 +40,4 @@ monitor/adequacy modules in one place.
 
 VM definition, Iris separation logic backend, resource algebras,
 session invariants, WP rules, and adequacy.
-
-Scaffolded per work/iris_3.md — populated incrementally.
 -/

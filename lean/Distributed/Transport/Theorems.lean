@@ -27,7 +27,7 @@ def validateAsNakamoto (p : ProtocolSpec) : AssumptionSummary :=
 def validateAsHybrid (p : ProtocolSpec) : AssumptionSummary :=
   validateWithAssumptions p hybridAssumptions
 
-/-- Validate the protocol against characterization assumptions from `work/consensus.md`. -/
+/-- Validate the protocol against characterization assumptions. -/
 def validateCharacterization (p : ProtocolSpec) : AssumptionSummary :=
   validateWithAssumptions p characterizationAssumptions
 

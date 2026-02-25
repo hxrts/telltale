@@ -1,8 +1,7 @@
 //! Runtime architecture contract.
 //!
 //! This module defines the canonical semantic engine and the role of each
-//! runtime surface. It is used as the source of truth for migration gates in
-//! `work/rust_vm_impl.md` Phase 0.
+//! runtime surface.
 
 /// Runtime engine role classification during migration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

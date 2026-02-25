@@ -1,6 +1,6 @@
 //! Pretty-printer for the choreography DSL.
 //!
-//! Emits the new layout-sensitive syntax described in work/syntax.md.
+//! Emits layout-sensitive syntax for the choreography language.
 
 use crate::ast::{Branch, Choreography, Condition, MessageType, Protocol, Role, RoleParam};
 use crate::compiler::parser::parse_choreography_str;

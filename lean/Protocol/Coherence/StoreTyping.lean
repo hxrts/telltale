@@ -53,7 +53,6 @@ def StoreTyped (G : GEnv) (S : SEnv) (store : VarStore) : Prop :=
 
 /-- Strong store typing: same-domain property + type correspondence.
     This strengthening is needed for the progress theorem.
-    Reference: `work/effects/008.lean:114-116` -/
 structure StoreTypedStrong (G : GEnv) (S : SEnv) (store : VarStore) : Prop where
   /-- Same-domain: S and store have the same variables. -/
   sameDomain : ∀ x, (lookupSEnv S x).isSome ↔ (lookupStr store x).isSome
@@ -68,11 +67,9 @@ theorem StoreTypedStrong.to_store_typed {G : GEnv} {S : SEnv} {store : VarStore}
 /-! ## Store Bridge Lemma
 
 The key lemma connecting static typing to runtime values.
-Reference: `work/effects/008.lean:304-308` -/
 
 /-- If a variable has a type in the static environment and the store is strongly typed,
     then the variable exists in the store and its value has the corresponding type.
-    Reference: `work/effects/008.lean:304-308` -/
 theorem store_lookup_of_senv_lookup {G : GEnv} {S : SEnv} {store : VarStore} {x : Var} {T : ValType}
     (hStore : StoreTypedStrong G S store) (hS : lookupSEnv S x = some T) :
     ∃ v, lookupStr store x = some v ∧ HasTypeVal G v T := by
@@ -96,7 +93,6 @@ theorem store_value_typed {G : GEnv} {S : SEnv} {store : VarStore} {x : Var} {v 
 /-! ## EdgeCoherent Irrelevance Lemmas -/
 
 /-- Updating G at an endpoint not involved in edge e doesn't affect EdgeCoherent at e.
-    Reference: `work/effects/004.lean` edge_coherent_update_g_irrelevant -/
 theorem edge_coherent_update_g_irrelevant (G : GEnv) (D : DEnv) (e : Edge)
     (ep : Endpoint) (L : LocalType)
     (hNeSender : ep ≠ { sid := e.sid, role := e.sender })
@@ -113,7 +109,6 @@ theorem edge_coherent_update_g_irrelevant (G : GEnv) (D : DEnv) (e : Edge)
   simpa [lookup_g_update_neq _ _ _ _ hNeSender] using hGsender
 
 /-- Updating D at edge e' ≠ e doesn't affect EdgeCoherent at e.
-    Reference: `work/effects/004.lean` edge_coherent_update_d_irrelevant -/
 theorem edge_coherent_update_d_irrelevant (G : GEnv) (D : DEnv) (e e' : Edge)
     (ts : List ValType)
     (hNe : e' ≠ e)

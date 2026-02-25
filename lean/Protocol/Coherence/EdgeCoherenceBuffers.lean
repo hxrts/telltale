@@ -42,10 +42,8 @@ inductive HasTypeVal (G : GEnv) : Value → ValType → Prop where
 /-! ## Value Type Inversion Lemmas
 
 These lemmas extract concrete value forms from typing judgments.
-Reference: `work/effects/008.lean:313-324, 521-524` -/
 
 /-- If a value has channel type, it must be a channel value with matching endpoint.
-    Reference: `work/effects/008.lean:313-318` -/
 theorem has_type_val_chan_inv {G : GEnv} {v : Value} {sid : SessionId} {role : Role}
     (h : HasTypeVal G v (.chan sid role)) :
     v = .chan ⟨sid, role⟩ := by
@@ -53,7 +51,6 @@ theorem has_type_val_chan_inv {G : GEnv} {v : Value} {sid : SessionId} {role : R
   | chan hLookup => rfl
 
 /-- If a value has string type, it must be a string value.
-    Reference: `work/effects/008.lean:521-524` -/
 theorem has_type_val_string_inv {G : GEnv} {v : Value}
     (h : HasTypeVal G v .string) :
     ∃ s, v = .string s := by

@@ -25,10 +25,6 @@ Solution Structure. We define:
 - `consumeOneHO`: Single-step consume, produces delta when consuming channel types
 - `ConsumeHO`: Full trace consume, composes deltas from each step
 - conservative core lemmas (`consume_ho_conservative`, empty-delta/converse forms)
-
-## Reference
-
-Ported from `work/aristotle/23_higher_order_consume.lean`.
 -/
 
 set_option linter.mathlibStandardSet false

@@ -170,7 +170,6 @@ theorem consume_length_le_depth {from_ : Role} {L L' : LocalType} {ts : List Val
 /-- Consume associativity for append: consuming ts then [T] equals consuming ts ++ [T].
     This is the key lemma for send preservation - appending to trace end
     corresponds to receiver eventually receiving that type.
-    Reference: `work/effects/004.lean` consume_append -/
 theorem consume_append (from_ : Role) (Lr : LocalType) (ts : List ValType) (T : ValType) {L' : LocalType} :
     Consume from_ Lr ts = some L' →
     Consume from_ Lr (ts ++ [T]) = Consume from_ L' [T] := by
@@ -195,7 +194,6 @@ theorem consume_append (from_ : Role) (Lr : LocalType) (ts : List ValType) (T : 
 
 /-- Consume decomposition: consuming T::ts equals consuming T then ts.
     This is the key lemma for recv preservation.
-    Reference: `work/effects/004.lean` consume_cons -/
 theorem consume_cons (from_ : Role) (Lr : LocalType) (T : ValType) (ts : List ValType) :
     Consume from_ Lr (T :: ts) =
     match Consume from_ Lr [T] with
@@ -272,7 +270,6 @@ theorem consume_non_recv_empty {from_ : Role} {L : LocalType} {ts : List ValType
     | branch r bs => exact absurd rfl (hNotBranch r bs)
 
 /-- If sender ≠ role in recv type, trace must be empty for consumption to succeed.
-    Reference: `work/effects/004.lean` consume_other_empty -/
 theorem consume_other_empty {from_ r : Role} {T : ValType} {L : LocalType}
     {ts : List ValType} {L' : LocalType}
     (hNe : from_ ≠ r)

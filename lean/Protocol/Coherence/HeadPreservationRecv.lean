@@ -57,7 +57,6 @@ private theorem consume_branch_nonempty_is_some_false
     Recv action removes trace HEAD, and receiver type advances from recv to continuation.
     The key insight is that Coherent implies the continuation can consume the remaining trace,
     which means the new head (if any) must match the continuation's expected recv type.
-    Reference: `work/effects/004.lean` proof structure -/
 theorem head_coherent_recv_preserved
     (G : GEnv) (D : DEnv) (receiverEp : Endpoint) (senderRole : Role) (Trecv : ValType)
     (L : LocalType)

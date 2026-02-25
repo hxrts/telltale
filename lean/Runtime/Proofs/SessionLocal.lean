@@ -38,8 +38,6 @@ multiple sessions. The `delegation_preserves_coherent` theorem (from Delegation.
 is used here to prove that receiving a delegated endpoint safely extends the
 coroutine's footprint.
 
-See `work/vm_instructions.md` for the full specification.
-
 Note: This module is kept at the Protocol level (GEnv, DEnv, Coherent) to avoid
 the Iris import collision. VM-level integration requires resolving the Store
 name collision between Protocol.Environments.Core and Iris.Std.Heap.

@@ -5,7 +5,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
-const DEFAULT_OUT_DIR: &str = "work/effect_handler_scaffold";
+const DEFAULT_OUT_DIR: &str = "target/effect_handler_scaffold";
 const DEFAULT_STRUCT_NAME: &str = "HostEffectHandler";
 const DEFAULT_WITH_SIMULATOR: bool = true;
 

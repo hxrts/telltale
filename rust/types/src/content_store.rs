@@ -12,7 +12,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This corresponds to the memoization infrastructure described in work/009.md Phase 1.5.
+//! This corresponds to the memoization infrastructure in the Lean formalization.
 
 use crate::content_id::{ContentId, Hasher, Sha256Hasher};
 use crate::contentable::{Contentable, ContentableError};
