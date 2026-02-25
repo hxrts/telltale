@@ -287,7 +287,7 @@ impl ThreadedVM {
         if picks.len() == 1 {
             let pick = picks.into_iter().next().expect("single pick exists");
             let result = exec_instr(&pick.coro, &pick.session, &exec_ctx);
-            return self.commit_pick_result(pick, result, tick, &handler_identity);
+            return self.commit_pick_result(&pick, result, tick, &handler_identity);
         }
 
         let results: Vec<Result<(StepPack, Option<OutputConditionHint>), Fault>> =
@@ -300,14 +300,14 @@ impl ThreadedVM {
 
         let mut progressed = false;
         for (pick, result) in picks.into_iter().zip(results.into_iter()) {
-            progressed |= self.commit_pick_result(pick, result, tick, &handler_identity)?;
+            progressed |= self.commit_pick_result(&pick, result, tick, &handler_identity)?;
         }
         Ok(progressed)
     }
 
     fn commit_pick_result(
         &mut self,
-        pick: Picked,
+        pick: &Picked,
         result: Result<(StepPack, Option<OutputConditionHint>), Fault>,
         tick: u64,
         handler_identity: &str,

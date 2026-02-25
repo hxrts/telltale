@@ -208,7 +208,7 @@ impl VM {
         if self
             .sessions
             .default_handler_for_session(sid)
-            .is_none_or(String::is_empty)
+            .map_or(true, String::is_empty)
         {
             return Err(Fault::Invoke {
                 message: "no handler bound".to_string(),
