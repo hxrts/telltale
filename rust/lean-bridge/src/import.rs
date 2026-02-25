@@ -4,7 +4,7 @@
 //! back into GlobalType and LocalTypeR.
 
 use serde_json::Value;
-use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
+use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort, ValType};
 use thiserror::Error;
 
 /// Errors that can occur during JSON import.
@@ -29,6 +29,62 @@ pub enum ImportError {
     ExpectedObject(String),
 }
 
+fn required_field<'a>(json: &'a Value, field: &str) -> Result<&'a Value, ImportError> {
+    json.get(field)
+        .ok_or_else(|| ImportError::MissingField(field.to_string()))
+}
+
+fn required_str(json: &Value, field: &str) -> Result<String, ImportError> {
+    required_field(json, field)?
+        .as_str()
+        .map(ToString::to_string)
+        .ok_or_else(|| ImportError::MissingField(field.to_string()))
+}
+
+fn required_array<'a>(json: &'a Value, field: &str) -> Result<&'a [Value], ImportError> {
+    required_field(json, field)?
+        .as_array()
+        .map(Vec::as_slice)
+        .ok_or_else(|| ImportError::MissingField(field.to_string()))
+}
+
+fn parse_global_comm(json: &Value) -> Result<GlobalType, ImportError> {
+    let sender = required_str(json, "sender")?;
+    let receiver = required_str(json, "receiver")?;
+    let branches = parse_global_branches(required_array(json, "branches")?)?;
+    Ok(GlobalType::Comm {
+        sender,
+        receiver,
+        branches,
+    })
+}
+
+fn parse_global_branches(branches: &[Value]) -> Result<Vec<(Label, GlobalType)>, ImportError> {
+    let mut parsed = Vec::with_capacity(branches.len());
+    for branch in branches {
+        let label = parse_label(
+            branch
+                .get("label")
+                .ok_or_else(|| ImportError::MissingField("label in branch".to_string()))?,
+        )?;
+        let cont = json_to_global(branch.get("continuation").ok_or_else(|| {
+            ImportError::MissingField("continuation in branch".to_string())
+        })?)?;
+        parsed.push((label, cont));
+    }
+    Ok(parsed)
+}
+
+fn parse_global_rec(json: &Value) -> Result<GlobalType, ImportError> {
+    let var = required_str(json, "var")?;
+    let body = json_to_global(required_field(json, "body")?)?;
+    Ok(GlobalType::mu(var, body))
+}
+
+fn parse_global_var(json: &Value) -> Result<GlobalType, ImportError> {
+    Ok(GlobalType::var(required_str(json, "name")?))
+}
+
 /// Parse JSON into a GlobalType.
 ///
 /// # Example
@@ -49,71 +105,51 @@ pub fn json_to_global(json: &Value) -> Result<GlobalType, ImportError> {
 
     match kind {
         "end" => Ok(GlobalType::End),
-
-        "comm" => {
-            let sender = json
-                .get("sender")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| ImportError::MissingField("sender".to_string()))?
-                .to_string();
-
-            let receiver = json
-                .get("receiver")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| ImportError::MissingField("receiver".to_string()))?
-                .to_string();
-
-            let branches_json = json
-                .get("branches")
-                .and_then(|v| v.as_array())
-                .ok_or_else(|| ImportError::MissingField("branches".to_string()))?;
-
-            let mut branches = Vec::new();
-            for branch in branches_json {
-                let label =
-                    parse_label(branch.get("label").ok_or_else(|| {
-                        ImportError::MissingField("label in branch".to_string())
-                    })?)?;
-                let cont = json_to_global(branch.get("continuation").ok_or_else(|| {
-                    ImportError::MissingField("continuation in branch".to_string())
-                })?)?;
-                branches.push((label, cont));
-            }
-
-            Ok(GlobalType::Comm {
-                sender,
-                receiver,
-                branches,
-            })
-        }
-
-        "rec" => {
-            let var = json
-                .get("var")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| ImportError::MissingField("var".to_string()))?
-                .to_string();
-
-            let body = json_to_global(
-                json.get("body")
-                    .ok_or_else(|| ImportError::MissingField("body".to_string()))?,
-            )?;
-
-            Ok(GlobalType::mu(var, body))
-        }
-
-        "var" => {
-            let name = json
-                .get("name")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| ImportError::MissingField("name".to_string()))?
-                .to_string();
-
-            Ok(GlobalType::var(name))
-        }
-
+        "comm" => parse_global_comm(json),
+        "rec" => parse_global_rec(json),
+        "var" => parse_global_var(json),
         other => Err(ImportError::InvalidKind(other.to_string())),
     }
+}
+
+fn parse_local_branches(
+    branches: &[Value],
+) -> Result<Vec<(Label, Option<ValType>, LocalTypeR)>, ImportError> {
+    let mut parsed = Vec::with_capacity(branches.len());
+    for branch in branches {
+        let label = parse_label(
+            branch
+                .get("label")
+                .ok_or_else(|| ImportError::MissingField("label in branch".to_string()))?,
+        )?;
+        let cont = json_to_local(branch.get("continuation").ok_or_else(|| {
+            ImportError::MissingField("continuation in branch".to_string())
+        })?)?;
+        parsed.push((label, None, cont));
+    }
+    Ok(parsed)
+}
+
+fn parse_local_send(json: &Value) -> Result<LocalTypeR, ImportError> {
+    let partner = required_str(json, "partner")?;
+    let branches = parse_local_branches(required_array(json, "branches")?)?;
+    Ok(LocalTypeR::Send { partner, branches })
+}
+
+fn parse_local_recv(json: &Value) -> Result<LocalTypeR, ImportError> {
+    let partner = required_str(json, "partner")?;
+    let branches = parse_local_branches(required_array(json, "branches")?)?;
+    Ok(LocalTypeR::Recv { partner, branches })
+}
+
+fn parse_local_rec(json: &Value) -> Result<LocalTypeR, ImportError> {
+    let var = required_str(json, "var")?;
+    let body = json_to_local(required_field(json, "body")?)?;
+    Ok(LocalTypeR::mu(var, body))
+}
+
+fn parse_local_var(json: &Value) -> Result<LocalTypeR, ImportError> {
+    Ok(LocalTypeR::var(required_str(json, "name")?))
 }
 
 /// Parse JSON into a LocalTypeR.
@@ -136,86 +172,10 @@ pub fn json_to_local(json: &Value) -> Result<LocalTypeR, ImportError> {
 
     match kind {
         "end" => Ok(LocalTypeR::End),
-
-        "send" => {
-            let partner = json
-                .get("partner")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| ImportError::MissingField("partner".to_string()))?
-                .to_string();
-
-            let branches_json = json
-                .get("branches")
-                .and_then(|v| v.as_array())
-                .ok_or_else(|| ImportError::MissingField("branches".to_string()))?;
-
-            let mut branches = Vec::new();
-            for branch in branches_json {
-                let label =
-                    parse_label(branch.get("label").ok_or_else(|| {
-                        ImportError::MissingField("label in branch".to_string())
-                    })?)?;
-                let cont = json_to_local(branch.get("continuation").ok_or_else(|| {
-                    ImportError::MissingField("continuation in branch".to_string())
-                })?)?;
-                branches.push((label, None, cont));
-            }
-
-            Ok(LocalTypeR::Send { partner, branches })
-        }
-
-        "recv" => {
-            let partner = json
-                .get("partner")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| ImportError::MissingField("partner".to_string()))?
-                .to_string();
-
-            let branches_json = json
-                .get("branches")
-                .and_then(|v| v.as_array())
-                .ok_or_else(|| ImportError::MissingField("branches".to_string()))?;
-
-            let mut branches = Vec::new();
-            for branch in branches_json {
-                let label =
-                    parse_label(branch.get("label").ok_or_else(|| {
-                        ImportError::MissingField("label in branch".to_string())
-                    })?)?;
-                let cont = json_to_local(branch.get("continuation").ok_or_else(|| {
-                    ImportError::MissingField("continuation in branch".to_string())
-                })?)?;
-                branches.push((label, None, cont));
-            }
-
-            Ok(LocalTypeR::Recv { partner, branches })
-        }
-
-        "rec" => {
-            let var = json
-                .get("var")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| ImportError::MissingField("var".to_string()))?
-                .to_string();
-
-            let body = json_to_local(
-                json.get("body")
-                    .ok_or_else(|| ImportError::MissingField("body".to_string()))?,
-            )?;
-
-            Ok(LocalTypeR::mu(var, body))
-        }
-
-        "var" => {
-            let name = json
-                .get("name")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| ImportError::MissingField("name".to_string()))?
-                .to_string();
-
-            Ok(LocalTypeR::var(name))
-        }
-
+        "send" => parse_local_send(json),
+        "recv" => parse_local_recv(json),
+        "rec" => parse_local_rec(json),
+        "var" => parse_local_var(json),
         other => Err(ImportError::InvalidKind(other.to_string())),
     }
 }

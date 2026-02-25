@@ -56,7 +56,12 @@ pub fn obs_session(ev: &ObsEvent) -> Option<SessionId> {
 #[must_use]
 pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
     let mut out = ev.clone();
-    match &mut out {
+    set_obs_event_tick(&mut out, tick);
+    out
+}
+
+fn set_obs_event_tick(out: &mut ObsEvent, tick: u64) {
+    match out {
         ObsEvent::Sent {
             tick: event_tick, ..
         }
@@ -115,7 +120,6 @@ pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
             tick: event_tick, ..
         } => *event_tick = tick,
     }
-    out
 }
 
 /// Normalize a trace by assigning session-local ticks.

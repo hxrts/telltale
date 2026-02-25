@@ -18,7 +18,7 @@
 //! - `Extension`: No theory equivalent
 //! - `LocalChoice`: DSL-only feature for local decisions
 
-use super::{Branch, Choreography, LocalType, MessageType, Protocol};
+use super::{Branch, Choreography, LocalType, MessageType, NonEmptyVec, Protocol};
 use telltale_types::{GlobalType as GlobalTypeCore, Label, LocalTypeR, PayloadSort};
 use thiserror::Error;
 
@@ -96,38 +96,13 @@ pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCor
             message,
             continuation,
             ..
-        } => {
-            let cont_global = protocol_to_global(continuation)?;
-            let label = message_to_label(message);
-            Ok(GlobalTypeCore::send(
-                from.name().to_string(),
-                to.name().to_string(),
-                label,
-                cont_global,
-            ))
-        }
+        } => convert_protocol_send(from, to, message, continuation),
 
         Protocol::Choice {
             role: decider,
             branches,
             ..
-        } => {
-            // Extract receiver from first branch (all branches must have same receiver)
-            let first_receiver = extract_receiver(&branches[0], decider)?;
-
-            // Convert all branches
-            let mut global_branches = Vec::with_capacity(branches.len());
-            for branch in branches {
-                let (label, cont) = convert_choice_branch(branch, decider, &first_receiver)?;
-                global_branches.push((label, cont));
-            }
-
-            Ok(GlobalTypeCore::comm(
-                decider.name().to_string(),
-                first_receiver,
-                global_branches,
-            ))
-        }
+        } => convert_protocol_choice(decider, branches),
 
         Protocol::Broadcast { .. } => Err(ConversionError::UnsupportedFeature {
             feature: "Broadcast".to_string(),
@@ -149,6 +124,39 @@ pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCor
             hint: "Protocol extensions have no theory equivalent".to_string(),
         }),
     }
+}
+
+fn convert_protocol_send(
+    from: &super::Role,
+    to: &super::Role,
+    message: &MessageType,
+    continuation: &Protocol,
+) -> ConversionResult<GlobalTypeCore> {
+    let cont_global = protocol_to_global(continuation)?;
+    let label = message_to_label(message);
+    Ok(GlobalTypeCore::send(
+        from.name().to_string(),
+        to.name().to_string(),
+        label,
+        cont_global,
+    ))
+}
+
+fn convert_protocol_choice(
+    decider: &super::Role,
+    branches: &NonEmptyVec<Branch>,
+) -> ConversionResult<GlobalTypeCore> {
+    let first_receiver = extract_receiver(&branches[0], decider)?;
+    let mut global_branches = Vec::with_capacity(branches.len());
+    for branch in branches {
+        let (label, cont) = convert_choice_branch(branch, decider, &first_receiver)?;
+        global_branches.push((label, cont));
+    }
+    Ok(GlobalTypeCore::comm(
+        decider.name().to_string(),
+        first_receiver,
+        global_branches,
+    ))
 }
 
 /// Extract the receiver from a choice branch's initial Send.
@@ -244,73 +252,17 @@ pub fn local_to_local_r(local: &LocalType) -> ConversionResult<LocalTypeR> {
             to,
             message,
             continuation,
-        } => {
-            let cont_r = local_to_local_r(continuation)?;
-            let label = message_to_label(message);
-            Ok(LocalTypeR::send(to.name().to_string(), label, cont_r))
-        }
+        } => convert_local_send(to, message, continuation),
 
         LocalType::Receive {
             from,
             message,
             continuation,
-        } => {
-            let cont_r = local_to_local_r(continuation)?;
-            let label = message_to_label(message);
-            Ok(LocalTypeR::recv(from.name().to_string(), label, cont_r))
-        }
+        } => convert_local_receive(from, message, continuation),
 
-        LocalType::Select { to, branches } => {
-            let mut r_branches = Vec::with_capacity(branches.len());
-            for (ident, cont) in branches {
-                // Flatten nested Send that duplicates the choice label
-                // DSL produces: Select { Accept -> Send(Accept, End) }
-                // Theory expects: Send { (Accept, End) }
-                let cont_r = match cont {
-                    // If continuation is a Send to same partner with matching label, flatten it
-                    LocalType::Send {
-                        to: send_to,
-                        message,
-                        continuation,
-                    } if send_to.name() == to.name() && message.name == *ident => {
-                        local_to_local_r(continuation)?
-                    }
-                    _ => local_to_local_r(cont)?,
-                };
-                let label = Label::new(ident.to_string());
-                r_branches.push((label, None, cont_r));
-            }
-            Ok(LocalTypeR::Send {
-                partner: to.name().to_string(),
-                branches: r_branches,
-            })
-        }
+        LocalType::Select { to, branches } => convert_local_select(to, branches),
 
-        LocalType::Branch { from, branches } => {
-            let mut r_branches = Vec::with_capacity(branches.len());
-            for (ident, cont) in branches {
-                // Flatten nested Receive that duplicates the choice label
-                // DSL produces: Branch { Accept -> Recv(Accept, End) }
-                // Theory expects: Recv { (Accept, End) }
-                let cont_r = match cont {
-                    // If continuation is a Receive from same partner with matching label, flatten it
-                    LocalType::Receive {
-                        from: recv_from,
-                        message,
-                        continuation,
-                    } if recv_from.name() == from.name() && message.name == *ident => {
-                        local_to_local_r(continuation)?
-                    }
-                    _ => local_to_local_r(cont)?,
-                };
-                let label = Label::new(ident.to_string());
-                r_branches.push((label, None, cont_r));
-            }
-            Ok(LocalTypeR::Recv {
-                partner: from.name().to_string(),
-                branches: r_branches,
-            })
-        }
+        LocalType::Branch { from, branches } => convert_local_branch(from, branches),
 
         LocalType::Rec { label, body } => {
             let body_r = local_to_local_r(body)?;
@@ -333,6 +285,80 @@ pub fn local_to_local_r(local: &LocalType) -> ConversionResult<LocalTypeR> {
             hint: "Timeout is a DSL extension with no theory equivalent".to_string(),
         }),
     }
+}
+
+fn convert_local_send(
+    to: &super::Role,
+    message: &MessageType,
+    continuation: &LocalType,
+) -> ConversionResult<LocalTypeR> {
+    let cont_r = local_to_local_r(continuation)?;
+    let label = message_to_label(message);
+    Ok(LocalTypeR::send(to.name().to_string(), label, cont_r))
+}
+
+fn convert_local_receive(
+    from: &super::Role,
+    message: &MessageType,
+    continuation: &LocalType,
+) -> ConversionResult<LocalTypeR> {
+    let cont_r = local_to_local_r(continuation)?;
+    let label = message_to_label(message);
+    Ok(LocalTypeR::recv(from.name().to_string(), label, cont_r))
+}
+
+fn convert_local_select(
+    to: &super::Role,
+    branches: &[(proc_macro2::Ident, LocalType)],
+) -> ConversionResult<LocalTypeR> {
+    let mut r_branches = Vec::with_capacity(branches.len());
+    for (ident, cont) in branches {
+        // Flatten nested Send that duplicates the choice label
+        // DSL produces: Select { Accept -> Send(Accept, End) }
+        // Theory expects: Send { (Accept, End) }
+        let cont_r = match cont {
+            LocalType::Send {
+                to: send_to,
+                message,
+                continuation,
+            } if send_to.name() == to.name() && message.name == *ident => {
+                local_to_local_r(continuation)?
+            }
+            _ => local_to_local_r(cont)?,
+        };
+        r_branches.push((Label::new(ident.to_string()), None, cont_r));
+    }
+    Ok(LocalTypeR::Send {
+        partner: to.name().to_string(),
+        branches: r_branches,
+    })
+}
+
+fn convert_local_branch(
+    from: &super::Role,
+    branches: &[(proc_macro2::Ident, LocalType)],
+) -> ConversionResult<LocalTypeR> {
+    let mut r_branches = Vec::with_capacity(branches.len());
+    for (ident, cont) in branches {
+        // Flatten nested Receive that duplicates the choice label
+        // DSL produces: Branch { Accept -> Recv(Accept, End) }
+        // Theory expects: Recv { (Accept, End) }
+        let cont_r = match cont {
+            LocalType::Receive {
+                from: recv_from,
+                message,
+                continuation,
+            } if recv_from.name() == from.name() && message.name == *ident => {
+                local_to_local_r(continuation)?
+            }
+            _ => local_to_local_r(cont)?,
+        };
+        r_branches.push((Label::new(ident.to_string()), None, cont_r));
+    }
+    Ok(LocalTypeR::Recv {
+        partner: from.name().to_string(),
+        branches: r_branches,
+    })
 }
 
 // ============================================================================

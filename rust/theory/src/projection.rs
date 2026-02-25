@@ -45,7 +45,7 @@
 use crate::limits::{CacheEntries, DEFAULT_PROJECTOR_CACHE_ENTRIES};
 use crate::merge::{merge_all, MergeError};
 use telltale_types::content_store::{CacheMetrics, KeyedContentStore};
-use telltale_types::{GlobalType, LocalTypeR};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 use thiserror::Error;
 
 /// Errors that can occur during projection
@@ -74,6 +74,32 @@ pub enum ProjectionError {
 
 /// Result type for projection operations
 pub type ProjectionResult = Result<LocalTypeR, ProjectionError>;
+
+fn project_branches_for_role(
+    branches: &[(Label, GlobalType)],
+    role: &str,
+) -> Result<Vec<(Label, Option<telltale_types::ValType>, LocalTypeR)>, ProjectionError> {
+    let mut local_branches = Vec::with_capacity(branches.len());
+    for (label, cont) in branches {
+        let local_cont = project(cont, role)?;
+        local_branches.push((label.clone(), None, local_cont));
+    }
+    Ok(local_branches)
+}
+
+fn project_non_participant(
+    branches: &[(Label, GlobalType)],
+    role: &str,
+) -> Result<LocalTypeR, ProjectionError> {
+    let mut projections = Vec::with_capacity(branches.len());
+    for (_label, cont) in branches {
+        projections.push(project(cont, role)?);
+    }
+    merge_all(&projections).map_err(|e| ProjectionError::MergeFailure {
+        role: role.to_string(),
+        source: e,
+    })
+}
 
 /// Project a global type onto a specific role.
 ///
@@ -115,39 +141,21 @@ pub fn project(global: &GlobalType, role: &str) -> ProjectionResult {
 
             if role == sender {
                 // Sender sees internal choice (send)
-                let mut local_branches = Vec::with_capacity(branches.len());
-                for (label, cont) in branches {
-                    let local_cont = project(cont, role)?;
-                    local_branches.push((label.clone(), None, local_cont));
-                }
-
+                let local_branches = project_branches_for_role(branches, role)?;
                 Ok(LocalTypeR::Send {
                     partner: receiver.clone(),
                     branches: local_branches,
                 })
             } else if role == receiver {
                 // Receiver sees external choice (recv)
-                let mut local_branches = Vec::with_capacity(branches.len());
-                for (label, cont) in branches {
-                    let local_cont = project(cont, role)?;
-                    local_branches.push((label.clone(), None, local_cont));
-                }
-
+                let local_branches = project_branches_for_role(branches, role)?;
                 Ok(LocalTypeR::Recv {
                     partner: sender.clone(),
                     branches: local_branches,
                 })
             } else {
                 // Non-participant: merge all branch projections
-                let mut projections = Vec::with_capacity(branches.len());
-                for (_, cont) in branches {
-                    projections.push(project(cont, role)?);
-                }
-
-                merge_all(&projections).map_err(|e| ProjectionError::MergeFailure {
-                    role: role.to_string(),
-                    source: e,
-                })
+                project_non_participant(branches, role)
             }
         }
 
