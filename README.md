@@ -1,6 +1,6 @@
 # Telltale
 
-This repo contains three related projects. A functional Rust library for writing composable multiparty session-typed choreographies. It includes a extensible Lean proof system. And a paper + artifact supplement for a three-paper MPST series detailing theoretical contributions.
+This repo contains three related projects. A functional Rust library for writing composable multiparty session-typed choreographies, an extensible Lean proof system, and a three-paper series describing MPST theoretical contributions.
 
 ## For Reviewers
 
