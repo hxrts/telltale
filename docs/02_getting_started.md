@@ -6,8 +6,8 @@ Add Telltale to your project dependencies.
 
 ```toml
 [dependencies]
-telltale = "0.9.1"
-telltale-choreography = "0.9.1"
+telltale = "0.1.0"
+telltale-choreography = "0.1.0"
 ```
 
 This adds the facade crate and the choreographic programming layer. Pinning versions keeps builds reproducible.

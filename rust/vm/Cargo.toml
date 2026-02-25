@@ -1,6 +1,6 @@
 [package]
 name = "telltale-vm"
-version = "0.9.1"
+version = "1.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
 rust-version = "1.75"
@@ -20,8 +20,8 @@ wasm = ["getrandom/js"]
 multi-thread = ["rayon"]
 
 [dependencies]
-telltale-types = { path = "../types", version = "0.9.1" }
-telltale-theory = { path = "../theory", version = "0.9.1" }
+telltale-types = { path = "../types", version = "1.0.0" }
+telltale-theory = { path = "../theory", version = "1.0.0" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -33,8 +33,8 @@ getrandom = { workspace = true, features = ["js"] }
 wasm-bindgen = { workspace = true }
 
 [dev-dependencies]
-telltale-theory = { path = "../theory", version = "0.9.1" }
-telltale-lean-bridge = { path = "../lean-bridge", version = "0.9.1" }
+telltale-theory = { path = "../theory", version = "1.0.0" }
+telltale-lean-bridge = { path = "../lean-bridge", version = "1.0.0" }
 assert_matches = { workspace = true }
 wasm-bindgen-test = "0.3"
 criterion = { workspace = true }

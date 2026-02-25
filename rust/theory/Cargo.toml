@@ -1,6 +1,6 @@
 [package]
 name = "telltale-theory"
-version = "0.9.1"
+version = "1.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
 rust-version = "1.75"
@@ -15,13 +15,13 @@ categories = ["algorithms"]
 bench = false
 
 [dependencies]
-telltale-types = { path = "../types", version = "0.9.1" }
+telltale-types = { path = "../types", version = "1.0.0" }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
 assert_matches = { workspace = true }
-telltale-lean-bridge = { path = "../lean-bridge", version = "0.9.1" }
+telltale-lean-bridge = { path = "../lean-bridge", version = "1.0.0" }
 criterion = { workspace = true }
 
 [features]
