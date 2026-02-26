@@ -26,24 +26,6 @@ The Lean 4 formalization spans approximately 620 files and 126,000 lines. It cov
 
 The `telltale-lean-bridge` crate provides JSON export and import for cross-validation between Rust and Lean. See [Lean Verification](23_lean_verification.md) for the verification pipeline.
 
-## Documentation Classification
-
-Documents are classified by purpose.
-
-| Type | Purpose |
-|---|---|
-| Guide | Workflow-oriented and task-oriented |
-| Reference | Runtime or API contract surfaces |
-| Concept | Theory, framing, or context |
-
-Normative status indicates contract scope.
-
-| Status | Meaning |
-|---|---|
-| Normative | Defines behavior contracts |
-| Informative | Explains usage without guarantees |
-| Mixed | Contains both; read section-by-section |
-
 ## Document Index
 
 | Document | Type | Status |
