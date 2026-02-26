@@ -79,23 +79,19 @@ Normative status indicates contract scope.
 | [API Reference](30_api_reference.md) | Reference | Informative |
 | [Glossary and Notation Index](31_glossary_notation.md) | Reference | Informative |
 
-## Reading Paths
+## Paths by Role
 
-### Library User
+### Library Users
 
 Start with [Getting Started](02_getting_started.md), then [Choreographic DSL](06_choreographic_dsl.md). Continue with [Examples](28_examples.md) and [API Reference](30_api_reference.md).
 
-### VM Integrator
+### VM Integrators
 
 Start with [Architecture](03_architecture.md), then [Effect Handlers and Session Types](11_effect_session_bridge.md), then [VM Architecture](12_vm_architecture.md). Continue with [Bytecode Instructions](13_bytecode_instructions.md), [Session Lifecycle](14_session_lifecycle.md), and [VM Simulation](15_vm_simulation_overview.md).
 
-### Lean and Proof Reader
+### Paper Reviewers
 
-Start with [Theory](05_theory.md), then [Lean Verification](23_lean_verification.md), then [Lean-Rust Bridge](24_lean_rust_bridge.md). Continue with [Capability and Admission](25_capability_admission.md), [Theorem Program](26_theorem_program.md), and [Distributed and Classical Families](27_distributed_classical_families.md).
-
-### Paper Reviewer
-
-Start with [Architecture](03_architecture.md) and [Theory](05_theory.md). Then read [Theorem Program](26_theorem_program.md) and [Glossary and Notation Index](31_glossary_notation.md).
+Start with [Architecture](03_architecture.md) and [Theory](05_theory.md), then [Lean Verification](23_lean_verification.md), and [Lean-Rust Bridge](24_lean_rust_bridge.md). Continue with [Capability and Admission](25_capability_admission.md), [Theorem Program](26_theorem_program.md), [Distributed and Classical Families](27_distributed_classical_families.md), and [Glossary and Notation Index](31_glossary_notation.md).
 
 ## Further Reading
 
