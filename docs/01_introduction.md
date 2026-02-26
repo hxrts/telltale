@@ -1,6 +1,6 @@
 # Introduction
 
-Telltale is a Rust framework for choreographic programming with multiparty session types. It enables writing distributed protocols from a global perspective with automatic projection to local implementations. The Lean 4 formalization provides mechanized proofs of preservation, progress, coherence, and harmony.
+[Telltale](https://github.com/hxrts/telltale) is a Rust framework for choreographic programming with multiparty session types. It enables writing distributed protocols from a global perspective with automatic projection to local implementations. The Lean 4 formalization provides mechanized proofs of preservation, progress, coherence, and harmony.
 
 The framework includes a bytecode VM with deterministic scheduling and configurable buffer backpressure policies. Asynchronous subtyping uses SISO decomposition with orphan-free deadlock checks. Endpoint transfer semantics support ownership handoff at runtime with progress token migration. Content addressing assigns cryptographic identities to protocol artifacts. The same choreography compiles to native and WASM targets.
 
