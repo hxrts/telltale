@@ -1,108 +1,106 @@
-# Background
+# Introduction
 
-This document introduces the theory behind Telltale. It covers multiparty session types, choreographic programming, and algebraic effects. These concepts explain how the system enforces type-safe distributed programming.
-See [Documentation Map](00_docs_map.md) for role-based reading paths and document classification.
+Telltale is a Rust framework for choreographic programming with multiparty session types. It enables writing distributed protocols from a global perspective with automatic projection to local implementations. The Lean 4 formalization provides mechanized proofs of preservation, progress, coherence, and harmony.
 
-## Session Types
+The framework includes a bytecode VM with deterministic scheduling and configurable buffer backpressure policies. Asynchronous subtyping uses SISO decomposition with orphan-free deadlock checks. Endpoint transfer semantics support ownership handoff at runtime with progress token migration. Content addressing assigns cryptographic identities to protocol artifacts. The same choreography compiles to native and WASM targets.
 
-Session types encode communication protocols as types. They specify the sequence and structure of messages exchanged between processes. A session type is a contract for communication. The compiler checks that implementations follow this contract.
+## Core Concepts
 
-Traditional type systems ensure data safety. They prevent type errors like passing a string where an integer is expected. Session types extend this to communication safety. They prevent protocol errors like sending when you should receive or terminating when more messages are expected.
+Session types encode communication protocols as types. A type like `!String.?Int.end` specifies: send a string, receive an integer, close the channel. The compiler checks that implementations follow the protocol contract.
 
-A session type describes a communication channel from one endpoint's perspective. The type `!String.?Int.end` means send a string, then receive an integer, then close the channel. The dual type `?String.!Int.end` means receive a string, then send an integer, then close.
+Multiparty session types extend this to protocols with three or more participants. Global types describe the full protocol. Projection transforms global types into local types for each participant. The type system tracks dependencies between participants to prevent deadlocks.
 
-These types are complementary and ensure the endpoints coordinate correctly.
+Choreographic programming builds on global types. A choreography describes computations and message flow from a neutral perspective. Endpoint projection generates the local implementation for each role.
 
-## Multiparty Session Types (MPST)
+## Effect Handlers
 
-Multiparty session types extend binary session types to protocols with three or more participants. Session types handle point-to-point channels. MPST handles protocols where multiple parties interact. The type system ensures all interactions remain synchronized.
+Communication operations are algebraic effects. Sending and receiving messages are abstract operations that handlers implement concretely. Programs specify what to communicate. Handlers determine how: in-memory channels for testing, TCP for deployment. The protocol logic remains unchanged across execution strategies.
 
-MPST introduces challenges beyond binary sessions. Participants must agree on the overall protocol flow. Messages between two participants affect what other participants can do next. The type system tracks these dependencies to prevent global deadlocks.
+## Bytecode VM
 
-In MPST, each participant has a local view that includes all partners. The customer type shows communication with both merchant and bank. The system ensures all views are compatible. For a deeper discussion of MPST theory, see [A Very Gentle Introduction to Multiparty Session Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf).
+The VM compiles local types to bytecode instructions. It manages scheduling, message buffers, and session lifecycle. The concurrency parameter N controls how many coroutines advance per round. Per-session traces are invariant over N.
 
-Advanced optimizations through asynchronous subtyping are covered in [Precise Subtyping for Asynchronous Multiparty Sessions](http://mrg.doc.ic.ac.uk/publications/precise-subtyping-for-asynchronous-multiparty-sessions/main.pdf). [Mechanised Subject Reduction for Multiparty Asynchronous Session Types](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.31) includes a mechanized Coq proof that adds a well-typed condition that fixes the original MPST formulation by Honda et al. The type theory in this crate draws from this revised formulation.
+## Lean Verification
 
-## Global Types and Projection
+The Lean 4 formalization spans approximately 620 files and 126,000 lines. It covers global types, local types, projection, and operational semantics. Deadlock-freedom claims are assumption-scoped with explicit premises for well-typedness, progress reachability, and fair scheduling.
 
-Global types describe protocols from a neutral perspective. They specify all interactions between all participants. Local types describe the protocol from one participant's viewpoint. Projection transforms global types into local types for each participant.
+The `telltale-lean-bridge` crate provides JSON export and import for cross-validation between Rust and Lean. See [Lean Verification](23_lean_verification.md) for the verification pipeline.
 
-```
-G = Alice -> Bob: Int.
-    Bob -> Alice: {Sum: Int, Product: Int}
-```
+## Documentation Classification
 
-This global type projects to different local types. Alice gets `Bob!Int.Bob&{Sum: Int, Product: Int}`. Bob gets `Alice?Int.Alice⊕{Sum: Int, Product: Int}`. Each participant sees only their part of the protocol.
+Documents are classified by purpose.
 
-The projection algorithm ensures the local types are compatible. Deadlock-freedom claims in this project are assumption-scoped and theorem-specific. Typical premises include well-typedness, progress reachability, and fairness scheduling assumptions. Under those premises, participants complete without protocol communication errors.
+| Type | Purpose |
+|---|---|
+| Guide | Workflow-oriented and task-oriented |
+| Reference | Runtime or API contract surfaces |
+| Concept | Theory, framing, or context |
 
-## Formal Verification
+Normative status indicates contract scope.
 
-Telltale includes a Lean 4 formalization that verifies the core type system. The formalization covers global types, local types, projection, and operational semantics. It proves preservation, progress, coherence, and harmony under explicit assumptions.
+| Status | Meaning |
+|---|---|
+| Normative | Defines behavior contracts |
+| Informative | Explains usage without guarantees |
+| Mixed | Contains both; read section-by-section |
 
-Deadlock-freedom claims are assumption-scoped. Typical premises include well-typedness, progress reachability, and fair scheduling. The Lean development separates structural well-formedness from progress predicates. This makes theorem statements precise about what conditions are required.
+## Document Index
 
-Core constructors in `telltale-types` align with the Lean definitions. Lean currently includes a `delegate` global constructor that Rust does not yet expose. The `telltale-lean-bridge` crate provides JSON export and import for cross-validation. See [Lean Verification Code Map](../lean/CODE_MAP.md) for details on the Lean codebase.
+| Document | Type | Status |
+|---|---|---|
+| [Getting Started](02_getting_started.md) | Guide | Informative |
+| [Architecture](03_architecture.md) | Concept | Mixed |
+| [Crate Organization](04_crate_organization.md) | Reference | Informative |
+| [Theory](05_theory.md) | Concept | Informative |
+| [Choreographic DSL](06_choreographic_dsl.md) | Guide | Mixed |
+| [Choreographic Projection Patterns](07_projection.md) | Reference | Mixed |
+| [DSL Extensions](08_extensions.md) | Guide | Mixed |
+| [Choreography Effect Handlers](09_effect_handlers.md) | Guide | Mixed |
+| [Using Telltale Handlers](10_telltale_handler.md) | Guide | Informative |
+| [Effect Handlers and Session Types](11_effect_session_bridge.md) | Reference | Normative |
+| [VM Architecture](12_vm_architecture.md) | Reference | Normative |
+| [Bytecode Instructions](13_bytecode_instructions.md) | Reference | Normative |
+| [Session Lifecycle](14_session_lifecycle.md) | Reference | Normative |
+| [VM Simulation](15_vm_simulation_overview.md) | Guide | Mixed |
+| [VM Simulation Runner](16_vm_simulation_runner.md) | Reference | Normative |
+| [VM Simulation Scenarios](17_vm_simulation_scenarios.md) | Guide | Mixed |
+| [VM Simulation Materials](18_vm_simulation_materials.md) | Reference | Informative |
+| [VM Parity](19_vm_parity.md) | Reference | Normative |
+| [Content Addressing](20_content_addressing.md) | Reference | Mixed |
+| [Resource Heap](21_resource_heap.md) | Reference | Mixed |
+| [Topology](22_topology.md) | Guide | Mixed |
+| [Lean Verification](23_lean_verification.md) | Reference | Mixed |
+| [Lean-Rust Bridge](24_lean_rust_bridge.md) | Reference | Normative |
+| [Capability and Admission](25_capability_admission.md) | Reference | Normative |
+| [Theorem Program](26_theorem_program.md) | Concept | Mixed |
+| [Distributed and Classical Families](27_distributed_classical_families.md) | Reference | Mixed |
+| [Examples](28_examples.md) | Guide | Informative |
+| [WASM Guide](29_wasm_guide.md) | Guide | Informative |
+| [API Reference](30_api_reference.md) | Reference | Informative |
+| [Glossary and Notation Index](31_glossary_notation.md) | Reference | Informative |
 
-## Choreographic Programming
+## Reading Paths
 
-Choreographic programming builds on global types. It lets you write program logic from a global perspective. The choreography describes computations and data flow between participants. Endpoint projection generates local implementations for each participant.
+### Library User
 
-```rust
-choreography!(r#"
-protocol Calculator =
-  roles Alice, Bob
-  Alice -> Bob : Value
-  Bob -> Alice : Result
-"#);
-```
+Start with [Getting Started](02_getting_started.md), then [Choreographic DSL](06_choreographic_dsl.md). Continue with [Examples](28_examples.md) and [API Reference](30_api_reference.md).
 
-This example defines a two-role protocol in the DSL. The compiler projects this to per-role local code.
+### VM Integrator
 
-This choreography specifies the communication protocol. The system projects it into separate programs for Alice and Bob. Alice's program sends a value and receives a result. Bob's program receives a value and sends back a result.
+Start with [Architecture](03_architecture.md), then [Effect Handlers and Session Types](11_effect_session_bridge.md), then [VM Architecture](12_vm_architecture.md). Continue with [Bytecode Instructions](13_bytecode_instructions.md), [Session Lifecycle](14_session_lifecycle.md), and [VM Simulation](15_vm_simulation_overview.md).
 
-Choreographic programming eliminates the need to manually coordinate distributed implementations. The global specification ensures all participants agree on the protocol. Type checking at the choreographic level prevents distributed system errors.
+### Lean and Proof Reader
 
-A good place to start learning more about choreographic programming is [Introduction to Choreographies](https://www.fabriziomontesi.com/files/m13_choreographies_behaviorally.pdf). For the integration with multiparty session types, see [Applied Choreographies](https://arxiv.org/pdf/2209.01886.pdf).
+Start with [Theory](05_theory.md), then [Lean Verification](23_lean_verification.md), then [Lean-Rust Bridge](24_lean_rust_bridge.md). Continue with [Capability and Admission](25_capability_admission.md), [Theorem Program](26_theorem_program.md), and [Distributed and Classical Families](27_distributed_classical_families.md).
 
-## Algebraic Effects
+### Paper Reviewer
 
-Algebraic effects separate what a program does from how it does it. The effect algebra defines a set of abstract operations that a program can perform. Handlers provide concrete implementations of these operations. This separation allows the same program to run with different implementations.
-
-In Telltale, communication operations are effects. Sending and receiving messages are abstract operations. Different handlers implement these operations differently.
-
-An in-memory handler passes messages through local channels. A network handler sends messages over TCP or WebSocket connections.
-
-```rust
-let program = Program::new()
-    .send(Role::Bob, Message::Hello)
-    .recv::<Message>(Role::Bob)
-    .end();
-
-// Same program, different handlers
-interpret(&mut in_memory_handler, &mut endpoint, program).await;
-interpret(&mut network_handler, &mut endpoint, program).await;
-```
-
-The program specifies what messages to send and receive. The handler determines how this happens. This design enables testing with local handlers and deployment with network handlers. The protocol logic remains unchanged.
-
-## Integration in Telltale
-
-Telltale combines these concepts into a practical system. Choreographies define distributed protocols globally. The type system enforces protocol safety through MPST. Effect handlers provide flexible execution strategies.
-
-The choreography macro parses protocol definitions. It generates role and message types automatically. It also creates per-role session types through projection.
-
-The effect system decouples protocol logic from transport mechanisms. Handlers interpret send and receive operations. Middleware can add logging, retry logic, or fault injection.
-
-The same choreography works across different deployment scenarios. Content addressing assigns cryptographic identities to protocol artifacts. This supports memoization and structural sharing.
-
-A bytecode VM provides an alternative execution model. The VM compiles local types to bytecode instructions and manages scheduling, buffers, and session lifecycle. The concurrency parameter N controls how many coroutines advance per scheduling round. Per-session traces are invariant over N, enabling testing at high concurrency and deployment at lower concurrency.
-
-Topology configuration separates deployment concerns from protocol logic. Resource heaps provide explicit state management with nullifier-based consumption tracking. This integration provides both safety and flexibility through a type system that prevents protocol errors and an effect system that allows diverse implementations.
+Start with [Architecture](03_architecture.md) and [Theory](05_theory.md). Then read [Theorem Program](26_theorem_program.md) and [Glossary and Notation Index](31_glossary_notation.md).
 
 ## Further Reading
 
-See [Glossary and Notation Index](31_glossary_notation.md) for shared terminology and notation.
-See [Architecture](03_architecture.md) for system design details. See [Choreographic DSL](06_choreographic_dsl.md) for the choreography language. See [Choreography Effect Handlers](09_effect_handlers.md) for the choreography handler system.
+For MPST theory, see [A Very Gentle Introduction to Multiparty Session Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf). For asynchronous subtyping, see [Precise Subtyping for Asynchronous Multiparty Sessions](http://mrg.doc.ic.ac.uk/publications/precise-subtyping-for-asynchronous-multiparty-sessions/main.pdf).
 
-See [Content Addressing](20_content_addressing.md) for cryptographic protocol identities. See [Topology](22_topology.md) for deployment configuration. See [Resource Heap](21_resource_heap.md) for explicit state management. See [VM Architecture](12_vm_architecture.md) for the bytecode execution model.
+For choreographic programming, see [Introduction to Choreographies](https://www.fabriziomontesi.com/files/m13_choreographies_behaviorally.pdf). For integration with session types, see [Applied Choreographies](https://arxiv.org/pdf/2209.01886.pdf).
+
+See [Glossary and Notation Index](31_glossary_notation.md) for shared terminology.
