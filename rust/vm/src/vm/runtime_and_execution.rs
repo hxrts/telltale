@@ -1,4 +1,11 @@
 impl VM {
+    fn communication_replay_enabled(&self) -> bool {
+        !matches!(
+            self.config.communication_replay_mode,
+            CommunicationReplayMode::Off
+        )
+    }
+
     /// Create a VM instance from configuration.
     #[must_use]
     pub fn new(config: VMConfig) -> Self {
@@ -27,6 +34,10 @@ impl VM {
     }
 
     fn allocate_send_sequence(&mut self, edge: &Edge) -> u64 {
+        if !self.communication_replay_enabled() {
+            // Off mode preserves legacy behavior and avoids replay bookkeeping.
+            return 0;
+        }
         self.sync_communication_consumption_mode();
         self.communication_consumption.allocate_send_sequence(edge)
     }
@@ -35,6 +46,15 @@ impl VM {
         &mut self,
         identity: CommunicationIdentity,
     ) -> Result<CommunicationConsumeResult, CommunicationReplayError> {
+        if !self.communication_replay_enabled() {
+            // Off mode intentionally skips replay-consumption state and artifacts.
+            return Ok(CommunicationConsumeResult {
+                mode: CommunicationReplayMode::Off,
+                pre_root: self.communication_consumption.state().root(),
+                post_root: self.communication_consumption.state().root(),
+                consumed_nullifier: None,
+            });
+        }
         self.sync_communication_consumption_mode();
         let result = self.communication_consumption.consume_receive(&identity)?;
         self.communication_consumption_artifacts

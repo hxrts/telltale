@@ -140,7 +140,13 @@ fn step_send(
     let enqueue = match decision {
         SendDecision::Deliver(payload) => {
             let edge = Edge::new(prepared.sid, role.to_string(), prepared.partner.clone());
-            let sequence_no = {
+            let sequence_no = if matches!(
+                ctx.config.communication_replay_mode,
+                crate::communication_replay::CommunicationReplayMode::Off
+            ) {
+                // Off mode preserves legacy behavior and avoids replay bookkeeping.
+                0
+            } else {
                 let mut model = ctx
                     .communication_consumption
                     .lock()
@@ -297,44 +303,49 @@ fn step_recv(
     };
 
     // Deterministic ordering: signature verification (above), then replay-consumption.
-    let identity = CommunicationIdentity::from_payload(
-        &edge,
-        CommunicationStepKind::Receive,
-        &prepared.label,
-        &val,
-        sequence_no,
-    );
-    let consume = {
-        let mut model = ctx
-            .communication_consumption
-            .lock()
-            .expect("communication replay lock poisoned");
-        model.set_mode(ctx.config.communication_replay_mode);
-        model.consume_receive(&identity)
-    }
-    .map_err(|err| {
-        let tag = err.tag();
-        let message = match err {
-            CommunicationReplayError::SequenceMismatch { expected, actual } => {
-                format!("{tag}: expected={expected}, actual={actual}")
-            }
-            CommunicationReplayError::DuplicateIdentity { .. } => tag.to_string(),
-        };
-        Fault::VerificationFailed {
-            edge: edge.clone(),
-            message,
+    if !matches!(
+        ctx.config.communication_replay_mode,
+        crate::communication_replay::CommunicationReplayMode::Off
+    ) {
+        let identity = CommunicationIdentity::from_payload(
+            &edge,
+            CommunicationStepKind::Receive,
+            &prepared.label,
+            &val,
+            sequence_no,
+        );
+        let consume = {
+            let mut model = ctx
+                .communication_consumption
+                .lock()
+                .expect("communication replay lock poisoned");
+            model.set_mode(ctx.config.communication_replay_mode);
+            model.consume_receive(&identity)
         }
-    })?;
-    ctx.communication_consumption_artifacts
-        .lock()
-        .expect("communication artifact lock poisoned")
-        .push(CommunicationConsumptionArtifact {
-            tick: ctx.tick,
-            identity,
-            mode: consume.mode,
-            pre_root: consume.pre_root,
-            post_root: consume.post_root,
-        });
+        .map_err(|err| {
+            let tag = err.tag();
+            let message = match err {
+                CommunicationReplayError::SequenceMismatch { expected, actual } => {
+                    format!("{tag}: expected={expected}, actual={actual}")
+                }
+                CommunicationReplayError::DuplicateIdentity { .. } => tag.to_string(),
+            };
+            Fault::VerificationFailed {
+                edge: edge.clone(),
+                message,
+            }
+        })?;
+        ctx.communication_consumption_artifacts
+            .lock()
+            .expect("communication artifact lock poisoned")
+            .push(CommunicationConsumptionArtifact {
+                tick: ctx.tick,
+                identity,
+                mode: consume.mode,
+                pre_root: consume.pre_root,
+                post_root: consume.post_root,
+            });
+    }
 
     validate_payload(
         ctx.config,

@@ -237,12 +237,13 @@ fn composed_workload_scales_with_lane_count_proxy() {
 
 #[test]
 fn tier1_throughput_budget_stays_within_45_percent() {
+    const PROTOCOLS: usize = 256;
     const SAMPLES: usize = 5;
     const MIN_MEDIAN_RATIO: f64 = 0.55;
     let mut ratios = Vec::with_capacity(SAMPLES);
     for _ in 0..SAMPLES {
-        let single = run_stress(64, 1);
-        let multi = run_stress(64, 8);
+        let single = run_stress(PROTOCOLS, 1);
+        let multi = run_stress(PROTOCOLS, 8);
         assert!(
             single.throughput_events_per_sec > 0.0 && multi.throughput_events_per_sec > 0.0,
             "throughput samples must be positive"
