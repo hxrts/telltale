@@ -1,5 +1,5 @@
 import Runtime.VM.Model.Config
-import Runtime.VM.Composition.DomainComposition
+import Runtime.VM.Composition
 import Runtime.Resources.BufferRA
 
 /-! # Unit Model

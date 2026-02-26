@@ -1,4 +1,4 @@
-import Runtime.VM.Composition.DomainComposition
+import Runtime.VM.Composition
 
 set_option autoImplicit false
 

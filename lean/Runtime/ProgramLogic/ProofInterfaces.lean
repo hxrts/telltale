@@ -1,5 +1,5 @@
 import Runtime.VM.Model.TypeClasses
-import Runtime.VM.Composition.DomainComposition
+import Runtime.VM.Composition
 import IrisExtractionInstance
 
 /-
