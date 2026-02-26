@@ -783,7 +783,6 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | File | Lines | Description |
 |------|-------|-------------|
 | Examples/SimpleProtocol.lean | 127 | Simple two-party protocol example |
-| Examples/Aura.lean | 133 | Aura instantiation example |
 | Tests/Main.lean | 98 | Runtime test harness |
 | Tests/SimulatorParity.lean | 54 | Lean/Rust simulator parity tests |
 | Tests/VMRunner.lean | 116 | JSON-driven VM runner (stdin choreographies, stdout traces) |
