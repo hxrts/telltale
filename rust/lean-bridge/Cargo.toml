@@ -1,6 +1,6 @@
 [package]
 name = "telltale-lean-bridge"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["Sam Hart <sam@hxrts.com>"]
 edition = "2021"
 description = "Lean verification bridge for Telltale session types"
@@ -33,21 +33,21 @@ exporter = ["telltale-choreography", "anyhow"]  # Enable choreography exporter
 golden = ["clap", "anyhow", "runner"]  # Enable golden file management CLI
 
 [dependencies]
-telltale-types = { path = "../types", version = "1.0.0" }
-telltale-theory = { path = "../theory", version = "1.0.0", optional = true }
+telltale-types = { path = "../types", version = "1.1.0" }
+telltale-theory = { path = "../theory", version = "1.1.0", optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 clap = { version = "4.4", features = ["derive"], optional = true }
 tempfile = { workspace = true }
 anyhow = { workspace = true, optional = true }
-telltale-choreography = { path = "../choreography", version = "1.0.0", optional = true }
+telltale-choreography = { path = "../choreography", version = "1.1.0", optional = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
-telltale-theory = { path = "../theory", version = "1.0.0" }
-telltale-choreography = { path = "../choreography", version = "1.0.0" }
-telltale-vm = { path = "../vm", version = "1.0.0", features = ["multi-thread"] }
+telltale-theory = { path = "../theory", version = "1.1.0" }
+telltale-choreography = { path = "../choreography", version = "1.1.0" }
+telltale-vm = { path = "../vm", version = "1.1.0", features = ["multi-thread"] }
 tempfile = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
