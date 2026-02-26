@@ -13,7 +13,6 @@ impl EquivalenceChecker {
         let golden_path = self
             .config
             .golden_dir
-            .join("projection")
             .join(test_name)
             .join(format!("{}.expected.json", role));
 
@@ -28,7 +27,7 @@ impl EquivalenceChecker {
 
     /// Load a golden bundle for a test case.
     pub fn load_golden_bundle(&self, test_name: &str) -> Result<GoldenBundle, EquivalenceError> {
-        let test_dir = self.config.golden_dir.join("projection").join(test_name);
+        let test_dir = self.config.golden_dir.join(test_name);
 
         let input_path = test_dir.join("input.json");
         let input: Value = serde_json::from_str(
@@ -114,7 +113,7 @@ impl EquivalenceChecker {
         test_name: &str,
         bundle: &GoldenBundle,
     ) -> Result<(), EquivalenceError> {
-        let test_dir = self.config.golden_dir.join("projection").join(test_name);
+        let test_dir = self.config.golden_dir.join(test_name);
         std::fs::create_dir_all(&test_dir)?;
 
         let input_path = test_dir.join("input.json");
@@ -137,7 +136,7 @@ impl EquivalenceChecker {
             .as_ref()
             .ok_or(EquivalenceError::LeanNotAvailable)?;
 
-        let projection_dir = self.config.golden_dir.join("projection");
+        let projection_dir = self.config.golden_dir.clone();
         if !projection_dir.exists() {
             return Ok(vec![]);
         }

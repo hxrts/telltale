@@ -10,13 +10,12 @@
 //!
 //! ```text
 //! golden/
-//!   projection/
-//!     ping_pong/
-//!       input.json           # GlobalType
-//!       Alice.expected.json  # Lean's projection for Alice
-//!       Bob.expected.json    # Lean's projection for Bob
-//!     choice_protocol/
-//!       ...
+//!   ping_pong/
+//!     input.json           # GlobalType
+//!     Alice.expected.json  # Lean's projection for Alice
+//!     Bob.expected.json    # Lean's projection for Bob
+//!   choice_protocol/
+//!     ...
 //! ```
 
 #![allow(clippy::unwrap_used)]
@@ -33,10 +32,7 @@ fn golden_dir() -> PathBuf {
 
 /// Load a GlobalType from a golden input file.
 fn load_input(test_name: &str) -> telltale_types::GlobalType {
-    let path = golden_dir()
-        .join("projection")
-        .join(test_name)
-        .join("input.json");
+    let path = golden_dir().join(test_name).join("input.json");
     let content =
         std::fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read {:?}", path));
     let json: serde_json::Value = serde_json::from_str(&content).expect("Failed to parse JSON");
@@ -159,11 +155,11 @@ fn test_choice_protocol_all_projections() {
 // All Golden Files Test
 // ============================================================================
 
-/// Test all golden files in the projection directory.
+/// Test all golden files in the golden directory.
 #[test]
 fn test_all_golden_projections() {
     let checker = EquivalenceChecker::with_golden_dir(golden_dir());
-    let projection_dir = golden_dir().join("projection");
+    let projection_dir = golden_dir();
 
     if !projection_dir.exists() {
         println!("No golden files found, skipping test");

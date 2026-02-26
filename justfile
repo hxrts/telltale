@@ -285,9 +285,9 @@ lean-init:
 telltale-lean-check: lean-init
     # Export rust choreography data, build the Lean runner, and verify three roles with logs
     mkdir -p lean/artifacts
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input fixtures/choreo/lean-sample.choreo --role Chef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-chef.json
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input fixtures/choreo/lean-sample.choreo --role SousChef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-sous.json
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input fixtures/choreo/lean-sample.choreo --role Baker --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-baker.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-sample.choreo --role Chef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-chef.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-sample.choreo --role SousChef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-sous.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-sample.choreo --role Baker --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-baker.json
     LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-chef.json --log lean/artifacts/runner-chef.log --json-log lean/artifacts/runner-chef.json
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-sous.json --log lean/artifacts/runner-sous.log --json-log lean/artifacts/runner-sous.json
@@ -296,9 +296,9 @@ telltale-lean-check: lean-init
 telltale-lean-check-extended: lean-init
     # Extended scenario with looped service and dessert fan-out
     mkdir -p lean/artifacts
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input fixtures/choreo/lean-extended.choreo --role Chef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-chef.json
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input fixtures/choreo/lean-extended.choreo --role SousChef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-sous.json
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input fixtures/choreo/lean-extended.choreo --role Baker --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-baker.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-extended.choreo --role Chef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-chef.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-extended.choreo --role SousChef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-sous.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-extended.choreo --role Baker --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-baker.json
     LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-chef.json --log lean/artifacts/runner-extended-chef.log --json-log lean/artifacts/runner-extended-chef.json
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-sous.json --log lean/artifacts/runner-extended-sous.log --json-log lean/artifacts/runner-extended-sous.json
@@ -330,7 +330,7 @@ test-live-equivalence: lean-init
 # Intentional failure fixture: labels mismatch.
 telltale-lean-check-failing: lean-init
     mkdir -p lean/artifacts
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input fixtures/choreo/lean-failing.choreo --role Chef --choreography-out lean/artifacts/lean-failing-choreography.json --program-out lean/artifacts/lean-failing-program-chef.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-failing.choreo --role Chef --choreography-out lean/artifacts/lean-failing-choreography.json --program-out lean/artifacts/lean-failing-program-chef.json
     # Corrupt the exported program to introduce a label mismatch
     perl -0pi -e 's/"name": "Pong"/"name": "WrongLabel"/' lean/artifacts/lean-failing-program-chef.json
     LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator

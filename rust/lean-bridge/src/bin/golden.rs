@@ -83,7 +83,7 @@ fn cmd_regenerate(golden_dir: &PathBuf) -> anyhow::Result<()> {
     require_lean()?;
 
     let checker = EquivalenceChecker::with_lean(golden_dir)?;
-    let projection_dir = golden_dir.join("projection");
+    let projection_dir = golden_dir.clone();
 
     if !projection_dir.exists() {
         println!("No golden files to regenerate");
@@ -173,7 +173,7 @@ fn cmd_add(golden_dir: &PathBuf, name: &str, json: &str) -> anyhow::Result<()> {
 
 /// List all golden test cases.
 fn cmd_list(golden_dir: &std::path::Path) -> anyhow::Result<()> {
-    let projection_dir = golden_dir.join("projection");
+    let projection_dir = golden_dir.to_path_buf();
 
     if !projection_dir.exists() {
         println!("No golden files found at {:?}", projection_dir);

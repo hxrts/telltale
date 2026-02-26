@@ -213,7 +213,7 @@ Claims include liveness configuration, distributed systems claims, and classical
 Golden mode compares Rust projections against stored expected JSON.
 Live mode compares Rust projections against fresh Lean runner output.
 
-Golden bundles are stored under `golden/projection/<test_name>` with `input.json` and `<role>.expected.json` files.
+Golden bundles are stored under `golden/<test_name>` with `input.json` and `<role>.expected.json` files.
 `check_golden_drift()` detects divergence between stored and fresh Lean projections.
 
 `EquivalenceResult` includes `equivalent`, `role`, both outputs, and a human-readable diff when unequal.

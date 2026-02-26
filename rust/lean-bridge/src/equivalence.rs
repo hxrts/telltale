@@ -21,7 +21,7 @@
 //! use telltale_lean_bridge::equivalence::{EquivalenceChecker, GoldenDir};
 //!
 //! // Fast golden file testing
-//! let checker = EquivalenceChecker::with_golden_dir("golden/projection");
+//! let checker = EquivalenceChecker::with_golden_dir("golden");
 //! let result = checker.check_projection_against_golden(&global, "Alice")?;
 //! assert!(result.equivalent);
 //!
