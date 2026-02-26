@@ -1,6 +1,30 @@
-# Crate Organization
+# Code Organization
 
-This document describes the current crate architecture. The structure aligns with Lean verification and provides clear separation of concerns.
+This document describes the implementation organization of the codebase. It focuses on workspace layout, crate dependency structure, crate-level responsibilities, and Rust-Lean constructor correspondence.
+
+For conceptual pipeline and runtime architecture, see [Architecture](03_architecture.md).
+
+## Workspace Layout
+
+Telltale is organized as a Cargo workspace with Rust crates in `rust/`, Lean formalization in `lean/`, and docs in `docs/`.
+
+```
+telltale/
+├── rust/                   Rust crates
+│   ├── src/                Facade crate (telltale)
+│   ├── types/              Core protocol types (telltale-types)
+│   ├── theory/             Session type algorithms (telltale-theory)
+│   ├── choreography/       DSL, projection glue, and effect runtime
+│   ├── lean-bridge/        Lean export/import/validation
+│   ├── vm/                 Bytecode VM
+│   ├── simulator/          VM-backed simulation
+│   ├── effect-scaffold/    Internal scaffolding tool
+│   ├── macros/             Procedural macros
+│   └── transport/          Production transports (not workspace member)
+├── lean/                   Lean 4 formalization
+├── docs/                   mdBook documentation
+└── examples/               Example protocols
+```
 
 ## Crate Dependency Graph
 
@@ -236,69 +260,6 @@ use telltale::prelude::*;
 
 The prelude provides access to types, theory algorithms, and other commonly used items.
 
-## Data Flow
-
-```mermaid
-flowchart TB
-    subgraph Input
-        dsl["DSL Text<br/>'A -> B'"]
-    end
-
-    subgraph Parsing
-        parser["Parser"]
-        ast["Choreography AST<br/>(DSL)"]
-    end
-
-    subgraph Lowering
-        lower["Lower"]
-        global["GlobalType<br/>(telltale-types)"]
-    end
-
-    subgraph Projection
-        proj["project()"]
-        local["LocalTypeR<br/>(telltale-types)"]
-    end
-
-    subgraph ExecutionPaths["Execution Paths"]
-        direction TB
-        subgraph EffectPath["Effect Handler Path"]
-            session["Session Types &<br/>Effect Programs<br/>(choreography)"]
-            handler["Effect Handler<br/>Interpretation"]
-        end
-
-        subgraph VMPath["VM Path"]
-            image["CodeImage<br/>(vm)"]
-            vmexec["VM Execution<br/>(scheduler, coroutines)"]
-        end
-
-        subgraph LeanPath["Lean Path"]
-            json["JSON<br/>(lean-bridge)"]
-            lean["Lean Validation"]
-        end
-    end
-
-    dsl --> parser
-    parser --> ast
-    ast --> lower
-    lower --> global
-    global --> proj
-    proj --> local
-
-    local --> session
-    local --> image
-    local --> json
-
-    session --> handler
-    image --> vmexec
-    json --> lean
-
-    style ExecutionPaths fill:#f5f5f5,stroke:#9e9e9e
-```
-
-The flow begins with DSL text parsed into a choreography AST. The AST is lowered to `GlobalType`. Projection computes `LocalTypeR` for each role.
-
-From local types, three paths are available. Code generation produces session types and effect programs for handler interpretation. The VM path compiles local types to bytecode for VM execution. The Lean path exports JSON for formal validation.
-
 ## Lean Correspondence
 
 The shared constructor set is aligned between `telltale-types` and Lean for core protocol terms. The table below shows the correspondence for constructors that are present in both implementations.
@@ -321,53 +282,3 @@ The Rust variant names match Lean constructor names. Field names are consistent 
 Rust `LocalTypeR` branches also carry `Option<ValType>` payload annotations. Lean tracks payload sorts at the label level in `GlobalType`.
 
 Lean `GlobalType` includes a `delegate` constructor for channel delegation that is not yet present in Rust. This is tracked as a known parity gap.
-
-## Extension Points
-
-The architecture supports extension at several points.
-
-### Adding New Code Generation Targets
-
-Implement generators in `rust/choreography/src/compiler/codegen/` that work with the choreography AST or `LocalType`.
-
-```rust
-pub fn generate_my_target(lt: &LocalType) -> MyOutput {
-    // implementation
-}
-```
-
-The function receives a local type and produces output in the target format. Follow existing generators as examples.
-
-### Custom Projection Strategies
-
-Extend projection in `rust/theory/src/projection.rs`.
-
-```rust
-pub fn project_with_strategy(
-    global: &GlobalType,
-    role: &str,
-    strategy: ProjectionStrategy,
-) -> Result<LocalTypeR, ProjectionError> {
-    // implementation
-}
-```
-
-The strategy parameter controls projection behavior. This enables alternative projection algorithms.
-
-### Lean Integration Extensions
-
-Extend the lean-bridge for custom validation.
-
-```rust
-impl Validator {
-    pub fn my_custom_validation(
-        &self,
-        rust_type: &LocalTypeR,
-        lean_result: &Value,
-    ) -> ValidationResult {
-        // implementation
-    }
-}
-```
-
-Custom validation methods can implement domain-specific comparison rules. See [Lean-Rust Bridge](24_lean_rust_bridge.md) for more details.

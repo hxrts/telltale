@@ -32,7 +32,7 @@ The `telltale-lean-bridge` crate provides JSON export and import for cross-valid
 |---|---|---|
 | [Getting Started](02_getting_started.md) | Guide | Informative |
 | [Architecture](03_architecture.md) | Concept | Mixed |
-| [Crate Organization](04_crate_organization.md) | Reference | Informative |
+| [Code Organization](04_code_organization.md) | Reference | Informative |
 | [Theory](05_theory.md) | Concept | Informative |
 | [Choreographic DSL](06_choreographic_dsl.md) | Guide | Mixed |
 | [Choreographic Projection Patterns](07_projection.md) | Reference | Mixed |

@@ -369,58 +369,8 @@ The projection algorithm can be extended for domain-specific optimizations. Over
 
 Add new code generation backends to target different session type libraries. The AST and LocalType representations are language-agnostic. Backends for other languages can be added.
 
-## Workspace Organization
+## Implementation Organization
 
-Telltale is organized as a Cargo workspace with multiple crates. All Rust code is located in the `rust/` directory. The layout tracks the Lean formalization for shared protocol concepts.
+This page focuses on conceptual architecture: compilation stages, runtime execution paths, and why those boundaries exist.
 
-```
-telltale/
-├── rust/                   All Rust crates
-│   ├── src/                Facade crate (telltale)
-│   ├── types/              Core types (telltale-types)
-│   │   └── src/
-│   │       ├── global.rs   GlobalType (matches Lean)
-│   │       ├── local.rs    LocalTypeR (matches Lean)
-│   │       ├── label.rs    Label, PayloadSort
-│   │       └── action.rs   Action, LocalAction
-│   ├── theory/             Session type algorithms (telltale-theory)
-│   │   └── src/
-│   │       ├── projection.rs   Global to local projection
-│   │       ├── merge.rs        Branch merging
-│   │       ├── subtyping/      Sync and async subtyping
-│   │       ├── duality.rs      Dual type computation
-│   │       └── bounded.rs      Bounded recursion
-│   ├── choreography/       DSL and effects (telltale-choreography)
-│   │   └── src/
-│   │       ├── ast/        Extended AST definitions
-│   │       ├── compiler/   Parser, projection, codegen
-│   │       ├── effects/    Effect handlers and middleware
-│   │       └── runtime/    Platform abstraction
-│   ├── lean-bridge/        Lean validation (telltale-lean-bridge)
-│   │   └── src/
-│   │       ├── export.rs   Rust to JSON export
-│   │       ├── import.rs   JSON to Rust import
-│   │       └── runner.rs   Lean binary invocation
-│   ├── vm/                 Bytecode VM engine (telltale-vm)
-│   ├── simulator/          Deterministic simulation (telltale-simulator)
-│   ├── effect-scaffold/    Internal scaffold crate (workspace member)
-│   └── macros/             Procedural macros (telltale-macros)
-├── lean/                   Lean 4 verification code
-├── examples/               Example protocols
-└── docs/                   Documentation
-```
-
-This tree outlines the workspace layout and crate locations. It helps map each crate name to its directory.
-The `rust/transport/` crate also exists in the repository, but it is not currently listed as a workspace member in the root `Cargo.toml`.
-
-### Crate Responsibilities
-
-The `telltale-types` crate contains core type definitions such as `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`. The shared constructors are aligned with Lean. Lean still includes a `delegate` constructor that Rust does not yet expose.
-
-The `telltale-theory` crate contains pure algorithms for projection, merge, duality, subtyping, and well-formedness checks. This crate depends only on `telltale-types`.
-
-The `telltale-choreography` crate is the choreographic programming layer including the DSL parser, effect handlers, code generation, and runtime support. The `telltale-lean-bridge` crate provides Lean integration through JSON export and import with a runner for invoking the verification binary.
-
-The `telltale-vm` crate provides the bytecode VM, scheduler, and compiler for `LocalTypeR`. The `telltale-simulator` crate wraps the VM with deterministic middleware for latency, faults, property monitoring, and checkpointing.
-
-The `telltale` crate is the main facade that re-exports types from other crates with feature flags. Most users import from this crate.
+For concrete workspace layout, crate dependency edges, per-crate responsibilities, and Lean constructor correspondence, see [Code Organization](04_code_organization.md).
