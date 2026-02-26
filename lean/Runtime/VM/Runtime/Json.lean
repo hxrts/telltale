@@ -50,21 +50,23 @@ def edgeToJson (e : Edge) : Json :=
 /-- Serialize a ticked observable event to JSON (UnitEffect only). -/
 def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
   match ev.event with
-  | .sent edge val _ =>
+  | .sent edge val seqNo =>
       Json.mkObj
         [ ("kind", Json.str "sent")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
         , ("sender", Json.str edge.sender)
         , ("receiver", Json.str edge.receiver)
+        , ("sequence", Json.num seqNo)
         , ("value", valueToJson val) ]
-  | .received edge val _ =>
+  | .received edge val seqNo =>
       Json.mkObj
         [ ("kind", Json.str "received")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
         , ("sender", Json.str edge.sender)
         , ("receiver", Json.str edge.receiver)
+        , ("sequence", Json.num seqNo)
         , ("value", valueToJson val) ]
   | .offered edge lbl =>
       Json.mkObj

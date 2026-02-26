@@ -427,26 +427,25 @@ impl VM {
                 true,
             )?;
         }
-        let enqueue = {
-            let session = self
-                .sessions
-                .get_mut(sid)
-                .ok_or_else(|| Fault::ChannelClosed {
-                    endpoint: ep.clone(),
-                })?;
-            match decision {
-                SendDecision::Deliver(payload) => {
-                    let payload = if let Some(corruption) = maybe_corruption {
-                        Self::apply_corruption(payload, corruption)
-                    } else {
-                        payload
-                    };
-                    session
-                        .send(role, &partner, payload)
-                        .map_err(|e| Fault::Invoke { message: e })?
-                }
-                SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
+        let enqueue = match decision {
+            SendDecision::Deliver(payload) => {
+                let sequence_no = self.allocate_send_sequence(&edge);
+                let payload = if let Some(corruption) = maybe_corruption {
+                    Self::apply_corruption(payload, corruption)
+                } else {
+                    payload
+                };
+                let session = self
+                    .sessions
+                    .get_mut(sid)
+                    .ok_or_else(|| Fault::ChannelClosed {
+                        endpoint: ep.clone(),
+                    })?;
+                session
+                    .send_with_sequence(role, &partner, payload, sequence_no)
+                    .map_err(|e| Fault::Invoke { message: e })?
             }
+            SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
         };
 
         match enqueue {

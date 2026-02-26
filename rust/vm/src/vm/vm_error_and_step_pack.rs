@@ -147,6 +147,10 @@ where
     persistence_model: PhantomData<P>,
     persistent: P::PState,
     verification: Nu,
+    #[serde(default)]
+    communication_consumption: DefaultCommunicationConsumption,
+    #[serde(default)]
+    communication_consumption_artifacts: Vec<CommunicationConsumptionArtifact>,
     coroutines: Vec<Coroutine>,
     sessions: SessionStore,
     arena: Arena,
@@ -189,6 +193,7 @@ where
     {
         config.assert_invariants();
         let tick_duration = config.tick_duration;
+        let communication_replay_mode = config.communication_replay_mode;
         let sched = Scheduler::new(config.sched_policy.clone());
         let mut guard_resources = BTreeMap::new();
         for layer in &config.guard_layers {
@@ -203,6 +208,10 @@ where
             persistence_model: PhantomData,
             persistent: P::PState::default(),
             verification: Nu::default(),
+            communication_consumption: DefaultCommunicationConsumption::new(
+                communication_replay_mode,
+            ),
+            communication_consumption_artifacts: Vec::new(),
             coroutines: Vec::new(),
             sessions: SessionStore::new(),
             arena: Arena::default(),
@@ -292,4 +301,3 @@ where
         bridge.verification_key_for_participant(participant)
     }
 }
-

@@ -21,6 +21,33 @@ impl VM {
         Ok(())
     }
 
+    fn sync_communication_consumption_mode(&mut self) {
+        self.communication_consumption
+            .set_mode(self.config.communication_replay_mode);
+    }
+
+    fn allocate_send_sequence(&mut self, edge: &Edge) -> u64 {
+        self.sync_communication_consumption_mode();
+        self.communication_consumption.allocate_send_sequence(edge)
+    }
+
+    fn consume_receive_identity(
+        &mut self,
+        identity: CommunicationIdentity,
+    ) -> Result<CommunicationConsumeResult, CommunicationReplayError> {
+        self.sync_communication_consumption_mode();
+        let result = self.communication_consumption.consume_receive(&identity)?;
+        self.communication_consumption_artifacts
+            .push(CommunicationConsumptionArtifact {
+                tick: self.clock.tick,
+                identity,
+                mode: result.mode,
+                pre_root: result.pre_root,
+                post_root: result.post_root,
+            });
+        Ok(result)
+    }
+
     fn open_choreography_session(
         &mut self,
         image: &CodeImage,
@@ -452,6 +479,18 @@ impl VM {
         &self.effect_trace
     }
 
+    /// Deterministic communication replay-state root.
+    #[must_use]
+    pub fn communication_replay_root(&self) -> crate::verification::Hash {
+        self.communication_consumption.state().root()
+    }
+
+    /// Receive-boundary replay-consumption artifacts.
+    #[must_use]
+    pub fn communication_consumption_artifacts(&self) -> &[CommunicationConsumptionArtifact] {
+        &self.communication_consumption_artifacts
+    }
+
     /// Canonical replay/state fragment for deterministic diffing and snapshots.
     #[must_use]
     pub fn canonical_replay_fragment(&self) -> CanonicalReplayFragmentV1 {
@@ -474,6 +513,9 @@ impl VM {
             corrupted_edges,
             timed_out_sites,
             self.config.effect_determinism_tier,
+            self.config.communication_replay_mode,
+            Some(self.communication_consumption.state().root()),
+            self.communication_consumption_artifacts.clone(),
         )
     }
 

@@ -1,5 +1,6 @@
     use super::*;
     use crate::buffer::BufferConfig;
+    use crate::communication_replay::{CommunicationReplayMode, DefaultCommunicationConsumption};
     use crate::coroutine::KnowledgeFact;
     use crate::effect::{EffectHandler, SendDecision, SendDecisionInput};
     use crate::verification::{Hash, Signature, VerifyingKey};
@@ -233,6 +234,7 @@
                     signer: VerifyingKey([0_u8; 32]),
                     digest: Hash([7_u8; 32]),
                 },
+                sequence_no: 0,
             };
             session
                 .send_signed("A", "B", &tampered)
@@ -251,6 +253,10 @@
         let config = VMConfig::default();
         let guard_resources = Arc::new(Mutex::new(BTreeMap::new()));
         let resource_states = Arc::new(Mutex::new(BTreeMap::new()));
+        let communication_consumption = Arc::new(Mutex::new(
+            DefaultCommunicationConsumption::new(CommunicationReplayMode::Off),
+        ));
+        let communication_consumption_artifacts = Arc::new(Mutex::new(Vec::new()));
         let crashed_sites = BTreeSet::new();
         let partitioned_edges = BTreeSet::new();
         let corrupted_edges = BTreeMap::new();
@@ -259,6 +265,8 @@
             config: &config,
             guard_resources: &guard_resources,
             resource_states: &resource_states,
+            communication_consumption: &communication_consumption,
+            communication_consumption_artifacts: &communication_consumption_artifacts,
             crashed_sites: &crashed_sites,
             partitioned_edges: &partitioned_edges,
             corrupted_edges: &corrupted_edges,

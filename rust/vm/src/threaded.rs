@@ -19,6 +19,10 @@ use telltale_types::{LocalTypeR, ValType};
 use crate::buffer::{BoundedBuffer, BufferConfig, EnqueueResult};
 use crate::clock::SimClock;
 use crate::commit_common::{apply_output_condition_gate, effect_trace_entry_for_event};
+use crate::communication_replay::{
+    CommunicationConsumption, CommunicationConsumptionArtifact, CommunicationIdentity,
+    CommunicationReplayError, CommunicationStepKind, DefaultCommunicationConsumption,
+};
 use crate::coroutine::{BlockReason, CoroStatus, Coroutine, Fault, ProgressToken, Value};
 use crate::effect::{
     CorruptionType, EffectHandler, EffectTraceEntry, ReplayEffectHandler, SendDecision,

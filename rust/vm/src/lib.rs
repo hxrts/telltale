@@ -50,6 +50,7 @@ pub mod bridge;
 pub mod buffer;
 pub mod clock;
 pub mod commit_common;
+pub mod communication_replay;
 pub mod compiler;
 pub mod composition;
 pub mod coroutine;
@@ -94,6 +95,12 @@ pub use bridge::{
     PersistenceEffectBridge,
 };
 pub use clock::SimClock;
+pub use communication_replay::{
+    CommunicationConsumeResult, CommunicationConsumption, CommunicationConsumptionArtifact,
+    CommunicationIdentity, CommunicationReplayError, CommunicationReplayMode,
+    CommunicationReplayState, CommunicationStepKind, DefaultCommunicationConsumption,
+    COMM_IDENTITY_DOMAIN_TAG, COMM_REPLAY_DUPLICATE_TAG, COMM_REPLAY_SEQUENCE_MISMATCH_TAG,
+};
 pub use composition::{
     ComposedRuntime, CompositionCertificate, CompositionError, DeterminismCapability, MemoryBudget,
     MemoryUsage, ProtocolBundle, SchedulerCapability, TheoremPackCapabilities,

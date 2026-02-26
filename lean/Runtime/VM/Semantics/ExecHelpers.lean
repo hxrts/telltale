@@ -52,10 +52,15 @@ structure StepPack (ι γ π ε ν : Type u)
 
 /-! ## Buffer helpers -/
 
+def signValueWithSeq {ν : Type u} [VerificationModel ν]
+    (sk : VerificationModel.SigningKey ν) (v : Value) (seqNo : Nat) : SignedValue ν :=
+  -- Create a signed payload with explicit sequence number.
+  { payload := v, signature := VerificationModel.sign sk v, seqNo := seqNo }
+
 def signValue {ν : Type u} [VerificationModel ν]
     (sk : VerificationModel.SigningKey ν) (v : Value) : SignedValue ν :=
   -- Create a signed payload using the verification model.
-  { payload := v, signature := VerificationModel.sign sk v }
+  signValueWithSeq sk v 0
 
 def verifySignedValue {ν : Type u} [VerificationModel ν]
     (vk : VerificationModel.VerifyKey ν) (sv : SignedValue ν) : Bool :=

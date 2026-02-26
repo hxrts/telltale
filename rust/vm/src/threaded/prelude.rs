@@ -106,6 +106,8 @@ pub struct ThreadedVM {
     lane_count: usize,
     guard_resources: Arc<Mutex<BTreeMap<String, Value>>>,
     resource_states: Arc<Mutex<BTreeMap<SessionId, ResourceState>>>,
+    communication_consumption: Arc<Mutex<DefaultCommunicationConsumption>>,
+    communication_consumption_artifacts: Arc<Mutex<Vec<CommunicationConsumptionArtifact>>>,
     effect_trace: Vec<EffectTraceEntry>,
     next_effect_id: u64,
     output_condition_checks: Vec<OutputConditionCheck>,

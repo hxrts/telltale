@@ -22,6 +22,7 @@ impl ThreadedVM {
             .build()
             .expect("thread pool build failed");
         let tick_duration = config.tick_duration;
+        let communication_replay_mode = config.communication_replay_mode;
         let scheduler = Scheduler::new(config.sched_policy.clone());
         let mut guard_resources = BTreeMap::new();
         for layer in &config.guard_layers {
@@ -44,6 +45,10 @@ impl ThreadedVM {
             lane_count: worker_count,
             guard_resources: Arc::new(Mutex::new(guard_resources)),
             resource_states: Arc::new(Mutex::new(BTreeMap::new())),
+            communication_consumption: Arc::new(Mutex::new(
+                DefaultCommunicationConsumption::new(communication_replay_mode),
+            )),
+            communication_consumption_artifacts: Arc::new(Mutex::new(Vec::new())),
             effect_trace: Vec::new(),
             next_effect_id: 0,
             output_condition_checks: Vec::new(),
@@ -272,6 +277,8 @@ impl ThreadedVM {
             config: &self.config,
             guard_resources: &self.guard_resources,
             resource_states: &self.resource_states,
+            communication_consumption: &self.communication_consumption,
+            communication_consumption_artifacts: &self.communication_consumption_artifacts,
             crashed_sites: &self.crashed_sites,
             partitioned_edges: &self.partitioned_edges,
             corrupted_edges: &self.corrupted_edges,
@@ -574,9 +581,51 @@ impl ThreadedVM {
         &self.effect_trace
     }
 
+    /// Deterministic communication replay-state root.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the communication replay mutex is poisoned.
+    #[must_use]
+    pub fn communication_replay_root(&self) -> crate::verification::Hash {
+        self.communication_consumption
+            .lock()
+            .expect("communication replay lock poisoned")
+            .state()
+            .root()
+    }
+
+    /// Receive-boundary replay-consumption artifacts.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the communication artifact mutex is poisoned.
+    #[must_use]
+    pub fn communication_consumption_artifacts(&self) -> Vec<CommunicationConsumptionArtifact> {
+        self.communication_consumption_artifacts
+            .lock()
+            .expect("communication artifact lock poisoned")
+            .clone()
+    }
+
     /// Canonical replay/state fragment for deterministic diffing and snapshots.
+    ///
+    /// # Panics
+    ///
+    /// Panics if communication replay-state or artifact mutexes are poisoned.
     #[must_use]
     pub fn canonical_replay_fragment(&self) -> CanonicalReplayFragmentV1 {
+        let communication_replay_root = self
+            .communication_consumption
+            .lock()
+            .expect("communication replay lock poisoned")
+            .state()
+            .root();
+        let communication_consumption_artifacts = self
+            .communication_consumption_artifacts
+            .lock()
+            .expect("communication artifact lock poisoned")
+            .clone();
         let corrupted_edges = self
             .corrupted_edges
             .iter()
@@ -595,6 +644,9 @@ impl ThreadedVM {
             corrupted_edges,
             timed_out_sites,
             self.config.effect_determinism_tier,
+            self.config.communication_replay_mode,
+            Some(communication_replay_root),
+            communication_consumption_artifacts,
         )
     }
 

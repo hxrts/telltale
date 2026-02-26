@@ -330,6 +330,9 @@ mod tests {
             corrupted_edges: Vec::new(),
             timed_out_sites: Vec::new(),
             effect_determinism_tier: EffectDeterminismTier::StrictDeterministic,
+            communication_replay_mode: crate::communication_replay::CommunicationReplayMode::Off,
+            communication_replay_root: None,
+            communication_consumption_artifacts: Vec::new(),
         }
     }
 

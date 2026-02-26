@@ -1,20 +1,24 @@
+struct RecvTypePlan {
+    ep: Endpoint,
+    sid: SessionId,
+    partner: String,
+    label: String,
+    expected_type: Option<ValType>,
+    continuation: LocalTypeR,
+}
+
 impl VM {
-    /// Recv: lookup type → match Recv → try dequeue → block or process → StepPack.
-    pub(crate) fn step_recv(
-        &mut self,
+    fn recv_type_plan(
+        &self,
         coro_idx: usize,
         role: &str,
         chan: u16,
-        dst_reg: u16,
-        handler: &dyn EffectHandler,
-    ) -> Result<StepPack, Fault> {
+    ) -> Result<RecvTypePlan, Fault> {
         let ep = self.endpoint_from_reg(coro_idx, chan)?;
         if !self.coroutines[coro_idx].owned_endpoints.contains(&ep) {
             return Err(Fault::ChannelClosed { endpoint: ep });
         }
         let sid = ep.sid;
-
-        // Type lookup.
         let local_type = self
             .sessions
             .lookup_type(&ep)
@@ -24,8 +28,6 @@ impl VM {
                 message: format!("{role}: no type registered"),
             })?
             .clone();
-
-        // Pattern match: must be Recv.
         let (partner, branches) = match &local_type {
             LocalTypeR::Recv {
                 partner, branches, ..
@@ -35,10 +37,9 @@ impl VM {
                     expected: telltale_types::ValType::Unit,
                     actual: telltale_types::ValType::Unit,
                     message: format!("{role}: expected Recv, got {other:?}"),
-                })
+                });
             }
         };
-
         let (label, expected_type, continuation) = branches
             .first()
             .ok_or_else(|| Fault::TypeViolation {
@@ -47,13 +48,92 @@ impl VM {
                 message: format!("{role}: recv has no branches"),
             })?
             .clone();
+        Ok(RecvTypePlan {
+            ep,
+            sid,
+            partner,
+            label: label.name,
+            expected_type,
+            continuation,
+        })
+    }
 
-        // Try dequeue.
+    fn recv_verified_signed_payload(
+        &mut self,
+        sid: SessionId,
+        ep: &Endpoint,
+        edge: &Edge,
+        partner: &str,
+        role: &str,
+    ) -> Result<(Value, u64), Fault> {
+        let session = self
+            .sessions
+            .get_mut(sid)
+            .ok_or_else(|| Fault::ChannelClosed {
+                endpoint: ep.clone(),
+            })?;
+        let signed = session
+            .recv_verified_signed(partner, role)
+            .map_err(|message| Fault::VerificationFailed {
+                edge: edge.clone(),
+                message,
+            })?
+            .ok_or_else(|| Fault::ChannelClosed {
+                endpoint: ep.clone(),
+            })?;
+        Ok((signed.payload, signed.sequence_no))
+    }
+
+    fn consume_receive_replay_identity(
+        &mut self,
+        edge: &Edge,
+        label: &str,
+        val: &Value,
+        sequence_no: u64,
+    ) -> Result<(), Fault> {
+        let identity = CommunicationIdentity::from_payload(
+            edge,
+            CommunicationStepKind::Receive,
+            label,
+            val,
+            sequence_no,
+        );
+        self.consume_receive_identity(identity).map_err(|err| {
+            let tag = err.tag();
+            let message = match err {
+                CommunicationReplayError::SequenceMismatch { expected, actual } => {
+                    format!("{tag}: expected={expected}, actual={actual}")
+                }
+                CommunicationReplayError::DuplicateIdentity { .. } => tag.to_string(),
+            };
+            Fault::VerificationFailed {
+                edge: edge.clone(),
+                message,
+            }
+        })?;
+        Ok(())
+    }
+
+    /// Recv: lookup type → match Recv → try dequeue → block or process → StepPack.
+    pub(crate) fn step_recv(
+        &mut self,
+        coro_idx: usize,
+        role: &str,
+        chan: u16,
+        dst_reg: u16,
+        handler: &dyn EffectHandler,
+    ) -> Result<StepPack, Fault> {
+        let recv_plan = self.recv_type_plan(coro_idx, role, chan)?;
+        let ep = recv_plan.ep;
+        let sid = recv_plan.sid;
+        let partner = recv_plan.partner;
+        let label = recv_plan.label;
+        let expected_type = recv_plan.expected_type;
+        let continuation = recv_plan.continuation;
         let session = self.sessions.get(sid).ok_or_else(|| Fault::ChannelClosed {
             endpoint: ep.clone(),
         })?;
         if !session.has_message(&partner, role) {
-            // Block — NO type advancement, NO state change.
             return Ok(StepPack {
                 coro_update: CoroUpdate::Block(BlockReason::Recv {
                     edge: Edge::new(sid, partner, role.to_string()),
@@ -65,29 +145,14 @@ impl VM {
         }
 
         let edge = Edge::new(sid, partner.clone(), role.to_string());
-        // Dequeue from signed session buffer and verify in place.
-        let val = {
-            let session = self
-                .sessions
-                .get_mut(sid)
-                .ok_or_else(|| Fault::ChannelClosed {
-                    endpoint: ep.clone(),
-                })?;
-            session
-                .recv_verified(&partner, role)
-                .map_err(|message| Fault::VerificationFailed {
-                    edge: edge.clone(),
-                    message,
-                })?
-                .ok_or_else(|| Fault::ChannelClosed {
-                    endpoint: ep.clone(),
-                })?
-        };
+        let (val, sequence_no) =
+            self.recv_verified_signed_payload(sid, &ep, &edge, &partner, role)?;
+        self.consume_receive_replay_identity(&edge, &label, &val, sequence_no)?;
 
         self.validate_payload(
             role,
             "receive",
-            &label.name,
+            &label,
             expected_type.as_ref(),
             &val,
             true,
@@ -98,13 +163,12 @@ impl VM {
             .handle_recv(
                 role,
                 &partner,
-                &label.name,
+                &label,
                 &mut self.coroutines[coro_idx].regs,
                 &val,
             )
             .map_err(|e| Fault::Invoke { message: e })?;
 
-        // Resolve continuation and advance type.
         let original = self.sessions.original_type(&ep).unwrap_or(&LocalTypeR::End);
         let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);
 
@@ -117,7 +181,7 @@ impl VM {
                 session: sid,
                 from: partner,
                 to: role.to_string(),
-                label: label.name,
+                label,
             }],
         })
     }

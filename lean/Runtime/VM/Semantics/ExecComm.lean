@@ -14,6 +14,31 @@ Send/offer sign outgoing values with the role's signing key before enqueueing.
 Recv/choose verify the sender's signature, consume a progress token, and dequeue from
 the buffer. All four update the session store's local type and trace on success. -/
 
+/-! ## Communication identity and replay semantics
+
+Canonical communication identity fields (matched with Rust runtime docs):
+
+- domain tag: `telltale.comm.identity.v1`
+- session id (`sid`)
+- directed edge endpoints (`sender`, `receiver`)
+- protocol step context (`send`/`recv`/`offer`/`choose`) with label context
+- message label (`label`)
+- payload digest (domain-separated hash of serialized payload)
+- sequence number (`seqNo`)
+
+Replay semantics by mode:
+
+- `off`: no replay-consumption enforcement.
+- `sequence`: receive must consume exactly the next expected sequence number on each edge.
+- `nullifier`: receive must consume an unseen nullifier derived from canonical identity.
+
+Expected outcomes:
+
+- duplicate delivery: rejected in `sequence` and `nullifier`, accepted in `off`
+- reordered delivery: rejected in `sequence`; allowed in `nullifier` when identity is unseen
+- cross-session reuse: rejected in `sequence` and `nullifier` because `sid` is part of identity
+-/
+
 /-
 The Problem. The four communication instructions (send, recv, offer, choose) share a
 complex pipeline: operand decoding, ownership checks, type lookup, edge validation,
@@ -46,18 +71,19 @@ private def sendCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
-    (bufs' : SignedBuffers ν) (T : ValType) (L' : LocalType) (v : Value) : StepPack ι γ π ε ν :=
+    (bufs' : SignedBuffers ν) (T : ValType) (L' : LocalType) (v : Value) (seqNo : Nat) :
+    StepPack ι γ π ε ν :=
   -- Commit a successful send to state and trace.
   let sessions' := sendUpdateSessions st.sessions ep edge bufs' T L'
   let st' := { st with buffers := bufs', sessions := sessions' }
-  continuePack st' coro (some (.obs (.sent edge v 0)))
+  continuePack st' coro (some (.obs (.sent edge v seqNo)))
 
 private def sendAfterEnqueue {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
-    (T : ValType) (L' : LocalType) (v : Value) (h : HandlerId)
+    (T : ValType) (L' : LocalType) (v : Value) (h : HandlerId) (seqNo : Nat)
     (res : SignedEnqueueResult) (bufs' : SignedBuffers ν) : StepPack ι γ π ε ν :=
   -- Resolve enqueue results and enforce transport checks.
   match res with
@@ -65,7 +91,7 @@ private def sendAfterEnqueue {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
       if st.config.transportOk h bufs' = false then
         faultPack st coro (.specFault "handler spec failed") "handler spec failed"
       else
-        sendCommit st coro ep edge bufs' T L' v
+        sendCommit st coro ep edge bufs' T L' v seqNo
   | .blocked =>
       blockPack st coro (.sendWait edge)
   | .dropped =>
@@ -80,10 +106,11 @@ private def sendOnHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (T : ValType) (L' : LocalType) (v : Value) (h : HandlerId) : StepPack ι γ π ε ν :=
   -- Sign and enqueue the payload for the edge handler.
-  let signed := signValue (st.config.roleSigningKey ep.role) v
-  let cfg := st.config.bufferConfig edge
-  let (res, bufs') := bufEnqueue cfg st.buffers edge signed
-  sendAfterEnqueue st coro ep edge T L' v h res bufs'
+  let (seqNo, st') := commAllocSendSeq st edge
+  let signed := signValueWithSeq (st'.config.roleSigningKey ep.role) v seqNo
+  let cfg := st'.config.bufferConfig edge
+  let (res, bufs') := bufEnqueue cfg st'.buffers edge signed
+  sendAfterEnqueue st' coro ep edge T L' v h seqNo res bufs'
 
 /-! ## Send semantics: edge and endpoint dispatch -/
 
@@ -163,7 +190,7 @@ private def recvCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (bufs' : SignedBuffers ν) (L' : LocalType) (payload : Value) (tokens' : List ProgressToken)
-    (dst : Reg) : StepPack ι γ π ε ν :=
+    (dst : Reg) (seqNo : Nat) : StepPack ι γ π ε ν :=
   -- Commit a successful receive to state and registers.
   match setReg coro.regs dst payload with
   | none => faultPack st coro .outOfRegisters "bad dst reg"
@@ -171,7 +198,7 @@ private def recvCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
       let sessions' := recvUpdateSessions st.sessions ep edge bufs' L'
       let st' := { st with buffers := bufs', sessions := sessions' }
       let coro' := { coro with regs := regs', progressTokens := tokens' }
-      continuePack st' coro' (some (.obs (.received edge payload 0)))
+      continuePack st' coro' (some (.obs (.received edge payload seqNo)))
 
 private def recvAfterDequeue {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -186,10 +213,22 @@ private def recvAfterDequeue {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
   else
     let vk := VerificationModel.verifyKeyOf (st.config.roleSigningKey edge.sender)
     if verifySignedValue vk sv then
-      if decide (valTypeOf sv.payload = T) then
-        recvCommit st coro ep edge bufs' L' sv.payload tokens' dst
-      else
-        faultPack st coro (.typeViolation T (valTypeOf sv.payload)) "bad recv payload"
+      let ident : CommunicationIdentity := {
+        sid := edge.sid
+        sender := edge.sender
+        receiver := edge.receiver
+        stepKind := .receive
+        label := "recv"
+        payloadDigest := communicationIdentityPayloadDigest sv.payload
+        seqNo := sv.seqNo
+      }
+      match commConsumeReceiveIdentity st st.clock ident with
+      | .error msg => faultPack st coro (.flowViolation msg) msg
+      | .ok (_, st') =>
+          if decide (valTypeOf sv.payload = T) then
+            recvCommit st' coro ep edge bufs' L' sv.payload tokens' dst sv.seqNo
+          else
+            faultPack st' coro (.typeViolation T (valTypeOf sv.payload)) "bad recv payload"
     else
       faultPack st coro (.invalidSignature edge) "invalid signature"
 

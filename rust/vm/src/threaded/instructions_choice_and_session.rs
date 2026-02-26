@@ -396,11 +396,16 @@ fn step_close(
     ep: &Endpoint,
     sid: SessionId,
     tick: u64,
+    ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
     session.status = SessionStatus::Closed;
     session.buffers.clear();
     session.edge_traces.clear();
     session.epoch = session.epoch.saturating_add(1);
+    ctx.communication_consumption
+        .lock()
+        .expect("communication replay lock poisoned")
+        .prune_session(sid);
 
     Ok(StepPack {
         coro_update: CoroUpdate::AdvancePc,
@@ -519,4 +524,3 @@ fn step_open(
         }],
     })
 }
-

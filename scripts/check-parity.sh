@@ -113,7 +113,7 @@ def parse_rust_enum_variants(path: Path, enum_name: str) -> list[str]:
 
 def parse_lean_structure_fields(path: Path, structure_name: str) -> list[str]:
     lines = path.read_text(encoding="utf-8").splitlines()
-    start_re = re.compile(rf"^\s*structure\s+{re.escape(structure_name)}\s+where\b")
+    start_re = re.compile(rf"^\s*structure\s+{re.escape(structure_name)}\b.*\bwhere\b")
     field_re = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_']*)\s*:\s*")
     stop_re = re.compile(
         r"^\s*(?:(?:private|protected)\s+)?"
@@ -235,6 +235,18 @@ enum_checks = [
             "chan": "Endpoint",
         },
     },
+    {
+        "label": "CommunicationReplayMode",
+        "lean_file": root / "lean/Runtime/VM/Model/Config.lean",
+        "lean_type": "CommunicationReplayMode",
+        "rust_file": root / "rust/vm/src/communication_replay.rs",
+        "rust_type": "CommunicationReplayMode",
+        "map": {
+            "off": "Off",
+            "sequence": "Sequence",
+            "nullifier": "Nullifier",
+        },
+    },
 ]
 
 struct_checks = [
@@ -245,6 +257,14 @@ struct_checks = [
         "rust_file": root / "rust/vm/src/coroutine.rs",
         "rust_type": "ProgressToken",
         "map": {},
+    },
+    {
+        "label": "SignedValue",
+        "lean_file": root / "lean/Runtime/VM/Model/TypeClasses.lean",
+        "lean_type": "SignedValue",
+        "rust_file": root / "rust/vm/src/buffer.rs",
+        "rust_type": "SignedValue",
+        "map": {"seqNo": "sequence_no"},
     },
 ]
 
@@ -290,7 +310,7 @@ if mismatches:
     print("[parity] uncovered mismatches:")
     for mismatch in mismatches:
         print(f"  - {mismatch}")
-    fail("found Lean/Rust parity mismatches - add deviation entry to docs/15_vm_parity.md Deviation Registry")
+    fail("found Lean/Rust parity mismatches - add deviation entry to docs/19_vm_parity.md Deviation Registry")
 
 print("[parity] policy/data shape parity check passed with no mismatches")
 

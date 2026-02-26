@@ -29,6 +29,8 @@ struct ThreadedStepCtx<'a> {
     config: &'a VMConfig,
     guard_resources: &'a Arc<Mutex<BTreeMap<String, Value>>>,
     resource_states: &'a Arc<Mutex<BTreeMap<SessionId, ResourceState>>>,
+    communication_consumption: &'a Arc<Mutex<DefaultCommunicationConsumption>>,
+    communication_consumption_artifacts: &'a Arc<Mutex<Vec<CommunicationConsumptionArtifact>>>,
     crashed_sites: &'a BTreeSet<String>,
     partitioned_edges: &'a BTreeSet<(String, String)>,
     corrupted_edges: &'a BTreeMap<(String, String), CorruptionType>,
@@ -239,7 +241,13 @@ fn exec_instr(
                     message: "endpoint not owned".to_string(),
                 });
             }
-            step_close(&mut session_guard, &close_ep, close_ep.sid, ctx.step.tick)
+            step_close(
+                &mut session_guard,
+                &close_ep,
+                close_ep.sid,
+                ctx.step.tick,
+                &ctx.step,
+            )
         }
         Instr::Open {
             ref roles,
@@ -433,4 +441,3 @@ fn validate_payload(
         None => Ok(()),
     }
 }
-

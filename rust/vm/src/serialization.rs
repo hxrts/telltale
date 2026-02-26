@@ -1,8 +1,10 @@
 //! Canonical serialization helpers for deterministic replay/testing artifacts.
 
+use crate::communication_replay::{CommunicationConsumptionArtifact, CommunicationReplayMode};
 use crate::determinism::EffectDeterminismTier;
 use crate::effect::{CorruptionType, EffectTraceEntry};
 use crate::trace::normalize_trace;
+use crate::verification::Hash;
 use crate::vm::ObsEvent;
 use serde::{Deserialize, Serialize};
 
@@ -78,6 +80,15 @@ pub struct CanonicalReplayFragmentV1 {
     /// Declared effect determinism tier for this run.
     #[serde(default)]
     pub effect_determinism_tier: EffectDeterminismTier,
+    /// Active communication replay mode.
+    #[serde(default)]
+    pub communication_replay_mode: CommunicationReplayMode,
+    /// Deterministic communication replay-state root.
+    #[serde(default)]
+    pub communication_replay_root: Option<Hash>,
+    /// Proof-friendly receive consumption artifacts.
+    #[serde(default)]
+    pub communication_consumption_artifacts: Vec<CommunicationConsumptionArtifact>,
 }
 
 /// Normalize an observable trace into the canonical versioned format.
@@ -113,6 +124,9 @@ pub fn canonical_replay_fragment_v1(
     mut corrupted_edges: Vec<((String, String), CorruptionType)>,
     mut timed_out_sites: Vec<(String, u64)>,
     effect_determinism_tier: EffectDeterminismTier,
+    communication_replay_mode: CommunicationReplayMode,
+    communication_replay_root: Option<Hash>,
+    communication_consumption_artifacts: Vec<CommunicationConsumptionArtifact>,
 ) -> CanonicalReplayFragmentV1 {
     crashed_sites.sort_unstable();
     crashed_sites.dedup();
@@ -134,6 +148,9 @@ pub fn canonical_replay_fragment_v1(
         corrupted_edges,
         timed_out_sites,
         effect_determinism_tier,
+        communication_replay_mode,
+        communication_replay_root,
+        communication_consumption_artifacts,
     }
 }
 

@@ -89,6 +89,9 @@ pub struct SignedValue<V> {
     pub payload: Value,
     /// The signature/proof attached to the payload.
     pub signature: V,
+    /// Monotonic sender-side sequence number for replay-consumption checks.
+    #[serde(default)]
+    pub sequence_no: u64,
 }
 
 /// Signed FIFO for a single edge.
@@ -135,10 +138,27 @@ pub fn signed_enqueue<V>(
     payload: Value,
     signature: V,
 ) -> SignedEnqueueResult {
+    signed_enqueue_with_sequence(buffers, edge, payload, signature, 0)
+}
+
+/// Enqueue one signed payload with explicit sequence number.
+pub fn signed_enqueue_with_sequence<V>(
+    buffers: &mut SignedBuffers<V>,
+    edge: Edge,
+    payload: Value,
+    signature: V,
+    sequence_no: u64,
+) -> SignedEnqueueResult {
     let queue = buffers
         .entry(edge)
         .or_insert_with(|| BoundedBuffer::new(&BufferConfig::default()));
-    queue.enqueue(SignedValue { payload, signature }).into()
+    queue
+        .enqueue(SignedValue {
+            payload,
+            signature,
+            sequence_no,
+        })
+        .into()
 }
 
 /// Dequeue and verify one signed payload.
@@ -392,6 +412,7 @@ mod tests {
         let signed = SignedValue {
             payload: Value::Nat(9),
             signature: vec![0_u8, 1_u8],
+            sequence_no: 0,
         };
         let mut buffers: SignedBuffers<Vec<u8>> = BTreeMap::new();
         assert_eq!(

@@ -86,6 +86,32 @@ Runtime mode admission and profile selection are capability gated.
 | Modulo commutativity | `moduloCommutativity` | `DeterminismMode::ModuloCommutativity` | Mixed-profile capability plus artifact support |
 | Replay | `replay` | `DeterminismMode::Replay` | Mixed-profile capability plus artifact support |
 
+## Communication Consumption Identity
+
+Communication replay-consumption uses one canonical identity schema across send and receive checks.
+
+Canonical identity fields:
+
+- Domain tag: `telltale.comm.identity.v1`
+- Session id: `sid`
+- Directed edge endpoints: `sender`, `receiver`
+- Protocol step context: `step_kind` (`send`, `recv`, `offer`, `choose`) and local label context
+- Message label: `label`
+- Payload digest: domain-separated digest of serialized payload bytes
+- Sequence number: `seq_no` (used by `sequence` mode, carried for all modes)
+
+Replay semantics by mode:
+
+- `off`: no replay-consumption checks are enforced.
+- `sequence`: receive must consume exactly the expected next `seq_no` per `(sid, sender, receiver)`.
+- `nullifier`: receive computes a nullifier over the canonical identity and rejects already-consumed identities.
+
+Replay outcomes:
+
+- Duplicate delivery: reject in `sequence` and `nullifier`, accept in `off`.
+- Reordered delivery: reject in `sequence`, accepted when unseen in `nullifier`, accept in `off`.
+- Cross-session reuse: reject in `sequence` and `nullifier` because `sid` is part of canonical identity.
+
 ## Proved Theorem Surfaces
 
 | Area | Lean Surface | Status |

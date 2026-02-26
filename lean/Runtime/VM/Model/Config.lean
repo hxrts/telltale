@@ -42,6 +42,12 @@ structure CostModel (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
 
 /-! ## VM configuration -/
 
+inductive CommunicationReplayMode where
+  | off
+  | sequence
+  | nullifier
+  deriving Repr, DecidableEq, Inhabited
+
 structure VMRuntimeConfig (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν] where
   -- Migration-safe config schema version.
   configVersion : Nat := 1
@@ -56,6 +62,7 @@ structure VMRuntimeConfig (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν] wh
   maxCoroutines : Nat := 1024
   maxSessions : Nat := 256
   monitorMode : MonitorMode := .sessionTypePrecheck
+  communicationReplayMode : CommunicationReplayMode := .off
   guardChain : GuardChain γ
   roleSigningKey : Role → VerificationModel.SigningKey ν
   outputCondition : OutputConditionConfig := {}

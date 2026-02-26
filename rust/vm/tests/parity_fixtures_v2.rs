@@ -18,8 +18,8 @@ use telltale_vm::loader::CodeImage;
 use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::vm::{ObsEvent, ThreadedRoundSemantics, VMConfig, VM};
 use telltale_vm::{
-    EffectDeterminismTier, EnvelopeDiffArtifactV1, FailureVisibleDiffClass,
-    SchedulerPermutationClass,
+    CommunicationReplayMode, EffectDeterminismTier, EnvelopeDiffArtifactV1,
+    FailureVisibleDiffClass, SchedulerPermutationClass,
 };
 use test_support::{PassthroughHandler, ScenarioSpec};
 
@@ -232,6 +232,40 @@ fn canonical_parity_is_exact_at_concurrency_one() {
         coop.canonical_replay_fragment(),
         threaded.canonical_replay_fragment(),
         "concurrency=1 must remain exact-match canonical parity"
+    );
+}
+
+#[test]
+fn communication_replay_sequence_mode_parity_at_concurrency_one() {
+    let cfg = VMConfig {
+        communication_replay_mode: CommunicationReplayMode::Sequence,
+        ..VMConfig::default()
+    };
+    let image = ScenarioSpec::simple("A", "B", "m-seq").to_code_image();
+    let mut coop = VM::new(cfg.clone());
+    let mut threaded = ThreadedVM::with_workers(
+        VMConfig {
+            threaded_round_semantics: ThreadedRoundSemantics::WaveParallelExtension,
+            ..cfg
+        },
+        2,
+    );
+    coop.load_choreography(&image)
+        .expect("load cooperative image");
+    threaded
+        .load_choreography(&image)
+        .expect("load threaded image");
+
+    coop.run_concurrent(&PassthroughHandler, 128, 1)
+        .expect("cooperative sequence replay run");
+    threaded
+        .run_concurrent(&PassthroughHandler, 128, 1)
+        .expect("threaded sequence replay run");
+
+    assert_eq!(
+        coop.canonical_replay_fragment(),
+        threaded.canonical_replay_fragment(),
+        "sequence replay mode must remain parity-exact at concurrency=1"
     );
 }
 

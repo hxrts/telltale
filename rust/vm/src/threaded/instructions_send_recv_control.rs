@@ -139,6 +139,15 @@ fn step_send(
     }
     let enqueue = match decision {
         SendDecision::Deliver(payload) => {
+            let edge = Edge::new(prepared.sid, role.to_string(), prepared.partner.clone());
+            let sequence_no = {
+                let mut model = ctx
+                    .communication_consumption
+                    .lock()
+                    .expect("communication replay lock poisoned");
+                model.set_mode(ctx.config.communication_replay_mode);
+                model.allocate_send_sequence(&edge)
+            };
             let payload = if let Some(corruption) = maybe_corruption {
                 ThreadedVM::apply_corruption(payload, corruption)
             } else {
@@ -146,7 +155,7 @@ fn step_send(
             };
             let mut session_guard = session.lock().expect("session lock poisoned");
             session_guard
-                .send(role, &prepared.partner, payload)
+                .send_with_sequence(role, &prepared.partner, payload, sequence_no)
                 .map_err(|e| Fault::Invoke { message: e })?
         }
         SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
@@ -260,7 +269,7 @@ fn step_recv(
     dst_reg: u16,
     ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
-    let (prepared, edge, val) = {
+    let (prepared, edge, val, sequence_no) = {
         let mut session_guard = session.lock().expect("session lock poisoned");
         let prepared = step_recv_prepare(coro, &session_guard, role, chan)?;
         if !session_guard.has_message(&prepared.partner, role) {
@@ -275,8 +284,8 @@ fn step_recv(
         }
 
         let edge = Edge::new(prepared.sid, prepared.partner.clone(), role.to_string());
-        let val = session_guard
-            .recv_verified(&prepared.partner, role)
+        let signed = session_guard
+            .recv_verified_signed(&prepared.partner, role)
             .map_err(|message| Fault::VerificationFailed {
                 edge: edge.clone(),
                 message,
@@ -284,8 +293,48 @@ fn step_recv(
             .ok_or_else(|| Fault::ChannelClosed {
                 endpoint: prepared.ep.clone(),
             })?;
-        (prepared, edge, val)
+        (prepared, edge, signed.payload, signed.sequence_no)
     };
+
+    // Deterministic ordering: signature verification (above), then replay-consumption.
+    let identity = CommunicationIdentity::from_payload(
+        &edge,
+        CommunicationStepKind::Receive,
+        &prepared.label,
+        &val,
+        sequence_no,
+    );
+    let consume = {
+        let mut model = ctx
+            .communication_consumption
+            .lock()
+            .expect("communication replay lock poisoned");
+        model.set_mode(ctx.config.communication_replay_mode);
+        model.consume_receive(&identity)
+    }
+    .map_err(|err| {
+        let tag = err.tag();
+        let message = match err {
+            CommunicationReplayError::SequenceMismatch { expected, actual } => {
+                format!("{tag}: expected={expected}, actual={actual}")
+            }
+            CommunicationReplayError::DuplicateIdentity { .. } => tag.to_string(),
+        };
+        Fault::VerificationFailed {
+            edge: edge.clone(),
+            message,
+        }
+    })?;
+    ctx.communication_consumption_artifacts
+        .lock()
+        .expect("communication artifact lock poisoned")
+        .push(CommunicationConsumptionArtifact {
+            tick: ctx.tick,
+            identity,
+            mode: consume.mode,
+            pre_root: consume.pre_root,
+            post_root: consume.post_root,
+        });
 
     validate_payload(
         ctx.config,

@@ -227,6 +227,7 @@ structure SignedValue (ν : Type u) [VerificationModel ν] where
   -- Payload paired with its authentication tag.
   payload : Value
   signature : VerificationModel.Signature ν
+  seqNo : Nat := 0
 
 abbrev SignedBuffer (ν : Type u) [VerificationModel ν] :=
   -- Buffer of signed payloads per edge.

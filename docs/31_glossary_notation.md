@@ -16,6 +16,9 @@ Use it as a stable lookup for terminology and notation.
 | admission | Runtime gate process that checks contracts and capability evidence. | [Capability and Admission](25_capability_admission.md) |
 | envelope | Declared refinement boundary for higher-concurrency and profile-scoped behavior. | [VM Architecture](12_vm_architecture.md), [VM Parity](19_vm_parity.md) |
 | determinism profile | Runtime trace-equivalence contract mode such as `Full` or `Replay`. | [VM Architecture](12_vm_architecture.md), [VM Parity](19_vm_parity.md) |
+| communication replay mode | Transport replay-consumption policy: `off`, `sequence`, or `nullifier`. | [VM Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
+| communication nullifier | Domain-separated digest of canonical communication identity used for one-time receive consumption checks. | [VM Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
+| consumption root | Deterministic accumulator root over communication replay-consumption state. | [VM Architecture](12_vm_architecture.md), [VM Parity](19_vm_parity.md) |
 
 ## Symbol and Notation Index
 
@@ -34,6 +37,8 @@ Use it as a stable lookup for terminology and notation.
 | `n = 1` | Canonical single-step concurrency regime for exact parity. | [VM Architecture](12_vm_architecture.md), [VM Parity](19_vm_parity.md) |
 | `n > 1` | Higher-concurrency regime admitted under envelope and premise-scoped constraints. | [VM Architecture](12_vm_architecture.md), [VM Parity](19_vm_parity.md) |
 | `Full`, `ModuloEffects`, `ModuloCommutativity`, `Replay` | Runtime determinism profiles. | [VM Architecture](12_vm_architecture.md), [VM Parity](19_vm_parity.md) |
+| `off`, `sequence`, `nullifier` | Communication replay-consumption modes. | [VM Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
+| `telltale.comm.identity.v1` | Domain-separation tag for canonical communication identity schema. | [VM Architecture](12_vm_architecture.md) |
 
 ## Notation Consistency Rules
 

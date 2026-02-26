@@ -321,6 +321,7 @@ impl VM {
             .map_err(|e| Fault::Close { message: e })?;
         self.monitor.remove_kind(sid);
         self.resource_states.remove(&sid);
+        self.communication_consumption.prune_session(sid);
         let epoch = self.sessions.get(sid).map_or(0, |session| session.epoch);
 
         Ok(StepPack {

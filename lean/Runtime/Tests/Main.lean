@@ -71,6 +71,21 @@ def emptyState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerif
   , ghostSessions := default
   , progressSupply := () }
 
+def withCommReplayMode
+    (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify)
+    (mode : CommunicationReplayMode) :
+    VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+  { st with config := { st.config with communicationReplayMode := mode } }
+
+def sampleCommIdentity (seqNo : Nat) : CommunicationIdentity :=
+  { sid := 0
+  , sender := "A"
+  , receiver := "B"
+  , stepKind := .receive
+  , label := "recv"
+  , payloadDigest := communicationIdentityPayloadDigest (.nat 7)
+  , seqNo := seqNo }
+
 /-- Simple two-party LocalTypeR image. -/
 def twoPartyImage : CodeImage UnitGuard UnitEffect :=
   let lbl : SessionTypes.GlobalType.Label := { name := "msg" }
@@ -628,3 +643,36 @@ def main : IO Unit := do
   let badTransferPack := stepTransfer stPlan badTransferCoro 0 1 0
   expect (hasTransferFaultMsg badTransferPack.res "bad transfer target")
     "transfer target type fault did not use normalized transfer fault helper"
+
+  -- Test 39: communication replay off mode accepts duplicate identities.
+  let offStart := withCommReplayMode emptyState .off
+  let offDuplicateOk :=
+    match commConsumeReceiveIdentity offStart 0 (sampleCommIdentity 0) with
+    | .ok (_, offNext) =>
+        match commConsumeReceiveIdentity offNext 1 (sampleCommIdentity 0) with
+        | .ok _ => true
+        | .error _ => false
+    | .error _ => false
+  expect offDuplicateOk "comm replay off mode rejected duplicate identity"
+
+  -- Test 40: sequence mode rejects out-of-order sequence numbers.
+  let seqStart := withCommReplayMode emptyState .sequence
+  let seqMismatchRejected :=
+    match commConsumeReceiveIdentity seqStart 0 (sampleCommIdentity 0) with
+    | .ok (_, seqNext) =>
+        match commConsumeReceiveIdentity seqNext 1 (sampleCommIdentity 2) with
+        | .error msg => msg.startsWith "comm_replay.sequence_mismatch"
+        | .ok _ => false
+    | .error _ => false
+  expect seqMismatchRejected "comm replay sequence mode accepted out-of-order sequence number"
+
+  -- Test 41: nullifier mode rejects duplicate identities.
+  let nullStart := withCommReplayMode emptyState .nullifier
+  let nullDuplicateRejected :=
+    match commConsumeReceiveIdentity nullStart 0 (sampleCommIdentity 3) with
+    | .ok (_, nullNext) =>
+        match commConsumeReceiveIdentity nullNext 1 (sampleCommIdentity 3) with
+        | .error msg => msg = "comm_replay.duplicate"
+        | .ok _ => false
+    | .error _ => false
+  expect nullDuplicateRejected "comm replay nullifier mode accepted duplicate identity"

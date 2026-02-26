@@ -23,6 +23,11 @@ use crate::bridge::{IdentityGuardBridge, IdentityVerificationBridge};
 use crate::buffer::{BufferConfig, EnqueueResult};
 use crate::clock::SimClock;
 use crate::commit_common::{apply_output_condition_gate, effect_trace_entry_for_event};
+use crate::communication_replay::{
+    CommunicationConsumeResult, CommunicationConsumption, CommunicationConsumptionArtifact,
+    CommunicationIdentity, CommunicationReplayError, CommunicationReplayMode,
+    CommunicationStepKind, DefaultCommunicationConsumption,
+};
 use crate::coroutine::{
     BlockReason, CoroStatus, Coroutine, Fault, KnowledgeFact, ProgressToken, Value,
 };

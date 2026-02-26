@@ -54,6 +54,9 @@ pub struct VMConfig {
     /// Runtime payload hardening mode for inbound/outbound messages.
     #[serde(default)]
     pub payload_validation_mode: PayloadValidationMode,
+    /// Communication replay-consumption mode.
+    #[serde(default)]
+    pub communication_replay_mode: CommunicationReplayMode,
     /// Upper bound for VM payload values in estimated wire bytes.
     #[serde(default = "default_max_payload_bytes")]
     pub max_payload_bytes: usize,
@@ -86,6 +89,7 @@ impl Default for VMConfig {
             threaded_round_semantics: ThreadedRoundSemantics::CanonicalOneStep,
             effect_trace_capture_mode: EffectTraceCaptureMode::Full,
             payload_validation_mode: PayloadValidationMode::Structural,
+            communication_replay_mode: CommunicationReplayMode::Off,
             max_payload_bytes: default_max_payload_bytes(),
             host_contract_assertions: false,
         }

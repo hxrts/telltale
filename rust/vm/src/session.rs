@@ -203,6 +203,35 @@ impl SessionState {
             &SignedValue {
                 payload: val,
                 signature,
+                sequence_no: 0,
+            },
+        )
+    }
+
+    /// Send a value from one role to another with explicit sequence number.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no buffer exists for the given edge.
+    pub fn send_with_sequence(
+        &mut self,
+        from: &str,
+        to: &str,
+        val: Value,
+        sequence_no: u64,
+    ) -> Result<crate::buffer::EnqueueResult, String> {
+        let signer = signing_key_for_endpoint(&Endpoint {
+            sid: self.sid,
+            role: from.to_string(),
+        });
+        let signature = signValue(&val, &signer);
+        self.send_signed(
+            from,
+            to,
+            &SignedValue {
+                payload: val,
+                signature,
+                sequence_no,
             },
         )
     }
@@ -218,7 +247,11 @@ impl SessionState {
     /// # Errors
     ///
     /// Returns an error if signature verification fails.
-    pub fn recv_verified(&mut self, from: &str, to: &str) -> Result<Option<Value>, String> {
+    pub fn recv_verified_signed(
+        &mut self,
+        from: &str,
+        to: &str,
+    ) -> Result<Option<SignedValue<Signature>>, String> {
         let sender = Endpoint {
             sid: self.sid,
             role: from.to_string(),
@@ -233,7 +266,18 @@ impl SessionState {
                 "signature verification failed on edge {from} -> {to}"
             ));
         }
-        Ok(Some(signed.payload))
+        Ok(Some(signed))
+    }
+
+    /// Receive and verify a value destined for a role from a specific sender.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signature verification fails.
+    pub fn recv_verified(&mut self, from: &str, to: &str) -> Result<Option<Value>, String> {
+        Ok(self
+            .recv_verified_signed(from, to)?
+            .map(|signed| signed.payload))
     }
 
     /// Receive a value destined for a role from a specific sender.

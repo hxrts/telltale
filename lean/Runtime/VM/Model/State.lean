@@ -353,6 +353,37 @@ structure StructuredErrorEvent where
   detail : String
   deriving Repr, DecidableEq, Inhabited
 
+/-! ## Communication replay-consumption state -/
+
+inductive CommunicationStepKind where
+  | send
+  | receive
+  | offer
+  | choose
+  deriving Repr, DecidableEq, Inhabited
+
+def communicationIdentityDomainTag : String :=
+  "telltale.comm.identity.v1"
+
+structure CommunicationIdentity where
+  domainTag : String := communicationIdentityDomainTag
+  sid : SessionId
+  sender : Role
+  receiver : Role
+  stepKind : CommunicationStepKind
+  label : Label
+  payloadDigest : String
+  seqNo : Nat
+  deriving Repr, DecidableEq, Inhabited
+
+structure CommunicationConsumeArtifact where
+  tick : Nat
+  identity : CommunicationIdentity
+  mode : CommunicationReplayMode
+  preRoot : String
+  postRoot : String
+  deriving Repr, DecidableEq, Inhabited
+
 /-! ## Scheduler state: runtime record -/
 
 structure SchedState (γ : Type u) where
@@ -399,6 +430,10 @@ structure VMState (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν] where
   failureTrace : List FailureTraceEvent := []
   structuredErrorEvents : List StructuredErrorEvent := []
   nextFailureSeqNo : Nat := 0
+  commNextSendSeq : List (Edge × Nat) := []
+  commNextRecvSeq : List (Edge × Nat) := []
+  commConsumedNullifiers : List String := []
+  commConsumptionArtifacts : List CommunicationConsumeArtifact := []
   mask : Unit
   ghostSessions : GhostRuntimeState
   progressSupply : Unit
@@ -433,6 +468,86 @@ def recordCheckpointMeta {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
 def setRestartAnchor {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
     (st : VMState ι γ π ε ν) (anchor : RestartAnchor) : VMState ι γ π ε ν :=
   { st with restartAnchor := some anchor }
+
+def communicationIdentityPayloadDigest (v : Value) : String :=
+  reprStr v
+
+def communicationIdentityNullifier (ident : CommunicationIdentity) : String :=
+  reprStr ident
+
+def communicationReplayRoot {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
+    (st : VMState ι γ π ε ν) : String :=
+  reprStr (st.commNextSendSeq, st.commNextRecvSeq, st.commConsumedNullifiers)
+
+def commSeqLookup (entries : List (Edge × Nat)) (edge : Edge) : Nat :=
+  match entries.find? (fun p => decide (p.fst = edge)) with
+  | some (_, n) => n
+  | none => 0
+
+def commSeqSet (entries : List (Edge × Nat)) (edge : Edge) (next : Nat) :
+    List (Edge × Nat) :=
+  let rec go (xs : List (Edge × Nat)) : List (Edge × Nat) :=
+    match xs with
+    | [] => [(edge, next)]
+    | (edge', n') :: rest =>
+        if edge' = edge then
+          (edge, next) :: rest
+        else
+          (edge', n') :: go rest
+  go entries
+
+def commAllocSendSeq {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
+    (st : VMState ι γ π ε ν) (edge : Edge) : Nat × VMState ι γ π ε ν :=
+  let seqNo := commSeqLookup st.commNextSendSeq edge
+  let nextSend := commSeqSet st.commNextSendSeq edge (seqNo + 1)
+  (seqNo, { st with commNextSendSeq := nextSend })
+
+def commConsumeReceiveIdentity {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
+    (st : VMState ι γ π ε ν) (tick : Nat) (ident : CommunicationIdentity) :
+    Except String (CommunicationConsumeArtifact × VMState ι γ π ε ν) :=
+  let preRoot := communicationReplayRoot st
+  match st.config.communicationReplayMode with
+  | .off =>
+      let postRoot := preRoot
+      let artifact : CommunicationConsumeArtifact := {
+        tick := tick, identity := ident, mode := .off, preRoot := preRoot, postRoot := postRoot
+      }
+      let st' := { st with commConsumptionArtifacts := st.commConsumptionArtifacts ++ [artifact] }
+      .ok (artifact, st')
+  | .sequence =>
+      let edge : Edge := { sid := ident.sid, sender := ident.sender, receiver := ident.receiver }
+      let expected := commSeqLookup st.commNextRecvSeq edge
+      if ident.seqNo = expected then
+        let nextRecv := commSeqSet st.commNextRecvSeq edge (expected + 1)
+        let st1 := { st with commNextRecvSeq := nextRecv }
+        let postRoot := communicationReplayRoot st1
+        let artifact : CommunicationConsumeArtifact := {
+          tick := tick
+          identity := ident
+          mode := .sequence
+          preRoot := preRoot
+          postRoot := postRoot
+        }
+        let st' := { st1 with commConsumptionArtifacts := st1.commConsumptionArtifacts ++ [artifact] }
+        .ok (artifact, st')
+      else
+        .error s!"comm_replay.sequence_mismatch: expected={expected}, actual={ident.seqNo}"
+  | .nullifier =>
+      let nullifier := communicationIdentityNullifier ident
+      if nullifier ∈ st.commConsumedNullifiers then
+        .error "comm_replay.duplicate"
+      else
+        let st1 := { st with commConsumedNullifiers := st.commConsumedNullifiers ++ [nullifier] }
+        let postRoot := communicationReplayRoot st1
+        let artifact : CommunicationConsumeArtifact := {
+          tick := tick
+          identity := ident
+          mode := .nullifier
+          preRoot := preRoot
+          postRoot := postRoot
+        }
+        let st' := { st1 with commConsumptionArtifacts := st1.commConsumptionArtifacts ++ [artifact] }
+        .ok (artifact, st')
 
 /-- Well-formedness: coroutine PCs are in range and sessions are bounded. -/
 def WFVMState {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]

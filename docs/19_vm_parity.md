@@ -17,6 +17,8 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 | `OutputConditionPolicy` | `Runtime/VM/Model/OutputCondition.lean` | `rust/vm/src/output_condition.rs` | Aligned |
 | Runtime `Value` variants | `Protocol/Values.lean` | `rust/vm/src/coroutine.rs` | Aligned |
 | `ProgressToken` fields | `Runtime/VM/Model/State.lean` | `rust/vm/src/coroutine.rs` | Aligned |
+| `CommunicationReplayMode` variants | `Runtime/VM/Model/Config.lean` | `rust/vm/src/communication_replay.rs` | Aligned |
+| `SignedValue` transport fields (`payload`, `signature`, `sequence_no`) | `Runtime/VM/Model/TypeClasses.lean` | `rust/vm/src/buffer.rs` | Aligned |
 | Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | no executable admission gate in baseline Lean runner | `rust/vm/src/vm.rs` | Runtime-only extension (documented deviation) |
 
 These checks are automated by `just check-parity --types`.
@@ -114,6 +116,7 @@ Any intentional parity break must be recorded in the deviation table below befor
 |----|--------|-------|---------|---------|
 | threaded-round-extension | resolved | vm-runtime | 2026-04-30 | Threaded backend defaults to canonical one-step rounds |
 | payload-hardening-extension | active | vm-runtime | 2026-06-30 | Rust VM adds configurable payload-admission checks for malformed/adversarial message values |
+| comm-replay-label-context | active | vm-runtime | 2026-08-31 | Lean receive semantics use a fixed `"recv"` label-context token for communication identity while Rust records concrete runtime label strings |
 
 ### Deviation Details
 
@@ -153,6 +156,29 @@ Any intentional parity break must be recorded in the deviation table below befor
 - `rust/vm/src/vm.rs::tests::test_payload_validation_off_allows_annotated_type_mismatch_for_compatibility`
 - `rust/vm/src/vm.rs::tests::test_payload_validation_strict_schema_requires_annotations_for_send_recv`
 - `rust/vm/src/vm.rs::tests::test_payload_validation_size_bound_rejects_oversized_payloads`
+
+#### comm-replay-label-context
+
+**Lean:** `Runtime/VM/Semantics/ExecComm.lean`, `Runtime/VM/Model/State.lean`
+**Rust:** `rust/vm/src/vm/instruction_control_and_effects.rs`, `rust/vm/src/threaded/instructions_send_recv_control.rs`, `rust/vm/src/communication_replay.rs`
+
+**Reason:** Lean executable receive semantics currently normalize communication identity label-context to `"recv"` in `stepReceive`. Rust records concrete runtime message labels.
+
+**Impact:** Replay-consumption mode parity is preserved for sequence and duplicate checks on edge/sequence/nullifier dimensions. Label-granular identity discrimination may differ for protocols that rely on multiple labels sharing identical payloads and sequence positions.
+
+**Alternatives considered:** Temporarily dropping label-context from Rust identities was rejected because it would reduce diagnostic precision and weaken artifact expressiveness.
+
+**Covers:** `comm.replay.identity.label_context`
+
+**Tests:**
+- `lean/Runtime/Tests/Main.lean` tests 39-41
+- `rust/vm/src/communication_replay.rs` mode tests
+- `rust/vm/tests/parity_fixtures_v2.rs::communication_replay_sequence_mode_parity_at_concurrency_one`
+
+**Exit criteria:**
+- Extend Lean local-type receive semantics to carry branch-label context through receive identities.
+- Remove fixed `"recv"` label token from Lean communication identity construction.
+- Keep `just check-parity --types` and `just check-parity --suite` passing without this deviation entry.
 
 ## CI Gates
 
