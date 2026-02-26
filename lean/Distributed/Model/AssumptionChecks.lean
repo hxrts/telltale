@@ -2,7 +2,7 @@ import Distributed.Model.Classifier
 
 set_option autoImplicit false
 
-/-! # Distributed.Model.Assumptions.Checks
+/-! # Distributed.Model.AssumptionChecks
 
 Internal boolean checks used by assumption validators.
 -/

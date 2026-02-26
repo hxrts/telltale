@@ -1,4 +1,4 @@
-import Distributed.Model.Assumptions.Checks
+import Distributed.Model.AssumptionChecks
 
 set_option autoImplicit false
 

@@ -1,5 +1,5 @@
 import Runtime.ProgramLogic.LanguageInstance
-import Runtime.Invariants.SessionInv
+import Runtime.Invariants
 import Runtime.ProgramLogic.GhostState
 import Runtime.ProgramLogic.WPPair
 import IrisExtractionInstance

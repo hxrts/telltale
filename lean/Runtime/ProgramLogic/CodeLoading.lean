@@ -1,7 +1,7 @@
 import Protocol.Coherence.Consume
 import Protocol.DeadlockFreedom
 import Runtime.VM.API
-import Runtime.Invariants.SessionInv
+import Runtime.Invariants
 import IrisExtractionInstance
 
 /-
