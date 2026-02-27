@@ -345,6 +345,7 @@ async fn handle_connection(
     Ok(())
 }
 
+#[allow(clippy::type_complexity)]
 async fn lookup_sender(
     senders: &Arc<Mutex<BTreeMap<String, mpsc::Sender<Vec<u8>>>>>,
     peer_role: &str,

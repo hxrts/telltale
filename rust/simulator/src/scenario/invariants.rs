@@ -11,16 +11,16 @@ pub(super) fn parse_invariant(name: &str) -> Result<Property, String> {
 fn parse_parameterized_invariant(name: &str) -> Result<Property, String> {
     if let Some((base, args)) = parse_call(name) {
         match base {
-            "send_recv_liveness" => return parse_send_recv_liveness(args),
-            "buffer_bound" => return parse_buffer_bound(args),
-            "type_monotonicity" => return parse_type_monotonicity(args),
+            "send_recv_liveness" => return parse_send_recv_liveness(&args),
+            "buffer_bound" => return parse_buffer_bound(&args),
+            "type_monotonicity" => return parse_type_monotonicity(&args),
             _ => {}
         }
     }
     Err(format!("unknown invariant: {name}"))
 }
 
-fn parse_send_recv_liveness(args: Vec<&str>) -> Result<Property, String> {
+fn parse_send_recv_liveness(args: &[&str]) -> Result<Property, String> {
     if args.len() != 2 {
         return Err("send_recv_liveness requires (sid,bound)".into());
     }
@@ -33,7 +33,7 @@ fn parse_send_recv_liveness(args: Vec<&str>) -> Result<Property, String> {
     Ok(Property::SendRecvLiveness { sid, bound })
 }
 
-fn parse_buffer_bound(args: Vec<&str>) -> Result<Property, String> {
+fn parse_buffer_bound(args: &[&str]) -> Result<Property, String> {
     if args.len() != 2 {
         return Err("buffer_bound requires (sid,max)".into());
     }
@@ -46,7 +46,7 @@ fn parse_buffer_bound(args: Vec<&str>) -> Result<Property, String> {
     Ok(Property::BufferBound { sid, max })
 }
 
-fn parse_type_monotonicity(args: Vec<&str>) -> Result<Property, String> {
+fn parse_type_monotonicity(args: &[&str]) -> Result<Property, String> {
     if args.len() != 1 {
         return Err("type_monotonicity requires (sid)".into());
     }
