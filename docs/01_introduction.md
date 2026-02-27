@@ -1,12 +1,12 @@
 # Introduction
 
-[Telltale](https://github.com/hxrts/telltale) is a Rust framework for choreographic programming with multiparty session types. It enables writing distributed protocols from a global perspective with automatic projection to local implementations. The Lean 4 formalization provides mechanized proofs of preservation, progress, coherence, and harmony.
+[Telltale](https://github.com/hxrts/telltale) is a Rust framework for choreographic programming with multiparty session types. It enables writing distributed protocols from a global perspective with automatic projection to local implementations. The accompanying Lean 4 formalization provides mechanized proofs of preservation, progress, coherence, and harmony.
 
 The framework includes a bytecode VM with deterministic scheduling and configurable buffer backpressure policies. Asynchronous subtyping uses SISO decomposition with orphan-free deadlock checks. Endpoint transfer semantics support ownership handoff at runtime with progress token migration. Content addressing assigns cryptographic identities to protocol artifacts. The same choreography compiles to native and WASM targets.
 
 ## Core Concepts
 
-Session types encode communication protocols as types. A type like `!String.?Int.end` specifies: send a string, receive an integer, close the channel. The compiler checks that implementations follow the protocol contract.
+Session types encode communication protocols as types. A type like `!String.?Int.end` sends a string, receives an integer, then closes the channel. The compiler checks that implementations follow the protocol contract.
 
 Multiparty session types extend this to protocols with three or more participants. Global types describe the full protocol. Projection transforms global types into local types for each participant. The type system tracks dependencies between participants to prevent deadlocks.
 
@@ -14,11 +14,13 @@ Choreographic programming builds on global types. A choreography describes compu
 
 ## Effect Handlers
 
-Communication operations are algebraic effects. Sending and receiving messages are abstract operations that handlers implement concretely. Programs specify what to communicate. Handlers determine how: in-memory channels for testing, TCP for deployment. The protocol logic remains unchanged across execution strategies.
+Communication operations are algebraic effects. Sending and receiving messages are abstract operations that handlers implement concretely. Programs specify what to communicate.
+
+Handlers determine how messages are delivered. In-memory channels work for testing. TCP connections work for deployment. The protocol logic remains unchanged across execution strategies.
 
 ## Bytecode VM
 
-The VM compiles local types to bytecode instructions. It manages scheduling, message buffers, and session lifecycle. The concurrency parameter N controls how many coroutines advance per round. Per-session traces are invariant over N.
+The VM compiles local types to bytecode instructions. It manages scheduling, message buffers, and session lifecycle. The concurrency parameter `N` controls how many coroutines advance per round. Per-session traces are invariant over `N`.
 
 ## Lean Verification
 
@@ -65,15 +67,15 @@ The `telltale-lean-bridge` crate provides JSON export and import for cross-valid
 
 ### Library Users
 
-Start with [Getting Started](02_getting_started.md), then [Choreographic DSL](06_choreographic_dsl.md). Continue with [Examples](28_examples.md) and [API Reference](30_api_reference.md).
+Start with [Getting Started](02_getting_started.md). Then read [Choreographic DSL](06_choreographic_dsl.md). Continue with [Examples](28_examples.md) and [API Reference](30_api_reference.md).
 
 ### VM Integrators
 
-Start with [Architecture](03_architecture.md), then [Effect Handlers and Session Types](11_effect_session_bridge.md), then [VM Architecture](12_vm_architecture.md). Continue with [Bytecode Instructions](13_bytecode_instructions.md), [Session Lifecycle](14_session_lifecycle.md), and [VM Simulation](15_vm_simulation_overview.md).
+Start with [Architecture](03_architecture.md). Then read [Effect Handlers and Session Types](11_effect_session_bridge.md) and [VM Architecture](12_vm_architecture.md). Continue with [Bytecode Instructions](13_bytecode_instructions.md) and [Session Lifecycle](14_session_lifecycle.md). See [VM Simulation](15_vm_simulation_overview.md) for testing.
 
 ### Paper Reviewers
 
-Start with [Architecture](03_architecture.md) and [Theory](05_theory.md), then [Lean Verification](23_lean_verification.md), and [Lean-Rust Bridge](24_lean_rust_bridge.md). Continue with [Capability and Admission](25_capability_admission.md), [Theorem Program](26_theorem_program.md), [Distributed and Classical Families](27_distributed_classical_families.md), and [Glossary and Notation Index](31_glossary_notation.md).
+Start with [Architecture](03_architecture.md) and [Theory](05_theory.md). Then read [Lean Verification](23_lean_verification.md) and [Lean-Rust Bridge](24_lean_rust_bridge.md). Continue with [Capability and Admission](25_capability_admission.md) and [Theorem Program](26_theorem_program.md). See [Distributed and Classical Families](27_distributed_classical_families.md) and [Glossary and Notation Index](31_glossary_notation.md) for reference.
 
 ## Further Reading
 

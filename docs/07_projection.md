@@ -170,7 +170,9 @@ LocalType::Loop {
 
 The count condition is maintained.
 
-Supported conditions include `Condition::Count(n)` for fixed iteration count. Custom boolean expressions use `Condition::Custom(expr)`. Infinite loops use `None` and must be terminated externally. The AST also includes `Fuel`, `YieldAfter`, and `YieldWhen` for tooling or extensions.
+Supported conditions include `Condition::Count(n)` for fixed iteration count. Custom boolean expressions use `Condition::Custom(expr)`. Infinite loops use `None` and must be terminated externally.
+
+The AST also includes `Fuel`, `YieldAfter`, and `YieldWhen` for tooling or extensions.
 
 Note: `Condition::RoleDecides(role)` loops are desugared at parse time to a choice+recursion pattern, so they don't appear in the AST after parsing and are handled as standard `Protocol::Rec` with `Protocol::Choice` during projection.
 

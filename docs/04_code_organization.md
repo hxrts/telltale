@@ -1,6 +1,6 @@
 # Code Organization
 
-This document describes the implementation organization of the codebase. It focuses on workspace layout, crate dependency structure, crate-level responsibilities, and Rust-Lean constructor correspondence.
+This document describes the implementation organization of the codebase. It covers workspace layout, crate dependency structure, crate-level responsibilities, and Rust-Lean constructor correspondence.
 
 For conceptual pipeline and runtime architecture, see [Architecture](03_architecture.md).
 
@@ -26,7 +26,7 @@ telltale/
 └── examples/               Example protocols
 ```
 
-This layout shows where each major subsystem lives so you can navigate from interface docs to implementation files without jumping across unrelated directories.
+This layout shows where each major subsystem lives. You can navigate from interface docs to implementation files without jumping across unrelated directories.
 
 ## Crate Dependency Graph
 
@@ -87,7 +87,7 @@ graph TB
     choreo --> transport
 ```
 
-This diagram shows direct crate dependencies. Arrows point from dependency to dependent crate. Some edges are feature-gated, such as `telltale-theory` and `telltale-choreography` support in `telltale-lean-bridge`.
+This diagram shows direct crate dependencies. Arrows point from dependency to dependent crate. Some edges are feature-gated. For example, `telltale-theory` and `telltale-choreography` support in `telltale-lean-bridge` requires explicit feature flags.
 
 ## Crate Descriptions
 
@@ -97,11 +97,11 @@ This crate is located in `rust/types/`. It contains core type definitions shared
 
 The crate defines `GlobalType` for global protocol views. It defines `LocalTypeR` for local participant views. It also defines `Label` for message labels with payload sorts, `PayloadSort` for type classification, and `Action` for send and receive actions.
 
-The crate also provides content addressing infrastructure. The `ContentId` type wraps a cryptographic hash. The `Contentable` trait defines canonical serialization. The `Hasher` trait abstracts hash algorithms.
+The crate provides content addressing infrastructure. The `ContentId` type wraps a cryptographic hash. The `Contentable` trait defines canonical serialization. The `Hasher` trait abstracts hash algorithms.
 
 #### Feature Flags
 
-`dag-cbor` enables DAG-CBOR serialization for IPLD or IPFS compatibility. It adds `to_cbor_bytes()`, `from_cbor_bytes()`, and `content_id_cbor_sha256()` methods to `Contentable` types.
+The `dag-cbor` feature enables DAG-CBOR serialization for IPLD or IPFS compatibility. It adds `to_cbor_bytes()`, `from_cbor_bytes()`, and `content_id_cbor_sha256()` methods to `Contentable` types.
 
 ```rust
 use telltale_types::{GlobalType, LocalTypeR, Label, PayloadSort};
@@ -121,7 +121,7 @@ The first expression creates a global type matching Lean's `GlobalType.comm "Cli
 
 This crate is located in `rust/theory/`. It implements pure algorithms for session type operations. The crate performs no IO or parsing.
 
-The `projection` module handles `GlobalType` to `LocalTypeR` projection with merging. The `merge` module implements branch merging with distinct semantics for send and receive. Send merge requires identical label sets while receive merge unions labels. This matches Lean's `mergeSendSorted` and `mergeRecvSorted` functions.
+The `projection` module handles `GlobalType` to `LocalTypeR` projection with merging. The `merge` module implements branch merging with distinct semantics for send and receive. Send merge requires identical label sets. Receive merge unions labels. This matches Lean's `mergeSendSorted` and `mergeRecvSorted` functions.
 
 The `subtyping/sync` module provides synchronous subtyping. The `subtyping/async` module provides asynchronous subtyping via SISO decomposition. The `well_formedness` module contains validation predicates.
 
@@ -194,9 +194,7 @@ The `runner` module provides `run`, `run_concurrent`, and `run_with_scenario` fo
 
 The `ChoreographySpec` struct packages a choreography for simulation. It includes local types, global type, and initial state vectors. The `Trace` type collects step records during execution.
 
-The `harness` module adds high level integration APIs for third party projects.
-It exports `HostAdapter`, `DirectAdapter`, `MaterialAdapter`, `HarnessSpec`, `HarnessConfig`, and `SimulationHarness`.
-The `contracts` module exports reusable post run checks for replay coherence and expected role coverage.
+The `harness` module adds high level integration APIs for third party projects. It exports `HostAdapter`, `DirectAdapter`, `MaterialAdapter`, `HarnessSpec`, `HarnessConfig`, and `SimulationHarness`. The `contracts` module exports reusable post run checks for replay coherence and expected role coverage.
 
 Material-model handlers are grouped in `rust/simulator/src/material_handlers/`. The crate re-exports `IsingHandler`, `HamiltonianHandler`, `ContinuumFieldHandler`, and `handler_from_material` from this module for runtime selection by scenario material type.
 
@@ -213,8 +211,7 @@ let trace = run(&spec.local_types, &spec.global_type, &spec.initial_states, 100,
 
 The `run` function executes a choreography and returns a trace. The trace contains step records for each role at each step.
 
-The simulator crate also ships a CLI entrypoint in `rust/simulator/src/bin/run.rs`.
-Use `just sim-run <config>` for a single config file execution path.
+The simulator crate also ships a CLI entrypoint in `rust/simulator/src/bin/run.rs`. Use `just sim-run <config>` for a single config file execution path.
 
 ### telltale-choreography
 
@@ -222,7 +219,7 @@ This crate is located in `rust/choreography/`. It provides DSL and parsing for c
 
 The `ast/` directory contains extended AST types including `Protocol`, `LocalType`, and `Role`. The `compiler/parser` module handles DSL parsing. The `compiler/projection` module handles choreography to `LocalType` projection. The `compiler/codegen` module handles Rust code generation.
 
-The parser now supports proof-bundle declarations and protocol bundle requirements. Parsed bundles are stored as typed metadata on `Choreography` through `ProofBundleDecl`.
+The parser supports proof-bundle declarations and protocol bundle requirements. Parsed bundles are stored as typed metadata on `Choreography` through `ProofBundleDecl`.
 
 The parser supports enriched proof-bundle fields (`version`, `issuer`, `constraint`). It also supports capability inference that can auto-select required bundles when protocol `requires` is omitted.
 
@@ -234,7 +231,7 @@ The parser supports first-class combinators (`handshake`, `retry`, `quorum_colle
 
 Lowering diagnostics are exposed through `explain_lowering` and `choreo-fmt --explain-lowering`. Lint output includes fix suggestions and an LSP-style JSON rendering helper.
 
-Validation in this crate now includes bundle and capability checks. It rejects duplicate bundle declarations, missing required bundles, and missing capability coverage for VM-core statements. See [Choreographic DSL](06_choreographic_dsl.md) for syntax details.
+Validation in this crate includes bundle and capability checks. It rejects duplicate bundle declarations, missing required bundles, and missing capability coverage for VM-core statements. See [Choreographic DSL](06_choreographic_dsl.md) for syntax details.
 
 The `effects/` directory contains the effect system and handlers. The `extensions/` directory contains the DSL extension system. The `runtime/` directory contains platform abstraction.
 
@@ -250,7 +247,7 @@ This crate is located in `rust/transport/`. It provides production transport imp
 
 The crate implements TCP-based transports with async networking via tokio. Future features include TLS support. The transport layer integrates with the effect handler system from `telltale-choreography`.
 
-### telltale
+### src
 
 This crate is defined at the repository root and uses `rust/src/` as its library source path. It re-exports core APIs from `telltale-types`, `telltale-macros`, and optional `telltale-theory` features.
 
@@ -281,6 +278,7 @@ The shared constructor set is aligned between `telltale-types` and Lean for core
 | `Label` | `Label { name, sort }` | `rust/types/src/global.rs` |
 
 The Rust variant names match Lean constructor names. Field names are consistent across both implementations.
+
 Rust `LocalTypeR` branches also carry `Option<ValType>` payload annotations. Lean tracks payload sorts at the label level in `GlobalType`.
 
 Lean `GlobalType` includes a `delegate` constructor for channel delegation that is not yet present in Rust. This is tracked as a known parity gap.

@@ -27,11 +27,13 @@ This table is a quick entry point for crate selection. Use it before reading the
 
 ### Understanding the Crates
 
-Telltale is organized as a Cargo workspace with several crates. The layout tracks the Lean formalization for shared protocol concepts. The `telltale-types` crate contains core type definitions such as `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`.
+Telltale is organized as a Cargo workspace with several crates. The layout tracks the Lean formalization for shared protocol concepts.
 
-Lean includes a `delegate` constructor that is not yet exposed in Rust. The `telltale-theory` crate contains pure algorithms for projection, merge, subtyping, and well-formedness checks.
+The `telltale-types` crate contains core type definitions such as `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`. Lean includes a `delegate` constructor that is not yet exposed in Rust.
 
-The `telltale-choreography` crate is the choreographic programming layer that provides the DSL parser, effect handlers, and code generation. The `telltale-vm` crate provides the bytecode VM execution engine. The `telltale-simulator` crate wraps the VM with deterministic middleware for testing. The `telltale-lean-bridge` crate enables cross-validation with Lean through JSON import and export functions.
+The `telltale-theory` crate contains pure algorithms for projection, merge, subtyping, and well-formedness checks. The `telltale-choreography` crate is the choreographic programming layer that provides the DSL parser, effect handlers, and code generation.
+
+The `telltale-vm` crate provides the bytecode VM execution engine. The `telltale-simulator` crate wraps the VM with deterministic middleware for testing. The `telltale-lean-bridge` crate enables cross-validation with Lean through JSON import and export functions.
 
 The `telltale` crate is the main facade that re-exports types from other crates with feature flags. Most users need both `telltale` and `telltale-choreography` for session types and the high-level DSL.
 
@@ -76,7 +78,7 @@ The workspace provides granular feature flags to control dependencies and functi
 
 | Feature | Default | Description |
 |---------|---------|-------------|
-| `runner` | yes | LeanRunner for invoking Lean binary |
+| `runner` | yes | `LeanRunner` for invoking Lean binary |
 | `cli` | no | Command-line interface binary |
 | `exporter` | no | Choreography exporter binary |
 | `golden` | no | Golden file management CLI |
@@ -99,7 +101,7 @@ telltale = { version = "2.0.0", features = ["full"] }
 
 This enables all optional features for the facade crate.
 
-For WASM support, enable the wasm feature on the choreography crate.
+For WASM support, enable the `wasm` feature on the choreography crate.
 
 ```toml
 telltale-choreography = { version = "2.0.0", features = ["wasm"] }
@@ -168,7 +170,7 @@ Roles are participants in the protocol. Each role sends and receives messages ac
 
 ### Messages
 
-Messages are data exchanged between roles. They must implement `Serialize` and `Deserialize` from the serde library.
+Messages are data exchanged between roles. They must implement `Serialize` and `Deserialize` from the `serde` library.
 
 ### Effect Handlers
 

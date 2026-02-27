@@ -544,8 +544,14 @@ This sets up a local channel pair and exercises a full send and receive. It vali
 
 ## Operational Notes
 
-`TelltaleHandler` is intentionally thin. Most correctness comes from the session-typed state in `TelltaleEndpoint` and from protocol generation. Treat the handler as a transport adapter with stable behavior. Keep role definitions and message definitions close to each protocol module so type drift is easy to detect during review.
+`TelltaleHandler` is intentionally thin. Most correctness comes from the session-typed state in `TelltaleEndpoint` and from protocol generation. Treat the handler as a transport adapter with stable behavior.
 
-For production integrations, prefer explicit lifecycle management even though drop-based cleanup exists. Close channels when a protocol is complete. Inspect endpoint metadata after important milestones such as branch commits or retries. This makes stuck-session diagnosis faster because metadata captures operation counts and completion status per peer.
+Keep role definitions and message definitions close to each protocol module. This makes type drift easy to detect during review.
 
-When introducing custom transports, keep serialization and framing deterministic. Use one canonical message encoding in both tests and production. Add at least one integration test that runs both endpoints concurrently and one scenario test that exercises failure handling. This keeps transport behavior aligned with the same protocol contracts used by local test setups.
+For production integrations, prefer explicit lifecycle management even though drop-based cleanup exists. Close channels when a protocol is complete. Inspect endpoint metadata after important milestones such as branch commits or retries.
+
+This makes stuck-session diagnosis faster. Metadata captures operation counts and completion status per peer.
+
+When introducing custom transports, keep serialization and framing deterministic. Use one canonical message encoding in both tests and production.
+
+Add at least one integration test that runs both endpoints concurrently. Add one scenario test that exercises failure handling. This keeps transport behavior aligned with the same protocol contracts used by local test setups.

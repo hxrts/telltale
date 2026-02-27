@@ -237,7 +237,7 @@ If any threshold is violated, CI fails before benchmark lanes are considered hea
 
 ## Update Rule
 
-When any parity matrix row changes, update the Deviation Registry table in this file in the same change set. For any VM PR that changes public runtime behavior, include a parity impact statement in the PR checklist and add differential tests when observable behavior changes.
+When any parity matrix row changes, update the Deviation Registry table in this file in the same change set. For any VM PR that changes public runtime behavior, include a parity impact statement in the PR checklist. Add differential tests when observable behavior changes.
 
 ## Type-Level Parity Checklist
 

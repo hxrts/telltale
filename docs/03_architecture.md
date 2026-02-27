@@ -90,7 +90,7 @@ pub struct Choreography {
 }
 ```
 
-This struct holds the protocol name and optional namespace. It contains participating roles and the protocol tree. Metadata attributes are stored in the attrs field.
+This struct holds the protocol name and optional namespace. It contains participating roles and the protocol tree. Metadata attributes are stored in the `attrs` field.
 
 The `Protocol` enum defines all protocol actions.
 
@@ -131,14 +131,13 @@ pub enum Protocol {
 }
 ```
 
-Protocol is a recursive tree structure. It includes support for annotations at multiple levels. Broadcasts, choices, parallel composition, and recursive definitions are supported. `NonEmptyVec` is used where the DSL enforces at least one branch.
+`Protocol` is a recursive tree structure. It includes support for annotations at multiple levels. Broadcasts, choices, parallel composition, and recursive definitions are supported. `NonEmptyVec` is used where the DSL enforces at least one branch.
 
 ### Parser Module
 
 The parser module is located in `rust/choreography/src/compiler/parser/`. It converts DSL text into AST using the Pest parser generator.
 
-The parser validates role declarations. It builds the protocol tree from the input text.
-It runs a layout preprocessor before the grammar parse. This enables layout sensitive syntax with explicit braces for empty blocks.
+The parser validates role declarations and builds the protocol tree from the input text. It runs a layout preprocessor before the grammar parse. This enables layout sensitive syntax with explicit braces for empty blocks.
 
 Two entry points are available.
 
@@ -242,11 +241,12 @@ pub trait ChoreoHandler: Send {
 ```
 
 Handlers implement this trait to provide different execution strategies. This async handler is distinct from the synchronous `telltale_vm::effect::EffectHandler` used by the VM.
+
 Use [Effect Handlers and Session Types](11_effect_session_bridge.md) for VM integration guidance.
 
 ### VM Execution Layer
 
-The VM provides a bytecode execution model for local types. The `telltale-vm` crate compiles `LocalTypeR` into bytecode and executes it with a policy-based scheduler. `telltale-simulator` wraps the VM with deterministic middleware for latency, faults, property monitoring, and checkpointing.
+The VM provides a bytecode execution model for local types. The `telltale-vm` crate compiles `LocalTypeR` into bytecode and executes it with a policy-based scheduler. The `telltale-simulator` crate wraps the VM with deterministic middleware for latency, faults, property monitoring, and checkpointing.
 
 The VM maintains session state with bounded message buffers. Each coroutine references its assigned program by ID. The scheduler policies are observationally equivalent per the Lean model. Nested VMs can be hosted inside a coroutine for hierarchical simulation.
 
@@ -347,7 +347,7 @@ Type checking prevents common distributed systems errors. Message ordering and p
 
 ### Platform Abstraction
 
-The runtime module provides platform-specific async primitives. Native targets use tokio. WASM uses wasm-bindgen-futures.
+The runtime module provides platform-specific async primitives. Native targets use tokio. WASM uses `wasm-bindgen-futures`.
 
 This abstraction makes the core library portable. The same code runs on servers and in browsers.
 
@@ -367,7 +367,7 @@ The projection algorithm can be extended for domain-specific optimizations. Over
 
 ### Code Generation Backends
 
-Add new code generation backends to target different session type libraries. The AST and LocalType representations are language-agnostic. Backends for other languages can be added.
+Add new code generation backends to target different session type libraries. The AST and `LocalType` representations are language-agnostic. Backends for other languages can be added.
 
 ## Implementation Organization
 

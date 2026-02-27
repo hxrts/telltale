@@ -160,7 +160,7 @@ Asynchronous subtyping accounts for message buffering. Messages may arrive befor
 
 The key insight is that output actions can be reordered with respect to input actions under certain conditions. This enables optimizations that would be unsound in synchronous semantics.
 
-Telltale implements the asynchronous subtyping algorithm from Bravetti et al. (POPL 2021) which decomposes types into single-input-single-output segments for decidable checking.
+Telltale implements the asynchronous subtyping algorithm from Bravetti et al. (POPL 2021). This algorithm decomposes types into single-input-single-output segments for decidable checking.
 
 ## Bisimulation
 

@@ -47,8 +47,9 @@ protocol ThresholdProtocol =
 "#;
 ```
 
-Multiple modules can coexist in separate files. Inside the `choreography!` macro you typically omit the module header, but it is supported in string-based parsing.
-`import` declarations are parsed for completeness, but import resolution is not currently applied during compilation.
+Multiple modules can coexist in separate files. Inside the `choreography!` macro you typically omit the module header. String-based parsing supports module headers.
+
+The parser recognizes `import` declarations for completeness. Import resolution is not currently applied during compilation.
 
 ### Supported Constructs
 
