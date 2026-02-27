@@ -1,14 +1,21 @@
 //! Generate deterministic `EffectHandler` integration stubs.
 
 use std::env;
-use std::fs::{self, OpenOptions};
-use std::io::{ErrorKind, Write};
+use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const DEFAULT_OUT_DIR: &str = "target/effect_handler_scaffold";
 const DEFAULT_STRUCT_NAME: &str = "HostEffectHandler";
 const DEFAULT_WITH_SIMULATOR: bool = true;
 const STRUCT_NAME_TEMPLATE_TOKEN: &str = "{{STRUCT_NAME}}";
+
+#[derive(Debug, Clone)]
+struct GeneratedFile {
+    name: &'static str,
+    kind: &'static str,
+    content: String,
+}
 
 fn main() {
     if let Err(error) = run() {
@@ -30,47 +37,11 @@ fn run() -> Result<(), String> {
     }
 
     let out_dir = PathBuf::from(&parsed.out_dir);
-    let handler_path = out_dir.join("effect_handler.rs");
-    let test_path = out_dir.join("effect_handler_test.rs");
-    let simulator_test_path = out_dir.join("simulator_harness_test.rs");
-    let readme_path = out_dir.join("README.md");
+    let generated = generate_scaffold(&out_dir, &parsed.struct_name, parsed.with_simulator)?;
 
-    fs::create_dir_all(&out_dir).map_err(|e| {
-        format!(
-            "failed to create output directory '{}': {e}",
-            out_dir.display()
-        )
-    })?;
-
-    write_new_file(
-        &handler_path,
-        &render_handler_template(&parsed.struct_name),
-        "handler stub",
-    )?;
-    write_new_file(
-        &test_path,
-        &render_test_template(&parsed.struct_name),
-        "test stub",
-    )?;
-    if parsed.with_simulator {
-        write_new_file(
-            &simulator_test_path,
-            &render_simulator_test_template(&parsed.struct_name),
-            "simulator harness test stub",
-        )?;
+    for path in generated {
+        println!("generated: {}", path.display());
     }
-    write_new_file(
-        &readme_path,
-        &render_readme_template(&parsed.struct_name, parsed.with_simulator),
-        "scaffold README",
-    )?;
-
-    println!("generated: {}", handler_path.display());
-    println!("generated: {}", test_path.display());
-    if parsed.with_simulator {
-        println!("generated: {}", simulator_test_path.display());
-    }
-    println!("generated: {}", readme_path.display());
     Ok(())
 }
 
@@ -202,21 +173,121 @@ fn print_help() {
     );
 }
 
-fn write_new_file(path: &Path, content: &str, kind: &str) -> Result<(), String> {
-    let mut file = match OpenOptions::new().write(true).create_new(true).open(path) {
-        Ok(file) => file,
-        Err(err) if err.kind() == ErrorKind::AlreadyExists => {
+fn build_generated_files(struct_name: &str, with_simulator: bool) -> Vec<GeneratedFile> {
+    let mut files = vec![
+        GeneratedFile {
+            name: "effect_handler.rs",
+            kind: "handler stub",
+            content: render_handler_template(struct_name),
+        },
+        GeneratedFile {
+            name: "effect_handler_test.rs",
+            kind: "test stub",
+            content: render_test_template(struct_name),
+        },
+    ];
+
+    if with_simulator {
+        files.push(GeneratedFile {
+            name: "simulator_harness_test.rs",
+            kind: "simulator harness test stub",
+            content: render_simulator_test_template(struct_name),
+        });
+    }
+
+    files.push(GeneratedFile {
+        name: "README.md",
+        kind: "scaffold README",
+        content: render_readme_template(struct_name, with_simulator),
+    });
+
+    files
+}
+
+fn generate_scaffold(
+    out_dir: &Path,
+    struct_name: &str,
+    with_simulator: bool,
+) -> Result<Vec<PathBuf>, String> {
+    fs::create_dir_all(out_dir).map_err(|e| {
+        format!(
+            "failed to create output directory '{}': {e}",
+            out_dir.display()
+        )
+    })?;
+
+    let files = build_generated_files(struct_name, with_simulator);
+    preflight_absent_targets(out_dir, &files)?;
+    write_files_transactionally(out_dir, &files)
+}
+
+fn preflight_absent_targets(out_dir: &Path, files: &[GeneratedFile]) -> Result<(), String> {
+    for file in files {
+        let path = out_dir.join(file.name);
+        if path.exists() {
             return Err(format!(
-                "{kind} already exists at '{}'; use a new output directory or remove existing files",
+                "{} already exists at '{}'; use a new output directory or remove existing files",
+                file.kind,
                 path.display()
             ));
         }
-        Err(err) => {
-            return Err(format!("failed to create '{}': {err}", path.display()));
+    }
+    Ok(())
+}
+
+fn write_files_transactionally(out_dir: &Path, files: &[GeneratedFile]) -> Result<Vec<PathBuf>, String> {
+    let stage_dir = out_dir.join(format!(
+        ".effect_scaffold_stage_{}_{}",
+        std::process::id(),
+        now_nanos()
+    ));
+    fs::create_dir_all(&stage_dir)
+        .map_err(|e| format!("failed to create staging directory '{}': {e}", stage_dir.display()))?;
+
+    for file in files {
+        let stage_path = stage_dir.join(file.name);
+        if let Err(err) = fs::write(&stage_path, &file.content) {
+            drop(fs::remove_dir_all(&stage_dir));
+            return Err(format!("failed to write staging file '{}': {err}", stage_path.display()));
         }
-    };
-    file.write_all(content.as_bytes())
-        .map_err(|e| format!("failed to write '{}': {e}", path.display()))
+    }
+
+    let mut moved = Vec::new();
+    for file in files {
+        let stage_path = stage_dir.join(file.name);
+        let target_path = out_dir.join(file.name);
+        if let Err(err) = fs::rename(&stage_path, &target_path) {
+            rollback_moved_files(&moved);
+            drop(fs::remove_dir_all(&stage_dir));
+            return Err(format!(
+                "failed to finalize '{}' from staging '{}': {err}",
+                target_path.display(),
+                stage_path.display()
+            ));
+        }
+        moved.push(target_path);
+    }
+
+    if let Err(err) = fs::remove_dir(&stage_dir) {
+        return Err(format!(
+            "generated files but failed to clean staging directory '{}': {err}",
+            stage_dir.display()
+        ));
+    }
+
+    Ok(moved)
+}
+
+fn rollback_moved_files(paths: &[PathBuf]) {
+    for path in paths {
+        drop(fs::remove_file(path));
+    }
+}
+
+fn now_nanos() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos())
 }
 
 fn is_valid_rust_identifier(input: &str) -> bool {
@@ -347,5 +418,48 @@ mod tests {
         assert!(!is_valid_rust_identifier("9bad"));
         assert!(!is_valid_rust_identifier("bad-name"));
         assert!(!is_valid_rust_identifier(""));
+    }
+
+    #[test]
+    fn handler_template_fails_closed_on_missing_payload() {
+        let rendered = render_handler_template("MyHandler");
+        assert!(rendered.contains("missing payload in send_decision"));
+        assert!(!rendered.contains("unwrap_or(Value::Unit)"));
+    }
+
+    #[test]
+    fn scaffold_generation_writes_expected_files() {
+        let out_dir = unique_temp_dir("effect_scaffold_ok");
+        let generated = generate_scaffold(&out_dir, "MyHandler", true).expect("generation succeeds");
+
+        assert_eq!(generated.len(), 4);
+        assert!(out_dir.join("effect_handler.rs").exists());
+        assert!(out_dir.join("effect_handler_test.rs").exists());
+        assert!(out_dir.join("simulator_harness_test.rs").exists());
+        assert!(out_dir.join("README.md").exists());
+
+        drop(fs::remove_dir_all(out_dir));
+    }
+
+    #[test]
+    fn preflight_rejects_existing_files_without_partial_writes() {
+        let out_dir = unique_temp_dir("effect_scaffold_preflight");
+        fs::create_dir_all(&out_dir).expect("create out dir");
+        fs::write(out_dir.join("effect_handler_test.rs"), "already here")
+            .expect("seed existing file");
+
+        let error = generate_scaffold(&out_dir, "MyHandler", true).expect_err("preflight should fail");
+        assert!(error.contains("effect_handler_test.rs"));
+        assert!(!out_dir.join("effect_handler.rs").exists());
+        assert!(!out_dir.join("simulator_harness_test.rs").exists());
+        assert!(!out_dir.join("README.md").exists());
+
+        drop(fs::remove_dir_all(out_dir));
+    }
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let mut path = env::temp_dir();
+        path.push(format!("{prefix}_{}_{}", std::process::id(), now_nanos()));
+        path
     }
 }

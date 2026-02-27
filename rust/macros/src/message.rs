@@ -4,7 +4,8 @@
 //! used in session-typed protocols.
 
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
+use std::collections::BTreeMap;
 use syn::{parse2, Data, DeriveInput, Error, Fields, Result};
 
 /// Implements the `Message` trait for the given type.
@@ -37,6 +38,7 @@ pub fn message(input: TokenStream) -> Result<TokenStream> {
     }?;
 
     let mut output = TokenStream::new();
+    let mut payload_types: BTreeMap<String, syn::Ident> = BTreeMap::new();
     for variant in variants {
         let variant_ident = &variant.ident;
         let fields = match &variant.fields {
@@ -53,6 +55,18 @@ pub fn message(input: TokenStream) -> Result<TokenStream> {
         }?;
 
         let ty = &field.ty;
+        let ty_key = ty.to_token_stream().to_string();
+        if let Some(existing_variant) = payload_types.get(&ty_key) {
+            return Err(Error::new_spanned(
+                variant,
+                format!(
+                    "duplicate payload type for Message derive: variants '{}' and '{}' both use type `{}`",
+                    existing_variant, variant_ident, ty_key
+                ),
+            ));
+        }
+        payload_types.insert(ty_key, variant_ident.clone());
+
         output.extend(quote! {
             impl #impl_generics ::telltale::Message<#ty> for #ident #ty_generics #where_clause {
                 fn upcast(label: #ty) -> Self {

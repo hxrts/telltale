@@ -47,7 +47,13 @@ fn unroll_type(mut ty: &mut Type) -> &mut Type {
 fn augment_type(mut ty: &mut Type, exclude: &HashSet<Ident>) {
     while let Type::Path(path) = unroll_type(ty) {
         // Check if this is a "Self" type path
-        if path.path.segments.len() == 1 && path.path.segments.first().unwrap().ident == "Self" {
+        if path.path.segments.len() == 1
+            && path
+                .path
+                .segments
+                .first()
+                .is_some_and(|segment| segment.ident == "Self")
+        {
             break;
         }
 
@@ -109,7 +115,12 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
         return Err(Error::new_spanned(&input.fields, message));
     }
 
-    let field = input.fields.iter_mut().next().unwrap();
+    let Some(field) = input.fields.iter_mut().next() else {
+        return Err(Error::new_spanned(
+            &input.fields,
+            "expected exactly one field",
+        ));
+    };
     augment_type(&mut field.ty, &exclude);
 
     let field_ty = &field.ty;
@@ -161,9 +172,21 @@ fn collect_enum_variants(
             ));
         }
 
-        let mut fields = fields.iter_mut();
-        let label = fields.next().unwrap().ty.clone();
-        let ty = &mut fields.next().unwrap().ty;
+        let mut field_iter = fields.iter_mut();
+        let Some(label_field) = field_iter.next() else {
+            return Err(Error::new_spanned(
+                &variant.fields,
+                "expected exactly two fields per variant",
+            ));
+        };
+        let Some(ty_field) = field_iter.next() else {
+            return Err(Error::new_spanned(
+                &variant.fields,
+                "expected exactly two fields per variant",
+            ));
+        };
+        let label = label_field.ty.clone();
+        let ty = &mut ty_field.ty;
         augment_type(ty, exclude);
 
         labels.push(label);

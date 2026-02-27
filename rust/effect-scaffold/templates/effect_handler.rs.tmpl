@@ -34,7 +34,13 @@ impl EffectHandler for {{STRUCT_NAME}} {
     }
 
     fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-        Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
+        match input.payload {
+            Some(payload) => Ok(SendDecision::Deliver(payload)),
+            None => Err(
+                "missing payload in send_decision; implement handle_send for custom send paths"
+                    .to_string(),
+            ),
+        }
     }
 
     fn handle_recv(

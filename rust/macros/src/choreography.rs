@@ -4,7 +4,8 @@
 //! which allows defining multiparty protocols from a global viewpoint.
 
 use proc_macro2::{Ident, TokenStream};
-use quote::quote;
+use quote::{quote, ToTokens};
+use std::collections::{BTreeMap, HashSet};
 use syn::{
     braced, parenthesized,
     parse::{Parse, ParseStream},
@@ -24,12 +25,13 @@ pub fn choreography(input: TokenStream) -> Result<TokenStream> {
 
     // Otherwise, fall back to syn-based parsing
     let protocol: ProtocolDef = syn::parse2(input)?;
+    validate_protocol(&protocol)?;
 
     // Generate role structs
     let role_structs = generate_role_structs(&protocol);
 
     // Generate message types
-    let message_types = generate_message_types(&protocol);
+    let message_types = generate_message_types(&protocol)?;
 
     // Generate session types for each role
     let session_types = generate_session_types(&protocol)?;
@@ -39,7 +41,6 @@ pub fn choreography(input: TokenStream) -> Result<TokenStream> {
 
     // Generate use statements for the necessary imports
     let imports = quote! {
-        use ::telltale::{channel, Message as MessageTrait, Role as RoleTrait, Roles as RolesTrait};
         use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
     };
 
@@ -79,11 +80,6 @@ struct ProtocolDef {
 /// Role definition
 struct RoleDef {
     name: Ident,
-    /// Parameters for parameterized roles like Worker[N]
-    ///
-    /// Reserved for future implementation of parameterized roles.
-    #[allow(dead_code)]
-    params: Option<syn::Expr>,
 }
 
 /// Protocol interaction
@@ -92,26 +88,8 @@ enum Interaction {
         from: Ident,
         to: Ident,
         message: Ident,
-        payload: Box<Option<syn::Type>>,
+        payload: Option<syn::Type>,
     },
-    /// Choice interaction
-    ///
-    /// Reserved for future macro-level choice syntax.
-    /// Currently choices are generated through code generation, not parsed from macro syntax.
-    #[allow(dead_code)]
-    Choice {
-        role: Ident,
-        branches: Vec<ChoiceBranch>,
-    },
-}
-
-/// Branch in a choice interaction
-///
-/// Reserved for future macro-level choice syntax.
-#[allow(dead_code)]
-struct ChoiceBranch {
-    label: Ident,
-    interactions: Vec<Interaction>,
 }
 
 fn parse_header_roles(input: ParseStream) -> Result<Option<Vec<RoleDef>>> {
@@ -124,10 +102,7 @@ fn parse_header_roles(input: ParseStream) -> Result<Option<Vec<RoleDef>>> {
     let mut roles = Vec::new();
     while !content.is_empty() {
         let role_name: Ident = content.parse()?;
-        roles.push(RoleDef {
-            name: role_name,
-            params: None,
-        });
+        roles.push(RoleDef { name: role_name });
         if content.peek(Token![,]) {
             let _: Token![,] = content.parse()?;
         } else {
@@ -159,10 +134,7 @@ fn parse_roles_block(
     let mut roles = Vec::new();
     loop {
         let role_name: Ident = content.parse()?;
-        roles.push(RoleDef {
-            name: role_name,
-            params: None,
-        });
+        roles.push(RoleDef { name: role_name });
         if content.peek(Token![,]) {
             let _: Token![,] = content.parse()?;
             continue;
@@ -225,9 +197,9 @@ fn parse_interaction(input: ParseStream) -> Result<Interaction> {
         let payload = if input.peek(syn::token::Paren) {
             let content;
             parenthesized!(content in input);
-            Box::new(Some(content.parse()?))
+            Some(content.parse()?)
         } else {
-            Box::new(None)
+            None
         };
 
         if input.peek(Token![;]) {
@@ -245,35 +217,83 @@ fn parse_interaction(input: ParseStream) -> Result<Interaction> {
     Err(Error::new(input.span(), "expected interaction"))
 }
 
+fn validate_protocol(protocol: &ProtocolDef) -> Result<()> {
+    if protocol.roles.len() < 2 {
+        return Err(Error::new(
+            protocol.name.span(),
+            "protocol must declare at least two roles",
+        ));
+    }
+
+    let mut role_names = HashSet::new();
+    for role in &protocol.roles {
+        let name = role.name.to_string();
+        if !role_names.insert(name.clone()) {
+            return Err(Error::new(
+                role.name.span(),
+                format!("duplicate role '{name}'"),
+            ));
+        }
+    }
+
+    for interaction in &protocol.interactions {
+        let Interaction::Send {
+            from,
+            to,
+            message: _,
+            payload: _,
+        } = interaction;
+
+        let from_name = from.to_string();
+        if !role_names.contains(&from_name) {
+            return Err(Error::new(
+                from.span(),
+                format!("role '{from_name}' is not declared in protocol roles"),
+            ));
+        }
+
+        let to_name = to.to_string();
+        if !role_names.contains(&to_name) {
+            return Err(Error::new(
+                to.span(),
+                format!("role '{to_name}' is not declared in protocol roles"),
+            ));
+        }
+
+        if from == to {
+            return Err(Error::new(
+                from.span(),
+                format!("self-send '{from_name} -> {to_name}' is not supported"),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 /// Generate role struct definitions
 fn generate_role_structs(protocol: &ProtocolDef) -> TokenStream {
     let role_names: Vec<_> = protocol.roles.iter().map(|r| &r.name).collect();
-    let _n = protocol.roles.len();
 
-    // Generate route attributes for each role
     let mut role_structs = Vec::new();
     for (i, role) in role_names.iter().enumerate() {
-        // Find the other roles this role needs to communicate with
-        let mut routes = Vec::new();
-        for (j, other) in role_names.iter().enumerate() {
-            if i != j {
-                routes.push(quote! { #[route(#other)] });
-            }
-        }
-
-        // For simplicity, just use first route for bidirectional channel
-        let route = if routes.is_empty() {
-            quote! {}
-        } else {
-            let other = &role_names[(i + 1) % role_names.len()];
-            quote! { #[route(#other)] }
-        };
+        let route_fields: Vec<_> = role_names
+            .iter()
+            .enumerate()
+            .filter_map(|(j, other)| {
+                if i == j {
+                    None
+                } else {
+                    Some(quote! { #[route(#other)] Channel })
+                }
+            })
+            .collect();
 
         role_structs.push(quote! {
             #[derive(::telltale::Role)]
             #[message(Label)]
             #[allow(dead_code)]
-            pub struct #role(#route Channel);
+            pub struct #role(#(#route_fields),*);
         });
     }
 
@@ -289,19 +309,53 @@ fn generate_role_structs(protocol: &ProtocolDef) -> TokenStream {
     }
 }
 
-/// Generate message types
-fn generate_message_types(protocol: &ProtocolDef) -> TokenStream {
-    let mut messages = Vec::new();
-
-    // Extract messages from interactions
-    for interaction in &protocol.interactions {
-        if let Interaction::Send {
-            message, payload, ..
-        } = interaction
-        {
-            messages.push((message, payload.as_ref().as_ref()));
-        }
+fn payload_signature(payload: Option<&syn::Type>) -> String {
+    match payload {
+        Some(ty) => ty.to_token_stream().to_string(),
+        None => "<none>".to_string(),
     }
+}
+
+fn collect_messages(protocol: &ProtocolDef) -> Result<Vec<(Ident, Option<syn::Type>)>> {
+    let mut seen: BTreeMap<String, (Ident, Option<syn::Type>, String)> = BTreeMap::new();
+    let mut ordered = Vec::new();
+
+    for interaction in &protocol.interactions {
+        let Interaction::Send {
+            from: _,
+            to: _,
+            message,
+            payload,
+        } = interaction;
+
+        let key = message.to_string();
+        let signature = payload_signature(payload.as_ref());
+        if let Some((_, _, existing_signature)) = seen.get(&key) {
+            if *existing_signature != signature {
+                return Err(Error::new(
+                    message.span(),
+                    format!(
+                        "message '{key}' is used with conflicting payload types in the same protocol"
+                    ),
+                ));
+            }
+            continue;
+        }
+
+        let payload_clone = payload.clone();
+        seen.insert(
+            key,
+            (message.clone(), payload_clone.clone(), signature),
+        );
+        ordered.push((message.clone(), payload_clone));
+    }
+
+    Ok(ordered)
+}
+
+/// Generate message types
+fn generate_message_types(protocol: &ProtocolDef) -> Result<TokenStream> {
+    let messages = collect_messages(protocol)?;
 
     let message_structs: Vec<_> = messages
         .iter()
@@ -324,7 +378,7 @@ fn generate_message_types(protocol: &ProtocolDef) -> TokenStream {
 
     let message_names: Vec<_> = messages.iter().map(|(name, _)| name).collect();
 
-    quote! {
+    Ok(quote! {
         /// Generated message types
         #(#message_structs)*
 
@@ -334,7 +388,7 @@ fn generate_message_types(protocol: &ProtocolDef) -> TokenStream {
         pub enum Label {
             #(#message_names(#message_names)),*
         }
-    }
+    })
 }
 
 /// Generate session types for each role
@@ -372,73 +426,6 @@ fn apply_send_recv_projection(
     }
 }
 
-fn project_branch_sequence(
-    role_name: &Ident,
-    interactions: &[Interaction],
-    continuation: &TokenStream,
-) -> TokenStream {
-    let mut branch_type = continuation.clone();
-    for branch_interaction in interactions.iter().rev() {
-        if let Interaction::Send {
-            from, to, message, ..
-        } = branch_interaction
-        {
-            branch_type = apply_send_recv_projection(role_name, from, to, message, branch_type);
-        }
-    }
-    branch_type
-}
-
-fn chooser_choice_type(
-    role_name: &Ident,
-    branches: &[ChoiceBranch],
-    continuation: &TokenStream,
-) -> Option<TokenStream> {
-    let branch_types: Vec<TokenStream> = branches
-        .iter()
-        .map(|branch| {
-            let branch_type =
-                project_branch_sequence(role_name, &branch.interactions, continuation);
-            let label = &branch.label;
-            quote! { ::telltale::Choose<#label, #branch_type> }
-        })
-        .collect();
-
-    if branch_types.is_empty() {
-        None
-    } else {
-        branch_types
-            .into_iter()
-            .fold(None, |acc, branch| match acc {
-                None => Some(branch),
-                Some(prev) => Some(quote! { ::telltale::Branch<#prev, #branch> }),
-            })
-    }
-}
-
-fn offer_choice_type(
-    role_name: &Ident,
-    choosing_role: &Ident,
-    branches: &[ChoiceBranch],
-    continuation: &TokenStream,
-) -> Option<TokenStream> {
-    let branch_types: Vec<TokenStream> = branches
-        .iter()
-        .map(|branch| {
-            let branch_type =
-                project_branch_sequence(role_name, &branch.interactions, continuation);
-            let label = &branch.label;
-            quote! { #label => #branch_type }
-        })
-        .collect();
-
-    if branch_types.is_empty() {
-        None
-    } else {
-        Some(quote! { ::telltale::Offer<#choosing_role, { #(#branch_types),* }> })
-    }
-}
-
 /// Project the protocol to a specific role's session type
 fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStream {
     let mut type_expr = quote! { ::telltale::End };
@@ -446,24 +433,13 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStr
 
     // Process interactions in reverse order to build the type
     for interaction in protocol.interactions.iter().rev() {
-        match interaction {
-            Interaction::Send {
-                from, to, message, ..
-            } => type_expr = apply_send_recv_projection(role_name, from, to, message, type_expr),
-            Interaction::Choice {
-                role: choosing_role,
-                branches,
-            } => {
-                let next = if choosing_role == role_name {
-                    chooser_choice_type(role_name, branches, &type_expr)
-                } else {
-                    offer_choice_type(role_name, choosing_role, branches, &type_expr)
-                };
-                if let Some(next) = next {
-                    type_expr = next;
-                }
-            }
-        }
+        let Interaction::Send {
+            from,
+            to,
+            message,
+            payload: _,
+        } = interaction;
+        type_expr = apply_send_recv_projection(role_name, from, to, message, type_expr);
     }
 
     type_expr
@@ -471,12 +447,10 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStr
 
 /// Generate setup function
 fn generate_setup_function(protocol: &ProtocolDef) -> TokenStream {
-    let _n = protocol.roles.len();
-    #[allow(clippy::no_effect_underscore_binding)] // For future use
-    let _protocol_name = &protocol.name;
+    let protocol_name = &protocol.name;
 
     quote! {
-        /// Setup function for the #protocol_name protocol
+        #[doc = concat!("Setup function for the ", stringify!(#protocol_name), " protocol.")]
         pub fn setup() -> Roles {
             Roles::default()
         }

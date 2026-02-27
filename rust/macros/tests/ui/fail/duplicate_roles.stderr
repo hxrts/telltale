@@ -1,0 +1,5 @@
+error: duplicate role 'A'
+ --> tests/ui/fail/duplicate_roles.rs:5:18
+  |
+5 |         roles A, A;
+  |                  ^

@@ -1,0 +1,5 @@
+error: message 'Msg' is used with conflicting payload types in the same protocol
+ --> tests/ui/fail/conflicting_message_payload.rs:7:17
+  |
+7 |         A -> B: Msg(u64);
+  |                 ^^^
