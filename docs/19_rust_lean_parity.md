@@ -1,12 +1,12 @@
-# VM Parity
+# Rust-Lean Parity
 
-This document defines the Lean/Rust parity contract for VM behavior, state schemas, and deviation governance.
+This document defines the Lean/Rust parity contract for VM behavior, choreography projection, state schemas, and deviation governance.
 
 ## Contract Levels
 
 Parity is enforced at two levels. Level 1 is policy/data shape parity for shared runtime encodings. Level 2 is behavior parity for executable traces under the declared concurrency envelope.
 
-## Policy and Data Shapes
+## VM Policy and Data Shapes
 
 The following shapes must remain aligned between Lean and Rust unless a deviation entry is active.
 
@@ -24,7 +24,7 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 
 These checks are automated by `just check-parity --types`.
 
-## Behavior Contract
+## VM Behavior Contract
 
 | Regime | Required Behavior |
 |---|---|
@@ -36,6 +36,34 @@ These checks are automated by `just check-parity --types`.
 | Load boundary | Runtime rejects malformed trusted image role/type shape before session open |
 
 These checks are automated by `just check-parity --suite`.
+
+## Choreography Projection Parity
+
+The parity scope covers projection behavior from global choreography forms to local session forms. It covers `send`, `choice`, recursion, and merge behavior for non-participant branches. It does not cover Rust-only runtime conveniences or extension-only AST constructs.
+
+### Shared Projection Semantics
+
+Rust and Lean are expected to align on the following surfaces.
+
+| Area | Lean Surface | Rust Surface | Status |
+|---|---|---|---|
+| Projection core relation | `lean/Choreography/Projection/Project.lean` | `rust/choreography/src/compiler/projection.rs` | Aligned on supported subset |
+| Merge semantics | `lean/Choreography/Projection/Erasure/Merge.lean` | `rust/choreography/src/compiler/projection/merge.rs` | Aligned |
+| Projection validation pipeline | `lean/Choreography/Projection/Validator.lean` | `rust/lean-bridge/src/runner_projection_export.rs` | Aligned |
+
+### Rust-Only Extensions
+
+The following surfaces are intentionally outside direct Lean parity. They must be documented as extensions and must not be confused with theorem-backed projection claims.
+
+| Surface | Rust Module | Parity Status |
+|---|---|---|
+| `LocalType::LocalChoice` | `rust/choreography/src/ast/local_type.rs` | Rust extension |
+| Timeout wrappers in local AST | `rust/choreography/src/ast/local_type.rs` | Rust extension |
+| Effect runtime `Parallel` execution contract | `rust/choreography/src/effects/interpreter.rs` | Rust runtime contract |
+
+### Projection Cross-Validation
+
+Projection cross-validation is exercised through `rust/lean-bridge/tests/projection_runner_tests.rs`. Tests skip per test when the Lean validator binary is unavailable. Skipping one test must not terminate the rest of the suite.
 
 ## State Schema
 
@@ -91,8 +119,7 @@ The Rust surfaces are in `rust/vm/src/runtime_contracts.rs` and `rust/vm/src/com
 
 ## Simulator Material Mirror
 
-Lean now includes executable mirror dynamics for simulator material handlers under `lean/Runtime/Simulation/`.
-Rust material handlers live under `rust/simulator/src/material_handlers/`.
+Lean now includes executable mirror dynamics for simulator material handlers under `lean/Runtime/Simulation/`. Rust material handlers live under `rust/simulator/src/material_handlers/`.
 
 Parity fixtures are enforced by:
 
@@ -117,7 +144,7 @@ Any intentional parity break must be recorded in the deviation table below befor
 
 | ID | Status | Owner | Revisit | Summary |
 |----|--------|-------|---------|---------|
-| _none_ | _n/a_ | _n/a_ | _n/a_ | No active VM parity deviations |
+| _none_ | _n/a_ | _n/a_ | _n/a_ | No active parity deviations |
 
 Resolved deviations move to history after one stable release cycle with no regressions on the covered surfaces.
 
@@ -235,9 +262,16 @@ Runtime performance governance enforces explicit thresholds from `artifacts/v2/b
 
 If any threshold is violated, CI fails before benchmark lanes are considered healthy.
 
-## Update Rule
+## Update Rules
 
 When any parity matrix row changes, update the Deviation Registry table in this file in the same change set. For any VM PR that changes public runtime behavior, include a parity impact statement in the PR checklist. Add differential tests when observable behavior changes.
+
+Any Rust PR that changes projection or merge semantics must include:
+
+1. The affected Rust module list.
+2. The Lean module list reviewed for parity.
+3. New or updated cross-validation tests for the changed behavior.
+4. A parity note update in this document when scope or status changes.
 
 ## Type-Level Parity Checklist
 
@@ -251,13 +285,11 @@ Every Rust PR that changes type semantics must include this checklist in the PR 
 
 ## Naming Compatibility
 
-Rust VM includes explicit Lean-compatibility wrappers such as `openDelta`, `siteName`, and `signValue`.
-These wrappers intentionally keep Lean-facing casing and therefore retain focused `#[allow(non_snake_case)]` annotations in `guard.rs`, `identity.rs`, `persistence.rs`, and `verification.rs`.
+Rust VM includes explicit Lean-compatibility wrappers such as `openDelta`, `siteName`, and `signValue`. These wrappers intentionally keep Lean-facing casing and therefore retain focused `#[allow(non_snake_case)]` annotations in `guard.rs`, `identity.rs`, `persistence.rs`, and `verification.rs`.
 
 ## Related Docs
 
 - [VM Architecture](12_vm_architecture.md)
 - [Bytecode Instructions](13_bytecode_instructions.md)
-- [Choreography Parity](32_choreography_parity.md)
 - [Lean Verification](23_lean_verification.md)
 - [Capability and Admission](25_capability_admission.md)

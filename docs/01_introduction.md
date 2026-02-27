@@ -49,7 +49,7 @@ The `telltale-lean-bridge` crate provides JSON export and import for cross-valid
 | [VM Simulation Runner](16_vm_simulation_runner.md) | Reference | Normative |
 | [VM Simulation Scenarios](17_vm_simulation_scenarios.md) | Guide | Mixed |
 | [VM Simulation Materials](18_vm_simulation_materials.md) | Reference | Informative |
-| [VM Parity](19_vm_parity.md) | Reference | Normative |
+| [Rust-Lean Parity](19_rust_lean_parity.md) | Reference | Normative |
 | [Content Addressing](20_content_addressing.md) | Reference | Mixed |
 | [Resource Heap](21_resource_heap.md) | Reference | Mixed |
 | [Topology](22_topology.md) | Guide | Mixed |

@@ -53,6 +53,21 @@ pub struct RoleFamilyConstraint {
 
 `TopologyMode` is parsed from DSL values like `local` and `kubernetes(ns)`. Role family constraints are used to validate wildcard and range roles.
 
+`RoleFamilyConstraint` provides helper constructors and a validation method:
+
+```rust
+// Minimum-only constraint (unbounded max)
+let unbounded = RoleFamilyConstraint::min_only(3);
+
+// Bounded constraint with min and max
+let bounded = RoleFamilyConstraint::bounded(2, 5);
+
+// Validate a role count against the constraint
+bounded.validate(4)?;  // Ok
+bounded.validate(1)?;  // Err(BelowMinimum)
+bounded.validate(6)?;  // Err(AboveMaximum)
+```
+
 ## DSL Syntax
 
 Topologies are defined in `.topology` files or parsed from strings.

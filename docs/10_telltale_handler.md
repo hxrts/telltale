@@ -181,6 +181,12 @@ pub fn new(local_role: R) -> Self
 ```
 Create a new endpoint for a role.
 
+#### Role Access
+```rust
+pub fn local_role(&self) -> &R
+```
+Get a reference to the local role.
+
 #### Channel Management
 ```rust
 pub fn register_channel(&mut self, peer: R, channel: SimpleChannel)

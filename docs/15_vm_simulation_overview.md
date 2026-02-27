@@ -46,5 +46,5 @@ The process exits with code `2` when configured contract checks fail.
 
 - [Effect Handlers and Session Types](11_effect_session_bridge.md)
 - [VM Architecture](12_vm_architecture.md)
-- [VM Parity](19_vm_parity.md)
+- [Rust-Lean Parity](19_rust_lean_parity.md)
 - [Lean-Rust Bridge](24_lean_rust_bridge.md)

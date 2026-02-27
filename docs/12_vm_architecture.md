@@ -4,7 +4,7 @@ This document defines the VM architecture, scheduling semantics, and concurrency
 
 ## Architecture Overview
 
-The canonical semantic authority is `VMKernel`. The cooperative `VM` and threaded `ThreadedVM` are execution adapters that call kernel-owned step entrypoints.
+The canonical semantic authority is `VMKernel`. The cooperative `VM` and threaded `ThreadedVM` are execution adapters that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
 
 The runtime keeps a single state model across targets. Core state includes coroutines, sessions, scheduler queues, observable trace, effect trace, and failure-topology snapshot fields.
 
@@ -148,7 +148,7 @@ Release conformance surfaces are exported through theorem-pack APIs and enforced
 - [Bytecode Instructions](13_bytecode_instructions.md)
 - [Session Lifecycle](14_session_lifecycle.md)
 - [VM Simulation](15_vm_simulation_overview.md)
-- [VM Parity](19_vm_parity.md)
+- [Rust-Lean Parity](19_rust_lean_parity.md)
 - [Effect Handlers and Session Types](11_effect_session_bridge.md)
 - [Lean Verification](23_lean_verification.md)
 - [Capability and Admission](25_capability_admission.md)

@@ -35,7 +35,7 @@ Choreographic DSL, projection, and effect execution.
 Key exports:
 
 - AST types: `Choreography`, `Protocol`, `Role`, `MessageType`
-- Effect system: `Program`, `ProgramBuilder`, `interpret`, `interpret_extensible`
+- Effect system: `Program`, `ProgramBuilder`, `interpret`
 - Handlers: `ChoreoHandler`, `InMemoryHandler`, `TelltaleHandler`
 - Topology: `Topology`, `TopologyHandler`, `TransportType`
 - Heap: `Heap`, `Resource`, `MerkleTree`, `HeapCommitment`
@@ -51,10 +51,12 @@ Key exports:
 
 - `VM`, `VMConfig`, `SchedPolicy`, `SimClock`
 - `Instr`, `Value`, `SessionStore`, `SessionId`
-- Effect boundary: `EffectHandler`, `SendDecision`, `AcquireDecision`
-- Effect trace and replay: `RecordingEffectHandler`, `ReplayEffectHandler`, `EffectTraceEntry`
-- Topology and output metadata: `TopologyPerturbation`, `OutputConditionHint`
 - `VMBackend` and `NestedVMHandler`
+
+Module access (not re-exported at crate root):
+- Effect boundary: `telltale_vm::effect::EffectHandler`, `SendDecision`, `AcquireDecision`
+- Effect trace: `telltale_vm::effect::RecordingEffectHandler`, `ReplayEffectHandler`
+- Loader: `telltale_vm::loader::CodeImage`
 
 See `rust/vm/src/lib.rs` for the full API.
 See [Effect Handlers and Session Types](11_effect_session_bridge.md) for integration-boundary guidance.
@@ -65,11 +67,13 @@ Simulation utilities built on the VM.
 
 Key exports:
 
-- `Trace` and `StepRecord` in `rust/simulator/src/trace.rs`
-- Runner functions in `rust/simulator/src/runner.rs`
-- Scenario types in `rust/simulator/src/scenario.rs`
 - Harness surface in `rust/simulator/src/harness.rs`:
   `HostAdapter`, `DirectAdapter`, `MaterialAdapter`, `HarnessSpec`, `HarnessConfig`, `SimulationHarness`
+
+Module access (not re-exported at crate root):
+- `telltale_simulator::trace::Trace`, `StepRecord`
+- `telltale_simulator::runner::run`, `run_concurrent`, `run_with_scenario`, `ChoreographySpec`
+- `telltale_simulator::scenario::Scenario`
 - Contract checks in `rust/simulator/src/contracts.rs`:
   `ContractCheckConfig`, `ContractCheckReport`, `evaluate_contracts`, `assert_contracts`
 - Preset helpers in `rust/simulator/src/presets.rs`

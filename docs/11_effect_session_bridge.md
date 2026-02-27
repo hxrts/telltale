@@ -70,8 +70,9 @@ The contract marks `handle_send` and `handle_choose` as compatibility hooks.
 
 | Callback | VM call point | Runtime behavior | Integration note |
 |---|---|---|---|
-| `send_decision` | `step_send`, `step_offer` | called before enqueue | payload is provided by VM register value in current dispatch path |
-| `handle_send` | default inside `send_decision` | fallback behavior | not used by canonical send path because payload is already provided |
+| `send_decision_fast_path` | `step_send` (before `send_decision`) | optional cache lookup | return `Some(Ok(decision))` to skip `send_decision`, `None` to proceed normally |
+| `send_decision` | `step_send`, `step_offer` | called before enqueue | receives `SendDecisionInput` with optional precomputed payload |
+| `handle_send` | default inside `send_decision` | fallback when no payload provided | called by default `send_decision` impl when payload is `None` |
 | `handle_recv` | `step_recv`, `step_choose` | called after dequeue and verification | use for state updates and host-side effects |
 | `handle_choose` | trait method only | no canonical call site today | keep implementation for compatibility and custom runners |
 | `step` | `step_invoke` | called during `Invoke` instruction | use for integration steps and persistent deltas |
@@ -79,7 +80,7 @@ The contract marks `handle_send` and `handle_choose` as compatibility hooks.
 | `handle_release` | `step_release` | release validation | return error to reject invalid evidence |
 | `topology_events` | `ingest_topology_events` | called once per scheduler tick | events are sorted by deterministic ordering key before apply |
 | `output_condition_hint` | post-dispatch pre-commit | queried only when a step emits events | return `None` to use VM default |
-| `handler_identity` | trace and commit attribution | stable handler id in traces | use deterministic identity value |
+| `handler_identity` | trace and commit attribution | stable handler id in traces | defaults to `DEFAULT_HANDLER_ID` when not overridden |
 
 ## Error Classification
 

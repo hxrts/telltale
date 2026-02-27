@@ -95,6 +95,6 @@ Admission and capability drift are controlled by repository lanes.
 ## Related Docs
 
 - [VM Architecture](12_vm_architecture.md)
-- [VM Parity](19_vm_parity.md)
+- [Rust-Lean Parity](19_rust_lean_parity.md)
 - [Lean Verification](23_lean_verification.md)
 - [Theorem Program](26_theorem_program.md)

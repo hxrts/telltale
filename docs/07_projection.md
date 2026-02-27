@@ -174,7 +174,7 @@ Supported conditions include `Condition::Count(n)` for fixed iteration count. Cu
 
 The AST also includes `Fuel`, `YieldAfter`, and `YieldWhen` for tooling or extensions.
 
-Note: `Condition::RoleDecides(role)` loops are desugared at parse time to a choice+recursion pattern, so they don't appear in the AST after parsing and are handled as standard `Protocol::Rec` with `Protocol::Choice` during projection.
+`Condition::RoleDecides(role)` loops specify that a role controls iteration. During projection, the condition is preserved in the local type and merge comparisons check that both sides use the same deciding role.
 
 ### 5. Parallel Composition
 

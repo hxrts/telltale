@@ -171,7 +171,7 @@ Each operation logs before delegating to the inner handler.
 
 ### Metrics
 
-The Metrics middleware is located in `rust/choreography/src/effects/middleware/metrics.rs`. It counts operations for monitoring. The middleware tracks send_count, recv_count, choose_count, and offer_count.
+The Metrics middleware is located in `rust/choreography/src/effects/middleware/metrics.rs`. It counts operations for monitoring. The middleware tracks `send_count`, `recv_count`, and `error_count`.
 
 Usage example shows metrics collection.
 
@@ -217,7 +217,7 @@ let mut handler = FaultInjection::new(base_handler, 0.1)
     .with_delays(Duration::from_millis(10), Duration::from_millis(100));
 ```
 
-Operations randomly fail 10% of the time. Delays range from 10ms to 100ms.
+Send operations randomly fail 10% of the time. Delays range from 10ms to 100ms. Fault injection only affects `send` operations. The `recv`, `choose`, and `offer` methods delegate directly to the inner handler.
 
 ## Composing Middleware
 

@@ -105,4 +105,4 @@ Risk notes:
 
 - [Bytecode Instructions](13_bytecode_instructions.md)
 - [VM Architecture](12_vm_architecture.md)
-- [VM Parity](19_vm_parity.md)
+- [Rust-Lean Parity](19_rust_lean_parity.md)
