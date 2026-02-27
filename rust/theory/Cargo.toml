@@ -22,7 +22,7 @@ thiserror = { workspace = true }
 proptest = { workspace = true }
 assert_matches = { workspace = true }
 criterion = { workspace = true }
-telltale-lean-bridge = { path = "../lean-bridge", version = "2.0.0" }
+telltale-lean-bridge = { path = "../lean-bridge", version = ">=1.0.0, <3.0.0" }
 
 [features]
 default = ["projection", "duality", "merge", "well-formedness", "bounded", "async-subtyping", "sync-subtyping", "semantics", "coherence"]

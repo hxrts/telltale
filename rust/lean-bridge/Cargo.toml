@@ -48,7 +48,7 @@ telltale-choreography = { path = "../choreography", version = "2.0.0", optional 
 proptest = { workspace = true }
 telltale-theory = { path = "../theory", version = "2.0.0" }
 telltale-choreography = { path = "../choreography", version = "2.0.0" }
-telltale-vm = { path = "../vm", version = "2.0.0", features = ["multi-thread"] }
+telltale-vm = { path = "../vm", version = ">=1.0.0, <3.0.0", features = ["multi-thread"] }
 tempfile = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
