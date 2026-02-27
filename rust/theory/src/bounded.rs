@@ -66,6 +66,7 @@ pub enum BoundingStrategy {
 /// # Returns
 ///
 /// A bounded version of the local type.
+#[must_use]
 pub fn bound_recursion(lt: &LocalTypeR, strategy: BoundingStrategy) -> LocalTypeR {
     match strategy {
         BoundingStrategy::Fuel(n) => bound_with_fuel(lt, n),
@@ -268,6 +269,7 @@ fn bound_with_yield_when_impl(
 /// Unfold a recursive type up to a maximum depth.
 ///
 /// This is useful for analysis or visualization of bounded protocols.
+#[must_use]
 pub fn unfold_bounded(lt: &LocalTypeR, max_depth: usize) -> LocalTypeR {
     unfold_bounded_impl(lt, &BTreeMap::new(), max_depth, 0)
 }

@@ -5,7 +5,9 @@
 use proptest::prelude::*;
 use quote::format_ident;
 use std::collections::HashMap;
-use telltale_choreography::ast::{Annotations, Branch, Choreography, MessageType, NonEmptyVec, Protocol, Role};
+use telltale_choreography::ast::{
+    Annotations, Branch, Choreography, MessageType, NonEmptyVec, Protocol, Role,
+};
 use telltale_choreography::compiler::analysis::analyze;
 
 fn role(name: &str) -> Role {
@@ -25,7 +27,11 @@ fn linear_protocol(bits: &[bool], a: &Role, b: &Role) -> Protocol {
         .enumerate()
         .rev()
         .fold(Protocol::End, |continuation, (idx, send_from_a)| {
-            let (from, to) = if *send_from_a { (a.clone(), b.clone()) } else { (b.clone(), a.clone()) };
+            let (from, to) = if *send_from_a {
+                (a.clone(), b.clone())
+            } else {
+                (b.clone(), a.clone())
+            };
             Protocol::Send {
                 from,
                 to,

@@ -43,7 +43,9 @@ fn dfs_cycle(
 pub(super) fn has_communication(protocol: &Protocol) -> bool {
     match protocol {
         Protocol::Send { .. } | Protocol::Broadcast { .. } => true,
-        Protocol::Choice { branches, .. } => branches.iter().any(|b| has_communication(&b.protocol)),
+        Protocol::Choice { branches, .. } => {
+            branches.iter().any(|b| has_communication(&b.protocol))
+        }
         Protocol::Loop { body, .. } => has_communication(body),
         Protocol::Parallel { protocols } => protocols.iter().any(has_communication),
         Protocol::Rec { body, .. } => has_communication(body),

@@ -96,8 +96,11 @@ impl Clock for MockClock {
         Duration::from_nanos(self.offset_ns.load(Ordering::SeqCst))
     }
 
+    #[allow(clippy::let_underscore_must_use)] // fetch_update never fails with our closure
     fn advance(&self, duration: Duration) {
         let delta = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
+        // fetch_update only returns Err if the closure returns None, which ours never does.
+        // We intentionally ignore the result since our closure always returns Some.
         let _ = self
             .offset_ns
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {

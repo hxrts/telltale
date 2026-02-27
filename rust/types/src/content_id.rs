@@ -136,7 +136,9 @@ impl<H: Hasher> ContentId<H> {
 
     /// Create a ContentId from a pre-computed hash.
     ///
-    /// Returns an error if the hash length doesn't match the hasher's output size.
+    /// # Errors
+    ///
+    /// Returns [`ContentIdError`] if the hash length doesn't match the hasher's output size.
     pub fn from_hash(hash: impl AsRef<[u8]>) -> Result<Self, ContentIdError>
     where
         for<'a> H::Digest: TryFrom<&'a [u8]>,

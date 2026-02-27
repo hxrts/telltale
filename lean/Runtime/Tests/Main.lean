@@ -679,7 +679,7 @@ def main : IO Unit := do
 
   -- Test 42: payload size gate rejects oversized send payloads.
   let (stPayload, _) := loadChoreography emptyState twoPartyImage
-  let oversizedPayload := String.mk (List.replicate 256 'x')
+  let oversizedPayload := String.ofList (List.replicate 256 'x')
   let injectPayload := fun (c : CoroutineState UnitGuard UnitEffect) =>
     match setReg c.regs 1 (.string oversizedPayload) with
     | some regs' => { c with regs := regs' }

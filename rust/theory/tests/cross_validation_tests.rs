@@ -4,13 +4,13 @@
 //! same `GlobalType` inputs and asserts the outputs are identical.
 
 use telltale_lean_bridge::export::global_to_json;
-use telltale_lean_bridge::import::json_to_local;
-use telltale_lean_bridge::runner::LeanRunner;
 #[cfg(feature = "async-subtyping")]
 use telltale_lean_bridge::export::local_to_json;
+use telltale_lean_bridge::import::json_to_local;
+use telltale_lean_bridge::runner::LeanRunner;
+use telltale_theory::project;
 #[cfg(feature = "async-subtyping")]
 use telltale_theory::{async_subtype, orphan_free};
-use telltale_theory::project;
 #[cfg(feature = "async-subtyping")]
 use telltale_types::LocalTypeR;
 use telltale_types::{GlobalType, Label, PayloadSort};

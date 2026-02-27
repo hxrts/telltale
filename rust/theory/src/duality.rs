@@ -29,6 +29,7 @@ use telltale_types::LocalTypeR;
 ///
 /// assert!(matches!(recv, LocalTypeR::Recv { partner, .. } if partner == "B"));
 /// ```
+#[must_use]
 pub fn dual(lt: &LocalTypeR) -> LocalTypeR {
     lt.dual()
 }
@@ -48,6 +49,7 @@ pub fn dual(lt: &LocalTypeR) -> LocalTypeR {
 ///
 /// assert!(is_dual(&send, &recv));
 /// ```
+#[must_use]
 pub fn is_dual(t1: &LocalTypeR, t2: &LocalTypeR) -> bool {
     &t1.dual() == t2
 }

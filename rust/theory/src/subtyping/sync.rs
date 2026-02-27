@@ -73,7 +73,11 @@ pub enum SyncSubtypeError {
 
 /// Check if `sub` is a subtype of `sup` using synchronous subtyping.
 ///
-/// Returns `Ok(true)` if the subtyping holds, `Ok(false)` or `Err` otherwise.
+/// Returns `Ok(())` if the subtyping holds.
+///
+/// # Errors
+///
+/// Returns [`SyncSubtypeError`] if the subtype relationship doesn't hold.
 ///
 /// # Examples
 ///
@@ -96,6 +100,7 @@ pub fn sync_subtype(sub: &LocalTypeR, sup: &LocalTypeR) -> Result<(), SyncSubtyp
     sync_subtype_with_assumptions(sub, sup, &mut BTreeSet::new())
 }
 
+#[allow(clippy::too_many_lines)] // Complex recursive algorithm
 fn sync_subtype_with_assumptions(
     sub: &LocalTypeR,
     sup: &LocalTypeR,

@@ -624,7 +624,9 @@ mod tests {
 
     #[test]
     fn try_then_rejects_invalid_composition_shapes() {
-        let left = Program::<TestRole, String>::builder().try_end().expect("left");
+        let left = Program::<TestRole, String>::builder()
+            .try_end()
+            .expect("left");
         let invalid_right = Program::<TestRole, String> {
             effects: vec![
                 Effect::End,

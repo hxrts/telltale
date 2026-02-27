@@ -78,6 +78,7 @@ pub struct Choreography {
 
 impl Choreography {
     /// Get the qualified name of the choreography (namespace::name or just name)
+    #[must_use]
     pub fn qualified_name(&self) -> String {
         match &self.namespace {
             Some(ns) => format!("{}::{}", ns, self.name),
@@ -86,6 +87,11 @@ impl Choreography {
     }
 
     /// Validate the choreography for correctness
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ValidationError`] if the choreography is invalid (unused roles,
+    /// malformed protocol, duplicate/missing proof bundles, or missing capabilities).
     pub fn validate(&self) -> Result<(), ValidationError> {
         // Check all roles are used
         for role in &self.roles {
@@ -127,6 +133,7 @@ impl Choreography {
     }
 
     /// Get choreography-level attributes/annotations
+    #[must_use]
     pub fn get_attributes(&self) -> &HashMap<String, String> {
         &self.attrs
     }
@@ -137,6 +144,7 @@ impl Choreography {
     }
 
     /// Get a specific choreography attribute
+    #[must_use]
     pub fn get_attribute(&self, key: &str) -> Option<&String> {
         self.attrs.get(key)
     }
@@ -152,6 +160,7 @@ impl Choreography {
     }
 
     /// Check if choreography has a specific attribute
+    #[must_use]
     pub fn has_attribute(&self, key: &str) -> bool {
         self.attrs.contains_key(key)
     }

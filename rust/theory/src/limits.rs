@@ -1,5 +1,8 @@
 //! Small, explicit limit types used across theory algorithms.
 
+// All as_usize methods are safe: u32 -> usize is always valid (usize >= 32 bits)
+#![allow(clippy::as_conversions)]
+
 /// Maximum recursion iterations for bounded unfolding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FuelSteps(pub u32);

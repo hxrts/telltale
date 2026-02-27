@@ -34,6 +34,7 @@ pub struct CacheMetrics {
 impl CacheMetrics {
     /// Calculate the hit rate as a percentage.
     #[must_use]
+    #[allow(clippy::as_conversions)] // u64 -> f64 is acceptable for percentage display
     pub fn hit_rate(&self) -> f64 {
         let total = self.hits + self.misses;
         if total == 0 {
@@ -140,6 +141,11 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
     /// Get a cached value by its content key.
     ///
     /// Updates cache metrics (hit/miss counters).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if computing the content ID fails or if a
+    /// hash collision is detected (when collision detection is enabled).
     pub fn get(&self, key: &K) -> Result<Option<&V>, ContentableError> {
         let cid = key.content_id::<H>()?;
         if let Some(v) = self.store.get(&cid) {
@@ -161,6 +167,11 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
     /// Insert a value into the store.
     ///
     /// Returns the previous value if the key already existed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if computing the content ID fails or if a
+    /// hash collision is detected (when collision detection is enabled).
     pub fn insert(&mut self, key: &K, value: V) -> Result<Option<V>, ContentableError> {
         let cid = key.content_id::<H>()?;
         if let Some(witnesses) = &mut self.collision_witnesses {
@@ -183,6 +194,11 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
     /// If the key exists, returns the cached value (cache hit).
     /// Otherwise, computes the value using the provided function,
     /// stores it, and returns a reference (cache miss).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if computing the content ID fails or if a
+    /// hash collision is detected (when collision detection is enabled).
     pub fn get_or_insert_with<F>(&mut self, key: &K, f: F) -> Result<&V, ContentableError>
     where
         F: FnOnce() -> V,
@@ -213,12 +229,20 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
     }
 
     /// Check if a key exists in the store.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if computing the content ID fails.
     pub fn contains(&self, key: &K) -> Result<bool, ContentableError> {
         let cid = key.content_id::<H>()?;
         Ok(self.store.contains_key(&cid))
     }
 
     /// Remove a value from the store.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if computing the content ID fails.
     pub fn remove(&mut self, key: &K) -> Result<Option<V>, ContentableError> {
         let cid = key.content_id::<H>()?;
         let removed = self.store.remove(&cid);
@@ -400,6 +424,11 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     }
 
     /// Get a cached value by content key and extra key.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if computing the content ID fails or if a
+    /// hash collision is detected (when collision detection is enabled).
     pub fn get(&self, key: &K, extra: &E) -> Result<Option<&V>, ContentableError> {
         let cid = key.content_id::<H>()?;
         if let Some(witnesses) = &self.collision_witnesses {
@@ -421,6 +450,11 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     }
 
     /// Insert a value into the store.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if computing the content ID fails or if a
+    /// hash collision is detected (when collision detection is enabled).
     pub fn insert(&mut self, key: &K, extra: E, value: V) -> Result<Option<V>, ContentableError> {
         let cid = key.content_id::<H>()?;
         if let Some(witnesses) = &mut self.collision_witnesses {
@@ -439,6 +473,11 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     }
 
     /// Get or compute a value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if computing the content ID fails or if a
+    /// hash collision is detected (when collision detection is enabled).
     pub fn get_or_insert_with<F>(&mut self, key: &K, extra: E, f: F) -> Result<&V, ContentableError>
     where
         F: FnOnce() -> V,
@@ -469,6 +508,10 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     }
 
     /// Check if a key pair exists in the store.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if computing the content ID fails.
     pub fn contains(&self, key: &K, extra: &E) -> Result<bool, ContentableError> {
         let cid = key.content_id::<H>()?;
         Ok(self.contains_with_content_id(&cid, extra))
@@ -483,6 +526,10 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     }
 
     /// Remove a value from the store.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if computing the content ID fails.
     pub fn remove(&mut self, key: &K, extra: &E) -> Result<Option<V>, ContentableError> {
         let cid = key.content_id::<H>()?;
         if let Some(inner) = self.store.get_mut(&cid) {

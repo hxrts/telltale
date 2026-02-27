@@ -79,6 +79,10 @@ impl FixedQ32 {
     }
 
     /// Construct from an integer, returning an error on overflow.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixedQ32Error::Overflow`] if the value is out of range.
     pub fn try_from_i64(value: i64) -> Result<Self, FixedQ32Error> {
         I32F32::checked_from_num(value)
             .map(Self)
@@ -86,6 +90,10 @@ impl FixedQ32 {
     }
 
     /// Construct from an unsigned integer, returning an error on overflow.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixedQ32Error::Overflow`] if the value is out of range.
     pub fn try_from_u64(value: u64) -> Result<Self, FixedQ32Error> {
         I32F32::checked_from_num(value)
             .map(Self)
@@ -93,6 +101,10 @@ impl FixedQ32 {
     }
 
     /// Construct from usize, returning an error on overflow.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixedQ32Error::Overflow`] if the value is out of range.
     pub fn try_from_usize(value: usize) -> Result<Self, FixedQ32Error> {
         I32F32::checked_from_num(value)
             .map(Self)
@@ -100,6 +112,11 @@ impl FixedQ32 {
     }
 
     /// Construct an exact fixed-point ratio `num / den`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixedQ32Error::DivisionByZero`] if `den` is zero, or
+    /// [`FixedQ32Error::Overflow`] if the result is out of range.
     pub fn from_ratio(num: i64, den: i64) -> Result<Self, FixedQ32Error> {
         if den == 0 {
             return Err(FixedQ32Error::DivisionByZero);
@@ -112,6 +129,10 @@ impl FixedQ32 {
     /// Construct a probability-like value from parts-per-million.
     ///
     /// `0` maps to `0.0`, `1_000_000` maps to `1.0`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixedQ32Error::Overflow`] if the result is out of range.
     pub fn from_ppm(ppm: u32) -> Result<Self, FixedQ32Error> {
         let n = I32F32::checked_from_num(ppm).ok_or(FixedQ32Error::Overflow)?;
         let d = I32F32::checked_from_num(PPM_SCALE).ok_or(FixedQ32Error::Overflow)?;
@@ -119,6 +140,10 @@ impl FixedQ32 {
     }
 
     /// Parse from a decimal string.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixedQ32Error::Overflow`] if parsing fails or the result is out of range.
     pub fn from_decimal_str(s: &str) -> Result<Self, FixedQ32Error> {
         s.parse::<I32F32>()
             .map(Self)
@@ -321,6 +346,10 @@ impl FixedQ32 {
     }
 
     /// Convert to i64 after floor rounding.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixedQ32Error::Overflow`] if the result is out of range.
     pub fn to_i64_floor(self) -> Result<i64, FixedQ32Error> {
         self.floor()
             .0
@@ -329,6 +358,10 @@ impl FixedQ32 {
     }
 
     /// Convert to i64 after ceiling rounding.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixedQ32Error::Overflow`] if the result is out of range.
     pub fn to_i64_ceil(self) -> Result<i64, FixedQ32Error> {
         self.ceil()
             .0
@@ -337,6 +370,10 @@ impl FixedQ32 {
     }
 
     /// Convert to i64 after nearest rounding.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixedQ32Error::Overflow`] if the result is out of range.
     pub fn to_i64_round(self) -> Result<i64, FixedQ32Error> {
         self.round()
             .0
@@ -345,6 +382,10 @@ impl FixedQ32 {
     }
 
     /// Convert to usize after nearest rounding.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixedQ32Error::Overflow`] if the result is out of range or negative.
     pub fn to_usize_round(self) -> Result<usize, FixedQ32Error> {
         let i = self.to_i64_round()?;
         if i < 0 {
@@ -354,6 +395,10 @@ impl FixedQ32 {
     }
 
     /// Convert to u64 after nearest rounding.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixedQ32Error::Overflow`] if the result is out of range or negative.
     pub fn to_u64_round(self) -> Result<u64, FixedQ32Error> {
         let i = self.to_i64_round()?;
         if i < 0 {

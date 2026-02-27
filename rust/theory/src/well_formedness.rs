@@ -66,6 +66,12 @@ pub type ValidationResult = Result<(), ValidationError>;
 /// Checks all well-formedness criteria and returns the first error found,
 /// or Ok(()) if the type is well-formed.
 ///
+/// # Errors
+///
+/// Returns [`ValidationError`] if the global type violates any well-formedness
+/// criteria (unbound variables, empty branches, self-communication, unguarded
+/// recursion, or duplicate labels).
+///
 /// # Examples
 ///
 /// ```
@@ -80,6 +86,7 @@ pub type ValidationResult = Result<(), ValidationError>;
 /// let bad = GlobalType::send("A", "A", Label::new("msg"), GlobalType::End);
 /// assert!(validate_global(&bad).is_err());
 /// ```
+#[allow(clippy::missing_panics_doc)] // pop().unwrap() is safe: guarded by len() check
 pub fn validate_global(g: &GlobalType) -> ValidationResult {
     let mut errors = Vec::new();
 
@@ -213,6 +220,12 @@ fn find_duplicate_label_local(lt: &LocalTypeR) -> Option<String> {
 
 /// Validate a local type for well-formedness.
 ///
+/// # Errors
+///
+/// Returns [`ValidationError`] if the local type violates well-formedness
+/// criteria (unbound variables, empty branches, unguarded recursion, or
+/// duplicate labels).
+///
 /// # Examples
 ///
 /// ```
@@ -227,6 +240,7 @@ fn find_duplicate_label_local(lt: &LocalTypeR) -> Option<String> {
 /// let bad = LocalTypeR::var("unbound");
 /// assert!(validate_local(&bad).is_err());
 /// ```
+#[allow(clippy::missing_panics_doc)] // pop().unwrap() is safe: guarded by len() check
 pub fn validate_local(lt: &LocalTypeR) -> ValidationResult {
     let mut errors = Vec::new();
 

@@ -89,6 +89,10 @@ pub struct SisoSegment {
 /// A type is async-subtypable if it can be decomposed into a sequence
 /// of SISO segments.
 ///
+/// # Errors
+///
+/// Returns [`AsyncSubtypeError`] if the type cannot be decomposed into SISO form.
+///
 /// # Examples
 ///
 /// ```
@@ -110,6 +114,11 @@ pub fn siso_decompose(lt: &LocalTypeR) -> Result<Vec<SisoSegment>, AsyncSubtypeE
 }
 
 /// Decompose a local type into SISO segments with an explicit unfold limit.
+///
+/// # Errors
+///
+/// Returns [`AsyncSubtypeError`] if the type cannot be decomposed into SISO form
+/// or if the unfold limit is exceeded.
 pub fn siso_decompose_with_fuel(
     lt: &LocalTypeR,
     fuel: UnfoldSteps,
@@ -316,6 +325,10 @@ fn find_input_continuation(lt: &LocalTypeR) -> Option<LocalTypeR> {
 ///
 /// This API is experimental and may be tightened as Lean parity coverage grows.
 ///
+/// # Errors
+///
+/// Returns [`AsyncSubtypeError`] if the subtype relationship doesn't hold.
+///
 /// # Examples
 ///
 /// ```
@@ -435,6 +448,7 @@ fn output_tree_compatible(sub: &OutputTree, sup: &OutputTree) -> bool {
 /// // End is always orphan-free
 /// assert!(orphan_free(&LocalTypeR::End));
 /// ```
+#[must_use]
 pub fn orphan_free(lt: &LocalTypeR) -> bool {
     // Conservative approximation:
     // every send branch must contain a reachable matching receive.

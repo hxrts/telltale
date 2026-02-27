@@ -16,7 +16,7 @@ use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput, Topolo
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::threaded::ThreadedVM;
-use telltale_vm::vm::{ObsEvent, ThreadedRoundSemantics, VMConfig, VM, VMError};
+use telltale_vm::vm::{ObsEvent, ThreadedRoundSemantics, VMConfig, VMError, VM};
 use telltale_vm::{
     CommunicationReplayMode, EffectDeterminismTier, EnvelopeDiffArtifactV1,
     FailureVisibleDiffClass, SchedulerPermutationClass,

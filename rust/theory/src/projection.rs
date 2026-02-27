@@ -106,6 +106,11 @@ fn project_non_participant(
 /// view for a single participant.
 /// If `role` does not appear in the protocol, the projection is `End`.
 ///
+/// # Errors
+///
+/// Returns [`ProjectionError`] if the global type cannot be projected (e.g., due
+/// to unmergeable branches for non-participant roles or empty branch sets).
+///
 /// # Examples
 ///
 /// ```
@@ -203,6 +208,10 @@ fn body_mentions_role(global: &GlobalType, role: &str) -> bool {
 /// Project a global type onto all its roles.
 ///
 /// Returns a map from role names to their local types.
+///
+/// # Errors
+///
+/// Returns [`ProjectionError`] if any role's projection fails.
 pub fn project_all(global: &GlobalType) -> Result<Vec<(String, LocalTypeR)>, ProjectionError> {
     let roles = global.roles();
     let mut projections = Vec::with_capacity(roles.len());
@@ -289,6 +298,10 @@ impl MemoizedProjector {
     ///
     /// On cache miss, computes the projection and caches the result.
     /// On cache hit, returns the cached result directly.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProjectionError`] if projection fails.
     pub fn project(&mut self, global: &GlobalType, role: &str) -> ProjectionResult {
         self.project_shared(global, role)
             .map(|local| (*local).clone())
@@ -297,6 +310,10 @@ impl MemoizedProjector {
     /// Project a global type onto a role, returning shared local-type storage.
     ///
     /// This avoids cloning large local types across repeated cache hits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProjectionError`] if projection fails or content addressing fails.
     pub fn project_shared(
         &mut self,
         global: &GlobalType,
@@ -323,6 +340,10 @@ impl MemoizedProjector {
     }
 
     /// Project a global type onto all its roles, using cached results.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProjectionError`] if any role's projection fails.
     pub fn project_all(
         &mut self,
         global: &GlobalType,

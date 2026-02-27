@@ -100,6 +100,11 @@ pub type MergeResult = Result<LocalTypeR, MergeError>;
 /// Returns `Ok(merged)` if the types can be merged, or `Err(error)` if they
 /// have incompatible structure.
 ///
+/// # Errors
+///
+/// Returns [`MergeError`] if the types have incompatible structure (different
+/// partners, mismatched labels for sends, incompatible recursive variables, etc.).
+///
 /// # Examples
 ///
 /// ```
@@ -372,7 +377,10 @@ fn merge_recv_branches(
 /// This is a convenience function for merging more than two types.
 /// It folds the merge operation over the list.
 ///
-/// Returns an error if the list is empty or if any pair cannot be merged.
+/// # Errors
+///
+/// Returns [`MergeError::IncompatibleTypes`] if the list is empty, or
+/// [`MergeError`] if any pair of types cannot be merged.
 pub fn merge_all(types: &[LocalTypeR]) -> MergeResult {
     match types {
         [] => Err(MergeError::IncompatibleTypes),
@@ -390,6 +398,7 @@ pub fn merge_all(types: &[LocalTypeR]) -> MergeResult {
 /// Check if two local types are mergeable without actually merging them.
 ///
 /// This is useful for validation without constructing the merged type.
+#[must_use]
 pub fn can_merge(t1: &LocalTypeR, t2: &LocalTypeR) -> bool {
     merge(t1, t2).is_ok()
 }

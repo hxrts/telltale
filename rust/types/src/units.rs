@@ -46,10 +46,21 @@ macro_rules! define_count {
             pub const MIN: u32 = $min;
             pub const MAX: u32 = $max;
 
+            /// Create a new value, returning an error if out of range.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`CountError`] if `value` is not in `MIN..=MAX`.
             pub fn new(value: u32) -> Result<Self, CountError> {
                 Self::try_new(value)
             }
 
+            /// Try to create a new value, returning an error if out of range.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`CountError`] if `value` is not in `MIN..=MAX`.
+            #[allow(clippy::as_conversions)] // u32 -> u64 is a safe widening conversion
             pub fn try_new(value: u32) -> Result<Self, CountError> {
                 if !(Self::MIN..=Self::MAX).contains(&value) {
                     return Err(CountError {
@@ -73,6 +84,7 @@ macro_rules! define_count {
             }
 
             #[must_use]
+            #[allow(clippy::as_conversions)] // u32 -> usize is safe (usize >= 32 bits)
             pub const fn as_usize(self) -> usize {
                 self.0 as usize
             }
@@ -89,6 +101,7 @@ macro_rules! define_count {
         impl TryFrom<usize> for $name {
             type Error = CountError;
 
+            #[allow(clippy::as_conversions)] // u32 -> u64 is a safe widening conversion
             fn try_from(value: usize) -> Result<Self, Self::Error> {
                 let value_u32 = u32::try_from(value).map_err(|_| CountError {
                     kind: stringify!($name),

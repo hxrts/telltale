@@ -57,6 +57,10 @@ use serde::{de::DeserializeOwned, Serialize};
 /// ```
 pub trait Contentable: Sized {
     /// Serialize to canonical byte representation (JSON format).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
     fn to_bytes(&self) -> Result<Vec<u8>, ContentableError>;
 
     /// Deserialize from JSON bytes.
@@ -70,6 +74,10 @@ pub trait Contentable: Sized {
     /// free-variable interfaces when supported by the implementation.
     ///
     /// Default behavior falls back to canonical bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
     fn to_template_bytes(&self) -> Result<Vec<u8>, ContentableError> {
         self.to_bytes()
     }
@@ -78,6 +86,10 @@ pub trait Contentable: Sized {
     ///
     /// DAG-CBOR is a deterministic subset of CBOR designed for content addressing.
     /// It produces more compact output than JSON and is compatible with IPLD/IPFS.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
     #[cfg(feature = "dag-cbor")]
     fn to_cbor_bytes(&self) -> Result<Vec<u8>, ContentableError>;
 
@@ -90,23 +102,39 @@ pub trait Contentable: Sized {
     fn from_cbor_bytes(bytes: &[u8]) -> Result<Self, ContentableError>;
 
     /// Compute content ID using the specified hasher (from JSON bytes).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
     fn content_id<H: Hasher>(&self) -> Result<ContentId<H>, ContentableError> {
         let bytes = self.to_bytes()?;
         Ok(ContentId::from_bytes(&bytes))
     }
 
     /// Compute content ID using default SHA-256 hasher (from JSON bytes).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
     fn content_id_sha256(&self) -> Result<ContentId<Sha256Hasher>, ContentableError> {
         self.content_id()
     }
 
     /// Compute a template ID using the specified hasher (from template bytes).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
     fn template_id<H: Hasher>(&self) -> Result<ContentId<H>, ContentableError> {
         let bytes = self.to_template_bytes()?;
         Ok(ContentId::from_bytes(&bytes))
     }
 
     /// Compute a template ID using default SHA-256 hasher.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
     fn template_id_sha256(&self) -> Result<ContentId<Sha256Hasher>, ContentableError> {
         self.template_id()
     }
@@ -115,6 +143,10 @@ pub trait Contentable: Sized {
     ///
     /// This produces a different content ID than the JSON-based methods.
     /// Use this for IPLD/IPFS compatibility.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
     #[cfg(feature = "dag-cbor")]
     fn content_id_cbor<H: Hasher>(&self) -> Result<ContentId<H>, ContentableError> {
         let bytes = self.to_cbor_bytes()?;
@@ -122,6 +154,10 @@ pub trait Contentable: Sized {
     }
 
     /// Compute content ID from DAG-CBOR using SHA-256 (requires `dag-cbor` feature).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
     #[cfg(feature = "dag-cbor")]
     fn content_id_cbor_sha256(&self) -> Result<ContentId<Sha256Hasher>, ContentableError> {
         self.content_id_cbor()
@@ -869,7 +905,7 @@ mod proptests {
                     let new_var = mapping
                         .iter()
                         .find(|(old, _)| *old == var)
-                        .map(|(_, new)| new.to_string())
+                        .map(|(_, new)| (*new).to_string())
                         .unwrap_or_else(|| var.clone());
 
                     bound.push((var.clone(), new_var.clone()));

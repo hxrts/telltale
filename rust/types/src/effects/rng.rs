@@ -23,6 +23,7 @@ pub trait Rng: Send {
     fn next_u64(&mut self) -> u64;
 
     /// Generate a random u32.
+    #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
     fn next_u32(&mut self) -> u32 {
         self.next_u64() as u32
     }
@@ -36,6 +37,7 @@ pub trait Rng: Send {
     ///
     /// Uses the upper 32 bits as the fractional part, giving uniform
     /// distribution over the representable range.
+    #[allow(clippy::as_conversions)] // Upper 32 bits of u64 fit in i64
     fn next_fixed(&mut self) -> FixedQ32 {
         // FixedQ32 is Q32.32: value = bits / 2^32
         // Take upper 32 bits as fractional part to get value in [0, 1)
@@ -258,6 +260,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::as_conversions)] // Test code: usize/u64 -> f64 for statistics
     fn test_next_u64_bounded_distribution_sanity() {
         // This is not a proof of uniformity. It catches obvious bias/regression.
         let mut rng = SeededRng::new(123456);

@@ -173,12 +173,10 @@ fn parse_annotated_stmt(
             Rule::annotation => {
                 let span = item.as_span();
                 let annotation_kind =
-                    item.into_inner()
-                        .next()
-                        .ok_or_else(|| ParseError::Syntax {
-                            span: ErrorSpan::from_pest_span(span, input),
-                            message: "annotation is missing its kind".to_string(),
-                        })?;
+                    item.into_inner().next().ok_or_else(|| ParseError::Syntax {
+                        span: ErrorSpan::from_pest_span(span, input),
+                        message: "annotation is missing its kind".to_string(),
+                    })?;
                 parse_annotation_kind(annotation_kind, &mut annotations, input)?;
             }
             _ => {
