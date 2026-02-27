@@ -139,7 +139,7 @@ fn cmd_check(golden_dir: &PathBuf) -> anyhow::Result<()> {
             println!("  - {}", item);
         }
         println!("\nRun 'cargo run -p telltale-lean-bridge --bin golden -- regenerate' to update");
-        std::process::exit(1);
+        Err(anyhow::anyhow!("golden file drift detected"))
     }
 }
 
@@ -210,14 +210,9 @@ fn cmd_list(golden_dir: &std::path::Path) -> anyhow::Result<()> {
 /// Require that Lean is available, or exit with helpful message.
 fn require_lean() -> anyhow::Result<()> {
     if !LeanRunner::is_available() {
-        eprintln!("Error: Lean runner not available");
-        eprintln!();
-        eprintln!("Build the Lean runner first:");
-        eprintln!("  cd lean && lake build telltale_validator");
-        eprintln!();
-        eprintln!("Or with Nix:");
-        eprintln!("  nix develop --command bash -c \"cd lean && lake build telltale_validator\"");
-        std::process::exit(1);
+        return Err(anyhow::anyhow!(
+            "Lean runner not available. Build with `cd lean && lake build telltale_validator`."
+        ));
     }
     Ok(())
 }

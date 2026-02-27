@@ -35,17 +35,19 @@ fn required_field<'a>(json: &'a Value, field: &str) -> Result<&'a Value, ImportE
 }
 
 fn required_str(json: &Value, field: &str) -> Result<String, ImportError> {
-    required_field(json, field)?
+    let value = required_field(json, field)?;
+    value
         .as_str()
         .map(ToString::to_string)
-        .ok_or_else(|| ImportError::MissingField(field.to_string()))
+        .ok_or_else(|| ImportError::ExpectedString(value.to_string()))
 }
 
 fn required_array<'a>(json: &'a Value, field: &str) -> Result<&'a [Value], ImportError> {
-    required_field(json, field)?
+    let value = required_field(json, field)?;
+    value
         .as_array()
         .map(Vec::as_slice)
-        .ok_or_else(|| ImportError::MissingField(field.to_string()))
+        .ok_or_else(|| ImportError::ExpectedArray(value.to_string()))
 }
 
 fn parse_global_comm(json: &Value) -> Result<GlobalType, ImportError> {
@@ -224,7 +226,9 @@ fn parse_sort(json: &Value) -> Result<PayloadSort, ImportError> {
                 ))
             }
         } else if let Some(n) = obj.get("vector").and_then(|v| v.as_u64()) {
-            Ok(PayloadSort::Vector(n as usize))
+            let size = usize::try_from(n)
+                .map_err(|_| ImportError::InvalidSort("vector size exceeds usize".to_string()))?;
+            Ok(PayloadSort::Vector(size))
         } else {
             Err(ImportError::InvalidSort(format!("{:?}", obj)))
         }
@@ -431,5 +435,47 @@ mod tests {
             }
             _ => panic!("Structure mismatch"),
         }
+    }
+
+    #[test]
+    fn test_parse_global_reports_expected_string_for_sender() {
+        let json = json!({
+            "kind": "comm",
+            "sender": 1,
+            "receiver": "B",
+            "branches": []
+        });
+
+        let err = json_to_global(&json).expect_err("sender should require string");
+        assert!(matches!(err, ImportError::ExpectedString(_)));
+    }
+
+    #[test]
+    fn test_parse_global_reports_expected_array_for_branches() {
+        let json = json!({
+            "kind": "comm",
+            "sender": "A",
+            "receiver": "B",
+            "branches": { "bad": true }
+        });
+
+        let err = json_to_global(&json).expect_err("branches should require array");
+        assert!(matches!(err, ImportError::ExpectedArray(_)));
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    #[test]
+    fn test_parse_vector_sort_rejects_overflow() {
+        let json = json!({
+            "kind": "send",
+            "partner": "B",
+            "branches": [{
+                "label": { "name": "config", "sort": { "vector": 4294967296u64 } },
+                "continuation": { "kind": "end" }
+            }]
+        });
+
+        let err = json_to_local(&json).expect_err("vector size should overflow on 32-bit");
+        assert!(matches!(err, ImportError::InvalidSort(_)));
     }
 }

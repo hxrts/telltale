@@ -1,4 +1,25 @@
 use super::*;
+use std::collections::BTreeSet;
+use std::path::Path;
+
+fn stale_golden_projection_roles(
+    test_dir: &Path,
+    fresh_roles: &BTreeSet<String>,
+) -> Result<Vec<String>, EquivalenceError> {
+    let mut stale = Vec::new();
+    for file in std::fs::read_dir(test_dir)? {
+        let file = file?;
+        let name = file.file_name().to_string_lossy().to_string();
+        if name.ends_with(".expected.json") {
+            let role = name.trim_end_matches(".expected.json").to_string();
+            if !fresh_roles.contains(&role) {
+                stale.push(role);
+            }
+        }
+    }
+    stale.sort();
+    Ok(stale)
+}
 
 impl EquivalenceChecker {
     /// Check a Rust projection against a golden file.
@@ -163,6 +184,7 @@ impl EquivalenceChecker {
                     Ok(projections) => projections,
                     Err(_) => continue,
                 };
+                let fresh_roles: BTreeSet<String> = projections.keys().cloned().collect();
 
                 for (role, fresh) in projections {
                     let golden_path = entry.path().join(format!("{}.expected.json", role));
@@ -178,9 +200,31 @@ impl EquivalenceChecker {
                         drifted.push(format!("{}:{}", test_name, role));
                     }
                 }
+
+                for stale in stale_golden_projection_roles(&entry.path(), &fresh_roles)? {
+                    drifted.push(format!("{}:{} (stale)", test_name, stale));
+                }
             }
         }
 
         Ok(drifted)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stale_golden_projection_roles_detects_extra_files() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        std::fs::write(dir.path().join("A.expected.json"), "{}").expect("write A");
+        std::fs::write(dir.path().join("B.expected.json"), "{}").expect("write B");
+        std::fs::write(dir.path().join("input.json"), "{}").expect("write input");
+
+        let fresh_roles = BTreeSet::from(["A".to_string()]);
+        let stale =
+            stale_golden_projection_roles(dir.path(), &fresh_roles).expect("compute stale roles");
+        assert_eq!(stale, vec!["B".to_string()]);
     }
 }

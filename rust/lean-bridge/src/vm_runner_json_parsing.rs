@@ -8,16 +8,28 @@ pub(super) fn parse_sim_run_output(value: Value) -> Result<SimRunOutput, VmRunne
     Ok(output)
 }
 
-pub(super) fn parse_sim_trace_validation(response: &Value) -> SimTraceValidation {
-    let valid = response
+pub(super) fn parse_required_valid(
+    response: &Value,
+    operation: &str,
+) -> Result<bool, VmRunnerError> {
+    response
         .get("valid")
         .and_then(Value::as_bool)
-        .unwrap_or_else(|| response.get("errors").is_none());
-    SimTraceValidation {
-        valid,
+        .ok_or_else(|| {
+            VmRunnerError::ParseError(format!(
+                "missing boolean field 'valid' in {operation} response"
+            ))
+        })
+}
+
+pub(super) fn parse_sim_trace_validation(
+    response: &Value,
+) -> Result<SimTraceValidation, VmRunnerError> {
+    Ok(SimTraceValidation {
+        valid: parse_required_valid(response, "validateSimulationTrace")?,
         errors: parse_simulation_errors(response),
         artifacts: response.get("artifacts").cloned().unwrap_or(Value::Null),
-    }
+    })
 }
 
 pub(super) fn simulation_trace_payload(trace: &[VmTraceEvent]) -> Value {

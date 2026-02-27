@@ -17,7 +17,9 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Child, Command, Output};
+use std::thread;
+use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
 use thiserror::Error;
 
@@ -51,6 +53,15 @@ pub enum LeanRunnerError {
     /// Validation failed with a specific reason.
     #[error("Validation failed: {0}")]
     ValidationFailed(String),
+
+    /// Lean process exceeded the configured timeout.
+    #[error("Lean process '{operation}' timed out after {timeout_ms}ms")]
+    TimedOut {
+        /// Operation name associated with the process invocation.
+        operation: String,
+        /// Timeout in milliseconds.
+        timeout_ms: u64,
+    },
 }
 
 /// Choreography input for the VM runner.
@@ -89,6 +100,49 @@ pub struct LeanRunner {
 impl LeanRunner {
     /// Default path to the Lean binary (relative to workspace root).
     pub const DEFAULT_BINARY_PATH: &'static str = "lean/.lake/build/bin/telltale_validator";
+    /// Default timeout for Lean process invocations.
+    pub const DEFAULT_TIMEOUT_MS: u64 = 120_000;
+
+    fn process_timeout() -> Duration {
+        let ms = std::env::var("TELLTALE_LEAN_TIMEOUT_MS")
+            .ok()
+            .and_then(|raw| raw.parse::<u64>().ok())
+            .unwrap_or(Self::DEFAULT_TIMEOUT_MS);
+        Duration::from_millis(ms.max(1))
+    }
+
+    fn wait_with_timeout(
+        mut child: Child,
+        timeout: Duration,
+        operation: &str,
+    ) -> Result<Output, LeanRunnerError> {
+        let start = Instant::now();
+        loop {
+            match child.try_wait()? {
+                Some(_) => return child.wait_with_output().map_err(LeanRunnerError::from),
+                None => {
+                    if start.elapsed() >= timeout {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Err(LeanRunnerError::TimedOut {
+                            operation: operation.to_string(),
+                            timeout_ms: timeout.as_millis() as u64,
+                        });
+                    }
+                    thread::sleep(Duration::from_millis(10));
+                }
+            }
+        }
+    }
+
+    fn run_command_with_timeout(
+        &self,
+        mut command: Command,
+        operation: &str,
+    ) -> Result<Output, LeanRunnerError> {
+        let child = command.spawn()?;
+        Self::wait_with_timeout(child, Self::process_timeout(), operation)
+    }
 
     /// Get the workspace root path by walking up from the manifest directory.
     fn find_workspace_root() -> Option<PathBuf> {
@@ -136,7 +190,7 @@ impl LeanRunner {
     /// Returns [`LeanRunnerError::BinaryNotFound`] if the binary doesn't exist.
     pub fn with_binary_path(path: impl AsRef<Path>) -> Result<Self, LeanRunnerError> {
         let binary_path = PathBuf::from(path.as_ref());
-        if !binary_path.exists() {
+        if !binary_path.exists() || !binary_path.is_file() {
             return Err(LeanRunnerError::BinaryNotFound(binary_path));
         }
         Ok(Self { binary_path })
@@ -237,14 +291,15 @@ impl LeanRunner {
         )?;
 
         // Invoke Lean runner
-        let output = Command::new(&self.binary_path)
+        let mut command = Command::new(&self.binary_path);
+        command
             .arg("--choreography")
             .arg(choreo_file.path())
             .arg("--program")
             .arg(program_file.path())
             .arg("--json-log")
-            .arg(json_log.path())
-            .output()?;
+            .arg(json_log.path());
+        let output = self.run_command_with_timeout(command, "validate")?;
 
         self.parse_output(output, json_log.path())
     }
@@ -325,6 +380,7 @@ impl LeanRunner {
 mod tests {
     use super::*;
     use std::process::Command;
+    use std::time::Duration;
 
     #[test]
     fn test_is_available_returns_bool() {
@@ -407,5 +463,16 @@ mod tests {
         assert!(result.success);
         assert_eq!(result.role, "A");
         assert_eq!(result.message, "coherent");
+    }
+
+    #[test]
+    fn test_wait_with_timeout_returns_timeout_error() {
+        let child = Command::new("sh")
+            .arg("-c")
+            .arg("sleep 1")
+            .spawn()
+            .expect("spawn sleep");
+        let result = LeanRunner::wait_with_timeout(child, Duration::from_millis(10), "test_sleep");
+        assert!(matches!(result, Err(LeanRunnerError::TimedOut { .. })));
     }
 }

@@ -264,8 +264,8 @@ fn local_types_equal(lt1: &LocalTypeR, lt2: &LocalTypeR) -> bool {
                 && b1
                     .iter()
                     .zip(b2.iter())
-                    .all(|((l1, _vt1, c1), (l2, _vt2, c2))| {
-                        labels_equal(l1, l2) && local_types_equal(c1, c2)
+                    .all(|((l1, vt1, c1), (l2, vt2, c2))| {
+                        labels_equal(l1, l2) && vt1 == vt2 && local_types_equal(c1, c2)
                     })
         }
 
@@ -284,8 +284,8 @@ fn local_types_equal(lt1: &LocalTypeR, lt2: &LocalTypeR) -> bool {
                 && b1
                     .iter()
                     .zip(b2.iter())
-                    .all(|((l1, _vt1, c1), (l2, _vt2, c2))| {
-                        labels_equal(l1, l2) && local_types_equal(c1, c2)
+                    .all(|((l1, vt1, c1), (l2, vt2, c2))| {
+                        labels_equal(l1, l2) && vt1 == vt2 && local_types_equal(c1, c2)
                     })
         }
 
@@ -308,6 +308,7 @@ fn labels_equal(l1: &telltale_types::Label, l2: &telltale_types::Label) -> bool 
 mod tests {
     use super::*;
     use telltale_types::Label;
+    use telltale_types::{PayloadSort, ValType};
 
     #[test]
     fn test_global_roundtrip_valid() {
@@ -371,5 +372,33 @@ mod tests {
             .compare_projection(&rust_result, &lean_json)
             .unwrap();
         assert!(result.is_valid());
+    }
+
+    #[test]
+    fn test_compare_projection_rejects_payload_annotation_mismatch() {
+        use serde_json::json;
+
+        let validator = Validator::new();
+        let rust_result = LocalTypeR::Send {
+            partner: "B".to_string(),
+            branches: vec![(
+                Label::with_sort("msg", PayloadSort::Nat),
+                Some(ValType::Nat),
+                LocalTypeR::End,
+            )],
+        };
+        let lean_json = json!({
+            "kind": "send",
+            "partner": "B",
+            "branches": [{
+                "label": { "name": "msg", "sort": "nat" },
+                "continuation": { "kind": "end" }
+            }]
+        });
+
+        let result = validator
+            .compare_projection(&rust_result, &lean_json)
+            .unwrap();
+        assert!(result.is_invalid());
     }
 }

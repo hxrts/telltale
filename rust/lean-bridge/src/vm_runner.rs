@@ -5,7 +5,9 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Output, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 use thiserror::Error;
 
 use crate::runner::ChoreographyJson;
@@ -20,8 +22,8 @@ use crate::vm_trace::{
 #[path = "vm_runner_json_parsing.rs"]
 mod parsing;
 use parsing::{
-    parse_sim_run_output, parse_sim_trace_validation, parse_structured_errors,
-    simulation_trace_payload,
+    parse_required_valid, parse_sim_run_output, parse_sim_trace_validation,
+    parse_structured_errors, simulation_trace_payload,
 };
 
 /// Errors from Lean VM runner operations.
@@ -44,6 +46,14 @@ pub enum VmRunnerError {
     /// Failed to parse Lean output or JSON.
     #[error("Failed to parse VM runner output: {0}")]
     ParseError(String),
+    /// VM runner process exceeded the configured timeout.
+    #[error("VM runner operation '{operation}' timed out after {timeout_ms}ms")]
+    TimedOut {
+        /// Operation name associated with the process invocation.
+        operation: String,
+        /// Timeout in milliseconds.
+        timeout_ms: u64,
+    },
 }
 
 /// Input JSON for the VM runner.
@@ -206,6 +216,40 @@ pub struct VmRunner {
 impl VmRunner {
     /// Default path to the VM runner binary (relative to workspace root).
     pub const DEFAULT_BINARY_PATH: &'static str = "lean/.lake/build/bin/vm_runner";
+    /// Default timeout for VM runner process invocations.
+    pub const DEFAULT_TIMEOUT_MS: u64 = 120_000;
+
+    fn process_timeout() -> Duration {
+        let ms = std::env::var("TELLTALE_VM_TIMEOUT_MS")
+            .ok()
+            .and_then(|raw| raw.parse::<u64>().ok())
+            .unwrap_or(Self::DEFAULT_TIMEOUT_MS);
+        Duration::from_millis(ms.max(1))
+    }
+
+    fn wait_with_timeout(
+        mut child: Child,
+        timeout: Duration,
+        operation: &str,
+    ) -> Result<Output, VmRunnerError> {
+        let start = Instant::now();
+        loop {
+            match child.try_wait()? {
+                Some(_) => return child.wait_with_output().map_err(VmRunnerError::from),
+                None => {
+                    if start.elapsed() >= timeout {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Err(VmRunnerError::TimedOut {
+                            operation: operation.to_string(),
+                            timeout_ms: timeout.as_millis() as u64,
+                        });
+                    }
+                    thread::sleep(Duration::from_millis(10));
+                }
+            }
+        }
+    }
 
     fn find_workspace_root() -> Option<PathBuf> {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
@@ -248,7 +292,7 @@ impl VmRunner {
     /// Returns [`VmRunnerError::BinaryNotFound`] if the binary doesn't exist.
     pub fn with_binary_path(path: impl AsRef<Path>) -> Result<Self, VmRunnerError> {
         let binary_path = PathBuf::from(path.as_ref());
-        if !binary_path.exists() {
+        if !binary_path.exists() || !binary_path.is_file() {
             return Err(VmRunnerError::BinaryNotFound(binary_path));
         }
         Ok(Self { binary_path })
@@ -279,13 +323,11 @@ impl VmRunner {
             .spawn()
             .map_err(VmRunnerError::TempFileError)?;
 
-        if let Some(stdin) = cmd.stdin.as_mut() {
+        if let Some(mut stdin) = cmd.stdin.take() {
             stdin.write_all(&payload)?;
         }
 
-        let output = cmd
-            .wait_with_output()
-            .map_err(VmRunnerError::TempFileError)?;
+        let output = Self::wait_with_timeout(cmd, Self::process_timeout(), "run")?;
 
         if !output.status.success() {
             return Err(VmRunnerError::ProcessFailed {
@@ -335,13 +377,11 @@ impl VmRunner {
             .spawn()
             .map_err(VmRunnerError::TempFileError)?;
 
-        if let Some(stdin) = cmd.stdin.as_mut() {
+        if let Some(mut stdin) = cmd.stdin.take() {
             stdin.write_all(&bytes)?;
         }
 
-        let output = cmd
-            .wait_with_output()
-            .map_err(VmRunnerError::TempFileError)?;
+        let output = Self::wait_with_timeout(cmd, Self::process_timeout(), operation)?;
         if !output.status.success() {
             return Err(VmRunnerError::ProcessFailed {
                 code: output.status.code().unwrap_or(-1),
@@ -364,12 +404,8 @@ impl VmRunner {
             "trace": rust_trace,
         });
         let response = self.run_lean_validation("validateTrace", &payload)?;
-        let valid = response
-            .get("valid")
-            .and_then(Value::as_bool)
-            .unwrap_or_else(|| response.get("errors").is_none());
         Ok(TraceValidation {
-            valid,
+            valid: parse_required_valid(&response, "validateTrace")?,
             errors: parse_structured_errors(&response),
         })
     }
@@ -402,7 +438,7 @@ impl VmRunner {
     ) -> Result<SimTraceValidation, VmRunnerError> {
         let payload = simulation_trace_payload(trace);
         let response = self.run_lean_validation("validateSimulationTrace", &payload)?;
-        Ok(parse_sim_trace_validation(&response))
+        parse_sim_trace_validation(&response)
     }
 
     /// Run the same choreography in Lean and compare normalized traces.
@@ -469,13 +505,9 @@ impl VmRunner {
         let payload =
             serde_json::to_value(bundle).map_err(|e| VmRunnerError::ParseError(e.to_string()))?;
         let response = self.run_lean_validation("verifyProtocolBundle", &payload)?;
-        let valid = response
-            .get("valid")
-            .and_then(Value::as_bool)
-            .unwrap_or_else(|| response.get("errors").is_none());
 
         Ok(InvariantVerificationResult {
-            valid,
+            valid: parse_required_valid(&response, "verifyProtocolBundle")?,
             errors: parse_structured_errors(&response),
             artifacts: response.get("artifacts").cloned().unwrap_or(Value::Null),
         })
@@ -538,14 +570,15 @@ pub fn vm_input_from_values(
 }
 
 /// Serialize a VM runner output to JSON for debugging.
-#[must_use]
-pub fn output_to_json(output: &VmRunOutput) -> Value {
-    serde_json::to_value(output).unwrap_or(Value::Null)
+pub fn output_to_json(output: &VmRunOutput) -> Result<Value, VmRunnerError> {
+    serde_json::to_value(output).map_err(|e| VmRunnerError::ParseError(e.to_string()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
+    use std::time::Duration;
 
     fn trace_event(kind: &str, tick: u64, session: Option<u64>) -> VmTraceEvent {
         VmTraceEvent {
@@ -616,12 +649,29 @@ mod tests {
             ],
             "artifacts": { "kind": "diff" }
         });
-        let parsed = parse_sim_trace_validation(&response);
+        let parsed = parse_sim_trace_validation(&response).expect("parse simulation validation");
         assert!(!parsed.valid);
         assert_eq!(parsed.errors.len(), 1);
         assert_eq!(parsed.errors[0].code, "sim.trace.mismatch");
         assert_eq!(parsed.errors[0].path.as_deref(), Some("trace[1]"));
         assert_eq!(parsed.artifacts["kind"], "diff");
+    }
+
+    #[test]
+    fn parse_required_valid_rejects_missing_or_non_boolean() {
+        let missing = serde_json::json!({
+            "errors": []
+        });
+        let missing_err =
+            parse_required_valid(&missing, "validateTrace").expect_err("missing valid must fail");
+        assert!(matches!(missing_err, VmRunnerError::ParseError(_)));
+
+        let wrong_type = serde_json::json!({
+            "valid": "true"
+        });
+        let wrong_type_err = parse_required_valid(&wrong_type, "validateTrace")
+            .expect_err("non-boolean valid must fail");
+        assert!(matches!(wrong_type_err, VmRunnerError::ParseError(_)));
     }
 
     #[test]
@@ -645,5 +695,16 @@ mod tests {
         let payload = simulation_trace_payload(&trace);
         assert!(payload["trace"].is_array());
         assert_eq!(payload["trace"][0]["kind"], "sent");
+    }
+
+    #[test]
+    fn wait_with_timeout_returns_timeout_error() {
+        let child = Command::new("sh")
+            .arg("-c")
+            .arg("sleep 1")
+            .spawn()
+            .expect("spawn sleep");
+        let result = VmRunner::wait_with_timeout(child, Duration::from_millis(10), "test_sleep");
+        assert!(matches!(result, Err(VmRunnerError::TimedOut { .. })));
     }
 }

@@ -98,22 +98,32 @@ pub struct VMState<G, E> {
 }
 
 /// Convert a full VM-state payload to canonical JSON.
-#[must_use]
-pub fn vm_state_to_json<G, E>(vm: &VMState<G, E>) -> Json
+pub fn vm_state_to_json<G, E>(vm: &VMState<G, E>) -> Result<Json, serde_json::Error>
 where
     G: Serialize,
     E: Serialize,
 {
-    json!({
+    let coroutines: Vec<Json> = vm
+        .coroutines
+        .iter()
+        .map(coroutine_to_json)
+        .collect::<Result<_, _>>()?;
+    let obs_trace: Vec<Json> = vm
+        .obs_trace
+        .iter()
+        .map(event_to_json)
+        .collect::<Result<_, _>>()?;
+
+    Ok(json!({
         "schema_version": VM_STATE_SCHEMA_VERSION,
         "compatibility": vm.compatibility,
         "clock": vm.clock,
         "nextCoroId": vm.next_coro_id,
         "nextSessionId": vm.next_session_id,
-        "coroutines": vm.coroutines.iter().map(coroutine_to_json).collect::<Vec<_>>(),
+        "coroutines": coroutines,
         "sessions": sessions_to_json(&vm.sessions),
-        "obsTrace": vm.obs_trace.iter().map(event_to_json).collect::<Vec<_>>(),
-    })
+        "obsTrace": obs_trace,
+    }))
 }
 
 /// Decode a VM-state payload from JSON with compatibility aliases.
@@ -126,43 +136,44 @@ where
 }
 
 /// Convert one coroutine payload to JSON.
-#[must_use]
-pub fn coroutine_to_json<G, E>(coro: &CoroutineState<G, E>) -> Json
+pub fn coroutine_to_json<G, E>(coro: &CoroutineState<G, E>) -> Result<Json, serde_json::Error>
 where
     G: Serialize,
     E: Serialize,
 {
-    json!({
+    let effect_ctx = match &coro.effect_ctx {
+        Some(ctx) => serde_json::to_value(ctx)?,
+        None => Json::Null,
+    };
+    Ok(json!({
         "id": coro.id,
         "programId": coro.program_id,
         "pc": coro.pc,
-        "status": status_to_json(&coro.status),
+        "status": status_to_json(&coro.status)?,
         "ownedEndpoints": coro.owned_endpoints.iter().map(endpoint_to_json).collect::<Vec<_>>(),
         "costBudget": coro.cost_budget,
-        "effectCtx": coro.effect_ctx.as_ref().map_or(Json::Null, |ctx| serde_json::to_value(ctx).unwrap_or(Json::Null)),
-    })
+        "effectCtx": effect_ctx,
+    }))
 }
 
 /// Convert one ticked event payload to JSON.
-#[must_use]
-pub fn event_to_json<E>(event: &TickedObsEvent<E>) -> Json
+pub fn event_to_json<E>(event: &TickedObsEvent<E>) -> Result<Json, serde_json::Error>
 where
     E: Serialize,
 {
-    json!({
+    Ok(json!({
         "schema_version": VM_STATE_SCHEMA_VERSION,
         "tick": event.tick,
-        "event": obs_event_to_json(&event.event),
-    })
+        "event": obs_event_to_json(&event.event)?,
+    }))
 }
 
 /// Convert coroutine status to JSON.
-#[must_use]
-pub fn status_to_json<S>(status: &S) -> Json
+pub fn status_to_json<S>(status: &S) -> Result<Json, serde_json::Error>
 where
     S: Serialize,
 {
-    serde_json::to_value(status).unwrap_or(Json::Null)
+    serde_json::to_value(status)
 }
 
 /// Convert session views to JSON.
@@ -193,12 +204,11 @@ pub fn endpoint_to_json(endpoint: &EndpointRef) -> Json {
 }
 
 /// Convert one observable event payload to JSON.
-#[must_use]
-pub fn obs_event_to_json<E>(event: &E) -> Json
+pub fn obs_event_to_json<E>(event: &E) -> Result<Json, serde_json::Error>
 where
     E: Serialize,
 {
-    serde_json::to_value(event).unwrap_or(Json::Null)
+    serde_json::to_value(event)
 }
 
 #[cfg(test)]
@@ -256,7 +266,7 @@ mod tests {
             }],
         };
 
-        let json = vm_state_to_json(&vm);
+        let json = vm_state_to_json(&vm).expect("encode vm state");
         assert_eq!(json["schema_version"], VM_STATE_SCHEMA_VERSION);
         assert_eq!(json["compatibility"]["family"], "vm_state");
         assert_eq!(json["nextCoroId"], 3);
@@ -302,7 +312,7 @@ mod tests {
             }],
         };
 
-        let encoded = vm_state_to_json(&vm);
+        let encoded = vm_state_to_json(&vm).expect("encode vm state");
         let decoded: VMState<Status, Event> = vm_state_from_json(encoded).expect("decode vm state");
         assert_eq!(decoded.schema_version, VM_STATE_SCHEMA_VERSION);
         assert_eq!(decoded.next_coro_id, 5);
@@ -344,5 +354,21 @@ mod tests {
         assert_eq!(decoded.next_coro_id, 7);
         assert_eq!(decoded.coroutines[0].program_id, 4);
         assert_eq!(decoded.obs_trace.len(), 1);
+    }
+
+    #[test]
+    fn vm_export_serialization_failure_is_not_silenced() {
+        struct FailingSerialize;
+        impl Serialize for FailingSerialize {
+            fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                Err(serde::ser::Error::custom("intentional failure"))
+            }
+        }
+
+        let err = status_to_json(&FailingSerialize).expect_err("must surface serialization error");
+        assert!(err.to_string().contains("intentional failure"));
     }
 }

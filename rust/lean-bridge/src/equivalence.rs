@@ -37,6 +37,7 @@ use crate::import::ImportError;
 use crate::runner::{LeanRunner, LeanRunnerError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use telltale_theory::projection::{project, ProjectionError};
@@ -207,6 +208,23 @@ impl EquivalenceChecker {
         }
     }
 
+    /// Create a checker with golden files only and explicit strictness mode.
+    pub fn with_golden_dir_strict(dir: impl AsRef<Path>, strict: bool) -> Self {
+        Self {
+            config: EquivalenceConfig {
+                golden_dir: dir.as_ref().to_path_buf(),
+                strict,
+            },
+            runner: None,
+        }
+    }
+
+    /// Return a checker with strict mode enabled or disabled.
+    pub fn with_strict_mode(mut self, strict: bool) -> Self {
+        self.config.strict = strict;
+        self
+    }
+
     /// Create a checker with both golden files and live Lean.
     ///
     /// Returns an error if the Lean runner is not available.
@@ -239,38 +257,27 @@ impl EquivalenceChecker {
     fn parse_projections_map(
         lean_output: &Value,
     ) -> Result<HashMap<String, Value>, EquivalenceError> {
-        let projections_val = lean_output.get("projections").ok_or_else(|| {
-            EquivalenceError::ParseError("Missing projections in Lean output".into())
-        })?;
+        crate::projection_payload::parse_projections_field(lean_output)
+            .map_err(EquivalenceError::ParseError)
+    }
 
-        match projections_val {
-            Value::Object(map) => Ok(map
-                .iter()
-                .map(|(role, local)| (role.clone(), local.clone()))
-                .collect()),
-            Value::Array(items) => {
-                let mut projections = HashMap::new();
-                for item in items {
-                    let obj = item.as_object().ok_or_else(|| {
-                        EquivalenceError::ParseError("Expected projection object".into())
-                    })?;
-                    let role = obj.get("role").and_then(|v| v.as_str()).ok_or_else(|| {
-                        EquivalenceError::ParseError("Expected role string".into())
-                    })?;
-                    let local_type = obj
-                        .get("local_type")
-                        .or_else(|| obj.get("localType"))
-                        .ok_or_else(|| {
-                            EquivalenceError::ParseError("Expected local type".into())
-                        })?;
-                    projections.insert(role.to_string(), local_type.clone());
-                }
-                Ok(projections)
-            }
-            _ => Err(EquivalenceError::ParseError(
-                "Invalid projections format".into(),
-            )),
+    fn ensure_projection_roles(
+        expected_roles: &[String],
+        projections: &HashMap<String, Value>,
+    ) -> Result<(), EquivalenceError> {
+        let expected: BTreeSet<String> = expected_roles.iter().cloned().collect();
+        let actual: BTreeSet<String> = projections.keys().cloned().collect();
+
+        let missing: Vec<String> = expected.difference(&actual).cloned().collect();
+        let unexpected: Vec<String> = actual.difference(&expected).cloned().collect();
+
+        if missing.is_empty() && unexpected.is_empty() {
+            return Ok(());
         }
+
+        Err(EquivalenceError::ParseError(format!(
+            "projection role-set mismatch: missing={missing:?}, unexpected={unexpected:?}"
+        )))
     }
 
     // ========================================================================
@@ -348,6 +355,7 @@ impl EquivalenceChecker {
 
         let mut results = Vec::new();
         let projections = Self::parse_projections_map(&lean_output)?;
+        Self::ensure_projection_roles(&global.roles(), &projections)?;
 
         for (role, expected) in projections {
             // Compute Rust projection
@@ -372,7 +380,12 @@ impl EquivalenceChecker {
         rust_output: &Value,
         expected: &Value,
     ) -> Result<EquivalenceResult, EquivalenceError> {
-        if self.json_structurally_equal(rust_output, expected) {
+        let equivalent = if self.config.strict {
+            serde_json::to_string(rust_output).ok() == serde_json::to_string(expected).ok()
+        } else {
+            self.json_structurally_equal(rust_output, expected)
+        };
+        if equivalent {
             Ok(EquivalenceResult::success(role, rust_output.clone()))
         } else {
             let diff = self.compute_diff(rust_output, expected);
@@ -480,5 +493,67 @@ mod tests {
             let with_lean = EquivalenceChecker::with_lean("golden").unwrap();
             assert!(with_lean.has_lean());
         }
+    }
+
+    #[test]
+    fn test_strict_mode_is_wired_into_comparison() {
+        let non_strict = EquivalenceChecker::with_golden_dir_strict("golden", false);
+        let strict = EquivalenceChecker::with_golden_dir_strict("golden", true);
+
+        let left: Value = serde_json::from_str(r#"{"a":1,"b":2}"#).expect("left json");
+        let right: Value = serde_json::from_str(r#"{"a":1,"b":2}"#).expect("right json");
+        let mismatch: Value = serde_json::from_str(r#"{"a":1,"b":3}"#).expect("mismatch json");
+
+        let strict_result = strict
+            .compare_local_types("A", &left, &right)
+            .expect("strict comparison result");
+        let strict_mismatch = strict
+            .compare_local_types("A", &left, &mismatch)
+            .expect("strict mismatch comparison");
+        let non_strict_result = non_strict
+            .compare_local_types("A", &left, &right)
+            .expect("non-strict comparison result");
+        let non_strict_mismatch = non_strict
+            .compare_local_types("A", &left, &mismatch)
+            .expect("non-strict mismatch comparison");
+
+        assert!(strict_result.equivalent);
+        assert!(non_strict_result.equivalent);
+        assert!(!strict_mismatch.equivalent);
+        assert!(!non_strict_mismatch.equivalent);
+    }
+
+    #[test]
+    fn test_projection_role_set_check_rejects_missing_roles() {
+        let expected = vec!["A".to_string(), "B".to_string()];
+        let mut projections = HashMap::new();
+        projections.insert("A".to_string(), serde_json::json!({"kind": "end"}));
+
+        let err = EquivalenceChecker::ensure_projection_roles(&expected, &projections)
+            .expect_err("must reject missing role");
+        assert!(matches!(err, EquivalenceError::ParseError(_)));
+    }
+
+    #[test]
+    fn test_projection_role_set_check_rejects_unexpected_roles() {
+        let expected = vec!["A".to_string()];
+        let mut projections = HashMap::new();
+        projections.insert("A".to_string(), serde_json::json!({"kind": "end"}));
+        projections.insert("B".to_string(), serde_json::json!({"kind": "end"}));
+
+        let err = EquivalenceChecker::ensure_projection_roles(&expected, &projections)
+            .expect_err("must reject unexpected role");
+        assert!(matches!(err, EquivalenceError::ParseError(_)));
+    }
+
+    #[test]
+    fn test_projection_role_set_check_accepts_exact_match() {
+        let expected = vec!["A".to_string(), "B".to_string()];
+        let mut projections = HashMap::new();
+        projections.insert("A".to_string(), serde_json::json!({"kind": "end"}));
+        projections.insert("B".to_string(), serde_json::json!({"kind": "end"}));
+
+        EquivalenceChecker::ensure_projection_roles(&expected, &projections)
+            .expect("must accept exact role set");
     }
 }

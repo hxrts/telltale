@@ -9,11 +9,11 @@
 //!     --choreography-out choreo.json --program-out program.json
 //! ```
 
-use std::env;
 use std::fs;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
+use bpaf::Bpaf;
 use serde_json::json;
 
 use telltale_choreography::ast::convert::choreography_to_global;
@@ -21,103 +21,66 @@ use telltale_choreography::compiler::parse_choreography_str;
 use telltale_lean_bridge::export::{global_to_json, local_to_json};
 use telltale_theory::projection::project as theory_project;
 
-struct Config {
+#[derive(Debug, Clone, Bpaf)]
+#[bpaf(
+    options,
+    version("1.1.0"),
+    descr("Export choreography DSL files to Lean bridge JSON payloads"),
+    footer("Example: lean-bridge-exporter --input protocol.choreo --role Alice --choreography-out choreo.json --program-out program.json")
+)]
+struct Cli {
+    /// Input choreography DSL file.
+    #[bpaf(long)]
     input: PathBuf,
+
+    /// Role to project for program output.
+    #[bpaf(long)]
     role: String,
+
+    /// Output path for choreography JSON payload.
+    #[bpaf(long("choreography-out"))]
     choreography_out: PathBuf,
+
+    /// Output path for projected program JSON payload.
+    #[bpaf(long("program-out"))]
     program_out: PathBuf,
 }
 
 fn main() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let config = parse_args(&args)?;
+    let cli = cli().run();
 
-    let source = fs::read_to_string(&config.input).with_context(|| {
-        format!(
-            "Failed to read choreography file {}",
-            config.input.display()
-        )
-    })?;
+    let source = fs::read_to_string(&cli.input)
+        .with_context(|| format!("Failed to read choreography file {}", cli.input.display()))?;
 
     let choreography = parse_choreography_str(&source)?;
 
     let global = choreography_to_global(&choreography)
-        .map_err(|e| anyhow!("Failed to convert choreography to GlobalType: {}", e))?;
+        .map_err(|e| anyhow!("Failed to convert choreography to GlobalType: {e}"))?;
 
     let global_json = global_to_json(&global);
 
-    if !global.roles().contains(&config.role) {
-        return Err(anyhow!("Unknown role {}", config.role));
+    if !global.roles().contains(&cli.role) {
+        return Err(anyhow!("Unknown role {}", cli.role));
     }
-    let local_r = theory_project(&global, &config.role)
+    let local_r = theory_project(&global, &cli.role)
         .map_err(|e| anyhow!("Failed to project local type from global type: {e:?}"))?;
 
     let program_json = json!({
-        "role": config.role,
+        "role": cli.role,
         "local_type": local_to_json(&local_r)
     });
 
     fs::write(
-        &config.choreography_out,
+        &cli.choreography_out,
         serde_json::to_string_pretty(&global_json)?,
     )
-    .with_context(|| format!("Failed to write {}", config.choreography_out.display()))?;
+    .with_context(|| format!("Failed to write {}", cli.choreography_out.display()))?;
 
     fs::write(
-        &config.program_out,
+        &cli.program_out,
         serde_json::to_string_pretty(&program_json)?,
     )
-    .with_context(|| format!("Failed to write {}", config.program_out.display()))?;
+    .with_context(|| format!("Failed to write {}", cli.program_out.display()))?;
 
     Ok(())
-}
-
-fn parse_args(args: &[String]) -> Result<Config> {
-    let mut config = Config {
-        input: PathBuf::new(),
-        role: String::new(),
-        choreography_out: PathBuf::new(),
-        program_out: PathBuf::new(),
-    };
-
-    let mut iter = args.iter().skip(1);
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--input" => {
-                config.input = iter
-                    .next()
-                    .map(PathBuf::from)
-                    .ok_or_else(|| anyhow!("Missing value for --input"))?
-            }
-            "--role" => config.role.clone_from(
-                iter.next()
-                    .ok_or_else(|| anyhow!("Missing value for --role"))?,
-            ),
-            "--choreography-out" => {
-                config.choreography_out = iter
-                    .next()
-                    .map(PathBuf::from)
-                    .ok_or_else(|| anyhow!("Missing value for --choreography-out"))?
-            }
-            "--program-out" => {
-                config.program_out = iter
-                    .next()
-                    .map(PathBuf::from)
-                    .ok_or_else(|| anyhow!("Missing value for --program-out"))?
-            }
-            _ => return Err(anyhow!("Unknown argument {arg}")),
-        }
-    }
-
-    if config.input.as_os_str().is_empty()
-        || config.role.is_empty()
-        || config.choreography_out.as_os_str().is_empty()
-        || config.program_out.as_os_str().is_empty()
-    {
-        return Err(anyhow!(
-            "Usage: lean-bridge-exporter --input <dsl> --role <role> --choreography-out <path> --program-out <path>"
-        ));
-    }
-
-    Ok(config)
 }

@@ -59,6 +59,9 @@ pub mod vm_export;
 pub mod vm_trace;
 
 #[cfg(feature = "runner")]
+pub(crate) mod projection_payload;
+
+#[cfg(feature = "runner")]
 pub mod equivalence;
 
 #[cfg(feature = "runner")]

@@ -44,12 +44,13 @@ impl LeanRunner {
         let output_file = NamedTempFile::new()?;
         let output_path = output_file.path().to_path_buf();
 
-        let output = Command::new(&self.binary_path)
+        let mut command = Command::new(&self.binary_path);
+        command
             .arg("--export-all-projections")
             .arg(input_file.path())
             .arg("--output")
-            .arg(&output_path)
-            .output()?;
+            .arg(&output_path);
+        let output = self.run_command_with_timeout(command, "project_all")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -71,42 +72,8 @@ impl LeanRunner {
             return Err(LeanRunnerError::ParseError(err.to_string()));
         }
 
-        let projections_val = payload
-            .get("projections")
-            .ok_or_else(|| LeanRunnerError::ParseError("missing projections field".to_string()))?;
-
-        let projections_map = match projections_val {
-            Value::Object(map) => map
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect::<std::collections::HashMap<_, _>>(),
-            Value::Array(items) => {
-                let mut out = std::collections::HashMap::new();
-                for item in items {
-                    let obj = item.as_object().ok_or_else(|| {
-                        LeanRunnerError::ParseError("invalid projection entry".to_string())
-                    })?;
-                    let role = obj.get("role").and_then(|v| v.as_str()).ok_or_else(|| {
-                        LeanRunnerError::ParseError("missing role in projection".to_string())
-                    })?;
-                    let local = obj
-                        .get("local_type")
-                        .or_else(|| obj.get("localType"))
-                        .ok_or_else(|| {
-                            LeanRunnerError::ParseError(
-                                "missing local_type in projection".to_string(),
-                            )
-                        })?;
-                    out.insert(role.to_string(), local.clone());
-                }
-                out
-            }
-            _ => {
-                return Err(LeanRunnerError::ParseError(
-                    "invalid projections format".to_string(),
-                ))
-            }
-        };
+        let projections_map = crate::projection_payload::parse_projections_field(&payload)
+            .map_err(LeanRunnerError::ParseError)?;
 
         if roles.is_empty() {
             return Ok(projections_map);
@@ -146,13 +113,14 @@ impl LeanRunner {
                 .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
         )?;
 
-        let output = Command::new(&self.binary_path)
+        let mut command = Command::new(&self.binary_path);
+        command
             .arg("--check-async-subtype")
             .arg(subtype_file.path())
             .arg(supertype_file.path())
             .arg("--output")
-            .arg(output_file.path())
-            .output()?;
+            .arg(output_file.path());
+        let output = self.run_command_with_timeout(command, "check_async_subtype")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -199,12 +167,13 @@ impl LeanRunner {
                 .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
         )?;
 
-        let output = Command::new(&self.binary_path)
+        let mut command = Command::new(&self.binary_path);
+        command
             .arg("--check-orphan-free")
             .arg(local_file.path())
             .arg("--output")
-            .arg(output_file.path())
-            .output()?;
+            .arg(output_file.path());
+        let output = self.run_command_with_timeout(command, "check_orphan_free")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -274,7 +243,7 @@ impl LeanRunner {
                 .map_err(LeanRunnerError::TempFileError)?;
         }
 
-        let output = child.wait_with_output()?;
+        let output = Self::wait_with_timeout(child, Self::process_timeout(), "run_vm_protocol")?;
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
@@ -308,14 +277,15 @@ impl LeanRunner {
                 .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
         )?;
 
-        let output = Command::new(&self.binary_path)
+        let mut command = Command::new(&self.binary_path);
+        command
             .arg("--export-projection")
             .arg(input_file.path())
             .arg("--role")
             .arg(role)
             .arg("--output")
-            .arg(output_file.path())
-            .output()?;
+            .arg(output_file.path());
+        let output = self.run_command_with_timeout(command, "export_projection")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -345,12 +315,13 @@ impl LeanRunner {
                 .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
         )?;
 
-        let output = Command::new(&self.binary_path)
+        let mut command = Command::new(&self.binary_path);
+        command
             .arg("--export-all-projections")
             .arg(input_file.path())
             .arg("--output")
-            .arg(output_file.path())
-            .output()?;
+            .arg(output_file.path());
+        let output = self.run_command_with_timeout(command, "export_all_projections")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
