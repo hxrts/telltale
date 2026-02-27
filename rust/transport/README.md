@@ -16,8 +16,8 @@ Add these dependencies to `Cargo.toml`.
 
 ```toml
 [dependencies]
-telltale-transport = "1.1.0"
-telltale-choreography = "1.1.0"
+telltale-transport = "2.0.0"
+telltale-choreography = "2.0.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
