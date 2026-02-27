@@ -678,35 +678,81 @@ def main : IO Unit := do
   expect nullDuplicateRejected "comm replay nullifier mode accepted duplicate identity"
 
   -- Test 42: payload size gate rejects oversized send payloads.
-  let (stPayload, _) := loadChoreography emptyState twoPartyImage
+  let sidPayload := 0
+  let epA : Endpoint := { sid := sidPayload, role := "A" }
+  let epB : Endpoint := { sid := sidPayload, role := "B" }
+  let rolesPayload : RoleSet := ["A", "B"]
+  let edgesPayload : List Edge := rolesPayload.foldr (fun src acc =>
+    let out : List Edge := rolesPayload.map (fun dst =>
+      ({ sid := sidPayload, sender := src, receiver := dst } : Edge))
+    out ++ acc) []
+  let buffersPayload := signedBuffersEnsure ([] : SignedBuffers UnitVerify) edgesPayload
+  let sessionPayload : SessionState UnitVerify :=
+    { scope := { id := sidPayload }
+    , sid := sidPayload
+    , roles := rolesPayload
+    , endpoints := [epA, epB]
+    , localTypes := [(epA, .send "B" .string .end_), (epB, .recv "A" .string .end_)]
+    , traces := initDEnv sidPayload rolesPayload
+    , buffers := buffersFor buffersPayload sidPayload
+    , handlers := edgesPayload.map (fun e => (e, 0))
+    , epoch := 0
+    , phase := .active }
   let oversizedPayload := String.ofList (List.replicate 256 'x')
-  let injectPayload := fun (c : CoroutineState UnitGuard UnitEffect) =>
-    match setReg c.regs 1 (.string oversizedPayload) with
-    | some regs' => { c with regs := regs' }
-    | none => c
-  let stPayloadCfg :=
-    { stPayload with
-        coroutines := stPayload.coroutines.map injectPayload
-        config := { stPayload.config with maxPayloadBytes := 8 } }
-  let stPayloadRun := runScheduled 20 1 stPayloadCfg
-  let payloadRejected :=
-    stPayloadRun.coroutines.toList.any (fun c =>
-      match c.status with
-      | .faulted (.specFault msg) => msg.startsWith "send payload exceeds max_payload_bytes="
-      | _ => false)
-  expect payloadRejected "payload size gate did not reject oversized payload"
+  let regsPayload : RegFile := #[.chan epA, .string oversizedPayload, .unit, .unit, .unit, .unit, .unit, .unit]
+  let senderPayload : CoroutineState UnitGuard UnitEffect :=
+    { mkReadyCoro 999 with regs := regsPayload, ownedEndpoints := [epA] }
+  let stPayload : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+    { emptyState with
+        config := { emptyState.config with maxPayloadBytes := 8 }
+        coroutines := #[senderPayload]
+        buffers := buffersPayload
+        sessions := [(sidPayload, sessionPayload)] }
+  let payloadResult :=
+    match (stepSend stPayload senderPayload 0 1).res.status with
+    | .faulted (.specFault msg) =>
+        (msg.startsWith "send payload exceeds max_payload_bytes=", s!"spec_fault:{msg}")
+    | .faulted _ => (false, "faulted_non_spec")
+    | .blocked _ => (false, "blocked")
+    | _ => (false, "non_fault_status")
+  let payloadRejected := payloadResult.fst
+  let payloadOutcome := payloadResult.snd
+  expect payloadRejected s!"payload size gate did not reject oversized payload ({payloadOutcome})"
 
   -- Test 43: strict-schema mode rejects annotationless single-branch send/recv paths.
-  let (stStrictSchema, _) := loadChoreography emptyState twoPartyImage
-  let stStrictCfg :=
-    { stStrictSchema with
-        config := { stStrictSchema.config with payloadValidationMode := .strictSchema } }
-  let stStrictRun := runScheduled 20 1 stStrictCfg
+  let sidStrict := sidPayload + 1
+  let epStrictA : Endpoint := { sid := sidStrict, role := "A" }
+  let epStrictB : Endpoint := { sid := sidStrict, role := "B" }
+  let rolesStrict : RoleSet := ["A", "B"]
+  let edgesStrict : List Edge := rolesStrict.foldr (fun src acc =>
+    let out : List Edge := rolesStrict.map (fun dst =>
+      ({ sid := sidStrict, sender := src, receiver := dst } : Edge))
+    out ++ acc) []
+  let buffersStrict := signedBuffersEnsure ([] : SignedBuffers UnitVerify) edgesStrict
+  let sessionStrict : SessionState UnitVerify :=
+    { scope := { id := sidStrict }
+    , sid := sidStrict
+    , roles := rolesStrict
+    , endpoints := [epStrictA, epStrictB]
+    , localTypes := [(epStrictA, .select "B" [("msg", .end_)]), (epStrictB, .branch "A" [("msg", .end_)])]
+    , traces := initDEnv sidStrict rolesStrict
+    , buffers := buffersFor buffersStrict sidStrict
+    , handlers := edgesStrict.map (fun e => (e, 0))
+    , epoch := 0
+    , phase := .active }
+  let regsStrict : RegFile := #[.chan epStrictA, .nat 1, .unit, .unit, .unit, .unit, .unit, .unit]
+  let senderStrict : CoroutineState UnitGuard UnitEffect :=
+    { mkReadyCoro 1000 with regs := regsStrict, ownedEndpoints := [epStrictA] }
+  let stStrictCfg : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+    { emptyState with
+        config := { emptyState.config with payloadValidationMode := .strictSchema }
+        coroutines := #[senderStrict]
+        buffers := buffersStrict
+        sessions := [(sidStrict, sessionStrict)] }
   let strictSchemaRejected :=
-    stStrictRun.coroutines.toList.any (fun c =>
-      match c.status with
-      | .faulted (.specFault msg) =>
-          msg.endsWith "requires explicit ValType annotation in strict_schema mode"
-      | _ => false)
+    match (stepSend stStrictCfg senderStrict 0 1).res.status with
+    | .faulted (.specFault msg) =>
+        msg.endsWith "requires explicit ValType annotation in strict_schema mode"
+    | _ => false
   expect strictSchemaRejected
     "strict-schema mode did not reject annotationless send/recv path"

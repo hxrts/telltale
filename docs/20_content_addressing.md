@@ -50,6 +50,8 @@ let template_id = open.template_id_sha256()?;
 let template_bytes = open.to_template_bytes()?;
 ```
 
+Template bytes and template IDs let you cache and compare partially specified protocols before all binders are resolved.
+
 ## Serialization Formats
 
 JSON is the default format. DAG-CBOR is available with the `dag-cbor` feature and produces compact binary output.
@@ -64,6 +66,7 @@ let cid = g.content_id_sha256()?;
 ```
 
 JSON and DAG-CBOR produce different content IDs for the same value. Choose one format consistently within a system.
+If you switch formats, treat that change as a cache-boundary event and regenerate persisted IDs.
 
 ## ContentStore
 

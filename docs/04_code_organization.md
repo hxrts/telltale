@@ -26,6 +26,8 @@ telltale/
 └── examples/               Example protocols
 ```
 
+This layout shows where each major subsystem lives so you can navigate from interface docs to implementation files without jumping across unrelated directories.
+
 ## Crate Dependency Graph
 
 ```mermaid

@@ -325,6 +325,6 @@ For deeper study of session type theory:
 - [Applied Choreographies](https://arxiv.org/pdf/2209.01886.pdf) integrates session types with choreographic programming.
 
 Within this documentation:
-- [Background](01_introduction.md) introduces the concepts in context
+- [Introduction](01_introduction.md) introduces the concepts in context
 - [Choreographic DSL](06_choreographic_dsl.md) shows how to write protocols
 - [Lean Verification](23_lean_verification.md) details the proof infrastructure
