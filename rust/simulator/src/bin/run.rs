@@ -6,22 +6,17 @@ use std::path::PathBuf;
 use telltale_simulator::contracts::evaluate_contracts;
 use telltale_simulator::harness::{HarnessConfig, MaterialAdapter, SimulationHarness};
 
+struct RunArgs {
+    config_path: PathBuf,
+    output_path: Option<PathBuf>,
+    pretty: bool,
+}
+
 fn main() {
-    let mut args = std::env::args().skip(1);
-    let mut config_path: Option<PathBuf> = None;
-    let mut output_path: Option<PathBuf> = None;
-    let mut pretty = false;
+    let raw_args: Vec<String> = std::env::args().skip(1).collect();
+    let args = parse_args(&raw_args).unwrap_or_else(|e| usage(&e));
 
-    while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "--config" => config_path = args.next().map(PathBuf::from),
-            "--output" => output_path = args.next().map(PathBuf::from),
-            "--pretty" => pretty = true,
-            _ => {}
-        }
-    }
-
-    let config_path = config_path.unwrap_or_else(|| usage("missing --config <path>"));
+    let config_path = args.config_path;
     let config = HarnessConfig::from_file(&config_path).unwrap_or_else(|e| fatal(&e));
 
     let adapter = MaterialAdapter::from_scenario(&config.spec.scenario);
@@ -59,14 +54,14 @@ fn main() {
         contracts,
     };
 
-    let json = if pretty {
+    let json = if args.pretty {
         serde_json::to_string_pretty(&output)
     } else {
         serde_json::to_string(&output)
     }
     .unwrap_or_else(|e| fatal(&format!("serialize output: {e}")));
 
-    if let Some(path) = output_path {
+    if let Some(path) = args.output_path {
         std::fs::write(&path, format!("{json}\n"))
             .unwrap_or_else(|e| fatal(&format!("write {}: {e}", path.display())));
     } else {
@@ -76,6 +71,44 @@ fn main() {
     if !output.contracts.passed {
         std::process::exit(2);
     }
+}
+
+fn parse_args(args: &[String]) -> Result<RunArgs, String> {
+    let mut config_path: Option<PathBuf> = None;
+    let mut output_path: Option<PathBuf> = None;
+    let mut pretty = false;
+
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--config" => {
+                let Some(path) = args.get(i + 1) else {
+                    return Err("missing value after --config".to_string());
+                };
+                config_path = Some(PathBuf::from(path));
+                i += 2;
+            }
+            "--output" => {
+                let Some(path) = args.get(i + 1) else {
+                    return Err("missing value after --output".to_string());
+                };
+                output_path = Some(PathBuf::from(path));
+                i += 2;
+            }
+            "--pretty" => {
+                pretty = true;
+                i += 1;
+            }
+            flag => return Err(format!("unknown argument: {flag}")),
+        }
+    }
+
+    let config_path = config_path.ok_or_else(|| "missing --config <path>".to_string())?;
+    Ok(RunArgs {
+        config_path,
+        output_path,
+        pretty,
+    })
 }
 
 #[derive(Debug, Serialize)]

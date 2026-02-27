@@ -210,6 +210,12 @@ pub struct FaultInjector<H: EffectHandler> {
 }
 
 impl<H: EffectHandler> FaultInjector<H> {
+    fn lock_state(&self) -> Result<std::sync::MutexGuard<'_, FaultState>, String> {
+        self.state
+            .lock()
+            .map_err(|_| "fault state lock poisoned".to_string())
+    }
+
     /// Creates a new fault injector wrapping an inner handler.
     #[must_use]
     pub fn new(inner: H, schedule: FaultSchedule, rng: SimRng) -> Self {
@@ -240,8 +246,8 @@ impl<H: EffectHandler> FaultInjector<H> {
 
     /// Advance fault schedule, activating and expiring faults.
     /// Uses the VM's global tick (not session-local normalization).
-    pub fn tick(&self, tick: u64, trace: &[ObsEvent]) {
-        let mut state = self.state.lock().expect("fault state lock poisoned");
+    pub fn tick(&self, tick: u64, logical_step: u64, trace: &[ObsEvent]) -> Result<(), String> {
+        let mut state = self.lock_state()?;
         state.current_tick = tick;
 
         let new_events = trace.get(state.last_trace_len..).unwrap_or(&[]);
@@ -266,7 +272,7 @@ impl<H: EffectHandler> FaultInjector<H> {
             if active.len() >= self.max_concurrent {
                 break;
             }
-            if trigger_fires(&scheduled.trigger, tick, new_events, rng) {
+            if trigger_fires(&scheduled.trigger, tick, logical_step, new_events, rng) {
                 let expires_at = fault_expiry(tick, &scheduled.fault, scheduled.duration);
                 active.push(ActiveFault {
                     fault: scheduled.fault.clone(),
@@ -278,14 +284,15 @@ impl<H: EffectHandler> FaultInjector<H> {
 
         state.refresh_crashed_roles();
         state.last_trace_len = trace.len();
+        Ok(())
     }
 
     /// Deliver any delayed messages whose time has arrived.
-    pub fn deliver<F>(&self, tick: u64, mut inject: F)
+    pub fn deliver<F>(&self, tick: u64, mut inject: F) -> Result<(), String>
     where
         F: FnMut(SessionId, &str, &str, Value) -> Result<EnqueueResult, String>,
     {
-        let mut state = self.state.lock().expect("fault state lock poisoned");
+        let mut state = self.lock_state()?;
         let mut pending = Vec::new();
         let mut deliver_now = Vec::new();
 
@@ -318,17 +325,20 @@ impl<H: EffectHandler> FaultInjector<H> {
                         value,
                     });
                 }
-                Err(_) => {}
+                Err(err) => {
+                    return Err(format!(
+                        "fault delivery inject failed for edge {from}->{to} (sid={sid}): {err}"
+                    ));
+                }
             }
         }
         state.in_flight.extend(retry);
+        Ok(())
     }
 
     /// Current crashed roles (for pausing VM execution).
-    #[must_use]
-    pub fn crashed_roles(&self) -> BTreeSet<String> {
-        let state = self.state.lock().expect("fault state lock poisoned");
-        state.crashed_roles.clone()
+    pub fn crashed_roles(&self) -> Result<BTreeSet<String>, String> {
+        Ok(self.lock_state()?.crashed_roles.clone())
     }
 }
 
@@ -353,7 +363,7 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
             return Ok(base);
         };
 
-        let mut state = self.state.lock().expect("fault state lock poisoned");
+        let mut state = self.lock_state()?;
         if state.is_crashed(role) {
             return Err("node crashed".into());
         }
@@ -373,7 +383,9 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
         }
 
         if let Some(delay) = state.message_delay_ticks() {
-            let delivery_tick = state.current_tick.saturating_add(delay as u64);
+            let delay_ticks = u64::try_from(delay)
+                .map_err(|_| format!("message delay {delay} cannot be represented as u64"))?;
+            let delivery_tick = state.current_tick.saturating_add(delay_ticks);
             state.in_flight.push(InFlightMessage {
                 delivery_tick,
                 sid,
@@ -396,9 +408,7 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
         payload: &Value,
     ) -> Result<(), String> {
         if self
-            .state
-            .lock()
-            .expect("fault state lock poisoned")
+            .lock_state()?
             .is_crashed(role)
         {
             return Err("node crashed".into());
@@ -418,9 +428,7 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
 
     fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String> {
         if self
-            .state
-            .lock()
-            .expect("fault state lock poisoned")
+            .lock_state()?
             .is_crashed(role)
         {
             return Err("node crashed".into());
@@ -429,11 +437,17 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
     }
 }
 
-fn trigger_fires(trigger: &Trigger, tick: u64, events: &[ObsEvent], rng: &mut SimRng) -> bool {
+fn trigger_fires(
+    trigger: &Trigger,
+    tick: u64,
+    logical_step: u64,
+    events: &[ObsEvent],
+    rng: &mut SimRng,
+) -> bool {
     match trigger {
         Trigger::Immediate => true,
         Trigger::AtTick(t) => tick >= *t,
-        Trigger::AfterStep(n) => tick >= *n,
+        Trigger::AfterStep(n) => logical_step >= *n,
         Trigger::Random(p) => rng.should_trigger(*p),
         Trigger::OnEvent { kind, role } => {
             let kind = kind.to_lowercase();
@@ -478,7 +492,10 @@ fn fault_expiry(tick: u64, fault: &Fault, scheduled: Option<usize>) -> Option<u6
         Fault::NetworkPartition { duration, .. } => Some(*duration),
         _ => scheduled,
     };
-    duration.map(|d| tick.saturating_add(d as u64))
+    duration.map(|d| {
+        let delta = u64::try_from(d).unwrap_or(u64::MAX);
+        tick.saturating_add(delta)
+    })
 }
 
 // RECURSION_SAFE: recurses only through finite product value nesting.
@@ -501,5 +518,22 @@ fn corrupt_value(val: Value) -> Value {
         }
         Value::Prod(a, b) => Value::Prod(Box::new(corrupt_value(*a)), b),
         Value::Endpoint(_) => val,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn after_step_trigger_uses_logical_step_not_tick() {
+        let mut rng = SimRng::new(0);
+        let trigger = Trigger::AfterStep(3);
+        let events: Vec<ObsEvent> = Vec::new();
+
+        // Global tick exceeds threshold but logical step does not.
+        assert!(!trigger_fires(&trigger, 10, 2, &events, &mut rng));
+        // Fires when logical step reaches threshold.
+        assert!(trigger_fires(&trigger, 2, 3, &events, &mut rng));
     }
 }

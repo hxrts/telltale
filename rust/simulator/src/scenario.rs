@@ -4,6 +4,7 @@
 //! and output configuration for a simulation.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 use telltale_types::FixedQ32;
@@ -280,6 +281,32 @@ fn default_link_enabled() -> bool {
     true
 }
 
+fn checked_u64_to_usize(name: &str, value: u64) -> Result<usize, String> {
+    usize::try_from(value).map_err(|_| format!("{name} value {value} exceeds platform usize"))
+}
+
+fn validate_probability(name: &str, probability: FixedQ32) -> Result<(), String> {
+    let zero = FixedQ32::zero();
+    let one = FixedQ32::one();
+    if !probability.is_finite() {
+        return Err(format!("{name} must be finite"));
+    }
+    if probability < zero || probability > one {
+        return Err(format!("{name} must be in [0,1], got {probability}"));
+    }
+    Ok(())
+}
+
+fn validate_non_negative(name: &str, value: FixedQ32) -> Result<(), String> {
+    if !value.is_finite() {
+        return Err(format!("{name} must be finite"));
+    }
+    if value < FixedQ32::zero() {
+        return Err(format!("{name} must be non-negative, got {value}"));
+    }
+    Ok(())
+}
+
 impl Scenario {
     /// Load a scenario from a TOML file.
     ///
@@ -298,7 +325,9 @@ impl Scenario {
     ///
     /// Returns an error if parsing fails.
     pub fn parse(s: &str) -> Result<Self, String> {
-        toml::from_str(s).map_err(|e| format!("parse TOML: {e}"))
+        let scenario: Self = toml::from_str(s).map_err(|e| format!("parse TOML: {e}"))?;
+        scenario.validate_semantics()?;
+        Ok(scenario)
     }
 
     /// Convert optional network spec to runtime config.
@@ -312,7 +341,7 @@ impl Scenario {
         let mut faults = Vec::new();
         for event in &self.events {
             let trigger = event.trigger.to_trigger()?;
-            let fault = event.action.to_fault();
+            let fault = event.action.to_fault()?;
             faults.push(ScheduledFault {
                 fault,
                 trigger,
@@ -341,10 +370,155 @@ impl Scenario {
                 name: liv.name.clone(),
                 precondition: pre,
                 goal,
-                bound: liv.bound as usize,
+                bound: checked_u64_to_usize("liveness bound", liv.bound)?,
             });
         }
         Ok(Some(PropertyMonitor::new(props)))
+    }
+
+    /// Validate scenario semantics that are not enforced by TOML shape parsing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if semantic validation fails.
+    pub fn validate_semantics(&self) -> Result<(), String> {
+        if self.roles.is_empty() {
+            return Err("scenario.roles must contain at least one role".to_string());
+        }
+
+        let mut role_set = BTreeSet::new();
+        for role in &self.roles {
+            if role.trim().is_empty() {
+                return Err("scenario.roles must not contain empty role names".to_string());
+            }
+            if !role_set.insert(role.clone()) {
+                return Err(format!("duplicate role in scenario.roles: '{role}'"));
+            }
+        }
+
+        if self.concurrency == 0 {
+            return Err("scenario.concurrency must be >= 1".to_string());
+        }
+
+        if matches!(self.checkpoint_interval, Some(0)) {
+            return Err("scenario.checkpoint_interval must be > 0 when set".to_string());
+        }
+
+        if let Some(network) = &self.network {
+            validate_non_negative("network.latency_variance", network.latency_variance)?;
+            validate_probability("network.loss_probability", network.loss_probability)?;
+
+            for (idx, partition) in network.partitions.iter().enumerate() {
+                if partition.start_tick > partition.end_tick {
+                    return Err(format!(
+                        "network.partitions[{idx}] has start_tick > end_tick"
+                    ));
+                }
+                if partition.groups.is_empty() {
+                    return Err(format!("network.partitions[{idx}] must define at least one group"));
+                }
+                let mut seen_partition_roles = BTreeSet::new();
+                for (group_idx, group) in partition.groups.iter().enumerate() {
+                    if group.is_empty() {
+                        return Err(format!(
+                            "network.partitions[{idx}].groups[{group_idx}] must not be empty"
+                        ));
+                    }
+                    for role in group {
+                        if !role_set.contains(role) {
+                            return Err(format!(
+                                "network.partitions[{idx}] references unknown role '{role}'"
+                            ));
+                        }
+                        if !seen_partition_roles.insert(role.clone()) {
+                            return Err(format!(
+                                "network.partitions[{idx}] role '{role}' appears in multiple groups"
+                            ));
+                        }
+                    }
+                }
+            }
+
+            for (idx, link) in network.links.iter().enumerate() {
+                if !role_set.contains(&link.from) {
+                    return Err(format!(
+                        "network.links[{idx}] references unknown from-role '{}'",
+                        link.from
+                    ));
+                }
+                if !role_set.contains(&link.to) {
+                    return Err(format!(
+                        "network.links[{idx}] references unknown to-role '{}'",
+                        link.to
+                    ));
+                }
+                if link.from == link.to {
+                    return Err(format!(
+                        "network.links[{idx}] has identical from/to role '{}'",
+                        link.from
+                    ));
+                }
+                if let (Some(start), Some(end)) = (link.start_tick, link.end_tick) {
+                    if start > end {
+                        return Err(format!(
+                            "network.links[{idx}] has start_tick > end_tick"
+                        ));
+                    }
+                }
+                if let Some(loss) = link.loss_probability {
+                    validate_probability("network.links.loss_probability", loss)?;
+                }
+                if let Some(variance) = link.latency_variance {
+                    validate_non_negative("network.links.latency_variance", variance)?;
+                }
+            }
+        }
+
+        for (idx, event) in self.events.iter().enumerate() {
+            let _trigger = event.trigger.to_trigger()?;
+            match event.action.to_fault()? {
+                Fault::NodeCrash { role, .. } => {
+                    if !role_set.contains(&role) {
+                        return Err(format!(
+                            "events[{idx}] node_crash references unknown role '{role}'"
+                        ));
+                    }
+                }
+                Fault::NetworkPartition { groups, .. } => {
+                    if groups.is_empty() {
+                        return Err(format!(
+                            "events[{idx}] network_partition must define at least one group"
+                        ));
+                    }
+                    let mut seen = BTreeSet::new();
+                    for (group_idx, group) in groups.iter().enumerate() {
+                        if group.is_empty() {
+                            return Err(format!(
+                                "events[{idx}] network_partition group {group_idx} must not be empty"
+                            ));
+                        }
+                        for role in group {
+                            if !role_set.contains(role) {
+                                return Err(format!(
+                                    "events[{idx}] network_partition references unknown role '{role}'"
+                                ));
+                            }
+                            if !seen.insert(role.clone()) {
+                                return Err(format!(
+                                    "events[{idx}] network_partition role '{role}' appears in multiple groups"
+                                ));
+                            }
+                        }
+                    }
+                }
+                Fault::MessageDrop { .. }
+                | Fault::MessageDelay { .. }
+                | Fault::MessageCorruption { .. } => {}
+            }
+        }
+
+        let _ = self.property_monitor()?;
+        Ok(())
     }
 }
 
@@ -361,9 +535,15 @@ impl TriggerSpec {
             triggers.push(Trigger::AfterStep(t));
         }
         if let Some(p) = self.random {
+            validate_probability("trigger.random", p)?;
             triggers.push(Trigger::Random(p));
         }
         if let Some(on) = &self.on_event {
+            let kind = on.kind.trim().to_lowercase();
+            match kind.as_str() {
+                "sent" | "received" | "opened" | "closed" | "invoked" | "halted" | "faulted" => {}
+                _ => return Err(format!("unsupported on_event kind: {}", on.kind)),
+            }
             triggers.push(Trigger::OnEvent {
                 kind: on.kind.clone(),
                 role: on.role.clone(),
@@ -380,25 +560,34 @@ impl TriggerSpec {
 }
 
 impl FaultActionSpec {
-    fn to_fault(&self) -> Fault {
+    fn to_fault(&self) -> Result<Fault, String> {
         match self {
-            FaultActionSpec::MessageDrop { probability } => Fault::MessageDrop {
-                probability: *probability,
-            },
-            FaultActionSpec::MessageDelay { ticks } => Fault::MessageDelay {
-                ticks: *ticks as usize,
-            },
-            FaultActionSpec::MessageCorruption { probability } => Fault::MessageCorruption {
-                probability: *probability,
-            },
-            FaultActionSpec::NodeCrash { role, duration } => Fault::NodeCrash {
+            FaultActionSpec::MessageDrop { probability } => {
+                validate_probability("event.message_drop.probability", *probability)?;
+                Ok(Fault::MessageDrop {
+                    probability: *probability,
+                })
+            }
+            FaultActionSpec::MessageDelay { ticks } => Ok(Fault::MessageDelay {
+                ticks: checked_u64_to_usize("event.message_delay.ticks", *ticks)?,
+            }),
+            FaultActionSpec::MessageCorruption { probability } => {
+                validate_probability("event.message_corruption.probability", *probability)?;
+                Ok(Fault::MessageCorruption {
+                    probability: *probability,
+                })
+            }
+            FaultActionSpec::NodeCrash { role, duration } => Ok(Fault::NodeCrash {
                 role: role.clone(),
-                duration: duration.map(|d| d as usize),
-            },
-            FaultActionSpec::NetworkPartition { groups, duration } => Fault::NetworkPartition {
+                duration: match duration {
+                    Some(value) => Some(checked_u64_to_usize("event.node_crash.duration", *value)?),
+                    None => None,
+                },
+            }),
+            FaultActionSpec::NetworkPartition { groups, duration } => Ok(Fault::NetworkPartition {
                 groups: groups.clone(),
-                duration: *duration as usize,
-            },
+                duration: checked_u64_to_usize("event.network_partition.duration", *duration)?,
+            }),
         }
     }
 }
@@ -587,5 +776,77 @@ mod tests {
         assert!(!bc.enabled);
         assert_eq!(bc.start_tick, None);
         assert_eq!(bc.end_tick, None);
+    }
+
+    #[test]
+    fn test_reject_duplicate_roles() {
+        let toml = r#"
+            name = "dup_roles"
+            roles = ["A", "A"]
+            steps = 1
+
+            [material]
+            layer = "mean_field"
+
+            [material.params]
+            beta = "1.0"
+            species = ["up", "down"]
+            initial_state = ["0.5", "0.5"]
+            step_size = "0.01"
+        "#;
+
+        let error = Scenario::parse(toml).expect_err("duplicate roles must fail");
+        assert!(error.contains("duplicate role"));
+    }
+
+    #[test]
+    fn test_reject_zero_concurrency() {
+        let toml = r#"
+            name = "bad_concurrency"
+            roles = ["A", "B"]
+            steps = 1
+            concurrency = 0
+
+            [material]
+            layer = "mean_field"
+
+            [material.params]
+            beta = "1.0"
+            species = ["up", "down"]
+            initial_state = ["0.5", "0.5"]
+            step_size = "0.01"
+        "#;
+
+        let error = Scenario::parse(toml).expect_err("zero concurrency must fail");
+        assert!(error.contains("concurrency"));
+    }
+
+    #[test]
+    fn test_reject_unknown_link_role() {
+        let toml = r#"
+            name = "bad_link_role"
+            roles = ["A", "B"]
+            steps = 1
+
+            [material]
+            layer = "mean_field"
+
+            [material.params]
+            beta = "1.0"
+            species = ["up", "down"]
+            initial_state = ["0.5", "0.5"]
+            step_size = "0.01"
+
+            [network]
+            base_latency_ms = 1
+
+            [[network.links]]
+            from = "A"
+            to = "C"
+            enabled = true
+        "#;
+
+        let error = Scenario::parse(toml).expect_err("unknown link role must fail");
+        assert!(error.contains("unknown to-role"));
     }
 }

@@ -224,11 +224,18 @@ struct LivenessTracking {
 }
 
 struct SendRecvTracking {
-    pending_sends: VecDeque<u64>,
+    pending_sends: VecDeque<PendingSend>,
 }
 
 struct TypeMonotonicityTracking {
     last_depths: BTreeMap<Endpoint, usize>,
+}
+
+struct PendingSend {
+    local_tick: u64,
+    from: String,
+    to: String,
+    label: String,
 }
 
 enum PropertyState {
@@ -365,26 +372,49 @@ impl PropertyMonitor {
                     }
                     for (event, local_tick) in &new_events_local {
                         match event {
-                            ObsEvent::Sent { session, .. } if session == sid => {
+                            ObsEvent::Sent {
+                                session,
+                                from,
+                                to,
+                                label,
+                                ..
+                            } if session == sid => {
                                 if let Some(tick) = *local_tick {
-                                    tracking.pending_sends.push_back(tick);
+                                    tracking.pending_sends.push_back(PendingSend {
+                                        local_tick: tick,
+                                        from: from.clone(),
+                                        to: to.clone(),
+                                        label: label.clone(),
+                                    });
                                 }
                             }
-                            ObsEvent::Received { session, .. } if session == sid => {
-                                tracking.pending_sends.pop_front();
+                            ObsEvent::Received {
+                                session,
+                                from,
+                                to,
+                                label,
+                                ..
+                            } if session == sid => {
+                                if let Some(index) = tracking.pending_sends.iter().position(|send| {
+                                    send.from == *from && send.to == *to && send.label == *label
+                                }) {
+                                    tracking.pending_sends.remove(index);
+                                }
                             }
                             _ => {}
                         }
                     }
-                    if let Some(&send_tick) = tracking.pending_sends.front() {
+                    if let Some(send) = tracking.pending_sends.front() {
                         let current_tick = self.session_counters.get(sid).copied().unwrap_or(0);
-                        if current_tick.saturating_sub(send_tick) > *bound as u64 {
+                        let bound_u64 = u64::try_from(*bound).unwrap_or(u64::MAX);
+                        if current_tick.saturating_sub(send.local_tick) > bound_u64 {
                             *violated = true;
                             self.violations.push(PropertyViolation {
                                 property_name: prop.name(),
                                 tick: ctx.tick,
                                 details: format!(
-                                    "send at local tick {send_tick} not received within {bound} ticks"
+                                    "send {} -> {} [{}] at local tick {} not received within {bound} ticks",
+                                    send.from, send.to, send.label, send.local_tick
                                 ),
                             });
                         }

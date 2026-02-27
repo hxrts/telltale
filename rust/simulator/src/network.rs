@@ -92,6 +92,18 @@ pub struct NetworkModel<H: EffectHandler> {
 }
 
 impl<H: EffectHandler> NetworkModel<H> {
+    fn lock_in_flight(&self) -> Result<std::sync::MutexGuard<'_, Vec<InFlightMessage>>, String> {
+        self.in_flight
+            .lock()
+            .map_err(|_| "network in-flight lock poisoned".to_string())
+    }
+
+    fn lock_rng(&self) -> Result<std::sync::MutexGuard<'_, SimRng>, String> {
+        self.rng
+            .lock()
+            .map_err(|_| "network rng lock poisoned".to_string())
+    }
+
     /// Creates a new network model wrapping an inner handler.
     #[must_use]
     pub fn new(inner: H, config: NetworkConfig, rng: SimRng, tick_duration: Duration) -> Self {
@@ -122,7 +134,7 @@ impl<H: EffectHandler> NetworkModel<H> {
     }
 
     /// Deliver any in-flight messages whose delivery time has arrived.
-    pub fn deliver<F>(&self, tick: u64, mut inject: F)
+    pub fn deliver<F>(&self, tick: u64, mut inject: F) -> Result<(), String>
     where
         F: FnMut(SessionId, &str, &str, Value) -> Result<EnqueueResult, String>,
     {
@@ -130,7 +142,7 @@ impl<H: EffectHandler> NetworkModel<H> {
         let mut deliver_now = Vec::new();
 
         {
-            let mut in_flight = self.in_flight.lock().expect("network lock poisoned");
+            let mut in_flight = self.lock_in_flight()?;
             for msg in in_flight.drain(..) {
                 if msg.delivery_tick <= tick {
                     deliver_now.push(msg);
@@ -161,16 +173,19 @@ impl<H: EffectHandler> NetworkModel<H> {
                         value,
                     });
                 }
-                Err(_) => {
-                    // Session missing or injection failed; drop.
+                Err(err) => {
+                    return Err(format!(
+                        "network delivery inject failed for edge {from}->{to} (sid={sid}): {err}"
+                    ));
                 }
             }
         }
 
         if !retry.is_empty() {
-            let mut in_flight = self.in_flight.lock().expect("network lock poisoned");
+            let mut in_flight = self.lock_in_flight()?;
             in_flight.extend(retry);
         }
+        Ok(())
     }
 
     fn latency_ticks(&self, latency: Duration) -> u64 {
@@ -282,7 +297,7 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
         }
 
         let delay_ticks = {
-            let mut rng = self.rng.lock().expect("network rng lock poisoned");
+            let mut rng = self.lock_rng()?;
             if rng.should_trigger(loss_probability) {
                 return Ok(SendDecision::Drop);
             }
@@ -295,7 +310,7 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
         }
 
         let delivery_tick = tick.saturating_add(delay_ticks);
-        let mut in_flight = self.in_flight.lock().expect("network lock poisoned");
+        let mut in_flight = self.lock_in_flight()?;
         in_flight.push(InFlightMessage {
             delivery_tick,
             sid,

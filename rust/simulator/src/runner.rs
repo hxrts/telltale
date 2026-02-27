@@ -14,6 +14,7 @@ use telltale_vm::vm::{ObsEvent, StepResult, VMConfig, VM};
 
 use crate::checkpoint::CheckpointStore;
 use crate::fault::FaultInjector;
+use crate::harness::derive_initial_states;
 use crate::network::NetworkModel;
 use crate::property::{PropertyContext, PropertyMonitor, PropertyViolation};
 use crate::rng::SimRng;
@@ -27,13 +28,14 @@ type CoroInfo = Vec<(usize, String)>;
 // (adapter removed; simulator handlers implement VM EffectHandler directly)
 
 /// Count active (Send/Recv) nodes per role in one Mu body traversal.
-// RECURSION_SAFE: follows one finite local-type branch after mu unfolding.
+// RECURSION_SAFE: follows finite local-type branches after mu unfolding.
 fn active_per_role(lt: &LocalTypeR) -> usize {
     match lt {
         LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
             1 + branches
-                .first()
+                .iter()
                 .map(|(_, _, cont)| active_per_role(cont))
+                .max()
                 .unwrap_or(0)
         }
         LocalTypeR::Mu { body, .. } => active_per_role(body),
@@ -41,12 +43,17 @@ fn active_per_role(lt: &LocalTypeR) -> usize {
     }
 }
 
+fn active_steps_per_session(local_types: &BTreeMap<String, LocalTypeR>) -> usize {
+    local_types.values().map(active_per_role).max().unwrap_or(0)
+}
+
 /// Record state for all roles in a coroutine set.
 fn record_all_roles(vm: &VM, coro_info: &CoroInfo, step: usize, trace: &mut Trace) {
+    let step_u64 = u64::try_from(step).unwrap_or(u64::MAX);
     for (coro_id, role) in coro_info {
         if let Some(coro) = vm.coroutine(*coro_id) {
             trace.record(StepRecord {
-                step: step as u64,
+                step: step_u64,
                 role: role.clone(),
                 state: registers_to_f64s(&coro.regs),
             });
@@ -59,19 +66,21 @@ fn init_coro_regs(
     vm: &mut VM,
     coro_info: &CoroInfo,
     initial_states: &BTreeMap<String, Vec<FixedQ32>>,
-) {
+) -> Result<(), String> {
     for (coro_id, role) in coro_info {
-        if let Some(init) = initial_states.get(role) {
-            if let Some(coro) = vm.coroutine_mut(*coro_id) {
-                let vals = f64s_to_values(init);
-                for (i, v) in vals.into_iter().enumerate() {
-                    if i + 2 < coro.regs.len() {
-                        coro.regs[i + 2] = v;
-                    }
+        let init = initial_states
+            .get(role)
+            .ok_or_else(|| format!("missing initial state for role '{role}'"))?;
+        if let Some(coro) = vm.coroutine_mut(*coro_id) {
+            let vals = f64s_to_values(init);
+            for (i, v) in vals.into_iter().enumerate() {
+                if i + 2 < coro.regs.len() {
+                    coro.regs[i + 2] = v;
                 }
             }
         }
     }
+    Ok(())
 }
 
 /// Count newly appended `Invoked` events and advance trace cursor.
@@ -163,7 +172,7 @@ pub fn run_concurrent(
         let coro_info: CoroInfo = coros.iter().map(|c| (c.id, c.role.clone())).collect();
         let num_roles = coro_info.len();
 
-        init_coro_regs(&mut vm, &coro_info, &spec.initial_states);
+        init_coro_regs(&mut vm, &coro_info, &spec.initial_states)?;
         session_infos.push((sid, coro_info, num_roles));
     }
 
@@ -177,13 +186,7 @@ pub fn run_concurrent(
 
     let per_session_apr: Vec<usize> = specs
         .iter()
-        .map(|s| {
-            s.local_types
-                .values()
-                .next()
-                .map(active_per_role)
-                .unwrap_or(0)
-        })
+        .map(|s| active_steps_per_session(&s.local_types))
         .collect();
 
     let total_roles: usize = session_infos.iter().map(|(_, _, n)| *n).sum();
@@ -273,14 +276,11 @@ pub fn run(
     let coro_info: CoroInfo = coros.iter().map(|c| (c.id, c.role.clone())).collect();
     let num_roles = coro_info.len();
 
-    init_coro_regs(&mut vm, &coro_info, initial_states);
+    init_coro_regs(&mut vm, &coro_info, initial_states)?;
 
     let mut trace = Trace::new();
 
-    let apr = coro_info
-        .first()
-        .map(|(_, role)| local_types.get(role).map(active_per_role).unwrap_or(0))
-        .unwrap_or(0);
+    let apr = active_steps_per_session(local_types);
 
     let max_vm_steps = steps * num_roles * 10;
     let mut prev_trace_len = 0;
@@ -388,16 +388,26 @@ pub fn run_with_scenario(
     let coro_info: CoroInfo = coros.iter().map(|c| (c.id, c.role.clone())).collect();
     let num_roles = coro_info.len();
 
-    init_coro_regs(&mut vm, &coro_info, initial_states);
+    let resolved_initial_states = if initial_states.is_empty() {
+        derive_initial_states(scenario)?
+    } else {
+        initial_states.clone()
+    };
+    init_coro_regs(&mut vm, &coro_info, &resolved_initial_states)?;
 
     let mut trace = Trace::new();
-    let apr = coro_info
-        .first()
-        .map(|(_, role)| local_types.get(role).map(active_per_role).unwrap_or(0))
-        .unwrap_or(0);
+    let apr = active_steps_per_session(local_types);
 
-    let max_vm_rounds = scenario.steps * (num_roles as u64) * 10;
-    let steps_limit = scenario.steps as usize;
+    let num_roles_u64 =
+        u64::try_from(num_roles).map_err(|_| format!("num_roles {num_roles} exceeds u64"))?;
+    let max_vm_rounds = scenario
+        .steps
+        .saturating_mul(num_roles_u64)
+        .saturating_mul(10);
+    let steps_limit = usize::try_from(scenario.steps)
+        .map_err(|_| format!("scenario.steps {} exceeds usize", scenario.steps))?;
+    let concurrency = usize::try_from(scenario.concurrency)
+        .map_err(|_| format!("scenario.concurrency {} exceeds usize", scenario.concurrency))?;
     let mut prev_trace_len = 0;
     let mut invoke_count: usize = 0;
     let mut active_count: usize = 0;
@@ -445,34 +455,53 @@ pub fn run_with_scenario(
         }
 
         let next_tick = vm.clock().tick + 1;
+        let next_logical_step = rounds_executed.saturating_add(1);
 
         if let Some(net) = &network {
-            net.inner().tick(next_tick, vm.trace());
-            net.inner().deliver(next_tick, |sid, from, to, val| {
-                vm.inject_message(sid, from, to, val)
-                    .map_err(|e| e.to_string())
-            });
+            net.inner()
+                .tick(next_tick, next_logical_step, vm.trace())
+                .map_err(|e| format!("fault middleware tick: {e}"))?;
+            net.inner()
+                .deliver(next_tick, |sid, from, to, val| {
+                    vm.inject_message(sid, from, to, val)
+                        .map_err(|e| e.to_string())
+                })
+                .map_err(|e| format!("fault middleware deliver: {e}"))?;
             net.set_tick(next_tick);
             net.deliver(next_tick, |sid, from, to, val| {
                 vm.inject_message(sid, from, to, val)
                     .map_err(|e| e.to_string())
-            });
-            vm.set_paused_roles(&net.inner().crashed_roles());
-            match vm.step_round(net, scenario.concurrency as usize) {
+            })
+            .map_err(|e| format!("network middleware deliver: {e}"))?;
+            let paused_roles = net
+                .inner()
+                .crashed_roles()
+                .map_err(|e| format!("fault middleware crashed_roles: {e}"))?;
+            vm.set_paused_roles(&paused_roles);
+            match vm.step_round(net, concurrency) {
                 Ok(StepResult::AllDone | StepResult::Stuck) => break,
                 Ok(StepResult::Continue) => {}
                 Err(e) => return Err(format!("vm error: {e}")),
             }
             rounds_executed = rounds_executed.saturating_add(1);
         } else {
-            let fault = fault_only.as_ref().expect("fault injector");
-            fault.tick(next_tick, vm.trace());
-            fault.deliver(next_tick, |sid, from, to, val| {
-                vm.inject_message(sid, from, to, val)
-                    .map_err(|e| e.to_string())
-            });
-            vm.set_paused_roles(&fault.crashed_roles());
-            match vm.step_round(fault, scenario.concurrency as usize) {
+            let Some(fault) = fault_only.as_ref() else {
+                return Err("internal simulator error: fault middleware missing".to_string());
+            };
+            fault
+                .tick(next_tick, next_logical_step, vm.trace())
+                .map_err(|e| format!("fault middleware tick: {e}"))?;
+            fault
+                .deliver(next_tick, |sid, from, to, val| {
+                    vm.inject_message(sid, from, to, val)
+                        .map_err(|e| e.to_string())
+                })
+                .map_err(|e| format!("fault middleware deliver: {e}"))?;
+            let paused_roles = fault
+                .crashed_roles()
+                .map_err(|e| format!("fault middleware crashed_roles: {e}"))?;
+            vm.set_paused_roles(&paused_roles);
+            match vm.step_round(fault, concurrency) {
                 Ok(StepResult::AllDone | StepResult::Stuck) => break,
                 Ok(StepResult::Continue) => {}
                 Err(e) => return Err(format!("vm error: {e}")),
@@ -510,10 +539,11 @@ pub fn run_with_scenario(
     }
 
     if trace.records.is_empty() {
+        let fallback_step = steps_limit.saturating_sub(1);
         record_all_roles(
             &vm,
             &coro_info,
-            scenario.steps.saturating_sub(1) as usize,
+            fallback_step,
             &mut trace,
         );
     }
