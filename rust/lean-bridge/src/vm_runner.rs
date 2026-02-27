@@ -238,8 +238,16 @@ impl VmRunner {
                 Some(_) => return child.wait_with_output().map_err(VmRunnerError::from),
                 None => {
                     if start.elapsed() >= timeout {
-                        let _ = child.kill();
-                        let _ = child.wait();
+                        if let Err(err) = child.kill() {
+                            eprintln!(
+                                "best-effort child.kill failed during timeout handling: {err}"
+                            );
+                        }
+                        if let Err(err) = child.wait() {
+                            eprintln!(
+                                "best-effort child.wait failed during timeout handling: {err}"
+                            );
+                        }
                         return Err(VmRunnerError::TimedOut {
                             operation: operation.to_string(),
                             timeout_ms: timeout.as_millis() as u64,

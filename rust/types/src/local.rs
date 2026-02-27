@@ -191,59 +191,13 @@ impl LocalTypeR {
     pub fn substitute(&self, var_name: &str, replacement: &LocalTypeR) -> LocalTypeR {
         match self {
             LocalTypeR::End => LocalTypeR::End,
-            LocalTypeR::Send { partner, branches } => LocalTypeR::Send {
-                partner: partner.clone(),
-                branches: branches
-                    .iter()
-                    .map(|(l, vt, cont)| {
-                        (
-                            l.clone(),
-                            vt.clone(),
-                            cont.substitute(var_name, replacement),
-                        )
-                    })
-                    .collect(),
-            },
-            LocalTypeR::Recv { partner, branches } => LocalTypeR::Recv {
-                partner: partner.clone(),
-                branches: branches
-                    .iter()
-                    .map(|(l, vt, cont)| {
-                        (
-                            l.clone(),
-                            vt.clone(),
-                            cont.substitute(var_name, replacement),
-                        )
-                    })
-                    .collect(),
-            },
-            LocalTypeR::Mu { var, body } => {
-                if var == var_name {
-                    // Variable is shadowed by this binder
-                    LocalTypeR::Mu {
-                        var: var.clone(),
-                        body: body.clone(),
-                    }
-                } else {
-                    let replacement_free = replacement.free_vars();
-                    if replacement_free.iter().any(|v| v == var) {
-                        // Alpha-rename binder to avoid capture before descending.
-                        let mut avoid = body.all_var_names();
-                        avoid.extend(replacement.all_var_names());
-                        avoid.insert(var_name.to_string());
-                        let fresh = Self::fresh_var(var, &avoid);
-                        let renamed_body = body.substitute(var, &LocalTypeR::Var(fresh.clone()));
-                        return LocalTypeR::Mu {
-                            var: fresh,
-                            body: Box::new(renamed_body.substitute(var_name, replacement)),
-                        };
-                    }
-                    LocalTypeR::Mu {
-                        var: var.clone(),
-                        body: Box::new(body.substitute(var_name, replacement)),
-                    }
-                }
+            LocalTypeR::Send { partner, branches } => {
+                Self::substitute_branching(partner, branches, var_name, replacement, true)
             }
+            LocalTypeR::Recv { partner, branches } => {
+                Self::substitute_branching(partner, branches, var_name, replacement, false)
+            }
+            LocalTypeR::Mu { var, body } => Self::substitute_mu(var, body, var_name, replacement),
             LocalTypeR::Var(t) => {
                 if t == var_name {
                     replacement.clone()
@@ -251,6 +205,67 @@ impl LocalTypeR {
                     LocalTypeR::Var(t.clone())
                 }
             }
+        }
+    }
+
+    fn substitute_branching(
+        partner: &str,
+        branches: &[(Label, Option<ValType>, LocalTypeR)],
+        var_name: &str,
+        replacement: &LocalTypeR,
+        is_send: bool,
+    ) -> LocalTypeR {
+        let substituted = branches
+            .iter()
+            .map(|(l, vt, cont)| {
+                (
+                    l.clone(),
+                    vt.clone(),
+                    cont.substitute(var_name, replacement),
+                )
+            })
+            .collect();
+        if is_send {
+            LocalTypeR::Send {
+                partner: partner.to_string(),
+                branches: substituted,
+            }
+        } else {
+            LocalTypeR::Recv {
+                partner: partner.to_string(),
+                branches: substituted,
+            }
+        }
+    }
+
+    fn substitute_mu(
+        var: &str,
+        body: &LocalTypeR,
+        var_name: &str,
+        replacement: &LocalTypeR,
+    ) -> LocalTypeR {
+        if var == var_name {
+            return LocalTypeR::Mu {
+                var: var.to_string(),
+                body: Box::new(body.clone()),
+            };
+        }
+        let replacement_free = replacement.free_vars();
+        if replacement_free.iter().any(|v| v == var) {
+            // Alpha-rename binder to avoid capture before descending.
+            let mut avoid = body.all_var_names();
+            avoid.extend(replacement.all_var_names());
+            avoid.insert(var_name.to_string());
+            let fresh = Self::fresh_var(var, &avoid);
+            let renamed_body = body.substitute(var, &LocalTypeR::Var(fresh.clone()));
+            return LocalTypeR::Mu {
+                var: fresh,
+                body: Box::new(renamed_body.substitute(var_name, replacement)),
+            };
+        }
+        LocalTypeR::Mu {
+            var: var.to_string(),
+            body: Box::new(body.substitute(var_name, replacement)),
         }
     }
 

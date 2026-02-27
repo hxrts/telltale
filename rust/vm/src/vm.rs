@@ -68,6 +68,7 @@ include!("vm/runtime_and_execution.rs");
 include!("vm/introspection_and_validation.rs");
 include!("vm/topology_and_dispatch.rs");
 include!("vm/instruction_control_and_effects.rs");
+include!("vm/instruction_tag.rs");
 include!("vm/instruction_choice_and_session.rs");
 include!("vm/open_commit_and_interning.rs");
 include!("vm/kernel_impl.rs");

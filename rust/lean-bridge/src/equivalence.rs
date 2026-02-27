@@ -196,6 +196,31 @@ pub struct EquivalenceChecker {
     runner: Option<LeanRunner>,
 }
 
+/// Strictness selection for equivalence comparisons.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Strictness {
+    /// Exact JSON/trace matching.
+    Strict,
+    /// Structural matching with tolerated non-semantic differences.
+    Lenient,
+}
+
+impl Strictness {
+    const fn is_strict(self) -> bool {
+        matches!(self, Self::Strict)
+    }
+}
+
+impl From<bool> for Strictness {
+    fn from(value: bool) -> Self {
+        if value {
+            Self::Strict
+        } else {
+            Self::Lenient
+        }
+    }
+}
+
 impl EquivalenceChecker {
     /// Create a checker with golden files only (no Lean runner).
     pub fn with_golden_dir(dir: impl AsRef<Path>) -> Self {
@@ -209,19 +234,22 @@ impl EquivalenceChecker {
     }
 
     /// Create a checker with golden files only and explicit strictness mode.
-    pub fn with_golden_dir_strict(dir: impl AsRef<Path>, strict: bool) -> Self {
+    pub fn with_golden_dir_strict(
+        dir: impl AsRef<Path>,
+        strictness: impl Into<Strictness>,
+    ) -> Self {
         Self {
             config: EquivalenceConfig {
                 golden_dir: dir.as_ref().to_path_buf(),
-                strict,
+                strict: strictness.into().is_strict(),
             },
             runner: None,
         }
     }
 
     /// Return a checker with strict mode enabled or disabled.
-    pub fn with_strict_mode(mut self, strict: bool) -> Self {
-        self.config.strict = strict;
+    pub fn with_strict_mode(mut self, strictness: impl Into<Strictness>) -> Self {
+        self.config.strict = strictness.into().is_strict();
         self
     }
 

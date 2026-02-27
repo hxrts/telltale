@@ -178,6 +178,23 @@ impl TcpTransport {
         })
     }
 
+    async fn incoming_receiver_for_role(
+        &self,
+        role_str: &str,
+        from_role: &RoleName,
+    ) -> TransportResult<IncomingReceiver> {
+        self.incoming
+            .lock()
+            .await
+            .get(role_str)
+            .cloned()
+            .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))
+    }
+
+    async fn take_connection_tasks(&self) -> Vec<JoinHandle<()>> {
+        std::mem::take(&mut *self.connection_tasks.lock().await)
+    }
+
     /// Start the transport (begin listening for connections).
     #[instrument(skip(self), fields(role = %self.config.role))]
     pub async fn start(&self) -> TcpResult<()> {
@@ -295,10 +312,7 @@ async fn handle_connection(
         .map_err(|e| TcpTransportError::InvalidMessage(format!("Invalid role name: {}", e)))?;
 
     debug!(peer = %peer_role, local = local_role, "Identified peer");
-    let sender = {
-        let senders_guard = senders.lock().await;
-        senders_guard.get(&peer_role).cloned()
-    };
+    let sender = lookup_sender(&senders, &peer_role).await;
     let Some(sender) = sender else {
         warn!(peer = %peer_role, local = local_role, "Unknown peer attempted connection");
         return Err(TcpTransportError::UnknownPeer(peer_role));
@@ -329,6 +343,14 @@ async fn handle_connection(
     }
 
     Ok(())
+}
+
+async fn lookup_sender(
+    senders: &Arc<Mutex<BTreeMap<String, mpsc::Sender<Vec<u8>>>>>,
+    peer_role: &str,
+) -> Option<mpsc::Sender<Vec<u8>>> {
+    let sender_map = senders.lock().await;
+    sender_map.get(peer_role).cloned()
 }
 
 #[async_trait]
@@ -372,15 +394,9 @@ impl Transport for TcpTransport {
     #[instrument(skip(self), fields(role = %self.config.role, from = %from_role))]
     async fn recv(&self, from_role: &RoleName) -> TransportResult<Vec<u8>> {
         let role_str = from_role.as_str();
-        let receiver = {
-            let incoming = self.incoming.lock().await;
-            let receiver = incoming
-                .get(role_str)
-                .cloned()
-                .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?;
-            receiver
-        };
+        let receiver = self.incoming_receiver_for_role(role_str, from_role).await?;
 
+        // LOCK_AWAIT_OK: receiver access is serialized to preserve per-peer FIFO.
         let mut receiver = receiver.lock().await;
         let bytes = receiver.recv().await.ok_or(TransportError::ChannelClosed)?;
         debug!(msg_len = bytes.len(), "Message received");
@@ -396,22 +412,25 @@ impl Transport for TcpTransport {
 
         // Send shutdown signal - receiver may be dropped during shutdown.
         if let Some(tx) = self.shutdown_tx.lock().await.take() {
-            let _ = tx.send(()).await; // Intentional: send failure ok during shutdown.
+            if tx.send(()).await.is_err() {
+                debug!("shutdown receiver already dropped; continuing close");
+            }
         }
 
         if let Some(task) = self.accept_task.lock().await.take() {
-            let _ = task.await;
+            if let Err(err) = task.await {
+                debug!("best-effort accept task join failed during close: {err}");
+            }
         }
 
-        let mut tasks = {
-            let mut guard = self.connection_tasks.lock().await;
-            std::mem::take(&mut *guard)
-        };
+        let mut tasks = self.take_connection_tasks().await;
         for task in &tasks {
             task.abort();
         }
         for task in tasks.drain(..) {
-            let _ = task.await;
+            if let Err(err) = task.await {
+                debug!("best-effort connection task join failed during close: {err}");
+            }
         }
 
         // Close all connections
