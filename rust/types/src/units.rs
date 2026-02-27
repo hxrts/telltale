@@ -46,17 +46,8 @@ macro_rules! define_count {
             pub const MIN: u32 = $min;
             pub const MAX: u32 = $max;
 
-            #[must_use]
-            pub fn new(value: u32) -> Self {
-                assert!(
-                    value >= Self::MIN,
-                    concat!(stringify!($name), " below minimum")
-                );
-                assert!(
-                    value <= Self::MAX,
-                    concat!(stringify!($name), " above maximum")
-                );
-                Self(value)
+            pub fn new(value: u32) -> Result<Self, CountError> {
+                Self::try_new(value)
             }
 
             pub fn try_new(value: u32) -> Result<Self, CountError> {
@@ -69,6 +60,11 @@ macro_rules! define_count {
                     });
                 }
                 Ok(Self(value))
+            }
+
+            #[must_use]
+            pub const fn new_unchecked(value: u32) -> Self {
+                Self(value)
             }
 
             #[must_use]

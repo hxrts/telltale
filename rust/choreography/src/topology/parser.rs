@@ -494,7 +494,10 @@ mod tests {
         let result = parse_topology(input).unwrap();
         let key = (RoleName::from_static("Alice"), RoleName::from_static("Bob"));
         let capacity = result.topology.channel_capacities.get(&key).copied();
-        assert_eq!(capacity, Some(ChannelCapacity::new(4)));
+        assert_eq!(
+            capacity,
+            Some(ChannelCapacity::try_new(4).expect("test capacity in range"))
+        );
     }
 
     #[test]

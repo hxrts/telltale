@@ -55,10 +55,10 @@ impl Label {
         }
     }
 
-    /// Check if this label matches another by name
+    /// Check if this label matches another exactly (name and sort).
     #[must_use]
     pub fn matches(&self, other: &Label) -> bool {
-        self.name == other.name
+        self == other
     }
 
     /// Check if this label matches a name
@@ -101,9 +101,12 @@ mod tests {
         let l1 = Label::new("msg");
         let l2 = Label::with_sort("msg", PayloadSort::Bool);
         let l3 = Label::new("other");
+        let l4 = Label::new("msg");
 
-        assert!(l1.matches(&l2)); // Same name, different sort
+        assert!(!l1.matches(&l2)); // Same name, different sort
         assert!(!l1.matches(&l3)); // Different name
+        assert!(l1.matches(&l4)); // Exact match
+        assert!(l1.matches_name("msg")); // Name-only helper
     }
 
     #[test]

@@ -10,6 +10,9 @@
 //! 2. Normalize branch ordering (deterministic)
 //! 3. Serialize to bytes (JSON by default, DAG-CBOR with feature flag)
 //!
+//! Canonical serialization for binder-carrying protocol types requires
+//! all recursion variables to be bound. Open terms are rejected.
+//!
 //! # Serialization Formats
 //!
 //! - **JSON** (default): Simple and human-readable. Uses `to_bytes`/`from_bytes`.
@@ -36,6 +39,9 @@ use serde::{de::DeserializeOwned, Serialize};
 /// - `from_bytes(to_bytes(x)) ≈ x` (modulo α-equivalence for types with binders)
 /// - Two α-equivalent values produce identical bytes
 /// - Byte order is deterministic (independent of insertion order, etc.)
+///
+/// For binder-carrying protocol types (`GlobalType`, `LocalTypeR`), canonical
+/// serialization requires all recursion variables to be bound.
 ///
 /// # Examples
 ///
@@ -202,6 +208,11 @@ impl Contentable for Label {
 
 impl Contentable for GlobalType {
     fn to_bytes(&self) -> Result<Vec<u8>, ContentableError> {
+        if !self.all_vars_bound() {
+            return Err(ContentableError::InvalidFormat(
+                "canonical serialization requires all recursion variables to be bound".to_string(),
+            ));
+        }
         // Convert to de Bruijn, normalize, then serialize
         let db = GlobalTypeDB::from(self).normalize();
         to_json_bytes(&db)
@@ -216,6 +227,11 @@ impl Contentable for GlobalType {
 
     #[cfg(feature = "dag-cbor")]
     fn to_cbor_bytes(&self) -> Result<Vec<u8>, ContentableError> {
+        if !self.all_vars_bound() {
+            return Err(ContentableError::InvalidFormat(
+                "canonical serialization requires all recursion variables to be bound".to_string(),
+            ));
+        }
         let db = GlobalTypeDB::from(self).normalize();
         to_cbor_bytes_impl(&db)
     }
@@ -229,7 +245,13 @@ impl Contentable for GlobalType {
 
 impl Contentable for LocalTypeR {
     fn to_bytes(&self) -> Result<Vec<u8>, ContentableError> {
-        // Convert to de Bruijn, normalize, then serialize
+        if !self.all_vars_bound() {
+            return Err(ContentableError::InvalidFormat(
+                "canonical serialization requires all recursion variables to be bound".to_string(),
+            ));
+        }
+        // Convert to de Bruijn, normalize, then serialize.
+        // Payload annotations on local branches are preserved.
         let db = LocalTypeRDB::from(self).normalize();
         to_json_bytes(&db)
     }
@@ -243,6 +265,11 @@ impl Contentable for LocalTypeR {
 
     #[cfg(feature = "dag-cbor")]
     fn to_cbor_bytes(&self) -> Result<Vec<u8>, ContentableError> {
+        if !self.all_vars_bound() {
+            return Err(ContentableError::InvalidFormat(
+                "canonical serialization requires all recursion variables to be bound".to_string(),
+            ));
+        }
         let db = LocalTypeRDB::from(self).normalize();
         to_cbor_bytes_impl(&db)
     }
@@ -302,14 +329,14 @@ fn local_from_de_bruijn(db: &LocalTypeRDB, names: &mut Vec<String>) -> LocalType
             partner: partner.clone(),
             branches: branches
                 .iter()
-                .map(|(l, cont)| (l.clone(), None, local_from_de_bruijn(cont, names)))
+                .map(|(l, vt, cont)| (l.clone(), vt.clone(), local_from_de_bruijn(cont, names)))
                 .collect(),
         },
         LocalTypeRDB::Recv { partner, branches } => LocalTypeR::Recv {
             partner: partner.clone(),
             branches: branches
                 .iter()
-                .map(|(l, cont)| (l.clone(), None, local_from_de_bruijn(cont, names)))
+                .map(|(l, vt, cont)| (l.clone(), vt.clone(), local_from_de_bruijn(cont, names)))
                 .collect(),
         },
         LocalTypeRDB::Rec(body) => {
@@ -425,6 +452,29 @@ mod tests {
     }
 
     #[test]
+    fn test_local_type_roundtrip_preserves_payload_annotation() {
+        let t = LocalTypeR::Send {
+            partner: "B".to_string(),
+            branches: vec![(
+                Label::new("msg"),
+                Some(crate::ValType::Nat),
+                LocalTypeR::Recv {
+                    partner: "A".to_string(),
+                    branches: vec![(
+                        Label::new("ack"),
+                        Some(crate::ValType::Bool),
+                        LocalTypeR::End,
+                    )],
+                },
+            )],
+        };
+
+        let bytes = t.to_bytes().unwrap();
+        let recovered = LocalTypeR::from_bytes(&bytes).unwrap();
+        assert_eq!(t, recovered);
+    }
+
+    #[test]
     fn test_branch_ordering_normalized() {
         // Branches in different order should produce same bytes
         let g1 = GlobalType::comm(
@@ -508,6 +558,20 @@ mod tests {
             g1.content_id_sha256().unwrap(),
             g2.content_id_sha256().unwrap()
         );
+    }
+
+    #[test]
+    fn test_global_type_open_term_rejected_for_canonical_serialization() {
+        let open = GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("free_t"));
+        let err = open.to_bytes().expect_err("open terms must be rejected");
+        assert!(matches!(err, ContentableError::InvalidFormat(_)));
+    }
+
+    #[test]
+    fn test_local_type_open_term_rejected_for_canonical_serialization() {
+        let open = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("free_t"));
+        let err = open.to_bytes().expect_err("open terms must be rejected");
+        assert!(matches!(err, ContentableError::InvalidFormat(_)));
     }
 
     // ========================================================================
@@ -664,37 +728,6 @@ mod proptests {
         ]
     }
 
-    /// Generate a random GlobalType (limited depth to avoid explosion)
-    fn arb_global_type(depth: usize) -> impl Strategy<Value = GlobalType> {
-        if depth == 0 {
-            prop_oneof![
-                Just(GlobalType::End),
-                arb_var_name().prop_map(GlobalType::var),
-            ]
-            .boxed()
-        } else {
-            prop_oneof![
-                Just(GlobalType::End),
-                // Simple send
-                (
-                    arb_role(),
-                    arb_role(),
-                    arb_label(),
-                    arb_global_type(depth - 1)
-                )
-                    .prop_map(|(sender, receiver, label, cont)| {
-                        GlobalType::send(sender, receiver, label, cont)
-                    }),
-                // Recursive type
-                (arb_var_name(), arb_global_type(depth - 1))
-                    .prop_map(|(var, body)| GlobalType::mu(var, body)),
-                // Variable
-                arb_var_name().prop_map(GlobalType::var),
-            ]
-            .boxed()
-        }
-    }
-
     /// Generate a random LocalTypeR (limited depth)
     #[allow(dead_code)]
     fn arb_local_type(depth: usize) -> impl Strategy<Value = LocalTypeR> {
@@ -821,7 +854,7 @@ mod proptests {
     proptest! {
         /// Property: Same type produces same content ID
         #[test]
-        fn prop_content_id_deterministic(g in arb_global_type(3)) {
+        fn prop_content_id_deterministic(g in arb_closed_global_type(3)) {
             let cid1 = g.content_id_sha256().unwrap();
             let cid2 = g.content_id_sha256().unwrap();
             prop_assert_eq!(cid1, cid2);
@@ -829,7 +862,7 @@ mod proptests {
 
         /// Property: Same type produces same bytes
         #[test]
-        fn prop_to_bytes_deterministic(g in arb_global_type(3)) {
+        fn prop_to_bytes_deterministic(g in arb_closed_global_type(3)) {
             let bytes1 = g.to_bytes().unwrap();
             let bytes2 = g.to_bytes().unwrap();
             prop_assert_eq!(bytes1, bytes2);

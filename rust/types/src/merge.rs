@@ -62,6 +62,14 @@ pub enum MergeError {
     #[error("incompatible continuations for label '{label}'")]
     IncompatibleContinuations { label: String },
 
+    /// Labels with the same name have incompatible payload annotations
+    #[error("payload annotation mismatch for label '{label}': left={left}, right={right}")]
+    PayloadAnnotationMismatch {
+        label: String,
+        left: String,
+        right: String,
+    },
+
     /// Send branches have different label sets (not allowed for internal choice)
     #[error("send branch label mismatch: cannot merge sends with different labels '{left}' vs '{right}'")]
     SendLabelMismatch { left: String, right: String },
@@ -231,6 +239,21 @@ fn merge_var_pair(v1: &str, v2: &str) -> MergeResult {
     Ok(LocalTypeR::Var(v1.to_string()))
 }
 
+fn merge_payload_annotations(
+    label: &Label,
+    left: &Option<crate::ValType>,
+    right: &Option<crate::ValType>,
+) -> Result<Option<crate::ValType>, MergeError> {
+    if left == right {
+        return Ok(left.clone());
+    }
+    Err(MergeError::PayloadAnnotationMismatch {
+        label: label.name.clone(),
+        left: format!("{left:?}"),
+        right: format!("{right:?}"),
+    })
+}
+
 /// Merge two sets of send branches (internal choice).
 ///
 /// **Requires identical label sets.** This matches Lean's `mergeSendSorted`.
@@ -263,7 +286,7 @@ fn merge_send_branches(
 
     // Each branch must have the same label, merge continuations
     let mut result = Vec::with_capacity(sorted1.len());
-    for ((label1, vt1, cont1), (label2, _vt2, cont2)) in sorted1.iter().zip(sorted2.iter()) {
+    for ((label1, vt1, cont1), (label2, vt2, cont2)) in sorted1.iter().zip(sorted2.iter()) {
         // Labels must match exactly (name and sort)
         if label1.name != label2.name {
             return Err(MergeError::SendLabelMismatch {
@@ -282,8 +305,9 @@ fn merge_send_branches(
             merge(cont1, cont2).map_err(|_| MergeError::IncompatibleContinuations {
                 label: label1.name.clone(),
             })?;
+        let merged_vt = merge_payload_annotations(label1, vt1, vt2)?;
 
-        result.push((label1.clone(), vt1.clone(), merged_cont));
+        result.push((label1.clone(), merged_vt, merged_cont));
     }
 
     Ok(result)
@@ -317,7 +341,7 @@ fn merge_recv_branches(
 
     // Union with branches from the second set
     for (label, vt, cont) in branches2 {
-        if let Some((existing_label, _existing_vt, existing_cont)) = result.get(&label.name) {
+        if let Some((existing_label, existing_vt, existing_cont)) = result.get(&label.name) {
             // Label exists in both - merge continuations
             let merged_cont =
                 merge(existing_cont, cont).map_err(|_| MergeError::IncompatibleContinuations {
@@ -329,7 +353,8 @@ fn merge_recv_branches(
                     label: label.name.clone(),
                 });
             }
-            result.insert(label.name.clone(), (label.clone(), vt.clone(), merged_cont));
+            let merged_vt = merge_payload_annotations(label, existing_vt, vt)?;
+            result.insert(label.name.clone(), (label.clone(), merged_vt, merged_cont));
         } else {
             // New label - add it (this is the key difference from send merge)
             result.insert(
@@ -372,6 +397,7 @@ pub fn can_merge(t1: &LocalTypeR, t2: &LocalTypeR) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ValType;
     use assert_matches::assert_matches;
 
     #[test]
@@ -438,6 +464,54 @@ mod tests {
             "Expected SendBranchCountMismatch, got {:?}",
             result
         );
+    }
+
+    #[test]
+    fn test_merge_sends_payload_annotation_mismatch_fails() {
+        let t1 = LocalTypeR::Send {
+            partner: "B".to_string(),
+            branches: vec![(
+                Label::new("x"),
+                Some(ValType::Nat),
+                LocalTypeR::End,
+            )],
+        };
+        let t2 = LocalTypeR::Send {
+            partner: "B".to_string(),
+            branches: vec![(
+                Label::new("x"),
+                Some(ValType::Bool),
+                LocalTypeR::End,
+            )],
+        };
+
+        let result = merge(&t1, &t2);
+        assert!(matches!(
+            result,
+            Err(MergeError::PayloadAnnotationMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn test_merge_sends_payload_annotation_none_some_mismatch_fails() {
+        let t1 = LocalTypeR::Send {
+            partner: "B".to_string(),
+            branches: vec![(Label::new("x"), None, LocalTypeR::End)],
+        };
+        let t2 = LocalTypeR::Send {
+            partner: "B".to_string(),
+            branches: vec![(
+                Label::new("x"),
+                Some(ValType::Nat),
+                LocalTypeR::End,
+            )],
+        };
+
+        let result = merge(&t1, &t2);
+        assert!(matches!(
+            result,
+            Err(MergeError::PayloadAnnotationMismatch { .. })
+        ));
     }
 
     #[test]
@@ -520,6 +594,58 @@ mod tests {
             assert!(labels.contains(&"x"));
             assert!(labels.contains(&"y"));
             assert!(labels.contains(&"z"));
+        });
+    }
+
+    #[test]
+    fn test_merge_recvs_overlapping_payload_annotation_mismatch_fails() {
+        let t1 = LocalTypeR::Recv {
+            partner: "A".to_string(),
+            branches: vec![(
+                Label::new("y"),
+                Some(ValType::Nat),
+                LocalTypeR::End,
+            )],
+        };
+        let t2 = LocalTypeR::Recv {
+            partner: "A".to_string(),
+            branches: vec![(
+                Label::new("y"),
+                Some(ValType::Bool),
+                LocalTypeR::End,
+            )],
+        };
+
+        let result = merge(&t1, &t2);
+        assert!(matches!(
+            result,
+            Err(MergeError::PayloadAnnotationMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn test_merge_recvs_overlapping_payload_annotation_match_succeeds() {
+        let t1 = LocalTypeR::Recv {
+            partner: "A".to_string(),
+            branches: vec![(
+                Label::new("y"),
+                Some(ValType::Nat),
+                LocalTypeR::End,
+            )],
+        };
+        let t2 = LocalTypeR::Recv {
+            partner: "A".to_string(),
+            branches: vec![(
+                Label::new("y"),
+                Some(ValType::Nat),
+                LocalTypeR::End,
+            )],
+        };
+
+        let result = merge(&t1, &t2).expect("matching payload annotations should merge");
+        assert_matches!(result, LocalTypeR::Recv { branches, .. } => {
+            assert_eq!(branches.len(), 1);
+            assert_eq!(branches[0].1, Some(ValType::Nat));
         });
     }
 

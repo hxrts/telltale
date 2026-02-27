@@ -614,7 +614,7 @@ mod tests {
             .channel_capacity(
                 RoleName::from_static("Alice"),
                 RoleName::from_static("Bob"),
-                ChannelCapacity::new(1),
+                ChannelCapacity::try_new(1).expect("test capacity in range"),
             )
             .build();
 

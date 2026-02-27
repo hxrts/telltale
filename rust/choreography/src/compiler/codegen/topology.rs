@@ -424,7 +424,8 @@ fn generate_channel_capacity_builder_call(
         .channel_capacity(
             RoleName::from_static(#sender_literal),
             RoleName::from_static(#receiver_literal),
-            ChannelCapacity::new(#capacity_value)
+            ChannelCapacity::try_new(#capacity_value)
+                .expect("generated channel capacity must be within declared bounds")
         )
     }
 }

@@ -63,8 +63,14 @@ macro_rules! define_ident {
             }
 
             pub fn from_static(value: &'static str) -> Self {
-                debug_assert!(validate_ident($kind, value).is_ok());
+                validate_ident($kind, value)
+                    .expect(concat!("invalid ", $kind, " identifier in from_static"));
                 Self(Arc::from(value))
+            }
+
+            pub fn try_from_static(value: &'static str) -> Result<Self, IdentifierError> {
+                validate_ident($kind, value)?;
+                Ok(Self(Arc::from(value)))
             }
 
             pub fn as_str(&self) -> &str {
@@ -129,3 +135,20 @@ define_ident!(RoleName, "role");
 define_ident!(LabelName, "label");
 define_ident!(ProtocolName, "protocol");
 define_ident!(Region, "region");
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn try_from_static_validates_identifiers() {
+        assert!(RoleName::try_from_static("Valid_1").is_ok());
+        assert!(RoleName::try_from_static("1invalid").is_err());
+    }
+
+    #[test]
+    fn from_static_panics_on_invalid_identifier() {
+        let result = std::panic::catch_unwind(|| RoleName::from_static("1invalid"));
+        assert!(result.is_err());
+    }
+}

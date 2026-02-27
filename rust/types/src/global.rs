@@ -132,6 +132,41 @@ pub enum GlobalType {
 }
 
 impl GlobalType {
+    fn collect_all_var_names(&self, names: &mut BTreeSet<String>) {
+        match self {
+            GlobalType::End => {}
+            GlobalType::Comm { branches, .. } => {
+                for (_, cont) in branches {
+                    cont.collect_all_var_names(names);
+                }
+            }
+            GlobalType::Mu { var, body } => {
+                names.insert(var.clone());
+                body.collect_all_var_names(names);
+            }
+            GlobalType::Var(t) => {
+                names.insert(t.clone());
+            }
+        }
+    }
+
+    fn all_var_names(&self) -> BTreeSet<String> {
+        let mut names = BTreeSet::new();
+        self.collect_all_var_names(&mut names);
+        names
+    }
+
+    fn fresh_var(base: &str, avoid: &BTreeSet<String>) -> String {
+        let mut idx = 0usize;
+        loop {
+            let candidate = format!("{base}_{idx}");
+            if !avoid.contains(&candidate) {
+                return candidate;
+            }
+            idx += 1;
+        }
+    }
+
     /// Create a simple send without choice
     #[must_use]
     pub fn send(
@@ -264,6 +299,19 @@ impl GlobalType {
                         body: body.clone(),
                     }
                 } else {
+                    let replacement_free = replacement.free_vars();
+                    if replacement_free.iter().any(|v| v == var) {
+                        // Alpha-rename binder to avoid capture before descending.
+                        let mut avoid = body.all_var_names();
+                        avoid.extend(replacement.all_var_names());
+                        avoid.insert(var_name.to_string());
+                        let fresh = Self::fresh_var(var, &avoid);
+                        let renamed_body = body.substitute(var, &GlobalType::Var(fresh.clone()));
+                        return GlobalType::Mu {
+                            var: fresh,
+                            body: Box::new(renamed_body.substitute(var_name, replacement)),
+                        };
+                    }
                     GlobalType::Mu {
                         var: var.clone(),
                         body: Box::new(body.substitute(var_name, replacement)),
@@ -329,6 +377,26 @@ impl GlobalType {
         }
     }
 
+    fn branches_have_unique_names(branches: &[(Label, GlobalType)]) -> bool {
+        let mut seen = BTreeSet::new();
+        branches.iter().all(|(label, _)| seen.insert(label.name.clone()))
+    }
+
+    /// Check if all communication nodes have unique branch label names.
+    #[must_use]
+    pub fn unique_branch_labels(&self) -> bool {
+        match self {
+            GlobalType::End | GlobalType::Var(_) => true,
+            GlobalType::Mu { body, .. } => body.unique_branch_labels(),
+            GlobalType::Comm { branches, .. } => {
+                Self::branches_have_unique_names(branches)
+                    && branches
+                        .iter()
+                        .all(|(_, cont)| cont.unique_branch_labels())
+            }
+        }
+    }
+
     /// Check if sender and receiver are different in each communication.
     ///
     /// Corresponds to Lean's `GlobalType.noSelfComm`.
@@ -358,6 +426,7 @@ impl GlobalType {
     pub fn well_formed(&self) -> bool {
         self.all_vars_bound()
             && self.all_comms_non_empty()
+            && self.unique_branch_labels()
             && self.no_self_comm()
             && self.is_guarded()
     }
@@ -367,7 +436,23 @@ impl GlobalType {
     /// Corresponds to Lean's `GlobalType.mentionsRole`.
     #[must_use]
     pub fn mentions_role(&self, role: &str) -> bool {
-        self.roles().contains(&role.to_string())
+        self.mentions_role_inner(role)
+    }
+
+    fn mentions_role_inner(&self, role: &str) -> bool {
+        match self {
+            GlobalType::End | GlobalType::Var(_) => false,
+            GlobalType::Mu { body, .. } => body.mentions_role_inner(role),
+            GlobalType::Comm {
+                sender,
+                receiver,
+                branches,
+            } => {
+                sender == role
+                    || receiver == role
+                    || branches.iter().any(|(_, cont)| cont.mentions_role_inner(role))
+            }
+        }
     }
 
     /// Count the depth of a global type (for termination proofs).
@@ -408,6 +493,19 @@ impl GlobalType {
     /// has been performed.
     #[must_use]
     pub fn consume(&self, sender: &str, receiver: &str, label: &str) -> Option<GlobalType> {
+        self.consume_with_fuel(sender, receiver, label, self.depth() + 1)
+    }
+
+    fn consume_with_fuel(
+        &self,
+        sender: &str,
+        receiver: &str,
+        label: &str,
+        fuel: usize,
+    ) -> Option<GlobalType> {
+        if fuel == 0 {
+            return None;
+        }
         match self {
             GlobalType::Comm {
                 sender: s,
@@ -425,7 +523,8 @@ impl GlobalType {
             }
             GlobalType::Mu { var, body } => {
                 // Unfold and try again
-                body.substitute(var, self).consume(sender, receiver, label)
+                body.substitute(var, self)
+                    .consume_with_fuel(sender, receiver, label, fuel - 1)
             }
             _ => None,
         }
@@ -436,6 +535,7 @@ impl GlobalType {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use proptest::prelude::*;
 
     #[test]
     fn test_simple_protocol() {
@@ -500,6 +600,28 @@ mod tests {
     }
 
     #[test]
+    fn test_substitute_avoids_capture() {
+        // Substituting x := y under μy must alpha-rename the binder first.
+        let g = GlobalType::mu("y", GlobalType::var("x"));
+        let result = g.substitute("x", &GlobalType::var("y"));
+
+        assert_matches!(result, GlobalType::Mu { var, body } => {
+            assert_ne!(var, "y");
+            assert_matches!(*body, GlobalType::Var(ref name) => {
+                assert_eq!(name, "y");
+            });
+        });
+    }
+
+    #[test]
+    fn test_substitute_avoids_capture_with_nested_binders() {
+        // Freshening should avoid collisions with existing binder names.
+        let g = GlobalType::mu("y", GlobalType::mu("y_0", GlobalType::var("x")));
+        let result = g.substitute("x", &GlobalType::var("y"));
+        assert!(result.free_vars().contains(&"y".to_string()));
+    }
+
+    #[test]
     fn test_consume() {
         let g = GlobalType::comm(
             "A",
@@ -514,6 +636,22 @@ mod tests {
         assert_eq!(g.consume("A", "B", "reject"), Some(GlobalType::End));
         assert_eq!(g.consume("A", "B", "unknown"), None);
         assert_eq!(g.consume("B", "A", "accept"), None);
+    }
+
+    #[test]
+    fn test_consume_unguarded_recursion_returns_none() {
+        let unguarded = GlobalType::mu("t", GlobalType::var("t"));
+        assert_eq!(unguarded.consume("A", "B", "msg"), None);
+    }
+
+    #[test]
+    fn test_consume_guarded_recursion_still_works() {
+        let g = GlobalType::mu(
+            "t",
+            GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("t")),
+        );
+        let out = g.consume("A", "B", "msg");
+        assert!(matches!(out, Some(GlobalType::Mu { .. })));
     }
 
     #[test]
@@ -542,6 +680,20 @@ mod tests {
     }
 
     #[test]
+    fn test_duplicate_branch_labels_not_well_formed() {
+        let g = GlobalType::comm(
+            "A",
+            "B",
+            vec![
+                (Label::new("msg"), GlobalType::End),
+                (Label::new("msg"), GlobalType::End),
+            ],
+        );
+        assert!(!g.unique_branch_labels());
+        assert!(!g.well_formed());
+    }
+
+    #[test]
     fn test_roles_are_sorted() {
         let g = GlobalType::comm(
             "Zed",
@@ -553,5 +705,54 @@ mod tests {
         );
 
         assert_eq!(g.roles(), vec!["Alice", "Bob", "Carol", "Zed"]);
+    }
+
+    #[test]
+    fn test_mentions_role_direct_traversal_matches_expectation() {
+        let g = GlobalType::mu(
+            "t",
+            GlobalType::comm(
+                "A",
+                "B",
+                vec![
+                    (Label::new("x"), GlobalType::send("B", "C", Label::new("y"), GlobalType::var("t"))),
+                ],
+            ),
+        );
+        assert!(g.mentions_role("A"));
+        assert!(g.mentions_role("B"));
+        assert!(g.mentions_role("C"));
+        assert!(!g.mentions_role("D"));
+    }
+
+    fn arb_var_name() -> impl Strategy<Value = String> {
+        prop_oneof![
+            Just("x".to_string()),
+            Just("y".to_string()),
+            Just("z".to_string()),
+            Just("t".to_string()),
+            Just("u".to_string()),
+        ]
+    }
+
+    proptest! {
+        #[test]
+        fn prop_substitute_identity_when_var_absent(var in arb_var_name()) {
+            let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+            let replacement = GlobalType::var("r");
+            prop_assert_eq!(g.substitute(&var, &replacement), g);
+        }
+
+        #[test]
+        fn prop_substitute_avoids_capture_simple(
+            binder in arb_var_name(),
+            target in arb_var_name(),
+        ) {
+            prop_assume!(binder != target);
+            let g = GlobalType::mu(&binder, GlobalType::var(&target));
+            let replacement = GlobalType::var(&binder);
+            let result = g.substitute(&target, &replacement);
+            prop_assert!(result.free_vars().contains(&binder));
+        }
     }
 }

@@ -60,6 +60,41 @@ pub enum LocalTypeR {
 }
 
 impl LocalTypeR {
+    fn collect_all_var_names(&self, names: &mut BTreeSet<String>) {
+        match self {
+            LocalTypeR::End => {}
+            LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
+                for (_, _, cont) in branches {
+                    cont.collect_all_var_names(names);
+                }
+            }
+            LocalTypeR::Mu { var, body } => {
+                names.insert(var.clone());
+                body.collect_all_var_names(names);
+            }
+            LocalTypeR::Var(t) => {
+                names.insert(t.clone());
+            }
+        }
+    }
+
+    fn all_var_names(&self) -> BTreeSet<String> {
+        let mut names = BTreeSet::new();
+        self.collect_all_var_names(&mut names);
+        names
+    }
+
+    fn fresh_var(base: &str, avoid: &BTreeSet<String>) -> String {
+        let mut idx = 0usize;
+        loop {
+            let candidate = format!("{base}_{idx}");
+            if !avoid.contains(&candidate) {
+                return candidate;
+            }
+            idx += 1;
+        }
+    }
+
     /// Create a simple send with one label
     #[must_use]
     pub fn send(partner: impl Into<String>, label: Label, cont: LocalTypeR) -> Self {
@@ -190,6 +225,19 @@ impl LocalTypeR {
                         body: body.clone(),
                     }
                 } else {
+                    let replacement_free = replacement.free_vars();
+                    if replacement_free.iter().any(|v| v == var) {
+                        // Alpha-rename binder to avoid capture before descending.
+                        let mut avoid = body.all_var_names();
+                        avoid.extend(replacement.all_var_names());
+                        avoid.insert(var_name.to_string());
+                        let fresh = Self::fresh_var(var, &avoid);
+                        let renamed_body = body.substitute(var, &LocalTypeR::Var(fresh.clone()));
+                        return LocalTypeR::Mu {
+                            var: fresh,
+                            body: Box::new(renamed_body.substitute(var_name, replacement)),
+                        };
+                    }
                     LocalTypeR::Mu {
                         var: var.clone(),
                         body: Box::new(body.substitute(var_name, replacement)),
@@ -288,6 +336,26 @@ impl LocalTypeR {
         }
     }
 
+    fn branches_have_unique_names(branches: &[(Label, Option<ValType>, LocalTypeR)]) -> bool {
+        let mut seen = BTreeSet::new();
+        branches.iter().all(|(label, _, _)| seen.insert(label.name.clone()))
+    }
+
+    /// Check if all send/recv nodes have unique branch label names.
+    #[must_use]
+    pub fn unique_branch_labels(&self) -> bool {
+        match self {
+            LocalTypeR::End | LocalTypeR::Var(_) => true,
+            LocalTypeR::Mu { body, .. } => body.unique_branch_labels(),
+            LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
+                Self::branches_have_unique_names(branches)
+                    && branches
+                        .iter()
+                        .all(|(_, _, cont)| cont.unique_branch_labels())
+            }
+        }
+    }
+
     /// Well-formedness predicate for local types.
     ///
     /// Corresponds to Lean's `LocalTypeR.wellFormed`.
@@ -297,7 +365,10 @@ impl LocalTypeR {
     /// 3. All recursion is guarded (no immediate recursion without communication)
     #[must_use]
     pub fn well_formed(&self) -> bool {
-        self.all_vars_bound() && self.all_choices_non_empty() && self.is_guarded()
+        self.all_vars_bound()
+            && self.all_choices_non_empty()
+            && self.unique_branch_labels()
+            && self.is_guarded()
     }
 
     /// Count the depth of a local type (for termination proofs).
@@ -358,17 +429,44 @@ impl LocalTypeR {
         }
     }
 
-    /// Extract all labels from a local type.
+    /// Extract labels from the outermost visible choice node.
     ///
-    /// Corresponds to Lean's `LocalTypeR.labels`.
+    /// For recursive terms (`Mu`), this inspects the wrapped body.
     #[must_use]
-    pub fn labels(&self) -> Vec<String> {
+    pub fn head_labels(&self) -> Vec<String> {
         match self {
             LocalTypeR::End | LocalTypeR::Var(_) => vec![],
             LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
                 branches.iter().map(|(l, _, _)| l.name.clone()).collect()
             }
-            LocalTypeR::Mu { body, .. } => body.labels(),
+            LocalTypeR::Mu { body, .. } => body.head_labels(),
+        }
+    }
+
+    /// Backward-compatible alias for `head_labels`.
+    #[must_use]
+    pub fn labels(&self) -> Vec<String> {
+        self.head_labels()
+    }
+
+    /// Extract all labels that appear anywhere in the local type.
+    #[must_use]
+    pub fn all_labels(&self) -> Vec<String> {
+        let mut labels = BTreeSet::new();
+        self.collect_all_labels(&mut labels);
+        labels.into_iter().collect()
+    }
+
+    fn collect_all_labels(&self, labels: &mut BTreeSet<String>) {
+        match self {
+            LocalTypeR::End | LocalTypeR::Var(_) => {}
+            LocalTypeR::Mu { body, .. } => body.collect_all_labels(labels),
+            LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
+                for (label, _, cont) in branches {
+                    labels.insert(label.name.clone());
+                    cont.collect_all_labels(labels);
+                }
+            }
         }
     }
 
@@ -398,7 +496,20 @@ impl LocalTypeR {
     /// Check if a local type mentions a specific partner.
     #[must_use]
     pub fn mentions_partner(&self, role: &str) -> bool {
-        self.partners().contains(&role.to_string())
+        self.mentions_partner_inner(role)
+    }
+
+    fn mentions_partner_inner(&self, role: &str) -> bool {
+        match self {
+            LocalTypeR::End | LocalTypeR::Var(_) => false,
+            LocalTypeR::Mu { body, .. } => body.mentions_partner_inner(role),
+            LocalTypeR::Send { partner, branches } | LocalTypeR::Recv { partner, branches } => {
+                partner == role
+                    || branches
+                        .iter()
+                        .any(|(_, _, cont)| cont.mentions_partner_inner(role))
+            }
+        }
     }
 
     /// Check if this is an internal choice (send)
@@ -425,6 +536,7 @@ mod tests {
     use super::*;
     use crate::PayloadSort;
     use assert_matches::assert_matches;
+    use proptest::prelude::*;
 
     #[test]
     fn test_simple_local_type() {
@@ -483,6 +595,26 @@ mod tests {
     }
 
     #[test]
+    fn test_substitute_avoids_capture() {
+        let lt = LocalTypeR::mu("y", LocalTypeR::var("x"));
+        let result = lt.substitute("x", &LocalTypeR::var("y"));
+
+        assert_matches!(result, LocalTypeR::Mu { var, body } => {
+            assert_ne!(var, "y");
+            assert_matches!(*body, LocalTypeR::Var(ref name) => {
+                assert_eq!(name, "y");
+            });
+        });
+    }
+
+    #[test]
+    fn test_substitute_avoids_capture_with_nested_binders() {
+        let lt = LocalTypeR::mu("y", LocalTypeR::mu("y_0", LocalTypeR::var("x")));
+        let result = lt.substitute("x", &LocalTypeR::var("y"));
+        assert!(result.free_vars().contains(&"y".to_string()));
+    }
+
+    #[test]
     fn test_unbound_variable() {
         // !B{msg.t} where t is unbound
         let lt = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("t"));
@@ -533,6 +665,7 @@ mod tests {
         ];
         let lt = LocalTypeR::recv_choice("A", branches);
         assert!(lt.well_formed());
+        assert_eq!(lt.head_labels(), vec!["accept", "data"]);
         assert_eq!(lt.labels(), vec!["accept", "data"]);
     }
 
@@ -558,6 +691,19 @@ mod tests {
     }
 
     #[test]
+    fn test_duplicate_branch_labels_not_well_formed() {
+        let lt = LocalTypeR::recv_choice(
+            "A",
+            vec![
+                (Label::new("msg"), None, LocalTypeR::End),
+                (Label::new("msg"), None, LocalTypeR::End),
+            ],
+        );
+        assert!(!lt.unique_branch_labels());
+        assert!(!lt.well_formed());
+    }
+
+    #[test]
     fn test_partners_are_sorted() {
         let lt = LocalTypeR::send(
             "Zed",
@@ -570,5 +716,66 @@ mod tests {
         );
 
         assert_eq!(lt.partners(), vec!["Alice", "Bob", "Zed"]);
+    }
+
+    #[test]
+    fn test_mentions_partner_direct_traversal_matches_expectation() {
+        let lt = LocalTypeR::mu(
+            "t",
+            LocalTypeR::send(
+                "A",
+                Label::new("x"),
+                LocalTypeR::recv("B", Label::new("y"), LocalTypeR::var("t")),
+            ),
+        );
+        assert!(lt.mentions_partner("A"));
+        assert!(lt.mentions_partner("B"));
+        assert!(!lt.mentions_partner("C"));
+    }
+
+    #[test]
+    fn test_all_labels_collects_nested_labels() {
+        let lt = LocalTypeR::send(
+            "B",
+            Label::new("outer"),
+            LocalTypeR::recv(
+                "A",
+                Label::new("inner"),
+                LocalTypeR::send("C", Label::new("leaf"), LocalTypeR::End),
+            ),
+        );
+        assert_eq!(lt.head_labels(), vec!["outer"]);
+        assert_eq!(lt.all_labels(), vec!["inner", "leaf", "outer"]);
+    }
+
+    fn arb_var_name() -> impl Strategy<Value = String> {
+        prop_oneof![
+            Just("x".to_string()),
+            Just("y".to_string()),
+            Just("z".to_string()),
+            Just("t".to_string()),
+            Just("u".to_string()),
+        ]
+    }
+
+    proptest! {
+        #[test]
+        fn prop_substitute_identity_when_var_absent(var in arb_var_name()) {
+            let lt = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
+            let replacement = LocalTypeR::var("r");
+            prop_assert_eq!(lt.substitute(&var, &replacement), lt);
+        }
+
+        #[test]
+        fn prop_substitute_avoids_capture_simple(
+            binder in arb_var_name(),
+            target in arb_var_name(),
+        ) {
+            prop_assume!(binder != target);
+            let lt = LocalTypeR::mu(&binder, LocalTypeR::var(&target));
+            let replacement = LocalTypeR::var(&binder);
+            let result = lt.substitute(&target, &replacement);
+            prop_assert!(result.free_vars().contains(&binder));
+        }
     }
 }

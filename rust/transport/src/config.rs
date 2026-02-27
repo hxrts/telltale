@@ -52,7 +52,7 @@ impl Default for TcpTransportConfig {
             listen_addr: String::new(),
             peers: BTreeMap::new(),
             retry: RetryConfig::default(),
-            buffer_size: QueueCapacity::new(32),
+            buffer_size: QueueCapacity::try_new(32).expect("default buffer size in range"),
         }
     }
 }
@@ -70,7 +70,7 @@ impl TcpTransportConfig {
             listen_addr: listen_addr.into(),
             peers: BTreeMap::new(),
             retry: RetryConfig::default(),
-            buffer_size: QueueCapacity::new(32),
+            buffer_size: QueueCapacity::try_new(32).expect("default buffer size in range"),
         }
     }
 
@@ -128,13 +128,16 @@ mod tests {
         let config = TcpTransportConfig::new("Alice", "127.0.0.1:8080")
             .with_peer("Bob", "127.0.0.1:8081")
             .with_peer("Carol", "127.0.0.1:8082")
-            .with_buffer_size(QueueCapacity::new(64));
+            .with_buffer_size(QueueCapacity::try_new(64).expect("test buffer size in range"));
 
         assert_eq!(config.role, "Alice");
         assert_eq!(config.listen_addr, "127.0.0.1:8080");
         assert_eq!(config.peers.len(), 2);
         assert_eq!(config.peers.get("Bob"), Some(&"127.0.0.1:8081".to_string()));
-        assert_eq!(config.buffer_size, QueueCapacity::new(64));
+        assert_eq!(
+            config.buffer_size,
+            QueueCapacity::try_new(64).expect("test buffer size in range")
+        );
     }
 
     #[test]

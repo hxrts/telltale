@@ -50,8 +50,17 @@ pub trait Rng: Send {
         if bound == 0 {
             return 0;
         }
-        // Simple modulo - not perfectly uniform but fast
-        self.next_u64() % bound
+        if bound == 1 {
+            return 0;
+        }
+        // Largest inclusive value that can be reduced mod `bound` without bias.
+        let zone = u64::MAX - (u64::MAX % bound);
+        loop {
+            let value = self.next_u64();
+            if value <= zone {
+                return value % bound;
+            }
+        }
     }
 
     /// Choose a random element from a slice.
@@ -236,6 +245,36 @@ mod tests {
             let val = rng.next_fixed();
             assert!(val >= FixedQ32::zero());
             assert!(val < FixedQ32::one());
+        }
+    }
+
+    #[test]
+    fn test_next_u64_bounded_reproducible() {
+        let mut rng1 = SeededRng::new(777);
+        let mut rng2 = SeededRng::new(777);
+        for _ in 0..256 {
+            assert_eq!(rng1.next_u64_bounded(37), rng2.next_u64_bounded(37));
+        }
+    }
+
+    #[test]
+    fn test_next_u64_bounded_distribution_sanity() {
+        // This is not a proof of uniformity. It catches obvious bias/regression.
+        let mut rng = SeededRng::new(123456);
+        let bound = 8u64;
+        let mut counts = [0usize; 8];
+        let draws = 80_000usize;
+        for _ in 0..draws {
+            let idx = usize::try_from(rng.next_u64_bounded(bound)).expect("index fits");
+            counts[idx] += 1;
+        }
+        let expected = draws as f64 / bound as f64;
+        for count in counts {
+            let delta = (count as f64 - expected).abs();
+            assert!(
+                delta / expected < 0.08,
+                "bucket count {count} too far from expected {expected}"
+            );
         }
     }
 }

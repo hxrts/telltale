@@ -75,6 +75,7 @@ impl CacheMetrics {
 #[derive(Debug)]
 pub struct ContentStore<K: Contentable, V, H: Hasher + Eq + StdHash = Sha256Hasher> {
     store: HashMap<ContentId<H>, V>,
+    collision_witnesses: Option<HashMap<ContentId<H>, Vec<u8>>>,
     hits: AtomicU64,
     misses: AtomicU64,
     _key: std::marker::PhantomData<K>,
@@ -92,6 +93,20 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
     pub fn new() -> Self {
         Self {
             store: HashMap::new(),
+            collision_witnesses: None,
+            hits: AtomicU64::new(0),
+            misses: AtomicU64::new(0),
+            _key: std::marker::PhantomData,
+        }
+    }
+
+    /// Create a new content store that validates `ContentId` collisions by
+    /// storing canonical-byte witnesses.
+    #[must_use]
+    pub fn new_collision_defended() -> Self {
+        Self {
+            store: HashMap::new(),
+            collision_witnesses: Some(HashMap::new()),
             hits: AtomicU64::new(0),
             misses: AtomicU64::new(0),
             _key: std::marker::PhantomData,
@@ -103,6 +118,19 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             store: HashMap::with_capacity(capacity),
+            collision_witnesses: None,
+            hits: AtomicU64::new(0),
+            misses: AtomicU64::new(0),
+            _key: std::marker::PhantomData,
+        }
+    }
+
+    /// Create a pre-sized collision-defended content store.
+    #[must_use]
+    pub fn with_capacity_collision_defended(capacity: usize) -> Self {
+        Self {
+            store: HashMap::with_capacity(capacity),
+            collision_witnesses: Some(HashMap::with_capacity(capacity)),
             hits: AtomicU64::new(0),
             misses: AtomicU64::new(0),
             _key: std::marker::PhantomData,
@@ -114,16 +142,20 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
     /// Updates cache metrics (hit/miss counters).
     pub fn get(&self, key: &K) -> Result<Option<&V>, ContentableError> {
         let cid = key.content_id::<H>()?;
-        match self.store.get(&cid) {
-            Some(v) => {
-                self.hits.fetch_add(1, Ordering::Relaxed);
-                Ok(Some(v))
+        if let Some(v) = self.store.get(&cid) {
+            if let Some(witnesses) = &self.collision_witnesses {
+                let bytes = key.to_bytes()?;
+                if witnesses.get(&cid).is_some_and(|stored| stored != &bytes) {
+                    return Err(ContentableError::InvalidFormat(
+                        "content-id collision detected during get".to_string(),
+                    ));
+                }
             }
-            None => {
-                self.misses.fetch_add(1, Ordering::Relaxed);
-                Ok(None)
-            }
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            return Ok(Some(v));
         }
+        self.misses.fetch_add(1, Ordering::Relaxed);
+        Ok(None)
     }
 
     /// Insert a value into the store.
@@ -131,6 +163,18 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
     /// Returns the previous value if the key already existed.
     pub fn insert(&mut self, key: &K, value: V) -> Result<Option<V>, ContentableError> {
         let cid = key.content_id::<H>()?;
+        if let Some(witnesses) = &mut self.collision_witnesses {
+            let bytes = key.to_bytes()?;
+            if let Some(stored) = witnesses.get(&cid) {
+                if stored != &bytes {
+                    return Err(ContentableError::InvalidFormat(
+                        "content-id collision detected during insert".to_string(),
+                    ));
+                }
+            } else {
+                witnesses.insert(cid.clone(), bytes);
+            }
+        }
         Ok(self.store.insert(cid, value))
     }
 
@@ -144,6 +188,18 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
         F: FnOnce() -> V,
     {
         let cid = key.content_id::<H>()?;
+        if let Some(witnesses) = &mut self.collision_witnesses {
+            let bytes = key.to_bytes()?;
+            if let Some(stored) = witnesses.get(&cid) {
+                if stored != &bytes {
+                    return Err(ContentableError::InvalidFormat(
+                        "content-id collision detected during get_or_insert_with".to_string(),
+                    ));
+                }
+            } else {
+                witnesses.insert(cid.clone(), bytes);
+            }
+        }
         match self.store.entry(cid) {
             std::collections::hash_map::Entry::Occupied(entry) => {
                 self.hits.fetch_add(1, Ordering::Relaxed);
@@ -165,12 +221,21 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
     /// Remove a value from the store.
     pub fn remove(&mut self, key: &K) -> Result<Option<V>, ContentableError> {
         let cid = key.content_id::<H>()?;
-        Ok(self.store.remove(&cid))
+        let removed = self.store.remove(&cid);
+        if removed.is_some() && self.collision_witnesses.is_some() {
+            if let Some(witnesses) = &mut self.collision_witnesses {
+                witnesses.remove(&cid);
+            }
+        }
+        Ok(removed)
     }
 
     /// Clear all entries from the store.
     pub fn clear(&mut self) {
         self.store.clear();
+        if let Some(witnesses) = &mut self.collision_witnesses {
+            witnesses.clear();
+        }
     }
 
     /// Get the number of entries in the store.
@@ -206,6 +271,7 @@ impl<K: Contentable, V: Clone, H: Hasher + Eq + StdHash> Clone for ContentStore<
     fn clone(&self) -> Self {
         Self {
             store: self.store.clone(),
+            collision_witnesses: self.collision_witnesses.clone(),
             hits: AtomicU64::new(self.hits.load(Ordering::Relaxed)),
             misses: AtomicU64::new(self.misses.load(Ordering::Relaxed)),
             _key: std::marker::PhantomData,
@@ -252,7 +318,8 @@ pub struct KeyedContentStore<
     V,
     H: Hasher + Eq + StdHash = Sha256Hasher,
 > {
-    store: HashMap<(ContentId<H>, E), V>,
+    store: HashMap<ContentId<H>, HashMap<E, V>>,
+    collision_witnesses: Option<HashMap<ContentId<H>, Vec<u8>>>,
     hits: AtomicU64,
     misses: AtomicU64,
     _key: std::marker::PhantomData<K>,
@@ -274,6 +341,19 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     pub fn new() -> Self {
         Self {
             store: HashMap::new(),
+            collision_witnesses: None,
+            hits: AtomicU64::new(0),
+            misses: AtomicU64::new(0),
+            _key: std::marker::PhantomData,
+        }
+    }
+
+    /// Create a new keyed content store with collision-defense enabled.
+    #[must_use]
+    pub fn new_collision_defended() -> Self {
+        Self {
+            store: HashMap::new(),
+            collision_witnesses: Some(HashMap::new()),
             hits: AtomicU64::new(0),
             misses: AtomicU64::new(0),
             _key: std::marker::PhantomData,
@@ -285,6 +365,19 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             store: HashMap::with_capacity(capacity),
+            collision_witnesses: None,
+            hits: AtomicU64::new(0),
+            misses: AtomicU64::new(0),
+            _key: std::marker::PhantomData,
+        }
+    }
+
+    /// Create a pre-sized keyed collision-defended store.
+    #[must_use]
+    pub fn with_capacity_collision_defended(capacity: usize) -> Self {
+        Self {
+            store: HashMap::with_capacity(capacity),
+            collision_witnesses: Some(HashMap::with_capacity(capacity)),
             hits: AtomicU64::new(0),
             misses: AtomicU64::new(0),
             _key: std::marker::PhantomData,
@@ -294,7 +387,7 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     /// Get a cached value by precomputed content id and extra key.
     #[must_use]
     pub fn get_with_content_id(&self, cid: &ContentId<H>, extra: &E) -> Option<&V> {
-        match self.store.get(&(cid.clone(), extra.clone())) {
+        match self.store.get(cid).and_then(|inner| inner.get(extra)) {
             Some(v) => {
                 self.hits.fetch_add(1, Ordering::Relaxed);
                 Some(v)
@@ -309,17 +402,39 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     /// Get a cached value by content key and extra key.
     pub fn get(&self, key: &K, extra: &E) -> Result<Option<&V>, ContentableError> {
         let cid = key.content_id::<H>()?;
+        if let Some(witnesses) = &self.collision_witnesses {
+            if witnesses.contains_key(&cid) {
+                let bytes = key.to_bytes()?;
+                if witnesses.get(&cid).is_some_and(|stored| stored != &bytes) {
+                    return Err(ContentableError::InvalidFormat(
+                        "content-id collision detected during keyed get".to_string(),
+                    ));
+                }
+            }
+        }
         Ok(self.get_with_content_id(&cid, extra))
     }
 
     /// Insert a value by precomputed content id and extra key.
     pub fn insert_with_content_id(&mut self, cid: ContentId<H>, extra: E, value: V) -> Option<V> {
-        self.store.insert((cid, extra), value)
+        self.store.entry(cid).or_default().insert(extra, value)
     }
 
     /// Insert a value into the store.
     pub fn insert(&mut self, key: &K, extra: E, value: V) -> Result<Option<V>, ContentableError> {
         let cid = key.content_id::<H>()?;
+        if let Some(witnesses) = &mut self.collision_witnesses {
+            let bytes = key.to_bytes()?;
+            if let Some(stored) = witnesses.get(&cid) {
+                if stored != &bytes {
+                    return Err(ContentableError::InvalidFormat(
+                        "content-id collision detected during keyed insert".to_string(),
+                    ));
+                }
+            } else {
+                witnesses.insert(cid.clone(), bytes);
+            }
+        }
         Ok(self.insert_with_content_id(cid, extra, value))
     }
 
@@ -329,8 +444,19 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
         F: FnOnce() -> V,
     {
         let cid = key.content_id::<H>()?;
-        let composite = (cid, extra);
-        match self.store.entry(composite) {
+        if let Some(witnesses) = &mut self.collision_witnesses {
+            let bytes = key.to_bytes()?;
+            if let Some(stored) = witnesses.get(&cid) {
+                if stored != &bytes {
+                    return Err(ContentableError::InvalidFormat(
+                        "content-id collision detected during keyed get_or_insert_with".to_string(),
+                    ));
+                }
+            } else {
+                witnesses.insert(cid.clone(), bytes);
+            }
+        }
+        match self.store.entry(cid).or_default().entry(extra) {
             std::collections::hash_map::Entry::Occupied(entry) => {
                 self.hits.fetch_add(1, Ordering::Relaxed);
                 Ok(entry.into_mut())
@@ -351,30 +477,44 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     /// Check if a precomputed content id + extra key exists.
     #[must_use]
     pub fn contains_with_content_id(&self, cid: &ContentId<H>, extra: &E) -> bool {
-        self.store.contains_key(&(cid.clone(), extra.clone()))
+        self.store.get(cid).is_some_and(|inner| inner.contains_key(extra))
     }
 
     /// Remove a value from the store.
     pub fn remove(&mut self, key: &K, extra: &E) -> Result<Option<V>, ContentableError> {
         let cid = key.content_id::<H>()?;
-        Ok(self.store.remove(&(cid, extra.clone())))
+        if let Some(inner) = self.store.get_mut(&cid) {
+            let removed = inner.remove(extra);
+            if inner.is_empty() {
+                self.store.remove(&cid);
+                if let Some(witnesses) = &mut self.collision_witnesses {
+                    witnesses.remove(&cid);
+                }
+            }
+            Ok(removed)
+        } else {
+            Ok(None)
+        }
     }
 
     /// Clear all entries from the store.
     pub fn clear(&mut self) {
         self.store.clear();
+        if let Some(witnesses) = &mut self.collision_witnesses {
+            witnesses.clear();
+        }
     }
 
     /// Get the number of entries in the store.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.store.len()
+        self.store.values().map(HashMap::len).sum()
     }
 
     /// Check if the store is empty.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.store.is_empty()
+        self.len() == 0
     }
 
     /// Get cache performance metrics.
@@ -400,6 +540,7 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V: Clone, H: Hasher + Eq + StdHash
     fn clone(&self) -> Self {
         Self {
             store: self.store.clone(),
+            collision_witnesses: self.collision_witnesses.clone(),
             hits: AtomicU64::new(self.hits.load(Ordering::Relaxed)),
             misses: AtomicU64::new(self.misses.load(Ordering::Relaxed)),
             _key: std::marker::PhantomData,
@@ -410,7 +551,24 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V: Clone, H: Hasher + Eq + StdHash
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::content_id::Hasher;
     use crate::{GlobalType, Label, LocalTypeR};
+
+    #[derive(Clone, Default, PartialEq, Eq, Hash)]
+    struct ConstantHasher;
+
+    impl Hasher for ConstantHasher {
+        type Digest = [u8; 1];
+        const HASH_SIZE: usize = 1;
+
+        fn digest(_data: &[u8]) -> Self::Digest {
+            [0u8]
+        }
+
+        fn algorithm_name() -> &'static str {
+            "constant"
+        }
+    }
 
     #[test]
     fn test_content_store_basic() {
@@ -570,5 +728,29 @@ mod tests {
         let removed = store.remove(&global).unwrap();
         assert_eq!(removed, Some(42));
         assert!(!store.contains(&global).unwrap());
+    }
+
+    #[test]
+    fn test_collision_defense_rejects_hash_alias_in_content_store() {
+        let mut store: ContentStore<GlobalType, i32, ConstantHasher> =
+            ContentStore::new_collision_defended();
+        let g1 = GlobalType::send("A", "B", Label::new("x"), GlobalType::End);
+        let g2 = GlobalType::send("A", "B", Label::new("y"), GlobalType::End);
+        store.insert(&g1, 1).expect("first insert should succeed");
+        let result = store.insert(&g2, 2);
+        assert!(matches!(result, Err(ContentableError::InvalidFormat(_))));
+    }
+
+    #[test]
+    fn test_collision_defense_rejects_hash_alias_in_keyed_store() {
+        let mut store: KeyedContentStore<GlobalType, String, i32, ConstantHasher> =
+            KeyedContentStore::new_collision_defended();
+        let g1 = GlobalType::send("A", "B", Label::new("x"), GlobalType::End);
+        let g2 = GlobalType::send("A", "B", Label::new("y"), GlobalType::End);
+        store
+            .insert(&g1, "A".to_string(), 1)
+            .expect("first insert should succeed");
+        let result = store.insert(&g2, "B".to_string(), 2);
+        assert!(matches!(result, Err(ContentableError::InvalidFormat(_))));
     }
 }

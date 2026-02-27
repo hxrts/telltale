@@ -40,7 +40,8 @@ impl InMemoryTransportFactory {
     /// Create a new factory with default buffer size.
     pub fn new() -> Self {
         Self {
-            buffer_size: QueueCapacity::new(CHANNEL_BUFFER_SIZE_COUNT_DEFAULT),
+            buffer_size: QueueCapacity::try_new(CHANNEL_BUFFER_SIZE_COUNT_DEFAULT)
+                .expect("default channel buffer size must be within bounds"),
             transports: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
@@ -145,7 +146,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_in_memory_factory_custom_buffer_size() {
-        let factory = InMemoryTransportFactory::with_buffer_size(QueueCapacity::new(64));
+        let factory = InMemoryTransportFactory::with_buffer_size(
+            QueueCapacity::try_new(64).expect("test buffer size in range"),
+        );
         let _transport = factory.create(&RoleName::from_static("Alice")).await.unwrap();
         // Buffer size is internal, just verify creation succeeds
     }

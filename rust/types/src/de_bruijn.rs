@@ -25,7 +25,7 @@
 //!
 //! This module corresponds to `lean/Telltale/Protocol/DeBruijn.lean`.
 
-use crate::{GlobalType, Label, LocalTypeR};
+use crate::{GlobalType, Label, LocalTypeR, ValType};
 use serde::{Deserialize, Serialize};
 
 /// Global type with de Bruijn indices (for serialization only).
@@ -143,6 +143,9 @@ impl From<&GlobalType> for GlobalTypeDB {
 /// to reference binders. Two α-equivalent local types produce
 /// identical `LocalTypeRDB` values.
 ///
+/// Unlike binder names, branch payload annotations (`Option<ValType>`) are
+/// semantic metadata and are preserved in this representation.
+///
 /// # Examples
 ///
 /// ```
@@ -164,12 +167,12 @@ pub enum LocalTypeRDB {
     /// Internal choice: send to partner
     Send {
         partner: String,
-        branches: Vec<(Label, LocalTypeRDB)>,
+        branches: Vec<(Label, Option<ValType>, LocalTypeRDB)>,
     },
     /// External choice: receive from partner
     Recv {
         partner: String,
-        branches: Vec<(Label, LocalTypeRDB)>,
+        branches: Vec<(Label, Option<ValType>, LocalTypeRDB)>,
     },
     /// Recursive type: μ.T (no variable name)
     Rec(Box<LocalTypeRDB>),
@@ -193,14 +196,14 @@ impl LocalTypeRDB {
                 partner: partner.clone(),
                 branches: branches
                     .iter()
-                    .map(|(l, _vt, cont)| (l.clone(), Self::from_local_type_with_env(cont, env)))
+                    .map(|(l, vt, cont)| (l.clone(), vt.clone(), Self::from_local_type_with_env(cont, env)))
                     .collect(),
             },
             LocalTypeR::Recv { partner, branches } => LocalTypeRDB::Recv {
                 partner: partner.clone(),
                 branches: branches
                     .iter()
-                    .map(|(l, _vt, cont)| (l.clone(), Self::from_local_type_with_env(cont, env)))
+                    .map(|(l, vt, cont)| (l.clone(), vt.clone(), Self::from_local_type_with_env(cont, env)))
                     .collect(),
             },
             LocalTypeR::Mu { var, body } => {
@@ -227,7 +230,7 @@ impl LocalTypeRDB {
             LocalTypeRDB::Send { partner, branches } => {
                 let mut sorted_branches: Vec<_> = branches
                     .iter()
-                    .map(|(l, cont)| (l.clone(), cont.normalize()))
+                    .map(|(l, vt, cont)| (l.clone(), vt.clone(), cont.normalize()))
                     .collect();
                 sorted_branches.sort_by(|a, b| a.0.name.cmp(&b.0.name));
                 LocalTypeRDB::Send {
@@ -238,7 +241,7 @@ impl LocalTypeRDB {
             LocalTypeRDB::Recv { partner, branches } => {
                 let mut sorted_branches: Vec<_> = branches
                     .iter()
-                    .map(|(l, cont)| (l.clone(), cont.normalize()))
+                    .map(|(l, vt, cont)| (l.clone(), vt.clone(), cont.normalize()))
                     .collect();
                 sorted_branches.sort_by(|a, b| a.0.name.cmp(&b.0.name));
                 LocalTypeRDB::Recv {
@@ -427,9 +430,9 @@ mod tests {
         assert_matches!(db, LocalTypeRDB::Rec(body) => {
             assert_matches!(*body, LocalTypeRDB::Send { ref partner, ref branches } => {
                 assert_eq!(partner, "B");
-                assert_matches!(&branches[0].1, LocalTypeRDB::Recv { partner, branches: recv_branches } => {
+                assert_matches!(&branches[0].2, LocalTypeRDB::Recv { partner, branches: recv_branches } => {
                     assert_eq!(partner, "A");
-                    assert_matches!(recv_branches[0].1, LocalTypeRDB::Var(0));
+                    assert_matches!(recv_branches[0].2, LocalTypeRDB::Var(0));
                 });
             });
         });

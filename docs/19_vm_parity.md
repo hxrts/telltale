@@ -117,6 +117,9 @@ Any intentional parity break must be recorded in the deviation table below befor
 | threaded-round-extension | resolved | vm-runtime | 2026-04-30 | Threaded backend defaults to canonical one-step rounds |
 | payload-hardening-extension | active | vm-runtime | 2026-06-30 | Rust VM adds configurable payload-admission checks for malformed/adversarial message values |
 | comm-replay-label-context | active | vm-runtime | 2026-08-31 | Lean receive semantics use a fixed `"recv"` label-context token for communication identity while Rust records concrete runtime label strings |
+| types-merge-payload-annotation | active | types-parity | 2026-08-31 | Rust local-type merge rejects overlapping payload-annotation mismatches while Lean erasure merge keeps left annotation |
+| types-content-id-closedness | active | types-parity | 2026-08-31 | Rust canonical serialization rejects open terms for content addressing while Lean DB representations remain defined for open terms |
+| types-local-db-payload-retention | active | types-parity | 2026-08-31 | Rust content-addressing de Bruijn form retains local payload annotations while Lean LocalTypeDB erases them |
 
 ### Deviation Details
 
@@ -180,6 +183,51 @@ Any intentional parity break must be recorded in the deviation table below befor
 - Remove fixed `"recv"` label token from Lean communication identity construction.
 - Keep `just check-parity --types` and `just check-parity --suite` passing without this deviation entry.
 
+#### types-merge-payload-annotation
+
+**Lean:** `lean/Choreography/Projection/Erasure/Merge.lean`
+**Rust:** `rust/types/src/merge.rs`
+
+**Reason:** Rust merge now enforces explicit payload-annotation compatibility for overlapping labels. Lean merge remains left-biased on branch payload annotation metadata.
+
+**Impact:** Rust rejects more malformed or inconsistent local merges. Lean erasure proofs are unchanged.
+
+**Covers:** `types.merge.payload_annotation.compatibility`
+
+**Exit criteria:**
+- Port the same payload-annotation compatibility rule into Lean merge.
+- Update Lean merge soundness proofs accordingly.
+
+#### types-content-id-closedness
+
+**Lean:** `lean/SessionTypes/LocalTypeDB/Core.lean`, `lean/SessionTypes/GlobalType/*`
+**Rust:** `rust/types/src/contentable.rs`
+
+**Reason:** Rust content addressing now rejects open terms to avoid free-variable canonicalization collisions.
+
+**Impact:** `to_bytes` and `content_id` for open `GlobalType` and `LocalTypeR` return `InvalidFormat` in Rust.
+
+**Covers:** `types.content_id.closed_only`
+
+**Exit criteria:**
+- Define and prove a Lean and Rust shared canonical policy for open terms.
+- Remove the deviation by aligning both sides on that policy.
+
+#### types-local-db-payload-retention
+
+**Lean:** `lean/SessionTypes/LocalTypeDB/Core.lean`, `lean/SessionTypes/LocalTypeConv.lean`
+**Rust:** `rust/types/src/de_bruijn.rs`, `rust/types/src/contentable.rs`
+
+**Reason:** Rust local de Bruijn canonicalization now preserves `Option<ValType>` payload annotations.
+
+**Impact:** Rust local content roundtrip is payload-annotation-preserving. Lean LocalTypeDB still reasons on payload-erased branch shapes.
+
+**Covers:** `types.local_db.payload_annotation.retention`
+
+**Exit criteria:**
+- Introduce a Lean de Bruijn surface that preserves payload annotations for parity-sensitive serialization.
+- Keep existing proof-oriented erased representation as a separate layer if needed.
+
 ## CI Gates
 
 The minimum parity governance gates are `just check-parity --all`, `just check-release-conformance`, and workflow gates in `.github/workflows/verify.yml` and `.github/workflows/check.yml`.
@@ -199,6 +247,16 @@ If any threshold is violated, CI fails before benchmark lanes are considered hea
 ## Update Rule
 
 When any parity matrix row changes, update the Deviation Registry table in this file in the same change set. For any VM PR that changes public runtime behavior, include a parity impact statement in the PR checklist and add differential tests when observable behavior changes.
+
+## Type-Level Parity Checklist
+
+Every Rust PR that changes type semantics must include this checklist in the PR description.
+
+1. List affected Rust modules under `rust/types/src/`.
+2. List corresponding Lean modules reviewed for parity.
+3. State whether behavior is aligned or intentionally divergent.
+4. If divergent, add or update a Deviation Registry entry in this document.
+5. Link tests that cover new behavior and edge cases.
 
 ## Naming Compatibility
 
