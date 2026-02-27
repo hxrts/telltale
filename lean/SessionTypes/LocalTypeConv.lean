@@ -41,6 +41,34 @@ open SessionTypes.LocalTypeDB
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeConvProofs
 
+/-- Parity-sensitive payload-preserving conversion surface (named → de Bruijn). -/
+def toDBParity? (t : LocalTypeR) (ctx : NameContext := TypeContext.empty) : Option LocalTypeDBAnn :=
+  LocalTypeR.toDBAnn? ctx t
+
+/-- Parity-sensitive payload-preserving conversion surface (de Bruijn → named). -/
+def fromDBParity (t : LocalTypeDBAnn) (ctx : NameContext := TypeContext.empty) : LocalTypeR :=
+  LocalTypeDBAnn.fromDBAnn ctx t
+
+/-- Payload-preserving and erased DB conversions have identical success/failure behavior. -/
+theorem to_db_parity_is_some_eq_to_db_is_some (t : LocalTypeR) (ctx : NameContext := TypeContext.empty) :
+    (toDBParity? t ctx).isSome = (t.toDB? ctx).isSome :=
+  LocalTypeConvProofs.to_db_ann_is_some_eq_to_db_is_some ctx t
+
+/-- Closed terms admit a total payload-preserving DB conversion. -/
+def toDBParity_closed_safe (t : LocalTypeR) (_hclosed : t.isClosed = true) : LocalTypeDBAnn :=
+  match hAnn : toDBParity? t TypeContext.empty with
+  | some dbAnn => dbAnn
+  | none =>
+      False.elim <| by
+        rcases LocalTypeConvProofs.to_db_closed t _hclosed with ⟨db, hdb, _⟩
+        rcases LocalTypeConvProofs.to_db_lifts_to_db_ann (ctx := TypeContext.empty) (t := t) (db := db) hdb with
+          ⟨dbAnn, hAnn'⟩
+        have hAnnSome : toDBParity? t TypeContext.empty = some dbAnn := by
+          simpa [toDBParity?] using hAnn'
+        have : False := by
+          simp [hAnn] at hAnnSome
+        exact this
+
 /-- For closed DB terms, the safe conversion succeeds and matches the total conversion.
 
 **Proven** in LocalTypeConvProofs.lean -/

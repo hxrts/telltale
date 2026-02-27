@@ -676,3 +676,37 @@ def main : IO Unit := do
         | .ok _ => false
     | .error _ => false
   expect nullDuplicateRejected "comm replay nullifier mode accepted duplicate identity"
+
+  -- Test 42: payload size gate rejects oversized send payloads.
+  let (stPayload, _) := loadChoreography emptyState twoPartyImage
+  let oversizedPayload := String.mk (List.replicate 256 'x')
+  let injectPayload := fun (c : CoroutineState UnitGuard UnitEffect) =>
+    match setReg c.regs 1 (.string oversizedPayload) with
+    | some regs' => { c with regs := regs' }
+    | none => c
+  let stPayloadCfg :=
+    { stPayload with
+        coroutines := stPayload.coroutines.map injectPayload
+        config := { stPayload.config with maxPayloadBytes := 8 } }
+  let stPayloadRun := runScheduled 20 1 stPayloadCfg
+  let payloadRejected :=
+    stPayloadRun.coroutines.toList.any (fun c =>
+      match c.status with
+      | .faulted (.specFault msg) => msg.startsWith "send payload exceeds max_payload_bytes="
+      | _ => false)
+  expect payloadRejected "payload size gate did not reject oversized payload"
+
+  -- Test 43: strict-schema mode rejects annotationless single-branch send/recv paths.
+  let (stStrictSchema, _) := loadChoreography emptyState twoPartyImage
+  let stStrictCfg :=
+    { stStrictSchema with
+        config := { stStrictSchema.config with payloadValidationMode := .strictSchema } }
+  let stStrictRun := runScheduled 20 1 stStrictCfg
+  let strictSchemaRejected :=
+    stStrictRun.coroutines.toList.any (fun c =>
+      match c.status with
+      | .faulted (.specFault msg) =>
+          msg.endsWith "requires explicit ValType annotation in strict_schema mode"
+      | _ => false)
+  expect strictSchemaRejected
+    "strict-schema mode did not reject annotationless send/recv path"

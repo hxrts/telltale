@@ -379,7 +379,9 @@ impl GlobalType {
 
     fn branches_have_unique_names(branches: &[(Label, GlobalType)]) -> bool {
         let mut seen = BTreeSet::new();
-        branches.iter().all(|(label, _)| seen.insert(label.name.clone()))
+        branches
+            .iter()
+            .all(|(label, _)| seen.insert(label.name.clone()))
     }
 
     /// Check if all communication nodes have unique branch label names.
@@ -390,9 +392,7 @@ impl GlobalType {
             GlobalType::Mu { body, .. } => body.unique_branch_labels(),
             GlobalType::Comm { branches, .. } => {
                 Self::branches_have_unique_names(branches)
-                    && branches
-                        .iter()
-                        .all(|(_, cont)| cont.unique_branch_labels())
+                    && branches.iter().all(|(_, cont)| cont.unique_branch_labels())
             }
         }
     }
@@ -450,7 +450,9 @@ impl GlobalType {
             } => {
                 sender == role
                     || receiver == role
-                    || branches.iter().any(|(_, cont)| cont.mentions_role_inner(role))
+                    || branches
+                        .iter()
+                        .any(|(_, cont)| cont.mentions_role_inner(role))
             }
         }
     }
@@ -714,9 +716,10 @@ mod tests {
             GlobalType::comm(
                 "A",
                 "B",
-                vec![
-                    (Label::new("x"), GlobalType::send("B", "C", Label::new("y"), GlobalType::var("t"))),
-                ],
+                vec![(
+                    Label::new("x"),
+                    GlobalType::send("B", "C", Label::new("y"), GlobalType::var("t")),
+                )],
             ),
         );
         assert!(g.mentions_role("A"));

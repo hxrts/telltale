@@ -1,4 +1,5 @@
 import SessionTypes.LocalTypeDB.Core
+import SessionTypes.LocalTypeDB.Annotated
 import SessionTypes.LocalTypeDB.Preservation
 
 /-! # SessionTypes.LocalTypeDB

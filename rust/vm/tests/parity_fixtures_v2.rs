@@ -11,12 +11,12 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use telltale_types::{GlobalType, LocalTypeR};
-use telltale_vm::coroutine::Value;
+use telltale_vm::coroutine::{Fault, Value};
 use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput, TopologyPerturbation};
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::threaded::ThreadedVM;
-use telltale_vm::vm::{ObsEvent, ThreadedRoundSemantics, VMConfig, VM};
+use telltale_vm::vm::{ObsEvent, ThreadedRoundSemantics, VMConfig, VM, VMError};
 use telltale_vm::{
     CommunicationReplayMode, EffectDeterminismTier, EnvelopeDiffArtifactV1,
     FailureVisibleDiffClass, SchedulerPermutationClass,
@@ -125,6 +125,53 @@ impl EffectHandler for TopologyOnceHandler {
                 to: "B".to_string(),
             },
         ])
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct OversizedPayloadHandler;
+
+impl EffectHandler for OversizedPayloadHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &[Value],
+    ) -> Result<Value, String> {
+        Ok(Value::Str("x".repeat(256)))
+    }
+
+    fn send_decision(&self, _input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        Ok(SendDecision::Deliver(Value::Str("x".repeat(256))))
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<Value>,
+        _payload: &Value,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[Value],
+    ) -> Result<String, String> {
+        labels
+            .first()
+            .cloned()
+            .ok_or_else(|| "no labels available".to_string())
+    }
+
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
+        Ok(())
     }
 }
 
@@ -266,6 +313,56 @@ fn communication_replay_sequence_mode_parity_at_concurrency_one() {
         coop.canonical_replay_fragment(),
         threaded.canonical_replay_fragment(),
         "sequence replay mode must remain parity-exact at concurrency=1"
+    );
+}
+
+#[test]
+fn payload_size_rejection_parity_at_concurrency_one() {
+    let cfg = VMConfig {
+        max_payload_bytes: 8,
+        ..VMConfig::default()
+    };
+    let image = ScenarioSpec::simple("A", "B", "oversized").to_code_image();
+    let mut coop = VM::new(cfg.clone());
+    let mut threaded = ThreadedVM::with_workers(
+        VMConfig {
+            threaded_round_semantics: ThreadedRoundSemantics::WaveParallelExtension,
+            ..cfg
+        },
+        2,
+    );
+    coop.load_choreography(&image)
+        .expect("load cooperative image");
+    threaded
+        .load_choreography(&image)
+        .expect("load threaded image");
+
+    let coop_err = coop
+        .run_concurrent(&OversizedPayloadHandler, 128, 1)
+        .expect_err("cooperative run should reject oversized payload");
+    let threaded_err = threaded
+        .run_concurrent(&OversizedPayloadHandler, 128, 1)
+        .expect_err("threaded run should reject oversized payload");
+
+    assert!(
+        matches!(
+            coop_err,
+            VMError::Fault {
+                fault: Fault::TypeViolation { ref message, .. },
+                ..
+            } if message.contains("exceeds max_payload_bytes")
+        ),
+        "cooperative oversized payload error did not match payload-size rejection contract"
+    );
+    assert!(
+        matches!(
+            threaded_err,
+            VMError::Fault {
+                fault: Fault::TypeViolation { ref message, .. },
+                ..
+            } if message.contains("exceeds max_payload_bytes")
+        ),
+        "threaded oversized payload error did not match payload-size rejection contract"
     );
 }
 

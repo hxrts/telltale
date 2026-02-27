@@ -3,7 +3,9 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use telltale_theory::projection::{project_all, MemoizedProjector};
-use telltale_theory::{async_subtype, sync_subtype};
+use telltale_theory::{
+    async_subtype, check_coherent, reduces_star_with_fuel, sync_subtype, TraversalFuel,
+};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 fn chain_global(depth: usize) -> GlobalType {
@@ -63,5 +65,32 @@ fn bench_subtyping(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_projection, bench_subtyping);
+fn bench_coherence_and_reduction(c: &mut Criterion) {
+    let global = chain_global(128);
+
+    c.bench_function("coherence_check_depth_128", |b| {
+        b.iter(|| {
+            let bundle = check_coherent(black_box(&global));
+            black_box(bundle.is_coherent());
+        })
+    });
+
+    c.bench_function("reduction_star_depth_128", |b| {
+        b.iter(|| {
+            let ok = reduces_star_with_fuel(
+                black_box(&global),
+                black_box(&GlobalType::End),
+                TraversalFuel(20_000),
+            );
+            black_box(ok);
+        })
+    });
+}
+
+criterion_group!(
+    benches,
+    bench_projection,
+    bench_subtyping,
+    bench_coherence_and_reduction
+);
 criterion_main!(benches);

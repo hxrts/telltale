@@ -1,5 +1,5 @@
 
-import Choreography.Projection.Erasure.Merge
+import Choreography.Projection.Erasure.PayloadCompat
 
 /-! # Choreography.Projection.Erasure.MergeSoundness
 
@@ -129,25 +129,24 @@ private theorem merge_branches_send_sound
             size_of_cont_lt_size_of_branches lbl vt1 t1 tail
           have hlt2 : sizeOf t2 < sizeOf bs2 :=
             size_of_cont_lt_size_of_branches_mem hmem2_cont
-/- ## Structured Block 3 -/
           have hsum :
               sizeOf t1 + sizeOf t2 < sizeOf ((lbl, vt1, t1) :: tail) + sizeOf bs2 :=
             Nat.add_lt_add hlt1 hlt2
           have hm' : sizeOf ((lbl, vt1, t1) :: tail) + sizeOf bs2 < m := by
             simpa [hlt] using hm
           have hltm : sizeOf t1 + sizeOf t2 < m := Nat.lt_trans hsum hm'
-              have ht2 : t2 = t2' := by
-                simpa [hlookup'] using h2
-              subst ht2
-              simp [lookupBranch, hlt] at hbs
-              cases hbs
-              exact hmerge _ _ _ hltm hmerge'
-            ·
-              have h1_tail : lookupBranch lbl tail = some t1' := by
-                simpa [lookupBranch, hlt] using h1
-              have hbs' : lookupBranch lbl rest' = some t' := by
-                  simpa [lookupBranch, hlt] using hbs
-              exact hper lbl t1' t2' t' h1_tail h2 hbs'
+          have ht2 : t2 = t2' := by
+            simpa [hlookup'] using h2
+          subst ht2
+          simp [lookupBranch, hlt] at hbs
+          cases hbs
+          exact hmerge _ _ _ hltm hmerge'
+        ·
+          have h1_tail : lookupBranch lbl tail = some t1' := by
+            simpa [lookupBranch, hlt] using h1
+          have hbs' : lookupBranch lbl rest' = some t' := by
+            simpa [lookupBranch, hlt] using hbs
+          exact hper lbl t1' t2' t' h1_tail h2 hbs'
 
 -- mergeBranchesRecv Soundness
 
@@ -237,8 +236,8 @@ private theorem merge_branches_recv_sound
           ·
             have h1_tail : lookupBranch lbl tail = none := by
               simpa [lookupBranch, hlt] using h1'
-                have htail := hright lbl t2' h1_tail h2'
-                simpa [lookupBranch, hlt] using htail
+            have htail := hright lbl t2' h1_tail h2'
+            simpa [lookupBranch, hlt] using htail
 
       -- mergeBranchesRecv Cons Merged-Label Path
 
@@ -273,45 +272,40 @@ private theorem merge_branches_recv_sound
             have hm' : sizeOf ((lbl, vt1, t1) :: tail) + sizeOf bs2 < m := by
               simpa [hlt] using hm
             have hltm : sizeOf t1 + sizeOf t2 < m := Nat.lt_trans hsum hm'
-                have ht2 : t2 = t2' := by
-                  simpa [hlookup'] using h2'
-                subst ht2
-                simp [lookupBranch, hlt] at hbs
-                cases hbs
-                exact hmerge _ _ _ hltm hmerge'
-              ·
-                have h1_tail : lookupBranch lbl tail = some t1' := by
-                  simpa [lookupBranch, hlt] using h1'
-                have hbs' : lookupBranch lbl rest' = some t' := by
-                  simpa [lookupBranch, hlt] using hbs
-                exact hper lbl t1' t2' t' h1_tail h2' hbs'
+            have ht2 : t2 = t2' := by
+              simpa [hlookup'] using h2'
+            subst ht2
+            simp [lookupBranch, hlt] at hbs
+            cases hbs
+            exact hmerge _ _ _ hltm hmerge'
+          ·
+            have h1_tail : lookupBranch lbl tail = some t1' := by
+              simpa [lookupBranch, hlt] using h1'
+            have hbs' : lookupBranch lbl rest' = some t' := by
+              simpa [lookupBranch, hlt] using hbs
+            exact hper lbl t1' t2' t' h1_tail h2' hbs'
 
-            -- mergeBranchesRecv Merged-Label Left-Preservation Subcase
+        · intro lbl t1' h1' h2'
+          by_cases hlt : l = lbl
+          ·
+            exfalso
+            have h2'' : lookupBranch l bs2 = none := by
+              simpa [hlt] using h2'
+            simp [hlookup] at h2''
+          ·
+            have h1_tail : lookupBranch lbl tail = some t1' := by
+              simpa [lookupBranch, hlt] using h1'
+            have htail := hleft lbl t1' h1_tail h2'
+            simpa [lookupBranch, hlt] using htail
 
-            · intro lbl t1' h1' h2'
-              by_cases hlt : l = lbl
-              ·
-                exfalso
-                have h2'' : lookupBranch l bs2 = none := by
-                  simpa [hlt] using h2'
-                simp [hlookup] at h2''
-              ·
-                have h1_tail : lookupBranch lbl tail = some t1' := by
-                  simpa [lookupBranch, hlt] using h1'
-                have htail := hleft lbl t1' h1_tail h2'
-                simpa [lookupBranch, hlt] using htail
-
-            -- mergeBranchesRecv Merged-Label Right-Preservation Subcase
-
-/- ## Structured Block 6 -/
-            · intro lbl t2' h1' h2'
-              by_cases hlt : l = lbl
-              · simp [lookupBranch, hlt] at h1'
-              ·
-                have h1_tail : lookupBranch lbl tail = none := by
-                  simpa [lookupBranch, hlt] using h1'
-                  have htail := hright lbl t2' h1_tail h2'
-                  simpa [lookupBranch, hlt] using htail
+        · intro lbl t2' h1' h2'
+          by_cases hlt : l = lbl
+          · simp [lookupBranch, hlt] at h1'
+          ·
+            have h1_tail : lookupBranch lbl tail = none := by
+              simpa [lookupBranch, hlt] using h1'
+            have htail := hright lbl t2' h1_tail h2'
+            simpa [lookupBranch, hlt] using htail
 
 -- Merge Soundness
 
@@ -400,33 +394,35 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
           | send q bs' =>
               by_cases hp : p = q
               · subst hp
-                simp [merge] at h
-                cases hmerge' : mergeBranchesSend bs bs' with
-                | none =>
-                    simp [hmerge'] at h
-                | some bs'' =>
-                    by_cases hsubset : labelsSubsetb bs' bs = true
-                    · simp [hmerge', hsubset] at h
-                      cases h
-                      have hm : sizeOf bs + sizeOf bs' < m := by
-                        have h1 : sizeOf bs < sizeOf (LocalTypeR.send p bs) :=
-                          size_of_branches_lt_size_of_send p bs
-                        have h2 : sizeOf bs' < sizeOf (LocalTypeR.send p bs') :=
-                          size_of_branches_lt_size_of_send p bs'
-                        have hsum :
-                            sizeOf bs + sizeOf bs' < sizeOf (LocalTypeR.send p bs) + sizeOf (LocalTypeR.send p bs') :=
-                          Nat.add_lt_add h1 h2
-                        simpa [m] using hsum
-                      have hsend :=
-                        merge_branches_send_sound m hmerge (bs1 := bs) (bs2 := bs') (bs := bs'') hm hmerge'
-                      rcases hsend with ⟨hsub12, hsub1b, hsubb1, hper⟩
-                      have hsub21 : labelsSubset bs' bs :=
-                        labels_subset_of_labels_subsetb (bs1 := bs') (bs2 := bs) hsubset
-/- ## Structured Block 8 -/
-                      have h1 : sameLabels bs bs' := same_labels_of_subsets hsub12 hsub21
-                      have h2 : sameLabels bs bs'' := same_labels_of_subsets hsub1b hsubb1
-                      exact Erases.send h1 h2 hper
-                    · simp [hmerge', hsubset] at h
+                by_cases hcompat : payloadAnnotationsCompatible bs bs' = true
+                · simp [merge, hcompat] at h
+                  cases hmerge' : mergeBranchesSend bs bs' with
+                  | none =>
+                      simp [hmerge'] at h
+                  | some bs'' =>
+                      by_cases hsubset : labelsSubsetb bs' bs = true
+                      · simp [hmerge', hsubset] at h
+                        cases h
+                        have hm : sizeOf bs + sizeOf bs' < m := by
+                          have h1 : sizeOf bs < sizeOf (LocalTypeR.send p bs) :=
+                            size_of_branches_lt_size_of_send p bs
+                          have h2 : sizeOf bs' < sizeOf (LocalTypeR.send p bs') :=
+                            size_of_branches_lt_size_of_send p bs'
+                          have hsum :
+                              sizeOf bs + sizeOf bs' < sizeOf (LocalTypeR.send p bs) + sizeOf (LocalTypeR.send p bs') :=
+                            Nat.add_lt_add h1 h2
+                          simpa [m] using hsum
+                        have hsend :=
+                          merge_branches_send_sound m hmerge (bs1 := bs) (bs2 := bs') (bs := bs'') hm hmerge'
+                        rcases hsend with ⟨hsub12, hsub1b, hsubb1, hper⟩
+                        have hsub21 : labelsSubset bs' bs :=
+                          labels_subset_of_labels_subsetb (bs1 := bs') (bs2 := bs) hsubset
+  /- ## Structured Block 8 -/
+                        have h1 : sameLabels bs bs' := same_labels_of_subsets hsub12 hsub21
+                        have h2 : sameLabels bs bs'' := same_labels_of_subsets hsub1b hsubb1
+                        exact Erases.send h1 h2 hper
+                      · simp [hmerge', hsubset] at h
+                · simp [merge, hcompat] at h
               · simp [merge, hp] at h
             | «end» | var _ | mu _ _ | recv _ _ =>
                 have : False := by
@@ -440,31 +436,39 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
           | recv q bs' =>
               by_cases hp : p = q
               · subst hp
-                simp [merge] at h
-                cases hmerge' : mergeBranchesRecv bs bs' with
-                | none =>
-                    simp [hmerge'] at h
-                | some bs'' =>
-                    simp [hmerge'] at h
-                    cases h
-                    have hm : sizeOf bs + sizeOf bs' < m := by
-                      have h1 : sizeOf bs < sizeOf (LocalTypeR.recv p bs) :=
-                        size_of_branches_lt_size_of_recv p bs
-                      have h2 : sizeOf bs' < sizeOf (LocalTypeR.recv p bs') :=
-                        size_of_branches_lt_size_of_recv p bs'
-                      have hsum :
-                          sizeOf bs + sizeOf bs' < sizeOf (LocalTypeR.recv p bs) + sizeOf (LocalTypeR.recv p bs') :=
-                        Nat.add_lt_add h1 h2
-                      simpa [m] using hsum
-                    have hrecv :=
-                      merge_branches_recv_sound m hmerge (bs1 := bs) (bs2 := bs') (bs := bs'') hm hmerge'
-                    rcases hrecv with ⟨hper, hleft, hright⟩
-                    exact Erases.recv hper hleft hright
+                by_cases hcompat : payloadAnnotationsCompatible bs bs' = true
+                · simp [merge, hcompat] at h
+                  cases hmerge' : mergeBranchesRecv bs bs' with
+                  | none =>
+                      simp [hmerge'] at h
+                  | some bs'' =>
+                      simp [hmerge'] at h
+                      cases h
+                      have hm : sizeOf bs + sizeOf bs' < m := by
+                        have h1 : sizeOf bs < sizeOf (LocalTypeR.recv p bs) :=
+                          size_of_branches_lt_size_of_recv p bs
+                        have h2 : sizeOf bs' < sizeOf (LocalTypeR.recv p bs') :=
+                          size_of_branches_lt_size_of_recv p bs'
+                        have hsum :
+                            sizeOf bs + sizeOf bs' < sizeOf (LocalTypeR.recv p bs) + sizeOf (LocalTypeR.recv p bs') :=
+                          Nat.add_lt_add h1 h2
+                        simpa [m] using hsum
+                      have hrecv :=
+                        merge_branches_recv_sound m hmerge (bs1 := bs) (bs2 := bs') (bs := bs'') hm hmerge'
+                      rcases hrecv with ⟨hper, hleft, hright⟩
+                      exact Erases.recv hper hleft hright
+                · simp [merge, hcompat] at h
               · simp [merge, hp] at h
           | «end» | var _ | mu _ _ | send _ _ =>
                 have : False := by
                   simp [merge] at h
                 exact this.elim
+
+/-- Compatibility-gated merge entrypoint is sound w.r.t. `Erases`. -/
+theorem merge_with_payload_compat_sound :
+    ∀ a b c, mergeWithPayloadCompat a b = some c → Erases a b c := by
+  intro a b c h
+  simpa [mergeWithPayloadCompat] using (merge_sound a b c h)
 
 -- mergeAll Soundness
 

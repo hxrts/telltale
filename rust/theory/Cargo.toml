@@ -36,7 +36,7 @@ semantics = []         # Async step semantics from ECOOP 2025
 coherence = ["semantics", "well-formedness"]  # Coherence predicates (requires semantics and well-formedness)
 
 # Optional advanced algorithms
-async-subtyping = []   # POPL 2021 asynchronous subtyping
+async-subtyping = []   # Experimental conservative async-subtyping checker (POPL 2021-inspired)
 sync-subtyping = []    # Synchronous subtyping
 bounded = []           # Bounded recursion strategies
 

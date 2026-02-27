@@ -48,6 +48,12 @@ inductive CommunicationReplayMode where
   | nullifier
   deriving Repr, DecidableEq, Inhabited
 
+inductive PayloadValidationMode where
+  | off
+  | structural
+  | strictSchema
+  deriving Repr, DecidableEq, Inhabited
+
 structure VMRuntimeConfig (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν] where
   -- Migration-safe config schema version.
   configVersion : Nat := 1
@@ -62,6 +68,8 @@ structure VMRuntimeConfig (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν] wh
   maxCoroutines : Nat := 1024
   maxSessions : Nat := 256
   monitorMode : MonitorMode := .sessionTypePrecheck
+  payloadValidationMode : PayloadValidationMode := .structural
+  maxPayloadBytes : Nat := 65536
   communicationReplayMode : CommunicationReplayMode := .off
   guardChain : GuardChain γ
   roleSigningKey : Role → VerificationModel.SigningKey ν

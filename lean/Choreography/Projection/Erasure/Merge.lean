@@ -130,6 +130,29 @@ private theorem label_inb_of_lookup_none {lbl : Label} {bs : List BranchR}
     (h : lookupBranch lbl bs = none) : labelInb lbl bs = false := by
   simp [labelInb, h]
 
+-- Payload Annotation Compatibility
+
+/-- Lookup a branch payload annotation by label. -/
+def lookupBranchPayload (lbl : Label) (branches : List BranchR) : Option (Option SessionTypes.ValType) :=
+  match branches with
+  | [] => none
+  | (lbl', vt, _) :: rest =>
+      if lbl' = lbl then
+        some vt
+      else
+        lookupBranchPayload lbl rest
+
+/-- Directional payload-annotation compatibility for overlapping labels. -/
+def payloadAnnotationsCompatibleDir (src dst : List BranchR) : Bool :=
+  src.all (fun (lbl, vt, _cont) =>
+    match lookupBranchPayload lbl dst with
+    | none => true
+    | some vt' => decide (vt = vt'))
+
+/-- Symmetric payload-annotation compatibility for overlapping labels. -/
+def payloadAnnotationsCompatible (bs1 bs2 : List BranchR) : Bool :=
+  payloadAnnotationsCompatibleDir bs1 bs2 && payloadAnnotationsCompatibleDir bs2 bs1
+
 -- appendMissing Lookup Preservation
 
 private theorem lookup_branch_append_missing_of_not_in
@@ -223,17 +246,23 @@ mutual
           none
     | .send p bs1, .send q bs2 =>
         if _h : p = q then
-          match mergeBranchesSend bs1 bs2 with
-          | some bs =>
-              if labelsSubsetb bs2 bs1 then some (.send p bs) else none
-          | none => none
+          if payloadAnnotationsCompatible bs1 bs2 then
+            match mergeBranchesSend bs1 bs2 with
+            | some bs =>
+                if labelsSubsetb bs2 bs1 then some (.send p bs) else none
+            | none => none
+          else
+            none
         else
           none
     | .recv p bs1, .recv q bs2 =>
         if _h : p = q then
-          match mergeBranchesRecv bs1 bs2 with
-          | some bs => some (.recv p bs)
-          | none => none
+          if payloadAnnotationsCompatible bs1 bs2 then
+            match mergeBranchesRecv bs1 bs2 with
+            | some bs => some (.recv p bs)
+            | none => none
+          else
+            none
         else
           none
     | _, _ => none

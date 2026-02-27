@@ -88,13 +88,16 @@ impl VM {
         &mut self,
         edge: &Edge,
         label: &str,
+        expected_type: Option<&ValType>,
         val: &Value,
         sequence_no: u64,
     ) -> Result<(), Fault> {
+        let replay_label =
+            crate::communication_replay::canonical_receive_label_context(label, expected_type);
         let identity = CommunicationIdentity::from_payload(
             edge,
             CommunicationStepKind::Receive,
-            label,
+            replay_label,
             val,
             sequence_no,
         );
@@ -147,7 +150,7 @@ impl VM {
         let edge = Edge::new(sid, partner.clone(), role.to_string());
         let (val, sequence_no) =
             self.recv_verified_signed_payload(sid, &ep, &edge, &partner, role)?;
-        self.consume_receive_replay_identity(&edge, &label, &val, sequence_no)?;
+        self.consume_receive_replay_identity(&edge, &label, expected_type.as_ref(), &val, sequence_no)?;
 
         self.validate_payload(
             role,

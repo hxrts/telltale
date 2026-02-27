@@ -338,7 +338,9 @@ impl LocalTypeR {
 
     fn branches_have_unique_names(branches: &[(Label, Option<ValType>, LocalTypeR)]) -> bool {
         let mut seen = BTreeSet::new();
-        branches.iter().all(|(label, _, _)| seen.insert(label.name.clone()))
+        branches
+            .iter()
+            .all(|(label, _, _)| seen.insert(label.name.clone()))
     }
 
     /// Check if all send/recv nodes have unique branch label names.

@@ -614,7 +614,7 @@ fn test_async_subtype_end_reflexive() {
 }
 
 #[test]
-fn test_async_subtype_end_is_subtype_of_all() {
+fn test_async_subtype_end_only_matches_empty_phase_supertype() {
     let mut runner = TestRunner::new_with_rng(
         Config::default(),
         TestRng::from_seed(RngAlgorithm::ChaCha, &DETERMINISTIC_SEED),
@@ -628,15 +628,21 @@ fn test_async_subtype_end_is_subtype_of_all() {
             .expect("Should generate value")
             .current();
 
-        // End (doing nothing) should be a subtype of any type
-        // because End trivially satisfies the supertype's requirements
         let result = async_subtype(&LocalTypeR::End, &lt);
-        assert!(
-            result.is_ok(),
-            "End should be async subtype of {:?}, got {:?}",
-            lt,
-            result
-        );
+        if matches!(lt, LocalTypeR::End) {
+            assert!(
+                result.is_ok(),
+                "End should be async subtype of End, got {:?}",
+                result
+            );
+        } else {
+            assert!(
+                result.is_err(),
+                "Conservative checker should reject End <: {:?}, got {:?}",
+                lt,
+                result
+            );
+        }
     }
 }
 

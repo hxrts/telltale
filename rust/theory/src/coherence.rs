@@ -13,10 +13,13 @@
 //! - `projectable` ↔ Lean's `projectable` definition
 //! - `check_coherent` bundles all predicates
 
-use crate::merge::can_merge;
+use crate::merge::merge_all;
 use crate::projection::MemoizedProjector;
-use crate::semantics::{can_step, step, GlobalAction};
+use crate::semantics;
 use crate::well_formedness::unique_labels;
+use std::collections::BTreeSet;
+use telltale_types::content_id::Sha256Hasher;
+use telltale_types::contentable::Contentable;
 use telltale_types::GlobalType;
 
 /// Coherence bundle for global types.
@@ -47,10 +50,19 @@ pub struct CoherentG {
 }
 
 impl CoherentG {
-    /// Check if all coherence conditions are satisfied
+    /// Check implemented coherence conditions.
+    ///
+    /// This excludes the placeholder `linear` predicate until a full
+    /// linearity algorithm is implemented.
     #[must_use]
     pub fn is_coherent(&self) -> bool {
-        self.linear && self.size && self.action && self.uniq_labels && self.projectable && self.good
+        self.is_coherent_core()
+    }
+
+    /// Check the currently implemented coherence bundle.
+    #[must_use]
+    pub fn is_coherent_core(&self) -> bool {
+        self.size && self.action && self.uniq_labels && self.projectable && self.good
     }
 }
 
@@ -83,7 +95,7 @@ pub fn check_coherent(g: &GlobalType) -> CoherentG {
 /// Placeholder linearity predicate for globals.
 ///
 /// Corresponds to Lean's `linearPred`.
-/// Currently always returns true (refinement needed for full linearity checks).
+/// This is currently a placeholder and does not provide a full linearity proof.
 #[must_use]
 pub fn linear_pred(_g: &GlobalType) -> bool {
     // Linearity would ensure channels are used without races and choices are well-scoped.
@@ -149,7 +161,7 @@ pub fn projectable(g: &GlobalType) -> bool {
     // Check that projection would succeed for each role
     // For now, we check structural properties that ensure projection succeeds
     for role in &roles {
-        if !can_project_role(g, role, &mut Vec::new(), &mut projector) {
+        if !can_project_role(g, role, &mut BTreeSet::new(), &mut projector) {
             return false;
         }
     }
@@ -163,13 +175,14 @@ pub fn projectable(g: &GlobalType) -> bool {
 fn can_project_role(
     g: &GlobalType,
     role: &str,
-    visited: &mut Vec<GlobalType>,
+    visited: &mut BTreeSet<String>,
     projector: &mut MemoizedProjector,
 ) -> bool {
-    if visited.contains(g) {
+    let fingerprint = global_fingerprint(g);
+    if visited.contains(&fingerprint) {
         return true; // Assume projectable for cycles
     }
-    visited.push(g.clone());
+    visited.insert(fingerprint);
 
     match g {
         GlobalType::End => true,
@@ -213,20 +226,7 @@ fn can_project_role(
                     return false;
                 }
 
-                // Check that all projected types can be merged pairwise
-                if projected.len() <= 1 {
-                    return true;
-                }
-
-                // Check that each pair can merge (transitive property)
-                let first = &projected[0];
-                for other in &projected[1..] {
-                    if !can_merge(first, other) {
-                        return false;
-                    }
-                }
-
-                true
+                merge_all(&projected).is_ok()
             }
         }
         GlobalType::Mu { body, .. } => {
@@ -236,6 +236,12 @@ fn can_project_role(
     }
 }
 
+fn global_fingerprint(g: &GlobalType) -> String {
+    g.content_id::<Sha256Hasher>()
+        .map(|cid| cid.to_hex())
+        .unwrap_or_else(|_| format!("{g:?}"))
+}
+
 /// Good global check: enabledness implies step existence.
 ///
 /// Corresponds to Lean's `goodG`.
@@ -243,46 +249,7 @@ fn can_project_role(
 /// a step must exist (step returns Some).
 #[must_use]
 pub fn good_g(g: &GlobalType) -> bool {
-    good_g_fuel(g, 100, &mut Vec::new())
-}
-
-fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut Vec<GlobalType>) -> bool {
-    if fuel == 0 {
-        return true; // Assume good if we run out of fuel
-    }
-
-    if visited.contains(g) {
-        return true; // Avoid infinite loops
-    }
-    visited.push(g.clone());
-
-    match g {
-        GlobalType::End => true,
-        GlobalType::Var(_) => true,
-        GlobalType::Comm {
-            sender,
-            receiver,
-            branches,
-        } => {
-            // Check all head actions have steps
-            for (l, cont) in branches {
-                let act = GlobalAction::new(sender, receiver, l.clone());
-                if can_step(g, &act) && step(g, &act).is_none() {
-                    return false;
-                }
-                // Recursively check continuations
-                if !good_g_fuel(cont, fuel - 1, visited) {
-                    return false;
-                }
-            }
-            true
-        }
-        GlobalType::Mu { .. } => {
-            // Check the unfolded type (unfold handles substitution)
-            let unfolded = g.unfold();
-            good_g_fuel(&unfolded, fuel - 1, visited)
-        }
-    }
+    semantics::good_g(g)
 }
 
 #[cfg(test)]
@@ -477,6 +444,45 @@ mod tests {
     }
 
     #[test]
+    fn test_not_projectable_when_fold_merge_fails_after_pairwise_pass() {
+        // Outer choice unseen by C.
+        // C branch projections:
+        // - l1: ?B{x:end}
+        // - l2: ?B{y:end}
+        // - l3: ?B{x:end, y:!D{m:end}}
+        // Pairwise with first branch can pass, but full fold merge must fail.
+        let g = GlobalType::comm(
+            "A",
+            "B",
+            vec![
+                (
+                    Label::new("l1"),
+                    GlobalType::send("B", "C", Label::new("x"), GlobalType::End),
+                ),
+                (
+                    Label::new("l2"),
+                    GlobalType::send("B", "C", Label::new("y"), GlobalType::End),
+                ),
+                (
+                    Label::new("l3"),
+                    GlobalType::comm(
+                        "B",
+                        "C",
+                        vec![
+                            (Label::new("x"), GlobalType::End),
+                            (
+                                Label::new("y"),
+                                GlobalType::send("C", "D", Label::new("m"), GlobalType::End),
+                            ),
+                        ],
+                    ),
+                ),
+            ],
+        );
+        assert!(!projectable(&g));
+    }
+
+    #[test]
     fn test_size_pred() {
         let good = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         assert!(size_pred(&good));
@@ -515,5 +521,14 @@ mod tests {
             ],
         );
         assert!(good_g(&g));
+    }
+
+    #[test]
+    fn test_good_g_matches_semantics_module() {
+        let g = GlobalType::mu(
+            "t",
+            GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("t")),
+        );
+        assert_eq!(good_g(&g), crate::semantics::good_g(&g));
     }
 }

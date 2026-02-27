@@ -10,6 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
+use telltale_types::ValType;
 
 use crate::coroutine::Value;
 use crate::session::{Edge, SessionId};
@@ -74,6 +75,22 @@ pub struct CommunicationIdentity {
     /// Sequence number carried by the transport message.
     #[serde(default)]
     pub sequence_no: u64,
+}
+
+/// Canonical receive replay label-context.
+///
+/// Lean uses deterministic typed-context tokens for receive replay identities.
+/// Rust aligns with that token when the session type carries an expected payload
+/// annotation, and falls back to the runtime label when no annotation exists.
+#[must_use]
+pub fn canonical_receive_label_context(
+    runtime_label: &str,
+    expected_type: Option<&ValType>,
+) -> String {
+    match expected_type {
+        Some(expected) => format!("recv:{expected:?}"),
+        None => runtime_label.to_string(),
+    }
 }
 
 impl CommunicationIdentity {
@@ -367,5 +384,17 @@ mod tests {
             .consume_receive(&identity)
             .expect_err("duplicate identity should fail");
         assert_eq!(err.tag(), COMM_REPLAY_DUPLICATE_TAG);
+    }
+
+    #[test]
+    fn canonical_receive_label_uses_typed_context_when_available() {
+        let label = canonical_receive_label_context("msg", Some(&ValType::Nat));
+        assert_eq!(label, "recv:Nat");
+    }
+
+    #[test]
+    fn canonical_receive_label_falls_back_to_runtime_label_when_untyped() {
+        let label = canonical_receive_label_context("msg", None);
+        assert_eq!(label, "msg");
     }
 }

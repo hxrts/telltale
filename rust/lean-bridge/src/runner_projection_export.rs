@@ -122,6 +122,121 @@ impl LeanRunner {
         Ok(selected)
     }
 
+    /// Check conservative async-subtyping in Lean.
+    ///
+    /// Invokes the Lean validator with `--check-async-subtype` mode and returns
+    /// whether the subtype relation holds.
+    pub fn check_async_subtype(
+        &self,
+        subtype_json: &Value,
+        supertype_json: &Value,
+    ) -> Result<bool, LeanRunnerError> {
+        let subtype_file = NamedTempFile::new()?;
+        let supertype_file = NamedTempFile::new()?;
+        let output_file = NamedTempFile::new()?;
+
+        std::fs::write(
+            subtype_file.path(),
+            serde_json::to_string_pretty(subtype_json)
+                .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
+        )?;
+        std::fs::write(
+            supertype_file.path(),
+            serde_json::to_string_pretty(supertype_json)
+                .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
+        )?;
+
+        let output = Command::new(&self.binary_path)
+            .arg("--check-async-subtype")
+            .arg(subtype_file.path())
+            .arg(supertype_file.path())
+            .arg("--output")
+            .arg(output_file.path())
+            .output()?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            return Err(LeanRunnerError::ProcessFailed {
+                code: output.status.code().unwrap_or(-1),
+                stderr,
+            });
+        }
+
+        let output_content = std::fs::read_to_string(output_file.path())?;
+        let payload: Value = serde_json::from_str(&output_content)
+            .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
+
+        let success = payload
+            .get("success")
+            .and_then(|v| v.as_bool())
+            .ok_or_else(|| LeanRunnerError::ParseError("missing success field".to_string()))?;
+        if !success {
+            let err = payload
+                .get("error")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Lean async-subtyping check failed");
+            return Err(LeanRunnerError::ParseError(err.to_string()));
+        }
+
+        let result = payload
+            .get("result")
+            .and_then(|v| v.as_bool())
+            .ok_or_else(|| LeanRunnerError::ParseError("missing result field".to_string()))?;
+        Ok(result)
+    }
+
+    /// Check conservative orphan-freedom in Lean.
+    ///
+    /// Invokes the Lean validator with `--check-orphan-free` mode and returns
+    /// whether the orphan-freedom predicate holds.
+    pub fn check_orphan_free(&self, local_json: &Value) -> Result<bool, LeanRunnerError> {
+        let local_file = NamedTempFile::new()?;
+        let output_file = NamedTempFile::new()?;
+
+        std::fs::write(
+            local_file.path(),
+            serde_json::to_string_pretty(local_json)
+                .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
+        )?;
+
+        let output = Command::new(&self.binary_path)
+            .arg("--check-orphan-free")
+            .arg(local_file.path())
+            .arg("--output")
+            .arg(output_file.path())
+            .output()?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            return Err(LeanRunnerError::ProcessFailed {
+                code: output.status.code().unwrap_or(-1),
+                stderr,
+            });
+        }
+
+        let output_content = std::fs::read_to_string(output_file.path())?;
+        let payload: Value = serde_json::from_str(&output_content)
+            .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
+
+        let success = payload
+            .get("success")
+            .and_then(|v| v.as_bool())
+            .ok_or_else(|| LeanRunnerError::ParseError("missing success field".to_string()))?;
+        if !success {
+            let err = payload
+                .get("error")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Lean orphan-free check failed");
+            return Err(LeanRunnerError::ParseError(err.to_string()));
+        }
+
+        let result = payload
+            .get("result")
+            .and_then(|v| v.as_bool())
+            .ok_or_else(|| LeanRunnerError::ParseError("missing result field".to_string()))?;
+        Ok(result)
+    }
+
     /// Run one or more choreographies on the Lean VM at a given concurrency level.
     ///
     /// # Errors

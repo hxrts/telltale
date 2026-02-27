@@ -307,10 +307,14 @@ fn step_recv(
         ctx.config.communication_replay_mode,
         crate::communication_replay::CommunicationReplayMode::Off
     ) {
+        let replay_label = crate::communication_replay::canonical_receive_label_context(
+            &prepared.label,
+            prepared.expected_type.as_ref(),
+        );
         let identity = CommunicationIdentity::from_payload(
             &edge,
             CommunicationStepKind::Receive,
-            &prepared.label,
+            replay_label,
             &val,
             sequence_no,
         );

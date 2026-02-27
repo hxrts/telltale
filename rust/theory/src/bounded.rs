@@ -31,7 +31,7 @@
 //! ```
 
 use crate::limits::{FuelSteps, YieldAfterSteps};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use telltale_types::LocalTypeR;
 
 /// Strategy for bounding recursive types.
@@ -211,16 +211,17 @@ fn bound_with_yield_when_impl(
         LocalTypeR::Send { partner, branches } => {
             let mut bounded_branches = Vec::with_capacity(branches.len());
             for (label, vt, cont) in branches {
+                let mut branch_seen = seen_conditions.clone();
                 let next = if label.name == condition {
                     // Yield when this condition is seen
-                    if seen_conditions.contains(condition) {
+                    if branch_seen.contains(condition) {
                         LocalTypeR::End
                     } else {
-                        seen_conditions.insert(condition.to_string());
-                        bound_with_yield_when_impl(cont, condition, seen_conditions)
+                        branch_seen.insert(condition.to_string());
+                        bound_with_yield_when_impl(cont, condition, &mut branch_seen)
                     }
                 } else {
-                    bound_with_yield_when_impl(cont, condition, seen_conditions)
+                    bound_with_yield_when_impl(cont, condition, &mut branch_seen)
                 };
                 bounded_branches.push((label.clone(), vt.clone(), next));
             }
@@ -233,15 +234,16 @@ fn bound_with_yield_when_impl(
         LocalTypeR::Recv { partner, branches } => {
             let mut bounded_branches = Vec::with_capacity(branches.len());
             for (label, vt, cont) in branches {
+                let mut branch_seen = seen_conditions.clone();
                 let next = if label.name == condition {
-                    if seen_conditions.contains(condition) {
+                    if branch_seen.contains(condition) {
                         LocalTypeR::End
                     } else {
-                        seen_conditions.insert(condition.to_string());
-                        bound_with_yield_when_impl(cont, condition, seen_conditions)
+                        branch_seen.insert(condition.to_string());
+                        bound_with_yield_when_impl(cont, condition, &mut branch_seen)
                     }
                 } else {
-                    bound_with_yield_when_impl(cont, condition, seen_conditions)
+                    bound_with_yield_when_impl(cont, condition, &mut branch_seen)
                 };
                 bounded_branches.push((label.clone(), vt.clone(), next));
             }
@@ -267,12 +269,12 @@ fn bound_with_yield_when_impl(
 ///
 /// This is useful for analysis or visualization of bounded protocols.
 pub fn unfold_bounded(lt: &LocalTypeR, max_depth: usize) -> LocalTypeR {
-    unfold_bounded_impl(lt, lt, max_depth, 0)
+    unfold_bounded_impl(lt, &BTreeMap::new(), max_depth, 0)
 }
 
 fn unfold_bounded_impl(
-    original: &LocalTypeR,
     current: &LocalTypeR,
+    env: &BTreeMap<String, LocalTypeR>,
     max_depth: usize,
     depth: usize,
 ) -> LocalTypeR {
@@ -289,7 +291,7 @@ fn unfold_bounded_impl(
                 unfolded_branches.push((
                     label.clone(),
                     vt.clone(),
-                    unfold_bounded_impl(original, cont, max_depth, depth),
+                    unfold_bounded_impl(cont, env, max_depth, depth),
                 ));
             }
             LocalTypeR::Send {
@@ -304,7 +306,7 @@ fn unfold_bounded_impl(
                 unfolded_branches.push((
                     label.clone(),
                     vt.clone(),
-                    unfold_bounded_impl(original, cont, max_depth, depth),
+                    unfold_bounded_impl(cont, env, max_depth, depth),
                 ));
             }
             LocalTypeR::Recv {
@@ -313,15 +315,15 @@ fn unfold_bounded_impl(
             }
         }
 
-        LocalTypeR::Mu { body, .. } => {
-            // Increment depth when entering a Mu
-            unfold_bounded_impl(original, body, max_depth, depth + 1)
+        LocalTypeR::Mu { var, body } => {
+            let mut extended_env = env.clone();
+            extended_env.insert(var.clone(), (**body).clone());
+            unfold_bounded_impl(body, &extended_env, max_depth, depth + 1)
         }
 
-        LocalTypeR::Var(_) => {
-            // Replace variable with the body of the enclosing Mu
-            if let LocalTypeR::Mu { body, .. } = original {
-                unfold_bounded_impl(original, body, max_depth, depth + 1)
+        LocalTypeR::Var(var) => {
+            if let Some(bound_body) = env.get(var) {
+                unfold_bounded_impl(bound_body, env, max_depth, depth + 1)
             } else {
                 LocalTypeR::End
             }
@@ -482,5 +484,55 @@ mod tests {
 
         let yield_when = bound_recursion(&lt, BoundingStrategy::YieldWhen("x".to_string()));
         assert!(matches!(yield_when, LocalTypeR::End));
+    }
+
+    #[test]
+    fn test_unfold_bounded_uses_nearest_binder() {
+        // μt. μt. !B{inner.t}
+        // Inner `t` must refer to the inner binder, not the outer one.
+        let lt = LocalTypeR::mu(
+            "t",
+            LocalTypeR::mu(
+                "t",
+                LocalTypeR::send("B", Label::new("inner"), LocalTypeR::var("t")),
+            ),
+        );
+        let unfolded = unfold_bounded(&lt, 3);
+
+        assert!(matches!(
+            unfolded,
+            LocalTypeR::Send { .. } | LocalTypeR::End
+        ));
+    }
+
+    #[test]
+    fn test_yield_when_branch_local_state() {
+        // Two sibling branches both start with "stop".
+        // Branch-local tracking should allow one "stop" per branch.
+        let lt = LocalTypeR::send_choice(
+            "B",
+            vec![
+                (
+                    Label::new("left"),
+                    None,
+                    LocalTypeR::send("B", Label::new("stop"), LocalTypeR::End),
+                ),
+                (
+                    Label::new("right"),
+                    None,
+                    LocalTypeR::send("B", Label::new("stop"), LocalTypeR::End),
+                ),
+            ],
+        );
+
+        let bounded = bound_recursion(&lt, BoundingStrategy::YieldWhen("stop".to_string()));
+        match bounded {
+            LocalTypeR::Send { branches, .. } => {
+                for (_, _, cont) in branches {
+                    assert!(matches!(cont, LocalTypeR::Send { .. }));
+                }
+            }
+            _ => panic!("expected send choice"),
+        }
     }
 }

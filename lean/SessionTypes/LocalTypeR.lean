@@ -3,6 +3,7 @@ import SessionTypes.LocalTypeR.Environments
 import SessionTypes.LocalTypeR.Unfolding
 import SessionTypes.LocalTypeR.Substitution
 import SessionTypes.LocalTypeR.WellFormedness
+import SessionTypes.LocalTypeR.AsyncSubtype
 
 /-! # SessionTypes.LocalTypeR
 

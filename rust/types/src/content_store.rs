@@ -477,7 +477,9 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     /// Check if a precomputed content id + extra key exists.
     #[must_use]
     pub fn contains_with_content_id(&self, cid: &ContentId<H>, extra: &E) -> bool {
-        self.store.get(cid).is_some_and(|inner| inner.contains_key(extra))
+        self.store
+            .get(cid)
+            .is_some_and(|inner| inner.contains_key(extra))
     }
 
     /// Remove a value from the store.

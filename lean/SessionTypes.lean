@@ -4,6 +4,7 @@ import SessionTypes.LocalTypeR
 import SessionTypes.LocalTypeDB
 import SessionTypes.LocalTypeConv
 import SessionTypes.LocalTypeRDBBridge
+import SessionTypes.ContentIdentityPolicy
 import SessionTypes.Participation
 import SessionTypes.TypeContext
 

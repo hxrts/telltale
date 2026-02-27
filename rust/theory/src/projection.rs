@@ -54,10 +54,6 @@ use thiserror::Error;
 /// Errors that can occur during projection
 #[derive(Debug, Clone, Error)]
 pub enum ProjectionError {
-    /// Role not found in the protocol
-    #[error("role '{0}' not found in protocol")]
-    RoleNotFound(String),
-
     /// Branches could not be merged for a non-participant
     #[error("cannot merge branches for role '{role}': {source}")]
     MergeFailure {
@@ -108,6 +104,7 @@ fn project_non_participant(
 ///
 /// This transforms a bird's-eye view protocol description into the local
 /// view for a single participant.
+/// If `role` does not appear in the protocol, the projection is `End`.
 ///
 /// # Examples
 ///
@@ -408,6 +405,13 @@ mod tests {
         // C is not involved, should get End
         let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let local = project(&g, "C").unwrap();
+        assert_eq!(local, LocalTypeR::End);
+    }
+
+    #[test]
+    fn test_project_unknown_role_returns_end_by_design() {
+        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let local = project(&g, "UnknownRole").unwrap();
         assert_eq!(local, LocalTypeR::End);
     }
 
@@ -864,10 +868,8 @@ mod tests {
         );
 
         // C's projection should succeed - it receives "ping" in both branches
-        // The continuations are Var("t") and End, which need to be handled
+        // The continuations are Var("t") and End, which are incompatible.
         let c_local = project(&g, "C");
-        // This actually fails because Var("t") can't merge with End
-        // Let's verify the behavior
-        assert!(c_local.is_err() || matches!(c_local, Ok(LocalTypeR::Mu { .. })));
+        assert!(c_local.is_err());
     }
 }

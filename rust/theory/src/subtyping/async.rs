@@ -13,6 +13,7 @@
 //! be decomposed into alternating input and output phases.
 
 use crate::limits::{UnfoldSteps, DEFAULT_SISO_UNFOLD_STEPS};
+use std::collections::BTreeMap;
 use telltale_types::{Label, LocalTypeR};
 use thiserror::Error;
 
@@ -31,9 +32,9 @@ pub enum AsyncSubtypeError {
     #[error("output trees do not match")]
     OutputTreeMismatch,
 
-    /// Orphan message detected
-    #[error("orphan message detected: message '{label}' from {partner} has no receiver")]
-    OrphanMessage { partner: String, label: String },
+    /// Segment phase mismatch
+    #[error("siso phase mismatch: subtype has {sub} segments, supertype has {sup}")]
+    PhaseMismatch { sub: usize, sup: usize },
 
     /// SISO decomposition exceeded the unfold limit.
     #[error("siso decomposition exceeded the unfold limit")]
@@ -308,6 +309,13 @@ fn find_input_continuation(lt: &LocalTypeR) -> Option<LocalTypeR> {
 /// Asynchronous subtyping is more permissive than synchronous subtyping,
 /// allowing reordering of independent sends and receives.
 ///
+/// This implementation intentionally enforces a conservative subset of
+/// asynchronous subtyping. Two types are considered compatible only when
+/// their SISO decomposition has matching phases and each input/output tree
+/// is structurally compatible.
+///
+/// This API is experimental and may be tightened as Lean parity coverage grows.
+///
 /// # Examples
 ///
 /// ```
@@ -319,21 +327,94 @@ fn find_input_continuation(lt: &LocalTypeR) -> Option<LocalTypeR> {
 /// assert!(async_subtype(&t1, &t2).is_ok());
 /// ```
 pub fn async_subtype(sub: &LocalTypeR, sup: &LocalTypeR) -> Result<(), AsyncSubtypeError> {
-    // For now, use a simplified check based on SISO decomposition
     let sub_segments = siso_decompose(sub)?;
     let sup_segments = siso_decompose(sup)?;
 
-    // The decompositions should be compatible
-    // (This is a simplified version - full algorithm is more complex)
-    if sub_segments.len() != sup_segments.len()
-        && !sub_segments.is_empty()
-        && !sup_segments.is_empty()
-    {
-        // Different number of phases might still be okay in some cases
-        // For now, we'll be permissive
+    if sub_segments.len() != sup_segments.len() {
+        return Err(AsyncSubtypeError::PhaseMismatch {
+            sub: sub_segments.len(),
+            sup: sup_segments.len(),
+        });
+    }
+
+    for (sub_seg, sup_seg) in sub_segments.iter().zip(sup_segments.iter()) {
+        if !input_tree_compatible(&sub_seg.input, &sup_seg.input) {
+            return Err(AsyncSubtypeError::InputTreeMismatch);
+        }
+        if !output_tree_compatible(&sub_seg.output, &sup_seg.output) {
+            return Err(AsyncSubtypeError::OutputTreeMismatch);
+        }
     }
 
     Ok(())
+}
+
+fn input_tree_compatible(sub: &InputTree, sup: &InputTree) -> bool {
+    match (sub, sup) {
+        (InputTree::Empty, InputTree::Empty) => true,
+        (
+            InputTree::Recv {
+                partner: sub_partner,
+                branches: sub_branches,
+            },
+            InputTree::Recv {
+                partner: sup_partner,
+                branches: sup_branches,
+            },
+        ) => {
+            if sub_partner != sup_partner || sub_branches.len() != sup_branches.len() {
+                return false;
+            }
+
+            let sup_by_name: BTreeMap<&str, (&Label, &InputTree)> = sup_branches
+                .iter()
+                .map(|(label, tree)| (label.name.as_str(), (label, tree)))
+                .collect();
+
+            sub_branches.iter().all(|(sub_label, sub_tree)| {
+                sup_by_name
+                    .get(sub_label.name.as_str())
+                    .is_some_and(|(sup_label, sup_tree)| {
+                        *sub_label == **sup_label && input_tree_compatible(sub_tree, sup_tree)
+                    })
+            })
+        }
+        _ => false,
+    }
+}
+
+fn output_tree_compatible(sub: &OutputTree, sup: &OutputTree) -> bool {
+    match (sub, sup) {
+        (OutputTree::Empty, OutputTree::Empty) => true,
+        (
+            OutputTree::Send {
+                partner: sub_partner,
+                branches: sub_branches,
+            },
+            OutputTree::Send {
+                partner: sup_partner,
+                branches: sup_branches,
+            },
+        ) => {
+            if sub_partner != sup_partner || sub_branches.len() != sup_branches.len() {
+                return false;
+            }
+
+            let sup_by_name: BTreeMap<&str, (&Label, &OutputTree)> = sup_branches
+                .iter()
+                .map(|(label, tree)| (label.name.as_str(), (label, tree)))
+                .collect();
+
+            sub_branches.iter().all(|(sub_label, sub_tree)| {
+                sup_by_name
+                    .get(sub_label.name.as_str())
+                    .is_some_and(|(sup_label, sup_tree)| {
+                        *sub_label == **sup_label && output_tree_compatible(sub_tree, sup_tree)
+                    })
+            })
+        }
+        _ => false,
+    }
 }
 
 /// Check if a local type is orphan-free.
@@ -343,6 +424,7 @@ pub fn async_subtype(sub: &LocalTypeR, sup: &LocalTypeR) -> Result<(), AsyncSubt
 ///
 /// Note: This is a conservative approximation. A full orphan-free check requires
 /// analyzing the complete protocol composition.
+/// This API is experimental.
 ///
 /// # Examples
 ///
@@ -354,49 +436,87 @@ pub fn async_subtype(sub: &LocalTypeR, sup: &LocalTypeR) -> Result<(), AsyncSubt
 /// assert!(orphan_free(&LocalTypeR::End));
 /// ```
 pub fn orphan_free(lt: &LocalTypeR) -> bool {
-    // A simple orphan check: verify that sends are eventually matched by receives
-    // This is a conservative approximation
+    // Conservative approximation:
+    // every send branch must contain a reachable matching receive.
     check_orphan_free(lt, &mut Vec::new())
 }
 
-fn check_orphan_free(lt: &LocalTypeR, pending_sends: &mut Vec<(String, String)>) -> bool {
+fn check_orphan_free(lt: &LocalTypeR, mu_stack: &mut Vec<String>) -> bool {
     match lt {
-        LocalTypeR::End => pending_sends.is_empty(),
+        LocalTypeR::End => true,
 
         LocalTypeR::Send { partner, branches } => {
             for (label, _vt, cont) in branches {
-                pending_sends.push((partner.clone(), label.name.clone()));
-                if !check_orphan_free(cont, pending_sends) {
+                if !has_reachable_recv(cont, partner, &label.name, &mut Vec::new()) {
                     return false;
                 }
-                pending_sends.pop();
+                if !check_orphan_free(cont, mu_stack) {
+                    return false;
+                }
             }
             true
         }
 
+        LocalTypeR::Recv { branches, .. } => {
+            for (_label, _vt, cont) in branches {
+                if !check_orphan_free(cont, mu_stack) {
+                    return false;
+                }
+            }
+            true
+        }
+
+        LocalTypeR::Mu { var, body } => {
+            if mu_stack.iter().any(|v| v == var) {
+                return true;
+            }
+            mu_stack.push(var.clone());
+            let ok = check_orphan_free(body, mu_stack);
+            mu_stack.pop();
+            ok
+        }
+
+        // Conservative handling for open recursion references.
+        LocalTypeR::Var(_) => true,
+    }
+}
+
+fn has_reachable_recv(
+    lt: &LocalTypeR,
+    partner: &str,
+    label_name: &str,
+    mu_stack: &mut Vec<String>,
+) -> bool {
+    match lt {
+        LocalTypeR::End => false,
+        LocalTypeR::Send { branches, .. } => branches
+            .iter()
+            .any(|(_label, _vt, cont)| has_reachable_recv(cont, partner, label_name, mu_stack)),
         LocalTypeR::Recv {
-            partner: _,
+            partner: recv_partner,
             branches,
         } => {
-            // A receive might consume a pending send
-            // (simplified check - real implementation would track more precisely)
-            for (_label, _vt, cont) in branches {
-                if !check_orphan_free(cont, pending_sends) {
-                    return false;
-                }
+            if recv_partner == partner
+                && branches
+                    .iter()
+                    .any(|(recv_label, _vt, _)| recv_label.name == label_name)
+            {
+                return true;
             }
-            true
+            branches
+                .iter()
+                .any(|(_label, _vt, cont)| has_reachable_recv(cont, partner, label_name, mu_stack))
         }
-
-        LocalTypeR::Mu { body, .. } => {
-            // For recursive types, check the body
-            check_orphan_free(body, pending_sends)
+        LocalTypeR::Mu { var, body } => {
+            if mu_stack.iter().any(|v| v == var) {
+                return false;
+            }
+            mu_stack.push(var.clone());
+            let found = has_reachable_recv(body, partner, label_name, mu_stack);
+            mu_stack.pop();
+            found
         }
-
-        LocalTypeR::Var(_) => {
-            // Variable reference - assume valid
-            true
-        }
+        LocalTypeR::Var(_) => false,
     }
 }
 
@@ -433,15 +553,64 @@ mod tests {
     }
 
     #[test]
+    fn test_async_subtype_label_mismatch_fails() {
+        let sub = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
+        let sup = LocalTypeR::send("B", Label::new("other"), LocalTypeR::End);
+        assert!(matches!(
+            async_subtype(&sub, &sup),
+            Err(AsyncSubtypeError::OutputTreeMismatch)
+        ));
+    }
+
+    #[test]
+    fn test_async_subtype_phase_mismatch_fails() {
+        let sub = LocalTypeR::send(
+            "B",
+            Label::new("req"),
+            LocalTypeR::recv("B", Label::new("resp"), LocalTypeR::End),
+        );
+        let sup = LocalTypeR::send("B", Label::new("req"), LocalTypeR::End);
+
+        assert!(matches!(
+            async_subtype(&sub, &sup),
+            Err(AsyncSubtypeError::PhaseMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn test_async_subtype_partner_mismatch_fails() {
+        let sub = LocalTypeR::recv("A", Label::new("msg"), LocalTypeR::End);
+        let sup = LocalTypeR::recv("B", Label::new("msg"), LocalTypeR::End);
+        assert!(matches!(
+            async_subtype(&sub, &sup),
+            Err(AsyncSubtypeError::InputTreeMismatch)
+        ));
+    }
+
+    #[test]
     fn test_orphan_free_simple() {
         let t = LocalTypeR::send(
             "B",
             Label::new("req"),
             LocalTypeR::recv("B", Label::new("resp"), LocalTypeR::End),
         );
-        // Note: our simplified orphan check is conservative
-        // The actual check would need to verify protocol composition
-        assert!(orphan_free(&t) || !orphan_free(&t)); // Test doesn't crash
+        assert!(!orphan_free(&t));
+    }
+
+    #[test]
+    fn test_orphan_free_matching_label() {
+        let t = LocalTypeR::send(
+            "B",
+            Label::new("req"),
+            LocalTypeR::recv("B", Label::new("req"), LocalTypeR::End),
+        );
+        assert!(orphan_free(&t));
+    }
+
+    #[test]
+    fn test_orphan_free_unmatched_send() {
+        let t = LocalTypeR::send("B", Label::new("req"), LocalTypeR::End);
+        assert!(!orphan_free(&t));
     }
 
     #[test]
@@ -475,5 +644,26 @@ mod tests {
             }
             _ => panic!("Expected Send tree"),
         }
+    }
+
+    #[test]
+    fn test_build_input_tree_not_siso() {
+        let t = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
+        assert!(matches!(
+            build_input_tree(&t),
+            Err(AsyncSubtypeError::NotSisoDecomposable)
+        ));
+    }
+
+    #[test]
+    fn test_siso_decompose_unfold_limit_exceeded() {
+        let t = LocalTypeR::mu(
+            "X",
+            LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("X")),
+        );
+        assert!(matches!(
+            siso_decompose_with_fuel(&t, UnfoldSteps(0)),
+            Err(AsyncSubtypeError::UnfoldLimitExceeded)
+        ));
     }
 }

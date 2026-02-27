@@ -66,6 +66,14 @@ pub trait Contentable: Sized {
     /// Returns an error if deserialization fails.
     fn from_bytes(bytes: &[u8]) -> Result<Self, ContentableError>;
 
+    /// Serialize to template bytes, allowing open terms with explicit
+    /// free-variable interfaces when supported by the implementation.
+    ///
+    /// Default behavior falls back to canonical bytes.
+    fn to_template_bytes(&self) -> Result<Vec<u8>, ContentableError> {
+        self.to_bytes()
+    }
+
     /// Serialize to DAG-CBOR bytes (requires `dag-cbor` feature).
     ///
     /// DAG-CBOR is a deterministic subset of CBOR designed for content addressing.
@@ -90,6 +98,17 @@ pub trait Contentable: Sized {
     /// Compute content ID using default SHA-256 hasher (from JSON bytes).
     fn content_id_sha256(&self) -> Result<ContentId<Sha256Hasher>, ContentableError> {
         self.content_id()
+    }
+
+    /// Compute a template ID using the specified hasher (from template bytes).
+    fn template_id<H: Hasher>(&self) -> Result<ContentId<H>, ContentableError> {
+        let bytes = self.to_template_bytes()?;
+        Ok(ContentId::from_bytes(&bytes))
+    }
+
+    /// Compute a template ID using default SHA-256 hasher.
+    fn template_id_sha256(&self) -> Result<ContentId<Sha256Hasher>, ContentableError> {
+        self.template_id()
     }
 
     /// Compute content ID from DAG-CBOR bytes (requires `dag-cbor` feature).
@@ -147,6 +166,24 @@ fn to_json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, ContentableError> {
 fn from_json_bytes<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ContentableError> {
     serde_json::from_slice(bytes)
         .map_err(|e| ContentableError::DeserializationFailed(e.to_string()))
+}
+
+fn sorted_free_vars(mut vars: Vec<String>) -> Vec<String> {
+    vars.sort();
+    vars.dedup();
+    vars
+}
+
+#[derive(Serialize)]
+struct GlobalTemplateEnvelope {
+    free_vars: Vec<String>,
+    db: GlobalTypeDB,
+}
+
+#[derive(Serialize)]
+struct LocalTemplateEnvelope {
+    free_vars: Vec<String>,
+    db: LocalTypeRDB,
 }
 
 // Helper for DAG-CBOR serialization (requires dag-cbor feature)
@@ -218,6 +255,14 @@ impl Contentable for GlobalType {
         to_json_bytes(&db)
     }
 
+    fn to_template_bytes(&self) -> Result<Vec<u8>, ContentableError> {
+        let free_vars = sorted_free_vars(self.free_vars());
+        let env: Vec<&str> = free_vars.iter().map(String::as_str).collect();
+        let db = GlobalTypeDB::from_global_type_with_env(self, &env).normalize();
+        let envelope = GlobalTemplateEnvelope { free_vars, db };
+        to_json_bytes(&envelope)
+    }
+
     fn from_bytes(bytes: &[u8]) -> Result<Self, ContentableError> {
         // Note: This returns a type with generated variable names,
         // since de Bruijn indices don't preserve names.
@@ -254,6 +299,14 @@ impl Contentable for LocalTypeR {
         // Payload annotations on local branches are preserved.
         let db = LocalTypeRDB::from(self).normalize();
         to_json_bytes(&db)
+    }
+
+    fn to_template_bytes(&self) -> Result<Vec<u8>, ContentableError> {
+        let free_vars = sorted_free_vars(self.free_vars());
+        let env: Vec<&str> = free_vars.iter().map(String::as_str).collect();
+        let db = LocalTypeRDB::from_local_type_with_env(self, &env).normalize();
+        let envelope = LocalTemplateEnvelope { free_vars, db };
+        to_json_bytes(&envelope)
     }
 
     fn from_bytes(bytes: &[u8]) -> Result<Self, ContentableError> {
@@ -572,6 +625,40 @@ mod tests {
         let open = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("free_t"));
         let err = open.to_bytes().expect_err("open terms must be rejected");
         assert!(matches!(err, ContentableError::InvalidFormat(_)));
+    }
+
+    #[test]
+    fn test_global_type_open_term_has_template_id() {
+        let open = GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("free_t"));
+        let tid = open
+            .template_id_sha256()
+            .expect("open terms should support template IDs");
+        let tid2 = open
+            .template_id_sha256()
+            .expect("template IDs should be deterministic");
+        assert_eq!(tid, tid2);
+    }
+
+    #[test]
+    fn test_local_type_open_term_has_template_id() {
+        let open = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("free_t"));
+        let tid = open
+            .template_id_sha256()
+            .expect("open terms should support template IDs");
+        let tid2 = open
+            .template_id_sha256()
+            .expect("template IDs should be deterministic");
+        assert_eq!(tid, tid2);
+    }
+
+    #[test]
+    fn test_template_id_distinguishes_free_variable_interfaces() {
+        let g1 = GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("x"));
+        let g2 = GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("y"));
+        assert_ne!(
+            g1.template_id_sha256().unwrap(),
+            g2.template_id_sha256().unwrap()
+        );
     }
 
     // ========================================================================

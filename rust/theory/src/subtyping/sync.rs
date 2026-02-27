@@ -43,6 +43,22 @@ pub enum SyncSubtypeError {
     #[error("continuation for label '{label}' is not a subtype")]
     ContinuationMismatch { label: String },
 
+    /// Label sort mismatch for a matching branch name
+    #[error("label sort mismatch for '{label}': expected {expected}, found {found}")]
+    LabelSortMismatch {
+        label: String,
+        expected: String,
+        found: String,
+    },
+
+    /// Payload annotation mismatch for a matching branch name
+    #[error("payload annotation mismatch for '{label}': expected {expected}, found {found}")]
+    PayloadAnnotationMismatch {
+        label: String,
+        expected: String,
+        found: String,
+    },
+
     /// Variable mismatch
     #[error("type variable mismatch: expected {expected}, found {found}")]
     VariableMismatch { expected: String, found: String },
@@ -113,11 +129,26 @@ fn sync_subtype_with_assumptions(
             }
 
             // Subtype must have all labels of supertype
-            let sub_labels: BTreeMap<_, _> = b1.iter().map(|(l, _vt, c)| (&l.name, c)).collect();
+            let sub_labels: BTreeMap<_, _> =
+                b1.iter().map(|(l, vt, c)| (&l.name, (l, vt, c))).collect();
 
-            for (label, _vt, sup_cont) in b2 {
+            for (label, sup_vt, sup_cont) in b2 {
                 match sub_labels.get(&label.name) {
-                    Some(sub_cont) => {
+                    Some((sub_label, sub_vt, sub_cont)) => {
+                        if sub_label.sort != label.sort {
+                            return Err(SyncSubtypeError::LabelSortMismatch {
+                                label: label.name.clone(),
+                                expected: format!("{:?}", label.sort),
+                                found: format!("{:?}", sub_label.sort),
+                            });
+                        }
+                        if *sub_vt != sup_vt {
+                            return Err(SyncSubtypeError::PayloadAnnotationMismatch {
+                                label: label.name.clone(),
+                                expected: format!("{sup_vt:?}"),
+                                found: format!("{sub_vt:?}"),
+                            });
+                        }
                         sync_subtype_with_assumptions(sub_cont, sup_cont, assumptions).map_err(
                             |_| SyncSubtypeError::ContinuationMismatch {
                                 label: label.name.clone(),
@@ -154,8 +185,10 @@ fn sync_subtype_with_assumptions(
             }
 
             // Supertype must have all labels of subtype (contravariance)
-            let sup_labels: BTreeMap<_, _> = b2.iter().map(|(l, _vt, c)| (&l.name, c)).collect();
-            let sub_labels: BTreeMap<_, _> = b1.iter().map(|(l, _vt, c)| (&l.name, c)).collect();
+            let sup_labels: BTreeMap<_, _> =
+                b2.iter().map(|(l, vt, c)| (&l.name, (l, vt, c))).collect();
+            let sub_labels: BTreeMap<_, _> =
+                b1.iter().map(|(l, vt, c)| (&l.name, (l, vt, c))).collect();
 
             // Check subtype doesn't have extra labels
             for (label, _vt, _) in b1 {
@@ -167,8 +200,22 @@ fn sync_subtype_with_assumptions(
             }
 
             // Check continuations for matching labels
-            for (label, _vt, sup_cont) in b2 {
-                if let Some(sub_cont) = sub_labels.get(&label.name) {
+            for (label, sup_vt, sup_cont) in b2 {
+                if let Some((sub_label, sub_vt, sub_cont)) = sub_labels.get(&label.name) {
+                    if sub_label.sort != label.sort {
+                        return Err(SyncSubtypeError::LabelSortMismatch {
+                            label: label.name.clone(),
+                            expected: format!("{:?}", label.sort),
+                            found: format!("{:?}", sub_label.sort),
+                        });
+                    }
+                    if *sub_vt != sup_vt {
+                        return Err(SyncSubtypeError::PayloadAnnotationMismatch {
+                            label: label.name.clone(),
+                            expected: format!("{sup_vt:?}"),
+                            found: format!("{sub_vt:?}"),
+                        });
+                    }
                     sync_subtype_with_assumptions(sub_cont, sup_cont, assumptions).map_err(
                         |_| SyncSubtypeError::ContinuationMismatch {
                             label: label.name.clone(),
@@ -241,7 +288,7 @@ fn sync_subtype_with_assumptions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use telltale_types::Label;
+    use telltale_types::{Label, PayloadSort, ValType};
 
     #[test]
     fn test_end_subtype() {
@@ -351,6 +398,40 @@ mod tests {
         assert!(matches!(
             sync_subtype(&sub, &sup),
             Err(SyncSubtypeError::VariableMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn test_send_label_sort_mismatch() {
+        let sub = LocalTypeR::send(
+            "B",
+            Label::with_sort("msg", PayloadSort::Nat),
+            LocalTypeR::End,
+        );
+        let sup = LocalTypeR::send(
+            "B",
+            Label::with_sort("msg", PayloadSort::Bool),
+            LocalTypeR::End,
+        );
+        assert!(matches!(
+            sync_subtype(&sub, &sup),
+            Err(SyncSubtypeError::LabelSortMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn test_recv_payload_annotation_mismatch() {
+        let sub = LocalTypeR::recv_choice(
+            "A",
+            vec![(Label::new("x"), Some(ValType::Nat), LocalTypeR::End)],
+        );
+        let sup = LocalTypeR::recv_choice(
+            "A",
+            vec![(Label::new("x"), Some(ValType::Bool), LocalTypeR::End)],
+        );
+        assert!(matches!(
+            sync_subtype(&sub, &sup),
+            Err(SyncSubtypeError::PayloadAnnotationMismatch { .. })
         ));
     }
 }

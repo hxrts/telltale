@@ -254,12 +254,12 @@ lemma index_of_append_suffix {pref ctx : Context} {x v : String} {j : Nat}
 /-! ## String / Nat helpers for fresh-name proofs -/
 
 lemma string_data_append (s1 s2 : String) : (s1 ++ s2).toList = s1.toList ++ s2.toList := by
-  simp [String.to_list_append]
+  simp [String.toList_append]
 
 theorem string_append_left_cancel (p s1 s2 : String) : p ++ s1 = p ++ s2 → s1 = s2 := by
   intro h
   have h_list : p.toList ++ s1.toList = p.toList ++ s2.toList := by
-    simpa [String.to_list_append] using (congrArg String.toList h)
+    simpa [String.toList_append] using (congrArg String.toList h)
   have h_cancel : s1.toList = s2.toList :=
     List.append_cancel_left h_list
   exact String.toList_injective h_cancel

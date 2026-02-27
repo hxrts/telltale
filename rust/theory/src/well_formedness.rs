@@ -19,12 +19,15 @@
 //! - Types are guarded
 //! - Label names are unique within each branch set
 //!
+//! This module provides diagnostic wrappers around core predicates in
+//! `telltale-types`. Boolean predicates are delegated to the type crate.
+//!
 //! # Lean Correspondence
 //!
 //! - `unique_labels` ↔ Lean's `uniqLabels` inductive
 //! - `branches_unique` ↔ Lean's `BranchesUniq`
 
-use telltale_types::{GlobalType, Label, LocalTypeR};
+use telltale_types::{GlobalType, LocalTypeR};
 use thiserror::Error;
 
 /// Errors during well-formedness validation
@@ -159,32 +162,7 @@ fn find_self_comm(g: &GlobalType) -> Option<String> {
 /// ```
 #[must_use]
 pub fn unique_labels(g: &GlobalType) -> bool {
-    match g {
-        GlobalType::End => true,
-        GlobalType::Var(_) => true,
-        GlobalType::Comm { branches, .. } => {
-            // Check that this branch set has unique label names
-            if !branches_unique(branches) {
-                return false;
-            }
-            // Recursively check all continuations
-            branches.iter().all(|(_, cont)| unique_labels(cont))
-        }
-        GlobalType::Mu { body, .. } => unique_labels(body),
-    }
-}
-
-/// Helper: check if all labels in a branch list have unique names.
-///
-/// Corresponds to Lean's `BranchesUniq`.
-fn branches_unique(branches: &[(Label, GlobalType)]) -> bool {
-    let mut seen = std::collections::HashSet::new();
-    for (label, _) in branches {
-        if !seen.insert(&label.name) {
-            return false;
-        }
-    }
-    true
+    g.unique_branch_labels()
 }
 
 /// Find duplicate label names in a global type.
@@ -211,32 +189,7 @@ fn find_duplicate_label(g: &GlobalType) -> Option<String> {
 /// Corresponds to Lean's `uniqLabels` for local types.
 #[must_use]
 pub fn unique_labels_local(lt: &LocalTypeR) -> bool {
-    match lt {
-        LocalTypeR::End => true,
-        LocalTypeR::Var(_) => true,
-        LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
-            if !branches_unique_local(branches) {
-                return false;
-            }
-            branches
-                .iter()
-                .all(|(_l, _vt, cont)| unique_labels_local(cont))
-        }
-        LocalTypeR::Mu { body, .. } => unique_labels_local(body),
-    }
-}
-
-/// Helper: check if all labels in a local branch list have unique names.
-fn branches_unique_local(
-    branches: &[(Label, Option<telltale_types::ValType>, LocalTypeR)],
-) -> bool {
-    let mut seen = std::collections::HashSet::new();
-    for (label, _vt, _) in branches {
-        if !seen.insert(&label.name) {
-            return false;
-        }
-    }
-    true
+    lt.unique_branch_labels()
 }
 
 /// Find duplicate label names in a local type.

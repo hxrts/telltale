@@ -55,6 +55,55 @@ set_option autoImplicit false
 
 universe u
 
+private def payloadByteEstimate (v : Value) : Nat :=
+  (reprStr v).length
+
+private def payloadSizeViolation? {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (context : String) (v : Value) : Option String :=
+  if st.config.payloadValidationMode = .off then
+    none
+  else
+    let bytes := payloadByteEstimate v
+    if bytes ≤ st.config.maxPayloadBytes then
+      none
+    else
+      some s!"{context} payload exceeds max_payload_bytes={st.config.maxPayloadBytes} (actual={bytes})"
+
+private def recvIdentityLabel (T : ValType) : Label :=
+  s!"recv:{reprStr T}"
+
+private def strictSchemaAnnotationMessage (role context label : String) : String :=
+  s!"{role}: {context} payload '{label}' requires explicit ValType annotation in strict_schema mode"
+
+private def strictSchemaMissingAnnotationSend?
+    {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (role : Role) (choices : List (Label × LocalType)) : Option String :=
+  if st.config.payloadValidationMode = .strictSchema then
+    match choices with
+    | (lbl, _) :: [] => some (strictSchemaAnnotationMessage role "send" lbl)
+    | _ => none
+  else
+    none
+
+private def strictSchemaMissingAnnotationRecv?
+    {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (role : Role) (choices : List (Label × LocalType)) : Option String :=
+  if st.config.payloadValidationMode = .strictSchema then
+    match choices with
+    | (lbl, _) :: [] => some (strictSchemaAnnotationMessage role "receive" lbl)
+    | _ => none
+  else
+    none
+
 /-! ## Send semantics -/
 
 private def sendUpdateSessions {ν : Type u} [VerificationModel ν]
@@ -138,8 +187,11 @@ private def sendWithType {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     (ep : Endpoint) (r : Role) (T : ValType) (L' : LocalType) (v : Value) : StepPack ι γ π ε ν :=
   -- Type-check payload and dispatch to edge handling.
   if decide (valTypeOf v = T) then
-    let edge := edgeTo ep r
-    sendOnEdge st coro ep edge T L' v
+    match payloadSizeViolation? st "send" v with
+    | some msg => faultPack st coro (.specFault msg) msg
+    | none =>
+        let edge := edgeTo ep r
+        sendOnEdge st coro ep edge T L' v
   else
     faultPack st coro (.typeViolation T (valTypeOf v)) "bad send payload"
 
@@ -153,6 +205,10 @@ private def sendWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
   if owns coro ep then
     match SessionStore.lookupType st.sessions ep with
     | some (.send r T L') => sendWithType st coro ep r T L' v
+    | some (.select _ choices) =>
+        match strictSchemaMissingAnnotationSend? st ep.role choices with
+        | some msg => faultPack st coro (.specFault msg) msg
+        | none => faultPack st coro (.specFault "send not permitted") "send not permitted"
     | _ => faultPack st coro (.specFault "send not permitted") "send not permitted"
   else
     faultPack st coro (.channelClosed ep) "endpoint not owned"
@@ -208,29 +264,33 @@ private def recvAfterDequeue {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     (T : ValType) (L' : LocalType) (dst : Reg) (h : HandlerId)
     (tokens' : List ProgressToken) (sv : SignedValue ν) (bufs' : SignedBuffers ν) : StepPack ι γ π ε ν :=
   -- Verify signatures, types, and apply transport spec.
-  if st.config.transportOk h bufs' = false then
-    faultPack st coro (.specFault "handler spec failed") "handler spec failed"
-  else
-    let vk := VerificationModel.verifyKeyOf (st.config.roleSigningKey edge.sender)
-    if verifySignedValue vk sv then
-      let ident : CommunicationIdentity := {
-        sid := edge.sid
-        sender := edge.sender
-        receiver := edge.receiver
-        stepKind := .receive
-        label := "recv"
-        payloadDigest := communicationIdentityPayloadDigest sv.payload
-        seqNo := sv.seqNo
-      }
-      match commConsumeReceiveIdentity st st.clock ident with
-      | .error msg => faultPack st coro (.flowViolation msg) msg
-      | .ok (_, st') =>
-          if decide (valTypeOf sv.payload = T) then
-            recvCommit st' coro ep edge bufs' L' sv.payload tokens' dst sv.seqNo
-          else
-            faultPack st' coro (.typeViolation T (valTypeOf sv.payload)) "bad recv payload"
-    else
-      faultPack st coro (.invalidSignature edge) "invalid signature"
+  match payloadSizeViolation? st "receive" sv.payload with
+  | some msg =>
+      faultPack st coro (.specFault msg) msg
+  | none =>
+      if st.config.transportOk h bufs' = false then
+        faultPack st coro (.specFault "handler spec failed") "handler spec failed"
+      else
+        let vk := VerificationModel.verifyKeyOf (st.config.roleSigningKey edge.sender)
+        if verifySignedValue vk sv then
+          let ident : CommunicationIdentity := {
+            sid := edge.sid
+            sender := edge.sender
+            receiver := edge.receiver
+            stepKind := .receive
+            label := recvIdentityLabel T
+            payloadDigest := communicationIdentityPayloadDigest sv.payload
+            seqNo := sv.seqNo
+          }
+          match commConsumeReceiveIdentity st st.clock ident with
+          | .error msg => faultPack st coro (.flowViolation msg) msg
+          | .ok (_, st') =>
+              if decide (valTypeOf sv.payload = T) then
+                recvCommit st' coro ep edge bufs' L' sv.payload tokens' dst sv.seqNo
+              else
+                faultPack st' coro (.typeViolation T (valTypeOf sv.payload)) "bad recv payload"
+        else
+          faultPack st coro (.invalidSignature edge) "invalid signature"
 
 /-! ## Receive semantics: dequeue and edge checks -/
 
@@ -282,6 +342,10 @@ private def recvWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
         let edge := edgeFrom r ep
         let token := { sid := edge.sid, endpoint := { sid := edge.sid, role := edge.receiver } }
         recvOnEdge st coro ep edge T L' dst token
+    | some (.branch _ choices) =>
+        match strictSchemaMissingAnnotationRecv? st ep.role choices with
+        | some msg => faultPack st coro (.specFault msg) msg
+        | none => faultPack st coro (.specFault "recv not permitted") "recv not permitted"
     | _ => faultPack st coro (.specFault "recv not permitted") "recv not permitted"
   else
     faultPack st coro (.channelClosed ep) "endpoint not owned"

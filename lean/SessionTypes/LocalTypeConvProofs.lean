@@ -1,6 +1,7 @@
 import SessionTypes.LocalTypeConvProofs.Helpers
 import SessionTypes.LocalTypeConvProofs.ClosedRoundtrip
 import SessionTypes.LocalTypeConvProofs.Roundtrip
+import SessionTypes.LocalTypeConvProofs.PayloadParityBridge
 
 /-! # SessionTypes.LocalTypeConvProofs
 

@@ -22,6 +22,22 @@ fn test_can_step_wrong_label() {
 }
 
 #[test]
+fn test_can_step_wrong_sort() {
+    let g = GlobalType::send(
+        "A",
+        "B",
+        Label::with_sort("msg", telltale_types::PayloadSort::Nat),
+        GlobalType::End,
+    );
+    let wrong = GlobalAction::new(
+        "A",
+        "B",
+        Label::with_sort("msg", telltale_types::PayloadSort::Bool),
+    );
+    assert!(!can_step(&g, &wrong));
+}
+
+#[test]
 fn test_can_step_async() {
     let inner = GlobalType::send("C", "D", Label::new("m2"), GlobalType::End);
     let g = GlobalType::send("A", "B", Label::new("m1"), inner);
@@ -94,6 +110,20 @@ fn test_local_can_step_recv() {
 }
 
 #[test]
+fn test_local_can_step_wrong_sort() {
+    let lt = LocalTypeR::recv(
+        "A",
+        Label::with_sort("msg", telltale_types::PayloadSort::Nat),
+        LocalTypeR::End,
+    );
+    let act = LocalAction::recv(
+        "A",
+        Label::with_sort("msg", telltale_types::PayloadSort::Bool),
+    );
+    assert!(!local_can_step(&lt, &act));
+}
+
+#[test]
 fn test_local_can_step_async() {
     let inner = LocalTypeR::send("C", Label::new("m2"), LocalTypeR::End);
     let lt = LocalTypeR::send("B", Label::new("m1"), inner);
@@ -148,4 +178,29 @@ fn test_local_action_to_global() {
     let global = act.to_global("A");
     assert_eq!(global.sender, "A");
     assert_eq!(global.receiver, "B");
+}
+
+#[test]
+fn test_can_step_with_deep_fuel_bound() {
+    fn deep_prefix(depth: usize, tail: GlobalType) -> GlobalType {
+        let mut acc = tail;
+        for i in (0..depth).rev() {
+            acc = GlobalType::send("A", "B", Label::new(format!("p{i}")), acc);
+        }
+        acc
+    }
+
+    let g = deep_prefix(150, GlobalType::send("C", "D", Label::new("target"), GlobalType::End));
+    let act = GlobalAction::new("C", "D", Label::new("target"));
+
+    assert!(!can_step_with_fuel(
+        &g,
+        &act,
+        crate::limits::TraversalFuel(50)
+    ));
+    assert!(can_step_with_fuel(
+        &g,
+        &act,
+        crate::limits::TraversalFuel(500)
+    ));
 }

@@ -29,10 +29,26 @@ Types that can be serialized canonically implement `Contentable`.
 pub trait Contentable: Sized {
     fn to_bytes(&self) -> Result<Vec<u8>, ContentableError>;
     fn from_bytes(bytes: &[u8]) -> Result<Self, ContentableError>;
+    fn to_template_bytes(&self) -> Result<Vec<u8>, ContentableError>;
 }
 ```
 
 `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort` implement this trait. The serializer converts types to a de Bruijn representation and normalizes branch ordering, so alpha equivalent types share the same content ID.
+
+## Closed vs Open Terms
+
+`content_id` is defined for closed terms only. For open terms, use `template_id`, which includes an explicit free-variable interface in the serialized template envelope.
+
+```rust
+use telltale_types::{GlobalType, Label};
+use telltale_types::contentable::Contentable;
+
+let open = GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("free_t"));
+assert!(open.content_id_sha256().is_err());
+
+let template_id = open.template_id_sha256()?;
+let template_bytes = open.to_template_bytes()?;
+```
 
 ## Serialization Formats
 

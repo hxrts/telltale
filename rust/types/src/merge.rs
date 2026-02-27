@@ -470,19 +470,11 @@ mod tests {
     fn test_merge_sends_payload_annotation_mismatch_fails() {
         let t1 = LocalTypeR::Send {
             partner: "B".to_string(),
-            branches: vec![(
-                Label::new("x"),
-                Some(ValType::Nat),
-                LocalTypeR::End,
-            )],
+            branches: vec![(Label::new("x"), Some(ValType::Nat), LocalTypeR::End)],
         };
         let t2 = LocalTypeR::Send {
             partner: "B".to_string(),
-            branches: vec![(
-                Label::new("x"),
-                Some(ValType::Bool),
-                LocalTypeR::End,
-            )],
+            branches: vec![(Label::new("x"), Some(ValType::Bool), LocalTypeR::End)],
         };
 
         let result = merge(&t1, &t2);
@@ -500,11 +492,7 @@ mod tests {
         };
         let t2 = LocalTypeR::Send {
             partner: "B".to_string(),
-            branches: vec![(
-                Label::new("x"),
-                Some(ValType::Nat),
-                LocalTypeR::End,
-            )],
+            branches: vec![(Label::new("x"), Some(ValType::Nat), LocalTypeR::End)],
         };
 
         let result = merge(&t1, &t2);
@@ -601,19 +589,11 @@ mod tests {
     fn test_merge_recvs_overlapping_payload_annotation_mismatch_fails() {
         let t1 = LocalTypeR::Recv {
             partner: "A".to_string(),
-            branches: vec![(
-                Label::new("y"),
-                Some(ValType::Nat),
-                LocalTypeR::End,
-            )],
+            branches: vec![(Label::new("y"), Some(ValType::Nat), LocalTypeR::End)],
         };
         let t2 = LocalTypeR::Recv {
             partner: "A".to_string(),
-            branches: vec![(
-                Label::new("y"),
-                Some(ValType::Bool),
-                LocalTypeR::End,
-            )],
+            branches: vec![(Label::new("y"), Some(ValType::Bool), LocalTypeR::End)],
         };
 
         let result = merge(&t1, &t2);
@@ -627,19 +607,11 @@ mod tests {
     fn test_merge_recvs_overlapping_payload_annotation_match_succeeds() {
         let t1 = LocalTypeR::Recv {
             partner: "A".to_string(),
-            branches: vec![(
-                Label::new("y"),
-                Some(ValType::Nat),
-                LocalTypeR::End,
-            )],
+            branches: vec![(Label::new("y"), Some(ValType::Nat), LocalTypeR::End)],
         };
         let t2 = LocalTypeR::Recv {
             partner: "A".to_string(),
-            branches: vec![(
-                Label::new("y"),
-                Some(ValType::Nat),
-                LocalTypeR::End,
-            )],
+            branches: vec![(Label::new("y"), Some(ValType::Nat), LocalTypeR::End)],
         };
 
         let result = merge(&t1, &t2).expect("matching payload annotations should merge");

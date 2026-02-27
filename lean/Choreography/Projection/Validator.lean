@@ -190,13 +190,76 @@ def runExportAllProjections (inputPath : System.FilePath)
   IO.FS.writeFile outputPath (payload.pretty ++ "\n")
   pure (if ok then 0 else 1)
 
+/-! ## Async-Subtyping Check Runner -/
+
+/-- Decode a local type JSON file. -/
+def readLocalTypeFile (path : System.FilePath) : IO (Except String LocalTypeR) := do
+  let j ← readJsonFile path
+  match j with
+  | .error err => pure (.error err)
+  | .ok doc => pure (localTypeRFromJson doc)
+
+/-- Export conservative async-subtyping check result to a JSON file. -/
+def runCheckAsyncSubtype (subPath supPath : System.FilePath)
+    (outputPath : System.FilePath) : IO UInt32 := do
+  let subResult ← readLocalTypeFile subPath
+  let supResult ← readLocalTypeFile supPath
+  let (payload, exitCode) :=
+    match subResult, supResult with
+    | .ok subLt, .ok supLt =>
+        match asyncSubtype subLt supLt with
+        | .ok _ =>
+            (Json.mkObj
+              [ ("success", Json.bool true)
+              , ("result", Json.bool true)
+              ], (0 : UInt32))
+        | .error err =>
+            (Json.mkObj
+              [ ("success", Json.bool true)
+              , ("result", Json.bool false)
+              , ("reason", Json.str err.message)
+              ], (0 : UInt32))
+    | .error err, _ =>
+        (Json.mkObj
+          [ ("success", Json.bool false)
+          , ("error", Json.str s!"failed to decode subtype local type: {err}")
+          ], (1 : UInt32))
+    | _, .error err =>
+        (Json.mkObj
+          [ ("success", Json.bool false)
+          , ("error", Json.str s!"failed to decode supertype local type: {err}")
+          ], (1 : UInt32))
+  IO.FS.writeFile outputPath (payload.pretty ++ "\n")
+  pure exitCode
+
+/-- Export conservative orphan-freedom check result to a JSON file. -/
+def runCheckOrphanFree (localPath : System.FilePath)
+    (outputPath : System.FilePath) : IO UInt32 := do
+  let localResult ← readLocalTypeFile localPath
+  let (payload, exitCode) :=
+    match localResult with
+    | .ok localType =>
+        (Json.mkObj
+          [ ("success", Json.bool true)
+          , ("result", Json.bool (orphanFree localType))
+          ], (0 : UInt32))
+    | .error err =>
+        (Json.mkObj
+          [ ("success", Json.bool false)
+          , ("error", Json.str s!"failed to decode local type: {err}")
+          ], (1 : UInt32))
+  IO.FS.writeFile outputPath (payload.pretty ++ "\n")
+  pure exitCode
+
 /-! ## CLI Entry -/
 
 /-- Usage message. -/
 def usage : String :=
   "usage: telltale_validator --choreography <path> --program <path> [--log <path>] [--json-log <path>]\n" ++
   "       telltale_validator --export-projection <path> --role <role> --output <path>\n" ++
-  "       telltale_validator --export-all-projections <path> --output <path>"
+  "       telltale_validator --export-all-projections <path> --output <path>\n" ++
+  "       telltale_validator --check-async-subtype <subtype-path> <supertype-path> --output <path>\n" ++
+  "       telltale_validator --check-orphan-free <local-type-path> --output <path>"
 
 /-- CLI entry point. -/
 def validatorMain (args : List String) : IO UInt32 :=
@@ -215,6 +278,10 @@ def validatorMain (args : List String) : IO UInt32 :=
       runExportProjection ⟨inputPath⟩ role ⟨outputPath⟩
   | ["--export-all-projections", inputPath, "--output", outputPath] =>
       runExportAllProjections ⟨inputPath⟩ ⟨outputPath⟩
+  | ["--check-async-subtype", subPath, supPath, "--output", outputPath] =>
+      runCheckAsyncSubtype ⟨subPath⟩ ⟨supPath⟩ ⟨outputPath⟩
+  | ["--check-orphan-free", localPath, "--output", outputPath] =>
+      runCheckOrphanFree ⟨localPath⟩ ⟨outputPath⟩
   | _ =>
       IO.println usage *> pure (1 : UInt32)
 

@@ -307,10 +307,7 @@ proptest! {
         }
     }
 
-    /// Projection failure should be reflected in projectable check (one direction).
-    /// Note: projectable() is a simplified check, so it may return true even when
-    /// projection fails (false positive). But if projection succeeds for all roles,
-    /// projectable should definitely return true.
+    /// Projection success should be reflected in projectable check.
     #[test]
     fn prop_projection_success_implies_projectable(g in well_formed_global(2)) {
         if !g.well_formed() {
@@ -328,6 +325,34 @@ proptest! {
                 "All roles projected successfully but projectable() returned false"
             );
         }
+    }
+
+    /// Projection failure should imply non-projectable.
+    #[test]
+    fn prop_projection_failure_implies_not_projectable(g in well_formed_global(2)) {
+        if !g.well_formed() {
+            return Ok(());
+        }
+
+        let roles = g.roles();
+        let any_project_failed = roles.iter().any(|r| project(&g, r).is_err());
+        if any_project_failed {
+            prop_assert!(
+                !projectable(&g),
+                "Some role projection failed but projectable() returned true"
+            );
+        }
+    }
+
+    /// Projectable should align with per-role projection success.
+    #[test]
+    fn prop_projectable_matches_projection_totality(g in well_formed_global(2)) {
+        if !g.well_formed() {
+            return Ok(());
+        }
+        let roles = g.roles();
+        let all_ok = roles.iter().all(|r| project(&g, r).is_ok());
+        prop_assert_eq!(projectable(&g), all_ok);
     }
 }
 

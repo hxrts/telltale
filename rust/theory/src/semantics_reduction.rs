@@ -1,4 +1,8 @@
 use super::{can_step, step, GlobalAction};
+use crate::limits::{TraversalFuel, DEFAULT_TRAVERSAL_FUEL};
+use std::collections::BTreeSet;
+use telltale_types::content_id::Sha256Hasher;
+use telltale_types::contentable::Contentable;
 use telltale_types::GlobalType;
 
 /// Check if a global type reduces to another via one communication.
@@ -7,7 +11,13 @@ use telltale_types::GlobalType;
 /// G ⟹ G' means G can reduce to G' by performing one communication.
 #[must_use]
 pub fn reduces(global: &GlobalType, target: &GlobalType) -> bool {
-    reduces_fuel(global, target, 100)
+    reduces_with_fuel(global, target, DEFAULT_TRAVERSAL_FUEL)
+}
+
+/// Fuel-bounded one-step reduction reachability.
+#[must_use]
+pub fn reduces_with_fuel(global: &GlobalType, target: &GlobalType, fuel: TraversalFuel) -> bool {
+    reduces_fuel(global, target, fuel.as_usize())
 }
 
 fn reduces_fuel(g: &GlobalType, g_prime: &GlobalType, fuel: usize) -> bool {
@@ -39,14 +49,24 @@ fn reduces_fuel(g: &GlobalType, g_prime: &GlobalType, fuel: usize) -> bool {
 /// Corresponds to Lean's `GlobalTypeReducesStar`.
 #[must_use]
 pub fn reduces_star(global: &GlobalType, target: &GlobalType) -> bool {
-    reduces_star_fuel(global, target, 100, &mut Vec::new())
+    reduces_star_with_fuel(global, target, DEFAULT_TRAVERSAL_FUEL)
+}
+
+/// Fuel-bounded multi-step reduction reachability.
+#[must_use]
+pub fn reduces_star_with_fuel(
+    global: &GlobalType,
+    target: &GlobalType,
+    fuel: TraversalFuel,
+) -> bool {
+    reduces_star_fuel(global, target, fuel.as_usize(), &mut BTreeSet::new())
 }
 
 fn reduces_star_fuel(
     g: &GlobalType,
     g_prime: &GlobalType,
     fuel: usize,
-    visited: &mut Vec<GlobalType>,
+    visited: &mut BTreeSet<String>,
 ) -> bool {
     if fuel == 0 {
         return false;
@@ -56,10 +76,11 @@ fn reduces_star_fuel(
         return true;
     }
 
-    if visited.contains(g) {
+    let fingerprint = global_fingerprint(g);
+    if visited.contains(&fingerprint) {
         return false;
     }
-    visited.push(g.clone());
+    visited.insert(fingerprint);
 
     match g {
         GlobalType::Comm { branches, .. } => {
@@ -84,18 +105,25 @@ fn reduces_star_fuel(
 /// For well-formed types, if `can_step(g, act)` then `step(g, act).is_some()`.
 #[must_use]
 pub fn good_g(global: &GlobalType) -> bool {
-    good_g_fuel(global, 100, &mut Vec::new())
+    good_g_with_fuel(global, DEFAULT_TRAVERSAL_FUEL)
 }
 
-fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut Vec<GlobalType>) -> bool {
+/// Fuel-bounded good-global check.
+#[must_use]
+pub fn good_g_with_fuel(global: &GlobalType, fuel: TraversalFuel) -> bool {
+    good_g_fuel(global, fuel.as_usize(), &mut BTreeSet::new())
+}
+
+fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut BTreeSet<String>) -> bool {
     if fuel == 0 {
         return true;
     }
 
-    if visited.contains(g) {
+    let fingerprint = global_fingerprint(g);
+    if visited.contains(&fingerprint) {
         return true;
     }
-    visited.push(g.clone());
+    visited.insert(fingerprint);
 
     match g {
         GlobalType::End => true,
@@ -121,4 +149,10 @@ fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut Vec<GlobalType>) -> bo
             good_g_fuel(&unfolded, fuel - 1, visited)
         }
     }
+}
+
+fn global_fingerprint(g: &GlobalType) -> String {
+    g.content_id::<Sha256Hasher>()
+        .map(|cid| cid.to_hex())
+        .unwrap_or_else(|_| format!("{g:?}"))
 }

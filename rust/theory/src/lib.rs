@@ -13,7 +13,9 @@
 //! - **Semantics**: Async step semantics for global and local types
 //! - **Coherence**: Coherence predicates for global types
 //!
-//! All algorithms are designed to match their Lean implementations exactly.
+//! Core semantics-facing algorithms are maintained for Lean parity by default.
+//! Some advanced checks remain conservative or experimental and are documented
+//! at their API surfaces.
 //!
 //! # Features
 //!
@@ -23,7 +25,7 @@
 //! - `well-formedness` (default) - Type validation
 //! - `semantics` (default) - Async step semantics
 //! - `coherence` (default) - Coherence predicates
-//! - `async-subtyping` - POPL 2021 asynchronous subtyping algorithm
+//! - `async-subtyping` - Experimental conservative async-subtyping checker
 //! - `sync-subtyping` - Synchronous subtyping
 //! - `bounded` - Bounded recursion strategies
 //!
@@ -62,8 +64,8 @@ pub use coherence::{check_coherent, projectable, CoherentG};
 #[cfg(feature = "duality")]
 pub use duality::{dual, is_dual};
 pub use limits::{
-    CacheEntries, FuelSteps, UnfoldSteps, YieldAfterSteps, DEFAULT_PROJECTOR_CACHE_ENTRIES,
-    DEFAULT_SISO_UNFOLD_STEPS,
+    CacheEntries, FuelSteps, TraversalFuel, UnfoldSteps, YieldAfterSteps,
+    DEFAULT_PROJECTOR_CACHE_ENTRIES, DEFAULT_SISO_UNFOLD_STEPS, DEFAULT_TRAVERSAL_FUEL,
 };
 #[cfg(feature = "merge")]
 pub use merge::{can_merge, merge, merge_all, MergeError};
@@ -72,7 +74,9 @@ pub use policy::{BreadthFirst, DepthFirst, RoundRobin, SchedulerPolicy};
 pub use projection::{project, project_all, MemoizedProjector, ProjectionError};
 #[cfg(feature = "semantics")]
 pub use semantics::{
-    can_step, consume_with_proof, good_g, local_can_step, local_step, reduces, reduces_star, step,
+    can_step, can_step_with_fuel, consume_with_proof, consume_with_proof_with_fuel, good_g,
+    good_g_with_fuel, local_can_step, local_can_step_with_fuel, local_step, local_step_with_fuel,
+    reduces, reduces_star, reduces_star_with_fuel, reduces_with_fuel, step, step_with_fuel,
     ConsumeResult, GlobalAction, LocalAction, LocalKind,
 };
 #[cfg(feature = "well-formedness")]

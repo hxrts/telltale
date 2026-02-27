@@ -19,7 +19,7 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 | `ProgressToken` fields | `Runtime/VM/Model/State.lean` | `rust/vm/src/coroutine.rs` | Aligned |
 | `CommunicationReplayMode` variants | `Runtime/VM/Model/Config.lean` | `rust/vm/src/communication_replay.rs` | Aligned |
 | `SignedValue` transport fields (`payload`, `signature`, `sequence_no`) | `Runtime/VM/Model/TypeClasses.lean` | `rust/vm/src/buffer.rs` | Aligned |
-| Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | no executable admission gate in baseline Lean runner | `rust/vm/src/vm.rs` | Runtime-only extension (documented deviation) |
+| Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | `Runtime/VM/Model/Config.lean`, `Runtime/VM/Semantics/ExecComm.lean` | `rust/vm/src/vm.rs` | Aligned |
 
 These checks are automated by `just check-parity --types`.
 
@@ -110,123 +110,111 @@ Executable modules must not depend on placeholder proof definitions. Proof-only 
 
 Any intentional parity break must be recorded in the deviation table below before merge. Required fields include id, owner, status, reason, impact, alternatives considered, revisit date, and coverage scope.
 
-### Deviation Registry
+### Deviation Registry (Active)
 
 | ID | Status | Owner | Revisit | Summary |
 |----|--------|-------|---------|---------|
-| threaded-round-extension | resolved | vm-runtime | 2026-04-30 | Threaded backend defaults to canonical one-step rounds |
-| payload-hardening-extension | active | vm-runtime | 2026-06-30 | Rust VM adds configurable payload-admission checks for malformed/adversarial message values |
-| comm-replay-label-context | active | vm-runtime | 2026-08-31 | Lean receive semantics use a fixed `"recv"` label-context token for communication identity while Rust records concrete runtime label strings |
-| types-merge-payload-annotation | active | types-parity | 2026-08-31 | Rust local-type merge rejects overlapping payload-annotation mismatches while Lean erasure merge keeps left annotation |
-| types-content-id-closedness | active | types-parity | 2026-08-31 | Rust canonical serialization rejects open terms for content addressing while Lean DB representations remain defined for open terms |
-| types-local-db-payload-retention | active | types-parity | 2026-08-31 | Rust content-addressing de Bruijn form retains local payload annotations while Lean LocalTypeDB erases them |
+| _none_ | _n/a_ | _n/a_ | _n/a_ | No active VM parity deviations |
 
-### Deviation Details
+Resolved deviations move to history after one stable release cycle with no regressions on the covered surfaces.
+
+### Resolved Deviation History
+
+| ID | Status | Owner | Moved On | Summary |
+|----|--------|-------|----------|---------|
+| threaded-round-extension | resolved | vm-runtime | 2026-02-27 | Threaded backend defaults to canonical one-step rounds |
+| payload-hardening-extension | resolved | vm-runtime | 2026-02-27 | Lean and Rust now enforce payload-size admission on executable send/receive paths and strict-schema annotation rejection on annotationless send/receive shapes |
+| comm-replay-label-context | resolved | vm-runtime | 2026-02-27 | Rust receive replay identity now canonicalizes to the Lean-style typed-context label token when session payload annotation is available |
+| types-merge-payload-annotation | resolved | types-parity | 2026-02-27 | Lean canonical merge now enforces payload-annotation compatibility on overlapping send/recv labels and exposes matching soundness at the compatibility-gated entrypoint |
+| types-content-id-closedness | resolved | types-parity | 2026-02-27 | Lean now exposes explicit closed-only canonical identity and open-term template identity policy surfaces with proofs matching Rust `content_id`/`template_id` contract |
+| types-local-db-payload-retention | resolved | types-parity | 2026-02-27 | Lean payload-preserving DB conversion is promoted via parity surfaces with explicit success-equivalence bridge theorems to legacy erased conversion |
+| theory-async-subtyping-conservative | resolved | theory-parity | 2026-02-27 | Lean and Rust both expose conservative executable async-subtyping with cross-validation tests |
+| theory-orphan-free-conservative | resolved | theory-parity | 2026-02-27 | Lean and Rust both expose conservative executable orphan-freedom with cross-validation tests |
+
+### Deviation Details (Active)
+
+### Resolved Deviation Notes
 
 #### threaded-round-extension
 
 **Lean:** `Runtime/VM/Runtime/Runner.lean`
 **Rust:** `rust/vm/src/threaded.rs`
 
-**Reason:** VMConfig now exposes `threaded_round_semantics` and defaults to canonical one-step semantics aligned with Lean.
-
-**Impact:** No active parity divergence remains for default threaded execution. Multi-pick wave mode is now an explicit opt-in extension.
-
-**Alternatives considered:** Keeping wave-parallel semantics as default was rejected because it kept parity drift in the baseline runner path.
+**Resolution:** VMConfig exposes `threaded_round_semantics` and defaults to canonical one-step semantics aligned with Lean.
 
 **Covers:** `threaded.round.wave.parallelism`
 
-**Tests:**
-- `rust/vm/tests/topology_effect_ingress.rs::cooperative_vm_ingests_topology_events_before_instruction_effects`
-- `rust/vm/tests/threaded_lane_runtime.rs`
-- `rust/vm/tests/parity_fixtures_v2.rs::envelope_bounded_parity_holds_for_n_gt_1`
-
 #### payload-hardening-extension
 
-**Lean:** Baseline executable semantics assume well-formed value flows for typed transitions.
-**Rust:** `rust/vm/src/vm.rs`, `rust/vm/src/threaded.rs` add `VMConfig.payload_validation_mode` and `VMConfig.max_payload_bytes` runtime checks.
+**Lean:** `lean/Runtime/VM/Model/Config.lean`, `lean/Runtime/VM/Semantics/ExecComm.lean`
+**Rust:** `rust/vm/src/vm.rs`, `rust/vm/src/threaded.rs`, `rust/vm/tests/parity_fixtures_v2.rs`
 
-**Reason:** Integrations often run in environments where peers may construct malformed payloads. VM-level admission checks avoid requiring each integrator to hand-write custom guards.
-
-**Impact:** For well-formed traces, behavior is parity-preserving. For malformed/adversarial payload traces, Rust may reject earlier via `Fault::TypeViolation` under `structural`/`strict_schema` modes.
-
-**Alternatives considered:** Integrator-only guard implementations and codegen-only validation were rejected as insufficiently uniform at the VM boundary.
+**Resolution:** Lean and Rust both expose executable payload-size admission controls. Lean now emits strict-schema annotation rejection on annotationless single-branch send/receive shapes, and parity fixtures cover oversized payload rejection behavior at canonical concurrency.
 
 **Covers:** `runtime.payload.admission`, `runtime.payload.size_bound`, `runtime.payload.strict_schema`
-
-**Tests:**
-- `rust/vm/src/vm.rs::tests::test_payload_validation_structural_rejects_annotated_type_mismatch`
-- `rust/vm/src/vm.rs::tests::test_payload_validation_off_allows_annotated_type_mismatch_for_compatibility`
-- `rust/vm/src/vm.rs::tests::test_payload_validation_strict_schema_requires_annotations_for_send_recv`
-- `rust/vm/src/vm.rs::tests::test_payload_validation_size_bound_rejects_oversized_payloads`
 
 #### comm-replay-label-context
 
 **Lean:** `Runtime/VM/Semantics/ExecComm.lean`, `Runtime/VM/Model/State.lean`
 **Rust:** `rust/vm/src/vm/instruction_control_and_effects.rs`, `rust/vm/src/threaded/instructions_send_recv_control.rs`, `rust/vm/src/communication_replay.rs`
 
-**Reason:** Lean executable receive semantics currently normalize communication identity label-context to `"recv"` in `stepReceive`. Rust records concrete runtime message labels.
-
-**Impact:** Replay-consumption mode parity is preserved for sequence and duplicate checks on edge/sequence/nullifier dimensions. Label-granular identity discrimination may differ for protocols that rely on multiple labels sharing identical payloads and sequence positions.
-
-**Alternatives considered:** Temporarily dropping label-context from Rust identities was rejected because it would reduce diagnostic precision and weaken artifact expressiveness.
+**Resolution:** Rust receive replay identity now canonicalizes to typed-context replay labels (`recv:<ValType>`) when expected payload annotations are present, matching Lean receive identity construction.
 
 **Covers:** `comm.replay.identity.label_context`
 
-**Tests:**
-- `lean/Runtime/Tests/Main.lean` tests 39-41
-- `rust/vm/src/communication_replay.rs` mode tests
-- `rust/vm/tests/parity_fixtures_v2.rs::communication_replay_sequence_mode_parity_at_concurrency_one`
-
-**Exit criteria:**
-- Extend Lean local-type receive semantics to carry branch-label context through receive identities.
-- Remove fixed `"recv"` label token from Lean communication identity construction.
-- Keep `just check-parity --types` and `just check-parity --suite` passing without this deviation entry.
-
 #### types-merge-payload-annotation
 
-**Lean:** `lean/Choreography/Projection/Erasure/Merge.lean`
+**Lean:** `lean/Choreography/Projection/Erasure/Merge.lean`, `lean/Choreography/Projection/Erasure/PayloadCompat.lean`, `lean/Choreography/Projection/Erasure/MergeSoundness.lean`
 **Rust:** `rust/types/src/merge.rs`
 
-**Reason:** Rust merge now enforces explicit payload-annotation compatibility for overlapping labels. Lean merge remains left-biased on branch payload annotation metadata.
-
-**Impact:** Rust rejects more malformed or inconsistent local merges. Lean erasure proofs are unchanged.
+**Resolution:** Lean `merge` is now compatibility-gated directly via `payloadAnnotationsCompatible`, `mergeWithPayloadCompat` is a stable alias to canonical `merge`, and `merge_with_payload_compat_sound` proves soundness at the compatibility-gated entrypoint.
 
 **Covers:** `types.merge.payload_annotation.compatibility`
 
-**Exit criteria:**
-- Port the same payload-annotation compatibility rule into Lean merge.
-- Update Lean merge soundness proofs accordingly.
-
 #### types-content-id-closedness
 
-**Lean:** `lean/SessionTypes/LocalTypeDB/Core.lean`, `lean/SessionTypes/GlobalType/*`
+**Lean:** `lean/SessionTypes/ContentIdentityPolicy.lean`
 **Rust:** `rust/types/src/contentable.rs`
 
-**Reason:** Rust content addressing now rejects open terms to avoid free-variable canonicalization collisions.
-
-**Impact:** `to_bytes` and `content_id` for open `GlobalType` and `LocalTypeR` return `InvalidFormat` in Rust.
+**Resolution:** Lean now exposes executable closed-only canonical identity surfaces (`globalToCanonicalIdentityBytes?`, `localToCanonicalIdentityBytes?`) and open-term template identity surfaces (`globalToTemplateIdentityBytes`, `localToTemplateIdentityBytes`) plus proofs that canonical identity is admitted iff terms are closed/all-bound.
 
 **Covers:** `types.content_id.closed_only`
 
-**Exit criteria:**
-- Define and prove a Lean and Rust shared canonical policy for open terms.
-- Remove the deviation by aligning both sides on that policy.
-
 #### types-local-db-payload-retention
 
-**Lean:** `lean/SessionTypes/LocalTypeDB/Core.lean`, `lean/SessionTypes/LocalTypeConv.lean`
+**Lean:** `lean/SessionTypes/LocalTypeDB/Annotated.lean`, `lean/SessionTypes/LocalTypeConv.lean`, `lean/SessionTypes/LocalTypeConvProofs/PayloadParityBridge.lean`
 **Rust:** `rust/types/src/de_bruijn.rs`, `rust/types/src/contentable.rs`
 
-**Reason:** Rust local de Bruijn canonicalization now preserves `Option<ValType>` payload annotations.
-
-**Impact:** Rust local content roundtrip is payload-annotation-preserving. Lean LocalTypeDB still reasons on payload-erased branch shapes.
+**Resolution:** Lean `LocalTypeDBAnn` is promoted via parity-facing conversion surfaces (`toDBParity?`, `fromDBParity`, `toDBParity_closed_safe`). Bridge theorems now prove success/failure equivalence between payload-preserving and legacy erased conversion (`to_db_ann_is_some_eq_to_db_is_some`) and provide lift witnesses from erased-success to payload-preserving success (`to_db_lifts_to_db_ann`).
 
 **Covers:** `types.local_db.payload_annotation.retention`
 
-**Exit criteria:**
-- Introduce a Lean de Bruijn surface that preserves payload annotations for parity-sensitive serialization.
-- Keep existing proof-oriented erased representation as a separate layer if needed.
+#### theory-async-subtyping-conservative
+
+**Lean:** `lean/SessionTypes/LocalTypeR/AsyncSubtype.lean`, `lean/Choreography/Projection/Validator.lean`
+**Rust:** `rust/theory/src/subtyping/async.rs`, `rust/lean-bridge/src/runner_projection_export.rs`
+
+**Resolution:** Lean and Rust now expose matching conservative executable async-subtyping with parity tests.
+
+**Covers:** `theory.async_subtyping.conservative_subset`
+
+#### theory-orphan-free-conservative
+
+**Lean:** `lean/SessionTypes/LocalTypeR/AsyncSubtype.lean`, `lean/Choreography/Projection/Validator.lean`
+**Rust:** `rust/theory/src/subtyping/async.rs`, `rust/lean-bridge/src/runner_projection_export.rs`
+
+**Resolution:** Lean and Rust now expose matching conservative executable orphan-freedom with parity tests.
+
+**Covers:** `theory.orphan_free.conservative_local_check`
+
+#### conservative-async-subtyping-contract
+
+Conservative async-subtyping (Lean and Rust) is intentionally phase- and tree-structural:
+
+- SISO decomposition must succeed on both sides under bounded unfolding.
+- Subtype and supertype must have equal phase counts.
+- Each aligned phase must satisfy input-tree and output-tree structural compatibility.
+- Empty behavior (`End`) only matches supertypes with empty phase decomposition under this conservative contract.
 
 ## CI Gates
 

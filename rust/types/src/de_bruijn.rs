@@ -73,7 +73,7 @@ impl GlobalTypeDB {
         Self::from_global_type_with_env(g, &[])
     }
 
-    fn from_global_type_with_env(g: &GlobalType, env: &[&str]) -> Self {
+    pub(crate) fn from_global_type_with_env(g: &GlobalType, env: &[&str]) -> Self {
         match g {
             GlobalType::End => GlobalTypeDB::End,
             GlobalType::Comm {
@@ -189,21 +189,33 @@ impl LocalTypeRDB {
         Self::from_local_type_with_env(t, &[])
     }
 
-    fn from_local_type_with_env(t: &LocalTypeR, env: &[&str]) -> Self {
+    pub(crate) fn from_local_type_with_env(t: &LocalTypeR, env: &[&str]) -> Self {
         match t {
             LocalTypeR::End => LocalTypeRDB::End,
             LocalTypeR::Send { partner, branches } => LocalTypeRDB::Send {
                 partner: partner.clone(),
                 branches: branches
                     .iter()
-                    .map(|(l, vt, cont)| (l.clone(), vt.clone(), Self::from_local_type_with_env(cont, env)))
+                    .map(|(l, vt, cont)| {
+                        (
+                            l.clone(),
+                            vt.clone(),
+                            Self::from_local_type_with_env(cont, env),
+                        )
+                    })
                     .collect(),
             },
             LocalTypeR::Recv { partner, branches } => LocalTypeRDB::Recv {
                 partner: partner.clone(),
                 branches: branches
                     .iter()
-                    .map(|(l, vt, cont)| (l.clone(), vt.clone(), Self::from_local_type_with_env(cont, env)))
+                    .map(|(l, vt, cont)| {
+                        (
+                            l.clone(),
+                            vt.clone(),
+                            Self::from_local_type_with_env(cont, env),
+                        )
+                    })
                     .collect(),
             },
             LocalTypeR::Mu { var, body } => {

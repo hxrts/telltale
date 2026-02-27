@@ -21,6 +21,7 @@
 //! - `step` ↔ Lean's `step` inductive
 //! - `ConsumeResult` ↔ Lean's `ConsumeResult` inductive
 
+use crate::limits::{TraversalFuel, DEFAULT_TRAVERSAL_FUEL};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 #[path = "semantics_reduction.rs"]
@@ -30,7 +31,9 @@ mod tests {
     include!("../tests/unit/semantics_tests.rs");
 }
 
-pub use reduction::{good_g, reduces, reduces_star};
+pub use reduction::{
+    good_g, good_g_with_fuel, reduces, reduces_star, reduces_star_with_fuel, reduces_with_fuel,
+};
 
 /// Direction of a local action (send or receive).
 ///
@@ -147,7 +150,13 @@ impl LocalAction {
 /// ```
 #[must_use]
 pub fn can_step(global: &GlobalType, action: &GlobalAction) -> bool {
-    can_step_fuel(global, action, 100)
+    can_step_with_fuel(global, action, DEFAULT_TRAVERSAL_FUEL)
+}
+
+/// Fuel-bounded can-step check for deep recursive protocols.
+#[must_use]
+pub fn can_step_with_fuel(global: &GlobalType, action: &GlobalAction, fuel: TraversalFuel) -> bool {
+    can_step_fuel(global, action, fuel.as_usize())
 }
 
 /// Fuel-bounded version of can_step for termination.
@@ -167,7 +176,7 @@ fn can_step_fuel(g: &GlobalType, act: &GlobalAction, fuel: usize) -> bool {
             // comm_head: direct match at head position
             if sender == &act.sender
                 && receiver == &act.receiver
-                && branches.iter().any(|(l, _)| l.name == act.label.name)
+                && branches.iter().any(|(l, _)| l == &act.label)
             {
                 return true;
             }
@@ -217,7 +226,17 @@ fn can_step_fuel(g: &GlobalType, act: &GlobalAction, fuel: usize) -> bool {
 /// ```
 #[must_use]
 pub fn step(global: &GlobalType, action: &GlobalAction) -> Option<GlobalType> {
-    step_fuel(global, action, 100)
+    step_with_fuel(global, action, DEFAULT_TRAVERSAL_FUEL)
+}
+
+/// Fuel-bounded step for deep recursive protocols.
+#[must_use]
+pub fn step_with_fuel(
+    global: &GlobalType,
+    action: &GlobalAction,
+    fuel: TraversalFuel,
+) -> Option<GlobalType> {
+    step_fuel(global, action, fuel.as_usize())
 }
 
 /// Fuel-bounded version of step for termination.
@@ -237,7 +256,7 @@ fn step_fuel(g: &GlobalType, act: &GlobalAction, fuel: usize) -> Option<GlobalTy
             // comm_head: direct match at head position
             if sender == &act.sender && receiver == &act.receiver {
                 for (l, cont) in branches {
-                    if l.name == act.label.name {
+                    if l == &act.label {
                         return Some(cont.clone());
                     }
                 }
@@ -304,7 +323,17 @@ fn step_fuel(g: &GlobalType, act: &GlobalAction, fuel: usize) -> Option<GlobalTy
 /// ```
 #[must_use]
 pub fn local_can_step(local: &LocalTypeR, action: &LocalAction) -> bool {
-    local_can_step_fuel(local, action, 100)
+    local_can_step_with_fuel(local, action, DEFAULT_TRAVERSAL_FUEL)
+}
+
+/// Fuel-bounded local can-step check.
+#[must_use]
+pub fn local_can_step_with_fuel(
+    local: &LocalTypeR,
+    action: &LocalAction,
+    fuel: TraversalFuel,
+) -> bool {
+    local_can_step_fuel(local, action, fuel.as_usize())
 }
 
 /// Fuel-bounded version of local_can_step for termination.
@@ -319,9 +348,7 @@ fn local_can_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> bool 
         LocalTypeR::Send { partner, branches } => {
             if act.kind == LocalKind::Send {
                 // send_head: direct match
-                if partner == &act.partner
-                    && branches.iter().any(|(l, _vt, _)| l.name == act.label.name)
-                {
+                if partner == &act.partner && branches.iter().any(|(l, _vt, _)| l == &act.label) {
                     return true;
                 }
 
@@ -340,7 +367,7 @@ fn local_can_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> bool 
             // recv_head: direct match
             if act.kind == LocalKind::Recv
                 && partner == &act.partner
-                && branches.iter().any(|(l, _vt, _)| l.name == act.label.name)
+                && branches.iter().any(|(l, _vt, _)| l == &act.label)
             {
                 return true;
             }
@@ -360,7 +387,17 @@ fn local_can_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> bool 
 /// Returns the resulting local type after the action is performed.
 #[must_use]
 pub fn local_step(local: &LocalTypeR, action: &LocalAction) -> Option<LocalTypeR> {
-    local_step_fuel(local, action, 100)
+    local_step_with_fuel(local, action, DEFAULT_TRAVERSAL_FUEL)
+}
+
+/// Fuel-bounded local step.
+#[must_use]
+pub fn local_step_with_fuel(
+    local: &LocalTypeR,
+    action: &LocalAction,
+    fuel: TraversalFuel,
+) -> Option<LocalTypeR> {
+    local_step_fuel(local, action, fuel.as_usize())
 }
 
 /// Fuel-bounded version of local_step for termination.
@@ -375,7 +412,7 @@ fn local_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> Option<Lo
             if act.kind == LocalKind::Send {
                 if partner == &act.partner {
                     for (l, _vt, cont) in branches {
-                        if l.name == act.label.name {
+                        if l == &act.label {
                             return Some(cont.clone());
                         }
                     }
@@ -407,7 +444,7 @@ fn local_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> Option<Lo
         LocalTypeR::Recv { partner, branches } => {
             if act.kind == LocalKind::Recv && partner == &act.partner {
                 for (l, _vt, cont) in branches {
-                    if l.name == act.label.name {
+                    if l == &act.label {
                         return Some(cont.clone());
                     }
                 }
@@ -466,7 +503,19 @@ pub fn consume_with_proof(
     receiver: &str,
     label: &Label,
 ) -> Option<ConsumeResult> {
-    consume_with_proof_fuel(global, sender, receiver, label, 100)
+    consume_with_proof_with_fuel(global, sender, receiver, label, DEFAULT_TRAVERSAL_FUEL)
+}
+
+/// Fuel-bounded constructive consume relation.
+#[must_use]
+pub fn consume_with_proof_with_fuel(
+    global: &GlobalType,
+    sender: &str,
+    receiver: &str,
+    label: &Label,
+    fuel: TraversalFuel,
+) -> Option<ConsumeResult> {
+    consume_with_proof_fuel(global, sender, receiver, label, fuel.as_usize())
 }
 
 fn consume_with_proof_fuel(
@@ -488,7 +537,7 @@ fn consume_with_proof_fuel(
         } => {
             if s == sender && r == receiver {
                 for (l, cont) in branches {
-                    if l.name == label.name {
+                    if l == label {
                         return Some(ConsumeResult::Comm {
                             sender: sender.to_string(),
                             receiver: receiver.to_string(),
