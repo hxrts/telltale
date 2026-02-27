@@ -22,7 +22,8 @@ open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 section
 open Classical
--- Label Predicates
+
+/-! ## Label Predicates and Basic Lookup Lemmas -/
 
 /-- Boolean label-in predicate for branch lists. -/
 def labelInb (lbl : Label) (branches : List BranchR) : Bool :=
@@ -76,7 +77,7 @@ theorem mem_of_lookup_branch {lbl : Label} {t : LocalTypeR} {bs : List BranchR}
         obtain ⟨vt, hmem⟩ := ih h
         exact ⟨vt, List.mem_cons_of_mem _ hmem⟩
 
--- Subset Coherence
+/-! ## Subset Coherence -/
 
 /-- sameLabels from both subset directions. -/
 theorem same_labels_of_subsets {bs1 bs2 : List BranchR}
@@ -116,7 +117,7 @@ theorem labels_subset_of_labels_subsetb {bs1 bs2 : List BranchR}
           (label_in_tail_of_ne (lbl := lbl) (l := l) (vt := vt) (t := t) (rest := tail) hlt).1 hIn
         exact ih h'.2 lbl hIn_tail
 
--- appendMissing Lemmas
+/-! ## appendMissing Lemmas -/
 
 theorem append_missing_nil (bs : List BranchR) :
     appendMissing bs [] = bs := by
@@ -130,7 +131,7 @@ private theorem label_inb_of_lookup_none {lbl : Label} {bs : List BranchR}
     (h : lookupBranch lbl bs = none) : labelInb lbl bs = false := by
   simp [labelInb, h]
 
--- Payload Annotation Compatibility
+/-! ## Payload Annotation Compatibility -/
 
 /-- Lookup a branch payload annotation by label. -/
 def lookupBranchPayload (lbl : Label) (branches : List BranchR) : Option (Option SessionTypes.ValType) :=
@@ -153,7 +154,7 @@ def payloadAnnotationsCompatibleDir (src dst : List BranchR) : Bool :=
 def payloadAnnotationsCompatible (bs1 bs2 : List BranchR) : Bool :=
   payloadAnnotationsCompatibleDir bs1 bs2 && payloadAnnotationsCompatibleDir bs2 bs1
 
--- appendMissing Lookup Preservation
+/-! ## appendMissing Lookup Preservation -/
 
 private theorem lookup_branch_append_missing_of_not_in
     {lbl : Label} {bs2 bs1 : List BranchR}
@@ -191,9 +192,7 @@ private theorem lookup_branch_append_missing_of_not_in
                 _ = lookupBranch lbl ((l, t) :: tail) := by
                   simp [lookupBranch, hlt]
 
--- Merge Algorithm
-
--- Well-Founded Lookup Helper
+/-! ## Merge Algorithm: Lookup Helper -/
 
 private def lookupBranchEq (lbl : Label) :
     (bs : List BranchR) →
@@ -231,6 +230,7 @@ private lemma lookup_branch_eq_none {lbl : Label} :
             exact this.elim
 
 mutual
+  /-! ## Merge Algorithm: Core and Branch Merge -/
   -- Core Merge
 
   /-- Merge two local types, returning a common erasure if possible. -/
@@ -338,7 +338,7 @@ mutual
         exact Nat.add_lt_add hlt1 hlt2
 end
 
--- Inversion Lemmas
+/-! ## Inversion Lemmas -/
 
 theorem merge_branches_send_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValType} {t1 : LocalTypeR}
     {rest bs2 bs : List BranchR}

@@ -13,11 +13,22 @@ This module is intentionally proof-light and executable. It preserves
 serialization and cross-language checks.
 -/
 
+/-!
+The Problem. Legacy de Bruijn conversion erases branch payload annotations, but
+parity-sensitive serialization and cross-language checks need those annotations.
+
+Solution Structure. Introduce an executable payload-preserving de Bruijn surface,
+provide conversions to and from named local types, closedness checks, and a
+deterministic payload-erasure projection back to the legacy de Bruijn surface.
+-/
+
 namespace SessionTypes
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 open SessionTypes (ValType)
+
+/-! ## Payload-Preserving Syntax -/
 
 /-- Payload-preserving de Bruijn local types. -/
 inductive LocalTypeDBAnn where
@@ -29,6 +40,8 @@ inductive LocalTypeDBAnn where
   deriving Repr, Inhabited
 
 abbrev NameContext := SessionTypes.NameOnlyContext
+
+/-! ## Named-to-de-Bruijn Conversion -/
 
 mutual
   /-- Convert named local types to payload-preserving de Bruijn form. -/
@@ -52,6 +65,8 @@ mutual
         pure ((lbl, vt, cont') :: rest')
 end
 
+/-! ## de-Bruijn-to-Named Conversion -/
+
 mutual
   /-- Convert payload-preserving de Bruijn form back to named local types. -/
   def LocalTypeDBAnn.fromDBAnn : NameContext → LocalTypeDBAnn → LocalTypeR
@@ -74,6 +89,8 @@ mutual
         (lbl, vt, LocalTypeDBAnn.fromDBAnn ctx cont) :: LocalTypeDBAnn.branchesFromDBAnn ctx rest
 end
 
+/-! ## Closedness Checks -/
+
 mutual
   /-- Closedness at de Bruijn depth `k`. -/
   def LocalTypeDBAnn.isClosedAt : Nat → LocalTypeDBAnn → Bool
@@ -92,6 +109,8 @@ end
 /-- Closedness at top-level depth. -/
 def LocalTypeDBAnn.isClosed (t : LocalTypeDBAnn) : Bool :=
   t.isClosedAt 0
+
+/-! ## Payload Erasure -/
 
 mutual
   /-- Erase payload annotations from payload-preserving de Bruijn local types. -/

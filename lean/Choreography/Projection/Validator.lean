@@ -232,6 +232,8 @@ def runCheckAsyncSubtype (subPath supPath : System.FilePath)
   IO.FS.writeFile outputPath (payload.pretty ++ "\n")
   pure exitCode
 
+/-! ## Orphan-Freedom Check Runner -/
+
 /-- Export conservative orphan-freedom check result to a JSON file. -/
 def runCheckOrphanFree (localPath : System.FilePath)
     (outputPath : System.FilePath) : IO UInt32 := do

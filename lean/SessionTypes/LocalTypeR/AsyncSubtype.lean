@@ -2,7 +2,8 @@ import SessionTypes.LocalTypeR.Unfolding
 
 set_option autoImplicit false
 
-/-!
+/-! # SessionTypes.LocalTypeR.AsyncSubtype
+
 The Problem. Rust exposes a conservative executable asynchronous-subtyping checker
 for local types (SISO phase decomposition + tree compatibility), but Lean lacked a
 matching executable relation for parity checks.
@@ -231,6 +232,8 @@ def findOutputBranchByName (branches : List (Label × OutputTree)) (name : Strin
       else
         findOutputBranchByName rest name
 
+/-! ## Tree Compatibility: Input Trees -/
+
 mutual
   /-- Conservative compatibility check for input trees. -/
   def inputTreeCompatible : InputTree → InputTree → Bool
@@ -255,6 +258,8 @@ mutual
             inputTreeCompatible subTree supTree &&
             inputBranchesCompatible rest supBranches
 end
+
+/-! ## Tree Compatibility: Output Trees -/
 
 mutual
   /-- Conservative compatibility check for output trees. -/
@@ -313,6 +318,8 @@ def asyncSubtype (sub sup : LocalTypeR) : Except AsyncSubtypeError Unit :=
 private def branchHasLabelName (branches : List BranchR) (labelName : String) : Bool :=
   branches.any (fun (lbl, _vt, _cont) => lbl.name == labelName)
 
+/-! ## Conservative Orphan-Freedom: Reachability Core -/
+
 mutual
   /-- Conservative orphan-freedom check with bounded traversal fuel. -/
   def checkOrphanFreeWithFuel (fuel : Nat) (lt : LocalTypeR) (muStack : List String) : Bool :=
@@ -360,6 +367,8 @@ mutual
             else
               hasReachableRecvWithFuel fuel' body partner labelName (var :: muStack)
 end
+
+/-! ## Conservative Orphan-Freedom: Public Predicates -/
 
 /-- Conservative orphan-freedom predicate for local types. -/
 def orphanFreeWithFuel (fuel : Nat) (lt : LocalTypeR) : Bool :=

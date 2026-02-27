@@ -85,6 +85,8 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         , ("receiver", Json.str edge.receiver)
         , ("label", Json.str lbl) ]
 
+  /- ## Session lifecycle events -/
+
   -- Session lifecycle events
 
   | .opened sid roles =>

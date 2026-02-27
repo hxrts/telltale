@@ -13,6 +13,8 @@ open SessionTypes
 open SessionTypes.LocalTypeR
 open SessionTypes.LocalTypeConv
 
+/-! ## Conversion Success Parity -/
+
 mutual
   /-- `toDBAnn?` succeeds exactly when legacy `toDB?` succeeds. -/
   theorem to_db_ann_is_some_eq_to_db_is_some (ctx : Context) :
@@ -48,6 +50,8 @@ mutual
                 simp [LocalTypeR.branchesToDBAnn?, LocalTypeR.branchesToDB?,
                   hContAnn, hRestAnn, hContDb, hRestDb] at hCont hRest ⊢
 end
+
+/-! ## Existence Bridge -/
 
 /-- Any successful legacy `toDB?` conversion lifts to a payload-preserving conversion. -/
 theorem to_db_lifts_to_db_ann

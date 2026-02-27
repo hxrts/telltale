@@ -14,11 +14,23 @@ This mirrors the Rust `Contentable` contract:
   free-variable interface.
 -/
 
+/-!
+The Problem. We need one identity policy that is safe for closed-term canonical
+identity while still supporting open-term templates used during projection and
+cross-language checks.
+
+Solution Structure. Define canonical identity only for closed terms and define
+template identity for all terms with an explicit canonicalized free-variable
+interface carried by envelopes.
+-/
+
 namespace SessionTypes.ContentIdentity
 
 open SessionTypes
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
+
+/-! ## Interface Canonicalization and Envelopes -/
 
 /-- Canonicalized free-variable interface used by template identity envelopes. -/
 def canonicalFreeVarInterface (vars : List String) : List String :=
@@ -35,6 +47,8 @@ structure LocalTemplateEnvelope where
   freeVars : List String
   body : LocalTypeR
   deriving Repr, Inhabited
+
+/-! ## Global Identity Bytes and Basic Properties -/
 
 /-- Canonical bytes are only defined for closed/all-bound global types. -/
 def globalToCanonicalIdentityBytes? (g : GlobalType) : Option ByteArray :=
@@ -77,6 +91,8 @@ theorem global_template_identity_always_defined (g : GlobalType) :
 theorem global_template_envelope_records_interface (g : GlobalType) :
     (globalTemplateEnvelope g).freeVars = canonicalFreeVarInterface g.freeVars := by
   rfl
+
+/-! ## Local Identity Bytes and Basic Properties -/
 
 /-- Canonical bytes are only defined for closed local types. -/
 def localToCanonicalIdentityBytes? (t : LocalTypeR) : Option ByteArray :=
