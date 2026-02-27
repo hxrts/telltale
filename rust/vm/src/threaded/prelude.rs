@@ -214,7 +214,7 @@ impl ThreadedSessionStore {
             epoch: 0,
         };
 
-        let mut sessions = self.sessions.write().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut sessions = self.sessions.write().expect("threaded VM lock poisoned");
         sessions.insert(sid, Arc::new(Mutex::new(state)));
         sid
     }
@@ -222,17 +222,17 @@ impl ThreadedSessionStore {
     fn get(&self, sid: SessionId) -> Option<Arc<Mutex<SessionState>>> {
         self.sessions
             .read()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .expect("threaded VM lock poisoned")
             .get(&sid)
             .cloned()
     }
 
     fn active_count(&self) -> usize {
-        let sessions = self.sessions.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let sessions = self.sessions.read().expect("threaded VM lock poisoned");
         sessions
             .values()
             .filter(|session| {
-                session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).status == SessionStatus::Active
+                session.lock().expect("threaded VM lock poisoned").status == SessionStatus::Active
             })
             .count()
     }
@@ -312,7 +312,7 @@ fn coro_has_progress(coros: &[Arc<Mutex<Coroutine>>], coro_id: usize) -> bool {
         .map(|coro| {
             !coro
                 .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .expect("threaded VM lock poisoned")
                 .progress_tokens
                 .is_empty()
         })

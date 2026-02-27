@@ -224,18 +224,11 @@ struct LivenessTracking {
 }
 
 struct SendRecvTracking {
-    pending_sends: VecDeque<PendingSend>,
+    pending_sends: BTreeMap<(String, String, String), VecDeque<u64>>,
 }
 
 struct TypeMonotonicityTracking {
     last_depths: BTreeMap<Endpoint, usize>,
-}
-
-struct PendingSend {
-    local_tick: u64,
-    from: String,
-    to: String,
-    label: String,
 }
 
 enum PropertyState {
@@ -275,7 +268,7 @@ impl PropertyMonitor {
                 Property::SendRecvLiveness { .. } => PropertyState::SendRecv {
                     violated: false,
                     tracking: SendRecvTracking {
-                        pending_sends: VecDeque::new(),
+                        pending_sends: BTreeMap::new(),
                     },
                 },
                 Property::TypeMonotonicity { .. } => PropertyState::TypeMonotonicity {
@@ -380,12 +373,12 @@ impl PropertyMonitor {
                                 ..
                             } if session == sid => {
                                 if let Some(tick) = *local_tick {
-                                    tracking.pending_sends.push_back(PendingSend {
-                                        local_tick: tick,
-                                        from: from.clone(),
-                                        to: to.clone(),
-                                        label: label.clone(),
-                                    });
+                                    let key = (from.clone(), to.clone(), label.clone());
+                                    tracking
+                                        .pending_sends
+                                        .entry(key)
+                                        .or_default()
+                                        .push_back(tick);
                                 }
                             }
                             ObsEvent::Received {
@@ -395,26 +388,38 @@ impl PropertyMonitor {
                                 label,
                                 ..
                             } if session == sid => {
-                                if let Some(index) = tracking.pending_sends.iter().position(|send| {
-                                    send.from == *from && send.to == *to && send.label == *label
-                                }) {
-                                    tracking.pending_sends.remove(index);
+                                let key = (from.clone(), to.clone(), label.clone());
+                                if let Some(queue) = tracking.pending_sends.get_mut(&key) {
+                                    queue.pop_front();
+                                    if queue.is_empty() {
+                                        tracking.pending_sends.remove(&key);
+                                    }
                                 }
                             }
                             _ => {}
                         }
                     }
-                    if let Some(send) = tracking.pending_sends.front() {
+                    let oldest_send = tracking.pending_sends.iter().fold(
+                        None,
+                        |oldest, (key, queue)| match queue.front() {
+                            Some(local_tick) => match oldest {
+                                Some((_, oldest_tick)) if oldest_tick <= *local_tick => oldest,
+                                _ => Some((key, *local_tick)),
+                            },
+                            None => oldest,
+                        },
+                    );
+                    if let Some(((from, to, label), local_tick)) = oldest_send {
                         let current_tick = self.session_counters.get(sid).copied().unwrap_or(0);
                         let bound_u64 = u64::try_from(*bound).unwrap_or(u64::MAX);
-                        if current_tick.saturating_sub(send.local_tick) > bound_u64 {
+                        if current_tick.saturating_sub(local_tick) > bound_u64 {
                             *violated = true;
                             self.violations.push(PropertyViolation {
                                 property_name: prop.name(),
                                 tick: ctx.tick,
                                 details: format!(
                                     "send {} -> {} [{}] at local tick {} not received within {bound} ticks",
-                                    send.from, send.to, send.label, send.local_tick
+                                    from, to, label, local_tick
                                 ),
                             });
                         }

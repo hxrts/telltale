@@ -3,8 +3,7 @@
 //! Executes projected local types through the bytecode VM with pluggable
 //! effect handlers.
 
-// Simulator middleware uses internal Mutex locks that can panic if poisoned.
-// This is intentional as poisoned locks indicate a prior panic in simulation.
+// Simulator uses explicit Result-based error propagation in runtime paths.
 #![allow(clippy::missing_panics_doc)]
 // Simulator uses u64/usize conversions for tick/index interop with the VM.
 #![allow(

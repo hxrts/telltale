@@ -343,10 +343,7 @@ fn collect_messages(protocol: &ProtocolDef) -> Result<Vec<(Ident, Option<syn::Ty
         }
 
         let payload_clone = payload.clone();
-        seen.insert(
-            key,
-            (message.clone(), payload_clone.clone(), signature),
-        );
+        seen.insert(key, (message.clone(), payload_clone.clone(), signature));
         ordered.push((message.clone(), payload_clone));
     }
 

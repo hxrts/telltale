@@ -44,6 +44,22 @@ impl ContinuumFieldHandler {
             tick_count: Mutex::new(BTreeMap::new()),
         }
     }
+
+    fn lock_peer_fields(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, BTreeMap<String, FixedQ32>>, String> {
+        self.peer_fields
+            .lock()
+            .map_err(|_| "continuum handler peer field state lock poisoned".to_string())
+    }
+
+    fn lock_tick_count(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, BTreeMap<String, usize>>, String> {
+        self.tick_count
+            .lock()
+            .map_err(|_| "continuum handler tick counter lock poisoned".to_string())
+    }
 }
 
 impl EffectHandler for ContinuumFieldHandler {
@@ -70,10 +86,7 @@ impl EffectHandler for ContinuumFieldHandler {
         payload: &Value,
     ) -> Result<(), String> {
         let val = value_to_f64(payload)?;
-        self.peer_fields
-            .lock()
-            .expect("continuum handler lock poisoned")
-            .insert(role.to_string(), val);
+        self.lock_peer_fields()?.insert(role.to_string(), val);
         Ok(())
     }
 
@@ -97,10 +110,7 @@ impl EffectHandler for ContinuumFieldHandler {
         }
 
         let phase = {
-            let mut ticks = self
-                .tick_count
-                .lock()
-                .expect("continuum handler lock poisoned");
+            let mut ticks = self.lock_tick_count()?;
             let tick = ticks.entry(role.to_string()).or_insert(0);
             let phase = *tick % 2;
             *tick += 1;
@@ -113,9 +123,7 @@ impl EffectHandler for ContinuumFieldHandler {
         }
 
         let peer_field = self
-            .peer_fields
-            .lock()
-            .expect("continuum handler lock poisoned")
+            .lock_peer_fields()?
             .get(role)
             .copied()
             .unwrap_or(vals[0]);

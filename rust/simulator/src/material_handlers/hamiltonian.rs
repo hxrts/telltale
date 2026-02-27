@@ -48,6 +48,30 @@ impl HamiltonianHandler {
         }
     }
 
+    fn lock_peer_positions(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, BTreeMap<String, FixedQ32>>, String> {
+        self.peer_positions
+            .lock()
+            .map_err(|_| "hamiltonian handler peer-position lock poisoned".to_string())
+    }
+
+    fn lock_peer_forces(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, BTreeMap<String, FixedQ32>>, String> {
+        self.peer_forces
+            .lock()
+            .map_err(|_| "hamiltonian handler peer-force lock poisoned".to_string())
+    }
+
+    fn lock_tick_count(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, BTreeMap<String, usize>>, String> {
+        self.tick_count
+            .lock()
+            .map_err(|_| "hamiltonian handler tick-counter lock poisoned".to_string())
+    }
+
     /// Compute force on a role given its position and its peer's position.
     ///
     /// For harmonic potential V = k/2 * (q_A - q_B)^2:
@@ -74,9 +98,7 @@ impl EffectHandler for HamiltonianHandler {
                 .ok_or_else(|| "missing position state".into()),
             "force" => {
                 let peer_pos = self
-                    .peer_positions
-                    .lock()
-                    .expect("hamiltonian handler lock poisoned")
+                    .lock_peer_positions()?
                     .get(role)
                     .copied()
                     .unwrap_or_else(FixedQ32::zero);
@@ -105,16 +127,10 @@ impl EffectHandler for HamiltonianHandler {
         let val = value_to_f64(payload)?;
         match label {
             "position" => {
-                self.peer_positions
-                    .lock()
-                    .expect("hamiltonian handler lock poisoned")
-                    .insert(role.to_string(), val);
+                self.lock_peer_positions()?.insert(role.to_string(), val);
             }
             "force" => {
-                self.peer_forces
-                    .lock()
-                    .expect("hamiltonian handler lock poisoned")
-                    .insert(role.to_string(), val);
+                self.lock_peer_forces()?.insert(role.to_string(), val);
             }
             other => return Err(format!("unknown label: {other}")),
         }
@@ -144,10 +160,7 @@ impl EffectHandler for HamiltonianHandler {
         }
 
         let phase = {
-            let mut ticks = self
-                .tick_count
-                .lock()
-                .expect("hamiltonian handler lock poisoned");
+            let mut ticks = self.lock_tick_count()?;
             let tick = ticks.entry(role.to_string()).or_insert(0);
             let phase = *tick % 4;
             *tick += 1;
@@ -163,9 +176,7 @@ impl EffectHandler for HamiltonianHandler {
         let mass = self.params.mass;
 
         let peer_pos = self
-            .peer_positions
-            .lock()
-            .expect("hamiltonian handler lock poisoned")
+            .lock_peer_positions()?
             .get(role)
             .copied()
             .unwrap_or_else(FixedQ32::zero);

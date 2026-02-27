@@ -17,7 +17,10 @@ use telltale_types::FixedQ32;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, instrument, warn};
+
+type IncomingReceiver = Arc<Mutex<mpsc::Receiver<Vec<u8>>>>;
 
 fn scale_duration_by_fixed(duration: Duration, factor: FixedQ32) -> Duration {
     if factor <= FixedQ32::zero() {
@@ -67,11 +70,15 @@ pub struct TcpTransport {
     /// Outgoing connections (role -> stream).
     outgoing: Arc<RwLock<BTreeMap<String, Arc<Mutex<TcpStream>>>>>,
     /// Incoming message queues (role -> receiver).
-    incoming: Arc<Mutex<BTreeMap<String, mpsc::Receiver<Vec<u8>>>>>,
+    incoming: Arc<Mutex<BTreeMap<String, IncomingReceiver>>>,
     /// Senders for incoming messages (used by accept loop).
     incoming_senders: Arc<Mutex<BTreeMap<String, mpsc::Sender<Vec<u8>>>>>,
     /// Shutdown signal sender.
     shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
+    /// Accept-loop task.
+    accept_task: Arc<Mutex<Option<JoinHandle<()>>>>,
+    /// Active connection tasks.
+    connection_tasks: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 impl TcpTransport {
@@ -84,6 +91,8 @@ impl TcpTransport {
             incoming: Arc::new(Mutex::new(BTreeMap::new())),
             incoming_senders: Arc::new(Mutex::new(BTreeMap::new())),
             shutdown_tx: Arc::new(Mutex::new(None)),
+            accept_task: Arc::new(Mutex::new(None)),
+            connection_tasks: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -111,7 +120,10 @@ impl TcpTransport {
         for peer in self.config.peers.keys() {
             let (tx, rx) = mpsc::channel(self.config.buffer_size.as_usize());
             self.incoming_senders.lock().await.insert(peer.clone(), tx);
-            self.incoming.lock().await.insert(peer.clone(), rx);
+            self.incoming
+                .lock()
+                .await
+                .insert(peer.clone(), Arc::new(Mutex::new(rx)));
         }
     }
 
@@ -121,9 +133,14 @@ impl TcpTransport {
         shutdown_rx
     }
 
-    fn spawn_accept_loop(&self, listener: TcpListener, mut shutdown_rx: mpsc::Receiver<()>) {
+    fn spawn_accept_loop(
+        &self,
+        listener: TcpListener,
+        mut shutdown_rx: mpsc::Receiver<()>,
+    ) -> JoinHandle<()> {
         let incoming_senders = Arc::clone(&self.incoming_senders);
         let state = Arc::clone(&self.state);
+        let connection_tasks = Arc::clone(&self.connection_tasks);
         let role = self.config.role.clone();
         let buffer_size = self.config.buffer_size;
 
@@ -137,11 +154,14 @@ impl TcpTransport {
                                 debug!(peer_addr = %addr, "Accepted connection");
                                 let senders = Arc::clone(&incoming_senders);
                                 let role_name = role.clone();
-                                tokio::spawn(async move {
+                                let task = tokio::spawn(async move {
                                     if let Err(e) = handle_connection(stream, senders, &role_name, buffer_size).await {
                                         warn!(error = %e, "Connection handler error");
                                     }
                                 });
+                                let mut tasks = connection_tasks.lock().await;
+                                tasks.retain(|join_handle| !join_handle.is_finished());
+                                tasks.push(task);
                             }
                             Err(e) => {
                                 error!(error = %e, "Accept error");
@@ -155,7 +175,7 @@ impl TcpTransport {
                 }
             }
             *state.write().await = TransportState::Stopped;
-        });
+        })
     }
 
     /// Start the transport (begin listening for connections).
@@ -176,7 +196,8 @@ impl TcpTransport {
         self.initialize_incoming_channels().await;
 
         let shutdown_rx = self.install_shutdown_channel().await;
-        self.spawn_accept_loop(listener, shutdown_rx);
+        let accept_task = self.spawn_accept_loop(listener, shutdown_rx);
+        *self.accept_task.lock().await = Some(accept_task);
 
         Ok(())
     }
@@ -200,7 +221,11 @@ impl TcpTransport {
                 Ok(mut stream) => {
                     // Send our role name
                     let role_bytes = self.config.role.as_bytes();
-                    let len = role_bytes.len() as u32;
+                    let len = u32::try_from(role_bytes.len()).map_err(|_| {
+                        TcpTransportError::InvalidMessage(
+                            "Role name exceeds u32 length prefix".to_string(),
+                        )
+                    })?;
                     stream.write_all(&len.to_be_bytes()).await?;
                     stream.write_all(role_bytes).await?;
                     stream.flush().await?;
@@ -255,7 +280,8 @@ async fn handle_connection(
     // Read peer's role name
     let mut len_buf = [0u8; 4];
     stream.read_exact(&mut len_buf).await?;
-    let len = u32::from_be_bytes(len_buf) as usize;
+    let len = usize::try_from(u32::from_be_bytes(len_buf))
+        .map_err(|_| TcpTransportError::InvalidMessage("Invalid role name length".to_string()))?;
 
     if len > ROLE_NAME_LEN_MAX_BYTES {
         return Err(TcpTransportError::InvalidMessage(
@@ -269,6 +295,14 @@ async fn handle_connection(
         .map_err(|e| TcpTransportError::InvalidMessage(format!("Invalid role name: {}", e)))?;
 
     debug!(peer = %peer_role, local = local_role, "Identified peer");
+    let sender = {
+        let senders_guard = senders.lock().await;
+        senders_guard.get(&peer_role).cloned()
+    };
+    let Some(sender) = sender else {
+        warn!(peer = %peer_role, local = local_role, "Unknown peer attempted connection");
+        return Err(TcpTransportError::UnknownPeer(peer_role));
+    };
 
     // Forever loop: reads messages until connection closed (EOF) or error
     loop {
@@ -288,20 +322,9 @@ async fn handle_connection(
         let mut payload = vec![0u8; len.as_usize()];
         stream.read_exact(&mut payload).await?;
 
-        // Forward to channel without holding the lock across await.
-        let sender = {
-            let senders_guard = senders.lock().await;
-            let sender = senders_guard.get(&peer_role).cloned();
-            drop(senders_guard);
-            sender
-        };
-        if let Some(sender) = sender {
-            if sender.send(payload).await.is_err() {
-                debug!(peer = %peer_role, "Receiver dropped");
-                break;
-            }
-        } else {
-            warn!(peer = %peer_role, "No channel for peer");
+        if sender.send(payload).await.is_err() {
+            debug!(peer = %peer_role, "Receiver dropped");
+            break;
         }
     }
 
@@ -349,24 +372,17 @@ impl Transport for TcpTransport {
     #[instrument(skip(self), fields(role = %self.config.role, from = %from_role))]
     async fn recv(&self, from_role: &RoleName) -> TransportResult<Vec<u8>> {
         let role_str = from_role.as_str();
-        let role_key = role_str.to_string();
-        let mut receiver = {
-            let mut incoming = self.incoming.lock().await;
+        let receiver = {
+            let incoming = self.incoming.lock().await;
             let receiver = incoming
-                .remove(&role_key)
+                .get(role_str)
+                .cloned()
                 .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?;
-            drop(incoming);
             receiver
         };
 
-        let msg = receiver.recv().await;
-
-        {
-            let mut incoming = self.incoming.lock().await;
-            incoming.insert(role_key, receiver);
-        }
-
-        let bytes = msg.ok_or(TransportError::ChannelClosed)?;
+        let mut receiver = receiver.lock().await;
+        let bytes = receiver.recv().await.ok_or(TransportError::ChannelClosed)?;
         debug!(msg_len = bytes.len(), "Message received");
         Ok(bytes)
     }
@@ -383,8 +399,24 @@ impl Transport for TcpTransport {
             let _ = tx.send(()).await; // Intentional: send failure ok during shutdown.
         }
 
+        if let Some(task) = self.accept_task.lock().await.take() {
+            let _ = task.await;
+        }
+
+        let mut tasks = {
+            let mut guard = self.connection_tasks.lock().await;
+            std::mem::take(&mut *guard)
+        };
+        for task in &tasks {
+            task.abort();
+        }
+        for task in tasks.drain(..) {
+            let _ = task.await;
+        }
+
         // Close all connections
         self.outgoing.write().await.clear();
+        *self.state.write().await = TransportState::Stopped;
 
         info!(role = %self.config.role, "Transport closed");
         Ok(())
@@ -421,6 +453,7 @@ mod tests {
 
         // Close
         transport.close().await.unwrap();
+        assert_eq!(transport.state().await, TransportState::Stopped);
     }
 
     #[tokio::test]

@@ -100,7 +100,7 @@ impl ThreadedVM {
 
     fn bind_default_handlers_for_session(&mut self, sid: SessionId) {
         if let Some(session) = self.sessions.get(sid) {
-            let mut session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut session_guard = session.lock().expect("threaded VM lock poisoned");
             session_guard.default_handler = crate::session::DEFAULT_HANDLER_ID.to_string();
         }
     }
@@ -147,6 +147,10 @@ impl ThreadedVM {
     ///
     /// Returns a [`VMError`] when session/coroutine limits are exceeded.
     ///
+    /// # Panics
+    ///
+    /// Panics if an internal threaded VM lock is poisoned.
+    ///
     pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
         self.ensure_session_capacity()?;
         image
@@ -162,7 +166,7 @@ impl ThreadedVM {
         self.bind_default_handlers_for_session(sid);
         self.resource_states
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .expect("threaded VM lock poisoned")
             .entry(sid)
             .or_default();
 
@@ -365,7 +369,7 @@ impl ThreadedVM {
                             coro_id: pick.coro_id,
                             fault: fault.clone(),
                         });
-                        let mut coro = pick.coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                        let mut coro = pick.coro.lock().expect("threaded VM lock poisoned");
                         let was_terminal = coro.is_terminal();
                         coro.status = CoroStatus::Faulted(fault.clone());
                         self.note_status_transition(was_terminal, coro.is_terminal());
@@ -384,7 +388,7 @@ impl ThreadedVM {
                     coro_id: pick.coro_id,
                     fault: fault.clone(),
                 });
-                let mut coro = pick.coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                let mut coro = pick.coro.lock().expect("threaded VM lock poisoned");
                 let was_terminal = coro.is_terminal();
                 coro.status = CoroStatus::Faulted(fault.clone());
                 self.note_status_transition(was_terminal, coro.is_terminal());
@@ -453,7 +457,7 @@ impl ThreadedVM {
             let Some(coro) = self.coroutines.get(*coro_id) else {
                 return false;
             };
-            let guard = coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let guard = coro.lock().expect("threaded VM lock poisoned");
             if !matches!(guard.status, CoroStatus::Ready | CoroStatus::Speculating) {
                 return false;
             }
@@ -599,39 +603,51 @@ impl ThreadedVM {
 
     /// Deterministic communication replay-state root.
     ///
+    /// # Panics
+    ///
+    /// Panics if an internal threaded VM lock is poisoned.
+    ///
     #[must_use]
     pub fn communication_replay_root(&self) -> crate::verification::Hash {
         self.communication_consumption
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .expect("threaded VM lock poisoned")
             .state()
             .root()
     }
 
     /// Receive-boundary replay-consumption artifacts.
     ///
+    /// # Panics
+    ///
+    /// Panics if an internal threaded VM lock is poisoned.
+    ///
     #[must_use]
     pub fn communication_consumption_artifacts(&self) -> Vec<CommunicationConsumptionArtifact> {
         self.communication_consumption_artifacts
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .expect("threaded VM lock poisoned")
             .clone()
     }
 
     /// Canonical replay/state fragment for deterministic diffing and snapshots.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal threaded VM lock is poisoned.
     ///
     #[must_use]
     pub fn canonical_replay_fragment(&self) -> CanonicalReplayFragmentV1 {
         let communication_replay_root = self
             .communication_consumption
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .expect("threaded VM lock poisoned")
             .state()
             .root();
         let communication_consumption_artifacts = self
             .communication_consumption_artifacts
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .expect("threaded VM lock poisoned")
             .clone();
         let corrupted_edges = self
             .corrupted_edges

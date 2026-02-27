@@ -721,7 +721,7 @@ dependencies = [
 
 [[package]]
 name = "telltale"
-version = "0.9.1"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -748,7 +748,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-choreography"
-version = "0.9.1"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -784,7 +784,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-macros"
-version = "0.9.1"
+version = "1.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -793,7 +793,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-theory"
-version = "0.9.1"
+version = "1.1.0"
 dependencies = [
  "telltale-types",
  "thiserror",
@@ -801,7 +801,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-types"
-version = "0.9.1"
+version = "1.1.0"
 dependencies = [
  "fixed",
  "serde",

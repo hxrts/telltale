@@ -218,7 +218,7 @@
     }
 
     #[test]
-    fn threaded_replay_accessors_recover_from_poisoned_locks() {
+    fn threaded_replay_accessors_fail_fast_on_poisoned_locks() {
         let vm = ThreadedVM::with_workers(VMConfig::default(), 1);
         let replay = vm.communication_consumption.clone();
         let artifacts = vm.communication_consumption_artifacts.clone();
@@ -235,9 +235,21 @@
         }));
         assert!(artifact_poison.is_err(), "poison setup should panic");
 
-        let _root = vm.communication_replay_root();
-        let snapshot = vm.communication_consumption_artifacts();
-        assert!(snapshot.is_empty());
+        let root_access = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ignored = vm.communication_replay_root();
+        }));
+        assert!(
+            root_access.is_err(),
+            "replay-root accessor should fail fast after poison"
+        );
+
+        let artifacts_access = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ignored = vm.communication_consumption_artifacts();
+        }));
+        assert!(
+            artifacts_access.is_err(),
+            "artifact accessor should fail fast after poison"
+        );
     }
 
     #[test]

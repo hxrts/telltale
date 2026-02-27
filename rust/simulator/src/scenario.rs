@@ -415,7 +415,9 @@ impl Scenario {
                     ));
                 }
                 if partition.groups.is_empty() {
-                    return Err(format!("network.partitions[{idx}] must define at least one group"));
+                    return Err(format!(
+                        "network.partitions[{idx}] must define at least one group"
+                    ));
                 }
                 let mut seen_partition_roles = BTreeSet::new();
                 for (group_idx, group) in partition.groups.iter().enumerate() {
@@ -460,9 +462,7 @@ impl Scenario {
                 }
                 if let (Some(start), Some(end)) = (link.start_tick, link.end_tick) {
                     if start > end {
-                        return Err(format!(
-                            "network.links[{idx}] has start_tick > end_tick"
-                        ));
+                        return Err(format!("network.links[{idx}] has start_tick > end_tick"));
                     }
                 }
                 if let Some(loss) = link.loss_probability {

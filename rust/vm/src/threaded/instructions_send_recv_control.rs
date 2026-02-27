@@ -71,7 +71,7 @@ fn step_send(
     ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
     let prepared = {
-        let session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let session_guard = session.lock().expect("threaded VM lock poisoned");
         step_send_prepare(coro, &session_guard, role, chan)?
     };
 
@@ -150,7 +150,7 @@ fn step_send(
                 let mut model = ctx
                     .communication_consumption
                     .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                    .expect("threaded VM lock poisoned");
                 model.set_mode(ctx.config.communication_replay_mode);
                 model.allocate_send_sequence(&edge)
             };
@@ -159,7 +159,7 @@ fn step_send(
             } else {
                 payload
             };
-            let mut session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut session_guard = session.lock().expect("threaded VM lock poisoned");
             session_guard
                 .send_with_sequence(role, &prepared.partner, payload, sequence_no)
                 .map_err(|e| Fault::Invoke { message: e })?
@@ -306,7 +306,7 @@ fn consume_receive_replay_identity(
         let mut model = ctx
             .communication_consumption
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .expect("threaded VM lock poisoned");
         model.set_mode(ctx.config.communication_replay_mode);
         model.consume_receive(&identity)
     }
@@ -325,7 +325,7 @@ fn consume_receive_replay_identity(
     })?;
     ctx.communication_consumption_artifacts
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .expect("threaded VM lock poisoned")
         .push(CommunicationConsumptionArtifact {
             tick: ctx.tick,
             identity,
@@ -345,7 +345,7 @@ fn step_recv(
     ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
     let (prepared, edge, val, sequence_no) = {
-        let mut session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut session_guard = session.lock().expect("threaded VM lock poisoned");
         let prepared = step_recv_prepare(coro, &session_guard, role, chan)?;
         if !session_guard.has_message(&prepared.partner, role) {
             return Ok(blocked_recv_pack(&prepared, role));
@@ -500,7 +500,7 @@ fn step_acquire(
         let mut resources = ctx
             .guard_resources
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .expect("threaded VM lock poisoned");
         resources
             .entry(input.layer.to_string())
             .or_insert(Value::Unit);
@@ -517,14 +517,14 @@ fn step_acquire(
             let mut resources = ctx
                 .guard_resources
                 .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+                .expect("threaded VM lock poisoned");
             resources.insert(input.layer.to_string(), evidence.clone());
             drop(resources);
 
             let mut scoped_states = ctx
                 .resource_states
                 .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+                .expect("threaded VM lock poisoned");
             let state = scoped_states.entry(input.sid).or_default();
             let _commitment = state.commit(&evidence);
             Ok(StepPack {
@@ -561,7 +561,7 @@ fn step_release(
         let mut resources = ctx
             .guard_resources
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .expect("threaded VM lock poisoned");
         resources
             .entry(input.layer.to_string())
             .or_insert(Value::Unit);
@@ -581,14 +581,14 @@ fn step_release(
         let mut resources = ctx
             .guard_resources
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .expect("threaded VM lock poisoned");
         resources.insert(input.layer.to_string(), ev.clone());
     }
 
     if let Some(state) = ctx
         .resource_states
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .expect("threaded VM lock poisoned")
         .get_mut(&input.sid)
     {
         state.consume(&ev).map_err(|message| Fault::Acquire {

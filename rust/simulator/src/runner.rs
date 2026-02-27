@@ -406,8 +406,12 @@ pub fn run_with_scenario(
         .saturating_mul(10);
     let steps_limit = usize::try_from(scenario.steps)
         .map_err(|_| format!("scenario.steps {} exceeds usize", scenario.steps))?;
-    let concurrency = usize::try_from(scenario.concurrency)
-        .map_err(|_| format!("scenario.concurrency {} exceeds usize", scenario.concurrency))?;
+    let concurrency = usize::try_from(scenario.concurrency).map_err(|_| {
+        format!(
+            "scenario.concurrency {} exceeds usize",
+            scenario.concurrency
+        )
+    })?;
     let mut prev_trace_len = 0;
     let mut invoke_count: usize = 0;
     let mut active_count: usize = 0;
@@ -540,12 +544,7 @@ pub fn run_with_scenario(
 
     if trace.records.is_empty() {
         let fallback_step = steps_limit.saturating_sub(1);
-        record_all_roles(
-            &vm,
-            &coro_info,
-            fallback_step,
-            &mut trace,
-        );
+        record_all_roles(&vm, &coro_info, fallback_step, &mut trace);
     }
 
     let obs_trace = vm.trace().to_vec();

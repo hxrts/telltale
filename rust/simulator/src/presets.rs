@@ -118,18 +118,18 @@ pub fn fault_to_action(fault: &Fault) -> Option<FaultActionSpec> {
             probability: *probability,
         }),
         Fault::MessageDelay { ticks } => Some(FaultActionSpec::MessageDelay {
-            ticks: *ticks as u64,
+            ticks: u64::try_from(*ticks).ok()?,
         }),
         Fault::MessageCorruption { probability } => Some(FaultActionSpec::MessageCorruption {
             probability: *probability,
         }),
         Fault::NodeCrash { role, duration } => Some(FaultActionSpec::NodeCrash {
             role: role.clone(),
-            duration: duration.map(|value| value as u64),
+            duration: duration.map(u64::try_from).transpose().ok()?,
         }),
         Fault::NetworkPartition { groups, duration } => Some(FaultActionSpec::NetworkPartition {
             groups: groups.clone(),
-            duration: *duration as u64,
+            duration: u64::try_from(*duration).ok()?,
         }),
     }
 }

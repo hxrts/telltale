@@ -13,6 +13,7 @@ pub struct CheckpointStore {
     checkpoints: BTreeMap<u64, SerializedState>,
     interval: u64,
     dir: Option<PathBuf>,
+    last_persist_error: Option<String>,
 }
 
 impl CheckpointStore {
@@ -23,6 +24,7 @@ impl CheckpointStore {
             checkpoints: BTreeMap::new(),
             interval,
             dir: None,
+            last_persist_error: None,
         }
     }
 
@@ -33,6 +35,7 @@ impl CheckpointStore {
             checkpoints: BTreeMap::new(),
             interval,
             dir: Some(dir),
+            last_persist_error: None,
         }
     }
 
@@ -41,14 +44,29 @@ impl CheckpointStore {
         if self.interval == 0 || tick % self.interval != 0 {
             return;
         }
-        if let Ok(data) = serde_json::to_vec(vm) {
-            self.checkpoints.insert(tick, data);
-            if let Some(dir) = &self.dir {
-                if std::fs::create_dir_all(dir).is_ok() {
-                    let path = dir.join(format!("checkpoint_{tick}.json"));
-                    if let Err(_err) = std::fs::write(path, self.checkpoints.get(&tick).unwrap()) {
-                        // Best-effort persistence only.
-                    }
+        self.last_persist_error = None;
+        let data = match serde_json::to_vec(vm) {
+            Ok(data) => data,
+            Err(err) => {
+                self.last_persist_error =
+                    Some(format!("failed to serialize checkpoint {tick}: {err}"));
+                return;
+            }
+        };
+
+        self.checkpoints.insert(tick, data);
+        if let Some(dir) = &self.dir {
+            if let Err(err) = std::fs::create_dir_all(dir) {
+                self.last_persist_error = Some(format!(
+                    "failed to create checkpoint directory {dir:?}: {err}"
+                ));
+                return;
+            }
+            let path = dir.join(format!("checkpoint_{tick}.json"));
+            if let Some(bytes) = self.checkpoints.get(&tick) {
+                if let Err(err) = std::fs::write(&path, bytes) {
+                    self.last_persist_error =
+                        Some(format!("failed to persist checkpoint {path:?}: {err}"));
                 }
             }
         }
@@ -69,5 +87,11 @@ impl CheckpointStore {
             .range(..=tick)
             .next_back()
             .map(|(k, v)| (*k, v))
+    }
+
+    /// Last non-fatal persistence/serialization error observed by `maybe_checkpoint`.
+    #[must_use]
+    pub fn last_persist_error(&self) -> Option<&str> {
+        self.last_persist_error.as_deref()
     }
 }

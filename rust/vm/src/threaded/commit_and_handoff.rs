@@ -34,7 +34,7 @@ impl ThreadedVM {
             }
         }
 
-        let mut coro_guard = coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut coro_guard = coro.lock().expect("threaded VM lock poisoned");
         let was_terminal = coro_guard.is_terminal();
 
         match pack.coro_update {
@@ -96,7 +96,7 @@ impl ThreadedVM {
         self.note_status_transition(was_terminal, is_terminal);
 
         if let Some((ep, update)) = pack.type_update {
-            let mut session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut session_guard = session.lock().expect("threaded VM lock poisoned");
             match update {
                 TypeUpdate::Advance(lt) => {
                     if let Some(entry) = session_guard.local_types.get_mut(&ep) {
@@ -153,7 +153,7 @@ impl ThreadedVM {
         }
 
         self.trace.extend(pack.events);
-        let coro_guard = coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let coro_guard = coro.lock().expect("threaded VM lock poisoned");
 
         match &coro_guard.status {
             CoroStatus::Ready => Ok(ExecOutcome::Continue),
@@ -304,7 +304,7 @@ impl ThreadedVM {
     ) -> Result<(), Fault> {
         let mut owners = Vec::new();
         for coro in &self.coroutines {
-            let guard = coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let guard = coro.lock().expect("threaded VM lock poisoned");
             if guard.owned_endpoints.contains(endpoint) {
                 owners.push(guard.id);
             }

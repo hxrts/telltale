@@ -401,7 +401,7 @@ fn step_close(
     session.epoch = session.epoch.saturating_add(1);
     ctx.communication_consumption
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .expect("threaded VM lock poisoned")
         .prune_session(sid);
 
     Ok(StepPack {
@@ -482,7 +482,7 @@ fn step_open(
         message: "open session missing after allocation".to_string(),
     })?;
     {
-        let mut session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut session_guard = session.lock().expect("threaded VM lock poisoned");
         for ((sender, receiver), handler_id) in handlers {
             session_guard.edge_handlers.insert(
                 Edge::new(sid, sender.clone(), receiver.clone()),

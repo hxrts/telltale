@@ -235,20 +235,30 @@ fn preflight_absent_targets(out_dir: &Path, files: &[GeneratedFile]) -> Result<(
     Ok(())
 }
 
-fn write_files_transactionally(out_dir: &Path, files: &[GeneratedFile]) -> Result<Vec<PathBuf>, String> {
+fn write_files_transactionally(
+    out_dir: &Path,
+    files: &[GeneratedFile],
+) -> Result<Vec<PathBuf>, String> {
     let stage_dir = out_dir.join(format!(
         ".effect_scaffold_stage_{}_{}",
         std::process::id(),
         now_nanos()
     ));
-    fs::create_dir_all(&stage_dir)
-        .map_err(|e| format!("failed to create staging directory '{}': {e}", stage_dir.display()))?;
+    fs::create_dir_all(&stage_dir).map_err(|e| {
+        format!(
+            "failed to create staging directory '{}': {e}",
+            stage_dir.display()
+        )
+    })?;
 
     for file in files {
         let stage_path = stage_dir.join(file.name);
         if let Err(err) = fs::write(&stage_path, &file.content) {
             drop(fs::remove_dir_all(&stage_dir));
-            return Err(format!("failed to write staging file '{}': {err}", stage_path.display()));
+            return Err(format!(
+                "failed to write staging file '{}': {err}",
+                stage_path.display()
+            ));
         }
     }
 
@@ -430,7 +440,8 @@ mod tests {
     #[test]
     fn scaffold_generation_writes_expected_files() {
         let out_dir = unique_temp_dir("effect_scaffold_ok");
-        let generated = generate_scaffold(&out_dir, "MyHandler", true).expect("generation succeeds");
+        let generated =
+            generate_scaffold(&out_dir, "MyHandler", true).expect("generation succeeds");
 
         assert_eq!(generated.len(), 4);
         assert!(out_dir.join("effect_handler.rs").exists());
@@ -448,7 +459,8 @@ mod tests {
         fs::write(out_dir.join("effect_handler_test.rs"), "already here")
             .expect("seed existing file");
 
-        let error = generate_scaffold(&out_dir, "MyHandler", true).expect_err("preflight should fail");
+        let error =
+            generate_scaffold(&out_dir, "MyHandler", true).expect_err("preflight should fail");
         assert!(error.contains("effect_handler_test.rs"));
         assert!(!out_dir.join("effect_handler.rs").exists());
         assert!(!out_dir.join("simulator_harness_test.rs").exists());

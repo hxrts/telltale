@@ -407,10 +407,7 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
         state: &mut Vec<Value>,
         payload: &Value,
     ) -> Result<(), String> {
-        if self
-            .lock_state()?
-            .is_crashed(role)
-        {
+        if self.lock_state()?.is_crashed(role) {
             return Err("node crashed".into());
         }
         self.inner.handle_recv(role, partner, label, state, payload)
@@ -427,10 +424,7 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
     }
 
     fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String> {
-        if self
-            .lock_state()?
-            .is_crashed(role)
-        {
+        if self.lock_state()?.is_crashed(role) {
             return Err("node crashed".into());
         }
         self.inner.step(role, state)

@@ -19,8 +19,7 @@ struct ReplayArgs {
 #[allow(clippy::too_many_lines)]
 fn main() {
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
-    let replay_args = parse_args(&raw_args)
-        .unwrap_or_else(|e| usage(&format!("{e}\n")));
+    let replay_args = parse_args(&raw_args).unwrap_or_else(|e| usage(&format!("{e}\n")));
 
     let scenario =
         Scenario::from_file(&replay_args.scenario_path).unwrap_or_else(|e| fatal(&e.to_string()));
