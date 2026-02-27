@@ -73,6 +73,30 @@ impl CodeImage {
     pub fn roles(&self) -> Vec<String> {
         self.programs.keys().cloned().collect()
     }
+
+    /// Validate trusted-image runtime shape constraints.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string when the image shape violates VM runtime
+    /// expectations (role coverage, type coverage, or global well-formedness).
+    pub fn validate_runtime_shape(&self) -> Result<(), String> {
+        if self.programs.is_empty() {
+            return Err("code image must contain at least one role program".to_string());
+        }
+        if !self.global_type.well_formed() {
+            return Err("code image global type is not well-formed".to_string());
+        }
+        let program_roles: Vec<&String> = self.programs.keys().collect();
+        let type_roles: Vec<&String> = self.local_types.keys().collect();
+        if program_roles != type_roles {
+            return Err(format!(
+                "code image role mismatch: programs {:?}, local_types {:?}",
+                program_roles, type_roles
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl UntrustedImage {
@@ -261,5 +285,17 @@ mod tests {
 
         assert_eq!(validated.local_types, trusted.local_types);
         assert_eq!(validated.programs, trusted.programs);
+    }
+
+    #[test]
+    fn test_trusted_runtime_shape_rejects_program_local_type_role_mismatch() {
+        let global = simple_global();
+        let projected: BTreeMap<_, _> = telltale_theory::projection::project_all(&global)
+            .unwrap()
+            .into_iter()
+            .collect();
+        let mut image = CodeImage::from_local_types(&projected, &global);
+        image.programs.remove("B");
+        assert!(image.validate_runtime_shape().is_err());
     }
 }

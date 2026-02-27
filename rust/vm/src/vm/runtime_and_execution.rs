@@ -72,6 +72,7 @@ impl VM {
         &mut self,
         image: &CodeImage,
     ) -> Result<(SessionId, Vec<String>), VMError> {
+        image.validate_runtime_shape().map_err(|reason| VMError::InvalidCodeImage { reason })?;
         let roles = image.roles();
         let sid = self.sessions.next_session_id();
         self.sessions.open_with_sid(
@@ -185,7 +186,7 @@ impl VM {
         }
         self.last_sched_step = None;
         self.clock.advance();
-        if self.coroutines.iter().all(|c| c.is_terminal()) {
+        if self.all_done() {
             return Ok(StepResult::AllDone);
         }
 
@@ -281,14 +282,16 @@ impl VM {
                     coro_id,
                     fault: fault.clone(),
                 });
-                let idx = self.coro_index(coro_id);
+                let Some(idx) = self.coro_index(coro_id) else {
+                    return Err(VMError::Fault { coro_id, fault });
+                };
                 self.coroutines[idx].status = CoroStatus::Faulted(fault.clone());
                 self.sched.mark_done(coro_id);
                 return Err(VMError::Fault { coro_id, fault });
             }
         }
 
-        if self.coroutines.iter().all(|c| c.is_terminal()) {
+        if self.all_done() {
             #[cfg(debug_assertions)]
             debug_assert!(self.wf_vm_state().is_ok());
             Ok(StepResult::AllDone)

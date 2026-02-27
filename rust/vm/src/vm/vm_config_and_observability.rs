@@ -97,21 +97,42 @@ impl Default for VMConfig {
 }
 
 impl VMConfig {
+    /// Validate VM configuration invariants required for safe state initialization.
+    ///
+    /// # Errors
+    ///
+    /// Returns a reason string if a required invariant is violated.
+    pub fn validate_invariants(&self) -> Result<(), String> {
+        if self.config_schema_version < 1 {
+            return Err("config_schema_version must be >= 1".to_string());
+        }
+        if self.max_sessions == 0 {
+            return Err("max_sessions must be > 0".to_string());
+        }
+        if self.max_coroutines == 0 {
+            return Err("max_coroutines must be > 0".to_string());
+        }
+        if self.num_registers == 0 {
+            return Err("num_registers must be > 0".to_string());
+        }
+        if self.instruction_cost == 0 {
+            return Err("instruction_cost must be > 0".to_string());
+        }
+        if self.max_payload_bytes == 0 {
+            return Err("max_payload_bytes must be > 0".to_string());
+        }
+        Ok(())
+    }
+
     /// Assert VM configuration invariants required for safe state initialization.
     ///
     /// # Panics
     ///
     /// Panics when a required invariant is violated.
     pub fn assert_invariants(&self) {
-        assert!(
-            self.config_schema_version >= 1,
-            "config_schema_version must be >= 1"
-        );
-        assert!(self.max_sessions > 0, "max_sessions must be > 0");
-        assert!(self.max_coroutines > 0, "max_coroutines must be > 0");
-        assert!(self.num_registers > 0, "num_registers must be > 0");
-        assert!(self.instruction_cost > 0, "instruction_cost must be > 0");
-        assert!(self.max_payload_bytes > 0, "max_payload_bytes must be > 0");
+        if let Err(reason) = self.validate_invariants() {
+            panic!("{reason}");
+        }
     }
 }
 

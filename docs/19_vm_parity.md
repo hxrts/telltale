@@ -20,6 +20,7 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 | `CommunicationReplayMode` variants | `Runtime/VM/Model/Config.lean` | `rust/vm/src/communication_replay.rs` | Aligned |
 | `SignedValue` transport fields (`payload`, `signature`, `sequence_no`) | `Runtime/VM/Model/TypeClasses.lean` | `rust/vm/src/buffer.rs` | Aligned |
 | Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | `Runtime/VM/Model/Config.lean`, `Runtime/VM/Semantics/ExecComm.lean` | `rust/vm/src/vm.rs` | Aligned |
+| Register bounds failure semantics (`OutOfRegisters`) | `Runtime/VM/Semantics/ExecSteps.lean` | `rust/vm/src/vm`, `rust/vm/src/threaded` | Aligned |
 
 These checks are automated by `just check-parity --types`.
 
@@ -31,6 +32,8 @@ These checks are automated by `just check-parity --types`.
 | Threaded `n > 1` | Conformance within declared `EnvelopeDiff` bounds |
 | Failure-visible artifacts | Snapshot parity within declared failure envelope class |
 | Speculation | No sentinel fallback behavior for join/abort with deterministic gated semantics |
+| Register bounds | Out-of-range register operands fail with `OutOfRegisters` (no unchecked panic paths) |
+| Load boundary | Runtime rejects malformed trusted image role/type shape before session open |
 
 These checks are automated by `just check-parity --suite`.
 

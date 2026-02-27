@@ -49,7 +49,7 @@ impl EffectTraceTape {
         };
         self.entries
             .lock()
-            .expect("effect trace tape lock poisoned")
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
             .push(entry);
     }
 
@@ -62,7 +62,7 @@ impl EffectTraceTape {
     pub fn entries(&self) -> Vec<EffectTraceEntry> {
         self.entries
             .lock()
-            .expect("effect trace tape lock poisoned")
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clone()
     }
 }
@@ -131,12 +131,18 @@ impl<'a> ReplayEffectHandler<'a> {
     /// Panics if the internal mutex is poisoned.
     #[must_use]
     pub fn remaining(&self) -> usize {
-        let cursor = *self.cursor.lock().expect("replay cursor lock poisoned");
+        let cursor = *self
+            .cursor
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         self.entries.len().saturating_sub(cursor)
     }
 
     fn next_entry(&self, expected_kind: &str) -> Result<EffectTraceEntry, String> {
-        let mut cursor = self.cursor.lock().expect("replay cursor lock poisoned");
+        let mut cursor = self
+            .cursor
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let idx = *cursor;
         let Some(entry) = self.entries.get(idx) else {
             return Err(format!(
@@ -154,7 +160,10 @@ impl<'a> ReplayEffectHandler<'a> {
     }
 
     fn peek_entry_kind(&self) -> Option<String> {
-        let cursor = *self.cursor.lock().expect("replay cursor lock poisoned");
+        let cursor = *self
+            .cursor
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         self.entries
             .get(cursor)
             .map(|entry| entry.effect_kind.clone())
@@ -195,4 +204,3 @@ impl<'a> ReplayEffectHandler<'a> {
         }
     }
 }
-

@@ -17,6 +17,8 @@ The VM groups instructions by execution concern.
 
 ## Instruction Reference
 
+All register operands are bounds-checked at runtime. Out-of-range reads or writes fail with `Fault::OutOfRegisters`.
+
 ### Communication
 
 | Instruction | Fields | Runtime effect |

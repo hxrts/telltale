@@ -88,7 +88,7 @@ impl VM {
                     sid,
                     role: endpoint_role.clone(),
                 };
-                coro.regs[usize::from(*reg)] = Value::Endpoint(ep.clone());
+                Self::write_coro_reg(coro, *reg, Value::Endpoint(ep.clone()))?;
                 if !coro.owned_endpoints.contains(&ep) {
                     coro.owned_endpoints.push(ep);
                 }
@@ -173,7 +173,7 @@ impl VM {
                 coro.status = CoroStatus::Done;
             }
             CoroUpdate::AdvancePcWriteReg { reg, ref val } => {
-                coro.regs[usize::from(reg)] = val.clone();
+                Self::write_coro_reg(coro, reg, val.clone())?;
                 coro.pc += 1;
                 coro.status = CoroStatus::Ready;
             }

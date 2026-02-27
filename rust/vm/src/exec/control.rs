@@ -19,10 +19,9 @@ pub(crate) fn step_set(dst: u16, val: ImmValue) -> StepPack {
 }
 
 /// Execute `move`.
-#[must_use]
-pub(crate) fn step_move(vm: &VM, coro_idx: usize, dst: u16, src: u16) -> StepPack {
-    let value = vm.read_reg(coro_idx, src);
-    write_reg_pack(dst, value)
+pub(crate) fn step_move(vm: &VM, coro_idx: usize, dst: u16, src: u16) -> Result<StepPack, Fault> {
+    let value = vm.read_reg(coro_idx, src)?;
+    Ok(write_reg_pack(dst, value))
 }
 
 /// Execute `jump`.

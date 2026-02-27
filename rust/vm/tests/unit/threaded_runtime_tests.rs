@@ -208,19 +208,32 @@
     }
 
     #[test]
+    fn try_with_workers_rejects_invalid_config_without_panicking() {
+        let config = VMConfig {
+            num_registers: 0,
+            ..VMConfig::default()
+        };
+        let result = ThreadedVM::try_with_workers(config, 1);
+        assert!(matches!(result, Err(VMError::InvalidConfig { .. })));
+    }
+
+    #[test]
     fn threaded_replay_accessors_recover_from_poisoned_locks() {
         let vm = ThreadedVM::with_workers(VMConfig::default(), 1);
         let replay = vm.communication_consumption.clone();
         let artifacts = vm.communication_consumption_artifacts.clone();
 
-        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let replay_poison = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let _guard = replay.lock().expect("acquire replay lock");
             panic!("poison replay lock");
         }));
-        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        assert!(replay_poison.is_err(), "poison setup should panic");
+
+        let artifact_poison = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let _guard = artifacts.lock().expect("acquire artifact lock");
             panic!("poison artifact lock");
         }));
+        assert!(artifact_poison.is_err(), "poison setup should panic");
 
         let _root = vm.communication_replay_root();
         let snapshot = vm.communication_consumption_artifacts();

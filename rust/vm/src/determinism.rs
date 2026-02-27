@@ -86,8 +86,11 @@ fn flush_commutative_run(out: &mut Vec<ObsEvent>, run: &mut Vec<ObsEvent>) {
     }
     let mut buckets: BTreeMap<usize, Vec<ObsEvent>> = BTreeMap::new();
     for event in run.drain(..) {
-        let sid = obs_session(&event).expect("eligible events are session scoped");
-        buckets.entry(sid).or_default().push(event);
+        if let Some(sid) = obs_session(&event) {
+            buckets.entry(sid).or_default().push(event);
+        } else {
+            out.push(event);
+        }
     }
     let mut cursors: BTreeMap<usize, usize> = buckets.keys().map(|sid| (*sid, 0)).collect();
 
@@ -95,11 +98,12 @@ fn flush_commutative_run(out: &mut Vec<ObsEvent>, run: &mut Vec<ObsEvent>) {
     loop {
         let mut progressed = false;
         for (sid, events) in &buckets {
-            let cursor = cursors.get_mut(sid).expect("cursor exists");
-            if *cursor < events.len() {
-                out.push(events[*cursor].clone());
-                *cursor += 1;
-                progressed = true;
+            if let Some(cursor) = cursors.get_mut(sid) {
+                if *cursor < events.len() {
+                    out.push(events[*cursor].clone());
+                    *cursor += 1;
+                    progressed = true;
+                }
             }
         }
         if !progressed {

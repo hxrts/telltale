@@ -65,7 +65,7 @@ impl NestedVMHandler {
         self.sites.get(name).map(|site| {
             site.vm
                 .lock()
-                .expect("site vm lock poisoned")
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .trace()
                 .to_vec()
         })
@@ -78,9 +78,12 @@ impl NestedVMHandler {
     /// Panics if the site VM mutex is poisoned.
     #[must_use]
     pub fn site_all_done(&self, name: &str) -> Option<bool> {
-        self.sites
-            .get(name)
-            .map(|site| site.vm.lock().expect("site vm lock poisoned").all_done())
+        self.sites.get(name).map(|site| {
+            site.vm
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .all_done()
+        })
     }
 
     fn step_site(&self, name: &str) -> Result<(), String> {
@@ -92,7 +95,7 @@ impl NestedVMHandler {
         let mut vm = site
             .vm
             .lock()
-            .map_err(|_| "site vm lock poisoned".to_string())?;
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let handler = site.handler.as_ref();
 
         for _ in 0..self.max_rounds_per_step {

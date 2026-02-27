@@ -234,7 +234,9 @@ impl VM {
     fn try_unblock_receivers(&mut self) {
         let blocked_ids = self.sched.blocked_ids();
         for coro_id in blocked_ids {
-            let idx = self.coro_index(coro_id);
+            let Some(idx) = self.coro_index(coro_id) else {
+                continue;
+            };
             let role = &self.coroutines[idx].role;
             if self.paused_roles.contains(role)
                 || self.is_site_crashed(role)
@@ -273,7 +275,9 @@ impl VM {
             .map_err(|e| Fault::Invoke {
                 message: e.to_string(),
             })?;
-        let idx = self.coro_index(coro_id);
+        let idx = self.coro_index(coro_id).ok_or_else(|| Fault::Speculation {
+            message: format!("scheduler selected missing coroutine {coro_id}"),
+        })?;
         let pc = self.coroutines[idx].pc;
         let sid = self.coroutines[idx].session_id;
         let role = self.coroutines[idx].role.clone();

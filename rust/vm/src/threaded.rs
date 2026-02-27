@@ -33,7 +33,9 @@ use crate::faults::{
     speculation_fault_join_requires_active, transfer_fault_delegation_guard_violation,
 };
 use crate::instr::{Endpoint, Instr, InvokeAction, PC};
-use crate::instruction_semantics::{decode_endpoint_fact, endpoint_from_reg};
+use crate::instruction_semantics::{
+    decode_branch_label_payload, decode_endpoint_fact, endpoint_from_reg,
+};
 use crate::intern::{StringId, SymbolTable};
 use crate::kernel::{KernelMachine, VMKernel};
 use crate::loader::CodeImage;

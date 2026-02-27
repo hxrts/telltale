@@ -201,7 +201,11 @@ fn exec_instr(
             })
         }
         Instr::Move { dst, src } => {
-            let v = coro_guard.regs[usize::from(src)].clone();
+            let v = coro_guard
+                .regs
+                .get(usize::from(src))
+                .cloned()
+                .ok_or(Fault::OutOfRegisters)?;
             Ok(StepPack {
                 coro_update: CoroUpdate::AdvancePcWriteReg { reg: dst, val: v },
                 type_update: None,

@@ -797,6 +797,11 @@ while IFS= read -r file; do
 done < <(find "${RUST_DIR}" -name '*.rs' -type f | grep -v '/target/' | grep -v '/tests/' | grep -v '/benches/' | grep -v '/examples/' | grep -v '/src/bin/')
 print_hits "warning" "functions over 60 lines (refactor into smaller units)" "${large_block_hits}" "Extract logical steps into helper functions. Each function should do one thing. Compose small functions to build complex behavior."
 
+# VM core lint-allow policy: keep suppressions narrow and explicit.
+vm_core_allow_hits="$(rg -n --pcre2 '^[[:space:]]*#[[:space:]]*\\[[[:space:]]*allow\\([[:space:]]*clippy::[^)]+\\)[[:space:]]*\\]' "${RUST_DIR}/vm/src" -g '*.rs' || true)"
+vm_core_allow_hits="$(printf '%s\n' "${vm_core_allow_hits}" | rg -v 'clippy::(as_conversions|derivable_impls|field_reassign_with_default)' || true)"
+print_hits "warning" "broad clippy allow annotations in vm core paths" "${vm_core_allow_hits}" "Remove broad vm-core lint suppressions or replace them with smaller helper refactors. Keep only narrowly justified allows with an adjacent rationale comment."
+
 print_section "Numeric Safety Checks"
 
 # 11) Fixed-point policy: use only telltale_types::FixedQ32 wrapper API.

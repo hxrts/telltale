@@ -36,6 +36,24 @@ pub enum VMError {
         /// Requested concurrency.
         n: usize,
     },
+    /// VM configuration violates required runtime invariants.
+    #[error("invalid VM config: {reason}")]
+    InvalidConfig {
+        /// Validation failure details.
+        reason: String,
+    },
+    /// Thread-pool initialization failed.
+    #[error("thread pool build failed: {message}")]
+    ThreadPoolBuild {
+        /// Build error details.
+        message: String,
+    },
+    /// Code image failed runtime validation checks.
+    #[error("invalid code image: {reason}")]
+    InvalidCodeImage {
+        /// Validation failure details.
+        reason: String,
+    },
 }
 
 // ---- StepPack: atomic instruction result (matches Lean StepPack) ----

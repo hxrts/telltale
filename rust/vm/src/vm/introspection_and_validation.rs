@@ -8,13 +8,14 @@ impl VM {
     /// Whether all coroutines are terminal (done or faulted).
     #[must_use]
     pub fn all_done(&self) -> bool {
-        self.coroutines.iter().all(|c| c.is_terminal())
+        self.sched.ready_count() == 0 && self.sched.blocked_count() == 0
     }
 
     /// Get a coroutine by ID.
     #[must_use]
     pub fn coroutine(&self, id: usize) -> Option<&Coroutine> {
-        self.coroutines.iter().find(|c| c.id == id)
+        let idx = self.coro_index(id)?;
+        self.coroutines.get(idx)
     }
 
     /// Program length for a coroutine by id.
@@ -26,7 +27,8 @@ impl VM {
 
     /// Get a mutable coroutine by ID.
     pub fn coroutine_mut(&mut self, id: usize) -> Option<&mut Coroutine> {
-        self.coroutines.iter_mut().find(|c| c.id == id)
+        let idx = self.coro_index(id)?;
+        self.coroutines.get_mut(idx)
     }
 
     /// Get all coroutines for a session.
@@ -241,15 +243,28 @@ impl VM {
 
     // ---- Private ----
 
-    fn coro_index(&self, id: usize) -> usize {
-        self.coroutines
-            .iter()
-            .position(|c| c.id == id)
-            .expect("coroutine exists")
+    fn coro_index(&self, id: usize) -> Option<usize> {
+        if self
+            .coroutines
+            .get(id)
+            .is_some_and(|coro| coro.id == id)
+        {
+            return Some(id);
+        }
+        self.coroutines.iter().position(|c| c.id == id)
     }
 
-    pub(crate) fn read_reg(&self, coro_idx: usize, reg: u16) -> Value {
-        self.coroutines[coro_idx].regs[usize::from(reg)].clone()
+    pub(crate) fn read_reg(&self, coro_idx: usize, reg: u16) -> Result<Value, Fault> {
+        self.read_reg_checked(coro_idx, reg)
+    }
+
+    pub(crate) fn write_coro_reg(coro: &mut Coroutine, reg: u16, value: Value) -> Result<(), Fault> {
+        let slot = coro
+            .regs
+            .get_mut(usize::from(reg))
+            .ok_or(Fault::OutOfRegisters)?;
+        *slot = value;
+        Ok(())
     }
 
     fn read_reg_checked(&self, coro_idx: usize, reg: u16) -> Result<Value, Fault> {

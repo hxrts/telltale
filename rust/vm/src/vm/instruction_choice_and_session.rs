@@ -1,4 +1,61 @@
 impl VM {
+    fn recv_choose_payload(
+        &mut self,
+        ep: &Endpoint,
+        role: &str,
+        partner: &str,
+    ) -> Result<(Edge, Value), Fault> {
+        let edge = Edge::new(ep.sid, partner.to_string(), role.to_string());
+        let session = self
+            .sessions
+            .get_mut(ep.sid)
+            .ok_or_else(|| Fault::ChannelClosed {
+                endpoint: ep.clone(),
+            })?;
+        let val = session
+            .recv_verified(partner, role)
+            .map_err(|message| Fault::VerificationFailed {
+                edge: edge.clone(),
+                message,
+            })?
+            .ok_or_else(|| Fault::ChannelClosed {
+                endpoint: ep.clone(),
+            })?;
+        Ok((edge, val))
+    }
+
+    fn resolve_choose_step(
+        &self,
+        ep: &Endpoint,
+        role: &str,
+        label: &str,
+        table: &[(String, PC)],
+    ) -> Result<(LocalTypeR, PC), Fault> {
+        let local_type = self
+            .sessions
+            .lookup_type(ep)
+            .ok_or_else(|| Fault::TypeViolation {
+                expected: telltale_types::ValType::Unit,
+                actual: telltale_types::ValType::Unit,
+                message: format!("{role}: no type registered"),
+            })?;
+        let (_, branches) = Self::expect_recv_type(local_type, role)?;
+        let (_, _, continuation) = branches
+            .iter()
+            .find(|(l, _, _)| l.name == label)
+            .ok_or_else(|| Fault::UnknownLabel {
+                label: label.to_string(),
+            })?;
+        let target_pc = table
+            .iter()
+            .find(|(l, _)| l == label)
+            .map(|(_, pc)| *pc)
+            .ok_or_else(|| Fault::UnknownLabel {
+                label: label.to_string(),
+            })?;
+        Ok((continuation.clone(), target_pc))
+    }
+
     pub(crate) fn step_check(
         &mut self,
         coro_idx: usize,
@@ -93,17 +150,7 @@ impl VM {
             });
         }
 
-        let edge = Edge::new(sid, partner.clone(), role.to_string());
-        let session = self.sessions.get_mut(sid).unwrap();
-        let val = session
-            .recv_verified(&partner, role)
-            .map_err(|message| Fault::VerificationFailed {
-                edge: edge.clone(),
-                message,
-            })?
-            .ok_or_else(|| Fault::ChannelClosed {
-                endpoint: ep.clone(),
-            })?;
+        let (edge, val) = self.recv_choose_payload(&ep, role, &partner)?;
         self.validate_payload(
             role,
             "choose",
@@ -112,38 +159,8 @@ impl VM {
             &val,
             false,
         )?;
-        let label = match &val {
-            Value::Str(l) => l.clone(),
-            _ => unreachable!("validate_payload enforces string branch labels for choose"),
-        };
-
-        let continuation = {
-            let local_type = self
-                .sessions
-                .lookup_type(&ep)
-                .ok_or_else(|| Fault::TypeViolation {
-                    expected: telltale_types::ValType::Unit,
-                    actual: telltale_types::ValType::Unit,
-                    message: format!("{role}: no type registered"),
-                })?;
-            let (_, branches) = Self::expect_recv_type(local_type, role)?;
-            let (_, _, continuation) =
-                branches
-                    .iter()
-                    .find(|(l, _, _)| l.name == label)
-                    .ok_or_else(|| Fault::UnknownLabel {
-                        label: label.clone(),
-                    })?;
-            continuation.clone()
-        };
-
-        let target_pc = table
-            .iter()
-            .find(|(l, _)| *l == label)
-            .map(|(_, pc)| *pc)
-            .ok_or_else(|| Fault::UnknownLabel {
-                label: label.clone(),
-            })?;
+        let label = decode_branch_label_payload(role, &val)?;
+        let (continuation, target_pc) = self.resolve_choose_step(&ep, role, &label, table)?;
 
         handler
             .handle_recv(

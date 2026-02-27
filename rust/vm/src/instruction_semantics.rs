@@ -54,3 +54,19 @@ pub fn decode_endpoint_fact(value: Value) -> Option<(Endpoint, String)> {
         _ => None,
     }
 }
+
+/// Decode a branch label payload for choose/offer dispatch.
+///
+/// # Errors
+///
+/// Returns `Fault::TypeViolation` when the payload is not a string label.
+pub fn decode_branch_label_payload(role: &str, payload: &Value) -> Result<String, Fault> {
+    match payload {
+        Value::Str(label) => Ok(label.clone()),
+        other => Err(Fault::TypeViolation {
+            expected: telltale_types::ValType::String,
+            actual: val_type_of(other),
+            message: format!("{role}: choose expects string branch label payload"),
+        }),
+    }
+}

@@ -45,7 +45,8 @@ use crate::guard::{GuardLayer, InMemoryGuardLayer, LayerId};
 use crate::identity::IdentityModel;
 use crate::instr::{Endpoint, Instr, InvokeAction, PC};
 use crate::instruction_semantics::{
-    decode_endpoint_fact, endpoint_from_reg as decode_endpoint_from_reg,
+    decode_branch_label_payload, decode_endpoint_fact,
+    endpoint_from_reg as decode_endpoint_from_reg,
 };
 use crate::intern::{StringId, SymbolTable};
 use crate::kernel::{KernelMachine, VMKernel};

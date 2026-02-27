@@ -253,6 +253,15 @@ struct PlannedWave {
     stop_after_wave: bool,
 }
 
+fn write_coro_reg(coro: &mut Coroutine, reg: u16, value: Value) -> Result<(), Fault> {
+    let slot = coro
+        .regs
+        .get_mut(usize::from(reg))
+        .ok_or(Fault::OutOfRegisters)?;
+    *slot = value;
+    Ok(())
+}
+
 /// How to update the coroutine after an instruction.
 enum CoroUpdate {
     /// Advance PC by 1, status = Ready.

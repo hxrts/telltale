@@ -204,10 +204,7 @@ fn step_choose(
         &val,
         false,
     )?;
-    let label = match &val {
-        Value::Str(l) => l.clone(),
-        _ => unreachable!("validate_payload enforces string branch labels for choose"),
-    };
+    let label = decode_branch_label_payload(role, &val)?;
 
     let (_lbl, _vt, continuation) = branches
         .iter()
@@ -504,7 +501,7 @@ fn step_open(
             sid,
             role: endpoint_role.clone(),
         };
-        coro.regs[usize::from(*reg)] = Value::Endpoint(ep.clone());
+        write_coro_reg(coro, *reg, Value::Endpoint(ep.clone()))?;
         if !coro.owned_endpoints.contains(&ep) {
             coro.owned_endpoints.push(ep);
         }

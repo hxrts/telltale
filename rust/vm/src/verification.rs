@@ -119,7 +119,10 @@ fn hash_bytes_with_tag(tag: HashTag, bytes: &[u8]) -> Hash {
         block.hash(&mut hasher);
         bytes.hash(&mut hasher);
         let digest = hasher.finish().to_le_bytes();
-        let start = usize::try_from(block).expect("u64 block index fits in usize") * 8;
+        let Ok(block_usize) = usize::try_from(block) else {
+            return Hash(out);
+        };
+        let start = block_usize * 8;
         out[start..start + 8].copy_from_slice(&digest);
     }
     Hash(out)

@@ -8,19 +8,22 @@ impl ThreadedVM {
         Self::with_workers(config, workers)
     }
 
-    /// Create with explicit worker count.
+    /// Fallible constructor with explicit worker count.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the thread pool cannot be created.
-    #[must_use]
-    pub fn with_workers(config: VMConfig, workers: usize) -> Self {
-        config.assert_invariants();
+    /// Returns [`VMError::ThreadPoolBuild`] if the Rayon thread pool cannot be created.
+    pub fn try_with_workers(config: VMConfig, workers: usize) -> Result<Self, VMError> {
+        config
+            .validate_invariants()
+            .map_err(|reason| VMError::InvalidConfig { reason })?;
         let worker_count = workers.max(1);
         let pool = ThreadPoolBuilder::new()
             .num_threads(worker_count)
             .build()
-            .expect("thread pool build failed");
+            .map_err(|e| VMError::ThreadPoolBuild {
+                message: e.to_string(),
+            })?;
         let tick_duration = config.tick_duration;
         let communication_replay_mode = config.communication_replay_mode;
         let scheduler = Scheduler::new(config.sched_policy.clone());
@@ -28,7 +31,7 @@ impl ThreadedVM {
         for layer in &config.guard_layers {
             guard_resources.insert(layer.id.clone(), Value::Unit);
         }
-        Self {
+        Ok(Self {
             config,
             programs: Vec::new(),
             coroutines: Vec::new(),
@@ -63,7 +66,18 @@ impl ThreadedVM {
             contention_metrics: ContentionMetrics::default(),
             force_invalid_wave_certificate_once: false,
             handler_identity_anchor: None,
-        }
+        })
+    }
+
+    /// Create with explicit worker count.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the thread pool cannot be created.
+    #[must_use]
+    pub fn with_workers(config: VMConfig, workers: usize) -> Self {
+        Self::try_with_workers(config, workers)
+            .unwrap_or_else(|e| panic!("threaded VM initialization failed: {e}"))
     }
 
     fn ensure_session_capacity(&self) -> Result<(), VMError> {
@@ -135,6 +149,9 @@ impl ThreadedVM {
     ///
     pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
         self.ensure_session_capacity()?;
+        image
+            .validate_runtime_shape()
+            .map_err(|reason| VMError::InvalidCodeImage { reason })?;
 
         let roles = image.roles();
         let sid = self.sessions.open(
@@ -289,7 +306,9 @@ impl ThreadedVM {
             step: step_ctx,
         };
         if picks.len() == 1 {
-            let pick = picks.into_iter().next().expect("single pick exists");
+            let Some(pick) = picks.into_iter().next() else {
+                return Ok(false);
+            };
             let result = exec_instr(&pick.coro, &pick.session, &exec_ctx);
             return self.commit_pick_result(&pick, result, tick, &handler_identity);
         }

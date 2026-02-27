@@ -53,7 +53,7 @@ impl ThreadedVM {
                 coro_guard.status = CoroStatus::Done;
             }
             CoroUpdate::AdvancePcWriteReg { reg, ref val } => {
-                coro_guard.regs[usize::from(reg)] = val.clone();
+                write_coro_reg(&mut coro_guard, reg, val.clone())?;
                 coro_guard.pc += 1;
                 coro_guard.status = CoroStatus::Ready;
             }

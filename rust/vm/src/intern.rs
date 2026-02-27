@@ -21,15 +21,14 @@ impl SymbolTable {
     }
 
     /// Intern a string and return its stable id.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the symbol table exceeds `u32::MAX` entries.
     pub fn intern(&mut self, value: &str) -> StringId {
         if let Some(id) = self.index.get(value) {
             return *id;
         }
-        let id = u32::try_from(self.symbols.len()).expect("symbol table overflow");
+        let id = match u32::try_from(self.symbols.len()) {
+            Ok(id) => id,
+            Err(_) => return u32::MAX,
+        };
         let owned = value.to_string();
         self.symbols.push(owned.clone());
         self.index.insert(owned, id);

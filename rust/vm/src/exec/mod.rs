@@ -62,7 +62,7 @@ pub(crate) fn step_instr(
             dst,
         } => ownership::step_check(vm, coro_idx, role, sid, knowledge, target, dst),
         Instr::Set { dst, val } => Ok(control::step_set(dst, val)),
-        Instr::Move { dst, src } => Ok(control::step_move(vm, coro_idx, dst, src)),
+        Instr::Move { dst, src } => control::step_move(vm, coro_idx, dst, src),
         Instr::Jump { target } => Ok(control::step_jump(target)),
         Instr::Spawn { target, args } => control::step_spawn(vm, coro_idx, target, &args),
         Instr::Yield => Ok(control::step_yield()),

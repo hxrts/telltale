@@ -407,7 +407,12 @@ impl ThreadedVM {
             .coroutines
             .get(coro_id)
             .cloned()
-            .expect("coroutine exists");
+            .ok_or(VMError::Fault {
+                coro_id,
+                fault: Fault::Speculation {
+                    message: "scheduler selected missing coroutine".to_string(),
+                },
+            })?;
         let sid = {
             let coro_guard = coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             coro_guard.session_id

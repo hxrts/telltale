@@ -65,6 +65,14 @@ Runtime mode admission and profile selection are capability gated.
 | Threaded certified-wave fallback | `WaveCertificate` check with one-step degrade | `rust/vm/src/threaded.rs` |
 | Deviation registry enforcement | Undocumented parity drift rejection | `just check-parity --types` |
 
+## Runtime Hardening Contracts
+
+The VM adapters now enforce explicit runtime hardening at load and startup boundaries.
+
+- `ThreadedVM` provides both `with_workers` (panic-on-invalid initialization compatibility path) and `try_with_workers` (fallible initialization with `VMError`).
+- Cooperative and threaded `load_choreography` paths validate trusted `CodeImage` runtime shape before session allocation.
+- Register-bound violations are fail-closed through `Fault::OutOfRegisters` rather than unchecked index panic in executable instruction paths.
+
 ## Capability Gate Architecture
 
 | Capability Gate | Lean Surface | Rust Surface |
