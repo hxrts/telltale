@@ -508,6 +508,29 @@ mod tests {
     }
 
     #[test]
+    fn test_loop_unsupported() {
+        let protocol = Protocol::Loop {
+            condition: None,
+            body: Box::new(Protocol::End),
+        };
+        let result = protocol_to_global(&protocol);
+        assert!(
+            matches!(result, Err(ConversionError::UnsupportedFeature { feature, .. }) if feature == "Loop")
+        );
+    }
+
+    #[test]
+    fn test_parallel_unsupported() {
+        let protocol = Protocol::Parallel {
+            protocols: NonEmptyVec::from_head_tail(Protocol::End, vec![Protocol::End]),
+        };
+        let result = protocol_to_global(&protocol);
+        assert!(
+            matches!(result, Err(ConversionError::UnsupportedFeature { feature, .. }) if feature == "Parallel")
+        );
+    }
+
+    #[test]
     fn test_local_type_conversion() {
         // Send to B: msg. End
         let local = LocalType::Send {
@@ -518,6 +541,55 @@ mod tests {
 
         let local_r = local_to_local_r(&local).unwrap();
         assert!(matches!(local_r, LocalTypeR::Send { partner, .. } if partner == "B"));
+    }
+
+    #[test]
+    fn test_localchoice_unsupported() {
+        let local = LocalType::LocalChoice {
+            branches: vec![(ident("L"), LocalType::End)],
+        };
+        let result = local_to_local_r(&local);
+        assert!(
+            matches!(result, Err(ConversionError::UnsupportedFeature { feature, .. }) if feature == "LocalChoice")
+        );
+    }
+
+    #[test]
+    fn test_timeout_unsupported() {
+        let local = LocalType::Timeout {
+            duration: std::time::Duration::from_millis(100),
+            body: Box::new(LocalType::End),
+        };
+        let result = local_to_local_r(&local);
+        assert!(
+            matches!(result, Err(ConversionError::UnsupportedFeature { feature, .. }) if feature == "Timeout")
+        );
+    }
+
+    #[test]
+    fn test_message_conversion_uses_unit_payload_sort() {
+        let protocol = Protocol::Send {
+            from: role("A"),
+            to: role("B"),
+            message: MessageType {
+                name: ident("payload_msg"),
+                type_annotation: None,
+                payload: Some(quote::quote! { Vec<u8> }),
+            },
+            continuation: Box::new(Protocol::End),
+            annotations: Annotations::new(),
+            from_annotations: Annotations::new(),
+            to_annotations: Annotations::new(),
+        };
+
+        let global = protocol_to_global(&protocol).expect("conversion should succeed");
+        match global {
+            GlobalTypeCore::Comm { branches, .. } => {
+                let (label, _) = &branches[0];
+                assert_eq!(label.sort, PayloadSort::Unit);
+            }
+            _ => panic!("expected comm"),
+        }
     }
 
     #[test]

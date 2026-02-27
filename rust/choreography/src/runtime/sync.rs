@@ -33,11 +33,10 @@ pub use futures::channel::mpsc;
 /// On native targets, this awaits the async lock.
 /// On WASM, this uses the blocking (but single-threaded safe) lock.
 ///
-/// # Panics (WASM only)
+/// # Lock Poisoning (WASM only)
 ///
-/// On WASM targets, panics if the lock is poisoned (another thread panicked
-/// while holding the lock). This should not occur in practice since WASM
-/// is single-threaded.
+/// On WASM targets, lock poisoning is recovered by taking the inner guard.
+/// This avoids panic-only behavior in adapter/runtime helpers.
 ///
 /// # Example
 ///
@@ -54,7 +53,10 @@ macro_rules! read_lock {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            $lock.read().expect("RwLock poisoned")
+            match $lock.read() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            }
         }
     }};
 }
@@ -64,11 +66,10 @@ macro_rules! read_lock {
 /// On native targets, this awaits the async lock.
 /// On WASM, this uses the blocking (but single-threaded safe) lock.
 ///
-/// # Panics (WASM only)
+/// # Lock Poisoning (WASM only)
 ///
-/// On WASM targets, panics if the lock is poisoned (another thread panicked
-/// while holding the lock). This should not occur in practice since WASM
-/// is single-threaded.
+/// On WASM targets, lock poisoning is recovered by taking the inner guard.
+/// This avoids panic-only behavior in adapter/runtime helpers.
 ///
 /// # Example
 ///
@@ -85,7 +86,10 @@ macro_rules! write_lock {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            $lock.write().expect("RwLock poisoned")
+            match $lock.write() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            }
         }
     }};
 }
@@ -95,11 +99,10 @@ macro_rules! write_lock {
 /// On native targets, this awaits the async lock.
 /// On WASM, this uses the blocking (but single-threaded safe) lock.
 ///
-/// # Panics (WASM only)
+/// # Lock Poisoning (WASM only)
 ///
-/// On WASM targets, panics if the mutex is poisoned (another thread panicked
-/// while holding the lock). This should not occur in practice since WASM
-/// is single-threaded.
+/// On WASM targets, lock poisoning is recovered by taking the inner guard.
+/// This avoids panic-only behavior in adapter/runtime helpers.
 ///
 /// # Example
 ///
@@ -116,7 +119,10 @@ macro_rules! mutex_lock {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            $lock.lock().expect("Mutex poisoned")
+            match $lock.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            }
         }
     }};
 }

@@ -104,14 +104,16 @@ pub(super) fn merge_labeled_local_types(
                 })
             } else {
                 // Different messages - create a Branch with CHOICE LABELS (not message names!)
+                let mut branches = vec![
+                    (t1.label.clone(), *cont1.clone()), // Use choice label
+                    (t2.label.clone(), *cont2.clone()), // Use choice label
+                ];
+                sort_branches_by_label(&mut branches);
                 Ok(LabeledLocalType {
                     label: t1.label.clone(), // Arbitrary choice; branch contains both
                     local_type: LocalType::Branch {
                         from: from1.clone(),
-                        branches: vec![
-                            (t1.label.clone(), *cont1.clone()), // Use choice label
-                            (t2.label.clone(), *cont2.clone()), // Use choice label
-                        ],
+                        branches,
                     },
                 })
             }
@@ -137,6 +139,7 @@ pub(super) fn merge_labeled_local_types(
             } else {
                 new_branches.push((t2.label.clone(), *cont2.clone())); // Use choice label
             }
+            sort_branches_by_label(&mut new_branches);
             Ok(LabeledLocalType {
                 label: t1.label.clone(),
                 local_type: LocalType::Branch {
@@ -166,6 +169,7 @@ pub(super) fn merge_labeled_local_types(
             } else {
                 new_branches.push((t1.label.clone(), *cont1.clone())); // Use choice label
             }
+            sort_branches_by_label(&mut new_branches);
             Ok(LabeledLocalType {
                 label: t2.label.clone(),
                 local_type: LocalType::Branch {
@@ -487,6 +491,10 @@ fn merge_branch_branches(
     branches.sort_by(|a, b| a.0.to_string().cmp(&b.0.to_string()));
 
     Ok(branches)
+}
+
+fn sort_branches_by_label(branches: &mut [(proc_macro2::Ident, LocalType)]) {
+    branches.sort_by(|a, b| a.0.to_string().cmp(&b.0.to_string()));
 }
 
 /// Compare two optional conditions for equality.

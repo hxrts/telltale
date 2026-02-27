@@ -9,6 +9,7 @@ For VM host integration, see [Effect Handlers and Session Types](11_effect_sessi
 `ChoreoHandler` decouples protocol logic from transport implementation.
 Handlers interpret choreographic effects into concrete communication operations.
 Protocol code remains unchanged across handlers.
+The effect runtime normalizes `Parallel` effects to deterministic declaration order.
 
 ## Boundary Selection
 
@@ -74,6 +75,7 @@ The trait defines send, receive, choice, and timeout operations.
 It also provides default `broadcast` and `parallel_send` helpers.
 
 The `send` method transmits a message to another role. The `recv` method waits for a message from another role. The `choose` method makes a branch selection. The `offer` method receives a branch selection.
+Nested branch, loop, timeout, and parallel interpretation returns non-duplicated receive traces.
 
 The `Endpoint` associated type holds connection state. Different handlers use different endpoint types.
 

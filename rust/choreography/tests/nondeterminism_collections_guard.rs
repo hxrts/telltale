@@ -10,6 +10,14 @@ const FORBIDDEN_PATTERNS: &[&str] = &[
 
 const GUARDED_SOURCES: &[(&str, &str)] = &[
     (
+        "src/runtime/adapter.rs",
+        include_str!("../src/runtime/adapter.rs"),
+    ),
+    (
+        "src/runtime/test_adapter.rs",
+        include_str!("../src/runtime/test_adapter.rs"),
+    ),
+    (
         "src/effects/handlers/in_memory.rs",
         include_str!("../src/effects/handlers/in_memory.rs"),
     ),
@@ -32,6 +40,18 @@ const GUARDED_SOURCES: &[(&str, &str)] = &[
     (
         "src/extensions/discovery.rs",
         include_str!("../src/extensions/discovery.rs"),
+    ),
+    (
+        "src/testing/transport.rs",
+        include_str!("../src/testing/transport.rs"),
+    ),
+    (
+        "src/testing/state_machine.rs",
+        include_str!("../src/testing/state_machine.rs"),
+    ),
+    (
+        "src/testing/observer.rs",
+        include_str!("../src/testing/observer.rs"),
     ),
 ];
 

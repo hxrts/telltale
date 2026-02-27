@@ -206,19 +206,22 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                     .filter(|r| r.name() != from.name())
                     .cloned()
                     .collect();
-
-                Protocol::Broadcast {
-                    from: from.clone(),
-                    to_all: NonEmptyVec::new(to_all)
-                        .expect("broadcast must target at least one role"),
-                    message: MessageType {
-                        name: message.name.clone(),
-                        type_annotation: message.type_annotation.clone(),
-                        payload: message.payload.clone(),
-                    },
-                    continuation: Box::new(current),
-                    annotations: Annotations::from_legacy_map(annotations),
-                    from_annotations: Annotations::from_legacy_map(from_annotations),
+                if let Ok(to_all) = NonEmptyVec::new(to_all) {
+                    Protocol::Broadcast {
+                        from: from.clone(),
+                        to_all,
+                        message: MessageType {
+                            name: message.name.clone(),
+                            type_annotation: message.type_annotation.clone(),
+                            payload: message.payload.clone(),
+                        },
+                        continuation: Box::new(current),
+                        annotations: Annotations::from_legacy_map(annotations),
+                        from_annotations: Annotations::from_legacy_map(from_annotations),
+                    }
+                } else {
+                    // No non-sender recipients: treat as no-op and preserve continuation.
+                    current
                 }
             }
             Statement::Choice {
@@ -234,11 +237,14 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                         protocol: convert_statements_to_protocol(&b.statements, roles),
                     })
                     .collect();
-                Protocol::Choice {
-                    role: role.clone(),
-                    branches: NonEmptyVec::new(branch_vec)
-                        .expect("choice must have at least one branch"),
-                    annotations: Annotations::from_legacy_map(annotations),
+                if let Ok(branches) = NonEmptyVec::new(branch_vec) {
+                    Protocol::Choice {
+                        role: role.clone(),
+                        branches,
+                        annotations: Annotations::from_legacy_map(annotations),
+                    }
+                } else {
+                    current
                 }
             }
             // TimedChoice desugars to standard Choice with typed annotation.
@@ -262,11 +268,14 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                     })
                     .collect();
 
-                Protocol::Choice {
-                    role: role.clone(),
-                    branches: NonEmptyVec::new(branch_vec)
-                        .expect("timed_choice must have at least one branch"),
-                    annotations,
+                if let Ok(branches) = NonEmptyVec::new(branch_vec) {
+                    Protocol::Choice {
+                        role: role.clone(),
+                        branches,
+                        annotations,
+                    }
+                } else {
+                    current
                 }
             }
             // Heartbeat desugars to recursive choice with liveness detection:
@@ -457,9 +466,10 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                     .iter()
                     .map(|b| convert_statements_to_protocol(b, roles))
                     .collect();
-                Protocol::Parallel {
-                    protocols: NonEmptyVec::new(protocols_vec)
-                        .expect("parallel must have at least one branch"),
+                if let Ok(protocols) = NonEmptyVec::new(protocols_vec) {
+                    Protocol::Parallel { protocols }
+                } else {
+                    current
                 }
             }
             Statement::Branch { .. } => {

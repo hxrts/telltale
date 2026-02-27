@@ -23,14 +23,14 @@
 //! ```
 
 use async_trait::async_trait;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 use super::adapter::{ChoiceLabel, ChoreographicAdapter, Message};
 use crate::effects::{ChoreographyError, RoleId};
 
 /// Message queue type: maps (from_role, to_role) pairs to queues of serialized messages.
-type MessageQueues = HashMap<(String, String), Vec<Vec<u8>>>;
+type MessageQueues = BTreeMap<(String, String), Vec<Vec<u8>>>;
 
 /// A test adapter for choreographic protocols with role family support.
 ///
@@ -40,7 +40,7 @@ pub struct TestAdapter<R: RoleId> {
     /// The role this adapter represents
     role: R,
     /// Role families: family name -> list of role instances
-    families: HashMap<String, Vec<R>>,
+    families: BTreeMap<String, Vec<R>>,
     /// Sent messages: (from, to) -> queue of serialized messages
     sent: Arc<Mutex<MessageQueues>>,
     /// Received messages: (from, to) -> queue of serialized messages
@@ -52,9 +52,9 @@ impl<R: RoleId> TestAdapter<R> {
     pub fn new(role: R) -> Self {
         Self {
             role,
-            families: HashMap::new(),
-            sent: Arc::new(Mutex::new(HashMap::new())),
-            received: Arc::new(Mutex::new(HashMap::new())),
+            families: BTreeMap::new(),
+            sent: Arc::new(Mutex::new(BTreeMap::new())),
+            received: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -101,19 +101,19 @@ impl<R: RoleId> TestAdapter<R> {
     ///
     /// Messages sent by one adapter can be received by the other.
     pub fn linked_pair(role_a: R, role_b: R) -> (Self, Self) {
-        let shared_a_to_b = Arc::new(Mutex::new(HashMap::new()));
-        let shared_b_to_a = Arc::new(Mutex::new(HashMap::new()));
+        let shared_a_to_b = Arc::new(Mutex::new(BTreeMap::new()));
+        let shared_b_to_a = Arc::new(Mutex::new(BTreeMap::new()));
 
         let adapter_a = Self {
             role: role_a,
-            families: HashMap::new(),
+            families: BTreeMap::new(),
             sent: shared_a_to_b.clone(),
             received: shared_b_to_a.clone(),
         };
 
         let adapter_b = Self {
             role: role_b,
-            families: HashMap::new(),
+            families: BTreeMap::new(),
             sent: shared_b_to_a,
             received: shared_a_to_b,
         };

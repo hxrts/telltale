@@ -205,6 +205,7 @@ LocalType::Send {
 
 Operations are merged into one local type in a deterministic traversal order.
 This merged order is a projection artifact rather than a scheduling guarantee.
+Branch labels in merged `Branch` nodes are canonicalized in label order to keep output deterministic.
 
 Conflicting parallel composition causes errors.
 
@@ -250,6 +251,7 @@ Send merge requires identical label sets. A non-participant cannot choose which 
 Receive merge unions label sets. A non-participant can receive any message regardless of which branch was taken. Different incoming messages in different branches are combined into a single receive with multiple labels.
 
 This distinction is critical for protocol safety. The Rust implementation matches the Lean formalization in `lean/Choreography/Projection/`.
+Projection parity checks are exercised from `rust/lean-bridge/tests/projection_runner_tests.rs`.
 
 ### Parallel Composition
 

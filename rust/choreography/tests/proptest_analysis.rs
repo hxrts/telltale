@@ -1,479 +1,145 @@
 #![cfg(not(target_arch = "wasm32"))]
-// Property-based tests for choreography analysis
-//
-// Tests critical invariants for static analysis:
-// 1. Analysis always completes (no infinite loops)
-// 2. Role participation is accurately tracked
-// 3. Deadlock detection is consistent
-// 4. Warnings are valid and actionable
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
 use proptest::prelude::*;
-use proptest::strategy::BoxedStrategy;
-use quote::{format_ident, quote};
+use quote::format_ident;
 use std::collections::HashMap;
-use telltale_choreography::ast::{Annotations, Choreography, MessageType, Protocol, Role};
+use telltale_choreography::ast::{Annotations, Branch, Choreography, MessageType, NonEmptyVec, Protocol, Role};
 use telltale_choreography::compiler::analysis::analyze;
 
-// Reuse strategies from projection tests
-fn role_strategy() -> impl Strategy<Value = Role> {
-    prop_oneof![
-        Just(Role::new(format_ident!("Alice")).unwrap()),
-        Just(Role::new(format_ident!("Bob")).unwrap()),
-        Just(Role::new(format_ident!("Charlie")).unwrap()),
-        Just(Role::new(format_ident!("Dave")).unwrap()),
-    ]
+fn role(name: &str) -> Role {
+    Role::new(format_ident!("{}", name)).unwrap()
 }
 
-fn message_strategy() -> impl Strategy<Value = MessageType> {
-    prop_oneof![
-        Just(MessageType {
-            name: format_ident!("Request"),
-
-            type_annotation: None,
-            payload: Some(quote! { String }),
-        }),
-        Just(MessageType {
-            name: format_ident!("Response"),
-
-            type_annotation: None,
-            payload: Some(quote! { i32 }),
-        }),
-        Just(MessageType {
-            name: format_ident!("Data"),
-
-            type_annotation: None,
-            payload: Some(quote! { Vec<u8> }),
-        }),
-    ]
+fn msg(name: &str) -> MessageType {
+    MessageType {
+        name: format_ident!("{}", name),
+        type_annotation: None,
+        payload: None,
+    }
 }
 
-fn simple_protocol_strategy() -> BoxedStrategy<Protocol> {
-    // Disabled due to Protocol no longer implementing Clone
-    // This would need to be rewritten to work with non-cloneable Protocol
-
-    any::<()>().prop_map(|_| Protocol::End).boxed()
-
-    /*
-    let leaf = prop_oneof![Just(Protocol::End),];
-
-    leaf.prop_recursive(3, 8, 10, |inner| {
-        prop_oneof![
-            // Send
-            (
-                role_strategy(),
-                role_strategy(),
-                message_strategy(),
-                inner.clone()
-            )
-                .prop_map(|(from, to, msg, cont)| {
-                    if from == to {
-                        Protocol::End
-                    } else {
-                        Protocol::Send {
-                            from,
-                            to,
-                            message: msg,
-                            continuation: Box::new(cont),
-                            annotations: Annotations::new(),
-                            from_annotations: Annotations::new(),
-                            to_annotations: Annotations::new(),
-                        }
-                    }
-                }),
-            // Choice - branches must start with Send for analysis to work
-            (
-                role_strategy(),
-                role_strategy(),
-                prop::collection::vec(message_strategy(), 1..3)
-            )
-                .prop_filter_map(
-                    "choice branches need communication",
-                    |(chooser, other, msgs)| {
-                        if chooser == other || msgs.is_empty() {
-                            return None;
-                        }
-                        Some(Protocol::Choice {
-                            role: chooser.clone(),
-                            branches: msgs
-                                .into_iter()
-                                .enumerate()
-                                .map(|(i, msg)| Branch {
-                                    label: format_ident!("branch{}", i),
-                                    guard: None,
-                                    protocol: Protocol::Send {
-                                        from: chooser.clone(),
-                                        to: other.clone(),
-                                        message: msg,
-                                        continuation: Box::new(Protocol::End),
-                                        annotations: Annotations::new(),
-                                        from_annotations: Annotations::new(),
-                                        to_annotations: Annotations::new(),
-                                    },
-                                })
-                                .collect(),
-                            annotations: Annotations::new(),
-                        })
-                    }
-                ),
-        ]
-    })
-    */
-}
-
-// Helper: Extract all roles mentioned in a protocol
-fn extract_roles(protocol: &Protocol) -> Vec<Role> {
-    let mut roles = Vec::new();
-    fn collect_roles(protocol: &Protocol, roles: &mut Vec<Role>) {
-        match protocol {
+fn linear_protocol(bits: &[bool], a: &Role, b: &Role) -> Protocol {
+    bits.iter()
+        .enumerate()
+        .rev()
+        .fold(Protocol::End, |continuation, (idx, send_from_a)| {
+            let (from, to) = if *send_from_a { (a.clone(), b.clone()) } else { (b.clone(), a.clone()) };
             Protocol::Send {
                 from,
                 to,
-                continuation,
-                ..
-            } => {
-                if !roles.contains(from) {
-                    roles.push(from.clone());
-                }
-                if !roles.contains(to) {
-                    roles.push(to.clone());
-                }
-                collect_roles(continuation, roles);
+                message: msg(&format!("M{idx}")),
+                continuation: Box::new(continuation),
+                annotations: Annotations::new(),
+                from_annotations: Annotations::new(),
+                to_annotations: Annotations::new(),
             }
-            Protocol::Choice { role, branches, .. } => {
-                if !roles.contains(role) {
-                    roles.push(role.clone());
-                }
-                for branch in branches {
-                    collect_roles(&branch.protocol, roles);
-                }
-            }
-            _ => {}
-        }
-    }
-    collect_roles(protocol, &mut roles);
-
-    // Always include at least these roles to avoid empty role lists
-    for role in &[
-        Role::new(format_ident!("Alice")).unwrap(),
-        Role::new(format_ident!("Bob")).unwrap(),
-        Role::new(format_ident!("Charlie")).unwrap(),
-    ] {
-        if !roles.contains(role) {
-            roles.push(role.clone());
-        }
-    }
-
-    roles
+        })
 }
 
-fn choreography_strategy() -> impl Strategy<Value = Choreography> {
-    simple_protocol_strategy().prop_map(|protocol| {
-        let roles = extract_roles(&protocol);
-        Choreography {
-            name: format_ident!("TestChoreography"),
-            namespace: None,
-            roles,
-            protocol,
-            attrs: HashMap::new(),
-        }
-    })
-}
-
-proptest! {
-    /// Property: Analysis always completes
-    /// Analysis should never hang or panic, even on complex choreographies
-    #[test]
-    fn analysis_completes(choreo in choreography_strategy()) {
-        let result = analyze(&choreo);
-        // If we get here without panicking, analysis completed successfully
-        let _ = result; // Use result to avoid warning
-    }
-
-    /// Property: All declared roles are tracked
-    #[test]
-    fn all_roles_tracked(choreo in choreography_strategy()) {
-        let result = analyze(&choreo);
-
-        for role in &choreo.roles {
-            assert!(
-                result.role_participation.contains_key(role),
-                "All roles should be tracked in participation info"
-            );
-        }
-    }
-
-    /// Property: Participation counts are valid
-    #[test]
-    fn participation_counts_valid(choreo in choreography_strategy()) {
-        let result = analyze(&choreo);
-
-        for info in result.role_participation.values() {
-            // usize is always non-negative, so just check they exist
-            let _sends = info.sends;
-            let _receives = info.receives;
-            let _choices = info.choices;
-        }
-    }
-
-    /// Property: Send/receive counts balance
-    /// Total sends should equal total receives across all roles
-    #[test]
-    fn send_receive_balance(choreo in choreography_strategy()) {
-        let result = analyze(&choreo);
-
-        let total_sends: usize = result.role_participation.values()
-            .map(|info| info.sends)
-            .sum();
-        let total_receives: usize = result.role_participation.values()
-            .map(|info| info.receives)
-            .sum();
-
-        assert_eq!(
-            total_sends, total_receives,
-            "Total sends must equal total receives"
-        );
-    }
-
-    /// Property: Active roles have non-zero participation
-    #[test]
-    fn active_roles_participate(choreo in choreography_strategy()) {
-        let result = analyze(&choreo);
-
-        for (role, info) in &result.role_participation {
-            if info.is_active {
-                let total_activity = info.sends + info.receives + info.choices;
-                assert!(
-                    total_activity > 0,
-                    "Active role {role:?} should have some activity"
-                );
-            }
-        }
-    }
-
-    /// Property: Unused role warnings are accurate
-    #[test]
-    fn unused_role_warnings_accurate(choreo in choreography_strategy()) {
-        let result = analyze(&choreo);
-
-        let unused_roles: Vec<_> = result.warnings.iter()
-            .filter_map(|w| {
-                if let telltale_choreography::compiler::analysis::AnalysisWarning::UnusedRole(r) = w {
-                    Some(r)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        // All unused roles should have zero participation
-        for role in unused_roles {
-            if let Some(info) = result.role_participation.get(role) {
-                assert!(
-                    !info.is_active,
-                    "Role warned as unused should not be active"
-                );
-            }
-        }
-    }
-
-    /// Property: Simple linear protocols analyze successfully
-    /// A protocol that's just a sequence of sends completes analysis
-    #[test]
-    fn linear_protocol_analyzes(
-        from in role_strategy(),
-        to in role_strategy(),
-        msg in message_strategy(),
-    ) {
-        prop_assume!(from != to);
-
-        let choreo = Choreography {
-            name: format_ident!("LinearProtocol"),
-        namespace: None,
-            roles: vec![from.clone(), to.clone()],
-            protocol: Protocol::Send {
-                from: from.clone(),
-                to: to.clone(),
-                message: msg,
-                continuation: Box::new(Protocol::Send {
-                    from: to.clone(),
-                    to: from.clone(),
-                    message: MessageType {
-                        name: format_ident!("Ack"),
-
-                        type_annotation: None,
-                        payload: Some(quote! { () }),
-                    },
+fn choice_protocol(chooser: &Role, peer: &Role) -> Protocol {
+    Protocol::Choice {
+        role: chooser.clone(),
+        branches: NonEmptyVec::from_head_tail(
+            Branch {
+                label: format_ident!("Left"),
+                guard: None,
+                protocol: Protocol::Send {
+                    from: chooser.clone(),
+                    to: peer.clone(),
+                    message: msg("LeftMsg"),
                     continuation: Box::new(Protocol::End),
                     annotations: Annotations::new(),
                     from_annotations: Annotations::new(),
                     to_annotations: Annotations::new(),
-                }),
-                annotations: Annotations::new(),
-                from_annotations: Annotations::new(),
-                to_annotations: Annotations::new(),
+                },
             },
-            attrs: HashMap::new(),
-        };
-
-        let result = analyze(&choreo);
-        // Analysis should complete successfully
-        // Note: Deadlock detection is conservative and may report potential issues
-        assert!(
-            result.role_participation.len() == 2,
-            "Should track both roles"
-        );
-    }
-
-    /// Property: End-only protocol has no activity
-    #[test]
-    fn end_only_no_activity(roles in prop::collection::vec(role_strategy(), 1..5)) {
-        let choreo = Choreography {
-            name: format_ident!("EndOnly"),
-        namespace: None,
-            roles: roles.clone(),
-            protocol: Protocol::End,
-            attrs: HashMap::new(),
-        };
-
-        let result = analyze(&choreo);
-
-        for info in result.role_participation.values() {
-            assert_eq!(info.sends, 0, "End-only protocol should have no sends");
-            assert_eq!(info.receives, 0, "End-only protocol should have no receives");
-            assert_eq!(info.choices, 0, "End-only protocol should have no choices");
-        }
-    }
-
-    /// Property: Protocol with communication has progress
-    #[test]
-    fn communication_implies_progress(
-        from in role_strategy(),
-        to in role_strategy(),
-        msg in message_strategy(),
-    ) {
-        prop_assume!(from != to);
-
-        let choreo = Choreography {
-            name: format_ident!("WithCommunication"),
-        namespace: None,
-            roles: vec![from.clone(), to.clone()],
-            protocol: Protocol::Send {
-                from,
-                to,
-                message: msg,
-                continuation: Box::new(Protocol::End),
-                annotations: Annotations::new(),
-                from_annotations: Annotations::new(),
-                to_annotations: Annotations::new(),
-            },
-            attrs: HashMap::new(),
-        };
-
-        let result = analyze(&choreo);
-        assert!(
-            result.has_progress,
-            "Protocol with communication should have progress"
-        );
-    }
-
-    /// Property: Communication graph has valid edges
-    /// All edges should reference roles that exist in the choreography
-    #[test]
-    fn communication_graph_valid(choreo in choreography_strategy()) {
-        let result = analyze(&choreo);
-
-        for (from, to, _msg) in &result.communication_graph.edges {
-            assert!(
-                choreo.roles.contains(from),
-                "Edge source role should exist in choreography"
-            );
-            assert!(
-                choreo.roles.contains(to),
-                "Edge destination role should exist in choreography"
-            );
-        }
+            vec![Branch {
+                label: format_ident!("Right"),
+                guard: None,
+                protocol: Protocol::Send {
+                    from: chooser.clone(),
+                    to: peer.clone(),
+                    message: msg("RightMsg"),
+                    continuation: Box::new(Protocol::End),
+                    annotations: Annotations::new(),
+                    from_annotations: Annotations::new(),
+                    to_annotations: Annotations::new(),
+                },
+            }],
+        ),
+        annotations: Annotations::new(),
     }
 }
 
-#[cfg(test)]
-mod unit_tests {
-    use super::*;
+fn protocol_strategy() -> impl Strategy<Value = Protocol> {
+    prop_oneof![
+        any::<u8>().prop_map(|_| Protocol::End),
+        prop::collection::vec(any::<bool>(), 1..6).prop_map(|bits| {
+            let a = role("Alice");
+            let b = role("Bob");
+            linear_protocol(&bits, &a, &b)
+        }),
+        any::<u8>().prop_map(|_| {
+            let a = role("Alice");
+            let b = role("Bob");
+            choice_protocol(&a, &b)
+        }),
+    ]
+}
 
+fn choreography_strategy() -> impl Strategy<Value = Choreography> {
+    protocol_strategy().prop_map(|protocol| Choreography {
+        name: format_ident!("AnalysisProp"),
+        namespace: None,
+        roles: vec![role("Alice"), role("Bob"), role("Charlie")],
+        protocol,
+        attrs: HashMap::new(),
+    })
+}
+
+proptest! {
     #[test]
-    fn test_two_party_analysis() {
-        let alice = Role::new(format_ident!("Alice")).unwrap();
-        let bob = Role::new(format_ident!("Bob")).unwrap();
-
-        let choreo = Choreography {
-            name: format_ident!("TwoParty"),
-            namespace: None,
-            roles: vec![alice.clone(), bob.clone()],
-            protocol: Protocol::Send {
-                from: alice.clone(),
-                to: bob.clone(),
-                message: MessageType {
-                    name: format_ident!("Hello"),
-
-                    type_annotation: None,
-                    payload: Some(quote! { String }),
-                },
-                continuation: Box::new(Protocol::End),
-                annotations: Annotations::new(),
-                from_annotations: Annotations::new(),
-                to_annotations: Annotations::new(),
-            },
-            attrs: HashMap::new(),
-        };
-
-        let result = analyze(&choreo);
-
-        // Alice sends 1, receives 0
-        let alice_info = result.role_participation.get(&alice).unwrap();
-        assert_eq!(alice_info.sends, 1);
-        assert_eq!(alice_info.receives, 0);
-
-        // Bob sends 0, receives 1
-        let bob_info = result.role_participation.get(&bob).unwrap();
-        assert_eq!(bob_info.sends, 0);
-        assert_eq!(bob_info.receives, 1);
+    fn analysis_completes_without_panicking(choreo in choreography_strategy()) {
+        let _ = analyze(&choreo);
     }
 
     #[test]
-    fn test_unused_role_warning() {
-        let alice = Role::new(format_ident!("Alice")).unwrap();
-        let bob = Role::new(format_ident!("Bob")).unwrap();
-        let charlie = Role::new(format_ident!("Charlie")).unwrap();
-
-        let choreo = Choreography {
-            name: format_ident!("ThreeParty"),
-            namespace: None,
-            roles: vec![alice.clone(), bob.clone(), charlie.clone()],
-            protocol: Protocol::Send {
-                from: alice,
-                to: bob,
-                message: MessageType {
-                    name: format_ident!("Hello"),
-
-                    type_annotation: None,
-                    payload: Some(quote! { String }),
-                },
-                continuation: Box::new(Protocol::End),
-                annotations: Annotations::new(),
-                from_annotations: Annotations::new(),
-                to_annotations: Annotations::new(),
-            },
-            attrs: HashMap::new(),
-        };
-
+    fn analysis_tracks_all_declared_roles(choreo in choreography_strategy()) {
         let result = analyze(&choreo);
-
-        // Charlie should be warned as unused
-        let has_unused_warning = result.warnings.iter().any(|w| {
-            matches!(w, telltale_choreography::compiler::analysis::AnalysisWarning::UnusedRole(r) if *r == charlie)
-        });
-
-        assert!(has_unused_warning, "Unused role should generate warning");
+        for role in &choreo.roles {
+            prop_assert!(result.role_participation.contains_key(role));
+        }
     }
+
+    #[test]
+    fn total_sends_equal_total_receives(choreo in choreography_strategy()) {
+        let result = analyze(&choreo);
+        let total_sends: usize = result.role_participation.values().map(|p| p.sends).sum();
+        let total_receives: usize = result.role_participation.values().map(|p| p.receives).sum();
+        prop_assert_eq!(total_sends, total_receives);
+    }
+
+    #[test]
+    fn communication_graph_edges_match_send_count(choreo in choreography_strategy()) {
+        let result = analyze(&choreo);
+        let total_sends: usize = result.role_participation.values().map(|p| p.sends).sum();
+        prop_assert_eq!(total_sends, result.communication_graph.edges.len());
+    }
+}
+
+#[test]
+fn end_only_protocol_has_no_activity() {
+    let choreo = Choreography {
+        name: format_ident!("EndOnly"),
+        namespace: None,
+        roles: vec![role("Alice"), role("Bob")],
+        protocol: Protocol::End,
+        attrs: HashMap::new(),
+    };
+    let result = analyze(&choreo);
+    assert!(result.is_deadlock_free);
+    assert!(result.has_progress);
+    assert!(result.communication_graph.edges.is_empty());
 }

@@ -54,7 +54,11 @@ pub enum Effect<R: RoleId, M> {
         on_timeout: Option<Box<Program<R, M>>>,
     },
 
-    /// Execute multiple programs in parallel
+    /// Execute multiple programs using deterministic normalized ordering.
+    ///
+    /// The interpreter executes sub-programs in declaration order. This keeps
+    /// behavior reproducible across runtimes while preserving the high-level
+    /// "parallel composition" intent.
     Parallel { programs: Vec<Program<R, M>> },
 
     /// Extension effect for domain-specific operations
@@ -227,56 +231,99 @@ impl<R: RoleId, M> ProgramBuilder<R, M> {
     }
 
     /// Push an effect onto the builder.
-    ///
-    /// # Panics
-    ///
-    /// Panics if called after `end()` has been called, as no effects can
-    /// follow the End effect.
-    fn push(&mut self, effect: Effect<R, M>) {
+    fn try_push(&mut self, effect: Effect<R, M>) -> Result<(), ProgramError> {
         if self.ended {
-            panic!("cannot add effects after end");
+            return Err(ProgramError::InvalidStructure(
+                "cannot add effects after end".to_string(),
+            ));
         }
         if matches!(effect, Effect::End) {
             self.ended = true;
         }
         self.effects.push(effect);
+        Ok(())
+    }
+
+    /// Fallible `send`.
+    pub fn try_send(mut self, to: R, msg: M) -> Result<Self, ProgramError> {
+        self.try_push(Effect::Send { to, msg })?;
+        Ok(self)
     }
 
     /// Add a send effect.
     pub fn send(mut self, to: R, msg: M) -> Self {
-        self.push(Effect::Send { to, msg });
+        self = self
+            .try_send(to, msg)
+            .unwrap_or_else(|err| panic!("invalid send composition: {err}"));
         self
+    }
+
+    /// Fallible `recv`.
+    pub fn try_recv<T: 'static>(mut self, from: R) -> Result<Self, ProgramError> {
+        self.try_push(Effect::Recv {
+            from,
+            msg_tag: MessageTag::of::<T>(),
+        })?;
+        Ok(self)
     }
 
     /// Add a receive effect.
     pub fn recv<T: 'static>(mut self, from: R) -> Self {
-        self.push(Effect::Recv {
-            from,
-            msg_tag: MessageTag::of::<T>(),
-        });
+        self = self
+            .try_recv::<T>(from)
+            .unwrap_or_else(|err| panic!("invalid recv composition: {err}"));
         self
+    }
+
+    /// Fallible `choose`.
+    pub fn try_choose(mut self, at: R, label: <R as RoleId>::Label) -> Result<Self, ProgramError> {
+        self.try_push(Effect::Choose { at, label })?;
+        Ok(self)
     }
 
     /// Add a choice effect.
     pub fn choose(mut self, at: R, label: <R as RoleId>::Label) -> Self {
-        self.push(Effect::Choose { at, label });
+        self = self
+            .try_choose(at, label)
+            .unwrap_or_else(|err| panic!("invalid choose composition: {err}"));
         self
+    }
+
+    /// Fallible `offer`.
+    pub fn try_offer(mut self, from: R) -> Result<Self, ProgramError> {
+        self.try_push(Effect::Offer { from })?;
+        Ok(self)
     }
 
     /// Add an offer effect.
     pub fn offer(mut self, from: R) -> Self {
-        self.push(Effect::Offer { from });
+        self = self
+            .try_offer(from)
+            .unwrap_or_else(|err| panic!("invalid offer composition: {err}"));
         self
     }
 
-    /// Add a timeout effect.
-    pub fn with_timeout(mut self, at: R, dur: Duration, body: Program<R, M>) -> Self {
-        self.push(Effect::Timeout {
+    /// Fallible `with_timeout`.
+    pub fn try_with_timeout(
+        mut self,
+        at: R,
+        dur: Duration,
+        body: Program<R, M>,
+    ) -> Result<Self, ProgramError> {
+        self.try_push(Effect::Timeout {
             at,
             dur,
             body: Box::new(body),
             on_timeout: None,
-        });
+        })?;
+        Ok(self)
+    }
+
+    /// Add a timeout effect.
+    pub fn with_timeout(mut self, at: R, dur: Duration, body: Program<R, M>) -> Self {
+        self = self
+            .try_with_timeout(at, dur, body)
+            .unwrap_or_else(|err| panic!("invalid timeout composition: {err}"));
         self
     }
 
@@ -292,20 +339,42 @@ impl<R: RoleId, M> ProgramBuilder<R, M> {
         body: Program<R, M>,
         on_timeout: Program<R, M>,
     ) -> Self {
-        self.push(Effect::Timeout {
+        self.try_push(Effect::Timeout {
             at,
             dur,
             body: Box::new(body),
             on_timeout: Some(Box::new(on_timeout)),
-        });
+        })
+        .unwrap_or_else(|err| panic!("invalid timed choice composition: {err}"));
         self
+    }
+
+    /// Add a parallel composition effect.
+    pub fn try_parallel(mut self, programs: Vec<Program<R, M>>) -> Result<Self, ProgramError> {
+        self.try_push(Effect::Parallel { programs })?;
+        Ok(self)
     }
 
     /// Add a parallel composition effect.
     #[must_use]
     pub fn parallel(mut self, programs: Vec<Program<R, M>>) -> Self {
-        self.push(Effect::Parallel { programs });
+        self = self
+            .try_parallel(programs)
+            .unwrap_or_else(|err| panic!("invalid parallel composition: {err}"));
         self
+    }
+
+    /// Add a branch effect with multiple labeled continuations.
+    pub fn try_branch(
+        mut self,
+        choosing_role: R,
+        branches: Vec<(<R as RoleId>::Label, Program<R, M>)>,
+    ) -> Result<Self, ProgramError> {
+        self.try_push(Effect::Branch {
+            choosing_role,
+            branches,
+        })?;
+        Ok(self)
     }
 
     /// Add a branch effect with multiple labeled continuations.
@@ -314,37 +383,78 @@ impl<R: RoleId, M> ProgramBuilder<R, M> {
         choosing_role: R,
         branches: Vec<(<R as RoleId>::Label, Program<R, M>)>,
     ) -> Self {
-        self.push(Effect::Branch {
-            choosing_role,
-            branches,
-        });
+        self = self
+            .try_branch(choosing_role, branches)
+            .unwrap_or_else(|err| panic!("invalid branch composition: {err}"));
         self
+    }
+
+    /// Add a loop effect.
+    pub fn try_loop_n(
+        mut self,
+        iterations: usize,
+        body: Program<R, M>,
+    ) -> Result<Self, ProgramError> {
+        self.try_push(Effect::Loop {
+            iterations: Some(iterations),
+            body: Box::new(body),
+        })?;
+        Ok(self)
     }
 
     /// Add a loop effect.
     #[must_use]
     pub fn loop_n(mut self, iterations: usize, body: Program<R, M>) -> Self {
-        self.push(Effect::Loop {
-            iterations: Some(iterations),
-            body: Box::new(body),
-        });
+        self = self
+            .try_loop_n(iterations, body)
+            .unwrap_or_else(|err| panic!("invalid loop composition: {err}"));
         self
+    }
+
+    /// Add an infinite loop effect (or until break).
+    pub fn try_loop_inf(mut self, body: Program<R, M>) -> Result<Self, ProgramError> {
+        self.try_push(Effect::Loop {
+            iterations: None,
+            body: Box::new(body),
+        })?;
+        Ok(self)
     }
 
     /// Add an infinite loop effect (or until break).
     #[must_use]
     pub fn loop_inf(mut self, body: Program<R, M>) -> Self {
-        self.push(Effect::Loop {
-            iterations: None,
-            body: Box::new(body),
-        });
+        self = self
+            .try_loop_inf(body)
+            .unwrap_or_else(|err| panic!("invalid infinite loop composition: {err}"));
         self
     }
 
     /// Add a domain-specific extension effect.
+    pub fn try_ext<E: ExtensionEffect<R> + 'static>(
+        mut self,
+        extension: E,
+    ) -> Result<Self, ProgramError> {
+        self.try_push(Effect::Extension(Box::new(extension)))?;
+        Ok(self)
+    }
+
+    /// Add a domain-specific extension effect.
     pub fn ext<E: ExtensionEffect<R> + 'static>(mut self, extension: E) -> Self {
-        self.push(Effect::Extension(Box::new(extension)));
+        self = self
+            .try_ext(extension)
+            .unwrap_or_else(|err| panic!("invalid extension composition: {err}"));
         self
+    }
+
+    /// Add multiple extension effects.
+    pub fn try_exts<E: ExtensionEffect<R> + 'static>(
+        mut self,
+        extensions: impl IntoIterator<Item = E>,
+    ) -> Result<Self, ProgramError> {
+        for ext in extensions {
+            self.try_push(Effect::Extension(Box::new(ext)))?;
+        }
+        Ok(self)
     }
 
     /// Add multiple extension effects.
@@ -352,22 +462,24 @@ impl<R: RoleId, M> ProgramBuilder<R, M> {
         mut self,
         extensions: impl IntoIterator<Item = E>,
     ) -> Self {
-        for ext in extensions {
-            self.push(Effect::Extension(Box::new(ext)));
-        }
+        self = self
+            .try_exts(extensions)
+            .unwrap_or_else(|err| panic!("invalid extension sequence composition: {err}"));
         self
     }
 
     /// Mark the end of the program and finalize it.
     ///
-    /// # Panics
-    ///
-    /// Panics if the program violates structural invariants. This should not
-    /// happen with normal builder usage. Use `build()` for fallible construction.
-    pub fn end(mut self) -> Program<R, M> {
-        self.push(Effect::End);
-        self.build()
+    /// Prefer [`ProgramBuilder::try_end`] for fallible construction.
+    pub fn end(self) -> Program<R, M> {
+        self.try_end()
             .unwrap_or_else(|err| panic!("invalid program: {err}"))
+    }
+
+    /// Fallible variant of [`ProgramBuilder::end`].
+    pub fn try_end(mut self) -> Result<Program<R, M>, ProgramError> {
+        self.try_push(Effect::End)?;
+        self.build()
     }
 
     /// Validate and build the program without appending `End`.
@@ -486,6 +598,47 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn try_builder_apis_reject_effects_after_end() {
+        let builder = ProgramBuilder::<TestRole, String> {
+            effects: vec![Effect::End],
+            ended: true,
+        };
+        let err = builder
+            .try_send(TestRole::Bob, "late-msg".to_string())
+            .expect_err("try_send must reject effects after end");
+        assert!(matches!(err, ProgramError::InvalidStructure(_)));
+    }
+
+    #[test]
+    fn try_end_is_fallible_and_builds_valid_program() {
+        let program = Program::<TestRole, String>::builder()
+            .try_send(TestRole::Bob, "hello".to_string())
+            .expect("try_send should succeed")
+            .try_end()
+            .expect("try_end should succeed");
+        assert!(matches!(program.effects().last(), Some(Effect::End)));
+    }
+
+    #[test]
+    fn try_then_rejects_invalid_composition_shapes() {
+        let left = Program::<TestRole, String>::builder().try_end().expect("left");
+        let invalid_right = Program::<TestRole, String> {
+            effects: vec![
+                Effect::End,
+                Effect::Send {
+                    to: TestRole::Bob,
+                    msg: "invalid".to_string(),
+                },
+            ],
+        };
+
+        let err = left
+            .try_then(invalid_right)
+            .expect_err("try_then must reject invalid end placement");
+        assert!(matches!(err, ProgramError::InvalidStructure(_)));
     }
 
     proptest! {

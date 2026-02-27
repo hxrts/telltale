@@ -171,10 +171,14 @@ fn parse_annotated_stmt(
     for item in inner {
         match item.as_rule() {
             Rule::annotation => {
-                let annotation_kind = item
-                    .into_inner()
-                    .next()
-                    .expect("grammar: annotation must have kind");
+                let span = item.as_span();
+                let annotation_kind =
+                    item.into_inner()
+                        .next()
+                        .ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(span, input),
+                            message: "annotation is missing its kind".to_string(),
+                        })?;
                 parse_annotation_kind(annotation_kind, &mut annotations, input)?;
             }
             _ => {
@@ -205,10 +209,11 @@ fn parse_annotation_kind(
         match kind.as_rule() {
             Rule::runtime_timeout_annotation => {
                 // Parse @runtime_timeout(duration)
-                let duration_pair = kind
-                    .into_inner()
-                    .next()
-                    .expect("grammar: runtime_timeout must have duration");
+                let span = kind.as_span();
+                let duration_pair = kind.into_inner().next().ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "runtime_timeout annotation is missing duration".to_string(),
+                })?;
                 let duration_ms = parse_duration(duration_pair, input)?;
                 annotations.insert("runtime_timeout".to_string(), duration_ms.to_string());
             }
@@ -281,8 +286,8 @@ fn parse_statement_inner(
         Rule::loop_stmt => parse_loop_stmt(pair, declared_roles, input, protocol_defs),
         Rule::branch_stmt => parse_branch_stmt(pair, declared_roles, input, protocol_defs),
         Rule::rec_stmt => parse_rec_stmt(pair, declared_roles, input, protocol_defs),
-        Rule::continue_stmt => parse_continue_stmt(pair),
-        Rule::call_stmt => parse_call_stmt(pair),
+        Rule::continue_stmt => parse_continue_stmt(pair, input),
+        Rule::call_stmt => parse_call_stmt(pair, input),
         Rule::handshake_stmt => parse_handshake_stmt(pair, declared_roles, input),
         Rule::retry_stmt => parse_retry_stmt(pair, declared_roles, input, protocol_defs),
         Rule::quorum_collect_stmt => parse_quorum_collect_stmt(pair, declared_roles, input),
@@ -358,16 +363,19 @@ pub(crate) fn parse_duration(
 /// Parse message specification
 pub(crate) fn parse_message(
     pair: pest::iterators::Pair<Rule>,
-    _input: &str,
+    input: &str,
 ) -> std::result::Result<MessageSpec, ParseError> {
-    let _span = pair.as_span();
+    let span = pair.as_span();
     let mut inner = pair.into_inner();
 
     let name = format_ident!(
         "{}",
         inner
             .next()
-            .expect("grammar: message must have name")
+            .ok_or_else(|| ParseError::Syntax {
+                span: ErrorSpan::from_pest_span(span, input),
+                message: "message is missing a name".to_string(),
+            })?
             .as_str()
     );
 
@@ -406,17 +414,19 @@ pub(crate) fn parse_local_protocol_decl(
     input: &str,
     protocol_defs: &mut HashMap<String, Vec<Statement>>,
 ) -> std::result::Result<(), ParseError> {
+    let span = pair.as_span();
     let mut inner = pair.into_inner();
-    let name_pair = inner
-        .next()
-        .expect("grammar: local_protocol_decl must have name");
+    let name_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "local protocol declaration is missing a name".to_string(),
+    })?;
     let proto_name = name_pair.as_str().to_string();
-    let span = name_pair.as_span();
+    let name_span = name_pair.as_span();
 
     if protocol_defs.contains_key(&proto_name) {
         return Err(ParseError::DuplicateProtocol {
             protocol: proto_name,
-            span: ErrorSpan::from_pest_span(span, input),
+            span: ErrorSpan::from_pest_span(name_span, input),
         });
     }
 
@@ -435,7 +445,10 @@ pub(crate) fn parse_local_protocol_decl(
     }
 
     let ParsedBody { roles, statements } = parse_protocol_body(
-        body_pair.expect("grammar: local_protocol_decl must have body"),
+        body_pair.ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "local protocol declaration is missing a body".to_string(),
+        })?,
         declared_roles,
         input,
         protocol_defs,
@@ -444,7 +457,7 @@ pub(crate) fn parse_local_protocol_decl(
 
     if roles.is_some() {
         return Err(ParseError::Syntax {
-            span: ErrorSpan::from_pest_span(span, input),
+            span: ErrorSpan::from_pest_span(name_span, input),
             message: "local protocols cannot declare roles".to_string(),
         });
     }

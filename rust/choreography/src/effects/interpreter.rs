@@ -70,18 +70,19 @@ impl<M, R: RoleId> Interpreter<M, R> {
         H: ChoreoHandler<Role = R> + Send,
         M: ProgramMessage + Serialize + DeserializeOwned + 'static,
     {
+        let start_len = self.received_values.len();
         for effect in program.into_effects() {
             match self.execute_effect(handler, endpoint, effect).await {
                 Ok(()) => continue,
                 Err(ChoreographyError::Timeout(_)) => {
                     return Ok(InterpretResult {
-                        received_values: self.received_values.clone(),
+                        received_values: self.received_values_since(start_len),
                         final_state: InterpreterState::Timeout,
                     });
                 }
                 Err(e) => {
                     return Ok(InterpretResult {
-                        received_values: self.received_values.clone(),
+                        received_values: self.received_values_since(start_len),
                         final_state: InterpreterState::Failed(e.to_string()),
                     });
                 }
@@ -89,7 +90,7 @@ impl<M, R: RoleId> Interpreter<M, R> {
         }
 
         Ok(InterpretResult {
-            received_values: self.received_values.clone(),
+            received_values: self.received_values_since(start_len),
             final_state: InterpreterState::Completed,
         })
     }
@@ -177,7 +178,6 @@ impl<M, R: RoleId> Interpreter<M, R> {
                 let result = self
                     .run(handler, endpoint, selected_branch.1.clone())
                     .await?;
-                self.received_values.extend(result.received_values);
 
                 // Clear the label after use
                 self.last_label = None;
@@ -205,7 +205,6 @@ impl<M, R: RoleId> Interpreter<M, R> {
                 for iteration in 0..count {
                     tracing::debug!(iteration, "Loop iteration");
                     let result = self.run(handler, endpoint, (*body).clone()).await?;
-                    self.received_values.extend(result.received_values);
 
                     if !matches!(result.final_state, InterpreterState::Completed) {
                         match result.final_state {
@@ -261,8 +260,7 @@ impl<M, R: RoleId> Interpreter<M, R> {
 
                 match timeout_result {
                     Ok(Ok(result)) => {
-                        // Success - merge the results
-                        self.received_values.extend(result.received_values);
+                        // Success: nested run already appended any receives.
                         if !matches!(result.final_state, InterpreterState::Completed) {
                             // Propagate non-completed state by updating our state
                             // and returning an error for Failed/Timeout
@@ -284,7 +282,6 @@ impl<M, R: RoleId> Interpreter<M, R> {
                             // Execute the fallback program (timed choice)
                             tracing::debug!("Timeout fired, executing fallback program");
                             let result = self.run(handler, endpoint, *timeout_body).await?;
-                            self.received_values.extend(result.received_values);
                             if !matches!(result.final_state, InterpreterState::Completed) {
                                 match result.final_state {
                                     InterpreterState::Failed(msg) => {
@@ -305,16 +302,12 @@ impl<M, R: RoleId> Interpreter<M, R> {
             }
 
             Effect::Parallel { programs } => {
-                // Execute programs in parallel using tokio::spawn
-                // Note: This requires cloning handler state which may not always be possible
-                // For handlers that don't support concurrent access, execute sequentially
+                // Deterministic normalized semantics: execute in declaration order.
+                // This keeps handler interactions reproducible across runtimes.
                 tracing::debug!(program_count = programs.len(), "Executing parallel effect");
 
-                // Try to execute in parallel, fall back to sequential if needed
-                // Sequential execution is still correct, just less performant
                 for program in programs {
                     let result = self.run(handler, endpoint, program).await?;
-                    self.received_values.extend(result.received_values);
 
                     match result.final_state {
                         InterpreterState::Failed(msg) => {
@@ -356,6 +349,13 @@ impl<M, R: RoleId> Interpreter<M, R> {
         Ok(())
     }
 
+    fn received_values_since(&self, start_len: usize) -> Vec<M>
+    where
+        M: ProgramMessage,
+    {
+        self.received_values[start_len..].to_vec()
+    }
+
     async fn try_recv_as_type<H, T>(
         &mut self,
         handler: &mut H,
@@ -393,18 +393,19 @@ impl<M, R: RoleId> ExtensibleInterpreter<M, R> {
         H: ExtensibleHandler<Role = R> + Send,
         M: ProgramMessage + Serialize + DeserializeOwned + 'static,
     {
+        let start_len = self.base.received_values.len();
         for effect in program.into_effects() {
             match self.execute_effect(handler, endpoint, effect).await {
                 Ok(()) => continue,
                 Err(ChoreographyError::Timeout(_)) => {
                     return Ok(InterpretResult {
-                        received_values: self.base.received_values.clone(),
+                        received_values: self.base.received_values_since(start_len),
                         final_state: InterpreterState::Timeout,
                     });
                 }
                 Err(e) => {
                     return Ok(InterpretResult {
-                        received_values: self.base.received_values.clone(),
+                        received_values: self.base.received_values_since(start_len),
                         final_state: InterpreterState::Failed(e.to_string()),
                     });
                 }
@@ -412,7 +413,7 @@ impl<M, R: RoleId> ExtensibleInterpreter<M, R> {
         }
 
         Ok(InterpretResult {
-            received_values: self.base.received_values.clone(),
+            received_values: self.base.received_values_since(start_len),
             final_state: InterpreterState::Completed,
         })
     }

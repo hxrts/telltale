@@ -80,6 +80,10 @@ harness = false
 name = "telltale_handler_bench"
 harness = false
 
+[[bench]]
+name = "hot_paths"
+harness = false
+
 [[bin]]
 name = "choreo-fmt"
 path = "src/bin/choreo_fmt.rs"

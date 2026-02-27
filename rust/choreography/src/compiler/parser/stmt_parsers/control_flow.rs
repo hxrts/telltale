@@ -15,17 +15,19 @@ pub(crate) fn parse_rec_stmt(
     input: &str,
     protocol_defs: &HashMap<String, Vec<Statement>>,
 ) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
     let mut inner = pair.into_inner();
 
-    let label = format_ident!(
-        "{}",
-        inner
-            .next()
-            .expect("grammar: rec_stmt must have label")
-            .as_str()
-    );
+    let label_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "rec statement is missing a label".to_string(),
+    })?;
+    let label = format_ident!("{}", label_pair.as_str());
     let body = parse_block(
-        inner.next().expect("grammar: rec_stmt must have body"),
+        inner.next().ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "rec statement is missing a body".to_string(),
+        })?,
         declared_roles,
         input,
         protocol_defs,
@@ -37,11 +39,14 @@ pub(crate) fn parse_rec_stmt(
 /// Parse protocol call statement
 pub(crate) fn parse_call_stmt(
     pair: pest::iterators::Pair<Rule>,
+    input: &str,
 ) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
     let mut inner = pair.into_inner();
-    let proto_name_pair = inner
-        .next()
-        .expect("grammar: call_stmt must have protocol name");
+    let proto_name_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "call statement is missing protocol name".to_string(),
+    })?;
     let proto_name = proto_name_pair.as_str();
 
     Ok(Statement::Call {
@@ -150,11 +155,14 @@ pub(crate) fn parse_quorum_collect_stmt(
 /// Parse continue statement (recursive back-reference)
 pub(crate) fn parse_continue_stmt(
     pair: pest::iterators::Pair<Rule>,
+    input: &str,
 ) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
     let mut inner = pair.into_inner();
-    let label_pair = inner
-        .next()
-        .expect("grammar: continue_stmt must have label");
+    let label_pair = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "continue statement is missing label".to_string(),
+    })?;
     let label = label_pair.as_str();
 
     Ok(Statement::Continue {

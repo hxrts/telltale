@@ -8,9 +8,6 @@
 //! participant. This includes an effect handler system that decouples protocol
 //! logic from transport implementation.
 
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-
 pub mod ast;
 pub mod compiler;
 pub mod effects;
@@ -77,6 +74,15 @@ pub use testing::{
 // Re-export macros from telltale-macros
 pub use telltale_macros::choreography;
 pub use telltale_types::{ChannelCapacity, MessageLenBytes, QueueCapacity};
+
+/// Unstable low-level extension integration surfaces.
+///
+/// These items are exposed for advanced integrations and may evolve faster than
+/// the stable root-level API.
+#[doc(hidden)]
+pub mod unstable {
+    pub use crate::extensions::{CodegenContext, ParseContext, ProjectionContext, StatementParser};
+}
 
 // High-level API functions for extension-aware compilation
 

@@ -15,17 +15,14 @@ impl<'a> ProjectionContext<'a> {
 
         match non_end.len() {
             0 => Ok(LocalType::End),
-            1 => Ok(non_end
-                .into_iter()
-                .next()
-                .expect("non_end must have exactly one element")),
+            1 => Ok(non_end.into_iter().next().unwrap_or(LocalType::End)),
             _ => {
                 // Check for conflicts
                 self.check_parallel_conflicts(&non_end)?;
 
                 // Multiple non-trivial projections - merge them
-                // Interleaving is allowed in parallel composition
-                // The merge creates a sequential composition (non-deterministic order)
+                // Interleaving is normalized to declaration order.
+                // The merge creates a deterministic sequential composition.
                 let mut merged = LocalType::End;
                 for proj in non_end.into_iter().rev() {
                     merged = self.sequential_merge(proj, merged);
@@ -169,8 +166,8 @@ impl<'a> ProjectionContext<'a> {
             Ok(labeled_projections
                 .into_iter()
                 .next()
-                .expect("projections must be non-empty when windows returned true")
-                .1)
+                .map(|(_, projection)| projection)
+                .unwrap_or(LocalType::End))
         } else {
             // Different projections per branch - need to merge with label awareness
             self.merge_local_types_labeled(labeled_projections)
@@ -203,7 +200,9 @@ impl<'a> ProjectionContext<'a> {
         // Fold the merge operation over all projections, preserving labels
         // Safety: non_end is non-empty (checked above)
         let mut iter = non_end.into_iter();
-        let (first_label, first_type) = iter.next().expect("non-empty after is_empty check");
+        let Some((first_label, first_type)) = iter.next() else {
+            return Ok(LocalType::End);
+        };
         let mut result = LabeledLocalType {
             label: first_label,
             local_type: first_type,

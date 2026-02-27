@@ -118,10 +118,12 @@ pub fn parse_choreography_str_with_extensions(
                         topologies.push(parse_topology_decl(inner, &preprocessed)?);
                     }
                     Rule::protocol_decl => {
+                        let protocol_span = inner.as_span();
                         let mut proto_inner = inner.into_inner();
-                        let name_pair = proto_inner
-                            .next()
-                            .expect("grammar: protocol_decl must have name");
+                        let name_pair = proto_inner.next().ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(protocol_span, &preprocessed),
+                            message: "protocol declaration is missing a name".to_string(),
+                        })?;
                         name = format_ident!("{}", name_pair.as_str());
 
                         let mut header_roles: Option<Vec<crate::ast::Role>> = None;
@@ -148,7 +150,10 @@ pub fn parse_choreography_str_with_extensions(
                         }
 
                         let allow_roles_decl = header_roles.is_none();
-                        let body_pair = body_pair.expect("grammar: protocol_decl must have body");
+                        let body_pair = body_pair.ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(protocol_span, &preprocessed),
+                            message: "protocol declaration is missing a body".to_string(),
+                        })?;
                         let body_span = body_pair.as_span();
                         let types::ParsedBody {
                             roles: body_roles,

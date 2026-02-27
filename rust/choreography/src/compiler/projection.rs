@@ -352,7 +352,7 @@ impl<'a> ProjectionContext<'a> {
 
             if receives_choice {
                 // We receive the choice - project as Branch
-                let sender = sender.expect("sender must be Some when receives_choice is true");
+                let sender = sender.ok_or(ProjectionError::NonParticipantChoice)?;
                 let mut local_branches = Vec::new();
 
                 for branch in branches {
@@ -428,10 +428,7 @@ impl<'a> ProjectionContext<'a> {
             }
             1 => {
                 // Role appears in exactly one branch - use that projection
-                Ok(projections
-                    .into_iter()
-                    .next()
-                    .expect("projections must have exactly one element"))
+                Ok(projections.into_iter().next().unwrap_or(LocalType::End))
             }
             _ => {
                 // Role appears in multiple parallel branches
