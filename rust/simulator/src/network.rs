@@ -178,11 +178,16 @@ impl<H: EffectHandler> NetworkModel<H> {
         if tick_secs <= 0.0 {
             return 0;
         }
-        let ticks = latency.as_secs_f64() / tick_secs;
-        if ticks.is_finite() {
-            ticks.round().max(0.0) as u64
-        } else {
+        let latency_secs = latency.as_secs_f64();
+        if latency_secs <= 0.0 || !latency_secs.is_finite() {
             0
+        } else {
+            let ticks = (latency_secs / tick_secs).ceil();
+            if ticks.is_finite() {
+                ticks.max(1.0) as u64
+            } else {
+                0
+            }
         }
     }
 
@@ -478,6 +483,36 @@ mod tests {
     }
 
     #[test]
+    fn sub_tick_link_latency_also_defers_delivery() {
+        let config = NetworkConfig {
+            links: vec![LinkPolicy {
+                from: "A".to_string(),
+                to: "B".to_string(),
+                start_tick: None,
+                end_tick: None,
+                enabled: true,
+                base_latency: Some(Duration::from_micros(100)),
+                latency_variance: Some(FixedQ32::zero()),
+                loss_probability: Some(FixedQ32::zero()),
+            }],
+            ..NetworkConfig::default()
+        };
+        let model = model(config);
+        model.set_tick(3);
+        let decision = model
+            .send_decision(SendDecisionInput {
+                sid: 0,
+                role: "A",
+                partner: "B",
+                label: "msg",
+                state: &[],
+                payload: Some(Value::Nat(1)),
+            })
+            .expect("send decision");
+        assert!(matches!(decision, SendDecision::Defer));
+    }
+
+    #[test]
     fn link_loss_override_applies() {
         let config = NetworkConfig {
             links: vec![LinkPolicy {
@@ -505,5 +540,17 @@ mod tests {
             })
             .expect("send decision");
         assert!(matches!(decision, SendDecision::Drop));
+    }
+
+    #[test]
+    fn positive_sub_tick_latency_rounds_up_to_one_tick() {
+        let model = model(NetworkConfig::default());
+        assert_eq!(model.latency_ticks(Duration::from_micros(100)), 1);
+    }
+
+    #[test]
+    fn exact_zero_latency_stays_zero_ticks() {
+        let model = model(NetworkConfig::default());
+        assert_eq!(model.latency_ticks(Duration::ZERO), 0);
     }
 }

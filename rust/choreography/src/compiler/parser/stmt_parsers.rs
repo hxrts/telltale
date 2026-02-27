@@ -24,6 +24,24 @@ pub(super) use vm::{
     parse_vm_join_stmt, parse_vm_release_stmt, parse_vm_tag_stmt, parse_vm_transfer_stmt,
 };
 
+fn syntax_error(span: pest::Span<'_>, input: &str, message: impl Into<String>) -> ParseError {
+    ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: message.into(),
+    }
+}
+
+fn next_required<'i>(
+    pairs: &mut pest::iterators::Pairs<'i, Rule>,
+    span: pest::Span<'i>,
+    input: &str,
+    message: &str,
+) -> std::result::Result<pest::iterators::Pair<'i, Rule>, ParseError> {
+    pairs
+        .next()
+        .ok_or_else(|| syntax_error(span, input, message.to_string()))
+}
+
 fn parse_guard_predicate(
     expr_src: &str,
     span: pest::Span,
@@ -54,22 +72,17 @@ pub(super) fn parse_send_stmt(
     declared_roles: &HashSet<String>,
     input: &str,
 ) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
     let mut inner = pair.into_inner();
 
-    let from_pair = inner
-        .next()
-        .expect("grammar: send_stmt must have sender role");
+    let from_pair = next_required(&mut inner, span, input, "send is missing sender role")?;
     let from = parse_role_ref(from_pair, declared_roles, input)?;
 
-    let to_pair = inner
-        .next()
-        .expect("grammar: send_stmt must have receiver role");
+    let to_pair = next_required(&mut inner, span, input, "send is missing receiver role")?;
     let to = parse_role_ref(to_pair, declared_roles, input)?;
 
-    let message = super::statement::parse_message(
-        inner.next().expect("grammar: send_stmt must have message"),
-        input,
-    )?;
+    let message_pair = next_required(&mut inner, span, input, "send is missing message payload")?;
+    let message = super::statement::parse_message(message_pair, input)?;
 
     Ok(Statement::Send {
         from,
@@ -87,19 +100,14 @@ pub(super) fn parse_broadcast_stmt(
     declared_roles: &HashSet<String>,
     input: &str,
 ) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
     let mut inner = pair.into_inner();
 
-    let from_pair = inner
-        .next()
-        .expect("grammar: broadcast_stmt must have sender role");
+    let from_pair = next_required(&mut inner, span, input, "broadcast is missing sender role")?;
     let from = parse_role_ref(from_pair, declared_roles, input)?;
 
-    let message = super::statement::parse_message(
-        inner
-            .next()
-            .expect("grammar: broadcast_stmt must have message"),
-        input,
-    )?;
+    let message_pair = next_required(&mut inner, span, input, "broadcast is missing message")?;
+    let message = super::statement::parse_message(message_pair, input)?;
 
     Ok(Statement::Broadcast {
         from,
@@ -121,36 +129,42 @@ pub(super) fn parse_choice_stmt(
     let mut branches = Vec::new();
 
     let mut parse_branch = |item: pest::iterators::Pair<Rule>| -> Result<(), ParseError> {
+        let branch_span = item.as_span();
         let mut branch_inner = item.into_inner();
-        let label = format_ident!(
-            "{}",
-            branch_inner
-                .next()
-                .expect("grammar: choice_branch must have label")
-                .as_str()
-        );
+        let label_pair = next_required(
+            &mut branch_inner,
+            branch_span,
+            input,
+            "choice branch is missing label",
+        )?;
+        let label = format_ident!("{}", label_pair.as_str());
 
         // Check for optional guard
         let mut guard = None;
-        let next_item = branch_inner
-            .next()
-            .expect("grammar: choice_branch must have body or guard");
+        let next_item = next_required(
+            &mut branch_inner,
+            branch_span,
+            input,
+            "choice branch is missing body",
+        )?;
         let body = if let Rule::guard = next_item.as_rule() {
             let guard_span = next_item.as_span();
-            let guard_expr = next_item
-                .into_inner()
-                .next()
-                .expect("grammar: guard must have expression")
-                .as_str();
-            guard = Some(parse_guard_predicate(guard_expr, guard_span, input)?);
-            parse_block(
-                branch_inner
-                    .next()
-                    .expect("grammar: choice_branch with guard must have body"),
-                declared_roles,
+            let mut guard_inner = next_item.into_inner();
+            let guard_expr_pair = next_required(
+                &mut guard_inner,
+                guard_span,
                 input,
-                protocol_defs,
-            )?
+                "guard is missing expression",
+            )?;
+            let guard_expr = guard_expr_pair.as_str();
+            guard = Some(parse_guard_predicate(guard_expr, guard_span, input)?);
+            let body_pair = next_required(
+                &mut branch_inner,
+                branch_span,
+                input,
+                "choice branch with guard is missing body",
+            )?;
+            parse_block(body_pair, declared_roles, input, protocol_defs)?
         } else {
             parse_block(next_item, declared_roles, input, protocol_defs)?
         };
@@ -225,36 +239,42 @@ pub(super) fn parse_timed_choice_stmt(
     let mut branches = Vec::new();
 
     let mut parse_branch = |item: pest::iterators::Pair<Rule>| -> Result<(), ParseError> {
+        let branch_span = item.as_span();
         let mut branch_inner = item.into_inner();
-        let label = format_ident!(
-            "{}",
-            branch_inner
-                .next()
-                .expect("grammar: choice_branch must have label")
-                .as_str()
-        );
+        let label_pair = next_required(
+            &mut branch_inner,
+            branch_span,
+            input,
+            "timed_choice branch is missing label",
+        )?;
+        let label = format_ident!("{}", label_pair.as_str());
 
         // Check for optional guard
         let mut guard = None;
-        let next_item = branch_inner
-            .next()
-            .expect("grammar: choice_branch must have body or guard");
+        let next_item = next_required(
+            &mut branch_inner,
+            branch_span,
+            input,
+            "timed_choice branch is missing body",
+        )?;
         let body = if let Rule::guard = next_item.as_rule() {
             let guard_span = next_item.as_span();
-            let guard_expr = next_item
-                .into_inner()
-                .next()
-                .expect("grammar: guard must have expression")
-                .as_str();
-            guard = Some(parse_guard_predicate(guard_expr, guard_span, input)?);
-            parse_block(
-                branch_inner
-                    .next()
-                    .expect("grammar: choice_branch with guard must have body"),
-                declared_roles,
+            let mut guard_inner = next_item.into_inner();
+            let guard_expr_pair = next_required(
+                &mut guard_inner,
+                guard_span,
                 input,
-                protocol_defs,
-            )?
+                "guard is missing expression",
+            )?;
+            let guard_expr = guard_expr_pair.as_str();
+            guard = Some(parse_guard_predicate(guard_expr, guard_span, input)?);
+            let body_pair = next_required(
+                &mut branch_inner,
+                branch_span,
+                input,
+                "timed_choice branch with guard is missing body",
+            )?;
+            parse_block(body_pair, declared_roles, input, protocol_defs)?
         } else {
             parse_block(next_item, declared_roles, input, protocol_defs)?
         };
@@ -431,10 +451,13 @@ pub(super) fn parse_loop_stmt(
                         }
                         Rule::loop_repeat => {
                             let span = spec.as_span();
-                            let count_pair = spec
-                                .into_inner()
-                                .next()
-                                .expect("grammar: loop_repeat must have value");
+                            let mut repeat_inner = spec.into_inner();
+                            let count_pair = next_required(
+                                &mut repeat_inner,
+                                span,
+                                input,
+                                "loop repeat is missing value",
+                            )?;
                             let count_str = count_pair.as_str();
                             if let Ok(count) = count_str.parse::<usize>() {
                                 condition = Some(Condition::Count(count));
@@ -449,10 +472,13 @@ pub(super) fn parse_loop_stmt(
                         }
                         Rule::loop_while => {
                             let span = spec.as_span();
-                            let cond_pair = spec
-                                .into_inner()
-                                .next()
-                                .expect("grammar: loop while must have string");
+                            let mut while_inner = spec.into_inner();
+                            let cond_pair = next_required(
+                                &mut while_inner,
+                                span,
+                                input,
+                                "loop while is missing condition string",
+                            )?;
                             let cond_lit = syn::parse_str::<syn::LitStr>(cond_pair.as_str())
                                 .map_err(|e| ParseError::InvalidCondition {
                                     message: format!("Invalid loop condition string: {e}"),
@@ -487,10 +513,13 @@ pub(super) fn parse_loop_stmt(
                     }
                     Rule::loop_repeat => {
                         let span = spec.as_span();
-                        let count_pair = spec
-                            .into_inner()
-                            .next()
-                            .expect("grammar: loop_repeat must have value");
+                        let mut repeat_inner = spec.into_inner();
+                        let count_pair = next_required(
+                            &mut repeat_inner,
+                            span,
+                            input,
+                            "loop repeat is missing value",
+                        )?;
                         let count_str = count_pair.as_str();
                         if let Ok(count) = count_str.parse::<usize>() {
                             condition = Some(Condition::Count(count));
@@ -507,10 +536,13 @@ pub(super) fn parse_loop_stmt(
                     }
                     Rule::loop_while => {
                         let span = spec.as_span();
-                        let cond_pair = spec
-                            .into_inner()
-                            .next()
-                            .expect("grammar: loop while must have string");
+                        let mut while_inner = spec.into_inner();
+                        let cond_pair = next_required(
+                            &mut while_inner,
+                            span,
+                            input,
+                            "loop while is missing condition string",
+                        )?;
                         let cond_lit =
                             syn::parse_str::<syn::LitStr>(cond_pair.as_str()).map_err(|e| {
                                 ParseError::InvalidCondition {
@@ -552,4 +584,37 @@ pub(super) fn parse_branch_stmt(
         }
     }
     Ok(Statement::Branch { body, span })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pest::Parser;
+
+    use super::super::ChoreographyParser;
+
+    #[test]
+    fn parse_send_stmt_handles_malformed_pair_without_panicking() {
+        let pair = ChoreographyParser::parse(Rule::role_ref, "A")
+            .expect("parse role_ref")
+            .next()
+            .expect("role_ref pair");
+        let mut declared = HashSet::new();
+        declared.insert("A".to_string());
+        declared.insert("B".to_string());
+        let parsed = parse_send_stmt(pair, &declared, "A");
+        assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn parse_broadcast_stmt_handles_malformed_pair_without_panicking() {
+        let pair = ChoreographyParser::parse(Rule::role_ref, "A")
+            .expect("parse role_ref")
+            .next()
+            .expect("role_ref pair");
+        let mut declared = HashSet::new();
+        declared.insert("A".to_string());
+        let parsed = parse_broadcast_stmt(pair, &declared, "A");
+        assert!(parsed.is_err());
+    }
 }

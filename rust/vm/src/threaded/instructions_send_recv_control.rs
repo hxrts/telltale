@@ -71,7 +71,7 @@ fn step_send(
     ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
     let prepared = {
-        let session_guard = session.lock().expect("session lock poisoned");
+        let session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         step_send_prepare(coro, &session_guard, role, chan)?
     };
 
@@ -150,7 +150,7 @@ fn step_send(
                 let mut model = ctx
                     .communication_consumption
                     .lock()
-                    .expect("communication replay lock poisoned");
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
                 model.set_mode(ctx.config.communication_replay_mode);
                 model.allocate_send_sequence(&edge)
             };
@@ -159,7 +159,7 @@ fn step_send(
             } else {
                 payload
             };
-            let mut session_guard = session.lock().expect("session lock poisoned");
+            let mut session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             session_guard
                 .send_with_sequence(role, &prepared.partner, payload, sequence_no)
                 .map_err(|e| Fault::Invoke { message: e })?
@@ -276,7 +276,7 @@ fn step_recv(
     ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
     let (prepared, edge, val, sequence_no) = {
-        let mut session_guard = session.lock().expect("session lock poisoned");
+        let mut session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let prepared = step_recv_prepare(coro, &session_guard, role, chan)?;
         if !session_guard.has_message(&prepared.partner, role) {
             return Ok(StepPack {
@@ -318,7 +318,7 @@ fn step_recv(
             let mut model = ctx
                 .communication_consumption
                 .lock()
-                .expect("communication replay lock poisoned");
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             model.set_mode(ctx.config.communication_replay_mode);
             model.consume_receive(&identity)
         }
@@ -337,7 +337,7 @@ fn step_recv(
         })?;
         ctx.communication_consumption_artifacts
             .lock()
-            .expect("communication artifact lock poisoned")
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
             .push(CommunicationConsumptionArtifact {
                 tick: ctx.tick,
                 identity,
@@ -480,7 +480,7 @@ fn step_acquire(
         let mut resources = ctx
             .guard_resources
             .lock()
-            .expect("guard resources lock poisoned");
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         resources
             .entry(input.layer.to_string())
             .or_insert(Value::Unit);
@@ -497,14 +497,14 @@ fn step_acquire(
             let mut resources = ctx
                 .guard_resources
                 .lock()
-                .expect("guard resources lock poisoned");
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             resources.insert(input.layer.to_string(), evidence.clone());
             drop(resources);
 
             let mut scoped_states = ctx
                 .resource_states
                 .lock()
-                .expect("resource state lock poisoned");
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             let state = scoped_states.entry(input.sid).or_default();
             let _commitment = state.commit(&evidence);
             Ok(StepPack {
@@ -541,7 +541,7 @@ fn step_release(
         let mut resources = ctx
             .guard_resources
             .lock()
-            .expect("guard resources lock poisoned");
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         resources
             .entry(input.layer.to_string())
             .or_insert(Value::Unit);
@@ -561,14 +561,14 @@ fn step_release(
         let mut resources = ctx
             .guard_resources
             .lock()
-            .expect("guard resources lock poisoned");
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         resources.insert(input.layer.to_string(), ev.clone());
     }
 
     if let Some(state) = ctx
         .resource_states
         .lock()
-        .expect("resource state lock poisoned")
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
         .get_mut(&input.sid)
     {
         state.consume(&ev).map_err(|message| Fault::Acquire {

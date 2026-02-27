@@ -20,7 +20,7 @@ fn lock_with_contention<'a, T>(
             metrics.lock_contention_events = metrics.lock_contention_events.saturating_add(1);
             metrics.mutex_lock_contention_events =
                 metrics.mutex_lock_contention_events.saturating_add(1);
-            arc.lock().expect("mutex lock poisoned after contention")
+            arc.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
         }
     }
 }
@@ -69,7 +69,7 @@ fn exec_instr(
     session: &Arc<Mutex<SessionState>>,
     ctx: &ThreadedExecCtx<'_>,
 ) -> Result<(StepPack, Option<OutputConditionHint>), Fault> {
-    let mut coro_guard = coro.lock().expect("coroutine lock poisoned");
+    let mut coro_guard = coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     let pc = coro_guard.pc;
     let program = ctx
         .programs
@@ -104,7 +104,7 @@ fn exec_instr(
             step_recv(&mut coro_guard, session, &role, chan, dst, &ctx.step)
         }
         Instr::Halt => {
-            let mut session_guard = session.lock().expect("session lock poisoned");
+            let mut session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             step_halt(&mut session_guard, &ep, ctx.step.tick)
         }
         Instr::Jump { target } => Ok(StepPack {
@@ -118,7 +118,7 @@ fn exec_instr(
             events: vec![],
         }),
         Instr::Invoke { action, dst } => {
-            let session_guard = session.lock().expect("session lock poisoned");
+            let session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             step_invoke(
                 &mut coro_guard,
                 &session_guard,
@@ -209,7 +209,7 @@ fn exec_instr(
             })
         }
         Instr::Choose { chan, ref table } => {
-            let mut session_guard = session.lock().expect("session lock poisoned");
+            let mut session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             step_choose(
                 &mut coro_guard,
                 &mut session_guard,
@@ -220,7 +220,7 @@ fn exec_instr(
             )
         }
         Instr::Offer { chan, ref label } => {
-            let mut session_guard = session.lock().expect("session lock poisoned");
+            let mut session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             step_offer(
                 &mut coro_guard,
                 &mut session_guard,
@@ -234,7 +234,7 @@ fn exec_instr(
         Instr::Close {
             session: session_reg,
         } => {
-            let mut session_guard = session.lock().expect("session lock poisoned");
+            let mut session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             let close_ep = endpoint_from_reg(&coro_guard, session_reg)?;
             if !coro_guard.owned_endpoints.contains(&close_ep) {
                 return Err(Fault::Close {
@@ -296,7 +296,7 @@ fn monitor_precheck(
     }
     match instr {
         Instr::Send { .. } | Instr::Offer { .. } => {
-            let session_guard = session.lock().expect("session lock poisoned");
+            let session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             let local_type = session_guard
                 .local_types
                 .get(ep)
@@ -318,7 +318,7 @@ fn monitor_precheck(
             }
         }
         Instr::Receive { .. } => {
-            let session_guard = session.lock().expect("session lock poisoned");
+            let session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             let local_type = session_guard
                 .local_types
                 .get(ep)
@@ -351,7 +351,7 @@ fn monitor_precheck(
                         .to_string(),
                 });
             }
-            let session_guard = session.lock().expect("session lock poisoned");
+            let session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             let local_type = session_guard
                 .local_types
                 .get(ep)

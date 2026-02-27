@@ -86,7 +86,7 @@ impl ThreadedVM {
 
     fn bind_default_handlers_for_session(&mut self, sid: SessionId) {
         if let Some(session) = self.sessions.get(sid) {
-            let mut session_guard = session.lock().expect("session lock poisoned");
+            let mut session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             session_guard.default_handler = crate::session::DEFAULT_HANDLER_ID.to_string();
         }
     }
@@ -133,9 +133,6 @@ impl ThreadedVM {
     ///
     /// Returns a [`VMError`] when session/coroutine limits are exceeded.
     ///
-    /// # Panics
-    ///
-    /// Panics if the shared resource-state lock is poisoned.
     pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
         self.ensure_session_capacity()?;
 
@@ -148,7 +145,7 @@ impl ThreadedVM {
         self.bind_default_handlers_for_session(sid);
         self.resource_states
             .lock()
-            .expect("resource state lock poisoned")
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
             .entry(sid)
             .or_default();
 
@@ -349,7 +346,7 @@ impl ThreadedVM {
                             coro_id: pick.coro_id,
                             fault: fault.clone(),
                         });
-                        let mut coro = pick.coro.lock().expect("coroutine lock poisoned");
+                        let mut coro = pick.coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
                         let was_terminal = coro.is_terminal();
                         coro.status = CoroStatus::Faulted(fault.clone());
                         self.note_status_transition(was_terminal, coro.is_terminal());
@@ -368,7 +365,7 @@ impl ThreadedVM {
                     coro_id: pick.coro_id,
                     fault: fault.clone(),
                 });
-                let mut coro = pick.coro.lock().expect("coroutine lock poisoned");
+                let mut coro = pick.coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
                 let was_terminal = coro.is_terminal();
                 coro.status = CoroStatus::Faulted(fault.clone());
                 self.note_status_transition(was_terminal, coro.is_terminal());
@@ -437,7 +434,7 @@ impl ThreadedVM {
             let Some(coro) = self.coroutines.get(*coro_id) else {
                 return false;
             };
-            let guard = coro.lock().expect("coroutine lock poisoned");
+            let guard = coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             if !matches!(guard.status, CoroStatus::Ready | CoroStatus::Speculating) {
                 return false;
             }
@@ -583,48 +580,39 @@ impl ThreadedVM {
 
     /// Deterministic communication replay-state root.
     ///
-    /// # Panics
-    ///
-    /// Panics if the communication replay mutex is poisoned.
     #[must_use]
     pub fn communication_replay_root(&self) -> crate::verification::Hash {
         self.communication_consumption
             .lock()
-            .expect("communication replay lock poisoned")
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
             .state()
             .root()
     }
 
     /// Receive-boundary replay-consumption artifacts.
     ///
-    /// # Panics
-    ///
-    /// Panics if the communication artifact mutex is poisoned.
     #[must_use]
     pub fn communication_consumption_artifacts(&self) -> Vec<CommunicationConsumptionArtifact> {
         self.communication_consumption_artifacts
             .lock()
-            .expect("communication artifact lock poisoned")
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clone()
     }
 
     /// Canonical replay/state fragment for deterministic diffing and snapshots.
     ///
-    /// # Panics
-    ///
-    /// Panics if communication replay-state or artifact mutexes are poisoned.
     #[must_use]
     pub fn canonical_replay_fragment(&self) -> CanonicalReplayFragmentV1 {
         let communication_replay_root = self
             .communication_consumption
             .lock()
-            .expect("communication replay lock poisoned")
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
             .state()
             .root();
         let communication_consumption_artifacts = self
             .communication_consumption_artifacts
             .lock()
-            .expect("communication artifact lock poisoned")
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clone();
         let corrupted_edges = self
             .corrupted_edges

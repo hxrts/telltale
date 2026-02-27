@@ -173,16 +173,28 @@ impl<R: RoleId, M> Program<R, M> {
 
     /// Extend this program with another program.
     ///
+    /// If `self` ends with `Effect::End`, that terminal marker is removed before
+    /// appending `other`, so composition preserves the single-terminal-`End`
+    /// invariant.
+    ///
     /// # Panics
     ///
-    /// Panics if the composed program violates structural invariants (e.g., End
-    /// not at the final position). Use `try_then` for fallible composition.
+    /// Panics only if the composed program violates structural invariants. Use
+    /// `try_then` for fallible composition.
     #[must_use]
     pub fn then(self, other: Program<R, M>) -> Program<R, M> {
+        self.try_then(other)
+            .unwrap_or_else(|err| panic!("invalid program composition: {err}"))
+    }
+
+    /// Fallible version of [`Program::then`].
+    pub fn try_then(self, other: Program<R, M>) -> Result<Program<R, M>, ProgramError> {
         let mut effects = self.effects;
+        if matches!(effects.last(), Some(Effect::End)) {
+            effects.pop();
+        }
         effects.extend(other.effects);
         Program::from_effects(effects)
-            .unwrap_or_else(|err| panic!("invalid program composition: {err}"))
     }
 
     /// Check if the program is empty.
@@ -414,6 +426,95 @@ impl<R: RoleId, M> Effect<R, M> {
         match self {
             Effect::Extension(ext) => Some(ext.type_id()),
             _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::identifiers::RoleName;
+    use proptest::prelude::*;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum TestRole {
+        Alice,
+        Bob,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum TestLabel {
+        L0,
+    }
+
+    impl crate::effects::LabelId for TestLabel {
+        fn as_str(&self) -> &'static str {
+            "L0"
+        }
+
+        fn from_str(label: &str) -> Option<Self> {
+            (label == "L0").then_some(Self::L0)
+        }
+    }
+
+    impl RoleId for TestRole {
+        type Label = TestLabel;
+
+        fn role_name(&self) -> RoleName {
+            match self {
+                Self::Alice => RoleName::from_static("Alice"),
+                Self::Bob => RoleName::from_static("Bob"),
+            }
+        }
+    }
+
+    #[test]
+    fn then_composes_ended_programs_without_panic() {
+        let left = Program::<TestRole, String>::new()
+            .send(TestRole::Bob, "hello".to_string())
+            .end();
+        let right = Program::<TestRole, String>::new()
+            .recv::<String>(TestRole::Alice)
+            .end();
+        let composed = left.then(right);
+        assert!(matches!(composed.effects().last(), Some(Effect::End)));
+        assert_eq!(
+            composed
+                .effects()
+                .iter()
+                .filter(|effect| matches!(effect, Effect::End))
+                .count(),
+            1
+        );
+    }
+
+    proptest! {
+        #[test]
+        fn try_then_keeps_single_terminal_end(include_left_send in any::<bool>(), include_right_recv in any::<bool>()) {
+            let left_builder = Program::<TestRole, String>::builder();
+            let left_builder = if include_left_send {
+                left_builder.send(TestRole::Bob, "msg".to_string())
+            } else {
+                left_builder
+            };
+            let left = left_builder.end();
+
+            let right_builder = Program::<TestRole, String>::builder();
+            let right_builder = if include_right_recv {
+                right_builder.recv::<String>(TestRole::Alice)
+            } else {
+                right_builder
+            };
+            let right = right_builder.end();
+
+            let composed = left.try_then(right).expect("composition should be structurally valid");
+            let end_count = composed
+                .effects()
+                .iter()
+                .filter(|effect| matches!(effect, Effect::End))
+                .count();
+            prop_assert_eq!(end_count, 1);
+            prop_assert!(matches!(composed.effects().last(), Some(Effect::End)));
         }
     }
 }

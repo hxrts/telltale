@@ -141,9 +141,9 @@ impl ThreadedVM {
             .sessions
             .sessions
             .read()
-            .expect("session store lock poisoned");
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         for session in sessions.values() {
-            let mut session_guard = session.lock().expect("session lock poisoned");
+            let mut session_guard = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             if !session_guard.roles.iter().any(|role| role == site) {
                 continue;
             }
@@ -161,7 +161,7 @@ impl ThreadedVM {
         let mut faulted = Vec::new();
         let mut newly_terminal = 0_usize;
         for coro in &self.coroutines {
-            let mut guard = coro.lock().expect("coroutine lock poisoned");
+            let mut guard = coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             if guard.role == site && !guard.is_terminal() {
                 let fault = Fault::Invoke {
                     message: reason.clone(),
@@ -327,7 +327,7 @@ impl ThreadedVM {
         let blocked_ids = self.scheduler.blocked_ids();
         for coro_id in blocked_ids {
             let should_skip = self.coroutines.get(coro_id).is_some_and(|coro| {
-                let guard = coro.lock().expect("coroutine lock poisoned");
+                let guard = coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
                 self.crashed_sites.contains(&guard.role)
                     || self.timed_out_sites.contains_key(&guard.role)
             });
@@ -337,7 +337,7 @@ impl ThreadedVM {
             let reason = self.scheduler.block_reason(coro_id).cloned();
             if let Some(BlockReason::Recv { token, .. }) = reason {
                 if let Some(session) = self.sessions.get(token.sid) {
-                    let session = session.lock().expect("session lock poisoned");
+                    let session = session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
                     let has_msg = session.roles.iter().any(|sender| {
                         sender != &token.endpoint.role
                             && session.has_message(sender, &token.endpoint.role)
@@ -360,7 +360,7 @@ impl ThreadedVM {
         let Some(coro) = coros.get(id) else {
             return false;
         };
-        let coro_guard = coro.lock().expect("coroutine lock poisoned");
+        let coro_guard = coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let sid = coro_guard.session_id;
         let lane = id % planner.lane_count;
         if crashed_sites.contains(&coro_guard.role)
@@ -409,7 +409,7 @@ impl ThreadedVM {
             .cloned()
             .expect("coroutine exists");
         let sid = {
-            let coro_guard = coro.lock().expect("coroutine lock poisoned");
+            let coro_guard = coro.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             coro_guard.session_id
         };
         let session = self

@@ -75,7 +75,7 @@ impl FixedQ32 {
     /// 1/2.
     #[must_use]
     pub fn half() -> Self {
-        Self::from_ratio(1, 2).expect("1/2 must be representable")
+        Self::from_bits(Self::SCALE / 2)
     }
 
     /// Construct from an integer, returning an error on overflow.
@@ -276,7 +276,7 @@ impl FixedQ32 {
             return Self::zero();
         }
         // Newton iteration over fixed point.
-        let two = Self::from_ratio(2, 1).expect("2 must be representable");
+        let two = Self::from_bits(2 * Self::SCALE);
         let mut x = self.max(Self::one());
         for _ in 0..16 {
             let q = self.saturating_div(x);
@@ -291,15 +291,15 @@ impl FixedQ32 {
     #[must_use]
     pub fn tanh_approx(self) -> Self {
         let one = Self::one();
-        let three = Self::from_ratio(3, 1).expect("3 must be representable");
+        let three = Self::from_bits(3 * Self::SCALE);
         if self >= three {
             return one;
         }
         if self <= -three {
             return -one;
         }
-        let nine = Self::from_ratio(9, 1).expect("9 must be representable");
-        let twenty_seven = Self::from_ratio(27, 1).expect("27 must be representable");
+        let nine = Self::from_bits(9 * Self::SCALE);
+        let twenty_seven = Self::from_bits(27 * Self::SCALE);
         let x2 = self.square();
         let num = self.saturating_mul(twenty_seven.saturating_add(x2));
         let den = twenty_seven.saturating_add(nine.saturating_mul(x2));
@@ -573,6 +573,7 @@ impl FromStr for FixedQ32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn one_has_expected_scale_bits() {
@@ -620,5 +621,22 @@ mod tests {
         let high = FixedQ32::from_ratio(10, 1).expect("fit").tanh_approx();
         assert_eq!(low, FixedQ32::neg_one());
         assert_eq!(high, FixedQ32::one());
+    }
+
+    proptest! {
+        #[test]
+        fn from_ppm_stays_in_unit_interval(ppm in 0u32..=PPM_SCALE) {
+            let value = FixedQ32::from_ppm(ppm).expect("ppm in range is representable");
+            prop_assert!(value >= FixedQ32::zero());
+            prop_assert!(value <= FixedQ32::one());
+        }
+
+        #[test]
+        fn tanh_approx_is_clamped(raw in any::<i32>()) {
+            let x = FixedQ32::from_bits(i64::from(raw) << FixedQ32::FRACTIONAL_BITS);
+            let y = x.tanh_approx();
+            prop_assert!(y >= FixedQ32::neg_one());
+            prop_assert!(y <= FixedQ32::one());
+        }
     }
 }

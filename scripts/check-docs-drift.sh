@@ -8,7 +8,7 @@ DOC_FILES=(
   "docs/01_introduction.md"
   "docs/02_getting_started.md"
   "docs/03_architecture.md"
-  "docs/04_crate_organization.md"
+  "docs/04_code_organization.md"
 )
 
 VERSION_CHECK_PATHS=(

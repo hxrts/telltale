@@ -16,10 +16,12 @@ pub(crate) fn parse_role_param(
     _role_name: &str,
     input: &str,
 ) -> std::result::Result<RoleParam, ParseError> {
+    let span = pair.as_span();
     let mut inner = pair.into_inner();
-    let param_expr = inner
-        .next()
-        .expect("grammar: role_param must contain role_param_expr");
+    let param_expr = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "Invalid role parameter: missing parameter expression".to_string(),
+    })?;
 
     match param_expr.as_rule() {
         Rule::role_param_expr => {
@@ -65,10 +67,12 @@ pub(crate) fn parse_role_index(
     _role_name: &str,
     input: &str,
 ) -> std::result::Result<RoleIndex, ParseError> {
+    let span = pair.as_span();
     let mut inner = pair.into_inner();
-    let index_expr = inner
-        .next()
-        .expect("grammar: role_index must contain role_index_expr");
+    let index_expr = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "Invalid role index: missing index expression".to_string(),
+    })?;
 
     match index_expr.as_rule() {
         Rule::role_index_expr => {
@@ -137,12 +141,14 @@ pub(crate) fn parse_range_expr(
 
     let pair_span = pair.as_span();
     let mut inner = pair.into_inner();
-    let start_expr = inner
-        .next()
-        .expect("grammar: range_expr must have start expression");
-    let end_expr = inner
-        .next()
-        .expect("grammar: range_expr must have end expression");
+    let start_expr = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(pair_span, input),
+        message: "Invalid range expression: missing start expression".to_string(),
+    })?;
+    let end_expr = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(pair_span, input),
+        message: "Invalid range expression: missing end expression".to_string(),
+    })?;
 
     let start = match start_expr.as_rule() {
         Rule::integer => {
@@ -204,9 +210,10 @@ pub(crate) fn parse_role_ref(
     let span = pair.as_span();
     let mut inner = pair.into_inner();
 
-    let role_ident = inner
-        .next()
-        .expect("grammar: role_ref must have identifier");
+    let role_ident = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "Invalid role reference: missing role identifier".to_string(),
+    })?;
     let role_name = role_ident.as_str().trim();
 
     // Check if the base role name is declared
@@ -256,10 +263,12 @@ pub(crate) fn parse_roles_from_pair(
     for role_list in role_list_pairs {
         for role_decl in role_list.into_inner() {
             if let Rule::role_decl = role_decl.as_rule() {
+                let role_span = role_decl.as_span();
                 let mut inner_role = role_decl.into_inner();
-                let role_ident = inner_role
-                    .next()
-                    .expect("grammar: role_decl must have identifier");
+                let role_ident = inner_role.next().ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(role_span, input),
+                    message: "Invalid role declaration: missing role identifier".to_string(),
+                })?;
                 let role_name = role_ident.as_str().trim();
                 let span = role_ident.as_span();
 
@@ -288,4 +297,43 @@ pub(crate) fn parse_roles_from_pair(
     }
 
     Ok(roles)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pest::Parser;
+
+    use super::super::ChoreographyParser;
+
+    #[test]
+    fn parse_role_param_handles_malformed_pair_without_panicking() {
+        let pair = ChoreographyParser::parse(Rule::role_decl, "Worker")
+            .expect("parse role_decl")
+            .next()
+            .expect("role_decl pair");
+        let parsed = parse_role_param(pair, "Worker", "Worker");
+        assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn parse_role_ref_handles_non_role_pair_without_panicking() {
+        let pair = ChoreographyParser::parse(Rule::role_index, "[0]")
+            .expect("parse role_index")
+            .next()
+            .expect("role_index pair");
+        let declared = HashSet::new();
+        let parsed = parse_role_ref(pair, &declared, "[0]");
+        assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn parse_range_expr_handles_non_range_pair_without_panicking() {
+        let pair = ChoreographyParser::parse(Rule::integer, "7")
+            .expect("parse integer")
+            .next()
+            .expect("integer pair");
+        let parsed = parse_range_expr(pair, "7");
+        assert!(parsed.is_err());
+    }
 }

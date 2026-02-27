@@ -208,6 +208,26 @@
     }
 
     #[test]
+    fn threaded_replay_accessors_recover_from_poisoned_locks() {
+        let vm = ThreadedVM::with_workers(VMConfig::default(), 1);
+        let replay = vm.communication_consumption.clone();
+        let artifacts = vm.communication_consumption_artifacts.clone();
+
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = replay.lock().expect("acquire replay lock");
+            panic!("poison replay lock");
+        }));
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = artifacts.lock().expect("acquire artifact lock");
+            panic!("poison artifact lock");
+        }));
+
+        let _root = vm.communication_replay_root();
+        let snapshot = vm.communication_consumption_artifacts();
+        assert!(snapshot.is_empty());
+    }
+
+    #[test]
     fn threaded_recv_reports_verification_fault_for_tampered_signature() {
         let mut local_types = BTreeMap::new();
         local_types.insert(

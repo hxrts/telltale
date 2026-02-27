@@ -265,24 +265,22 @@ impl LeanRunner {
             });
         }
 
-        // Parse JSON log if available
-        if json_log_path.exists() {
-            let log_content = std::fs::read_to_string(json_log_path)?;
-            if !log_content.trim().is_empty() {
-                let log_json: Value = serde_json::from_str(&log_content)
-                    .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
-
-                return self.parse_json_log(&log_json, stdout);
-            }
+        if !json_log_path.exists() {
+            return Err(LeanRunnerError::ParseError(
+                "Lean validator completed but did not emit a JSON log".to_string(),
+            ));
         }
 
-        // Fallback: assume success if process exited 0
-        Ok(LeanValidationResult {
-            success: true,
-            role: String::new(),
-            message: String::new(),
-            raw_output: stdout,
-        })
+        let log_content = std::fs::read_to_string(json_log_path)?;
+        if log_content.trim().is_empty() {
+            return Err(LeanRunnerError::ParseError(
+                "Lean validator emitted an empty JSON log".to_string(),
+            ));
+        }
+        let log_json: Value = serde_json::from_str(&log_content)
+            .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
+
+        self.parse_json_log(&log_json, stdout)
     }
 
     /// Parse the JSON log output from the runner.
@@ -291,9 +289,28 @@ impl LeanRunner {
         log: &Value,
         raw_output: String,
     ) -> Result<LeanValidationResult, LeanRunnerError> {
-        let role = log["role"].as_str().unwrap_or("").to_string();
-        let success = log["status"].as_str() == Some("ok");
-        let message = log["message"].as_str().unwrap_or("").to_string();
+        let role = log
+            .get("role")
+            .and_then(Value::as_str)
+            .ok_or_else(|| LeanRunnerError::ParseError("missing string field: role".to_string()))?
+            .to_string();
+        let status = log.get("status").and_then(Value::as_str).ok_or_else(|| {
+            LeanRunnerError::ParseError("missing string field: status".to_string())
+        })?;
+        let success = match status {
+            "ok" => true,
+            "error" => false,
+            other => {
+                return Err(LeanRunnerError::ParseError(format!(
+                    "invalid status value in JSON log: {other}"
+                )))
+            }
+        };
+        let message = log
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
 
         Ok(LeanValidationResult {
             success,
@@ -307,6 +324,7 @@ impl LeanRunner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
 
     #[test]
     fn test_is_available_returns_bool() {
@@ -331,5 +349,63 @@ mod tests {
         assert!(matches!(result, Err(LeanRunnerError::BinaryNotFound(_))));
     }
 
-    // No log parsing tests yet; validator logs are integration-tested elsewhere.
+    fn successful_output() -> std::process::Output {
+        Command::new("sh")
+            .arg("-c")
+            .arg("true")
+            .output()
+            .expect("invoke shell")
+    }
+
+    #[test]
+    fn test_parse_output_requires_json_log_file() {
+        let runner = LeanRunner {
+            binary_path: PathBuf::from("/tmp/fake-validator"),
+        };
+        let missing = std::env::temp_dir().join("missing-validator-log.json");
+        let result = runner.parse_output(successful_output(), &missing);
+        assert!(matches!(result, Err(LeanRunnerError::ParseError(_))));
+    }
+
+    #[test]
+    fn test_parse_output_rejects_empty_json_log() {
+        let runner = LeanRunner {
+            binary_path: PathBuf::from("/tmp/fake-validator"),
+        };
+        let empty = NamedTempFile::new().expect("create temp file");
+        let result = runner.parse_output(successful_output(), empty.path());
+        assert!(matches!(result, Err(LeanRunnerError::ParseError(_))));
+    }
+
+    #[test]
+    fn test_parse_json_log_rejects_invalid_status() {
+        let runner = LeanRunner {
+            binary_path: PathBuf::from("/tmp/fake-validator"),
+        };
+        let log = serde_json::json!({
+            "role": "A",
+            "status": "maybe",
+            "message": "test"
+        });
+        let result = runner.parse_json_log(&log, String::new());
+        assert!(matches!(result, Err(LeanRunnerError::ParseError(_))));
+    }
+
+    #[test]
+    fn test_parse_json_log_success() {
+        let runner = LeanRunner {
+            binary_path: PathBuf::from("/tmp/fake-validator"),
+        };
+        let log = serde_json::json!({
+            "role": "A",
+            "status": "ok",
+            "message": "coherent"
+        });
+        let result = runner
+            .parse_json_log(&log, "stdout".to_string())
+            .expect("parse valid log");
+        assert!(result.success);
+        assert_eq!(result.role, "A");
+        assert_eq!(result.message, "coherent");
+    }
 }

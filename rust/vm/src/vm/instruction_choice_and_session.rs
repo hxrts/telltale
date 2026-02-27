@@ -66,17 +66,18 @@ impl VM {
         }
         let sid = ep.sid;
 
-        let local_type = self
-            .sessions
-            .lookup_type(&ep)
-            .ok_or_else(|| Fault::TypeViolation {
-                expected: telltale_types::ValType::Unit,
-                actual: telltale_types::ValType::Unit,
-                message: format!("{role}: no type registered"),
-            })?
-            .clone();
-
-        let (partner, branches) = Self::expect_recv_type(&local_type, role)?;
+        let partner = {
+            let local_type = self
+                .sessions
+                .lookup_type(&ep)
+                .ok_or_else(|| Fault::TypeViolation {
+                    expected: telltale_types::ValType::Unit,
+                    actual: telltale_types::ValType::Unit,
+                    message: format!("{role}: no type registered"),
+                })?;
+            let (partner, _) = Self::expect_recv_type(local_type, role)?;
+            partner.to_string()
+        };
 
         let session = self.sessions.get(sid).ok_or_else(|| Fault::ChannelClosed {
             endpoint: ep.clone(),
@@ -84,7 +85,7 @@ impl VM {
         if !session.has_message(&partner, role) {
             return Ok(StepPack {
                 coro_update: CoroUpdate::Block(BlockReason::Recv {
-                    edge: Edge::new(sid, partner, role.to_string()),
+                    edge: Edge::new(sid, partner.clone(), role.to_string()),
                     token: ProgressToken::for_endpoint(ep.clone()),
                 }),
                 type_update: None,
@@ -116,13 +117,25 @@ impl VM {
             _ => unreachable!("validate_payload enforces string branch labels for choose"),
         };
 
-        let (_lbl, _vt, continuation) = branches
-            .iter()
-            .find(|(l, _, _)| l.name == label)
-            .ok_or_else(|| Fault::UnknownLabel {
-                label: label.clone(),
-            })?
-            .clone();
+        let continuation = {
+            let local_type = self
+                .sessions
+                .lookup_type(&ep)
+                .ok_or_else(|| Fault::TypeViolation {
+                    expected: telltale_types::ValType::Unit,
+                    actual: telltale_types::ValType::Unit,
+                    message: format!("{role}: no type registered"),
+                })?;
+            let (_, branches) = Self::expect_recv_type(local_type, role)?;
+            let (_, _, continuation) =
+                branches
+                    .iter()
+                    .find(|(l, _, _)| l.name == label)
+                    .ok_or_else(|| Fault::UnknownLabel {
+                        label: label.clone(),
+                    })?;
+            continuation.clone()
+        };
 
         let target_pc = table
             .iter()
@@ -189,23 +202,21 @@ impl VM {
                 expected: telltale_types::ValType::Unit,
                 actual: telltale_types::ValType::Unit,
                 message: format!("{role}: no type registered"),
-            })?
-            .clone();
+            })?;
 
-        match &local_type {
+        match local_type {
             LocalTypeR::Send {
                 partner, branches, ..
             } => {
                 let partner = partner.clone();
-                let branches = branches.clone();
-
                 let (_lbl, expected_type, continuation) = branches
                     .iter()
                     .find(|(l, _, _)| l.name == label)
                     .ok_or_else(|| Fault::UnknownLabel {
                         label: label.to_string(),
-                    })?
-                    .clone();
+                    })?;
+                let expected_type = expected_type.clone();
+                let continuation = continuation.clone();
 
                 let offer_payload = Value::Str(label.to_string());
                 let fast_path = SendDecisionFastPathInput::new(

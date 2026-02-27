@@ -325,14 +325,14 @@ impl VM {
     }
 
     /// Extract partner and branches from a Recv local type.
-    fn expect_recv_type(
-        local_type: &LocalTypeR,
+    fn expect_recv_type<'a>(
+        local_type: &'a LocalTypeR,
         role: &str,
-    ) -> Result<(String, BranchList), Fault> {
+    ) -> Result<(&'a str, &'a BranchList), Fault> {
         match local_type {
             LocalTypeR::Recv {
                 partner, branches, ..
-            } => Ok((partner.clone(), branches.clone())),
+            } => Ok((partner.as_str(), branches)),
             other => Err(Fault::TypeViolation {
                 expected: telltale_types::ValType::Unit,
                 actual: telltale_types::ValType::Unit,
