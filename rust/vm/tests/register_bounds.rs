@@ -1,3 +1,4 @@
+#![cfg(not(target_arch = "wasm32"))]
 #![allow(missing_docs)]
 
 use std::collections::BTreeMap;
