@@ -68,6 +68,8 @@ bounded.validate(1)?;  // Err(BelowMinimum)
 bounded.validate(6)?;  // Err(AboveMaximum)
 ```
 
+These helpers let generated runners fail fast on invalid family cardinalities before any transport wiring or handler startup occurs.
+
 ## DSL Syntax
 
 Topologies are defined in `.topology` files or parsed from strings.
