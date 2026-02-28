@@ -67,6 +67,78 @@ example (bundle : VMLivenessBundle store₀)
     ).foster?.isSome = true := by
   rfl
 
+example (bundle : VMLivenessBundle store₀)
+    (p : Adapters.MaxWeightProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withClassicalProfiles
+        { maxWeight? := some p })
+    ).maxWeight?.isSome = true := by
+  rfl
+
+example (bundle : VMLivenessBundle store₀)
+    (p : Adapters.LDPProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withClassicalProfiles
+        { ldp? := some p })
+    ).ldp?.isSome = true := by
+  rfl
+
+example (bundle : VMLivenessBundle store₀)
+    (p : Adapters.MeanFieldProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withClassicalProfiles
+        { meanField? := some p })
+    ).meanField?.isSome = true := by
+  rfl
+
+example (bundle : VMLivenessBundle store₀)
+    (p : Adapters.HeavyTrafficProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withClassicalProfiles
+        { heavyTraffic? := some p })
+    ).heavyTraffic?.isSome = true := by
+  rfl
+
+example (bundle : VMLivenessBundle store₀)
+    (p : Adapters.MixingProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withClassicalProfiles
+        { mixing? := some p })
+    ).mixing?.isSome = true := by
+  rfl
+
+example (bundle : VMLivenessBundle store₀)
+    (p : Adapters.FluidProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withClassicalProfiles
+        { fluid? := some p })
+    ).fluid?.isSome = true := by
+  rfl
+
+example (bundle : VMLivenessBundle store₀)
+    (p : Adapters.ConcentrationProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withClassicalProfiles
+        { concentration? := some p })
+    ).concentration?.isSome = true := by
+  rfl
+
+example (bundle : VMLivenessBundle store₀)
+    (p : Adapters.LittlesLawProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withClassicalProfiles
+        { littlesLaw? := some p })
+    ).littlesLaw?.isSome = true := by
+  rfl
+
+example (bundle : VMLivenessBundle store₀)
+    (p : Adapters.FunctionalCLTProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withClassicalProfiles
+        { functionalCLT? := some p })
+    ).functionalCLT?.isSome = true := by
+  rfl
+
 end
 
 end Examples

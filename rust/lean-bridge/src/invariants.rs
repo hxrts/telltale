@@ -132,6 +132,61 @@ pub struct AtomicBroadcastConfig {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct AccountableSafetyConfig {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct FailureDetectorsConfig {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct DataAvailabilityConfig {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct CoordinationConfig {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct CRDTConfig {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ByzantineSafetyConfig {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ConsensusEnvelopeConfig {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct FailureEnvelopeConfig {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct VMEnvelopeAdherenceConfig {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct VMEnvelopeAdmissionConfig {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ProtocolEnvelopeBridgeConfig {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct DistributedClaims {
     #[serde(default)]
     pub fault_model: FaultModel,
@@ -143,6 +198,17 @@ pub struct DistributedClaims {
     pub nakamoto: Option<NakamotoConfig>,
     pub reconfiguration: Option<ReconfigurationConfig>,
     pub atomic_broadcast: Option<AtomicBroadcastConfig>,
+    pub accountable_safety: Option<AccountableSafetyConfig>,
+    pub failure_detectors: Option<FailureDetectorsConfig>,
+    pub data_availability: Option<DataAvailabilityConfig>,
+    pub coordination: Option<CoordinationConfig>,
+    pub crdt: Option<CRDTConfig>,
+    pub byzantine_safety: Option<ByzantineSafetyConfig>,
+    pub consensus_envelope: Option<ConsensusEnvelopeConfig>,
+    pub failure_envelope: Option<FailureEnvelopeConfig>,
+    pub vm_envelope_adherence: Option<VMEnvelopeAdherenceConfig>,
+    pub vm_envelope_admission: Option<VMEnvelopeAdmissionConfig>,
+    pub protocol_envelope_bridge: Option<ProtocolEnvelopeBridgeConfig>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -282,6 +348,9 @@ mod tests {
                     crash_bound: 1,
                     requires_determinism: true,
                 }),
+                accountable_safety: Some(AccountableSafetyConfig { enabled: true }),
+                byzantine_safety: Some(ByzantineSafetyConfig { enabled: true }),
+                protocol_envelope_bridge: Some(ProtocolEnvelopeBridgeConfig { enabled: true }),
                 ..DistributedClaims::default()
             },
             classical: ClassicalClaims {

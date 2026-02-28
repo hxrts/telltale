@@ -82,12 +82,15 @@ pub mod test_utils;
 pub use export::{global_to_json, local_to_json};
 pub use import::{json_to_global, json_to_local, ImportError};
 pub use invariants::{
-    export_protocol_bundle, AvailabilityLevel, CAPConfig, ClassicalClaims, ConcentrationConfig,
-    ConsistencyLevel, DistributedClaims, FLPConfig, FaultModel, FluidConfig, FosterConfig,
+    export_protocol_bundle, AccountableSafetyConfig, AvailabilityLevel, ByzantineSafetyConfig,
+    CAPConfig, CRDTConfig, ClassicalClaims, ConcentrationConfig, ConsensusEnvelopeConfig,
+    ConsistencyLevel, CoordinationConfig, DataAvailabilityConfig, DistributedClaims, FLPConfig,
+    FailureDetectorsConfig, FailureEnvelopeConfig, FaultModel, FluidConfig, FosterConfig,
     FunctionalCLTConfig, HeavyTrafficConfig, InvariantClaims, LDPConfig, LittlesLawConfig,
     LivenessConfig, MaxWeightConfig, MeanFieldConfig, MixingConfig, NakamotoConfig,
-    PartialSynchronyConfig, PartitionModel, ProtocolBundle, QuorumGeometryConfig, QuorumSystemKind,
-    ReconfigurationConfig, ResponsivenessConfig, SchedulerKind, TimingModel,
+    PartialSynchronyConfig, PartitionModel, ProtocolBundle, ProtocolEnvelopeBridgeConfig,
+    QuorumGeometryConfig, QuorumSystemKind, ReconfigurationConfig, ResponsivenessConfig,
+    SchedulerKind, TimingModel, VMEnvelopeAdherenceConfig, VMEnvelopeAdmissionConfig,
     PROTOCOL_BUNDLE_SCHEMA_VERSION,
 };
 pub use schema::{

@@ -117,6 +117,42 @@ example (bundle : VMLivenessBundle store₀) (p : Adapters.CRDTProfile) :
     ).crdt?.isSome = true := by
   rfl
 
+example (bundle : VMLivenessBundle store₀) (p : Adapters.ByzantineSafetyProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withByzantineSafety p)
+    ).byzantineSafety?.isSome = true := by
+  rfl
+
+example (bundle : VMLivenessBundle store₀) (p : Adapters.ConsensusEnvelopeProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withConsensusEnvelope p)
+    ).consensusEnvelope?.isSome = true := by
+  rfl
+
+example (bundle : VMLivenessBundle store₀) (p : Adapters.FailureEnvelopeProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withFailureEnvelope p)
+    ).failureEnvelope?.isSome = true := by
+  rfl
+
+example (bundle : VMLivenessBundle store₀) (p : Adapters.VMEnvelopeAdherenceProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withVMEnvelopeAdherence p)
+    ).vmEnvelopeAdherence?.isSome = true := by
+  rfl
+
+example (bundle : VMLivenessBundle store₀) (p : Adapters.VMEnvelopeAdmissionProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withVMEnvelopeAdmission p)
+    ).vmEnvelopeAdmission?.isSome = true := by
+  rfl
+
+example (bundle : VMLivenessBundle store₀) (p : Adapters.ProtocolEnvelopeBridgeProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withProtocolEnvelopeBridge p)
+    ).protocolEnvelopeBridge?.isSome = true := by
+  rfl
+
 end
 
 end Examples
