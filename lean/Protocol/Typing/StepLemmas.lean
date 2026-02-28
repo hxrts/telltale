@@ -343,10 +343,7 @@ theorem store_typed_recv_preserved {G : GEnv} {S : SEnv} {store : VarStore} {e :
 
 -- Enqueue Typing Preservation
 
-/-- BuffersTyped is preserved when enqueuing a well-typed value.
-
-    NOTE: This lemma is proven in Protocol.Preservation. It's duplicated here to avoid
-    circular dependencies, but should be moved to a shared module. -/
+/-- BuffersTyped is preserved when enqueuing a well-typed value. -/
 theorem buffers_typed_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
     {e : Edge} {v : Value} {T : ValType}
     (hBT : BuffersTyped G D bufs)
@@ -430,10 +427,7 @@ theorem buffers_typed_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
 -- Dequeue Typing Preservation
 
 /-- BuffersTyped is preserved when dequeuing a buffer: removing the head preserves typing
-    for the remaining elements (which shift down by one index).
-
-    NOTE: This lemma needs to be proven. Similar to buffers_typed_enqueue, this should be
-    moved to a shared module to avoid circular dependencies. -/
+    for the remaining elements (which shift down by one index). -/
 theorem buffers_typed_dequeue {G : GEnv} {D : DEnv} {bufs : Buffers}
     {recvEdge : Edge} {v : Value} {vs : List Value} {T : ValType} :
     BuffersTyped G D bufs →

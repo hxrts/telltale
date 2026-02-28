@@ -26,7 +26,7 @@ open SessionCoTypes.EQ2Paco
 open Paco
 open SessionTypes.Participation
 
-/-- Local copy of BranchesRel_mono (since the original is private in EQ2.lean). -/
+/-- BranchesRel is monotone in its relation parameter. -/
 theorem branches_rel_mono {R S : Rel}
     (h : ∀ a b, R a b → S a b) :
     ∀ {bs cs}, BranchesRel R bs cs → BranchesRel S bs cs := by

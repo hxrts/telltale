@@ -63,7 +63,7 @@ def fromPacoRel (R : Paco.Rel LocalTypeR) : EQ2.Rel := R
 def EQ2F_paco (R : Paco.Rel LocalTypeR) : Paco.Rel LocalTypeR :=
   EQ2F (fromPacoRel R)
 
-/-- Local copy of BranchesRel_mono (since the original is private). -/
+/-- BranchesRel is monotone in its relation parameter. -/
 private theorem branches_rel_mono' {R S : EQ2.Rel}
     (h : ∀ a b, R a b → S a b) :
     ∀ {bs cs}, BranchesRel R bs cs → BranchesRel S bs cs := by
