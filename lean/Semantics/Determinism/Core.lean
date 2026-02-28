@@ -1,3 +1,2 @@
 import Semantics.Determinism.Core.GlobalDeterminism
 import Semantics.Determinism.Core.RemainingDeterminism
-import Semantics.Determinism.Core.InterfaceBridge
