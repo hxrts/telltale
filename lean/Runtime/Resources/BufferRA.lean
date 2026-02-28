@@ -6,7 +6,7 @@ import IrisExtractionInstance
 
 /-! # Task 14: Buffer Resource Algebra
 
-Ghost state for bounded buffers and refinement chain from iris_runtime_2.md §6.
+Ghost state for bounded buffers and refinement chain.
 
 ## Definitions
 
@@ -16,7 +16,7 @@ Ghost state for bounded buffers and refinement chain from iris_runtime_2.md §6.
 - `bounded_refines_unbounded`
 - `shared_refines_reliable` / `reliable_refines_unreliable`
 
-Dependencies: Shim.ResourceAlgebra. -/
+Dependencies: IrisExtractionInstance. -/
 
 /-
 The Problem. Buffers in the VM have multiple backing implementations (shared memory,

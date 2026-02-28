@@ -36,7 +36,9 @@ The following definitions form the semantic interface for proofs:
 - `ConfigStepDet`: configuration step determinism
 - `Claims`: bundle of determinism properties
 
-## Dependencies
+## Interface Boundary
 
-This module uses placeholder definitions until Project.lean builds.
+This module uses an environment-indexed determinism configuration interface.
+The bridge to `Semantics.SubjectReduction.Configuration` is explicit in
+`Semantics.Determinism.Core.InterfaceBridge`.
 -/

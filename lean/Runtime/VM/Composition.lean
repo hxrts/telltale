@@ -3,7 +3,7 @@ import Runtime.VM.Model.TypeClasses
 /-! # Domain Model Composition
 
 Unit, sum, and product instances for all five domain interfaces, plus the bridge
-classes that connect them. This is the Lean counterpart of `runtime.md` §20.
+classes that connect them. This provides the composition operators for domain model combination.
 
 **Unit instances** (`GuardLayer Unit`, `EffectRuntime Unit`, `VerificationModel Unit`,
 `AuthTree Unit`, `AccumulatedSet Unit`) provide trivial no-op implementations used

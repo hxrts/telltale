@@ -14,7 +14,7 @@ Connects VM execution to Iris program logic.
 - `to_val` / `of_val` / `prim_step`
 - `LanguageMixin` proofs
 
-Dependencies: Task 11, Shim.WeakestPre.
+Dependencies: Task 11, IrisExtractionInstance.
 -/
 
 /-

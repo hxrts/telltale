@@ -8,14 +8,12 @@ Step functions for `transfer`, `tag`, and `check`.
 `stepTransfer` moves an owned endpoint from one coroutine to another. It applies a
 (currently empty) resource transaction at the endpoint's session scope, migrates
 progress tokens and knowledge facts that are bound to the transferred endpoint,
-and emits a `transferred` event. This is the operational counterpart of the owned
-protocol continuation transfer described in `runtime.md` §19.
+and emits a `transferred` event. This is the operational counterpart of owned protocol continuation transfer.
 
 `stepTag` records a knowledge fact (endpoint + string) in the coroutine's knowledge
 set and emits a `tagged` event. `stepCheck` queries whether a fact exists in the
 knowledge set and whether the flow policy permits it to reach a target role, writing
-a boolean result to a destination register. Together these implement the epistemic
-separation logic instructions from `runtime.md` §16. -/
+a boolean result to a destination register. Together these implement the epistemic separation logic instructions. -/
 
 /-
 The Problem. Session endpoints can be dynamically transferred between coroutines,
@@ -109,7 +107,7 @@ private def transferWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [G
       , deltaProof := ()
       , logicProofs := []
       , complianceProofs := []
-      , authorizedImbalance := true }
+      , imbalanceAuth := .endpointTransfer }
     match applyTransactionAtScope st.resourceStates { id := ep.sid } tx with
     | none =>
         transferFaultPack st coro "resource transaction failed"

@@ -117,6 +117,17 @@ abbrev DeltaProof :=
   -- Placeholder for balance proofs.
   Unit
 
+inductive ImbalanceAuthorization where
+  -- No imbalance is authorized.
+  | none
+  -- Session-open lifecycle bookkeeping can authorize imbalance in V1.
+  | lifecycleOpen
+  -- Session-close lifecycle bookkeeping can authorize imbalance in V1.
+  | lifecycleClose
+  -- Endpoint transfer bookkeeping can authorize imbalance in V1.
+  | endpointTransfer
+  deriving Inhabited, Repr, DecidableEq
+
 /-- Transaction bundles resource creation and consumption. -/
 structure Transaction (ν : Type u) [VerificationModel ν] [AccumulatedSet ν] where
   created : List (Resource ν) -- Newly created resources.
@@ -124,7 +135,7 @@ structure Transaction (ν : Type u) [VerificationModel ν] [AccumulatedSet ν] w
   deltaProof : DeltaProof -- Balance proof (stub in V1).
   logicProofs : List ResourceLogicProof -- Predicate proofs (stub in V1).
   complianceProofs : List (ComplianceProof ν) -- Membership/non-membership proofs.
-  authorizedImbalance : Bool -- Whether a non-zero delta is authorized.
+  imbalanceAuth : ImbalanceAuthorization -- Why imbalance is authorized (if at all).
 
 /-! ## Transaction Validity Checks -/
 
@@ -162,7 +173,10 @@ def Transaction.validB {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
     (tx : Transaction ν) (st : ResourceState ν) : Bool :=
   -- V1 validity: balance + membership/non-membership proofs.
   let balanced := txBalancedB tx
-  let balanceOk := tx.authorizedImbalance || balanced
+  let balanceOk :=
+    balanced || match tx.imbalanceAuth with
+      | .none => false
+      | _ => true
   balanceOk &&
     complianceCoversConsumed st tx &&
     complianceCoversCreated st tx

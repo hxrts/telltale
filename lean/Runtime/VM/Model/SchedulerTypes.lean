@@ -8,7 +8,7 @@ its own file to avoid circular imports: `Config.lean` needs the policy type, but
  full scheduler implementation (`Runtime/VM/Scheduler.lean`) needs the config.
 
 The `progressAware` policy is the session-type-aware variant that prefers coroutines
-holding progress tokens, connecting to the liveness reasoning in `runtime.md` §18.
+holding progress tokens, connecting to the session-type-aware liveness reasoning.
 -/
 
 set_option autoImplicit false

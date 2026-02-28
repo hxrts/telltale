@@ -4,7 +4,7 @@ import Runtime.VM.Semantics.ExecHelpers
 /-! # Speculation Instruction Semantics
 
 Step functions for `fork`, `join`, and `abort`, the speculation lifecycle
-described in `runtime.md` §17.
+for speculative ghost session execution.
 
 `stepFork` enters speculative mode by reading a ghost session id from a register
 and setting `specState` on the coroutine, with configuration-gated depth checks.

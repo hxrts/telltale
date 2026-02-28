@@ -4,7 +4,7 @@ import IrisExtractionInstance
 
 /-! # Task 13: Session Resource Algebra
 
-Ghost map for session endpoints from iris_runtime_2.md §5.1.
+Ghost map for session endpoints.
 
 ## Definitions
 

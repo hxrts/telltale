@@ -8,13 +8,13 @@ identity model and integrates crashes, partitions, and recovery without
 committing to a concrete recovery algorithm.
 
 Solution Structure. Define failure modes, a failure-aware step relation,
-and deterministic recovery actions aligned with runtime.md §9.
+and deterministic recovery actions.
 -/
 
 /-! # Task 24: Failure Model and Recovery
 
 Failure-aware step relation and recovery predicates
-from runtime.md §9.
+for failure-aware VM execution.
 
 ## Definitions
 

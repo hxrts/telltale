@@ -17,7 +17,7 @@ statements that can be refined by later proofs.
 /-! # Task 22: Observable Trace Infrastructure and VM Adequacy
 
 Observable events, trace properties, and the capstone adequacy theorem
-from iris_runtime_2.md §11.
+for VM execution.
 
 ## Definitions
 
@@ -30,7 +30,7 @@ from iris_runtime_2.md §11.
 - `no_phantom_events`
 - `compile_refines`
 
-Dependencies: Task 12, Task 19, Shim.WeakestPre.
+Dependencies: Task 12, Task 19, IrisExtractionInstance.
 -/
 
 set_option autoImplicit false

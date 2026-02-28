@@ -41,9 +41,11 @@ The following definitions form the semantic interface for proofs:
 - `ConfigStepDet`: configuration step determinism
 - `Claims`: bundle of determinism properties
 
-## Dependencies
+## Interface Boundary
 
-This module uses placeholder definitions until Project.lean builds.
+This module uses an environment-indexed determinism configuration interface.
+Bridging lemmas into process-indexed subject-reduction configurations are
+provided in `Semantics.Determinism.Core.InterfaceBridge`.
 -/
 
 /-
@@ -63,12 +65,12 @@ open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 open Semantics.Environment
 
-/-! ## Placeholder Definitions
+/-! ## Determinism Interface Definitions
 
-These will be unified with SubjectReduction once Project.lean is fixed.
+These definitions are intentionally environment-indexed for determinism proofs.
 -/
 
-/-- Placeholder configuration. -/
+/-- Determinism configuration: global type paired with an environment snapshot. -/
 structure Configuration where
   globalType : GlobalType
   env : EnvConfig
@@ -90,7 +92,7 @@ inductive ConfigStepStar : Configuration → Configuration → List GlobalAction
       (hrest : ConfigStepStar c' c'' acts) :
       ConfigStepStar c c'' (act :: acts)
 
-/-- Placeholder: local action. -/
+/-- Local action used by local determinism lemmas in this interface. -/
 structure LocalActionR where
   participant : String
   label : Label

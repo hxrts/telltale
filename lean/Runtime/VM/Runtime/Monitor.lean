@@ -13,8 +13,7 @@ cyclic dependencies on VM state.
 
 /-! # Task 23: Unified Monitor
 
-Monitor consistency across session kinds
-from iris_runtime_2.md §14.
+Monitor consistency across session kinds.
 
 ## Definitions
 
@@ -27,7 +26,7 @@ from iris_runtime_2.md §14.
 
 Failure model definitions live in `Runtime.VM.Runtime.Failure`.
 
-Dependencies: Task 19, Shim.Invariants.
+Dependencies: Task 19, IrisExtractionInstance.
 -/
 
 set_option autoImplicit false

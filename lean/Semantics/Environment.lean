@@ -23,6 +23,7 @@ The following definitions form the semantic interface for proofs:
 - `EnvAction` - Environment action (deliver, timeout, drop)
 - `EnvConfigStep` - Environment transition relation
 - `FairEnv` - Fairness predicate for liveness
+- `StrongFairEnv` - Strong fairness via enabled-action realization
 -/
 
 /-
@@ -263,10 +264,29 @@ def FairEnv (trace : EnvTrace) : Prop :=
         | some env => env.pendingTimeouts.isEmpty
         | none => False)
 
-/-- Strong fairness: every infinitely often enabled action is taken infinitely often. -/
+/-- Action `act` is enabled at position `i` if some environment step with `act`
+can be taken from the environment at `i`. -/
+def EnvTrace.enabledAt (trace : EnvTrace) (i : Nat) (act : EnvAction) : Prop :=
+  ∃ env env', trace.getAt i = some env ∧ EnvConfigStep env act env'
+
+/-- Action `act` occurs at position `i` when the adjacent environments realize
+that environment step. -/
+def EnvTrace.stepAt (trace : EnvTrace) (i : Nat) (act : EnvAction) : Prop :=
+  ∃ env env', trace.getAt i = some env ∧ trace.getAt (i + 1) = some env' ∧
+    EnvConfigStep env act env'
+
+/-- Strong fairness on finite traces: every enabled action on an index with a
+successor is eventually realized at some later (or equal) index. -/
 def StrongFairEnv (trace : EnvTrace) : Prop :=
-  -- Placeholder for strong fairness
-  FairEnv trace
+  FairEnv trace ∧
+  ∀ act i, i + 1 < trace.length →
+    trace.enabledAt i act →
+      ∃ j, j ≥ i ∧ j + 1 < trace.length ∧ trace.stepAt j act
+
+/-- Strong fairness includes weak fairness. -/
+theorem strong_fair_implies_fair {trace : EnvTrace}
+    (hStrong : StrongFairEnv trace) : FairEnv trace :=
+  hStrong.1
 
 /-! ## Queue Invariants
 

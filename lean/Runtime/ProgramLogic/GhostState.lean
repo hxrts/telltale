@@ -18,7 +18,7 @@ theorems for knowledge flow, progress, ghost sessions, and bundles.
 /-! # Tasks 20A–20C: Knowledge, Progress, Ghost Sessions, Resource Bundles
 
 Epistemic separation, progress tokens, ghost sessions, and resource bundles
-from runtime.md §§16–19.
+for session reasoning.
 
 ## Definitions
 
@@ -27,7 +27,7 @@ from runtime.md §§16–19.
 - `GhostSession`, `ghost_session_inv`, `join_sound`, `abort_safe`
 - `ResourceBundle`, `transfer_bundle`, `ResourceTree`
 
-Dependencies: Task 13, Compat.RA + Compat.Inv + Compat.SavedProp.
+Dependencies: Task 13, IrisExtractionInstance.
 -/
 
 set_option autoImplicit false

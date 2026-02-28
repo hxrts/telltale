@@ -14,15 +14,15 @@ The Problem. The runtime needs a per-session cancelable invariant that
 ties session coherence, buffer typing, progress supply, and knowledge
 tracking into a single Iris resource.
 
-Solution Structure. Define the invariant body with local stubs for
+Solution Structure. Define the invariant body with local schematic layers for
 coherence/buffer typing, add lifecycle event types, and provide
-placeholder correctness statements that match runtime.md §7.
+scaffold statements for cancelable invariants without over-claiming completeness.
 -/
 
 
 /-! # Task 16: Session Cancelable Invariants
 
-Per-session cancelable invariant from iris_runtime_2.md §7.
+Per-session cancelable invariant for session coherence and buffer typing.
 
 ## Definitions
 
@@ -34,7 +34,7 @@ Per-session cancelable invariant from iris_runtime_2.md §7.
 - `LifecycleEvent` — open, join, leave, close
 - `open_coherent`, `leave_preserves_coherent`, `close_empty`
 
-Dependencies: Task 13, Shim.Invariants + Shim.SavedProp.
+Dependencies: Task 13, IrisExtractionInstance.
 -/
 
 set_option autoImplicit false
@@ -72,9 +72,11 @@ def knowledge_inv (γ : GhostName) (sid : SessionId) (e : Endpoint) : iProp :=
   -- Endpoint-specific knowledge invariant.
   knows γ (knowledge_fact sid e)
 
-def knowledge_inv_all (_γ : GhostName) (_sid : SessionId) (_G : SessionMap) : iProp :=
-  -- Placeholder: omit map traversal until endpoint-keyed ghost maps land.
+def knowledge_inv_all_schematic (_γ : GhostName) (_sid : SessionId) (_G : SessionMap) : iProp :=
+  -- Schematic layer: map traversal is intentionally omitted in V1.
   iProp.emp
+
+abbrev knowledge_inv_all := knowledge_inv_all_schematic
 
 /-! ## Cancelable session invariant -/
 
@@ -89,7 +91,7 @@ def session_inv_body (γ : GhostName) (sid : SessionId) : iProp :=
               (iProp.sep (head_coherent sid G D)
                 (iProp.sep (session_progress_supply γ sid)
                   (iProp.sep (speculation_session_inv γ sid)
-                    (knowledge_inv_all γ sid G))))))
+                    (knowledge_inv_all_schematic γ sid G))))))
 
 def sessionNs (sid : SessionId) : Namespace :=
   -- Namespace for a session invariant.

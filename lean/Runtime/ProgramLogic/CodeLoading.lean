@@ -9,13 +9,13 @@ The Problem. The VM needs a code loading interface with V1 hash checks
 and a safe update predicate that preserves protocol coherence.
 
 Solution Structure. Provide hash-based load helpers and a `SafeUpdate`
-predicate aligned with runtime.md §10, leaving proofs as stubs.
+predicate, leaving proofs as stubs.
 -/
 
 
 /-! # Task 21: Code Loading and Hot-Swap
 
-Dynamic code loading and safe protocol update from iris_runtime_2.md §10.
+Dynamic code loading and safe protocol update.
 
 ## Definitions
 
@@ -24,7 +24,7 @@ Dynamic code loading and safe protocol update from iris_runtime_2.md §10.
 - `hotSwap_preserves_coherent`
 - `code_signature_check`
 
-Dependencies: Task 11, Task 16, Shim.Invariants + Shim.WeakestPre.
+Dependencies: Task 11, Task 16, IrisExtractionInstance.
 -/
 
 set_option autoImplicit false

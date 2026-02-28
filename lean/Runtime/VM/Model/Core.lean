@@ -10,7 +10,7 @@ by the guard layer `γ` and effect model `ε` so that domain-specific guard and 
 actions appear directly in the bytecode.
 
 The instruction set is organized into paired groups that mirror the acquire/interact/release
-pattern described in `runtime.md` §3: communication (send/receive, offer/choose), resources
+pattern: communication (send/receive, offer/choose), resources
 (acquire/release), sessions (open/close), speculation (fork/join/abort), ownership and
 knowledge (transfer, tag/check), and control flow (set, move, jump, spawn, yield, halt).
 -/

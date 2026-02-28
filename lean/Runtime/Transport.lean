@@ -13,7 +13,7 @@ stubs for handler-backed transports.
 
 /-! # Transport Abstraction
 
-Transport interface, specification, and refinement from iris_runtime_2.md §8.
+Transport interface, specification, and refinement.
 
 ## Definitions
 
@@ -39,10 +39,16 @@ inductive TransportResult (ν : Type u) [VerificationModel ν] where
   | error (msg : String)
 
 structure Transport (ν : Type u) [VerificationModel ν] where
-  -- Abstract send/recv over directed edges.
-  send : Edge → SignedValue ν → TransportResult ν
-  recv : Edge → TransportResult ν
-  connected : Edge → Bool
+  -- Abstract state carried by this transport implementation.
+  State : Type
+  -- Initial transport state.
+  init : State
+  -- Send may update transport state.
+  send : State → Edge → SignedValue ν → State × TransportResult ν
+  -- Receive may update transport state.
+  recv : State → Edge → State × TransportResult ν
+  -- Connectivity can depend on current state.
+  connected : State → Edge → Bool
 
 /-! ## Transport specification -/
 
@@ -231,8 +237,61 @@ def transport_refines_buffers {ν : Type u} [VerificationModel ν]
   -- Transport traces satisfy their declared specification.
   SpecSatisfied spec (traceOfBuffers bufs)
 
+/-- Queue state used by the in-memory FIFO transport. -/
+abbrev InMemoryState (ν : Type u) [VerificationModel ν] := SignedBuffers ν
+
+private def queueGet {ν : Type u} [VerificationModel ν]
+    (st : InMemoryState ν) (edge : Edge) : List (SignedValue ν) :=
+  match st with
+  | [] => []
+  | (edge', q) :: rest =>
+      if decide (edge' = edge) then q else queueGet rest edge
+
+private def queueSet {ν : Type u} [VerificationModel ν]
+    (st : InMemoryState ν) (edge : Edge) (q : List (SignedValue ν)) : InMemoryState ν :=
+  match st with
+  | [] => [(edge, q)]
+  | (edge', q') :: rest =>
+      if decide (edge' = edge) then (edge, q) :: rest
+      else (edge', q') :: queueSet rest edge q
+
+def inMemorySend {ν : Type u} [VerificationModel ν]
+    (st : InMemoryState ν) (edge : Edge) (v : SignedValue ν) :
+    InMemoryState ν × TransportResult ν :=
+  -- FIFO enqueue: append to the tail of the edge queue.
+  let q := queueGet st edge
+  (queueSet st edge (q ++ [v]), .ok v)
+
+def inMemoryRecv {ν : Type u} [VerificationModel ν]
+    (st : InMemoryState ν) (edge : Edge) :
+    InMemoryState ν × TransportResult ν :=
+  -- FIFO dequeue: pop from the head of the edge queue.
+  match queueGet st edge with
+  | [] => (st, .blocked)
+  | v :: rest => (queueSet st edge rest, .ok v)
+
+/-- Sanity check: a single send followed by recv on the same edge returns the
+same payload. -/
+theorem inMemory_single_send_then_recv {ν : Type u} [VerificationModel ν]
+    (edge : Edge) (v : SignedValue ν) :
+    let st₁ := (inMemorySend ([] : InMemoryState ν) edge v).1
+    (inMemoryRecv st₁ edge).2 = .ok v := by
+  simp [inMemorySend, inMemoryRecv, queueGet, queueSet]
+
+/-- Sanity check: two sends on one edge are received in FIFO order. -/
+theorem inMemory_two_send_fifo {ν : Type u} [VerificationModel ν]
+    (edge : Edge) (v₁ v₂ : SignedValue ν) :
+    let st₁ := (inMemorySend ([] : InMemoryState ν) edge v₁).1
+    let st₂ := (inMemorySend st₁ edge v₂).1
+    let r₁ := inMemoryRecv st₂ edge
+    let r₂ := inMemoryRecv r₁.1 edge
+    r₁.2 = .ok v₁ ∧ r₂.2 = .ok v₂ := by
+  simp [inMemorySend, inMemoryRecv, queueGet, queueSet]
+
 def InMemoryTransport {ν : Type u} [VerificationModel ν] : Transport ν :=
-  -- Simple in-memory transport stub.
-  { send := fun _ _ => .blocked
-  , recv := fun _ => .blocked
-  , connected := fun _ => true }
+  -- Minimal FIFO in-memory transport model.
+  { State := InMemoryState ν
+  , init := []
+  , send := inMemorySend
+  , recv := inMemoryRecv
+  , connected := fun _ _ => true }

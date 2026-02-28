@@ -14,7 +14,7 @@ combinator and expose the derived rules as the public API.
 
 /-! # Task 19: Session WP Rules
 
-Weakest precondition rules for each bytecode instruction from iris_runtime_2.md §7.
+Weakest precondition rules for each bytecode instruction.
 
 ## Rules
 
@@ -25,7 +25,7 @@ Weakest precondition rules for each bytecode instruction from iris_runtime_2.md 
 - `wp_transfer`, `wp_tag`, `wp_check`
 - `wp_set`, `wp_move`, `wp_jump`, `wp_spawn`, `wp_yield`, `wp_halt`
 
-Dependencies: Task 12, Task 16, Shim.Invariants + Shim.WeakestPre.
+Dependencies: Task 12, Task 16, IrisExtractionInstance.
 -/
 
 set_option autoImplicit false

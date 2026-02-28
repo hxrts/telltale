@@ -142,7 +142,7 @@ private def mkOpenTx {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
   , deltaProof := ()
   , logicProofs := []
   , complianceProofs := [proof]
-  , authorizedImbalance := true }
+  , imbalanceAuth := .lifecycleOpen }
 
 /-! ### Open Commit Pipeline -/
 
@@ -271,7 +271,7 @@ private def mkCloseTx {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
   , deltaProof := ()
   , logicProofs := []
   , complianceProofs := [proof]
-  , authorizedImbalance := true }
+  , imbalanceAuth := .lifecycleClose }
 
 /-! ### Close Commit Pipeline -/
 

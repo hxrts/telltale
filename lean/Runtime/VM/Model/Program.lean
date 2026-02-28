@@ -10,7 +10,7 @@ VM loads and executes. A `Program` is bytecode plus per-role entry points, local
 handler types, and source metadata. A `CodeImage` bundles executable program payload with
 its global type. An
 `UntrustedImage` is an unverified program pending signature and typing checks, used by
-the code loading pipeline (`runtime.md` §10).
+the code loading pipeline.
 -/
 
 /-
