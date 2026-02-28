@@ -4,7 +4,7 @@ set_option linter.dupNamespace false
 
 /-! # SessionCoTypes.Coinductive.Roundtrip.EnvDefs
 
-Stub definitions (nameOf, envOf), environment containment helpers, and toInductiveBody.
+Environment naming (nameOf, envOf), containment helpers, and toInductiveBody.
 -/
 
 /-
@@ -24,10 +24,9 @@ open SessionTypes.LocalTypeR
 local instance : DecidableEq LocalTypeC := by
   classical
   infer_instance
-/-! ## Stub Definitions (Work in Progress)
+/-! ## Environment Naming and Containment
 
-These definitions and theorems are incomplete. Full proofs are being developed
-in this file. The placeholders below serve as notes for the public API.
+Core definitions for assigning names to coinductive nodes and building environments.
 -/
 
 /-- Name assigned to a coinductive node in a finite system. -/

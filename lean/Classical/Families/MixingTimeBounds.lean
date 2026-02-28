@@ -77,7 +77,7 @@ acts like a contractive map, ensuring the mixing rate ρ < 1.
 
 - Levin, D.A., Peres, Y., and Wilmer, E.L. (2009). Markov Chains and Mixing Times.
 - Jerrum, M. and Sinclair, A. (1989). Approximating the permanent.
-- See also `Runtime/Proofs/SchedulingChain.lean` for protocol mixing analysis.
+- See also `Runtime/Proofs/SchedulingBound.lean` for protocol scheduling analysis.
 -/
 
 /-

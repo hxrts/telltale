@@ -22,5 +22,5 @@ inductive SchedPolicy where
   | cooperative
   -- Priority policy from coroutine id to priority.
   | priority (f : Nat → Nat)
-  -- Prefer coroutines holding progress tokens (§18).
+  -- Prefer coroutines holding progress tokens.
   | progressAware

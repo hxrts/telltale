@@ -63,7 +63,7 @@ guarantees that every coherent protocol execution eventually terminates.
 
 - Foster, F.G. (1953). On the stochastic matrices associated with certain queuing processes.
 - Meyn, S.P. and Tweedie, R.L. (1993). Markov Chains and Stochastic Stability.
-- See also `Protocol/Coherence/Lyapunov.lean` for the session-types instantiation.
+- See also `Runtime/Proofs/Lyapunov.lean` for the session-types instantiation.
 -/
 
 /-
