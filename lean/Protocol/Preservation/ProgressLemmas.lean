@@ -26,8 +26,9 @@ section
 
 /-! ## Progress Lemmas for Individual Process Forms
 
-These lemmas are currently axiomatized to keep the development building while
-TypedStep-based proofs are refactored.
+The main progress lemmas (`progress_send`, `progress_recv`, `progress_select`,
+`progress_branch`) are proven in `Protocol/Typing/Progress/LocalProgressCases.lean`.
+This file provides the `BlockedRecv` predicate used in those proofs.
 -/
 
 /-- Blocked recv predicate: recv/branch is waiting on an empty buffer. -/

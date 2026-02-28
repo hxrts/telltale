@@ -136,8 +136,7 @@ theorem select_ready_of_progress_vm_state {store : SessionStore ν}
 /-- Store lookups agree with environment projections.
 
     This connects SessionStore operations to Protocol-level environments.
-    These bridge lemmas require store consistency invariants from Arena.lean.
-    For now, we axiomatize them pending full integration. -/
+    These bridge lemmas follow from the store consistency invariants. -/
 theorem store_lookup_trace_eq_lookup_d {store : SessionStore ν} {edge : Edge}
     (hWF : sessionStore_refines_envs store) :
     lookupD (SessionStore.toDEnv store) edge = SessionStore.lookupTrace store edge := by
