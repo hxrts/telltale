@@ -1277,6 +1277,10 @@ Reproduction workflow and expected outputs are documented in
 \texttt{just artifact-check}. Pinned-commit, DOI, and Lean-statistics rows are
 synchronized via
 \texttt{bash scripts/paper\_repro\_rows.sh --sync paper/paper1.tex paper/paper2.tex paper/paper3.tex}.
+Artifact semantics note. The Lean artifact exposes an explicit trace-level
+strong fairness predicate (\texttt{StrongFairEnv}) refining weak fairness, and
+the default in-memory runtime transport implements minimal per-edge FIFO
+enqueue/dequeue behavior.
 
 \begin{table}[H]
 	\centering
@@ -1286,9 +1290,9 @@ synchronized via
 		\thead{Artifact Field} & \thead{Value}                                                                             \\
 		\midrule
 		Repository             & \url{https://github.com/hxrts/telltale}                                                   \\
-		Pinned commit          & \texttt{557ffa07300ab088}\allowbreak\texttt{005b68516b8c9475}\allowbreak\texttt{f9cc9625} \\
-		Archival DOI           & \texttt{DOI-UNSET}                                                                        \\
-		Lean source statistics & 1299 files, 205754 LOC, axioms: 0, unresolved proof holes (\texttt{sorry}): 0             \\
+		Pinned commit & \texttt{ccddc8ea843684c4}\allowbreak\texttt{d2d018f673c4861d}\allowbreak\texttt{0664e008} \\
+		Archival DOI & \texttt{DOI-UNSET} \\
+		Lean source statistics & 1303 files, 206913 LOC, axioms: 0, unresolved proof holes (\texttt{sorry}): 0 \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Artifact identity and verification statistics for this draft snapshot.}
