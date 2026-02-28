@@ -100,7 +100,7 @@ theorem to_db_closed (t : LocalTypeR) (hclosed : t.isClosed = true) :
 This is the key property enabling DB-based proofs: we can convert to DB, prove something,
 then convert back, knowing we get the same term.
 
-**Status**: Proven infrastructure exists (get_index_of_roundtrip), full proof pending. -/
+**Status**: Proven in LocalTypeConvProofs/ClosedRoundtrip.lean. -/
 theorem to_db_from_db_roundtrip_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
   (t.fromDB TypeContext.empty (by
       simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using hclosed)).toDB? TypeContext.empty = some t :=
