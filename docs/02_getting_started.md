@@ -22,6 +22,7 @@ This adds the facade crate and the choreographic programming layer. Pinning vers
 | Bytecode execution with schedulers | `telltale-vm` |
 | Deterministic simulation and scenario middleware | `telltale-simulator` |
 | Lean JSON import, export, and validation tools | `telltale-lean-bridge` |
+| Production transport adapters | `telltale-transport` |
 
 This table is a quick entry point for crate selection. Use it before reading the full crate descriptions.
 
@@ -33,7 +34,7 @@ The `telltale-types` crate contains core type definitions such as `GlobalType`, 
 
 The `telltale-theory` crate contains pure algorithms for projection, merge, subtyping, and well-formedness checks. The `telltale-choreography` crate is the choreographic programming layer that provides the DSL parser, effect handlers, and code generation.
 
-The `telltale-vm` crate provides the bytecode VM execution engine. The `telltale-simulator` crate wraps the VM with deterministic middleware for testing. The `telltale-lean-bridge` crate enables cross-validation with Lean through JSON import and export functions.
+The `telltale-vm` crate provides the bytecode VM execution engine. The `telltale-simulator` crate wraps the VM with deterministic middleware for testing. The `telltale-lean-bridge` crate enables cross-validation with Lean through JSON import and export functions. The `telltale-transport` crate provides production-oriented transport adapters that integrate with choreography handlers.
 
 The `telltale` crate is the main facade that re-exports types from other crates with feature flags. Most users need both `telltale` and `telltale-choreography` for session types and the high-level DSL.
 

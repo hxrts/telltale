@@ -6,12 +6,13 @@ For conceptual pipeline and runtime architecture, see [Architecture](03_architec
 
 ## Workspace Layout
 
-Telltale is organized as a Cargo workspace with Rust crates in `rust/`, Lean formalization in `lean/`, and docs in `docs/`.
+Telltale is organized as a Cargo workspace rooted at `Cargo.toml`, with the facade package declared at the repository root and additional crates under `rust/`. Lean formalization lives in `lean/` and documentation in `docs/`.
 
 ```
 telltale/
-├── rust/                   Rust crates
-│   ├── src/                Facade crate (telltale)
+├── Cargo.toml              Workspace + root package (telltale)
+├── rust/
+│   ├── src/                Root package source (`telltale` lib path)
 │   ├── types/              Core protocol types (telltale-types)
 │   ├── theory/             Session type algorithms (telltale-theory)
 │   ├── choreography/       DSL, projection glue, and effect runtime
@@ -20,7 +21,7 @@ telltale/
 │   ├── simulator/          VM-backed simulation
 │   ├── effect-scaffold/    Internal scaffolding tool
 │   ├── macros/             Procedural macros
-│   └── transport/          Production transports (not workspace member)
+│   └── transport/          Production transports (workspace member)
 ├── lean/                   Lean 4 formalization
 ├── docs/                   mdBook documentation
 └── examples/               Example protocols
@@ -60,7 +61,7 @@ graph TB
     end
 
     subgraph Auxiliary
-        transport["telltale-transport<br/>Production transports<br/>(not workspace member)"]
+        transport["telltale-transport<br/>Production transports"]
     end
 
     types --> theory
@@ -243,7 +244,7 @@ This crate is located in `rust/effect-scaffold/`. It is an internal helper tool 
 
 ### telltale-transport
 
-This crate is located in `rust/transport/`. It provides production transport implementations for session types. The crate depends on `telltale-choreography` and `telltale-types`. It currently exists outside the workspace member list in the root `Cargo.toml`.
+This crate is located in `rust/transport/`. It provides production transport implementations for session types. The crate depends on `telltale-choreography` and `telltale-types` and is part of the workspace member list in the root `Cargo.toml`.
 
 The crate implements TCP-based transports with async networking via tokio. Future features include TLS support. The transport layer integrates with the effect handler system from `telltale-choreography`.
 

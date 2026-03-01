@@ -24,7 +24,7 @@ The VM compiles local types to bytecode instructions. It manages scheduling, mes
 
 ## Lean Verification
 
-The Lean 4 formalization spans approximately 620 files and 126,000 lines. It covers global types, local types, projection, and operational semantics. Deadlock-freedom claims are assumption-scoped with explicit premises for well-typedness, progress reachability, and fair scheduling.
+The Lean 4 formalization spans roughly 624 files and 127k lines in the core libraries (generated metrics in `lean/CODE_MAP.md`). It covers global types, local types, projection, and operational semantics. Deadlock-freedom claims are assumption-scoped with explicit premises for well-typedness, progress reachability, and fair scheduling.
 
 The `telltale-lean-bridge` crate provides JSON export and import for cross-validation between Rust and Lean. See [Lean Verification](23_lean_verification.md) for the verification pipeline.
 
