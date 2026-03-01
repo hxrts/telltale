@@ -219,6 +219,16 @@ placeholder_hits="$(scan_rg '\bProp\s*:=\s*True\b')"
 print_hits "error" "No Prop := True placeholder contracts in production paths" "${placeholder_hits}" \
   "Replace placeholder contracts with real predicates/theorems or move them to explicitly excluded experimental paths."
 
+# Technical debt markers in source.
+todo_hits="$(scan_rg '\b(TODO|FIXME|HACK|XXX|WIP|REVISIT)\b')"
+print_hits "warning" "Technical debt markers in source" "${todo_hits}" \
+  "Resolve the marker or convert it into a tracked issue reference with a concrete follow-up plan."
+
+# Placeholder/stub indicators in comments (-- or /- -/ style).
+placeholder_comment_hits="$(scan_rg '(--|/-[^!]).*\b(stub|placeholder|dummy|temporary|temp fix|for now|hardcoded|hard-coded|in a real implementation|not yet implemented|needs to be (implemented|fixed|replaced|updated)|will be (implemented|replaced)|should (eventually|later)|come back to this)\b')"
+print_hits "warning" "Placeholder/stub indicators in comments" "${placeholder_comment_hits}" \
+  "Replace placeholder implementations with production code or convert to a tracked issue."
+
 root_import_hits="$(rg -n --pcre2 '^(import .*\b(MutualTest|LocalTypeDBExamples|Examples|Tests)\b)' \
   "${LEAN_DIR}/SessionTypes.lean" "${LEAN_DIR}/Choreography.lean" "${LEAN_DIR}/Protocol.lean" "${LEAN_DIR}/Runtime.lean" 2>/dev/null || true)"
 print_hits "error" "Root facades avoid debug/example/test imports" "${root_import_hits}" \

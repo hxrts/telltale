@@ -530,8 +530,13 @@ compound_assert_hits="$(rg -n --pcre2 '\b(debug_)?assert!\s*\([^)]*(&&|\|\|)[^)]
 print_hits "warning" "compound assertions in a single assert! call" "${compound_assert_hits}" "Split asserts into one invariant per assert! call so failures are precise and easier to diagnose."
 
 # 6) TODO/FIXME/HACK markers in source.
-todo_hits="$(rg -n --pcre2 '\b(TODO|FIXME|HACK|XXX)\b' "${RUST_DIR}" -g '*.rs' | rg -v '/tests?/|/benches?/' || true)"
+todo_hits="$(rg -n --pcre2 '\b(TODO|FIXME|HACK|XXX|WIP|REVISIT)\b' "${RUST_DIR}" -g '*.rs' | rg -v '/tests?/|/benches?/' || true)"
 print_hits "warning" "technical-debt markers in source" "${todo_hits}" "Resolve the marker or convert it into a tracked issue reference with a concrete follow-up plan."
+
+# 6b) Placeholder/stub indicators in comments.
+# Exclude "temporary file" / "temp file" which refer to actual temp files, not placeholder code.
+placeholder_hits="$(rg -n --pcre2 -i '//.*\b(stub|placeholder|dummy|temporary|temp fix|for now|hardcoded|hard-coded|in a real implementation|not yet implemented|needs to be (implemented|fixed|replaced|updated)|will be (implemented|replaced)|should (eventually|later)|come back to this)\b' "${RUST_DIR}" -g '*.rs' | rg -v '/tests?/|/benches?/' | rg -vi 'temp(orary)? file' || true)"
+print_hits "warning" "placeholder/stub indicators in comments" "${placeholder_hits}" "Replace placeholder implementations with production code or convert to a tracked issue."
 
 # 7) Large magic-number comparisons.
 magic_hits="$(rg -n --pcre2 '(<=|>=|<|>)\s*[0-9]{3,}\b' "${RUST_DIR}" -g '*.rs' | rg -v '/tests?/|/benches?/' || true)"

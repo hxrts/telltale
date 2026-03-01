@@ -18,6 +18,7 @@ ci-dry-run:
     just check-capability-gates
     just check-release-conformance
     just check-docs-drift
+    just check-doc-links-in-code
     just check-doc-quality
     just v2-baseline check
     just check-vm-placeholders
@@ -97,6 +98,10 @@ check-parity-ledger:
 # Check crate and feature references in docs/00-03 against Cargo metadata.
 check-docs-drift:
     ./scripts/check-docs-drift.sh
+
+# Check docs/ links referenced from rust/ and lean/ sources resolve to existing files.
+check-doc-links-in-code:
+    ./scripts/check-doc-links-in-code.sh
 
 # Enforce documentation style, link integrity, and command/reference validity.
 check-doc-quality:
