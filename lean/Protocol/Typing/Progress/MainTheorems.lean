@@ -369,13 +369,13 @@ theorem progress_typed_with_rolecomplete {G D Ssh Sown store bufs P} :
   exact progress_typed (G:=G) (D:=D) (Ssh:=Ssh) (Sown:=Sown) (store:=store) (bufs:=bufs) (P:=P)
     ⟨hWF, hComplete⟩
 
-/-  Subject reduction (soundness) theorem moved to Protocol.Preservation
+/-  Subject reduction (soundness) theorem is in Protocol.Preservation.SubjectReduction
     to avoid circular dependency (Step is defined in Semantics which imports Typing).
 
     **Theorem**: TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
                  Step ⟨P, store, bufs, G, D, n⟩ ⟨P', store', bufs', G', D', n⟩
 
-    This will be proven in Preservation.lean after TypedStep is available. -/
+    See `subject_reduction` in Protocol/Preservation/SubjectReduction.lean. -/
 
 
 end

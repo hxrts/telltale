@@ -447,17 +447,11 @@ theorem swap_roles_preserves_other_sessions {G : GEnv} {D : DEnv}
 /-! ## VM Integration Notes
 
 The VM-level instruction footprint and cross-session diamond proofs are in
-`Runtime/Proofs/Frame.lean`. They require resolving the Store name collision
-between Protocol.Environments.Core and Iris.Std.Heap before they can be
-connected to this module.
+`Runtime/Proofs/Frame.lean`:
 
-The key definitions that need VM types:
-- `instrSessionFootprint : Instr → CoroutineState → Set SessionId`
-- `DisjointInstrSessionFootprints : Instr → Instr → CoroutineState → CoroutineState → Prop`
-- `cross_session_diamond_from_frame`
-
-These are temporarily defined in Frame.lean with stubs until the import collision
-is resolved.
+- `vmInstrFootprint : Instr → CoroutineState → Set SessionId`
+- `instruction_frame`: Frame property for single-session instruction steps
+- `cross_session_diamond_from_frame`: Disjoint footprints imply diamond property
 -/
 
 end

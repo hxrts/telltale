@@ -45,7 +45,7 @@ variable [GhostMapSlot Unit]
 variable [GhostMapSlot Nat]
 variable [GhostMapSlot LocalType]
 
-/-! ## Session coherence stubs -/
+/-! ## Session coherence definitions -/
 
 def session_coherent (sid : SessionId) (G : SessionMap) (D : DEnv) : iProp :=
   -- Coherence: every endpoint can consume its own pending trace.
@@ -202,7 +202,7 @@ inductive LifecycleEvent (ι : Type) [IdentityModel ι]
   | transfer (sid : SessionId) (endpoint : Endpoint)
       (fromCoro toCoro : Nat) (bundle : ResourceBundle γ ε)
 
-/-! ## Lifecycle correctness stubs -/
+/-! ## Lifecycle correctness properties -/
 
 def open_coherent {ι : Type} [IdentityModel ι]
     (_roles : RoleSet) (_types : Role → LocalType)
