@@ -1,6 +1,6 @@
 [package]
 name = "telltale-theory"
-version = "2.0.0"
+version = "2.1.0"
 authors = ["Sam Hart"]
 edition = "2021"
 rust-version = "1.75"
@@ -15,7 +15,7 @@ categories = ["algorithms"]
 bench = false
 
 [dependencies]
-telltale-types = { path = "../types", version = "2.0.0" }
+telltale-types = { path = "../types", version = "2.1.0" }
 thiserror = { workspace = true }
 
 [dev-dependencies]

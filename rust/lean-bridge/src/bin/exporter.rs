@@ -24,7 +24,7 @@ use telltale_theory::projection::project as theory_project;
 #[derive(Debug, Clone, Bpaf)]
 #[bpaf(
     options,
-    version("2.0.0"),
+    version("2.1.0"),
     descr("Export choreography DSL files to Lean bridge JSON payloads"),
     footer("Example: lean-bridge-exporter --input protocol.choreo --role Alice --choreography-out choreo.json --program-out program.json")
 )]
