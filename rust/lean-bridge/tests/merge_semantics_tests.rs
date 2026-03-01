@@ -1,7 +1,7 @@
 //! Tests validating merge semantics correspondence between Rust and Lean.
 //!
 //! These tests verify that the Rust merge implementation matches the behavior
-//! defined in `lean/Telltale/Protocol/ProjectionR.lean`:
+//! defined in `lean/Choreography/Projection/`:
 //!
 //! - `merge_send_branches` ↔ Lean's `LocalTypeR.mergeSendSorted`
 //! - `merge_recv_branches` ↔ Lean's `LocalTypeR.mergeRecvSorted`

@@ -8,7 +8,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This module mirrors `lean/Telltale/Protocol/Coherence.lean`:
+//! This module mirrors `lean/Protocol/Coherence.lean`:
 //! - `CoherentG` ↔ Lean's `coherentG` structure
 //! - `projectable` ↔ Lean's `projectable` definition
 //! - `check_coherent` bundles all predicates

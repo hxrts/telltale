@@ -1,7 +1,7 @@
 //! Dynamic choreography loading.
 //!
 //! Matches `CodeImage`, `UntrustedImage`, `loadTrusted`, `loadUntrusted`
-//! from `runtime.md §10`.
+//! from `lean/Runtime/VM/Model/Program.lean`.
 
 use std::collections::BTreeMap;
 

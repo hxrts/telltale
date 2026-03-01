@@ -191,4 +191,4 @@ fn demonstrate_role_validation() {
 }
 
 // Notes:
-// Generated topology helper APIs are documented in docs/20_topology.md.
+// Generated topology helper APIs are documented in docs/22_topology.md.

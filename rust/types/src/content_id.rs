@@ -10,7 +10,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This module corresponds to `lean/Telltale/Protocol/ContentId.lean`.
+//! This module corresponds to `lean/SessionTypes/ContentIdentityPolicy.lean`.
 
 use sha2::Digest;
 use std::fmt;

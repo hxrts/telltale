@@ -1,7 +1,7 @@
 //! Actions in Session Types
 //!
 //! Actions represent the basic communication primitives in session types.
-//! These correspond to the Lean definitions in `lean/Telltale/Protocol/Core.lean`.
+//! These correspond to the Lean definitions in `lean/SessionTypes/Core.lean`.
 
 use crate::Label;
 use serde::{Deserialize, Serialize};

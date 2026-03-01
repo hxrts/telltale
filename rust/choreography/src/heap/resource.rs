@@ -13,10 +13,8 @@
 //!
 //! ## Lean Correspondence
 //!
-//! This module corresponds to `lean/Telltale/Protocol/Resource.lean`:
-//! - `ResourceId` ↔ Lean's `ResourceId`
-//! - `Resource` ↔ Lean's `Resource`
-//! - `HeapError` ↔ Lean's `HeapError`
+//! Resource concepts correspond to `lean/Runtime/Resources/ResourceModel.lean`.
+//! The specific Rust types (`ResourceId`, `Resource`, `HeapError`) are Rust-only.
 
 use sha2::{Digest, Sha256};
 use std::fmt;

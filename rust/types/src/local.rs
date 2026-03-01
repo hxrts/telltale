@@ -7,7 +7,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! The core `LocalTypeR` enum mirrors `lean/Telltale/Protocol/LocalTypeR.lean`:
+//! The core `LocalTypeR` enum mirrors `lean/SessionTypes/LocalTypeR/Core/Base.lean`:
 //! - `LocalTypeR::End` ↔ Lean's `LocalTypeR.end`
 //! - `LocalTypeR::Send` ↔ Lean's `LocalTypeR.send`
 //! - `LocalTypeR::Recv` ↔ Lean's `LocalTypeR.recv`

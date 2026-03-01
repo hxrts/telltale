@@ -17,7 +17,7 @@
 //! while `ChoreoHandler` is an async, typed transport abstraction for generated
 //! choreography code.
 //!
-//! Integration guide: [`Effect Handlers and Session Types`](../../../docs/10_effect_session_bridge.md).
+//! Integration guide: [`Effect Handlers and Session Types`](../../../docs/11_effect_session_bridge.md).
 
 use crate::coroutine::Value;
 use crate::output_condition::OutputConditionHint;

@@ -30,12 +30,12 @@ use crate::effects::RoleId;
 ///
 /// ```text
 /// #[derive(Clone, Debug)]
-/// pub struct ValidateCapability {
+/// pub struct ValidateCapability<R: RoleId> {
 ///     pub capability: String,
-///     pub role: Role,
+///     pub role: R,
 /// }
 ///
-/// impl ExtensionEffect for ValidateCapability {
+/// impl<R: RoleId> ExtensionEffect<R> for ValidateCapability<R> {
 ///     fn type_id(&self) -> TypeId {
 ///         TypeId::of::<Self>()
 ///     }
@@ -44,7 +44,7 @@ use crate::effects::RoleId;
 ///         "ValidateCapability"
 ///     }
 ///
-///     fn participating_roles<R: RoleId>(&self) -> Vec<R> {
+///     fn participating_roles(&self) -> Vec<R> {
 ///         vec![self.role]
 ///     }
 ///
@@ -56,7 +56,7 @@ use crate::effects::RoleId;
 ///         self
 ///     }
 ///
-///     fn clone_box(&self) -> Box<dyn ExtensionEffect> {
+///     fn clone_box(&self) -> Box<dyn ExtensionEffect<R>> {
 ///         Box::new(self.clone())
 ///     }
 /// }

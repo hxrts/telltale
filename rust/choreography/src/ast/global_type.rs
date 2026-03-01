@@ -7,7 +7,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! These types mirror the definitions in `lean/Telltale/Protocol/GlobalType.lean`.
+//! These types mirror the definitions in `lean/SessionTypes/GlobalType.lean`.
 
 // Re-export all core types from telltale-types
 pub use telltale_types::{GlobalType, Label, PayloadSort};

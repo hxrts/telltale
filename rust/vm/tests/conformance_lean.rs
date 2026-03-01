@@ -159,10 +159,10 @@ impl EffectHandler for HintedInvokeHandler {
 }
 
 // ============================================================================
-// SessionInv.lean
+// Runtime/Invariants.lean
 // ============================================================================
 
-/// Lean: `SessionInv.coherent`
+/// Lean: `session_coherent`
 /// After each instruction, endpoint type matches protocol state.
 #[test]
 fn test_lean_session_coherent() {
@@ -199,7 +199,7 @@ fn test_lean_session_coherent() {
     assert!(vm.sessions().lookup_type(&ep_b).is_none());
 }
 
-/// Lean: `SessionInv.ns_disjoint`
+/// Lean: `session_ns_disjoint`
 /// Two sessions have independent type namespaces.
 #[test]
 fn test_lean_session_ns_disjoint() {
@@ -225,7 +225,7 @@ fn test_lean_session_ns_disjoint() {
     assert_ne!(sid1, sid2);
 }
 
-/// Lean: `SessionInv.conservation`
+/// Lean: `session_inv` (conservation property)
 /// Type entry count is not changed by send/recv (only by Halt/Close).
 #[test]
 fn test_lean_conservation_inv_preserved() {
@@ -249,7 +249,7 @@ fn test_lean_conservation_inv_preserved() {
     assert!(session.local_types.len() <= count_before);
 }
 
-/// Lean: `SessionInv.close_empty`
+/// Lean: `close_empty`
 /// After close with no pending, buffers are empty.
 #[test]
 fn test_lean_close_empty() {
@@ -269,7 +269,7 @@ fn test_lean_close_empty() {
     }
 }
 
-/// Lean: `SessionInv.leave_preserves_coherent`
+/// Lean: `leave_preserves_coherent`
 /// Halt removes one endpoint; others remain valid.
 #[test]
 fn test_lean_leave_preserves_coherent() {
@@ -287,7 +287,7 @@ fn test_lean_leave_preserves_coherent() {
 }
 
 // ============================================================================
-// Transport.lean
+// Runtime/Transport.lean
 // ============================================================================
 
 /// Lean: `Transport.fifo`
@@ -971,7 +971,7 @@ fn test_lean_abort_policy_is_deterministic_and_scoped() {
 }
 
 // ============================================================================
-// Runtime/VM/Scheduler.lean
+// Runtime/VM/Runtime/Scheduler.lean
 // ============================================================================
 
 /// Lean: `Scheduler.schedule_confluence`
@@ -1033,7 +1033,7 @@ fn test_lean_cooperative_refines_concurrent() {
 }
 
 // ============================================================================
-// Runtime/VM/Monitor.lean
+// Runtime/VM/Runtime/Monitor.lean
 // ============================================================================
 
 /// Lean: `Monitor.sound_send`
@@ -1113,7 +1113,7 @@ fn test_lean_monitor_sound_offer() {
 }
 
 // ============================================================================
-// Adequacy.lean
+// Runtime/Adequacy/Adequacy.lean
 // ============================================================================
 
 /// Lean: `Adequacy.causal_consistency`
@@ -1237,7 +1237,7 @@ fn test_lean_no_phantom_events() {
 }
 
 // ============================================================================
-// State.lean
+// Runtime/VM/Model/State.lean
 // ============================================================================
 
 /// Lean: `State.wf_pc_bounds`

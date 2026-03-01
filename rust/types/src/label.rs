@@ -4,7 +4,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! Corresponds to the `Label` structure in `lean/Telltale/Protocol/GlobalType.lean`.
+//! Corresponds to the `Label` structure in `lean/SessionTypes/GlobalType.lean`.
 
 use crate::PayloadSort;
 use serde::{Deserialize, Serialize};

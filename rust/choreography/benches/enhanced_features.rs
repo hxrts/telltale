@@ -295,8 +295,8 @@ fn bench_memory_usage(c: &mut Criterion) {
         b.iter(|| {
             let _choreo = parse_choreography_str(black_box(complex_protocol)).unwrap();
 
-            // Force allocation by parsing again since clone is no longer available
-            let _cloned = parse_choreography_str(black_box(complex_protocol)).unwrap();
+            // Force additional allocation by parsing again
+            let _reparsed = parse_choreography_str(black_box(complex_protocol)).unwrap();
         })
     });
 

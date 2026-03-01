@@ -1,6 +1,6 @@
 //! Bytecode instruction set.
 //!
-//! Matches the Lean `Instr γ ε` type from `lean/Runtime/VM/Core.lean`.
+//! Matches the Lean `Instr γ ε` type from `lean/Runtime/VM/Model/Core.lean`.
 //! Registers are `u16` indices, PC is `usize`.
 
 use serde::{Deserialize, Serialize};

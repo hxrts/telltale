@@ -304,7 +304,7 @@ fn bench_scaling(c: &mut Criterion) {
         let alice = role("Alice");
         let bob = role("Bob");
 
-        // Create a linear protocol with N send operations (responses are implicit in choreographies)
+        // Create a linear protocol with N alternating send operations
         let mut protocol = Protocol::End;
         for i in 0..*num_interactions {
             // Alternate sender for more interesting protocols

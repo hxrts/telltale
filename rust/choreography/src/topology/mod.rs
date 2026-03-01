@@ -13,11 +13,8 @@
 //!
 //! ## Lean Correspondence
 //!
-//! This module corresponds to `lean/Telltale/Protocol/Location.lean`:
-//! - `Location` ↔ Lean's `Location`
-//! - `TopologyConstraint` ↔ Lean's `TopologyConstraint`
-//! - `Topology` ↔ Lean's `Topology`
-//! - `TopologyMode` ↔ Lean's `TopologyMode`
+//! Topology types are currently Rust-only. Future Lean formalization may
+//! include deployment constraints in `lean/Protocol/Deployment/`.
 
 mod handler;
 mod parser;

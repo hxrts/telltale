@@ -15,11 +15,8 @@
 //!
 //! ## Lean Correspondence
 //!
-//! This module corresponds to `lean/Telltale/Protocol/Heap.lean`:
-//! - `Heap` ↔ Lean's `Heap`
-//! - `alloc` ↔ Lean's `Heap.alloc`
-//! - `consume` ↔ Lean's `Heap.consume`
-//! - `read` ↔ Lean's `Heap.read`
+//! The heap abstraction is currently Rust-only. Resource concepts
+//! correspond to `lean/Runtime/Resources/ResourceModel.lean`.
 
 use super::resource::{HeapError, Resource, ResourceId};
 use std::collections::{BTreeMap, BTreeSet};

@@ -15,9 +15,9 @@
 //!
 //! # Annotations
 //!
-//! - `#[sequential]` - Force sequential execution
-//! - `#[unordered]` - Allow unordered collection
-//! - `#[batch]` - Combine multiple messages into a single send
+//! - `@sequential` - Force sequential execution
+//! - `@unordered` - Allow unordered collection
+//! - `@batch` - Combine multiple messages into a single send
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};

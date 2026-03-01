@@ -14,7 +14,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This module mirrors `lean/Telltale/Protocol/GlobalType.lean`:
+//! This module mirrors `lean/SessionTypes/GlobalType.lean`:
 //! - `GlobalAction` ↔ Lean's `GlobalActionR`
 //! - `LocalAction` ↔ Lean's `LocalActionR`
 //! - `can_step` ↔ Lean's `canStep` inductive

@@ -8,7 +8,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This module mirrors the definitions in `lean/Telltale/Protocol/GlobalType.lean`:
+//! This module mirrors the definitions in `lean/SessionTypes/GlobalType.lean`:
 //! - `PayloadSort` ↔ Lean's `PayloadSort`
 //! - `GlobalType` ↔ Lean's `GlobalType`
 

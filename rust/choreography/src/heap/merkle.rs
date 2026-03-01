@@ -11,10 +11,7 @@
 //!
 //! ## Lean Correspondence
 //!
-//! This module corresponds to `lean/Telltale/Protocol/Merkle.lean`:
-//! - `MerkleTree` ↔ Lean's `MerkleTree`
-//! - `MerkleProof` ↔ Lean's `MerkleProof`
-//! - `merkle_root` ↔ Lean's `merkleRoot`
+//! Merkle tree operations are currently Rust-only.
 
 use super::heap_impl::Heap;
 use super::resource::{Resource, ResourceId};

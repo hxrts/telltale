@@ -14,9 +14,8 @@
 //!
 //! ## Lean Correspondence
 //!
-//! This module corresponds to the Lean formalization:
-//! - `lean/Telltale/Protocol/Resource.lean` - Resource types
-//! - `lean/Telltale/Protocol/Heap.lean` - Heap operations
+//! Resource concepts correspond to `lean/Runtime/Resources/ResourceModel.lean`.
+//! The heap abstraction is currently Rust-only.
 //!
 //! ## Example
 //!

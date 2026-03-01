@@ -1,6 +1,6 @@
 //! Session lifecycle and store.
 //!
-//! Matches the Lean `SessionState`, `SessionStore` from `runtime.md §7`.
+//! Matches the Lean `SessionState`, `SessionStore` from `lean/Runtime/VM/Model/State.lean`.
 //! Local type state lives here — the session store is the single source
 //! of truth for per-endpoint type advancement.
 

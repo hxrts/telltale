@@ -10,10 +10,10 @@
 //!
 //! | Rust Type | Lean Definition |
 //! |-----------|-----------------|
-//! | `GlobalType` | `lean/Telltale/Protocol/GlobalType.lean` |
-//! | `LocalTypeR` | `lean/Telltale/Protocol/LocalTypeR.lean` |
-//! | `PayloadSort` | `lean/Telltale/Protocol/GlobalType.lean` |
-//! | `Label` | `lean/Telltale/Protocol/GlobalType.lean` |
+//! | `GlobalType` | `lean/SessionTypes/GlobalType.lean` |
+//! | `LocalTypeR` | `lean/SessionTypes/LocalTypeR/Core/Base.lean` |
+//! | `PayloadSort` | `lean/SessionTypes/GlobalType.lean` |
+//! | `Label` | `lean/SessionTypes/GlobalType.lean` |
 //!
 //! # References
 //!

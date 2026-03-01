@@ -29,7 +29,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This implementation corresponds to `lean/Telltale/Protocol/ProjectionR.lean`:
+//! This implementation corresponds to `lean/Choreography/Projection/`:
 //! - `merge_send_branches` ↔ Lean's `LocalTypeR.mergeSendSorted`
 //! - `merge_recv_branches` ↔ Lean's `LocalTypeR.mergeRecvSorted`
 //!

@@ -1,8 +1,7 @@
 //! Policy-based coroutine scheduler.
 //!
-//! Matches `SchedPolicy` and `schedStep` from `runtime.md §4`.
 //! All policies produce observably equivalent results per the
-//! `schedule_confluence` theorem.
+//! `schedule_confluence` theorem in `lean/Runtime/Proofs/SchedulerApi.lean`.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 

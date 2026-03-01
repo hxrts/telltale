@@ -21,7 +21,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This module corresponds to `lean/Telltale/Protocol/Serialize.lean`.
+//! This module corresponds to `lean/SessionTypes/ContentIdentityPolicy.lean`.
 //! The `toCbor`/`fromCbor` methods in Lean map to `to_cbor_bytes`/`from_cbor_bytes` here.
 
 use crate::content_id::{ContentId, Hasher, Sha256Hasher};

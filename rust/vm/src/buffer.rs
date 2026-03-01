@@ -1,6 +1,6 @@
 //! Bounded buffers with backpressure.
 //!
-//! Matches the Lean `BoundedBuffer` from `runtime.md §6`.
+//! Matches the Lean `BoundedBuffer` from `lean/Runtime/Resources/BufferRA.lean`.
 //! Ring buffer with configurable mode and backpressure policy.
 
 use std::collections::BTreeMap;

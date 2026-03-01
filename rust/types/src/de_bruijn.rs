@@ -23,7 +23,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This module corresponds to `lean/Telltale/Protocol/DeBruijn.lean`.
+//! This module corresponds to `lean/SessionTypes/LocalTypeDB/Core.lean`.
 
 use crate::{GlobalType, Label, LocalTypeR, ValType};
 use serde::{Deserialize, Serialize};

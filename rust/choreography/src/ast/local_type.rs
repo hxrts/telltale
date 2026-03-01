@@ -8,7 +8,7 @@
 //! # Correspondence with Lean
 //!
 //! The core `LocalTypeR` is re-exported from `telltale-types` and mirrors
-//! `lean/Telltale/Protocol/LocalTypeR.lean`.
+//! `lean/SessionTypes/LocalTypeR/Core/Base.lean`.
 //!
 //! The extended `LocalType` adds constructs for code generation (loops, timeouts, etc.).
 
