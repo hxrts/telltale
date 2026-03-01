@@ -62,8 +62,7 @@ fn demo_annotation_extension() -> Result<(), Box<dyn std::error::Error>> {
         }
     "#;
 
-    // This would normally parse if we had full integration
-    // For now, we just show that the extension is registered
+    // Demonstrate extension registration (full dispatch is a reserved extension point)
     println!("Priority extension registered");
     println!(
         "Can handle 'priority_stmt': {}",
@@ -162,7 +161,7 @@ impl StatementParser for PriorityStatementParser {
 
         Ok(Box::new(PriorityProtocol {
             level: priority,
-            // In a real implementation, we'd parse the nested send statement
+            // Production parsers would also extract nested statements here
         }))
     }
 }

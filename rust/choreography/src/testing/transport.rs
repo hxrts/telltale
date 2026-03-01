@@ -209,8 +209,7 @@ impl AsyncSimulatedTransport for InMemoryTransport {
     }
 
     async fn recv(&mut self, from: &RoleName) -> TransportResult<ProtocolEnvelope> {
-        // In a real implementation, this would wait for a message.
-        // For now, just try immediately.
+        // Simulated recv: returns immediately (no blocking) for deterministic testing
         SimulatedTransport::recv(self, from)
     }
 

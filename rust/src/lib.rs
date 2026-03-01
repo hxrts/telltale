@@ -174,11 +174,12 @@ pub trait Route<R>: Role + Sized {
     fn route(&mut self) -> &mut Self::Route;
 }
 
-/// This structure is mainly a placeholder for a `Role` and for types.
-/// Typically, each each state (in the sense of automata state) of the protocol,
-/// e.g. a `Send`, a `Receive`, etc, contains a `State`, as well as some type
-/// bounds. When an action is taken (e.g. when `send` is called on a `Send`),
-/// the `Send` will take it state and convert it into the continuation.
+/// Wrapper holding a mutable reference to a `Role` during protocol execution.
+///
+/// Each session type (Send, Receive, Select, Branch) contains a `State` along
+/// with type parameters encoding the protocol continuation. When an action is
+/// performed (e.g., `send` on a `Send`), the state transitions to the next
+/// session type in the protocol.
 pub struct State<'r, R: Role> {
     role: &'r mut R,
 }

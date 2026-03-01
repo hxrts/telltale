@@ -71,16 +71,6 @@ impl GrammarComposer {
         hasher.finish()
     }
 
-    /// Register an extension from a trait reference
-    pub fn register_extension_from_trait(
-        &mut self,
-        _extension: &dyn GrammarExtension,
-    ) -> Result<(), GrammarCompositionError> {
-        // For now, we can't register from trait references due to object safety
-        // In a real implementation, this would require cloning or different approach
-        Ok(())
-    }
-
     /// Compose the final grammar including all registered extensions
     pub fn compose(&mut self) -> Result<String, GrammarCompositionError> {
         // Check if we can use cached grammar

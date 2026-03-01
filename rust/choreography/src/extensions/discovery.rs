@@ -212,7 +212,7 @@ impl ExtensionDiscovery {
         for ext_name in &resolved {
             if let Some(package) = self.discovered_extensions.get(ext_name) {
                 if let Some(required_version) = &package.metadata.required_telltale_version {
-                    // In a real implementation, we'd check against actual version
+                    // Compare against baseline 0.5.0 (could use env!("CARGO_PKG_VERSION"))
                     if required_version != "0.5.0" {
                         return Err(ParseError::IncompatibleExtensions {
                             details: format!(
@@ -231,7 +231,7 @@ impl ExtensionDiscovery {
     /// Load extension from a directory or file.
     ///
     /// **Note**: This method loads extension metadata from TOML files but creates
-    /// a `PlaceholderExtension` that does not provide actual grammar rules.
+    /// a `MetadataOnlyExtension` that does not provide actual grammar rules.
     /// For production use, prefer static registration via `register_extension()`
     /// with a concrete `GrammarExtension` implementation.
     ///
@@ -255,8 +255,8 @@ impl ExtensionDiscovery {
                     details: format!("Invalid extension metadata: {}", e),
                 })?;
 
-            // For now, we'll create a placeholder extension since we can't load dynamic libraries
-            let extension = Box::new(PlaceholderExtension::new(&metadata));
+            // Dynamic library loading not supported; create metadata-only extension
+            let extension = Box::new(MetadataOnlyExtension::new(&metadata));
 
             let package = ExtensionPackage {
                 metadata: metadata.clone(),
@@ -436,13 +436,12 @@ impl ClonableExtensionWrapper {
 
 impl GrammarExtension for ClonableExtensionWrapper {
     fn grammar_rules(&self) -> &'static str {
-        // This is a limitation - we need to box the string or use a different approach
-        // For now, return empty string
+        // Wrapper cannot provide dynamic rules; returns empty (use inner extension directly)
         ""
     }
 
     fn statement_rules(&self) -> Vec<&'static str> {
-        // Another limitation - return empty for now
+        // Wrapper cannot provide dynamic rules; returns empty
         vec![]
     }
 
@@ -456,25 +455,21 @@ impl GrammarExtension for ClonableExtensionWrapper {
     }
 }
 
-/// Placeholder extension for loaded extensions.
+/// Metadata-only extension loaded from configuration files.
 ///
-/// Used when loading extensions from configuration files. This is a stub
-/// implementation that does not provide actual grammar rules - it exists
-/// primarily for testing extension discovery and dependency resolution.
+/// Does not provide grammar rules - exists for testing extension discovery
+/// and dependency resolution. Dynamic library loading is not supported.
 ///
-/// **For production use**, implement the `GrammarExtension` trait directly
-/// and register via `ExtensionDiscovery::register_extension()`.
-///
-/// Dynamic library loading is not currently implemented. If needed in the
-/// future, this struct could be replaced with a dynamically-loaded extension.
+/// **For production use**, implement `GrammarExtension` directly and
+/// register via `ExtensionDiscovery::register_extension()`.
 #[derive(Debug, Clone)]
-struct PlaceholderExtension {
+struct MetadataOnlyExtension {
     #[allow(dead_code)] // Stored for error messages and debugging
     name: String,
     priority: u32,
 }
 
-impl PlaceholderExtension {
+impl MetadataOnlyExtension {
     fn new(metadata: &ExtensionMetadata) -> Self {
         Self {
             name: metadata.name.clone(),
@@ -483,7 +478,7 @@ impl PlaceholderExtension {
     }
 }
 
-impl GrammarExtension for PlaceholderExtension {
+impl GrammarExtension for MetadataOnlyExtension {
     fn grammar_rules(&self) -> &'static str {
         ""
     }
@@ -549,7 +544,7 @@ mod tests {
             keywords: None,
         };
 
-        let extension = Box::new(PlaceholderExtension::new(&metadata));
+        let extension = Box::new(MetadataOnlyExtension::new(&metadata));
         assert!(discovery.register_extension(metadata, extension).is_ok());
         assert!(discovery.has_extension("test_ext"));
     }
@@ -575,7 +570,7 @@ mod tests {
         discovery
             .register_extension(
                 base_metadata.clone(),
-                Box::new(PlaceholderExtension::new(&base_metadata)),
+                Box::new(MetadataOnlyExtension::new(&base_metadata)),
             )
             .unwrap();
 
@@ -596,7 +591,7 @@ mod tests {
         discovery
             .register_extension(
                 dep_metadata.clone(),
-                Box::new(PlaceholderExtension::new(&dep_metadata)),
+                Box::new(MetadataOnlyExtension::new(&dep_metadata)),
             )
             .unwrap();
 

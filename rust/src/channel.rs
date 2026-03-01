@@ -18,7 +18,7 @@ pub trait Pair<P: Pair<Self>>: Sized {
     fn pair() -> (Self, P);
 }
 
-/// An empty channel placeholder representing no communication.
+/// Unit channel type representing the absence of communication.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Nil;
 

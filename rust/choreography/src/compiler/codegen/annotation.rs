@@ -120,8 +120,7 @@ pub(crate) fn generate_annotation_attributes(annotations: &crate::ast::Annotatio
         attrs.push(quote! { #[priority = #p] });
     }
 
-    // For timeout/async/retry, fall back to string-based lookup for now
-    // as these aren't yet typed variants
+    // timeout/async/retry use string-based lookup (not typed Annotation variants)
     if let Some(timeout) = annotations.get("timeout") {
         attrs.push(quote! { #[timeout = #timeout] });
     }

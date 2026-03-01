@@ -270,7 +270,7 @@ fn parse_constraint(
                 .flat_map(|p| p.into_inner())
                 .map(|p| RoleName::new(p.as_str()))
                 .collect::<Result<Vec<_>, _>>()?;
-            // For now, create pairwise separation constraints
+            // Separated constraints are binary; use first two roles
             if roles.len() >= 2 {
                 Ok(TopologyConstraint::Separated(
                     roles[0].clone(),

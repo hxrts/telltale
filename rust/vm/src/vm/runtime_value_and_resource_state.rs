@@ -14,7 +14,7 @@ fn default_max_payload_bytes() -> usize {
     64 * 1024
 }
 
-/// Lean-aligned scope identifier placeholder.
+/// Scope identifier type, aligned with Lean's scope representation.
 pub type ScopeId = usize;
 
 /// Lean-aligned program representation.

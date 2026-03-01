@@ -258,8 +258,7 @@ fn apply_annotations_to_statement(stmt: &mut Statement, annotations: HashMap<Str
         } => {
             stmt_annotations.extend(annotations);
         }
-        // For statements without annotations field, we could wrap or extend
-        // For now, these don't support annotations
+        // Statements without an annotations field do not support annotations
         _ => {
             // Could log a warning here about unsupported annotation target
         }

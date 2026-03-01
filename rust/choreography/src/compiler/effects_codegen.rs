@@ -437,8 +437,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                     }
                 }
                 Some(Condition::YieldWhen(_condition)) => {
-                    // Yield when condition is met
-                    // For now, execute once and check condition
+                    // YieldWhen executes once then yields (condition captured for observability)
                     quote! {
                         .loop_n(1, Program::new()#body_effects.end())
                     }

@@ -27,7 +27,7 @@ use telltale_types::GlobalType;
 /// Corresponds to Lean's `coherentG` structure.
 /// A coherent global type satisfies all of the following:
 ///
-/// - `linear`: Linearity predicate (placeholder, always true for now)
+/// - `linear`: Linearity predicate (trivially true, matches Lean's `linearPred`)
 /// - `size`: All communications have non-empty branches
 /// - `action`: Sender ≠ receiver in all communications
 /// - `uniq_labels`: Branch labels are unique in each choice
@@ -35,7 +35,7 @@ use telltale_types::GlobalType;
 /// - `good`: Enabledness implies step exists (goodG condition)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CoherentG {
-    /// Linearity predicate (placeholder - always true for now)
+    /// Linearity predicate (trivially true, matches Lean's `linearPred`)
     pub linear: bool,
     /// Size predicate: all communications have non-empty branches
     pub size: bool,
@@ -52,8 +52,8 @@ pub struct CoherentG {
 impl CoherentG {
     /// Check implemented coherence conditions.
     ///
-    /// This excludes the placeholder `linear` predicate until a full
-    /// linearity algorithm is implemented.
+    /// This excludes the trivially-true `linear` predicate since the
+    /// full linearity algorithm is not yet formalized in Lean.
     #[must_use]
     pub fn is_coherent(&self) -> bool {
         self.is_coherent_core()
@@ -92,15 +92,15 @@ pub fn check_coherent(g: &GlobalType) -> CoherentG {
     }
 }
 
-/// Placeholder linearity predicate for globals.
+/// Trivially-true linearity predicate for globals.
 ///
 /// Corresponds to Lean's `linearPred`.
-/// This is currently a placeholder and does not provide a full linearity proof.
+///
+/// Linearity would ensure channels are used without races and choices are
+/// well-scoped. The full linearity algorithm is not yet formalized in Lean,
+/// so this returns `true` to maintain correspondence with the Lean definition.
 #[must_use]
 pub fn linear_pred(_g: &GlobalType) -> bool {
-    // Linearity would ensure channels are used without races and choices are well-scoped.
-    // We stub this out to mirror the current Lean placeholder and keep checks explicit
-    // until a full linearity predicate is implemented.
     true
 }
 
@@ -158,8 +158,8 @@ pub fn projectable(g: &GlobalType) -> bool {
     let roles = g.roles();
     let mut projector = MemoizedProjector::new();
 
-    // Check that projection would succeed for each role
-    // For now, we check structural properties that ensure projection succeeds
+    // Check that projection would succeed for each role by verifying
+    // structural properties that ensure projection succeeds
     for role in &roles {
         if !can_project_role(g, role, &mut BTreeSet::new(), &mut projector) {
             return false;

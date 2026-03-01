@@ -378,8 +378,7 @@ impl ProtocolAnnotation {
     pub fn from_legacy(key: &str, value: &str) -> Self {
         match key {
             "timed_choice" if value == "true" => {
-                // Duration is stored separately as timeout_ms
-                // Return a placeholder - caller should combine with timeout_ms
+                // Duration comes from separate timeout_ms annotation; use zero default
                 Self::TimedChoice {
                     duration: Duration::from_secs(0),
                 }

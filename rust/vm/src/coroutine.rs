@@ -36,7 +36,7 @@ impl ProgressToken {
     }
 }
 
-/// Effect-context placeholder aligned with the Lean VM model.
+/// Effect context for coroutine execution, aligned with the Lean VM model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EffectCtx<E = ()> {
     /// Optional effect metadata captured for replay/introspection.

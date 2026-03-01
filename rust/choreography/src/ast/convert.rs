@@ -219,7 +219,7 @@ fn message_to_label(message: &MessageType) -> Label {
     // If there's a type annotation, we could map it to PayloadSort
     let name = message.name.to_string();
 
-    // For now, use Unit sort. Could be extended to parse type annotations.
+    // Default to Unit sort; type annotations would map to other PayloadSort variants
     Label::with_sort(name, PayloadSort::Unit)
 }
 
@@ -377,8 +377,7 @@ pub fn local_types_equivalent(lt1: &LocalTypeR, lt2: &LocalTypeR) -> bool {
         (LocalTypeR::Var(v1), LocalTypeR::Var(v2)) => v1 == v2,
 
         (LocalTypeR::Mu { var: v1, body: b1 }, LocalTypeR::Mu { var: v2, body: b2 }) => {
-            // For alpha-equivalence, we'd need more sophisticated comparison
-            // For now, require same variable names
+            // Syntactic equality (not alpha-equivalence); requires matching variable names
             v1 == v2 && local_types_equivalent(b1, b2)
         }
 

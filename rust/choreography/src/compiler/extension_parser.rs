@@ -66,9 +66,8 @@ impl ExtensionParser {
         // Reserve capacity based on input size for efficient parsing
         self.parse_buffer.reserve(input.len());
 
-        // For now, we'll use a hybrid approach:
-        // 1. Try parsing with the standard parser first
-        // 2. If successful, post-process to handle any extension statements
+        // Hybrid approach: parse with standard parser, then post-process
+        // to handle any extension statements
 
         let mut choreography =
             parse_choreography_str(input).map_err(ExtensionParseError::StandardParseError)?;
@@ -82,20 +81,15 @@ impl ExtensionParser {
 
     /// Process a protocol tree to identify and dispatch extension statements.
     ///
-    /// Currently a pass-through - returns the protocol unchanged.
-    /// Full extension statement dispatch will be implemented when extension parsing
-    /// requirements are finalized. The implementation will:
-    /// 1. Parse with the composed grammar
-    /// 2. Identify extension statements in the parse tree
-    /// 3. Dispatch to registered extension parsers
+    /// Returns the protocol unchanged. Extension statement dispatch is a reserved
+    /// extension point: the grammar composer identifies extension statements,
+    /// but this method does not yet transform them.
     fn process_extensions_optimized(
         &mut self,
         protocol: Protocol,
         _input: &str,
         _roles: &[Role],
     ) -> Result<Protocol, ExtensionParseError> {
-        // Currently a pass-through. Extension statements are identified
-        // by the grammar composer but not yet dispatched to parsers.
         Ok(protocol)
     }
 

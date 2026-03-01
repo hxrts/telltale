@@ -1,6 +1,6 @@
 //! Scheduler policies for work-queue based algorithms.
 //!
-//! This is a stub module used to prepare for the work-budget refactor.
+//! Provides pluggable frontier ordering policies for graph exploration algorithms.
 
 use std::collections::VecDeque;
 

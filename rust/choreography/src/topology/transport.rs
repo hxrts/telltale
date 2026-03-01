@@ -224,15 +224,15 @@ impl TransportFactory {
                 Box::new(InMemoryChannelTransport::new(role.clone()))
             }
             Some(TopologyMode::PerRole) => {
-                // For per-role mode, we'd use TCP but for now fall back to in-memory
+                // PerRole mode falls back to in-memory (TCP transport unsupported)
                 Box::new(InMemoryChannelTransport::new(role.clone()))
             }
             Some(TopologyMode::Kubernetes(_namespace)) => {
-                // Placeholder: would use K8s service discovery
+                // Kubernetes mode falls back to in-memory (K8s discovery unsupported)
                 Box::new(InMemoryChannelTransport::new(role.clone()))
             }
             Some(TopologyMode::Consul(_datacenter)) => {
-                // Placeholder: would use Consul service discovery
+                // Consul mode falls back to in-memory (Consul discovery unsupported)
                 Box::new(InMemoryChannelTransport::new(role.clone()))
             }
         }

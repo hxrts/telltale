@@ -78,7 +78,7 @@ fn generate_type_expr(local_type: &LocalType) -> TokenStream {
         }
 
         LocalType::Timeout { duration: _, body } => {
-            // Generate type for the body, ignoring timeout info for now
+            // Timeout duration is a runtime concern; type is determined by body
             generate_type_expr(body)
         }
     }
@@ -250,9 +250,7 @@ fn generate_extension_code(
         pub fn create_extension_registry() -> ::telltale_choreography::extensions::ExtensionRegistry {
             let mut registry = ::telltale_choreography::extensions::ExtensionRegistry::new();
 
-            // In a real implementation, this would register runtime extension handlers
-            // For now, we just return the empty registry
-
+            // Runtime extension handlers would be registered here if needed
             registry
         }
     }

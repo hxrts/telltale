@@ -57,7 +57,7 @@ pub fn choreography(input: TokenStream) -> Result<TokenStream> {
 ///
 /// Note: DSL string parsing with full support for parameterized roles is now available
 /// in the `telltale-choreography` crate. The macro in that crate (`telltale_choreography::choreography!`)
-/// provides complete integration. This stub remains for backwards compatibility.
+/// provides complete integration. This entry point emits a compile error directing users there.
 fn choreography_from_dsl_string(dsl: String) -> proc_macro2::TokenStream {
     drop(dsl); // Explicitly consume parameter
     quote! {

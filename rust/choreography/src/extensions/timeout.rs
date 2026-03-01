@@ -77,15 +77,11 @@ impl TimeoutStatementParser {
         content: &str,
         context: &ParseContext,
     ) -> Result<TimeoutProtocol, ParseError> {
-        // Simplified parsing - extract duration and roles
-        // In a real implementation, this would use the Pest parse tree
-
+        // Simplified parsing - extract duration and roles (production would use Pest tree)
         let duration_ms = self.extract_duration(content)?;
         let roles = self.extract_roles(content, context)?;
 
-        // For simplicity, assume the body is just an End protocol
-        // In practice, you'd recursively parse the protocol body
-
+        // Body defaults to End; full implementation would recursively parse
         Ok(TimeoutProtocol {
             duration: Duration::from_millis(duration_ms),
             role_names: roles.iter().map(|r| r.name().to_string()).collect(),
@@ -113,10 +109,8 @@ impl TimeoutStatementParser {
         _content: &str,
         context: &ParseContext,
     ) -> Result<Vec<Role>, ParseError> {
-        // Simplified role extraction
-        // In practice, this would properly parse role references
-
-        // For now, just return all declared roles
+        // Simplified role extraction; returns all declared roles
+        // (production would properly parse role references from content)
         Ok(context.declared_roles.to_vec())
     }
 }
@@ -178,12 +172,11 @@ impl ProtocolExtension for TimeoutProtocol {
             .iter()
             .any(|name| name == &role.name().to_string())
         {
-            // This role participates in the timeout
-            // For now, just return a placeholder. In a real implementation,
-            // we would need to create a new projection context to project the body
+            // This role participates in the timeout; body defaults to End
+            // (full implementation would project the protocol body recursively)
             Ok(LocalType::Timeout {
                 duration: self.duration,
-                body: Box::new(LocalType::End), // Placeholder
+                body: Box::new(LocalType::End),
             })
         } else {
             // This role doesn't participate in timeout, return End

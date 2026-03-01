@@ -512,10 +512,10 @@ impl ProtocolTest {
             .map(|bytes| bincode::deserialize(bytes))
     }
 
-    /// Run the test (placeholder - actual implementation depends on protocol).
+    /// Run the test with the configured bindings and assertions.
     ///
-    /// This is a framework method that sets up the test infrastructure.
-    /// The actual execution logic is provided by generated protocol code.
+    /// Sets up test infrastructure and validates bindings. Protocol-specific
+    /// execution logic is provided by generated code.
     pub async fn run(self) -> Result<TestResult, ChoreographyError> {
         let start = std::time::Instant::now();
         self.validate_bindings()?;

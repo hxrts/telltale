@@ -332,9 +332,7 @@ impl<M, R: RoleId> Interpreter<M, R> {
                     "Executing extension effect"
                 );
 
-                // We need to check if handler implements ExtensibleHandler
-                // For now, we'll add a separate interpret function for extensible handlers
-                // and keep this one for backward compatibility
+                // Extension effects require ExtensibleHandler; use interpret_extensible()
                 tracing::warn!(
                     "Extension effect encountered but handler does not support extensions. \
                      Use interpret_extensible() for handlers with extension support."

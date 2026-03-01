@@ -106,7 +106,7 @@ pub fn parse_choreography_str_with_extensions(
                         namespace = Some(parse_module_decl(inner, &preprocessed)?);
                     }
                     Rule::import_decl => {
-                        // Imports are parsed for completeness but ignored for now.
+                        // Imports are parsed but not processed (reserved syntax)
                     }
                     Rule::proof_bundle_decl => {
                         proof_bundles.push(parse_proof_bundle_decl(inner, &preprocessed)?);
@@ -262,8 +262,8 @@ pub fn parse_choreography_str_with_extensions(
 
 /// Preprocess extension syntax to transform it into standard DSL syntax.
 ///
-/// The new DSL drops annotation/extension surface syntax for now, so this is a
-/// no-op placeholder that keeps the API stable.
+/// Returns input unchanged - extension surface syntax is not used in the
+/// current DSL. This function maintains API stability.
 fn preprocess_extension_syntax(
     input: &str,
     _registry: &ExtensionRegistry,

@@ -96,7 +96,8 @@ impl GuardLayer for InMemoryGuardLayer {
         if !self.resources.contains_key(layer) {
             return Err(format!("unknown guard layer {}", layer.0));
         }
-        // Evidence intentionally unused in this stub (future: validate close evidence).
+        // SimpleGuardLayer does not validate; custom implementations can override
+        // to verify evidence matches open(). Evidence intentionally discarded:
         let _ = evidence;
         Ok(())
     }
