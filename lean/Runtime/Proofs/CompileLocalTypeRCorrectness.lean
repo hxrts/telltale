@@ -1,9 +1,11 @@
 import Runtime.VM.Model.CompileLocalTypeR
 
 
-/-! # CompileLocalTypeR Correctness Stubs
+/-! # CompileLocalTypeR Correctness
 
-Statements only (no proofs yet).
+Basic correctness properties for the LocalTypeR compiler:
+- `compile_nonempty`: non-end types compile to non-empty bytecode
+- `compile_ends_halt_or_jmp`: compiled code always ends with halt or jump
 -/
 
 set_option autoImplicit false

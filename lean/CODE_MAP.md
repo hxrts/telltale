@@ -723,7 +723,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | Proofs/ConcurrencyThreaded.lean | 102 | V2: Threaded concurrency proofs with wave certification |
 | Proofs/SchedulerTheoremPack.lean | 200 | V2: Scheduler theorem bundle for runtime admission |
 | Proofs/SchedulerApi.lean | 257 | Scheduler API surface for runtime admission |
-| Proofs/CompileLocalTypeRCorrectness.lean | 53 | Compiler correctness stubs (nonempty, ends with halt/jmp) |
+| Proofs/CompileLocalTypeRCorrectness.lean | 53 | Compiler correctness properties (nonempty, ends with halt/jmp) |
 | Proofs/SessionLocal.lean | 337 | `SessionSlice`, `SessionCoherent`, session-local frame infrastructure |
 | Proofs/Frame.lean | 128 | `session_local_op_preserves_other`, `disjoint_ops_preserve_unrelated` |
 | Proofs/Delegation.lean | 6 | Re-export wrapper importing `Protocol.Coherence.Delegation` |
