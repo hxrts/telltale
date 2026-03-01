@@ -44,8 +44,8 @@ This keeps material-step semantics synchronized across Lean and Rust lanes.
 `run_with_scenario` returns in-memory artifacts and stats.
 It does not write arbitrary scenario output files by itself.
 
-`active_per_role` follows the first branch when estimating active node count.
-`Trigger::AfterStep` is evaluated against current tick in the fault injector.
+`active_per_role` uses the maximum active-depth branch when estimating active node count.
+`Trigger::AfterStep` is evaluated against logical step count in the fault injector.
 
 ## Related Docs
 

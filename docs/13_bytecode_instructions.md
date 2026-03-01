@@ -66,7 +66,7 @@ All register operands are bounds-checked at runtime. Out-of-range reads or write
 | `Set` | `dst`, `val` | Writes an immediate value to a register. |
 | `Move` | `dst`, `src` | Copies a register value. |
 | `Jump` | `target` | Performs an unconditional jump. |
-| `Spawn` | `target`, `args` | Spawns a child coroutine in cooperative execution. Threaded runtime rejects this opcode today. |
+| `Spawn` | `target`, `args` | Spawns a child coroutine with copied argument registers. |
 | `Yield` | none | Yields back to the scheduler. |
 | `Halt` | none | Terminates coroutine execution. |
 
@@ -74,7 +74,7 @@ All register operands are bounds-checked at runtime. Out-of-range reads or write
 
 `rust/vm/src/compiler.rs` exposes `compile(local_type: &LocalTypeR) -> Vec<Instr>`.
 
-The compiler emits only communication and control instructions. It does not emit guard, speculation, or ownership opcodes.
+The compiler emits communication instructions, `Invoke`, and control-flow instructions. It does not emit guard, speculation, or ownership opcodes.
 
 | `LocalTypeR` node | Emission pattern |
 |---|---|

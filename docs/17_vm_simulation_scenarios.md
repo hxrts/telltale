@@ -92,7 +92,7 @@ Predicate strings are parsed by `parse_predicate`.
 ## Checkpointing and Replay
 
 `CheckpointStore` snapshots VM state as JSON bytes at configured intervals.
-`run_with_scenario` writes checkpoint files under `artifacts/<scenario.name>/`.
+When `checkpoint_interval` is set, `run_with_scenario` writes checkpoint files under `artifacts/<scenario.name>/`.
 
 Replay loads one checkpoint and one scenario.
 It then runs the same middleware and property loop for selected rounds.
