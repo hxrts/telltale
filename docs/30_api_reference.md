@@ -24,9 +24,21 @@ Key exports:
 
 - `GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`
 - `ContentId`, `Sha256Hasher`, `ContentStore`, `KeyedContentStore`
-- Merge and projection helpers in `rust/types/src`
+- Merge helpers (`merge`, `merge_all`, `can_merge`) and canonical-serialization utilities
 
 See `rust/types/src/lib.rs` for re-exports.
+
+### `telltale-theory`
+
+Session-type algorithms and executable theory checks.
+
+Key exports:
+
+- Projection: `project`, `project_all`, `MemoizedProjector`
+- Merge, duality, well-formedness, and semantics checks
+- Subtyping surfaces (feature-gated): `async_subtype`, `sync_subtype`
+
+See `rust/theory/src/lib.rs` for the complete feature-gated API.
 
 ### `telltale-choreography`
 
@@ -91,6 +103,18 @@ Key exports:
 - `LeanRunner`, `Validator`, `ValidationResult`
 
 See [Lean-Rust Bridge](24_lean_rust_bridge.md) for details.
+
+### `telltale-transport`
+
+Production transport implementations for choreography topologies.
+
+Key exports:
+
+- `TcpTransport`, `TcpTransportConfig`, `TransportState`
+- Resolver and factory surfaces: `EnvResolver`, `StaticResolver`, `TcpTransportFactory`
+- Re-exported transport traits/types: `Transport`, `TransportError`, `TransportResult`, `RoleName`
+
+See `rust/transport/src/lib.rs` for the current public surface.
 
 ## Guidance
 

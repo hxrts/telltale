@@ -45,23 +45,17 @@ pub struct Heap {
 Allocate and consume resources using the functional API.
 
 ```rust
-use telltale_choreography::heap::{Heap, Resource, Message};
+use telltale_choreography::heap::{Heap, Resource};
 
 let heap = Heap::new();
-let msg = Resource::Message(Message {
-    sender: "Alice".to_string(),
-    receiver: "Bob".to_string(),
-    label: "Ping".to_string(),
-    payload: vec![1, 2, 3],
-    sequence: 0,
-});
+let msg = Resource::message("Alice", "Bob", "Ping", vec![1, 2, 3], 0);
 let (msg_id, heap) = heap.alloc(msg);
 let heap = heap.consume(&msg_id)?;
 ```
 
 The `alloc` method returns a new heap and the allocated resource ID. The `consume` method marks a resource as nullified while keeping it in the heap. The `read` method returns an error if the resource does not exist or has already been consumed.
 
-Additional heap methods include `size()`, `contains()`, `is_consumed()`, `is_active()`, and `alloc_counter()`. The mutable variants `alloc_mut` and `consume_mut` modify the heap in place.
+Additional heap methods include `size()`, `nullified_count()`, `contains()`, `is_consumed()`, `is_active()`, and `alloc_counter()`. `size()` reports allocated resources, including consumed entries that are retained for auditability. The mutable variants `alloc_mut` and `consume_mut` modify the heap in place.
 
 ## Merkle Commitments
 

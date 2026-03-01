@@ -8,8 +8,11 @@ Top level examples in `examples/`:
 
 - `adder.rs` for a simple request response protocol
 - `alternating_bit.rs` for a reliable message delivery pattern
+- `async_subtyping.rs` for async-subtyping checks and examples
+- `bounded_recursion.rs` for bounded recursion strategies
 - `client_server_log.rs` for logging in a client server protocol
 - `ring.rs` and `ring_choice.rs` for ring topologies and branching
+- `three_adder.rs` for a three-party aggregation flow
 - `double_buffering.rs` and `elevator.rs` for multi step coordination
 - `fft.rs` for distributed computation
 - `oauth.rs` for a multi role authentication flow

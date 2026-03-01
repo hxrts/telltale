@@ -91,6 +91,7 @@ Admission and capability drift are controlled by repository lanes.
 | theorem-pack release conformance | `just check-release-conformance` |
 | VM parity suite | `just check-parity --suite` |
 | parity type and schema policy | `just check-parity --types` |
+| consolidated parity policy | `just check-parity --all` |
 
 ## Related Docs
 

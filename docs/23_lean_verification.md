@@ -38,7 +38,7 @@ The VM model is centered under `lean/Runtime/VM`.
 | Core instruction and state model | `Runtime/VM/Model/*` |
 | Executable semantics | `Runtime/VM/Semantics/*` |
 | Runtime adapters and monitor | `Runtime/VM/Runtime/*` |
-| Composition and domain instances | `Runtime/VM/Composition/*` |
+| Composition and domain instances | `Runtime/VM/Composition.lean` |
 
 The effect model uses the current split `EffectRuntime` and `EffectSpec`. Monitor typing lives in `Runtime/VM/Runtime/Monitor.lean`.
 
@@ -85,6 +85,7 @@ Lean and Rust alignment is checked by automation lanes.
 | Release conformance | `just check-release-conformance` |
 | VM parity suite | `just check-parity --suite` |
 | Type and schema parity | `just check-parity --types` |
+| Conformance-specific parity lane | `just check-parity --conformance` |
 | Consolidated parity lane | `just check-parity --all` |
 
 ## Related Docs

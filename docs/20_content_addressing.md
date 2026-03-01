@@ -92,7 +92,7 @@ Content IDs are useful for caching projection results.
 
 ```rust
 use std::collections::HashMap;
-use telltale_types::{ContentId, GlobalType, Label};
+use telltale_types::{ContentId, GlobalType, Label, LocalTypeR};
 use telltale_theory::project;
 
 let global = GlobalType::send("Alice", "Bob", Label::new("ping"), GlobalType::End);

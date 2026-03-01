@@ -24,7 +24,7 @@ The default feature set enables Lean runner integration.
 default = ["runner"]
 cli = ["clap"]
 runner = ["telltale-theory"]
-exporter = ["telltale-choreography", "anyhow"]
+exporter = ["telltale-choreography", "anyhow", "bpaf"]
 golden = ["clap", "anyhow", "runner"]
 
 [[bin]]
@@ -239,6 +239,8 @@ Each CLI targets a different workflow stage.
 - `lean-bridge-exporter`: convert choreography DSL input into choreography and program JSON files for Lean validation.
 - `golden`: regenerate, check, add, and list projection golden files.
 
+`lean-bridge` and `golden` use `clap` parsing. `lean-bridge-exporter` uses `bpaf`.
+
 The `golden` CLI expects Lean validator availability for regeneration and drift checks.
 It resolves relative `--golden-dir` paths from the crate manifest directory.
 
@@ -247,16 +249,25 @@ It resolves relative `--golden-dir` paths from the crate manifest directory.
 Bridge tests in `rust/lean-bridge/tests` cover conversion, projection parity, schema compatibility, invariant verification, and VM correspondence.
 Most Lean-dependent tests skip when Lean binaries are missing.
 
-- `schema_version_tests.rs`
-- `projection_runner_tests.rs`
+- `coherence_tests.rs`
 - `golden_equivalence_tests.rs`
-- `live_equivalence_tests.rs`
 - `invariant_verification_tests.rs`
-- `vm_correspondence_tests.rs`
-- `vm_differential_step_tests.rs`
-- `vm_cross_target_matrix_tests.rs`
+- `lean_integration_tests.rs`
+- `live_equivalence_tests.rs`
+- `merge_semantics_tests.rs`
+- `projection_equivalence_tests.rs`
+- `projection_runner_tests.rs`
 - `property_tests.rs`
+- `proptest_async_subtyping.rs`
+- `proptest_bundle_transport.rs`
+- `proptest_json_roundtrip.rs`
+- `proptest_projection.rs`
+- `schema_version_tests.rs`
+- `semantics_verification_tests.rs`
 - `vm_composition_stress_tests.rs`
+- `vm_correspondence_tests.rs`
+- `vm_cross_target_matrix_tests.rs`
+- `vm_differential_step_tests.rs`
 
 These lanes are aligned with repository parity and release-gate lanes.
 Examples include `just check-parity --types`, `just check-parity --suite`, and `just check-capability-gates`.

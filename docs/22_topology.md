@@ -153,7 +153,7 @@ handler.initialize().await?;
 
 The local constructor sets `TopologyMode::Local` and creates in process transports. For custom layouts, use `TopologyHandler::new` or the builder with a `Topology`.
 
-Generated protocols include helpers like `Protocol::handler(role)` and `Protocol::with_topology(topology, role)`. These return a `TopologyHandler` for the selected role.
+Generated protocols include helpers under `Protocol::topology`, including `Protocol::topology::handler(role)` and `Protocol::topology::with_topology(topology, role)`. These return a `TopologyHandler` for the selected role.
 
 ### Generated Topology Helper Surface
 

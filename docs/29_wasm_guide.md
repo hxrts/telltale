@@ -89,11 +89,11 @@ enum Message {
 
 async fn run_once() -> Result<(), Box<dyn std::error::Error>> {
     use futures::join;
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
     use std::sync::{Arc, Mutex};
 
-    let channels = Arc::new(Mutex::new(HashMap::new()));
-    let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+    let channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut client =
         InMemoryHandler::with_channels(Role::Client, channels.clone(), choice_channels.clone());

@@ -32,7 +32,7 @@ Paper 2 adds quantitative dynamics and algorithmic decision surfaces.
 | Claim family | Lean anchor modules |
 |---|---|
 | weighted quantitative descent and scheduler-lifted bounds | `Runtime/Proofs/WeightedMeasure/*`, `Runtime/Proofs/SchedulingBound*.lean`, `Runtime/Proofs/Lyapunov.lean` |
-| regular finite-reachability decidability | `SessionCoTypes/AsyncSubtyping/*`, regular equivalence modules |
+| regular finite-reachability decidability | `SessionCoTypes/AsyncSubtyping/*`, `SessionCoTypes/Coinductive/Regular*.lean` |
 | crash-stop characterization | `Protocol/CrashTolerance.lean` |
 | Byzantine exact safety interface package | distributed adapter and theorem-pack modules |
 

@@ -8,6 +8,7 @@ Distributed profile wrappers are defined in `lean/Runtime/Proofs/Adapters/Distri
 
 | Family | Wrapper type | Inventory key |
 |---|---|---|
+| FLP lower bound | `FLPProfile` | `flp_lower_bound` |
 | FLP impossibility | `FLPProfile` | `flp_impossibility` |
 | CAP impossibility | `CAPProfile` | `cap_impossibility` |
 | quorum geometry | `QuorumGeometryProfile` | `quorum_geometry_safety` |
