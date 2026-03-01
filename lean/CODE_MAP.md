@@ -1,7 +1,7 @@
 # Lean Verification Code Map
 
 <!-- GENERATED_METRICS:BEGIN -->
-**Last Updated:** 2026-02-28
+**Last Updated:** 2026-03-01
 <!-- GENERATED_METRICS:END -->
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
@@ -35,16 +35,16 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | Library        | Files | Lines   | Focus                                                      |
 |----------------|------:|--------:|------------------------------------------------------------|
 | SessionTypes   |    47 |   9,967 | Global/local type definitions, de Bruijn, participation    |
-| SessionCoTypes |    78 |  16,305 | Coinductive EQ2, bisimulation, duality, async subtyping    |
-| Choreography   |    89 |  19,310 | Projection, harmony, blindness, embedding, erasure         |
-| Semantics      |    13 |   2,295 | Operational semantics, determinism, deadlock freedom       |
+| SessionCoTypes |    78 |  16,302 | Coinductive EQ2, bisimulation, duality, async subtyping    |
+| Choreography   |    89 |  19,308 | Projection, harmony, blindness, embedding, erasure         |
+| Semantics      |    14 |   2,359 | Operational semantics, determinism, deadlock freedom       |
 | Classical      |    16 |   2,193 | Transported theorems (queueing, large deviations, mixing)  |
 | ClassicalAnalysis |     3 |   1,128 | Real analysis concrete models for classical transport      |
 | Distributed    |    59 |   7,266 | Distributed assumptions, validation, FLP/CAP theorem packaging |
-| Protocol       |   170 |  40,082 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   145 |  28,062 | VM, Iris backend via iris-lean, resource algebras, WP      |
+| Protocol       |   170 |  40,077 | Async buffered MPST, coherence, preservation, monitoring   |
+| Runtime        |   145 |  28,142 | VM, Iris backend via iris-lean, resource algebras, WP      |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **623** | **127,438** |                                                            |
+| **Total**      | **624** | **127,572** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
