@@ -27,11 +27,10 @@ private def ProjSubstRel (t : String) (G : GlobalType) (role : String) : Rel := 
     a = projTrans (g.substitute t G) role ∧
     b = (projTrans g role).substitute t (projTrans G role)
 
-/-! ## Remaining Lemmas for Legacy Gaps
+/-! ## Mu-Unfold Lemmas
 
-The following lemmas capture the semantic properties needed for the remaining cases.
-They are eliminable using the fullUnfold infrastructure once `eq2_of_full_unfold_eq`
-and related lemmas are proven. -/
+The following lemmas capture the semantic properties needed for the mu cases.
+These are proven in MuUnfoldLemmas.lean using proj_subst and EQ2 infrastructure. -/
 
 /-- Mu-mu crossed unfold: left unfold relates to right mu.
 

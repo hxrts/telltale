@@ -59,9 +59,9 @@ Coherence is now proven from first principles using participation structure, fol
 **COHERENCE PROOF COMPLETE (modulo helper lemmas):**
 - `trans_branches_coherent_eq2`: **PROVEN** using participation structure
   - Case 1 (non-participant): Uses `eq_end` - all branches project to .end
-  - Case 2 (participant): Uses `part_of_all2` - uniform participation (legacy extraction gaps)
+  - Case 2 (participant): Uses `part_of_all2` - uniform participation ✓
 - `trans_produces_c_project`: Bridges trans to CProject (uses coherence)
-- `branches_project_coherent`: Extracts EQ2 equivalence from AllBranchesProj (legacy gaps)
+- `branches_project_coherent`: Extracts EQ2 equivalence from AllBranchesProj
 
 **Inherited from MuUnfoldLemmas.lean (via ProjSubst.lean):**
 4. `proj_subst`: Projection-substitution commutation (Coq indProj.v:173)
@@ -120,8 +120,8 @@ The proof proceeds by case analysis on the GlobalType witness:
 - `.mu s inner`:
   - s = t (shadowed): both sides identical ✓
   - s ≠ t:
-    - Both guarded: mu-mu case requires s-unfold/t-subst interaction [legacy gaps]
-    - Mismatched guardedness: requires showing unfold relates to .end [legacy gaps]
+    - Both guarded: mu-mu case via eq2_mu_crossed_unfold_left/right ✓
+    - Mismatched guardedness: via eq2_mu_unguarded_to_end/eq2_end_to_mu_unguarded ✓
     - Both unguarded: both .end ✓
 - `.comm sender receiver branches`:
   - role = sender: both .send, branches via trans_branches_proj_subst_rel ✓

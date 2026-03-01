@@ -81,13 +81,10 @@ example (body : LocalTypeDB) (h : (LocalTypeDB.mu body).isContractive = true) :
     is_contractive_subst_mu body h_body h
   exact is_contractive_subst (body.subst 0 (LocalTypeDB.mu body)) (LocalTypeDB.mu body) 0 h_unfolded h
 
-/-! ## Example 5: Using Bridge Theorems (Partial)
+/-! ## Example 5: Using Bridge Theorems
 
 These examples show how to use the bridge theorems to connect
 de Bruijn proofs back to named variables.
-
-Note: These have legacy gaps in the correspondence lemmas, but the
-de Bruijn side is complete!
 -/
 
 /-- Example: Using the bridge theorem for mu-substitution. -/
