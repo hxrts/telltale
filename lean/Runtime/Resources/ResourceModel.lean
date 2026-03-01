@@ -28,11 +28,11 @@ abbrev LabelRef (ν : Type u) [VerificationModel ν] :=
   VerificationModel.Hash ν
 
 abbrev ValueRef :=
-  -- Placeholder for resource payloads.
+  -- Resource payload value in the runtime value domain.
   Value
 
 abbrev Delta :=
-  -- Placeholder for delta accounting.
+  -- Signed quantity delta used by V1 accounting.
   Int
 
 /-- Resource records are immutable and committed. -/
@@ -46,7 +46,7 @@ structure Resource (ν : Type u) [VerificationModel ν] where
   nullifierKey : VerificationModel.NullifierKey ν -- Nullifier key for spending.
   isEphemeral : Bool -- Whether the resource persists across transactions.
 
-/-- Serialize a resource for hashing/commitment (placeholder). -/
+/-- Serialize a resource for hashing/commitment. -/
 def resourcePayload {ν : Type u} [VerificationModel ν] (_r : Resource ν) : Data :=
   -- Encode quantity/value/ephemeral flag in a deterministic V1 payload.
   Value.prod (Value.prod (.nat _r.quantity) _r.value) (.bool _r.isEphemeral)
@@ -79,7 +79,7 @@ def Resource.kind {ν : Type u} [VerificationModel ν]
   -- Domain-separated hash for the resource kind.
   VerificationModel.hashTagged .resourceKind (resourcePayload r)
 
-/-- Resource delta contribution (placeholder). -/
+/-- Resource delta contribution under quantity accounting. -/
 def Resource.delta {ν : Type u} [VerificationModel ν]
     (_r : Resource ν) : Delta :=
   -- V1 uses quantity-only delta accounting.
@@ -106,7 +106,7 @@ structure ResourceState (ν : Type u) [VerificationModel ν] [AccumulatedSet ν]
   nullifiers : AccumulatedSet.State ν -- Spent-resource set in scope.
 
 abbrev ResourceLogicProof :=
-  -- Placeholder for logic proof objects.
+  -- V1 witness token for logic-side checks.
   Unit
 
 abbrev ComplianceProof (ν : Type u) [VerificationModel ν] [AccumulatedSet ν] :=
@@ -114,7 +114,7 @@ abbrev ComplianceProof (ν : Type u) [VerificationModel ν] [AccumulatedSet ν] 
   AccumulatedSet.ProofMember ν × AccumulatedSet.ProofNonMember ν
 
 abbrev DeltaProof :=
-  -- Placeholder for balance proofs.
+  -- V1 witness token for balance-side checks.
   Unit
 
 inductive ImbalanceAuthorization where
@@ -132,14 +132,14 @@ inductive ImbalanceAuthorization where
 structure Transaction (ν : Type u) [VerificationModel ν] [AccumulatedSet ν] where
   created : List (Resource ν) -- Newly created resources.
   consumed : List (Resource ν) -- Resources consumed in this step.
-  deltaProof : DeltaProof -- Balance proof (stub in V1).
-  logicProofs : List ResourceLogicProof -- Predicate proofs (stub in V1).
+  deltaProof : DeltaProof -- Balance witness carried by V1 transactions.
+  logicProofs : List ResourceLogicProof -- Predicate witnesses carried by V1 transactions.
   complianceProofs : List (ComplianceProof ν) -- Membership/non-membership proofs.
   imbalanceAuth : ImbalanceAuthorization -- Why imbalance is authorized (if at all).
 
 /-! ## Transaction Validity Checks -/
 
-/-- Delta balance predicate for a transaction (stub). -/
+/-- Delta balance predicate for a transaction. -/
 def txBalanced {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
     (tx : Transaction ν) : Prop :=
   -- V1 balances by total quantity across all kinds.

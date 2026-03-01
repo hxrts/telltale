@@ -181,6 +181,8 @@ class HandlerSatisfiesTransportSpec (ν : Type u) [VerificationModel ν]
 
 /-! ## Serialization -/
 
+/-! ### Value Encoding -/
+
 def serializeNat (v : Value) : List Nat :=
   -- Encode values into a simple tagged list of naturals.
   match v with
@@ -198,6 +200,8 @@ def serialize (v : Value) : ByteArray :=
   -- Serialize into a byte array via UInt8 tags.
   let bytes := (serializeNat v).map UInt8.ofNat
   ByteArray.mk bytes.toArray
+
+/-! ### Value Decoding -/
 
 def deserializeAux (fuel : Nat) (bytes : List Nat) : Option Value :=
   -- Fuel-bounded decoder for tagged values.
@@ -232,10 +236,14 @@ def serialize_roundtrip (v : Value) : Prop :=
   -- Roundtrip property for serialization.
   deserialize (serialize v) = some v
 
+/-! ### Refinement Contract -/
+
 def transport_refines_buffers {ν : Type u} [VerificationModel ν]
     (_t : Transport ν) (spec : TransportSpec ν) (bufs : SignedBuffers ν) : Prop :=
   -- Transport traces satisfy their declared specification.
   SpecSatisfied spec (traceOfBuffers bufs)
+
+/-! ## In-Memory FIFO Transport -/
 
 /-- Queue state used by the in-memory FIFO transport. -/
 abbrev InMemoryState (ν : Type u) [VerificationModel ν] := SignedBuffers ν
@@ -269,6 +277,8 @@ def inMemoryRecv {ν : Type u} [VerificationModel ν]
   match queueGet st edge with
   | [] => (st, .blocked)
   | v :: rest => (queueSet st edge rest, .ok v)
+
+/-! ### FIFO Sanity Lemmas -/
 
 /-- Sanity check: a single send followed by recv on the same edge returns the
 same payload. -/
