@@ -42,6 +42,8 @@ jobs:
         run: ./scripts/check-parity.sh --all
       - name: Check docs drift
         run: ./scripts/check-docs-drift.sh
+      - name: Check docs links referenced from code
+        run: ./scripts/check-doc-links-in-code.sh
       - name: Run linter
         uses: actions-rs/cargo@v1
         with:
