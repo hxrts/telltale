@@ -147,6 +147,71 @@ pub(crate) enum ExecOutcome {
 
 // ---- The VM ----
 
+/// Retained observability artifacts with optional bounded storage.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub(crate) struct RetainedLog<T>(Vec<T>);
+
+impl<T> Default for RetainedLog<T> {
+    fn default() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl<T> RetainedLog<T> {
+    fn push(&mut self, item: T, config: &ObservabilityRetentionConfig) {
+        match config.mode {
+            ObservabilityRetentionMode::Disabled => {}
+            ObservabilityRetentionMode::Full => self.0.push(item),
+            ObservabilityRetentionMode::Capped => {
+                self.0.push(item);
+                self.trim_to_capacity(config.capacity);
+            }
+        }
+    }
+
+    fn extend<I>(&mut self, iter: I, config: &ObservabilityRetentionConfig)
+    where
+        I: IntoIterator<Item = T>,
+    {
+        match config.mode {
+            ObservabilityRetentionMode::Disabled => {}
+            ObservabilityRetentionMode::Full => self.0.extend(iter),
+            ObservabilityRetentionMode::Capped => {
+                self.0.extend(iter);
+                self.trim_to_capacity(config.capacity);
+            }
+        }
+    }
+
+    fn as_slice(&self) -> &[T] {
+        &self.0
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn drain(&mut self) -> Vec<T> {
+        self.0.drain(..).collect()
+    }
+
+    fn trim_to_capacity(&mut self, capacity: usize) {
+        if self.0.len() > capacity {
+            let overflow = self.0.len() - capacity;
+            self.0.drain(0..overflow);
+        }
+    }
+}
+
+impl<T> std::ops::Deref for RetainedLog<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
 /// The choreographic VM.
 ///
 /// Manages coroutines, sessions (which own type state), and a scheduler.
@@ -159,7 +224,7 @@ where
 {
     config: VMConfig,
     code: Option<Program>,
-    programs: Vec<Program>,
+    programs: ProgramStore,
     identity_model: PhantomData<I>,
     guard_model: PhantomData<G>,
     persistence_model: PhantomData<P>,
@@ -168,14 +233,14 @@ where
     #[serde(default)]
     communication_consumption: DefaultCommunicationConsumption,
     #[serde(default)]
-    communication_consumption_artifacts: Vec<CommunicationConsumptionArtifact>,
+    communication_consumption_artifacts: RetainedLog<CommunicationConsumptionArtifact>,
     coroutines: Vec<Coroutine>,
     sessions: SessionStore,
     arena: Arena,
     resource_states: BTreeMap<ScopeId, ResourceState>,
     sched: Scheduler,
     monitor: SessionMonitor,
-    obs_trace: Vec<ObsEvent>,
+    obs_trace: RetainedLog<ObsEvent>,
     role_symbols: SymbolTable,
     label_symbols: SymbolTable,
     clock: SimClock,
@@ -183,9 +248,9 @@ where
     next_session_id: SessionId,
     paused_roles: BTreeSet<String>,
     guard_layer: InMemoryGuardLayer,
-    effect_trace: Vec<EffectTraceEntry>,
+    effect_trace: RetainedLog<EffectTraceEntry>,
     next_effect_id: u64,
-    output_condition_checks: Vec<OutputConditionCheck>,
+    output_condition_checks: RetainedLog<OutputConditionCheck>,
     crashed_sites: BTreeSet<SiteId>,
     partitioned_edges: BTreeSet<(SiteId, SiteId)>,
     corrupted_edges: BTreeMap<(SiteId, SiteId), CorruptionType>,
@@ -220,7 +285,7 @@ where
         Self {
             config,
             code: None,
-            programs: Vec::new(),
+            programs: ProgramStore::new(),
             identity_model: PhantomData,
             guard_model: PhantomData,
             persistence_model: PhantomData,
@@ -229,14 +294,14 @@ where
             communication_consumption: DefaultCommunicationConsumption::new(
                 communication_replay_mode,
             ),
-            communication_consumption_artifacts: Vec::new(),
+            communication_consumption_artifacts: RetainedLog::default(),
             coroutines: Vec::new(),
             sessions: SessionStore::new(),
             arena: Arena::default(),
             resource_states: BTreeMap::new(),
             sched,
             monitor: SessionMonitor::default(),
-            obs_trace: Vec::new(),
+            obs_trace: RetainedLog::default(),
             role_symbols: SymbolTable::new(),
             label_symbols: SymbolTable::new(),
             clock: SimClock::new(tick_duration),
@@ -249,9 +314,9 @@ where
                     .map(|(k, v)| (LayerId(k), v))
                     .collect(),
             },
-            effect_trace: Vec::new(),
+            effect_trace: RetainedLog::default(),
             next_effect_id: 0,
-            output_condition_checks: Vec::new(),
+            output_condition_checks: RetainedLog::default(),
             crashed_sites: BTreeSet::new(),
             partitioned_edges: BTreeSet::new(),
             corrupted_edges: BTreeMap::new(),

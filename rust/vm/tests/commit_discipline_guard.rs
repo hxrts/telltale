@@ -75,7 +75,7 @@ fn commit_pack_contains_commit_owned_mutation_sites() {
         "self.sessions.update_type(",
         "self.sessions.update_original(",
         "self.sessions.remove_type(",
-        "self.obs_trace.extend(",
+        ".extend(pack.events, &self.config.observability_retention)",
         "coro.pc +=",
         "coro.status =",
     ];

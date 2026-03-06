@@ -11,24 +11,28 @@ use crate::output_condition::{
 use crate::vm::ObsEvent;
 
 /// Apply output-condition verification for a commit and record diagnostics.
-pub(crate) fn apply_output_condition_gate(
+pub(crate) fn apply_output_condition_gate<RecordCheck, RecordEvent>(
     policy: &OutputConditionPolicy,
-    checks: &mut Vec<OutputConditionCheck>,
-    trace: &mut Vec<ObsEvent>,
+    mut record_check: RecordCheck,
+    mut record_event: RecordEvent,
     tick: u64,
     output_hint: Option<OutputConditionHint>,
-) -> Result<(), Fault> {
+) -> Result<(), Fault>
+where
+    RecordCheck: FnMut(OutputConditionCheck),
+    RecordEvent: FnMut(ObsEvent),
+{
     let digest = "vm.output_digest.unspecified".to_string();
     let meta = match output_hint {
         Some(h) => OutputConditionMeta::from_hint(h, digest),
         None => OutputConditionMeta::default_observable(digest),
     };
     let passed = verify_output_condition(policy, &meta);
-    checks.push(OutputConditionCheck {
+    record_check(OutputConditionCheck {
         meta: meta.clone(),
         passed,
     });
-    trace.push(ObsEvent::OutputConditionChecked {
+    record_event(ObsEvent::OutputConditionChecked {
         tick,
         predicate_ref: meta.predicate_ref.clone(),
         witness_ref: meta.witness_ref.clone(),

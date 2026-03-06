@@ -141,6 +141,35 @@ fn vm_config_optional_hooks_have_deterministic_defaults() {
 }
 
 #[test]
+fn named_strict_profiles_encode_explicit_runtime_modes() {
+    let minimal = VMConfig::strict_minimal();
+    let observable = VMConfig::strict_observable();
+    let verified = VMConfig::strict_verified();
+
+    assert_eq!(minimal.determinism_mode, telltale_vm::DeterminismMode::Full);
+    assert_eq!(
+        minimal.threaded_round_semantics,
+        telltale_vm::vm::ThreadedRoundSemantics::CanonicalOneStep
+    );
+    assert_eq!(
+        minimal.effect_trace_capture_mode,
+        telltale_vm::vm::EffectTraceCaptureMode::Disabled
+    );
+    assert_eq!(
+        verified.communication_replay_mode,
+        telltale_vm::CommunicationReplayMode::Nullifier
+    );
+    assert_eq!(
+        verified.payload_validation_mode,
+        telltale_vm::vm::PayloadValidationMode::StrictSchema
+    );
+    assert_eq!(
+        observable.effect_trace_capture_mode,
+        telltale_vm::vm::EffectTraceCaptureMode::Full
+    );
+}
+
+#[test]
 #[should_panic(expected = "max_sessions must be > 0")]
 fn vm_new_rejects_invalid_config() {
     let cfg = VMConfig {

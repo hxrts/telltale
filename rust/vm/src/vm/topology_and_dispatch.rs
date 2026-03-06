@@ -101,11 +101,14 @@ impl VM {
         }
         for (coro_id, fault) in faulted {
             self.sched.mark_done(coro_id);
-            self.obs_trace.push(ObsEvent::Faulted {
-                tick: self.clock.tick,
-                coro_id,
-                fault,
-            });
+            self.obs_trace.push(
+                ObsEvent::Faulted {
+                    tick: self.clock.tick,
+                    coro_id,
+                    fault,
+                },
+                &self.config.observability_retention,
+            );
         }
     }
 
@@ -210,20 +213,23 @@ impl VM {
         for event in events {
             self.apply_topology_event(&event);
             if self.should_capture_effect_kind("topology_event") {
-                self.effect_trace.push(EffectTraceEntry {
-                    effect_id: self.next_effect_id,
-                    effect_kind: "topology_event".to_string(),
-                    inputs: json!({
-                        "tick": tick,
-                    }),
-                    outputs: json!({
-                        "applied": true,
-                        "topology": event,
-                    }),
-                    handler_identity: handler_identity.clone(),
-                    ordering_key: self.next_effect_id,
-                    topology: Some(event),
-                });
+                self.effect_trace.push(
+                    EffectTraceEntry {
+                        effect_id: self.next_effect_id,
+                        effect_kind: "topology_event".to_string(),
+                        inputs: json!({
+                            "tick": tick,
+                        }),
+                        outputs: json!({
+                            "applied": true,
+                            "topology": event,
+                        }),
+                        handler_identity: handler_identity.clone(),
+                        ordering_key: self.next_effect_id,
+                        topology: Some(event),
+                    },
+                    &self.config.observability_retention,
+                );
                 self.next_effect_id = self.next_effect_id.saturating_add(1);
             }
         }

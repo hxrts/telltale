@@ -123,8 +123,11 @@ impl VM {
         if !pack.events.is_empty() {
             if let Err(fault) = apply_output_condition_gate(
                 &self.config.output_condition_policy,
-                &mut self.output_condition_checks,
-                &mut self.obs_trace,
+                |check| {
+                    self.output_condition_checks
+                        .push(check, &self.config.observability_retention)
+                },
+                |event| self.obs_trace.push(event, &self.config.observability_retention),
                 self.clock.tick,
                 output_hint,
             ) {
@@ -143,7 +146,8 @@ impl VM {
             );
             if let Some(entry) = maybe_entry {
                 if self.should_capture_effect_kind(&entry.effect_kind) {
-                    self.effect_trace.push(entry);
+                    self.effect_trace
+                        .push(entry, &self.config.observability_retention);
                     self.next_effect_id = self.next_effect_id.saturating_add(1);
                 }
             }
@@ -192,7 +196,8 @@ impl VM {
         }
 
         // Emit events.
-        self.obs_trace.extend(pack.events);
+        self.obs_trace
+            .extend(pack.events, &self.config.observability_retention);
 
         // Map to ExecOutcome.
         match &self.coroutines[coro_idx].status {

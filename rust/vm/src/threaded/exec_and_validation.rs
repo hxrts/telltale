@@ -41,7 +41,7 @@ struct ThreadedStepCtx<'a> {
 
 struct ThreadedExecCtx<'a> {
     store: &'a ThreadedSessionStore,
-    programs: &'a [Vec<Instr>],
+    programs: &'a ProgramStore,
     step: ThreadedStepCtx<'a>,
 }
 

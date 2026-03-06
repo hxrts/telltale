@@ -1686,6 +1686,7 @@ name = "telltale-vm"
 version = "2.1.0"
 dependencies = [
  "assert_matches",
+ "bincode",
  "criterion",
  "getrandom 0.2.16",
  "proptest",

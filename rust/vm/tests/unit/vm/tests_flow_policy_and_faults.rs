@@ -35,14 +35,14 @@
         vm.coroutines[a_idx].regs[3] = Value::Str("Observer".to_string());
 
         let a_program_id = vm.coroutines[a_idx].program_id;
-        vm.programs[a_program_id] = vec![
+        vm.replace_program_for_test(a_program_id, vec![
             Instr::Check {
                 knowledge: 2,
                 target: 3,
                 dst: 4,
             },
             Instr::Halt,
-        ];
+        ]);
 
         let handler = PassthroughHandler;
         let _ignored = vm.step(&handler).expect("check step should succeed");
@@ -84,14 +84,14 @@
         vm.coroutines[a_idx].regs[3] = Value::Str("Observer".to_string());
 
         let a_program_id = vm.coroutines[a_idx].program_id;
-        vm.programs[a_program_id] = vec![
+        vm.replace_program_for_test(a_program_id, vec![
             Instr::Check {
                 knowledge: 2,
                 target: 3,
                 dst: 4,
             },
             Instr::Halt,
-        ];
+        ]);
 
         let handler = PassthroughHandler;
         let _ignored = vm.step(&handler).expect("check step should succeed");
@@ -137,14 +137,14 @@
         vm.coroutines[a_idx].regs[3] = Value::Str(target_role.to_string());
 
         let a_program_id = vm.coroutines[a_idx].program_id;
-        vm.programs[a_program_id] = vec![
+        vm.replace_program_for_test(a_program_id, vec![
             Instr::Check {
                 knowledge: 2,
                 target: 3,
                 dst: 4,
             },
             Instr::Halt,
-        ];
+        ]);
 
         let handler = PassthroughHandler;
         let _ignored = vm.step(&handler).expect("check step should execute");

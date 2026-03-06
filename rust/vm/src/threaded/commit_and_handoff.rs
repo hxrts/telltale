@@ -11,8 +11,8 @@ impl ThreadedVM {
         if !pack.events.is_empty() {
             apply_output_condition_gate(
                 &self.config.output_condition_policy,
-                &mut self.output_condition_checks,
-                &mut self.trace,
+                |check| self.output_condition_checks.push(check),
+                |event| self.trace.push(event),
                 self.clock.tick,
                 output_hint,
             )?;

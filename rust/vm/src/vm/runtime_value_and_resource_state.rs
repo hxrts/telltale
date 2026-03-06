@@ -17,8 +17,92 @@ fn default_max_payload_bytes() -> usize {
 /// Scope identifier type, aligned with Lean's scope representation.
 pub type ScopeId = usize;
 
-/// Lean-aligned program representation.
-pub type Program = Vec<Instr>;
+/// Lean-aligned immutable program representation.
+pub type Program = Box<[Instr]>;
+
+/// Immutable program storage with deterministic interning.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ProgramStore {
+    programs: Vec<Program>,
+    #[serde(default)]
+    cache: BTreeMap<Vec<u8>, usize>,
+}
+
+impl ProgramStore {
+    /// Create an empty immutable program store.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn ensure_cache_initialized(&mut self) {
+        if self.cache.len() == self.programs.len() {
+            return;
+        }
+        self.cache.clear();
+        for (idx, program) in self.programs.iter().enumerate() {
+            self.cache.insert(Self::cache_key(program), idx);
+        }
+    }
+
+    fn cache_key(program: &[Instr]) -> Vec<u8> {
+        bincode::serialize(program).expect("program serialization for cache key should succeed")
+    }
+
+    /// Reserve space for additional unique programs.
+    pub fn reserve(&mut self, additional: usize) {
+        self.programs.reserve(additional);
+    }
+
+    /// Intern a program and return its stable index.
+    pub fn intern(&mut self, program: Vec<Instr>) -> usize {
+        self.ensure_cache_initialized();
+        let key = Self::cache_key(&program);
+        if let Some(existing) = self.cache.get(&key) {
+            return *existing;
+        }
+        let program_id = self.programs.len();
+        self.programs.push(program.into_boxed_slice());
+        self.cache.insert(key, program_id);
+        program_id
+    }
+
+    /// Fetch an immutable program by id.
+    #[must_use]
+    pub fn get(&self, program_id: usize) -> Option<&Program> {
+        self.programs.get(program_id)
+    }
+
+    /// Number of unique programs retained by the store.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.programs.len()
+    }
+
+    /// Whether the program store is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.programs.is_empty()
+    }
+
+    /// Total instruction count across all unique programs.
+    #[must_use]
+    pub fn instruction_count(&self) -> usize {
+        self.programs.iter().map(|program| program.len()).sum()
+    }
+
+    #[cfg(test)]
+    fn replace_for_test(&mut self, program_id: usize, program: Vec<Instr>) {
+        self.ensure_cache_initialized();
+        if let Some(existing) = self.programs.get(program_id) {
+            let key = Self::cache_key(existing);
+            self.cache.remove(&key);
+        }
+        self.programs[program_id] = program.into_boxed_slice();
+        let new_key = Self::cache_key(&self.programs[program_id]);
+        self.cache.insert(new_key, program_id);
+    }
+}
 
 /// Branch list type used in local types.
 type BranchList = Vec<(
@@ -534,6 +618,43 @@ pub enum EffectTraceCaptureMode {
     Disabled,
 }
 
+/// Retention policy for stored observability artifacts.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ObservabilityRetentionMode {
+    /// Retain all recorded artifacts.
+    #[default]
+    Full,
+    /// Retain only the most recent `capacity` artifacts per stream.
+    Capped,
+    /// Disable retention entirely while preserving runtime behavior.
+    Disabled,
+}
+
+/// Retention configuration for observability artifacts.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ObservabilityRetentionConfig {
+    /// Retention policy for observability artifacts.
+    #[serde(default)]
+    pub mode: ObservabilityRetentionMode,
+    /// Maximum retained items per stream when `mode = capped`.
+    #[serde(default = "default_observability_retention_capacity")]
+    pub capacity: usize,
+}
+
+const fn default_observability_retention_capacity() -> usize {
+    4_096
+}
+
+impl Default for ObservabilityRetentionConfig {
+    fn default() -> Self {
+        Self {
+            mode: ObservabilityRetentionMode::Full,
+            capacity: default_observability_retention_capacity(),
+        }
+    }
+}
+
 /// Payload validation mode for runtime message hardening.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
@@ -546,4 +667,3 @@ pub enum PayloadValidationMode {
     /// Structural checks plus strict annotation requirement for `Send` and `Receive`.
     StrictSchema,
 }
-

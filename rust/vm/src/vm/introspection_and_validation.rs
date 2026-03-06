@@ -22,7 +22,13 @@ impl VM {
     #[must_use]
     pub fn coroutine_program_len(&self, id: usize) -> Option<usize> {
         let coro = self.coroutine(id)?;
-        self.programs.get(coro.program_id).map(std::vec::Vec::len)
+        self.programs.get(coro.program_id).map(|program| program.len())
+    }
+
+    /// Number of unique immutable programs retained by the VM.
+    #[must_use]
+    pub fn unique_program_count(&self) -> usize {
+        self.programs.len()
     }
 
     /// Get a mutable coroutine by ID.
@@ -49,6 +55,11 @@ impl VM {
     /// Access the session store mutably.
     pub fn sessions_mut(&mut self) -> &mut SessionStore {
         &mut self.sessions
+    }
+
+    #[cfg(test)]
+    fn replace_program_for_test(&mut self, program_id: usize, program: Vec<Instr>) {
+        self.programs.replace_for_test(program_id, program);
     }
 
     /// Runtime well-formedness predicate used by debug assertions.

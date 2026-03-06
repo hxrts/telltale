@@ -397,14 +397,14 @@
             Value::Nat(u64::try_from(vm.coroutines[b_idx].id).expect("coroutine id fits in u64"));
 
         let a_program_id = vm.coroutines[a_idx].program_id;
-        vm.programs[a_program_id] = vec![
+        vm.replace_program_for_test(a_program_id, vec![
             Instr::Transfer {
                 endpoint: 2,
                 target: 3,
                 bundle: 0,
             },
             Instr::Halt,
-        ];
+        ]);
 
         let handler = PassthroughHandler;
         // Intentionally discard StepResult: we only care that the step executes without panic
@@ -447,14 +447,14 @@
             Value::Nat(u64::try_from(vm.coroutines[b_idx].id).expect("coroutine id fits in u64"));
 
         let a_program_id = vm.coroutines[a_idx].program_id;
-        vm.programs[a_program_id] = vec![
+        vm.replace_program_for_test(a_program_id, vec![
             Instr::Transfer {
                 endpoint: 2,
                 target: 3,
                 bundle: 0,
             },
             Instr::Halt,
-        ];
+        ]);
 
         let err = vm
             .step(&PassthroughHandler)
@@ -510,18 +510,17 @@
         vm.coroutines[a_idx].regs[3] = Value::Str("Observer".to_string());
 
         let a_program_id = vm.coroutines[a_idx].program_id;
-        vm.programs[a_program_id] = vec![
+        vm.replace_program_for_test(a_program_id, vec![
             Instr::Check {
                 knowledge: 2,
                 target: 3,
                 dst: 4,
             },
             Instr::Halt,
-        ];
+        ]);
 
         let handler = PassthroughHandler;
         // Intentionally discard StepResult: we only care that the step executes without panic
         let _ignored = vm.step(&handler).expect("check step should succeed");
         assert_eq!(vm.coroutines[a_idx].regs[4], Value::Bool(false));
     }
-

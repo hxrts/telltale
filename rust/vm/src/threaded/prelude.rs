@@ -91,7 +91,7 @@ impl ContentionMetrics {
 /// Threaded VM runtime. Uses OS threads for coroutine execution.
 pub struct ThreadedVM {
     config: VMConfig,
-    programs: Vec<Program>,
+    programs: ProgramStore,
     coroutines: Vec<Arc<Mutex<Coroutine>>>,
     sessions: ThreadedSessionStore,
     scheduler: Scheduler,
@@ -171,39 +171,42 @@ impl ThreadedSessionStore {
         initial_types: &BTreeMap<String, LocalTypeR>,
     ) -> SessionId {
         let sid = self.next_id.fetch_add(1, Ordering::SeqCst);
+        let role_count = roles.len();
+        let role_ids = SessionState::build_role_ids(&roles);
 
-        let mut local_types = BTreeMap::new();
+        let mut local_type_entries = Vec::with_capacity(role_count);
         for role in &roles {
             if let Some(lt) = initial_types.get(role) {
                 let ep = Endpoint {
                     sid,
                     role: role.clone(),
                 };
-                local_types.insert(
+                local_type_entries.push((
                     ep,
                     TypeEntry {
                         current: unfold_mu(lt),
                         original: lt.clone(),
                     },
-                );
+                ));
             }
         }
+        let local_types = local_type_entries.into_iter().collect();
 
-        let mut buffers = BTreeMap::new();
-        for from in &roles {
-            for to in &roles {
-                if from != to {
-                    let edge = Edge::new(sid, from.clone(), to.clone());
-                    buffers.insert(edge, BoundedBuffer::new(buffer_config));
-                }
-            }
+        let edge_lookup = SessionState::build_edge_lookup(sid, &roles, &role_ids);
+        let edge_capacity = role_count.saturating_mul(role_count.saturating_sub(1));
+        let mut buffer_entries = Vec::with_capacity(edge_capacity);
+        for edge in edge_lookup.values() {
+            buffer_entries.push((edge.clone(), BoundedBuffer::new(buffer_config)));
         }
+        let buffers = buffer_entries.into_iter().collect();
 
         let state = SessionState {
             sid,
             roles,
+            role_ids,
             local_types,
             buffers,
+            edge_lookup,
             auth_leaves: BTreeMap::new(),
             auth_trees: BTreeMap::new(),
             auth_roots: BTreeMap::new(),

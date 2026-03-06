@@ -55,7 +55,10 @@ use crate::output_condition::{OutputConditionCheck, OutputConditionPolicy};
 use crate::persistence::{NoopPersistence, PersistenceModel};
 use crate::scheduler::{SchedPolicy, Scheduler};
 use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragmentV1};
-use crate::session::{unfold_if_var_with_scope, Edge, SessionId, SessionStatus, SessionStore};
+use crate::session::{
+    unfold_if_var_with_scope, ClosedSessionSummary, Edge, SessionId, SessionStatus, SessionStore,
+    SessionStoreMemoryUsage,
+};
 use crate::transfer_semantics::{
     decode_transfer_request, endpoint_owner_ids, move_endpoint_bundle,
 };

@@ -18,6 +18,73 @@ use crate::verification::{
     DefaultVerificationModel, Hash, HashTag, Signature, VerificationModel,
 };
 
+/// Archival summary for a closed session that has been reaped from live state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClosedSessionSummary {
+    /// Session identifier.
+    pub sid: SessionId,
+    /// Terminal session status at reap time.
+    pub status: SessionStatus,
+    /// Number of participant roles.
+    pub role_count: usize,
+    /// Number of retained endpoint type entries at reap time.
+    pub local_type_entries: usize,
+    /// Number of directed edges tracked by the session.
+    pub edge_count: usize,
+    /// Number of edge-bound handlers.
+    pub edge_handler_count: usize,
+    /// Number of accumulated auth leaves across all edges.
+    pub auth_leaf_count: usize,
+    /// Number of auth trees retained by the session.
+    pub auth_tree_count: usize,
+    /// Number of auth roots retained by the session.
+    pub auth_root_count: usize,
+    /// Final epoch value.
+    pub epoch: usize,
+}
+
+impl ClosedSessionSummary {
+    fn from_session(session: &SessionState) -> Self {
+        Self {
+            sid: session.sid,
+            status: session.status.clone(),
+            role_count: session.roles.len(),
+            local_type_entries: session.local_types.len(),
+            edge_count: session.buffers.len(),
+            edge_handler_count: session.edge_handlers.len(),
+            auth_leaf_count: session.auth_leaves.values().map(Vec::len).sum(),
+            auth_tree_count: session.auth_trees.len(),
+            auth_root_count: session.auth_roots.len(),
+            epoch: session.epoch,
+        }
+    }
+}
+
+/// Approximate retained state for the session store.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionStoreMemoryUsage {
+    /// Number of live sessions still resident in the store.
+    pub live_sessions: usize,
+    /// Number of closed/cancelled/faulted sessions still resident in the store.
+    pub live_closed_sessions: usize,
+    /// Number of archived closed-session summaries retained after reaping.
+    pub archived_closed_sessions: usize,
+    /// Number of live endpoint type entries.
+    pub live_local_type_entries: usize,
+    /// Number of live directed buffers.
+    pub live_buffer_count: usize,
+    /// Number of live buffered messages.
+    pub live_buffered_messages: usize,
+    /// Number of live edge-bound handlers.
+    pub live_edge_handler_count: usize,
+    /// Number of live auth leaves across sessions.
+    pub live_auth_leaf_count: usize,
+    /// Number of live auth trees.
+    pub live_auth_tree_count: usize,
+    /// Number of live auth roots.
+    pub live_auth_root_count: usize,
+}
+
 /// Session identifier. Each session gets a unique ID within the VM.
 pub type SessionId = usize;
 
@@ -117,12 +184,18 @@ pub struct SessionState {
     pub sid: SessionId,
     /// Role names in this session.
     pub roles: Vec<String>,
+    /// Deterministic internal ids for participant roles.
+    #[serde(default)]
+    role_ids: BTreeMap<String, u16>,
     /// Per-endpoint local type state. This IS the type truth.
     ///
     /// Matches Lean `localTypes : List (Endpoint × LocalType)`.
     pub local_types: BTreeMap<Endpoint, TypeEntry>,
     /// Message buffers keyed by directed edge.
     pub buffers: BTreeMap<Edge, SignedBuffer<Signature>>,
+    /// Deterministic internal edge lookup keyed by interned role ids.
+    #[serde(default)]
+    edge_lookup: BTreeMap<(u16, u16), Edge>,
     /// Per-edge authenticated leaves for Merkle-auth tracking.
     pub auth_leaves: BTreeMap<Edge, Vec<Hash>>,
     /// Per-edge Merkle trees for incremental authenticated updates.
@@ -144,8 +217,51 @@ pub struct SessionState {
 }
 
 impl SessionState {
+    pub(crate) fn build_role_ids(roles: &[String]) -> BTreeMap<String, u16> {
+        roles
+            .iter()
+            .enumerate()
+            .map(|(idx, role)| {
+                (
+                    role.clone(),
+                    u16::try_from(idx).expect("role count should fit in u16"),
+                )
+            })
+            .collect()
+    }
+
+    pub(crate) fn build_edge_lookup(
+        sid: SessionId,
+        roles: &[String],
+        role_ids: &BTreeMap<String, u16>,
+    ) -> BTreeMap<(u16, u16), Edge> {
+        let edge_capacity = roles.len().saturating_mul(roles.len().saturating_sub(1));
+        let mut edges = Vec::with_capacity(edge_capacity);
+        for from in roles {
+            for to in roles {
+                if from == to {
+                    continue;
+                }
+                let from_id = *role_ids
+                    .get(from)
+                    .expect("sender role id must exist for edge table");
+                let to_id = *role_ids
+                    .get(to)
+                    .expect("receiver role id must exist for edge table");
+                edges.push(((from_id, to_id), Edge::new(sid, from.clone(), to.clone())));
+            }
+        }
+        edges.into_iter().collect()
+    }
+
+    fn edge_for_roles(&self, from: &str, to: &str) -> Option<&Edge> {
+        let from_id = self.role_ids.get(from)?;
+        let to_id = self.role_ids.get(to)?;
+        self.edge_lookup.get(&(*from_id, *to_id))
+    }
+
     fn update_auth_tree(&mut self, edge: &Edge, signed: &SignedValue<Signature>) {
-        let bytes = serde_json::to_vec(signed).unwrap_or_default();
+        let bytes = bincode::serialize(signed).unwrap_or_default();
         let leaf = DefaultVerificationModel::hash(HashTag::MerkleLeaf, &bytes);
         self.auth_leaves.entry(edge.clone()).or_default().push(leaf);
         let tree = self
@@ -167,7 +283,10 @@ impl SessionState {
         to: &str,
         signed: &SignedValue<Signature>,
     ) -> Result<crate::buffer::EnqueueResult, String> {
-        let edge = Edge::new(self.sid, from, to);
+        let edge = self
+            .edge_for_roles(from, to)
+            .cloned()
+            .ok_or_else(|| format!("no buffer for edge {from} → {to}"))?;
         let buf = self
             .buffers
             .get_mut(&edge)
@@ -238,7 +357,7 @@ impl SessionState {
 
     /// Receive a signed value destined for a role from a specific sender.
     pub fn recv_signed(&mut self, from: &str, to: &str) -> Option<SignedValue<Signature>> {
-        let edge = Edge::new(self.sid, from, to);
+        let edge = self.edge_for_roles(from, to)?.clone();
         self.buffers.get_mut(&edge).and_then(|buf| buf.dequeue())
     }
 
@@ -288,7 +407,9 @@ impl SessionState {
     /// Check if there is a message available on an edge.
     #[must_use]
     pub fn has_message(&self, from: &str, to: &str) -> bool {
-        let edge = Edge::new(self.sid, from, to);
+        let Some(edge) = self.edge_for_roles(from, to) else {
+            return false;
+        };
         self.buffers.get(&edge).is_some_and(|buf| !buf.is_empty())
     }
 }
@@ -300,6 +421,8 @@ impl SessionState {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SessionStore {
     sessions: BTreeMap<SessionId, SessionState>,
+    #[serde(default)]
+    archived_closed: Vec<ClosedSessionSummary>,
     next_id: SessionId,
 }
 
@@ -320,40 +443,43 @@ impl SessionStore {
         buffer_config: &BufferConfig,
         initial_types: &BTreeMap<String, LocalTypeR>,
     ) -> SessionId {
+        let role_count = roles.len();
+        let role_ids = SessionState::build_role_ids(&roles);
         // Build per-endpoint local types with initial unfolding.
-        let mut local_types = BTreeMap::new();
+        let mut local_type_entries = Vec::with_capacity(role_count);
         for role in &roles {
             if let Some(lt) = initial_types.get(role) {
                 let ep = Endpoint {
                     sid,
                     role: role.clone(),
                 };
-                local_types.insert(
+                local_type_entries.push((
                     ep,
                     TypeEntry {
                         current: unfold_mu(lt),
                         original: lt.clone(),
                     },
-                );
+                ));
             }
         }
+        let local_types = local_type_entries.into_iter().collect();
 
         // Create buffers for each directed edge.
-        let mut buffers = BTreeMap::new();
-        for from in &roles {
-            for to in &roles {
-                if from != to {
-                    let edge = Edge::new(sid, from.clone(), to.clone());
-                    buffers.insert(edge, BoundedBuffer::new(buffer_config));
-                }
-            }
+        let edge_lookup = SessionState::build_edge_lookup(sid, &roles, &role_ids);
+        let edge_capacity = role_count.saturating_mul(role_count.saturating_sub(1));
+        let mut buffer_entries = Vec::with_capacity(edge_capacity);
+        for edge in edge_lookup.values() {
+            buffer_entries.push((edge.clone(), BoundedBuffer::new(buffer_config)));
         }
+        let buffers = buffer_entries.into_iter().collect();
 
         let state = SessionState {
             sid,
             roles,
+            role_ids,
             local_types,
             buffers,
+            edge_lookup,
             auth_leaves: BTreeMap::new(),
             auth_trees: BTreeMap::new(),
             auth_roots: BTreeMap::new(),
@@ -475,6 +601,54 @@ impl SessionStore {
         Ok(())
     }
 
+    /// Closed/cancelled/faulted session identifiers still resident in the store.
+    #[must_use]
+    pub fn closed_session_ids(&self) -> Vec<SessionId> {
+        self.sessions
+            .iter()
+            .filter_map(|(sid, session)| {
+                matches!(
+                    session.status,
+                    SessionStatus::Closed
+                        | SessionStatus::Cancelled
+                        | SessionStatus::Faulted { .. }
+                )
+                .then_some(*sid)
+            })
+            .collect()
+    }
+
+    /// Reap specific session ids from live storage and archive compact summaries.
+    pub fn reap_sessions(&mut self, session_ids: &[SessionId]) -> Vec<ClosedSessionSummary> {
+        let mut reaped = Vec::new();
+        for sid in session_ids {
+            let Some(session) = self.sessions.get(sid) else {
+                continue;
+            };
+            if !matches!(
+                session.status,
+                SessionStatus::Closed | SessionStatus::Cancelled | SessionStatus::Faulted { .. }
+            ) {
+                continue;
+            }
+
+            let session = self
+                .sessions
+                .remove(sid)
+                .expect("session existence checked before removal");
+            let summary = ClosedSessionSummary::from_session(&session);
+            self.archived_closed.push(summary.clone());
+            reaped.push(summary);
+        }
+        reaped
+    }
+
+    /// Reap all closed/cancelled/faulted sessions from live storage.
+    pub fn reap_closed(&mut self) -> Vec<ClosedSessionSummary> {
+        let sids = self.closed_session_ids();
+        self.reap_sessions(&sids)
+    }
+
     /// Number of active sessions.
     #[must_use]
     pub fn active_count(&self) -> usize {
@@ -484,10 +658,54 @@ impl SessionStore {
             .count()
     }
 
+    /// Number of sessions still resident in the store.
+    #[must_use]
+    pub fn live_count(&self) -> usize {
+        self.sessions.len()
+    }
+
     /// All session IDs.
     #[must_use]
     pub fn session_ids(&self) -> Vec<SessionId> {
         self.sessions.keys().copied().collect()
+    }
+
+    /// Archived closed-session summaries retained after reaping.
+    #[must_use]
+    pub fn archived_closed(&self) -> &[ClosedSessionSummary] {
+        &self.archived_closed
+    }
+
+    /// Approximate retained state for the session store.
+    #[must_use]
+    pub fn memory_usage(&self) -> SessionStoreMemoryUsage {
+        let mut usage = SessionStoreMemoryUsage {
+            live_sessions: self.sessions.len(),
+            archived_closed_sessions: self.archived_closed.len(),
+            ..SessionStoreMemoryUsage::default()
+        };
+
+        for session in self.sessions.values() {
+            if matches!(
+                session.status,
+                SessionStatus::Closed | SessionStatus::Cancelled | SessionStatus::Faulted { .. }
+            ) {
+                usage.live_closed_sessions += 1;
+            }
+            usage.live_local_type_entries += session.local_types.len();
+            usage.live_buffer_count += session.buffers.len();
+            usage.live_buffered_messages += session
+                .buffers
+                .values()
+                .map(BoundedBuffer::len)
+                .sum::<usize>();
+            usage.live_edge_handler_count += session.edge_handlers.len();
+            usage.live_auth_leaf_count += session.auth_leaves.values().map(Vec::len).sum::<usize>();
+            usage.live_auth_tree_count += session.auth_trees.len();
+            usage.live_auth_root_count += session.auth_roots.len();
+        }
+
+        usage
     }
 
     /// Lookup edge-bound handler id.
@@ -713,6 +931,71 @@ mod tests {
         assert_eq!(session.status, SessionStatus::Closed);
         assert!(session.buffers.is_empty());
         assert!(session.edge_traces.is_empty());
+    }
+
+    #[test]
+    fn test_reap_closed_archives_and_removes_session() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+
+        store.close(sid).expect("close session");
+        let summaries = store.reap_closed();
+
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].sid, sid);
+        assert!(store.get(sid).is_none());
+        assert_eq!(store.archived_closed().len(), 1);
+    }
+
+    #[test]
+    fn test_memory_usage_tracks_live_and_archived_closed_sessions() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+
+        let before_close = store.memory_usage();
+        assert_eq!(before_close.live_sessions, 1);
+        assert_eq!(before_close.live_closed_sessions, 0);
+
+        store.close(sid).expect("close session");
+        let after_close = store.memory_usage();
+        assert_eq!(after_close.live_sessions, 1);
+        assert_eq!(after_close.live_closed_sessions, 1);
+
+        store.reap_closed();
+        let after_reap = store.memory_usage();
+        assert_eq!(after_reap.live_sessions, 0);
+        assert_eq!(after_reap.live_closed_sessions, 0);
+        assert_eq!(after_reap.archived_closed_sessions, 1);
+    }
+
+    #[test]
+    fn test_session_state_roundtrip_preserves_internal_role_edge_indexes() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into(), "C".into()],
+            &BufferConfig::default(),
+            &BTreeMap::new(),
+        );
+
+        let session = store.get_mut(sid).expect("session exists");
+        session
+            .send("A", "B", Value::Nat(7))
+            .expect("send should succeed");
+
+        let encoded = serde_json::to_string(session).expect("serialize session");
+        let mut decoded: SessionState = serde_json::from_str(&encoded).expect("deserialize");
+
+        assert!(decoded.has_message("A", "B"));
+        assert_eq!(decoded.recv("A", "B"), Some(Value::Nat(7)));
+        assert!(!decoded.has_message("A", "B"));
     }
 
     #[test]

@@ -109,6 +109,28 @@ debug = true
 [profile.bench]
 debug = true
 
+[profile.perf-cpu]
+inherits = "release"
+debug = 1
+lto = "thin"
+codegen-units = 1
+incremental = false
+strip = "none"
+
+[profile.perf-heap]
+inherits = "release"
+debug = 1
+lto = "off"
+codegen-units = 1
+incremental = false
+strip = "none"
+
+[profile.perf-debug]
+inherits = "dev"
+opt-level = 1
+debug = 2
+incremental = false
+
 [workspace]
 members = ["rust/macros", "rust/choreography", "rust/types", "rust/theory", "rust/lean-bridge", "rust/vm", "rust/simulator", "rust/effect-scaffold", "rust/transport"]
 exclude = ["examples/wasm-ping-pong", "external-demo", "external-demo-macros"]

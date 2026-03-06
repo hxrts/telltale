@@ -33,7 +33,7 @@ impl ThreadedVM {
         }
         Ok(Self {
             config,
-            programs: Vec::new(),
+            programs: ProgramStore::new(),
             coroutines: Vec::new(),
             sessions: ThreadedSessionStore::new(),
             scheduler,
@@ -113,9 +113,9 @@ impl ThreadedVM {
     ) -> Result<(), VMError> {
         self.ensure_coroutine_capacity()?;
         let role_key = role.to_string();
-        let program = image.programs.get(&role_key).cloned().unwrap_or_default();
-        let program_id = self.programs.len();
-        self.programs.push(program);
+        let program_id = self
+            .programs
+            .intern(image.programs.get(&role_key).cloned().unwrap_or_default());
         let coro_id = self.next_coro_id;
         self.next_coro_id += 1;
 
@@ -158,6 +158,8 @@ impl ThreadedVM {
             .map_err(|reason| VMError::InvalidCodeImage { reason })?;
 
         let roles = image.roles();
+        self.programs.reserve(image.programs.len());
+        self.coroutines.reserve(roles.len());
         let sid = self.sessions.open(
             roles.clone(),
             &self.config.buffer_config,

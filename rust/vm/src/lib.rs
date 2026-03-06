@@ -146,7 +146,10 @@ pub use serialization::{
     canonical_effect_trace, canonical_replay_fragment_v1, canonical_trace_v1,
     CanonicalReplayFragmentV1, CanonicalTraceV1,
 };
-pub use session::{decode_edge_json, Edge, HandlerId, SessionId, SessionStore};
+pub use session::{
+    decode_edge_json, ClosedSessionSummary, Edge, HandlerId, SessionId, SessionStore,
+    SessionStoreMemoryUsage,
+};
 #[cfg(feature = "multi-thread")]
 pub use threaded::{
     ContentionMetrics, LaneHandoff, LaneId, LaneSchedulerState, LaneSelection, ThreadedVM,
@@ -162,8 +165,9 @@ pub use verification::{
     VerifyingKey,
 };
 pub use vm::{
-    EffectTraceCaptureMode, MonitorMode, PayloadValidationMode, Program, RuntimeTuningProfile,
-    SchedExecStatus, SchedStepDebug, ThreadedRoundSemantics, VMConfig, VMState, VM,
+    EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig, ObservabilityRetentionMode,
+    PayloadValidationMode, Program, ProgramStore, RuntimeTuningProfile, SchedExecStatus,
+    SchedStepDebug, ThreadedRoundSemantics, VMConfig, VMState, VmMemoryUsage, VM,
 };
 #[cfg(target_arch = "wasm32")]
 pub use wasm::WasmVM;

@@ -48,8 +48,8 @@ use crate::session::{
 use crate::transfer_semantics::{decode_transfer_request, move_endpoint_bundle};
 use crate::vm::{
     runtime_value_matches_val_type, runtime_value_val_type, runtime_value_wire_size_bytes,
-    EffectTraceCaptureMode, MonitorMode, ObsEvent, Program, ResourceState, RunStatus, SiteId,
-    StepResult, ThreadedRoundSemantics, VMConfig, VMError,
+    EffectTraceCaptureMode, MonitorMode, ObsEvent, Program, ProgramStore, ResourceState, RunStatus,
+    SiteId, StepResult, ThreadedRoundSemantics, VMConfig, VMError,
 };
 
 // Lane identifier in the threaded runtime.

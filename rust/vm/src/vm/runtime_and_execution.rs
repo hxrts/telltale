@@ -1,3 +1,26 @@
+/// Approximate retained state for the live VM runtime.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VmMemoryUsage {
+    /// Session-store retained state.
+    pub session_store: SessionStoreMemoryUsage,
+    /// Number of coroutine records still retained by the VM.
+    pub coroutine_records: usize,
+    /// Number of terminal coroutine records retained by the VM.
+    pub terminal_coroutines: usize,
+    /// Number of loaded immutable program records.
+    pub program_count: usize,
+    /// Total instruction count across loaded programs.
+    pub program_instruction_count: usize,
+    /// Number of retained observable events.
+    pub obs_events: usize,
+    /// Number of retained effect-trace entries.
+    pub effect_trace_entries: usize,
+    /// Number of retained replay-consumption artifacts.
+    pub communication_artifacts: usize,
+    /// Number of retained output-condition checks.
+    pub output_condition_checks: usize,
+}
+
 impl VM {
     fn communication_replay_enabled(&self) -> bool {
         !matches!(
@@ -57,14 +80,16 @@ impl VM {
         }
         self.sync_communication_consumption_mode();
         let result = self.communication_consumption.consume_receive(&identity)?;
-        self.communication_consumption_artifacts
-            .push(CommunicationConsumptionArtifact {
+        self.communication_consumption_artifacts.push(
+            CommunicationConsumptionArtifact {
                 tick: self.clock.tick,
                 identity,
                 mode: result.mode,
                 pre_root: result.pre_root,
                 post_root: result.post_root,
-            });
+            },
+            &self.config.observability_retention,
+        );
         Ok(result)
     }
 
@@ -89,11 +114,14 @@ impl VM {
             .or_default();
         self.apply_open_delta(sid)
             .map_err(VMError::PersistenceError)?;
-        self.obs_trace.push(ObsEvent::Opened {
-            tick: self.clock.tick,
-            session: sid,
-            roles: roles.clone(),
-        });
+        self.obs_trace.push(
+            ObsEvent::Opened {
+                tick: self.clock.tick,
+                session: sid,
+                roles: roles.clone(),
+            },
+            &self.config.observability_retention,
+        );
         Ok((sid, roles))
     }
 
@@ -109,10 +137,15 @@ impl VM {
             });
         }
 
-        let program = image.programs.get(role).cloned().unwrap_or_default();
-        let program_id = self.programs.len();
-        self.programs.push(program.clone());
+        let program_id = self
+            .programs
+            .intern(image.programs.get(role).cloned().unwrap_or_default());
         if self.code.is_none() {
+            let program = self
+                .programs
+                .get(program_id)
+                .expect("interned program must exist")
+                .clone();
             self.code = Some(program);
         }
 
@@ -164,6 +197,8 @@ impl VM {
     pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
         self.ensure_session_capacity()?;
         let (sid, roles) = self.open_choreography_session(image)?;
+        self.programs.reserve(image.programs.len());
+        self.coroutines.reserve(roles.len());
         self.spawn_session_coroutines(image, sid, &roles)?;
         Ok(sid)
     }
@@ -267,21 +302,27 @@ impl VM {
                     exec_status: SchedExecStatus::Halted,
                 });
                 self.sched.mark_done(coro_id);
-                self.obs_trace.push(ObsEvent::Halted {
-                    tick: self.clock.tick,
-                    coro_id,
-                });
+                self.obs_trace.push(
+                    ObsEvent::Halted {
+                        tick: self.clock.tick,
+                        coro_id,
+                    },
+                    &self.config.observability_retention,
+                );
             }
             Err(fault) => {
                 self.last_sched_step = Some(SchedStepDebug {
                     selected_coro: coro_id,
                     exec_status: SchedExecStatus::Faulted,
                 });
-                self.obs_trace.push(ObsEvent::Faulted {
-                    tick: self.clock.tick,
-                    coro_id,
-                    fault: fault.clone(),
-                });
+                self.obs_trace.push(
+                    ObsEvent::Faulted {
+                        tick: self.clock.tick,
+                        coro_id,
+                        fault: fault.clone(),
+                    },
+                    &self.config.observability_retention,
+                );
                 let Some(idx) = self.coro_index(coro_id) else {
                     return Err(VMError::Fault { coro_id, fault });
                 };
@@ -433,13 +474,41 @@ impl VM {
     /// Get the observable trace.
     #[must_use]
     pub fn trace(&self) -> &[ObsEvent] {
-        &self.obs_trace
+        self.obs_trace.as_slice()
+    }
+
+    /// Reap closed sessions once all associated coroutines are terminal.
+    pub fn reap_closed_sessions(&mut self) -> Vec<ClosedSessionSummary> {
+        let eligible: Vec<SessionId> = self
+            .sessions
+            .closed_session_ids()
+            .into_iter()
+            .filter(|sid| {
+                self.coroutines
+                    .iter()
+                    .filter(|coro| coro.session_id == *sid)
+                    .all(Coroutine::is_terminal)
+            })
+            .collect();
+        if eligible.is_empty() {
+            return Vec::new();
+        }
+
+        for sid in &eligible {
+            self.monitor.remove_kind(*sid);
+            self.resource_states.remove(sid);
+            self.communication_consumption.prune_session(*sid);
+        }
+        self.coroutines.retain(|coro| {
+            !(eligible.contains(&coro.session_id) && coro.is_terminal())
+        });
+        self.sessions.reap_sessions(&eligible)
     }
 
     /// Lean-aligned observable trace accessor.
     #[must_use]
     pub fn obs_trace(&self) -> &[ObsEvent] {
-        &self.obs_trace
+        self.obs_trace.as_slice()
     }
 
     /// Number of interned role symbols.
@@ -490,16 +559,38 @@ impl VM {
         self.sessions.active_count()
     }
 
+    /// Number of sessions still resident in the VM, including closed ones.
+    #[must_use]
+    pub fn live_session_count(&self) -> usize {
+        self.sessions.live_count()
+    }
+
+    /// Approximate retained state for the VM runtime.
+    #[must_use]
+    pub fn memory_usage(&self) -> VmMemoryUsage {
+        VmMemoryUsage {
+            session_store: self.sessions.memory_usage(),
+            coroutine_records: self.coroutines.len(),
+            terminal_coroutines: self.coroutines.iter().filter(|coro| coro.is_terminal()).count(),
+            program_count: self.programs.len(),
+            program_instruction_count: self.programs.instruction_count(),
+            obs_events: self.obs_trace.len(),
+            effect_trace_entries: self.effect_trace.len(),
+            communication_artifacts: self.communication_consumption_artifacts.len(),
+            output_condition_checks: self.output_condition_checks.len(),
+        }
+    }
+
     /// Get recorded output-condition verification checks.
     #[must_use]
     pub fn output_condition_checks(&self) -> &[OutputConditionCheck] {
-        &self.output_condition_checks
+        self.output_condition_checks.as_slice()
     }
 
     /// Get recorded effect-trace entries.
     #[must_use]
     pub fn effect_trace(&self) -> &[EffectTraceEntry] {
-        &self.effect_trace
+        self.effect_trace.as_slice()
     }
 
     /// Deterministic communication replay-state root.
@@ -511,7 +602,29 @@ impl VM {
     /// Receive-boundary replay-consumption artifacts.
     #[must_use]
     pub fn communication_consumption_artifacts(&self) -> &[CommunicationConsumptionArtifact] {
-        &self.communication_consumption_artifacts
+        self.communication_consumption_artifacts.as_slice()
+    }
+
+    /// Drain retained observable events in canonical insertion order.
+    pub fn drain_obs_trace(&mut self) -> Vec<ObsEvent> {
+        self.obs_trace.drain()
+    }
+
+    /// Drain retained effect-trace entries in canonical insertion order.
+    pub fn drain_effect_trace(&mut self) -> Vec<EffectTraceEntry> {
+        self.effect_trace.drain()
+    }
+
+    /// Drain retained output-condition diagnostics in canonical insertion order.
+    pub fn drain_output_condition_checks(&mut self) -> Vec<OutputConditionCheck> {
+        self.output_condition_checks.drain()
+    }
+
+    /// Drain retained communication replay-consumption artifacts in canonical insertion order.
+    pub fn drain_communication_consumption_artifacts(
+        &mut self,
+    ) -> Vec<CommunicationConsumptionArtifact> {
+        self.communication_consumption_artifacts.drain()
     }
 
     /// Canonical replay/state fragment for deterministic diffing and snapshots.
@@ -529,8 +642,8 @@ impl VM {
             .map(|(site, until_tick)| (site.clone(), *until_tick))
             .collect();
         canonical_replay_fragment_v1(
-            &self.obs_trace,
-            &self.effect_trace,
+            self.obs_trace.as_slice(),
+            self.effect_trace.as_slice(),
             self.crashed_sites.iter().cloned().collect(),
             partitioned_edges,
             corrupted_edges,
@@ -538,7 +651,7 @@ impl VM {
             self.config.effect_determinism_tier,
             self.config.communication_replay_mode,
             Some(self.communication_consumption.state().root()),
-            self.communication_consumption_artifacts.clone(),
+            self.communication_consumption_artifacts.as_slice().to_vec(),
         )
     }
 

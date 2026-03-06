@@ -13,10 +13,10 @@ use telltale_types::LocalTypeR;
 use telltale_vm::buffer::{
     BackpressurePolicy, BoundedBuffer, BufferConfig, BufferMode, EnqueueResult,
 };
-use telltale_vm::coroutine::Value;
+use telltale_vm::coroutine::{CoroStatus, Value};
 use telltale_vm::instr::Endpoint;
 use telltale_vm::session::{SessionStatus, SessionStore};
-use telltale_vm::vm::{VMConfig, VM};
+use telltale_vm::vm::{ObservabilityRetentionConfig, ObservabilityRetentionMode, VMConfig, VM};
 
 use test_support::PassthroughHandler;
 
@@ -104,6 +104,183 @@ fn test_active_count_tracks_sessions() {
     store.close(sid1).unwrap();
     // Closed sessions are not active.
     assert_eq!(store.active_count(), 1);
+}
+
+#[test]
+fn test_vm_reap_closed_sessions_removes_terminal_coroutines_and_live_session_state() {
+    let mut vm = VM::new(VMConfig::default());
+    let sid = vm
+        .load_choreography(&test_support::simple_send_recv_image("A", "B", "msg"))
+        .expect("load choreography");
+
+    vm.sessions_mut().close(sid).expect("close session");
+    let coro_ids: Vec<usize> = vm
+        .session_coroutines(sid)
+        .iter()
+        .map(|coro| coro.id)
+        .collect();
+    for coro_id in &coro_ids {
+        vm.coroutine_mut(*coro_id).expect("coroutine exists").status = CoroStatus::Done;
+    }
+
+    let before = vm.memory_usage();
+    assert_eq!(before.session_store.live_sessions, 1);
+    assert_eq!(before.session_store.live_closed_sessions, 1);
+    assert_eq!(before.coroutine_records, coro_ids.len());
+
+    let reaped = vm.reap_closed_sessions();
+    assert_eq!(reaped.len(), 1);
+    assert_eq!(reaped[0].sid, sid);
+    assert_eq!(vm.live_session_count(), 0);
+    assert_eq!(vm.coroutine_count(), 0);
+    assert!(vm.wf_vm_state().is_ok());
+
+    let after = vm.memory_usage();
+    assert_eq!(after.session_store.live_sessions, 0);
+    assert_eq!(after.session_store.live_closed_sessions, 0);
+    assert_eq!(after.session_store.archived_closed_sessions, 1);
+    assert_eq!(after.coroutine_records, 0);
+}
+
+#[test]
+fn test_vm_reap_closed_sessions_skips_nonterminal_coroutines() {
+    let mut vm = VM::new(VMConfig::default());
+    let sid = vm
+        .load_choreography(&test_support::simple_send_recv_image("A", "B", "msg"))
+        .expect("load choreography");
+
+    vm.sessions_mut().close(sid).expect("close session");
+    let reaped = vm.reap_closed_sessions();
+    assert!(reaped.is_empty());
+    assert_eq!(vm.live_session_count(), 1);
+}
+
+#[test]
+fn test_vm_observability_retention_capped_keeps_latest_suffix_in_order() {
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
+    let handler = PassthroughHandler;
+
+    let mut full = VM::new(VMConfig::default());
+    full.load_choreography(&image).expect("load choreography");
+    full.run(&handler, 100).expect("run choreography");
+    let full_trace = full.trace().to_vec();
+    let full_effect_trace = full.effect_trace().to_vec();
+
+    let cap = 3;
+    let mut capped = VM::new(VMConfig {
+        observability_retention: ObservabilityRetentionConfig {
+            mode: ObservabilityRetentionMode::Capped,
+            capacity: cap,
+        },
+        ..VMConfig::default()
+    });
+    capped.load_choreography(&image).expect("load choreography");
+    capped.run(&handler, 100).expect("run choreography");
+
+    let expected_trace_start = full_trace.len().saturating_sub(cap);
+    let expected_effect_start = full_effect_trace.len().saturating_sub(cap);
+    assert_eq!(capped.trace(), &full_trace[expected_trace_start..]);
+    assert_eq!(
+        capped.effect_trace(),
+        &full_effect_trace[expected_effect_start..]
+    );
+
+    let drained_trace = capped.drain_obs_trace();
+    assert_eq!(drained_trace, full_trace[expected_trace_start..].to_vec());
+    assert!(capped.trace().is_empty());
+
+    let drained_effect_trace = capped.drain_effect_trace();
+    assert_eq!(
+        drained_effect_trace,
+        full_effect_trace[expected_effect_start..].to_vec()
+    );
+    assert!(capped.effect_trace().is_empty());
+}
+
+#[test]
+fn test_vm_observability_retention_disabled_drops_storage_without_changing_faults() {
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
+    let mut vm = VM::new(VMConfig {
+        observability_retention: ObservabilityRetentionConfig {
+            mode: ObservabilityRetentionMode::Disabled,
+            capacity: 1,
+        },
+        ..VMConfig::default()
+    });
+    vm.load_choreography(&image).expect("load choreography");
+    vm.run(&PassthroughHandler, 100).expect("run choreography");
+
+    assert!(vm.trace().is_empty());
+    assert!(vm.effect_trace().is_empty());
+    assert!(vm.output_condition_checks().is_empty());
+    assert!(vm.communication_consumption_artifacts().is_empty());
+
+    let usage = vm.memory_usage();
+    assert_eq!(usage.obs_events, 0);
+    assert_eq!(usage.effect_trace_entries, 0);
+    assert_eq!(usage.output_condition_checks, 0);
+    assert_eq!(usage.communication_artifacts, 0);
+}
+
+#[test]
+fn test_vm_reuses_immutable_program_storage_across_identical_loads() {
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
+    let mut vm = VM::new(VMConfig::default());
+
+    let sid1 = vm.load_choreography(&image).expect("load choreography");
+    let usage_after_first = vm.memory_usage();
+    assert_eq!(vm.unique_program_count(), 2);
+    let program_instruction_count = usage_after_first.program_instruction_count;
+    assert!(program_instruction_count > 0);
+
+    let sid2 = vm.load_choreography(&image).expect("load choreography");
+    let usage_after_second = vm.memory_usage();
+
+    assert_ne!(sid1, sid2);
+    assert_eq!(vm.unique_program_count(), 2);
+    assert_eq!(
+        usage_after_second.program_instruction_count,
+        program_instruction_count
+    );
+    assert_eq!(vm.coroutine_count(), 4);
+}
+
+#[test]
+fn test_vm_session_churn_with_reaping_and_capped_retention_stays_bounded() {
+    let image = test_support::simple_send_recv_image("A", "B", "msg");
+    let cap = 8;
+    let mut vm = VM::new(VMConfig {
+        observability_retention: ObservabilityRetentionConfig {
+            mode: ObservabilityRetentionMode::Capped,
+            capacity: cap,
+        },
+        ..VMConfig::default()
+    });
+    let handler = PassthroughHandler;
+
+    for _ in 0..32 {
+        let sid = vm.load_choreography(&image).expect("load choreography");
+        vm.run(&handler, 100).expect("run choreography");
+        vm.sessions_mut().close(sid).expect("close session");
+        let coro_ids: Vec<usize> = vm
+            .session_coroutines(sid)
+            .iter()
+            .map(|coro| coro.id)
+            .collect();
+        for coro_id in coro_ids {
+            vm.coroutine_mut(coro_id).expect("coroutine exists").status = CoroStatus::Done;
+        }
+
+        let reaped = vm.reap_closed_sessions();
+        assert_eq!(reaped.len(), 1);
+
+        let usage = vm.memory_usage();
+        assert_eq!(usage.session_store.live_sessions, 0);
+        assert_eq!(usage.session_store.live_closed_sessions, 0);
+        assert_eq!(usage.coroutine_records, 0);
+        assert!(usage.obs_events <= cap);
+        assert!(usage.effect_trace_entries <= cap);
+    }
 }
 
 // ============================================================================

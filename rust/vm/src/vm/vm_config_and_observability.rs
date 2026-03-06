@@ -51,6 +51,9 @@ pub struct VMConfig {
     /// Effect-trace capture mode for integration/perf tuning.
     #[serde(default)]
     pub effect_trace_capture_mode: EffectTraceCaptureMode,
+    /// Retention policy for observable and diagnostic artifacts.
+    #[serde(default)]
+    pub observability_retention: ObservabilityRetentionConfig,
     /// Runtime payload hardening mode for inbound/outbound messages.
     #[serde(default)]
     pub payload_validation_mode: PayloadValidationMode,
@@ -88,6 +91,7 @@ impl Default for VMConfig {
             runtime_tuning_profile: RuntimeTuningProfile::Standard,
             threaded_round_semantics: ThreadedRoundSemantics::CanonicalOneStep,
             effect_trace_capture_mode: EffectTraceCaptureMode::Full,
+            observability_retention: ObservabilityRetentionConfig::default(),
             payload_validation_mode: PayloadValidationMode::Structural,
             communication_replay_mode: CommunicationReplayMode::Off,
             max_payload_bytes: default_max_payload_bytes(),
@@ -121,6 +125,11 @@ impl VMConfig {
         if self.max_payload_bytes == 0 {
             return Err("max_payload_bytes must be > 0".to_string());
         }
+        if self.observability_retention.mode == ObservabilityRetentionMode::Capped
+            && self.observability_retention.capacity == 0
+        {
+            return Err("observability_retention.capacity must be > 0 in capped mode".to_string());
+        }
         Ok(())
     }
 
@@ -132,6 +141,82 @@ impl VMConfig {
     pub fn assert_invariants(&self) {
         if let Err(reason) = self.validate_invariants() {
             panic!("{reason}");
+        }
+    }
+
+    /// Deterministic baseline profile with minimal retained instrumentation.
+    #[must_use]
+    pub fn strict_minimal() -> Self {
+        Self {
+            determinism_mode: DeterminismMode::Full,
+            threaded_round_semantics: ThreadedRoundSemantics::CanonicalOneStep,
+            effect_trace_capture_mode: EffectTraceCaptureMode::Disabled,
+            payload_validation_mode: PayloadValidationMode::Structural,
+            communication_replay_mode: CommunicationReplayMode::Off,
+            observability_retention: ObservabilityRetentionConfig {
+                mode: ObservabilityRetentionMode::Capped,
+                capacity: 1_024,
+            },
+            ..Self::default()
+        }
+    }
+
+    /// Deterministic profile with full observable/effect tracing enabled.
+    #[must_use]
+    pub fn strict_observable() -> Self {
+        Self {
+            effect_trace_capture_mode: EffectTraceCaptureMode::Full,
+            observability_retention: ObservabilityRetentionConfig::default(),
+            ..Self::strict_minimal()
+        }
+    }
+
+    /// Deterministic profile with strict validation and replay tracking enabled.
+    #[must_use]
+    pub fn strict_verified() -> Self {
+        Self {
+            effect_trace_capture_mode: EffectTraceCaptureMode::Full,
+            payload_validation_mode: PayloadValidationMode::StrictSchema,
+            communication_replay_mode: CommunicationReplayMode::Nullifier,
+            observability_retention: ObservabilityRetentionConfig::default(),
+            ..Self::strict_minimal()
+        }
+    }
+
+    /// Deterministic churn profile for repeated short-lived sessions.
+    #[must_use]
+    pub fn strict_churn() -> Self {
+        Self {
+            observability_retention: ObservabilityRetentionConfig {
+                mode: ObservabilityRetentionMode::Capped,
+                capacity: 256,
+            },
+            ..Self::strict_minimal()
+        }
+    }
+
+    /// Deterministic buffer-pressure profile for allocator and queue stress.
+    #[must_use]
+    pub fn strict_buffer_pressure() -> Self {
+        Self {
+            buffer_config: BufferConfig {
+                mode: crate::buffer::BufferMode::Fifo,
+                initial_capacity: 1,
+                policy: crate::buffer::BackpressurePolicy::Resize { max_capacity: 8 },
+            },
+            ..Self::strict_minimal()
+        }
+    }
+
+    /// Deterministic large-fanout profile for scheduler and metadata scaling tests.
+    #[must_use]
+    pub fn strict_large_fanout() -> Self {
+        Self {
+            observability_retention: ObservabilityRetentionConfig {
+                mode: ObservabilityRetentionMode::Capped,
+                capacity: 4_096,
+            },
+            ..Self::strict_minimal()
         }
     }
 }
