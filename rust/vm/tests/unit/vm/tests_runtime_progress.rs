@@ -203,6 +203,35 @@
     }
 
     #[test]
+    fn test_resume_role_rebuilds_ready_eligibility_and_allows_progress() {
+        let mut local_types = BTreeMap::new();
+        local_types.insert("A".to_string(), LocalTypeR::End);
+
+        let mut programs = BTreeMap::new();
+        programs.insert("A".to_string(), vec![Instr::Halt]);
+
+        let image = CodeImage {
+            programs,
+            global_type: GlobalType::End,
+            local_types,
+        };
+
+        let mut vm = VM::new(VMConfig::default());
+        vm.load_choreography(&image).expect("load choreography");
+        vm.pause_role("A");
+        let handler = PassthroughHandler;
+
+        let stuck = vm.step_round(&handler, 1).expect("paused step round");
+        assert!(matches!(stuck, StepResult::Stuck));
+        assert_eq!(vm.scheduler_step_count(), 0);
+
+        vm.resume_role("A");
+        let resumed = vm.step_round(&handler, 1).expect("resumed step round");
+        assert!(matches!(resumed, StepResult::AllDone));
+        assert_eq!(vm.scheduler_step_count(), 1);
+    }
+
+    #[test]
     fn test_yield_advances_pc_and_sets_spawn_wait_blocked_status() {
         let mut local_types = BTreeMap::new();
         local_types.insert("A".to_string(), LocalTypeR::End);
@@ -450,12 +479,24 @@
             ObsEvent::Opened { session, .. } => *session,
             _ => unreachable!(),
         };
+        assert!(
+            vm.trace().iter().any(|event| matches!(
+                event,
+                ObsEvent::Opened { roles, .. }
+                    if roles == &vec!["A".to_string(), "B".to_string()]
+            )),
+            "opened event must preserve canonical role strings at the trace boundary"
+        );
         let session = vm.sessions().get(sid).expect("opened session exists");
         assert_eq!(session.local_types.len(), 2);
         for ((sender, receiver), handler_id) in full_handlers {
             let edge = Edge::new(sid, sender, receiver);
             assert_eq!(session.edge_handlers.get(&edge), Some(&handler_id));
         }
+        assert_eq!(vm.role_symbol_count(), 2);
+        assert_eq!(vm.label_symbol_count(), 0);
+        assert_eq!(vm.handler_symbol_count(), 5);
+        assert_eq!(vm.edge_symbol_count(), 4);
 
         let coro = vm.coroutine(0).expect("coroutine exists");
         assert!(matches!(coro.regs[0], Value::Endpoint(_)));
@@ -554,4 +595,3 @@
             other => panic!("unexpected error: {other:?}"),
         }
     }
-

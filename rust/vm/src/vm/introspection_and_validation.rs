@@ -234,16 +234,19 @@ impl VM {
     /// Pause execution for all coroutines of a role.
     pub fn pause_role(&mut self, role: &str) {
         self.paused_roles.insert(role.to_string());
+        self.mark_eligibility_dirty();
     }
 
     /// Resume execution for all coroutines of a role.
     pub fn resume_role(&mut self, role: &str) {
         self.paused_roles.remove(role);
+        self.mark_eligibility_dirty();
     }
 
     /// Replace the paused role set.
     pub fn set_paused_roles(&mut self, roles: &BTreeSet<String>) {
         self.paused_roles = roles.clone();
+        self.mark_eligibility_dirty();
     }
 
     /// Access paused roles.

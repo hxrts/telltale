@@ -19,6 +19,46 @@ pub struct VmMemoryUsage {
     pub communication_artifacts: usize,
     /// Number of retained output-condition checks.
     pub output_condition_checks: usize,
+    /// Estimated retained bytes by VM subsystem.
+    pub retained_bytes: VmRetainedBytes,
+}
+
+/// Estimated retained bytes for VM subsystems.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VmRetainedBytes {
+    /// Session-store retained bytes.
+    pub session_store: usize,
+    /// Coroutine state.
+    pub coroutines: usize,
+    /// Immutable program storage.
+    pub programs: usize,
+    /// Resource-state storage.
+    pub resource_states: usize,
+    /// Observable/effect trace storage.
+    pub traces: usize,
+    /// Replay-state and replay-artifact storage.
+    pub replay: usize,
+    /// Output-condition diagnostics.
+    pub output_condition_checks: usize,
+    /// Scheduler and control-state bookkeeping.
+    pub scheduler_and_control: usize,
+    /// Symbol interning tables.
+    pub symbols: usize,
+    /// Guard-layer resources.
+    pub guard_layer: usize,
+    /// Session monitor metadata.
+    pub monitor: usize,
+    /// Arena slot storage.
+    pub arena: usize,
+    /// Aggregate retained bytes across VM subsystems.
+    pub total: usize,
+}
+
+fn vm_serialized_bytes<T: Serialize>(value: &T) -> usize {
+    bincode::serialized_size(value)
+        .ok()
+        .and_then(|bytes| usize::try_from(bytes).ok())
+        .unwrap_or(0)
 }
 
 impl VM {
@@ -40,6 +80,7 @@ impl VM {
             sid,
             crate::session::DEFAULT_HANDLER_ID.to_string(),
         );
+        let _ = self.handler_symbols.intern(crate::session::DEFAULT_HANDLER_ID);
     }
 
     fn ensure_session_capacity(&self) -> Result<(), VMError> {
@@ -49,6 +90,52 @@ impl VM {
             });
         }
         Ok(())
+    }
+
+    fn coroutine_runtime_eligible(&self, coro_id: usize) -> bool {
+        let Some(idx) = self.coro_index(coro_id) else {
+            return false;
+        };
+        let role = &self.coroutines[idx].role;
+        !self.paused_roles.contains(role)
+            && !self.crashed_sites.contains(role)
+            && !self.timed_out_sites.contains_key(role)
+    }
+
+    fn mark_eligibility_dirty(&mut self) {
+        self.eligibility_dirty = true;
+    }
+
+    fn sync_ready_eligibility_for(&mut self, coro_id: usize) {
+        if self.sched.is_ready(coro_id) && self.coroutine_runtime_eligible(coro_id) {
+            self.eligible_ready.insert(coro_id);
+        } else {
+            self.eligible_ready.remove(&coro_id);
+        }
+    }
+
+    fn refresh_ready_eligibility(&mut self) {
+        self.eligible_ready = self
+            .sched
+            .ready_set_snapshot()
+            .into_iter()
+            .filter(|coro_id| self.coroutine_runtime_eligible(*coro_id))
+            .collect();
+        self.eligibility_dirty = false;
+    }
+
+    fn ensure_ready_eligibility(&mut self) {
+        if self.eligibility_dirty {
+            self.refresh_ready_eligibility();
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    fn debug_assert_ready_eligibility_consistent(&self) {
+        for coro_id in &self.eligible_ready {
+            debug_assert!(self.sched.is_ready(*coro_id));
+            debug_assert!(self.coroutine_runtime_eligible(*coro_id));
+        }
     }
 
     fn sync_communication_consumption_mode(&mut self) {
@@ -108,6 +195,7 @@ impl VM {
         );
         self.next_session_id = self.sessions.next_session_id();
         self.bind_default_handlers_for_session(sid);
+        self.intern_session_runtime_symbols(sid);
         self.monitor.set_kind(sid, SessionKind::Peer);
         self.resource_states
             .entry(sid)
@@ -170,6 +258,7 @@ impl VM {
         }
         self.sched.add_ready(coro_id);
         self.coroutines.push(coro);
+        self.sync_ready_eligibility_for(coro_id);
         Ok(())
     }
 
@@ -230,45 +319,24 @@ impl VM {
         self.ingest_topology_events(handler)?;
         self.prune_expired_timeouts();
         self.try_unblock_receivers();
-
-        let paused_roles = &self.paused_roles;
-        let crashed_sites = &self.crashed_sites;
-        let timed_out_sites = &self.timed_out_sites;
-        let coroutines = &self.coroutines;
-        let has_eligible = self.sched.any_ready(|id| {
-            coroutines
-                .get(id)
-                .map(|c| {
-                    !paused_roles.contains(&c.role)
-                        && !crashed_sites.contains(&c.role)
-                        && !timed_out_sites.contains_key(&c.role)
-                })
-                .unwrap_or(false)
-        });
-        if !has_eligible {
+        self.ensure_ready_eligibility();
+        #[cfg(debug_assertions)]
+        self.debug_assert_ready_eligibility_consistent();
+        if self.eligible_ready.is_empty() {
             return Ok(StepResult::Stuck);
         }
-        let Some(coro_id) = VMKernel::select_ready_eligible(
-            &mut self.sched,
-            |id| {
-                coroutines
-                    .get(id)
-                    .map(|c| !c.progress_tokens.is_empty())
-                    .unwrap_or(false)
-            },
-            |id| {
-                coroutines
-                    .get(id)
-                    .map(|c| {
-                        !paused_roles.contains(&c.role)
-                            && !crashed_sites.contains(&c.role)
-                            && !timed_out_sites.contains_key(&c.role)
-                    })
-                    .unwrap_or(false)
-            },
-        ) else {
+        let eligible_ready = self.eligible_ready.clone();
+        let coroutines = &self.coroutines;
+        let Some(coro_id) = self.sched.pick_runnable_from_set(&eligible_ready, |id| {
+            coroutines
+                .iter()
+                .find(|coro| coro.id == id)
+                .map(|c| !c.progress_tokens.is_empty())
+                .unwrap_or(false)
+        }) else {
             return Ok(StepResult::Stuck);
         };
+        self.eligible_ready.remove(&coro_id);
 
         let result = self.exec_instr(coro_id, handler);
 
@@ -279,6 +347,7 @@ impl VM {
                     exec_status: SchedExecStatus::Continue,
                 });
                 self.sched.reschedule(coro_id);
+                self.sync_ready_eligibility_for(coro_id);
             }
             Ok(ExecOutcome::Blocked(reason)) => {
                 let yielded = matches!(reason, BlockReason::Spawn);
@@ -292,8 +361,10 @@ impl VM {
                 });
                 if yielded {
                     self.sched.reschedule(coro_id);
+                    self.sync_ready_eligibility_for(coro_id);
                 } else {
                     self.sched.mark_blocked(coro_id, reason);
+                    self.eligible_ready.remove(&coro_id);
                 }
             }
             Ok(ExecOutcome::Halted) => {
@@ -302,6 +373,7 @@ impl VM {
                     exec_status: SchedExecStatus::Halted,
                 });
                 self.sched.mark_done(coro_id);
+                self.eligible_ready.remove(&coro_id);
                 self.obs_trace.push(
                     ObsEvent::Halted {
                         tick: self.clock.tick,
@@ -328,15 +400,20 @@ impl VM {
                 };
                 self.coroutines[idx].status = CoroStatus::Faulted(fault.clone());
                 self.sched.mark_done(coro_id);
+                self.eligible_ready.remove(&coro_id);
                 return Err(VMError::Fault { coro_id, fault });
             }
         }
 
         if self.all_done() {
             #[cfg(debug_assertions)]
+            self.debug_assert_ready_eligibility_consistent();
+            #[cfg(debug_assertions)]
             debug_assert!(self.wf_vm_state().is_ok());
             Ok(StepResult::AllDone)
         } else {
+            #[cfg(debug_assertions)]
+            self.debug_assert_ready_eligibility_consistent();
             #[cfg(debug_assertions)]
             debug_assert!(self.wf_vm_state().is_ok());
             Ok(StepResult::Continue)
@@ -523,6 +600,18 @@ impl VM {
         self.label_symbols.len()
     }
 
+    /// Number of interned handler symbols.
+    #[must_use]
+    pub fn handler_symbol_count(&self) -> usize {
+        self.handler_symbols.len()
+    }
+
+    /// Number of interned edge symbols.
+    #[must_use]
+    pub fn edge_symbol_count(&self) -> usize {
+        self.edge_symbols.len()
+    }
+
     /// Access VM configuration.
     #[must_use]
     pub fn config(&self) -> &VMConfig {
@@ -568,8 +657,55 @@ impl VM {
     /// Approximate retained state for the VM runtime.
     #[must_use]
     pub fn memory_usage(&self) -> VmMemoryUsage {
+        let session_store = self.sessions.memory_usage();
+        let retained_bytes = VmRetainedBytes {
+            session_store: session_store.retained_bytes.total,
+            coroutines: self.coroutines.iter().map(vm_serialized_bytes).sum(),
+            programs: vm_serialized_bytes(&self.programs)
+                .saturating_add(vm_serialized_bytes(&self.code)),
+            resource_states: vm_serialized_bytes(&self.resource_states),
+            traces: vm_serialized_bytes(&self.obs_trace)
+                .saturating_add(vm_serialized_bytes(&self.effect_trace)),
+            replay: vm_serialized_bytes(&self.communication_consumption)
+                .saturating_add(vm_serialized_bytes(&self.communication_consumption_artifacts)),
+            output_condition_checks: vm_serialized_bytes(&self.output_condition_checks),
+            scheduler_and_control: vm_serialized_bytes(&self.sched)
+                .saturating_add(vm_serialized_bytes(&self.eligible_ready))
+                .saturating_add(vm_serialized_bytes(&self.paused_roles))
+                .saturating_add(vm_serialized_bytes(&self.crashed_sites))
+                .saturating_add(vm_serialized_bytes(&self.partitioned_edges))
+                .saturating_add(vm_serialized_bytes(&self.corrupted_edges))
+                .saturating_add(vm_serialized_bytes(&self.timed_out_sites))
+                .saturating_add(vm_serialized_bytes(&self.clock))
+                .saturating_add(vm_serialized_bytes(&self.last_sched_step))
+                .saturating_add(vm_serialized_bytes(&self.handler_identity_anchor))
+                .saturating_add(vm_serialized_bytes(&self.next_coro_id))
+                .saturating_add(vm_serialized_bytes(&self.next_session_id)),
+            symbols: vm_serialized_bytes(&self.role_symbols)
+                .saturating_add(vm_serialized_bytes(&self.label_symbols))
+                .saturating_add(vm_serialized_bytes(&self.handler_symbols))
+                .saturating_add(vm_serialized_bytes(&self.edge_symbols)),
+            guard_layer: vm_serialized_bytes(&self.guard_layer),
+            monitor: vm_serialized_bytes(&self.monitor),
+            arena: vm_serialized_bytes(&self.arena),
+            total: 0,
+        };
+        let mut retained_bytes = retained_bytes;
+        retained_bytes.total = retained_bytes
+            .session_store
+            .saturating_add(retained_bytes.coroutines)
+            .saturating_add(retained_bytes.programs)
+            .saturating_add(retained_bytes.resource_states)
+            .saturating_add(retained_bytes.traces)
+            .saturating_add(retained_bytes.replay)
+            .saturating_add(retained_bytes.output_condition_checks)
+            .saturating_add(retained_bytes.scheduler_and_control)
+            .saturating_add(retained_bytes.symbols)
+            .saturating_add(retained_bytes.guard_layer)
+            .saturating_add(retained_bytes.monitor)
+            .saturating_add(retained_bytes.arena);
         VmMemoryUsage {
-            session_store: self.sessions.memory_usage(),
+            session_store,
             coroutine_records: self.coroutines.len(),
             terminal_coroutines: self.coroutines.iter().filter(|coro| coro.is_terminal()).count(),
             program_count: self.programs.len(),
@@ -578,6 +714,7 @@ impl VM {
             effect_trace_entries: self.effect_trace.len(),
             communication_artifacts: self.communication_consumption_artifacts.len(),
             output_condition_checks: self.output_condition_checks.len(),
+            retained_bytes,
         }
     }
 

@@ -98,6 +98,8 @@ pub struct ThreadedVM {
     trace: Vec<ObsEvent>,
     role_symbols: SymbolTable,
     label_symbols: SymbolTable,
+    handler_symbols: SymbolTable,
+    edge_symbols: EdgeSymbolTable,
     clock: SimClock,
     next_coro_id: usize,
     non_terminal_coroutines: usize,
@@ -200,13 +202,20 @@ impl ThreadedSessionStore {
         }
         let buffers = buffer_entries.into_iter().collect();
 
-        let state = SessionState {
+        let mut state = SessionState {
             sid,
             roles,
             role_ids,
             local_types,
             buffers,
             edge_lookup,
+            handler_ids: BTreeMap::new(),
+            handlers_by_id: Vec::new(),
+            edge_handler_lookup: BTreeMap::new(),
+            default_handler_id: None,
+            label_ids: BTreeMap::new(),
+            labels_by_id: Vec::new(),
+            branch_lookup: BTreeMap::new(),
             auth_leaves: BTreeMap::new(),
             auth_trees: BTreeMap::new(),
             auth_roots: BTreeMap::new(),
@@ -216,6 +225,7 @@ impl ThreadedSessionStore {
             status: SessionStatus::Active,
             epoch: 0,
         };
+        state.rebuild_derived_indexes();
 
         let mut sessions = self.sessions.write().expect("threaded VM lock poisoned");
         sessions.insert(sid, Arc::new(Mutex::new(state)));

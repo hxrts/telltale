@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use telltale_types::{LocalTypeR, ValType};
+use telltale_types::{Label, LocalTypeR, ValType};
 
 use crate::buffer::{BoundedBuffer, BufferConfig, SignedBuffer, SignedValue};
 use crate::coroutine::Value;
@@ -58,6 +58,10 @@ impl ClosedSessionSummary {
             epoch: session.epoch,
         }
     }
+
+    fn retained_bytes_estimate(&self) -> usize {
+        std::mem::size_of::<Self>().saturating_add(serialized_bytes(self))
+    }
 }
 
 /// Approximate retained state for the session store.
@@ -83,6 +87,29 @@ pub struct SessionStoreMemoryUsage {
     pub live_auth_tree_count: usize,
     /// Number of live auth roots.
     pub live_auth_root_count: usize,
+    /// Estimated retained bytes by session-store subsystem.
+    pub retained_bytes: SessionStoreRetainedBytes,
+}
+
+/// Estimated retained bytes for session-store subsystems.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionStoreRetainedBytes {
+    /// Live session metadata excluding dedicated subsystems below.
+    pub live_sessions: usize,
+    /// Archived closed-session summaries.
+    pub archived_closed: usize,
+    /// Local type storage and endpoint bindings.
+    pub local_types: usize,
+    /// Buffer storage and buffered payloads.
+    pub buffers: usize,
+    /// Edge-trace storage.
+    pub traces: usize,
+    /// Auth leaves, trees, and roots.
+    pub auth: usize,
+    /// Handler bindings and defaults.
+    pub handlers: usize,
+    /// Aggregate retained bytes across all session-store subsystems.
+    pub total: usize,
 }
 
 /// Session identifier. Each session gets a unique ID within the VM.
@@ -90,12 +117,35 @@ pub type SessionId = usize;
 
 /// Handler identifier for edge-bound runtime dispatch.
 pub type HandlerId = String;
+type HandlerNumericId = u16;
+type LabelNumericId = u16;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub(crate) enum BranchDirection {
+    Send,
+    Recv,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct CachedBranch {
+    pub(crate) direction: BranchDirection,
+    pub(crate) partner: String,
+    pub(crate) expected_type: Option<ValType>,
+    pub(crate) continuation: LocalTypeR,
+}
 
 /// Built-in fallback handler id used when no edge-specific binding exists.
 pub const DEFAULT_HANDLER_ID: &str = "default_handler";
 
 fn default_handler_id() -> HandlerId {
     DEFAULT_HANDLER_ID.to_string()
+}
+
+fn serialized_bytes<T: Serialize>(value: &T) -> usize {
+    bincode::serialized_size(value)
+        .ok()
+        .and_then(|bytes| usize::try_from(bytes).ok())
+        .unwrap_or(0)
 }
 
 /// Edge between two roles in a session (directed: sender → receiver).
@@ -178,14 +228,14 @@ pub struct TypeEntry {
 ///
 /// Stores per-endpoint local types (the type truth), message buffers,
 /// and lifecycle status. Matches Lean `SessionState`.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub struct SessionState {
     /// Session identifier.
     pub sid: SessionId,
     /// Role names in this session.
     pub roles: Vec<String>,
     /// Deterministic internal ids for participant roles.
-    #[serde(default)]
+    #[serde(skip)]
     role_ids: BTreeMap<String, u16>,
     /// Per-endpoint local type state. This IS the type truth.
     ///
@@ -194,8 +244,29 @@ pub struct SessionState {
     /// Message buffers keyed by directed edge.
     pub buffers: BTreeMap<Edge, SignedBuffer<Signature>>,
     /// Deterministic internal edge lookup keyed by interned role ids.
-    #[serde(default)]
+    #[serde(skip)]
     edge_lookup: BTreeMap<(u16, u16), Edge>,
+    /// Deterministic internal ids for bound handlers.
+    #[serde(skip)]
+    handler_ids: BTreeMap<HandlerId, HandlerNumericId>,
+    /// Reverse lookup for internal handler ids.
+    #[serde(skip)]
+    handlers_by_id: Vec<HandlerId>,
+    /// Deterministic handler binding keyed by internal edge ids.
+    #[serde(skip)]
+    edge_handler_lookup: BTreeMap<(u16, u16), HandlerNumericId>,
+    /// Session-wide fallback handler id.
+    #[serde(skip)]
+    default_handler_id: Option<HandlerNumericId>,
+    /// Deterministic internal ids for branch labels reachable from current local types.
+    #[serde(skip)]
+    label_ids: BTreeMap<String, LabelNumericId>,
+    /// Reverse lookup for internal label ids.
+    #[serde(skip)]
+    labels_by_id: Vec<String>,
+    /// Cached branch resolution keyed by endpoint then label id.
+    #[serde(skip)]
+    branch_lookup: BTreeMap<Endpoint, BTreeMap<LabelNumericId, CachedBranch>>,
     /// Per-edge authenticated leaves for Merkle-auth tracking.
     pub auth_leaves: BTreeMap<Edge, Vec<Hash>>,
     /// Per-edge Merkle trees for incremental authenticated updates.
@@ -217,6 +288,64 @@ pub struct SessionState {
 }
 
 impl SessionState {
+    fn retained_session_core_bytes(&self) -> usize {
+        std::mem::size_of::<Self>()
+            .saturating_add(serialized_bytes(&self.sid))
+            .saturating_add(serialized_bytes(&self.roles))
+            .saturating_add(serialized_bytes(&self.role_ids))
+            .saturating_add(serialized_bytes(&self.edge_lookup))
+            .saturating_add(serialized_bytes(&self.handler_ids))
+            .saturating_add(serialized_bytes(&self.handlers_by_id))
+            .saturating_add(serialized_bytes(&self.edge_handler_lookup))
+            .saturating_add(serialized_bytes(&self.default_handler_id))
+            .saturating_add(serialized_bytes(&self.label_ids))
+            .saturating_add(serialized_bytes(&self.labels_by_id))
+            .saturating_add(serialized_bytes(&self.branch_lookup))
+            .saturating_add(serialized_bytes(&self.status))
+            .saturating_add(serialized_bytes(&self.epoch))
+    }
+
+    fn retained_local_type_bytes(&self) -> usize {
+        serialized_bytes(&self.local_types)
+    }
+
+    fn retained_buffer_bytes(&self) -> usize {
+        serialized_bytes(&self.buffers)
+    }
+
+    fn retained_trace_bytes(&self) -> usize {
+        serialized_bytes(&self.edge_traces)
+    }
+
+    fn retained_auth_bytes(&self) -> usize {
+        serialized_bytes(&self.auth_leaves)
+            .saturating_add(serialized_bytes(&self.auth_trees))
+            .saturating_add(serialized_bytes(&self.auth_roots))
+    }
+
+    fn retained_handler_bytes(&self) -> usize {
+        serialized_bytes(&self.edge_handlers)
+            .saturating_add(serialized_bytes(&self.default_handler))
+    }
+
+    fn rebuild_derived_indexes(&mut self) {
+        self.role_ids = Self::build_role_ids(&self.roles);
+        self.edge_lookup = Self::build_edge_lookup(self.sid, &self.roles, &self.role_ids);
+        let (handler_ids, handlers_by_id, edge_handler_lookup, default_handler_id) =
+            Self::build_handler_indexes(&self.role_ids, &self.default_handler, &self.edge_handlers);
+        self.handler_ids = handler_ids;
+        self.handlers_by_id = handlers_by_id;
+        self.edge_handler_lookup = edge_handler_lookup;
+        self.default_handler_id = default_handler_id;
+        self.label_ids = BTreeMap::new();
+        self.labels_by_id = Vec::new();
+        self.branch_lookup = BTreeMap::new();
+        let endpoints: Vec<Endpoint> = self.local_types.keys().cloned().collect();
+        for endpoint in endpoints {
+            self.refresh_endpoint_branch_lookup(&endpoint);
+        }
+    }
+
     pub(crate) fn build_role_ids(roles: &[String]) -> BTreeMap<String, u16> {
         roles
             .iter()
@@ -254,10 +383,158 @@ impl SessionState {
         edges.into_iter().collect()
     }
 
+    pub(crate) fn build_handler_indexes(
+        role_ids: &BTreeMap<String, u16>,
+        default_handler: &str,
+        edge_handlers: &BTreeMap<Edge, HandlerId>,
+    ) -> (
+        BTreeMap<HandlerId, HandlerNumericId>,
+        Vec<HandlerId>,
+        BTreeMap<(u16, u16), HandlerNumericId>,
+        Option<HandlerNumericId>,
+    ) {
+        let mut handler_ids = BTreeMap::new();
+        let mut handlers_by_id = Vec::new();
+        let intern_handler = |handler: &str,
+                              handler_ids: &mut BTreeMap<HandlerId, HandlerNumericId>,
+                              handlers_by_id: &mut Vec<HandlerId>|
+         -> HandlerNumericId {
+            if let Some(id) = handler_ids.get(handler) {
+                return *id;
+            }
+            let id = u16::try_from(handlers_by_id.len()).expect("handler count should fit in u16");
+            let owned = handler.to_string();
+            handler_ids.insert(owned.clone(), id);
+            handlers_by_id.push(owned);
+            id
+        };
+
+        let default_handler_id = (!default_handler.is_empty())
+            .then(|| intern_handler(default_handler, &mut handler_ids, &mut handlers_by_id));
+
+        let mut edge_handler_lookup = BTreeMap::new();
+        for (edge, handler) in edge_handlers {
+            let Some(from_id) = role_ids.get(&edge.sender) else {
+                continue;
+            };
+            let Some(to_id) = role_ids.get(&edge.receiver) else {
+                continue;
+            };
+            let handler_id = intern_handler(handler, &mut handler_ids, &mut handlers_by_id);
+            edge_handler_lookup.insert((*from_id, *to_id), handler_id);
+        }
+
+        (
+            handler_ids,
+            handlers_by_id,
+            edge_handler_lookup,
+            default_handler_id,
+        )
+    }
+
     fn edge_for_roles(&self, from: &str, to: &str) -> Option<&Edge> {
         let from_id = self.role_ids.get(from)?;
         let to_id = self.role_ids.get(to)?;
         self.edge_lookup.get(&(*from_id, *to_id))
+    }
+
+    fn edge_key_for_roles(&self, from: &str, to: &str) -> Option<(u16, u16)> {
+        let from_id = self.role_ids.get(from)?;
+        let to_id = self.role_ids.get(to)?;
+        Some((*from_id, *to_id))
+    }
+
+    fn intern_label(&mut self, label: &str) -> LabelNumericId {
+        if let Some(id) = self.label_ids.get(label) {
+            return *id;
+        }
+        let id = u16::try_from(self.labels_by_id.len()).expect("label count should fit in u16");
+        let owned = label.to_string();
+        self.label_ids.insert(owned.clone(), id);
+        self.labels_by_id.push(owned);
+        id
+    }
+
+    fn intern_handler_binding(&mut self, handler: &str) -> HandlerNumericId {
+        if let Some(id) = self.handler_ids.get(handler) {
+            return *id;
+        }
+        let id = u16::try_from(self.handlers_by_id.len()).expect("handler count should fit in u16");
+        let owned = handler.to_string();
+        self.handler_ids.insert(owned.clone(), id);
+        self.handlers_by_id.push(owned);
+        id
+    }
+
+    fn handler_by_id(&self, handler_id: HandlerNumericId) -> Option<&HandlerId> {
+        self.handlers_by_id.get(usize::from(handler_id))
+    }
+
+    fn branch_shape(
+        local_type: &LocalTypeR,
+    ) -> Option<(
+        BranchDirection,
+        &str,
+        &[(Label, Option<ValType>, LocalTypeR)],
+    )> {
+        match local_type {
+            LocalTypeR::Send { partner, branches } => {
+                Some((BranchDirection::Send, partner.as_str(), branches.as_slice()))
+            }
+            LocalTypeR::Recv { partner, branches } => {
+                Some((BranchDirection::Recv, partner.as_str(), branches.as_slice()))
+            }
+            _ => None,
+        }
+    }
+
+    fn refresh_endpoint_branch_lookup(&mut self, ep: &Endpoint) {
+        self.branch_lookup.remove(ep);
+        let Some(entry) = self.local_types.get(ep) else {
+            return;
+        };
+        let Some((direction, partner, branches)) = Self::branch_shape(&entry.current) else {
+            return;
+        };
+        let partner = partner.to_string();
+        let branches: Vec<(String, Option<ValType>, LocalTypeR)> = branches
+            .iter()
+            .map(|(label, expected_type, continuation)| {
+                (
+                    label.name.clone(),
+                    expected_type.clone(),
+                    continuation.clone(),
+                )
+            })
+            .collect();
+
+        let mut endpoint_lookup = BTreeMap::new();
+        for (label, expected_type, continuation) in branches {
+            let label_id = self.intern_label(&label);
+            endpoint_lookup.insert(
+                label_id,
+                CachedBranch {
+                    direction,
+                    partner: partner.clone(),
+                    expected_type,
+                    continuation,
+                },
+            );
+        }
+        if !endpoint_lookup.is_empty() {
+            self.branch_lookup.insert(ep.clone(), endpoint_lookup);
+        }
+    }
+
+    /// Lookup a cached branch resolution for an endpoint and label.
+    #[must_use]
+    pub(crate) fn lookup_branch_resolution(
+        &self,
+        ep: &Endpoint,
+        label: &str,
+    ) -> Option<&CachedBranch> {
+        let label_id = self.label_ids.get(label)?;
+        self.branch_lookup.get(ep)?.get(label_id)
     }
 
     fn update_auth_tree(&mut self, edge: &Edge, signed: &SignedValue<Signature>) {
@@ -412,6 +689,85 @@ impl SessionState {
         };
         self.buffers.get(&edge).is_some_and(|buf| !buf.is_empty())
     }
+
+    /// Lookup an edge-bound handler by role pair using the internal numeric path.
+    #[must_use]
+    pub fn lookup_handler_for_roles(&self, from: &str, to: &str) -> Option<&HandlerId> {
+        if self.edge_handlers.is_empty() {
+            return None;
+        }
+        let edge_key = self.edge_key_for_roles(from, to)?;
+        let handler_id = self.edge_handler_lookup.get(&edge_key)?;
+        self.handler_by_id(*handler_id)
+    }
+
+    /// Lookup the session-wide fallback handler using the internal numeric path.
+    #[must_use]
+    pub fn default_handler_binding(&self) -> Option<&HandlerId> {
+        if self.default_handler.is_empty() {
+            return None;
+        }
+        let handler_id = self.default_handler_id?;
+        self.handler_by_id(handler_id)
+    }
+
+    /// Whether the session currently has any handler binding configured.
+    #[must_use]
+    pub fn has_bound_handler(&self) -> bool {
+        !self.default_handler.is_empty() || !self.edge_handlers.is_empty()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct SessionStateSerde {
+    sid: SessionId,
+    roles: Vec<String>,
+    local_types: BTreeMap<Endpoint, TypeEntry>,
+    buffers: BTreeMap<Edge, SignedBuffer<Signature>>,
+    auth_leaves: BTreeMap<Edge, Vec<Hash>>,
+    #[serde(default)]
+    auth_trees: BTreeMap<Edge, AuthTree>,
+    auth_roots: BTreeMap<Edge, Hash>,
+    edge_handlers: BTreeMap<Edge, HandlerId>,
+    #[serde(default = "default_handler_id")]
+    default_handler: HandlerId,
+    edge_traces: BTreeMap<Edge, Vec<ValType>>,
+    status: SessionStatus,
+    epoch: usize,
+}
+
+impl<'de> Deserialize<'de> for SessionState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = SessionStateSerde::deserialize(deserializer)?;
+        let mut session = Self {
+            sid: raw.sid,
+            roles: raw.roles,
+            role_ids: BTreeMap::new(),
+            local_types: raw.local_types,
+            buffers: raw.buffers,
+            edge_lookup: BTreeMap::new(),
+            handler_ids: BTreeMap::new(),
+            handlers_by_id: Vec::new(),
+            edge_handler_lookup: BTreeMap::new(),
+            default_handler_id: None,
+            label_ids: BTreeMap::new(),
+            labels_by_id: Vec::new(),
+            branch_lookup: BTreeMap::new(),
+            auth_leaves: raw.auth_leaves,
+            auth_trees: raw.auth_trees,
+            auth_roots: raw.auth_roots,
+            edge_handlers: raw.edge_handlers,
+            default_handler: raw.default_handler,
+            edge_traces: raw.edge_traces,
+            status: raw.status,
+            epoch: raw.epoch,
+        };
+        session.rebuild_derived_indexes();
+        Ok(session)
+    }
 }
 
 /// Store of all sessions managed by the VM.
@@ -473,13 +829,20 @@ impl SessionStore {
         }
         let buffers = buffer_entries.into_iter().collect();
 
-        let state = SessionState {
+        let mut state = SessionState {
             sid,
             roles,
             role_ids,
             local_types,
             buffers,
             edge_lookup,
+            handler_ids: BTreeMap::new(),
+            handlers_by_id: Vec::new(),
+            edge_handler_lookup: BTreeMap::new(),
+            default_handler_id: None,
+            label_ids: BTreeMap::new(),
+            labels_by_id: Vec::new(),
+            branch_lookup: BTreeMap::new(),
             auth_leaves: BTreeMap::new(),
             auth_trees: BTreeMap::new(),
             auth_roots: BTreeMap::new(),
@@ -489,6 +852,7 @@ impl SessionStore {
             status: SessionStatus::Active,
             epoch: 0,
         };
+        state.rebuild_derived_indexes();
 
         self.sessions.insert(sid, state);
         self.next_id = self.next_id.max(sid.saturating_add(1));
@@ -536,6 +900,7 @@ impl SessionStore {
             if let Some(entry) = session.local_types.get_mut(ep) {
                 entry.current = new_type;
             }
+            session.refresh_endpoint_branch_lookup(ep);
         }
     }
 
@@ -562,6 +927,7 @@ impl SessionStore {
     pub fn remove_type(&mut self, ep: &Endpoint) {
         if let Some(session) = self.sessions.get_mut(&ep.sid) {
             session.local_types.remove(ep);
+            session.branch_lookup.remove(ep);
         }
     }
 
@@ -684,6 +1050,11 @@ impl SessionStore {
             archived_closed_sessions: self.archived_closed.len(),
             ..SessionStoreMemoryUsage::default()
         };
+        usage.retained_bytes.archived_closed = self
+            .archived_closed
+            .iter()
+            .map(ClosedSessionSummary::retained_bytes_estimate)
+            .sum();
 
         for session in self.sessions.values() {
             if matches!(
@@ -703,7 +1074,22 @@ impl SessionStore {
             usage.live_auth_leaf_count += session.auth_leaves.values().map(Vec::len).sum::<usize>();
             usage.live_auth_tree_count += session.auth_trees.len();
             usage.live_auth_root_count += session.auth_roots.len();
+            usage.retained_bytes.live_sessions += session.retained_session_core_bytes();
+            usage.retained_bytes.local_types += session.retained_local_type_bytes();
+            usage.retained_bytes.buffers += session.retained_buffer_bytes();
+            usage.retained_bytes.traces += session.retained_trace_bytes();
+            usage.retained_bytes.auth += session.retained_auth_bytes();
+            usage.retained_bytes.handlers += session.retained_handler_bytes();
         }
+        usage.retained_bytes.total = usage
+            .retained_bytes
+            .live_sessions
+            .saturating_add(usage.retained_bytes.archived_closed)
+            .saturating_add(usage.retained_bytes.local_types)
+            .saturating_add(usage.retained_bytes.buffers)
+            .saturating_add(usage.retained_bytes.traces)
+            .saturating_add(usage.retained_bytes.auth)
+            .saturating_add(usage.retained_bytes.handlers);
 
         usage
     }
@@ -711,25 +1097,33 @@ impl SessionStore {
     /// Lookup edge-bound handler id.
     #[must_use]
     pub fn lookup_handler(&self, edge: &Edge) -> Option<&HandlerId> {
-        self.sessions.get(&edge.sid)?.edge_handlers.get(edge)
+        self.sessions
+            .get(&edge.sid)?
+            .lookup_handler_for_roles(&edge.sender, &edge.receiver)
     }
 
     /// Lookup a default handler id for a session.
     #[must_use]
     pub fn default_handler_for_session(&self, sid: SessionId) -> Option<&HandlerId> {
-        Some(&self.sessions.get(&sid)?.default_handler)
+        self.sessions.get(&sid)?.default_handler_binding()
     }
 
     /// Set the default handler id for a session.
     pub fn set_default_handler_for_session(&mut self, sid: SessionId, handler: HandlerId) {
         if let Some(session) = self.sessions.get_mut(&sid) {
+            let handler_id = session.intern_handler_binding(&handler);
             session.default_handler = handler;
+            session.default_handler_id = Some(handler_id);
         }
     }
 
     /// Update edge-bound handler id.
     pub fn update_handler(&mut self, edge: &Edge, handler: HandlerId) {
         if let Some(session) = self.sessions.get_mut(&edge.sid) {
+            let handler_id = session.intern_handler_binding(&handler);
+            if let Some(edge_key) = session.edge_key_for_roles(&edge.sender, &edge.receiver) {
+                session.edge_handler_lookup.insert(edge_key, handler_id);
+            }
             session.edge_handlers.insert(edge.clone(), handler);
         }
     }
@@ -893,6 +1287,55 @@ mod tests {
     }
 
     #[test]
+    fn test_branch_lookup_tracks_type_updates_and_removals() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+        let ep_a = Endpoint {
+            sid,
+            role: "A".into(),
+        };
+
+        let initial = store
+            .get(sid)
+            .expect("session exists")
+            .lookup_branch_resolution(&ep_a, "msg")
+            .expect("initial branch must be cached");
+        assert_eq!(initial.direction, BranchDirection::Send);
+        assert_eq!(initial.partner, "B");
+        assert_eq!(initial.expected_type, None);
+
+        store.update_type(
+            &ep_a,
+            LocalTypeR::Send {
+                partner: "B".into(),
+                branches: vec![(Label::new("alt"), Some(ValType::Nat), LocalTypeR::End)],
+            },
+        );
+
+        let updated_session = store.get(sid).expect("session exists after type update");
+        assert!(updated_session
+            .lookup_branch_resolution(&ep_a, "msg")
+            .is_none());
+        let updated = updated_session
+            .lookup_branch_resolution(&ep_a, "alt")
+            .expect("updated branch must be cached");
+        assert_eq!(updated.direction, BranchDirection::Send);
+        assert_eq!(updated.partner, "B");
+        assert_eq!(updated.expected_type, Some(ValType::Nat));
+
+        store.remove_type(&ep_a);
+        assert!(store
+            .get(sid)
+            .expect("session exists after remove")
+            .lookup_branch_resolution(&ep_a, "alt")
+            .is_none());
+    }
+
+    #[test]
     fn test_session_send_recv() {
         let mut store = SessionStore::new();
         let sid = store.open(
@@ -963,17 +1406,25 @@ mod tests {
         let before_close = store.memory_usage();
         assert_eq!(before_close.live_sessions, 1);
         assert_eq!(before_close.live_closed_sessions, 0);
+        assert!(before_close.retained_bytes.total > 0);
+        assert!(before_close.retained_bytes.live_sessions > 0);
+        assert!(before_close.retained_bytes.buffers > 0);
 
         store.close(sid).expect("close session");
         let after_close = store.memory_usage();
         assert_eq!(after_close.live_sessions, 1);
         assert_eq!(after_close.live_closed_sessions, 1);
+        assert!(after_close.retained_bytes.total > 0);
 
         store.reap_closed();
         let after_reap = store.memory_usage();
         assert_eq!(after_reap.live_sessions, 0);
         assert_eq!(after_reap.live_closed_sessions, 0);
         assert_eq!(after_reap.archived_closed_sessions, 1);
+        assert_eq!(after_reap.retained_bytes.live_sessions, 0);
+        assert_eq!(after_reap.retained_bytes.local_types, 0);
+        assert_eq!(after_reap.retained_bytes.buffers, 0);
+        assert!(after_reap.retained_bytes.archived_closed > 0);
     }
 
     #[test]
@@ -986,13 +1437,38 @@ mod tests {
         );
 
         let session = store.get_mut(sid).expect("session exists");
+        session.default_handler = "handler/default".to_string();
+        session
+            .edge_handlers
+            .insert(Edge::new(sid, "A", "B"), "handler/ab".to_string());
+        session.rebuild_derived_indexes();
         session
             .send("A", "B", Value::Nat(7))
             .expect("send should succeed");
 
-        let encoded = serde_json::to_string(session).expect("serialize session");
-        let mut decoded: SessionState = serde_json::from_str(&encoded).expect("deserialize");
+        let encoded = bincode::serialize(session).expect("serialize session");
+        let mut decoded: SessionState = bincode::deserialize(&encoded).expect("deserialize");
 
+        assert_eq!(
+            decoded.default_handler_binding().map(String::as_str),
+            Some("handler/default")
+        );
+        assert_eq!(
+            decoded
+                .lookup_handler_for_roles("A", "B")
+                .map(String::as_str),
+            Some("handler/ab")
+        );
+        assert!(decoded.has_bound_handler());
+        assert!(decoded
+            .lookup_branch_resolution(
+                &Endpoint {
+                    sid,
+                    role: "A".into()
+                },
+                "msg"
+            )
+            .is_none());
         assert!(decoded.has_message("A", "B"));
         assert_eq!(decoded.recv("A", "B"), Some(Value::Nat(7)));
         assert!(!decoded.has_message("A", "B"));
@@ -1082,10 +1558,23 @@ mod tests {
         let edge = Edge::new(sid, "A", "B");
 
         assert!(store.lookup_handler(&edge).is_none());
+        assert_eq!(
+            store.default_handler_for_session(sid).map(String::as_str),
+            Some(DEFAULT_HANDLER_ID)
+        );
         store.update_handler(&edge, "handler/send".to_string());
         assert_eq!(
             store.lookup_handler(&edge).map(String::as_str),
             Some("handler/send")
+        );
+        store.set_default_handler_for_session(sid, "handler/default".to_string());
+        assert_eq!(
+            store.default_handler_for_session(sid).map(String::as_str),
+            Some("handler/default")
+        );
+        assert!(
+            store.get(sid).expect("session exists").has_bound_handler(),
+            "internal handler ids must remain populated after updates"
         );
 
         assert!(store.lookup_trace(&edge).is_none());

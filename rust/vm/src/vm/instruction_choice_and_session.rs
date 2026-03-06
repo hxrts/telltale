@@ -39,13 +39,25 @@ impl VM {
                 actual: telltale_types::ValType::Unit,
                 message: format!("{role}: no type registered"),
             })?;
-        let (_, branches) = Self::expect_recv_type(local_type, role)?;
-        let (_, _, continuation) = branches
-            .iter()
-            .find(|(l, _, _)| l.name == label)
+        let _ = Self::expect_recv_type(local_type, role)?;
+        let session = self
+            .sessions
+            .get(ep.sid)
+            .ok_or_else(|| Fault::ChannelClosed {
+                endpoint: ep.clone(),
+            })?;
+        let cached = session
+            .lookup_branch_resolution(ep, label)
             .ok_or_else(|| Fault::UnknownLabel {
                 label: label.to_string(),
             })?;
+        if cached.direction != crate::session::BranchDirection::Recv {
+            return Err(Fault::TypeViolation {
+                expected: telltale_types::ValType::Unit,
+                actual: telltale_types::ValType::Unit,
+                message: format!("{role}: Choose expects Recv, got {local_type:?}"),
+            });
+        }
         let target_pc = table
             .iter()
             .find(|(l, _)| l == label)
@@ -53,7 +65,7 @@ impl VM {
             .ok_or_else(|| Fault::UnknownLabel {
                 label: label.to_string(),
             })?;
-        Ok((continuation.clone(), target_pc))
+        Ok((cached.continuation.clone(), target_pc))
     }
 
     pub(crate) fn step_check(
@@ -222,18 +234,24 @@ impl VM {
             })?;
 
         match local_type {
-            LocalTypeR::Send {
-                partner, branches, ..
-            } => {
+            LocalTypeR::Send { partner, .. } => {
                 let partner = partner.clone();
-                let (_lbl, expected_type, continuation) = branches
-                    .iter()
-                    .find(|(l, _, _)| l.name == label)
+                let cached = self
+                    .sessions
+                    .get(sid)
+                    .and_then(|session| session.lookup_branch_resolution(&ep, label))
                     .ok_or_else(|| Fault::UnknownLabel {
                         label: label.to_string(),
                     })?;
-                let expected_type = expected_type.clone();
-                let continuation = continuation.clone();
+                if cached.direction != crate::session::BranchDirection::Send {
+                    return Err(Fault::TypeViolation {
+                        expected: telltale_types::ValType::Unit,
+                        actual: telltale_types::ValType::Unit,
+                        message: format!("{role}: Offer expects Send, got {local_type:?}"),
+                    });
+                }
+                let expected_type = cached.expected_type.clone();
+                let continuation = cached.continuation.clone();
 
                 let offer_payload = Value::Str(label.to_string());
                 let fast_path = SendDecisionFastPathInput::new(

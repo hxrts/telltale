@@ -85,6 +85,18 @@ impl ThreadedVM {
         self.label_symbols.len()
     }
 
+    /// Number of interned handler symbols.
+    #[must_use]
+    pub fn handler_symbol_count(&self) -> usize {
+        self.handler_symbols.len()
+    }
+
+    /// Number of interned edge symbols.
+    #[must_use]
+    pub fn edge_symbol_count(&self) -> usize {
+        self.edge_symbols.len()
+    }
+
     /// Serializable snapshot of current lane scheduler state.
     #[must_use]
     pub fn lane_scheduler_state(&self) -> LaneSchedulerState {

@@ -201,6 +201,33 @@ impl Scheduler {
         None
     }
 
+    fn next_lane_with_filtered_ready<F>(&mut self, mut is_ready: F) -> Option<LaneId>
+    where
+        F: FnMut(usize) -> bool,
+    {
+        if self.lane_order.is_empty() {
+            self.lane_order = self.lane_queues.keys().copied().collect();
+        }
+        if self.lane_order.is_empty() {
+            return None;
+        }
+        let lane_count = self.lane_order.len();
+        let start = self.lane_cursor % lane_count;
+        for offset in 0..lane_count {
+            let idx = (start + offset) % lane_count;
+            let lane = self.lane_order[idx];
+            if self
+                .lane_ready_set
+                .get(&lane)
+                .is_some_and(|ready| ready.iter().copied().any(&mut is_ready))
+            {
+                self.lane_cursor = (idx + 1) % lane_count;
+                return Some(lane);
+            }
+        }
+        None
+    }
+
     /// Register a coroutine as ready.
     pub fn add_ready(&mut self, coro_id: usize) {
         let lane = self.lane_for_or_default(coro_id);
@@ -313,6 +340,60 @@ impl Scheduler {
         self.schedule_with(has_progress)
     }
 
+    /// Pick the next runnable coroutine restricted to a cached eligible-ready set.
+    pub fn pick_runnable_from_set<F>(
+        &mut self,
+        eligible: &BTreeSet<usize>,
+        has_progress: F,
+    ) -> Option<usize>
+    where
+        F: Fn(usize) -> bool + Copy,
+    {
+        let lane = self.next_lane_with_filtered_ready(|id| eligible.contains(&id))?;
+        let policy = self.policy.clone();
+        let picked = match policy {
+            SchedPolicy::Priority(priority) => {
+                self.pick_priority_candidate_in_lane_filtered(lane, &priority, has_progress, |id| {
+                    eligible.contains(&id)
+                })
+            }
+            SchedPolicy::ProgressAware => {
+                if let Some(pos) = self.lane_queues.get(&lane).and_then(|queue| {
+                    queue.iter().position(|id| {
+                        self.lane_ready_set
+                            .get(&lane)
+                            .is_some_and(|ready| ready.contains(id))
+                            && eligible.contains(id)
+                            && has_progress(*id)
+                    })
+                }) {
+                    let picked = self
+                        .lane_queues
+                        .get_mut(&lane)
+                        .and_then(|queue| queue.remove(pos));
+                    if let Some(coro_id) = picked {
+                        self.lane_queue_remove(lane, coro_id);
+                        Some(coro_id)
+                    } else {
+                        None
+                    }
+                } else {
+                    self.lane_queue_pop_front_filtered(lane, |id| eligible.contains(&id))
+                }
+            }
+            SchedPolicy::Cooperative | SchedPolicy::RoundRobin => {
+                self.lane_queue_pop_front_filtered(lane, |id| eligible.contains(&id))
+            }
+        };
+        if let Some(coro_id) = picked {
+            self.step_count += 1;
+            self.remove_from_global_ready(coro_id);
+            Some(coro_id)
+        } else {
+            None
+        }
+    }
+
     /// Lean-aligned scheduler state transition helper.
     pub fn update_after_step(&mut self, coro_id: usize, update: StepUpdate) {
         match update {
@@ -329,6 +410,12 @@ impl Scheduler {
         }
         let lane = self.lane_for_or_default(coro_id);
         self.lane_queue_push(lane, coro_id);
+    }
+
+    /// Return whether a coroutine is currently in the global ready set.
+    #[must_use]
+    pub fn is_ready(&self, coro_id: usize) -> bool {
+        self.ready_set.contains(&coro_id)
     }
 
     /// Number of ready coroutines.
@@ -434,6 +521,79 @@ impl Scheduler {
                 .lane_ready_set
                 .get(&lane)
                 .is_some_and(|ready| ready.contains(&id))
+            {
+                continue;
+            }
+            let score = match policy {
+                PriorityPolicy::FixedMap(priorities) => priorities.get(&id).copied().unwrap_or(0),
+                PriorityPolicy::Aging => queue.len().saturating_sub(pos),
+                PriorityPolicy::TokenWeighted => {
+                    let progress = usize::from(has_progress(id));
+                    progress * queue.len().saturating_add(1) + queue.len().saturating_sub(pos)
+                }
+            };
+            let replace = match best {
+                None => true,
+                Some((best_pos, best_score)) => {
+                    score > best_score || (score == best_score && pos < best_pos)
+                }
+            };
+            if replace {
+                best = Some((pos, score));
+            }
+        }
+        let pos = best.map(|(pos, _)| pos)?;
+        let picked = self
+            .lane_queues
+            .get_mut(&lane)
+            .and_then(|lane_queue| lane_queue.remove(pos));
+        if let Some(coro_id) = picked {
+            self.lane_queue_remove(lane, coro_id);
+            Some(coro_id)
+        } else {
+            None
+        }
+    }
+
+    fn lane_queue_pop_front_filtered<F>(&mut self, lane: LaneId, mut include: F) -> Option<usize>
+    where
+        F: FnMut(usize) -> bool,
+    {
+        let queue = self.lane_queues.get_mut(&lane)?;
+        let pos = queue.iter().position(|id| {
+            self.lane_ready_set
+                .get(&lane)
+                .is_some_and(|ready| ready.contains(id))
+                && include(*id)
+        })?;
+        let picked = queue.remove(pos);
+        if let Some(coro_id) = picked {
+            self.lane_queue_remove(lane, coro_id);
+            Some(coro_id)
+        } else {
+            None
+        }
+    }
+
+    fn pick_priority_candidate_in_lane_filtered<FProgress, FInclude>(
+        &mut self,
+        lane: LaneId,
+        policy: &PriorityPolicy,
+        has_progress: FProgress,
+        mut include: FInclude,
+    ) -> Option<usize>
+    where
+        FProgress: Fn(usize) -> bool,
+        FInclude: FnMut(usize) -> bool,
+    {
+        let queue = self.lane_queues.get(&lane)?;
+        let mut best: Option<(usize, usize)> = None;
+        for (pos, id) in queue.iter().copied().enumerate() {
+            if !self
+                .lane_ready_set
+                .get(&lane)
+                .is_some_and(|ready| ready.contains(&id))
+                || !include(id)
             {
                 continue;
             }
@@ -669,5 +829,18 @@ mod tests {
         assert_eq!(sched.step_count(), 0);
         assert_eq!(sched.schedule(), None);
         assert_eq!(sched.step_count(), 0);
+    }
+
+    #[test]
+    fn test_pick_runnable_from_set_skips_ineligible_ready_entries_without_reordering() {
+        let mut sched = Scheduler::new(SchedPolicy::Cooperative);
+        sched.add_ready(0);
+        sched.add_ready(1);
+        sched.add_ready(2);
+
+        let eligible = BTreeSet::from([2]);
+        assert_eq!(sched.pick_runnable_from_set(&eligible, |_| false), Some(2));
+        assert_eq!(sched.ready_snapshot(), vec![0, 1]);
+        assert_eq!(sched.step_count(), 1);
     }
 }

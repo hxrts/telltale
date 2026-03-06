@@ -30,10 +30,23 @@ fn step_send_prepare(
             message: format!("{role}: no type registered"),
         })?;
 
-    let (partner, branches) = match &type_entry.current {
+    let (partner, label, expected_type, continuation) = match &type_entry.current {
         LocalTypeR::Send {
             partner, branches, ..
-        } => (partner.clone(), branches.clone()),
+        } => {
+            let (label, expected_type, continuation) =
+                branches.first().ok_or_else(|| Fault::TypeViolation {
+                    expected: telltale_types::ValType::Unit,
+                    actual: telltale_types::ValType::Unit,
+                    message: format!("{role}: send has no branches"),
+                })?;
+            (
+                partner.clone(),
+                label.name.clone(),
+                expected_type.clone(),
+                continuation.clone(),
+            )
+        }
         other => {
             return Err(Fault::TypeViolation {
                 expected: telltale_types::ValType::Unit,
@@ -43,20 +56,13 @@ fn step_send_prepare(
         }
     };
 
-    let (label, expected_type, continuation) =
-        branches.first().ok_or_else(|| Fault::TypeViolation {
-            expected: telltale_types::ValType::Unit,
-            actual: telltale_types::ValType::Unit,
-            message: format!("{role}: send has no branches"),
-        })?;
-
     Ok(SendPrepared {
         ep,
         sid,
         partner,
-        label: label.name.clone(),
-        expected_type: expected_type.clone(),
-        continuation: continuation.clone(),
+        label,
+        expected_type,
+        continuation,
         original: type_entry.original.clone(),
     })
 }
@@ -236,10 +242,23 @@ fn step_recv_prepare(
             message: format!("{role}: no type registered"),
         })?;
 
-    let (partner, branches) = match &type_entry.current {
+    let (partner, label, expected_type, continuation) = match &type_entry.current {
         LocalTypeR::Recv {
             partner, branches, ..
-        } => (partner.clone(), branches.clone()),
+        } => {
+            let (label, expected_type, continuation) =
+                branches.first().ok_or_else(|| Fault::TypeViolation {
+                    expected: telltale_types::ValType::Unit,
+                    actual: telltale_types::ValType::Unit,
+                    message: format!("{role}: recv has no branches"),
+                })?;
+            (
+                partner.clone(),
+                label.name.clone(),
+                expected_type.clone(),
+                continuation.clone(),
+            )
+        }
         other => {
             return Err(Fault::TypeViolation {
                 expected: telltale_types::ValType::Unit,
@@ -249,20 +268,13 @@ fn step_recv_prepare(
         }
     };
 
-    let (label, expected_type, continuation) =
-        branches.first().ok_or_else(|| Fault::TypeViolation {
-            expected: telltale_types::ValType::Unit,
-            actual: telltale_types::ValType::Unit,
-            message: format!("{role}: recv has no branches"),
-        })?;
-
     Ok(RecvPrepared {
         ep,
         sid,
         partner,
-        label: label.name.clone(),
-        expected_type: expected_type.clone(),
-        continuation: continuation.clone(),
+        label,
+        expected_type,
+        continuation,
         original: type_entry.original.clone(),
     })
 }
@@ -452,7 +464,7 @@ fn step_invoke(
             return Err(Fault::OutOfRegisters);
         }
     }
-    if session.edge_handlers.is_empty() && session.default_handler.is_empty() {
+    if !session.has_bound_handler() {
         return Err(Fault::Invoke {
             message: "no handler bound".to_string(),
         });

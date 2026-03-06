@@ -11,8 +11,12 @@ impl VM {
 
     fn prune_expired_timeouts(&mut self) {
         let tick = self.clock.tick;
+        let prior_len = self.timed_out_sites.len();
         self.timed_out_sites
             .retain(|_, until_tick| *until_tick > tick);
+        if self.timed_out_sites.len() != prior_len {
+            self.mark_eligibility_dirty();
+        }
     }
 
     fn is_site_timed_out(&self, site: &str) -> bool {
@@ -101,6 +105,7 @@ impl VM {
         }
         for (coro_id, fault) in faulted {
             self.sched.mark_done(coro_id);
+            self.eligible_ready.remove(&coro_id);
             self.obs_trace.push(
                 ObsEvent::Faulted {
                     tick: self.clock.tick,
@@ -171,6 +176,7 @@ impl VM {
             TopologyPerturbation::Crash { site } => {
                 self.crashed_sites.insert(site.clone());
                 self.apply_site_failure(site);
+                self.mark_eligibility_dirty();
             }
             TopologyPerturbation::Partition { from, to } => {
                 self.partitioned_edges.insert((from.clone(), to.clone()));
@@ -196,6 +202,7 @@ impl VM {
                     .tick
                     .saturating_add(self.duration_to_ticks(*duration));
                 self.timed_out_sites.insert(site.clone(), until_tick);
+                self.mark_eligibility_dirty();
             }
         }
         self.normalize_topology_state();
@@ -259,6 +266,7 @@ impl VM {
                     });
                     if has_msg {
                         self.sched.unblock(coro_id);
+                        self.sync_ready_eligibility_for(coro_id);
                     }
                 }
             }

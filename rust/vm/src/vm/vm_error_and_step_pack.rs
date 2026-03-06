@@ -152,6 +152,10 @@ pub(crate) enum ExecOutcome {
 #[serde(transparent)]
 pub(crate) struct RetainedLog<T>(Vec<T>);
 
+fn default_true() -> bool {
+    true
+}
+
 impl<T> Default for RetainedLog<T> {
     fn default() -> Self {
         Self(Vec::new())
@@ -243,10 +247,16 @@ where
     obs_trace: RetainedLog<ObsEvent>,
     role_symbols: SymbolTable,
     label_symbols: SymbolTable,
+    handler_symbols: SymbolTable,
+    edge_symbols: EdgeSymbolTable,
     clock: SimClock,
     next_coro_id: usize,
     next_session_id: SessionId,
     paused_roles: BTreeSet<String>,
+    #[serde(skip, default)]
+    eligible_ready: BTreeSet<usize>,
+    #[serde(skip, default = "default_true")]
+    eligibility_dirty: bool,
     guard_layer: InMemoryGuardLayer,
     effect_trace: RetainedLog<EffectTraceEntry>,
     next_effect_id: u64,
@@ -304,10 +314,14 @@ where
             obs_trace: RetainedLog::default(),
             role_symbols: SymbolTable::new(),
             label_symbols: SymbolTable::new(),
+            handler_symbols: SymbolTable::new(),
+            edge_symbols: EdgeSymbolTable::new(),
             clock: SimClock::new(tick_duration),
             next_coro_id: 0,
             next_session_id: 0,
             paused_roles: BTreeSet::new(),
+            eligible_ready: BTreeSet::new(),
+            eligibility_dirty: true,
             guard_layer: InMemoryGuardLayer {
                 resources: guard_resources
                     .into_iter()

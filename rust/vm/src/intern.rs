@@ -1,10 +1,14 @@
 //! String interning for hot runtime paths.
 
+use crate::session::SessionId;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Stable identifier for interned runtime strings.
 pub type StringId = u32;
+
+/// Stable identifier for interned runtime edges.
+pub type EdgeId = u32;
 
 /// Runtime symbol table used to intern repeated role/label strings.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -44,6 +48,70 @@ impl SymbolTable {
     }
 
     /// Number of interned symbols.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.symbols.len()
+    }
+
+    /// Whether the table is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.symbols.is_empty()
+    }
+}
+
+/// Deterministic key for an interned session edge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct EdgeSymbol {
+    /// Session containing the edge.
+    pub sid: SessionId,
+    /// Interned sender role id.
+    pub sender: StringId,
+    /// Interned receiver role id.
+    pub receiver: StringId,
+}
+
+/// Runtime symbol table used to intern repeated session edges.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct EdgeSymbolTable {
+    symbols: Vec<EdgeSymbol>,
+    index: BTreeMap<EdgeSymbol, EdgeId>,
+}
+
+impl EdgeSymbolTable {
+    /// Create an empty edge symbol table.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Intern a session edge and return its stable id.
+    pub fn intern(&mut self, sid: SessionId, sender: StringId, receiver: StringId) -> EdgeId {
+        let edge = EdgeSymbol {
+            sid,
+            sender,
+            receiver,
+        };
+        if let Some(id) = self.index.get(&edge) {
+            return *id;
+        }
+        let id = match u32::try_from(self.symbols.len()) {
+            Ok(id) => id,
+            Err(_) => return u32::MAX,
+        };
+        self.symbols.push(edge);
+        self.index.insert(edge, id);
+        id
+    }
+
+    /// Resolve an id to its edge components, if present.
+    #[must_use]
+    #[allow(clippy::as_conversions)]
+    pub fn resolve(&self, id: EdgeId) -> Option<EdgeSymbol> {
+        self.symbols.get(id as usize).copied()
+    }
+
+    /// Number of interned edges.
     #[must_use]
     pub fn len(&self) -> usize {
         self.symbols.len()

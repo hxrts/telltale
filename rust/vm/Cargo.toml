@@ -3,6 +3,7 @@ name = "telltale-vm"
 version = "2.1.0"
 authors = ["Sam Hart"]
 edition = "2021"
+autobenches = false
 rust-version = "1.75"
 description = "Bytecode VM for choreographic session type protocols"
 readme = "../../README.md"

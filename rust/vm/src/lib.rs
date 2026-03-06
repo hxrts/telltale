@@ -125,7 +125,7 @@ pub use guard::{GuardLayer, InMemoryGuardLayer, LayerId};
 pub use identity::{IdentityModel, ParticipantId, SiteId as IdentitySiteId, StaticIdentityModel};
 pub use instr::Instr;
 pub use integration::{run_loaded_vm_record_replay_conformance, LoadedVmReplayConformance};
-pub use intern::{StringId, SymbolTable};
+pub use intern::{EdgeId, EdgeSymbol, EdgeSymbolTable, StringId, SymbolTable};
 pub use kernel::VMKernel;
 pub use nested::NestedVMHandler;
 pub use output_condition::{
@@ -148,7 +148,7 @@ pub use serialization::{
 };
 pub use session::{
     decode_edge_json, ClosedSessionSummary, Edge, HandlerId, SessionId, SessionStore,
-    SessionStoreMemoryUsage,
+    SessionStoreMemoryUsage, SessionStoreRetainedBytes,
 };
 #[cfg(feature = "multi-thread")]
 pub use threaded::{
@@ -167,7 +167,7 @@ pub use verification::{
 pub use vm::{
     EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig, ObservabilityRetentionMode,
     PayloadValidationMode, Program, ProgramStore, RuntimeTuningProfile, SchedExecStatus,
-    SchedStepDebug, ThreadedRoundSemantics, VMConfig, VMState, VmMemoryUsage, VM,
+    SchedStepDebug, ThreadedRoundSemantics, VMConfig, VMState, VmMemoryUsage, VmRetainedBytes, VM,
 };
 #[cfg(target_arch = "wasm32")]
 pub use wasm::WasmVM;

@@ -28,10 +28,23 @@ impl VM {
                 message: format!("{role}: no type registered"),
             })?
             .clone();
-        let (partner, branches) = match &local_type {
+        let (partner, label, expected_type, continuation) = match &local_type {
             LocalTypeR::Recv {
                 partner, branches, ..
-            } => (partner.clone(), branches.clone()),
+            } => {
+                let (label, expected_type, continuation) =
+                    branches.first().ok_or_else(|| Fault::TypeViolation {
+                        expected: telltale_types::ValType::Unit,
+                        actual: telltale_types::ValType::Unit,
+                        message: format!("{role}: recv has no branches"),
+                    })?;
+                (
+                    partner.clone(),
+                    label.name.clone(),
+                    expected_type.clone(),
+                    continuation.clone(),
+                )
+            }
             other => {
                 return Err(Fault::TypeViolation {
                     expected: telltale_types::ValType::Unit,
@@ -40,19 +53,11 @@ impl VM {
                 });
             }
         };
-        let (label, expected_type, continuation) = branches
-            .first()
-            .ok_or_else(|| Fault::TypeViolation {
-                expected: telltale_types::ValType::Unit,
-                actual: telltale_types::ValType::Unit,
-                message: format!("{role}: recv has no branches"),
-            })?
-            .clone();
         Ok(RecvTypePlan {
             ep,
             sid,
             partner,
-            label: label.name,
+            label,
             expected_type,
             continuation,
         })
@@ -242,6 +247,7 @@ impl VM {
 
         self.sched.add_ready(new_id);
         self.coroutines.push(child);
+        self.sync_ready_eligibility_for(new_id);
 
         Ok(StepPack {
             coro_update: CoroUpdate::AdvancePc,

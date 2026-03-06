@@ -40,6 +40,8 @@ impl ThreadedVM {
             trace: Vec::new(),
             role_symbols: SymbolTable::new(),
             label_symbols: SymbolTable::new(),
+            handler_symbols: SymbolTable::new(),
+            edge_symbols: EdgeSymbolTable::new(),
             clock: SimClock::new(tick_duration),
             next_coro_id: 0,
             non_terminal_coroutines: 0,
@@ -103,6 +105,7 @@ impl ThreadedVM {
             let mut session_guard = session.lock().expect("threaded VM lock poisoned");
             session_guard.default_handler = crate::session::DEFAULT_HANDLER_ID.to_string();
         }
+        let _: StringId = self.handler_symbols.intern(crate::session::DEFAULT_HANDLER_ID);
     }
 
     fn spawn_role_coroutine(
@@ -166,6 +169,7 @@ impl ThreadedVM {
             &image.local_types,
         );
         self.bind_default_handlers_for_session(sid);
+        self.intern_session_runtime_symbols(sid);
         self.resource_states
             .lock()
             .expect("threaded VM lock poisoned")

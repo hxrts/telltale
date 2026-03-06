@@ -3,6 +3,7 @@ name = "telltale-theory"
 version = "2.1.0"
 authors = ["Sam Hart"]
 edition = "2021"
+autobenches = false
 rust-version = "1.75"
 description = "Session type theory algorithms - projection, merge, subtyping"
 readme = "../../README.md"

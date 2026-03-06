@@ -1,4 +1,5 @@
 use super::*;
+use async_recursion::async_recursion;
 use crate::effects::{LabelId, RoleId};
 use crate::identifiers::RoleName;
 use std::time::Duration;
@@ -42,6 +43,152 @@ impl RoleId for TestRole {
 
 #[derive(Clone, Debug, PartialEq, Serialize, serde::Deserialize)]
 struct TestMessage(String);
+
+async fn interpret_reference(
+    handler: &mut testing::MockHandler<TestRole>,
+    endpoint: &mut (),
+    program: Program<TestRole, TestMessage>,
+) -> ChoreoResult<InterpretResult<TestMessage>> {
+    #[async_recursion]
+    async fn run_program(
+        handler: &mut testing::MockHandler<TestRole>,
+        endpoint: &mut (),
+        program: Program<TestRole, TestMessage>,
+        received_values: &mut Vec<TestMessage>,
+        last_label: &mut Option<TestLabel>,
+    ) -> ChoreoResult<()> {
+        for effect in program.into_effects() {
+            match effect {
+                Effect::Send { to, msg } => handler.send(endpoint, to, &msg).await?,
+                Effect::Recv { from, .. } => {
+                    let value = handler.recv(endpoint, from).await?;
+                    received_values.push(value);
+                }
+                Effect::Choose { at, label } => {
+                    handler.choose(endpoint, at, label).await?;
+                    *last_label = Some(label);
+                }
+                Effect::Offer { from } => {
+                    *last_label = Some(handler.offer(endpoint, from).await?);
+                }
+                Effect::Branch { branches, .. } => {
+                    let label = (*last_label).ok_or_else(|| {
+                        ChoreographyError::ProtocolViolation(
+                            "Branch effect requires a preceding Choose or Offer effect"
+                                .to_string(),
+                        )
+                    })?;
+                    let (_, selected) = branches
+                        .iter()
+                        .find(|(branch_label, _)| branch_label == &label)
+                        .ok_or_else(|| {
+                            ChoreographyError::ProtocolViolation(format!(
+                                "No branch found for label {label:?}"
+                            ))
+                        })?;
+                    run_program(
+                        handler,
+                        endpoint,
+                        selected.clone(),
+                        received_values,
+                        last_label,
+                    )
+                    .await?;
+                    *last_label = None;
+                }
+                Effect::Loop { iterations, body } => {
+                    for _ in 0..iterations.unwrap_or(1) {
+                        run_program(
+                            handler,
+                            endpoint,
+                            (*body).clone(),
+                            received_values,
+                            last_label,
+                        )
+                        .await?;
+                    }
+                }
+                Effect::Timeout {
+                    dur,
+                    body,
+                    on_timeout,
+                    ..
+                } => {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    let timeout_result =
+                        tokio::time::timeout(dur, run_program(
+                            handler,
+                            endpoint,
+                            *body,
+                            received_values,
+                            last_label,
+                        ))
+                        .await;
+
+                    #[cfg(target_arch = "wasm32")]
+                    let timeout_result = {
+                        use futures::future::{select, Either};
+                        use futures::pin_mut;
+                        use wasm_timer::Delay;
+
+                        let body_future =
+                            run_program(handler, endpoint, *body, received_values, last_label);
+                        let timeout = Delay::new(dur);
+                        pin_mut!(body_future);
+                        pin_mut!(timeout);
+
+                        match select(body_future, timeout).await {
+                            Either::Left((result, _)) => Ok(result),
+                            Either::Right(_) => Err(()),
+                        }
+                    };
+
+                    match timeout_result {
+                        Ok(result) => result?,
+                        Err(_) => {
+                            if let Some(timeout_body) = on_timeout {
+                                run_program(
+                                    handler,
+                                    endpoint,
+                                    *timeout_body,
+                                    received_values,
+                                    last_label,
+                                )
+                                .await?;
+                            } else {
+                                return Err(ChoreographyError::Timeout(dur));
+                            }
+                        }
+                    }
+                }
+                Effect::Parallel { programs } => {
+                    for nested in programs {
+                        run_program(handler, endpoint, nested, received_values, last_label)
+                            .await?;
+                    }
+                }
+                Effect::Extension(_) => {}
+                Effect::End => {}
+            }
+        }
+
+        Ok(())
+    }
+
+    let mut received_values = Vec::new();
+    let mut last_label = None;
+    let start_len = received_values.len();
+    let final_state = match run_program(handler, endpoint, program, &mut received_values, &mut last_label).await {
+        Ok(()) => InterpreterState::Completed,
+        Err(ChoreographyError::Timeout(_)) => InterpreterState::Timeout,
+        Err(err) => InterpreterState::Failed(err.to_string()),
+    };
+
+    Ok(InterpretResult {
+        received_values: received_values[start_len..].to_vec(),
+        final_state,
+    })
+}
 
 #[tokio::test]
 async fn test_simple_program() {
@@ -236,4 +383,62 @@ async fn test_parallel_fails_fast_on_first_error() {
         }],
         "later branches must not execute after an earlier failure"
     );
+}
+
+#[tokio::test]
+async fn test_stack_interpreter_matches_reference_recursive_execution() {
+    let nested_branch = Program::<TestRole, TestMessage>::new()
+        .recv::<TestMessage>(TestRole::Bob)
+        .parallel(vec![
+            Program::new()
+                .send(TestRole::Bob, TestMessage("parallel-a".into()))
+                .end(),
+            Program::new()
+                .send(TestRole::Alice, TestMessage("parallel-b".into()))
+                .end(),
+        ])
+        .end();
+    let loop_body = Program::<TestRole, TestMessage>::new()
+        .choose(TestRole::Alice, TestLabel::Continue)
+        .branch(TestRole::Alice, vec![(TestLabel::Continue, nested_branch)])
+        .end();
+    let program = Program::<TestRole, TestMessage>::new()
+        .loop_n(2, loop_body)
+        .with_timeout(
+            TestRole::Alice,
+            Duration::from_secs(1),
+            Program::new()
+                .recv::<TestMessage>(TestRole::Bob)
+                .send(TestRole::Bob, TestMessage("tail".into()))
+                .end(),
+        )
+        .end();
+
+    let scripted_messages = vec![
+        TestMessage("branch-0".into()),
+        TestMessage("branch-1".into()),
+        TestMessage("timeout-body".into()),
+    ];
+
+    let mut stack_handler = testing::MockHandler::new(TestRole::Alice);
+    let mut reference_handler = testing::MockHandler::new(TestRole::Alice);
+    for message in &scripted_messages {
+        let bytes = bincode::serialize(message).expect("serialize scripted message");
+        stack_handler.add_response(testing::MockResponse::Message(bytes.clone()));
+        reference_handler.add_response(testing::MockResponse::Message(bytes));
+    }
+
+    let mut stack_endpoint = ();
+    let mut reference_endpoint = ();
+    let stack_result = interpret(&mut stack_handler, &mut stack_endpoint, program.clone())
+        .await
+        .expect("stack interpreter");
+    let reference_result =
+        interpret_reference(&mut reference_handler, &mut reference_endpoint, program)
+            .await
+            .expect("reference interpreter");
+
+    assert_eq!(stack_result.final_state, reference_result.final_state);
+    assert_eq!(stack_result.received_values, reference_result.received_values);
+    assert_eq!(stack_handler.operations(), reference_handler.operations());
 }

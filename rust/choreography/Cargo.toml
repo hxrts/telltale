@@ -3,6 +3,7 @@ name = "telltale-choreography"
 version = "2.1.0"
 authors = ["Sam Hart"]
 edition = "2021"
+autobenches = false
 rust-version = "1.75"
 description = "Choreographic programming for Telltale - effect-based distributed protocols"
 readme = "../../README.md"
@@ -84,6 +85,10 @@ harness = false
 
 [[bench]]
 name = "hot_paths"
+harness = false
+
+[[bench]]
+name = "enhanced_features"
 harness = false
 
 [[bin]]

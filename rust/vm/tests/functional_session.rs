@@ -127,6 +127,9 @@ fn test_vm_reap_closed_sessions_removes_terminal_coroutines_and_live_session_sta
     assert_eq!(before.session_store.live_sessions, 1);
     assert_eq!(before.session_store.live_closed_sessions, 1);
     assert_eq!(before.coroutine_records, coro_ids.len());
+    assert!(before.retained_bytes.total > 0);
+    assert!(before.retained_bytes.session_store > 0);
+    assert!(before.retained_bytes.coroutines > 0);
 
     let reaped = vm.reap_closed_sessions();
     assert_eq!(reaped.len(), 1);
@@ -140,6 +143,9 @@ fn test_vm_reap_closed_sessions_removes_terminal_coroutines_and_live_session_sta
     assert_eq!(after.session_store.live_closed_sessions, 0);
     assert_eq!(after.session_store.archived_closed_sessions, 1);
     assert_eq!(after.coroutine_records, 0);
+    assert_eq!(after.retained_bytes.coroutines, 0);
+    assert!(after.retained_bytes.session_store > 0);
+    assert!(after.retained_bytes.total < before.retained_bytes.total);
 }
 
 #[test]
@@ -220,6 +226,8 @@ fn test_vm_observability_retention_disabled_drops_storage_without_changing_fault
     assert_eq!(usage.effect_trace_entries, 0);
     assert_eq!(usage.output_condition_checks, 0);
     assert_eq!(usage.communication_artifacts, 0);
+    assert!(usage.retained_bytes.traces > 0);
+    assert!(usage.retained_bytes.output_condition_checks > 0);
 }
 
 #[test]

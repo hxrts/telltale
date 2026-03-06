@@ -1,4 +1,31 @@
 impl VM {
+    fn intern_edge(&mut self, edge: &Edge) -> EdgeId {
+        let sender = self.role_symbols.intern(&edge.sender);
+        let receiver = self.role_symbols.intern(&edge.receiver);
+        self.edge_symbols.intern(edge.sid, sender, receiver)
+    }
+
+    fn intern_session_runtime_symbols(&mut self, sid: SessionId) {
+        let Some(session) = self.sessions.get(sid) else {
+            return;
+        };
+        let roles = session.roles.clone();
+        let default_handler = session.default_handler.clone();
+        let handler_bindings: Vec<(Edge, String)> = session
+            .edge_handlers
+            .iter()
+            .map(|(edge, handler_id)| (edge.clone(), handler_id.clone()))
+            .collect();
+        for role in roles {
+            let _: StringId = self.role_symbols.intern(&role);
+        }
+        let _: StringId = self.handler_symbols.intern(&default_handler);
+        for (edge, handler_id) in handler_bindings {
+            let _: EdgeId = self.intern_edge(&edge);
+            let _: StringId = self.handler_symbols.intern(&handler_id);
+        }
+    }
+
     pub(crate) fn step_open(
         &mut self,
         coro_idx: usize,
@@ -138,6 +165,9 @@ impl VM {
 
         for ev in &pack.events {
             self.intern_obs_event(ev);
+            if let ObsEvent::Opened { session, .. } = ev {
+                self.intern_session_runtime_symbols(*session);
+            }
             let maybe_entry = effect_trace_entry_for_event(
                 ev,
                 self.next_effect_id,
@@ -222,8 +252,7 @@ impl VM {
                 let _: StringId = self.label_symbols.intern(label);
             }
             ObsEvent::Offered { edge, label, .. } | ObsEvent::Chose { edge, label, .. } => {
-                let _: StringId = self.role_symbols.intern(&edge.sender);
-                let _: StringId = self.role_symbols.intern(&edge.receiver);
+                let _: EdgeId = self.intern_edge(edge);
                 let _: StringId = self.label_symbols.intern(label);
             }
             ObsEvent::Opened { roles, .. } => {

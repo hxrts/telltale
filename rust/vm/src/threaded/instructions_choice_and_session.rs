@@ -150,7 +150,7 @@ fn step_choose(
     }
     let sid = ep.sid;
 
-    let local_type = session
+    let partner = match &session
         .local_types
         .get(&ep)
         .ok_or_else(|| Fault::TypeViolation {
@@ -159,12 +159,8 @@ fn step_choose(
             message: format!("{role}: no type registered"),
         })?
         .current
-        .clone();
-
-    let (partner, branches) = match &local_type {
-        LocalTypeR::Recv {
-            partner, branches, ..
-        } => (partner.clone(), branches.clone()),
+    {
+        LocalTypeR::Recv { partner, .. } => partner.clone(),
         other => {
             return Err(Fault::TypeViolation {
                 expected: telltale_types::ValType::Unit,
@@ -206,13 +202,34 @@ fn step_choose(
     )?;
     let label = decode_branch_label_payload(role, &val)?;
 
-    let (_lbl, _vt, continuation) = branches
-        .iter()
-        .find(|(l, _, _)| l.name == label)
+    let current_type = &session
+        .local_types
+        .get(&ep)
+        .ok_or_else(|| Fault::TypeViolation {
+            expected: telltale_types::ValType::Unit,
+            actual: telltale_types::ValType::Unit,
+            message: format!("{role}: no type registered"),
+        })?
+        .current;
+    if !matches!(current_type, LocalTypeR::Recv { .. }) {
+        return Err(Fault::TypeViolation {
+            expected: telltale_types::ValType::Unit,
+            actual: telltale_types::ValType::Unit,
+            message: format!("{role}: Choose expects Recv, got {current_type:?}"),
+        });
+    }
+    let cached = session
+        .lookup_branch_resolution(&ep, &label)
         .ok_or_else(|| Fault::UnknownLabel {
             label: label.clone(),
-        })?
-        .clone();
+        })?;
+    if cached.direction != crate::session::BranchDirection::Recv {
+        return Err(Fault::TypeViolation {
+            expected: telltale_types::ValType::Unit,
+            actual: telltale_types::ValType::Unit,
+            message: format!("{role}: Choose expects Recv, got {current_type:?}"),
+        });
+    }
 
     let target_pc = table
         .iter()
@@ -231,7 +248,7 @@ fn step_choose(
         .get(&ep)
         .map(|entry| &entry.original)
         .unwrap_or(&LocalTypeR::End);
-    let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);
+    let (_resolved, type_update) = resolve_type_update(&cached.continuation, original, &ep);
 
     Ok(StepPack {
         coro_update: CoroUpdate::SetPc(target_pc),
@@ -271,7 +288,7 @@ fn step_offer(
     }
     let sid = ep.sid;
 
-    let local_type = session
+    match &session
         .local_types
         .get(&ep)
         .ok_or_else(|| Fault::TypeViolation {
@@ -280,22 +297,23 @@ fn step_offer(
             message: format!("{role}: no type registered"),
         })?
         .current
-        .clone();
-
-    match &local_type {
-        LocalTypeR::Send {
-            partner, branches, ..
-        } => {
+    {
+        LocalTypeR::Send { partner, .. } => {
             let partner = partner.clone();
-            let branches = branches.clone();
-
-            let (_lbl, expected_type, continuation) = branches
-                .iter()
-                .find(|(l, _, _)| l.name == label)
+            let cached = session
+                .lookup_branch_resolution(&ep, label)
                 .ok_or_else(|| Fault::UnknownLabel {
                     label: label.to_string(),
-                })?
-                .clone();
+                })?;
+            if cached.direction != crate::session::BranchDirection::Send {
+                return Err(Fault::TypeViolation {
+                    expected: telltale_types::ValType::Unit,
+                    actual: telltale_types::ValType::Unit,
+                    message: format!("{role}: Offer expects Send, got {:?}", session.local_types.get(&ep).expect("endpoint type exists").current),
+                });
+            }
+            let expected_type = cached.expected_type.clone();
+            let continuation = cached.continuation.clone();
 
             let offer_payload = Value::Str(label.to_string());
             let fast_path =

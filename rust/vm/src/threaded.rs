@@ -36,7 +36,7 @@ use crate::instr::{Endpoint, Instr, InvokeAction, PC};
 use crate::instruction_semantics::{
     decode_branch_label_payload, decode_endpoint_fact, endpoint_from_reg,
 };
-use crate::intern::{StringId, SymbolTable};
+use crate::intern::{EdgeId, EdgeSymbolTable, StringId, SymbolTable};
 use crate::kernel::{KernelMachine, VMKernel};
 use crate::loader::CodeImage;
 use crate::output_condition::{OutputConditionCheck, OutputConditionHint};
