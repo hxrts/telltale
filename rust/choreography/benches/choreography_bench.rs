@@ -360,5 +360,4 @@ criterion_group!(
     bench_validation,
     bench_scaling
 );
-
 criterion_main!(benches);

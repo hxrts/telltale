@@ -165,7 +165,7 @@ pest = "2.7"
 pest_derive = "2.7"
 
 # Testing
-criterion = "0.3"
+criterion = { version = "0.3", features = ["html_reports"] }
 proptest = "1.4"
 tempfile = "3.2"
 assert_matches = "1.5"

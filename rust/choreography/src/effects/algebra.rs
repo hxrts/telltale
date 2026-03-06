@@ -546,6 +546,7 @@ impl<R: RoleId, M> Effect<R, M> {
 mod tests {
     use super::*;
     use crate::identifiers::RoleName;
+    #[cfg(not(target_arch = "wasm32"))]
     use proptest::prelude::*;
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -643,6 +644,7 @@ mod tests {
         assert!(matches!(err, ProgramError::InvalidStructure(_)));
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     proptest! {
         #[test]
         fn try_then_keeps_single_terminal_end(include_left_send in any::<bool>(), include_right_recv in any::<bool>()) {

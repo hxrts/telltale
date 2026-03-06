@@ -6,7 +6,6 @@
 pub mod analysis;
 pub mod choice_analysis;
 pub mod codegen;
-pub mod concurrency;
 pub mod diagnostics;
 pub mod effects_codegen;
 pub mod extension_parser;
@@ -30,12 +29,6 @@ pub use codegen::{
     generate_choreography_code, generate_choreography_code_with_namespacing,
     generate_choreography_code_with_topology, generate_helpers, generate_role_implementations,
     generate_session_type, generate_topology_integration, InlineTopology,
-};
-pub use concurrency::{
-    generate_batch_recv, generate_batch_send, generate_broadcast, generate_collection,
-    generate_ordered_collection, generate_parallel_broadcast, generate_sequential_broadcast,
-    generate_unordered_collection, BatchConfig, BroadcastMode, CollectionMode,
-    ProtocolConcurrencyConfig, StatementConcurrencyConfig,
 };
 pub use diagnostics::{
     check_self_communication, validate_roles, Diagnostic, DiagnosticCode, DiagnosticCollector,

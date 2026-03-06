@@ -34,8 +34,8 @@ jobs:
         with:
           command: build
           args: --workspace --all-targets --all-features
-      - name: Install ripgrep
-        run: sudo apt-get update && sudo apt-get install -y ripgrep
+      - name: Install native tooling
+        run: sudo apt-get update && sudo apt-get install -y ripgrep gnuplot
       - name: Run executable VM placeholder baseline checks
         run: ./scripts/check-vm-placeholders.sh
       - name: Run parity checks
@@ -68,7 +68,7 @@ jobs:
           toolchain: stable
           target: wasm32-unknown-unknown
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: cargo install wasm-pack --version 0.14.0 --locked
       - name: Check WASM compilation (choreography)
         uses: actions-rs/cargo@v1
         with:
@@ -83,17 +83,9 @@ jobs:
         run: |
           cd examples/wasm-ping-pong
           wasm-pack build --target web
-      - name: Test WASM example (headless)
+      - name: Test WASM suites
         run: |
-          cd examples/wasm-ping-pong
-          # Set Chrome flags for better CI stability
-          export CHROME_BIN=google-chrome-stable
-          export CHROMEDRIVER_ARGS="--no-sandbox --disable-dev-shm-usage --disable-gpu"
-          # Try with timeout, fallback to build-only if tests timeout
-          timeout 60s wasm-pack test --headless --chrome -- --timeout 30 || {
-            echo "WASM tests timed out, but WASM build succeeded - this is acceptable for CI"
-            exit 0
-          }
+          just wasm-test-all
 
   benchmarks:
     name: Benchmarks
@@ -105,6 +97,8 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
+      - name: Install gnuplot
+        run: sudo apt-get update && sudo apt-get install -y gnuplot
       - name: Build benchmark targets
         uses: actions-rs/cargo@v1
         with:

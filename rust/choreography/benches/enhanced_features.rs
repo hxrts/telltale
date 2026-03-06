@@ -322,5 +322,4 @@ criterion_group!(
     bench_scalability,
     bench_memory_usage
 );
-
 criterion_main!(benches);

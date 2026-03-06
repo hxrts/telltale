@@ -31,6 +31,29 @@
           targets = [ "wasm32-unknown-unknown" ];
         };
 
+        wasmPack = pkgs.rustPlatform.buildRustPackage rec {
+          pname = "wasm-pack";
+          version = "0.14.0";
+
+          src = pkgs.fetchCrate {
+            inherit pname version;
+            hash = "sha256-lXxUsj2OFyUReAujBivXGAPBGOcl5rCuj7RnLkKp6sQ=";
+          };
+
+          cargoHash = "sha256-n9xuwlj8+3fDTHMS2XobqWFc6mNHQcmmvebRDc82oSo=";
+          doCheck = false;
+
+          meta = with pkgs.lib; {
+            description = "Tool for building Rust-generated WebAssembly packages";
+            homepage = "https://github.com/rustwasm/wasm-pack";
+            license = with licenses; [
+              asl20
+              mit
+            ];
+            mainProgram = "wasm-pack";
+          };
+        };
+
         # LaTeX distribution for paper compilation
         texlive = pkgs.texlive.combine {
           inherit (pkgs.texlive)
@@ -55,7 +78,8 @@
         nativeBuildInputs = with pkgs; [
           rustToolchain
           pkg-config
-          wasm-pack
+          gnuplot
+          wasmPack
           wasm-bindgen-cli
           mdbook
           mdbook-mermaid

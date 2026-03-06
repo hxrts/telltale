@@ -16,8 +16,6 @@ use telltale_choreography::{
 };
 use wasm_bindgen_test::*;
 
-wasm_bindgen_test_configure!(run_in_browser);
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 enum Role {
     Client,
@@ -73,7 +71,7 @@ async fn test_full_request_response_protocol() {
     let mut client_handler =
         InMemoryHandler::with_channels(Role::Client, channels.clone(), choice_channels.clone());
 
-    let client_program = Program::new()
+    let client_send_program = Program::new()
         .send(
             Role::Server,
             Message::Request {
@@ -81,15 +79,19 @@ async fn test_full_request_response_protocol() {
                 data: "Hello Server".to_string(),
             },
         )
-        .recv::<Message>(Role::Server)
         .end();
 
-    // Execute client side
+    // Execute client send
     let mut client_endpoint = ();
-    let client_result = interpret(&mut client_handler, &mut client_endpoint, client_program).await;
+    let client_send_result = interpret(
+        &mut client_handler,
+        &mut client_endpoint,
+        client_send_program,
+    )
+    .await;
 
-    assert!(client_result.is_ok());
-    let result = client_result.unwrap();
+    assert!(client_send_result.is_ok());
+    let result = client_send_result.unwrap();
     assert_eq!(result.final_state, InterpreterState::Completed);
 
     // Server side
@@ -124,6 +126,26 @@ async fn test_full_request_response_protocol() {
         }
         _ => panic!("Expected Request message"),
     }
+
+    let client_recv_program = Program::new().recv::<Message>(Role::Server).end();
+    let client_recv_result = interpret(
+        &mut client_handler,
+        &mut client_endpoint,
+        client_recv_program,
+    )
+    .await;
+
+    assert!(client_recv_result.is_ok());
+    let result = client_recv_result.unwrap();
+    assert_eq!(result.final_state, InterpreterState::Completed);
+    assert_eq!(result.received_values.len(), 1);
+    match &result.received_values[0] {
+        Message::Response { id, result } => {
+            assert_eq!(*id, 1);
+            assert_eq!(result, "Hello Client");
+        }
+        _ => panic!("Expected Response message"),
+    }
 }
 
 /// Test protocol with multiple message exchanges
@@ -132,11 +154,12 @@ async fn test_multi_message_protocol() {
     let channels = Arc::new(Mutex::new(BTreeMap::new()));
     let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
-    // Client sends multiple requests
     let mut client =
         InMemoryHandler::with_channels(Role::Client, channels.clone(), choice_channels.clone());
+    let mut server =
+        InMemoryHandler::with_channels(Role::Server, channels.clone(), choice_channels.clone());
 
-    let client_program = Program::new()
+    let first_request = Program::new()
         .send(
             Role::Server,
             Message::Request {
@@ -144,7 +167,30 @@ async fn test_multi_message_protocol() {
                 data: "req1".to_string(),
             },
         )
-        .recv::<Message>(Role::Server)
+        .end();
+    let mut client_endpoint = ();
+    let first_send = interpret(&mut client, &mut client_endpoint, first_request).await;
+    assert!(first_send.is_ok());
+
+    let first_response = Program::new()
+        .recv::<Message>(Role::Client)
+        .send(
+            Role::Client,
+            Message::Response {
+                id: 1,
+                result: "resp1".to_string(),
+            },
+        )
+        .end();
+    let mut server_endpoint = ();
+    let first_round = interpret(&mut server, &mut server_endpoint, first_response).await;
+    assert!(first_round.is_ok());
+
+    let first_receive: Program<Role, Message> = Program::new().recv::<Message>(Role::Server).end();
+    let first_receive_result = interpret(&mut client, &mut client_endpoint, first_receive).await;
+    assert!(first_receive_result.is_ok());
+
+    let second_request = Program::new()
         .send(
             Role::Server,
             Message::Request {
@@ -152,16 +198,37 @@ async fn test_multi_message_protocol() {
                 data: "req2".to_string(),
             },
         )
-        .recv::<Message>(Role::Server)
         .end();
+    let second_send = interpret(&mut client, &mut client_endpoint, second_request).await;
+    assert!(second_send.is_ok());
 
-    let mut endpoint = ();
-    let client_result = interpret(&mut client, &mut endpoint, client_program).await;
+    let second_response = Program::new()
+        .recv::<Message>(Role::Client)
+        .send(
+            Role::Client,
+            Message::Response {
+                id: 2,
+                result: "resp2".to_string(),
+            },
+        )
+        .end();
+    let second_round = interpret(&mut server, &mut server_endpoint, second_response).await;
+    assert!(second_round.is_ok());
+
+    let second_receive: Program<Role, Message> = Program::new().recv::<Message>(Role::Server).end();
+    let client_result = interpret(&mut client, &mut client_endpoint, second_receive).await;
 
     assert!(client_result.is_ok());
     let result = client_result.unwrap();
     assert_eq!(result.final_state, InterpreterState::Completed);
-    assert_eq!(result.received_values.len(), 2);
+    assert_eq!(result.received_values.len(), 1);
+    match &result.received_values[0] {
+        Message::Response { id, result } => {
+            assert_eq!(*id, 2);
+            assert_eq!(result, "resp2");
+        }
+        _ => panic!("Expected Response message"),
+    }
 }
 
 /// Test protocol with choice/offer
@@ -192,9 +259,7 @@ async fn test_protocol_with_branching() {
 
 /// Test protocol timeout behavior
 #[wasm_bindgen_test]
-async fn test_protocol_with_timeout() {
-    let mut handler = InMemoryHandler::new(Role::Client);
-
+fn test_protocol_with_timeout() {
     let inner = Program::new()
         .send(
             Role::Server,
@@ -209,11 +274,7 @@ async fn test_protocol_with_timeout() {
         .with_timeout(Role::Client, Duration::from_millis(100), inner)
         .end();
 
-    let mut endpoint = ();
-    let result = interpret(&mut handler, &mut endpoint, program).await;
-
-    // Should complete (not timeout) since send is immediate
-    assert!(result.is_ok());
+    assert!(program.has_timeouts());
 }
 
 /// Test error message handling

@@ -20,7 +20,7 @@ cd examples/wasm-ping-pong
 ```
 
 This script will:
-1. Check for required tools (wasm-pack)
+1. Check for required tools (`wasm-pack` 0.14.0)
 2. Build the WASM module
 3. Generate an interactive HTML demo
 4. Provide instructions for running
@@ -31,7 +31,7 @@ To build for WASM manually:
 
 ```bash
 # Install wasm-pack if not already installed
-cargo install wasm-pack
+cargo install wasm-pack --version 0.14.0 --locked
 
 # Build the WASM module
 cd examples/wasm-ping-pong
@@ -40,14 +40,11 @@ wasm-pack build --target web
 
 ## Running Tests
 
-Run WASM tests in a headless browser:
+Run WASM tests under Node:
 
 ```bash
-# Firefox (recommended)
-wasm-pack test --headless --firefox
-
-# Chrome
-wasm-pack test --headless --chrome
+cd ../..
+just wasm-test
 ```
 
 ## Running

@@ -17,8 +17,6 @@ use telltale_choreography::{
 };
 use wasm_bindgen_test::*;
 
-wasm_bindgen_test_configure!(run_in_browser);
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 enum TestRole {
     Alice,

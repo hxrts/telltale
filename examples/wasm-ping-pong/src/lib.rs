@@ -10,12 +10,17 @@ use telltale_choreography::{
 use serde::{Serialize, Deserialize};
 use std::sync::{Arc, Mutex};
 use std::collections::BTreeMap;
+use std::sync::Once;
+
+static INIT: Once = Once::new();
 
 /// Initialize panic hook for better error messages in browser console
 #[wasm_bindgen(start)]
 pub fn init() {
-    console_error_panic_hook::set_once();
-    tracing_wasm::set_as_global_default();
+    INIT.call_once(|| {
+        console_error_panic_hook::set_once();
+        let _ = tracing_wasm::try_set_as_global_default();
+    });
 }
 
 /// Role definitions
@@ -143,8 +148,6 @@ pub async fn run_bob() -> Result<String, JsValue> {
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
-
-    wasm_bindgen_test_configure!(run_in_browser);
 
     #[wasm_bindgen_test]
     fn test_role_creation() {

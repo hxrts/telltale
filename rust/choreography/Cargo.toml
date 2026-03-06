@@ -71,6 +71,8 @@ test-utils = ["rand"]
 wasm = ["getrandom/js"]
 # Internal feature for WASM integration tests (requires wasm-pack)
 _wasm_integration_tests = []
+native-examples = []
+native-cli = []
 
 [[bench]]
 name = "choreography_bench"
@@ -87,3 +89,20 @@ harness = false
 [[bin]]
 name = "choreo-fmt"
 path = "src/bin/choreo_fmt.rs"
+required-features = ["native-cli"]
+
+[[example]]
+name = "extension_workflow"
+required-features = ["native-examples"]
+
+[[example]]
+name = "tcp_ping_pong"
+required-features = ["native-examples"]
+
+[[example]]
+name = "telltale_client_server"
+required-features = ["native-examples"]
+
+[[example]]
+name = "telltale_three_party_negotiation"
+required-features = ["native-examples"]

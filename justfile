@@ -163,9 +163,53 @@ bench-check:
 wasm-build:
     cd examples/wasm-ping-pong && wasm-pack build --target web
 
-# Run WASM tests (requires Chrome/Firefox)
+# Run the example WASM tests under Node.
 wasm-test:
-    cd examples/wasm-ping-pong && wasm-pack test --headless --chrome
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shim_root="$(mktemp -d)"
+    trap 'rm -rf "$shim_root"' EXIT
+    mkdir -p "$shim_root/env"
+    cat >"$shim_root/env/index.js" <<'EOF'
+    module.exports = new Proxy(
+      {},
+      {
+        get(_target, prop) {
+          if (prop === "__esModule") {
+            return true;
+          }
+          return function () {};
+        },
+      },
+    );
+    EOF
+    cd examples/wasm-ping-pong
+    NODE_PATH="$shim_root" wasm-pack test --node
+
+# Run all repository-managed WASM tests without requiring a browser driver.
+wasm-test-all:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shim_root="$(mktemp -d)"
+    trap 'rm -rf "$shim_root"' EXIT
+    mkdir -p "$shim_root/env"
+    cat >"$shim_root/env/index.js" <<'EOF'
+    module.exports = new Proxy(
+      {},
+      {
+        get(_target, prop) {
+          if (prop === "__esModule") {
+            return true;
+          }
+          return function () {};
+        },
+      },
+    );
+    EOF
+    NODE_PATH="$shim_root" wasm-pack test --node rust/vm --features wasm -- --nocapture
+    NODE_PATH="$shim_root" wasm-pack test --node rust/choreography --features "wasm _wasm_integration_tests" -- --nocapture
+    cd examples/wasm-ping-pong
+    NODE_PATH="$shim_root" wasm-pack test --node
 
 # Format choreography DSL files (prints to stdout unless --write is used)
 choreo-fmt *FILES:

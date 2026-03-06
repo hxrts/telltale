@@ -30,6 +30,12 @@ Use a path dependency only for local workspace development.
 
 Build with `wasm-pack` or `cargo` targets.
 
+For reproducible local setup, install the same tool version used in CI.
+
+```bash
+cargo install wasm-pack --version 0.14.0 --locked
+```
+
 ```bash
 wasm-pack build --target web
 ```
@@ -157,14 +163,18 @@ spawn(async move {
 
 ## Testing
 
-Use `wasm-bindgen-test` for browser tests.
+Use `wasm-bindgen-test` for WASM tests.
 
 ```rust
 use wasm_bindgen_test::*;
-
-wasm_bindgen_test_configure!(run_in_browser);
 ```
 
-Run tests with `wasm-pack test --headless --chrome`.
+Repository-managed tests run under Node, not a browser driver.
+
+```bash
+just wasm-test-all
+```
+
+For ad hoc crate-level runs, use `wasm-pack test --node`.
 
 See [Choreography Effect Handlers](09_effect_handlers.md) for handler details and [Using Telltale Handlers](10_telltale_handler.md) for the channel based API.
