@@ -16,8 +16,6 @@ pub mod merge;
 pub mod parser;
 pub mod pretty;
 pub mod projection;
-pub mod runner;
-pub mod typed_runner;
 
 // Re-export compiler pipeline components explicitly
 pub use analysis::{
@@ -59,8 +57,3 @@ pub use pretty::{
     format_choreography, format_choreography_str, format_choreography_with_config, PrettyConfig,
 };
 pub use projection::{project, ProjectionError};
-pub use runner::{generate_all_runners, generate_execute_as, generate_runner_fn};
-pub use typed_runner::{
-    extract_role_messages, generate_all_typed_runners, generate_typed_runner, MessageDirection,
-    RoleMessageInfo, SerializationConfig, SerializationFormat,
-};

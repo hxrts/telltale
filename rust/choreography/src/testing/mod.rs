@@ -46,7 +46,6 @@
 
 pub mod clock;
 pub mod envelope;
-pub mod harness;
 pub mod observer;
 pub mod state_machine;
 pub mod transport;
@@ -54,7 +53,6 @@ pub mod transport;
 // Re-export main types
 pub use clock::{AsyncClock, Clock, MockClock, Rng, SeededRng, WallClock};
 pub use envelope::ProtocolEnvelope;
-pub use harness::{ProtocolTest, ProtocolTestBuilder, RoleBinding, TestConfig, TestResult};
 pub use observer::{NullObserver, ProtocolObserver, RecordingObserver};
 pub use state_machine::{BlockedOn, Checkpoint, ProtocolStateMachine, StepInput, StepOutput};
 pub use transport::{

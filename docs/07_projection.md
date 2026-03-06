@@ -270,9 +270,8 @@ The projection error surface includes:
 - `ProjectionError::WildcardProjection`
 - `ProjectionError::RangeProjection`
 
-Dynamic family resolution is handled in generated runner code with a `ChoreographicAdapter`.
-This runtime layer resolves role families through methods such as `resolve_family()` and `resolve_range()`.
-Projection still enforces core structural rules before code generation.
+Projection still enforces core structural rules before interpretation.
+If a choreography uses parameterized roles, bind those roles to a concrete participant set before building executable effect programs.
 
 ## Implementation Notes
 

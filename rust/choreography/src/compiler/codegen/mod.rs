@@ -187,14 +187,9 @@ pub fn generate_choreography_code(
         .iter()
         .map(|(role, local_type)| generate_session_type(role, local_type, name));
 
-    // Generate runner functions and execute_as dispatch
-    let runner_code = super::runner::generate_all_runners(name, roles, local_types);
-
     quote! {
         #role_struct_defs
         #(#session_type_defs)*
-
-        #runner_code
     }
 }
 

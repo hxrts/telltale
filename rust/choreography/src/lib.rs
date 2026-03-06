@@ -19,11 +19,8 @@ pub mod testing;
 pub mod topology;
 pub mod tracing;
 
-// Re-export runtime adapter types
-pub use runtime::{
-    ChoiceLabel, ChoreographicAdapter, ChoreographicAdapterExt, Message, ProtocolContext,
-    ProtocolOutput, SystemClock, SystemRng,
-};
+// Re-export runtime support types
+pub use runtime::{SystemClock, SystemRng};
 
 // Re-export typed identifiers
 pub use identifiers::{Datacenter, Endpoint as TopologyEndpoint, Namespace, Region, RoleName};
@@ -66,9 +63,8 @@ pub use heap::{
 // Re-export testing types for protocol testing
 pub use testing::{
     AsyncClock, BlockedOn, Checkpoint, Clock, InMemoryTransport, MockClock, NullObserver,
-    ProtocolEnvelope, ProtocolObserver, ProtocolStateMachine, ProtocolTest, ProtocolTestBuilder,
-    RecordingObserver, Rng, RoleBinding, SeededRng, SimulatedTransport, StepInput, StepOutput,
-    TestConfig, TestResult, WallClock,
+    ProtocolEnvelope, ProtocolObserver, ProtocolStateMachine, RecordingObserver, Rng, SeededRng,
+    SimulatedTransport, StepInput, StepOutput, WallClock,
 };
 
 // Re-export macros from telltale-macros

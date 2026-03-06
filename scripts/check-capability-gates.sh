@@ -55,9 +55,40 @@ require_ripgrep() {
   fi
 }
 
+mathlib_checkout_path() {
+  python3 - "${ROOT_DIR}/lean/dependency_pins.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+pins = json.loads(Path(sys.argv[1]).read_text())
+for dep in pins.get("dependencies", []):
+    if dep.get("name") == "mathlib4":
+        path = dep.get("path")
+        if not isinstance(path, str):
+            raise SystemExit("error: mathlib4 dependency pin path must be a string")
+        print(path)
+        raise SystemExit(0)
+
+raise SystemExit("error: missing mathlib4 dependency pin")
+PY
+}
+
+require_mathlib_cache() {
+  local mathlib_path
+  mathlib_path="$(mathlib_checkout_path)"
+  local marker="${mathlib_path}/.lake/build/lib/lean/Mathlib.olean"
+  if [[ ! -f "${marker}" ]]; then
+    echo "error: missing prebuilt mathlib4 cache at ${marker}" >&2
+    echo "hint: run ./scripts/bootstrap-lean-dependency-checkouts.sh" >&2
+    exit 2
+  fi
+}
+
 # --- Byzantine Capability Checks ---
 check_byzantine() {
   require_ripgrep
+  require_mathlib_cache
   local TEST_FILE="${ROOT_DIR}/lean/Distributed/Tests/ByzantineConformance.lean"
   local THEOREMPACK_API_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/API.lean"
   local THEOREMPACK_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack.lean"
@@ -101,6 +132,7 @@ check_byzantine() {
   echo "Type-checking Lean Byzantine conformance test module..."
   (
     cd "${ROOT_DIR}/lean"
+    lake build Distributed.Tests.ByzantineConformance >/dev/null
     lake env lean Distributed/Tests/ByzantineConformance.lean >/dev/null
   )
   echo "OK   Distributed.Tests.ByzantineConformance type-checks successfully"
@@ -120,6 +152,7 @@ check_delegation() {
 # --- Envelope Capability Checks ---
 check_envelope() {
   require_ripgrep
+  require_mathlib_cache
   local THEOREMPACK_API_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/API.lean"
   local THEOREMPACK_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack.lean"
   local ADAPTER_FILE="${ROOT_DIR}/lean/Runtime/Proofs/Adapters/Distributed.lean"
@@ -255,6 +288,7 @@ check_failure() {
 # --- Runtime Contract Checks ---
 check_contracts() {
   require_ripgrep
+  require_mathlib_cache
   local CONTRACTS_FILE="${ROOT_DIR}/lean/Runtime/Proofs/Contracts/RuntimeContracts.lean"
   local API_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/API.lean"
   local EXAMPLE_FILE="${ROOT_DIR}/lean/Runtime/Proofs/Examples/ComposedProofPack.lean"
@@ -301,6 +335,7 @@ check_contracts() {
 # --- Speculation/WP Surface Checks ---
 check_speculation() {
   require_ripgrep
+  require_mathlib_cache
   local TARGET_FILES=(
     "${ROOT_DIR}/lean/Runtime/ProgramLogic/GhostState.lean"
     "${ROOT_DIR}/lean/Runtime/ProgramLogic/WPPair.lean"

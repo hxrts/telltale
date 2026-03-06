@@ -29,6 +29,30 @@ repo_by_name = {
 def run(cmd: list[str], cwd: Path | None = None) -> str:
     return subprocess.check_output(cmd, cwd=str(cwd) if cwd else None, text=True).strip()
 
+
+def ensure_mathlib_cache(checkout: Path) -> None:
+    marker = checkout / ".lake" / "build" / "lib" / "lean" / "Mathlib.olean"
+    if marker.exists():
+        print(f"OK   mathlib4 cache present at {marker}")
+        return
+
+    print("sync mathlib4 cache: fetching prebuilt oleans with `lake exe cache get`")
+    try:
+        subprocess.check_call(["lake", "exe", "cache", "get"], cwd=str(checkout))
+    except subprocess.CalledProcessError as err:
+        raise SystemExit(
+            "error: failed to fetch prebuilt mathlib4 cache; "
+            "run `cd /Users/hxrts/projects/lean_common/mathlib4 && lake exe cache get` "
+            f"after resolving the local issue ({err})"
+        ) from err
+
+    if not marker.exists():
+        raise SystemExit(
+            "error: `lake exe cache get` completed but Mathlib.olean is still missing at "
+            f"{marker}"
+        )
+    print(f"OK   mathlib4 cache ready at {marker}")
+
 for dep in deps:
     name = dep.get("name")
     path = dep.get("path")
@@ -55,4 +79,7 @@ for dep in deps:
     if actual != revision:
         raise SystemExit(f"error: {name} pinned checkout mismatch: expected {revision}, got {actual}")
     print(f"OK   {name} pinned at {actual}")
+
+    if name == "mathlib4":
+        ensure_mathlib_cache(checkout)
 PY

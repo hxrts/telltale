@@ -441,13 +441,8 @@ pub fn generate_choreography_code_with_topology(
     let base_code = generate_choreography_code(&name, &choreography.roles, local_types);
     let topology_code = generate_topology_integration(choreography, inline_topologies);
 
-    // Generate runner code with topology awareness
-    let runner_code =
-        crate::compiler::runner::generate_all_runners(&name, &choreography.roles, local_types);
-
     quote! {
         #base_code
-        #runner_code
         #topology_code
     }
 }

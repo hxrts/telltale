@@ -289,114 +289,15 @@ InMemoryHandler and TelltaleHandler both work in WASM environments. They use fut
 
 For WASM network communication, implement a custom handler. Use web-sys WebSocket or fetch APIs. See [WASM Guide](29_wasm_guide.md) for details.
 
-## Role Family Resolution
+## Parameterized Roles
 
-For protocols with parameterized roles (wildcards and ranges), use `ChoreographicAdapter` for role family resolution.
+Parameterized roles remain a choreography-level feature of the DSL and AST.
+Projection and interpretation still require concrete role values at execution time.
 
-### ChoreographicAdapter Trait
+Wildcard, symbolic, and unresolved range forms are not interpreted directly by `ChoreoHandler`.
+Resolve participant sets during choreography construction or initialization, then build effect programs over concrete `RoleId` values.
 
-The adapter trait provides methods for resolving role families at runtime.
-
-```rust
-pub trait ChoreographicAdapter: Sized {
-    type Role: RoleId;
-    type Error;
-
-    /// Resolve all instances of a parameterized role family.
-    fn resolve_family(&self, family: &str) -> Result<Vec<Self::Role>, Self::Error>;
-
-    /// Resolve a range of role instances [start, end).
-    fn resolve_range(&self, family: &str, start: u32, end: u32)
-        -> Result<Vec<Self::Role>, Self::Error>;
-
-    /// Get the number of instances in a role family.
-    fn family_size(&self, family: &str) -> Result<usize, Self::Error>;
-
-    /// Broadcast a message to all roles in the list.
-    async fn broadcast<M: Message + Clone>(&mut self, to: &[Self::Role], msg: M)
-        -> Result<(), Self::Error>;
-
-    /// Collect messages from all roles in the list.
-    async fn collect<M: Message>(&mut self, from: &[Self::Role])
-        -> Result<Vec<M>, Self::Error>;
-}
-```
-
-These methods resolve role families and support fan out and fan in messaging. Generated code uses them when a protocol includes wildcard or range roles.
-
-### TestAdapter for Role Families
-
-The `TestAdapter` implements `ChoreographicAdapter` for testing protocols with role families.
-
-```rust
-use telltale_choreography::runtime::test_adapter::TestAdapter;
-
-// Create adapter with configured role family
-let witnesses: Vec<Role> = (0..5).map(Role::Witness).collect();
-let adapter = TestAdapter::new(Role::Coordinator)
-    .with_family("Witness", witnesses);
-
-// Resolve all witnesses
-let all = adapter.resolve_family("Witness")?;  // 5 witnesses
-
-// Resolve subset for threshold operations
-let threshold = adapter.resolve_range("Witness", 0, 3)?;  // 3 witnesses
-
-// Get family size
-let size = adapter.family_size("Witness")?;  // 5
-```
-
-`TestAdapter` keeps role families in memory and is intended for local tests.
-
-### Broadcast and Collect
-
-For one-to-many and many-to-one communication patterns:
-
-```rust
-// Broadcast to all witnesses
-let witnesses = adapter.resolve_family("Witness")?;
-adapter.broadcast(&witnesses, SigningRequest { ... }).await?;
-
-// Collect responses from threshold
-let threshold = adapter.resolve_range("Witness", 0, 3)?;
-let responses: Vec<PartialSignature> = adapter.collect(&threshold).await?;
-```
-
-Use these helpers for one to many and many to one exchanges in role family protocols.
-
-### Execution Hints
-
-Annotations like `@parallel` and `@min_responses(N)` control how broadcast and collect operations execute. These are deployment hints, not protocol semantics. They affect code generation without changing the session type.
-
-```
-@parallel Coordinator -> Witness[*] : SignRequest
-@min_responses(3) Witness[*] -> Coordinator : PartialSignature
-```
-
-The `@parallel` annotation causes generated code to use `futures::future::join_all()` for concurrent execution instead of sequential iteration.
-
-The `@min_responses(N)` annotation generates threshold checking. The collect operation succeeds if at least N responses arrive. Fewer responses result in an `InsufficientResponses` error.
-
-Execution hints are extracted from annotations and passed separately to code generation. This keeps the `LocalType` pure for Lean verification while enabling runtime optimizations.
-
-```rust
-use telltale_choreography::ast::{ExecutionHints, ChoreographyWithHints};
-
-// Extract hints from a parsed choreography
-let with_hints = ChoreographyWithHints::from_choreography(choreography);
-
-// Hints are available for codegen
-let hints = &with_hints.hints;
-if hints.is_parallel(&path) {
-    // Generate parallel code
-}
-```
-
-Default behavior without hints is sequential execution with all responses required.
-
-### Topology Validation
-
-Role family constraints can be validated against topology configuration.
+Topology constraints remain useful for validating concrete deployments.
 
 ```rust
 use telltale_choreography::topology::Topology;
@@ -410,13 +311,10 @@ let config = r#"
 "#;
 
 let topology = Topology::parse(config)?.topology;
-
-// Validate resolved family meets constraints
-let count = adapter.family_size("Witness")?;
-topology.validate_family("Witness", count)?;
+topology.validate_family("Witness", 5)?;
 ```
 
-Run this check during initialization to ensure deployment configuration matches the resolved family size.
+Run this check before execution to ensure the concrete participant set matches deployment expectations.
 
 ## Effect Interpretation
 
