@@ -233,20 +233,49 @@ impl VM {
 
     /// Pause execution for all coroutines of a role.
     pub fn pause_role(&mut self, role: &str) {
-        self.paused_roles.insert(role.to_string());
-        self.mark_eligibility_dirty();
+        if !self.paused_roles.insert(role.to_string()) {
+            return;
+        }
+        let coro_ids = self.role_coroutines.get(role).cloned().unwrap_or_default();
+        for coro_id in coro_ids {
+            self.paused_coro_ids.insert(coro_id);
+            self.sync_ready_eligibility_for(coro_id);
+        }
+        #[cfg(debug_assertions)]
+        self.debug_assert_paused_role_index();
     }
 
     /// Resume execution for all coroutines of a role.
     pub fn resume_role(&mut self, role: &str) {
-        self.paused_roles.remove(role);
-        self.mark_eligibility_dirty();
+        if !self.paused_roles.remove(role) {
+            return;
+        }
+        let coro_ids = self.role_coroutines.get(role).cloned().unwrap_or_default();
+        for coro_id in coro_ids {
+            self.paused_coro_ids.remove(&coro_id);
+            self.sync_ready_eligibility_for(coro_id);
+        }
+        #[cfg(debug_assertions)]
+        self.debug_assert_paused_role_index();
     }
 
     /// Replace the paused role set.
     pub fn set_paused_roles(&mut self, roles: &BTreeSet<String>) {
-        self.paused_roles = roles.clone();
-        self.mark_eligibility_dirty();
+        let to_pause: Vec<String> = roles
+            .difference(&self.paused_roles)
+            .cloned()
+            .collect();
+        let to_resume: Vec<String> = self
+            .paused_roles
+            .difference(roles)
+            .cloned()
+            .collect();
+        for role in to_resume {
+            self.resume_role(&role);
+        }
+        for role in to_pause {
+            self.pause_role(&role);
+        }
     }
 
     /// Access paused roles.
@@ -266,6 +295,17 @@ impl VM {
             return Some(id);
         }
         self.coroutines.iter().position(|c| c.id == id)
+    }
+
+    #[cfg(debug_assertions)]
+    fn debug_assert_paused_role_index(&self) {
+        let expected: BTreeSet<usize> = self
+            .coroutines
+            .iter()
+            .filter(|coro| self.paused_roles.contains(&coro.role))
+            .map(|coro| coro.id)
+            .collect();
+        debug_assert_eq!(self.paused_coro_ids, expected);
     }
 
     pub(crate) fn read_reg(&self, coro_idx: usize, reg: u16) -> Result<Value, Fault> {

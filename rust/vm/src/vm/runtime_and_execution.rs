@@ -61,12 +61,42 @@ fn vm_serialized_bytes<T: Serialize>(value: &T) -> usize {
         .unwrap_or(0)
 }
 
+/// Phase timing breakdown for one `load_choreography` call.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct LoadChoreographyProfile {
+    /// Time spent validating the code image shape.
+    pub validate_runtime_shape_ns: u128,
+    /// Time spent opening session state from the precomputed plan.
+    pub open_session_ns: u128,
+    /// Time spent interning session runtime symbols and emitting the open event.
+    pub intern_and_open_event_ns: u128,
+    /// Time spent spawning role coroutines.
+    pub spawn_coroutines_ns: u128,
+    /// End-to-end load time.
+    pub total_ns: u128,
+}
+
 impl VM {
     fn communication_replay_enabled(&self) -> bool {
         !matches!(
             self.config.communication_replay_mode,
             CommunicationReplayMode::Off
         )
+    }
+
+    fn intern_load_plan_symbols(&mut self, plan: &crate::session::SessionOpenPlan, sid: SessionId) {
+        for role in plan.roles() {
+            let _: StringId = self.role_symbols.intern(role);
+        }
+        let _: StringId = self.handler_symbols.intern(crate::session::DEFAULT_HANDLER_ID);
+        let edge_handlers: Vec<_> = self
+            .sessions
+            .get(sid)
+            .map(|session| session.edge_handlers.keys().cloned().collect())
+            .unwrap_or_default();
+        for edge in edge_handlers {
+            let _: EdgeId = self.intern_edge(&edge);
+        }
     }
 
     /// Create a VM instance from configuration.
@@ -97,9 +127,10 @@ impl VM {
             return false;
         };
         let role = &self.coroutines[idx].role;
-        !self.paused_roles.contains(role)
+        !(self.paused_coro_ids.contains(&coro_id) || self.paused_roles.contains(role))
             && !self.crashed_sites.contains(role)
-            && !self.timed_out_sites.contains_key(role)
+            && !(self.timed_out_coro_ids.contains(&coro_id)
+                || self.timed_out_sites.contains_key(role))
     }
 
     fn mark_eligibility_dirty(&mut self) {
@@ -160,8 +191,8 @@ impl VM {
             // Off mode intentionally skips replay-consumption state and artifacts.
             return Ok(CommunicationConsumeResult {
                 mode: CommunicationReplayMode::Off,
-                pre_root: self.communication_consumption.state().root(),
-                post_root: self.communication_consumption.state().root(),
+                pre_root: self.communication_consumption.root(),
+                post_root: self.communication_consumption.root(),
                 consumed_nullifier: None,
             });
         }
@@ -180,22 +211,36 @@ impl VM {
         Ok(result)
     }
 
-    fn open_choreography_session(
+    fn session_open_plan(
         &mut self,
         image: &CodeImage,
-    ) -> Result<(SessionId, Vec<String>), VMError> {
-        image.validate_runtime_shape().map_err(|reason| VMError::InvalidCodeImage { reason })?;
-        let roles = image.roles();
+    ) -> &crate::session::SessionOpenPlan {
+        let key = std::ptr::from_ref(image) as usize;
+        self.session_open_plans
+            .entry(key)
+            .or_insert_with(|| crate::session::SessionOpenPlan::new(&image.roles(), &image.local_types))
+    }
+
+    fn open_choreography_session(
+        &mut self,
+        plan: &crate::session::SessionOpenPlan,
+    ) -> (SessionId, Vec<String>) {
         let sid = self.sessions.next_session_id();
-        self.sessions.open_with_sid(
-            sid,
-            roles.clone(),
-            &self.config.buffer_config,
-            &image.local_types,
-        );
+        let roles = plan.roles().to_vec();
+        self.sessions
+            .open_with_sid_from_plan(sid, plan, &self.config.buffer_config);
+        (sid, roles)
+    }
+
+    fn finalize_open_choreography_session(
+        &mut self,
+        sid: SessionId,
+        roles: &[String],
+        plan: &crate::session::SessionOpenPlan,
+    ) -> Result<(), VMError> {
         self.next_session_id = self.sessions.next_session_id();
         self.bind_default_handlers_for_session(sid);
-        self.intern_session_runtime_symbols(sid);
+        self.intern_load_plan_symbols(plan, sid);
         self.monitor.set_kind(sid, SessionKind::Peer);
         self.resource_states
             .entry(sid)
@@ -206,11 +251,11 @@ impl VM {
             ObsEvent::Opened {
                 tick: self.clock.tick,
                 session: sid,
-                roles: roles.clone(),
+                roles: roles.to_vec(),
             },
             &self.config.observability_retention,
         );
-        Ok((sid, roles))
+        Ok(())
     }
 
     fn spawn_coroutine_for_role(
@@ -244,6 +289,16 @@ impl VM {
             sid,
             role: role.to_string(),
         };
+        self.role_coroutines
+            .entry(role.to_string())
+            .or_default()
+            .push(coro_id);
+        if self.paused_roles.contains(role) {
+            self.paused_coro_ids.insert(coro_id);
+        }
+        if self.timed_out_sites.contains_key(role) {
+            self.timed_out_coro_ids.insert(coro_id);
+        }
         let mut coro = Coroutine::new(
             coro_id,
             program_id,
@@ -284,12 +339,45 @@ impl VM {
     ///
     /// Returns an error if session or coroutine limits are exceeded.
     pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
+        self.load_choreography_profiled(image).map(|(sid, _)| sid)
+    }
+
+    /// Load a choreography and return a deterministic phase timing breakdown.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if validation fails or if session/coroutine limits are exceeded.
+    pub fn load_choreography_profiled(
+        &mut self,
+        image: &CodeImage,
+    ) -> Result<(SessionId, LoadChoreographyProfile), VMError> {
         self.ensure_session_capacity()?;
-        let (sid, roles) = self.open_choreography_session(image)?;
+        let total_start = std::time::Instant::now();
+        let validate_start = std::time::Instant::now();
+        image.validate_runtime_shape().map_err(|reason| VMError::InvalidCodeImage { reason })?;
+        let validate_runtime_shape_ns = validate_start.elapsed().as_nanos();
+        let plan = self.session_open_plan(image).clone();
+        let open_start = std::time::Instant::now();
+        let (sid, roles) = self.open_choreography_session(&plan);
+        let open_session_ns = open_start.elapsed().as_nanos();
+        let intern_start = std::time::Instant::now();
+        self.finalize_open_choreography_session(sid, &roles, &plan)?;
+        let intern_and_open_event_ns = intern_start.elapsed().as_nanos();
         self.programs.reserve(image.programs.len());
         self.coroutines.reserve(roles.len());
+        let spawn_start = std::time::Instant::now();
         self.spawn_session_coroutines(image, sid, &roles)?;
-        Ok(sid)
+        let spawn_coroutines_ns = spawn_start.elapsed().as_nanos();
+        Ok((
+            sid,
+            LoadChoreographyProfile {
+                validate_runtime_shape_ns,
+                open_session_ns,
+                intern_and_open_event_ns,
+                spawn_coroutines_ns,
+                total_ns: total_start.elapsed().as_nanos(),
+            },
+        ))
     }
 
     /// Execute one scheduler round: advance at most one ready coroutine.
@@ -733,7 +821,7 @@ impl VM {
     /// Deterministic communication replay-state root.
     #[must_use]
     pub fn communication_replay_root(&self) -> crate::verification::Hash {
-        self.communication_consumption.state().root()
+        self.communication_consumption.root()
     }
 
     /// Receive-boundary replay-consumption artifacts.
@@ -787,7 +875,7 @@ impl VM {
             timed_out_sites,
             self.config.effect_determinism_tier,
             self.config.communication_replay_mode,
-            Some(self.communication_consumption.state().root()),
+            Some(self.communication_consumption.root()),
             self.communication_consumption_artifacts.as_slice().to_vec(),
         )
     }

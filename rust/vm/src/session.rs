@@ -64,6 +64,66 @@ impl ClosedSessionSummary {
     }
 }
 
+/// Reusable session-open layout derived from a fixed role topology and local types.
+#[derive(Debug, Clone)]
+pub struct SessionOpenPlan {
+    roles: Vec<String>,
+    role_ids: BTreeMap<String, u16>,
+    initial_types: Vec<(String, LocalTypeR, LocalTypeR)>,
+    edge_blueprint: Vec<((u16, u16), String, String)>,
+    active_branch_roles: Vec<String>,
+}
+
+impl SessionOpenPlan {
+    /// Build a reusable open plan from a role list and initial local types.
+    #[must_use]
+    pub fn new(roles: &[String], initial_types: &BTreeMap<String, LocalTypeR>) -> Self {
+        let role_ids = SessionState::build_role_ids(roles);
+        let mut planned_types = Vec::with_capacity(roles.len());
+        let mut active_branch_roles = Vec::new();
+        for role in roles {
+            if let Some(original) = initial_types.get(role) {
+                let current = unfold_mu(original);
+                if SessionState::branch_shape(&current).is_some() {
+                    active_branch_roles.push(role.clone());
+                }
+                planned_types.push((role.clone(), current, original.clone()));
+            }
+        }
+
+        let edge_capacity = roles.len().saturating_mul(roles.len().saturating_sub(1));
+        let mut edge_blueprint = Vec::with_capacity(edge_capacity);
+        for from in roles {
+            for to in roles {
+                if from == to {
+                    continue;
+                }
+                let from_id = *role_ids
+                    .get(from)
+                    .expect("sender role id must exist for session-open plan");
+                let to_id = *role_ids
+                    .get(to)
+                    .expect("receiver role id must exist for session-open plan");
+                edge_blueprint.push(((from_id, to_id), from.clone(), to.clone()));
+            }
+        }
+
+        Self {
+            roles: roles.to_vec(),
+            role_ids,
+            initial_types: planned_types,
+            edge_blueprint,
+            active_branch_roles,
+        }
+    }
+
+    /// Canonical role ordering for this plan.
+    #[must_use]
+    pub fn roles(&self) -> &[String] {
+        &self.roles
+    }
+}
+
 /// Approximate retained state for the session store.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionStoreMemoryUsage {
@@ -799,47 +859,57 @@ impl SessionStore {
         buffer_config: &BufferConfig,
         initial_types: &BTreeMap<String, LocalTypeR>,
     ) -> SessionId {
-        let role_count = roles.len();
-        let role_ids = SessionState::build_role_ids(&roles);
-        // Build per-endpoint local types with initial unfolding.
-        let mut local_type_entries = Vec::with_capacity(role_count);
-        for role in &roles {
-            if let Some(lt) = initial_types.get(role) {
-                let ep = Endpoint {
+        let plan = SessionOpenPlan::new(&roles, initial_types);
+        self.open_with_sid_from_plan(sid, &plan, buffer_config)
+    }
+
+    /// Open a new session from a reusable precomputed open plan.
+    pub fn open_with_sid_from_plan(
+        &mut self,
+        sid: SessionId,
+        plan: &SessionOpenPlan,
+        buffer_config: &BufferConfig,
+    ) -> SessionId {
+        let mut local_type_entries = Vec::with_capacity(plan.initial_types.len());
+        for (role, current, original) in &plan.initial_types {
+            local_type_entries.push((
+                Endpoint {
                     sid,
                     role: role.clone(),
-                };
-                local_type_entries.push((
-                    ep,
-                    TypeEntry {
-                        current: unfold_mu(lt),
-                        original: lt.clone(),
-                    },
-                ));
-            }
+                },
+                TypeEntry {
+                    current: current.clone(),
+                    original: original.clone(),
+                },
+            ));
         }
         let local_types = local_type_entries.into_iter().collect();
 
-        // Create buffers for each directed edge.
-        let edge_lookup = SessionState::build_edge_lookup(sid, &roles, &role_ids);
-        let edge_capacity = role_count.saturating_mul(role_count.saturating_sub(1));
-        let mut buffer_entries = Vec::with_capacity(edge_capacity);
-        for edge in edge_lookup.values() {
-            buffer_entries.push((edge.clone(), BoundedBuffer::new(buffer_config)));
+        let mut edge_entries = Vec::with_capacity(plan.edge_blueprint.len());
+        let mut buffer_entries = Vec::with_capacity(plan.edge_blueprint.len());
+        for (key, from, to) in &plan.edge_blueprint {
+            let edge = Edge::new(sid, from.clone(), to.clone());
+            edge_entries.push((*key, edge.clone()));
+            buffer_entries.push((edge, BoundedBuffer::new(buffer_config)));
         }
+        let edge_lookup = edge_entries.into_iter().collect();
         let buffers = buffer_entries.into_iter().collect();
+
+        let default_handler = default_handler_id();
+        let (handler_ids, handlers_by_id, edge_handler_lookup, default_handler_id) =
+            SessionState::build_handler_indexes(&plan.role_ids, &default_handler, &BTreeMap::new());
 
         let mut state = SessionState {
             sid,
-            roles,
-            role_ids,
+            roles: plan.roles.clone(),
+            role_ids: plan.role_ids.clone(),
             local_types,
             buffers,
             edge_lookup,
-            handler_ids: BTreeMap::new(),
-            handlers_by_id: Vec::new(),
-            edge_handler_lookup: BTreeMap::new(),
-            default_handler_id: None,
+            handler_ids,
+            handlers_by_id,
+            edge_handler_lookup,
+            default_handler_id,
             label_ids: BTreeMap::new(),
             labels_by_id: Vec::new(),
             branch_lookup: BTreeMap::new(),
@@ -847,12 +917,17 @@ impl SessionStore {
             auth_trees: BTreeMap::new(),
             auth_roots: BTreeMap::new(),
             edge_handlers: BTreeMap::new(),
-            default_handler: default_handler_id(),
+            default_handler,
             edge_traces: BTreeMap::new(),
             status: SessionStatus::Active,
             epoch: 0,
         };
-        state.rebuild_derived_indexes();
+        for role in &plan.active_branch_roles {
+            state.refresh_endpoint_branch_lookup(&Endpoint {
+                sid,
+                role: role.clone(),
+            });
+        }
 
         self.sessions.insert(sid, state);
         self.next_id = self.next_id.max(sid.saturating_add(1));

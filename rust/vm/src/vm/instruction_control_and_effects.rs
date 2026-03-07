@@ -99,13 +99,12 @@ impl VM {
     ) -> Result<(), Fault> {
         let replay_label =
             crate::communication_replay::canonical_receive_label_context(label, expected_type);
-        let identity = CommunicationIdentity::from_payload(
+        let identity = crate::communication_replay::CommunicationIdentitySeed::new(
             edge,
             CommunicationStepKind::Receive,
             replay_label,
-            val,
-            sequence_no,
-        );
+        )
+        .build(val, sequence_no);
         self.consume_receive_identity(identity).map_err(|err| {
             let tag = err.tag();
             let message = match err {

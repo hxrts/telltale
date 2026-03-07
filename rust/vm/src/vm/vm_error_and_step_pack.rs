@@ -254,6 +254,14 @@ where
     next_session_id: SessionId,
     paused_roles: BTreeSet<String>,
     #[serde(skip, default)]
+    role_coroutines: BTreeMap<String, Vec<usize>>,
+    #[serde(skip, default)]
+    paused_coro_ids: BTreeSet<usize>,
+    #[serde(skip, default)]
+    timed_out_coro_ids: BTreeSet<usize>,
+    #[serde(skip, default)]
+    session_open_plans: BTreeMap<usize, crate::session::SessionOpenPlan>,
+    #[serde(skip, default)]
     eligible_ready: BTreeSet<usize>,
     #[serde(skip, default = "default_true")]
     eligibility_dirty: bool,
@@ -320,6 +328,10 @@ where
             next_coro_id: 0,
             next_session_id: 0,
             paused_roles: BTreeSet::new(),
+            role_coroutines: BTreeMap::new(),
+            paused_coro_ids: BTreeSet::new(),
+            timed_out_coro_ids: BTreeSet::new(),
+            session_open_plans: BTreeMap::new(),
             eligible_ready: BTreeSet::new(),
             eligibility_dirty: true,
             guard_layer: InMemoryGuardLayer {

@@ -11,11 +11,20 @@ impl VM {
 
     fn prune_expired_timeouts(&mut self) {
         let tick = self.clock.tick;
-        let prior_len = self.timed_out_sites.len();
-        self.timed_out_sites
-            .retain(|_, until_tick| *until_tick > tick);
-        if self.timed_out_sites.len() != prior_len {
-            self.mark_eligibility_dirty();
+        let expired_roles: Vec<String> = self
+            .timed_out_sites
+            .iter()
+            .filter_map(|(role, until_tick)| (*until_tick <= tick).then_some(role.clone()))
+            .collect();
+        if !expired_roles.is_empty() {
+            for role in &expired_roles {
+                self.timed_out_sites.remove(role);
+                let coro_ids = self.role_coroutines.get(role).cloned().unwrap_or_default();
+                for coro_id in coro_ids {
+                    self.timed_out_coro_ids.remove(&coro_id);
+                    self.sync_ready_eligibility_for(coro_id);
+                }
+            }
         }
     }
 
@@ -202,7 +211,11 @@ impl VM {
                     .tick
                     .saturating_add(self.duration_to_ticks(*duration));
                 self.timed_out_sites.insert(site.clone(), until_tick);
-                self.mark_eligibility_dirty();
+                let coro_ids = self.role_coroutines.get(site).cloned().unwrap_or_default();
+                for coro_id in coro_ids {
+                    self.timed_out_coro_ids.insert(coro_id);
+                    self.sync_ready_eligibility_for(coro_id);
+                }
             }
         }
         self.normalize_topology_state();

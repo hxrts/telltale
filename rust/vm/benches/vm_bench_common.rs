@@ -12,7 +12,8 @@ use telltale_vm::instr::Endpoint;
 use telltale_vm::loader::CodeImage;
 use telltale_vm::session::SessionStore;
 use telltale_vm::vm::{
-    ObservabilityRetentionConfig, ObservabilityRetentionMode, PayloadValidationMode, RunStatus,
+    LoadChoreographyProfile, ObservabilityRetentionConfig, ObservabilityRetentionMode,
+    PayloadValidationMode, RunStatus,
 };
 use telltale_vm::{CommunicationReplayMode, Instr, VMConfig, VmMemoryUsage, VM};
 
@@ -302,6 +303,48 @@ pub(crate) fn run_repeated_load_reuse(iterations: usize) -> VmMemoryUsage {
     vm.memory_usage()
 }
 
+pub(crate) fn load_choreography_profile(
+    image: &CodeImage,
+    config: VMConfig,
+) -> LoadChoreographyProfile {
+    let mut vm = VM::new(config);
+    let (_, profile) = vm
+        .load_choreography_profiled(image)
+        .expect("load choreography");
+    profile
+}
+
+pub(crate) fn run_repeated_open_same_image_profile(
+    iterations: usize,
+    num_roles: usize,
+    yields_per_role: usize,
+) -> LoadChoreographyProfile {
+    let image = yield_image(num_roles, yields_per_role);
+    let mut config = VMConfig {
+        observability_retention: capped_retention_config(),
+        ..VMConfig::strict_large_fanout()
+    };
+    config.max_coroutines = config
+        .max_coroutines
+        .max(iterations.saturating_mul(num_roles).saturating_add(16));
+    let mut vm = VM::new(config);
+    let mut last = LoadChoreographyProfile::default();
+    for _ in 0..iterations {
+        let (_, profile) = vm
+            .load_choreography_profiled(&image)
+            .expect("load choreography");
+        last = profile;
+    }
+    last
+}
+
+pub(crate) fn run_repeated_open_wide_roles_profile(
+    iterations: usize,
+    num_roles: usize,
+) -> LoadChoreographyProfile {
+    run_repeated_open_same_image_profile(iterations, num_roles, 1)
+}
+
 pub(crate) fn run_send_recv_workload(
     image: &CodeImage,
     config: VMConfig,
@@ -338,6 +381,26 @@ pub(crate) fn run_many_paused_scheduler_workload(
     }
     let status = vm.run(&BenchHandler, 10_000).expect("run vm");
     assert!(matches!(status, RunStatus::Stuck));
+    vm.memory_usage()
+}
+
+pub(crate) fn run_pause_resume_churn_workload(
+    num_roles: usize,
+    iterations: usize,
+) -> VmMemoryUsage {
+    let image = yield_image(num_roles, 4);
+    let mut vm = VM::new(VMConfig {
+        observability_retention: capped_retention_config(),
+        ..VMConfig::strict_large_fanout()
+    });
+    vm.load_choreography(&image).expect("load choreography");
+    for idx in 1..num_roles {
+        vm.pause_role(&format!("R{idx}"));
+    }
+    for _ in 0..iterations {
+        vm.resume_role("R1");
+        vm.pause_role("R1");
+    }
     vm.memory_usage()
 }
 

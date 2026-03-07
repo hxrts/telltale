@@ -307,13 +307,12 @@ fn consume_receive_replay_identity(
         &prepared.label,
         prepared.expected_type.as_ref(),
     );
-    let identity = CommunicationIdentity::from_payload(
+    let identity = crate::communication_replay::CommunicationIdentitySeed::new(
         edge,
         CommunicationStepKind::Receive,
         replay_label,
-        val,
-        sequence_no,
-    );
+    )
+    .build(val, sequence_no);
     let consume = {
         let mut model = ctx
             .communication_consumption

@@ -22,7 +22,6 @@ impl ThreadedVM {
         self.communication_consumption
             .lock()
             .expect("threaded VM lock poisoned")
-            .state()
             .root()
     }
 
@@ -52,7 +51,6 @@ impl ThreadedVM {
             .communication_consumption
             .lock()
             .expect("threaded VM lock poisoned")
-            .state()
             .root();
         let communication_consumption_artifacts = self
             .communication_consumption_artifacts
