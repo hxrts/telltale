@@ -69,6 +69,8 @@ jobs:
           target: wasm32-unknown-unknown
       - name: Install wasm-pack
         run: cargo install wasm-pack --version 0.14.0 --locked
+      - name: Install just
+        run: cargo install just --locked
       - name: Check WASM compilation (choreography)
         uses: actions-rs/cargo@v1
         with:
