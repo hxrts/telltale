@@ -17,46 +17,34 @@ VERSION_CHECK_PATHS=(
 )
 
 tmp_metadata="$(mktemp)"
+tmp_workspace_crates="$(mktemp)"
+tmp_workspace_versions="$(mktemp)"
 tmp_doc_features="$(mktemp)"
 tmp_doc_features_filtered="$(mktemp)"
 tmp_actual_features="$(mktemp)"
 tmp_missing_in_docs="$(mktemp)"
 tmp_extra_in_docs="$(mktemp)"
 tmp_doc_version_hits="$(mktemp)"
-trap 'rm -f "$tmp_metadata" "$tmp_doc_features" "$tmp_doc_features_filtered" "$tmp_actual_features" "$tmp_missing_in_docs" "$tmp_extra_in_docs" "$tmp_doc_version_hits"' EXIT
+trap 'rm -f "$tmp_metadata" "$tmp_workspace_crates" "$tmp_workspace_versions" "$tmp_doc_features" "$tmp_doc_features_filtered" "$tmp_actual_features" "$tmp_missing_in_docs" "$tmp_extra_in_docs" "$tmp_doc_version_hits"' EXIT
 
 cargo metadata --no-deps --format-version 1 >"$tmp_metadata"
 
-declare -A workspace_crates=()
-declare -A workspace_versions=()
-while IFS= read -r crate; do
-  workspace_crates["$crate"]=1
-done < <(
-  jq -r '
-    . as $m
-    | $m.workspace_members[] as $wid
-    | $m.packages[]
-    | select(.id == $wid)
-    | .name
-  ' "$tmp_metadata" | sort -u
-)
+jq -r '
+  . as $m
+  | $m.workspace_members[] as $wid
+  | $m.packages[]
+  | select(.id == $wid)
+  | .name
+' "$tmp_metadata" | sort -u >"$tmp_workspace_crates"
 
-while IFS=$'\t' read -r crate version; do
-  workspace_versions["$crate"]="$version"
-done < <(
-  jq -r '
-    . as $m
-    | $m.workspace_members[] as $wid
-    | $m.packages[]
-    | select(.id == $wid)
-    | [.name, .version]
-    | @tsv
-  ' "$tmp_metadata" | sort -u
-)
-
-declare -A allowed_external_crates=(
-  ["telltale-transport"]=1
-)
+jq -r '
+  . as $m
+  | $m.workspace_members[] as $wid
+  | $m.packages[]
+  | select(.id == $wid)
+  | [.name, .version]
+  | @tsv
+' "$tmp_metadata" | sort -u >"$tmp_workspace_versions"
 
 status=0
 
@@ -64,7 +52,7 @@ while IFS= read -r referenced_crate; do
   if [[ -z "$referenced_crate" ]]; then
     continue
   fi
-  if [[ -z "${workspace_crates[$referenced_crate]+x}" && -z "${allowed_external_crates[$referenced_crate]+x}" ]]; then
+  if ! grep -Fxq "$referenced_crate" "$tmp_workspace_crates" && [[ "$referenced_crate" != "telltale-transport" ]]; then
     echo "error: docs reference unknown crate '$referenced_crate'" >&2
     status=1
   fi
@@ -80,8 +68,9 @@ awk '
     in_table = 0
   }
   {
-    if (match($0, /^#### .*`([^`]+)`/, m)) {
-      crate = m[1]
+    if ($0 ~ /^#### / && $0 ~ /`/) {
+      split($0, heading_parts, /`/)
+      crate = heading_parts[2]
       in_table = 0
       next
     }
@@ -173,7 +162,7 @@ while IFS= read -r hit; do
   if [[ -z "$declared_version" ]]; then
     declared_version="$(sed -nE 's/.*version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' <<<"$line")"
   fi
-  expected_version="${workspace_versions[$crate]:-}"
+  expected_version="$(awk -F $'\t' -v crate="$crate" '$1 == crate { print $2; exit }' "$tmp_workspace_versions")"
 
   if [[ -z "$expected_version" ]]; then
     continue

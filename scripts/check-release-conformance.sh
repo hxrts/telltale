@@ -92,7 +92,10 @@ else
 fi
 
 mkdir -p "$(dirname "${REPORT_FILE}")"
-mapfile -t inventory_keys < <(
+inventory_keys=()
+while IFS= read -r inventory_key; do
+  inventory_keys+=("${inventory_key}")
+done < <(
   rg -o '\("([^"]+)", pack\.[^)]+\.isSome\)' "${INVENTORY_FILE}" \
     | sed -E 's/^\("([^"]+)".*/\1/'
 )
