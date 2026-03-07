@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use criterion::{black_box, Criterion};
+use criterion::{black_box, BatchSize, Criterion};
 use telltale_types::ValType;
 use telltale_vm::vm::RunStatus;
 use telltale_vm::VM;
@@ -11,8 +11,8 @@ use crate::common::{
     run_many_paused_scheduler_workload, run_pause_resume_churn_workload, run_repeated_load_reuse,
     run_repeated_open_same_image_profile, run_repeated_open_wide_roles_profile,
     run_send_recv_workload, run_short_lived_session_churn, run_yield_workload, send_recv_image,
-    typed_send_recv_image, validation_off_config, validation_strict_schema_config,
-    validation_structural_config, yield_image, BenchHandler,
+    setup_many_paused_scheduler_vm, typed_send_recv_image, validation_off_config,
+    validation_strict_schema_config, validation_structural_config, yield_image, BenchHandler,
 };
 
 pub(crate) fn bench_runtime(c: &mut Criterion) {
@@ -191,6 +191,18 @@ pub(crate) fn bench_runtime(c: &mut Criterion) {
                 black_box(8),
             ))
         })
+    });
+
+    c.bench_function("vm_scheduler_many_paused_run_only", |b| {
+        b.iter_batched(
+            || setup_many_paused_scheduler_vm(black_box(256), black_box(8)),
+            |mut vm| {
+                let status = vm.run(&handler, 10_000).expect("run vm");
+                assert!(matches!(status, RunStatus::Stuck));
+                black_box((status, vm.trace().len()));
+            },
+            BatchSize::SmallInput,
+        )
     });
 
     c.bench_function("vm_scheduler_pause_resume_churn", |b| {

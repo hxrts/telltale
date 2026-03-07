@@ -254,6 +254,8 @@ where
     next_session_id: SessionId,
     paused_roles: BTreeSet<String>,
     #[serde(skip, default)]
+    coro_slots: BTreeMap<usize, usize>,
+    #[serde(skip, default)]
     role_coroutines: BTreeMap<String, Vec<usize>>,
     #[serde(skip, default)]
     paused_coro_ids: BTreeSet<usize>,
@@ -328,6 +330,7 @@ where
             next_coro_id: 0,
             next_session_id: 0,
             paused_roles: BTreeSet::new(),
+            coro_slots: BTreeMap::new(),
             role_coroutines: BTreeMap::new(),
             paused_coro_ids: BTreeSet::new(),
             timed_out_coro_ids: BTreeSet::new(),

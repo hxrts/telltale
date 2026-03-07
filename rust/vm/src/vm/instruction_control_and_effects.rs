@@ -244,8 +244,19 @@ impl VM {
             }
         }
 
+        self.role_coroutines
+            .entry(child.role.clone())
+            .or_default()
+            .push(new_id);
+        if self.paused_roles.contains(&child.role) {
+            self.paused_coro_ids.insert(new_id);
+        }
+        if self.timed_out_sites.contains_key(&child.role) {
+            self.timed_out_coro_ids.insert(new_id);
+        }
         self.sched.add_ready(new_id);
         self.coroutines.push(child);
+        self.coro_slots.insert(new_id, self.coroutines.len() - 1);
         self.sync_ready_eligibility_for(new_id);
 
         Ok(StepPack {

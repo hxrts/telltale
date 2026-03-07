@@ -114,6 +114,7 @@ impl VM {
         }
         for (coro_id, fault) in faulted {
             self.sched.mark_done(coro_id);
+            #[cfg(debug_assertions)]
             self.eligible_ready.remove(&coro_id);
             self.obs_trace.push(
                 ObsEvent::Faulted {

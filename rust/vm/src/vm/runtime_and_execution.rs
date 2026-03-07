@@ -138,20 +138,30 @@ impl VM {
     }
 
     fn sync_ready_eligibility_for(&mut self, coro_id: usize) {
-        if self.sched.is_ready(coro_id) && self.coroutine_runtime_eligible(coro_id) {
-            self.eligible_ready.insert(coro_id);
-        } else {
-            self.eligible_ready.remove(&coro_id);
+        let eligible = self.sched.is_ready(coro_id) && self.coroutine_runtime_eligible(coro_id);
+        self.sched.set_ready_eligibility(coro_id, eligible);
+        #[cfg(debug_assertions)]
+        {
+            if eligible {
+                self.eligible_ready.insert(coro_id);
+            } else {
+                self.eligible_ready.remove(&coro_id);
+            }
         }
     }
 
     fn refresh_ready_eligibility(&mut self) {
-        self.eligible_ready = self
-            .sched
-            .ready_set_snapshot()
-            .into_iter()
-            .filter(|coro_id| self.coroutine_runtime_eligible(*coro_id))
-            .collect();
+        self.sched.clear_ready_eligibility();
+        #[cfg(debug_assertions)]
+        self.eligible_ready.clear();
+        for coro_id in self.sched.ready_set_snapshot() {
+            let eligible = self.coroutine_runtime_eligible(coro_id);
+            self.sched.set_ready_eligibility(coro_id, eligible);
+            #[cfg(debug_assertions)]
+            if eligible {
+                self.eligible_ready.insert(coro_id);
+            }
+        }
         self.eligibility_dirty = false;
     }
 
@@ -313,6 +323,7 @@ impl VM {
         }
         self.sched.add_ready(coro_id);
         self.coroutines.push(coro);
+        self.coro_slots.insert(coro_id, self.coroutines.len() - 1);
         self.sync_ready_eligibility_for(coro_id);
         Ok(())
     }
@@ -410,20 +421,22 @@ impl VM {
         self.ensure_ready_eligibility();
         #[cfg(debug_assertions)]
         self.debug_assert_ready_eligibility_consistent();
-        if self.eligible_ready.is_empty() {
+        if !self.sched.has_eligible_ready() {
             return Ok(StepResult::Stuck);
         }
-        let eligible_ready = self.eligible_ready.clone();
         let coroutines = &self.coroutines;
-        let Some(coro_id) = self.sched.pick_runnable_from_set(&eligible_ready, |id| {
-            coroutines
-                .iter()
-                .find(|coro| coro.id == id)
-                .map(|c| !c.progress_tokens.is_empty())
-                .unwrap_or(false)
+        let coro_slots = &self.coro_slots;
+        let Some(coro_id) = self.sched.pick_eligible_runnable(|id| {
+            coro_slots
+                .get(&id)
+                .and_then(|idx| coroutines.get(*idx))
+                .or_else(|| coroutines.get(id).filter(|coro| coro.id == id))
+                .or_else(|| coroutines.iter().find(|coro| coro.id == id))
+                .is_some_and(|coro| !coro.progress_tokens.is_empty())
         }) else {
             return Ok(StepResult::Stuck);
         };
+        #[cfg(debug_assertions)]
         self.eligible_ready.remove(&coro_id);
 
         let result = self.exec_instr(coro_id, handler);
@@ -452,6 +465,7 @@ impl VM {
                     self.sync_ready_eligibility_for(coro_id);
                 } else {
                     self.sched.mark_blocked(coro_id, reason);
+                    #[cfg(debug_assertions)]
                     self.eligible_ready.remove(&coro_id);
                 }
             }
@@ -461,6 +475,7 @@ impl VM {
                     exec_status: SchedExecStatus::Halted,
                 });
                 self.sched.mark_done(coro_id);
+                #[cfg(debug_assertions)]
                 self.eligible_ready.remove(&coro_id);
                 self.obs_trace.push(
                     ObsEvent::Halted {
@@ -488,6 +503,7 @@ impl VM {
                 };
                 self.coroutines[idx].status = CoroStatus::Faulted(fault.clone());
                 self.sched.mark_done(coro_id);
+                #[cfg(debug_assertions)]
                 self.eligible_ready.remove(&coro_id);
                 return Err(VMError::Fault { coro_id, fault });
             }
@@ -667,6 +683,7 @@ impl VM {
         self.coroutines.retain(|coro| {
             !(eligible.contains(&coro.session_id) && coro.is_terminal())
         });
+        self.rebuild_coroutine_indexes();
         self.sessions.reap_sessions(&eligible)
     }
 

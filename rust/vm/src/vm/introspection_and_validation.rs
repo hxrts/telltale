@@ -287,6 +287,9 @@ impl VM {
     // ---- Private ----
 
     fn coro_index(&self, id: usize) -> Option<usize> {
+        if let Some(idx) = self.coro_slots.get(&id).copied() {
+            return Some(idx);
+        }
         if self
             .coroutines
             .get(id)
@@ -295,6 +298,27 @@ impl VM {
             return Some(id);
         }
         self.coroutines.iter().position(|c| c.id == id)
+    }
+
+    fn rebuild_coroutine_indexes(&mut self) {
+        self.coro_slots.clear();
+        self.role_coroutines.clear();
+        self.paused_coro_ids.clear();
+        self.timed_out_coro_ids.clear();
+
+        for (idx, coro) in self.coroutines.iter().enumerate() {
+            self.coro_slots.insert(coro.id, idx);
+            self.role_coroutines
+                .entry(coro.role.clone())
+                .or_default()
+                .push(coro.id);
+            if self.paused_roles.contains(&coro.role) {
+                self.paused_coro_ids.insert(coro.id);
+            }
+            if self.timed_out_sites.contains_key(&coro.role) {
+                self.timed_out_coro_ids.insert(coro.id);
+            }
+        }
     }
 
     #[cfg(debug_assertions)]

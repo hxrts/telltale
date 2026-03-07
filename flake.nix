@@ -81,6 +81,7 @@
           gnuplot
           wasmPack
           wasm-bindgen-cli
+          samply
           mdbook
           mdbook-mermaid
           just

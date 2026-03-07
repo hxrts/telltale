@@ -159,6 +159,26 @@ wasm-check:
 bench-check:
     cargo bench --workspace --no-run
 
+# Profile a single VM runtime benchmark with samply.
+profile-vm bench:
+    samply record cargo bench -p telltale-vm --bench vm_runtime_bench -- {{ bench }}
+
+# Profile the paused-role scheduler hotspot with samply.
+profile-vm-scheduler:
+    samply record cargo run -p telltale-vm --release --bin vm_profile_driver -- scheduler-many-paused-run-only 200000
+
+# Profile the repeated load/reuse hotspot with samply.
+profile-vm-load:
+    samply record cargo run -p telltale-vm --release --bin vm_profile_driver -- repeated-load-reuse
+
+# Profile the replay/nullifier hotspot with samply.
+profile-vm-replay:
+    samply record cargo run -p telltale-vm --release --bin vm_profile_driver -- send-recv-replay-nullifier
+
+# Profile the repeated fixed-topology open path with samply.
+profile-vm-open:
+    samply record cargo run -p telltale-vm --release --bin vm_profile_driver -- repeated-open-same-image
+
 # Build WASM example with wasm-pack
 wasm-build:
     cd examples/wasm-ping-pong && wasm-pack build --target web

@@ -370,6 +370,13 @@ pub(crate) fn run_many_paused_scheduler_workload(
     num_roles: usize,
     yields_per_role: usize,
 ) -> VmMemoryUsage {
+    let mut vm = setup_many_paused_scheduler_vm(num_roles, yields_per_role);
+    let status = vm.run(&BenchHandler, 10_000).expect("run vm");
+    assert!(matches!(status, RunStatus::Stuck));
+    vm.memory_usage()
+}
+
+pub(crate) fn setup_many_paused_scheduler_vm(num_roles: usize, yields_per_role: usize) -> VM {
     let image = yield_image(num_roles, yields_per_role);
     let mut vm = VM::new(VMConfig {
         observability_retention: capped_retention_config(),
@@ -379,9 +386,7 @@ pub(crate) fn run_many_paused_scheduler_workload(
     for idx in 1..num_roles {
         vm.pause_role(&format!("R{idx}"));
     }
-    let status = vm.run(&BenchHandler, 10_000).expect("run vm");
-    assert!(matches!(status, RunStatus::Stuck));
-    vm.memory_usage()
+    vm
 }
 
 pub(crate) fn run_pause_resume_churn_workload(
