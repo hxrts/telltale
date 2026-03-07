@@ -515,7 +515,7 @@ fn step_open(
                 );
             }
         }
-        session_guard.rebuild_derived_indexes();
+        session_guard.refresh_handler_indexes();
     }
 
     for (_, _, reg) in &triples {

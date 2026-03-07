@@ -16,12 +16,12 @@ use std::time::Duration;
 
 use telltale_types::{LocalTypeR, ValType};
 
-use crate::buffer::{BoundedBuffer, BufferConfig, EnqueueResult};
+use crate::buffer::{BufferConfig, EnqueueResult};
 use crate::clock::SimClock;
 use crate::commit_common::{apply_output_condition_gate, effect_trace_entry_for_event};
 use crate::communication_replay::{
-    CommunicationConsumption, CommunicationConsumptionArtifact, CommunicationIdentity,
-    CommunicationReplayError, CommunicationStepKind, DefaultCommunicationConsumption,
+    CommunicationConsumption, CommunicationConsumptionArtifact, CommunicationReplayError,
+    CommunicationStepKind, DefaultCommunicationConsumption,
 };
 use crate::coroutine::{BlockReason, CoroStatus, Coroutine, Fault, ProgressToken, Value};
 use crate::effect::{
@@ -43,14 +43,13 @@ use crate::output_condition::{OutputConditionCheck, OutputConditionHint};
 use crate::scheduler::Scheduler;
 use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragmentV1};
 use crate::session::{
-    unfold_if_var_with_scope, unfold_mu, Edge, SessionId, SessionOpenPlan, SessionState,
-    SessionStatus, TypeEntry,
+    unfold_if_var_with_scope, Edge, SessionId, SessionOpenPlan, SessionState, SessionStatus,
 };
 use crate::transfer_semantics::{decode_transfer_request, move_endpoint_bundle};
 use crate::vm::{
     runtime_value_matches_val_type, runtime_value_val_type, runtime_value_wire_size_bytes,
-    EffectTraceCaptureMode, MonitorMode, ObsEvent, Program, ProgramStore, ResourceState, RunStatus,
-    SiteId, StepResult, ThreadedRoundSemantics, VMConfig, VMError,
+    EffectTraceCaptureMode, MonitorMode, ObsEvent, ProgramStore, ResourceState, RunStatus, SiteId,
+    StepResult, ThreadedRoundSemantics, VMConfig, VMError,
 };
 
 // Lane identifier in the threaded runtime.

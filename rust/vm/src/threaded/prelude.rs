@@ -182,64 +182,7 @@ impl ThreadedSessionStore {
         buffer_config: &BufferConfig,
     ) -> SessionId {
         let sid = self.next_id.fetch_add(1, Ordering::SeqCst);
-        let mut local_type_entries = Vec::with_capacity(plan.roles().len());
-        for (role, current, original) in &plan.initial_types {
-            local_type_entries.push((
-                Endpoint {
-                    sid,
-                    role: role.clone(),
-                },
-                TypeEntry {
-                    current: current.clone(),
-                    original: original.clone(),
-                },
-            ));
-        }
-        let local_types = local_type_entries.into_iter().collect();
-
-        let mut edge_entries = Vec::with_capacity(plan.edge_blueprint().len());
-        let mut buffer_entries = Vec::with_capacity(plan.edge_blueprint().len());
-        for (key, from, to) in plan.edge_blueprint() {
-            let edge = Edge::new(sid, from.clone(), to.clone());
-            edge_entries.push((*key, edge.clone()));
-            buffer_entries.push((edge, BoundedBuffer::new(buffer_config)));
-        }
-        let edge_lookup = edge_entries.into_iter().collect();
-        let buffers = buffer_entries.into_iter().collect();
-
-        let default_handler = crate::session::DEFAULT_HANDLER_ID.to_string();
-        let (handler_ids, handlers_by_id, edge_handler_lookup, default_handler_id) =
-            SessionState::build_handler_indexes(&plan.role_ids, &default_handler, &BTreeMap::new());
-
-        let mut state = SessionState {
-            sid,
-            roles: plan.roles().to_vec(),
-            role_ids: plan.role_ids.clone(),
-            local_types,
-            buffers,
-            edge_lookup,
-            handler_ids,
-            handlers_by_id,
-            edge_handler_lookup,
-            default_handler_id,
-            label_ids: BTreeMap::new(),
-            labels_by_id: Vec::new(),
-            branch_lookup: BTreeMap::new(),
-            auth_leaves: BTreeMap::new(),
-            auth_trees: BTreeMap::new(),
-            auth_roots: BTreeMap::new(),
-            edge_handlers: BTreeMap::new(),
-            default_handler,
-            edge_traces: BTreeMap::new(),
-            status: SessionStatus::Active,
-            epoch: 0,
-        };
-        for role in &plan.active_branch_roles {
-            state.refresh_endpoint_branch_lookup(&Endpoint {
-                sid,
-                role: role.clone(),
-            });
-        }
+        let state = SessionState::from_open_plan(sid, plan, buffer_config);
 
         let mut sessions = self.sessions.write().expect("threaded VM lock poisoned");
         sessions.insert(sid, Arc::new(Mutex::new(state)));
