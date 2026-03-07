@@ -135,7 +135,7 @@ impl LeanRunner {
                         }
                         return Err(LeanRunnerError::TimedOut {
                             operation: operation.to_string(),
-                            timeout_ms: timeout.as_millis() as u64,
+                            timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
                         });
                     }
                     thread::sleep(Duration::from_millis(10));

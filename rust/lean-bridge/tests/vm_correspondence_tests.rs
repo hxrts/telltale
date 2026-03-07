@@ -1,4 +1,4 @@
-#![allow(clippy::expect_used)]
+#![allow(clippy::as_conversions, clippy::expect_used)]
 
 #[path = "test_choreographies/mod.rs"]
 mod test_choreographies;

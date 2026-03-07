@@ -16,6 +16,7 @@ pub(super) struct LabeledLocalType {
 ///
 /// When merging Receive operations with different messages, this uses the choice labels
 /// instead of message type names for the resulting Branch node.
+#[allow(clippy::too_many_lines)]
 pub(super) fn merge_labeled_local_types(
     t1: &LabeledLocalType,
     t2: &LabeledLocalType,

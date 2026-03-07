@@ -95,7 +95,7 @@ impl VM {
             sid,
             crate::session::DEFAULT_HANDLER_ID.to_string(),
         );
-        let _ = self.handler_symbols.intern(crate::session::DEFAULT_HANDLER_ID);
+        self.handler_symbols.intern(crate::session::DEFAULT_HANDLER_ID);
     }
 
     fn ensure_session_capacity(&self) -> Result<(), VMError> {
@@ -125,7 +125,12 @@ impl VM {
 
     fn sync_ready_eligibility_for(&mut self, coro_id: usize) {
         let eligible = self.sched.is_ready(coro_id) && self.coroutine_runtime_eligible(coro_id);
-        self.sched.set_ready_eligibility(coro_id, eligible);
+        let eligibility = if eligible {
+            crate::scheduler::ReadyEligibility::Eligible
+        } else {
+            crate::scheduler::ReadyEligibility::Ineligible
+        };
+        self.sched.set_ready_eligibility(coro_id, eligibility);
         #[cfg(debug_assertions)]
         {
             if eligible {
@@ -142,7 +147,12 @@ impl VM {
         self.eligible_ready.clear();
         for coro_id in self.sched.ready_set_snapshot() {
             let eligible = self.coroutine_runtime_eligible(coro_id);
-            self.sched.set_ready_eligibility(coro_id, eligible);
+            let eligibility = if eligible {
+                crate::scheduler::ReadyEligibility::Eligible
+            } else {
+                crate::scheduler::ReadyEligibility::Ineligible
+            };
+            self.sched.set_ready_eligibility(coro_id, eligibility);
             #[cfg(debug_assertions)]
             if eligible {
                 self.eligible_ready.insert(coro_id);
@@ -719,8 +729,24 @@ impl VM {
     #[must_use]
     pub fn memory_usage(&self) -> VmMemoryUsage {
         let session_store = self.sessions.memory_usage();
-        let retained_bytes = VmRetainedBytes {
-            session_store: session_store.retained_bytes.total,
+        let retained_bytes = self.retained_bytes(session_store.retained_bytes.total);
+        VmMemoryUsage {
+            session_store,
+            coroutine_records: self.coroutines.len(),
+            terminal_coroutines: self.coroutines.iter().filter(|coro| coro.is_terminal()).count(),
+            program_count: self.programs.len(),
+            program_instruction_count: self.programs.instruction_count(),
+            obs_events: self.obs_trace.len(),
+            effect_trace_entries: self.effect_trace.len(),
+            communication_artifacts: self.communication_consumption_artifacts.len(),
+            output_condition_checks: self.output_condition_checks.len(),
+            retained_bytes,
+        }
+    }
+
+    fn retained_bytes(&self, session_store_bytes: usize) -> VmRetainedBytes {
+        let mut retained_bytes = VmRetainedBytes {
+            session_store: session_store_bytes,
             coroutines: self.coroutines.iter().map(vm_serialized_bytes).sum(),
             programs: vm_serialized_bytes(&self.programs)
                 .saturating_add(vm_serialized_bytes(&self.code)),
@@ -751,8 +777,12 @@ impl VM {
             arena: vm_serialized_bytes(&self.arena),
             total: 0,
         };
-        let mut retained_bytes = retained_bytes;
-        retained_bytes.total = retained_bytes
+        retained_bytes.total = Self::retained_bytes_total(&retained_bytes);
+        retained_bytes
+    }
+
+    fn retained_bytes_total(retained_bytes: &VmRetainedBytes) -> usize {
+        retained_bytes
             .session_store
             .saturating_add(retained_bytes.coroutines)
             .saturating_add(retained_bytes.programs)
@@ -764,19 +794,7 @@ impl VM {
             .saturating_add(retained_bytes.symbols)
             .saturating_add(retained_bytes.guard_layer)
             .saturating_add(retained_bytes.monitor)
-            .saturating_add(retained_bytes.arena);
-        VmMemoryUsage {
-            session_store,
-            coroutine_records: self.coroutines.len(),
-            terminal_coroutines: self.coroutines.iter().filter(|coro| coro.is_terminal()).count(),
-            program_count: self.programs.len(),
-            program_instruction_count: self.programs.instruction_count(),
-            obs_events: self.obs_trace.len(),
-            effect_trace_entries: self.effect_trace.len(),
-            communication_artifacts: self.communication_consumption_artifacts.len(),
-            output_condition_checks: self.output_condition_checks.len(),
-            retained_bytes,
-        }
+            .saturating_add(retained_bytes.arena)
     }
 
     /// Get recorded output-condition verification checks.

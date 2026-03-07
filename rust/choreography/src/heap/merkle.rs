@@ -267,7 +267,7 @@ mod tests {
 
     #[test]
     fn test_four_leaves() {
-        let leaves: Vec<[u8; 32]> = (0..4).map(|i| Sha256::digest([i as u8]).into()).collect();
+        let leaves: Vec<[u8; 32]> = (0_u8..4).map(|i| Sha256::digest([i]).into()).collect();
         let tree = MerkleTree::from_leaves(leaves.clone());
 
         let h01 = hash_pair(&leaves[0], &leaves[1]);
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_proof_generation_and_verification() {
-        let leaves: Vec<[u8; 32]> = (0..4).map(|i| Sha256::digest([i as u8]).into()).collect();
+        let leaves: Vec<[u8; 32]> = (0_u8..4).map(|i| Sha256::digest([i]).into()).collect();
         let tree = MerkleTree::from_leaves(leaves);
 
         for i in 0..4 {
@@ -291,7 +291,7 @@ mod tests {
 
     #[test]
     fn test_proof_for_out_of_bounds() {
-        let leaves: Vec<[u8; 32]> = (0..4).map(|i| Sha256::digest([i as u8]).into()).collect();
+        let leaves: Vec<[u8; 32]> = (0_u8..4).map(|i| Sha256::digest([i]).into()).collect();
         let tree = MerkleTree::from_leaves(leaves);
 
         assert!(tree.prove(4).is_none());
@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn test_odd_number_of_leaves() {
-        let leaves: Vec<[u8; 32]> = (0..3).map(|i| Sha256::digest([i as u8]).into()).collect();
+        let leaves: Vec<[u8; 32]> = (0_u8..3).map(|i| Sha256::digest([i]).into()).collect();
         let tree = MerkleTree::from_leaves(leaves);
 
         // Should still work with 3 leaves

@@ -51,6 +51,12 @@
 //! assert_eq!(json["kind"], "comm");
 //! ```
 
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::must_use_candidate
+)]
+
 use cfg_if::cfg_if;
 
 pub mod export;

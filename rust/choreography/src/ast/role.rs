@@ -194,7 +194,12 @@ impl Role {
 
     /// Create a new indexed role (e.g., Worker with index 0)
     pub fn indexed(name: Ident, index: usize) -> RoleValidationResult<Self> {
-        let role_index = RoleIndex::safe_concrete(index as u32)?;
+        let role_index = RoleIndex::safe_concrete(u32::try_from(index).map_err(|_| {
+            RoleValidationError::IndexOverflow {
+                index: u32::MAX,
+                max: MAX_ROLE_INDEX,
+            }
+        })?)?;
         let role = Self::new_unchecked(name, None, Some(role_index), None);
         role.validate()?;
         Ok(role)
@@ -217,7 +222,12 @@ impl Role {
         let size_token: TokenStream = size.to_string().parse().unwrap();
         let role = Self::new_unchecked(
             name,
-            Some(RoleParam::safe_static(size as u32)?),
+            Some(RoleParam::safe_static(u32::try_from(size).map_err(
+                |_| RoleValidationError::CountOverflow {
+                    count: u32::MAX,
+                    max: MAX_ROLE_COUNT,
+                },
+            )?)?),
             None,
             Some(size_token),
         );

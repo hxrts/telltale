@@ -169,10 +169,10 @@ impl ExtensionRegistry {
                 if priority > existing_priority {
                     // New extension wins, record conflict
                     self.rule_conflicts
-                        .entry(rule.to_string())
+                        .entry((*rule).to_string())
                         .or_default()
                         .push(existing_id.clone());
-                    self.rule_to_parser.insert(rule.to_string(), id.clone());
+                    self.rule_to_parser.insert((*rule).to_string(), id.clone());
                 } else if priority == existing_priority {
                     // Equal priority - this is a conflict
                     return Err(ParseError::PriorityConflict {
@@ -180,12 +180,12 @@ impl ExtensionRegistry {
                         extension2: id.clone(),
                         priority1: existing_priority,
                         priority2: priority,
-                        rule: rule.to_string(),
+                        rule: (*rule).to_string(),
                     });
                 }
                 // Lower priority - existing extension wins
             } else {
-                self.rule_to_parser.insert(rule.to_string(), id.clone());
+                self.rule_to_parser.insert((*rule).to_string(), id.clone());
             }
         }
 

@@ -28,7 +28,7 @@ fn scale_duration_by_fixed(duration: Duration, factor: FixedQ32) -> Duration {
     }
 
     let duration_nanos = duration.as_nanos();
-    let factor_bits = factor.to_bits() as u128;
+    let factor_bits = u128::try_from(factor.to_bits()).unwrap_or_default();
     let scaled = duration_nanos
         .saturating_mul(factor_bits)
         .checked_shr(FixedQ32::FRACTIONAL_BITS)

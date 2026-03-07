@@ -29,7 +29,7 @@ fn require_lean() -> Option<LeanRunner> {
 /// Project via Lean and Rust, assert results match.
 fn cross_validate(runner: &LeanRunner, g: &GlobalType, roles: &[&str]) {
     let json = global_to_json(g);
-    let role_strings: Vec<String> = roles.iter().map(|r| r.to_string()).collect();
+    let role_strings: Vec<String> = roles.iter().map(|r| (*r).to_string()).collect();
     let lean_projections = runner
         .project(&json, &role_strings)
         .expect("Lean projection should succeed");

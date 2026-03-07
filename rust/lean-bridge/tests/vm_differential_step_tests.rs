@@ -1,4 +1,4 @@
-#![allow(clippy::expect_used)]
+#![allow(clippy::as_conversions, clippy::expect_used)]
 
 #[path = "test_choreographies/mod.rs"]
 mod test_choreographies;
@@ -298,6 +298,7 @@ fn fixture_to_choreography_json(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn assert_step_indexed_equivalence(
     fixture: &test_choreographies::ProtocolFixture,
     max_steps: usize,

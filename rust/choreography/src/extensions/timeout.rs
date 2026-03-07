@@ -185,7 +185,7 @@ impl ProtocolExtension for TimeoutProtocol {
     }
 
     fn generate_code(&self, _context: &CodegenContext) -> proc_macro2::TokenStream {
-        let duration_ms = self.duration.as_millis() as u64;
+        let duration_ms = u64::try_from(self.duration.as_millis()).unwrap_or(u64::MAX);
         let _role_names = &self.role_names;
 
         quote::quote! {

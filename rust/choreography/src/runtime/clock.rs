@@ -5,6 +5,10 @@
 //! in the `testing` module instead.
 
 use std::time::{Duration, Instant};
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 use crate::testing::clock::{AsyncClock, Clock, Rng, WallClock};
 use cfg_if::cfg_if;
@@ -23,10 +27,13 @@ impl SystemClock {
     /// in production contexts.
     #[must_use]
     pub fn timestamp_ns() -> u64 {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as u64
+        u64::try_from(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos(),
+        )
+        .unwrap_or(u64::MAX)
     }
 }
 
@@ -72,10 +79,13 @@ impl SystemRng {
     /// Create a new system RNG seeded from current time.
     #[must_use]
     pub fn new() -> Self {
-        let seed = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as u64;
+        let seed = u64::try_from(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos(),
+        )
+        .unwrap_or(u64::MAX);
         Self {
             state: if seed == 0 { 1 } else { seed },
         }
@@ -85,7 +95,10 @@ impl SystemRng {
 impl Rng for SystemRng {
     fn next_u64(&mut self) -> u64 {
         // Mix in address for additional entropy
-        let ptr = self as *mut Self as u64;
+        let mut hasher = DefaultHasher::new();
+        let ptr: *const Self = self;
+        ptr.hash(&mut hasher);
+        let ptr = hasher.finish();
         self.state = self
             .state
             .wrapping_mul(ptr)
@@ -100,10 +113,13 @@ impl Rng for SystemRng {
     fn fork(&mut self) -> Self {
         // Fork by mixing current state with time-based entropy
         let fork_seed = self.next_u64()
-            ^ std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos() as u64;
+            ^ u64::try_from(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos(),
+            )
+            .unwrap_or(u64::MAX);
         Self {
             state: if fork_seed == 0 { 1 } else { fork_seed },
         }

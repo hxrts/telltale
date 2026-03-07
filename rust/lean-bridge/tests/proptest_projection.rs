@@ -472,6 +472,7 @@ fn test_rust_projection_matches_lean_choice() {
 /// This test specifically validates that the choice continuation bug is fixed
 /// by checking against Lean's verified implementation.
 #[test]
+#[allow(clippy::too_many_lines)]
 fn test_choice_continuation_bug_fix_against_lean() {
     skip_without_lean!();
 

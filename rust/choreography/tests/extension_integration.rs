@@ -89,21 +89,23 @@ impl TestHandler {
 
         // Register TestExtension handler
         let executed = executed_extensions.clone();
-        let _ = registry.register::<TestExtension, _>(move |_ep, ext| {
-            let executed = executed.clone();
-            Box::pin(async move {
-                let test_ext = ext
-                    .as_any()
-                    .downcast_ref::<TestExtension>()
-                    .ok_or_else(|| ExtensionError::TypeMismatch {
-                        expected: "TestExtension",
-                        actual: ext.type_name(),
-                    })?;
+        registry
+            .register::<TestExtension, _>(move |_ep, ext| {
+                let executed = executed.clone();
+                Box::pin(async move {
+                    let test_ext =
+                        ext.as_any()
+                            .downcast_ref::<TestExtension>()
+                            .ok_or_else(|| ExtensionError::TypeMismatch {
+                                expected: "TestExtension",
+                                actual: ext.type_name(),
+                            })?;
 
-                executed.lock().unwrap().push(test_ext.value);
-                Ok(())
+                    executed.lock().unwrap().push(test_ext.value);
+                    Ok(())
+                })
             })
-        });
+            .expect("register test extension");
 
         Self {
             registry,

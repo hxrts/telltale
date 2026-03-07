@@ -83,7 +83,7 @@ fn bench_dynamic_role_projection(c: &mut Criterion) {
         |b, choreo| {
             b.iter(|| {
                 for role in &choreo.roles {
-                    let _ = project(black_box(choreo), black_box(role));
+                    drop(project(black_box(choreo), black_box(role)));
                 }
             })
         },
@@ -96,7 +96,7 @@ fn bench_dynamic_role_projection(c: &mut Criterion) {
         |b, choreo| {
             b.iter(|| {
                 for role in &choreo.roles {
-                    let _ = project(black_box(choreo), black_box(role));
+                    drop(project(black_box(choreo), black_box(role)));
                 }
             })
         },
@@ -226,7 +226,7 @@ fn bench_complex_protocol(c: &mut Criterion) {
 
             // Try projection (may fail for dynamic roles without bindings)
             for role in &parsed.roles {
-                let _ = project(&parsed, role);
+                drop(project(&parsed, role));
             }
 
             // Generate code
@@ -305,7 +305,7 @@ fn bench_memory_usage(c: &mut Criterion) {
     group.bench_function("projection_allocation", |b| {
         b.iter(|| {
             for role in &choreo.roles {
-                let _ = project(black_box(&choreo), black_box(role));
+                drop(project(black_box(&choreo), black_box(role)));
             }
         })
     });

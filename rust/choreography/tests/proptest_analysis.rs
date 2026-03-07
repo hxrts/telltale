@@ -108,7 +108,7 @@ fn choreography_strategy() -> impl Strategy<Value = Choreography> {
 proptest! {
     #[test]
     fn analysis_completes_without_panicking(choreo in choreography_strategy()) {
-        let _ = analyze(&choreo);
+        drop(analyze(&choreo));
     }
 
     #[test]

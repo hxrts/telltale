@@ -58,6 +58,15 @@ pub enum StepUpdate {
     Done,
 }
 
+/// Cached readiness eligibility for scheduler-side filtered ready queues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ReadyEligibility {
+    /// Coroutine is both ready and eligible for scheduling.
+    Eligible,
+    /// Coroutine should be removed from the eligible-ready cache.
+    Ineligible,
+}
+
 /// Cross-lane capability-transfer record.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrossLaneHandoff {
@@ -184,6 +193,7 @@ impl Scheduler {
 
     fn lane_queue_pop_front(&mut self, lane: LaneId) -> Option<usize> {
         loop {
+            // bounded: queue drains until empty or ready element found
             let coro_id = self
                 .lane_queues
                 .get_mut(&lane)
@@ -200,6 +210,7 @@ impl Scheduler {
 
     fn lane_eligible_queue_pop_front(&mut self, lane: LaneId) -> Option<usize> {
         loop {
+            // bounded: queue drains until empty or eligible element found
             let coro_id = self
                 .lane_eligible_queues
                 .get_mut(&lane)
@@ -549,9 +560,9 @@ impl Scheduler {
     }
 
     /// Update cached ready eligibility for a coroutine.
-    pub fn set_ready_eligibility(&mut self, coro_id: usize, eligible: bool) {
+    pub fn set_ready_eligibility(&mut self, coro_id: usize, eligibility: ReadyEligibility) {
         let lane = self.lane_for_or_default(coro_id);
-        if eligible && self.ready_set.contains(&coro_id) {
+        if matches!(eligibility, ReadyEligibility::Eligible) && self.ready_set.contains(&coro_id) {
             self.lane_eligible_queue_push(lane, coro_id);
         } else {
             self.lane_eligible_queue_remove(lane, coro_id);
@@ -886,7 +897,7 @@ mod tests {
         sched.add_ready(1);
         sched.add_ready(2);
 
-        sched.set_ready_eligibility(2, true);
+        sched.set_ready_eligibility(2, ReadyEligibility::Eligible);
         assert_eq!(sched.pick_eligible_runnable(|_| false), Some(2));
         assert_eq!(sched.ready_snapshot(), vec![0, 1]);
         assert_eq!(sched.step_count(), 1);

@@ -139,7 +139,7 @@ fn interpreter_hot_path(c: &mut Criterion) {
             rt.block_on(async {
                 let mut handler = telltale_choreography::NoOpHandler::<BenchRole>::new();
                 let mut endpoint = ();
-                let _ = interpret(&mut handler, &mut endpoint, black_box(program.clone())).await;
+                drop(interpret(&mut handler, &mut endpoint, black_box(program.clone())).await);
             });
         });
     });

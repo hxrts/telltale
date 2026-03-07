@@ -39,7 +39,7 @@ impl VM {
                 actual: telltale_types::ValType::Unit,
                 message: format!("{role}: no type registered"),
             })?;
-        let _ = Self::expect_recv_type(local_type, role)?;
+        Self::expect_recv_type(local_type, role)?;
         let session = self
             .sessions
             .get(ep.sid)

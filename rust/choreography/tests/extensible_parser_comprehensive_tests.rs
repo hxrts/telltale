@@ -7,6 +7,8 @@
 //! - Backwards compatibility
 //! - Error handling and edge cases
 
+#![allow(clippy::as_conversions)]
+
 use std::time::Instant;
 use telltale_choreography::{
     ast::*,

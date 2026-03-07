@@ -35,6 +35,12 @@
 //! - 4 bytes: message length (big-endian u32)
 //! - N bytes: message payload
 
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::must_use_candidate
+)]
+
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -170,7 +176,7 @@ impl TcpTransport {
                 Ok(mut stream) => {
                     // Send our role name so the peer knows who connected
                     let role_bytes = self.role.as_str().as_bytes();
-                    let len = role_bytes.len() as u32;
+                    let len = u32::try_from(role_bytes.len()).unwrap_or(u32::MAX);
                     stream.write_all(&len.to_be_bytes()).await?;
                     stream.write_all(role_bytes).await?;
                     stream.flush().await?;
@@ -216,7 +222,7 @@ async fn handle_incoming_connection(
     // First, read the peer's role name
     let mut len_buf = [0u8; 4];
     stream.read_exact(&mut len_buf).await?;
-    let len = u32::from_be_bytes(len_buf) as usize;
+    let len = usize::try_from(u32::from_be_bytes(len_buf)).unwrap_or(usize::MAX);
 
     let mut role_buf = vec![0u8; len];
     stream.read_exact(&mut role_buf).await?;
@@ -239,7 +245,7 @@ async fn handle_incoming_connection(
             }
             Err(e) => return Err(e.into()),
         }
-        let len = u32::from_be_bytes(len_buf) as usize;
+        let len = usize::try_from(u32::from_be_bytes(len_buf)).unwrap_or(usize::MAX);
 
         // Read message payload
         let mut payload = vec![0u8; len];
@@ -282,7 +288,7 @@ impl Transport for TcpTransport {
         let mut stream = stream.lock().await;
 
         // Write length prefix
-        let len = message.len() as u32;
+        let len = u32::try_from(message.len()).unwrap_or(u32::MAX);
         stream.write_all(&len.to_be_bytes()).await?;
 
         // Write payload
@@ -323,7 +329,9 @@ impl Transport for TcpTransport {
     async fn close(&self) -> TransportResult<()> {
         if let Some(shutdown) = self.shutdown.lock().await.take() {
             // Ignore send failure: receiver may already be dropped during shutdown
-            let _ = shutdown.send(());
+            if shutdown.send(()).is_err() {
+                // Receiver already dropped during shutdown.
+            }
         }
 
         // Close all outgoing connections

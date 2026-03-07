@@ -306,7 +306,7 @@ async fn test_handler_metadata_updates_on_send() {
         .unwrap();
 
     // Consume the message on the other end to avoid channel blocking
-    let _ = other.recv().await;
+    drop(other.recv().await);
 
     // Metadata should be updated
     let meta = endpoint.get_metadata(&TestRole::Bob).unwrap();
@@ -421,7 +421,7 @@ async fn test_handler_choose_updates_metadata() {
         .unwrap();
 
     // Consume on the other end
-    let _ = other.recv().await;
+    drop(other.recv().await);
 
     let meta = endpoint.get_metadata(&TestRole::Bob).unwrap();
     assert_eq!(meta.operation_count, 1);

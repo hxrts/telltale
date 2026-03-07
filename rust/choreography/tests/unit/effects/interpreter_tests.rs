@@ -45,11 +45,13 @@ impl RoleId for TestRole {
 #[derive(Clone, Debug, PartialEq, Serialize, serde::Deserialize)]
 struct TestMessage(String);
 
+#[allow(clippy::too_many_lines)]
 async fn interpret_reference(
     handler: &mut testing::MockHandler<TestRole>,
     endpoint: &mut (),
     program: Program<TestRole, TestMessage>,
 ) -> ChoreoResult<InterpretResult<TestMessage>> {
+    #[allow(clippy::too_many_lines)]
     #[async_recursion]
     async fn run_program(
         handler: &mut testing::MockHandler<TestRole>,

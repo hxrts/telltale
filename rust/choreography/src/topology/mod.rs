@@ -160,7 +160,10 @@ impl RoleFamilyConstraint {
 
     /// Validate a count against this constraint.
     pub fn validate(&self, count: usize) -> Result<(), RoleFamilyConstraintError> {
-        let count = count as u32;
+        let count = u32::try_from(count).map_err(|_| RoleFamilyConstraintError::AboveMaximum {
+            actual: u32::MAX,
+            max: self.max.unwrap_or(u32::MAX),
+        })?;
         if count < self.min {
             return Err(RoleFamilyConstraintError::BelowMinimum {
                 actual: count,

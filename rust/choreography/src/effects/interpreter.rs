@@ -162,6 +162,7 @@ impl<M, R: RoleId> Interpreter<M, R> {
         Ok(())
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn execute_base_effect<'a, H>(
         &mut self,
         handler: &mut H,

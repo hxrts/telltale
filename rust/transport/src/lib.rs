@@ -58,6 +58,11 @@
 //!
 //! // Mixed IPv4 and IPv6 peers
 //! let mixed = TcpTransportConfig::new("Gateway", "0.0.0.0:8080")
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::must_use_candidate
+)]
 //!     .with_peer("IPv4Peer", "192.168.1.100:8081")
 //!     .with_peer("IPv6Peer", "[2001:db8::1]:8082");
 //! ```

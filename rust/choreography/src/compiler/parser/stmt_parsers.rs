@@ -423,6 +423,7 @@ pub(super) fn parse_heartbeat_stmt(
 }
 
 /// Parse loop statement
+#[allow(clippy::too_many_lines)]
 pub(super) fn parse_loop_stmt(
     pair: pest::iterators::Pair<Rule>,
     declared_roles: &HashSet<String>,

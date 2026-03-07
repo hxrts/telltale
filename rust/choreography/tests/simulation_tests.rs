@@ -7,6 +7,7 @@
 //! - MockClock determinism and reproducibility
 //! - Observer event capture correctness
 
+#![allow(clippy::as_conversions, clippy::cast_possible_truncation)]
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
@@ -757,25 +758,25 @@ fn test_in_memory_transport_fifo_ordering() {
     server.set_role(RoleName::from_static("Server"));
 
     // Send multiple messages
-    for i in 0..5 {
+    for i in 0_u8..5 {
         let envelope = ProtocolEnvelope::builder()
             .protocol("Test")
             .sender(RoleName::from_static("Client"))
             .recipient(RoleName::from_static("Server"))
             .message_type("Msg")
-            .sequence(i)
-            .payload(vec![i as u8])
+            .sequence(u64::from(i))
+            .payload(vec![i])
             .build()
             .unwrap();
         SimulatedTransport::send(&mut client, &RoleName::from_static("Server"), envelope).unwrap();
     }
 
     // Receive in FIFO order
-    for i in 0..5 {
+    for i in 0_u8..5 {
         let received =
             SimulatedTransport::recv(&mut server, &RoleName::from_static("Client")).unwrap();
-        assert_eq!(received.sequence, i);
-        assert_eq!(received.payload, vec![i as u8]);
+        assert_eq!(received.sequence, u64::from(i));
+        assert_eq!(received.payload, vec![i]);
     }
 }
 
@@ -1116,12 +1117,13 @@ fn test_faulty_transport_partial_drop_rate() {
 
     let send_count = 1000;
     for i in 0..send_count {
+        let payload = u8::try_from(i % 256).unwrap_or(0);
         let envelope = ProtocolEnvelope::builder()
             .protocol("Test")
             .sender(RoleName::from_static("Client"))
             .recipient(RoleName::from_static("Server"))
             .message_type("Msg")
-            .payload(vec![(i % 256) as u8])
+            .payload(vec![payload])
             .build()
             .unwrap();
         faulty

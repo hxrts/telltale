@@ -278,7 +278,7 @@ impl<T> FaultyTransport<T> {
         self.rng_state ^= self.rng_state << 17;
         // FixedQ32 is Q32.32: value = bits / 2^32
         // Take upper 32 bits as fractional part to get value in [0, 1)
-        let frac_bits = (self.rng_state >> 32) as i64;
+        let frac_bits = i64::try_from(self.rng_state >> 32).unwrap_or(i64::MAX);
         FixedQ32::from_bits(frac_bits)
     }
 

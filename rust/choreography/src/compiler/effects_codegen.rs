@@ -179,6 +179,7 @@ fn generate_program_builder(protocol: &Protocol, role: &Role) -> TokenStream {
 }
 
 /// Generate effect builder calls for a protocol
+#[allow(clippy::cognitive_complexity)]
 #[allow(clippy::too_many_lines)]
 // RECURSION_SAFE: structural recursion over finite protocol AST depth.
 fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
@@ -231,7 +232,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
             let timed_choice_duration = annotations.timed_choice();
             let is_timed_choice = timed_choice_duration.is_some();
             let timeout_ms = timed_choice_duration
-                .map(|d| d.as_millis() as u64)
+                .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
                 .unwrap_or(5000); // Default 5 seconds
 
             // Generate Branch effect with all possible continuations

@@ -76,8 +76,8 @@ impl telltale::Message<Box<dyn std::any::Any + Send>> for BenchMessage {
 fn bench_send_recv_throughput(c: &mut Criterion) {
     let mut group = c.benchmark_group("send_recv_throughput");
 
-    for size in &[128, 1024, 4096, 16384, 65536] {
-        group.throughput(Throughput::Bytes(*size as u64));
+    for size in &[128_usize, 1024, 4096, 16384, 65536] {
+        group.throughput(Throughput::Bytes(u64::try_from(*size).unwrap_or(u64::MAX)));
 
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             let runtime = Runtime::new().unwrap();

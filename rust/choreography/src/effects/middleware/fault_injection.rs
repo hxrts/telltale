@@ -58,7 +58,7 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for FaultInjection<H> {
         // Inject random delay
         if let Some((min, max)) = self.delay_range {
             let delay_ms = self.rng.gen_range(min.as_millis()..=max.as_millis());
-            let delay = Duration::from_millis(delay_ms as u64);
+            let delay = Duration::from_millis(u64::try_from(delay_ms).unwrap_or(u64::MAX));
 
             cfg_if! {
                 if #[cfg(target_arch = "wasm32")] {

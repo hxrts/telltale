@@ -130,9 +130,9 @@ fi
 # Look for struct fields with `: usize,` pattern (trailing comma indicates field, not fn param)
 # Excludes function signatures, generic bounds, and return types
 section "Checking for usize in serializable types"
-USIZE_SERDE=$(grep -rn ":\s*usize\s*," rust/*/src --include="*.rs" 2>/dev/null \
+USIZE_SERDE=$( (grep -rn ":\s*usize\s*," rust/*/src --include="*.rs" 2>/dev/null \
     | grep -v "fn \|test\|example\|// " \
-    | wc -l | tr -d ' ')
+    | wc -l | tr -d ' ') || true)
 
 if [ "$USIZE_SERDE" -gt 10 ]; then
     log_warn "Found $USIZE_SERDE potential usize fields in struct types"
@@ -148,7 +148,7 @@ fi
 
 # 6. Check for TODO/FIXME comments (technical debt tracking)
 section "Checking for technical debt markers"
-TODO_COUNT=$(grep -rn "TODO\|FIXME\|HACK\|XXX" rust/*/src --include="*.rs" 2>/dev/null | wc -l | tr -d ' ')
+TODO_COUNT=$( (grep -rn "TODO\|FIXME\|HACK\|XXX" rust/*/src --include="*.rs" 2>/dev/null | wc -l | tr -d ' ') || true)
 
 if [ "$TODO_COUNT" -gt 0 ]; then
     log_info "Found $TODO_COUNT TODO/FIXME comments (technical debt)"
@@ -159,10 +159,10 @@ fi
 
 # 7. Check for magic numbers in bounds (style guide: encode limits as constants)
 section "Checking for magic numbers"
-MAGIC_BOUNDS=$(grep -rn "< [0-9]\{3,\}\|> [0-9]\{3,\}\|<= [0-9]\{3,\}\|>= [0-9]\{3,\}" \
+MAGIC_BOUNDS=$( (grep -rn "< [0-9]\{3,\}\|> [0-9]\{3,\}\|<= [0-9]\{3,\}\|>= [0-9]\{3,\}" \
     rust/*/src --include="*.rs" 2>/dev/null \
     | grep -v "const\|static\|test\|#\[" \
-    | wc -l | tr -d ' ')
+    | wc -l | tr -d ' ') || true)
 
 if [ "$MAGIC_BOUNDS" -gt 0 ]; then
     log_warn "Found $MAGIC_BOUNDS potential magic numbers (3+ digits) in comparisons"

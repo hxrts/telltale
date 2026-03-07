@@ -8,6 +8,12 @@
 //! participant. This includes an effect handler system that decouples protocol
 //! logic from transport implementation.
 
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::must_use_candidate
+)]
+
 pub mod ast;
 pub mod compiler;
 pub mod effects;

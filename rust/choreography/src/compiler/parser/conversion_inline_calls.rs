@@ -3,6 +3,7 @@ use super::super::types::{ChoiceBranch, Statement};
 use std::collections::HashMap;
 
 /// Inline all Call statements by replacing them with their definitions.
+#[allow(clippy::too_many_lines)]
 pub(crate) fn inline_calls(
     statements: &[Statement],
     protocol_defs: &HashMap<String, Vec<Statement>>,

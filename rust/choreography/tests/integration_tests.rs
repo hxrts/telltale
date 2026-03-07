@@ -368,7 +368,7 @@ fn test_performance_characteristics() {
 
         // Test projection performance
         for role in &choreo.roles {
-            let _ = project(&choreo, role); // May fail for dynamic roles, but should be fast
+            drop(project(&choreo, role)); // May fail for dynamic roles, but should be fast
         }
     }
 

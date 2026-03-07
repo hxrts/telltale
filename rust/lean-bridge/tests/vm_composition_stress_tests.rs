@@ -1,4 +1,8 @@
-#![allow(clippy::expect_used)]
+#![allow(
+    clippy::as_conversions,
+    clippy::cast_possible_truncation,
+    clippy::expect_used
+)]
 //! Composition stress tests: concurrent protocol execution and runtime metrics.
 
 use cfg_if::cfg_if;

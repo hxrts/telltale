@@ -390,7 +390,7 @@ impl PhaseGuard {
 impl Drop for PhaseGuard {
     fn drop(&mut self) {
         let _enter = self.span.enter();
-        let duration_ms = self.start.elapsed().as_millis() as u64;
+        let duration_ms = u64::try_from(self.start.elapsed().as_millis()).unwrap_or(u64::MAX);
         trace_phase_end(self.phase, duration_ms);
     }
 }

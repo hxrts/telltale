@@ -426,7 +426,7 @@ impl ClonableExtensionWrapper {
             rules: extension
                 .statement_rules()
                 .iter()
-                .map(|s| s.to_string())
+                .map(|s| (*s).to_string())
                 .collect(),
             grammar: extension.grammar_rules().to_string(),
             priority: metadata.priority.unwrap_or(extension.priority()),
