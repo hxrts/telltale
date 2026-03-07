@@ -69,6 +69,7 @@ fn legacy_nullifier_consume(
     })
 }
 
+#[allow(clippy::too_many_lines)]
 pub(crate) fn bench_verification_and_allocations(c: &mut Criterion) {
     eprintln!(
         "vm benchmark snapshot session_open_allocations: {}",

@@ -74,6 +74,8 @@ The workspace provides granular feature flags to control dependencies and functi
 |---------|---------|-------------|
 | `test-utils` | no | Testing utilities (random, fault injection) |
 | `wasm` | no | WebAssembly support |
+| `native-cli` | no | Build native CLI binaries such as `choreo-fmt` |
+| `native-examples` | no | Build native examples that depend on local runtime tooling |
 
 #### Lean Bridge Crate (`telltale-lean-bridge`)
 

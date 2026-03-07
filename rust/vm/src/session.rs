@@ -110,6 +110,11 @@ impl SessionOpenPlan {
     }
 
     /// Build a reusable open plan from a role list and initial local types.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internally assigned role id does not map back into the
+    /// canonical `roles` slice while constructing the edge blueprint.
     #[must_use]
     pub fn new(roles: &[String], initial_types: &BTreeMap<String, LocalTypeR>) -> Self {
         let role_ids = SessionState::build_role_ids(roles);
@@ -221,6 +226,14 @@ pub type SessionId = usize;
 pub type HandlerId = String;
 type HandlerNumericId = u16;
 type LabelNumericId = u16;
+type EdgeKey = (u16, u16);
+type LocalBranches<'a> = &'a [(Label, Option<ValType>, LocalTypeR)];
+type HandlerIndexBuild = (
+    BTreeMap<HandlerId, HandlerNumericId>,
+    Vec<HandlerId>,
+    BTreeMap<EdgeKey, HandlerNumericId>,
+    Option<HandlerNumericId>,
+);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub(crate) enum BranchDirection {
@@ -534,7 +547,7 @@ impl SessionState {
     pub(crate) fn build_edge_lookup_from_buffers(
         role_ids: &BTreeMap<String, u16>,
         buffers: &BTreeMap<Edge, SignedBuffer<Signature>>,
-    ) -> BTreeMap<(u16, u16), Edge> {
+    ) -> BTreeMap<EdgeKey, Edge> {
         let mut lookup = BTreeMap::new();
         for edge in buffers.keys() {
             let Some(from_id) = role_ids.get(&edge.sender) else {
@@ -552,12 +565,7 @@ impl SessionState {
         role_ids: &BTreeMap<String, u16>,
         default_handler: &str,
         edge_handlers: &BTreeMap<Edge, HandlerId>,
-    ) -> (
-        BTreeMap<HandlerId, HandlerNumericId>,
-        Vec<HandlerId>,
-        BTreeMap<(u16, u16), HandlerNumericId>,
-        Option<HandlerNumericId>,
-    ) {
+    ) -> HandlerIndexBuild {
         let mut handler_ids = BTreeMap::new();
         let mut handlers_by_id = Vec::new();
         let intern_handler = |handler: &str,
@@ -635,13 +643,7 @@ impl SessionState {
         self.handlers_by_id.get(usize::from(handler_id))
     }
 
-    fn branch_shape(
-        local_type: &LocalTypeR,
-    ) -> Option<(
-        BranchDirection,
-        &str,
-        &[(Label, Option<ValType>, LocalTypeR)],
-    )> {
+    fn branch_shape(local_type: &LocalTypeR) -> Option<(BranchDirection, &str, LocalBranches<'_>)> {
         match local_type {
             LocalTypeR::Send { partner, branches } => {
                 Some((BranchDirection::Send, partner.as_str(), branches.as_slice()))
@@ -852,7 +854,7 @@ impl SessionState {
         let Some(edge) = self.edge_for_roles(from, to) else {
             return false;
         };
-        self.buffers.get(&edge).is_some_and(|buf| !buf.is_empty())
+        self.buffers.get(edge).is_some_and(|buf| !buf.is_empty())
     }
 
     /// Lookup an edge-bound handler by role pair using the internal numeric path.
@@ -957,6 +959,7 @@ impl SessionStore {
     /// Open a new session with an externally supplied session id.
     ///
     /// Callers should source ids from `SessionStore::next_session_id()`.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn open_with_sid(
         &mut self,
         sid: SessionId,
@@ -984,6 +987,7 @@ impl SessionStore {
     /// Open a new session with the given roles, buffer config, and initial local types.
     ///
     /// Returns the session ID. Endpoints are constructed as `Endpoint { sid, role }`.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn open(
         &mut self,
         roles: Vec<String>,
@@ -1107,6 +1111,11 @@ impl SessionStore {
     }
 
     /// Reap specific session ids from live storage and archive compact summaries.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a session disappears between the initial residency/status check
+    /// and the subsequent removal from the store.
     pub fn reap_sessions(&mut self, session_ids: &[SessionId]) -> Vec<ClosedSessionSummary> {
         let mut reaped = Vec::new();
         for sid in session_ids {

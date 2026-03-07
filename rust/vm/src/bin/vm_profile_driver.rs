@@ -58,6 +58,10 @@ impl EffectHandler for ProfileHandler {
     }
 }
 
+fn bool_to_usize(value: bool) -> usize {
+    usize::from(u8::from(value))
+}
+
 fn main() {
     let mut args = env::args().skip(1);
     let workload = args.next().unwrap_or_else(|| usage_and_exit());
@@ -108,7 +112,10 @@ fn profile_scheduler_many_paused(iterations: usize) -> usize {
         }
         let status = vm.run(&handler, 10_000).expect("run vm");
         checksum ^= black_box(vm.trace().len())
-            ^ black_box(matches!(status, telltale_vm::vm::RunStatus::Stuck) as usize);
+            ^ black_box(bool_to_usize(matches!(
+                status,
+                telltale_vm::vm::RunStatus::Stuck
+            )));
     }
     checksum
 }
@@ -144,7 +151,10 @@ fn profile_scheduler_many_paused_run_only(yields_per_role: usize) -> usize {
     }
     let status = vm.run(&handler, max_rounds).expect("run vm");
     black_box(vm.trace().len())
-        ^ black_box(matches!(status, telltale_vm::vm::RunStatus::MaxRoundsExceeded) as usize)
+        ^ black_box(bool_to_usize(matches!(
+            status,
+            telltale_vm::vm::RunStatus::MaxRoundsExceeded
+        )))
 }
 
 fn profile_send_recv_replay_nullifier(iterations: usize) -> usize {
@@ -161,7 +171,10 @@ fn profile_send_recv_replay_nullifier(iterations: usize) -> usize {
     }
     let status = vm.run(&handler, 100_000).expect("run vm");
     black_box(vm.trace().len())
-        ^ black_box(matches!(status, telltale_vm::vm::RunStatus::AllDone) as usize)
+        ^ black_box(bool_to_usize(matches!(
+            status,
+            telltale_vm::vm::RunStatus::AllDone
+        )))
 }
 
 fn profile_repeated_open_same_image(iterations: usize) -> usize {
@@ -177,12 +190,8 @@ fn profile_repeated_open_same_image(iterations: usize) -> usize {
     let mut vm = VM::new(config);
     let mut checksum = 0usize;
     for _ in 0..iterations {
-        let (_, profile) = vm
-            .load_choreography_profiled(&image)
-            .expect("load choreography");
-        checksum ^= black_box(profile.open_session_ns as usize)
-            ^ black_box(profile.intern_and_open_event_ns as usize)
-            ^ black_box(profile.spawn_coroutines_ns as usize);
+        let sid = vm.load_choreography(&image).expect("load choreography");
+        checksum ^= black_box(sid) ^ black_box(vm.session_coroutines(sid).len());
     }
     checksum
 }

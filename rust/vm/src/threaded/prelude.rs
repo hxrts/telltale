@@ -166,6 +166,7 @@ impl ThreadedSessionStore {
         Self::default()
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn open(
         &self,
         roles: Vec<String>,

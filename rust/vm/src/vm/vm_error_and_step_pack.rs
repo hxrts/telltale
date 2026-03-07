@@ -262,7 +262,7 @@ where
     #[serde(skip, default)]
     timed_out_coro_ids: BTreeSet<usize>,
     #[serde(skip, default)]
-    session_open_plans: BTreeMap<usize, crate::session::SessionOpenPlan>,
+    session_open_plans: BTreeMap<String, crate::session::SessionOpenPlan>,
     #[serde(skip, default)]
     eligible_ready: BTreeSet<usize>,
     #[serde(skip, default = "default_true")]

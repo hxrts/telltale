@@ -61,21 +61,6 @@ fn vm_serialized_bytes<T: Serialize>(value: &T) -> usize {
         .unwrap_or(0)
 }
 
-/// Phase timing breakdown for one `load_choreography` call.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct LoadChoreographyProfile {
-    /// Time spent validating the code image shape.
-    pub validate_runtime_shape_ns: u128,
-    /// Time spent opening session state from the precomputed plan.
-    pub open_session_ns: u128,
-    /// Time spent interning session runtime symbols and emitting the open event.
-    pub intern_and_open_event_ns: u128,
-    /// Time spent spawning role coroutines.
-    pub spawn_coroutines_ns: u128,
-    /// End-to-end load time.
-    pub total_ns: u128,
-}
-
 impl VM {
     fn communication_replay_enabled(&self) -> bool {
         !matches!(
@@ -127,10 +112,11 @@ impl VM {
             return false;
         };
         let role = &self.coroutines[idx].role;
-        !(self.paused_coro_ids.contains(&coro_id) || self.paused_roles.contains(role))
-            && !self.crashed_sites.contains(role)
-            && !(self.timed_out_coro_ids.contains(&coro_id)
-                || self.timed_out_sites.contains_key(role))
+        !(self.paused_coro_ids.contains(&coro_id)
+            || self.paused_roles.contains(role)
+            || self.crashed_sites.contains(role)
+            || self.timed_out_coro_ids.contains(&coro_id)
+            || self.timed_out_sites.contains_key(role))
     }
 
     fn mark_eligibility_dirty(&mut self) {
@@ -225,7 +211,7 @@ impl VM {
         &mut self,
         image: &CodeImage,
     ) -> &crate::session::SessionOpenPlan {
-        let key = std::ptr::from_ref(image) as usize;
+        let key = format!("{image:p}");
         self.session_open_plans
             .entry(key)
             .or_insert_with(|| crate::session::SessionOpenPlan::new(&image.roles(), &image.local_types))
@@ -350,45 +336,15 @@ impl VM {
     ///
     /// Returns an error if session or coroutine limits are exceeded.
     pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
-        self.load_choreography_profiled(image).map(|(sid, _)| sid)
-    }
-
-    /// Load a choreography and return a deterministic phase timing breakdown.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if validation fails or if session/coroutine limits are exceeded.
-    pub fn load_choreography_profiled(
-        &mut self,
-        image: &CodeImage,
-    ) -> Result<(SessionId, LoadChoreographyProfile), VMError> {
         self.ensure_session_capacity()?;
-        let total_start = std::time::Instant::now();
-        let validate_start = std::time::Instant::now();
         image.validate_runtime_shape().map_err(|reason| VMError::InvalidCodeImage { reason })?;
-        let validate_runtime_shape_ns = validate_start.elapsed().as_nanos();
         let plan = self.session_open_plan(image).clone();
-        let open_start = std::time::Instant::now();
         let (sid, roles) = self.open_choreography_session(&plan);
-        let open_session_ns = open_start.elapsed().as_nanos();
-        let intern_start = std::time::Instant::now();
         self.finalize_open_choreography_session(sid, &roles, &plan)?;
-        let intern_and_open_event_ns = intern_start.elapsed().as_nanos();
         self.programs.reserve(image.programs.len());
         self.coroutines.reserve(roles.len());
-        let spawn_start = std::time::Instant::now();
         self.spawn_session_coroutines(image, sid, &roles)?;
-        let spawn_coroutines_ns = spawn_start.elapsed().as_nanos();
-        Ok((
-            sid,
-            LoadChoreographyProfile {
-                validate_runtime_shape_ns,
-                open_session_ns,
-                intern_and_open_event_ns,
-                spawn_coroutines_ns,
-                total_ns: total_start.elapsed().as_nanos(),
-            },
-        ))
+        Ok(sid)
     }
 
     /// Execute one scheduler round: advance at most one ready coroutine.

@@ -6,15 +6,16 @@ use telltale_vm::vm::RunStatus;
 use telltale_vm::VM;
 
 use crate::common::{
-    capped_retention_config, load_choreography_profile, observable_choice_config,
-    replay_nullifier_config, replay_off_config, replay_sequence_config, run_choice_workload,
-    run_many_paused_scheduler_workload, run_pause_resume_churn_workload, run_repeated_load_reuse,
-    run_repeated_open_same_image_profile, run_repeated_open_wide_roles_profile,
-    run_send_recv_workload, run_short_lived_session_churn, run_yield_workload, send_recv_image,
-    setup_many_paused_scheduler_vm, typed_send_recv_image, validation_off_config,
-    validation_strict_schema_config, validation_structural_config, yield_image, BenchHandler,
+    capped_retention_config, observable_choice_config, replay_nullifier_config, replay_off_config,
+    replay_sequence_config, run_choice_workload, run_many_paused_scheduler_workload,
+    run_pause_resume_churn_workload, run_repeated_load_reuse, run_repeated_open_same_image,
+    run_repeated_open_wide_roles, run_send_recv_workload, run_short_lived_session_churn,
+    run_yield_workload, send_recv_image, setup_many_paused_scheduler_vm, typed_send_recv_image,
+    validation_off_config, validation_strict_schema_config, validation_structural_config,
+    yield_image, BenchHandler,
 };
 
+#[allow(clippy::too_many_lines)]
 pub(crate) fn bench_runtime(c: &mut Criterion) {
     let handler = BenchHandler;
     let image_small = yield_image(8, 64);
@@ -60,45 +61,9 @@ pub(crate) fn bench_runtime(c: &mut Criterion) {
         b.iter(|| black_box(run_repeated_load_reuse(black_box(32))))
     });
 
-    c.bench_function("vm_load_choreography_phase_open", |b| {
-        b.iter(|| {
-            black_box(
-                load_choreography_profile(
-                    black_box(&image_small),
-                    telltale_vm::VMConfig::strict_large_fanout(),
-                )
-                .open_session_ns,
-            )
-        })
-    });
-
-    c.bench_function("vm_load_choreography_phase_intern", |b| {
-        b.iter(|| {
-            black_box(
-                load_choreography_profile(
-                    black_box(&image_small),
-                    telltale_vm::VMConfig::strict_large_fanout(),
-                )
-                .intern_and_open_event_ns,
-            )
-        })
-    });
-
-    c.bench_function("vm_load_choreography_phase_spawn", |b| {
-        b.iter(|| {
-            black_box(
-                load_choreography_profile(
-                    black_box(&image_small),
-                    telltale_vm::VMConfig::strict_large_fanout(),
-                )
-                .spawn_coroutines_ns,
-            )
-        })
-    });
-
     c.bench_function("vm_repeated_open_same_image_fixed_topology", |b| {
         b.iter(|| {
-            black_box(run_repeated_open_same_image_profile(
+            black_box(run_repeated_open_same_image(
                 black_box(32),
                 black_box(16),
                 black_box(16),
@@ -107,12 +72,7 @@ pub(crate) fn bench_runtime(c: &mut Criterion) {
     });
 
     c.bench_function("vm_repeated_open_wide_roles", |b| {
-        b.iter(|| {
-            black_box(run_repeated_open_wide_roles_profile(
-                black_box(32),
-                black_box(64),
-            ))
-        })
+        b.iter(|| black_box(run_repeated_open_wide_roles(black_box(32), black_box(64))))
     });
 
     c.bench_function("vm_send_recv_replay_off", |b| {

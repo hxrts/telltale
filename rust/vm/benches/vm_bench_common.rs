@@ -12,8 +12,7 @@ use telltale_vm::instr::Endpoint;
 use telltale_vm::loader::CodeImage;
 use telltale_vm::session::SessionStore;
 use telltale_vm::vm::{
-    LoadChoreographyProfile, ObservabilityRetentionConfig, ObservabilityRetentionMode,
-    PayloadValidationMode, RunStatus,
+    ObservabilityRetentionConfig, ObservabilityRetentionMode, PayloadValidationMode, RunStatus,
 };
 use telltale_vm::{CommunicationReplayMode, Instr, VMConfig, VmMemoryUsage, VM};
 
@@ -303,22 +302,11 @@ pub(crate) fn run_repeated_load_reuse(iterations: usize) -> VmMemoryUsage {
     vm.memory_usage()
 }
 
-pub(crate) fn load_choreography_profile(
-    image: &CodeImage,
-    config: VMConfig,
-) -> LoadChoreographyProfile {
-    let mut vm = VM::new(config);
-    let (_, profile) = vm
-        .load_choreography_profiled(image)
-        .expect("load choreography");
-    profile
-}
-
-pub(crate) fn run_repeated_open_same_image_profile(
+pub(crate) fn run_repeated_open_same_image(
     iterations: usize,
     num_roles: usize,
     yields_per_role: usize,
-) -> LoadChoreographyProfile {
+) -> VmMemoryUsage {
     let image = yield_image(num_roles, yields_per_role);
     let mut config = VMConfig {
         observability_retention: capped_retention_config(),
@@ -328,21 +316,14 @@ pub(crate) fn run_repeated_open_same_image_profile(
         .max_coroutines
         .max(iterations.saturating_mul(num_roles).saturating_add(16));
     let mut vm = VM::new(config);
-    let mut last = LoadChoreographyProfile::default();
     for _ in 0..iterations {
-        let (_, profile) = vm
-            .load_choreography_profiled(&image)
-            .expect("load choreography");
-        last = profile;
+        vm.load_choreography(&image).expect("load choreography");
     }
-    last
+    vm.memory_usage()
 }
 
-pub(crate) fn run_repeated_open_wide_roles_profile(
-    iterations: usize,
-    num_roles: usize,
-) -> LoadChoreographyProfile {
-    run_repeated_open_same_image_profile(iterations, num_roles, 1)
+pub(crate) fn run_repeated_open_wide_roles(iterations: usize, num_roles: usize) -> VmMemoryUsage {
+    run_repeated_open_same_image(iterations, num_roles, 1)
 }
 
 pub(crate) fn run_send_recv_workload(
