@@ -1,6 +1,6 @@
 [package]
 name = "telltale-vm"
-version = "2.1.0"
+version = "3.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
 autobenches = false
@@ -21,8 +21,8 @@ wasm = ["getrandom/js"]
 multi-thread = ["rayon"]
 
 [dependencies]
-telltale-types = { path = "../types", version = "2.1.0" }
-telltale-theory = { path = "../theory", version = "2.1.0" }
+telltale-types = { path = "../types", version = "3.0.0" }
+telltale-theory = { path = "../theory", version = "3.0.0" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 bincode = { workspace = true }
@@ -36,11 +36,11 @@ getrandom = { workspace = true, features = ["js"] }
 wasm-bindgen = { workspace = true }
 
 [dev-dependencies]
-telltale-theory = { path = "../theory", version = "2.1.0" }
+telltale-theory = { path = "../theory", version = "3.0.0" }
 assert_matches = { workspace = true }
 wasm-bindgen-test = "0.3"
 criterion = { workspace = true }
-telltale-lean-bridge = { path = "../lean-bridge", version = "2.1.0" }
+telltale-lean-bridge = { path = "../lean-bridge", version = "3.0.0" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 proptest = { workspace = true }
