@@ -4,14 +4,17 @@ use super::limits::CHANNEL_BUFFER_SIZE_COUNT_DEFAULT;
 use super::transport::{InMemoryChannelTransport, Transport, TransportError};
 use crate::{QueueCapacity, RoleName};
 use async_trait::async_trait;
+use cfg_if::cfg_if;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::sync::Mutex;
-
-#[cfg(target_arch = "wasm32")]
-use futures::lock::Mutex;
+cfg_if! {
+    if #[cfg(target_arch = "wasm32")] {
+        use futures::lock::Mutex;
+    } else {
+        use tokio::sync::Mutex;
+    }
+}
 
 /// Factory for creating Transport instances.
 ///

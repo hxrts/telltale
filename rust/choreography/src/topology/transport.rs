@@ -10,6 +10,7 @@ use crate::identifiers::RoleName;
 use crate::mutex_lock;
 use crate::runtime::sync::{mpsc, Mutex};
 use async_trait::async_trait;
+use cfg_if::cfg_if;
 #[cfg(target_arch = "wasm32")]
 use futures::{SinkExt, StreamExt};
 use std::collections::BTreeMap;
@@ -134,69 +135,62 @@ impl InMemoryChannelTransport {
 #[async_trait]
 impl Transport for InMemoryChannelTransport {
     async fn send(&self, to_role: &RoleName, message: Vec<u8>) -> TransportResult<()> {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            let senders = mutex_lock!(self.senders);
-            let sender = senders
-                .get(to_role)
-                .ok_or_else(|| TransportError::UnknownRole(to_role.clone()))?;
+        cfg_if! {
+            if #[cfg(target_arch = "wasm32")] {
+                // Clone the sender to release the lock before awaiting.
+                let sender = {
+                    let senders = mutex_lock!(self.senders);
+                    senders
+                        .get(to_role)
+                        .cloned()
+                        .ok_or_else(|| TransportError::UnknownRole(to_role.clone()))?
+                };
 
-            sender
-                .send(message)
-                .await
-                .map_err(|_| TransportError::ChannelClosed)
-        }
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            // Clone the sender to release the lock before awaiting
-            // futures::channel::mpsc::Sender is Clone
-            let sender = {
+                let mut sender = sender;
+                sender
+                    .send(message)
+                    .await
+                    .map_err(|_| TransportError::ChannelClosed)
+            } else {
                 let senders = mutex_lock!(self.senders);
-                senders
+                let sender = senders
                     .get(to_role)
-                    .cloned()
-                    .ok_or_else(|| TransportError::UnknownRole(to_role.clone()))?
-            };
+                    .ok_or_else(|| TransportError::UnknownRole(to_role.clone()))?;
 
-            let mut sender = sender;
-            sender
-                .send(message)
-                .await
-                .map_err(|_| TransportError::ChannelClosed)
+                sender
+                    .send(message)
+                    .await
+                    .map_err(|_| TransportError::ChannelClosed)
+            }
         }
     }
 
     async fn recv(&self, from_role: &RoleName) -> TransportResult<Vec<u8>> {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            let mut receivers = mutex_lock!(self.receivers);
-            let receiver = receivers
-                .get_mut(from_role)
-                .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?;
-            receiver.recv().await.ok_or(TransportError::ChannelClosed)
-        }
+        cfg_if! {
+            if #[cfg(target_arch = "wasm32")] {
+                // For WASM, take the receiver out so the lock is not held across `.await`.
+                let mut receiver = {
+                    let mut receivers = mutex_lock!(self.receivers);
+                    receivers
+                        .remove(from_role)
+                        .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?
+                };
 
-        #[cfg(target_arch = "wasm32")]
-        {
-            // For WASM, we need to take the receiver out, use it, and put it back
-            // to avoid holding the lock across the await
-            let mut receiver = {
+                let result = receiver.next().await;
+
+                {
+                    let mut receivers = mutex_lock!(self.receivers);
+                    receivers.insert(from_role.clone(), receiver);
+                }
+
+                result.ok_or(TransportError::ChannelClosed)
+            } else {
                 let mut receivers = mutex_lock!(self.receivers);
-                receivers
-                    .remove(from_role)
-                    .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?
-            };
-
-            let result = receiver.next().await;
-
-            // Put the receiver back
-            {
-                let mut receivers = mutex_lock!(self.receivers);
-                receivers.insert(from_role.clone(), receiver);
+                let receiver = receivers
+                    .get_mut(from_role)
+                    .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?;
+                receiver.recv().await.ok_or(TransportError::ChannelClosed)
             }
-
-            result.ok_or(TransportError::ChannelClosed)
         }
     }
 

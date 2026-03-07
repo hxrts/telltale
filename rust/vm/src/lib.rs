@@ -44,6 +44,8 @@
 //! while vm.step(&handler)? {}
 //! ```
 
+use cfg_if::cfg_if;
+
 pub mod architecture;
 pub mod backend;
 pub mod bridge;
@@ -76,14 +78,22 @@ pub mod runtime_contracts;
 pub mod scheduler;
 pub mod serialization;
 pub mod session;
-#[cfg(feature = "multi-thread")]
-pub mod threaded;
 pub mod trace;
 pub mod transfer_semantics;
 pub mod verification;
 pub mod vm;
-#[cfg(target_arch = "wasm32")]
-pub mod wasm;
+
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        pub mod threaded;
+    }
+}
+
+cfg_if! {
+    if #[cfg(target_arch = "wasm32")] {
+        pub mod wasm;
+    }
+}
 
 pub use architecture::{
     EngineOwnership, EngineRole, CANONICAL_ENGINE, CROSS_TARGET_CONTRACT, ENGINE_OWNERSHIP,
@@ -108,8 +118,6 @@ pub use composition::{
 pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
 pub use determinism::{DeterminismMode, EffectDeterminismTier};
 pub use driver::NativeSingleThreadDriver;
-#[cfg(feature = "multi-thread")]
-pub use driver::NativeThreadedDriver;
 pub use effect::{
     classify_effect_error, classify_effect_error_owned, send_fast_path_key, CorruptionType,
     EffectError, EffectErrorCategory, EffectTraceEntry, EffectTraceTape, RecordingEffectHandler,
@@ -150,10 +158,6 @@ pub use session::{
     decode_edge_json, ClosedSessionSummary, Edge, HandlerId, SessionId, SessionStore,
     SessionStoreMemoryUsage, SessionStoreRetainedBytes,
 };
-#[cfg(feature = "multi-thread")]
-pub use threaded::{
-    ContentionMetrics, LaneHandoff, LaneId, LaneSchedulerState, LaneSelection, ThreadedVM,
-};
 pub use trace::{
     normalize_trace, normalize_trace_v1, obs_session, strict_trace, with_tick, NormalizedTraceV1,
     TRACE_NORMALIZATION_SCHEMA_VERSION,
@@ -169,5 +173,18 @@ pub use vm::{
     PayloadValidationMode, Program, ProgramStore, RuntimeTuningProfile, SchedExecStatus,
     SchedStepDebug, ThreadedRoundSemantics, VMConfig, VMState, VmMemoryUsage, VmRetainedBytes, VM,
 };
-#[cfg(target_arch = "wasm32")]
-pub use wasm::WasmVM;
+
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        pub use driver::NativeThreadedDriver;
+        pub use threaded::{
+            ContentionMetrics, LaneHandoff, LaneId, LaneSchedulerState, LaneSelection, ThreadedVM,
+        };
+    }
+}
+
+cfg_if! {
+    if #[cfg(target_arch = "wasm32")] {
+        pub use wasm::WasmVM;
+    }
+}

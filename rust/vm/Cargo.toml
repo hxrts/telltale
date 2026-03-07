@@ -29,6 +29,7 @@ bincode = { workspace = true }
 thiserror = { workspace = true }
 rayon = { version = "1", optional = true }
 serde_yaml = { workspace = true }
+cfg-if = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { workspace = true, features = ["js"] }

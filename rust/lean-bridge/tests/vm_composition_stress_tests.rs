@@ -1,6 +1,7 @@
 #![allow(clippy::expect_used)]
 //! Composition stress tests: concurrent protocol execution and runtime metrics.
 
+use cfg_if::cfg_if;
 use std::time::Instant;
 
 use telltale_types::{GlobalType, Label, LocalTypeR};
@@ -106,21 +107,23 @@ fn median_f64(samples: &[f64]) -> f64 {
     }
 }
 
-#[cfg(target_os = "linux")]
-fn current_rss_bytes() -> Option<u64> {
-    let status = std::fs::read_to_string("/proc/self/status").ok()?;
-    for line in status.lines() {
-        if let Some(rest) = line.strip_prefix("VmRSS:") {
-            let kb = rest.split_whitespace().next()?.parse::<u64>().ok()?;
-            return Some(kb.saturating_mul(1024));
+cfg_if! {
+    if #[cfg(target_os = "linux")] {
+        fn current_rss_bytes() -> Option<u64> {
+            let status = std::fs::read_to_string("/proc/self/status").ok()?;
+            for line in status.lines() {
+                if let Some(rest) = line.strip_prefix("VmRSS:") {
+                    let kb = rest.split_whitespace().next()?.parse::<u64>().ok()?;
+                    return Some(kb.saturating_mul(1024));
+                }
+            }
+            None
+        }
+    } else {
+        fn current_rss_bytes() -> Option<u64> {
+            None
         }
     }
-    None
-}
-
-#[cfg(not(target_os = "linux"))]
-fn current_rss_bytes() -> Option<u64> {
-    None
 }
 
 fn run_stress(protocols: usize, workers: usize) -> StressReport {

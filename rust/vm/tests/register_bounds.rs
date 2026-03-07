@@ -1,6 +1,7 @@
 #![cfg(not(target_arch = "wasm32"))]
 #![allow(missing_docs)]
 
+use cfg_if::cfg_if;
 use std::collections::BTreeMap;
 
 use proptest::prelude::*;
@@ -9,9 +10,13 @@ use telltale_vm::coroutine::Fault;
 use telltale_vm::effect::EffectHandler;
 use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::{RunStatus, VMError};
-#[cfg(feature = "multi-thread")]
-use telltale_vm::ThreadedVM;
 use telltale_vm::{Instr, VMConfig, VM};
+
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        use telltale_vm::ThreadedVM;
+    }
+}
 
 struct NoopHandler;
 
@@ -123,23 +128,26 @@ proptest! {
     }
 }
 
-#[cfg(feature = "multi-thread")]
-proptest! {
-    #[test]
-    fn threaded_move_oob_register_faults(offset in 0u16..256) {
-        let src = 16u16.saturating_add(offset);
-        let image = single_role_move_image(src);
-        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 1);
-        vm.load_choreography(&image).expect("load choreography");
-        assert_out_of_registers(vm.run(&NoopHandler, 8));
-    }
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        proptest! {
+            #[test]
+            fn threaded_move_oob_register_faults(offset in 0u16..256) {
+                let src = 16u16.saturating_add(offset);
+                let image = single_role_move_image(src);
+                let mut vm = ThreadedVM::with_workers(VMConfig::default(), 1);
+                vm.load_choreography(&image).expect("load choreography");
+                assert_out_of_registers(vm.run(&NoopHandler, 8));
+            }
 
-    #[test]
-    fn threaded_receive_dst_oob_register_faults(offset in 0u16..256) {
-        let dst = 16u16.saturating_add(offset);
-        let image = recv_oob_image(dst);
-        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 1);
-        vm.load_choreography(&image).expect("load choreography");
-        assert_out_of_registers(vm.run(&NoopHandler, 16));
+            #[test]
+            fn threaded_receive_dst_oob_register_faults(offset in 0u16..256) {
+                let dst = 16u16.saturating_add(offset);
+                let image = recv_oob_image(dst);
+                let mut vm = ThreadedVM::with_workers(VMConfig::default(), 1);
+                vm.load_choreography(&image).expect("load choreography");
+                assert_out_of_registers(vm.run(&NoopHandler, 16));
+            }
+        }
     }
 }

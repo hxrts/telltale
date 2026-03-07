@@ -1,6 +1,8 @@
 #![cfg(not(target_arch = "wasm32"))]
 #![allow(missing_docs)]
 
+use cfg_if::cfg_if;
+
 #[allow(dead_code, unreachable_pub)]
 #[path = "support/mod.rs"]
 mod test_support;
@@ -11,11 +13,15 @@ use std::time::Duration;
 use telltale_vm::effect::{
     EffectHandler, EffectTraceEntry, SendDecision, SendDecisionInput, TopologyPerturbation,
 };
-#[cfg(feature = "multi-thread")]
-use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::trace::normalize_trace_v1;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
 use test_support::{simple_send_recv_image, PassthroughHandler};
+
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        use telltale_vm::threaded::ThreadedVM;
+    }
+}
 
 #[derive(Debug, Clone)]
 struct OrderedTopologyHandler {
@@ -78,40 +84,6 @@ impl EffectHandler for OrderedTopologyHandler {
     }
 }
 
-#[cfg(feature = "multi-thread")]
-fn obs_signature(trace: &[ObsEvent]) -> Vec<String> {
-    trace
-        .iter()
-        .map(|event| match event {
-            ObsEvent::Opened { session, roles, .. } => {
-                format!("opened:{session}:{}", roles.join(","))
-            }
-            ObsEvent::Sent {
-                session,
-                from,
-                to,
-                label,
-                ..
-            } => format!("sent:{session}:{from}:{to}:{label}"),
-            ObsEvent::Received {
-                session,
-                from,
-                to,
-                label,
-                ..
-            } => format!("received:{session}:{from}:{to}:{label}"),
-            ObsEvent::Invoked { coro_id, role, .. } => format!("invoked:{coro_id}:{role}"),
-            ObsEvent::Halted { coro_id, .. } => format!("halted:{coro_id}"),
-            ObsEvent::OutputConditionChecked {
-                predicate_ref,
-                passed,
-                ..
-            } => format!("output_check:{predicate_ref}:{passed}"),
-            other => format!("{other:?}"),
-        })
-        .collect()
-}
-
 #[test]
 fn canonical_replay_fragment_is_stable_for_identical_runs() {
     let image = simple_send_recv_image("A", "B", "m");
@@ -166,30 +138,6 @@ fn canonical_replay_fragment_sorts_topology_state() {
     );
     assert!(fragment.crashed_sites.windows(2).all(|w| w[0] <= w[1]));
     assert!(fragment.partitioned_edges.windows(2).all(|w| w[0] <= w[1]));
-}
-
-#[cfg(feature = "multi-thread")]
-#[test]
-fn canonical_replay_fragment_matches_cross_target_for_deterministic_run() {
-    let image = simple_send_recv_image("A", "B", "m");
-    let handler = PassthroughHandler;
-
-    let mut coop = VM::new(VMConfig::default());
-    coop.load_choreography(&image)
-        .expect("load cooperative image");
-    coop.run(&handler, 64).expect("run cooperative VM");
-
-    let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 2);
-    threaded
-        .load_choreography(&image)
-        .expect("load threaded image");
-    threaded.run(&handler, 64).expect("run threaded VM");
-
-    assert_eq!(
-        obs_signature(&coop.canonical_replay_fragment().obs_trace),
-        obs_signature(&threaded.canonical_replay_fragment().obs_trace),
-        "normalized observable traces should match across targets"
-    );
 }
 
 #[test]
@@ -281,55 +229,114 @@ fn run_replay_shared_accepts_arc_backed_trace() {
     );
 }
 
-#[cfg(feature = "multi-thread")]
-#[test]
-fn threaded_run_replay_shared_accepts_arc_backed_trace() {
-    let image = simple_send_recv_image("A", "B", "m");
-    let handler = PassthroughHandler;
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        fn obs_signature(trace: &[ObsEvent]) -> Vec<String> {
+            trace
+                .iter()
+                .map(|event| match event {
+                    ObsEvent::Opened { session, roles, .. } => {
+                        format!("opened:{session}:{}", roles.join(","))
+                    }
+                    ObsEvent::Sent {
+                        session,
+                        from,
+                        to,
+                        label,
+                        ..
+                    } => format!("sent:{session}:{from}:{to}:{label}"),
+                    ObsEvent::Received {
+                        session,
+                        from,
+                        to,
+                        label,
+                        ..
+                    } => format!("received:{session}:{from}:{to}:{label}"),
+                    ObsEvent::Invoked { coro_id, role, .. } => format!("invoked:{coro_id}:{role}"),
+                    ObsEvent::Halted { coro_id, .. } => format!("halted:{coro_id}"),
+                    ObsEvent::OutputConditionChecked {
+                        predicate_ref,
+                        passed,
+                        ..
+                    } => format!("output_check:{predicate_ref}:{passed}"),
+                    other => format!("{other:?}"),
+                })
+                .collect()
+        }
 
-    let mut baseline = ThreadedVM::with_workers(VMConfig::default(), 2);
-    baseline.load_choreography(&image).expect("load baseline");
-    baseline.run(&handler, 64).expect("run baseline");
-    let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
-    let baseline_effect_semantics: Vec<_> = baseline
-        .effect_trace()
-        .iter()
-        .map(|entry| {
-            (
-                entry.effect_kind.clone(),
-                entry.inputs.clone(),
-                entry.outputs.clone(),
-                entry.ordering_key,
-            )
-        })
-        .collect();
-    let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(baseline.effect_trace());
+        #[test]
+        fn canonical_replay_fragment_matches_cross_target_for_deterministic_run() {
+            let image = simple_send_recv_image("A", "B", "m");
+            let handler = PassthroughHandler;
 
-    let mut replay_vm = ThreadedVM::with_workers(VMConfig::default(), 2);
-    replay_vm.load_choreography(&image).expect("load replay VM");
-    replay_vm
-        .run_replay_shared(&handler, replay_trace, 64)
-        .expect("run replay VM");
-    let replay_obs = replay_vm.canonical_replay_fragment().obs_trace;
-    let replay_effect_semantics: Vec<_> = replay_vm
-        .effect_trace()
-        .iter()
-        .map(|entry| {
-            (
-                entry.effect_kind.clone(),
-                entry.inputs.clone(),
-                entry.outputs.clone(),
-                entry.ordering_key,
-            )
-        })
-        .collect();
+            let mut coop = VM::new(VMConfig::default());
+            coop.load_choreography(&image)
+                .expect("load cooperative image");
+            coop.run(&handler, 64).expect("run cooperative VM");
 
-    assert_eq!(
-        baseline_obs, replay_obs,
-        "threaded arc-backed replay must preserve deterministic observable outputs"
-    );
-    assert_eq!(
-        baseline_effect_semantics, replay_effect_semantics,
-        "threaded arc-backed replay must preserve effect semantics (excluding handler identity)"
-    );
+            let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 2);
+            threaded
+                .load_choreography(&image)
+                .expect("load threaded image");
+            threaded.run(&handler, 64).expect("run threaded VM");
+
+            assert_eq!(
+                obs_signature(&coop.canonical_replay_fragment().obs_trace),
+                obs_signature(&threaded.canonical_replay_fragment().obs_trace),
+                "normalized observable traces should match across targets"
+            );
+        }
+
+        #[test]
+        fn threaded_run_replay_shared_accepts_arc_backed_trace() {
+            let image = simple_send_recv_image("A", "B", "m");
+            let handler = PassthroughHandler;
+
+            let mut baseline = ThreadedVM::with_workers(VMConfig::default(), 2);
+            baseline.load_choreography(&image).expect("load baseline");
+            baseline.run(&handler, 64).expect("run baseline");
+            let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
+            let baseline_effect_semantics: Vec<_> = baseline
+                .effect_trace()
+                .iter()
+                .map(|entry| {
+                    (
+                        entry.effect_kind.clone(),
+                        entry.inputs.clone(),
+                        entry.outputs.clone(),
+                        entry.ordering_key,
+                    )
+                })
+                .collect();
+            let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(baseline.effect_trace());
+
+            let mut replay_vm = ThreadedVM::with_workers(VMConfig::default(), 2);
+            replay_vm.load_choreography(&image).expect("load replay VM");
+            replay_vm
+                .run_replay_shared(&handler, replay_trace, 64)
+                .expect("run replay VM");
+            let replay_obs = replay_vm.canonical_replay_fragment().obs_trace;
+            let replay_effect_semantics: Vec<_> = replay_vm
+                .effect_trace()
+                .iter()
+                .map(|entry| {
+                    (
+                        entry.effect_kind.clone(),
+                        entry.inputs.clone(),
+                        entry.outputs.clone(),
+                        entry.ordering_key,
+                    )
+                })
+                .collect();
+
+            assert_eq!(
+                baseline_obs, replay_obs,
+                "threaded arc-backed replay must preserve deterministic observable outputs"
+            );
+            assert_eq!(
+                baseline_effect_semantics, replay_effect_semantics,
+                "threaded arc-backed replay must preserve effect semantics (excluding handler identity)"
+            );
+        }
+    }
 }

@@ -5,6 +5,7 @@
 
 use async_recursion::async_recursion;
 use async_trait::async_trait;
+use cfg_if::cfg_if;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::effects::algebra::{Effect, InterpretResult, InterpreterState, Program, ProgramMessage};
@@ -248,26 +249,28 @@ impl<M, R: RoleId> Interpreter<M, R> {
                     "Executing timeout effect"
                 );
 
-                #[cfg(not(target_arch = "wasm32"))]
-                let timeout_result =
-                    tokio::time::timeout(*dur, self.run(handler, endpoint, body)).await;
+                cfg_if! {
+                    if #[cfg(target_arch = "wasm32")] {
+                        let timeout_result = {
+                            use futures::future::{select, Either};
+                            use futures::pin_mut;
+                            use wasm_timer::Delay;
 
-                #[cfg(target_arch = "wasm32")]
-                let timeout_result = {
-                    use futures::future::{select, Either};
-                    use futures::pin_mut;
-                    use wasm_timer::Delay;
+                            let body_future = self.run(handler, endpoint, body);
+                            let timeout = Delay::new(*dur);
+                            pin_mut!(body_future);
+                            pin_mut!(timeout);
 
-                    let body_future = self.run(handler, endpoint, body);
-                    let timeout = Delay::new(*dur);
-                    pin_mut!(body_future);
-                    pin_mut!(timeout);
-
-                    match select(body_future, timeout).await {
-                        Either::Left((result, _)) => Ok(result),
-                        Either::Right(_) => Err(()),
+                            match select(body_future, timeout).await {
+                                Either::Left((result, _)) => Ok(result),
+                                Either::Right(_) => Err(()),
+                            }
+                        };
+                    } else {
+                        let timeout_result =
+                            tokio::time::timeout(*dur, self.run(handler, endpoint, body)).await;
                     }
-                };
+                }
 
                 match timeout_result {
                     Ok(Ok(result)) => self.propagate_nested_result(result, *dur)?,

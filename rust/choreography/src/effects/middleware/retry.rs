@@ -3,6 +3,7 @@
 // Implements exponential backoff retry logic for failed send operations.
 
 use async_trait::async_trait;
+use cfg_if::cfg_if;
 use serde::{de::DeserializeOwned, Serialize};
 use std::time::Duration;
 use tracing::debug;
@@ -56,14 +57,12 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for Retry<H> {
                     let delay = self.base_delay * (1 << (retries - 1));
                     debug!(?to, ?retries, ?delay, "send failed, retrying");
                     // Platform-specific sleep
-                    #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        tokio::time::sleep(delay).await;
-                    }
-
-                    #[cfg(target_arch = "wasm32")]
-                    {
-                        wasm_timer::Delay::new(delay).await.ok();
+                    cfg_if! {
+                        if #[cfg(target_arch = "wasm32")] {
+                            wasm_timer::Delay::new(delay).await.ok();
+                        } else {
+                            tokio::time::sleep(delay).await;
+                        }
                     }
                 }
                 Err(e) => return Err(e),

@@ -3,18 +3,24 @@
 //! Drivers own target/runtime orchestration while semantic stepping stays in
 //! the VM kernel path.
 
-pub mod single_thread;
+use cfg_if::cfg_if;
 
-#[cfg(feature = "multi-thread")]
-pub mod threaded;
+pub mod single_thread;
 
 pub use single_thread::NativeSingleThreadDriver;
 
-#[cfg(feature = "multi-thread")]
-pub use threaded::NativeThreadedDriver;
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        pub mod threaded;
+        pub use threaded::NativeThreadedDriver;
+    }
+}
 
-/// Cooperative driver for WebAssembly targets.
-///
-/// Uses the single-threaded driver since WASM lacks native threading support.
-#[cfg(target_arch = "wasm32")]
-pub type WasmCooperativeDriver = NativeSingleThreadDriver;
+cfg_if! {
+    if #[cfg(target_arch = "wasm32")] {
+        /// Cooperative driver for WebAssembly targets.
+        ///
+        /// Uses the single-threaded driver since WASM lacks native threading support.
+        pub type WasmCooperativeDriver = NativeSingleThreadDriver;
+    }
+}

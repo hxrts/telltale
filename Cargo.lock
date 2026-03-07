@@ -1561,6 +1561,7 @@ dependencies = [
  "async-trait",
  "base64",
  "bincode",
+ "cfg-if",
  "criterion",
  "futures",
  "getrandom 0.2.16",
@@ -1600,6 +1601,7 @@ version = "2.1.0"
 dependencies = [
  "anyhow",
  "bpaf",
+ "cfg-if",
  "clap 4.5.53",
  "proptest",
  "serde",
@@ -1687,6 +1689,7 @@ version = "2.1.0"
 dependencies = [
  "assert_matches",
  "bincode",
+ "cfg-if",
  "criterion",
  "getrandom 0.2.16",
  "proptest",

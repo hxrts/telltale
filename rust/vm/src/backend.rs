@@ -2,6 +2,8 @@
 //!
 //! Allows swapping cooperative and threaded backends behind a common API.
 
+use cfg_if::cfg_if;
+
 use crate::effect::EffectHandler;
 use crate::loader::CodeImage;
 use crate::session::SessionId;
@@ -58,28 +60,34 @@ impl VMBackend for VM {
     }
 }
 
-#[cfg(feature = "multi-thread")]
-use crate::threaded::ThreadedVM;
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        use crate::threaded::ThreadedVM;
 
-#[cfg(feature = "multi-thread")]
-impl VMBackend for ThreadedVM {
-    fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
-        self.load_choreography(image)
-    }
+        impl VMBackend for ThreadedVM {
+            fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
+                self.load_choreography(image)
+            }
 
-    fn step_round(&mut self, handler: &dyn EffectHandler, n: usize) -> Result<StepResult, VMError> {
-        self.step_round(handler, n)
-    }
+            fn step_round(
+                &mut self,
+                handler: &dyn EffectHandler,
+                n: usize,
+            ) -> Result<StepResult, VMError> {
+                self.step_round(handler, n)
+            }
 
-    fn run(
-        &mut self,
-        handler: &dyn EffectHandler,
-        max_rounds: usize,
-    ) -> Result<RunStatus, VMError> {
-        self.run(handler, max_rounds)
-    }
+            fn run(
+                &mut self,
+                handler: &dyn EffectHandler,
+                max_rounds: usize,
+            ) -> Result<RunStatus, VMError> {
+                self.run(handler, max_rounds)
+            }
 
-    fn trace(&self) -> Vec<ObsEvent> {
-        self.trace().to_vec()
+            fn trace(&self) -> Vec<ObsEvent> {
+                self.trace().to_vec()
+            }
+        }
     }
 }

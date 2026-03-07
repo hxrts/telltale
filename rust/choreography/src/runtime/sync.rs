@@ -7,26 +7,16 @@
 //! On WASM, we use std::sync primitives (which work because WASM is single-threaded)
 //! and futures::channel for message passing.
 
-// Re-export platform-specific RwLock
-#[cfg(not(target_arch = "wasm32"))]
-pub use tokio::sync::RwLock;
+use cfg_if::cfg_if;
 
-#[cfg(target_arch = "wasm32")]
-pub use std::sync::RwLock;
-
-// Re-export platform-specific Mutex
-#[cfg(not(target_arch = "wasm32"))]
-pub use tokio::sync::Mutex;
-
-#[cfg(target_arch = "wasm32")]
-pub use std::sync::Mutex;
-
-// Re-export platform-specific mpsc channels
-#[cfg(not(target_arch = "wasm32"))]
-pub use tokio::sync::mpsc;
-
-#[cfg(target_arch = "wasm32")]
-pub use futures::channel::mpsc;
+cfg_if! {
+    if #[cfg(target_arch = "wasm32")] {
+        pub use futures::channel::mpsc;
+        pub use std::sync::{Mutex, RwLock};
+    } else {
+        pub use tokio::sync::{mpsc, Mutex, RwLock};
+    }
+}
 
 /// Helper macro for acquiring a read lock.
 ///
@@ -47,15 +37,14 @@ pub use futures::channel::mpsc;
 #[macro_export]
 macro_rules! read_lock {
     ($lock:expr) => {{
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            $lock.read().await
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            match $lock.read() {
-                Ok(guard) => guard,
-                Err(poisoned) => poisoned.into_inner(),
+        cfg_if::cfg_if! {
+            if #[cfg(target_arch = "wasm32")] {
+                match $lock.read() {
+                    Ok(guard) => guard,
+                    Err(poisoned) => poisoned.into_inner(),
+                }
+            } else {
+                $lock.read().await
             }
         }
     }};
@@ -80,15 +69,14 @@ macro_rules! read_lock {
 #[macro_export]
 macro_rules! write_lock {
     ($lock:expr) => {{
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            $lock.write().await
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            match $lock.write() {
-                Ok(guard) => guard,
-                Err(poisoned) => poisoned.into_inner(),
+        cfg_if::cfg_if! {
+            if #[cfg(target_arch = "wasm32")] {
+                match $lock.write() {
+                    Ok(guard) => guard,
+                    Err(poisoned) => poisoned.into_inner(),
+                }
+            } else {
+                $lock.write().await
             }
         }
     }};
@@ -113,15 +101,14 @@ macro_rules! write_lock {
 #[macro_export]
 macro_rules! mutex_lock {
     ($lock:expr) => {{
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            $lock.lock().await
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            match $lock.lock() {
-                Ok(guard) => guard,
-                Err(poisoned) => poisoned.into_inner(),
+        cfg_if::cfg_if! {
+            if #[cfg(target_arch = "wasm32")] {
+                match $lock.lock() {
+                    Ok(guard) => guard,
+                    Err(poisoned) => poisoned.into_inner(),
+                }
+            } else {
+                $lock.lock().await
             }
         }
     }};

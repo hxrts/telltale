@@ -3,6 +3,7 @@
 //! Provides platform-specific implementations for spawning tasks and running futures.
 //! Supports both native (Tokio) and WASM (wasm-bindgen-futures) targets.
 
+use cfg_if::cfg_if;
 use std::future::Future;
 
 /// Marker trait for runtime implementations (not used as trait object)
@@ -16,14 +17,12 @@ pub fn spawn<F>(future: F)
 where
     F: Future<Output = ()> + Send + 'static,
 {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        tokio::spawn(future);
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        wasm_bindgen_futures::spawn_local(future);
+    cfg_if! {
+        if #[cfg(target_arch = "wasm32")] {
+            wasm_bindgen_futures::spawn_local(future);
+        } else {
+            tokio::spawn(future);
+        }
     }
 }
 
@@ -35,13 +34,11 @@ pub fn spawn_local<F>(future: F)
 where
     F: Future<Output = ()> + 'static,
 {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        tokio::task::spawn_local(future);
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        wasm_bindgen_futures::spawn_local(future);
+    cfg_if! {
+        if #[cfg(target_arch = "wasm32")] {
+            wasm_bindgen_futures::spawn_local(future);
+        } else {
+            tokio::task::spawn_local(future);
+        }
     }
 }

@@ -7,6 +7,7 @@
 use std::time::{Duration, Instant};
 
 use crate::testing::clock::{AsyncClock, Clock, Rng, WallClock};
+use cfg_if::cfg_if;
 
 /// System clock using real time.
 ///
@@ -42,13 +43,12 @@ impl Clock for SystemClock {
 
 impl AsyncClock for SystemClock {
     async fn sleep(&self, duration: Duration) {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            tokio::time::sleep(duration).await;
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            wasm_timer::Delay::new(duration).await.ok();
+        cfg_if! {
+            if #[cfg(target_arch = "wasm32")] {
+                wasm_timer::Delay::new(duration).await.ok();
+            } else {
+                tokio::time::sleep(duration).await;
+            }
         }
     }
 }

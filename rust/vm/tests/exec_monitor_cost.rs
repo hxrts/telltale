@@ -6,13 +6,18 @@
 mod test_support;
 
 use assert_matches::assert_matches;
+use cfg_if::cfg_if;
 use telltale_vm::coroutine::Fault;
 use telltale_vm::instr::{ImmValue, Instr};
-#[cfg(feature = "multi-thread")]
-use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::vm::{MonitorMode, VMConfig, VMError, VM};
 
 use test_support::PassthroughHandler;
+
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        use telltale_vm::threaded::ThreadedVM;
+    }
+}
 
 #[test]
 fn cooperative_monitor_precheck_catches_mismatched_instr_shape() {
@@ -213,89 +218,90 @@ fn cooperative_out_of_credits_faults_before_dispatch() {
     );
 }
 
-#[cfg(feature = "multi-thread")]
-#[test]
-fn threaded_out_of_credits_faults_before_dispatch() {
-    let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ThreadedVM::with_workers(
-        VMConfig {
-            initial_cost_budget: 0,
-            instruction_cost: 1,
-            ..VMConfig::default()
-        },
-        2,
-    );
-    vm.load_choreography(&image).expect("load image");
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        #[test]
+        fn threaded_out_of_credits_faults_before_dispatch() {
+            let image = test_support::simple_send_recv_image("A", "B", "msg");
+            let mut vm = ThreadedVM::with_workers(
+                VMConfig {
+                    initial_cost_budget: 0,
+                    instruction_cost: 1,
+                    ..VMConfig::default()
+                },
+                2,
+            );
+            vm.load_choreography(&image).expect("load image");
 
-    let err = vm
-        .run(&PassthroughHandler, 32)
-        .expect_err("expected out-of-credits");
-    assert_matches!(
-        err,
-        VMError::Fault {
-            fault: Fault::OutOfCredits,
-            ..
+            let err = vm
+                .run(&PassthroughHandler, 32)
+                .expect_err("expected out-of-credits");
+            assert_matches!(
+                err,
+                VMError::Fault {
+                    fault: Fault::OutOfCredits,
+                    ..
+                }
+            );
         }
-    );
-}
 
-#[cfg(feature = "multi-thread")]
-#[test]
-fn threaded_monitor_precheck_catches_mismatched_instr_shape() {
-    let mut image = test_support::simple_send_recv_image("A", "B", "msg");
-    image.programs.insert(
-        "A".to_string(),
-        vec![Instr::Receive { chan: 0, dst: 0 }, Instr::Halt],
-    );
+        #[test]
+        fn threaded_monitor_precheck_catches_mismatched_instr_shape() {
+            let mut image = test_support::simple_send_recv_image("A", "B", "msg");
+            image.programs.insert(
+                "A".to_string(),
+                vec![Instr::Receive { chan: 0, dst: 0 }, Instr::Halt],
+            );
 
-    let mut vm = ThreadedVM::with_workers(
-        VMConfig {
-            monitor_mode: MonitorMode::SessionTypePrecheck,
-            ..VMConfig::default()
-        },
-        2,
-    );
-    vm.load_choreography(&image).expect("load image");
+            let mut vm = ThreadedVM::with_workers(
+                VMConfig {
+                    monitor_mode: MonitorMode::SessionTypePrecheck,
+                    ..VMConfig::default()
+                },
+                2,
+            );
+            vm.load_choreography(&image).expect("load image");
 
-    let err = vm
-        .run(&PassthroughHandler, 32)
-        .expect_err("expected mismatch");
-    assert_matches!(
-        err,
-        VMError::Fault {
-            fault: Fault::TypeViolation {
-                ref message,
-                ..
-            },
-            ..
-        } if message.contains("[monitor]")
-    );
-}
+            let err = vm
+                .run(&PassthroughHandler, 32)
+                .expect_err("expected mismatch");
+            assert_matches!(
+                err,
+                VMError::Fault {
+                    fault: Fault::TypeViolation {
+                        ref message,
+                        ..
+                    },
+                    ..
+                } if message.contains("[monitor]")
+            );
+        }
 
-#[cfg(feature = "multi-thread")]
-#[test]
-fn threaded_monitor_precheck_bypasses_control_flow_instrs() {
-    let mut image = test_support::simple_send_recv_image("A", "B", "msg");
-    image.programs.insert(
-        "A".to_string(),
-        vec![
-            Instr::Set {
-                dst: 0,
-                val: ImmValue::Nat(7),
-            },
-            Instr::Halt,
-        ],
-    );
+        #[test]
+        fn threaded_monitor_precheck_bypasses_control_flow_instrs() {
+            let mut image = test_support::simple_send_recv_image("A", "B", "msg");
+            image.programs.insert(
+                "A".to_string(),
+                vec![
+                    Instr::Set {
+                        dst: 0,
+                        val: ImmValue::Nat(7),
+                    },
+                    Instr::Halt,
+                ],
+            );
 
-    let mut vm = ThreadedVM::with_workers(
-        VMConfig {
-            monitor_mode: MonitorMode::SessionTypePrecheck,
-            ..VMConfig::default()
-        },
-        2,
-    );
-    vm.load_choreography(&image).expect("load image");
+            let mut vm = ThreadedVM::with_workers(
+                VMConfig {
+                    monitor_mode: MonitorMode::SessionTypePrecheck,
+                    ..VMConfig::default()
+                },
+                2,
+            );
+            vm.load_choreography(&image).expect("load image");
 
-    vm.run(&PassthroughHandler, 1)
-        .expect("control-flow step should bypass monitor precheck");
+            vm.run(&PassthroughHandler, 1)
+                .expect("control-flow step should bypass monitor precheck");
+        }
+    }
 }

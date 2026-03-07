@@ -546,8 +546,13 @@ impl<R: RoleId, M> Effect<R, M> {
 mod tests {
     use super::*;
     use crate::identifiers::RoleName;
-    #[cfg(not(target_arch = "wasm32"))]
-    use proptest::prelude::*;
+    use cfg_if::cfg_if;
+
+    cfg_if! {
+        if #[cfg(not(target_arch = "wasm32"))] {
+            use proptest::prelude::*;
+        }
+    }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     enum TestRole {
@@ -644,34 +649,39 @@ mod tests {
         assert!(matches!(err, ProgramError::InvalidStructure(_)));
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
-    proptest! {
-        #[test]
-        fn try_then_keeps_single_terminal_end(include_left_send in any::<bool>(), include_right_recv in any::<bool>()) {
-            let left_builder = Program::<TestRole, String>::builder();
-            let left_builder = if include_left_send {
-                left_builder.send(TestRole::Bob, "msg".to_string())
-            } else {
-                left_builder
-            };
-            let left = left_builder.end();
+    cfg_if! {
+        if #[cfg(not(target_arch = "wasm32"))] {
+            proptest! {
+                #[test]
+                fn try_then_keeps_single_terminal_end(include_left_send in any::<bool>(), include_right_recv in any::<bool>()) {
+                    let left_builder = Program::<TestRole, String>::builder();
+                    let left_builder = if include_left_send {
+                        left_builder.send(TestRole::Bob, "msg".to_string())
+                    } else {
+                        left_builder
+                    };
+                    let left = left_builder.end();
 
-            let right_builder = Program::<TestRole, String>::builder();
-            let right_builder = if include_right_recv {
-                right_builder.recv::<String>(TestRole::Alice)
-            } else {
-                right_builder
-            };
-            let right = right_builder.end();
+                    let right_builder = Program::<TestRole, String>::builder();
+                    let right_builder = if include_right_recv {
+                        right_builder.recv::<String>(TestRole::Alice)
+                    } else {
+                        right_builder
+                    };
+                    let right = right_builder.end();
 
-            let composed = left.try_then(right).expect("composition should be structurally valid");
-            let end_count = composed
-                .effects()
-                .iter()
-                .filter(|effect| matches!(effect, Effect::End))
-                .count();
-            prop_assert_eq!(end_count, 1);
-            prop_assert!(matches!(composed.effects().last(), Some(Effect::End)));
+                    let composed = left
+                        .try_then(right)
+                        .expect("composition should be structurally valid");
+                    let end_count = composed
+                        .effects()
+                        .iter()
+                        .filter(|effect| matches!(effect, Effect::End))
+                        .count();
+                    prop_assert_eq!(end_count, 1);
+                    prop_assert!(matches!(composed.effects().last(), Some(Effect::End)));
+                }
+            }
         }
     }
 }

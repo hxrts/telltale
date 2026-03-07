@@ -1,13 +1,10 @@
 #![allow(missing_docs, clippy::as_conversions)]
 
-#[cfg(not(feature = "multi-thread"))]
-fn main() {
-    eprintln!("error: example requires --features multi-thread");
-    std::process::exit(2);
-}
+use cfg_if::cfg_if;
 
-#[cfg(feature = "multi-thread")]
-mod app {
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        mod app {
     use std::collections::BTreeMap;
     use std::time::Instant;
 
@@ -558,12 +555,18 @@ mod app {
         }
         out
     }
-}
+        }
 
-#[cfg(feature = "multi-thread")]
-fn main() {
-    if let Err(err) = app::run() {
-        eprintln!("error: {err}");
-        std::process::exit(1);
+        fn main() {
+            if let Err(err) = app::run() {
+                eprintln!("error: {err}");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        fn main() {
+            eprintln!("error: example requires --features multi-thread");
+            std::process::exit(2);
+        }
     }
 }

@@ -1,5 +1,6 @@
 //! Flow-policy serialization compatibility tests.
 
+use cfg_if::cfg_if;
 use std::collections::BTreeSet;
 
 use telltale_vm::vm::{FlowPolicy, FlowPredicate, VMConfig};
@@ -179,13 +180,16 @@ fn vm_new_rejects_invalid_config() {
     drop(telltale_vm::vm::VM::new(cfg));
 }
 
-#[cfg(feature = "multi-thread")]
-#[test]
-#[should_panic(expected = "instruction_cost must be > 0")]
-fn threaded_vm_rejects_invalid_config() {
-    let cfg = VMConfig {
-        instruction_cost: 0,
-        ..VMConfig::default()
-    };
-    drop(telltale_vm::threaded::ThreadedVM::with_workers(cfg, 2));
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        #[test]
+        #[should_panic(expected = "instruction_cost must be > 0")]
+        fn threaded_vm_rejects_invalid_config() {
+            let cfg = VMConfig {
+                instruction_cost: 0,
+                ..VMConfig::default()
+            };
+            drop(telltale_vm::threaded::ThreadedVM::with_workers(cfg, 2));
+        }
+    }
 }

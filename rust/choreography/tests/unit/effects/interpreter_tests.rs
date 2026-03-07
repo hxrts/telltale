@@ -1,5 +1,6 @@
 use super::*;
 use async_recursion::async_recursion;
+use cfg_if::cfg_if;
 use crate::effects::{LabelId, RoleId};
 use crate::identifiers::RoleName;
 use std::time::Duration;
@@ -114,32 +115,30 @@ async fn interpret_reference(
                     on_timeout,
                     ..
                 } => {
-                    #[cfg(not(target_arch = "wasm32"))]
-                    let timeout_result =
-                        tokio::time::timeout(dur, run_program(
-                            handler,
-                            endpoint,
-                            *body,
-                            received_values,
-                            last_label,
-                        ))
-                        .await;
+                    cfg_if! {
+                        if #[cfg(target_arch = "wasm32")] {
+                            let timeout_result = {
+                                use futures::future::{select, Either};
+                                use futures::pin_mut;
+                                use wasm_timer::Delay;
 
-                    #[cfg(target_arch = "wasm32")]
-                    let timeout_result = {
-                        use futures::future::{select, Either};
-                        use futures::pin_mut;
-                        use wasm_timer::Delay;
+                                let body_future =
+                                    run_program(handler, endpoint, *body, received_values, last_label);
+                                let timeout = Delay::new(dur);
+                                pin_mut!(body_future);
+                                pin_mut!(timeout);
 
-                        let body_future =
-                            run_program(handler, endpoint, *body, received_values, last_label);
-                        let timeout = Delay::new(dur);
-                        pin_mut!(body_future);
-                        pin_mut!(timeout);
-
-                        match select(body_future, timeout).await {
-                            Either::Left((result, _)) => Ok(result),
-                            Either::Right(_) => Err(()),
+                                match select(body_future, timeout).await {
+                                    Either::Left((result, _)) => Ok(result),
+                                    Either::Right(_) => Err(()),
+                                }
+                            };
+                        } else {
+                            let timeout_result = tokio::time::timeout(
+                                dur,
+                                run_program(handler, endpoint, *body, received_values, last_label),
+                            )
+                            .await;
                         }
                     };
 

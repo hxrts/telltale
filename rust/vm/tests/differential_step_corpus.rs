@@ -8,6 +8,7 @@
 #[path = "support/mod.rs"]
 mod test_support;
 
+use cfg_if::cfg_if;
 use std::collections::BTreeMap;
 
 use telltale_types::{GlobalType, LocalTypeR};
@@ -15,11 +16,15 @@ use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
 use telltale_vm::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_vm::loader::CodeImage;
-#[cfg(feature = "multi-thread")]
-use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::vm::{ObsEvent, StepResult, VMConfig, VM};
 
 use test_support::PassthroughHandler;
+
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        use telltale_vm::threaded::ThreadedVM;
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct StepSnap {
@@ -306,38 +311,6 @@ impl EffectHandler for KnowledgePayloadHandler {
     }
 }
 
-#[cfg(feature = "multi-thread")]
-fn run_threaded_snaps(
-    image: &CodeImage,
-    handler: &dyn EffectHandler,
-    max_steps: usize,
-) -> Vec<StepSnap> {
-    let mut vm = ThreadedVM::with_workers(VMConfig::default(), 1);
-    vm.load_choreography(image).expect("load choreography");
-    let mut snaps = Vec::new();
-    let mut prev_len = vm.trace().len();
-    for _ in 0..max_steps {
-        let result = vm.step_round(handler, 1).expect("step round");
-        let trace = vm.trace();
-        let mut new_events = Vec::new();
-        for ev in &trace[prev_len..] {
-            if matches!(ev, ObsEvent::OutputConditionChecked { .. }) {
-                continue;
-            }
-            new_events.push(event_name(ev));
-        }
-        prev_len = trace.len();
-        snaps.push(StepSnap {
-            result: result_name(&result),
-            new_events,
-        });
-        if matches!(result, StepResult::AllDone | StepResult::Stuck) {
-            break;
-        }
-    }
-    snaps
-}
-
 #[test]
 fn cooperative_step_corpus_send_recv_shape() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
@@ -486,88 +459,120 @@ fn cooperative_step_corpus_speculation_shape() {
     );
 }
 
-#[cfg(feature = "multi-thread")]
-#[test]
-fn threaded_matches_cooperative_step_corpus_send_recv() {
-    let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let handler = PassthroughHandler;
-    let coop = run_cooperative_snaps(&image, &handler, 16);
-    let threaded = run_threaded_snaps(&image, &handler, 16);
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        fn run_threaded_snaps(
+            image: &CodeImage,
+            handler: &dyn EffectHandler,
+            max_steps: usize,
+        ) -> Vec<StepSnap> {
+            let mut vm = ThreadedVM::with_workers(VMConfig::default(), 1);
+            vm.load_choreography(image).expect("load choreography");
+            let mut snaps = Vec::new();
+            let mut prev_len = vm.trace().len();
+            for _ in 0..max_steps {
+                let result = vm.step_round(handler, 1).expect("step round");
+                let trace = vm.trace();
+                let mut new_events = Vec::new();
+                for ev in &trace[prev_len..] {
+                    if matches!(ev, ObsEvent::OutputConditionChecked { .. }) {
+                        continue;
+                    }
+                    new_events.push(event_name(ev));
+                }
+                prev_len = trace.len();
+                snaps.push(StepSnap {
+                    result: result_name(&result),
+                    new_events,
+                });
+                if matches!(result, StepResult::AllDone | StepResult::Stuck) {
+                    break;
+                }
+            }
+            snaps
+        }
 
-    let coop_events = flatten_events(&coop);
-    let threaded_events = flatten_events(&threaded);
+        #[test]
+        fn threaded_matches_cooperative_step_corpus_send_recv() {
+            let image = test_support::simple_send_recv_image("A", "B", "msg");
+            let handler = PassthroughHandler;
+            let coop = run_cooperative_snaps(&image, &handler, 16);
+            let threaded = run_threaded_snaps(&image, &handler, 16);
 
-    assert_eq!(
-        coop_events, threaded_events,
-        "threaded backend diverged in event sequence"
-    );
-    assert_eq!(
-        coop.first(),
-        threaded.first(),
-        "first-step transition mismatch"
-    );
-    assert_eq!(
-        coop.last().map(|s| s.result),
-        Some("all_done"),
-        "coop did not terminate"
-    );
-    assert_eq!(
-        threaded.last().map(|s| s.result),
-        Some("all_done"),
-        "threaded did not terminate"
-    );
-}
+            let coop_events = flatten_events(&coop);
+            let threaded_events = flatten_events(&threaded);
 
-#[cfg(feature = "multi-thread")]
-#[test]
-fn threaded_matches_cooperative_step_corpus_choice() {
-    let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let handler = PassthroughHandler;
-    let coop = run_cooperative_snaps(&image, &handler, 16);
-    let threaded = run_threaded_snaps(&image, &handler, 16);
+            assert_eq!(
+                coop_events, threaded_events,
+                "threaded backend diverged in event sequence"
+            );
+            assert_eq!(
+                coop.first(),
+                threaded.first(),
+                "first-step transition mismatch"
+            );
+            assert_eq!(
+                coop.last().map(|s| s.result),
+                Some("all_done"),
+                "coop did not terminate"
+            );
+            assert_eq!(
+                threaded.last().map(|s| s.result),
+                Some("all_done"),
+                "threaded did not terminate"
+            );
+        }
 
-    let coop_events = flatten_events(&coop);
-    let threaded_events = flatten_events(&threaded);
+        #[test]
+        fn threaded_matches_cooperative_step_corpus_choice() {
+            let image = test_support::choice_image("A", "B", &["yes", "no"]);
+            let handler = PassthroughHandler;
+            let coop = run_cooperative_snaps(&image, &handler, 16);
+            let threaded = run_threaded_snaps(&image, &handler, 16);
 
-    assert_eq!(
-        coop_events, threaded_events,
-        "threaded backend diverged on choice event sequence"
-    );
-    assert!(
-        coop_events.contains(&"offered"),
-        "cooperative trace missing offered"
-    );
-    assert!(
-        coop_events.contains(&"chose"),
-        "cooperative trace missing chose"
-    );
-    assert_eq!(
-        coop.last().map(|s| s.result),
-        Some("all_done"),
-        "coop did not terminate"
-    );
-    assert_eq!(
-        threaded.last().map(|s| s.result),
-        Some("all_done"),
-        "threaded did not terminate"
-    );
-}
+            let coop_events = flatten_events(&coop);
+            let threaded_events = flatten_events(&threaded);
 
-#[cfg(feature = "multi-thread")]
-#[test]
-fn threaded_matches_cooperative_step_corpus_control_spawn() {
-    let image = control_spawn_fixture_image();
-    let handler = PassthroughHandler;
-    let coop = run_cooperative_snaps(&image, &handler, 32);
-    let threaded = run_threaded_snaps(&image, &handler, 32);
+            assert_eq!(
+                coop_events, threaded_events,
+                "threaded backend diverged on choice event sequence"
+            );
+            assert!(
+                coop_events.contains(&"offered"),
+                "cooperative trace missing offered"
+            );
+            assert!(
+                coop_events.contains(&"chose"),
+                "cooperative trace missing chose"
+            );
+            assert_eq!(
+                coop.last().map(|s| s.result),
+                Some("all_done"),
+                "coop did not terminate"
+            );
+            assert_eq!(
+                threaded.last().map(|s| s.result),
+                Some("all_done"),
+                "threaded did not terminate"
+            );
+        }
 
-    assert_eq!(
-        coop, threaded,
-        "threaded backend diverged on control/spawn step corpus"
-    );
-    assert_eq!(
-        threaded.last().map(|s| s.result),
-        Some("all_done"),
-        "threaded did not terminate"
-    );
+        #[test]
+        fn threaded_matches_cooperative_step_corpus_control_spawn() {
+            let image = control_spawn_fixture_image();
+            let handler = PassthroughHandler;
+            let coop = run_cooperative_snaps(&image, &handler, 32);
+            let threaded = run_threaded_snaps(&image, &handler, 32);
+
+            assert_eq!(
+                coop, threaded,
+                "threaded backend diverged on control/spawn step corpus"
+            );
+            assert_eq!(
+                threaded.last().map(|s| s.result),
+                Some("all_done"),
+                "threaded did not terminate"
+            );
+        }
+    }
 }

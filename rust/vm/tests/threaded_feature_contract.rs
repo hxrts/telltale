@@ -1,6 +1,8 @@
 #![cfg(not(target_arch = "wasm32"))]
 //! Contract test for threaded conformance lane execution.
 
+use cfg_if::cfg_if;
+
 #[test]
 #[allow(clippy::assertions_on_constants)]
 fn strict_conformance_env_requires_multi_thread_feature() {
@@ -13,9 +15,12 @@ fn strict_conformance_env_requires_multi_thread_feature() {
     );
 }
 
-#[cfg(feature = "multi-thread")]
-#[test]
-#[allow(clippy::assertions_on_constants)]
-fn threaded_feature_lane_is_active() {
-    assert!(cfg!(feature = "multi-thread"));
+cfg_if! {
+    if #[cfg(feature = "multi-thread")] {
+        #[test]
+        #[allow(clippy::assertions_on_constants)]
+        fn threaded_feature_lane_is_active() {
+            assert!(cfg!(feature = "multi-thread"));
+        }
+    }
 }

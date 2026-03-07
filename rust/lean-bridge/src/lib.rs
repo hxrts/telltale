@@ -51,6 +51,8 @@
 //! assert_eq!(json["kind"], "comm");
 //! ```
 
+use cfg_if::cfg_if;
+
 pub mod export;
 pub mod import;
 pub mod invariants;
@@ -58,23 +60,16 @@ pub mod schema;
 pub mod vm_export;
 pub mod vm_trace;
 
-#[cfg(feature = "runner")]
-pub(crate) mod projection_payload;
-
-#[cfg(feature = "runner")]
-pub mod equivalence;
-
-#[cfg(feature = "runner")]
-pub mod runner;
-
-#[cfg(feature = "runner")]
-pub mod sim_reference;
-
-#[cfg(feature = "runner")]
-pub mod validate;
-
-#[cfg(feature = "runner")]
-pub mod vm_runner;
+cfg_if! {
+    if #[cfg(feature = "runner")] {
+        pub(crate) mod projection_payload;
+        pub mod equivalence;
+        pub mod runner;
+        pub mod sim_reference;
+        pub mod validate;
+        pub mod vm_runner;
+    }
+}
 
 #[cfg(test)]
 pub mod test_utils;
@@ -108,24 +103,21 @@ pub use vm_trace::{
     ReplayTraceBundle, SessionTrace, TopologyPerturbationEvent, TopologyPerturbationKind,
 };
 
-#[cfg(feature = "runner")]
-pub use equivalence::{
-    CoherenceBundle, EquivalenceChecker, EquivalenceConfig, EquivalenceError, EquivalenceResult,
-    GoldenBundle,
-};
-
-#[cfg(feature = "runner")]
-pub use runner::{ChoreographyJson, LeanRunner, LeanRunnerError, LeanValidationResult};
-
-#[cfg(feature = "runner")]
-pub use sim_reference::{SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError};
-
-#[cfg(feature = "runner")]
-pub use vm_runner::{
-    compute_trace_diff, ComparisonResult, InvariantVerificationResult, LeanStructuredError,
-    TraceValidation, VmRunInput, VmRunOutput, VmRunner, VmRunnerError, VmSessionStatus,
-    VmStepState, VmTraceEvent,
-};
-
-#[cfg(feature = "runner")]
-pub use validate::{ValidationResult, Validator};
+cfg_if! {
+    if #[cfg(feature = "runner")] {
+        pub use equivalence::{
+            CoherenceBundle, EquivalenceChecker, EquivalenceConfig, EquivalenceError,
+            EquivalenceResult, GoldenBundle,
+        };
+        pub use runner::{ChoreographyJson, LeanRunner, LeanRunnerError, LeanValidationResult};
+        pub use sim_reference::{
+            SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
+        };
+        pub use vm_runner::{
+            compute_trace_diff, ComparisonResult, InvariantVerificationResult, LeanStructuredError,
+            TraceValidation, VmRunInput, VmRunOutput, VmRunner, VmRunnerError, VmSessionStatus,
+            VmStepState, VmTraceEvent,
+        };
+        pub use validate::{ValidationResult, Validator};
+    }
+}

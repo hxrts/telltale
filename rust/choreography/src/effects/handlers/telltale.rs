@@ -14,6 +14,7 @@
 // - TelltaleHandler: implements ChoreoHandler over either transport.
 
 use async_trait::async_trait;
+use cfg_if::cfg_if;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, fmt::Debug, marker::PhantomData, time::Duration};
 
@@ -387,27 +388,25 @@ where
     where
         F: std::future::Future<Output = ChoreoResult<T>> + Send,
     {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            match tokio::time::timeout(dur, body).await {
-                Ok(result) => result,
-                Err(_) => Err(ChoreographyError::Timeout(dur)),
-            }
-        }
+        cfg_if! {
+            if #[cfg(target_arch = "wasm32")] {
+                use futures::future::{select, Either};
+                use futures::pin_mut;
+                use wasm_timer::Delay;
 
-        #[cfg(target_arch = "wasm32")]
-        {
-            use futures::future::{select, Either};
-            use futures::pin_mut;
-            use wasm_timer::Delay;
+                let timeout = Delay::new(dur);
+                pin_mut!(body);
+                pin_mut!(timeout);
 
-            let timeout = Delay::new(dur);
-            pin_mut!(body);
-            pin_mut!(timeout);
-
-            match select(body, timeout).await {
-                Either::Left((result, _)) => result,
-                Either::Right(_) => Err(ChoreographyError::Timeout(dur)),
+                match select(body, timeout).await {
+                    Either::Left((result, _)) => result,
+                    Either::Right(_) => Err(ChoreographyError::Timeout(dur)),
+                }
+            } else {
+                match tokio::time::timeout(dur, body).await {
+                    Ok(result) => result,
+                    Err(_) => Err(ChoreographyError::Timeout(dur)),
+                }
             }
         }
     }

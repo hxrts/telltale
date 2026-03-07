@@ -5,6 +5,8 @@
 #[cfg(feature = "test-utils")]
 use async_trait::async_trait;
 #[cfg(feature = "test-utils")]
+use cfg_if::cfg_if;
+#[cfg(feature = "test-utils")]
 use serde::{de::DeserializeOwned, Serialize};
 #[cfg(feature = "test-utils")]
 use std::time::Duration;
@@ -58,14 +60,12 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for FaultInjection<H> {
             let delay_ms = self.rng.gen_range(min.as_millis()..=max.as_millis());
             let delay = Duration::from_millis(delay_ms as u64);
 
-            #[cfg(not(target_arch = "wasm32"))]
-            {
-                tokio::time::sleep(delay).await;
-            }
-
-            #[cfg(target_arch = "wasm32")]
-            {
-                wasm_timer::Delay::new(delay).await.ok();
+            cfg_if! {
+                if #[cfg(target_arch = "wasm32")] {
+                    wasm_timer::Delay::new(delay).await.ok();
+                } else {
+                    tokio::time::sleep(delay).await;
+                }
             }
         }
 

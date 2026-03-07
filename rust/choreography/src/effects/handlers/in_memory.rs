@@ -5,6 +5,7 @@
 // WASM-compatible.
 
 use async_trait::async_trait;
+use cfg_if::cfg_if;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::StreamExt;
 use serde::{de::DeserializeOwned, Serialize};
@@ -241,28 +242,26 @@ impl<R: RoleId + 'static> ChoreoHandler for InMemoryHandler<R> {
     {
         if at == self.role {
             // Platform-specific timeout implementation
-            #[cfg(not(target_arch = "wasm32"))]
-            {
-                match tokio::time::timeout(dur, body).await {
-                    Ok(result) => result,
-                    Err(_) => Err(ChoreographyError::Timeout(dur)),
-                }
-            }
+            cfg_if! {
+                if #[cfg(target_arch = "wasm32")] {
+                    // Use wasm_timer for WASM compatibility.
+                    use futures::future::{select, Either};
+                    use futures::pin_mut;
+                    use wasm_timer::Delay;
 
-            #[cfg(target_arch = "wasm32")]
-            {
-                // Use wasm_timer for WASM compatibility
-                use futures::future::{select, Either};
-                use futures::pin_mut;
-                use wasm_timer::Delay;
+                    let timeout = Delay::new(dur);
+                    pin_mut!(body);
+                    pin_mut!(timeout);
 
-                let timeout = Delay::new(dur);
-                pin_mut!(body);
-                pin_mut!(timeout);
-
-                match select(body, timeout).await {
-                    Either::Left((result, _)) => result,
-                    Either::Right(_) => Err(ChoreographyError::Timeout(dur)),
+                    match select(body, timeout).await {
+                        Either::Left((result, _)) => result,
+                        Either::Right(_) => Err(ChoreographyError::Timeout(dur)),
+                    }
+                } else {
+                    match tokio::time::timeout(dur, body).await {
+                        Ok(result) => result,
+                        Err(_) => Err(ChoreographyError::Timeout(dur)),
+                    }
                 }
             }
         } else {
