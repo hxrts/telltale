@@ -347,12 +347,7 @@
     }
 
     fn open_buffer_pressure_image() -> CodeImage {
-        let full_handlers = vec![
-            (("A".to_string(), "A".to_string()), "hAA".to_string()),
-            (("A".to_string(), "B".to_string()), "hAB".to_string()),
-            (("B".to_string(), "A".to_string()), "hBA".to_string()),
-            (("B".to_string(), "B".to_string()), "hBB".to_string()),
-        ];
+        let reachable_handlers = vec![(("A".to_string(), "B".to_string()), "hAB".to_string())];
         let send_twice = LocalTypeR::send(
             "B",
             Label::new("m"),
@@ -372,7 +367,7 @@
                 Instr::Open {
                     roles: vec!["A".to_string(), "B".to_string()],
                     local_types: vec![("A".to_string(), send_twice), ("B".to_string(), recv_twice)],
-                    handlers: full_handlers,
+                    handlers: reachable_handlers,
                     dsts: vec![("A".to_string(), 1), ("B".to_string(), 2)],
                 },
                 Instr::Set {
@@ -421,10 +416,16 @@
         let image = open_test_image(Instr::Open {
             roles: vec!["A".to_string(), "B".to_string()],
             local_types: vec![
-                ("A".to_string(), LocalTypeR::End),
-                ("B".to_string(), LocalTypeR::End),
+                (
+                    "A".to_string(),
+                    LocalTypeR::send("B", Label::new("go"), LocalTypeR::End),
+                ),
+                (
+                    "B".to_string(),
+                    LocalTypeR::recv("A", Label::new("go"), LocalTypeR::End),
+                ),
             ],
-            handlers: vec![(("A".to_string(), "B".to_string()), "h".to_string())],
+            handlers: vec![],
             dsts: vec![("A".to_string(), 0), ("B".to_string(), 1)],
         });
 
@@ -446,19 +447,22 @@
 
     #[test]
     fn test_open_initializes_local_types_handlers_and_endpoints() {
-        let full_handlers = vec![
-            (("A".to_string(), "A".to_string()), "hAA".to_string()),
+        let reachable_handlers = vec![
             (("A".to_string(), "B".to_string()), "hAB".to_string()),
-            (("B".to_string(), "A".to_string()), "hBA".to_string()),
-            (("B".to_string(), "B".to_string()), "hBB".to_string()),
         ];
         let image = open_test_image(Instr::Open {
             roles: vec!["A".to_string(), "B".to_string()],
             local_types: vec![
-                ("A".to_string(), LocalTypeR::End),
-                ("B".to_string(), LocalTypeR::End),
+                (
+                    "A".to_string(),
+                    LocalTypeR::send("B", Label::new("go"), LocalTypeR::End),
+                ),
+                (
+                    "B".to_string(),
+                    LocalTypeR::recv("A", Label::new("go"), LocalTypeR::End),
+                ),
             ],
-            handlers: full_handlers.clone(),
+            handlers: reachable_handlers.clone(),
             dsts: vec![("A".to_string(), 0), ("B".to_string(), 1)],
         });
 
@@ -489,14 +493,14 @@
         );
         let session = vm.sessions().get(sid).expect("opened session exists");
         assert_eq!(session.local_types.len(), 2);
-        for ((sender, receiver), handler_id) in full_handlers {
+        for ((sender, receiver), handler_id) in reachable_handlers {
             let edge = Edge::new(sid, sender, receiver);
             assert_eq!(session.edge_handlers.get(&edge), Some(&handler_id));
         }
         assert_eq!(vm.role_symbol_count(), 2);
         assert_eq!(vm.label_symbol_count(), 0);
-        assert_eq!(vm.handler_symbol_count(), 5);
-        assert_eq!(vm.edge_symbol_count(), 4);
+        assert_eq!(vm.handler_symbol_count(), 2);
+        assert_eq!(vm.edge_symbol_count(), 1);
 
         let coro = vm.coroutine(0).expect("coroutine exists");
         assert!(matches!(coro.regs[0], Value::Endpoint(_)));
@@ -530,19 +534,13 @@
 
     #[test]
     fn test_runtime_open_allocates_session_id_after_loaded_session_without_collision() {
-        let full_handlers = vec![
-            (("A".to_string(), "A".to_string()), "hAA".to_string()),
-            (("A".to_string(), "B".to_string()), "hAB".to_string()),
-            (("B".to_string(), "A".to_string()), "hBA".to_string()),
-            (("B".to_string(), "B".to_string()), "hBB".to_string()),
-        ];
         let image = open_test_image(Instr::Open {
             roles: vec!["A".to_string(), "B".to_string()],
             local_types: vec![
                 ("A".to_string(), LocalTypeR::End),
                 ("B".to_string(), LocalTypeR::End),
             ],
-            handlers: full_handlers,
+            handlers: vec![],
             dsts: vec![("A".to_string(), 0), ("B".to_string(), 1)],
         });
 

@@ -4,7 +4,7 @@
 //! Local type state lives here — the session store is the single source
 //! of truth for per-endpoint type advancement.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -67,14 +67,48 @@ impl ClosedSessionSummary {
 /// Reusable session-open layout derived from a fixed role topology and local types.
 #[derive(Debug, Clone)]
 pub struct SessionOpenPlan {
-    roles: Vec<String>,
-    role_ids: BTreeMap<String, u16>,
-    initial_types: Vec<(String, LocalTypeR, LocalTypeR)>,
-    edge_blueprint: Vec<((u16, u16), String, String)>,
-    active_branch_roles: Vec<String>,
+    pub(crate) roles: Vec<String>,
+    pub(crate) role_ids: BTreeMap<String, u16>,
+    pub(crate) initial_types: Vec<(String, LocalTypeR, LocalTypeR)>,
+    pub(crate) edge_blueprint: Vec<((u16, u16), String, String)>,
+    pub(crate) active_branch_roles: Vec<String>,
 }
 
 impl SessionOpenPlan {
+    fn collect_protocol_edges(
+        role: &str,
+        local_type: &LocalTypeR,
+        role_ids: &BTreeMap<String, u16>,
+        edges: &mut BTreeSet<(u16, u16)>,
+    ) {
+        match local_type {
+            LocalTypeR::End | LocalTypeR::Var(_) => {}
+            LocalTypeR::Mu { body, .. } => {
+                Self::collect_protocol_edges(role, body, role_ids, edges);
+            }
+            LocalTypeR::Send { partner, branches } => {
+                if let (Some(from_id), Some(to_id)) = (role_ids.get(role), role_ids.get(partner)) {
+                    if from_id != to_id {
+                        edges.insert((*from_id, *to_id));
+                    }
+                }
+                for (_, _, continuation) in branches {
+                    Self::collect_protocol_edges(role, continuation, role_ids, edges);
+                }
+            }
+            LocalTypeR::Recv { partner, branches } => {
+                if let (Some(from_id), Some(to_id)) = (role_ids.get(partner), role_ids.get(role)) {
+                    if from_id != to_id {
+                        edges.insert((*from_id, *to_id));
+                    }
+                }
+                for (_, _, continuation) in branches {
+                    Self::collect_protocol_edges(role, continuation, role_ids, edges);
+                }
+            }
+        }
+    }
+
     /// Build a reusable open plan from a role list and initial local types.
     #[must_use]
     pub fn new(roles: &[String], initial_types: &BTreeMap<String, LocalTypeR>) -> Self {
@@ -91,21 +125,23 @@ impl SessionOpenPlan {
             }
         }
 
-        let edge_capacity = roles.len().saturating_mul(roles.len().saturating_sub(1));
-        let mut edge_blueprint = Vec::with_capacity(edge_capacity);
-        for from in roles {
-            for to in roles {
-                if from == to {
-                    continue;
-                }
-                let from_id = *role_ids
-                    .get(from)
-                    .expect("sender role id must exist for session-open plan");
-                let to_id = *role_ids
-                    .get(to)
-                    .expect("receiver role id must exist for session-open plan");
-                edge_blueprint.push(((from_id, to_id), from.clone(), to.clone()));
+        let mut protocol_edges = BTreeSet::new();
+        for role in roles {
+            if let Some(original) = initial_types.get(role) {
+                Self::collect_protocol_edges(role, original, &role_ids, &mut protocol_edges);
             }
+        }
+        let mut edge_blueprint = Vec::with_capacity(protocol_edges.len());
+        for (from_id, to_id) in protocol_edges {
+            let from = roles
+                .get(usize::from(from_id))
+                .expect("sender role id must index the session-open role set")
+                .clone();
+            let to = roles
+                .get(usize::from(to_id))
+                .expect("receiver role id must index the session-open role set")
+                .clone();
+            edge_blueprint.push(((from_id, to_id), from, to));
         }
 
         Self {
@@ -121,6 +157,12 @@ impl SessionOpenPlan {
     #[must_use]
     pub fn roles(&self) -> &[String] {
         &self.roles
+    }
+
+    /// Directed protocol edges needed by this session.
+    #[must_use]
+    pub fn edge_blueprint(&self) -> &[((u16, u16), String, String)] {
+        &self.edge_blueprint
     }
 }
 
@@ -390,7 +432,7 @@ impl SessionState {
 
     fn rebuild_derived_indexes(&mut self) {
         self.role_ids = Self::build_role_ids(&self.roles);
-        self.edge_lookup = Self::build_edge_lookup(self.sid, &self.roles, &self.role_ids);
+        self.edge_lookup = Self::build_edge_lookup_from_buffers(&self.role_ids, &self.buffers);
         let (handler_ids, handlers_by_id, edge_handler_lookup, default_handler_id) =
             Self::build_handler_indexes(&self.role_ids, &self.default_handler, &self.edge_handlers);
         self.handler_ids = handler_ids;
@@ -419,28 +461,21 @@ impl SessionState {
             .collect()
     }
 
-    pub(crate) fn build_edge_lookup(
-        sid: SessionId,
-        roles: &[String],
+    pub(crate) fn build_edge_lookup_from_buffers(
         role_ids: &BTreeMap<String, u16>,
+        buffers: &BTreeMap<Edge, SignedBuffer<Signature>>,
     ) -> BTreeMap<(u16, u16), Edge> {
-        let edge_capacity = roles.len().saturating_mul(roles.len().saturating_sub(1));
-        let mut edges = Vec::with_capacity(edge_capacity);
-        for from in roles {
-            for to in roles {
-                if from == to {
-                    continue;
-                }
-                let from_id = *role_ids
-                    .get(from)
-                    .expect("sender role id must exist for edge table");
-                let to_id = *role_ids
-                    .get(to)
-                    .expect("receiver role id must exist for edge table");
-                edges.push(((from_id, to_id), Edge::new(sid, from.clone(), to.clone())));
-            }
+        let mut lookup = BTreeMap::new();
+        for edge in buffers.keys() {
+            let Some(from_id) = role_ids.get(&edge.sender) else {
+                continue;
+            };
+            let Some(to_id) = role_ids.get(&edge.receiver) else {
+                continue;
+            };
+            lookup.insert((*from_id, *to_id), edge.clone());
         }
-        edges.into_iter().collect()
+        lookup
     }
 
     pub(crate) fn build_handler_indexes(
@@ -548,7 +583,7 @@ impl SessionState {
         }
     }
 
-    fn refresh_endpoint_branch_lookup(&mut self, ep: &Endpoint) {
+    pub(crate) fn refresh_endpoint_branch_lookup(&mut self, ep: &Endpoint) {
         self.branch_lookup.remove(ep);
         let Some(entry) = self.local_types.get(ep) else {
             return;
@@ -885,9 +920,9 @@ impl SessionStore {
         }
         let local_types = local_type_entries.into_iter().collect();
 
-        let mut edge_entries = Vec::with_capacity(plan.edge_blueprint.len());
-        let mut buffer_entries = Vec::with_capacity(plan.edge_blueprint.len());
-        for (key, from, to) in &plan.edge_blueprint {
+        let mut edge_entries = Vec::with_capacity(plan.edge_blueprint().len());
+        let mut buffer_entries = Vec::with_capacity(plan.edge_blueprint().len());
+        for (key, from, to) in plan.edge_blueprint() {
             let edge = Edge::new(sid, from.clone(), to.clone());
             edge_entries.push((*key, edge.clone()));
             buffer_entries.push((edge, BoundedBuffer::new(buffer_config)));
@@ -1296,6 +1331,19 @@ mod tests {
         m
     }
 
+    fn single_send_recv_types() -> BTreeMap<String, LocalTypeR> {
+        let mut types = BTreeMap::new();
+        types.insert(
+            "A".to_string(),
+            LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End),
+        );
+        types.insert(
+            "B".to_string(),
+            LocalTypeR::recv("A", Label::new("msg"), LocalTypeR::End),
+        );
+        types
+    }
+
     #[test]
     fn test_session_open_with_types() {
         let mut store = SessionStore::new();
@@ -1416,7 +1464,7 @@ mod tests {
         let sid = store.open(
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
-            &BTreeMap::new(),
+            &single_send_recv_types(),
         );
 
         let session = store.get_mut(sid).unwrap();
@@ -1429,12 +1477,48 @@ mod tests {
     }
 
     #[test]
+    fn test_open_allocates_only_protocol_reachable_edges() {
+        let mut types = BTreeMap::new();
+        types.insert(
+            "A".to_string(),
+            LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End),
+        );
+        types.insert(
+            "B".to_string(),
+            LocalTypeR::recv("A", Label::new("msg"), LocalTypeR::End),
+        );
+        types.insert("C".to_string(), LocalTypeR::End);
+
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into(), "C".into()],
+            &BufferConfig::default(),
+            &types,
+        );
+
+        let session = store.get_mut(sid).expect("session exists");
+        assert_eq!(session.buffers.len(), 1);
+        assert!(session.buffers.contains_key(&Edge::new(sid, "A", "B")));
+        assert!(session.send("A", "B", Value::Nat(42)).is_ok());
+        assert!(session.has_message("A", "B"));
+        assert_eq!(session.recv("A", "B"), Some(Value::Nat(42)));
+        assert_eq!(
+            session.send("B", "A", Value::Nat(7)).unwrap_err(),
+            "no buffer for edge B → A"
+        );
+        assert_eq!(
+            session.send("A", "C", Value::Nat(9)).unwrap_err(),
+            "no buffer for edge A → C"
+        );
+    }
+
+    #[test]
     fn test_close_clears_buffers_and_traces_even_when_messages_pending() {
         let mut store = SessionStore::new();
         let sid = store.open(
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
-            &BTreeMap::new(),
+            &single_send_recv_types(),
         );
         let edge = Edge::new(sid, "A", "B");
         store
@@ -1508,7 +1592,11 @@ mod tests {
         let sid = store.open(
             vec!["A".into(), "B".into(), "C".into()],
             &BufferConfig::default(),
-            &BTreeMap::new(),
+            &{
+                let mut types = single_send_recv_types();
+                types.insert("C".to_string(), LocalTypeR::End);
+                types
+            },
         );
 
         let session = store.get_mut(sid).expect("session exists");
@@ -1543,7 +1631,7 @@ mod tests {
                 },
                 "msg"
             )
-            .is_none());
+            .is_some());
         assert!(decoded.has_message("A", "B"));
         assert_eq!(decoded.recv("A", "B"), Some(Value::Nat(7)));
         assert!(!decoded.has_message("A", "B"));
@@ -1555,12 +1643,12 @@ mod tests {
         let sid1 = store.open(
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
-            &BTreeMap::new(),
+            &single_send_recv_types(),
         );
         let sid2 = store.open(
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
-            &BTreeMap::new(),
+            &single_send_recv_types(),
         );
 
         assert_ne!(sid1, sid2);
@@ -1599,12 +1687,12 @@ mod tests {
         let sid1 = store.open(
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
-            &BTreeMap::new(),
+            &single_send_recv_types(),
         );
         let sid2 = store.open(
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
-            &BTreeMap::new(),
+            &single_send_recv_types(),
         );
 
         let e1 = Edge::new(sid1, "A", "B");

@@ -43,7 +43,8 @@ use crate::output_condition::{OutputConditionCheck, OutputConditionHint};
 use crate::scheduler::Scheduler;
 use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragmentV1};
 use crate::session::{
-    unfold_if_var_with_scope, unfold_mu, Edge, SessionId, SessionState, SessionStatus, TypeEntry,
+    unfold_if_var_with_scope, unfold_mu, Edge, SessionId, SessionOpenPlan, SessionState,
+    SessionStatus, TypeEntry,
 };
 use crate::transfer_semantics::{decode_transfer_request, move_endpoint_bundle};
 use crate::vm::{

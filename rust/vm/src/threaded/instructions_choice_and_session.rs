@@ -478,35 +478,44 @@ fn step_open(
         });
     }
 
+    let initial_types: BTreeMap<String, LocalTypeR> = local_types.iter().cloned().collect();
+    let plan = SessionOpenPlan::new(&open_roles, &initial_types);
+
     let has_handler = |sender: &str, receiver: &str| {
         handlers
             .iter()
             .any(|((s, r), _)| s == sender && r == receiver)
     };
-    let covers_edges = open_roles.iter().all(|sender| {
-        open_roles
-            .iter()
-            .all(|receiver| has_handler(sender, receiver))
-    });
+    let covers_edges = plan
+        .edge_blueprint()
+        .iter()
+        .all(|(_, sender, receiver)| has_handler(sender, receiver));
     if !covers_edges {
         return Err(Fault::Speculation {
             message: "handler bindings missing".to_string(),
         });
     }
 
-    let initial_types: BTreeMap<String, LocalTypeR> = local_types.iter().cloned().collect();
-    let sid = store.open(open_roles.clone(), buffer_config, &initial_types);
+    let sid = store.open_from_plan(&plan, buffer_config);
     let session = store.get(sid).ok_or_else(|| Fault::Close {
         message: "open session missing after allocation".to_string(),
     })?;
     {
         let mut session_guard = session.lock().expect("threaded VM lock poisoned");
-        for ((sender, receiver), handler_id) in handlers {
-            session_guard.edge_handlers.insert(
-                Edge::new(sid, sender.clone(), receiver.clone()),
-                handler_id.clone(),
-            );
+        for (_, sender, receiver) in plan.edge_blueprint() {
+            if let Some((_, handler_id)) = handlers
+                .iter()
+                .find(|((bound_sender, bound_receiver), _)| {
+                    bound_sender == sender && bound_receiver == receiver
+                })
+            {
+                session_guard.edge_handlers.insert(
+                    Edge::new(sid, sender.clone(), receiver.clone()),
+                    handler_id.clone(),
+                );
+            }
         }
+        session_guard.rebuild_derived_indexes();
     }
 
     for (_, _, reg) in &triples {

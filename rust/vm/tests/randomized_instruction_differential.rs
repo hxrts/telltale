@@ -1,3 +1,4 @@
+//! Differential randomized instruction checks between deterministic VM backends.
 #![cfg(all(not(target_arch = "wasm32"), feature = "multi-thread"))]
 #![allow(missing_docs)]
 

@@ -9,7 +9,7 @@ mod test_support;
 use std::collections::BTreeMap;
 
 use assert_matches::assert_matches;
-use telltale_types::LocalTypeR;
+use telltale_types::{Label, LocalTypeR};
 use telltale_vm::buffer::{
     BackpressurePolicy, BoundedBuffer, BufferConfig, BufferMode, EnqueueResult,
 };
@@ -19,6 +19,19 @@ use telltale_vm::session::{SessionStatus, SessionStore};
 use telltale_vm::vm::{ObservabilityRetentionConfig, ObservabilityRetentionMode, VMConfig, VM};
 
 use test_support::PassthroughHandler;
+
+fn simple_send_recv_types() -> BTreeMap<String, LocalTypeR> {
+    let mut types = BTreeMap::new();
+    types.insert(
+        "A".to_string(),
+        LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End),
+    );
+    types.insert(
+        "B".to_string(),
+        LocalTypeR::recv("A", Label::new("msg"), LocalTypeR::End),
+    );
+    types
+}
 
 // ============================================================================
 // Session Lifecycle
@@ -45,7 +58,7 @@ fn test_session_active_to_closed_clears_pending_buffers() {
     let sid = store.open(
         vec!["A".into(), "B".into()],
         &BufferConfig::default(),
-        &BTreeMap::new(),
+        &simple_send_recv_types(),
     );
 
     // Put a message in the buffer.
@@ -65,12 +78,12 @@ fn test_session_ids_monotonic() {
     let sid1 = store.open(
         vec!["A".into(), "B".into()],
         &BufferConfig::default(),
-        &BTreeMap::new(),
+        &simple_send_recv_types(),
     );
     let sid2 = store.open(
         vec!["A".into(), "B".into()],
         &BufferConfig::default(),
-        &BTreeMap::new(),
+        &simple_send_recv_types(),
     );
     let sid3 = store.open(
         vec!["A".into(), "B".into()],
@@ -457,12 +470,12 @@ fn test_two_sessions_independent_buffers() {
     let sid1 = store.open(
         vec!["A".into(), "B".into()],
         &BufferConfig::default(),
-        &BTreeMap::new(),
+        &simple_send_recv_types(),
     );
     let sid2 = store.open(
         vec!["A".into(), "B".into()],
         &BufferConfig::default(),
-        &BTreeMap::new(),
+        &simple_send_recv_types(),
     );
 
     // Send in session 1.

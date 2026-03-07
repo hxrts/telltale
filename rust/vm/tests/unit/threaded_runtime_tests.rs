@@ -147,12 +147,7 @@
     fn threaded_open_uses_configured_buffer_capacity() {
         let mut coro = Coroutine::new(0, 0, 0, "A".to_string(), 8, usize::MAX);
         let store = ThreadedSessionStore::new();
-        let handlers = vec![
-            (("A".to_string(), "A".to_string()), "hAA".to_string()),
-            (("A".to_string(), "B".to_string()), "hAB".to_string()),
-            (("B".to_string(), "A".to_string()), "hBA".to_string()),
-            (("B".to_string(), "B".to_string()), "hBB".to_string()),
-        ];
+        let handlers = vec![(("A".to_string(), "B".to_string()), "hAB".to_string())];
         let cfg = BufferConfig {
             mode: crate::buffer::BufferMode::Fifo,
             initial_capacity: 1,
@@ -165,8 +160,14 @@
             &cfg,
             &["A".to_string(), "B".to_string()],
             &[
-                ("A".to_string(), LocalTypeR::End),
-                ("B".to_string(), LocalTypeR::End),
+                (
+                    "A".to_string(),
+                    LocalTypeR::send("B", Label::new("m"), LocalTypeR::End),
+                ),
+                (
+                    "B".to_string(),
+                    LocalTypeR::recv("A", Label::new("m"), LocalTypeR::End),
+                ),
             ],
             &handlers,
             &[("A".to_string(), 1), ("B".to_string(), 2)],

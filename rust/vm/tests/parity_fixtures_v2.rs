@@ -1,7 +1,7 @@
+//! Lean/Rust parity fixtures for speculation, scheduler, and failure-envelope scenarios.
 #![cfg(not(target_arch = "wasm32"))]
 #![cfg(feature = "multi-thread")]
 #![allow(missing_docs)]
-//! Lean/Rust parity fixtures for speculation, scheduler, and failure-envelope scenarios.
 
 #[allow(dead_code, unreachable_pub)]
 #[path = "support/mod.rs"]

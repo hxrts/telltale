@@ -65,34 +65,40 @@ impl VM {
             });
         }
 
+        let initial_types: BTreeMap<String, LocalTypeR> = local_types.iter().cloned().collect();
+        let plan = crate::session::SessionOpenPlan::new(&open_roles, &initial_types);
+
         let has_handler = |sender: &str, receiver: &str| {
             handlers
                 .iter()
                 .any(|((s, r), _)| s == sender && r == receiver)
         };
-        let covers_edges = open_roles.iter().all(|sender| {
-            open_roles
-                .iter()
-                .all(|receiver| has_handler(sender, receiver))
-        });
+        let covers_edges = plan
+            .edge_blueprint()
+            .iter()
+            .all(|(_, sender, receiver)| has_handler(sender, receiver));
         if !covers_edges {
             return Err(Fault::Speculation {
                 message: "handler bindings missing".to_string(),
             });
         }
 
-        let initial_types: BTreeMap<String, LocalTypeR> = local_types.iter().cloned().collect();
-        let sid = self.sessions.open(
-            open_roles.clone(),
-            &self.config.buffer_config,
-            &initial_types,
-        );
+        let sid = self
+            .sessions
+            .open_with_sid_from_plan(self.sessions.next_session_id(), &plan, &self.config.buffer_config);
         self.next_session_id = self.sessions.next_session_id();
-        for ((sender, receiver), handler_id) in handlers {
-            self.sessions.update_handler(
-                &Edge::new(sid, sender.clone(), receiver.clone()),
-                handler_id.clone(),
-            );
+        for (_, sender, receiver) in plan.edge_blueprint() {
+            if let Some((_, handler_id)) = handlers
+                .iter()
+                .find(|((bound_sender, bound_receiver), _)| {
+                    bound_sender == sender && bound_receiver == receiver
+                })
+            {
+                self.sessions.update_handler(
+                    &Edge::new(sid, sender.clone(), receiver.clone()),
+                    handler_id.clone(),
+                );
+            }
         }
         self.monitor.set_kind(sid, SessionKind::Peer);
         self.resource_states
