@@ -40,7 +40,7 @@ telltale-theory = { path = "../theory", version = "3.0.0" }
 assert_matches = { workspace = true }
 wasm-bindgen-test = "0.3"
 criterion = { workspace = true }
-telltale-lean-bridge = { path = "../lean-bridge", version = "3.0.0" }
+telltale-lean-bridge = { path = "../lean-bridge", version = ">=2.1.0, <4.0.0" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 proptest = { workspace = true }
