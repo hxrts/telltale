@@ -118,6 +118,7 @@ impl LeanRunner {
     ) -> Result<Output, LeanRunnerError> {
         let start = Instant::now();
         loop {
+            // bounded: exits on child completion or timeout
             match child.try_wait()? {
                 Some(_) => return child.wait_with_output().map_err(LeanRunnerError::from),
                 None => {

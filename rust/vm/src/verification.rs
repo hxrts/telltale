@@ -290,6 +290,7 @@ impl AuthTree {
         let mut idx = self.levels[0].len() - 1;
         let mut level_idx = 0;
         loop {
+            // bounded: traverses log(n) tree levels upward
             let level = &self.levels[level_idx];
             let pair_start = idx & !1;
             let left = level[pair_start];

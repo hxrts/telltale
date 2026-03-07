@@ -133,6 +133,7 @@ fn parse_roles_block(
 
     let mut roles = Vec::new();
     loop {
+        // bounded: consumes token stream, breaks on non-comma
         let role_name: Ident = content.parse()?;
         roles.push(RoleDef { name: role_name });
         if content.peek(Token![,]) {

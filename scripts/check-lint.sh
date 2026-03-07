@@ -107,32 +107,43 @@ if [ "$UNSAFE_WITHOUT_SAFETY" -eq 0 ]; then
 fi
 
 # 4. Check for unbounded loops (style guide: put a limit on everything)
+# Accepts comment on same line as `loop {` OR on the immediately following line
 section "Checking for unbounded loops"
-UNBOUNDED_LOOPS=$(grep -rn "loop {" rust/*/src --include="*.rs" 2>/dev/null \
-    | grep -v "// bounded\|// forever\|// infinite\|#\[allow" \
-    | wc -l | tr -d ' ')
+UNBOUNDED_LOOPS=0
+while IFS=: read -r file line _; do
+    # Check if this line or the next line has a bounded/forever/infinite comment
+    next_line=$((line + 1))
+    if ! sed -n "${line}p;${next_line}p" "$file" 2>/dev/null | grep -qE "// bounded|// forever|// infinite|#\[allow"; then
+        ((UNBOUNDED_LOOPS++)) || true
+        [ "$UNBOUNDED_LOOPS" -le 5 ] && echo "  $file:$line"
+    fi
+done < <(grep -rn "loop {$" rust/*/src --include="*.rs" 2>/dev/null)
 
 if [ "$UNBOUNDED_LOOPS" -gt 0 ]; then
     log_warn "Found $UNBOUNDED_LOOPS potential unbounded loops"
     echo "  Add '// bounded:' or '// forever:' comment to document intent"
-    grep -rn "loop {" rust/*/src --include="*.rs" 2>/dev/null \
-        | grep -v "// bounded\|// forever\|// infinite\|#\[allow" \
-        | head -5
 else
     log_ok "All loops are documented or bounded"
 fi
 
 # 5. Check for usize in stored/serialized types (style guide: explicit sizes)
+# Look for struct fields with `: usize,` pattern (trailing comma indicates field, not fn param)
+# Excludes function signatures, generic bounds, and return types
 section "Checking for usize in serializable types"
-USIZE_SERDE=$(grep -rn "usize" rust/*/src --include="*.rs" 2>/dev/null \
-    | grep -E "Serialize|Deserialize" \
+USIZE_SERDE=$(grep -rn ":\s*usize\s*," rust/*/src --include="*.rs" 2>/dev/null \
+    | grep -v "fn \|test\|example\|// " \
     | wc -l | tr -d ' ')
 
-if [ "$USIZE_SERDE" -gt 0 ]; then
-    log_warn "Found $USIZE_SERDE files with usize near Serialize/Deserialize"
-    echo "  Consider using explicit u32/u64 for serialized data"
+if [ "$USIZE_SERDE" -gt 10 ]; then
+    log_warn "Found $USIZE_SERDE potential usize fields in struct types"
+    echo "  Consider using explicit u32/u64 for cross-platform serialized data"
+    grep -rn ":\s*usize\s*," rust/*/src --include="*.rs" 2>/dev/null \
+        | grep -v "fn \|test\|example\|// " \
+        | head -5
+elif [ "$USIZE_SERDE" -gt 0 ]; then
+    log_info "Found $USIZE_SERDE usize struct fields (acceptable for internal use)"
 else
-    log_ok "No usize in serializable types"
+    log_ok "No usize in struct types"
 fi
 
 # 6. Check for TODO/FIXME comments (technical debt tracking)

@@ -73,6 +73,7 @@ pub fn parse_choreography_str(input: &str) -> std::result::Result<Choreography, 
 }
 
 /// Parse a choreographic protocol from a string with extension support
+#[allow(clippy::too_many_lines)]
 pub fn parse_choreography_str_with_extensions(
     input: &str,
     registry: &ExtensionRegistry,
@@ -361,6 +362,7 @@ fn normalize_macro_token_input(input: &TokenStream) -> String {
         ];
 
         loop {
+            // bounded: converges as patterns reduce spacing
             let mut changed = false;
             for (from, to) in patterns {
                 if s.contains(from) {

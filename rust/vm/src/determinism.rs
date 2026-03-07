@@ -94,8 +94,8 @@ fn flush_commutative_run(out: &mut Vec<ObsEvent>, run: &mut Vec<ObsEvent>) {
     }
     let mut cursors: BTreeMap<usize, usize> = buckets.keys().map(|sid| (*sid, 0)).collect();
 
-    // BOUND: processes total_events across all buckets, exits when all cursors exhausted
     loop {
+        // bounded: processes total_events across all buckets, exits when all cursors exhausted
         let mut progressed = false;
         for (sid, events) in &buckets {
             if let Some(cursor) = cursors.get_mut(sid) {

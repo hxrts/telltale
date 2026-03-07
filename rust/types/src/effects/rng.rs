@@ -58,6 +58,7 @@ pub trait Rng: Send {
         // Largest inclusive value that can be reduced mod `bound` without bias.
         let zone = u64::MAX - (u64::MAX % bound);
         loop {
+            // bounded: rejection sampling terminates with probability > 0.5 per iteration
             let value = self.next_u64();
             if value <= zone {
                 return value % bound;

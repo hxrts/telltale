@@ -159,6 +159,7 @@ impl GlobalType {
     fn fresh_var(base: &str, avoid: &BTreeSet<String>) -> String {
         let mut idx = 0usize;
         loop {
+            // bounded: idx increments until fresh name found (finite avoid set)
             let candidate = format!("{base}_{idx}");
             if !avoid.contains(&candidate) {
                 return candidate;

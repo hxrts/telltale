@@ -145,8 +145,8 @@ impl TcpTransport {
         let buffer_size = self.config.buffer_size;
 
         tokio::spawn(async move {
-            // Forever loop: runs until shutdown signal received via shutdown_rx
             loop {
+                // forever: runs until shutdown signal received via shutdown_rx
                 tokio::select! {
                     accept_result = listener.accept() => {
                         match accept_result {
@@ -232,8 +232,8 @@ impl TcpTransport {
         let mut attempts = 0;
         let mut delay = retry.initial_delay;
 
-        // BOUND: exits on success or when attempts >= retry.max_attempts
         loop {
+            // bounded: exits on success or when attempts >= retry.max_attempts
             match TcpStream::connect(addr).await {
                 Ok(mut stream) => {
                     // Send our role name
@@ -318,8 +318,8 @@ async fn handle_connection(
         return Err(TcpTransportError::UnknownPeer(peer_role));
     };
 
-    // Forever loop: reads messages until connection closed (EOF) or error
     loop {
+        // forever: reads messages until connection closed (EOF) or error
         let mut len_buf = [0u8; 4];
         match stream.read_exact(&mut len_buf).await {
             Ok(_) => {}
