@@ -2,7 +2,9 @@
 //!
 //! Emits layout-sensitive syntax for the choreography language.
 
-use crate::ast::{Annotations, Branch, Choreography, Condition, MessageType, Protocol, Role, RoleParam};
+use crate::ast::{
+    Annotations, Branch, Choreography, Condition, MessageType, Protocol, Role, RoleParam,
+};
 use crate::compiler::parser::parse_choreography_str;
 
 #[derive(Debug, Clone)]
@@ -155,11 +157,7 @@ fn format_choice_protocol(
     config: &PrettyConfig,
     out: &mut String,
 ) {
-    write_line(
-        out,
-        indent,
-        &format!("choice at {}", format_role_ref(role)),
-    );
+    write_line(out, indent, &format!("choice at {}", format_role_ref(role)));
     for branch in branches {
         format_branch(branch, indent + config.indent, config, out);
     }

@@ -3,11 +3,11 @@ use std::collections::{HashMap, HashSet};
 use super::super::role::parse_role_ref;
 use super::super::statement::parse_message;
 use super::super::types::Statement;
+use super::super::ParseError;
 use super::super::Rule;
 use super::{
     extract_statement_annotations, next_required, parse_annotated_sender_ref, syntax_error,
 };
-use super::super::ParseError;
 
 /// Parse send statement: A -> B: Message(payload)
 pub(crate) fn parse_send_stmt(

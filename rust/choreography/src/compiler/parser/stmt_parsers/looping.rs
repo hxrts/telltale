@@ -171,7 +171,10 @@ pub(crate) fn parse_loop_stmt(
                 for spec in item.into_inner() {
                     if matches!(
                         spec.as_rule(),
-                        Rule::loop_decide | Rule::loop_repeat | Rule::loop_while | Rule::loop_forever
+                        Rule::loop_decide
+                            | Rule::loop_repeat
+                            | Rule::loop_while
+                            | Rule::loop_forever
                     ) {
                         condition = parse_loop_condition(spec, declared_roles, input)?;
                     }

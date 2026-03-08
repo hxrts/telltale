@@ -107,9 +107,7 @@ fn is_statement_annotation_key(key: &str) -> bool {
     )
 }
 
-fn extract_statement_annotations(
-    annotations: &HashMap<String, String>,
-) -> HashMap<String, String> {
+fn extract_statement_annotations(annotations: &HashMap<String, String>) -> HashMap<String, String> {
     annotations
         .iter()
         .filter(|(key, _)| is_statement_annotation_key(key))

@@ -23,7 +23,10 @@ const KERNEL_SOURCES: &[(&str, &str)] = &[
     ("src/kernel.rs", include_str!("../src/kernel.rs")),
     ("src/vm.rs", include_str!("../src/vm.rs")),
     ("src/threaded.rs", include_str!("../src/threaded.rs")),
-    ("src/scheduler/mod.rs", include_str!("../src/scheduler/mod.rs")),
+    (
+        "src/scheduler/mod.rs",
+        include_str!("../src/scheduler/mod.rs"),
+    ),
     ("src/session/mod.rs", include_str!("../src/session/mod.rs")),
     ("src/coroutine.rs", include_str!("../src/coroutine.rs")),
     ("src/exec/mod.rs", include_str!("../src/exec/mod.rs")),

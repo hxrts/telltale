@@ -223,6 +223,8 @@ B
   -> A : Result(i : Int, ok : Bool)
 ```
 
+This sequence demonstrates payload and result handling patterns with mixed message shapes.
+
 #### 9) Dynamic Role Count Support
 
 Dynamic role counts are supported via wildcard and symbolic parameters.

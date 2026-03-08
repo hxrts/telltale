@@ -52,6 +52,8 @@ pub mod bridge;
 pub mod buffer;
 pub mod clock;
 pub mod commit_common;
+/// Communication replay modes and consumption state for deterministic and speculatively
+/// replayed session histories.
 pub mod communication_replay;
 pub mod compiler;
 pub mod composition;
@@ -77,6 +79,7 @@ pub mod persistence;
 pub mod runtime_contracts;
 pub mod scheduler;
 pub mod serialization;
+/// Session store and role/session bookkeeping used by protocol execution.
 pub mod session;
 pub mod trace;
 pub mod transfer_semantics;

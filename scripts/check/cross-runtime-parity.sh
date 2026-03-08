@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Consolidated Lean/Rust parity checks.
 # Usage:
-#   ./scripts/check/parity.sh [--all|--types|--suite|--conformance]
+#   ./scripts/check/cross-runtime-parity.sh [--all|--types|--suite|--conformance]
 #
 # Modes:
 #   --all         Run all parity checks (default)
@@ -320,7 +320,7 @@ just_text = justfile.read_text(encoding="utf-8")
 
 required_ci_markers = [
     ("verify workflow parity gate", "just check-parity", verify_text),
-    ("check workflow parity gate", "./scripts/check/parity.sh", check_text),
+    ("check workflow parity gate", "./scripts/check/cross-runtime-parity.sh", check_text),
     ("ci-dry-run parity gate", "just check-parity", just_text),
 ]
 

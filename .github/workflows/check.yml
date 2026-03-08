@@ -39,7 +39,7 @@ jobs:
       - name: Run executable VM placeholder baseline checks
         run: ./scripts/check/vm-placeholders.sh
       - name: Run parity checks
-        run: ./scripts/check/parity.sh --all
+        run: ./scripts/check/cross-runtime-parity.sh --all
       - name: Check docs drift
         run: ./scripts/check/docs-drift.sh
       - name: Check docs links referenced from code

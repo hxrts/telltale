@@ -10,8 +10,8 @@ use std::collections::{HashMap, HashSet};
 
 use super::error::{ErrorSpan, ParseError};
 use super::stmt_parsers::{
-    parse_broadcast_stmt, parse_call_stmt, parse_choice_stmt, parse_par_stmt,
-    parse_continue_stmt, parse_handshake_stmt, parse_heartbeat_stmt, parse_loop_stmt,
+    parse_broadcast_stmt, parse_call_stmt, parse_choice_stmt, parse_continue_stmt,
+    parse_handshake_stmt, parse_heartbeat_stmt, parse_loop_stmt, parse_par_stmt,
     parse_quorum_collect_stmt, parse_rec_stmt, parse_retry_stmt, parse_send_stmt,
     parse_timed_choice_stmt, parse_vm_abort_stmt, parse_vm_acquire_stmt, parse_vm_check_stmt,
     parse_vm_fork_stmt, parse_vm_join_stmt, parse_vm_release_stmt, parse_vm_tag_stmt,

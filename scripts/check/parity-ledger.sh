@@ -21,4 +21,4 @@ if ! rg -q "^\| ID \| Status \| Owner \| Revisit \| Summary \|" "${PARITY_DOC}";
   exit 1
 fi
 
-./scripts/check/parity.sh --types
+./scripts/check/cross-runtime-parity.sh --types

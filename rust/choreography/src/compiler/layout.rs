@@ -274,7 +274,8 @@ mod tests {
 
     #[test]
     fn layout_ignores_explicit_braces_blocks() {
-        let input = "protocol Test =\n  roles A, B\n  par {\n    | A -> B : Msg\n    | B -> A : Ack\n  }\n";
+        let input =
+            "protocol Test =\n  roles A, B\n  par {\n    | A -> B : Msg\n    | B -> A : Ack\n  }\n";
         let out = preprocess_layout(input).unwrap();
         // Should still insert outer protocol block, but not double-open inside explicit braces.
         let normalized = out.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -292,7 +293,8 @@ mod tests {
 
     #[test]
     fn layout_does_not_insert_braces_inside_multiline_sender_records() {
-        let input = "protocol Test =\n  roles A, B\n  A {\n    priority = high,\n  }\n    -> B : Msg\n";
+        let input =
+            "protocol Test =\n  roles A, B\n  A {\n    priority = high,\n  }\n    -> B : Msg\n";
         let out = preprocess_layout(input).unwrap();
         assert!(!out.contains("{     priority = high,"));
         assert!(out.contains("A {"));

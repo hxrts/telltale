@@ -1071,7 +1071,10 @@ protocol Generics = {
 ";
 
     let result = parse_choreography_str(input);
-    assert!(result.is_err(), "angle-bracket generic message types must be rejected");
+    assert!(
+        result.is_err(),
+        "angle-bracket generic message types must be rejected"
+    );
 }
 
 #[test]

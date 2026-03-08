@@ -96,7 +96,7 @@ check-vm-placeholders:
 
 # Consolidated Lean/Rust parity checks (types, suite, conformance)
 check-parity mode="--all":
-    ./scripts/check/parity.sh {{ mode }}
+    ./scripts/check/cross-runtime-parity.sh {{ mode }}
 
 # Enforce parity type ledger plus deviation registry presence/shape.
 check-parity-ledger:
