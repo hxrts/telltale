@@ -1,6 +1,6 @@
 [package]
 name = "telltale-macros"
-version = "3.0.0"
+version = "4.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
 description = "Procedural macros for Telltale session types (Aura flavored)."

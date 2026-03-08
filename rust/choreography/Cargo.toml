@@ -1,6 +1,6 @@
 [package]
 name = "telltale-choreography"
-version = "3.0.0"
+version = "4.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
 autobenches = false
@@ -16,10 +16,10 @@ categories = ["asynchronous", "concurrency"]
 bench = false
 
 [dependencies]
-telltale = { path = "../..", version = "3.0.0" }
-telltale-macros = { path = "../macros", version = "3.0.0" }
-telltale-types = { path = "../types", version = "3.0.0" }
-telltale-theory = { path = "../theory", version = "3.0.0" }
+telltale = { path = "../..", version = "4.0.0" }
+telltale-macros = { path = "../macros", version = "4.0.0" }
+telltale-types = { path = "../types", version = "4.0.0" }
+telltale-theory = { path = "../theory", version = "4.0.0" }
 futures = { workspace = true }
 async-trait = { workspace = true }
 async-recursion = { workspace = true }
