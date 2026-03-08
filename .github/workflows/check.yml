@@ -23,7 +23,7 @@ jobs:
         run: |
           sudo mkdir -p /Users/hxrts/projects
           sudo chown -R "$USER":"$USER" /Users/hxrts
-          ./scripts/bootstrap-lean-dependency-checkouts.sh
+          ./scripts/bootstrap/dependency-checkouts.sh
       - name: Check formatting
         uses: actions-rs/cargo@v1
         with:
@@ -37,13 +37,13 @@ jobs:
       - name: Install native tooling
         run: sudo apt-get update && sudo apt-get install -y ripgrep gnuplot
       - name: Run executable VM placeholder baseline checks
-        run: ./scripts/check-vm-placeholders.sh
+        run: ./scripts/check/vm-placeholders.sh
       - name: Run parity checks
-        run: ./scripts/check-parity.sh --all
+        run: ./scripts/check/parity.sh --all
       - name: Check docs drift
-        run: ./scripts/check-docs-drift.sh
+        run: ./scripts/check/docs-drift.sh
       - name: Check docs links referenced from code
-        run: ./scripts/check-doc-links-in-code.sh
+        run: ./scripts/check/doc-links-in-code.sh
       - name: Run linter
         uses: actions-rs/cargo@v1
         with:

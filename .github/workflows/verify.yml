@@ -32,7 +32,7 @@ jobs:
         run: |
           sudo mkdir -p /Users/hxrts/projects
           sudo chown -R "$USER":"$USER" /Users/hxrts
-          ./scripts/bootstrap-lean-dependency-checkouts.sh
+          ./scripts/bootstrap/dependency-checkouts.sh
 
       - name: Install just
         run: cargo install just --locked
@@ -117,7 +117,7 @@ jobs:
         run: |
           sudo mkdir -p /Users/hxrts/projects
           sudo chown -R "$USER":"$USER" /Users/hxrts
-          ./scripts/bootstrap-lean-dependency-checkouts.sh
+          ./scripts/bootstrap/dependency-checkouts.sh
 
       - name: Install just
         run: cargo install just --locked

@@ -39,21 +39,21 @@ ci-dry-run:
 
 # Rust style guide lint check (comprehensive)
 lint:
-    ./scripts/check-lint.sh
+    ./scripts/check/lint.sh
 
 # Rust style guide lint check (quick - format + clippy only)
 lint-quick:
-    ./scripts/check-lint.sh --quick
+    ./scripts/check/lint.sh --quick
 
 # Rust architecture/style-guide pattern checker
 check-arch-rust:
-    ./scripts/check-arch-rust.sh
+    ./scripts/check/architecture-rust.sh
 
 # TellTale syntax/style check suite (dependency layering, docs references, symbols)
 check-telltale-style:
-    ./scripts/check-dependency-layers.sh
-    ./scripts/check-doc-links-extended.sh
-    ./scripts/check-text-symbols.sh
+    ./scripts/check/dependency-layers.sh
+    ./scripts/check/doc-links-extended.sh
+    ./scripts/check/text-symbols.sh
 
 # Generate deterministic EffectHandler stubs plus simulator harness test templates.
 effect-scaffold out="work/effect_handler_scaffold" name="HostEffectHandler":
@@ -72,71 +72,71 @@ check-arch: check-arch-rust
 
 # Lean architecture/style-guide pattern checker
 check-arch-lean:
-    ./scripts/check-arch-lean.sh
+    ./scripts/check/architecture-lean.sh
 
 # Validate pinned revisions for local Lean dependency checkouts.
 check-lean-dependency-pins:
-    ./scripts/check-lean-dependency-pins.sh
+    ./scripts/check/lean-dependency-pins.sh
 
 # Consolidated capability gate checks (byzantine, delegation, envelope, failure, contracts, speculation)
 check-capability-gates:
-    ./scripts/check-capability-gates.sh --all
+    ./scripts/check/capability-gates.sh --all
 
 # Release theorem-capability and conformance checks
 check-release-conformance:
-    ./scripts/check-release-conformance.sh
+    ./scripts/check/release-conformance.sh
 
 # V2 baseline management (check, freeze, run, sla)
 v2-baseline mode="check":
-    ./scripts/v2-baseline.sh {{ mode }}
+    ./scripts/ops/baseline-v2.sh {{ mode }}
 
 # Prevent new placeholder/stub/TODO markers in executable Lean VM modules.
 check-vm-placeholders:
-    ./scripts/check-vm-placeholders.sh
+    ./scripts/check/vm-placeholders.sh
 
 # Consolidated Lean/Rust parity checks (types, suite, conformance)
 check-parity mode="--all":
-    ./scripts/check-parity.sh {{ mode }}
+    ./scripts/check/parity.sh {{ mode }}
 
 # Enforce parity type ledger plus deviation registry presence/shape.
 check-parity-ledger:
-    ./scripts/check-parity-ledger.sh
+    ./scripts/check/parity-ledger.sh
 
 # Check crate and feature references in docs/00-03 against Cargo metadata.
 check-docs-drift:
-    ./scripts/check-docs-drift.sh
+    ./scripts/check/docs-drift.sh
 
 # Check docs/ links referenced from rust/ and lean/ sources resolve to existing files.
 check-doc-links-in-code:
-    ./scripts/check-doc-links-in-code.sh
+    ./scripts/check/doc-links-in-code.sh
 
 # Enforce documentation style, link integrity, and command/reference validity.
 check-doc-quality:
-    ./scripts/check-doc-quality.sh
+    ./scripts/check/doc-quality.sh
 
 # Refresh generated Lean metrics in docs
 sync-lean-metrics:
-    ./scripts/sync-lean-metrics.sh
+    ./scripts/ops/sync-lean-metrics.sh
 
 # Verify generated Lean metrics are fresh
 check-lean-metrics:
-    ./scripts/sync-lean-metrics.sh --check
+    ./scripts/ops/sync-lean-metrics.sh --check
 
 # Sync reproducibility rows in all three papers (pinned commit, DOI, Lean stats).
 paper-repro-sync:
-    bash scripts/paper_repro_rows.sh --sync paper/paper1.tex paper/paper2.tex paper/paper3.tex
+    bash scripts/ops/paper-repro-rows.sh --sync paper/paper1.tex paper/paper2.tex paper/paper3.tex
 
 # Check reproducibility rows are up to date (current commit, DOI metadata, Lean stats).
 paper-repro-check:
-    bash scripts/paper_repro_rows.sh --check paper/paper1.tex paper/paper2.tex paper/paper3.tex
+    bash scripts/ops/paper-repro-rows.sh --check paper/paper1.tex paper/paper2.tex paper/paper3.tex
 
 # Strict reproducibility check, including DOI being set in paper/artifact_metadata.env.
 paper-repro-check-strict:
-    bash scripts/paper_repro_rows.sh --check --strict-doi paper/paper1.tex paper/paper2.tex paper/paper3.tex
+    bash scripts/ops/paper-repro-rows.sh --check --strict-doi paper/paper1.tex paper/paper2.tex paper/paper3.tex
 
 # Generate machine-readable publication supplement manifest.
 artifact-manifest:
-    bash scripts/generate_artifact_manifest.sh
+    bash scripts/ops/generate-artifact-manifest.sh
 
 # Clean publication artifact logs.
 artifact-clean:
@@ -155,7 +155,7 @@ artifact-check:
 
 # Generate Lean style conformance baseline report
 lean-style-baseline:
-    ./scripts/gen-lean-style-baseline.sh
+    ./scripts/ops/generate-lean-style-baseline.sh
 
 # Check WASM compilation for choreography and core crates
 wasm-check:
@@ -338,7 +338,7 @@ serve: summary _gen-assets
 
 # Check Lean codebase for escape hatches (sorry, axiom, unsafe, partial, theorem shells, etc.)
 escape:
-    ./scripts/check-escape.sh
+    ./scripts/check/escape-hatches.sh
 
 # Test Lean installation
 lean-test:

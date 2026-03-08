@@ -17,7 +17,7 @@ package telltale where
 
 -- Mathlib provides standard lemmas and automation for proofs.
 -- Local checkout is pinned by revision in `lean/dependency_pins.json`
--- and validated by `scripts/check-lean-dependency-pins.sh`.
+-- and validated by `scripts/check/lean-dependency-pins.sh`.
 require mathlib from "/Users/hxrts/projects/lean_common/mathlib4"
 
 -- Paco provides parametrized coinduction for EQ2 proofs.
