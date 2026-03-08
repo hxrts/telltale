@@ -7,7 +7,7 @@ use crate::ast::{Choreography, Condition, Protocol, Role};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-#[path = "effects_codegen_protocol_types.rs"]
+#[path = "effects_protocol_types.rs"]
 mod protocol_types;
 use protocol_types::{generate_label_type, generate_message_types};
 

@@ -110,5 +110,6 @@ name = "telltale_client_server"
 required-features = ["native-examples"]
 
 [[example]]
-name = "telltale_three_party_negotiation"
+name = "three_party_negotiation"
+path = "examples/three_party_negotiation.rs"
 required-features = ["native-examples"]

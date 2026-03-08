@@ -64,24 +64,24 @@ use crate::transfer_semantics::{
 };
 use crate::verification::{DefaultVerificationModel, VerificationModel};
 
-include!("vm/runtime_value_and_resource_state/mod.rs");
-include!("vm/vm_config_and_observability.rs");
+include!("vm/runtime_state/mod.rs");
+include!("vm/vm_config.rs");
 include!("vm/vm_error_and_step_pack.rs");
-include!("vm/runtime_and_execution/mod.rs");
-include!("vm/introspection_and_validation.rs");
+include!("vm/runtime_exec/mod.rs");
+include!("vm/validation.rs");
 include!("vm/topology_and_dispatch.rs");
-include!("vm/instruction_control_and_effects.rs");
+include!("vm/instruction_effects.rs");
 include!("vm/instruction_tag.rs");
-include!("vm/instruction_choice_and_session.rs");
-include!("vm/open_commit_and_interning.rs");
+include!("vm/instruction_choice.rs");
+include!("vm/open_commit.rs");
 include!("vm/kernel_impl.rs");
 
 #[cfg(test)]
 mod tests {
-    include!("../tests/unit/vm/tests_effect_handlers_core.rs");
-    include!("../tests/unit/vm/tests_effect_handlers_edge_cases.rs");
+    include!("../tests/unit/vm/tests_handlers_core.rs");
+    include!("../tests/unit/vm/tests_handlers_edge.rs");
     include!("../tests/unit/vm/tests_runtime_progress.rs");
-    include!("../tests/unit/vm/tests_monitor_and_persistence.rs");
-    include!("../tests/unit/vm/tests_compiler_and_topology.rs");
-    include!("../tests/unit/vm/tests_flow_policy_and_faults.rs");
+    include!("../tests/unit/vm/tests_monitor_persist.rs");
+    include!("../tests/unit/vm/tests_compiler_topology.rs");
+    include!("../tests/unit/vm/tests_flow_policy_faults.rs");
 }

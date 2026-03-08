@@ -23,16 +23,16 @@ mod stmt_parsers;
 mod tests {
     use super::*;
 
-    mod core_syntax_and_decide_loops {
-        include!("../../../tests/unit/compiler/parser/core_syntax_and_decide_loops.rs");
+    mod core_syntax_loops {
+        include!("../../../tests/unit/compiler/parser/core_syntax_loops.rs");
     }
 
     mod annotations_and_parallel {
         include!("../../../tests/unit/compiler/parser/annotations_and_parallel.rs");
     }
 
-    mod proof_bundles_and_predicates {
-        include!("../../../tests/unit/compiler/parser/proof_bundles_and_predicates.rs");
+    mod proof_bundles_predicates {
+        include!("../../../tests/unit/compiler/parser/proof_bundles_predicates.rs");
     }
 }
 mod types;

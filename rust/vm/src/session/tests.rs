@@ -1,6 +1,4 @@
     use serde_json::json;
-    use telltale_types::Label;
-
     fn default_types() -> BTreeMap<String, LocalTypeR> {
         let mut m = BTreeMap::new();
         m.insert(
@@ -465,4 +463,3 @@
         let err = decode_edge_json(&legacy, None).expect_err("legacy edge shape must be rejected");
         assert!(err.contains("invalid edge json"), "unexpected error: {err}");
     }
-}

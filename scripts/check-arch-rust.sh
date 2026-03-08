@@ -845,7 +845,7 @@ print_hits "error" "floating-point types in deterministic VM/simulation scope" "
 # Note: MockClock's Instant::now() is documented as unavoidable - Rust's Instant
 # cannot be constructed synthetically. Only the offset matters for determinism.
 nondet_hits="$(scan_scope_hits 'SystemTime::now\(|Instant::now\(|UNIX_EPOCH|rand::thread_rng\(|thread_rng\(|rand::random\(|getrandom\(|from_entropy\(|OsRng\b|Utc::now\(|Local::now\(' "${DETERMINISM_RUNTIME_SCOPE[@]}" "${DETERMINISM_TEST_SCOPE[@]}")"
-nondet_hits="$(filter_out_paths "${nondet_hits}" 'kernel_nondeterminism_guard.rs:')"
+nondet_hits="$(filter_out_paths "${nondet_hits}" 'kernel_nondeterminism_guard.rs:' 'kernel_ndet_guard.rs:')"
 nondet_hits="$(filter_out_paths "${nondet_hits}" 'simulation/clock.rs:.*start: Instant::now')"
 nondet_hits="$(filter_out_comments "${nondet_hits}")"
 print_hits "error" "direct host nondeterminism in deterministic VM/simulation scope" "${nondet_hits}" "Route entropy and wall-clock access through explicit effect injection APIs; keep core runtime logic pure and replayable."
