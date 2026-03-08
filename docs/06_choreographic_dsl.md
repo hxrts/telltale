@@ -187,21 +187,22 @@ The `continue` keyword is for recursive back-references within a `rec` block. Th
 Define and reuse local protocol fragments inside a `where` block.
 
 ```choreo
-protocol Main =
+protocol Main = {
   roles A, B, C
   call Handshake
   call DataTransfer
   A -> C : Done
-  where
-    protocol Handshake =
-      roles A, B
-      A -> B : Hello
-      B -> A : Hi
-
-    protocol DataTransfer =
-      roles A, B
-      A -> B : Data
-      B -> A : Ack
+}
+where {
+  protocol Handshake = {
+    A -> B : Hello
+    B -> A : Hi
+  }
+  protocol DataTransfer = {
+    A -> B : Data
+    B -> A : Ack
+  }
+}
 ```
 
 Local protocols can call each other and can be used within choices, loops, and branches.
@@ -263,13 +264,18 @@ A timed choice races an operation against a timeout deadline:
 
 ```choreo
 protocol TimedRequest =
+{
   roles Client, Server
   Client -> Server : Request
-  timed_choice at Client(5s)
-    OnTime ->
+  timed_choice at Client(5s) {
+    | OnTime -> {
       Server -> Client : Response
-    TimedOut ->
+    }
+    | TimedOut -> {
       Client -> Server : Cancel
+    }
+  }
+}
 ```
 
 This desugars to a standard `Choice` with a `TimedChoice { duration }` annotation. The timeout is enforced at runtime by the effect interpreter.
@@ -331,15 +337,14 @@ Unlike `timed_choice`, this metadata does not change the session type. It is a h
 proof_bundle DelegationBase version "1.0.0" issuer "did:example:issuer" constraint "fresh_nonce" requires [delegation, guard_tokens]
 proof_bundle KnowledgeBase requires [knowledge_flow]
 
-protocol TransferFlow requires DelegationBase, KnowledgeBase =
+protocol TransferFlow requires DelegationBase, KnowledgeBase = {
   roles A, B
   acquire guard as token
-  transfer endpoint to B with bundle DelegationBase
-  delegate endpoint to B with bundle DelegationBase
+  transfer token to B with bundle DelegationBase
   tag obligation as obligation_tag
   check obligation for B into witness
-  release guard using token
   A -> B : Commit
+}
 ```
 
 The parser stores bundle declarations and required bundle names in typed choreography metadata. Bundle records include optional `version`, `issuer`, and repeated `constraint` fields.
