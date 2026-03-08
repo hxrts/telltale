@@ -24,7 +24,7 @@ protocol Test = {
 }
 "#;
 
-    println!("🎉 Final Verification: Fixed Macro Test");
+    println!("Final Verification: Fixed Macro Test");
     println!("========================================");
     println!("Input choreography:");
     println!("{}", input);
@@ -32,42 +32,42 @@ protocol Test = {
 
     match test_fixed_implementation(input) {
         Ok(tokens) => {
-            println!("✅ SUCCESS: Fixed implementation generates valid code!");
+            println!("✓ SUCCESS: Fixed implementation generates valid code!");
             println!("Generated code:");
             println!("{}", tokens);
 
             let code_str = tokens.to_string();
 
-            println!("\n📊 Code Quality Checks:");
+            println!("\nCode Quality Checks:");
 
             // Check 1: No stray .with_timeout
             if !code_str.contains(". with_timeout") {
-                println!("  ✅ No malformed .with_timeout calls");
+                println!("  ✓ No malformed .with_timeout calls");
             } else {
-                println!("  ❌ Still contains malformed .with_timeout");
+                println!("  ✗ Still contains malformed .with_timeout");
             }
 
             // Check 2: Has proper role structures
             if code_str.contains("struct Roles") {
-                println!("  ✅ Roles structure generated");
+                println!("  ✓ Roles structure generated");
             }
 
             // Check 3: Has session types
             if code_str.contains("type Alice_Test") && code_str.contains("type Bob_Test") {
-                println!("  ✅ Session types generated for both roles");
+                println!("  ✓ Session types generated for both roles");
             }
 
             // Check 4: Proper syntax (ends correctly)
             if code_str.trim_end().ends_with(';') {
-                println!("  ✅ Code has proper syntax termination");
+                println!("  ✓ Code has proper syntax termination");
             }
 
-            println!("\n🔧 Implementation Details:");
+            println!("\nImplementation Details:");
             println!("  - Uses empty ExtensionRegistry instead of built-in extensions");
             println!("  - Avoids the buggy timeout extension entirely");
             println!("  - Generates clean, compilable Telltale session types");
 
-            println!("\n💡 Next Steps:");
+            println!("\nNext Steps:");
             println!("  1. The macro in external-demo-macros has been fixed");
             println!(
                 "  2. The timeout extension still needs a proper fix in its generate_code() method"
@@ -75,7 +75,7 @@ protocol Test = {
             println!("  3. Once fixed, the macro can be updated to use built-in extensions again");
         }
         Err(err) => {
-            println!("❌ Error: {}", err);
+            println!("✗ Error: {}", err);
         }
     }
 }

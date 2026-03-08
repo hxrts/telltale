@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
-PARITY_DOC="docs/15_vm_parity.md"
+PARITY_DOC="docs/19_rust_lean_parity.md"
 
 if [[ ! -f "${PARITY_DOC}" ]]; then
   echo "[parity-ledger] missing ${PARITY_DOC}" >&2

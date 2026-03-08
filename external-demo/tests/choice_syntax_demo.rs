@@ -37,10 +37,10 @@ protocol TestChoice = {
 }
 "#;
 
-    println!("❌ ORIGINAL SYNTAX (doesn't work):");
+    println!("✗ ORIGINAL SYNTAX (doesn't work):");
     println!("{}", original_request);
 
-    println!("✅ CORRECTED SYNTAX (works!):");
+    println!("✓ CORRECTED SYNTAX (works!):");
     println!("{}", corrected_syntax);
 
     let registry = ExtensionRegistry::new();
@@ -53,9 +53,9 @@ protocol TestChoice = {
 
     // Test corrected (should work)
     match parse_and_generate_with_extensions(corrected_syntax, &registry) {
-        Ok(_) => println!("✅ SUCCESS: Corrected syntax works perfectly!"),
+        Ok(_) => println!("✓ SUCCESS: Corrected syntax works perfectly!"),
         Err(e) => {
-            println!("❌ ERROR: Corrected syntax failed: {}", e);
+            println!("✗ ERROR: Corrected syntax failed: {}", e);
             panic!("This should work!");
         }
     }

@@ -17,6 +17,7 @@ ci-dry-run:
     just check-lean-dependency-pins
     just check-capability-gates
     just check-release-conformance
+    just check-telltale-style
     just check-docs-drift
     just check-doc-links-in-code
     just check-doc-quality
@@ -47,6 +48,12 @@ lint-quick:
 # Rust architecture/style-guide pattern checker
 check-arch-rust:
     ./scripts/check-arch-rust.sh
+
+# TellTale syntax/style check suite (dependency layering, docs references, symbols)
+check-telltale-style:
+    ./scripts/check-dependency-layers.sh
+    ./scripts/check-doc-links-extended.sh
+    ./scripts/check-text-symbols.sh
 
 # Generate deterministic EffectHandler stubs plus simulator harness test templates.
 effect-scaffold out="work/effect_handler_scaffold" name="HostEffectHandler":

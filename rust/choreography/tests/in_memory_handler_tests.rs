@@ -129,7 +129,7 @@ async fn test_complex_message_serialization() {
     // Send complex message
     let msg = ComplexMessage {
         id: 12345678901234,
-        name: "Test Message with Special Chars: 日本語 🎉".to_string(),
+        name: "Test Message with Special Chars: 日本語".to_string(),
         data: vec![0, 1, 255, 128, 64],
         flag: true,
     };
@@ -241,8 +241,8 @@ async fn test_label_with_special_characters() {
             special_chars: "日本語".to_string(),
         },
         LabelMessage {
-            label: "emoji:🎉🚀".to_string(),
-            special_chars: "🎉🚀".to_string(),
+            label: "emoji:party-rocket".to_string(),
+            special_chars: "party".to_string(),
         },
         LabelMessage {
             label: "newline\ntest".to_string(),

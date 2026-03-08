@@ -310,7 +310,7 @@ if mismatches:
     print("[parity] uncovered mismatches:")
     for mismatch in mismatches:
         print(f"  - {mismatch}")
-    fail("found Lean/Rust parity mismatches - add deviation entry to docs/19_vm_parity.md Deviation Registry")
+    fail("found Lean/Rust parity mismatches - add deviation entry to docs/19_rust_lean_parity.md Deviation Registry")
 
 print("[parity] policy/data shape parity check passed with no mismatches")
 

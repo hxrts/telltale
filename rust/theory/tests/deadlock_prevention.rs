@@ -261,21 +261,21 @@ fn test_deadlock_prevention_pipeline() {
     // Stage 2: Well-formedness Check (type construction)
     assert!(
         !unguarded_protocol.well_formed(),
-        "❌ Stage 2: Unguarded protocol rejected at well-formedness check"
+        "✗ Stage 2: Unguarded protocol rejected at well-formedness check"
     );
     assert!(
         guarded_protocol.well_formed(),
-        "✅ Stage 2: Guarded protocol passes well-formedness check"
+        "✓ Stage 2: Guarded protocol passes well-formedness check"
     );
 
     // Stage 3: Validation (before projection)
     assert!(
         validate_global(&unguarded_protocol).is_err(),
-        "❌ Stage 3: Unguarded protocol rejected at validation"
+        "✗ Stage 3: Unguarded protocol rejected at validation"
     );
     assert!(
         validate_global(&guarded_protocol).is_ok(),
-        "✅ Stage 3: Guarded protocol passes validation"
+        "✓ Stage 3: Guarded protocol passes validation"
     );
 
     // Stage 4: Projection (to local types)
@@ -283,33 +283,33 @@ fn test_deadlock_prevention_pipeline() {
     let unguarded_local = project(&unguarded_protocol, "A").unwrap();
     assert!(
         matches!(unguarded_local, LocalTypeR::End),
-        "❌ Stage 4: Unguarded protocol projects to End"
+        "✗ Stage 4: Unguarded protocol projects to End"
     );
 
     let guarded_local = project(&guarded_protocol, "A");
     assert!(
         guarded_local.is_ok(),
-        "✅ Stage 4: Guarded protocol can be projected"
+        "✓ Stage 4: Guarded protocol can be projected"
     );
 
     // Stage 5: Local type validation
     if let Ok(local) = project(&guarded_protocol, "A") {
         assert!(
             local.is_guarded(),
-            "✅ Stage 5: Projected local type is guarded"
+            "✓ Stage 5: Projected local type is guarded"
         );
         assert!(
             local.well_formed(),
-            "✅ Stage 5: Projected local type is well-formed"
+            "✓ Stage 5: Projected local type is well-formed"
         );
         assert!(
             validate_local(&local).is_ok(),
-            "✅ Stage 5: Projected local type validates"
+            "✓ Stage 5: Projected local type validates"
         );
     }
 
-    println!("✅ All pipeline stages correctly reject unguarded protocols");
-    println!("✅ All pipeline stages correctly accept guarded protocols");
+    println!("✓ All pipeline stages correctly reject unguarded protocols");
+    println!("✓ All pipeline stages correctly accept guarded protocols");
 }
 
 // ============================================================================
@@ -455,5 +455,5 @@ fn test_comprehensive_deadlock_rejection() {
         );
     }
 
-    println!("✅ All {} deadlock pattern tests passed", tests.len());
+    println!("✓ All {} deadlock pattern tests passed", tests.len());
 }
