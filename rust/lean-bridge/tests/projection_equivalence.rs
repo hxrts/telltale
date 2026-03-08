@@ -213,10 +213,10 @@ fn test_binary_choice() {
 protocol BinaryChoice = {
     roles Client, Server
     choice at Client {
-        Accept -> {
+        | Accept -> {
             Client -> Server: Accept
         }
-        Reject -> {
+        | Reject -> {
             Client -> Server: Reject
         }
     }
@@ -233,11 +233,11 @@ fn test_choice_with_continuation() {
 protocol ChoiceWithCont = {
     roles Client, Server
     choice at Client {
-        Success -> {
+        | Success -> {
             Client -> Server: Success
             Server -> Client: Data
         }
-        Failure -> {
+        | Failure -> {
             Client -> Server: Failure
             Server -> Client: Error
         }
@@ -255,13 +255,13 @@ fn test_three_way_choice() {
 protocol ThreeWayChoice = {
     roles A, B
     choice at A {
-        Option1 -> {
+        | Option1 -> {
             A -> B: Option1
         }
-        Option2 -> {
+        | Option2 -> {
             A -> B: Option2
         }
-        Option3 -> {
+        | Option3 -> {
             A -> B: Option3
         }
     }
@@ -300,12 +300,12 @@ protocol RecWithChoice = {
     roles Client, Server
     rec MainLoop {
         choice at Client {
-            Continue -> {
+            | Continue -> {
                 Client -> Server: Continue
                 Server -> Client: Data
                 continue MainLoop
             }
-            Stop -> {
+            | Stop -> {
                 Client -> Server: Stop
             }
         }
@@ -327,18 +327,18 @@ fn test_nested_choice() {
 protocol NestedChoice = {
     roles A, B
     choice at A {
-        Outer1 -> {
+        | Outer1 -> {
             A -> B: Outer1
             choice at B {
-                Inner1 -> {
+                | Inner1 -> {
                     B -> A: Inner1
                 }
-                Inner2 -> {
+                | Inner2 -> {
                     B -> A: Inner2
                 }
             }
         }
-        Outer2 -> {
+        | Outer2 -> {
             A -> B: Outer2
         }
     }
@@ -355,11 +355,11 @@ fn test_three_party_choice() {
 protocol ThreePartyChoice = {
     roles A, B, C
     choice at A {
-        Left -> {
+        | Left -> {
             A -> B: Left
             B -> C: Notify
         }
-        Right -> {
+        | Right -> {
             A -> B: Right
             B -> C: Notify
         }
@@ -384,11 +384,11 @@ fn test_non_participant_mergeable() {
 protocol Mergeable = {
     roles A, B, C
     choice at A {
-        Left -> {
+        | Left -> {
             A -> B: Left
             C -> B: Status
         }
-        Right -> {
+        | Right -> {
             A -> B: Right
             C -> B: Status
         }
@@ -412,10 +412,10 @@ protocol SingleRoleBranch = {
     roles A, B
     A -> B: Start
     choice at A {
-        Done -> {
+        | Done -> {
             A -> B: Done
         }
-        More -> {
+        | More -> {
             A -> B: More
             A -> B: Extra
         }

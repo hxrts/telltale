@@ -9,14 +9,17 @@ protocol MealPrep =
   Chef -> Baker : OvenStatus { status : String }
 
   -- Cooking phase
-  case choose Chef of
-    pasta ->
+  choice at Chef {
+    | pasta -> {
       Chef -> SousChef : BoilPasta
       SousChef -> Chef : PastaReady
       Chef -> Baker : PrepareGarlicBread
       Baker -> Chef : BreadReady
-    tacos ->
+    }
+    | tacos -> {
       Chef -> SousChef : PrepTortillas
       SousChef -> Chef : TortillasReady
       Chef -> Baker : PrepareGarlicBread
       Baker -> Chef : BreadReady
+    }
+  }

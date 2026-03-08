@@ -12,14 +12,17 @@ protocol MealService =
   SousChef -> Chef : CourseReady
 
   -- Cooking phase: Chef decides the dish, then coordinates preparation
-  case choose Chef of
-    pasta ->
+  choice at Chef {
+    | pasta -> {
       Chef -> SousChef : BoilPasta
       SousChef -> Chef : PastaReady
       Chef -> Baker : PrepareGarlicBread  -- side dish
       Baker -> Chef : BreadReady
-    tacos ->
+    }
+    | tacos -> {
       Chef -> SousChef : PrepTortillas
       SousChef -> Chef : TortillasReady
       Chef -> Baker : PrepareGarlicBread
       Baker -> Chef : BreadReady
+    }
+  }
