@@ -6,9 +6,13 @@ lean_threads := "3"
 # Default task
 default: book
 
-# Run the same checks as GitHub CI
-ci-dry-run:
+# Keep this in the same order as GitHub workflows:
+# - check.yml fast checks
+# - verify.yml fast lane checks
+# - verify.yml scheduled heavy lane checks when lane="full"
+ci-dry-run lane="fast":
     cargo fmt --all -- --check
+    cargo build --workspace --all-targets --all-features
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
     RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
     cargo test --workspace --all-targets --all-features
@@ -19,11 +23,15 @@ ci-dry-run:
     just check-release-conformance
     just check-telltale-style
     just check-docs-drift
+    just check-doc-links-ci
     just check-doc-links-in-code
     bash ./scripts/check/doc-quality.sh
     just v2-baseline check
     just check-vm-placeholders
     just check-parity
+    just verify-lean-vm-targets
+    just verify-protocols
+    just verify-track-a
     just v2-baseline sla
     just check-lean-metrics
     # Benchmark target compilation checks
@@ -31,11 +39,25 @@ ci-dry-run:
     just book
     # WASM compilation checks
     just wasm-check
+    just wasm-test-all
     # Golden file equivalence tests (fast, no Lean required)
     just test-golden
     just telltale-lean-check
     just telltale-lean-check-extended
     just telltale-lean-check-failing
+    if [ "{{lane}}" = "full" ]; then \
+      just verify-lean-full || true; \
+      just verify-cross-target-matrix && \
+      just verify-track-b && \
+      just verify-properties && \
+      just verify-composition-stress && \
+      just v2-baseline run && \
+      :; \
+    fi
+
+# Mirror the markdown link-check action used in GitHub check.yml docs lane
+check-doc-links-ci:
+    find docs -name '*.md' -print0 | xargs -0 npx --yes markdown-link-check --config .github/config/markdown-link-check.json
 
 # Rust style guide lint check (comprehensive)
 lint:
@@ -419,7 +441,7 @@ export-protocol-bundles:
 # Rust/Lean VM trace correspondence checks.
 verify-vm-correspondence:
     cargo test -p telltale-lean-bridge --test vm_correspondence_tests
-    cargo test -p telltale-lean-bridge --test vm_differential_step_tests
+    cargo test -p telltale-lean-bridge --test vm_differential_steps
 
 # Track A gate: naming/API changes must preserve behavior.
 verify-track-a:
@@ -429,7 +451,7 @@ verify-track-a:
 
 # Lean-side invariant verification checks for protocol bundles.
 verify-invariants:
-    cargo test -p telltale-lean-bridge --test invariant_verification_tests
+    cargo test -p telltale-lean-bridge --test invariant_verification
 
 # Targeted protocol verification lane (fast CI).
 verify-protocols:
