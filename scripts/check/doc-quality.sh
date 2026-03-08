@@ -2,136 +2,143 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-cd "${ROOT_DIR}"
+cd "$ROOT_DIR"
 
-python3 - "${ROOT_DIR}" <<'PY'
-import re
-import subprocess
-import sys
-from pathlib import Path
+DOCS_DIR="$ROOT_DIR/docs"
 
-root = Path(sys.argv[1])
-docs_dir = root / "docs"
-
-# Include root docs and nested docs folders, but exclude mdbook output.
-doc_files = sorted(
-    p
-    for p in docs_dir.rglob("*.md")
-    if "book" not in p.parts and p.name != "SUMMARY.md"
+mapfile -t DOC_FILES < <(
+  find "$DOCS_DIR" -type f -name "*.md" ! -path "*/book/*" ! -name "SUMMARY.md" | sort
 )
 
-if not doc_files:
-    print("no docs found")
-    sys.exit(1)
+if (( ${#DOC_FILES[@]} == 0 )); then
+  echo "no docs found"
+  exit 1
+fi
 
-# Cache titles for link-text consistency checks.
-titles: dict[Path, str] = {}
-for path in doc_files:
-    title = ""
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.startswith("# "):
-            title = line[2:].strip()
-            break
-    if title:
-        titles[path.resolve()] = title
+declare -A DOC_TITLES
+for doc_file in "${DOC_FILES[@]}"; do
+  title="$(sed -n 's/^# //p' "$doc_file" | head -n 1)"
+  if [[ -n "$title" ]]; then
+    DOC_TITLES["$(realpath "$doc_file")"]="$title"
+  fi
+done
 
-just_list = subprocess.check_output(["just", "--list"], text=True, cwd=root)
-recipes = set()
-for line in just_list.splitlines():
-    line = line.strip()
-    if not line or line.startswith("Available recipes"):
+declare -A JUST_RECIPES
+while IFS= read -r line; do
+  line="${line%%$'\r'}"
+  line="$(sed -e 's/^[[:space:]]*//' <<<"$line")"
+  if [[ -z "$line" || "$line" == Available\ recipes* ]]; then
+    continue
+  fi
+  recipe="${line%% *}"
+  recipe="${recipe%:}"
+  if [[ -n "$recipe" ]]; then
+    JUST_RECIPES["$recipe"]=1
+  fi
+done < <(just --list)
+
+errors=()
+for doc_file in "${DOC_FILES[@]}"; do
+  rel_file="${doc_file#$ROOT_DIR/}"
+
+  while IFS='|' read -r label target; do
+    target_file="${target%%#*}"
+    target_path="$(realpath -m "$(dirname "$doc_file")/$target_file")"
+    if [[ ! -f "$target_path" ]]; then
+      errors+=("$rel_file: missing linked file $target")
+      continue
+    fi
+
+    title="${DOC_TITLES[$target_path]+_}"
+    if [[ -n "$title" ]]; then
+      expected="${DOC_TITLES[$target_path]}"
+      if [[ "$label" != "$expected" ]]; then
+        errors+=("$rel_file: link text '$label' does not match title '$expected' for $target")
+      fi
+    fi
+  done < <(perl -ne 'while (/\[([^\]]+)\]\(([^)]+\.md(?:#[^)]+)?)\)/g) { print "$1|$2\n"; }' "$doc_file")
+
+  while IFS= read -r recipe; do
+    if [[ -z "${JUST_RECIPES[$recipe]+x}" ]]; then
+      errors+=("$rel_file: unknown just recipe '$recipe'")
+    fi
+  done < <(perl -ne 'while (/\bjust\s+([A-Za-z0-9_-]+)/g) { print "$1\n"; }' "$doc_file")
+
+  while IFS= read -r script_name; do
+    if [[ ! -f "$ROOT_DIR/scripts/$script_name" ]]; then
+      errors+=("$rel_file: missing script reference scripts/$script_name")
+    fi
+  done < <(perl -ne 'while (/\bscripts\/([A-Za-z0-9_.-]+\.sh)\b/g) { print "$1\n"; }' "$doc_file")
+
+  in_code=0
+  pending_explainer=0
+  prose_words=0
+  code_words=0
+  line_no=0
+
+  while IFS= read -r line; do
+    (( line_no += 1 ))
+
+    trimmed="$(printf '%s' "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
+    if [[ "$trimmed" == '```'* ]]; then
+      if (( in_code == 0 )); then
+        in_code=1
+      else
+        in_code=0
+        pending_explainer=1
+      fi
+      continue
+    fi
+
+    if (( in_code == 1 )); then
+      line_words="$(grep -oE '[A-Za-z0-9_]+' <<<"$line" | wc -l | tr -d ' ' || true)"
+      (( code_words += line_words ))
+      continue
+    fi
+
+    line_words="$(grep -oE '[A-Za-z0-9_]+' <<<"$line" | wc -l | tr -d ' ' || true)"
+    (( prose_words += line_words ))
+
+    if [[ "$line" == *"—"* ]]; then
+      errors+=("$rel_file:$line_no: em dash is not allowed")
+    fi
+    if [[ "$line" == *";"* ]]; then
+      errors+=("$rel_file:$line_no: semicolon is not allowed")
+    fi
+
+    if (( pending_explainer == 1 )); then
+      if [[ -z "$trimmed" ]]; then
         continue
-    recipe = line.split()[0]
-    if recipe.endswith(":"):
-        recipe = recipe[:-1]
-    recipes.add(recipe)
+      fi
 
-link_re = re.compile(r"\[([^\]]+)\]\(([^)]+\.md(?:#[^)]+)?)\)")
-just_re = re.compile(r"\bjust\s+([A-Za-z0-9_-]+)")
-script_re = re.compile(r"\bscripts/([A-Za-z0-9_.-]+\.sh)\b")
-word_re = re.compile(r"[A-Za-z0-9_]+")
+      if [[ "$trimmed" == '#'*
+        || "$trimmed" == '```'* ]]; then
+        errors+=("$rel_file:$line_no: code block must be followed by an explanatory paragraph")
+      elif [[ "$trimmed" == -* || "$trimmed" == '*'* ]]; then
+        errors+=("$rel_file:$line_no: explanatory text after code block must be prose, not a list")
+      elif [[ "$trimmed" =~ ^[0-9]+\.[[:space:]]* ]]; then
+        errors+=("$rel_file:$line_no: explanatory text after code block must be prose, not a list")
+      fi
+      pending_explainer=0
+    fi
+  done < "$doc_file"
 
-errors: list[str] = []
+  if (( in_code == 1 )); then
+    errors+=("$rel_file: unclosed fenced code block")
+  fi
 
-for path in doc_files:
-    lines = path.read_text(encoding="utf-8").splitlines()
-    rel = path.relative_to(root)
+  if (( prose_words <= code_words )); then
+    errors+=("$rel_file: prose word count ($prose_words) must exceed code word count ($code_words)")
+  fi
+done
 
-    # Check link titles and link targets.
-    text = "\n".join(lines)
-    for text_label, raw_target in link_re.findall(text):
-        target_no_anchor = raw_target.split("#", 1)[0]
-        target_path = (path.parent / target_no_anchor).resolve()
-        if not target_path.exists():
-            errors.append(f"{rel}: missing linked file {raw_target}")
-            continue
-        if target_path in titles:
-            expected = titles[target_path]
-            if text_label != expected:
-                errors.append(
-                    f"{rel}: link text '{text_label}' does not match title '{expected}' for {raw_target}"
-                )
+if (( ${#errors[@]} > 0 )); then
+  echo "doc quality check failed:"
+  for err in "${errors[@]}"; do
+    echo "- $err"
+  done
+  exit 1
+fi
 
-    # Check command references and script references.
-    for recipe in just_re.findall(text):
-        if recipe not in recipes:
-            errors.append(f"{rel}: unknown just recipe '{recipe}'")
-    for script_name in script_re.findall(text):
-        script_path = root / "scripts" / script_name
-        if not script_path.exists():
-            errors.append(f"{rel}: missing script reference scripts/{script_name}")
-
-    # Style and code-block checks outside fenced code.
-    in_code = False
-    pending_explainer = False
-    prose_words = 0
-    code_words = 0
-
-    for idx, line in enumerate(lines, start=1):
-        stripped = line.strip()
-        if stripped.startswith("```"):
-            in_code = not in_code
-            if not in_code:
-                pending_explainer = True
-            continue
-
-        if in_code:
-            code_words += len(word_re.findall(line))
-            continue
-
-        prose_words += len(word_re.findall(line))
-
-        if "—" in line:
-            errors.append(f"{rel}:{idx}: em dash is not allowed")
-        if ";" in line:
-            errors.append(f"{rel}:{idx}: semicolon is not allowed")
-
-        if pending_explainer:
-            if not stripped:
-                continue
-            if stripped.startswith("#") or stripped.startswith("```"):
-                errors.append(
-                    f"{rel}:{idx}: code block must be followed by an explanatory paragraph"
-                )
-            elif stripped.startswith(("-", "*", "1.", "2.", "3.")):
-                errors.append(
-                    f"{rel}:{idx}: explanatory text after code block must be prose, not a list"
-                )
-            pending_explainer = False
-
-    if in_code:
-        errors.append(f"{rel}: unclosed fenced code block")
-
-    if prose_words <= code_words:
-        errors.append(
-            f"{rel}: prose word count ({prose_words}) must exceed code word count ({code_words})"
-        )
-
-if errors:
-    print("doc quality check failed:\n")
-    for err in errors:
-        print(f"- {err}")
-    sys.exit(1)
-
-print("doc quality check passed")
-PY
+echo "doc quality check passed"
