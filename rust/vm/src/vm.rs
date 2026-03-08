@@ -64,10 +64,10 @@ use crate::transfer_semantics::{
 };
 use crate::verification::{DefaultVerificationModel, VerificationModel};
 
-include!("vm/runtime_value_and_resource_state.rs");
+include!("vm/runtime_value_and_resource_state/mod.rs");
 include!("vm/vm_config_and_observability.rs");
 include!("vm/vm_error_and_step_pack.rs");
-include!("vm/runtime_and_execution.rs");
+include!("vm/runtime_and_execution/mod.rs");
 include!("vm/introspection_and_validation.rs");
 include!("vm/topology_and_dispatch.rs");
 include!("vm/instruction_control_and_effects.rs");
