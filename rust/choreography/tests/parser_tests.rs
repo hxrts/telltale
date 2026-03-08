@@ -505,6 +505,48 @@ protocol CommentTest = {
 }
 
 #[test]
+fn test_parse_typed_payload_with_inline_comment() {
+    let input = r"
+protocol TypedCommentedPayload = {
+    roles A, B
+
+    A -> B: Message(
+        value = 1 -- inline payload comment
+        flag = true
+    )
+}
+";
+
+    let result = parse_choreography_str(input);
+    assert!(
+        result.is_ok(),
+        "Failed to parse typed payload with inline comment: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_parse_typed_payload_with_block_comment() {
+    let input = r#"
+protocol TypedPayloadBlockComment = {
+    roles A, B
+
+    A -> B: Message(
+        value = 1 {- block payload comment -}
+        tag = "ok"
+    )
+}
+"#;
+
+    let result = parse_choreography_str(input);
+    assert!(
+        result.is_ok(),
+        "Failed to parse typed payload with block comment: {:?}",
+        result.err()
+    );
+}
+
+#[test]
 fn test_parse_whitespace_variations() {
     let input = r"
 protocol WhitespaceTest = {

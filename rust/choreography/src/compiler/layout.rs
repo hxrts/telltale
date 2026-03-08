@@ -40,38 +40,7 @@ struct LineScan {
     has_code: bool,
     depth_delta: i32,
     end_state: ScanState,
-}
-
-fn advance_if_in_block_comment(chars: &[char], st: &mut ScanState, idx: usize) -> Option<usize> {
-    if !st.in_block_comment {
-        return None;
-    }
-    if chars[idx] == '-' && chars.get(idx + 1).copied() == Some('}') {
-        st.in_block_comment = false;
-        return Some(idx + 2);
-    }
-    Some(idx + 1)
-}
-
-fn advance_if_in_string(chars: &[char], st: &mut ScanState, idx: usize) -> Option<usize> {
-    if !st.in_string {
-        return None;
-    }
-    if st.escape {
-        st.escape = false;
-        return Some(idx + 1);
-    }
-    match chars[idx] {
-        '\\' => {
-            st.escape = true;
-            Some(idx + 1)
-        }
-        '"' => {
-            st.in_string = false;
-            Some(idx + 1)
-        }
-        _ => Some(idx + 1),
-    }
+    sanitized_line: String,
 }
 
 fn update_code_and_depth(ch: char, has_code: &mut bool, depth_delta: &mut i32) {
@@ -90,35 +59,61 @@ fn scan_line(line: &str, state: &ScanState) -> LineScan {
     let mut has_code = false;
     let mut depth_delta = 0i32;
     let chars: Vec<char> = line.chars().collect();
+    let mut sanitized_line = String::with_capacity(line.len());
     let mut i = 0usize;
 
     while i < chars.len() {
-        if let Some(next_idx) = advance_if_in_block_comment(&chars, &mut st, i) {
-            i = next_idx;
+        if st.in_block_comment {
+            if chars[i] == '-' && chars.get(i + 1).copied() == Some('}') {
+                sanitized_line.push(' ');
+                sanitized_line.push(' ');
+                st.in_block_comment = false;
+                i += 2;
+                continue;
+            }
+            sanitized_line.push(' ');
+            i += 1;
             continue;
         }
-        if let Some(next_idx) = advance_if_in_string(&chars, &mut st, i) {
-            i = next_idx;
+
+        if st.in_string {
+            let ch = chars[i];
+            sanitized_line.push(ch);
+            if st.escape {
+                st.escape = false;
+                i += 1;
+                continue;
+            }
+            if ch == '\\' {
+                st.escape = true;
+            } else if ch == '"' {
+                st.in_string = false;
+            }
+            i += 1;
             continue;
         }
 
         let ch = chars[i];
         let next = chars.get(i + 1).copied();
         if ch == '-' && next == Some('-') {
+            sanitized_line.push_str(&" ".repeat(chars.len() - i));
             break;
         }
         if ch == '{' && next == Some('-') {
             st.in_block_comment = true;
+            sanitized_line.push_str("  ");
             i += 2;
             continue;
         }
         if ch == '"' {
             st.in_string = true;
+            sanitized_line.push(ch);
             i += 1;
             continue;
         }
 
         update_code_and_depth(ch, &mut has_code, &mut depth_delta);
+        sanitized_line.push(ch);
         i += 1;
     }
 
@@ -126,6 +121,7 @@ fn scan_line(line: &str, state: &ScanState) -> LineScan {
         has_code,
         depth_delta,
         end_state: st,
+        sanitized_line,
     }
 }
 
@@ -214,7 +210,7 @@ pub fn preprocess_layout(input: &str) -> Result<String, LayoutError> {
         let indent = leading_indent(line, line_no)?;
 
         let scan = scan_line(line, &scan_state);
-        scan_state = scan.end_state.clone();
+        scan_state = scan.end_state;
 
         let layout_enabled = explicit_depth == 0;
         let mut prefix = String::new();
@@ -230,7 +226,7 @@ pub fn preprocess_layout(input: &str) -> Result<String, LayoutError> {
 
         let mut out_line = String::new();
         out_line.push_str(&prefix);
-        out_line.push_str(line);
+        out_line.push_str(&scan.sanitized_line);
         out_lines.push(out_line);
 
         explicit_depth += scan.depth_delta;
@@ -307,5 +303,14 @@ mod tests {
         let out = preprocess_layout(input).unwrap();
         assert!(!out.contains("{     -> B : Msg"));
         assert!(out.contains("-> B : Msg"));
+    }
+
+    #[test]
+    fn layout_removes_inline_comments_in_output_lines() {
+        let input = "protocol InlineComment =\n  roles A, B\n  A -> B : Message(\n    value = 1 -- inline payload comment\n    flag = true\n  )\n";
+        let out = preprocess_layout(input).unwrap();
+        assert!(!out.contains("-- inline payload comment"));
+        assert!(out.contains("value = 1"));
+        assert!(out.contains("flag = true"));
     }
 }
