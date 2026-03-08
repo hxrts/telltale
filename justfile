@@ -20,7 +20,7 @@ ci-dry-run:
     just check-telltale-style
     just check-docs-drift
     just check-doc-links-in-code
-    just check-doc-quality
+    bash ./scripts/check/doc-quality.sh
     just v2-baseline check
     just check-vm-placeholders
     just check-parity
@@ -112,7 +112,7 @@ check-doc-links-in-code:
 
 # Enforce documentation style, link integrity, and command/reference validity.
 check-doc-quality:
-    ./scripts/check/doc-quality.sh
+    bash ./scripts/check/doc-quality.sh
 
 # Refresh generated Lean metrics in docs
 sync-lean-metrics:
