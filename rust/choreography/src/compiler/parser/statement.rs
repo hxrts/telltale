@@ -1,7 +1,7 @@
 //! Statement parsing functions.
 //!
 //! This module handles parsing of all statement types in the choreography DSL,
-//! including send, broadcast, choice, loop, branch, recursion, and more.
+//! including send, broadcast, choice, loop, parallel composition, recursion, and more.
 
 use crate::ast::Role;
 use proc_macro2::TokenStream;
@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::error::{ErrorSpan, ParseError};
 use super::stmt_parsers::{
-    parse_branch_stmt, parse_broadcast_stmt, parse_call_stmt, parse_choice_stmt,
+    parse_broadcast_stmt, parse_call_stmt, parse_choice_stmt, parse_par_stmt,
     parse_continue_stmt, parse_handshake_stmt, parse_heartbeat_stmt, parse_loop_stmt,
     parse_quorum_collect_stmt, parse_rec_stmt, parse_retry_stmt, parse_send_stmt,
     parse_timed_choice_stmt, parse_vm_abort_stmt, parse_vm_acquire_stmt, parse_vm_check_stmt,
@@ -75,7 +75,6 @@ pub(crate) fn parse_protocol_body(
         }
     }
 
-    let statements = normalize_branches_to_parallel(statements, input)?;
     Ok(ParsedBody { roles, statements })
 }
 
@@ -98,52 +97,6 @@ pub(crate) fn parse_block(
     Ok(statements)
 }
 
-/// Normalize consecutive Branch statements into Parallel statements
-pub(crate) fn normalize_branches_to_parallel(
-    statements: Vec<Statement>,
-    input: &str,
-) -> std::result::Result<Vec<Statement>, ParseError> {
-    let mut result = Vec::new();
-    let mut i = 0usize;
-
-    while i < statements.len() {
-        match &statements[i] {
-            Statement::Branch { .. } => {
-                let mut branches = Vec::new();
-                let mut span = None;
-                while i < statements.len() {
-                    if let Statement::Branch { body, span: s } = &statements[i] {
-                        if span.is_none() {
-                            span = Some(s.clone());
-                        }
-                        branches.push(body.clone());
-                        i += 1;
-                    } else {
-                        break;
-                    }
-                }
-
-                if branches.len() < 2 {
-                    let err_span = span.unwrap_or_else(|| ErrorSpan::from_line_col(1, 1, input));
-                    return Err(ParseError::Syntax {
-                        span: err_span,
-                        message: "parallel requires at least two adjacent branch blocks"
-                            .to_string(),
-                    });
-                }
-
-                result.push(Statement::Parallel { branches });
-            }
-            _ => {
-                result.push(statements[i].clone());
-                i += 1;
-            }
-        }
-    }
-
-    Ok(result)
-}
-
 /// Parse a single statement
 pub(crate) fn parse_statement(
     pair: pest::iterators::Pair<Rule>,
@@ -151,118 +104,7 @@ pub(crate) fn parse_statement(
     input: &str,
     protocol_defs: &HashMap<String, Vec<Statement>>,
 ) -> std::result::Result<Statement, ParseError> {
-    match pair.as_rule() {
-        Rule::annotated_stmt => parse_annotated_stmt(pair, declared_roles, input, protocol_defs),
-        _ => parse_statement_inner(pair, declared_roles, input, protocol_defs),
-    }
-}
-
-/// Parse an annotated statement (e.g., @runtime_timeout(5s) Alice -> Bob: Msg)
-fn parse_annotated_stmt(
-    pair: pest::iterators::Pair<Rule>,
-    declared_roles: &HashSet<String>,
-    input: &str,
-    protocol_defs: &HashMap<String, Vec<Statement>>,
-) -> std::result::Result<Statement, ParseError> {
-    let inner = pair.into_inner();
-    let mut annotations: HashMap<String, String> = HashMap::new();
-
-    // Parse all annotations
-    for item in inner {
-        match item.as_rule() {
-            Rule::annotation => {
-                let span = item.as_span();
-                let annotation_kind =
-                    item.into_inner().next().ok_or_else(|| ParseError::Syntax {
-                        span: ErrorSpan::from_pest_span(span, input),
-                        message: "annotation is missing its kind".to_string(),
-                    })?;
-                parse_annotation_kind(annotation_kind, &mut annotations, input)?;
-            }
-            _ => {
-                // This should be the inner statement
-                let mut stmt = parse_statement_inner(item, declared_roles, input, protocol_defs)?;
-                // Apply collected annotations to the statement
-                apply_annotations_to_statement(&mut stmt, annotations);
-                return Ok(stmt);
-            }
-        }
-    }
-
-    // This shouldn't happen if grammar is correct
-    Err(ParseError::Syntax {
-        span: ErrorSpan::from_line_col(1, 1, input),
-        message: "Annotated statement missing inner statement".to_string(),
-    })
-}
-
-/// Parse an annotation kind and add to annotations map
-fn parse_annotation_kind(
-    pair: pest::iterators::Pair<Rule>,
-    annotations: &mut HashMap<String, String>,
-    input: &str,
-) -> std::result::Result<(), ParseError> {
-    let mut inner = pair.into_inner();
-    if let Some(kind) = inner.next() {
-        match kind.as_rule() {
-            Rule::runtime_timeout_annotation => {
-                // Parse @runtime_timeout(duration)
-                let span = kind.as_span();
-                let duration_pair = kind.into_inner().next().ok_or_else(|| ParseError::Syntax {
-                    span: ErrorSpan::from_pest_span(span, input),
-                    message: "runtime_timeout annotation is missing duration".to_string(),
-                })?;
-                let duration_ms = parse_duration(duration_pair, input)?;
-                annotations.insert("runtime_timeout".to_string(), duration_ms.to_string());
-            }
-            Rule::custom_annotation => {
-                // Parse @custom_name(args)
-                let mut custom_inner = kind.into_inner();
-                if let Some(name_pair) = custom_inner.next() {
-                    let name = name_pair.as_str().to_string();
-                    let value = custom_inner
-                        .next()
-                        .map(|p| p.as_str().to_string())
-                        .unwrap_or_default();
-                    annotations.insert(name, value);
-                }
-            }
-            _ => {}
-        }
-    }
-    Ok(())
-}
-
-/// Apply parsed annotations to a statement
-fn apply_annotations_to_statement(stmt: &mut Statement, annotations: HashMap<String, String>) {
-    if annotations.is_empty() {
-        return;
-    }
-
-    match stmt {
-        Statement::Send {
-            annotations: stmt_annotations,
-            ..
-        } => {
-            stmt_annotations.extend(annotations);
-        }
-        Statement::Broadcast {
-            annotations: stmt_annotations,
-            ..
-        } => {
-            stmt_annotations.extend(annotations);
-        }
-        Statement::Choice {
-            annotations: stmt_annotations,
-            ..
-        } => {
-            stmt_annotations.extend(annotations);
-        }
-        // Statements without an annotations field do not support annotations
-        _ => {
-            // Could log a warning here about unsupported annotation target
-        }
-    }
+    parse_statement_inner(pair, declared_roles, input, protocol_defs)
 }
 
 /// Parse the actual statement (without annotations)
@@ -280,8 +122,8 @@ fn parse_statement_inner(
             parse_timed_choice_stmt(pair, declared_roles, input, protocol_defs)
         }
         Rule::choice_stmt => parse_choice_stmt(pair, declared_roles, input, protocol_defs),
+        Rule::par_stmt => parse_par_stmt(pair, declared_roles, input, protocol_defs),
         Rule::loop_stmt => parse_loop_stmt(pair, declared_roles, input, protocol_defs),
-        Rule::branch_stmt => parse_branch_stmt(pair, declared_roles, input, protocol_defs),
         Rule::rec_stmt => parse_rec_stmt(pair, declared_roles, input, protocol_defs),
         Rule::continue_stmt => parse_continue_stmt(pair, input),
         Rule::call_stmt => parse_call_stmt(pair, input),
@@ -362,6 +204,10 @@ pub(crate) fn parse_message(
     pair: pest::iterators::Pair<Rule>,
     input: &str,
 ) -> std::result::Result<MessageSpec, ParseError> {
+    fn normalize_dsl_type_source(src: &str) -> String {
+        src.replace('.', " :: ")
+    }
+
     let span = pair.as_span();
     let mut inner = pair.into_inner();
 
@@ -376,17 +222,23 @@ pub(crate) fn parse_message(
             .as_str()
     );
 
-    let mut type_annotation = None;
+    let type_annotation = None;
     let mut payload = None;
 
     for part in inner {
         match part.as_rule() {
-            Rule::message_type => {
-                // Parse the type annotation
-                let type_str = part.as_str();
-                // Remove angle brackets
-                let type_str = type_str.trim_start_matches('<').trim_end_matches('>');
-                type_annotation = syn::parse_str::<TokenStream>(type_str).ok();
+            Rule::message_of => {
+                let payload_type = part
+                    .into_inner()
+                    .next()
+                    .ok_or_else(|| ParseError::Syntax {
+                        span: ErrorSpan::from_pest_span(span, input),
+                        message: "message `of` clause is missing a type".to_string(),
+                    })?
+                    .as_str()
+                    .to_string();
+                let payload_type = normalize_dsl_type_source(&payload_type);
+                payload = syn::parse_str::<TokenStream>(&payload_type).ok();
             }
             Rule::payload => {
                 // Parse the payload

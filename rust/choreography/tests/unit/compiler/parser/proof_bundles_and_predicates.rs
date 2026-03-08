@@ -5,13 +5,13 @@ use crate::ast::{LocalType, Protocol, ValidationError};
         let input = r#"
 protocol ThresholdSign =
   roles Coordinator, Signer
-  @min_responses(3) Signer -> Coordinator : Signature
+  Signer { min_responses = 3 } -> Coordinator : Signature
 "#;
 
         let result = parse_choreography_str(input);
         assert!(
             result.is_ok(),
-            "Failed to parse @min_responses: {:?}",
+            "Failed to parse sender-record min_responses: {:?}",
             result.err()
         );
 
@@ -29,17 +29,51 @@ protocol ThresholdSign =
     }
 
     #[test]
-    fn test_parse_combined_annotations() {
+    fn test_parse_multiline_min_responses_annotation_with_closing_paren_on_own_line() {
         let input = r#"
-protocol ParallelThreshold =
-  roles Coordinator, Worker
-  @parallel @min_responses(2) Worker -> Coordinator : Vote
+protocol ThresholdSign =
+  roles Coordinator, Signer
+  Signer {
+    min_responses = 3,
+  }
+    -> Coordinator : Signature
 "#;
 
         let result = parse_choreography_str(input);
         assert!(
             result.is_ok(),
-            "Failed to parse combined annotations: {:?}",
+            "Failed to parse multiline sender-record min_responses: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Send { annotations, .. } => {
+                assert!(
+                    annotations.has_min_responses(),
+                    "Expected multiline min_responses annotation"
+                );
+                assert_eq!(annotations.min_responses(), Some(3));
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_parse_combined_annotations() {
+        let input = r#"
+protocol ParallelThreshold =
+  roles Coordinator, Worker
+  Worker {
+    parallel = true,
+    min_responses = 2,
+  } -> Coordinator : Vote
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse combined sender-record metadata: {:?}",
             result.err()
         );
 
@@ -197,9 +231,9 @@ protocol DuplicateBundle requires Core =
 protocol GuardTypeCheck =
   roles A, B
   choice at A
-    ok when (count + 1) ->
+    | ok when (count + 1) ->
       A -> B : Ack
-    no ->
+    | no ->
       A -> B : Nack
 "#;
 
@@ -312,9 +346,9 @@ protocol LinearBranchDivergence =
   roles A, B
   acquire guard as token
   choice at A
-    consume ->
+    | consume ->
       release guard using token
-    keep ->
+    | keep ->
       A -> B : Skip
 "#;
 
@@ -448,13 +482,14 @@ protocol ExplainMe =
 protocol PredicateTyping =
   roles A, B
   choice at A
-    ok when (if ready { true } else { false }) ->
+    | ok when (if ready { true } else { false }) ->
       A -> B : Accept
-    no ->
+    | no ->
       A -> B : Reject
 "#;
 
         let err = parse_choreography_str(input).expect_err("parse should fail");
+        assert!(matches!(err, ParseError::Syntax { .. }));
         assert!(err.to_string().contains("boolean-like"));
     }
 
@@ -486,4 +521,106 @@ protocol PredicateTyping =
         let choreo = parse_choreography(input).expect("macro token parsing should succeed");
         assert_eq!(choreo.name.to_string(), "Ops");
         assert_eq!(choreo.roles.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_choreography_macro_tokens_with_sender_record_and_of_payload() {
+        let input: TokenStream = quote::quote! {
+            protocol Purchase = {
+                roles Buyer, Seller;
+                Buyer { priority = high } -> Seller : Request of shop.Order;
+            }
+        };
+
+        let choreo = parse_choreography(input).expect("macro token parsing should succeed");
+        match &choreo.protocol {
+            Protocol::Send {
+                from_annotations,
+                message,
+                ..
+            } => {
+                assert_eq!(from_annotations.get("priority"), Some("high".to_string()));
+                assert_eq!(
+                    message.payload.as_ref().map(ToString::to_string),
+                    Some("shop :: Order".to_string())
+                );
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_parse_choreography_macro_string_literal_with_preferred_syntax() {
+        let input: TokenStream = quote::quote! {
+            r#"
+protocol ReplicatedWrite =
+  roles Client, Leader, Replica0, Replica1
+  Client { priority = high }
+    -> Leader : Put of kv.Write
+  par
+    | Leader { shard = 0 }
+        -> Replica0 : Replicate of kv.Write
+    | Leader { shard = 1 }
+        -> Replica1 : Replicate of kv.Write
+"#
+        };
+
+        let choreo = parse_choreography(input).expect("macro string-literal parsing should succeed");
+        match &choreo.protocol {
+            Protocol::Send {
+                from_annotations,
+                message,
+                continuation,
+                ..
+            } => {
+                assert_eq!(from_annotations.get("priority"), Some("high".to_string()));
+                assert_eq!(
+                    message.payload.as_ref().map(ToString::to_string),
+                    Some("kv :: Write".to_string())
+                );
+                match continuation.as_ref() {
+                    Protocol::Parallel { protocols } => assert_eq!(protocols.len(), 2),
+                    _ => panic!("Expected parallel continuation"),
+                }
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_parse_choreography_macro_tokens_with_choice_bars_and_par() {
+        let input: TokenStream = quote::quote! {
+            protocol Branchy = {
+                roles A, B, C, D;
+                par {
+                    | {
+                        choice at A {
+                            | Accept -> {
+                                A -> B : Ok;
+                            }
+                            | Reject -> {
+                                A -> B : No;
+                            }
+                        }
+                    }
+                    | B -> D : Right;
+                }
+            }
+        };
+
+        let choreo = parse_choreography(input).expect("macro token parsing should succeed");
+        match &choreo.protocol {
+            Protocol::Parallel { protocols } => {
+                assert_eq!(protocols.len(), 2);
+                match protocols.first() {
+                    Protocol::Choice { branches, .. } => {
+                        assert_eq!(branches.len(), 2);
+                        assert_eq!(branches.first().label.to_string(), "Accept");
+                        assert_eq!(branches.as_slice()[1].label.to_string(), "Reject");
+                    }
+                    _ => panic!("Expected choice in first parallel branch"),
+                }
+            }
+            _ => panic!("Expected Parallel"),
+        }
     }

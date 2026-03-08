@@ -10,8 +10,9 @@
 //! 2. Choice syntax - branching with explicit decider roles
 //! 3. Dynamic roles - runtime-determined participant counts
 //! 4. Range syntax - address subsets of dynamic roles
-//! 5. Cross-feature integration - combining all features
-//! 6. **Projection** - DSL → Parse → Project to local session types
+//! 5. Recursion syntax - explicit `rec` / `continue`
+//! 6. Cross-feature integration - combining all features
+//! 7. **Projection** - DSL → Parse → Project to local session types
 
 use telltale_choreography::compiler::parser::parse_choreography_str;
 use telltale_choreography::compiler::projection::project;
@@ -26,6 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     demo_choice_syntax()?;
     demo_dynamic_roles()?;
     demo_range_syntax()?;
+    demo_recursion_syntax()?;
     demo_integration()?;
     demo_projection()?;
 
@@ -38,26 +40,32 @@ fn demo_namespace_support() -> Result<(), Box<dyn std::error::Error>> {
 
     let protocol_a = r#"
         module authentication exposing (LoginProtocol)
-        protocol LoginProtocol = {
+        protocol LoginProtocol =
             roles Client, Server, Database
 
-            Client -> Server : LoginRequest
-            Server -> Database : ValidateCredentials
-            Database -> Server : ValidationResult
-            Server -> Client : LoginResponse
-        }
+            Client
+              -> Server : LoginRequest of auth.LoginRequest
+            Server
+              -> Database : ValidateCredentials of auth.Credentials
+            Database
+              -> Server : ValidationResult of auth.ValidationResult
+            Server
+              -> Client : LoginResponse of auth.LoginResponse
     "#;
 
     let protocol_b = r#"
         module payment exposing (PaymentProtocol)
-        protocol PaymentProtocol = {
+        protocol PaymentProtocol =
             roles Client, Server, Database
 
-            Client -> Server : PaymentRequest
-            Server -> Database : ProcessPayment
-            Database -> Server : PaymentResult
-            Server -> Client : PaymentResponse
-        }
+            Client
+              -> Server : PaymentRequest of payments.PaymentRequest
+            Server
+              -> Database : ProcessPayment of payments.PaymentCommand
+            Database
+              -> Server : PaymentResult of payments.PaymentResult
+            Server
+              -> Client : PaymentResponse of payments.PaymentResponse
     "#;
 
     let choreo_a = parse_choreography_str(protocol_a)?;
@@ -76,18 +84,16 @@ fn demo_choice_syntax() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== 2. Choice Syntax ===");
 
     let protocol = r#"
-        protocol ShoppingFlow = {
+        protocol ShoppingFlow =
             roles Client, Server
 
-            choice at Client {
-                buy -> {
-                    Client -> Server : Purchase
-                }
-                cancel -> {
-                    Client -> Server : Cancel
-                }
-            }
-        }
+            choice at Client
+              | Buy ->
+                  Client
+                    -> Server : Purchase of shop.Order
+              | Cancel ->
+                  Client
+                    -> Server : Cancel
     "#;
 
     let _choreo = parse_choreography_str(protocol)?;
@@ -103,14 +109,17 @@ fn demo_dynamic_roles() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== 3. Dynamic Roles Support ===");
 
     let protocol = r#"
-        protocol DynamicWorkflow = {
+        protocol DynamicWorkflow =
             roles Coordinator, Workers[*], Database
 
-            Coordinator -> Workers[*] : StartWork
-            Workers[i] -> Database : QueryData
-            Database -> Workers[i] : ResultData
-            Workers[0..quorum] -> Coordinator : WorkComplete
-        }
+            Coordinator { priority = high }
+              -> Workers[*] : StartWork of work.Start
+            Workers[i]
+              -> Database : QueryData of work.Query
+            Database
+              -> Workers[i] : ResultData of work.Result
+            Workers[0..quorum]
+              -> Coordinator : WorkComplete
     "#;
 
     let choreo = parse_choreography_str(protocol)?;
@@ -137,14 +146,17 @@ fn demo_range_syntax() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== 4. Range Syntax Support ===");
 
     let protocol = r#"
-        protocol ConsensusProtocol = {
+        protocol ConsensusProtocol =
             roles Leader, Followers[N]
 
-            Leader -> Followers[*] : PrepareRequest
-            Followers[0..quorum] -> Leader : PrepareResponse
-            Leader -> Followers[*] : CommitRequest
-            Followers[majority..N] -> Leader : CommitResponse
-        }
+            Leader
+              -> Followers[*] : PrepareRequest of consensus.Prepare
+            Followers[0..quorum]
+              -> Leader : PrepareResponse
+            Leader
+              -> Followers[*] : CommitRequest of consensus.Commit
+            Followers[majority..N]
+              -> Leader : CommitResponse
     "#;
 
     let _choreo = parse_choreography_str(protocol)?;
@@ -157,24 +169,52 @@ fn demo_range_syntax() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn demo_recursion_syntax() -> Result<(), Box<dyn std::error::Error>> {
+    println!("=== 5. Recursion Syntax ===");
+
+    let protocol = r#"
+        protocol Heartbeat =
+          roles Monitor, Worker
+
+          rec Loop
+            Monitor
+              -> Worker : Ping
+            Worker
+              -> Monitor : Pong
+            continue Loop
+    "#;
+
+    let _choreo = parse_choreography_str(protocol)?;
+    println!("Parsed protocol with explicit recursion:");
+    println!("   • `rec Loop` declares the recursive label");
+    println!("   • `continue Loop` re-enters the protocol body");
+    println!();
+
+    Ok(())
+}
+
 fn demo_integration() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== 5. Cross-Feature Integration ===");
+    println!("=== 6. Cross-Feature Integration ===");
 
     let complex_protocol = r#"
         module distributed_consensus exposing (ByzantineConsensus)
-        protocol ByzantineConsensus = {
+        protocol ByzantineConsensus =
             roles Leader, Followers[*], Auditor
 
-            Leader -> Followers[*] : PrepareRequest
+            Leader
+              -> Followers[*] : PrepareRequest of consensus.Prepare
 
-            Followers[0..byzantine_threshold] -> Leader : PrepareResponse
+            Followers[0..byzantine_threshold]
+              -> Leader : PrepareResponse
 
-            Leader -> Followers[*] : CommitRequest
+            Leader
+              -> Followers[*] : CommitRequest of consensus.Commit
 
-            Followers[honest_majority] -> Leader : CommitResponse
+            Followers[honest_majority]
+              -> Leader : CommitResponse
 
-            Leader -> Auditor : ConsensusResult
-        }
+            Leader
+              -> Auditor : ConsensusResult of consensus.Result
     "#;
 
     let choreo = parse_choreography_str(complex_protocol)?;
@@ -190,16 +230,17 @@ fn demo_integration() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn demo_projection() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== 6. End-to-End: DSL → Parse → Project ===");
+    println!("=== 7. End-to-End: DSL → Parse → Project ===");
 
     // A simple protocol to demonstrate projection
     let protocol = r#"
-        protocol RequestResponse = {
+        protocol RequestResponse =
             roles Client, Server
 
-            Client -> Server : Request
-            Server -> Client : Response
-        }
+            Client
+              -> Server : Request of api.Request
+            Server
+              -> Client : Response of api.Response
     "#;
 
     // Step 1: Parse the DSL
@@ -225,19 +266,18 @@ fn demo_projection() -> Result<(), Box<dyn std::error::Error>> {
     // Show a more complex example with choice
     println!("\n--- Choice Protocol Projection ---");
     let choice_protocol = r#"
-        protocol AuthFlow = {
+        protocol AuthFlow =
             roles Client, Server
 
-            Client -> Server : LoginRequest
-            choice at Server {
-                success -> {
-                    Server -> Client : AuthToken
-                }
-                failure -> {
-                    Server -> Client : AuthError
-                }
-            }
-        }
+            Client
+              -> Server : LoginRequest of auth.LoginRequest
+            choice at Server
+              | Success ->
+                  Server
+                    -> Client : AuthToken of auth.Token
+              | Failure ->
+                  Server
+                    -> Client : AuthError of auth.Error
     "#;
 
     let auth_choreo = parse_choreography_str(choice_protocol)?;

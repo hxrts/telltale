@@ -22,10 +22,10 @@ protocol SimpleSend =
 protocol Negotiation =
   roles Buyer, Seller
   Buyer -> Seller : Offer
-  case choose Seller of
-    accept ->
+  choice at Seller
+    | accept ->
       Seller -> Buyer : Accept
-    reject ->
+    | reject ->
       Seller -> Buyer : Reject
 "#;
 
@@ -42,9 +42,9 @@ protocol Negotiation =
 protocol AliasChoice =
   roles A, B
   choice at A
-    ok ->
+    | ok ->
       A -> B : Ack
-    fail ->
+    | fail ->
       A -> B : Nack
 "#;
 
@@ -414,8 +414,8 @@ protocol ThreeRoles =
 protocol TypedLoop =
   roles Client, Server
   loop decide by Client
-    Client -> Server : Request<String>
-    Server -> Client : Response<u32>
+    Client -> Server : Request of builtins.String
+    Server -> Client : Response of builtins.U32
 "#;
 
         let result = parse_choreography_str(input);
@@ -434,10 +434,8 @@ protocol TypedLoop =
                                 ..
                             } => {
                                 assert_eq!(message.name.to_string(), "Request");
-                                // Type annotation should be preserved
-                                assert!(message.type_annotation.is_some());
-                                let type_str =
-                                    message.type_annotation.as_ref().unwrap().to_string();
+                                assert!(message.payload.is_some());
+                                let type_str = message.payload.as_ref().unwrap().to_string();
                                 assert!(
                                     type_str.contains("String"),
                                     "Expected String type, got: {}",
@@ -447,12 +445,11 @@ protocol TypedLoop =
                                 match continuation.as_ref() {
                                     Protocol::Send { message, .. } => {
                                         assert_eq!(message.name.to_string(), "Response");
-                                        assert!(message.type_annotation.is_some());
-                                        let type_str =
-                                            message.type_annotation.as_ref().unwrap().to_string();
+                                        assert!(message.payload.is_some());
+                                        let type_str = message.payload.as_ref().unwrap().to_string();
                                         assert!(
-                                            type_str.contains("u32"),
-                                            "Expected u32 type, got: {}",
+                                            type_str.contains("U32"),
+                                            "Expected U32 type, got: {}",
                                             type_str
                                         );
                                     }
@@ -478,9 +475,9 @@ protocol FirstIsChoice =
   roles A, B
   loop decide by A
     choice at A
-      opt1 ->
+      | opt1 ->
         A -> B : Msg1
-      opt2 ->
+      | opt2 ->
         A -> B : Msg2
 "#;
 

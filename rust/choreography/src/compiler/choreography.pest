@@ -58,46 +58,15 @@ block_protocol = { "{" ~ roles_decl? ~ statement* ~ "}" | "(" ~ roles_decl? ~ st
 
 // Statement types
 statement = _{
-    annotated_stmt
-    | send_stmt
+    send_stmt
     | broadcast_stmt
     | heartbeat_stmt
     | timed_choice_stmt
     | choice_stmt
+    | par_stmt
     | loop_stmt
-    | branch_stmt
     | rec_stmt
     | continue_stmt
-    | call_stmt
-    | handshake_stmt
-    | retry_stmt
-    | quorum_collect_stmt
-    | vm_acquire_stmt
-    | vm_release_stmt
-    | vm_fork_stmt
-    | vm_join_stmt
-    | vm_abort_stmt
-    | vm_transfer_stmt
-    | vm_tag_stmt
-    | vm_check_stmt
-}
-
-// Annotated statement - statement with prefix annotation(s)
-// Syntax: @runtime_timeout(5s) Alice -> Bob: Message
-annotated_stmt = { annotation+ ~ inner_stmt }
-annotation = { "@" ~ annotation_kind }
-annotation_kind = { runtime_timeout_annotation | custom_annotation }
-runtime_timeout_annotation = { "runtime_timeout" ~ "(" ~ duration ~ ")" }
-custom_annotation = { ident ~ ("(" ~ annotation_args ~ ")")? }
-annotation_args = { (!(")" | ",") ~ ANY)* ~ ("," ~ (!(")" | ",") ~ ANY)*)* }
-
-inner_stmt = _{
-    send_stmt
-    | broadcast_stmt
-    | choice_stmt
-    | loop_stmt
-    | branch_stmt
-    | rec_stmt
     | call_stmt
     | handshake_stmt
     | retry_stmt
@@ -147,10 +116,16 @@ vm_layer = { ident | string }
 continue_stmt = { "continue" ~ ident }
 
 // Send statement
-send_stmt = { role_ref ~ "->" ~ role_ref ~ ":" ~ message }
+send_stmt = { annotated_sender_ref ~ "->" ~ role_ref ~ ":" ~ message }
 
 // Broadcast statement
-broadcast_stmt = { role_ref ~ "->*" ~ ":" ~ message }
+broadcast_stmt = { annotated_sender_ref ~ "->*" ~ ":" ~ message }
+
+annotated_sender_ref = { role_ref ~ role_metadata_record? }
+role_metadata_record = { "{" ~ role_annotation_entries? ~ "}" }
+role_annotation_entries = { role_annotation_entry ~ ("," ~ role_annotation_entry)* ~ ","? }
+role_annotation_entry = { ident ~ "=" ~ role_annotation_value }
+role_annotation_value = { string | duration | integer | ident }
 
 // Role reference (can be simple or indexed)
 role_ref = { ident ~ role_index? }
@@ -160,10 +135,15 @@ range_expr = { (integer | ident) ~ ".." ~ (integer | ident) }
 
 // Choice statement
 choice_stmt = { choice_head ~ choice_block }
-choice_head = { ("case" ~ "choose" ~ role_ref ~ "of") | ("choice" ~ "at" ~ role_ref) }
+choice_head = { "choice" ~ "at" ~ role_ref }
 choice_block = { block_choice }
 block_choice = { "{" ~ choice_branch+ ~ "}" | "(" ~ choice_branch+ ~ ")" }
-choice_branch = { ident ~ guard? ~ "->" ~ block }
+choice_branch = { "|" ~ ident ~ guard? ~ "->" ~ block }
+
+// Parallel block with bar-prefixed branches
+par_stmt = { "par" ~ par_block }
+par_block = { "{" ~ par_branch+ ~ "}" | "(" ~ par_branch+ ~ ")" }
+par_branch = { "|" ~ (block | statement) }
 
 // Guard condition for choice branches
 guard = { "when" ~ "(" ~ guard_expr ~ ")" }
@@ -178,9 +158,6 @@ loop_while = { "while" ~ string }
 loop_forever = { "forever" }
 int_expr = { integer | ident }
 
-// Parallel branch statement
-branch_stmt = { "branch" ~ block }
-
 // Recursive protocol
 rec_stmt = { "rec" ~ ident ~ block }
 
@@ -188,10 +165,11 @@ rec_stmt = { "rec" ~ ident ~ block }
 block = { "{" ~ statement* ~ "}" | "(" ~ statement+ ~ ")" }
 
 // Message specification
-message = { ident ~ message_type? ~ payload? }
-message_type = { "<" ~ type_spec ~ ("," ~ type_spec)* ~ ">" }
+message = { ident ~ message_of? ~ payload? }
+message_of = { "of" ~ type_spec }
 type_spec = { type_path ~ type_generics? }
-type_path = { ident ~ ("::" ~ ident)* }
+type_path = { ident ~ type_path_segment* }
+type_path_segment = { "." ~ ident }
 type_generics = { "<" ~ type_spec ~ ("," ~ type_spec)* ~ ">" }
 
 payload = { payload_paren | payload_brace }

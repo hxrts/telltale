@@ -7,12 +7,13 @@ use telltale_choreography::compiler::parse_dsl;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dsl = r"
-    protocol TestParamRoles = {
-        roles Coordinator, Worker[3]
-        
-        Coordinator -> Worker[0] : Task
-        Worker[0] -> Coordinator : Result
-    }
+    protocol TestParamRoles =
+      roles Coordinator, Worker[3]
+
+      Coordinator { shard = 0 }
+        -> Worker[0] : Task of jobs.Task
+      Worker[0]
+        -> Coordinator : Result of jobs.Result
     ";
 
     println!("Parsing choreography...\n");

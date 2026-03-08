@@ -90,12 +90,6 @@ pub(crate) fn inline_calls(
                     branches: new_branches,
                 });
             }
-            Statement::Branch { body, span } => {
-                result.push(Statement::Branch {
-                    body: inline_calls(body, protocol_defs, input)?,
-                    span: span.clone(),
-                });
-            }
             Statement::Rec { label, body } => {
                 result.push(Statement::Rec {
                     label: label.clone(),

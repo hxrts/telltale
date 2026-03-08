@@ -145,12 +145,12 @@ pub(crate) fn generate_runtime_annotation_access(name: &str, protocol: &Protocol
         return quote! {};
     }
 
-    // Convert to legacy map for code generation
-    let legacy_map = all_annotations.to_legacy_map();
-    let mut legacy_entries: Vec<_> = legacy_map.iter().collect();
-    legacy_entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+    // Convert to a flat key-value map for code generation.
+    let annotation_map = all_annotations.to_map();
+    let mut annotation_entries: Vec<_> = annotation_map.iter().collect();
+    annotation_entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
 
-    let annotation_map: Vec<TokenStream> = legacy_entries
+    let annotation_inserts: Vec<TokenStream> = annotation_entries
         .into_iter()
         .map(|(key, value)| {
             quote! { map.insert(#key.to_string(), #value.to_string()); }
@@ -161,7 +161,7 @@ pub(crate) fn generate_runtime_annotation_access(name: &str, protocol: &Protocol
         /// Get runtime annotations for this protocol node
         pub fn #fn_name() -> std::collections::HashMap<String, String> {
             let mut map = std::collections::HashMap::new();
-            #(#annotation_map)*
+            #(#annotation_inserts)*
             map
         }
     }

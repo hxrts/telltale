@@ -112,19 +112,57 @@ pub enum ProtocolAnnotation {
 }
 
 impl ProtocolAnnotation {
-    fn custom_legacy(key: &str, value: &str) -> Self {
+    fn custom_kv(key: &str, value: &str) -> Self {
         Self::Custom {
             key: key.to_string(),
             value: value.to_string(),
         }
     }
 
-    fn parse_u32_legacy(value: &str) -> Option<u32> {
+    fn parse_u32_value(value: &str) -> Option<u32> {
         value.parse::<u32>().ok()
     }
 
-    fn parse_u64_legacy(value: &str) -> Option<u64> {
+    fn parse_u64_value(value: &str) -> Option<u64> {
         value.parse::<u64>().ok()
+    }
+
+    fn parse_duration_value(value: &str) -> Option<Duration> {
+        let trimmed = value.trim();
+        let (number, unit) = if let Some(number) = trimmed.strip_suffix("ms") {
+            (number, "ms")
+        } else if let Some(number) = trimmed.strip_suffix('s') {
+            (number, "s")
+        } else if let Some(number) = trimmed.strip_suffix('m') {
+            (number, "m")
+        } else if let Some(number) = trimmed.strip_suffix('h') {
+            (number, "h")
+        } else {
+            return Self::parse_u64_value(trimmed).map(Duration::from_millis);
+        };
+
+        let value = number.trim().parse::<u64>().ok()?;
+        let millis = match unit {
+            "ms" => value,
+            "s" => value.saturating_mul(1000),
+            "m" => value.saturating_mul(60_000),
+            "h" => value.saturating_mul(3_600_000),
+            _ => return None,
+        };
+        Some(Duration::from_millis(millis))
+    }
+
+    fn format_duration_value(duration: Duration) -> String {
+        let millis = duration.as_millis();
+        if millis % 3_600_000 == 0 {
+            format!("{}h", millis / 3_600_000)
+        } else if millis % 60_000 == 0 {
+            format!("{}m", millis / 60_000)
+        } else if millis % 1000 == 0 {
+            format!("{}s", millis / 1000)
+        } else {
+            format!("{millis}ms")
+        }
     }
 
     /// Create a timed choice annotation from a duration.
@@ -371,11 +409,9 @@ impl ProtocolAnnotation {
         }
     }
 
-    /// Convert from legacy HashMap format.
-    ///
-    /// Parses known annotation types and falls back to Custom for unknown ones.
+    /// Convert from a key-value annotation pair.
     #[must_use]
-    pub fn from_legacy(key: &str, value: &str) -> Self {
+    pub fn from_key_value(key: &str, value: &str) -> Self {
         match key {
             "timed_choice" if value == "true" => {
                 // Duration comes from separate timeout_ms annotation; use zero default
@@ -383,20 +419,20 @@ impl ProtocolAnnotation {
                     duration: Duration::from_secs(0),
                 }
             }
-            "timeout_ms" => Self::parse_u64_legacy(value)
+            "timeout_ms" => Self::parse_u64_value(value)
                 .map(|ms| Self::TimedChoice {
                     duration: Duration::from_millis(ms),
                 })
-                .unwrap_or_else(|| Self::custom_legacy(key, value)),
-            "priority" => Self::parse_u32_legacy(value)
+                .unwrap_or_else(|| Self::custom_kv(key, value)),
+            "priority" => Self::parse_u32_value(value)
                 .map(Self::Priority)
-                .unwrap_or_else(|| Self::custom_legacy(key, value)),
-            "retry" => Self::parse_u32_legacy(value)
+                .unwrap_or_else(|| Self::custom_kv(key, value)),
+            "retry" => Self::parse_u32_value(value)
                 .map(|max_attempts| Self::Retry {
                     max_attempts,
                     delay: None,
                 })
-                .unwrap_or_else(|| Self::custom_legacy(key, value)),
+                .unwrap_or_else(|| Self::custom_kv(key, value)),
             "idempotent" if value == "true" => Self::Idempotent,
             "trace" => Self::Trace {
                 label: if value.is_empty() || value == "true" {
@@ -405,15 +441,50 @@ impl ProtocolAnnotation {
                     Some(value.to_string())
                 },
             },
-            "runtime_timeout" => Self::parse_u64_legacy(value)
-                .map(|ms| Self::RuntimeTimeout(Duration::from_millis(ms)))
-                .unwrap_or_else(|| Self::custom_legacy(key, value)),
+            "runtime_timeout" => Self::parse_duration_value(value)
+                .map(Self::RuntimeTimeout)
+                .unwrap_or_else(|| Self::custom_kv(key, value)),
             "parallel" if value.is_empty() || value == "true" => Self::Parallel,
             "ordered" if value.is_empty() || value == "true" => Self::Ordered,
-            "min_responses" => Self::parse_u32_legacy(value)
+            "min_responses" => Self::parse_u32_value(value)
                 .map(Self::MinResponses)
-                .unwrap_or_else(|| Self::custom_legacy(key, value)),
-            _ => Self::custom_legacy(key, value),
+                .unwrap_or_else(|| Self::custom_kv(key, value)),
+            _ => Self::custom_kv(key, value),
+        }
+    }
+
+    #[must_use]
+    pub fn to_key_value(&self) -> (String, String) {
+        match self {
+            Self::TimedChoice { duration } => {
+                ("timeout_ms".to_string(), duration.as_millis().to_string())
+            }
+            Self::Priority(value) => ("priority".to_string(), value.to_string()),
+            Self::Retry { max_attempts, .. } => ("retry".to_string(), max_attempts.to_string()),
+            Self::Idempotent => ("idempotent".to_string(), "true".to_string()),
+            Self::Trace { label } => (
+                "trace".to_string(),
+                label.clone().unwrap_or_else(|| "true".to_string()),
+            ),
+            Self::RuntimeTimeout(duration) => (
+                "runtime_timeout".to_string(),
+                Self::format_duration_value(*duration),
+            ),
+            Self::Heartbeat {
+                interval,
+                on_missing_count,
+            } => (
+                "heartbeat".to_string(),
+                format!(
+                    "every {} on_missing {}",
+                    Self::format_duration_value(*interval),
+                    on_missing_count
+                ),
+            ),
+            Self::Parallel => ("parallel".to_string(), "true".to_string()),
+            Self::Ordered => ("ordered".to_string(), "true".to_string()),
+            Self::MinResponses(value) => ("min_responses".to_string(), value.to_string()),
+            Self::Custom { key, value } => (key.clone(), value.clone()),
         }
     }
 }

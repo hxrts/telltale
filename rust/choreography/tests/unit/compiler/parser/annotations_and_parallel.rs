@@ -213,10 +213,9 @@ protocol TargetConsistency =
         let input = r#"
 protocol Parallel =
   roles A, B, C, D
-  branch
-    A -> B : Msg1
-  branch
-    C -> D : Msg2
+  par
+    | A -> B : Msg1
+    | C -> D : Msg2
 "#;
 
         let result = parse_choreography_str(input);
@@ -240,15 +239,12 @@ protocol Parallel =
         let input = r#"
 protocol SingleBranch =
   roles A, B
-  branch
-    A -> B : Msg
+  par
+    | A -> B : Msg
 "#;
 
         let result = parse_choreography_str(input);
         assert!(result.is_err());
-        let err = result.unwrap_err();
-        let err_str = err.to_string();
-        assert!(err_str.contains("parallel requires at least two adjacent branch blocks"));
     }
 
     #[test]
@@ -258,10 +254,10 @@ protocol TimedRequest =
   roles Alice, Bob
   Alice -> Bob : Request
   timed_choice at Alice(5s) {
-    OnTime -> {
+    | OnTime -> {
       Bob -> Alice : Response
     }
-    TimedOut -> {
+    | TimedOut -> {
       Alice -> Bob : Cancel
     }
   }
@@ -308,10 +304,10 @@ protocol TimedRequest =
 protocol QuickTimeout =
   roles Client, Server
   timed_choice at Client(500ms) {
-    Fast -> {
+    | Fast -> {
       Server -> Client : Data
     }
-    Slow -> {
+    | Slow -> {
       Client -> Server : Abort
     }
   }
@@ -343,10 +339,10 @@ protocol QuickTimeout =
 protocol LongTimeout =
   roles A, B
   timed_choice at A(2m) {
-    Done -> {
+    | Done -> {
       B -> A : Complete
     }
-    Expired -> {
+    | Expired -> {
       A -> B : Timeout
     }
   }
@@ -479,14 +475,14 @@ protocol FastHeartbeat =
         let input = r#"
 protocol TimedRequest =
   roles Client, Server
-  @runtime_timeout(5s) Client -> Server : Request
+  Client { runtime_timeout = 5s } -> Server : Request
   Server -> Client : Response
 "#;
 
         let result = parse_choreography_str(input);
         assert!(
             result.is_ok(),
-            "Failed to parse @runtime_timeout: {:?}",
+            "Failed to parse sender-record runtime_timeout: {:?}",
             result.err()
         );
 
@@ -515,17 +511,49 @@ protocol TimedRequest =
     }
 
     #[test]
-    fn test_parse_runtime_timeout_milliseconds() {
+    fn test_parse_multiline_runtime_timeout_annotation_with_closing_paren_on_own_line() {
         let input = r#"
-protocol QuickCheck =
-  roles A, B
-  @runtime_timeout(100ms) A -> B : Ping
+protocol TimedRequest =
+  roles Client, Server
+  Client {
+    runtime_timeout = 5s,
+  }
+    -> Server : Request
+  Server -> Client : Response
 "#;
 
         let result = parse_choreography_str(input);
         assert!(
             result.is_ok(),
-            "Failed to parse @runtime_timeout with ms: {:?}",
+            "Failed to parse multiline sender-record runtime_timeout: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Send { annotations, .. } => {
+                assert!(annotations.has_runtime_timeout());
+                assert_eq!(
+                    annotations.runtime_timeout(),
+                    Some(std::time::Duration::from_secs(5))
+                );
+            }
+            _ => panic!("Expected Send for Request"),
+        }
+    }
+
+    #[test]
+    fn test_parse_runtime_timeout_milliseconds() {
+        let input = r#"
+protocol QuickCheck =
+  roles A, B
+  A { runtime_timeout = 100ms } -> B : Ping
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse sender-record runtime_timeout with ms: {:?}",
             result.err()
         );
 
@@ -545,13 +573,13 @@ protocol QuickCheck =
         let input = r#"
 protocol Broadcast =
   roles Coordinator, Worker
-  @parallel Coordinator -> Worker : Task
+  Coordinator { parallel = true } -> Worker : Task
 "#;
 
         let result = parse_choreography_str(input);
         assert!(
             result.is_ok(),
-            "Failed to parse @parallel: {:?}",
+            "Failed to parse sender-record parallel metadata: {:?}",
             result.err()
         );
 
@@ -565,17 +593,316 @@ protocol Broadcast =
     }
 
     #[test]
-    fn test_parse_ordered_annotation() {
+    fn test_parse_choice_with_bar_prefixed_branches() {
         let input = r#"
-protocol OrderedCollect =
-  roles Coordinator, Worker
-  @ordered Worker -> Coordinator : Result
+protocol Decision =
+  roles A, B
+  choice at A
+    | Accept ->
+        A -> B : Ok
+    | Reject ->
+        A -> B : No
 "#;
 
         let result = parse_choreography_str(input);
         assert!(
             result.is_ok(),
-            "Failed to parse @ordered: {:?}",
+            "Failed to parse choice with bar-prefixed branches: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Choice { branches, .. } => {
+                assert_eq!(branches.len(), 2);
+                assert_eq!(branches.first().label.to_string(), "Accept");
+                assert_eq!(branches.as_slice()[1].label.to_string(), "Reject");
+            }
+            _ => panic!("Expected Choice"),
+        }
+    }
+
+    #[test]
+    fn test_parse_par_with_single_line_bar_branches() {
+        let input = r#"
+protocol ParallelBars =
+  roles A, B, C, D
+  par
+    | A -> B : Left
+    | C -> D : Right
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse `par` with single-line branches: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Parallel { protocols } => {
+                assert_eq!(protocols.len(), 2);
+            }
+            _ => panic!("Expected Parallel"),
+        }
+    }
+
+    #[test]
+    fn test_parse_par_with_block_branch() {
+        let input = r#"
+protocol ParallelBarsBlock =
+  roles A, B, C, D
+  par
+    |
+      A -> B : Left
+      B -> A : Ack
+    | C -> D : Right
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse `par` with block branch: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Parallel { protocols } => {
+                assert_eq!(protocols.len(), 2);
+                match &protocols.first() {
+                    Protocol::Send { continuation, .. } => {
+                        assert!(matches!(continuation.as_ref(), Protocol::Send { .. }));
+                    }
+                    _ => panic!("Expected first branch to be a send sequence"),
+                }
+            }
+            _ => panic!("Expected Parallel"),
+        }
+    }
+
+    #[test]
+    fn test_reject_par_without_bar_branches() {
+        let input = r#"
+protocol ParallelMissingBars =
+  roles A, B, C, D
+  par
+    A -> B : Left
+    C -> D : Right
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_err(),
+            "`par` branches must be introduced with `|`"
+        );
+    }
+
+    #[test]
+    fn test_parse_sender_role_annotation_block() {
+        let input = r#"
+protocol RoleAnnotatedSend =
+  roles Role, OtherRole
+  Role {
+    annotation1 = "value",
+    annotation2 = 100,
+    annotation3 = another,
+  } -> OtherRole : Message of crate.Type
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse sender role annotation block: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Send {
+                from,
+                to,
+                message,
+                from_annotations,
+                ..
+            } => {
+                assert_eq!(from.name().to_string(), "Role");
+                assert_eq!(to.name().to_string(), "OtherRole");
+                assert_eq!(message.name.to_string(), "Message");
+                assert_eq!(
+                    message.payload.as_ref().map(ToString::to_string),
+                    Some("crate :: Type".to_string())
+                );
+                assert_eq!(
+                    from_annotations.get("annotation1"),
+                    Some("value".to_string())
+                );
+                assert_eq!(from_annotations.get("annotation2"), Some("100".to_string()));
+                assert_eq!(
+                    from_annotations.get("annotation3"),
+                    Some("another".to_string())
+                );
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_parse_sender_record_with_aligned_arrow_layout() {
+        let input = r#"
+protocol StyledSend =
+  roles Buyer, Seller
+  Buyer { priority = high }
+    -> Seller : Request of shop.Order
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse aligned-arrow sender record syntax: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Send {
+                from_annotations,
+                message,
+                ..
+            } => {
+                assert_eq!(from_annotations.get("priority"), Some("high".to_string()));
+                assert_eq!(
+                    message.payload.as_ref().map(ToString::to_string),
+                    Some("shop :: Order".to_string())
+                );
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_parse_sender_role_annotation_block_with_indexed_role() {
+        let input = r#"
+protocol RoleAnnotatedIndexedSend =
+  roles Worker[N], Coordinator
+  Worker[0] {
+    shard = 0,
+  } -> Coordinator : Result
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse sender annotation block on indexed role: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Send {
+                from,
+                from_annotations,
+                ..
+            } => {
+                assert_eq!(from.name().to_string(), "Worker");
+                assert_eq!(
+                    from.index().as_ref().map(ToString::to_string),
+                    Some("0".to_string())
+                );
+                assert_eq!(from_annotations.get("shard"), Some("0".to_string()));
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_parse_sender_role_annotation_block_on_broadcast() {
+        let input = r#"
+protocol RoleAnnotatedBroadcast =
+  roles Coordinator, Worker
+  Coordinator {
+    batch_size = 100,
+  } ->* : Task
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse sender annotation block on broadcast: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Broadcast {
+                from,
+                from_annotations,
+                ..
+            } => {
+                assert_eq!(from.name().to_string(), "Coordinator");
+                assert_eq!(
+                    from_annotations.get("batch_size"),
+                    Some("100".to_string())
+                );
+            }
+            _ => panic!("Expected Broadcast"),
+        }
+    }
+
+    #[test]
+    fn test_reject_sender_metadata_in_square_brackets() {
+        let input = r#"
+protocol InvalidRoleMetadata =
+  roles Role, OtherRole
+  Role[annotation1 = "value"] -> OtherRole : Message
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_err(),
+            "square brackets must stay reserved for role indexing"
+        );
+    }
+
+    #[test]
+    fn test_reject_sender_metadata_at_brackets_syntax() {
+        let input = r#"
+protocol LegacyRoleAnnotatedSend =
+  roles Role, OtherRole
+  Role @[
+    annotation1 = "value",
+  ] -> OtherRole : Message
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(result.is_err(), "`@[ ... ]` sender metadata must be rejected");
+    }
+
+    #[test]
+    fn test_reject_mixed_sender_metadata_and_of_payload_legacy_syntax() {
+        let input = r#"
+protocol LegacyAndNew =
+  roles Role, OtherRole
+  Role @[ priority = high ] -> OtherRole : Message of shop.Order
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(result.is_err(), "mixed legacy sender metadata must be rejected");
+    }
+
+    #[test]
+    fn test_parse_ordered_annotation() {
+        let input = r#"
+protocol OrderedCollect =
+  roles Coordinator, Worker
+  Worker { ordered = true } -> Coordinator : Result
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse sender-record ordered metadata: {:?}",
             result.err()
         );
 

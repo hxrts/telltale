@@ -79,8 +79,8 @@ fn update_code_and_depth(ch: char, has_code: &mut bool, depth_delta: &mut i32) {
         *has_code = true;
     }
     match ch {
-        '{' | '(' => *depth_delta += 1,
-        '}' | ')' => *depth_delta -= 1,
+        '{' | '(' | '[' => *depth_delta += 1,
+        '}' | ')' | ']' => *depth_delta -= 1,
         _ => {}
     }
 }
@@ -127,6 +127,11 @@ fn scan_line(line: &str, state: &ScanState) -> LineScan {
         depth_delta,
         end_state: st,
     }
+}
+
+fn is_layout_continuation(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    trimmed.starts_with("->") || trimmed.starts_with('{')
 }
 
 fn leading_indent(line: &str, line_no: usize) -> Result<usize, LayoutError> {
@@ -214,7 +219,7 @@ pub fn preprocess_layout(input: &str) -> Result<String, LayoutError> {
         let layout_enabled = explicit_depth == 0;
         let mut prefix = String::new();
 
-        if layout_enabled && scan.has_code {
+        if layout_enabled && scan.has_code && !is_layout_continuation(line) {
             prefix.push_str(&adjust_indent_stack(
                 &mut indent_stack,
                 indent,
@@ -258,30 +263,47 @@ mod tests {
 
     #[test]
     fn layout_handles_choice_and_branch_blocks() {
-        let input = "protocol Test =\n  roles A, B\n  case choose A of\n    Buy ->\n      A -> B : Msg\n    Cancel -> {}\n";
+        let input = "protocol Test =\n  roles A, B\n  choice at A\n    | Buy ->\n        A -> B : Msg\n    | Cancel -> {}\n";
         let out = preprocess_layout(input).unwrap();
         let normalized = out.split_whitespace().collect::<Vec<_>>().join(" ");
-        assert!(normalized.contains("case choose A of"));
-        assert!(normalized.contains("{ Buy ->"));
+        assert!(normalized.contains("choice at A"));
+        assert!(normalized.contains("{ | Buy ->"));
         assert!(normalized.contains("{ A -> B"));
-        assert!(normalized.contains("} Cancel -> {}"));
+        assert!(normalized.contains("} | Cancel -> {}"));
     }
 
     #[test]
     fn layout_ignores_explicit_braces_blocks() {
-        let input = "protocol Test =\n  roles A, B\n  branch {\n    A -> B : Msg\n  }\n  branch\n    B -> A : Ack\n";
+        let input = "protocol Test =\n  roles A, B\n  par {\n    | A -> B : Msg\n    | B -> A : Ack\n  }\n";
         let out = preprocess_layout(input).unwrap();
         // Should still insert outer protocol block, but not double-open inside explicit braces.
         let normalized = out.split_whitespace().collect::<Vec<_>>().join(" ");
         assert!(normalized.contains("{ roles"));
-        assert!(normalized.contains("branch {"));
+        assert!(normalized.contains("par {"));
     }
 
     #[test]
     fn layout_allows_empty_blocks_only_with_braces() {
-        let input = "protocol Test =\n  roles A, B\n  case choose A of\n    Cancel -> {}\n";
+        let input = "protocol Test =\n  roles A, B\n  choice at A\n    | Cancel -> {}\n";
         let out = preprocess_layout(input).unwrap();
         let normalized = out.split_whitespace().collect::<Vec<_>>().join(" ");
         assert!(normalized.contains("Cancel -> {}"));
+    }
+
+    #[test]
+    fn layout_does_not_insert_braces_inside_multiline_sender_records() {
+        let input = "protocol Test =\n  roles A, B\n  A {\n    priority = high,\n  }\n    -> B : Msg\n";
+        let out = preprocess_layout(input).unwrap();
+        assert!(!out.contains("{     priority = high,"));
+        assert!(out.contains("A {"));
+        assert!(out.contains("}\n    -> B : Msg"));
+    }
+
+    #[test]
+    fn layout_treats_arrow_line_as_continuation() {
+        let input = "protocol Test =\n  roles A, B\n  A { priority = high }\n    -> B : Msg\n";
+        let out = preprocess_layout(input).unwrap();
+        assert!(!out.contains("{     -> B : Msg"));
+        assert!(out.contains("-> B : Msg"));
     }
 }

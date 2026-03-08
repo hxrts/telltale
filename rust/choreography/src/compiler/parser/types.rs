@@ -9,8 +9,6 @@ use quote::quote;
 use std::collections::HashMap;
 use syn::{BinOp, Expr, Lit, UnOp};
 
-use super::error::ErrorSpan;
-
 /// Choreography statement types
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)] // Statement enum is internal to parser; performance impact is minimal
@@ -54,10 +52,6 @@ pub(crate) enum Statement {
     Loop {
         condition: Option<crate::ast::Condition>,
         body: Vec<Statement>,
-    },
-    Branch {
-        body: Vec<Statement>,
-        span: ErrorSpan,
     },
     Parallel {
         branches: Vec<Vec<Statement>>,

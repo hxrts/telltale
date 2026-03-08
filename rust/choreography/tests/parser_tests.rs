@@ -3,6 +3,7 @@
 
 // Comprehensive tests for the choreographic DSL parser
 
+use telltale_choreography::ast::Protocol;
 use telltale_choreography::compiler::parser::{parse_choreography_str, ParseError};
 
 #[test]
@@ -103,10 +104,10 @@ protocol Choice = {
     A -> B: Propose
     
     choice at B {
-        accept -> {
+        | accept -> {
             B -> A: Accept
         }
-        reject -> {
+        | reject -> {
             B -> A: Reject
         }
     }
@@ -124,13 +125,13 @@ protocol ThreeWayChoice = {
     roles Client, Server
     
     choice at Client {
-        get -> {
+        | get -> {
             Client -> Server: Get
         }
-        post -> {
+        | post -> {
             Client -> Server: Post
         }
-        delete -> {
+        | delete -> {
             Client -> Server: Delete
         }
     }
@@ -148,18 +149,18 @@ protocol NestedChoice = {
     roles A, B, C
     
     choice at A {
-        path1 -> {
+        | path1 -> {
             A -> B: First
             choice at B {
-                inner1 -> {
+                | inner1 -> {
                     B -> C: InnerA
                 }
-                inner2 -> {
+                | inner2 -> {
                     B -> C: InnerB
                 }
             }
         }
-        path2 -> {
+        | path2 -> {
             A -> C: Second
         }
     }
@@ -242,11 +243,9 @@ fn test_parse_parallel() {
 protocol Parallel = {
     roles A, B, C, D
 
-    branch {
-        A -> B: Msg1
-    }
-    branch {
-        C -> D: Msg2
+    par {
+        | A -> B: Msg1
+        | C -> D: Msg2
     }
 }
 ";
@@ -323,7 +322,7 @@ protocol ComplexProtocol = {
     Seller -> Buyer: Quote
     
     choice at Buyer {
-        order -> {
+        | order -> {
             Buyer -> Seller: Order
             Seller -> Shipper: ShipRequest
             Shipper -> Buyer: Tracking
@@ -336,7 +335,7 @@ protocol ComplexProtocol = {
             Shipper -> Buyer: Delivered
             Buyer -> Seller: Confirmation
         }
-        cancel -> {
+        | cancel -> {
             Buyer -> Seller: Cancel
         }
     }
@@ -396,7 +395,7 @@ protocol Invalid = {
     roles Alice
     
     choice at Bob {
-        opt -> {
+        | opt -> {
             Alice -> Alice: Self
         }
     }
@@ -784,10 +783,10 @@ protocol CallInChoice = {
     Client -> Server: Request
     
     choice at Server {
-        ok -> {
+        | ok -> {
             call Success
         }
-        error -> {
+        | error -> {
             call Failure
         }
     }
@@ -897,10 +896,10 @@ protocol GuardExample = {
     roles Client, Server
     
     choice at Client {
-        buy when (balance > price) -> {
+        | buy when (balance > price) -> {
             Client -> Server: Purchase
         }
-        cancel -> {
+        | cancel -> {
             Client -> Server: Cancel
         }
     }
@@ -922,13 +921,13 @@ protocol MultiGuards = {
     roles A, B
     
     choice at A {
-        option1 when (x > 0) -> {
+        | option1 when (x > 0) -> {
             A -> B: Msg1
         }
-        option2 when (x < 0) -> {
+        | option2 when (x < 0) -> {
             A -> B: Msg2
         }
-        option3 -> {
+        | option3 -> {
             A -> B: Msg3
         }
     }
@@ -950,10 +949,10 @@ protocol ComplexGuard = {
     roles Client, Server
     
     choice at Client {
-        proceed when (balance >= price && is_authenticated) -> {
+        | proceed when (balance >= price && is_authenticated) -> {
             Client -> Server: Action
         }
-        reject -> {
+        | reject -> {
             Client -> Server: Reject
         }
     }
@@ -975,18 +974,18 @@ protocol NestedGuard = {
     roles A, B, C
     
     choice at A {
-        outer when (condition1) -> {
+        | outer when (condition1) -> {
             A -> B: Start
             choice at B {
-                inner when (condition2) -> {
+                | inner when (condition2) -> {
                     B -> C: Inner
                 }
-                fallback -> {
+                | fallback -> {
                     B -> C: Fallback
                 }
             }
         }
-        skip -> {
+        | skip -> {
             A -> C: Skip
         }
     }
@@ -1024,44 +1023,44 @@ protocol Simple = {
 // ============================================================================
 
 #[test]
-fn test_parse_message_with_type() {
+fn test_parse_message_with_of_type() {
     let input = r"
 protocol TypedMessages = {
     roles A, B
     
-    A -> B: Request<String>
-    B -> A: Response<i32>
+    A -> B: Request of shop.Request
+    B -> A: Response of shop.Response
 }
 ";
 
     let result = parse_choreography_str(input);
     assert!(
         result.is_ok(),
-        "Failed to parse typed messages: {:?}",
+        "Failed to parse `of`-typed messages: {:?}",
         result.err()
     );
 }
 
 #[test]
-fn test_parse_message_with_multiple_types() {
+fn test_parse_message_with_structured_payload() {
     let input = r"
-protocol MultiTyped = {
+protocol StructuredPayload = {
     roles A, B
     
-    A -> B: Data<String, i32, bool>
+    A -> B: Data(first: String, second: I32, flag: Bool)
 }
 ";
 
     let result = parse_choreography_str(input);
     assert!(
         result.is_ok(),
-        "Failed to parse multi-typed message: {:?}",
+        "Failed to parse structured payload: {:?}",
         result.err()
     );
 }
 
 #[test]
-fn test_parse_message_with_generic_types() {
+fn test_reject_message_with_generic_angle_bracket_types() {
     let input = r"
 protocol Generics = {
     roles A, B
@@ -1072,28 +1071,24 @@ protocol Generics = {
 ";
 
     let result = parse_choreography_str(input);
-    assert!(
-        result.is_ok(),
-        "Failed to parse generic types: {:?}",
-        result.err()
-    );
+    assert!(result.is_err(), "angle-bracket generic message types must be rejected");
 }
 
 #[test]
-fn test_parse_message_with_type_and_payload() {
+fn test_parse_message_with_of_type_and_payload() {
     let input = r"
 protocol TypedWithPayload = {
     roles A, B
     
-    A -> B: Request<String>(data)
-    B -> A: Response<i32>(result)
+    A -> B: Request of shop.Request(data)
+    B -> A: Response of shop.Response(result)
 }
 ";
 
     let result = parse_choreography_str(input);
     assert!(
         result.is_ok(),
-        "Failed to parse typed message with payload: {:?}",
+        "Failed to parse `of`-typed message with payload: {:?}",
         result.err()
     );
 }
@@ -1104,16 +1099,80 @@ fn test_parse_message_with_path_types() {
 protocol PathTypes = {
     roles A, B
     
-    A -> B: Data<std::string::String>
-    B -> A: Result<std::vec::Vec<i32>>
+    A -> B: Data of std.string.String
+    B -> A: Result of std.collections.Vector
 }
 ";
 
     let result = parse_choreography_str(input);
     assert!(
         result.is_ok(),
-        "Failed to parse path types: {:?}",
+        "Failed to parse dotted path types: {:?}",
         result.err()
+    );
+}
+
+#[test]
+fn test_parse_message_with_of_payload_and_dotted_path() {
+    let input = r"
+protocol PayloadOf = {
+    roles A, B
+
+    A -> B: Request of shop.Order
+}
+";
+
+    let result = parse_choreography_str(input);
+    assert!(
+        result.is_ok(),
+        "Failed to parse message with `of` payload syntax: {:?}",
+        result.err()
+    );
+
+    let choreo = result.unwrap();
+    match &choreo.protocol {
+        Protocol::Send { message, .. } => {
+            assert_eq!(message.name.to_string(), "Request");
+            assert_eq!(
+                message.payload.as_ref().map(ToString::to_string),
+                Some("shop :: Order".to_string())
+            );
+        }
+        _ => panic!("Expected Send"),
+    }
+}
+
+#[test]
+fn test_reject_message_with_of_missing_payload_type() {
+    let input = r"
+protocol MissingPayloadOf = {
+    roles A, B
+
+    A -> B: Request of
+}
+";
+
+    let result = parse_choreography_str(input);
+    assert!(
+        result.is_err(),
+        "missing payload type after `of` should not parse"
+    );
+}
+
+#[test]
+fn test_reject_message_with_dotted_angle_bracket_type() {
+    let input = r"
+protocol DottedTyped = {
+    roles A, B
+
+    A -> B: Request<shop.Order>
+}
+";
+
+    let result = parse_choreography_str(input);
+    assert!(
+        result.is_err(),
+        "angle-bracket dotted types must be rejected in favor of `of` syntax"
     );
 }
 
@@ -1192,10 +1251,10 @@ protocol ParameterizedChoice = {
     roles Master, Worker[N]
     
     choice at Master {
-        assign -> {
+        | assign -> {
             Master -> Worker[i]: Task
         }
-        skip -> {
+        | skip -> {
             Master -> Worker[0]: Skip
         }
     }

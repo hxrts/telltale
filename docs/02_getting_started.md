@@ -124,8 +124,10 @@ use telltale_choreography::choreography;
 choreography!(r#"
 protocol PingPong =
   roles Alice, Bob
-  Alice -> Bob : Ping
-  Bob -> Alice : Pong
+  Alice
+    -> Bob : Ping
+  Bob
+    -> Alice : Pong
 "#);
 ```
 

@@ -29,11 +29,11 @@ impl Annotations {
         Self { items }
     }
 
-    /// Convert from legacy HashMap format.
+    /// Convert from a key-value map.
     ///
     /// Special handling for timed_choice which uses two keys (timed_choice + timeout_ms).
     #[must_use]
-    pub fn from_legacy_map(map: &HashMap<String, String>) -> Self {
+    pub fn from_map(map: &HashMap<String, String>) -> Self {
         let mut items = Vec::new();
 
         if map.get("timed_choice").is_some_and(|v| v == "true") {
@@ -51,15 +51,15 @@ impl Annotations {
             if key == "timed_choice" || key == "timeout_ms" {
                 continue;
             }
-            items.push(ProtocolAnnotation::from_legacy(key, value));
+            items.push(ProtocolAnnotation::from_key_value(key, value));
         }
 
         Self { items }
     }
 
-    /// Convert to legacy HashMap format (for backward compatibility).
+    /// Convert to a key-value map.
     #[must_use]
-    pub fn to_legacy_map(&self) -> HashMap<String, String> {
+    pub fn to_map(&self) -> HashMap<String, String> {
         let mut map = HashMap::new();
 
         for annotation in &self.items {
@@ -68,49 +68,9 @@ impl Annotations {
                     map.insert("timed_choice".to_string(), "true".to_string());
                     map.insert("timeout_ms".to_string(), duration.as_millis().to_string());
                 }
-                ProtocolAnnotation::Priority(p) => {
-                    map.insert("priority".to_string(), p.to_string());
-                }
-                ProtocolAnnotation::Retry { max_attempts, .. } => {
-                    map.insert("retry".to_string(), max_attempts.to_string());
-                }
-                ProtocolAnnotation::Idempotent => {
-                    map.insert("idempotent".to_string(), "true".to_string());
-                }
-                ProtocolAnnotation::Trace { label } => {
-                    map.insert(
-                        "trace".to_string(),
-                        label.clone().unwrap_or_else(|| "true".to_string()),
-                    );
-                }
-                ProtocolAnnotation::RuntimeTimeout(d) => {
-                    map.insert("runtime_timeout".to_string(), d.as_millis().to_string());
-                }
-                ProtocolAnnotation::Heartbeat {
-                    interval,
-                    on_missing_count,
-                } => {
-                    map.insert("heartbeat".to_string(), "true".to_string());
-                    map.insert(
-                        "heartbeat_interval_ms".to_string(),
-                        interval.as_millis().to_string(),
-                    );
-                    map.insert(
-                        "heartbeat_on_missing_count".to_string(),
-                        on_missing_count.to_string(),
-                    );
-                }
-                ProtocolAnnotation::Parallel => {
-                    map.insert("parallel".to_string(), "true".to_string());
-                }
-                ProtocolAnnotation::Ordered => {
-                    map.insert("ordered".to_string(), "true".to_string());
-                }
-                ProtocolAnnotation::MinResponses(n) => {
-                    map.insert("min_responses".to_string(), n.to_string());
-                }
-                ProtocolAnnotation::Custom { key, value } => {
-                    map.insert(key.clone(), value.clone());
+                _ => {
+                    let (key, value) = annotation.to_key_value();
+                    map.insert(key, value);
                 }
             }
         }
@@ -341,11 +301,11 @@ mod tests {
     }
 
     #[test]
-    fn test_from_legacy() {
-        let ann = ProtocolAnnotation::from_legacy("priority", "5");
+    fn test_from_key_value() {
+        let ann = ProtocolAnnotation::from_key_value("priority", "5");
         assert_eq!(ann, ProtocolAnnotation::Priority(5));
 
-        let ann = ProtocolAnnotation::from_legacy("unknown", "value");
+        let ann = ProtocolAnnotation::from_key_value("unknown", "value");
         assert!(matches!(ann, ProtocolAnnotation::Custom { .. }));
     }
 
@@ -362,18 +322,18 @@ mod tests {
     }
 
     #[test]
-    fn test_legacy_map_roundtrip() {
+    fn test_map_roundtrip() {
         let mut original = HashMap::new();
         original.insert("timed_choice".to_string(), "true".to_string());
         original.insert("timeout_ms".to_string(), "5000".to_string());
         original.insert("priority".to_string(), "10".to_string());
 
-        let anns = Annotations::from_legacy_map(&original);
+        let anns = Annotations::from_map(&original);
         assert!(anns.has_timed_choice());
         assert_eq!(anns.timed_choice(), Some(Duration::from_secs(5)));
         assert_eq!(anns.priority(), Some(10));
 
-        let restored = anns.to_legacy_map();
+        let restored = anns.to_map();
         assert_eq!(restored.get("timed_choice"), Some(&"true".to_string()));
         assert_eq!(restored.get("timeout_ms"), Some(&"5000".to_string()));
     }
@@ -424,31 +384,31 @@ mod tests {
     }
 
     #[test]
-    fn test_from_legacy_parallel() {
-        let ann = ProtocolAnnotation::from_legacy("parallel", "true");
+    fn test_from_key_value_parallel() {
+        let ann = ProtocolAnnotation::from_key_value("parallel", "true");
         assert_eq!(ann, ProtocolAnnotation::Parallel);
 
-        let ann = ProtocolAnnotation::from_legacy("ordered", "true");
+        let ann = ProtocolAnnotation::from_key_value("ordered", "true");
         assert_eq!(ann, ProtocolAnnotation::Ordered);
 
-        let ann = ProtocolAnnotation::from_legacy("parallel", "");
+        let ann = ProtocolAnnotation::from_key_value("parallel", "");
         assert_eq!(ann, ProtocolAnnotation::Parallel);
 
-        let ann = ProtocolAnnotation::from_legacy("ordered", "");
+        let ann = ProtocolAnnotation::from_key_value("ordered", "");
         assert_eq!(ann, ProtocolAnnotation::Ordered);
 
-        let ann = ProtocolAnnotation::from_legacy("min_responses", "3");
+        let ann = ProtocolAnnotation::from_key_value("min_responses", "3");
         assert_eq!(ann, ProtocolAnnotation::MinResponses(3));
     }
 
     #[test]
-    fn test_to_legacy_map_new_annotations() {
+    fn test_to_map_new_annotations() {
         let mut anns = Annotations::new();
         anns.push(ProtocolAnnotation::Parallel);
         anns.push(ProtocolAnnotation::Ordered);
         anns.push(ProtocolAnnotation::MinResponses(5));
 
-        let map = anns.to_legacy_map();
+        let map = anns.to_map();
         assert_eq!(map.get("parallel"), Some(&"true".to_string()));
         assert_eq!(map.get("ordered"), Some(&"true".to_string()));
         assert_eq!(map.get("min_responses"), Some(&"5".to_string()));

@@ -19,6 +19,21 @@ pub struct LintDiagnostic {
     pub suggestion: Option<String>,
 }
 
+fn push_lint(
+    diagnostics: &mut Vec<LintDiagnostic>,
+    level: LintLevel,
+    code: &str,
+    message: &str,
+    suggestion: impl Into<Option<String>>,
+) {
+    diagnostics.push(LintDiagnostic {
+        code: code.to_string(),
+        level,
+        message: message.to_string(),
+        suggestion: suggestion.into(),
+    });
+}
+
 /// Collect DSL lint diagnostics for a parsed choreography.
 pub fn collect_dsl_lints(choreography: &Choreography, level: LintLevel) -> Vec<LintDiagnostic> {
     if level == LintLevel::Off {
@@ -29,23 +44,23 @@ pub fn collect_dsl_lints(choreography: &Choreography, level: LintLevel) -> Vec<L
     let inferred = choreography.inferred_required_proof_bundles();
     let required = choreography.required_proof_bundles();
     if !inferred.is_empty() && inferred == required {
-        diagnostics.push(LintDiagnostic {
-            code: "dsl.inferred_requires".to_string(),
+        push_lint(
+            &mut diagnostics,
             level,
-            message: "Protocol requirements were inferred from VM-core capabilities".to_string(),
-            suggestion: Some(format!(
+            "dsl.inferred_requires",
+            "Protocol requirements were inferred from VM-core capabilities",
+            Some(format!(
                 "Add explicit `requires {}` to the protocol header",
                 inferred.join(", ")
             )),
-        });
+        );
     }
 
     diagnostics
 }
 
-/// Render lint diagnostics into a lightweight LSP-like JSON string.
-pub fn render_lsp_lint_diagnostics(choreography: &Choreography, level: LintLevel) -> String {
-    let diagnostics: Vec<serde_json::Value> = collect_dsl_lints(choreography, level)
+fn diagnostics_to_lsp_json(diagnostics: Vec<LintDiagnostic>) -> String {
+    let diagnostics: Vec<serde_json::Value> = diagnostics
         .into_iter()
         .map(|lint| {
             serde_json::json!({
@@ -67,6 +82,11 @@ pub fn render_lsp_lint_diagnostics(choreography: &Choreography, level: LintLevel
         })
         .collect();
     serde_json::to_string_pretty(&diagnostics).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// Render lint diagnostics into a lightweight LSP-like JSON string.
+pub fn render_lsp_lint_diagnostics(choreography: &Choreography, level: LintLevel) -> String {
+    diagnostics_to_lsp_json(collect_dsl_lints(choreography, level))
 }
 
 #[allow(clippy::too_many_lines)]
@@ -185,15 +205,14 @@ fn render_lowering_summary(choreography: &Choreography, out: &mut String) {
     }
 }
 
-fn render_lowering_lints(choreography: &Choreography, out: &mut String) {
-    let lints = collect_dsl_lints(choreography, LintLevel::Warn);
+fn render_lowering_lints(lints: &[LintDiagnostic], out: &mut String) {
     if lints.is_empty() {
         return;
     }
     writeln!(out, "Lints:").unwrap();
     for lint in lints {
         writeln!(out, "- [{}] {}", lint.code, lint.message).unwrap();
-        if let Some(fix) = lint.suggestion {
+        if let Some(fix) = &lint.suggestion {
             writeln!(out, "  fix: {fix}").unwrap();
         }
     }
@@ -202,10 +221,11 @@ fn render_lowering_lints(choreography: &Choreography, out: &mut String) {
 /// Produce a canonical lowering report for a DSL snippet.
 pub fn explain_lowering(input: &str) -> std::result::Result<String, ParseError> {
     let choreography = parse_choreography_str(input)?;
+    let lints = collect_dsl_lints(&choreography, LintLevel::Warn);
     let mut out = String::new();
     render_lowering_summary(&choreography, &mut out);
     writeln!(out, "Lowering:").unwrap();
     render_lowering_protocol(&choreography.protocol, 1, &mut out);
-    render_lowering_lints(&choreography, &mut out);
+    render_lowering_lints(&lints, &mut out);
     Ok(out)
 }

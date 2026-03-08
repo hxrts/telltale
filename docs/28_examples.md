@@ -28,8 +28,10 @@ Advanced examples live under `examples/advanced_features/` and runnable bundles 
 choreography!(r#"
 protocol RequestResponse =
   roles Client, Server
-  Client -> Server : Request
-  Server -> Client : Response
+  Client
+    -> Server : Request of api.Request
+  Server
+    -> Client : Response of api.Response
 "#);
 ```
 
@@ -41,11 +43,13 @@ Use this pattern when the client waits for a reply before continuing.
 choreography!(r#"
 protocol ChoicePattern =
   roles Client, Server
-  case choose Server of
-    Accept ->
-      Server -> Client : Confirmation
-    Reject ->
-      Server -> Client : Rejection
+  choice at Server
+    | Accept ->
+        Server
+          -> Client : Confirmation
+    | Reject ->
+        Server
+          -> Client : Rejection
 "#);
 ```
 
@@ -58,8 +62,10 @@ choreography!(r#"
 protocol LoopPattern =
   roles Client, Server
   loop repeat 5
-    Client -> Server : Request
-    Server -> Client : Response
+    Client
+      -> Server : Request
+    Server
+      -> Client : Response
 "#);
 ```
 
@@ -71,10 +77,11 @@ Use bounded loops for batch workflows or retries.
 choreography!(r#"
 protocol ParallelPattern =
   roles Coordinator, Worker1, Worker2
-  branch
-    Coordinator -> Worker1 : Task
-  branch
-    Coordinator -> Worker2 : Task
+  par
+    | Coordinator
+        -> Worker1 : Task
+    | Coordinator
+        -> Worker2 : Task
 "#);
 ```
 

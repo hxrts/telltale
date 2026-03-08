@@ -26,12 +26,13 @@ fn test_concrete_array() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test 1: Concrete array size Worker[3]");
 
     let dsl = r"
-    protocol ConcreteArray = {
-        roles Master, Worker[3]
-        
-        Master -> Worker[0] : Task
-        Worker[0] -> Master : Result
-    }
+    protocol ConcreteArray =
+      roles Master, Worker[3]
+
+      Master { shard = 0 }
+        -> Worker[0] : Task of jobs.Task
+      Worker[0]
+        -> Master : Result of jobs.Result
     ";
 
     let choreography = parse_dsl(dsl)?;
@@ -49,16 +50,16 @@ fn test_multiple_workers() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test 2: Multiple indexed workers");
 
     let dsl = r"
-    protocol MultipleWorkers = {
-        roles Coordinator, Worker[5]
-        
-        Coordinator -> Worker[0] : Init
-        Coordinator -> Worker[1] : Init
-        Coordinator -> Worker[2] : Init
-        Worker[0] -> Coordinator : Done
-        Worker[1] -> Coordinator : Done
-        Worker[2] -> Coordinator : Done
-    }
+    protocol MultipleWorkers =
+      roles Coordinator, Worker[5]
+
+      par
+        | Coordinator { shard = 0 }
+            -> Worker[0] : Init of jobs.Init
+        | Coordinator { shard = 1 }
+            -> Worker[1] : Init of jobs.Init
+        | Coordinator { shard = 2 }
+            -> Worker[2] : Init of jobs.Init
     ";
 
     let choreography = parse_dsl(dsl)?;
@@ -77,12 +78,13 @@ fn test_symbolic_params() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test 3: Symbolic parameters Worker[N]");
 
     let dsl = r"
-    protocol SymbolicParam = {
-        roles Leader, Follower[N]
-        
-        Leader -> Follower[i] : Command
-        Follower[i] -> Leader : Ack
-    }
+    protocol SymbolicParam =
+      roles Leader, Follower[N]
+
+      Leader
+        -> Follower[i] : Command of control.Command
+      Follower[i]
+        -> Leader : Ack
     ";
 
     let choreography = parse_dsl(dsl)?;

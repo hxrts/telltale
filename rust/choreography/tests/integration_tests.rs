@@ -121,14 +121,14 @@ fn test_complex_multi_feature_protocol() {
             Workers[0..majority] -> Coordinator: WorkResult
 
             choice at Coordinator {
-                success -> {
+                | success -> {
                     Coordinator -> Workers[*]: SuccessNotification
                     Coordinator -> Database: FinalizeTransaction
                 }
-                retry -> {
+                | retry -> {
                     Coordinator -> Workers[*]: RetryRequest
                 }
-                abort -> {
+                | abort -> {
                     Coordinator -> Database: AbortTransaction
                     Coordinator -> Workers[*]: AbortNotification
                 }
@@ -257,21 +257,21 @@ fn test_nested_choices() {
             Client -> Server: StartSession
 
             choice at Server {
-                authenticate -> {
+                | authenticate -> {
                     Server -> Database: AuthQuery
 
                     choice at Database {
-                        success -> {
+                        | success -> {
                             Database -> Server: AuthSuccess
                             Server -> Client: AuthToken
                         }
-                        failure -> {
+                        | failure -> {
                             Database -> Server: AuthFailure
                             Server -> Client: AuthDenied
                         }
                     }
                 }
-                reject -> {
+                | reject -> {
                     Server -> Client: Rejected
                 }
             }
@@ -346,10 +346,10 @@ fn test_performance_characteristics() {
             Workers[0..batch_size] -> Controller: WorkComplete
 
             choice at Controller {
-                continue -> {
+                | continue -> {
                     Controller -> Workers[*]: ContinueWork
                 }
-                stop -> {
+                | stop -> {
                     Controller -> Workers[*]: StopWork
                 }
             }

@@ -306,10 +306,10 @@ fn test_module_dynamic_roles_integration() {
             Database -> Workers[i]: Response
 
             choice at Coordinator {
-                success -> {
+                | success -> {
                     Coordinator -> Workers[*]: Success
                 }
-                retry -> {
+                | retry -> {
                     Coordinator -> Workers[active_set]: Retry
                 }
             }

@@ -139,15 +139,6 @@ fn validate_linear_block(
                     )?;
                 }
             }
-            Statement::Branch { body, .. } => {
-                let out = validate_linear_block(body, &live_assets, input)?;
-                validate_preserved_linear_assets(
-                    input,
-                    &live_assets,
-                    &out,
-                    "branch blocks must preserve linear assets",
-                )?;
-            }
             Statement::Heartbeat {
                 on_missing_body,
                 body,
@@ -187,9 +178,7 @@ fn collect_vm_required_capabilities(statements: &[Statement], out: &mut HashSet<
                     collect_vm_required_capabilities(&branch.statements, out);
                 }
             }
-            Statement::Loop { body, .. }
-            | Statement::Rec { body, .. }
-            | Statement::Branch { body, .. } => {
+            Statement::Loop { body, .. } | Statement::Rec { body, .. } => {
                 collect_vm_required_capabilities(body, out);
             }
             Statement::Parallel { branches } => {

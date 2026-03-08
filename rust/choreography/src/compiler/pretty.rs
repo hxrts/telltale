@@ -2,7 +2,7 @@
 //!
 //! Emits layout-sensitive syntax for the choreography language.
 
-use crate::ast::{Branch, Choreography, Condition, MessageType, Protocol, Role, RoleParam};
+use crate::ast::{Annotations, Branch, Choreography, Condition, MessageType, Protocol, Role, RoleParam};
 use crate::compiler::parser::parse_choreography_str;
 
 #[derive(Debug, Clone)]
@@ -54,15 +54,38 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
             from,
             to,
             message,
+            annotations,
+            from_annotations,
             continuation,
             ..
-        } => format_send_protocol(from, to, message, continuation, indent, config, out),
+        } => format_send_protocol(
+            from,
+            annotations,
+            from_annotations,
+            to,
+            message,
+            continuation,
+            indent,
+            config,
+            out,
+        ),
         Protocol::Broadcast {
             from,
             message,
+            annotations,
+            from_annotations,
             continuation,
             ..
-        } => format_broadcast_protocol(from, message, continuation, indent, config, out),
+        } => format_broadcast_protocol(
+            from,
+            annotations,
+            from_annotations,
+            message,
+            continuation,
+            indent,
+            config,
+            out,
+        ),
         Protocol::Choice { role, branches, .. } => {
             format_choice_protocol(role, branches, indent, config, out)
         }
@@ -86,6 +109,8 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
 
 fn format_send_protocol(
     from: &Role,
+    annotations: &Annotations,
+    from_annotations: &Annotations,
     to: &Role,
     message: &MessageType,
     continuation: &Protocol,
@@ -93,30 +118,33 @@ fn format_send_protocol(
     config: &PrettyConfig,
     out: &mut String,
 ) {
-    let line = format!(
-        "{} -> {} : {}",
-        format_role_ref(from),
-        format_role_ref(to),
-        format_message(message)
+    let sender_annotations = merge_sender_annotations(from_annotations, annotations);
+    write_line(out, indent, &format_sender_term(from, &sender_annotations));
+    write_line(
+        out,
+        indent + config.indent,
+        &format!("-> {} : {}", format_role_ref(to), format_message(message)),
     );
-    write_line(out, indent, &line);
     format_protocol(continuation, indent, config, out);
 }
 
 fn format_broadcast_protocol(
     from: &Role,
+    annotations: &Annotations,
+    from_annotations: &Annotations,
     message: &MessageType,
     continuation: &Protocol,
     indent: usize,
     config: &PrettyConfig,
     out: &mut String,
 ) {
-    let line = format!(
-        "{} ->* : {}",
-        format_role_ref(from),
-        format_message(message)
+    let sender_annotations = merge_sender_annotations(from_annotations, annotations);
+    write_line(out, indent, &format_sender_term(from, &sender_annotations));
+    write_line(
+        out,
+        indent + config.indent,
+        &format!("->* : {}", format_message(message)),
     );
-    write_line(out, indent, &line);
     format_protocol(continuation, indent, config, out);
 }
 
@@ -130,7 +158,7 @@ fn format_choice_protocol(
     write_line(
         out,
         indent,
-        &format!("case choose {} of", format_role_ref(role)),
+        &format!("choice at {}", format_role_ref(role)),
     );
     for branch in branches {
         format_branch(branch, indent + config.indent, config, out);
@@ -159,12 +187,13 @@ fn format_parallel_protocol(
     config: &PrettyConfig,
     out: &mut String,
 ) {
+    write_line(out, indent, "par");
     for branch in protocols {
         if is_end(branch) {
-            write_line(out, indent, "branch {}");
+            write_line(out, indent + config.indent, "| {}");
         } else {
-            write_line(out, indent, "branch");
-            format_protocol(branch, indent + config.indent, config, out);
+            write_line(out, indent + config.indent, "|");
+            format_protocol(branch, indent + (2 * config.indent), config, out);
         }
     }
 }
@@ -196,7 +225,7 @@ fn format_extension_protocol(
 }
 
 fn format_branch(branch: &Branch, indent: usize, config: &PrettyConfig, out: &mut String) {
-    let mut header = branch.label.to_string();
+    let mut header = format!("| {}", branch.label);
     if let Some(guard) = &branch.guard {
         let guard_str = guard.to_string();
         header.push_str(&format!(" when ({})", guard_str));
@@ -254,18 +283,52 @@ fn format_role_ref(role: &Role) -> String {
     out
 }
 
+fn format_sender_term(role: &Role, annotations: &Annotations) -> String {
+    let mut out = format_role_ref(role);
+    let mut entries: Vec<_> = annotations.to_map().into_iter().collect();
+    entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+    if !entries.is_empty() {
+        let formatted = entries
+            .into_iter()
+            .map(|(key, value)| format!("{key} = {value}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(" { ");
+        out.push_str(&formatted);
+        out.push_str(" }");
+    }
+    out
+}
+
+fn merge_sender_annotations(
+    sender_annotations: &Annotations,
+    statement_annotations: &Annotations,
+) -> Annotations {
+    let mut merged = sender_annotations.to_map();
+    for (key, value) in statement_annotations.to_map() {
+        merged.entry(key).or_insert(value);
+    }
+    Annotations::from_map(&merged)
+}
+
+fn normalize_surface_type_string(s: &str) -> String {
+    s.replace(" :: ", ".").replace("::", ".")
+}
+
 fn format_message(message: &MessageType) -> String {
     let mut out = message.name.to_string();
-    if let Some(type_annotation) = &message.type_annotation {
-        let type_str = type_annotation.to_string();
-        out.push('<');
-        out.push_str(&type_str);
-        out.push('>');
-    }
     if let Some(payload) = &message.payload {
         let payload_str = payload.to_string();
-        out.push(' ');
-        out.push_str(&payload_str);
+        if payload_str.starts_with('(') {
+            out.push(' ');
+            out.push_str(&payload_str);
+        } else {
+            out.push_str(" of ");
+            out.push_str(&normalize_surface_type_string(&payload_str));
+        }
+    } else if let Some(type_annotation) = &message.type_annotation {
+        out.push_str(" of ");
+        out.push_str(&normalize_surface_type_string(&type_annotation.to_string()));
     }
     out
 }
@@ -289,6 +352,7 @@ mod tests {
         let input = "protocol PingPong =\n  roles Alice, Bob\n  Alice -> Bob : Ping\n  Bob -> Alice : Pong\n";
         let choreo = parse_choreography_str(input).expect("should parse");
         let formatted = format_choreography(&choreo);
+        assert!(formatted.contains("Alice\n    -> Bob : Ping"));
         assert!(parse_choreography_str(&formatted).is_ok());
     }
 
@@ -297,17 +361,49 @@ mod tests {
         let input = r#"
 protocol Demo =
   roles Client, Server
-  case choose Client of
-    Buy ->
+  choice at Client
+    | Buy ->
       Client -> Server : Purchase
-    Cancel -> {}
+    | Cancel -> {}
   loop repeat 2
     Client -> Server : Ping
     Server -> Client : Pong
 "#;
         let choreo = parse_choreography_str(input).expect("should parse");
         let formatted = format_choreography(&choreo);
-        assert!(formatted.contains("case choose Client of"));
+        assert!(formatted.contains("choice at Client"));
+        assert!(formatted.contains("| Buy ->"));
         assert!(parse_choreography_str(&formatted).is_ok());
+    }
+
+    #[test]
+    fn pretty_emits_aligned_arrows_and_sender_records() {
+        let input = r#"
+protocol Styled =
+  roles A, B, C, D
+  A { priority = high } -> B : Request of shop.Order
+  par
+    | C -> D : Left
+    | D -> C : Right
+"#;
+
+        let choreo = parse_choreography_str(input).expect("should parse");
+        let formatted = format_choreography(&choreo);
+        assert!(formatted.contains("A { priority = high }\n    -> B : Request of shop.Order"));
+        assert!(formatted.contains("par\n    |\n      C\n        -> D : Left"));
+        assert!(parse_choreography_str(&formatted).is_ok());
+    }
+
+    #[test]
+    fn pretty_is_stable_on_reformat() {
+        let input = r#"
+protocol Stable =
+  roles A, B
+  A { priority = high } -> B : Request of shop.Order
+"#;
+
+        let first = format_choreography_str(input).expect("first format should succeed");
+        let second = format_choreography_str(&first).expect("second format should succeed");
+        assert_eq!(first, second);
     }
 }

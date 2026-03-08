@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::error::{ErrorSpan, ParseError};
 use super::role::parse_role_ref;
-use super::statement::{parse_block, parse_duration};
+use super::statement::{parse_block, parse_duration, parse_statement};
 use super::types::{ChoiceBranch, PredicateExpr, Statement};
 use super::Rule;
 
@@ -29,6 +29,115 @@ fn syntax_error(span: pest::Span<'_>, input: &str, message: impl Into<String>) -
         span: ErrorSpan::from_pest_span(span, input),
         message: message.into(),
     }
+}
+
+fn parse_role_annotation_value(pair: pest::iterators::Pair<Rule>) -> String {
+    let value_pair = if pair.as_rule() == Rule::role_annotation_value {
+        pair.into_inner().next()
+    } else {
+        Some(pair)
+    };
+
+    match value_pair.map(|p| (p.as_rule(), p.as_str().to_string())) {
+        Some((Rule::string, raw)) => raw
+            .strip_prefix('"')
+            .and_then(|s| s.strip_suffix('"'))
+            .unwrap_or(&raw)
+            .to_string(),
+        Some((Rule::duration, raw)) => raw.trim().to_string(),
+        Some((_, raw)) => raw.trim().to_string(),
+        None => String::new(),
+    }
+}
+
+fn parse_role_annotation_block(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<HashMap<String, String>, ParseError> {
+    let mut annotations = HashMap::new();
+
+    for item in pair.into_inner() {
+        if item.as_rule() != Rule::role_annotation_entries {
+            continue;
+        }
+
+        for entry in item.into_inner() {
+            if entry.as_rule() != Rule::role_annotation_entry {
+                continue;
+            }
+
+            let entry_span = entry.as_span();
+            let mut parts = entry.into_inner();
+            let key = next_required(
+                &mut parts,
+                entry_span,
+                input,
+                "role annotation entry is missing a key",
+            )?
+            .as_str()
+            .to_string();
+            let value_pair = next_required(
+                &mut parts,
+                entry_span,
+                input,
+                "role annotation entry is missing a value",
+            )?;
+            let value = parse_role_annotation_value(value_pair);
+            annotations.insert(key, value);
+        }
+    }
+
+    Ok(annotations)
+}
+
+fn is_statement_annotation_key(key: &str) -> bool {
+    matches!(
+        key,
+        "runtime_timeout"
+            | "parallel"
+            | "ordered"
+            | "min_responses"
+            | "retry"
+            | "idempotent"
+            | "trace"
+    )
+}
+
+fn extract_statement_annotations(
+    annotations: &HashMap<String, String>,
+) -> HashMap<String, String> {
+    annotations
+        .iter()
+        .filter(|(key, _)| is_statement_annotation_key(key))
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect()
+}
+
+fn parse_annotated_sender_ref(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+) -> std::result::Result<(Role, HashMap<String, String>), ParseError> {
+    let span = pair.as_span();
+    let mut role: Option<Role> = None;
+    let mut annotations = HashMap::new();
+
+    for item in pair.into_inner() {
+        match item.as_rule() {
+            Rule::role_ref => {
+                role = Some(parse_role_ref(item, declared_roles, input)?);
+            }
+            Rule::role_metadata_record => {
+                annotations = parse_role_annotation_block(item, input)?;
+            }
+            _ => {}
+        }
+    }
+
+    let role =
+        role.ok_or_else(|| syntax_error(span, input, "send is missing sender role".to_string()))?;
+
+    Ok((role, annotations))
 }
 
 fn next_required<'i>(
@@ -76,20 +185,34 @@ pub(super) fn parse_send_stmt(
     let mut inner = pair.into_inner();
 
     let from_pair = next_required(&mut inner, span, input, "send is missing sender role")?;
-    let from = parse_role_ref(from_pair, declared_roles, input)?;
+    let (from, from_annotations) = match from_pair.as_rule() {
+        Rule::annotated_sender_ref => parse_annotated_sender_ref(from_pair, declared_roles, input)?,
+        Rule::role_ref => (
+            parse_role_ref(from_pair, declared_roles, input)?,
+            HashMap::new(),
+        ),
+        _ => {
+            return Err(syntax_error(
+                span,
+                input,
+                "send is missing sender role".to_string(),
+            ))
+        }
+    };
 
     let to_pair = next_required(&mut inner, span, input, "send is missing receiver role")?;
     let to = parse_role_ref(to_pair, declared_roles, input)?;
 
     let message_pair = next_required(&mut inner, span, input, "send is missing message payload")?;
     let message = super::statement::parse_message(message_pair, input)?;
+    let annotations = extract_statement_annotations(&from_annotations);
 
     Ok(Statement::Send {
         from,
         to,
         message,
-        annotations: HashMap::new(),
-        from_annotations: HashMap::new(),
+        annotations,
+        from_annotations,
         to_annotations: HashMap::new(),
     })
 }
@@ -104,16 +227,30 @@ pub(super) fn parse_broadcast_stmt(
     let mut inner = pair.into_inner();
 
     let from_pair = next_required(&mut inner, span, input, "broadcast is missing sender role")?;
-    let from = parse_role_ref(from_pair, declared_roles, input)?;
+    let (from, from_annotations) = match from_pair.as_rule() {
+        Rule::annotated_sender_ref => parse_annotated_sender_ref(from_pair, declared_roles, input)?,
+        Rule::role_ref => (
+            parse_role_ref(from_pair, declared_roles, input)?,
+            HashMap::new(),
+        ),
+        _ => {
+            return Err(syntax_error(
+                span,
+                input,
+                "broadcast is missing sender role".to_string(),
+            ))
+        }
+    };
 
     let message_pair = next_required(&mut inner, span, input, "broadcast is missing message")?;
     let message = super::statement::parse_message(message_pair, input)?;
+    let annotations = extract_statement_annotations(&from_annotations);
 
     Ok(Statement::Broadcast {
         from,
         message,
-        annotations: HashMap::new(),
-        from_annotations: HashMap::new(),
+        annotations,
+        from_annotations,
     })
 }
 
@@ -223,6 +360,59 @@ pub(super) fn parse_choice_stmt(
         branches,
         annotations: HashMap::new(),
     })
+}
+
+/// Parse `par` statement with bar-prefixed branches.
+pub(super) fn parse_par_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+    protocol_defs: &HashMap<String, Vec<Statement>>,
+) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
+    let mut branches = Vec::new();
+
+    for item in pair.into_inner() {
+        if item.as_rule() != Rule::par_block {
+            continue;
+        }
+
+        for branch_item in item.into_inner() {
+            if branch_item.as_rule() != Rule::par_branch {
+                continue;
+            }
+
+            let mut branch_statements = Vec::new();
+            for branch_part in branch_item.into_inner() {
+                match branch_part.as_rule() {
+                    Rule::block => {
+                        branch_statements =
+                            parse_block(branch_part, declared_roles, input, protocol_defs)?;
+                    }
+                    _ => {
+                        branch_statements.push(parse_statement(
+                            branch_part,
+                            declared_roles,
+                            input,
+                            protocol_defs,
+                        )?);
+                    }
+                }
+            }
+
+            branches.push(branch_statements);
+        }
+    }
+
+    if branches.len() < 2 {
+        return Err(syntax_error(
+            span,
+            input,
+            "`par` requires at least two `|` branches".to_string(),
+        ));
+    }
+
+    Ok(Statement::Parallel { branches })
 }
 
 /// Parse timed choice statement
@@ -568,23 +758,6 @@ pub(super) fn parse_loop_stmt(
     }
 
     Ok(Statement::Loop { condition, body })
-}
-
-/// Parse branch statement
-pub(super) fn parse_branch_stmt(
-    pair: pest::iterators::Pair<Rule>,
-    declared_roles: &HashSet<String>,
-    input: &str,
-    protocol_defs: &HashMap<String, Vec<Statement>>,
-) -> std::result::Result<Statement, ParseError> {
-    let span = ErrorSpan::from_pest_span(pair.as_span(), input);
-    let mut body = Vec::new();
-    for item in pair.into_inner() {
-        if item.as_rule() == Rule::block {
-            body = parse_block(item, declared_roles, input, protocol_defs)?;
-        }
-    }
-    Ok(Statement::Branch { body, span })
 }
 
 #[cfg(test)]

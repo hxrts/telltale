@@ -6,6 +6,13 @@ The parser translates a layout-sensitive DSL into the internal AST (`Choreograph
 
 Empty blocks must use `{}`. The DSL does not use an explicit `end` keyword. A protocol ends when its block ends.
 
+The preferred surface style mixes MPST operators with a small functional-language layout:
+
+- keep `->`, `->*`, `|`, `rec`, and `continue` for protocol structure
+- use indentation to make control flow visually obvious
+- use sender records like `Role { priority = high }`
+- use `Message of module.Type` with dotted paths instead of Rust-style `::`
+
 The parser module is located in `rust/choreography/src/compiler/parser/`. It provides an implementation of the choreography DSL parser using Pest plus a layout preprocessor.
 
 ## DSL Syntax
@@ -55,16 +62,19 @@ The parser recognizes `import` declarations for completeness. Import resolution 
 
 #### 1) Send Statement
 
-```rust
-Role1 -> Role2 : MessageName
-Role1 -> Role2 : MessageWithPayload { data : String, count : Int }
+```choreo
+Buyer { priority = high }
+  -> Seller : Request of shop.Order
+
+Seller
+  -> Buyer : Quote of shop.Price
 ```
 
-The send statement transfers a message from one role to another.
+The send statement transfers a message from one role to another. Sender metadata is written as a record attached to the sender term. Typed message attachment is written as `Message of module.Type`.
 
 #### 2) Broadcast Statement
 
-```rust
+```choreo
 Leader ->* : Announcement
 ```
 
@@ -72,32 +82,21 @@ Broadcast sends a message to all other roles.
 
 #### 3) Choice Statement (explicit decider)
 
-```rust
-case choose Client of
-  Buy when (balance > price) ->
-    Client -> Server : Purchase
-  Cancel ->
-    Client -> Server : Cancel
-```
-
-The deciding role (`Client`) selects a branch. Guards are optional.
-Guard expressions are parsed through a typed predicate IR and must be boolean-like. Valid examples include `ready`, `balance > price`, and `is_open()`.
-
-Alias syntax (sugar):
-
-```rust
+```choreo
 choice at Client
-  Buy ->
-    Client -> Server : Purchase
-  Cancel ->
-    Client -> Server : Cancel
+  | Buy when (balance > price) ->
+      Client
+        -> Server : Purchase of shop.Order
+  | Cancel ->
+      Client
+        -> Server : Cancel
 ```
 
-This is equivalent to the `case choose` form. It is a lighter syntax for the same choice structure.
+The deciding role (`Client`) selects a branch. Guards are optional. Guard expressions are parsed through a typed predicate IR and must be boolean-like. Valid examples include `ready`, `balance > price`, and `is_open()`.
 
 #### 4) Loop Statement
 
-```rust
+```choreo
 loop decide by Client
   Client -> Server : Request
   Server -> Client : Response
@@ -110,7 +109,7 @@ A synthetic `Done` message is added as the termination signal.
 
 The example above desugars to:
 
-```rust
+```choreo
 rec RoleDecidesLoop
   choice at Client
     Request ->
@@ -129,7 +128,7 @@ This desugaring converts the `RoleDecides` loop into standard multiparty session
 constructs (choice + recursion), enabling formal verification in Lean and compatibility
 with standard MPST projection algorithms.
 
-```rust
+```choreo
 loop repeat 5
   A -> B : Ping
   B -> A : Pong
@@ -137,37 +136,37 @@ loop repeat 5
 
 This loop repeats a fixed number of times. The compiler records the iteration count in the AST.
 
-```rust
+```choreo
 loop while "has_more_data"
   A -> B : Data
 ```
 
 This loop parses the string content through the same typed predicate IR used by guards. The parser rejects non-boolean predicates such as `"count + 1"` before building the AST.
 
-```rust
+```choreo
 loop forever
   A -> B : Tick
 ```
 
 This loop has no exit condition. Use it for persistent background protocols.
 
-#### 5) Parallel Statement (branch adjacency)
+#### 5) Parallel Statement
 
-Parallel composition is expressed by adjacent `branch` blocks at the same indentation level.
-
-```rust
-branch
-  A -> B : Msg1
-  B -> A : Ack
-branch
-  C -> D : Msg2
+```choreo
+par
+  | A
+      -> B : Msg1
+    B
+      -> A : Ack
+  | C
+      -> D : Msg2
 ```
 
-A solitary `branch` is a parse error. Use `{}` for an empty branch if needed.
+Parallel composition is expressed by `par` with leading `|` branches. A solitary branch is a parse error.
 
 #### 6) Recursion and Calls
 
-```rust
+```choreo
 rec Loop
   A -> B : Tick
   continue Loop
@@ -175,7 +174,7 @@ rec Loop
 
 This defines a recursive label `Loop` and uses `continue Loop` to jump back, modeling unbounded recursion.
 
-```rust
+```choreo
 call Handshake
 ```
 
@@ -187,7 +186,7 @@ The `continue` keyword is for recursive back-references within a `rec` block. Th
 
 Define and reuse local protocol fragments inside a `where` block.
 
-```rust
+```choreo
 protocol Main =
   roles A, B, C
   call Handshake
@@ -209,25 +208,25 @@ Local protocols can call each other and can be used within choices, loops, and b
 
 #### 8) Message Types and Payloads
 
-Message types support generic parameters. Payloads may be written with `{}` or `()`.
+The preferred typed message form is `Message of module.Type`. Dotted paths are preferred in DSL surface syntax.
 
-```rust
-A -> B : Request<String>
-B -> A : Response<i32>
+```choreo
+A
+  -> B : Request of api.Request
+B
+  -> A : Response of api.Response
 
-A -> B : Data<String, i32, bool>
-
-A -> B : Msg { data : String, count : Int }
-B -> A : Result(i : Int, ok : Bool)
+A
+  -> B : Msg { data : String, count : Int }
+B
+  -> A : Result(i : Int, ok : Bool)
 ```
-
-This section shows generic parameters and payload shapes. Both `{}` and `()` forms are accepted.
 
 #### 9) Dynamic Role Count Support
 
 Dynamic role counts are supported via wildcard and symbolic parameters.
 
-```rust
+```choreo
 protocol ThresholdProtocol =
   roles Coordinator, Signers[*]
   Coordinator -> Signers[*] : Request
@@ -236,7 +235,7 @@ protocol ThresholdProtocol =
 
 This example uses a wildcard role family. It also uses a symbolic bound in the role index.
 
-```rust
+```choreo
 protocol ConsensusProtocol =
   roles Leader, Followers[N]
   Leader -> Followers[*] : Proposal
@@ -245,7 +244,7 @@ protocol ConsensusProtocol =
 
 This example mixes a named count with index variables. It enables parameterized protocols.
 
-```rust
+```choreo
 protocol PartialBroadcast =
   roles Broadcaster, Receivers[*]
   Broadcaster -> Receivers[0..count] : Message
@@ -262,7 +261,7 @@ Timing patterns provide constructs for building time-aware protocols. All patter
 
 A timed choice races an operation against a timeout deadline:
 
-```rust
+```choreo
 protocol TimedRequest =
   roles Client, Server
   Client -> Server : Request
@@ -281,7 +280,7 @@ Durations support: `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours
 
 The heartbeat pattern models connection liveness detection:
 
-```rust
+```choreo
 protocol Liveness =
   roles Alice, Bob
   heartbeat Alice -> Bob every 1s on_missing(3) {
@@ -294,7 +293,7 @@ protocol Liveness =
 
 This desugars to a recursive choice:
 
-```rust
+```choreo
 rec HeartbeatLoop
   Alice -> Bob : Heartbeat
   choice at Bob
@@ -310,24 +309,25 @@ rec HeartbeatLoop
 
 The `on_missing(3)` parameter indicates how many missed heartbeats before declaring the sender dead. The runtime uses this for timeout calculations.
 
-##### Runtime Timeout Annotation
+##### Runtime Timeout Metadata
 
-The `@runtime_timeout` annotation provides transport-level timeout hints:
+Record metadata can carry transport-level timeout hints:
 
-```rust
+```choreo
 protocol TimedOps =
   roles Client, Server
-  @runtime_timeout(5s) Client -> Server : Request
+  Client { runtime_timeout = 5s }
+    -> Server : Request
   Server -> Client : Response
 ```
 
-Unlike `timed_choice`, this annotation does not change the session type. It is a hint to the transport layer and is not verified in Lean. Use it for operational timeouts when you do not want the protocol to branch on timeout.
+Unlike `timed_choice`, this metadata does not change the session type. It is a hint to the transport layer and is not verified in Lean. Use it for operational timeouts when you do not want the protocol to branch on timeout.
 
 #### 11) Proof Bundles and VM-Core Statements
 
 `proof_bundle` declarations define capability sets. `protocol ... requires ...` selects the bundles required by a protocol.
 
-```rust
+```choreo
 proof_bundle DelegationBase version "1.0.0" issuer "did:example:issuer" constraint "fresh_nonce" requires [delegation, guard_tokens]
 proof_bundle KnowledgeBase requires [knowledge_flow]
 
@@ -348,7 +348,7 @@ Validation fails on duplicate bundles, missing required bundles, or missing capa
 
 VM-core statements lower to `Protocol::Extension` nodes with annotations. The annotation keys are `vm_core_op`, `required_capability`, and `vm_core_operands`.
 
-```rust
+```choreo
 protocol SpeculativeFlow requires SpecBundle =
   roles A, B
   fork ghost0
@@ -362,7 +362,7 @@ This lowering preserves statement order and continuation structure. Projection s
 
 The DSL includes first-class combinators for common patterns.
 
-```rust
+```choreo
 protocol Combinators =
   roles A, B
   handshake A <-> B : Hello
@@ -378,7 +378,7 @@ protocol Combinators =
 
 Role sets and topologies are declared at the top level and stored as typed metadata.
 
-```rust
+```choreo
 role_set Signers = Alice, Bob, Carol
 role_set Quorum = subset(Signers, 0..2)
 cluster LocalCluster = Signers, Quorum
@@ -443,7 +443,7 @@ The parser builds the AST for projection, validation, and code generation.
 
 1. Preprocess layout (indentation -> `{}`/`()`).
 2. Parse with Pest grammar.
-3. Build statements and normalize branch adjacency to `Parallel`.
+3. Build statements and normalize `par` branches into `Parallel`.
 4. Resolve `call` references and lower VM-core statements to `Protocol::Extension`.
 5. Build `Choreography` and attach typed proof-bundle metadata.
 6. Run semantic checks with `choreography.validate()` when required by your integration.
@@ -509,7 +509,7 @@ This pattern matches common parse errors. It formats diagnostics with the report
 - Integers: `[0-9]+`
 - Strings: `"..."` (used in `loop while`)
 - Keywords: `protocol`, `roles`, `case`, `choose`, `of`, `choice`, `at`, `loop`,
-  `decide`, `by`, `repeat`, `while`, `forever`, `branch`, `rec`, `call`, `where`,
+  `decide`, `by`, `repeat`, `while`, `forever`, `branch`, `par`, `rec`, `call`, `where`,
   `module`, `import`, `exposing`, `proof_bundle`, `requires`, `acquire`, `release`,
   `fork`, `join`, `abort`, `transfer`, `delegate`, `tag`, `check`, `using`, `into`,
   `version`, `issuer`, `constraint`, `handshake`, `retry`, `quorum_collect`, `min`,
@@ -535,7 +535,7 @@ Indentation defines blocks. Use `{}` to force an empty block or to opt out of la
 
 ## Validation
 
-The parser validates role declarations and `branch` adjacency. `choreography.validate()` also validates proof-bundle declarations, required bundle references, and VM-core capability coverage.
+The parser validates role declarations and parallel branch structure. `choreography.validate()` also validates proof-bundle declarations, required bundle references, and VM-core capability coverage.
 
 ## Error Messages
 
@@ -567,71 +567,87 @@ This error indicates that a role name appears more than once. The location point
 
 ### Simple Two-Party Protocol
 
-```rust
+```choreo
 protocol PingPong =
   roles Alice, Bob
-  Alice -> Bob : Ping
-  Bob -> Alice : Pong
+  Alice
+    -> Bob : Ping
+  Bob
+    -> Alice : Pong
 ```
 
 This example shows a simple two role protocol. It uses a single send and reply.
 
 ### Protocol with Choice
 
-```rust
+```choreo
 protocol Negotiation =
   roles Buyer, Seller
 
-  Buyer -> Seller : Offer
+  Buyer
+    -> Seller : Offer
 
-  case choose Seller of
-    Accept ->
-      Seller -> Buyer : Accept
-    Reject ->
-      Seller -> Buyer : Reject
+  choice at Seller
+    | Accept ->
+        Seller
+          -> Buyer : Accept
+    | Reject ->
+        Seller
+          -> Buyer : Reject
 ```
 
 This example shows an explicit choice decided by `Seller`. Each branch starts with a send from the deciding role.
 
 ### Complex E-Commerce Protocol
 
-```rust
+```choreo
 protocol ECommerce =
   roles Buyer, Seller, Shipper
 
-  Buyer -> Seller : Inquiry
-  Seller -> Buyer : Quote
+  Buyer
+    -> Seller : Inquiry of commerce.Inquiry
+  Seller
+    -> Buyer : Quote of commerce.Quote
 
-  case choose Buyer of
-    Order ->
-      Buyer -> Seller : Order
-      Seller -> Shipper : ShipRequest
-      Shipper -> Buyer : Tracking
+  choice at Buyer
+    | Order ->
+        Buyer
+          -> Seller : Order of commerce.Order
+        Seller
+          -> Shipper : ShipRequest of logistics.ShipRequest
+        Shipper
+          -> Buyer : Tracking of logistics.Tracking
 
-      loop decide by Buyer
-        Buyer -> Shipper : StatusCheck
-        Shipper -> Buyer : StatusUpdate
+        loop decide by Buyer
+          Buyer
+            -> Shipper : StatusCheck
+          Shipper
+            -> Buyer : StatusUpdate
 
-      Shipper -> Buyer : Delivered
-      Buyer -> Seller : Confirmation
-    Cancel ->
-      Buyer -> Seller : Cancel
+        Shipper
+          -> Buyer : Delivered
+        Buyer
+          -> Seller : Confirmation
+    | Cancel ->
+        Buyer
+          -> Seller : Cancel
 ```
 
 This example combines choice and looping. It models a longer interaction with a buyer controlled loop.
 
 ### Parallel Example
 
-```rust
+```choreo
 protocol ParallelDemo =
   roles A, B, C, D
-  branch
-    A -> B : Msg1
-  branch
-    C -> D : Msg2
+  par
+    | A
+        -> B : Msg1
+    | C
+        -> D : Msg2
 ```
 
-This example uses adjacent `branch` blocks. Each branch defines a parallel sub protocol.
+This example uses `par` with leading `|` branches. Each branch defines a parallel sub protocol.
 
 ## Integration
 

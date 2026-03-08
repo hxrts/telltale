@@ -137,7 +137,7 @@ pub enum Protocol {
 
 The parser module is located in `rust/choreography/src/compiler/parser/`. It converts DSL text into AST using the Pest parser generator.
 
-The parser validates role declarations and builds the protocol tree from the input text. It runs a layout preprocessor before the grammar parse. This enables layout sensitive syntax with explicit braces for empty blocks.
+The parser validates role declarations and builds the protocol tree from the input text. It runs a layout preprocessor before the grammar parse. This enables layout-sensitive syntax with explicit braces for empty blocks, aligned arrows, sender records, `choice at` branches with leading `|`, and `par` blocks.
 
 Two entry points are available.
 
@@ -258,8 +258,10 @@ This section demonstrates the transformation of a choreography through each laye
 
 Input choreography:
 ```rust
-Alice -> Bob: Request
-Bob -> Alice: Response
+Alice
+  -> Bob : Request of api.Request
+Bob
+  -> Alice : Response of api.Response
 ```
 
 The choreography specifies a request-response pattern.
