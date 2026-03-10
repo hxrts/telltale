@@ -6,7 +6,7 @@ This repo contains three related projects. A Rust library for writing composable
 
 ## For Reviewers
 
-Run `just artifact-check`. Then inspect `paper/artifact_manifest.json` and [Artifact Reproduction Guide](ARTIFACT.md).
+Run `just artifact-check`. Then inspect `papers/artifact_manifest.json` and [Artifact Reproduction Guide](ARTIFACT.md).
 
 ## Project Surfaces
 
@@ -28,7 +28,7 @@ The Lean project is an active mechanized proof stack. It covers session foundati
 
 ### 3. Paper + Artifact Supplement
 
-The paper project contains the three manuscripts and submission-focused reproducibility tooling. The sources are `paper/paper1.tex`, `paper/paper2.tex`, and `paper/paper3.tex`. The reproducibility guide is [Artifact Reproduction Guide](ARTIFACT.md). Citation metadata is in `paper/CITATION.cff`.
+The paper project contains the three manuscripts and submission-focused reproducibility tooling. The sources are `papers/paper1.tex`, `papers/paper2.tex`, and `papers/paper3.tex`. The reproducibility guide is [Artifact Reproduction Guide](ARTIFACT.md). Citation metadata is in `papers/CITATION.cff`.
 
 ## Quick Start
 
@@ -51,7 +51,7 @@ This command set validates the Rust library, proof-facing protocol checks, and p
 |---|---|
 | `rust/` | Rust library and runtime system |
 | `lean/` | Lean proof development and verification stack |
-| `paper/` | Paper sources, supplement metadata, citation |
+| `papers/` | Paper sources, supplement metadata, citation |
 | `scripts/` | Verification/repro automation scripts |
 | `docs/` | Extended technical documentation |
 

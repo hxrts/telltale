@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-METADATA_FILE="${ROOT_DIR}/paper/artifact_metadata.env"
+METADATA_FILE="${ROOT_DIR}/papers/artifact_metadata.env"
 
 ARTIFACT_DOI="DOI-UNSET"
 if [[ -f "${METADATA_FILE}" ]]; then

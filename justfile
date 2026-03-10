@@ -185,15 +185,15 @@ check-lean-metrics:
 
 # Sync reproducibility rows in all three papers (pinned commit, DOI, Lean stats).
 paper-repro-sync:
-    bash scripts/ops/paper-repro-rows.sh --sync paper/paper1.tex paper/paper2.tex paper/paper3.tex
+    bash scripts/ops/paper-repro-rows.sh --sync papers/paper1.tex papers/paper2.tex papers/paper3.tex
 
 # Check reproducibility rows are up to date (current commit, DOI metadata, Lean stats).
 paper-repro-check:
-    bash scripts/ops/paper-repro-rows.sh --check paper/paper1.tex paper/paper2.tex paper/paper3.tex
+    bash scripts/ops/paper-repro-rows.sh --check papers/paper1.tex papers/paper2.tex papers/paper3.tex
 
-# Strict reproducibility check, including DOI being set in paper/artifact_metadata.env.
+# Strict reproducibility check, including DOI being set in papers/artifact_metadata.env.
 paper-repro-check-strict:
-    bash scripts/ops/paper-repro-rows.sh --check --strict-doi paper/paper1.tex paper/paper2.tex paper/paper3.tex
+    bash scripts/ops/paper-repro-rows.sh --check --strict-doi papers/paper1.tex papers/paper2.tex papers/paper3.tex
 
 # Generate machine-readable publication supplement manifest.
 artifact-manifest:
@@ -201,18 +201,18 @@ artifact-manifest:
 
 # Clean publication artifact logs.
 artifact-clean:
-    rm -rf artifacts/paper
+    rm -rf artifacts/papers
     rm -rf artifacts/_tmp_backup_* artifacts/_tmp_generated_*
 
 # One-command publication supplement verification.
 artifact-check:
-    mkdir -p artifacts/paper
+    mkdir -p artifacts/papers
     just paper-repro-sync
-    just paper-repro-check | tee artifacts/paper/paper-repro-check.log
-    just escape | tee artifacts/paper/check-escape.log
-    just verify-protocols | tee artifacts/paper/verify-protocols.log
-    just paper | tee artifacts/paper/paper-build.log
-    just artifact-manifest | tee artifacts/paper/artifact-manifest.log
+    just paper-repro-check | tee artifacts/papers/paper-repro-check.log
+    just escape | tee artifacts/papers/check-escape.log
+    just verify-protocols | tee artifacts/papers/verify-protocols.log
+    just paper | tee artifacts/papers/paper-build.log
+    just artifact-manifest | tee artifacts/papers/artifact-manifest.log
 
 # Generate Lean style conformance baseline report
 lean-style-baseline:
@@ -377,7 +377,7 @@ book: summary _gen-assets
 paper:
     #!/usr/bin/env bash
     set -euo pipefail
-    cd paper
+    cd papers
     mkdir -p build
     for p in paper1 paper2 paper3; do
         echo "Building $p.pdf..."
@@ -388,7 +388,7 @@ paper:
 
 # Clean paper build artifacts
 paper-clean:
-    rm -rf paper/build
+    rm -rf papers/build
 
 # Serve locally with live reload
 serve: summary _gen-assets

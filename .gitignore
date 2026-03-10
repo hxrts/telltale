@@ -47,8 +47,8 @@ iris-lean/
 /artifacts/
 
 # Paper build artifacts
-/paper/build/
-/paper/artifact_manifest.json
+/papers/build/
+/papers/artifact_manifest.json
 
 # mdbook generated files
 /mermaid.min.js

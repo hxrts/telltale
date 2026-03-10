@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-OUT_FILE="${ROOT_DIR}/paper/artifact_manifest.json"
+OUT_FILE="${ROOT_DIR}/papers/artifact_manifest.json"
 LOG_DIR="${ROOT_DIR}/artifacts/paper"
-PAPER_DIR="${ROOT_DIR}/paper/build"
+PAPER_DIR="${ROOT_DIR}/papers/build"
 
 hash_file() {
   local path="$1"

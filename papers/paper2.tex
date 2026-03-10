@@ -1523,7 +1523,7 @@ Reproduction workflow and expected outputs are documented in
 \texttt{ARTIFACT.md}. The one-command supplement check is
 \texttt{just artifact-check}. Pinned-commit, DOI, and Lean-statistics rows are
 synchronized via
-\texttt{bash scripts/paper\_repro\_rows.sh --sync paper/paper1.tex paper/paper2.tex paper/paper3.tex}.
+\texttt{bash scripts/paper\_repro\_rows.sh --sync papers/paper1.tex papers/paper2.tex papers/paper3.tex}.
 Artifact semantics note. The Lean artifact exposes an explicit trace-level
 strong fairness predicate (\texttt{StrongFairEnv}) refining weak fairness, and
 the default in-memory runtime transport implements minimal per-edge FIFO
@@ -1547,7 +1547,7 @@ enqueue/dequeue behavior.
 
 \begin{enumerate}
 	\item Run \texttt{just artifact-check}. This runs reproducibility row checks, \texttt{just escape}, \texttt{just verify-protocols}, paper builds, and manifest generation.
-	\item Before camera-ready submission, set DOI in \texttt{paper/artifact\_metadata.env} and run \texttt{just paper-repro-check-strict}.
+	\item Before camera-ready submission, set DOI in \texttt{papers/artifact\_metadata.env} and run \texttt{just paper-repro-check-strict}.
 \end{enumerate}
 
 % Full-width index on its own page

@@ -1,6 +1,6 @@
 # Artifact Reproduction Guide
 
-This repository ships a publication supplement for the three-paper MPST series in `paper/`.
+This repository ships a publication supplement for the three-paper MPST series in `papers/`.
 
 ## Prerequisites
 
@@ -27,22 +27,22 @@ This command:
 2. Verifies reproducibility rows are up to date.
 3. Runs paper-facing checks (`just escape`, `just verify-protocols`).
 4. Builds all three paper PDFs (`just paper`).
-5. Generates `paper/artifact_manifest.json`.
+5. Generates `papers/artifact_manifest.json`.
 
 ## Expected Outputs
 
 - PDFs:
-  - `paper/build/paper1.pdf`
-  - `paper/build/paper2.pdf`
-  - `paper/build/paper3.pdf`
+  - `papers/build/paper1.pdf`
+  - `papers/build/paper2.pdf`
+  - `papers/build/paper3.pdf`
 - Logs:
-  - `artifacts/paper/*.log`
+  - `artifacts/papers/*.log`
 - Manifest:
-  - `paper/artifact_manifest.json`
+  - `papers/artifact_manifest.json`
 
 ## Supplement Integrity
 
-`paper/artifact_manifest.json` records:
+`papers/artifact_manifest.json` records:
 
 - exact repository commit,
 - toolchain versions,
