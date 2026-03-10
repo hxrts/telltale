@@ -26,9 +26,11 @@ Main code is in `rust/`. Workspace configuration is in `Cargo.toml`. A typical h
 
 The Lean project is an active mechanized proof stack. It covers session foundations, semantics, protocol coherence, runtime adequacy, and bridge theorems. Main code is in `lean/`. The toolchain pin is `lean-toolchain`. A typical proof-facing gate is `just verify-protocols`.
 
-### 3. Paper + Artifact Supplement
+### 3. Papers + Artifact Supplement
 
-The paper project contains the three manuscripts and submission-focused reproducibility tooling. PDFs: [Paper 1](https://hxrts.com/telltale/papers/paper1.pdf), [Paper 2](https://hxrts.com/telltale/papers/paper2.pdf), [Paper 3](https://hxrts.com/telltale/papers/paper3.pdf). The reproducibility guide is [Artifact Reproduction Guide](papers/ARTIFACT.md). Citation metadata is in `papers/CITATION.cff`.
+The three papers establish a mechanized metatheory for asynchronous buffered multiparty session types. Paper 1 defines an operational coherence invariant enabling compositional preservation proofs. Paper 2 adds quantitative Lyapunov bounds and decidability results. Paper 3 proves a harmony theorem for dynamic reconfiguration. Together they connect choreographic specifications to VM runtime adherence. All results are mechanized in Lean 4.
+
+The `papers/` directory contains manuscripts and [reproducibility documentation](papers/ARTIFACT.md). PDFs: [Paper 1](https://hxrts.com/telltale/papers/paper1.pdf), [Paper 2](https://hxrts.com/telltale/papers/paper2.pdf), [Paper 3](https://hxrts.com/telltale/papers/paper3.pdf). Citation metadata is in `papers/CITATION.cff`.
 
 ## Quick Start
 

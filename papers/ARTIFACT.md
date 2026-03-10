@@ -1,4 +1,4 @@
-# Artifact Reproduction Guide
+# Artifact Reproduction
 
 This repository ships a publication supplement for the three-paper MPST series in `papers/`.
 
