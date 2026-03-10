@@ -28,7 +28,7 @@ The Lean project is an active mechanized proof stack. It covers session foundati
 
 ### 3. Paper + Artifact Supplement
 
-The paper project contains the three manuscripts and submission-focused reproducibility tooling. The sources are `papers/paper1.tex`, `papers/paper2.tex`, and `papers/paper3.tex`. The reproducibility guide is [Artifact Reproduction Guide](ARTIFACT.md). Citation metadata is in `papers/CITATION.cff`.
+The paper project contains the three manuscripts and submission-focused reproducibility tooling. PDFs: [Paper 1](https://hxrts.com/telltale/papers/paper1.pdf) | [Paper 2](https://hxrts.com/telltale/papers/paper2.pdf) | [Paper 3](https://hxrts.com/telltale/papers/paper3.pdf). The reproducibility guide is [Artifact Reproduction Guide](ARTIFACT.md). Citation metadata is in `papers/CITATION.cff`.
 
 ## Quick Start
 

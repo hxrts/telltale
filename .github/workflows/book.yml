@@ -31,6 +31,12 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - name: Build documentation
         run: nix develop --command just book
+      - name: Build papers
+        run: nix develop --command just paper
+      - name: Copy papers to book output
+        run: |
+          mkdir -p docs/book/papers
+          cp papers/build/*.pdf docs/book/papers/
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact
