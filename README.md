@@ -6,7 +6,7 @@ This repo contains three related projects. A Rust library for writing composable
 
 ## For Reviewers
 
-Run `just artifact-check`. Then inspect `papers/artifact_manifest.json` and [Artifact Reproduction Guide](ARTIFACT.md).
+Run `just artifact-check`. Then inspect `papers/artifact_manifest.json` and [Artifact Reproduction Guide](papers/ARTIFACT.md).
 
 ## Project Surfaces
 
@@ -28,7 +28,7 @@ The Lean project is an active mechanized proof stack. It covers session foundati
 
 ### 3. Paper + Artifact Supplement
 
-The paper project contains the three manuscripts and submission-focused reproducibility tooling. PDFs: [Paper 1](https://hxrts.com/telltale/papers/paper1.pdf) | [Paper 2](https://hxrts.com/telltale/papers/paper2.pdf) | [Paper 3](https://hxrts.com/telltale/papers/paper3.pdf). The reproducibility guide is [Artifact Reproduction Guide](ARTIFACT.md). Citation metadata is in `papers/CITATION.cff`.
+The paper project contains the three manuscripts and submission-focused reproducibility tooling. PDFs: [Paper 1](https://hxrts.com/telltale/papers/paper1.pdf), [Paper 2](https://hxrts.com/telltale/papers/paper2.pdf), [Paper 3](https://hxrts.com/telltale/papers/paper3.pdf). The reproducibility guide is [Artifact Reproduction Guide](papers/ARTIFACT.md). Citation metadata is in `papers/CITATION.cff`.
 
 ## Quick Start
 
@@ -57,7 +57,7 @@ This command set validates the Rust library, proof-facing protocol checks, and p
 
 ## Reproducibility
 
-Use the Nix flake for reproducible builds with pinned toolchains. See [Artifact Reproduction Guide](ARTIFACT.md) for the full workflow and expected outputs.
+Use the Nix flake for reproducible builds with pinned toolchains. See [Artifact Reproduction Guide](papers/ARTIFACT.md) for the full workflow and expected outputs.
 
 ## License
 
