@@ -55,10 +55,6 @@ This command set validates the Rust library, proof-facing protocol checks, and p
 | `scripts/` | Verification/repro automation scripts |
 | `docs/` | Extended technical documentation |
 
-## Reproducibility
-
-Use the Nix flake for reproducible builds with pinned toolchains. See [Artifact Reproduction Guide](papers/ARTIFACT.md) for the full workflow and expected outputs.
-
 ## License
 
 Licensed under the MIT [license](LICENSE).
