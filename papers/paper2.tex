@@ -28,6 +28,10 @@
 \usepackage[font=small,labelfont=bf]{caption}
 \usepackage{float}
 \usepackage{tikz}
+\usepackage{eso-pic}
+\AddToShipoutPictureBG{%
+  \AtPageCenter{\makebox(0,0){\rotatebox{45}{\scalebox{8}{\textcolor[gray]{0.9}{DRAFT}}}}}%
+}
 
 % Reduce space between section number and title, prevent hyphenation in headings
 \makeatletter
