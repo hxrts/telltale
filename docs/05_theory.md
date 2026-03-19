@@ -241,6 +241,18 @@ For delegation to be safe, certain conditions must hold. The delegated endpoint 
 
 Telltale's `DelegationWF` predicate captures these conditions. The safe delegation theorem shows that coherence is preserved when this predicate holds.
 
+### Host-Runtime Ownership Contract
+
+Telltale's Rust runtime also enforces a host ownership contract around delegation, reconfiguration, and session-local host mutation. This contract uses concepts such as current owner capability, ownership generation, transfer receipts, rollback, and stale-owner rejection.
+
+This layer should be interpreted carefully:
+
+- it is the host/runtime realization of delegation boundaries
+- it is aligned with theorem-side concepts such as `DelegationWF`
+- it is not itself a new theorem statement
+
+In other words, the Lean theory proves protocol-side safety properties under declared premises. The Rust ownership contract is an implementation hardening layer that makes those protocol-side boundaries explicit at the host embedding boundary.
+
 ## Coherence
 
 Coherence is the invariant that makes multiparty session types work. It ensures that the collective state of all participants remains consistent with the global protocol.

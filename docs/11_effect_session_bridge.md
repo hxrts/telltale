@@ -20,6 +20,10 @@ Telltale uses three layers.
 
 Projection and runtime checks preserve obligations across these layers.
 
+This document describes a host-runtime contract.
+It is normative for Rust embedders, but it is not itself a theorem statement.
+The theorem-backed protocol properties remain in projection, coherence, and harmony. The host ownership rules below are implementation contracts enforced by the VM/runtime boundary.
+
 ## Rust Handler Surfaces
 
 Rust exposes two handler interfaces.
@@ -45,6 +49,29 @@ The VM monitor enforces session typing before and during execution.
 The boundary keeps typing logic in Telltale.
 It keeps host logic focused on effect interpretation.
 
+## Canonical Ingress and Ownership
+
+External host events must enter the VM through canonical ingress surfaces.
+
+| Ingress surface | Purpose | Ownership rule |
+|---|---|---|
+| `topology_events` | inject crash, partition, heal, corruption, and timeout events | must not mutate session-local host state directly |
+| `send_decision` / `send_decision_fast_path` | compute outbound delivery behavior | may inspect current callback state only |
+| `handle_recv` | apply receive-side host effects | may mutate callback-local state only |
+| `step` | perform `Invoke`-scoped integration work | may mutate callback-local state only |
+| `output_condition_hint` | provide commit metadata | observation only |
+
+Session-local host mutation outside these callback-local values should flow through an explicit ownership capability such as `OwnedSession`.
+This is the preferred production path for mutating edge traces, handler bindings, or other session-local host metadata.
+
+Host rules:
+
+- `EffectHandler` methods are synchronous. Async work must happen outside callback execution and feed results back through a later ingress call.
+- Admission and ownership are distinct. Passing admission/runtime gates does not imply the caller is the current session owner.
+- Ownership is generation-bearing. Reusing the same owner label after transfer does not preserve authority.
+- Fragment-scoped capabilities do not imply full-session ingress rights.
+- Stale owners fail closed with typed ownership diagnostics before host mutation is applied.
+
 ## Boundary Ownership
 
 The boundary separates protocol semantics from host materialization.
@@ -60,6 +87,14 @@ The boundary separates protocol semantics from host materialization.
 | Guard transitions | VM guard instruction flow | grant or block in `handle_acquire`, validation in `handle_release` |
 | Topology metadata | event ingestion order and application | produced events in `topology_events` |
 | Output metadata | commit-time query point | optional hint from `output_condition_hint` |
+
+Additional ownership split:
+
+| Concern | Telltale VM owns | Host runtime owns |
+|---|---|---|
+| current owner identity and generation | validation and stale-owner rejection | choosing owner labels and transfer policy |
+| transfer receipts and rollback | staged transfer enforcement and audit artifacts | when to request transfer |
+| session-local mutation gate | capability and scope checks | operations performed through `OwnedSession` |
 
 ## VM Callback Semantics
 
@@ -82,6 +117,12 @@ The contract marks `handle_send` and `handle_choose` as compatibility hooks.
 | `output_condition_hint` | post-dispatch pre-commit | queried only when a step emits events | return `None` to use VM default |
 | `handler_identity` | trace and commit attribution | stable handler id in traces | defaults to `DEFAULT_HANDLER_ID` when not overridden |
 
+Callback safety notes:
+
+- `handle_send` and `handle_choose` remain compatibility hooks. They should not become hidden side channels for session metadata mutation.
+- Bridge traits in `rust/vm/src/bridge.rs` are deterministic lookup/projection surfaces, not mutation surfaces.
+- `sessions_mut()` is a low-level escape hatch intended for runtime internals and tests; production embedders should prefer `load_choreography_owned(...)` plus `OwnedSession`.
+
 ## Error Classification
 
 The VM keeps callback signatures as `Result<_, String>`.
@@ -98,10 +139,11 @@ This keeps runtime semantics unchanged and improves host observability.
 
 1. Use `telltale-theory` at setup time to project global types to local types.
 2. Compile local types to VM bytecode and load with `CodeImage`.
-3. Implement `EffectHandler` with deterministic host operations.
-4. Map each callback to host primitives without reimplementing protocol typing.
-5. Run `run_loaded_vm_record_replay_conformance` to validate record and replay behavior on a loaded VM.
-6. Run Lean bridge lanes for parity and equivalence checks.
+3. Prefer `load_choreography_owned(...)` when a host needs to retain session-local control after open.
+4. Implement `EffectHandler` with deterministic host operations.
+5. Map each callback to host primitives without reimplementing protocol typing.
+6. Run `run_loaded_vm_record_replay_conformance` to validate record and replay behavior on a loaded VM.
+7. Run Lean bridge lanes for parity and equivalence checks.
 
 ## Integration Tooling
 
@@ -154,7 +196,7 @@ Use `off` for trusted benchmarks, `structural` for standard deployments, and `st
 `VMConfig.max_payload_bytes` bounds payload size in VM message validation.
 Default is `65536`.
 
-`VMConfig.host_contract_assertions` enables runtime checks for handler identity stability and topology ordering inputs.
+`VMConfig.host_contract_assertions` enables runtime checks for handler identity stability, topology ordering inputs, and transfer-event auditability.
 Default value is `false`.
 
 ## Integration Checklist
@@ -162,6 +204,8 @@ Default value is `false`.
 - Determinism: use stable ordering and deterministic serialization.
 - Atomicity: ensure a failed effect does not leave partial host state.
 - Isolation: keep handler state scoped to the active endpoint and session.
+- Ownership: route session-local host mutation through a current ownership capability, not ad hoc session-store access.
+- Canonical ingress: surface async work by later ingress calls rather than performing it inside synchronous callbacks.
 - Replayability: validate traces with `RecordingEffectHandler` and `ReplayEffectHandler`.
 - Admission: keep VM runtime gates and profile settings explicit in `VMConfig`.
 

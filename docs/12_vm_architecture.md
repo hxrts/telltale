@@ -6,7 +6,7 @@ This document defines the VM architecture, scheduling semantics, and concurrency
 
 The canonical semantic authority is `VMKernel`. The cooperative `VM` and threaded `ThreadedVM` are execution adapters that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
 
-The runtime keeps a single state model across targets. Core state includes coroutines, sessions, scheduler queues, observable trace, effect trace, and failure-topology snapshot fields.
+The runtime keeps a single state model across targets. Core state includes coroutines, sessions, scheduler queues, observable trace, effect trace, delegation audit records, and failure-topology snapshot fields.
 
 The canonical round model is one semantic step when concurrency is nonzero. Threaded execution is admitted as an extension only when the wave certificate gate is satisfied.
 
@@ -71,7 +71,42 @@ The VM adapters now enforce explicit runtime hardening at load and startup bound
 
 - `ThreadedVM` provides both `with_workers` (panic-on-invalid initialization compatibility path) and `try_with_workers` (fallible initialization with `VMError`).
 - Cooperative and threaded `load_choreography` paths validate trusted `CodeImage` runtime shape before session allocation.
+- Preferred host integration uses `load_choreography_owned(...)` and `OwnedSession` when the embedding runtime needs explicit session ownership after open.
 - Register-bound violations are fail-closed through `Fault::OutOfRegisters` rather than unchecked index panic in executable instruction paths.
+
+## Host Ownership Contract in the Runtime
+
+The VM architecture now distinguishes three runtime concepts:
+
+| Runtime concept | Purpose |
+|---|---|
+| protocol typing | monitor/local-type correctness |
+| capability admission | whether a runtime mode/profile is allowed |
+| current ownership | which host capability may mutate session-local runtime state right now |
+
+Ownership is a host-runtime contract, not a replacement for typing or admission.
+
+Runtime ownership details:
+
+- session-local host mutation flows through an ownership capability carrying owner label, generation, and scope
+- transfer is staged with explicit receipts
+- delegation emits auditable transfer records
+- host assertion mode can reject transfer events that do not have matching committed audit records
+
+## Delegation and Reconfiguration Path
+
+Runtime delegation uses one sanctioned manager-style path rather than scattered owner mutation.
+
+| Step | Runtime behavior |
+|---|---|
+| decode transfer | extract endpoint and target coroutine |
+| coherence validation | ensure source, target, and delegated endpoint stay within the intended session boundary |
+| issue receipt | allocate an explicit delegation receipt with endpoint-scoped authority |
+| apply transfer | move endpoint bundle and associated runtime state |
+| post-check | validate resulting owner state |
+| audit or rollback | record committed transfer or roll back and emit rollback audit |
+
+This path is the runtime realization of delegation/reconfiguration, but it should not be read as the theorem statement itself. The theorem-level side remains `DelegationWF` and related harmony results.
 
 ## Capability Gate Architecture
 

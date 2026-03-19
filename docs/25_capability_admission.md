@@ -2,6 +2,10 @@
 
 This document defines the capability gates that control runtime admission and profile selection.
 
+Admission is not the same thing as current ownership.
+Admission answers whether a runtime/profile/configuration is allowed in principle.
+Ownership answers who may currently drive session-local host mutation for one live session or fragment.
+
 ## Gate Layers
 
 Admission is enforced across Lean theorem-pack surfaces and Rust runtime checks.
@@ -26,6 +30,23 @@ Rust runtime admission uses a fixed gate sequence.
 | unified gate | `enforce_vm_runtime_gates` | `Admitted`, `RejectedMissingContracts`, or `RejectedUnsupportedDeterminismProfile` |
 
 The unified gate is the admission decision used by higher-level runtime loaders.
+
+## Admission vs Ownership
+
+These concepts are intentionally separate.
+
+| Question | Admission answers | Ownership answers |
+|---|---|---|
+| can this runtime mode/profile be used? | yes | no |
+| does this theorem-pack/runtime-contract inventory admit the feature? | yes | no |
+| may this caller mutate session-local host state right now? | no | yes |
+| does this caller hold current fragment/session authority? | no | yes |
+
+Practical consequence:
+
+- passing `enforce_vm_runtime_gates(...)` does not authorize session-local mutation
+- hosts still need a live ownership capability such as `OwnedSession`
+- stale-owner rejection can occur even when admission remains valid
 
 ## Determinism Profiles
 
@@ -68,6 +89,8 @@ Composed runtime admission in `rust/vm/src/composition.rs` enforces both proof a
 | memory budget | `BudgetExceeded` |
 
 This path guarantees that admitted bundles carry both semantic and operational evidence.
+
+When composition metadata defines fragment or bundle boundaries, runtime ownership should derive from that metadata rather than from ad hoc host-side reconstruction. Admission decides whether the bundle may run. Ownership decides who may currently drive it.
 
 ## Admission Diagnostics
 

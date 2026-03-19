@@ -4,7 +4,7 @@ This document defines session state and lifecycle behavior in `rust/vm/src/sessi
 
 ## Session State Model
 
-A session stores role membership, per-endpoint local types, directed buffers, edge handler bindings, trace data, and lifecycle metadata.
+A session stores role membership, per-endpoint local types, directed buffers, edge handler bindings, trace data, lifecycle metadata, and host-runtime ownership state.
 
 | Field group | Purpose |
 |---|---|
@@ -14,14 +14,48 @@ A session stores role membership, per-endpoint local types, directed buffers, ed
 | `edge_handlers` | Per-edge runtime handler binding |
 | `edge_traces`, auth fields | Coherence and authenticated trace material |
 | `status`, `epoch` | Lifecycle phase and close epoch counter |
+| ownership state | current owner capability, transfer-in-progress state, and terminal ownership reason |
 
 The VM also tracks communication replay-consumption state at runtime scope (`off`, `sequence`, `nullifier`). This state is keyed by session-qualified edges and contributes to canonical replay artifacts.
+
+Ownership fields are a runtime hardening contract rather than a theorem surface. They govern who may drive session-local host mutation and how ownership transfer is staged and audited.
 
 ## Session Status Values
 
 `SessionStatus` includes `Active`, `Draining`, `Closed`, `Cancelled`, and `Faulted`.
 
 `Draining` is currently a declared status only. The current `SessionStore::close` path sets `Closed` directly and clears buffers.
+
+## Ownership Lifecycle
+
+Session ownership is tracked separately from capability admission.
+
+| Ownership element | Meaning |
+|---|---|
+| current owner capability | the live owner label, generation, and authorized scope |
+| ownership generation | increments on transfer or scope attenuation so stale handles fail closed |
+| pending transfer receipt | explicit staged transfer that must commit or roll back |
+| terminal ownership reason | recorded reason when owner death or transfer failure forces cancellation or fault |
+
+Default runtime rules:
+
+- at most one current owner exists for one active session ownership unit
+- transfer is explicit and uses a receipt
+- rollback is claim-specific, so failing one staged transfer does not tear down unrelated ownership state
+- fragment-scoped ownership attenuates authority and does not imply full-session mutation rights
+
+## Ownership Failure Mapping
+
+Ownership failures map into session terminal behavior as follows.
+
+| Ownership failure | Runtime behavior |
+|---|---|
+| owner death | `Faulted { reason = "ownership owner ... died" }` |
+| abandoned transfer | `Cancelled` |
+| failed transfer commit | `Faulted { reason = "ownership transfer commit failed: ..." }` |
+| stale owner use | typed ownership error, fail-closed, no status change unless policy escalates |
+
+These mappings are implementation policy. They are not claims that the Lean theory proves host-runtime ownership outcomes directly.
 
 ## Open Path
 
@@ -30,6 +64,13 @@ The VM also tracks communication replay-consumption state at runtime scope (`off
 Open admission checks enforce role uniqueness and full handler coverage across the opened role set. Arity must match between `local_types` and `dsts`.
 
 On success the VM allocates a fresh session, initializes buffers and local type entries, stores edge handlers, writes endpoint values to destination registers, and emits an `Opened` event.
+
+Preferred host integration path:
+
+- low-level open: `load_choreography(...)`
+- ownership-bearing open: `load_choreography_owned(...)`
+
+The owned path immediately claims session ownership and is the preferred public integration route for hosts that will mutate session-local runtime metadata.
 
 ## Type Advancement
 
@@ -72,6 +113,8 @@ Policy semantics:
 The VM first checks endpoint ownership for the closing coroutine. If ownership is valid, the store sets `status = Closed`, clears buffers and edge traces, and increments `epoch`.
 
 Close emits `Closed` and `EpochAdvanced` observable events. There is no automatic draining loop in the current close implementation.
+
+The close path is distinct from host-runtime ownership transfer. Endpoint/coroutine ownership for bytecode execution remains part of normal VM execution semantics. Host-runtime ownership governs who may mutate session-local host state at the embedding boundary.
 
 ## Migration and Operations
 

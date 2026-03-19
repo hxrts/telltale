@@ -24,6 +24,8 @@ assert_contracts(&result, &ContractCheckConfig::default())?;
 This path runs VM execution, scenario middleware, and post-run contract checks.
 It is the recommended integration lane for host runtimes.
 
+It is also the recommended lane for testing ownership handoff, stale-owner rejection, and owner-failure scenarios because the simulator can inject timing, crash, and replay conditions around the same VM ownership contract used in production runtimes.
+
 ## Document Map
 
 Use these pages for detailed behavior.

@@ -15,6 +15,9 @@ The preferred surface style mixes MPST operators with a small functional-languag
 
 The parser module is located in `rust/choreography/src/compiler/parser/`. It provides an implementation of the choreography DSL parser using Pest plus a layout preprocessor.
 
+The DSL describes protocol structure and role-local communication obligations.
+It does not directly express host-runtime ownership. Session/fragment ownership boundaries are derived later by the runtime, typically from composition/link metadata when available.
+
 ## DSL Syntax
 
 ```rust

@@ -250,6 +250,8 @@ The VM provides a bytecode execution model for local types. The `telltale-vm` cr
 
 The VM maintains session state with bounded message buffers. Each coroutine references its assigned program by ID. The scheduler policies are observationally equivalent per the Lean model. Nested VMs can be hosted inside a coroutine for hierarchical simulation.
 
+At the embedding boundary, the VM now also distinguishes current host ownership from protocol typing and capability admission. Production host integrations can use `load_choreography_owned(...)` and `OwnedSession` when they need explicit session-local authority after open. Delegation/reconfiguration paths emit explicit receipts and audit records instead of relying on ad hoc owner mutation.
+
 See [VM Architecture](12_vm_architecture.md) for details on the bytecode VM architecture.
 
 ## Data Flow

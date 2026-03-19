@@ -14,6 +14,10 @@ Use it as a stable lookup for terminology and notation.
 | effect handler | Runtime boundary that interprets VM or choreography actions. | [Choreography Effect Handlers](09_effect_handlers.md), [Effect Handlers and Session Types](11_effect_session_bridge.md) |
 | theorem-pack | Lean-exported capability inventory used by runtime admission gates. | [Lean Verification](23_lean_verification.md), [Capability and Admission](25_capability_admission.md) |
 | admission | Runtime gate process that checks contracts and capability evidence. | [Capability and Admission](25_capability_admission.md) |
+| ownership capability | Runtime host authority token carrying owner label, generation, and scope. | [Effect Handlers and Session Types](11_effect_session_bridge.md), [Session Lifecycle](14_session_lifecycle.md) |
+| ownership epoch | Generation used to invalidate stale owner handles after transfer or scope attenuation. | [Session Lifecycle](14_session_lifecycle.md) |
+| canonical ingress | Sanctioned host event entry path such as `topology_events`, `send_decision`, `handle_recv`, or `step`. | [Effect Handlers and Session Types](11_effect_session_bridge.md) |
+| stale-owner rejection | Fail-closed behavior when a prior ownership capability is reused after transfer or attenuation. | [Effect Handlers and Session Types](11_effect_session_bridge.md), [Session Lifecycle](14_session_lifecycle.md) |
 | envelope | Declared refinement boundary for higher-concurrency and profile-scoped behavior. | [VM Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
 | determinism profile | Runtime trace-equivalence contract mode such as `Full` or `Replay`. | [VM Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
 | communication replay mode | Transport replay-consumption policy: `off`, `sequence`, or `nullifier`. | [VM Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
