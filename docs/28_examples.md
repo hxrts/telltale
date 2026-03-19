@@ -18,7 +18,7 @@ Top level examples in `examples/`:
 - `oauth.rs` for a multi role authentication flow
 - `wasm-ping-pong/` for browser builds
 
-Advanced examples live under `examples/advanced_features/` and runnable bundles under `examples/running_examples/`.
+Advanced examples live under `examples/advanced_features/`. Protocol snapshots under `examples/running_examples/` are source/reference material only.
 
 ## Common Patterns
 
