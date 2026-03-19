@@ -1519,7 +1519,7 @@ checksum = "591ef38edfb78ca4771ee32cf494cb8771944bee237a9b91fc9c1424ac4b777b"
 
 [[package]]
 name = "telltale"
-version = "4.0.1"
+version = "5.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1554,7 +1554,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-choreography"
-version = "4.0.1"
+version = "5.0.0"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -1597,7 +1597,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-lean-bridge"
-version = "4.0.1"
+version = "5.0.0"
 dependencies = [
  "anyhow",
  "bpaf",
@@ -1626,7 +1626,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-macros"
-version = "4.0.1"
+version = "5.0.0"
 dependencies = [
  "futures",
  "proc-macro2",
@@ -1638,7 +1638,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-simulator"
-version = "4.0.1"
+version = "5.0.0"
 dependencies = [
  "assert_matches",
  "getrandom 0.2.16",
@@ -1655,7 +1655,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-theory"
-version = "4.0.1"
+version = "5.0.0"
 dependencies = [
  "assert_matches",
  "criterion",
@@ -1667,7 +1667,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-transport"
-version = "4.0.1"
+version = "5.0.0"
 dependencies = [
  "async-trait",
  "telltale-choreography",
@@ -1680,7 +1680,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-types"
-version = "4.0.1"
+version = "5.0.0"
 dependencies = [
  "assert_matches",
  "fixed",
@@ -1694,7 +1694,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-vm"
-version = "4.0.1"
+version = "5.0.0"
 dependencies = [
  "assert_matches",
  "bincode",
