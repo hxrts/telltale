@@ -1616,6 +1616,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "telltale-lint-checks"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.110",
+]
+
+[[package]]
 name = "telltale-macros"
 version = "4.0.1"
 dependencies = [

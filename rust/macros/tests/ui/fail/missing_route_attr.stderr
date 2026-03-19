@@ -1,0 +1,5 @@
+error: expected #[route(...)] attribute
+  --> tests/ui/fail/missing_route_attr.rs:11:14
+   |
+11 | struct Alice(Channel);
+   |              ^^^^^^^

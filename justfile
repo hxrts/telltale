@@ -62,6 +62,7 @@ ci-dry-run lane="fast":
     just check-release-conformance
     just check-telltale-style
     just check-docs-drift
+    just check-aura-borrowed-lints
     just check-doc-links-ci
     just check-doc-links-in-code
     bash ./scripts/check/doc-quality.sh
@@ -105,6 +106,18 @@ lint:
 # Rust style guide lint check (quick - format + clippy only)
 lint-quick:
     ./scripts/check/lint.sh --quick
+
+# Periodic broader Clippy style audit, kept out of the default CI lane.
+clippy-style-audit:
+    cargo clippy --workspace --all-targets --all-features -- \
+        -W clippy::must_use_candidate \
+        -W clippy::trivially_copy_pass_by_ref \
+        -W clippy::needless_pass_by_value \
+        -W clippy::manual_let_else \
+        -W clippy::unused_async \
+        -W clippy::cognitive_complexity \
+        -W clippy::fn_params_excessive_bools \
+        -W clippy::too_many_arguments
 
 # Rust architecture/style-guide pattern checker
 check-arch-rust:
@@ -176,6 +189,10 @@ check-parity-ledger:
 check-docs-drift:
     ./scripts/check/docs-drift.sh
 
+# Check for semantic drift in backticked commands, file paths, crates, and qualified symbols.
+check-docs-semantic-drift:
+    ./scripts/check/docs-semantic-drift.sh
+
 # Check docs/ links referenced from rust/ and lean/ sources resolve to existing files.
 check-doc-links-in-code:
     ./scripts/check/doc-links-in-code.sh
@@ -183,6 +200,35 @@ check-doc-links-in-code:
 # Enforce documentation style, link integrity, and command/reference validity.
 check-doc-quality:
     bash ./scripts/check/doc-quality.sh
+
+# Reject raw session-store ownership mutation outside sanctioned entry points.
+check-session-ingress-boundary:
+    ./scripts/check/session-ingress-boundary.sh
+
+# Reject raw wall-clock/timer usage in deterministic runtime paths.
+check-time-domain-boundaries:
+    ./scripts/check/time-domain-boundaries.sh
+
+# Enforce style/serialization boundaries in selected core crates.
+check-style-boundaries:
+    ./scripts/check/style-boundaries.sh
+
+# Keep a small authoritative verification inventory aligned with source-of-truth metrics.
+check-verification-inventory:
+    ./scripts/check/verification-inventory.sh
+
+# Keep proc-macro UI boundary contracts under targeted trybuild coverage.
+check-macro-boundaries:
+    cargo test -p telltale-macros --test macro_ui -- --nocapture
+
+# Aggregate the Aura-derived boundary checks borrowed into Telltale.
+check-aura-borrowed-lints:
+    just check-session-ingress-boundary
+    just check-time-domain-boundaries
+    just check-style-boundaries
+    just check-docs-semantic-drift
+    just check-verification-inventory
+    just check-macro-boundaries
 
 # Refresh generated Lean metrics in docs
 sync-lean-metrics:

@@ -1,0 +1,13 @@
+[package]
+name = "telltale-lint-checks"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+proc-macro2 = { workspace = true, features = ["span-locations"] }
+quote = { workspace = true }
+syn = { workspace = true, features = ["full", "visit", "parsing", "extra-traits"] }
+
+[lints]
+workspace = true

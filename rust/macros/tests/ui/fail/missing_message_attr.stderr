@@ -1,0 +1,5 @@
+error: expected #[message(...)] attribute
+  --> tests/ui/fail/missing_message_attr.rs:10:1
+   |
+10 | struct Alice(#[route(Bob)] Channel);
+   | ^^^^^^

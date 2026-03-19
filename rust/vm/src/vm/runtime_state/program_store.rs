@@ -46,7 +46,8 @@ impl ProgramStore {
     }
 
     fn cache_key(program: &[Instr]) -> Vec<u8> {
-        bincode::serialize(program).expect("program serialization for cache key should succeed")
+        crate::serialization::binary_encode(program)
+            .expect("program serialization for cache key should succeed")
     }
 
     /// Reserve space for additional unique programs.

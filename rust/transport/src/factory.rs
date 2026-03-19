@@ -44,6 +44,7 @@ impl<R: EndpointResolver> TcpTransportFactory<R> {
     }
 
     /// Create a factory with default configuration.
+    #[must_use]
     pub fn with_resolver(resolver: R) -> Self {
         Self::new(resolver, TcpTransportConfig::default())
     }

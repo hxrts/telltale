@@ -44,6 +44,8 @@ jobs:
         run: just check-ownership-contracts
       - name: Check docs drift
         run: ./scripts/check/docs-drift.sh
+      - name: Run Aura-derived boundary checks
+        run: just check-aura-borrowed-lints
       - name: Check docs links referenced from code
         run: ./scripts/check/doc-links-in-code.sh
       - name: Run linter

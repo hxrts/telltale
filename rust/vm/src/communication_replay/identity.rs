@@ -21,7 +21,7 @@ fn default_domain_tag() -> String {
 }
 
 fn replay_binary_encode<T: Serialize>(value: &T) -> Vec<u8> {
-    bincode::serialize(value).unwrap_or_default()
+    crate::serialization::binary_encode(value).unwrap_or_default()
 }
 
 fn zero_hash() -> Hash {

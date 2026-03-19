@@ -42,14 +42,16 @@ fn main() {
             concurrency: result.stats.concurrency,
             rounds_executed: result.stats.rounds_executed,
             final_tick: result.stats.final_tick,
-            total_obs_events: result.stats.total_obs_events,
-            total_invoked_events: result.stats.total_invoked_events,
-            checkpoint_writes: result.stats.checkpoint_writes,
+            total_obs_events: u64::try_from(result.stats.total_obs_events).unwrap_or(u64::MAX),
+            total_invoked_events: u64::try_from(result.stats.total_invoked_events)
+                .unwrap_or(u64::MAX),
+            checkpoint_writes: u64::try_from(result.stats.checkpoint_writes).unwrap_or(u64::MAX),
         },
         replay: ReplayOutput {
-            obs_events: result.replay.obs_trace.len(),
-            effect_events: result.replay.effect_trace.len(),
-            output_condition_checks: result.replay.output_condition_trace.len(),
+            obs_events: u64::try_from(result.replay.obs_trace.len()).unwrap_or(u64::MAX),
+            effect_events: u64::try_from(result.replay.effect_trace.len()).unwrap_or(u64::MAX),
+            output_condition_checks: u64::try_from(result.replay.output_condition_trace.len())
+                .unwrap_or(u64::MAX),
         },
         contracts,
     };
@@ -134,16 +136,16 @@ struct StatsOutput {
     concurrency: u64,
     rounds_executed: u64,
     final_tick: u64,
-    total_obs_events: usize,
-    total_invoked_events: usize,
-    checkpoint_writes: usize,
+    total_obs_events: u64,
+    total_invoked_events: u64,
+    checkpoint_writes: u64,
 }
 
 #[derive(Debug, Serialize)]
 struct ReplayOutput {
-    obs_events: usize,
-    effect_events: usize,
-    output_condition_checks: usize,
+    obs_events: u64,
+    effect_events: u64,
+    output_condition_checks: u64,
 }
 
 fn usage(msg: &str) -> ! {

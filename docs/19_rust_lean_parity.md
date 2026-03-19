@@ -17,7 +17,7 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 | `OutputConditionPolicy` | `Runtime/VM/Model/OutputCondition.lean` | `rust/vm/src/output_condition.rs` | Aligned |
 | Runtime `Value` variants | `Protocol/Values.lean` | `rust/vm/src/coroutine.rs` | Aligned |
 | `ProgressToken` fields | `Runtime/VM/Model/State.lean` | `rust/vm/src/coroutine.rs` | Aligned |
-| `CommunicationReplayMode` variants | `Runtime/VM/Model/Config.lean` | `rust/vm/src/communication_replay.rs` | Aligned |
+| `CommunicationReplayMode` variants | `Runtime/VM/Model/Config.lean` | `rust/vm/src/communication_replay/mod.rs` | Aligned |
 | `SignedValue` transport fields (`payload`, `signature`, `sequence_no`) | `Runtime/VM/Model/TypeClasses.lean` | `rust/vm/src/buffer.rs` | Aligned |
 | Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | `Runtime/VM/Model/Config.lean`, `Runtime/VM/Semantics/ExecComm.lean` | `rust/vm/src/vm.rs` | Aligned |
 | Register bounds failure semantics (`OutOfRegisters`) | `Runtime/VM/Semantics/ExecSteps.lean` | `rust/vm/src/vm`, `rust/vm/src/threaded` | Aligned |
@@ -186,7 +186,7 @@ Resolved deviations move to history after one stable release cycle with no regre
 #### comm-replay-label-context
 
 **Lean:** `Runtime/VM/Semantics/ExecComm.lean`, `Runtime/VM/Model/State.lean`
-**Rust:** `rust/vm/src/vm/instruction_control_and_effects.rs`, `rust/vm/src/threaded/instructions_send_recv_control.rs`, `rust/vm/src/communication_replay.rs`
+**Rust:** `rust/vm/src/vm/instruction_effects.rs`, `rust/vm/src/threaded/instructions_send_recv.rs`, `rust/vm/src/communication_replay/identity.rs`
 
 **Resolution:** Rust receive replay identity now canonicalizes to typed-context replay labels (`recv:<ValType>`) when expected payload annotations are present, matching Lean receive identity construction.
 

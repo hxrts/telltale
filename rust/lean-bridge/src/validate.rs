@@ -84,6 +84,7 @@ impl Validator {
     }
 
     /// Set the path to the Lean executable.
+    #[must_use]
     pub fn with_lean_path(mut self, path: impl Into<String>) -> Self {
         self.lean_path = Some(path.into());
         self

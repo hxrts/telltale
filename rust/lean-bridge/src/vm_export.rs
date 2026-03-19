@@ -39,32 +39,32 @@ impl Default for CompatibilityMeta {
 /// Endpoint reference in exported VM-state payloads.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EndpointRef {
-    pub sid: usize,
+    pub sid: u64,
     pub role: String,
 }
 
 /// Session view in exported VM-state payloads.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SessionView {
-    pub sid: usize,
+    pub sid: u64,
     pub roles: Vec<String>,
     pub status: String,
-    pub epoch: usize,
+    pub epoch: u64,
 }
 
 /// Generic exported coroutine state.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(bound(deserialize = "G: Deserialize<'de>, E: Deserialize<'de>"))]
 pub struct CoroutineState<G, E> {
-    pub id: usize,
+    pub id: u64,
     #[serde(rename = "programId", alias = "program_id")]
-    pub program_id: usize,
-    pub pc: usize,
+    pub program_id: u64,
+    pub pc: u64,
     pub status: G,
     #[serde(rename = "ownedEndpoints", alias = "owned_endpoints")]
     pub owned_endpoints: Vec<EndpointRef>,
     #[serde(rename = "costBudget", alias = "cost_budget")]
-    pub cost_budget: usize,
+    pub cost_budget: u64,
     #[serde(rename = "effectCtx", alias = "effect_ctx")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effect_ctx: Option<E>,
@@ -88,9 +88,9 @@ pub struct VMState<G, E> {
     pub compatibility: CompatibilityMeta,
     pub clock: u64,
     #[serde(rename = "nextCoroId", alias = "next_coro_id")]
-    pub next_coro_id: usize,
+    pub next_coro_id: u64,
     #[serde(rename = "nextSessionId", alias = "next_session_id")]
-    pub next_session_id: usize,
+    pub next_session_id: u64,
     pub coroutines: Vec<CoroutineState<G, E>>,
     pub sessions: Vec<SessionView>,
     #[serde(rename = "obsTrace", alias = "obs_trace")]

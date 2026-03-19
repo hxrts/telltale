@@ -368,7 +368,7 @@ impl SessionState {
     }
 
     fn update_auth_tree(&mut self, edge: &Edge, signed: &SignedValue<Signature>) {
-        let bytes = bincode::serialize(signed).unwrap_or_default();
+        let bytes = crate::serialization::binary_encode(signed).unwrap_or_default();
         let leaf = DefaultVerificationModel::hash(HashTag::MerkleLeaf, &bytes);
         self.auth_leaves.entry(edge.clone()).or_default().push(leaf);
         let tree = self

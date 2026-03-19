@@ -1,6 +1,7 @@
 //! Elevator example demonstrating state machine session types.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
+#![allow(clippy::disallowed_methods)] // Example-only randomized timing is intentionally nondeterministic.
 #![allow(missing_docs)]
 
 use futures::{

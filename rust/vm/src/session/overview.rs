@@ -252,10 +252,7 @@ fn default_handler_id() -> HandlerId {
 }
 
 fn serialized_bytes<T: Serialize>(value: &T) -> usize {
-    bincode::serialized_size(value)
-        .ok()
-        .and_then(|bytes| usize::try_from(bytes).ok())
-        .unwrap_or(0)
+    crate::serialization::binary_size(value)
 }
 
 /// Edge between two roles in a session (directed: sender → receiver).

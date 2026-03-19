@@ -6,7 +6,7 @@ use crate::effect::{CorruptionType, EffectTraceEntry};
 use crate::trace::normalize_trace;
 use crate::verification::Hash;
 use crate::vm::ObsEvent;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Canonical schema version identifier for VM replay/trace payloads.
 pub const SERIALIZATION_SCHEMA_VERSION: &str = "vm.serialization.v1";
@@ -21,6 +21,41 @@ fn normalize_serialization_schema_version(raw: &str) -> String {
     } else {
         raw.to_string()
     }
+}
+
+/// Serialize one value through the canonical VM binary codec.
+///
+/// This wrapper keeps binary-serialization policy centralized inside the VM
+/// crate instead of scattering direct `bincode` calls through runtime code.
+///
+/// # Errors
+///
+/// Returns a `bincode::Error` if the value cannot be serialized by the
+/// canonical binary codec.
+pub fn binary_encode<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, bincode::Error> {
+    bincode::serialize(value)
+}
+
+/// Deserialize one value through the canonical VM binary codec.
+///
+/// This wrapper keeps binary-serialization policy centralized inside the VM
+/// crate instead of scattering direct `bincode` calls through runtime code.
+///
+/// # Errors
+///
+/// Returns a `bincode::Error` if the bytes do not decode as the requested type
+/// under the canonical binary codec.
+pub fn binary_decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, bincode::Error> {
+    bincode::deserialize(bytes)
+}
+
+/// Return the binary-encoded size for one value, saturating to `usize`.
+#[must_use]
+pub fn binary_size<T: Serialize + ?Sized>(value: &T) -> usize {
+    bincode::serialized_size(value)
+        .ok()
+        .and_then(|bytes| usize::try_from(bytes).ok())
+        .unwrap_or(0)
 }
 
 fn deserialize_serialization_schema_version<'de, D>(deserializer: D) -> Result<String, D::Error>

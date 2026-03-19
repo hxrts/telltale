@@ -75,18 +75,21 @@ impl TcpTransportConfig {
     }
 
     /// Add a peer role with its address.
+    #[must_use]
     pub fn with_peer(mut self, role: impl Into<String>, addr: impl Into<String>) -> Self {
         self.peers.insert(role.into(), addr.into());
         self
     }
 
     /// Set retry configuration.
+    #[must_use]
     pub fn with_retry(mut self, retry: RetryConfig) -> Self {
         self.retry = retry;
         self
     }
 
     /// Set the buffer size for incoming message channels.
+    #[must_use]
     pub fn with_buffer_size(mut self, size: QueueCapacity) -> Self {
         self.buffer_size = size;
         self

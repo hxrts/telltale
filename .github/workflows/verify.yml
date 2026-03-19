@@ -62,6 +62,11 @@ jobs:
           mkdir -p artifacts
           just check-docs-drift | tee artifacts/check-docs-drift.log
 
+      - name: Run Aura-derived boundary checks
+        run: |
+          mkdir -p artifacts
+          just check-aura-borrowed-lints | tee artifacts/check-aura-borrowed-lints.log
+
       - name: Run docs links-in-code checks
         run: |
           mkdir -p artifacts
@@ -151,6 +156,11 @@ jobs:
         run: |
           mkdir -p artifacts
           just check-docs-drift | tee artifacts/check-docs-drift.log
+
+      - name: Run Aura-derived boundary checks
+        run: |
+          mkdir -p artifacts
+          just check-aura-borrowed-lints | tee artifacts/check-aura-borrowed-lints.log
 
       - name: Run docs links-in-code checks
         run: |

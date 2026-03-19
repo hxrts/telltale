@@ -75,6 +75,7 @@ impl StaticResolver {
     }
 
     /// Add a role-to-endpoint mapping.
+    #[must_use]
     pub fn with_mapping(mut self, role: RoleName, endpoint: TopologyEndpoint) -> Self {
         self.endpoints.insert(role, endpoint);
         self

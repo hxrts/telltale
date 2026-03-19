@@ -223,6 +223,7 @@ impl From<bool> for Strictness {
 
 impl EquivalenceChecker {
     /// Create a checker with golden files only (no Lean runner).
+    #[must_use]
     pub fn with_golden_dir(dir: impl AsRef<Path>) -> Self {
         Self {
             config: EquivalenceConfig {
@@ -234,6 +235,7 @@ impl EquivalenceChecker {
     }
 
     /// Create a checker with golden files only and explicit strictness mode.
+    #[must_use]
     pub fn with_golden_dir_strict(
         dir: impl AsRef<Path>,
         strictness: impl Into<Strictness>,
@@ -248,6 +250,7 @@ impl EquivalenceChecker {
     }
 
     /// Return a checker with strict mode enabled or disabled.
+    #[must_use]
     pub fn with_strict_mode(mut self, strictness: impl Into<Strictness>) -> Self {
         self.config.strict = strictness.into().is_strict();
         self

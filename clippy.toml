@@ -5,6 +5,27 @@
 # Limit function cognitive complexity (style guide: keep functions small)
 cognitive-complexity-threshold = 25
 
+# Determinism and boundary policy
+#
+# Keep the default Clippy lane focused on clear boundary violations with
+# obvious sanctioned alternatives. More scoped time-domain and ownership-path
+# checks live in repo-local lint tooling.
+disallowed-methods = [
+    # Randomness must go through seeded/deterministic wrappers.
+    { path = "rand::random", reason = "route entropy through explicit wrappers or scoped example/test allowances", allow-invalid = true },
+    { path = "rand::thread_rng", reason = "route entropy through explicit wrappers or scoped example/test allowances", allow-invalid = true },
+
+    # UUID generation should stay behind explicit boundary helpers.
+    { path = "uuid::Uuid::new_v4", reason = "keep UUID generation behind explicit boundary helpers", allow-invalid = true },
+    { path = "uuid::Builder::from_random_bytes", reason = "keep UUID generation behind explicit boundary helpers", allow-invalid = true },
+]
+
+disallowed-types = [
+    # Raw RNG handles should stay behind wrapper types/effects.
+    { path = "rand::rngs::OsRng", reason = "keep raw RNG handles behind wrapper effects", allow-invalid = true },
+    { path = "rand::rngs::ThreadRng", reason = "keep raw RNG handles behind wrapper effects", allow-invalid = true },
+]
+
 # Enforce explicit integer sizes in public APIs
 avoid-breaking-exported-api = false
 
@@ -22,13 +43,17 @@ too-many-arguments-threshold = 10
 msrv = "1.75.0"
 
 # Disallow certain types in public APIs
-# Uncomment when ready to enforce:
-# disallowed-types = [
-#     { path = "std::collections::HashMap", reason = "Use BTreeMap for determinism" },
-# ]
-
-# Disallow certain methods
-# Uncomment when ready to enforce:
-# disallowed-methods = [
-#     { path = "std::option::Option::unwrap", reason = "Use expect() with context or proper error handling" },
-# ]
+# The default lane keeps noisy style rules out. Run the style audit recipe for
+# broader conformance sweeps:
+#
+#   just clippy-style-audit
+#
+# Suggested extra lints for audit mode:
+#   -W clippy::must_use_candidate
+#   -W clippy::trivially_copy_pass_by_ref
+#   -W clippy::needless_pass_by_value
+#   -W clippy::manual_let_else
+#   -W clippy::unused_async
+#   -W clippy::cognitive_complexity
+#   -W clippy::fn_params_excessive_bools
+#   -W clippy::too_many_arguments
