@@ -47,6 +47,7 @@ layer_of = {
     "telltale": 4,
     # Internal support utility
     "effect-scaffold": 4,
+    "telltale-lint-checks": 4,
 }
 
 workspace_members = set(metadata["workspace_members"])
