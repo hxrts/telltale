@@ -25,6 +25,12 @@ REQUIRE_MAIN=1
 VERSION=""
 TAG_PREFIX="v"
 TAG_NAME=""
+TRANSIENT_RELEASE_PATHS=(
+  "examples/wasm-ping-pong/Cargo.lock"
+  "lean/CODE_MAP.md"
+)
+RESTORE_ON_EXIT=()
+RESTORE_TMP_DIR=""
 
 usage() {
   cat <<'EOF'
@@ -51,6 +57,38 @@ die() {
 require_command() {
   local cmd="$1"
   command -v "${cmd}" >/dev/null 2>&1 || die "${cmd} is required"
+}
+
+prepare_transient_restore() {
+  local path status backup_name backup_path
+  RESTORE_TMP_DIR="$(mktemp -d)"
+  for path in "${TRANSIENT_RELEASE_PATHS[@]}"; do
+    [[ -e "${path}" ]] || continue
+    if git diff --quiet -- "${path}" && git diff --cached --quiet -- "${path}"; then
+      status="$(git status --porcelain --untracked-files=no -- "${path}")"
+      [[ -z "${status}" ]] || continue
+      backup_name="${path//\//__}"
+      backup_path="${RESTORE_TMP_DIR}/${backup_name}"
+      cp "${path}" "${backup_path}"
+      RESTORE_ON_EXIT+=("${path}:${backup_path}")
+    fi
+  done
+}
+
+restore_transient_paths() {
+  local entry path backup_path
+  for entry in "${RESTORE_ON_EXIT[@]}"; do
+    path="${entry%%:*}"
+    backup_path="${entry#*:}"
+    [[ -f "${backup_path}" ]] || continue
+    if ! cmp -s "${backup_path}" "${path}"; then
+      cp "${backup_path}" "${path}"
+      echo "== restored transient release path ${path} =="
+    fi
+  done
+  if [[ -n "${RESTORE_TMP_DIR}" && -d "${RESTORE_TMP_DIR}" ]]; then
+    rm -rf "${RESTORE_TMP_DIR}"
+  fi
 }
 
 extract_manifest_version() {
@@ -182,6 +220,7 @@ push_git_refs() {
 main() {
   require_command cargo
   require_command git
+  trap restore_transient_paths EXIT
 
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
@@ -237,6 +276,7 @@ main() {
 
   assert_branch
   assert_clean_tree
+  prepare_transient_restore
 
   for package in "${RELEASE_PACKAGES[@]}"; do
     echo "== validating version for ${package} =="
