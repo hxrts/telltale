@@ -35,8 +35,9 @@ jobs:
         run: nix develop --command just paper
       - name: Copy papers to book output
         run: |
-          mkdir -p docs/book/papers
-          cp papers/build/*.pdf docs/book/papers/
+          book_output=docs/book
+          mkdir -p "$book_output"/papers
+          cp papers/build/*.pdf "$book_output"/papers/
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact

@@ -121,7 +121,7 @@ Callback safety notes:
 
 - `handle_send` and `handle_choose` remain compatibility hooks. They should not become hidden side channels for session metadata mutation.
 - Bridge traits in `rust/vm/src/bridge.rs` are deterministic lookup/projection surfaces, not mutation surfaces.
-- `sessions_mut()` is a low-level escape hatch intended for runtime internals and tests; production embedders should prefer `load_choreography_owned(...)` plus `OwnedSession`.
+- `sessions_mut()` is a low-level escape hatch intended for runtime internals and tests. Production embedders should prefer `load_choreography_owned(...)` plus `OwnedSession`.
 
 ## Error Classification
 

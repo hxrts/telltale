@@ -168,13 +168,11 @@ fn ownership_handoff_race_with_target_crash_keeps_transfer_observable() {
     };
     let vm = run_faulted_transfer(schedule, 8);
 
-    let transfers: Vec<_> = vm
-        .trace()
-        .iter()
-        .filter(|event| matches!(event, ObsEvent::Transferred { .. }))
-        .collect();
     assert_eq!(
-        transfers.len(),
+        vm.trace()
+            .iter()
+            .filter(|event| matches!(event, ObsEvent::Transferred { .. }))
+            .count(),
         1,
         "target crash should not erase the explicit ownership handoff observable"
     );
