@@ -14,6 +14,7 @@ impl VM {
             effect_trace_entries: self.effect_trace.len(),
             communication_artifacts: self.communication_consumption_artifacts.len(),
             output_condition_checks: self.output_condition_checks.len(),
+            delegation_audits: self.delegation_audit_log.len(),
             retained_bytes,
         }
     }
@@ -26,7 +27,8 @@ impl VM {
                 .saturating_add(vm_serialized_bytes(&self.code)),
             resource_states: vm_serialized_bytes(&self.resource_states),
             traces: vm_serialized_bytes(&self.obs_trace)
-                .saturating_add(vm_serialized_bytes(&self.effect_trace)),
+                .saturating_add(vm_serialized_bytes(&self.effect_trace))
+                .saturating_add(vm_serialized_bytes(&self.delegation_audit_log)),
             replay: vm_serialized_bytes(&self.communication_consumption)
                 .saturating_add(vm_serialized_bytes(&self.communication_consumption_artifacts)),
             output_condition_checks: vm_serialized_bytes(&self.output_condition_checks),
@@ -83,6 +85,12 @@ impl VM {
         self.effect_trace.as_slice()
     }
 
+    /// Get recorded delegation audit records.
+    #[must_use]
+    pub fn delegation_audit_log(&self) -> &[DelegationAuditRecord] {
+        self.delegation_audit_log.as_slice()
+    }
+
     /// Deterministic communication replay-state root.
     #[must_use]
     pub fn communication_replay_root(&self) -> crate::verification::Hash {
@@ -108,6 +116,11 @@ impl VM {
     /// Drain retained output-condition diagnostics in canonical insertion order.
     pub fn drain_output_condition_checks(&mut self) -> Vec<OutputConditionCheck> {
         self.output_condition_checks.drain()
+    }
+
+    /// Drain retained delegation audit records in canonical insertion order.
+    pub fn drain_delegation_audit_log(&mut self) -> Vec<DelegationAuditRecord> {
+        self.delegation_audit_log.drain()
     }
 
     /// Drain retained communication replay-consumption artifacts in canonical insertion order.

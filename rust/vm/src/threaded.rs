@@ -43,9 +43,13 @@ use crate::output_condition::{OutputConditionCheck, OutputConditionHint};
 use crate::scheduler::Scheduler;
 use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragmentV1};
 use crate::session::{
-    unfold_if_var_with_scope, Edge, SessionId, SessionOpenPlan, SessionState, SessionStatus,
+    unfold_if_var_with_scope, Edge, OwnershipScope, SessionId, SessionOpenPlan, SessionState,
+    SessionStatus,
 };
-use crate::transfer_semantics::{decode_transfer_request, move_endpoint_bundle};
+use crate::transfer_semantics::{
+    decode_transfer_request, delegation_receipt, move_endpoint_bundle,
+    validate_delegation_coherence, DelegationAuditRecord, DelegationReceipt, DelegationStatus,
+};
 use crate::vm::{
     runtime_value_matches_val_type, runtime_value_val_type, runtime_value_wire_size_bytes,
     EffectTraceCaptureMode, MonitorMode, ObsEvent, ProgramStore, ResourceState, RunStatus, SiteId,

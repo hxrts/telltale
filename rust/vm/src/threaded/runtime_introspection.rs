@@ -11,6 +11,12 @@ impl ThreadedVM {
         &self.effect_trace
     }
 
+    /// Get recorded delegation audit records.
+    #[must_use]
+    pub fn delegation_audit_log(&self) -> &[DelegationAuditRecord] {
+        &self.delegation_audit_log
+    }
+
     /// Deterministic communication replay-state root.
     ///
     /// # Panics

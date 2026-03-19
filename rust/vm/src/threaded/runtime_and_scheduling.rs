@@ -65,6 +65,8 @@ impl ThreadedVM {
             pending_handoffs: VecDeque::new(),
             handoff_trace_log: Vec::new(),
             next_handoff_id: 0,
+            delegation_audit_log: Vec::new(),
+            next_delegation_receipt_id: 0,
             contention_metrics: ContentionMetrics::default(),
             force_invalid_wave_certificate_once: false,
             handler_identity_anchor: None,

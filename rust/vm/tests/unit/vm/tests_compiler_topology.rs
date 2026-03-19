@@ -415,6 +415,18 @@
             .progress_tokens
             .iter()
             .any(|t| t.sid == sid && t.endpoint == ep_a));
+        let audit = vm
+            .delegation_audit_log()
+            .last()
+            .expect("delegation audit should be recorded");
+        assert_eq!(audit.status, DelegationStatus::Committed);
+        assert_eq!(audit.receipt.session, sid);
+        assert_eq!(audit.receipt.from_coro, vm.coroutines[a_idx].id);
+        assert_eq!(audit.receipt.to_coro, vm.coroutines[b_idx].id);
+        assert_eq!(
+            audit.receipt.scope,
+            OwnershipScope::Fragments(BTreeSet::from(["A".to_string()]))
+        );
     }
 
     #[test]
@@ -471,6 +483,75 @@
             },
             other => panic!("expected VMError::Fault, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_transfer_rejects_cross_session_target_and_preserves_source_state() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig::default());
+        let sid1 = vm.load_choreography(&image).unwrap();
+        let sid2 = vm.load_choreography(&image).unwrap();
+
+        let a1_idx = vm
+            .coroutines
+            .iter()
+            .position(|c| c.role == "A" && c.session_id == sid1)
+            .expect("A coroutine for session 1 exists");
+        let b2_idx = vm
+            .coroutines
+            .iter()
+            .position(|c| c.role == "B" && c.session_id == sid2)
+            .expect("B coroutine for session 2 exists");
+
+        let ep_a = Endpoint {
+            sid: sid1,
+            role: "A".to_string(),
+        };
+        vm.coroutines[a1_idx].regs[2] = Value::Endpoint(ep_a.clone());
+        vm.coroutines[a1_idx].regs[3] =
+            Value::Nat(u64::try_from(vm.coroutines[b2_idx].id).expect("coroutine id fits in u64"));
+
+        let a_program_id = vm.coroutines[a1_idx].program_id;
+        vm.replace_program_for_test(a_program_id, vec![
+            Instr::Transfer {
+                endpoint: 2,
+                target: 3,
+                bundle: 0,
+            },
+            Instr::Halt,
+        ]);
+
+        let err = vm
+            .step(&PassthroughHandler)
+            .expect_err("cross-session transfer must fail");
+        match err {
+            VMError::Fault { fault, .. } => match fault {
+                Fault::Transfer { message } => {
+                    assert!(
+                        message.contains("target coroutine session"),
+                        "unexpected transfer fault message: {message}"
+                    );
+                }
+                other => panic!("expected transfer fault, got {other:?}"),
+            },
+            other => panic!("expected VMError::Fault, got {other:?}"),
+        }
+
+        assert!(
+            vm.coroutines[a1_idx].owned_endpoints.contains(&ep_a),
+            "source endpoint ownership must remain intact on failed validation"
+        );
+        assert!(
+            !vm.coroutines[b2_idx].owned_endpoints.contains(&ep_a),
+            "cross-session target must not receive endpoint ownership"
+        );
+        assert!(
+            vm.delegation_audit_log().is_empty(),
+            "failed prevalidation should not emit a committed delegation record"
+        );
     }
 
     #[test]

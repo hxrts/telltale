@@ -35,6 +35,8 @@ pub struct LaneHandoff {
     pub from_lane: LaneId,
     /// Destination lane id.
     pub to_lane: LaneId,
+    /// Explicit receipt for this endpoint handoff.
+    pub receipt: DelegationReceipt,
 }
 
 /// Serializable snapshot of lane-aware scheduler state.
@@ -121,6 +123,8 @@ pub struct ThreadedVM {
     pending_handoffs: VecDeque<LaneHandoff>,
     handoff_trace_log: Vec<LaneHandoff>,
     next_handoff_id: u64,
+    delegation_audit_log: Vec<DelegationAuditRecord>,
+    next_delegation_receipt_id: u64,
     contention_metrics: ContentionMetrics,
     force_invalid_wave_certificate_once: bool,
     handler_identity_anchor: Option<String>,

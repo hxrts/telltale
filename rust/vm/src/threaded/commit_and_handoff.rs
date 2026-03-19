@@ -1,4 +1,34 @@
 impl ThreadedVM {
+    fn issue_delegation_receipt(
+        &mut self,
+        endpoint: Endpoint,
+        from_coro: usize,
+        to_coro: usize,
+    ) -> DelegationReceipt {
+        let receipt = delegation_receipt(
+            self.next_delegation_receipt_id,
+            endpoint,
+            from_coro,
+            to_coro,
+        );
+        self.next_delegation_receipt_id = self.next_delegation_receipt_id.saturating_add(1);
+        receipt
+    }
+
+    fn record_delegation_audit(
+        &mut self,
+        receipt: DelegationReceipt,
+        status: DelegationStatus,
+        reason: Option<String>,
+    ) {
+        self.delegation_audit_log.push(DelegationAuditRecord {
+            tick: self.clock.tick,
+            receipt,
+            status,
+            reason,
+        });
+    }
+
     fn intern_edge(&mut self, edge: &Edge) -> EdgeId {
         let sender = self.role_symbols.intern(&edge.sender);
         let receiver = self.role_symbols.intern(&edge.receiver);
@@ -235,6 +265,21 @@ impl ThreadedVM {
         tick: u64,
     ) -> Result<(), Fault> {
         self.assert_delegation_handoff_owner(&endpoint, from_coro)?;
+        let source_arc = self
+            .coroutines
+            .get(from_coro)
+            .cloned()
+            .ok_or(Fault::Transfer {
+                message: "transfer source coroutine not found".into(),
+            })?;
+        let target_arc = self.coroutines.get(to_coro).cloned().ok_or(Fault::Transfer {
+            message: "target coroutine not found".into(),
+        })?;
+        {
+            let source = source_arc.lock().expect("threaded VM lock poisoned");
+            let target = target_arc.lock().expect("threaded VM lock poisoned");
+            validate_delegation_coherence(&source, &target, &endpoint, &source.role)?;
+        }
         let from_lane = self.lane_of_coro(from_coro).ok_or(Fault::Transfer {
             message: "transfer source coroutine not found".into(),
         })?;
@@ -251,11 +296,12 @@ impl ThreadedVM {
             handoff_id: self.next_handoff_id,
             tick,
             session: endpoint.sid,
-            endpoint_role: endpoint.role,
+            endpoint_role: endpoint.role.clone(),
             from_coro,
             to_coro,
             from_lane,
             to_lane,
+            receipt: self.issue_delegation_receipt(endpoint, from_coro, to_coro),
         };
         self.next_handoff_id = self.next_handoff_id.saturating_add(1);
         self.pending_handoffs.push_back(handoff.clone());
@@ -285,10 +331,7 @@ impl ThreadedVM {
     }
 
     fn apply_handoff(&mut self, handoff: &LaneHandoff) -> Result<(), Fault> {
-        let endpoint = Endpoint {
-            sid: handoff.session,
-            role: handoff.endpoint_role.clone(),
-        };
+        let endpoint = handoff.receipt.endpoint.clone();
         if handoff.from_coro == handoff.to_coro {
             let source_arc =
                 self.coroutines
@@ -298,7 +341,21 @@ impl ThreadedVM {
                         message: "transfer source coroutine not found".into(),
                     })?;
             let mut source = lock_with_contention(&source_arc, &mut self.contention_metrics);
-            move_endpoint_bundle(&endpoint, &mut source, None)
+            let source_before = source.clone();
+            let result = move_endpoint_bundle(&endpoint, &mut source, None).and_then(|_| {
+                drop(source);
+                self.assert_delegation_handoff_owner(&endpoint, handoff.to_coro)
+            });
+            if let Err(err) = result {
+                let mut source = lock_with_contention(&source_arc, &mut self.contention_metrics);
+                *source = source_before;
+                self.record_delegation_audit(
+                    handoff.receipt.clone(),
+                    DelegationStatus::RolledBack,
+                    Some(err.to_string()),
+                );
+                return Err(err);
+            }
         } else {
             let source_arc =
                 self.coroutines
@@ -319,13 +376,59 @@ impl ThreadedVM {
             if handoff.from_coro < handoff.to_coro {
                 let mut source = lock_with_contention(&source_arc, &mut self.contention_metrics);
                 let mut target = lock_with_contention(&target_arc, &mut self.contention_metrics);
-                move_endpoint_bundle(&endpoint, &mut source, Some(&mut target))
+                validate_delegation_coherence(&source, &target, &endpoint, &source.role)?;
+                let source_before = source.clone();
+                let target_before = target.clone();
+                let result = move_endpoint_bundle(&endpoint, &mut source, Some(&mut target))
+                    .and_then(|_| {
+                        drop(target);
+                        drop(source);
+                        self.assert_delegation_handoff_owner(&endpoint, handoff.to_coro)
+                    });
+                if let Err(err) = result {
+                    let mut source =
+                        lock_with_contention(&source_arc, &mut self.contention_metrics);
+                    let mut target =
+                        lock_with_contention(&target_arc, &mut self.contention_metrics);
+                    *source = source_before;
+                    *target = target_before;
+                    self.record_delegation_audit(
+                        handoff.receipt.clone(),
+                        DelegationStatus::RolledBack,
+                        Some(err.to_string()),
+                    );
+                    return Err(err);
+                }
             } else {
                 let mut target = lock_with_contention(&target_arc, &mut self.contention_metrics);
                 let mut source = lock_with_contention(&source_arc, &mut self.contention_metrics);
-                move_endpoint_bundle(&endpoint, &mut source, Some(&mut target))
+                validate_delegation_coherence(&source, &target, &endpoint, &source.role)?;
+                let source_before = source.clone();
+                let target_before = target.clone();
+                let result = move_endpoint_bundle(&endpoint, &mut source, Some(&mut target))
+                    .and_then(|_| {
+                        drop(source);
+                        drop(target);
+                        self.assert_delegation_handoff_owner(&endpoint, handoff.to_coro)
+                    });
+                if let Err(err) = result {
+                    let mut target =
+                        lock_with_contention(&target_arc, &mut self.contention_metrics);
+                    let mut source =
+                        lock_with_contention(&source_arc, &mut self.contention_metrics);
+                    *source = source_before;
+                    *target = target_before;
+                    self.record_delegation_audit(
+                        handoff.receipt.clone(),
+                        DelegationStatus::RolledBack,
+                        Some(err.to_string()),
+                    );
+                    return Err(err);
+                }
             }
         }
+        self.record_delegation_audit(handoff.receipt.clone(), DelegationStatus::Committed, None);
+        Ok(())
     }
 
     fn assert_delegation_handoff_owner(

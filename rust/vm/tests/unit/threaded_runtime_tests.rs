@@ -383,3 +383,135 @@
             other => panic!("expected transfer fault, got {other:?}"),
         }
     }
+
+    #[test]
+    fn delegation_handoff_emits_endpoint_scoped_receipt() {
+        let mut local_types = BTreeMap::new();
+        local_types.insert(
+            "A".to_string(),
+            LocalTypeR::send("B", Label::new("m"), LocalTypeR::End),
+        );
+        local_types.insert(
+            "B".to_string(),
+            LocalTypeR::recv("A", Label::new("m"), LocalTypeR::End),
+        );
+        let global = GlobalType::send("A", "B", Label::new("m"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 2);
+        let sid = vm.load_choreography(&image).expect("load choreography");
+        let endpoint = Endpoint {
+            sid,
+            role: "A".to_string(),
+        };
+
+        let mut source = None;
+        let mut target = None;
+        for coro in &vm.coroutines {
+            let guard = coro.lock().expect("coroutine lock poisoned");
+            if guard.role == "A" {
+                source = Some(guard.id);
+            } else if guard.role == "B" {
+                target = Some(guard.id);
+            }
+        }
+        let source = source.expect("source coroutine");
+        let target = target.expect("target coroutine");
+
+        vm.enqueue_handoff(endpoint.clone(), source, target, vm.clock.tick)
+            .expect("enqueue handoff");
+        let receipt = &vm.handoff_trace().last().expect("handoff trace").receipt;
+        assert_eq!(receipt.endpoint, endpoint);
+        assert_eq!(receipt.from_coro, source);
+        assert_eq!(receipt.to_coro, target);
+        assert_eq!(
+            receipt.scope,
+            OwnershipScope::Fragments(BTreeSet::from(["A".to_string()]))
+        );
+    }
+
+    #[test]
+    fn delegation_handoff_rollback_restores_source_when_apply_fails() {
+        let mut local_types = BTreeMap::new();
+        local_types.insert(
+            "A".to_string(),
+            LocalTypeR::send("B", Label::new("m"), LocalTypeR::End),
+        );
+        local_types.insert(
+            "B".to_string(),
+            LocalTypeR::recv("A", Label::new("m"), LocalTypeR::End),
+        );
+        local_types.insert("C".to_string(), LocalTypeR::End);
+        let global = GlobalType::send("A", "B", Label::new("m"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 3);
+        let sid = vm.load_choreography(&image).expect("load choreography");
+        let endpoint = Endpoint {
+            sid,
+            role: "A".to_string(),
+        };
+
+        let mut source = None;
+        let mut target = None;
+        let mut third = None;
+        for coro in &vm.coroutines {
+            let guard = coro.lock().expect("coroutine lock poisoned");
+            match guard.role.as_str() {
+                "A" => source = Some(guard.id),
+                "B" => target = Some(guard.id),
+                "C" => third = Some(guard.id),
+                _ => {}
+            }
+        }
+        let source = source.expect("source coroutine");
+        let target = target.expect("target coroutine");
+        let third = third.expect("third coroutine");
+
+        vm.enqueue_handoff(endpoint.clone(), source, target, vm.clock.tick)
+            .expect("enqueue handoff");
+
+        {
+            let third_arc = vm
+                .coroutines
+                .get(third)
+                .cloned()
+                .expect("third coroutine arc");
+            let mut third_guard = third_arc.lock().expect("coroutine lock poisoned");
+            third_guard.owned_endpoints.push(endpoint.clone());
+        }
+
+        let err = vm
+            .apply_handoffs_deterministically()
+            .expect_err("corrupted handoff apply must fail");
+        match err {
+            Fault::Transfer { message } => {
+                assert!(
+                    message.contains("delegation guard violation"),
+                    "unexpected transfer fault message: {message}"
+                );
+            }
+            other => panic!("expected transfer fault, got {other:?}"),
+        }
+
+        let source_guard = vm.coroutines[source]
+            .lock()
+            .expect("source coroutine lock poisoned");
+        let target_guard = vm.coroutines[target]
+            .lock()
+            .expect("target coroutine lock poisoned");
+        assert!(
+            source_guard.owned_endpoints.contains(&endpoint),
+            "rollback must restore source ownership"
+        );
+        assert!(
+            !target_guard.owned_endpoints.contains(&endpoint),
+            "rollback must remove any staged target ownership"
+        );
+        let audit = vm
+            .delegation_audit_log()
+            .last()
+            .expect("rollback should be audited");
+        assert_eq!(audit.status, DelegationStatus::RolledBack);
+        assert!(audit.reason.as_ref().is_some_and(|r| r.contains("delegation guard violation")));
+    }

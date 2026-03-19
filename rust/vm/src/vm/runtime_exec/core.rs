@@ -15,6 +15,8 @@ pub struct VmMemoryUsage {
     pub obs_events: usize,
     /// Number of retained effect-trace entries.
     pub effect_trace_entries: usize,
+    /// Number of retained delegation audit records.
+    pub delegation_audits: usize,
     /// Number of retained replay-consumption artifacts.
     pub communication_artifacts: usize,
     /// Number of retained output-condition checks.

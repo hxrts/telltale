@@ -541,6 +541,140 @@ impl VM {
         })
     }
 
+    fn issue_delegation_receipt(
+        &mut self,
+        endpoint: Endpoint,
+        from_coro: usize,
+        to_coro: usize,
+    ) -> DelegationReceipt {
+        let receipt = delegation_receipt(
+            self.next_delegation_receipt_id,
+            endpoint,
+            from_coro,
+            to_coro,
+        );
+        self.next_delegation_receipt_id = self.next_delegation_receipt_id.saturating_add(1);
+        receipt
+    }
+
+    fn record_delegation_audit(
+        &mut self,
+        receipt: DelegationReceipt,
+        status: DelegationStatus,
+        reason: Option<String>,
+    ) {
+        self.delegation_audit_log.push(
+            DelegationAuditRecord {
+                tick: self.clock.tick,
+                receipt,
+                status,
+                reason,
+            },
+            &self.config.observability_retention,
+        );
+    }
+
+    fn validate_delegation_transfer(
+        &self,
+        coro_idx: usize,
+        target_idx: usize,
+        role: &str,
+        endpoint: &Endpoint,
+    ) -> Result<(), Fault> {
+        validate_delegation_coherence(
+            &self.coroutines[coro_idx],
+            &self.coroutines[target_idx],
+            endpoint,
+            role,
+        )?;
+        if endpoint_owner_ids(&self.coroutines, endpoint) != vec![self.coroutines[coro_idx].id] {
+            return Err(transfer_fault_delegation_guard_violation("before"));
+        }
+        Ok(())
+    }
+
+    fn apply_delegation_transfer_with_receipt(
+        &mut self,
+        coro_idx: usize,
+        target_idx: usize,
+        receipt: &DelegationReceipt,
+    ) -> Result<(), Fault> {
+        let ep = receipt.endpoint.clone();
+        if coro_idx == target_idx {
+            let source_before = self.coroutines[coro_idx].clone();
+            let result = move_endpoint_bundle(&ep, &mut self.coroutines[coro_idx], None).and_then(
+                |_| {
+                    if endpoint_owner_ids(&self.coroutines, &ep) == vec![self.coroutines[target_idx].id]
+                    {
+                        Ok(())
+                    } else {
+                        Err(transfer_fault_delegation_guard_violation("after"))
+                    }
+                },
+            );
+            if let Err(err) = result {
+                self.coroutines[coro_idx] = source_before;
+                self.record_delegation_audit(
+                    receipt.clone(),
+                    DelegationStatus::RolledBack,
+                    Some(err.to_string()),
+                );
+                return Err(err);
+            }
+        } else if coro_idx < target_idx {
+            let source_before = self.coroutines[coro_idx].clone();
+            let target_before = self.coroutines[target_idx].clone();
+            let result = {
+                let (left, right) = self.coroutines.split_at_mut(target_idx);
+                move_endpoint_bundle(&ep, &mut left[coro_idx], Some(&mut right[0]))
+            }
+            .and_then(|_| {
+                if endpoint_owner_ids(&self.coroutines, &ep) == vec![self.coroutines[target_idx].id] {
+                    Ok(())
+                } else {
+                    Err(transfer_fault_delegation_guard_violation("after"))
+                }
+            });
+            if let Err(err) = result {
+                self.coroutines[coro_idx] = source_before;
+                self.coroutines[target_idx] = target_before;
+                self.record_delegation_audit(
+                    receipt.clone(),
+                    DelegationStatus::RolledBack,
+                    Some(err.to_string()),
+                );
+                return Err(err);
+            }
+        } else {
+            let source_before = self.coroutines[coro_idx].clone();
+            let target_before = self.coroutines[target_idx].clone();
+            let result = {
+                let (left, right) = self.coroutines.split_at_mut(coro_idx);
+                move_endpoint_bundle(&ep, &mut right[0], Some(&mut left[target_idx]))
+            }
+            .and_then(|_| {
+                if endpoint_owner_ids(&self.coroutines, &ep) == vec![self.coroutines[target_idx].id] {
+                    Ok(())
+                } else {
+                    Err(transfer_fault_delegation_guard_violation("after"))
+                }
+            });
+            if let Err(err) = result {
+                self.coroutines[coro_idx] = source_before;
+                self.coroutines[target_idx] = target_before;
+                self.record_delegation_audit(
+                    receipt.clone(),
+                    DelegationStatus::RolledBack,
+                    Some(err.to_string()),
+                );
+                return Err(err);
+            }
+        }
+
+        self.record_delegation_audit(receipt.clone(), DelegationStatus::Committed, None);
+        Ok(())
+    }
+
     pub(crate) fn step_transfer(
         &mut self,
         coro_idx: usize,
@@ -560,22 +694,13 @@ impl VM {
             .ok_or(Fault::Transfer {
                 message: "target coroutine not found".into(),
             })?;
-        if endpoint_owner_ids(&self.coroutines, &ep) != vec![self.coroutines[coro_idx].id] {
-            return Err(transfer_fault_delegation_guard_violation("before"));
-        }
-
-        if coro_idx == target_idx {
-            move_endpoint_bundle(&ep, &mut self.coroutines[coro_idx], None)?;
-        } else if coro_idx < target_idx {
-            let (left, right) = self.coroutines.split_at_mut(target_idx);
-            move_endpoint_bundle(&ep, &mut left[coro_idx], Some(&mut right[0]))?;
-        } else {
-            let (left, right) = self.coroutines.split_at_mut(coro_idx);
-            move_endpoint_bundle(&ep, &mut right[0], Some(&mut left[target_idx]))?;
-        }
-        if endpoint_owner_ids(&self.coroutines, &ep) != vec![self.coroutines[target_idx].id] {
-            return Err(transfer_fault_delegation_guard_violation("after"));
-        }
+        self.validate_delegation_transfer(coro_idx, target_idx, role, &ep)?;
+        let receipt = self.issue_delegation_receipt(
+            ep.clone(),
+            self.coroutines[coro_idx].id,
+            self.coroutines[target_idx].id,
+        );
+        self.apply_delegation_transfer_with_receipt(coro_idx, target_idx, &receipt)?;
 
         self.sched.record_cross_lane_handoff(
             self.coroutines[coro_idx].id,

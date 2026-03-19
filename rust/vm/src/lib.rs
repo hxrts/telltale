@@ -167,7 +167,11 @@ pub use trace::{
     normalize_trace, normalize_trace_v1, obs_session, strict_trace, with_tick, NormalizedTraceV1,
     TRACE_NORMALIZATION_SCHEMA_VERSION,
 };
-pub use transfer_semantics::{decode_transfer_request, move_endpoint_bundle, TransferRequest};
+pub use transfer_semantics::{
+    decode_transfer_request, delegation_receipt, delegation_scope_for_endpoint,
+    move_endpoint_bundle, validate_delegation_coherence, DelegationAuditRecord, DelegationReceipt,
+    DelegationStatus, TransferRequest,
+};
 pub use verification::{
     signValue, sign_value, verifySignedValue, verify_signed_value, AuthProof, AuthTree, Commitment,
     DefaultVerificationModel, Hash, HashTag, Nullifier, Signature, SigningKey, VerificationModel,
