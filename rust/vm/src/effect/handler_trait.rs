@@ -2,6 +2,17 @@
 ///
 /// This is the interface between the VM and the host application. Each
 /// choreography can bind a different handler at session open time.
+///
+/// Host-contract rules:
+/// - Methods on this trait are synchronous. Async I/O, transport polling,
+///   storage flushes, and background retries must happen outside callback
+///   execution and feed their results back through canonical ingress.
+/// - Implementations must treat the provided `state` as session-local scratch
+///   for the current callback only. They must not rely on unrelated session
+///   state or mutate VM session metadata through side channels.
+/// - Host-managed session-local mutation should flow through an explicit
+///   ownership capability such as `OwnedSession`, not through ad hoc access to
+///   the session store while callbacks are executing.
 pub trait EffectHandler: Send + Sync {
     /// Stable identifier for effect-trace attribution.
     fn handler_identity(&self) -> String {
@@ -147,7 +158,10 @@ pub trait EffectHandler: Send + Sync {
 
     /// Topology perturbations injected by the environment for this scheduler tick.
     ///
-    /// The VM ingests these before selecting coroutines for the round.
+    /// The VM ingests these before selecting coroutines for the round. This is
+    /// a canonical ingress surface for external events; implementations should
+    /// stage async discoveries before this method is called rather than doing
+    /// async work from inside the callback.
     ///
     /// # Errors
     ///

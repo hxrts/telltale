@@ -53,6 +53,10 @@ impl VM {
     }
 
     /// Access the session store mutably.
+    ///
+    /// This is a low-level escape hatch. Preferred host integrations should use
+    /// `OwnedSession` plus the ownership-gated session mutation APIs instead of
+    /// mutating session-local host state directly through `sessions_mut()`.
     pub fn sessions_mut(&mut self) -> &mut SessionStore {
         &mut self.sessions
     }

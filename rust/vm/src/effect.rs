@@ -6,11 +6,17 @@
 //!
 //! Normative integration contract:
 //! - `topology_events` is queried once per scheduler round before pick/dispatch.
+//! - external host events must enter through canonical ingress such as
+//!   `topology_events`, `send_decision`, `handle_recv`, `step`, or
+//!   `output_condition_hint`; embedders should not mutate session-local host
+//!   state from ad hoc side channels during callback execution.
 //! - `send_decision` is the canonical send hook for `Send` and `Offer`.
 //! - `handle_recv` is the canonical receive hook for `Receive` and `Choose`.
 //! - `step` is called only from the `Invoke` instruction.
 //! - `output_condition_hint` is queried only for eventful commits.
 //! - `handle_send` and `handle_choose` are compatibility hooks.
+//! - any host mutation of session-local runtime state should be routed through
+//!   an explicit ownership capability such as `OwnedSession`.
 //!
 //! This is intentionally **not** the same as `telltale_choreography::ChoreoHandler`:
 //! the VM handler is synchronous, session-local, and operates on bytecode state,

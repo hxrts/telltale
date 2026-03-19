@@ -1,0 +1,135 @@
+//! Preferred owned-session helpers for host integration.
+//!
+//! These wrappers are the preferred public path for embedders that want to
+//! respect the host-runtime ownership contract. Lower-level session accessors
+//! remain available for tests and internal runtime wiring, but production host
+//! mutation should flow through an owned capability.
+
+use crate::loader::CodeImage;
+use crate::session::{
+    OwnershipCapability, OwnershipError, OwnershipReceipt, OwnershipScope, SessionHostMutation,
+    SessionId,
+};
+use crate::vm::{VMError, VM};
+
+/// Capability-bearing handle returned by the preferred owned open path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OwnedSession {
+    session_id: SessionId,
+    capability: OwnershipCapability,
+}
+
+impl OwnedSession {
+    pub(crate) fn new(session_id: SessionId, capability: OwnershipCapability) -> Self {
+        Self {
+            session_id,
+            capability,
+        }
+    }
+
+    /// Session identifier for this owned handle.
+    #[must_use]
+    pub fn session_id(&self) -> SessionId {
+        self.session_id
+    }
+
+    /// Live ownership capability carried by this handle.
+    #[must_use]
+    pub fn capability(&self) -> &OwnershipCapability {
+        &self.capability
+    }
+
+    /// Apply one session-local host mutation through the ownership gate.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the capability is stale or lacks scope.
+    pub fn apply_host_mutation(
+        &self,
+        vm: &mut VM,
+        mutation: SessionHostMutation,
+    ) -> Result<(), OwnershipError> {
+        vm.sessions_mut()
+            .apply_owned_session_mutation(&self.capability, mutation)
+    }
+
+    /// Begin an explicit ownership transfer from this handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the capability is stale.
+    pub fn begin_transfer(
+        &self,
+        vm: &mut VM,
+        new_owner_id: impl Into<String>,
+        new_scope: OwnershipScope,
+    ) -> Result<OwnershipReceipt, OwnershipError> {
+        vm.sessions_mut()
+            .begin_ownership_transfer(&self.capability, new_owner_id, new_scope)
+    }
+
+    /// Commit an explicit ownership transfer and return the refreshed handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the receipt is stale or mismatched.
+    pub fn commit_transfer(
+        &self,
+        vm: &mut VM,
+        receipt: &OwnershipReceipt,
+    ) -> Result<Self, OwnershipError> {
+        let capability = vm.sessions_mut().commit_ownership_transfer(receipt)?;
+        Ok(Self::new(receipt.session_id, capability))
+    }
+
+    /// Attenuate the handle scope and return the refreshed capability.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the capability is stale or transfer-pending.
+    pub fn attenuate_scope(
+        &self,
+        vm: &mut VM,
+        new_scope: OwnershipScope,
+    ) -> Result<Self, OwnershipError> {
+        let capability = vm
+            .sessions_mut()
+            .attenuate_ownership_scope(&self.capability, new_scope)?;
+        Ok(Self::new(self.session_id, capability))
+    }
+
+    /// Release the live ownership claim for this handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the capability is stale.
+    pub fn release(&self, vm: &mut VM) -> Result<(), OwnershipError> {
+        vm.sessions_mut().release_ownership(&self.capability)
+    }
+}
+
+impl VM {
+    /// Preferred choreography open path that immediately claims session ownership.
+    ///
+    /// Lower-level `load_choreography(...)` remains available for runtime
+    /// internals and tests. Third-party host integrations should prefer this
+    /// owned helper so subsequent session-local mutation flows through an
+    /// explicit ownership capability.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `VMError` if the choreography cannot be loaded or the initial
+    /// ownership claim fails.
+    pub fn load_choreography_owned(
+        &mut self,
+        image: &CodeImage,
+        owner_id: impl Into<String>,
+    ) -> Result<OwnedSession, VMError> {
+        let sid = self.load_choreography(image)?;
+        let capability = self
+            .sessions_mut()
+            .claim_ownership(sid, owner_id, OwnershipScope::Session)
+            .map_err(|err| VMError::OwnershipContract(format!("{err:?}")))?;
+        Ok(OwnedSession::new(sid, capability))
+    }
+}

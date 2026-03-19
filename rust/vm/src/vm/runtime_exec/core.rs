@@ -343,6 +343,10 @@ impl VM {
     /// and returns the session ID. Type state is initialized in the
     /// session store — no separate monitor needed.
     ///
+    /// This is the low-level open path. Third-party embedders that want the
+    /// stronger host ownership contract should prefer
+    /// `load_choreography_owned(...)`.
+    ///
     /// # Errors
     ///
     /// Returns an error if session or coroutine limits are exceeded.

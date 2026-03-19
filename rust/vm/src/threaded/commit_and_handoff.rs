@@ -214,6 +214,11 @@ impl ThreadedVM {
             self.apply_handoffs_deterministically()?;
         }
 
+        self.assert_delegation_events_audited(&pack.events)
+            .map_err(|err| Fault::Invoke {
+                message: err.to_string(),
+            })?;
+
         self.trace.extend(pack.events);
         let coro_guard = coro.lock().expect("threaded VM lock poisoned");
 

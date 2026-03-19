@@ -231,6 +231,11 @@ impl VM {
             }
         }
 
+        self.assert_delegation_events_audited(&pack.events)
+            .map_err(|err| Fault::Invoke {
+                message: err.to_string(),
+            })?;
+
         // Emit events.
         self.obs_trace
             .extend(pack.events, &self.config.observability_retention);

@@ -54,6 +54,9 @@ pub enum VMError {
         /// Validation failure details.
         reason: String,
     },
+    /// Ownership contract violation surfaced by a preferred host integration path.
+    #[error("ownership contract error: {0}")]
+    OwnershipContract(String),
 }
 
 // ---- StepPack: atomic instruction result (matches Lean StepPack) ----

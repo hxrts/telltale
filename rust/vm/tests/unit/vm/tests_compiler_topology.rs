@@ -555,6 +555,61 @@
     }
 
     #[test]
+    fn test_load_choreography_owned_claims_owner_and_routes_mutation() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig::default());
+        let owned = vm
+            .load_choreography_owned(&image, "runtime/owner")
+            .expect("owned open should succeed");
+        assert_eq!(owned.capability().owner_id, "runtime/owner");
+        assert_eq!(owned.capability().scope, OwnershipScope::Session);
+
+        let edge = Edge::new(owned.session_id(), "A", "B");
+        owned
+            .apply_host_mutation(
+                &mut vm,
+                SessionHostMutation::UpdateTrace {
+                    edge: edge.clone(),
+                    trace: vec![ValType::Nat],
+                },
+            )
+            .expect("owned mutation should succeed");
+        assert_eq!(
+            vm.sessions().lookup_trace(&edge),
+            Some([ValType::Nat].as_slice())
+        );
+    }
+
+    #[test]
+    fn test_host_contract_assertions_reject_unaudited_transfer_events() {
+        let vm = VM::new(VMConfig {
+            host_contract_assertions: true,
+            ..VMConfig::default()
+        });
+        let err = vm
+            .assert_delegation_events_audited(&[ObsEvent::Transferred {
+                tick: 0,
+                session: 9,
+                role: "A".to_string(),
+                from: 1,
+                to: 2,
+            }])
+            .expect_err("unaudited transfer event must fail host assertion");
+        match err {
+            VMError::HandlerError(message) => {
+                assert!(
+                    message.contains("matching committed delegation audit record"),
+                    "unexpected error message: {message}"
+                );
+            }
+            other => panic!("expected handler error, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn test_check_applies_flow_policy() {
         let local_types = simple_send_recv_types();
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);

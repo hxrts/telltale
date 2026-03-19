@@ -303,6 +303,39 @@ impl ThreadedVM {
         Ok(())
     }
 
+    fn assert_delegation_events_audited(&self, events: &[ObsEvent]) -> Result<(), VMError> {
+        if !self.config.host_contract_assertions {
+            return Ok(());
+        }
+        for event in events {
+            let ObsEvent::Transferred {
+                session,
+                role,
+                from,
+                to,
+                ..
+            } = event
+            else {
+                continue;
+            };
+            let expected_scope = OwnershipScope::Fragments(BTreeSet::from([role.clone()]));
+            let found = self.delegation_audit_log.iter().rev().any(|audit| {
+                audit.status == DelegationStatus::Committed
+                    && audit.receipt.session == *session
+                    && audit.receipt.endpoint.role == *role
+                    && audit.receipt.from_coro == *from
+                    && audit.receipt.to_coro == *to
+                    && audit.receipt.scope == expected_scope
+            });
+            if !found {
+                return Err(VMError::HandlerError(format!(
+                    "[host-contract] transfer event for session {session} role {role} must have a matching committed delegation audit record"
+                )));
+            }
+        }
+        Ok(())
+    }
+
     fn ingest_topology_events(&mut self, handler: &dyn EffectHandler) -> Result<(), VMError> {
         let tick = self.clock.tick;
         let handler_identity = handler.handler_identity();

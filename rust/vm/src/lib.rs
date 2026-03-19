@@ -75,6 +75,7 @@ pub mod kernel;
 pub mod loader;
 pub mod nested;
 pub mod output_condition;
+pub mod owned;
 pub mod persistence;
 pub mod runtime_contracts;
 pub mod scheduler;
@@ -143,6 +144,7 @@ pub use output_condition::{
     verify_output_condition, OutputConditionCheck, OutputConditionHint, OutputConditionMeta,
     OutputConditionPolicy,
 };
+pub use owned::OwnedSession;
 pub use persistence::{NoopPersistence, PersistenceModel};
 pub use runtime_contracts::{
     admit_vm_runtime, determinism_profile_supported, enforce_vm_runtime_gates,
