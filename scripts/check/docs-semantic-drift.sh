@@ -14,7 +14,11 @@ import sys
 from pathlib import Path
 
 root = Path.cwd()
-doc_files = [root / "CLAUDE.md", *sorted((root / "docs").rglob("*.md"))]
+doc_files = [
+    path
+    for path in [root / "CLAUDE.md", *sorted((root / "docs").rglob("*.md"))]
+    if path.exists()
+]
 
 metadata = json.loads(
     subprocess.check_output(
