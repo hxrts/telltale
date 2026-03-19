@@ -159,6 +159,15 @@ check-vm-placeholders:
 check-parity mode="--all":
     ./scripts/check/cross-runtime-parity.sh {{ mode }}
 
+# Focused ownership-contract assertions, delegation negatives, and replay checks.
+check-ownership-contracts:
+    cargo test -p telltale-vm --lib ownership_
+    cargo test -p telltale-vm --test ownership_contracts -- --nocapture
+    cargo test -p telltale-vm --test serialization_replay ownership_transfer_ -- --nocapture
+    cargo test -p telltale-vm --features multi-thread --test ownership_contracts threaded_ownership_ -- --nocapture
+    cargo test -p telltale-vm --features multi-thread --test serialization_replay threaded_ownership_transfer_ -- --nocapture
+    cargo test -p telltale-simulator --test ownership_faults -- --nocapture
+
 # Enforce parity type ledger plus deviation registry presence/shape.
 check-parity-ledger:
     ./scripts/check/parity-ledger.sh

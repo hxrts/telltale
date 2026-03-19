@@ -1,0 +1,181 @@
+//! Simulator fault scenarios covering ownership handoff and owner failure behavior.
+
+use std::collections::BTreeMap;
+
+use telltale_simulator::fault::{Fault, FaultInjector, FaultSchedule, ScheduledFault, Trigger};
+use telltale_simulator::rng::SimRng;
+use telltale_types::{GlobalType, LocalTypeR};
+use telltale_vm::buffer::EnqueueResult;
+use telltale_vm::coroutine::Value;
+use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
+use telltale_vm::instr::{ImmValue, Instr};
+use telltale_vm::loader::CodeImage;
+use telltale_vm::vm::{ObsEvent, StepResult, VMConfig, VM};
+
+#[derive(Debug, Clone, Copy)]
+struct NoopHandler;
+
+impl EffectHandler for NoopHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &[Value],
+    ) -> Result<Value, String> {
+        Ok(Value::Unit)
+    }
+
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<Value>,
+        _payload: &Value,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[Value],
+    ) -> Result<String, String> {
+        labels
+            .first()
+            .cloned()
+            .ok_or_else(|| "no labels available".to_string())
+    }
+
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+fn transfer_image() -> CodeImage {
+    let mut local_types = BTreeMap::new();
+    local_types.insert("A".to_string(), LocalTypeR::End);
+    local_types.insert("B".to_string(), LocalTypeR::End);
+
+    let mut programs = BTreeMap::new();
+    programs.insert(
+        "A".to_string(),
+        vec![
+            Instr::Set {
+                dst: 1,
+                val: ImmValue::Nat(1),
+            },
+            Instr::Transfer {
+                endpoint: 0,
+                target: 1,
+                bundle: 2,
+            },
+            Instr::Halt,
+        ],
+    );
+    programs.insert("B".to_string(), vec![Instr::Halt]);
+
+    CodeImage {
+        programs,
+        global_type: GlobalType::End,
+        local_types,
+    }
+}
+
+fn run_faulted_transfer(schedule: FaultSchedule, max_rounds: usize) -> VM {
+    let mut vm = VM::new(VMConfig::default());
+    vm.load_choreography(&transfer_image())
+        .expect("load transfer fixture");
+    let fault = FaultInjector::new(NoopHandler, schedule, SimRng::new(7));
+
+    for logical_step in 1..=max_rounds {
+        let next_tick = vm.clock().tick + 1;
+        fault
+            .tick(
+                next_tick,
+                u64::try_from(logical_step).expect("logical step fits in u64"),
+                vm.trace(),
+            )
+            .expect("advance fault schedule");
+        fault
+            .deliver(next_tick, |sid, from, to, value| {
+                vm.inject_message(sid, from, to, value)
+                    .map_err(|err| err.to_string())
+                    .map(|result| match result {
+                        EnqueueResult::Ok => EnqueueResult::Ok,
+                        EnqueueResult::Dropped => EnqueueResult::Dropped,
+                        EnqueueResult::WouldBlock => EnqueueResult::WouldBlock,
+                        EnqueueResult::Full => EnqueueResult::Full,
+                    })
+            })
+            .expect("deliver delayed messages");
+        vm.set_paused_roles(
+            &fault
+                .crashed_roles()
+                .expect("read currently crashed simulator roles"),
+        );
+        match vm.step_round(&fault, 1).expect("step transfer fixture") {
+            StepResult::Continue => {}
+            StepResult::AllDone | StepResult::Stuck => break,
+        }
+    }
+
+    vm
+}
+
+#[test]
+fn ownership_owner_failure_before_handoff_emits_no_transfer_event() {
+    let schedule = FaultSchedule {
+        faults: vec![ScheduledFault {
+            fault: Fault::NodeCrash {
+                role: "A".to_string(),
+                duration: None,
+            },
+            trigger: Trigger::AtTick(1),
+            duration: None,
+        }],
+        max_concurrent: 1,
+    };
+    let vm = run_faulted_transfer(schedule, 8);
+
+    assert!(
+        vm.trace()
+            .iter()
+            .all(|event| !matches!(event, ObsEvent::Transferred { .. })),
+        "crashing the current owner before the transfer should suppress handoff observables"
+    );
+}
+
+#[test]
+fn ownership_handoff_race_with_target_crash_keeps_transfer_observable() {
+    let schedule = FaultSchedule {
+        faults: vec![ScheduledFault {
+            fault: Fault::NodeCrash {
+                role: "B".to_string(),
+                duration: None,
+            },
+            trigger: Trigger::AtTick(1),
+            duration: None,
+        }],
+        max_concurrent: 1,
+    };
+    let vm = run_faulted_transfer(schedule, 8);
+
+    let transfers: Vec<_> = vm
+        .trace()
+        .iter()
+        .filter(|event| matches!(event, ObsEvent::Transferred { .. }))
+        .collect();
+    assert_eq!(
+        transfers.len(),
+        1,
+        "target crash should not erase the explicit ownership handoff observable"
+    );
+}

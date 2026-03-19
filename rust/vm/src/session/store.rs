@@ -772,6 +772,7 @@ impl SessionStore {
     }
 
     /// Update coherence trace for an edge.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn update_trace(&mut self, edge: &Edge, trace: Vec<ValType>) {
         if let Some(session) = self.sessions.get_mut(&edge.sid) {
             session.edge_traces.insert(edge.clone(), trace);

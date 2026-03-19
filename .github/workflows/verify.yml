@@ -52,6 +52,11 @@ jobs:
           mkdir -p artifacts
           just check-parity | tee artifacts/check-parity.log
 
+      - name: Run ownership contract checks
+        run: |
+          mkdir -p artifacts
+          just check-ownership-contracts | tee artifacts/check-ownership-contracts.log
+
       - name: Run docs drift checks
         run: |
           mkdir -p artifacts
@@ -136,6 +141,11 @@ jobs:
         run: |
           mkdir -p artifacts
           just check-parity | tee artifacts/check-parity.log
+
+      - name: Run ownership contract checks
+        run: |
+          mkdir -p artifacts
+          just check-ownership-contracts | tee artifacts/check-ownership-contracts.log
 
       - name: Run docs drift checks
         run: |

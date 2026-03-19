@@ -549,6 +549,7 @@ impl SessionState {
 
     /// Read the current host/runtime ownership state.
     #[must_use]
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn ownership(&self) -> &SessionOwnershipState {
         &self.ownership
     }

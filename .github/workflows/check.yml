@@ -40,6 +40,8 @@ jobs:
         run: ./scripts/check/vm-placeholders.sh
       - name: Run parity checks
         run: ./scripts/check/cross-runtime-parity.sh --all
+      - name: Run ownership contract checks
+        run: just check-ownership-contracts
       - name: Check docs drift
         run: ./scripts/check/docs-drift.sh
       - name: Check docs links referenced from code

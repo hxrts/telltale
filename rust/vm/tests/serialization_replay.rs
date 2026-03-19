@@ -10,6 +10,7 @@ mod test_support;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
+use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::effect::{
     EffectHandler, EffectTraceEntry, SendDecision, SendDecisionInput, TopologyPerturbation,
 };
@@ -229,6 +230,63 @@ fn run_replay_shared_accepts_arc_backed_trace() {
     );
 }
 
+fn transfer_image() -> telltale_vm::loader::CodeImage {
+    let mut local_types = BTreeMap::new();
+    local_types.insert("A".to_string(), LocalTypeR::End);
+    local_types.insert("B".to_string(), LocalTypeR::End);
+
+    let mut programs = BTreeMap::new();
+    programs.insert(
+        "A".to_string(),
+        vec![
+            telltale_vm::instr::Instr::Set {
+                dst: 1,
+                val: telltale_vm::instr::ImmValue::Nat(1),
+            },
+            telltale_vm::instr::Instr::Transfer {
+                endpoint: 0,
+                target: 1,
+                bundle: 2,
+            },
+            telltale_vm::instr::Instr::Halt,
+        ],
+    );
+    programs.insert("B".to_string(), vec![telltale_vm::instr::Instr::Halt]);
+
+    telltale_vm::loader::CodeImage {
+        programs,
+        global_type: GlobalType::End,
+        local_types,
+    }
+}
+
+#[test]
+fn ownership_transfer_replay_preserves_observable_trace() {
+    let image = transfer_image();
+    let handler = PassthroughHandler;
+
+    let mut baseline = VM::new(VMConfig::default());
+    baseline.load_choreography(&image).expect("load baseline");
+    baseline.run(&handler, 32).expect("run baseline");
+    let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
+    let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(baseline.effect_trace());
+
+    let mut replay_vm = VM::new(VMConfig::default());
+    replay_vm.load_choreography(&image).expect("load replay VM");
+    replay_vm
+        .run_replay_shared(&handler, replay_trace, 32)
+        .expect("run replay VM");
+    let replay_obs = replay_vm.canonical_replay_fragment().obs_trace;
+
+    assert_eq!(baseline_obs, replay_obs);
+    assert!(
+        replay_obs
+            .iter()
+            .any(|event| matches!(event, ObsEvent::Transferred { role, .. } if role == "A")),
+        "replayed ownership transfer must retain the transfer observable"
+    );
+}
+
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
         fn obs_signature(trace: &[ObsEvent]) -> Vec<String> {
@@ -336,6 +394,33 @@ cfg_if! {
             assert_eq!(
                 baseline_effect_semantics, replay_effect_semantics,
                 "threaded arc-backed replay must preserve effect semantics (excluding handler identity)"
+            );
+        }
+
+        #[test]
+        fn threaded_ownership_transfer_replay_preserves_observable_trace() {
+            let image = transfer_image();
+            let handler = PassthroughHandler;
+
+            let mut baseline = ThreadedVM::with_workers(VMConfig::default(), 2);
+            baseline.load_choreography(&image).expect("load baseline");
+            baseline.run(&handler, 32).expect("run baseline");
+            let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
+            let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(baseline.effect_trace());
+
+            let mut replay_vm = ThreadedVM::with_workers(VMConfig::default(), 2);
+            replay_vm.load_choreography(&image).expect("load replay VM");
+            replay_vm
+                .run_replay_shared(&handler, replay_trace, 32)
+                .expect("run replay VM");
+            let replay_obs = replay_vm.canonical_replay_fragment().obs_trace;
+
+            assert_eq!(baseline_obs, replay_obs);
+            assert!(
+                replay_obs
+                    .iter()
+                    .any(|event| matches!(event, ObsEvent::Transferred { role, .. } if role == "A")),
+                "replayed threaded ownership transfer must retain the transfer observable"
             );
         }
     }

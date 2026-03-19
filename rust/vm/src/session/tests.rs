@@ -646,6 +646,38 @@
     }
 
     #[test]
+    fn ownership_release_rejects_pending_transfer_and_preserves_owner() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+        let owner = store
+            .claim_ownership(sid, "owner/a", OwnershipScope::Session)
+            .expect("claim ownership");
+        let receipt = store
+            .begin_ownership_transfer(&owner, "owner/b", OwnershipScope::Session)
+            .expect("stage transfer");
+
+        let err = store
+            .release_ownership(&owner)
+            .expect_err("release must fail while transfer is pending");
+        assert_eq!(
+            err,
+            OwnershipError::TransferPending {
+                session_id: sid,
+                claim_id: receipt.claim_id,
+            }
+        );
+        assert_eq!(
+            store.current_ownership(sid),
+            Some(&owner),
+            "failed release must preserve the live owner capability"
+        );
+    }
+
+    #[test]
     fn test_owner_death_faults_session_and_records_terminal_reason() {
         let mut store = SessionStore::new();
         let sid = store.open(
@@ -732,6 +764,61 @@
                 claim_id: receipt2.claim_id,
                 reason: "commit witness missing".to_string(),
             })
+        );
+    }
+
+    #[test]
+    fn ownership_terminal_session_rejects_reclaim_and_mutation() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+        let edge = Edge::new(sid, "A", "B");
+        let owner = store
+            .claim_ownership(sid, "owner/a", OwnershipScope::Session)
+            .expect("claim ownership");
+        let receipt = store
+            .begin_ownership_transfer(&owner, "owner/b", OwnershipScope::Session)
+            .expect("stage transfer");
+
+        store
+            .cancel_abandoned_transfer(&receipt)
+            .expect("abandoned transfer should terminate session");
+
+        let reclaim = store
+            .claim_ownership(sid, "owner/c", OwnershipScope::Session)
+            .expect_err("terminal session must reject reclaim");
+        assert_eq!(
+            reclaim,
+            OwnershipError::Terminal {
+                session_id: sid,
+                reason: OwnershipTerminalReason::TransferAbandoned {
+                    owner_id: "owner/a".to_string(),
+                    claim_id: receipt.claim_id,
+                },
+            }
+        );
+
+        let mutate = store
+            .apply_owned_session_mutation(
+                &owner,
+                SessionHostMutation::UpdateTrace {
+                    edge,
+                    trace: vec![ValType::Nat],
+                },
+            )
+            .expect_err("terminal session must reject stale host mutation");
+        assert_eq!(
+            mutate,
+            OwnershipError::Terminal {
+                session_id: sid,
+                reason: OwnershipTerminalReason::TransferAbandoned {
+                    owner_id: "owner/a".to_string(),
+                    claim_id: receipt.claim_id,
+                },
+            }
         );
     }
 
