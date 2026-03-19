@@ -412,18 +412,36 @@
             &BTreeMap::new(),
         );
         let edge = Edge::new(sid, "A", "B");
+        let owner = store
+            .claim_ownership(sid, "runtime/owner", OwnershipScope::Session)
+            .expect("claim ownership");
 
         assert!(store.lookup_handler(&edge).is_none());
         assert_eq!(
             store.default_handler_for_session(sid).map(String::as_str),
             Some(DEFAULT_HANDLER_ID)
         );
-        store.update_handler(&edge, "handler/send".to_string());
+        store
+            .apply_owned_session_mutation(
+                &owner,
+                SessionHostMutation::UpdateEdgeHandler {
+                    edge: edge.clone(),
+                    handler: "handler/send".to_string(),
+                },
+            )
+            .expect("owned edge handler update");
         assert_eq!(
             store.lookup_handler(&edge).map(String::as_str),
             Some("handler/send")
         );
-        store.set_default_handler_for_session(sid, "handler/default".to_string());
+        store
+            .apply_owned_session_mutation(
+                &owner,
+                SessionHostMutation::SetDefaultHandler {
+                    handler: "handler/default".to_string(),
+                },
+            )
+            .expect("owned default handler update");
         assert_eq!(
             store.default_handler_for_session(sid).map(String::as_str),
             Some("handler/default")
@@ -434,8 +452,287 @@
         );
 
         assert!(store.lookup_trace(&edge).is_none());
-        store.update_trace(&edge, vec![ValType::Nat]);
+        store
+            .apply_owned_session_mutation(
+                &owner,
+                SessionHostMutation::UpdateTrace {
+                    edge: edge.clone(),
+                    trace: vec![ValType::Nat],
+                },
+            )
+            .expect("owned trace update");
         assert_eq!(store.lookup_trace(&edge), Some([ValType::Nat].as_slice()));
+    }
+
+    #[test]
+    fn test_claim_rejects_overlapping_owner() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+
+        let owner = store
+            .claim_ownership(sid, "owner/a", OwnershipScope::Session)
+            .expect("first claim should succeed");
+        assert_eq!(owner.generation, 0);
+
+        let err = store
+            .claim_ownership(sid, "owner/b", OwnershipScope::Session)
+            .expect_err("overlapping claim must fail");
+        assert_eq!(
+            err,
+            OwnershipError::AlreadyClaimed {
+                session_id: sid,
+                current_owner_id: "owner/a".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_transfer_invalidates_prior_owner_handle() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+        let edge = Edge::new(sid, "A", "B");
+        let owner = store
+            .claim_ownership(sid, "owner/a", OwnershipScope::Session)
+            .expect("claim ownership");
+        let receipt = store
+            .begin_ownership_transfer(&owner, "owner/b", OwnershipScope::Session)
+            .expect("stage transfer");
+        let new_owner = store
+            .commit_ownership_transfer(&receipt)
+            .expect("commit transfer");
+        assert_eq!(new_owner.owner_id, "owner/b");
+        assert_eq!(new_owner.generation, owner.generation + 1);
+
+        let stale = store
+            .apply_owned_session_mutation(
+                &owner,
+                SessionHostMutation::UpdateTrace {
+                    edge: edge.clone(),
+                    trace: vec![ValType::Nat],
+                },
+            )
+            .expect_err("stale owner must fail");
+        assert_eq!(
+            stale,
+            OwnershipError::StaleCapability {
+                session_id: sid,
+                owner_id: "owner/a".to_string(),
+                expected_generation: 0,
+                actual_generation: 1,
+            }
+        );
+
+        store
+            .apply_owned_session_mutation(
+                &new_owner,
+                SessionHostMutation::UpdateTrace {
+                    edge,
+                    trace: vec![ValType::Bool],
+                },
+            )
+            .expect("new owner may mutate");
+    }
+
+    #[test]
+    fn test_scope_attenuation_reuses_label_but_invalidates_generation() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+        let edge = Edge::new(sid, "A", "B");
+        let owner = store
+            .claim_ownership(sid, "owner/a", OwnershipScope::Session)
+            .expect("claim ownership");
+
+        let attenuated = store
+            .attenuate_ownership_scope(
+                &owner,
+                OwnershipScope::Fragments(BTreeSet::from(["bundle/alpha".to_string()])),
+            )
+            .expect("attenuate scope");
+        assert_eq!(attenuated.owner_id, owner.owner_id);
+        assert_eq!(attenuated.generation, owner.generation + 1);
+
+        let stale = store
+            .apply_owned_session_mutation(
+                &owner,
+                SessionHostMutation::SetDefaultHandler {
+                    handler: "handler/default".to_string(),
+                },
+            )
+            .expect_err("old generation must be stale");
+        assert_eq!(
+            stale,
+            OwnershipError::StaleCapability {
+                session_id: sid,
+                owner_id: "owner/a".to_string(),
+                expected_generation: 0,
+                actual_generation: 1,
+            }
+        );
+
+        let scope_err = store
+            .apply_owned_session_mutation(
+                &attenuated,
+                SessionHostMutation::UpdateTrace {
+                    edge,
+                    trace: vec![ValType::Nat],
+                },
+            )
+            .expect_err("fragment scope must not mutate session-local host state");
+        assert_eq!(
+            scope_err,
+            OwnershipError::ScopeViolation {
+                session_id: sid,
+                owner_id: "owner/a".to_string(),
+                required: OwnershipScope::Session,
+                actual: OwnershipScope::Fragments(BTreeSet::from([
+                    "bundle/alpha".to_string()
+                ])),
+            }
+        );
+    }
+
+    #[test]
+    fn test_transfer_rollback_is_claim_specific_and_preserves_current_owner() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+        let edge = Edge::new(sid, "A", "B");
+        let owner = store
+            .claim_ownership(sid, "owner/a", OwnershipScope::Session)
+            .expect("claim ownership");
+        let receipt = store
+            .begin_ownership_transfer(
+                &owner,
+                "owner/b",
+                OwnershipScope::Fragments(BTreeSet::from(["bundle/beta".to_string()])),
+            )
+            .expect("stage transfer");
+
+        store
+            .rollback_ownership_transfer(&receipt)
+            .expect("rollback staged transfer");
+        let session = store.get(sid).expect("session exists");
+        assert!(session.ownership().pending_transfer.is_none());
+        assert_eq!(
+            session.ownership().current.as_ref(),
+            Some(&owner),
+            "rollback must preserve the preexisting current owner"
+        );
+
+        store
+            .apply_owned_session_mutation(
+                &owner,
+                SessionHostMutation::UpdateTrace {
+                    edge,
+                    trace: vec![ValType::Nat],
+                },
+            )
+            .expect("original owner must remain live after rollback");
+    }
+
+    #[test]
+    fn test_owner_death_faults_session_and_records_terminal_reason() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+        store
+            .claim_ownership(sid, "owner/a", OwnershipScope::Session)
+            .expect("claim ownership");
+
+        store
+            .mark_owner_died(sid, "owner/a")
+            .expect("owner death should fault session");
+
+        let session = store.get(sid).expect("session exists");
+        assert_eq!(
+            session.status,
+            SessionStatus::Faulted {
+                reason: "ownership owner `owner/a` died".to_string(),
+            }
+        );
+        assert_eq!(
+            session.ownership().terminal_reason,
+            Some(OwnershipTerminalReason::OwnerDied {
+                owner_id: "owner/a".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn test_abandoned_and_failed_transfer_are_terminal() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+        let owner = store
+            .claim_ownership(sid, "owner/a", OwnershipScope::Session)
+            .expect("claim ownership");
+        let receipt = store
+            .begin_ownership_transfer(&owner, "owner/b", OwnershipScope::Session)
+            .expect("stage transfer");
+
+        store
+            .cancel_abandoned_transfer(&receipt)
+            .expect("abandoned transfer should cancel session");
+        let cancelled = store.get(sid).expect("session exists");
+        assert_eq!(cancelled.status, SessionStatus::Cancelled);
+        assert_eq!(
+            cancelled.ownership().terminal_reason,
+            Some(OwnershipTerminalReason::TransferAbandoned {
+                owner_id: "owner/a".to_string(),
+                claim_id: receipt.claim_id,
+            })
+        );
+
+        let sid2 = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+        let owner2 = store
+            .claim_ownership(sid2, "owner/c", OwnershipScope::Session)
+            .expect("claim ownership");
+        let receipt2 = store
+            .begin_ownership_transfer(&owner2, "owner/d", OwnershipScope::Session)
+            .expect("stage transfer");
+        store
+            .fault_failed_transfer_commit(&receipt2, "commit witness missing")
+            .expect("failed transfer commit should fault session");
+        let faulted = store.get(sid2).expect("session exists");
+        assert_eq!(
+            faulted.status,
+            SessionStatus::Faulted {
+                reason: "ownership transfer commit failed: commit witness missing".to_string(),
+            }
+        );
+        assert_eq!(
+            faulted.ownership().terminal_reason,
+            Some(OwnershipTerminalReason::TransferCommitFailed {
+                owner_id: "owner/c".to_string(),
+                claim_id: receipt2.claim_id,
+                reason: "commit witness missing".to_string(),
+            })
+        );
     }
 
     #[test]

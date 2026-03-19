@@ -26,6 +26,7 @@ impl<'de> Deserialize<'de> for SessionState {
             edge_traces: raw.edge_traces,
             status: raw.status,
             epoch: raw.epoch,
+            ownership: raw.ownership,
         };
         session.rebuild_derived_indexes();
         Ok(session)
@@ -45,6 +46,75 @@ pub struct SessionStore {
 }
 
 impl SessionStore {
+    fn session_mut_or_error(
+        &mut self,
+        sid: SessionId,
+    ) -> Result<&mut SessionState, OwnershipError> {
+        self.sessions
+            .get_mut(&sid)
+            .ok_or(OwnershipError::SessionNotFound { session_id: sid })
+    }
+
+    fn terminal_error(session: &SessionState) -> Option<OwnershipError> {
+        session
+            .ownership
+            .terminal_reason
+            .clone()
+            .map(|reason| OwnershipError::Terminal {
+                session_id: session.sid,
+                reason,
+            })
+    }
+
+    fn ensure_mutable_ownership(session: &SessionState) -> Result<(), OwnershipError> {
+        if let Some(err) = Self::terminal_error(session) {
+            return Err(err);
+        }
+        Ok(())
+    }
+
+    fn validate_current_owner(
+        session: &SessionState,
+        capability: &OwnershipCapability,
+    ) -> Result<(), OwnershipError> {
+        Self::ensure_mutable_ownership(session)?;
+        let Some(current) = session.ownership.current.as_ref() else {
+            return Err(OwnershipError::Unclaimed {
+                session_id: session.sid,
+            });
+        };
+        if current.owner_id != capability.owner_id || current.generation != capability.generation {
+            return Err(OwnershipError::StaleCapability {
+                session_id: session.sid,
+                owner_id: capability.owner_id.clone(),
+                expected_generation: capability.generation,
+                actual_generation: current.generation,
+            });
+        }
+        Ok(())
+    }
+
+    fn require_session_scope(
+        session: &SessionState,
+        capability: &OwnershipCapability,
+    ) -> Result<(), OwnershipError> {
+        Self::validate_current_owner(session, capability)?;
+        let Some(current) = session.ownership.current.as_ref() else {
+            return Err(OwnershipError::Unclaimed {
+                session_id: session.sid,
+            });
+        };
+        if !current.scope.allows_session_mutation() {
+            return Err(OwnershipError::ScopeViolation {
+                session_id: session.sid,
+                owner_id: current.owner_id.clone(),
+                required: OwnershipScope::Session,
+                actual: current.scope.clone(),
+            });
+        }
+        Ok(())
+    }
+
     /// Create an empty session store.
     #[must_use]
     pub fn new() -> Self {
@@ -163,6 +233,343 @@ impl SessionStore {
     /// Get a mutable reference to a session.
     pub fn get_mut(&mut self, sid: SessionId) -> Option<&mut SessionState> {
         self.sessions.get_mut(&sid)
+    }
+
+    /// Get the current live ownership capability for a session, if any.
+    #[must_use]
+    pub fn current_ownership(&self, sid: SessionId) -> Option<&OwnershipCapability> {
+        self.sessions.get(&sid)?.ownership.current.as_ref()
+    }
+
+    /// Claim ownership for an unclaimed session.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the session is missing, terminal, or already claimed.
+    pub fn claim_ownership(
+        &mut self,
+        sid: SessionId,
+        owner_id: impl Into<FragmentOwnerId>,
+        scope: OwnershipScope,
+    ) -> Result<OwnershipCapability, OwnershipError> {
+        let session = self.session_mut_or_error(sid)?;
+        Self::ensure_mutable_ownership(session)?;
+        if let Some(current) = session.ownership.current.as_ref() {
+            return Err(OwnershipError::AlreadyClaimed {
+                session_id: sid,
+                current_owner_id: current.owner_id.clone(),
+            });
+        }
+        if let Some(pending) = session.ownership.pending_transfer.as_ref() {
+            return Err(OwnershipError::TransferPending {
+                session_id: sid,
+                claim_id: pending.receipt.claim_id,
+            });
+        }
+        let capability = OwnershipCapability {
+            session_id: sid,
+            owner_id: owner_id.into(),
+            generation: 0,
+            scope,
+        };
+        session.ownership.current = Some(capability.clone());
+        Ok(capability)
+    }
+
+    /// Release the current owner capability for a session.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the capability is stale or a transfer is still pending.
+    pub fn release_ownership(
+        &mut self,
+        capability: &OwnershipCapability,
+    ) -> Result<(), OwnershipError> {
+        let session = self.session_mut_or_error(capability.session_id)?;
+        Self::validate_current_owner(session, capability)?;
+        if let Some(pending) = session.ownership.pending_transfer.as_ref() {
+            return Err(OwnershipError::TransferPending {
+                session_id: capability.session_id,
+                claim_id: pending.receipt.claim_id,
+            });
+        }
+        session.ownership.current = None;
+        Ok(())
+    }
+
+    /// Begin an explicit ownership transfer and return a typed receipt.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the capability is stale or another transfer is pending.
+    pub fn begin_ownership_transfer(
+        &mut self,
+        capability: &OwnershipCapability,
+        new_owner_id: impl Into<FragmentOwnerId>,
+        new_scope: OwnershipScope,
+    ) -> Result<OwnershipReceipt, OwnershipError> {
+        let session = self.session_mut_or_error(capability.session_id)?;
+        Self::validate_current_owner(session, capability)?;
+        if let Some(pending) = session.ownership.pending_transfer.as_ref() {
+            return Err(OwnershipError::TransferPending {
+                session_id: capability.session_id,
+                claim_id: pending.receipt.claim_id,
+            });
+        }
+        let claim_id = session.ownership.next_claim_id;
+        session.ownership.next_claim_id = session.ownership.next_claim_id.saturating_add(1);
+        let receipt = OwnershipReceipt {
+            session_id: capability.session_id,
+            claim_id,
+            from_owner_id: capability.owner_id.clone(),
+            from_generation: capability.generation,
+            to_owner_id: new_owner_id.into(),
+            to_generation: capability.generation.saturating_add(1),
+            scope: new_scope,
+        };
+        session.ownership.pending_transfer = Some(PendingOwnershipTransfer {
+            receipt: receipt.clone(),
+        });
+        Ok(receipt)
+    }
+
+    /// Commit a previously staged ownership transfer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the receipt is stale or mismatched.
+    pub fn commit_ownership_transfer(
+        &mut self,
+        receipt: &OwnershipReceipt,
+    ) -> Result<OwnershipCapability, OwnershipError> {
+        let session = self.session_mut_or_error(receipt.session_id)?;
+        Self::ensure_mutable_ownership(session)?;
+        let Some(current) = session.ownership.current.as_ref() else {
+            return Err(OwnershipError::Unclaimed {
+                session_id: receipt.session_id,
+            });
+        };
+        let Some(pending) = session.ownership.pending_transfer.as_ref() else {
+            return Err(OwnershipError::TransferNotPending {
+                session_id: receipt.session_id,
+            });
+        };
+        if pending.receipt != *receipt {
+            return Err(OwnershipError::ReceiptMismatch {
+                session_id: receipt.session_id,
+                claim_id: receipt.claim_id,
+            });
+        }
+        if current.owner_id != receipt.from_owner_id || current.generation != receipt.from_generation
+        {
+            return Err(OwnershipError::StaleCapability {
+                session_id: receipt.session_id,
+                owner_id: receipt.from_owner_id.clone(),
+                expected_generation: receipt.from_generation,
+                actual_generation: current.generation,
+            });
+        }
+        let capability = OwnershipCapability {
+            session_id: receipt.session_id,
+            owner_id: receipt.to_owner_id.clone(),
+            generation: receipt.to_generation,
+            scope: receipt.scope.clone(),
+        };
+        session.ownership.current = Some(capability.clone());
+        session.ownership.pending_transfer = None;
+        Ok(capability)
+    }
+
+    /// Roll back only the staged transfer identified by this receipt.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the receipt does not match the current staged transfer.
+    pub fn rollback_ownership_transfer(
+        &mut self,
+        receipt: &OwnershipReceipt,
+    ) -> Result<(), OwnershipError> {
+        let session = self.session_mut_or_error(receipt.session_id)?;
+        Self::ensure_mutable_ownership(session)?;
+        let Some(pending) = session.ownership.pending_transfer.as_ref() else {
+            return Err(OwnershipError::TransferNotPending {
+                session_id: receipt.session_id,
+            });
+        };
+        if pending.receipt != *receipt {
+            return Err(OwnershipError::ReceiptMismatch {
+                session_id: receipt.session_id,
+                claim_id: receipt.claim_id,
+            });
+        }
+        session.ownership.pending_transfer = None;
+        Ok(())
+    }
+
+    /// Attenuate or otherwise change scope for the same owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the capability is stale or a transfer is pending.
+    pub fn attenuate_ownership_scope(
+        &mut self,
+        capability: &OwnershipCapability,
+        new_scope: OwnershipScope,
+    ) -> Result<OwnershipCapability, OwnershipError> {
+        let session = self.session_mut_or_error(capability.session_id)?;
+        Self::validate_current_owner(session, capability)?;
+        if let Some(pending) = session.ownership.pending_transfer.as_ref() {
+            return Err(OwnershipError::TransferPending {
+                session_id: capability.session_id,
+                claim_id: pending.receipt.claim_id,
+            });
+        }
+        let next = OwnershipCapability {
+            session_id: capability.session_id,
+            owner_id: capability.owner_id.clone(),
+            generation: capability.generation.saturating_add(1),
+            scope: new_scope,
+        };
+        session.ownership.current = Some(next.clone());
+        Ok(next)
+    }
+
+    /// Apply session-local host mutation through the ownership gate.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the capability is stale or lacks full-session scope.
+    pub fn apply_owned_session_mutation(
+        &mut self,
+        capability: &OwnershipCapability,
+        mutation: SessionHostMutation,
+    ) -> Result<(), OwnershipError> {
+        let session = self.session_mut_or_error(capability.session_id)?;
+        Self::require_session_scope(session, capability)?;
+        match mutation {
+            SessionHostMutation::SetDefaultHandler { handler } => {
+                let handler_id = session.intern_handler_binding(&handler);
+                session.default_handler = handler;
+                session.default_handler_id = Some(handler_id);
+            }
+            SessionHostMutation::UpdateEdgeHandler { edge, handler } => {
+                let handler_id = session.intern_handler_binding(&handler);
+                if let Some(edge_key) = session.edge_key_for_roles(&edge.sender, &edge.receiver) {
+                    session.edge_handler_lookup.insert(edge_key, handler_id);
+                }
+                session.edge_handlers.insert(edge, handler);
+            }
+            SessionHostMutation::UpdateTrace { edge, trace } => {
+                session.edge_traces.insert(edge, trace);
+            }
+        }
+        Ok(())
+    }
+
+    /// Mark the current owner as dead and fault the session.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the session is missing or owner mismatch occurs.
+    pub fn mark_owner_died(
+        &mut self,
+        sid: SessionId,
+        owner_id: &str,
+    ) -> Result<(), OwnershipError> {
+        let session = self.session_mut_or_error(sid)?;
+        Self::ensure_mutable_ownership(session)?;
+        let Some(current) = session.ownership.current.as_ref() else {
+            return Err(OwnershipError::Unclaimed { session_id: sid });
+        };
+        if current.owner_id != owner_id {
+            return Err(OwnershipError::StaleCapability {
+                session_id: sid,
+                owner_id: owner_id.to_string(),
+                expected_generation: current.generation,
+                actual_generation: current.generation,
+            });
+        }
+        let reason = OwnershipTerminalReason::OwnerDied {
+            owner_id: owner_id.to_string(),
+        };
+        session.status = SessionStatus::Faulted {
+            reason: format!("ownership owner `{owner_id}` died"),
+        };
+        session.ownership.current = None;
+        session.ownership.pending_transfer = None;
+        session.ownership.terminal_reason = Some(reason);
+        Ok(())
+    }
+
+    /// Cancel a session because a staged transfer was abandoned.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the receipt does not match the staged transfer.
+    pub fn cancel_abandoned_transfer(
+        &mut self,
+        receipt: &OwnershipReceipt,
+    ) -> Result<(), OwnershipError> {
+        let session = self.session_mut_or_error(receipt.session_id)?;
+        Self::ensure_mutable_ownership(session)?;
+        let Some(pending) = session.ownership.pending_transfer.as_ref() else {
+            return Err(OwnershipError::TransferNotPending {
+                session_id: receipt.session_id,
+            });
+        };
+        if pending.receipt != *receipt {
+            return Err(OwnershipError::ReceiptMismatch {
+                session_id: receipt.session_id,
+                claim_id: receipt.claim_id,
+            });
+        }
+        let reason = OwnershipTerminalReason::TransferAbandoned {
+            owner_id: receipt.from_owner_id.clone(),
+            claim_id: receipt.claim_id,
+        };
+        session.status = SessionStatus::Cancelled;
+        session.ownership.current = None;
+        session.ownership.pending_transfer = None;
+        session.ownership.terminal_reason = Some(reason);
+        Ok(())
+    }
+
+    /// Fault a session because a staged transfer could not commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the receipt does not match the staged transfer.
+    pub fn fault_failed_transfer_commit(
+        &mut self,
+        receipt: &OwnershipReceipt,
+        reason: impl Into<String>,
+    ) -> Result<(), OwnershipError> {
+        let session = self.session_mut_or_error(receipt.session_id)?;
+        Self::ensure_mutable_ownership(session)?;
+        let Some(pending) = session.ownership.pending_transfer.as_ref() else {
+            return Err(OwnershipError::TransferNotPending {
+                session_id: receipt.session_id,
+            });
+        };
+        if pending.receipt != *receipt {
+            return Err(OwnershipError::ReceiptMismatch {
+                session_id: receipt.session_id,
+                claim_id: receipt.claim_id,
+            });
+        }
+        let reason = reason.into();
+        let terminal = OwnershipTerminalReason::TransferCommitFailed {
+            owner_id: receipt.from_owner_id.clone(),
+            claim_id: receipt.claim_id,
+            reason: reason.clone(),
+        };
+        session.status = SessionStatus::Faulted {
+            reason: format!("ownership transfer commit failed: {reason}"),
+        };
+        session.ownership.current = None;
+        session.ownership.pending_transfer = None;
+        session.ownership.terminal_reason = Some(terminal);
+        Ok(())
     }
 
     /// Iterate over all sessions.
@@ -335,7 +742,7 @@ impl SessionStore {
     }
 
     /// Set the default handler id for a session.
-    pub fn set_default_handler_for_session(&mut self, sid: SessionId, handler: HandlerId) {
+    pub(crate) fn set_default_handler_for_session(&mut self, sid: SessionId, handler: HandlerId) {
         if let Some(session) = self.sessions.get_mut(&sid) {
             let handler_id = session.intern_handler_binding(&handler);
             session.default_handler = handler;
@@ -344,7 +751,7 @@ impl SessionStore {
     }
 
     /// Update edge-bound handler id.
-    pub fn update_handler(&mut self, edge: &Edge, handler: HandlerId) {
+    pub(crate) fn update_handler(&mut self, edge: &Edge, handler: HandlerId) {
         if let Some(session) = self.sessions.get_mut(&edge.sid) {
             let handler_id = session.intern_handler_binding(&handler);
             if let Some(edge_key) = session.edge_key_for_roles(&edge.sender, &edge.receiver) {
@@ -365,7 +772,7 @@ impl SessionStore {
     }
 
     /// Update coherence trace for an edge.
-    pub fn update_trace(&mut self, edge: &Edge, trace: Vec<ValType>) {
+    pub(crate) fn update_trace(&mut self, edge: &Edge, trace: Vec<ValType>) {
         if let Some(session) = self.sessions.get_mut(&edge.sid) {
             session.edge_traces.insert(edge.clone(), trace);
         }

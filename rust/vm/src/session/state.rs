@@ -59,6 +59,8 @@ pub struct SessionState {
     pub status: SessionStatus,
     /// Epoch counter for draining.
     pub epoch: usize,
+    /// Host/runtime ownership state for session-local mutation.
+    ownership: SessionOwnershipState,
 }
 
 impl SessionState {
@@ -118,6 +120,7 @@ impl SessionState {
             edge_traces: BTreeMap::new(),
             status: SessionStatus::Active,
             epoch: 0,
+            ownership: SessionOwnershipState::default(),
         };
         for role in &plan.active_branch_roles {
             state.refresh_endpoint_branch_lookup(&Endpoint {
@@ -143,6 +146,7 @@ impl SessionState {
             .saturating_add(serialized_bytes(&self.branch_lookup))
             .saturating_add(serialized_bytes(&self.status))
             .saturating_add(serialized_bytes(&self.epoch))
+            .saturating_add(serialized_bytes(&self.ownership))
     }
 
     fn retained_local_type_bytes(&self) -> usize {
@@ -542,6 +546,12 @@ impl SessionState {
     pub fn has_bound_handler(&self) -> bool {
         !self.default_handler.is_empty() || !self.edge_handlers.is_empty()
     }
+
+    /// Read the current host/runtime ownership state.
+    #[must_use]
+    pub(crate) fn ownership(&self) -> &SessionOwnershipState {
+        &self.ownership
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -560,4 +570,6 @@ struct SessionStateSerde {
     edge_traces: BTreeMap<Edge, Vec<ValType>>,
     status: SessionStatus,
     epoch: usize,
+    #[serde(default)]
+    ownership: SessionOwnershipState,
 }
