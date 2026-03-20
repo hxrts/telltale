@@ -1,6 +1,7 @@
 # Verification Inventory
 
-This page is the small authoritative inventory for verification counts that are stable enough to check automatically.
+This page is the authoritative inventory for verification counts.
+Only counts that are stable enough to check automatically are tracked here.
 
 When one of these values changes legitimately:
 

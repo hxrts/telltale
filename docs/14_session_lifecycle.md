@@ -164,7 +164,7 @@ Opt-in guidance:
 
 Why this matters for consensus protocols:
 
-- Protocol-level BFT logic can tolerate many faults, but zk proofs of full executions require transport-level one-time consumption to prevent replay-equivalent transcript ambiguity.
+- Protocol-level BFT logic can tolerate many faults. However, zk proofs of full executions require transport-level one-time consumption to prevent replay-equivalent transcript ambiguity.
 - Enabling replay-consumption closes this gap between protocol safety and proof transcript soundness.
 
 Configuration examples:

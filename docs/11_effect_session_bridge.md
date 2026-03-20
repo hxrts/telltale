@@ -21,7 +21,7 @@ Telltale uses three layers.
 Projection and runtime checks preserve obligations across these layers.
 
 This document describes a host-runtime contract.
-It is normative for Rust embedders, but it is not itself a theorem statement.
+It is normative for Rust embedders. It is not itself a theorem statement.
 The theorem-backed protocol properties remain in projection, coherence, and harmony. The host ownership rules below are implementation contracts enforced by the VM/runtime boundary.
 
 ## Rust Handler Surfaces
@@ -149,8 +149,7 @@ Host guidance:
 
 ## Language-Declared Effect Invocation
 
-The choreography language now has nominal `effect` declarations, protocol-level
-`uses` clauses, and `check Effect.op(...)` expressions.
+The choreography language now has nominal `effect` declarations, protocol-level `uses` clauses, and `check Effect.op(...)` expressions.
 
 ```tell
 effect Runtime
@@ -276,7 +275,7 @@ This split is in `lean/Runtime/VM/Model/TypeClasses.lean`.
 | invoke typing | `WellTypedInstr.wt_invoke` in `lean/Runtime/VM/Runtime/Monitor.lean` | ties invoke to handler type |
 | behavioral equivalence | `Runtime/Proofs/EffectBisim/*` | observer-level bisimulation bridge |
 | config equivalence bridge | `Runtime/Proofs/EffectBisim/ConfigEquivBridge.lean` | links protocol quotient and effect bisimulation |
-| composed effect domains | `Runtime/VM/Composition/DomainComposition.lean` | sum and product composition instances |
+| composed effect domains | `Runtime/Proofs/VM/DomainComposition.lean` | sum and product composition instances |
 
 ## Glossary
 

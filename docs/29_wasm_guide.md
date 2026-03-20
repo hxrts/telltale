@@ -1,18 +1,22 @@
 # WASM Guide
 
-This guide explains how to build and run the choreography runtime on `wasm32`.
+This guide explains how to build and run the choreography runtime on `wasm32`. It covers feature flags, build tooling, handler compatibility, and testing.
 
 ## Overview
 
-The `telltale-choreography` crate supports WASM targets. Core effects, handlers, and timeouts compile under `wasm32` using `wasm-bindgen-futures` and `wasm-timer`.
+The `telltale-choreography` crate supports WASM targets. Core effects, handlers, and timeouts compile under `wasm32` using `wasm-bindgen-futures` and `wasm-timer`. The same `Program` and `interpret` API used on native targets works without modification. Platform differences are handled internally by the runtime module.
 
 ## What Works
 
 In WASM builds you can use `Program`, `interpret`, and effect handlers. `InMemoryHandler` and `TelltaleHandler` are WASM compatible for local or custom transports. Middleware such as `Trace`, `Metrics`, and `Retry` is WASM compatible. `FaultInjection` is available with the `test-utils` feature.
 
+Protocol definitions written with `choreography!` produce the same projected types on both platforms. The effect algebra is transport-agnostic. Only the lowest-level spawn and timer calls differ between native and WASM.
+
 ## Limitations
 
-WASM is single threaded, so concurrency is async only. Direct `std::net` sockets are not available, so network transports must use browser APIs or host provided bindings.
+WASM is single threaded. Concurrency is async only. Direct `std::net` sockets are not available. Network transports must use browser APIs or host provided bindings.
+
+Tokio-specific features such as `tokio::spawn` are not available. Use the `runtime::spawn` abstraction instead. File system access is also unavailable unless the host provides a binding.
 
 ## Enable WASM
 
@@ -25,10 +29,9 @@ wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 ```
 
-The `wasm` feature enables `getrandom` support and pulls in the WASM runtime dependencies.
-Use a path dependency only for local workspace development.
+The `wasm` feature enables `getrandom` support and pulls in the WASM runtime dependencies. Use a path dependency only for local workspace development.
 
-Build with `wasm-pack` or `cargo` targets.
+Build with `wasm-pack` or `cargo` targets. `wasm-pack` produces a ready-to-use JavaScript package. Direct `cargo build --target wasm32-unknown-unknown` works for library crates that do not need JS bindings.
 
 For reproducible local setup, install the same tool version used in CI.
 
@@ -44,7 +47,9 @@ This produces a `pkg` directory with JavaScript bindings.
 
 ## Minimal Example
 
-This example runs a simple request response program using `InMemoryHandler`.
+This example runs a simple request response program using `InMemoryHandler`. It defines the role, label, and message types needed by the effect system. It then builds two programs and runs them concurrently with shared channels.
+
+The first section defines the `Role` and `Label` enums. `LabelId` requires string round-tripping via `as_str` and `from_str`. `RoleId` associates a label type and provides canonical names through `role_name`.
 
 ```rust
 use serde::{Deserialize, Serialize};
@@ -86,13 +91,25 @@ impl RoleId for Role {
         }
     }
 }
+```
 
+The `Message` enum carries the payload variants exchanged between roles. Both variants use `String` here, but any `Serialize + Deserialize` type works.
+
+```rust
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 enum Message {
     Ping(String),
     Pong(String),
 }
+```
 
+The `run_once` function creates shared channel maps and builds one handler per role. Each handler receives the same `Arc<Mutex<BTreeMap>>` pair so that sends from one role are visible to the other.
+
+`Program::new()` starts a builder chain. The client sends a `Ping` and receives a response. The server receives first and replies with `Pong`. Both programs call `.end()` to close the session.
+
+The `interpret` function drives each program through its handler. `futures::join!` runs both concurrently on the same async executor, which is compatible with both Tokio and WASM runtimes.
+
+```rust
 async fn run_once() -> Result<(), Box<dyn std::error::Error>> {
     use futures::join;
     use std::collections::BTreeMap;
@@ -126,11 +143,11 @@ async fn run_once() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-For multi role tests, share channels by using `InMemoryHandler::with_channels` and a shared channel map. The WASM test suite in `rust/choreography/tests/wasm_integration.rs` shows larger examples.
+For multi role tests, share channels by using `InMemoryHandler::with_channels` and a shared channel map. The WASM test suite in `rust/choreography/tests/wasm_integration.rs` shows larger examples. Each handler must reference the same `Arc<Mutex<BTreeMap>>` instances for messages to route correctly. The unit endpoint `()` is sufficient when no external state is needed.
 
 ## TelltaleHandler in WASM
 
-`TelltaleHandler` works in WASM with `SimpleChannel` or custom sessions.
+`TelltaleHandler` works in WASM with `SimpleChannel` or custom sessions. This handler manages typed endpoints and routes messages through registered channels. It is the recommended handler for integration-level WASM tests.
 
 ```rust
 use telltale_choreography::{SimpleChannel, TelltaleEndpoint, TelltaleHandler};
@@ -145,11 +162,11 @@ bob_ep.register_channel(Role::Client, bob_ch);
 let mut handler = TelltaleHandler::<Role, Message>::new();
 ```
 
-Use your protocol message type for `Message` and ensure the role implements both `telltale::Role` and `RoleId`. For browser transports, build a `TelltaleSession` from a sink and stream and register it with `TelltaleEndpoint::register_session`.
+Use your protocol message type for `Message`. The role must implement both `telltale::Role` and `RoleId`. For browser transports, build a `TelltaleSession` from a sink and stream. Register it with `TelltaleEndpoint::register_session`.
 
 ## Runtime Utilities
 
-The runtime provides WASM aware task spawning helpers.
+The runtime provides WASM aware task spawning helpers. These abstractions let the same protocol code run on both native and browser targets without conditional compilation at the call site.
 
 ```rust
 use telltale_choreography::runtime::spawn;
@@ -163,18 +180,18 @@ spawn(async move {
 
 ## Testing
 
-Use `wasm-bindgen-test` for WASM tests.
+Use `wasm-bindgen-test` for WASM tests. Import the crate and annotate test functions with `#[wasm_bindgen_test]`. Tests marked with `#[wasm_bindgen_test(unsupported = test)]` run as standard `#[test]` on native targets and as WASM tests on `wasm32`.
 
 ```rust
 use wasm_bindgen_test::*;
 ```
 
-Repository-managed tests run under Node, not a browser driver.
+Repository-managed tests run under Node, not a browser driver. This avoids the need for a headless browser in CI.
 
 ```bash
 just wasm-test-all
 ```
 
-For ad hoc crate-level runs, use `wasm-pack test --node`.
+For ad hoc crate-level runs, use `wasm-pack test --node`. This compiles the crate for `wasm32` and executes tests in a Node environment.
 
-See [Choreography Effect Handlers](09_effect_handlers.md) for handler details and [Using Telltale Handlers](10_telltale_handler.md) for the channel based API.
+See [Choreography Effect Handlers](09_effect_handlers.md) for handler details. See [Using Telltale Handlers](10_telltale_handler.md) for the channel based API.

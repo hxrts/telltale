@@ -300,7 +300,7 @@ Resolve participant sets during choreography construction or initialization, the
 Topology constraints remain useful for validating concrete deployments.
 
 ```rust
-use telltale_choreography::topology::Topology;
+use telltale_choreography::topology::{Topology, parse_topology};
 
 let config = r#"
     topology Prod for Protocol {
@@ -310,7 +310,7 @@ let config = r#"
     }
 "#;
 
-let topology = Topology::parse(config)?.topology;
+let topology = parse_topology(config)?.topology;
 topology.validate_family("Witness", 5)?;
 ```
 

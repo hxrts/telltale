@@ -36,7 +36,7 @@ Paper 2 adds quantitative dynamics and algorithmic decision surfaces.
 | crash-stop characterization | `Protocol/CrashTolerance.lean` |
 | Byzantine exact safety interface package | distributed adapter and theorem-pack modules |
 
-Bound classes differ by theorem. Productive-step bounds are exact under premises and scheduler-lifted totals are profile-dependent conservative bounds.
+Bound classes differ by theorem. Productive-step bounds are exact under premises. Scheduler-lifted totals are profile-dependent conservative bounds.
 
 ## Paper 3 Mapping
 
@@ -63,7 +63,7 @@ Each theorem family is tied to explicit assumption bundles.
 | interface only | package provides typed boundary and witness hooks without stronger global claim |
 | out of scope | intentionally deferred claim class |
 
-Examples include scheduler-lifted total-step bounds as conservative and Byzantine liveness outside declared timing and fairness bundles as out of scope.
+Scheduler-lifted total-step bounds are an example of the conservative class. Byzantine liveness outside declared timing and fairness bundles falls under out of scope.
 
 ## Runtime Capability Link
 

@@ -148,7 +148,7 @@ Runtime delegation uses one sanctioned manager-style path rather than scattered 
 | post-check | validate resulting owner state |
 | audit or rollback | record committed transfer or roll back and emit rollback audit |
 
-This path is the runtime realization of delegation/reconfiguration, but it should not be read as the theorem statement itself. The theorem-level side remains `DelegationWF` and related harmony results.
+This path is the runtime realization of delegation/reconfiguration. It should not be read as the theorem statement itself. The theorem-level side remains `DelegationWF` and related harmony results.
 
 ## Capability Gate Architecture
 
@@ -202,7 +202,7 @@ Replay outcomes:
 | Area | Lean Surface | Status |
 |---|---|---|
 | Canonical round normalization | `Runtime/Proofs/Concurrency.lean` | Proved |
-| Threaded equality at `n = 1` | `schedRoundThreaded_one_eq_schedRound_one`, `runScheduledThreaded_one_eq_runScheduled` | Proved |
+| Threaded equality at `n = 1` | `sched_round_threaded_one_eq_sched_round_one`, `run_scheduled_threaded_one_eq_run_scheduled` | Proved |
 | Per-session trace equality at `n = 1` | `per_session_trace_threaded_one_eq_canonical` | Proved |
 | Scheduler theorem exports | `Runtime/Proofs/VM/Scheduler.lean` | Proved |
 
@@ -214,7 +214,9 @@ Replay outcomes:
 | Runtime admission/profile gates | `Runtime/Proofs/Contracts/RuntimeContracts.lean` | Interface consumed by runtime |
 | Theorem-pack capability inventory APIs | `Runtime/Proofs/TheoremPack/API.lean` | Interface consumed by runtime |
 
-These interfaces are intentionally explicit. They are not claimed as unconditional global theorems. Canonical one-step normalization and `n = 1` refinement are theorem-backed in Lean. Higher-concurrency threaded refinement is modeled as a certified interface with premise-scoped refinement obligations. Rust uses executable certificate checking and parity fixtures as release guards.
+These interfaces are intentionally explicit. They are not claimed as unconditional global theorems. Canonical one-step normalization and `n = 1` refinement are theorem-backed in Lean. Higher-concurrency threaded refinement is modeled as a certified interface with premise-scoped refinement obligations.
+
+Rust uses executable certificate checking and parity fixtures as release guards.
 
 ## Release and CI Conformance
 

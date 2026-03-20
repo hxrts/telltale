@@ -118,6 +118,23 @@ pub enum Protocol {
         branches: NonEmptyVec<Branch>,
         annotations: Annotations,
     },
+    Let {
+        name: String,
+        expr: AuthorityExpr,
+        linear: bool,
+        continuation: Box<Protocol>,
+    },
+    Case {
+        expr: AuthorityExpr,
+        branches: NonEmptyVec<CaseBranch>,
+    },
+    Timeout {
+        role: Role,
+        duration_ms: u64,
+        body: Box<Protocol>,
+        on_timeout: Box<Protocol>,
+        on_cancel: Option<Box<Protocol>>,
+    },
     Loop { condition: Option<Condition>, body: Box<Protocol> },
     Parallel { protocols: NonEmptyVec<Protocol> },
     Rec { label: Ident, body: Box<Protocol> },
@@ -131,7 +148,7 @@ pub enum Protocol {
 }
 ```
 
-`Protocol` is a recursive tree structure. It includes support for annotations at multiple levels. Broadcasts, choices, parallel composition, and recursive definitions are supported. `NonEmptyVec` is used where the DSL enforces at least one branch.
+`Protocol` is a recursive tree structure. It includes support for annotations at multiple levels. Broadcasts, choices, parallel composition, recursive definitions, authority bindings, case matching, and timeouts are supported. `NonEmptyVec` is used where the DSL enforces at least one branch.
 
 ### Parser Module
 
@@ -227,7 +244,7 @@ pub trait ChoreoHandler: Send {
         &mut self, ep: &mut Self::Endpoint, from: Self::Role
     ) -> ChoreoResult<M>;
     async fn choose(
-        &mut self, ep: &mut Self::Endpoint, to: Self::Role, label: <Self::Role as RoleId>::Label
+        &mut self, ep: &mut Self::Endpoint, who: Self::Role, label: <Self::Role as RoleId>::Label
     ) -> ChoreoResult<()>;
     async fn offer(
         &mut self, ep: &mut Self::Endpoint, from: Self::Role
@@ -260,7 +277,7 @@ See [VM Architecture](12_vm_architecture.md) for details on the bytecode VM arch
 This section demonstrates the transformation of a choreography through each layer.
 
 Input choreography:
-```rust
+```tell
 Alice
   -> Bob : Request of api.Request
 Bob
@@ -336,13 +353,13 @@ The handler interprets this program into actual communication.
 
 Creating distributed programs typically requires writing separate implementations for each participant. This approach is error-prone and hard to verify.
 
-Choreographies specify the global protocol once. Automatic projection generates local code for each role. This approach prevents protocol mismatches and simplifies reasoning about distributed systems.
+Choreographies specify the global protocol once. Automatic projection generates local code for each role. This approach prevents protocol mismatches by construction.
 
 ### Why Effect Handlers
 
 Separating protocol logic from transport enables testing and composition. The same protocol can run with different handlers without code changes.
 
-Effect handlers provide runtime flexibility. Test handlers use in-memory communication. Production handlers use network transports.
+Effect handlers provide transport independence. Test handlers use in-memory communication. Production handlers use network transports.
 
 ### Why Session Types
 
@@ -364,7 +381,7 @@ Implement `ChoreoHandler` to add new transport mechanisms. See [Choreography Eff
 
 ### Middleware
 
-Wrap handlers with middleware for cross-cutting concerns. Logging, metrics, and retry logic can be added as middleware. Middleware composes naturally.
+Wrap handlers with middleware for cross-cutting concerns. Logging, metrics, and retry logic can be added as middleware. Multiple middleware layers can be stacked on a single handler.
 
 ### Custom Projections
 

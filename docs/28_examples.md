@@ -1,26 +1,30 @@
 # Examples
 
-This document points to the example programs and common usage patterns.
+This document points to the example programs and common usage patterns. Each example demonstrates a specific protocol shape or runtime feature. The choreography DSL examples show global protocol definitions. The testing pattern examples show how to validate protocol behavior in unit and integration tests.
 
 ## Example Index
 
+All examples compile against the workspace. They use the `choreography!` macro or the effect builder API depending on the pattern.
+
 Top level examples in `examples/`:
 
-- `adder.rs` for a simple request response protocol
-- `alternating_bit.rs` for a reliable message delivery pattern
-- `async_subtyping.rs` for async-subtyping checks and examples
-- `bounded_recursion.rs` for bounded recursion strategies
-- `client_server_log.rs` for logging in a client server protocol
-- `ring.rs` and `ring_choice.rs` for ring topologies and branching
-- `three_adder.rs` for a three-party aggregation flow
-- `double_buffering.rs` and `elevator.rs` for multi step coordination
-- `fft.rs` for distributed computation
-- `oauth.rs` for a multi role authentication flow
-- `wasm-ping-pong/` for browser builds
+- `adder.rs` for a simple two-party request response protocol
+- `alternating_bit.rs` for a reliable message delivery pattern with acknowledgment loops
+- `async_subtyping.rs` for async-subtyping checks and subtype relation examples
+- `bounded_recursion.rs` for bounded recursion strategies with configurable depth
+- `client_server_log.rs` for logging in a client server protocol with a third observer role
+- `ring.rs` and `ring_choice.rs` for ring topologies and branching across multiple roles
+- `three_adder.rs` for a three-party aggregation flow with intermediate accumulation
+- `double_buffering.rs` and `elevator.rs` for multi step coordination across turns
+- `fft.rs` for distributed computation with parallel decomposition
+- `oauth.rs` for a multi role authentication flow with token exchange
+- `wasm-ping-pong/` for browser builds using `wasm-pack`
 
-Advanced examples live under `examples/advanced_features/`. Protocol snapshots under `examples/running_examples/` are source/reference material only.
+Advanced examples live under `examples/advanced_features/`. These cover annotation and namespace features. Protocol snapshots under `examples/running_examples/` are source and reference material only. They include `.nuscr` protocol files with corresponding Rust implementations and expected outputs.
 
 ## Common Patterns
+
+The following patterns cover the core choreography constructs. Each pattern uses the `choreography!` macro with a raw string protocol definition. The macro parses the protocol, validates role declarations, and generates projection code.
 
 ### Request Response
 
@@ -35,7 +39,7 @@ protocol RequestResponse =
 "#);
 ```
 
-Use this pattern when the client waits for a reply before continuing.
+The `choreography!` macro parses the protocol string at compile time. Each message line declares a sender, receiver, label, and optional payload type. Projection produces one local session type per role.
 
 ### Choice
 
@@ -53,7 +57,7 @@ protocol ChoicePattern =
 "#);
 ```
 
-Only the deciding role selects the branch. Other roles react to that choice.
+Only the deciding role selects the branch. Other roles react to that choice. The `choice at` clause names the selecting participant. Each branch label must be distinct within the choice block.
 
 ### Loops
 
@@ -69,7 +73,7 @@ protocol LoopPattern =
 "#);
 ```
 
-Use bounded loops for batch workflows or retries.
+Use bounded loops for batch workflows or retries. The `repeat` count sets an upper iteration limit. The body runs sequentially within each iteration.
 
 ### Parallel Branches
 
@@ -85,9 +89,11 @@ protocol ParallelPattern =
 "#);
 ```
 
-Parallel branches must be independent in order to remain well formed.
+Parallel branches must be independent in order to remain well formed. Each branch operates on a disjoint set of roles. The runtime executes branches concurrently when possible.
 
 ## Testing Patterns
+
+Three handler types support different test scenarios. `InMemoryHandler` is the simplest, operating with in-process channels. `TelltaleHandler` uses `SimpleChannel` pairs for typed bidirectional communication. `RecordingHandler` captures events without executing real transport.
 
 ### Unit Test With InMemoryHandler
 
@@ -105,7 +111,7 @@ async fn test_send_only() {
 }
 ```
 
-Use `InMemoryHandler::with_channels` and shared channel maps when a test needs both send and receive.
+`InMemoryHandler::new` creates isolated channels for send-only tests. Use `InMemoryHandler::with_channels` and shared channel maps when a test needs both send and receive. The `interpret` function drives each effect step through the handler.
 
 ### Integration Test With TelltaleHandler
 
@@ -125,7 +131,7 @@ async fn test_session_types() {
 }
 ```
 
-This pattern validates the channel based handler without custom transports. Ensure the role type implements both `telltale::Role` and `RoleId`.
+This pattern validates the channel based handler without custom transports. The role type must implement both `telltale::Role` and `RoleId`. `SimpleChannel::pair` returns two linked endpoints that relay messages in both directions.
 
 ### RecordingHandler
 
@@ -145,22 +151,23 @@ let base = InMemoryHandler::new(Role::Alice);
 let mut handler = FaultInjection::new(base, 0.1);
 ```
 
-Use this to validate retry behavior and error handling.
-Enable this by adding `features = ["test-utils"]` on `telltale-choreography` in test builds.
+Use this to validate retry behavior and error handling. The second argument is the failure probability per operation. Enable this by adding `features = ["test-utils"]` on `telltale-choreography` in test builds.
 
 ## Running Examples
 
-Run a single example with Cargo.
+Run a single example with Cargo. Each example is a standalone binary that demonstrates the protocol end to end.
 
 ```bash
 cargo run --example adder
 ```
 
-The `wasm-ping-pong` example uses its own build script.
+This compiles and runs the `adder` example, which demonstrates a simple two-party request response protocol.
+
+The `wasm-ping-pong` example uses its own build script. It produces a browser-loadable WASM module.
 
 ```bash
 cd examples/wasm-ping-pong
 ./build.sh
 ```
 
-See the comments in each example file for setup requirements.
+See the comments in each example file for setup requirements. For WASM-specific guidance, see [WASM Guide](29_wasm_guide.md).

@@ -113,6 +113,7 @@ Extension errors surface as `ExtensionError`.
 
 ```rust
 pub enum ExtensionError {
+    UnknownExtension { type_name: &'static str, type_id: TypeId },
     HandlerNotRegistered { type_name: &'static str },
     ExecutionFailed { type_name: &'static str, error: String },
     TypeMismatch { expected: &'static str, actual: &'static str },
@@ -192,8 +193,11 @@ pub trait ProtocolExtension: Send + Sync + Debug {
     fn type_name(&self) -> &'static str;
     fn mentions_role(&self, role: &Role) -> bool;
     fn validate(&self, roles: &[Role]) -> Result<(), ExtensionValidationError>;
-    fn project(&self, role: &Role, ctx: &ProjectionContext) -> Result<LocalType, ProjectionError>;
-    fn generate_code(&self, ctx: &CodegenContext) -> proc_macro2::TokenStream;
+    fn project(&self, role: &Role, context: &ProjectionContext) -> Result<LocalType, ProjectionError>;
+    fn generate_code(&self, context: &CodegenContext) -> proc_macro2::TokenStream;
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+    fn type_id(&self) -> TypeId;
 }
 ```
 
@@ -300,7 +304,7 @@ impl RoleId for Role {
 enum Message { Ping, Pong }
 ```
 
-Roles implement `RoleId`, labels implement `LabelId`, and messages are serializable.
+Roles implement `RoleId`. Labels implement `LabelId`. Messages are serializable.
 
 ### Step 3: Build an Extensible Handler
 
@@ -366,7 +370,7 @@ fn test_registry() {
     let handler = DomainHandler::new();
     assert!(handler
         .extension_registry()
-        .is_registered::<ValidateCapability>());
+        .is_registered::<ValidateCapability<Role>>());
 }
 ```
 

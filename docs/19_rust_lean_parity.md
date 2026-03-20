@@ -206,7 +206,7 @@ Resolved deviations move to history after one stable release cycle with no regre
 **Lean:** `lean/Runtime/VM/Model/Config.lean`, `lean/Runtime/VM/Semantics/ExecComm.lean`
 **Rust:** `rust/vm/src/vm.rs`, `rust/vm/src/threaded.rs`, `rust/vm/tests/parity_fixtures_v2.rs`
 
-**Resolution:** Lean and Rust both expose executable payload-size admission controls. Lean now emits strict-schema annotation rejection on annotationless single-branch send/receive shapes, and parity fixtures cover oversized payload rejection behavior at canonical concurrency.
+**Resolution:** Lean and Rust both expose executable payload-size admission controls. Lean now emits strict-schema annotation rejection on annotationless single-branch send/receive shapes. Parity fixtures cover oversized payload rejection behavior at canonical concurrency.
 
 **Covers:** `runtime.payload.admission`, `runtime.payload.size_bound`, `runtime.payload.strict_schema`
 
@@ -224,7 +224,7 @@ Resolved deviations move to history after one stable release cycle with no regre
 **Lean:** `lean/Choreography/Projection/Erasure/Merge.lean`, `lean/Choreography/Projection/Erasure/PayloadCompat.lean`, `lean/Choreography/Projection/Erasure/MergeSoundness.lean`
 **Rust:** `rust/types/src/merge.rs`
 
-**Resolution:** Lean `merge` is now compatibility-gated directly via `payloadAnnotationsCompatible`, `mergeWithPayloadCompat` is a stable alias to canonical `merge`, and `merge_with_payload_compat_sound` proves soundness at the compatibility-gated entrypoint.
+**Resolution:** Lean `merge` is now compatibility-gated directly via `payloadAnnotationsCompatible`. `mergeWithPayloadCompat` is a stable alias to canonical `merge`. `merge_with_payload_compat_sound` proves soundness at the compatibility-gated entrypoint.
 
 **Covers:** `types.merge.payload_annotation.compatibility`
 
@@ -233,7 +233,7 @@ Resolved deviations move to history after one stable release cycle with no regre
 **Lean:** `lean/SessionTypes/ContentIdentityPolicy.lean`
 **Rust:** `rust/types/src/contentable.rs`
 
-**Resolution:** Lean now exposes executable closed-only canonical identity surfaces (`globalToCanonicalIdentityBytes?`, `localToCanonicalIdentityBytes?`) and open-term template identity surfaces (`globalToTemplateIdentityBytes`, `localToTemplateIdentityBytes`) plus proofs that canonical identity is admitted iff terms are closed/all-bound.
+**Resolution:** Lean now exposes executable closed-only canonical identity surfaces (`globalToCanonicalIdentityBytes?`, `localToCanonicalIdentityBytes?`) and open-term template identity surfaces (`globalToTemplateIdentityBytes`, `localToTemplateIdentityBytes`). Proofs show that canonical identity is admitted iff terms are closed/all-bound.
 
 **Covers:** `types.content_id.closed_only`
 
@@ -242,7 +242,7 @@ Resolved deviations move to history after one stable release cycle with no regre
 **Lean:** `lean/SessionTypes/LocalTypeDB/Annotated.lean`, `lean/SessionTypes/LocalTypeConv.lean`, `lean/SessionTypes/LocalTypeConvProofs/PayloadParityBridge.lean`
 **Rust:** `rust/types/src/de_bruijn.rs`, `rust/types/src/contentable.rs`
 
-**Resolution:** Lean `LocalTypeDBAnn` is promoted via parity-facing conversion surfaces (`toDBParity?`, `fromDBParity`, `toDBParity_closed_safe`). Bridge theorems now prove success/failure equivalence between payload-preserving and legacy erased conversion (`to_db_ann_is_some_eq_to_db_is_some`) and provide lift witnesses from erased-success to payload-preserving success (`to_db_lifts_to_db_ann`).
+**Resolution:** Lean `LocalTypeDBAnn` is promoted via parity-facing conversion surfaces (`toDBParity?`, `fromDBParity`, `toDBParity_closed_safe`). Bridge theorems prove success/failure equivalence between payload-preserving and legacy erased conversion (`to_db_ann_is_some_eq_to_db_is_some`). Lift witnesses from erased-success to payload-preserving success are provided by `to_db_lifts_to_db_ann`.
 
 **Covers:** `types.local_db.payload_annotation.retention`
 

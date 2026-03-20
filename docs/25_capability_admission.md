@@ -48,7 +48,7 @@ Practical consequence:
 - hosts still need a live ownership capability such as `OwnedSession`
 - stale-owner rejection can occur even when admission remains valid
 - a choreography `uses Runtime, Audit` declaration states external protocol
-  dependencies, but it does not replace runtime admission or ownership checks
+  dependencies. It does not replace runtime admission or ownership checks
 
 ## Effect Interfaces vs Admission
 

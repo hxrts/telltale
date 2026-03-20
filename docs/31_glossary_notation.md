@@ -1,7 +1,7 @@
 # Glossary and Notation Index
 
-This page defines shared terms and symbols used across the docs and paper-aligned pages.
-Use it as a stable lookup for terminology and notation.
+This page defines shared terms and symbols used across the documentation and paper-aligned pages.
+It serves as the stable lookup for terminology and notation.
 
 ## Core Terms
 

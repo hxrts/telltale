@@ -537,7 +537,7 @@ the timeout result must be explicit in the protocol and replay/audit surface.
 
 This lowering preserves statement order and continuation structure. Projection skips extension-local behavior for now and continues projecting the remaining protocol.
 
-#### 12) First-Class Combinators
+#### 13) First-Class Combinators
 
 The DSL includes first-class combinators for common patterns.
 
@@ -553,7 +553,7 @@ protocol Combinators =
 
 `handshake` lowers to a two-message exchange (`Hello` and `HelloAck`). `retry` lowers to a bounded loop. `quorum_collect` lowers to a protocol extension node with combinator annotations.
 
-#### 13) Role Sets and Topologies
+#### 14) Role Sets and Topologies
 
 Role sets and topologies are declared at the top level and stored as typed metadata.
 
@@ -567,7 +567,7 @@ mesh FullMesh = Alice, Bob, Carol
 
 These declarations do not change core protocol semantics. They provide structured topology context for tooling and simulation setup.
 
-#### 14) Lowering Diagnostics
+#### 15) Lowering Diagnostics
 
 Use `choreo-fmt --explain-lowering` to inspect canonical lowering output.
 
@@ -577,7 +577,7 @@ choreo-fmt --explain-lowering protocol.tell
 
 The report includes proof-bundle metadata, inferred requirements, lowered protocol shape, and lint suggestions.
 
-#### 15) String-based Protocol Definition
+#### 16) String-based Protocol Definition
 
 ```rust
 use telltale_choreography::compiler::parser::parse_choreography_str;

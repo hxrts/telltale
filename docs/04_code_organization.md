@@ -183,10 +183,10 @@ let mut vm = VM::new(VMConfig::default());
 let image = CodeImage::from_local_types(&local_types, &global_type);
 let _session: OwnedSession =
     vm.load_choreography_owned(&image, "runtime/owner")?;
-vm.run(&handler, 1000)?;
+while vm.step(&handler)? {}
 ```
 
-The first line creates a VM with default configuration. The second line creates a code image from local types. The third line opens the choreography and binds the current host owner. The fourth line runs the VM with an effect handler that implements `telltale_vm::effect::EffectHandler`.
+The first line creates a VM with default configuration. The second line creates a code image from local types. The third line opens the choreography and binds the current host owner. The fourth line steps the VM to completion with an effect handler that implements `telltale_vm::effect::EffectHandler`.
 
 ### telltale-simulator
 
@@ -277,7 +277,7 @@ The shared constructor set is aligned between `telltale-types` and Lean for core
 | `LocalTypeR.mu t T` | `LocalTypeR::Mu { var, body }` | `rust/types/src/local.rs` |
 | `LocalTypeR.var t` | `LocalTypeR::Var(String)` | `rust/types/src/local.rs` |
 | `PayloadSort.unit` | `PayloadSort::Unit` | `rust/types/src/global.rs` |
-| `Label` | `Label { name, sort }` | `rust/types/src/global.rs` |
+| `Label` | `Label { name, sort }` | `rust/types/src/label.rs` |
 
 The Rust variant names match Lean constructor names. Field names are consistent across both implementations.
 

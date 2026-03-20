@@ -4,7 +4,7 @@ This document summarizes the distributed and classical theorem families exposed 
 
 ## Distributed Families
 
-Distributed profile wrappers are defined in `lean/Runtime/Proofs/Adapters/Distributed/ProfileWrappers.lean` and attached through profile setters.
+Distributed profile wrappers are defined in `lean/Runtime/Proofs/Adapters/Distributed/ProfileWrappers.lean`. They are attached through profile setters.
 
 | Family | Wrapper type | Inventory key |
 |---|---|---|
@@ -52,13 +52,13 @@ These profiles are transported into theorem artifacts by adapter constructors an
 
 The combined builder is in `lean/Runtime/Proofs/TheoremPack/Build.lean`.
 
-Optional artifacts are assembled into `VMTheoremPack` and then summarized by `theoremInventory` in `lean/Runtime/Proofs/TheoremPack/Inventory.lean`. This inventory is the capability surface used by release and admission checks.
+Optional artifacts are assembled into `VMTheoremPack`. The `theoremInventory` function in `lean/Runtime/Proofs/TheoremPack/Inventory.lean` summarizes the pack. This inventory is the capability surface used by release and admission checks.
 
 ## Runtime Admission Impact
 
 Runtime features that require profile evidence are gate-controlled.
 
-Examples include mixed determinism profiles, Byzantine envelope operation, autoscaling and repartition requests, and placement refinement. Gate aliases are provided in `lean/Runtime/Proofs/TheoremPack/API.lean` and consumed in Rust runtime admission paths.
+Examples include mixed determinism profiles, Byzantine envelope operation, autoscaling and repartition requests, and placement refinement. Gate aliases are provided in `lean/Runtime/Proofs/TheoremPack/API.lean`. Rust runtime admission paths consume these aliases.
 
 ## Assumption Discipline
 

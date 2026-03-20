@@ -2,7 +2,9 @@
 
 [Telltale](https://github.com/hxrts/telltale) is a Rust framework for choreographic programming with multiparty session types. It enables writing distributed protocols from a global perspective with automatic projection to local implementations. The accompanying Lean 4 formalization provides mechanized proofs of preservation, progress, coherence, and harmony.
 
-The framework includes a bytecode VM with deterministic scheduling and configurable buffer backpressure policies. Asynchronous subtyping uses SISO decomposition with orphan-free deadlock checks. Endpoint transfer semantics support ownership handoff at runtime with progress token migration. Content addressing assigns cryptographic identities to protocol artifacts. The same choreography compiles to native and WASM targets.
+The framework includes a bytecode VM with deterministic scheduling and configurable buffer backpressure policies. Asynchronous subtyping uses SISO decomposition with orphan-free deadlock checks. Endpoint transfer semantics support ownership handoff at runtime with progress token migration. Content addressing assigns cryptographic identities to protocol artifacts.
+
+The same choreography compiles to native and WASM targets.
 
 ## Core Concepts
 
@@ -16,7 +18,7 @@ Choreographic programming builds on global types. A choreography describes compu
 
 Communication operations are algebraic effects. Sending and receiving messages are abstract operations that handlers implement concretely. Programs specify what to communicate.
 
-Handlers determine how messages are delivered. In-memory channels work for testing. TCP connections work for deployment. The protocol logic remains unchanged across execution strategies.
+Handlers determine how messages are delivered. In-memory channels serve testing scenarios. TCP connections serve deployment scenarios. The protocol logic remains unchanged across execution strategies.
 
 ## Bytecode VM
 

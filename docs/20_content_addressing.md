@@ -33,7 +33,7 @@ pub trait Contentable: Sized {
 }
 ```
 
-`GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort` implement this trait. The serializer converts types to a de Bruijn representation and normalizes branch ordering, so alpha equivalent types share the same content ID.
+`GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort` implement this trait. The serializer converts types to a de Bruijn representation and normalizes branch ordering. Alpha equivalent types share the same content ID.
 
 ## Closed vs Open Terms
 

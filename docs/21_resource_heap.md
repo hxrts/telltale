@@ -89,6 +89,6 @@ Use these errors to distinguish missing resources from double consumption.
 
 ## Determinism Notes
 
-All operations are deterministic and avoid hash map iteration order. The resource byte encoding is currently a bespoke format, and future work may replace it with a canonical codec.
+All operations are deterministic and avoid hash map iteration order. The resource byte encoding is currently a bespoke format. Future work may replace it with a canonical codec.
 
 See [Content Addressing](20_content_addressing.md) for the type level content ID system and [Choreography Effect Handlers](09_effect_handlers.md) for choreography runtime integration.

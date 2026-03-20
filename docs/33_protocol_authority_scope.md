@@ -75,16 +75,15 @@ Working distinction:
 
 ## Weak Current Surfaces
 
-The current repo already has a strong VM/effect boundary, but several
-parts of that boundary still rely on raw strings or convention-driven
-host behavior.
+The current repo already has a strong VM/effect boundary.
+Several parts of that boundary still rely on raw strings or convention-driven host behavior.
 
 ### VM/Effect Callback Surface
 
 The VM `EffectHandler` trait in `rust/vm/src/effect/handler_trait.rs`
 has now moved to typed outcomes.
-Callbacks return `EffectResult<_>` and failures use `EffectFailure` /
-`EffectFailureKind` rather than raw `String` classification.
+Callbacks return `EffectResult<_>` with typed failure variants.
+Failures use `EffectFailure` and `EffectFailureKind` rather than raw `String` classification.
 
 This was the highest-priority boundary change because it makes timeout,
 cancellation, stale authority, invalid evidence, determinism, topology,
@@ -106,8 +105,8 @@ typed evidence/failure as the rest of the authority design firms up.
 ### Internal Runtime Surfaces Worth Tracking
 
 Some lower-level VM/session functions also use raw strings today.
-They are not all equally important, but they should be inventoried so
-future typed-boundary work does not stop at the trait edge.
+They are not all equally important.
+They should be inventoried so future typed-boundary work does not stop at the trait edge.
 
 Examples include:
 

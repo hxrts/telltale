@@ -251,23 +251,23 @@ Most Lean-dependent tests skip when Lean binaries are missing.
 
 - `coherence_tests.rs`
 - `golden_equivalence_tests.rs`
-- `invariant_verification_tests.rs`
+- `invariant_verification.rs`
 - `lean_integration_tests.rs`
 - `live_equivalence_tests.rs`
 - `merge_semantics_tests.rs`
-- `projection_equivalence_tests.rs`
+- `projection_equivalence.rs`
 - `projection_runner_tests.rs`
 - `property_tests.rs`
 - `proptest_async_subtyping.rs`
-- `proptest_bundle_transport.rs`
+- `proptest_bundle.rs`
 - `proptest_json_roundtrip.rs`
 - `proptest_projection.rs`
 - `schema_version_tests.rs`
-- `semantics_verification_tests.rs`
-- `vm_composition_stress_tests.rs`
+- `semantics_verification.rs`
+- `vm_composition_stress.rs`
 - `vm_correspondence_tests.rs`
-- `vm_cross_target_matrix_tests.rs`
-- `vm_differential_step_tests.rs`
+- `vm_cross_target_tests.rs`
+- `vm_differential_steps.rs`
 
 These lanes are aligned with repository parity and release-gate lanes.
 Examples include `just check-parity --types`, `just check-parity --suite`, and `just check-capability-gates`.
