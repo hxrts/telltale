@@ -11,36 +11,18 @@ if ! command -v git >/dev/null 2>&1; then
   exit 2
 fi
 
-SCAN_WORK=false
-if [[ "${1:-}" == "--work" ]]; then
-  SCAN_WORK=true
-elif [[ "${1:-}" != "" ]]; then
-  echo "usage: $0 [--work]"
-  echo "  --work   include work/ references in scan"
+if [[ "${1:-}" != "" ]]; then
+  echo "usage: $0"
   exit 2
 fi
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
-SCAN_ROOTS=(
-  "docs"
-  "rust"
-  "lean"
-  "scripts"
-  ".github"
-)
-
-if [[ "$SCAN_WORK" == true ]]; then
-  SCAN_ROOTS+=("work")
-fi
-
 ROOT_FILES=(
   "README.md"
   "CLAUDE.md"
 )
-
-export INCLUDE_WORK="$SCAN_WORK"
 
 python3 - <<'PY'
 import os
@@ -61,8 +43,6 @@ scan_roots = [
     "scripts",
     ".github",
 ]
-if os.environ.get("INCLUDE_WORK", "false") == "true":
-    scan_roots.append("work")
 
 root_files = ["README.md", "CLAUDE.md"]
 

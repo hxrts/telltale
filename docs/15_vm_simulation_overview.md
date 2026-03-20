@@ -39,7 +39,7 @@ Use these pages for detailed behavior.
 Use the simulator runner binary through `just` for CI-friendly JSON output.
 
 ```text
-just sim-run work/sim_integration.toml
+just sim-run artifacts/sim_integration.toml
 ```
 
 The process exits with code `2` when configured contract checks fail.

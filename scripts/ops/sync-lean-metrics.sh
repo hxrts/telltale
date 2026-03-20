@@ -4,7 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LEAN_DIR="${ROOT_DIR}/lean"
 CODE_MAP_FILE="${ROOT_DIR}/lean/CODE_MAP.md"
-STATUS_FILE="${ROOT_DIR}/work/status.md"
 
 CHECK_MODE=0
 if [[ "${1:-}" == "--check" ]]; then
@@ -191,7 +190,6 @@ done
 TODAY="$(date +%F)"
 
 before_code_map_hash="$(shasum -a 256 "$CODE_MAP_FILE" | awk '{print $1}')"
-before_status_hash="$(shasum -a 256 "$STATUS_FILE" | awk '{print $1}')"
 
 CODE_MAP_METRICS="**Last Updated:** ${TODAY}"
 
@@ -213,33 +211,12 @@ printf -v total_row "| **Total**      | **%s** | **%s** | %-58s |" \
   ""
 overview_table+=$'\n'"${total_row}"
 
-status_table="| Library        | Files | Lines | Axioms | Sorry |"
-status_table+=$'\n'"| -------------- | ----: | ----: | -----: | ----: |"
-
-for ((i=0; i<${#LIB_NAMES[@]}; i++)); do
-  printf -v status_row "| %-14s | %5s | %5s | %6s | %5s |" \
-    "${LIB_NAMES[$i]}" \
-    "$(add_commas "${FILE_COUNTS[$i]}")" \
-    "$(add_commas "${LINE_COUNTS[$i]}")" \
-    "$(add_commas "${AXIOM_COUNTS[$i]}")" \
-    "$(add_commas "${SORRY_COUNTS[$i]}")"
-  status_table+=$'\n'"${status_row}"
-done
-
-status_metrics="**Last updated:** ${TODAY}"
-status_metrics+=$'\n\n---\n\n## Library Statistics\n\n'
-status_metrics+="**~$(add_commas "$TOTAL_FILES") files, ~$(add_commas "$TOTAL_LINES") lines, $(add_commas "$TOTAL_AXIOMS") axioms, $(add_commas "$TOTAL_SORRY") sorry.**"
-status_metrics+=$'\n\nMain proof obligations discharged (0 proof holes). Remaining work is feature development and axiom retirement.\n\n'
-status_metrics+="${status_table}"
-
 replace_block "$CODE_MAP_FILE" "<!-- GENERATED_METRICS:BEGIN -->" "<!-- GENERATED_METRICS:END -->" "$CODE_MAP_METRICS"
 replace_block "$CODE_MAP_FILE" "<!-- GENERATED_OVERVIEW_TABLE:BEGIN -->" "<!-- GENERATED_OVERVIEW_TABLE:END -->" "$overview_table"
-replace_block "$STATUS_FILE" "<!-- GENERATED_STATUS_METRICS:BEGIN -->" "<!-- GENERATED_STATUS_METRICS:END -->" "$status_metrics"
 
 if (( CHECK_MODE == 1 )); then
   after_code_map_hash="$(shasum -a 256 "$CODE_MAP_FILE" | awk '{print $1}')"
-  after_status_hash="$(shasum -a 256 "$STATUS_FILE" | awk '{print $1}')"
-  if [[ "$before_code_map_hash" != "$after_code_map_hash" ]] || [[ "$before_status_hash" != "$after_status_hash" ]]; then
+  if [[ "$before_code_map_hash" != "$after_code_map_hash" ]]; then
     echo "Lean metrics are stale. Run: ./scripts/ops/sync-lean-metrics.sh" >&2
     exit 1
   fi
@@ -249,4 +226,3 @@ fi
 
 echo "Updated generated metrics in:"
 echo "  - lean/CODE_MAP.md"
-echo "  - work/status.md"

@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Rust Style Guide Conformance Checker for Telltale-Aura
-# Based on work/style_guide_rust.md
+# Rust Style Guide Conformance Checker for Telltale
 #
 # Usage:
 #   ./scripts/check/lint.sh            # Full check
@@ -36,7 +35,6 @@ section() { echo -e "\n${BLUE}--- $1 ---${NC}"; }
 
 echo "========================================"
 echo "  Rust Style Guide Conformance Check"
-echo "  See: work/style_guide_rust.md"
 echo "========================================"
 
 if $QUICK_MODE; then

@@ -210,14 +210,14 @@ It also writes a local scaffold `README.md` with next-step instructions.
 just effect-scaffold
 ```
 
-This command writes files under `work/effect_handler_scaffold` by default. Use `cargo run -p effect-scaffold -- --no-simulator` when you want only VM level stubs without simulator harness artifacts.
+This command writes files under `artifacts/effect_handler_scaffold` by default. Use `cargo run -p effect-scaffold -- --no-simulator` when you want only VM level stubs without simulator harness artifacts.
 
 Use `just sim-run <config>` to execute a simulator harness config file.
 This command runs the VM with scenario middleware and contract checks.
 It is the fastest path for CI validation in third party host projects.
 
 ```text
-just sim-run work/sim_integration.toml
+just sim-run artifacts/sim_integration.toml
 ```
 
 This command prints a JSON report. The process exits with code `2` when contract checks fail.

@@ -140,7 +140,7 @@ check-telltale-style:
     ./scripts/check/text-symbols.sh
 
 # Generate deterministic EffectHandler stubs plus simulator harness test templates.
-effect-scaffold out="work/effect_handler_scaffold" name="HostEffectHandler":
+effect-scaffold out="artifacts/effect_handler_scaffold" name="HostEffectHandler":
     cargo run -p effect-scaffold -- {{ out }} {{ name }}
 
 # Run a simulator harness config and print a JSON report.

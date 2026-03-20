@@ -54,7 +54,6 @@ path_prefixes = (
     "scripts/",
     "papers/",
     ".github/",
-    "work/",
     "src/",
 )
 path_literals = {
@@ -115,7 +114,6 @@ for file in doc_files:
         if looks_like_path(snippet):
             if (
                 "*" in snippet
-                or snippet.startswith("work/")
                 or "/.lake/build/" in snippet
             ):
                 continue

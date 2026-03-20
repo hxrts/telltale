@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LEAN_DIR="${ROOT_DIR}/lean"
-OUT_FILE="${ROOT_DIR}/work/lean_style_baseline.md"
+OUT_FILE="${ROOT_DIR}/artifacts/lean_style_baseline.md"
 
 if ! command -v rg >/dev/null 2>&1; then
   echo "error: ripgrep (rg) is required" >&2
