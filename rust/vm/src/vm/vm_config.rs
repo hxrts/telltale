@@ -232,6 +232,31 @@ pub struct TickedObsEvent {
 
 /// Observable event emitted by the VM.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SessionTerminalReason {
+    /// Session closed normally.
+    Closed {
+        /// Deterministic terminal explanation recorded in the trace.
+        reason: String,
+    },
+    /// Session cancelled through an explicit cancellation path.
+    Cancelled {
+        /// Deterministic terminal explanation recorded in the trace.
+        reason: String,
+    },
+    /// Session aborted through an explicit abort path.
+    Aborted {
+        /// Deterministic terminal explanation recorded in the trace.
+        reason: String,
+    },
+    /// Session faulted with an explicit terminal reason.
+    Faulted {
+        /// Deterministic terminal explanation recorded in the trace.
+        reason: String,
+    },
+}
+
+/// Observable event emitted by the VM.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ObsEvent {
     /// Value sent on an edge.
     Sent {
@@ -296,6 +321,15 @@ pub enum ObsEvent {
         tick: u64,
         /// Session ID.
         session: SessionId,
+    },
+    /// Explicit terminal transition for one session.
+    SessionTerminal {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
+        /// Session ID.
+        session: SessionId,
+        /// Explicit terminal reason.
+        reason: SessionTerminalReason,
     },
     /// Session epoch advanced.
     EpochAdvanced {
@@ -412,6 +446,52 @@ pub enum ObsEvent {
         coro_id: usize,
         /// The fault.
         fault: Fault,
+    },
+    /// Typed failure branch entry became visible before terminal fault handling.
+    FailureBranchEntered {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
+        /// Session ID.
+        session: SessionId,
+        /// Coroutine ID.
+        coro_id: usize,
+        /// Failure that entered the branch.
+        fault: Fault,
+    },
+    /// Explicit timeout occurrence became active for one site.
+    TimeoutIssued {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
+        /// Site that timed out.
+        site: String,
+        /// Tick until which the timeout remains active.
+        until_tick: u64,
+        /// Timeout witness issued for the occurrence.
+        witness_id: AuthorityWitnessId,
+    },
+    /// Explicit cancellation path was requested.
+    CancellationRequested {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
+        /// Session ID.
+        session: SessionId,
+        /// Cancellation witness issued for the request.
+        witness_id: AuthorityWitnessId,
+        /// Owner whose lifecycle triggered the cancellation.
+        owner_id: FragmentOwnerId,
+        /// Ownership reason for the cancellation request.
+        reason: OwnershipTerminalReason,
+    },
+    /// Explicit cancellation path completed.
+    Cancelled {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
+        /// Session ID.
+        session: SessionId,
+        /// Cancellation witness used for the completion.
+        witness_id: AuthorityWitnessId,
+        /// Ownership reason for the completed cancellation.
+        reason: OwnershipTerminalReason,
     },
     /// Output-condition verification was evaluated at commit time.
     OutputConditionChecked {

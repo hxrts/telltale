@@ -98,6 +98,19 @@ impl VM {
                     selected_coro: coro_id,
                     exec_status: SchedExecStatus::Faulted,
                 });
+                let Some(idx) = self.coro_index(coro_id) else {
+                    return Err(VMError::Fault { coro_id, fault });
+                };
+                let session = self.coroutines[idx].session_id;
+                self.obs_trace.push(
+                    ObsEvent::FailureBranchEntered {
+                        tick: self.clock.tick,
+                        session,
+                        coro_id,
+                        fault: fault.clone(),
+                    },
+                    &self.config.observability_retention,
+                );
                 self.obs_trace.push(
                     ObsEvent::Faulted {
                         tick: self.clock.tick,
@@ -106,9 +119,6 @@ impl VM {
                     },
                     &self.config.observability_retention,
                 );
-                let Some(idx) = self.coro_index(coro_id) else {
-                    return Err(VMError::Fault { coro_id, fault });
-                };
                 self.coroutines[idx].status = CoroStatus::Faulted(fault.clone());
                 self.sched.mark_done(coro_id);
                 #[cfg(debug_assertions)]

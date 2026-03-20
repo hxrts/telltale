@@ -540,10 +540,19 @@ impl VM {
         Ok(StepPack {
             coro_update: CoroUpdate::AdvancePc,
             type_update: None,
-            events: vec![ObsEvent::Aborted {
-                tick: self.clock.tick,
-                session: sid,
-            }],
+            events: vec![
+                ObsEvent::Aborted {
+                    tick: self.clock.tick,
+                    session: sid,
+                },
+                ObsEvent::SessionTerminal {
+                    tick: self.clock.tick,
+                    session: sid,
+                    reason: SessionTerminalReason::Aborted {
+                        reason: "abort instruction".to_string(),
+                    },
+                },
+            ],
         })
     }
 

@@ -21,6 +21,7 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 | `SignedValue` transport fields (`payload`, `signature`, `sequence_no`) | `Runtime/VM/Model/TypeClasses.lean` | `rust/vm/src/buffer.rs` | Aligned |
 | Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | `Runtime/VM/Model/Config.lean`, `Runtime/VM/Semantics/ExecComm.lean` | `rust/vm/src/vm.rs` | Aligned |
 | Register bounds failure semantics (`OutOfRegisters`) | `Runtime/VM/Semantics/ExecSteps.lean` | `rust/vm/src/vm`, `rust/vm/src/threaded` | Aligned |
+| Explicit failure/timeout observable event inventory (`TimeoutIssued`, `CancellationRequested`, `Cancelled`, `FailureBranchEntered`, `SessionTerminal`) | inventory-only for next Lean runtime/event pass | `rust/vm/src/vm/vm_config.rs`, `rust/vm/src/trace.rs` | Inventory tracked |
 
 These checks are automated by `just check-parity --types`.
 
@@ -34,8 +35,11 @@ These checks are automated by `just check-parity --types`.
 | Speculation | No sentinel fallback behavior for join/abort with deterministic gated semantics |
 | Register bounds | Out-of-range register operands fail with `OutOfRegisters` (no unchecked panic paths) |
 | Load boundary | Runtime rejects malformed trusted image role/type shape before session open |
+| Explicit failure and timeout ordering | per-session trace preserves `TimeoutIssued`, `CancellationRequested`, `Cancelled`, `FailureBranchEntered`, and `SessionTerminal` ordering |
 
 These checks are automated by `just check-parity --suite`.
+
+The explicit failure/timeout event family is currently tracked as a Rust-side bridge inventory surface while the next Lean runtime/event pass catches up. This is an inventory obligation, not a hidden parity exception.
 
 ## Choreography Projection Parity
 

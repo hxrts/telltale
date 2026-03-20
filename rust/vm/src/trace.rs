@@ -35,18 +35,23 @@ pub fn obs_session(ev: &ObsEvent) -> Option<SessionId> {
         | ObsEvent::Received { session, .. }
         | ObsEvent::Opened { session, .. }
         | ObsEvent::Closed { session, .. }
+        | ObsEvent::SessionTerminal { session, .. }
         | ObsEvent::Acquired { session, .. }
         | ObsEvent::Released { session, .. }
         | ObsEvent::Transferred { session, .. }
         | ObsEvent::Forked { session, .. }
         | ObsEvent::Joined { session, .. }
         | ObsEvent::Aborted { session, .. }
+        | ObsEvent::CancellationRequested { session, .. }
+        | ObsEvent::Cancelled { session, .. }
         | ObsEvent::Tagged { session, .. }
         | ObsEvent::Checked { session, .. } => Some(*session),
         ObsEvent::Offered { edge, .. } | ObsEvent::Chose { edge, .. } => Some(edge.sid),
         ObsEvent::EpochAdvanced { sid, .. } => Some(*sid),
         ObsEvent::Halted { .. }
         | ObsEvent::Invoked { .. }
+        | ObsEvent::TimeoutIssued { .. }
+        | ObsEvent::FailureBranchEntered { .. }
         | ObsEvent::Faulted { .. }
         | ObsEvent::OutputConditionChecked { .. } => None,
     }
@@ -81,6 +86,9 @@ fn set_obs_event_tick(out: &mut ObsEvent, tick: u64) {
         | ObsEvent::Closed {
             tick: event_tick, ..
         }
+        | ObsEvent::SessionTerminal {
+            tick: event_tick, ..
+        }
         | ObsEvent::EpochAdvanced {
             tick: event_tick, ..
         }
@@ -108,10 +116,22 @@ fn set_obs_event_tick(out: &mut ObsEvent, tick: u64) {
         | ObsEvent::Aborted {
             tick: event_tick, ..
         }
+        | ObsEvent::CancellationRequested {
+            tick: event_tick, ..
+        }
+        | ObsEvent::Cancelled {
+            tick: event_tick, ..
+        }
         | ObsEvent::Tagged {
             tick: event_tick, ..
         }
         | ObsEvent::Checked {
+            tick: event_tick, ..
+        }
+        | ObsEvent::FailureBranchEntered {
+            tick: event_tick, ..
+        }
+        | ObsEvent::TimeoutIssued {
             tick: event_tick, ..
         }
         | ObsEvent::Faulted {

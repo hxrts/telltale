@@ -141,8 +141,7 @@ impl OwnedSession {
     ///
     /// Returns an `OwnershipError` if the live owner no longer matches this handle.
     pub fn mark_owner_died(&self, vm: &mut VM) -> Result<CancellationWitness, OwnershipError> {
-        vm.sessions_mut()
-            .mark_owner_died(self.session_id, &self.capability.owner_id)
+        vm.mark_owner_died(self.session_id, &self.capability.owner_id)
     }
 
     /// Cancel the session because this transfer was abandoned.
@@ -155,7 +154,7 @@ impl OwnedSession {
         vm: &mut VM,
         receipt: &OwnershipReceipt,
     ) -> Result<CancellationWitness, OwnershipError> {
-        vm.sessions_mut().cancel_abandoned_transfer(receipt)
+        vm.cancel_abandoned_transfer(receipt)
     }
 }
 

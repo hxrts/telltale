@@ -270,8 +270,17 @@ impl VM {
                     .clock
                     .tick
                     .saturating_add(self.duration_to_ticks(*duration));
-                let _witness = self.issue_timeout_witness(site, until_tick);
+                let witness = self.issue_timeout_witness(site, until_tick);
                 self.timed_out_sites.insert(site.clone(), until_tick);
+                self.obs_trace.push(
+                    ObsEvent::TimeoutIssued {
+                        tick: self.clock.tick,
+                        site: site.clone(),
+                        until_tick,
+                        witness_id: witness.witness_id,
+                    },
+                    &self.config.observability_retention,
+                );
                 let coro_ids = self.role_coroutines.get(site).cloned().unwrap_or_default();
                 for coro_id in coro_ids {
                     self.timed_out_coro_ids.insert(coro_id);
@@ -317,6 +326,105 @@ impl VM {
                 self.next_effect_id = self.next_effect_id.saturating_add(1);
             }
         }
+        Ok(())
+    }
+
+    /// Fault a session because the current owner died.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the live owner no longer matches.
+    pub fn mark_owner_died(
+        &mut self,
+        sid: SessionId,
+        owner_id: &str,
+    ) -> Result<CancellationWitness, OwnershipError> {
+        let witness = self.sessions_mut().mark_owner_died(sid, owner_id)?;
+        self.obs_trace.push(
+            ObsEvent::SessionTerminal {
+                tick: self.clock.tick,
+                session: sid,
+                reason: SessionTerminalReason::Faulted {
+                    reason: format!("ownership owner `{owner_id}` died"),
+                },
+            },
+            &self.config.observability_retention,
+        );
+        Ok(witness)
+    }
+
+    /// Cancel a session because a staged transfer was abandoned.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the receipt no longer matches the staged transfer.
+    pub fn cancel_abandoned_transfer(
+        &mut self,
+        receipt: &OwnershipReceipt,
+    ) -> Result<CancellationWitness, OwnershipError> {
+        let requested_reason = OwnershipTerminalReason::TransferAbandoned {
+            owner_id: receipt.from_owner_id.clone(),
+            claim_id: receipt.claim_id,
+        };
+        let witness = self.sessions_mut().cancel_abandoned_transfer(receipt)?;
+        self.obs_trace.push(
+            ObsEvent::CancellationRequested {
+                tick: self.clock.tick,
+                session: receipt.session_id,
+                witness_id: witness.witness_id,
+                owner_id: receipt.from_owner_id.clone(),
+                reason: requested_reason.clone(),
+            },
+            &self.config.observability_retention,
+        );
+        self.obs_trace.push(
+            ObsEvent::Cancelled {
+                tick: self.clock.tick,
+                session: receipt.session_id,
+                witness_id: witness.witness_id,
+                reason: requested_reason.clone(),
+            },
+            &self.config.observability_retention,
+        );
+        self.obs_trace.push(
+            ObsEvent::SessionTerminal {
+                tick: self.clock.tick,
+                session: receipt.session_id,
+                reason: SessionTerminalReason::Cancelled {
+                    reason: format!(
+                        "ownership transfer {} abandoned by {}",
+                        receipt.claim_id, receipt.from_owner_id
+                    ),
+                },
+            },
+            &self.config.observability_retention,
+        );
+        Ok(witness)
+    }
+
+    /// Fault a session because a staged transfer could not commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the receipt no longer matches the staged transfer.
+    pub fn fault_failed_transfer_commit(
+        &mut self,
+        receipt: &OwnershipReceipt,
+        reason: impl Into<String>,
+    ) -> Result<(), OwnershipError> {
+        let reason = reason.into();
+        self.sessions_mut()
+            .fault_failed_transfer_commit(receipt, reason.clone())?;
+        self.obs_trace.push(
+            ObsEvent::SessionTerminal {
+                tick: self.clock.tick,
+                session: receipt.session_id,
+                reason: SessionTerminalReason::Faulted {
+                    reason: format!("ownership transfer commit failed: {reason}"),
+                },
+            },
+            &self.config.observability_retention,
+        );
         Ok(())
     }
 

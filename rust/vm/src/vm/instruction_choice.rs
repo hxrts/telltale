@@ -392,6 +392,13 @@ impl VM {
                     tick: self.clock.tick,
                     session: sid,
                 },
+                ObsEvent::SessionTerminal {
+                    tick: self.clock.tick,
+                    session: sid,
+                    reason: SessionTerminalReason::Closed {
+                        reason: "close instruction".to_string(),
+                    },
+                },
                 ObsEvent::EpochAdvanced {
                     tick: self.clock.tick,
                     sid,

@@ -93,6 +93,20 @@ Runtime ownership details:
 - delegation emits auditable transfer records
 - host assertion mode can reject transfer events that do not have matching committed audit records
 
+## Failure and Timeout Event Surface
+
+Failure-visible behavior now uses explicit observable events rather than relying on host-side inference from final state alone.
+
+| Event | Runtime role |
+|---|---|
+| `TimeoutIssued` | records deterministic timeout activation and timeout-witness issuance |
+| `CancellationRequested` | records the start of an explicit cancellation path |
+| `Cancelled` | records successful cancellation completion |
+| `FailureBranchEntered` | records typed failure visibility before coroutine fault finalization |
+| `SessionTerminal` | records the terminal reason for close, cancel, abort, or fault |
+
+For canonical ordering, the cooperative runtime emits the explicit event sequence before any coarser terminal summary. Threaded execution must preserve the same per-session ordering in its observable trace envelope.
+
 ## Delegation and Reconfiguration Path
 
 Runtime delegation uses one sanctioned manager-style path rather than scattered owner mutation.

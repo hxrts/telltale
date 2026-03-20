@@ -287,6 +287,12 @@
         assert!(
             vm.obs_trace()
                 .iter()
+                .any(|event| matches!(event, ObsEvent::FailureBranchEntered { .. })),
+            "faulted step must emit explicit failure-branch event"
+        );
+        assert!(
+            vm.obs_trace()
+                .iter()
                 .any(|event| matches!(event, ObsEvent::Faulted { .. })),
             "faulted step must emit Faulted trace event"
         );
@@ -547,4 +553,14 @@
             .filter(|e| matches!(e, ObsEvent::Closed { .. }))
             .count();
         assert!(closed_count >= 1, "expected at least one Closed event");
+        assert!(
+            vm.obs_trace.iter().any(|event| matches!(
+                event,
+                ObsEvent::SessionTerminal {
+                    reason: SessionTerminalReason::Closed { .. },
+                    ..
+                }
+            )),
+            "expected explicit closed terminal reason"
+        );
     }

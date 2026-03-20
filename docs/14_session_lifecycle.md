@@ -61,6 +61,28 @@ Ownership failures map into session terminal behavior as follows.
 
 These mappings are implementation policy. They are not claims that the Lean theory proves host-runtime ownership outcomes directly.
 
+## Explicit Failure and Timeout Observability
+
+Failure, timeout, and cancellation behavior is now explicit at the VM trace surface rather than inferred only from final status.
+
+| Observable event | Meaning |
+|---|---|
+| `TimeoutIssued` | a timeout occurrence became active for one site and issued a timeout witness |
+| `CancellationRequested` | a cancellation path was requested for one session with one cancellation witness |
+| `Cancelled` | the explicit cancellation path completed for one session using the same witness |
+| `FailureBranchEntered` | a typed failure branch became visible before terminal fault handling |
+| `SessionTerminal` | a session reached an explicit terminal state with a deterministic terminal reason |
+
+Deterministic ordering rules:
+
+- timeout activation is recorded as `TimeoutIssued` at the tick where the topology timeout becomes active
+- explicit cancellation emits `CancellationRequested`, then `Cancelled`, then `SessionTerminal { Cancelled { ... } }`
+- explicit abort emits `Aborted`, then `SessionTerminal { Aborted { ... } }`
+- explicit close emits `Closed`, then `SessionTerminal { Closed { ... } }`, then `EpochAdvanced`
+- coroutine fault handling emits `FailureBranchEntered` before `Faulted`
+
+These events are part of replay-visible observability. Host integrations should not reconstruct this ordering indirectly from final statuses.
+
 ## Open Path
 
 `Open` is executed by `VM::step_open`. The instruction carries `roles`, `local_types`, `handlers`, and `dsts`.
@@ -117,7 +139,7 @@ Policy semantics:
 
 The VM first checks endpoint ownership for the closing coroutine. If ownership is valid, the store sets `status = Closed`, clears buffers and edge traces, and increments `epoch`.
 
-Close emits `Closed` and `EpochAdvanced` observable events. There is no automatic draining loop in the current close implementation.
+Close emits `Closed`, `SessionTerminal { Closed { ... } }`, and `EpochAdvanced` observable events. There is no automatic draining loop in the current close implementation.
 
 The close path is distinct from host-runtime ownership transfer. Endpoint/coroutine ownership for bytecode execution remains part of normal VM execution semantics. Host-runtime ownership governs who may mutate session-local host state at the embedding boundary.
 

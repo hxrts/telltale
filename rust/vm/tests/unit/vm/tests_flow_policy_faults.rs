@@ -245,6 +245,14 @@
             other => panic!("expected timeout witness, got {other:?}"),
         }
         assert_eq!(audit[0].event, AuthorityAuditEvent::Issued);
+        assert!(vm.obs_trace().iter().any(|event| matches!(
+            event,
+            ObsEvent::TimeoutIssued {
+                site,
+                until_tick: 21,
+                ..
+            } if site == "A"
+        )));
     }
 
     #[test]
@@ -271,6 +279,49 @@
             .expect("session exists")
             .recv("A", "B");
         assert_eq!(received, Some(Value::Nat(11)));
+    }
+
+    #[test]
+    fn test_cancel_abandoned_transfer_emits_request_and_completion() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+        let mut vm = VM::new(VMConfig::default());
+        let owned = vm
+            .load_choreography_owned(&image, "owner/a")
+            .expect("load owned choreography");
+
+        let receipt = owned
+            .begin_transfer(&mut vm, "owner/b", OwnershipScope::Session)
+            .expect("stage transfer");
+        let witness = owned
+            .cancel_abandoned_transfer(&mut vm, &receipt)
+            .expect("cancel abandoned transfer");
+
+        assert!(vm.obs_trace().iter().any(|event| matches!(
+            event,
+            ObsEvent::CancellationRequested {
+                session,
+                witness_id,
+                ..
+            } if *session == owned.session_id() && *witness_id == witness.witness_id
+        )));
+        assert!(vm.obs_trace().iter().any(|event| matches!(
+            event,
+            ObsEvent::Cancelled {
+                session,
+                witness_id,
+                ..
+            } if *session == owned.session_id() && *witness_id == witness.witness_id
+        )));
+        assert!(vm.obs_trace().iter().any(|event| matches!(
+            event,
+            ObsEvent::SessionTerminal {
+                session,
+                reason: SessionTerminalReason::Cancelled { .. },
+                ..
+            } if *session == owned.session_id()
+        )));
     }
 
     #[test]
