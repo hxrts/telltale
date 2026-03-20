@@ -85,9 +85,11 @@ impl WasmVM {
         let spec: WasmChoreoSpec = serde_json::from_str(json)
             .map_err(|e| JsValue::from_str(&format!("invalid json: {e}")))?;
         let image = CodeImage::from_local_types(&spec.local_types, &spec.global_type);
-        self.inner
-            .load_choreography(&image)
-            .map_err(|e| JsValue::from_str(&e.to_string()))
+        let owned = self
+            .inner
+            .load_choreography_owned(&image, "wasm/host")
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(owned.session_id())
     }
 
     /// Execute one scheduler round with concurrency `n`.

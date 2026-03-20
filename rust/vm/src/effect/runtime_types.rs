@@ -204,9 +204,7 @@ impl<'a> ReplayEffectHandler<'a> {
         outputs: &JsonValue,
         _explicit_payload: Option<Value>,
     ) -> Option<EffectResult<SendDecision>> {
-        let Some(result) = decode_effect_result::<SendDecision>(outputs) else {
-            return None;
-        };
+        let result = decode_effect_result::<SendDecision>(outputs)?;
         match result {
             EffectResult::Success(SendDecision::Deliver(payload)) => {
                 Some(EffectResult::Success(SendDecision::Deliver(payload)))

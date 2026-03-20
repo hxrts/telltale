@@ -8,7 +8,9 @@ use serde::Serialize;
 use serde_json::json;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, RecordingEffectHandler, SendDecision, SendDecisionInput};
+use telltale_vm::effect::{
+    EffectHandler, EffectResult, RecordingEffectHandler, SendDecision, SendDecisionInput,
+};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
@@ -27,12 +29,12 @@ impl EffectHandler for DeterministicHandler {
         _partner: &str,
         label: &str,
         _state: &[Value],
-    ) -> Result<Value, String> {
-        Ok(Value::Str(label.to_string()))
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Str(label.to_string()))
     }
 
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-        Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
     }
 
     fn handle_recv(
@@ -42,8 +44,8 @@ impl EffectHandler for DeterministicHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -52,15 +54,17 @@ impl EffectHandler for DeterministicHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".to_string())
+    ) -> EffectResult<String> {
+        EffectResult::success(
+            labels
+                .first()
+                .cloned()
+                .expect("labels should contain at least one branch"),
+        )
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-        Ok(())
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::success(())
     }
 }
 
@@ -76,18 +80,18 @@ impl EffectHandler for FlakySendHandler {
         _partner: &str,
         _label: &str,
         _state: &[Value],
-    ) -> Result<Value, String> {
-        Ok(Value::Nat(1))
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Nat(1))
     }
 
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
         let idx = self.counter.fetch_add(1, Ordering::Relaxed);
         if idx % 2 == 0 {
-            Ok(SendDecision::Deliver(
+            EffectResult::success(SendDecision::Deliver(
                 input.payload.unwrap_or(Value::Nat(1)),
             ))
         } else {
-            Ok(SendDecision::Drop)
+            EffectResult::success(SendDecision::Drop)
         }
     }
 
@@ -98,8 +102,8 @@ impl EffectHandler for FlakySendHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -108,15 +112,17 @@ impl EffectHandler for FlakySendHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".to_string())
+    ) -> EffectResult<String> {
+        EffectResult::success(
+            labels
+                .first()
+                .cloned()
+                .expect("labels should contain at least one branch"),
+        )
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-        Ok(())
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::success(())
     }
 }
 

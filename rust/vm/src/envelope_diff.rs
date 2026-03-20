@@ -333,6 +333,7 @@ mod tests {
             communication_replay_mode: crate::communication_replay::CommunicationReplayMode::Off,
             communication_replay_root: None,
             communication_consumption_artifacts: Vec::new(),
+            semantic_audit_log: Vec::new(),
         }
     }
 

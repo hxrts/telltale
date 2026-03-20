@@ -49,6 +49,7 @@ where
 }
 
 /// Build canonical effect-trace entry from an observable event, if applicable.
+#[allow(clippy::too_many_lines)]
 pub(crate) fn effect_trace_entry_for_event(
     ev: &ObsEvent,
     effect_id: u64,

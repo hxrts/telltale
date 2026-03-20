@@ -70,7 +70,7 @@ fn owned_boundary_docs_do_not_recommend_raw_open_or_backend_abstractions() {
 
     assert!(
         violations.is_empty(),
-        "host-facing docs/templates drifted away from the canonical owned boundary:\n{}",
+        "host-facing docs and scaffold sources drifted away from the canonical owned boundary:\n{}",
         violations.join("\n")
     );
 }

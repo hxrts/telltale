@@ -365,12 +365,6 @@ mod tests {
     use super::*;
     use telltale_vm::effect::{EffectFailure, EffectResult};
 
-    fn expect_success<T>(result: EffectResult<T>) -> T {
-        result
-            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
-            .expect("effect should succeed")
-    }
-
     struct PassthroughHandler;
 
     impl EffectHandler for PassthroughHandler {

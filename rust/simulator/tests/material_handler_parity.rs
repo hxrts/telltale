@@ -9,7 +9,7 @@ use telltale_simulator::material_handlers::{
 };
 use telltale_types::FixedQ32;
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::EffectHandler;
+use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 
 fn q32(value: FixedQ32) -> Value {
     Value::Str(format!("q32:{}", value.to_bits()))
@@ -43,6 +43,12 @@ fn approx_eq(lhs: FixedQ32, rhs: FixedQ32, eps: FixedQ32) -> bool {
     (lhs - rhs).abs() <= eps
 }
 
+fn expect_effect_success<T>(result: EffectResult<T>, context: &str) -> T {
+    result
+        .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
+        .unwrap_or_else(|failure| panic!("{context}: {failure}"))
+}
+
 #[test]
 fn ising_equilibrium_fixture_matches_lean_mirror() {
     let params = MeanFieldParams {
@@ -54,7 +60,7 @@ fn ising_equilibrium_fixture_matches_lean_mirror() {
     let handler = IsingHandler::new(params);
     let mut state = regs(&[FixedQ32::half(), FixedQ32::half()]);
 
-    handler.step("A", &mut state).expect("step succeeds");
+    expect_effect_success(handler.step("A", &mut state), "step succeeds");
 
     assert_eq!(state_at(&state, 0), FixedQ32::half());
     assert_eq!(state_at(&state, 1), FixedQ32::half());
@@ -77,7 +83,7 @@ fn ising_zero_beta_drift_fixture_matches_lean_mirror() {
         FixedQ32::from_ratio(2, 5).expect("0.4"),
     ]);
 
-    handler.step("A", &mut state).expect("step succeeds");
+    expect_effect_success(handler.step("A", &mut state), "step succeeds");
 
     let eps = FixedQ32::from_ratio(1, 1_000_000).expect("epsilon");
     let expected_up = FixedQ32::from_ratio(29, 50).expect("0.58");
@@ -99,7 +105,7 @@ fn hamiltonian_phase_gate_fixture_matches_lean_mirror() {
     let handler = HamiltonianHandler::new(params);
     let mut state = regs(&[FixedQ32::one(), FixedQ32::zero()]);
 
-    handler.step("A", &mut state).expect("step succeeds");
+    expect_effect_success(handler.step("A", &mut state), "step succeeds");
 
     assert_eq!(state_at(&state, 0), FixedQ32::one());
     assert_eq!(state_at(&state, 1), FixedQ32::zero());
@@ -118,20 +124,21 @@ fn hamiltonian_leapfrog_fixture_matches_lean_mirror() {
     let handler = HamiltonianHandler::new(params);
     let mut state = regs(&[FixedQ32::one(), FixedQ32::zero()]);
     let mut recv_state = Vec::new();
-    handler
-        .handle_recv(
+    expect_effect_success(
+        handler.handle_recv(
             "A",
             "B",
             "position",
             &mut recv_state,
             &q32(FixedQ32::neg_one()),
-        )
-        .expect("seed peer position");
+        ),
+        "seed peer position",
+    );
 
     for _ in 0..3 {
-        handler.step("A", &mut state).expect("phase gate steps");
+        expect_effect_success(handler.step("A", &mut state), "phase gate steps");
     }
-    handler.step("A", &mut state).expect("integration step");
+    expect_effect_success(handler.step("A", &mut state), "integration step");
 
     let eps = FixedQ32::from_ratio(1, 1_000_000).expect("epsilon");
     let expected_pos = FixedQ32::from_ratio(9_999, 10_000).expect("0.9999");
@@ -151,14 +158,15 @@ fn continuum_phase_and_diffusion_fixtures_match_lean_mirror() {
     let handler = ContinuumFieldHandler::new(params);
     let mut state = regs(&[FixedQ32::one()]);
     let mut recv_state = Vec::new();
-    handler
-        .handle_recv("A", "B", "field", &mut recv_state, &q32(FixedQ32::zero()))
-        .expect("seed peer field");
+    expect_effect_success(
+        handler.handle_recv("A", "B", "field", &mut recv_state, &q32(FixedQ32::zero())),
+        "seed peer field",
+    );
 
-    handler.step("A", &mut state).expect("phase 0");
+    expect_effect_success(handler.step("A", &mut state), "phase 0");
     assert_eq!(state_at(&state, 0), FixedQ32::one());
 
-    handler.step("A", &mut state).expect("phase 1");
+    expect_effect_success(handler.step("A", &mut state), "phase 1");
     let eps = FixedQ32::from_ratio(1, 1_000_000).expect("epsilon");
     let expected = FixedQ32::from_ratio(9, 10).expect("0.9");
     assert!(approx_eq(state_at(&state, 0), expected, eps));

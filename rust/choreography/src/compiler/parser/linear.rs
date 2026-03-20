@@ -87,13 +87,13 @@ fn validate_linear_block(
     for statement in statements {
         match statement {
             Statement::Let { name, expr, body } => {
-                if matches!(expr, super::types::AuthorityExprSpec::Transfer { .. }) {
-                    if !live_assets.insert(name.clone()) {
-                        return Err(linear_usage_error(
-                            input,
-                            format!("linear asset '{name}' bound more than once"),
-                        ));
-                    }
+                if matches!(expr, super::types::AuthorityExprSpec::Transfer { .. })
+                    && !live_assets.insert(name.clone())
+                {
+                    return Err(linear_usage_error(
+                        input,
+                        format!("linear asset '{name}' bound more than once"),
+                    ));
                 }
                 if let Some(body) = body {
                     let out = validate_linear_block(body, &live_assets, input)?;

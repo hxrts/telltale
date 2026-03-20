@@ -250,6 +250,8 @@ fn scan_session_ingress(file: &Path, syntax: &File) -> Vec<String> {
         "rust/vm/src/owned.rs",
         "rust/vm/src/session/store.rs",
         "rust/vm/src/session/tests.rs",
+        "rust/vm/src/threaded/runtime_and_scheduling.rs",
+        "rust/vm/src/vm/topology_and_dispatch.rs",
         "rust/vm/src/vm/validation.rs",
     ];
 

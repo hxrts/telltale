@@ -256,9 +256,7 @@ impl Choreography {
                 Protocol::Send { continuation, .. }
                 | Protocol::Broadcast { continuation, .. }
                 | Protocol::Extension { continuation, .. }
-                | Protocol::Let {
-                    continuation, ..
-                } => {
+                | Protocol::Let { continuation, .. } => {
                     if let Protocol::Let { expr, .. } = protocol {
                         validate_expr(expr, effect_ops, used)?;
                     }

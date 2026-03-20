@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use telltale_types::{GlobalType, Label, LocalTypeR, ValType};
 use telltale_vm::buffer::BufferConfig;
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::EffectHandler;
+use telltale_vm::effect::{EffectHandler, EffectResult};
 use telltale_vm::instr::Endpoint;
 use telltale_vm::loader::CodeImage;
 use telltale_vm::session::SessionStore;
@@ -63,8 +63,8 @@ impl EffectHandler for BenchHandler {
         _partner: &str,
         _label: &str,
         _state: &[Value],
-    ) -> Result<Value, String> {
-        Ok(Value::Unit)
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Unit)
     }
 
     fn handle_recv(
@@ -74,8 +74,8 @@ impl EffectHandler for BenchHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -84,15 +84,17 @@ impl EffectHandler for BenchHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels to choose from".to_string())
+    ) -> EffectResult<String> {
+        EffectResult::success(
+            labels
+                .first()
+                .cloned()
+                .expect("labels should contain at least one branch"),
+        )
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-        Ok(())
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::success(())
     }
 }
 

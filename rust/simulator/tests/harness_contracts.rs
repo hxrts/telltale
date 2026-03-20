@@ -8,7 +8,7 @@ use telltale_simulator::material::{MaterialParams, MeanFieldParams};
 use telltale_simulator::scenario::{OutputConfig, Scenario};
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
+use telltale_vm::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
 
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;
@@ -20,12 +20,12 @@ impl EffectHandler for PassthroughHandler {
         _partner: &str,
         label: &str,
         _state: &[Value],
-    ) -> Result<Value, String> {
-        Ok(Value::Str(label.to_string()))
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Str(label.to_string()))
     }
 
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-        Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
     }
 
     fn handle_recv(
@@ -35,8 +35,8 @@ impl EffectHandler for PassthroughHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -45,15 +45,17 @@ impl EffectHandler for PassthroughHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".to_string())
+    ) -> EffectResult<String> {
+        EffectResult::success(
+            labels
+                .first()
+                .cloned()
+                .expect("labels should contain at least one branch"),
+        )
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-        Ok(())
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::success(())
     }
 }
 

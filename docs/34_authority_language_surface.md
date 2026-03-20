@@ -40,6 +40,8 @@ protocol Flow uses Runtime =
   ...
 ```
 
+This is the smallest effect declaration plus dependency declaration that the language accepts.
+
 ### `Result` with `case/of`
 
 ```choreo
@@ -47,6 +49,8 @@ case check Runtime.ready(session) of
   | Ok witness -> ...
   | Err reason -> ...
 ```
+
+This is the canonical typed branching form for authority checks.
 
 ### `Maybe`
 
@@ -56,6 +60,8 @@ case maybeReceipt of
   | Nothing -> ...
 ```
 
+This keeps absence explicit instead of falling back to implicit defaults.
+
 ### Custom Union and Alias
 
 ```choreo
@@ -63,11 +69,15 @@ type CommitError = TimedOut | Cancelled
 type alias ReadyWitness = { epoch : Int }
 ```
 
+Custom unions and aliases name failure and evidence values directly in the DSL.
+
 ### Evidence Binding with `let`
 
 ```choreo
 let receipt = transfer Session from Coordinator to Worker
 ```
+
+Ordinary `let` syntax is the only binding form used for receipts and other authority artifacts.
 
 ### Timeout and Cancellation
 
@@ -80,6 +90,8 @@ on cancel
   Coordinator -> Worker : Cancelled
 ```
 
+Timeout and cancellation are explicit protocol branches, not host-only control flow.
+
 ### Evidence Guard
 
 ```choreo
@@ -87,12 +99,16 @@ choice at Coordinator
   | Commit when check Runtime.ready(session) yields witness -> ...
 ```
 
+Evidence guards bind the witness directly at the branch point that authorizes the action.
+
 ### Linear Single-Use Binding
 
 ```choreo
 let receipt = transfer Session from Coordinator to Worker
 commit transfer receipt
 ```
+
+Transfers produce linear values that the compiler requires to be consumed exactly once.
 
 ### Local Helper Expression
 
@@ -104,6 +120,8 @@ case decision of
   | Err reason -> ...
 ```
 
+`let ... in ...` keeps small authority decisions local instead of pushing them into host callbacks.
+
 ### No Implicit Default
 
 ```choreo
@@ -112,11 +130,15 @@ case readiness of
   | Err reason -> ...
 ```
 
+Protocol-critical matches must be exhaustive, and implicit catch-all masking is rejected.
+
 ### Typed External Query
 
 ```choreo
 let readiness = check Runtime.ready(session)
 ```
+
+Typed external queries always enter the protocol through explicit `check` expressions.
 
 ## Result and Maybe
 

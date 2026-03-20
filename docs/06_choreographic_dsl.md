@@ -387,6 +387,8 @@ protocol SpeculativeFlow requires SpecBundle =
   join
 ```
 
+This example shows a VM-core extension form that still stays inside the typed choreography surface.
+
 #### 12) Authority and Failure Surface
 
 The authority/failure additions keep the language expression-oriented and

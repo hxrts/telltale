@@ -444,6 +444,7 @@ pub fn semantic_audit_log_v1(
 
 /// Build a canonical replay-state fragment from runtime snapshots.
 #[must_use]
+#[allow(clippy::too_many_arguments)]
 pub fn canonical_replay_fragment_v1(
     obs_trace: &[ObsEvent],
     effect_trace: &[EffectTraceEntry],

@@ -49,13 +49,15 @@ fn authority_surface_compile_fail_fixtures() {
         });
 
         let actual = match compile_fixture(&source) {
-            Ok(()) => panic!(
-                "fixture {case_name} compiled successfully but was expected to fail"
-            ),
+            Ok(()) => panic!("fixture {case_name} compiled successfully but was expected to fail"),
             Err(err) => err,
         };
 
-        for needle in expected.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        for needle in expected
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+        {
             assert!(
                 actual.contains(needle),
                 "fixture {case_name} failed with unexpected error.\nexpected snippet: {needle}\nactual error: {actual}"

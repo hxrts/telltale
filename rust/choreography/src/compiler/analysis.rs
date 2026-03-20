@@ -345,9 +345,10 @@ impl<'a> Analyzer<'a> {
             } => {
                 Self::check_protocol_progress(body)
                     && Self::check_protocol_progress(on_timeout)
-                    && on_cancel
-                        .as_deref()
-                        .is_none_or(Self::check_protocol_progress)
+                    && match on_cancel.as_deref() {
+                        Some(protocol) => Self::check_protocol_progress(protocol),
+                        None => true,
+                    }
             }
             Protocol::Loop { body, .. } => {
                 // Check that loop body has communication (progress)
