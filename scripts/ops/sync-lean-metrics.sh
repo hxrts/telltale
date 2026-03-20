@@ -6,11 +6,6 @@ LEAN_DIR="${ROOT_DIR}/lean"
 CODE_MAP_FILE="${ROOT_DIR}/lean/CODE_MAP.md"
 STATUS_FILE="${ROOT_DIR}/work/status.md"
 
-if ! command -v rg >/dev/null 2>&1; then
-  echo "error: ripgrep (rg) is required" >&2
-  exit 2
-fi
-
 CHECK_MODE=0
 if [[ "${1:-}" == "--check" ]]; then
   CHECK_MODE=1
@@ -100,7 +95,13 @@ count_pattern_in_files() {
     echo 0
     return
   fi
-  (rg -n --pcre2 "$pattern" "$@" || true) | wc -l | tr -d ' '
+  local count=0
+  local file
+  for file in "$@"; do
+    [[ -z "$file" ]] && continue
+    count=$((count + $(grep -E -c "$pattern" "$file" || true)))
+  done
+  echo "$count"
 }
 
 collect_lib_files() {
@@ -119,7 +120,7 @@ collect_lib_files() {
     if [[ "$api_base" != "$lib_root" && -f "${LEAN_DIR}/${api_base}API.lean" ]]; then
       printf '%s\n' "${LEAN_DIR}/${api_base}API.lean"
     fi
-  } | sort -u | rg -v "$EXCLUDE_REGEX" || true
+  } | sort -u | grep -Ev "$EXCLUDE_REGEX" || true
 }
 
 add_commas() {

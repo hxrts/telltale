@@ -54,6 +54,7 @@ ci-dry-run lane="fast":
     # Fail fast on generated docs/metrics drift before the expensive build/test lanes.
     just check-workflow-actions
     just check-verification-inventory
+    just check-lean-metrics-minimal-env
     just check-lean-metrics
     cargo build --workspace --all-targets --all-features
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
@@ -244,6 +245,10 @@ sync-lean-metrics:
 # Verify generated Lean metrics are fresh
 check-lean-metrics:
     ./scripts/ops/sync-lean-metrics.sh --check
+
+# Verify lean-metrics freshness without assuming optional local tools are on PATH.
+check-lean-metrics-minimal-env:
+    env PATH="/usr/bin:/bin" bash ./scripts/ops/sync-lean-metrics.sh --check
 
 # Sync reproducibility rows in all three papers (pinned commit, DOI, Lean stats).
 paper-repro-sync:
