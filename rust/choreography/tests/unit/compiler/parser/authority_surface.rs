@@ -55,6 +55,34 @@ protocol CommitFlow uses Runtime, Audit =
 }
 
 #[test]
+fn test_parse_let_in_and_maybe_surface() {
+    let input = r#"
+type alias InviteHandle = { id : Int }
+
+effect Runtime
+  lookupInvite : Session -> Maybe InviteHandle
+
+protocol InviteFlow uses Runtime =
+  {
+    roles Coordinator, Worker
+    let invite = check Runtime.lookupInvite(session) in {
+      case invite of {
+        | Just handle -> {
+          Coordinator -> Worker : UseInvite(handle)
+        }
+        | Nothing -> {
+          Coordinator -> Worker : MissingInvite
+        }
+      }
+    }
+  }
+"#;
+
+    let choreography = parse_choreography_str(input).expect("let-in Maybe surface should parse");
+    choreography.validate().expect("effect invocation should validate");
+}
+
+#[test]
 fn test_reject_non_exhaustive_result_case() {
     let input = r#"
 effect Runtime
@@ -93,6 +121,21 @@ protocol TransferFlow =
 }
 
 #[test]
+fn test_reject_dropped_linear_binding_use() {
+    let input = r#"
+protocol TransferFlow =
+  {
+    roles Coordinator, Worker
+    let receipt = transfer Session from Coordinator to Worker
+    Coordinator -> Worker : TransferAccepted
+  }
+"#;
+
+    let err = parse_choreography_str(input).expect_err("dropped linear binding should fail");
+    assert!(err.to_string().contains("never consumed"));
+}
+
+#[test]
 fn test_reject_undeclared_protocol_use() {
     let input = r#"
 protocol CommitFlow uses Runtime =
@@ -107,4 +150,55 @@ protocol CommitFlow uses Runtime =
         .validate()
         .expect_err("undeclared effect interface should fail validation");
     assert!(err.to_string().contains("undeclared effect interface"));
+}
+
+#[test]
+fn test_reject_undeclared_effect_operation_invocation() {
+    let input = r#"
+effect Runtime
+  ready : Session -> Result CommitError ReadyWitness
+
+protocol CommitFlow uses Runtime =
+  {
+    roles Coordinator, Worker
+    let readiness = check Runtime.lookup(session)
+    case readiness of {
+      | Ok witness -> {
+        Coordinator -> Worker : Commit(witness)
+      }
+      | Err reason -> {
+        Coordinator -> Worker : Retry(reason)
+      }
+    }
+  }
+"#;
+
+    let choreography = parse_choreography_str(input).expect("parse should succeed");
+    let err = choreography
+        .validate()
+        .expect_err("undeclared effect operation should fail validation");
+    assert!(err.to_string().contains("undeclared operation"));
+}
+
+#[test]
+fn test_reject_duplicate_effect_declarations() {
+    let input = r#"
+effect Runtime
+  ready : Session -> Result CommitError ReadyWitness
+
+effect Runtime
+  transfer : TransferRequest -> Result TransferError TransferReceipt
+
+protocol CommitFlow uses Runtime =
+  {
+    roles Coordinator, Worker
+    Coordinator -> Worker : Ping
+  }
+"#;
+
+    let choreography = parse_choreography_str(input).expect("parse should succeed");
+    let err = choreography
+        .validate()
+        .expect_err("duplicate effect declarations should fail validation");
+    assert!(err.to_string().contains("duplicate effect interface declaration"));
 }

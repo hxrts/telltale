@@ -1,6 +1,6 @@
 // Choreography struct definition and validation
 
-use super::{Protocol, Role, ValidationError};
+use super::{ChoiceGuard, Protocol, Role, ValidationError};
 use proc_macro2::Ident;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
@@ -152,7 +152,7 @@ impl Choreography {
         // Check protocol is well-formed
         self.protocol.validate(&self.roles)?;
         self.validate_proof_bundles()?;
-        self.validate_effect_uses()?;
+        self.validate_effect_surface()?;
 
         Ok(())
     }
@@ -182,16 +182,148 @@ impl Choreography {
         Ok(())
     }
 
-    fn validate_effect_uses(&self) -> Result<(), ValidationError> {
-        let declared: BTreeSet<String> = self.effect_decls().into_iter().map(|d| d.name).collect();
-        for used in self.protocol_uses() {
-            if !declared.contains(&used) {
+    fn validate_effect_surface(&self) -> Result<(), ValidationError> {
+        let mut effect_names = BTreeSet::new();
+        let mut effect_ops: HashMap<String, BTreeSet<String>> = HashMap::new();
+        for effect in self.effect_decls() {
+            if !effect_names.insert(effect.name.clone()) {
                 return Err(ValidationError::ExtensionError(format!(
-                    "protocol uses undeclared effect interface `{used}`"
+                    "duplicate effect interface declaration `{}`",
+                    effect.name
+                )));
+            }
+            let mut ops = BTreeSet::new();
+            for op in effect.operations {
+                if !ops.insert(op.name.clone()) {
+                    return Err(ValidationError::ExtensionError(format!(
+                        "duplicate effect operation `{}.{}`",
+                        effect.name, op.name
+                    )));
+                }
+            }
+            effect_ops.insert(effect.name, ops);
+        }
+
+        let declared = effect_names;
+        let used: BTreeSet<String> = self.protocol_uses().into_iter().collect();
+        for effect in &used {
+            if !declared.contains(effect) {
+                return Err(ValidationError::ExtensionError(format!(
+                    "protocol uses undeclared effect interface `{effect}`"
                 )));
             }
         }
-        Ok(())
+
+        fn validate_expr(
+            expr: &super::AuthorityExpr,
+            effect_ops: &HashMap<String, BTreeSet<String>>,
+            used: &BTreeSet<String>,
+        ) -> Result<(), ValidationError> {
+            match expr {
+                super::AuthorityExpr::Check {
+                    effect, operation, ..
+                } => {
+                    if !used.contains(effect) {
+                        return Err(ValidationError::ExtensionError(format!(
+                            "effect invocation `{effect}.{operation}` is not allowed without `uses {effect}`"
+                        )));
+                    }
+                    let Some(ops) = effect_ops.get(effect) else {
+                        return Err(ValidationError::ExtensionError(format!(
+                            "effect invocation references undeclared interface `{effect}`"
+                        )));
+                    };
+                    if !ops.contains(operation) {
+                        return Err(ValidationError::ExtensionError(format!(
+                            "effect invocation references undeclared operation `{effect}.{operation}`"
+                        )));
+                    }
+                    Ok(())
+                }
+                super::AuthorityExpr::Var(_)
+                | super::AuthorityExpr::Transfer { .. }
+                | super::AuthorityExpr::Constructor { .. }
+                | super::AuthorityExpr::Call { .. } => Ok(()),
+            }
+        }
+
+        fn validate_protocol_effects(
+            protocol: &Protocol,
+            effect_ops: &HashMap<String, BTreeSet<String>>,
+            used: &BTreeSet<String>,
+        ) -> Result<(), ValidationError> {
+            match protocol {
+                Protocol::Send { continuation, .. }
+                | Protocol::Broadcast { continuation, .. }
+                | Protocol::Extension { continuation, .. }
+                | Protocol::Let {
+                    continuation, ..
+                } => {
+                    if let Protocol::Let { expr, .. } = protocol {
+                        validate_expr(expr, effect_ops, used)?;
+                    }
+                    validate_protocol_effects(continuation, effect_ops, used)
+                }
+                Protocol::Choice { branches, .. } => {
+                    for branch in branches {
+                        if let Some(ChoiceGuard::Evidence {
+                            effect, operation, ..
+                        }) = &branch.guard
+                        {
+                            if !used.contains(effect) {
+                                return Err(ValidationError::ExtensionError(format!(
+                                    "effect guard `{effect}.{operation}` is not allowed without `uses {effect}`"
+                                )));
+                            }
+                            let Some(ops) = effect_ops.get(effect) else {
+                                return Err(ValidationError::ExtensionError(format!(
+                                    "effect guard references undeclared interface `{effect}`"
+                                )));
+                            };
+                            if !ops.contains(operation) {
+                                return Err(ValidationError::ExtensionError(format!(
+                                    "effect guard references undeclared operation `{effect}.{operation}`"
+                                )));
+                            }
+                        }
+                        validate_protocol_effects(&branch.protocol, effect_ops, used)?;
+                    }
+                    Ok(())
+                }
+                Protocol::Case { expr, branches } => {
+                    validate_expr(expr, effect_ops, used)?;
+                    for branch in branches {
+                        validate_protocol_effects(&branch.protocol, effect_ops, used)?;
+                    }
+                    Ok(())
+                }
+                Protocol::Timeout {
+                    body,
+                    on_timeout,
+                    on_cancel,
+                    ..
+                } => {
+                    validate_protocol_effects(body, effect_ops, used)?;
+                    validate_protocol_effects(on_timeout, effect_ops, used)?;
+                    if let Some(on_cancel) = on_cancel.as_deref() {
+                        validate_protocol_effects(on_cancel, effect_ops, used)?;
+                    }
+                    Ok(())
+                }
+                Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => {
+                    validate_protocol_effects(body, effect_ops, used)
+                }
+                Protocol::Parallel { protocols } => {
+                    for protocol in protocols {
+                        validate_protocol_effects(protocol, effect_ops, used)?;
+                    }
+                    Ok(())
+                }
+                Protocol::Var(_) | Protocol::End => Ok(()),
+            }
+        }
+
+        validate_protocol_effects(&self.protocol, &effect_ops, &used)
     }
 
     /// Get choreography-level attributes/annotations
