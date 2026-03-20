@@ -176,16 +176,17 @@ The `session` module manages session state and type advancement. The `buffer` mo
 The `loader` module handles dynamic choreography loading. The `CodeImage` struct packages local types for loading. The `load_choreography` method creates sessions and coroutines from a code image.
 
 ```rust
-use telltale_vm::{VM, VMConfig};
+use telltale_vm::{OwnedSession, VM, VMConfig};
 use telltale_vm::loader::CodeImage;
 
 let mut vm = VM::new(VMConfig::default());
 let image = CodeImage::from_local_types(&local_types, &global_type);
-let sid = vm.load_choreography(&image)?;
+let _session: OwnedSession =
+    vm.load_choreography_owned(&image, "runtime/owner")?;
 vm.run(&handler, 1000)?;
 ```
 
-The first line creates a VM with default configuration. The second line creates a code image from local types. The third line loads the choreography and returns a session ID. The fourth line runs the VM with an effect handler that implements `telltale_vm::effect::EffectHandler`.
+The first line creates a VM with default configuration. The second line creates a code image from local types. The third line opens the choreography and binds the current host owner. The fourth line runs the VM with an effect handler that implements `telltale_vm::effect::EffectHandler`.
 
 ### telltale-simulator
 

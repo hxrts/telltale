@@ -95,10 +95,9 @@ On success the VM allocates a fresh session, initializes buffers and local type 
 
 Preferred host integration path:
 
-- low-level open: `load_choreography(...)`
 - ownership-bearing open: `load_choreography_owned(...)`
 
-The owned path immediately claims session ownership and is the preferred public integration route for hosts that will mutate session-local runtime metadata.
+The open path immediately claims session ownership and is the public integration route for hosts that will mutate session-local runtime metadata.
 Hosts that need to materialize protocol-critical checks should also issue explicit readiness witnesses through that ownership-bearing path rather than caching ambient booleans out of band.
 
 ## Type Advancement

@@ -41,14 +41,15 @@ use crate::intern::{EdgeId, EdgeSymbolTable, StringId, SymbolTable};
 use crate::kernel::{KernelMachine, VMKernel};
 use crate::loader::CodeImage;
 use crate::output_condition::{OutputConditionCheck, OutputConditionHint};
+use crate::owned::OwnedSession;
 use crate::scheduler::Scheduler;
 use crate::serialization::{
     canonical_replay_fragment_v1, semantic_audit_log_v1, CanonicalReplayFragmentV1,
     SemanticAuditRecord,
 };
 use crate::session::{
-    unfold_if_var_with_scope, Edge, OwnershipScope, SessionId, SessionOpenPlan, SessionState,
-    SessionStatus,
+    unfold_if_var_with_scope, Edge, OwnershipCapability, OwnershipError, OwnershipScope, SessionId,
+    SessionOpenPlan, SessionState, SessionStatus,
 };
 use crate::transfer_semantics::{
     decode_transfer_request, delegation_receipt, move_endpoint_bundle,

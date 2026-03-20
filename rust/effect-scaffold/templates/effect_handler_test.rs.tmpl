@@ -35,6 +35,8 @@ fn host_handler_smoke_test() {
         host_contract_assertions: true,
         ..VMConfig::default()
     });
-    vm.load_choreography(&image).expect("load choreography");
+    let _session = vm
+        .load_choreography_owned(&image, "scaffold/owner")
+        .expect("load choreography");
     vm.run(&{{STRUCT_NAME}}, 100).expect("run should succeed");
 }

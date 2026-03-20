@@ -63,7 +63,7 @@ Key exports:
 
 - `VM`, `VMConfig`, `SchedPolicy`, `SimClock`
 - `Instr`, `Value`, `SessionStore`, `SessionId`
-- `VMBackend` and `NestedVMHandler`
+- `OwnedSession` and `NestedVMHandler`
 
 Module access (not re-exported at crate root):
 - Effect boundary: `telltale_vm::effect::EffectHandler`, `SendDecision`, `AcquireDecision`

@@ -4,7 +4,6 @@ use crate::effect::EffectHandler;
 use crate::kernel::VMKernel;
 use crate::loader::CodeImage;
 use crate::owned::OwnedSession;
-use crate::session::SessionId;
 use crate::vm::{ObsEvent, RunStatus, StepResult, VMConfig, VMError, VM};
 
 /// Native cooperative runtime driver backed by the canonical VM kernel.
@@ -32,15 +31,6 @@ impl NativeSingleThreadDriver {
     #[must_use]
     pub fn vm(&self) -> &VM {
         &self.vm
-    }
-
-    /// Load a choreography image through the low-level open path.
-    ///
-    /// # Errors
-    ///
-    /// Returns a `VMError` if limits are exceeded.
-    pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
-        self.vm.load_choreography(image)
     }
 
     /// Preferred choreography open path that returns an ownership-bearing handle.

@@ -21,9 +21,8 @@ pub trait EffectHandler: Send + Sync {
 
     /// Compute the payload for a send instruction.
     ///
-    /// Compatibility hook:
-    /// Canonical VM send paths pass an explicit payload into `send_decision`.
-    /// This method remains for adapters and custom runners.
+    /// Helper hook used by the default `send_decision` implementation and by
+    /// custom runners that want direct payload computation.
     ///
     /// # Arguments
     /// * `role` - The sending role
@@ -89,11 +88,10 @@ pub trait EffectHandler: Send + Sync {
 
     /// Choose which branch to take for internal choice (select).
     ///
-    /// Compatibility hook:
-    /// The canonical VM currently resolves branch labels from received payloads and
-    /// does not call this method in default dispatch paths.
+    /// Branch-selection helper for custom runners.
     ///
-    /// Custom runners may still use this as an explicit branch-selection hook.
+    /// The canonical VM resolves branch labels from received payloads and does
+    /// not call this method in default dispatch paths.
     ///
     /// # Arguments
     /// * `role` - The choosing role

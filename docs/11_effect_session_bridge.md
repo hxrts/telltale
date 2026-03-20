@@ -61,8 +61,8 @@ External host events must enter the VM through canonical ingress surfaces.
 | `step` | perform `Invoke`-scoped integration work | may mutate callback-local state only |
 | `output_condition_hint` | provide commit metadata | observation only |
 
-Session-local host mutation outside these callback-local values should flow through an explicit ownership capability such as `OwnedSession`.
-This is the preferred production path for mutating edge traces, handler bindings, or other session-local host metadata.
+Session-local host mutation outside these callback-local values flows through an explicit ownership capability such as `OwnedSession`.
+This is the host integration path for mutating edge traces, handler bindings, or other session-local host metadata.
 
 Protocol-critical host decisions should also use explicit witnesses where available:
 
@@ -107,15 +107,14 @@ Additional ownership split:
 The VM dispatch path is in `rust/vm/src/vm.rs`.
 The trait surface is in `rust/vm/src/effect.rs`.
 The normative contract is documented in that trait module.
-The contract marks `handle_send` and `handle_choose` as compatibility hooks.
 
 | Callback | VM call point | Runtime behavior | Integration note |
 |---|---|---|---|
 | `send_decision_fast_path` | `step_send` (before `send_decision`) | optional cache lookup | return `Some(EffectResult::Success(decision))` to skip `send_decision`, `None` to proceed normally |
 | `send_decision` | `step_send`, `step_offer` | called before enqueue | receives `SendDecisionInput` with optional precomputed payload |
-| `handle_send` | default inside `send_decision` | fallback when no payload provided | called by default `send_decision` impl when payload is `None` |
+| `handle_send` | default inside `send_decision` | payload derivation helper | called by default `send_decision` impl when payload is `None` |
 | `handle_recv` | `step_recv`, `step_choose` | called after dequeue and verification | use for state updates and host-side effects |
-| `handle_choose` | trait method only | no canonical call site today | keep implementation for compatibility and custom runners |
+| `handle_choose` | trait method only | branch-selection helper for custom runners | not part of the canonical VM dispatch path |
 | `step` | `step_invoke` | called during `Invoke` instruction | use for integration steps and persistent deltas |
 | `handle_acquire` | `step_acquire` | grant, block, or fail acquire | return `EffectResult::Success(evidence)`, `EffectResult::Blocked`, or `EffectResult::Failure(...)` |
 | `handle_release` | `step_release` | release validation | return `EffectResult::Failure(...)` to reject invalid evidence |
@@ -125,9 +124,9 @@ The contract marks `handle_send` and `handle_choose` as compatibility hooks.
 
 Callback safety notes:
 
-- `handle_send` and `handle_choose` remain compatibility hooks. They should not become hidden side channels for session metadata mutation.
+- `handle_send` and `handle_choose` must not become hidden side channels for session metadata mutation.
 - Bridge traits in `rust/vm/src/bridge.rs` are deterministic lookup/projection surfaces, not mutation surfaces.
-- `sessions_mut()` is a low-level escape hatch intended for runtime internals and tests. Production embedders should prefer `load_choreography_owned(...)` plus `OwnedSession`.
+- Public host integrations open sessions through `load_choreography_owned(...)` and mutate session-local host metadata through `OwnedSession`.
 
 ## Typed Effect Outcomes
 
@@ -165,7 +164,7 @@ They fail closed if the owner becomes stale, scope attenuates, the witness is fo
 
 1. Use `telltale-theory` at setup time to project global types to local types.
 2. Compile local types to VM bytecode and load with `CodeImage`.
-3. Prefer `load_choreography_owned(...)` when a host needs to retain session-local control after open.
+3. Open sessions with `load_choreography_owned(...)` so the host authority boundary is explicit from the first step.
 4. Implement `EffectHandler` with deterministic host operations.
 5. Map each callback to host primitives without reimplementing protocol typing.
 6. Run `run_loaded_vm_record_replay_conformance` to validate record and replay behavior on a loaded VM.

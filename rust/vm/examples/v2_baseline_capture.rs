@@ -12,7 +12,7 @@ cfg_if! {
     use telltale_types::{GlobalType, Label, LocalTypeR};
     use telltale_vm::coroutine::Value;
     use telltale_vm::determinism::{DeterminismMode, EffectDeterminismTier};
-    use telltale_vm::effect::EffectHandler;
+    use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
     use telltale_vm::envelope_diff::EnvelopeDiffArtifactV1;
     use telltale_vm::loader::CodeImage;
     use telltale_vm::threaded::ThreadedVM;
@@ -47,8 +47,8 @@ cfg_if! {
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Ok(Value::Nat(1))
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Nat(1))
         }
 
         fn handle_recv(
@@ -58,8 +58,8 @@ cfg_if! {
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -68,15 +68,17 @@ cfg_if! {
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".to_string())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => {
+                    EffectResult::failure(EffectFailure::invalid_input("no labels available"))
+                }
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
     }
 
@@ -130,7 +132,10 @@ cfg_if! {
         let mut canonical_vm = VM::new(tuning.config.clone());
         for i in 0..sessions {
             canonical_vm
-                .load_choreography(&build_workload_image(workload_mode, i))
+                .load_choreography_owned(
+                    &build_workload_image(workload_mode, i),
+                    format!("baseline/canonical/{i}"),
+                )
                 .map_err(|err| format!("canonical load failed: {err}"))?;
         }
         let canonical = run_canonical_metrics(
@@ -144,7 +149,10 @@ cfg_if! {
             ThreadedVM::with_workers(tuning.config.clone(), tuning.threaded_workers);
         for i in 0..sessions {
             threaded_vm
-                .load_choreography(&build_workload_image(workload_mode, i))
+                .load_choreography_owned(
+                    &build_workload_image(workload_mode, i),
+                    format!("baseline/threaded/{i}"),
+                )
                 .map_err(|err| format!("threaded load failed: {err}"))?;
         }
         let threaded = run_threaded_metrics(

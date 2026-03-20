@@ -50,9 +50,9 @@ impl ThreadedVM {
             lane_count: worker_count,
             guard_resources: Arc::new(Mutex::new(guard_resources)),
             resource_states: Arc::new(Mutex::new(BTreeMap::new())),
-            communication_consumption: Arc::new(Mutex::new(
-                DefaultCommunicationConsumption::new(communication_replay_mode),
-            )),
+            communication_consumption: Arc::new(Mutex::new(DefaultCommunicationConsumption::new(
+                communication_replay_mode,
+            ))),
             communication_consumption_artifacts: Arc::new(Mutex::new(Vec::new())),
             effect_trace: Vec::new(),
             next_effect_id: 0,
@@ -107,7 +107,9 @@ impl ThreadedVM {
             let mut session_guard = session.lock().expect("threaded VM lock poisoned");
             session_guard.default_handler = crate::session::DEFAULT_HANDLER_ID.to_string();
         }
-        let _: StringId = self.handler_symbols.intern(crate::session::DEFAULT_HANDLER_ID);
+        let _: StringId = self
+            .handler_symbols
+            .intern(crate::session::DEFAULT_HANDLER_ID);
     }
 
     fn spawn_role_coroutine(
@@ -146,7 +148,7 @@ impl ThreadedVM {
         Ok(())
     }
 
-    /// Load a choreography into the threaded VM.
+    /// Runtime open primitive for the threaded VM.
     ///
     /// # Errors
     ///
@@ -156,6 +158,7 @@ impl ThreadedVM {
     ///
     /// Panics if an internal threaded VM lock is poisoned.
     ///
+    #[doc(hidden)]
     pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
         self.ensure_session_capacity()?;
         image
@@ -189,6 +192,24 @@ impl ThreadedVM {
         }
 
         Ok(sid)
+    }
+
+    /// Preferred choreography open path that records host ownership at open.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `VMError` if the choreography cannot be loaded or claimed.
+    pub fn load_choreography_owned(
+        &mut self,
+        image: &CodeImage,
+        owner_id: impl Into<String>,
+    ) -> Result<OwnedSession, VMError> {
+        let sid = self.load_choreography(image)?;
+        let capability = self
+            .sessions
+            .claim_ownership(sid, owner_id, OwnershipScope::Session)
+            .map_err(|err| VMError::OwnershipContract(format!("{err:?}")))?;
+        Ok(OwnedSession::new(sid, capability))
     }
 
     /// Execute one scheduler round: advance up to `n` ready coroutines.
@@ -596,5 +617,4 @@ impl ThreadedVM {
         let replay = ReplayEffectHandler::with_fallback(replay_trace, fallback);
         self.run_concurrent(&replay, max_rounds, concurrency)
     }
-
 }

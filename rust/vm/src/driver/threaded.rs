@@ -2,7 +2,7 @@
 
 use crate::effect::EffectHandler;
 use crate::loader::CodeImage;
-use crate::session::SessionId;
+use crate::owned::OwnedSession;
 use crate::threaded::ThreadedVM;
 use crate::vm::{ObsEvent, RunStatus, StepResult, VMConfig, VMError};
 
@@ -40,13 +40,17 @@ impl NativeThreadedDriver {
         &self.vm
     }
 
-    /// Load a choreography image.
+    /// Open a choreography and immediately bind host ownership.
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if limits are exceeded.
-    pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
-        self.vm.load_choreography(image)
+    /// Returns a `VMError` if the choreography cannot be loaded or claimed.
+    pub fn load_choreography_owned(
+        &mut self,
+        image: &CodeImage,
+        owner_id: impl Into<String>,
+    ) -> Result<OwnedSession, VMError> {
+        self.vm.load_choreography_owned(image, owner_id)
     }
 
     /// Execute one scheduler round.

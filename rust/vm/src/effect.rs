@@ -14,7 +14,8 @@
 //! - `handle_recv` is the canonical receive hook for `Receive` and `Choose`.
 //! - `step` is called only from the `Invoke` instruction.
 //! - `output_condition_hint` is queried only for eventful commits.
-//! - `handle_send` and `handle_choose` are compatibility hooks.
+//! - `handle_send` and `handle_choose` are helper hooks for adapters and
+//!   custom runners, not canonical session ingress surfaces.
 //! - any host mutation of session-local runtime state should be routed through
 //!   an explicit ownership capability such as `OwnedSession`.
 //!

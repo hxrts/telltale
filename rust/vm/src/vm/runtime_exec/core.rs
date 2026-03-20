@@ -73,7 +73,9 @@ impl VM {
         for role in plan.roles() {
             let _: StringId = self.role_symbols.intern(role);
         }
-        let _: StringId = self.handler_symbols.intern(crate::session::DEFAULT_HANDLER_ID);
+        let _: StringId = self
+            .handler_symbols
+            .intern(crate::session::DEFAULT_HANDLER_ID);
         let edge_handlers: Vec<_> = self
             .sessions
             .get(sid)
@@ -91,11 +93,10 @@ impl VM {
     }
 
     fn bind_default_handlers_for_session(&mut self, sid: SessionId) {
-        self.sessions.set_default_handler_for_session(
-            sid,
-            crate::session::DEFAULT_HANDLER_ID.to_string(),
-        );
-        self.handler_symbols.intern(crate::session::DEFAULT_HANDLER_ID);
+        self.sessions
+            .set_default_handler_for_session(sid, crate::session::DEFAULT_HANDLER_ID.to_string());
+        self.handler_symbols
+            .intern(crate::session::DEFAULT_HANDLER_ID);
     }
 
     fn ensure_session_capacity(&self) -> Result<(), VMError> {
@@ -217,14 +218,11 @@ impl VM {
         Ok(result)
     }
 
-    fn session_open_plan(
-        &mut self,
-        image: &CodeImage,
-    ) -> &crate::session::SessionOpenPlan {
+    fn session_open_plan(&mut self, image: &CodeImage) -> &crate::session::SessionOpenPlan {
         let key = format!("{image:p}");
-        self.session_open_plans
-            .entry(key)
-            .or_insert_with(|| crate::session::SessionOpenPlan::new(&image.roles(), &image.local_types))
+        self.session_open_plans.entry(key).or_insert_with(|| {
+            crate::session::SessionOpenPlan::new(&image.roles(), &image.local_types)
+        })
     }
 
     fn open_choreography_session(
@@ -248,9 +246,7 @@ impl VM {
         self.bind_default_handlers_for_session(sid);
         self.intern_load_plan_symbols(plan, sid);
         self.monitor.set_kind(sid, SessionKind::Peer);
-        self.resource_states
-            .entry(sid)
-            .or_default();
+        self.resource_states.entry(sid).or_default();
         self.apply_open_delta(sid)
             .map_err(VMError::PersistenceError)?;
         self.obs_trace.push(
@@ -336,22 +332,21 @@ impl VM {
         Ok(())
     }
 
-    /// Load a choreography from a verified code image.
+    /// Runtime open primitive for a verified code image.
     ///
     /// Creates a session (with local types), spawns coroutines per role,
     /// and returns the session ID. Type state is initialized in the
-    /// session store — no separate monitor needed.
-    ///
-    /// This is the low-level open path. Third-party embedders that want the
-    /// stronger host ownership contract should prefer
-    /// `load_choreography_owned(...)`.
+    /// session store with no separate monitor object.
     ///
     /// # Errors
     ///
     /// Returns an error if session or coroutine limits are exceeded.
+    #[doc(hidden)]
     pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
         self.ensure_session_capacity()?;
-        image.validate_runtime_shape().map_err(|reason| VMError::InvalidCodeImage { reason })?;
+        image
+            .validate_runtime_shape()
+            .map_err(|reason| VMError::InvalidCodeImage { reason })?;
         let plan = self.session_open_plan(image).clone();
         let (sid, roles) = self.open_choreography_session(&plan);
         self.finalize_open_choreography_session(sid, &roles, &plan)?;
@@ -360,5 +355,4 @@ impl VM {
         self.spawn_session_coroutines(image, sid, &roles)?;
         Ok(sid)
     }
-
 }

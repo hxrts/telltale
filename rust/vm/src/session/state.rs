@@ -553,6 +553,12 @@ impl SessionState {
     pub(crate) fn ownership(&self) -> &SessionOwnershipState {
         &self.ownership
     }
+
+    /// Mutate the current host/runtime ownership state.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn ownership_mut(&mut self) -> &mut SessionOwnershipState {
+        &mut self.ownership
+    }
 }
 
 #[derive(Debug, Deserialize)]

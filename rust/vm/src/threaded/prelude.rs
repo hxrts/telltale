@@ -181,11 +181,7 @@ impl ThreadedSessionStore {
         self.open_from_plan(&plan, buffer_config)
     }
 
-    fn open_from_plan(
-        &self,
-        plan: &SessionOpenPlan,
-        buffer_config: &BufferConfig,
-    ) -> SessionId {
+    fn open_from_plan(&self, plan: &SessionOpenPlan, buffer_config: &BufferConfig) -> SessionId {
         let sid = self.next_id.fetch_add(1, Ordering::SeqCst);
         let state = SessionState::from_open_plan(sid, plan, buffer_config);
 
@@ -210,6 +206,44 @@ impl ThreadedSessionStore {
                 session.lock().expect("threaded VM lock poisoned").status == SessionStatus::Active
             })
             .count()
+    }
+
+    fn claim_ownership(
+        &self,
+        sid: SessionId,
+        owner_id: impl Into<String>,
+        scope: OwnershipScope,
+    ) -> Result<OwnershipCapability, OwnershipError> {
+        let session = self
+            .get(sid)
+            .ok_or(OwnershipError::SessionNotFound { session_id: sid })?;
+        let mut session = session.lock().expect("threaded VM lock poisoned");
+        if let Some(reason) = session.ownership().terminal_reason.clone() {
+            return Err(OwnershipError::Terminal {
+                session_id: sid,
+                reason,
+            });
+        }
+        if let Some(current) = session.ownership().current.as_ref() {
+            return Err(OwnershipError::AlreadyClaimed {
+                session_id: sid,
+                current_owner_id: current.owner_id.clone(),
+            });
+        }
+        if let Some(pending) = session.ownership().pending_transfer.as_ref() {
+            return Err(OwnershipError::TransferPending {
+                session_id: sid,
+                claim_id: pending.receipt.claim_id,
+            });
+        }
+        let capability = OwnershipCapability {
+            session_id: sid,
+            owner_id: owner_id.into(),
+            generation: 0,
+            scope,
+        };
+        session.ownership_mut().current = Some(capability.clone());
+        Ok(capability)
     }
 }
 

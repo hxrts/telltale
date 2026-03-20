@@ -35,19 +35,19 @@
 //! # Usage
 //!
 //! ```ignore
-//! use telltale_vm::{VM, VMConfig, compiler, loader::CodeImage};
+//! use telltale_vm::{OwnedSession, VM, VMConfig, compiler, loader::CodeImage};
 //!
 //! let config = VMConfig::default();
 //! let mut vm = VM::new(config);
 //! let image = CodeImage::from_local_types(&local_types, &global_type);
-//! let sid = vm.load_choreography(image, &handler)?;
+//! let _session: OwnedSession =
+//!     vm.load_choreography_owned(&image, "runtime/owner")?;
 //! while vm.step(&handler)? {}
 //! ```
 
 use cfg_if::cfg_if;
 
 pub mod architecture;
-pub mod backend;
 pub mod bridge;
 pub mod buffer;
 pub mod clock;
@@ -103,7 +103,6 @@ pub use architecture::{
     EngineOwnership, EngineRole, CANONICAL_ENGINE, CROSS_TARGET_CONTRACT, ENGINE_OWNERSHIP,
     EQUIVALENCE_SURFACES,
 };
-pub use backend::VMBackend;
 pub use bridge::{
     EffectGuardBridge, IdentityGuardBridge, IdentityPersistenceBridge, IdentityVerificationBridge,
     PersistenceEffectBridge,

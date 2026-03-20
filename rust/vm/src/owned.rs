@@ -161,10 +161,8 @@ impl OwnedSession {
 impl VM {
     /// Preferred choreography open path that immediately claims session ownership.
     ///
-    /// Lower-level `load_choreography(...)` remains available for runtime
-    /// internals and tests. Third-party host integrations should prefer this
-    /// owned helper so subsequent session-local mutation flows through an
-    /// explicit ownership capability.
+    /// Third-party host integrations use this owned helper so subsequent
+    /// session-local mutation flows through an explicit ownership capability.
     ///
     /// # Errors
     ///

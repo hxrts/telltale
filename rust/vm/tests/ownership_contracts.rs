@@ -200,6 +200,19 @@ fn ownership_transfer_record_replay_preserves_observable_handoff() {
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
         #[test]
+        fn threaded_owned_open_claims_host_authority() {
+            let image = simple_send_recv_image("A", "B", "m");
+            let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 2);
+            let owned = threaded
+                .load_choreography_owned(&image, "threaded/runtime")
+                .expect("threaded owned open should succeed");
+
+            assert_eq!(owned.capability().owner_id, "threaded/runtime");
+            assert_eq!(owned.capability().generation, 0);
+            assert!(matches!(owned.capability().scope, OwnershipScope::Session));
+        }
+
+        #[test]
         fn threaded_ownership_transfer_matches_cooperative_audit_surface() {
             let image = transfer_image();
 

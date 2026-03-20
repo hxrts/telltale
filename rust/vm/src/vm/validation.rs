@@ -22,7 +22,9 @@ impl VM {
     #[must_use]
     pub fn coroutine_program_len(&self, id: usize) -> Option<usize> {
         let coro = self.coroutine(id)?;
-        self.programs.get(coro.program_id).map(|program| program.len())
+        self.programs
+            .get(coro.program_id)
+            .map(|program| program.len())
     }
 
     /// Number of unique immutable programs retained by the VM.
@@ -54,9 +56,10 @@ impl VM {
 
     /// Access the session store mutably.
     ///
-    /// This is a low-level escape hatch. Preferred host integrations should use
-    /// `OwnedSession` plus the ownership-gated session mutation APIs instead of
-    /// mutating session-local host state directly through `sessions_mut()`.
+    /// Runtime internals and test support use this surface directly. Public host
+    /// integrations use `OwnedSession` plus the ownership-gated session mutation
+    /// APIs instead of mutating session-local host state through `sessions_mut()`.
+    #[doc(hidden)]
     pub fn sessions_mut(&mut self) -> &mut SessionStore {
         &mut self.sessions
     }
@@ -265,15 +268,8 @@ impl VM {
 
     /// Replace the paused role set.
     pub fn set_paused_roles(&mut self, roles: &BTreeSet<String>) {
-        let to_pause: Vec<String> = roles
-            .difference(&self.paused_roles)
-            .cloned()
-            .collect();
-        let to_resume: Vec<String> = self
-            .paused_roles
-            .difference(roles)
-            .cloned()
-            .collect();
+        let to_pause: Vec<String> = roles.difference(&self.paused_roles).cloned().collect();
+        let to_resume: Vec<String> = self.paused_roles.difference(roles).cloned().collect();
         for role in to_resume {
             self.resume_role(&role);
         }
@@ -294,11 +290,7 @@ impl VM {
         if let Some(idx) = self.coro_slots.get(&id).copied() {
             return Some(idx);
         }
-        if self
-            .coroutines
-            .get(id)
-            .is_some_and(|coro| coro.id == id)
-        {
+        if self.coroutines.get(id).is_some_and(|coro| coro.id == id) {
             return Some(id);
         }
         self.coroutines.iter().position(|c| c.id == id)
@@ -340,7 +332,11 @@ impl VM {
         self.read_reg_checked(coro_idx, reg)
     }
 
-    pub(crate) fn write_coro_reg(coro: &mut Coroutine, reg: u16, value: Value) -> Result<(), Fault> {
+    pub(crate) fn write_coro_reg(
+        coro: &mut Coroutine,
+        reg: u16,
+        value: Value,
+    ) -> Result<(), Fault> {
         let slot = coro
             .regs
             .get_mut(usize::from(reg))
@@ -538,5 +534,4 @@ impl VM {
             .record(ep, &format!("{instr:?}"), self.clock.tick);
         Ok(())
     }
-
 }
