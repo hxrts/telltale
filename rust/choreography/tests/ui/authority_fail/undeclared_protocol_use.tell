@@ -1,0 +1,3 @@
+protocol CommitFlow uses Runtime =
+  roles Coordinator, Worker
+  Coordinator -> Worker : Ping

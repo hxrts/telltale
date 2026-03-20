@@ -1,0 +1,5 @@
+protocol TransferFlow =
+  roles Coordinator, Worker, Client
+  let receipt = transfer Session from Coordinator to Worker
+  Coordinator -> Worker : TransferAccepted(receipt)
+  Coordinator -> Client : ReceiptAudit(receipt)

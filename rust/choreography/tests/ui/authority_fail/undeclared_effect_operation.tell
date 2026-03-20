@@ -1,0 +1,11 @@
+effect Runtime
+  ready : Session -> Result CommitError ReadyWitness
+
+protocol CommitFlow uses Runtime =
+  roles Coordinator, Worker
+  let readiness = check Runtime.lookup(session)
+  case readiness of
+    | Ok witness ->
+        Coordinator -> Worker : Commit(witness)
+    | Err reason ->
+        Coordinator -> Worker : Retry(reason)

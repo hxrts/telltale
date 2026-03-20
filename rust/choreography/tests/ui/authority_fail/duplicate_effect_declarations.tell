@@ -1,0 +1,9 @@
+effect Runtime
+  ready : Session -> Result CommitError ReadyWitness
+
+effect Runtime
+  transfer : TransferRequest -> Result TransferError TransferReceipt
+
+protocol CommitFlow uses Runtime =
+  roles Coordinator, Worker
+  Coordinator -> Worker : Ping
