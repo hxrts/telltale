@@ -29,13 +29,17 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
+      - name: Install just
+        run: cargo install just --locked
+      - name: Check verification inventory freshness
+        run: just check-verification-inventory
+      - name: Check Lean metrics freshness
+        run: just check-lean-metrics
       - name: Build sources
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --workspace --all-targets --all-features
-      - name: Install just
-        run: cargo install just --locked
       - name: Install native tooling
         run: sudo apt-get update && sudo apt-get install -y ripgrep gnuplot
       - name: Run executable VM placeholder baseline checks

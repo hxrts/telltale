@@ -37,6 +37,16 @@ jobs:
       - name: Install just
         run: cargo install just --locked
 
+      - name: Check verification inventory freshness
+        run: |
+          mkdir -p artifacts
+          just check-verification-inventory | tee artifacts/check-verification-inventory.log
+
+      - name: Check Lean metrics freshness
+        run: |
+          mkdir -p artifacts
+          just check-lean-metrics | tee artifacts/check-lean-metrics.log
+
       - name: Run Lean architecture/style checks
         run: |
           mkdir -p artifacts
@@ -131,6 +141,16 @@ jobs:
 
       - name: Install just
         run: cargo install just --locked
+
+      - name: Check verification inventory freshness
+        run: |
+          mkdir -p artifacts
+          just check-verification-inventory | tee artifacts/check-verification-inventory.log
+
+      - name: Check Lean metrics freshness
+        run: |
+          mkdir -p artifacts
+          just check-lean-metrics | tee artifacts/check-lean-metrics.log
 
       - name: Run Lean architecture/style checks
         run: |

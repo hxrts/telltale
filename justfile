@@ -51,6 +51,9 @@ release \
 # - verify.yml scheduled heavy lane checks when lane="full"
 ci-dry-run lane="fast":
     cargo fmt --all -- --check
+    # Fail fast on generated docs/metrics drift before the expensive build/test lanes.
+    just check-verification-inventory
+    just check-lean-metrics
     cargo build --workspace --all-targets --all-features
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
     RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -73,7 +76,6 @@ ci-dry-run lane="fast":
     just verify-protocols
     just verify-track-a
     just v2-baseline sla
-    just check-lean-metrics
     # Benchmark target compilation checks
     just bench-check
     just book
