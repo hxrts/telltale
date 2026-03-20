@@ -134,9 +134,27 @@ protocol WithBundles requires Base, Extra =
                 Protocol::Send { continuation, .. } | Protocol::Broadcast { continuation, .. } => {
                     collect_vm_ops(continuation, out);
                 }
+                Protocol::Let { continuation, .. } => collect_vm_ops(continuation, out),
                 Protocol::Choice { branches, .. } => {
                     for branch in branches {
                         collect_vm_ops(&branch.protocol, out);
+                    }
+                }
+                Protocol::Case { branches, .. } => {
+                    for branch in branches {
+                        collect_vm_ops(&branch.protocol, out);
+                    }
+                }
+                Protocol::Timeout {
+                    body,
+                    on_timeout,
+                    on_cancel,
+                    ..
+                } => {
+                    collect_vm_ops(body, out);
+                    collect_vm_ops(on_timeout, out);
+                    if let Some(on_cancel) = on_cancel.as_deref() {
+                        collect_vm_ops(on_cancel, out);
                     }
                 }
                 Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => {
@@ -371,8 +389,24 @@ protocol LinearBranchDivergence =
                 Protocol::Send { continuation, .. } | Protocol::Broadcast { continuation, .. } => {
                     has_quorum_extension(continuation)
                 }
+                Protocol::Let { continuation, .. } => has_quorum_extension(continuation),
                 Protocol::Choice { branches, .. } => {
                     branches.iter().any(|b| has_quorum_extension(&b.protocol))
+                }
+                Protocol::Case { branches, .. } => {
+                    branches.iter().any(|b| has_quorum_extension(&b.protocol))
+                }
+                Protocol::Timeout {
+                    body,
+                    on_timeout,
+                    on_cancel,
+                    ..
+                } => {
+                    has_quorum_extension(body)
+                        || has_quorum_extension(on_timeout)
+                        || on_cancel
+                            .as_deref()
+                            .is_some_and(has_quorum_extension)
                 }
                 Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => {
                     has_quorum_extension(body)

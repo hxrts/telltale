@@ -187,6 +187,32 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
         Protocol::End => {
             quote! {}
         }
+        Protocol::Let { continuation, .. } => generate_program_effects(continuation, role),
+        Protocol::Case { branches, .. } => {
+            let branch_effects: Vec<_> = branches
+                .iter()
+                .map(|branch| generate_program_effects(&branch.protocol, role))
+                .collect();
+            quote! { #(#branch_effects)* }
+        }
+        Protocol::Timeout {
+            body,
+            on_timeout,
+            on_cancel,
+            ..
+        } => {
+            let body_effects = generate_program_effects(body, role);
+            let timeout_effects = generate_program_effects(on_timeout, role);
+            let cancel_effects = on_cancel
+                .as_deref()
+                .map(|branch| generate_program_effects(branch, role))
+                .unwrap_or_default();
+            quote! {
+                #body_effects
+                #timeout_effects
+                #cancel_effects
+            }
+        }
         Protocol::Send {
             from,
             to,
@@ -322,8 +348,14 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                             .map(|branch| {
                                 let label_ident = &branch.label;
                                 if let Some(ref guard) = branch.guard {
+                                    let guard_ts = match guard {
+                                        crate::ast::ChoiceGuard::Predicate(tokens) => {
+                                            quote!(#tokens)
+                                        }
+                                        crate::ast::ChoiceGuard::Evidence { .. } => quote!(true),
+                                    };
                                     quote! {
-                                        if #guard {
+                                        if #guard_ts {
                                             Label::#label_ident
                                         }
                                     }

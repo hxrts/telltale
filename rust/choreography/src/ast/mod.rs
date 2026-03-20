@@ -47,7 +47,10 @@ pub use telltale_types::{
 
 // Re-export DSL-specific types
 pub use annotation::{Annotations, ProtocolAnnotation};
-pub use choreography::{Choreography, ProofBundleDecl, RoleSetDecl, TopologyDecl};
+pub use choreography::{
+    Choreography, EffectDecl, EffectOpDecl, ProofBundleDecl, RoleSetDecl, TopologyDecl,
+    TypeConstructorDecl, TypeDecl,
+};
 pub use execution_hints::{
     ChoreographyWithHints, ExecutionHints, ExecutionHintsBuilder, OperationHints, OperationPath,
     OperationStep,
@@ -56,7 +59,9 @@ pub use global_type::GlobalType; // Extended GlobalType with DSL features
 pub use local_type::LocalType; // Extended LocalType for code generation
 pub use message::MessageType;
 pub use non_empty::{NonEmptyError, NonEmptyVec};
-pub use protocol::{Branch, Condition, Protocol};
+pub use protocol::{
+    AuthorityExpr, Branch, CaseBranch, CasePattern, ChoiceGuard, Condition, Protocol,
+};
 pub use role::{
     RangeExpr, Role, RoleBoundsChecker, RoleIndex, RoleParam, RoleRange, RoleValidationError,
     RoleValidationResult, MAX_RANGE_COUNT, MAX_ROLE_COUNT, MAX_ROLE_INDEX,

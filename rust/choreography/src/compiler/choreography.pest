@@ -9,7 +9,16 @@ COMMENT = _{ "--" ~ (!"\n" ~ ANY)* ~ ("\n" | EOI) | "{-" ~ (!"-}" ~ ANY)* ~ "-}"
 
 // Top-level choreography definition
 choreography = {
-    SOI ~ module_decl? ~ import_decl* ~ proof_bundle_decl* ~ role_set_decl* ~ topology_decl* ~ protocol_decl ~ EOI
+    SOI
+        ~ module_decl?
+        ~ import_decl*
+        ~ proof_bundle_decl*
+        ~ role_set_decl*
+        ~ topology_decl*
+        ~ type_decl*
+        ~ effect_decl*
+        ~ protocol_decl
+        ~ EOI
 }
 
 // Module and imports (optional)
@@ -18,7 +27,7 @@ import_decl = { "import" ~ ident ~ ("as" ~ ident)? ~ ("exposing" ~ "(" ~ expose_
 expose_list = { (!")" ~ ANY)* }
 
 // Protocol definitions
-protocol_decl = { "protocol" ~ ident ~ header_roles? ~ protocol_requires? ~ "=" ~ protocol_body ~ where_block? }
+protocol_decl = { "protocol" ~ ident ~ header_roles? ~ protocol_requires? ~ protocol_uses? ~ "=" ~ protocol_body ~ where_block? }
 where_block = { "where" ~ locals_block }
 locals_block = { "{" ~ local_protocol_decl+ ~ "}" | "(" ~ local_protocol_decl+ ~ ")" | local_protocol_decl+ }
 local_protocol_decl = { "protocol" ~ ident ~ header_roles? ~ "=" ~ protocol_body }
@@ -32,6 +41,21 @@ proof_bundle_constraint = { "constraint" ~ string }
 proof_bundle_requires = { "requires" ~ "[" ~ capability_list? ~ "]" }
 capability_list = { ident ~ ("," ~ ident)* }
 protocol_requires = { "requires" ~ ident ~ ("," ~ ident)* }
+protocol_uses = { "uses" ~ ident ~ ("," ~ ident)* }
+
+type_decl = { type_alias_decl | union_type_decl }
+type_alias_decl = { "type" ~ "alias" ~ ident ~ "=" ~ type_expr }
+union_type_decl = { "type" ~ ident ~ union_ctor_decl+ }
+union_ctor_decl = { "|" ~ ident ~ ("of" ~ type_expr)? }
+
+effect_decl = { "effect" ~ ident ~ effect_body }
+effect_body = { "{" ~ effect_op_decl+ ~ "}" | effect_op_decl+ }
+effect_op_decl = { ident ~ ":" ~ type_expr ~ "->" ~ type_expr }
+type_expr = { type_record | type_result | type_maybe | type_unit | type_path }
+type_record = { "{" ~ (!"}" ~ ANY)* ~ "}" }
+type_result = { "Result" ~ type_expr ~ type_expr }
+type_maybe = { "Maybe" ~ type_expr }
+type_unit = { "Unit" }
 
 // Role-set and topology declarations
 role_set_decl = { "role_set" ~ ident ~ "=" ~ role_set_expr }
@@ -58,7 +82,11 @@ block_protocol = { "{" ~ roles_decl? ~ statement* ~ "}" | "(" ~ roles_decl? ~ st
 
 // Statement types
 statement = _{
-    send_stmt
+    let_in_stmt
+    | let_stmt
+    | case_stmt
+    | timeout_stmt
+    | send_stmt
     | broadcast_stmt
     | heartbeat_stmt
     | timed_choice_stmt
@@ -80,6 +108,30 @@ statement = _{
     | vm_tag_stmt
     | vm_check_stmt
 }
+
+let_in_stmt = { "let" ~ ident ~ "=" ~ authority_expr ~ "in" ~ block }
+let_stmt = { "let" ~ ident ~ "=" ~ authority_expr }
+case_stmt = { "case" ~ authority_expr ~ "of" ~ case_block }
+case_block = { "{" ~ case_branch+ ~ "}" | "(" ~ case_branch+ ~ ")" }
+case_branch = { "|" ~ match_pattern ~ "->" ~ block }
+match_pattern = { ident ~ ident* }
+
+timeout_stmt = {
+    "timeout" ~ duration ~ "at" ~ role_ref ~ block
+    ~ "on" ~ "timeout" ~ block
+    ~ ("on" ~ "cancel" ~ block)?
+}
+
+authority_expr = { check_expr | transfer_expr | result_ctor_expr | maybe_ctor_expr | call_expr | ident_expr }
+check_expr = { "check" ~ effect_call }
+transfer_expr = { "transfer" ~ ident ~ "from" ~ role_ref ~ "to" ~ role_ref }
+result_ctor_expr = { ("Ok" | "Err") ~ ident_expr? }
+maybe_ctor_expr = { ("Just" ~ ident_expr) | "Nothing" }
+effect_call = { ident ~ "." ~ ident ~ "(" ~ argument_list? ~ ")" }
+call_expr = { ident ~ "(" ~ argument_list? ~ ")" }
+argument_list = { authority_atom ~ ("," ~ authority_atom)* }
+authority_atom = { effect_call | ident_expr | string | integer }
+ident_expr = { ident ~ ("." ~ ident)* }
 
 // Timed choice statement - desugars to choice with timeout annotation
 // Syntax: timed_choice at Alice(5s) { OnTime { ... } TimedOut { ... } }
@@ -146,7 +198,9 @@ par_block = { "{" ~ par_branch+ ~ "}" | "(" ~ par_branch+ ~ ")" }
 par_branch = { "|" ~ (block | statement) }
 
 // Guard condition for choice branches
-guard = { "when" ~ "(" ~ guard_expr ~ ")" }
+guard = { evidence_guard | predicate_guard }
+predicate_guard = { "when" ~ "(" ~ guard_expr ~ ")" }
+evidence_guard = { "when" ~ "check" ~ effect_call ~ "yields" ~ ident }
 guard_expr = { (!")" ~ ANY)+ }
 
 // Loop statement

@@ -3,7 +3,8 @@
 //! Emits layout-sensitive syntax for the choreography language.
 
 use crate::ast::{
-    Annotations, Branch, Choreography, Condition, MessageType, Protocol, Role, RoleParam,
+    Annotations, AuthorityExpr, Branch, CaseBranch, ChoiceGuard, Choreography, Condition,
+    MessageType, Protocol, Role, RoleParam,
 };
 use crate::compiler::parser::parse_choreography_str;
 
@@ -90,6 +91,49 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
         ),
         Protocol::Choice { role, branches, .. } => {
             format_choice_protocol(role, branches, indent, config, out)
+        }
+        Protocol::Let {
+            name,
+            expr,
+            continuation,
+            ..
+        } => {
+            write_line(
+                out,
+                indent,
+                &format!("let {} = {}", name, format_authority_expr(expr)),
+            );
+            format_protocol(continuation, indent, config, out);
+        }
+        Protocol::Case { expr, branches } => {
+            write_line(
+                out,
+                indent,
+                &format!("case {} of", format_authority_expr(expr)),
+            );
+            for branch in branches {
+                format_case_branch(branch, indent + config.indent, config, out);
+            }
+        }
+        Protocol::Timeout {
+            role,
+            duration_ms,
+            body,
+            on_timeout,
+            on_cancel,
+        } => {
+            write_line(
+                out,
+                indent,
+                &format!("timeout {}ms at {}", duration_ms, format_role_ref(role)),
+            );
+            format_protocol(body, indent + config.indent, config, out);
+            write_line(out, indent, "on timeout");
+            format_protocol(on_timeout, indent + config.indent, config, out);
+            if let Some(on_cancel) = on_cancel.as_deref() {
+                write_line(out, indent, "on cancel");
+                format_protocol(on_cancel, indent + config.indent, config, out);
+            }
         }
         Protocol::Loop { condition, body } => {
             format_loop_protocol(condition, body, indent, config, out)
@@ -225,8 +269,7 @@ fn format_extension_protocol(
 fn format_branch(branch: &Branch, indent: usize, config: &PrettyConfig, out: &mut String) {
     let mut header = format!("| {}", branch.label);
     if let Some(guard) = &branch.guard {
-        let guard_str = guard.to_string();
-        header.push_str(&format!(" when ({})", guard_str));
+        header.push_str(&format!(" {}", format_choice_guard(guard)));
     }
 
     if is_end(&branch.protocol) {
@@ -234,6 +277,62 @@ fn format_branch(branch: &Branch, indent: usize, config: &PrettyConfig, out: &mu
     } else {
         write_line(out, indent, &format!("{} ->", header));
         format_protocol(&branch.protocol, indent + config.indent, config, out);
+    }
+}
+
+fn format_case_branch(branch: &CaseBranch, indent: usize, config: &PrettyConfig, out: &mut String) {
+    let binders = if branch.pattern.binders.is_empty() {
+        String::new()
+    } else {
+        format!(" {}", branch.pattern.binders.join(" "))
+    };
+    let header = format!("| {}{} ->", branch.pattern.constructor, binders);
+    if is_end(&branch.protocol) {
+        write_line(out, indent, &format!("{} {{}}", header));
+    } else {
+        write_line(out, indent, &header);
+        format_protocol(&branch.protocol, indent + config.indent, config, out);
+    }
+}
+
+fn format_choice_guard(guard: &ChoiceGuard) -> String {
+    match guard {
+        ChoiceGuard::Predicate(tokens) => format!("when ({})", tokens),
+        ChoiceGuard::Evidence {
+            effect,
+            operation,
+            args,
+            binding,
+        } => {
+            let args = if args.is_empty() {
+                String::new()
+            } else {
+                args.join(", ")
+            };
+            format!(
+                "when check {}.{}({}) yields {}",
+                effect, operation, args, binding
+            )
+        }
+    }
+}
+
+fn format_authority_expr(expr: &AuthorityExpr) -> String {
+    match expr {
+        AuthorityExpr::Var(name) => name.clone(),
+        AuthorityExpr::Check {
+            effect,
+            operation,
+            args,
+        } => format!("check {}.{}({})", effect, operation, args.join(", ")),
+        AuthorityExpr::Transfer { subject, from, to } => {
+            format!("transfer {} from {} to {}", subject, from, to)
+        }
+        AuthorityExpr::Constructor { name, arg } => match arg {
+            Some(arg) => format!("{name} {arg}"),
+            None => name.clone(),
+        },
+        AuthorityExpr::Call { name, args } => format!("{name}({})", args.join(", ")),
     }
 }
 

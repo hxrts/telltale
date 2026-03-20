@@ -11,11 +11,15 @@ use super::role::parse_role_ref;
 use super::types::PredicateExpr;
 use super::Rule;
 
+mod authority;
 mod branching;
 mod control_flow;
 mod looping;
 mod send;
 mod vm;
+pub(crate) use authority::{
+    parse_case_stmt, parse_let_in_stmt, parse_let_stmt, parse_timeout_stmt,
+};
 pub(crate) use branching::{parse_choice_stmt, parse_par_stmt, parse_timed_choice_stmt};
 pub(super) use control_flow::{
     parse_call_stmt, parse_continue_stmt, parse_handshake_stmt, parse_quorum_collect_stmt,

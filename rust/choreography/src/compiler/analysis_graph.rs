@@ -46,10 +46,23 @@ pub(super) fn has_communication(protocol: &Protocol) -> bool {
         Protocol::Choice { branches, .. } => {
             branches.iter().any(|b| has_communication(&b.protocol))
         }
+        Protocol::Case { branches, .. } => branches.iter().any(|b| has_communication(&b.protocol)),
+        Protocol::Timeout {
+            body,
+            on_timeout,
+            on_cancel,
+            ..
+        } => {
+            has_communication(body)
+                || has_communication(on_timeout)
+                || on_cancel.as_deref().is_some_and(has_communication)
+        }
         Protocol::Loop { body, .. } => has_communication(body),
         Protocol::Parallel { protocols } => protocols.iter().any(has_communication),
         Protocol::Rec { body, .. } => has_communication(body),
         Protocol::Var(_) | Protocol::End => false,
-        Protocol::Extension { continuation, .. } => has_communication(continuation),
+        Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
+            has_communication(continuation)
+        }
     }
 }

@@ -5,8 +5,8 @@
 //! and inlining of protocol calls.
 
 use crate::ast::{
-    Annotations, Branch, Condition, LocalType, MessageType, NonEmptyVec, Protocol,
-    ProtocolAnnotation, Role,
+    Annotations, AuthorityExpr, Branch, CaseBranch, CasePattern, ChoiceGuard, Condition, LocalType,
+    MessageType, NonEmptyVec, Protocol, ProtocolAnnotation, Role,
 };
 use crate::compiler::projection::ProjectionError;
 use crate::extensions::{
@@ -15,7 +15,7 @@ use crate::extensions::{
 use quote::format_ident;
 use std::any::{Any, TypeId};
 
-use super::types::{Statement, VmCoreOp};
+use super::types::{AuthorityExprSpec, CaseBranchSpec, ChoiceGuardSpec, Statement, VmCoreOp};
 
 #[path = "conversion_inline_calls.rs"]
 mod inline_calls;
@@ -135,6 +135,65 @@ impl ProtocolExtension for DslCombinatorExtension {
     }
 }
 
+fn convert_authority_expr(expr: &AuthorityExprSpec) -> AuthorityExpr {
+    match expr {
+        AuthorityExprSpec::Var(name) => AuthorityExpr::Var(name.clone()),
+        AuthorityExprSpec::Check {
+            effect,
+            operation,
+            args,
+        } => AuthorityExpr::Check {
+            effect: effect.clone(),
+            operation: operation.clone(),
+            args: args.clone(),
+        },
+        AuthorityExprSpec::Transfer { subject, from, to } => AuthorityExpr::Transfer {
+            subject: subject.clone(),
+            from: from.clone(),
+            to: to.clone(),
+        },
+        AuthorityExprSpec::Constructor { name, arg } => AuthorityExpr::Constructor {
+            name: name.clone(),
+            arg: arg.clone(),
+        },
+        AuthorityExprSpec::Call { name, args } => AuthorityExpr::Call {
+            name: name.clone(),
+            args: args.clone(),
+        },
+    }
+}
+
+fn convert_choice_guard(guard: &ChoiceGuardSpec) -> ChoiceGuard {
+    match guard {
+        ChoiceGuardSpec::Predicate(tokens) => ChoiceGuard::Predicate(tokens.clone()),
+        ChoiceGuardSpec::Evidence {
+            effect,
+            operation,
+            args,
+            binding,
+        } => ChoiceGuard::Evidence {
+            effect: effect.clone(),
+            operation: operation.clone(),
+            args: args.clone(),
+            binding: binding.clone(),
+        },
+    }
+}
+
+fn convert_case_branch(branch: &CaseBranchSpec, roles: &[Role]) -> CaseBranch {
+    CaseBranch {
+        pattern: CasePattern {
+            constructor: branch.pattern.constructor.clone(),
+            binders: branch.pattern.binders.clone(),
+        },
+        protocol: convert_statements_to_protocol(&branch.statements, roles),
+    }
+}
+
+fn binding_is_linear(expr: &AuthorityExprSpec) -> bool {
+    matches!(expr, AuthorityExprSpec::Transfer { .. })
+}
+
 fn vm_op_operands(op: &VmCoreOp) -> String {
     match op {
         VmCoreOp::Acquire { layer, dst } => format!("layer={layer},dst={dst}"),
@@ -174,6 +233,48 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
     // Build protocol from back to front
     for statement in statements.iter().rev() {
         current = match statement {
+            Statement::Let { name, expr, body } => {
+                let continuation = if let Some(body) = body {
+                    convert_statements_to_protocol(body, roles)
+                } else {
+                    current
+                };
+                Protocol::Let {
+                    name: name.clone(),
+                    expr: convert_authority_expr(expr),
+                    linear: binding_is_linear(expr),
+                    continuation: Box::new(continuation),
+                }
+            }
+            Statement::Case { expr, branches } => {
+                let branch_vec: Vec<_> = branches
+                    .iter()
+                    .map(|branch| convert_case_branch(branch, roles))
+                    .collect();
+                if let Ok(branches) = NonEmptyVec::new(branch_vec) {
+                    Protocol::Case {
+                        expr: convert_authority_expr(expr),
+                        branches,
+                    }
+                } else {
+                    current
+                }
+            }
+            Statement::Timeout {
+                role,
+                duration_ms,
+                body,
+                on_timeout,
+                on_cancel,
+            } => Protocol::Timeout {
+                role: role.clone(),
+                duration_ms: *duration_ms,
+                body: Box::new(convert_statements_to_protocol(body, roles)),
+                on_timeout: Box::new(convert_statements_to_protocol(on_timeout, roles)),
+                on_cancel: on_cancel
+                    .as_ref()
+                    .map(|branch| Box::new(convert_statements_to_protocol(branch, roles))),
+            },
             Statement::Send {
                 from,
                 to,
@@ -233,7 +334,7 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                     .iter()
                     .map(|b| Branch {
                         label: b.label.clone(),
-                        guard: b.guard.clone(),
+                        guard: b.guard.as_ref().map(convert_choice_guard),
                         protocol: convert_statements_to_protocol(&b.statements, roles),
                     })
                     .collect();
@@ -263,7 +364,7 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                     .iter()
                     .map(|b| Branch {
                         label: b.label.clone(),
-                        guard: b.guard.clone(),
+                        guard: b.guard.as_ref().map(convert_choice_guard),
                         protocol: convert_statements_to_protocol(&b.statements, roles),
                     })
                     .collect();

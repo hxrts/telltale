@@ -34,6 +34,10 @@ mod tests {
     mod proof_bundles_predicates {
         include!("../../../tests/unit/compiler/parser/proof_bundles_predicates.rs");
     }
+
+    mod authority_surface {
+        include!("../../../tests/unit/compiler/parser/authority_surface.rs");
+    }
 }
 mod types;
 
@@ -43,7 +47,7 @@ pub use lints::{
     collect_dsl_lints, explain_lowering, render_lsp_lint_diagnostics, LintDiagnostic, LintLevel,
 };
 
-use crate::ast::{Choreography, ProofBundleDecl, RoleSetDecl, TopologyDecl};
+use crate::ast::{Choreography, EffectDecl, ProofBundleDecl, RoleSetDecl, TopologyDecl, TypeDecl};
 use crate::compiler::layout::preprocess_layout;
 use crate::extensions::{ExtensionRegistry, ProtocolExtension};
 use pest::Parser;
@@ -54,10 +58,10 @@ use std::collections::{HashMap, HashSet};
 
 use conversion::{convert_statements_to_protocol, inline_calls};
 use declarations::{
-    parse_module_decl, parse_proof_bundle_decl, parse_protocol_requires, parse_role_set_decl,
-    parse_topology_decl,
+    parse_effect_decl, parse_module_decl, parse_proof_bundle_decl, parse_protocol_requires,
+    parse_protocol_uses, parse_role_set_decl, parse_topology_decl, parse_type_decl,
 };
-use linear::{infer_required_proof_bundles, validate_linear_vm_assets};
+use linear::{infer_required_proof_bundles, validate_authority_surface, validate_linear_vm_assets};
 use role::parse_roles_from_pair;
 use statement::{parse_local_protocol_decl, parse_protocol_body};
 use types::Statement;
@@ -96,8 +100,11 @@ pub fn parse_choreography_str_with_extensions(
     let mut statements: Vec<Statement> = Vec::new();
     let mut proof_bundles: Vec<ProofBundleDecl> = Vec::new();
     let mut required_bundles: Vec<String> = Vec::new();
+    let mut protocol_uses: Vec<String> = Vec::new();
     let mut role_sets: Vec<RoleSetDecl> = Vec::new();
     let mut topologies: Vec<TopologyDecl> = Vec::new();
+    let mut type_decls: Vec<TypeDecl> = Vec::new();
+    let mut effect_decls: Vec<EffectDecl> = Vec::new();
 
     for pair in pairs {
         if pair.as_rule() == Rule::choreography {
@@ -117,6 +124,12 @@ pub fn parse_choreography_str_with_extensions(
                     }
                     Rule::topology_decl => {
                         topologies.push(parse_topology_decl(inner, &preprocessed)?);
+                    }
+                    Rule::type_decl => {
+                        type_decls.push(parse_type_decl(inner, &preprocessed)?);
+                    }
+                    Rule::effect_decl => {
+                        effect_decls.push(parse_effect_decl(inner, &preprocessed)?);
                     }
                     Rule::protocol_decl => {
                         let protocol_span = inner.as_span();
@@ -139,6 +152,9 @@ pub fn parse_choreography_str_with_extensions(
                                 }
                                 Rule::protocol_requires => {
                                     required_bundles = parse_protocol_requires(item);
+                                }
+                                Rule::protocol_uses => {
+                                    protocol_uses = parse_protocol_uses(item);
                                 }
                                 Rule::protocol_body => {
                                     body_pair = Some(item);
@@ -198,6 +214,7 @@ pub fn parse_choreography_str_with_extensions(
 
                         statements = inline_calls(&body_statements, &protocol_defs, &preprocessed)?;
                         validate_linear_vm_assets(&statements, &preprocessed)?;
+                        validate_authority_surface(&statements, &preprocessed)?;
                     }
                     _ => {}
                 }
@@ -253,6 +270,24 @@ pub fn parse_choreography_str_with_extensions(
         })?;
     choreography
         .set_topologies(&topologies)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            message,
+        })?;
+    choreography
+        .set_type_decls(&type_decls)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            message,
+        })?;
+    choreography
+        .set_effect_decls(&effect_decls)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            message,
+        })?;
+    choreography
+        .set_protocol_uses(&protocol_uses)
         .map_err(|message| ParseError::Syntax {
             span: ErrorSpan::from_line_col(1, 1, &preprocessed),
             message,

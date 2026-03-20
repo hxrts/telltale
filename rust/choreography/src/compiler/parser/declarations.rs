@@ -1,4 +1,12 @@
 use super::*;
+use crate::ast::{EffectOpDecl, TypeConstructorDecl};
+
+pub(super) fn parse_protocol_uses(pair: pest::iterators::Pair<Rule>) -> Vec<String> {
+    pair.into_inner()
+        .filter(|p| p.as_rule() == Rule::ident)
+        .map(|p| p.as_str().to_string())
+        .collect()
+}
 
 pub(super) fn parse_module_decl(
     pair: pest::iterators::Pair<Rule>,
@@ -242,4 +250,138 @@ pub(super) fn parse_topology_decl(
         name,
         members,
     })
+}
+
+pub(super) fn parse_type_decl(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<TypeDecl, ParseError> {
+    let span = pair.as_span();
+    let inner = pair.into_inner().next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "type declaration is empty".to_string(),
+    })?;
+    match inner.as_rule() {
+        Rule::type_alias_decl => {
+            let mut alias_inner = inner.into_inner();
+            let name = alias_inner
+                .next()
+                .ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "type alias is missing name".to_string(),
+                })?
+                .as_str()
+                .to_string();
+            let alias_of = alias_inner
+                .next()
+                .ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "type alias is missing right-hand side".to_string(),
+                })?
+                .as_str()
+                .trim()
+                .to_string();
+            Ok(TypeDecl {
+                name,
+                is_alias: true,
+                alias_of: Some(alias_of),
+                constructors: Vec::new(),
+            })
+        }
+        Rule::union_type_decl => {
+            let mut union_inner = inner.into_inner();
+            let name = union_inner
+                .next()
+                .ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "type declaration is missing name".to_string(),
+                })?
+                .as_str()
+                .to_string();
+            let constructors = union_inner
+                .filter(|p| p.as_rule() == Rule::union_ctor_decl)
+                .map(|ctor| {
+                    let mut ctor_inner = ctor.into_inner();
+                    let name = ctor_inner
+                        .next()
+                        .map(|p| p.as_str().to_string())
+                        .unwrap_or_default();
+                    let payload_type = ctor_inner.next().map(|p| p.as_str().trim().to_string());
+                    TypeConstructorDecl { name, payload_type }
+                })
+                .collect();
+            Ok(TypeDecl {
+                name,
+                is_alias: false,
+                alias_of: None,
+                constructors,
+            })
+        }
+        _ => Err(ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "unsupported type declaration".to_string(),
+        }),
+    }
+}
+
+pub(super) fn parse_effect_decl(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<EffectDecl, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let name = inner
+        .next()
+        .ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "effect declaration is missing name".to_string(),
+        })?
+        .as_str()
+        .to_string();
+    let mut operations = Vec::new();
+    for op in inner {
+        let op_pairs: Vec<_> = match op.as_rule() {
+            Rule::effect_op_decl => vec![op],
+            Rule::effect_body => op
+                .into_inner()
+                .filter(|p| p.as_rule() == Rule::effect_op_decl)
+                .collect(),
+            _ => Vec::new(),
+        };
+        for op in op_pairs {
+            let mut op_inner = op.into_inner();
+            let op_name = op_inner
+                .next()
+                .ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "effect operation is missing name".to_string(),
+                })?
+                .as_str()
+                .to_string();
+            let input_type = op_inner
+                .next()
+                .ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "effect operation is missing input type".to_string(),
+                })?
+                .as_str()
+                .trim()
+                .to_string();
+            let output_type = op_inner
+                .next()
+                .ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "effect operation is missing output type".to_string(),
+                })?
+                .as_str()
+                .trim()
+                .to_string();
+            operations.push(EffectOpDecl {
+                name: op_name,
+                input_type,
+                output_type,
+            });
+        }
+    }
+    Ok(EffectDecl { name, operations })
 }

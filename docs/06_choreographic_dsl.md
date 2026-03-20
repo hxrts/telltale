@@ -18,6 +18,18 @@ The parser module is located in `rust/choreography/src/compiler/parser/`. It pro
 The DSL describes protocol structure and role-local communication obligations.
 It does not directly express host-runtime ownership. Session/fragment ownership boundaries are derived later by the runtime, typically from composition/link metadata when available.
 
+The current DSL also has an authority-oriented preview surface for protocol-critical host queries and typed local branching:
+
+- top-level `type` and `type alias` declarations
+- nominal `effect` interface declarations
+- protocol-level `uses` declarations
+- `let` bindings for `check ...` and `transfer ...`
+- `case ... of` over `Result`/`Maybe`-style constructors
+- `timeout ... on timeout ... on cancel ...`
+- evidence guards of the form `when check Effect.op(...) yields witness`
+
+These forms are parser and AST level surfaces first. `let` is treated as local-only and projects through to the continuation. `case/of` and `timeout` are intentionally rejected by the current MPST projection pass until their projection rules are formalized explicitly.
+
 ## DSL Syntax
 
 ```rust

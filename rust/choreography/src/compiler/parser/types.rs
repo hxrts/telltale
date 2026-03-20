@@ -13,6 +13,22 @@ use syn::{BinOp, Expr, Lit, UnOp};
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)] // Statement enum is internal to parser; performance impact is minimal
 pub(crate) enum Statement {
+    Let {
+        name: String,
+        expr: AuthorityExprSpec,
+        body: Option<Vec<Statement>>,
+    },
+    Case {
+        expr: AuthorityExprSpec,
+        branches: Vec<CaseBranchSpec>,
+    },
+    Timeout {
+        role: Role,
+        duration_ms: u64,
+        body: Vec<Statement>,
+        on_timeout: Vec<Statement>,
+        on_cancel: Option<Vec<Statement>>,
+    },
     Send {
         from: Role,
         to: Role,
@@ -143,8 +159,54 @@ impl VmCoreOp {
 #[derive(Debug, Clone)]
 pub(crate) struct ChoiceBranch {
     pub label: Ident,
-    pub guard: Option<TokenStream>,
+    pub guard: Option<ChoiceGuardSpec>,
     pub statements: Vec<Statement>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct CaseBranchSpec {
+    pub pattern: CasePatternSpec,
+    pub statements: Vec<Statement>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct CasePatternSpec {
+    pub constructor: String,
+    pub binders: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum AuthorityExprSpec {
+    Var(String),
+    Check {
+        effect: String,
+        operation: String,
+        args: Vec<String>,
+    },
+    Transfer {
+        subject: String,
+        from: String,
+        to: String,
+    },
+    Constructor {
+        name: String,
+        arg: Option<String>,
+    },
+    Call {
+        name: String,
+        args: Vec<String>,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum ChoiceGuardSpec {
+    Predicate(TokenStream),
+    Evidence {
+        effect: String,
+        operation: String,
+        args: Vec<String>,
+        binding: String,
+    },
 }
 
 /// Message specification with optional payload

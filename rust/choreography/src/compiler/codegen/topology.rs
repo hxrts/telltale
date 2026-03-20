@@ -92,6 +92,23 @@ fn collect_branch_requirements_from_protocol(
                 collect_branch_requirements_from_protocol(&branch.protocol, requirements);
             }
         }
+        Protocol::Case { branches, .. } => {
+            for branch in branches {
+                collect_branch_requirements_from_protocol(&branch.protocol, requirements);
+            }
+        }
+        Protocol::Timeout {
+            body,
+            on_timeout,
+            on_cancel,
+            ..
+        } => {
+            collect_branch_requirements_from_protocol(body, requirements);
+            collect_branch_requirements_from_protocol(on_timeout, requirements);
+            if let Some(on_cancel) = on_cancel.as_deref() {
+                collect_branch_requirements_from_protocol(on_cancel, requirements);
+            }
+        }
         Protocol::Send { continuation, .. } => {
             collect_branch_requirements_from_protocol(continuation, requirements);
         }
@@ -109,7 +126,7 @@ fn collect_branch_requirements_from_protocol(
         Protocol::Rec { body, .. } => {
             collect_branch_requirements_from_protocol(body, requirements);
         }
-        Protocol::Extension { continuation, .. } => {
+        Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
             collect_branch_requirements_from_protocol(continuation, requirements);
         }
         Protocol::Var(_) | Protocol::End => {}

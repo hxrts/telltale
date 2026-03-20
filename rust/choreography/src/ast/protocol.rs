@@ -45,6 +45,40 @@ pub enum Protocol {
         annotations: Annotations,
     },
 
+    /// Local authority/evidence binding.
+    Let {
+        /// Bound variable name.
+        name: String,
+        /// Bound expression.
+        expr: AuthorityExpr,
+        /// Whether the binding is linear/single-use.
+        linear: bool,
+        /// Continuation after the binding.
+        continuation: Box<Protocol>,
+    },
+
+    /// Local authority/result match.
+    Case {
+        /// Scrutinee expression.
+        expr: AuthorityExpr,
+        /// Match branches.
+        branches: NonEmptyVec<CaseBranch>,
+    },
+
+    /// Explicit timeout/cancel surface syntax prior to projection lowering.
+    Timeout {
+        /// Role that owns the timeout decision.
+        role: Role,
+        /// Timeout duration in milliseconds.
+        duration_ms: u64,
+        /// Main body before timeout fires.
+        body: Box<Protocol>,
+        /// Timeout branch.
+        on_timeout: Box<Protocol>,
+        /// Optional explicit cancellation branch.
+        on_cancel: Option<Box<Protocol>>,
+    },
+
     /// Loop construct
     Loop {
         condition: Option<Condition>,
@@ -78,8 +112,58 @@ pub enum Protocol {
 #[derive(Debug)]
 pub struct Branch {
     pub label: Ident,
-    pub guard: Option<TokenStream>,
+    pub guard: Option<ChoiceGuard>,
     pub protocol: Protocol,
+}
+
+/// Match branch in a `case/of` expression.
+#[derive(Debug)]
+pub struct CaseBranch {
+    pub pattern: CasePattern,
+    pub protocol: Protocol,
+}
+
+/// Pattern accepted by DSL `case/of`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CasePattern {
+    pub constructor: String,
+    pub binders: Vec<String>,
+}
+
+/// Authority- or evidence-oriented expression surface syntax.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AuthorityExpr {
+    Var(String),
+    Check {
+        effect: String,
+        operation: String,
+        args: Vec<String>,
+    },
+    Transfer {
+        subject: String,
+        from: String,
+        to: String,
+    },
+    Constructor {
+        name: String,
+        arg: Option<String>,
+    },
+    Call {
+        name: String,
+        args: Vec<String>,
+    },
+}
+
+/// Guard surface syntax attached to one choice branch.
+#[derive(Debug, Clone)]
+pub enum ChoiceGuard {
+    Predicate(TokenStream),
+    Evidence {
+        effect: String,
+        operation: String,
+        args: Vec<String>,
+        binding: String,
+    },
 }
 
 /// Loop condition
@@ -126,6 +210,24 @@ impl Protocol {
             Protocol::Choice {
                 role: r, branches, ..
             } => r.matches_family(role) || branches.iter().any(|b| b.protocol.mentions_role(role)),
+            Protocol::Let { continuation, .. } => continuation.mentions_role(role),
+            Protocol::Case { branches, .. } => {
+                branches.iter().any(|b| b.protocol.mentions_role(role))
+            }
+            Protocol::Timeout {
+                role: timeout_role,
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                timeout_role.matches_family(role)
+                    || body.mentions_role(role)
+                    || on_timeout.mentions_role(role)
+                    || on_cancel
+                        .as_deref()
+                        .is_some_and(|branch| branch.mentions_role(role))
+            }
             Protocol::Loop { body, .. } => body.mentions_role(role),
             Protocol::Parallel { protocols } => protocols.iter().any(|p| p.mentions_role(role)),
             Protocol::Rec { body, .. } => body.mentions_role(role),
@@ -167,6 +269,28 @@ impl Protocol {
                 validate_choice_branches(role, branches)?;
                 Ok(())
             }
+            Protocol::Let { continuation, .. } => continuation.validate(roles),
+            Protocol::Case { branches, .. } => {
+                for branch in branches {
+                    branch.protocol.validate(roles)?;
+                }
+                Ok(())
+            }
+            Protocol::Timeout {
+                role,
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                ensure_declared_role(roles, role)?;
+                body.validate(roles)?;
+                on_timeout.validate(roles)?;
+                if let Some(on_cancel) = on_cancel.as_deref() {
+                    on_cancel.validate(roles)?;
+                }
+                Ok(())
+            }
             Protocol::Loop { body, .. } => body.validate(roles),
             Protocol::Parallel { protocols } => {
                 for p in protocols {
@@ -196,6 +320,10 @@ impl Protocol {
             Protocol::Send { annotations, .. } => annotations,
             Protocol::Broadcast { annotations, .. } => annotations,
             Protocol::Choice { annotations, .. } => annotations,
+            Protocol::Let { .. } | Protocol::Case { .. } | Protocol::Timeout { .. } => {
+                static EMPTY: std::sync::OnceLock<Annotations> = std::sync::OnceLock::new();
+                EMPTY.get_or_init(Annotations::new)
+            }
             Protocol::Extension { annotations, .. } => annotations,
             Protocol::Loop { .. }
             | Protocol::Parallel { .. }
@@ -246,6 +374,7 @@ impl Protocol {
             Protocol::Send { annotations, .. } => Some(annotations),
             Protocol::Broadcast { annotations, .. } => Some(annotations),
             Protocol::Choice { annotations, .. } => Some(annotations),
+            Protocol::Let { .. } | Protocol::Case { .. } | Protocol::Timeout { .. } => None,
             Protocol::Extension { annotations, .. } => Some(annotations),
             Protocol::Loop { .. }
             | Protocol::Parallel { .. }
@@ -389,9 +518,29 @@ impl Protocol {
             Protocol::Broadcast { continuation, .. } => {
                 continuation.collect_nodes_with_annotation(key, nodes);
             }
+            Protocol::Let { continuation, .. } => {
+                continuation.collect_nodes_with_annotation(key, nodes);
+            }
             Protocol::Choice { branches, .. } => {
                 for branch in branches {
                     branch.protocol.collect_nodes_with_annotation(key, nodes);
+                }
+            }
+            Protocol::Case { branches, .. } => {
+                for branch in branches {
+                    branch.protocol.collect_nodes_with_annotation(key, nodes);
+                }
+            }
+            Protocol::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                body.collect_nodes_with_annotation(key, nodes);
+                on_timeout.collect_nodes_with_annotation(key, nodes);
+                if let Some(on_cancel) = on_cancel.as_deref() {
+                    on_cancel.collect_nodes_with_annotation(key, nodes);
                 }
             }
             Protocol::Loop { body, .. } => {
@@ -433,11 +582,33 @@ impl Protocol {
             Protocol::Broadcast { continuation, .. } => {
                 continuation.collect_nodes_with_annotation_value(key, value, nodes);
             }
+            Protocol::Let { continuation, .. } => {
+                continuation.collect_nodes_with_annotation_value(key, value, nodes);
+            }
             Protocol::Choice { branches, .. } => {
                 for branch in branches {
                     branch
                         .protocol
                         .collect_nodes_with_annotation_value(key, value, nodes);
+                }
+            }
+            Protocol::Case { branches, .. } => {
+                for branch in branches {
+                    branch
+                        .protocol
+                        .collect_nodes_with_annotation_value(key, value, nodes);
+                }
+            }
+            Protocol::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                body.collect_nodes_with_annotation_value(key, value, nodes);
+                on_timeout.collect_nodes_with_annotation_value(key, value, nodes);
+                if let Some(on_cancel) = on_cancel.as_deref() {
+                    on_cancel.collect_nodes_with_annotation_value(key, value, nodes);
                 }
             }
             Protocol::Loop { body, .. } => {
@@ -471,9 +642,29 @@ impl Protocol {
             Protocol::Broadcast { continuation, .. } => {
                 count += continuation.deep_annotation_count();
             }
+            Protocol::Let { continuation, .. } => {
+                count += continuation.deep_annotation_count();
+            }
             Protocol::Choice { branches, .. } => {
                 for branch in branches {
                     count += branch.protocol.deep_annotation_count();
+                }
+            }
+            Protocol::Case { branches, .. } => {
+                for branch in branches {
+                    count += branch.protocol.deep_annotation_count();
+                }
+            }
+            Protocol::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                count += body.deep_annotation_count();
+                count += on_timeout.deep_annotation_count();
+                if let Some(on_cancel) = on_cancel.as_deref() {
+                    count += on_cancel.deep_annotation_count();
                 }
             }
             Protocol::Loop { body, .. } => {
@@ -514,9 +705,29 @@ impl Protocol {
             Protocol::Broadcast { continuation, .. } => {
                 continuation.visit_annotated_nodes(f);
             }
+            Protocol::Let { continuation, .. } => {
+                continuation.visit_annotated_nodes(f);
+            }
             Protocol::Choice { branches, .. } => {
                 for branch in branches {
                     branch.protocol.visit_annotated_nodes(f);
+                }
+            }
+            Protocol::Case { branches, .. } => {
+                for branch in branches {
+                    branch.protocol.visit_annotated_nodes(f);
+                }
+            }
+            Protocol::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                body.visit_annotated_nodes(f);
+                on_timeout.visit_annotated_nodes(f);
+                if let Some(on_cancel) = on_cancel.as_deref() {
+                    on_cancel.visit_annotated_nodes(f);
                 }
             }
             Protocol::Loop { body, .. } => {
@@ -555,9 +766,29 @@ impl Protocol {
             Protocol::Broadcast { continuation, .. } => {
                 continuation.visit_annotated_nodes_mut(f);
             }
+            Protocol::Let { continuation, .. } => {
+                continuation.visit_annotated_nodes_mut(f);
+            }
             Protocol::Choice { branches, .. } => {
                 for branch in branches {
                     branch.protocol.visit_annotated_nodes_mut(f);
+                }
+            }
+            Protocol::Case { branches, .. } => {
+                for branch in branches {
+                    branch.protocol.visit_annotated_nodes_mut(f);
+                }
+            }
+            Protocol::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                body.visit_annotated_nodes_mut(f);
+                on_timeout.visit_annotated_nodes_mut(f);
+                if let Some(on_cancel) = on_cancel.as_deref_mut() {
+                    on_cancel.visit_annotated_nodes_mut(f);
                 }
             }
             Protocol::Loop { body, .. } => {

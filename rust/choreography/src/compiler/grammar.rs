@@ -438,11 +438,11 @@ mod tests {
 
     impl GrammarExtension for TestExtension {
         fn grammar_rules(&self) -> &'static str {
-            "timeout_stmt = { \"timeout\" ~ integer ~ block }"
+            "audit_stmt = { \"audit\" ~ ident ~ block }"
         }
 
         fn statement_rules(&self) -> Vec<&'static str> {
-            vec!["timeout_stmt"]
+            vec!["audit_stmt"]
         }
 
         fn extension_id(&self) -> &'static str {
@@ -465,7 +465,7 @@ mod tests {
             .register_extension(TestExtension)
             .expect("extension should register");
         assert_eq!(composer.extension_count(), 1);
-        assert!(composer.has_extension_rule("timeout_stmt"));
+        assert!(composer.has_extension_rule("audit_stmt"));
     }
 
     #[test]
@@ -479,7 +479,7 @@ mod tests {
         assert!(result.is_ok(), "Grammar composition should succeed");
 
         let composed = result.unwrap();
-        assert!(composed.contains("timeout_stmt"));
+        assert!(composed.contains("audit_stmt"));
         assert!(composed.contains("choreography"));
         assert!(composed.contains("// Extension Rules"));
     }
@@ -523,7 +523,7 @@ mod tests {
             .build();
 
         assert_eq!(composer.extension_count(), 1);
-        assert!(composer.has_extension_rule("timeout_stmt"));
+        assert!(composer.has_extension_rule("audit_stmt"));
     }
 
     #[test]

@@ -10,12 +10,12 @@ use std::collections::{HashMap, HashSet};
 
 use super::error::{ErrorSpan, ParseError};
 use super::stmt_parsers::{
-    parse_broadcast_stmt, parse_call_stmt, parse_choice_stmt, parse_continue_stmt,
-    parse_handshake_stmt, parse_heartbeat_stmt, parse_loop_stmt, parse_par_stmt,
-    parse_quorum_collect_stmt, parse_rec_stmt, parse_retry_stmt, parse_send_stmt,
-    parse_timed_choice_stmt, parse_vm_abort_stmt, parse_vm_acquire_stmt, parse_vm_check_stmt,
-    parse_vm_fork_stmt, parse_vm_join_stmt, parse_vm_release_stmt, parse_vm_tag_stmt,
-    parse_vm_transfer_stmt,
+    parse_broadcast_stmt, parse_call_stmt, parse_case_stmt, parse_choice_stmt, parse_continue_stmt,
+    parse_handshake_stmt, parse_heartbeat_stmt, parse_let_in_stmt, parse_let_stmt, parse_loop_stmt,
+    parse_par_stmt, parse_quorum_collect_stmt, parse_rec_stmt, parse_retry_stmt, parse_send_stmt,
+    parse_timed_choice_stmt, parse_timeout_stmt, parse_vm_abort_stmt, parse_vm_acquire_stmt,
+    parse_vm_check_stmt, parse_vm_fork_stmt, parse_vm_join_stmt, parse_vm_release_stmt,
+    parse_vm_tag_stmt, parse_vm_transfer_stmt,
 };
 use super::types::{MessageSpec, ParsedBody, Statement};
 use super::Rule;
@@ -115,6 +115,10 @@ fn parse_statement_inner(
     protocol_defs: &HashMap<String, Vec<Statement>>,
 ) -> std::result::Result<Statement, ParseError> {
     match pair.as_rule() {
+        Rule::let_in_stmt => parse_let_in_stmt(pair, declared_roles, input, protocol_defs),
+        Rule::let_stmt => parse_let_stmt(pair, declared_roles, input),
+        Rule::case_stmt => parse_case_stmt(pair, declared_roles, input, protocol_defs),
+        Rule::timeout_stmt => parse_timeout_stmt(pair, declared_roles, input, protocol_defs),
         Rule::send_stmt => parse_send_stmt(pair, declared_roles, input),
         Rule::broadcast_stmt => parse_broadcast_stmt(pair, declared_roles, input),
         Rule::heartbeat_stmt => parse_heartbeat_stmt(pair, declared_roles, input, protocol_defs),

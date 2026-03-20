@@ -43,6 +43,9 @@ pub enum ProjectionError {
 
     #[error("cannot merge branches: {0}")]
     MergeFailure(String),
+
+    #[error("authority-local construct `{construct}` is not projectable without an explicit session-typing rule")]
+    UnsupportedAuthorityConstruct { construct: &'static str },
 }
 
 /// Context for projection algorithm
@@ -153,6 +156,16 @@ impl<'a> ProjectionContext<'a> {
                 branches,
                 ..
             } => self.project_choice(choice_role, branches),
+
+            Protocol::Let { continuation, .. } => self.project_protocol(continuation),
+
+            Protocol::Case { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
+                construct: "case/of",
+            }),
+
+            Protocol::Timeout { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
+                construct: "timeout",
+            }),
 
             Protocol::Loop { condition, body } => self.project_loop(condition.as_ref(), body),
 

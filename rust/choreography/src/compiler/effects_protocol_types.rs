@@ -143,6 +143,23 @@ fn collect_message_types(protocol: &Protocol, message_types: &mut HashSet<Messag
                 collect_message_types(&branch.protocol, message_types);
             }
         }
+        Protocol::Case { branches, .. } => {
+            for branch in branches {
+                collect_message_types(&branch.protocol, message_types);
+            }
+        }
+        Protocol::Timeout {
+            body,
+            on_timeout,
+            on_cancel,
+            ..
+        } => {
+            collect_message_types(body, message_types);
+            collect_message_types(on_timeout, message_types);
+            if let Some(on_cancel) = on_cancel.as_deref() {
+                collect_message_types(on_cancel, message_types);
+            }
+        }
         Protocol::Loop { body, .. } => {
             collect_message_types(body, message_types);
         }
@@ -156,7 +173,7 @@ fn collect_message_types(protocol: &Protocol, message_types: &mut HashSet<Messag
         }
         Protocol::Var(_) | Protocol::End => {}
 
-        Protocol::Extension { continuation, .. } => {
+        Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
             collect_message_types(continuation, message_types);
         }
     }
@@ -171,9 +188,28 @@ fn collect_choice_labels(protocol: &Protocol, labels: &mut HashSet<String>) {
                 collect_choice_labels(&branch.protocol, labels);
             }
         }
+        Protocol::Case { branches, .. } => {
+            for branch in branches {
+                labels.insert(branch.pattern.constructor.clone());
+                collect_choice_labels(&branch.protocol, labels);
+            }
+        }
+        Protocol::Timeout {
+            body,
+            on_timeout,
+            on_cancel,
+            ..
+        } => {
+            collect_choice_labels(body, labels);
+            collect_choice_labels(on_timeout, labels);
+            if let Some(on_cancel) = on_cancel.as_deref() {
+                collect_choice_labels(on_cancel, labels);
+            }
+        }
         Protocol::Send { continuation, .. }
         | Protocol::Broadcast { continuation, .. }
-        | Protocol::Extension { continuation, .. } => {
+        | Protocol::Extension { continuation, .. }
+        | Protocol::Let { continuation, .. } => {
             collect_choice_labels(continuation, labels);
         }
         Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => {

@@ -119,6 +119,24 @@ pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCor
             hint: "Parallel composition has no theory equivalent".to_string(),
         }),
 
+        Protocol::Let { .. } => Err(ConversionError::UnsupportedFeature {
+            feature: "Let".to_string(),
+            hint: "Authority-local let bindings must be erased or lowered before theory conversion"
+                .to_string(),
+        }),
+
+        Protocol::Case { .. } => Err(ConversionError::UnsupportedFeature {
+            feature: "Case".to_string(),
+            hint: "Authority-local case/of must be lowered to explicit protocol choices first"
+                .to_string(),
+        }),
+
+        Protocol::Timeout { .. } => Err(ConversionError::UnsupportedFeature {
+            feature: "Timeout".to_string(),
+            hint: "Timeout blocks must be lowered to explicit protocol choices before theory conversion"
+                .to_string(),
+        }),
+
         Protocol::Extension { .. } => Err(ConversionError::UnsupportedFeature {
             feature: "Extension".to_string(),
             hint: "Protocol extensions have no theory equivalent".to_string(),

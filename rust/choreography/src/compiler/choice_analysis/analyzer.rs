@@ -68,6 +68,23 @@ impl ChoiceAnalyzer {
                     self.analyze_protocol(&branch.protocol, choices, Some(&choice_id));
                 }
             }
+            Protocol::Case { branches, .. } => {
+                for branch in branches {
+                    self.analyze_protocol(&branch.protocol, choices, parent_choice);
+                }
+            }
+            Protocol::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                self.analyze_protocol(body, choices, parent_choice);
+                self.analyze_protocol(on_timeout, choices, parent_choice);
+                if let Some(on_cancel) = on_cancel.as_deref() {
+                    self.analyze_protocol(on_cancel, choices, parent_choice);
+                }
+            }
             Protocol::Send { continuation, .. } => {
                 self.analyze_protocol(continuation, choices, parent_choice);
             }
@@ -85,7 +102,7 @@ impl ChoiceAnalyzer {
             Protocol::Rec { body, .. } => {
                 self.analyze_protocol(body, choices, parent_choice);
             }
-            Protocol::Extension { continuation, .. } => {
+            Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
                 self.analyze_protocol(continuation, choices, parent_choice);
             }
             Protocol::Var(_) | Protocol::End => {}
@@ -222,6 +239,23 @@ impl ChoiceAnalyzer {
             Protocol::Choice { branches, .. } => {
                 self.collect_nested_choice_messages(branches, messages);
             }
+            Protocol::Case { branches, .. } => {
+                for branch in branches {
+                    self.collect_messages_from_protocol(&branch.protocol, messages);
+                }
+            }
+            Protocol::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                self.collect_messages_from_protocol(body, messages);
+                self.collect_messages_from_protocol(on_timeout, messages);
+                if let Some(on_cancel) = on_cancel.as_deref() {
+                    self.collect_messages_from_protocol(on_cancel, messages);
+                }
+            }
             Protocol::Loop { body, .. } => {
                 self.collect_messages_from_protocol(body, messages);
             }
@@ -233,7 +267,7 @@ impl ChoiceAnalyzer {
             Protocol::Rec { body, .. } => {
                 self.collect_messages_from_protocol(body, messages);
             }
-            Protocol::Extension { continuation, .. } => {
+            Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
                 self.collect_messages_from_protocol(continuation, messages);
             }
             Protocol::Var(_) | Protocol::End => {}
@@ -436,6 +470,25 @@ impl ChoiceAnalyzer {
                     self.collect_roles_from_protocol(&branch.protocol, roles);
                 }
             }
+            Protocol::Case { branches, .. } => {
+                for branch in branches {
+                    self.collect_roles_from_protocol(&branch.protocol, roles);
+                }
+            }
+            Protocol::Timeout {
+                role,
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                roles.insert(role.name().to_string());
+                self.collect_roles_from_protocol(body, roles);
+                self.collect_roles_from_protocol(on_timeout, roles);
+                if let Some(on_cancel) = on_cancel.as_deref() {
+                    self.collect_roles_from_protocol(on_cancel, roles);
+                }
+            }
             Protocol::Loop { body, .. } => {
                 self.collect_roles_from_protocol(body, roles);
             }
@@ -447,7 +500,7 @@ impl ChoiceAnalyzer {
             Protocol::Rec { body, .. } => {
                 self.collect_roles_from_protocol(body, roles);
             }
-            Protocol::Extension { continuation, .. } => {
+            Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
                 self.collect_roles_from_protocol(continuation, roles);
             }
             Protocol::Var(_) | Protocol::End => {}

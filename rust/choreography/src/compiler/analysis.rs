@@ -133,6 +133,23 @@ impl<'a> Analyzer<'a> {
             } => self.analyze_broadcast(from, to_all, &message.name.to_string(), continuation),
 
             Protocol::Choice { role, branches, .. } => self.analyze_choice(role, branches),
+            Protocol::Case { branches, .. } => {
+                for branch in branches {
+                    self.analyze_protocol(&branch.protocol);
+                }
+            }
+            Protocol::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                self.analyze_protocol(body);
+                self.analyze_protocol(on_timeout);
+                if let Some(on_cancel) = on_cancel.as_deref() {
+                    self.analyze_protocol(on_cancel);
+                }
+            }
 
             Protocol::Loop { body, .. } => {
                 self.analyze_protocol(body);
@@ -150,7 +167,7 @@ impl<'a> Analyzer<'a> {
 
             Protocol::Var(_) | Protocol::End => {}
 
-            Protocol::Extension { continuation, .. } => {
+            Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
                 self.analyze_protocol(continuation);
             }
         }
@@ -259,6 +276,23 @@ impl<'a> Analyzer<'a> {
                     Self::extract_dependencies(&branch.protocol, deps);
                 }
             }
+            Protocol::Case { branches, .. } => {
+                for branch in branches {
+                    Self::extract_dependencies(&branch.protocol, deps);
+                }
+            }
+            Protocol::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                Self::extract_dependencies(body, deps);
+                Self::extract_dependencies(on_timeout, deps);
+                if let Some(on_cancel) = on_cancel.as_deref() {
+                    Self::extract_dependencies(on_cancel, deps);
+                }
+            }
             Protocol::Loop { body, .. } => {
                 Self::extract_dependencies(body, deps);
             }
@@ -276,7 +310,7 @@ impl<'a> Analyzer<'a> {
             }
             Protocol::Var(_) | Protocol::End => {}
 
-            Protocol::Extension { continuation, .. } => {
+            Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
                 Self::extract_dependencies(continuation, deps);
             }
         }
@@ -300,6 +334,21 @@ impl<'a> Analyzer<'a> {
                     .iter()
                     .all(|b| Self::check_protocol_progress(&b.protocol))
             }
+            Protocol::Case { branches, .. } => branches
+                .iter()
+                .all(|b| Self::check_protocol_progress(&b.protocol)),
+            Protocol::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                Self::check_protocol_progress(body)
+                    && Self::check_protocol_progress(on_timeout)
+                    && on_cancel
+                        .as_deref()
+                        .is_none_or(Self::check_protocol_progress)
+            }
             Protocol::Loop { body, .. } => {
                 // Check that loop body has communication (progress)
                 has_communication(body)
@@ -312,7 +361,9 @@ impl<'a> Analyzer<'a> {
             Protocol::Var(_) => true, // Assume recursive calls are okay
             Protocol::Broadcast { continuation, .. } => Self::check_protocol_progress(continuation),
 
-            Protocol::Extension { continuation, .. } => Self::check_protocol_progress(continuation),
+            Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
+                Self::check_protocol_progress(continuation)
+            }
         }
     }
 

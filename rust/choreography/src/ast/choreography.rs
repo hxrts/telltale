@@ -10,6 +10,9 @@ const ATTR_REQUIRED_PROOF_BUNDLES: &str = "dsl.required_proof_bundles";
 const ATTR_INFERRED_REQUIRED_PROOF_BUNDLES: &str = "dsl.inferred_required_proof_bundles";
 const ATTR_ROLE_SETS: &str = "dsl.role_sets";
 const ATTR_TOPOLOGIES: &str = "dsl.topologies";
+const ATTR_TYPE_DECLS: &str = "dsl.type_decls";
+const ATTR_EFFECT_DECLS: &str = "dsl.effect_decls";
+const ATTR_PROTOCOL_USES: &str = "dsl.protocol_uses";
 
 /// Typed proof-bundle declaration metadata from DSL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -61,6 +64,52 @@ pub struct TopologyDecl {
     pub members: Vec<String>,
 }
 
+/// DSL type declaration metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TypeDecl {
+    /// Declared type name.
+    pub name: String,
+    /// Whether this is a `type alias`.
+    pub is_alias: bool,
+    /// Right-hand side for aliases.
+    #[serde(default)]
+    pub alias_of: Option<String>,
+    /// Union constructors for nominal sum types.
+    #[serde(default)]
+    pub constructors: Vec<TypeConstructorDecl>,
+}
+
+/// Constructor declaration for one nominal union type.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TypeConstructorDecl {
+    /// Constructor name.
+    pub name: String,
+    /// Optional payload type rendered from source syntax.
+    #[serde(default)]
+    pub payload_type: Option<String>,
+}
+
+/// Nominal effect interface declaration metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EffectDecl {
+    /// Effect interface name.
+    pub name: String,
+    /// Declared operations for this interface.
+    #[serde(default)]
+    pub operations: Vec<EffectOpDecl>,
+}
+
+/// One operation in a nominal effect interface.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EffectOpDecl {
+    /// Operation name.
+    pub name: String,
+    /// Input type as declared in DSL surface syntax.
+    pub input_type: String,
+    /// Output type as declared in DSL surface syntax.
+    pub output_type: String,
+}
+
 /// A complete choreographic protocol specification
 #[derive(Debug)]
 pub struct Choreography {
@@ -103,6 +152,7 @@ impl Choreography {
         // Check protocol is well-formed
         self.protocol.validate(&self.roles)?;
         self.validate_proof_bundles()?;
+        self.validate_effect_uses()?;
 
         Ok(())
     }
@@ -129,6 +179,18 @@ impl Choreography {
             }
         }
 
+        Ok(())
+    }
+
+    fn validate_effect_uses(&self) -> Result<(), ValidationError> {
+        let declared: BTreeSet<String> = self.effect_decls().into_iter().map(|d| d.name).collect();
+        for used in self.protocol_uses() {
+            if !declared.contains(&used) {
+                return Err(ValidationError::ExtensionError(format!(
+                    "protocol uses undeclared effect interface `{used}`"
+                )));
+            }
+        }
         Ok(())
     }
 
@@ -323,6 +385,57 @@ impl Choreography {
             .unwrap_or_default()
     }
 
+    /// Set nominal type declarations for this choreography.
+    pub fn set_type_decls(&mut self, decls: &[TypeDecl]) -> Result<(), String> {
+        let encoded =
+            serde_json::to_string(decls).map_err(|e| format!("encode type declarations: {e}"))?;
+        self.attrs.insert(ATTR_TYPE_DECLS.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get nominal type declarations.
+    #[must_use]
+    pub fn type_decls(&self) -> Vec<TypeDecl> {
+        self.attrs
+            .get(ATTR_TYPE_DECLS)
+            .and_then(|s| serde_json::from_str::<Vec<TypeDecl>>(s).ok())
+            .unwrap_or_default()
+    }
+
+    /// Set nominal effect interface declarations for this choreography.
+    pub fn set_effect_decls(&mut self, decls: &[EffectDecl]) -> Result<(), String> {
+        let encoded =
+            serde_json::to_string(decls).map_err(|e| format!("encode effect declarations: {e}"))?;
+        self.attrs.insert(ATTR_EFFECT_DECLS.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get nominal effect interface declarations.
+    #[must_use]
+    pub fn effect_decls(&self) -> Vec<EffectDecl> {
+        self.attrs
+            .get(ATTR_EFFECT_DECLS)
+            .and_then(|s| serde_json::from_str::<Vec<EffectDecl>>(s).ok())
+            .unwrap_or_default()
+    }
+
+    /// Set explicit protocol effect dependencies.
+    pub fn set_protocol_uses(&mut self, uses: &[String]) -> Result<(), String> {
+        let encoded =
+            serde_json::to_string(uses).map_err(|e| format!("encode protocol uses: {e}"))?;
+        self.attrs.insert(ATTR_PROTOCOL_USES.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get explicit protocol effect dependencies.
+    #[must_use]
+    pub fn protocol_uses(&self) -> Vec<String> {
+        self.attrs
+            .get(ATTR_PROTOCOL_USES)
+            .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
+            .unwrap_or_default()
+    }
+
     fn required_bundle_capabilities(&self) -> BTreeSet<String> {
         let required = self.required_proof_bundles();
         let required_set: BTreeSet<&str> = required.iter().map(String::as_str).collect();
@@ -348,6 +461,24 @@ impl Choreography {
                     }
                 }
                 Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => collect(body, out),
+                Protocol::Let { continuation, .. } => collect(continuation, out),
+                Protocol::Case { branches, .. } => {
+                    for branch in branches {
+                        collect(&branch.protocol, out);
+                    }
+                }
+                Protocol::Timeout {
+                    body,
+                    on_timeout,
+                    on_cancel,
+                    ..
+                } => {
+                    collect(body, out);
+                    collect(on_timeout, out);
+                    if let Some(on_cancel) = on_cancel.as_deref() {
+                        collect(on_cancel, out);
+                    }
+                }
                 Protocol::Parallel { protocols } => {
                     for p in protocols {
                         collect(p, out);

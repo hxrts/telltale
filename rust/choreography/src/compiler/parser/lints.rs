@@ -133,6 +133,32 @@ fn render_lowering_protocol(protocol: &Protocol, depth: usize, out: &mut String)
                 render_lowering_protocol(&branch.protocol, depth + 2, out);
             }
         }
+        Protocol::Let {
+            name, continuation, ..
+        } => {
+            writeln!(out, "{indent}- let {name} = ...").unwrap();
+            render_lowering_protocol(continuation, depth + 1, out);
+        }
+        Protocol::Case { branches, .. } => {
+            writeln!(out, "{indent}- case/of").unwrap();
+            for branch in branches {
+                writeln!(out, "{indent}  branch {}", branch.pattern.constructor).unwrap();
+                render_lowering_protocol(&branch.protocol, depth + 2, out);
+            }
+        }
+        Protocol::Timeout {
+            body,
+            on_timeout,
+            on_cancel,
+            ..
+        } => {
+            writeln!(out, "{indent}- timeout").unwrap();
+            render_lowering_protocol(body, depth + 1, out);
+            render_lowering_protocol(on_timeout, depth + 1, out);
+            if let Some(on_cancel) = on_cancel.as_deref() {
+                render_lowering_protocol(on_cancel, depth + 1, out);
+            }
+        }
         Protocol::Loop { body, .. } => {
             writeln!(out, "{indent}- loop").unwrap();
             render_lowering_protocol(body, depth + 1, out);

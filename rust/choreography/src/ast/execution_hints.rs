@@ -385,6 +385,35 @@ impl ExecutionHints {
                     );
                 }
             }
+            Protocol::Case { branches, .. } => {
+                for branch in branches.as_slice() {
+                    let branch_path =
+                        path.push(OperationStep::Branch(branch.pattern.constructor.clone()));
+                    let mut branch_counters = HintExtractionCounters::default();
+                    Self::extract_recursive(
+                        &branch.protocol,
+                        &branch_path,
+                        hints,
+                        &mut branch_counters,
+                    );
+                }
+            }
+            Protocol::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                Self::extract_recursive(body, path, hints, counters);
+                let timeout_path = path.push(OperationStep::Branch("timeout".to_string()));
+                let mut timeout_counters = HintExtractionCounters::default();
+                Self::extract_recursive(on_timeout, &timeout_path, hints, &mut timeout_counters);
+                if let Some(on_cancel) = on_cancel.as_deref() {
+                    let cancel_path = path.push(OperationStep::Branch("cancel".to_string()));
+                    let mut cancel_counters = HintExtractionCounters::default();
+                    Self::extract_recursive(on_cancel, &cancel_path, hints, &mut cancel_counters);
+                }
+            }
 
             Protocol::Loop { body, .. } => {
                 let loop_path = path.push(OperationStep::Loop(counters.loop_count));
@@ -415,6 +444,9 @@ impl ExecutionHints {
                 if let Some(op_hints) = Self::hints_from_annotations(annotations) {
                     hints.insert(path.clone(), op_hints);
                 }
+                Self::extract_recursive(continuation, path, hints, counters);
+            }
+            Protocol::Let { continuation, .. } => {
                 Self::extract_recursive(continuation, path, hints, counters);
             }
 

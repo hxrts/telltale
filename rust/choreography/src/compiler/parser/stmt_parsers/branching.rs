@@ -6,8 +6,9 @@ use quote::format_ident;
 use super::super::error::{ErrorSpan, ParseError};
 use super::super::role::parse_role_ref;
 use super::super::statement::{parse_block, parse_statement};
-use super::super::types::{ChoiceBranch, Statement};
+use super::super::types::{ChoiceBranch, ChoiceGuardSpec, Statement};
 use super::super::Rule;
+use super::authority::parse_effect_call;
 use super::{next_required, parse_guard_predicate, syntax_error};
 
 fn parse_choice_branch(
@@ -36,17 +37,62 @@ fn parse_choice_branch(
     let statements = if let Rule::guard = next_item.as_rule() {
         let guard_span = next_item.as_span();
         let mut guard_inner = next_item.into_inner();
-        let guard_expr_pair = next_required(
+        let guard_kind = next_required(
             &mut guard_inner,
             guard_span,
             input,
             "guard is missing expression",
         )?;
-        guard = Some(parse_guard_predicate(
-            guard_expr_pair.as_str(),
-            guard_span,
-            input,
-        )?);
+        guard = Some(match guard_kind.as_rule() {
+            Rule::predicate_guard => {
+                let mut predicate_inner = guard_kind.into_inner();
+                let guard_expr_pair = next_required(
+                    &mut predicate_inner,
+                    guard_span,
+                    input,
+                    "guard is missing expression",
+                )?;
+                ChoiceGuardSpec::Predicate(parse_guard_predicate(
+                    guard_expr_pair.as_str(),
+                    guard_span,
+                    input,
+                )?)
+            }
+            Rule::evidence_guard => {
+                let mut evidence_inner = guard_kind.into_inner();
+                let call_pair = next_required(
+                    &mut evidence_inner,
+                    guard_span,
+                    input,
+                    "evidence guard is missing check call",
+                )?;
+                let (effect, operation, args) =
+                    parse_effect_call(call_pair).map_err(|message| ParseError::Syntax {
+                        span: ErrorSpan::from_pest_span(guard_span, input),
+                        message,
+                    })?;
+                let binding = next_required(
+                    &mut evidence_inner,
+                    guard_span,
+                    input,
+                    "evidence guard is missing witness binding",
+                )?
+                .as_str()
+                .to_string();
+                ChoiceGuardSpec::Evidence {
+                    effect,
+                    operation,
+                    args,
+                    binding,
+                }
+            }
+            _ => {
+                return Err(ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(guard_span, input),
+                    message: "unsupported guard form".to_string(),
+                })
+            }
+        });
         let body_pair = next_required(
             &mut branch_inner,
             branch_span,
