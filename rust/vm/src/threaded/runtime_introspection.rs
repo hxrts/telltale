@@ -17,6 +17,13 @@ impl ThreadedVM {
         &self.delegation_audit_log
     }
 
+    /// Get canonical semantic audit records derived from delegation,
+    /// failure-visible events, and effect/interface traces.
+    #[must_use]
+    pub fn semantic_audit_log(&self) -> Vec<SemanticAuditRecord> {
+        semantic_audit_log_v1(&[], &self.delegation_audit_log, &self.trace, &self.effect_trace)
+    }
+
     /// Deterministic communication replay-state root.
     ///
     /// # Panics
@@ -76,6 +83,8 @@ impl ThreadedVM {
         canonical_replay_fragment_v1(
             &self.trace,
             &self.effect_trace,
+            &[],
+            &self.delegation_audit_log,
             self.crashed_sites.iter().cloned().collect(),
             self.partitioned_edges.iter().cloned().collect(),
             corrupted_edges,

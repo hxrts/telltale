@@ -3,10 +3,16 @@
 use crate::communication_replay::{CommunicationConsumptionArtifact, CommunicationReplayMode};
 use crate::determinism::EffectDeterminismTier;
 use crate::effect::{CorruptionType, EffectTraceEntry};
+use crate::session::{
+    AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord, AuthorityWitnessId,
+    FragmentOwnerId, OwnershipTerminalReason, SessionId,
+};
 use crate::trace::normalize_trace;
+use crate::transfer_semantics::{DelegationAuditRecord, DelegationReceipt, DelegationStatus};
 use crate::verification::Hash;
-use crate::vm::ObsEvent;
+use crate::vm::{ObsEvent, SessionTerminalReason};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 
 /// Canonical schema version identifier for VM replay/trace payloads.
 pub const SERIALIZATION_SCHEMA_VERSION: &str = "vm.serialization.v1";
@@ -124,6 +130,117 @@ pub struct CanonicalReplayFragmentV1 {
     /// Proof-friendly receive consumption artifacts.
     #[serde(default)]
     pub communication_consumption_artifacts: Vec<CommunicationConsumptionArtifact>,
+    /// Canonical semantic audit records derived from authority/failure/effect surfaces.
+    #[serde(default)]
+    pub semantic_audit_log: Vec<SemanticAuditRecord>,
+}
+
+/// Replay-stable semantic record derived from authority, delegation, effect, and
+/// failure-visible runtime artifacts.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SemanticAuditRecord {
+    /// Authority witness issuance/consumption/rejection.
+    Authority {
+        /// Scheduler tick associated with the authority artifact, when present.
+        tick: Option<u64>,
+        /// Session referenced by the authority artifact, when session-scoped.
+        session: Option<SessionId>,
+        /// Authority witness or receipt artifact carried by the audit record.
+        artifact: AuthorityArtifact,
+        /// Audit event kind recorded for the authority artifact.
+        event: AuthorityAuditEvent,
+        /// Optional rejection or failure reason associated with the audit record.
+        reason: Option<String>,
+    },
+    /// Delegation/transfer completion or rollback.
+    Delegation {
+        /// Scheduler tick at which the delegation audit record was emitted.
+        tick: u64,
+        /// Session being delegated.
+        session: SessionId,
+        /// Delegation receipt proving the sanctioned transfer path.
+        receipt: DelegationReceipt,
+        /// Final delegation status for the receipt.
+        status: DelegationStatus,
+        /// Optional rollback or rejection reason for the transfer.
+        reason: Option<String>,
+    },
+    /// Explicit typed failure branch entry.
+    FailureBranch {
+        /// Scheduler tick at which the failure branch became visible.
+        tick: u64,
+        /// Session containing the failing coroutine.
+        session: SessionId,
+        /// Coroutine entering the failure branch.
+        coro_id: usize,
+        /// Typed fault surfaced by the branch.
+        fault: crate::coroutine::Fault,
+    },
+    /// Explicit timeout activation and timeout witness issuance.
+    TimeoutIssued {
+        /// Scheduler tick at which the timeout became active.
+        tick: u64,
+        /// Site for which timeout was issued.
+        site: String,
+        /// Tick horizon until which the timeout remains active.
+        until_tick: u64,
+        /// Issued timeout witness identifier.
+        witness_id: AuthorityWitnessId,
+    },
+    /// Explicit cancellation request.
+    CancellationRequested {
+        /// Scheduler tick at which cancellation was requested.
+        tick: u64,
+        /// Session being cancelled.
+        session: SessionId,
+        /// Cancellation witness authorizing the request.
+        witness_id: AuthorityWitnessId,
+        /// Owner capability active when cancellation was requested.
+        owner_id: FragmentOwnerId,
+        /// Terminal ownership reason causing the cancellation request.
+        reason: OwnershipTerminalReason,
+    },
+    /// Explicit cancellation completion.
+    Cancelled {
+        /// Scheduler tick at which cancellation completed.
+        tick: u64,
+        /// Session that was cancelled.
+        session: SessionId,
+        /// Cancellation witness consumed by completion.
+        witness_id: AuthorityWitnessId,
+        /// Terminal ownership reason recorded for the cancellation.
+        reason: OwnershipTerminalReason,
+    },
+    /// Explicit session terminal reason.
+    SessionTerminal {
+        /// Scheduler tick at which terminal state became visible.
+        tick: u64,
+        /// Session that reached terminal state.
+        session: SessionId,
+        /// Deterministic terminal reason recorded by the runtime.
+        reason: SessionTerminalReason,
+    },
+    /// Structured effect/interface observation.
+    EffectObservation {
+        /// Stable effect identifier assigned by the runtime.
+        effect_id: u64,
+        /// Deterministic ordering key used for canonical replay comparison.
+        ordering_key: u64,
+        /// Session referenced by the effect observation, when derivable.
+        session: Option<SessionId>,
+        /// Raw runtime effect kind tag.
+        effect_kind: String,
+        /// Nominal effect interface classification, when known.
+        effect_interface: Option<String>,
+        /// Nominal effect operation classification, when known.
+        effect_operation: Option<String>,
+        /// Stable handler identity attached to the observation.
+        handler_identity: String,
+        /// Serialized effect inputs.
+        inputs: JsonValue,
+        /// Serialized effect outputs.
+        outputs: JsonValue,
+    },
 }
 
 /// Normalize an observable trace into the canonical versioned format.
@@ -149,11 +266,189 @@ pub fn canonical_effect_trace(trace: &[EffectTraceEntry]) -> Vec<EffectTraceEntr
     out
 }
 
+fn authority_artifact_session(artifact: &AuthorityArtifact) -> Option<SessionId> {
+    match artifact {
+        AuthorityArtifact::Readiness(witness) => Some(witness.session_id),
+        AuthorityArtifact::Cancellation(witness) => Some(witness.session_id),
+        AuthorityArtifact::Timeout(_) => None,
+    }
+}
+
+fn effect_entry_session(entry: &EffectTraceEntry) -> Option<SessionId> {
+    entry
+        .inputs
+        .get("session")
+        .and_then(JsonValue::as_u64)
+        .and_then(|sid| usize::try_from(sid).ok())
+        .or_else(|| {
+            entry
+                .inputs
+                .get("sid")
+                .and_then(JsonValue::as_u64)
+                .and_then(|sid| usize::try_from(sid).ok())
+        })
+}
+
+fn semantic_rank(record: &SemanticAuditRecord) -> u8 {
+    match record {
+        SemanticAuditRecord::Authority { .. } => 0,
+        SemanticAuditRecord::Delegation { .. } => 1,
+        SemanticAuditRecord::FailureBranch { .. } => 2,
+        SemanticAuditRecord::TimeoutIssued { .. } => 3,
+        SemanticAuditRecord::CancellationRequested { .. } => 4,
+        SemanticAuditRecord::Cancelled { .. } => 5,
+        SemanticAuditRecord::SessionTerminal { .. } => 6,
+        SemanticAuditRecord::EffectObservation { .. } => 7,
+    }
+}
+
+fn semantic_tick(record: &SemanticAuditRecord) -> u64 {
+    match record {
+        SemanticAuditRecord::Authority { tick, .. } => tick.unwrap_or(0),
+        SemanticAuditRecord::Delegation { tick, .. }
+        | SemanticAuditRecord::FailureBranch { tick, .. }
+        | SemanticAuditRecord::TimeoutIssued { tick, .. }
+        | SemanticAuditRecord::CancellationRequested { tick, .. }
+        | SemanticAuditRecord::Cancelled { tick, .. }
+        | SemanticAuditRecord::SessionTerminal { tick, .. } => *tick,
+        SemanticAuditRecord::EffectObservation { ordering_key, .. } => *ordering_key,
+    }
+}
+
+/// Canonicalize semantic audit ordering for deterministic replay diffs.
+#[must_use]
+pub fn canonical_semantic_audit_log(records: &[SemanticAuditRecord]) -> Vec<SemanticAuditRecord> {
+    let mut out = records.to_vec();
+    out.sort_by(|lhs, rhs| {
+        let lhs_key = (
+            semantic_tick(lhs),
+            semantic_rank(lhs),
+            serde_json::to_string(lhs).unwrap_or_default(),
+        );
+        let rhs_key = (
+            semantic_tick(rhs),
+            semantic_rank(rhs),
+            serde_json::to_string(rhs).unwrap_or_default(),
+        );
+        lhs_key.cmp(&rhs_key)
+    });
+    out
+}
+
+/// Build canonical semantic audit records from authority, delegation,
+/// failure-visible observable events, and effect/interface observations.
+#[must_use]
+pub fn semantic_audit_log_v1(
+    authority_audit_log: &[AuthorityAuditRecord],
+    delegation_audit_log: &[DelegationAuditRecord],
+    obs_trace: &[ObsEvent],
+    effect_trace: &[EffectTraceEntry],
+) -> Vec<SemanticAuditRecord> {
+    let mut records = Vec::new();
+
+    records.extend(authority_audit_log.iter().cloned().map(|record| {
+        SemanticAuditRecord::Authority {
+            tick: record.tick,
+            session: authority_artifact_session(&record.artifact),
+            artifact: record.artifact,
+            event: record.event,
+            reason: record.reason,
+        }
+    }));
+
+    records.extend(delegation_audit_log.iter().cloned().map(|record| {
+        SemanticAuditRecord::Delegation {
+            tick: record.tick,
+            session: record.receipt.session,
+            receipt: record.receipt,
+            status: record.status,
+            reason: record.reason,
+        }
+    }));
+
+    records.extend(obs_trace.iter().filter_map(|event| match event {
+        ObsEvent::FailureBranchEntered {
+            tick,
+            session,
+            coro_id,
+            fault,
+        } => Some(SemanticAuditRecord::FailureBranch {
+            tick: *tick,
+            session: *session,
+            coro_id: *coro_id,
+            fault: fault.clone(),
+        }),
+        ObsEvent::TimeoutIssued {
+            tick,
+            site,
+            until_tick,
+            witness_id,
+        } => Some(SemanticAuditRecord::TimeoutIssued {
+            tick: *tick,
+            site: site.clone(),
+            until_tick: *until_tick,
+            witness_id: *witness_id,
+        }),
+        ObsEvent::CancellationRequested {
+            tick,
+            session,
+            witness_id,
+            owner_id,
+            reason,
+        } => Some(SemanticAuditRecord::CancellationRequested {
+            tick: *tick,
+            session: *session,
+            witness_id: *witness_id,
+            owner_id: owner_id.clone(),
+            reason: reason.clone(),
+        }),
+        ObsEvent::Cancelled {
+            tick,
+            session,
+            witness_id,
+            reason,
+        } => Some(SemanticAuditRecord::Cancelled {
+            tick: *tick,
+            session: *session,
+            witness_id: *witness_id,
+            reason: reason.clone(),
+        }),
+        ObsEvent::SessionTerminal {
+            tick,
+            session,
+            reason,
+        } => Some(SemanticAuditRecord::SessionTerminal {
+            tick: *tick,
+            session: *session,
+            reason: reason.clone(),
+        }),
+        _ => None,
+    }));
+
+    records.extend(effect_trace.iter().cloned().map(|entry| {
+        SemanticAuditRecord::EffectObservation {
+            effect_id: entry.effect_id,
+            ordering_key: entry.ordering_key,
+            session: effect_entry_session(&entry),
+            effect_kind: entry.effect_kind,
+            effect_interface: entry.effect_interface,
+            effect_operation: entry.effect_operation,
+            handler_identity: entry.handler_identity,
+            inputs: entry.inputs,
+            outputs: entry.outputs,
+        }
+    }));
+
+    canonical_semantic_audit_log(&records)
+}
+
 /// Build a canonical replay-state fragment from runtime snapshots.
 #[must_use]
 pub fn canonical_replay_fragment_v1(
     obs_trace: &[ObsEvent],
     effect_trace: &[EffectTraceEntry],
+    authority_audit_log: &[AuthorityAuditRecord],
+    delegation_audit_log: &[DelegationAuditRecord],
     mut crashed_sites: Vec<String>,
     mut partitioned_edges: Vec<(String, String)>,
     mut corrupted_edges: Vec<((String, String), CorruptionType)>,
@@ -186,6 +481,12 @@ pub fn canonical_replay_fragment_v1(
         communication_replay_mode,
         communication_replay_root,
         communication_consumption_artifacts,
+        semantic_audit_log: semantic_audit_log_v1(
+            authority_audit_log,
+            delegation_audit_log,
+            obs_trace,
+            effect_trace,
+        ),
     }
 }
 
@@ -203,6 +504,8 @@ mod tests {
                 inputs: serde_json::json!({}),
                 outputs: serde_json::json!({}),
                 handler_identity: "h".to_string(),
+                effect_interface: None,
+                effect_operation: None,
                 ordering_key: 3,
                 topology: None,
             },
@@ -212,6 +515,8 @@ mod tests {
                 inputs: serde_json::json!({}),
                 outputs: serde_json::json!({}),
                 handler_identity: "h".to_string(),
+                effect_interface: None,
+                effect_operation: None,
                 ordering_key: 2,
                 topology: None,
             },

@@ -15,7 +15,9 @@ use telltale_types::FixedQ32;
 use crate::material::HamiltonianParams;
 use crate::value_conv::{fixed_to_value, registers_to_f64s, value_to_f64, write_f64s};
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
+use telltale_vm::effect::{
+    EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
+};
 
 /// Effect handler for Hamiltonian 2-body dynamics.
 ///
@@ -88,32 +90,41 @@ impl EffectHandler for HamiltonianHandler {
         _partner: &str,
         label: &str,
         state: &[Value],
-    ) -> Result<Value, String> {
+    ) -> EffectResult<Value> {
         let vals = registers_to_f64s(state);
         match label {
             "position" => vals
                 .first()
                 .copied()
                 .map(fixed_to_value)
-                .ok_or_else(|| "missing position state".into()),
+                .map(EffectResult::success)
+                .unwrap_or_else(|| {
+                    EffectResult::failure(EffectFailure::invalid_input("missing position state"))
+                }),
             "force" => {
-                let peer_pos = self
-                    .lock_peer_positions()?
-                    .get(role)
-                    .copied()
-                    .unwrap_or_else(FixedQ32::zero);
+                let peer_pos = match self.lock_peer_positions() {
+                    Ok(peer_positions) => peer_positions
+                        .get(role)
+                        .copied()
+                        .unwrap_or_else(FixedQ32::zero),
+                    Err(err) => {
+                        return EffectResult::failure(EffectFailure::contract_violation(err));
+                    }
+                };
                 let my_pos = vals.first().copied().unwrap_or_else(FixedQ32::zero);
                 let f = self.force(my_pos, peer_pos);
-                Ok(fixed_to_value(f))
+                EffectResult::success(fixed_to_value(f))
             }
-            other => Err(format!("unknown label: {other}")),
+            other => EffectResult::failure(EffectFailure::invalid_input(format!(
+                "unknown label: {other}"
+            ))),
         }
     }
 
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
         // Always compute payload via handle_send, ignoring any passed-in payload
         self.handle_send(input.role, input.partner, input.label, input.state)
-            .map(SendDecision::Deliver)
+            .map_success(SendDecision::Deliver)
     }
 
     fn handle_recv(
@@ -123,18 +134,37 @@ impl EffectHandler for HamiltonianHandler {
         label: &str,
         _state: &mut Vec<Value>,
         payload: &Value,
-    ) -> Result<(), String> {
-        let val = value_to_f64(payload)?;
+    ) -> EffectResult<()> {
+        let val = match value_to_f64(payload) {
+            Ok(val) => val,
+            Err(err) => return EffectResult::failure(EffectFailure::invalid_input(err)),
+        };
         match label {
             "position" => {
-                self.lock_peer_positions()?.insert(role.to_string(), val);
+                let mut peer_positions = match self.lock_peer_positions() {
+                    Ok(peer_positions) => peer_positions,
+                    Err(err) => {
+                        return EffectResult::failure(EffectFailure::contract_violation(err));
+                    }
+                };
+                peer_positions.insert(role.to_string(), val);
             }
             "force" => {
-                self.lock_peer_forces()?.insert(role.to_string(), val);
+                let mut peer_forces = match self.lock_peer_forces() {
+                    Ok(peer_forces) => peer_forces,
+                    Err(err) => {
+                        return EffectResult::failure(EffectFailure::contract_violation(err));
+                    }
+                };
+                peer_forces.insert(role.to_string(), val);
             }
-            other => return Err(format!("unknown label: {other}")),
+            other => {
+                return EffectResult::failure(EffectFailure::invalid_input(format!(
+                    "unknown label: {other}"
+                )));
+            }
         }
-        Ok(())
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -143,24 +173,27 @@ impl EffectHandler for HamiltonianHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".into())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+        }
     }
 
-    fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String> {
+    fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
         let mut vals = registers_to_f64s(state);
         if vals.len() != 2 {
-            return Err(format!(
+            return EffectResult::failure(EffectFailure::invalid_input(format!(
                 "Hamiltonian expects [position, momentum], got {} elements",
                 vals.len()
-            ));
+            )));
         }
 
         let phase = {
-            let mut ticks = self.lock_tick_count()?;
+            let mut ticks = match self.lock_tick_count() {
+                Ok(ticks) => ticks,
+                Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
+            };
             let tick = ticks.entry(role.to_string()).or_insert(0);
             let phase = *tick % 4;
             *tick += 1;
@@ -169,17 +202,19 @@ impl EffectHandler for HamiltonianHandler {
 
         // Only integrate on tick 3 (after force exchange complete).
         if phase != 3 {
-            return Ok(());
+            return EffectResult::success(());
         }
 
         let dt = self.params.step_size;
         let mass = self.params.mass;
 
-        let peer_pos = self
-            .lock_peer_positions()?
-            .get(role)
-            .copied()
-            .unwrap_or_else(FixedQ32::zero);
+        let peer_pos = match self.lock_peer_positions() {
+            Ok(peer_positions) => peer_positions
+                .get(role)
+                .copied()
+                .unwrap_or_else(FixedQ32::zero),
+            Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
+        };
 
         let force = self.force(vals[0], peer_pos);
 
@@ -195,7 +230,7 @@ impl EffectHandler for HamiltonianHandler {
         vals[1] += new_force * dt / two;
 
         write_f64s(state, &vals);
-        Ok(())
+        EffectResult::success(())
     }
 }
 
@@ -204,6 +239,13 @@ mod tests {
     use super::*;
     use crate::material::HamiltonianParams;
     use crate::value_conv::{registers_to_f64s, write_f64s};
+    use telltale_vm::effect::{EffectFailure, EffectResult};
+
+    fn expect_success<T>(result: EffectResult<T>) -> T {
+        result
+            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
+            .expect("effect should succeed")
+    }
 
     fn test_params() -> HamiltonianParams {
         HamiltonianParams {
@@ -258,7 +300,7 @@ mod tests {
 
         // Simulate 100 integration steps (each needs 4 ticks)
         for _ in 0..400 {
-            handler.step("A", &mut state_a).unwrap();
+            expect_success(handler.step("A", &mut state_a));
         }
 
         let final_vals = registers_to_f64s(&state_a);

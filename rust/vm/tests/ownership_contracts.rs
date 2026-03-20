@@ -18,7 +18,7 @@ use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::ObsEvent;
 use telltale_vm::{
     run_loaded_vm_record_replay_conformance, DelegationStatus, Edge, OwnershipError,
-    OwnershipScope, SessionHostMutation, VMConfig, VM,
+    OwnershipScope, SemanticAuditRecord, SessionHostMutation, VMConfig, VM,
 };
 use test_support::simple_send_recv_image;
 
@@ -187,6 +187,13 @@ fn ownership_transfer_record_replay_preserves_observable_handoff() {
     assert_eq!(
         audit.receipt.scope,
         OwnershipScope::Fragments(BTreeSet::from(["A".to_string()]))
+    );
+    assert!(
+        vm.semantic_audit_log().iter().any(|record| matches!(
+            record,
+            SemanticAuditRecord::Delegation { status, .. } if *status == DelegationStatus::Committed
+        )),
+        "semantic audit surface should retain committed delegation records"
     );
 }
 

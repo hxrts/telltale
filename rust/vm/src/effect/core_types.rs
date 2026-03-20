@@ -160,10 +160,35 @@ pub struct EffectTraceEntry {
     pub outputs: JsonValue,
     /// Stable identity of the handler implementation.
     pub handler_identity: String,
+    /// Optional nominal interface classification for this effect.
+    #[serde(default)]
+    pub effect_interface: Option<String>,
+    /// Optional nominal operation classification for this effect.
+    #[serde(default)]
+    pub effect_operation: Option<String>,
     /// Deterministic ordering key used in replay comparisons.
     pub ordering_key: u64,
     /// Optional topology perturbation payload.
     pub topology: Option<TopologyPerturbation>,
+}
+
+/// Infer a nominal interface/operation pair from one runtime effect kind.
+#[must_use]
+pub fn infer_effect_interface_and_operation(
+    effect_kind: &str,
+) -> (Option<String>, Option<String>) {
+    match effect_kind {
+        "send_decision" => (Some("Transport".to_string()), Some("sendDecision".to_string())),
+        "handle_recv" => (Some("Transport".to_string()), Some("handleRecv".to_string())),
+        "handle_choose" => (Some("Transport".to_string()), Some("handleChoose".to_string())),
+        "invoke_step" => (Some("Runtime".to_string()), Some("invoke".to_string())),
+        "handle_acquire" => (Some("Guard".to_string()), Some("acquire".to_string())),
+        "handle_release" => (Some("Guard".to_string()), Some("release".to_string())),
+        "topology_events" | "topology_event" => {
+            (Some("Runtime".to_string()), Some("topologyEvents".to_string()))
+        }
+        _ => (None, None),
+    }
 }
 
 /// Decision returned by [`EffectHandler::send_decision`].

@@ -156,8 +156,9 @@ pub use scheduler::{
     Scheduler, StepUpdate,
 };
 pub use serialization::{
-    canonical_effect_trace, canonical_replay_fragment_v1, canonical_trace_v1,
-    CanonicalReplayFragmentV1, CanonicalTraceV1,
+    canonical_effect_trace, canonical_replay_fragment_v1, canonical_semantic_audit_log,
+    canonical_trace_v1, semantic_audit_log_v1, CanonicalReplayFragmentV1, CanonicalTraceV1,
+    SemanticAuditRecord,
 };
 pub use session::{
     decode_edge_json, AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord,

@@ -25,8 +25,9 @@ use crate::communication_replay::{
 };
 use crate::coroutine::{BlockReason, CoroStatus, Coroutine, Fault, ProgressToken, Value};
 use crate::effect::{
-    CorruptionType, EffectFailure, EffectHandler, EffectTraceEntry, ReplayEffectHandler,
-    SendDecision, SendDecisionFastPathInput, SendDecisionInput, TopologyPerturbation,
+    infer_effect_interface_and_operation, CorruptionType, EffectFailure, EffectHandler,
+    EffectTraceEntry, ReplayEffectHandler, SendDecision, SendDecisionFastPathInput,
+    SendDecisionInput, TopologyPerturbation,
 };
 use crate::faults::{
     speculation_fault_abort_requires_active, speculation_fault_disabled,
@@ -41,7 +42,10 @@ use crate::kernel::{KernelMachine, VMKernel};
 use crate::loader::CodeImage;
 use crate::output_condition::{OutputConditionCheck, OutputConditionHint};
 use crate::scheduler::Scheduler;
-use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragmentV1};
+use crate::serialization::{
+    canonical_replay_fragment_v1, semantic_audit_log_v1, CanonicalReplayFragmentV1,
+    SemanticAuditRecord,
+};
 use crate::session::{
     unfold_if_var_with_scope, Edge, OwnershipScope, SessionId, SessionOpenPlan, SessionState,
     SessionStatus,

@@ -125,6 +125,8 @@ mod tests {
             inputs: json!({}),
             outputs: json!({}),
             handler_identity: "h".to_string(),
+            effect_interface: None,
+            effect_operation: None,
             ordering_key: id,
             topology: None,
         }

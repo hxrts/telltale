@@ -7,7 +7,9 @@ use telltale_types::FixedQ32;
 
 use telltale_vm::buffer::EnqueueResult;
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
+use telltale_vm::effect::{
+    EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
+};
 use telltale_vm::session::SessionId;
 
 use crate::rng::SimRng;
@@ -258,23 +260,27 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
         partner: &str,
         label: &str,
         state: &[Value],
-    ) -> Result<Value, String> {
+    ) -> EffectResult<Value> {
         self.inner.handle_send(role, partner, label, state)
     }
 
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-        let base = self.inner.send_decision(input.clone())?;
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        let base = match self.inner.send_decision(input.clone()) {
+            EffectResult::Success(base) => base,
+            EffectResult::Blocked => return EffectResult::Blocked,
+            EffectResult::Failure(failure) => return EffectResult::Failure(failure),
+        };
         let sid = input.sid;
         let role = input.role;
         let partner = input.partner;
 
         let SendDecision::Deliver(payload) = base else {
-            return Ok(base);
+            return EffectResult::success(base);
         };
 
         let tick = self.current_tick.load(Ordering::Relaxed);
         if self.is_partitioned(role, partner, tick) {
-            return Ok(SendDecision::Drop);
+            return EffectResult::success(SendDecision::Drop);
         }
 
         let mut loss_probability = self.config.loss_probability;
@@ -283,7 +289,7 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
 
         if let Some(link) = self.link_policy(role, partner, tick) {
             if !link.enabled {
-                return Ok(SendDecision::Drop);
+                return EffectResult::success(SendDecision::Drop);
             }
             if let Some(override_loss) = link.loss_probability {
                 loss_probability = override_loss;
@@ -297,20 +303,26 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
         }
 
         let delay_ticks = {
-            let mut rng = self.lock_rng()?;
+            let mut rng = match self.lock_rng() {
+                Ok(rng) => rng,
+                Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
+            };
             if rng.should_trigger(loss_probability) {
-                return Ok(SendDecision::Drop);
+                return EffectResult::success(SendDecision::Drop);
             }
             let latency = rng.sample_duration(base_latency, latency_variance);
             self.latency_ticks(latency)
         };
 
         if delay_ticks == 0 {
-            return Ok(SendDecision::Deliver(payload));
+            return EffectResult::success(SendDecision::Deliver(payload));
         }
 
         let delivery_tick = tick.saturating_add(delay_ticks);
-        let mut in_flight = self.lock_in_flight()?;
+        let mut in_flight = match self.lock_in_flight() {
+            Ok(in_flight) => in_flight,
+            Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
+        };
         in_flight.push(InFlightMessage {
             delivery_tick,
             sid,
@@ -319,7 +331,7 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
             value: payload,
         });
 
-        Ok(SendDecision::Defer)
+        EffectResult::success(SendDecision::Defer)
     }
 
     fn handle_recv(
@@ -329,7 +341,7 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
         label: &str,
         state: &mut Vec<Value>,
         payload: &Value,
-    ) -> Result<(), String> {
+    ) -> EffectResult<()> {
         self.inner.handle_recv(role, partner, label, state, payload)
     }
 
@@ -339,11 +351,11 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
         partner: &str,
         labels: &[String],
         state: &[Value],
-    ) -> Result<String, String> {
+    ) -> EffectResult<String> {
         self.inner.handle_choose(role, partner, labels, state)
     }
 
-    fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String> {
+    fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
         self.inner.step(role, state)
     }
 }
@@ -351,6 +363,13 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use telltale_vm::effect::{EffectFailure, EffectResult};
+
+    fn expect_success<T>(result: EffectResult<T>) -> T {
+        result
+            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
+            .expect("effect should succeed")
+    }
 
     struct PassthroughHandler;
 
@@ -361,12 +380,12 @@ mod tests {
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Ok(Value::Unit)
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Unit)
         }
 
-        fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-            Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
+        fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+            EffectResult::success(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
         }
 
         fn handle_recv(
@@ -376,8 +395,8 @@ mod tests {
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -386,15 +405,15 @@ mod tests {
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".to_string())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
     }
 
@@ -433,6 +452,7 @@ mod tests {
                 state: &[],
                 payload: Some(Value::Nat(1)),
             })
+            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
             .expect("send decision");
         assert!(matches!(decision, SendDecision::Drop));
     }
@@ -463,6 +483,7 @@ mod tests {
                 state: &[],
                 payload: Some(Value::Nat(1)),
             })
+            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
             .expect("send decision");
         assert!(matches!(decision, SendDecision::Deliver(Value::Nat(1))));
     }
@@ -493,6 +514,7 @@ mod tests {
                 state: &[],
                 payload: Some(Value::Nat(1)),
             })
+            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
             .expect("send decision");
         assert!(matches!(decision, SendDecision::Defer));
     }
@@ -523,6 +545,7 @@ mod tests {
                 state: &[],
                 payload: Some(Value::Nat(1)),
             })
+            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
             .expect("send decision");
         assert!(matches!(decision, SendDecision::Defer));
     }
@@ -553,6 +576,7 @@ mod tests {
                 state: &[],
                 payload: Some(Value::Nat(1)),
             })
+            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
             .expect("send decision");
         assert!(matches!(decision, SendDecision::Drop));
     }

@@ -14,7 +14,7 @@ use telltale_types::FixedQ32;
 use crate::material::ContinuumFieldParams;
 use crate::value_conv::{fixed_to_value, registers_to_f64s, value_to_f64, write_f64s};
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::EffectHandler;
+use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 
 /// Effect handler for two-site continuum field dynamics.
 ///
@@ -69,12 +69,14 @@ impl EffectHandler for ContinuumFieldHandler {
         _partner: &str,
         _label: &str,
         state: &[Value],
-    ) -> Result<Value, String> {
+    ) -> EffectResult<Value> {
         let vals = registers_to_f64s(state);
         if vals.is_empty() {
-            return Err("continuum field expects at least 1 field component".into());
+            return EffectResult::failure(EffectFailure::invalid_input(
+                "continuum field expects at least 1 field component",
+            ));
         }
-        Ok(fixed_to_value(vals[0]))
+        EffectResult::success(fixed_to_value(vals[0]))
     }
 
     fn handle_recv(
@@ -84,10 +86,17 @@ impl EffectHandler for ContinuumFieldHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         payload: &Value,
-    ) -> Result<(), String> {
-        let val = value_to_f64(payload)?;
-        self.lock_peer_fields()?.insert(role.to_string(), val);
-        Ok(())
+    ) -> EffectResult<()> {
+        let val = match value_to_f64(payload) {
+            Ok(val) => val,
+            Err(err) => return EffectResult::failure(EffectFailure::invalid_input(err)),
+        };
+        let mut peer_fields = match self.lock_peer_fields() {
+            Ok(peer_fields) => peer_fields,
+            Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
+        };
+        peer_fields.insert(role.to_string(), val);
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -96,21 +105,26 @@ impl EffectHandler for ContinuumFieldHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".into())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+        }
     }
 
-    fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String> {
+    fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
         let mut vals = registers_to_f64s(state);
         if vals.is_empty() {
-            return Err("continuum field expects at least 1 field component".into());
+            return EffectResult::failure(EffectFailure::invalid_input(
+                "continuum field expects at least 1 field component",
+            ));
         }
 
         let phase = {
-            let mut ticks = self.lock_tick_count()?;
+            let mut ticks = match self.lock_tick_count() {
+                Ok(ticks) => ticks,
+                Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
+            };
             let tick = ticks.entry(role.to_string()).or_insert(0);
             let phase = *tick % 2;
             *tick += 1;
@@ -119,14 +133,13 @@ impl EffectHandler for ContinuumFieldHandler {
 
         // Only integrate on tick 1 (after recv, when peer field is available).
         if phase != 1 {
-            return Ok(());
+            return EffectResult::success(());
         }
 
-        let peer_field = self
-            .lock_peer_fields()?
-            .get(role)
-            .copied()
-            .unwrap_or(vals[0]);
+        let peer_field = match self.lock_peer_fields() {
+            Ok(peer_fields) => peer_fields.get(role).copied().unwrap_or(vals[0]),
+            Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
+        };
 
         let dt = self.params.step_size;
         let k = self.params.coupling;
@@ -136,7 +149,7 @@ impl EffectHandler for ContinuumFieldHandler {
         vals[0] += drift * dt;
 
         write_f64s(state, &vals);
-        Ok(())
+        EffectResult::success(())
     }
 }
 
@@ -145,6 +158,13 @@ mod tests {
     use super::*;
     use crate::material::ContinuumFieldParams;
     use crate::value_conv::{registers_to_f64s, write_f64s};
+    use telltale_vm::effect::{EffectFailure, EffectResult};
+
+    fn expect_success<T>(result: EffectResult<T>) -> T {
+        result
+            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
+            .expect("effect should succeed")
+    }
 
     fn test_params() -> ContinuumFieldParams {
         ContinuumFieldParams {
@@ -167,20 +187,16 @@ mod tests {
 
         for _ in 0..1000 {
             // Tick 0: A sends, B recvs.
-            let payload_a = handler.handle_send("A", "B", "field", &state_a).unwrap();
-            handler
-                .handle_recv("B", "A", "field", &mut state_b, &payload_a)
-                .unwrap();
-            handler.step("A", &mut state_a).unwrap(); // tick 0 for A (no-op)
-            handler.step("B", &mut state_b).unwrap(); // tick 0 for B (no-op)
+            let payload_a = expect_success(handler.handle_send("A", "B", "field", &state_a));
+            expect_success(handler.handle_recv("B", "A", "field", &mut state_b, &payload_a));
+            expect_success(handler.step("A", &mut state_a)); // tick 0 for A (no-op)
+            expect_success(handler.step("B", &mut state_b)); // tick 0 for B (no-op)
 
             // Tick 1: B sends, A recvs.
-            let payload_b = handler.handle_send("B", "A", "field", &state_b).unwrap();
-            handler
-                .handle_recv("A", "B", "field", &mut state_a, &payload_b)
-                .unwrap();
-            handler.step("A", &mut state_a).unwrap(); // tick 1 for A (integrate)
-            handler.step("B", &mut state_b).unwrap(); // tick 1 for B (integrate)
+            let payload_b = expect_success(handler.handle_send("B", "A", "field", &state_b));
+            expect_success(handler.handle_recv("A", "B", "field", &mut state_a, &payload_b));
+            expect_success(handler.step("A", &mut state_a)); // tick 1 for A (integrate)
+            expect_success(handler.step("B", &mut state_b)); // tick 1 for B (integrate)
         }
 
         let final_total = registers_to_f64s(&state_a)[0] + registers_to_f64s(&state_b)[0];
@@ -203,20 +219,16 @@ mod tests {
 
         for _ in 0..10000 {
             // Tick 0: A→B send, B recv.
-            let payload_a = handler.handle_send("A", "B", "field", &state_a).unwrap();
-            handler
-                .handle_recv("B", "A", "field", &mut state_b, &payload_a)
-                .unwrap();
-            handler.step("A", &mut state_a).unwrap();
-            handler.step("B", &mut state_b).unwrap();
+            let payload_a = expect_success(handler.handle_send("A", "B", "field", &state_a));
+            expect_success(handler.handle_recv("B", "A", "field", &mut state_b, &payload_a));
+            expect_success(handler.step("A", &mut state_a));
+            expect_success(handler.step("B", &mut state_b));
 
             // Tick 1: B→A send, A recv.
-            let payload_b = handler.handle_send("B", "A", "field", &state_b).unwrap();
-            handler
-                .handle_recv("A", "B", "field", &mut state_a, &payload_b)
-                .unwrap();
-            handler.step("A", &mut state_a).unwrap();
-            handler.step("B", &mut state_b).unwrap();
+            let payload_b = expect_success(handler.handle_send("B", "A", "field", &state_b));
+            expect_success(handler.handle_recv("A", "B", "field", &mut state_a, &payload_b));
+            expect_success(handler.step("A", &mut state_a));
+            expect_success(handler.step("B", &mut state_b));
         }
 
         // Should converge to equal field values (average = 0.5).

@@ -6,7 +6,9 @@ use telltale_types::FixedQ32;
 
 use telltale_vm::buffer::EnqueueResult;
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
+use telltale_vm::effect::{
+    EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
+};
 use telltale_vm::session::SessionId;
 use telltale_vm::vm::ObsEvent;
 
@@ -349,31 +351,38 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
         partner: &str,
         label: &str,
         state: &[Value],
-    ) -> Result<Value, String> {
+    ) -> EffectResult<Value> {
         self.inner.handle_send(role, partner, label, state)
     }
 
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-        let base = self.inner.send_decision(input.clone())?;
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        let base = match self.inner.send_decision(input.clone()) {
+            EffectResult::Success(base) => base,
+            EffectResult::Blocked => return EffectResult::Blocked,
+            EffectResult::Failure(failure) => return EffectResult::Failure(failure),
+        };
         let sid = input.sid;
         let role = input.role;
         let partner = input.partner;
 
         let SendDecision::Deliver(payload) = base else {
-            return Ok(base);
+            return EffectResult::success(base);
         };
 
-        let mut state = self.lock_state()?;
+        let mut state = match self.lock_state() {
+            Ok(state) => state,
+            Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
+        };
         if state.is_crashed(role) {
-            return Err("node crashed".into());
+            return EffectResult::failure(EffectFailure::topology_disruption("node crashed"));
         }
         if state.partitioned(role, partner) {
-            return Ok(SendDecision::Drop);
+            return EffectResult::success(SendDecision::Drop);
         }
         let drop_p = state.message_drop_probability();
         let zero = FixedQ32::zero();
         if drop_p > zero && state.rng.should_trigger(drop_p) {
-            return Ok(SendDecision::Drop);
+            return EffectResult::success(SendDecision::Drop);
         }
 
         let mut payload = payload;
@@ -383,8 +392,14 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
         }
 
         if let Some(delay) = state.message_delay_ticks() {
-            let delay_ticks = u64::try_from(delay)
-                .map_err(|_| format!("message delay {delay} cannot be represented as u64"))?;
+            let delay_ticks = match u64::try_from(delay) {
+                Ok(delay_ticks) => delay_ticks,
+                Err(_) => {
+                    return EffectResult::failure(EffectFailure::contract_violation(format!(
+                        "message delay {delay} cannot be represented as u64"
+                    )));
+                }
+            };
             let delivery_tick = state.current_tick.saturating_add(delay_ticks);
             state.in_flight.push(InFlightMessage {
                 delivery_tick,
@@ -393,10 +408,10 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
                 to: partner.to_string(),
                 value: payload,
             });
-            return Ok(SendDecision::Defer);
+            return EffectResult::success(SendDecision::Defer);
         }
 
-        Ok(SendDecision::Deliver(payload))
+        EffectResult::success(SendDecision::Deliver(payload))
     }
 
     fn handle_recv(
@@ -406,9 +421,16 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
         label: &str,
         state: &mut Vec<Value>,
         payload: &Value,
-    ) -> Result<(), String> {
-        if self.lock_state()?.is_crashed(role) {
-            return Err("node crashed".into());
+    ) -> EffectResult<()> {
+        match self.lock_state() {
+            Ok(state_guard) => {
+                if state_guard.is_crashed(role) {
+                    return EffectResult::failure(EffectFailure::topology_disruption(
+                        "node crashed",
+                    ));
+                }
+            }
+            Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
         }
         self.inner.handle_recv(role, partner, label, state, payload)
     }
@@ -419,13 +441,20 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
         partner: &str,
         labels: &[String],
         state: &[Value],
-    ) -> Result<String, String> {
+    ) -> EffectResult<String> {
         self.inner.handle_choose(role, partner, labels, state)
     }
 
-    fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String> {
-        if self.lock_state()?.is_crashed(role) {
-            return Err("node crashed".into());
+    fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
+        match self.lock_state() {
+            Ok(state_guard) => {
+                if state_guard.is_crashed(role) {
+                    return EffectResult::failure(EffectFailure::topology_disruption(
+                        "node crashed",
+                    ));
+                }
+            }
+            Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
         }
         self.inner.step(role, state)
     }

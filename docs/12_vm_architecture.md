@@ -107,6 +107,25 @@ Failure-visible behavior now uses explicit observable events rather than relying
 
 For canonical ordering, the cooperative runtime emits the explicit event sequence before any coarser terminal summary. Threaded execution must preserve the same per-session ordering in its observable trace envelope.
 
+## Semantic Audit Surface
+
+Replay-visible auditability now has one canonical surface derived from existing semantic artifacts rather than ad hoc logging-only streams.
+
+| Source surface | Canonical semantic record |
+|---|---|
+| authority witness audit log | `SemanticAuditRecord::Authority` |
+| delegation audit log | `SemanticAuditRecord::Delegation` |
+| explicit failure/timeout/cancellation/session-terminal events | `FailureBranch`, `TimeoutIssued`, `CancellationRequested`, `Cancelled`, `SessionTerminal` |
+| effect trace | `EffectObservation` with nominal interface/operation classification |
+
+Runtime accessors:
+
+- `VM::semantic_audit_log()`
+- `ThreadedVM::semantic_audit_log()`
+- `canonical_replay_fragment().semantic_audit_log`
+
+This keeps replay, simulator harnesses, and parity checks aligned on one derived semantic audit vocabulary.
+
 ## Delegation and Reconfiguration Path
 
 Runtime delegation uses one sanctioned manager-style path rather than scattered owner mutation.

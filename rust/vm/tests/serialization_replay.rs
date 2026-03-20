@@ -12,11 +12,12 @@ use std::sync::Arc;
 use std::time::Duration;
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::effect::{
-    EffectFailure, EffectHandler, EffectResult, EffectTraceEntry, SendDecision, SendDecisionInput,
-    TopologyPerturbation,
+    EffectFailure, EffectHandler, EffectResult, EffectTraceEntry, RecordingEffectHandler,
+    SendDecision, SendDecisionInput, TopologyPerturbation,
 };
 use telltale_vm::trace::normalize_trace_v1;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::{DelegationStatus, SemanticAuditRecord};
 use test_support::{simple_send_recv_image, PassthroughHandler};
 
 cfg_if! {
@@ -104,6 +105,13 @@ fn canonical_replay_fragment_is_stable_for_identical_runs() {
     let rhs = serde_json::to_string(&vm_b.canonical_replay_fragment())
         .expect("serialize canonical replay fragment rhs");
     assert_eq!(lhs, rhs, "canonical replay fragments should match");
+    assert!(
+        vm_a.canonical_replay_fragment()
+            .semantic_audit_log
+            .iter()
+            .any(|record| matches!(record, SemanticAuditRecord::EffectObservation { .. })),
+        "canonical replay fragments should retain structured semantic audit records"
+    );
 }
 
 #[test]
@@ -140,6 +148,24 @@ fn canonical_replay_fragment_sorts_topology_state() {
     );
     assert!(fragment.crashed_sites.windows(2).all(|w| w[0] <= w[1]));
     assert!(fragment.partitioned_edges.windows(2).all(|w| w[0] <= w[1]));
+    assert!(
+        fragment.semantic_audit_log.iter().any(|record| matches!(
+            record,
+            SemanticAuditRecord::TimeoutIssued { site, .. } if site == "B"
+        )),
+        "topology-triggered timeout should be preserved in semantic audit records"
+    );
+    assert!(
+        fragment.semantic_audit_log.iter().any(|record| matches!(
+            record,
+            SemanticAuditRecord::EffectObservation {
+                effect_interface: Some(interface),
+                effect_operation: Some(operation),
+                ..
+            } if interface == "Runtime" && operation == "topologyEvents"
+        )),
+        "topology ingress should remain visible as a structured effect observation"
+    );
 }
 
 #[test]
@@ -183,10 +209,11 @@ fn normalize_trace_v1_emits_versioned_payload() {
 fn run_replay_shared_accepts_arc_backed_trace() {
     let image = simple_send_recv_image("A", "B", "m");
     let handler = PassthroughHandler;
+    let recording = RecordingEffectHandler::new(&handler);
 
     let mut baseline = VM::new(VMConfig::default());
     baseline.load_choreography(&image).expect("load baseline");
-    baseline.run(&handler, 64).expect("run baseline");
+    baseline.run(&recording, 64).expect("run baseline");
     let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
     let baseline_effect_semantics: Vec<_> = baseline
         .effect_trace()
@@ -200,7 +227,7 @@ fn run_replay_shared_accepts_arc_backed_trace() {
             )
         })
         .collect();
-    let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(baseline.effect_trace());
+    let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(recording.effect_trace());
 
     let mut replay_vm = VM::new(VMConfig::default());
     replay_vm.load_choreography(&image).expect("load replay VM");
@@ -265,12 +292,13 @@ fn transfer_image() -> telltale_vm::loader::CodeImage {
 fn ownership_transfer_replay_preserves_observable_trace() {
     let image = transfer_image();
     let handler = PassthroughHandler;
+    let recording = RecordingEffectHandler::new(&handler);
 
     let mut baseline = VM::new(VMConfig::default());
     baseline.load_choreography(&image).expect("load baseline");
-    baseline.run(&handler, 32).expect("run baseline");
+    baseline.run(&recording, 32).expect("run baseline");
     let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
-    let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(baseline.effect_trace());
+    let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(recording.effect_trace());
 
     let mut replay_vm = VM::new(VMConfig::default());
     replay_vm.load_choreography(&image).expect("load replay VM");
@@ -285,6 +313,17 @@ fn ownership_transfer_replay_preserves_observable_trace() {
             .iter()
             .any(|event| matches!(event, ObsEvent::Transferred { role, .. } if role == "A")),
         "replayed ownership transfer must retain the transfer observable"
+    );
+    assert!(
+        baseline
+            .canonical_replay_fragment()
+            .semantic_audit_log
+            .iter()
+            .any(|record| matches!(
+                record,
+                SemanticAuditRecord::Delegation { status, .. } if *status == DelegationStatus::Committed
+            )),
+        "ownership transfer replay should preserve committed delegation audit records"
     );
 }
 
@@ -350,10 +389,11 @@ cfg_if! {
         fn threaded_run_replay_shared_accepts_arc_backed_trace() {
             let image = simple_send_recv_image("A", "B", "m");
             let handler = PassthroughHandler;
+            let recording = RecordingEffectHandler::new(&handler);
 
             let mut baseline = ThreadedVM::with_workers(VMConfig::default(), 2);
             baseline.load_choreography(&image).expect("load baseline");
-            baseline.run(&handler, 64).expect("run baseline");
+            baseline.run(&recording, 64).expect("run baseline");
             let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
             let baseline_effect_semantics: Vec<_> = baseline
                 .effect_trace()
@@ -367,7 +407,7 @@ cfg_if! {
                     )
                 })
                 .collect();
-            let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(baseline.effect_trace());
+            let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(recording.effect_trace());
 
             let mut replay_vm = ThreadedVM::with_workers(VMConfig::default(), 2);
             replay_vm.load_choreography(&image).expect("load replay VM");
@@ -402,12 +442,13 @@ cfg_if! {
         fn threaded_ownership_transfer_replay_preserves_observable_trace() {
             let image = transfer_image();
             let handler = PassthroughHandler;
+            let recording = RecordingEffectHandler::new(&handler);
 
             let mut baseline = ThreadedVM::with_workers(VMConfig::default(), 2);
             baseline.load_choreography(&image).expect("load baseline");
-            baseline.run(&handler, 32).expect("run baseline");
+            baseline.run(&recording, 32).expect("run baseline");
             let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
-            let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(baseline.effect_trace());
+            let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(recording.effect_trace());
 
             let mut replay_vm = ThreadedVM::with_workers(VMConfig::default(), 2);
             replay_vm.load_choreography(&image).expect("load replay VM");

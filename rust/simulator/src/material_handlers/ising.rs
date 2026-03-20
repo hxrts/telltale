@@ -8,7 +8,7 @@ use crate::material::MeanFieldParams;
 use crate::value_conv::{fixed_vec_to_value, registers_to_f64s, write_f64s};
 use telltale_types::FixedQ32;
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::EffectHandler;
+use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 
 /// Effect handler for the mean-field Ising model.
 pub struct IsingHandler {
@@ -30,9 +30,9 @@ impl EffectHandler for IsingHandler {
         _partner: &str,
         _label: &str,
         state: &[Value],
-    ) -> Result<Value, String> {
+    ) -> EffectResult<Value> {
         // Send current concentrations as the payload.
-        Ok(fixed_vec_to_value(&registers_to_f64s(state)))
+        EffectResult::success(fixed_vec_to_value(&registers_to_f64s(state)))
     }
 
     fn handle_recv(
@@ -42,12 +42,12 @@ impl EffectHandler for IsingHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
+    ) -> EffectResult<()> {
         // For mean-field: receiving peer concentrations doesn't immediately
         // modify local state. The drift computation in `step` uses only the
         // local state (mean-field approximation: each species sees the global
         // magnetization through its own concentration).
-        Ok(())
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -56,20 +56,20 @@ impl EffectHandler for IsingHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".into())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+        }
     }
 
-    fn step(&self, _role: &str, state: &mut Vec<Value>) -> Result<(), String> {
+    fn step(&self, _role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
         let mut vals = registers_to_f64s(state);
         if vals.len() != 2 {
-            return Err(format!(
+            return EffectResult::failure(EffectFailure::invalid_input(format!(
                 "mean-field Ising expects 2-species state, got {}",
                 vals.len()
-            ));
+            )));
         }
 
         let dt = self.params.step_size;
@@ -103,7 +103,7 @@ impl EffectHandler for IsingHandler {
         }
 
         write_f64s(state, &vals);
-        Ok(())
+        EffectResult::success(())
     }
 }
 
@@ -112,6 +112,13 @@ mod tests {
     use super::*;
     use crate::material::MeanFieldParams;
     use crate::value_conv::{registers_to_f64s, write_f64s};
+    use telltale_vm::effect::{EffectFailure, EffectResult};
+
+    fn expect_success<T>(result: EffectResult<T>) -> T {
+        result
+            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
+            .expect("effect should succeed")
+    }
 
     fn test_params(beta: FixedQ32) -> MeanFieldParams {
         MeanFieldParams {
@@ -138,7 +145,7 @@ mod tests {
         );
 
         for _ in 0..1000 {
-            handler.step("A", &mut state).unwrap();
+            expect_success(handler.step("A", &mut state));
         }
 
         let vals = registers_to_f64s(&state);
@@ -164,7 +171,7 @@ mod tests {
         );
 
         for _ in 0..10000 {
-            handler.step("A", &mut state).unwrap();
+            expect_success(handler.step("A", &mut state));
         }
 
         let vals = registers_to_f64s(&state);
@@ -186,7 +193,8 @@ mod tests {
         write_f64s(&mut state, &[v06, v04]);
         let payload = handler
             .handle_send("A", "B", "concentration", &state)
-            .unwrap();
+            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
+            .expect("effect should succeed");
         assert_eq!(payload, fixed_vec_to_value(&[v06, v04]));
     }
 }

@@ -3,7 +3,7 @@
 use serde_json::json;
 
 use crate::coroutine::Fault;
-use crate::effect::EffectTraceEntry;
+use crate::effect::{infer_effect_interface_and_operation, EffectTraceEntry};
 use crate::output_condition::{
     verify_output_condition, OutputConditionCheck, OutputConditionHint, OutputConditionMeta,
     OutputConditionPolicy,
@@ -62,88 +62,123 @@ pub(crate) fn effect_trace_entry_for_event(
             to,
             label,
             ..
-        } => Some(EffectTraceEntry {
-            effect_id,
-            effect_kind: "send_decision".to_string(),
-            inputs: json!({
-                "session": session,
-                "from": from,
-                "to": to,
-                "label": label,
-            }),
-            outputs: json!({"committed": true}),
-            handler_identity: handler_identity.to_string(),
-            ordering_key,
-            topology: None,
-        }),
+        } => {
+            let effect_kind = "send_decision".to_string();
+            let (effect_interface, effect_operation) =
+                infer_effect_interface_and_operation(&effect_kind);
+            Some(EffectTraceEntry {
+                effect_id,
+                effect_kind,
+                inputs: json!({
+                    "session": session,
+                    "from": from,
+                    "to": to,
+                    "label": label,
+                }),
+                outputs: json!({"committed": true}),
+                handler_identity: handler_identity.to_string(),
+                effect_interface,
+                effect_operation,
+                ordering_key,
+                topology: None,
+            })
+        }
         ObsEvent::Received {
             session,
             from,
             to,
             label,
             ..
-        } => Some(EffectTraceEntry {
-            effect_id,
-            effect_kind: "handle_recv".to_string(),
-            inputs: json!({
-                "session": session,
-                "from": from,
-                "to": to,
-                "label": label,
-            }),
-            outputs: json!({"committed": true}),
-            handler_identity: handler_identity.to_string(),
-            ordering_key,
-            topology: None,
-        }),
-        ObsEvent::Invoked { coro_id, role, .. } => Some(EffectTraceEntry {
-            effect_id,
-            effect_kind: "invoke_step".to_string(),
-            inputs: json!({
-                "coro_id": coro_id,
-                "role": role,
-            }),
-            outputs: json!({"ok": true}),
-            handler_identity: handler_identity.to_string(),
-            ordering_key,
-            topology: None,
-        }),
+        } => {
+            let effect_kind = "handle_recv".to_string();
+            let (effect_interface, effect_operation) =
+                infer_effect_interface_and_operation(&effect_kind);
+            Some(EffectTraceEntry {
+                effect_id,
+                effect_kind,
+                inputs: json!({
+                    "session": session,
+                    "from": from,
+                    "to": to,
+                    "label": label,
+                }),
+                outputs: json!({"committed": true}),
+                handler_identity: handler_identity.to_string(),
+                effect_interface,
+                effect_operation,
+                ordering_key,
+                topology: None,
+            })
+        }
+        ObsEvent::Invoked { coro_id, role, .. } => {
+            let effect_kind = "invoke_step".to_string();
+            let (effect_interface, effect_operation) =
+                infer_effect_interface_and_operation(&effect_kind);
+            Some(EffectTraceEntry {
+                effect_id,
+                effect_kind,
+                inputs: json!({
+                    "coro_id": coro_id,
+                    "role": role,
+                }),
+                outputs: json!({"ok": true}),
+                handler_identity: handler_identity.to_string(),
+                effect_interface,
+                effect_operation,
+                ordering_key,
+                topology: None,
+            })
+        }
         ObsEvent::Acquired {
             session,
             role,
             layer,
             ..
-        } => Some(EffectTraceEntry {
-            effect_id,
-            effect_kind: "handle_acquire".to_string(),
-            inputs: json!({
-                "session": session,
-                "role": role,
-                "layer": layer,
-            }),
-            outputs: json!({"granted": true}),
-            handler_identity: handler_identity.to_string(),
-            ordering_key,
-            topology: None,
-        }),
+        } => {
+            let effect_kind = "handle_acquire".to_string();
+            let (effect_interface, effect_operation) =
+                infer_effect_interface_and_operation(&effect_kind);
+            Some(EffectTraceEntry {
+                effect_id,
+                effect_kind,
+                inputs: json!({
+                    "session": session,
+                    "role": role,
+                    "layer": layer,
+                }),
+                outputs: json!({"granted": true}),
+                handler_identity: handler_identity.to_string(),
+                effect_interface,
+                effect_operation,
+                ordering_key,
+                topology: None,
+            })
+        }
         ObsEvent::Released {
             session,
             role,
             layer,
             ..
-        } => Some(EffectTraceEntry {
-            effect_id,
-            effect_kind: "handle_release".to_string(),
-            inputs: json!({
-                "session": session,
-                "role": role,
-                "layer": layer,
-            }),
-            outputs: json!({"ok": true}),
-            handler_identity: handler_identity.to_string(),
-            ordering_key,
-            topology: None,
-        }),
+        } => {
+            let effect_kind = "handle_release".to_string();
+            let (effect_interface, effect_operation) =
+                infer_effect_interface_and_operation(&effect_kind);
+            Some(EffectTraceEntry {
+                effect_id,
+                effect_kind,
+                inputs: json!({
+                    "session": session,
+                    "role": role,
+                    "layer": layer,
+                }),
+                outputs: json!({"ok": true}),
+                handler_identity: handler_identity.to_string(),
+                effect_interface,
+                effect_operation,
+                ordering_key,
+                topology: None,
+            })
+        }
         _ => None,
     }
 }

@@ -109,6 +109,7 @@ Current design rule:
 
 - language-level authority checks and evidence-sensitive decisions must map to explicit effect operations and explicit VM-visible events
 - missing or ambiguous authoritative input must become typed failure, never silent fallback success
+- canonical replay artifacts must preserve these decisions as structured semantic audit records rather than opaque host-only log text
 
 ## Future Extension Path
 

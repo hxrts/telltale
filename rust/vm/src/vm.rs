@@ -33,9 +33,9 @@ use crate::coroutine::{
 };
 use crate::determinism::{DeterminismMode, EffectDeterminismTier};
 use crate::effect::{
-    CorruptionType, EffectFailure, EffectHandler, EffectResult, EffectTraceEntry,
-    ReplayEffectHandler, SendDecision, SendDecisionFastPathInput, SendDecisionInput,
-    TopologyPerturbation,
+    infer_effect_interface_and_operation, CorruptionType, EffectFailure, EffectHandler,
+    EffectResult, EffectTraceEntry, ReplayEffectHandler, SendDecision, SendDecisionFastPathInput,
+    SendDecisionInput, TopologyPerturbation,
 };
 use crate::exec;
 use crate::faults::{
@@ -55,7 +55,10 @@ use crate::loader::CodeImage;
 use crate::output_condition::{OutputConditionCheck, OutputConditionPolicy};
 use crate::persistence::{NoopPersistence, PersistenceModel};
 use crate::scheduler::{SchedPolicy, Scheduler};
-use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragmentV1};
+use crate::serialization::{
+    canonical_replay_fragment_v1, semantic_audit_log_v1, CanonicalReplayFragmentV1,
+    SemanticAuditRecord,
+};
 #[allow(unused_imports)]
 use crate::session::SessionHostMutation;
 use crate::session::{

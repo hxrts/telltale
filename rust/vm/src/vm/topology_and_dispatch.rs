@@ -306,10 +306,13 @@ impl VM {
         for event in events {
             self.apply_topology_event(&event);
             if self.should_capture_effect_kind("topology_event") {
+                let effect_kind = "topology_event".to_string();
+                let (effect_interface, effect_operation) =
+                    infer_effect_interface_and_operation(&effect_kind);
                 self.effect_trace.push(
                     EffectTraceEntry {
                         effect_id: self.next_effect_id,
-                        effect_kind: "topology_event".to_string(),
+                        effect_kind,
                         inputs: json!({
                             "tick": tick,
                         }),
@@ -318,6 +321,8 @@ impl VM {
                             "topology": event,
                         }),
                         handler_identity: handler_identity.clone(),
+                        effect_interface,
+                        effect_operation,
                         ordering_key: self.next_effect_id,
                         topology: Some(event),
                     },

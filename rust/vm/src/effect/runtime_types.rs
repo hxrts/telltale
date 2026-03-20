@@ -75,12 +75,16 @@ impl EffectTraceTape {
         topology: Option<TopologyPerturbation>,
     ) {
         let effect_id = self.next_effect_id.fetch_add(1, Ordering::Relaxed);
+        let (effect_interface, effect_operation) =
+            infer_effect_interface_and_operation(effect_kind);
         let entry = EffectTraceEntry {
             effect_id,
             effect_kind: effect_kind.to_string(),
             inputs,
             outputs,
             handler_identity: handler_identity.to_string(),
+            effect_interface,
+            effect_operation,
             ordering_key: effect_id,
             topology,
         };

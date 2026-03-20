@@ -99,6 +99,18 @@ impl VM {
         self.authority_audit_log.as_slice()
     }
 
+    /// Get canonical semantic audit records derived from authority, delegation,
+    /// failure, and effect/interface traces.
+    #[must_use]
+    pub fn semantic_audit_log(&self) -> Vec<SemanticAuditRecord> {
+        semantic_audit_log_v1(
+            self.authority_audit_log.as_slice(),
+            self.delegation_audit_log.as_slice(),
+            self.obs_trace.as_slice(),
+            self.effect_trace.as_slice(),
+        )
+    }
+
     /// Deterministic communication replay-state root.
     #[must_use]
     pub fn communication_replay_root(&self) -> crate::verification::Hash {
@@ -160,6 +172,8 @@ impl VM {
         canonical_replay_fragment_v1(
             self.obs_trace.as_slice(),
             self.effect_trace.as_slice(),
+            self.authority_audit_log.as_slice(),
+            self.delegation_audit_log.as_slice(),
             self.crashed_sites.iter().cloned().collect(),
             partitioned_edges,
             corrupted_edges,

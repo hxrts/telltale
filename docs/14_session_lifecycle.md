@@ -83,6 +83,8 @@ Deterministic ordering rules:
 
 These events are part of replay-visible observability. Host integrations should not reconstruct this ordering indirectly from final statuses.
 
+Canonical replay artifacts also retain these lifecycle-visible events through `semantic_audit_log`, together with authority witness issuance/consumption and delegation completion records. Embedders and simulator harnesses should prefer that canonical semantic audit surface over custom post-hoc reconstruction from raw logs.
+
 ## Open Path
 
 `Open` is executed by `VM::step_open`. The instruction carries `roles`, `local_types`, `handlers`, and `dsts`.

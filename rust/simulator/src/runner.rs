@@ -11,6 +11,7 @@ use telltale_vm::effect::{EffectHandler, EffectTraceEntry};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::output_condition::OutputConditionCheck;
 use telltale_vm::vm::{ObsEvent, StepResult, VMConfig, VM};
+use telltale_vm::SemanticAuditRecord;
 
 use crate::checkpoint::CheckpointStore;
 use crate::fault::FaultInjector;
@@ -345,6 +346,8 @@ pub struct ScenarioReplayArtifact {
     pub effect_trace: Vec<EffectTraceEntry>,
     /// Output-condition verification checks captured by the VM.
     pub output_condition_trace: Vec<OutputConditionCheck>,
+    /// Canonical semantic audit records derived from the VM run.
+    pub semantic_audit_log: Vec<SemanticAuditRecord>,
 }
 
 /// Structured statistics emitted by scenario execution.
@@ -550,6 +553,7 @@ pub fn run_with_scenario(
     let obs_trace = vm.trace().to_vec();
     let effect_trace = vm.effect_trace().to_vec();
     let output_condition_trace = vm.output_condition_checks().to_vec();
+    let semantic_audit_log = vm.semantic_audit_log();
     let total_invoked_events = obs_trace
         .iter()
         .filter(|event| matches!(event, ObsEvent::Invoked { .. }))
@@ -562,6 +566,7 @@ pub fn run_with_scenario(
             obs_trace,
             effect_trace,
             output_condition_trace,
+            semantic_audit_log,
         },
         stats: ScenarioStats {
             seed: scenario.seed,
