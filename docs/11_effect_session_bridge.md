@@ -152,7 +152,7 @@ Host guidance:
 The choreography language now has nominal `effect` declarations, protocol-level
 `uses` clauses, and `check Effect.op(...)` expressions.
 
-```choreo
+```tell
 effect Runtime
   ready : Session -> Result CommitError ReadyWitness
 

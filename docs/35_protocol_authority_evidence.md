@@ -35,7 +35,7 @@ Keep logic in the host when:
 
 The current language surface uses a small set of explicit forms:
 
-```choreo
+```tell
 effect Runtime
   ready : Session -> Result CommitError ReadyWitness
 
@@ -50,7 +50,7 @@ protocol CommitFlow uses Runtime =
 
 Evidence binding uses ordinary `let`:
 
-```choreo
+```tell
 let receipt = transfer Session from Coordinator to Worker
 ```
 

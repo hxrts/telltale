@@ -32,7 +32,7 @@ additions.
 
 ### Nominal Effects and `uses`
 
-```choreo
+```tell
 effect Runtime
   ready : Session -> Result CommitError ReadyWitness
 
@@ -44,7 +44,7 @@ This is the smallest effect declaration plus dependency declaration that the lan
 
 ### `Result` with `case/of`
 
-```choreo
+```tell
 case check Runtime.ready(session) of
   | Ok witness -> ...
   | Err reason -> ...
@@ -54,7 +54,7 @@ This is the canonical typed branching form for authority checks.
 
 ### `Maybe`
 
-```choreo
+```tell
 case maybeReceipt of
   | Just receipt -> ...
   | Nothing -> ...
@@ -64,7 +64,7 @@ This keeps absence explicit instead of falling back to implicit defaults.
 
 ### Custom Union and Alias
 
-```choreo
+```tell
 type CommitError = TimedOut | Cancelled
 type alias ReadyWitness = { epoch : Int }
 ```
@@ -73,7 +73,7 @@ Custom unions and aliases name failure and evidence values directly in the DSL.
 
 ### Evidence Binding with `let`
 
-```choreo
+```tell
 let receipt = transfer Session from Coordinator to Worker
 ```
 
@@ -81,7 +81,7 @@ Ordinary `let` syntax is the only binding form used for receipts and other autho
 
 ### Timeout and Cancellation
 
-```choreo
+```tell
 timeout 5s at Coordinator
   Worker -> Coordinator : Ready
 on timeout
@@ -94,7 +94,7 @@ Timeout and cancellation are explicit protocol branches, not host-only control f
 
 ### Evidence Guard
 
-```choreo
+```tell
 choice at Coordinator
   | Commit when check Runtime.ready(session) yields witness -> ...
 ```
@@ -103,7 +103,7 @@ Evidence guards bind the witness directly at the branch point that authorizes th
 
 ### Linear Single-Use Binding
 
-```choreo
+```tell
 let receipt = transfer Session from Coordinator to Worker
 commit transfer receipt
 ```
@@ -112,7 +112,7 @@ Transfers produce linear values that the compiler requires to be consumed exactl
 
 ### Local Helper Expression
 
-```choreo
+```tell
 let decision = check Runtime.ready(session)
 in
 case decision of
@@ -124,7 +124,7 @@ case decision of
 
 ### No Implicit Default
 
-```choreo
+```tell
 case readiness of
   | Ok witness -> ...
   | Err reason -> ...
@@ -134,7 +134,7 @@ Protocol-critical matches must be exhaustive, and implicit catch-all masking is 
 
 ### Typed External Query
 
-```choreo
+```tell
 let readiness = check Runtime.ready(session)
 ```
 
@@ -193,7 +193,7 @@ There is no fallback to implicit host knowledge.
 
 `check Effect.op(...)` is the language-level way to invoke typed host effects.
 
-```choreo
+```tell
 effect Runtime
   ready : Session -> Result CommitError ReadyWitness
 

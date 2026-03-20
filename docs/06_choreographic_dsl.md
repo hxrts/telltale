@@ -86,7 +86,7 @@ The parser recognizes `import` declarations for completeness. Import resolution 
 
 #### 1) Send Statement
 
-```choreo
+```tell
 Buyer { priority = high }
   -> Seller : Request of shop.Order
 
@@ -98,7 +98,7 @@ The send statement transfers a message from one role to another. Sender metadata
 
 #### 2) Broadcast Statement
 
-```choreo
+```tell
 Leader ->* : Announcement
 ```
 
@@ -106,7 +106,7 @@ Broadcast sends a message to all other roles.
 
 #### 3) Choice Statement (explicit decider)
 
-```choreo
+```tell
 choice at Client
   | Buy when (balance > price) ->
       Client
@@ -120,7 +120,7 @@ The deciding role (`Client`) selects a branch. Guards are optional. Guard expres
 
 #### 4) Loop Statement
 
-```choreo
+```tell
 loop decide by Client
   Client -> Server : Request
   Server -> Client : Response
@@ -133,7 +133,7 @@ A synthetic `Done` message is added as the termination signal.
 
 The example above desugars to:
 
-```choreo
+```tell
 rec RoleDecidesLoop
   choice at Client
     Request ->
@@ -152,7 +152,7 @@ This desugaring converts the `RoleDecides` loop into standard multiparty session
 constructs (choice + recursion), enabling formal verification in Lean and compatibility
 with standard MPST projection algorithms.
 
-```choreo
+```tell
 loop repeat 5
   A -> B : Ping
   B -> A : Pong
@@ -160,14 +160,14 @@ loop repeat 5
 
 This loop repeats a fixed number of times. The compiler records the iteration count in the AST.
 
-```choreo
+```tell
 loop while "has_more_data"
   A -> B : Data
 ```
 
 This loop parses the string content through the same typed predicate IR used by guards. The parser rejects non-boolean predicates such as `"count + 1"` before building the AST.
 
-```choreo
+```tell
 loop forever
   A -> B : Tick
 ```
@@ -176,7 +176,7 @@ This loop has no exit condition. Use it for persistent background protocols.
 
 #### 5) Parallel Statement
 
-```choreo
+```tell
 par
   | A
       -> B : Msg1
@@ -190,7 +190,7 @@ Parallel composition is expressed by `par` with leading `|` branches. A solitary
 
 #### 6) Recursion and Calls
 
-```choreo
+```tell
 rec Loop
   A -> B : Tick
   continue Loop
@@ -198,7 +198,7 @@ rec Loop
 
 This defines a recursive label `Loop` and uses `continue Loop` to jump back, modeling unbounded recursion.
 
-```choreo
+```tell
 call Handshake
 ```
 
@@ -210,7 +210,7 @@ The `continue` keyword is for recursive back-references within a `rec` block. Th
 
 Define and reuse local protocol fragments inside a `where` block.
 
-```choreo
+```tell
 protocol Main = {
   roles A, B, C
   call Handshake
@@ -235,7 +235,7 @@ Local protocols can call each other and can be used within choices, loops, and b
 
 The preferred typed message form is `Message of module.Type`. Dotted paths are preferred in DSL surface syntax.
 
-```choreo
+```tell
 A
   -> B : Request of api.Request
 B
@@ -253,7 +253,7 @@ This sequence demonstrates payload and result handling patterns with mixed messa
 
 Dynamic role counts are supported via wildcard and symbolic parameters.
 
-```choreo
+```tell
 protocol ThresholdProtocol =
   roles Coordinator, Signers[*]
   Coordinator -> Signers[*] : Request
@@ -262,7 +262,7 @@ protocol ThresholdProtocol =
 
 This example uses a wildcard role family. It also uses a symbolic bound in the role index.
 
-```choreo
+```tell
 protocol ConsensusProtocol =
   roles Leader, Followers[N]
   Leader -> Followers[*] : Proposal
@@ -271,7 +271,7 @@ protocol ConsensusProtocol =
 
 This example mixes a named count with index variables. It enables parameterized protocols.
 
-```choreo
+```tell
 protocol PartialBroadcast =
   roles Broadcaster, Receivers[*]
   Broadcaster -> Receivers[0..count] : Message
@@ -288,7 +288,7 @@ Timing patterns provide constructs for building time-aware protocols. All patter
 
 A timed choice races an operation against a timeout deadline:
 
-```choreo
+```tell
 protocol TimedRequest =
 {
   roles Client, Server
@@ -312,7 +312,7 @@ Durations support: `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours
 
 The heartbeat pattern models connection liveness detection:
 
-```choreo
+```tell
 protocol Liveness =
   roles Alice, Bob
   heartbeat Alice -> Bob every 1s on_missing(3) {
@@ -325,7 +325,7 @@ protocol Liveness =
 
 This desugars to a recursive choice:
 
-```choreo
+```tell
 rec HeartbeatLoop
   Alice -> Bob : Heartbeat
   choice at Bob
@@ -345,7 +345,7 @@ The `on_missing(3)` parameter indicates how many missed heartbeats before declar
 
 Record metadata can carry transport-level timeout hints:
 
-```choreo
+```tell
 protocol TimedOps =
   roles Client, Server
   Client { runtime_timeout = 5s }
@@ -359,7 +359,7 @@ Unlike `timed_choice`, this metadata does not change the session type. It is a h
 
 `proof_bundle` declarations define capability sets. `protocol ... requires ...` selects the bundles required by a protocol.
 
-```choreo
+```tell
 proof_bundle DelegationBase version "1.0.0" issuer "did:example:issuer" constraint "fresh_nonce" requires [delegation, guard_tokens]
 proof_bundle KnowledgeBase requires [knowledge_flow]
 
@@ -379,7 +379,7 @@ Validation fails on duplicate bundles, missing required bundles, or missing capa
 
 VM-core statements lower to `Protocol::Extension` nodes with annotations. The annotation keys are `vm_core_op`, `required_capability`, and `vm_core_operands`.
 
-```choreo
+```tell
 protocol SpeculativeFlow requires SpecBundle =
   roles A, B
   fork ghost0
@@ -396,7 +396,7 @@ Elm/PureScript-like while making protocol-critical host decisions explicit.
 
 ##### Nominal Effect Interfaces and `uses`
 
-```choreo
+```tell
 effect Runtime
   ready : Session -> Result CommitError ReadyWitness
   cancel : Session -> Result CancelError CancelReceipt
@@ -414,7 +414,7 @@ Only declared effects named in `uses` may be referenced by `check`.
 
 ##### `Result` and `Maybe` with `case/of`
 
-```choreo
+```tell
 let readiness = check Runtime.ready(session)
 in
 case readiness of
@@ -430,7 +430,7 @@ authority checks. Exhaustiveness is required for `Ok`/`Err` and
 
 ##### Custom Unions and Type Aliases
 
-```choreo
+```tell
 type CommitError
   = TimedOut
   | Cancelled
@@ -445,7 +445,7 @@ evidence payloads.
 
 ##### Evidence Binding with `let`
 
-```choreo
+```tell
 let receipt = transfer Session from Coordinator to Worker
 let readiness = check Runtime.ready(session)
 ```
@@ -455,7 +455,7 @@ authority-binding syntax beyond normal expression binding.
 
 ##### Typed Timeout and Cancellation Blocks
 
-```choreo
+```tell
 timeout 5s at Coordinator
   Worker -> Coordinator : Ready of ReadyWitness
 on timeout
@@ -469,7 +469,7 @@ protocol-visible outcomes rather than ambient runtime metadata.
 
 ##### Evidence Guards
 
-```choreo
+```tell
 choice at Coordinator
   | Commit when check Runtime.ready(session) yields witness ->
       Coordinator -> Worker : Commit of witness
@@ -482,7 +482,7 @@ authoritative query succeeds and binds evidence”.
 
 ##### Linear Single-Use Bindings
 
-```choreo
+```tell
 let receipt = transfer Session from Coordinator to Worker
 commit transfer receipt
 ```
@@ -492,7 +492,7 @@ compiler rejects duplicate use and implicit discard.
 
 ##### Local Helpers with `let ... in`
 
-```choreo
+```tell
 let decision =
   case check Runtime.ready(session) of
     | Ok witness -> Commit witness
@@ -510,7 +510,7 @@ logic back into untyped host code.
 
 ##### No Implicit Default Branches
 
-```choreo
+```tell
 case check Runtime.ready(session) of
   | Ok witness -> ...
   | Err TimedOut -> ...
@@ -521,7 +521,7 @@ masking for `Result` and `Maybe`. Missing cases are validation errors.
 
 ##### Typed External Query Surface
 
-```choreo
+```tell
 let readiness = check Runtime.ready(session)
 ```
 
@@ -541,7 +541,7 @@ This lowering preserves statement order and continuation structure. Projection s
 
 The DSL includes first-class combinators for common patterns.
 
-```choreo
+```tell
 protocol Combinators =
   roles A, B
   handshake A <-> B : Hello
@@ -557,7 +557,7 @@ protocol Combinators =
 
 Role sets and topologies are declared at the top level and stored as typed metadata.
 
-```choreo
+```tell
 role_set Signers = Alice, Bob, Carol
 role_set Quorum = subset(Signers, 0..2)
 cluster LocalCluster = Signers, Quorum
@@ -747,7 +747,7 @@ This error indicates that a role name appears more than once. The location point
 
 ### Simple Two-Party Protocol
 
-```choreo
+```tell
 protocol PingPong =
   roles Alice, Bob
   Alice
@@ -760,7 +760,7 @@ This example shows a simple two role protocol. It uses a single send and reply.
 
 ### Protocol with Choice
 
-```choreo
+```tell
 protocol Negotiation =
   roles Buyer, Seller
 
@@ -780,7 +780,7 @@ This example shows an explicit choice decided by `Seller`. Each branch starts wi
 
 ### Complex E-Commerce Protocol
 
-```choreo
+```tell
 protocol ECommerce =
   roles Buyer, Seller, Shipper
 
@@ -817,7 +817,7 @@ This example combines choice and looping. It models a longer interaction with a 
 
 ### Parallel Example
 
-```choreo
+```tell
 protocol ParallelDemo =
   roles A, B, C, D
   par
