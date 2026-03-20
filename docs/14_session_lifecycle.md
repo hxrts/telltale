@@ -14,7 +14,7 @@ A session stores role membership, per-endpoint local types, directed buffers, ed
 | `edge_handlers` | Per-edge runtime handler binding |
 | `edge_traces`, auth fields | Coherence and authenticated trace material |
 | `status`, `epoch` | Lifecycle phase and close epoch counter |
-| ownership state | current owner capability, transfer-in-progress state, and terminal ownership reason |
+| ownership state | current owner capability, transfer-in-progress state, issued readiness witnesses, consumed witness ids, and terminal ownership reason |
 
 The VM also tracks communication replay-consumption state at runtime scope (`off`, `sequence`, `nullifier`). This state is keyed by session-qualified edges and contributes to canonical replay artifacts.
 
@@ -35,12 +35,15 @@ Session ownership is tracked separately from capability admission.
 | current owner capability | the live owner label, generation, and authorized scope |
 | ownership generation | increments on transfer or scope attenuation so stale handles fail closed |
 | pending transfer receipt | explicit staged transfer that must commit or roll back |
+| readiness witness | single-use proof that a protocol-critical check succeeded under one live owner generation |
+| authority audit log | deterministic issuance/consumption history for readiness and cancellation witnesses |
 | terminal ownership reason | recorded reason when owner death or transfer failure forces cancellation or fault |
 
 Default runtime rules:
 
 - at most one current owner exists for one active session ownership unit
 - transfer is explicit and uses a receipt
+- readiness witnesses are single-use and generation-bound
 - rollback is claim-specific, so failing one staged transfer does not tear down unrelated ownership state
 - fragment-scoped ownership attenuates authority and does not imply full-session mutation rights
 
@@ -54,6 +57,7 @@ Ownership failures map into session terminal behavior as follows.
 | abandoned transfer | `Cancelled` |
 | failed transfer commit | `Faulted { reason = "ownership transfer commit failed: ..." }` |
 | stale owner use | typed ownership error, fail-closed, no status change unless policy escalates |
+| forged or reused readiness witness | typed ownership error, fail-closed, audit rejection record |
 
 These mappings are implementation policy. They are not claims that the Lean theory proves host-runtime ownership outcomes directly.
 
@@ -71,6 +75,7 @@ Preferred host integration path:
 - ownership-bearing open: `load_choreography_owned(...)`
 
 The owned path immediately claims session ownership and is the preferred public integration route for hosts that will mutate session-local runtime metadata.
+Hosts that need to materialize protocol-critical checks should also issue explicit readiness witnesses through that ownership-bearing path rather than caching ambient booleans out of band.
 
 ## Type Advancement
 

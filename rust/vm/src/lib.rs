@@ -160,10 +160,12 @@ pub use serialization::{
     CanonicalReplayFragmentV1, CanonicalTraceV1,
 };
 pub use session::{
-    decode_edge_json, ClosedSessionSummary, Edge, FragmentOwnerId, HandlerId, OwnershipCapability,
-    OwnershipClaimId, OwnershipEpoch, OwnershipError, OwnershipReceipt, OwnershipScope,
-    OwnershipTerminalReason, SessionHostMutation, SessionId, SessionStore, SessionStoreMemoryUsage,
-    SessionStoreRetainedBytes,
+    decode_edge_json, AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord,
+    AuthorityWitnessId, CancellationWitness, ClosedSessionSummary, Edge, FragmentOwnerId,
+    HandlerId, OwnershipCapability, OwnershipClaimId, OwnershipEpoch, OwnershipError,
+    OwnershipReceipt, OwnershipScope, OwnershipTerminalReason, ReadinessWitness,
+    SessionHostMutation, SessionId, SessionStore, SessionStoreMemoryUsage,
+    SessionStoreRetainedBytes, TimeoutWitness,
 };
 pub use trace::{
     normalize_trace, normalize_trace_v1, obs_session, strict_trace, with_tick, NormalizedTraceV1,

@@ -217,6 +217,9 @@ pub type OwnershipEpoch = u64;
 /// Identifier for one staged ownership operation.
 pub type OwnershipClaimId = u64;
 
+/// Identifier for one issued authority witness.
+pub type AuthorityWitnessId = u64;
+
 /// Handler identifier for edge-bound runtime dispatch.
 pub type HandlerId = String;
 type HandlerNumericId = u16;
@@ -371,6 +374,87 @@ pub struct OwnershipReceipt {
     pub scope: OwnershipScope,
 }
 
+/// Witness proving a protocol-critical readiness check succeeded under the
+/// current owner capability.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReadinessWitness {
+    /// Unique witness identifier within one session.
+    pub witness_id: AuthorityWitnessId,
+    /// Session whose readiness was proven.
+    pub session_id: SessionId,
+    /// Owner label that requested the witness.
+    pub owner_id: FragmentOwnerId,
+    /// Owner generation that must still be live when the witness is consumed.
+    pub generation: OwnershipEpoch,
+    /// Scope under which the witness was issued.
+    pub scope: OwnershipScope,
+    /// Predicate/check reference justified by this witness.
+    pub predicate_ref: String,
+}
+
+/// Witness proving a session transitioned to an explicit cancellation path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CancellationWitness {
+    /// Unique witness identifier within one session.
+    pub witness_id: AuthorityWitnessId,
+    /// Session that was cancelled or faulted due to ownership failure.
+    pub session_id: SessionId,
+    /// Owner whose capability/lifecycle triggered the terminal transition.
+    pub owner_id: FragmentOwnerId,
+    /// Owner generation at the time the witness was issued.
+    pub generation: OwnershipEpoch,
+    /// Terminal ownership reason captured by the witness.
+    pub reason: OwnershipTerminalReason,
+}
+
+/// Witness proving a topology timeout was issued for one site.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TimeoutWitness {
+    /// Unique witness identifier within one runtime.
+    pub witness_id: AuthorityWitnessId,
+    /// Site that timed out.
+    pub site: String,
+    /// Tick at which the timeout witness was issued.
+    pub issued_at_tick: u64,
+    /// Tick until which the timeout remains active.
+    pub until_tick: u64,
+}
+
+/// Typed authority artifact emitted or consumed by the runtime.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AuthorityArtifact {
+    /// Readiness witness issued or consumed by an owner-gated flow.
+    Readiness(ReadinessWitness),
+    /// Cancellation witness issued by ownership failure handling.
+    Cancellation(CancellationWitness),
+    /// Timeout witness issued from topology ingress.
+    Timeout(TimeoutWitness),
+}
+
+/// Lifecycle event for one authority artifact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AuthorityAuditEvent {
+    /// Artifact was issued.
+    Issued,
+    /// Artifact was consumed exactly once.
+    Consumed,
+    /// Artifact was rejected.
+    Rejected,
+}
+
+/// Deterministic audit record for witness issuance or consumption.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthorityAuditRecord {
+    /// Optional runtime tick when the record was emitted.
+    pub tick: Option<u64>,
+    /// Artifact covered by this audit record.
+    pub artifact: AuthorityArtifact,
+    /// Event recorded for the artifact.
+    pub event: AuthorityAuditEvent,
+    /// Optional rejection or diagnostic reason.
+    pub reason: Option<String>,
+}
+
 /// Terminal reason recorded when ownership fails closed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OwnershipTerminalReason {
@@ -458,6 +542,22 @@ pub enum OwnershipError {
         /// Identifier carried by the mismatched receipt.
         claim_id: OwnershipClaimId,
     },
+    /// Witness does not match current live authority state.
+    InvalidWitness {
+        /// Session whose witness validation failed.
+        session_id: SessionId,
+        /// Witness that failed validation.
+        witness_id: AuthorityWitnessId,
+        /// Human-readable mismatch reason.
+        reason: String,
+    },
+    /// Witness was already consumed.
+    WitnessConsumed {
+        /// Session whose witness was already consumed.
+        session_id: SessionId,
+        /// Witness id that cannot be reused.
+        witness_id: AuthorityWitnessId,
+    },
     /// Ownership already terminated for this session.
     Terminal {
         /// Session whose ownership contract is terminal.
@@ -502,6 +602,10 @@ pub(crate) struct SessionOwnershipState {
     pub(crate) pending_transfer: Option<PendingOwnershipTransfer>,
     pub(crate) terminal_reason: Option<OwnershipTerminalReason>,
     pub(crate) next_claim_id: OwnershipClaimId,
+    pub(crate) next_witness_id: AuthorityWitnessId,
+    pub(crate) issued_readiness: BTreeMap<AuthorityWitnessId, ReadinessWitness>,
+    pub(crate) consumed_witnesses: BTreeSet<AuthorityWitnessId>,
+    pub(crate) audit_log: Vec<AuthorityAuditRecord>,
 }
 
 impl Default for SessionOwnershipState {
@@ -511,6 +615,10 @@ impl Default for SessionOwnershipState {
             pending_transfer: None,
             terminal_reason: None,
             next_claim_id: 1,
+            next_witness_id: 1,
+            issued_readiness: BTreeMap::new(),
+            consumed_witnesses: BTreeSet::new(),
+            audit_log: Vec::new(),
         }
     }
 }

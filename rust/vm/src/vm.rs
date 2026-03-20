@@ -59,8 +59,9 @@ use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragment
 #[allow(unused_imports)]
 use crate::session::SessionHostMutation;
 use crate::session::{
-    unfold_if_var_with_scope, ClosedSessionSummary, Edge, OwnershipScope, SessionId, SessionStatus,
-    SessionStore, SessionStoreMemoryUsage,
+    unfold_if_var_with_scope, AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord,
+    ClosedSessionSummary, Edge, OwnershipScope, SessionId, SessionStatus, SessionStore,
+    SessionStoreMemoryUsage, TimeoutWitness,
 };
 use crate::transfer_semantics::{
     decode_transfer_request, delegation_receipt, endpoint_owner_ids, move_endpoint_bundle,

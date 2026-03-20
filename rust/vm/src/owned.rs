@@ -7,8 +7,8 @@
 
 use crate::loader::CodeImage;
 use crate::session::{
-    OwnershipCapability, OwnershipError, OwnershipReceipt, OwnershipScope, SessionHostMutation,
-    SessionId,
+    CancellationWitness, OwnershipCapability, OwnershipError, OwnershipReceipt, OwnershipScope,
+    ReadinessWitness, SessionHostMutation, SessionId,
 };
 use crate::vm::{VMError, VM};
 
@@ -51,6 +51,34 @@ impl OwnedSession {
     ) -> Result<(), OwnershipError> {
         vm.sessions_mut()
             .apply_owned_session_mutation(&self.capability, mutation)
+    }
+
+    /// Issue a single-use readiness witness for a protocol-critical check.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the capability is stale or lacks session scope.
+    pub fn issue_readiness_witness(
+        &self,
+        vm: &mut VM,
+        predicate_ref: impl Into<String>,
+    ) -> Result<ReadinessWitness, OwnershipError> {
+        vm.sessions_mut()
+            .issue_readiness_witness(&self.capability, predicate_ref)
+    }
+
+    /// Consume a previously issued readiness witness exactly once.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the witness is stale, forged, mismatched, or reused.
+    pub fn consume_readiness_witness(
+        &self,
+        vm: &mut VM,
+        witness: &ReadinessWitness,
+    ) -> Result<(), OwnershipError> {
+        vm.sessions_mut()
+            .consume_readiness_witness(&self.capability, witness)
     }
 
     /// Begin an explicit ownership transfer from this handle.
@@ -105,6 +133,29 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the capability is stale.
     pub fn release(&self, vm: &mut VM) -> Result<(), OwnershipError> {
         vm.sessions_mut().release_ownership(&self.capability)
+    }
+
+    /// Fault the session because the current owner died.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the live owner no longer matches this handle.
+    pub fn mark_owner_died(&self, vm: &mut VM) -> Result<CancellationWitness, OwnershipError> {
+        vm.sessions_mut()
+            .mark_owner_died(self.session_id, &self.capability.owner_id)
+    }
+
+    /// Cancel the session because this transfer was abandoned.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the receipt no longer matches the live staged transfer.
+    pub fn cancel_abandoned_transfer(
+        &self,
+        vm: &mut VM,
+        receipt: &OwnershipReceipt,
+    ) -> Result<CancellationWitness, OwnershipError> {
+        vm.sessions_mut().cancel_abandoned_transfer(receipt)
     }
 }
 

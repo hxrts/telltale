@@ -234,6 +234,17 @@
             .expect("timeout topology ingress should not fault");
         assert!(matches!(step, StepResult::Stuck));
         assert!(!vm.timed_out_sites().is_empty());
+        let audit = vm.authority_audit_log();
+        assert_eq!(audit.len(), 1);
+        match &audit[0].artifact {
+            AuthorityArtifact::Timeout(witness) => {
+                assert_eq!(witness.site, "A");
+                assert_eq!(witness.issued_at_tick, 1);
+                assert_eq!(witness.until_tick, 21);
+            }
+            other => panic!("expected timeout witness, got {other:?}"),
+        }
+        assert_eq!(audit[0].event, AuthorityAuditEvent::Issued);
     }
 
     #[test]

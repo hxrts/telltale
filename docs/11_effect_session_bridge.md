@@ -64,6 +64,12 @@ External host events must enter the VM through canonical ingress surfaces.
 Session-local host mutation outside these callback-local values should flow through an explicit ownership capability such as `OwnedSession`.
 This is the preferred production path for mutating edge traces, handler bindings, or other session-local host metadata.
 
+Protocol-critical host decisions should also use explicit witnesses where available:
+
+- readiness checks should issue and later consume a `ReadinessWitness`
+- ownership-failure cancellation paths issue a `CancellationWitness`
+- topology timeout ingress emits a `TimeoutWitness`
+
 Host rules:
 
 - `EffectHandler` methods are synchronous. Async work must happen outside callback execution and feed results back through a later ingress call.
@@ -141,6 +147,19 @@ Host guidance:
 - Use `Failure` for typed terminal or policy-visible failures.
 - Do not encode timeout, cancellation, or ownership failure in ad hoc strings when a specific `EffectFailureKind` exists.
 - Replay, recording, and effect-trace serialization preserve these typed outcomes directly.
+
+## Authority Witnesses
+
+The ownership boundary now includes explicit witness objects for protocol-critical authority flow.
+
+| Witness | Issued by | Consumed by | Purpose |
+|---|---|---|---|
+| `ReadinessWitness` | `SessionStore::issue_readiness_witness` or `OwnedSession::issue_readiness_witness` | `consume_readiness_witness` | prove a readiness/admission-style check under a specific live owner generation |
+| `CancellationWitness` | owner death or abandoned-transfer handling | observational/audit surface | make cancellation-triggering ownership failure explicit |
+| `TimeoutWitness` | topology timeout ingress | observational/audit surface | make timeout issuance explicit and replay-visible |
+
+Readiness witnesses are generation-bound and single-use.
+They fail closed if the owner becomes stale, scope attenuates, the witness is forged, or a second consume is attempted.
 
 ## Integration Workflow
 

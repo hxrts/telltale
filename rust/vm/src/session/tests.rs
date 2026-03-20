@@ -604,6 +604,97 @@
     }
 
     #[test]
+    fn readiness_witness_is_generation_bound_and_single_use() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+        let owner = store
+            .claim_ownership(sid, "owner/a", OwnershipScope::Session)
+            .expect("claim ownership");
+        let witness = store
+            .issue_readiness_witness(&owner, "commit.ready")
+            .expect("issue readiness witness");
+
+        store
+            .consume_readiness_witness(&owner, &witness)
+            .expect("consume readiness witness");
+
+        let reused = store
+            .consume_readiness_witness(&owner, &witness)
+            .expect_err("double use must fail");
+        assert_eq!(
+            reused,
+            OwnershipError::WitnessConsumed {
+                session_id: sid,
+                witness_id: witness.witness_id,
+            }
+        );
+
+        let audit = store.authority_audit_log(sid).expect("authority audit log");
+        assert_eq!(audit.len(), 3);
+        assert!(matches!(audit[0].artifact, AuthorityArtifact::Readiness(_)));
+        assert_eq!(audit[0].event, AuthorityAuditEvent::Issued);
+        assert_eq!(audit[1].event, AuthorityAuditEvent::Consumed);
+        assert_eq!(audit[2].event, AuthorityAuditEvent::Rejected);
+    }
+
+    #[test]
+    fn readiness_witness_rejects_forged_and_stale_use() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+        let owner = store
+            .claim_ownership(sid, "owner/a", OwnershipScope::Session)
+            .expect("claim ownership");
+        let witness = store
+            .issue_readiness_witness(&owner, "commit.ready")
+            .expect("issue readiness witness");
+
+        let forged = ReadinessWitness {
+            predicate_ref: "forged.ready".to_string(),
+            ..witness.clone()
+        };
+        let forged_err = store
+            .consume_readiness_witness(&owner, &forged)
+            .expect_err("forged witness must fail");
+        assert_eq!(
+            forged_err,
+            OwnershipError::InvalidWitness {
+                session_id: sid,
+                witness_id: witness.witness_id,
+                reason: "witness payload mismatch".to_string(),
+            }
+        );
+
+        let attenuated = store
+            .attenuate_ownership_scope(
+                &owner,
+                OwnershipScope::Fragments(BTreeSet::from(["bundle/alpha".to_string()])),
+            )
+            .expect("attenuate scope");
+        let stale_err = store
+            .consume_readiness_witness(&attenuated, &witness)
+            .expect_err("stale readiness witness must fail");
+        assert_eq!(
+            stale_err,
+            OwnershipError::ScopeViolation {
+                session_id: sid,
+                owner_id: "owner/a".to_string(),
+                required: OwnershipScope::Session,
+                actual: OwnershipScope::Fragments(BTreeSet::from([
+                    "bundle/alpha".to_string()
+                ])),
+            }
+        );
+    }
+
+    #[test]
     fn test_transfer_rollback_is_claim_specific_and_preserves_current_owner() {
         let mut store = SessionStore::new();
         let sid = store.open(
@@ -689,9 +780,17 @@
             .claim_ownership(sid, "owner/a", OwnershipScope::Session)
             .expect("claim ownership");
 
-        store
+        let cancellation = store
             .mark_owner_died(sid, "owner/a")
             .expect("owner death should fault session");
+        assert_eq!(cancellation.session_id, sid);
+        assert_eq!(cancellation.owner_id, "owner/a");
+        assert_eq!(
+            cancellation.reason,
+            OwnershipTerminalReason::OwnerDied {
+                owner_id: "owner/a".to_string(),
+            }
+        );
 
         let session = store.get(sid).expect("session exists");
         assert_eq!(
@@ -723,9 +822,11 @@
             .begin_ownership_transfer(&owner, "owner/b", OwnershipScope::Session)
             .expect("stage transfer");
 
-        store
+        let cancelled_witness = store
             .cancel_abandoned_transfer(&receipt)
             .expect("abandoned transfer should cancel session");
+        assert_eq!(cancelled_witness.session_id, sid);
+        assert_eq!(cancelled_witness.owner_id, "owner/a");
         let cancelled = store.get(sid).expect("session exists");
         assert_eq!(cancelled.status, SessionStatus::Cancelled);
         assert_eq!(

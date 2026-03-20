@@ -115,6 +115,26 @@ impl SessionStore {
         Ok(())
     }
 
+    fn next_witness_id(session: &mut SessionState) -> AuthorityWitnessId {
+        let witness_id = session.ownership.next_witness_id;
+        session.ownership.next_witness_id = session.ownership.next_witness_id.saturating_add(1);
+        witness_id
+    }
+
+    fn push_authority_audit(
+        session: &mut SessionState,
+        artifact: AuthorityArtifact,
+        event: AuthorityAuditEvent,
+        reason: Option<String>,
+    ) {
+        session.ownership.audit_log.push(AuthorityAuditRecord {
+            tick: None,
+            artifact,
+            event,
+            reason,
+        });
+    }
+
     /// Create an empty session store.
     #[must_use]
     pub fn new() -> Self {
@@ -239,6 +259,30 @@ impl SessionStore {
     #[must_use]
     pub fn current_ownership(&self, sid: SessionId) -> Option<&OwnershipCapability> {
         self.sessions.get(&sid)?.ownership.current.as_ref()
+    }
+
+    /// Validate that a capability still matches the live owner state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the session is missing, terminal, or stale.
+    pub fn validate_ownership_capability(
+        &self,
+        capability: &OwnershipCapability,
+    ) -> Result<(), OwnershipError> {
+        let session = self
+            .sessions
+            .get(&capability.session_id)
+            .ok_or(OwnershipError::SessionNotFound {
+                session_id: capability.session_id,
+            })?;
+        Self::validate_current_owner(session, capability)
+    }
+
+    /// Read deterministic authority audit records for one session.
+    #[must_use]
+    pub fn authority_audit_log(&self, sid: SessionId) -> Option<&[AuthorityAuditRecord]> {
+        Some(self.sessions.get(&sid)?.ownership.audit_log.as_slice())
     }
 
     /// Claim ownership for an unclaimed session.
@@ -466,6 +510,120 @@ impl SessionStore {
         Ok(())
     }
 
+    /// Issue a single-use readiness witness under the current owner capability.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the capability is stale or lacks full-session scope.
+    pub fn issue_readiness_witness(
+        &mut self,
+        capability: &OwnershipCapability,
+        predicate_ref: impl Into<String>,
+    ) -> Result<ReadinessWitness, OwnershipError> {
+        let session = self.session_mut_or_error(capability.session_id)?;
+        Self::require_session_scope(session, capability)?;
+        let witness = ReadinessWitness {
+            witness_id: Self::next_witness_id(session),
+            session_id: capability.session_id,
+            owner_id: capability.owner_id.clone(),
+            generation: capability.generation,
+            scope: capability.scope.clone(),
+            predicate_ref: predicate_ref.into(),
+        };
+        session
+            .ownership
+            .issued_readiness
+            .insert(witness.witness_id, witness.clone());
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::Readiness(witness.clone()),
+            AuthorityAuditEvent::Issued,
+            None,
+        );
+        Ok(witness)
+    }
+
+    /// Consume a readiness witness exactly once under the same live owner capability.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OwnershipError` if the witness is stale, forged, mismatched, or already used.
+    pub fn consume_readiness_witness(
+        &mut self,
+        capability: &OwnershipCapability,
+        witness: &ReadinessWitness,
+    ) -> Result<(), OwnershipError> {
+        let session = self.session_mut_or_error(capability.session_id)?;
+        Self::require_session_scope(session, capability)?;
+        if session.ownership.consumed_witnesses.contains(&witness.witness_id) {
+            Self::push_authority_audit(
+                session,
+                AuthorityArtifact::Readiness(witness.clone()),
+                AuthorityAuditEvent::Rejected,
+                Some("witness already consumed".to_string()),
+            );
+            return Err(OwnershipError::WitnessConsumed {
+                session_id: witness.session_id,
+                witness_id: witness.witness_id,
+            });
+        }
+        let Some(issued) = session.ownership.issued_readiness.get(&witness.witness_id) else {
+            Self::push_authority_audit(
+                session,
+                AuthorityArtifact::Readiness(witness.clone()),
+                AuthorityAuditEvent::Rejected,
+                Some("witness was never issued".to_string()),
+            );
+            return Err(OwnershipError::InvalidWitness {
+                session_id: capability.session_id,
+                witness_id: witness.witness_id,
+                reason: "witness was never issued".to_string(),
+            });
+        };
+        if issued != witness {
+            Self::push_authority_audit(
+                session,
+                AuthorityArtifact::Readiness(witness.clone()),
+                AuthorityAuditEvent::Rejected,
+                Some("witness payload mismatch".to_string()),
+            );
+            return Err(OwnershipError::InvalidWitness {
+                session_id: capability.session_id,
+                witness_id: witness.witness_id,
+                reason: "witness payload mismatch".to_string(),
+            });
+        }
+        if witness.session_id != capability.session_id
+            || witness.owner_id != capability.owner_id
+            || witness.generation != capability.generation
+            || witness.scope != capability.scope
+        {
+            Self::push_authority_audit(
+                session,
+                AuthorityArtifact::Readiness(witness.clone()),
+                AuthorityAuditEvent::Rejected,
+                Some("live ownership no longer matches witness".to_string()),
+            );
+            return Err(OwnershipError::InvalidWitness {
+                session_id: capability.session_id,
+                witness_id: witness.witness_id,
+                reason: "live ownership no longer matches witness".to_string(),
+            });
+        }
+        session.ownership.issued_readiness.remove(&witness.witness_id);
+        session
+            .ownership
+            .consumed_witnesses
+            .insert(witness.witness_id);
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::Readiness(witness.clone()),
+            AuthorityAuditEvent::Consumed,
+            None,
+        );
+        Ok(())
+    }
+
     /// Mark the current owner as dead and fault the session.
     ///
     /// # Errors
@@ -475,7 +633,7 @@ impl SessionStore {
         &mut self,
         sid: SessionId,
         owner_id: &str,
-    ) -> Result<(), OwnershipError> {
+    ) -> Result<CancellationWitness, OwnershipError> {
         let session = self.session_mut_or_error(sid)?;
         Self::ensure_mutable_ownership(session)?;
         let Some(current) = session.ownership.current.as_ref() else {
@@ -489,16 +647,30 @@ impl SessionStore {
                 actual_generation: current.generation,
             });
         }
+        let generation = current.generation;
         let reason = OwnershipTerminalReason::OwnerDied {
             owner_id: owner_id.to_string(),
         };
         session.status = SessionStatus::Faulted {
             reason: format!("ownership owner `{owner_id}` died"),
         };
+        let witness = CancellationWitness {
+            witness_id: Self::next_witness_id(session),
+            session_id: sid,
+            owner_id: owner_id.to_string(),
+            generation,
+            reason: reason.clone(),
+        };
         session.ownership.current = None;
         session.ownership.pending_transfer = None;
         session.ownership.terminal_reason = Some(reason);
-        Ok(())
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::Cancellation(witness.clone()),
+            AuthorityAuditEvent::Issued,
+            None,
+        );
+        Ok(witness)
     }
 
     /// Cancel a session because a staged transfer was abandoned.
@@ -509,7 +681,7 @@ impl SessionStore {
     pub fn cancel_abandoned_transfer(
         &mut self,
         receipt: &OwnershipReceipt,
-    ) -> Result<(), OwnershipError> {
+    ) -> Result<CancellationWitness, OwnershipError> {
         let session = self.session_mut_or_error(receipt.session_id)?;
         Self::ensure_mutable_ownership(session)?;
         let Some(pending) = session.ownership.pending_transfer.as_ref() else {
@@ -528,10 +700,23 @@ impl SessionStore {
             claim_id: receipt.claim_id,
         };
         session.status = SessionStatus::Cancelled;
+        let witness = CancellationWitness {
+            witness_id: Self::next_witness_id(session),
+            session_id: receipt.session_id,
+            owner_id: receipt.from_owner_id.clone(),
+            generation: receipt.from_generation,
+            reason: reason.clone(),
+        };
         session.ownership.current = None;
         session.ownership.pending_transfer = None;
         session.ownership.terminal_reason = Some(reason);
-        Ok(())
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::Cancellation(witness.clone()),
+            AuthorityAuditEvent::Issued,
+            None,
+        );
+        Ok(witness)
     }
 
     /// Fault a session because a staged transfer could not commit.

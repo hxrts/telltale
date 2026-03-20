@@ -1,4 +1,24 @@
 impl VM {
+    fn issue_timeout_witness(&mut self, site: &str, until_tick: u64) -> TimeoutWitness {
+        let witness = TimeoutWitness {
+            witness_id: self.next_authority_witness_id,
+            site: site.to_string(),
+            issued_at_tick: self.clock.tick,
+            until_tick,
+        };
+        self.next_authority_witness_id = self.next_authority_witness_id.saturating_add(1);
+        self.authority_audit_log.push(
+            AuthorityAuditRecord {
+                tick: Some(self.clock.tick),
+                artifact: AuthorityArtifact::Timeout(witness.clone()),
+                event: AuthorityAuditEvent::Issued,
+                reason: None,
+            },
+            &self.config.observability_retention,
+        );
+        witness
+    }
+
     fn duration_to_ticks(&self, duration: Duration) -> u64 {
         let tick_nanos = self.config.tick_duration.as_nanos();
         if tick_nanos == 0 {
@@ -250,6 +270,7 @@ impl VM {
                     .clock
                     .tick
                     .saturating_add(self.duration_to_ticks(*duration));
+                let _witness = self.issue_timeout_witness(site, until_tick);
                 self.timed_out_sites.insert(site.clone(), until_tick);
                 let coro_ids = self.role_coroutines.get(site).cloned().unwrap_or_default();
                 for coro_id in coro_ids {
