@@ -241,7 +241,8 @@ fn step_choose(
 
     ctx.handler
         .handle_recv(role, &partner, &label, &mut coro.regs, &val)
-        .map_err(|e| Fault::Invoke { message: e })?;
+        .expect_success(|| EffectFailure::contract_violation("handle_recv returned blocked"))
+        .map_err(|failure| Fault::Invoke { failure })?;
 
     let original = session
         .local_types
@@ -322,7 +323,13 @@ fn step_offer(
                 ctx.handler
                     .send_decision_fast_path(fast_path, &coro.regs, Some(&offer_payload))
             {
-                decision.map_err(|e| Fault::Invoke { message: e })?
+                decision
+                    .expect_success(|| {
+                        EffectFailure::contract_violation(
+                            "send_decision_fast_path returned blocked",
+                        )
+                    })
+                    .map_err(|failure| Fault::Invoke { failure })?
             } else {
                 ctx.handler
                     .send_decision(SendDecisionInput {
@@ -333,7 +340,10 @@ fn step_offer(
                         state: &coro.regs,
                         payload: Some(offer_payload),
                     })
-                    .map_err(|e| Fault::Invoke { message: e })?
+                    .expect_success(|| {
+                        EffectFailure::contract_violation("send_decision returned blocked")
+                    })
+                    .map_err(|failure| Fault::Invoke { failure })?
             };
             if let SendDecision::Deliver(payload) = &decision {
                 validate_payload(
@@ -349,7 +359,9 @@ fn step_offer(
             let enqueue = match decision {
                 SendDecision::Deliver(payload) => session
                     .send(role, &partner, payload)
-                    .map_err(|e| Fault::Invoke { message: e })?,
+                    .map_err(|e| Fault::Invoke {
+                        failure: EffectFailure::invalid_input(e),
+                    })?,
                 SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
             };
             match enqueue {

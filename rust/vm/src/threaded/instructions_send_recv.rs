@@ -97,7 +97,9 @@ fn step_send(
         ctx.handler
             .send_decision_fast_path(fast_path, &coro.regs, Some(&send_payload))
     {
-        decision.map_err(|e| Fault::Invoke { message: e })?
+        decision
+            .expect_success(|| EffectFailure::contract_violation("send_decision_fast_path returned blocked"))
+            .map_err(|failure| Fault::Invoke { failure })?
     } else {
         ctx.handler
             .send_decision(SendDecisionInput {
@@ -108,7 +110,8 @@ fn step_send(
                 state: &coro.regs,
                 payload: Some(send_payload),
             })
-            .map_err(|e| Fault::Invoke { message: e })?
+            .expect_success(|| EffectFailure::contract_violation("send_decision returned blocked"))
+            .map_err(|failure| Fault::Invoke { failure })?
     };
 
     if ctx.crashed_sites.contains(role)
@@ -168,7 +171,9 @@ fn step_send(
             let mut session_guard = session.lock().expect("threaded VM lock poisoned");
             session_guard
                 .send_with_sequence(role, &prepared.partner, payload, sequence_no)
-                .map_err(|e| Fault::Invoke { message: e })?
+                .map_err(|e| Fault::Invoke {
+                    failure: EffectFailure::invalid_input(e),
+                })?
         }
         SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
     };
@@ -396,7 +401,8 @@ fn step_recv(
             &mut coro.regs,
             &val,
         )
-        .map_err(|e| Fault::Invoke { message: e })?;
+        .expect_success(|| EffectFailure::contract_violation("handle_recv returned blocked"))
+        .map_err(|failure| Fault::Invoke { failure })?;
 
     let (_resolved, type_update) =
         resolve_type_update(&prepared.continuation, &prepared.original, &prepared.ep);
@@ -465,13 +471,14 @@ fn step_invoke(
     }
     if !session.has_bound_handler() {
         return Err(Fault::Invoke {
-            message: "no handler bound".to_string(),
+            failure: EffectFailure::contract_violation("no handler bound"),
         });
     }
     let coro_id = coro.id;
     handler
         .step(role, &mut coro.regs)
-        .map_err(|e| Fault::Invoke { message: e })?;
+        .expect_success(|| EffectFailure::contract_violation("step returned blocked"))
+        .map_err(|failure| Fault::Invoke { failure })?;
 
     Ok(StepPack {
         coro_update: CoroUpdate::AdvancePc,

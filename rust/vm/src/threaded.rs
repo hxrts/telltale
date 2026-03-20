@@ -25,8 +25,9 @@ use crate::communication_replay::{
 };
 use crate::coroutine::{BlockReason, CoroStatus, Coroutine, Fault, ProgressToken, Value};
 use crate::effect::{
-    CorruptionType, EffectHandler, EffectTraceEntry, ReplayEffectHandler, SendDecision,
-    SendDecisionFastPathInput, SendDecisionInput, TopologyPerturbation,
+    CorruptionType, EffectFailure, EffectHandler, EffectResult, EffectTraceEntry,
+    ReplayEffectHandler, SendDecision, SendDecisionFastPathInput, SendDecisionInput,
+    TopologyPerturbation,
 };
 use crate::faults::{
     speculation_fault_abort_requires_active, speculation_fault_disabled,

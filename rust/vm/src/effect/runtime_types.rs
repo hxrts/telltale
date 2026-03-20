@@ -5,6 +5,43 @@ pub struct EffectTraceTape {
     entries: Mutex<Vec<EffectTraceEntry>>,
 }
 
+fn encode_effect_result<T>(result: &EffectResult<T>) -> JsonValue
+where
+    T: Serialize,
+{
+    match result {
+        EffectResult::Success(value) => json!({
+            "status": "success",
+            "value": value,
+        }),
+        EffectResult::Blocked => json!({
+            "status": "blocked",
+        }),
+        EffectResult::Failure(failure) => json!({
+            "status": "failure",
+            "failure": failure,
+        }),
+    }
+}
+
+fn decode_effect_result<T>(outputs: &JsonValue) -> Option<EffectResult<T>>
+where
+    T: DeserializeOwned,
+{
+    match outputs.get("status").and_then(JsonValue::as_str)? {
+        "success" => {
+            let value = serde_json::from_value(outputs.get("value")?.clone()).ok()?;
+            Some(EffectResult::Success(value))
+        }
+        "blocked" => Some(EffectResult::Blocked),
+        "failure" => {
+            let failure = serde_json::from_value(outputs.get("failure")?.clone()).ok()?;
+            Some(EffectResult::Failure(failure))
+        }
+        _ => None,
+    }
+}
+
 impl EffectTraceTape {
     /// Create an empty tape.
     #[must_use]
@@ -159,48 +196,25 @@ impl<'a> ReplayEffectHandler<'a> {
         Ok(entry.clone())
     }
 
-    fn peek_entry_kind(&self) -> Option<String> {
-        let cursor = *self
-            .cursor
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        self.entries
-            .get(cursor)
-            .map(|entry| entry.effect_kind.clone())
-    }
-
     fn parse_send_decision(
         outputs: &JsonValue,
-        explicit_payload: Option<Value>,
-    ) -> Option<SendDecision> {
-        let decision = outputs.get("decision").and_then(JsonValue::as_str)?;
-        match decision {
-            "deliver" => {
-                let payload = outputs
-                    .get("payload")
-                    .and_then(|value| serde_json::from_value(value.clone()).ok())
-                    .or(explicit_payload)
-                    .unwrap_or(Value::Unit);
-                Some(SendDecision::Deliver(payload))
+        _explicit_payload: Option<Value>,
+    ) -> Option<EffectResult<SendDecision>> {
+        let Some(result) = decode_effect_result::<SendDecision>(outputs) else {
+            return None;
+        };
+        match result {
+            EffectResult::Success(SendDecision::Deliver(payload)) => {
+                Some(EffectResult::Success(SendDecision::Deliver(payload)))
             }
-            "drop" => Some(SendDecision::Drop),
-            "defer" => Some(SendDecision::Defer),
-            _ => None,
-        }
-    }
-
-    fn parse_acquire_decision(outputs: &JsonValue) -> Option<AcquireDecision> {
-        let decision = outputs.get("decision").and_then(JsonValue::as_str)?;
-        match decision {
-            "grant" => {
-                let evidence = outputs
-                    .get("evidence")
-                    .and_then(|value| serde_json::from_value(value.clone()).ok())
-                    .unwrap_or(Value::Unit);
-                Some(AcquireDecision::Grant(evidence))
+            EffectResult::Success(SendDecision::Drop) => {
+                Some(EffectResult::Success(SendDecision::Drop))
             }
-            "block" => Some(AcquireDecision::Block),
-            _ => None,
+            EffectResult::Success(SendDecision::Defer) => {
+                Some(EffectResult::Success(SendDecision::Defer))
+            }
+            EffectResult::Blocked => Some(EffectResult::Blocked),
+            EffectResult::Failure(failure) => Some(EffectResult::Failure(failure)),
         }
     }
 }

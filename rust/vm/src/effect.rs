@@ -28,6 +28,7 @@
 use crate::coroutine::Value;
 use crate::output_condition::OutputConditionHint;
 use crate::session::SessionId;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::Value as JsonValue;

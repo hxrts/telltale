@@ -329,13 +329,13 @@
             .expect_err("identity change should fail with assertions enabled");
         match err {
             VMError::HandlerError(message) => {
-                assert!(message.contains("handler_identity changed"));
+                assert!(message.message.contains("handler_identity changed"));
             }
             VMError::Fault {
-                fault: Fault::Invoke { message },
+                fault: Fault::Invoke { failure },
                 ..
             } => {
-                assert!(message.contains("handler_identity changed"));
+                assert!(failure.message.contains("handler_identity changed"));
             }
             other => panic!("unexpected error: {other:?}"),
         }
@@ -358,8 +358,8 @@
             .expect_err("unsorted topology events should fail with assertions enabled");
         match err {
             VMError::HandlerError(message) => {
-                assert!(message.contains("topology_events"));
-                assert!(message.contains("pre-sorted"));
+                assert!(message.message.contains("topology_events"));
+                assert!(message.message.contains("pre-sorted"));
             }
             other => panic!("unexpected error: {other:?}"),
         }
@@ -601,7 +601,9 @@
         match err {
             VMError::HandlerError(message) => {
                 assert!(
-                    message.contains("matching committed delegation audit record"),
+                    message
+                        .message
+                        .contains("matching committed delegation audit record"),
                     "unexpected error message: {message}"
                 );
             }

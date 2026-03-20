@@ -9,28 +9,35 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         partner: &str,
         label: &str,
         state: &[Value],
-    ) -> Result<Value, String> {
+    ) -> EffectResult<Value> {
         if let Some(fallback) = self.fallback {
             fallback.handle_send(role, partner, label, state)
         } else {
-            Ok(Value::Unit)
+            EffectResult::success(Value::Unit)
         }
     }
 
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-        let entry = self.next_entry("send_decision")?;
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        let entry = match self.next_entry("send_decision") {
+            Ok(entry) => entry,
+            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
+        };
         if let Some(decision) = Self::parse_send_decision(&entry.outputs, input.payload.clone()) {
-            return Ok(decision);
+            return decision;
         }
         if let Some(committed) = entry.outputs.get("committed").and_then(JsonValue::as_bool) {
             if committed {
-                return Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)));
+                return EffectResult::success(SendDecision::Deliver(
+                    input.payload.unwrap_or(Value::Unit),
+                ));
             }
         }
         if let Some(fallback) = self.fallback {
             return fallback.send_decision(input);
         }
-        Err("replay send_decision missing decision payload".to_string())
+        EffectResult::failure(EffectFailure::determinism(
+            "replay send_decision missing typed outcome",
+        ))
     }
 
     fn handle_recv(
@@ -40,12 +47,20 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         label: &str,
         state: &mut Vec<Value>,
         payload: &Value,
-    ) -> Result<(), String> {
-        self.next_entry("handle_recv")?;
+    ) -> EffectResult<()> {
+        let entry = match self.next_entry("handle_recv") {
+            Ok(entry) => entry,
+            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
+        };
+        if let Some(outcome) = decode_effect_result::<()>(&entry.outputs) {
+            return outcome;
+        }
         if let Some(fallback) = self.fallback {
             return fallback.handle_recv(role, partner, label, state, payload);
         }
-        Ok(())
+        EffectResult::failure(EffectFailure::determinism(
+            "replay handle_recv missing typed outcome",
+        ))
     }
 
     fn handle_choose(
@@ -54,23 +69,36 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         partner: &str,
         labels: &[String],
         state: &[Value],
-    ) -> Result<String, String> {
-        let entry = self.next_entry("handle_choose")?;
-        if let Some(chosen) = entry.outputs.get("label").and_then(JsonValue::as_str) {
-            return Ok(chosen.to_string());
+    ) -> EffectResult<String> {
+        let entry = match self.next_entry("handle_choose") {
+            Ok(entry) => entry,
+            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
+        };
+        if let Some(chosen) = decode_effect_result::<String>(&entry.outputs) {
+            return chosen;
         }
         if let Some(fallback) = self.fallback {
             return fallback.handle_choose(role, partner, labels, state);
         }
-        Err("replay handle_choose missing chosen label".to_string())
+        EffectResult::failure(EffectFailure::determinism(
+            "replay handle_choose missing typed outcome",
+        ))
     }
 
-    fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String> {
-        self.next_entry("invoke_step")?;
+    fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
+        let entry = match self.next_entry("invoke_step") {
+            Ok(entry) => entry,
+            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
+        };
+        if let Some(outcome) = decode_effect_result::<()>(&entry.outputs) {
+            return outcome;
+        }
         if let Some(fallback) = self.fallback {
             return fallback.step(role, state);
         }
-        Ok(())
+        EffectResult::failure(EffectFailure::determinism(
+            "replay invoke_step missing typed outcome",
+        ))
     }
 
     fn handle_acquire(
@@ -79,20 +107,20 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         role: &str,
         layer: &str,
         state: &[Value],
-    ) -> Result<AcquireDecision, String> {
-        let entry = self.next_entry("handle_acquire")?;
-        if let Some(decision) = Self::parse_acquire_decision(&entry.outputs) {
-            return Ok(decision);
-        }
-        if let Some(granted) = entry.outputs.get("granted").and_then(JsonValue::as_bool) {
-            if granted {
-                return Ok(AcquireDecision::Grant(Value::Unit));
-            }
+    ) -> EffectResult<Value> {
+        let entry = match self.next_entry("handle_acquire") {
+            Ok(entry) => entry,
+            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
+        };
+        if let Some(decision) = decode_effect_result::<Value>(&entry.outputs) {
+            return decision;
         }
         if let Some(fallback) = self.fallback {
             return fallback.handle_acquire(sid, role, layer, state);
         }
-        Err("replay handle_acquire missing acquire decision".to_string())
+        EffectResult::failure(EffectFailure::determinism(
+            "replay handle_acquire missing typed outcome",
+        ))
     }
 
     fn handle_release(
@@ -102,29 +130,33 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         layer: &str,
         evidence: &Value,
         state: &[Value],
-    ) -> Result<(), String> {
-        self.next_entry("handle_release")?;
+    ) -> EffectResult<()> {
+        let entry = match self.next_entry("handle_release") {
+            Ok(entry) => entry,
+            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
+        };
+        if let Some(outcome) = decode_effect_result::<()>(&entry.outputs) {
+            return outcome;
+        }
         if let Some(fallback) = self.fallback {
             return fallback.handle_release(sid, role, layer, evidence, state);
         }
-        Ok(())
+        EffectResult::failure(EffectFailure::determinism(
+            "replay handle_release missing typed outcome",
+        ))
     }
 
-    fn topology_events(&self, _tick: u64) -> Result<Vec<TopologyPerturbation>, String> {
-        let mut events = Vec::new();
-        while self.peek_entry_kind().as_deref() == Some("topology_event") {
-            let entry = self.next_entry("topology_event")?;
-            if let Some(topology) = entry.topology {
-                events.push(topology);
-                continue;
-            }
-            if let Some(raw) = entry.outputs.get("topology") {
-                if let Ok(topology) = serde_json::from_value::<TopologyPerturbation>(raw.clone()) {
-                    events.push(topology);
-                }
-            }
+    fn topology_events(&self, _tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
+        let entry = match self.next_entry("topology_events") {
+            Ok(entry) => entry,
+            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
+        };
+        if let Some(outcome) = decode_effect_result::<Vec<TopologyPerturbation>>(&entry.outputs) {
+            return outcome;
         }
-        Ok(events)
+        EffectResult::failure(EffectFailure::determinism(
+            "replay topology_events missing typed outcome",
+        ))
     }
 
     fn output_condition_hint(
@@ -162,19 +194,19 @@ mod tests {
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Ok(Value::Nat(1))
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Nat(1))
         }
 
         #[allow(clippy::as_conversions, clippy::cast_possible_wrap)]
-        fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
             let idx = self.counter.fetch_add(1, Ordering::Relaxed);
             if idx % 2 == 0 {
-                Ok(SendDecision::Deliver(
+                EffectResult::success(SendDecision::Deliver(
                     input.payload.unwrap_or(Value::Nat(idx as u64)),
                 ))
             } else {
-                Ok(SendDecision::Drop)
+                EffectResult::success(SendDecision::Drop)
             }
         }
 
@@ -185,8 +217,8 @@ mod tests {
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -195,15 +227,15 @@ mod tests {
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels".to_string())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
     }
 
@@ -221,6 +253,7 @@ mod tests {
                 state: &[],
                 payload: Some(Value::Nat(7)),
             })
+            .expect_success(|| EffectFailure::contract_violation("decision blocked"))
             .expect("first decision");
         let second = recorder
             .send_decision(SendDecisionInput {
@@ -231,6 +264,7 @@ mod tests {
                 state: &[],
                 payload: Some(Value::Nat(8)),
             })
+            .expect_success(|| EffectFailure::contract_violation("decision blocked"))
             .expect("second decision");
         assert!(matches!(first, SendDecision::Deliver(_)));
         assert!(matches!(second, SendDecision::Drop));
@@ -245,6 +279,7 @@ mod tests {
                 state: &[],
                 payload: Some(Value::Nat(0)),
             })
+            .expect_success(|| EffectFailure::contract_violation("decision blocked"))
             .expect("replay first decision");
         let replay_second = replay
             .send_decision(SendDecisionInput {
@@ -255,10 +290,29 @@ mod tests {
                 state: &[],
                 payload: Some(Value::Nat(0)),
             })
+            .expect_success(|| EffectFailure::contract_violation("decision blocked"))
             .expect("replay second decision");
         assert!(matches!(replay_first, SendDecision::Deliver(_)));
         assert!(matches!(replay_second, SendDecision::Drop));
         assert_eq!(replay.remaining(), 0);
+    }
+
+    #[test]
+    fn typed_effect_outcomes_serialize_and_roundtrip() {
+        let blocked_json = encode_effect_result::<SendDecision>(&EffectResult::Blocked);
+        let blocked = decode_effect_result::<SendDecision>(&blocked_json)
+            .expect("blocked outcome should decode");
+        assert!(matches!(blocked, EffectResult::Blocked));
+
+        let failure_json = encode_effect_result::<SendDecision>(&EffectResult::failure(
+            EffectFailure::timeout("send timed out"),
+        ));
+        let failure = decode_effect_result::<SendDecision>(&failure_json)
+            .expect("failure outcome should decode");
+        assert_eq!(
+            failure,
+            EffectResult::Failure(EffectFailure::timeout("send timed out"))
+        );
     }
 
     #[test]
@@ -274,8 +328,8 @@ mod tests {
                 _partner: &str,
                 _label: &str,
                 _state: &[Value],
-            ) -> Result<Value, String> {
-                Ok(Value::Unit)
+            ) -> EffectResult<Value> {
+                EffectResult::success(Value::Unit)
             }
 
             fn handle_recv(
@@ -285,8 +339,8 @@ mod tests {
                 _label: &str,
                 _state: &mut Vec<Value>,
                 _payload: &Value,
-            ) -> Result<(), String> {
-                Ok(())
+            ) -> EffectResult<()> {
+                EffectResult::success(())
             }
 
             fn handle_choose(
@@ -295,25 +349,25 @@ mod tests {
                 _partner: &str,
                 labels: &[String],
                 _state: &[Value],
-            ) -> Result<String, String> {
-                labels
-                    .first()
-                    .cloned()
-                    .ok_or_else(|| "no labels".to_string())
+            ) -> EffectResult<String> {
+                match labels.first().cloned() {
+                    Some(label) => EffectResult::success(label),
+                    None => EffectResult::failure(EffectFailure::invalid_input("no labels")),
+                }
             }
 
-            fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-                Ok(())
+            fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+                EffectResult::success(())
             }
 
-            fn topology_events(&self, _tick: u64) -> Result<Vec<TopologyPerturbation>, String> {
+            fn topology_events(&self, _tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
                 let idx = self.emitted.fetch_add(1, Ordering::Relaxed);
                 if idx == 0 {
-                    Ok(vec![TopologyPerturbation::Crash {
+                    EffectResult::success(vec![TopologyPerturbation::Crash {
                         site: "node-a".to_string(),
                     }])
                 } else {
-                    Ok(Vec::new())
+                    EffectResult::success(Vec::new())
                 }
             }
         }
@@ -322,44 +376,56 @@ mod tests {
             emitted: AtomicUsize::new(0),
         };
         let recorder = RecordingEffectHandler::new(&base);
-        let first = recorder.topology_events(1).expect("record topology");
-        let second = recorder.topology_events(2).expect("record topology");
+        let first = recorder
+            .topology_events(1)
+            .expect_success(|| EffectFailure::contract_violation("topology blocked"))
+            .expect("record topology");
+        let second = recorder
+            .topology_events(2)
+            .expect_success(|| EffectFailure::contract_violation("topology blocked"))
+            .expect("record topology");
         assert_eq!(first.len(), 1);
         assert!(second.is_empty());
 
         let replay = ReplayEffectHandler::new(recorder.effect_trace());
-        let replay_first = replay.topology_events(1).expect("replay topology");
-        let replay_second = replay.topology_events(2).expect("replay topology");
+        let replay_first = replay
+            .topology_events(1)
+            .expect_success(|| EffectFailure::contract_violation("topology blocked"))
+            .expect("replay topology");
+        let replay_second = replay
+            .topology_events(2)
+            .expect_success(|| EffectFailure::contract_violation("topology blocked"))
+            .expect("replay topology");
         assert_eq!(replay_first.len(), 1);
         assert!(replay_second.is_empty());
         assert_eq!(replay.remaining(), 0);
     }
 
     #[test]
-    fn classify_effect_error_categories_from_strings() {
+    fn effect_failure_constructors_preserve_typed_kinds() {
         assert_eq!(
-            classify_effect_error("timed out waiting for recv"),
-            EffectErrorCategory::Timeout
+            EffectFailure::timeout("timed out waiting for recv").kind,
+            EffectFailureKind::Timeout
         );
         assert_eq!(
-            classify_effect_error("topology partition mismatch"),
-            EffectErrorCategory::Topology
+            EffectFailure::topology_disruption("topology partition mismatch").kind,
+            EffectFailureKind::TopologyDisruption
         );
         assert_eq!(
-            classify_effect_error("replay trace kind mismatch"),
-            EffectErrorCategory::Determinism
+            EffectFailure::determinism("replay trace kind mismatch").kind,
+            EffectFailureKind::Determinism
         );
         assert_eq!(
-            classify_effect_error("handler identity contract violated"),
-            EffectErrorCategory::ContractViolation
+            EffectFailure::contract_violation("handler identity contract violated").kind,
+            EffectFailureKind::ContractViolation
         );
         assert_eq!(
-            classify_effect_error("channel unavailable"),
-            EffectErrorCategory::Unavailable
+            EffectFailure::unavailable("channel unavailable").kind,
+            EffectFailureKind::Unavailable
         );
         assert_eq!(
-            classify_effect_error("invalid payload type"),
-            EffectErrorCategory::InvalidInput
+            EffectFailure::invalid_input("invalid payload type").kind,
+            EffectFailureKind::InvalidInput
         );
     }
 

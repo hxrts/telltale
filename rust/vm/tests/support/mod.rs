@@ -7,7 +7,7 @@ use proptest::prelude::*;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::buffer::{BackpressurePolicy, BufferConfig, BufferMode};
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::EffectHandler;
+use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::{ObsEvent, StepResult, VMError, VM};
 
@@ -33,8 +33,8 @@ impl EffectHandler for PassthroughHandler {
         _partner: &str,
         _label: &str,
         _state: &[Value],
-    ) -> Result<Value, String> {
-        Ok(Value::Nat(42))
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Nat(42))
     }
 
     fn handle_recv(
@@ -44,8 +44,8 @@ impl EffectHandler for PassthroughHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -54,15 +54,15 @@ impl EffectHandler for PassthroughHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".into())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+        }
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-        Ok(())
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::success(())
     }
 }
 
@@ -90,12 +90,12 @@ impl EffectHandler for RecordingHandler {
         partner: &str,
         label: &str,
         _state: &[Value],
-    ) -> Result<Value, String> {
+    ) -> EffectResult<Value> {
         self.sends
             .lock()
             .expect("recording handler lock poisoned")
             .push((role.into(), partner.into(), label.into()));
-        Ok(Value::Nat(42))
+        EffectResult::success(Value::Nat(42))
     }
 
     fn handle_recv(
@@ -105,12 +105,12 @@ impl EffectHandler for RecordingHandler {
         label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
+    ) -> EffectResult<()> {
         self.recvs
             .lock()
             .expect("recording handler lock poisoned")
             .push((role.into(), partner.into(), label.into()));
-        Ok(())
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -119,19 +119,19 @@ impl EffectHandler for RecordingHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".into())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+        }
     }
 
-    fn step(&self, role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
+    fn step(&self, role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
         self.steps
             .lock()
             .expect("recording handler lock poisoned")
             .push(role.into());
-        Ok(())
+        EffectResult::success(())
     }
 }
 
@@ -155,8 +155,8 @@ impl EffectHandler for FailingHandler {
         _partner: &str,
         _label: &str,
         _state: &[Value],
-    ) -> Result<Value, String> {
-        Err(self.message.clone())
+    ) -> EffectResult<Value> {
+        EffectResult::failure(EffectFailure::contract_violation(self.message.clone()))
     }
 
     fn handle_recv(
@@ -166,8 +166,8 @@ impl EffectHandler for FailingHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
-        Err(self.message.clone())
+    ) -> EffectResult<()> {
+        EffectResult::failure(EffectFailure::contract_violation(self.message.clone()))
     }
 
     fn handle_choose(
@@ -176,12 +176,12 @@ impl EffectHandler for FailingHandler {
         _partner: &str,
         _labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        Err(self.message.clone())
+    ) -> EffectResult<String> {
+        EffectResult::failure(EffectFailure::contract_violation(self.message.clone()))
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-        Err(self.message.clone())
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::failure(EffectFailure::contract_violation(self.message.clone()))
     }
 }
 

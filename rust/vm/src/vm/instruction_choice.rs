@@ -182,7 +182,10 @@ impl VM {
                 &mut self.coroutines[coro_idx].regs,
                 &val,
             )
-            .map_err(|e| Fault::Invoke { message: e })?;
+            .expect_success(|| {
+                EffectFailure::contract_violation("handle_recv returned blocked")
+            })
+            .map_err(|failure| Fault::Invoke { failure })?;
 
         let original = self.sessions.original_type(&ep).unwrap_or(&LocalTypeR::End);
         let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);
@@ -266,7 +269,13 @@ impl VM {
                     &self.coroutines[coro_idx].regs,
                     Some(&offer_payload),
                 ) {
-                    decision.map_err(|e| Fault::Invoke { message: e })?
+                    decision
+                        .expect_success(|| {
+                            EffectFailure::contract_violation(
+                                "send_decision_fast_path returned blocked",
+                            )
+                        })
+                        .map_err(|failure| Fault::Invoke { failure })?
                 } else {
                     handler
                         .send_decision(SendDecisionInput {
@@ -277,7 +286,10 @@ impl VM {
                             state: &self.coroutines[coro_idx].regs,
                             payload: Some(offer_payload),
                         })
-                        .map_err(|e| Fault::Invoke { message: e })?
+                        .expect_success(|| {
+                            EffectFailure::contract_violation("send_decision returned blocked")
+                        })
+                        .map_err(|failure| Fault::Invoke { failure })?
                 };
                 if let SendDecision::Deliver(payload) = &decision {
                     self.validate_payload(
@@ -298,7 +310,9 @@ impl VM {
                 let enqueue = match decision {
                     SendDecision::Deliver(payload) => session
                         .send(role, &partner, payload)
-                        .map_err(|e| Fault::Invoke { message: e })?,
+                        .map_err(|e| Fault::Invoke {
+                            failure: EffectFailure::invalid_input(e),
+                        })?,
                     SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
                 };
                 match enqueue {

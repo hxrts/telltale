@@ -31,15 +31,14 @@ pub trait EffectHandler: Send + Sync {
     /// * `label` - The message label
     /// * `state` - The coroutine's register file (for reading state)
     ///
-    /// # Errors
-    /// Returns an error string if the handler fails.
+    /// Returns a typed outcome for the callback.
     fn handle_send(
         &self,
         role: &str,
         partner: &str,
         label: &str,
         state: &[Value],
-    ) -> Result<Value, String>;
+    ) -> EffectResult<Value>;
 
     /// Optional fast-path hook for send decision dispatch.
     ///
@@ -50,7 +49,7 @@ pub trait EffectHandler: Send + Sync {
         _fast_path: SendDecisionFastPathInput<'_>,
         _state: &[Value],
         _payload: Option<&Value>,
-    ) -> Option<Result<SendDecision, String>> {
+    ) -> Option<EffectResult<SendDecision>> {
         None
     }
 
@@ -59,15 +58,13 @@ pub trait EffectHandler: Send + Sync {
     /// Middleware can override this to model loss/delay/corruption. The default
     /// behavior computes a payload via `handle_send` unless one is provided.
     ///
-    /// # Errors
-    ///
-    /// Returns an error string if the handler fails.
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+    /// Returns a typed outcome for the callback.
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
         if let Some(payload) = input.payload {
-            Ok(SendDecision::Deliver(payload))
+            EffectResult::success(SendDecision::Deliver(payload))
         } else {
             self.handle_send(input.role, input.partner, input.label, input.state)
-                .map(SendDecision::Deliver)
+                .map_success(SendDecision::Deliver)
         }
     }
 
@@ -80,8 +77,7 @@ pub trait EffectHandler: Send + Sync {
     /// * `state` - The coroutine's register file (mutable for state updates)
     /// * `payload` - The received value
     ///
-    /// # Errors
-    /// Returns an error string if the handler fails.
+    /// Returns a typed outcome for the callback.
     fn handle_recv(
         &self,
         role: &str,
@@ -89,7 +85,7 @@ pub trait EffectHandler: Send + Sync {
         label: &str,
         state: &mut Vec<Value>,
         payload: &Value,
-    ) -> Result<(), String>;
+    ) -> EffectResult<()>;
 
     /// Choose which branch to take for internal choice (select).
     ///
@@ -105,46 +101,37 @@ pub trait EffectHandler: Send + Sync {
     /// * `labels` - The available branch labels
     /// * `state` - The coroutine's register file (for reading state)
     ///
-    /// # Errors
-    /// Returns an error string if the handler fails.
+    /// Returns a typed outcome for the callback.
     fn handle_choose(
         &self,
         role: &str,
         partner: &str,
         labels: &[String],
         state: &[Value],
-    ) -> Result<String, String>;
+    ) -> EffectResult<String>;
 
     /// Perform an integration step after a protocol round.
     ///
     /// Called after all sends/receives for a tick are complete.
     ///
-    /// # Errors
-    /// Returns an error string if the handler fails.
-    fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String>;
+    /// Returns a typed outcome for the callback.
+    fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()>;
 
     /// Attempt to acquire a guard layer.
     ///
-    /// Returning `AcquireDecision::Block` causes the coroutine to block.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error string if acquisition fails.
+    /// Returning `EffectResult::Blocked` causes the coroutine to block.
+    /// `Success(evidence)` grants the acquire and binds the evidence value.
     fn handle_acquire(
         &self,
         _sid: SessionId,
         _role: &str,
         _layer: &str,
         _state: &[Value],
-    ) -> Result<AcquireDecision, String> {
-        Ok(AcquireDecision::Grant(Value::Unit))
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Unit)
     }
 
     /// Release a guard layer using previously acquired evidence.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error string if release fails.
     fn handle_release(
         &self,
         _sid: SessionId,
@@ -152,8 +139,8 @@ pub trait EffectHandler: Send + Sync {
         _layer: &str,
         _evidence: &Value,
         _state: &[Value],
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     /// Topology perturbations injected by the environment for this scheduler tick.
@@ -163,11 +150,9 @@ pub trait EffectHandler: Send + Sync {
     /// stage async discoveries before this method is called rather than doing
     /// async work from inside the callback.
     ///
-    /// # Errors
-    ///
-    /// Returns an error string if topology retrieval fails.
-    fn topology_events(&self, _tick: u64) -> Result<Vec<TopologyPerturbation>, String> {
-        Ok(Vec::new())
+    /// Returns a typed outcome for the callback.
+    fn topology_events(&self, _tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
+        EffectResult::success(Vec::new())
     }
 
     /// Optional output-condition metadata for commit gating.
@@ -195,11 +180,11 @@ impl<T: EffectHandler + ?Sized> EffectHandler for &T {
         partner: &str,
         label: &str,
         state: &[Value],
-    ) -> Result<Value, String> {
+    ) -> EffectResult<Value> {
         (**self).handle_send(role, partner, label, state)
     }
 
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
         (**self).send_decision(input)
     }
 
@@ -208,7 +193,7 @@ impl<T: EffectHandler + ?Sized> EffectHandler for &T {
         fast_path: SendDecisionFastPathInput<'_>,
         state: &[Value],
         payload: Option<&Value>,
-    ) -> Option<Result<SendDecision, String>> {
+    ) -> Option<EffectResult<SendDecision>> {
         (**self).send_decision_fast_path(fast_path, state, payload)
     }
 
@@ -219,7 +204,7 @@ impl<T: EffectHandler + ?Sized> EffectHandler for &T {
         label: &str,
         state: &mut Vec<Value>,
         payload: &Value,
-    ) -> Result<(), String> {
+    ) -> EffectResult<()> {
         (**self).handle_recv(role, partner, label, state, payload)
     }
 
@@ -229,11 +214,11 @@ impl<T: EffectHandler + ?Sized> EffectHandler for &T {
         partner: &str,
         labels: &[String],
         state: &[Value],
-    ) -> Result<String, String> {
+    ) -> EffectResult<String> {
         (**self).handle_choose(role, partner, labels, state)
     }
 
-    fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String> {
+    fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
         (**self).step(role, state)
     }
 
@@ -243,7 +228,7 @@ impl<T: EffectHandler + ?Sized> EffectHandler for &T {
         role: &str,
         layer: &str,
         state: &[Value],
-    ) -> Result<AcquireDecision, String> {
+    ) -> EffectResult<Value> {
         (**self).handle_acquire(sid, role, layer, state)
     }
 
@@ -254,11 +239,11 @@ impl<T: EffectHandler + ?Sized> EffectHandler for &T {
         layer: &str,
         evidence: &Value,
         state: &[Value],
-    ) -> Result<(), String> {
+    ) -> EffectResult<()> {
         (**self).handle_release(sid, role, layer, evidence, state)
     }
 
-    fn topology_events(&self, tick: u64) -> Result<Vec<TopologyPerturbation>, String> {
+    fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
         (**self).topology_events(tick)
     }
 

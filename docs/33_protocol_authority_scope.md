@@ -79,24 +79,16 @@ The current repo already has a strong VM/effect boundary, but several
 parts of that boundary still rely on raw strings or convention-driven
 host behavior.
 
-### Stringly VM/Effect Callback Surface
+### VM/Effect Callback Surface
 
-The primary weak surface is the VM `EffectHandler` trait in
-`rust/vm/src/effect/handler_trait.rs`.
-These methods currently return `Result<_, String>`:
+The VM `EffectHandler` trait in `rust/vm/src/effect/handler_trait.rs`
+has now moved to typed outcomes.
+Callbacks return `EffectResult<_>` and failures use `EffectFailure` /
+`EffectFailureKind` rather than raw `String` classification.
 
-- `handle_send`
-- `send_decision`
-- `send_decision_fast_path`
-- `handle_recv`
-- `handle_choose`
-- `step`
-- `handle_acquire`
-- `handle_release`
-- `topology_events`
-
-This is the most important place to replace stringly host failure with
-typed outcomes.
+This was the highest-priority boundary change because it makes timeout,
+cancellation, stale authority, invalid evidence, determinism, topology,
+and contract failures explicit at the protocol boundary.
 
 ### Guard/Evidence Surface
 
@@ -125,7 +117,10 @@ Examples include:
 
 Phase 1 conclusion:
 
-- the highest-priority weak surface is the effect/guard host boundary
+- the effect host boundary was the highest-priority weak surface and has
+  now been tightened to typed outcomes
+- the remaining highest-priority weak surface is the guard/evidence
+  boundary
 - the next priority is authority/evidence-carrying runtime APIs
 - generic parser/compiler `String` errors are lower priority for this
   workstream unless they become part of the protocol authority surface

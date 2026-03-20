@@ -17,8 +17,8 @@
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Ok(Value::Nat(42))
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Nat(42))
         }
 
         fn handle_recv(
@@ -28,8 +28,8 @@
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -38,15 +38,15 @@
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".into())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
     }
 
@@ -60,12 +60,12 @@
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Err("send failed".to_string())
+        ) -> EffectResult<Value> {
+            EffectResult::failure(EffectFailure::denied("send failed"))
         }
 
-        fn send_decision(&self, _input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-            Err("send failed".to_string())
+        fn send_decision(&self, _input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+            EffectResult::failure(EffectFailure::denied("send failed"))
         }
 
         fn handle_recv(
@@ -75,8 +75,8 @@
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -85,15 +85,15 @@
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".to_string())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
     }
 
@@ -135,8 +135,8 @@
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Ok(Value::Nat(1))
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Nat(1))
         }
 
         fn handle_recv(
@@ -146,8 +146,8 @@
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -156,25 +156,25 @@
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".to_string())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
-        fn topology_events(&self, tick: u64) -> Result<Vec<TopologyPerturbation>, String> {
+        fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
             if tick == 1 {
-                Ok(vec![TopologyPerturbation::Timeout {
+                EffectResult::success(vec![TopologyPerturbation::Timeout {
                     site: "A".to_string(),
                     duration: Duration::from_millis(20),
                 }])
             } else {
-                Ok(Vec::new())
+                EffectResult::success(Vec::new())
             }
         }
     }
@@ -188,8 +188,8 @@
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Ok(Value::Nat(0))
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Nat(0))
         }
 
         fn handle_recv(
@@ -199,8 +199,8 @@
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -209,26 +209,26 @@
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".to_string())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
-        fn topology_events(&self, tick: u64) -> Result<Vec<TopologyPerturbation>, String> {
+        fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
             if tick == 1 {
-                Ok(vec![TopologyPerturbation::Corrupt {
+                EffectResult::success(vec![TopologyPerturbation::Corrupt {
                     from: "A".to_string(),
                     to: "B".to_string(),
                     corruption: CorruptionType::BitFlip,
                 }])
             } else {
-                Ok(Vec::new())
+                EffectResult::success(Vec::new())
             }
         }
     }
@@ -242,8 +242,8 @@
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Ok(Value::Unit)
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Unit)
         }
 
         fn handle_recv(
@@ -253,8 +253,8 @@
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -263,24 +263,24 @@
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".to_string())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
-        fn topology_events(&self, tick: u64) -> Result<Vec<TopologyPerturbation>, String> {
+        fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
             if tick == 1 {
-                Ok(vec![TopologyPerturbation::Crash {
+                EffectResult::success(vec![TopologyPerturbation::Crash {
                     site: "A".to_string(),
                 }])
             } else {
-                Ok(Vec::new())
+                EffectResult::success(Vec::new())
             }
         }
     }
@@ -312,8 +312,8 @@
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Ok(Value::Unit)
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Unit)
         }
 
         fn handle_recv(
@@ -323,8 +323,8 @@
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -333,15 +333,15 @@
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".to_string())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
     }
 
@@ -354,8 +354,8 @@
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Ok(Value::Unit)
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Unit)
         }
 
         fn handle_recv(
@@ -365,8 +365,8 @@
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -375,20 +375,20 @@
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".to_string())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
-        fn topology_events(&self, tick: u64) -> Result<Vec<TopologyPerturbation>, String> {
+        fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
             if tick == 1 {
-                Ok(vec![
+                EffectResult::success(vec![
                     TopologyPerturbation::Timeout {
                         site: "B".to_string(),
                         duration: Duration::from_millis(1),
@@ -398,7 +398,7 @@
                     },
                 ])
             } else {
-                Ok(Vec::new())
+                EffectResult::success(Vec::new())
             }
         }
     }

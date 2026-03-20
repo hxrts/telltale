@@ -26,7 +26,7 @@ pub enum VMError {
     SessionNotFound(SessionId),
     /// Effect handler error.
     #[error("effect handler error: {0}")]
-    HandlerError(String),
+    HandlerError(EffectFailure),
     /// Persistence model lifecycle error.
     #[error("persistence error: {0}")]
     PersistenceError(String),

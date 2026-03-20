@@ -402,6 +402,7 @@ mod tests {
 
     use super::*;
     use crate::coroutine::Value;
+    use crate::effect::{EffectFailure, EffectResult};
 
     #[derive(Debug, Clone, Copy)]
     struct Noop;
@@ -413,8 +414,8 @@ mod tests {
             _partner: &str,
             label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Ok(Value::Str(label.to_string()))
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Str(label.to_string()))
         }
 
         fn handle_recv(
@@ -424,8 +425,8 @@ mod tests {
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -434,15 +435,15 @@ mod tests {
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".to_string())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
     }
 

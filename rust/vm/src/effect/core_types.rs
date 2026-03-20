@@ -167,7 +167,7 @@ pub struct EffectTraceEntry {
 }
 
 /// Decision returned by [`EffectHandler::send_decision`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SendDecision {
     /// Deliver the payload immediately (enqueue to buffer).
     Deliver(Value),
@@ -266,12 +266,20 @@ impl<'a> SendDecisionFastPathInput<'a> {
     }
 }
 
-/// Classify a stringly-typed effect error into a structured category.
+/// Typed failure kinds at the VM effect boundary.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum EffectErrorCategory {
-    /// Timeout/deadline failure.
+pub enum EffectFailureKind {
+    /// The requested action was denied by host policy or readiness rules.
+    Denied,
+    /// The requested action timed out.
     Timeout,
+    /// The requested action was explicitly cancelled.
+    Cancelled,
+    /// The caller's authority token is stale.
+    StaleAuthority,
+    /// The supplied evidence or witness is invalid.
+    InvalidEvidence,
     /// Transport/runtime unavailable.
     Unavailable,
     /// Invalid host input or payload contract.
@@ -279,98 +287,157 @@ pub enum EffectErrorCategory {
     /// Replay/determinism contract failure.
     Determinism,
     /// Topology ingress or topology mutation failure.
-    Topology,
+    TopologyDisruption,
     /// Host contract assertion or identity violation.
     ContractViolation,
     /// Unclassified failure.
     Unknown,
 }
 
-/// Structured view of host effect errors.
+/// Structured failure at the host effect boundary.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct EffectError {
-    /// Typed category inferred from message content.
-    pub category: EffectErrorCategory,
-    /// Original host error string.
+pub struct EffectFailure {
+    /// Typed failure kind.
+    pub kind: EffectFailureKind,
+    /// Human-readable failure detail.
     pub message: String,
 }
 
-impl EffectError {
-    /// Build a structured error from a raw host message.
+impl EffectFailure {
+    /// Build one failure value.
     #[must_use]
-    pub fn classify(message: impl Into<String>) -> Self {
-        let message = message.into();
+    pub fn new(kind: EffectFailureKind, message: impl Into<String>) -> Self {
         Self {
-            category: classify_effect_error(&message),
-            message,
+            kind,
+            message: message.into(),
         }
     }
+
+    /// Convenience constructor for denied outcomes.
+    #[must_use]
+    pub fn denied(message: impl Into<String>) -> Self {
+        Self::new(EffectFailureKind::Denied, message)
+    }
+
+    /// Convenience constructor for timeout outcomes.
+    #[must_use]
+    pub fn timeout(message: impl Into<String>) -> Self {
+        Self::new(EffectFailureKind::Timeout, message)
+    }
+
+    /// Convenience constructor for cancelled outcomes.
+    #[must_use]
+    pub fn cancelled(message: impl Into<String>) -> Self {
+        Self::new(EffectFailureKind::Cancelled, message)
+    }
+
+    /// Convenience constructor for stale-authority failures.
+    #[must_use]
+    pub fn stale_authority(message: impl Into<String>) -> Self {
+        Self::new(EffectFailureKind::StaleAuthority, message)
+    }
+
+    /// Convenience constructor for invalid-evidence failures.
+    #[must_use]
+    pub fn invalid_evidence(message: impl Into<String>) -> Self {
+        Self::new(EffectFailureKind::InvalidEvidence, message)
+    }
+
+    /// Convenience constructor for unavailable failures.
+    #[must_use]
+    pub fn unavailable(message: impl Into<String>) -> Self {
+        Self::new(EffectFailureKind::Unavailable, message)
+    }
+
+    /// Convenience constructor for invalid-input failures.
+    #[must_use]
+    pub fn invalid_input(message: impl Into<String>) -> Self {
+        Self::new(EffectFailureKind::InvalidInput, message)
+    }
+
+    /// Convenience constructor for determinism failures.
+    #[must_use]
+    pub fn determinism(message: impl Into<String>) -> Self {
+        Self::new(EffectFailureKind::Determinism, message)
+    }
+
+    /// Convenience constructor for topology failures.
+    #[must_use]
+    pub fn topology_disruption(message: impl Into<String>) -> Self {
+        Self::new(EffectFailureKind::TopologyDisruption, message)
+    }
+
+    /// Convenience constructor for contract-violation failures.
+    #[must_use]
+    pub fn contract_violation(message: impl Into<String>) -> Self {
+        Self::new(EffectFailureKind::ContractViolation, message)
+    }
 }
 
-impl core::fmt::Display for EffectError {
+impl core::fmt::Display for EffectFailure {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?}: {}", self.category, self.message)
+        write!(f, "{:?}: {}", self.kind, self.message)
     }
 }
 
-impl std::error::Error for EffectError {}
+impl std::error::Error for EffectFailure {}
 
-impl From<EffectError> for String {
-    fn from(value: EffectError) -> Self {
-        value.message
-    }
+/// Typed outcome for one VM effect callback.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum EffectResult<T> {
+    /// Callback completed successfully and produced a value.
+    Success(T),
+    /// Callback requested a clean block rather than a hard failure.
+    Blocked,
+    /// Callback failed with a typed failure.
+    Failure(EffectFailure),
 }
 
-/// Classify a raw error message into a coarse effect category.
-#[must_use]
-pub fn classify_effect_error(message: &str) -> EffectErrorCategory {
-    let lower = message.to_ascii_lowercase();
-    if lower.contains("timeout") || lower.contains("timed out") || lower.contains("deadline") {
-        return EffectErrorCategory::Timeout;
+impl<T> EffectResult<T> {
+    /// Construct a successful effect outcome.
+    #[must_use]
+    pub fn success(value: T) -> Self {
+        Self::Success(value)
     }
-    if lower.contains("topology")
-        || lower.contains("partition")
-        || lower.contains("crash")
-        || lower.contains("corrupt")
-        || lower.contains("heal")
-    {
-        return EffectErrorCategory::Topology;
-    }
-    if lower.contains("determinism")
-        || lower.contains("replay")
-        || lower.contains("mismatch")
-        || lower.contains("nondetermin")
-        || lower.contains("ordering")
-    {
-        return EffectErrorCategory::Determinism;
-    }
-    if lower.contains("contract") || lower.contains("assert") || lower.contains("identity") {
-        return EffectErrorCategory::ContractViolation;
-    }
-    if lower.contains("unavailable")
-        || lower.contains("disconnect")
-        || lower.contains("closed")
-        || lower.contains("missing")
-        || lower.contains("not found")
-        || lower.contains("exhausted")
-    {
-        return EffectErrorCategory::Unavailable;
-    }
-    if lower.contains("invalid")
-        || lower.contains("unknown label")
-        || lower.contains("malformed")
-        || lower.contains("type")
-        || lower.contains("register")
-    {
-        return EffectErrorCategory::InvalidInput;
-    }
-    EffectErrorCategory::Unknown
-}
 
-/// Build a typed error wrapper from a raw host error message.
-#[must_use]
-pub fn classify_effect_error_owned(message: impl Into<String>) -> EffectError {
-    EffectError::classify(message)
+    /// Construct a blocked effect outcome.
+    #[must_use]
+    pub fn blocked() -> Self {
+        Self::Blocked
+    }
+
+    /// Construct a failed effect outcome.
+    #[must_use]
+    pub fn failure(failure: EffectFailure) -> Self {
+        Self::Failure(failure)
+    }
+
+    /// Map the success payload while preserving blocked/failure outcomes.
+    #[must_use]
+    pub fn map_success<U>(self, f: impl FnOnce(T) -> U) -> EffectResult<U> {
+        match self {
+            Self::Success(value) => EffectResult::Success(f(value)),
+            Self::Blocked => EffectResult::Blocked,
+            Self::Failure(failure) => EffectResult::Failure(failure),
+        }
+    }
+
+    /// Extract the success payload or convert `Blocked` into a failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns the typed failure directly, or a supplied contract-violation
+    /// failure when blocking is not valid for the current callback.
+    pub fn expect_success(
+        self,
+        blocked_failure: impl FnOnce() -> EffectFailure,
+    ) -> Result<T, EffectFailure> {
+        match self {
+            Self::Success(value) => Ok(value),
+            Self::Blocked => Err(blocked_failure()),
+            Self::Failure(failure) => Err(failure),
+        }
+    }
 }
 
 /// Deterministic key for optional send fast-path caches.
@@ -410,13 +477,4 @@ pub fn send_fast_path_key(
         hash = mix(hash, &[tag]);
     }
     hash
-}
-
-/// Decision returned by [`EffectHandler::handle_acquire`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AcquireDecision {
-    /// Acquire succeeded and produced evidence.
-    Grant(Value),
-    /// Acquire denied and should block.
-    Block,
 }

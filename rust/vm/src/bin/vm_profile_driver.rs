@@ -5,7 +5,7 @@ use std::env;
 use std::hint::black_box;
 
 use telltale_types::{GlobalType, Label, LocalTypeR, ValType};
-use telltale_vm::effect::EffectHandler;
+use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::{
     ObservabilityRetentionConfig, ObservabilityRetentionMode, PayloadValidationMode,
@@ -21,8 +21,8 @@ impl EffectHandler for ProfileHandler {
         _partner: &str,
         _label: &str,
         _state: &[telltale_vm::coroutine::Value],
-    ) -> Result<telltale_vm::coroutine::Value, String> {
-        Ok(telltale_vm::coroutine::Value::Unit)
+    ) -> EffectResult<telltale_vm::coroutine::Value> {
+        EffectResult::success(telltale_vm::coroutine::Value::Unit)
     }
 
     fn handle_recv(
@@ -32,8 +32,8 @@ impl EffectHandler for ProfileHandler {
         _label: &str,
         _state: &mut Vec<telltale_vm::coroutine::Value>,
         _payload: &telltale_vm::coroutine::Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -42,19 +42,19 @@ impl EffectHandler for ProfileHandler {
         _partner: &str,
         labels: &[String],
         _state: &[telltale_vm::coroutine::Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels to choose from".to_string())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels to choose from")),
+        }
     }
 
     fn step(
         &self,
         _role: &str,
         _state: &mut Vec<telltale_vm::coroutine::Value>,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 }
 

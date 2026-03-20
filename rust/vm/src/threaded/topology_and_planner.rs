@@ -277,8 +277,10 @@ impl ThreadedVM {
                 Ok(())
             }
             Some(anchor) if anchor == handler_identity => Ok(()),
-            Some(anchor) => Err(VMError::HandlerError(format!(
-                "[host-contract] handler_identity changed from '{anchor}' to '{handler_identity}'"
+            Some(anchor) => Err(VMError::HandlerError(EffectFailure::contract_violation(
+                format!(
+                    "[host-contract] handler_identity changed from '{anchor}' to '{handler_identity}'"
+                ),
             ))),
         }
     }
@@ -295,8 +297,10 @@ impl ThreadedVM {
             let prev_key = events[idx - 1].ordering_key();
             let next_key = events[idx].ordering_key();
             if prev_key > next_key {
-                return Err(VMError::HandlerError(format!(
-                    "[host-contract] topology_events at tick {tick} must be pre-sorted by ordering_key; out-of-order index {idx}"
+                return Err(VMError::HandlerError(EffectFailure::contract_violation(
+                    format!(
+                        "[host-contract] topology_events at tick {tick} must be pre-sorted by ordering_key; out-of-order index {idx}"
+                    ),
                 )));
             }
         }
@@ -328,8 +332,10 @@ impl ThreadedVM {
                     && audit.receipt.scope == expected_scope
             });
             if !found {
-                return Err(VMError::HandlerError(format!(
-                    "[host-contract] transfer event for session {session} role {role} must have a matching committed delegation audit record"
+                return Err(VMError::HandlerError(EffectFailure::contract_violation(
+                    format!(
+                        "[host-contract] transfer event for session {session} role {role} must have a matching committed delegation audit record"
+                    ),
                 )));
             }
         }
@@ -342,6 +348,9 @@ impl ThreadedVM {
         self.enforce_handler_identity_contract(&handler_identity)?;
         let mut events = handler
             .topology_events(tick)
+            .expect_success(|| {
+                EffectFailure::contract_violation("topology_events returned blocked")
+            })
             .map_err(VMError::HandlerError)?;
         self.assert_topology_events_sorted(tick, &events)?;
         events.sort_by_key(TopologyPerturbation::ordering_key);

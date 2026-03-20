@@ -123,9 +123,9 @@ pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
 pub use determinism::{DeterminismMode, EffectDeterminismTier};
 pub use driver::NativeSingleThreadDriver;
 pub use effect::{
-    classify_effect_error, classify_effect_error_owned, send_fast_path_key, CorruptionType,
-    EffectError, EffectErrorCategory, EffectTraceEntry, EffectTraceTape, RecordingEffectHandler,
-    ReplayEffectHandler, SendDecisionFastPathInput, SendPayloadKind, TopologyPerturbation,
+    send_fast_path_key, CorruptionType, EffectFailure, EffectFailureKind, EffectResult,
+    EffectTraceEntry, EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler,
+    SendDecisionFastPathInput, SendPayloadKind, TopologyPerturbation,
 };
 pub use envelope_diff::{
     EffectOrderingClass, EnvelopeDiff, EnvelopeDiffArtifactV1, FailureVisibleDiffClass,

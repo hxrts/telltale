@@ -9,7 +9,7 @@ use telltale_types::{GlobalType, LocalTypeR};
 
 use crate::coroutine::Value;
 use crate::driver::WasmCooperativeDriver;
-use crate::effect::EffectHandler;
+use crate::effect::{EffectFailure, EffectHandler, EffectResult};
 use crate::loader::CodeImage;
 use crate::trace::{normalize_trace, strict_trace};
 use crate::vm::{ObsEvent, RunStatus, StepResult, VMConfig};
@@ -29,8 +29,8 @@ impl EffectHandler for NoOpHandler {
         _partner: &str,
         _label: &str,
         _state: &[Value],
-    ) -> Result<Value, String> {
-        Ok(Value::Unit)
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Unit)
     }
 
     fn handle_recv(
@@ -40,8 +40,8 @@ impl EffectHandler for NoOpHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -50,15 +50,15 @@ impl EffectHandler for NoOpHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".into())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+        }
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-        Ok(())
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::success(())
     }
 }
 

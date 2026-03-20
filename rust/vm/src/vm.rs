@@ -33,8 +33,9 @@ use crate::coroutine::{
 };
 use crate::determinism::{DeterminismMode, EffectDeterminismTier};
 use crate::effect::{
-    CorruptionType, EffectHandler, EffectTraceEntry, ReplayEffectHandler, SendDecision,
-    SendDecisionFastPathInput, SendDecisionInput, TopologyPerturbation,
+    CorruptionType, EffectFailure, EffectHandler, EffectResult, EffectTraceEntry,
+    ReplayEffectHandler, SendDecision, SendDecisionFastPathInput, SendDecisionInput,
+    TopologyPerturbation,
 };
 use crate::exec;
 use crate::faults::{

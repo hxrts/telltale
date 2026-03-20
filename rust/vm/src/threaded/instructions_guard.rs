@@ -5,11 +5,11 @@ fn guard_active(config: &VMConfig, layer: &str) -> Result<(), Fault> {
     match config.guard_layers.iter().find(|cfg| cfg.id == layer) {
         None => Err(Fault::Acquire {
             layer: layer.to_string(),
-            message: "unknown layer".into(),
+            failure: EffectFailure::invalid_input("unknown layer"),
         }),
         Some(cfg) if !cfg.active => Err(Fault::Acquire {
             layer: layer.to_string(),
-            message: "inactive layer".into(),
+            failure: EffectFailure::unavailable("inactive layer"),
         }),
         Some(_) => Ok(()),
     }
@@ -33,12 +33,41 @@ fn step_acquire(
     let decision = ctx
         .handler
         .handle_acquire(input.sid, input.role, input.layer, &coro.regs)
-        .map_err(|e| Fault::Acquire {
+        .expect_success(|| EffectFailure::contract_violation("handle_acquire returned blocked"))
+        .map_err(|failure| Fault::Acquire {
             layer: input.layer.to_string(),
-            message: e,
+            failure,
         })?;
     match decision {
-        crate::effect::AcquireDecision::Grant(evidence) => {
+        Value::Unit => {
+            let mut resources = ctx
+                .guard_resources
+                .lock()
+                .expect("threaded VM lock poisoned");
+            resources.insert(input.layer.to_string(), Value::Unit);
+            drop(resources);
+
+            let mut scoped_states = ctx
+                .resource_states
+                .lock()
+                .expect("threaded VM lock poisoned");
+            let state = scoped_states.entry(input.sid).or_default();
+            let _commitment = state.commit(&Value::Unit);
+            Ok(StepPack {
+                coro_update: CoroUpdate::AdvancePcWriteReg {
+                    reg: input.dst,
+                    val: Value::Unit,
+                },
+                type_update: None,
+                events: vec![ObsEvent::Acquired {
+                    tick: ctx.tick,
+                    session: input.ep.sid,
+                    role: input.role.to_string(),
+                    layer: input.layer.to_string(),
+                }],
+            })
+        }
+        evidence => {
             let mut resources = ctx
                 .guard_resources
                 .lock()
@@ -66,13 +95,6 @@ fn step_acquire(
                 }],
             })
         }
-        crate::effect::AcquireDecision::Block => Ok(StepPack {
-            coro_update: CoroUpdate::Block(BlockReason::AcquireDenied {
-                layer: input.layer.to_string(),
-            }),
-            type_update: None,
-            events: vec![],
-        }),
     }
 }
 
@@ -98,9 +120,10 @@ fn step_release(
         .clone();
     ctx.handler
         .handle_release(input.sid, input.role, input.layer, &ev, &coro.regs)
-        .map_err(|e| Fault::Acquire {
+        .expect_success(|| EffectFailure::contract_violation("handle_release returned blocked"))
+        .map_err(|failure| Fault::Acquire {
             layer: input.layer.to_string(),
-            message: e,
+            failure,
         })?;
     {
         let mut resources = ctx
@@ -118,7 +141,7 @@ fn step_release(
     {
         state.consume(&ev).map_err(|message| Fault::Acquire {
             layer: input.layer.to_string(),
-            message,
+            failure: EffectFailure::invalid_evidence(message),
         })?;
     }
     Ok(StepPack {

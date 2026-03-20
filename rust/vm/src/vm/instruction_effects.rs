@@ -174,7 +174,10 @@ impl VM {
                 &mut self.coroutines[coro_idx].regs,
                 &val,
             )
-            .map_err(|e| Fault::Invoke { message: e })?;
+            .expect_success(|| {
+                EffectFailure::contract_violation("handle_recv returned blocked")
+            })
+            .map_err(|failure| Fault::Invoke { failure })?;
 
         let original = self.sessions.original_type(&ep).unwrap_or(&LocalTypeR::End);
         let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);
@@ -294,16 +297,19 @@ impl VM {
             .map_or(true, String::is_empty)
         {
             return Err(Fault::Invoke {
-                message: "no handler bound".to_string(),
+                failure: EffectFailure::contract_violation("no handler bound"),
             });
         }
         let coro_id = self.coroutines[coro_idx].id;
         handler
             .step(role, &mut self.coroutines[coro_idx].regs)
-            .map_err(|e| Fault::Invoke { message: e })?;
+            .expect_success(|| EffectFailure::contract_violation("step returned blocked"))
+            .map_err(|failure| Fault::Invoke { failure })?;
         self.apply_invoke_delta(sid, &action_repr)
             .map_err(|e| Fault::Invoke {
-                message: format!("invoke persistence delta failed: {e}"),
+                failure: EffectFailure::contract_violation(format!(
+                    "invoke persistence delta failed: {e}"
+                )),
             })?;
 
         Ok(StepPack {
@@ -324,11 +330,11 @@ impl VM {
         match self.config.guard_layers.iter().find(|cfg| cfg.id == layer) {
             None => Err(Fault::Acquire {
                 layer: layer.to_string(),
-                message: "unknown layer".into(),
+                failure: EffectFailure::invalid_input("unknown layer"),
             }),
             Some(cfg) if !cfg.active => Err(Fault::Acquire {
                 layer: layer.to_string(),
-                message: "inactive layer".into(),
+                failure: EffectFailure::unavailable("inactive layer"),
             }),
             Some(_) => Ok(()),
         }
@@ -350,21 +356,16 @@ impl VM {
             .open_(&layer_id)
             .map_err(|e| Fault::Acquire {
                 layer: input.layer.to_string(),
-                message: e,
+                failure: EffectFailure::invalid_evidence(e),
             })?;
-        let decision = handler
-            .handle_acquire(
-                input.sid,
-                input.role,
-                input.layer,
-                &self.coroutines[input.coro_idx].regs,
-            )
-            .map_err(|e| Fault::Acquire {
-                layer: input.layer.to_string(),
-                message: e,
-            })?;
+        let decision = handler.handle_acquire(
+            input.sid,
+            input.role,
+            input.layer,
+            &self.coroutines[input.coro_idx].regs,
+        );
         match decision {
-            crate::effect::AcquireDecision::Grant(evidence) => {
+            EffectResult::Success(evidence) => {
                 self.guard_layer
                     .resources
                     .insert(layer_id, evidence.clone());
@@ -387,12 +388,16 @@ impl VM {
                     }],
                 })
             }
-            crate::effect::AcquireDecision::Block => Ok(StepPack {
+            EffectResult::Blocked => Ok(StepPack {
                 coro_update: CoroUpdate::Block(BlockReason::AcquireDenied {
                     layer: input.layer.to_string(),
                 }),
                 type_update: None,
                 events: vec![],
+            }),
+            EffectResult::Failure(failure) => Err(Fault::Acquire {
+                layer: input.layer.to_string(),
+                failure,
             }),
         }
     }
@@ -416,7 +421,7 @@ impl VM {
             .clone();
         let decoded = InMemoryGuardLayer::decodeEvidence(&ev).map_err(|e| Fault::Acquire {
             layer: input.layer.to_string(),
-            message: e,
+            failure: EffectFailure::invalid_evidence(e),
         })?;
         handler
             .handle_release(
@@ -426,20 +431,21 @@ impl VM {
                 &ev,
                 &self.coroutines[input.coro_idx].regs,
             )
-            .map_err(|e| Fault::Acquire {
+            .expect_success(|| EffectFailure::contract_violation("handle_release returned blocked"))
+            .map_err(|failure| Fault::Acquire {
                 layer: input.layer.to_string(),
-                message: e,
+                failure,
             })?;
         self.guard_layer
             .close(&layer_id, decoded)
             .map_err(|e| Fault::Acquire {
                 layer: input.layer.to_string(),
-                message: e,
+                failure: EffectFailure::invalid_evidence(e),
             })?;
         if let Some(state) = self.resource_states.get_mut(&input.sid) {
             state.consume(&ev).map_err(|e| Fault::Acquire {
                 layer: input.layer.to_string(),
-                message: e,
+                failure: EffectFailure::invalid_evidence(e),
             })?;
         }
         Ok(StepPack {

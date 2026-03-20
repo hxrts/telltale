@@ -14,14 +14,14 @@
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
+        ) -> EffectResult<Value> {
             self.handle_send_calls.fetch_add(1, Ordering::Relaxed);
-            Ok(Value::Nat(1))
+            EffectResult::success(Value::Nat(1))
         }
 
-        fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+        fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
             self.send_decision_calls.fetch_add(1, Ordering::Relaxed);
-            Ok(SendDecision::Deliver(
+            EffectResult::success(SendDecision::Deliver(
                 input.payload.unwrap_or(Value::Nat(1)),
             ))
         }
@@ -33,9 +33,9 @@
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
+        ) -> EffectResult<()> {
             self.handle_recv_calls.fetch_add(1, Ordering::Relaxed);
-            Ok(())
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -44,16 +44,16 @@
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
+        ) -> EffectResult<String> {
             self.handle_choose_calls.fetch_add(1, Ordering::Relaxed);
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".to_string())
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
     }
 
@@ -66,12 +66,12 @@
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Ok(Value::Bool(true))
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Bool(true))
         }
 
-        fn send_decision(&self, _input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-            Ok(SendDecision::Deliver(Value::Bool(true)))
+        fn send_decision(&self, _input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+            EffectResult::success(SendDecision::Deliver(Value::Bool(true)))
         }
 
         fn handle_recv(
@@ -81,8 +81,8 @@
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -91,15 +91,15 @@
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".to_string())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
     }
 
@@ -112,12 +112,12 @@
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Ok(Value::Str("x".repeat(128)))
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Str("x".repeat(128)))
         }
 
-        fn send_decision(&self, _input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-            Ok(SendDecision::Deliver(Value::Str("x".repeat(128))))
+        fn send_decision(&self, _input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+            EffectResult::success(SendDecision::Deliver(Value::Str("x".repeat(128))))
         }
 
         fn handle_recv(
@@ -127,8 +127,8 @@
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -137,15 +137,15 @@
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".to_string())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
     }
 
@@ -245,4 +245,3 @@
             local_types,
         }
     }
-

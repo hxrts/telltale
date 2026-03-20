@@ -48,9 +48,9 @@
             .expect_err("invoke should fault without default handler");
         match err {
             VMError::Fault {
-                fault: Fault::Invoke { message },
+                fault: Fault::Invoke { failure },
                 ..
-            } => assert_eq!(message, "no handler bound"),
+            } => assert_eq!(failure.message, "no handler bound"),
             other => panic!("unexpected error: {other:?}"),
         }
     }

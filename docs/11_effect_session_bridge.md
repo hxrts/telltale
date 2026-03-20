@@ -105,14 +105,14 @@ The contract marks `handle_send` and `handle_choose` as compatibility hooks.
 
 | Callback | VM call point | Runtime behavior | Integration note |
 |---|---|---|---|
-| `send_decision_fast_path` | `step_send` (before `send_decision`) | optional cache lookup | return `Some(Ok(decision))` to skip `send_decision`, `None` to proceed normally |
+| `send_decision_fast_path` | `step_send` (before `send_decision`) | optional cache lookup | return `Some(EffectResult::Success(decision))` to skip `send_decision`, `None` to proceed normally |
 | `send_decision` | `step_send`, `step_offer` | called before enqueue | receives `SendDecisionInput` with optional precomputed payload |
 | `handle_send` | default inside `send_decision` | fallback when no payload provided | called by default `send_decision` impl when payload is `None` |
 | `handle_recv` | `step_recv`, `step_choose` | called after dequeue and verification | use for state updates and host-side effects |
 | `handle_choose` | trait method only | no canonical call site today | keep implementation for compatibility and custom runners |
 | `step` | `step_invoke` | called during `Invoke` instruction | use for integration steps and persistent deltas |
-| `handle_acquire` | `step_acquire` | grant or block acquire | return `Grant` with evidence or `Block` |
-| `handle_release` | `step_release` | release validation | return error to reject invalid evidence |
+| `handle_acquire` | `step_acquire` | grant, block, or fail acquire | return `EffectResult::Success(evidence)`, `EffectResult::Blocked`, or `EffectResult::Failure(...)` |
+| `handle_release` | `step_release` | release validation | return `EffectResult::Failure(...)` to reject invalid evidence |
 | `topology_events` | `ingest_topology_events` | called once per scheduler tick | events are sorted by deterministic ordering key before apply |
 | `output_condition_hint` | post-dispatch pre-commit | queried only when a step emits events | return `None` to use VM default |
 | `handler_identity` | trace and commit attribution | stable handler id in traces | defaults to `DEFAULT_HANDLER_ID` when not overridden |
@@ -123,17 +123,24 @@ Callback safety notes:
 - Bridge traits in `rust/vm/src/bridge.rs` are deterministic lookup/projection surfaces, not mutation surfaces.
 - `sessions_mut()` is a low-level escape hatch intended for runtime internals and tests. Production embedders should prefer `load_choreography_owned(...)` plus `OwnedSession`.
 
-## Error Classification
+## Typed Effect Outcomes
 
-The VM keeps callback signatures as `Result<_, String>`.
-Use `classify_effect_error` and `EffectError` from `telltale-vm` for typed diagnostics.
-This keeps runtime semantics unchanged and improves host observability.
+The VM now uses a typed effect boundary.
+`EffectHandler` callbacks return `EffectResult<T>` rather than `Result<T, String>`.
 
-| Utility | Purpose |
+| Outcome surface | Purpose |
 |---|---|
-| `classify_effect_error` | maps raw handler error strings to `EffectErrorCategory` |
-| `classify_effect_error_owned` | wraps raw strings into `EffectError` |
-| `EffectErrorCategory` | coarse taxonomy for timeout, topology, determinism, and contract failures |
+| `EffectResult::Success(value)` | callback completed successfully |
+| `EffectResult::Blocked` | callback requested a clean scheduler-visible block |
+| `EffectResult::Failure(EffectFailure)` | callback failed with typed diagnostics |
+| `EffectFailureKind` | coarse failure taxonomy including timeout, cancellation, stale authority, invalid evidence, determinism, topology disruption, and contract violation |
+
+Host guidance:
+
+- Use `Blocked` only for genuinely resumable conditions such as acquire deferral.
+- Use `Failure` for typed terminal or policy-visible failures.
+- Do not encode timeout, cancellation, or ownership failure in ad hoc strings when a specific `EffectFailureKind` exists.
+- Replay, recording, and effect-trace serialization preserve these typed outcomes directly.
 
 ## Integration Workflow
 

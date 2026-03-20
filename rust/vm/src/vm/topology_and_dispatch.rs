@@ -104,9 +104,9 @@ impl VM {
 
         let mut faulted = Vec::new();
         for coro in &mut self.coroutines {
-            if coro.role == site && !coro.is_terminal() {
+                if coro.role == site && !coro.is_terminal() {
                 let fault = Fault::Invoke {
-                    message: reason.clone(),
+                    failure: EffectFailure::topology_disruption(reason.clone()),
                 };
                 coro.status = CoroStatus::Faulted(fault.clone());
                 faulted.push((coro.id, fault));
@@ -155,8 +155,10 @@ impl VM {
                 Ok(())
             }
             Some(anchor) if anchor == handler_identity => Ok(()),
-            Some(anchor) => Err(VMError::HandlerError(format!(
-                "[host-contract] handler_identity changed from '{anchor}' to '{handler_identity}'"
+            Some(anchor) => Err(VMError::HandlerError(EffectFailure::contract_violation(
+                format!(
+                    "[host-contract] handler_identity changed from '{anchor}' to '{handler_identity}'"
+                ),
             ))),
         }
     }
@@ -173,8 +175,10 @@ impl VM {
             let prev_key = events[idx - 1].ordering_key();
             let next_key = events[idx].ordering_key();
             if prev_key > next_key {
-                return Err(VMError::HandlerError(format!(
-                    "[host-contract] topology_events at tick {tick} must be pre-sorted by ordering_key; out-of-order index {idx}"
+                return Err(VMError::HandlerError(EffectFailure::contract_violation(
+                    format!(
+                        "[host-contract] topology_events at tick {tick} must be pre-sorted by ordering_key; out-of-order index {idx}"
+                    ),
                 )));
             }
         }
@@ -206,8 +210,10 @@ impl VM {
                     && audit.receipt.scope == expected_scope
             });
             if !found {
-                return Err(VMError::HandlerError(format!(
-                    "[host-contract] transfer event for session {session} role {role} must have a matching committed delegation audit record"
+                return Err(VMError::HandlerError(EffectFailure::contract_violation(
+                    format!(
+                        "[host-contract] transfer event for session {session} role {role} must have a matching committed delegation audit record"
+                    ),
                 )));
             }
         }
@@ -261,6 +267,9 @@ impl VM {
         self.enforce_handler_identity_contract(&handler_identity)?;
         let mut events = handler
             .topology_events(tick)
+            .expect_success(|| {
+                EffectFailure::contract_violation("topology_events returned blocked")
+            })
             .map_err(VMError::HandlerError)?;
         self.assert_topology_events_sorted(tick, &events)?;
         events.sort_by_key(TopologyPerturbation::ordering_key);
@@ -334,7 +343,7 @@ impl VM {
         let handler_identity = handler.handler_identity();
         self.enforce_handler_identity_contract(&handler_identity)
             .map_err(|e| Fault::Invoke {
-                message: e.to_string(),
+                failure: EffectFailure::contract_violation(e.to_string()),
             })?;
         let idx = self.coro_index(coro_id).ok_or_else(|| Fault::Speculation {
             message: format!("scheduler selected missing coroutine {coro_id}"),
@@ -451,7 +460,13 @@ impl VM {
         let decision = if let Some(decision) =
             handler.send_decision_fast_path(fast_path, &coro.regs, Some(&send_payload))
         {
-            decision.map_err(|e| Fault::Invoke { message: e })?
+            decision
+                .expect_success(|| {
+                    EffectFailure::contract_violation(
+                        "send_decision_fast_path returned blocked",
+                    )
+                })
+                .map_err(|failure| Fault::Invoke { failure })?
         } else {
             handler
                 .send_decision(SendDecisionInput {
@@ -462,7 +477,10 @@ impl VM {
                     state: &coro.regs,
                     payload: Some(send_payload),
                 })
-                .map_err(|e| Fault::Invoke { message: e })?
+                .expect_success(|| {
+                    EffectFailure::contract_violation("send_decision returned blocked")
+                })
+                .map_err(|failure| Fault::Invoke { failure })?
         };
 
         let edge = Edge::new(sid, role.to_string(), partner.clone());
@@ -508,7 +526,9 @@ impl VM {
                     })?;
                 session
                     .send_with_sequence(role, &partner, payload, sequence_no)
-                    .map_err(|e| Fault::Invoke { message: e })?
+                    .map_err(|e| Fault::Invoke {
+                        failure: EffectFailure::invalid_input(e),
+                    })?
             }
             SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
         };

@@ -163,16 +163,16 @@ pub enum Fault {
     /// Effect handler error.
     #[serde(alias = "InvokeFault")]
     Invoke {
-        /// Error message from the handler.
-        message: String,
+        /// Typed failure from the handler boundary.
+        failure: crate::effect::EffectFailure,
     },
     /// Guard layer failure.
     #[serde(alias = "AcquireFault")]
     Acquire {
         /// Guard layer identifier.
         layer: String,
-        /// Error message.
-        message: String,
+        /// Typed failure.
+        failure: crate::effect::EffectFailure,
     },
     /// Ownership transfer failure.
     #[serde(alias = "TransferFault")]
@@ -246,9 +246,9 @@ impl std::fmt::Display for Fault {
                 "verification failed on edge {}:{}→{}: {message}",
                 edge.sid, edge.sender, edge.receiver
             ),
-            Self::Invoke { message } => write!(f, "invoke fault: {message}"),
-            Self::Acquire { layer, message } => {
-                write!(f, "acquire fault ({layer}): {message}")
+            Self::Invoke { failure } => write!(f, "invoke fault: {failure}"),
+            Self::Acquire { layer, failure } => {
+                write!(f, "acquire fault ({layer}): {failure}")
             }
             Self::Transfer { message } => write!(f, "transfer fault: {message}"),
             Self::Speculation { message } => write!(f, "speculation fault: {message}"),

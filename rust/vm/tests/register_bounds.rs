@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use proptest::prelude::*;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Fault;
-use telltale_vm::effect::EffectHandler;
+use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::{RunStatus, VMError};
 use telltale_vm::{Instr, VMConfig, VM};
@@ -27,8 +27,8 @@ impl EffectHandler for NoopHandler {
         _partner: &str,
         _label: &str,
         _state: &[telltale_vm::Value],
-    ) -> Result<telltale_vm::Value, String> {
-        Ok(telltale_vm::Value::Unit)
+    ) -> EffectResult<telltale_vm::Value> {
+        EffectResult::success(telltale_vm::Value::Unit)
     }
 
     fn handle_recv(
@@ -38,8 +38,8 @@ impl EffectHandler for NoopHandler {
         _label: &str,
         _state: &mut Vec<telltale_vm::Value>,
         _payload: &telltale_vm::Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -48,15 +48,15 @@ impl EffectHandler for NoopHandler {
         _partner: &str,
         labels: &[String],
         _state: &[telltale_vm::Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no label".to_string())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no label")),
+        }
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<telltale_vm::Value>) -> Result<(), String> {
-        Ok(())
+    fn step(&self, _role: &str, _state: &mut Vec<telltale_vm::Value>) -> EffectResult<()> {
+        EffectResult::success(())
     }
 }
 

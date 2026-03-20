@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use crate::coroutine::Value;
-use crate::effect::EffectHandler;
+use crate::effect::{EffectFailure, EffectHandler, EffectResult};
 use crate::vm::{ObsEvent, StepResult, VMError, VM};
 
 struct SiteRunner {
@@ -126,9 +126,11 @@ impl EffectHandler for NestedVMHandler {
         _partner: &str,
         _label: &str,
         _state: &[Value],
-    ) -> Result<Value, String> {
-        self.step_site(role)?;
-        Ok(Value::Unit)
+    ) -> EffectResult<Value> {
+        match self.step_site(role) {
+            Ok(()) => EffectResult::success(Value::Unit),
+            Err(message) => EffectResult::failure(EffectFailure::contract_violation(message)),
+        }
     }
 
     fn handle_recv(
@@ -138,8 +140,11 @@ impl EffectHandler for NestedVMHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
-        self.step_site(role)
+    ) -> EffectResult<()> {
+        match self.step_site(role) {
+            Ok(()) => EffectResult::success(()),
+            Err(message) => EffectResult::failure(EffectFailure::contract_violation(message)),
+        }
     }
 
     fn handle_choose(
@@ -148,14 +153,17 @@ impl EffectHandler for NestedVMHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".into())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+        }
     }
 
-    fn step(&self, role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-        self.step_site(role)
+    fn step(&self, role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        match self.step_site(role) {
+            Ok(()) => EffectResult::success(()),
+            Err(message) => EffectResult::failure(EffectFailure::contract_violation(message)),
+        }
     }
 }
