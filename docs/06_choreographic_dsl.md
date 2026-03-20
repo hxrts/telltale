@@ -15,10 +15,15 @@ The preferred surface style mixes MPST operators with a small functional-languag
 
 The parser module is located in `rust/choreography/src/compiler/parser/`. It provides an implementation of the choreography DSL parser using Pest plus a layout preprocessor.
 
-The DSL describes protocol structure and role-local communication obligations.
-It does not directly express host-runtime ownership. Session/fragment ownership boundaries are derived later by the runtime, typically from composition/link metadata when available.
+The DSL describes protocol structure, role-local communication obligations, and
+protocol-critical authority checks.
+It does not model arbitrary host state or general application ownership.
+Session/fragment ownership boundaries are still derived at runtime, typically
+from composition/link metadata when available, but protocol-visible authority
+queries and evidence flow are now part of the language surface.
 
-The current DSL also has an authority-oriented preview surface for protocol-critical host queries and typed local branching:
+The current DSL includes an authority-oriented surface for protocol-critical
+host queries and typed local branching:
 
 - top-level `type` and `type alias` declarations
 - nominal `effect` interface declarations
@@ -28,7 +33,10 @@ The current DSL also has an authority-oriented preview surface for protocol-crit
 - `timeout ... on timeout ... on cancel ...`
 - evidence guards of the form `when check Effect.op(...) yields witness`
 
-These forms are parser and AST level surfaces first. `let` is treated as local-only and projects through to the continuation. `case/of` and `timeout` are intentionally rejected by the current MPST projection pass until their projection rules are formalized explicitly.
+These forms are parser and AST level surfaces first. `let` is treated as
+local-only and projects through to the continuation. `case/of` and `timeout`
+are intentionally rejected by the current MPST projection pass until their
+projection rules are formalized explicitly.
 
 ## DSL Syntax
 
@@ -377,6 +385,152 @@ protocol SpeculativeFlow requires SpecBundle =
   A -> B : Try
   join
 ```
+
+#### 12) Authority and Failure Surface
+
+The authority/failure additions keep the language expression-oriented and
+Elm/PureScript-like while making protocol-critical host decisions explicit.
+
+##### Nominal Effect Interfaces and `uses`
+
+```choreo
+effect Runtime
+  ready : Session -> Result CommitError ReadyWitness
+  cancel : Session -> Result CancelError CancelReceipt
+
+effect Audit
+  record : AuditEvent -> Unit
+
+protocol CommitFlow uses Runtime, Audit =
+  roles Coordinator, Worker
+  ...
+```
+
+Effects are nominal declarations. `uses` makes protocol dependencies explicit.
+Only declared effects named in `uses` may be referenced by `check`.
+
+##### `Result` and `Maybe` with `case/of`
+
+```choreo
+let readiness = check Runtime.ready(session)
+in
+case readiness of
+  | Ok witness ->
+      Coordinator -> Worker : Commit of witness
+  | Err TimedOut ->
+      Coordinator -> Worker : Cancel
+```
+
+`Result` and `Maybe` are first-class sum-style forms for protocol-visible
+authority checks. Exhaustiveness is required for `Ok`/`Err` and
+`Just`/`Nothing`.
+
+##### Custom Unions and Type Aliases
+
+```choreo
+type CommitError
+  = TimedOut
+  | Cancelled
+  | InvalidWitness
+
+type alias ReadyWitness =
+  { epoch : Int, issuedBy : Role }
+```
+
+Use custom unions for typed failure surfaces and aliases for structured
+evidence payloads.
+
+##### Evidence Binding with `let`
+
+```choreo
+let receipt = transfer Session from Coordinator to Worker
+let readiness = check Runtime.ready(session)
+```
+
+Evidence and receipts use ordinary `let` bindings. There is no special
+authority-binding syntax beyond normal expression binding.
+
+##### Typed Timeout and Cancellation Blocks
+
+```choreo
+timeout 5s at Coordinator
+  Worker -> Coordinator : Ready of ReadyWitness
+on timeout
+  Coordinator -> Worker : Cancel
+on cancel
+  Coordinator -> Worker : Cancelled
+```
+
+Use `timeout ... on timeout ... on cancel ...` when timeout and cancellation are
+protocol-visible outcomes rather than ambient runtime metadata.
+
+##### Evidence Guards
+
+```choreo
+choice at Coordinator
+  | Commit when check Runtime.ready(session) yields witness ->
+      Coordinator -> Worker : Commit of witness
+  | Abort ->
+      Coordinator -> Worker : Abort
+```
+
+Evidence guards are the concise path for “take this branch only if a typed
+authoritative query succeeds and binds evidence”.
+
+##### Linear Single-Use Bindings
+
+```choreo
+let receipt = transfer Session from Coordinator to Worker
+commit transfer receipt
+```
+
+Bindings produced by transfer-like authority operations are linear. The
+compiler rejects duplicate use and implicit discard.
+
+##### Local Helpers with `let ... in`
+
+```choreo
+let decision =
+  case check Runtime.ready(session) of
+    | Ok witness -> Commit witness
+    | Err reason -> Abort reason
+in
+case decision of
+  | Commit witness ->
+      Coordinator -> Worker : Commit of witness
+  | Abort reason ->
+      Coordinator -> Worker : Abort of reason
+```
+
+Local helper expressions keep authority logic readable without pushing that
+logic back into untyped host code.
+
+##### No Implicit Default Branches
+
+```choreo
+case check Runtime.ready(session) of
+  | Ok witness -> ...
+  | Err TimedOut -> ...
+```
+
+Protocol-critical authority flows do not allow implicit wildcard/default
+masking for `Result` and `Maybe`. Missing cases are validation errors.
+
+##### Typed External Query Surface
+
+```choreo
+let readiness = check Runtime.ready(session)
+```
+
+`check Effect.op(...)` is the canonical language-level form for typed host
+queries. It is the user-facing surface that later lowers to the same typed VM
+`invoke` boundary used by the runtime/effect bridge.
+
+##### Choosing Between Timeout Metadata and Timeout Branching
+
+Use `runtime_timeout = 5s` sender metadata for operational transport hints that
+do not change the protocol. Use `timeout ... on timeout ... on cancel ...` when
+the timeout result must be explicit in the protocol and replay/audit surface.
 
 This lowering preserves statement order and continuation structure. Projection skips extension-local behavior for now and continues projecting the remaining protocol.
 

@@ -147,6 +147,34 @@ Host guidance:
 - Do not encode timeout, cancellation, or ownership failure in ad hoc strings when a specific `EffectFailureKind` exists.
 - Replay, recording, and effect-trace serialization preserve these typed outcomes directly.
 
+## Language-Declared Effect Invocation
+
+The choreography language now has nominal `effect` declarations, protocol-level
+`uses` clauses, and `check Effect.op(...)` expressions.
+
+```choreo
+effect Runtime
+  ready : Session -> Result CommitError ReadyWitness
+
+protocol CommitFlow uses Runtime =
+  let readiness = check Runtime.ready(session)
+  ...
+```
+
+Host-boundary rule:
+
+- this does not create a second integration channel beside the VM/effect layer
+- language-declared effect operations still lower to the same typed VM
+  `invoke` boundary and handler-obligation model
+- missing or ambiguous authority must surface as typed failure or explicit
+  evidence rejection, never as fallback success
+
+Operational consequence:
+
+- embedders implement one typed host boundary in `EffectHandler`
+- language-level authority checks become explicit effect observations and
+  semantic-audit records once lowered into the VM
+
 ## Authority Witnesses
 
 The ownership boundary now includes explicit witness objects for protocol-critical authority flow.
@@ -159,6 +187,8 @@ The ownership boundary now includes explicit witness objects for protocol-critic
 
 Readiness witnesses are generation-bound and single-use.
 They fail closed if the owner becomes stale, scope attenuates, the witness is forged, or a second consume is attempted.
+These runtime witnesses are the evidence objects that back language-level
+authority checks and evidence-bearing branches after lowering.
 
 ## Integration Workflow
 

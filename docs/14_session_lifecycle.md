@@ -84,6 +84,9 @@ Deterministic ordering rules:
 These events are part of replay-visible observability. Host integrations should not reconstruct this ordering indirectly from final statuses.
 
 Canonical replay artifacts also retain these lifecycle-visible events through `semantic_audit_log`, together with authority witness issuance/consumption and delegation completion records. Embedders and simulator harnesses should prefer that canonical semantic audit surface over custom post-hoc reconstruction from raw logs.
+When choreography-level `timeout ... on timeout ... on cancel ...` lowering is
+used, its protocol-visible timeout and cancellation outcomes are expected to map
+to this same explicit lifecycle event family.
 
 ## Open Path
 
@@ -99,6 +102,9 @@ Preferred host integration path:
 
 The open path immediately claims session ownership and is the public integration route for hosts that will mutate session-local runtime metadata.
 Hosts that need to materialize protocol-critical checks should also issue explicit readiness witnesses through that ownership-bearing path rather than caching ambient booleans out of band.
+Language-level `check Effect.op(...)` forms are expected to lower into this same
+readiness/evidence machinery rather than inventing a separate host-visible
+authority cache.
 
 ## Type Advancement
 

@@ -1,8 +1,10 @@
 # Authority Language Surface
 
-This page records the current authority/failure-oriented DSL surface added on top of the choreography parser.
+This page records the current authority/failure-oriented DSL surface added on
+top of the choreography parser.
 
-It is a design-note and contract page for the current implementation.
+It is the current reference page for language-level authority checks, typed
+failure branching, and nominal effect interfaces.
 It is intentionally narrower than a full generalized effect language.
 
 ## Current Surface
@@ -22,6 +24,99 @@ Protocol-local forms:
 - `case expr of { | Ok witness -> { ... } | Err reason -> { ... } }`
 - `timeout 5s at Coordinator { ... } on timeout { ... } on cancel { ... }`
 - `choice at Coordinator { | Commit when check Runtime.ready(session) yields witness -> { ... } }`
+
+## Review Sketches
+
+These are the short canonical examples for the current reviewed language
+additions.
+
+### Nominal Effects and `uses`
+
+```choreo
+effect Runtime
+  ready : Session -> Result CommitError ReadyWitness
+
+protocol Flow uses Runtime =
+  ...
+```
+
+### `Result` with `case/of`
+
+```choreo
+case check Runtime.ready(session) of
+  | Ok witness -> ...
+  | Err reason -> ...
+```
+
+### `Maybe`
+
+```choreo
+case maybeReceipt of
+  | Just receipt -> ...
+  | Nothing -> ...
+```
+
+### Custom Union and Alias
+
+```choreo
+type CommitError = TimedOut | Cancelled
+type alias ReadyWitness = { epoch : Int }
+```
+
+### Evidence Binding with `let`
+
+```choreo
+let receipt = transfer Session from Coordinator to Worker
+```
+
+### Timeout and Cancellation
+
+```choreo
+timeout 5s at Coordinator
+  Worker -> Coordinator : Ready
+on timeout
+  Coordinator -> Worker : Cancel
+on cancel
+  Coordinator -> Worker : Cancelled
+```
+
+### Evidence Guard
+
+```choreo
+choice at Coordinator
+  | Commit when check Runtime.ready(session) yields witness -> ...
+```
+
+### Linear Single-Use Binding
+
+```choreo
+let receipt = transfer Session from Coordinator to Worker
+commit transfer receipt
+```
+
+### Local Helper Expression
+
+```choreo
+let decision = check Runtime.ready(session)
+in
+case decision of
+  | Ok witness -> ...
+  | Err reason -> ...
+```
+
+### No Implicit Default
+
+```choreo
+case readiness of
+  | Ok witness -> ...
+  | Err reason -> ...
+```
+
+### Typed External Query
+
+```choreo
+let readiness = check Runtime.ready(session)
+```
 
 ## Result and Maybe
 
@@ -72,6 +167,26 @@ Current validation rules:
 This is the current clean-break contract.
 There is no fallback to implicit host knowledge.
 
+## Typed Host Effect Invocation
+
+`check Effect.op(...)` is the language-level way to invoke typed host effects.
+
+```choreo
+effect Runtime
+  ready : Session -> Result CommitError ReadyWitness
+
+protocol Flow uses Runtime =
+  let readiness = check Runtime.ready(session)
+```
+
+Current contract:
+
+- the protocol must declare the effect in `uses`
+- the operation must exist on the named nominal interface
+- lowering stays centered on the existing VM `invoke` boundary
+- effect observations keep the nominal interface and operation identity for
+  replay/audit surfaces
+
 ## Projection and Theory Boundary
 
 Current projection behavior is intentionally explicit:
@@ -115,7 +230,7 @@ Current design rule:
 
 The initial design is nominal on purpose.
 
-Explicitly not implemented in this phase:
+Not part of the current language surface:
 
 - effect polymorphism
 - parameterized effect rows
@@ -127,5 +242,19 @@ Reserved extension points:
 - explicit operation signatures
 - explicit `uses` lists
 - AST nodes that separate effect references from generic expression calls
+
+## Why Nominal First
+
+The first effect-interface feature is deliberately nominal.
+
+Reasons:
+
+- the VM and Lean already have a typed effect-obligation boundary centered on
+  `invoke`
+- nominal interfaces are enough to make host dependencies explicit and typed
+- observational audit/parity semantics are easier to stabilize with named
+  interfaces and operations
+- generalized effect polymorphism should wait until the nominal lowering,
+  replay/audit model, and Rust/Lean correspondence are stable
 
 This keeps the current system small while leaving a clean path toward later parameterized or polymorphic effects.

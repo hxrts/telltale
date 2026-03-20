@@ -273,6 +273,37 @@ The projection error surface includes:
 Projection still enforces core structural rules before interpretation.
 If a choreography uses parameterized roles, bind those roles to a concrete participant set before building executable effect programs.
 
+## Authority-Oriented Projection Status
+
+The authority/failure additions in the DSL are intentionally split between
+language validation and MPST projection.
+
+| Surface | Current projection status | Reason |
+|---|---|---|
+| `let binding = expr` | projected through to continuation | local helper form with no direct session action |
+| linear `let receipt = transfer ...` | validated before projection | single-use guarantees are enforced before local type generation |
+| nominal `effect` declarations | not projected directly | describe external obligations, not local communication actions |
+| `protocol ... uses ...` | validation-only metadata | constrains which effects may be referenced |
+| `check Effect.op(...)` in local expressions | validation-only until lowered | remains a typed external query, not a local type action by itself |
+| `case ... of` | rejected by current projection pass | explicit projection rule set not finalized |
+| `timeout ... on timeout ... on cancel ...` | rejected by current projection pass | protocol-visible timeout branching needs explicit local-type semantics |
+| `when check ... yields witness` guards | validated, then rejected unless lowered | evidence-binding branch conditions are not yet projected directly |
+
+Current fail-closed rule:
+
+- if a choreography relies on authority constructs that do not yet have an
+  explicit projection rule, projection stops with a validation error instead of
+  guessing a local-session encoding
+
+Current linearity rule:
+
+- linear transfer/receipt bindings must be consumed exactly once before
+  projection continues
+- duplicate use and implicit discard are rejected before local type generation
+
+This keeps the parser/AST surface ahead of the proven MPST subset without
+creating silent projection behavior.
+
 ## Implementation Notes
 
 ### LocalType Variants
@@ -295,6 +326,9 @@ pub enum LocalType {
 ```
 
 Each variant represents a different local type pattern.
+The `Timeout` local variant here refers to the existing local-type timeout
+annotation surface. It is not yet the projection target for the newer
+authority-level `timeout ... on timeout ... on cancel ...` choreography form.
 
 ### Code Generation
 

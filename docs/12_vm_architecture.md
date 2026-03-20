@@ -73,6 +73,9 @@ The VM adapters now enforce explicit runtime hardening at load and startup bound
 - Cooperative and threaded `load_choreography` paths validate trusted `CodeImage` runtime shape before session allocation.
 - Preferred host integration uses `load_choreography_owned(...)` and `OwnedSession` when the embedding runtime needs explicit session ownership after open.
 - Register-bound violations are fail-closed through `Fault::OutOfRegisters` rather than unchecked index panic in executable instruction paths.
+- Language-level `effect` declarations and `check` expressions lower through the
+  same `Invoke`/`EffectHandler` boundary rather than introducing a second host
+  execution channel.
 
 ## Host Ownership Contract in the Runtime
 
@@ -92,6 +95,9 @@ Runtime ownership details:
 - transfer is staged with explicit receipts
 - delegation emits auditable transfer records
 - host assertion mode can reject transfer events that do not have matching committed audit records
+- language-level authority/evidence constructs must lower to these runtime
+  ownership and audit surfaces instead of bypassing them with host-local
+  heuristics
 
 ## Failure and Timeout Event Surface
 
@@ -125,6 +131,9 @@ Runtime accessors:
 - `canonical_replay_fragment().semantic_audit_log`
 
 This keeps replay, simulator harnesses, and parity checks aligned on one derived semantic audit vocabulary.
+Language-level authority checks are expected to arrive at this same audit
+surface after lowering, with the nominal effect interface and operation name
+retained in `EffectObservation`.
 
 ## Delegation and Reconfiguration Path
 

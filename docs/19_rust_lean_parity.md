@@ -43,6 +43,27 @@ Explicit failure, timeout, cancellation, and session-terminal events are now par
 
 Language-level nominal `effect` declarations do not introduce a second runtime bridge. Their intended justification remains the existing VM `invoke` boundary and handler-typing obligations in `Runtime/Proofs/VM/BridgeStrengthening.lean`.
 
+## Effect Interface Justification
+
+The language-level effect interface design follows the same proof boundary used
+by the MPST-plus-effects papers and the Lean runtime:
+
+- typed effect obligations remain attached to the executable handler boundary,
+  not to a separate host-only mechanism
+- authority-sensitive language constructs must lower to explicit effect
+  observations, witness issuance/consumption, and failure-visible events
+- proof-carrying evidence remains fail-closed on missing or invalid authority
+- behavioral correspondence is observational, through traces and effect/audit
+  surfaces, rather than through arbitrary host internals
+
+This is why the current language design is nominal-first:
+
+- `effect` declarations and `uses` clauses are stable names for explicit host
+  obligations
+- lowering stays centered on the existing `invoke` and `EffectSpec` story
+- generalized effect polymorphism waits until the nominal surface,
+  lowering, and parity/audit semantics are stable
+
 ## Choreography Projection Parity
 
 The parity scope covers projection behavior from global choreography forms to local session forms. It covers `send`, `choice`, recursion, and merge behavior for non-participant branches. It does not cover Rust-only runtime conveniences or extension-only AST constructs.

@@ -15,6 +15,14 @@ Use it as a stable lookup for terminology and notation.
 | theorem-pack | Lean-exported capability inventory used by runtime admission gates. | [Lean Verification](23_lean_verification.md), [Capability and Admission](25_capability_admission.md) |
 | admission | Runtime gate process that checks contracts and capability evidence. | [Capability and Admission](25_capability_admission.md) |
 | ownership capability | Runtime host authority token carrying owner label, generation, and scope. | [Effect Handlers and Session Types](11_effect_session_bridge.md), [Session Lifecycle](14_session_lifecycle.md) |
+| evidence | Typed proof object or witness consumed by protocol-critical authority flow. | [Authority Language Surface](34_authority_language_surface.md) |
+| receipt | Single-use transfer or handoff proof emitted by an explicit ownership/delegation path. | [Session Lifecycle](14_session_lifecycle.md), [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) |
+| linear binding | Binding that the compiler requires to be consumed exactly once. | [Choreographic DSL](06_choreographic_dsl.md), [Authority Language Surface](34_authority_language_surface.md) |
+| `Result` | Built-in success/failure sum form with `Ok` and `Err`. | [Choreographic DSL](06_choreographic_dsl.md) |
+| `Maybe` | Built-in optional-value sum form with `Just` and `Nothing`. | [Choreographic DSL](06_choreographic_dsl.md) |
+| effect declaration | Nominal choreography declaration for one typed external host interface. | [Authority Language Surface](34_authority_language_surface.md) |
+| `uses` clause | Protocol-level declaration of which named effect interfaces may be invoked. | [Authority Language Surface](34_authority_language_surface.md) |
+| timeout branch | Protocol-visible timeout/cancellation construct with explicit alternate branches. | [Choreographic DSL](06_choreographic_dsl.md), [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) |
 | ownership epoch | Generation used to invalidate stale owner handles after transfer or scope attenuation. | [Session Lifecycle](14_session_lifecycle.md) |
 | canonical ingress | Sanctioned host event entry path such as `topology_events`, `send_decision`, `handle_recv`, or `step`. | [Effect Handlers and Session Types](11_effect_session_bridge.md) |
 | stale-owner rejection | Fail-closed behavior when a prior ownership capability is reused after transfer or attenuation. | [Effect Handlers and Session Types](11_effect_session_bridge.md), [Session Lifecycle](14_session_lifecycle.md) |
@@ -43,6 +51,11 @@ Use it as a stable lookup for terminology and notation.
 | `Full`, `ModuloEffects`, `ModuloCommutativity`, `Replay` | Runtime determinism profiles. | [VM Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
 | `off`, `sequence`, `nullifier` | Communication replay-consumption modes. | [VM Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
 | `telltale.comm.identity.v1` | Domain-separation tag for canonical communication identity schema. | [VM Architecture](12_vm_architecture.md) |
+| `case ... of` | Exhaustive sum-pattern branching over forms such as `Result` and `Maybe`. | [Choreographic DSL](06_choreographic_dsl.md), [Authority Language Surface](34_authority_language_surface.md) |
+| `let x = check Effect.op(args)` | Typed external query binding that later lowers to the VM effect boundary. | [Choreographic DSL](06_choreographic_dsl.md), [Authority Language Surface](34_authority_language_surface.md) |
+| `effect Name` | Nominal effect-interface declaration. | [Authority Language Surface](34_authority_language_surface.md) |
+| `protocol P uses Runtime, Audit` | Protocol declaration naming its allowed effect interfaces. | [Authority Language Surface](34_authority_language_surface.md) |
+| `timeout 5s at R ... on timeout ... on cancel ...` | Protocol-visible timeout and cancellation branch form. | [Choreographic DSL](06_choreographic_dsl.md), [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) |
 
 ## Notation Consistency Rules
 

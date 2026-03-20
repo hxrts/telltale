@@ -47,6 +47,22 @@ Practical consequence:
 - passing `enforce_vm_runtime_gates(...)` does not authorize session-local mutation
 - hosts still need a live ownership capability such as `OwnedSession`
 - stale-owner rejection can occur even when admission remains valid
+- a choreography `uses Runtime, Audit` declaration states external protocol
+  dependencies, but it does not replace runtime admission or ownership checks
+
+## Effect Interfaces vs Admission
+
+Language-level effect interfaces and runtime admission solve different problems.
+
+| Surface | Main question |
+|---|---|
+| `effect` declaration | what typed host operation does the protocol depend on? |
+| `uses` clause | which named external interfaces may this protocol call? |
+| admission gate | may this runtime/profile/configuration run at all? |
+| ownership capability | who may currently drive one live session or fragment? |
+
+Nominal effect interfaces therefore narrow protocol dependencies without
+weakening theorem-pack admission or ownership enforcement.
 
 ## Determinism Profiles
 
