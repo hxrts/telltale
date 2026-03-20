@@ -297,8 +297,12 @@ lean-style-baseline:
 
 # Check WASM compilation for choreography and core crates
 wasm-check:
-    cargo check --package telltale-choreography --target wasm32-unknown-unknown --features wasm
-    cargo check --package telltale --target wasm32-unknown-unknown --features wasm
+    #!/usr/bin/env bash
+    set -euo pipefail
+    wasm_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-check.XXXXXX")"
+    trap 'rm -rf "$wasm_target"' EXIT
+    CARGO_TARGET_DIR="$wasm_target" cargo check --package telltale-choreography --target wasm32-unknown-unknown --features wasm
+    CARGO_TARGET_DIR="$wasm_target" cargo check --package telltale --target wasm32-unknown-unknown --features wasm
 
 # Check benchmark target compilation without running benchmarks
 bench-check:
@@ -326,14 +330,20 @@ profile-vm-open:
 
 # Build WASM example with wasm-pack
 wasm-build:
-    cd examples/wasm-ping-pong && wasm-pack build --target web
+    #!/usr/bin/env bash
+    set -euo pipefail
+    wasm_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-build.XXXXXX")"
+    trap 'rm -rf "$wasm_target"' EXIT
+    cd examples/wasm-ping-pong
+    CARGO_TARGET_DIR="$wasm_target" wasm-pack build --target web
 
 # Run the example WASM tests under Node.
 wasm-test:
     #!/usr/bin/env bash
     set -euo pipefail
     shim_root="$(mktemp -d)"
-    trap 'rm -rf "$shim_root"' EXIT
+    wasm_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-test.XXXXXX")"
+    trap 'rm -rf "$shim_root" "$wasm_target"' EXIT
     mkdir -p "$shim_root/env"
     cat >"$shim_root/env/index.js" <<'EOF'
     module.exports = new Proxy(
@@ -349,14 +359,17 @@ wasm-test:
     );
     EOF
     cd examples/wasm-ping-pong
-    NODE_PATH="$shim_root" wasm-pack test --node
+    CARGO_TARGET_DIR="$wasm_target" NODE_PATH="$shim_root" wasm-pack test --node
 
 # Run all repository-managed WASM tests without requiring a browser driver.
 wasm-test-all:
     #!/usr/bin/env bash
     set -euo pipefail
     shim_root="$(mktemp -d)"
-    trap 'rm -rf "$shim_root"' EXIT
+    vm_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-vm.XXXXXX")"
+    choreo_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-choreo.XXXXXX")"
+    example_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-example.XXXXXX")"
+    trap 'rm -rf "$shim_root" "$vm_target" "$choreo_target" "$example_target"' EXIT
     mkdir -p "$shim_root/env"
     cat >"$shim_root/env/index.js" <<'EOF'
     module.exports = new Proxy(
@@ -371,10 +384,10 @@ wasm-test-all:
       },
     );
     EOF
-    NODE_PATH="$shim_root" wasm-pack test --node rust/vm --features wasm -- --nocapture
-    NODE_PATH="$shim_root" wasm-pack test --node rust/choreography --features "wasm _wasm_integration_tests" -- --nocapture
+    CARGO_TARGET_DIR="$vm_target" NODE_PATH="$shim_root" wasm-pack test --node rust/vm --features wasm -- --nocapture
+    CARGO_TARGET_DIR="$choreo_target" NODE_PATH="$shim_root" wasm-pack test --node rust/choreography --features "wasm _wasm_integration_tests" -- --nocapture
     cd examples/wasm-ping-pong
-    NODE_PATH="$shim_root" wasm-pack test --node
+    CARGO_TARGET_DIR="$example_target" NODE_PATH="$shim_root" wasm-pack test --node
 
 # Format choreography DSL files (prints to stdout unless --write is used)
 choreo-fmt *FILES:
@@ -591,9 +604,13 @@ verify-lean-vm-targets: lean-init
 
 # Cross-target runtime comparison lane.
 verify-cross-target-matrix:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    wasm_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-cross-target-wasm.XXXXXX")"
+    trap 'rm -rf "$wasm_target"' EXIT
     cargo test -p telltale-vm --features multi-thread --test threaded_equivalence
     cargo test -p telltale-vm --test lean_vm_equivalence
-    wasm-pack test --node rust/vm --features wasm -- --nocapture
+    CARGO_TARGET_DIR="$wasm_target" wasm-pack test --node rust/vm --features wasm -- --nocapture
     cargo test -p telltale-lean-bridge --test vm_cross_target_matrix_tests
 
 # Composition/concurrency stress lane.
