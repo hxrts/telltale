@@ -77,7 +77,11 @@ replace_block() {
   fi
 
   local tmp_file
-  tmp_file="$(mktemp)"
+  local tmp_root="${TMPDIR:-/tmp}"
+  if [[ ! -d "$tmp_root" ]]; then
+    tmp_root="/tmp"
+  fi
+  tmp_file="$(TMPDIR="$tmp_root" mktemp)"
 
   {
     sed -n "1,${begin_line}p" "$file"

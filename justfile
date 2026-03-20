@@ -50,8 +50,15 @@ release \
 # - verify.yml fast lane checks
 # - verify.yml scheduled heavy lane checks when lane="full"
 ci-dry-run lane="fast":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp_root="${TMPDIR:-/tmp}"
+    if [[ ! -d "$tmp_root" ]]; then
+      export TMPDIR="/tmp"
+    fi
     cargo fmt --all -- --check
     # Fail fast on generated docs/metrics drift before the expensive build/test lanes.
+    just check-workflow-actions-regression
     just check-workflow-actions
     just check-verification-inventory
     just check-lean-metrics-minimal-env
@@ -89,14 +96,13 @@ ci-dry-run lane="fast":
     just telltale-lean-check
     just telltale-lean-check-extended
     just telltale-lean-check-failing
-    if [ "{{lane}}" = "full" ]; then \
-      just verify-lean-full || true; \
-      just verify-cross-target-matrix && \
-      just verify-track-b && \
-      just verify-properties && \
-      just verify-composition-stress && \
-      just v2-baseline run && \
-      :; \
+    if [[ "{{lane}}" == "full" ]]; then
+      just verify-lean-full || true
+      just verify-cross-target-matrix
+      just verify-track-b
+      just verify-properties
+      just verify-composition-stress
+      just v2-baseline run
     fi
 
 # Mirror the markdown link-check action used in GitHub check.yml docs lane
@@ -204,6 +210,10 @@ check-doc-links-in-code:
 # Validate that all remote GitHub Action references in workflows resolve.
 check-workflow-actions:
     ./scripts/check/workflow-actions.sh
+
+# Prove the workflow action checker rejects a known-bad remote action reference.
+check-workflow-actions-regression:
+    ./scripts/check/workflow-actions-regression.sh
 
 # Enforce documentation style, link integrity, and command/reference validity.
 check-doc-quality:
