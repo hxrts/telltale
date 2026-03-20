@@ -113,6 +113,23 @@ structure CoroutineState (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] whe
   knowledgeSet : KnowledgeSet
   costBudget : Nat
   specState : Option SpeculationState
+
+abbrev AuthorityWitnessId := Nat
+abbrev FragmentOwnerId := String
+
+inductive OwnershipTerminalReason where
+  | ownerDied (ownerId : FragmentOwnerId)
+  | transferAbandoned (ownerId : FragmentOwnerId) (claimId : Nat)
+  | transferCommitFailed (ownerId : FragmentOwnerId) (claimId : Nat) (reason : String)
+  deriving Repr, DecidableEq
+
+inductive SessionTerminalReason where
+  | closed (reason : String)
+  | cancelled (reason : String)
+  | aborted (reason : String)
+  | faulted (reason : String)
+  deriving Repr, DecidableEq
+
 /-! ## Execution results and events -/
 inductive ObsEvent (ε : Type u) [EffectRuntime ε] where
   | sent (edge : Edge) (val : Value) (seqNo : Nat)
@@ -129,8 +146,16 @@ inductive ObsEvent (ε : Type u) [EffectRuntime ε] where
   | forked (sid : SessionId) (ghostSid : GhostSessionId)
   | joined (sid : SessionId)
   | aborted (sid : SessionId)
+  | sessionTerminal (sid : SessionId) (reason : SessionTerminalReason)
   | tagged (fact : Knowledge)
   | checked (target : Role) (permitted : Bool)
+  | failureBranchEntered (sid : SessionId) (coroId : CoroutineId) (faultClass : String)
+  | timeoutIssued (site : Site) (untilTick : Nat) (witnessId : AuthorityWitnessId)
+  | cancellationRequested (sid : SessionId)
+      (witnessId : AuthorityWitnessId) (ownerId : FragmentOwnerId)
+      (reason : OwnershipTerminalReason)
+  | cancelled (sid : SessionId) (witnessId : AuthorityWitnessId)
+      (reason : OwnershipTerminalReason)
 structure TickedObsEvent (ε : Type u) [EffectRuntime ε] where
   tick : Nat
   event : ObsEvent ε
@@ -154,8 +179,13 @@ def obsSid? {ε : Type u} [EffectRuntime ε] : ObsEvent ε → Option SessionId
   | .forked sid _ => some sid
   | .joined sid => some sid
   | .aborted sid => some sid
+  | .sessionTerminal sid _ => some sid
   | .tagged _ => none
   | .checked _ _ => none
+  | .failureBranchEntered sid _ _ => some sid
+  | .timeoutIssued _ _ _ => none
+  | .cancellationRequested sid _ _ _ => some sid
+  | .cancelled sid _ _ => some sid
 /-- Filter observable events by session id. -/
 def filterBySid {ε : Type u} [EffectRuntime ε] (sid : SessionId)
     (trace : List (TickedObsEvent ε)) : List (TickedObsEvent ε) :=

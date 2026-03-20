@@ -176,7 +176,7 @@ impl ThreadedVM {
             let mut guard = coro.lock().expect("threaded VM lock poisoned");
             if guard.role == site && !guard.is_terminal() {
                 let fault = Fault::Invoke {
-                    message: reason.clone(),
+                    failure: EffectFailure::topology_disruption(reason.clone()),
                 };
                 guard.status = CoroStatus::Faulted(fault.clone());
                 newly_terminal = newly_terminal.saturating_add(1);

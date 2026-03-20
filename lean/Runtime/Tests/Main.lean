@@ -40,8 +40,13 @@ def obsTag : ObsEvent UnitEffect → String
   | .forked _ _ => "forked"
   | .joined _ => "joined"
   | .aborted _ => "aborted"
+  | .sessionTerminal _ _ => "session_terminal"
   | .tagged _ => "tagged"
   | .checked _ _ => "checked"
+  | .failureBranchEntered _ _ _ => "failure_branch_entered"
+  | .timeoutIssued _ _ _ => "timeout_issued"
+  | .cancellationRequested _ _ _ _ => "cancellation_requested"
+  | .cancelled _ _ _ => "cancelled"
 
 /-- Extract tags from a filtered trace (UnitEffect only). -/
 def traceTags (trace : List (TickedObsEvent UnitEffect)) : List String :=

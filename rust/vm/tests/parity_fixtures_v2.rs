@@ -12,7 +12,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::coroutine::{Fault, Value};
-use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput, TopologyPerturbation};
+use telltale_vm::effect::{
+    EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
+    TopologyPerturbation,
+};
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::threaded::ThreadedVM;
@@ -76,12 +79,12 @@ impl EffectHandler for TopologyOnceHandler {
         _partner: &str,
         label: &str,
         _state: &[Value],
-    ) -> Result<Value, String> {
-        Ok(Value::Str(label.to_string()))
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Str(label.to_string()))
     }
 
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-        Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
     }
 
     fn handle_recv(
@@ -91,8 +94,8 @@ impl EffectHandler for TopologyOnceHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -101,22 +104,22 @@ impl EffectHandler for TopologyOnceHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".to_string())
-    }
-
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-        Ok(())
-    }
-
-    fn topology_events(&self, _tick: u64) -> Result<Vec<TopologyPerturbation>, String> {
-        if self.emitted.swap(true, Ordering::Relaxed) {
-            return Ok(Vec::new());
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
         }
-        Ok(vec![
+    }
+
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn topology_events(&self, _tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
+        if self.emitted.swap(true, Ordering::Relaxed) {
+            return EffectResult::success(Vec::new());
+        }
+        EffectResult::success(vec![
             TopologyPerturbation::Crash {
                 site: "A".to_string(),
             },
@@ -138,12 +141,12 @@ impl EffectHandler for OversizedPayloadHandler {
         _partner: &str,
         _label: &str,
         _state: &[Value],
-    ) -> Result<Value, String> {
-        Ok(Value::Str("x".repeat(256)))
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Str("x".repeat(256)))
     }
 
-    fn send_decision(&self, _input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-        Ok(SendDecision::Deliver(Value::Str("x".repeat(256))))
+    fn send_decision(&self, _input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(Value::Str("x".repeat(256))))
     }
 
     fn handle_recv(
@@ -153,8 +156,8 @@ impl EffectHandler for OversizedPayloadHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -163,15 +166,15 @@ impl EffectHandler for OversizedPayloadHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".to_string())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+        }
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-        Ok(())
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::success(())
     }
 }
 

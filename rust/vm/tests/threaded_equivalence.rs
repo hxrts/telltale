@@ -13,7 +13,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use telltale_vm::coroutine::Fault;
 use telltale_vm::coroutine::Value;
 use telltale_vm::determinism::{replay_consistent, DeterminismMode};
-use telltale_vm::effect::{EffectHandler, RecordingEffectHandler, SendDecision, SendDecisionInput};
+use telltale_vm::effect::{
+    EffectFailure, EffectHandler, EffectResult, RecordingEffectHandler, SendDecision,
+    SendDecisionInput,
+};
 use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::vm::{ObsEvent, VMConfig, VMError, VM};
 use telltale_vm::OutputConditionPolicy;
@@ -99,18 +102,18 @@ impl EffectHandler for FlakySendHandler {
         _partner: &str,
         _label: &str,
         _state: &[Value],
-    ) -> Result<Value, String> {
-        Ok(Value::Nat(1))
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Nat(1))
     }
 
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
         let idx = self.counter.fetch_add(1, Ordering::Relaxed);
         if idx % 2 == 0 {
-            Ok(SendDecision::Deliver(
+            EffectResult::success(SendDecision::Deliver(
                 input.payload.unwrap_or(Value::Nat(1)),
             ))
         } else {
-            Ok(SendDecision::Drop)
+            EffectResult::success(SendDecision::Drop)
         }
     }
 
@@ -121,8 +124,8 @@ impl EffectHandler for FlakySendHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -131,15 +134,15 @@ impl EffectHandler for FlakySendHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".to_string())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+        }
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-        Ok(())
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::success(())
     }
 }
 

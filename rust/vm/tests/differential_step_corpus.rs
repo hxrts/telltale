@@ -59,8 +59,13 @@ fn event_name(ev: &ObsEvent) -> &'static str {
         ObsEvent::Forked { .. } => "forked",
         ObsEvent::Joined { .. } => "joined",
         ObsEvent::Aborted { .. } => "aborted",
+        ObsEvent::SessionTerminal { .. } => "session_terminal",
         ObsEvent::Tagged { .. } => "tagged",
         ObsEvent::Checked { .. } => "checked",
+        ObsEvent::FailureBranchEntered { .. } => "failure_branch_entered",
+        ObsEvent::TimeoutIssued { .. } => "timeout_issued",
+        ObsEvent::CancellationRequested { .. } => "cancellation_requested",
+        ObsEvent::Cancelled { .. } => "cancelled",
         ObsEvent::Faulted { .. } => "faulted",
         ObsEvent::OutputConditionChecked { .. } => "output_condition_checked",
     }

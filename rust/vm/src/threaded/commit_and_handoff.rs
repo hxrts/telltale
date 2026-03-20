@@ -216,7 +216,7 @@ impl ThreadedVM {
 
         self.assert_delegation_events_audited(&pack.events)
             .map_err(|err| Fault::Invoke {
-                message: err.to_string(),
+                failure: EffectFailure::contract_violation(err.to_string()),
             })?;
 
         self.trace.extend(pack.events);

@@ -21,7 +21,7 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 | `SignedValue` transport fields (`payload`, `signature`, `sequence_no`) | `Runtime/VM/Model/TypeClasses.lean` | `rust/vm/src/buffer.rs` | Aligned |
 | Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | `Runtime/VM/Model/Config.lean`, `Runtime/VM/Semantics/ExecComm.lean` | `rust/vm/src/vm.rs` | Aligned |
 | Register bounds failure semantics (`OutOfRegisters`) | `Runtime/VM/Semantics/ExecSteps.lean` | `rust/vm/src/vm`, `rust/vm/src/threaded` | Aligned |
-| Explicit failure/timeout observable event inventory (`TimeoutIssued`, `CancellationRequested`, `Cancelled`, `FailureBranchEntered`, `SessionTerminal`) | inventory-only for next Lean runtime/event pass | `rust/vm/src/vm/vm_config.rs`, `rust/vm/src/trace.rs` | Inventory tracked |
+| Explicit failure/timeout observable event inventory (`TimeoutIssued`, `CancellationRequested`, `Cancelled`, `FailureBranchEntered`, `SessionTerminal`) | `Runtime/VM/Model/State.lean`, `Runtime/VM/Runtime/Json.lean`, `Runtime/Proofs/TheoremPack/ReleaseConformance.lean` | `rust/vm/src/vm/vm_config.rs`, `rust/vm/src/trace.rs` | Aligned |
 
 These checks are automated by `just check-parity --types`.
 
@@ -39,7 +39,9 @@ These checks are automated by `just check-parity --types`.
 
 These checks are automated by `just check-parity --suite`.
 
-The explicit failure/timeout event family is currently tracked as a Rust-side bridge inventory surface while the next Lean runtime/event pass catches up. This is an inventory obligation, not a hidden parity exception.
+Explicit failure, timeout, cancellation, and session-terminal events are now part of the executable Lean runtime/event inventory. Replay tagging, JSON serialization, and theorem-pack release conformance all use the same observable event family.
+
+Language-level nominal `effect` declarations do not introduce a second runtime bridge. Their intended justification remains the existing VM `invoke` boundary and handler-typing obligations in `Runtime/Proofs/VM/BridgeStrengthening.lean`.
 
 ## Choreography Projection Parity
 

@@ -12,7 +12,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::effect::{
-    EffectHandler, EffectTraceEntry, SendDecision, SendDecisionInput, TopologyPerturbation,
+    EffectFailure, EffectHandler, EffectResult, EffectTraceEntry, SendDecision, SendDecisionInput,
+    TopologyPerturbation,
 };
 use telltale_vm::trace::normalize_trace_v1;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
@@ -42,12 +43,12 @@ impl EffectHandler for OrderedTopologyHandler {
         _partner: &str,
         label: &str,
         _state: &[telltale_vm::Value],
-    ) -> Result<telltale_vm::Value, String> {
-        Ok(telltale_vm::Value::Str(label.to_string()))
+    ) -> EffectResult<telltale_vm::Value> {
+        EffectResult::success(telltale_vm::Value::Str(label.to_string()))
     }
 
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-        Ok(SendDecision::Deliver(
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(
             input.payload.unwrap_or(telltale_vm::Value::Unit),
         ))
     }
@@ -59,8 +60,8 @@ impl EffectHandler for OrderedTopologyHandler {
         _label: &str,
         _state: &mut Vec<telltale_vm::Value>,
         _payload: &telltale_vm::Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -69,19 +70,19 @@ impl EffectHandler for OrderedTopologyHandler {
         _partner: &str,
         labels: &[String],
         _state: &[telltale_vm::Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels".to_string())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels")),
+        }
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<telltale_vm::Value>) -> Result<(), String> {
-        Ok(())
+    fn step(&self, _role: &str, _state: &mut Vec<telltale_vm::Value>) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
-    fn topology_events(&self, tick: u64) -> Result<Vec<TopologyPerturbation>, String> {
-        Ok(self.events_by_tick.get(&tick).cloned().unwrap_or_default())
+    fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
+        EffectResult::success(self.events_by_tick.get(&tick).cloned().unwrap_or_default())
     }
 }
 

@@ -37,6 +37,8 @@ def theoremInventory
   , ("vm_envelope_adherence", pack.vmEnvelopeAdherence?.isSome)
   , ("vm_envelope_admission", pack.vmEnvelopeAdmission?.isSome)
   , ("protocol_envelope_bridge", pack.protocolEnvelopeBridge?.isSome)
+  , ("effect_interface_bridge",
+      pack.vmEnvelopeAdherence?.isSome && pack.protocolEnvelopeBridge?.isSome)
   , ("classical_foster", pack.foster?.isSome)
   , ("classical_maxweight", pack.maxWeight?.isSome)
   , ("classical_ldp", pack.ldp?.isSome)

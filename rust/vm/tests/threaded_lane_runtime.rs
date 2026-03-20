@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::EffectHandler;
+use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_vm::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::threaded::{ContentionMetrics, ThreadedVM};
@@ -28,8 +28,8 @@ impl EffectHandler for RuntimeHandler {
         _partner: &str,
         _label: &str,
         _state: &[Value],
-    ) -> Result<Value, String> {
-        Ok(Value::Unit)
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Unit)
     }
 
     fn handle_recv(
@@ -39,8 +39,8 @@ impl EffectHandler for RuntimeHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -49,21 +49,21 @@ impl EffectHandler for RuntimeHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".to_string())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+        }
     }
 
-    fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String> {
+    fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
         if role == "A" {
             state[0] = Value::Endpoint(Endpoint {
                 sid: 0,
                 role: "A".to_string(),
             });
         }
-        Ok(())
+        EffectResult::success(())
     }
 }
 

@@ -99,6 +99,7 @@ Current intent:
 - `effect` declarations become the source for generated Rust host interfaces
 - `check Effect.op(...)` remains a DSL-level reference to a typed external query
 - execution must still cross the same typed handler-obligation boundary rather than inventing a second host channel
+- the Lean bridge statement for nominal effect declarations stays centered on the existing VM `invoke` obligation rather than a separate effect-language proof surface
 
 ## Observable Trace Model
 

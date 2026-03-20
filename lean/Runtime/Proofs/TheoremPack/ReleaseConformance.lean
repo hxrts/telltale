@@ -140,8 +140,13 @@ private def obsTag {ε : Type u} [EffectRuntime ε] : ObsEvent ε → String
   | .forked _ _ => "forked"
   | .joined _ => "joined"
   | .aborted _ => "aborted"
+  | .sessionTerminal _ _ => "session_terminal"
   | .tagged _ => "tagged"
   | .checked _ _ => "checked"
+  | .failureBranchEntered _ _ _ => "failure_branch_entered"
+  | .timeoutIssued _ _ _ => "timeout_issued"
+  | .cancellationRequested _ _ _ _ => "cancellation_requested"
+  | .cancelled _ _ _ => "cancelled"
 
 private def replaySessionSignature {ε : Type u} [EffectRuntime ε]
     (trace : List (TickedObsEvent ε)) :

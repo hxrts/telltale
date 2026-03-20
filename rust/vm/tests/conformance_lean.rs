@@ -10,15 +10,20 @@
 mod test_support;
 
 use std::collections::{BTreeMap, HashSet};
+use std::time::Duration;
 
 use assert_matches::assert_matches;
 use telltale_types::LocalTypeR;
 use telltale_vm::buffer::BufferConfig;
 use telltale_vm::coroutine::{CoroStatus, Fault};
-use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
+use telltale_vm::effect::{
+    EffectHandler, EffectResult, SendDecision, SendDecisionInput, TopologyPerturbation,
+};
 use telltale_vm::instr::Endpoint;
 use telltale_vm::output_condition::OutputConditionHint;
-use telltale_vm::session::{SessionStatus, SessionStore};
+use telltale_vm::session::{
+    AuthorityArtifact, AuthorityAuditEvent, OwnershipScope, SessionStatus, SessionStore,
+};
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
 
 use test_support::PassthroughHandler;
@@ -52,12 +57,12 @@ impl EffectHandler for KnowledgePayloadHandler {
         _partner: &str,
         _label: &str,
         _state: &[telltale_vm::coroutine::Value],
-    ) -> Result<telltale_vm::coroutine::Value, String> {
-        Ok(telltale_vm::coroutine::Value::Unit)
+    ) -> EffectResult<telltale_vm::coroutine::Value> {
+        EffectResult::success(telltale_vm::coroutine::Value::Unit)
     }
 
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-        Ok(SendDecision::Deliver(telltale_vm::coroutine::Value::Prod(
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(telltale_vm::coroutine::Value::Prod(
             Box::new(telltale_vm::coroutine::Value::Endpoint(Endpoint {
                 sid: input.sid,
                 role: input.role.to_string(),
@@ -73,8 +78,8 @@ impl EffectHandler for KnowledgePayloadHandler {
         _label: &str,
         _state: &mut Vec<telltale_vm::coroutine::Value>,
         _payload: &telltale_vm::coroutine::Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -83,19 +88,21 @@ impl EffectHandler for KnowledgePayloadHandler {
         _partner: &str,
         labels: &[String],
         _state: &[telltale_vm::coroutine::Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".to_string())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(telltale_vm::effect::EffectFailure::invalid_input(
+                "no labels available",
+            )),
+        }
     }
 
     fn step(
         &self,
         _role: &str,
         _state: &mut Vec<telltale_vm::coroutine::Value>,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 }
 
@@ -109,8 +116,8 @@ impl EffectHandler for HintedInvokeHandler {
         _partner: &str,
         _label: &str,
         _state: &[telltale_vm::coroutine::Value],
-    ) -> Result<telltale_vm::coroutine::Value, String> {
-        Ok(telltale_vm::coroutine::Value::Unit)
+    ) -> EffectResult<telltale_vm::coroutine::Value> {
+        EffectResult::success(telltale_vm::coroutine::Value::Unit)
     }
 
     fn handle_recv(
@@ -120,8 +127,8 @@ impl EffectHandler for HintedInvokeHandler {
         _label: &str,
         _state: &mut Vec<telltale_vm::coroutine::Value>,
         _payload: &telltale_vm::coroutine::Value,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn handle_choose(
@@ -130,19 +137,21 @@ impl EffectHandler for HintedInvokeHandler {
         _partner: &str,
         labels: &[String],
         _state: &[telltale_vm::coroutine::Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".to_string())
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(telltale_vm::effect::EffectFailure::invalid_input(
+                "no labels available",
+            )),
+        }
     }
 
     fn step(
         &self,
         _role: &str,
         _state: &mut Vec<telltale_vm::coroutine::Value>,
-    ) -> Result<(), String> {
-        Ok(())
+    ) -> EffectResult<()> {
+        EffectResult::success(())
     }
 
     fn output_condition_hint(
@@ -155,6 +164,66 @@ impl EffectHandler for HintedInvokeHandler {
             predicate_ref: "vm.custom.observable".to_string(),
             witness_ref: Some(format!("sid:{sid}:role:{role}")),
         })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TimeoutAtTickOneHandler;
+
+impl EffectHandler for TimeoutAtTickOneHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &[telltale_vm::coroutine::Value],
+    ) -> EffectResult<telltale_vm::coroutine::Value> {
+        EffectResult::success(telltale_vm::coroutine::Value::Unit)
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<telltale_vm::coroutine::Value>,
+        _payload: &telltale_vm::coroutine::Value,
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[telltale_vm::coroutine::Value],
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(telltale_vm::effect::EffectFailure::invalid_input(
+                "no labels available",
+            )),
+        }
+    }
+
+    fn step(
+        &self,
+        _role: &str,
+        _state: &mut Vec<telltale_vm::coroutine::Value>,
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
+        if tick == 1 {
+            EffectResult::success(vec![TopologyPerturbation::Timeout {
+                site: "A".to_string(),
+                duration: Duration::from_millis(20),
+            }])
+        } else {
+            EffectResult::success(Vec::new())
+        }
     }
 }
 
@@ -718,6 +787,177 @@ fn test_lean_invoke_and_output_condition_hint_behavior() {
     assert!(
         checks[0].passed,
         "allowlist policy should accept custom predicate"
+    );
+}
+
+/// Lean VM failure observability: failure branch entry is explicit and ordered
+/// before the terminal fault artifact for the same coroutine/session.
+#[test]
+fn test_lean_failure_branch_and_terminal_fault_ordering() {
+    use telltale_vm::instr::{ImmValue, Instr};
+
+    let image = single_role_end_image(vec![
+        Instr::Set {
+            dst: 99,
+            val: ImmValue::Nat(7),
+        },
+        Instr::Halt,
+    ]);
+    let mut vm = VM::new(VMConfig::default());
+    let sid = vm.load_choreography(&image).unwrap();
+
+    let err = vm.step(&PassthroughHandler);
+    assert!(err.is_err(), "register-bounds violation must fault");
+
+    let failure_idx = vm
+        .trace()
+        .iter()
+        .position(|event| {
+            matches!(event, ObsEvent::FailureBranchEntered { session, .. } if *session == sid)
+        })
+        .expect("failure branch event");
+    let fault_idx = vm
+        .trace()
+        .iter()
+        .position(|event| matches!(event, ObsEvent::Faulted { .. }))
+        .expect("faulted event");
+    assert!(
+        failure_idx < fault_idx,
+        "failure-branch event must precede terminal fault event"
+    );
+}
+
+/// Lean VM authority observability: timeout and cancellation paths surface as
+/// explicit witness-bearing events rather than silent host-side control flow.
+#[test]
+fn test_lean_authority_timeout_and_cancellation_trace_behavior() {
+    use telltale_vm::instr::Instr;
+
+    let image = single_role_end_image(vec![Instr::Halt]);
+    let mut vm = VM::new(VMConfig::default());
+    let owned = vm
+        .load_choreography_owned(&image, "owner/a")
+        .expect("load owned choreography");
+
+    let step = vm
+        .step(&TimeoutAtTickOneHandler)
+        .expect("timeout ingress should not fault");
+    assert!(
+        matches!(step, telltale_vm::vm::StepResult::Stuck),
+        "timeout ingress should block scheduling"
+    );
+    assert!(
+        vm.trace()
+            .iter()
+            .any(|event| matches!(event, ObsEvent::TimeoutIssued { site, .. } if site == "A")),
+        "expected explicit timeout event"
+    );
+    assert!(
+        vm.authority_audit_log().iter().any(|record| matches!(
+            (&record.artifact, record.event),
+            (AuthorityArtifact::Timeout(_), AuthorityAuditEvent::Issued)
+        )),
+        "expected issued timeout witness in authority audit log"
+    );
+
+    let sid = owned.session_id();
+    let receipt = owned
+        .begin_transfer(&mut vm, "owner/b", OwnershipScope::Session)
+        .expect("stage transfer");
+    let cancellation = owned
+        .cancel_abandoned_transfer(&mut vm, &receipt)
+        .expect("cancel abandoned transfer");
+
+    let trace = vm.trace();
+    let requested_idx = trace
+        .iter()
+        .position(|event| {
+            matches!(event, ObsEvent::CancellationRequested { session, witness_id, .. }
+            if *session == sid && *witness_id == cancellation.witness_id)
+        })
+        .expect("cancellation requested event");
+    let cancelled_idx = trace
+        .iter()
+        .position(|event| {
+            matches!(event, ObsEvent::Cancelled { session, witness_id, .. }
+            if *session == sid && *witness_id == cancellation.witness_id)
+        })
+        .expect("cancelled event");
+    let terminal_idx = trace
+        .iter()
+        .position(|event| {
+            matches!(event, ObsEvent::SessionTerminal { session, .. }
+            if *session == sid)
+        })
+        .expect("session terminal event");
+    assert!(
+        requested_idx < cancelled_idx && cancelled_idx < terminal_idx,
+        "cancellation request, completion, and terminal reason must stay ordered"
+    );
+}
+
+/// Lean VM authority semantics: evidence is single-use and invalid/stale uses
+/// are rejected with explicit audit artifacts.
+#[test]
+fn test_lean_authority_evidence_rejection_behavior() {
+    let mut store = SessionStore::new();
+    let mut local_types = BTreeMap::new();
+    local_types.insert("A".to_string(), LocalTypeR::End);
+    local_types.insert("B".to_string(), LocalTypeR::End);
+    let sid = store.open(
+        vec!["A".into(), "B".into()],
+        &BufferConfig::default(),
+        &local_types,
+    );
+    let owner = store
+        .claim_ownership(sid, "owner/a", OwnershipScope::Session)
+        .expect("claim ownership");
+    let witness = store
+        .issue_readiness_witness(&owner, "commit.ready")
+        .expect("issue readiness witness");
+    let forged = telltale_vm::session::ReadinessWitness {
+        predicate_ref: "forged.ready".to_string(),
+        ..witness.clone()
+    };
+    let forged_err = store
+        .consume_readiness_witness(&owner, &forged)
+        .expect_err("forged witness must fail");
+    assert!(
+        matches!(
+            forged_err,
+            telltale_vm::session::OwnershipError::InvalidWitness { .. }
+        ),
+        "forged witness must fail with InvalidWitness"
+    );
+
+    store
+        .consume_readiness_witness(&owner, &witness)
+        .expect("consume readiness witness once");
+    let reused = store
+        .consume_readiness_witness(&owner, &witness)
+        .expect_err("reused witness must fail");
+    assert!(
+        matches!(
+            reused,
+            telltale_vm::session::OwnershipError::WitnessConsumed { .. }
+        ),
+        "double-consume must fail with WitnessConsumed"
+    );
+
+    let audit = store.authority_audit_log(sid).expect("authority audit log");
+    assert!(
+        audit
+            .iter()
+            .any(|record| record.event == AuthorityAuditEvent::Consumed),
+        "expected consumed readiness audit record"
+    );
+    let rejected = audit
+        .iter()
+        .filter(|record| record.event == AuthorityAuditEvent::Rejected)
+        .count();
+    assert!(
+        rejected >= 2,
+        "expected rejection audit records for reused and forged evidence"
     );
 }
 

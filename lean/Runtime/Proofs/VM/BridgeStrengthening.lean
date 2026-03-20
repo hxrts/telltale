@@ -85,6 +85,44 @@ theorem handler_fragment_typing_of_premises
   intro action hMem
   exact handler_obligation_local (γ:=γ) (ε:=ε) hPrem action hsid
 
+/-! ## Nominal Effect-Interface Bridge -/
+
+/-- Nominal DSL effect interface declaration lowered through the VM `invoke`
+boundary rather than a separate host channel. -/
+structure NominalEffectInterfaceDecl where
+  name : String
+  actions : List (EffectRuntime.EffectAction ε)
+
+/-- Every action named by the interface must satisfy the same handler typing
+obligation as a raw VM `invoke`. -/
+def effect_interface_decl_typed
+    (decl : NominalEffectInterfaceDecl (ε:=ε)) (hsid : HandlerId) : Prop :=
+  ∀ action, action ∈ decl.actions →
+    handler_invoke_typed (γ:=γ) (ε:=ε) action hsid
+
+/-- VM bridge premises are strong enough to justify one nominal DSL effect
+interface through the existing `invoke` boundary. -/
+theorem effect_interface_decl_typed_of_premises
+    {m : SessionMonitor γ}
+    (hPrem : VMBridgePremises (γ:=γ) (ε:=ε) m)
+    (decl : NominalEffectInterfaceDecl (ε:=ε))
+    (hsid : HandlerId) :
+    effect_interface_decl_typed (γ:=γ) (ε:=ε) decl hsid := by
+  intro action hMem
+  exact handler_obligation_local (γ:=γ) (ε:=ε) hPrem action hsid
+
+/-- Any invocation routed through a declared effect interface preserves the same
+typed boundary used by the runtime monitor. -/
+theorem effect_interface_invocation_preserves_boundary
+    {m : SessionMonitor γ}
+    (hPrem : VMBridgePremises (γ:=γ) (ε:=ε) m)
+    (decl : NominalEffectInterfaceDecl (ε:=ε))
+    (hsid : HandlerId)
+    (action : EffectRuntime.EffectAction ε)
+    (hMem : action ∈ decl.actions) :
+    handler_invoke_typed (γ:=γ) (ε:=ε) action hsid := by
+  exact effect_interface_decl_typed_of_premises (γ:=γ) (ε:=ε) hPrem decl hsid action hMem
+
 /-! ## VM-Step Typing Bridge -/
 
 /-- VM-step level bridge fact for handler steps.

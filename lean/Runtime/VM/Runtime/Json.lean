@@ -45,6 +45,36 @@ def edgeToJson (e : Edge) : Json :=
     , ("sender", Json.str e.sender)
     , ("receiver", Json.str e.receiver) ]
 
+private def sessionTerminalReasonTag : SessionTerminalReason → String
+  | .closed _ => "closed"
+  | .cancelled _ => "cancelled"
+  | .aborted _ => "aborted"
+  | .faulted _ => "faulted"
+
+private def sessionTerminalReasonText : SessionTerminalReason → String
+  | .closed reason => reason
+  | .cancelled reason => reason
+  | .aborted reason => reason
+  | .faulted reason => reason
+
+private def ownershipTerminalReasonToJson (reason : OwnershipTerminalReason) : Json :=
+  match reason with
+  | .ownerDied ownerId =>
+      Json.mkObj
+        [ ("kind", Json.str "owner_died")
+        , ("owner_id", Json.str ownerId) ]
+  | .transferAbandoned ownerId claimId =>
+      Json.mkObj
+        [ ("kind", Json.str "transfer_abandoned")
+        , ("owner_id", Json.str ownerId)
+        , ("claim_id", Json.num claimId) ]
+  | .transferCommitFailed ownerId claimId detail =>
+      Json.mkObj
+        [ ("kind", Json.str "transfer_commit_failed")
+        , ("owner_id", Json.str ownerId)
+        , ("claim_id", Json.num claimId)
+        , ("reason", Json.str detail) ]
+
 /-! ### Observable event encoder -/
 
 /-- Serialize a ticked observable event to JSON (UnitEffect only). -/
@@ -134,6 +164,13 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         [ ("kind", Json.str "aborted")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid) ]
+  | .sessionTerminal sid reason =>
+      Json.mkObj
+        [ ("kind", Json.str "session_terminal")
+        , ("tick", Json.num ev.tick)
+        , ("session", Json.num sid)
+        , ("reason_kind", Json.str (sessionTerminalReasonTag reason))
+        , ("reason", Json.str (sessionTerminalReasonText reason)) ]
 
   -- Guard/effect and monitoring events
 
@@ -165,6 +202,35 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
 /- ## Structured Block 2 -/
         , ("tick", Json.num ev.tick)
         , ("permitted", Json.bool permitted) ]
+  | .failureBranchEntered sid coroId faultClass =>
+      Json.mkObj
+        [ ("kind", Json.str "failure_branch_entered")
+        , ("tick", Json.num ev.tick)
+        , ("session", Json.num sid)
+        , ("coro_id", Json.num coroId)
+        , ("fault", Json.str faultClass) ]
+  | .timeoutIssued site untilTick witnessId =>
+      Json.mkObj
+        [ ("kind", Json.str "timeout_issued")
+        , ("tick", Json.num ev.tick)
+        , ("site", Json.str site)
+        , ("until_tick", Json.num untilTick)
+        , ("witness_id", Json.num witnessId) ]
+  | .cancellationRequested sid witnessId ownerId reason =>
+      Json.mkObj
+        [ ("kind", Json.str "cancellation_requested")
+        , ("tick", Json.num ev.tick)
+        , ("session", Json.num sid)
+        , ("witness_id", Json.num witnessId)
+        , ("owner_id", Json.str ownerId)
+        , ("reason", ownershipTerminalReasonToJson reason) ]
+  | .cancelled sid witnessId reason =>
+      Json.mkObj
+        [ ("kind", Json.str "cancelled")
+        , ("tick", Json.num ev.tick)
+        , ("session", Json.num sid)
+        , ("witness_id", Json.num witnessId)
+        , ("reason", ownershipTerminalReasonToJson reason) ]
 
 /-! ### Trace-level serializers -/
 

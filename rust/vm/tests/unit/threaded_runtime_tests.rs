@@ -2,7 +2,7 @@
     use crate::buffer::BufferConfig;
     use crate::communication_replay::{CommunicationReplayMode, DefaultCommunicationConsumption};
     use crate::coroutine::KnowledgeFact;
-    use crate::effect::{EffectHandler, SendDecision, SendDecisionInput};
+    use crate::effect::{EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput};
     use crate::verification::{Hash, Signature, VerifyingKey};
     use crate::vm::{FlowPolicy, FlowPredicate};
     use std::collections::{BTreeMap, BTreeSet};
@@ -18,12 +18,12 @@
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> Result<Value, String> {
-            Ok(Value::Unit)
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Unit)
         }
 
-        fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-            Ok(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
+        fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+            EffectResult::success(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
         }
 
         fn handle_recv(
@@ -33,8 +33,8 @@
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> Result<(), String> {
-            Ok(())
+        ) -> EffectResult<()> {
+            EffectResult::success(())
         }
 
         fn handle_choose(
@@ -43,15 +43,15 @@
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> Result<String, String> {
-            labels
-                .first()
-                .cloned()
-                .ok_or_else(|| "no labels available".to_string())
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-            Ok(())
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
         }
     }
 
