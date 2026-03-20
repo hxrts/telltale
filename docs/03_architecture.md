@@ -146,7 +146,8 @@ pub fn parse_choreography_str(input: &str) -> Result<Choreography, ParseError>
 pub fn parse_choreography_file(path: &Path) -> Result<Choreography, ParseError>
 ```
 
-The parser performs syntactic validation and basic semantic checks.
+The parser performs syntactic validation and basic semantic checks. The file-based
+entry point expects the canonical `.tell` source extension.
 
 ### Projection Module
 

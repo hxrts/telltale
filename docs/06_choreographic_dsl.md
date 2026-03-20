@@ -14,6 +14,7 @@ The preferred surface style mixes MPST operators with a small functional-languag
 - use `Message of module.Type` with dotted paths instead of Rust-style `::`
 
 The parser module is located in `rust/choreography/src/compiler/parser/`. It provides an implementation of the choreography DSL parser using Pest plus a layout preprocessor.
+The canonical source-file extension for Telltale choreography files is `.tell`.
 
 The DSL describes protocol structure, role-local communication obligations, and
 protocol-critical authority checks.
@@ -569,7 +570,7 @@ These declarations do not change core protocol semantics. They provide structure
 Use `choreo-fmt --explain-lowering` to inspect canonical lowering output.
 
 ```bash
-choreo-fmt --explain-lowering protocol.choreo
+choreo-fmt --explain-lowering protocol.tell
 ```
 
 The report includes proof-bundle metadata, inferred requirements, lowered protocol shape, and lint suggestions.
@@ -643,12 +644,13 @@ protocol Example =
 This example parses a DSL string into a `Choreography`. It uses `parse_choreography_str` directly.
 
 `parse_choreography_file` parses a DSL file from disk.
+It expects the canonical `.tell` source extension.
 
 ```rust
 use std::path::Path;
 use telltale_choreography::compiler::parser::parse_choreography_file;
 
-let choreo = parse_choreography_file(Path::new("protocol.choreo"))?;
+let choreo = parse_choreography_file(Path::new("protocol.tell"))?;
 ```
 
 This example parses a file path into a `Choreography`. The file must contain a valid DSL definition.

@@ -44,7 +44,7 @@ pub use merge::{can_merge, merge, merge_all, MergeError};
 pub use parser::{
     choreography_macro, collect_dsl_lints, explain_lowering, parse_choreography,
     parse_choreography_file, parse_choreography_str, parse_dsl, render_lsp_lint_diagnostics,
-    ErrorSpan, LintDiagnostic, LintLevel, ParseError,
+    ErrorSpan, LintDiagnostic, LintLevel, ParseError, DEFAULT_SOURCE_EXTENSION,
 };
 pub use pretty::{
     format_choreography, format_choreography_str, format_choreography_with_config, PrettyConfig,

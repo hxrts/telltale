@@ -5,7 +5,7 @@
 //! # Usage
 //!
 //! ```bash
-//! lean-bridge-exporter --input protocol.choreo --role Alice \
+//! lean-bridge-exporter --input protocol.tell --role Alice \
 //!     --choreography-out choreo.json --program-out program.json
 //! ```
 
@@ -17,7 +17,7 @@ use bpaf::Bpaf;
 use serde_json::json;
 
 use telltale_choreography::ast::convert::choreography_to_global;
-use telltale_choreography::compiler::parse_choreography_str;
+use telltale_choreography::compiler::parse_choreography_file;
 use telltale_lean_bridge::export::{global_to_json, local_to_json};
 use telltale_theory::projection::project as theory_project;
 
@@ -26,7 +26,7 @@ use telltale_theory::projection::project as theory_project;
     options,
     version("3.0.0"),
     descr("Export choreography DSL files to Lean bridge JSON payloads"),
-    footer("Example: lean-bridge-exporter --input protocol.choreo --role Alice --choreography-out choreo.json --program-out program.json")
+    footer("Example: lean-bridge-exporter --input protocol.tell --role Alice --choreography-out choreo.json --program-out program.json")
 )]
 struct Cli {
     /// Input choreography DSL file.
@@ -49,10 +49,8 @@ struct Cli {
 fn main() -> Result<()> {
     let cli = cli().run();
 
-    let source = fs::read_to_string(&cli.input)
-        .with_context(|| format!("Failed to read choreography file {}", cli.input.display()))?;
-
-    let choreography = parse_choreography_str(&source)?;
+    let choreography = parse_choreography_file(&cli.input)
+        .with_context(|| format!("Failed to parse choreography file {}", cli.input.display()))?;
 
     let global = choreography_to_global(&choreography)
         .map_err(|e| anyhow!("Failed to convert choreography to GlobalType: {e}"))?;

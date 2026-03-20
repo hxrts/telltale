@@ -22,6 +22,7 @@ mod stmt_parsers;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     mod core_syntax_loops {
         include!("../../../tests/unit/compiler/parser/core_syntax_loops.rs");
@@ -37,6 +38,32 @@ mod tests {
 
     mod authority_surface {
         include!("../../../tests/unit/compiler/parser/authority_surface.rs");
+    }
+
+    #[test]
+    fn parse_choreography_file_accepts_tell_extension() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("protocol.tell");
+        std::fs::write(&path, "protocol Ping =\n  roles A, B\n  A -> B : Msg\n")
+            .expect("write tell fixture");
+
+        let parsed = parse_choreography_file(&path).expect("parse .tell source");
+        assert_eq!(parsed.name.to_string(), "Ping");
+    }
+
+    #[test]
+    fn parse_choreography_file_rejects_choreo_extension() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("protocol.choreo");
+        std::fs::write(&path, "protocol Ping =\n  roles A, B\n  A -> B : Msg\n")
+            .expect("write choreo fixture");
+
+        let err = parse_choreography_file(&path).expect_err("reject legacy extension");
+        let rendered = err.to_string();
+        assert!(
+            rendered.contains(".tell"),
+            "error should point to canonical .tell extension: {rendered}"
+        );
     }
 }
 mod types;
@@ -69,6 +96,9 @@ use types::Statement;
 #[derive(Parser)]
 #[grammar = "compiler/choreography.pest"]
 struct ChoreographyParser;
+
+/// Canonical source-file extension for Telltale choreography files.
+pub const DEFAULT_SOURCE_EXTENSION: &str = "tell";
 
 /// Parse a choreographic protocol from a string
 pub fn parse_choreography_str(input: &str) -> std::result::Result<Choreography, ParseError> {
@@ -423,6 +453,21 @@ fn normalize_macro_token_input(input: &TokenStream) -> String {
 pub fn parse_choreography_file(
     path: &std::path::Path,
 ) -> std::result::Result<Choreography, ParseError> {
+    if path.extension().and_then(std::ffi::OsStr::to_str) != Some(DEFAULT_SOURCE_EXTENSION) {
+        return Err(ParseError::Syntax {
+            span: ErrorSpan {
+                line: 1,
+                column: 1,
+                line_end: 1,
+                column_end: 1,
+                snippet: format!("Unsupported source file extension: {}", path.display()),
+            },
+            message: format!(
+                "Telltale source files must use the .{DEFAULT_SOURCE_EXTENSION} extension"
+            ),
+        });
+    }
+
     let content = std::fs::read_to_string(path).map_err(|e| ParseError::Syntax {
         span: ErrorSpan {
             line: 1,
