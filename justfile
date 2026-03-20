@@ -52,6 +52,7 @@ release \
 ci-dry-run lane="fast":
     cargo fmt --all -- --check
     # Fail fast on generated docs/metrics drift before the expensive build/test lanes.
+    just check-workflow-actions
     just check-verification-inventory
     just check-lean-metrics
     cargo build --workspace --all-targets --all-features
@@ -198,6 +199,10 @@ check-docs-semantic-drift:
 # Check docs/ links referenced from rust/ and lean/ sources resolve to existing files.
 check-doc-links-in-code:
     ./scripts/check/doc-links-in-code.sh
+
+# Validate that all remote GitHub Action references in workflows resolve.
+check-workflow-actions:
+    ./scripts/check/workflow-actions.sh
 
 # Enforce documentation style, link integrity, and command/reference validity.
 check-doc-quality:

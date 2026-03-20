@@ -31,6 +31,8 @@ jobs:
           args: --all -- --check
       - name: Install just
         run: cargo install just --locked
+      - name: Check workflow action references
+        run: just check-workflow-actions
       - name: Check verification inventory freshness
         run: just check-verification-inventory
       - name: Check Lean metrics freshness

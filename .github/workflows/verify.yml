@@ -37,6 +37,11 @@ jobs:
       - name: Install just
         run: cargo install just --locked
 
+      - name: Check workflow action references
+        run: |
+          mkdir -p artifacts
+          just check-workflow-actions | tee artifacts/check-workflow-actions.log
+
       - name: Check verification inventory freshness
         run: |
           mkdir -p artifacts
@@ -142,6 +147,11 @@ jobs:
       - name: Install just
         run: cargo install just --locked
 
+      - name: Check workflow action references
+        run: |
+          mkdir -p artifacts
+          just check-workflow-actions | tee artifacts/check-workflow-actions.log
+
       - name: Check verification inventory freshness
         run: |
           mkdir -p artifacts
@@ -196,9 +206,6 @@ jobs:
         run: |
           mkdir -p artifacts
           just check-release-conformance | tee artifacts/check-release-conformance.log
-
-      - name: Setup Lean
-        uses: leanprover/lean4-action@v1
 
       - name: Run full Lean build
         continue-on-error: true
