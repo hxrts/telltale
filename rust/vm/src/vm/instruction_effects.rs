@@ -167,13 +167,28 @@ impl VM {
 
         // Process via handler.
         let handler_identity = handler.handler_identity();
-        match handler.handle_recv(
+        let request = EffectRequest::receive(
+            self.clock.tick,
+            Some(sid),
+            None,
             role,
             &partner,
             &label,
-            &mut self.coroutines[coro_idx].regs,
-            &val,
-        ) {
+            &self.coroutines[coro_idx].regs,
+            val.clone(),
+        );
+        self.ensure_effect_request_allowed(&request)
+            .map_err(|failure| Fault::Invoke { failure })?;
+        let predicted_effect_id = self.next_effect_id;
+        let recv_outcome = handler.handle_effect(request.clone());
+        self.record_effect_exchange(&request, &recv_outcome, &handler_identity, predicted_effect_id);
+        if let Some(EffectResponse::Receive { state }) = recv_outcome.response.clone() {
+            self.coroutines[coro_idx].regs = state;
+        }
+        match recv_outcome
+            .into_unit("handle_recv")
+            .unwrap_or_else(EffectResult::failure)
+        {
             EffectResult::Success(()) => {}
             EffectResult::Blocked => {
                 let effect_id = self.issue_runtime_effect(
@@ -351,7 +366,25 @@ impl VM {
         }
         let coro_id = self.coroutines[coro_idx].id;
         let handler_identity = handler.handler_identity();
-        match handler.step(role, &mut self.coroutines[coro_idx].regs) {
+        let request = EffectRequest::invoke_step(
+            self.clock.tick,
+            Some(sid),
+            None,
+            role,
+            &self.coroutines[coro_idx].regs,
+        );
+        self.ensure_effect_request_allowed(&request)
+            .map_err(|failure| Fault::Invoke { failure })?;
+        let predicted_effect_id = self.next_effect_id;
+        let step_outcome = handler.handle_effect(request.clone());
+        self.record_effect_exchange(&request, &step_outcome, &handler_identity, predicted_effect_id);
+        if let Some(EffectResponse::InvokeStep { state }) = step_outcome.response.clone() {
+            self.coroutines[coro_idx].regs = state;
+        }
+        match step_outcome
+            .into_unit("invoke_step")
+            .unwrap_or_else(EffectResult::failure)
+        {
             EffectResult::Success(()) => {}
             EffectResult::Blocked => {
                 let effect_id = self.issue_runtime_effect(
@@ -456,13 +489,26 @@ impl VM {
                 layer: input.layer.to_string(),
                 failure: EffectFailure::invalid_evidence(e),
             })?;
-        let decision = handler.handle_acquire(
+        let request = EffectRequest::acquire(
+            self.clock.tick,
             input.sid,
+            None,
             input.role,
             input.layer,
             &self.coroutines[input.coro_idx].regs,
         );
+        self.ensure_effect_request_allowed(&request)
+            .map_err(|failure| Fault::Acquire {
+                layer: input.layer.to_string(),
+                failure,
+            })?;
+        let predicted_effect_id = self.next_effect_id;
         let handler_identity = handler.handler_identity();
+        let acquire_outcome = handler.handle_effect(request.clone());
+        self.record_effect_exchange(&request, &acquire_outcome, &handler_identity, predicted_effect_id);
+        let decision = acquire_outcome
+            .into_value("acquire")
+            .unwrap_or_else(EffectResult::failure);
         match decision {
             EffectResult::Success(evidence) => {
                 self.guard_layer
@@ -570,13 +616,27 @@ impl VM {
             failure: EffectFailure::invalid_evidence(e),
         })?;
         let handler_identity = handler.handler_identity();
-        match handler.handle_release(
+        let request = EffectRequest::release(
+            self.clock.tick,
             input.sid,
+            None,
             input.role,
             input.layer,
             &ev,
             &self.coroutines[input.coro_idx].regs,
-        ) {
+        );
+        self.ensure_effect_request_allowed(&request)
+            .map_err(|failure| Fault::Acquire {
+                layer: input.layer.to_string(),
+                failure,
+            })?;
+        let predicted_effect_id = self.next_effect_id;
+        let release_outcome = handler.handle_effect(request.clone());
+        self.record_effect_exchange(&request, &release_outcome, &handler_identity, predicted_effect_id);
+        match release_outcome
+            .into_unit("handle_release")
+            .unwrap_or_else(EffectResult::failure)
+        {
             EffectResult::Success(()) => {}
             EffectResult::Blocked => {
                 let effect_id = self.issue_runtime_effect(

@@ -284,10 +284,7 @@ fn authority_read_from_record(record: &AuthorityAuditRecord) -> AuthoritativeRea
 }
 
 fn proof_id(check: &OutputConditionCheck) -> String {
-    format!(
-        "{}:{}",
-        check.meta.predicate_ref, check.meta.output_digest
-    )
+    format!("{}:{}", check.meta.predicate_ref, check.meta.output_digest)
 }
 
 fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSemanticObjects {
@@ -355,21 +352,25 @@ pub fn protocol_machine_semantic_objects_v1(
         .iter()
         .map(authority_read_from_record)
         .collect();
-    authoritative_reads.extend(output_condition_checks.iter().map(|check| AuthoritativeRead {
-        read_id: format!("output_condition:{}", proof_id(check)),
-        session: None,
-        owner_id: None,
-        kind: AuthoritativeReadKind::OutputCondition,
-        lifecycle: if check.passed {
-            AuthoritativeReadLifecycle::Verified
-        } else {
-            AuthoritativeReadLifecycle::Rejected
-        },
-        predicate_ref: Some(check.meta.predicate_ref.clone()),
-        witness_id: None,
-        generation: None,
-        reason: (!check.passed).then(|| "output condition failed".to_string()),
-    }));
+    authoritative_reads.extend(
+        output_condition_checks
+            .iter()
+            .map(|check| AuthoritativeRead {
+                read_id: format!("output_condition:{}", proof_id(check)),
+                session: None,
+                owner_id: None,
+                kind: AuthoritativeReadKind::OutputCondition,
+                lifecycle: if check.passed {
+                    AuthoritativeReadLifecycle::Verified
+                } else {
+                    AuthoritativeReadLifecycle::Rejected
+                },
+                predicate_ref: Some(check.meta.predicate_ref.clone()),
+                witness_id: None,
+                generation: None,
+                reason: (!check.passed).then(|| "output condition failed".to_string()),
+            }),
+    );
 
     let observed_reads: Vec<_> = outstanding_effects
         .iter()
@@ -396,27 +397,31 @@ pub fn protocol_machine_semantic_objects_v1(
         })
         .collect();
 
-    operation_instances.extend(materialization_proofs.iter().map(|proof| OperationInstance {
-        operation_id: format!("materialization:{}", proof.proof_id),
-        session: proof.session,
-        owner_id: None,
-        kind: "materialization".to_string(),
-        phase: if proof.passed {
-            OperationPhase::Succeeded
-        } else {
-            OperationPhase::Failed
-        },
-        handler_identity: None,
-        effect_ids: Vec::new(),
-        dependent_operation_ids: Vec::new(),
-        terminal_publication: Some(if proof.passed {
-            "materialization.succeeded".to_string()
-        } else {
-            "materialization.failed".to_string()
-        }),
-        budget_ticks: Some(1),
-        requires_proof: true,
-    }));
+    operation_instances.extend(
+        materialization_proofs
+            .iter()
+            .map(|proof| OperationInstance {
+                operation_id: format!("materialization:{}", proof.proof_id),
+                session: proof.session,
+                owner_id: None,
+                kind: "materialization".to_string(),
+                phase: if proof.passed {
+                    OperationPhase::Succeeded
+                } else {
+                    OperationPhase::Failed
+                },
+                handler_identity: None,
+                effect_ids: Vec::new(),
+                dependent_operation_ids: Vec::new(),
+                terminal_publication: Some(if proof.passed {
+                    "materialization.succeeded".to_string()
+                } else {
+                    "materialization.failed".to_string()
+                }),
+                budget_ticks: Some(1),
+                requires_proof: true,
+            }),
+    );
 
     let mut canonical_handles: Vec<_> = materialization_proofs
         .iter()

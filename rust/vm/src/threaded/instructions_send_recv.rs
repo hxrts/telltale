@@ -86,33 +86,22 @@ fn step_send(
         .get(usize::from(val_reg))
         .cloned()
         .ok_or(Fault::OutOfRegisters)?;
-    let fast_path = SendDecisionFastPathInput::new(
+    let request = EffectRequest::send_decision(
+        ctx.tick,
         prepared.sid,
+        None,
         role,
         &prepared.partner,
         &prepared.label,
-        Some(&send_payload),
+        &coro.regs,
+        Some(send_payload),
     );
-    let decision = if let Some(decision) =
-        ctx.handler
-            .send_decision_fast_path(fast_path, &coro.regs, Some(&send_payload))
-    {
-        decision
-            .expect_success(|| EffectFailure::contract_violation("send_decision_fast_path returned blocked"))
-            .map_err(|failure| Fault::Invoke { failure })?
-    } else {
-        ctx.handler
-            .send_decision(SendDecisionInput {
-                sid: prepared.sid,
-                role,
-                partner: &prepared.partner,
-                label: &prepared.label,
-                state: &coro.regs,
-                payload: Some(send_payload),
-            })
-            .expect_success(|| EffectFailure::contract_violation("send_decision returned blocked"))
-            .map_err(|failure| Fault::Invoke { failure })?
-    };
+    let outcome = ctx.handler.handle_effect(request.clone());
+    let decision = outcome
+        .into_send_decision()
+        .unwrap_or_else(EffectResult::failure)
+        .expect_success(|| EffectFailure::contract_violation("send_decision returned blocked"))
+        .map_err(|failure| Fault::Invoke { failure })?;
 
     if ctx.crashed_sites.contains(role)
         || ctx.crashed_sites.contains(&prepared.partner)
@@ -393,14 +382,23 @@ fn step_recv(
         true,
     )?;
 
-    ctx.handler
-        .handle_recv(
-            role,
-            &prepared.partner,
-            &prepared.label,
-            &mut coro.regs,
-            &val,
-        )
+    let request = EffectRequest::receive(
+        ctx.tick,
+        Some(prepared.sid),
+        None,
+        role,
+        &prepared.partner,
+        &prepared.label,
+        &coro.regs,
+        val.clone(),
+    );
+    let recv_outcome = ctx.handler.handle_effect(request.clone());
+    if let Some(EffectResponse::Receive { state }) = recv_outcome.response.clone() {
+        coro.regs = state;
+    }
+    recv_outcome
+        .into_unit("handle_recv")
+        .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("handle_recv returned blocked"))
         .map_err(|failure| Fault::Invoke { failure })?;
 
@@ -475,8 +473,21 @@ fn step_invoke(
         });
     }
     let coro_id = coro.id;
-    handler
-        .step(role, &mut coro.regs)
+    let request = EffectRequest::invoke_step(
+        tick,
+        Some(session.sid),
+        None,
+        role,
+        &coro.regs,
+    );
+    // Threaded step paths share the same canonical request admissibility rules.
+    let step_outcome = handler.handle_effect(request);
+    if let Some(EffectResponse::InvokeStep { state }) = step_outcome.response.clone() {
+        coro.regs = state;
+    }
+    step_outcome
+        .into_unit("invoke_step")
+        .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("step returned blocked"))
         .map_err(|failure| Fault::Invoke { failure })?;
 

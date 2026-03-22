@@ -8,11 +8,11 @@ type CommitError | NotReady | TimedOut
 type alias ReadyWitness = { epoch : Int, issuedBy : Role }
 
 effect Runtime
-  ready : Session -> Result CommitError ReadyWitness
-  transfer : TransferRequest -> Result TransferError TransferReceipt
+  authoritative ready : Session -> Result CommitError ReadyWitness
+  command transfer : TransferRequest -> Result TransferError TransferReceipt
 
 effect Audit
-  record : AuditEvent -> Unit
+  observe record : AuditEvent -> Unit
 
 protocol CommitFlow uses Runtime, Audit =
   {
@@ -50,6 +50,15 @@ protocol CommitFlow uses Runtime, Audit =
     assert_eq!(
         choreography.protocol_uses(),
         vec!["Runtime".to_string(), "Audit".to_string()]
+    );
+    let runtime_metadata = choreography.runtime_effect_metadata();
+    assert!(
+        runtime_metadata.iter().any(|op| {
+            op.interface_name == "Runtime"
+                && op.operation_name == "ready"
+                && op.authority_class == crate::ast::EffectOpAuthorityClass::Authoritative
+        }),
+        "runtime effect metadata should carry effect authority class"
     );
     choreography.validate().expect("declared effect uses should validate");
 }
@@ -201,4 +210,23 @@ protocol CommitFlow uses Runtime =
         .validate()
         .expect_err("duplicate effect declarations should fail validation");
     assert!(err.to_string().contains("duplicate effect interface declaration"));
+}
+
+#[test]
+fn test_reject_observational_effect_used_with_check() {
+    let input = r#"
+effect Runtime
+  observe watchPresence : Session -> PresenceView
+
+protocol WatchFlow uses Runtime =
+  roles Coordinator, Worker
+  let presence = check Runtime.watchPresence(session)
+  Coordinator -> Worker : Seen(presence)
+"#;
+
+    let choreography = parse_choreography_str(input).expect("parse should succeed");
+    let err = choreography
+        .validate()
+        .expect_err("observational effect use should fail validation");
+    assert!(err.to_string().contains("observational"));
 }

@@ -115,16 +115,16 @@ pub mod protocol_machine {
     pub use crate::kernel::VMKernel;
     pub use crate::semantic_objects::{
         AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
-        CanonicalHandleKind, OperationInstance, OperationPhase, ObservedRead,
-        OutstandingEffect, OutstandingEffectStatus, ProgressContract, ProgressState,
-        ProtocolMachineSemanticObjects, SemanticHandoff, SEMANTIC_OBJECTS_SCHEMA_VERSION,
+        CanonicalHandleKind, ObservedRead, OperationInstance, OperationPhase, OutstandingEffect,
+        OutstandingEffectStatus, ProgressContract, ProgressState, ProtocolMachineSemanticObjects,
+        SemanticHandoff, SEMANTIC_OBJECTS_SCHEMA_VERSION,
     };
     pub use crate::vm::{
         EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig,
         ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore,
         RuntimeTuningProfile, SchedExecStatus, SchedStepDebug, ThreadedRoundSemantics,
-        VM as ProtocolMachine, VMConfig as ProtocolMachineConfig, VMError as ProtocolMachineError,
-        VMState as ProtocolMachineState, VmMemoryUsage, VmRetainedBytes,
+        VMConfig as ProtocolMachineConfig, VMError as ProtocolMachineError,
+        VMState as ProtocolMachineState, VmMemoryUsage, VmRetainedBytes, VM as ProtocolMachine,
     };
 }
 
@@ -162,12 +162,14 @@ pub use composition::{
 pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
 pub use determinism::{DeterminismMode, EffectDeterminismTier};
 pub use driver::NativeSingleThreadDriver as GuestRuntime;
-pub use effect::{
-    send_fast_path_key, CorruptionType, EffectFailure, EffectFailureKind, EffectResult,
-    EffectTraceEntry, EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler,
-    SendDecisionFastPathInput, SendPayloadKind, TopologyPerturbation,
-};
 pub use effect::EffectHandler as ExternalHandler;
+pub use effect::{
+    CorruptionType, EffectAdmissibility, EffectAuthorityClass, EffectExchangeRecord, EffectFailure,
+    EffectFailureKind, EffectHandlerDomain, EffectInterfaceMetadata, EffectOutcome,
+    EffectOutcomeStatus, EffectReentrancyPolicy, EffectRequest, EffectRequestBody, EffectResponse,
+    EffectResult, EffectTimeoutPolicy, EffectTotality, EffectTraceEntry, EffectTraceTape,
+    RecordingEffectHandler, ReplayEffectHandler, TopologyPerturbation,
+};
 pub use envelope_diff::{
     EffectOrderingClass, EnvelopeDiff, EnvelopeDiffArtifactV1, FailureVisibleDiffClass,
     SchedulerPermutationClass, WaveWidthBound,
@@ -198,15 +200,15 @@ pub use scheduler::{
 };
 pub use semantic_objects::{
     protocol_machine_semantic_objects_v1, AuthoritativeRead, AuthoritativeReadKind,
-    AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, OperationInstance,
-    OperationPhase, ObservedRead, OutstandingEffect, OutstandingEffectStatus,
+    AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, ObservedRead,
+    OperationInstance, OperationPhase, OutstandingEffect, OutstandingEffectStatus,
     ProgressContract, ProgressState, ProtocolMachineSemanticObjects, SemanticHandoff,
     SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 pub use serialization::{
     canonical_effect_trace, canonical_replay_fragment_v1, canonical_semantic_audit_log,
-    canonical_trace_v1, canonicalize_protocol_machine_semantic_objects,
-    semantic_audit_log_v1, CanonicalReplayFragmentV1, CanonicalTraceV1, SemanticAuditRecord,
+    canonical_trace_v1, canonicalize_protocol_machine_semantic_objects, semantic_audit_log_v1,
+    CanonicalReplayFragmentV1, CanonicalTraceV1, SemanticAuditRecord,
 };
 pub use session::{
     decode_edge_json, AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord,
@@ -233,9 +235,9 @@ pub use verification::{
 pub use vm::{
     EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig, ObservabilityRetentionMode,
     PayloadValidationMode, Program, ProgramStore, RuntimeTuningProfile, SchedExecStatus,
-    SchedStepDebug, ThreadedRoundSemantics, VM as ProtocolMachine,
-    VMConfig as ProtocolMachineConfig, VMError as ProtocolMachineError,
-    VMState as ProtocolMachineState, VmMemoryUsage, VmRetainedBytes,
+    SchedStepDebug, ThreadedRoundSemantics, VMConfig as ProtocolMachineConfig,
+    VMError as ProtocolMachineError, VMState as ProtocolMachineState, VmMemoryUsage,
+    VmRetainedBytes, VM as ProtocolMachine,
 };
 
 cfg_if! {

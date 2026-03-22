@@ -88,22 +88,46 @@ fn canonical_public_examples_use_protocol_machine_terms() {
         ("../../../docs/04_code_organization.md", "GuestRuntime"),
         ("../../../docs/30_api_reference.md", "ProtocolMachine"),
         ("../../../docs/30_api_reference.md", "GuestRuntime"),
-        ("../../../docs/14_session_lifecycle.md", "ProtocolMachineConfig"),
+        (
+            "../../../docs/14_session_lifecycle.md",
+            "ProtocolMachineConfig",
+        ),
         ("../../../docs/19_rust_lean_parity.md", "ProtocolMachine"),
         (
             "../../effect-scaffold/templates/effect_handler_test.rs.tmpl",
             "ProtocolMachine::new",
         ),
-        ("../../../docs/24_lean_rust_bridge.md", "ProtocolMachineRunner"),
-        ("../../../docs/24_lean_rust_bridge.md", "ProtocolMachineSemanticObjects"),
+        (
+            "../../../docs/24_lean_rust_bridge.md",
+            "ProtocolMachineRunner",
+        ),
+        (
+            "../../../docs/24_lean_rust_bridge.md",
+            "ProtocolMachineSemanticObjects",
+        ),
         ("../../lean-bridge/src/lib.rs", "ProtocolMachineRunner"),
-        ("../../lean-bridge/src/lib.rs", "ProtocolMachineSemanticObjects"),
+        (
+            "../../lean-bridge/src/lib.rs",
+            "ProtocolMachineSemanticObjects",
+        ),
     ];
     let forbidden_patterns = [
-        ("../../../docs/04_code_organization.md", "use telltale_vm::{OwnedSession, VM, VMConfig};"),
-        ("../../../docs/04_code_organization.md", "let mut vm = VM::new"),
-        ("../../../docs/24_lean_rust_bridge.md", "The bridge does not define VM semantics."),
-        ("../../../docs/24_lean_rust_bridge.md", "## Lean VM Runner Wrapper"),
+        (
+            "../../../docs/04_code_organization.md",
+            "use telltale_vm::{OwnedSession, VM, VMConfig};",
+        ),
+        (
+            "../../../docs/04_code_organization.md",
+            "let mut vm = VM::new",
+        ),
+        (
+            "../../../docs/24_lean_rust_bridge.md",
+            "The bridge does not define VM semantics.",
+        ),
+        (
+            "../../../docs/24_lean_rust_bridge.md",
+            "## Lean VM Runner Wrapper",
+        ),
         (
             "../../effect-scaffold/templates/effect_handler_test.rs.tmpl",
             "use telltale_vm::vm::{EffectTraceCaptureMode, VMConfig, VM};",

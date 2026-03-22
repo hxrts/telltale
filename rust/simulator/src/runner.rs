@@ -344,6 +344,8 @@ pub struct ScenarioReplayArtifact {
     pub obs_trace: Vec<ObsEvent>,
     /// Effect trace entries for deterministic replay.
     pub effect_trace: Vec<EffectTraceEntry>,
+    /// Canonical typed effect exchanges captured from the guest runtime.
+    pub effect_exchanges: Vec<telltale_vm::EffectExchangeRecord>,
     /// Output-condition verification checks captured by the VM.
     pub output_condition_trace: Vec<OutputConditionCheck>,
     /// Canonical semantic audit records derived from the VM run.
@@ -568,6 +570,7 @@ pub fn run_with_scenario(
         replay: ScenarioReplayArtifact {
             obs_trace,
             effect_trace,
+            effect_exchanges: vm.effect_exchanges().to_vec(),
             output_condition_trace,
             semantic_audit_log,
             semantic_objects,

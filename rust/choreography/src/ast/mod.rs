@@ -48,8 +48,8 @@ pub use telltale_types::{
 // Re-export DSL-specific types
 pub use annotation::{Annotations, ProtocolAnnotation};
 pub use choreography::{
-    Choreography, EffectDecl, EffectOpDecl, ProofBundleDecl, RoleSetDecl, TopologyDecl,
-    TypeConstructorDecl, TypeDecl,
+    Choreography, EffectDecl, EffectOpAuthorityClass, EffectOpDecl, ProofBundleDecl, RoleSetDecl,
+    RuntimeEffectMetadataDecl, TopologyDecl, TypeConstructorDecl, TypeDecl,
 };
 pub use execution_hints::{
     ChoreographyWithHints, ExecutionHints, ExecutionHintsBuilder, OperationHints, OperationPath,

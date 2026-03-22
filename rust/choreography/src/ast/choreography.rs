@@ -99,15 +99,52 @@ pub struct EffectDecl {
     pub operations: Vec<EffectOpDecl>,
 }
 
+/// Authority class for one nominal effect operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum EffectOpAuthorityClass {
+    /// Operation may produce authoritative semantic evidence.
+    Authoritative,
+    /// Operation performs command work without itself proving semantic truth.
+    #[default]
+    Command,
+    /// Operation is observational only and must not be consumed via `check`.
+    Observe,
+}
+
 /// One operation in a nominal effect interface.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EffectOpDecl {
     /// Operation name.
     pub name: String,
+    /// Authority class attached to this operation.
+    #[serde(default)]
+    pub authority_class: EffectOpAuthorityClass,
     /// Input type as declared in DSL surface syntax.
     pub input_type: String,
     /// Output type as declared in DSL surface syntax.
     pub output_type: String,
+}
+
+/// Runtime-facing effect metadata derived from one nominal effect declaration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RuntimeEffectMetadataDecl {
+    /// Nominal effect interface name.
+    pub interface_name: String,
+    /// Nominal effect operation name.
+    pub operation_name: String,
+    /// Authority class attached to this operation.
+    pub authority_class: EffectOpAuthorityClass,
+    /// Runtime admissibility policy name.
+    pub admissibility: String,
+    /// Runtime totality policy name.
+    pub totality: String,
+    /// Runtime timeout policy name.
+    pub timeout_policy: String,
+    /// Runtime reentrancy policy name.
+    pub reentrancy_policy: String,
+    /// Runtime handler-domain name.
+    pub handler_domain: String,
 }
 
 /// A complete choreographic protocol specification
@@ -184,7 +221,7 @@ impl Choreography {
 
     fn validate_effect_surface(&self) -> Result<(), ValidationError> {
         let mut effect_names = BTreeSet::new();
-        let mut effect_ops: HashMap<String, BTreeSet<String>> = HashMap::new();
+        let mut effect_ops: HashMap<String, HashMap<String, EffectOpDecl>> = HashMap::new();
         for effect in self.effect_decls() {
             if !effect_names.insert(effect.name.clone()) {
                 return Err(ValidationError::ExtensionError(format!(
@@ -192,9 +229,9 @@ impl Choreography {
                     effect.name
                 )));
             }
-            let mut ops = BTreeSet::new();
+            let mut ops = HashMap::new();
             for op in effect.operations {
-                if !ops.insert(op.name.clone()) {
+                if ops.insert(op.name.clone(), op.clone()).is_some() {
                     return Err(ValidationError::ExtensionError(format!(
                         "duplicate effect operation `{}.{}`",
                         effect.name, op.name
@@ -216,7 +253,7 @@ impl Choreography {
 
         fn validate_expr(
             expr: &super::AuthorityExpr,
-            effect_ops: &HashMap<String, BTreeSet<String>>,
+            effect_ops: &HashMap<String, HashMap<String, EffectOpDecl>>,
             used: &BTreeSet<String>,
         ) -> Result<(), ValidationError> {
             match expr {
@@ -233,9 +270,14 @@ impl Choreography {
                             "effect invocation references undeclared interface `{effect}`"
                         )));
                     };
-                    if !ops.contains(operation) {
+                    let Some(op_decl) = ops.get(operation) else {
                         return Err(ValidationError::ExtensionError(format!(
                             "effect invocation references undeclared operation `{effect}.{operation}`"
+                        )));
+                    };
+                    if matches!(op_decl.authority_class, EffectOpAuthorityClass::Observe) {
+                        return Err(ValidationError::ExtensionError(format!(
+                            "effect invocation `{effect}.{operation}` is observational and may not be invoked with `check`"
                         )));
                     }
                     Ok(())
@@ -249,7 +291,7 @@ impl Choreography {
 
         fn validate_protocol_effects(
             protocol: &Protocol,
-            effect_ops: &HashMap<String, BTreeSet<String>>,
+            effect_ops: &HashMap<String, HashMap<String, EffectOpDecl>>,
             used: &BTreeSet<String>,
         ) -> Result<(), ValidationError> {
             match protocol {
@@ -278,9 +320,14 @@ impl Choreography {
                                     "effect guard references undeclared interface `{effect}`"
                                 )));
                             };
-                            if !ops.contains(operation) {
+                            let Some(op_decl) = ops.get(operation) else {
                                 return Err(ValidationError::ExtensionError(format!(
                                     "effect guard references undeclared operation `{effect}.{operation}`"
+                                )));
+                            };
+                            if matches!(op_decl.authority_class, EffectOpAuthorityClass::Observe) {
+                                return Err(ValidationError::ExtensionError(format!(
+                                    "effect guard `{effect}.{operation}` is observational and may not be invoked with `check`"
                                 )));
                             }
                         }
@@ -547,6 +594,72 @@ impl Choreography {
             .get(ATTR_EFFECT_DECLS)
             .and_then(|s| serde_json::from_str::<Vec<EffectDecl>>(s).ok())
             .unwrap_or_default()
+    }
+
+    /// Derive runtime-facing effect metadata from nominal effect declarations
+    /// and protocol `uses` dependencies.
+    #[must_use]
+    pub fn runtime_effect_metadata(&self) -> Vec<RuntimeEffectMetadataDecl> {
+        let used: BTreeSet<String> = self.protocol_uses().into_iter().collect();
+        self.effect_decls()
+            .into_iter()
+            .flat_map(|effect| {
+                let is_used = used.contains(effect.name.as_str());
+                effect.operations.into_iter().map(move |op| {
+                    let (
+                        admissibility,
+                        totality,
+                        timeout_policy,
+                        reentrancy_policy,
+                        handler_domain,
+                    ) = match op.authority_class {
+                        EffectOpAuthorityClass::Authoritative => (
+                            if is_used {
+                                "declared_use_only"
+                            } else {
+                                "internal_only"
+                            },
+                            "may_block",
+                            "inherit_operation_budget",
+                            "reject_same_fragment",
+                            if is_used { "external" } else { "internal" },
+                        ),
+                        EffectOpAuthorityClass::Command => (
+                            if is_used {
+                                "declared_use_only"
+                            } else {
+                                "internal_only"
+                            },
+                            "immediate",
+                            "none",
+                            "allow",
+                            if is_used { "external" } else { "internal" },
+                        ),
+                        EffectOpAuthorityClass::Observe => (
+                            if is_used {
+                                "declared_use_only"
+                            } else {
+                                "internal_only"
+                            },
+                            "immediate",
+                            "none",
+                            "allow",
+                            if is_used { "external" } else { "internal" },
+                        ),
+                    };
+                    RuntimeEffectMetadataDecl {
+                        interface_name: effect.name.clone(),
+                        operation_name: op.name,
+                        authority_class: op.authority_class,
+                        admissibility: admissibility.to_string(),
+                        totality: totality.to_string(),
+                        timeout_policy: timeout_policy.to_string(),
+                        reentrancy_policy: reentrancy_policy.to_string(),
+                        handler_domain: handler_domain.to_string(),
+                    }
+                })
+            })
+            .collect()
     }
 
     /// Set explicit protocol effect dependencies.

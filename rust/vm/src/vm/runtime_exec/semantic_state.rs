@@ -1,4 +1,63 @@
 impl VM {
+    fn ensure_effect_request_allowed(&self, request: &EffectRequest) -> Result<(), EffectFailure> {
+        request.metadata.validate()?;
+        match request.metadata.reentrancy_policy {
+            crate::effect::EffectReentrancyPolicy::Allow => {}
+            crate::effect::EffectReentrancyPolicy::RejectSameOperation => {
+                if let Some(operation_id) = &request.operation_id {
+                    if self.outstanding_effects.as_slice().iter().any(|effect| {
+                        effect.operation_id == *operation_id
+                            && matches!(
+                                effect.status,
+                                OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
+                            )
+                    }) {
+                        return Err(EffectFailure::contract_violation(format!(
+                            "reentrancy rejected for operation `{operation_id}`"
+                        )));
+                    }
+                }
+            }
+            crate::effect::EffectReentrancyPolicy::RejectSameFragment => {
+                if let Some(session) = request.session {
+                    if self.outstanding_effects.as_slice().iter().any(|effect| {
+                        effect.session == Some(session)
+                            && matches!(
+                                effect.status,
+                                OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
+                            )
+                    }) {
+                        return Err(EffectFailure::contract_violation(format!(
+                            "reentrancy rejected for session fragment `{session}`"
+                        )));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn record_effect_exchange(
+        &mut self,
+        request: &EffectRequest,
+        outcome: &EffectOutcome,
+        handler_identity: &str,
+        effect_id: u64,
+    ) {
+        let mut request = request.clone();
+        request.effect_id = Some(effect_id);
+        self.effect_exchanges.push(
+            EffectExchangeRecord {
+                effect_id,
+                handler_identity: handler_identity.to_string(),
+                ordering_key: self.clock.tick,
+                request,
+                outcome: outcome.clone(),
+            },
+            &self.config.observability_retention,
+        );
+    }
+
     fn current_operation_owner(&self, session: Option<SessionId>) -> Option<FragmentOwnerId> {
         session.and_then(|sid| {
             self.sessions
@@ -247,5 +306,82 @@ impl VM {
                 operation.terminal_publication = Some("effect.invalidated".to_string());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod runtime_effect_state_tests {
+    use super::*;
+
+    fn test_vm() -> VM {
+        VM::new(VMConfig::default())
+    }
+
+    #[test]
+    fn runtime_reentrancy_rejects_same_operation_requests() {
+        let mut vm = test_vm();
+        vm.outstanding_effects.push(
+            OutstandingEffect {
+                effect_id: 1,
+                operation_id: "effect:1".to_string(),
+                session: Some(7),
+                owner_id: Some("owner/a".to_string()),
+                effect_interface: Some("Runtime".to_string()),
+                effect_operation: Some("invoke".to_string()),
+                effect_kind: "invoke_step".to_string(),
+                handler_identity: "host/runtime".to_string(),
+                status: OutstandingEffectStatus::Pending,
+                ordering_key: 1,
+                budget_ticks: Some(1),
+                retry_policy: "forbid_late_results".to_string(),
+                invalidation_token: "effect:1:live".to_string(),
+                completed_at_tick: None,
+                inputs: serde_json::json!({ "session": 7 }),
+                outputs: serde_json::json!({ "status": "pending" }),
+            },
+            &vm.config.observability_retention,
+        );
+
+        let mut request = EffectRequest::invoke_step(5, Some(7), Some("effect:1".to_string()), "A", &[]);
+        request.metadata.reentrancy_policy = crate::effect::EffectReentrancyPolicy::RejectSameOperation;
+
+        let err = vm
+            .ensure_effect_request_allowed(&request)
+            .expect_err("same operation reentrancy must fail");
+        assert!(err.message.contains("reentrancy rejected"));
+    }
+
+    #[test]
+    fn runtime_reentrancy_rejects_same_fragment_requests() {
+        let mut vm = test_vm();
+        vm.outstanding_effects.push(
+            OutstandingEffect {
+                effect_id: 2,
+                operation_id: "effect:2".to_string(),
+                session: Some(9),
+                owner_id: Some("owner/b".to_string()),
+                effect_interface: Some("Guard".to_string()),
+                effect_operation: Some("acquire".to_string()),
+                effect_kind: "handle_acquire".to_string(),
+                handler_identity: "host/runtime".to_string(),
+                status: OutstandingEffectStatus::Blocked,
+                ordering_key: 2,
+                budget_ticks: Some(1),
+                retry_policy: "forbid_late_results".to_string(),
+                invalidation_token: "effect:2:live".to_string(),
+                completed_at_tick: None,
+                inputs: serde_json::json!({ "session": 9 }),
+                outputs: serde_json::json!({ "status": "blocked" }),
+            },
+            &vm.config.observability_retention,
+        );
+
+        let mut request = EffectRequest::acquire(6, 9, Some("effect:3".to_string()), "A", "Guard", &[]);
+        request.metadata.reentrancy_policy = crate::effect::EffectReentrancyPolicy::RejectSameFragment;
+
+        let err = vm
+            .ensure_effect_request_allowed(&request)
+            .expect_err("same fragment reentrancy must fail");
+        assert!(err.message.contains("session fragment"));
     }
 }

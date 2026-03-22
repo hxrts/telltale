@@ -1,5 +1,5 @@
 use super::*;
-use crate::ast::{EffectOpDecl, TypeConstructorDecl};
+use crate::ast::{EffectOpAuthorityClass, EffectOpDecl, TypeConstructorDecl};
 
 pub(super) fn parse_protocol_uses(pair: pest::iterators::Pair<Rule>) -> Vec<String> {
     pair.into_inner()
@@ -350,14 +350,26 @@ pub(super) fn parse_effect_decl(
         };
         for op in op_pairs {
             let mut op_inner = op.into_inner();
-            let op_name = op_inner
-                .next()
-                .ok_or_else(|| ParseError::Syntax {
-                    span: ErrorSpan::from_pest_span(span, input),
-                    message: "effect operation is missing name".to_string(),
-                })?
-                .as_str()
-                .to_string();
+            let first = op_inner.next().ok_or_else(|| ParseError::Syntax {
+                span: ErrorSpan::from_pest_span(span, input),
+                message: "effect operation is missing name".to_string(),
+            })?;
+            let (authority_class, op_name_pair) =
+                if first.as_rule() == Rule::effect_op_authority_class {
+                    let authority_class = match first.as_str() {
+                        "authoritative" => EffectOpAuthorityClass::Authoritative,
+                        "observe" => EffectOpAuthorityClass::Observe,
+                        _ => EffectOpAuthorityClass::Command,
+                    };
+                    let op_name = op_inner.next().ok_or_else(|| ParseError::Syntax {
+                        span: ErrorSpan::from_pest_span(span, input),
+                        message: "effect operation is missing name".to_string(),
+                    })?;
+                    (authority_class, op_name)
+                } else {
+                    (EffectOpAuthorityClass::Command, first)
+                };
+            let op_name = op_name_pair.as_str().to_string();
             let input_type = op_inner
                 .next()
                 .ok_or_else(|| ParseError::Syntax {
@@ -378,6 +390,7 @@ pub(super) fn parse_effect_decl(
                 .to_string();
             operations.push(EffectOpDecl {
                 name: op_name,
+                authority_class,
                 input_type,
                 output_type,
             });

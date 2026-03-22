@@ -109,6 +109,12 @@ impl VM {
         self.effect_trace.as_slice()
     }
 
+    /// Get canonical typed effect request/outcome exchanges.
+    #[must_use]
+    pub fn effect_exchanges(&self) -> &[EffectExchangeRecord] {
+        self.effect_exchanges.as_slice()
+    }
+
     /// Get canonical operation instances tracked as runtime state.
     #[must_use]
     pub fn operation_instances(&self) -> &[OperationInstance] {

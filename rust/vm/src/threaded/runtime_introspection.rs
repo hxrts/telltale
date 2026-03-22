@@ -11,6 +11,12 @@ impl ThreadedVM {
         &self.effect_trace
     }
 
+    /// Get canonical typed effect request/outcome exchanges.
+    #[must_use]
+    pub fn effect_exchanges(&self) -> &[EffectExchangeRecord] {
+        &self.effect_exchanges
+    }
+
     /// Get canonical operation instances tracked as runtime state.
     #[must_use]
     pub fn operation_instances(&self) -> &[OperationInstance] {

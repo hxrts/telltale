@@ -17,9 +17,7 @@ use telltale_vm::effect::{
 };
 use telltale_vm::trace::normalize_trace_v1;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
-use telltale_vm::{
-    CanonicalHandleKind, DelegationStatus, SemanticAuditRecord,
-};
+use telltale_vm::{CanonicalHandleKind, DelegationStatus, SemanticAuditRecord};
 use test_support::{simple_send_recv_image, PassthroughHandler};
 
 cfg_if! {
@@ -115,7 +113,9 @@ fn canonical_replay_fragment_is_stable_for_identical_runs() {
         "canonical replay fragments should retain structured semantic audit records"
     );
     assert!(
-        vm_a.canonical_replay_fragment().semantic_objects.schema_version
+        vm_a.canonical_replay_fragment()
+            .semantic_objects
+            .schema_version
             == telltale_vm::SEMANTIC_OBJECTS_SCHEMA_VERSION,
         "canonical replay fragments should retain canonical semantic-object bundles"
     );
@@ -296,7 +296,10 @@ fn semantic_object_bundle_roundtrips_through_replay_fragment() {
             .semantic_objects
             .canonical_handles
             .iter()
-            .all(|handle| matches!(handle.kind, CanonicalHandleKind::Materialization | CanonicalHandleKind::Handoff)),
+            .all(|handle| matches!(
+                handle.kind,
+                CanonicalHandleKind::Materialization | CanonicalHandleKind::Handoff
+            )),
         "semantic object bundle should preserve canonical handle kinds"
     );
 }

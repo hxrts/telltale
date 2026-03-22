@@ -343,7 +343,8 @@ fn render_readme_template(struct_name: &str, with_simulator: bool) -> String {
         "## Files".to_string(),
         "".to_string(),
         "- `effect_handler.rs`: deterministic `EffectHandler` template.".to_string(),
-        "- `effect_handler_test.rs`: VM smoke test for handler callbacks.".to_string(),
+        "- `effect_handler_test.rs`: protocol-machine smoke test for typed effect requests."
+            .to_string(),
     ];
 
     if with_simulator {

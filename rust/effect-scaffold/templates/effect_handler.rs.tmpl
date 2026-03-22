@@ -1,10 +1,8 @@
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{
-    AcquireDecision, EffectHandler, SendDecision, SendDecisionFastPathInput, SendDecisionInput,
+    EffectHandler, EffectOutcome, EffectRequest, EffectRequestBody, EffectResponse, SendDecision,
     TopologyPerturbation,
 };
-use telltale_vm::output_condition::OutputConditionHint;
-use telltale_vm::session::SessionId;
 
 /// Deterministic host integration scaffold.
 pub struct {{STRUCT_NAME}};
@@ -14,100 +12,47 @@ impl EffectHandler for {{STRUCT_NAME}} {
         "{{STRUCT_NAME}}".to_string()
     }
 
-    fn handle_send(
-        &self,
-        _role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &[Value],
-    ) -> Result<Value, String> {
-        Ok(Value::Unit)
-    }
-
-    fn send_decision_fast_path(
-        &self,
-        _fast_path: SendDecisionFastPathInput<'_>,
-        _state: &[Value],
-        _payload: Option<&Value>,
-    ) -> Option<Result<SendDecision, String>> {
-        None
-    }
-
-    fn send_decision(&self, input: SendDecisionInput<'_>) -> Result<SendDecision, String> {
-        match input.payload {
-            Some(payload) => Ok(SendDecision::Deliver(payload)),
-            None => Err(
-                "missing payload in send_decision; implement handle_send for custom send paths"
-                    .to_string(),
-            ),
+    fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
+        match request.body {
+            EffectRequestBody::SendDecision { payload, .. } => {
+                let payload = payload.unwrap_or(Value::Unit);
+                EffectOutcome::success(EffectResponse::SendDecision {
+                    decision: SendDecision::Deliver(payload),
+                })
+            }
+            EffectRequestBody::Receive { state, .. } => {
+                EffectOutcome::success(EffectResponse::Receive { state })
+            }
+            EffectRequestBody::Choose { labels, .. } => {
+                let label = labels
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "default".to_string());
+                EffectOutcome::success(EffectResponse::Choose { label })
+            }
+            EffectRequestBody::InvokeStep { state, .. } => {
+                EffectOutcome::success(EffectResponse::InvokeStep { state })
+            }
+            EffectRequestBody::Acquire { .. } => {
+                EffectOutcome::success(EffectResponse::Acquire {
+                    evidence: Value::Unit,
+                })
+            }
+            EffectRequestBody::Release { .. } => EffectOutcome::success(EffectResponse::Release),
+            EffectRequestBody::TopologyEvents { .. } => {
+                EffectOutcome::success(EffectResponse::TopologyEvents {
+                    events: Vec::<TopologyPerturbation>::new(),
+                })
+            }
+            EffectRequestBody::OutputConditionHint { .. } => {
+                EffectOutcome::success(EffectResponse::OutputConditionHint { hint: None })
+            }
         }
-    }
-
-    fn handle_recv(
-        &self,
-        _role: &str,
-        _partner: &str,
-        _label: &str,
-        _state: &mut Vec<Value>,
-        _payload: &Value,
-    ) -> Result<(), String> {
-        Ok(())
-    }
-
-    fn handle_choose(
-        &self,
-        _role: &str,
-        _partner: &str,
-        labels: &[String],
-        _state: &[Value],
-    ) -> Result<String, String> {
-        labels
-            .first()
-            .cloned()
-            .ok_or_else(|| "no labels available".to_string())
-    }
-
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-        Ok(())
-    }
-
-    fn handle_acquire(
-        &self,
-        _sid: SessionId,
-        _role: &str,
-        _layer: &str,
-        _state: &[Value],
-    ) -> Result<AcquireDecision, String> {
-        Ok(AcquireDecision::Grant(Value::Unit))
-    }
-
-    fn handle_release(
-        &self,
-        _sid: SessionId,
-        _role: &str,
-        _layer: &str,
-        _evidence: &Value,
-        _state: &[Value],
-    ) -> Result<(), String> {
-        Ok(())
-    }
-
-    fn topology_events(&self, _tick: u64) -> Result<Vec<TopologyPerturbation>, String> {
-        Ok(Vec::new())
-    }
-
-    fn output_condition_hint(
-        &self,
-        _sid: SessionId,
-        _role: &str,
-        _state: &[Value],
-    ) -> Option<OutputConditionHint> {
-        None
     }
 }
 
 // Integration checklist:
-// - [ ] Keep all callback results deterministic for equal inputs.
+// - [ ] Keep all request/outcome handling deterministic for equal inputs.
 // - [ ] Keep handler_identity stable for the full runtime lifetime.
-// - [ ] Do not mutate shared host state outside explicit callback boundaries.
-// - [ ] Validate host assumptions for topology ordering and session ownership.
+// - [ ] Do not mutate shared host state outside explicit request handling boundaries.
+// - [ ] Validate host assumptions for topology ordering, session ownership, and effect metadata.

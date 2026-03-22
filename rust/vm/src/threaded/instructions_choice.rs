@@ -239,8 +239,22 @@ fn step_choose(
             label: label.clone(),
         })?;
 
-    ctx.handler
-        .handle_recv(role, &partner, &label, &mut coro.regs, &val)
+    let recv_outcome = ctx.handler.handle_effect(EffectRequest::receive(
+        ctx.tick,
+        Some(sid),
+        None,
+        role,
+        &partner,
+        &label,
+        &coro.regs,
+        val.clone(),
+    ));
+    if let Some(EffectResponse::Receive { state }) = recv_outcome.response.clone() {
+        coro.regs = state;
+    }
+    recv_outcome
+        .into_unit("handle_recv")
+        .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("handle_recv returned blocked"))
         .map_err(|failure| Fault::Invoke { failure })?;
 
@@ -317,34 +331,24 @@ fn step_offer(
             let continuation = cached.continuation.clone();
 
             let offer_payload = Value::Str(label.to_string());
-            let fast_path =
-                SendDecisionFastPathInput::new(sid, role, &partner, label, Some(&offer_payload));
-            let decision = if let Some(decision) =
-                ctx.handler
-                    .send_decision_fast_path(fast_path, &coro.regs, Some(&offer_payload))
-            {
-                decision
-                    .expect_success(|| {
-                        EffectFailure::contract_violation(
-                            "send_decision_fast_path returned blocked",
-                        )
-                    })
-                    .map_err(|failure| Fault::Invoke { failure })?
-            } else {
-                ctx.handler
-                    .send_decision(SendDecisionInput {
-                        sid,
-                        role,
-                        partner: &partner,
-                        label,
-                        state: &coro.regs,
-                        payload: Some(offer_payload),
-                    })
-                    .expect_success(|| {
-                        EffectFailure::contract_violation("send_decision returned blocked")
-                    })
-                    .map_err(|failure| Fault::Invoke { failure })?
-            };
+            let decision = ctx
+                .handler
+                .handle_effect(EffectRequest::send_decision(
+                    ctx.tick,
+                    sid,
+                    None,
+                    role,
+                    &partner,
+                    label,
+                    &coro.regs,
+                    Some(offer_payload),
+                ))
+                .into_send_decision()
+                .unwrap_or_else(EffectResult::failure)
+                .expect_success(|| {
+                    EffectFailure::contract_violation("send_decision returned blocked")
+                })
+                .map_err(|failure| Fault::Invoke { failure })?;
             if let SendDecision::Deliver(payload) = &decision {
                 validate_payload(
                     ctx.config,

@@ -39,7 +39,7 @@ pub struct OutputConditionCheck {
 }
 
 /// Optional output-condition metadata emitted by the host for the current step.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OutputConditionHint {
     /// Stable predicate identifier (name/hash) for gating output commit.
     pub predicate_ref: String,

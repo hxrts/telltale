@@ -8,6 +8,7 @@ import Runtime.VM.Model.Knowledge
 import Runtime.VM.Model.Config
 import Runtime.VM.Model.CompileLocalTypeR
 import Runtime.VM.Model.Program
+import Runtime.VM.Model.Effects
 import Runtime.VM.Model.SemanticObjects
 import Runtime.VM.Model.State
 import Runtime.VM.Model.UnitModel

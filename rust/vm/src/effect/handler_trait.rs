@@ -6,19 +6,149 @@
 ///
 /// Host-contract rules:
 /// - Methods on this trait are synchronous. Async I/O, transport polling,
-///   storage flushes, and background retries must happen outside callback
+///   storage flushes, and background retries must happen outside handler
 ///   execution and feed their results back through canonical ingress.
 /// - Implementations must treat the provided `state` as session-local scratch
-///   for the current callback only. They must not rely on unrelated session
+///   for the current request only. They must not rely on unrelated session
 ///   state or mutate VM session metadata through side channels.
 /// - Host-managed session-local mutation should flow through an explicit
 ///   ownership capability such as `OwnedSession`, not through ad hoc access to
-///   the session store while callbacks are executing.
+///   the session store while handlers are executing.
 #[doc(alias = "ExternalHandler")]
 pub trait EffectHandler: Send + Sync {
     /// Stable identifier for effect-trace attribution.
     fn handler_identity(&self) -> String {
         crate::session::DEFAULT_HANDLER_ID.to_string()
+    }
+
+    /// Canonical typed effect boundary for guest-runtime execution.
+    ///
+    /// Runtime code must route host-facing effect work through this method so
+    /// the request/outcome contract remains explicit and replay-visible.
+    ///
+    /// The default implementation preserves compatibility for existing
+    /// helper-method-based handlers by translating each typed request into the
+    /// corresponding helper method. New code should prefer overriding
+    /// `handle_effect` directly.
+    fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
+        if let Err(failure) = request.metadata.validate() {
+            return EffectOutcome::failure(failure);
+        }
+
+        match request.body {
+            EffectRequestBody::SendDecision {
+                role,
+                partner,
+                label,
+                state,
+                payload,
+            } => {
+                let Some(sid) = request.session else {
+                    return EffectOutcome::failure(EffectFailure::contract_violation(
+                        "send_decision request is missing session",
+                    ));
+                };
+                match self.send_decision(SendDecisionInput {
+                    sid,
+                    role: &role,
+                    partner: &partner,
+                    label: &label,
+                    state: &state,
+                    payload,
+                }) {
+                    EffectResult::Success(decision) => {
+                        EffectOutcome::success(EffectResponse::SendDecision { decision })
+                    }
+                    EffectResult::Blocked => EffectOutcome::blocked(),
+                    EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+                }
+            }
+            EffectRequestBody::Receive {
+                role,
+                partner,
+                label,
+                state,
+                payload,
+            } => {
+                let mut state = state;
+                match self.handle_recv(&role, &partner, &label, &mut state, &payload) {
+                    EffectResult::Success(()) => {
+                        EffectOutcome::success(EffectResponse::Receive { state })
+                    }
+                    EffectResult::Blocked => EffectOutcome::blocked(),
+                    EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+                }
+            }
+            EffectRequestBody::Choose {
+                role,
+                partner,
+                labels,
+                state,
+            } => match self.handle_choose(&role, &partner, &labels, &state) {
+                EffectResult::Success(label) => {
+                    EffectOutcome::success(EffectResponse::Choose { label })
+                }
+                EffectResult::Blocked => EffectOutcome::blocked(),
+                EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+            },
+            EffectRequestBody::InvokeStep { role, state } => {
+                let mut state = state;
+                match self.step(&role, &mut state) {
+                    EffectResult::Success(()) => {
+                        EffectOutcome::success(EffectResponse::InvokeStep { state })
+                    }
+                    EffectResult::Blocked => EffectOutcome::blocked(),
+                    EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+                }
+            }
+            EffectRequestBody::Acquire { role, layer, state } => {
+                let Some(sid) = request.session else {
+                    return EffectOutcome::failure(EffectFailure::contract_violation(
+                        "acquire request is missing session",
+                    ));
+                };
+                match self.handle_acquire(sid, &role, &layer, &state) {
+                    EffectResult::Success(evidence) => {
+                        EffectOutcome::success(EffectResponse::Acquire { evidence })
+                    }
+                    EffectResult::Blocked => EffectOutcome::blocked(),
+                    EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+                }
+            }
+            EffectRequestBody::Release {
+                role,
+                layer,
+                evidence,
+                state,
+            } => {
+                let Some(sid) = request.session else {
+                    return EffectOutcome::failure(EffectFailure::contract_violation(
+                        "release request is missing session",
+                    ));
+                };
+                match self.handle_release(sid, &role, &layer, &evidence, &state) {
+                    EffectResult::Success(()) => EffectOutcome::success(EffectResponse::Release),
+                    EffectResult::Blocked => EffectOutcome::blocked(),
+                    EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+                }
+            }
+            EffectRequestBody::TopologyEvents { tick } => match self.topology_events(tick) {
+                EffectResult::Success(events) => {
+                    EffectOutcome::success(EffectResponse::TopologyEvents { events })
+                }
+                EffectResult::Blocked => EffectOutcome::blocked(),
+                EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+            },
+            EffectRequestBody::OutputConditionHint { role, state } => {
+                let Some(sid) = request.session else {
+                    return EffectOutcome::failure(EffectFailure::contract_violation(
+                        "output_condition_hint request is missing session",
+                    ));
+                };
+                let hint = self.output_condition_hint(sid, &role, &state);
+                EffectOutcome::success(EffectResponse::OutputConditionHint { hint })
+            }
+        }
     }
 
     /// Compute the payload for a send instruction.
@@ -32,7 +162,7 @@ pub trait EffectHandler: Send + Sync {
     /// * `label` - The message label
     /// * `state` - The coroutine's register file (for reading state)
     ///
-    /// Returns a typed outcome for the callback.
+    /// Returns a typed outcome for the request.
     fn handle_send(
         &self,
         role: &str,
@@ -41,25 +171,12 @@ pub trait EffectHandler: Send + Sync {
         state: &[Value],
     ) -> EffectResult<Value>;
 
-    /// Optional fast-path hook for send decision dispatch.
-    ///
-    /// Returning `Some(result)` bypasses `send_decision`.
-    /// Returning `None` keeps canonical behavior unchanged.
-    fn send_decision_fast_path(
-        &self,
-        _fast_path: SendDecisionFastPathInput<'_>,
-        _state: &[Value],
-        _payload: Option<&Value>,
-    ) -> Option<EffectResult<SendDecision>> {
-        None
-    }
-
     /// Decide how to handle a send, optionally with a precomputed payload.
     ///
     /// Middleware can override this to model loss/delay/corruption. The default
     /// behavior computes a payload via `handle_send` unless one is provided.
     ///
-    /// Returns a typed outcome for the callback.
+    /// Returns a typed outcome for the request.
     fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
         if let Some(payload) = input.payload {
             EffectResult::success(SendDecision::Deliver(payload))
@@ -78,7 +195,7 @@ pub trait EffectHandler: Send + Sync {
     /// * `state` - The coroutine's register file (mutable for state updates)
     /// * `payload` - The received value
     ///
-    /// Returns a typed outcome for the callback.
+    /// Returns a typed outcome for the request.
     fn handle_recv(
         &self,
         role: &str,
@@ -101,7 +218,7 @@ pub trait EffectHandler: Send + Sync {
     /// * `labels` - The available branch labels
     /// * `state` - The coroutine's register file (for reading state)
     ///
-    /// Returns a typed outcome for the callback.
+    /// Returns a typed outcome for the request.
     fn handle_choose(
         &self,
         role: &str,
@@ -114,7 +231,7 @@ pub trait EffectHandler: Send + Sync {
     ///
     /// Called after all sends/receives for a tick are complete.
     ///
-    /// Returns a typed outcome for the callback.
+    /// Returns a typed outcome for the request.
     fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()>;
 
     /// Attempt to acquire a guard layer.
@@ -148,9 +265,9 @@ pub trait EffectHandler: Send + Sync {
     /// The VM ingests these before selecting coroutines for the round. This is
     /// a canonical ingress surface for external events; implementations should
     /// stage async discoveries before this method is called rather than doing
-    /// async work from inside the callback.
+    /// async work from inside request handling.
     ///
-    /// Returns a typed outcome for the callback.
+    /// Returns a typed outcome for the request.
     fn topology_events(&self, _tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
         EffectResult::success(Vec::new())
     }
@@ -174,6 +291,10 @@ impl<T: EffectHandler + ?Sized> EffectHandler for &T {
         (**self).handler_identity()
     }
 
+    fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
+        (**self).handle_effect(request)
+    }
+
     fn handle_send(
         &self,
         role: &str,
@@ -186,15 +307,6 @@ impl<T: EffectHandler + ?Sized> EffectHandler for &T {
 
     fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
         (**self).send_decision(input)
-    }
-
-    fn send_decision_fast_path(
-        &self,
-        fast_path: SendDecisionFastPathInput<'_>,
-        state: &[Value],
-        payload: Option<&Value>,
-    ) -> Option<EffectResult<SendDecision>> {
-        (**self).send_decision_fast_path(fast_path, state, payload)
     }
 
     fn handle_recv(

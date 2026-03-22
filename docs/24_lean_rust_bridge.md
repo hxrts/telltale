@@ -158,6 +158,7 @@ pub struct ProtocolMachineRunOutput {
     pub concurrency: u64,
     pub status: String,
     pub effect_trace: Vec<EffectTraceEvent>,
+    pub effect_exchanges: Vec<EffectExchangeRecord>,
     pub output_condition_trace: Vec<OutputConditionTraceEvent>,
     pub step_states: Vec<VmStepState>,
     pub semantic_objects: ProtocolMachineSemanticObjects,
@@ -199,6 +200,10 @@ VM-state export as its primary cross-language contract.
 `ProtocolMachineRunOutput.semantic_objects` carries the same canonical runtime
 state used by replay export: live `OperationInstance` and `OutstandingEffect`
 objects plus the derived handoff/read/proof/publication surfaces.
+
+`ProtocolMachineRunOutput.effect_exchanges` is the canonical bridge-side export
+for the typed effect boundary. It carries `EffectRequest`, `EffectOutcome`, and
+the validated runtime metadata for each exchange.
 
 ## Trace Normalization and Equivalence
 

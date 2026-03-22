@@ -4,15 +4,15 @@ use std::collections::BTreeMap;
 
 use proptest::prelude::*;
 use telltale_lean_bridge::{
-    export_protocol_bundle, InvariantClaims, ProtocolMachineRunner,
-    ProtocolMachineRunnerError, ProtocolMachineTraceEvent, SchedulerKind,
+    export_protocol_bundle, InvariantClaims, ProtocolMachineRunner, ProtocolMachineRunnerError,
+    ProtocolMachineTraceEvent, SchedulerKind,
 };
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 use telltale_vm::vm::ObsEvent;
+use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 
 #[derive(Clone, Debug)]
 struct GeneratedProtocol {

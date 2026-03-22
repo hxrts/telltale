@@ -32,7 +32,16 @@ fn step_acquire(
     }
     let decision = ctx
         .handler
-        .handle_acquire(input.sid, input.role, input.layer, &coro.regs)
+        .handle_effect(EffectRequest::acquire(
+            ctx.tick,
+            input.sid,
+            None,
+            input.role,
+            input.layer,
+            &coro.regs,
+        ))
+        .into_value("acquire")
+        .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("handle_acquire returned blocked"))
         .map_err(|failure| Fault::Acquire {
             layer: input.layer.to_string(),
@@ -119,7 +128,17 @@ fn step_release(
         .ok_or(Fault::OutOfRegisters)?
         .clone();
     ctx.handler
-        .handle_release(input.sid, input.role, input.layer, &ev, &coro.regs)
+        .handle_effect(EffectRequest::release(
+            ctx.tick,
+            input.sid,
+            None,
+            input.role,
+            input.layer,
+            &ev,
+            &coro.regs,
+        ))
+        .into_unit("handle_release")
+        .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("handle_release returned blocked"))
         .map_err(|failure| Fault::Acquire {
             layer: input.layer.to_string(),

@@ -55,6 +55,7 @@ impl ThreadedVM {
             ))),
             communication_consumption_artifacts: Arc::new(Mutex::new(Vec::new())),
             effect_trace: Vec::new(),
+            effect_exchanges: Vec::new(),
             operation_instances: Vec::new(),
             outstanding_effects: Vec::new(),
             next_effect_id: 0,

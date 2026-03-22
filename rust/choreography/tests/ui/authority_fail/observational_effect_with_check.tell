@@ -1,0 +1,7 @@
+effect Runtime
+  observe watchPresence : Session -> PresenceView
+
+protocol WatchFlow uses Runtime =
+  roles Coordinator, Worker
+  let presence = check Runtime.watchPresence(session)
+  Coordinator -> Worker : Seen(presence)

@@ -50,7 +50,8 @@ union_ctor_decl = { "|" ~ ident ~ ("of" ~ type_expr)? }
 
 effect_decl = { "effect" ~ ident ~ effect_body }
 effect_body = { "{" ~ effect_op_decl+ ~ "}" | effect_op_decl+ }
-effect_op_decl = { ident ~ ":" ~ type_expr ~ "->" ~ type_expr }
+effect_op_decl = { effect_op_authority_class? ~ ident ~ ":" ~ type_expr ~ "->" ~ type_expr }
+effect_op_authority_class = { "authoritative" | "command" | "observe" }
 type_expr = { type_record | type_result | type_maybe | type_unit | type_path }
 type_record = { "{" ~ (!"}" ~ ANY)* ~ "}" }
 type_result = { "Result" ~ type_expr ~ type_expr }

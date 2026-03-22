@@ -1,4 +1,60 @@
 impl ThreadedVM {
+    fn ensure_effect_request_allowed(&self, request: &EffectRequest) -> Result<(), EffectFailure> {
+        request.metadata.validate()?;
+        match request.metadata.reentrancy_policy {
+            crate::effect::EffectReentrancyPolicy::Allow => {}
+            crate::effect::EffectReentrancyPolicy::RejectSameOperation => {
+                if let Some(operation_id) = &request.operation_id {
+                    if self.outstanding_effects.iter().any(|effect| {
+                        effect.operation_id == *operation_id
+                            && matches!(
+                                effect.status,
+                                OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
+                            )
+                    }) {
+                        return Err(EffectFailure::contract_violation(format!(
+                            "reentrancy rejected for operation `{operation_id}`"
+                        )));
+                    }
+                }
+            }
+            crate::effect::EffectReentrancyPolicy::RejectSameFragment => {
+                if let Some(session) = request.session {
+                    if self.outstanding_effects.iter().any(|effect| {
+                        effect.session == Some(session)
+                            && matches!(
+                                effect.status,
+                                OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
+                            )
+                    }) {
+                        return Err(EffectFailure::contract_violation(format!(
+                            "reentrancy rejected for session fragment `{session}`"
+                        )));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn record_effect_exchange(
+        &mut self,
+        request: &EffectRequest,
+        outcome: &EffectOutcome,
+        handler_identity: &str,
+        effect_id: u64,
+    ) {
+        let mut request = request.clone();
+        request.effect_id = Some(effect_id);
+        self.effect_exchanges.push(EffectExchangeRecord {
+            effect_id,
+            handler_identity: handler_identity.to_string(),
+            ordering_key: self.clock.tick,
+            request,
+            outcome: outcome.clone(),
+        });
+    }
+
     fn current_operation_owner(&self, session: Option<SessionId>) -> Option<String> {
         session.and_then(|sid| {
             self.sessions

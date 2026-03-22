@@ -18,6 +18,7 @@ use crate::sim_reference::{
 use crate::vm_trace::{
     normalize_vm_trace, traces_equivalent, EffectTraceEvent, OutputConditionTraceEvent,
 };
+use telltale_vm::EffectExchangeRecord;
 
 #[path = "vm_runner_json_parsing.rs"]
 mod parsing;
@@ -161,6 +162,9 @@ pub struct VmRunOutput {
     /// Optional effect trace for replay/determinism checks.
     #[serde(default)]
     pub effect_trace: Vec<EffectTraceEvent>,
+    /// Canonical typed effect request/outcome exchanges.
+    #[serde(default)]
+    pub effect_exchanges: Vec<EffectExchangeRecord>,
     /// Optional output-condition verification records.
     #[serde(default)]
     pub output_condition_trace: Vec<OutputConditionTraceEvent>,

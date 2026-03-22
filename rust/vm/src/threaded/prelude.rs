@@ -113,6 +113,7 @@ pub struct ThreadedVM {
     communication_consumption: Arc<Mutex<DefaultCommunicationConsumption>>,
     communication_consumption_artifacts: Arc<Mutex<Vec<CommunicationConsumptionArtifact>>>,
     effect_trace: Vec<EffectTraceEntry>,
+    effect_exchanges: Vec<EffectExchangeRecord>,
     operation_instances: Vec<OperationInstance>,
     outstanding_effects: Vec<OutstandingEffect>,
     next_effect_id: u64,

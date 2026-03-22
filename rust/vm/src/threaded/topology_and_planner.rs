@@ -352,8 +352,20 @@ impl ThreadedVM {
         let tick = self.clock.tick;
         let handler_identity = handler.handler_identity();
         self.enforce_handler_identity_contract(&handler_identity)?;
-        let mut events = handler
-            .topology_events(tick)
+        let request = EffectRequest::topology_events(tick);
+        self.ensure_effect_request_allowed(&request)
+            .map_err(VMError::HandlerError)?;
+        let predicted_effect_id = self.next_effect_id;
+        let topology_outcome = handler.handle_effect(request.clone());
+        self.record_effect_exchange(
+            &request,
+            &topology_outcome,
+            &handler_identity,
+            predicted_effect_id,
+        );
+        let mut events = topology_outcome
+            .into_topology()
+            .unwrap_or_else(EffectResult::failure)
             .expect_success(|| {
                 EffectFailure::contract_violation("topology_events returned blocked")
             })

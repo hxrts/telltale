@@ -101,10 +101,10 @@ pub use schema::{
 pub use semantic_objects::{
     default_semantic_objects_schema_version, semantic_objects_from_json, semantic_objects_to_json,
     AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
-    CanonicalHandleKind, DelegationStatus, MaterializationProof, OperationInstance,
-    OperationPhase, ObservedRead, OutstandingEffect, OutstandingEffectStatus, OwnershipScope,
-    ProgressContract, ProgressState, ProtocolMachineSemanticObjects, SemanticHandoff,
-    TickedObsEvent, SEMANTIC_OBJECTS_SCHEMA_VERSION,
+    CanonicalHandleKind, DelegationStatus, MaterializationProof, ObservedRead, OperationInstance,
+    OperationPhase, OutstandingEffect, OutstandingEffectStatus, OwnershipScope, ProgressContract,
+    ProgressState, ProtocolMachineSemanticObjects, SemanticHandoff, TickedObsEvent,
+    SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 pub use vm_trace::{
     event_session, normalize_vm_trace, observationally_equivalent, partition_by_session,

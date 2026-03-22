@@ -4,8 +4,8 @@
 mod test_choreographies;
 
 use telltale_lean_bridge::{
-    default_schema_version, global_to_json, ChoreographyJson, EffectTraceEvent,
-    OutputConditionTraceEvent, ProtocolMachineRunOutput, ProtocolMachineRunner,
+    default_schema_version, global_to_json, semantic_objects_from_json, ChoreographyJson,
+    EffectTraceEvent, OutputConditionTraceEvent, ProtocolMachineRunOutput, ProtocolMachineRunner,
     ProtocolMachineSessionStatus, ProtocolMachineTraceEvent,
 };
 use telltale_vm::coroutine::Value;
@@ -206,6 +206,7 @@ fn run_rust_vm(
             topology: None,
         })
         .collect();
+    let effect_exchanges = vm.effect_exchanges().to_vec();
 
     let output_condition_trace = vm
         .output_condition_checks()
@@ -218,6 +219,11 @@ fn run_rust_vm(
         })
         .collect();
 
+    let semantic_objects = semantic_objects_from_json(
+        serde_json::to_value(vm.semantic_objects()).expect("encode semantic objects"),
+    )
+    .expect("decode semantic objects into bridge schema");
+
     Ok(ProtocolMachineRunOutput {
         schema_version: default_schema_version(),
         trace,
@@ -226,8 +232,10 @@ fn run_rust_vm(
         concurrency: 1,
         status: "ok".to_string(),
         effect_trace,
+        effect_exchanges,
         output_condition_trace,
         step_states: Vec::new(),
+        semantic_objects,
     })
 }
 

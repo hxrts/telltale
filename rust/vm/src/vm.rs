@@ -33,9 +33,9 @@ use crate::coroutine::{
 };
 use crate::determinism::{DeterminismMode, EffectDeterminismTier};
 use crate::effect::{
-    infer_effect_interface_and_operation, CorruptionType, EffectFailure, EffectHandler,
-    EffectResult, EffectTraceEntry, ReplayEffectHandler, SendDecision, SendDecisionFastPathInput,
-    SendDecisionInput, TopologyPerturbation,
+    infer_effect_interface_and_operation, CorruptionType, EffectExchangeRecord, EffectFailure,
+    EffectHandler, EffectOutcome, EffectRequest, EffectResponse, EffectResult, EffectTraceEntry,
+    ReplayEffectHandler, SendDecision, TopologyPerturbation,
 };
 use crate::exec;
 use crate::faults::{
@@ -56,8 +56,8 @@ use crate::output_condition::{OutputConditionCheck, OutputConditionPolicy};
 use crate::persistence::{NoopPersistence, PersistenceModel};
 use crate::scheduler::{SchedPolicy, Scheduler};
 use crate::semantic_objects::{
-    protocol_machine_semantic_objects_v1, OperationInstance, OperationPhase,
-    OutstandingEffect, OutstandingEffectStatus, ProtocolMachineSemanticObjects,
+    protocol_machine_semantic_objects_v1, OperationInstance, OperationPhase, OutstandingEffect,
+    OutstandingEffectStatus, ProtocolMachineSemanticObjects,
 };
 use crate::serialization::{
     canonical_replay_fragment_v1, semantic_audit_log_v1, CanonicalReplayFragmentV1,

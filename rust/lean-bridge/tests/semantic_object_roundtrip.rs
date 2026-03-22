@@ -60,11 +60,19 @@ fn simple_send_recv_image() -> CodeImage {
     let mut locals = std::collections::BTreeMap::new();
     locals.insert(
         "A".to_string(),
-        telltale_types::LocalTypeR::send("B", telltale_types::Label::new("msg"), telltale_types::LocalTypeR::End),
+        telltale_types::LocalTypeR::send(
+            "B",
+            telltale_types::Label::new("msg"),
+            telltale_types::LocalTypeR::End,
+        ),
     );
     locals.insert(
         "B".to_string(),
-        telltale_types::LocalTypeR::recv("A", telltale_types::Label::new("msg"), telltale_types::LocalTypeR::End),
+        telltale_types::LocalTypeR::recv(
+            "A",
+            telltale_types::Label::new("msg"),
+            telltale_types::LocalTypeR::End,
+        ),
     );
     CodeImage::from_local_types(&locals, &global)
 }
@@ -73,8 +81,12 @@ fn simple_send_recv_image() -> CodeImage {
 fn semantic_object_schema_roundtrips_from_protocol_machine_objects() {
     let image = simple_send_recv_image();
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
-    machine.load_choreography(&image).expect("load choreography");
-    machine.run(&PassthroughHandler, 64).expect("run protocol machine");
+    machine
+        .load_choreography(&image)
+        .expect("load choreography");
+    machine
+        .run(&PassthroughHandler, 64)
+        .expect("run protocol machine");
 
     let encoded =
         serde_json::to_value(machine.semantic_objects()).expect("encode protocol-machine objects");

@@ -277,7 +277,16 @@ fn exec_instr(
         Some(
             ctx.step
                 .handler
-                .output_condition_hint(sid, role.as_str(), &coro_guard.regs)
+                .handle_effect(EffectRequest::output_condition_hint(
+                    ctx.step.tick,
+                    sid,
+                    None,
+                    role.as_str(),
+                    &coro_guard.regs,
+                ))
+                .into_output_condition_hint()
+                .ok()
+                .flatten()
                 .unwrap_or(OutputConditionHint {
                     predicate_ref: "vm.observable_output".to_string(),
                     witness_ref: None,

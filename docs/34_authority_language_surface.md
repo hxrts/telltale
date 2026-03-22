@@ -13,7 +13,7 @@ Top-level declarations:
 
 - `type Name | Ctor | Ctor of Payload`
 - `type alias Name = { ... }`
-- `effect Runtime { ready : Session -> Result CommitError ReadyWitness }`
+- `effect Runtime { authoritative ready : Session -> Result CommitError ReadyWitness }`
 - `protocol Flow uses Runtime, Audit = ...`
 
 Protocol-local forms:
@@ -34,7 +34,8 @@ additions.
 
 ```tell
 effect Runtime
-  ready : Session -> Result CommitError ReadyWitness
+  authoritative ready : Session -> Result CommitError ReadyWitness
+  observe watchPresence : Session -> PresenceView
 
 protocol Flow uses Runtime =
   ...
@@ -181,10 +182,12 @@ Current validation rules:
 
 - effect interface names must be unique
 - operation names must be unique within an effect
+- effect operations may be classified as `authoritative`, `command`, or `observe`
 - `protocol ... uses ...` may reference only declared effects
 - `check Effect.op(...)` and evidence guards may reference only:
   - effects named in `uses`
   - operations declared on those effects
+- `check Effect.op(...)` may not target `observe` operations
 
 This is the current clean-break contract.
 There is no fallback to implicit host knowledge.

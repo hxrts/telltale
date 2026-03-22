@@ -230,6 +230,41 @@ fn vm_run_output_roundtrip_preserves_semantic_objects() {
         "steps_executed": 0,
         "concurrency": 1,
         "status": "ok",
+        "effect_exchanges": [{
+            "effect_id": 9,
+            "handler_identity": "host/runtime",
+            "ordering_key": 3,
+            "request": {
+                "effect_id": 9,
+                "tick": 3,
+                "session": 2,
+                "operation_id": "effect:9",
+                "metadata": {
+                    "interface_name": "Transport",
+                    "operation_name": "sendDecision",
+                    "authority_class": "command",
+                    "admissibility": "declared_use_only",
+                    "totality": "immediate",
+                    "timeout_policy": "none",
+                    "reentrancy_policy": "allow",
+                    "handler_domain": "external"
+                },
+                "body": {
+                    "kind": "send_decision",
+                    "role": "A",
+                    "partner": "B",
+                    "label": "msg",
+                    "state": [],
+                    "payload": null
+                }
+            },
+            "outcome": {
+                "status": {
+                    "status": "blocked"
+                },
+                "response": null
+            }
+        }],
         "semantic_objects": {
             "schema_version": SEMANTIC_OBJECTS_SCHEMA_VERSION,
             "operation_instances": [{
@@ -274,9 +309,12 @@ fn vm_run_output_roundtrip_preserves_semantic_objects() {
 
     let decoded: ProtocolMachineRunOutput =
         serde_json::from_value(payload).expect("decode runner output");
+    assert_eq!(decoded.effect_exchanges.len(), 1);
     assert_eq!(decoded.semantic_objects.outstanding_effects.len(), 1);
     assert_eq!(
-        decoded.semantic_objects.operation_instances[0].terminal_publication.as_deref(),
+        decoded.semantic_objects.operation_instances[0]
+            .terminal_publication
+            .as_deref(),
         Some("effect.blocked")
     );
 }
@@ -289,5 +327,8 @@ fn semantic_objects_decode_requires_canonical_shape() {
     });
 
     let decoded = serde_json::from_value::<ProtocolMachineSemanticObjects>(legacy);
-    assert!(decoded.is_err(), "legacy VM-state payloads must no longer decode");
+    assert!(
+        decoded.is_err(),
+        "legacy VM-state payloads must no longer decode"
+    );
 }

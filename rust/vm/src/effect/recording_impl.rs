@@ -3,6 +3,13 @@ impl EffectHandler for RecordingEffectHandler<'_> {
         self.inner.handler_identity()
     }
 
+    fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
+        let outcome = self.inner.handle_effect(request.clone());
+        self.tape
+            .record_exchange(request, outcome.clone(), &self.inner.handler_identity(), None);
+        outcome
+    }
+
     fn handle_send(
         &self,
         role: &str,
@@ -14,32 +21,18 @@ impl EffectHandler for RecordingEffectHandler<'_> {
     }
 
     fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
-        let payload_hint = input.payload.clone();
-        let decision = self.inner.send_decision(input.clone());
-        self.tape.record(
-            "send_decision",
-            json!({
-                "sid": input.sid,
-                "role": input.role,
-                "partner": input.partner,
-                "label": input.label,
-                "payload_hint": payload_hint,
-            }),
-            encode_effect_result(&decision),
-            &self.inner.handler_identity(),
+        self.handle_effect(EffectRequest::send_decision(
+            0,
+            input.sid,
             None,
-        );
-        decision
-    }
-
-    fn send_decision_fast_path(
-        &self,
-        fast_path: SendDecisionFastPathInput<'_>,
-        state: &[Value],
-        payload: Option<&Value>,
-    ) -> Option<EffectResult<SendDecision>> {
-        self.inner
-            .send_decision_fast_path(fast_path, state, payload)
+            input.role,
+            input.partner,
+            input.label,
+            input.state,
+            input.payload,
+        ))
+        .into_send_decision()
+        .unwrap_or_else(EffectResult::failure)
     }
 
     fn handle_recv(
@@ -50,19 +43,29 @@ impl EffectHandler for RecordingEffectHandler<'_> {
         state: &mut Vec<Value>,
         payload: &Value,
     ) -> EffectResult<()> {
-        let outcome = self.inner.handle_recv(role, partner, label, state, payload);
-        self.tape.record(
-            "handle_recv",
-            json!({
-                "role": role,
-                "partner": partner,
-                "label": label,
-                "payload": payload,
-            }),
-            encode_effect_result(&outcome),
-            &self.inner.handler_identity(),
-            None,
-        );
+        let outcome = self
+            .handle_effect(EffectRequest::receive(
+                0,
+                None,
+                None,
+                role,
+                partner,
+                label,
+                state,
+                payload.clone(),
+            ))
+            .into_unit("handle_recv")
+            .unwrap_or_else(EffectResult::failure);
+        if let EffectResult::Success(()) = &outcome {
+            if let Some(EffectResponse::Receive { state: new_state }) = self
+                .tape
+                .exchanges()
+                .last()
+                .and_then(|exchange| exchange.outcome.response.clone())
+            {
+                *state = new_state;
+            }
+        }
         outcome
     }
 
@@ -73,32 +76,34 @@ impl EffectHandler for RecordingEffectHandler<'_> {
         labels: &[String],
         state: &[Value],
     ) -> EffectResult<String> {
-        let chosen = self.inner.handle_choose(role, partner, labels, state);
-        self.tape.record(
-            "handle_choose",
-            json!({
-                "role": role,
-                "partner": partner,
-                "labels": labels,
-            }),
-            encode_effect_result(&chosen),
-            &self.inner.handler_identity(),
+        self.handle_effect(EffectRequest::choose(
+            0,
             None,
-        );
-        chosen
+            None,
+            role,
+            partner,
+            labels,
+            state,
+        ))
+        .into_label()
+        .unwrap_or_else(EffectResult::failure)
     }
 
     fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
-        let outcome = self.inner.step(role, state);
-        self.tape.record(
-            "invoke_step",
-            json!({
-                "role": role,
-            }),
-            encode_effect_result(&outcome),
-            &self.inner.handler_identity(),
-            None,
-        );
+        let outcome = self
+            .handle_effect(EffectRequest::invoke_step(0, None, None, role, state))
+            .into_unit("invoke_step")
+            .unwrap_or_else(EffectResult::failure);
+        if let EffectResult::Success(()) = &outcome {
+            if let Some(EffectResponse::InvokeStep { state: new_state }) = self
+                .tape
+                .exchanges()
+                .last()
+                .and_then(|exchange| exchange.outcome.response.clone())
+            {
+                *state = new_state;
+            }
+        }
         outcome
     }
 
@@ -109,19 +114,9 @@ impl EffectHandler for RecordingEffectHandler<'_> {
         layer: &str,
         state: &[Value],
     ) -> EffectResult<Value> {
-        let decision = self.inner.handle_acquire(sid, role, layer, state);
-        self.tape.record(
-            "handle_acquire",
-            json!({
-                "sid": sid,
-                "role": role,
-                "layer": layer,
-            }),
-            encode_effect_result(&decision),
-            &self.inner.handler_identity(),
-            None,
-        );
-        decision
+        self.handle_effect(EffectRequest::acquire(0, sid, None, role, layer, state))
+            .into_value("acquire")
+            .unwrap_or_else(EffectResult::failure)
     }
 
     fn handle_release(
@@ -132,34 +127,15 @@ impl EffectHandler for RecordingEffectHandler<'_> {
         evidence: &Value,
         state: &[Value],
     ) -> EffectResult<()> {
-        let outcome = self.inner.handle_release(sid, role, layer, evidence, state);
-        self.tape.record(
-            "handle_release",
-            json!({
-                "sid": sid,
-                "role": role,
-                "layer": layer,
-                "evidence": evidence,
-            }),
-            encode_effect_result(&outcome),
-            &self.inner.handler_identity(),
-            None,
-        );
-        outcome
+        self.handle_effect(EffectRequest::release(0, sid, None, role, layer, evidence, state))
+            .into_unit("handle_release")
+            .unwrap_or_else(EffectResult::failure)
     }
 
     fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
-        let outcome = self.inner.topology_events(tick);
-        self.tape.record(
-            "topology_events",
-            json!({
-                "tick": tick,
-            }),
-            encode_effect_result(&outcome),
-            &self.inner.handler_identity(),
-            None,
-        );
-        outcome
+        self.handle_effect(EffectRequest::topology_events(tick))
+            .into_topology()
+            .unwrap_or_else(EffectResult::failure)
     }
 
     fn output_condition_hint(
@@ -168,6 +144,9 @@ impl EffectHandler for RecordingEffectHandler<'_> {
         role: &str,
         state: &[Value],
     ) -> Option<OutputConditionHint> {
-        self.inner.output_condition_hint(sid, role, state)
+        self.handle_effect(EffectRequest::output_condition_hint(0, sid, None, role, state))
+            .into_output_condition_hint()
+            .ok()
+            .flatten()
     }
 }

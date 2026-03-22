@@ -174,14 +174,27 @@ impl VM {
         let label = decode_branch_label_payload(role, &val)?;
         let (continuation, target_pc) = self.resolve_choose_step(&ep, role, &label, table)?;
 
-        handler
-            .handle_recv(
-                role,
-                &partner,
-                &label,
-                &mut self.coroutines[coro_idx].regs,
-                &val,
-            )
+        let request = EffectRequest::receive(
+            self.clock.tick,
+            Some(sid),
+            None,
+            role,
+            &partner,
+            &label,
+            &self.coroutines[coro_idx].regs,
+            val.clone(),
+        );
+        self.ensure_effect_request_allowed(&request)
+            .map_err(|failure| Fault::Invoke { failure })?;
+        let predicted_effect_id = self.next_effect_id;
+        let recv_outcome = handler.handle_effect(request.clone());
+        self.record_effect_exchange(&request, &recv_outcome, &handler.handler_identity(), predicted_effect_id);
+        if let Some(EffectResponse::Receive { state }) = recv_outcome.response.clone() {
+            self.coroutines[coro_idx].regs = state;
+        }
+        recv_outcome
+            .into_unit("handle_recv")
+            .unwrap_or_else(EffectResult::failure)
             .expect_success(|| {
                 EffectFailure::contract_violation("handle_recv returned blocked")
             })
@@ -257,40 +270,33 @@ impl VM {
                 let continuation = cached.continuation.clone();
 
                 let offer_payload = Value::Str(label.to_string());
-                let fast_path = SendDecisionFastPathInput::new(
+                let request = EffectRequest::send_decision(
+                    self.clock.tick,
                     sid,
+                    None,
                     role,
                     &partner,
                     label,
-                    Some(&offer_payload),
-                );
-                let decision = if let Some(decision) = handler.send_decision_fast_path(
-                    fast_path,
                     &self.coroutines[coro_idx].regs,
-                    Some(&offer_payload),
-                ) {
-                    decision
-                        .expect_success(|| {
-                            EffectFailure::contract_violation(
-                                "send_decision_fast_path returned blocked",
-                            )
-                        })
-                        .map_err(|failure| Fault::Invoke { failure })?
-                } else {
-                    handler
-                        .send_decision(SendDecisionInput {
-                            sid,
-                            role,
-                            partner: &partner,
-                            label,
-                            state: &self.coroutines[coro_idx].regs,
-                            payload: Some(offer_payload),
-                        })
-                        .expect_success(|| {
-                            EffectFailure::contract_violation("send_decision returned blocked")
-                        })
-                        .map_err(|failure| Fault::Invoke { failure })?
-                };
+                    Some(offer_payload),
+                );
+                self.ensure_effect_request_allowed(&request)
+                    .map_err(|failure| Fault::Invoke { failure })?;
+                let predicted_effect_id = self.next_effect_id;
+                let effect_outcome = handler.handle_effect(request.clone());
+                self.record_effect_exchange(
+                    &request,
+                    &effect_outcome,
+                    &handler.handler_identity(),
+                    predicted_effect_id,
+                );
+                let decision = effect_outcome
+                    .into_send_decision()
+                    .unwrap_or_else(EffectResult::failure)
+                    .expect_success(|| {
+                        EffectFailure::contract_violation("send_decision returned blocked")
+                    })
+                    .map_err(|failure| Fault::Invoke { failure })?;
                 if let SendDecision::Deliver(payload) = &decision {
                     self.validate_payload(
                         role,

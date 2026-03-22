@@ -1,26 +1,18 @@
 /// Thread-safe effect-trace tape used by recording/replay handlers.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct EffectTraceTape {
     next_effect_id: AtomicU64,
     entries: Mutex<Vec<EffectTraceEntry>>,
+    exchanges: Mutex<Vec<EffectExchangeRecord>>,
 }
 
-fn encode_effect_result<T>(result: &EffectResult<T>) -> JsonValue
-where
-    T: Serialize,
-{
-    match result {
-        EffectResult::Success(value) => json!({
-            "status": "success",
-            "value": value,
-        }),
-        EffectResult::Blocked => json!({
-            "status": "blocked",
-        }),
-        EffectResult::Failure(failure) => json!({
-            "status": "failure",
-            "failure": failure,
-        }),
+impl Default for EffectTraceTape {
+    fn default() -> Self {
+        Self {
+            next_effect_id: AtomicU64::new(0),
+            entries: Mutex::new(Vec::new()),
+            exchanges: Mutex::new(Vec::new()),
+        }
     }
 }
 
@@ -58,6 +50,7 @@ impl EffectTraceTape {
         Self {
             next_effect_id: AtomicU64::new(next_effect_id),
             entries: Mutex::new(entries),
+            exchanges: Mutex::new(Vec::new()),
         }
     }
 
@@ -94,6 +87,66 @@ impl EffectTraceTape {
             .push(entry);
     }
 
+    /// Record one canonical typed request/outcome exchange and derive the
+    /// legacy effect-trace entry from it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
+    pub fn record_exchange(
+        &self,
+        mut request: EffectRequest,
+        outcome: EffectOutcome,
+        handler_identity: &str,
+        topology: Option<TopologyPerturbation>,
+    ) {
+        let effect_id = self.next_effect_id.fetch_add(1, Ordering::Relaxed);
+        request.effect_id = Some(effect_id);
+        let effect_kind = match &request.body {
+            EffectRequestBody::SendDecision { .. } => "send_decision",
+            EffectRequestBody::Receive { .. } => "handle_recv",
+            EffectRequestBody::Choose { .. } => "handle_choose",
+            EffectRequestBody::InvokeStep { .. } => "invoke_step",
+            EffectRequestBody::Acquire { .. } => "handle_acquire",
+            EffectRequestBody::Release { .. } => "handle_release",
+            EffectRequestBody::TopologyEvents { .. } => "topology_events",
+            EffectRequestBody::OutputConditionHint { .. } => "output_condition_hint",
+        };
+        let request_json =
+            serde_json::to_value(&request).expect("effect request should serialize to json");
+        let outcome_json =
+            serde_json::to_value(&outcome).expect("effect outcome should serialize to json");
+        let exchange = EffectExchangeRecord {
+            effect_id,
+            handler_identity: handler_identity.to_string(),
+            ordering_key: effect_id,
+            request,
+            outcome,
+        };
+        let entry = EffectTraceEntry {
+            effect_id,
+            effect_kind: effect_kind.to_string(),
+            inputs: request_json,
+            outputs: outcome_json,
+            handler_identity: handler_identity.to_string(),
+            effect_interface: Some(exchange.request.metadata.interface_name.clone()),
+            effect_operation: Some(exchange.request.metadata.operation_name.clone()),
+            ordering_key: effect_id,
+            topology: topology.or_else(|| match &exchange.outcome.response {
+                Some(EffectResponse::TopologyEvents { events }) => events.first().cloned(),
+                _ => None,
+            }),
+        };
+        self.exchanges
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .push(exchange);
+        self.entries
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .push(entry);
+    }
+
     /// Clone all recorded entries.
     ///
     /// # Panics
@@ -102,6 +155,19 @@ impl EffectTraceTape {
     #[must_use]
     pub fn entries(&self) -> Vec<EffectTraceEntry> {
         self.entries
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
+    /// Clone all recorded typed exchanges.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
+    #[must_use]
+    pub fn exchanges(&self) -> Vec<EffectExchangeRecord> {
+        self.exchanges
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clone()
@@ -128,6 +194,12 @@ impl<'a> RecordingEffectHandler<'a> {
     #[must_use]
     pub fn effect_trace(&self) -> Vec<EffectTraceEntry> {
         self.tape.entries()
+    }
+
+    /// Clone the recorded typed effect exchanges.
+    #[must_use]
+    pub fn effect_exchanges(&self) -> Vec<EffectExchangeRecord> {
+        self.tape.exchanges()
     }
 }
 

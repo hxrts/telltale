@@ -296,8 +296,15 @@ impl VM {
         let tick = self.clock.tick;
         let handler_identity = handler.handler_identity();
         self.enforce_handler_identity_contract(&handler_identity)?;
-        let mut events = handler
-            .topology_events(tick)
+        let request = EffectRequest::topology_events(tick);
+        self.ensure_effect_request_allowed(&request)
+            .map_err(VMError::HandlerError)?;
+        let predicted_effect_id = self.next_effect_id;
+        let topology_outcome = handler.handle_effect(request.clone());
+        self.record_effect_exchange(&request, &topology_outcome, &handler_identity, predicted_effect_id);
+        let mut events = topology_outcome
+            .into_topology()
+            .unwrap_or_else(EffectResult::failure)
             .expect_success(|| {
                 EffectFailure::contract_violation("topology_events returned blocked")
             })
@@ -537,7 +544,27 @@ impl VM {
         let output_hint = if pack.events.is_empty() {
             None
         } else {
-            handler.output_condition_hint(sid, &role, &self.coroutines[idx].regs)
+            let request = EffectRequest::output_condition_hint(
+                self.clock.tick,
+                sid,
+                None,
+                &role,
+                &self.coroutines[idx].regs,
+            );
+            match self.ensure_effect_request_allowed(&request) {
+                Ok(()) => {
+                    let predicted_effect_id = self.next_effect_id;
+                    let outcome = handler.handle_effect(request.clone());
+                    self.record_effect_exchange(
+                        &request,
+                        &outcome,
+                        &handler_identity,
+                        predicted_effect_id,
+                    );
+                    outcome.into_output_condition_hint().ok().flatten()
+                }
+                Err(_) => None,
+            }
         };
 
         // 3. Commit atomically.
@@ -607,109 +634,67 @@ impl VM {
             "to": partner,
             "label": label.name,
         });
-        let fast_path =
-            SendDecisionFastPathInput::new(sid, role, &partner, &label.name, Some(&send_payload));
-        let decision = if let Some(decision) =
-            handler.send_decision_fast_path(fast_path, &coro.regs, Some(&send_payload))
+        let request = EffectRequest::send_decision(
+            self.clock.tick,
+            sid,
+            None,
+            role,
+            &partner,
+            &label.name,
+            &coro.regs,
+            Some(send_payload),
+        );
+        self.ensure_effect_request_allowed(&request)
+            .map_err(|failure| Fault::Invoke { failure })?;
+        let predicted_effect_id = self.next_effect_id;
+        let send_outcome = handler.handle_effect(request.clone());
+        self.record_effect_exchange(&request, &send_outcome, &handler_identity, predicted_effect_id);
+        let decision = match send_outcome
+            .into_send_decision()
+            .unwrap_or_else(EffectResult::failure)
         {
-            match decision {
-                EffectResult::Success(decision) => decision,
-                EffectResult::Blocked => {
-                    let effect_id = self.issue_runtime_effect(
-                        "send_decision",
-                        Some(sid),
-                        &handler_identity,
-                        effect_inputs.clone(),
-                    );
-                    let failure = EffectFailure::contract_violation(
-                        "send_decision_fast_path returned blocked",
-                    );
-                    self.complete_runtime_effect(
-                        effect_id,
-                        OutstandingEffectStatus::Failed,
-                        json!({
-                            "status": "failure",
-                            "failure": failure,
-                        }),
-                    )
-                    .map_err(|err| Fault::Invoke {
-                        failure: EffectFailure::contract_violation(err.to_string()),
-                    })?;
-                    return Err(Fault::Invoke { failure });
-                }
-                EffectResult::Failure(failure) => {
-                    let effect_id = self.issue_runtime_effect(
-                        "send_decision",
-                        Some(sid),
-                        &handler_identity,
-                        effect_inputs.clone(),
-                    );
-                    self.complete_runtime_effect(
-                        effect_id,
-                        OutstandingEffectStatus::Failed,
-                        json!({
-                            "status": "failure",
-                            "failure": failure,
-                        }),
-                    )
-                    .map_err(|err| Fault::Invoke {
-                        failure: EffectFailure::contract_violation(err.to_string()),
-                    })?;
-                    return Err(Fault::Invoke { failure });
-                }
+            EffectResult::Success(decision) => decision,
+            EffectResult::Blocked => {
+                let effect_id = self.issue_runtime_effect(
+                    "send_decision",
+                    Some(sid),
+                    &handler_identity,
+                    effect_inputs.clone(),
+                );
+                let failure =
+                    EffectFailure::contract_violation("send_decision returned blocked");
+                self.complete_runtime_effect(
+                    effect_id,
+                    OutstandingEffectStatus::Failed,
+                    json!({
+                        "status": "failure",
+                        "failure": failure,
+                    }),
+                )
+                .map_err(|err| Fault::Invoke {
+                    failure: EffectFailure::contract_violation(err.to_string()),
+                })?;
+                return Err(Fault::Invoke { failure });
             }
-        } else {
-            match handler.send_decision(SendDecisionInput {
-                    sid,
-                    role,
-                    partner: &partner,
-                    label: &label.name,
-                    state: &coro.regs,
-                    payload: Some(send_payload),
-                }) {
-                EffectResult::Success(decision) => decision,
-                EffectResult::Blocked => {
-                    let effect_id = self.issue_runtime_effect(
-                        "send_decision",
-                        Some(sid),
-                        &handler_identity,
-                        effect_inputs.clone(),
-                    );
-                    let failure =
-                        EffectFailure::contract_violation("send_decision returned blocked");
-                    self.complete_runtime_effect(
-                        effect_id,
-                        OutstandingEffectStatus::Failed,
-                        json!({
-                            "status": "failure",
-                            "failure": failure,
-                        }),
-                    )
-                    .map_err(|err| Fault::Invoke {
-                        failure: EffectFailure::contract_violation(err.to_string()),
-                    })?;
-                    return Err(Fault::Invoke { failure });
-                }
-                EffectResult::Failure(failure) => {
-                    let effect_id = self.issue_runtime_effect(
-                        "send_decision",
-                        Some(sid),
-                        &handler_identity,
-                        effect_inputs.clone(),
-                    );
-                    self.complete_runtime_effect(
-                        effect_id,
-                        OutstandingEffectStatus::Failed,
-                        json!({
-                            "status": "failure",
-                            "failure": failure,
-                        }),
-                    )
-                    .map_err(|err| Fault::Invoke {
-                        failure: EffectFailure::contract_violation(err.to_string()),
-                    })?;
-                    return Err(Fault::Invoke { failure });
-                }
+            EffectResult::Failure(failure) => {
+                let effect_id = self.issue_runtime_effect(
+                    "send_decision",
+                    Some(sid),
+                    &handler_identity,
+                    effect_inputs.clone(),
+                );
+                self.complete_runtime_effect(
+                    effect_id,
+                    OutstandingEffectStatus::Failed,
+                    json!({
+                        "status": "failure",
+                        "failure": failure,
+                    }),
+                )
+                .map_err(|err| Fault::Invoke {
+                    failure: EffectFailure::contract_violation(err.to_string()),
+                })?;
+                return Err(Fault::Invoke { failure });
             }
         };
 

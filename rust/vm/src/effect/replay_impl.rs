@@ -3,6 +3,113 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         "replay_handler".to_string()
     }
 
+    fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
+        let expected_kind = match &request.body {
+            EffectRequestBody::SendDecision { .. } => "send_decision",
+            EffectRequestBody::Receive { .. } => "handle_recv",
+            EffectRequestBody::Choose { .. } => "handle_choose",
+            EffectRequestBody::InvokeStep { .. } => "invoke_step",
+            EffectRequestBody::Acquire { .. } => "handle_acquire",
+            EffectRequestBody::Release { .. } => "handle_release",
+            EffectRequestBody::TopologyEvents { .. } => "topology_events",
+            EffectRequestBody::OutputConditionHint { .. } => "output_condition_hint",
+        };
+        let entry = match self.next_entry(expected_kind) {
+            Ok(entry) => entry,
+            Err(message) => return EffectOutcome::failure(EffectFailure::determinism(message)),
+        };
+        if let Ok(outcome) = serde_json::from_value::<EffectOutcome>(entry.outputs.clone()) {
+            return outcome;
+        }
+
+        match expected_kind {
+            "send_decision" => {
+                let payload = match &request.body {
+                    EffectRequestBody::SendDecision { payload, .. } => payload.clone(),
+                    _ => None,
+                };
+                if let Some(outcome) = Self::parse_send_decision(&entry.outputs, payload) {
+                    return match outcome {
+                        EffectResult::Success(decision) => {
+                            EffectOutcome::success(EffectResponse::SendDecision { decision })
+                        }
+                        EffectResult::Blocked => EffectOutcome::blocked(),
+                        EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+                    };
+                }
+            }
+            "handle_recv" | "invoke_step" | "handle_release" => {
+                if let Some(outcome) = decode_effect_result::<()>(&entry.outputs) {
+                    return match outcome {
+                        EffectResult::Success(()) => match request.body {
+                            EffectRequestBody::Receive { state, .. } => {
+                                EffectOutcome::success(EffectResponse::Receive { state })
+                            }
+                            EffectRequestBody::InvokeStep { state, .. } => {
+                                EffectOutcome::success(EffectResponse::InvokeStep { state })
+                            }
+                            _ => EffectOutcome::success(EffectResponse::Release),
+                        },
+                        EffectResult::Blocked => EffectOutcome::blocked(),
+                        EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+                    };
+                }
+            }
+            "handle_choose" => {
+                if let Some(outcome) = decode_effect_result::<String>(&entry.outputs) {
+                    return match outcome {
+                        EffectResult::Success(label) => {
+                            EffectOutcome::success(EffectResponse::Choose { label })
+                        }
+                        EffectResult::Blocked => EffectOutcome::blocked(),
+                        EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+                    };
+                }
+            }
+            "handle_acquire" => {
+                if let Some(outcome) = decode_effect_result::<Value>(&entry.outputs) {
+                    return match outcome {
+                        EffectResult::Success(evidence) => {
+                            EffectOutcome::success(EffectResponse::Acquire { evidence })
+                        }
+                        EffectResult::Blocked => EffectOutcome::blocked(),
+                        EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+                    };
+                }
+            }
+            "topology_events" => {
+                if let Some(outcome) = decode_effect_result::<Vec<TopologyPerturbation>>(&entry.outputs) {
+                    return match outcome {
+                        EffectResult::Success(events) => {
+                            EffectOutcome::success(EffectResponse::TopologyEvents { events })
+                        }
+                        EffectResult::Blocked => EffectOutcome::blocked(),
+                        EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+                    };
+                }
+            }
+            "output_condition_hint" => {
+                return EffectOutcome::success(EffectResponse::OutputConditionHint {
+                    hint: self.fallback.and_then(|fallback| match request.body {
+                        EffectRequestBody::OutputConditionHint { role, state } => request
+                            .session
+                            .and_then(|sid| fallback.output_condition_hint(sid, &role, &state)),
+                        _ => None,
+                    }),
+                });
+            }
+            _ => {}
+        }
+
+        if let Some(fallback) = self.fallback {
+            return fallback.handle_effect(request);
+        }
+
+        EffectOutcome::failure(EffectFailure::determinism(format!(
+            "replay {expected_kind} missing typed outcome"
+        )))
+    }
+
     fn handle_send(
         &self,
         role: &str,
@@ -18,26 +125,18 @@ impl EffectHandler for ReplayEffectHandler<'_> {
     }
 
     fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
-        let entry = match self.next_entry("send_decision") {
-            Ok(entry) => entry,
-            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
-        };
-        if let Some(decision) = Self::parse_send_decision(&entry.outputs, input.payload.clone()) {
-            return decision;
-        }
-        if let Some(committed) = entry.outputs.get("committed").and_then(JsonValue::as_bool) {
-            if committed {
-                return EffectResult::success(SendDecision::Deliver(
-                    input.payload.unwrap_or(Value::Unit),
-                ));
-            }
-        }
-        if let Some(fallback) = self.fallback {
-            return fallback.send_decision(input);
-        }
-        EffectResult::failure(EffectFailure::determinism(
-            "replay send_decision missing typed outcome",
+        self.handle_effect(EffectRequest::send_decision(
+            0,
+            input.sid,
+            None,
+            input.role,
+            input.partner,
+            input.label,
+            input.state,
+            input.payload,
         ))
+        .into_send_decision()
+        .unwrap_or_else(EffectResult::failure)
     }
 
     fn handle_recv(
@@ -48,19 +147,22 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         state: &mut Vec<Value>,
         payload: &Value,
     ) -> EffectResult<()> {
-        let entry = match self.next_entry("handle_recv") {
-            Ok(entry) => entry,
-            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
-        };
-        if let Some(outcome) = decode_effect_result::<()>(&entry.outputs) {
-            return outcome;
+        let outcome = self.handle_effect(EffectRequest::receive(
+            0,
+            None,
+            None,
+            role,
+            partner,
+            label,
+            state,
+            payload.clone(),
+        ));
+        if let Some(EffectResponse::Receive { state: new_state }) = outcome.response.clone() {
+            *state = new_state;
         }
-        if let Some(fallback) = self.fallback {
-            return fallback.handle_recv(role, partner, label, state, payload);
-        }
-        EffectResult::failure(EffectFailure::determinism(
-            "replay handle_recv missing typed outcome",
-        ))
+        outcome
+            .into_unit("handle_recv")
+            .unwrap_or_else(EffectResult::failure)
     }
 
     fn handle_choose(
@@ -70,35 +172,27 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         labels: &[String],
         state: &[Value],
     ) -> EffectResult<String> {
-        let entry = match self.next_entry("handle_choose") {
-            Ok(entry) => entry,
-            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
-        };
-        if let Some(chosen) = decode_effect_result::<String>(&entry.outputs) {
-            return chosen;
-        }
-        if let Some(fallback) = self.fallback {
-            return fallback.handle_choose(role, partner, labels, state);
-        }
-        EffectResult::failure(EffectFailure::determinism(
-            "replay handle_choose missing typed outcome",
+        self.handle_effect(EffectRequest::choose(
+            0,
+            None,
+            None,
+            role,
+            partner,
+            labels,
+            state,
         ))
+        .into_label()
+        .unwrap_or_else(EffectResult::failure)
     }
 
     fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
-        let entry = match self.next_entry("invoke_step") {
-            Ok(entry) => entry,
-            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
-        };
-        if let Some(outcome) = decode_effect_result::<()>(&entry.outputs) {
-            return outcome;
+        let outcome = self.handle_effect(EffectRequest::invoke_step(0, None, None, role, state));
+        if let Some(EffectResponse::InvokeStep { state: new_state }) = outcome.response.clone() {
+            *state = new_state;
         }
-        if let Some(fallback) = self.fallback {
-            return fallback.step(role, state);
-        }
-        EffectResult::failure(EffectFailure::determinism(
-            "replay invoke_step missing typed outcome",
-        ))
+        outcome
+            .into_unit("invoke_step")
+            .unwrap_or_else(EffectResult::failure)
     }
 
     fn handle_acquire(
@@ -108,19 +202,9 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         layer: &str,
         state: &[Value],
     ) -> EffectResult<Value> {
-        let entry = match self.next_entry("handle_acquire") {
-            Ok(entry) => entry,
-            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
-        };
-        if let Some(decision) = decode_effect_result::<Value>(&entry.outputs) {
-            return decision;
-        }
-        if let Some(fallback) = self.fallback {
-            return fallback.handle_acquire(sid, role, layer, state);
-        }
-        EffectResult::failure(EffectFailure::determinism(
-            "replay handle_acquire missing typed outcome",
-        ))
+        self.handle_effect(EffectRequest::acquire(0, sid, None, role, layer, state))
+            .into_value("acquire")
+            .unwrap_or_else(EffectResult::failure)
     }
 
     fn handle_release(
@@ -131,32 +215,15 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         evidence: &Value,
         state: &[Value],
     ) -> EffectResult<()> {
-        let entry = match self.next_entry("handle_release") {
-            Ok(entry) => entry,
-            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
-        };
-        if let Some(outcome) = decode_effect_result::<()>(&entry.outputs) {
-            return outcome;
-        }
-        if let Some(fallback) = self.fallback {
-            return fallback.handle_release(sid, role, layer, evidence, state);
-        }
-        EffectResult::failure(EffectFailure::determinism(
-            "replay handle_release missing typed outcome",
-        ))
+        self.handle_effect(EffectRequest::release(0, sid, None, role, layer, evidence, state))
+            .into_unit("handle_release")
+            .unwrap_or_else(EffectResult::failure)
     }
 
-    fn topology_events(&self, _tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
-        let entry = match self.next_entry("topology_events") {
-            Ok(entry) => entry,
-            Err(message) => return EffectResult::failure(EffectFailure::determinism(message)),
-        };
-        if let Some(outcome) = decode_effect_result::<Vec<TopologyPerturbation>>(&entry.outputs) {
-            return outcome;
-        }
-        EffectResult::failure(EffectFailure::determinism(
-            "replay topology_events missing typed outcome",
-        ))
+    fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
+        self.handle_effect(EffectRequest::topology_events(tick))
+            .into_topology()
+            .unwrap_or_else(EffectResult::failure)
     }
 
     fn output_condition_hint(
@@ -165,8 +232,10 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         role: &str,
         state: &[Value],
     ) -> Option<OutputConditionHint> {
-        self.fallback
-            .and_then(|fallback| fallback.output_condition_hint(sid, role, state))
+        self.handle_effect(EffectRequest::output_condition_hint(0, sid, None, role, state))
+            .into_output_condition_hint()
+            .ok()
+            .flatten()
     }
 }
 
@@ -299,14 +368,17 @@ mod tests {
 
     #[test]
     fn typed_effect_outcomes_serialize_and_roundtrip() {
-        let blocked_json = encode_effect_result::<SendDecision>(&EffectResult::Blocked);
+        let blocked_json = serde_json::json!({
+            "status": "blocked",
+        });
         let blocked = decode_effect_result::<SendDecision>(&blocked_json)
             .expect("blocked outcome should decode");
         assert!(matches!(blocked, EffectResult::Blocked));
 
-        let failure_json = encode_effect_result::<SendDecision>(&EffectResult::failure(
-            EffectFailure::timeout("send timed out"),
-        ));
+        let failure_json = serde_json::json!({
+            "status": "failure",
+            "failure": EffectFailure::timeout("send timed out"),
+        });
         let failure = decode_effect_result::<SendDecision>(&failure_json)
             .expect("failure outcome should decode");
         assert_eq!(
@@ -429,14 +501,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn send_fast_path_key_is_deterministic_for_same_inputs() {
-        let left = send_fast_path_key(7, "A", "B", "msg", Some(SendPayloadKind::Nat));
-        let right = send_fast_path_key(7, "A", "B", "msg", Some(SendPayloadKind::Nat));
-        assert_eq!(left, right);
-        assert_ne!(
-            left,
-            send_fast_path_key(7, "A", "B", "msg2", Some(SendPayloadKind::Nat))
-        );
-    }
 }

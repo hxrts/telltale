@@ -44,6 +44,10 @@ Explicit failure, timeout, cancellation, and session-terminal events are now par
 
 Language-level nominal `effect` declarations do not introduce a second runtime bridge. Their intended justification remains the existing VM `invoke` boundary and handler-typing obligations in `Runtime/Proofs/VM/BridgeStrengthening.lean`.
 
+Typed effect requests and outcomes are now part of the parity surface directly.
+Rust and Lean must agree on effect-interface metadata, request bodies, outcome
+statuses, and replay-visible effect exchanges.
+
 ## Effect Interface Justification
 
 The language-level effect interface design follows the same proof boundary used
@@ -110,6 +114,7 @@ Lean, Rust, and the Rust/Lean bridge.
 | `AuthoritativeRead` / `ObservedRead` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | `MaterializationProof` / `CanonicalHandle` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | `ProgressContract` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| typed effect metadata / request / outcome model | `Runtime/VM/Model/Effects.lean` | `rust/vm/src/effect.rs` | `rust/lean-bridge/src/vm_runner.rs` (`effect_exchanges`) | Aligned |
 
 `OperationInstance` and `OutstandingEffect` are now compared as canonical
 runtime state, not as post-hoc derivations from generic effect-trace order.
