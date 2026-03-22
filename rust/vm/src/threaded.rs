@@ -43,6 +43,9 @@ use crate::loader::CodeImage;
 use crate::output_condition::{OutputConditionCheck, OutputConditionHint};
 use crate::owned::OwnedSession;
 use crate::scheduler::Scheduler;
+use crate::semantic_objects::{
+    protocol_machine_semantic_objects_v1, ProtocolMachineSemanticObjects,
+};
 use crate::serialization::{
     canonical_replay_fragment_v1, semantic_audit_log_v1, CanonicalReplayFragmentV1,
     SemanticAuditRecord,

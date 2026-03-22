@@ -3,6 +3,10 @@
 use crate::communication_replay::{CommunicationConsumptionArtifact, CommunicationReplayMode};
 use crate::determinism::EffectDeterminismTier;
 use crate::effect::{CorruptionType, EffectTraceEntry};
+use crate::output_condition::OutputConditionCheck;
+use crate::semantic_objects::{
+    protocol_machine_semantic_objects_v1, ProtocolMachineSemanticObjects,
+};
 use crate::session::{
     AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord, AuthorityWitnessId,
     FragmentOwnerId, OwnershipTerminalReason, SessionId,
@@ -133,6 +137,10 @@ pub struct CanonicalReplayFragmentV1 {
     /// Canonical semantic audit records derived from authority/failure/effect surfaces.
     #[serde(default)]
     pub semantic_audit_log: Vec<SemanticAuditRecord>,
+    /// Canonical semantic objects derived from authority, delegation,
+    /// effect, and proof surfaces.
+    #[serde(default)]
+    pub semantic_objects: ProtocolMachineSemanticObjects,
 }
 
 /// Replay-stable semantic record derived from authority, delegation, effect, and
@@ -335,6 +343,31 @@ pub fn canonical_semantic_audit_log(records: &[SemanticAuditRecord]) -> Vec<Sema
     out
 }
 
+/// Canonicalize semantic-object ordering for deterministic replay diffs.
+#[must_use]
+pub fn canonicalize_protocol_machine_semantic_objects(
+    objects: &ProtocolMachineSemanticObjects,
+) -> ProtocolMachineSemanticObjects {
+    let mut out = objects.clone();
+    out.operation_instances
+        .sort_by(|lhs, rhs| lhs.operation_id.cmp(&rhs.operation_id));
+    out.outstanding_effects
+        .sort_by(|lhs, rhs| lhs.effect_id.cmp(&rhs.effect_id));
+    out.semantic_handoffs
+        .sort_by(|lhs, rhs| lhs.handoff_id.cmp(&rhs.handoff_id));
+    out.authoritative_reads
+        .sort_by(|lhs, rhs| lhs.read_id.cmp(&rhs.read_id));
+    out.observed_reads
+        .sort_by(|lhs, rhs| lhs.read_id.cmp(&rhs.read_id));
+    out.materialization_proofs
+        .sort_by(|lhs, rhs| lhs.proof_id.cmp(&rhs.proof_id));
+    out.canonical_handles
+        .sort_by(|lhs, rhs| lhs.handle_id.cmp(&rhs.handle_id));
+    out.progress_contracts
+        .sort_by(|lhs, rhs| lhs.operation_id.cmp(&rhs.operation_id));
+    out
+}
+
 /// Build canonical semantic audit records from authority, delegation,
 /// failure-visible observable events, and effect/interface observations.
 #[must_use]
@@ -450,6 +483,7 @@ pub fn canonical_replay_fragment_v1(
     effect_trace: &[EffectTraceEntry],
     authority_audit_log: &[AuthorityAuditRecord],
     delegation_audit_log: &[DelegationAuditRecord],
+    output_condition_checks: &[OutputConditionCheck],
     mut crashed_sites: Vec<String>,
     mut partitioned_edges: Vec<(String, String)>,
     mut corrupted_edges: Vec<((String, String), CorruptionType)>,
@@ -487,6 +521,14 @@ pub fn canonical_replay_fragment_v1(
             delegation_audit_log,
             obs_trace,
             effect_trace,
+        ),
+        semantic_objects: canonicalize_protocol_machine_semantic_objects(
+            &protocol_machine_semantic_objects_v1(
+                authority_audit_log,
+                delegation_audit_log,
+                effect_trace,
+                output_condition_checks,
+            ),
         ),
     }
 }

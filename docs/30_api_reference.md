@@ -70,6 +70,10 @@ Key exports:
 - `ProtocolMachine`, `ProtocolMachineConfig`, `GuestRuntime`, `SchedPolicy`, `SimClock`
 - `Instr`, `Value`, `SessionStore`, `SessionId`
 - `OwnedSession`, `ExternalHandler`, and `NestedVMHandler`
+- canonical semantic objects:
+  `OperationInstance`, `OutstandingEffect`, `SemanticHandoff`,
+  `AuthoritativeRead`, `ObservedRead`, `MaterializationProof`,
+  `CanonicalHandle`, `ProgressContract`, `ProtocolMachineSemanticObjects`
 
 `GuestRuntime` is the Telltale-owned runtime instantiated around the protocol
 machine. `ExternalHandler` is the host-runtime boundary implemented by
@@ -111,6 +115,7 @@ Key exports:
 
 - `global_to_json`, `local_to_json`, `json_to_global`, `json_to_local`
 - `LeanRunner`, `Validator`, `ValidationResult`
+- `ProtocolMachineSemanticObjects` and semantic-object schema helpers
 
 See [Lean-Rust Bridge](24_lean_rust_bridge.md) for details.
 

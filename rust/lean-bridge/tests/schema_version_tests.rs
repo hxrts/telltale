@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use telltale_lean_bridge::{
     ensure_supported_schema_version, export_protocol_bundle, ChoreographyJson, InvariantClaims,
     ProtocolBundle, ProtocolMachineRunInput, ProtocolMachineRunOutput,
-    ProtocolMachineStateView, ReplayTraceBundle, LEAN_BRIDGE_SCHEMA_VERSION,
-    PROTOCOL_BUNDLE_SCHEMA_VERSION, VM_STATE_SCHEMA_VERSION,
+    ProtocolMachineSemanticObjects, ReplayTraceBundle, LEAN_BRIDGE_SCHEMA_VERSION,
+    PROTOCOL_BUNDLE_SCHEMA_VERSION, SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
@@ -124,78 +124,100 @@ fn protocol_bundle_legacy_decode_defaults_schema_version() {
 }
 
 #[test]
-fn vm_state_roundtrip_preserves_vm_state_schema_version() {
-    let state = json!({
-        "schema_version": VM_STATE_SCHEMA_VERSION,
-        "compatibility": {
-            "family": "vm_state",
-            "version": VM_STATE_SCHEMA_VERSION,
-            "backward_compatible_from": ["vm_state.v0"]
-        },
-        "clock": 3,
-        "nextCoroId": 2,
-        "nextSessionId": 1,
-        "coroutines": [{
-            "id": 0,
-            "programId": 11,
-            "pc": 7,
-            "status": {"kind": "ready"},
-            "ownedEndpoints": [{"sid": 0, "role": "A"}],
-            "costBudget": 100,
-            "effectCtx": null
+fn semantic_objects_roundtrip_preserves_schema_version() {
+    let payload = json!({
+        "schema_version": SEMANTIC_OBJECTS_SCHEMA_VERSION,
+        "operation_instances": [{
+            "operation_id": "effect:1",
+            "session": 1,
+            "owner_id": null,
+            "kind": "readChannel",
+            "phase": "succeeded",
+            "handler_identity": "host/runtime",
+            "effect_ids": [1]
         }],
-        "sessions": [{
-            "sid": 0,
-            "roles": ["A", "B"],
-            "status": "active",
-            "epoch": 0
+        "outstanding_effects": [{
+            "effect_id": 1,
+            "operation_id": "effect:1",
+            "session": 1,
+            "effect_interface": "Runtime",
+            "effect_operation": "readChannel",
+            "effect_kind": "invoke_step",
+            "handler_identity": "host/runtime",
+            "status": "succeeded",
+            "ordering_key": 1,
+            "inputs": {"session": 1},
+            "outputs": {"status": "success"}
         }],
-        "obsTrace": [{
-            "tick": 0,
-            "event": {"kind": "sent"}
+        "semantic_handoffs": [{
+            "handoff_id": 3,
+            "session": 1,
+            "from_coro": 0,
+            "to_coro": 1,
+            "scope": { "Fragments": ["A"] },
+            "status": "Committed",
+            "tick": 7,
+            "reason": null
+        }],
+        "authoritative_reads": [{
+            "read_id": "readiness:1:Issued",
+            "session": 1,
+            "owner_id": "runtime/owner",
+            "kind": "readiness",
+            "lifecycle": "issued",
+            "predicate_ref": "session.ready",
+            "witness_id": 1,
+            "generation": 0,
+            "reason": null
+        }],
+        "observed_reads": [{
+            "read_id": "effect:1",
+            "session": 1,
+            "effect_id": 1,
+            "effect_interface": "Runtime",
+            "effect_operation": "readChannel",
+            "handler_identity": "host/runtime",
+            "status": "succeeded"
+        }],
+        "materialization_proofs": [{
+            "proof_id": "session.ready:digest",
+            "session": null,
+            "predicate_ref": "session.ready",
+            "witness_ref": "w1",
+            "output_digest": "digest",
+            "passed": true
+        }],
+        "canonical_handles": [{
+            "handle_id": "materialization:digest",
+            "session": null,
+            "owner_id": null,
+            "kind": "materialization",
+            "proof_ref": "session.ready:digest"
+        }],
+        "progress_contracts": [{
+            "operation_id": "effect:1",
+            "session": 1,
+            "state": "succeeded",
+            "last_ordering_key": 1,
+            "bounded": true
         }]
     });
 
-    let decoded: ProtocolMachineStateView<serde_json::Value, serde_json::Value> =
-        serde_json::from_value(state.clone()).expect("decode vm_state.v1");
-    assert_eq!(decoded.schema_version, VM_STATE_SCHEMA_VERSION);
+    let decoded: ProtocolMachineSemanticObjects =
+        serde_json::from_value(payload.clone()).expect("decode semantic objects");
+    assert_eq!(decoded.schema_version, SEMANTIC_OBJECTS_SCHEMA_VERSION);
 
-    let encoded = serde_json::to_value(decoded).expect("encode vm_state.v1");
-    assert_eq!(encoded["schema_version"], VM_STATE_SCHEMA_VERSION);
+    let encoded = serde_json::to_value(decoded).expect("encode semantic objects");
+    assert_eq!(encoded["schema_version"], SEMANTIC_OBJECTS_SCHEMA_VERSION);
 }
 
 #[test]
-fn vm_state_legacy_decode_accepts_v0_shape_aliases() {
+fn semantic_objects_decode_requires_canonical_shape() {
     let legacy = json!({
-        "schema_version": "vm_state.v0",
-        "clock": 1,
-        "next_coro_id": 4,
-        "next_session_id": 5,
-        "coroutines": [{
-            "id": 1,
-            "program_id": 9,
-            "pc": 0,
-            "status": {"kind": "blocked"},
-            "owned_endpoints": [{"sid": 0, "role": "A"}],
-            "cost_budget": 50,
-            "effect_ctx": null
-        }],
-        "sessions": [{
-            "sid": 0,
-            "roles": ["A"],
-            "status": "active",
-            "epoch": 0
-        }],
-        "obs_trace": [{
-            "tick": 0,
-            "event": {"kind": "opened"}
-        }]
+        "schema_version": "protocol_machine.semantic_objects.v1",
+        "clock": 1
     });
 
-    let decoded: ProtocolMachineStateView<serde_json::Value, serde_json::Value> =
-        serde_json::from_value(legacy).expect("decode vm_state.v0 aliases");
-    assert_eq!(decoded.schema_version, "vm_state.v0");
-    assert_eq!(decoded.next_coro_id, 4);
-    assert_eq!(decoded.next_session_id, 5);
-    assert_eq!(decoded.coroutines[0].program_id, 9);
+    let decoded = serde_json::from_value::<ProtocolMachineSemanticObjects>(legacy);
+    assert!(decoded.is_err(), "legacy VM-state payloads must no longer decode");
 }

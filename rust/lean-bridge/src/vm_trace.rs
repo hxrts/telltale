@@ -139,8 +139,8 @@ fn event_session_from_value(value: &Value) -> Option<usize> {
 /// cross-session scheduling interleavings.
 #[must_use]
 pub fn normalize_vm_trace<E>(
-    trace: &[crate::vm_export::TickedObsEvent<E>],
-) -> Vec<crate::vm_export::TickedObsEvent<E>>
+    trace: &[crate::semantic_objects::TickedObsEvent<E>],
+) -> Vec<crate::semantic_objects::TickedObsEvent<E>>
 where
     E: Serialize + Clone,
 {
@@ -150,7 +150,7 @@ where
     for ev in trace {
         if let Some(sid) = event_session(&ev.event) {
             let counter = counters.entry(sid).or_insert(0);
-            out.push(crate::vm_export::TickedObsEvent {
+            out.push(crate::semantic_objects::TickedObsEvent {
                 tick: *counter,
                 event: ev.event.clone(),
             });
@@ -166,8 +166,8 @@ where
 /// Compare two traces after per-session normalization.
 #[must_use]
 pub fn traces_equivalent<E>(
-    rust_trace: &[crate::vm_export::TickedObsEvent<E>],
-    lean_trace: &[crate::vm_export::TickedObsEvent<E>],
+    rust_trace: &[crate::semantic_objects::TickedObsEvent<E>],
+    lean_trace: &[crate::semantic_objects::TickedObsEvent<E>],
 ) -> bool
 where
     E: Serialize + Clone + PartialEq,
@@ -180,8 +180,8 @@ where
 /// Equivalence is defined as equality after per-session tick normalization.
 #[must_use]
 pub fn observationally_equivalent<E>(
-    left: &[crate::vm_export::TickedObsEvent<E>],
-    right: &[crate::vm_export::TickedObsEvent<E>],
+    left: &[crate::semantic_objects::TickedObsEvent<E>],
+    right: &[crate::semantic_objects::TickedObsEvent<E>],
 ) -> bool
 where
     E: Serialize + Clone + PartialEq,
@@ -202,7 +202,7 @@ pub fn partition_by_session(events: &[NormalizedEvent]) -> BTreeMap<usize, Sessi
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vm_export::TickedObsEvent;
+    use crate::semantic_objects::TickedObsEvent;
     use serde_json::json;
 
     #[test]

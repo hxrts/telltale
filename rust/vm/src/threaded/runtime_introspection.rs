@@ -24,6 +24,18 @@ impl ThreadedVM {
         semantic_audit_log_v1(&[], &self.delegation_audit_log, &self.trace, &self.effect_trace)
     }
 
+    /// Get canonical semantic objects derived from handoff, effect, and
+    /// output-condition surfaces.
+    #[must_use]
+    pub fn semantic_objects(&self) -> ProtocolMachineSemanticObjects {
+        protocol_machine_semantic_objects_v1(
+            &[],
+            &self.delegation_audit_log,
+            &self.effect_trace,
+            &self.output_condition_checks,
+        )
+    }
+
     /// Deterministic communication replay-state root.
     ///
     /// # Panics
@@ -85,6 +97,7 @@ impl ThreadedVM {
             &self.effect_trace,
             &[],
             &self.delegation_audit_log,
+            &self.output_condition_checks,
             self.crashed_sites.iter().cloned().collect(),
             self.partitioned_edges.iter().cloned().collect(),
             corrupted_edges,

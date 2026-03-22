@@ -11,10 +11,10 @@ use std::time::{Duration, Instant};
 use thiserror::Error;
 
 use crate::runner::ChoreographyJson;
+use crate::semantic_objects::TickedObsEvent;
 use crate::sim_reference::{
     SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
 };
-use crate::vm_export::TickedObsEvent;
 use crate::vm_trace::{
     normalize_vm_trace, traces_equivalent, EffectTraceEvent, OutputConditionTraceEvent,
 };

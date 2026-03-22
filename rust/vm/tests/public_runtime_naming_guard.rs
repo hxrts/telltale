@@ -95,9 +95,9 @@ fn canonical_public_examples_use_protocol_machine_terms() {
             "ProtocolMachine::new",
         ),
         ("../../../docs/24_lean_rust_bridge.md", "ProtocolMachineRunner"),
-        ("../../../docs/24_lean_rust_bridge.md", "ProtocolMachineStateView"),
+        ("../../../docs/24_lean_rust_bridge.md", "ProtocolMachineSemanticObjects"),
         ("../../lean-bridge/src/lib.rs", "ProtocolMachineRunner"),
-        ("../../lean-bridge/src/lib.rs", "ProtocolMachineStateView"),
+        ("../../lean-bridge/src/lib.rs", "ProtocolMachineSemanticObjects"),
     ];
     let forbidden_patterns = [
         ("../../../docs/04_code_organization.md", "use telltale_vm::{OwnedSession, VM, VMConfig};"),

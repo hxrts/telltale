@@ -1,6 +1,7 @@
 # Rust-Lean Parity
 
-This document defines the Lean/Rust parity contract for VM behavior, choreography projection, state schemas, and deviation governance.
+This document defines the Lean/Rust parity contract for protocol-machine behavior,
+choreography projection, semantic-object schemas, and deviation governance.
 
 ## Contract Levels
 
@@ -95,6 +96,20 @@ Projection cross-validation is exercised through `rust/lean-bridge/tests/project
 ## State Schema
 
 Lean and Rust schemas remain shape-equivalent on safety-visible and replay-visible fields. Runtime-only helper fields are allowed when they do not alter observable semantics.
+
+### Semantic Object Family
+
+The canonical cross-language semantic-object family must remain aligned between
+Lean, Rust, and the Rust/Lean bridge.
+
+| Object | Lean Surface | Rust Surface | Bridge Surface | Status |
+|---|---|---|---|---|
+| `OperationInstance` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `OutstandingEffect` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `SemanticHandoff` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `AuthoritativeRead` / `ObservedRead` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `MaterializationProof` / `CanonicalHandle` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `ProgressContract` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 
 ### Lean ProtocolMachineState
 

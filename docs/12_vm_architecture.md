@@ -7,6 +7,10 @@ This document defines the protocol-machine architecture, scheduling semantics, a
 The canonical semantic authority is `VMKernel`. The cooperative `ProtocolMachine` (currently implemented by `VM`) and threaded `ThreadedVM` are execution adapters that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
 
 The runtime keeps a single state model across targets. Core state includes coroutines, sessions, scheduler queues, observable trace, effect trace, delegation audit records, and failure-topology snapshot fields.
+The canonical exported semantic surface is the semantic-object family:
+`OperationInstance`, `OutstandingEffect`, `SemanticHandoff`,
+`AuthoritativeRead`, `ObservedRead`, `MaterializationProof`,
+`CanonicalHandle`, and `ProgressContract`.
 
 The canonical round model is one semantic step when concurrency is nonzero. Threaded execution is admitted as an extension only when the wave certificate gate is satisfied.
 
@@ -134,6 +138,22 @@ This keeps replay, simulator harnesses, and parity checks aligned on one derived
 Language-level authority checks are expected to arrive at this same audit
 surface after lowering, with the nominal effect interface and operation name
 retained in `EffectObservation`.
+
+## Canonical Semantic Objects
+
+The protocol machine now exports one higher-level semantic object bundle derived
+from effect, authority, delegation, and output-condition surfaces.
+
+Runtime accessors:
+
+- `VM::semantic_objects()`
+- `ThreadedVM::semantic_objects()`
+- `canonical_replay_fragment().semantic_objects`
+
+This bundle is the canonical bridge-facing and replay-facing representation of
+operation instances, outstanding effects, semantic handoffs, authoritative and
+observed reads, materialization proofs, canonical handles, and progress
+contracts.
 
 ## Delegation and Reconfiguration Path
 

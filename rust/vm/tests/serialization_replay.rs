@@ -17,7 +17,9 @@ use telltale_vm::effect::{
 };
 use telltale_vm::trace::normalize_trace_v1;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
-use telltale_vm::{DelegationStatus, SemanticAuditRecord};
+use telltale_vm::{
+    CanonicalHandleKind, DelegationStatus, SemanticAuditRecord,
+};
 use test_support::{simple_send_recv_image, PassthroughHandler};
 
 cfg_if! {
@@ -112,6 +114,11 @@ fn canonical_replay_fragment_is_stable_for_identical_runs() {
             .any(|record| matches!(record, SemanticAuditRecord::EffectObservation { .. })),
         "canonical replay fragments should retain structured semantic audit records"
     );
+    assert!(
+        vm_a.canonical_replay_fragment().semantic_objects.schema_version
+            == telltale_vm::SEMANTIC_OBJECTS_SCHEMA_VERSION,
+        "canonical replay fragments should retain canonical semantic-object bundles"
+    );
 }
 
 #[test]
@@ -165,6 +172,10 @@ fn canonical_replay_fragment_sorts_topology_state() {
             } if interface == "Runtime" && operation == "topologyEvents"
         )),
         "topology ingress should remain visible as a structured effect observation"
+    );
+    assert_eq!(
+        fragment.semantic_objects.schema_version,
+        telltale_vm::SEMANTIC_OBJECTS_SCHEMA_VERSION
     );
 }
 
@@ -255,6 +266,38 @@ fn run_replay_shared_accepts_arc_backed_trace() {
     assert_eq!(
         baseline_effect_semantics, replay_effect_semantics,
         "arc-backed replay must preserve effect semantics (excluding handler identity)"
+    );
+}
+
+#[test]
+fn semantic_object_bundle_roundtrips_through_replay_fragment() {
+    let image = simple_send_recv_image("A", "B", "m");
+    let handler = PassthroughHandler;
+
+    let mut vm = VM::new(VMConfig::default());
+    vm.load_choreography(&image).expect("load vm");
+    vm.run(&handler, 64).expect("run vm");
+
+    let fragment = vm.canonical_replay_fragment();
+    let encoded = serde_json::to_string(&fragment).expect("serialize replay fragment");
+    let decoded: telltale_vm::CanonicalReplayFragmentV1 =
+        serde_json::from_str(&encoded).expect("deserialize replay fragment");
+
+    assert_eq!(
+        decoded.semantic_objects.schema_version,
+        telltale_vm::SEMANTIC_OBJECTS_SCHEMA_VERSION
+    );
+    assert!(
+        decoded.semantic_objects == vm.semantic_objects(),
+        "semantic object bundle should roundtrip exactly through replay-fragment serialization"
+    );
+    assert!(
+        decoded
+            .semantic_objects
+            .canonical_handles
+            .iter()
+            .all(|handle| matches!(handle.kind, CanonicalHandleKind::Materialization | CanonicalHandleKind::Handoff)),
+        "semantic object bundle should preserve canonical handle kinds"
     );
 }
 

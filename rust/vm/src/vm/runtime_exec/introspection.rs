@@ -1,4 +1,26 @@
 impl VM {
+    fn combined_authority_audit_log(&self) -> Vec<AuthorityAuditRecord> {
+        let mut out = self.authority_audit_log.as_slice().to_vec();
+        for sid in self.sessions.session_ids() {
+            if let Some(records) = self.sessions.authority_audit_log(sid) {
+                out.extend_from_slice(records);
+            }
+        }
+        out.sort_by(|lhs, rhs| {
+            let lhs_key = (
+                lhs.tick.unwrap_or(0),
+                serde_json::to_string(lhs).unwrap_or_default(),
+            );
+            let rhs_key = (
+                rhs.tick.unwrap_or(0),
+                serde_json::to_string(rhs).unwrap_or_default(),
+            );
+            lhs_key.cmp(&rhs_key)
+        });
+        out.dedup_by(|lhs, rhs| lhs == rhs);
+        out
+    }
+
 /// Approximate retained state for the VM runtime.
     #[must_use]
     pub fn memory_usage(&self) -> VmMemoryUsage {
@@ -103,11 +125,25 @@ impl VM {
     /// failure, and effect/interface traces.
     #[must_use]
     pub fn semantic_audit_log(&self) -> Vec<SemanticAuditRecord> {
+        let authority_audit_log = self.combined_authority_audit_log();
         semantic_audit_log_v1(
-            self.authority_audit_log.as_slice(),
+            authority_audit_log.as_slice(),
             self.delegation_audit_log.as_slice(),
             self.obs_trace.as_slice(),
             self.effect_trace.as_slice(),
+        )
+    }
+
+    /// Get canonical semantic objects derived from authority, handoff, effect,
+    /// and output-condition surfaces.
+    #[must_use]
+    pub fn semantic_objects(&self) -> ProtocolMachineSemanticObjects {
+        let authority_audit_log = self.combined_authority_audit_log();
+        protocol_machine_semantic_objects_v1(
+            authority_audit_log.as_slice(),
+            self.delegation_audit_log.as_slice(),
+            self.effect_trace.as_slice(),
+            self.output_condition_checks.as_slice(),
         )
     }
 
@@ -158,6 +194,7 @@ impl VM {
     /// Canonical replay/state fragment for deterministic diffing and snapshots.
     #[must_use]
     pub fn canonical_replay_fragment(&self) -> CanonicalReplayFragmentV1 {
+        let authority_audit_log = self.combined_authority_audit_log();
         let partitioned_edges = self.partitioned_edges.iter().cloned().collect();
         let corrupted_edges = self
             .corrupted_edges
@@ -172,8 +209,9 @@ impl VM {
         canonical_replay_fragment_v1(
             self.obs_trace.as_slice(),
             self.effect_trace.as_slice(),
-            self.authority_audit_log.as_slice(),
+            authority_audit_log.as_slice(),
             self.delegation_audit_log.as_slice(),
+            self.output_condition_checks.as_slice(),
             self.crashed_sites.iter().cloned().collect(),
             partitioned_edges,
             corrupted_edges,

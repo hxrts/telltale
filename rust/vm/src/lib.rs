@@ -87,6 +87,7 @@ pub mod owned;
 pub mod persistence;
 pub mod runtime_contracts;
 pub mod scheduler;
+pub mod semantic_objects;
 pub mod serialization;
 /// Session store and role/session bookkeeping used by protocol execution.
 pub mod session;
@@ -112,6 +113,12 @@ cfg_if! {
 /// Canonical protocol-machine public surface.
 pub mod protocol_machine {
     pub use crate::kernel::VMKernel;
+    pub use crate::semantic_objects::{
+        AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
+        CanonicalHandleKind, OperationInstance, OperationPhase, ObservedRead,
+        OutstandingEffect, OutstandingEffectStatus, ProgressContract, ProgressState,
+        ProtocolMachineSemanticObjects, SemanticHandoff, SEMANTIC_OBJECTS_SCHEMA_VERSION,
+    };
     pub use crate::vm::{
         EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig,
         ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore,
@@ -189,10 +196,17 @@ pub use scheduler::{
     CrossLaneHandoff, LaneId as SchedulerLaneId, PriorityPolicy, SchedPolicy, SchedState,
     Scheduler, StepUpdate,
 };
+pub use semantic_objects::{
+    protocol_machine_semantic_objects_v1, AuthoritativeRead, AuthoritativeReadKind,
+    AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, OperationInstance,
+    OperationPhase, ObservedRead, OutstandingEffect, OutstandingEffectStatus,
+    ProgressContract, ProgressState, ProtocolMachineSemanticObjects, SemanticHandoff,
+    SEMANTIC_OBJECTS_SCHEMA_VERSION,
+};
 pub use serialization::{
     canonical_effect_trace, canonical_replay_fragment_v1, canonical_semantic_audit_log,
-    canonical_trace_v1, semantic_audit_log_v1, CanonicalReplayFragmentV1, CanonicalTraceV1,
-    SemanticAuditRecord,
+    canonical_trace_v1, canonicalize_protocol_machine_semantic_objects,
+    semantic_audit_log_v1, CanonicalReplayFragmentV1, CanonicalTraceV1, SemanticAuditRecord,
 };
 pub use session::{
     decode_edge_json, AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord,

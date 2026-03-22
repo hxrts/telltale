@@ -17,9 +17,9 @@ use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::ObsEvent;
 use telltale_vm::{
-    run_loaded_vm_record_replay_conformance, DelegationStatus, Edge, OwnershipError,
-    OwnershipScope, ProtocolMachine, ProtocolMachineConfig, SemanticAuditRecord,
-    SessionHostMutation,
+    run_loaded_vm_record_replay_conformance, AuthoritativeReadKind, CanonicalHandleKind,
+    DelegationStatus, Edge, OwnershipError, OwnershipScope, ProgressState, ProtocolMachine,
+    ProtocolMachineConfig, SemanticAuditRecord, SessionHostMutation,
 };
 use test_support::simple_send_recv_image;
 
@@ -195,6 +195,53 @@ fn ownership_transfer_record_replay_preserves_observable_handoff() {
             SemanticAuditRecord::Delegation { status, .. } if *status == DelegationStatus::Committed
         )),
         "semantic audit surface should retain committed delegation records"
+    );
+    let semantic_objects = vm.semantic_objects();
+    assert!(
+        semantic_objects
+            .semantic_handoffs
+            .iter()
+            .any(|handoff| handoff.handoff_id == audit.receipt.receipt_id),
+        "canonical semantic object surface should retain semantic handoffs"
+    );
+    assert!(
+        semantic_objects
+            .canonical_handles
+            .iter()
+            .any(|handle| matches!(handle.kind, CanonicalHandleKind::Handoff)),
+        "committed handoff should produce a canonical handle"
+    );
+    assert!(
+        semantic_objects
+            .progress_contracts
+            .iter()
+            .any(|contract| matches!(contract.state, ProgressState::HandedOff)),
+        "handoff should surface a progress contract state"
+    );
+}
+
+#[test]
+fn ownership_semantic_objects_expose_authoritative_reads() {
+    let image = simple_send_recv_image("A", "B", "m");
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let owned = vm
+        .load_choreography_owned(&image, "runtime/owner")
+        .expect("owned open should succeed");
+
+    let witness = owned
+        .issue_readiness_witness(&mut vm, "session.ready")
+        .expect("issue readiness witness");
+    owned
+        .consume_readiness_witness(&mut vm, &witness)
+        .expect("consume readiness witness");
+
+    let semantic_objects = vm.semantic_objects();
+    assert!(
+        semantic_objects
+            .authoritative_reads
+            .iter()
+            .any(|read| matches!(read.kind, AuthoritativeReadKind::Readiness)),
+        "semantic objects should expose readiness witnesses as authoritative reads"
     );
 }
 

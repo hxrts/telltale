@@ -63,7 +63,7 @@ pub mod export;
 pub mod import;
 pub mod invariants;
 pub mod schema;
-pub mod vm_export;
+pub mod semantic_objects;
 pub mod vm_trace;
 
 cfg_if! {
@@ -98,10 +98,13 @@ pub use schema::{
     default_schema_version, ensure_supported_schema_version, is_supported_schema_version,
     LEAN_BRIDGE_SCHEMA_VERSION,
 };
-pub use vm_export::{
-    coroutine_to_json, endpoint_to_json, event_to_json, obs_event_to_json, sessions_to_json,
-    status_to_json, vm_state_from_json, vm_state_to_json, CompatibilityMeta, CoroutineState,
-    EndpointRef, ProtocolMachineStateView, SessionView, TickedObsEvent, VM_STATE_SCHEMA_VERSION,
+pub use semantic_objects::{
+    default_semantic_objects_schema_version, semantic_objects_from_json, semantic_objects_to_json,
+    AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
+    CanonicalHandleKind, DelegationStatus, MaterializationProof, OperationInstance,
+    OperationPhase, ObservedRead, OutstandingEffect, OutstandingEffectStatus, OwnershipScope,
+    ProgressContract, ProgressState, ProtocolMachineSemanticObjects, SemanticHandoff,
+    TickedObsEvent, SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 pub use vm_trace::{
     event_session, normalize_vm_trace, observationally_equivalent, partition_by_session,

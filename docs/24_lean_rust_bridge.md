@@ -5,18 +5,18 @@ It handles JSON conversion, schema versioning, runner invocation, trace comparis
 
 The bridge does not define protocol-machine semantics.
 Semantics remain in `telltale-vm`, `telltale-theory`, and Lean runtime modules.
-Historical module/file names such as `vm_runner`, `vm_export`, and `vm_trace` still exist internally,
+Historical module/file names such as `vm_runner` and `vm_trace` still exist internally,
 but the canonical public bridge surface is the protocol-machine surface:
 `ProtocolMachineRunner`, `ProtocolMachineRunInput`, `ProtocolMachineRunOutput`,
-and `ProtocolMachineStateView`.
+and `ProtocolMachineSemanticObjects`.
 Bridge payloads describe guest-runtime and protocol-machine artifacts; host-runtime
 handlers remain outside the bridge and re-enter through typed effect surfaces.
 
 ## Scope
 
 This document covers runtime bridge behavior implemented in `rust/lean-bridge/src`.
-It covers `export`, `import`, `schema`, `runner`, `vm_runner`, `sim_reference`, `vm_export`,
-`vm_trace`, `invariants`, `equivalence`, and `validate`.
+It covers `export`, `import`, `schema`, `runner`, `vm_runner`, `sim_reference`,
+`semantic_objects`, `vm_trace`, `invariants`, `equivalence`, and `validate`.
 
 This document also covers bridge CLIs and bridge test lanes in `rust/lean-bridge/tests`.
 It does not restate theorem internals from Lean proof files.
@@ -85,12 +85,13 @@ Each family has an explicit version constant.
 |---|---|---|---|
 | Lean bridge core | `LEAN_BRIDGE_SCHEMA_VERSION` | `lean_bridge.v1` | `ProtocolMachineRunInput`, `ProtocolMachineRunOutput`, `SimRunInput`, `SimRunOutput`, replay bundles |
 | Protocol bundles | `PROTOCOL_BUNDLE_SCHEMA_VERSION` | `protocol_bundle.v1` | `ProtocolBundle` |
-| Protocol-machine state export | `VM_STATE_SCHEMA_VERSION` | `vm_state.v1` | `ProtocolMachineStateView` export payloads |
+| Protocol-machine semantic objects | `SEMANTIC_OBJECTS_SCHEMA_VERSION` | `protocol_machine.semantic_objects.v1` | `ProtocolMachineSemanticObjects` export payloads |
 
 `schema::ensure_supported_schema_version()` rejects unsupported `lean_bridge` versions.
-`vm_export` supports alias decoding for legacy `vm_state.v0` field names such as `next_coro_id` and `obs_trace`.
+Protocol-machine semantic objects now use one canonical schema family with no
+legacy VM-state compatibility aliases.
 VM runtime parity artifacts use the same string-based scheme: `vm.serialization.v1` and `vm.envelope_diff.v1`.
-Legacy numeric schema values (`1`) are normalized during deserialization for backward compatibility.
+Legacy numeric schema values (`1`) are normalized during deserialization for backward compatibility where the family still supports them.
 
 ## Reference Simulation Payloads
 
@@ -174,16 +175,25 @@ It returns structured `ProtocolMachineRunnerError` values for binary lookup, pro
 `run_reference_simulation()` decodes `SimRunOutput` and enforces schema checks on response payloads.
 `validate_simulation_trace()` returns typed `SimTraceValidation` values with structured `SimulationStructuredError` entries.
 
-## Protocol-Machine State Export Surface
+## Protocol-Machine Semantic Object Export Surface
 
-`vm_export` provides generic payload structs that avoid a hard dependency on `telltale-vm` to prevent crate cycles.
-Guest-runtime adapters can map concrete protocol-machine data into these bridge structs.
+`semantic_objects` provides the canonical bridge payloads for the protocol
+machine’s semantic object family.
 
-`ProtocolMachineStateView<G, E>` carries clock, coroutine list, session view list, and ticked observable trace.
-It includes `CompatibilityMeta { family, version, backward_compatible_from }`.
+`ProtocolMachineSemanticObjects` carries:
 
-`vm_state_to_json()` emits canonical field names such as `nextCoroId` and `obsTrace`.
-`vm_state_from_json()` accepts alias fields for compatibility with older payload shapes.
+- `OperationInstance`
+- `OutstandingEffect`
+- `SemanticHandoff`
+- `AuthoritativeRead`
+- `ObservedRead`
+- `MaterializationProof`
+- `CanonicalHandle`
+- `ProgressContract`
+
+`semantic_objects_to_json()` and `semantic_objects_from_json()` encode and
+decode the canonical schema directly. The bridge no longer treats generic
+VM-state export as its primary cross-language contract.
 
 ## Trace Normalization and Equivalence
 
