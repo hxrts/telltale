@@ -29,6 +29,18 @@ impl ThreadedVM {
         &self.outstanding_effects
     }
 
+    /// Get canonical progress contracts tracked as runtime state.
+    #[must_use]
+    pub fn progress_contracts(&self) -> &[crate::semantic_objects::ProgressContract] {
+        &self.progress_contracts
+    }
+
+    /// Get replay-visible progress transitions tracked as runtime state.
+    #[must_use]
+    pub fn progress_transitions(&self) -> &[crate::semantic_objects::ProgressTransition] {
+        &self.progress_transitions
+    }
+
     /// Get recorded delegation audit records.
     #[must_use]
     pub fn delegation_audit_log(&self) -> &[DelegationAuditRecord] {
@@ -45,6 +57,8 @@ impl ThreadedVM {
             &self.operation_instances,
             &self.trace,
             &self.outstanding_effects,
+            &self.progress_contracts,
+            &self.progress_transitions,
         )
     }
 
@@ -58,6 +72,8 @@ impl ThreadedVM {
             &self.operation_instances,
             &self.outstanding_effects,
             &self.output_condition_checks,
+            &self.progress_contracts,
+            &self.progress_transitions,
         )
     }
 
@@ -161,6 +177,8 @@ impl ThreadedVM {
             &self.operation_instances,
             &self.outstanding_effects,
             &self.output_condition_checks,
+            &self.progress_contracts,
+            &self.progress_transitions,
             self.crashed_sites.iter().cloned().collect(),
             self.partitioned_edges.iter().cloned().collect(),
             corrupted_edges,

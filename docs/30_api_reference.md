@@ -75,10 +75,12 @@ Key exports:
   `TransformationObligation`,
   `AuthoritativeRead`, `ObservedRead`, `MaterializationProof`,
   `CanonicalHandle`, `PublicationEvent`, `ProgressContract`,
+  `ProgressTransition`,
   `ProtocolMachineSemanticObjects`
 - runtime introspection:
   `operation_instances()`, `outstanding_effects()`, `semantic_objects()`,
-  `publication_events()`, `require_authoritative_read()`,
+  `progress_contracts()`, `progress_transitions()`, `publication_events()`,
+  `require_authoritative_read()`,
   `require_canonical_handle()`, `semantic_audit_log()`,
   `canonical_replay_fragment()`
 

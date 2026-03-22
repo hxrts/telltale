@@ -58,6 +58,8 @@ impl ThreadedVM {
             effect_exchanges: Vec::new(),
             operation_instances: Vec::new(),
             outstanding_effects: Vec::new(),
+            progress_contracts: Vec::new(),
+            progress_transitions: Vec::new(),
             next_effect_id: 0,
             output_condition_checks: Vec::new(),
             crashed_sites: BTreeSet::new(),
@@ -239,6 +241,7 @@ impl ThreadedVM {
         self.ingest_topology_events(handler)?;
         self.prune_expired_timeouts();
         self.try_unblock_receivers();
+        self.evaluate_progress_contracts()?;
 
         let mut progressed = false;
         let mut remaining = match self.config.threaded_round_semantics {
@@ -267,6 +270,8 @@ impl ThreadedVM {
                 break;
             }
         }
+
+        self.evaluate_progress_contracts()?;
 
         if self.all_done() {
             Ok(StepResult::AllDone)

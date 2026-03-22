@@ -100,6 +100,256 @@ impl VM {
         }
     }
 
+    fn progress_state_for_effect_status(status: OutstandingEffectStatus) -> ProgressState {
+        match status {
+            OutstandingEffectStatus::Pending => ProgressState::Pending,
+            OutstandingEffectStatus::Blocked => ProgressState::Blocked,
+            OutstandingEffectStatus::Succeeded => ProgressState::Succeeded,
+            OutstandingEffectStatus::Failed => ProgressState::Failed,
+            OutstandingEffectStatus::Cancelled => ProgressState::Cancelled,
+            OutstandingEffectStatus::Invalidated => ProgressState::TimedOut,
+        }
+    }
+
+    fn set_progress_contract_state(
+        &mut self,
+        operation_id: &str,
+        session: Option<SessionId>,
+        state: ProgressState,
+        budget_ticks: Option<u64>,
+        reason: Option<String>,
+        refresh_progress_tick: bool,
+    ) {
+        let ordering_key = Some(self.clock.tick);
+        let retention = &self.config.observability_retention;
+        if let Some(contract) = self
+            .progress_contracts
+            .as_mut_slice()
+            .iter_mut()
+            .find(|contract| contract.operation_id == operation_id)
+        {
+            let previous = contract.state;
+            contract.session = session.or(contract.session);
+            contract.last_ordering_key = ordering_key;
+            contract.bounded = budget_ticks.is_some();
+            contract.budget_ticks = budget_ticks;
+            if refresh_progress_tick || contract.last_progress_tick.is_none() {
+                contract.last_progress_tick = ordering_key;
+            }
+            if previous != state
+                && matches!(
+                    state,
+                    ProgressState::Blocked
+                        | ProgressState::NoProgress
+                        | ProgressState::Degraded
+                        | ProgressState::TimedOut
+                )
+            {
+                contract.escalated_at_tick = ordering_key;
+            }
+            contract.reason = reason.clone();
+            contract.state = state;
+            if previous != state {
+                self.progress_transitions.push(
+                    ProgressTransition {
+                        operation_id: operation_id.to_string(),
+                        session,
+                        from_state: previous,
+                        to_state: state,
+                        tick: self.clock.tick,
+                        reason,
+                    },
+                    retention,
+                );
+            }
+            return;
+        }
+
+        self.progress_contracts.push(
+            ProgressContract {
+                operation_id: operation_id.to_string(),
+                session,
+                state,
+                last_ordering_key: ordering_key,
+                bounded: budget_ticks.is_some(),
+                budget_ticks,
+                last_progress_tick: ordering_key,
+                escalated_at_tick: matches!(
+                    state,
+                    ProgressState::Blocked
+                        | ProgressState::NoProgress
+                        | ProgressState::Degraded
+                        | ProgressState::TimedOut
+                )
+                .then_some(self.clock.tick),
+                reason,
+            },
+            retention,
+        );
+    }
+
+    fn evaluate_progress_contracts(&mut self) -> Result<(), VMError> {
+        let active_effect_ids: Vec<_> = self
+            .outstanding_effects
+            .as_slice()
+            .iter()
+            .filter(|effect| {
+                matches!(
+                    effect.status,
+                    OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
+                )
+            })
+            .map(|effect| effect.effect_id)
+            .collect();
+
+        for effect_id in active_effect_ids {
+            let Some(effect_index) = self
+                .outstanding_effects
+                .as_slice()
+                .iter()
+                .position(|effect| effect.effect_id == effect_id)
+            else {
+                continue;
+            };
+            let effect = self.outstanding_effects.as_slice()[effect_index].clone();
+            let budget = effect.budget_ticks.ok_or_else(|| {
+                VMError::HandlerError(EffectFailure::contract_violation(format!(
+                    "[host-contract] semantic-path effect {} requires a bounded wait budget",
+                    effect.effect_id
+                )))
+            })?;
+            let Some(contract) = self
+                .progress_contracts
+                .as_slice()
+                .iter()
+                .find(|contract| contract.operation_id == effect.operation_id)
+            else {
+                return Err(VMError::HandlerError(EffectFailure::contract_violation(
+                    format!(
+                        "[host-contract] outstanding effect {} requires a live progress contract",
+                        effect.effect_id
+                    ),
+                )));
+            };
+            let since = contract
+                .escalated_at_tick
+                .or(contract.last_progress_tick)
+                .unwrap_or(effect.ordering_key);
+            let elapsed = self.clock.tick.saturating_sub(since);
+            let target_state = match contract.state {
+                ProgressState::Pending if elapsed < budget => ProgressState::Pending,
+                ProgressState::Pending => ProgressState::Blocked,
+                ProgressState::Blocked if elapsed < budget => ProgressState::Blocked,
+                ProgressState::Blocked => ProgressState::NoProgress,
+                ProgressState::NoProgress if elapsed < budget => ProgressState::NoProgress,
+                ProgressState::NoProgress => ProgressState::Degraded,
+                ProgressState::Degraded if elapsed < budget => ProgressState::Degraded,
+                ProgressState::Degraded => ProgressState::TimedOut,
+                ProgressState::Succeeded
+                | ProgressState::Failed
+                | ProgressState::Cancelled
+                | ProgressState::TimedOut
+                | ProgressState::HandedOff => continue,
+            };
+
+            let reason = match target_state {
+                ProgressState::Pending => None,
+                ProgressState::Blocked => Some("waiting on bounded semantic-path effect".to_string()),
+                ProgressState::NoProgress => {
+                    Some("no progress observed within bounded wait budget".to_string())
+                }
+                ProgressState::Degraded => {
+                    Some("bounded wait degraded after repeated no-progress windows".to_string())
+                }
+                ProgressState::TimedOut => {
+                    Some("bounded wait exhausted; late results are invalid".to_string())
+                }
+                ProgressState::Succeeded
+                | ProgressState::Failed
+                | ProgressState::Cancelled
+                | ProgressState::HandedOff => None,
+            };
+
+            if matches!(target_state, ProgressState::Blocked) && effect.status == OutstandingEffectStatus::Pending {
+                if let Some(effect_mut) = self
+                    .outstanding_effects
+                    .as_mut_slice()
+                    .iter_mut()
+                    .find(|effect_mut| effect_mut.effect_id == effect_id)
+                {
+                    effect_mut.status = OutstandingEffectStatus::Blocked;
+                    effect_mut.outputs = json!({
+                        "status": "blocked",
+                        "reason": reason.clone().unwrap_or_default(),
+                    });
+                    effect_mut.ordering_key = self.clock.tick;
+                }
+                if let Some(operation) = self
+                    .operation_instances
+                    .as_mut_slice()
+                    .iter_mut()
+                    .find(|operation| operation.operation_id == effect.operation_id)
+                {
+                    operation.phase = OperationPhase::Blocked;
+                    operation.terminal_publication = Some("effect.blocked".to_string());
+                }
+            }
+
+            if matches!(target_state, ProgressState::NoProgress | ProgressState::Degraded) {
+                if let Some(operation) = self
+                    .operation_instances
+                    .as_mut_slice()
+                    .iter_mut()
+                    .find(|operation| operation.operation_id == effect.operation_id)
+                {
+                    operation.phase = OperationPhase::Blocked;
+                    operation.terminal_publication = Some(match target_state {
+                        ProgressState::NoProgress => "effect.no_progress".to_string(),
+                        ProgressState::Degraded => "effect.degraded".to_string(),
+                        _ => unreachable!(),
+                    });
+                }
+            }
+
+            if target_state == ProgressState::TimedOut {
+                if let Some(effect_mut) = self
+                    .outstanding_effects
+                    .as_mut_slice()
+                    .iter_mut()
+                    .find(|effect_mut| effect_mut.effect_id == effect_id)
+                {
+                    effect_mut.status = OutstandingEffectStatus::Invalidated;
+                    effect_mut.outputs = json!({
+                        "status": "invalidated",
+                        "reason": reason.clone().unwrap_or_default(),
+                    });
+                    effect_mut.completed_at_tick = Some(self.clock.tick);
+                    effect_mut.ordering_key = self.clock.tick;
+                }
+                if let Some(operation) = self
+                    .operation_instances
+                    .as_mut_slice()
+                    .iter_mut()
+                    .find(|operation| operation.operation_id == effect.operation_id)
+                {
+                    operation.phase = OperationPhase::TimedOut;
+                    operation.terminal_publication = Some("effect.timed_out".to_string());
+                }
+            }
+
+            self.set_progress_contract_state(
+                &effect.operation_id,
+                effect.session,
+                target_state,
+                Some(budget),
+                reason,
+                false,
+            );
+        }
+
+        Ok(())
+    }
+
     fn issue_runtime_effect(
         &mut self,
         effect_kind: &str,
@@ -138,7 +388,7 @@ impl VM {
         );
         self.operation_instances.push(
             OperationInstance {
-                operation_id,
+                operation_id: operation_id.clone(),
                 session,
                 owner_id,
                 kind: effect_operation.unwrap_or_else(|| effect_kind.to_string()),
@@ -151,6 +401,14 @@ impl VM {
                 requires_proof: false,
             },
             &self.config.observability_retention,
+        );
+        self.set_progress_contract_state(
+            &operation_id,
+            session,
+            ProgressState::Pending,
+            budget_ticks,
+            None,
+            true,
         );
         effect_id
     }
@@ -211,7 +469,7 @@ impl VM {
         );
         self.operation_instances.push(
             OperationInstance {
-                operation_id,
+                operation_id: operation_id.clone(),
                 session,
                 owner_id,
                 kind: entry
@@ -228,6 +486,18 @@ impl VM {
             },
             &self.config.observability_retention,
         );
+        self.set_progress_contract_state(
+            &operation_id,
+            session,
+            Self::progress_state_for_effect_status(status),
+            budget_ticks,
+            entry
+                .outputs
+                .get("reason")
+                .and_then(serde_json::Value::as_str)
+                .map(ToString::to_string),
+            true,
+        );
     }
 
     fn complete_runtime_effect(
@@ -236,11 +506,11 @@ impl VM {
         status: OutstandingEffectStatus,
         outputs: serde_json::Value,
     ) -> Result<(), VMError> {
-        let Some(effect) = self
+        let Some(effect_index) = self
             .outstanding_effects
-            .as_mut_slice()
-            .iter_mut()
-            .find(|effect| effect.effect_id == effect_id)
+            .as_slice()
+            .iter()
+            .position(|effect| effect.effect_id == effect_id)
         else {
             return Err(VMError::HandlerError(EffectFailure::contract_violation(
                 format!(
@@ -249,31 +519,55 @@ impl VM {
             )));
         };
         if !matches!(
-            effect.status,
+            self.outstanding_effects.as_slice()[effect_index].status,
             OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
         ) {
             return Err(VMError::HandlerError(EffectFailure::contract_violation(
                 format!(
                     "[host-contract] late result for effect {effect_id} rejected after {:?}",
-                    effect.status
+                    self.outstanding_effects.as_slice()[effect_index].status
                 ),
             )));
         }
 
-        effect.status = status;
-        effect.outputs = outputs;
-        effect.completed_at_tick = Some(self.clock.tick);
-        effect.ordering_key = self.clock.tick;
+        let operation_id;
+        let session;
+        let budget_ticks;
+        let reason;
+        {
+            let effect = &mut self.outstanding_effects.as_mut_slice()[effect_index];
+            effect.status = status;
+            effect.outputs = outputs;
+            effect.completed_at_tick = Some(self.clock.tick);
+            effect.ordering_key = self.clock.tick;
+            operation_id = effect.operation_id.clone();
+            session = effect.session;
+            budget_ticks = effect.budget_ticks;
+            reason = effect
+                .outputs
+                .get("reason")
+                .and_then(serde_json::Value::as_str)
+                .map(ToString::to_string);
+        }
 
         if let Some(operation) = self
             .operation_instances
             .as_mut_slice()
             .iter_mut()
-            .find(|operation| operation.operation_id == effect.operation_id)
+            .find(|operation| operation.operation_id == operation_id)
         {
             operation.phase = Self::effect_status_phase(status);
             operation.terminal_publication = Self::effect_terminal_publication(status);
         }
+
+        self.set_progress_contract_state(
+            &operation_id,
+            session,
+            Self::progress_state_for_effect_status(status),
+            budget_ticks,
+            reason,
+            true,
+        );
 
         Ok(())
     }
@@ -309,6 +603,16 @@ impl VM {
                 operation.phase = OperationPhase::Failed;
                 operation.terminal_publication = Some("effect.invalidated".to_string());
             }
+        }
+        for operation_id in invalidated {
+            self.set_progress_contract_state(
+                &operation_id,
+                Some(session),
+                ProgressState::Failed,
+                Some(1),
+                Some(reason.to_string()),
+                true,
+            );
         }
     }
 
@@ -378,6 +682,24 @@ impl VM {
                 operation.terminal_publication = Some("effect.invalidated".to_string());
             }
         }
+        for operation_id in invalidated_operations {
+            self.set_progress_contract_state(
+                &operation_id,
+                Some(receipt.session),
+                ProgressState::Failed,
+                Some(1),
+                Some("semantic handoff invalidated blocked effect".to_string()),
+                true,
+            );
+        }
+        self.set_progress_contract_state(
+            &handoff_operation_id,
+            Some(receipt.session),
+            ProgressState::HandedOff,
+            Some(1),
+            Some("semantic handoff committed".to_string()),
+            true,
+        );
     }
 }
 
@@ -573,5 +895,120 @@ mod runtime_effect_state_tests {
             )
             .expect_err("stale post-handoff result must be rejected");
         assert!(err.to_string().contains("late result"));
+    }
+
+    #[test]
+    fn runtime_progress_contract_escalates_and_invalidates_late_results() {
+        let mut vm = test_vm();
+        vm.clock.tick = 1;
+        let effect_id = vm.issue_runtime_effect(
+            "invoke_step",
+            Some(7),
+            "host/runtime",
+            serde_json::json!({ "session": 7 }),
+        );
+
+        vm.clock.tick = 2;
+        vm.evaluate_progress_contracts()
+            .expect("blocked escalation should succeed");
+        assert!(matches!(
+            vm.progress_contracts
+                .as_slice()
+                .iter()
+                .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
+                .expect("progress contract")
+                .state,
+            ProgressState::Blocked
+        ));
+
+        vm.clock.tick = 3;
+        vm.evaluate_progress_contracts()
+            .expect("no-progress escalation should succeed");
+        assert!(matches!(
+            vm.progress_contracts
+                .as_slice()
+                .iter()
+                .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
+                .expect("progress contract")
+                .state,
+            ProgressState::NoProgress
+        ));
+
+        vm.clock.tick = 4;
+        vm.evaluate_progress_contracts()
+            .expect("degraded escalation should succeed");
+        assert!(matches!(
+            vm.progress_contracts
+                .as_slice()
+                .iter()
+                .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
+                .expect("progress contract")
+                .state,
+            ProgressState::Degraded
+        ));
+
+        vm.clock.tick = 5;
+        vm.evaluate_progress_contracts()
+            .expect("timeout escalation should succeed");
+        let contract = vm
+            .progress_contracts
+            .as_slice()
+            .iter()
+            .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
+            .expect("progress contract");
+        assert_eq!(contract.state, ProgressState::TimedOut);
+        assert_eq!(
+            contract.reason.as_deref(),
+            Some("bounded wait exhausted; late results are invalid")
+        );
+        let effect = vm
+            .outstanding_effects
+            .as_slice()
+            .iter()
+            .find(|effect| effect.effect_id == effect_id)
+            .expect("effect");
+        assert_eq!(effect.status, OutstandingEffectStatus::Invalidated);
+
+        let err = vm
+            .complete_runtime_effect(
+                effect_id,
+                OutstandingEffectStatus::Succeeded,
+                serde_json::json!({ "status": "success" }),
+            )
+            .expect_err("late timeout result must be rejected");
+        assert!(err.to_string().contains("late result"));
+    }
+
+    #[test]
+    fn runtime_progress_contract_requires_bounded_waits() {
+        let mut vm = test_vm();
+        vm.clock.tick = 1;
+        let effect_id = vm.issue_runtime_effect(
+            "invoke_step",
+            Some(9),
+            "host/runtime",
+            serde_json::json!({ "session": 9 }),
+        );
+        let operation_id = format!("effect:{effect_id}");
+        vm.outstanding_effects
+            .as_mut_slice()
+            .iter_mut()
+            .find(|effect| effect.effect_id == effect_id)
+            .expect("effect")
+            .budget_ticks = None;
+        let contract = vm
+            .progress_contracts
+            .as_mut_slice()
+            .iter_mut()
+            .find(|contract| contract.operation_id == operation_id)
+            .expect("progress contract");
+        contract.budget_ticks = None;
+        contract.bounded = false;
+
+        vm.clock.tick = 2;
+        let err = vm
+            .evaluate_progress_contracts()
+            .expect_err("unbounded semantic-path effect must be rejected");
+        assert!(err.to_string().contains("bounded wait budget"));
     }
 }

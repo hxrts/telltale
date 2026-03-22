@@ -634,3 +634,71 @@
         assert_eq!(blocked.owner_id.as_deref(), Some("coro:1"));
         assert_eq!(blocked.status, OutstandingEffectStatus::Invalidated);
     }
+
+    #[test]
+    fn progress_contracts_escalate_consistently_in_threaded_runtime() {
+        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 2);
+        vm.clock.tick = 1;
+        let effect_id = vm.issue_runtime_effect(
+            "invoke_step",
+            Some(7),
+            "host/runtime",
+            serde_json::json!({ "session": 7 }),
+        );
+
+        vm.clock.tick = 2;
+        vm.evaluate_progress_contracts()
+            .expect("blocked escalation should succeed");
+        assert_eq!(
+            vm.progress_contracts
+                .iter()
+                .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
+                .expect("progress contract")
+                .state,
+            ProgressState::Blocked
+        );
+
+        vm.clock.tick = 3;
+        vm.evaluate_progress_contracts()
+            .expect("no-progress escalation should succeed");
+        assert_eq!(
+            vm.progress_contracts
+                .iter()
+                .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
+                .expect("progress contract")
+                .state,
+            ProgressState::NoProgress
+        );
+
+        vm.clock.tick = 4;
+        vm.evaluate_progress_contracts()
+            .expect("degraded escalation should succeed");
+        assert_eq!(
+            vm.progress_contracts
+                .iter()
+                .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
+                .expect("progress contract")
+                .state,
+            ProgressState::Degraded
+        );
+
+        vm.clock.tick = 5;
+        vm.evaluate_progress_contracts()
+            .expect("timeout escalation should succeed");
+        assert_eq!(
+            vm.progress_contracts
+                .iter()
+                .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
+                .expect("progress contract")
+                .state,
+            ProgressState::TimedOut
+        );
+        let err = vm
+            .complete_runtime_effect(
+                effect_id,
+                OutstandingEffectStatus::Succeeded,
+                serde_json::json!({ "status": "success" }),
+            )
+            .expect_err("late timeout result must be rejected");
+        assert!(err.to_string().contains("late result"));
+    }

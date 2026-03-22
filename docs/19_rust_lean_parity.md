@@ -115,6 +115,7 @@ Lean, Rust, and the Rust/Lean bridge.
 | `AuthoritativeRead` / `ObservedRead` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | `MaterializationProof` / `CanonicalHandle` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | `ProgressContract` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `ProgressTransition` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | typed effect metadata / request / outcome model | `Runtime/VM/Model/Effects.lean` | `rust/vm/src/effect.rs` | `rust/lean-bridge/src/vm_runner.rs` (`effect_exchanges`) | Aligned |
 
 `OperationInstance` and `OutstandingEffect` are now compared as canonical
@@ -131,6 +132,11 @@ or revocation. Bridge-side execution comparison reports these handoff and
 invalidation surfaces separately from raw trace equivalence so stale-owner and
 late-result mismatches do not hide inside otherwise equivalent instruction
 traces.
+
+`ProgressContract` parity now covers bounded-wait metadata, explicit
+no-progress and degraded states, and timeout escalation state. `ProgressTransition`
+parity makes those escalations replay-visible instead of leaving them as
+target-specific scheduling heuristics.
 
 ### Lean ProtocolMachineState
 

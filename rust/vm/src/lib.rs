@@ -116,9 +116,9 @@ pub mod protocol_machine {
     pub use crate::semantic_objects::{
         AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
         CanonicalHandleKind, ObservedRead, OperationInstance, OperationPhase, OutstandingEffect,
-        OutstandingEffectStatus, ProgressContract, ProgressState, ProtocolMachineSemanticObjects,
-        PublicationEvent, PublicationObserverClass, PublicationStatus, SemanticHandoff,
-        SEMANTIC_OBJECTS_SCHEMA_VERSION,
+        OutstandingEffectStatus, ProgressContract, ProgressState, ProgressTransition,
+        ProtocolMachineSemanticObjects, PublicationEvent, PublicationObserverClass,
+        PublicationStatus, SemanticHandoff, SEMANTIC_OBJECTS_SCHEMA_VERSION,
     };
     pub use crate::vm::{
         EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig,
@@ -203,8 +203,9 @@ pub use semantic_objects::{
     protocol_machine_semantic_objects_v1, AuthoritativeRead, AuthoritativeReadKind,
     AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, ObservedRead,
     OperationInstance, OperationPhase, OutstandingEffect, OutstandingEffectStatus,
-    ProgressContract, ProgressState, ProtocolMachineSemanticObjects, PublicationEvent,
-    PublicationObserverClass, PublicationStatus, SemanticHandoff, SEMANTIC_OBJECTS_SCHEMA_VERSION,
+    ProgressContract, ProgressState, ProgressTransition, ProtocolMachineSemanticObjects,
+    PublicationEvent, PublicationObserverClass, PublicationStatus, SemanticHandoff,
+    SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 pub use serialization::{
     canonical_effect_trace, canonical_replay_fragment_v1, canonical_semantic_audit_log,

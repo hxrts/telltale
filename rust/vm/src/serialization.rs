@@ -5,8 +5,8 @@ use crate::determinism::EffectDeterminismTier;
 use crate::effect::{CorruptionType, EffectTraceEntry};
 use crate::output_condition::OutputConditionCheck;
 use crate::semantic_objects::{
-    protocol_machine_semantic_objects_v1, OperationInstance, OutstandingEffect,
-    ProtocolMachineSemanticObjects, PublicationEvent, TransformationObligation,
+    protocol_machine_semantic_objects_v1, OperationInstance, OutstandingEffect, ProgressContract,
+    ProgressTransition, ProtocolMachineSemanticObjects, PublicationEvent, TransformationObligation,
 };
 use crate::session::{
     AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord, AuthorityWitnessId,
@@ -192,6 +192,15 @@ pub enum SemanticAuditRecord {
         /// Canonical publication event.
         event: PublicationEvent,
     },
+    /// Replay-visible progress-contract transition.
+    ProgressTransition {
+        /// Stable tick at which the transition became visible.
+        tick: u64,
+        /// Session scoped by the progress contract, when available.
+        session: Option<SessionId>,
+        /// Canonical progress transition.
+        transition: ProgressTransition,
+    },
     /// Explicit typed failure branch entry.
     FailureBranch {
         /// Scheduler tick at which the failure branch became visible.
@@ -307,12 +316,13 @@ fn semantic_rank(record: &SemanticAuditRecord) -> u8 {
         SemanticAuditRecord::Delegation { .. } => 1,
         SemanticAuditRecord::TransformationObligation { .. } => 2,
         SemanticAuditRecord::Publication { .. } => 3,
-        SemanticAuditRecord::FailureBranch { .. } => 4,
-        SemanticAuditRecord::TimeoutIssued { .. } => 5,
-        SemanticAuditRecord::CancellationRequested { .. } => 6,
-        SemanticAuditRecord::Cancelled { .. } => 7,
-        SemanticAuditRecord::SessionTerminal { .. } => 8,
-        SemanticAuditRecord::EffectObservation { .. } => 9,
+        SemanticAuditRecord::ProgressTransition { .. } => 4,
+        SemanticAuditRecord::FailureBranch { .. } => 5,
+        SemanticAuditRecord::TimeoutIssued { .. } => 6,
+        SemanticAuditRecord::CancellationRequested { .. } => 7,
+        SemanticAuditRecord::Cancelled { .. } => 8,
+        SemanticAuditRecord::SessionTerminal { .. } => 9,
+        SemanticAuditRecord::EffectObservation { .. } => 10,
     }
 }
 
@@ -322,6 +332,7 @@ fn semantic_tick(record: &SemanticAuditRecord) -> u64 {
         SemanticAuditRecord::Delegation { tick, .. }
         | SemanticAuditRecord::TransformationObligation { tick, .. }
         | SemanticAuditRecord::Publication { tick, .. }
+        | SemanticAuditRecord::ProgressTransition { tick, .. }
         | SemanticAuditRecord::FailureBranch { tick, .. }
         | SemanticAuditRecord::TimeoutIssued { tick, .. }
         | SemanticAuditRecord::CancellationRequested { tick, .. }
@@ -406,6 +417,8 @@ pub fn semantic_audit_log_v1(
     operation_instances: &[OperationInstance],
     obs_trace: &[ObsEvent],
     outstanding_effects: &[OutstandingEffect],
+    progress_contracts: &[ProgressContract],
+    progress_transitions: &[ProgressTransition],
 ) -> Vec<SemanticAuditRecord> {
     let mut records = Vec::new();
 
@@ -435,6 +448,8 @@ pub fn semantic_audit_log_v1(
         operation_instances,
         outstanding_effects,
         &[],
+        progress_contracts,
+        progress_transitions,
     );
     let obligations = semantic_objects.transformation_obligations.clone();
     records.extend(obligations.into_iter().map(|obligation| {
@@ -454,6 +469,13 @@ pub fn semantic_audit_log_v1(
                 event,
             }),
     );
+    records.extend(progress_transitions.iter().cloned().map(|transition| {
+        SemanticAuditRecord::ProgressTransition {
+            tick: transition.tick,
+            session: transition.session,
+            transition,
+        }
+    }));
 
     records.extend(obs_trace.iter().filter_map(|event| match event {
         ObsEvent::FailureBranchEntered {
@@ -542,6 +564,8 @@ pub fn canonical_replay_fragment_v1(
     operation_instances: &[OperationInstance],
     outstanding_effects: &[OutstandingEffect],
     output_condition_checks: &[OutputConditionCheck],
+    progress_contracts: &[ProgressContract],
+    progress_transitions: &[ProgressTransition],
     mut crashed_sites: Vec<String>,
     mut partitioned_edges: Vec<(String, String)>,
     mut corrupted_edges: Vec<((String, String), CorruptionType)>,
@@ -580,6 +604,8 @@ pub fn canonical_replay_fragment_v1(
             operation_instances,
             obs_trace,
             outstanding_effects,
+            progress_contracts,
+            progress_transitions,
         ),
         semantic_objects: canonicalize_protocol_machine_semantic_objects(
             &protocol_machine_semantic_objects_v1(
@@ -588,6 +614,8 @@ pub fn canonical_replay_fragment_v1(
                 operation_instances,
                 outstanding_effects,
                 output_condition_checks,
+                progress_contracts,
+                progress_transitions,
             ),
         ),
     }

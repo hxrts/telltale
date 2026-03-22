@@ -98,11 +98,25 @@ pub enum PublicationStatus {
 pub enum ProgressState {
     Pending,
     Blocked,
+    NoProgress,
+    Degraded,
     Succeeded,
     Failed,
     Cancelled,
     TimedOut,
     HandedOff,
+}
+
+fn default_progress_contract_last_progress_tick() -> Option<u64> {
+    None
+}
+
+fn default_progress_contract_escalated_at_tick() -> Option<u64> {
+    None
+}
+
+fn default_progress_contract_reason() -> Option<String> {
+    None
 }
 
 /// First-class view of one operation instance.
@@ -249,6 +263,25 @@ pub struct ProgressContract {
     pub state: ProgressState,
     pub last_ordering_key: Option<u64>,
     pub bounded: bool,
+    #[serde(default)]
+    pub budget_ticks: Option<u64>,
+    #[serde(default = "default_progress_contract_last_progress_tick")]
+    pub last_progress_tick: Option<u64>,
+    #[serde(default = "default_progress_contract_escalated_at_tick")]
+    pub escalated_at_tick: Option<u64>,
+    #[serde(default = "default_progress_contract_reason")]
+    pub reason: Option<String>,
+}
+
+/// Replay-visible progress transition for one operation-level contract.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgressTransition {
+    pub operation_id: String,
+    pub session: Option<SessionId>,
+    pub from_state: ProgressState,
+    pub to_state: ProgressState,
+    pub tick: u64,
+    pub reason: Option<String>,
 }
 
 /// Canonical bundle of semantic objects exported by the protocol machine.
@@ -268,6 +301,8 @@ pub struct ProtocolMachineSemanticObjects {
     #[serde(default)]
     pub publication_events: Vec<PublicationEvent>,
     pub progress_contracts: Vec<ProgressContract>,
+    #[serde(default)]
+    pub progress_transitions: Vec<ProgressTransition>,
 }
 
 impl Default for ProtocolMachineSemanticObjects {
@@ -284,6 +319,7 @@ impl Default for ProtocolMachineSemanticObjects {
             canonical_handles: Vec::new(),
             publication_events: Vec::new(),
             progress_contracts: Vec::new(),
+            progress_transitions: Vec::new(),
         }
     }
 }
@@ -336,7 +372,7 @@ fn progress_state(status: OutstandingEffectStatus) -> ProgressState {
         OutstandingEffectStatus::Succeeded => ProgressState::Succeeded,
         OutstandingEffectStatus::Failed => ProgressState::Failed,
         OutstandingEffectStatus::Cancelled => ProgressState::Cancelled,
-        OutstandingEffectStatus::Invalidated => ProgressState::Failed,
+        OutstandingEffectStatus::Invalidated => ProgressState::TimedOut,
     }
 }
 
@@ -409,6 +445,20 @@ fn publication_observer_class(publication: &str) -> PublicationObserverClass {
     }
 }
 
+fn progress_state_rank(state: ProgressState) -> u8 {
+    match state {
+        ProgressState::Pending => 0,
+        ProgressState::Blocked => 1,
+        ProgressState::NoProgress => 2,
+        ProgressState::Degraded => 3,
+        ProgressState::Succeeded => 4,
+        ProgressState::Failed => 5,
+        ProgressState::Cancelled => 6,
+        ProgressState::TimedOut => 7,
+        ProgressState::HandedOff => 8,
+    }
+}
+
 fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSemanticObjects {
     out.operation_instances
         .sort_by(|lhs, rhs| lhs.operation_id.cmp(&rhs.operation_id));
@@ -430,6 +480,20 @@ fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSeman
         .sort_by(|lhs, rhs| lhs.publication_id.cmp(&rhs.publication_id));
     out.progress_contracts
         .sort_by(|lhs, rhs| lhs.operation_id.cmp(&rhs.operation_id));
+    out.progress_transitions.sort_by(|lhs, rhs| {
+        (
+            lhs.tick,
+            &lhs.operation_id,
+            progress_state_rank(lhs.from_state),
+            progress_state_rank(lhs.to_state),
+        )
+            .cmp(&(
+                rhs.tick,
+                &rhs.operation_id,
+                progress_state_rank(rhs.from_state),
+                progress_state_rank(rhs.to_state),
+            ))
+    });
     out
 }
 
@@ -442,6 +506,8 @@ pub fn protocol_machine_semantic_objects_v1(
     operation_instances: &[OperationInstance],
     outstanding_effects: &[OutstandingEffect],
     output_condition_checks: &[OutputConditionCheck],
+    progress_contracts: &[ProgressContract],
+    progress_transitions: &[ProgressTransition],
 ) -> ProtocolMachineSemanticObjects {
     let mut operation_instances = operation_instances.to_vec();
     let outstanding_effects = outstanding_effects.to_vec();
@@ -687,23 +753,34 @@ pub fn protocol_machine_semantic_objects_v1(
             });
     }
 
-    let mut progress_contracts: Vec<_> = outstanding_effects
-        .iter()
-        .map(|effect| ProgressContract {
-            operation_id: effect.operation_id.clone(),
-            session: effect.session,
-            state: progress_state(effect.status),
-            last_ordering_key: Some(effect.ordering_key),
+    let mut progress_contracts: Vec<_> = progress_contracts.to_vec();
+    if progress_contracts.is_empty() {
+        progress_contracts = outstanding_effects
+            .iter()
+            .map(|effect| ProgressContract {
+                operation_id: effect.operation_id.clone(),
+                session: effect.session,
+                state: progress_state(effect.status),
+                last_ordering_key: Some(effect.ordering_key),
+                bounded: true,
+                budget_ticks: effect.budget_ticks,
+                last_progress_tick: Some(effect.ordering_key),
+                escalated_at_tick: None,
+                reason: None,
+            })
+            .collect();
+        progress_contracts.extend(semantic_handoffs.iter().map(|handoff| ProgressContract {
+            operation_id: format!("handoff:{}", handoff.handoff_id),
+            session: Some(handoff.session),
+            state: ProgressState::HandedOff,
+            last_ordering_key: Some(handoff.tick),
             bounded: true,
-        })
-        .collect();
-    progress_contracts.extend(semantic_handoffs.iter().map(|handoff| ProgressContract {
-        operation_id: format!("handoff:{}", handoff.handoff_id),
-        session: Some(handoff.session),
-        state: ProgressState::HandedOff,
-        last_ordering_key: Some(handoff.tick),
-        bounded: true,
-    }));
+            budget_ticks: Some(1),
+            last_progress_tick: Some(handoff.tick),
+            escalated_at_tick: None,
+            reason: handoff.reason.clone(),
+        }));
+    }
 
     canonicalize(ProtocolMachineSemanticObjects {
         schema_version: default_semantic_objects_schema_version(),
@@ -717,5 +794,6 @@ pub fn protocol_machine_semantic_objects_v1(
         canonical_handles,
         publication_events: publication_events.into_values().collect(),
         progress_contracts,
+        progress_transitions: progress_transitions.to_vec(),
     })
 }

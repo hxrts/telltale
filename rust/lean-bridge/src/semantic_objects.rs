@@ -80,6 +80,8 @@ pub enum PublicationStatus {
 pub enum ProgressState {
     Pending,
     Blocked,
+    NoProgress,
+    Degraded,
     Succeeded,
     Failed,
     Cancelled,
@@ -233,6 +235,24 @@ pub struct ProgressContract {
     pub state: ProgressState,
     pub last_ordering_key: Option<u64>,
     pub bounded: bool,
+    #[serde(default)]
+    pub budget_ticks: Option<u64>,
+    #[serde(default)]
+    pub last_progress_tick: Option<u64>,
+    #[serde(default)]
+    pub escalated_at_tick: Option<u64>,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProgressTransition {
+    pub operation_id: String,
+    pub session: Option<u64>,
+    pub from_state: ProgressState,
+    pub to_state: ProgressState,
+    pub tick: u64,
+    pub reason: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -258,6 +278,8 @@ pub struct ProtocolMachineSemanticObjects {
     #[serde(default)]
     pub publication_events: Vec<PublicationEvent>,
     pub progress_contracts: Vec<ProgressContract>,
+    #[serde(default)]
+    pub progress_transitions: Vec<ProgressTransition>,
 }
 
 impl Default for ProtocolMachineSemanticObjects {
@@ -274,6 +296,7 @@ impl Default for ProtocolMachineSemanticObjects {
             canonical_handles: Vec::new(),
             publication_events: Vec::new(),
             progress_contracts: Vec::new(),
+            progress_transitions: Vec::new(),
         }
     }
 }
@@ -414,6 +437,18 @@ mod tests {
                 state: ProgressState::Succeeded,
                 last_ordering_key: Some(1),
                 bounded: true,
+                budget_ticks: Some(1),
+                last_progress_tick: Some(1),
+                escalated_at_tick: None,
+                reason: None,
+            }],
+            progress_transitions: vec![ProgressTransition {
+                operation_id: "effect:1".to_string(),
+                session: Some(1),
+                from_state: ProgressState::Pending,
+                to_state: ProgressState::Succeeded,
+                tick: 1,
+                reason: None,
             }],
         };
 

@@ -127,6 +127,18 @@ impl VM {
         self.outstanding_effects.as_slice()
     }
 
+    /// Get canonical progress contracts tracked as runtime state.
+    #[must_use]
+    pub fn progress_contracts(&self) -> &[crate::semantic_objects::ProgressContract] {
+        self.progress_contracts.as_slice()
+    }
+
+    /// Get replay-visible progress transitions tracked as runtime state.
+    #[must_use]
+    pub fn progress_transitions(&self) -> &[crate::semantic_objects::ProgressTransition] {
+        self.progress_transitions.as_slice()
+    }
+
     /// Get recorded delegation audit records.
     #[must_use]
     pub fn delegation_audit_log(&self) -> &[DelegationAuditRecord] {
@@ -150,6 +162,8 @@ impl VM {
             self.operation_instances.as_slice(),
             self.obs_trace.as_slice(),
             self.outstanding_effects.as_slice(),
+            self.progress_contracts.as_slice(),
+            self.progress_transitions.as_slice(),
         )
     }
 
@@ -164,6 +178,8 @@ impl VM {
             self.operation_instances.as_slice(),
             self.outstanding_effects.as_slice(),
             self.output_condition_checks.as_slice(),
+            self.progress_contracts.as_slice(),
+            self.progress_transitions.as_slice(),
         )
     }
 
@@ -270,6 +286,8 @@ impl VM {
             self.operation_instances.as_slice(),
             self.outstanding_effects.as_slice(),
             self.output_condition_checks.as_slice(),
+            self.progress_contracts.as_slice(),
+            self.progress_transitions.as_slice(),
             self.crashed_sites.iter().cloned().collect(),
             partitioned_edges,
             corrupted_edges,

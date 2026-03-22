@@ -116,6 +116,8 @@ pub struct ThreadedVM {
     effect_exchanges: Vec<EffectExchangeRecord>,
     operation_instances: Vec<OperationInstance>,
     outstanding_effects: Vec<OutstandingEffect>,
+    progress_contracts: Vec<ProgressContract>,
+    progress_transitions: Vec<ProgressTransition>,
     next_effect_id: u64,
     output_condition_checks: Vec<OutputConditionCheck>,
     crashed_sites: BTreeSet<String>,

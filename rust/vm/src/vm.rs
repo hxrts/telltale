@@ -59,7 +59,8 @@ use crate::persistence::{NoopPersistence, PersistenceModel};
 use crate::scheduler::{SchedPolicy, Scheduler};
 use crate::semantic_objects::{
     protocol_machine_semantic_objects_v1, OperationInstance, OperationPhase, OutstandingEffect,
-    OutstandingEffectStatus, ProtocolMachineSemanticObjects,
+    OutstandingEffectStatus, ProgressContract, ProgressState, ProgressTransition,
+    ProtocolMachineSemanticObjects,
 };
 use crate::serialization::{
     canonical_replay_fragment_v1, semantic_audit_log_v1, CanonicalReplayFragmentV1,

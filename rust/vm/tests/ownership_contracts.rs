@@ -313,6 +313,8 @@ fn ownership_proof_bearing_success_is_enforced_for_publication() {
         }],
         &[],
         &[],
+        &[],
+        &[],
     );
     let publication = objects
         .publication_events
@@ -382,6 +384,8 @@ fn ownership_publication_path_is_canonical_and_unique() {
                 requires_proof: false,
             },
         ],
+        &[],
+        &[],
         &[],
         &[],
     );

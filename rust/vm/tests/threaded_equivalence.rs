@@ -20,6 +20,7 @@ use telltale_vm::effect::{
 use telltale_vm::threaded::ThreadedVM;
 use telltale_vm::vm::{ObsEvent, VMConfig, VMError, VM};
 use telltale_vm::OutputConditionPolicy;
+use telltale_vm::ProgressState;
 use test_support::{
     choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,
 };
@@ -88,6 +89,37 @@ fn run_threaded(
     vm.run_concurrent(&handler, 200, 1)
         .expect("threaded run at canonical concurrency=1");
     per_session(vm.trace())
+}
+
+fn run_progress_states(
+    image: &telltale_vm::loader::CodeImage,
+) -> (
+    Vec<(String, ProgressState, Option<String>)>,
+    Vec<(String, ProgressState, Option<String>)>,
+) {
+    let handler = PassthroughHandler;
+
+    let mut coop = VM::new(VMConfig::default());
+    coop.load_choreography(image).expect("load image");
+    coop.run(&handler, 64).expect("cooperative run");
+    let coop_progress = coop
+        .semantic_objects()
+        .progress_contracts
+        .into_iter()
+        .map(|contract| (contract.operation_id, contract.state, contract.reason))
+        .collect();
+
+    let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 2);
+    threaded.load_choreography(image).expect("load image");
+    threaded.run(&handler, 64).expect("threaded run");
+    let threaded_progress = threaded
+        .semantic_objects()
+        .progress_contracts
+        .into_iter()
+        .map(|contract| (contract.operation_id, contract.state, contract.reason))
+        .collect();
+
+    (coop_progress, threaded_progress)
 }
 
 #[derive(Debug, Default)]
@@ -161,6 +193,13 @@ fn test_threaded_matches_cooperative() {
     let threaded = run_threaded(&images, workers);
 
     assert_eq!(coop, threaded, "per-session traces should match");
+}
+
+#[test]
+fn test_progress_contract_exports_match_across_drivers() {
+    let image = simple_send_recv_image("A", "B", "msg");
+    let (coop_progress, threaded_progress) = run_progress_states(&image);
+    assert_eq!(coop_progress, threaded_progress);
 }
 
 #[test]

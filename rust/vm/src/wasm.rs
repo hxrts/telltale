@@ -133,4 +133,10 @@ impl WasmVM {
         let trace = normalize_trace(self.inner.trace());
         serde_json::to_string(&trace).map_err(|e| JsValue::from_str(&e.to_string()))
     }
+
+    /// Get canonical semantic objects as JSON.
+    pub fn semantic_objects_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&self.inner.vm().semantic_objects())
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
 }

@@ -26,6 +26,7 @@ impl VM {
         self.ingest_topology_events(handler)?;
         self.prune_expired_timeouts();
         self.try_unblock_receivers();
+        self.evaluate_progress_contracts()?;
         self.ensure_ready_eligibility();
         #[cfg(debug_assertions)]
         self.debug_assert_ready_eligibility_consistent();
@@ -126,6 +127,8 @@ impl VM {
                 return Err(VMError::Fault { coro_id, fault });
             }
         }
+
+        self.evaluate_progress_contracts()?;
 
         if self.all_done() {
             #[cfg(debug_assertions)]

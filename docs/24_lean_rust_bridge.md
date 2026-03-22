@@ -194,6 +194,7 @@ machine’s semantic object family.
 - `CanonicalHandle`
 - `PublicationEvent`
 - `ProgressContract`
+- `ProgressTransition`
 
 `semantic_objects_to_json()` and `semantic_objects_from_json()` encode and
 decode the canonical schema directly. The bridge no longer treats generic
@@ -201,7 +202,8 @@ VM-state export as its primary cross-language contract.
 
 `ProtocolMachineRunOutput.semantic_objects` carries the same canonical runtime
 state used by replay export: live `OperationInstance` and `OutstandingEffect`
-objects plus the derived handoff/obligation/read/proof/publication surfaces.
+objects plus the derived handoff/obligation/read/proof/publication/progress
+surfaces.
 
 `ProtocolMachineRunOutput.effect_exchanges` is the canonical bridge-side export
 for the typed effect boundary. It carries `EffectRequest`, `EffectOutcome`, and
@@ -215,6 +217,8 @@ semantic-object payload:
 - proof-bearing success remains in `materialization_proofs`
 - strong follow-on handles remain in `canonical_handles`
 - canonical publication remains in `publication_events`
+- bounded waits, no-progress/degraded state, and timeout escalation remain in
+  `progress_contracts` / `progress_transitions`
 
 `compare_execution()` now reports handoff and invalidation agreement alongside
 trace equivalence. In addition to normalized trace comparison, callers can

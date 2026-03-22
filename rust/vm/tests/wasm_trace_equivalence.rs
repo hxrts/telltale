@@ -12,6 +12,7 @@ use telltale_vm::loader::CodeImage;
 use telltale_vm::trace::normalize_trace;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
 use telltale_vm::wasm::WasmVM;
+use telltale_vm::ProtocolMachineSemanticObjects;
 
 struct NoOpHandler;
 
@@ -73,6 +74,9 @@ fn assert_wasm_trace_matches_vm(
     wasm_vm.run(max_steps, 1).unwrap();
     let wasm_trace_json = wasm_vm.trace_normalized_json().unwrap();
     let wasm_trace: Vec<ObsEvent> = serde_json::from_str(&wasm_trace_json).unwrap();
+    let wasm_semantic_objects_json = wasm_vm.semantic_objects_json().unwrap();
+    let wasm_semantic_objects: ProtocolMachineSemanticObjects =
+        serde_json::from_str(&wasm_semantic_objects_json).unwrap();
 
     let image = CodeImage::from_local_types(&local_copy, &global);
     let handler = NoOpHandler;
@@ -80,8 +84,13 @@ fn assert_wasm_trace_matches_vm(
     vm.load_choreography(&image).unwrap();
     vm.run(&handler, max_steps).unwrap();
     let native_trace = normalize_trace(vm.trace());
+    let native_semantic_objects = vm.semantic_objects();
 
     assert_eq!(wasm_trace, native_trace);
+    assert_eq!(
+        wasm_semantic_objects.progress_contracts,
+        native_semantic_objects.progress_contracts
+    );
 }
 
 #[wasm_bindgen_test]

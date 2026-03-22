@@ -53,6 +53,8 @@ inductive PublicationStatus where
 inductive ProgressState where
   | pending
   | blocked
+  | noProgress
+  | degraded
   | succeeded
   | failed
   | cancelled
@@ -192,6 +194,19 @@ structure ProgressContract where
   state : ProgressState
   lastOrderingKey : Option Nat
   bounded : Bool
+  budgetTicks : Option Nat
+  lastProgressTick : Option Nat
+  escalatedAtTick : Option Nat
+  reason : Option String
+  deriving Repr, DecidableEq
+
+structure ProgressTransition where
+  operationId : String
+  session : Option Nat
+  fromState : ProgressState
+  toState : ProgressState
+  tick : Nat
+  reason : Option String
   deriving Repr, DecidableEq
 
 structure ProtocolMachineSemanticObjects where
@@ -205,6 +220,7 @@ structure ProtocolMachineSemanticObjects where
   canonicalHandles : List CanonicalHandle
   publicationEvents : List PublicationEvent
   progressContracts : List ProgressContract
+  progressTransitions : List ProgressTransition
   deriving Repr, DecidableEq
 
 end Runtime.VM.Model
