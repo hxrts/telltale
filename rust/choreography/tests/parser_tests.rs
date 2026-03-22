@@ -103,11 +103,11 @@ protocol Choice = {
     
     A -> B: Propose
     
-    choice at B {
-        | accept -> {
+    choice B at {
+        | accept => {
             B -> A: Accept
         }
-        | reject -> {
+        | reject => {
             B -> A: Reject
         }
     }
@@ -124,14 +124,14 @@ fn test_parse_choice_three_branches() {
 protocol ThreeWayChoice = {
     roles Client, Server
     
-    choice at Client {
-        | get -> {
+    choice Client at {
+        | get => {
             Client -> Server: Get
         }
-        | post -> {
+        | post => {
             Client -> Server: Post
         }
-        | delete -> {
+        | delete => {
             Client -> Server: Delete
         }
     }
@@ -148,19 +148,19 @@ fn test_parse_nested_choice() {
 protocol NestedChoice = {
     roles A, B, C
     
-    choice at A {
-        | path1 -> {
+    choice A at {
+        | path1 => {
             A -> B: First
-            choice at B {
-                | inner1 -> {
+            choice B at {
+                | inner1 => {
                     B -> C: InnerA
                 }
-                | inner2 -> {
+                | inner2 => {
                     B -> C: InnerB
                 }
             }
         }
-        | path2 -> {
+        | path2 => {
             A -> C: Second
         }
     }
@@ -321,8 +321,8 @@ protocol ComplexProtocol = {
     Buyer -> Seller: Inquiry
     Seller -> Buyer: Quote
     
-    choice at Buyer {
-        | order -> {
+    choice Buyer at {
+        | order => {
             Buyer -> Seller: Order
             Seller -> Shipper: ShipRequest
             Shipper -> Buyer: Tracking
@@ -335,7 +335,7 @@ protocol ComplexProtocol = {
             Shipper -> Buyer: Delivered
             Buyer -> Seller: Confirmation
         }
-        | cancel -> {
+        | cancel => {
             Buyer -> Seller: Cancel
         }
     }
@@ -394,8 +394,8 @@ fn test_error_undefined_role_in_choice() {
 protocol Invalid = {
     roles Alice
     
-    choice at Bob {
-        | opt -> {
+    choice Bob at {
+        | opt => {
             Alice -> Alice: Self
         }
     }
@@ -824,11 +824,11 @@ protocol CallInChoice = {
 
     Client -> Server: Request
     
-    choice at Server {
-        | ok -> {
+    choice Server at {
+        | ok => {
             call Success
         }
-        | error -> {
+        | error => {
             call Failure
         }
     }
@@ -937,11 +937,11 @@ fn test_parse_choice_with_guard() {
 protocol GuardExample = {
     roles Client, Server
     
-    choice at Client {
-        | buy when (balance > price) -> {
+    choice Client at {
+        | buy when (balance > price) => {
             Client -> Server: Purchase
         }
-        | cancel -> {
+        | cancel => {
             Client -> Server: Cancel
         }
     }
@@ -962,14 +962,14 @@ fn test_parse_choice_with_multiple_guards() {
 protocol MultiGuards = {
     roles A, B
     
-    choice at A {
-        | option1 when (x > 0) -> {
+    choice A at {
+        | option1 when (x > 0) => {
             A -> B: Msg1
         }
-        | option2 when (x < 0) -> {
+        | option2 when (x < 0) => {
             A -> B: Msg2
         }
-        | option3 -> {
+        | option3 => {
             A -> B: Msg3
         }
     }
@@ -990,11 +990,11 @@ fn test_parse_guard_with_complex_expression() {
 protocol ComplexGuard = {
     roles Client, Server
     
-    choice at Client {
-        | proceed when (balance >= price && is_authenticated) -> {
+    choice Client at {
+        | proceed when (balance >= price && is_authenticated) => {
             Client -> Server: Action
         }
-        | reject -> {
+        | reject => {
             Client -> Server: Reject
         }
     }
@@ -1015,19 +1015,19 @@ fn test_parse_guard_in_nested_choice() {
 protocol NestedGuard = {
     roles A, B, C
     
-    choice at A {
-        | outer when (condition1) -> {
+    choice A at {
+        | outer when (condition1) => {
             A -> B: Start
-            choice at B {
-                | inner when (condition2) -> {
+            choice B at {
+                | inner when (condition2) => {
                     B -> C: Inner
                 }
-                | fallback -> {
+                | fallback => {
                     B -> C: Fallback
                 }
             }
         }
-        | skip -> {
+        | skip => {
             A -> C: Skip
         }
     }
@@ -1295,11 +1295,11 @@ fn test_parse_parameterized_role_in_choice() {
 protocol ParameterizedChoice = {
     roles Master, Worker[N]
     
-    choice at Master {
-        | assign -> {
+    choice Master at {
+        | assign => {
             Master -> Worker[i]: Task
         }
-        | skip -> {
+        | skip => {
             Master -> Worker[0]: Skip
         }
     }

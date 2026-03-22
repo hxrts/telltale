@@ -87,18 +87,18 @@ fn demo_choice_syntax() -> Result<(), Box<dyn std::error::Error>> {
         protocol ShoppingFlow =
             roles Client, Server
 
-            choice at Client
-              | Buy ->
+            choice Client at
+              | Buy =>
                   Client
                     -> Server : Purchase of shop.Order
-              | Cancel ->
+              | Cancel =>
                   Client
                     -> Server : Cancel
     "#;
 
     let _choreo = parse_choreography_str(protocol)?;
     println!("Parsed protocol with choice branches:");
-    println!("   • Explicit decider role with 'choice at'");
+    println!("   • Explicit decider role with 'choice Role at'");
     println!("   • Labelled branches with 'label -> {{ ... }}'");
     println!();
 
@@ -271,11 +271,11 @@ fn demo_projection() -> Result<(), Box<dyn std::error::Error>> {
 
             Client
               -> Server : LoginRequest of auth.LoginRequest
-            choice at Server
-              | Success ->
+            choice Server at
+              | Success =>
                   Server
                     -> Client : AuthToken of auth.Token
-              | Failure ->
+              | Failure =>
                   Server
                     -> Client : AuthError of auth.Error
     "#;

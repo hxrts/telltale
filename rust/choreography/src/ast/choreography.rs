@@ -282,6 +282,31 @@ impl Choreography {
                     }
                     Ok(())
                 }
+                super::AuthorityExpr::Observe {
+                    effect, operation, ..
+                } => {
+                    if !used.contains(effect) {
+                        return Err(ValidationError::ExtensionError(format!(
+                            "effect invocation `{effect}.{operation}` is not allowed without `uses {effect}`"
+                        )));
+                    }
+                    let Some(ops) = effect_ops.get(effect) else {
+                        return Err(ValidationError::ExtensionError(format!(
+                            "effect invocation references undeclared interface `{effect}`"
+                        )));
+                    };
+                    let Some(op_decl) = ops.get(operation) else {
+                        return Err(ValidationError::ExtensionError(format!(
+                            "effect invocation references undeclared operation `{effect}.{operation}`"
+                        )));
+                    };
+                    if !matches!(op_decl.authority_class, EffectOpAuthorityClass::Observe) {
+                        return Err(ValidationError::ExtensionError(format!(
+                            "effect invocation `{effect}.{operation}` is not observational and may not be invoked with `observe`"
+                        )));
+                    }
+                    Ok(())
+                }
                 super::AuthorityExpr::Var(_)
                 | super::AuthorityExpr::Transfer { .. }
                 | super::AuthorityExpr::Constructor { .. }

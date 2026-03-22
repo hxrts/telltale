@@ -120,15 +120,15 @@ fn test_complex_multi_feature_protocol() {
             Database -> Workers[i]: QueryResult
             Workers[0..majority] -> Coordinator: WorkResult
 
-            choice at Coordinator {
-                | success -> {
+            choice Coordinator at {
+                | success => {
                     Coordinator -> Workers[*]: SuccessNotification
                     Coordinator -> Database: FinalizeTransaction
                 }
-                | retry -> {
+                | retry => {
                     Coordinator -> Workers[*]: RetryRequest
                 }
-                | abort -> {
+                | abort => {
                     Coordinator -> Database: AbortTransaction
                     Coordinator -> Workers[*]: AbortNotification
                 }
@@ -256,22 +256,22 @@ fn test_nested_choices() {
 
             Client -> Server: StartSession
 
-            choice at Server {
-                | authenticate -> {
+            choice Server at {
+                | authenticate => {
                     Server -> Database: AuthQuery
 
-                    choice at Database {
-                        | success -> {
+                    choice Database at {
+                        | success => {
                             Database -> Server: AuthSuccess
                             Server -> Client: AuthToken
                         }
-                        | failure -> {
+                        | failure => {
                             Database -> Server: AuthFailure
                             Server -> Client: AuthDenied
                         }
                     }
                 }
-                | reject -> {
+                | reject => {
                     Server -> Client: Rejected
                 }
             }
@@ -345,11 +345,11 @@ fn test_performance_characteristics() {
             Controller -> Workers[*]: StartWork
             Workers[0..batch_size] -> Controller: WorkComplete
 
-            choice at Controller {
-                | continue -> {
+            choice Controller at {
+                | continue => {
                     Controller -> Workers[*]: ContinueWork
                 }
-                | stop -> {
+                | stop => {
                     Controller -> Workers[*]: StopWork
                 }
             }

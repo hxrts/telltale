@@ -22,10 +22,10 @@ protocol SimpleSend =
 protocol Negotiation =
   roles Buyer, Seller
   Buyer -> Seller : Offer
-  choice at Seller
-    | accept ->
+  choice Seller at
+    | accept =>
       Seller -> Buyer : Accept
-    | reject ->
+    | reject =>
       Seller -> Buyer : Reject
 "#;
 
@@ -41,10 +41,10 @@ protocol Negotiation =
         let input = r#"
 protocol AliasChoice =
   roles A, B
-  choice at A
-    | ok ->
+  choice A at
+    | ok =>
       A -> B : Ack
-    | fail ->
+    | fail =>
       A -> B : Nack
 "#;
 
@@ -132,7 +132,7 @@ protocol DecideLoop =
         // loop decide by Client { Client -> Server: Ping; ... }
         // becomes:
         //   rec RoleDecidesLoop {
-        //       choice at Client {
+        //       choice Client at {
         //           Ping { Client -> Server: Ping; ...; continue }
         //           Done { Client -> Server: Done }
         //       }
@@ -474,10 +474,10 @@ protocol TypedLoop =
 protocol FirstIsChoice =
   roles A, B
   loop decide by A
-    choice at A
-      | opt1 ->
+    choice A at
+      | opt1 =>
         A -> B : Msg1
-      | opt2 ->
+      | opt2 =>
         A -> B : Msg2
 "#;
 

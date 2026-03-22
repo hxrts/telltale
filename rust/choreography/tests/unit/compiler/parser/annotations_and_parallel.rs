@@ -253,11 +253,11 @@ protocol SingleBranch =
 protocol TimedRequest =
   roles Alice, Bob
   Alice -> Bob : Request
-  timed_choice at Alice(5s) {
-    | OnTime -> {
+  timed_choice Alice at(5s) {
+    | OnTime => {
       Bob -> Alice : Response
     }
-    | TimedOut -> {
+    | TimedOut => {
       Alice -> Bob : Cancel
     }
   }
@@ -303,11 +303,11 @@ protocol TimedRequest =
         let input = r#"
 protocol QuickTimeout =
   roles Client, Server
-  timed_choice at Client(500ms) {
-    | Fast -> {
+  timed_choice Client at(500ms) {
+    | Fast => {
       Server -> Client : Data
     }
-    | Slow -> {
+    | Slow => {
       Client -> Server : Abort
     }
   }
@@ -338,11 +338,11 @@ protocol QuickTimeout =
         let input = r#"
 protocol LongTimeout =
   roles A, B
-  timed_choice at A(2m) {
-    | Done -> {
+  timed_choice A at(2m) {
+    | Done => {
       B -> A : Complete
     }
-    | Expired -> {
+    | Expired => {
       A -> B : Timeout
     }
   }
@@ -392,7 +392,7 @@ protocol Liveness =
             Protocol::Rec { label, body } => {
                 assert_eq!(label.to_string(), "HeartbeatLoop");
 
-                // Inside: Sender -> Receiver: Heartbeat; choice at Receiver { ... }
+                // Inside: Sender -> Receiver: Heartbeat; choice Receiver at { ... }
                 match body.as_ref() {
                     Protocol::Send {
                         from,
@@ -597,10 +597,10 @@ protocol Broadcast =
         let input = r#"
 protocol Decision =
   roles A, B
-  choice at A
-    | Accept ->
+  choice A at
+    | Accept =>
         A -> B : Ok
-    | Reject ->
+    | Reject =>
         A -> B : No
 "#;
 

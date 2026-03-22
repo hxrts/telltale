@@ -183,6 +183,11 @@ pub(crate) enum AuthorityExprSpec {
         operation: String,
         args: Vec<String>,
     },
+    Observe {
+        effect: String,
+        operation: String,
+        args: Vec<String>,
+    },
     Transfer {
         subject: String,
         from: String,

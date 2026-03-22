@@ -147,6 +147,15 @@ fn convert_authority_expr(expr: &AuthorityExprSpec) -> AuthorityExpr {
             operation: operation.clone(),
             args: args.clone(),
         },
+        AuthorityExprSpec::Observe {
+            effect,
+            operation,
+            args,
+        } => AuthorityExpr::Observe {
+            effect: effect.clone(),
+            operation: operation.clone(),
+            args: args.clone(),
+        },
         AuthorityExprSpec::Transfer { subject, from, to } => AuthorityExpr::Transfer {
             subject: subject.clone(),
             from: from.clone(),
@@ -382,7 +391,7 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
             // Heartbeat desugars to recursive choice with liveness detection:
             //   rec HeartbeatLoop {
             //       Sender -> Receiver: Heartbeat;
-            //       choice at Receiver {
+            //       choice Receiver at {
             //           Alive { body; continue HeartbeatLoop }
             //           Dead { on_missing_body }
             //       }
@@ -454,7 +463,7 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
             //   loop decide by Client { Client -> Server: Request; ... }
             // becomes:
             //   rec RoleDecidesLoop {
-            //       choice at Client {
+            //       choice Client at {
             //           Request { Client -> Server: Request; ...; continue RoleDecidesLoop }
             //           Done { Client -> Server: Done }
             //       }
@@ -528,7 +537,7 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                             protocol: done_branch_protocol,
                         };
 
-                        // Build the choice at the deciding role
+                        // Build the choice the at deciding role
                         let choice = Protocol::Choice {
                             role: deciding_role.clone(),
                             branches: NonEmptyVec::from_head_tail(

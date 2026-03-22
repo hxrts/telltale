@@ -11,19 +11,21 @@ It is intentionally narrower than a full generalized effect language.
 
 Top-level declarations:
 
-- `type Name | Ctor | Ctor of Payload`
+- `type Name = | Ctor | Ctor(Payload)`
 - `type alias Name = { ... }`
-- `effect Runtime { authoritative ready : Session -> Result CommitError ReadyWitness }`
+- `effect Runtime`
+- `  authoritative ready : Session -> Result CommitError ReadyWitness`
 - `protocol Flow uses Runtime, Audit = ...`
 
 Protocol-local forms:
 
 - `let binding = check Runtime.op(args)`
+- `let binding = observe Effect.op(args)`
 - `let receipt = transfer Session from A to B`
-- `let binding = ... in { ... }`
-- `case expr of { | Ok witness -> { ... } | Err reason -> { ... } }`
-- `timeout 5s at Coordinator { ... } on timeout { ... } on cancel { ... }`
-- `choice at Coordinator { | Commit when check Runtime.ready(session) yields witness -> { ... } }`
+- `let binding = ... in ...`
+- `case expr of | Ok(value) => ... | Err(reason) => ...`
+- `timeout 5s Coordinator at ... on timeout => ... on cancel => ...`
+- `choice Coordinator at | Commit when check Runtime.ready(session) yields witness => ...`
 
 ## Review Sketches
 
@@ -47,8 +49,8 @@ This is the smallest effect declaration plus dependency declaration that the lan
 
 ```tell
 case check Runtime.ready(session) of
-  | Ok witness -> ...
-  | Err reason -> ...
+  | Ok(witness) => ...
+  | Err(reason) => ...
 ```
 
 This is the canonical typed branching form for authority checks.
@@ -57,8 +59,8 @@ This is the canonical typed branching form for authority checks.
 
 ```tell
 case maybeReceipt of
-  | Just receipt -> ...
-  | Nothing -> ...
+  | Just(receipt) => ...
+  | Nothing => ...
 ```
 
 This keeps absence explicit instead of falling back to implicit defaults.
@@ -83,11 +85,11 @@ Ordinary `let` syntax is the only binding form used for receipts and other autho
 ### Timeout and Cancellation
 
 ```tell
-timeout 5s at Coordinator
+timeout 5s Coordinator at
   Worker -> Coordinator : Ready
-on timeout
+on timeout =>
   Coordinator -> Worker : Cancel
-on cancel
+on cancel =>
   Coordinator -> Worker : Cancelled
 ```
 
@@ -96,8 +98,8 @@ Timeout and cancellation are explicit protocol branches, not host-only control f
 ### Evidence Guard
 
 ```tell
-choice at Coordinator
-  | Commit when check Runtime.ready(session) yields witness -> ...
+choice Coordinator at
+  | Commit when check Runtime.ready(session) yields witness => ...
 ```
 
 Evidence guards bind the witness directly at the branch point that authorizes the action.
@@ -117,8 +119,8 @@ Transfers produce linear values that the compiler requires to be consumed exactl
 let decision = check Runtime.ready(session)
 in
 case decision of
-  | Ok witness -> ...
-  | Err reason -> ...
+  | Ok(witness) => ...
+  | Err(reason) => ...
 ```
 
 `let ... in ...` keeps small authority decisions local instead of pushing them into host callbacks.
@@ -127,8 +129,8 @@ case decision of
 
 ```tell
 case readiness of
-  | Ok witness -> ...
-  | Err reason -> ...
+  | Ok(witness) => ...
+  | Err(reason) => ...
 ```
 
 Protocol-critical matches must be exhaustive, and implicit catch-all masking is rejected.
@@ -162,6 +164,7 @@ Current linear classification:
 
 - `transfer ...` bindings are linear
 - `check ...` bindings are not linear by default
+- `observe ...` bindings are not linear and may not be used where authoritative evidence is required
 
 Current linear rules:
 
@@ -188,6 +191,7 @@ Current validation rules:
   - effects named in `uses`
   - operations declared on those effects
 - `check Effect.op(...)` may not target `observe` operations
+- `observe Effect.op(...)` may reference only observational operations
 
 This is the current clean-break contract.
 There is no fallback to implicit host knowledge.
@@ -211,6 +215,8 @@ Current contract:
 
 - the protocol must declare the effect in `uses`
 - the operation must exist on the named nominal interface
+- `check` is for authoritative or command operations
+- `observe` is for observational operations
 - lowering stays centered on the existing VM `invoke` boundary
 - effect observations keep the nominal interface and operation identity for
   replay/audit surfaces

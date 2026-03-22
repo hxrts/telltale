@@ -299,14 +299,26 @@ pub(super) fn parse_type_decl(
                 .as_str()
                 .to_string();
             let constructors = union_inner
-                .filter(|p| p.as_rule() == Rule::union_ctor_decl)
+                .flat_map(|p| match p.as_rule() {
+                    Rule::union_ctor_decl => vec![p],
+                    Rule::union_ctor_block => p
+                        .into_inner()
+                        .filter(|inner| inner.as_rule() == Rule::union_ctor_decl)
+                        .collect(),
+                    _ => Vec::new(),
+                })
                 .map(|ctor| {
                     let mut ctor_inner = ctor.into_inner();
                     let name = ctor_inner
                         .next()
                         .map(|p| p.as_str().to_string())
                         .unwrap_or_default();
-                    let payload_type = ctor_inner.next().map(|p| p.as_str().trim().to_string());
+                    let payload_type = ctor_inner.next().map(|p| {
+                        p.into_inner()
+                            .next()
+                            .map(|inner| inner.as_str().trim().to_string())
+                            .unwrap_or_default()
+                    });
                     TypeConstructorDecl { name, payload_type }
                 })
                 .collect();

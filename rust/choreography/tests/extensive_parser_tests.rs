@@ -461,11 +461,11 @@ mod feature_inheritance_tests {
             protocol ChoiceExample = {
                 roles Alice, Bob, Charlie
 
-                choice at Alice {
-                    | path1 -> {
+                choice Alice at {
+                    | path1 => {
                         Alice -> Bob: Request
                     }
-                    | path2 -> {
+                    | path2 => {
                         Alice -> Charlie: Alternative
                     }
                 }
@@ -586,15 +586,15 @@ mod feature_inheritance_tests {
             protocol ComplexExample = {
                 roles Coordinator, Worker[N], Client
 
-                choice at Coordinator {
-                    | distribute -> {
+                choice Coordinator at {
+                    | distribute => {
                         loop forever {
                             Coordinator -> Worker[*]: Task
                             Worker[*] -> Coordinator: Result
                         }
                         Coordinator -> Client: Summary
                     }
-                    | direct -> {
+                    | direct => {
                         Coordinator -> Client: DirectResponse
                     }
                 }
@@ -689,11 +689,11 @@ mod standard_syntax_tests {
             r#"
                 protocol Test2 = {
                     roles X, Y, Z
-                    choice at X {
-                        | opt1 -> {
+                    choice X at {
+                        | opt1 => {
                             X -> Y: Option1
                         }
-                        | opt2 -> {
+                        | opt2 => {
                             X -> Z: Option2
                         }
                     }
@@ -1126,11 +1126,11 @@ mod regression_tests {
             protocol Regression1 = {
                 roles Worker[N], Coordinator
 
-                choice at Coordinator {
-                    | parallel -> {
+                choice Coordinator at {
+                    | parallel => {
                         Worker[*] -> Coordinator: Status
                     }
-                    | sequential -> {
+                    | sequential => {
                         Worker[0] -> Coordinator: FirstStatus
                         Worker[1] -> Coordinator: SecondStatus
                     }
@@ -1157,20 +1157,20 @@ mod regression_tests {
             protocol NestedExample = {
                 roles A, B, C
 
-                choice at A {
-                    | path1 -> {
+                choice A at {
+                    | path1 => {
                         loop forever {
-                            choice at B {
-                                | continue -> {
+                            choice B at {
+                                | continue => {
                                     B -> A: Continue
                                 }
-                                | stop -> {
+                                | stop => {
                                     B -> A: Stop
                                 }
                             }
                         }
                     }
-                    | path2 -> {
+                    | path2 => {
                         A -> C: Direct
                     }
                 }

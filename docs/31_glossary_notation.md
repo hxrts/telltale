@@ -55,7 +55,7 @@ It serves as the stable lookup for terminology and notation.
 | `let x = check Effect.op(args)` | Typed external query binding that later lowers to the VM effect boundary. | [Choreographic DSL](06_choreographic_dsl.md), [Authority Language Surface](34_authority_language_surface.md) |
 | `effect Name` | Nominal effect-interface declaration. | [Authority Language Surface](34_authority_language_surface.md) |
 | `protocol P uses Runtime, Audit` | Protocol declaration naming its allowed effect interfaces. | [Authority Language Surface](34_authority_language_surface.md) |
-| `timeout 5s at R ... on timeout ... on cancel ...` | Protocol-visible timeout and cancellation branch form. | [Choreographic DSL](06_choreographic_dsl.md), [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) |
+| `timeout 5s R at ... on timeout => ... on cancel => ...` | Protocol-visible timeout and cancellation branch form. | [Choreographic DSL](06_choreographic_dsl.md), [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) |
 
 ## Notation Consistency Rules
 

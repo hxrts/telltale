@@ -5,7 +5,7 @@ protocol CommitFlow uses Runtime =
   roles Coordinator, Worker
   let readiness = check Runtime.lookup(session)
   case readiness of
-    | Ok witness ->
+    | Ok(witness) =>
         Coordinator -> Worker : Commit(witness)
-    | Err reason ->
+    | Err(reason) =>
         Coordinator -> Worker : Retry(reason)

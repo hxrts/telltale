@@ -259,13 +259,13 @@ mod tests {
 
     #[test]
     fn layout_handles_choice_and_branch_blocks() {
-        let input = "protocol Test =\n  roles A, B\n  choice at A\n    | Buy ->\n        A -> B : Msg\n    | Cancel -> {}\n";
+        let input = "protocol Test =\n  roles A, B\n  choice A at\n    | Buy =>\n        A -> B : Msg\n    | Cancel => {}\n";
         let out = preprocess_layout(input).unwrap();
         let normalized = out.split_whitespace().collect::<Vec<_>>().join(" ");
-        assert!(normalized.contains("choice at A"));
-        assert!(normalized.contains("{ | Buy ->"));
+        assert!(normalized.contains("choice A at"));
+        assert!(normalized.contains("{ | Buy =>"));
         assert!(normalized.contains("{ A -> B"));
-        assert!(normalized.contains("} | Cancel -> {}"));
+        assert!(normalized.contains("} | Cancel => {}"));
     }
 
     #[test]
@@ -281,10 +281,10 @@ mod tests {
 
     #[test]
     fn layout_allows_empty_blocks_only_with_braces() {
-        let input = "protocol Test =\n  roles A, B\n  choice at A\n    | Cancel -> {}\n";
+        let input = "protocol Test =\n  roles A, B\n  choice A at\n    | Cancel => {}\n";
         let out = preprocess_layout(input).unwrap();
         let normalized = out.split_whitespace().collect::<Vec<_>>().join(" ");
-        assert!(normalized.contains("Cancel -> {}"));
+        assert!(normalized.contains("Cancel => {}"));
     }
 
     #[test]

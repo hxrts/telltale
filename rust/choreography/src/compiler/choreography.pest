@@ -45,8 +45,10 @@ protocol_uses = { "uses" ~ ident ~ ("," ~ ident)* }
 
 type_decl = { type_alias_decl | union_type_decl }
 type_alias_decl = { "type" ~ "alias" ~ ident ~ "=" ~ type_expr }
-union_type_decl = { "type" ~ ident ~ union_ctor_decl+ }
-union_ctor_decl = { "|" ~ ident ~ ("of" ~ type_expr)? }
+union_type_decl = { "type" ~ ident ~ "=" ~ union_ctor_block }
+union_ctor_block = { union_ctor_decl+ | "{" ~ union_ctor_decl+ ~ "}" | "(" ~ union_ctor_decl+ ~ ")" }
+union_ctor_decl = { "|" ~ ident ~ ctor_type_payload? }
+ctor_type_payload = { "(" ~ type_expr ~ ")" }
 
 effect_decl = { "effect" ~ ident ~ effect_body }
 effect_body = { "{" ~ effect_op_decl+ ~ "}" | effect_op_decl+ }
@@ -114,20 +116,23 @@ let_in_stmt = { "let" ~ ident ~ "=" ~ authority_expr ~ "in" ~ block }
 let_stmt = { "let" ~ ident ~ "=" ~ authority_expr }
 case_stmt = { "case" ~ authority_expr ~ "of" ~ case_block }
 case_block = { "{" ~ case_branch+ ~ "}" | "(" ~ case_branch+ ~ ")" }
-case_branch = { "|" ~ match_pattern ~ "->" ~ block }
-match_pattern = { ident ~ ident* }
+case_branch = { "|" ~ match_pattern ~ "=>" ~ branch_body }
+match_pattern = { ident ~ match_pattern_payload? }
+match_pattern_payload = { "(" ~ ident ~ ("," ~ ident)* ~ ")" }
 
 timeout_stmt = {
-    "timeout" ~ duration ~ "at" ~ role_ref ~ block
-    ~ "on" ~ "timeout" ~ block
-    ~ ("on" ~ "cancel" ~ block)?
+    "timeout" ~ duration ~ role_ref ~ "at" ~ block
+    ~ "on" ~ "timeout" ~ "=>" ~ branch_body
+    ~ ("on" ~ "cancel" ~ "=>" ~ branch_body)?
 }
 
-authority_expr = { check_expr | transfer_expr | result_ctor_expr | maybe_ctor_expr | call_expr | ident_expr }
+authority_expr = { check_expr | observe_expr | transfer_expr | result_ctor_expr | maybe_ctor_expr | call_expr | ident_expr }
 check_expr = { "check" ~ effect_call }
+observe_expr = { "observe" ~ effect_call }
 transfer_expr = { "transfer" ~ ident ~ "from" ~ role_ref ~ "to" ~ role_ref }
-result_ctor_expr = { ("Ok" | "Err") ~ ident_expr? }
-maybe_ctor_expr = { ("Just" ~ ident_expr) | "Nothing" }
+result_ctor_expr = { ("Ok" | "Err") ~ ctor_value_payload? }
+maybe_ctor_expr = { ("Just" ~ ctor_value_payload) | "Nothing" }
+ctor_value_payload = { "(" ~ ident_expr ~ ")" }
 effect_call = { ident ~ "." ~ ident ~ "(" ~ argument_list? ~ ")" }
 call_expr = { ident ~ "(" ~ argument_list? ~ ")" }
 argument_list = { authority_atom ~ ("," ~ authority_atom)* }
@@ -135,8 +140,8 @@ authority_atom = { effect_call | ident_expr | string | integer }
 ident_expr = { ident ~ ("." ~ ident)* }
 
 // Timed choice statement - desugars to choice with timeout annotation
-// Syntax: timed_choice at Alice(5s) { OnTime { ... } TimedOut { ... } }
-timed_choice_stmt = { "timed_choice" ~ "at" ~ role_ref ~ "(" ~ duration ~ ")" ~ choice_block }
+// Syntax: timed_choice Alice at(5s) { OnTime { ... } TimedOut { ... } }
+timed_choice_stmt = { "timed_choice" ~ role_ref ~ "at" ~ "(" ~ duration ~ ")" ~ choice_block }
 duration = { integer ~ time_unit }
 time_unit = { "ms" | "s" | "m" | "h" }
 
@@ -188,10 +193,10 @@ range_expr = { (integer | ident) ~ ".." ~ (integer | ident) }
 
 // Choice statement
 choice_stmt = { choice_head ~ choice_block }
-choice_head = { "choice" ~ "at" ~ role_ref }
+choice_head = { "choice" ~ role_ref ~ "at" }
 choice_block = { block_choice }
 block_choice = { "{" ~ choice_branch+ ~ "}" | "(" ~ choice_branch+ ~ ")" }
-choice_branch = { "|" ~ ident ~ guard? ~ "->" ~ block }
+choice_branch = { "|" ~ ident ~ guard? ~ "=>" ~ branch_body }
 
 // Parallel block with bar-prefixed branches
 par_stmt = { "par" ~ par_block }
@@ -218,6 +223,7 @@ rec_stmt = { "rec" ~ ident ~ block }
 
 // Block
 block = { "{" ~ statement* ~ "}" | "(" ~ statement+ ~ ")" }
+branch_body = { block | statement }
 
 // Message specification
 message = { ident ~ message_of? ~ payload? }

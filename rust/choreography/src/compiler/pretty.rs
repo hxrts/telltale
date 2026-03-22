@@ -125,13 +125,13 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
             write_line(
                 out,
                 indent,
-                &format!("timeout {}ms at {}", duration_ms, format_role_ref(role)),
+                &format!("timeout {}ms {} at", duration_ms, format_role_ref(role)),
             );
             format_protocol(body, indent + config.indent, config, out);
-            write_line(out, indent, "on timeout");
+            write_line(out, indent, "on timeout =>");
             format_protocol(on_timeout, indent + config.indent, config, out);
             if let Some(on_cancel) = on_cancel.as_deref() {
-                write_line(out, indent, "on cancel");
+                write_line(out, indent, "on cancel =>");
                 format_protocol(on_cancel, indent + config.indent, config, out);
             }
         }
@@ -201,7 +201,7 @@ fn format_choice_protocol(
     config: &PrettyConfig,
     out: &mut String,
 ) {
-    write_line(out, indent, &format!("choice at {}", format_role_ref(role)));
+    write_line(out, indent, &format!("choice {} at", format_role_ref(role)));
     for branch in branches {
         format_branch(branch, indent + config.indent, config, out);
     }
@@ -273,9 +273,9 @@ fn format_branch(branch: &Branch, indent: usize, config: &PrettyConfig, out: &mu
     }
 
     if is_end(&branch.protocol) {
-        write_line(out, indent, &format!("{} -> {{}}", header));
+        write_line(out, indent, &format!("{} => {{}}", header));
     } else {
-        write_line(out, indent, &format!("{} ->", header));
+        write_line(out, indent, &format!("{} =>", header));
         format_protocol(&branch.protocol, indent + config.indent, config, out);
     }
 }
@@ -284,11 +284,11 @@ fn format_case_branch(branch: &CaseBranch, indent: usize, config: &PrettyConfig,
     let binders = if branch.pattern.binders.is_empty() {
         String::new()
     } else {
-        format!(" {}", branch.pattern.binders.join(" "))
+        format!("({})", branch.pattern.binders.join(", "))
     };
-    let header = format!("| {}{} ->", branch.pattern.constructor, binders);
+    let header = format!("| {}{} =>", branch.pattern.constructor, binders);
     if is_end(&branch.protocol) {
-        write_line(out, indent, &format!("{} {{}}", header));
+        write_line(out, indent, &format!("{header} {{}}"));
     } else {
         write_line(out, indent, &header);
         format_protocol(&branch.protocol, indent + config.indent, config, out);
@@ -325,11 +325,16 @@ fn format_authority_expr(expr: &AuthorityExpr) -> String {
             operation,
             args,
         } => format!("check {}.{}({})", effect, operation, args.join(", ")),
+        AuthorityExpr::Observe {
+            effect,
+            operation,
+            args,
+        } => format!("observe {}.{}({})", effect, operation, args.join(", ")),
         AuthorityExpr::Transfer { subject, from, to } => {
             format!("transfer {} from {} to {}", subject, from, to)
         }
         AuthorityExpr::Constructor { name, arg } => match arg {
-            Some(arg) => format!("{name} {arg}"),
+            Some(arg) => format!("{name}({arg})"),
             None => name.clone(),
         },
         AuthorityExpr::Call { name, args } => format!("{name}({})", args.join(", ")),
@@ -458,18 +463,18 @@ mod tests {
         let input = r#"
 protocol Demo =
   roles Client, Server
-  choice at Client
-    | Buy ->
+  choice Client at
+    | Buy =>
       Client -> Server : Purchase
-    | Cancel -> {}
+    | Cancel => {}
   loop repeat 2
     Client -> Server : Ping
     Server -> Client : Pong
 "#;
         let choreo = parse_choreography_str(input).expect("should parse");
         let formatted = format_choreography(&choreo);
-        assert!(formatted.contains("choice at Client"));
-        assert!(formatted.contains("| Buy ->"));
+        assert!(formatted.contains("choice Client at"));
+        assert!(formatted.contains("| Buy =>"));
         assert!(parse_choreography_str(&formatted).is_ok());
     }
 

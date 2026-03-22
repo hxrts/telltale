@@ -9,7 +9,9 @@ Empty blocks must use `{}`. The DSL does not use an explicit `end` keyword. A pr
 The preferred surface style mixes MPST operators with a small functional-language layout:
 
 - keep `->`, `->*`, `|`, `rec`, and `continue` for protocol structure
+- reserve `=>` for branch/result bodies
 - use indentation to make control flow visually obvious
+- keep braces for record/data layout instead of general structural blocks
 - use sender records like `Role { priority = high }`
 - use `Message of module.Type` with dotted paths instead of Rust-style `::`
 
@@ -54,15 +56,14 @@ This form passes the DSL as a string literal.
 
 ```rust
 choreography! {
-  protocol PingPong = {
-    roles Alice, Bob;
-    Alice -> Bob : Ping;
-    Bob -> Alice : Pong;
-  }
+  protocol PingPong =
+    roles Alice, Bob
+    Alice -> Bob : Ping
+    Bob -> Alice : Pong
 }
 ```
 
-This form passes the DSL as normal macro tokens. Semicolons are treated as statement separators. Composite operators are normalized for DSL parsing.
+This form passes the DSL as normal macro tokens. Semicolons are still normalized when present, but the canonical surface is indentation-based rather than brace-block-based.
 
 ### Namespaces
 
@@ -107,11 +108,11 @@ Broadcast sends a message to all other roles.
 #### 3) Choice Statement (explicit decider)
 
 ```tell
-choice at Client
-  | Buy when (balance > price) ->
+choice Client at
+  | Buy when (balance > price) =>
       Client
         -> Server : Purchase of shop.Order
-  | Cancel ->
+  | Cancel =>
       Client
         -> Server : Cancel
 ```
@@ -135,7 +136,7 @@ The example above desugars to:
 
 ```tell
 rec RoleDecidesLoop
-  choice at Client
+  choice Client at
     Request ->
       Client -> Server : Request
       Server -> Client : Response
@@ -178,12 +179,10 @@ This loop has no exit condition. Use it for persistent background protocols.
 
 ```tell
 par
-  | A
-      -> B : Msg1
+  | A -> B : Msg1
     B
       -> A : Ack
-  | C
-      -> D : Msg2
+  | C -> D : Msg2
 ```
 
 Parallel composition is expressed by `par` with leading `|` branches. A solitary branch is a parse error.
@@ -290,18 +289,11 @@ A timed choice races an operation against a timeout deadline:
 
 ```tell
 protocol TimedRequest =
-{
   roles Client, Server
   Client -> Server : Request
-  timed_choice at Client(5s) {
-    | OnTime -> {
-      Server -> Client : Response
-    }
-    | TimedOut -> {
-      Client -> Server : Cancel
-    }
-  }
-}
+  timed_choice Client at(5s)
+    | OnTime => Server -> Client : Response
+    | TimedOut => Client -> Server : Cancel
 ```
 
 This desugars to a standard `Choice` with a `TimedChoice { duration }` annotation. The timeout is enforced at runtime by the effect interpreter.
@@ -328,7 +320,7 @@ This desugars to a recursive choice:
 ```tell
 rec HeartbeatLoop
   Alice -> Bob : Heartbeat
-  choice at Bob
+  choice Bob at
     Alive ->
       // body
       Alice -> Bob : Ping
@@ -418,9 +410,9 @@ Only declared effects named in `uses` may be referenced by `check`.
 let readiness = check Runtime.ready(session)
 in
 case readiness of
-  | Ok witness ->
-      Coordinator -> Worker : Commit of witness
-  | Err TimedOut ->
+  | Ok(witness) =>
+      Coordinator -> Worker : Commit(witness)
+  | Err(TimedOut) =>
       Coordinator -> Worker : Cancel
 ```
 
@@ -456,11 +448,11 @@ authority-binding syntax beyond normal expression binding.
 ##### Typed Timeout and Cancellation Blocks
 
 ```tell
-timeout 5s at Coordinator
-  Worker -> Coordinator : Ready of ReadyWitness
-on timeout
+timeout 5s Coordinator at
+  Worker -> Coordinator : Ready(readyWitness)
+on timeout =>
   Coordinator -> Worker : Cancel
-on cancel
+on cancel =>
   Coordinator -> Worker : Cancelled
 ```
 
@@ -470,10 +462,10 @@ protocol-visible outcomes rather than ambient runtime metadata.
 ##### Evidence Guards
 
 ```tell
-choice at Coordinator
-  | Commit when check Runtime.ready(session) yields witness ->
-      Coordinator -> Worker : Commit of witness
-  | Abort ->
+choice Coordinator at
+  | Commit when check Runtime.ready(session) yields witness =>
+      Coordinator -> Worker : Commit(witness)
+  | Abort =>
       Coordinator -> Worker : Abort
 ```
 
@@ -495,14 +487,14 @@ compiler rejects duplicate use and implicit discard.
 ```tell
 let decision =
   case check Runtime.ready(session) of
-    | Ok witness -> Commit witness
-    | Err reason -> Abort reason
+    | Ok(witness) => Commit(witness)
+    | Err(reason) => Abort(reason)
 in
 case decision of
-  | Commit witness ->
-      Coordinator -> Worker : Commit of witness
-  | Abort reason ->
-      Coordinator -> Worker : Abort of reason
+  | Commit(witness) =>
+      Coordinator -> Worker : Commit(witness)
+  | Abort(reason) =>
+      Coordinator -> Worker : Abort(reason)
 ```
 
 Local helper expressions keep authority logic readable without pushing that
@@ -512,8 +504,8 @@ logic back into untyped host code.
 
 ```tell
 case check Runtime.ready(session) of
-  | Ok witness -> ...
-  | Err TimedOut -> ...
+  | Ok(witness) => ...
+  | Err(TimedOut) => ...
 ```
 
 Protocol-critical authority flows do not allow implicit wildcard/default
@@ -767,11 +759,11 @@ protocol Negotiation =
   Buyer
     -> Seller : Offer
 
-  choice at Seller
-    | Accept ->
+  choice Seller at
+    | Accept =>
         Seller
           -> Buyer : Accept
-    | Reject ->
+    | Reject =>
         Seller
           -> Buyer : Reject
 ```
@@ -789,8 +781,8 @@ protocol ECommerce =
   Seller
     -> Buyer : Quote of commerce.Quote
 
-  choice at Buyer
-    | Order ->
+  choice Buyer at
+    | Order =>
         Buyer
           -> Seller : Order of commerce.Order
         Seller
@@ -808,7 +800,7 @@ protocol ECommerce =
           -> Buyer : Delivered
         Buyer
           -> Seller : Confirmation
-    | Cancel ->
+    | Cancel =>
         Buyer
           -> Seller : Cancel
 ```
@@ -821,10 +813,8 @@ This example combines choice and looping. It models a longer interaction with a 
 protocol ParallelDemo =
   roles A, B, C, D
   par
-    | A
-        -> B : Msg1
-    | C
-        -> D : Msg2
+    | A -> B : Msg1
+    | C -> D : Msg2
 ```
 
 This example uses `par` with leading `|` branches. Each branch defines a parallel sub protocol.

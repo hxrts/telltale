@@ -127,7 +127,7 @@ fn render_lowering_protocol(protocol: &Protocol, depth: usize, out: &mut String)
             render_lowering_protocol(continuation, depth + 1, out);
         }
         Protocol::Choice { role, branches, .. } => {
-            writeln!(out, "{indent}- choice at {}", role.name()).unwrap();
+            writeln!(out, "{indent}- choice {} at", role.name()).unwrap();
             for branch in branches {
                 writeln!(out, "{indent}  branch {}", branch.label).unwrap();
                 render_lowering_protocol(&branch.protocol, depth + 2, out);

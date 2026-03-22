@@ -460,6 +460,7 @@ fn count_expr_uses(expr: &super::types::AuthorityExprSpec, name: &str) -> usize 
     match expr {
         super::types::AuthorityExprSpec::Var(var) => usize::from(var == name),
         super::types::AuthorityExprSpec::Check { args, .. }
+        | super::types::AuthorityExprSpec::Observe { args, .. }
         | super::types::AuthorityExprSpec::Call { args, .. } => args
             .iter()
             .map(|arg| arg.split(name).count().saturating_sub(1))

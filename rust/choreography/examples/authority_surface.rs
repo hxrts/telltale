@@ -2,7 +2,9 @@ use telltale_choreography::compiler::parser::parse_choreography_str;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = r#"
-type CommitError | NotReady | TimedOut
+type CommitError =
+  | NotReady
+  | TimedOut
 
 type alias ReadyWitness = { epoch : Int, issuedBy : Role }
 
@@ -15,27 +17,21 @@ effect Audit
   observe record : AuditEvent -> Unit
 
 protocol CommitFlow uses Runtime, Audit =
-  {
-    roles Coordinator, Worker, Client
-    let readiness = check Runtime.ready(session)
-    case readiness of {
-      | Ok witness -> {
+  roles Coordinator, Worker, Client
+  let readiness = check Runtime.ready(session)
+  case readiness of
+    | Ok(witness) =>
         Coordinator -> Worker : Commit(witness)
-      }
-      | Err reason -> {
+    | Err(reason) =>
         Coordinator -> Client : Retry(reason)
-      }
-    }
-    let receipt = transfer Session from Coordinator to Worker
-    Worker -> Client : TransferAccepted(receipt)
-    timeout 5s at Coordinator {
-      Worker -> Coordinator : Ready
-    } on timeout {
-      Coordinator -> Worker : Cancel
-    } on cancel {
-      Coordinator -> Client : Cancelled
-    }
-  }
+  let receipt = transfer Session from Coordinator to Worker
+  Worker -> Client : TransferAccepted(receipt)
+  timeout 5s Coordinator at
+    Worker -> Coordinator : Ready
+  on timeout =>
+    Coordinator -> Worker : Cancel
+  on cancel =>
+    Coordinator -> Client : Cancelled
 "#;
 
     let choreography = parse_choreography_str(input)?;

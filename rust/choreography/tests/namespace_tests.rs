@@ -261,20 +261,20 @@ protocol ComplexProtocol = {
     Coordinator -> Worker1: Task
     Coordinator -> Worker2: Task
     
-    choice at Worker1 {
-        | success -> {
+    choice Worker1 at {
+        | success => {
             Worker1 -> Coordinator: Success
         }
-        | failure -> {
+        | failure => {
             Worker1 -> Coordinator: Failure
         }
     }
     
-    choice at Worker2 {
-        | success -> {
+    choice Worker2 at {
+        | success => {
             Worker2 -> Coordinator: Success
         }
-        | failure -> {
+        | failure => {
             Worker2 -> Coordinator: Failure
         }
     }

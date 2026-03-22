@@ -248,10 +248,10 @@ protocol DuplicateBundle requires Core =
         let input = r#"
 protocol GuardTypeCheck =
   roles A, B
-  choice at A
-    | ok when (count + 1) ->
+  choice A at
+    | ok when (count + 1) =>
       A -> B : Ack
-    | no ->
+    | no =>
       A -> B : Nack
 "#;
 
@@ -363,10 +363,10 @@ protocol LinearDoubleConsume =
 protocol LinearBranchDivergence =
   roles A, B
   acquire guard as token
-  choice at A
-    | consume ->
+  choice A at
+    | consume =>
       release guard using token
-    | keep ->
+    | keep =>
       A -> B : Skip
 "#;
 
@@ -515,10 +515,10 @@ protocol ExplainMe =
         let input = r#"
 protocol PredicateTyping =
   roles A, B
-  choice at A
-    | ok when (if ready { true } else { false }) ->
+  choice A at
+    | ok when (if ready { true } else { false }) =>
       A -> B : Accept
-    | no ->
+    | no =>
       A -> B : Reject
 "#;
 
@@ -592,10 +592,8 @@ protocol ReplicatedWrite =
   Client { priority = high }
     -> Leader : Put of kv.Write
   par
-    | Leader { shard = 0 }
-        -> Replica0 : Replicate of kv.Write
-    | Leader { shard = 1 }
-        -> Replica1 : Replicate of kv.Write
+    | Leader { shard = 0 } -> Replica0 : Replicate of kv.Write
+    | Leader { shard = 1 } -> Replica1 : Replicate of kv.Write
 "#
         };
 
@@ -628,11 +626,11 @@ protocol ReplicatedWrite =
                 roles A, B, C, D;
                 par {
                     | {
-                        choice at A {
-                            | Accept -> {
+                        choice A at {
+                            | Accept => {
                                 A -> B : Ok;
                             }
-                            | Reject -> {
+                            | Reject => {
                                 A -> B : No;
                             }
                         }

@@ -3,7 +3,9 @@ use crate::compiler::parser::parse_choreography_str;
 #[test]
 fn test_parse_authority_surface_with_effects_types_and_uses() {
     let input = r#"
-type CommitError | NotReady | TimedOut
+type CommitError =
+  | NotReady
+  | TimedOut
 
 type alias ReadyWitness = { epoch : Int, issuedBy : Role }
 
@@ -19,25 +21,25 @@ protocol CommitFlow uses Runtime, Audit =
     roles Coordinator, Worker, Client
     let readiness = check Runtime.ready(session)
     case readiness of {
-      | Ok witness -> {
+      | Ok(witness) => {
         Coordinator -> Worker : Commit(witness)
       }
-      | Err reason -> {
+      | Err(reason) => {
         Coordinator -> Client : Retry(reason)
       }
     }
-    timeout 5s at Coordinator {
+    timeout 5s Coordinator at {
       Worker -> Coordinator : Ready
-    } on timeout {
+    } on timeout => {
       Coordinator -> Worker : Cancel
-    } on cancel {
+    } on cancel => {
       Coordinator -> Client : Cancelled
     }
-    choice at Coordinator {
-      | Commit when check Runtime.ready(session) yields witness -> {
+    choice Coordinator at {
+      | Commit when check Runtime.ready(session) yields witness => {
         Coordinator -> Worker : CommitAgain(witness)
       }
-      | Abort -> {
+      | Abort => {
         Coordinator -> Worker : Abort
       }
     }
@@ -76,10 +78,10 @@ protocol InviteFlow uses Runtime =
     roles Coordinator, Worker
     let invite = check Runtime.lookupInvite(session) in {
       case invite of {
-        | Just handle -> {
+        | Just(handle) => {
           Coordinator -> Worker : UseInvite(handle)
         }
-        | Nothing -> {
+        | Nothing => {
           Coordinator -> Worker : MissingInvite
         }
       }
@@ -102,7 +104,7 @@ protocol CommitFlow uses Runtime =
     roles Coordinator, Worker
     let readiness = check Runtime.ready(session)
     case readiness of {
-      | Ok witness -> {
+      | Ok(witness) => {
         Coordinator -> Worker : Commit(witness)
       }
     }
@@ -172,10 +174,10 @@ protocol CommitFlow uses Runtime =
     roles Coordinator, Worker
     let readiness = check Runtime.lookup(session)
     case readiness of {
-      | Ok witness -> {
+      | Ok(witness) => {
         Coordinator -> Worker : Commit(witness)
       }
-      | Err reason -> {
+      | Err(reason) => {
         Coordinator -> Worker : Retry(reason)
       }
     }

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::ast::Role;
 
 use super::super::role::parse_role_ref;
-use super::super::statement::{parse_block, parse_duration};
+use super::super::statement::{parse_block, parse_duration, parse_statement};
 use super::super::types::{AuthorityExprSpec, CaseBranchSpec, CasePatternSpec, Statement};
 use super::super::Rule;
 use super::{next_required, syntax_error};
@@ -24,6 +24,17 @@ fn parse_authority_expr(pair: pest::iterators::Pair<Rule>) -> Result<AuthorityEx
                 .next()
                 .ok_or_else(|| "check is missing effect call".to_string())?;
             parse_effect_call(call).map(|(effect, operation, args)| AuthorityExprSpec::Check {
+                effect,
+                operation,
+                args,
+            })
+        }
+        Rule::observe_expr => {
+            let call = pair
+                .into_inner()
+                .next()
+                .ok_or_else(|| "observe is missing effect call".to_string())?;
+            parse_effect_call(call).map(|(effect, operation, args)| AuthorityExprSpec::Observe {
                 effect,
                 operation,
                 args,
@@ -101,6 +112,36 @@ fn parse_argument_list(pair: pest::iterators::Pair<Rule>) -> Result<Vec<String>,
         }
     }
     Ok(args)
+}
+
+fn parse_branch_body(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+    protocol_defs: &HashMap<String, Vec<Statement>>,
+) -> std::result::Result<Vec<Statement>, super::super::error::ParseError> {
+    let pair = if pair.as_rule() == Rule::branch_body {
+        let span = pair.as_span();
+        pair.into_inner()
+            .next()
+            .ok_or_else(|| syntax_error(span, input, "branch body is empty"))?
+    } else {
+        pair
+    };
+    match pair.as_rule() {
+        Rule::block => parse_block(pair, declared_roles, input, protocol_defs),
+        Rule::statement => Ok(vec![parse_statement(
+            pair,
+            declared_roles,
+            input,
+            protocol_defs,
+        )?]),
+        _ => Err(syntax_error(
+            pair.as_span(),
+            input,
+            "expected an indented branch body or compact statement body",
+        )),
+    }
 }
 
 pub(crate) fn parse_effect_call(
@@ -202,7 +243,7 @@ pub(crate) fn parse_case_stmt(
             input,
             "case branch is missing body",
         )?;
-        let statements = parse_block(body_pair, declared_roles, input, protocol_defs)?;
+        let statements = parse_branch_body(body_pair, declared_roles, input, protocol_defs)?;
         branches.push(CaseBranchSpec {
             pattern,
             statements,
@@ -224,7 +265,17 @@ fn parse_case_pattern(pair: pest::iterators::Pair<Rule>) -> CasePatternSpec {
         .next()
         .map(|p| p.as_str().to_string())
         .unwrap_or_default();
-    let binders = inner.map(|p| p.as_str().to_string()).collect();
+    let binders = inner
+        .flat_map(|p| match p.as_rule() {
+            Rule::match_pattern_payload => p
+                .into_inner()
+                .filter(|inner| inner.as_rule() == Rule::ident)
+                .map(|ident| ident.as_str().to_string())
+                .collect::<Vec<_>>(),
+            Rule::ident => vec![p.as_str().to_string()],
+            _ => Vec::new(),
+        })
+        .collect();
     CasePatternSpec {
         constructor,
         binders,
@@ -240,12 +291,14 @@ pub(crate) fn parse_timeout_stmt(
     let span = pair.as_span();
     let mut duration_ms = None;
     let mut role: Option<Role> = None;
-    let mut blocks = Vec::new();
+    let mut blocks: Vec<Vec<Statement>> = Vec::new();
     for item in pair.into_inner() {
         match item.as_rule() {
             Rule::duration => duration_ms = Some(parse_duration(item, input)?),
             Rule::role_ref => role = Some(parse_role_ref(item, declared_roles, input)?),
-            Rule::block => blocks.push(parse_block(item, declared_roles, input, protocol_defs)?),
+            Rule::block | Rule::statement | Rule::branch_body => {
+                blocks.push(parse_branch_body(item, declared_roles, input, protocol_defs)?)
+            }
             _ => {}
         }
     }
