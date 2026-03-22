@@ -154,6 +154,7 @@ impl ThreadedVM {
             .sessions
             .read()
             .expect("threaded VM lock poisoned");
+        let mut faulted_sessions = Vec::new();
         for session in sessions.values() {
             let mut session_guard = session.lock().expect("threaded VM lock poisoned");
             if !session_guard.roles.iter().any(|role| role == site) {
@@ -165,9 +166,14 @@ impl ThreadedVM {
             ) {
                 continue;
             }
+            faulted_sessions.push(session_guard.sid);
             session_guard.status = SessionStatus::Faulted {
                 reason: reason.clone(),
             };
+        }
+        drop(sessions);
+        for sid in faulted_sessions {
+            self.invalidate_outstanding_effects_for_session(sid, &reason);
         }
 
         let mut faulted = Vec::new();
@@ -356,28 +362,31 @@ impl ThreadedVM {
         events.sort_by_key(TopologyPerturbation::ordering_key);
         for event in events {
             self.apply_topology_event(&event);
+            let effect_kind = "topology_event".to_string();
+            let (effect_interface, effect_operation) =
+                infer_effect_interface_and_operation(&effect_kind);
+            let entry = EffectTraceEntry {
+                effect_id: self.next_effect_id,
+                effect_kind,
+                inputs: json!({
+                    "tick": tick,
+                }),
+                outputs: json!({
+                    "status": "success",
+                    "applied": true,
+                    "topology": event,
+                }),
+                handler_identity: handler_identity.clone(),
+                effect_interface,
+                effect_operation,
+                ordering_key: self.next_effect_id,
+                topology: Some(event.clone()),
+            };
+            self.sync_runtime_effect_from_trace_entry(&entry);
             if self.should_capture_effect_kind("topology_event") {
-                let effect_kind = "topology_event".to_string();
-                let (effect_interface, effect_operation) =
-                    infer_effect_interface_and_operation(&effect_kind);
-                self.effect_trace.push(EffectTraceEntry {
-                    effect_id: self.next_effect_id,
-                    effect_kind,
-                    inputs: json!({
-                        "tick": tick,
-                    }),
-                    outputs: json!({
-                        "applied": true,
-                        "topology": event,
-                    }),
-                    handler_identity: handler_identity.clone(),
-                    effect_interface,
-                    effect_operation,
-                    ordering_key: self.next_effect_id,
-                    topology: Some(event),
-                });
-                self.next_effect_id = self.next_effect_id.saturating_add(1);
+                self.effect_trace.push(entry);
             }
+            self.next_effect_id = self.next_effect_id.saturating_add(1);
         }
         Ok(())
     }

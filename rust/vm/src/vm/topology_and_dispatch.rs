@@ -118,6 +118,7 @@ impl VM {
                 session.status = SessionStatus::Faulted {
                     reason: reason.clone(),
                 };
+                self.invalidate_outstanding_effects_for_session(sid, &reason);
                 self.monitor.remove_kind(sid);
             }
         }
@@ -305,31 +306,32 @@ impl VM {
         events.sort_by_key(TopologyPerturbation::ordering_key);
         for event in events {
             self.apply_topology_event(&event);
+            let effect_kind = "topology_event".to_string();
+            let (effect_interface, effect_operation) =
+                infer_effect_interface_and_operation(&effect_kind);
+            let entry = EffectTraceEntry {
+                effect_id: self.next_effect_id,
+                effect_kind,
+                inputs: json!({
+                    "tick": tick,
+                }),
+                outputs: json!({
+                    "status": "success",
+                    "applied": true,
+                    "topology": event,
+                }),
+                handler_identity: handler_identity.clone(),
+                effect_interface,
+                effect_operation,
+                ordering_key: self.next_effect_id,
+                topology: Some(event.clone()),
+            };
+            self.sync_runtime_effect_from_trace_entry(&entry);
             if self.should_capture_effect_kind("topology_event") {
-                let effect_kind = "topology_event".to_string();
-                let (effect_interface, effect_operation) =
-                    infer_effect_interface_and_operation(&effect_kind);
-                self.effect_trace.push(
-                    EffectTraceEntry {
-                        effect_id: self.next_effect_id,
-                        effect_kind,
-                        inputs: json!({
-                            "tick": tick,
-                        }),
-                        outputs: json!({
-                            "applied": true,
-                            "topology": event,
-                        }),
-                        handler_identity: handler_identity.clone(),
-                        effect_interface,
-                        effect_operation,
-                        ordering_key: self.next_effect_id,
-                        topology: Some(event),
-                    },
-                    &self.config.observability_retention,
-                );
-                self.next_effect_id = self.next_effect_id.saturating_add(1);
+                self.effect_trace
+                    .push(entry, &self.config.observability_retention);
             }
+            self.next_effect_id = self.next_effect_id.saturating_add(1);
         }
         Ok(())
     }
@@ -345,6 +347,10 @@ impl VM {
         owner_id: &str,
     ) -> Result<CancellationWitness, OwnershipError> {
         let witness = self.sessions_mut().mark_owner_died(sid, owner_id)?;
+        self.invalidate_outstanding_effects_for_session(
+            sid,
+            &format!("ownership owner `{owner_id}` died"),
+        );
         self.obs_trace.push(
             ObsEvent::SessionTerminal {
                 tick: self.clock.tick,
@@ -372,6 +378,10 @@ impl VM {
             claim_id: receipt.claim_id,
         };
         let witness = self.sessions_mut().cancel_abandoned_transfer(receipt)?;
+        self.invalidate_outstanding_effects_for_session(
+            receipt.session_id,
+            "ownership transfer abandoned",
+        );
         self.obs_trace.push(
             ObsEvent::CancellationRequested {
                 tick: self.clock.tick,
@@ -420,6 +430,7 @@ impl VM {
         let reason = reason.into();
         self.sessions_mut()
             .fault_failed_transfer_commit(receipt, reason.clone())?;
+        self.invalidate_outstanding_effects_for_session(receipt.session_id, &reason);
         self.obs_trace.push(
             ObsEvent::SessionTerminal {
                 tick: self.clock.tick,
@@ -589,32 +600,117 @@ impl VM {
         // Compute payload/decision via handler.
         let coro = &self.coroutines[coro_idx];
         let send_payload = self.read_reg_checked(coro_idx, val_reg)?;
+        let handler_identity = handler.handler_identity();
+        let effect_inputs = json!({
+            "session": sid,
+            "from": role,
+            "to": partner,
+            "label": label.name,
+        });
         let fast_path =
             SendDecisionFastPathInput::new(sid, role, &partner, &label.name, Some(&send_payload));
         let decision = if let Some(decision) =
             handler.send_decision_fast_path(fast_path, &coro.regs, Some(&send_payload))
         {
-            decision
-                .expect_success(|| {
-                    EffectFailure::contract_violation(
+            match decision {
+                EffectResult::Success(decision) => decision,
+                EffectResult::Blocked => {
+                    let effect_id = self.issue_runtime_effect(
+                        "send_decision",
+                        Some(sid),
+                        &handler_identity,
+                        effect_inputs.clone(),
+                    );
+                    let failure = EffectFailure::contract_violation(
                         "send_decision_fast_path returned blocked",
+                    );
+                    self.complete_runtime_effect(
+                        effect_id,
+                        OutstandingEffectStatus::Failed,
+                        json!({
+                            "status": "failure",
+                            "failure": failure,
+                        }),
                     )
-                })
-                .map_err(|failure| Fault::Invoke { failure })?
+                    .map_err(|err| Fault::Invoke {
+                        failure: EffectFailure::contract_violation(err.to_string()),
+                    })?;
+                    return Err(Fault::Invoke { failure });
+                }
+                EffectResult::Failure(failure) => {
+                    let effect_id = self.issue_runtime_effect(
+                        "send_decision",
+                        Some(sid),
+                        &handler_identity,
+                        effect_inputs.clone(),
+                    );
+                    self.complete_runtime_effect(
+                        effect_id,
+                        OutstandingEffectStatus::Failed,
+                        json!({
+                            "status": "failure",
+                            "failure": failure,
+                        }),
+                    )
+                    .map_err(|err| Fault::Invoke {
+                        failure: EffectFailure::contract_violation(err.to_string()),
+                    })?;
+                    return Err(Fault::Invoke { failure });
+                }
+            }
         } else {
-            handler
-                .send_decision(SendDecisionInput {
+            match handler.send_decision(SendDecisionInput {
                     sid,
                     role,
                     partner: &partner,
                     label: &label.name,
                     state: &coro.regs,
                     payload: Some(send_payload),
-                })
-                .expect_success(|| {
-                    EffectFailure::contract_violation("send_decision returned blocked")
-                })
-                .map_err(|failure| Fault::Invoke { failure })?
+                }) {
+                EffectResult::Success(decision) => decision,
+                EffectResult::Blocked => {
+                    let effect_id = self.issue_runtime_effect(
+                        "send_decision",
+                        Some(sid),
+                        &handler_identity,
+                        effect_inputs.clone(),
+                    );
+                    let failure =
+                        EffectFailure::contract_violation("send_decision returned blocked");
+                    self.complete_runtime_effect(
+                        effect_id,
+                        OutstandingEffectStatus::Failed,
+                        json!({
+                            "status": "failure",
+                            "failure": failure,
+                        }),
+                    )
+                    .map_err(|err| Fault::Invoke {
+                        failure: EffectFailure::contract_violation(err.to_string()),
+                    })?;
+                    return Err(Fault::Invoke { failure });
+                }
+                EffectResult::Failure(failure) => {
+                    let effect_id = self.issue_runtime_effect(
+                        "send_decision",
+                        Some(sid),
+                        &handler_identity,
+                        effect_inputs.clone(),
+                    );
+                    self.complete_runtime_effect(
+                        effect_id,
+                        OutstandingEffectStatus::Failed,
+                        json!({
+                            "status": "failure",
+                            "failure": failure,
+                        }),
+                    )
+                    .map_err(|err| Fault::Invoke {
+                        failure: EffectFailure::contract_violation(err.to_string()),
+                    })?;
+                    return Err(Fault::Invoke { failure });
+                }
+            }
         };
 
         let edge = Edge::new(sid, role.to_string(), partner.clone());
@@ -625,6 +721,23 @@ impl VM {
             || self.is_site_timed_out(&partner)
             || self.is_edge_partitioned(role, &partner)
         {
+            let effect_id = self.issue_runtime_effect(
+                "send_decision",
+                Some(sid),
+                &handler_identity,
+                effect_inputs.clone(),
+            );
+            self.complete_runtime_effect(
+                effect_id,
+                OutstandingEffectStatus::Blocked,
+                json!({
+                    "status": "blocked",
+                    "reason": "topology unavailable",
+                }),
+            )
+            .map_err(|err| Fault::Invoke {
+                failure: EffectFailure::contract_violation(err.to_string()),
+            })?;
             return Ok(StepPack {
                 coro_update: CoroUpdate::Block(BlockReason::Send { edge }),
                 type_update: None,
@@ -670,6 +783,23 @@ impl VM {
         match enqueue {
             EnqueueResult::Ok => {}
             EnqueueResult::WouldBlock => {
+                let effect_id = self.issue_runtime_effect(
+                    "send_decision",
+                    Some(sid),
+                    &handler_identity,
+                    effect_inputs,
+                );
+                self.complete_runtime_effect(
+                    effect_id,
+                    OutstandingEffectStatus::Blocked,
+                    json!({
+                        "status": "blocked",
+                        "reason": "buffer would block",
+                    }),
+                )
+                .map_err(|err| Fault::Invoke {
+                    failure: EffectFailure::contract_violation(err.to_string()),
+                })?;
                 // Block — NO type advancement.
                 return Ok(StepPack {
                     coro_update: CoroUpdate::Block(BlockReason::Send { edge }),

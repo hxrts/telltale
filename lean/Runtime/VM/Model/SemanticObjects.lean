@@ -68,18 +68,27 @@ structure OperationInstance where
   phase : OperationPhase
   handlerIdentity : Option String
   effectIds : List Nat
+  dependentOperationIds : List String
+  terminalPublication : Option String
+  budgetTicks : Option Nat
+  requiresProof : Bool
   deriving Repr, DecidableEq
 
 structure OutstandingEffect where
   effectId : Nat
   operationId : String
   session : Option Nat
+  ownerId : Option String
   effectInterface : Option String
   effectOperation : Option String
   effectKind : String
   handlerIdentity : String
   status : OutstandingEffectStatus
   orderingKey : Nat
+  budgetTicks : Option Nat
+  retryPolicy : String
+  invalidationToken : String
+  completedAtTick : Option Nat
   inputs : String
   outputs : String
   deriving Repr, DecidableEq

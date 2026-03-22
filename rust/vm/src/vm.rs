@@ -56,7 +56,8 @@ use crate::output_condition::{OutputConditionCheck, OutputConditionPolicy};
 use crate::persistence::{NoopPersistence, PersistenceModel};
 use crate::scheduler::{SchedPolicy, Scheduler};
 use crate::semantic_objects::{
-    protocol_machine_semantic_objects_v1, ProtocolMachineSemanticObjects,
+    protocol_machine_semantic_objects_v1, OperationInstance, OperationPhase,
+    OutstandingEffect, OutstandingEffectStatus, ProtocolMachineSemanticObjects,
 };
 use crate::serialization::{
     canonical_replay_fragment_v1, semantic_audit_log_v1, CanonicalReplayFragmentV1,
@@ -96,4 +97,5 @@ mod tests {
     include!("../tests/unit/vm/tests_monitor_persist.rs");
     include!("../tests/unit/vm/tests_compiler_topology.rs");
     include!("../tests/unit/vm/tests_flow_policy_faults.rs");
+    include!("../tests/unit/vm/tests_semantic_state.rs");
 }

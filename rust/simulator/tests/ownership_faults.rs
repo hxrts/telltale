@@ -153,6 +153,10 @@ fn ownership_owner_failure_before_handoff_emits_no_transfer_event() {
             .all(|event| !matches!(event, ObsEvent::Transferred { .. })),
         "crashing the current owner before the transfer should suppress handoff observables"
     );
+    assert!(
+        vm.semantic_objects().semantic_handoffs.is_empty(),
+        "owner crash before transfer should leave no semantic handoff state"
+    );
 }
 
 #[test]
@@ -177,5 +181,10 @@ fn ownership_handoff_race_with_target_crash_keeps_transfer_observable() {
             .count(),
         1,
         "target crash should not erase the explicit ownership handoff observable"
+    );
+    assert_eq!(
+        vm.semantic_objects().semantic_handoffs.len(),
+        1,
+        "simulator ownership race should preserve one semantic handoff artifact"
     );
 }

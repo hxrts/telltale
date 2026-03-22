@@ -7,7 +7,6 @@
 //! higher-level runtimes.
 #![allow(missing_docs)]
 
-use crate::effect::EffectTraceEntry;
 use crate::output_condition::OutputConditionCheck;
 use crate::session::{
     AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord, AuthorityWitnessId,
@@ -99,6 +98,10 @@ pub struct OperationInstance {
     pub phase: OperationPhase,
     pub handler_identity: Option<String>,
     pub effect_ids: Vec<u64>,
+    pub dependent_operation_ids: Vec<String>,
+    pub terminal_publication: Option<String>,
+    pub budget_ticks: Option<u64>,
+    pub requires_proof: bool,
 }
 
 /// First-class view of one deferred or completed effect.
@@ -107,12 +110,17 @@ pub struct OutstandingEffect {
     pub effect_id: u64,
     pub operation_id: String,
     pub session: Option<SessionId>,
+    pub owner_id: Option<FragmentOwnerId>,
     pub effect_interface: Option<String>,
     pub effect_operation: Option<String>,
     pub effect_kind: String,
     pub handler_identity: String,
     pub status: OutstandingEffectStatus,
     pub ordering_key: u64,
+    pub budget_ticks: Option<u64>,
+    pub retry_policy: String,
+    pub invalidation_token: String,
+    pub completed_at_tick: Option<u64>,
     pub inputs: serde_json::Value,
     pub outputs: serde_json::Value,
 }
@@ -218,42 +226,6 @@ impl Default for ProtocolMachineSemanticObjects {
     }
 }
 
-fn effect_entry_session(entry: &EffectTraceEntry) -> Option<SessionId> {
-    entry
-        .inputs
-        .get("session")
-        .and_then(serde_json::Value::as_u64)
-        .and_then(|sid| usize::try_from(sid).ok())
-        .or_else(|| {
-            entry.inputs
-                .get("sid")
-                .and_then(serde_json::Value::as_u64)
-                .and_then(|sid| usize::try_from(sid).ok())
-        })
-}
-
-fn effect_status(entry: &EffectTraceEntry) -> OutstandingEffectStatus {
-    match entry.outputs.get("status").and_then(serde_json::Value::as_str) {
-        Some("success") => OutstandingEffectStatus::Succeeded,
-        Some("blocked") => OutstandingEffectStatus::Blocked,
-        Some("failure") => OutstandingEffectStatus::Failed,
-        Some("cancelled") => OutstandingEffectStatus::Cancelled,
-        Some("invalidated") => OutstandingEffectStatus::Invalidated,
-        _ => OutstandingEffectStatus::Pending,
-    }
-}
-
-fn operation_phase(status: OutstandingEffectStatus) -> OperationPhase {
-    match status {
-        OutstandingEffectStatus::Pending => OperationPhase::Pending,
-        OutstandingEffectStatus::Blocked => OperationPhase::Blocked,
-        OutstandingEffectStatus::Succeeded => OperationPhase::Succeeded,
-        OutstandingEffectStatus::Failed => OperationPhase::Failed,
-        OutstandingEffectStatus::Cancelled => OperationPhase::Cancelled,
-        OutstandingEffectStatus::Invalidated => OperationPhase::Failed,
-    }
-}
-
 fn progress_state(status: OutstandingEffectStatus) -> ProgressState {
     match status {
         OutstandingEffectStatus::Pending => ProgressState::Pending,
@@ -344,41 +316,12 @@ fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSeman
 pub fn protocol_machine_semantic_objects_v1(
     authority_audit_log: &[AuthorityAuditRecord],
     delegation_audit_log: &[DelegationAuditRecord],
-    effect_trace: &[EffectTraceEntry],
+    operation_instances: &[OperationInstance],
+    outstanding_effects: &[OutstandingEffect],
     output_condition_checks: &[OutputConditionCheck],
 ) -> ProtocolMachineSemanticObjects {
-    let outstanding_effects: Vec<_> = effect_trace
-        .iter()
-        .map(|entry| OutstandingEffect {
-            effect_id: entry.effect_id,
-            operation_id: format!("effect:{}", entry.effect_id),
-            session: effect_entry_session(entry),
-            effect_interface: entry.effect_interface.clone(),
-            effect_operation: entry.effect_operation.clone(),
-            effect_kind: entry.effect_kind.clone(),
-            handler_identity: entry.handler_identity.clone(),
-            status: effect_status(entry),
-            ordering_key: entry.ordering_key,
-            inputs: entry.inputs.clone(),
-            outputs: entry.outputs.clone(),
-        })
-        .collect();
-
-    let mut operation_instances: Vec<_> = outstanding_effects
-        .iter()
-        .map(|effect| OperationInstance {
-            operation_id: effect.operation_id.clone(),
-            session: effect.session,
-            owner_id: None,
-            kind: effect
-                .effect_operation
-                .clone()
-                .unwrap_or_else(|| effect.effect_kind.clone()),
-            phase: operation_phase(effect.status),
-            handler_identity: Some(effect.handler_identity.clone()),
-            effect_ids: vec![effect.effect_id],
-        })
-        .collect();
+    let mut operation_instances = operation_instances.to_vec();
+    let outstanding_effects = outstanding_effects.to_vec();
 
     let semantic_handoffs: Vec<_> = delegation_audit_log
         .iter()
@@ -402,6 +345,10 @@ pub fn protocol_machine_semantic_objects_v1(
         phase: OperationPhase::HandedOff,
         handler_identity: None,
         effect_ids: Vec::new(),
+        dependent_operation_ids: Vec::new(),
+        terminal_publication: Some("handoff.committed".to_string()),
+        budget_ticks: Some(1),
+        requires_proof: false,
     }));
 
     let mut authoritative_reads: Vec<_> = authority_audit_log
@@ -461,6 +408,14 @@ pub fn protocol_machine_semantic_objects_v1(
         },
         handler_identity: None,
         effect_ids: Vec::new(),
+        dependent_operation_ids: Vec::new(),
+        terminal_publication: Some(if proof.passed {
+            "materialization.succeeded".to_string()
+        } else {
+            "materialization.failed".to_string()
+        }),
+        budget_ticks: Some(1),
+        requires_proof: true,
     }));
 
     let mut canonical_handles: Vec<_> = materialization_proofs

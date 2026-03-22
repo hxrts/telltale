@@ -181,11 +181,12 @@ impl VM {
                 self.clock.tick,
             );
             if let Some(entry) = maybe_entry {
+                self.sync_runtime_effect_from_trace_entry(&entry);
                 if self.should_capture_effect_kind(&entry.effect_kind) {
                     self.effect_trace
                         .push(entry, &self.config.observability_retention);
-                    self.next_effect_id = self.next_effect_id.saturating_add(1);
                 }
+                self.next_effect_id = self.next_effect_id.saturating_add(1);
             }
         }
 

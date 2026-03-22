@@ -109,6 +109,18 @@ impl VM {
         self.effect_trace.as_slice()
     }
 
+    /// Get canonical operation instances tracked as runtime state.
+    #[must_use]
+    pub fn operation_instances(&self) -> &[OperationInstance] {
+        self.operation_instances.as_slice()
+    }
+
+    /// Get canonical outstanding effects tracked as runtime state.
+    #[must_use]
+    pub fn outstanding_effects(&self) -> &[OutstandingEffect] {
+        self.outstanding_effects.as_slice()
+    }
+
     /// Get recorded delegation audit records.
     #[must_use]
     pub fn delegation_audit_log(&self) -> &[DelegationAuditRecord] {
@@ -130,7 +142,7 @@ impl VM {
             authority_audit_log.as_slice(),
             self.delegation_audit_log.as_slice(),
             self.obs_trace.as_slice(),
-            self.effect_trace.as_slice(),
+            self.outstanding_effects.as_slice(),
         )
     }
 
@@ -142,7 +154,8 @@ impl VM {
         protocol_machine_semantic_objects_v1(
             authority_audit_log.as_slice(),
             self.delegation_audit_log.as_slice(),
-            self.effect_trace.as_slice(),
+            self.operation_instances.as_slice(),
+            self.outstanding_effects.as_slice(),
             self.output_condition_checks.as_slice(),
         )
     }
@@ -211,6 +224,8 @@ impl VM {
             self.effect_trace.as_slice(),
             authority_audit_log.as_slice(),
             self.delegation_audit_log.as_slice(),
+            self.operation_instances.as_slice(),
+            self.outstanding_effects.as_slice(),
             self.output_condition_checks.as_slice(),
             self.crashed_sites.iter().cloned().collect(),
             partitioned_edges,

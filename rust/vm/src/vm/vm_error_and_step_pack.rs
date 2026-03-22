@@ -195,6 +195,10 @@ impl<T> RetainedLog<T> {
         &self.0
     }
 
+    fn as_mut_slice(&mut self) -> &mut [T] {
+        &mut self.0
+    }
+
     fn len(&self) -> usize {
         self.0.len()
     }
@@ -272,6 +276,8 @@ where
     eligibility_dirty: bool,
     guard_layer: InMemoryGuardLayer,
     effect_trace: RetainedLog<EffectTraceEntry>,
+    operation_instances: RetainedLog<OperationInstance>,
+    outstanding_effects: RetainedLog<OutstandingEffect>,
     next_effect_id: u64,
     output_condition_checks: RetainedLog<OutputConditionCheck>,
     delegation_audit_log: RetainedLog<DelegationAuditRecord>,
@@ -351,6 +357,8 @@ where
                     .collect(),
             },
             effect_trace: RetainedLog::default(),
+            operation_instances: RetainedLog::default(),
+            outstanding_effects: RetainedLog::default(),
             next_effect_id: 0,
             output_condition_checks: RetainedLog::default(),
             delegation_audit_log: RetainedLog::default(),

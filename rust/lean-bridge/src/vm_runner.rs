@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use thiserror::Error;
 
 use crate::runner::ChoreographyJson;
-use crate::semantic_objects::TickedObsEvent;
+use crate::semantic_objects::{ProtocolMachineSemanticObjects, TickedObsEvent};
 use crate::sim_reference::{
     SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
 };
@@ -167,6 +167,9 @@ pub struct VmRunOutput {
     /// Optional per-step scheduler state snapshots.
     #[serde(default)]
     pub step_states: Vec<VmStepState>,
+    /// Canonical semantic object export from the protocol machine runtime.
+    #[serde(default)]
+    pub semantic_objects: ProtocolMachineSemanticObjects,
 }
 
 /// Canonical public alias for protocol-machine runner input payloads.

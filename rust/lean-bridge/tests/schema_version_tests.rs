@@ -32,6 +32,7 @@ fn vm_run_output_legacy_decode_defaults_schema_version() {
     assert_eq!(out.schema_version, LEAN_BRIDGE_SCHEMA_VERSION);
     assert_eq!(out.trace[0].schema_version, LEAN_BRIDGE_SCHEMA_VERSION);
     assert_eq!(out.sessions[0].schema_version, LEAN_BRIDGE_SCHEMA_VERSION);
+    assert!(out.semantic_objects.outstanding_effects.is_empty());
 }
 
 #[test]
@@ -134,18 +135,27 @@ fn semantic_objects_roundtrip_preserves_schema_version() {
             "kind": "readChannel",
             "phase": "succeeded",
             "handler_identity": "host/runtime",
-            "effect_ids": [1]
+            "effect_ids": [1],
+            "dependent_operation_ids": [],
+            "terminal_publication": "effect.succeeded",
+            "budget_ticks": 1,
+            "requires_proof": false
         }],
         "outstanding_effects": [{
             "effect_id": 1,
             "operation_id": "effect:1",
             "session": 1,
+            "owner_id": "runtime/owner",
             "effect_interface": "Runtime",
             "effect_operation": "readChannel",
             "effect_kind": "invoke_step",
             "handler_identity": "host/runtime",
             "status": "succeeded",
             "ordering_key": 1,
+            "budget_ticks": 1,
+            "retry_policy": "forbid_late_results",
+            "invalidation_token": "effect:1:live",
+            "completed_at_tick": 1,
             "inputs": {"session": 1},
             "outputs": {"status": "success"}
         }],
@@ -209,6 +219,66 @@ fn semantic_objects_roundtrip_preserves_schema_version() {
 
     let encoded = serde_json::to_value(decoded).expect("encode semantic objects");
     assert_eq!(encoded["schema_version"], SEMANTIC_OBJECTS_SCHEMA_VERSION);
+}
+
+#[test]
+fn vm_run_output_roundtrip_preserves_semantic_objects() {
+    let payload = json!({
+        "schema_version": LEAN_BRIDGE_SCHEMA_VERSION,
+        "trace": [],
+        "sessions": [],
+        "steps_executed": 0,
+        "concurrency": 1,
+        "status": "ok",
+        "semantic_objects": {
+            "schema_version": SEMANTIC_OBJECTS_SCHEMA_VERSION,
+            "operation_instances": [{
+                "operation_id": "effect:9",
+                "session": 2,
+                "owner_id": "owner/a",
+                "kind": "sendDecision",
+                "phase": "blocked",
+                "handler_identity": "host/runtime",
+                "effect_ids": [9],
+                "dependent_operation_ids": [],
+                "terminal_publication": "effect.blocked",
+                "budget_ticks": 1,
+                "requires_proof": false
+            }],
+            "outstanding_effects": [{
+                "effect_id": 9,
+                "operation_id": "effect:9",
+                "session": 2,
+                "owner_id": "owner/a",
+                "effect_interface": "Transport",
+                "effect_operation": "sendDecision",
+                "effect_kind": "send_decision",
+                "handler_identity": "host/runtime",
+                "status": "blocked",
+                "ordering_key": 3,
+                "budget_ticks": 1,
+                "retry_policy": "forbid_late_results",
+                "invalidation_token": "effect:9:live",
+                "completed_at_tick": 3,
+                "inputs": { "session": 2 },
+                "outputs": { "status": "blocked" }
+            }],
+            "semantic_handoffs": [],
+            "authoritative_reads": [],
+            "observed_reads": [],
+            "materialization_proofs": [],
+            "canonical_handles": [],
+            "progress_contracts": []
+        }
+    });
+
+    let decoded: ProtocolMachineRunOutput =
+        serde_json::from_value(payload).expect("decode runner output");
+    assert_eq!(decoded.semantic_objects.outstanding_effects.len(), 1);
+    assert_eq!(
+        decoded.semantic_objects.operation_instances[0].terminal_publication.as_deref(),
+        Some("effect.blocked")
+    );
 }
 
 #[test]

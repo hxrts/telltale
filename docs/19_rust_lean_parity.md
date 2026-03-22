@@ -111,6 +111,12 @@ Lean, Rust, and the Rust/Lean bridge.
 | `MaterializationProof` / `CanonicalHandle` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | `ProgressContract` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 
+`OperationInstance` and `OutstandingEffect` are now compared as canonical
+runtime state, not as post-hoc derivations from generic effect-trace order.
+Parity on these objects therefore covers owner identity, phase/status,
+budget/invalidation fields, dependent-operation edges, and terminal
+publication state.
+
 ### Lean ProtocolMachineState
 
 Source: `lean/Runtime/VM/Model/State.lean`

@@ -160,6 +160,7 @@ pub struct ProtocolMachineRunOutput {
     pub effect_trace: Vec<EffectTraceEvent>,
     pub output_condition_trace: Vec<OutputConditionTraceEvent>,
     pub step_states: Vec<VmStepState>,
+    pub semantic_objects: ProtocolMachineSemanticObjects,
 }
 ```
 
@@ -194,6 +195,10 @@ machine’s semantic object family.
 `semantic_objects_to_json()` and `semantic_objects_from_json()` encode and
 decode the canonical schema directly. The bridge no longer treats generic
 VM-state export as its primary cross-language contract.
+
+`ProtocolMachineRunOutput.semantic_objects` carries the same canonical runtime
+state used by replay export: live `OperationInstance` and `OutstandingEffect`
+objects plus the derived handoff/read/proof/publication surfaces.
 
 ## Trace Normalization and Equivalence
 

@@ -11,6 +11,18 @@ impl ThreadedVM {
         &self.effect_trace
     }
 
+    /// Get canonical operation instances tracked as runtime state.
+    #[must_use]
+    pub fn operation_instances(&self) -> &[OperationInstance] {
+        &self.operation_instances
+    }
+
+    /// Get canonical outstanding effects tracked as runtime state.
+    #[must_use]
+    pub fn outstanding_effects(&self) -> &[OutstandingEffect] {
+        &self.outstanding_effects
+    }
+
     /// Get recorded delegation audit records.
     #[must_use]
     pub fn delegation_audit_log(&self) -> &[DelegationAuditRecord] {
@@ -21,7 +33,7 @@ impl ThreadedVM {
     /// failure-visible events, and effect/interface traces.
     #[must_use]
     pub fn semantic_audit_log(&self) -> Vec<SemanticAuditRecord> {
-        semantic_audit_log_v1(&[], &self.delegation_audit_log, &self.trace, &self.effect_trace)
+        semantic_audit_log_v1(&[], &self.delegation_audit_log, &self.trace, &self.outstanding_effects)
     }
 
     /// Get canonical semantic objects derived from handoff, effect, and
@@ -31,7 +43,8 @@ impl ThreadedVM {
         protocol_machine_semantic_objects_v1(
             &[],
             &self.delegation_audit_log,
-            &self.effect_trace,
+            &self.operation_instances,
+            &self.outstanding_effects,
             &self.output_condition_checks,
         )
     }
@@ -97,6 +110,8 @@ impl ThreadedVM {
             &self.effect_trace,
             &[],
             &self.delegation_audit_log,
+            &self.operation_instances,
+            &self.outstanding_effects,
             &self.output_condition_checks,
             self.crashed_sites.iter().cloned().collect(),
             self.partitioned_edges.iter().cloned().collect(),

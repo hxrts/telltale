@@ -859,6 +859,13 @@ fn test_lean_authority_timeout_and_cancellation_trace_behavior() {
         )),
         "expected issued timeout witness in authority audit log"
     );
+    assert!(
+        vm.semantic_objects()
+            .outstanding_effects
+            .iter()
+            .any(|effect| effect.effect_kind == "topology_event"),
+        "timeout ingress should create explicit outstanding-effect state"
+    );
 
     let sid = owned.session_id();
     let receipt = owned

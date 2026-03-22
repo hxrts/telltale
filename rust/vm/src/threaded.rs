@@ -44,7 +44,8 @@ use crate::output_condition::{OutputConditionCheck, OutputConditionHint};
 use crate::owned::OwnedSession;
 use crate::scheduler::Scheduler;
 use crate::semantic_objects::{
-    protocol_machine_semantic_objects_v1, ProtocolMachineSemanticObjects,
+    protocol_machine_semantic_objects_v1, OperationInstance, OperationPhase,
+    OutstandingEffect, OutstandingEffectStatus, ProtocolMachineSemanticObjects,
 };
 use crate::serialization::{
     canonical_replay_fragment_v1, semantic_audit_log_v1, CanonicalReplayFragmentV1,
@@ -68,6 +69,7 @@ use crate::vm::{
 
 include!("threaded/prelude.rs");
 include!("threaded/runtime_and_scheduling.rs");
+include!("threaded/semantic_state.rs");
 include!("threaded/runtime_introspection.rs");
 include!("threaded/topology_and_planner.rs");
 include!("threaded/commit_and_handoff.rs");

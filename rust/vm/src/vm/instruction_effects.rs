@@ -166,18 +166,67 @@ impl VM {
         )?;
 
         // Process via handler.
-        handler
-            .handle_recv(
-                role,
-                &partner,
-                &label,
-                &mut self.coroutines[coro_idx].regs,
-                &val,
-            )
-            .expect_success(|| {
-                EffectFailure::contract_violation("handle_recv returned blocked")
-            })
-            .map_err(|failure| Fault::Invoke { failure })?;
+        let handler_identity = handler.handler_identity();
+        match handler.handle_recv(
+            role,
+            &partner,
+            &label,
+            &mut self.coroutines[coro_idx].regs,
+            &val,
+        ) {
+            EffectResult::Success(()) => {}
+            EffectResult::Blocked => {
+                let effect_id = self.issue_runtime_effect(
+                    "handle_recv",
+                    Some(sid),
+                    &handler_identity,
+                    json!({
+                        "session": sid,
+                        "from": partner,
+                        "to": role,
+                        "label": label,
+                    }),
+                );
+                let failure = EffectFailure::contract_violation("handle_recv returned blocked");
+                self.complete_runtime_effect(
+                    effect_id,
+                    OutstandingEffectStatus::Failed,
+                    json!({
+                        "status": "failure",
+                        "failure": failure,
+                    }),
+                )
+                .map_err(|err| Fault::Invoke {
+                    failure: EffectFailure::contract_violation(err.to_string()),
+                })?;
+                return Err(Fault::Invoke { failure });
+            }
+            EffectResult::Failure(failure) => {
+                let effect_id = self.issue_runtime_effect(
+                    "handle_recv",
+                    Some(sid),
+                    &handler_identity,
+                    json!({
+                        "session": sid,
+                        "from": partner,
+                        "to": role,
+                        "label": label,
+                    }),
+                );
+                self.complete_runtime_effect(
+                    effect_id,
+                    OutstandingEffectStatus::Failed,
+                    json!({
+                        "status": "failure",
+                        "failure": failure,
+                    }),
+                )
+                .map_err(|err| Fault::Invoke {
+                    failure: EffectFailure::contract_violation(err.to_string()),
+                })?;
+                return Err(Fault::Invoke { failure });
+            }
+        }
 
         let original = self.sessions.original_type(&ep).unwrap_or(&LocalTypeR::End);
         let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);
@@ -301,10 +350,59 @@ impl VM {
             });
         }
         let coro_id = self.coroutines[coro_idx].id;
-        handler
-            .step(role, &mut self.coroutines[coro_idx].regs)
-            .expect_success(|| EffectFailure::contract_violation("step returned blocked"))
-            .map_err(|failure| Fault::Invoke { failure })?;
+        let handler_identity = handler.handler_identity();
+        match handler.step(role, &mut self.coroutines[coro_idx].regs) {
+            EffectResult::Success(()) => {}
+            EffectResult::Blocked => {
+                let effect_id = self.issue_runtime_effect(
+                    "invoke_step",
+                    Some(sid),
+                    &handler_identity,
+                    json!({
+                        "session": sid,
+                        "role": role,
+                        "action": action_repr,
+                    }),
+                );
+                let failure = EffectFailure::contract_violation("step returned blocked");
+                self.complete_runtime_effect(
+                    effect_id,
+                    OutstandingEffectStatus::Failed,
+                    json!({
+                        "status": "failure",
+                        "failure": failure,
+                    }),
+                )
+                .map_err(|err| Fault::Invoke {
+                    failure: EffectFailure::contract_violation(err.to_string()),
+                })?;
+                return Err(Fault::Invoke { failure });
+            }
+            EffectResult::Failure(failure) => {
+                let effect_id = self.issue_runtime_effect(
+                    "invoke_step",
+                    Some(sid),
+                    &handler_identity,
+                    json!({
+                        "session": sid,
+                        "role": role,
+                        "action": action_repr,
+                    }),
+                );
+                self.complete_runtime_effect(
+                    effect_id,
+                    OutstandingEffectStatus::Failed,
+                    json!({
+                        "status": "failure",
+                        "failure": failure,
+                    }),
+                )
+                .map_err(|err| Fault::Invoke {
+                    failure: EffectFailure::contract_violation(err.to_string()),
+                })?;
+                return Err(Fault::Invoke { failure });
+            }
+        }
         self.apply_invoke_delta(sid, &action_repr)
             .map_err(|e| Fault::Invoke {
                 failure: EffectFailure::contract_violation(format!(
@@ -364,6 +462,7 @@ impl VM {
             input.layer,
             &self.coroutines[input.coro_idx].regs,
         );
+        let handler_identity = handler.handler_identity();
         match decision {
             EffectResult::Success(evidence) => {
                 self.guard_layer
@@ -389,15 +488,62 @@ impl VM {
                 })
             }
             EffectResult::Blocked => Ok(StepPack {
-                coro_update: CoroUpdate::Block(BlockReason::AcquireDenied {
-                    layer: input.layer.to_string(),
-                }),
+                coro_update: {
+                    let effect_id = self.issue_runtime_effect(
+                        "handle_acquire",
+                        Some(input.sid),
+                        &handler_identity,
+                        json!({
+                            "session": input.sid,
+                            "role": input.role,
+                            "layer": input.layer,
+                        }),
+                    );
+                    self.complete_runtime_effect(
+                        effect_id,
+                        OutstandingEffectStatus::Blocked,
+                        json!({
+                            "status": "blocked",
+                        }),
+                    )
+                    .map_err(|err| Fault::Acquire {
+                        layer: input.layer.to_string(),
+                        failure: EffectFailure::contract_violation(err.to_string()),
+                    })?;
+                    CoroUpdate::Block(BlockReason::AcquireDenied {
+                        layer: input.layer.to_string(),
+                    })
+                },
                 type_update: None,
                 events: vec![],
             }),
             EffectResult::Failure(failure) => Err(Fault::Acquire {
                 layer: input.layer.to_string(),
-                failure,
+                failure: {
+                    let effect_id = self.issue_runtime_effect(
+                        "handle_acquire",
+                        Some(input.sid),
+                        &handler_identity,
+                        json!({
+                            "session": input.sid,
+                            "role": input.role,
+                            "layer": input.layer,
+                        }),
+                    );
+                    self.complete_runtime_effect(
+                        effect_id,
+                        OutstandingEffectStatus::Failed,
+                        json!({
+                            "status": "failure",
+                            "failure": failure,
+                        }),
+                    )
+                    .map_err(|err| Fault::Acquire {
+                        layer: input.layer.to_string(),
+                        failure: EffectFailure::contract_violation(err.to_string()),
+                    })?;
+                    failure
+                },
             }),
         }
     }
@@ -423,19 +569,74 @@ impl VM {
             layer: input.layer.to_string(),
             failure: EffectFailure::invalid_evidence(e),
         })?;
-        handler
-            .handle_release(
-                input.sid,
-                input.role,
-                input.layer,
-                &ev,
-                &self.coroutines[input.coro_idx].regs,
-            )
-            .expect_success(|| EffectFailure::contract_violation("handle_release returned blocked"))
-            .map_err(|failure| Fault::Acquire {
-                layer: input.layer.to_string(),
-                failure,
-            })?;
+        let handler_identity = handler.handler_identity();
+        match handler.handle_release(
+            input.sid,
+            input.role,
+            input.layer,
+            &ev,
+            &self.coroutines[input.coro_idx].regs,
+        ) {
+            EffectResult::Success(()) => {}
+            EffectResult::Blocked => {
+                let effect_id = self.issue_runtime_effect(
+                    "handle_release",
+                    Some(input.sid),
+                    &handler_identity,
+                    json!({
+                        "session": input.sid,
+                        "role": input.role,
+                        "layer": input.layer,
+                    }),
+                );
+                let failure =
+                    EffectFailure::contract_violation("handle_release returned blocked");
+                self.complete_runtime_effect(
+                    effect_id,
+                    OutstandingEffectStatus::Failed,
+                    json!({
+                        "status": "failure",
+                        "failure": failure,
+                    }),
+                )
+                .map_err(|err| Fault::Acquire {
+                    layer: input.layer.to_string(),
+                    failure: EffectFailure::contract_violation(err.to_string()),
+                })?;
+                return Err(Fault::Acquire {
+                    layer: input.layer.to_string(),
+                    failure,
+                });
+            }
+            EffectResult::Failure(failure) => {
+                let effect_id = self.issue_runtime_effect(
+                    "handle_release",
+                    Some(input.sid),
+                    &handler_identity,
+                    json!({
+                        "session": input.sid,
+                        "role": input.role,
+                        "layer": input.layer,
+                    }),
+                );
+                self.complete_runtime_effect(
+                    effect_id,
+                    OutstandingEffectStatus::Failed,
+                    json!({
+                        "status": "failure",
+                        "failure": failure,
+                    }),
+                )
+                .map_err(|err| Fault::Acquire {
+                    layer: input.layer.to_string(),
+                    failure: EffectFailure::contract_violation(err.to_string()),
+                })?;
+                return Err(Fault::Acquire {
+                    layer: input.layer.to_string(),
+                    failure,
+                });
+            }
+        }
         self.guard_layer
             .close(&layer_id, decoded)
             .map_err(|e| Fault::Acquire {

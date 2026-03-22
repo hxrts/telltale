@@ -5,7 +5,8 @@ use crate::determinism::EffectDeterminismTier;
 use crate::effect::{CorruptionType, EffectTraceEntry};
 use crate::output_condition::OutputConditionCheck;
 use crate::semantic_objects::{
-    protocol_machine_semantic_objects_v1, ProtocolMachineSemanticObjects,
+    protocol_machine_semantic_objects_v1, OperationInstance, OutstandingEffect,
+    ProtocolMachineSemanticObjects,
 };
 use crate::session::{
     AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord, AuthorityWitnessId,
@@ -282,21 +283,6 @@ fn authority_artifact_session(artifact: &AuthorityArtifact) -> Option<SessionId>
     }
 }
 
-fn effect_entry_session(entry: &EffectTraceEntry) -> Option<SessionId> {
-    entry
-        .inputs
-        .get("session")
-        .and_then(JsonValue::as_u64)
-        .and_then(|sid| usize::try_from(sid).ok())
-        .or_else(|| {
-            entry
-                .inputs
-                .get("sid")
-                .and_then(JsonValue::as_u64)
-                .and_then(|sid| usize::try_from(sid).ok())
-        })
-}
-
 fn semantic_rank(record: &SemanticAuditRecord) -> u8 {
     match record {
         SemanticAuditRecord::Authority { .. } => 0,
@@ -375,7 +361,7 @@ pub fn semantic_audit_log_v1(
     authority_audit_log: &[AuthorityAuditRecord],
     delegation_audit_log: &[DelegationAuditRecord],
     obs_trace: &[ObsEvent],
-    effect_trace: &[EffectTraceEntry],
+    outstanding_effects: &[OutstandingEffect],
 ) -> Vec<SemanticAuditRecord> {
     let mut records = Vec::new();
 
@@ -458,17 +444,17 @@ pub fn semantic_audit_log_v1(
         _ => None,
     }));
 
-    records.extend(effect_trace.iter().cloned().map(|entry| {
+    records.extend(outstanding_effects.iter().cloned().map(|effect| {
         SemanticAuditRecord::EffectObservation {
-            effect_id: entry.effect_id,
-            ordering_key: entry.ordering_key,
-            session: effect_entry_session(&entry),
-            effect_kind: entry.effect_kind,
-            effect_interface: entry.effect_interface,
-            effect_operation: entry.effect_operation,
-            handler_identity: entry.handler_identity,
-            inputs: entry.inputs,
-            outputs: entry.outputs,
+            effect_id: effect.effect_id,
+            ordering_key: effect.ordering_key,
+            session: effect.session,
+            effect_kind: effect.effect_kind,
+            effect_interface: effect.effect_interface,
+            effect_operation: effect.effect_operation,
+            handler_identity: effect.handler_identity,
+            inputs: effect.inputs,
+            outputs: effect.outputs,
         }
     }));
 
@@ -483,6 +469,8 @@ pub fn canonical_replay_fragment_v1(
     effect_trace: &[EffectTraceEntry],
     authority_audit_log: &[AuthorityAuditRecord],
     delegation_audit_log: &[DelegationAuditRecord],
+    operation_instances: &[OperationInstance],
+    outstanding_effects: &[OutstandingEffect],
     output_condition_checks: &[OutputConditionCheck],
     mut crashed_sites: Vec<String>,
     mut partitioned_edges: Vec<(String, String)>,
@@ -520,13 +508,14 @@ pub fn canonical_replay_fragment_v1(
             authority_audit_log,
             delegation_audit_log,
             obs_trace,
-            effect_trace,
+            outstanding_effects,
         ),
         semantic_objects: canonicalize_protocol_machine_semantic_objects(
             &protocol_machine_semantic_objects_v1(
                 authority_audit_log,
                 delegation_audit_log,
-                effect_trace,
+                operation_instances,
+                outstanding_effects,
                 output_condition_checks,
             ),
         ),

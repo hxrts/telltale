@@ -334,6 +334,7 @@ mod tests {
             communication_replay_root: None,
             communication_consumption_artifacts: Vec::new(),
             semantic_audit_log: Vec::new(),
+            semantic_objects: crate::semantic_objects::ProtocolMachineSemanticObjects::default(),
         }
     }
 

@@ -6,7 +6,7 @@ This document defines the protocol-machine architecture, scheduling semantics, a
 
 The canonical semantic authority is `VMKernel`. The cooperative `ProtocolMachine` (currently implemented by `VM`) and threaded `ThreadedVM` are execution adapters that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
 
-The runtime keeps a single state model across targets. Core state includes coroutines, sessions, scheduler queues, observable trace, effect trace, delegation audit records, and failure-topology snapshot fields.
+The runtime keeps a single state model across targets. Core state includes coroutines, sessions, scheduler queues, observable trace, effect trace, live operation-instance state, live outstanding-effect state, delegation audit records, and failure-topology snapshot fields.
 The canonical exported semantic surface is the semantic-object family:
 `OperationInstance`, `OutstandingEffect`, `SemanticHandoff`,
 `AuthoritativeRead`, `ObservedRead`, `MaterializationProof`,
@@ -119,14 +119,14 @@ For canonical ordering, the cooperative runtime emits the explicit event sequenc
 
 ## Semantic Audit Surface
 
-Replay-visible auditability now has one canonical surface derived from existing semantic artifacts rather than ad hoc logging-only streams.
+Replay-visible auditability now has one canonical surface derived from existing semantic artifacts rather than ad hoc logging-only streams. Effect observations now flow from the runtime's live outstanding-effect state rather than being reconstructed only from generic trace order.
 
 | Source surface | Canonical semantic record |
 |---|---|
 | authority witness audit log | `SemanticAuditRecord::Authority` |
 | delegation audit log | `SemanticAuditRecord::Delegation` |
 | explicit failure/timeout/cancellation/session-terminal events | `FailureBranch`, `TimeoutIssued`, `CancellationRequested`, `Cancelled`, `SessionTerminal` |
-| effect trace | `EffectObservation` with nominal interface/operation classification |
+| outstanding-effect runtime state | `EffectObservation` with nominal interface/operation classification |
 
 Runtime accessors:
 
@@ -142,7 +142,8 @@ retained in `EffectObservation`.
 ## Canonical Semantic Objects
 
 The protocol machine now exports one higher-level semantic object bundle derived
-from effect, authority, delegation, and output-condition surfaces.
+from live operation/effect runtime state plus authority, delegation, and
+output-condition surfaces.
 
 Runtime accessors:
 
@@ -154,6 +155,12 @@ This bundle is the canonical bridge-facing and replay-facing representation of
 operation instances, outstanding effects, semantic handoffs, authoritative and
 observed reads, materialization proofs, canonical handles, and progress
 contracts.
+
+`OperationInstance` and `OutstandingEffect` are first-class runtime objects.
+They carry owner id, budget ticks, retry policy, invalidation token,
+dependent-operation edges, and terminal publication state. Replay export and
+bridge payloads consume those runtime objects directly instead of deriving them
+later from raw trace order.
 
 ## Delegation and Reconfiguration Path
 

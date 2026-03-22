@@ -74,6 +74,9 @@ Key exports:
   `OperationInstance`, `OutstandingEffect`, `SemanticHandoff`,
   `AuthoritativeRead`, `ObservedRead`, `MaterializationProof`,
   `CanonicalHandle`, `ProgressContract`, `ProtocolMachineSemanticObjects`
+- runtime introspection:
+  `operation_instances()`, `outstanding_effects()`, `semantic_objects()`,
+  `semantic_audit_log()`, `canonical_replay_fragment()`
 
 `GuestRuntime` is the Telltale-owned runtime instantiated around the protocol
 machine. `ExternalHandler` is the host-runtime boundary implemented by
