@@ -1,8 +1,8 @@
-//! VM-state export helpers for Lean bridge JSON payloads.
+//! Protocol-machine state export helpers for Lean bridge JSON payloads.
 //!
 //! This module is intentionally generic and does not depend on `telltale-vm`
-//! to avoid cross-crate cycles. Runtime adapters can map concrete VM state
-//! into these export structs before serialization.
+//! to avoid cross-crate cycles. Guest-runtime adapters can map concrete
+//! protocol-machine state into these export structs before serialization.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as Json};
@@ -96,6 +96,9 @@ pub struct VMState<G, E> {
     #[serde(rename = "obsTrace", alias = "obs_trace")]
     pub obs_trace: Vec<TickedObsEvent<E>>,
 }
+
+/// Canonical public alias for bridge-visible protocol-machine state.
+pub type ProtocolMachineStateView<G, E> = VMState<G, E>;
 
 /// Convert a full VM-state payload to canonical JSON.
 pub fn vm_state_to_json<G, E>(vm: &VMState<G, E>) -> Result<Json, serde_json::Error>

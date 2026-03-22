@@ -10,7 +10,7 @@ use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::{
     ObservabilityRetentionConfig, ObservabilityRetentionMode, PayloadValidationMode,
 };
-use telltale_vm::{CommunicationReplayMode, Instr, VMConfig, VM};
+use telltale_vm::{CommunicationReplayMode, Instr, ProtocolMachine, ProtocolMachineConfig};
 
 struct ProfileHandler;
 
@@ -102,9 +102,9 @@ fn profile_scheduler_many_paused(iterations: usize) -> usize {
     let mut checksum = 0usize;
     for _ in 0..iterations {
         let image = yield_image(256, 8);
-        let mut vm = VM::new(VMConfig {
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
             observability_retention: capped_retention_config(),
-            ..VMConfig::strict_large_fanout()
+            ..ProtocolMachineConfig::strict_large_fanout()
         });
         vm.load_choreography(&image).expect("load choreography");
         for idx in 1..256 {
@@ -122,15 +122,15 @@ fn profile_scheduler_many_paused(iterations: usize) -> usize {
 
 fn profile_repeated_load_reuse(iterations: usize) -> usize {
     let image = yield_image(16, 16);
-    let mut config = VMConfig {
+    let mut config = ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
-        ..VMConfig::strict_large_fanout()
+        ..ProtocolMachineConfig::strict_large_fanout()
     };
     config.max_sessions = config.max_sessions.max(iterations.saturating_add(16));
     config.max_coroutines = config
         .max_coroutines
         .max(iterations.saturating_mul(16).saturating_add(16));
-    let mut vm = VM::new(config);
+    let mut vm = ProtocolMachine::new(config);
     for _ in 0..iterations {
         vm.load_choreography(&image).expect("load choreography");
     }
@@ -141,9 +141,9 @@ fn profile_scheduler_many_paused_run_only(yields_per_role: usize) -> usize {
     let handler = ProfileHandler;
     let max_rounds = yields_per_role.max(1);
     let image = looping_yield_image(256);
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
-        ..VMConfig::strict_large_fanout()
+        ..ProtocolMachineConfig::strict_large_fanout()
     });
     vm.load_choreography(&image).expect("load choreography");
     for idx in 1..256 {
@@ -160,11 +160,11 @@ fn profile_scheduler_many_paused_run_only(yields_per_role: usize) -> usize {
 fn profile_send_recv_replay_nullifier(iterations: usize) -> usize {
     let handler = ProfileHandler;
     let image = typed_send_recv_image("A", "B", "msg", Some(ValType::Unit));
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         communication_replay_mode: CommunicationReplayMode::Nullifier,
         payload_validation_mode: PayloadValidationMode::Structural,
-        ..VMConfig::strict_verified()
+        ..ProtocolMachineConfig::strict_verified()
     });
     for _ in 0..iterations {
         vm.load_choreography(&image).expect("load choreography");
@@ -179,15 +179,15 @@ fn profile_send_recv_replay_nullifier(iterations: usize) -> usize {
 
 fn profile_repeated_open_same_image(iterations: usize) -> usize {
     let image = yield_image(16, 16);
-    let mut config = VMConfig {
+    let mut config = ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
-        ..VMConfig::strict_large_fanout()
+        ..ProtocolMachineConfig::strict_large_fanout()
     };
     config.max_sessions = config.max_sessions.max(iterations.saturating_add(16));
     config.max_coroutines = config
         .max_coroutines
         .max(iterations.saturating_mul(16).saturating_add(16));
-    let mut vm = VM::new(config);
+    let mut vm = ProtocolMachine::new(config);
     let mut checksum = 0usize;
     for _ in 0..iterations {
         let sid = vm.load_choreography(&image).expect("load choreography");

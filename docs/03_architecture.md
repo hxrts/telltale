@@ -262,15 +262,15 @@ Handlers implement this trait to provide different execution strategies. This as
 
 Use [Effect Handlers and Session Types](11_effect_session_bridge.md) for VM integration guidance.
 
-### VM Execution Layer
+### Protocol-Machine Execution Layer
 
-The VM provides a bytecode execution model for local types. The `telltale-vm` crate compiles `LocalTypeR` into bytecode and executes it with a policy-based scheduler. The `telltale-simulator` crate wraps the VM with deterministic middleware for latency, faults, property monitoring, and checkpointing.
+The protocol machine provides a bytecode execution model for local types. The `telltale-vm` crate compiles `LocalTypeR` into bytecode and executes it with a policy-based scheduler. The `telltale-simulator` crate wraps guest runtimes around that protocol machine with deterministic middleware for latency, faults, property monitoring, and checkpointing.
 
-The VM maintains session state with bounded message buffers. Each coroutine references its assigned program by ID. The scheduler policies are observationally equivalent per the Lean model. Nested VMs can be hosted inside a coroutine for hierarchical simulation.
+The protocol machine maintains session state with bounded message buffers. Each coroutine references its assigned program by ID. The scheduler policies are observationally equivalent per the Lean model. Nested protocol machines can be hosted inside a coroutine for hierarchical simulation.
 
-At the embedding boundary, the VM now also distinguishes current host ownership from protocol typing and capability admission. Production host integrations can use `load_choreography_owned(...)` and `OwnedSession` when they need explicit session-local authority after open. Delegation/reconfiguration paths emit explicit receipts and audit records instead of relying on ad hoc owner mutation.
+At the embedding boundary, the protocol machine now also distinguishes current host ownership from protocol typing and capability admission. Production host integrations can use `load_choreography_owned(...)` and `OwnedSession` when they need explicit session-local authority after open. Guest runtimes embed the protocol machine inside a host runtime with explicit external handlers. Delegation/reconfiguration paths emit explicit receipts and audit records instead of relying on ad hoc owner mutation.
 
-See [VM Architecture](12_vm_architecture.md) for details on the bytecode VM architecture.
+See [VM Architecture](12_vm_architecture.md) for details on the underlying bytecode protocol-machine architecture.
 
 ## Data Flow
 

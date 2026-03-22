@@ -1,8 +1,9 @@
-//! Effect handler trait for the VM.
+//! Effect handler trait for the protocol machine guest-runtime boundary.
 //!
-//! The host (simulator, application, etc.) implements this trait to provide
-//! material-specific behavior: computing payloads for sends, processing
-//! received values, and performing integration steps.
+//! The host runtime (simulator, application, integration harness, etc.)
+//! implements this trait to provide material-specific behavior: computing
+//! payloads for sends, processing received values, and performing integration
+//! steps for a guest runtime that is driving the protocol machine.
 //!
 //! Normative integration contract:
 //! - `topology_events` is queried once per scheduler round before pick/dispatch.
@@ -20,9 +21,9 @@
 //!   an explicit ownership capability such as `OwnedSession`.
 //!
 //! This is intentionally **not** the same as `telltale_choreography::ChoreoHandler`:
-//! the VM handler is synchronous, session-local, and operates on bytecode state,
-//! while `ChoreoHandler` is an async, typed transport abstraction for generated
-//! choreography code.
+//! the protocol-machine guest-runtime handler is synchronous, session-local,
+//! and operates on bytecode state, while `ChoreoHandler` is an async, typed
+//! transport abstraction for generated choreography code.
 //!
 //! Integration guide: [`Effect Handlers and Session Types`](../../../docs/11_effect_session_bridge.md).
 

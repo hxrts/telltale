@@ -1,5 +1,6 @@
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{EffectTraceCaptureMode, VMConfig, VM};
+use telltale_vm::vm::EffectTraceCaptureMode;
+use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 use std::collections::BTreeMap;
@@ -30,13 +31,15 @@ fn simple_send_recv_image() -> CodeImage {
 #[test]
 fn host_handler_smoke_test() {
     let image = simple_send_recv_image();
-    let mut vm = VM::new(VMConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         effect_trace_capture_mode: EffectTraceCaptureMode::Full,
         host_contract_assertions: true,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
-    let _session = vm
+    let _session = machine
         .load_choreography_owned(&image, "scaffold/owner")
         .expect("load choreography");
-    vm.run(&{{STRUCT_NAME}}, 100).expect("run should succeed");
+    machine
+        .run(&{{STRUCT_NAME}}, 100)
+        .expect("run should succeed");
 }

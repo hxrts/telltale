@@ -3,7 +3,7 @@
 use criterion::{black_box, BatchSize, Criterion};
 use telltale_types::ValType;
 use telltale_vm::vm::RunStatus;
-use telltale_vm::VM;
+use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 
 use crate::common::{
     capped_retention_config, observable_choice_config, replay_nullifier_config, replay_off_config,
@@ -27,9 +27,9 @@ pub(crate) fn bench_runtime(c: &mut Criterion) {
 
     c.bench_function("vm_run_yield_small", |b| {
         b.iter(|| {
-            let mut vm = VM::new(telltale_vm::VMConfig {
+            let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
                 observability_retention: capped_retention_config(),
-                ..telltale_vm::VMConfig::strict_minimal()
+                ..ProtocolMachineConfig::strict_minimal()
             });
             vm.load_choreography(black_box(&image_small))
                 .expect("load choreography");
@@ -41,9 +41,9 @@ pub(crate) fn bench_runtime(c: &mut Criterion) {
 
     c.bench_function("vm_run_yield_wide", |b| {
         b.iter(|| {
-            let mut vm = VM::new(telltale_vm::VMConfig {
+            let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
                 observability_retention: capped_retention_config(),
-                ..telltale_vm::VMConfig::strict_large_fanout()
+                ..ProtocolMachineConfig::strict_large_fanout()
             });
             vm.load_choreography(black_box(&image_wide))
                 .expect("load choreography");

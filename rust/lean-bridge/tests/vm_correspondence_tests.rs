@@ -5,13 +5,15 @@ mod test_choreographies;
 
 use telltale_lean_bridge::{
     default_schema_version, global_to_json, ChoreographyJson, EffectTraceEvent,
-    OutputConditionTraceEvent, VmRunOutput, VmRunner, VmSessionStatus, VmTraceEvent,
+    OutputConditionTraceEvent, ProtocolMachineRunOutput, ProtocolMachineRunner,
+    ProtocolMachineSessionStatus, ProtocolMachineTraceEvent,
 };
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::output_condition::OutputConditionPolicy;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::vm::ObsEvent;
+use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 
 #[derive(Debug, thiserror::Error)]
 enum VmCorrespondenceError {
@@ -70,8 +72,8 @@ impl EffectHandler for PassthroughHandler {
     }
 }
 
-fn obs_to_vm_trace(ev: &ObsEvent) -> Option<VmTraceEvent> {
-    let mut out = VmTraceEvent {
+fn obs_to_vm_trace(ev: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
+    let mut out = ProtocolMachineTraceEvent {
         schema_version: default_schema_version(),
         kind: String::new(),
         tick: 0,
@@ -164,11 +166,11 @@ fn obs_to_vm_trace(ev: &ObsEvent) -> Option<VmTraceEvent> {
 fn run_rust_vm(
     fixture: &test_choreographies::ProtocolFixture,
     max_steps: usize,
-) -> Result<VmRunOutput, VmCorrespondenceError> {
+) -> Result<ProtocolMachineRunOutput, VmCorrespondenceError> {
     let image = CodeImage::from_local_types(&fixture.local_types, &fixture.global);
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::AllowAll,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
     vm.load_choreography(&image)
         .map_err(|e| VmCorrespondenceError::Load(e.to_string()))?;
@@ -180,7 +182,7 @@ fn run_rust_vm(
         .sessions()
         .session_ids()
         .into_iter()
-        .map(|sid| VmSessionStatus {
+        .map(|sid| ProtocolMachineSessionStatus {
             schema_version: default_schema_version(),
             sid: sid as u64,
             terminal: vm
@@ -216,7 +218,7 @@ fn run_rust_vm(
         })
         .collect();
 
-    Ok(VmRunOutput {
+    Ok(ProtocolMachineRunOutput {
         schema_version: default_schema_version(),
         trace,
         sessions,
@@ -241,7 +243,7 @@ fn fixture_to_choreography_json(
     }
 }
 
-fn lean_trace_is_load_only(trace: &[VmTraceEvent]) -> bool {
+fn lean_trace_is_load_only(trace: &[ProtocolMachineTraceEvent]) -> bool {
     !trace.is_empty() && trace.iter().all(|ev| ev.kind == "opened")
 }
 
@@ -266,7 +268,7 @@ fn test_vm_trace_correspondence_ping_pong() {
     let fixture = test_choreographies::ping_pong();
     let rust_output = run_rust_vm(&fixture, 200).expect("run rust VM");
 
-    let Some(runner) = VmRunner::try_new() else {
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
         eprintln!("SKIPPED: Lean vm_runner not available");
         return;
     };
@@ -293,7 +295,7 @@ fn test_vm_trace_correspondence_all_tier1() {
         test_choreographies::chain(),
     ];
 
-    let Some(runner) = VmRunner::try_new() else {
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
         eprintln!("SKIPPED: Lean vm_runner not available");
         return;
     };
@@ -328,7 +330,7 @@ fn test_vm_trace_correspondence_tier2_to_tier4() {
         test_choreographies::tier4_classical::queue_observer(),
     ];
 
-    let Some(runner) = VmRunner::try_new() else {
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
         eprintln!("SKIPPED: Lean vm_runner not available");
         return;
     };

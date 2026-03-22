@@ -64,7 +64,7 @@ pub enum LeanRunnerError {
     },
 }
 
-/// Choreography input for the VM runner.
+/// Choreography input for the Lean protocol-machine runner.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChoreographyJson {
     /// Schema version for this payload.

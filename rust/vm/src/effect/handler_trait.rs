@@ -1,7 +1,8 @@
 /// VM-level effect handler.
 ///
-/// This is the interface between the VM and the host application. Each
-/// choreography can bind a different handler at session open time.
+/// This is the interface between a guest runtime and the surrounding host
+/// runtime. Each choreography can bind a different handler at session open
+/// time.
 ///
 /// Host-contract rules:
 /// - Methods on this trait are synchronous. Async I/O, transport polling,
@@ -13,6 +14,7 @@
 /// - Host-managed session-local mutation should flow through an explicit
 ///   ownership capability such as `OwnedSession`, not through ad hoc access to
 ///   the session store while callbacks are executing.
+#[doc(alias = "ExternalHandler")]
 pub trait EffectHandler: Send + Sync {
     /// Stable identifier for effect-trace attribution.
     fn handler_identity(&self) -> String {

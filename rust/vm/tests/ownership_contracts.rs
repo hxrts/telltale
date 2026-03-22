@@ -18,13 +18,14 @@ use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::ObsEvent;
 use telltale_vm::{
     run_loaded_vm_record_replay_conformance, DelegationStatus, Edge, OwnershipError,
-    OwnershipScope, SemanticAuditRecord, SessionHostMutation, VMConfig, VM,
+    OwnershipScope, ProtocolMachine, ProtocolMachineConfig, SemanticAuditRecord,
+    SessionHostMutation,
 };
 use test_support::simple_send_recv_image;
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
-        use telltale_vm::ThreadedVM;
+        use telltale_vm::ThreadedGuestRuntime;
     }
 }
 
@@ -108,7 +109,7 @@ fn transfer_image() -> CodeImage {
 #[test]
 fn ownership_owned_session_transfer_invalidates_stale_handles() {
     let image = simple_send_recv_image("A", "B", "m");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let owned = vm
         .load_choreography_owned(&image, "runtime/owner")
         .expect("owned open should succeed");
@@ -164,7 +165,7 @@ fn ownership_owned_session_transfer_invalidates_stale_handles() {
 
 #[test]
 fn ownership_transfer_record_replay_preserves_observable_handoff() {
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&transfer_image())
         .expect("load transfer fixture");
 
@@ -202,7 +203,7 @@ cfg_if! {
         #[test]
         fn threaded_owned_open_claims_host_authority() {
             let image = simple_send_recv_image("A", "B", "m");
-            let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 2);
+            let mut threaded = ThreadedGuestRuntime::with_workers(ProtocolMachineConfig::default(), 2);
             let owned = threaded
                 .load_choreography_owned(&image, "threaded/runtime")
                 .expect("threaded owned open should succeed");
@@ -216,13 +217,13 @@ cfg_if! {
         fn threaded_ownership_transfer_matches_cooperative_audit_surface() {
             let image = transfer_image();
 
-            let mut coop = VM::new(VMConfig::default());
+            let mut coop = ProtocolMachine::new(ProtocolMachineConfig::default());
             coop.load_choreography(&image)
                 .expect("load cooperative transfer fixture");
             coop.run(&NoopHandler, 32)
                 .expect("run cooperative transfer fixture");
 
-            let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 2);
+            let mut threaded = ThreadedGuestRuntime::with_workers(ProtocolMachineConfig::default(), 2);
             threaded
                 .load_choreography(&image)
                 .expect("load threaded transfer fixture");

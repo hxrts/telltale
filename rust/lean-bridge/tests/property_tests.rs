@@ -4,13 +4,15 @@ use std::collections::BTreeMap;
 
 use proptest::prelude::*;
 use telltale_lean_bridge::{
-    export_protocol_bundle, InvariantClaims, SchedulerKind, VmRunner, VmRunnerError, VmTraceEvent,
+    export_protocol_bundle, InvariantClaims, ProtocolMachineRunner,
+    ProtocolMachineRunnerError, ProtocolMachineTraceEvent, SchedulerKind,
 };
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
+use telltale_vm::vm::ObsEvent;
 
 #[derive(Clone, Debug)]
 struct GeneratedProtocol {
@@ -227,8 +229,8 @@ impl EffectHandler for PropertyHandler {
     }
 }
 
-fn obs_to_vm_trace(event: &ObsEvent) -> Option<VmTraceEvent> {
-    let mut out = VmTraceEvent {
+fn obs_to_vm_trace(event: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
+    let mut out = ProtocolMachineTraceEvent {
         schema_version: telltale_lean_bridge::default_schema_version(),
         kind: String::new(),
         tick: 0,
@@ -286,9 +288,11 @@ fn obs_to_vm_trace(event: &ObsEvent) -> Option<VmTraceEvent> {
     }
 }
 
-fn run_rust_vm_trace(protocol: &GeneratedProtocol) -> Result<Vec<VmTraceEvent>, String> {
+fn run_rust_vm_trace(
+    protocol: &GeneratedProtocol,
+) -> Result<Vec<ProtocolMachineTraceEvent>, String> {
     let image = CodeImage::from_local_types(&protocol.local_types, &protocol.global);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).map_err(|e| e.to_string())?;
     vm.run(&PropertyHandler, 128).map_err(|e| e.to_string())?;
     Ok(vm.trace().iter().filter_map(obs_to_vm_trace).collect())
@@ -302,7 +306,7 @@ proptest! {
         let trace = run_rust_vm_trace(&protocol)
             .map_err(proptest::test_runner::TestCaseError::fail)?;
 
-        let Some(runner) = VmRunner::try_new() else {
+        let Some(runner) = ProtocolMachineRunner::try_new() else {
             return Ok(());
         };
 
@@ -313,7 +317,8 @@ proptest! {
                     "Lean validation returned invalid without structured errors"
                 );
             }
-            Err(VmRunnerError::ProcessFailed { stderr, .. }) if unsupported_lean_operation(&stderr) => {}
+            Err(ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
+                if unsupported_lean_operation(&stderr) => {}
             Err(err) => {
                 return Err(proptest::test_runner::TestCaseError::fail(format!(
                     "validate_trace failed: {err}"
@@ -328,7 +333,7 @@ proptest! {
         claims in arb_invariant_claims()
     ) {
         let local_ok = runtime_check_invariant(&protocol, &claims);
-        let Some(runner) = VmRunner::try_new() else {
+        let Some(runner) = ProtocolMachineRunner::try_new() else {
             return Ok(());
         };
 
@@ -351,7 +356,8 @@ proptest! {
                     "structured errors must include non-empty codes"
                 );
             }
-            Err(VmRunnerError::ProcessFailed { stderr, .. }) if unsupported_lean_operation(&stderr) => {}
+            Err(ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
+                if unsupported_lean_operation(&stderr) => {}
             Err(err) => {
                 return Err(proptest::test_runner::TestCaseError::fail(format!(
                     "verify_invariants failed: {err}"

@@ -1,13 +1,13 @@
-//! Bytecode VM for choreographic session type protocols.
+//! Protocol-machine and guest-runtime surfaces for choreographic session type protocols.
 //!
-//! This crate provides a standalone, embeddable virtual machine that executes
-//! choreographic protocols projected to local session types. The VM validates
-//! every instruction against its session type monitor, ensuring protocol
-//! conformance at runtime.
+//! This crate provides a standalone, embeddable protocol machine that executes
+//! choreographic protocols projected to local session types. The protocol
+//! machine validates every instruction against its session type monitor,
+//! ensuring protocol conformance at runtime.
 //!
 //! # Architecture
 //!
-//! The VM follows the Lean specification in `lean/Runtime/VM/`:
+//! The protocol machine follows the Lean specification in `lean/Runtime/VM/`:
 //! - **Instructions** ([`instr::Instr`]): bytecode ops for send/recv/choice/session lifecycle
 //! - **Coroutines** ([`coroutine::Coroutine`]): lightweight execution units, one per role
 //! - **Sessions** ([`session::SessionStore`]): manage session lifecycle and namespaces
@@ -16,18 +16,20 @@
 //! - **Loader** ([`loader`]): dynamic choreography loading with validation
 //! - **Compiler** ([`compiler`]): compile `LocalTypeR` to bytecode
 //!
-//! The VM is the **single execution engine** for simulation and runtime
-//! orchestration. Higher-level systems (e.g. `telltale-simulator`) wrap the
-//! VM with deterministic middleware for network latency, faults, property
-//! monitoring, and checkpointing.
+//! The crate exposes one canonical single-thread protocol-machine surface,
+//! [`ProtocolMachine`], plus guest-runtime driver surfaces such as
+//! [`GuestRuntime`]. Higher-level systems (for example `telltale-simulator`)
+//! instantiate guest runtimes around the protocol machine with deterministic
+//! middleware for network latency, faults, property monitoring, and
+//! checkpointing.
 //!
 //! **Nested simulation** is supported via [`nested::NestedVMHandler`], which
-//! allows a VM coroutine to host an inner VM for distributed or hierarchical
-//! simulations.
+//! allows a protocol-machine coroutine to host an inner protocol machine for
+//! distributed or hierarchical simulations.
 //!
 //! # Effect Handler Contract
 //!
-//! The VM's [`effect::EffectHandler`] is synchronous, deterministic, and
+//! The protocol machine's [`ExternalHandler`] is synchronous, deterministic, and
 //! **session-local**. It must not depend on global time or shared mutable
 //! state across sessions. This is distinct from the async, typed
 //! `telltale_choreography::ChoreoHandler` used by generated choreography code.
@@ -35,14 +37,20 @@
 //! # Usage
 //!
 //! ```ignore
-//! use telltale_vm::{OwnedSession, VM, VMConfig, compiler, loader::CodeImage};
+//! use telltale_vm::{
+//!     GuestRuntime, OwnedSession, ProtocolMachine, ProtocolMachineConfig, loader::CodeImage
+//! };
 //!
-//! let config = VMConfig::default();
-//! let mut vm = VM::new(config);
+//! let config = ProtocolMachineConfig::default();
+//! let mut machine = ProtocolMachine::new(config);
 //! let image = CodeImage::from_local_types(&local_types, &global_type);
 //! let _session: OwnedSession =
-//!     vm.load_choreography_owned(&image, "runtime/owner")?;
-//! while vm.step(&handler)? {}
+//!     machine.load_choreography_owned(&image, "runtime/owner")?;
+//! while machine.step(&handler)? {}
+//!
+//! let mut guest = GuestRuntime::new(ProtocolMachineConfig::default());
+//! let _owned = guest.load_choreography_owned(&image, "runtime/owner")?;
+//! guest.run(&handler, 64, 1)?;
 //! ```
 
 use cfg_if::cfg_if;
@@ -85,10 +93,12 @@ pub mod session;
 pub mod trace;
 pub mod transfer_semantics;
 pub mod verification;
+#[doc(hidden)]
 pub mod vm;
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
+        #[doc(hidden)]
         pub mod threaded;
     }
 }
@@ -97,6 +107,30 @@ cfg_if! {
     if #[cfg(target_arch = "wasm32")] {
         pub mod wasm;
     }
+}
+
+/// Canonical protocol-machine public surface.
+pub mod protocol_machine {
+    pub use crate::kernel::VMKernel;
+    pub use crate::vm::{
+        EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig,
+        ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore,
+        RuntimeTuningProfile, SchedExecStatus, SchedStepDebug, ThreadedRoundSemantics,
+        VM as ProtocolMachine, VMConfig as ProtocolMachineConfig, VMError as ProtocolMachineError,
+        VMState as ProtocolMachineState, VmMemoryUsage, VmRetainedBytes,
+    };
+}
+
+/// Canonical guest-runtime public surface.
+pub mod guest_runtime {
+    pub use crate::driver::NativeSingleThreadDriver as GuestRuntime;
+    #[cfg(feature = "multi-thread")]
+    pub use crate::driver::NativeThreadedDriver as ThreadedGuestRuntime;
+}
+
+/// Canonical host-runtime boundary surface.
+pub mod host_runtime {
+    pub use crate::effect::EffectHandler as ExternalHandler;
 }
 
 pub use architecture::{
@@ -120,12 +154,13 @@ pub use composition::{
 };
 pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
 pub use determinism::{DeterminismMode, EffectDeterminismTier};
-pub use driver::NativeSingleThreadDriver;
+pub use driver::NativeSingleThreadDriver as GuestRuntime;
 pub use effect::{
     send_fast_path_key, CorruptionType, EffectFailure, EffectFailureKind, EffectResult,
     EffectTraceEntry, EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler,
     SendDecisionFastPathInput, SendPayloadKind, TopologyPerturbation,
 };
+pub use effect::EffectHandler as ExternalHandler;
 pub use envelope_diff::{
     EffectOrderingClass, EnvelopeDiff, EnvelopeDiffArtifactV1, FailureVisibleDiffClass,
     SchedulerPermutationClass, WaveWidthBound,
@@ -184,15 +219,15 @@ pub use verification::{
 pub use vm::{
     EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig, ObservabilityRetentionMode,
     PayloadValidationMode, Program, ProgramStore, RuntimeTuningProfile, SchedExecStatus,
-    SchedStepDebug, ThreadedRoundSemantics, VMConfig, VMState, VmMemoryUsage, VmRetainedBytes, VM,
+    SchedStepDebug, ThreadedRoundSemantics, VM as ProtocolMachine,
+    VMConfig as ProtocolMachineConfig, VMError as ProtocolMachineError,
+    VMState as ProtocolMachineState, VmMemoryUsage, VmRetainedBytes,
 };
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
-        pub use driver::NativeThreadedDriver;
-        pub use threaded::{
-            ContentionMetrics, LaneHandoff, LaneId, LaneSchedulerState, LaneSelection, ThreadedVM,
-        };
+        pub use driver::NativeThreadedDriver as ThreadedGuestRuntime;
+        pub use threaded::{ContentionMetrics, LaneHandoff, LaneId, LaneSchedulerState, LaneSelection};
     }
 }
 

@@ -161,7 +161,12 @@ These commands generate samples, validate round-trips, and import JSON respectiv
 
 ### telltale-vm
 
-This crate is located in `rust/vm/`. It provides a bytecode VM for executing session type protocols. The VM is the core engine used by the simulator and can also be embedded directly.
+This crate is located in `rust/vm/`. It provides the protocol machine and guest-runtime surfaces for executing session type protocols. The protocol machine is the canonical semantic core used by the simulator and by direct embeddings.
+
+The canonical public entry modules are `telltale_vm::protocol_machine`,
+`telltale_vm::guest_runtime`, and `telltale_vm::host_runtime`. The historical
+`vm` and `threaded` modules still exist as implementation modules, but they are
+not the architectural front door.
 
 The `instr` module defines the bytecode instruction set. Communication instructions include `Send`, `Receive`, `Offer`, and `Choose`. Session lifecycle uses `Open` and `Close`.
 
@@ -173,24 +178,27 @@ The `scheduler` module implements scheduling policies. Available policies are `C
 
 The `session` module manages session state and type advancement. The `buffer` module provides bounded message buffers. Buffer modes include `Fifo` and `LatestValue`. Backpressure policies include `Block`, `Drop`, `Error`, and `Resize`.
 
-The `loader` module handles dynamic choreography loading. The `CodeImage` struct packages local types for loading. The `load_choreography` method creates sessions and coroutines from a code image.
+The `loader` module handles dynamic choreography loading. The `CodeImage` struct packages local types for loading. The preferred host-facing open path is `load_choreography_owned(...)`, which binds explicit guest-runtime ownership at open.
 
 ```rust
-use telltale_vm::{OwnedSession, VM, VMConfig};
+use telltale_vm::{GuestRuntime, OwnedSession, ProtocolMachine, ProtocolMachineConfig};
 use telltale_vm::loader::CodeImage;
 
-let mut vm = VM::new(VMConfig::default());
+let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
 let image = CodeImage::from_local_types(&local_types, &global_type);
 let _session: OwnedSession =
-    vm.load_choreography_owned(&image, "runtime/owner")?;
-while vm.step(&handler)? {}
+    machine.load_choreography_owned(&image, "runtime/owner")?;
+while machine.step(&handler)? {}
+
+let mut guest = GuestRuntime::new(ProtocolMachineConfig::default());
+let _owned = guest.load_choreography_owned(&image, "runtime/owner")?;
 ```
 
-The first line creates a VM with default configuration. The second line creates a code image from local types. The third line opens the choreography and binds the current host owner. The fourth line steps the VM to completion with an effect handler that implements `telltale_vm::effect::EffectHandler`.
+The first line creates a protocol machine with default configuration. The second line creates a code image from local types. The third line opens the choreography and binds the current host owner. The fourth line steps the protocol machine to completion with an external handler. The final two lines show the higher-level guest-runtime surface that wraps the protocol machine for host integration.
 
 ### telltale-simulator
 
-This crate is located in `rust/simulator/`. It wraps the VM for simulation and testing. The crate depends on `telltale-vm` and `telltale-types`.
+This crate is located in `rust/simulator/`. It wraps the protocol machine and guest-runtime surfaces for simulation and testing. The crate depends on `telltale-vm` and `telltale-types`.
 
 The `runner` module provides `run`, `run_concurrent`, and `run_with_scenario` for single or multi choreography execution. Scenario runs attach middleware for faults, network latency, property monitors, and checkpoints.
 

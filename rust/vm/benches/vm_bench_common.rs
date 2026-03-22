@@ -14,7 +14,9 @@ use telltale_vm::session::SessionStore;
 use telltale_vm::vm::{
     ObservabilityRetentionConfig, ObservabilityRetentionMode, PayloadValidationMode, RunStatus,
 };
-use telltale_vm::{CommunicationReplayMode, Instr, VMConfig, VmMemoryUsage, VM};
+use telltale_vm::{
+    CommunicationReplayMode, Instr, ProtocolMachine, ProtocolMachineConfig, VmMemoryUsage,
+};
 
 pub(crate) struct CountingAllocator;
 
@@ -189,71 +191,71 @@ pub(crate) fn capped_retention_config() -> ObservabilityRetentionConfig {
     }
 }
 
-pub(crate) fn replay_off_config() -> VMConfig {
-    VMConfig {
+pub(crate) fn replay_off_config() -> ProtocolMachineConfig {
+    ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         communication_replay_mode: CommunicationReplayMode::Off,
         payload_validation_mode: PayloadValidationMode::Structural,
-        ..VMConfig::strict_minimal()
+        ..ProtocolMachineConfig::strict_minimal()
     }
 }
 
-pub(crate) fn replay_sequence_config() -> VMConfig {
-    VMConfig {
+pub(crate) fn replay_sequence_config() -> ProtocolMachineConfig {
+    ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         communication_replay_mode: CommunicationReplayMode::Sequence,
         payload_validation_mode: PayloadValidationMode::Structural,
-        ..VMConfig::strict_minimal()
+        ..ProtocolMachineConfig::strict_minimal()
     }
 }
 
-pub(crate) fn replay_nullifier_config() -> VMConfig {
-    VMConfig {
+pub(crate) fn replay_nullifier_config() -> ProtocolMachineConfig {
+    ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         communication_replay_mode: CommunicationReplayMode::Nullifier,
         payload_validation_mode: PayloadValidationMode::Structural,
-        ..VMConfig::strict_verified()
+        ..ProtocolMachineConfig::strict_verified()
     }
 }
 
-pub(crate) fn validation_off_config() -> VMConfig {
-    VMConfig {
+pub(crate) fn validation_off_config() -> ProtocolMachineConfig {
+    ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         communication_replay_mode: CommunicationReplayMode::Off,
         payload_validation_mode: PayloadValidationMode::Off,
-        ..VMConfig::strict_minimal()
+        ..ProtocolMachineConfig::strict_minimal()
     }
 }
 
-pub(crate) fn validation_structural_config() -> VMConfig {
-    VMConfig {
+pub(crate) fn validation_structural_config() -> ProtocolMachineConfig {
+    ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         communication_replay_mode: CommunicationReplayMode::Off,
         payload_validation_mode: PayloadValidationMode::Structural,
-        ..VMConfig::strict_minimal()
+        ..ProtocolMachineConfig::strict_minimal()
     }
 }
 
-pub(crate) fn validation_strict_schema_config() -> VMConfig {
-    VMConfig {
+pub(crate) fn validation_strict_schema_config() -> ProtocolMachineConfig {
+    ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         communication_replay_mode: CommunicationReplayMode::Off,
         payload_validation_mode: PayloadValidationMode::StrictSchema,
-        ..VMConfig::strict_verified()
+        ..ProtocolMachineConfig::strict_verified()
     }
 }
 
-pub(crate) fn observable_choice_config() -> VMConfig {
-    VMConfig {
+pub(crate) fn observable_choice_config() -> ProtocolMachineConfig {
+    ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
-        ..VMConfig::strict_observable()
+        ..ProtocolMachineConfig::strict_observable()
     }
 }
 
 pub(crate) fn run_yield_workload(image: &CodeImage, max_rounds: usize) -> VmMemoryUsage {
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
-        ..VMConfig::strict_minimal()
+        ..ProtocolMachineConfig::strict_minimal()
     });
     vm.load_choreography(image).expect("load choreography");
     let status = vm.run(&BenchHandler, max_rounds).expect("run vm");
@@ -266,9 +268,9 @@ pub(crate) fn run_short_lived_session_churn(iterations: usize) -> VmMemoryUsage 
     let mut last_usage = VmMemoryUsage::default();
 
     for _ in 0..iterations {
-        let mut vm = VM::new(VMConfig {
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
             observability_retention: capped_retention_config(),
-            ..VMConfig::strict_churn()
+            ..ProtocolMachineConfig::strict_churn()
         });
         let sid = vm.load_choreography(&image).expect("load choreography");
         let status = vm.run(&BenchHandler, 10_000).expect("run vm");
@@ -292,9 +294,9 @@ pub(crate) fn run_short_lived_session_churn(iterations: usize) -> VmMemoryUsage 
 
 pub(crate) fn run_repeated_load_reuse(iterations: usize) -> VmMemoryUsage {
     let image = yield_image(16, 16);
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
-        ..VMConfig::strict_large_fanout()
+        ..ProtocolMachineConfig::strict_large_fanout()
     });
 
     for _ in 0..iterations {
@@ -310,14 +312,14 @@ pub(crate) fn run_repeated_open_same_image(
     yields_per_role: usize,
 ) -> VmMemoryUsage {
     let image = yield_image(num_roles, yields_per_role);
-    let mut config = VMConfig {
+    let mut config = ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
-        ..VMConfig::strict_large_fanout()
+        ..ProtocolMachineConfig::strict_large_fanout()
     };
     config.max_coroutines = config
         .max_coroutines
         .max(iterations.saturating_mul(num_roles).saturating_add(16));
-    let mut vm = VM::new(config);
+    let mut vm = ProtocolMachine::new(config);
     for _ in 0..iterations {
         vm.load_choreography(&image).expect("load choreography");
     }
@@ -330,10 +332,10 @@ pub(crate) fn run_repeated_open_wide_roles(iterations: usize, num_roles: usize) 
 
 pub(crate) fn run_send_recv_workload(
     image: &CodeImage,
-    config: VMConfig,
+    config: ProtocolMachineConfig,
     iterations: usize,
 ) -> VmMemoryUsage {
-    let mut vm = VM::new(config);
+    let mut vm = ProtocolMachine::new(config);
 
     for _ in 0..iterations {
         vm.load_choreography(image).expect("load choreography");
@@ -344,7 +346,10 @@ pub(crate) fn run_send_recv_workload(
     vm.memory_usage()
 }
 
-pub(crate) fn run_choice_workload(config: VMConfig, iterations: usize) -> VmMemoryUsage {
+pub(crate) fn run_choice_workload(
+    config: ProtocolMachineConfig,
+    iterations: usize,
+) -> VmMemoryUsage {
     let image = choice_image("A", "B", &["left", "right", "other"]);
     run_send_recv_workload(&image, config, iterations)
 }
@@ -359,11 +364,14 @@ pub(crate) fn run_many_paused_scheduler_workload(
     vm.memory_usage()
 }
 
-pub(crate) fn setup_many_paused_scheduler_vm(num_roles: usize, yields_per_role: usize) -> VM {
+pub(crate) fn setup_many_paused_scheduler_vm(
+    num_roles: usize,
+    yields_per_role: usize,
+) -> ProtocolMachine {
     let image = yield_image(num_roles, yields_per_role);
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
-        ..VMConfig::strict_large_fanout()
+        ..ProtocolMachineConfig::strict_large_fanout()
     });
     vm.load_choreography(&image).expect("load choreography");
     for idx in 1..num_roles {
@@ -377,9 +385,9 @@ pub(crate) fn run_pause_resume_churn_workload(
     iterations: usize,
 ) -> VmMemoryUsage {
     let image = yield_image(num_roles, 4);
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
-        ..VMConfig::strict_large_fanout()
+        ..ProtocolMachineConfig::strict_large_fanout()
     });
     vm.load_choreography(&image).expect("load choreography");
     for idx in 1..num_roles {
@@ -412,7 +420,7 @@ pub(crate) fn choreography_load_allocation_count(
 ) -> usize {
     let image = yield_image(num_roles, yields_per_role);
     let (_, allocations) = count_allocations(|| {
-        let mut vm = VM::new(VMConfig::strict_large_fanout());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::strict_large_fanout());
         vm.load_choreography(&image).expect("load choreography");
         vm
     });

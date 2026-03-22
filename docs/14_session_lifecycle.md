@@ -154,7 +154,7 @@ The close path is distinct from host-runtime ownership transfer. Endpoint/corout
 
 Default behavior:
 
-- `VMConfig.communication_replay_mode` defaults to `off`, preserving prior runtime behavior.
+- `ProtocolMachineConfig.communication_replay_mode` defaults to `off`, preserving prior runtime behavior.
 - Existing workloads continue to run without replay-consumption enforcement until mode is changed.
 
 Opt-in guidance:
@@ -169,7 +169,7 @@ Why this matters for consensus protocols:
 
 Configuration examples:
 
-- Local test config: `VMConfig { communication_replay_mode: Sequence, ..VMConfig::default() }`
+- Local test config: `ProtocolMachineConfig { communication_replay_mode: Sequence, ..ProtocolMachineConfig::default() }`
 - CI parity fixture config: set `communication_replay_mode` in both cooperative and threaded runners and compare canonical replay fragments.
 
 Risk notes:

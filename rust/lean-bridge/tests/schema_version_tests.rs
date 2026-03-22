@@ -2,8 +2,9 @@ use serde_json::json;
 use std::collections::BTreeMap;
 use telltale_lean_bridge::{
     ensure_supported_schema_version, export_protocol_bundle, ChoreographyJson, InvariantClaims,
-    ProtocolBundle, ReplayTraceBundle, VMState, VmRunInput, VmRunOutput,
-    LEAN_BRIDGE_SCHEMA_VERSION, PROTOCOL_BUNDLE_SCHEMA_VERSION, VM_STATE_SCHEMA_VERSION,
+    ProtocolBundle, ProtocolMachineRunInput, ProtocolMachineRunOutput,
+    ProtocolMachineStateView, ReplayTraceBundle, LEAN_BRIDGE_SCHEMA_VERSION,
+    PROTOCOL_BUNDLE_SCHEMA_VERSION, VM_STATE_SCHEMA_VERSION,
 };
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
@@ -26,7 +27,8 @@ fn vm_run_output_legacy_decode_defaults_schema_version() {
         "status": "ok"
     });
 
-    let out: VmRunOutput = serde_json::from_value(legacy).expect("decode legacy VmRunOutput");
+    let out: ProtocolMachineRunOutput =
+        serde_json::from_value(legacy).expect("decode legacy ProtocolMachineRunOutput");
     assert_eq!(out.schema_version, LEAN_BRIDGE_SCHEMA_VERSION);
     assert_eq!(out.trace[0].schema_version, LEAN_BRIDGE_SCHEMA_VERSION);
     assert_eq!(out.sessions[0].schema_version, LEAN_BRIDGE_SCHEMA_VERSION);
@@ -34,7 +36,7 @@ fn vm_run_output_legacy_decode_defaults_schema_version() {
 
 #[test]
 fn vm_run_input_roundtrip_preserves_schema_version() {
-    let input = VmRunInput {
+    let input = ProtocolMachineRunInput {
         schema_version: LEAN_BRIDGE_SCHEMA_VERSION.to_string(),
         choreographies: vec![ChoreographyJson {
             schema_version: LEAN_BRIDGE_SCHEMA_VERSION.to_string(),
@@ -45,10 +47,11 @@ fn vm_run_input_roundtrip_preserves_schema_version() {
         max_steps: 5,
     };
 
-    let encoded = serde_json::to_value(&input).expect("serialize VmRunInput");
+    let encoded = serde_json::to_value(&input).expect("serialize ProtocolMachineRunInput");
     assert_eq!(encoded["schema_version"], LEAN_BRIDGE_SCHEMA_VERSION);
 
-    let decoded: VmRunInput = serde_json::from_value(encoded).expect("deserialize VmRunInput");
+    let decoded: ProtocolMachineRunInput =
+        serde_json::from_value(encoded).expect("deserialize ProtocolMachineRunInput");
     assert_eq!(decoded.schema_version, LEAN_BRIDGE_SCHEMA_VERSION);
     assert_eq!(
         decoded.choreographies[0].schema_version,
@@ -153,7 +156,7 @@ fn vm_state_roundtrip_preserves_vm_state_schema_version() {
         }]
     });
 
-    let decoded: VMState<serde_json::Value, serde_json::Value> =
+    let decoded: ProtocolMachineStateView<serde_json::Value, serde_json::Value> =
         serde_json::from_value(state.clone()).expect("decode vm_state.v1");
     assert_eq!(decoded.schema_version, VM_STATE_SCHEMA_VERSION);
 
@@ -189,7 +192,7 @@ fn vm_state_legacy_decode_accepts_v0_shape_aliases() {
         }]
     });
 
-    let decoded: VMState<serde_json::Value, serde_json::Value> =
+    let decoded: ProtocolMachineStateView<serde_json::Value, serde_json::Value> =
         serde_json::from_value(legacy).expect("decode vm_state.v0 aliases");
     assert_eq!(decoded.schema_version, "vm_state.v0");
     assert_eq!(decoded.next_coro_id, 4);

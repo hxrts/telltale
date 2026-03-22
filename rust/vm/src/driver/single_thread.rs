@@ -1,4 +1,4 @@
-//! Native single-thread runtime driver.
+//! Native single-thread guest-runtime driver.
 
 use crate::effect::EffectHandler;
 use crate::kernel::VMKernel;
@@ -6,14 +6,15 @@ use crate::loader::CodeImage;
 use crate::owned::OwnedSession;
 use crate::vm::{ObsEvent, RunStatus, StepResult, VMConfig, VMError, VM};
 
-/// Native cooperative runtime driver backed by the canonical VM kernel.
+/// Native cooperative guest runtime backed by the canonical protocol machine.
+#[doc(alias = "GuestRuntime")]
 #[derive(Debug)]
 pub struct NativeSingleThreadDriver {
     vm: VM,
 }
 
 impl NativeSingleThreadDriver {
-    /// Create a new driver from VM config.
+    /// Create a new guest runtime from protocol-machine config.
     #[must_use]
     pub fn new(config: VMConfig) -> Self {
         Self {
@@ -21,13 +22,13 @@ impl NativeSingleThreadDriver {
         }
     }
 
-    /// Wrap an existing VM instance.
+    /// Wrap an existing protocol-machine instance inside this guest runtime.
     #[must_use]
     pub fn with_vm(vm: VM) -> Self {
         Self { vm }
     }
 
-    /// Access the inner VM.
+    /// Access the inner protocol machine.
     #[must_use]
     pub fn vm(&self) -> &VM {
         &self.vm
@@ -46,7 +47,7 @@ impl NativeSingleThreadDriver {
         self.vm.load_choreography_owned(image, owner_id)
     }
 
-    /// Execute one scheduler round via the kernel.
+    /// Execute one scheduler round via the protocol-machine kernel.
     ///
     /// # Errors
     ///
@@ -59,7 +60,7 @@ impl NativeSingleThreadDriver {
         VMKernel::step_round(&mut self.vm, handler, n)
     }
 
-    /// Run up to `max_rounds` with concurrency `n` via the kernel.
+    /// Run up to `max_rounds` with concurrency `n` via the protocol-machine kernel.
     ///
     /// # Errors
     ///

@@ -1,10 +1,10 @@
 # VM Architecture
 
-This document defines the VM architecture, scheduling semantics, and concurrency envelope used by Rust runtime targets and Lean conformance surfaces.
+This document defines the protocol-machine architecture, scheduling semantics, and concurrency envelope used by Rust runtime targets and Lean conformance surfaces. The file keeps the historical `VM` name only because the current crate/module paths still use it; the canonical public abstraction is the protocol machine.
 
 ## Architecture Overview
 
-The canonical semantic authority is `VMKernel`. The cooperative `VM` and threaded `ThreadedVM` are execution adapters that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
+The canonical semantic authority is `VMKernel`. The cooperative `ProtocolMachine` (currently implemented by `VM`) and threaded `ThreadedVM` are execution adapters that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
 
 The runtime keeps a single state model across targets. Core state includes coroutines, sessions, scheduler queues, observable trace, effect trace, delegation audit records, and failure-topology snapshot fields.
 
@@ -14,7 +14,7 @@ The canonical round model is one semantic step when concurrency is nonzero. Thre
 
 | Engine | Role | Contract Surface |
 |---|---|---|
-| `VM` | Canonical cooperative runtime | Exact reference for parity at concurrency `1` |
+| `ProtocolMachine` (`VM`) | Canonical cooperative runtime | Exact reference for parity at concurrency `1` |
 | `ThreadedVM` | Parallel wave executor | Certified-wave execution with fallback to canonical one-step |
 | WASM runtime | Single-thread deployment | Cooperative schedule only |
 
@@ -79,7 +79,7 @@ The VM adapters now enforce explicit runtime hardening at load and startup bound
 
 ## Host Ownership Contract in the Runtime
 
-The VM architecture now distinguishes three runtime concepts:
+The protocol-machine architecture now distinguishes three runtime concepts:
 
 | Runtime concept | Purpose |
 |---|---|

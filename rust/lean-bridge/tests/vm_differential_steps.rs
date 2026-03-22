@@ -7,15 +7,16 @@ use std::collections::BTreeMap;
 
 use serde_json::json;
 use telltale_lean_bridge::{
-    default_schema_version, global_to_json, normalize_vm_trace, ChoreographyJson, TickedObsEvent,
-    VmRunInput, VmRunner, VmTraceEvent,
+    default_schema_version, global_to_json, normalize_vm_trace, ChoreographyJson,
+    ProtocolMachineRunInput, ProtocolMachineRunner, ProtocolMachineTraceEvent, TickedObsEvent,
 };
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::output_condition::OutputConditionPolicy;
 use telltale_vm::session::SessionStatus;
-use telltale_vm::vm::{ObsEvent, StepResult, VMConfig, VM};
+use telltale_vm::vm::{ObsEvent, StepResult};
+use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;
@@ -72,13 +73,13 @@ struct RustStepState {
     status: String,
     selected_coro: Option<u64>,
     exec_status: Option<String>,
-    event: Option<TickedObsEvent<VmTraceEvent>>,
+    event: Option<TickedObsEvent<ProtocolMachineTraceEvent>>,
     pre_session_type_counts: BTreeMap<u64, u64>,
     session_type_counts: BTreeMap<u64, u64>,
     session_type_deltas: BTreeMap<u64, i64>,
 }
 
-fn session_type_counts(vm: &VM) -> BTreeMap<u64, u64> {
+fn session_type_counts(vm: &ProtocolMachine) -> BTreeMap<u64, u64> {
     let mut out = BTreeMap::new();
     for sid in vm.sessions().session_ids() {
         if let Some(sess) = vm.sessions().get(sid) {
@@ -106,7 +107,7 @@ fn session_type_deltas(
     out
 }
 
-fn canonical_event(event: &VmTraceEvent) -> serde_json::Value {
+fn canonical_event(event: &ProtocolMachineTraceEvent) -> serde_json::Value {
     json!({
         "kind": event.kind,
         "session": event.session,
@@ -127,12 +128,12 @@ fn canonical_event(event: &VmTraceEvent) -> serde_json::Value {
     })
 }
 
-fn lean_trace_is_load_only(trace: &[VmTraceEvent]) -> bool {
+fn lean_trace_is_load_only(trace: &[ProtocolMachineTraceEvent]) -> bool {
     !trace.is_empty() && trace.iter().all(|ev| ev.kind == "opened")
 }
 
-fn obs_to_vm_trace(ev: &ObsEvent) -> Option<VmTraceEvent> {
-    let mut out = VmTraceEvent {
+fn obs_to_vm_trace(ev: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
+    let mut out = ProtocolMachineTraceEvent {
         schema_version: default_schema_version(),
         kind: String::new(),
         tick: 0,
@@ -227,9 +228,9 @@ fn run_rust_step_states(
     max_steps: usize,
 ) -> Result<Vec<RustStepState>, String> {
     let image = CodeImage::from_local_types(&fixture.local_types, &fixture.global);
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::AllowAll,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
     vm.load_choreography(&image).map_err(|e| e.to_string())?;
 
@@ -304,17 +305,17 @@ fn fixture_to_choreography_json(
 fn assert_step_indexed_equivalence(
     fixture: &test_choreographies::ProtocolFixture,
     max_steps: usize,
-    runner: &VmRunner,
+    runner: &ProtocolMachineRunner,
 ) {
     let rust_steps = run_rust_step_states(fixture, max_steps)
         .unwrap_or_else(|e| panic!("run rust step states for {}: {e}", fixture.name));
 
-    let rust_events: Vec<TickedObsEvent<VmTraceEvent>> =
+    let rust_events: Vec<TickedObsEvent<ProtocolMachineTraceEvent>> =
         rust_steps.iter().filter_map(|s| s.event.clone()).collect();
     let rust_normalized = normalize_vm_trace(&rust_events);
 
     let choreo = fixture_to_choreography_json(fixture);
-    let input = VmRunInput {
+    let input = ProtocolMachineRunInput {
         schema_version: default_schema_version(),
         choreographies: vec![choreo],
         concurrency: 1,
@@ -331,7 +332,7 @@ fn assert_step_indexed_equivalence(
         return;
     }
     let lean_steps = lean_output.step_states.clone();
-    let lean_events: Vec<TickedObsEvent<VmTraceEvent>> = lean_steps
+    let lean_events: Vec<TickedObsEvent<ProtocolMachineTraceEvent>> = lean_steps
         .iter()
         .filter_map(|s| {
             s.event.clone().map(|event| TickedObsEvent {
@@ -445,7 +446,7 @@ fn assert_step_indexed_equivalence(
 
 #[test]
 fn tier1_step_indexed_correspondence() {
-    let Some(runner) = VmRunner::try_new() else {
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
         eprintln!("SKIPPED: Lean vm_runner not available");
         return;
     };
@@ -462,7 +463,7 @@ fn tier1_step_indexed_correspondence() {
 
 #[test]
 fn tier2_step_indexed_correspondence() {
-    let Some(runner) = VmRunner::try_new() else {
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
         eprintln!("SKIPPED: Lean vm_runner not available");
         return;
     };

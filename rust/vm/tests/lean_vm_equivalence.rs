@@ -1,5 +1,5 @@
 #![cfg(not(target_arch = "wasm32"))]
-//! Lean VM runner vs Rust VM equivalence tests.
+//! Lean protocol-machine runner vs Rust protocol-machine equivalence tests.
 #![allow(clippy::needless_collect)]
 
 #[allow(dead_code, unreachable_pub)]
@@ -7,17 +7,19 @@
 mod test_support;
 
 use telltale_lean_bridge::{
-    default_schema_version, global_to_json, ChoreographyJson, VmRunInput, VmRunner,
+    default_schema_version, global_to_json, ChoreographyJson, ProtocolMachineRunInput,
+    ProtocolMachineRunner,
 };
 use telltale_types::{GlobalType, Label};
 use telltale_vm::trace::normalize_trace;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::vm::ObsEvent;
+use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 
 use test_support::PassthroughHandler;
 
 #[test]
 fn test_lean_vm_trace_matches_rust() {
-    let Some(runner) = VmRunner::try_new() else {
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
         eprintln!("Lean vm_runner not available. Build with: cd lean && lake build vm_runner");
         return;
     };
@@ -25,7 +27,7 @@ fn test_lean_vm_trace_matches_rust() {
     let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
     let roles = vec!["A".to_string(), "B".to_string()];
 
-    let input = VmRunInput {
+    let input = ProtocolMachineRunInput {
         schema_version: default_schema_version(),
         choreographies: vec![ChoreographyJson {
             schema_version: default_schema_version(),
@@ -65,7 +67,7 @@ fn test_lean_vm_trace_matches_rust() {
 
     let image = test_support::simple_send_recv_image("A", "B", "msg");
     let handler = PassthroughHandler;
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).expect("load image");
     vm.run(&handler, 50).expect("run vm");
 

@@ -1,8 +1,8 @@
-//! Lean Verification Bridge for Telltale Session Types
+//! Lean verification bridge for Telltale protocol-machine artifacts.
 //!
-//! This crate provides bidirectional conversion between Rust session types
-//! and Lean-compatible JSON format, enabling formal verification of
-//! protocol properties in Lean.
+//! This crate provides bidirectional conversion between Rust protocol/session
+//! artifacts and Lean-compatible JSON format, enabling formal verification of
+//! protocol-machine properties in Lean.
 //!
 //! # Features
 //!
@@ -101,7 +101,7 @@ pub use schema::{
 pub use vm_export::{
     coroutine_to_json, endpoint_to_json, event_to_json, obs_event_to_json, sessions_to_json,
     status_to_json, vm_state_from_json, vm_state_to_json, CompatibilityMeta, CoroutineState,
-    EndpointRef, SessionView, TickedObsEvent, VMState, VM_STATE_SCHEMA_VERSION,
+    EndpointRef, ProtocolMachineStateView, SessionView, TickedObsEvent, VM_STATE_SCHEMA_VERSION,
 };
 pub use vm_trace::{
     event_session, normalize_vm_trace, observationally_equivalent, partition_by_session,
@@ -121,8 +121,9 @@ cfg_if! {
         };
         pub use vm_runner::{
             compute_trace_diff, ComparisonResult, InvariantVerificationResult, LeanStructuredError,
-            TraceValidation, VmRunInput, VmRunOutput, VmRunner, VmRunnerError, VmSessionStatus,
-            VmStepState, VmTraceEvent,
+            ProtocolMachineRunInput, ProtocolMachineRunOutput, ProtocolMachineRunner,
+            ProtocolMachineRunnerError, ProtocolMachineSessionStatus,
+            ProtocolMachineStepState, ProtocolMachineTraceEvent, TraceValidation,
         };
         pub use validate::{ValidationResult, Validator};
     }

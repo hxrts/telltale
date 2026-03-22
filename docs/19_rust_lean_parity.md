@@ -96,19 +96,19 @@ Projection cross-validation is exercised through `rust/lean-bridge/tests/project
 
 Lean and Rust schemas remain shape-equivalent on safety-visible and replay-visible fields. Runtime-only helper fields are allowed when they do not alter observable semantics.
 
-### Lean VMState
+### Lean ProtocolMachineState
 
 Source: `lean/Runtime/VM/Model/State.lean`
 
 The `CoroutineState` structure contains `id`, `programId`, `pc`, `regs`, `status`, `effectCtx`, `ownedEndpoints`, `progressTokens`, `knowledgeSet`, `costBudget`, and `specState`.
 
-The `VMState` structure contains `config`, `programs`, `coroutines`, `sessions`, `monitor`, `sched`, `resourceStates`, `persistent`, `obsTrace`, failure/topology state fields, and output-condition state.
+The Lean protocol-machine state structure (`VMState` in the current Lean files) contains `config`, `programs`, `coroutines`, `sessions`, `monitor`, `sched`, `resourceStates`, `persistent`, `obsTrace`, failure/topology state fields, and output-condition state.
 
-### Rust VM
+### Rust Protocol Machine
 
 Source: `rust/vm/src/vm.rs`
 
-The `VM` structure contains `config`, `programs`, `code`, `coroutines`, `sessions`, `monitor`, `sched`, `resource_states`, `persistent`, `obs_trace`, symbol/clock counters, failure/topology state fields, and output-condition state.
+The Rust protocol-machine structure (`ProtocolMachine`, currently implemented by `VM`) contains `config`, `programs`, `code`, `coroutines`, `sessions`, `monitor`, `sched`, `resource_states`, `persistent`, `obs_trace`, symbol/clock counters, failure/topology state fields, and output-condition state.
 
 The `Coroutine` structure in `rust/vm/src/coroutine.rs` contains identity/program/pc/status, register file, ownership/progress/knowledge sets, cost budget, speculation metadata, and effect context.
 

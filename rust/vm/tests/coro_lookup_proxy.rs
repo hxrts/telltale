@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::{Instr, VMConfig, VM};
+use telltale_vm::{Instr, ProtocolMachine, ProtocolMachineConfig};
 
 fn simple_single_role_image() -> CodeImage {
     let mut programs = BTreeMap::new();
@@ -20,12 +20,12 @@ fn simple_single_role_image() -> CodeImage {
 
 #[test]
 fn coroutine_lookup_proxy_stays_stable_for_large_id_sets() {
-    let config = VMConfig {
+    let config = ProtocolMachineConfig {
         max_sessions: 1024,
         max_coroutines: 4096,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
-    let mut vm = VM::new(config);
+    let mut vm = ProtocolMachine::new(config);
     let image = simple_single_role_image();
     let session_count = 256usize;
 

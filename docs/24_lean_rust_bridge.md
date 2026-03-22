@@ -3,13 +3,20 @@
 The `telltale-lean-bridge` crate is the typed boundary between Rust artifacts and Lean validation entrypoints.
 It handles JSON conversion, schema versioning, runner invocation, trace comparison, and typed invariant bundle export.
 
-The bridge does not define VM semantics.
+The bridge does not define protocol-machine semantics.
 Semantics remain in `telltale-vm`, `telltale-theory`, and Lean runtime modules.
+Historical module/file names such as `vm_runner`, `vm_export`, and `vm_trace` still exist internally,
+but the canonical public bridge surface is the protocol-machine surface:
+`ProtocolMachineRunner`, `ProtocolMachineRunInput`, `ProtocolMachineRunOutput`,
+and `ProtocolMachineStateView`.
+Bridge payloads describe guest-runtime and protocol-machine artifacts; host-runtime
+handlers remain outside the bridge and re-enter through typed effect surfaces.
 
 ## Scope
 
 This document covers runtime bridge behavior implemented in `rust/lean-bridge/src`.
-It covers `export`, `import`, `schema`, `runner`, `vm_runner`, `sim_reference`, `vm_export`, `vm_trace`, `invariants`, `equivalence`, and `validate`.
+It covers `export`, `import`, `schema`, `runner`, `vm_runner`, `sim_reference`, `vm_export`,
+`vm_trace`, `invariants`, `equivalence`, and `validate`.
 
 This document also covers bridge CLIs and bridge test lanes in `rust/lean-bridge/tests`.
 It does not restate theorem internals from Lean proof files.
@@ -40,7 +47,7 @@ name = "golden"
 required-features = ["golden"]
 ```
 
-`runner` controls `LeanRunner`, `VmRunner`, and equivalence modules.
+`runner` controls `LeanRunner`, `ProtocolMachineRunner`, and equivalence modules.
 Without `runner`, conversion and schema modules remain available.
 
 ## Conversion Layer
@@ -76,9 +83,9 @@ Each family has an explicit version constant.
 
 | Family | Version Constant | Value | Primary Payloads |
 |---|---|---|---|
-| Lean bridge core | `LEAN_BRIDGE_SCHEMA_VERSION` | `lean_bridge.v1` | `VmRunInput`, `VmRunOutput`, `SimRunInput`, `SimRunOutput`, replay bundles |
+| Lean bridge core | `LEAN_BRIDGE_SCHEMA_VERSION` | `lean_bridge.v1` | `ProtocolMachineRunInput`, `ProtocolMachineRunOutput`, `SimRunInput`, `SimRunOutput`, replay bundles |
 | Protocol bundles | `PROTOCOL_BUNDLE_SCHEMA_VERSION` | `protocol_bundle.v1` | `ProtocolBundle` |
-| VM state export | `VM_STATE_SCHEMA_VERSION` | `vm_state.v1` | `VMState` export payloads |
+| Protocol-machine state export | `VM_STATE_SCHEMA_VERSION` | `vm_state.v1` | `ProtocolMachineStateView` export payloads |
 
 `schema::ensure_supported_schema_version()` rejects unsupported `lean_bridge` versions.
 `vm_export` supports alias decoding for legacy `vm_state.v0` field names such as `next_coro_id` and `obs_trace`.
@@ -101,7 +108,7 @@ pub struct SimRunInput {
 
 pub struct SimRunOutput {
     pub schema_version: String,
-    pub trace: Vec<VmTraceEvent>,
+    pub trace: Vec<ProtocolMachineTraceEvent>,
     pub violations: Vec<Value>,
     pub artifacts: Value,
 }
@@ -127,25 +134,25 @@ The parsed result is `LeanValidationResult { success, role, message, raw_output 
 Projection methods call validator export modes.
 `project()` runs `--export-all-projections` and accepts both object and array projection formats from Lean output.
 `export_projection()` and `export_all_projections()` expose single-role and all-role export modes directly.
-`run_vm_protocol()` is also exposed on `LeanRunner` and forwards VM choreographies to the Lean `vm_runner` binary through stdin JSON.
+`run_vm_protocol()` is also exposed on `LeanRunner` and forwards protocol-machine choreographies to the Lean `vm_runner` binary through stdin JSON.
 
-## Lean VM Runner Wrapper
+## Lean Protocol-Machine Runner Wrapper
 
-`VmRunner` wraps the Lean VM binary at `lean/.lake/build/bin/vm_runner`.
-It serializes `VmRunInput` to process stdin and parses `VmRunOutput` from stdout.
+`ProtocolMachineRunner` wraps the Lean protocol-machine binary at `lean/.lake/build/bin/vm_runner`.
+It serializes `ProtocolMachineRunInput` to process stdin and parses `ProtocolMachineRunOutput` from stdout.
 
 ```rust
-pub struct VmRunInput {
+pub struct ProtocolMachineRunInput {
     pub schema_version: String,
     pub choreographies: Vec<ChoreographyJson>,
     pub concurrency: u64,
     pub max_steps: u64,
 }
 
-pub struct VmRunOutput {
+pub struct ProtocolMachineRunOutput {
     pub schema_version: String,
-    pub trace: Vec<VmTraceEvent>,
-    pub sessions: Vec<VmSessionStatus>,
+    pub trace: Vec<ProtocolMachineTraceEvent>,
+    pub sessions: Vec<ProtocolMachineSessionStatus>,
     pub steps_executed: u64,
     pub concurrency: u64,
     pub status: String,
@@ -155,8 +162,8 @@ pub struct VmRunOutput {
 }
 ```
 
-`VmRunner::run()` enforces schema compatibility checks on both input and output.
-It returns structured `VmRunnerError` values for binary lookup, process failure, IO, and parse failures.
+`ProtocolMachineRunner::run()` enforces schema compatibility checks on both input and output.
+It returns structured `ProtocolMachineRunnerError` values for binary lookup, process failure, IO, and parse failures.
 
 `validate_trace()` invokes Lean operation `validateTrace`.
 `run_reference_simulation()` invokes Lean operation `runSimulation`.
@@ -167,12 +174,12 @@ It returns structured `VmRunnerError` values for binary lookup, process failure,
 `run_reference_simulation()` decodes `SimRunOutput` and enforces schema checks on response payloads.
 `validate_simulation_trace()` returns typed `SimTraceValidation` values with structured `SimulationStructuredError` entries.
 
-## VM State Export Surface
+## Protocol-Machine State Export Surface
 
 `vm_export` provides generic payload structs that avoid a hard dependency on `telltale-vm` to prevent crate cycles.
-Runtime adapters can map concrete VM data into these bridge structs.
+Guest-runtime adapters can map concrete protocol-machine data into these bridge structs.
 
-`VMState<G, E>` carries clock, coroutine list, session view list, and ticked observable trace.
+`ProtocolMachineStateView<G, E>` carries clock, coroutine list, session view list, and ticked observable trace.
 It includes `CompatibilityMeta { family, version, backward_compatible_from }`.
 
 `vm_state_to_json()` emits canonical field names such as `nextCoroId` and `obsTrace`.
@@ -221,7 +228,7 @@ Comparison uses structural JSON equality rather than string formatting equality.
 
 ## Validator Utilities
 
-`validate::Validator` provides lightweight checks that do not require full VM execution.
+`validate::Validator` provides lightweight checks that do not require full protocol-machine execution.
 It supports global and local JSON roundtrip validation and projection result comparison.
 
 `compare_subtyping()` compares Rust and Lean subtype decisions through `SubtypingDecision`.
@@ -246,7 +253,7 @@ It resolves relative `--golden-dir` paths from the crate manifest directory.
 
 ## Test Lanes
 
-Bridge tests in `rust/lean-bridge/tests` cover conversion, projection parity, schema compatibility, invariant verification, and VM correspondence.
+Bridge tests in `rust/lean-bridge/tests` cover conversion, projection parity, schema compatibility, invariant verification, and protocol-machine correspondence.
 Most Lean-dependent tests skip when Lean binaries are missing.
 
 - `coherence_tests.rs`
@@ -277,7 +284,7 @@ Examples include `just check-parity --types`, `just check-parity --suite`, and `
 Projection export methods accept multiple Lean projection output shapes.
 This preserves compatibility with object and array forms from different validator revisions.
 
-`VmRunner` comparison reports the first normalized event mismatch through `compute_trace_diff()`.
+`ProtocolMachineRunner` comparison reports the first normalized event mismatch through `compute_trace_diff()`.
 If event prefixes match, it reports a length mismatch summary.
 
 The bridge normalizes per-session tick numbering for trace comparison.

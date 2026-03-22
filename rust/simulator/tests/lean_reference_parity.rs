@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 
 use telltale_lean_bridge::{
     compute_trace_diff, default_schema_version, global_to_json, local_to_json, normalize_vm_trace,
-    SimRunInput, SimRunOutput, SimTraceValidation, TickedObsEvent, VmRunner, VmRunnerError,
-    VmTraceEvent,
+    ProtocolMachineRunner, ProtocolMachineRunnerError, ProtocolMachineTraceEvent, SimRunInput,
+    SimRunOutput, SimTraceValidation, TickedObsEvent,
 };
 use telltale_simulator::runner::{run_with_scenario, ScenarioResult};
 use telltale_simulator::scenario::Scenario;
@@ -209,13 +209,15 @@ fn unsupported_operation(stderr: &str) -> bool {
 }
 
 fn run_reference_or_skip(
-    runner: &VmRunner,
+    runner: &ProtocolMachineRunner,
     input: &SimRunInput,
     fixture_name: &str,
 ) -> Option<SimRunOutput> {
     match runner.run_reference_simulation(input) {
         Ok(out) => Some(out),
-        Err(VmRunnerError::ProcessFailed { stderr, .. }) if unsupported_operation(&stderr) => {
+        Err(ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
+            if unsupported_operation(&stderr) =>
+        {
             eprintln!(
                 "SKIPPED: Lean vm_runner does not support runSimulation yet ({fixture_name})"
             );
@@ -226,13 +228,15 @@ fn run_reference_or_skip(
 }
 
 fn validate_sim_trace_or_skip(
-    runner: &VmRunner,
-    trace: &[VmTraceEvent],
+    runner: &ProtocolMachineRunner,
+    trace: &[ProtocolMachineTraceEvent],
     fixture_name: &str,
 ) -> Option<SimTraceValidation> {
     match runner.validate_simulation_trace(trace) {
         Ok(out) => Some(out),
-        Err(VmRunnerError::ProcessFailed { stderr, .. }) if unsupported_operation(&stderr) => {
+        Err(ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
+            if unsupported_operation(&stderr) =>
+        {
             eprintln!(
                 "SKIPPED: Lean vm_runner does not support validateSimulationTrace yet ({fixture_name})"
             );
@@ -243,8 +247,8 @@ fn validate_sim_trace_or_skip(
 }
 
 #[allow(clippy::as_conversions)]
-fn obs_to_vm_trace(event: &ObsEvent) -> Option<VmTraceEvent> {
-    let mut out = VmTraceEvent {
+fn obs_to_vm_trace(event: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
+    let mut out = ProtocolMachineTraceEvent {
         schema_version: default_schema_version(),
         kind: String::new(),
         tick: 0,
@@ -350,7 +354,9 @@ fn parity_signal_kind(kind: &str) -> bool {
     matches!(kind, "opened" | "sent" | "received" | "closed")
 }
 
-fn to_ticked(trace: &[VmTraceEvent]) -> Vec<TickedObsEvent<VmTraceEvent>> {
+fn to_ticked(
+    trace: &[ProtocolMachineTraceEvent],
+) -> Vec<TickedObsEvent<ProtocolMachineTraceEvent>> {
     trace
         .iter()
         .cloned()
@@ -392,7 +398,7 @@ fn to_sim_run_input(fixture: &SimFixture) -> SimRunInput {
 fn assert_reference_parity(fixture: SimFixture) {
     let rust_result = run_rust_scenario(&fixture);
 
-    let Some(runner) = VmRunner::try_new() else {
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
         eprintln!("SKIPPED: Lean vm_runner not available");
         return;
     };
@@ -402,14 +408,14 @@ fn assert_reference_parity(fixture: SimFixture) {
         return;
     };
 
-    let rust_events: Vec<VmTraceEvent> = rust_result
+    let rust_events: Vec<ProtocolMachineTraceEvent> = rust_result
         .replay
         .obs_trace
         .iter()
         .filter_map(obs_to_vm_trace)
         .filter(|event| parity_signal_kind(&event.kind))
         .collect();
-    let lean_events: Vec<VmTraceEvent> = lean_out
+    let lean_events: Vec<ProtocolMachineTraceEvent> = lean_out
         .trace
         .iter()
         .filter(|event| parity_signal_kind(&event.kind))
@@ -472,14 +478,14 @@ fn test_reference_simulator_parity_three_role_ring_loop() {
 #[test]
 fn test_rust_simulator_trace_validates_under_lean_reference_rules() {
     let fixtures = [ping_pong_loop_fixture(), three_role_ring_fixture()];
-    let Some(runner) = VmRunner::try_new() else {
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
         eprintln!("SKIPPED: Lean vm_runner not available");
         return;
     };
 
     for fixture in fixtures {
         let rust_result = run_rust_scenario(&fixture);
-        let rust_events: Vec<VmTraceEvent> = rust_result
+        let rust_events: Vec<ProtocolMachineTraceEvent> = rust_result
             .replay
             .obs_trace
             .iter()

@@ -1,4 +1,4 @@
-//! Lean VM runner wrapper.
+//! Lean protocol-machine runner wrapper.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -169,6 +169,21 @@ pub struct VmRunOutput {
     pub step_states: Vec<VmStepState>,
 }
 
+/// Canonical public alias for protocol-machine runner input payloads.
+pub type ProtocolMachineRunInput = VmRunInput;
+
+/// Canonical public alias for protocol-machine runner session-status payloads.
+pub type ProtocolMachineSessionStatus = VmSessionStatus;
+
+/// Canonical public alias for protocol-machine runner trace events.
+pub type ProtocolMachineTraceEvent = VmTraceEvent;
+
+/// Canonical public alias for protocol-machine runner step-state payloads.
+pub type ProtocolMachineStepState = VmStepState;
+
+/// Canonical public alias for protocol-machine runner output payloads.
+pub type ProtocolMachineRunOutput = VmRunOutput;
+
 /// Structured Lean-side validation error payload.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LeanStructuredError {
@@ -212,6 +227,12 @@ pub struct InvariantVerificationResult {
 pub struct VmRunner {
     binary_path: PathBuf,
 }
+
+/// Canonical public alias for the Lean protocol-machine runner wrapper.
+pub type ProtocolMachineRunner = VmRunner;
+
+/// Canonical public alias for protocol-machine runner errors.
+pub type ProtocolMachineRunnerError = VmRunnerError;
 
 impl VmRunner {
     /// Default path to the VM runner binary (relative to workspace root).

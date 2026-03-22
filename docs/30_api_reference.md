@@ -57,13 +57,23 @@ See `rust/choreography/src/lib.rs` for the full export surface.
 
 ### `telltale-vm`
 
-Bytecode VM for executing projected local types.
+Protocol-machine and guest-runtime surfaces for executing projected local types.
+
+Canonical public modules:
+
+- `telltale_vm::protocol_machine`
+- `telltale_vm::guest_runtime`
+- `telltale_vm::host_runtime`
 
 Key exports:
 
-- `VM`, `VMConfig`, `SchedPolicy`, `SimClock`
+- `ProtocolMachine`, `ProtocolMachineConfig`, `GuestRuntime`, `SchedPolicy`, `SimClock`
 - `Instr`, `Value`, `SessionStore`, `SessionId`
-- `OwnedSession` and `NestedVMHandler`
+- `OwnedSession`, `ExternalHandler`, and `NestedVMHandler`
+
+`GuestRuntime` is the Telltale-owned runtime instantiated around the protocol
+machine. `ExternalHandler` is the host-runtime boundary implemented by
+embedders and simulators.
 
 Module access (not re-exported at crate root):
 - Effect boundary: `telltale_vm::effect::EffectHandler`, `SendDecision`, `AcquireDecision`

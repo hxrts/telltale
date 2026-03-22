@@ -3,19 +3,21 @@
 #[path = "test_choreographies/mod.rs"]
 mod test_choreographies;
 
-use telltale_lean_bridge::{InvariantVerificationResult, VmRunner, VmRunnerError};
+use telltale_lean_bridge::{
+    InvariantVerificationResult, ProtocolMachineRunner, ProtocolMachineRunnerError,
+};
 
 fn verify_bundle_or_skip(
     bundle: &telltale_lean_bridge::ProtocolBundle,
 ) -> Option<InvariantVerificationResult> {
-    let Some(runner) = VmRunner::try_new() else {
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
         eprintln!("SKIPPED: Lean vm_runner not available");
         return None;
     };
 
     match runner.verify_invariants(bundle) {
         Ok(result) => Some(result),
-        Err(VmRunnerError::ProcessFailed { stderr, .. })
+        Err(ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
             if stderr.contains("verifyProtocolBundle")
                 || stderr.contains("unknown operation")
                 || stderr.contains("unsupported operation")
