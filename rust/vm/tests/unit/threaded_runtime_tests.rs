@@ -515,3 +515,122 @@
         assert_eq!(audit.status, DelegationStatus::RolledBack);
         assert!(audit.reason.as_ref().is_some_and(|r| r.contains("delegation guard violation")));
     }
+
+    #[test]
+    fn delegation_handoff_rebinds_pending_effects_and_invalidates_blocked_effects() {
+        let mut local_types = BTreeMap::new();
+        local_types.insert(
+            "A".to_string(),
+            LocalTypeR::send("B", Label::new("m"), LocalTypeR::End),
+        );
+        local_types.insert(
+            "B".to_string(),
+            LocalTypeR::recv("A", Label::new("m"), LocalTypeR::End),
+        );
+        let global = GlobalType::send("A", "B", Label::new("m"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 2);
+        let sid = vm.load_choreography(&image).expect("load choreography");
+        let endpoint = Endpoint {
+            sid,
+            role: "A".to_string(),
+        };
+
+        let mut source = None;
+        let mut target = None;
+        for coro in &vm.coroutines {
+            let guard = coro.lock().expect("coroutine lock poisoned");
+            if guard.role == "A" {
+                source = Some(guard.id);
+            } else if guard.role == "B" {
+                target = Some(guard.id);
+            }
+        }
+        let source = source.expect("source coroutine");
+        let target = target.expect("target coroutine");
+
+        vm.outstanding_effects.push(OutstandingEffect {
+            effect_id: 11,
+            operation_id: "effect:11".to_string(),
+            session: Some(sid),
+            owner_id: Some("coro:0".to_string()),
+            effect_interface: Some("Runtime".to_string()),
+            effect_operation: Some("invoke".to_string()),
+            effect_kind: "invoke_step".to_string(),
+            handler_identity: "host/runtime".to_string(),
+            status: OutstandingEffectStatus::Pending,
+            ordering_key: 1,
+            budget_ticks: Some(1),
+            retry_policy: "forbid_late_results".to_string(),
+            invalidation_token: "effect:11:live".to_string(),
+            completed_at_tick: None,
+            inputs: serde_json::json!({ "session": sid }),
+            outputs: serde_json::json!({ "status": "pending" }),
+        });
+        vm.outstanding_effects.push(OutstandingEffect {
+            effect_id: 12,
+            operation_id: "effect:12".to_string(),
+            session: Some(sid),
+            owner_id: Some("coro:0".to_string()),
+            effect_interface: Some("Runtime".to_string()),
+            effect_operation: Some("receive".to_string()),
+            effect_kind: "handle_recv".to_string(),
+            handler_identity: "host/runtime".to_string(),
+            status: OutstandingEffectStatus::Blocked,
+            ordering_key: 2,
+            budget_ticks: Some(1),
+            retry_policy: "forbid_late_results".to_string(),
+            invalidation_token: "effect:12:live".to_string(),
+            completed_at_tick: None,
+            inputs: serde_json::json!({ "session": sid }),
+            outputs: serde_json::json!({ "status": "blocked" }),
+        });
+        vm.operation_instances.push(OperationInstance {
+            operation_id: "effect:11".to_string(),
+            session: Some(sid),
+            owner_id: Some("coro:0".to_string()),
+            kind: "invoke".to_string(),
+            phase: OperationPhase::Pending,
+            handler_identity: Some("host/runtime".to_string()),
+            effect_ids: vec![11],
+            dependent_operation_ids: Vec::new(),
+            terminal_publication: None,
+            budget_ticks: Some(1),
+            requires_proof: false,
+        });
+        vm.operation_instances.push(OperationInstance {
+            operation_id: "effect:12".to_string(),
+            session: Some(sid),
+            owner_id: Some("coro:0".to_string()),
+            kind: "receive".to_string(),
+            phase: OperationPhase::Blocked,
+            handler_identity: Some("host/runtime".to_string()),
+            effect_ids: vec![12],
+            dependent_operation_ids: Vec::new(),
+            terminal_publication: Some("effect.blocked".to_string()),
+            budget_ticks: Some(1),
+            requires_proof: false,
+        });
+
+        vm.enqueue_handoff(endpoint, source, target, vm.clock.tick)
+            .expect("enqueue handoff");
+        vm.apply_handoffs_deterministically()
+            .expect("apply handoff");
+
+        let pending = vm
+            .outstanding_effects
+            .iter()
+            .find(|effect| effect.effect_id == 11)
+            .expect("pending effect");
+        assert_eq!(pending.owner_id.as_deref(), Some("coro:1"));
+        assert_eq!(pending.status, OutstandingEffectStatus::Pending);
+
+        let blocked = vm
+            .outstanding_effects
+            .iter()
+            .find(|effect| effect.effect_id == 12)
+            .expect("blocked effect");
+        assert_eq!(blocked.owner_id.as_deref(), Some("coro:1"));
+        assert_eq!(blocked.status, OutstandingEffectStatus::Invalidated);
+    }

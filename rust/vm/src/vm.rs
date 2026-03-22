@@ -32,6 +32,8 @@ use crate::coroutine::{
     BlockReason, CoroStatus, Coroutine, Fault, KnowledgeFact, ProgressToken, Value,
 };
 use crate::determinism::{DeterminismMode, EffectDeterminismTier};
+#[cfg(test)]
+use crate::effect::SendDecisionInput;
 use crate::effect::{
     infer_effect_interface_and_operation, CorruptionType, EffectExchangeRecord, EffectFailure,
     EffectHandler, EffectOutcome, EffectRequest, EffectResponse, EffectResult, EffectTraceEntry,

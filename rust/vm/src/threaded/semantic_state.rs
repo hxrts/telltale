@@ -1,4 +1,8 @@
 impl ThreadedVM {
+    fn coro_owner_id(coro_id: usize) -> String {
+        format!("coro:{coro_id}")
+    }
+
     fn ensure_effect_request_allowed(&self, request: &EffectRequest) -> Result<(), EffectFailure> {
         request.metadata.validate()?;
         match request.metadata.reentrancy_policy {
@@ -287,6 +291,74 @@ impl ThreadedVM {
 
         for operation in &mut self.operation_instances {
             if invalidated.iter().any(|operation_id| operation.operation_id == *operation_id) {
+                operation.phase = OperationPhase::Failed;
+                operation.terminal_publication = Some("effect.invalidated".to_string());
+            }
+        }
+    }
+
+    fn apply_semantic_handoff_obligations(&mut self, receipt: &DelegationReceipt) {
+        let handoff_operation_id = format!("handoff:{}", receipt.receipt_id);
+        let old_owner = Self::coro_owner_id(receipt.from_coro);
+        let new_owner = Self::coro_owner_id(receipt.to_coro);
+        let mut invalidated_operations = Vec::new();
+
+        for effect in &mut self.outstanding_effects {
+            if effect.session != Some(receipt.session) {
+                continue;
+            }
+            match effect.status {
+                OutstandingEffectStatus::Pending => {
+                    effect.owner_id = Some(new_owner.clone());
+                }
+                OutstandingEffectStatus::Blocked => {
+                    effect.status = OutstandingEffectStatus::Invalidated;
+                    effect.owner_id = Some(new_owner.clone());
+                    effect.outputs = json!({
+                        "status": "invalidated",
+                        "reason": "semantic handoff invalidated blocked effect",
+                        "revoked_owner_id": old_owner,
+                        "activated_owner_id": new_owner,
+                        "handoff_id": receipt.receipt_id,
+                    });
+                    effect.completed_at_tick = Some(self.clock.tick);
+                    effect.ordering_key = self.clock.tick;
+                    invalidated_operations.push(effect.operation_id.clone());
+                }
+                OutstandingEffectStatus::Succeeded
+                | OutstandingEffectStatus::Failed
+                | OutstandingEffectStatus::Cancelled
+                | OutstandingEffectStatus::Invalidated => {}
+            }
+        }
+
+        for operation in &mut self.operation_instances {
+            if operation.session != Some(receipt.session) {
+                continue;
+            }
+            if !operation
+                .dependent_operation_ids
+                .iter()
+                .any(|id| id == &handoff_operation_id)
+            {
+                operation
+                    .dependent_operation_ids
+                    .push(handoff_operation_id.clone());
+            }
+            match operation.phase {
+                OperationPhase::Pending | OperationPhase::Blocked => {
+                    operation.owner_id = Some(new_owner.clone());
+                }
+                OperationPhase::Succeeded
+                | OperationPhase::Failed
+                | OperationPhase::Cancelled
+                | OperationPhase::TimedOut
+                | OperationPhase::HandedOff => {}
+            }
+            if invalidated_operations
+                .iter()
+                .any(|operation_id| operation.operation_id == *operation_id)
+            {
                 operation.phase = OperationPhase::Failed;
                 operation.terminal_publication = Some("effect.invalidated".to_string());
             }

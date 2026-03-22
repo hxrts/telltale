@@ -1,4 +1,8 @@
 impl VM {
+    fn coro_owner_id(coro_id: usize) -> FragmentOwnerId {
+        format!("coro:{coro_id}")
+    }
+
     fn ensure_effect_request_allowed(&self, request: &EffectRequest) -> Result<(), EffectFailure> {
         request.metadata.validate()?;
         match request.metadata.reentrancy_policy {
@@ -307,6 +311,74 @@ impl VM {
             }
         }
     }
+
+    fn apply_semantic_handoff_obligations(&mut self, receipt: &DelegationReceipt) {
+        let handoff_operation_id = format!("handoff:{}", receipt.receipt_id);
+        let old_owner = Self::coro_owner_id(receipt.from_coro);
+        let new_owner = Self::coro_owner_id(receipt.to_coro);
+        let mut invalidated_operations = Vec::new();
+
+        for effect in self.outstanding_effects.as_mut_slice().iter_mut() {
+            if effect.session != Some(receipt.session) {
+                continue;
+            }
+            match effect.status {
+                OutstandingEffectStatus::Pending => {
+                    effect.owner_id = Some(new_owner.clone());
+                }
+                OutstandingEffectStatus::Blocked => {
+                    effect.status = OutstandingEffectStatus::Invalidated;
+                    effect.owner_id = Some(new_owner.clone());
+                    effect.outputs = json!({
+                        "status": "invalidated",
+                        "reason": "semantic handoff invalidated blocked effect",
+                        "revoked_owner_id": old_owner,
+                        "activated_owner_id": new_owner,
+                        "handoff_id": receipt.receipt_id,
+                    });
+                    effect.completed_at_tick = Some(self.clock.tick);
+                    effect.ordering_key = self.clock.tick;
+                    invalidated_operations.push(effect.operation_id.clone());
+                }
+                OutstandingEffectStatus::Succeeded
+                | OutstandingEffectStatus::Failed
+                | OutstandingEffectStatus::Cancelled
+                | OutstandingEffectStatus::Invalidated => {}
+            }
+        }
+
+        for operation in self.operation_instances.as_mut_slice().iter_mut() {
+            if operation.session != Some(receipt.session) {
+                continue;
+            }
+            if !operation
+                .dependent_operation_ids
+                .iter()
+                .any(|id| id == &handoff_operation_id)
+            {
+                operation
+                    .dependent_operation_ids
+                    .push(handoff_operation_id.clone());
+            }
+            match operation.phase {
+                OperationPhase::Pending | OperationPhase::Blocked => {
+                    operation.owner_id = Some(new_owner.clone());
+                }
+                OperationPhase::Succeeded
+                | OperationPhase::Failed
+                | OperationPhase::Cancelled
+                | OperationPhase::TimedOut
+                | OperationPhase::HandedOff => {}
+            }
+            if invalidated_operations
+                .iter()
+                .any(|operation_id| operation.operation_id == *operation_id)
+            {
+                operation.phase = OperationPhase::Failed;
+                operation.terminal_publication = Some("effect.invalidated".to_string());
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -383,5 +455,123 @@ mod runtime_effect_state_tests {
             .ensure_effect_request_allowed(&request)
             .expect_err("same fragment reentrancy must fail");
         assert!(err.message.contains("session fragment"));
+    }
+
+    #[test]
+    fn runtime_semantic_handoff_transfers_pending_effects_and_invalidates_blocked_effects() {
+        let mut vm = test_vm();
+        vm.clock.tick = 7;
+        vm.outstanding_effects.push(
+            OutstandingEffect {
+                effect_id: 11,
+                operation_id: "effect:11".to_string(),
+                session: Some(5),
+                owner_id: Some("coro:0".to_string()),
+                effect_interface: Some("Runtime".to_string()),
+                effect_operation: Some("invoke".to_string()),
+                effect_kind: "invoke_step".to_string(),
+                handler_identity: "host/runtime".to_string(),
+                status: OutstandingEffectStatus::Pending,
+                ordering_key: 1,
+                budget_ticks: Some(1),
+                retry_policy: "forbid_late_results".to_string(),
+                invalidation_token: "effect:11:live".to_string(),
+                completed_at_tick: None,
+                inputs: serde_json::json!({ "session": 5 }),
+                outputs: serde_json::json!({ "status": "pending" }),
+            },
+            &vm.config.observability_retention,
+        );
+        vm.outstanding_effects.push(
+            OutstandingEffect {
+                effect_id: 12,
+                operation_id: "effect:12".to_string(),
+                session: Some(5),
+                owner_id: Some("coro:0".to_string()),
+                effect_interface: Some("Runtime".to_string()),
+                effect_operation: Some("receive".to_string()),
+                effect_kind: "handle_recv".to_string(),
+                handler_identity: "host/runtime".to_string(),
+                status: OutstandingEffectStatus::Blocked,
+                ordering_key: 2,
+                budget_ticks: Some(1),
+                retry_policy: "forbid_late_results".to_string(),
+                invalidation_token: "effect:12:live".to_string(),
+                completed_at_tick: None,
+                inputs: serde_json::json!({ "session": 5 }),
+                outputs: serde_json::json!({ "status": "blocked" }),
+            },
+            &vm.config.observability_retention,
+        );
+        vm.operation_instances.push(
+            OperationInstance {
+                operation_id: "effect:11".to_string(),
+                session: Some(5),
+                owner_id: Some("coro:0".to_string()),
+                kind: "invoke".to_string(),
+                phase: OperationPhase::Pending,
+                handler_identity: Some("host/runtime".to_string()),
+                effect_ids: vec![11],
+                dependent_operation_ids: Vec::new(),
+                terminal_publication: None,
+                budget_ticks: Some(1),
+                requires_proof: false,
+            },
+            &vm.config.observability_retention,
+        );
+        vm.operation_instances.push(
+            OperationInstance {
+                operation_id: "effect:12".to_string(),
+                session: Some(5),
+                owner_id: Some("coro:0".to_string()),
+                kind: "receive".to_string(),
+                phase: OperationPhase::Blocked,
+                handler_identity: Some("host/runtime".to_string()),
+                effect_ids: vec![12],
+                dependent_operation_ids: Vec::new(),
+                terminal_publication: Some("effect.blocked".to_string()),
+                budget_ticks: Some(1),
+                requires_proof: false,
+            },
+            &vm.config.observability_retention,
+        );
+
+        let receipt = delegation_receipt(
+            3,
+            Endpoint {
+                sid: 5,
+                role: "A".to_string(),
+            },
+            0,
+            1,
+        );
+        vm.apply_semantic_handoff_obligations(&receipt);
+
+        let pending = vm
+            .outstanding_effects
+            .as_slice()
+            .iter()
+            .find(|effect| effect.effect_id == 11)
+            .expect("pending effect");
+        assert_eq!(pending.owner_id.as_deref(), Some("coro:1"));
+        assert_eq!(pending.status, OutstandingEffectStatus::Pending);
+
+        let blocked = vm
+            .outstanding_effects
+            .as_slice()
+            .iter()
+            .find(|effect| effect.effect_id == 12)
+            .expect("blocked effect");
+        assert_eq!(blocked.owner_id.as_deref(), Some("coro:1"));
+        assert_eq!(blocked.status, OutstandingEffectStatus::Invalidated);
+
+        let err = vm
+            .complete_runtime_effect(
+                12,
+                OutstandingEffectStatus::Succeeded,
+                serde_json::json!({ "status": "success" }),
+            )
+            .expect_err("stale post-handoff result must be rejected");
+        assert!(err.to_string().contains("late result"));
     }
 }

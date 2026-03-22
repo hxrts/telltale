@@ -111,6 +111,7 @@ Lean, Rust, and the Rust/Lean bridge.
 | `OperationInstance` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | `OutstandingEffect` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | `SemanticHandoff` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `TransformationObligation` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | `AuthoritativeRead` / `ObservedRead` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | `MaterializationProof` / `CanonicalHandle` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | `ProgressContract` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
@@ -121,6 +122,15 @@ runtime state, not as post-hoc derivations from generic effect-trace order.
 Parity on these objects therefore covers owner identity, phase/status,
 budget/invalidation fields, dependent-operation edges, and terminal
 publication state.
+
+`SemanticHandoff` parity now also covers explicit owner revocation and
+activation (`revoked_owner_id`, `activated_owner_id`).
+`TransformationObligation` parity covers transformed fragments, affected
+operations/effects, transport vs invalidation policy, and publication transfer
+or revocation. Bridge-side execution comparison reports these handoff and
+invalidation surfaces separately from raw trace equivalence so stale-owner and
+late-result mismatches do not hide inside otherwise equivalent instruction
+traces.
 
 ### Lean ProtocolMachineState
 

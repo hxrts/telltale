@@ -39,7 +39,13 @@ impl ThreadedVM {
     /// failure-visible events, and effect/interface traces.
     #[must_use]
     pub fn semantic_audit_log(&self) -> Vec<SemanticAuditRecord> {
-        semantic_audit_log_v1(&[], &self.delegation_audit_log, &self.trace, &self.outstanding_effects)
+        semantic_audit_log_v1(
+            &[],
+            &self.delegation_audit_log,
+            &self.operation_instances,
+            &self.trace,
+            &self.outstanding_effects,
+        )
     }
 
     /// Get canonical semantic objects derived from handoff, effect, and

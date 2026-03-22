@@ -72,6 +72,7 @@ Key exports:
 - `OwnedSession`, `ExternalHandler`, and `NestedVMHandler`
 - canonical semantic objects:
   `OperationInstance`, `OutstandingEffect`, `SemanticHandoff`,
+  `TransformationObligation`,
   `AuthoritativeRead`, `ObservedRead`, `MaterializationProof`,
   `CanonicalHandle`, `ProgressContract`, `ProtocolMachineSemanticObjects`
 - runtime introspection:

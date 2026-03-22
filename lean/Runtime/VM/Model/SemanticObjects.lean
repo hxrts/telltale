@@ -98,6 +98,26 @@ structure SemanticHandoff where
   session : Nat
   fromCoro : Nat
   toCoro : Nat
+  revokedOwnerId : String
+  activatedOwnerId : String
+  scope : OwnershipScope
+  status : DelegationStatus
+  tick : Nat
+  reason : Option String
+  deriving Repr, DecidableEq
+
+structure TransformationObligation where
+  obligationId : String
+  handoffId : Nat
+  session : Nat
+  transformedFragments : List String
+  affectedOperationIds : List String
+  affectedEffectIds : List Nat
+  transportedEffectIds : List Nat
+  invalidatedEffectIds : List Nat
+  witnessPolicy : String
+  publicationRevokedFrom : String
+  publicationActivatedTo : String
   scope : OwnershipScope
   status : DelegationStatus
   tick : Nat
@@ -155,6 +175,7 @@ structure ProtocolMachineSemanticObjects where
   operationInstances : List OperationInstance
   outstandingEffects : List OutstandingEffect
   semanticHandoffs : List SemanticHandoff
+  transformationObligations : List TransformationObligation
   authoritativeReads : List AuthoritativeRead
   observedReads : List ObservedRead
   materializationProofs : List MaterializationProof

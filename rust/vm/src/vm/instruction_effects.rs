@@ -948,6 +948,7 @@ impl VM {
         }
 
         self.record_delegation_audit(receipt.clone(), DelegationStatus::Committed, None);
+        self.apply_semantic_handoff_obligations(receipt);
         Ok(())
     }
 

@@ -132,6 +132,30 @@ pub struct SemanticHandoff {
     pub session: SessionId,
     pub from_coro: usize,
     pub to_coro: usize,
+    #[serde(default)]
+    pub revoked_owner_id: String,
+    #[serde(default)]
+    pub activated_owner_id: String,
+    pub scope: OwnershipScope,
+    pub status: DelegationStatus,
+    pub tick: u64,
+    pub reason: Option<String>,
+}
+
+/// Explicit transformation-local obligation bundle carried by one handoff.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TransformationObligation {
+    pub obligation_id: String,
+    pub handoff_id: u64,
+    pub session: SessionId,
+    pub transformed_fragments: Vec<String>,
+    pub affected_operation_ids: Vec<String>,
+    pub affected_effect_ids: Vec<u64>,
+    pub transported_effect_ids: Vec<u64>,
+    pub invalidated_effect_ids: Vec<u64>,
+    pub witness_policy: String,
+    pub publication_revoked_from: String,
+    pub publication_activated_to: String,
     pub scope: OwnershipScope,
     pub status: DelegationStatus,
     pub tick: u64,
@@ -203,6 +227,8 @@ pub struct ProtocolMachineSemanticObjects {
     pub operation_instances: Vec<OperationInstance>,
     pub outstanding_effects: Vec<OutstandingEffect>,
     pub semantic_handoffs: Vec<SemanticHandoff>,
+    #[serde(default)]
+    pub transformation_obligations: Vec<TransformationObligation>,
     pub authoritative_reads: Vec<AuthoritativeRead>,
     pub observed_reads: Vec<ObservedRead>,
     pub materialization_proofs: Vec<MaterializationProof>,
@@ -217,6 +243,7 @@ impl Default for ProtocolMachineSemanticObjects {
             operation_instances: Vec::new(),
             outstanding_effects: Vec::new(),
             semantic_handoffs: Vec::new(),
+            transformation_obligations: Vec::new(),
             authoritative_reads: Vec::new(),
             observed_reads: Vec::new(),
             materialization_proofs: Vec::new(),
@@ -287,12 +314,25 @@ fn proof_id(check: &OutputConditionCheck) -> String {
     format!("{}:{}", check.meta.predicate_ref, check.meta.output_digest)
 }
 
+fn coro_owner_id(coro_id: usize) -> String {
+    format!("coro:{coro_id}")
+}
+
+fn transformed_fragments(scope: &OwnershipScope) -> Vec<String> {
+    match scope {
+        OwnershipScope::Session => vec!["session".to_string()],
+        OwnershipScope::Fragments(fragments) => fragments.iter().cloned().collect(),
+    }
+}
+
 fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSemanticObjects {
     out.operation_instances
         .sort_by(|lhs, rhs| lhs.operation_id.cmp(&rhs.operation_id));
     out.outstanding_effects
         .sort_by(|lhs, rhs| lhs.effect_id.cmp(&rhs.effect_id));
     out.semantic_handoffs
+        .sort_by(|lhs, rhs| lhs.handoff_id.cmp(&rhs.handoff_id));
+    out.transformation_obligations
         .sort_by(|lhs, rhs| lhs.handoff_id.cmp(&rhs.handoff_id));
     out.authoritative_reads
         .sort_by(|lhs, rhs| lhs.read_id.cmp(&rhs.read_id));
@@ -327,10 +367,66 @@ pub fn protocol_machine_semantic_objects_v1(
             session: record.receipt.session,
             from_coro: record.receipt.from_coro,
             to_coro: record.receipt.to_coro,
+            revoked_owner_id: coro_owner_id(record.receipt.from_coro),
+            activated_owner_id: coro_owner_id(record.receipt.to_coro),
             scope: record.receipt.scope.clone(),
             status: record.status.clone(),
             tick: record.tick,
             reason: record.reason.clone(),
+        })
+        .collect();
+
+    let transformation_obligations: Vec<_> = delegation_audit_log
+        .iter()
+        .map(|record| {
+            let affected_operation_ids: Vec<_> = operation_instances
+                .iter()
+                .filter(|operation| operation.session == Some(record.receipt.session))
+                .map(|operation| operation.operation_id.clone())
+                .collect();
+            let affected_effect_ids: Vec<_> = outstanding_effects
+                .iter()
+                .filter(|effect| effect.session == Some(record.receipt.session))
+                .map(|effect| effect.effect_id)
+                .collect();
+            let transported_effect_ids: Vec<_> = outstanding_effects
+                .iter()
+                .filter(|effect| {
+                    effect.session == Some(record.receipt.session)
+                        && matches!(effect.status, OutstandingEffectStatus::Pending)
+                })
+                .map(|effect| effect.effect_id)
+                .collect();
+            let invalidated_effect_ids: Vec<_> = outstanding_effects
+                .iter()
+                .filter(|effect| {
+                    effect.session == Some(record.receipt.session)
+                        && matches!(effect.status, OutstandingEffectStatus::Invalidated)
+                })
+                .map(|effect| effect.effect_id)
+                .collect();
+
+            TransformationObligation {
+                obligation_id: format!("handoff:{}", record.receipt.receipt_id),
+                handoff_id: record.receipt.receipt_id,
+                session: record.receipt.session,
+                transformed_fragments: transformed_fragments(&record.receipt.scope),
+                affected_operation_ids,
+                affected_effect_ids,
+                transported_effect_ids,
+                invalidated_effect_ids,
+                witness_policy: if matches!(record.status, DelegationStatus::Committed) {
+                    "transport_pending_invalidate_blocked".to_string()
+                } else {
+                    "rollback".to_string()
+                },
+                publication_revoked_from: coro_owner_id(record.receipt.from_coro),
+                publication_activated_to: coro_owner_id(record.receipt.to_coro),
+                scope: record.receipt.scope.clone(),
+                status: record.status.clone(),
+                tick: record.tick,
+                reason: record.reason.clone(),
+            }
         })
         .collect();
 
@@ -467,6 +563,7 @@ pub fn protocol_machine_semantic_objects_v1(
         operation_instances,
         outstanding_effects,
         semantic_handoffs,
+        transformation_obligations,
         authoritative_reads,
         observed_reads,
         materialization_proofs,

@@ -88,6 +88,45 @@ When choreography-level `timeout ... on timeout ... on cancel ...` lowering is
 used, its protocol-visible timeout and cancellation outcomes are expected to map
 to this same explicit lifecycle event family.
 
+## Semantic Handoff and Transformation Obligations
+
+Committed delegation is now exported as a first-class semantic handoff surface,
+not just as a low-level transfer receipt.
+
+| Semantic object | Meaning |
+|---|---|
+| `SemanticHandoff` | replay-visible owner transition with explicit revoked and activated owners |
+| `TransformationObligation` | bundle of fragment, operation, effect, witness, and publication obligations induced by the handoff |
+
+Runtime rules for committed handoff:
+
+- old-owner revocation and new-owner activation are explicit semantic events
+- publication authority transfers from `revoked_owner_id` to
+  `activated_owner_id`
+- pending outstanding effects in the affected session are rebound to the new
+  owner
+- blocked outstanding effects are invalidated and become late-result-rejecting
+  semantic artifacts
+- affected `OperationInstance` values gain an explicit dependency edge on the
+  handoff receipt and are rebound or failed closed as required by status
+
+`TransformationObligation` is the canonical export for the resulting
+transformation-local obligations. Each obligation records:
+
+- transformed fragments
+- affected operation ids
+- affected effect ids
+- transported effect ids
+- invalidated effect ids
+- witness transport or invalidation policy
+- publication revocation and activation owners
+- scope, tick, and status
+
+Late results arriving after invalidation or post-handoff revocation must fail
+closed. Embedders and simulator harnesses should treat these invalidation
+artifacts as canonical semantic audit data rather than reconstructing them from
+raw effect trace order.
+
 ## Open Path
 
 `Open` is executed by `VM::step_open`. The instruction carries `roles`, `local_types`, `handlers`, and `dsts`.

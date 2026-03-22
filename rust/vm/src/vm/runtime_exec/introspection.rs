@@ -147,6 +147,7 @@ impl VM {
         semantic_audit_log_v1(
             authority_audit_log.as_slice(),
             self.delegation_audit_log.as_slice(),
+            self.operation_instances.as_slice(),
             self.obs_trace.as_slice(),
             self.outstanding_effects.as_slice(),
         )

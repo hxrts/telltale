@@ -434,6 +434,7 @@ impl ThreadedVM {
             }
         }
         self.record_delegation_audit(handoff.receipt.clone(), DelegationStatus::Committed, None);
+        self.apply_semantic_handoff_obligations(&handoff.receipt);
         Ok(())
     }
 

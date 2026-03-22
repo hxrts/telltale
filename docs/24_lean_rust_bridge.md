@@ -187,6 +187,7 @@ machine’s semantic object family.
 - `OperationInstance`
 - `OutstandingEffect`
 - `SemanticHandoff`
+- `TransformationObligation`
 - `AuthoritativeRead`
 - `ObservedRead`
 - `MaterializationProof`
@@ -199,11 +200,23 @@ VM-state export as its primary cross-language contract.
 
 `ProtocolMachineRunOutput.semantic_objects` carries the same canonical runtime
 state used by replay export: live `OperationInstance` and `OutstandingEffect`
-objects plus the derived handoff/read/proof/publication surfaces.
+objects plus the derived handoff/obligation/read/proof/publication surfaces.
 
 `ProtocolMachineRunOutput.effect_exchanges` is the canonical bridge-side export
 for the typed effect boundary. It carries `EffectRequest`, `EffectOutcome`, and
 the validated runtime metadata for each exchange.
+
+`compare_execution()` now reports handoff and invalidation agreement alongside
+trace equivalence. In addition to normalized trace comparison, callers can
+inspect:
+
+- `semantic_handoffs_equivalent`
+- `invalidation_artifacts_equivalent`
+
+These booleans compare exported `SemanticHandoff` objects plus invalidated
+effect ids and `TransformationObligation` bundles. This keeps stale-owner and
+late-result mismatches visible even when the raw instruction trace still
+normalizes successfully.
 
 ## Trace Normalization and Equivalence
 

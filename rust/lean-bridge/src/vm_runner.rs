@@ -213,6 +213,8 @@ pub struct TraceValidation {
 pub struct ComparisonResult {
     pub equivalent: bool,
     pub trace_equivalent: bool,
+    pub semantic_handoffs_equivalent: bool,
+    pub invalidation_artifacts_equivalent: bool,
     pub rust_normalized: Vec<TickedObsEvent<VmTraceEvent>>,
     pub lean_normalized: Vec<TickedObsEvent<VmTraceEvent>>,
     #[serde(default)]
@@ -519,10 +521,42 @@ impl VmRunner {
         let lean_normalized = normalize_vm_trace(&lean_ticked);
         let trace_equivalent = traces_equivalent(&rust_ticked, &lean_ticked);
         let diff = compute_trace_diff(&rust_normalized, &lean_normalized);
+        let semantic_handoffs_equivalent = rust_output.semantic_objects.semantic_handoffs
+            == lean_output.semantic_objects.semantic_handoffs;
+        let rust_invalidated_effects: Vec<_> = rust_output
+            .semantic_objects
+            .outstanding_effects
+            .iter()
+            .filter(|effect| {
+                matches!(
+                    effect.status,
+                    crate::semantic_objects::OutstandingEffectStatus::Invalidated
+                )
+            })
+            .map(|effect| effect.effect_id)
+            .collect();
+        let lean_invalidated_effects: Vec<_> = lean_output
+            .semantic_objects
+            .outstanding_effects
+            .iter()
+            .filter(|effect| {
+                matches!(
+                    effect.status,
+                    crate::semantic_objects::OutstandingEffectStatus::Invalidated
+                )
+            })
+            .map(|effect| effect.effect_id)
+            .collect();
+        let invalidation_artifacts_equivalent = rust_invalidated_effects
+            == lean_invalidated_effects
+            && rust_output.semantic_objects.transformation_obligations
+                == lean_output.semantic_objects.transformation_obligations;
 
         Ok(ComparisonResult {
             equivalent: trace_equivalent,
             trace_equivalent,
+            semantic_handoffs_equivalent,
+            invalidation_artifacts_equivalent,
             rust_normalized,
             lean_normalized,
             diff,

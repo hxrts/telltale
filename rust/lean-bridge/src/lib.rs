@@ -104,7 +104,7 @@ pub use semantic_objects::{
     CanonicalHandleKind, DelegationStatus, MaterializationProof, ObservedRead, OperationInstance,
     OperationPhase, OutstandingEffect, OutstandingEffectStatus, OwnershipScope, ProgressContract,
     ProgressState, ProtocolMachineSemanticObjects, SemanticHandoff, TickedObsEvent,
-    SEMANTIC_OBJECTS_SCHEMA_VERSION,
+    TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 pub use vm_trace::{
     event_session, normalize_vm_trace, observationally_equivalent, partition_by_session,

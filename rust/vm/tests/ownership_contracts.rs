@@ -196,6 +196,16 @@ fn ownership_transfer_record_replay_preserves_observable_handoff() {
         )),
         "semantic audit surface should retain committed delegation records"
     );
+    assert!(
+        vm.semantic_audit_log().iter().any(|record| matches!(
+            record,
+            SemanticAuditRecord::TransformationObligation { obligation, .. }
+                if obligation.handoff_id == audit.receipt.receipt_id
+                    && obligation.publication_revoked_from == "coro:0"
+                    && obligation.publication_activated_to == "coro:1"
+        )),
+        "semantic audit surface should retain handoff obligation bundles"
+    );
     let semantic_objects = vm.semantic_objects();
     assert!(
         semantic_objects
@@ -203,6 +213,24 @@ fn ownership_transfer_record_replay_preserves_observable_handoff() {
             .iter()
             .any(|handoff| handoff.handoff_id == audit.receipt.receipt_id),
         "canonical semantic object surface should retain semantic handoffs"
+    );
+    assert!(
+        semantic_objects
+            .semantic_handoffs
+            .iter()
+            .any(|handoff| handoff.revoked_owner_id == "coro:0"
+                && handoff.activated_owner_id == "coro:1"),
+        "semantic handoff should make owner revocation/activation explicit"
+    );
+    assert!(
+        semantic_objects
+            .transformation_obligations
+            .iter()
+            .any(
+                |obligation| obligation.handoff_id == audit.receipt.receipt_id
+                    && obligation.transformed_fragments == vec!["A".to_string()]
+            ),
+        "canonical semantic object surface should retain transformation-local obligations"
     );
     assert!(
         semantic_objects

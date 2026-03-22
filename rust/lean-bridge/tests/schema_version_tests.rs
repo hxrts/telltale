@@ -164,6 +164,25 @@ fn semantic_objects_roundtrip_preserves_schema_version() {
             "session": 1,
             "from_coro": 0,
             "to_coro": 1,
+            "revoked_owner_id": "coro:0",
+            "activated_owner_id": "coro:1",
+            "scope": { "Fragments": ["A"] },
+            "status": "Committed",
+            "tick": 7,
+            "reason": null
+        }],
+        "transformation_obligations": [{
+            "obligation_id": "handoff:3",
+            "handoff_id": 3,
+            "session": 1,
+            "transformed_fragments": ["A"],
+            "affected_operation_ids": ["effect:1"],
+            "affected_effect_ids": [1],
+            "transported_effect_ids": [1],
+            "invalidated_effect_ids": [],
+            "witness_policy": "transport_pending_invalidate_blocked",
+            "publication_revoked_from": "coro:0",
+            "publication_activated_to": "coro:1",
             "scope": { "Fragments": ["A"] },
             "status": "Committed",
             "tick": 7,
@@ -299,6 +318,7 @@ fn vm_run_output_roundtrip_preserves_semantic_objects() {
                 "outputs": { "status": "blocked" }
             }],
             "semantic_handoffs": [],
+            "transformation_obligations": [],
             "authoritative_reads": [],
             "observed_reads": [],
             "materialization_proofs": [],
@@ -311,11 +331,66 @@ fn vm_run_output_roundtrip_preserves_semantic_objects() {
         serde_json::from_value(payload).expect("decode runner output");
     assert_eq!(decoded.effect_exchanges.len(), 1);
     assert_eq!(decoded.semantic_objects.outstanding_effects.len(), 1);
+    assert!(decoded
+        .semantic_objects
+        .transformation_obligations
+        .is_empty());
     assert_eq!(
         decoded.semantic_objects.operation_instances[0]
             .terminal_publication
             .as_deref(),
         Some("effect.blocked")
+    );
+}
+
+#[test]
+fn semantic_objects_roundtrip_preserves_handoff_obligations() {
+    let payload = json!({
+        "schema_version": SEMANTIC_OBJECTS_SCHEMA_VERSION,
+        "operation_instances": [],
+        "outstanding_effects": [],
+        "semantic_handoffs": [{
+            "handoff_id": 4,
+            "session": 2,
+            "from_coro": 0,
+            "to_coro": 1,
+            "revoked_owner_id": "coro:0",
+            "activated_owner_id": "coro:1",
+            "scope": { "Fragments": ["A"] },
+            "status": "Committed",
+            "tick": 9,
+            "reason": null
+        }],
+        "transformation_obligations": [{
+            "obligation_id": "handoff:4",
+            "handoff_id": 4,
+            "session": 2,
+            "transformed_fragments": ["A"],
+            "affected_operation_ids": ["effect:10"],
+            "affected_effect_ids": [10],
+            "transported_effect_ids": [10],
+            "invalidated_effect_ids": [11],
+            "witness_policy": "transport_pending_invalidate_blocked",
+            "publication_revoked_from": "coro:0",
+            "publication_activated_to": "coro:1",
+            "scope": { "Fragments": ["A"] },
+            "status": "Committed",
+            "tick": 9,
+            "reason": null
+        }],
+        "authoritative_reads": [],
+        "observed_reads": [],
+        "materialization_proofs": [],
+        "canonical_handles": [],
+        "progress_contracts": []
+    });
+
+    let decoded: ProtocolMachineSemanticObjects =
+        serde_json::from_value(payload).expect("decode semantic objects");
+    assert_eq!(decoded.semantic_handoffs[0].revoked_owner_id, "coro:0");
+    assert_eq!(
+        decoded.transformation_obligations[0].invalidated_effect_ids,
+        vec![11]
     );
 }
 

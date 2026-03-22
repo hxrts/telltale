@@ -6,7 +6,7 @@ use crate::effect::{CorruptionType, EffectTraceEntry};
 use crate::output_condition::OutputConditionCheck;
 use crate::semantic_objects::{
     protocol_machine_semantic_objects_v1, OperationInstance, OutstandingEffect,
-    ProtocolMachineSemanticObjects,
+    ProtocolMachineSemanticObjects, TransformationObligation,
 };
 use crate::session::{
     AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord, AuthorityWitnessId,
@@ -174,6 +174,15 @@ pub enum SemanticAuditRecord {
         /// Optional rollback or rejection reason for the transfer.
         reason: Option<String>,
     },
+    /// Transformation-local obligation bundle emitted for one handoff.
+    TransformationObligation {
+        /// Scheduler tick at which the obligation became canonical.
+        tick: u64,
+        /// Session whose fragments were transformed.
+        session: SessionId,
+        /// Explicit obligation bundle tied to the handoff.
+        obligation: TransformationObligation,
+    },
     /// Explicit typed failure branch entry.
     FailureBranch {
         /// Scheduler tick at which the failure branch became visible.
@@ -287,12 +296,13 @@ fn semantic_rank(record: &SemanticAuditRecord) -> u8 {
     match record {
         SemanticAuditRecord::Authority { .. } => 0,
         SemanticAuditRecord::Delegation { .. } => 1,
-        SemanticAuditRecord::FailureBranch { .. } => 2,
-        SemanticAuditRecord::TimeoutIssued { .. } => 3,
-        SemanticAuditRecord::CancellationRequested { .. } => 4,
-        SemanticAuditRecord::Cancelled { .. } => 5,
-        SemanticAuditRecord::SessionTerminal { .. } => 6,
-        SemanticAuditRecord::EffectObservation { .. } => 7,
+        SemanticAuditRecord::TransformationObligation { .. } => 2,
+        SemanticAuditRecord::FailureBranch { .. } => 3,
+        SemanticAuditRecord::TimeoutIssued { .. } => 4,
+        SemanticAuditRecord::CancellationRequested { .. } => 5,
+        SemanticAuditRecord::Cancelled { .. } => 6,
+        SemanticAuditRecord::SessionTerminal { .. } => 7,
+        SemanticAuditRecord::EffectObservation { .. } => 8,
     }
 }
 
@@ -300,6 +310,7 @@ fn semantic_tick(record: &SemanticAuditRecord) -> u64 {
     match record {
         SemanticAuditRecord::Authority { tick, .. } => tick.unwrap_or(0),
         SemanticAuditRecord::Delegation { tick, .. }
+        | SemanticAuditRecord::TransformationObligation { tick, .. }
         | SemanticAuditRecord::FailureBranch { tick, .. }
         | SemanticAuditRecord::TimeoutIssued { tick, .. }
         | SemanticAuditRecord::CancellationRequested { tick, .. }
@@ -360,6 +371,7 @@ pub fn canonicalize_protocol_machine_semantic_objects(
 pub fn semantic_audit_log_v1(
     authority_audit_log: &[AuthorityAuditRecord],
     delegation_audit_log: &[DelegationAuditRecord],
+    operation_instances: &[OperationInstance],
     obs_trace: &[ObsEvent],
     outstanding_effects: &[OutstandingEffect],
 ) -> Vec<SemanticAuditRecord> {
@@ -382,6 +394,22 @@ pub fn semantic_audit_log_v1(
             receipt: record.receipt,
             status: record.status,
             reason: record.reason,
+        }
+    }));
+
+    let obligations = protocol_machine_semantic_objects_v1(
+        authority_audit_log,
+        delegation_audit_log,
+        operation_instances,
+        outstanding_effects,
+        &[],
+    )
+    .transformation_obligations;
+    records.extend(obligations.into_iter().map(|obligation| {
+        SemanticAuditRecord::TransformationObligation {
+            tick: obligation.tick,
+            session: obligation.session,
+            obligation,
         }
     }));
 
@@ -507,6 +535,7 @@ pub fn canonical_replay_fragment_v1(
         semantic_audit_log: semantic_audit_log_v1(
             authority_audit_log,
             delegation_audit_log,
+            operation_instances,
             obs_trace,
             outstanding_effects,
         ),
