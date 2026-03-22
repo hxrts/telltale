@@ -61,6 +61,42 @@ impl ThreadedVM {
         )
     }
 
+    /// Get canonical semantic publication events.
+    #[must_use]
+    pub fn publication_events(&self) -> Vec<crate::semantic_objects::PublicationEvent> {
+        self.semantic_objects().publication_events
+    }
+
+    /// Require that one semantic-path read be authoritative.
+    ///
+    /// # Errors
+    ///
+    /// Returns a contract violation when the requested read is observational or unknown.
+    pub fn require_authoritative_read(
+        &self,
+        read_id: &str,
+    ) -> Result<crate::semantic_objects::AuthoritativeRead, VMError> {
+        self.semantic_objects()
+            .require_authoritative_read(read_id)
+            .cloned()
+            .map_err(|message| VMError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
+    }
+
+    /// Require that one parity-critical path use a canonical handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns a contract violation when the requested handle is missing.
+    pub fn require_canonical_handle(
+        &self,
+        handle_id: &str,
+    ) -> Result<crate::semantic_objects::CanonicalHandle, VMError> {
+        self.semantic_objects()
+            .require_canonical_handle(handle_id)
+            .cloned()
+            .map_err(|message| VMError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
+    }
+
     /// Deterministic communication replay-state root.
     ///
     /// # Panics

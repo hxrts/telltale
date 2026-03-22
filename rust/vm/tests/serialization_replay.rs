@@ -114,10 +114,25 @@ fn canonical_replay_fragment_is_stable_for_identical_runs() {
     );
     assert!(
         vm_a.canonical_replay_fragment()
+            .semantic_audit_log
+            .iter()
+            .any(|record| matches!(record, SemanticAuditRecord::Publication { .. })),
+        "canonical replay fragments should retain canonical publication records"
+    );
+    assert!(
+        vm_a.canonical_replay_fragment()
             .semantic_objects
             .schema_version
             == telltale_vm::SEMANTIC_OBJECTS_SCHEMA_VERSION,
         "canonical replay fragments should retain canonical semantic-object bundles"
+    );
+    assert!(
+        !vm_a
+            .canonical_replay_fragment()
+            .semantic_objects
+            .publication_events
+            .is_empty(),
+        "canonical replay fragments should retain canonical publication events"
     );
 }
 

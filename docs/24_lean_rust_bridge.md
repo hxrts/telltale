@@ -192,6 +192,7 @@ machine’s semantic object family.
 - `ObservedRead`
 - `MaterializationProof`
 - `CanonicalHandle`
+- `PublicationEvent`
 - `ProgressContract`
 
 `semantic_objects_to_json()` and `semantic_objects_from_json()` encode and
@@ -205,6 +206,15 @@ objects plus the derived handoff/obligation/read/proof/publication surfaces.
 `ProtocolMachineRunOutput.effect_exchanges` is the canonical bridge-side export
 for the typed effect boundary. It carries `EffectRequest`, `EffectOutcome`, and
 the validated runtime metadata for each exchange.
+
+Authoritative-read/materialization/publication parity now flows through the same
+semantic-object payload:
+
+- observational reads remain in `observed_reads`
+- semantic-path evidence remains in `authoritative_reads`
+- proof-bearing success remains in `materialization_proofs`
+- strong follow-on handles remain in `canonical_handles`
+- canonical publication remains in `publication_events`
 
 `compare_execution()` now reports handoff and invalidation agreement alongside
 trace equivalence. In addition to normalized trace comparison, callers can

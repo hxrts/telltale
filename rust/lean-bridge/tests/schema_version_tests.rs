@@ -223,6 +223,18 @@ fn semantic_objects_roundtrip_preserves_schema_version() {
             "kind": "materialization",
             "proof_ref": "session.ready:digest"
         }],
+        "publication_events": [{
+            "publication_id": "materialization:session.ready:digest:materialization.succeeded",
+            "session": null,
+            "operation_id": "materialization:session.ready:digest",
+            "owner_id": null,
+            "publication": "materialization.succeeded",
+            "observer_class": "audit",
+            "status": "published",
+            "proof_ref": "session.ready:digest",
+            "handle_ref": "materialization:digest",
+            "reason": null
+        }],
         "progress_contracts": [{
             "operation_id": "effect:1",
             "session": 1,
@@ -323,6 +335,18 @@ fn vm_run_output_roundtrip_preserves_semantic_objects() {
             "observed_reads": [],
             "materialization_proofs": [],
             "canonical_handles": [],
+            "publication_events": [{
+                "publication_id": "effect:9:effect.blocked",
+                "session": 2,
+                "operation_id": "effect:9",
+                "owner_id": "owner/a",
+                "publication": "effect.blocked",
+                "observer_class": "canonical",
+                "status": "published",
+                "proof_ref": null,
+                "handle_ref": null,
+                "reason": null
+            }],
             "progress_contracts": []
         }
     });
@@ -331,6 +355,7 @@ fn vm_run_output_roundtrip_preserves_semantic_objects() {
         serde_json::from_value(payload).expect("decode runner output");
     assert_eq!(decoded.effect_exchanges.len(), 1);
     assert_eq!(decoded.semantic_objects.outstanding_effects.len(), 1);
+    assert_eq!(decoded.semantic_objects.publication_events.len(), 1);
     assert!(decoded
         .semantic_objects
         .transformation_obligations
@@ -382,6 +407,18 @@ fn semantic_objects_roundtrip_preserves_handoff_obligations() {
         "observed_reads": [],
         "materialization_proofs": [],
         "canonical_handles": [],
+        "publication_events": [{
+            "publication_id": "handoff:4:handoff.committed",
+            "session": 2,
+            "operation_id": "handoff:4",
+            "owner_id": null,
+            "publication": "handoff.committed",
+            "observer_class": "audit",
+            "status": "published",
+            "proof_ref": "handoff:4",
+            "handle_ref": "handoff:4",
+            "reason": null
+        }],
         "progress_contracts": []
     });
 
@@ -391,6 +428,10 @@ fn semantic_objects_roundtrip_preserves_handoff_obligations() {
     assert_eq!(
         decoded.transformation_obligations[0].invalidated_effect_ids,
         vec![11]
+    );
+    assert_eq!(
+        decoded.publication_events[0].publication.as_str(),
+        "handoff.committed"
     );
 }
 

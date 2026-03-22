@@ -17,9 +17,10 @@ use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::ObsEvent;
 use telltale_vm::{
-    run_loaded_vm_record_replay_conformance, AuthoritativeReadKind, CanonicalHandleKind,
-    DelegationStatus, Edge, OwnershipError, OwnershipScope, ProgressState, ProtocolMachine,
-    ProtocolMachineConfig, SemanticAuditRecord, SessionHostMutation,
+    protocol_machine_semantic_objects_v1, run_loaded_vm_record_replay_conformance,
+    AuthoritativeReadKind, CanonicalHandleKind, DelegationStatus, Edge, OperationInstance,
+    OperationPhase, OwnershipError, OwnershipScope, ProgressState, ProtocolMachine,
+    ProtocolMachineConfig, PublicationStatus, SemanticAuditRecord, SessionHostMutation,
 };
 use test_support::simple_send_recv_image;
 
@@ -270,6 +271,124 @@ fn ownership_semantic_objects_expose_authoritative_reads() {
             .iter()
             .any(|read| matches!(read.kind, AuthoritativeReadKind::Readiness)),
         "semantic objects should expose readiness witnesses as authoritative reads"
+    );
+}
+
+#[test]
+fn ownership_observed_reads_are_rejected_on_semantic_paths() {
+    let image = simple_send_recv_image("A", "B", "m");
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
+    vm.load_choreography(&image).expect("load image");
+    vm.run(&NoopHandler, 32).expect("run image");
+
+    let observed = vm
+        .semantic_objects()
+        .observed_reads
+        .first()
+        .cloned()
+        .expect("runtime should surface at least one observed read");
+    let err = vm
+        .require_authoritative_read(&observed.read_id)
+        .expect_err("observational reads must be rejected on semantic paths");
+    assert!(err.to_string().contains("observed read"));
+}
+
+#[test]
+fn ownership_proof_bearing_success_is_enforced_for_publication() {
+    let objects = protocol_machine_semantic_objects_v1(
+        &[],
+        &[],
+        &[OperationInstance {
+            operation_id: "accept:1".to_string(),
+            session: Some(1),
+            owner_id: Some("runtime/owner".to_string()),
+            kind: "acceptInvite".to_string(),
+            phase: OperationPhase::Succeeded,
+            handler_identity: Some("host/runtime".to_string()),
+            effect_ids: Vec::new(),
+            dependent_operation_ids: Vec::new(),
+            terminal_publication: Some("accept.succeeded".to_string()),
+            budget_ticks: Some(1),
+            requires_proof: true,
+        }],
+        &[],
+        &[],
+    );
+    let publication = objects
+        .publication_events
+        .iter()
+        .find(|event| event.operation_id == "accept:1")
+        .expect("publication event");
+    assert_eq!(publication.status, PublicationStatus::Rejected);
+    assert_eq!(
+        publication.reason.as_deref(),
+        Some("proof-bearing success required")
+    );
+}
+
+#[test]
+fn ownership_canonical_handle_is_required_on_parity_critical_paths() {
+    let image = simple_send_recv_image("A", "B", "m");
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
+    vm.load_choreography(&image).expect("load image");
+    vm.run(&NoopHandler, 32).expect("run image");
+
+    let semantic_objects = vm.semantic_objects();
+    let handle = semantic_objects
+        .canonical_handles
+        .first()
+        .expect("successful output-condition checks should yield a canonical handle");
+    let bound = vm
+        .require_canonical_handle(&handle.handle_id)
+        .expect("existing canonical handle must bind");
+    assert_eq!(bound.handle_id, handle.handle_id);
+
+    let err = vm
+        .require_canonical_handle("materialization:missing")
+        .expect_err("missing canonical handles must be rejected");
+    assert!(err.to_string().contains("canonical handle"));
+}
+
+#[test]
+fn ownership_publication_path_is_canonical_and_unique() {
+    let objects = protocol_machine_semantic_objects_v1(
+        &[],
+        &[],
+        &[
+            OperationInstance {
+                operation_id: "effect:1".to_string(),
+                session: Some(1),
+                owner_id: Some("runtime/owner".to_string()),
+                kind: "readChannel".to_string(),
+                phase: OperationPhase::Succeeded,
+                handler_identity: Some("host/runtime".to_string()),
+                effect_ids: Vec::new(),
+                dependent_operation_ids: Vec::new(),
+                terminal_publication: Some("effect.succeeded".to_string()),
+                budget_ticks: Some(1),
+                requires_proof: false,
+            },
+            OperationInstance {
+                operation_id: "effect:1".to_string(),
+                session: Some(1),
+                owner_id: Some("runtime/owner".to_string()),
+                kind: "readChannel".to_string(),
+                phase: OperationPhase::Succeeded,
+                handler_identity: Some("host/runtime".to_string()),
+                effect_ids: Vec::new(),
+                dependent_operation_ids: Vec::new(),
+                terminal_publication: Some("effect.succeeded".to_string()),
+                budget_ticks: Some(1),
+                requires_proof: false,
+            },
+        ],
+        &[],
+        &[],
+    );
+    assert_eq!(
+        objects.publication_events.len(),
+        1,
+        "duplicate publication roots must collapse into one canonical publication event"
     );
 }
 

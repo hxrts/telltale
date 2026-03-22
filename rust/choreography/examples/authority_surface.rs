@@ -7,11 +7,12 @@ type CommitError | NotReady | TimedOut
 type alias ReadyWitness = { epoch : Int, issuedBy : Role }
 
 effect Runtime
-  ready : Session -> Result CommitError ReadyWitness
-  transfer : TransferRequest -> Result TransferError TransferReceipt
+  authoritative ready : Session -> Result CommitError ReadyWitness
+  command transfer : TransferRequest -> Result TransferError TransferReceipt
+  observe watchPresence : Session -> PresenceView
 
 effect Audit
-  record : AuditEvent -> Unit
+  observe record : AuditEvent -> Unit
 
 protocol CommitFlow uses Runtime, Audit =
   {

@@ -63,6 +63,20 @@ pub enum CanonicalHandleKind {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub enum PublicationObserverClass {
+    Canonical,
+    Audit,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PublicationStatus {
+    Published,
+    Rejected,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ProgressState {
     Pending,
     Blocked,
@@ -199,6 +213,20 @@ pub struct CanonicalHandle {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PublicationEvent {
+    pub publication_id: String,
+    pub session: Option<u64>,
+    pub operation_id: String,
+    pub owner_id: Option<String>,
+    pub publication: String,
+    pub observer_class: PublicationObserverClass,
+    pub status: PublicationStatus,
+    pub proof_ref: Option<String>,
+    pub handle_ref: Option<String>,
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProgressContract {
     pub operation_id: String,
     pub session: Option<u64>,
@@ -227,6 +255,8 @@ pub struct ProtocolMachineSemanticObjects {
     pub observed_reads: Vec<ObservedRead>,
     pub materialization_proofs: Vec<MaterializationProof>,
     pub canonical_handles: Vec<CanonicalHandle>,
+    #[serde(default)]
+    pub publication_events: Vec<PublicationEvent>,
     pub progress_contracts: Vec<ProgressContract>,
 }
 
@@ -242,6 +272,7 @@ impl Default for ProtocolMachineSemanticObjects {
             observed_reads: Vec::new(),
             materialization_proofs: Vec::new(),
             canonical_handles: Vec::new(),
+            publication_events: Vec::new(),
             progress_contracts: Vec::new(),
         }
     }
@@ -363,6 +394,19 @@ mod tests {
                 owner_id: None,
                 kind: CanonicalHandleKind::Materialization,
                 proof_ref: Some("session.ready:digest".to_string()),
+            }],
+            publication_events: vec![PublicationEvent {
+                publication_id: "materialization:session.ready:digest:materialization.succeeded"
+                    .to_string(),
+                session: None,
+                operation_id: "materialization:session.ready:digest".to_string(),
+                owner_id: None,
+                publication: "materialization.succeeded".to_string(),
+                observer_class: PublicationObserverClass::Audit,
+                status: PublicationStatus::Published,
+                proof_ref: Some("session.ready:digest".to_string()),
+                handle_ref: Some("materialization:digest".to_string()),
+                reason: None,
             }],
             progress_contracts: vec![ProgressContract {
                 operation_id: "effect:1".to_string(),

@@ -61,7 +61,7 @@ effect requests.
 | `EffectRequestBody::SendDecision` | compute outbound delivery behavior | may inspect request-local state only |
 | `EffectRequestBody::Receive` | apply receive-side host effects | may mutate request-local state only |
 | `EffectRequestBody::InvokeStep` | perform `Invoke`-scoped integration work | may mutate request-local state only |
-| `EffectRequestBody::OutputConditionHint` | provide commit metadata | observation only |
+| `EffectRequestBody::OutputConditionHint` | provide authoritative commit metadata for proof-bearing success and canonical handle issuance | must not be synthesized from observational snapshots |
 
 Session-local host mutation outside these request-local values flows through an explicit ownership capability such as `OwnedSession`.
 This is the host integration path for mutating edge traces, handler bindings, or other session-local host metadata.
@@ -177,6 +177,28 @@ Operational consequence:
 - embedders implement one typed host boundary in `EffectHandler`
 - language-level authority checks become explicit effect observations and
   semantic-audit records once lowered into the VM
+
+## Authoritative Reads, Materialization, and Publication
+
+The protocol machine now distinguishes observational reads from semantic-path
+authoritative reads.
+
+| Surface | Meaning |
+|---|---|
+| `ObservedRead` | handler/effect observation only; must not authorize semantic truth |
+| `AuthoritativeRead` | witness-bearing semantic input accepted on parity-critical paths |
+| `MaterializationProof` | proof-bearing success artifact derived from canonical output-condition checks |
+| `CanonicalHandle` | strong runtime handle that later parity-critical paths must require |
+| `PublicationEvent` | one sealed canonical publication path for lifecycle-visible semantic state |
+
+Host-runtime rules:
+
+- observational effect results must not be promoted into semantic truth
+- proof-bearing success is mandatory when an operation declares `requires_proof`
+- canonical publication is derived from sanctioned runtime state; embedders must
+  not bypass it with parallel publish helpers
+- parity-critical follow-on work should require a `CanonicalHandle`, not a weak
+  id reconstructed from observational state
 
 ## Authority Witnesses
 

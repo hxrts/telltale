@@ -10,7 +10,7 @@ The runtime keeps a single state model across targets. Core state includes corou
 The canonical exported semantic surface is the semantic-object family:
 `OperationInstance`, `OutstandingEffect`, `SemanticHandoff`,
 `AuthoritativeRead`, `ObservedRead`, `MaterializationProof`,
-`CanonicalHandle`, and `ProgressContract`.
+`CanonicalHandle`, `PublicationEvent`, and `ProgressContract`.
 
 The canonical round model is one semantic step when concurrency is nonzero. Threaded execution is admitted as an extension only when the wave certificate gate is satisfied.
 
@@ -153,14 +153,19 @@ Runtime accessors:
 
 This bundle is the canonical bridge-facing and replay-facing representation of
 operation instances, outstanding effects, semantic handoffs, authoritative and
-observed reads, materialization proofs, canonical handles, and progress
-contracts.
+observed reads, materialization proofs, canonical handles, publication events,
+and progress contracts.
 
 `OperationInstance` and `OutstandingEffect` are first-class runtime objects.
 They carry owner id, budget ticks, retry policy, invalidation token,
 dependent-operation edges, and terminal publication state. Replay export and
 bridge payloads consume those runtime objects directly instead of deriving them
 later from raw trace order.
+
+`PublicationEvent` is the one canonical runtime publication surface. It carries
+publication id, operation id, observer class, publication status, and optional
+proof/handle references. This makes proof-bearing success and publication-path
+uniqueness replay-visible instead of leaving them as host-side conventions.
 
 ## Delegation and Reconfiguration Path
 

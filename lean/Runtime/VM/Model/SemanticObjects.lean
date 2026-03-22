@@ -40,6 +40,16 @@ inductive CanonicalHandleKind where
   | handoff
   deriving Repr, DecidableEq
 
+inductive PublicationObserverClass where
+  | canonical
+  | audit
+  deriving Repr, DecidableEq
+
+inductive PublicationStatus where
+  | published
+  | rejected
+  deriving Repr, DecidableEq
+
 inductive ProgressState where
   | pending
   | blocked
@@ -163,6 +173,19 @@ structure CanonicalHandle where
   proofRef : Option String
   deriving Repr, DecidableEq
 
+structure PublicationEvent where
+  publicationId : String
+  session : Option Nat
+  operationId : String
+  ownerId : Option String
+  publication : String
+  observerClass : PublicationObserverClass
+  status : PublicationStatus
+  proofRef : Option String
+  handleRef : Option String
+  reason : Option String
+  deriving Repr, DecidableEq
+
 structure ProgressContract where
   operationId : String
   session : Option Nat
@@ -180,6 +203,7 @@ structure ProtocolMachineSemanticObjects where
   observedReads : List ObservedRead
   materializationProofs : List MaterializationProof
   canonicalHandles : List CanonicalHandle
+  publicationEvents : List PublicationEvent
   progressContracts : List ProgressContract
   deriving Repr, DecidableEq
 

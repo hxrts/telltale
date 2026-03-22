@@ -3,6 +3,7 @@ use telltale_vm::effect::{
     EffectHandler, EffectOutcome, EffectRequest, EffectRequestBody, EffectResponse, SendDecision,
     TopologyPerturbation,
 };
+use telltale_vm::OutputConditionHint;
 
 /// Deterministic host integration scaffold.
 pub struct {{STRUCT_NAME}};
@@ -45,7 +46,12 @@ impl EffectHandler for {{STRUCT_NAME}} {
                 })
             }
             EffectRequestBody::OutputConditionHint { .. } => {
-                EffectOutcome::success(EffectResponse::OutputConditionHint { hint: None })
+                EffectOutcome::success(EffectResponse::OutputConditionHint {
+                    hint: Some(OutputConditionHint {
+                        predicate_ref: format!("{}.authoritative_output", self.handler_identity()),
+                        witness_ref: Some("scaffold/default".to_string()),
+                    }),
+                })
             }
         }
     }
@@ -56,3 +62,6 @@ impl EffectHandler for {{STRUCT_NAME}} {
 // - [ ] Keep handler_identity stable for the full runtime lifetime.
 // - [ ] Do not mutate shared host state outside explicit request handling boundaries.
 // - [ ] Validate host assumptions for topology ordering, session ownership, and effect metadata.
+// - [ ] Do not promote observed host snapshots into semantic truth; return authoritative
+//       `OutputConditionHint` / acquire evidence for parity-critical success paths.
+// - [ ] Require canonical handles or ownership receipts on later parity-critical host paths.

@@ -191,6 +191,9 @@ Current validation rules:
 
 This is the current clean-break contract.
 There is no fallback to implicit host knowledge.
+Lowering is expected to preserve this split into the runtime semantic-object
+family as `AuthoritativeRead` versus `ObservedRead`; observational reads are not
+allowed to become proof-bearing success or canonical publication by repair.
 
 ## Typed Host Effect Invocation
 

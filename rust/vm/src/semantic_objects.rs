@@ -14,6 +14,7 @@ use crate::session::{
 };
 use crate::transfer_semantics::{DelegationAuditRecord, DelegationStatus};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// Canonical schema version identifier for semantic-object exports.
 pub const SEMANTIC_OBJECTS_SCHEMA_VERSION: &str = "protocol_machine.semantic_objects.v1";
@@ -73,6 +74,22 @@ pub enum AuthoritativeReadLifecycle {
 pub enum CanonicalHandleKind {
     Materialization,
     Handoff,
+}
+
+/// Observer/export class for one canonical publication path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PublicationObserverClass {
+    Canonical,
+    Audit,
+}
+
+/// Status for one canonical publication event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PublicationStatus {
+    Published,
+    Rejected,
 }
 
 /// Progress state for one operation-level contract.
@@ -209,6 +226,21 @@ pub struct CanonicalHandle {
     pub proof_ref: Option<String>,
 }
 
+/// Canonical semantic publication event.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PublicationEvent {
+    pub publication_id: String,
+    pub session: Option<SessionId>,
+    pub operation_id: String,
+    pub owner_id: Option<FragmentOwnerId>,
+    pub publication: String,
+    pub observer_class: PublicationObserverClass,
+    pub status: PublicationStatus,
+    pub proof_ref: Option<String>,
+    pub handle_ref: Option<String>,
+    pub reason: Option<String>,
+}
+
 /// Explicit progress contract attached to one operation instance.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProgressContract {
@@ -233,6 +265,8 @@ pub struct ProtocolMachineSemanticObjects {
     pub observed_reads: Vec<ObservedRead>,
     pub materialization_proofs: Vec<MaterializationProof>,
     pub canonical_handles: Vec<CanonicalHandle>,
+    #[serde(default)]
+    pub publication_events: Vec<PublicationEvent>,
     pub progress_contracts: Vec<ProgressContract>,
 }
 
@@ -248,8 +282,50 @@ impl Default for ProtocolMachineSemanticObjects {
             observed_reads: Vec::new(),
             materialization_proofs: Vec::new(),
             canonical_handles: Vec::new(),
+            publication_events: Vec::new(),
             progress_contracts: Vec::new(),
         }
+    }
+}
+
+impl ProtocolMachineSemanticObjects {
+    /// Require one semantic-path read to be authoritative rather than observational.
+    ///
+    /// # Errors
+    ///
+    /// Returns a descriptive error when the read is observational or unknown.
+    pub fn require_authoritative_read(&self, read_id: &str) -> Result<&AuthoritativeRead, String> {
+        if let Some(read) = self
+            .authoritative_reads
+            .iter()
+            .find(|read| read.read_id == read_id)
+        {
+            return Ok(read);
+        }
+        if self
+            .observed_reads
+            .iter()
+            .any(|read| read.read_id == read_id)
+        {
+            return Err(format!(
+                "observed read `{read_id}` may not be consumed on a semantic path; use an AuthoritativeRead instead"
+            ));
+        }
+        Err(format!("semantic read `{read_id}` is unknown"))
+    }
+
+    /// Require one strong canonical handle on a parity-critical path.
+    ///
+    /// # Errors
+    ///
+    /// Returns a descriptive error when the handle is missing.
+    pub fn require_canonical_handle(&self, handle_id: &str) -> Result<&CanonicalHandle, String> {
+        self.canonical_handles
+            .iter()
+            .find(|handle| handle.handle_id == handle_id)
+            .ok_or_else(|| {
+                format!("canonical handle `{handle_id}` is required on this parity-critical path")
+            })
     }
 }
 
@@ -325,6 +401,14 @@ fn transformed_fragments(scope: &OwnershipScope) -> Vec<String> {
     }
 }
 
+fn publication_observer_class(publication: &str) -> PublicationObserverClass {
+    if publication.starts_with("handoff.") || publication.starts_with("materialization.") {
+        PublicationObserverClass::Audit
+    } else {
+        PublicationObserverClass::Canonical
+    }
+}
+
 fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSemanticObjects {
     out.operation_instances
         .sort_by(|lhs, rhs| lhs.operation_id.cmp(&rhs.operation_id));
@@ -342,6 +426,8 @@ fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSeman
         .sort_by(|lhs, rhs| lhs.proof_id.cmp(&rhs.proof_id));
     out.canonical_handles
         .sort_by(|lhs, rhs| lhs.handle_id.cmp(&rhs.handle_id));
+    out.publication_events
+        .sort_by(|lhs, rhs| lhs.publication_id.cmp(&rhs.publication_id));
     out.progress_contracts
         .sort_by(|lhs, rhs| lhs.operation_id.cmp(&rhs.operation_id));
     out
@@ -540,6 +626,67 @@ pub fn protocol_machine_semantic_objects_v1(
         })
     }));
 
+    let proof_by_operation: BTreeMap<String, String> = materialization_proofs
+        .iter()
+        .filter(|proof| proof.passed)
+        .map(|proof| {
+            (
+                format!("materialization:{}", proof.proof_id),
+                proof.proof_id.clone(),
+            )
+        })
+        .collect();
+    let handle_by_proof: BTreeMap<String, String> = canonical_handles
+        .iter()
+        .filter_map(|handle| {
+            handle
+                .proof_ref
+                .as_ref()
+                .map(|proof_ref| (proof_ref.clone(), handle.handle_id.clone()))
+        })
+        .collect();
+    let mut publication_events = BTreeMap::<String, PublicationEvent>::new();
+    for operation in &operation_instances {
+        let Some(publication) = operation.terminal_publication.as_ref() else {
+            continue;
+        };
+        let proof_ref = proof_by_operation
+            .get(&operation.operation_id)
+            .cloned()
+            .or_else(|| {
+                operation
+                    .operation_id
+                    .strip_prefix("handoff:")
+                    .map(|suffix| format!("handoff:{suffix}"))
+            });
+        let handle_ref = proof_ref
+            .as_ref()
+            .and_then(|proof_ref| handle_by_proof.get(proof_ref).cloned());
+        let (status, reason) = if operation.requires_proof && handle_ref.is_none() {
+            (
+                PublicationStatus::Rejected,
+                Some("proof-bearing success required".to_string()),
+            )
+        } else {
+            (PublicationStatus::Published, None)
+        };
+        let publication_id = format!("{}:{publication}", operation.operation_id);
+        publication_events
+            .entry(publication_id.clone())
+            .or_insert(PublicationEvent {
+                publication_id,
+                session: operation.session,
+                operation_id: operation.operation_id.clone(),
+                owner_id: operation.owner_id.clone(),
+                publication: publication.clone(),
+                observer_class: publication_observer_class(publication),
+                status,
+                proof_ref,
+                handle_ref,
+                reason,
+            });
+    }
+
     let mut progress_contracts: Vec<_> = outstanding_effects
         .iter()
         .map(|effect| ProgressContract {
@@ -568,6 +715,7 @@ pub fn protocol_machine_semantic_objects_v1(
         observed_reads,
         materialization_proofs,
         canonical_handles,
+        publication_events: publication_events.into_values().collect(),
         progress_contracts,
     })
 }

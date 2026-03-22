@@ -42,4 +42,17 @@ fn host_handler_smoke_test() {
     machine
         .run(&{{STRUCT_NAME}}, 100)
         .expect("run should succeed");
+    let semantic_objects = machine.semantic_objects();
+    assert!(
+        !semantic_objects.authoritative_reads.is_empty(),
+        "scaffolded handlers should surface authoritative read material"
+    );
+    assert!(
+        !semantic_objects.materialization_proofs.is_empty(),
+        "scaffolded handlers should emit proof-bearing materialization state"
+    );
+    assert!(
+        !semantic_objects.publication_events.is_empty(),
+        "scaffolded handlers should emit canonical publication events"
+    );
 }
