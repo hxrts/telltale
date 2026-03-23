@@ -227,7 +227,7 @@ jobs:
       - name: Run V2 benchmark matrix
         run: |
           mkdir -p artifacts
-          just v2-baseline run | tee artifacts/v2-baseline-run.log
+          just perf-baseline run | tee artifacts/perf-baseline-run.log
 
       - name: Upload heavy-lane artifacts
         uses: actions/upload-artifact@v4

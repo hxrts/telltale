@@ -323,7 +323,7 @@ If any gate fails, parity drift is treated as a release blocker.
 
 ## Performance SLA
 
-Runtime performance governance enforces explicit thresholds from `artifacts/v2/benchmark_matrix/summary.json` through `just v2-baseline sla`.
+Runtime performance governance enforces explicit thresholds from `artifacts/v2/benchmark_matrix/summary.json` through `just perf-baseline sla`.
 
 - `TT_SLA_THROUGHPUT_RATIO_MIN` (default `1.0`)
 - `TT_SLA_P99_REGRESSION_MAX_PERCENT` (default `15.0`)

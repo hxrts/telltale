@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Consolidated V2 baseline management script.
+# Performance baseline management script.
 # Usage:
-#   ./scripts/ops/baseline-v2.sh [check|freeze|run|sla]
+#   ./scripts/ops/perf-baseline.sh [check|freeze|run|sla]
 #
 # Modes:
-#   check   Verify V2 baseline artifact integrity (default)
-#   freeze  Capture/freeze V2 baseline metrics + conformance artifacts
-#   run     Run V2 benchmark matrix across workloads
+#   check   Verify baseline artifact integrity (default)
+#   freeze  Capture baseline metrics and conformance artifacts
+#   run     Run benchmark matrix across workloads
 #   sla     Check performance SLA thresholds and CI gate ordering
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -149,7 +149,7 @@ do_freeze() {
   local ARTIFACT_DIR="${ROOT_DIR}/artifacts/v2/baseline"
   mkdir -p "${ARTIFACT_DIR}"
 
-  echo "== V2 Baseline Freeze =="
+  echo "== Baseline Freeze =="
   echo "artifact dir: ${ARTIFACT_DIR}"
 
   cat > "${ARTIFACT_DIR}/suite_manifest.json" <<'JSON'
@@ -265,7 +265,7 @@ do_run() {
 
   mkdir -p "${OUT_DIR}"
 
-  echo "== V2 Benchmark Matrix =="
+  echo "== Benchmark Matrix =="
   echo "-> disjoint workload"
   cargo run -p telltale-vm --example v2_baseline_capture --features multi-thread -- \
     --workload disjoint \
@@ -282,62 +282,48 @@ do_run() {
     --tuning-profile m1_stress_reference \
     --output "${CONTENDED_M1_OUT}"
 
-  python3 - "${DISJOINT_OUT}" "${CONTENDED_OUT}" "${CONTENDED_M1_OUT}" "${SUMMARY_OUT}" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-disjoint_path = Path(sys.argv[1])
-contended_path = Path(sys.argv[2])
-contended_m1_path = Path(sys.argv[3])
-summary_path = Path(sys.argv[4])
-
-disjoint = json.loads(disjoint_path.read_text(encoding="utf-8"))
-contended = json.loads(contended_path.read_text(encoding="utf-8"))
-contended_m1 = json.loads(contended_m1_path.read_text(encoding="utf-8"))
-
-
-def summarize(run: dict) -> dict:
-    c = run["canonical"]
-    t = run["threaded"]
-    throughput_ratio = (t["throughput_steps_per_sec"] / c["throughput_steps_per_sec"]) if c["throughput_steps_per_sec"] else 0.0
-    p99_regression = (
-        ((t["p99_step_latency_us"] - c["p99_step_latency_us"]) / c["p99_step_latency_us"]) * 100.0
-        if c["p99_step_latency_us"]
-        else 0.0
-    )
-    return {
-        "workload": run["workload"],
-        "throughput_ratio_threaded_vs_canonical": throughput_ratio,
-        "p99_latency_regression_percent": p99_regression,
-        "threaded_lock_contention_events_per_1k_steps": t["lock_contention_events_per_1k_steps"],
-        "threaded_mutex_lock_contention_events_per_1k_steps": t["mutex_lock_contention_events_per_1k_steps"],
-        "threaded_planner_conflict_events_per_1k_steps": t["planner_conflict_events_per_1k_steps"],
-        "canonical_mean_wave_width": c["mean_wave_width"],
-        "threaded_mean_wave_width": t["mean_wave_width"],
-        "threaded_max_wave_width": t["max_wave_width"],
+  # jq filter: summarize a single benchmark run
+  local jq_summarize='
+    def summarize:
+      .canonical as $c | .threaded as $t |
+      (if $c.throughput_steps_per_sec != 0 then
+         $t.throughput_steps_per_sec / $c.throughput_steps_per_sec
+       else 0.0 end) as $throughput_ratio |
+      (if $c.p99_step_latency_us != 0 then
+         (($t.p99_step_latency_us - $c.p99_step_latency_us) / $c.p99_step_latency_us) * 100.0
+       else 0.0 end) as $p99_regression |
+      {
+        workload: .workload,
+        throughput_ratio_threaded_vs_canonical: $throughput_ratio,
+        p99_latency_regression_percent: $p99_regression,
+        threaded_lock_contention_events_per_1k_steps: $t.lock_contention_events_per_1k_steps,
+        threaded_mutex_lock_contention_events_per_1k_steps: $t.mutex_lock_contention_events_per_1k_steps,
+        threaded_planner_conflict_events_per_1k_steps: $t.planner_conflict_events_per_1k_steps,
+        canonical_mean_wave_width: $c.mean_wave_width,
+        threaded_mean_wave_width: $t.mean_wave_width,
+        threaded_max_wave_width: $t.max_wave_width
+      };
+    .[0] as $disjoint | .[1] as $contended | .[2] as $contended_m1 |
+    ($contended_m1.threaded.lock_contention_events_per_1k_steps) as $m1_lock |
+    ($contended.threaded.lock_contention_events_per_1k_steps) as $c_lock |
+    {
+      schema_version: 1,
+      disjoint: ($disjoint | summarize),
+      contended: ($contended | summarize),
+      contended_m1_stress_reference: ($contended_m1 | summarize),
+      lock_contention_reduction_vs_m1_stress_percent:
+        (if $m1_lock > 0.0 then (($m1_lock - $c_lock) / $m1_lock) * 100.0
+         else 100.0 end)
     }
+  '
 
-
-summary = {
-    "schema_version": 1,
-    "disjoint": summarize(disjoint),
-    "contended": summarize(contended),
-    "contended_m1_stress_reference": summarize(contended_m1),
-    "lock_contention_reduction_vs_m1_stress_percent": (
-        (
-            contended_m1["threaded"]["lock_contention_events_per_1k_steps"]
-            - contended["threaded"]["lock_contention_events_per_1k_steps"]
-        )
-        / contended_m1["threaded"]["lock_contention_events_per_1k_steps"]
-        * 100.0
-        if contended_m1["threaded"]["lock_contention_events_per_1k_steps"] > 0.0
-        else 100.0
-    ),
-}
-summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
-print(json.dumps(summary, indent=2))
-PY
+  local summary
+  summary="$(jq -n --slurpfile d "${DISJOINT_OUT}" \
+                    --slurpfile c "${CONTENDED_OUT}" \
+                    --slurpfile m "${CONTENDED_M1_OUT}" \
+                    '[$d[0], $c[0], $m[0]] | '"${jq_summarize}")"
+  printf '%s\n' "${summary}" > "${SUMMARY_OUT}"
+  printf '%s\n' "${summary}"
 
   echo "OK   wrote:"
   echo "  - ${DISJOINT_OUT}"
@@ -374,10 +360,10 @@ do_sla() {
     echo "${line}"
   }
 
-  local line_capability line_parity line_v2_baseline line_bench
+  local line_capability line_parity line_perf_baseline line_bench
   line_capability="$(require_line "check-capability-gates" "^[[:space:]]+just check-capability-gates$")"
   line_parity="$(require_line "check-parity" "^[[:space:]]+just check-parity$")"
-  line_v2_baseline="$(require_line "v2-baseline check" "^[[:space:]]+just v2-baseline check$")"
+  line_perf_baseline="$(require_line "perf-baseline check" "^[[:space:]]+just perf-baseline check$")"
   line_bench="$(require_line "bench-check" "^[[:space:]]+just bench-check$")"
 
   local errors=0
@@ -395,7 +381,7 @@ do_sla() {
 
   check_before_bench "check-capability-gates" "${line_capability}"
   check_before_bench "check-parity" "${line_parity}"
-  check_before_bench "v2-baseline check" "${line_v2_baseline}"
+  check_before_bench "perf-baseline check" "${line_perf_baseline}"
 
   if (( errors > 0 )); then
     exit 1
@@ -410,66 +396,67 @@ do_sla() {
   local P99_REGRESSION_MAX_PERCENT="${TT_SLA_P99_REGRESSION_MAX_PERCENT:-15.0}"
   local LOCK_CONTENTION_REDUCTION_MIN_PERCENT="${TT_SLA_LOCK_CONTENTION_REDUCTION_MIN_PERCENT:-50.0}"
 
-  python3 - "${SUMMARY_FILE}" \
-    "${THROUGHPUT_RATIO_MIN}" \
-    "${P99_REGRESSION_MAX_PERCENT}" \
-    "${LOCK_CONTENTION_REDUCTION_MIN_PERCENT}" <<'PY'
-import json
-import sys
-from pathlib import Path
+  local sla_result
+  sla_result="$(jq -r \
+    --argjson throughput_min "${THROUGHPUT_RATIO_MIN}" \
+    --argjson p99_max "${P99_REGRESSION_MAX_PERCENT}" \
+    --argjson lock_min "${LOCK_CONTENTION_REDUCTION_MIN_PERCENT}" '
+    def check_scenario(scenario_key):
+      .[scenario_key] as $payload |
+      if ($payload | type) != "object" then
+        ["missing benchmark scenario \u0027" + scenario_key + "\u0027"]
+      else
+        (if ($payload.throughput_ratio_threaded_vs_canonical == null) or
+            ($payload.throughput_ratio_threaded_vs_canonical < $throughput_min) then
+          [scenario_key + ": throughput_ratio_threaded_vs_canonical=" +
+           ($payload.throughput_ratio_threaded_vs_canonical | tostring) +
+           " < " + ($throughput_min | tostring)]
+        else [] end) +
+        (if ($payload.p99_latency_regression_percent == null) or
+            ($payload.p99_latency_regression_percent > $p99_max) then
+          [scenario_key + ": p99_latency_regression_percent=" +
+           ($payload.p99_latency_regression_percent | tostring) +
+           " > " + ($p99_max | tostring)]
+        else [] end)
+      end;
 
-summary_path = Path(sys.argv[1])
-throughput_min = float(sys.argv[2])
-p99_max = float(sys.argv[3])
-lock_min = float(sys.argv[4])
+    (check_scenario("disjoint") +
+     check_scenario("contended") +
+     check_scenario("contended_m1_stress_reference")) as $scenario_errors |
 
-summary = json.loads(summary_path.read_text())
-errors: list[str] = []
+    (.contended // {}) as $contended |
+    (.contended_m1_stress_reference // {}) as $contended_m1 |
+    ($contended.threaded_lock_contention_events_per_1k_steps) as $c_lock |
+    ($contended_m1.threaded_lock_contention_events_per_1k_steps) as $m1_lock |
+    .lock_contention_reduction_vs_m1_stress_percent as $lock_reduction |
 
-for scenario in ("disjoint", "contended", "contended_m1_stress_reference"):
-    payload = summary.get(scenario)
-    if not isinstance(payload, dict):
-        errors.append(f"missing benchmark scenario '{scenario}'")
-        continue
-    ratio = payload.get("throughput_ratio_threaded_vs_canonical")
-    p99 = payload.get("p99_latency_regression_percent")
-    if ratio is None or float(ratio) < throughput_min:
-        errors.append(
-            f"{scenario}: throughput_ratio_threaded_vs_canonical={ratio} < {throughput_min}"
-        )
-    if p99 is None or float(p99) > p99_max:
-        errors.append(f"{scenario}: p99_latency_regression_percent={p99} > {p99_max}")
+    ($scenario_errors + (
+      if ($c_lock == null) or ($m1_lock == null) then
+        ["missing lock contention metrics in benchmark summary for SLA evaluation"]
+      elif ($c_lock == 0) and ($m1_lock == 0) then
+        []
+      elif ($lock_reduction == null) or ($lock_reduction < $lock_min) then
+        ["lock_contention_reduction_vs_m1_stress_percent=" +
+         ($lock_reduction | tostring) + " < " + ($lock_min | tostring)]
+      else [] end
+    )) as $all_errors |
 
-lock_reduction = summary.get("lock_contention_reduction_vs_m1_stress_percent")
-contended = summary.get("contended", {})
-contended_m1 = summary.get("contended_m1_stress_reference", {})
-contended_lock = contended.get("threaded_lock_contention_events_per_1k_steps")
-contended_m1_lock = contended_m1.get("threaded_lock_contention_events_per_1k_steps")
+    if ($all_errors | length) > 0 then
+      ($all_errors | map("FAIL " + .) | join("\n")) + "\n__EXIT_1__"
+    else
+      "OK   benchmark SLA thresholds satisfied " +
+      "(throughput>=" + ($throughput_min | tostring) +
+      ", p99<=" + ($p99_max | tostring) +
+      "%, lock-reduction>=" + ($lock_min | tostring) + "%)"
+    end
+  ' "${SUMMARY_FILE}")"
 
-if contended_lock is None or contended_m1_lock is None:
-    errors.append(
-        "missing lock contention metrics in benchmark summary for SLA evaluation"
-    )
-elif float(contended_lock) == 0.0 and float(contended_m1_lock) == 0.0:
-    # No lock contention in either scenario; lock-reduction SLA is not applicable.
-    pass
-elif lock_reduction is None or float(lock_reduction) < lock_min:
-    errors.append(
-        "lock_contention_reduction_vs_m1_stress_percent="
-        f"{lock_reduction} < {lock_min}"
-    )
-
-if errors:
-    for err in errors:
-        print(f"FAIL {err}")
-    raise SystemExit(1)
-
-print(
-    "OK   benchmark SLA thresholds satisfied "
-    f"(throughput>={throughput_min}, p99<={p99_max}%, "
-    f"lock-reduction>={lock_min}%)"
-)
-PY
+  # Check for failure sentinel and split output
+  if [[ "${sla_result}" == *"__EXIT_1__"* ]]; then
+    printf '%s\n' "${sla_result%__EXIT_1__}"
+    exit 1
+  fi
+  printf '%s\n' "${sla_result}"
 }
 
 # --- Main ---
