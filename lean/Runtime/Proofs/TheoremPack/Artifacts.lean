@@ -1,3 +1,4 @@
+import Runtime.Proofs.InvariantSpace
 import Runtime.Proofs.TheoremPack.Profiles
 
 /-! # Theorem Pack Artifacts
@@ -25,6 +26,61 @@ universe u v
 section
 
 variable {ν : Type u} [VerificationModel ν]
+
+/-! ## Semantic Object Artifact Family -/
+
+/-- Packaged theorem-pack view of protocol-machine semantic-object witnesses. -/
+structure SemanticObjectArtifacts where
+  coreInvariants? : Option CoreSemanticObjectWitness := none
+  outstandingEffects? : Option OutstandingEffectSemanticWitness := none
+  semanticHandoffs? : Option SemanticHandoffWitness := none
+  authoritativeReadsPublication? : Option AuthoritativeReadPublicationWitness := none
+  materializationSuccess? : Option MaterializationSuccessWitness := none
+  progressContracts? : Option ProgressContractWitness := none
+  transformationLocalObligations? : Option TransformationLocalObligationWitness := none
+
+/-- Lift invariant-space semantic witnesses into the theorem-pack artifact layer. -/
+def SemanticObjectArtifacts.ofWitnessBundle
+    (bundle : SemanticObjectWitnessBundle) : SemanticObjectArtifacts :=
+  { coreInvariants? := bundle.coreInvariants?
+  , outstandingEffects? := bundle.outstandingEffects?
+  , semanticHandoffs? := bundle.semanticHandoffs?
+  , authoritativeReadsPublication? := bundle.authoritativeReadsPublication?
+  , materializationSuccess? := bundle.materializationSuccess?
+  , progressContracts? := bundle.progressContracts?
+  , transformationLocalObligations? := bundle.transformationLocalObligations?
+  }
+
+/-- Inventory view for semantic-object theorem families carried by one theorem pack. -/
+def SemanticObjectArtifacts.inventory
+    (artifacts? : Option SemanticObjectArtifacts) : List (String × Bool) :=
+  match artifacts? with
+  | some artifacts =>
+      [ ("semantic_object_core_invariants", artifacts.coreInvariants?.isSome)
+      , ("semantic_object_outstanding_effects", artifacts.outstandingEffects?.isSome)
+      , ("semantic_object_semantic_handoffs", artifacts.semanticHandoffs?.isSome)
+      , ("semantic_object_authoritative_reads_publication",
+          artifacts.authoritativeReadsPublication?.isSome)
+      , ("semantic_object_materialization_success", artifacts.materializationSuccess?.isSome)
+      , ("semantic_object_progress_contracts", artifacts.progressContracts?.isSome)
+      , ("semantic_object_transformation_local_obligations",
+          artifacts.transformationLocalObligations?.isSome)
+      ]
+  | none =>
+      [ ("semantic_object_core_invariants", false)
+      , ("semantic_object_outstanding_effects", false)
+      , ("semantic_object_semantic_handoffs", false)
+      , ("semantic_object_authoritative_reads_publication", false)
+      , ("semantic_object_materialization_success", false)
+      , ("semantic_object_progress_contracts", false)
+      , ("semantic_object_transformation_local_obligations", false)
+      ]
+
+/-- Compact enabled semantic-object attachment names carried by the theorem pack. -/
+def SemanticObjectArtifacts.attachmentPoints
+    (artifacts? : Option SemanticObjectArtifacts) : List String :=
+  (SemanticObjectArtifacts.inventory artifacts?).foldr
+    (fun entry acc => if entry.2 then entry.1 :: acc else acc) []
 
 /-! ## FLP Artifacts -/
 

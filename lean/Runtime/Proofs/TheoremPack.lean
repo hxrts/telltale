@@ -34,12 +34,23 @@ variable {ν : Type u} [VerificationModel ν]
 structure FailureEnvelopeSlot where
   failureEnvelope? : Option FailureEnvelopeArtifact
 
+/-- Facade-level view exposing semantic-object theorem attachment artifacts. -/
+structure SemanticObjectSlot where
+  semanticObjects? : Option SemanticObjectArtifacts
+
 /-- Build the failure-envelope slot view from a theorem pack. -/
 def failureEnvelopeSlot
     {store₀ : SessionStore ν} {State : Type v}
     {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
     (pack : VMTheoremPack (space := space)) : FailureEnvelopeSlot :=
   { failureEnvelope? := pack.failureEnvelope? }
+
+/-- Build the semantic-object slot view from a theorem pack. -/
+def semanticObjectSlot
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : VMTheoremPack (space := space)) : SemanticObjectSlot :=
+  { semanticObjects? := pack.semanticObjects? }
 
 /-- Capability bits used by conformance scripts at the façade layer. -/
 def envelopeCapabilityBits
@@ -52,6 +63,20 @@ def envelopeCapabilityBits
   , ("vm_envelope_admission", pack.vmEnvelopeAdmission?.isSome)
   , ("protocol_envelope_bridge", pack.protocolEnvelopeBridge?.isSome)
   ]
+
+/-- Facade-level semantic-object theorem inventory. -/
+def semanticObjectInventory
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : VMTheoremPack (space := space)) : List (String × Bool) :=
+  Runtime.Proofs.semanticObjectInventory (pack := pack)
+
+/-- Facade-level list of enabled semantic-object theorem attachment points. -/
+def semanticObjectAttachmentPoints
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : VMTheoremPack (space := space)) : List String :=
+  SemanticObjectArtifacts.attachmentPoints pack.semanticObjects?
 
 /-- Facade projection of the optional Byzantine-safety artifact slot. -/
 def byzantineSafetyArtifact?

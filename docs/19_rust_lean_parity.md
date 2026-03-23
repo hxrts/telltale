@@ -170,6 +170,12 @@ Transformation-local obligation bundles now live in
 coverage/admissibility lemmas and lightweight linking / reconfiguration bridge
 structures in
 `Runtime/VM/Model/SemanticObjects/TransformationLocalObligationsLemmas.lean`.
+Theorem-pack attachment for these semantic-object proof families now lives in
+`Runtime/Proofs/InvariantSpace.lean` via `SemanticObjectWitnessBundle`, and the
+same attachment points are exposed through
+`Runtime/Proofs/TheoremPack/Inventory.lean`,
+`Runtime/Proofs/TheoremPack/API.lean`, and
+`Runtime/Proofs/Contracts/RuntimeContracts.lean`.
 
 ### Lean ProtocolMachineState
 
@@ -198,6 +204,9 @@ Runtime modes that require theorem/capability evidence are admission gated.
 | Runtime capability snapshot | `runtimeCapabilitySnapshot` | `runtime_capability_snapshot` | Aligned |
 
 The Rust surfaces are in `rust/vm/src/runtime_contracts.rs` and `rust/vm/src/composition.rs`.
+On the Lean side, `TheoremPackCapabilityContract.semanticAttachmentPoints`
+provides the canonical runtime-facing list of enabled semantic-object theorem
+attachment points.
 
 ## Determinism Profiles
 

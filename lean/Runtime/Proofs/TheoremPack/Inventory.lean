@@ -11,6 +11,13 @@ section
 /-! ## Base Inventory -/
 
 variable {ν : Type u} [VerificationModel ν]
+
+def semanticObjectInventory
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : VMTheoremPack (space := space)) : List (String × Bool) :=
+  SemanticObjectArtifacts.inventory pack.semanticObjects?
+
 def theoremInventory
     {store₀ : SessionStore ν} {State : Type v}
     {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
@@ -49,7 +56,7 @@ def theoremInventory
   , ("classical_concentration", pack.concentration?.isSome)
   , ("classical_littles_law", pack.littlesLaw?.isSome)
   , ("classical_functional_clt", pack.functionalCLT?.isSome)
-  ]
+  ] ++ semanticObjectInventory (pack := pack)
 
 /-! ## Determinism Extension -/
 

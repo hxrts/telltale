@@ -1,5 +1,6 @@
 import Runtime.VM.Model.SemanticObjects.Core
 import Runtime.VM.Model.SemanticObjects.Invariants
+import Runtime.VM.Model.SemanticObjects.AuthoritativeReadsPublication
 
 set_option autoImplicit false
 
@@ -59,6 +60,24 @@ def CanonicalHandle.adequateForSuccessContext
   handle.kind = ctx.requiredHandleKind ∧
   handle.proofRef = some proof.proofId
 
+def CanonicalHandle.sameHandleDomain
+    (left right : CanonicalHandle) : Prop :=
+  left.session = right.session ∧
+  left.ownerId = right.ownerId ∧
+  left.kind = right.kind
+
+def PublicationEvent.adequateForSuccessContext
+    (event : PublicationEvent)
+    (ctx : SuccessProofContext)
+    (proof : MaterializationProof)
+    (handle : CanonicalHandle) : Prop :=
+  event.operationId = ctx.operationId ∧
+  event.session = ctx.session ∧
+  event.status = .published ∧
+  event.observerClass = .canonical ∧
+  event.proofRef = some proof.proofId ∧
+  event.handleRef = some handle.handleId
+
 def ProtocolMachineSemanticObjects.hasAdequateSuccessArtifacts
     (objects : ProtocolMachineSemanticObjects)
     (ctx : SuccessProofContext) : Prop :=
@@ -66,6 +85,30 @@ def ProtocolMachineSemanticObjects.hasAdequateSuccessArtifacts
     proof.adequateForSuccessContext ctx ∧
     ∃ handle ∈ objects.canonicalHandles,
       handle.adequateForSuccessContext ctx proof
+
+def ProtocolMachineSemanticObjects.authoritativeMaterializationAdequate
+    (objects : ProtocolMachineSemanticObjects)
+    (ctx : SuccessProofContext) : Prop :=
+  ∃ proof ∈ objects.materializationProofs,
+    proof.adequateForSuccessContext ctx ∧
+    ∃ handle ∈ objects.canonicalHandles,
+      handle.adequateForSuccessContext ctx proof ∧
+      ∃ event ∈ objects.publicationEvents,
+        event.adequateForSuccessContext ctx proof handle ∧
+        event.hasCanonicalAuthorityEvidence
+
+def ProtocolMachineSemanticObjects.canonicalHandleDomainUnique
+    (objects : ProtocolMachineSemanticObjects)
+    (ctx : SuccessProofContext) : Prop :=
+  ∀ handle₁ ∈ objects.canonicalHandles,
+    ∀ handle₂ ∈ objects.canonicalHandles,
+      (∃ proof ∈ objects.materializationProofs,
+        proof.adequateForSuccessContext ctx ∧
+        handle₁.adequateForSuccessContext ctx proof) →
+      (∃ proof ∈ objects.materializationProofs,
+        proof.adequateForSuccessContext ctx ∧
+        handle₂.adequateForSuccessContext ctx proof) →
+      handle₁.handleId = handle₂.handleId
 
 def ProtocolMachineSemanticObjects.successProofBacked
     (objects : ProtocolMachineSemanticObjects)
@@ -91,5 +134,14 @@ def ProtocolMachineSemanticObjects.observedMaterializationInsufficient
     (ctx : SuccessProofContext) : Prop :=
   ∀ read ∈ objects.observedReads,
     ¬ read.establishesCanonicalMaterialization ctx
+
+def ProtocolMachineSemanticObjects.weakerPublicationInsufficient
+    (objects : ProtocolMachineSemanticObjects)
+    (ctx : SuccessProofContext) : Prop :=
+  ∀ event ∈ objects.publicationEvents,
+    event.observerClass ≠ .canonical →
+      ∀ proof ∈ objects.materializationProofs,
+        ∀ handle ∈ objects.canonicalHandles,
+          ¬ event.adequateForSuccessContext ctx proof handle
 
 end Runtime.VM.Model

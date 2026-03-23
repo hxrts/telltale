@@ -47,6 +47,19 @@ theorem successProofBacked_requires_proof_and_handle
         handle.adequateForSuccessContext ctx proof := by
   exact hBacked operation hMem hRequires
 
+theorem authoritativeMaterializationAdequate_requires_publication
+    {objects : ProtocolMachineSemanticObjects}
+    {ctx : SuccessProofContext}
+    (hAdequate : objects.authoritativeMaterializationAdequate ctx) :
+    ∃ proof ∈ objects.materializationProofs,
+      proof.adequateForSuccessContext ctx ∧
+      ∃ handle ∈ objects.canonicalHandles,
+        handle.adequateForSuccessContext ctx proof ∧
+        ∃ event ∈ objects.publicationEvents,
+          event.adequateForSuccessContext ctx proof handle ∧
+          event.hasCanonicalAuthorityEvidence := by
+  exact hAdequate
+
 theorem proofless_success_impossible_for_targeted_operation
     {objects : ProtocolMachineSemanticObjects}
     {ctx : SuccessProofContext}
@@ -70,6 +83,20 @@ theorem observedMaterializationInsufficient_prevents_observed_promotion
     ¬ read.establishesCanonicalMaterialization ctx :=
   hObserved read hMem
 
+theorem weakerPublicationInsufficient_prevents_noncanonical_forgery
+    {objects : ProtocolMachineSemanticObjects}
+    {ctx : SuccessProofContext}
+    (hWeak : objects.weakerPublicationInsufficient ctx)
+    {event : PublicationEvent}
+    (hMem : event ∈ objects.publicationEvents)
+    (hNonCanonical : event.observerClass ≠ .canonical)
+    {proof : MaterializationProof}
+    (hProof : proof ∈ objects.materializationProofs)
+    {handle : CanonicalHandle}
+    (hHandle : handle ∈ objects.canonicalHandles) :
+    ¬ event.adequateForSuccessContext ctx proof handle :=
+  hWeak event hMem hNonCanonical proof hProof handle hHandle
+
 theorem adequate_success_artifacts_require_passed_proof
     {objects : ProtocolMachineSemanticObjects}
     {ctx : SuccessProofContext}
@@ -82,5 +109,48 @@ theorem adequate_success_artifacts_require_passed_proof
   rcases hProofAdequate with ⟨_, _, _, _, hPassed⟩
   rcases hHandleAdequate with ⟨_, _, hProofRef⟩
   exact ⟨proof, hProofMem, hPassed, handle, hHandleMem, hProofRef⟩
+
+theorem canonical_handle_domain_unique_for_success_context
+    {objects : ProtocolMachineSemanticObjects}
+    {ctx : SuccessProofContext}
+    (hUnique : objects.canonicalHandleDomainUnique ctx)
+    {handle₁ handle₂ : CanonicalHandle}
+    (hHandle₁ : handle₁ ∈ objects.canonicalHandles)
+    (hHandle₂ : handle₂ ∈ objects.canonicalHandles)
+    (hAdequate₁ : ∃ proof ∈ objects.materializationProofs,
+        proof.adequateForSuccessContext ctx ∧
+        handle₁.adequateForSuccessContext ctx proof)
+    (hAdequate₂ : ∃ proof ∈ objects.materializationProofs,
+        proof.adequateForSuccessContext ctx ∧
+        handle₂.adequateForSuccessContext ctx proof) :
+    handle₁.handleId = handle₂.handleId :=
+  hUnique handle₁ hHandle₁ handle₂ hHandle₂ hAdequate₁ hAdequate₂
+
+theorem publication_backed_materialization_has_canonical_surface
+    {objects : ProtocolMachineSemanticObjects}
+    {ctx : SuccessProofContext}
+    (hAdequate : objects.authoritativeMaterializationAdequate ctx) :
+    ∃ event ∈ objects.publicationEvents,
+      event.observerClass = .canonical ∧
+      event.status = .published ∧
+      event.proofRef.isSome ∧
+      event.handleRef.isSome := by
+  rcases hAdequate with ⟨proof, hProofMem, hProof, handle, hHandleMem, hHandle, event, hEventMem, hEvent, hEvidence⟩
+  refine ⟨event, hEventMem, hEvent.2.2.2.1, hEvent.2.2.1, hEvidence.2.1, hEvidence.2.2⟩
+
+theorem proofless_or_handleless_publication_cannot_materialize
+    {ctx : SuccessProofContext}
+    {event : PublicationEvent}
+    {proof : MaterializationProof}
+    {handle : CanonicalHandle}
+    (hMissing : event.proofRef.isNone ∨ event.handleRef.isNone) :
+    ¬ event.adequateForSuccessContext ctx proof handle := by
+  intro hAdequate
+  rcases hAdequate with ⟨_, _, _, _, hProofRef, hHandleRef⟩
+  cases hMissing with
+  | inl hNoProof =>
+      simp [hProofRef] at hNoProof
+  | inr hNoHandle =>
+      simp [hHandleRef] at hNoHandle
 
 end Runtime.VM.Model

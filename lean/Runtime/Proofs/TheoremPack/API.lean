@@ -52,6 +52,28 @@ abbrev capabilitiesWithDeterminism
     (determinism : VMDeterminismArtifacts) : List (String × Bool) :=
   theoremInventoryWithDeterminism (space := space) pack determinism
 
+/-- API alias: theorem-pack projection of semantic-object proof-family artifacts. -/
+abbrev semanticObjectArtifacts
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : VMTheoremPack (space := space)) : Option SemanticObjectArtifacts :=
+  pack.semanticObjects?
+
+/-- API alias: semantic-object proof-family inventory extracted from the theorem pack. -/
+abbrev semanticObjectInventory
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : VMTheoremPack (space := space)) :
+    List (String × Bool) :=
+  Runtime.Proofs.semanticObjectInventory (pack := pack)
+
+/-- Compact list of enabled semantic-object theorem attachment points. -/
+def semanticObjectCapabilities
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : VMTheoremPack (space := space)) : List String :=
+  SemanticObjectArtifacts.attachmentPoints (semanticObjectArtifacts pack)
+
 /-- Deterministic minimal capability inventory:
 retain only capability names with proved evidence. -/
 def minimalCapabilities
@@ -164,6 +186,16 @@ def withOutputCondition
       toVMInvariantSpace :=
         VMInvariantSpace.withOutputConditionWitness space.toVMInvariantSpace w }
 
+/-- Attach semantic-object theorem attachment points to a combined proof space. -/
+def withSemanticObjectWitnesses
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (w : SemanticObjectWitnessBundle) :
+    VMInvariantSpaceWithProfiles store₀ State :=
+  { space with
+      toVMInvariantSpace :=
+        VMInvariantSpace.withSemanticObjectWitnesses space.toVMInvariantSpace w }
+
 /-- Composer API for liveness/distributed/classical/output-condition spaces. -/
 def composeProofSpaces
     {store₀ : SessionStore ν} {State : Type v}
@@ -188,6 +220,26 @@ def composeProofSpaces
   match output? with
   | some w => withOutputCondition (space := s₃) w
   | none => s₃
+
+/-- Composer API that additionally attaches semantic-object theorem surfaces. -/
+def composeProofSpacesWithSemanticObjects
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (liveness? : Option (VMLivenessBundle store₀))
+    (distributed? : Option Adapters.DistributedProfiles)
+    (classical? : Option (Adapters.ClassicalProfiles State))
+    (output? : Option OutputConditionWitness)
+    (semanticObjects? : Option SemanticObjectWitnessBundle) :
+    VMInvariantSpaceWithProfiles store₀ State :=
+  let composed := composeProofSpaces
+    (space := space)
+    (liveness? := liveness?)
+    (distributed? := distributed?)
+    (classical? := classical?)
+    (output? := output?)
+  match semanticObjects? with
+  | some witnesses => withSemanticObjectWitnesses (space := composed) witnesses
+  | none => composed
 
 /-! ### Runtime Capability Gates -/
 

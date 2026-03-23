@@ -19,6 +19,9 @@ import Runtime.Proofs.ProgressApi
 import Runtime.Proofs.SchedulerApi
 import Runtime.Proofs.EffectBisim
 import Runtime.Proofs.VM.BridgeStrengthening
+import Runtime.Proofs.VM.EffectContracts
+import Runtime.Proofs.VM.PublicationMaterialization
+import Runtime.Proofs.VM.ReplayFailureExactness
 import Runtime.Proofs.VM.Speculation
 import Runtime.Proofs.InvariantSpace
 import Runtime.Proofs.Adapters.Progress

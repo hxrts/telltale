@@ -42,9 +42,9 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | ClassicalAnalysis |     3 |   1,128 | Real analysis concrete models for classical transport      |
 | Distributed    |    59 |   7,266 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   170 |  40,077 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   161 |  30,516 | VM, Iris backend via iris-lean, resource algebras, WP      |
+| Runtime        |   167 |  31,724 | VM, Iris backend via iris-lean, resource algebras, WP      |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **640** | **129,946** |                                                            |
+| **Total**      | **646** | **131,154** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
@@ -741,7 +741,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | Proofs/ObserverProjection.lean | 206 | Observer projection for trace equivalence |
 | Proofs/ObserverProjectionEffectBisim.lean | 107 | Effect bisimulation for observer projection |
 | Proofs/HandlerEquivalence.lean | 145 | Handler equivalence proofs |
-| Proofs/InvariantSpace.lean | 61 | Proof-carrying invariant-space bundle for VM theorem derivation |
+| Proofs/InvariantSpace.lean | 61 | Proof-carrying invariant-space bundle plus semantic-object theorem attachment points |
 | Proofs/Adapters/Progress.lean | 50 | Invariant-space adapters for liveness/progress theorems |
 | Proofs/Adapters/Classical.lean | 416 | Invariant-space adapters for classical transport profiles and artifacts |
 | Proofs/Adapters/Distributed.lean | 87 | V2: Distributed adapter re-exports |
@@ -756,11 +756,11 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Proofs/TheoremPack/API.lean | 267 | V2: Public theorem pack interface |
+| Proofs/TheoremPack/API.lean | 267 | V2: Public theorem pack interface including semantic-object attachment APIs |
 | Proofs/TheoremPack/Build.lean | 371 | V2: Theorem pack construction |
 | Proofs/TheoremPack/Artifacts.lean | 426 | V2: Artifact generation for release gates |
 | Proofs/TheoremPack/Profiles.lean | 287 | V2: Determinism profile definitions |
-| Proofs/TheoremPack/Inventory.lean | 66 | V2: Capability inventory management |
+| Proofs/TheoremPack/Inventory.lean | 66 | V2: Capability inventory management including semantic-object proof families |
 | Proofs/TheoremPack/ReleaseConformance.lean | 299 | V2: Release gate conformance checking |
 
 ### Proofs/EffectBisim (V2 Handler Equivalence)

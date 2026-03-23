@@ -36,6 +36,7 @@ structure VMTheoremPack
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State) where
   termination? : Option (TerminationArtifact (ν := ν) (store₀ := store₀))
   outputCondition? : Option OutputConditionArtifact
+  semanticObjects? : Option SemanticObjectArtifacts
   flpLowerBound? : Option FLPLowerBoundArtifact
   flpImpossibility? : Option FLPImpossibilityArtifact
   capImpossibility? : Option CAPImpossibilityArtifact
@@ -92,6 +93,9 @@ def buildVMTheoremPack
           { witness := w
           , soundness := w.sound
           }
+  let semanticObjects? :=
+    space.toVMInvariantSpace.semanticObjectWitnesses?.map
+      SemanticObjectArtifacts.ofWitnessBundle
 
   -- Builder: Distributed Impossibility and Quorum
 
@@ -332,6 +336,7 @@ def buildVMTheoremPack
   let classicalPack := Adapters.buildVMClassicalTheoremPack (space := space.toClassicalSpace)
   { termination? := termination?
   , outputCondition? := outputCondition?
+  , semanticObjects? := semanticObjects?
   , flpLowerBound? := flpLowerBound?
   , flpImpossibility? := flpImpossibility?
   , capImpossibility? := capImpossibility?

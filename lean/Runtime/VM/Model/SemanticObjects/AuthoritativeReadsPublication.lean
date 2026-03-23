@@ -73,8 +73,13 @@ def PublicationEvent.canonicalPublicationFor
     (event : PublicationEvent)
     (ctx : AuthoritativeCommitmentContext) : Prop :=
   event.operationId = ctx.operationId ∧
+  event.session = ctx.session ∧
   event.observerClass = ctx.publicationObserverClass ∧
   event.status = .published
+
+def PublicationEvent.hasCanonicalAuthorityEvidence
+    (event : PublicationEvent) : Prop :=
+  event.ownerId.isSome ∧ event.proofRef.isSome ∧ event.handleRef.isSome
 
 def ProtocolMachineSemanticObjects.observerPublicationProjection
     (objects : ProtocolMachineSemanticObjects)
@@ -93,20 +98,35 @@ def ProtocolMachineSemanticObjects.canonicalPublicationPathUnique
       event₁.status = .published →
       event₂.status = .published →
       event₁.operationId = event₂.operationId →
+      event₁.session = event₂.session →
       event₁.publicationId = event₂.publicationId
+
+def ProtocolMachineSemanticObjects.canonicalPublicationSurfaceExclusive
+    (objects : ProtocolMachineSemanticObjects) : Prop :=
+  ∀ event₁ ∈ objects.publicationEvents,
+    ∀ event₂ ∈ objects.publicationEvents,
+      event₁.observerClass = .canonical →
+      event₂.observerClass = .canonical →
+      event₁.status = .published →
+      event₂.status = .published →
+      event₁.operationId = event₂.operationId →
+      event₁.session = event₂.session →
+      event₁.publicationId = event₂.publicationId ∧
+      event₁.proofRef = event₂.proofRef ∧
+      event₁.handleRef = event₂.handleRef
 
 def ProtocolMachineSemanticObjects.publicationObserverClassDisciplined
     (objects : ProtocolMachineSemanticObjects) : Prop :=
   ∀ event ∈ objects.publicationEvents,
     event.observerClass = .canonical →
       event.status = .published →
-      event.ownerId.isSome ∧ event.proofRef.isSome
+      event.hasCanonicalAuthorityEvidence
 
 def ProtocolMachineSemanticObjects.commitmentPublicationDisciplined
     (objects : ProtocolMachineSemanticObjects)
     (ctx : AuthoritativeCommitmentContext) : Prop :=
   objects.authoritativeCommitPermitted ctx →
     ∃ event ∈ objects.publicationEvents,
-      event.canonicalPublicationFor ctx ∧ event.proofRef.isSome
+      event.canonicalPublicationFor ctx ∧ event.hasCanonicalAuthorityEvidence
 
 end Runtime.VM.Model

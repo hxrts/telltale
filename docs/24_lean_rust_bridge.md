@@ -44,6 +44,12 @@ Transformation-local obligation bundles now live in
 coverage/admissibility lemmas and lightweight linking / reconfiguration bridge
 structures in
 `Runtime/VM/Model/SemanticObjects/TransformationLocalObligationsLemmas.lean`.
+The semantic-object theorem families are now attached to theorem-pack proof
+spaces through `Runtime/Proofs/InvariantSpace.lean` via
+`SemanticObjectWitnessBundle`, and the canonical inventory / contract surfaces
+for those attachment points live in `Runtime/Proofs/TheoremPack/API.lean`,
+`Runtime/Proofs/TheoremPack/Inventory.lean`, and
+`Runtime/Proofs/Contracts/RuntimeContracts.lean`.
 
 ## Scope
 

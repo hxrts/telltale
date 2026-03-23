@@ -8,6 +8,12 @@ inductive EffectAuthorityClass where
   | observe
   deriving Repr, DecidableEq
 
+inductive EffectSemanticClass where
+  | authoritative
+  | observational
+  | bestEffort
+  deriving Repr, DecidableEq
+
 inductive EffectAdmissibility where
   | always
   | declaredUseOnly
@@ -15,7 +21,7 @@ inductive EffectAdmissibility where
   deriving Repr, DecidableEq
 
 inductive EffectTotality where
-  | immediate
+  | mustTerminate
   | mayBlock
   deriving Repr, DecidableEq
 
@@ -31,21 +37,95 @@ inductive EffectReentrancyPolicy where
   | rejectSameFragment
   deriving Repr, DecidableEq
 
+inductive EffectRetryShape where
+  | forbidden
+  | bounded (maxRetries : Nat)
+  | untilTimeout
+  deriving Repr, DecidableEq
+
 inductive EffectHandlerDomain where
   | internal
   | external
   deriving Repr, DecidableEq
 
+structure EffectResponsibilityDomain where
+  footprintKey : String
+  operationId : Option String := none
+  fragmentId : Option String := none
+  ownerId : Option String := none
+  deriving Repr, DecidableEq
+
+def EffectTimeoutPolicy.requiresExplicitTimeout : EffectTimeoutPolicy → Prop
+  | .required _ => True
+  | .none | .inheritOperationBudget => False
+
+def EffectRetryShape.hasExplicitRule : EffectRetryShape → Prop
+  | .forbidden => False
+  | .bounded _ | .untilTimeout => True
+
+def EffectResponsibilityDomain.sameSemanticFootprint
+    (left right : EffectResponsibilityDomain) : Prop :=
+  left.footprintKey = right.footprintKey
+
+def EffectResponsibilityDomain.sameOperation
+    (left right : EffectResponsibilityDomain) : Prop :=
+  left.operationId.isSome ∧ left.operationId = right.operationId
+
+def EffectResponsibilityDomain.sameFragment
+    (left right : EffectResponsibilityDomain) : Prop :=
+  left.fragmentId.isSome ∧ left.fragmentId = right.fragmentId
+
+def EffectReentrancyPolicy.admits
+    (policy : EffectReentrancyPolicy)
+    (active incoming : EffectResponsibilityDomain) : Prop :=
+  match policy with
+  | .allow => True
+  | .rejectSameOperation =>
+      ¬ EffectResponsibilityDomain.sameOperation active incoming
+  | .rejectSameFragment =>
+      ¬ EffectResponsibilityDomain.sameSemanticFootprint active incoming
+
 structure EffectInterfaceMetadata where
   interfaceName : String
   operationName : String
   authorityClass : EffectAuthorityClass
+  semanticClass : EffectSemanticClass
   admissibility : EffectAdmissibility
   totality : EffectTotality
   timeoutPolicy : EffectTimeoutPolicy
+  retryShape : EffectRetryShape
   reentrancyPolicy : EffectReentrancyPolicy
   handlerDomain : EffectHandlerDomain
   deriving Repr, DecidableEq
+
+def EffectInterfaceMetadata.timeoutRequired
+    (metadata : EffectInterfaceMetadata) : Prop :=
+  metadata.timeoutPolicy.requiresExplicitTimeout
+
+def EffectInterfaceMetadata.hasExplicitRetryRule
+    (metadata : EffectInterfaceMetadata) : Prop :=
+  metadata.retryShape.hasExplicitRule
+
+def EffectInterfaceMetadata.architecturallyLegal
+    (metadata : EffectInterfaceMetadata) : Prop :=
+  (metadata.semanticClass = .observational →
+      metadata.authorityClass ≠ .authoritative) ∧
+  (metadata.semanticClass = .bestEffort →
+      metadata.authorityClass ≠ .authoritative) ∧
+  (metadata.totality = .mayBlock → metadata.timeoutRequired) ∧
+  (metadata.hasExplicitRetryRule → metadata.timeoutRequired) ∧
+  (metadata.admissibility = .internalOnly →
+      metadata.handlerDomain = .internal)
+
+def EffectInterfaceMetadata.architecturallyIllegal
+    (metadata : EffectInterfaceMetadata) : Prop :=
+  ¬ metadata.architecturallyLegal
+
+def EffectInterfaceMetadata.reentrancyAdmissible
+    (metadata : EffectInterfaceMetadata)
+    (active incoming : EffectResponsibilityDomain) : Prop :=
+  metadata.architecturallyLegal ∧
+  metadata.reentrancyPolicy.admits active incoming
 
 inductive EffectRequestBody where
   | sendDecision (role partner label : String) (state : List String) (payload : Option String)
@@ -66,6 +146,14 @@ structure EffectRequest where
   metadata : EffectInterfaceMetadata
   body : EffectRequestBody
   deriving Repr, DecidableEq
+
+def EffectRequest.architecturallyLegal (request : EffectRequest) : Prop :=
+  request.metadata.architecturallyLegal
+
+def EffectRequest.reentrancyAdmissible
+    (request : EffectRequest)
+    (active incoming : EffectResponsibilityDomain) : Prop :=
+  request.metadata.reentrancyAdmissible active incoming
 
 inductive EffectOutcomeStatus where
   | success

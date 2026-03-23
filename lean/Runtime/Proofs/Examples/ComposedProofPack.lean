@@ -22,9 +22,48 @@ def baseComposedSpace :
     VMInvariantSpaceWithProfiles (ν := ν) store₀ State :=
   VMInvariantSpaceWithProfiles.mk
     (Adapters.VMInvariantSpaceWithDistributed.mk
-      (VMInvariantSpace.mk none none none)
+      (VMInvariantSpace.mk none none none none)
       {})
     {}
+
+def emptySemanticObjects : Runtime.VM.Model.ProtocolMachineSemanticObjects :=
+  { operationInstances := []
+  , outstandingEffects := []
+  , semanticHandoffs := []
+  , transformationObligations := []
+  , authoritativeReads := []
+  , observedReads := []
+  , materializationProofs := []
+  , canonicalHandles := []
+  , publicationEvents := []
+  , progressContracts := []
+  , progressTransitions := []
+  }
+
+def coreSemanticObjectWitness :
+    CoreSemanticObjectWitness :=
+  { objects := emptySemanticObjects
+  , invariants := by
+      simp [Runtime.VM.Model.ProtocolMachineSemanticObjects.coreSemanticObjectInvariants,
+        Runtime.VM.Model.ProtocolMachineSemanticObjects.explicitOperationIdentity,
+        Runtime.VM.Model.ProtocolMachineSemanticObjects.explicitOutstandingEffectIdentity,
+        Runtime.VM.Model.ProtocolMachineSemanticObjects.uniqueOperationIds,
+        Runtime.VM.Model.ProtocolMachineSemanticObjects.uniqueOutstandingEffectIds,
+        Runtime.VM.Model.ProtocolMachineSemanticObjects.uniqueSemanticOwner,
+        Runtime.VM.Model.ProtocolMachineSemanticObjects.explicitHandoffs,
+        Runtime.VM.Model.ProtocolMachineSemanticObjects.nonAuthoritativeObservedReads,
+        Runtime.VM.Model.ProtocolMachineSemanticObjects.disjointReadIdentities,
+        emptySemanticObjects]
+  }
+
+def semanticWitnessBundle : SemanticObjectWitnessBundle :=
+  { coreInvariants? := some coreSemanticObjectWitness }
+
+def semanticComposedSpace :
+    VMInvariantSpaceWithProfiles (ν := ν) store₀ State :=
+  Runtime.Proofs.TheoremPackAPI.withSemanticObjectWitnesses
+    (space := baseComposedSpace (ν := ν) (store₀ := store₀) (State := State))
+    semanticWitnessBundle
 
 def composedSpace (bundle : VMLivenessBundle store₀) (ow : OutputConditionWitness) :
     VMInvariantSpaceWithProfiles (ν := ν) store₀ State :=
@@ -49,6 +88,20 @@ example (bundle : VMLivenessBundle store₀) (ow : OutputConditionWitness) :
     True := by
   intro
   trivial
+
+/-- Semantic-object witness bundles flow through the same theorem-pack API surface. -/
+example :
+    ("semantic_object_core_invariants", true) ∈
+      Runtime.Proofs.TheoremPackAPI.semanticObjectInventory
+        (pack := Runtime.Proofs.TheoremPackAPI.mk
+          (space := semanticComposedSpace (ν := ν) (store₀ := store₀) (State := State))) := by
+  simp [semanticComposedSpace, Runtime.Proofs.TheoremPackAPI.withSemanticObjectWitnesses,
+    VMInvariantSpace.withSemanticObjectWitnesses, Runtime.Proofs.TheoremPackAPI.mk,
+    Runtime.Proofs.buildVMTheoremPack,
+    Runtime.Proofs.TheoremPackAPI.semanticObjectInventory, Runtime.Proofs.semanticObjectInventory,
+    Runtime.Proofs.SemanticObjectArtifacts.inventory,
+    Runtime.Proofs.SemanticObjectArtifacts.ofWitnessBundle,
+    semanticWitnessBundle, coreSemanticObjectWitness, baseComposedSpace]
 
 end
 

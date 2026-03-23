@@ -30,6 +30,8 @@ separate sections so the runtime boundary is explicit.
 namespace Runtime
 namespace Proofs
 
+universe u v
+
 section
 
 variable {ι γ π ε ν : Type}
@@ -89,10 +91,19 @@ structure SchedulerProfileContract (st₀ : VMState ι γ π ε ν) where
 /-- Theorem-pack capability contract: advanced runtime modes are gated by the
 inventory materialized from theorem-pack evidence. -/
 structure TheoremPackCapabilityContract
-    {store₀ : SessionStore ν} {State : Type}
+    {store₀ : SessionStore ν} {State : Type v}
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State) where
   theoremPack : VMTheoremPack (space := space)
   capabilityInventory : List (String × Bool)
+  semanticObjectInventory : List (String × Bool)
+
+/-- Runtime-facing list of enabled semantic-object theorem attachment points. -/
+def TheoremPackCapabilityContract.semanticAttachmentPoints
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (contract : TheoremPackCapabilityContract space) : List String :=
+  Runtime.Proofs.TheoremPackAPI.semanticObjectCapabilities
+    (pack := contract.theoremPack)
 
 /-! ## Combined Runtime Bundle -/
 
@@ -273,14 +284,17 @@ def SchedulerProfileContract.ofBundle {st₀ : VMState ι γ π ε ν}
 
 /-- Build a theorem-pack capability contract from a proof space. -/
 def TheoremPackCapabilityContract.ofProofSpace
-    {store₀ : SessionStore ν} {State : Type}
+    {store₀ : SessionStore ν} {State : Type v}
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State) :
     TheoremPackCapabilityContract space :=
   let pack := Runtime.Proofs.TheoremPackAPI.mk (space := space)
-  let minimal :=
-    Runtime.Proofs.TheoremPackAPI.minimalCapabilities (space := space) pack
+  let inventory :=
+    Runtime.Proofs.TheoremPackAPI.capabilities (space := space) pack
+  let semanticInventory :=
+    Runtime.Proofs.TheoremPackAPI.semanticObjectInventory (pack := pack)
   { theoremPack := pack
-  , capabilityInventory := minimal.map (fun name => (name, true))
+  , capabilityInventory := inventory
+  , semanticObjectInventory := semanticInventory
   }
 
 end
