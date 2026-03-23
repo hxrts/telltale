@@ -5,6 +5,8 @@
 
 use telltale_choreography::ast::Protocol;
 use telltale_choreography::compiler::parser::{parse_choreography_str, ParseError};
+use telltale_choreography::compiler::projection::{project, ProjectionError};
+use telltale_choreography::format_choreography_str;
 
 #[test]
 fn test_parse_simple_protocol() {
@@ -23,6 +25,143 @@ protocol PingPong = {
     let choreo = result.unwrap();
     assert_eq!(choreo.name.to_string(), "PingPong");
     assert_eq!(choreo.roles.len(), 2);
+}
+
+#[test]
+fn test_format_rewrites_legacy_brace_blocks_to_indentation_surface() {
+    let input = r#"
+protocol Choice = {
+  roles A, B
+  choice B at {
+    | Accept => {
+      B -> A : Ack
+    }
+    | Reject => {
+      B -> A : Nack
+    }
+  }
+}
+"#;
+
+    let formatted = format_choreography_str(input).expect("format should succeed");
+    assert!(formatted.contains("  choice B at\n    | Accept =>"));
+    assert!(!formatted.contains("choice B at {"));
+    assert!(!formatted.contains("=> {"));
+}
+
+#[test]
+fn test_reject_legacy_timed_choice_surface() {
+    let input = r#"
+protocol TimedRequest =
+  roles Client, Server
+  timed_choice Client at(5s)
+    | OnTime => Server -> Client : Response
+    | TimedOut => Client -> Server : Cancel
+"#;
+
+    let err = parse_choreography_str(input).expect_err("legacy timed_choice should fail");
+    assert!(matches!(
+        err,
+        ParseError::Pest(_) | ParseError::Syntax { .. } | ParseError::Layout { .. }
+    ));
+}
+
+#[test]
+fn test_parse_canonical_timeout_surface() {
+    let input = r#"
+protocol TimedRequest =
+  roles Client, Server
+  timeout 5s Client at
+    Server -> Client : Response
+  on timeout =>
+    Client -> Server : Cancel
+"#;
+
+    let choreo = parse_choreography_str(input).expect("canonical timeout should parse");
+    assert!(matches!(choreo.protocol, Protocol::Timeout { .. }));
+}
+
+#[test]
+fn test_reject_multiline_type_equals_surface() {
+    let input = r#"
+type AcceptError
+  = NotFound
+
+protocol Demo =
+  roles A, B
+  A -> B : Ping
+"#;
+
+    parse_choreography_str(input).expect_err("multiline type equals should fail");
+}
+
+#[test]
+fn test_reject_multiline_protocol_equals_surface() {
+    let input = r#"
+protocol Demo
+  =
+  roles A, B
+  A -> B : Ping
+"#;
+
+    parse_choreography_str(input).expect_err("multiline protocol equals should fail");
+}
+
+#[test]
+fn test_projection_rejects_authority_case_constructs_fail_closed() {
+    let input = r#"
+effect Runtime
+  authoritative ready : Session -> Result CommitError ReadyWitness
+
+protocol CommitFlow uses Runtime =
+  roles Coordinator, Worker
+  let readiness = check Runtime.ready(session)
+  case readiness of
+    | Ok(witness) =>
+        Coordinator -> Worker : Commit(witness)
+    | Err(reason) =>
+        Coordinator -> Worker : Retry(reason)
+"#;
+
+    let choreo = parse_choreography_str(input).expect("parse should succeed");
+    let coordinator = choreo
+        .roles
+        .iter()
+        .find(|role| role.name().to_string() == "Coordinator")
+        .expect("coordinator role");
+    let err = project(&choreo, coordinator).expect_err("projection should fail closed");
+    assert!(matches!(
+        err,
+        ProjectionError::UnsupportedAuthorityConstruct {
+            construct: "case/of"
+        }
+    ));
+}
+
+#[test]
+fn test_projection_rejects_timeout_constructs_fail_closed() {
+    let input = r#"
+protocol TimeoutFlow =
+  roles Coordinator, Worker
+  timeout 5s Coordinator at
+    Worker -> Coordinator : Ready
+  on timeout =>
+    Coordinator -> Worker : Cancel
+"#;
+
+    let choreo = parse_choreography_str(input).expect("parse should succeed");
+    let coordinator = choreo
+        .roles
+        .iter()
+        .find(|role| role.name().to_string() == "Coordinator")
+        .expect("coordinator role");
+    let err = project(&choreo, coordinator).expect_err("projection should fail closed");
+    assert!(matches!(
+        err,
+        ProjectionError::UnsupportedAuthorityConstruct {
+            construct: "timeout"
+        }
+    ));
 }
 
 #[test]

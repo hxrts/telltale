@@ -285,18 +285,20 @@ Timing patterns provide constructs for building time-aware protocols. All patter
 
 ##### Timed Choice
 
-A timed choice races an operation against a timeout deadline:
+A protocol-visible timeout branches the protocol on deadline expiry:
 
 ```tell
 protocol TimedRequest =
   roles Client, Server
-  Client -> Server : Request
-  timed_choice Client at(5s)
-    | OnTime => Server -> Client : Response
-    | TimedOut => Client -> Server : Cancel
+  timeout 5s Client at
+    Server -> Client : Response
+  on timeout =>
+    Client -> Server : Cancel
 ```
 
-This desugars to a standard `Choice` with a `TimedChoice { duration }` annotation. The timeout is enforced at runtime by the effect interpreter.
+Use `timeout duration Role at` when deadline expiry is a protocol-visible
+outcome. The runtime enforces the deadline, and projection currently rejects
+this form explicitly until the authority-sensitive lowering story is complete.
 
 Durations support: `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours).
 
@@ -345,7 +347,10 @@ protocol TimedOps =
   Server -> Client : Response
 ```
 
-Unlike `timed_choice`, this metadata does not change the session type. It is a hint to the transport layer and is not verified in Lean. Use it for operational timeouts when you do not want the protocol to branch on timeout.
+Unlike `timeout ... on timeout ...`, this metadata does not change the session
+type. It is a hint to the transport layer and is not verified in Lean. Use it
+for operational timeouts when you do not want the protocol to branch on
+timeout.
 
 #### 11) Proof Bundles and VM-Core Statements
 
@@ -423,8 +428,8 @@ authority checks. Exhaustiveness is required for `Ok`/`Err` and
 ##### Custom Unions and Type Aliases
 
 ```tell
-type CommitError
-  = TimedOut
+type CommitError =
+  | TimedOut
   | Cancelled
   | InvalidWitness
 

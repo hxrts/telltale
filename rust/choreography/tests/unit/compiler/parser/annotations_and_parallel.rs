@@ -248,104 +248,77 @@ protocol SingleBranch =
     }
 
     #[test]
-    fn test_parse_timed_choice() {
+    fn test_parse_timeout_branch_surface() {
         let input = r#"
 protocol TimedRequest =
   roles Alice, Bob
-  Alice -> Bob : Request
-  timed_choice Alice at(5s) {
-    | OnTime => {
-      Bob -> Alice : Response
-    }
-    | TimedOut => {
-      Alice -> Bob : Cancel
-    }
-  }
+  timeout 5s Alice at
+    Alice -> Bob : Request
+  on timeout =>
+    Alice -> Bob : Cancel
 "#;
 
         let result = parse_choreography_str(input);
         assert!(
             result.is_ok(),
-            "Failed to parse timed_choice: {:?}",
+            "Failed to parse timeout surface: {:?}",
             result.err()
         );
 
         let choreo = result.unwrap();
         assert_eq!(choreo.name.to_string(), "TimedRequest");
 
-        // Verify timed_choice is desugared to Choice with typed annotation
         match &choreo.protocol {
-            Protocol::Send { continuation, .. } => {
-                match continuation.as_ref() {
-                    Protocol::Choice {
-                        role,
-                        branches,
-                        annotations,
-                    } => {
-                        assert_eq!(role.name().to_string(), "Alice");
-                        assert_eq!(branches.len(), 2);
-                        // Check that timed_choice annotation is present
-                        assert!(annotations.has_timed_choice());
-                        assert_eq!(
-                            annotations.timed_choice(),
-                            Some(std::time::Duration::from_secs(5))
-                        );
-                    }
-                    _ => panic!("Expected Choice after Send"),
-                }
+            Protocol::Timeout {
+                role,
+                duration_ms,
+                on_cancel,
+                ..
+            } => {
+                assert_eq!(role.name().to_string(), "Alice");
+                assert_eq!(*duration_ms, 5_000);
+                assert!(on_cancel.is_none());
             }
-            _ => panic!("Expected Send as first protocol"),
+            _ => panic!("Expected Timeout as first protocol"),
         }
     }
 
     #[test]
-    fn test_parse_timed_choice_milliseconds() {
+    fn test_parse_timeout_milliseconds() {
         let input = r#"
 protocol QuickTimeout =
   roles Client, Server
-  timed_choice Client at(500ms) {
-    | Fast => {
-      Server -> Client : Data
-    }
-    | Slow => {
-      Client -> Server : Abort
-    }
-  }
+  timeout 500ms Client at
+    Server -> Client : Data
+  on timeout =>
+    Client -> Server : Abort
 "#;
 
         let result = parse_choreography_str(input);
         assert!(
             result.is_ok(),
-            "Failed to parse timed_choice with ms: {:?}",
+            "Failed to parse timeout with ms: {:?}",
             result.err()
         );
 
         let choreo = result.unwrap();
         match &choreo.protocol {
-            Protocol::Choice { annotations, .. } => {
-                assert!(annotations.has_timed_choice());
-                assert_eq!(
-                    annotations.timed_choice(),
-                    Some(std::time::Duration::from_millis(500))
-                );
+            Protocol::Timeout { duration_ms, .. } => {
+                assert_eq!(*duration_ms, 500);
             }
-            _ => panic!("Expected Choice as first protocol"),
+            _ => panic!("Expected Timeout as first protocol"),
         }
     }
 
     #[test]
-    fn test_parse_timed_choice_minutes() {
+    fn test_parse_timeout_minutes() {
         let input = r#"
 protocol LongTimeout =
   roles A, B
-  timed_choice A at(2m) {
-    | Done => {
-      B -> A : Complete
-    }
-    | Expired => {
-      A -> B : Timeout
-    }
-  }
+  timeout 2m A at
+    B -> A : Complete
+  on timeout =>
+    A -> B : Timeout
 "#;
 
         let result = parse_choreography_str(input);
@@ -353,15 +326,10 @@ protocol LongTimeout =
 
         let choreo = result.unwrap();
         match &choreo.protocol {
-            Protocol::Choice { annotations, .. } => {
-                // 2 minutes = 120000 ms
-                assert!(annotations.has_timed_choice());
-                assert_eq!(
-                    annotations.timed_choice(),
-                    Some(std::time::Duration::from_millis(120000))
-                );
+            Protocol::Timeout { duration_ms, .. } => {
+                assert_eq!(*duration_ms, 120_000);
             }
-            _ => panic!("Expected Choice"),
+            _ => panic!("Expected Timeout"),
         }
     }
 

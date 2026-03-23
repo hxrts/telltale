@@ -92,7 +92,6 @@ statement = _{
     | send_stmt
     | broadcast_stmt
     | heartbeat_stmt
-    | timed_choice_stmt
     | choice_stmt
     | par_stmt
     | loop_stmt
@@ -139,9 +138,6 @@ argument_list = { authority_atom ~ ("," ~ authority_atom)* }
 authority_atom = { effect_call | ident_expr | string | integer }
 ident_expr = { ident ~ ("." ~ ident)* }
 
-// Timed choice statement - desugars to choice with timeout annotation
-// Syntax: timed_choice Alice at(5s) { OnTime { ... } TimedOut { ... } }
-timed_choice_stmt = { "timed_choice" ~ role_ref ~ "at" ~ "(" ~ duration ~ ")" ~ choice_block }
 duration = { integer ~ time_unit }
 time_unit = { "ms" | "s" | "m" | "h" }
 

@@ -1,6 +1,23 @@
 use super::*;
 use crate::ast::{EffectOpAuthorityClass, EffectOpDecl, TypeConstructorDecl};
 
+pub(super) fn enforce_same_line_equals(
+    src: &str,
+    span: pest::Span<'_>,
+    input: &str,
+    kind: &str,
+) -> std::result::Result<(), ParseError> {
+    if let Some(eq_index) = src.find('=') {
+        if src[..eq_index].contains('\n') {
+            return Err(ParseError::Syntax {
+                span: ErrorSpan::from_pest_span(span, input),
+                message: format!("{kind} must keep `=` on the same line as the declaration head"),
+            });
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn parse_protocol_uses(pair: pest::iterators::Pair<Rule>) -> Vec<String> {
     pair.into_inner()
         .filter(|p| p.as_rule() == Rule::ident)
@@ -257,6 +274,7 @@ pub(super) fn parse_type_decl(
     input: &str,
 ) -> std::result::Result<TypeDecl, ParseError> {
     let span = pair.as_span();
+    enforce_same_line_equals(pair.as_str(), span, input, "type declaration")?;
     let inner = pair.into_inner().next().ok_or_else(|| ParseError::Syntax {
         span: ErrorSpan::from_pest_span(span, input),
         message: "type declaration is empty".to_string(),

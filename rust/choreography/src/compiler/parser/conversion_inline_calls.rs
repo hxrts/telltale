@@ -39,25 +39,6 @@ pub(crate) fn inline_calls(
                     annotations: HashMap::new(),
                 });
             }
-            Statement::TimedChoice {
-                role,
-                duration_ms,
-                branches,
-            } => {
-                let mut new_branches = Vec::new();
-                for b in branches {
-                    new_branches.push(ChoiceBranch {
-                        label: b.label.clone(),
-                        guard: b.guard.clone(),
-                        statements: inline_calls(&b.statements, protocol_defs, input)?,
-                    });
-                }
-                result.push(Statement::TimedChoice {
-                    role: role.clone(),
-                    duration_ms: *duration_ms,
-                    branches: new_branches,
-                });
-            }
             Statement::Heartbeat {
                 sender,
                 receiver,

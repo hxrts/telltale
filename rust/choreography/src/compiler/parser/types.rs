@@ -48,13 +48,6 @@ pub(crate) enum Statement {
         branches: Vec<ChoiceBranch>,
         annotations: HashMap<String, String>,
     },
-    /// Timed choice: actor makes a choice based on wall clock timeout.
-    /// Desugars to standard Choice with timeout annotation for code generation.
-    TimedChoice {
-        role: Role,
-        duration_ms: u64,
-        branches: Vec<ChoiceBranch>,
-    },
     /// Heartbeat: sender sends periodic heartbeats, receiver detects absence.
     /// Desugars to recursive choice with liveness detection.
     Heartbeat {

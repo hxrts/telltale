@@ -17,33 +17,24 @@ effect Audit
   observe record : AuditEvent -> Unit
 
 protocol CommitFlow uses Runtime, Audit =
-  {
-    roles Coordinator, Worker, Client
-    let readiness = check Runtime.ready(session)
-    case readiness of {
-      | Ok(witness) => {
+  roles Coordinator, Worker, Client
+  let readiness = check Runtime.ready(session)
+  case readiness of
+    | Ok(witness) =>
         Coordinator -> Worker : Commit(witness)
-      }
-      | Err(reason) => {
+    | Err(reason) =>
         Coordinator -> Client : Retry(reason)
-      }
-    }
-    timeout 5s Coordinator at {
-      Worker -> Coordinator : Ready
-    } on timeout => {
-      Coordinator -> Worker : Cancel
-    } on cancel => {
-      Coordinator -> Client : Cancelled
-    }
-    choice Coordinator at {
-      | Commit when check Runtime.ready(session) yields witness => {
+  timeout 5s Coordinator at
+    Worker -> Coordinator : Ready
+  on timeout =>
+    Coordinator -> Worker : Cancel
+  on cancel =>
+    Coordinator -> Client : Cancelled
+  choice Coordinator at
+    | Commit when check Runtime.ready(session) yields witness =>
         Coordinator -> Worker : CommitAgain(witness)
-      }
-      | Abort => {
+    | Abort =>
         Coordinator -> Worker : Abort
-      }
-    }
-  }
 "#;
 
     let choreography = parse_choreography_str(input).expect("authority surface should parse");
@@ -74,19 +65,13 @@ effect Runtime
   lookupInvite : Session -> Maybe InviteHandle
 
 protocol InviteFlow uses Runtime =
-  {
-    roles Coordinator, Worker
-    let invite = check Runtime.lookupInvite(session) in {
-      case invite of {
-        | Just(handle) => {
+  roles Coordinator, Worker
+  let invite = check Runtime.lookupInvite(session) in
+    case invite of
+      | Just(handle) =>
           Coordinator -> Worker : UseInvite(handle)
-        }
-        | Nothing => {
+      | Nothing =>
           Coordinator -> Worker : MissingInvite
-        }
-      }
-    }
-  }
 "#;
 
     let choreography = parse_choreography_str(input).expect("let-in Maybe surface should parse");
@@ -100,15 +85,11 @@ effect Runtime
   ready : Session -> Result CommitError ReadyWitness
 
 protocol CommitFlow uses Runtime =
-  {
-    roles Coordinator, Worker
-    let readiness = check Runtime.ready(session)
-    case readiness of {
-      | Ok(witness) => {
+  roles Coordinator, Worker
+  let readiness = check Runtime.ready(session)
+  case readiness of
+    | Ok(witness) =>
         Coordinator -> Worker : Commit(witness)
-      }
-    }
-  }
 "#;
 
     let err = parse_choreography_str(input).expect_err("non-exhaustive Result case should fail");
@@ -119,12 +100,10 @@ protocol CommitFlow uses Runtime =
 fn test_reject_duplicate_linear_binding_use() {
     let input = r#"
 protocol TransferFlow =
-  {
-    roles Coordinator, Worker, Client
-    let receipt = transfer Session from Coordinator to Worker
-    Coordinator -> Worker : TransferAccepted(receipt)
-    Coordinator -> Client : ReceiptAudit(receipt)
-  }
+  roles Coordinator, Worker, Client
+  let receipt = transfer Session from Coordinator to Worker
+  Coordinator -> Worker : TransferAccepted(receipt)
+  Coordinator -> Client : ReceiptAudit(receipt)
 "#;
 
     let err = parse_choreography_str(input).expect_err("duplicate linear use should fail");
@@ -135,11 +114,9 @@ protocol TransferFlow =
 fn test_reject_dropped_linear_binding_use() {
     let input = r#"
 protocol TransferFlow =
-  {
-    roles Coordinator, Worker
-    let receipt = transfer Session from Coordinator to Worker
-    Coordinator -> Worker : TransferAccepted
-  }
+  roles Coordinator, Worker
+  let receipt = transfer Session from Coordinator to Worker
+  Coordinator -> Worker : TransferAccepted
 "#;
 
     let err = parse_choreography_str(input).expect_err("dropped linear binding should fail");
@@ -150,10 +127,8 @@ protocol TransferFlow =
 fn test_reject_undeclared_protocol_use() {
     let input = r#"
 protocol CommitFlow uses Runtime =
-  {
-    roles Coordinator, Worker
-    Coordinator -> Worker : Ping
-  }
+  roles Coordinator, Worker
+  Coordinator -> Worker : Ping
 "#;
 
     let choreography = parse_choreography_str(input).expect("parse should succeed");
@@ -170,18 +145,13 @@ effect Runtime
   ready : Session -> Result CommitError ReadyWitness
 
 protocol CommitFlow uses Runtime =
-  {
-    roles Coordinator, Worker
-    let readiness = check Runtime.lookup(session)
-    case readiness of {
-      | Ok(witness) => {
+  roles Coordinator, Worker
+  let readiness = check Runtime.lookup(session)
+  case readiness of
+    | Ok(witness) =>
         Coordinator -> Worker : Commit(witness)
-      }
-      | Err(reason) => {
+    | Err(reason) =>
         Coordinator -> Worker : Retry(reason)
-      }
-    }
-  }
 "#;
 
     let choreography = parse_choreography_str(input).expect("parse should succeed");
@@ -201,10 +171,8 @@ effect Runtime
   transfer : TransferRequest -> Result TransferError TransferReceipt
 
 protocol CommitFlow uses Runtime =
-  {
-    roles Coordinator, Worker
-    Coordinator -> Worker : Ping
-  }
+  roles Coordinator, Worker
+  Coordinator -> Worker : Ping
 "#;
 
     let choreography = parse_choreography_str(input).expect("parse should succeed");

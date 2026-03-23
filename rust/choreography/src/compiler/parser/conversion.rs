@@ -357,37 +357,6 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                     current
                 }
             }
-            // TimedChoice desugars to standard Choice with typed annotation.
-            // This preserves Lean verification (Choice is core MPST) while carrying
-            // timeout info for code generation via typed ProtocolAnnotation.
-            Statement::TimedChoice {
-                role,
-                duration_ms,
-                branches,
-            } => {
-                // Use typed annotation instead of string key-value pair
-                let annotations =
-                    Annotations::single(ProtocolAnnotation::timed_choice_ms(*duration_ms));
-
-                let branch_vec: Vec<_> = branches
-                    .iter()
-                    .map(|b| Branch {
-                        label: b.label.clone(),
-                        guard: b.guard.as_ref().map(convert_choice_guard),
-                        protocol: convert_statements_to_protocol(&b.statements, roles),
-                    })
-                    .collect();
-
-                if let Ok(branches) = NonEmptyVec::new(branch_vec) {
-                    Protocol::Choice {
-                        role: role.clone(),
-                        branches,
-                        annotations,
-                    }
-                } else {
-                    current
-                }
-            }
             // Heartbeat desugars to recursive choice with liveness detection:
             //   rec HeartbeatLoop {
             //       Sender -> Receiver: Heartbeat;

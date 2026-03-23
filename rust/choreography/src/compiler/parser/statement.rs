@@ -9,13 +9,14 @@ use quote::format_ident;
 use std::collections::{HashMap, HashSet};
 
 use super::error::{ErrorSpan, ParseError};
+use super::declarations::enforce_same_line_equals;
 use super::stmt_parsers::{
     parse_broadcast_stmt, parse_call_stmt, parse_case_stmt, parse_choice_stmt, parse_continue_stmt,
     parse_handshake_stmt, parse_heartbeat_stmt, parse_let_in_stmt, parse_let_stmt, parse_loop_stmt,
     parse_par_stmt, parse_quorum_collect_stmt, parse_rec_stmt, parse_retry_stmt, parse_send_stmt,
-    parse_timed_choice_stmt, parse_timeout_stmt, parse_vm_abort_stmt, parse_vm_acquire_stmt,
-    parse_vm_check_stmt, parse_vm_fork_stmt, parse_vm_join_stmt, parse_vm_release_stmt,
-    parse_vm_tag_stmt, parse_vm_transfer_stmt,
+    parse_timeout_stmt, parse_vm_abort_stmt, parse_vm_acquire_stmt, parse_vm_check_stmt,
+    parse_vm_fork_stmt, parse_vm_join_stmt, parse_vm_release_stmt, parse_vm_tag_stmt,
+    parse_vm_transfer_stmt,
 };
 use super::types::{MessageSpec, ParsedBody, Statement};
 use super::Rule;
@@ -122,9 +123,6 @@ fn parse_statement_inner(
         Rule::send_stmt => parse_send_stmt(pair, declared_roles, input),
         Rule::broadcast_stmt => parse_broadcast_stmt(pair, declared_roles, input),
         Rule::heartbeat_stmt => parse_heartbeat_stmt(pair, declared_roles, input, protocol_defs),
-        Rule::timed_choice_stmt => {
-            parse_timed_choice_stmt(pair, declared_roles, input, protocol_defs)
-        }
         Rule::choice_stmt => parse_choice_stmt(pair, declared_roles, input, protocol_defs),
         Rule::par_stmt => parse_par_stmt(pair, declared_roles, input, protocol_defs),
         Rule::loop_stmt => parse_loop_stmt(pair, declared_roles, input, protocol_defs),
@@ -268,6 +266,12 @@ pub(crate) fn parse_local_protocol_decl(
     protocol_defs: &mut HashMap<String, Vec<Statement>>,
 ) -> std::result::Result<(), ParseError> {
     let span = pair.as_span();
+    enforce_same_line_equals(
+        pair.as_str(),
+        span,
+        input,
+        "local protocol declaration",
+    )?;
     let mut inner = pair.into_inner();
     let name_pair = inner.next().ok_or_else(|| ParseError::Syntax {
         span: ErrorSpan::from_pest_span(span, input),

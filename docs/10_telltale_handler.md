@@ -421,7 +421,9 @@ match result {
 }
 ```
 
-This pattern wraps a receive in a runtime timeout. Generated effect programs use `with_timeout` internally when sender metadata includes `runtime_timeout` or when `timed_choice` is present.
+This pattern wraps a receive in a runtime timeout. Generated effect programs use
+`with_timeout` internally when sender metadata includes `runtime_timeout` or
+when a protocol-level `timeout ... on timeout ...` branch is present.
 
 ## Best Practices
 

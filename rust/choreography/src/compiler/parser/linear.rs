@@ -167,7 +167,7 @@ fn validate_linear_block(
                 | VmCoreOp::Tag { .. }
                 | VmCoreOp::Check { .. } => {}
             },
-            Statement::Choice { branches, .. } | Statement::TimedChoice { branches, .. } => {
+            Statement::Choice { branches, .. } => {
                 live_assets = validate_linear_choice_branches(branches, &live_assets, input)?;
             }
             Statement::Loop { body, .. } => {
@@ -261,7 +261,7 @@ fn validate_case_exhaustiveness(statements: &[Statement], input: &str) -> Result
                     validate_case_exhaustiveness(&branch.statements, input)?;
                 }
             }
-            Statement::Choice { branches, .. } | Statement::TimedChoice { branches, .. } => {
+            Statement::Choice { branches, .. } => {
                 for branch in branches {
                     validate_case_exhaustiveness(&branch.statements, input)?;
                 }
@@ -338,7 +338,7 @@ fn validate_linear_bindings(statements: &[Statement], input: &str) -> Result<(),
             }
         }
         match statement {
-            Statement::Choice { branches, .. } | Statement::TimedChoice { branches, .. } => {
+            Statement::Choice { branches, .. } => {
                 for branch in branches {
                     validate_linear_bindings(&branch.statements, input)?;
                 }
@@ -432,7 +432,7 @@ fn count_statement_uses(statement: &Statement, name: &str) -> usize {
                 payload.to_string().split(name).count().saturating_sub(1)
             })
         }
-        Statement::Choice { branches, .. } | Statement::TimedChoice { branches, .. } => branches
+        Statement::Choice { branches, .. } => branches
             .iter()
             .map(|branch| count_binding_uses(&branch.statements, name))
             .sum(),
@@ -504,7 +504,7 @@ fn collect_vm_required_capabilities(statements: &[Statement], out: &mut HashSet<
             Statement::VmCoreOp { op } => {
                 out.insert(op.required_capability().to_string());
             }
-            Statement::Choice { branches, .. } | Statement::TimedChoice { branches, .. } => {
+            Statement::Choice { branches, .. } => {
                 for branch in branches {
                     collect_vm_required_capabilities(&branch.statements, out);
                 }

@@ -85,7 +85,8 @@ use std::collections::{HashMap, HashSet};
 
 use conversion::{convert_statements_to_protocol, inline_calls};
 use declarations::{
-    parse_effect_decl, parse_module_decl, parse_proof_bundle_decl, parse_protocol_requires,
+    enforce_same_line_equals, parse_effect_decl, parse_module_decl, parse_proof_bundle_decl,
+    parse_protocol_requires,
     parse_protocol_uses, parse_role_set_decl, parse_topology_decl, parse_type_decl,
 };
 use linear::{infer_required_proof_bundles, validate_authority_surface, validate_linear_vm_assets};
@@ -163,6 +164,12 @@ pub fn parse_choreography_str_with_extensions(
                     }
                     Rule::protocol_decl => {
                         let protocol_span = inner.as_span();
+                        enforce_same_line_equals(
+                            inner.as_str(),
+                            protocol_span,
+                            &preprocessed,
+                            "protocol declaration",
+                        )?;
                         let mut proto_inner = inner.into_inner();
                         let name_pair = proto_inner.next().ok_or_else(|| ParseError::Syntax {
                             span: ErrorSpan::from_pest_span(protocol_span, &preprocessed),
