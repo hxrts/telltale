@@ -68,8 +68,13 @@ This keeps absence explicit instead of falling back to implicit defaults.
 ### Custom Union and Alias
 
 ```tell
-type CommitError = TimedOut | Cancelled
-type alias ReadyWitness = { epoch : Int }
+type CommitError =
+  | TimedOut
+  | Cancelled
+
+type alias ReadyWitness =
+  { epoch : Int
+  }
 ```
 
 Custom unions and aliases name failure and evidence values directly in the DSL.
@@ -196,7 +201,7 @@ Current validation rules:
 This is the current clean-break contract.
 There is no fallback to implicit host knowledge.
 Lowering is expected to preserve this split into the runtime semantic-object
-family as `AuthoritativeRead` versus `ObservedRead`; observational reads are not
+family as `AuthoritativeRead` versus `ObservedRead`. Observational reads are not
 allowed to become proof-bearing success or canonical publication by repair.
 
 ## Typed Host Effect Invocation
@@ -217,7 +222,7 @@ Current contract:
 - the operation must exist on the named nominal interface
 - `check` is for authoritative or command operations
 - `observe` is for observational operations
-- lowering stays centered on the existing VM `invoke` boundary
+- lowering stays centered on the existing protocol-machine `invoke` boundary
 - effect observations keep the nominal interface and operation identity for
   replay/audit surfaces
 
@@ -240,23 +245,23 @@ Theory conversion has the same restriction:
 The current lowering split is:
 
 - parser/AST surface in `rust/choreography`
-- VM/effect execution boundary in `rust/vm`
-- typed handler boundary centered on VM `invoke`
+- protocol-machine effect execution boundary in `rust/vm`
+- typed handler boundary centered on protocol-machine `invoke`
 
 Current intent:
 
 - `effect` declarations become the source for generated Rust host interfaces
 - `check Effect.op(...)` remains a DSL-level reference to a typed external query
 - execution must still cross the same typed handler-obligation boundary rather than inventing a second host channel
-- the Lean bridge statement for nominal effect declarations stays centered on the existing VM `invoke` obligation rather than a separate effect-language proof surface
+- the Lean bridge statement for nominal effect declarations stays centered on the existing protocol-machine `invoke` obligation rather than a separate effect-language proof surface
 
 ## Observable Trace Model
 
-Language-level effect usage is expected to remain observable through the same runtime/effect tracing surfaces used by VM replay and effect-bisimulation work.
+Language-level effect usage is expected to remain observable through the same runtime/effect tracing surfaces used by protocol-machine replay and effect-bisimulation work.
 
 Current design rule:
 
-- language-level authority checks and evidence-sensitive decisions must map to explicit effect operations and explicit VM-visible events
+- language-level authority checks and evidence-sensitive decisions must map to explicit effect operations and explicit protocol-machine-visible events
 - missing or ambiguous authoritative input must become typed failure, never silent fallback success
 - canonical replay artifacts must preserve these decisions as structured semantic audit records rather than opaque host-only log text
 
@@ -283,7 +288,7 @@ The first effect-interface feature is deliberately nominal.
 
 Reasons:
 
-- the VM and Lean already have a typed effect-obligation boundary centered on
+- the protocol machine and Lean already have a typed effect-obligation boundary centered on
   `invoke`
 - nominal interfaces are enough to make host dependencies explicit and typed
 - observational audit/parity semantics are easier to stabilize with named

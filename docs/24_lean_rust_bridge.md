@@ -9,7 +9,7 @@ Historical module/file names such as `vm_runner` and `vm_trace` still exist inte
 but the canonical public bridge surface is the protocol-machine surface:
 `ProtocolMachineRunner`, `ProtocolMachineRunInput`, `ProtocolMachineRunOutput`,
 and `ProtocolMachineSemanticObjects`.
-Bridge payloads describe guest-runtime and protocol-machine artifacts; host-runtime
+Bridge payloads describe guest-runtime and protocol-machine artifacts. Host-runtime
 handlers remain outside the bridge and re-enter through typed effect surfaces.
 
 ## Scope
@@ -90,7 +90,7 @@ Each family has an explicit version constant.
 `schema::ensure_supported_schema_version()` rejects unsupported `lean_bridge` versions.
 Protocol-machine semantic objects now use one canonical schema family with no
 legacy VM-state compatibility aliases.
-VM runtime parity artifacts use the same string-based scheme: `vm.serialization.v1` and `vm.envelope_diff.v1`.
+Protocol-machine parity artifacts use the same string-based scheme: `vm.serialization.v1` and `vm.envelope_diff.v1`.
 Legacy numeric schema values (`1`) are normalized during deserialization for backward compatibility where the family still supports them.
 
 ## Reference Simulation Payloads
@@ -135,7 +135,7 @@ The parsed result is `LeanValidationResult { success, role, message, raw_output 
 Projection methods call validator export modes.
 `project()` runs `--export-all-projections` and accepts both object and array projection formats from Lean output.
 `export_projection()` and `export_all_projections()` expose single-role and all-role export modes directly.
-`run_vm_protocol()` is also exposed on `LeanRunner` and forwards protocol-machine choreographies to the Lean `vm_runner` binary through stdin JSON.
+`run_vm_protocol()` is also exposed on `LeanRunner` and forwards protocol-machine choreographies to the Lean protocol-machine runner binary (`vm_runner`) through stdin JSON.
 
 ## Lean Protocol-Machine Runner Wrapper
 
@@ -232,7 +232,7 @@ effect ids and `TransformationObligation` bundles. This keeps stale-owner and
 late-result mismatches visible even when the raw instruction trace still
 normalizes successfully.
 
-## Trace Normalization and Equivalence
+## Semantic-Audit Normalization and Equivalence
 
 `vm_trace::event_session()` extracts session ids from common event shapes.
 Supported fields include `session`, `sid`, `edge.sid`, and `endpoint.sid`.
@@ -340,6 +340,6 @@ This removes cross-session interleaving noise but keeps event payload difference
 ## Related Docs
 
 - [Lean Verification](23_lean_verification.md)
-- [VM Simulation](15_vm_simulation_overview.md)
+- [Protocol-Machine Simulation](15_vm_simulation_overview.md)
 - [Rust-Lean Parity](19_rust_lean_parity.md)
 - [Capability and Admission](25_capability_admission.md)

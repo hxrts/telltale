@@ -17,8 +17,8 @@ telltale/
 │   ├── theory/             Session type algorithms (telltale-theory)
 │   ├── choreography/       DSL, projection glue, and effect runtime
 │   ├── lean-bridge/        Lean export/import/validation
-│   ├── vm/                 Bytecode VM
-│   ├── simulator/          VM-backed simulation
+│   ├── vm/                 Protocol machine and guest runtime
+│   ├── simulator/          Protocol-machine-backed simulation
 │   ├── effect-scaffold/    Internal scaffolding tool
 │   ├── macros/             Procedural macros
 │   └── transport/          Production transports (workspace member)
@@ -46,8 +46,8 @@ graph TB
     end
 
     subgraph Runtime
-        vm["telltale-vm<br/>Bytecode VM & scheduler"]
-        simulator["telltale-simulator<br/>VM-based simulation"]
+        vm["telltale-vm<br/>Protocol machine & guest runtime"]
+        simulator["telltale-simulator<br/>Protocol-machine simulation"]
     end
 
     subgraph Application
@@ -233,7 +233,7 @@ The parser supports proof-bundle declarations and protocol bundle requirements. 
 
 The parser supports enriched proof-bundle fields (`version`, `issuer`, `constraint`). It also supports capability inference that can auto-select required bundles when protocol `requires` is omitted.
 
-The parser supports VM-core statements such as `acquire`, `transfer`, `fork`, and `check`. These statements lower to `Protocol::Extension` nodes with annotations that record operation kind, operands, and required capability. Projection preserves continuation projection when it encounters these extension nodes.
+The parser supports protocol-machine-core statements such as `acquire`, `transfer`, `fork`, and `check`. These statements lower to `Protocol::Extension` nodes with annotations that record operation kind, operands, and required capability. Projection preserves continuation projection when it encounters these extension nodes.
 
 The parser includes a linear usage checker for delegation assets introduced by `acquire`. It rejects double-consume, consume-before-acquire, and branch divergence for linear asset state.
 
@@ -256,7 +256,7 @@ This crate is located in `rust/effect-scaffold/`. It is an internal helper tool 
 - first-class simulator traits and scenario builders
 - an exported effect-family manifest
 
-The package is marked `publish = false` and is intended for repository workflows rather than library consumers. It no longer maintains a separate hand-authored scaffold vocabulary; the DSL effect surface is the single source of truth.
+The package is marked `publish = false` and is intended for repository workflows rather than library consumers. It no longer maintains a separate hand-authored scaffold vocabulary. The DSL effect surface is the single source of truth.
 
 ### telltale-transport
 

@@ -16,7 +16,7 @@ A session stores role membership, per-endpoint local types, directed buffers, ed
 | `status`, `epoch` | Lifecycle phase and close epoch counter |
 | ownership state | current owner capability, transfer-in-progress state, issued readiness witnesses, consumed witness ids, and terminal ownership reason |
 
-The VM also tracks communication replay-consumption state at runtime scope (`off`, `sequence`, `nullifier`). This state is keyed by session-qualified edges and contributes to canonical replay artifacts.
+The protocol machine also tracks communication replay-consumption state at runtime scope (`off`, `sequence`, `nullifier`). This state is keyed by session-qualified edges and contributes to canonical replay artifacts.
 
 Ownership fields are a runtime hardening contract rather than a theorem surface. They govern who may drive session-local host mutation and how ownership transfer is staged and audited.
 
@@ -91,7 +91,7 @@ to this same explicit lifecycle event family.
 ## Semantic Handoff and Transformation Obligations
 
 Committed delegation is now exported as a first-class semantic handoff surface,
-not just as a low-level transfer receipt.
+not only as a low-level transfer receipt.
 
 | Semantic object | Meaning |
 |---|---|
@@ -133,7 +133,7 @@ raw effect trace order.
 
 Open admission checks enforce role uniqueness and full handler coverage across the opened role set. Arity must match between `local_types` and `dsts`.
 
-On success the VM allocates a fresh session, initializes buffers and local type entries, stores edge handlers, writes endpoint values to destination registers, and emits an `Opened` event.
+On success the protocol machine allocates a fresh session, initializes buffers and local type entries, stores edge handlers, writes endpoint values to destination registers, and emits an `Opened` event.
 
 Preferred host integration path:
 
@@ -183,11 +183,11 @@ Policy semantics:
 
 `Close` is executed by `VM::step_close` and then `SessionStore::close`.
 
-The VM first checks endpoint ownership for the closing coroutine. If ownership is valid, the store sets `status = Closed`, clears buffers and edge traces, and increments `epoch`.
+The protocol machine first checks endpoint ownership for the closing coroutine. If ownership is valid, the store sets `status = Closed`, clears buffers and edge traces, and increments `epoch`.
 
 Close emits `Closed`, `SessionTerminal { Closed { ... } }`, and `EpochAdvanced` observable events. There is no automatic draining loop in the current close implementation.
 
-The close path is distinct from host-runtime ownership transfer. Endpoint/coroutine ownership for bytecode execution remains part of normal VM execution semantics. Host-runtime ownership governs who may mutate session-local host state at the embedding boundary.
+The close path is distinct from host-runtime ownership transfer. Endpoint/coroutine ownership for bytecode execution remains part of normal protocol-machine execution semantics. Host-runtime ownership governs who may mutate session-local host state at the embedding boundary.
 
 ## Migration and Operations
 
@@ -219,6 +219,6 @@ Risk notes:
 
 ## Related Docs
 
-- [Bytecode Instructions](13_bytecode_instructions.md)
-- [VM Architecture](12_vm_architecture.md)
+- [Protocol-Machine Bytecode Instructions](13_bytecode_instructions.md)
+- [Protocol Machine Architecture](12_vm_architecture.md)
 - [Rust-Lean Parity](19_rust_lean_parity.md)

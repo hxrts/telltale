@@ -91,7 +91,7 @@ embedders and simulators.
 Module access (not re-exported at crate root):
 - Effect boundary:
   `telltale_vm::effect::EffectHandler`, `EffectRequest`, `EffectOutcome`,
-  `EffectInterfaceMetadata`, `EffectExchangeRecord`, `SendDecision`, `AcquireDecision`
+  `EffectInterfaceMetadata`, `EffectExchangeRecord`, `SendDecision`, `SendDecisionInput`
 - Effect trace: `telltale_vm::effect::RecordingEffectHandler`, `ReplayEffectHandler`
 - Loader: `telltale_vm::loader::CodeImage`
 

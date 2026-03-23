@@ -7,7 +7,7 @@ choreography projection, semantic-object schemas, and deviation governance.
 
 Parity is enforced at two levels. Level 1 is policy/data shape parity for shared runtime encodings. Level 2 is behavior parity for executable traces under the declared concurrency envelope.
 
-## VM Policy and Data Shapes
+## Protocol-Machine Policy and Data Shapes
 
 The following shapes must remain aligned between Lean and Rust unless a deviation entry is active.
 
@@ -26,7 +26,7 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 
 These checks are automated by `just check-parity --types`.
 
-## VM Behavior Contract
+## Protocol-Machine Behavior Contract
 
 | Regime | Required Behavior |
 |---|---|
@@ -42,7 +42,7 @@ These checks are automated by `just check-parity --suite`.
 
 Explicit failure, timeout, cancellation, and session-terminal events are now part of the executable Lean runtime/event inventory. Replay tagging, JSON serialization, and theorem-pack release conformance all use the same observable event family.
 
-Language-level nominal `effect` declarations do not introduce a second runtime bridge. Their intended justification remains the existing VM `invoke` boundary and handler-typing obligations in `Runtime/Proofs/VM/BridgeStrengthening.lean`.
+Language-level nominal `effect` declarations do not introduce a second runtime bridge. Their intended justification remains the existing protocol-machine `invoke` boundary and handler-typing obligations in `Runtime/Proofs/VM/BridgeStrengthening.lean`.
 
 Typed effect requests and outcomes are now part of the parity surface directly.
 Rust and Lean must agree on effect-interface metadata, request bodies, outcome
@@ -65,7 +65,7 @@ This is why the current language design is nominal-first:
 
 - `effect` declarations and `uses` clauses are stable names for explicit host
   obligations
-- lowering stays centered on the existing `invoke` and `EffectSpec` story
+- lowering stays centered on the existing protocol-machine `invoke` and `EffectSpec` story
 - generalized effect polymorphism waits until the nominal surface,
   lowering, and parity/audit semantics are stable
 
@@ -201,7 +201,7 @@ The `lean/Runtime/VM` directory is organized into executable and proof modules.
 
 The `Runtime/VM/Model/` directory contains runtime data types, config, state, instruction forms, and event surfaces. The `Runtime/VM/Semantics/` directory contains executable step semantics. The `Runtime/VM/Runtime/` directory contains runtime adapters for loading, JSON, monitoring, and failure ingress.
 
-The `Runtime/VM/API.lean` file provides the stable facade for executable VM API imports. The `Runtime/VM/Composition/` directory contains composition/admission and theorem-pack integration surfaces. The `Runtime/Proofs/` directory contains proof/theorem-pack modules not required for core executable stepping.
+The `Runtime/VM/API.lean` file provides the stable facade for executable protocol-machine API imports. The `Runtime/VM/Composition/` directory contains composition/admission and theorem-pack integration surfaces. The `Runtime/Proofs/` directory contains proof/theorem-pack modules not required for core executable stepping.
 
 Executable modules must not depend on placeholder proof definitions. Proof-only placeholders stay isolated under proof modules. Any executable-path dependency on a stub or placeholder is a release blocker.
 
@@ -333,7 +333,7 @@ If any threshold is violated, CI fails before benchmark lanes are considered hea
 
 ## Update Rules
 
-When any parity matrix row changes, update the Deviation Registry table in this file in the same change set. For any VM PR that changes public runtime behavior, include a parity impact statement in the PR checklist. Add differential tests when observable behavior changes.
+When any parity matrix row changes, update the Deviation Registry table in this file in the same change set. For any protocol-machine PR that changes public runtime behavior, include a parity impact statement in the PR checklist. Add differential tests when observable behavior changes.
 
 Any Rust PR that changes projection or merge semantics must include:
 
@@ -354,11 +354,11 @@ Every Rust PR that changes type semantics must include this checklist in the PR 
 
 ## Naming Compatibility
 
-Rust VM includes explicit Lean-compatibility wrappers such as `openDelta`, `siteName`, and `signValue`. These wrappers intentionally keep Lean-facing casing and therefore retain focused `#[allow(non_snake_case)]` annotations in `guard.rs`, `identity.rs`, `persistence.rs`, and `verification.rs`.
+Rust protocol-machine code includes explicit Lean-compatibility wrappers such as `openDelta`, `siteName`, and `signValue`. These wrappers intentionally keep Lean-facing casing and therefore retain focused `#[allow(non_snake_case)]` annotations in `guard.rs`, `identity.rs`, `persistence.rs`, and `verification.rs`.
 
 ## Related Docs
 
-- [VM Architecture](12_vm_architecture.md)
-- [Bytecode Instructions](13_bytecode_instructions.md)
+- [Protocol Machine Architecture](12_vm_architecture.md)
+- [Protocol-Machine Bytecode Instructions](13_bytecode_instructions.md)
 - [Lean Verification](23_lean_verification.md)
 - [Capability and Admission](25_capability_admission.md)

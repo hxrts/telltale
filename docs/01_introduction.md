@@ -2,7 +2,7 @@
 
 [Telltale](https://github.com/hxrts/telltale) is a Rust framework for choreographic programming with multiparty session types. It enables writing distributed protocols from a global perspective with automatic projection to local implementations. The accompanying Lean 4 formalization provides mechanized proofs of preservation, progress, coherence, and harmony.
 
-The framework includes a bytecode VM with deterministic scheduling and configurable buffer backpressure policies. Asynchronous subtyping uses SISO decomposition with orphan-free deadlock checks. Endpoint transfer semantics support ownership handoff at runtime with progress token migration. Content addressing assigns cryptographic identities to protocol artifacts.
+The framework includes a protocol machine with deterministic scheduling and configurable buffer backpressure policies. Asynchronous subtyping uses SISO decomposition with orphan-free deadlock checks. Endpoint transfer semantics support ownership handoff at runtime with progress token migration. Content addressing assigns cryptographic identities to protocol artifacts.
 
 The same choreography compiles to native and WASM targets.
 
@@ -20,13 +20,13 @@ Communication operations are algebraic effects. Sending and receiving messages a
 
 Handlers determine how messages are delivered. In-memory channels serve testing scenarios. TCP connections serve deployment scenarios. The protocol logic remains unchanged across execution strategies.
 
-## Bytecode VM
+## Protocol Machine
 
-The VM compiles local types to bytecode instructions. It manages scheduling, message buffers, and session lifecycle. The concurrency parameter `N` controls how many coroutines advance per round. Per-session traces are invariant over `N`.
+The protocol machine compiles local types to bytecode instructions. It manages scheduling, message buffers, and session lifecycle. The concurrency parameter `N` controls how many coroutines advance per round. Per-session traces are invariant over `N`.
 
 ## Lean Verification
 
-The Lean 4 formalization spans roughly 624 files and 127k lines in the core libraries (generated metrics in `lean/CODE_MAP.md`). It covers global types, local types, projection, and operational semantics. Deadlock-freedom claims are assumption-scoped with explicit premises for well-typedness, progress reachability, and fair scheduling.
+The Lean 4 formalization spans roughly 626 files and 128k lines in the core libraries (generated metrics in `lean/CODE_MAP.md`). It covers global types, local types, projection, and operational semantics. Deadlock-freedom claims are assumption-scoped with explicit premises for well-typedness, progress reachability, and fair scheduling.
 
 The `telltale-lean-bridge` crate provides JSON export and import for cross-validation between Rust and Lean. See [Lean Verification](23_lean_verification.md) for the verification pipeline.
 
@@ -44,13 +44,13 @@ The `telltale-lean-bridge` crate provides JSON export and import for cross-valid
 | [Choreography Effect Handlers](09_effect_handlers.md) | Guide | Mixed |
 | [Using Telltale Handlers](10_telltale_handler.md) | Guide | Informative |
 | [Effect Handlers and Session Types](11_effect_session_bridge.md) | Reference | Normative |
-| [VM Architecture](12_vm_architecture.md) | Reference | Normative |
-| [Bytecode Instructions](13_bytecode_instructions.md) | Reference | Normative |
+| [Protocol Machine Architecture](12_vm_architecture.md) | Reference | Normative |
+| [Protocol-Machine Bytecode Instructions](13_bytecode_instructions.md) | Reference | Normative |
 | [Session Lifecycle](14_session_lifecycle.md) | Reference | Normative |
-| [VM Simulation](15_vm_simulation_overview.md) | Guide | Mixed |
-| [VM Simulation Runner](16_vm_simulation_runner.md) | Reference | Normative |
-| [VM Simulation Scenarios](17_vm_simulation_scenarios.md) | Guide | Mixed |
-| [VM Simulation Materials](18_vm_simulation_materials.md) | Reference | Informative |
+| [Protocol-Machine Simulation](15_vm_simulation_overview.md) | Guide | Mixed |
+| [Protocol-Machine Simulation Runner](16_vm_simulation_runner.md) | Reference | Normative |
+| [Protocol-Machine Simulation Scenarios](17_vm_simulation_scenarios.md) | Guide | Mixed |
+| [Protocol-Machine Simulation Materials](18_vm_simulation_materials.md) | Reference | Informative |
 | [Rust-Lean Parity](19_rust_lean_parity.md) | Reference | Normative |
 | [Content Addressing](20_content_addressing.md) | Reference | Mixed |
 | [Resource Heap](21_resource_heap.md) | Reference | Mixed |
@@ -71,9 +71,9 @@ The `telltale-lean-bridge` crate provides JSON export and import for cross-valid
 
 Start with [Getting Started](02_getting_started.md). Then read [Choreographic DSL](06_choreographic_dsl.md). Continue with [Examples](28_examples.md) and [API Reference](30_api_reference.md).
 
-### VM Integrators
+### Protocol-Machine Integrators
 
-Start with [Architecture](03_architecture.md). Then read [Effect Handlers and Session Types](11_effect_session_bridge.md) and [VM Architecture](12_vm_architecture.md). Continue with [Bytecode Instructions](13_bytecode_instructions.md) and [Session Lifecycle](14_session_lifecycle.md). See [VM Simulation](15_vm_simulation_overview.md) for testing.
+Start with [Architecture](03_architecture.md). Then read [Effect Handlers and Session Types](11_effect_session_bridge.md) and [Protocol Machine Architecture](12_vm_architecture.md). Continue with [Protocol-Machine Bytecode Instructions](13_bytecode_instructions.md) and [Session Lifecycle](14_session_lifecycle.md). See [Protocol-Machine Simulation](15_vm_simulation_overview.md) for testing.
 
 ### Paper Reviewers
 

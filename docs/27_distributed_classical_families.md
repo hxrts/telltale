@@ -25,8 +25,8 @@ Distributed profile wrappers are defined in `lean/Runtime/Proofs/Adapters/Distri
 | Byzantine safety family | `ByzantineSafetyProfile` | `byzantine_safety_characterization` |
 | consensus envelope family | `ConsensusEnvelopeProfile` | `consensus_envelope` |
 | failure envelope family | `FailureEnvelopeProfile` | `failure_envelope` |
-| Protocol-machine adherence family | `ProtocolMachineEnvelopeAdherenceProfile` | `protocol_machine_envelope_adherence` |
-| Protocol-machine admission family | `ProtocolMachineEnvelopeAdmissionProfile` | `protocol_machine_envelope_admission` |
+| VM envelope adherence family | `VMEnvelopeAdherenceProfile` | `vm_envelope_adherence` |
+| VM envelope admission family | `VMEnvelopeAdmissionProfile` | `vm_envelope_admission` |
 | protocol bridge family | `ProtocolEnvelopeBridgeProfile` | `protocol_envelope_bridge` |
 
 ## Classical Families

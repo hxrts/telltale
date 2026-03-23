@@ -264,7 +264,7 @@ In Telltale, coherence is formulated as a per-edge property. Each communication 
 
 The `Consume` function is the recursive alignment check at the heart of coherence. It interprets buffered traces against receiver expectations. For a receiver expecting type T and a buffer containing messages [m1, m2, ...], `Consume` verifies that each message matches the expected type at that point.
 
-Two key lemmas support preservation proofs. `Consume_append` shows that consumption over concatenated traces factors through sequential consumption. `Consume_cons` shows that head consumption reduces to one-step alignment plus recursive continuation alignment. These lemmas isolate message-type alignment complexity into reusable components.
+Two key lemmas support preservation proofs. `consume_append` shows that consumption over concatenated traces factors through sequential consumption. `consume_cons` shows that head consumption reduces to one-step alignment plus recursive continuation alignment. These lemmas isolate message-type alignment complexity into reusable components.
 
 ## Delivery Models
 
@@ -324,7 +324,7 @@ Key libraries include:
 - `SessionTypes` and `SessionCoTypes` for type definitions and bisimulation
 - `Choreography` for projection and harmony proofs
 - `Protocol` for coherence and preservation
-- `Runtime` for VM correctness
+- `Runtime` for protocol-machine correctness
 
 See [Lean Verification Code Map](../lean/CODE_MAP.md) for detailed documentation of the proof structure.
 

@@ -79,6 +79,49 @@ external_prefixes = {
     "proc_macro2",
 }
 
+# Well-known types and identifiers that should not trigger drift warnings.
+# Standard library types, Lean builtins, example role names, common enum
+# variants, and environment variable names are excluded.
+skip_identifiers = {
+    # Standard Rust types and traits
+    "String", "Vec", "Option", "Result", "Box", "Arc", "Rc", "Mutex",
+    "HashMap", "HashSet", "BTreeMap", "BTreeSet", "PathBuf", "Path",
+    "Ok", "Err", "Some", "None", "Self", "Sized", "Send", "Sync",
+    "Clone", "Copy", "Debug", "Display", "Default", "Drop", "Eq", "Ord",
+    "Hash", "Iterator", "Future", "Pin", "From", "Into", "AsRef", "Deref",
+    "PartialEq", "PartialOrd", "Serialize", "Deserialize", "Error",
+    "Read", "Write", "PhantomData", "Infallible",
+    # Standard Lean types
+    "Nat", "Int", "Bool", "Prop", "Type", "List", "Array", "Char", "Float",
+    "Unit", "Decidable", "Repr", "Inhabited", "Subtype", "Sigma", "Prod",
+    "Sum", "Or", "And", "Iff", "Not", "True", "False", "HEq", "BEq",
+    "Monoid", "Group", "Ring", "Field", "Finset",
+    # Markdown / formatting artifacts
+    "README", "SUMMARY", "TODO", "FIXME", "NOTE", "WARNING", "IMPORTANT",
+    # Common abbreviations
+    "API", "CLI", "CI", "CD", "PR", "OS", "IO", "UUID", "HTTP", "HTTPS",
+    "URL", "JSON", "CBOR", "TOML", "YAML", "WASM", "BFT", "CRDT",
+    # Example role names from choreography docs
+    "Alice", "Bob", "Chef", "SousChef", "Baker", "Seller", "Client",
+    "Server", "Worker", "Coordinator",
+    # DSL keywords and built-in value constructors
+    "Done", "Loop", "Parallel", "Maybe", "Just", "Nothing",
+    "Hello", "HelloAck", "Goodbye", "Ping", "Pong", "Ack",
+    "Commit", "Abort", "Cancel", "Retry",
+    # Common enum variant names
+    "Active", "Closed", "Draining", "Aborted", "Faulted",
+    "Admitted", "Blocked", "Failure", "Full",
+}
+
+# Known deprecated identifiers. Backtick references to these in docs are
+# flagged as stale. Each key maps to a short reason.
+deprecated_identifiers: dict[str, str] = {
+    # Add entries here as identifiers are removed or renamed, e.g.:
+    # "OldTypeName": "removed in v6.0, replaced by NewTypeName",
+}
+
+pascal_case_re = re.compile(r"^[A-Z][A-Za-z0-9_]+$")
+
 
 def line_for(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
@@ -102,6 +145,14 @@ for file in doc_files:
     for match in code_span.finditer(text):
         snippet = match.group(1).strip()
         line = line_for(text, match.start())
+
+        # Check for deprecated identifiers
+        if snippet in deprecated_identifiers:
+            reason = deprecated_identifiers[snippet]
+            errors.append(
+                f"{file.relative_to(root)}:{line}: deprecated identifier `{snippet}` ({reason})"
+            )
+            continue
 
         if snippet.startswith("just "):
             parts = snippet.split()
@@ -141,6 +192,23 @@ for file in doc_files:
             if symbol and symbol not in repo_identifiers:
                 errors.append(
                     f"{file.relative_to(root)}:{line}: unresolved repo-local symbol tail `{snippet}`"
+                )
+            continue
+
+        # PascalCase identifier check: verify backticked type/trait/enum names
+        # exist somewhere in the Rust or Lean source.
+        if pascal_case_re.match(snippet):
+            if snippet in skip_identifiers:
+                continue
+            # Skip single-letter type parameters
+            if len(snippet) <= 1:
+                continue
+            # Skip ALL_CAPS constants (environment variables, etc.)
+            if re.fullmatch(r"[A-Z][A-Z0-9_]+", snippet):
+                continue
+            if snippet not in repo_identifiers:
+                errors.append(
+                    f"{file.relative_to(root)}:{line}: unresolved type or identifier `{snippet}`"
                 )
 
 if errors:

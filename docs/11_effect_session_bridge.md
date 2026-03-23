@@ -17,13 +17,13 @@ Telltale uses three layers.
 |---|---|---|
 | Global protocol layer | choreography and projection | defines role-local protocol obligations |
 | Effect layer | handler interfaces | defines runtime action behavior |
-| VM layer | bytecode and monitor checks | enforces instruction-level typing and admission rules |
+| Protocol-machine layer | bytecode and monitor checks | enforces instruction-level typing and admission rules |
 
 Projection and runtime checks preserve obligations across these layers.
 
 This document describes a host-runtime contract.
 It is normative for Rust embedders. It is not itself a theorem statement.
-The theorem-backed protocol properties remain in projection, coherence, and harmony. The host ownership rules below are implementation contracts enforced by the VM/runtime boundary.
+The theorem-backed protocol properties remain in projection, coherence, and harmony. The host ownership rules below are implementation contracts enforced by the protocol-machine boundary.
 
 ## Rust Handler Surfaces
 
@@ -32,21 +32,21 @@ Rust exposes two handler interfaces.
 | Interface | Location | Purpose |
 |---|---|---|
 | `ChoreoHandler` | `rust/choreography/src/effects/handler.rs` | async typed API for generated choreography code |
-| `EffectHandler` | `rust/vm/src/effect.rs` | sync VM API over bytecode values |
+| `EffectHandler` | `rust/vm/src/effect.rs` | sync protocol-machine API over bytecode values |
 
 Third-party runtime integration should use `EffectHandler`.
 
-## Why the VM Boundary
+## Why the Protocol-Machine Boundary
 
 `EffectHandler` is synchronous.
 This matches deterministic host execution models.
 It avoids futures and runtime-specific scheduling inside handler calls.
 
-`EffectHandler` operates on VM values and labels.
+`EffectHandler` operates on protocol-machine values and labels.
 This keeps the wire and storage boundary host-defined.
 It avoids coupling to generated Rust message types.
 
-The VM monitor enforces session typing before and during execution.
+The protocol machine enforces session typing before and during execution.
 The boundary keeps typing logic in Telltale.
 It keeps host logic focused on effect interpretation.
 
@@ -84,7 +84,7 @@ Host rules:
 
 The boundary separates protocol semantics from host materialization.
 
-| Concern | Telltale VM owns | Host `EffectHandler` owns |
+| Concern | Protocol machine owns | Host `EffectHandler` owns |
 |---|---|---|
 | Session typing | Local type checks and continuation advancement | none |
 | Buffer and signature discipline | enqueue, dequeue, and signature verification | none |
@@ -92,13 +92,13 @@ The boundary separates protocol semantics from host materialization.
 | Send policy | call point and branch label context | `send_decision` return value |
 | Receive side effects | receive timing and source payload | register and host state mutation in `handle_recv` |
 | Invoke integration | when invoke runs | integration state mutation in `step` |
-| Guard transitions | VM guard instruction flow | grant or block in `handle_acquire`, validation in `handle_release` |
+| Guard transitions | protocol-machine guard instruction flow | grant or block in `handle_acquire`, validation in `handle_release` |
 | Topology metadata | event ingestion order and application | produced events in `topology_events` |
 | Output metadata | commit-time query point | optional hint from `output_condition_hint` |
 
 Additional ownership split:
 
-| Concern | Telltale VM owns | Host runtime owns |
+| Concern | Protocol machine owns | Host runtime owns |
 |---|---|---|
 | current owner identity and generation | validation and stale-owner rejection | choosing owner labels and transfer policy |
 | transfer receipts and rollback | staged transfer enforcement and audit artifacts | when to request transfer |
@@ -106,11 +106,11 @@ Additional ownership split:
 
 ## Typed Effect Boundary
 
-The VM dispatch path is in `rust/vm/src/vm.rs`.
+The protocol-machine dispatch path is in `rust/vm/src/vm.rs`.
 The trait surface is in `rust/vm/src/effect.rs`.
 The normative contract is documented in that trait module.
 
-| Surface | VM call point | Runtime behavior | Integration note |
+| Surface | protocol-machine call point | Runtime behavior | Integration note |
 |---|---|---|---|
 | `handle_effect(EffectRequest)` | all host-facing instruction sites | one canonical request/outcome surface | new runtime code must use this path |
 | `EffectRequest.metadata` | all request construction sites | carries interface name, operation name, authority class, admissibility, totality, timeout, reentrancy, and handler domain | validated before dispatch |
@@ -121,13 +121,13 @@ The normative contract is documented in that trait module.
 | `EffectRequestBody::Acquire` | `step_acquire` | grant, block, or fail acquire | return evidence in `EffectResponse::Acquire` |
 | `EffectRequestBody::Release` | `step_release` | release validation | return `EffectOutcome::failure(...)` to reject invalid evidence |
 | `EffectRequestBody::TopologyEvents` | `ingest_topology_events` | called once per scheduler tick | events are sorted by deterministic ordering key before apply |
-| `EffectRequestBody::OutputConditionHint` | post-dispatch pre-commit | queried only when a step emits events | return `None` to use VM default |
+| `EffectRequestBody::OutputConditionHint` | post-dispatch pre-commit | queried only when a step emits events | return `None` to use protocol-machine default |
 | `handler_identity` | trace and commit attribution | stable handler id in traces | defaults to `DEFAULT_HANDLER_ID` when not overridden |
 
 Helper-method compatibility notes:
 
 - `handle_send` and `handle_choose` must not become hidden side channels for session metadata mutation.
-- helper methods remain compatibility helpers for default `handle_effect` implementations; they are not separate ingress paths
+- helper methods remain compatibility helpers for default `handle_effect` implementations. They are not separate ingress paths.
 - Bridge traits in `rust/vm/src/bridge.rs` are deterministic lookup/projection surfaces, not mutation surfaces.
 - Public host integrations open sessions through `load_choreography_owned(...)` and mutate session-local host metadata through `OwnedSession`.
 
@@ -166,8 +166,8 @@ protocol CommitFlow uses Runtime =
 
 Host-boundary rule:
 
-- this does not create a second integration channel beside the VM/effect layer
-- language-declared effect operations still lower to the same typed VM
+- this does not create a second integration channel beside the protocol-machine effect layer
+- language-declared effect operations still lower to the same typed protocol machine
   `invoke` boundary and handler-obligation model
 - missing or ambiguous authority must surface as typed failure or explicit
   evidence rejection, never as fallback success
@@ -176,7 +176,7 @@ Operational consequence:
 
 - embedders implement one typed host boundary in `EffectHandler`
 - language-level authority checks become explicit effect observations and
-  semantic-audit records once lowered into the VM
+  semantic-audit records once lowered into the protocol machine
 
 ## Authoritative Reads, Materialization, and Publication
 
@@ -185,7 +185,7 @@ authoritative reads.
 
 | Surface | Meaning |
 |---|---|
-| `ObservedRead` | handler/effect observation only; must not authorize semantic truth |
+| `ObservedRead` | handler/effect observation only. Must not authorize semantic truth. |
 | `AuthoritativeRead` | witness-bearing semantic input accepted on parity-critical paths |
 | `MaterializationProof` | proof-bearing success artifact derived from canonical output-condition checks |
 | `CanonicalHandle` | strong runtime handle that later parity-critical paths must require |
@@ -195,8 +195,8 @@ Host-runtime rules:
 
 - observational effect results must not be promoted into semantic truth
 - proof-bearing success is mandatory when an operation declares `requires_proof`
-- canonical publication is derived from sanctioned runtime state; embedders must
-  not bypass it with parallel publish helpers
+- canonical publication is derived from sanctioned runtime state. Embedders must
+  not bypass it with parallel publish helpers.
 - parity-critical follow-on work should require a `CanonicalHandle`, not a weak
   id reconstructed from observational state
 
@@ -218,7 +218,7 @@ authority checks and evidence-bearing branches after lowering.
 ## Integration Workflow
 
 1. Use `telltale-theory` at setup time to project global types to local types.
-2. Compile local types to VM bytecode and load with `CodeImage`.
+2. Compile local types to protocol-machine bytecode and load with `CodeImage`.
 3. Open sessions with `load_choreography_owned(...)` so the host authority boundary is explicit from the first step.
 4. Implement `EffectHandler` with deterministic host operations.
 5. Map each typed effect request to host primitives without reimplementing protocol typing.
@@ -248,7 +248,7 @@ cargo run -p effect-scaffold -- --out artifacts/effect_handler_scaffold --dsl pa
 Use `--no-simulator` when you want only the Rust effect boundary without simulator artifacts.
 
 Use `just sim-run <config>` to execute a simulator harness config file.
-This command runs the VM with scenario middleware and contract checks.
+This command runs the protocol machine with scenario middleware and contract checks.
 It is the fastest path for CI validation in third party host projects.
 
 ```text
@@ -270,7 +270,7 @@ let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
 ```
 
-This lane validates runtime behavior without reimplementing VM checks in the host project. See [VM Simulation](15_vm_simulation_overview.md) for harness config fields and preset helpers.
+This lane validates runtime behavior without reimplementing protocol-machine checks in the host project. See [Protocol-Machine Simulation](15_vm_simulation_overview.md) for harness config fields and preset helpers.
 
 ## Performance and Diagnostics Controls
 
@@ -280,7 +280,7 @@ Default mode is `full`.
 `VMConfig.payload_validation_mode` controls runtime payload hardening.
 Use `off` for trusted benchmarks, `structural` for standard deployments, and `strict_schema` for adversarial inputs.
 
-`VMConfig.max_payload_bytes` bounds payload size in VM message validation.
+`VMConfig.max_payload_bytes` bounds payload size in protocol-machine message validation.
 Default is `65536`.
 
 `VMConfig.host_contract_assertions` enables runtime checks for handler identity stability, topology ordering inputs, and transfer-event auditability.
@@ -294,7 +294,7 @@ Default value is `false`.
 - Ownership: route session-local host mutation through a current ownership capability, not ad hoc session-store access.
 - Canonical ingress: surface async work by later ingress calls rather than performing it inside synchronous request handling.
 - Replayability: validate traces with `RecordingEffectHandler` and `ReplayEffectHandler`.
-- Admission: keep VM runtime gates and profile settings explicit in `VMConfig`.
+- Admission: keep protocol-machine runtime gates and profile settings explicit in `VMConfig`.
 
 ## Lean Correspondence
 
@@ -302,7 +302,7 @@ Lean splits effect execution and typing.
 This split is in `lean/Runtime/VM/Model/TypeClasses.lean` and the typed
 request/outcome model in `lean/Runtime/VM/Model/Effects.lean`.
 
-| Rust or VM surface | Lean surface | Purpose |
+| Rust or protocol-machine surface | Lean surface | Purpose |
 |---|---|---|
 | `EffectHandler` execution boundary | `EffectRuntime.exec` | executable effect semantics |
 | handler typing obligation | `EffectSpec.handlerType` | typing-level effect contract |
@@ -318,7 +318,7 @@ request/outcome model in `lean/Runtime/VM/Model/Effects.lean`.
 |---|---|
 | `Program` and `Effect` | choreography free algebra in `telltale-choreography` |
 | `ChoreoHandler` | async typed handler for generated choreography code |
-| `EffectHandler` | sync VM host interface for runtime integration |
+| `EffectHandler` | sync protocol-machine host interface for runtime integration |
 | `EffectRuntime` | Lean executable effect action and context transition |
 | `EffectSpec` | Lean typing obligation for effect actions |
 | `telltale_types::effects` | shared deterministic clock and RNG traits for simulation support |
@@ -326,6 +326,6 @@ request/outcome model in `lean/Runtime/VM/Model/Effects.lean`.
 ## Related Docs
 
 - [Choreography Effect Handlers](09_effect_handlers.md)
-- [VM Architecture](12_vm_architecture.md)
+- [Protocol Machine Architecture](12_vm_architecture.md)
 - [Lean Verification](23_lean_verification.md)
 - [Lean-Rust Bridge](24_lean_rust_bridge.md)

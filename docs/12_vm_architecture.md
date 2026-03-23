@@ -1,10 +1,10 @@
-# VM Architecture
+# Protocol Machine Architecture
 
-This document defines the protocol-machine architecture, scheduling semantics, and concurrency envelope used by Rust runtime targets and Lean conformance surfaces. The file keeps the historical `VM` name only because the current crate/module paths still use it; the canonical public abstraction is the protocol machine.
+This document defines the protocol-machine architecture, scheduling semantics, and concurrency envelope used by Rust runtime targets and Lean conformance surfaces. The file keeps the historical `VM` filename only because the current crate/module paths still use it. The canonical public abstraction is the protocol machine.
 
 ## Architecture Overview
 
-The canonical semantic authority is `VMKernel`. The cooperative `ProtocolMachine` (currently implemented by `VM`) and threaded `ThreadedVM` are execution adapters that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
+The canonical semantic authority is `VMKernel`. The cooperative `ProtocolMachine` (currently implemented by `VM`) and threaded `ThreadedGuestRuntime` (currently implemented by `ThreadedVM`) are the guest-runtime execution surfaces that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
 
 The runtime keeps a single state model across targets. Core state includes coroutines, sessions, scheduler queues, observable trace, effect trace, live operation-instance state, live outstanding-effect state, delegation audit records, and failure-topology snapshot fields.
 The canonical exported semantic surface is the semantic-object family:
@@ -19,9 +19,9 @@ The canonical round model is one semantic step when concurrency is nonzero. Thre
 
 | Engine | Role | Contract Surface |
 |---|---|---|
-| `ProtocolMachine` (`VM`) | Canonical cooperative runtime | Exact reference for parity at concurrency `1` |
-| `ThreadedVM` | Parallel wave executor | Certified-wave execution with fallback to canonical one-step |
-| WASM runtime | Single-thread deployment | Cooperative schedule only |
+| `ProtocolMachine` (`VM`) | Canonical cooperative protocol machine | Exact reference for parity at concurrency `1` |
+| `ThreadedGuestRuntime` (`ThreadedVM`) | Parallel wave executor | Certified-wave execution with fallback to canonical one-step |
+| WASM guest runtime | Single-thread deployment | Cooperative schedule only |
 
 ## Scheduler Semantics
 
@@ -72,9 +72,9 @@ Runtime mode admission and profile selection are capability gated.
 
 ## Runtime Hardening Contracts
 
-The VM adapters now enforce explicit runtime hardening at load and startup boundaries.
+The guest-runtime adapters now enforce explicit runtime hardening at load and startup boundaries.
 
-- `ThreadedVM` provides both `with_workers` (panic-on-invalid initialization compatibility path) and `try_with_workers` (fallible initialization with `VMError`).
+- `ThreadedGuestRuntime` (currently backed by `ThreadedVM`) provides both `with_workers` (panic-on-invalid initialization compatibility path) and `try_with_workers` (fallible initialization with `VMError`).
 - Cooperative and threaded `load_choreography` paths validate trusted `CodeImage` runtime shape before session allocation.
 - Preferred host integration uses `load_choreography_owned(...)` and `OwnedSession` when the embedding runtime needs explicit session ownership after open.
 - Register-bound violations are fail-closed through `Fault::OutOfRegisters` rather than unchecked index panic in executable instruction paths.
@@ -131,8 +131,8 @@ Replay-visible auditability now has one canonical surface derived from existing 
 
 Runtime accessors:
 
-- `VM::semantic_audit_log()`
-- `ThreadedVM::semantic_audit_log()`
+- `ProtocolMachine::semantic_audit_log()`
+- `ThreadedGuestRuntime::semantic_audit_log()`
 - `canonical_replay_fragment().semantic_audit_log`
 
 This keeps replay, simulator harnesses, and parity checks aligned on one derived semantic audit vocabulary.
@@ -148,8 +148,8 @@ output-condition surfaces.
 
 Runtime accessors:
 
-- `VM::semantic_objects()`
-- `ThreadedVM::semantic_objects()`
+- `ProtocolMachine::semantic_objects()`
+- `ThreadedGuestRuntime::semantic_objects()`
 - `canonical_replay_fragment().semantic_objects`
 
 This bundle is the canonical bridge-facing and replay-facing representation of
@@ -264,9 +264,9 @@ Release conformance surfaces are exported through theorem-pack APIs and enforced
 
 ## Related Docs
 
-- [Bytecode Instructions](13_bytecode_instructions.md)
+- [Protocol-Machine Bytecode Instructions](13_bytecode_instructions.md)
 - [Session Lifecycle](14_session_lifecycle.md)
-- [VM Simulation](15_vm_simulation_overview.md)
+- [Protocol-Machine Simulation](15_vm_simulation_overview.md)
 - [Rust-Lean Parity](19_rust_lean_parity.md)
 - [Effect Handlers and Session Types](11_effect_session_bridge.md)
 - [Lean Verification](23_lean_verification.md)

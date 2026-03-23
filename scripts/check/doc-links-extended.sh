@@ -53,6 +53,7 @@ checked = 0
 seen = set()
 missing = []
 outside = []
+work_links = []
 
 
 def sanitize(target: str) -> str:
@@ -126,6 +127,24 @@ def check_target(source: Path, line_no: int, raw_target: str):
     checked += 1
 
 
+def check_work_link(source: Path, line_no: int, raw_target: str):
+    """Flag markdown links that point to the work/ directory."""
+    if not raw_target:
+        return
+    candidate = sanitize(raw_target)
+    if not candidate:
+        return
+    if is_external(candidate):
+        return
+    if candidate.startswith("work/") or "/work/" in candidate:
+        rel = source.relative_to(root) if source.is_absolute() else source
+        work_links.append(f"{rel}:{line_no}: link to work/ directory: {candidate}")
+
+
+# -------------------------------------------------------------------
+# Scan all directories for docs/ link targets
+# -------------------------------------------------------------------
+
 for scan_root in scan_roots:
     abs_root = root / scan_root
     if not abs_root.exists():
@@ -157,11 +176,17 @@ for scan_root in scan_roots:
 
         for line_no, line in enumerate(lines, start=1):
             if "docs/" not in line and "/docs/" not in line:
-                continue
-            for m in markdown_re.finditer(line):
-                check_target(source, line_no, m.group(1))
-            for m in bare_re.finditer(line):
-                check_target(source, line_no, m.group(1))
+                pass
+            else:
+                for m in markdown_re.finditer(line):
+                    check_target(source, line_no, m.group(1))
+                for m in bare_re.finditer(line):
+                    check_target(source, line_no, m.group(1))
+
+            # Check for work/ links in markdown files
+            if str(rel).endswith(".md"):
+                for m in markdown_re.finditer(line):
+                    check_work_link(source, line_no, m.group(1))
 
 for rel_name in root_files:
     source = root / rel_name
@@ -171,24 +196,71 @@ for rel_name in root_files:
     lines = source.read_text(encoding="utf-8", errors="ignore").splitlines()
     for line_no, line in enumerate(lines, start=1):
         if "docs/" not in line and "/docs/" not in line:
-            continue
+            pass
+        else:
+            for m in markdown_re.finditer(line):
+                check_target(source, line_no, m.group(1))
+            for m in bare_re.finditer(line):
+                check_target(source, line_no, m.group(1))
+
         for m in markdown_re.finditer(line):
-            check_target(source, line_no, m.group(1))
-        for m in bare_re.finditer(line):
-            check_target(source, line_no, m.group(1))
+            check_work_link(source, line_no, m.group(1))
+
+# -------------------------------------------------------------------
+# SUMMARY.md completeness: every docs/*.md must appear in SUMMARY.md
+# -------------------------------------------------------------------
+
+summary_errors = []
+summary_path = docs_root / "SUMMARY.md"
+if summary_path.is_file():
+    summary_text = summary_path.read_text(encoding="utf-8")
+    summary_targets: set[str] = set()
+    for m in markdown_re.finditer(summary_text):
+        target = m.group(1).split("#", 1)[0].split("?", 1)[0].strip()
+        if target:
+            summary_targets.add(target)
+
+    for md in sorted(docs_root.glob("*.md")):
+        name = md.name
+        if name == "SUMMARY.md":
+            continue
+        if name not in summary_targets:
+            summary_errors.append(f"docs/SUMMARY.md: missing link to {name}")
+
+# -------------------------------------------------------------------
+# Report
+# -------------------------------------------------------------------
+
+has_errors = False
 
 if outside:
+    has_errors = True
     print("docs link check failed: references outside docs root")
     for entry in outside:
         print(f"  - {entry}")
 
 if missing:
+    has_errors = True
     print("docs link check failed: missing targets")
     for entry in missing:
         print(f"  - {entry}")
 
-if outside or missing:
-    print(f"docs link check found {len(outside) + len(missing)} issue(s)")
+if work_links:
+    has_errors = True
+    print("docs link check failed: links to work/ directory")
+    for entry in work_links:
+        print(f"  - {entry}")
+
+if summary_errors:
+    has_errors = True
+    print("docs link check failed: SUMMARY.md incomplete")
+    for entry in summary_errors:
+        print(f"  - {entry}")
+    print("hint: run `just summary` to regenerate SUMMARY.md")
+
+if has_errors:
+    total = len(outside) + len(missing) + len(work_links) + len(summary_errors)
+    print(f"docs link check found {total} issue(s)")
     raise SystemExit(1)
 
 print(f"docs link check passed ({checked} unique docs reference(s) checked)")

@@ -11,7 +11,7 @@ It serves as the stable lookup for terminology and notation.
 | harmony | Projection and protocol evolution commute under declared premises. | [Theory](05_theory.md), [Theorem Program](26_theorem_program.md) |
 | projection | Mapping from global choreography to per-role local session types. | [Choreographic Projection Patterns](07_projection.md) |
 | local type | Per-role protocol view used for runtime typing and progression. | [Theory](05_theory.md), [Session Lifecycle](14_session_lifecycle.md) |
-| effect handler | Runtime boundary that interprets VM or choreography actions. | [Choreography Effect Handlers](09_effect_handlers.md), [Effect Handlers and Session Types](11_effect_session_bridge.md) |
+| effect handler | Runtime boundary that interprets protocol-machine or choreography actions. | [Choreography Effect Handlers](09_effect_handlers.md), [Effect Handlers and Session Types](11_effect_session_bridge.md) |
 | theorem-pack | Lean-exported capability inventory used by runtime admission gates. | [Lean Verification](23_lean_verification.md), [Capability and Admission](25_capability_admission.md) |
 | admission | Runtime gate process that checks contracts and capability evidence. | [Capability and Admission](25_capability_admission.md) |
 | ownership capability | Runtime host authority token carrying owner label, generation, and scope. | [Effect Handlers and Session Types](11_effect_session_bridge.md), [Session Lifecycle](14_session_lifecycle.md) |
@@ -26,18 +26,18 @@ It serves as the stable lookup for terminology and notation.
 | ownership epoch | Generation used to invalidate stale owner handles after transfer or scope attenuation. | [Session Lifecycle](14_session_lifecycle.md) |
 | canonical ingress | Sanctioned host event entry path such as `topology_events`, `send_decision`, `handle_recv`, or `step`. | [Effect Handlers and Session Types](11_effect_session_bridge.md) |
 | stale-owner rejection | Fail-closed behavior when a prior ownership capability is reused after transfer or attenuation. | [Effect Handlers and Session Types](11_effect_session_bridge.md), [Session Lifecycle](14_session_lifecycle.md) |
-| envelope | Declared refinement boundary for higher-concurrency and profile-scoped behavior. | [VM Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
-| determinism profile | Runtime trace-equivalence contract mode such as `Full` or `Replay`. | [VM Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
-| communication replay mode | Transport replay-consumption policy: `off`, `sequence`, or `nullifier`. | [VM Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
-| communication nullifier | Domain-separated digest of canonical communication identity used for one-time receive consumption checks. | [VM Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
-| consumption root | Deterministic accumulator root over communication replay-consumption state. | [VM Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
+| envelope | Declared refinement boundary for higher-concurrency and profile-scoped behavior. | [Protocol Machine Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
+| determinism profile | Runtime trace-equivalence contract mode such as `Full` or `Replay`. | [Protocol Machine Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
+| communication replay mode | Transport replay-consumption policy: `off`, `sequence`, or `nullifier`. | [Protocol Machine Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
+| communication nullifier | Domain-separated digest of canonical communication identity used for one-time receive consumption checks. | [Protocol Machine Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
+| consumption root | Deterministic accumulator root over communication replay-consumption state. | [Protocol Machine Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
 
 ## Symbol and Notation Index
 
 | Symbol or Form | Meaning | Primary Docs |
 |---|---|---|
 | `G` | Global protocol type. | [Theory](05_theory.md) |
-| `L` or `LocalTypeR` | Local role protocol type. | [Theory](05_theory.md), [Bytecode Instructions](13_bytecode_instructions.md) |
+| `L` or `LocalTypeR` | Local role protocol type. | [Theory](05_theory.md), [Protocol-Machine Bytecode Instructions](13_bytecode_instructions.md) |
 | `project(G, R)` | Projection of global type `G` for role `R`. | [Theory](05_theory.md), [Choreographic Projection Patterns](07_projection.md) |
 | `μX. ... X` | Recursive protocol form with bound variable `X`. | [Theory](05_theory.md) |
 | `⊕{...}` | Internal choice at the selecting endpoint. | [Theory](05_theory.md) |
@@ -46,13 +46,13 @@ It serves as the stable lookup for terminology and notation.
 | `?T.S` | Receive `T`, then continue as `S`. | [Theory](05_theory.md) |
 | `end` | Session termination state. | [Theory](05_theory.md) |
 | `Consume` | Recursive receiver-side trace alignment kernel used in coherence proofs. | [Theory](05_theory.md), [Theorem Program](26_theorem_program.md) |
-| `n = 1` | Canonical single-step concurrency regime for exact parity. | [VM Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
-| `n > 1` | Higher-concurrency regime admitted under envelope and premise-scoped constraints. | [VM Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
-| `Full`, `ModuloEffects`, `ModuloCommutativity`, `Replay` | Runtime determinism profiles. | [VM Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
-| `off`, `sequence`, `nullifier` | Communication replay-consumption modes. | [VM Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
-| `telltale.comm.identity.v1` | Domain-separation tag for canonical communication identity schema. | [VM Architecture](12_vm_architecture.md) |
+| `n = 1` | Canonical single-step concurrency regime for exact parity. | [Protocol Machine Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
+| `n > 1` | Higher-concurrency regime admitted under envelope and premise-scoped constraints. | [Protocol Machine Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
+| `Full`, `ModuloEffects`, `ModuloCommutativity`, `Replay` | Runtime determinism profiles. | [Protocol Machine Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
+| `off`, `sequence`, `nullifier` | Communication replay-consumption modes. | [Protocol Machine Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
+| `telltale.comm.identity.v1` | Domain-separation tag for canonical communication identity schema. | [Protocol Machine Architecture](12_vm_architecture.md) |
 | `case ... of` | Exhaustive sum-pattern branching over forms such as `Result` and `Maybe`. | [Choreographic DSL](06_choreographic_dsl.md), [Authority Language Surface](34_authority_language_surface.md) |
-| `let x = check Effect.op(args)` | Typed external query binding that later lowers to the VM effect boundary. | [Choreographic DSL](06_choreographic_dsl.md), [Authority Language Surface](34_authority_language_surface.md) |
+| `let x = check Effect.op(args)` | Typed external query binding that later lowers to the protocol-machine effect boundary. | [Choreographic DSL](06_choreographic_dsl.md), [Authority Language Surface](34_authority_language_surface.md) |
 | `effect Name` | Nominal effect-interface declaration. | [Authority Language Surface](34_authority_language_surface.md) |
 | `protocol P uses Runtime, Audit` | Protocol declaration naming its allowed effect interfaces. | [Authority Language Surface](34_authority_language_surface.md) |
 | `timeout 5s R at ... on timeout => ... on cancel => ...` | Protocol-visible timeout and cancellation branch form. | [Choreographic DSL](06_choreographic_dsl.md), [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) |
@@ -66,6 +66,6 @@ Prefer existing symbols from this index unless precision requires a different on
 ## Related Docs
 
 - [Theory](05_theory.md)
-- [VM Architecture](12_vm_architecture.md)
+- [Protocol Machine Architecture](12_vm_architecture.md)
 - [Rust-Lean Parity](19_rust_lean_parity.md)
 - [Theorem Program](26_theorem_program.md)
