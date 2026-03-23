@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
+# Rust style-guide conformance checker for Telltale.
+# Runs rustfmt, clippy with strict settings, and heuristic checks for
+# unsafe usage, unbounded loops, magic numbers, tech debt, and more.
 set -euo pipefail
 
-# Rust Style Guide Conformance Checker for Telltale
-#
 # Usage:
 #   ./scripts/check/lint.sh            # Full check
 #   ./scripts/check/lint.sh --quick    # Quick check (format + clippy only)
+
+# ── Output Helpers ────────────────────────────────────────────
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -41,7 +44,7 @@ if $QUICK_MODE; then
     log_info "Running in quick mode (format + clippy only)"
 fi
 
-# 1. Rustfmt check
+# ── 1. Rustfmt ────────────────────────────────────────────────
 section "Checking formatting"
 if cargo fmt --all -- --check 2>/dev/null; then
     log_ok "Code is properly formatted"
@@ -49,7 +52,7 @@ else
     log_error "Code formatting issues found. Run 'cargo fmt --all'"
 fi
 
-# 2. Clippy with strict settings
+# ── 2. Clippy (Strict) ────────────────────────────────────────
 section "Running clippy (strict)"
 CLIPPY_FLAGS=(
     -D warnings
@@ -85,7 +88,7 @@ if $QUICK_MODE; then
     exit $( [ "$ERRORS" -gt 0 ] && echo 1 || echo 0 )
 fi
 
-# 3. Check for unsafe code outside designated modules
+# ── 3. Unsafe Usage ───────────────────────────────────────────
 section "Checking unsafe usage"
 UNSAFE_FILES=$(grep -rl "unsafe" rust/*/src --include="*.rs" 2>/dev/null || true)
 UNSAFE_WITHOUT_SAFETY=0
@@ -104,7 +107,7 @@ if [ "$UNSAFE_WITHOUT_SAFETY" -eq 0 ]; then
     log_ok "All unsafe blocks have Safety comments"
 fi
 
-# 4. Check for unbounded loops (style guide: put a limit on everything)
+# ── 4. Unbounded Loops ────────────────────────────────────────
 # Accepts comment on same line as `loop {` OR on the immediately following line
 section "Checking for unbounded loops"
 UNBOUNDED_LOOPS=0
@@ -124,7 +127,7 @@ else
     log_ok "All loops are documented or bounded"
 fi
 
-# 5. Check for usize in stored/serialized types (style guide: explicit sizes)
+# ── 5. usize in Serializable Types ────────────────────────────
 # Look for struct fields with `: usize,` pattern (trailing comma indicates field, not fn param)
 # Excludes function signatures, generic bounds, and return types
 section "Checking for usize in serializable types"
@@ -144,7 +147,7 @@ else
     log_ok "No usize in struct types"
 fi
 
-# 6. Check for TODO/FIXME comments (technical debt tracking)
+# ── 6. Technical Debt Markers ─────────────────────────────────
 section "Checking for technical debt markers"
 TODO_COUNT=$( (grep -rn "TODO\|FIXME\|HACK\|XXX" rust/*/src --include="*.rs" 2>/dev/null | wc -l | tr -d ' ') || true)
 
@@ -155,7 +158,7 @@ else
     log_ok "No technical debt markers found"
 fi
 
-# 7. Check for magic numbers in bounds (style guide: encode limits as constants)
+# ── 7. Magic Numbers ──────────────────────────────────────────
 section "Checking for magic numbers"
 MAGIC_BOUNDS=$( (grep -rn "< [0-9]\{3,\}\|> [0-9]\{3,\}\|<= [0-9]\{3,\}\|>= [0-9]\{3,\}" \
     rust/*/src --include="*.rs" 2>/dev/null \
@@ -169,7 +172,7 @@ else
     log_ok "No magic numbers in bounds"
 fi
 
-# 8. Check for #[must_use] candidates
+# ── 8. #[must_use] Candidates ─────────────────────────────────
 section "Checking for #[must_use] candidates"
 MUST_USE_OUTPUT=$(cargo clippy --workspace --all-features -- -W clippy::must_use_candidate 2>&1 || true)
 MUST_USE_COUNT=$(echo "$MUST_USE_OUTPUT" | grep -c "must_use_candidate" || true)
@@ -180,7 +183,7 @@ else
     log_ok "Most return values are properly annotated"
 fi
 
-# 9. Check for large enums (performance consideration)
+# ── 9. Large Enum Variants ────────────────────────────────────
 section "Checking for large enum variants"
 LARGE_ENUM_OUTPUT=$(cargo clippy --workspace --all-features -- -W clippy::large_enum_variant 2>&1 || true)
 LARGE_ENUM_COUNT=$(echo "$LARGE_ENUM_OUTPUT" | grep -c "large_enum_variant" || true)
@@ -192,7 +195,7 @@ else
     log_ok "No problematic large enum variants"
 fi
 
-# 10. Run cargo deny for dependency audit (if available)
+# ── 10. Dependency Audit ──────────────────────────────────────
 section "Checking dependencies"
 if command -v cargo-deny &> /dev/null; then
     if cargo deny check 2>&1; then
@@ -204,12 +207,12 @@ else
     log_info "cargo-deny not installed. Run: cargo install cargo-deny"
 fi
 
-# 11. Check test coverage (informational)
+# ── 11. Test Coverage ─────────────────────────────────────────
 section "Test information"
 TEST_COUNT=$(cargo test --workspace --all-features -- --list 2>/dev/null | grep -c "test$" || echo "0")
 log_info "Found $TEST_COUNT tests in workspace"
 
-# Summary
+# ── Summary ───────────────────────────────────────────────────
 echo ""
 echo "========================================"
 echo "  Summary"

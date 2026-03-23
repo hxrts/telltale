@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
+# Enforce docs prose quality: no em dashes, no semicolons, code blocks
+# followed by explanatory prose, prose must exceed code word count.
 set -eu
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
+# ── Setup ─────────────────────────────────────────────────────────────
 DOCS_DIR="$ROOT_DIR/docs"
 
 DOC_FILES="$(mktemp)"
@@ -17,10 +20,12 @@ if [ ! -s "$DOC_FILES" ]; then
   exit 1
 fi
 
+# Append a single error line.
 add_error() {
   printf '%s\n' "$1" >> "$ERRORS_FILE"
 }
 
+# ── Scan Each Doc File ────────────────────────────────────────────────
 while IFS= read -r doc_file; do
   rel_file="${doc_file#$ROOT_DIR/}"
 
@@ -91,6 +96,7 @@ while IFS= read -r doc_file; do
   fi
 done < "$DOC_FILES"
 
+# ── Report ────────────────────────────────────────────────────────────
 if [ -s "$ERRORS_FILE" ]; then
   echo "docs prose quality check failed:"
   while IFS= read -r err; do

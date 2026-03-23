@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
+# Print Lean codebase statistics (files, LOC, axioms, sorry count).
+# Supports --latex-row (emit a LaTeX table row) and --check (verify paper rows).
 set -euo pipefail
 
+# ── Paths & Dependencies ──────────────────────────────────────────────
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LEAN_DIR="${ROOT_DIR}/lean"
 
@@ -9,11 +12,13 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 2
 fi
 
+# ── Gather Statistics ──────────────────────────────────────────────────
 files="$(find "${LEAN_DIR}" -type f -name '*.lean' | wc -l | tr -d ' ')"
 loc="$(find "${LEAN_DIR}" -type f -name '*.lean' -print0 | xargs -0 cat | wc -l | tr -d ' ')"
 axioms="$( (rg -n '^[[:space:]]*axiom\\b' "${LEAN_DIR}" || true) | wc -l | tr -d ' ' )"
 sorries="$( (rg -n '\\bsorry\\b' "${LEAN_DIR}" || true) | wc -l | tr -d ' ' )"
 
+# ── Output Modes ──────────────────────────────────────────────────────
 if [[ "${1:-}" == "--latex-row" ]]; then
   echo "Lean source statistics & ${files} files, ${loc} LOC, axioms: ${axioms}, unresolved proof holes (\\texttt{sorry}): ${sorries} \\\\"
   exit 0

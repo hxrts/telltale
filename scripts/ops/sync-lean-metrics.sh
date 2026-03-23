@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
+# Update lean/CODE_MAP.md with current file/line counts per library.
+# Pass --check to verify freshness without writing.
 set -euo pipefail
 
+# ── Paths & Arguments ──────────────────────────────────────────────────
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LEAN_DIR="${ROOT_DIR}/lean"
 CODE_MAP_FILE="${ROOT_DIR}/lean/CODE_MAP.md"
@@ -17,6 +20,7 @@ fi
 
 EXCLUDE_REGEX='/(Examples|Tests)/|MutualTest|LocalTypeDBExamples\.lean'
 
+# ── Library Definitions ────────────────────────────────────────────────
 LIB_NAMES=(
   "SessionTypes"
   "SessionCoTypes"
@@ -56,6 +60,9 @@ LIB_FOCUS=(
   "Iris ghost state and program logic extraction"
 )
 
+# ── Helpers ───────────────────────────────────────────────────────────
+
+# Replace content between begin/end markers in a file
 replace_block() {
   local file="$1"
   local begin_marker="$2"
@@ -91,6 +98,7 @@ replace_block() {
   mv "$tmp_file" "$file"
 }
 
+# Count regex matches across a set of files
 count_pattern_in_files() {
   local pattern="$1"
   shift
@@ -107,6 +115,7 @@ count_pattern_in_files() {
   echo "$count"
 }
 
+# Collect all .lean files belonging to a library (root + subtree)
 collect_lib_files() {
   local lib_root="$1"
   local root_module="$2"
@@ -126,6 +135,7 @@ collect_lib_files() {
   } | sort -u | grep -Ev "$EXCLUDE_REGEX" || true
 }
 
+# Format a number with comma separators
 add_commas() {
   local n="$1"
   local sign=""
@@ -141,6 +151,7 @@ add_commas() {
   echo "${sign}${n}${out}"
 }
 
+# ── Gather Per-Library Stats ───────────────────────────────────────────
 FILE_COUNTS=()
 LINE_COUNTS=()
 AXIOM_COUNTS=()
@@ -187,6 +198,7 @@ for ((i=0; i<${#LIB_NAMES[@]}; i++)); do
   TOTAL_SORRY=$((TOTAL_SORRY + sorry_count))
 done
 
+# ── Write Metrics to CODE_MAP.md ───────────────────────────────────────
 TODAY="$(date +%F)"
 
 before_code_map_hash="$(shasum -a 256 "$CODE_MAP_FILE" | awk '{print $1}')"
@@ -214,6 +226,7 @@ overview_table+=$'\n'"${total_row}"
 replace_block "$CODE_MAP_FILE" "<!-- GENERATED_METRICS:BEGIN -->" "<!-- GENERATED_METRICS:END -->" "$CODE_MAP_METRICS"
 replace_block "$CODE_MAP_FILE" "<!-- GENERATED_OVERVIEW_TABLE:BEGIN -->" "<!-- GENERATED_OVERVIEW_TABLE:END -->" "$overview_table"
 
+# ── Check Mode ─────────────────────────────────────────────────────────
 if (( CHECK_MODE == 1 )); then
   after_code_map_hash="$(shasum -a 256 "$CODE_MAP_FILE" | awk '{print $1}')"
   if [[ "$before_code_map_hash" != "$after_code_map_hash" ]]; then

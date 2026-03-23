@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
+# Publish workspace crates to crates.io in dependency order.
+# Supports dry-run, version validation, git tagging, and push.
 set -euo pipefail
 
+# ── Setup ──────────────────────────────────────────────────────────────
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
+# Crates listed in dependency order (leaves first)
 RELEASE_PACKAGES=(
   "telltale-macros"
   "telltale-types"
@@ -16,6 +20,7 @@ RELEASE_PACKAGES=(
   "telltale-simulator"
 )
 
+# ── Defaults ──────────────────────────────────────────────────────────
 DRY_RUN=0
 SKIP_CI=0
 CREATE_TAG=1
@@ -32,6 +37,7 @@ TRANSIENT_RELEASE_PATHS=(
 RESTORE_ON_EXIT=()
 RESTORE_TMP_DIR=""
 
+# ── Helpers ───────────────────────────────────────────────────────────
 usage() {
   cat <<'EOF'
 Usage:
@@ -59,6 +65,7 @@ require_command() {
   command -v "${cmd}" >/dev/null 2>&1 || die "${cmd} is required"
 }
 
+# Back up files that may drift during publish so they can be restored
 prepare_transient_restore() {
   local path status backup_name backup_path
   RESTORE_TMP_DIR="$(mktemp -d)"
@@ -75,6 +82,7 @@ prepare_transient_restore() {
   done
 }
 
+# Restore backed-up transient paths on exit
 restore_transient_paths() {
   local entry path backup_path
   for entry in "${RESTORE_ON_EXIT[@]}"; do
@@ -91,6 +99,7 @@ restore_transient_paths() {
   fi
 }
 
+# Extract version from a Cargo.toml [package] section
 extract_manifest_version() {
   local manifest_path="$1"
   awk '
@@ -106,6 +115,7 @@ extract_manifest_version() {
   ' "${manifest_path}"
 }
 
+# Map crate name to Cargo.toml path
 manifest_path() {
   local crate="$1"
   case "${crate}" in
@@ -121,6 +131,8 @@ manifest_path() {
     *) return 1 ;;
   esac
 }
+
+# ── Validation ─────────────────────────────────────────────────────────
 
 assert_version_format() {
   local version="$1"
@@ -164,6 +176,8 @@ assert_versions_match() {
   fi
 }
 
+# ── Publish Pipeline ───────────────────────────────────────────────────
+
 run_ci_dry_run() {
   echo "== running preflight: just ci-dry-run =="
   just ci-dry-run
@@ -183,6 +197,8 @@ publish_package() {
   echo "== ${cmd[*]} =="
   "${cmd[@]}"
 }
+
+# ── Tagging & Push ─────────────────────────────────────────────────────
 
 create_release_tag() {
   if [[ "${CREATE_TAG}" -eq 0 ]]; then
@@ -217,6 +233,7 @@ push_git_refs() {
   fi
 }
 
+# ── Main ───────────────────────────────────────────────────────────────
 main() {
   require_command cargo
   require_command git

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Ensure executable Lean VM modules have no TODO/FIXME/stub markers
+# and do not import proof-layer modules.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -8,9 +10,11 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 2
 fi
 
+# ── Placeholder / Stub Scan ──────────────────────────────────────────
+
 PATTERN='(?i)\b(?:TODO|FIXME|TBD|placeholder|stub|unimplemented|WIP)\b'
 
-# Limit to executable VM modules (not proofs).
+# Limit to executable VM modules (not proofs)
 CURRENT_HITS="$({
   rg -n --pcre2 "${PATTERN}" \
     "${ROOT_DIR}/lean/Runtime/VM/Model" \
@@ -27,6 +31,8 @@ if [[ -n "${CURRENT_HITS}" ]]; then
   echo "Remove markers from executable VM modules." >&2
   exit 1
 fi
+
+# ── Proof Layer Import Guard ──────────────────────────────────────────
 
 PROOF_IMPORT_HITS="$(
   rg -n --pcre2 '^\s*import\s+Runtime\.Proofs(\.|$)' \

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
+# Validate all docs/ link references across the repo: check targets exist,
+# detect work/ links, verify SUMMARY.md completeness, check link text matches
+# target titles.
 set -uo pipefail
 
+# ── Prerequisites ─────────────────────────────────────────────────────
 if ! command -v rg >/dev/null 2>&1; then
   echo "error: ripgrep (rg) is required" >&2
   exit 2
@@ -24,7 +28,7 @@ if [[ ! -d docs ]]; then
   exit 2
 fi
 
-# ── State ────────────────────────────────────────────────────────────
+# ── State ─────────────────────────────────────────────────────────────
 
 SCAN_ROOTS=(docs rust lean scripts .github)
 ROOT_FILES=(README.md CLAUDE.md)
@@ -38,8 +42,9 @@ summary_errors=()
 title_mismatches=()
 missing_scripts=()
 
-# ── Helpers ──────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────
 
+# Strip whitespace, quotes, brackets, query strings, and anchors.
 sanitize() {
   local t="$1"
 
@@ -77,6 +82,7 @@ sanitize() {
   echo "$t"
 }
 
+# Return true for http/https/mailto/anchor-only links.
 is_external() {
   local lower
   lower="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
@@ -86,8 +92,7 @@ is_external() {
   esac
 }
 
-# resolve_path <source_file> <candidate>
-# Prints "STATUS:PATH" where STATUS is ok, outside_root, or outside_docs.
+# Resolve a relative link to a normalized path. Prints "STATUS:PATH".
 resolve_path() {
   local source="$1" candidate="$2"
 
@@ -131,6 +136,7 @@ resolve_path() {
   echo "ok:$normalised"
 }
 
+# Validate that a link target resolves to an existing file.
 check_target() {
   local source="$1" line_no="$2" raw_target="$3"
 
@@ -177,6 +183,7 @@ check_target() {
   checked=$((checked + 1))
 }
 
+# Flag links that point into the untracked work/ directory.
 check_work_link() {
   local source="$1" line_no="$2" raw_target="$3"
 
@@ -192,7 +199,7 @@ check_work_link() {
   fi
 }
 
-# Title cache for link title matching
+# Read the first H1 from a markdown file (cached).
 declare -A TITLE_CACHE=()
 
 get_title() {
@@ -209,6 +216,7 @@ get_title() {
   echo "$title"
 }
 
+# Verify that link text matches the target file's H1 title.
 check_link_title() {
   local source="$1" line_no="$2" link_text="$3" raw_target="$4"
 
@@ -233,20 +241,17 @@ check_link_title() {
   fi
 }
 
-# extract_markdown_targets <file>
-# Prints "LINE_NO:TARGET" for every markdown link in the file
+# Extract "LINE_NO:TARGET" for every markdown link in the file.
 extract_markdown_targets() {
   rg -n -o '\[[^\]]+\]\(([^)]+)\)' -r '$1' "$1" 2>/dev/null || true
 }
 
-# extract_markdown_links_with_text <file>
-# Prints "LINE_NO:TEXT|TARGET" for every markdown link
+# Extract "LINE_NO|TEXT|TARGET" for every markdown link.
 extract_markdown_links_with_text() {
   perl -ne 'while (/\[([^\]]+)\]\(([^)]+)\)/g) { print "$.|$1|$2\n"; }' "$1" 2>/dev/null || true
 }
 
-# extract_bare_docs_refs <file>
-# Prints "LINE_NO:TARGET" for bare docs/ path references.
+# Extract "LINE_NO:TARGET" for bare docs/ path references.
 extract_bare_docs_refs() {
   if rg --pcre2-version >/dev/null 2>&1; then
     rg -n -o --pcre2 '(?<![A-Za-z0-9_./-])((?:\./\.?/)*docs/[A-Za-z0-9._/-]+)' -r '$1' "$1" 2>/dev/null || true
@@ -255,6 +260,7 @@ extract_bare_docs_refs() {
   fi
 }
 
+# Process a single file: check all link targets, work/ refs, and titles.
 process_file() {
   local source="$1"
   local is_md=0
@@ -306,7 +312,7 @@ process_file() {
   fi
 }
 
-# ── Scan directories ─────────────────────────────────────────────────
+# ── Scan Directories ──────────────────────────────────────────────────
 
 for scan_root in "${SCAN_ROOTS[@]}"; do
   [[ -e "$scan_root" ]] || continue
@@ -324,14 +330,14 @@ for scan_root in "${SCAN_ROOTS[@]}"; do
   done < <(rg -l -0 'docs/|\.\.\/' "$scan_root" 2>/dev/null || true)
 done
 
-# ── Scan root files ──────────────────────────────────────────────────
+# ── Scan Root Files ───────────────────────────────────────────────────
 
 for rel_name in "${ROOT_FILES[@]}"; do
   [[ -f "$rel_name" ]] || continue
   process_file "$rel_name"
 done
 
-# ── SUMMARY.md completeness ─────────────────────────────────────────
+# ── SUMMARY.md Completeness ───────────────────────────────────────────
 
 if [[ -f docs/SUMMARY.md ]]; then
   declare -A summary_targets=()
@@ -354,7 +360,7 @@ if [[ -f docs/SUMMARY.md ]]; then
   done
 fi
 
-# ── Report ───────────────────────────────────────────────────────────
+# ── Report ────────────────────────────────────────────────────────────
 
 has_errors=0
 

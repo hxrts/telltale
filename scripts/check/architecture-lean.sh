@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Lean architecture and style conformance checker.
+# Scans the Lean codebase for escape hatches (sorry, axiom), style violations,
+# placeholder contracts, and structural metrics (file length, section headers).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -18,6 +21,8 @@ if [[ $# -ne 0 ]]; then
   echo "usage: $0 [--strict]" >&2
   exit 2
 fi
+
+# ── Output Helpers ────────────────────────────────────────────
 
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
@@ -203,6 +208,8 @@ collect_long_code_blocks() {
   printf '%s\n' "${out}" | sed '/^$/d' || true
 }
 
+# ── Escape Hatches ────────────────────────────────────────────
+
 print_section "Lean Escape Hatches"
 
 sorry_hits="$(scan_rg '\bsorry\b')"
@@ -212,6 +219,8 @@ print_hits "error" "No sorry proofs" "${sorry_hits}" \
 axiom_hits="$(scan_rg '^[[:space:]]*axiom\b')"
 print_hits "error" "No bare axiom declarations" "${axiom_hits}" \
   "Remove axioms or move temporary assumptions behind explicit, documented shim boundaries."
+
+# ── Style-Guide Conformance ───────────────────────────────────
 
 print_section "Lean Style-Guide Conformance (First-Pass Heuristics)"
 
@@ -271,6 +280,8 @@ print_hits "warning" "Code blocks stay within 50 non-comment lines" "${long_code
 module_doc_hits="$(collect_file_metric_hits module_doc 120)"
 print_hits "warning" "Non-trivial files include module docs" "${module_doc_hits}" \
   "Add a top module doc /-! # ... -/ after imports."
+
+# ── Summary ───────────────────────────────────────────────────
 
 echo ""
 print_section "Summary"

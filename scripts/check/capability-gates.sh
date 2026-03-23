@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
+# Consolidated capability gate checks for theorem-pack conformance.
+# Verifies that Lean theorem-pack modules carry the required capability
+# slots, conformance tests, and counterexample regressions for each gate.
 set -euo pipefail
 
-# Consolidated capability gate checks for theorem-pack conformance.
 # Usage:
 #   ./scripts/check/capability-gates.sh [--all|--byzantine|--delegation|--envelope|--failure|--contracts|--speculation]
 #
@@ -19,9 +21,12 @@ cd "${ROOT_DIR}"
 
 MODE="${1:---all}"
 
+# ── Counters and Helpers ──────────────────────────────────────
+
 checks=0
 failures=0
 
+# Run a silent pass/fail check with description
 check() {
   local desc="$1"
   local cmd="$2"
@@ -34,6 +39,7 @@ check() {
   fi
 }
 
+# Run a verbose check that prints the section name
 run_check() {
   local name="$1"
   local cmd="$2"
@@ -48,6 +54,7 @@ run_check() {
   echo
 }
 
+# Abort if ripgrep is not installed
 require_ripgrep() {
   if ! command -v rg >/dev/null 2>&1; then
     echo "error: ripgrep (rg) is required" >&2
@@ -55,25 +62,23 @@ require_ripgrep() {
   fi
 }
 
+# Resolve the mathlib4 checkout path from dependency_pins.json
 mathlib_checkout_path() {
-  python3 - "${ROOT_DIR}/lean/dependency_pins.json" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-pins = json.loads(Path(sys.argv[1]).read_text())
-for dep in pins.get("dependencies", []):
-    if dep.get("name") == "mathlib4":
-        path = dep.get("path")
-        if not isinstance(path, str):
-            raise SystemExit("error: mathlib4 dependency pin path must be a string")
-        print(path)
-        raise SystemExit(0)
-
-raise SystemExit("error: missing mathlib4 dependency pin")
-PY
+  local pins_file="${ROOT_DIR}/lean/dependency_pins.json"
+  local path
+  path="$(jq -r '.dependencies[]? | select(.name == "mathlib4") | .path' "$pins_file")"
+  if [[ -z "$path" || "$path" == "null" ]]; then
+    echo "error: missing mathlib4 dependency pin" >&2
+    return 1
+  fi
+  if ! jq -e '.dependencies[]? | select(.name == "mathlib4") | .path | type == "string"' "$pins_file" >/dev/null 2>&1; then
+    echo "error: mathlib4 dependency pin path must be a string" >&2
+    return 1
+  fi
+  printf '%s\n' "$path"
 }
 
+# Abort if prebuilt mathlib4 oleans are not available
 require_mathlib_cache() {
   local mathlib_path
   mathlib_path="$(mathlib_checkout_path)"
@@ -85,7 +90,7 @@ require_mathlib_cache() {
   fi
 }
 
-# --- Byzantine Capability Checks ---
+# ── Byzantine Capability Checks ───────────────────────────────
 check_byzantine() {
   require_ripgrep
   require_mathlib_cache
@@ -138,7 +143,7 @@ check_byzantine() {
   echo "OK   Distributed.Tests.ByzantineConformance type-checks successfully"
 }
 
-# --- Delegation/Shard Checks ---
+# ── Delegation/Shard Checks ───────────────────────────────────
 check_delegation() {
   echo "== Delegation Shard Gate =="
   local cooperative_target_dir="${ROOT_DIR}/target/capability-gates/cooperative"
@@ -151,7 +156,7 @@ check_delegation() {
     "CARGO_TARGET_DIR='${threaded_target_dir}' TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread delegation_handoff_guard_rejects_ambiguous_endpoint_ownership"
 }
 
-# --- Envelope Capability Checks ---
+# ── Envelope Capability Checks ────────────────────────────────
 check_envelope() {
   require_ripgrep
   require_mathlib_cache
@@ -221,7 +226,7 @@ check_envelope() {
   echo "OK   Runtime.Tests.Main executes successfully"
 }
 
-# --- Failure Capability Checks ---
+# ── Failure Capability Checks ─────────────────────────────────
 check_failure() {
   require_ripgrep
   local FAILURE_FILE="${ROOT_DIR}/lean/Runtime/VM/Runtime/Failure.lean"
@@ -287,7 +292,7 @@ check_failure() {
     "rg -q 'check-capability-gates' '${ROOT_DIR}/justfile'"
 }
 
-# --- Runtime Contract Checks ---
+# ── Runtime Contract Checks ───────────────────────────────────
 check_contracts() {
   require_ripgrep
   require_mathlib_cache
@@ -334,7 +339,7 @@ check_contracts() {
   fi
 }
 
-# --- Speculation/WP Surface Checks ---
+# ── Speculation/WP Surface Checks ─────────────────────────────
 check_speculation() {
   require_ripgrep
   require_mathlib_cache
@@ -392,7 +397,7 @@ check_speculation() {
   echo "OK   speculation/WP target modules build successfully"
 }
 
-# --- Main ---
+# ── Main ──────────────────────────────────────────────────────
 case "${MODE}" in
   --all)
     check_byzantine

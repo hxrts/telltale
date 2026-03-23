@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
+# Generate a Lean style baseline report analyzing conformance across
+# multiple criteria (headers, docstrings, file length, imports, etc.).
 set -euo pipefail
 
+# ── Paths & Dependencies ──────────────────────────────────────────────
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LEAN_DIR="${ROOT_DIR}/lean"
 OUT_FILE="${ROOT_DIR}/artifacts/lean_style_baseline.md"
@@ -10,6 +13,7 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 2
 fi
 
+# ── Discover Lean Modules ──────────────────────────────────────────────
 EXCLUDE_REGEX='/(Examples|Tests)/|MutualTest|LocalTypeDBExamples\.lean'
 
 FILES=()
@@ -19,6 +23,7 @@ while IFS= read -r f; do
 done < <(find "$LEAN_DIR" -type f -name '*.lean' -not -path '*/.lake/*' -not -path '*/target/*' | sort | rg -v "$EXCLUDE_REGEX" || true)
 TOTAL_FILES="${#FILES[@]}"
 
+# ── Criteria Definitions ───────────────────────────────────────────────
 CRITERIA=(
   "problem_headers"
   "section_headers"
@@ -41,6 +46,7 @@ LABELS=(
   "Has ## Expose block"
 )
 
+# ── Scoring State ──────────────────────────────────────────────────────
 PASS_COUNTS=()
 FAIL_COUNTS=()
 for ((i=0; i<${#CRITERIA[@]}; i++)); do
@@ -48,6 +54,7 @@ for ((i=0; i<${#CRITERIA[@]}; i++)); do
   FAIL_COUNTS+=(0)
 done
 
+# ── Temp Files ─────────────────────────────────────────────────────────
 TMP_DIR="$(mktemp -d)"
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -58,11 +65,15 @@ for crit in "${CRITERIA[@]}"; do
   : > "${TMP_DIR}/${crit}.fails"
 done
 
+# ── Helpers ───────────────────────────────────────────────────────────
+
+# Longest consecutive run of non-blank lines in a file
 max_nonblank_run() {
   local file="$1"
   awk 'NF { run += 1; if (run > max) max = run; next } { run = 0 } END { print max + 0 }' "$file"
 }
 
+# Record pass/fail for a single criterion on a single file
 record_result() {
   local idx="$1"
   local ok="$2"
@@ -76,6 +87,7 @@ record_result() {
   fi
 }
 
+# ── Evaluate Each Module ───────────────────────────────────────────────
 for file in "${FILES[@]}"; do
   rel="${file#${ROOT_DIR}/}"
   lines="$(wc -l < "$file" | tr -d ' ')"
@@ -114,6 +126,7 @@ for file in "${FILES[@]}"; do
   record_result 7 "$ok" "$rel"
 done
 
+# ── Emit Report ───────────────────────────────────────────────────────
 {
   echo "# Lean Style Baseline"
   echo ""

@@ -1,24 +1,26 @@
 #!/usr/bin/env bash
+# Detect stale backtick references in docs: unknown just recipes, missing file
+# paths, unresolved symbols, feature table mismatches, and version drift.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-# ── Temp directory for working files ────────────────────────────────
+# ── Temp Directory ────────────────────────────────────────────────────
 TMPDIR_DRIFT="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_DRIFT"' EXIT
 
 ERRORS_FILE="$TMPDIR_DRIFT/errors"
 touch "$ERRORS_FILE"
 
-# ── Collect doc files ───────────────────────────────────────────────
+# ── Collect Doc Files ─────────────────────────────────────────────────
 DOC_FILES=()
 [[ -f CLAUDE.md ]] && DOC_FILES+=(CLAUDE.md)
 while IFS= read -r f; do
     DOC_FILES+=("$f")
 done < <(find docs -name '*.md' -type f 2>/dev/null | sort)
 
-# ── Cargo metadata via jq ──────────────────────────────────────────
+# ── Cargo Metadata ────────────────────────────────────────────────────
 CARGO_META="$TMPDIR_DRIFT/cargo_meta.json"
 cargo metadata --no-deps --format-version 1 > "$CARGO_META"
 
@@ -31,10 +33,10 @@ cat "$TMPDIR_DRIFT/pkg_names" "$TMPDIR_DRIFT/pkg_names_underscore" | sort -u > "
 # Package versions: name<TAB>version
 jq -r '.packages[] | "\(.name)\t\(.version)"' "$CARGO_META" > "$TMPDIR_DRIFT/pkg_versions"
 
-# ── Just recipes ────────────────────────────────────────────────────
+# ── Just Recipes ──────────────────────────────────────────────────────
 just --summary | tr ' ' '\n' | sort -u > "$TMPDIR_DRIFT/just_recipes"
 
-# ── Build identifier set from Rust and Lean sources ─────────────────
+# ── Build Identifier Set ──────────────────────────────────────────────
 {
     for base_dir in src rust; do
         [[ -d "$base_dir" ]] && find "$base_dir" -name '*.rs' -type f -exec grep -ohP '\b[A-Za-z_][A-Za-z0-9_]*\b' {} + || true
@@ -42,7 +44,8 @@ just --summary | tr ' ' '\n' | sort -u > "$TMPDIR_DRIFT/just_recipes"
     [[ -d lean ]] && find lean -name '*.lean' -type f -exec grep -ohP '\b[A-Za-z_][A-Za-z0-9_]*\b' {} + || true
 } | sort -u > "$TMPDIR_DRIFT/repo_identifiers"
 
-# ── Skip identifiers (well-known types, traits, keywords) ──────────
+# ── Skip Identifiers ──────────────────────────────────────────────────
+# Well-known types, traits, keywords that should not trigger warnings.
 cat > "$TMPDIR_DRIFT/skip_identifiers" <<'SKIP'
 String
 Vec
@@ -184,7 +187,8 @@ Full
 SKIP
 sort -u "$TMPDIR_DRIFT/skip_identifiers" -o "$TMPDIR_DRIFT/skip_identifiers"
 
-# ── External prefixes for qualified paths ───────────────────────────
+# ── External Prefixes ─────────────────────────────────────────────────
+# Qualified paths starting with these are from external crates.
 cat > "$TMPDIR_DRIFT/external_prefixes" <<'EXT'
 std
 core
@@ -202,18 +206,19 @@ tempfile
 proc_macro2
 EXT
 
-# ── Deprecated identifiers (name<TAB>reason) ───────────────────────
-# Add entries here as identifiers are removed or renamed, e.g.:
-# OldTypeName	removed in v6.0, replaced by NewTypeName
+# ── Deprecated Identifiers ────────────────────────────────────────────
+# name<TAB>reason. Add entries as identifiers are removed or renamed.
 cat > "$TMPDIR_DRIFT/deprecated_identifiers" <<'DEP'
 DEP
 
-# ── Helper: check if value is in a sorted file ──────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────
+
+# Check if value is in a sorted file.
 in_set() {
     grep -qFx "$1" "$2" 2>/dev/null
 }
 
-# ── Helper: check if snippet looks like a file path ─────────────────
+# Check if snippet looks like a file path.
 looks_like_path() {
     local s="$1"
     case "$s" in
@@ -223,7 +228,7 @@ looks_like_path() {
     esac
 }
 
-# ── Helper: extract symbol tail from qualified path ──────────────────
+# Extract the last segment from a qualified path (after final ::).
 normalized_symbol_tail() {
     local snippet="$1"
     # Get the last segment after ::
@@ -234,7 +239,7 @@ normalized_symbol_tail() {
     fi
 }
 
-# ── Scan doc files for backtick code spans ──────────────────────────
+# ── Scan Backtick Code Spans ──────────────────────────────────────────
 for doc_file in "${DOC_FILES[@]}"; do
     line_no=0
     while IFS= read -r line; do
@@ -349,9 +354,8 @@ for doc_file in "${DOC_FILES[@]}"; do
     done < "$doc_file"
 done
 
-# ── Feature table accuracy ──────────────────────────────────────────
-# Parse feature tables from docs/02_getting_started.md and compare
-# documented features against actual Cargo features for target crates.
+# ── Feature Table Accuracy ────────────────────────────────────────────
+# Compare documented features against actual Cargo features.
 
 GETTING_STARTED="docs/02_getting_started.md"
 if [[ -f "$GETTING_STARTED" ]]; then
@@ -519,10 +523,8 @@ telltale-lean-bridge"
     done <<< "$TARGET_CRATES"
 fi
 
-# ── Crate version accuracy ──────────────────────────────────────────
-# Scan docs/ and rust/transport/README.md for dependency declarations
-# like `crate_name = "version"` or `crate_name = { version = "version" }`
-# and compare against actual workspace versions.
+# ── Crate Version Accuracy ────────────────────────────────────────────
+# Compare version strings in docs against actual workspace versions.
 
 VERSION_CHECK_FILES=()
 while IFS= read -r f; do
@@ -564,7 +566,7 @@ for vpath in "${VERSION_CHECK_FILES[@]}"; do
     done < "$vpath"
 done
 
-# ── Report results ──────────────────────────────────────────────────
+# ── Report ────────────────────────────────────────────────────────────
 if [[ -s "$ERRORS_FILE" ]]; then
     cat "$ERRORS_FILE" >&2
     exit 1

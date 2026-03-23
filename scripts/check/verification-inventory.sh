@@ -1,76 +1,114 @@
 #!/usr/bin/env bash
+# Verify that docs/32_verification_inventory.md metrics match actual values
+# derived from CODE_MAP.md, justfile recipe counts, and macro UI fixture counts.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-python3 <<'PY'
-from __future__ import annotations
+errors=()
 
-import re
-import sys
-from pathlib import Path
+# ── Helpers ───────────────────────────────────────────────────────────
 
-root = Path.cwd()
-doc_path = root / "docs/32_verification_inventory.md"
-code_map = (root / "lean/CODE_MAP.md").read_text(encoding="utf-8")
-justfile = (root / "justfile").read_text(encoding="utf-8")
-macro_ui = (root / "rust/macros/tests/macro_ui.rs").read_text(encoding="utf-8")
-doc_text = doc_path.read_text(encoding="utf-8")
-
-total_match = re.search(
-    r"\|\s+\*\*Total\*\*\s+\|\s+\*\*(?P<files>[0-9,]+)\*\*\s+\|\s+\*\*(?P<lines>[0-9,]+)\*\*",
-    code_map,
-)
-if not total_match:
-    raise SystemExit("failed to parse lean/CODE_MAP.md total metrics")
-
-def metric_value(name: str) -> int:
-    pattern = re.compile(rf"\|\s*{re.escape(name)}\s*\|\s*([0-9,]+)\s*\|")
-    match = pattern.search(doc_text)
-    if not match:
-        raise SystemExit(f"missing metric row in docs/32_verification_inventory.md: {name}")
-    return int(match.group(1).replace(",", ""))
-
-def recipe_command_count(recipe: str) -> int:
-    lines = justfile.splitlines()
-    count = 0
-    in_recipe = False
-    for line in lines:
-        if in_recipe:
-            if line.startswith(" ") or line.startswith("\t"):
-                stripped = line.strip()
-                if stripped and not stripped.startswith("#"):
-                    count += 1
-                continue
-            break
-        if re.match(rf"^{re.escape(recipe)}(?::|\s)", line):
-            in_recipe = True
-    if not in_recipe:
-        raise SystemExit(f"missing just recipe: {recipe}")
-    return count
-
-actual = {
-    "Lean core-library files": int(total_match.group("files").replace(",", "")),
-    "Lean core-library lines": int(total_match.group("lines").replace(",", "")),
-    "Ownership contract gate commands": recipe_command_count("check-ownership-contracts"),
-    "Aura-derived boundary checks": recipe_command_count("check-aura-borrowed-lints"),
-    "Macro UI pass fixtures": len(re.findall(r'\bt\.pass\(', macro_ui)),
-    "Macro UI compile-fail fixtures": len(re.findall(r'\bt\.compile_fail\(', macro_ui)),
+# Extract the documented value for a named metric from the inventory doc.
+# Usage: metric_value "Metric name"
+metric_value() {
+  local name="$1"
+  local row
+  row=$(grep -E "^\|[[:space:]]*${name}[[:space:]]*\|" docs/32_verification_inventory.md) || true
+  if [[ -z "$row" ]]; then
+    echo "missing metric row in docs/32_verification_inventory.md: ${name}" >&2
+    exit 1
+  fi
+  # Extract the numeric value column (second pipe-delimited field), strip commas
+  echo "$row" | sed 's/|/|/g' | awk -F'|' '{gsub(/[^0-9]/, "", $3); print $3}'
 }
 
-errors = []
-for name, expected in actual.items():
-    documented = metric_value(name)
-    if documented != expected:
-        errors.append(
-            f"docs/32_verification_inventory.md: metric `{name}` documents {documented} but actual is {expected}"
-        )
+# Count non-comment, non-blank indented lines in a justfile recipe body.
+# Usage: recipe_command_count "recipe-name"
+recipe_command_count() {
+  local recipe="$1"
+  local in_recipe=0
+  local count=0
+  while IFS= read -r line; do
+    if [[ "$in_recipe" -eq 1 ]]; then
+      # Recipe body lines start with space or tab
+      if [[ "$line" =~ ^[[:space:]] ]]; then
+        local stripped
+        stripped="${line#"${line%%[![:space:]]*}"}"
+        # Skip blank and comment lines
+        if [[ -n "$stripped" && ! "$stripped" =~ ^# ]]; then
+          count=$((count + 1))
+        fi
+        continue
+      else
+        break
+      fi
+    fi
+    # Match recipe header: name followed by colon or whitespace
+    if [[ "$line" =~ ^${recipe}(:|[[:space:]]) ]]; then
+      in_recipe=1
+    fi
+  done < justfile
+  if [[ "$in_recipe" -eq 0 ]]; then
+    echo "missing just recipe: ${recipe}" >&2
+    exit 1
+  fi
+  echo "$count"
+}
 
-if errors:
-    for error in errors:
-        print(error, file=sys.stderr)
-    sys.exit(1)
+# Compare a documented value against an actual value.
+# Usage: check_metric "Metric name" actual_value
+check_metric() {
+  local name="$1"
+  local actual="$2"
+  local documented
+  documented=$(metric_value "$name")
+  if [[ "$documented" -ne "$actual" ]]; then
+    errors+=("docs/32_verification_inventory.md: metric \`${name}\` documents ${documented} but actual is ${actual}")
+  fi
+}
 
-print("verification inventory check passed")
-PY
+# ── Lean CODE_MAP.md Total Metrics ────────────────────────────────────
+
+total_row=$(grep -E '^\|[[:space:]]+\*\*Total\*\*[[:space:]]+\|[[:space:]]+\*\*[0-9,]+\*\*[[:space:]]+\|[[:space:]]+\*\*[0-9,]+\*\*' lean/CODE_MAP.md | head -1) || true
+if [[ -z "$total_row" ]]; then
+  echo "failed to parse lean/CODE_MAP.md total metrics" >&2
+  exit 1
+fi
+
+# Extract files count (second bold value) and lines count (third bold value)
+actual_files=$(echo "$total_row" | sed 's/[*,]//g' | awk -F'|' '{gsub(/[^0-9]/, "", $3); print $3}')
+actual_lines=$(echo "$total_row" | sed 's/[*,]//g' | awk -F'|' '{gsub(/[^0-9]/, "", $4); print $4}')
+
+check_metric "Lean core-library files" "$actual_files"
+check_metric "Lean core-library lines" "$actual_lines"
+
+# ── Justfile Recipe Command Counts ────────────────────────────────────
+
+actual_ownership=$(recipe_command_count "check-ownership-contracts")
+actual_aura=$(recipe_command_count "check-aura-borrowed-lints")
+
+check_metric "Ownership contract gate commands" "$actual_ownership"
+check_metric "Aura-derived boundary checks" "$actual_aura"
+
+# ── Macro UI Fixture Counts ───────────────────────────────────────────
+
+macro_ui_file="rust/macros/tests/macro_ui.rs"
+
+actual_pass=$(grep -c '\bt\.pass(' "$macro_ui_file" || echo 0)
+actual_fail=$(grep -c '\bt\.compile_fail(' "$macro_ui_file" || echo 0)
+
+check_metric "Macro UI pass fixtures" "$actual_pass"
+check_metric "Macro UI compile-fail fixtures" "$actual_fail"
+
+# ── Report ────────────────────────────────────────────────────────────
+
+if [[ ${#errors[@]} -gt 0 ]]; then
+  for err in "${errors[@]}"; do
+    echo "$err" >&2
+  done
+  exit 1
+fi
+
+echo "verification inventory check passed"

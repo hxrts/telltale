@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Rust architecture and style conformance checker.
+# Scans Rust workspace sources for unsafe usage, determinism violations,
+# numeric safety issues, structural metrics, and style-guide adherence.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -9,6 +12,8 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 2
 fi
 
+# ── Output Helpers ────────────────────────────────────────────
+
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 GREEN='\033[0;32m'
@@ -18,6 +23,8 @@ NC='\033[0m'
 errors=0
 warnings=0
 summary_lines=""
+
+# ── Scope Definitions ─────────────────────────────────────────
 
 DETERMINISM_RUNTIME_SCOPE=(
   "${RUST_DIR}/vm/src"
@@ -424,6 +431,8 @@ scan_lock_await_hits() {
   ' "$file"
 }
 
+# ── Rust Architectural Style Checks ───────────────────────────
+
 print_section "Rust Architectural Style Checks"
 echo "Scanning: ${RUST_DIR}"
 
@@ -595,6 +604,8 @@ limit_constant_hits="$(awk '
   }
 ' $(find "${RUST_DIR}" -name '*.rs' -type f | grep -v '/tests/' | grep -v '/benches/' ) || true)"
 print_hits "warning" "limit-style constants without explicit unit tokens" "${limit_constant_hits}" "Rename constants to include units (for example, *_MS, *_BYTES, *_COUNT, *_TICKS) so bounds are unambiguous."
+
+# ── File and Block Size Checks ────────────────────────────────
 
 print_section "File and Block Size Checks"
 
@@ -807,6 +818,8 @@ vm_core_allow_hits="$(rg -n --pcre2 '^[[:space:]]*#[[:space:]]*\\[[[:space:]]*al
 vm_core_allow_hits="$(printf '%s\n' "${vm_core_allow_hits}" | rg -v 'clippy::(as_conversions|derivable_impls|field_reassign_with_default)' || true)"
 print_hits "warning" "broad clippy allow annotations in vm core paths" "${vm_core_allow_hits}" "Remove broad vm-core lint suppressions or replace them with smaller helper refactors. Keep only narrowly justified allows with an adjacent rationale comment."
 
+# ── Numeric Safety Checks ─────────────────────────────────────
+
 print_section "Numeric Safety Checks"
 
 # 11) Fixed-point policy: use only telltale_types::FixedQ32 wrapper API.
@@ -820,6 +833,8 @@ print_hits "error" "float-typed fields in config/schema definitions" "${config_f
 # 13) Strict fixed-point config decoding: FixedQ32 must not accept float tokens.
 fixed_q32_float_decode_hits="$(rg -n --pcre2 'visit_f(32|64)\s*\(' "${RUST_DIR}/types/src/fixed_q32.rs" || true)"
 print_hits "error" "FixedQ32 float-token deserialization path" "${fixed_q32_float_decode_hits}" "Reject JSON float tokens for FixedQ32 deserialization; accept deterministic encodings only (decimal strings or explicit fixed-point integer forms)."
+
+# ── Determinism and Effects Checks ────────────────────────────
 
 print_section "Determinism and Effects Checks"
 echo "Determinism runtime scope:"

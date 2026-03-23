@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
+# Release conformance gate checks.
+# Validates that theorem-pack release infrastructure (optimization envelopes,
+# certified replay, failure witnesses, evidence gates) is properly defined,
+# exported, tested, and wired into the CI/Justfile pipeline.
 set -euo pipefail
+
+# ── Paths ─────────────────────────────────────────────────────
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RELEASE_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/ReleaseConformance.lean"
@@ -14,9 +20,12 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 2
 fi
 
+# ── Counters and Helpers ──────────────────────────────────────
+
 errors=0
 checks=0
 
+# Run a pass/fail check with description
 check() {
   local desc="$1"
   local cmd="$2"
@@ -28,6 +37,8 @@ check() {
     echo "FAIL ${desc}"
   fi
 }
+
+# ── Release Conformance Checks ────────────────────────────────
 
 echo "== Release Conformance =="
 
@@ -72,6 +83,8 @@ check "Justfile includes release conformance check target" \
   "rg -q '^check-release-conformance:' '${JUSTFILE}' && \
    rg -q 'just check-release-conformance' '${JUSTFILE}'"
 
+# ── Lean Type-Check ───────────────────────────────────────────
+
 if command -v lake >/dev/null 2>&1; then
   echo "Type-checking release-conformance Lean modules..."
   (
@@ -90,6 +103,8 @@ elif command -v elan >/dev/null 2>&1; then
 else
   echo "WARN skipping Lean type-check in release-conformance script (no lake/elan)"
 fi
+
+# ── Report Export ─────────────────────────────────────────────
 
 mkdir -p "$(dirname "${REPORT_FILE}")"
 inventory_keys=()
@@ -116,6 +131,8 @@ done < <(
   echo "}"
 } > "${REPORT_FILE}"
 echo "OK   release conformance report exported: ${REPORT_FILE}"
+
+# ── Release-Tagged Mode ───────────────────────────────────────
 
 if [[ "${TT_RELEASE_TAGGED:-0}" == "1" ]]; then
   check "release-tagged mode enforces failure capability lane" \

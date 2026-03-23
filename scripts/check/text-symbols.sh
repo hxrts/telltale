@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
+# Find and optionally replace problematic Unicode text symbols (smart quotes,
+# em dashes, emoji) in tracked files. Supports --replace mode for auto-fix.
 set -euo pipefail
 
+# ── Options ───────────────────────────────────────────────────────────
 REPLACE_MODE=false
 if [[ "${1:-}" == "--replace" ]]; then
   REPLACE_MODE=true
 fi
 
+# ── Prerequisites ─────────────────────────────────────────────────────
 if ! command -v git >/dev/null 2>&1; then
   echo "error: git is required" >&2
   exit 2
@@ -16,11 +20,13 @@ if ! command -v grep >/dev/null 2>&1; then
   exit 2
 fi
 
+# ── Constants ─────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
 
+# Portable in-place sed (GNU vs BSD).
 if sed --version >/dev/null 2>&1; then
   SED_INPLACE="sed -i"
 else
@@ -32,6 +38,7 @@ found_any=false
 echo "Scanning tracked files for emoji/symbol drift..."
 echo
 
+# ── Replace Mode ──────────────────────────────────────────────────────
 if [[ "$REPLACE_MODE" == true ]]; then
   check_count=0
   x_count=0
@@ -78,6 +85,7 @@ if [[ "$REPLACE_MODE" == true ]]; then
   echo
 fi
 
+# ── Scan ──────────────────────────────────────────────────────────────
 while IFS= read -r file; do
   if [[ "$file" == "scripts/check/text-symbols.sh" ]]; then
     continue
@@ -97,6 +105,7 @@ while IFS= read -r file; do
   fi
 done < <(git ls-files)
 
+# ── Report ────────────────────────────────────────────────────────────
 if [[ "$found_any" == false ]]; then
   echo -e "${GREEN}No disallowed emojis found in tracked files.${NC}"
 else

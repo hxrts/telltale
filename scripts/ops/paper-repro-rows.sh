@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
+# Generate or check LaTeX table rows for paper reproducibility data
+# (commit hashes, archival DOIs, Lean stats). Supports --print, --sync, --check.
 set -euo pipefail
 
+# ── Paths & Metadata ──────────────────────────────────────────────────
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 METADATA_FILE="${ROOT_DIR}/papers/artifact_metadata.env"
 
@@ -15,6 +18,7 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 2
 fi
 
+# ── Usage ──────────────────────────────────────────────────────────────
 usage() {
   cat <<EOF
 usage:
@@ -25,6 +29,9 @@ usage:
 EOF
 }
 
+# ── Helpers ───────────────────────────────────────────────────────────
+
+# Format a git hash as breakable \texttt{} chunks for LaTeX
 format_commit_tex() {
   local hash="$1"
   local out=""
@@ -42,6 +49,7 @@ format_commit_tex() {
   printf '%s' "${out}"
 }
 
+# ── Build Row Data ─────────────────────────────────────────────────────
 CURRENT_COMMIT="$(git -C "${ROOT_DIR}" rev-parse HEAD)"
 COMMIT_TEX="$(format_commit_tex "${CURRENT_COMMIT}")"
 COMMIT_ROW="Pinned commit & ${COMMIT_TEX} \\\\"
@@ -51,6 +59,7 @@ COMMIT_ROW_AWK="$(printf '%s' "${COMMIT_ROW}" | sed 's/\\/\\\\/g')"
 DOI_ROW_AWK="$(printf '%s' "${DOI_ROW}" | sed 's/\\/\\\\/g')"
 LEAN_ROW_AWK="$(printf '%s' "${LEAN_ROW}" | sed 's/\\/\\\\/g')"
 
+# Replace reproducibility rows in a .tex file with current values
 sync_one() {
   local tex="$1"
   local tmp
@@ -96,6 +105,7 @@ sync_one() {
   mv "${tmp}" "${tex}"
 }
 
+# Verify a .tex file contains expected row values
 check_one() {
   local tex="$1"
   if ! rg -Fq "${COMMIT_ROW}" "${tex}"; then
@@ -115,6 +125,7 @@ check_one() {
   fi
 }
 
+# ── Dispatch ───────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--print" ]]; then
   cat <<EOF
 ${COMMIT_ROW}

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
+# Consolidated Lean/Rust cross-runtime parity checks.
+# Compares type shapes (enum variants, struct fields) between Lean and Rust,
+# runs the VM differential parity test suite, and validates CI gate markers.
 set -euo pipefail
 
-# Consolidated Lean/Rust parity checks.
 # Usage:
 #   ./scripts/check/cross-runtime-parity.sh [--all|--types|--suite|--conformance]
 #
@@ -15,6 +17,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
 MODE="${1:---all}"
+
+# ── Counters and Helpers ──────────────────────────────────────
 
 checks=0
 failures=0
@@ -33,306 +37,347 @@ run_check() {
   echo
 }
 
-# --- Type Shape Parity (from parity-ledger.sh) ---
+# ── Type Shape Parity ─────────────────────────────────────────
 check_types() {
-  python3 - "${ROOT_DIR}" <<'PY'
-import re
-import sys
-from pathlib import Path
+  local mismatches=()
 
-root = Path(sys.argv[1])
+  # ── Parser helpers ─────────────────────────────────────────
 
+  # parse_lean_inductive_variants FILE TYPE_NAME
+  # Prints one variant name per line.
+  parse_lean_inductive_variants() {
+    local file="$1" type_name="$2"
+    awk -v tname="$type_name" '
+      BEGIN { in_block = 0; found = 0 }
+      !in_block {
+        if ($0 ~ "^[[:space:]]*inductive[[:space:]]+" tname "[[:space:]]+where") {
+          in_block = 1
+        }
+        next
+      }
+      /^[[:space:]]*\|[[:space:]]*[A-Za-z_][A-Za-z0-9_]*/ {
+        line = $0
+        sub(/^[[:space:]]*\|[[:space:]]*/, "", line)
+        sub(/[[:space:]].*/, "", line)
+        print line
+        found = 1
+        next
+      }
+      found && /^[[:space:]]*(private[[:space:]]+|protected[[:space:]]+)?(def|theorem|lemma|structure|class|instance|abbrev|inductive|namespace|open|set_option|universe)/ {
+        exit
+      }
+    ' "$file"
+  }
 
-def fail(msg: str) -> None:
-    print(f"ERROR: {msg}")
-    sys.exit(1)
+  # parse_rust_enum_variants FILE ENUM_NAME
+  # Prints one variant name per line.
+  parse_rust_enum_variants() {
+    local file="$1" enum_name="$2"
+    awk -v ename="$enum_name" '
+      BEGIN { in_block = 0; depth = 0 }
+      !in_block {
+        if ($0 ~ "^[[:space:]]*pub[[:space:]]+enum[[:space:]]+" ename "[[:space:]]*\\{") {
+          in_block = 1
+          depth = gsub(/\{/, "{") - gsub(/\}/, "}")
+        }
+        next
+      }
+      {
+        depth += gsub(/\{/, "{") - gsub(/\}/, "}")
+        code = $0
+        sub(/\/\/.*/, "", code)        # strip line comments
+        gsub(/^[[:space:]]+/, "", code) # strip leading whitespace
+        gsub(/[[:space:]]+$/, "", code) # strip trailing whitespace
+        if (code != "" && code !~ /^#/ && code !~ /^\/\/\//) {
+          if (match(code, /^([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*[({,]/, arr)) {
+            print arr[1]
+          }
+        }
+        if (depth <= 0) exit
+      }
+    ' "$file"
+  }
 
+  # parse_lean_structure_fields FILE STRUCT_NAME
+  # Prints one field name per line.
+  parse_lean_structure_fields() {
+    local file="$1" struct_name="$2"
+    awk -v sname="$struct_name" '
+      BEGIN { in_block = 0; found = 0 }
+      !in_block {
+        if ($0 ~ "^[[:space:]]*structure[[:space:]]+" sname "([[:space:]]|$)" && $0 ~ "(^|[[:space:]])where([[:space:]]|$)") {
+          in_block = 1
+        }
+        next
+      }
+      {
+        code = $0
+        sub(/--.*/, "", code)           # strip Lean comments
+        gsub(/^[[:space:]]+/, "", code)
+        gsub(/[[:space:]]+$/, "", code)
+        if (code == "") next
+        if (match(code, /^([A-Za-z_][A-Za-z0-9_'"'"']*)[[:space:]]*:[[:space:]]*/)) {
+          field = code
+          sub(/[[:space:]]*:.*/, "", field)
+          print field
+          found = 1
+          next
+        }
+        if (found && code ~ /^(private[[:space:]]+|protected[[:space:]]+)?(def|theorem|lemma|structure|class|instance|abbrev|inductive|namespace|open|set_option|universe)/) {
+          exit
+        }
+      }
+    ' "$file"
+  }
 
-def parse_lean_inductive_variants(path: Path, inductive_name: str) -> list[str]:
-    text = path.read_text(encoding="utf-8")
-    lines = text.splitlines()
-    start_re = re.compile(rf"^\s*inductive\s+{re.escape(inductive_name)}\s+where\b")
-    variant_re = re.compile(r"^\s*\|\s*([A-Za-z_][A-Za-z0-9_]*)")
-    stop_re = re.compile(
-        r"^\s*(?:(?:private|protected)\s+)?"
-        r"(def|theorem|lemma|structure|class|instance|abbrev|inductive|namespace|open|set_option|universe)\b"
-    )
+  # parse_rust_struct_fields FILE STRUCT_NAME
+  # Prints one field name per line.
+  parse_rust_struct_fields() {
+    local file="$1" struct_name="$2"
+    awk -v sname="$struct_name" '
+      BEGIN { in_block = 0; depth = 0 }
+      !in_block {
+        if ($0 ~ "^[[:space:]]*pub[[:space:]]+struct[[:space:]]+" sname "(<[^>]+>)?[[:space:]]*\\{") {
+          in_block = 1
+          depth = gsub(/\{/, "{") - gsub(/\}/, "}")
+        }
+        next
+      }
+      {
+        depth += gsub(/\{/, "{") - gsub(/\}/, "}")
+        code = $0
+        sub(/\/\/.*/, "", code)
+        gsub(/^[[:space:]]+/, "", code)
+        gsub(/[[:space:]]+$/, "", code)
+        if (match(code, /^pub[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*:/, arr)) {
+          print arr[1]
+        }
+        if (depth <= 0) exit
+      }
+    ' "$file"
+  }
 
-    in_block = False
-    variants: list[str] = []
-    for line in lines:
-        if not in_block:
-            if start_re.match(line):
-                in_block = True
-            continue
+  # ucfirst STRING — capitalize first letter
+  ucfirst() {
+    local s="$1"
+    if [[ -z "$s" ]]; then
+      echo ""
+    else
+      echo "$(echo "${s:0:1}" | tr '[:lower:]' '[:upper:]')${s:1}"
+    fi
+  }
 
-        match = variant_re.match(line)
-        if match:
-            variants.append(match.group(1))
-            continue
+  # normalize_lean_variant NAME MAP_KEYS MAP_VALUES
+  # MAP_KEYS and MAP_VALUES are parallel |-delimited lists.
+  normalize_lean_variant() {
+    local name="$1" map_keys="$2" map_vals="$3"
+    if [[ -n "$map_keys" ]]; then
+      IFS='|' read -ra keys <<< "$map_keys"
+      IFS='|' read -ra vals <<< "$map_vals"
+      for i in "${!keys[@]}"; do
+        if [[ "$name" == "${keys[$i]}" ]]; then
+          echo "${vals[$i]}"
+          return
+        fi
+      done
+    fi
+    ucfirst "$name"
+  }
 
-        if variants and stop_re.match(line):
+  # sorted_unique — sort lines and deduplicate
+  sorted_unique() {
+    sort -u
+  }
+
+  # set_diff A B — lines in A not in B (inputs must be sorted)
+  set_diff() {
+    comm -23 <(echo "$1") <(echo "$2")
+  }
+
+  # compare_enum LABEL LEAN_FILE LEAN_TYPE RUST_FILE RUST_TYPE MAP_KEYS MAP_VALS
+  compare_enum() {
+    local label="$1" lean_file="$2" lean_type="$3" rust_file="$4" rust_type="$5"
+    local map_keys="$6" map_vals="$7"
+
+    local lean_raw rust_raw
+    lean_raw="$(parse_lean_inductive_variants "$lean_file" "$lean_type")"
+    if [[ -z "$lean_raw" ]]; then
+      echo "ERROR: could not parse Lean variants for ${lean_type} in ${lean_file}"
+      exit 1
+    fi
+    rust_raw="$(parse_rust_enum_variants "$rust_file" "$rust_type")"
+    if [[ -z "$rust_raw" ]]; then
+      echo "ERROR: could not parse Rust variants for ${rust_type} in ${rust_file}"
+      exit 1
+    fi
+
+    # Normalize Lean variants through mapping
+    local lean_norm=""
+    while IFS= read -r v; do
+      local nv
+      nv="$(normalize_lean_variant "$v" "$map_keys" "$map_vals")"
+      if [[ -n "$lean_norm" ]]; then
+        lean_norm="${lean_norm}"$'\n'"${nv}"
+      else
+        lean_norm="${nv}"
+      fi
+    done <<< "$lean_raw"
+
+    local lean_sorted rust_sorted
+    lean_sorted="$(echo "$lean_norm" | sorted_unique)"
+    rust_sorted="$(echo "$rust_raw" | sorted_unique)"
+
+    echo "[parity] ${label}: Lean=[${lean_sorted//$'\n'/, }] Rust=[${rust_sorted//$'\n'/, }]"
+
+    local missing_in_lean missing_in_rust
+    missing_in_lean="$(set_diff "$rust_sorted" "$lean_sorted")"
+    missing_in_rust="$(set_diff "$lean_sorted" "$rust_sorted")"
+
+    while IFS= read -r v; do
+      if [[ -n "$v" ]]; then mismatches+=("${label}:missing_in_lean:${v}"); fi
+    done <<< "$missing_in_lean"
+    while IFS= read -r v; do
+      if [[ -n "$v" ]]; then mismatches+=("${label}:missing_in_rust:${v}"); fi
+    done <<< "$missing_in_rust"
+  }
+
+  # compare_struct LABEL LEAN_FILE LEAN_TYPE RUST_FILE RUST_TYPE MAP_KEYS MAP_VALS
+  compare_struct() {
+    local label="$1" lean_file="$2" lean_type="$3" rust_file="$4" rust_type="$5"
+    local map_keys="$6" map_vals="$7"
+
+    local lean_raw rust_raw
+    lean_raw="$(parse_lean_structure_fields "$lean_file" "$lean_type")"
+    if [[ -z "$lean_raw" ]]; then
+      echo "ERROR: could not parse Lean fields for ${lean_type} in ${lean_file}"
+      exit 1
+    fi
+    rust_raw="$(parse_rust_struct_fields "$rust_file" "$rust_type")"
+    if [[ -z "$rust_raw" ]]; then
+      echo "ERROR: could not parse Rust fields for ${rust_type} in ${rust_file}"
+      exit 1
+    fi
+
+    # Normalize Lean field names through mapping (identity if no mapping)
+    local lean_norm=""
+    while IFS= read -r f; do
+      local nf="$f"
+      if [[ -n "$map_keys" ]]; then
+        IFS='|' read -ra keys <<< "$map_keys"
+        IFS='|' read -ra vals <<< "$map_vals"
+        for i in "${!keys[@]}"; do
+          if [[ "$f" == "${keys[$i]}" ]]; then
+            nf="${vals[$i]}"
             break
+          fi
+        done
+      fi
+      if [[ -n "$lean_norm" ]]; then
+        lean_norm="${lean_norm}"$'\n'"${nf}"
+      else
+        lean_norm="${nf}"
+      fi
+    done <<< "$lean_raw"
 
-    if not variants:
-        fail(f"could not parse Lean variants for {inductive_name} in {path}")
-    return variants
+    local lean_sorted rust_sorted
+    lean_sorted="$(echo "$lean_norm" | sorted_unique)"
+    rust_sorted="$(echo "$rust_raw" | sorted_unique)"
 
+    echo "[parity] ${label}: LeanFields=[${lean_sorted//$'\n'/, }] RustFields=[${rust_sorted//$'\n'/, }]"
 
-def parse_rust_enum_variants(path: Path, enum_name: str) -> list[str]:
-    lines = path.read_text(encoding="utf-8").splitlines()
-    start_re = re.compile(rf"^\s*pub\s+enum\s+{re.escape(enum_name)}\s*\{{")
-    variant_re = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(|\{|,)")
+    local missing_in_lean missing_in_rust
+    missing_in_lean="$(set_diff "$rust_sorted" "$lean_sorted")"
+    missing_in_rust="$(set_diff "$lean_sorted" "$rust_sorted")"
 
-    in_block = False
-    brace_depth = 0
-    variants: list[str] = []
+    while IFS= read -r f; do
+      if [[ -n "$f" ]]; then mismatches+=("${label}:missing_field_in_lean:${f}"); fi
+    done <<< "$missing_in_lean"
+    while IFS= read -r f; do
+      if [[ -n "$f" ]]; then mismatches+=("${label}:missing_field_in_rust:${f}"); fi
+    done <<< "$missing_in_rust"
+  }
 
-    for line in lines:
-        if not in_block:
-            if start_re.match(line):
-                in_block = True
-                brace_depth = line.count("{") - line.count("}")
-            continue
+  # ── Enum checks ───────────────────────────────────────────
 
-        brace_depth += line.count("{") - line.count("}")
-        code = line.split("//", 1)[0].strip()
+  compare_enum "FlowPolicy" \
+    "${ROOT_DIR}/lean/Runtime/VM/Model/Knowledge.lean" "FlowPolicy" \
+    "${ROOT_DIR}/rust/vm/src/vm/runtime_state/policy.rs" "FlowPolicy" \
+    "allowAll|denyAll|allowRoles|denyRoles|predicate|predicateExpr" \
+    "AllowAll|DenyAll|AllowRoles|DenyRoles|Predicate|PredicateExpr"
 
-        if code and not code.startswith("#") and not code.startswith("///"):
-            match = variant_re.match(code)
-            if match:
-                variants.append(match.group(1))
+  compare_enum "FlowPredicate" \
+    "${ROOT_DIR}/lean/Runtime/VM/Model/Knowledge.lean" "FlowPredicate" \
+    "${ROOT_DIR}/rust/vm/src/vm/runtime_state/policy.rs" "FlowPredicate" \
+    "targetRolePrefix|factContains|endpointRoleMatchesTarget|all|any" \
+    "TargetRolePrefix|FactContains|EndpointRoleMatchesTarget|All|Any"
 
-        if brace_depth == 0:
-            break
+  compare_enum "OutputConditionPolicy" \
+    "${ROOT_DIR}/lean/Runtime/VM/Model/OutputCondition.lean" "OutputConditionPolicy" \
+    "${ROOT_DIR}/rust/vm/src/output_condition.rs" "OutputConditionPolicy" \
+    "disabled|allowAll|denyAll|predicateAllowList" \
+    "Disabled|AllowAll|DenyAll|PredicateAllowList"
 
-    if not variants:
-        fail(f"could not parse Rust variants for {enum_name} in {path}")
-    return variants
+  compare_enum "Value" \
+    "${ROOT_DIR}/lean/Protocol/Values.lean" "Value" \
+    "${ROOT_DIR}/rust/vm/src/coroutine.rs" "Value" \
+    "string|chan" \
+    "Str|Endpoint"
 
+  compare_enum "CommunicationReplayMode" \
+    "${ROOT_DIR}/lean/Runtime/VM/Model/Config.lean" "CommunicationReplayMode" \
+    "${ROOT_DIR}/rust/vm/src/communication_replay/identity.rs" "CommunicationReplayMode" \
+    "off|sequence|nullifier" \
+    "Off|Sequence|Nullifier"
 
-def parse_lean_structure_fields(path: Path, structure_name: str) -> list[str]:
-    lines = path.read_text(encoding="utf-8").splitlines()
-    start_re = re.compile(rf"^\s*structure\s+{re.escape(structure_name)}\b.*\bwhere\b")
-    field_re = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_']*)\s*:\s*")
-    stop_re = re.compile(
-        r"^\s*(?:(?:private|protected)\s+)?"
-        r"(def|theorem|lemma|structure|class|instance|abbrev|inductive|namespace|open|set_option|universe)\b"
-    )
+  # ── Struct checks ─────────────────────────────────────────
 
-    in_block = False
-    fields: list[str] = []
-    for line in lines:
-        if not in_block:
-            if start_re.match(line):
-                in_block = True
-            continue
+  compare_struct "ProgressToken" \
+    "${ROOT_DIR}/lean/Runtime/VM/Model/State.lean" "ProgressToken" \
+    "${ROOT_DIR}/rust/vm/src/coroutine.rs" "ProgressToken" \
+    "" ""
 
-        code = line.split("--", 1)[0].strip()
-        if not code:
-            continue
-        match = field_re.match(code)
-        if match:
-            fields.append(match.group(1))
-            continue
+  compare_struct "SignedValue" \
+    "${ROOT_DIR}/lean/Runtime/VM/Model/TypeClasses.lean" "SignedValue" \
+    "${ROOT_DIR}/rust/vm/src/buffer.rs" "SignedValue" \
+    "seqNo" \
+    "sequence_no"
 
-        if fields and stop_re.match(code):
-            break
+  # ── Report mismatches ─────────────────────────────────────
 
-    if not fields:
-        fail(f"could not parse Lean fields for {structure_name} in {path}")
-    return fields
+  if (( ${#mismatches[@]} > 0 )); then
+    echo "[parity] uncovered mismatches:"
+    for m in "${mismatches[@]}"; do
+      echo "  - ${m}"
+    done
+    echo "ERROR: found Lean/Rust parity mismatches - add deviation entry to docs/19_rust_lean_parity.md Deviation Registry"
+    exit 1
+  fi
 
+  echo "[parity] policy/data shape parity check passed with no mismatches"
 
-def parse_rust_struct_fields(path: Path, struct_name: str) -> list[str]:
-    lines = path.read_text(encoding="utf-8").splitlines()
-    start_re = re.compile(rf"^\s*pub\s+struct\s+{re.escape(struct_name)}(?:<[^>]+>)?\s*\{{")
-    field_re = re.compile(r"^\s*pub\s+([A-Za-z_][A-Za-z0-9_]*)\s*:")
+  # ── CI marker checks ─────────────────────────────────────
 
-    in_block = False
-    brace_depth = 0
-    fields: list[str] = []
-    for line in lines:
-        if not in_block:
-            if start_re.match(line):
-                in_block = True
-                brace_depth = line.count("{") - line.count("}")
-            continue
+  local verify_workflow="${ROOT_DIR}/.github/workflows/verify.yml"
+  local check_workflow="${ROOT_DIR}/.github/workflows/check.yml"
+  local justfile="${ROOT_DIR}/justfile"
 
-        brace_depth += line.count("{") - line.count("}")
-        code = line.split("//", 1)[0].strip()
-        match = field_re.match(code)
-        if match:
-            fields.append(match.group(1))
+  if ! grep -qF "just check-parity" "$verify_workflow"; then
+    echo "ERROR: missing verify workflow parity gate: expected marker \`just check-parity\`"
+    exit 1
+  fi
+  if ! grep -qF "./scripts/check/cross-runtime-parity.sh" "$check_workflow"; then
+    echo "ERROR: missing check workflow parity gate: expected marker \`./scripts/check/cross-runtime-parity.sh\`"
+    exit 1
+  fi
+  if ! grep -qF "just check-parity" "$justfile"; then
+    echo "ERROR: missing ci-dry-run parity gate: expected marker \`just check-parity\`"
+    exit 1
+  fi
 
-        if brace_depth == 0:
-            break
-
-    if not fields:
-        fail(f"could not parse Rust fields for {struct_name} in {path}")
-    return fields
-
-
-def normalize_lean_variant(name: str, mapping: dict[str, str]) -> str:
-    if name in mapping:
-        return mapping[name]
-    if not name:
-        return name
-    return name[0].upper() + name[1:]
-
-
-enum_checks = [
-    {
-        "label": "FlowPolicy",
-        "lean_file": root / "lean/Runtime/VM/Model/Knowledge.lean",
-        "lean_type": "FlowPolicy",
-        "rust_file": root / "rust/vm/src/vm/runtime_state/policy.rs",
-        "rust_type": "FlowPolicy",
-        "map": {
-            "allowAll": "AllowAll",
-            "denyAll": "DenyAll",
-            "allowRoles": "AllowRoles",
-            "denyRoles": "DenyRoles",
-            "predicate": "Predicate",
-            "predicateExpr": "PredicateExpr",
-        },
-    },
-    {
-        "label": "FlowPredicate",
-        "lean_file": root / "lean/Runtime/VM/Model/Knowledge.lean",
-        "lean_type": "FlowPredicate",
-        "rust_file": root / "rust/vm/src/vm/runtime_state/policy.rs",
-        "rust_type": "FlowPredicate",
-        "map": {
-            "targetRolePrefix": "TargetRolePrefix",
-            "factContains": "FactContains",
-            "endpointRoleMatchesTarget": "EndpointRoleMatchesTarget",
-            "all": "All",
-            "any": "Any",
-        },
-    },
-    {
-        "label": "OutputConditionPolicy",
-        "lean_file": root / "lean/Runtime/VM/Model/OutputCondition.lean",
-        "lean_type": "OutputConditionPolicy",
-        "rust_file": root / "rust/vm/src/output_condition.rs",
-        "rust_type": "OutputConditionPolicy",
-        "map": {
-            "disabled": "Disabled",
-            "allowAll": "AllowAll",
-            "denyAll": "DenyAll",
-            "predicateAllowList": "PredicateAllowList",
-        },
-    },
-    {
-        "label": "Value",
-        "lean_file": root / "lean/Protocol/Values.lean",
-        "lean_type": "Value",
-        "rust_file": root / "rust/vm/src/coroutine.rs",
-        "rust_type": "Value",
-        "map": {
-            "string": "Str",
-            "chan": "Endpoint",
-        },
-    },
-    {
-        "label": "CommunicationReplayMode",
-        "lean_file": root / "lean/Runtime/VM/Model/Config.lean",
-        "lean_type": "CommunicationReplayMode",
-        "rust_file": root / "rust/vm/src/communication_replay/identity.rs",
-        "rust_type": "CommunicationReplayMode",
-        "map": {
-            "off": "Off",
-            "sequence": "Sequence",
-            "nullifier": "Nullifier",
-        },
-    },
-]
-
-struct_checks = [
-    {
-        "label": "ProgressToken",
-        "lean_file": root / "lean/Runtime/VM/Model/State.lean",
-        "lean_type": "ProgressToken",
-        "rust_file": root / "rust/vm/src/coroutine.rs",
-        "rust_type": "ProgressToken",
-        "map": {},
-    },
-    {
-        "label": "SignedValue",
-        "lean_file": root / "lean/Runtime/VM/Model/TypeClasses.lean",
-        "lean_type": "SignedValue",
-        "rust_file": root / "rust/vm/src/buffer.rs",
-        "rust_type": "SignedValue",
-        "map": {"seqNo": "sequence_no"},
-    },
-]
-
-verify_workflow = root / ".github/workflows/verify.yml"
-check_workflow = root / ".github/workflows/check.yml"
-justfile = root / "justfile"
-
-mismatches: list[str] = []
-for check in enum_checks:
-    lean_variants = parse_lean_inductive_variants(check["lean_file"], check["lean_type"])
-    rust_variants = parse_rust_enum_variants(check["rust_file"], check["rust_type"])
-
-    lean_norm = {normalize_lean_variant(name, check["map"]) for name in lean_variants}
-    rust_set = set(rust_variants)
-
-    missing_in_lean = sorted(rust_set - lean_norm)
-    missing_in_rust = sorted(lean_norm - rust_set)
-
-    print(f"[parity] {check['label']}: Lean={sorted(lean_norm)} Rust={sorted(rust_set)}")
-
-    for variant in missing_in_lean:
-        mismatches.append(f"{check['label']}:missing_in_lean:{variant}")
-    for variant in missing_in_rust:
-        mismatches.append(f"{check['label']}:missing_in_rust:{variant}")
-
-for check in struct_checks:
-    lean_fields = parse_lean_structure_fields(check["lean_file"], check["lean_type"])
-    rust_fields = parse_rust_struct_fields(check["rust_file"], check["rust_type"])
-    lean_norm = {check["map"].get(name, name) for name in lean_fields}
-    rust_set = set(rust_fields)
-
-    missing_in_lean = sorted(rust_set - lean_norm)
-    missing_in_rust = sorted(lean_norm - rust_set)
-
-    print(f"[parity] {check['label']}: LeanFields={sorted(lean_norm)} RustFields={sorted(rust_set)}")
-
-    for field in missing_in_lean:
-        mismatches.append(f"{check['label']}:missing_field_in_lean:{field}")
-    for field in missing_in_rust:
-        mismatches.append(f"{check['label']}:missing_field_in_rust:{field}")
-
-if mismatches:
-    print("[parity] uncovered mismatches:")
-    for mismatch in mismatches:
-        print(f"  - {mismatch}")
-    fail("found Lean/Rust parity mismatches - add deviation entry to docs/19_rust_lean_parity.md Deviation Registry")
-
-print("[parity] policy/data shape parity check passed with no mismatches")
-
-verify_text = verify_workflow.read_text(encoding="utf-8")
-check_text = check_workflow.read_text(encoding="utf-8")
-just_text = justfile.read_text(encoding="utf-8")
-
-required_ci_markers = [
-    ("verify workflow parity gate", "just check-parity", verify_text),
-    ("check workflow parity gate", "./scripts/check/cross-runtime-parity.sh", check_text),
-    ("ci-dry-run parity gate", "just check-parity", just_text),
-]
-
-for desc, needle, haystack in required_ci_markers:
-    if needle not in haystack:
-        fail(f"missing {desc}: expected marker `{needle}`")
-
-print("[parity] CI parity-regression gates are present in workflows and ci-dry-run")
-PY
+  echo "[parity] CI parity-regression gates are present in workflows and ci-dry-run"
 }
 
-# --- Suite: VM Differential Parity Suite ---
+# ── Suite: VM Differential Parity Suite ───────────────────────
 check_suite() {
   echo "== VM Parity Suite =="
   run_check "lean conformance corpus" \
@@ -359,7 +404,7 @@ check_suite() {
     "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test parity_fixtures_v2"
 }
 
-# --- Conformance: Strict VM Conformance ---
+# ── Conformance: Strict VM Conformance ────────────────────────
 check_conformance() {
   echo "== Strict VM Conformance =="
 
@@ -387,7 +432,7 @@ check_conformance() {
   echo "OK   strict VM conformance passed"
 }
 
-# --- Main ---
+# ── Main ──────────────────────────────────────────────────────
 case "${MODE}" in
   --all)
     check_types

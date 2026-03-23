@@ -22,7 +22,7 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 2
 fi
 
-# Colors for output
+# ── Output Helpers ────────────────────────────────────────────
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
@@ -92,7 +92,7 @@ search_pattern() {
     print_results "$description" "$severity" "$pattern" "$results"
 }
 
-# Search using PCRE2 multiline patterns (for theorem shells)
+# Search using PCRE2 multiline patterns (for theorem-shell placeholders)
 search_pcre2() {
     local pattern="$1"
     local description="$2"

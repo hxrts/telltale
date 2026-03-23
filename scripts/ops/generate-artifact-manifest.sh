@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
+# Generate papers/artifact_manifest.json with SHA-256 hashes, toolchain
+# versions, and metadata for all paper artifacts and verification logs.
 set -euo pipefail
 
+# ── Paths ─────────────────────────────────────────────────────────────
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT_FILE="${ROOT_DIR}/papers/artifact_manifest.json"
 LOG_DIR="${ROOT_DIR}/artifacts/paper"
 PAPER_DIR="${ROOT_DIR}/papers/build"
 
+# ── Helpers ───────────────────────────────────────────────────────────
+
+# Compute SHA-256 hash of a file (portable across Linux/macOS)
 hash_file() {
   local path="$1"
   if command -v sha256sum >/dev/null 2>&1; then
@@ -20,10 +26,12 @@ hash_file() {
   exit 2
 }
 
+# Escape a string for safe JSON embedding
 json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
+# Get version string for a CLI tool, with fallback
 tool_version() {
   local cmd="$1"
   local fallback="$2"
@@ -34,6 +42,7 @@ tool_version() {
   fi
 }
 
+# ── Collect Environment ────────────────────────────────────────────────
 LEAN_TOOLCHAIN="$(cat "${ROOT_DIR}/lean-toolchain" 2>/dev/null || echo "unavailable")"
 RUST_TOOLCHAIN="$(cat "${ROOT_DIR}/rust-toolchain" 2>/dev/null || echo "unavailable")"
 COMMIT="$(git -C "${ROOT_DIR}" rev-parse HEAD)"
@@ -44,6 +53,7 @@ fi
 
 mkdir -p "$(dirname "${OUT_FILE}")"
 
+# Return SHA-256 hash as quoted JSON string, or "null" if file is missing
 paper_hash_or_null() {
   local file="$1"
   if [[ -f "${file}" ]]; then
@@ -53,6 +63,7 @@ paper_hash_or_null() {
   fi
 }
 
+# ── Hash Log Files ─────────────────────────────────────────────────────
 LOG_JSON=""
 if [[ -d "${LOG_DIR}" ]]; then
   while IFS= read -r log_file; do
@@ -69,6 +80,7 @@ if [[ -z "${LOG_JSON}" ]]; then
   LOG_JSON="\"_none\":\"no-log-files-found\""
 fi
 
+# ── Write Manifest ─────────────────────────────────────────────────────
 cat > "${OUT_FILE}" <<EOF
 {
   "schema_version": 1,

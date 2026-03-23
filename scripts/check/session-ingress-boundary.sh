@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Run telltale-lint-checks session-ingress check on the VM crate source.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

@@ -1,85 +1,109 @@
 #!/usr/bin/env bash
+# Clone or update Lean dependency checkouts (mathlib4, iris-lean) to pinned
+# revisions from dependency_pins.json. Ensures mathlib cache is present.
 set -euo pipefail
+
+# ── Configuration ─────────────────────────────────────────────────────
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PINS_FILE="${ROOT_DIR}/lean/dependency_pins.json"
+
+# ── Prerequisites ─────────────────────────────────────────────────────
 
 if [[ ! -f "${PINS_FILE}" ]]; then
   echo "error: missing dependency pins file: ${PINS_FILE}" >&2
   exit 2
 fi
 
-python3 - "${PINS_FILE}" <<'PY'
-import json
-import subprocess
-import sys
-from pathlib import Path
+if ! command -v jq &>/dev/null; then
+  echo "error: jq is required but not found on PATH" >&2
+  exit 2
+fi
 
-pins_path = Path(sys.argv[1])
-pins = json.loads(pins_path.read_text())
-deps = pins.get("dependencies", [])
-if not isinstance(deps, list) or not deps:
-    raise SystemExit("error: dependency_pins.json must define non-empty dependencies")
+# ── Repository Mapping ────────────────────────────────────────────────
 
-repo_by_name = {
-    "mathlib4": "https://github.com/leanprover-community/mathlib4.git",
-    "iris-lean": "https://github.com/hxrts/iris-lean.git",
+# Resolve dependency name to its git remote URL.
+repo_for_name() {
+  case "$1" in
+    mathlib4)   echo "https://github.com/leanprover-community/mathlib4.git" ;;
+    iris-lean)  echo "https://github.com/hxrts/iris-lean.git" ;;
+    *)          return 1 ;;
+  esac
 }
 
-def run(cmd: list[str], cwd: Path | None = None) -> str:
-    return subprocess.check_output(cmd, cwd=str(cwd) if cwd else None, text=True).strip()
+# ── Mathlib Cache ─────────────────────────────────────────────────────
 
+# Fetch prebuilt oleans if the cache marker is absent.
+ensure_mathlib_cache() {
+  local checkout="$1"
+  local marker="${checkout}/.lake/build/lib/lean/Mathlib.olean"
 
-def ensure_mathlib_cache(checkout: Path) -> None:
-    marker = checkout / ".lake" / "build" / "lib" / "lean" / "Mathlib.olean"
-    if marker.exists():
-        print(f"OK   mathlib4 cache present at {marker}")
-        return
+  if [[ -f "${marker}" ]]; then
+    echo "OK   mathlib4 cache present at ${marker}"
+    return
+  fi
 
-    print("sync mathlib4 cache: fetching prebuilt oleans with `lake exe cache get`")
-    try:
-        subprocess.check_call(["lake", "exe", "cache", "get"], cwd=str(checkout))
-    except subprocess.CalledProcessError as err:
-        raise SystemExit(
-            "error: failed to fetch prebuilt mathlib4 cache; "
-            "run `cd /Users/hxrts/projects/lean_common/mathlib4 && lake exe cache get` "
-            f"after resolving the local issue ({err})"
-        ) from err
+  echo "sync mathlib4 cache: fetching prebuilt oleans with \`lake exe cache get\`"
+  if ! (cd "${checkout}" && lake exe cache get); then
+    echo "error: failed to fetch prebuilt mathlib4 cache; run \`cd /Users/hxrts/projects/lean_common/mathlib4 && lake exe cache get\` after resolving the local issue" >&2
+    exit 1
+  fi
 
-    if not marker.exists():
-        raise SystemExit(
-            "error: `lake exe cache get` completed but Mathlib.olean is still missing at "
-            f"{marker}"
-        )
-    print(f"OK   mathlib4 cache ready at {marker}")
+  if [[ ! -f "${marker}" ]]; then
+    echo "error: \`lake exe cache get\` completed but Mathlib.olean is still missing at ${marker}" >&2
+    exit 1
+  fi
 
-for dep in deps:
-    name = dep.get("name")
-    path = dep.get("path")
-    revision = dep.get("revision")
-    if not isinstance(name, str) or not isinstance(path, str) or not isinstance(revision, str):
-        raise SystemExit(f"error: invalid dependency pin entry: {dep}")
+  echo "OK   mathlib4 cache ready at ${marker}"
+}
 
-    repo = repo_by_name.get(name)
-    if repo is None:
-        raise SystemExit(f"error: missing repository mapping for dependency '{name}'")
+# ── Validate Dependencies Array ───────────────────────────────────────
 
-    checkout = Path(path)
-    checkout.parent.mkdir(parents=True, exist_ok=True)
+dep_count="$(jq -r '.dependencies | if type == "array" then length else -1 end' "${PINS_FILE}")"
+if [[ "${dep_count}" -le 0 ]]; then
+  echo "error: dependency_pins.json must define non-empty dependencies" >&2
+  exit 1
+fi
 
-    if (checkout / ".git").exists():
-        print(f"sync {name}: fetching pinned revision {revision}")
-    else:
-        print(f"clone {name}: {repo} -> {checkout}")
-        run(["git", "clone", "--filter=blob:none", repo, str(checkout)])
+# ── Iterate Dependencies ──────────────────────────────────────────────
 
-    run(["git", "fetch", "--depth=1", "origin", revision], cwd=checkout)
-    run(["git", "checkout", "--detach", revision], cwd=checkout)
-    actual = run(["git", "rev-parse", "HEAD"], cwd=checkout)
-    if actual != revision:
-        raise SystemExit(f"error: {name} pinned checkout mismatch: expected {revision}, got {actual}")
-    print(f"OK   {name} pinned at {actual}")
+for i in $(seq 0 $(( dep_count - 1 ))); do
+  name="$(jq -r ".dependencies[$i].name // empty" "${PINS_FILE}")"
+  path="$(jq -r ".dependencies[$i].path // empty" "${PINS_FILE}")"
+  revision="$(jq -r ".dependencies[$i].revision // empty" "${PINS_FILE}")"
 
-    if name == "mathlib4":
-        ensure_mathlib_cache(checkout)
-PY
+  if [[ -z "${name}" || -z "${path}" || -z "${revision}" ]]; then
+    entry="$(jq -c ".dependencies[$i]" "${PINS_FILE}")"
+    echo "error: invalid dependency pin entry: ${entry}" >&2
+    exit 1
+  fi
+
+  repo="$(repo_for_name "${name}")" || {
+    echo "error: missing repository mapping for dependency '${name}'" >&2
+    exit 1
+  }
+
+  checkout="${path}"
+  mkdir -p "$(dirname "${checkout}")"
+
+  if [[ -d "${checkout}/.git" ]]; then
+    echo "sync ${name}: fetching pinned revision ${revision}"
+  else
+    echo "clone ${name}: ${repo} -> ${checkout}"
+    git clone --filter=blob:none "${repo}" "${checkout}"
+  fi
+
+  git -C "${checkout}" fetch --depth=1 origin "${revision}"
+  git -C "${checkout}" checkout --detach "${revision}"
+
+  actual="$(git -C "${checkout}" rev-parse HEAD)"
+  if [[ "${actual}" != "${revision}" ]]; then
+    echo "error: ${name} pinned checkout mismatch: expected ${revision}, got ${actual}" >&2
+    exit 1
+  fi
+  echo "OK   ${name} pinned at ${actual}"
+
+  if [[ "${name}" == "mathlib4" ]]; then
+    ensure_mathlib_cache "${checkout}"
+  fi
+done

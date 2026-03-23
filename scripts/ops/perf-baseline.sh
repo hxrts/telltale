@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
 # Performance baseline management script.
-# Usage:
-#   ./scripts/ops/perf-baseline.sh [check|freeze|run|sla]
+# Usage:  ./scripts/ops/perf-baseline.sh [check|freeze|run|sla]
 #
 # Modes:
 #   check   Verify baseline artifact integrity (default)
 #   freeze  Capture baseline metrics and conformance artifacts
 #   run     Run benchmark matrix across workloads
 #   sla     Check performance SLA thresholds and CI gate ordering
+set -euo pipefail
 
+# ── Setup ──────────────────────────────────────────────────────────────
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
 MODE="${1:-check}"
 
+# Compute SHA-256 hash of a file (portable across Linux/macOS)
 hash_file() {
   local file="$1"
   if command -v sha256sum >/dev/null 2>&1; then
@@ -28,7 +28,7 @@ hash_file() {
   fi
 }
 
-# --- Check Mode: Verify baseline artifact integrity ---
+# ── Check Mode: Verify baseline artifact integrity ─────────────────────
 do_check() {
   local ARTIFACT_DIR="${ROOT_DIR}/artifacts/v2/baseline"
   local SNAPSHOT_FILE="${ARTIFACT_DIR}/hash_snapshot.json"
@@ -144,7 +144,7 @@ do_check() {
   fi
 }
 
-# --- Freeze Mode: Capture baseline artifacts ---
+# ── Freeze Mode: Capture baseline artifacts ────────────────────────────
 do_freeze() {
   local ARTIFACT_DIR="${ROOT_DIR}/artifacts/v2/baseline"
   mkdir -p "${ARTIFACT_DIR}"
@@ -255,7 +255,7 @@ JSON
   echo "  - ${ARTIFACT_DIR}/hash_snapshot.json"
 }
 
-# --- Run Mode: Run benchmark matrix ---
+# ── Run Mode: Run benchmark matrix ─────────────────────────────────────
 do_run() {
   local OUT_DIR="${ROOT_DIR}/artifacts/v2/benchmark_matrix"
   local DISJOINT_OUT="${OUT_DIR}/disjoint.json"
@@ -332,7 +332,7 @@ do_run() {
   echo "  - ${SUMMARY_OUT}"
 }
 
-# --- SLA Mode: Check performance governance ---
+# ── SLA Mode: Check performance governance ─────────────────────────────
 do_sla() {
   local JUSTFILE="${ROOT_DIR}/justfile"
   local SUMMARY_FILE="${ROOT_DIR}/artifacts/v2/benchmark_matrix/summary.json"
@@ -459,7 +459,7 @@ do_sla() {
   printf '%s\n' "${sla_result}"
 }
 
-# --- Main ---
+# ── Main ───────────────────────────────────────────────────────────────
 case "${MODE}" in
   check)
     do_check

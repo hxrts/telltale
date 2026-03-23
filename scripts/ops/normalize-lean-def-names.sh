@@ -16,7 +16,7 @@
 
 set -euo pipefail
 
-# Default values
+# ── Defaults ──────────────────────────────────────────────────────────
 SCOPE="lean"
 REWRITE_ROOT=""
 EXCLUDES=()
@@ -25,7 +25,7 @@ DRY_RUN=false
 SHOW_LIMIT=80
 SHOW_ALL=false
 
-# Parse arguments
+# ── Parse Arguments ────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case $1 in
         --scope)
@@ -76,16 +76,15 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Set rewrite root to scope if not specified
+# ── Resolve Paths ─────────────────────────────────────────────────────
 if [[ -z "$REWRITE_ROOT" ]]; then
     REWRITE_ROOT="$SCOPE"
 fi
 
-# Resolve paths
 SCOPE=$(cd "$SCOPE" 2>/dev/null && pwd) || { echo "error: scope not found: $SCOPE" >&2; exit 2; }
 REWRITE_ROOT=$(cd "$REWRITE_ROOT" 2>/dev/null && pwd) || { echo "error: rewrite root not found: $REWRITE_ROOT" >&2; exit 2; }
 
-# Build exclusion pattern for find
+# ── Build Find Exclusions ──────────────────────────────────────────────
 EXCLUDE_ARGS=()
 if [[ -n "${EXCLUDES+x}" ]]; then
     for ex in "${EXCLUDES[@]}"; do
@@ -100,17 +99,17 @@ if [[ -n "${EXCLUDES+x}" ]]; then
     done
 fi
 
-# Always exclude .lake, .git, build
+# Always exclude build artifacts
 EXCLUDE_ARGS+=(-path "*/.lake" -prune -o -path "*/.lake/*" -prune -o)
 EXCLUDE_ARGS+=(-path "*/.git" -prune -o -path "*/.git/*" -prune -o)
 EXCLUDE_ARGS+=(-path "*/build" -prune -o -path "*/build/*" -prune -o)
 
-# Temporary files for intermediate results
+# ── Temp Files ─────────────────────────────────────────────────────────
 RENAMES_FILE=$(mktemp)
 COLLISIONS_FILE=$(mktemp)
 trap 'rm -f "$RENAMES_FILE" "$COLLISIONS_FILE"' EXIT
 
-# AWK script for camelCase to snake_case conversion
+# ── Snake-Case Conversion (AWK) ────────────────────────────────────────
 to_snake_awk='
 function to_snake(s) {
     # Remove backticks
@@ -133,7 +132,9 @@ function to_snake(s) {
 }
 '
 
-# Discover non-conformant declarations
+# ── Discovery ─────────────────────────────────────────────────────────
+
+# Find theorem/lemma declarations whose tails are not snake_case
 discover_decls() {
     local root="$1"
 
@@ -199,7 +200,7 @@ discover_decls() {
     done
 }
 
-# Discover and collect renames
+# ── Run Discovery ──────────────────────────────────────────────────────
 echo "Scanning $SCOPE for non-conformant declarations..." >&2
 discover_decls "$SCOPE" > "$RENAMES_FILE"
 
@@ -210,7 +211,8 @@ if [[ "$total_discovered" -eq 0 ]]; then
     exit 0
 fi
 
-# Resolve collisions: group by new name, skip if multiple old names map to same new
+# ── Collision Resolution ───────────────────────────────────────────────
+# Group by new name; skip if multiple old names map to the same target
 gawk -F: '
 {
     file=$1; line=$2; kind=$3; old=$4; new=$5
@@ -258,7 +260,7 @@ if [[ "$collision_count" -gt 0 ]]; then
     echo "Skipped due to collisions: $collision_count"
 fi
 
-# Dry run output
+# ── Dry Run Output ─────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == true ]] || [[ "$APPLY" != true ]]; then
     if [[ "$SHOW_ALL" == true ]]; then
         limit=$safe_renames
@@ -294,16 +296,17 @@ if [[ "$DRY_RUN" == true ]] || [[ "$APPLY" != true ]]; then
     exit 0
 fi
 
-# Apply renames
+# ── Apply Renames ──────────────────────────────────────────────────────
 echo "Applying renames..." >&2
 
-# Build replacement map
+# Build old->new replacement map
+
 declare -A OLD_TO_NEW
 while IFS=: read -r _ _ _ old new; do
     OLD_TO_NEW["$old"]="$new"
 done < "$RENAMES_FILE"
 
-# AWK script for applying renames while preserving comments and strings
+# AWK script: apply renames while preserving comments and strings
 apply_renames_awk='
 BEGIN {
     # Build patterns from environment (passed as -v)
@@ -467,11 +470,11 @@ END {
 }
 '
 
-# Process files
+# ── Process Files ──────────────────────────────────────────────────────
 changed_files=0
 total_replacements=0
 
-# Build pattern string (old\x1fnew pairs separated by \x1f)
+# Build pattern string (old/new pairs delimited by \x1f)
 PATTERNS=""
 for old in "${!OLD_TO_NEW[@]}"; do
     new="${OLD_TO_NEW[$old]}"

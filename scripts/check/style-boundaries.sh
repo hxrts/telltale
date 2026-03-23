@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Run telltale-lint-checks style check across core Rust crate sources.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
