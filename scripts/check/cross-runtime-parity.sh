@@ -18,6 +18,10 @@ cd "${ROOT_DIR}"
 
 MODE="${1:---all}"
 
+ensure_lean_prebuilt() {
+  "${ROOT_DIR}/scripts/bootstrap/ensure-lean-prebuilt.sh"
+}
+
 # ── Counters and Helpers ──────────────────────────────────────
 
 checks=0
@@ -380,6 +384,7 @@ check_types() {
 # ── Suite: VM Differential Parity Suite ───────────────────────
 check_suite() {
   echo "== VM Parity Suite =="
+  ensure_lean_prebuilt
   run_check "lean conformance corpus" \
     "cargo test -p telltale-vm --test conformance_lean"
   run_check "lean equivalence corpus" \

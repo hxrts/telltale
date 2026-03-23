@@ -27,7 +27,7 @@ def baseSpace (bundle : VMLivenessBundle store₀) :
     VMInvariantSpaceWithProfiles (ν := ν) store₀ State :=
   VMInvariantSpaceWithProfiles.mk
     (Adapters.VMInvariantSpaceWithDistributed.mk
-      (VMInvariantSpace.mk (some bundle) none none)
+      (VMInvariantSpace.mk (some bundle) none none none)
       {})
     {}
 

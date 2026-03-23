@@ -20,6 +20,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
 MODE="${1:---all}"
+LEAN_PREBUILT_READY=0
 
 # ── Counters and Helpers ──────────────────────────────────────
 
@@ -62,32 +63,18 @@ require_ripgrep() {
   fi
 }
 
-# Resolve the mathlib4 checkout path from dependency_pins.json
-mathlib_checkout_path() {
-  local pins_file="${ROOT_DIR}/lean/dependency_pins.json"
-  local path
-  path="$(jq -r '.dependencies[]? | select(.name == "mathlib4") | .path' "$pins_file")"
-  if [[ -z "$path" || "$path" == "null" ]]; then
-    echo "error: missing mathlib4 dependency pin" >&2
-    return 1
+# Ensure repo-owned Lean entrypoints use hydrated local/prebuilt dependency artifacts.
+ensure_lean_prebuilt() {
+  if (( LEAN_PREBUILT_READY )); then
+    return
   fi
-  if ! jq -e '.dependencies[]? | select(.name == "mathlib4") | .path | type == "string"' "$pins_file" >/dev/null 2>&1; then
-    echo "error: mathlib4 dependency pin path must be a string" >&2
-    return 1
-  fi
-  printf '%s\n' "$path"
+  "${ROOT_DIR}/scripts/bootstrap/ensure-lean-prebuilt.sh"
+  LEAN_PREBUILT_READY=1
 }
 
 # Abort if prebuilt mathlib4 oleans are not available
 require_mathlib_cache() {
-  local mathlib_path
-  mathlib_path="$(mathlib_checkout_path)"
-  local marker="${mathlib_path}/.lake/build/lib/lean/Mathlib.olean"
-  if [[ ! -f "${marker}" ]]; then
-    echo "error: missing prebuilt mathlib4 cache at ${marker}" >&2
-    echo "hint: run ./scripts/bootstrap/dependency-checkouts.sh" >&2
-    exit 2
-  fi
+  ensure_lean_prebuilt
 }
 
 # ── Byzantine Capability Checks ───────────────────────────────

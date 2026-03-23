@@ -12,6 +12,8 @@ import Runtime.VM.Model.SemanticObjects.ProgressContracts
 import Runtime.VM.Model.SemanticObjects.ProgressContractsLemmas
 import Runtime.VM.Model.SemanticObjects.ReplayFailureExactness
 import Runtime.VM.Model.SemanticObjects.ReplayFailureExactnessLemmas
+import Runtime.VM.Model.SemanticObjects.CrossTargetProgressDependentWork
+import Runtime.VM.Model.SemanticObjects.CrossTargetProgressDependentWorkLemmas
 import Runtime.VM.Model.SemanticObjects.TransformationLocalObligations
 import Runtime.VM.Model.SemanticObjects.TransformationLocalObligationsLemmas
 

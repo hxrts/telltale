@@ -14,6 +14,7 @@ INVENTORY_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Inventory.lean"
 TEST_FILE="${ROOT_DIR}/lean/Runtime/Tests/Main.lean"
 JUSTFILE="${ROOT_DIR}/justfile"
 REPORT_FILE="${ROOT_DIR}/artifacts/release_conformance_report.json"
+LEAN_PREBUILT_HELPER="${ROOT_DIR}/scripts/bootstrap/ensure-lean-prebuilt.sh"
 
 if ! command -v rg >/dev/null 2>&1; then
   echo "error: ripgrep (rg) is required" >&2
@@ -87,6 +88,7 @@ check "Justfile includes release conformance check target" \
 
 if command -v lake >/dev/null 2>&1; then
   echo "Type-checking release-conformance Lean modules..."
+  "${LEAN_PREBUILT_HELPER}"
   (
     cd "${ROOT_DIR}/lean"
     lake build Runtime.Proofs.TheoremPack.ReleaseConformance Runtime.Tests.Main >/dev/null
@@ -94,6 +96,7 @@ if command -v lake >/dev/null 2>&1; then
   echo "OK   release-conformance Lean modules type-check successfully"
 elif command -v elan >/dev/null 2>&1; then
   echo "Type-checking release-conformance Lean modules via elan..."
+  "${LEAN_PREBUILT_HELPER}"
   (
     cd "${ROOT_DIR}"
     elan run leanprover/lean4:v4.26.0 lake --dir lean build \

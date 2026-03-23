@@ -25,7 +25,7 @@ def baseSpace (bundle : VMLivenessBundle store₀) :
     VMInvariantSpaceWithProfiles (ν := ν) store₀ State :=
   VMInvariantSpaceWithProfiles.mk
     (Adapters.VMInvariantSpaceWithDistributed.mk
-      (VMInvariantSpace.mk (some bundle) none none)
+      (VMInvariantSpace.mk (some bundle) none none none)
       {})
     {}
 
@@ -42,7 +42,7 @@ example (bundle : VMLivenessBundle store₀)
     (hHasProgress : bundle.progressHypothesis?.isSome = true) :
     ProgressEnabled store₀ := by
   let space : VMInvariantSpace (ν := ν) store₀ State :=
-    VMInvariantSpace.mk (some bundle) none none
+    VMInvariantSpace.mk (some bundle) none none none
   exact Adapters.vm_progress_from_invariant_space
     (space := space)
     (bundle := bundle)

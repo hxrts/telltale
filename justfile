@@ -503,6 +503,7 @@ lean-init:
     else
         echo "Lean project already initialized"
     fi
+    ./scripts/bootstrap/ensure-lean-prebuilt.sh
 
 telltale-lean-check: lean-init
     # Export rust choreography data, build the Lean runner, and verify three roles with logs
