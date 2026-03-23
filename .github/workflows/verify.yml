@@ -72,20 +72,15 @@ jobs:
           mkdir -p artifacts
           just check-ownership-contracts | tee artifacts/check-ownership-contracts.log
 
-      - name: Run docs drift checks
-        run: |
-          mkdir -p artifacts
-          just check-docs-drift | tee artifacts/check-docs-drift.log
-
       - name: Run Aura-derived boundary checks
         run: |
           mkdir -p artifacts
           just check-aura-borrowed-lints | tee artifacts/check-aura-borrowed-lints.log
 
-      - name: Run docs links-in-code checks
+      - name: Run docs link checks
         run: |
           mkdir -p artifacts
-          just check-doc-links-in-code | tee artifacts/check-doc-links-in-code.log
+          ./scripts/check/docs-links.sh | tee artifacts/check-docs-links.log
 
       - name: Run capability gate checks
         run: |
@@ -182,20 +177,15 @@ jobs:
           mkdir -p artifacts
           just check-ownership-contracts | tee artifacts/check-ownership-contracts.log
 
-      - name: Run docs drift checks
-        run: |
-          mkdir -p artifacts
-          just check-docs-drift | tee artifacts/check-docs-drift.log
-
       - name: Run Aura-derived boundary checks
         run: |
           mkdir -p artifacts
           just check-aura-borrowed-lints | tee artifacts/check-aura-borrowed-lints.log
 
-      - name: Run docs links-in-code checks
+      - name: Run docs link checks
         run: |
           mkdir -p artifacts
-          just check-doc-links-in-code | tee artifacts/check-doc-links-in-code.log
+          ./scripts/check/docs-links.sh | tee artifacts/check-docs-links.log
 
       - name: Run capability gate checks
         run: |

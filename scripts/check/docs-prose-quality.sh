@@ -8,8 +8,7 @@ DOCS_DIR="$ROOT_DIR/docs"
 
 DOC_FILES="$(mktemp)"
 ERRORS_FILE="$(mktemp)"
-JUST_RECIPES_FILE="$(mktemp)"
-trap 'rm -f "$DOC_FILES" "$ERRORS_FILE" "$JUST_RECIPES_FILE"' EXIT
+trap 'rm -f "$DOC_FILES" "$ERRORS_FILE"' EXIT
 
 find "$DOCS_DIR" -type f -name "*.md" ! -path "*/book/*" ! -name "SUMMARY.md" | sort > "$DOC_FILES"
 
@@ -18,53 +17,12 @@ if [ ! -s "$DOC_FILES" ]; then
   exit 1
 fi
 
-while IFS= read -r line; do
-  line="$(printf '%s' "$line" | sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-  if [ -z "$line" ] || [ "${line#Available recipes*}" != "$line" ]; then
-    continue
-  fi
-  recipe="${line%% *}"
-  recipe="${recipe%:}"
-  if [ -n "$recipe" ]; then
-    echo "$recipe" >> "$JUST_RECIPES_FILE"
-  fi
-done < <(just --list)
-
 add_error() {
   printf '%s\n' "$1" >> "$ERRORS_FILE"
 }
 
 while IFS= read -r doc_file; do
   rel_file="${doc_file#$ROOT_DIR/}"
-
-  while IFS='|' read -r label target; do
-    target_file="${target%%#*}"
-    target_path="$(realpath -m "$(dirname "$doc_file")/$target_file")"
-    if [ ! -f "$target_path" ]; then
-      add_error "$rel_file: missing linked file $target"
-      continue
-    fi
-
-    expected="$(sed -n 's/^# //p' "$target_path" | head -n 1)"
-    if [ -n "$expected" ] && [ "$label" != "$expected" ]; then
-      add_error "$rel_file: link text '$label' does not match title '$expected' for $target"
-    fi
-  done < <(perl -ne 'while (/\[([^\]]+)\]\(([^)]+\.md(?:#[^)]+)?)\)/g) { print "$1|$2\n"; }' "$doc_file")
-
-  while IFS= read -r recipe; do
-    if [ -z "$recipe" ]; then
-      continue
-    fi
-    if ! grep -Fxq -- "$recipe" "$JUST_RECIPES_FILE"; then
-      add_error "$rel_file: unknown just recipe '$recipe'"
-    fi
-  done < <(perl -ne 'while (/\bjust\s+([A-Za-z0-9_-]+)/g) { print "$1\n"; }' "$doc_file")
-
-  while IFS= read -r script_name; do
-    if [ ! -f "$ROOT_DIR/scripts/$script_name" ]; then
-      add_error "$rel_file: missing script reference scripts/$script_name"
-    fi
-  done < <(perl -ne 'while (/\bscripts\/([A-Za-z0-9_.-]+\.sh)\b/g) { print "$1\n"; }' "$doc_file")
 
   in_code=0
   pending_explainer=0
@@ -134,11 +92,11 @@ while IFS= read -r doc_file; do
 done < "$DOC_FILES"
 
 if [ -s "$ERRORS_FILE" ]; then
-  echo "doc quality check failed:"
+  echo "docs prose quality check failed:"
   while IFS= read -r err; do
     echo "- $err"
   done < "$ERRORS_FILE"
   exit 1
 fi
 
-echo "doc quality check passed"
+echo "docs prose quality check passed"

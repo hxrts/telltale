@@ -50,12 +50,10 @@ jobs:
         run: ./scripts/check/cross-runtime-parity.sh --all
       - name: Run ownership contract checks
         run: just check-ownership-contracts
-      - name: Check docs drift
-        run: ./scripts/check/docs-drift.sh
       - name: Run Aura-derived boundary checks
         run: just check-aura-borrowed-lints
-      - name: Check docs links referenced from code
-        run: ./scripts/check/doc-links-in-code.sh
+      - name: Check docs links
+        run: ./scripts/check/docs-links.sh
       - name: Run linter
         uses: actions-rs/cargo@v1
         with:

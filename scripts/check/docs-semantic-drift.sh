@@ -4,217 +4,570 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-python3 <<'PY'
-from __future__ import annotations
+# ── Temp directory for working files ────────────────────────────────
+TMPDIR_DRIFT="$(mktemp -d)"
+trap 'rm -rf "$TMPDIR_DRIFT"' EXIT
 
-import json
-import re
-import subprocess
-import sys
-from pathlib import Path
+ERRORS_FILE="$TMPDIR_DRIFT/errors"
+touch "$ERRORS_FILE"
 
-root = Path.cwd()
-doc_files = [
-    path
-    for path in [root / "CLAUDE.md", *sorted((root / "docs").rglob("*.md"))]
-    if path.exists()
-]
+# ── Collect doc files ───────────────────────────────────────────────
+DOC_FILES=()
+[[ -f CLAUDE.md ]] && DOC_FILES+=(CLAUDE.md)
+while IFS= read -r f; do
+    DOC_FILES+=("$f")
+done < <(find docs -name '*.md' -type f 2>/dev/null | sort)
 
-metadata = json.loads(
-    subprocess.check_output(
-        ["cargo", "metadata", "--no-deps", "--format-version", "1"],
-        cwd=root,
-        text=True,
-    )
-)
-workspace_packages = {pkg["name"] for pkg in metadata["packages"]}
-workspace_crate_tokens = workspace_packages | {name.replace("-", "_") for name in workspace_packages}
-just_recipes = set(
-    subprocess.check_output(["just", "--summary"], cwd=root, text=True).split()
-)
+# ── Cargo metadata via jq ──────────────────────────────────────────
+CARGO_META="$TMPDIR_DRIFT/cargo_meta.json"
+cargo metadata --no-deps --format-version 1 > "$CARGO_META"
 
-repo_identifiers: set[str] = set()
-identifier_pattern = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
+# Workspace package names
+jq -r '.packages[].name' "$CARGO_META" | sort -u > "$TMPDIR_DRIFT/pkg_names"
+# Also underscore variants
+sed 's/-/_/g' "$TMPDIR_DRIFT/pkg_names" > "$TMPDIR_DRIFT/pkg_names_underscore"
+cat "$TMPDIR_DRIFT/pkg_names" "$TMPDIR_DRIFT/pkg_names_underscore" | sort -u > "$TMPDIR_DRIFT/crate_tokens"
 
-for base in (root / "src", root / "rust", root / "lean"):
-    if not base.exists():
-        continue
-    glob = "*.lean" if base.name == "lean" else "*.rs"
-    for file in base.rglob(glob):
-        try:
-            text = file.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
-        repo_identifiers.update(identifier_pattern.findall(text))
+# Package versions: name<TAB>version
+jq -r '.packages[] | "\(.name)\t\(.version)"' "$CARGO_META" > "$TMPDIR_DRIFT/pkg_versions"
 
-path_prefixes = (
-    "docs/",
-    "rust/",
-    "lean/",
-    "scripts/",
-    "papers/",
-    ".github/",
-    "src/",
-)
-path_literals = {
-    "CLAUDE.md",
-    "Cargo.toml",
-    "justfile",
-    "lean/CODE_MAP.md",
+# ── Just recipes ────────────────────────────────────────────────────
+just --summary | tr ' ' '\n' | sort -u > "$TMPDIR_DRIFT/just_recipes"
+
+# ── Build identifier set from Rust and Lean sources ─────────────────
+{
+    for base_dir in src rust; do
+        [[ -d "$base_dir" ]] && find "$base_dir" -name '*.rs' -type f -exec grep -ohP '\b[A-Za-z_][A-Za-z0-9_]*\b' {} + || true
+    done
+    [[ -d lean ]] && find lean -name '*.lean' -type f -exec grep -ohP '\b[A-Za-z_][A-Za-z0-9_]*\b' {} + || true
+} | sort -u > "$TMPDIR_DRIFT/repo_identifiers"
+
+# ── Skip identifiers (well-known types, traits, keywords) ──────────
+cat > "$TMPDIR_DRIFT/skip_identifiers" <<'SKIP'
+String
+Vec
+Option
+Result
+Box
+Arc
+Rc
+Mutex
+HashMap
+HashSet
+BTreeMap
+BTreeSet
+PathBuf
+Path
+Ok
+Err
+Some
+None
+Self
+Sized
+Send
+Sync
+Clone
+Copy
+Debug
+Display
+Default
+Drop
+Eq
+Ord
+Hash
+Iterator
+Future
+Pin
+From
+Into
+AsRef
+Deref
+PartialEq
+PartialOrd
+Serialize
+Deserialize
+Error
+Read
+Write
+PhantomData
+Infallible
+Nat
+Int
+Bool
+Prop
+Type
+List
+Array
+Char
+Float
+Unit
+Decidable
+Repr
+Inhabited
+Subtype
+Sigma
+Prod
+Sum
+Or
+And
+Iff
+Not
+True
+False
+HEq
+BEq
+Monoid
+Group
+Ring
+Field
+Finset
+README
+SUMMARY
+TODO
+FIXME
+NOTE
+WARNING
+IMPORTANT
+API
+CLI
+CI
+CD
+PR
+OS
+IO
+UUID
+HTTP
+HTTPS
+URL
+JSON
+CBOR
+TOML
+YAML
+WASM
+BFT
+CRDT
+Alice
+Bob
+Chef
+SousChef
+Baker
+Seller
+Client
+Server
+Worker
+Coordinator
+Done
+Loop
+Parallel
+Maybe
+Just
+Nothing
+Hello
+HelloAck
+Goodbye
+Ping
+Pong
+Ack
+Commit
+Abort
+Cancel
+Retry
+Active
+Closed
+Draining
+Aborted
+Faulted
+Admitted
+Blocked
+Failure
+Full
+SKIP
+sort -u "$TMPDIR_DRIFT/skip_identifiers" -o "$TMPDIR_DRIFT/skip_identifiers"
+
+# ── External prefixes for qualified paths ───────────────────────────
+cat > "$TMPDIR_DRIFT/external_prefixes" <<'EXT'
+std
+core
+alloc
+serde
+serde_json
+tokio
+rayon
+uuid
+rand
+bincode
+thiserror
+clap
+tempfile
+proc_macro2
+EXT
+
+# ── Deprecated identifiers (name<TAB>reason) ───────────────────────
+# Add entries here as identifiers are removed or renamed, e.g.:
+# OldTypeName	removed in v6.0, replaced by NewTypeName
+cat > "$TMPDIR_DRIFT/deprecated_identifiers" <<'DEP'
+DEP
+
+# ── Helper: check if value is in a sorted file ──────────────────────
+in_set() {
+    grep -qFx "$1" "$2" 2>/dev/null
 }
-external_prefixes = {
-    "std",
-    "core",
-    "alloc",
-    "serde",
-    "serde_json",
-    "tokio",
-    "rayon",
-    "uuid",
-    "rand",
-    "bincode",
-    "thiserror",
-    "clap",
-    "tempfile",
-    "proc_macro2",
+
+# ── Helper: check if snippet looks like a file path ─────────────────
+looks_like_path() {
+    local s="$1"
+    case "$s" in
+        CLAUDE.md|Cargo.toml|justfile|lean/CODE_MAP.md) return 0 ;;
+        docs/*|rust/*|lean/*|scripts/*|papers/*|.github/*|src/*) return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
-# Well-known types and identifiers that should not trigger drift warnings.
-# Standard library types, Lean builtins, example role names, common enum
-# variants, and environment variable names are excluded.
-skip_identifiers = {
-    # Standard Rust types and traits
-    "String", "Vec", "Option", "Result", "Box", "Arc", "Rc", "Mutex",
-    "HashMap", "HashSet", "BTreeMap", "BTreeSet", "PathBuf", "Path",
-    "Ok", "Err", "Some", "None", "Self", "Sized", "Send", "Sync",
-    "Clone", "Copy", "Debug", "Display", "Default", "Drop", "Eq", "Ord",
-    "Hash", "Iterator", "Future", "Pin", "From", "Into", "AsRef", "Deref",
-    "PartialEq", "PartialOrd", "Serialize", "Deserialize", "Error",
-    "Read", "Write", "PhantomData", "Infallible",
-    # Standard Lean types
-    "Nat", "Int", "Bool", "Prop", "Type", "List", "Array", "Char", "Float",
-    "Unit", "Decidable", "Repr", "Inhabited", "Subtype", "Sigma", "Prod",
-    "Sum", "Or", "And", "Iff", "Not", "True", "False", "HEq", "BEq",
-    "Monoid", "Group", "Ring", "Field", "Finset",
-    # Markdown / formatting artifacts
-    "README", "SUMMARY", "TODO", "FIXME", "NOTE", "WARNING", "IMPORTANT",
-    # Common abbreviations
-    "API", "CLI", "CI", "CD", "PR", "OS", "IO", "UUID", "HTTP", "HTTPS",
-    "URL", "JSON", "CBOR", "TOML", "YAML", "WASM", "BFT", "CRDT",
-    # Example role names from choreography docs
-    "Alice", "Bob", "Chef", "SousChef", "Baker", "Seller", "Client",
-    "Server", "Worker", "Coordinator",
-    # DSL keywords and built-in value constructors
-    "Done", "Loop", "Parallel", "Maybe", "Just", "Nothing",
-    "Hello", "HelloAck", "Goodbye", "Ping", "Pong", "Ack",
-    "Commit", "Abort", "Cancel", "Retry",
-    # Common enum variant names
-    "Active", "Closed", "Draining", "Aborted", "Faulted",
-    "Admitted", "Blocked", "Failure", "Full",
+# ── Helper: extract symbol tail from qualified path ──────────────────
+normalized_symbol_tail() {
+    local snippet="$1"
+    # Get the last segment after ::
+    local last="${snippet##*::}"
+    # Extract leading identifier
+    if [[ "$last" =~ ^([A-Za-z_][A-Za-z0-9_]*) ]]; then
+        echo "${BASH_REMATCH[1]}"
+    fi
 }
 
-# Known deprecated identifiers. Backtick references to these in docs are
-# flagged as stale. Each key maps to a short reason.
-deprecated_identifiers: dict[str, str] = {
-    # Add entries here as identifiers are removed or renamed, e.g.:
-    # "OldTypeName": "removed in v6.0, replaced by NewTypeName",
-}
+# ── Scan doc files for backtick code spans ──────────────────────────
+for doc_file in "${DOC_FILES[@]}"; do
+    line_no=0
+    while IFS= read -r line; do
+        line_no=$((line_no + 1))
 
-pascal_case_re = re.compile(r"^[A-Z][A-Za-z0-9_]+$")
+        # Extract all backtick code spans from this line.
+        # We parse character-by-character to handle multiple spans per line.
+        rest="$line"
+        while [[ "$rest" == *'`'* ]]; do
+            # Skip to first backtick
+            rest="${rest#*\`}"
+            # If no closing backtick, break
+            if [[ "$rest" != *'`'* ]]; then
+                break
+            fi
+            # Extract content up to closing backtick
+            snippet="${rest%%\`*}"
+            rest="${rest#*\`}"
 
+            # Skip empty or multiline-looking spans
+            [[ -z "$snippet" ]] && continue
 
-def line_for(text: str, offset: int) -> int:
-    return text.count("\n", 0, offset) + 1
+            # Trim whitespace
+            snippet="${snippet#"${snippet%%[![:space:]]*}"}"
+            snippet="${snippet%"${snippet##*[![:space:]]}"}"
+            [[ -z "$snippet" ]] && continue
 
+            # ── Check deprecated identifiers ────────────────────
+            if [[ -s "$TMPDIR_DRIFT/deprecated_identifiers" ]]; then
+                dep_reason=""
+                while IFS=$'\t' read -r dep_name dep_msg; do
+                    if [[ "$snippet" == "$dep_name" ]]; then
+                        dep_reason="$dep_msg"
+                        break
+                    fi
+                done < "$TMPDIR_DRIFT/deprecated_identifiers"
+                if [[ -n "$dep_reason" ]]; then
+                    echo "$doc_file:$line_no: deprecated identifier \`$snippet\` ($dep_reason)" >> "$ERRORS_FILE"
+                    continue
+                fi
+            fi
 
-def looks_like_path(snippet: str) -> bool:
-    return snippet in path_literals or snippet.startswith(path_prefixes)
+            # ── just recipe check ───────────────────────────────
+            if [[ "$snippet" == "just "* ]]; then
+                # Split on space, get second word
+                read -ra parts <<< "$snippet"
+                if [[ ${#parts[@]} -ge 2 && "${parts[1]}" != -* ]]; then
+                    if ! in_set "${parts[1]}" "$TMPDIR_DRIFT/just_recipes"; then
+                        echo "$doc_file:$line_no: unknown just recipe \`${parts[1]}\`" >> "$ERRORS_FILE"
+                    fi
+                fi
+                continue
+            fi
 
+            # ── File path check ─────────────────────────────────
+            if looks_like_path "$snippet"; then
+                # Skip globs and .lake/build paths
+                if [[ "$snippet" == *'*'* || "$snippet" == *'/.lake/build/'* ]]; then
+                    continue
+                fi
+                if [[ ! -e "$ROOT_DIR/$snippet" ]]; then
+                    echo "$doc_file:$line_no: missing referenced path \`$snippet\`" >> "$ERRORS_FILE"
+                fi
+                continue
+            fi
 
-def normalized_symbol_tail(snippet: str) -> str | None:
-    last = snippet.split("::")[-1]
-    match = re.match(r"([A-Za-z_][A-Za-z0-9_]*)", last)
-    return match.group(1) if match else None
+            # ── Workspace crate token check ─────────────────────
+            if in_set "$snippet" "$TMPDIR_DRIFT/crate_tokens"; then
+                continue
+            fi
+            # Check if it matches the crate name pattern but is unknown
+            if [[ "$snippet" =~ ^(telltale(-[a-z0-9]+)?|effect-scaffold)$ ]]; then
+                echo "$doc_file:$line_no: unknown workspace crate \`$snippet\`" >> "$ERRORS_FILE"
+                continue
+            fi
 
+            # ── Qualified symbol check (contains ::) ────────────
+            if [[ "$snippet" == *'::'* ]]; then
+                # Skip if contains spaces, braces, parens, commas
+                if [[ "$snippet" =~ [[:space:]\{\}\(\),] ]]; then
+                    continue
+                fi
+                # Get the head (before first ::)
+                head="${snippet%%::*}"
+                if in_set "$head" "$TMPDIR_DRIFT/external_prefixes"; then
+                    continue
+                fi
+                symbol="$(normalized_symbol_tail "$snippet")"
+                if [[ -n "$symbol" ]] && ! in_set "$symbol" "$TMPDIR_DRIFT/repo_identifiers"; then
+                    echo "$doc_file:$line_no: unresolved repo-local symbol tail \`$snippet\`" >> "$ERRORS_FILE"
+                fi
+                continue
+            fi
 
-errors: list[str] = []
-code_span = re.compile(r"`([^`\n]+)`")
+            # ── PascalCase identifier check ─────────────────────
+            if [[ "$snippet" =~ ^[A-Z][A-Za-z0-9_]+$ ]]; then
+                # Skip if in the well-known skip set
+                if in_set "$snippet" "$TMPDIR_DRIFT/skip_identifiers"; then
+                    continue
+                fi
+                # Skip single-character (already excluded by regex requiring 2+ chars)
+                # Skip ALL_CAPS constants
+                if [[ "$snippet" =~ ^[A-Z][A-Z0-9_]+$ ]]; then
+                    continue
+                fi
+                if ! in_set "$snippet" "$TMPDIR_DRIFT/repo_identifiers"; then
+                    echo "$doc_file:$line_no: unresolved type or identifier \`$snippet\`" >> "$ERRORS_FILE"
+                fi
+            fi
 
-for file in doc_files:
-    text = file.read_text(encoding="utf-8")
-    for match in code_span.finditer(text):
-        snippet = match.group(1).strip()
-        line = line_for(text, match.start())
+        done
+    done < "$doc_file"
+done
 
-        # Check for deprecated identifiers
-        if snippet in deprecated_identifiers:
-            reason = deprecated_identifiers[snippet]
-            errors.append(
-                f"{file.relative_to(root)}:{line}: deprecated identifier `{snippet}` ({reason})"
+# ── Feature table accuracy ──────────────────────────────────────────
+# Parse feature tables from docs/02_getting_started.md and compare
+# documented features against actual Cargo features for target crates.
+
+GETTING_STARTED="docs/02_getting_started.md"
+if [[ -f "$GETTING_STARTED" ]]; then
+    TARGET_CRATES="telltale
+telltale-theory
+telltale-choreography
+telltale-lean-bridge"
+
+    # Build actual features per target crate (excluding default, _-prefixed,
+    # and pure optional-dep features).
+    while IFS= read -r crate_name; do
+        jq -r --arg cn "$crate_name" '
+            .packages[]
+            | select(.name == $cn)
+            | .features
+            | to_entries[]
+            | select(
+                .key != "default"
+                and (.key | startswith("_") | not)
+                and (
+                    # Exclude features whose sole dep is dep:<feature_name>
+                    (.value | length) != 1
+                    or .value[0] != ("dep:" + .key)
+                )
             )
+            | .key
+        ' "$CARGO_META" | sort -u > "$TMPDIR_DRIFT/actual_features_${crate_name}"
+    done <<< "$TARGET_CRATES"
+
+    # Parse documented features from feature tables in the markdown
+    current_crate=""
+    in_table=0
+
+    while IFS= read -r gs_line; do
+        # Detect heading like #### `telltale`
+        if [[ "$gs_line" == '#### '* && "$gs_line" == *'`'* ]]; then
+            # Extract text between first pair of backticks
+            candidate="${gs_line#*\`}"
+            candidate="${candidate%%\`*}"
+            candidate="${candidate#"${candidate%%[![:space:]]*}"}"
+            candidate="${candidate%"${candidate##*[![:space:]]}"}"
+            if echo "$TARGET_CRATES" | grep -qFx "$candidate"; then
+                current_crate="$candidate"
+            else
+                current_crate=""
+            fi
+            in_table=0
             continue
+        fi
 
-        if snippet.startswith("just "):
-            parts = snippet.split()
-            if len(parts) >= 2 and not parts[1].startswith("-") and parts[1] not in just_recipes:
-                errors.append(
-                    f"{file.relative_to(root)}:{line}: unknown just recipe `{parts[1]}`"
-                )
+        # Detect feature table header
+        if [[ -n "$current_crate" ]] && [[ "$gs_line" =~ ^\|[[:space:]]*Feature[[:space:]]*\|[[:space:]]*Default[[:space:]]*\|[[:space:]]*Description[[:space:]]*\| ]]; then
+            in_table=1
             continue
+        fi
 
-        if looks_like_path(snippet):
-            if (
-                "*" in snippet
-                or "/.lake/build/" in snippet
-            ):
-                continue
-            if not (root / snippet).exists():
-                errors.append(
-                    f"{file.relative_to(root)}:{line}: missing referenced path `{snippet}`"
-                )
+        # Skip separator row
+        if [[ $in_table -eq 1 ]] && [[ "$gs_line" =~ ^\|[-[:space:]]+\|[-[:space:]]+\|[-[:space:]]+\|$ ]]; then
             continue
+        fi
 
-        if snippet in workspace_crate_tokens:
+        # Parse feature row
+        if [[ $in_table -eq 1 ]] && [[ "$gs_line" == '|'* ]]; then
+            # Extract first cell content
+            IFS='|' read -ra cells <<< "$gs_line"
+            if [[ ${#cells[@]} -ge 2 ]]; then
+                feature="${cells[1]}"
+                # Trim whitespace and backticks
+                feature="${feature#"${feature%%[![:space:]]*}"}"
+                feature="${feature%"${feature##*[![:space:]]}"}"
+                feature="${feature#\`}"
+                feature="${feature%\`}"
+                feature="${feature#"${feature%%[![:space:]]*}"}"
+                feature="${feature%"${feature##*[![:space:]]}"}"
+                if [[ -n "$feature" ]]; then
+                    echo "$feature"
+                fi
+            fi
             continue
-        if re.fullmatch(r"(telltale(-[a-z0-9]+)?|effect-scaffold)", snippet):
-            errors.append(
-                f"{file.relative_to(root)}:{line}: unknown workspace crate `{snippet}`"
-            )
+        fi
+
+        # End of table
+        if [[ $in_table -eq 1 ]] && [[ "$gs_line" != '|'* ]]; then
+            in_table=0
+        fi
+    done < "$GETTING_STARTED" > "$TMPDIR_DRIFT/doc_features_raw"
+
+    # We need per-crate documented features. Re-parse with crate tracking.
+    while IFS= read -r crate_name; do
+        : > "$TMPDIR_DRIFT/doc_features_${crate_name}"
+    done <<< "$TARGET_CRATES"
+
+    current_crate=""
+    in_table=0
+
+    while IFS= read -r gs_line; do
+        if [[ "$gs_line" == '#### '* && "$gs_line" == *'`'* ]]; then
+            candidate="${gs_line#*\`}"
+            candidate="${candidate%%\`*}"
+            candidate="${candidate#"${candidate%%[![:space:]]*}"}"
+            candidate="${candidate%"${candidate##*[![:space:]]}"}"
+            if echo "$TARGET_CRATES" | grep -qFx "$candidate"; then
+                current_crate="$candidate"
+            else
+                current_crate=""
+            fi
+            in_table=0
             continue
+        fi
 
-        if "::" in snippet:
-            if re.search(r"[\s{}(),]", snippet):
-                continue
-            head = snippet.split("::", 1)[0]
-            if head in external_prefixes:
-                continue
-            symbol = normalized_symbol_tail(snippet)
-            if symbol and symbol not in repo_identifiers:
-                errors.append(
-                    f"{file.relative_to(root)}:{line}: unresolved repo-local symbol tail `{snippet}`"
-                )
+        if [[ -n "$current_crate" ]] && [[ "$gs_line" =~ ^\|[[:space:]]*Feature[[:space:]]*\|[[:space:]]*Default[[:space:]]*\|[[:space:]]*Description[[:space:]]*\| ]]; then
+            in_table=1
             continue
+        fi
 
-        # PascalCase identifier check: verify backticked type/trait/enum names
-        # exist somewhere in the Rust or Lean source.
-        if pascal_case_re.match(snippet):
-            if snippet in skip_identifiers:
-                continue
-            # Skip single-letter type parameters
-            if len(snippet) <= 1:
-                continue
-            # Skip ALL_CAPS constants (environment variables, etc.)
-            if re.fullmatch(r"[A-Z][A-Z0-9_]+", snippet):
-                continue
-            if snippet not in repo_identifiers:
-                errors.append(
-                    f"{file.relative_to(root)}:{line}: unresolved type or identifier `{snippet}`"
-                )
+        if [[ $in_table -eq 1 ]] && [[ "$gs_line" =~ ^\|[-[:space:]]+\|[-[:space:]]+\|[-[:space:]]+\|$ ]]; then
+            continue
+        fi
 
-if errors:
-    for error in errors:
-        print(error, file=sys.stderr)
-    sys.exit(1)
+        if [[ $in_table -eq 1 ]] && [[ "$gs_line" == '|'* ]]; then
+            IFS='|' read -ra cells <<< "$gs_line"
+            if [[ ${#cells[@]} -ge 2 ]]; then
+                feature="${cells[1]}"
+                feature="${feature#"${feature%%[![:space:]]*}"}"
+                feature="${feature%"${feature##*[![:space:]]}"}"
+                feature="${feature#\`}"
+                feature="${feature%\`}"
+                feature="${feature#"${feature%%[![:space:]]*}"}"
+                feature="${feature%"${feature##*[![:space:]]}"}"
+                if [[ -n "$feature" && -n "$current_crate" ]]; then
+                    echo "$feature" >> "$TMPDIR_DRIFT/doc_features_${current_crate}"
+                fi
+            fi
+            continue
+        fi
 
-print("docs semantic drift check passed")
-PY
+        if [[ $in_table -eq 1 ]] && [[ "$gs_line" != '|'* ]]; then
+            in_table=0
+        fi
+    done < "$GETTING_STARTED"
+
+    # Compare actual vs documented features per crate
+    while IFS= read -r crate_name; do
+        actual_file="$TMPDIR_DRIFT/actual_features_${crate_name}"
+        doc_file_feat="$TMPDIR_DRIFT/doc_features_${crate_name}"
+
+        [[ -f "$actual_file" ]] || continue
+        sort -u "$doc_file_feat" -o "$doc_file_feat" 2>/dev/null || true
+
+        # Missing in docs (in actual but not in docs)
+        while IFS= read -r feat; do
+            if ! in_set "$feat" "$doc_file_feat"; then
+                echo "docs/02_getting_started.md: feature \`$feat\` exists in \`$crate_name\` but is not documented in feature table" >> "$ERRORS_FILE"
+            fi
+        done < "$actual_file"
+
+        # Extra in docs (in docs but not in actual)
+        if [[ -s "$doc_file_feat" ]]; then
+            while IFS= read -r feat; do
+                if ! in_set "$feat" "$actual_file"; then
+                    echo "docs/02_getting_started.md: feature \`$feat\` is documented for \`$crate_name\` but does not exist in Cargo.toml" >> "$ERRORS_FILE"
+                fi
+            done < "$doc_file_feat"
+        fi
+    done <<< "$TARGET_CRATES"
+fi
+
+# ── Crate version accuracy ──────────────────────────────────────────
+# Scan docs/ and rust/transport/README.md for dependency declarations
+# like `crate_name = "version"` or `crate_name = { version = "version" }`
+# and compare against actual workspace versions.
+
+VERSION_CHECK_FILES=()
+while IFS= read -r f; do
+    VERSION_CHECK_FILES+=("$f")
+done < <(find docs -name '*.md' -type f 2>/dev/null | sort)
+[[ -f rust/transport/README.md ]] && VERSION_CHECK_FILES+=(rust/transport/README.md)
+
+for vpath in "${VERSION_CHECK_FILES[@]}"; do
+    line_no=0
+    while IFS= read -r vline; do
+        line_no=$((line_no + 1))
+
+        # Match: crate_name = "version"
+        crate_name=""
+        declared_version=""
+
+        if [[ "$vline" =~ ^[[:space:]]*(telltale(-[a-z0-9]+)?|effect-scaffold)[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]]; then
+            crate_name="${BASH_REMATCH[1]}"
+            declared_version="${BASH_REMATCH[3]}"
+        # Match: crate_name = { version = "version" ... }
+        elif [[ "$vline" =~ ^[[:space:]]*(telltale(-[a-z0-9]+)?|effect-scaffold)[[:space:]]*=[[:space:]]*\{.*version[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]]; then
+            crate_name="${BASH_REMATCH[1]}"
+            declared_version="${BASH_REMATCH[3]}"
+        fi
+
+        if [[ -n "$crate_name" && -n "$declared_version" ]]; then
+            expected_version=""
+            while IFS=$'\t' read -r pkg_name pkg_ver; do
+                if [[ "$pkg_name" == "$crate_name" ]]; then
+                    expected_version="$pkg_ver"
+                    break
+                fi
+            done < "$TMPDIR_DRIFT/pkg_versions"
+
+            if [[ -n "$expected_version" && "$declared_version" != "$expected_version" ]]; then
+                echo "$vpath:$line_no: \`$crate_name\` version \`$declared_version\` does not match workspace version \`$expected_version\`" >> "$ERRORS_FILE"
+            fi
+        fi
+    done < "$vpath"
+done
+
+# ── Report results ──────────────────────────────────────────────────
+if [[ -s "$ERRORS_FILE" ]]; then
+    cat "$ERRORS_FILE" >&2
+    exit 1
+fi
+
+echo "docs semantic drift check passed"
