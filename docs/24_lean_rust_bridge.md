@@ -19,6 +19,10 @@ Deferred-effect admissibility and stale late-result rejection now live in
 `Runtime/VM/Model/SemanticObjects/OutstandingEffects.lean`, with a small
 observation / `EffectBisim` bridge in
 `Runtime/VM/Model/SemanticObjects/OutstandingEffectsLemmas.lean`.
+Semantic handoff activation, publication transfer, and the explicit bridge to
+delegation / envelope-preservation theorem families now live in
+`Runtime/VM/Model/SemanticObjects/SemanticHandoffTransition.lean` and
+`Runtime/VM/Model/SemanticObjects/SemanticHandoffLemmas.lean`.
 
 ## Scope
 

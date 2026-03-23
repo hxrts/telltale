@@ -2,6 +2,8 @@ import Runtime.VM.Model.SemanticObjects.Core
 import Runtime.VM.Model.SemanticObjects.Invariants
 import Runtime.VM.Model.SemanticObjects.OutstandingEffects
 import Runtime.VM.Model.SemanticObjects.OutstandingEffectsLemmas
+import Runtime.VM.Model.SemanticObjects.SemanticHandoffTransition
+import Runtime.VM.Model.SemanticObjects.SemanticHandoffLemmas
 
 set_option autoImplicit false
 

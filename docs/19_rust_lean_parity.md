@@ -146,6 +146,10 @@ Deferred-effect admissibility, retry shape, and late-result rejection now live
 in `Runtime/VM/Model/SemanticObjects/OutstandingEffects.lean`, with the
 associated theorem-facing lemmas in
 `Runtime/VM/Model/SemanticObjects/OutstandingEffectsLemmas.lean`.
+Semantic handoff realization now lives in
+`Runtime/VM/Model/SemanticObjects/SemanticHandoffTransition.lean`, with
+theorem-facing owner/publication/delegation bridge lemmas in
+`Runtime/VM/Model/SemanticObjects/SemanticHandoffLemmas.lean`.
 
 ### Lean ProtocolMachineState
 
