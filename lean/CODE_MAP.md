@@ -42,9 +42,9 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | ClassicalAnalysis |     3 |   1,128 | Real analysis concrete models for classical transport      |
 | Distributed    |    59 |   7,266 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   170 |  40,077 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   149 |  28,766 | VM, Iris backend via iris-lean, resource algebras, WP      |
+| Runtime        |   151 |  29,027 | VM, Iris backend via iris-lean, resource algebras, WP      |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **628** | **128,196** |                                                            |
+| **Total**      | **630** | **128,457** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
@@ -601,6 +601,8 @@ See [Entropy](#entropy) section for full trust boundary documentation.
 | Program.lean | 137 | Program representation and code segments |
 | SemanticObjects/Core.lean | 241 | Canonical protocol-machine semantic object implementation layer |
 | SemanticObjects/Invariants.lean | 120 | Basic theorem-facing predicates for identity, ownership, and observed-read discipline |
+| SemanticObjects/OutstandingEffects.lean | 132 | Deferred-effect lifecycle model: issuance, blocking, completion, timeout, cancellation, invalidation, retry |
+| SemanticObjects/OutstandingEffectsLemmas.lean | 113 | Admissibility, late-result rejection, and observer / `EffectBisim` lemmas for outstanding effects |
 | SemanticObjects.lean | 9 | Re-export facade for semantic object implementation + invariants |
 | TypeClasses.lean | 251 | Identity, guard, persistence, effect, verification model typeclasses |
 | CompileLocalTypeR.lean | 190 | Compiler from LocalTypeR to VM bytecode instructions |

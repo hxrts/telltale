@@ -15,6 +15,10 @@ On the Lean side, the semantic-object implementation layer lives in
 `Runtime/VM/Model/SemanticObjects/Core.lean`, while theorem-facing predicates
 for identity, ownership, and observed-read discipline live in
 `Runtime/VM/Model/SemanticObjects/Invariants.lean`.
+Deferred-effect admissibility and stale late-result rejection now live in
+`Runtime/VM/Model/SemanticObjects/OutstandingEffects.lean`, with a small
+observation / `EffectBisim` bridge in
+`Runtime/VM/Model/SemanticObjects/OutstandingEffectsLemmas.lean`.
 
 ## Scope
 

@@ -142,6 +142,10 @@ The Lean implementation layer now keeps the executable semantic-object
 definitions in `Runtime/VM/Model/SemanticObjects/Core.lean` and the basic
 theorem-facing predicates in `Runtime/VM/Model/SemanticObjects/Invariants.lean`,
 with `Runtime/VM/Model/SemanticObjects.lean` serving as the re-export facade.
+Deferred-effect admissibility, retry shape, and late-result rejection now live
+in `Runtime/VM/Model/SemanticObjects/OutstandingEffects.lean`, with the
+associated theorem-facing lemmas in
+`Runtime/VM/Model/SemanticObjects/OutstandingEffectsLemmas.lean`.
 
 ### Lean ProtocolMachineState
 
