@@ -39,6 +39,11 @@ Progress-contract semantics now live in
 owner-liveness, escalation, and compatibility lemmas for the existing
 Lyapunov/weighted-measure/scheduling-bound surfaces in
 `Runtime/VM/Model/SemanticObjects/ProgressContractsLemmas.lean`.
+Transformation-local obligation bundles now live in
+`Runtime/VM/Model/SemanticObjects/TransformationLocalObligations.lean`, with
+coverage/admissibility lemmas and lightweight linking / reconfiguration bridge
+structures in
+`Runtime/VM/Model/SemanticObjects/TransformationLocalObligationsLemmas.lean`.
 
 ## Scope
 
