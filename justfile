@@ -73,19 +73,17 @@ ci-dry-run lane="fast":
     just check-capability-gates
     just check-release-conformance
     just check-telltale-style
-    just check-docs-drift
     just check-tooling-convergence
     just check-aura-borrowed-lints
     just check-doc-links-ci
-    just check-doc-links-in-code
-    bash ./scripts/check/doc-quality.sh
-    just v2-baseline check
+    just check-doc-quality
+    just perf-baseline check
     just check-vm-placeholders
     just check-parity
     just verify-lean-vm-targets
     just verify-protocols
     just verify-track-a
-    just v2-baseline sla
+    just perf-baseline sla
     # Benchmark target compilation checks
     just bench-check
     just book
@@ -103,7 +101,7 @@ ci-dry-run lane="fast":
       just verify-track-b
       just verify-properties
       just verify-composition-stress
-      just v2-baseline run
+      just perf-baseline run
     fi
 
 # Mirror the markdown link-check action used in GitHub check.yml docs lane
@@ -137,7 +135,7 @@ check-arch-rust:
 # TellTale syntax/style check suite (dependency layering, docs references, symbols)
 check-telltale-style:
     ./scripts/check/dependency-layers.sh
-    ./scripts/check/doc-links-extended.sh
+    ./scripts/check/docs-links.sh
     ./scripts/check/text-symbols.sh
 
 # Enforce public tooling/example cutover to generated effect interfaces and owned opens.
@@ -175,9 +173,9 @@ check-capability-gates:
 check-release-conformance:
     ./scripts/check/release-conformance.sh
 
-# V2 baseline management (check, freeze, run, sla)
-v2-baseline mode="check":
-    ./scripts/ops/baseline-v2.sh {{ mode }}
+# Performance baseline management (check, freeze, run, sla)
+perf-baseline mode="check":
+    ./scripts/ops/perf-baseline.sh {{ mode }}
 
 # Prevent new placeholder/stub/TODO markers in executable Lean VM modules.
 check-vm-placeholders:
@@ -200,17 +198,9 @@ check-ownership-contracts:
 check-parity-ledger:
     ./scripts/check/parity-ledger.sh
 
-# Check crate and feature references in docs/00-03 against Cargo metadata.
-check-docs-drift:
-    ./scripts/check/docs-drift.sh
-
-# Check for semantic drift in backticked commands, file paths, crates, and qualified symbols.
+# Check for semantic drift in backticked identifiers, paths, crates, features, and versions.
 check-docs-semantic-drift:
     ./scripts/check/docs-semantic-drift.sh
-
-# Check docs/ links referenced from rust/ and lean/ sources resolve to existing files.
-check-doc-links-in-code:
-    ./scripts/check/doc-links-in-code.sh
 
 # Validate that all remote GitHub Action references in workflows resolve.
 check-workflow-actions:
@@ -220,9 +210,9 @@ check-workflow-actions:
 check-workflow-actions-regression:
     ./scripts/check/workflow-actions-regression.sh
 
-# Enforce documentation style, link integrity, and command/reference validity.
+# Enforce documentation prose style and structure.
 check-doc-quality:
-    bash ./scripts/check/doc-quality.sh
+    bash ./scripts/check/docs-prose-quality.sh
 
 # Reject raw session-store ownership mutation outside sanctioned entry points.
 check-session-ingress-boundary:
