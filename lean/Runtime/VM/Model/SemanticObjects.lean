@@ -8,6 +8,8 @@ import Runtime.VM.Model.SemanticObjects.AuthoritativeReadsPublication
 import Runtime.VM.Model.SemanticObjects.AuthoritativeReadsPublicationLemmas
 import Runtime.VM.Model.SemanticObjects.MaterializationSuccess
 import Runtime.VM.Model.SemanticObjects.MaterializationSuccessLemmas
+import Runtime.VM.Model.SemanticObjects.ProgressContracts
+import Runtime.VM.Model.SemanticObjects.ProgressContractsLemmas
 
 set_option autoImplicit false
 

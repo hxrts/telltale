@@ -160,6 +160,11 @@ canonical-handle adequacy now live in
 `Runtime/VM/Model/SemanticObjects/MaterializationSuccess.lean`, with lemmas
 that rule out proof-less success and observational materialization promotion in
 `Runtime/VM/Model/SemanticObjects/MaterializationSuccessLemmas.lean`.
+Progress-contract semantics now live in
+`Runtime/VM/Model/SemanticObjects/ProgressContracts.lean`, with theorem-facing
+owner-liveness, escalation, and Lyapunov/weighted-measure/scheduling-bound
+compatibility lemmas in
+`Runtime/VM/Model/SemanticObjects/ProgressContractsLemmas.lean`.
 
 ### Lean ProtocolMachineState
 
