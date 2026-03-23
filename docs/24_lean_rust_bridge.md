@@ -11,6 +11,10 @@ but the canonical public bridge surface is the protocol-machine surface:
 and `ProtocolMachineSemanticObjects`.
 Bridge payloads describe guest-runtime and protocol-machine artifacts. Host-runtime
 handlers remain outside the bridge and re-enter through typed effect surfaces.
+On the Lean side, the semantic-object implementation layer lives in
+`Runtime/VM/Model/SemanticObjects/Core.lean`, while theorem-facing predicates
+for identity, ownership, and observed-read discipline live in
+`Runtime/VM/Model/SemanticObjects/Invariants.lean`.
 
 ## Scope
 

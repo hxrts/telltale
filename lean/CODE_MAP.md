@@ -42,9 +42,9 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | ClassicalAnalysis |     3 |   1,128 | Real analysis concrete models for classical transport      |
 | Distributed    |    59 |   7,266 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   170 |  40,077 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   147 |  28,611 | VM, Iris backend via iris-lean, resource algebras, WP      |
+| Runtime        |   149 |  28,766 | VM, Iris backend via iris-lean, resource algebras, WP      |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **626** | **128,041** |                                                            |
+| **Total**      | **628** | **128,196** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
@@ -599,6 +599,9 @@ See [Entropy](#entropy) section for full trust boundary documentation.
 | Config.lean | 85 | VMConfig, VMState, ResourcePool |
 | State.lean | 304 | Full machine state, session table, buffer management |
 | Program.lean | 137 | Program representation and code segments |
+| SemanticObjects/Core.lean | 241 | Canonical protocol-machine semantic object implementation layer |
+| SemanticObjects/Invariants.lean | 120 | Basic theorem-facing predicates for identity, ownership, and observed-read discipline |
+| SemanticObjects.lean | 9 | Re-export facade for semantic object implementation + invariants |
 | TypeClasses.lean | 251 | Identity, guard, persistence, effect, verification model typeclasses |
 | CompileLocalTypeR.lean | 190 | Compiler from LocalTypeR to VM bytecode instructions |
 | Knowledge.lean | 30 | Knowledge base and fact management |

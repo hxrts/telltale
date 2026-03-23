@@ -108,14 +108,14 @@ Lean, Rust, and the Rust/Lean bridge.
 
 | Object | Lean Surface | Rust Surface | Bridge Surface | Status |
 |---|---|---|---|---|
-| `OperationInstance` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `OutstandingEffect` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `SemanticHandoff` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `TransformationObligation` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `AuthoritativeRead` / `ObservedRead` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `MaterializationProof` / `CanonicalHandle` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `ProgressContract` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `ProgressTransition` | `Runtime/VM/Model/SemanticObjects.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `OperationInstance` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `OutstandingEffect` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `SemanticHandoff` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `TransformationObligation` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `AuthoritativeRead` / `ObservedRead` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `MaterializationProof` / `CanonicalHandle` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `ProgressContract` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `ProgressTransition` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | typed effect metadata / request / outcome model | `Runtime/VM/Model/Effects.lean` | `rust/vm/src/effect.rs` | `rust/lean-bridge/src/vm_runner.rs` (`effect_exchanges`) | Aligned |
 
 `OperationInstance` and `OutstandingEffect` are now compared as canonical
@@ -137,6 +137,11 @@ traces.
 no-progress and degraded states, and timeout escalation state. `ProgressTransition`
 parity makes those escalations replay-visible instead of leaving them as
 target-specific scheduling heuristics.
+
+The Lean implementation layer now keeps the executable semantic-object
+definitions in `Runtime/VM/Model/SemanticObjects/Core.lean` and the basic
+theorem-facing predicates in `Runtime/VM/Model/SemanticObjects/Invariants.lean`,
+with `Runtime/VM/Model/SemanticObjects.lean` serving as the re-export facade.
 
 ### Lean ProtocolMachineState
 
