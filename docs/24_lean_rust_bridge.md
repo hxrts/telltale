@@ -23,6 +23,11 @@ Semantic handoff activation, publication transfer, and the explicit bridge to
 delegation / envelope-preservation theorem families now live in
 `Runtime/VM/Model/SemanticObjects/SemanticHandoffTransition.lean` and
 `Runtime/VM/Model/SemanticObjects/SemanticHandoffLemmas.lean`.
+Authoritative-read commitment contexts, canonical publication-path uniqueness,
+and observer-class publication projection now live in
+`Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublication.lean`, with
+observer-projection / blindness / noninterference consequences in
+`Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublicationLemmas.lean`.
 
 ## Scope
 

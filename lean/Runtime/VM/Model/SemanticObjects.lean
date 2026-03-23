@@ -4,6 +4,8 @@ import Runtime.VM.Model.SemanticObjects.OutstandingEffects
 import Runtime.VM.Model.SemanticObjects.OutstandingEffectsLemmas
 import Runtime.VM.Model.SemanticObjects.SemanticHandoffTransition
 import Runtime.VM.Model.SemanticObjects.SemanticHandoffLemmas
+import Runtime.VM.Model.SemanticObjects.AuthoritativeReadsPublication
+import Runtime.VM.Model.SemanticObjects.AuthoritativeReadsPublicationLemmas
 
 set_option autoImplicit false
 

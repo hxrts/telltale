@@ -150,6 +150,11 @@ Semantic handoff realization now lives in
 `Runtime/VM/Model/SemanticObjects/SemanticHandoffTransition.lean`, with
 theorem-facing owner/publication/delegation bridge lemmas in
 `Runtime/VM/Model/SemanticObjects/SemanticHandoffLemmas.lean`.
+Authoritative-read commitment contexts, canonical publication-path uniqueness,
+and observer-class publication projection now live in
+`Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublication.lean`, with
+observer-projection / blindness / noninterference lemmas in
+`Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublicationLemmas.lean`.
 
 ### Lean ProtocolMachineState
 
