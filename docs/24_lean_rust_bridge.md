@@ -160,7 +160,7 @@ pub struct ProtocolMachineRunOutput {
     pub effect_trace: Vec<EffectTraceEvent>,
     pub effect_exchanges: Vec<EffectExchangeRecord>,
     pub output_condition_trace: Vec<OutputConditionTraceEvent>,
-    pub step_states: Vec<VmStepState>,
+    pub step_states: Vec<ProtocolMachineStepState>,
     pub semantic_objects: ProtocolMachineSemanticObjects,
 }
 ```
@@ -238,10 +238,10 @@ normalizes successfully.
 Supported fields include `session`, `sid`, `edge.sid`, and `endpoint.sid`.
 The extractor also searches nested objects.
 
-`normalize_vm_trace()` rewrites tick values into per-session local counters.
+`normalize_semantic_audit()` rewrites tick values into per-session local counters.
 Events that have no session id remain unchanged.
 
-`traces_equivalent()` and `observationally_equivalent()` compare traces after this normalization.
+`semantic_audits_equivalent()` and `observationally_equivalent()` compare traces after this normalization.
 `partition_by_session()` groups normalized events into per-session subsequences.
 
 ## Invariant Bundle Export

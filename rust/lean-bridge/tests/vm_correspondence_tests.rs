@@ -16,7 +16,7 @@ use telltale_vm::vm::ObsEvent;
 use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 
 #[derive(Debug, thiserror::Error)]
-enum VmCorrespondenceError {
+enum ProtocolMachineCorrespondenceError {
     #[error("vm load failed: {0}")]
     Load(String),
     #[error("vm run failed: {0}")]
@@ -72,7 +72,7 @@ impl EffectHandler for PassthroughHandler {
     }
 }
 
-fn obs_to_vm_trace(ev: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
+fn obs_to_semantic_audit_event(ev: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
     let mut out = ProtocolMachineTraceEvent {
         schema_version: default_schema_version(),
         kind: String::new(),
@@ -166,18 +166,22 @@ fn obs_to_vm_trace(ev: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
 fn run_rust_vm(
     fixture: &test_choreographies::ProtocolFixture,
     max_steps: usize,
-) -> Result<ProtocolMachineRunOutput, VmCorrespondenceError> {
+) -> Result<ProtocolMachineRunOutput, ProtocolMachineCorrespondenceError> {
     let image = CodeImage::from_local_types(&fixture.local_types, &fixture.global);
     let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::AllowAll,
         ..ProtocolMachineConfig::default()
     });
     vm.load_choreography(&image)
-        .map_err(|e| VmCorrespondenceError::Load(e.to_string()))?;
+        .map_err(|e| ProtocolMachineCorrespondenceError::Load(e.to_string()))?;
     vm.run(&PassthroughHandler, max_steps)
-        .map_err(|e| VmCorrespondenceError::Run(e.to_string()))?;
+        .map_err(|e| ProtocolMachineCorrespondenceError::Run(e.to_string()))?;
 
-    let trace = vm.trace().iter().filter_map(obs_to_vm_trace).collect();
+    let trace = vm
+        .trace()
+        .iter()
+        .filter_map(obs_to_semantic_audit_event)
+        .collect();
     let sessions = vm
         .sessions()
         .session_ids()
@@ -260,19 +264,19 @@ fn assert_stepwise_prefix_equivalent(
     result: &telltale_lean_bridge::ComparisonResult,
 ) {
     let min_len = result
-        .rust_normalized
+        .rust_semantic_audit
         .len()
-        .min(result.lean_normalized.len());
+        .min(result.lean_semantic_audit.len());
     for idx in 0..min_len {
         assert_eq!(
-            result.rust_normalized[idx], result.lean_normalized[idx],
+            result.rust_semantic_audit[idx], result.lean_semantic_audit[idx],
             "step mismatch for {fixture_name} at index {idx}"
         );
     }
 }
 
 #[test]
-fn test_vm_trace_correspondence_ping_pong() {
+fn test_protocol_machine_semantic_audit_correspondence_ping_pong() {
     let fixture = test_choreographies::ping_pong();
     let rust_output = run_rust_vm(&fixture, 200).expect("run rust VM");
 
@@ -296,7 +300,7 @@ fn test_vm_trace_correspondence_ping_pong() {
 }
 
 #[test]
-fn test_vm_trace_correspondence_all_tier1() {
+fn test_protocol_machine_semantic_audit_correspondence_all_tier1() {
     let fixtures = [
         test_choreographies::ping_pong(),
         test_choreographies::singleton(),
@@ -331,7 +335,7 @@ fn test_vm_trace_correspondence_all_tier1() {
 }
 
 #[test]
-fn test_vm_trace_correspondence_tier2_to_tier4() {
+fn test_protocol_machine_semantic_audit_correspondence_tier2_to_tier4() {
     let fixtures = [
         test_choreographies::tier2_control_flow::binary_choice(),
         test_choreographies::tier3_distributed::three_party_ack(),

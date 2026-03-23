@@ -1,4 +1,4 @@
-//! VM trace normalization helpers for cross-VM comparison.
+//! Semantic-audit normalization helpers for cross-runtime comparison.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -61,13 +61,13 @@ pub struct OutputConditionTraceEvent {
     pub passed: bool,
 }
 
-/// Replay bundle combining VM events with effect/output-condition traces.
+/// Replay bundle combining semantic-audit events with effect/output-condition traces.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ReplayTraceBundle {
+pub struct ProtocolMachineReplayBundle {
     /// Schema version for this payload.
     #[serde(default = "crate::schema::default_schema_version")]
     pub schema_version: String,
-    pub vm_trace: Vec<NormalizedEvent>,
+    pub semantic_audit: Vec<NormalizedEvent>,
     #[serde(default)]
     pub effect_trace: Vec<EffectTraceEvent>,
     #[serde(default)]
@@ -76,7 +76,7 @@ pub struct ReplayTraceBundle {
 
 /// Try to extract a session identifier from an event payload.
 ///
-/// Supports common shapes used by VM traces:
+/// Supports common shapes used by protocol-machine semantic audit events:
 /// - `{ "session": <usize>, ... }`
 /// - `{ "sid": <usize>, ... }`
 /// - nested `{ "edge": { "sid": <usize> } }`
@@ -138,7 +138,7 @@ fn event_session_from_value(value: &Value) -> Option<usize> {
 /// Normalize tick values per session so traces can be compared independent of
 /// cross-session scheduling interleavings.
 #[must_use]
-pub fn normalize_vm_trace<E>(
+pub fn normalize_semantic_audit<E>(
     trace: &[crate::semantic_objects::TickedObsEvent<E>],
 ) -> Vec<crate::semantic_objects::TickedObsEvent<E>>
 where
@@ -165,17 +165,17 @@ where
 
 /// Compare two traces after per-session normalization.
 #[must_use]
-pub fn traces_equivalent<E>(
+pub fn semantic_audits_equivalent<E>(
     rust_trace: &[crate::semantic_objects::TickedObsEvent<E>],
     lean_trace: &[crate::semantic_objects::TickedObsEvent<E>],
 ) -> bool
 where
     E: Serialize + Clone + PartialEq,
 {
-    normalize_vm_trace(rust_trace) == normalize_vm_trace(lean_trace)
+    normalize_semantic_audit(rust_trace) == normalize_semantic_audit(lean_trace)
 }
 
-/// Minimal shared observational equivalence relation for Lean/Rust VM traces.
+/// Minimal shared observational equivalence relation for Lean/Rust semantic audits.
 ///
 /// Equivalence is defined as equality after per-session tick normalization.
 #[must_use]
@@ -186,7 +186,7 @@ pub fn observationally_equivalent<E>(
 where
     E: Serialize + Clone + PartialEq,
 {
-    traces_equivalent(left, right)
+    semantic_audits_equivalent(left, right)
 }
 
 /// Extract per-session traces from a flat event list.
@@ -224,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    fn normalize_vm_trace_rewrites_ticks_per_session() {
+    fn normalize_semantic_audit_rewrites_ticks_per_session() {
         let trace = vec![
             TickedObsEvent {
                 tick: 10,
@@ -240,14 +240,14 @@ mod tests {
             },
         ];
 
-        let normalized = normalize_vm_trace(&trace);
+        let normalized = normalize_semantic_audit(&trace);
         assert_eq!(normalized[0].tick, 0);
         assert_eq!(normalized[1].tick, 0);
         assert_eq!(normalized[2].tick, 1);
     }
 
     #[test]
-    fn traces_equivalent_compares_normalized_ticks() {
+    fn semantic_audits_equivalent_compares_normalized_ticks() {
         let rust_trace = vec![
             TickedObsEvent {
                 tick: 50,
@@ -268,6 +268,6 @@ mod tests {
                 event: json!({"session": 1, "kind": "received"}),
             },
         ];
-        assert!(traces_equivalent(&rust_trace, &lean_trace));
+        assert!(semantic_audits_equivalent(&rust_trace, &lean_trace));
     }
 }

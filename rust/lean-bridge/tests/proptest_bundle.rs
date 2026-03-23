@@ -13,7 +13,7 @@ use telltale_lean_bridge::{
     LittlesLawConfig, MaxWeightConfig, MeanFieldConfig, MixingConfig, NakamotoConfig,
     PartialSynchronyConfig, PartitionModel, ProtocolBundle, ProtocolEnvelopeBridgeConfig,
     QuorumGeometryConfig, QuorumSystemKind, ReconfigurationConfig, ResponsivenessConfig,
-    TimingModel, VMEnvelopeAdherenceConfig, VMEnvelopeAdmissionConfig,
+    TimingModel, ProtocolMachineEnvelopeAdherenceConfig, ProtocolMachineEnvelopeAdmissionConfig,
 };
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 
@@ -66,8 +66,8 @@ fn distributed_slot_count(distributed: &DistributedClaims) -> usize {
         + usize::from(distributed.byzantine_safety.is_some())
         + usize::from(distributed.consensus_envelope.is_some())
         + usize::from(distributed.failure_envelope.is_some())
-        + usize::from(distributed.vm_envelope_adherence.is_some())
-        + usize::from(distributed.vm_envelope_admission.is_some())
+        + usize::from(distributed.protocol_machine_envelope_adherence.is_some())
+        + usize::from(distributed.protocol_machine_envelope_admission.is_some())
         + usize::from(distributed.protocol_envelope_bridge.is_some())
 }
 
@@ -308,20 +308,20 @@ proptest! {
     }
 
     #[test]
-    fn distributed_vm_envelope_adherence_roundtrip(enabled in any::<bool>()) {
+    fn distributed_protocol_machine_envelope_adherence_roundtrip(enabled in any::<bool>()) {
         let mut claims = empty_claims();
-        claims.distributed.vm_envelope_adherence = Some(VMEnvelopeAdherenceConfig { enabled });
+        claims.distributed.protocol_machine_envelope_adherence = Some(ProtocolMachineEnvelopeAdherenceConfig { enabled });
         let decoded = roundtrip_claims(claims);
-        assert!(decoded.distributed.vm_envelope_adherence.is_some());
+        assert!(decoded.distributed.protocol_machine_envelope_adherence.is_some());
         assert_single_distributed_slot(&decoded);
     }
 
     #[test]
-    fn distributed_vm_envelope_admission_roundtrip(enabled in any::<bool>()) {
+    fn distributed_protocol_machine_envelope_admission_roundtrip(enabled in any::<bool>()) {
         let mut claims = empty_claims();
-        claims.distributed.vm_envelope_admission = Some(VMEnvelopeAdmissionConfig { enabled });
+        claims.distributed.protocol_machine_envelope_admission = Some(ProtocolMachineEnvelopeAdmissionConfig { enabled });
         let decoded = roundtrip_claims(claims);
-        assert!(decoded.distributed.vm_envelope_admission.is_some());
+        assert!(decoded.distributed.protocol_machine_envelope_admission.is_some());
         assert_single_distributed_slot(&decoded);
     }
 

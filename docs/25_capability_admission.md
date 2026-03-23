@@ -86,7 +86,7 @@ The theorem-pack inventory publishes machine-readable capability keys.
 | protocol safety and liveness | `termination`, `output_condition_soundness` |
 | distributed impossibility and safety | `flp_impossibility`, `cap_impossibility`, `quorum_geometry_safety` |
 | distributed deployment families | `partial_synchrony_liveness`, `reconfiguration_safety`, `atomic_broadcast_ordering` |
-| advanced envelope families | `consensus_envelope`, `failure_envelope`, `vm_envelope_adherence`, `vm_envelope_admission`, `protocol_envelope_bridge` |
+| advanced envelope families | `consensus_envelope`, `failure_envelope`, `protocol_machine_envelope_adherence`, `protocol_machine_envelope_admission`, `protocol_envelope_bridge` |
 | classical transport families | `classical_foster`, `classical_maxweight`, `classical_ldp`, `classical_functional_clt` |
 
 Rust capability snapshots should align with this inventory for release and admission claims.

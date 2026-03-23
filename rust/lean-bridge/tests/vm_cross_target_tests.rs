@@ -377,7 +377,7 @@ fn cross_target_matrix_native_single_vs_threaded_traces() {
         let single_per_session = per_session(&single_trace);
         let threaded_per_session = per_session(&threaded_trace);
         assert_eq_structured_attributed(
-            "vm_trace.per_session",
+            "semantic_audit.per_session",
             &single_per_session,
             &threaded_per_session,
             &single_effect_sig,
@@ -429,7 +429,7 @@ fn cross_target_matrix_replay_effect_trace_comparison() {
     let single_per_session = per_session(&single_trace);
     let threaded_per_session = per_session(threaded.trace());
     assert_eq_structured(
-        "replay.vm_trace.per_session",
+        "replay.semantic_audit.per_session",
         &single_per_session,
         &threaded_per_session,
     );

@@ -18,7 +18,7 @@ use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 use test_support::PassthroughHandler;
 
 #[test]
-fn test_lean_vm_trace_matches_rust() {
+fn test_lean_semantic_audit_matches_rust() {
     let Some(runner) = ProtocolMachineRunner::try_new() else {
         eprintln!("Lean vm_runner not available. Build with: cd lean && lake build vm_runner");
         return;

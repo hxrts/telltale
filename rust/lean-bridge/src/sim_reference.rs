@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
-use crate::vm_runner::VmTraceEvent;
+use crate::vm_runner::ProtocolMachineTraceEvent;
 
 /// Input payload for Lean reference simulation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,7 +31,7 @@ pub struct SimRunOutput {
     pub schema_version: String,
     /// Observable trace produced by the simulation.
     #[serde(default)]
-    pub trace: Vec<VmTraceEvent>,
+    pub trace: Vec<ProtocolMachineTraceEvent>,
     /// Property violations emitted by Lean reference checks.
     #[serde(default)]
     pub violations: Vec<Value>,

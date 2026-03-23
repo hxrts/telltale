@@ -16,7 +16,7 @@ use crate::sim_reference::{
     SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
 };
 use crate::vm_trace::{
-    normalize_vm_trace, traces_equivalent, EffectTraceEvent, OutputConditionTraceEvent,
+    normalize_semantic_audit, semantic_audits_equivalent, EffectTraceEvent, OutputConditionTraceEvent,
 };
 use telltale_vm::EffectExchangeRecord;
 
@@ -27,17 +27,17 @@ use parsing::{
     parse_structured_errors, simulation_trace_payload,
 };
 
-/// Errors from Lean VM runner operations.
+/// Errors from Lean protocol-machine runner operations.
 #[derive(Debug, Error)]
-pub enum VmRunnerError {
-    /// The VM runner binary was not found at the expected path.
-    #[error("VM runner binary not found at {0}")]
+pub enum ProtocolMachineRunnerError {
+    /// The protocol-machine runner binary was not found at the expected path.
+    #[error("protocol-machine runner binary not found at {0}")]
     BinaryNotFound(PathBuf),
     /// Failed to create a temporary file for JSON exchange.
     #[error("Failed to create temp file: {0}")]
     TempFileError(#[from] std::io::Error),
     /// The Lean process exited with a non-zero status.
-    #[error("VM runner failed with exit code {code}: {stderr}")]
+    #[error("protocol-machine runner failed with exit code {code}: {stderr}")]
     ProcessFailed {
         /// Exit code from the process.
         code: i32,
@@ -45,10 +45,10 @@ pub enum VmRunnerError {
         stderr: String,
     },
     /// Failed to parse Lean output or JSON.
-    #[error("Failed to parse VM runner output: {0}")]
+    #[error("Failed to parse protocol-machine runner output: {0}")]
     ParseError(String),
-    /// VM runner process exceeded the configured timeout.
-    #[error("VM runner operation '{operation}' timed out after {timeout_ms}ms")]
+    /// Protocol-machine runner process exceeded the configured timeout.
+    #[error("protocol-machine runner operation '{operation}' timed out after {timeout_ms}ms")]
     TimedOut {
         /// Operation name associated with the process invocation.
         operation: String,
@@ -57,9 +57,9 @@ pub enum VmRunnerError {
     },
 }
 
-/// Input JSON for the VM runner.
+/// Input JSON for the protocol-machine runner.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VmRunInput {
+pub struct ProtocolMachineRunInput {
     /// Schema version for this payload.
     #[serde(default = "crate::schema::default_schema_version")]
     pub schema_version: String,
@@ -71,9 +71,9 @@ pub struct VmRunInput {
     pub max_steps: u64,
 }
 
-/// One session status entry from the VM runner.
+/// One session status entry from the protocol-machine runner.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VmSessionStatus {
+pub struct ProtocolMachineSessionStatus {
     /// Schema version for this payload.
     #[serde(default = "crate::schema::default_schema_version")]
     pub schema_version: String,
@@ -83,9 +83,9 @@ pub struct VmSessionStatus {
     pub terminal: bool,
 }
 
-/// One trace event from the VM runner.
+/// One semantic-audit event from the protocol-machine runner.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct VmTraceEvent {
+pub struct ProtocolMachineTraceEvent {
     /// Schema version for this payload.
     #[serde(default = "crate::schema::default_schema_version")]
     pub schema_version: String,
@@ -123,9 +123,9 @@ pub struct VmTraceEvent {
     pub passed: Option<bool>,
 }
 
-/// One scheduler-step state entry from the VM runner.
+/// One scheduler-step state entry from the protocol-machine runner.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VmStepState {
+pub struct ProtocolMachineStepState {
     /// Step index in execution order.
     #[serde(default)]
     pub step_index: u64,
@@ -140,19 +140,19 @@ pub struct VmStepState {
     pub session_type_counts: BTreeMap<u64, u64>,
     /// Optional event emitted by this scheduler step.
     #[serde(default)]
-    pub event: Option<VmTraceEvent>,
+    pub event: Option<ProtocolMachineTraceEvent>,
 }
 
-/// Output from the VM runner.
+/// Output from the protocol-machine runner.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VmRunOutput {
+pub struct ProtocolMachineRunOutput {
     /// Schema version for this payload.
     #[serde(default = "crate::schema::default_schema_version")]
     pub schema_version: String,
-    /// Observable trace.
-    pub trace: Vec<VmTraceEvent>,
+    /// Semantic audit emitted by the protocol machine.
+    pub trace: Vec<ProtocolMachineTraceEvent>,
     /// Session statuses.
-    pub sessions: Vec<VmSessionStatus>,
+    pub sessions: Vec<ProtocolMachineSessionStatus>,
     /// Steps executed.
     pub steps_executed: u64,
     /// Concurrency level.
@@ -170,26 +170,11 @@ pub struct VmRunOutput {
     pub output_condition_trace: Vec<OutputConditionTraceEvent>,
     /// Optional per-step scheduler state snapshots.
     #[serde(default)]
-    pub step_states: Vec<VmStepState>,
+    pub step_states: Vec<ProtocolMachineStepState>,
     /// Canonical semantic object export from the protocol machine runtime.
     #[serde(default)]
     pub semantic_objects: ProtocolMachineSemanticObjects,
 }
-
-/// Canonical public alias for protocol-machine runner input payloads.
-pub type ProtocolMachineRunInput = VmRunInput;
-
-/// Canonical public alias for protocol-machine runner session-status payloads.
-pub type ProtocolMachineSessionStatus = VmSessionStatus;
-
-/// Canonical public alias for protocol-machine runner trace events.
-pub type ProtocolMachineTraceEvent = VmTraceEvent;
-
-/// Canonical public alias for protocol-machine runner step-state payloads.
-pub type ProtocolMachineStepState = VmStepState;
-
-/// Canonical public alias for protocol-machine runner output payloads.
-pub type ProtocolMachineRunOutput = VmRunOutput;
 
 /// Structured Lean-side validation error payload.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -208,18 +193,18 @@ pub struct TraceValidation {
     pub errors: Vec<LeanStructuredError>,
 }
 
-/// Result of comparing Rust and Lean VM executions.
+/// Result of comparing Rust and Lean protocol-machine executions.
 #[derive(Debug, Clone, Serialize)]
 pub struct ComparisonResult {
     pub equivalent: bool,
-    pub trace_equivalent: bool,
+    pub semantic_audit_equivalent: bool,
     pub semantic_handoffs_equivalent: bool,
     pub invalidation_artifacts_equivalent: bool,
-    pub rust_normalized: Vec<TickedObsEvent<VmTraceEvent>>,
-    pub lean_normalized: Vec<TickedObsEvent<VmTraceEvent>>,
+    pub rust_semantic_audit: Vec<TickedObsEvent<ProtocolMachineTraceEvent>>,
+    pub lean_semantic_audit: Vec<TickedObsEvent<ProtocolMachineTraceEvent>>,
     #[serde(default)]
     pub diff: Option<Value>,
-    pub lean_output: VmRunOutput,
+    pub lean_output: ProtocolMachineRunOutput,
 }
 
 /// Result from protocol-bundle invariant verification.
@@ -232,21 +217,15 @@ pub struct InvariantVerificationResult {
     pub artifacts: Value,
 }
 
-/// Runner for invoking the Lean VM runner binary.
-pub struct VmRunner {
+/// Runner for invoking the Lean protocol-machine runner binary.
+pub struct ProtocolMachineRunner {
     binary_path: PathBuf,
 }
 
-/// Canonical public alias for the Lean protocol-machine runner wrapper.
-pub type ProtocolMachineRunner = VmRunner;
-
-/// Canonical public alias for protocol-machine runner errors.
-pub type ProtocolMachineRunnerError = VmRunnerError;
-
-impl VmRunner {
-    /// Default path to the VM runner binary (relative to workspace root).
+impl ProtocolMachineRunner {
+    /// Default path to the protocol-machine runner binary (relative to workspace root).
     pub const DEFAULT_BINARY_PATH: &'static str = "lean/.lake/build/bin/vm_runner";
-    /// Default timeout for VM runner process invocations.
+    /// Default timeout for protocol-machine runner process invocations.
     pub const DEFAULT_TIMEOUT_MS: u64 = 120_000;
 
     fn process_timeout() -> Duration {
@@ -261,12 +240,12 @@ impl VmRunner {
         mut child: Child,
         timeout: Duration,
         operation: &str,
-    ) -> Result<Output, VmRunnerError> {
+    ) -> Result<Output, ProtocolMachineRunnerError> {
         let start = Instant::now();
         loop {
             // bounded: exits on child completion or timeout
             match child.try_wait()? {
-                Some(_) => return child.wait_with_output().map_err(VmRunnerError::from),
+                Some(_) => return child.wait_with_output().map_err(ProtocolMachineRunnerError::from),
                 None => {
                     if start.elapsed() >= timeout {
                         if let Err(err) = child.kill() {
@@ -279,7 +258,7 @@ impl VmRunner {
                                 "best-effort child.wait failed during timeout handling: {err}"
                             );
                         }
-                        return Err(VmRunnerError::TimedOut {
+                        return Err(ProtocolMachineRunnerError::TimedOut {
                             operation: operation.to_string(),
                             timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
                         });
@@ -310,29 +289,29 @@ impl VmRunner {
             .filter(|p| p.exists())
     }
 
-    /// Create a new VM runner with the default binary path.
+    /// Create a new protocol-machine runner with the default binary path.
     ///
     /// # Errors
     ///
-    /// Returns [`VmRunnerError::BinaryNotFound`] if the binary doesn't exist.
-    pub fn new() -> Result<Self, VmRunnerError> {
+    /// Returns [`ProtocolMachineRunnerError::BinaryNotFound`] if the binary doesn't exist.
+    pub fn new() -> Result<Self, ProtocolMachineRunnerError> {
         match Self::get_binary_path() {
             Some(path) => Ok(Self { binary_path: path }),
-            None => Err(VmRunnerError::BinaryNotFound(PathBuf::from(
+            None => Err(ProtocolMachineRunnerError::BinaryNotFound(PathBuf::from(
                 Self::DEFAULT_BINARY_PATH,
             ))),
         }
     }
 
-    /// Create a VM runner with a custom binary path.
+    /// Create a protocol-machine runner with a custom binary path.
     ///
     /// # Errors
     ///
-    /// Returns [`VmRunnerError::BinaryNotFound`] if the binary doesn't exist.
-    pub fn with_binary_path(path: impl AsRef<Path>) -> Result<Self, VmRunnerError> {
+    /// Returns [`ProtocolMachineRunnerError::BinaryNotFound`] if the binary doesn't exist.
+    pub fn with_binary_path(path: impl AsRef<Path>) -> Result<Self, ProtocolMachineRunnerError> {
         let binary_path = PathBuf::from(path.as_ref());
         if !binary_path.exists() || !binary_path.is_file() {
-            return Err(VmRunnerError::BinaryNotFound(binary_path));
+            return Err(ProtocolMachineRunnerError::BinaryNotFound(binary_path));
         }
         Ok(Self { binary_path })
     }
@@ -343,24 +322,24 @@ impl VmRunner {
         Self::new().ok()
     }
 
-    /// Run the VM runner and return the parsed output.
+    /// Run the protocol-machine runner and return the parsed output.
     ///
     /// # Errors
     ///
-    /// Returns a [`VmRunnerError`] if the process fails or output is invalid.
-    pub fn run(&self, input: &VmRunInput) -> Result<VmRunOutput, VmRunnerError> {
-        crate::schema::ensure_supported_schema_version(&input.schema_version, "VmRunInput")
-            .map_err(VmRunnerError::ParseError)?;
+    /// Returns a [`ProtocolMachineRunnerError`] if the process fails or output is invalid.
+    pub fn run(&self, input: &ProtocolMachineRunInput) -> Result<ProtocolMachineRunOutput, ProtocolMachineRunnerError> {
+        crate::schema::ensure_supported_schema_version(&input.schema_version, "ProtocolMachineRunInput")
+            .map_err(ProtocolMachineRunnerError::ParseError)?;
 
         let payload =
-            serde_json::to_vec(input).map_err(|e| VmRunnerError::ParseError(e.to_string()))?;
+            serde_json::to_vec(input).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
 
         let mut cmd = Command::new(&self.binary_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(VmRunnerError::TempFileError)?;
+            .map_err(ProtocolMachineRunnerError::TempFileError)?;
 
         if let Some(mut stdin) = cmd.stdin.take() {
             stdin.write_all(&payload)?;
@@ -369,29 +348,29 @@ impl VmRunner {
         let output = Self::wait_with_timeout(cmd, Self::process_timeout(), "run")?;
 
         if !output.status.success() {
-            return Err(VmRunnerError::ProcessFailed {
+            return Err(ProtocolMachineRunnerError::ProcessFailed {
                 code: output.status.code().unwrap_or(-1),
                 stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
             });
         }
 
-        let out: VmRunOutput = serde_json::from_slice(&output.stdout)
-            .map_err(|e| VmRunnerError::ParseError(e.to_string()))?;
-        crate::schema::ensure_supported_schema_version(&out.schema_version, "VmRunOutput")
-            .map_err(VmRunnerError::ParseError)?;
+        let out: ProtocolMachineRunOutput = serde_json::from_slice(&output.stdout)
+            .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
+        crate::schema::ensure_supported_schema_version(&out.schema_version, "ProtocolMachineRunOutput")
+            .map_err(ProtocolMachineRunnerError::ParseError)?;
         Ok(out)
     }
 
-    /// Run the Lean VM execution entrypoint.
+    /// Run the Lean protocol-machine execution entrypoint.
     ///
     /// # Errors
     ///
     /// Returns an error if the process fails or output is invalid.
-    pub fn run_lean_vm(&self, input: &VmRunInput) -> Result<VmRunOutput, VmRunnerError> {
+    pub fn run_lean_vm(&self, input: &ProtocolMachineRunInput) -> Result<ProtocolMachineRunOutput, ProtocolMachineRunnerError> {
         self.run(input)
     }
 
-    /// Run a generic Lean VM validation operation.
+    /// Run a generic Lean protocol-machine validation operation.
     ///
     /// # Errors
     ///
@@ -400,21 +379,21 @@ impl VmRunner {
         &self,
         operation: &str,
         payload: &Value,
-    ) -> Result<Value, VmRunnerError> {
+    ) -> Result<Value, ProtocolMachineRunnerError> {
         let input = serde_json::json!({
             "schema_version": crate::schema::default_schema_version(),
             "operation": operation,
             "payload": payload,
         });
         let bytes =
-            serde_json::to_vec(&input).map_err(|e| VmRunnerError::ParseError(e.to_string()))?;
+            serde_json::to_vec(&input).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
 
         let mut cmd = Command::new(&self.binary_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(VmRunnerError::TempFileError)?;
+            .map_err(ProtocolMachineRunnerError::TempFileError)?;
 
         if let Some(mut stdin) = cmd.stdin.take() {
             stdin.write_all(&bytes)?;
@@ -422,23 +401,23 @@ impl VmRunner {
 
         let output = Self::wait_with_timeout(cmd, Self::process_timeout(), operation)?;
         if !output.status.success() {
-            return Err(VmRunnerError::ProcessFailed {
+            return Err(ProtocolMachineRunnerError::ProcessFailed {
                 code: output.status.code().unwrap_or(-1),
                 stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
             });
         }
-        serde_json::from_slice(&output.stdout).map_err(|e| VmRunnerError::ParseError(e.to_string()))
+        serde_json::from_slice(&output.stdout).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))
     }
 
-    /// Validate a trace against Lean-side VM specification checks.
+    /// Validate a semantic audit against Lean-side protocol-machine checks.
     ///
     /// # Errors
     ///
     /// Returns an error if Lean invocation fails.
     pub fn validate_trace(
         &self,
-        rust_trace: &[VmTraceEvent],
-    ) -> Result<TraceValidation, VmRunnerError> {
+        rust_trace: &[ProtocolMachineTraceEvent],
+    ) -> Result<TraceValidation, ProtocolMachineRunnerError> {
         let payload = serde_json::json!({
             "trace": rust_trace,
         });
@@ -457,11 +436,11 @@ impl VmRunner {
     pub fn run_reference_simulation(
         &self,
         input: &SimRunInput,
-    ) -> Result<SimRunOutput, VmRunnerError> {
+    ) -> Result<SimRunOutput, ProtocolMachineRunnerError> {
         crate::schema::ensure_supported_schema_version(&input.schema_version, "SimRunInput")
-            .map_err(VmRunnerError::ParseError)?;
+            .map_err(ProtocolMachineRunnerError::ParseError)?;
         let payload =
-            serde_json::to_value(input).map_err(|e| VmRunnerError::ParseError(e.to_string()))?;
+            serde_json::to_value(input).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
         let response = self.run_lean_validation("runSimulation", &payload)?;
         parse_sim_run_output(response)
     }
@@ -473,14 +452,14 @@ impl VmRunner {
     /// Returns an error if Lean invocation fails.
     pub fn validate_simulation_trace(
         &self,
-        trace: &[VmTraceEvent],
-    ) -> Result<SimTraceValidation, VmRunnerError> {
+        trace: &[ProtocolMachineTraceEvent],
+    ) -> Result<SimTraceValidation, ProtocolMachineRunnerError> {
         let payload = simulation_trace_payload(trace);
         let response = self.run_lean_validation("validateSimulationTrace", &payload)?;
         parse_sim_trace_validation(&response)
     }
 
-    /// Run the same choreography in Lean and compare normalized traces.
+    /// Run the same choreography in Lean and compare normalized semantic audits.
     ///
     /// # Errors
     ///
@@ -488,9 +467,9 @@ impl VmRunner {
     pub fn compare_execution(
         &self,
         choreography: &ChoreographyJson,
-        rust_output: &VmRunOutput,
-    ) -> Result<ComparisonResult, VmRunnerError> {
-        let input = VmRunInput {
+        rust_output: &ProtocolMachineRunOutput,
+    ) -> Result<ComparisonResult, ProtocolMachineRunnerError> {
+        let input = ProtocolMachineRunInput {
             schema_version: crate::schema::default_schema_version(),
             choreographies: vec![choreography.clone()],
             concurrency: rust_output.concurrency,
@@ -498,7 +477,7 @@ impl VmRunner {
         };
         let lean_output = self.run_lean_vm(&input)?;
 
-        let rust_ticked: Vec<TickedObsEvent<VmTraceEvent>> = rust_output
+        let rust_ticked: Vec<TickedObsEvent<ProtocolMachineTraceEvent>> = rust_output
             .trace
             .iter()
             .cloned()
@@ -507,7 +486,7 @@ impl VmRunner {
                 event,
             })
             .collect();
-        let lean_ticked: Vec<TickedObsEvent<VmTraceEvent>> = lean_output
+        let lean_ticked: Vec<TickedObsEvent<ProtocolMachineTraceEvent>> = lean_output
             .trace
             .iter()
             .cloned()
@@ -517,9 +496,9 @@ impl VmRunner {
             })
             .collect();
 
-        let rust_normalized = normalize_vm_trace(&rust_ticked);
-        let lean_normalized = normalize_vm_trace(&lean_ticked);
-        let trace_equivalent = traces_equivalent(&rust_ticked, &lean_ticked);
+        let rust_normalized = normalize_semantic_audit(&rust_ticked);
+        let lean_normalized = normalize_semantic_audit(&lean_ticked);
+        let semantic_audit_equivalent = semantic_audits_equivalent(&rust_ticked, &lean_ticked);
         let diff = compute_trace_diff(&rust_normalized, &lean_normalized);
         let semantic_handoffs_equivalent = rust_output.semantic_objects.semantic_handoffs
             == lean_output.semantic_objects.semantic_handoffs;
@@ -553,12 +532,12 @@ impl VmRunner {
                 == lean_output.semantic_objects.transformation_obligations;
 
         Ok(ComparisonResult {
-            equivalent: trace_equivalent,
-            trace_equivalent,
+            equivalent: semantic_audit_equivalent,
+            semantic_audit_equivalent,
             semantic_handoffs_equivalent,
             invalidation_artifacts_equivalent,
-            rust_normalized,
-            lean_normalized,
+            rust_semantic_audit: rust_normalized,
+            lean_semantic_audit: lean_normalized,
             diff,
             lean_output,
         })
@@ -572,9 +551,9 @@ impl VmRunner {
     pub fn verify_invariants(
         &self,
         bundle: &crate::invariants::ProtocolBundle,
-    ) -> Result<InvariantVerificationResult, VmRunnerError> {
+    ) -> Result<InvariantVerificationResult, ProtocolMachineRunnerError> {
         let payload =
-            serde_json::to_value(bundle).map_err(|e| VmRunnerError::ParseError(e.to_string()))?;
+            serde_json::to_value(bundle).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
         let response = self.run_lean_validation("verifyProtocolBundle", &payload)?;
 
         Ok(InvariantVerificationResult {
@@ -585,11 +564,11 @@ impl VmRunner {
     }
 }
 
-/// Compute a structured diff for two normalized traces.
+/// Compute a structured diff for two normalized semantic audits.
 #[must_use]
 pub fn compute_trace_diff(
-    rust_trace: &[TickedObsEvent<VmTraceEvent>],
-    lean_trace: &[TickedObsEvent<VmTraceEvent>],
+    rust_trace: &[TickedObsEvent<ProtocolMachineTraceEvent>],
+    lean_trace: &[TickedObsEvent<ProtocolMachineTraceEvent>],
 ) -> Option<Value> {
     if rust_trace == lean_trace {
         return None;
@@ -616,7 +595,7 @@ pub fn compute_trace_diff(
     }))
 }
 
-/// Helper to build a VM runner input from JSON values.
+/// Helper to build a protocol-machine runner input from JSON values.
 ///
 /// # Errors
 ///
@@ -625,14 +604,14 @@ pub fn vm_input_from_values(
     choreographies: Vec<Value>,
     concurrency: u64,
     max_steps: u64,
-) -> Result<VmRunInput, VmRunnerError> {
+) -> Result<ProtocolMachineRunInput, ProtocolMachineRunnerError> {
     let mut choreos = Vec::new();
     for value in choreographies {
         let choreo: ChoreographyJson =
-            serde_json::from_value(value).map_err(|e| VmRunnerError::ParseError(e.to_string()))?;
+            serde_json::from_value(value).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
         choreos.push(choreo);
     }
-    Ok(VmRunInput {
+    Ok(ProtocolMachineRunInput {
         schema_version: crate::schema::default_schema_version(),
         choreographies: choreos,
         concurrency,
@@ -640,9 +619,9 @@ pub fn vm_input_from_values(
     })
 }
 
-/// Serialize a VM runner output to JSON for debugging.
-pub fn output_to_json(output: &VmRunOutput) -> Result<Value, VmRunnerError> {
-    serde_json::to_value(output).map_err(|e| VmRunnerError::ParseError(e.to_string()))
+/// Serialize a protocol-machine runner output to JSON for debugging.
+pub fn output_to_json(output: &ProtocolMachineRunOutput) -> Result<Value, ProtocolMachineRunnerError> {
+    serde_json::to_value(output).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))
 }
 
 #[cfg(test)]
@@ -651,8 +630,8 @@ mod tests {
     use std::process::Command;
     use std::time::Duration;
 
-    fn trace_event(kind: &str, tick: u64, session: Option<u64>) -> VmTraceEvent {
-        VmTraceEvent {
+    fn trace_event(kind: &str, tick: u64, session: Option<u64>) -> ProtocolMachineTraceEvent {
+        ProtocolMachineTraceEvent {
             schema_version: crate::schema::default_schema_version(),
             kind: kind.to_string(),
             tick,
@@ -735,14 +714,14 @@ mod tests {
         });
         let missing_err =
             parse_required_valid(&missing, "validateTrace").expect_err("missing valid must fail");
-        assert!(matches!(missing_err, VmRunnerError::ParseError(_)));
+        assert!(matches!(missing_err, ProtocolMachineRunnerError::ParseError(_)));
 
         let wrong_type = serde_json::json!({
             "valid": "true"
         });
         let wrong_type_err = parse_required_valid(&wrong_type, "validateTrace")
             .expect_err("non-boolean valid must fail");
-        assert!(matches!(wrong_type_err, VmRunnerError::ParseError(_)));
+        assert!(matches!(wrong_type_err, ProtocolMachineRunnerError::ParseError(_)));
     }
 
     #[test]
@@ -775,7 +754,7 @@ mod tests {
             .arg("sleep 1")
             .spawn()
             .expect("spawn sleep");
-        let result = VmRunner::wait_with_timeout(child, Duration::from_millis(10), "test_sleep");
-        assert!(matches!(result, Err(VmRunnerError::TimedOut { .. })));
+        let result = ProtocolMachineRunner::wait_with_timeout(child, Duration::from_millis(10), "test_sleep");
+        assert!(matches!(result, Err(ProtocolMachineRunnerError::TimedOut { .. })));
     }
 }

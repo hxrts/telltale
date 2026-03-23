@@ -1,22 +1,22 @@
 use super::*;
 
-pub(super) fn parse_sim_run_output(value: Value) -> Result<SimRunOutput, VmRunnerError> {
+pub(super) fn parse_sim_run_output(value: Value) -> Result<SimRunOutput, ProtocolMachineRunnerError> {
     let output: SimRunOutput =
-        serde_json::from_value(value).map_err(|e| VmRunnerError::ParseError(e.to_string()))?;
+        serde_json::from_value(value).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
     crate::schema::ensure_supported_schema_version(&output.schema_version, "SimRunOutput")
-        .map_err(VmRunnerError::ParseError)?;
+        .map_err(ProtocolMachineRunnerError::ParseError)?;
     Ok(output)
 }
 
 pub(super) fn parse_required_valid(
     response: &Value,
     operation: &str,
-) -> Result<bool, VmRunnerError> {
+) -> Result<bool, ProtocolMachineRunnerError> {
     response
         .get("valid")
         .and_then(Value::as_bool)
         .ok_or_else(|| {
-            VmRunnerError::ParseError(format!(
+            ProtocolMachineRunnerError::ParseError(format!(
                 "missing boolean field 'valid' in {operation} response"
             ))
         })
@@ -24,7 +24,7 @@ pub(super) fn parse_required_valid(
 
 pub(super) fn parse_sim_trace_validation(
     response: &Value,
-) -> Result<SimTraceValidation, VmRunnerError> {
+) -> Result<SimTraceValidation, ProtocolMachineRunnerError> {
     Ok(SimTraceValidation {
         valid: parse_required_valid(response, "validateSimulationTrace")?,
         errors: parse_simulation_errors(response),
@@ -32,7 +32,7 @@ pub(super) fn parse_sim_trace_validation(
     })
 }
 
-pub(super) fn simulation_trace_payload(trace: &[VmTraceEvent]) -> Value {
+pub(super) fn simulation_trace_payload(trace: &[ProtocolMachineTraceEvent]) -> Value {
     serde_json::json!({
         "trace": trace,
     })

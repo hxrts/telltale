@@ -172,12 +172,12 @@ pub struct FailureEnvelopeConfig {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct VMEnvelopeAdherenceConfig {
+pub struct ProtocolMachineEnvelopeAdherenceConfig {
     pub enabled: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct VMEnvelopeAdmissionConfig {
+pub struct ProtocolMachineEnvelopeAdmissionConfig {
     pub enabled: bool,
 }
 
@@ -206,8 +206,8 @@ pub struct DistributedClaims {
     pub byzantine_safety: Option<ByzantineSafetyConfig>,
     pub consensus_envelope: Option<ConsensusEnvelopeConfig>,
     pub failure_envelope: Option<FailureEnvelopeConfig>,
-    pub vm_envelope_adherence: Option<VMEnvelopeAdherenceConfig>,
-    pub vm_envelope_admission: Option<VMEnvelopeAdmissionConfig>,
+    pub protocol_machine_envelope_adherence: Option<ProtocolMachineEnvelopeAdherenceConfig>,
+    pub protocol_machine_envelope_admission: Option<ProtocolMachineEnvelopeAdmissionConfig>,
     pub protocol_envelope_bridge: Option<ProtocolEnvelopeBridgeConfig>,
 }
 

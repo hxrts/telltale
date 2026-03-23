@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use serde_json::json;
 use telltale_lean_bridge::{
-    default_schema_version, global_to_json, normalize_vm_trace, ChoreographyJson,
+    default_schema_version, global_to_json, normalize_semantic_audit, ChoreographyJson,
     ProtocolMachineRunInput, ProtocolMachineRunner, ProtocolMachineTraceEvent, TickedObsEvent,
 };
 use telltale_vm::coroutine::Value;
@@ -132,7 +132,7 @@ fn lean_trace_is_load_only(trace: &[ProtocolMachineTraceEvent]) -> bool {
     !trace.is_empty() && trace.iter().all(|ev| ev.kind == "opened")
 }
 
-fn obs_to_vm_trace(ev: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
+fn obs_to_semantic_audit_event(ev: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
     let mut out = ProtocolMachineTraceEvent {
         schema_version: default_schema_version(),
         kind: String::new(),
@@ -249,7 +249,7 @@ fn run_rust_step_states(
         let event = vm
             .trace()
             .get(old_len)
-            .and_then(obs_to_vm_trace)
+            .and_then(obs_to_semantic_audit_event)
             .map(|event| TickedObsEvent {
                 tick: event.tick,
                 event,
@@ -312,7 +312,7 @@ fn assert_step_indexed_equivalence(
 
     let rust_events: Vec<TickedObsEvent<ProtocolMachineTraceEvent>> =
         rust_steps.iter().filter_map(|s| s.event.clone()).collect();
-    let rust_normalized = normalize_vm_trace(&rust_events);
+    let rust_normalized = normalize_semantic_audit(&rust_events);
 
     let choreo = fixture_to_choreography_json(fixture);
     let input = ProtocolMachineRunInput {
@@ -341,7 +341,7 @@ fn assert_step_indexed_equivalence(
             })
         })
         .collect();
-    let lean_normalized = normalize_vm_trace(&lean_events);
+    let lean_normalized = normalize_semantic_audit(&lean_events);
     if lean_normalized.is_empty() && !rust_normalized.is_empty() {
         eprintln!(
             "SKIPPED: Lean vm_runner emitted no step-level observables for {}",

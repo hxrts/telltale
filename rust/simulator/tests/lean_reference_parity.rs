@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use telltale_lean_bridge::{
-    compute_trace_diff, default_schema_version, global_to_json, local_to_json, normalize_vm_trace,
+    compute_trace_diff, default_schema_version, global_to_json, local_to_json, normalize_semantic_audit,
     ProtocolMachineRunner, ProtocolMachineRunnerError, ProtocolMachineTraceEvent, SimRunInput,
     SimRunOutput, SimTraceValidation, TickedObsEvent,
 };
@@ -247,7 +247,7 @@ fn validate_sim_trace_or_skip(
 }
 
 #[allow(clippy::as_conversions)]
-fn obs_to_vm_trace(event: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
+fn obs_to_semantic_audit_event(event: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
     let mut out = ProtocolMachineTraceEvent {
         schema_version: default_schema_version(),
         kind: String::new(),
@@ -412,7 +412,7 @@ fn assert_reference_parity(fixture: SimFixture) {
         .replay
         .obs_trace
         .iter()
-        .filter_map(obs_to_vm_trace)
+        .filter_map(obs_to_semantic_audit_event)
         .filter(|event| parity_signal_kind(&event.kind))
         .collect();
     let lean_events: Vec<ProtocolMachineTraceEvent> = lean_out
@@ -443,8 +443,8 @@ fn assert_reference_parity(fixture: SimFixture) {
 
     let rust_ticked = to_ticked(&rust_events);
     let lean_ticked = to_ticked(&lean_events);
-    let rust_norm = normalize_vm_trace(&rust_ticked);
-    let lean_norm = normalize_vm_trace(&lean_ticked);
+    let rust_norm = normalize_semantic_audit(&rust_ticked);
+    let lean_norm = normalize_semantic_audit(&lean_ticked);
 
     let diff = compute_trace_diff(&rust_norm, &lean_norm);
     assert_eq!(
@@ -489,7 +489,7 @@ fn test_rust_simulator_trace_validates_under_lean_reference_rules() {
             .replay
             .obs_trace
             .iter()
-            .filter_map(obs_to_vm_trace)
+            .filter_map(obs_to_semantic_audit_event)
             .collect();
         let Some(validation) = validate_sim_trace_or_skip(&runner, &rust_events, fixture.name)
         else {

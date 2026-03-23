@@ -63,7 +63,7 @@ These mappings are implementation policy. They are not claims that the Lean theo
 
 ## Explicit Failure and Timeout Observability
 
-Failure, timeout, and cancellation behavior is now explicit at the VM trace surface rather than inferred only from final status.
+Failure, timeout, and cancellation behavior is now explicit at the semantic-audit surface rather than inferred only from final status.
 
 | Observable event | Meaning |
 |---|---|

@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use telltale_lean_bridge::{
     ensure_supported_schema_version, export_protocol_bundle, ChoreographyJson, InvariantClaims,
     ProtocolBundle, ProtocolMachineRunInput, ProtocolMachineRunOutput,
-    ProtocolMachineSemanticObjects, ReplayTraceBundle, LEAN_BRIDGE_SCHEMA_VERSION,
+    ProtocolMachineSemanticObjects, ProtocolMachineReplayBundle, LEAN_BRIDGE_SCHEMA_VERSION,
     PROTOCOL_BUNDLE_SCHEMA_VERSION, SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 use telltale_types::{GlobalType, Label, LocalTypeR};
@@ -63,7 +63,7 @@ fn vm_run_input_roundtrip_preserves_schema_version() {
 #[test]
 fn replay_trace_bundle_legacy_decode_defaults_schema_version() {
     let legacy = json!({
-        "vm_trace": [{
+        "semantic_audit": [{
             "kind": "sent",
             "session_index": 0,
             "sender": "A",
@@ -74,15 +74,15 @@ fn replay_trace_bundle_legacy_decode_defaults_schema_version() {
         "output_condition_trace": []
     });
 
-    let bundle: ReplayTraceBundle =
-        serde_json::from_value(legacy).expect("decode legacy ReplayTraceBundle");
+    let bundle: ProtocolMachineReplayBundle =
+        serde_json::from_value(legacy).expect("decode legacy ProtocolMachineReplayBundle");
     assert_eq!(bundle.schema_version, LEAN_BRIDGE_SCHEMA_VERSION);
 }
 
 #[test]
 fn schema_validator_accepts_current_and_rejects_unknown() {
-    assert!(ensure_supported_schema_version(LEAN_BRIDGE_SCHEMA_VERSION, "VmRunInput").is_ok());
-    assert!(ensure_supported_schema_version("legacy.v0", "VmRunInput").is_err());
+    assert!(ensure_supported_schema_version(LEAN_BRIDGE_SCHEMA_VERSION, "ProtocolMachineRunInput").is_ok());
+    assert!(ensure_supported_schema_version("legacy.v0", "ProtocolMachineRunInput").is_err());
 }
 
 #[test]

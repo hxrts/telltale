@@ -229,7 +229,7 @@ impl EffectHandler for PropertyHandler {
     }
 }
 
-fn obs_to_vm_trace(event: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
+fn obs_to_semantic_audit_event(event: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
     let mut out = ProtocolMachineTraceEvent {
         schema_version: telltale_lean_bridge::default_schema_version(),
         kind: String::new(),
@@ -288,14 +288,14 @@ fn obs_to_vm_trace(event: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
     }
 }
 
-fn run_rust_vm_trace(
+fn run_rust_semantic_audit(
     protocol: &GeneratedProtocol,
 ) -> Result<Vec<ProtocolMachineTraceEvent>, String> {
     let image = CodeImage::from_local_types(&protocol.local_types, &protocol.global);
     let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).map_err(|e| e.to_string())?;
     vm.run(&PropertyHandler, 128).map_err(|e| e.to_string())?;
-    Ok(vm.trace().iter().filter_map(obs_to_vm_trace).collect())
+    Ok(vm.trace().iter().filter_map(obs_to_semantic_audit_event).collect())
 }
 
 proptest! {
@@ -303,7 +303,7 @@ proptest! {
 
     #[test]
     fn rust_lean_trace_consistency(protocol in arb_choreography()) {
-        let trace = run_rust_vm_trace(&protocol)
+        let trace = run_rust_semantic_audit(&protocol)
             .map_err(proptest::test_runner::TestCaseError::fail)?;
 
         let Some(runner) = ProtocolMachineRunner::try_new() else {
