@@ -411,6 +411,7 @@ pub fn canonicalize_protocol_machine_semantic_objects(
 /// Build canonical semantic audit records from authority, delegation,
 /// failure-visible observable events, and effect/interface observations.
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn semantic_audit_log_v1(
     authority_audit_log: &[AuthorityAuditRecord],
     delegation_audit_log: &[DelegationAuditRecord],

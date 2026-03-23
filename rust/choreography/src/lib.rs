@@ -40,10 +40,6 @@ pub use compiler::{
     format_choreography_with_config, ExtensionParseError, ExtensionParser, ExtensionParserBuilder,
     GrammarComposer, GrammarComposerBuilder, GrammarCompositionError, PrettyConfig,
 };
-pub use generated_effects::{
-    GeneratedEffectBehavior, GeneratedEffectFamily, GeneratedEffectOperation,
-    GeneratedSimulationMetadata, GeneratedSimulationMode,
-};
 pub use effects::middleware::{Metrics, Retry, Trace};
 pub use effects::NoOpHandler;
 pub use effects::{
@@ -56,6 +52,10 @@ pub use effects::{SimpleChannel, TelltaleEndpoint, TelltaleHandler};
 pub use extensions::{
     CodegenContext, ExtensionRegistry, ExtensionValidationError, GrammarExtension, ParseContext,
     ParseError, ProjectionContext, ProtocolExtension, StatementParser,
+};
+pub use generated_effects::{
+    GeneratedEffectBehavior, GeneratedEffectFamily, GeneratedEffectOperation,
+    GeneratedSimulationMetadata, GeneratedSimulationMode,
 };
 pub use runtime::{spawn, spawn_local};
 pub use topology::{

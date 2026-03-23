@@ -42,9 +42,9 @@ effect Runtime
 protocol CommitFlow uses Runtime =
   let readiness = check Runtime.ready(session)
   case readiness of
-    | Ok witness ->
-        Coordinator -> Worker : Commit of witness
-    | Err TimedOut ->
+    | Ok(witness) =>
+        Coordinator -> Worker : Commit(witness)
+    | Err(TimedOut) =>
         Coordinator -> Worker : Cancel
 ```
 
@@ -62,7 +62,7 @@ once.
 Language-level authority checks are expected to lower into the existing runtime
 authority surfaces:
 
-- `check Effect.op(...)` lowers to the typed VM/effect boundary
+- `check Effect.op(...)` lowers to the typed protocol-machine effect boundary
 - successful protocol-critical checks produce explicit evidence/witness objects
 - invalid or missing evidence fails closed
 - timeout and cancellation become explicit observable/runtime-audit outcomes
@@ -95,7 +95,7 @@ The authoritative path is:
 1. declare a nominal `effect`
 2. name it in `uses`
 3. invoke it with `check Effect.op(...)`
-4. lower it into the existing typed VM `invoke` boundary
+4. lower it into the existing typed protocol-machine `invoke` boundary
 5. preserve its outcome in effect/audit/replay surfaces
 
 That matches the project’s existing typed effect-obligation architecture and
@@ -106,4 +106,4 @@ observational correctness story.
 - [Protocol-Critical Authority Scope](33_protocol_authority_scope.md)
 - [Authority Language Surface](34_authority_language_surface.md)
 - [Effect Handlers and Session Types](11_effect_session_bridge.md)
-- [VM Architecture](12_vm_architecture.md)
+- [Protocol Machine Architecture](12_vm_architecture.md)

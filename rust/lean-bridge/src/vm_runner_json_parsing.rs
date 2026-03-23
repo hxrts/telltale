@@ -1,8 +1,10 @@
 use super::*;
 
-pub(super) fn parse_sim_run_output(value: Value) -> Result<SimRunOutput, ProtocolMachineRunnerError> {
-    let output: SimRunOutput =
-        serde_json::from_value(value).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
+pub(super) fn parse_sim_run_output(
+    value: Value,
+) -> Result<SimRunOutput, ProtocolMachineRunnerError> {
+    let output: SimRunOutput = serde_json::from_value(value)
+        .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
     crate::schema::ensure_supported_schema_version(&output.schema_version, "SimRunOutput")
         .map_err(ProtocolMachineRunnerError::ParseError)?;
     Ok(output)

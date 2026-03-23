@@ -4,9 +4,9 @@
 use std::collections::BTreeMap;
 
 use telltale_lean_bridge::{
-    compute_trace_diff, default_schema_version, global_to_json, local_to_json, normalize_semantic_audit,
-    ProtocolMachineRunner, ProtocolMachineRunnerError, ProtocolMachineTraceEvent, SimRunInput,
-    SimRunOutput, SimTraceValidation, TickedObsEvent,
+    compute_trace_diff, default_schema_version, global_to_json, local_to_json,
+    normalize_semantic_audit, ProtocolMachineRunner, ProtocolMachineRunnerError,
+    ProtocolMachineTraceEvent, SimRunInput, SimRunOutput, SimTraceValidation, TickedObsEvent,
 };
 use telltale_simulator::runner::{run_with_scenario, ScenarioResult};
 use telltale_simulator::scenario::Scenario;

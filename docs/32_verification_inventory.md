@@ -11,8 +11,8 @@ When one of these values changes legitimately:
 
 | Metric | Value | Source |
 |---|---:|---|
-| Lean core-library files | 624 | `lean/CODE_MAP.md` total row |
-| Lean core-library lines | 127,713 | `lean/CODE_MAP.md` total row |
+| Lean core-library files | 626 | `lean/CODE_MAP.md` total row |
+| Lean core-library lines | 128,041 | `lean/CODE_MAP.md` total row |
 | Ownership contract gate commands | 6 | `just check-ownership-contracts` |
 | Aura-derived boundary checks | 6 | `just check-aura-borrowed-lints` |
 | Explicit failure/timeout observable event kinds | 5 | `rust/vm/src/vm/vm_config.rs` (`ObsEvent`) |

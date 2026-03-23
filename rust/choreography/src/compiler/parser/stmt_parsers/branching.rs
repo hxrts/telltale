@@ -119,9 +119,9 @@ fn parse_branch_body(
 ) -> Result<Vec<Statement>, ParseError> {
     let pair = if pair.as_rule() == Rule::branch_body {
         let span = pair.as_span();
-        pair.into_inner().next().ok_or_else(|| {
-            syntax_error(span, input, "branch body is empty".to_string())
-        })?
+        pair.into_inner()
+            .next()
+            .ok_or_else(|| syntax_error(span, input, "branch body is empty".to_string()))?
     } else {
         pair
     };

@@ -8,7 +8,7 @@ The theorem program is organized into three stages.
 
 | Stage | Paper focus | Core output |
 |---|---|---|
-| Paper 1 | coherence and effect bridge | preservation kernel and typed VM bridge premises |
+| Paper 1 | coherence and effect bridge | preservation kernel and typed protocol-machine bridge premises |
 | Paper 2 | quantitative and decision dynamics | bounds, decidability packages, crash and Byzantine interfaces |
 | Paper 3 | reconfiguration and envelope adequacy | harmony under reconfiguration, envelope exactness, admission and adherence |
 
@@ -21,7 +21,7 @@ Paper 1 centers on operational coherence and the `Consume` kernel.
 | message-type alignment via `Consume` | `Protocol/Coherence/Consume.lean` |
 | subtype replacement and coherence lift | `Protocol/Coherence/SubtypeReplacement*.lean` |
 | coherence preservation stack | `Protocol/Preservation*.lean`, `Protocol/Coherence/*` |
-| typed effect bridge to VM | `Runtime/Proofs/VM/BridgeStrengthening.lean`, `Runtime/Proofs/EffectBisim/*` |
+| typed effect bridge to protocol machine | `Runtime/Proofs/VM/BridgeStrengthening.lean`, `Runtime/Proofs/EffectBisim/*` |
 
 Claim scope is assumption-scoped. Delivery and monitor premises remain explicit in the bridge layer.
 
@@ -40,7 +40,7 @@ Bound classes differ by theorem. Productive-step bounds are exact under premises
 
 ## Paper 3 Mapping
 
-Paper 3 integrates reconfiguration, exact envelope characterization, and VM adherence.
+Paper 3 integrates reconfiguration, exact envelope characterization, and protocol-machine adherence.
 
 | Claim family | Lean anchor modules |
 |---|---|

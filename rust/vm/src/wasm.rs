@@ -1,4 +1,4 @@
-//! WebAssembly bindings for the VM.
+//! WebAssembly bindings for the protocol machine guest runtime.
 
 use std::collections::BTreeMap;
 
@@ -62,7 +62,7 @@ impl EffectHandler for NoOpHandler {
     }
 }
 
-/// Wasm wrapper for the VM.
+/// Wasm wrapper for the protocol machine guest runtime.
 #[wasm_bindgen]
 pub struct WasmVM {
     inner: WasmCooperativeDriver,
@@ -70,7 +70,7 @@ pub struct WasmVM {
 
 #[wasm_bindgen]
 impl WasmVM {
-    /// Create a new VM with default configuration.
+    /// Create a new guest runtime with default configuration.
     #[wasm_bindgen(constructor)]
     pub fn new() -> WasmVM {
         WasmVM {
@@ -107,7 +107,7 @@ impl WasmVM {
         Ok(label.to_string())
     }
 
-    /// Run the VM for at most `max_rounds` with concurrency `n`.
+    /// Run the guest runtime for at most `max_rounds` with concurrency `n`.
     pub fn run(&mut self, max_rounds: usize, n: usize) -> Result<String, JsValue> {
         let handler = NoOpHandler;
         let status = self

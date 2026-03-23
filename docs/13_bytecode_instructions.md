@@ -1,10 +1,10 @@
-# Bytecode Instructions
+# Protocol-Machine Bytecode Instructions
 
-This document defines the current VM instruction set in `rust/vm/src/instr.rs`.
+This document defines the current protocol-machine instruction set in `rust/vm/src/instr.rs`.
 
 ## Instruction Families
 
-The VM groups instructions by execution concern.
+The protocol machine groups instructions by execution concern.
 
 | Family | Instructions |
 |---|---|
@@ -90,6 +90,6 @@ The compiler is intentionally simple. Full ISA coverage is provided by direct by
 
 ## Related Docs
 
-- [VM Architecture](12_vm_architecture.md)
+- [Protocol Machine Architecture](12_vm_architecture.md)
 - [Session Lifecycle](14_session_lifecycle.md)
 - [Lean-Rust Bridge](24_lean_rust_bridge.md)

@@ -8,8 +8,8 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use std::collections::{HashMap, HashSet};
 
-use super::error::{ErrorSpan, ParseError};
 use super::declarations::enforce_same_line_equals;
+use super::error::{ErrorSpan, ParseError};
 use super::stmt_parsers::{
     parse_broadcast_stmt, parse_call_stmt, parse_case_stmt, parse_choice_stmt, parse_continue_stmt,
     parse_dependent_work_stmt, parse_handoff_stmt, parse_handshake_stmt, parse_heartbeat_stmt,
@@ -270,12 +270,7 @@ pub(crate) fn parse_local_protocol_decl(
     protocol_defs: &mut HashMap<String, Vec<Statement>>,
 ) -> std::result::Result<(), ParseError> {
     let span = pair.as_span();
-    enforce_same_line_equals(
-        pair.as_str(),
-        span,
-        input,
-        "local protocol declaration",
-    )?;
+    enforce_same_line_equals(pair.as_str(), span, input, "local protocol declaration")?;
     let mut inner = pair.into_inner();
     let name_pair = inner.next().ok_or_else(|| ParseError::Syntax {
         span: ErrorSpan::from_pest_span(span, input),

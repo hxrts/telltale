@@ -128,13 +128,13 @@ Admission and capability drift are controlled by repository lanes.
 |---|---|
 | runtime capability gate shape | `just check-capability-gates` |
 | theorem-pack release conformance | `just check-release-conformance` |
-| VM parity suite | `just check-parity --suite` |
+| Protocol-machine parity suite | `just check-parity --suite` |
 | parity type and schema policy | `just check-parity --types` |
 | consolidated parity policy | `just check-parity --all` |
 
 ## Related Docs
 
-- [VM Architecture](12_vm_architecture.md)
+- [Protocol Machine Architecture](12_vm_architecture.md)
 - [Rust-Lean Parity](19_rust_lean_parity.md)
 - [Lean Verification](23_lean_verification.md)
 - [Theorem Program](26_theorem_program.md)

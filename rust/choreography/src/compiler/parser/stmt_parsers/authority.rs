@@ -296,9 +296,12 @@ pub(crate) fn parse_timeout_stmt(
         match item.as_rule() {
             Rule::duration => duration_ms = Some(parse_duration(item, input)?),
             Rule::role_ref => role = Some(parse_role_ref(item, declared_roles, input)?),
-            Rule::block | Rule::statement | Rule::branch_body => {
-                blocks.push(parse_branch_body(item, declared_roles, input, protocol_defs)?)
-            }
+            Rule::block | Rule::statement | Rule::branch_body => blocks.push(parse_branch_body(
+                item,
+                declared_roles,
+                input,
+                protocol_defs,
+            )?),
             _ => {}
         }
     }

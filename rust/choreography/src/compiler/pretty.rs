@@ -182,7 +182,10 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
             continuation,
         } => {
             let work_head = match arg {
-                Some(arg) => format!("dependent work {}{} required for {}", name, arg, required_for),
+                Some(arg) => format!(
+                    "dependent work {}{} required for {}",
+                    name, arg, required_for
+                ),
                 None => format!("dependent work {} required for {}", name, required_for),
             };
             write_line(out, indent, &work_head);

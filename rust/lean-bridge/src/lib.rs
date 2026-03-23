@@ -90,9 +90,9 @@ pub use invariants::{
     FunctionalCLTConfig, HeavyTrafficConfig, InvariantClaims, LDPConfig, LittlesLawConfig,
     LivenessConfig, MaxWeightConfig, MeanFieldConfig, MixingConfig, NakamotoConfig,
     PartialSynchronyConfig, PartitionModel, ProtocolBundle, ProtocolEnvelopeBridgeConfig,
+    ProtocolMachineEnvelopeAdherenceConfig, ProtocolMachineEnvelopeAdmissionConfig,
     QuorumGeometryConfig, QuorumSystemKind, ReconfigurationConfig, ResponsivenessConfig,
-    SchedulerKind, TimingModel, ProtocolMachineEnvelopeAdherenceConfig, ProtocolMachineEnvelopeAdmissionConfig,
-    PROTOCOL_BUNDLE_SCHEMA_VERSION,
+    SchedulerKind, TimingModel, PROTOCOL_BUNDLE_SCHEMA_VERSION,
 };
 pub use schema::{
     default_schema_version, ensure_supported_schema_version, is_supported_schema_version,
@@ -110,8 +110,7 @@ pub use semantic_objects::{
 pub use vm_trace::{
     event_session, normalize_semantic_audit, observationally_equivalent, partition_by_session,
     semantic_audits_equivalent, EffectTraceEvent, NormalizedEvent, OutputConditionTraceEvent,
-    ProtocolMachineReplayBundle, SessionTrace, TopologyPerturbationEvent,
-    TopologyPerturbationKind,
+    ProtocolMachineReplayBundle, SessionTrace, TopologyPerturbationEvent, TopologyPerturbationKind,
 };
 
 cfg_if! {

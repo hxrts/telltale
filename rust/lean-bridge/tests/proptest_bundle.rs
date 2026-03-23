@@ -12,8 +12,9 @@ use telltale_lean_bridge::{
     FosterConfig, FunctionalCLTConfig, HeavyTrafficConfig, InvariantClaims, LDPConfig,
     LittlesLawConfig, MaxWeightConfig, MeanFieldConfig, MixingConfig, NakamotoConfig,
     PartialSynchronyConfig, PartitionModel, ProtocolBundle, ProtocolEnvelopeBridgeConfig,
+    ProtocolMachineEnvelopeAdherenceConfig, ProtocolMachineEnvelopeAdmissionConfig,
     QuorumGeometryConfig, QuorumSystemKind, ReconfigurationConfig, ResponsivenessConfig,
-    TimingModel, ProtocolMachineEnvelopeAdherenceConfig, ProtocolMachineEnvelopeAdmissionConfig,
+    TimingModel,
 };
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 

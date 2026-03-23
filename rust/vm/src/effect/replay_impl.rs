@@ -3,6 +3,7 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         "replay_handler".to_string()
     }
 
+    #[allow(clippy::too_many_lines)]
     fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
         let expected_kind = match &request.body {
             EffectRequestBody::SendDecision { .. } => "send_decision",

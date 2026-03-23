@@ -38,7 +38,6 @@ protocol Flow uses Runtime =
     assert!(json.contains("\"host_trait_name\": \"RuntimeExternalHandler\""));
     assert!(json.contains("\"simulator_trait_name\": \"RuntimeSimulatorHandler\""));
 
-    let decoded: Vec<GeneratedEffectFamily> =
-        serde_json::from_str(&json).expect("decode manifest");
+    let decoded: Vec<GeneratedEffectFamily> = serde_json::from_str(&json).expect("decode manifest");
     assert_eq!(decoded, families);
 }

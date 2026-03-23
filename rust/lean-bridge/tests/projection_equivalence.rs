@@ -212,11 +212,11 @@ fn test_binary_choice() {
     let dsl = r#"
 protocol BinaryChoice = {
     roles Client, Server
-    choice at Client {
-        | Accept -> {
+    choice Client at {
+        | Accept => {
             Client -> Server: Accept
         }
-        | Reject -> {
+        | Reject => {
             Client -> Server: Reject
         }
     }
@@ -232,12 +232,12 @@ fn test_choice_with_continuation() {
     let dsl = r#"
 protocol ChoiceWithCont = {
     roles Client, Server
-    choice at Client {
-        | Success -> {
+    choice Client at {
+        | Success => {
             Client -> Server: Success
             Server -> Client: Data
         }
-        | Failure -> {
+        | Failure => {
             Client -> Server: Failure
             Server -> Client: Error
         }
@@ -254,14 +254,14 @@ fn test_three_way_choice() {
     let dsl = r#"
 protocol ThreeWayChoice = {
     roles A, B
-    choice at A {
-        | Option1 -> {
+    choice A at {
+        | Option1 => {
             A -> B: Option1
         }
-        | Option2 -> {
+        | Option2 => {
             A -> B: Option2
         }
-        | Option3 -> {
+        | Option3 => {
             A -> B: Option3
         }
     }
@@ -299,13 +299,13 @@ fn test_recursion_with_choice() {
 protocol RecWithChoice = {
     roles Client, Server
     rec MainLoop {
-        choice at Client {
-            | Continue -> {
+        choice Client at {
+            | Continue => {
                 Client -> Server: Continue
                 Server -> Client: Data
                 continue MainLoop
             }
-            | Stop -> {
+            | Stop => {
                 Client -> Server: Stop
             }
         }
@@ -326,19 +326,19 @@ fn test_nested_choice() {
     let dsl = r#"
 protocol NestedChoice = {
     roles A, B
-    choice at A {
-        | Outer1 -> {
+    choice A at {
+        | Outer1 => {
             A -> B: Outer1
-            choice at B {
-                | Inner1 -> {
+            choice B at {
+                | Inner1 => {
                     B -> A: Inner1
                 }
-                | Inner2 -> {
+                | Inner2 => {
                     B -> A: Inner2
                 }
             }
         }
-        | Outer2 -> {
+        | Outer2 => {
             A -> B: Outer2
         }
     }
@@ -354,12 +354,12 @@ fn test_three_party_choice() {
     let dsl = r#"
 protocol ThreePartyChoice = {
     roles A, B, C
-    choice at A {
-        | Left -> {
+    choice A at {
+        | Left => {
             A -> B: Left
             B -> C: Notify
         }
-        | Right -> {
+        | Right => {
             A -> B: Right
             B -> C: Notify
         }
@@ -383,12 +383,12 @@ fn test_non_participant_mergeable() {
     let dsl = r#"
 protocol Mergeable = {
     roles A, B, C
-    choice at A {
-        | Left -> {
+    choice A at {
+        | Left => {
             A -> B: Left
             C -> B: Status
         }
-        | Right -> {
+        | Right => {
             A -> B: Right
             C -> B: Status
         }
@@ -411,11 +411,11 @@ fn test_single_role_in_choice_branch() {
 protocol SingleRoleBranch = {
     roles A, B
     A -> B: Start
-    choice at A {
-        | Done -> {
+    choice A at {
+        | Done => {
             A -> B: Done
         }
-        | More -> {
+        | More => {
             A -> B: More
             A -> B: Extra
         }

@@ -477,8 +477,11 @@ fn count_statement_uses(statement: &Statement, name: &str) -> usize {
                     .saturating_sub(1)
                 + receipt.split(name).count().saturating_sub(1)
         }
-        Statement::DependentWork { arg, required_for, .. } => {
-            arg.as_ref().map_or(0, |v| v.split(name).count().saturating_sub(1))
+        Statement::DependentWork {
+            arg, required_for, ..
+        } => {
+            arg.as_ref()
+                .map_or(0, |v| v.split(name).count().saturating_sub(1))
                 + required_for.split(name).count().saturating_sub(1)
         }
     }

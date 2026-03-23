@@ -24,14 +24,14 @@ The Lean tree is organized as a layered stack.
 | Choreography | projection, blindness, erasure, harmony |
 | Semantics | small-step semantics, determinism, deadlock surfaces |
 | Protocol | coherence, typing, monitoring, deployment composition |
-| Runtime | VM model, semantics, runtime adapters, theorem-pack APIs |
+| Runtime | protocol-machine model, semantics, runtime adapters, theorem-pack APIs |
 | Distributed | FLP, CAP, quorum, synchrony, Nakamoto, reconfiguration, safety families |
 | Classical | transported queueing and stochastic theorem families |
 | IrisExtraction | runtime proof extraction and ghost logic bridge |
 
-## VM Model and Runtime Surfaces
+## Protocol-Machine Model and Runtime Surfaces
 
-The VM model is centered under `lean/Runtime/VM`.
+The protocol-machine model is centered under `lean/Runtime/VM`.
 
 | Surface | Location |
 |---|---|
@@ -83,14 +83,14 @@ Lean and Rust alignment is checked by automation lanes.
 |---|---|
 | Runtime capability gates | `just check-capability-gates` |
 | Release conformance | `just check-release-conformance` |
-| VM parity suite | `just check-parity --suite` |
+| Protocol-machine parity suite | `just check-parity --suite` |
 | Type and schema parity | `just check-parity --types` |
 | Conformance-specific parity lane | `just check-parity --conformance` |
 | Consolidated parity lane | `just check-parity --all` |
 
 ## Related Docs
 
-- [VM Architecture](12_vm_architecture.md)
+- [Protocol Machine Architecture](12_vm_architecture.md)
 - [Rust-Lean Parity](19_rust_lean_parity.md)
 - [Lean-Rust Bridge](24_lean_rust_bridge.md)
 - [Capability and Admission](25_capability_admission.md)

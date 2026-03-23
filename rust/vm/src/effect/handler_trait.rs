@@ -30,6 +30,7 @@ pub trait EffectHandler: Send + Sync {
     /// helper-method-based handlers by translating each typed request into the
     /// corresponding helper method. New code should prefer overriding
     /// `handle_effect` directly.
+    #[allow(clippy::too_many_lines)]
     fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
         if let Err(failure) = request.metadata.validate() {
             return EffectOutcome::failure(failure);

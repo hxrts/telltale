@@ -184,6 +184,7 @@ impl ThreadedVM {
         });
     }
 
+    #[allow(clippy::too_many_lines)]
     fn evaluate_progress_contracts(&mut self) -> Result<(), VMError> {
         let active_effect_ids: Vec<_> = self
             .outstanding_effects
@@ -569,7 +570,7 @@ impl ThreadedVM {
         }
 
         for operation in &mut self.operation_instances {
-            if invalidated.iter().any(|operation_id| operation.operation_id == *operation_id) {
+            if invalidated.contains(&operation.operation_id) {
                 operation.phase = OperationPhase::Failed;
                 operation.terminal_publication = Some("effect.invalidated".to_string());
             }
@@ -644,10 +645,7 @@ impl ThreadedVM {
                 | OperationPhase::TimedOut
                 | OperationPhase::HandedOff => {}
             }
-            if invalidated_operations
-                .iter()
-                .any(|operation_id| operation.operation_id == *operation_id)
-            {
+            if invalidated_operations.contains(&operation.operation_id) {
                 operation.phase = OperationPhase::Failed;
                 operation.terminal_publication = Some("effect.invalidated".to_string());
             }

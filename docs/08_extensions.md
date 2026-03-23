@@ -15,9 +15,9 @@ The repository contains two extension registries with the same name:
 
 ## Simulator Integration for Extensions
 
-Extension projects often need VM level regression tests in addition to parser tests.
+Extension projects often need protocol-machine-level regression tests in addition to parser tests.
 Use `telltale-simulator` harness APIs to run projected local types under scenario middleware.
-This keeps extension validation aligned with VM effect contracts.
+This keeps extension validation aligned with protocol-machine effect contracts.
 
 ```rust
 let harness = SimulationHarness::new(&DirectAdapter::new(&handler));
@@ -25,7 +25,7 @@ let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
 ```
 
-This pattern makes extension runtime checks reusable across projects. See [VM Simulation](15_vm_simulation_overview.md) for harness config files and preset constructors.
+This pattern makes extension runtime checks reusable across projects. See [Protocol-Machine Simulation](15_vm_simulation_overview.md) for harness config files and preset constructors.
 
 ## Runtime Effect Extensions
 

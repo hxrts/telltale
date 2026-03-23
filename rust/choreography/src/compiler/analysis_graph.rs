@@ -65,8 +65,6 @@ pub(super) fn has_communication(protocol: &Protocol) -> bool {
         | Protocol::Let { continuation, .. }
         | Protocol::Publish { continuation, .. }
         | Protocol::Handoff { continuation, .. }
-        | Protocol::DependentWork { continuation, .. } => {
-            has_communication(continuation)
-        }
+        | Protocol::DependentWork { continuation, .. } => has_communication(continuation),
     }
 }

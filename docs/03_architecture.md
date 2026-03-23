@@ -10,7 +10,7 @@ The architecture has three compile-time stages and two runtime paths:
 2. Projection (global protocol to local types)
 3. Code generation (local types to Rust code and effect programs)
 4. Effect handler execution (async interpreter with pluggable transports)
-5. VM execution and simulation (bytecode VM with scheduler and deterministic middleware)
+5. Protocol-machine execution and simulation (protocol machine with scheduler and deterministic middleware)
 
 ## Component Diagram
 
@@ -42,9 +42,9 @@ graph TB
         Exec["Running Protocol"]
     end
 
-    subgraph Layer5["Layer 5: VM + Simulation"]
-        VMCompiler["VM Compiler<br/>(LocalTypeR → Bytecode)"]
-        VM["Bytecode VM"]
+    subgraph Layer5["Layer 5: Protocol Machine + Simulation"]
+        VMCompiler["Protocol-Machine Compiler<br/>(LocalTypeR → Bytecode)"]
+        VM["Protocol Machine"]
         Scheduler["Scheduler<br/>(Policy-Based)"]
         Sessions["Session Store"]
         Buffers["Bounded Buffers"]
@@ -70,7 +70,7 @@ graph TB
     Middleware --> VM
 ```
 
-This diagram summarizes the compile time flow from DSL input to runtime execution. It also highlights the boundary between compilation and effect handler execution.
+This diagram summarizes the compile time flow from DSL input to runtime execution. It also highlights the boundary between compilation, the guest runtime, and host-runtime effect handling.
 
 ## Core Components
 
@@ -154,7 +154,7 @@ pub enum Protocol {
 
 The parser module is located in `rust/choreography/src/compiler/parser/`. It converts DSL text into AST using the Pest parser generator.
 
-The parser validates role declarations and builds the protocol tree from the input text. It runs a layout preprocessor before the grammar parse. This enables layout-sensitive syntax with explicit braces for empty blocks, aligned arrows, sender records, `choice at` branches with leading `|`, and `par` blocks.
+The parser validates role declarations and builds the protocol tree from the input text. It runs a layout preprocessor before the grammar parse. This enables layout-sensitive syntax with record braces, indentation-sensitive structural blocks, distinct `->` message arrows versus `=>` branch arrows, `choice Role at` branches with leading `|`, and `par` blocks.
 
 Two entry points are available.
 
@@ -258,9 +258,9 @@ pub trait ChoreoHandler: Send {
 }
 ```
 
-Handlers implement this trait to provide different execution strategies. This async handler is distinct from the synchronous `telltale_vm::effect::EffectHandler` used by the VM.
+Handlers implement this trait to provide different execution strategies. This async handler is distinct from the synchronous `telltale_vm::effect::EffectHandler` used by the protocol machine.
 
-Use [Effect Handlers and Session Types](11_effect_session_bridge.md) for VM integration guidance.
+Use [Effect Handlers and Session Types](11_effect_session_bridge.md) for protocol-machine integration guidance.
 
 ### Protocol-Machine Execution Layer
 
@@ -270,7 +270,7 @@ The protocol machine maintains session state with bounded message buffers. Each 
 
 At the embedding boundary, the protocol machine now also distinguishes current host ownership from protocol typing and capability admission. Production host integrations can use `load_choreography_owned(...)` and `OwnedSession` when they need explicit session-local authority after open. Guest runtimes embed the protocol machine inside a host runtime with explicit external handlers. Delegation/reconfiguration paths emit explicit receipts and audit records instead of relying on ad hoc owner mutation.
 
-See [VM Architecture](12_vm_architecture.md) for details on the underlying bytecode protocol-machine architecture.
+See [Protocol Machine Architecture](12_vm_architecture.md) for details on the underlying bytecode protocol-machine architecture.
 
 ## Data Flow
 

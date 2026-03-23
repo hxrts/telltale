@@ -500,6 +500,7 @@ fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSeman
 /// Build the canonical semantic-object bundle from lower-level runtime
 /// artifacts.
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn protocol_machine_semantic_objects_v1(
     authority_audit_log: &[AuthorityAuditRecord],
     delegation_audit_log: &[DelegationAuditRecord],
@@ -682,15 +683,18 @@ pub fn protocol_machine_semantic_objects_v1(
             proof_ref: Some(proof.proof_id.clone()),
         })
         .collect();
-    canonical_handles.extend(semantic_handoffs.iter().filter_map(|handoff| {
-        matches!(handoff.status, DelegationStatus::Committed).then(|| CanonicalHandle {
-            handle_id: format!("handoff:{}", handoff.handoff_id),
-            session: Some(handoff.session),
-            owner_id: None,
-            kind: CanonicalHandleKind::Handoff,
-            proof_ref: Some(format!("handoff:{}", handoff.handoff_id)),
-        })
-    }));
+    canonical_handles.extend(
+        semantic_handoffs
+            .iter()
+            .filter(|handoff| matches!(handoff.status, DelegationStatus::Committed))
+            .map(|handoff| CanonicalHandle {
+                handle_id: format!("handoff:{}", handoff.handoff_id),
+                session: Some(handoff.session),
+                owner_id: None,
+                kind: CanonicalHandleKind::Handoff,
+                proof_ref: Some(format!("handoff:{}", handoff.handoff_id)),
+            }),
+    );
 
     let proof_by_operation: BTreeMap<String, String> = materialization_proofs
         .iter()

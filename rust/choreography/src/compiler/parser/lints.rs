@@ -216,8 +216,11 @@ fn render_lowering_protocol(protocol: &Protocol, depth: usize, out: &mut String)
                 )
                 .unwrap();
             } else {
-                writeln!(out, "{indent}- dependent work {name} required for {required_for}")
-                    .unwrap();
+                writeln!(
+                    out,
+                    "{indent}- dependent work {name} required for {required_for}"
+                )
+                .unwrap();
             }
             render_lowering_protocol(continuation, depth + 1, out);
         }

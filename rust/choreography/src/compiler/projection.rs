@@ -183,11 +183,9 @@ impl<'a> ProjectionContext<'a> {
                 construct: "handoff",
             }),
 
-            Protocol::DependentWork { .. } => {
-                Err(ProjectionError::UnsupportedAuthorityConstruct {
-                    construct: "dependent work",
-                })
-            }
+            Protocol::DependentWork { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
+                construct: "dependent work",
+            }),
 
             Protocol::End => Ok(LocalType::End),
 

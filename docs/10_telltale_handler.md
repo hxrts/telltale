@@ -110,7 +110,7 @@ This example creates two endpoints and connects them with a `SimpleChannel` pair
 
 ## Simulator Regression Lane
 
-Use `telltale-simulator` to regression test projects that mix `TelltaleHandler` style protocol logic with VM execution.
+Use `telltale-simulator` to regression test projects that mix `TelltaleHandler` style protocol logic with protocol-machine execution.
 The harness API gives one stable path for scenario setup and contract checks.
 This avoids project-specific guard boilerplate for common replay and trace assertions.
 
@@ -120,7 +120,7 @@ let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
 ```
 
-This check complements endpoint unit tests. It validates VM level behavior under the same scenario middleware used by simulator parity lanes.
+This check complements endpoint unit tests. It validates protocol-machine behavior under the same scenario middleware used by simulator parity lanes.
 
 ---
 

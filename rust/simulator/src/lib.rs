@@ -1,11 +1,11 @@
-//! VM-backed simulation engine for Telltale choreographic protocols.
+//! Protocol-machine-backed simulation engine for Telltale choreographic protocols.
 //!
-//! Executes projected local types through the bytecode VM with pluggable
+//! Executes projected local types through the protocol machine with pluggable
 //! effect handlers.
 
 // Simulator uses explicit Result-based error propagation in runtime paths.
 #![allow(clippy::missing_panics_doc)]
-// Simulator uses u64/usize conversions for tick/index interop with the VM.
+// Simulator uses u64/usize conversions for tick/index interop with the protocol machine.
 #![allow(
     clippy::as_conversions,
     clippy::cast_possible_truncation,

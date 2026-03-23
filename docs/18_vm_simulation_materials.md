@@ -1,4 +1,4 @@
-# VM Simulation Materials
+# Protocol-Machine Simulation Materials
 
 This page documents material handlers, distributed simulation, and post-run analysis.
 It also records current limits and test coverage.
@@ -16,7 +16,7 @@ These handlers are constructed directly or through `handler_from_material`.
 
 ## Distributed Simulation
 
-`DistributedSimBuilder` constructs an outer VM plus per-site inner VMs through `NestedVMHandler`.
+`DistributedSimBuilder` constructs an outer protocol machine plus per-site inner protocol machines through `NestedVMHandler`.
 Each site owns a local set of `CodeImage` protocols and one effect handler.
 
 Build fails when site names do not match outer protocol roles.
@@ -25,7 +25,7 @@ The builder also supports `outer_concurrency(...)` and `inner_rounds_per_step(..
 
 ## Post-run Analysis
 
-The `analysis` module provides deterministic trace checks that do not mutate VM state.
+The `analysis` module provides deterministic trace checks that do not mutate protocol-machine state.
 Checks return structured pass and failure outputs.
 
 Available checks include `check_conservation`, `check_simplex`, `check_convergence`, and `check_energy_conservation`.
@@ -49,7 +49,7 @@ It does not write arbitrary scenario output files by itself.
 
 ## Related Docs
 
-- [VM Simulation](15_vm_simulation_overview.md)
-- [VM Simulation Runner](16_vm_simulation_runner.md)
-- [VM Simulation Scenarios](17_vm_simulation_scenarios.md)
+- [Protocol-Machine Simulation](15_vm_simulation_overview.md)
+- [Protocol-Machine Simulation Runner](16_vm_simulation_runner.md)
+- [Protocol-Machine Simulation Scenarios](17_vm_simulation_scenarios.md)
 - [Rust-Lean Parity](19_rust_lean_parity.md)

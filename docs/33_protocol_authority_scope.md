@@ -9,9 +9,9 @@ application runtime.
 
 ## Classification
 
-### Move Into The Telltale VM/Effect Layer
+### Move Into The Telltale Protocol-Machine/Effect Layer
 
-These concerns belong in the VM/effect/runtime boundary because they are
+These concerns belong in the protocol-machine/effect/runtime boundary because they are
 protocol-critical, observable, and suitable for runtime enforcement.
 
 | Concern | Why it belongs in Telltale |
@@ -26,7 +26,7 @@ protocol-critical, observable, and suitable for runtime enforcement.
 ### Move Into The Telltale DSL
 
 These concerns belong in the language surface because they are the
-ergonomic way to express the protocol-critical VM features above.
+ergonomic way to express the protocol-critical protocol-machine features above.
 
 | Concern | Why it belongs in the DSL |
 |---|---|
@@ -75,7 +75,7 @@ Working distinction:
 
 ## Weak Current Surfaces
 
-The current repo already has a strong VM/effect boundary.
+The current repo already has a strong protocol-machine/effect boundary.
 Several parts of that boundary still rely on raw strings or convention-driven host behavior.
 
 ### VM/Effect Callback Surface
@@ -152,7 +152,7 @@ hold:
 2. It can be represented as typed outcomes, evidence, receipts, or
    obligations rather than opaque host internals.
 3. It is observable at the replay/audit/effect-trace boundary.
-4. The VM can enforce or at least validate it at a meaningful boundary.
+4. The protocol machine can enforce or at least validate it at a meaningful boundary.
 5. Lean/Rust correspondence can model it without inventing a separate
    host-language semantics.
 
@@ -170,7 +170,7 @@ A concern should stay host-only when any of the following hold:
 
 The immediate design direction is:
 
-- strengthen the existing typed VM effect bridge rather than creating a
+- strengthen the existing typed protocol-machine effect bridge rather than creating a
   second host boundary
 - prioritize typed outcomes and typed evidence over generalized language
   abstraction

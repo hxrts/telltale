@@ -182,6 +182,9 @@ protocol Flow uses Runtime =
         assert_eq!(runtime.simulator_trait_name, "RuntimeSimulatorHandler");
         assert_eq!(runtime.operations.len(), 3);
         assert_eq!(runtime.operations[0].rust_method_name, "read_channel");
-        assert_eq!(runtime.operations[2].simulation.behavior, GeneratedEffectBehavior::Stream);
+        assert_eq!(
+            runtime.operations[2].simulation.behavior,
+            GeneratedEffectBehavior::Stream
+        );
     }
 }

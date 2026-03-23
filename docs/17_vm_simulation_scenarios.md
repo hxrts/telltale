@@ -1,4 +1,4 @@
-# VM Simulation Scenarios
+# Protocol-Machine Simulation Scenarios
 
 This page documents scenario configuration and middleware behavior.
 It covers scenario TOML shape, generated effect-family scripting, fault injection,
@@ -116,6 +116,6 @@ It then runs the same middleware and property loop for selected rounds.
 
 ## Related Docs
 
-- [VM Simulation](15_vm_simulation_overview.md)
-- [VM Simulation Runner](16_vm_simulation_runner.md)
-- [VM Simulation Materials](18_vm_simulation_materials.md)
+- [Protocol-Machine Simulation](15_vm_simulation_overview.md)
+- [Protocol-Machine Simulation Runner](16_vm_simulation_runner.md)
+- [Protocol-Machine Simulation Materials](18_vm_simulation_materials.md)

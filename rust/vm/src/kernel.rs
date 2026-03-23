@@ -1,7 +1,7 @@
-//! Deterministic VM kernel API.
+//! Deterministic protocol-machine kernel API.
 //!
 //! This module provides the canonical instruction-step entrypoints for the
-//! cooperative VM state machine. Driver layers (native single-thread, wasm,
+//! cooperative protocol-machine state machine. Driver layers (native single-thread, wasm,
 //! and adapter backends) should call this API instead of re-implementing
 //! stepping logic.
 

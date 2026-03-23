@@ -2,10 +2,10 @@ use super::*;
 use std::io::Write;
 
 impl LeanRunner {
-    /// Default path to the VM runner binary (relative to workspace root).
+    /// Default path to the protocol-machine runner binary (relative to workspace root).
     pub const VM_RUNNER_BINARY_PATH: &'static str = "lean/.lake/build/bin/vm_runner";
 
-    /// Get the full path to the VM runner binary.
+    /// Get the full path to the protocol-machine runner binary.
     fn get_vm_runner_path() -> Option<PathBuf> {
         Self::find_workspace_root()
             .map(|root| root.join(Self::VM_RUNNER_BINARY_PATH))

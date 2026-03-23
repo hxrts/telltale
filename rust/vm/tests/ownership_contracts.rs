@@ -423,7 +423,7 @@ cfg_if! {
 
             let mut threaded = ThreadedGuestRuntime::with_workers(ProtocolMachineConfig::default(), 2);
             threaded
-                .load_choreography(&image)
+                .load_choreography_owned(&image, "threaded/ownership_contracts")
                 .expect("load threaded transfer fixture");
             threaded
                 .run(&NoopHandler, 32)
@@ -465,6 +465,7 @@ cfg_if! {
                 .last()
                 .expect("cooperative transfer should emit audit");
             let threaded_audit = threaded
+                .vm()
                 .delegation_audit_log()
                 .last()
                 .expect("threaded transfer should emit audit");

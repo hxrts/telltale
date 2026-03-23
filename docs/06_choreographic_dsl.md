@@ -523,7 +523,7 @@ let readiness = check Runtime.ready(session)
 ```
 
 `check Effect.op(...)` is the canonical language-level form for typed host
-queries. It is the user-facing surface that later lowers to the same typed VM
+queries. It is the user-facing surface that later lowers to the same typed protocol-machine
 `invoke` boundary used by the runtime/effect bridge.
 
 ##### Choosing Between Timeout Metadata and Timeout Branching

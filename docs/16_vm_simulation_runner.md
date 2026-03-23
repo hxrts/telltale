@@ -1,4 +1,4 @@
-# VM Simulation Runner
+# Protocol-Machine Simulation Runner
 
 This page documents runner behavior in `telltale-simulator`.
 It covers trace shapes, semantic artifacts, runner APIs, harness APIs, and sampling logic.
@@ -128,7 +128,7 @@ Record ordering is stable within each sampling pass for role snapshots.
 
 ## Related Docs
 
-- [VM Simulation](15_vm_simulation_overview.md)
-- [VM Simulation Scenarios](17_vm_simulation_scenarios.md)
-- [VM Simulation Materials](18_vm_simulation_materials.md)
+- [Protocol-Machine Simulation](15_vm_simulation_overview.md)
+- [Protocol-Machine Simulation Scenarios](17_vm_simulation_scenarios.md)
+- [Protocol-Machine Simulation Materials](18_vm_simulation_materials.md)
 - [Rust-Lean Parity](19_rust_lean_parity.md)

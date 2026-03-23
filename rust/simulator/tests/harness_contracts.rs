@@ -175,8 +175,8 @@ fn run_config_enforces_contract_checks() {
 
 #[test]
 fn generated_effect_result_helpers_cover_failure_modes() {
-    let success = ScenarioEffectResult::success(serde_json::json!({"status": "ok"}))
-        .with_delay_ms(20);
+    let success =
+        ScenarioEffectResult::success(serde_json::json!({"status": "ok"})).with_delay_ms(20);
     let timeout = ScenarioEffectResult::<serde_json::Value>::timeout();
     let degraded = ScenarioEffectResult::<serde_json::Value>::degraded("owner_lag");
 

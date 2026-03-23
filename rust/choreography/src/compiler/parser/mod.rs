@@ -175,8 +175,7 @@ pub fn parse_choreography_str_with_extensions(
                         operation_decls.push(parse_operation_decl(inner, &preprocessed)?);
                     }
                     Rule::guest_runtime_decl => {
-                        guest_runtime_decls
-                            .push(parse_guest_runtime_decl(inner, &preprocessed)?);
+                        guest_runtime_decls.push(parse_guest_runtime_decl(inner, &preprocessed)?);
                     }
                     Rule::protocol_decl => {
                         let protocol_span = inner.as_span();

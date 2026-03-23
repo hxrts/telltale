@@ -16,7 +16,8 @@ use crate::sim_reference::{
     SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
 };
 use crate::vm_trace::{
-    normalize_semantic_audit, semantic_audits_equivalent, EffectTraceEvent, OutputConditionTraceEvent,
+    normalize_semantic_audit, semantic_audits_equivalent, EffectTraceEvent,
+    OutputConditionTraceEvent,
 };
 use telltale_vm::EffectExchangeRecord;
 
@@ -245,7 +246,11 @@ impl ProtocolMachineRunner {
         loop {
             // bounded: exits on child completion or timeout
             match child.try_wait()? {
-                Some(_) => return child.wait_with_output().map_err(ProtocolMachineRunnerError::from),
+                Some(_) => {
+                    return child
+                        .wait_with_output()
+                        .map_err(ProtocolMachineRunnerError::from)
+                }
                 None => {
                     if start.elapsed() >= timeout {
                         if let Err(err) = child.kill() {
@@ -327,12 +332,18 @@ impl ProtocolMachineRunner {
     /// # Errors
     ///
     /// Returns a [`ProtocolMachineRunnerError`] if the process fails or output is invalid.
-    pub fn run(&self, input: &ProtocolMachineRunInput) -> Result<ProtocolMachineRunOutput, ProtocolMachineRunnerError> {
-        crate::schema::ensure_supported_schema_version(&input.schema_version, "ProtocolMachineRunInput")
-            .map_err(ProtocolMachineRunnerError::ParseError)?;
+    pub fn run(
+        &self,
+        input: &ProtocolMachineRunInput,
+    ) -> Result<ProtocolMachineRunOutput, ProtocolMachineRunnerError> {
+        crate::schema::ensure_supported_schema_version(
+            &input.schema_version,
+            "ProtocolMachineRunInput",
+        )
+        .map_err(ProtocolMachineRunnerError::ParseError)?;
 
-        let payload =
-            serde_json::to_vec(input).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
+        let payload = serde_json::to_vec(input)
+            .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
 
         let mut cmd = Command::new(&self.binary_path)
             .stdin(Stdio::piped())
@@ -356,8 +367,11 @@ impl ProtocolMachineRunner {
 
         let out: ProtocolMachineRunOutput = serde_json::from_slice(&output.stdout)
             .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
-        crate::schema::ensure_supported_schema_version(&out.schema_version, "ProtocolMachineRunOutput")
-            .map_err(ProtocolMachineRunnerError::ParseError)?;
+        crate::schema::ensure_supported_schema_version(
+            &out.schema_version,
+            "ProtocolMachineRunOutput",
+        )
+        .map_err(ProtocolMachineRunnerError::ParseError)?;
         Ok(out)
     }
 
@@ -366,7 +380,10 @@ impl ProtocolMachineRunner {
     /// # Errors
     ///
     /// Returns an error if the process fails or output is invalid.
-    pub fn run_lean_vm(&self, input: &ProtocolMachineRunInput) -> Result<ProtocolMachineRunOutput, ProtocolMachineRunnerError> {
+    pub fn run_lean_vm(
+        &self,
+        input: &ProtocolMachineRunInput,
+    ) -> Result<ProtocolMachineRunOutput, ProtocolMachineRunnerError> {
         self.run(input)
     }
 
@@ -385,8 +402,8 @@ impl ProtocolMachineRunner {
             "operation": operation,
             "payload": payload,
         });
-        let bytes =
-            serde_json::to_vec(&input).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
+        let bytes = serde_json::to_vec(&input)
+            .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
 
         let mut cmd = Command::new(&self.binary_path)
             .stdin(Stdio::piped())
@@ -406,7 +423,8 @@ impl ProtocolMachineRunner {
                 stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
             });
         }
-        serde_json::from_slice(&output.stdout).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))
+        serde_json::from_slice(&output.stdout)
+            .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))
     }
 
     /// Validate a semantic audit against Lean-side protocol-machine checks.
@@ -439,8 +457,8 @@ impl ProtocolMachineRunner {
     ) -> Result<SimRunOutput, ProtocolMachineRunnerError> {
         crate::schema::ensure_supported_schema_version(&input.schema_version, "SimRunInput")
             .map_err(ProtocolMachineRunnerError::ParseError)?;
-        let payload =
-            serde_json::to_value(input).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
+        let payload = serde_json::to_value(input)
+            .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
         let response = self.run_lean_validation("runSimulation", &payload)?;
         parse_sim_run_output(response)
     }
@@ -552,8 +570,8 @@ impl ProtocolMachineRunner {
         &self,
         bundle: &crate::invariants::ProtocolBundle,
     ) -> Result<InvariantVerificationResult, ProtocolMachineRunnerError> {
-        let payload =
-            serde_json::to_value(bundle).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
+        let payload = serde_json::to_value(bundle)
+            .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
         let response = self.run_lean_validation("verifyProtocolBundle", &payload)?;
 
         Ok(InvariantVerificationResult {
@@ -607,8 +625,8 @@ pub fn vm_input_from_values(
 ) -> Result<ProtocolMachineRunInput, ProtocolMachineRunnerError> {
     let mut choreos = Vec::new();
     for value in choreographies {
-        let choreo: ChoreographyJson =
-            serde_json::from_value(value).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
+        let choreo: ChoreographyJson = serde_json::from_value(value)
+            .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
         choreos.push(choreo);
     }
     Ok(ProtocolMachineRunInput {
@@ -620,7 +638,9 @@ pub fn vm_input_from_values(
 }
 
 /// Serialize a protocol-machine runner output to JSON for debugging.
-pub fn output_to_json(output: &ProtocolMachineRunOutput) -> Result<Value, ProtocolMachineRunnerError> {
+pub fn output_to_json(
+    output: &ProtocolMachineRunOutput,
+) -> Result<Value, ProtocolMachineRunnerError> {
     serde_json::to_value(output).map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))
 }
 
@@ -714,14 +734,20 @@ mod tests {
         });
         let missing_err =
             parse_required_valid(&missing, "validateTrace").expect_err("missing valid must fail");
-        assert!(matches!(missing_err, ProtocolMachineRunnerError::ParseError(_)));
+        assert!(matches!(
+            missing_err,
+            ProtocolMachineRunnerError::ParseError(_)
+        ));
 
         let wrong_type = serde_json::json!({
             "valid": "true"
         });
         let wrong_type_err = parse_required_valid(&wrong_type, "validateTrace")
             .expect_err("non-boolean valid must fail");
-        assert!(matches!(wrong_type_err, ProtocolMachineRunnerError::ParseError(_)));
+        assert!(matches!(
+            wrong_type_err,
+            ProtocolMachineRunnerError::ParseError(_)
+        ));
     }
 
     #[test]
@@ -754,7 +780,14 @@ mod tests {
             .arg("sleep 1")
             .spawn()
             .expect("spawn sleep");
-        let result = ProtocolMachineRunner::wait_with_timeout(child, Duration::from_millis(10), "test_sleep");
-        assert!(matches!(result, Err(ProtocolMachineRunnerError::TimedOut { .. })));
+        let result = ProtocolMachineRunner::wait_with_timeout(
+            child,
+            Duration::from_millis(10),
+            "test_sleep",
+        );
+        assert!(matches!(
+            result,
+            Err(ProtocolMachineRunnerError::TimedOut { .. })
+        ));
     }
 }

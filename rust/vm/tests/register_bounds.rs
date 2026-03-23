@@ -136,7 +136,8 @@ cfg_if! {
                 let src = 16u16.saturating_add(offset);
                 let image = single_role_move_image(src);
                 let mut vm = ThreadedGuestRuntime::with_workers(ProtocolMachineConfig::default(), 1);
-                vm.load_choreography(&image).expect("load choreography");
+                vm.load_choreography_owned(&image, "tests/register_bounds")
+                    .expect("load choreography");
                 assert_out_of_registers(vm.run(&NoopHandler, 8));
             }
 
@@ -145,7 +146,8 @@ cfg_if! {
                 let dst = 16u16.saturating_add(offset);
                 let image = recv_oob_image(dst);
                 let mut vm = ThreadedGuestRuntime::with_workers(ProtocolMachineConfig::default(), 1);
-                vm.load_choreography(&image).expect("load choreography");
+                vm.load_choreography_owned(&image, "tests/register_bounds")
+                    .expect("load choreography");
                 assert_out_of_registers(vm.run(&NoopHandler, 16));
             }
         }

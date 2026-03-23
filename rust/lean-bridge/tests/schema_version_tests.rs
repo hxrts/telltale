@@ -2,9 +2,9 @@ use serde_json::json;
 use std::collections::BTreeMap;
 use telltale_lean_bridge::{
     ensure_supported_schema_version, export_protocol_bundle, ChoreographyJson, InvariantClaims,
-    ProtocolBundle, ProtocolMachineRunInput, ProtocolMachineRunOutput,
-    ProtocolMachineSemanticObjects, ProtocolMachineReplayBundle, LEAN_BRIDGE_SCHEMA_VERSION,
-    PROTOCOL_BUNDLE_SCHEMA_VERSION, SEMANTIC_OBJECTS_SCHEMA_VERSION,
+    ProtocolBundle, ProtocolMachineReplayBundle, ProtocolMachineRunInput, ProtocolMachineRunOutput,
+    ProtocolMachineSemanticObjects, LEAN_BRIDGE_SCHEMA_VERSION, PROTOCOL_BUNDLE_SCHEMA_VERSION,
+    SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
@@ -81,7 +81,10 @@ fn replay_trace_bundle_legacy_decode_defaults_schema_version() {
 
 #[test]
 fn schema_validator_accepts_current_and_rejects_unknown() {
-    assert!(ensure_supported_schema_version(LEAN_BRIDGE_SCHEMA_VERSION, "ProtocolMachineRunInput").is_ok());
+    assert!(
+        ensure_supported_schema_version(LEAN_BRIDGE_SCHEMA_VERSION, "ProtocolMachineRunInput")
+            .is_ok()
+    );
     assert!(ensure_supported_schema_version("legacy.v0", "ProtocolMachineRunInput").is_err());
 }
 

@@ -517,6 +517,7 @@
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn delegation_handoff_rebinds_pending_effects_and_invalidates_blocked_effects() {
         let mut local_types = BTreeMap::new();
         local_types.insert(

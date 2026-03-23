@@ -127,7 +127,7 @@ protocol CommitFlow uses Runtime =
     let coordinator = choreo
         .roles
         .iter()
-        .find(|role| role.name().to_string() == "Coordinator")
+        .find(|role| role.name() == "Coordinator")
         .expect("coordinator role");
     let err = project(&choreo, coordinator).expect_err("projection should fail closed");
     assert!(matches!(
@@ -153,7 +153,7 @@ protocol TimeoutFlow =
     let coordinator = choreo
         .roles
         .iter()
-        .find(|role| role.name().to_string() == "Coordinator")
+        .find(|role| role.name() == "Coordinator")
         .expect("coordinator role");
     let err = project(&choreo, coordinator).expect_err("projection should fail closed");
     assert!(matches!(

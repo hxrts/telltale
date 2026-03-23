@@ -91,6 +91,7 @@ fn run_threaded(
     per_session(vm.trace())
 }
 
+#[allow(clippy::type_complexity)]
 fn run_progress_states(
     image: &telltale_vm::loader::CodeImage,
 ) -> (

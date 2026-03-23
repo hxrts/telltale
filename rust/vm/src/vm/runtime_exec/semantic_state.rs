@@ -188,6 +188,7 @@ impl VM {
         );
     }
 
+    #[allow(clippy::too_many_lines)]
     fn evaluate_progress_contracts(&mut self) -> Result<(), VMError> {
         let active_effect_ids: Vec<_> = self
             .outstanding_effects
@@ -599,7 +600,7 @@ impl VM {
         }
 
         for operation in self.operation_instances.as_mut_slice().iter_mut() {
-            if invalidated.iter().any(|operation_id| operation.operation_id == *operation_id) {
+            if invalidated.contains(&operation.operation_id) {
                 operation.phase = OperationPhase::Failed;
                 operation.terminal_publication = Some("effect.invalidated".to_string());
             }
@@ -674,10 +675,7 @@ impl VM {
                 | OperationPhase::TimedOut
                 | OperationPhase::HandedOff => {}
             }
-            if invalidated_operations
-                .iter()
-                .any(|operation_id| operation.operation_id == *operation_id)
-            {
+            if invalidated_operations.contains(&operation.operation_id) {
                 operation.phase = OperationPhase::Failed;
                 operation.terminal_publication = Some("effect.invalidated".to_string());
             }
@@ -780,6 +778,7 @@ mod runtime_effect_state_tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn runtime_semantic_handoff_transfers_pending_effects_and_invalidates_blocked_effects() {
         let mut vm = test_vm();
         vm.clock.tick = 7;

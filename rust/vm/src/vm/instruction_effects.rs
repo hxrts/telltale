@@ -122,6 +122,7 @@ impl VM {
     }
 
     /// Recv: lookup type → match Recv → try dequeue → block or process → StepPack.
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn step_recv(
         &mut self,
         coro_idx: usize,
@@ -334,6 +335,7 @@ impl VM {
     }
 
     /// Invoke: call handler.step() for integration.
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn step_invoke(
         &mut self,
         coro_idx: usize,
@@ -471,6 +473,7 @@ impl VM {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn step_acquire(
         &mut self,
         input: GuardAcquireInput<'_>,
@@ -594,6 +597,7 @@ impl VM {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn step_release(
         &mut self,
         input: GuardReleaseInput<'_>,

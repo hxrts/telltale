@@ -128,14 +128,8 @@ fn canonical_public_examples_use_protocol_machine_terms() {
             "../../../docs/24_lean_rust_bridge.md",
             "## Lean VM Runner Wrapper",
         ),
-        (
-            "../../effect-scaffold/src/main.rs",
-            "STRUCT_NAME",
-        ),
-        (
-            "../../effect-scaffold/src/main.rs",
-            "--name STRUCT_NAME",
-        ),
+        ("../../effect-scaffold/src/main.rs", "STRUCT_NAME"),
+        ("../../effect-scaffold/src/main.rs", "--name STRUCT_NAME"),
     ];
 
     let mut violations = Vec::new();

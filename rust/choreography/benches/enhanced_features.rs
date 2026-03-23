@@ -187,29 +187,23 @@ fn bench_complex_protocol(c: &mut Criterion) {
 
         protocol ComplexProtocol =
           roles Coordinator, Workers[*], Database, Monitor
-          choice at Coordinator {
-            | Initialize -> {
+          choice Coordinator at
+            | Initialize => 
                 Coordinator -> Monitor : InitializeWork
                 Workers[i] -> Database : DataRequest
                 Database -> Workers[i] : DataResponse
-              }
-            | Report -> {
+            | Report =>
                 Coordinator -> Monitor : WorkProgress
                 Workers[0..quorum] -> Coordinator : WorkResult
-              }
-            | Success -> {
+            | Success =>
                 Coordinator -> Monitor : SuccessReport
                 Coordinator -> Workers[*] : Cleanup
-              }
-            | Failure -> {
+            | Failure =>
                 Coordinator -> Monitor : FailureAlert
                 Coordinator -> Database : RollbackTransaction
-              }
-            | Retry -> {
+            | Retry =>
                 Coordinator -> Monitor : RetryWork
                 Coordinator -> Workers[*] : RetryWork
-              }
-          }
           Monitor -> Coordinator : MonitoringComplete
     "#;
 

@@ -4,7 +4,7 @@
 
 This page documents the choreography-layer handler surface in `telltale-choreography`.
 This surface is `ChoreoHandler`.
-For VM host integration, see [Effect Handlers and Session Types](11_effect_session_bridge.md).
+For protocol-machine host integration, see [Effect Handlers and Session Types](11_effect_session_bridge.md).
 
 `ChoreoHandler` decouples protocol logic from transport implementation.
 Handlers interpret choreographic effects into concrete communication operations.
@@ -18,12 +18,12 @@ Choose the handler surface by integration level.
 | Use case | Handler surface |
 |---|---|
 | Generated choreography code over typed messages | `ChoreoHandler` |
-| VM bytecode execution in a host runtime | `EffectHandler` |
+| Protocol-machine bytecode execution in a host runtime | `EffectHandler` |
 
 `EffectHandler` is the integration boundary for third-party runtimes.
 `ChoreoHandler` is the integration boundary for async choreography transports.
 
-## VM Handler Test Path
+## Protocol-Machine Handler Test Path
 
 Projects that implement `EffectHandler` should validate behavior in `telltale-simulator`.
 Use `SimulationHarness` with `DirectAdapter` for host handlers.
@@ -35,7 +35,7 @@ let harness = SimulationHarness::new(&adapter);
 let result = harness.run(&spec)?;
 ```
 
-This test path runs the same VM callback surface that production execution uses. Add `assert_contracts` checks to make replay and trace guarantees explicit in CI.
+This test path runs the same protocol-machine callback surface that production execution uses. Add `assert_contracts` checks to make replay and trace guarantees explicit in CI.
 
 ## ChoreoHandler Trait
 

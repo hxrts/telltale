@@ -770,6 +770,11 @@ impl EffectOutcome {
     }
 
     /// Convert this outcome into a typed `EffectResult<SendDecision>`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectFailure`] when the outcome is a success with the wrong
+    /// response kind or a malformed successful payload.
     pub fn into_send_decision(self) -> Result<EffectResult<SendDecision>, EffectFailure> {
         match self.status {
             EffectOutcomeStatus::Blocked => Ok(EffectResult::Blocked),
@@ -785,6 +790,11 @@ impl EffectOutcome {
     }
 
     /// Convert this outcome into a typed `EffectResult<()>` for receive/release.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectFailure`] when the outcome is a success with the wrong
+    /// response kind or a malformed successful payload.
     pub fn into_unit(self, expected_kind: &str) -> Result<EffectResult<()>, EffectFailure> {
         match self.status {
             EffectOutcomeStatus::Blocked => Ok(EffectResult::Blocked),
@@ -805,6 +815,11 @@ impl EffectOutcome {
     }
 
     /// Convert this outcome into a typed `EffectResult<String>`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectFailure`] when the outcome is a success with the wrong
+    /// response kind or a malformed successful payload.
     pub fn into_label(self) -> Result<EffectResult<String>, EffectFailure> {
         match self.status {
             EffectOutcomeStatus::Blocked => Ok(EffectResult::Blocked),
@@ -820,6 +835,11 @@ impl EffectOutcome {
     }
 
     /// Convert this outcome into a typed `EffectResult<Value>`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectFailure`] when the outcome is a success with the wrong
+    /// response kind or a malformed successful payload.
     pub fn into_value(self, expected_kind: &str) -> Result<EffectResult<Value>, EffectFailure> {
         match self.status {
             EffectOutcomeStatus::Blocked => Ok(EffectResult::Blocked),
@@ -837,6 +857,11 @@ impl EffectOutcome {
     }
 
     /// Convert this outcome into a typed `EffectResult<Vec<TopologyPerturbation>>`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectFailure`] when the outcome is a success with the wrong
+    /// response kind or a malformed successful payload.
     pub fn into_topology(self) -> Result<EffectResult<Vec<TopologyPerturbation>>, EffectFailure> {
         match self.status {
             EffectOutcomeStatus::Blocked => Ok(EffectResult::Blocked),
@@ -852,6 +877,11 @@ impl EffectOutcome {
     }
 
     /// Convert this outcome into an output-condition hint.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EffectFailure`] when the outcome blocks, fails, or carries the
+    /// wrong response kind.
     pub fn into_output_condition_hint(self) -> Result<Option<OutputConditionHint>, EffectFailure> {
         match self.status {
             EffectOutcomeStatus::Blocked => Err(EffectFailure::contract_violation(
