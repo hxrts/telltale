@@ -6,6 +6,8 @@ import Runtime.VM.Model.SemanticObjects.SemanticHandoffTransition
 import Runtime.VM.Model.SemanticObjects.SemanticHandoffLemmas
 import Runtime.VM.Model.SemanticObjects.AuthoritativeReadsPublication
 import Runtime.VM.Model.SemanticObjects.AuthoritativeReadsPublicationLemmas
+import Runtime.VM.Model.SemanticObjects.MaterializationSuccess
+import Runtime.VM.Model.SemanticObjects.MaterializationSuccessLemmas
 
 set_option autoImplicit false
 

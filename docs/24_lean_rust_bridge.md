@@ -28,6 +28,12 @@ and observer-class publication projection now live in
 `Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublication.lean`, with
 observer-projection / blindness / noninterference consequences in
 `Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublicationLemmas.lean`.
+Proof-backed success contexts, materialization-proof adequacy, and
+canonical-handle adequacy now live in
+`Runtime/VM/Model/SemanticObjects/MaterializationSuccess.lean`, with
+theorem-facing proof-less-success rejection and observational-materialization
+rejection in
+`Runtime/VM/Model/SemanticObjects/MaterializationSuccessLemmas.lean`.
 
 ## Scope
 
