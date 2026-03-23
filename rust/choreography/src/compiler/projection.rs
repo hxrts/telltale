@@ -175,6 +175,20 @@ impl<'a> ProjectionContext<'a> {
 
             Protocol::Var(label) => self.project_var(label),
 
+            Protocol::Publish { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
+                construct: "publish",
+            }),
+
+            Protocol::Handoff { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
+                construct: "handoff",
+            }),
+
+            Protocol::DependentWork { .. } => {
+                Err(ProjectionError::UnsupportedAuthorityConstruct {
+                    construct: "dependent work",
+                })
+            }
+
             Protocol::End => Ok(LocalType::End),
 
             Protocol::Extension {

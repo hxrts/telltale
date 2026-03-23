@@ -145,6 +145,49 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
         Protocol::Var(label) => {
             write_line(out, indent, &format!("continue {}", label));
         }
+        Protocol::Publish {
+            event,
+            arg,
+            continuation,
+        } => {
+            if let Some(arg) = arg {
+                write_line(out, indent, &format!("publish {}{}", event, arg));
+            } else {
+                write_line(out, indent, &format!("publish {}", event));
+            }
+            format_protocol(continuation, indent, config, out);
+        }
+        Protocol::Handoff {
+            operation,
+            target,
+            receipt,
+            continuation,
+        } => {
+            write_line(
+                out,
+                indent,
+                &format!(
+                    "handoff {} to {} using {}",
+                    operation,
+                    format_role_ref(target),
+                    receipt
+                ),
+            );
+            format_protocol(continuation, indent, config, out);
+        }
+        Protocol::DependentWork {
+            name,
+            arg,
+            required_for,
+            continuation,
+        } => {
+            let work_head = match arg {
+                Some(arg) => format!("dependent work {}{} required for {}", name, arg, required_for),
+                None => format!("dependent work {} required for {}", name, required_for),
+            };
+            write_line(out, indent, &work_head);
+            format_protocol(continuation, indent, config, out);
+        }
         Protocol::Extension {
             extension,
             continuation,

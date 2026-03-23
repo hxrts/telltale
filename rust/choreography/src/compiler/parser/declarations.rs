@@ -1,5 +1,8 @@
 use super::*;
-use crate::ast::{EffectOpAuthorityClass, EffectOpDecl, TypeConstructorDecl};
+use crate::ast::{
+    EffectOpAuthorityClass, EffectOpDecl, FragmentDecl, GuestRuntimeDecl, OperationDecl,
+    OperationParamDecl, TypeConstructorDecl,
+};
 
 pub(super) fn enforce_same_line_equals(
     src: &str,
@@ -427,4 +430,203 @@ pub(super) fn parse_effect_decl(
         }
     }
     Ok(EffectDecl { name, operations })
+}
+
+pub(super) fn parse_fragment_decl(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<FragmentDecl, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let name = inner
+        .next()
+        .ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "fragment declaration is missing name".to_string(),
+        })?
+        .as_str()
+        .to_string();
+    let params = inner
+        .next()
+        .map(|p| {
+            p.into_inner()
+                .filter(|item| item.as_rule() == Rule::ident)
+                .map(|item| item.as_str().to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+    Ok(FragmentDecl { name, params })
+}
+
+pub(super) fn parse_operation_decl(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<OperationDecl, ParseError> {
+    let span = pair.as_span();
+    enforce_same_line_equals(pair.as_str(), span, input, "operation declaration")?;
+    let mut inner = pair.into_inner();
+    let name = inner
+        .next()
+        .ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "operation declaration is missing name".to_string(),
+        })?
+        .as_str()
+        .to_string();
+
+    let mut params = Vec::new();
+    let mut owner_role = None;
+    let mut within = None;
+    let mut body_source = None;
+
+    for item in inner {
+        match item.as_rule() {
+            Rule::operation_params => {
+                for param in item.into_inner() {
+                    if param.as_rule() != Rule::operation_param_decl {
+                        continue;
+                    }
+                    let mut param_inner = param.into_inner();
+                    let param_name = param_inner
+                        .next()
+                        .ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(span, input),
+                            message: "operation parameter is missing a name".to_string(),
+                        })?
+                        .as_str()
+                        .to_string();
+                    let type_name = param_inner
+                        .next()
+                        .ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(span, input),
+                            message: "operation parameter is missing a type".to_string(),
+                        })?
+                        .as_str()
+                        .trim()
+                        .to_string();
+                    params.push(OperationParamDecl {
+                        name: param_name,
+                        type_name,
+                    });
+                }
+            }
+            Rule::role_ref => {
+                owner_role = Some(item.as_str().trim().to_string());
+            }
+            Rule::operation_within => {
+                let mut within_inner = item.into_inner();
+                let fragment_name = within_inner
+                    .next()
+                    .ok_or_else(|| ParseError::Syntax {
+                        span: ErrorSpan::from_pest_span(span, input),
+                        message: "operation within clause is missing fragment name".to_string(),
+                    })?
+                    .as_str()
+                    .to_string();
+                let args: Vec<String> = within_inner
+                    .next()
+                    .map(|p| {
+                        p.into_inner()
+                            .filter(|arg| arg.as_rule() == Rule::ident)
+                            .map(|arg| arg.as_str().to_string())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                within = Some(if args.is_empty() {
+                    fragment_name
+                } else {
+                    format!("{}({})", fragment_name, args.join(", "))
+                });
+            }
+            Rule::protocol_body => {
+                body_source = Some(item.as_str().trim().to_string());
+            }
+            _ => {}
+        }
+    }
+
+    Ok(OperationDecl {
+        name,
+        params,
+        owner_role: owner_role.ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "operation declaration is missing owner role".to_string(),
+        })?,
+        within,
+        body_source: body_source.ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "operation declaration is missing body".to_string(),
+        })?,
+    })
+}
+
+pub(super) fn parse_guest_runtime_decl(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<GuestRuntimeDecl, ParseError> {
+    let span = pair.as_span();
+    enforce_same_line_equals(pair.as_str(), span, input, "guest runtime declaration")?;
+    let mut inner = pair.into_inner();
+    let name = inner
+        .next()
+        .ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "guest runtime declaration is missing name".to_string(),
+        })?
+        .as_str()
+        .to_string();
+    let body = inner.next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "guest runtime declaration is missing body".to_string(),
+    })?;
+
+    let mut uses = Vec::new();
+    let mut entry = None;
+    for stmt in body.into_inner() {
+        match stmt.as_rule() {
+            Rule::guest_runtime_stmt => {
+                for inner_stmt in stmt.into_inner() {
+                    match inner_stmt.as_rule() {
+                        Rule::guest_runtime_uses => {
+                            uses = inner_stmt
+                                .into_inner()
+                                .filter(|p| p.as_rule() == Rule::ident)
+                                .map(|p| p.as_str().to_string())
+                                .collect();
+                        }
+                        Rule::guest_runtime_entry => {
+                            entry = inner_stmt
+                                .into_inner()
+                                .find(|p| p.as_rule() == Rule::ident)
+                                .map(|p| p.as_str().to_string());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Rule::guest_runtime_uses => {
+                uses = stmt
+                    .into_inner()
+                    .filter(|p| p.as_rule() == Rule::ident)
+                    .map(|p| p.as_str().to_string())
+                    .collect();
+            }
+            Rule::guest_runtime_entry => {
+                entry = stmt
+                    .into_inner()
+                    .find(|p| p.as_rule() == Rule::ident)
+                    .map(|p| p.as_str().to_string());
+            }
+            _ => {}
+        }
+    }
+
+    Ok(GuestRuntimeDecl {
+        name,
+        uses,
+        entry: entry.ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "guest runtime declaration is missing entry".to_string(),
+        })?,
+    })
 }

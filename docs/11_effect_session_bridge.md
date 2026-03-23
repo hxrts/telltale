@@ -228,14 +228,24 @@ authority checks and evidence-bearing branches after lowering.
 ## Integration Tooling
 
 Use `just effect-scaffold` to generate host integration stubs.
-The command emits deterministic `EffectHandler` templates, VM smoke tests, and simulator harness contract tests.
-It also writes a local scaffold `README.md` with next-step instructions.
+The command now reads DSL `effect` declarations and emits:
+
+- `generated_effects.rs` with canonical Rust request/outcome enums and host-handler traits
+- `generated_simulator.rs` with first-class simulator traits, state, and scenario builders
+- `generated_effect_manifest.json` with the exported effect-family schema
+- a local scaffold `README.md` with next-step instructions
 
 ```text
 just effect-scaffold
 ```
 
-This command writes files under `artifacts/effect_handler_scaffold` by default. Use `cargo run -p effect-scaffold -- --no-simulator` when you want only VM level stubs without simulator harness artifacts.
+This command writes files under `artifacts/effect_handler_scaffold` by default. The direct form is:
+
+```text
+cargo run -p effect-scaffold -- --out artifacts/effect_handler_scaffold --dsl path/to/protocol.tell
+```
+
+Use `--no-simulator` when you want only the Rust effect boundary without simulator artifacts.
 
 Use `just sim-run <config>` to execute a simulator harness config file.
 This command runs the VM with scenario middleware and contract checks.

@@ -131,7 +131,11 @@ protocol WithBundles requires Base, Extra =
                     }
                     collect_vm_ops(continuation, out);
                 }
-                Protocol::Send { continuation, .. } | Protocol::Broadcast { continuation, .. } => {
+                Protocol::Send { continuation, .. }
+                | Protocol::Broadcast { continuation, .. }
+                | Protocol::Publish { continuation, .. }
+                | Protocol::Handoff { continuation, .. }
+                | Protocol::DependentWork { continuation, .. } => {
                     collect_vm_ops(continuation, out);
                 }
                 Protocol::Let { continuation, .. } => collect_vm_ops(continuation, out),
@@ -386,7 +390,11 @@ protocol LinearBranchDivergence =
                     annotations.custom("dsl_combinator") == Some("quorum_collect")
                         || has_quorum_extension(continuation)
                 }
-                Protocol::Send { continuation, .. } | Protocol::Broadcast { continuation, .. } => {
+                Protocol::Send { continuation, .. }
+                | Protocol::Broadcast { continuation, .. }
+                | Protocol::Publish { continuation, .. }
+                | Protocol::Handoff { continuation, .. }
+                | Protocol::DependentWork { continuation, .. } => {
                     has_quorum_extension(continuation)
                 }
                 Protocol::Let { continuation, .. } => has_quorum_extension(continuation),

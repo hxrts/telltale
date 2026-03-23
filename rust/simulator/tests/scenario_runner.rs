@@ -2,6 +2,8 @@
 
 use std::collections::BTreeMap;
 
+use serde_json::json;
+use telltale_simulator::generated::{GeneratedEffectScenario, ScenarioEffectDisposition};
 use telltale_simulator::runner::run_with_scenario;
 use telltale_simulator::scenario::Scenario;
 use telltale_types::{GlobalType, Label, LocalTypeR};
@@ -148,5 +150,26 @@ step_size = "0.01"
                 }
             )),
         "scenario replay should include structured semantic effect observations"
+    );
+}
+
+#[test]
+fn generated_effect_scenario_builder_records_effect_outcomes() {
+    let scenario = GeneratedEffectScenario::builder()
+        .record_return("Runtime", "acceptInvite", json!({"channel": "abc"}))
+        .with_delay_ms(15)
+        .record_timeout("Runtime", "acceptInvite")
+        .record_stale_late_result("Runtime", "acceptInvite")
+        .build();
+
+    assert_eq!(scenario.steps.len(), 3);
+    assert_eq!(scenario.steps[0].delay_ms, Some(15));
+    assert_eq!(
+        scenario.steps[1].disposition,
+        ScenarioEffectDisposition::Timeout
+    );
+    assert_eq!(
+        scenario.steps[2].disposition,
+        ScenarioEffectDisposition::StaleLateResult
     );
 }

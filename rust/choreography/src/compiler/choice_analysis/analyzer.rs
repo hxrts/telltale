@@ -102,7 +102,11 @@ impl ChoiceAnalyzer {
             Protocol::Rec { body, .. } => {
                 self.analyze_protocol(body, choices, parent_choice);
             }
-            Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
+            Protocol::Extension { continuation, .. }
+            | Protocol::Let { continuation, .. }
+            | Protocol::Publish { continuation, .. }
+            | Protocol::Handoff { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => {
                 self.analyze_protocol(continuation, choices, parent_choice);
             }
             Protocol::Var(_) | Protocol::End => {}
@@ -267,7 +271,11 @@ impl ChoiceAnalyzer {
             Protocol::Rec { body, .. } => {
                 self.collect_messages_from_protocol(body, messages);
             }
-            Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
+            Protocol::Extension { continuation, .. }
+            | Protocol::Let { continuation, .. }
+            | Protocol::Publish { continuation, .. }
+            | Protocol::Handoff { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => {
                 self.collect_messages_from_protocol(continuation, messages);
             }
             Protocol::Var(_) | Protocol::End => {}
@@ -500,7 +508,11 @@ impl ChoiceAnalyzer {
             Protocol::Rec { body, .. } => {
                 self.collect_roles_from_protocol(body, roles);
             }
-            Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
+            Protocol::Extension { continuation, .. }
+            | Protocol::Let { continuation, .. }
+            | Protocol::Publish { continuation, .. }
+            | Protocol::Handoff { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => {
                 self.collect_roles_from_protocol(continuation, roles);
             }
             Protocol::Var(_) | Protocol::End => {}

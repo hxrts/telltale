@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use telltale_simulator::contracts::{evaluate_contracts, ContractCheckConfig};
+use telltale_simulator::generated::ScenarioEffectResult;
 use telltale_simulator::harness::{DirectAdapter, HarnessConfig, HarnessSpec, SimulationHarness};
 use telltale_simulator::material::{MaterialParams, MeanFieldParams};
 use telltale_simulator::scenario::{OutputConfig, Scenario};
@@ -170,4 +171,22 @@ fn run_config_enforces_contract_checks() {
         Err(err) => err,
     };
     assert!(err.contains("missing sampled trace records"));
+}
+
+#[test]
+fn generated_effect_result_helpers_cover_failure_modes() {
+    let success = ScenarioEffectResult::success(serde_json::json!({"status": "ok"}))
+        .with_delay_ms(20);
+    let timeout = ScenarioEffectResult::<serde_json::Value>::timeout();
+    let degraded = ScenarioEffectResult::<serde_json::Value>::degraded("owner_lag");
+
+    assert!(matches!(
+        success,
+        ScenarioEffectResult::Return {
+            delay_ms: Some(20),
+            ..
+        }
+    ));
+    assert!(matches!(timeout, ScenarioEffectResult::Timeout { .. }));
+    assert!(matches!(degraded, ScenarioEffectResult::Degraded { .. }));
 }

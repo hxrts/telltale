@@ -61,7 +61,11 @@ pub(super) fn has_communication(protocol: &Protocol) -> bool {
         Protocol::Parallel { protocols } => protocols.iter().any(has_communication),
         Protocol::Rec { body, .. } => has_communication(body),
         Protocol::Var(_) | Protocol::End => false,
-        Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
+        Protocol::Extension { continuation, .. }
+        | Protocol::Let { continuation, .. }
+        | Protocol::Publish { continuation, .. }
+        | Protocol::Handoff { continuation, .. }
+        | Protocol::DependentWork { continuation, .. } => {
             has_communication(continuation)
         }
     }

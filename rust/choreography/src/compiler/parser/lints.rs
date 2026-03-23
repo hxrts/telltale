@@ -177,6 +177,50 @@ fn render_lowering_protocol(protocol: &Protocol, depth: usize, out: &mut String)
         Protocol::Var(label) => {
             writeln!(out, "{indent}- continue {label}").unwrap();
         }
+        Protocol::Publish {
+            event,
+            arg,
+            continuation,
+        } => {
+            if let Some(arg) = arg {
+                writeln!(out, "{indent}- publish {event}{arg}").unwrap();
+            } else {
+                writeln!(out, "{indent}- publish {event}").unwrap();
+            }
+            render_lowering_protocol(continuation, depth + 1, out);
+        }
+        Protocol::Handoff {
+            operation,
+            target,
+            receipt,
+            continuation,
+        } => {
+            writeln!(
+                out,
+                "{indent}- handoff {operation} to {} using {receipt}",
+                target.name()
+            )
+            .unwrap();
+            render_lowering_protocol(continuation, depth + 1, out);
+        }
+        Protocol::DependentWork {
+            name,
+            arg,
+            required_for,
+            continuation,
+        } => {
+            if let Some(arg) = arg {
+                writeln!(
+                    out,
+                    "{indent}- dependent work {name}{arg} required for {required_for}"
+                )
+                .unwrap();
+            } else {
+                writeln!(out, "{indent}- dependent work {name} required for {required_for}")
+                    .unwrap();
+            }
+            render_lowering_protocol(continuation, depth + 1, out);
+        }
         Protocol::Extension {
             annotations,
             continuation,

@@ -209,6 +209,9 @@ fn validate_linear_block(
             }
             Statement::Send { .. }
             | Statement::Broadcast { .. }
+            | Statement::Publish { .. }
+            | Statement::Handoff { .. }
+            | Statement::DependentWork { .. }
             | Statement::Continue { .. }
             | Statement::Handshake { .. }
             | Statement::QuorumCollect { .. }
@@ -301,6 +304,9 @@ fn validate_case_exhaustiveness(statements: &[Statement], input: &str) -> Result
             }
             Statement::Send { .. }
             | Statement::Broadcast { .. }
+            | Statement::Publish { .. }
+            | Statement::Handoff { .. }
+            | Statement::DependentWork { .. }
             | Statement::Continue { .. }
             | Statement::Handshake { .. }
             | Statement::QuorumCollect { .. }
@@ -383,6 +389,9 @@ fn validate_linear_bindings(statements: &[Statement], input: &str) -> Result<(),
             }
             Statement::Send { .. }
             | Statement::Broadcast { .. }
+            | Statement::Publish { .. }
+            | Statement::Handoff { .. }
+            | Statement::DependentWork { .. }
             | Statement::Continue { .. }
             | Statement::Handshake { .. }
             | Statement::QuorumCollect { .. }
@@ -449,10 +458,29 @@ fn count_statement_uses(statement: &Statement, name: &str) -> usize {
             ..
         } => count_binding_uses(on_missing_body, name) + count_binding_uses(body, name),
         Statement::VmCoreOp { .. }
+        | Statement::Publish { .. }
         | Statement::Continue { .. }
         | Statement::Handshake { .. }
         | Statement::QuorumCollect { .. }
         | Statement::Call { .. } => 0,
+        Statement::Handoff {
+            operation,
+            target,
+            receipt,
+        } => {
+            operation.split(name).count().saturating_sub(1)
+                + target
+                    .name()
+                    .to_string()
+                    .split(name)
+                    .count()
+                    .saturating_sub(1)
+                + receipt.split(name).count().saturating_sub(1)
+        }
+        Statement::DependentWork { arg, required_for, .. } => {
+            arg.as_ref().map_or(0, |v| v.split(name).count().saturating_sub(1))
+                + required_for.split(name).count().saturating_sub(1)
+        }
     }
 }
 
@@ -527,6 +555,9 @@ fn collect_vm_required_capabilities(statements: &[Statement], out: &mut HashSet<
             }
             Statement::Send { .. }
             | Statement::Broadcast { .. }
+            | Statement::Publish { .. }
+            | Statement::Handoff { .. }
+            | Statement::DependentWork { .. }
             | Statement::Continue { .. }
             | Statement::Handshake { .. }
             | Statement::QuorumCollect { .. }

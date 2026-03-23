@@ -612,6 +612,31 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                     annotations,
                 }
             }
+            Statement::Publish { event, arg } => Protocol::Publish {
+                event: event.clone(),
+                arg: arg.clone(),
+                continuation: Box::new(current),
+            },
+            Statement::Handoff {
+                operation,
+                target,
+                receipt,
+            } => Protocol::Handoff {
+                operation: operation.clone(),
+                target: target.clone(),
+                receipt: receipt.clone(),
+                continuation: Box::new(current),
+            },
+            Statement::DependentWork {
+                name,
+                arg,
+                required_for,
+            } => Protocol::DependentWork {
+                name: name.clone(),
+                arg: arg.clone(),
+                required_for: required_for.clone(),
+                continuation: Box::new(current),
+            },
             Statement::VmCoreOp { op } => {
                 let annotations = Annotations::from_vec(vec![
                     ProtocolAnnotation::custom("vm_core_op", op.op_name()),

@@ -87,6 +87,20 @@ pub(crate) enum Statement {
         min_responses: u32,
         message: MessageSpec,
     },
+    Publish {
+        event: String,
+        arg: Option<String>,
+    },
+    Handoff {
+        operation: String,
+        target: Role,
+        receipt: String,
+    },
+    DependentWork {
+        name: String,
+        arg: Option<String>,
+        required_for: String,
+    },
     VmCoreOp {
         op: VmCoreOp,
     },

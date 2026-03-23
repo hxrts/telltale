@@ -33,8 +33,8 @@ const PUBLIC_RUNTIME_SOURCES: &[(&str, &str)] = &[
         include_str!("../../../docs/30_api_reference.md"),
     ),
     (
-        "../../effect-scaffold/templates/effect_handler_test.rs.tmpl",
-        include_str!("../../effect-scaffold/templates/effect_handler_test.rs.tmpl"),
+        "../../effect-scaffold/src/main.rs",
+        include_str!("../../effect-scaffold/src/main.rs"),
     ),
     (
         "../../lean-bridge/src/lib.rs",
@@ -94,8 +94,8 @@ fn canonical_public_examples_use_protocol_machine_terms() {
         ),
         ("../../../docs/19_rust_lean_parity.md", "ProtocolMachine"),
         (
-            "../../effect-scaffold/templates/effect_handler_test.rs.tmpl",
-            "ProtocolMachine::new",
+            "../../effect-scaffold/src/main.rs",
+            "Generate Rust effect interfaces and simulator scaffolds from Telltale effect declarations.",
         ),
         (
             "../../../docs/24_lean_rust_bridge.md",
@@ -129,12 +129,12 @@ fn canonical_public_examples_use_protocol_machine_terms() {
             "## Lean VM Runner Wrapper",
         ),
         (
-            "../../effect-scaffold/templates/effect_handler_test.rs.tmpl",
-            "use telltale_vm::vm::{EffectTraceCaptureMode, VMConfig, VM};",
+            "../../effect-scaffold/src/main.rs",
+            "STRUCT_NAME",
         ),
         (
-            "../../effect-scaffold/templates/effect_handler_test.rs.tmpl",
-            "let mut vm = VM::new",
+            "../../effect-scaffold/src/main.rs",
+            "--name STRUCT_NAME",
         ),
     ];
 

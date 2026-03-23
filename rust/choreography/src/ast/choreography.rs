@@ -13,6 +13,9 @@ const ATTR_TOPOLOGIES: &str = "dsl.topologies";
 const ATTR_TYPE_DECLS: &str = "dsl.type_decls";
 const ATTR_EFFECT_DECLS: &str = "dsl.effect_decls";
 const ATTR_PROTOCOL_USES: &str = "dsl.protocol_uses";
+const ATTR_FRAGMENT_DECLS: &str = "dsl.fragment_decls";
+const ATTR_OPERATION_DECLS: &str = "dsl.operation_decls";
+const ATTR_GUEST_RUNTIME_DECLS: &str = "dsl.guest_runtime_decls";
 
 /// Typed proof-bundle declaration metadata from DSL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -145,6 +148,54 @@ pub struct RuntimeEffectMetadataDecl {
     pub reentrancy_policy: String,
     /// Runtime handler-domain name.
     pub handler_domain: String,
+}
+
+/// Fragment declaration metadata from DSL.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FragmentDecl {
+    /// Fragment name.
+    pub name: String,
+    /// Named fragment parameters.
+    #[serde(default)]
+    pub params: Vec<String>,
+}
+
+/// Operation parameter declaration metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OperationParamDecl {
+    /// Parameter name.
+    pub name: String,
+    /// Parameter type rendered from source syntax.
+    pub type_name: String,
+}
+
+/// Operation declaration metadata from DSL.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OperationDecl {
+    /// Operation name.
+    pub name: String,
+    /// Operation parameters.
+    #[serde(default)]
+    pub params: Vec<OperationParamDecl>,
+    /// Semantic owner role.
+    pub owner_role: String,
+    /// Optional fragment scope rendered from source syntax.
+    #[serde(default)]
+    pub within: Option<String>,
+    /// Raw operation body source.
+    pub body_source: String,
+}
+
+/// Guest-runtime declaration metadata from DSL.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GuestRuntimeDecl {
+    /// Guest-runtime name.
+    pub name: String,
+    /// Declared effect interface uses.
+    #[serde(default)]
+    pub uses: Vec<String>,
+    /// Entry protocol name.
+    pub entry: String,
 }
 
 /// A complete choreographic protocol specification
@@ -323,7 +374,10 @@ impl Choreography {
                 Protocol::Send { continuation, .. }
                 | Protocol::Broadcast { continuation, .. }
                 | Protocol::Extension { continuation, .. }
-                | Protocol::Let { continuation, .. } => {
+                | Protocol::Let { continuation, .. }
+                | Protocol::Publish { continuation, .. }
+                | Protocol::Handoff { continuation, .. }
+                | Protocol::DependentWork { continuation, .. } => {
                     if let Protocol::Let { expr, .. } = protocol {
                         validate_expr(expr, effect_ops, used)?;
                     }
@@ -704,6 +758,58 @@ impl Choreography {
             .unwrap_or_default()
     }
 
+    /// Set fragment declarations for this choreography.
+    pub fn set_fragment_decls(&mut self, decls: &[FragmentDecl]) -> Result<(), String> {
+        let encoded = serde_json::to_string(decls)
+            .map_err(|e| format!("encode fragment declarations: {e}"))?;
+        self.attrs.insert(ATTR_FRAGMENT_DECLS.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get fragment declarations.
+    #[must_use]
+    pub fn fragment_decls(&self) -> Vec<FragmentDecl> {
+        self.attrs
+            .get(ATTR_FRAGMENT_DECLS)
+            .and_then(|s| serde_json::from_str::<Vec<FragmentDecl>>(s).ok())
+            .unwrap_or_default()
+    }
+
+    /// Set operation declarations for this choreography.
+    pub fn set_operation_decls(&mut self, decls: &[OperationDecl]) -> Result<(), String> {
+        let encoded = serde_json::to_string(decls)
+            .map_err(|e| format!("encode operation declarations: {e}"))?;
+        self.attrs.insert(ATTR_OPERATION_DECLS.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get operation declarations.
+    #[must_use]
+    pub fn operation_decls(&self) -> Vec<OperationDecl> {
+        self.attrs
+            .get(ATTR_OPERATION_DECLS)
+            .and_then(|s| serde_json::from_str::<Vec<OperationDecl>>(s).ok())
+            .unwrap_or_default()
+    }
+
+    /// Set guest-runtime declarations for this choreography.
+    pub fn set_guest_runtime_decls(&mut self, decls: &[GuestRuntimeDecl]) -> Result<(), String> {
+        let encoded = serde_json::to_string(decls)
+            .map_err(|e| format!("encode guest runtime declarations: {e}"))?;
+        self.attrs
+            .insert(ATTR_GUEST_RUNTIME_DECLS.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get guest-runtime declarations.
+    #[must_use]
+    pub fn guest_runtime_decls(&self) -> Vec<GuestRuntimeDecl> {
+        self.attrs
+            .get(ATTR_GUEST_RUNTIME_DECLS)
+            .and_then(|s| serde_json::from_str::<Vec<GuestRuntimeDecl>>(s).ok())
+            .unwrap_or_default()
+    }
+
     fn required_bundle_capabilities(&self) -> BTreeSet<String> {
         let required = self.required_proof_bundles();
         let required_set: BTreeSet<&str> = required.iter().map(String::as_str).collect();
@@ -722,7 +828,10 @@ impl Choreography {
             match protocol {
                 Protocol::Send { continuation, .. }
                 | Protocol::Broadcast { continuation, .. }
-                | Protocol::Extension { continuation, .. } => collect(continuation, out),
+                | Protocol::Extension { continuation, .. }
+                | Protocol::Publish { continuation, .. }
+                | Protocol::Handoff { continuation, .. }
+                | Protocol::DependentWork { continuation, .. } => collect(continuation, out),
                 Protocol::Choice { branches, .. } => {
                     for branch in branches {
                         collect(&branch.protocol, out);

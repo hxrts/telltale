@@ -137,6 +137,23 @@ pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCor
                 .to_string(),
         }),
 
+        Protocol::Publish { .. } => Err(ConversionError::UnsupportedFeature {
+            feature: "Publish".to_string(),
+            hint: "Publication surfaces must be erased or lowered before theory conversion"
+                .to_string(),
+        }),
+
+        Protocol::Handoff { .. } => Err(ConversionError::UnsupportedFeature {
+            feature: "Handoff".to_string(),
+            hint: "Semantic handoff must be lowered before theory conversion".to_string(),
+        }),
+
+        Protocol::DependentWork { .. } => Err(ConversionError::UnsupportedFeature {
+            feature: "DependentWork".to_string(),
+            hint: "Dependent work declarations must be lowered before theory conversion"
+                .to_string(),
+        }),
+
         Protocol::Extension { .. } => Err(ConversionError::UnsupportedFeature {
             feature: "Extension".to_string(),
             hint: "Protocol extensions have no theory equivalent".to_string(),

@@ -1,4 +1,5 @@
 use crate::compiler::parser::parse_choreography_str;
+use crate::compiler::projection::project;
 
 #[test]
 fn test_parse_authority_surface_with_effects_types_and_uses() {
@@ -199,4 +200,59 @@ protocol WatchFlow uses Runtime =
         .validate()
         .expect_err("observational effect use should fail validation");
     assert!(err.to_string().contains("observational"));
+}
+
+#[test]
+fn test_parse_fragments_operations_and_guest_runtime_metadata() {
+    let input = r#"
+fragment ChannelMembership(channel)
+
+operation syncMembership(channel : ChannelId) at Worker within ChannelMembership(channel) =
+  publish SyncQueued(channel)
+
+guest runtime MessagingGuest =
+  uses Runtime, Audit
+  entry CommitFlow
+
+protocol CommitFlow uses Runtime, Audit =
+  roles Coordinator, Worker
+  Coordinator -> Worker : Ping
+"#;
+
+    let choreography = parse_choreography_str(input).expect("surface metadata should parse");
+    assert_eq!(choreography.fragment_decls().len(), 1);
+    assert_eq!(choreography.fragment_decls()[0].name, "ChannelMembership");
+    assert_eq!(choreography.fragment_decls()[0].params, vec!["channel"]);
+
+    assert_eq!(choreography.operation_decls().len(), 1);
+    let operation = &choreography.operation_decls()[0];
+    assert_eq!(operation.name, "syncMembership");
+    assert_eq!(operation.owner_role, "Worker");
+    assert_eq!(operation.within.as_deref(), Some("ChannelMembership(channel)"));
+    assert_eq!(operation.params.len(), 1);
+    assert!(operation.body_source.contains("publish SyncQueued(channel)"));
+
+    assert_eq!(choreography.guest_runtime_decls().len(), 1);
+    let guest_runtime = &choreography.guest_runtime_decls()[0];
+    assert_eq!(guest_runtime.name, "MessagingGuest");
+    assert_eq!(guest_runtime.uses, vec!["Runtime", "Audit"]);
+    assert_eq!(guest_runtime.entry, "CommitFlow");
+}
+
+#[test]
+fn test_parse_publish_handoff_and_dependent_work_and_fail_projection_closed() {
+    let input = r#"
+protocol AcceptFlow =
+  roles Coordinator, Worker
+  publish Started
+  let receipt = transfer Session from Coordinator to Worker
+  handoff acceptInvite to Worker using receipt
+  dependent work SyncMembership(channel) required for acceptInvite
+  Coordinator -> Worker : Commit
+"#;
+
+    let choreography = parse_choreography_str(input).expect("semantic surface should parse");
+    let err = project(&choreography, &choreography.roles[0])
+        .expect_err("new semantic forms should remain fail-closed in projection");
+    assert!(!err.to_string().is_empty());
 }

@@ -17,6 +17,9 @@ choreography = {
         ~ topology_decl*
         ~ type_decl*
         ~ effect_decl*
+        ~ fragment_decl*
+        ~ operation_decl*
+        ~ guest_runtime_decl*
         ~ protocol_decl
         ~ EOI
 }
@@ -69,6 +72,17 @@ role_set_subset = { "subset" ~ "(" ~ ident ~ "," ~ integer ~ ".." ~ integer ~ ")
 topology_decl = { topology_kind ~ ident ~ "=" ~ topology_members }
 topology_kind = { "cluster" | "ring" | "mesh" }
 topology_members = { ident ~ ("," ~ ident)* }
+fragment_decl = { "fragment" ~ ident ~ ident_list? }
+ident_list = { "(" ~ ident ~ ("," ~ ident)* ~ ")" }
+operation_decl = { "operation" ~ ident ~ operation_params? ~ "at" ~ role_ref ~ operation_within? ~ "=" ~ protocol_body }
+operation_params = { "(" ~ operation_param_decl ~ ("," ~ operation_param_decl)* ~ ")" }
+operation_param_decl = { ident ~ ":" ~ type_expr }
+operation_within = { "within" ~ ident ~ ident_list? }
+guest_runtime_decl = { "guest" ~ "runtime" ~ ident ~ "=" ~ guest_runtime_body }
+guest_runtime_body = { "{" ~ guest_runtime_stmt+ ~ "}" | guest_runtime_stmt+ }
+guest_runtime_stmt = { guest_runtime_uses | guest_runtime_entry }
+guest_runtime_uses = { "uses" ~ ident ~ ("," ~ ident)* }
+guest_runtime_entry = { "entry" ~ ident }
 
 header_roles = { "(" ~ role_list ~ ")" }
 
@@ -101,6 +115,9 @@ statement = _{
     | handshake_stmt
     | retry_stmt
     | quorum_collect_stmt
+    | publish_stmt
+    | handoff_stmt
+    | dependent_work_stmt
     | vm_acquire_stmt
     | vm_release_stmt
     | vm_fork_stmt
@@ -154,6 +171,9 @@ call_stmt = { "call" ~ ident }
 handshake_stmt = { "handshake" ~ role_ref ~ "<->" ~ role_ref ~ ":" ~ ident }
 retry_stmt = { "retry" ~ int_expr ~ block }
 quorum_collect_stmt = { "quorum_collect" ~ role_ref ~ "->" ~ role_ref ~ "min" ~ integer ~ ":" ~ message }
+publish_stmt = { "publish" ~ ident ~ ctor_value_payload? }
+handoff_stmt = { "handoff" ~ ident ~ "to" ~ role_ref ~ "using" ~ ident }
+dependent_work_stmt = { "dependent" ~ "work" ~ ident ~ ctor_value_payload? ~ "required" ~ "for" ~ ident }
 
 // VM-core operational statements
 vm_acquire_stmt = { "acquire" ~ vm_layer ~ "as" ~ ident }

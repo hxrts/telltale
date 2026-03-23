@@ -18,6 +18,7 @@ pub mod ast;
 pub mod compiler;
 pub mod effects;
 pub mod extensions;
+pub mod generated_effects;
 pub mod heap;
 pub mod identifiers;
 pub mod runtime;
@@ -38,6 +39,10 @@ pub use compiler::{
     create_standard_extension_parser, format_choreography, format_choreography_str,
     format_choreography_with_config, ExtensionParseError, ExtensionParser, ExtensionParserBuilder,
     GrammarComposer, GrammarComposerBuilder, GrammarCompositionError, PrettyConfig,
+};
+pub use generated_effects::{
+    GeneratedEffectBehavior, GeneratedEffectFamily, GeneratedEffectOperation,
+    GeneratedSimulationMetadata, GeneratedSimulationMode,
 };
 pub use effects::middleware::{Metrics, Retry, Trace};
 pub use effects::NoOpHandler;

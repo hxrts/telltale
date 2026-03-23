@@ -187,7 +187,12 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
         Protocol::End => {
             quote! {}
         }
-        Protocol::Let { continuation, .. } => generate_program_effects(continuation, role),
+        Protocol::Let { continuation, .. }
+        | Protocol::Publish { continuation, .. }
+        | Protocol::Handoff { continuation, .. }
+        | Protocol::DependentWork { continuation, .. } => {
+            generate_program_effects(continuation, role)
+        }
         Protocol::Case { branches, .. } => {
             let branch_effects: Vec<_> = branches
                 .iter()

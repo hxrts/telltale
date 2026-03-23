@@ -427,6 +427,11 @@ impl ExecutionHints {
                 let mut rec_counters = HintExtractionCounters::default();
                 Self::extract_recursive(body, &rec_path, hints, &mut rec_counters);
             }
+            Protocol::Publish { continuation, .. }
+            | Protocol::Handoff { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => {
+                Self::extract_recursive(continuation, path, hints, counters);
+            }
 
             Protocol::Parallel { protocols } => {
                 for (i, proto) in protocols.as_slice().iter().enumerate() {

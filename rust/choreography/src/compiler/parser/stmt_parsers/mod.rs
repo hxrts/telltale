@@ -15,6 +15,7 @@ mod authority;
 mod branching;
 mod control_flow;
 mod looping;
+mod semantic;
 mod send;
 mod vm;
 pub(crate) use authority::{
@@ -26,6 +27,7 @@ pub(super) use control_flow::{
     parse_rec_stmt, parse_retry_stmt,
 };
 pub(crate) use looping::{parse_heartbeat_stmt, parse_loop_stmt};
+pub(crate) use semantic::{parse_dependent_work_stmt, parse_handoff_stmt, parse_publish_stmt};
 pub(crate) use send::{parse_broadcast_stmt, parse_send_stmt};
 pub(super) use vm::{
     parse_vm_abort_stmt, parse_vm_acquire_stmt, parse_vm_check_stmt, parse_vm_fork_stmt,

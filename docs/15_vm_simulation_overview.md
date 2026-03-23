@@ -8,6 +8,7 @@ Detailed behavior is split into focused pages to keep this entry concise.
 The simulator runs projected local types on `telltale-vm`.
 It adds deterministic middleware for scenarios, faults, network behavior, and properties.
 It also provides a harness API for external integration testing.
+For effect-heavy guest runtimes, it also exposes generated effect-family scenario helpers so simulator scripts can be written in terms of declared effect operations and their semantic outcomes, not only raw traces.
 
 ## Quick Start
 
@@ -25,6 +26,8 @@ This path runs VM execution, scenario middleware, and post-run contract checks.
 It is the recommended integration lane for host runtimes.
 
 It is also the recommended lane for testing ownership handoff, stale-owner rejection, and owner-failure scenarios. The simulator can inject timing, crash, and replay conditions around the same VM ownership contract used in production runtimes.
+
+When a project uses generated effect interfaces from `effect-scaffold`, the simulator should be treated as a first-class handler domain. Generated scenario builders cover success, timeout, cancellation, stale late result, blocked, and degraded outcomes by default.
 
 ## Document Map
 

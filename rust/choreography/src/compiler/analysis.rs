@@ -167,7 +167,11 @@ impl<'a> Analyzer<'a> {
 
             Protocol::Var(_) | Protocol::End => {}
 
-            Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
+            Protocol::Extension { continuation, .. }
+            | Protocol::Let { continuation, .. }
+            | Protocol::Publish { continuation, .. }
+            | Protocol::Handoff { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => {
                 self.analyze_protocol(continuation);
             }
         }
@@ -310,7 +314,11 @@ impl<'a> Analyzer<'a> {
             }
             Protocol::Var(_) | Protocol::End => {}
 
-            Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
+            Protocol::Extension { continuation, .. }
+            | Protocol::Let { continuation, .. }
+            | Protocol::Publish { continuation, .. }
+            | Protocol::Handoff { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => {
                 Self::extract_dependencies(continuation, deps);
             }
         }
@@ -362,7 +370,11 @@ impl<'a> Analyzer<'a> {
             Protocol::Var(_) => true, // Assume recursive calls are okay
             Protocol::Broadcast { continuation, .. } => Self::check_protocol_progress(continuation),
 
-            Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
+            Protocol::Extension { continuation, .. }
+            | Protocol::Let { continuation, .. }
+            | Protocol::Publish { continuation, .. }
+            | Protocol::Handoff { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => {
                 Self::check_protocol_progress(continuation)
             }
         }

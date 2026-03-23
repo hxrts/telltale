@@ -126,7 +126,11 @@ fn collect_branch_requirements_from_protocol(
         Protocol::Rec { body, .. } => {
             collect_branch_requirements_from_protocol(body, requirements);
         }
-        Protocol::Extension { continuation, .. } | Protocol::Let { continuation, .. } => {
+        Protocol::Extension { continuation, .. }
+        | Protocol::Let { continuation, .. }
+        | Protocol::Publish { continuation, .. }
+        | Protocol::Handoff { continuation, .. }
+        | Protocol::DependentWork { continuation, .. } => {
             collect_branch_requirements_from_protocol(continuation, requirements);
         }
         Protocol::Var(_) | Protocol::End => {}

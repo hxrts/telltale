@@ -249,7 +249,14 @@ The `topology/` directory provides deployment configuration. See [Topology](22_t
 
 ### effect-scaffold
 
-This crate is located in `rust/effect-scaffold/`. It is an internal helper tool that generates deterministic effect-handler integration stubs and test scaffolds. The package is marked `publish = false` and is intended for repository workflows rather than library consumers.
+This crate is located in `rust/effect-scaffold/`. It is an internal helper tool that reads Telltale `effect` declarations and generates:
+
+- canonical Rust request/outcome enums
+- host-runtime handler traits
+- first-class simulator traits and scenario builders
+- an exported effect-family manifest
+
+The package is marked `publish = false` and is intended for repository workflows rather than library consumers. It no longer maintains a separate hand-authored scaffold vocabulary; the DSL effect surface is the single source of truth.
 
 ### telltale-transport
 

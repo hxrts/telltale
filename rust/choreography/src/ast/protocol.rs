@@ -94,6 +94,29 @@ pub enum Protocol {
     /// Reference to recursive label
     Var(Ident),
 
+    /// Canonical semantic publication surface.
+    Publish {
+        event: String,
+        arg: Option<String>,
+        continuation: Box<Protocol>,
+    },
+
+    /// Explicit semantic owner handoff.
+    Handoff {
+        operation: String,
+        target: Role,
+        receipt: String,
+        continuation: Box<Protocol>,
+    },
+
+    /// Declared semantically required dependent work.
+    DependentWork {
+        name: String,
+        arg: Option<String>,
+        required_for: String,
+        continuation: Box<Protocol>,
+    },
+
     /// Protocol extension point for custom behaviors
     Extension {
         /// The extension implementation
@@ -236,6 +259,13 @@ impl Protocol {
             Protocol::Loop { body, .. } => body.mentions_role(role),
             Protocol::Parallel { protocols } => protocols.iter().any(|p| p.mentions_role(role)),
             Protocol::Rec { body, .. } => body.mentions_role(role),
+            Protocol::Publish { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => continuation.mentions_role(role),
+            Protocol::Handoff {
+                target,
+                continuation,
+                ..
+            } => target.matches_family(role) || continuation.mentions_role(role),
             Protocol::Extension {
                 extension,
                 continuation,
@@ -304,6 +334,16 @@ impl Protocol {
                 Ok(())
             }
             Protocol::Rec { body, .. } => body.validate(roles),
+            Protocol::Publish { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => continuation.validate(roles),
+            Protocol::Handoff {
+                target,
+                continuation,
+                ..
+            } => {
+                ensure_declared_role(roles, target)?;
+                continuation.validate(roles)
+            }
             Protocol::Extension {
                 extension,
                 continuation,
@@ -325,7 +365,12 @@ impl Protocol {
             Protocol::Send { annotations, .. } => annotations,
             Protocol::Broadcast { annotations, .. } => annotations,
             Protocol::Choice { annotations, .. } => annotations,
-            Protocol::Let { .. } | Protocol::Case { .. } | Protocol::Timeout { .. } => {
+            Protocol::Let { .. }
+            | Protocol::Case { .. }
+            | Protocol::Timeout { .. }
+            | Protocol::Publish { .. }
+            | Protocol::Handoff { .. }
+            | Protocol::DependentWork { .. } => {
                 static EMPTY: std::sync::OnceLock<Annotations> = std::sync::OnceLock::new();
                 EMPTY.get_or_init(Annotations::new)
             }
@@ -379,7 +424,12 @@ impl Protocol {
             Protocol::Send { annotations, .. } => Some(annotations),
             Protocol::Broadcast { annotations, .. } => Some(annotations),
             Protocol::Choice { annotations, .. } => Some(annotations),
-            Protocol::Let { .. } | Protocol::Case { .. } | Protocol::Timeout { .. } => None,
+            Protocol::Let { .. }
+            | Protocol::Case { .. }
+            | Protocol::Timeout { .. }
+            | Protocol::Publish { .. }
+            | Protocol::Handoff { .. }
+            | Protocol::DependentWork { .. } => None,
             Protocol::Extension { annotations, .. } => Some(annotations),
             Protocol::Loop { .. }
             | Protocol::Parallel { .. }
@@ -559,6 +609,11 @@ impl Protocol {
             Protocol::Rec { body, .. } => {
                 body.collect_nodes_with_annotation(key, nodes);
             }
+            Protocol::Publish { continuation, .. }
+            | Protocol::Handoff { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => {
+                continuation.collect_nodes_with_annotation(key, nodes);
+            }
             Protocol::Extension { continuation, .. } => {
                 continuation.collect_nodes_with_annotation(key, nodes);
             }
@@ -627,6 +682,11 @@ impl Protocol {
             Protocol::Rec { body, .. } => {
                 body.collect_nodes_with_annotation_value(key, value, nodes);
             }
+            Protocol::Publish { continuation, .. }
+            | Protocol::Handoff { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => {
+                continuation.collect_nodes_with_annotation_value(key, value, nodes);
+            }
             Protocol::Extension { continuation, .. } => {
                 continuation.collect_nodes_with_annotation_value(key, value, nodes);
             }
@@ -682,6 +742,11 @@ impl Protocol {
             }
             Protocol::Rec { body, .. } => {
                 count += body.deep_annotation_count();
+            }
+            Protocol::Publish { continuation, .. }
+            | Protocol::Handoff { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => {
+                count += continuation.deep_annotation_count();
             }
             Protocol::Extension { continuation, .. } => {
                 count += continuation.deep_annotation_count();
@@ -746,6 +811,11 @@ impl Protocol {
             Protocol::Rec { body, .. } => {
                 body.visit_annotated_nodes(f);
             }
+            Protocol::Publish { continuation, .. }
+            | Protocol::Handoff { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => {
+                continuation.visit_annotated_nodes(f);
+            }
             Protocol::Extension { continuation, .. } => {
                 continuation.visit_annotated_nodes(f);
             }
@@ -806,6 +876,11 @@ impl Protocol {
             }
             Protocol::Rec { body, .. } => {
                 body.visit_annotated_nodes_mut(f);
+            }
+            Protocol::Publish { continuation, .. }
+            | Protocol::Handoff { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => {
+                continuation.visit_annotated_nodes_mut(f);
             }
             Protocol::Extension { continuation, .. } => {
                 continuation.visit_annotated_nodes_mut(f);

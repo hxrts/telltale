@@ -21,6 +21,8 @@ pub mod checkpoint;
 pub mod contracts;
 pub mod distributed;
 pub mod fault;
+/// Generated effect-family simulator helpers and scenario surfaces.
+pub mod generated;
 pub mod harness;
 pub mod material;
 pub mod material_handlers;
@@ -35,6 +37,10 @@ mod value_conv;
 
 pub use contracts::{
     assert_contracts, evaluate_contracts, ContractCheckConfig, ContractCheckReport,
+};
+pub use generated::{
+    GeneratedEffectScenario, GeneratedEffectScenarioBuilder, GeneratedEffectSimulationReport,
+    ScenarioEffectDisposition, ScenarioEffectResult, ScenarioEffectStep,
 };
 pub use harness::{
     derive_initial_states, DirectAdapter, HarnessConfig, HarnessSpec, HostAdapter, MaterialAdapter,

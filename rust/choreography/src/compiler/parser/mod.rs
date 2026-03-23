@@ -74,7 +74,10 @@ pub use lints::{
     collect_dsl_lints, explain_lowering, render_lsp_lint_diagnostics, LintDiagnostic, LintLevel,
 };
 
-use crate::ast::{Choreography, EffectDecl, ProofBundleDecl, RoleSetDecl, TopologyDecl, TypeDecl};
+use crate::ast::{
+    Choreography, EffectDecl, FragmentDecl, GuestRuntimeDecl, OperationDecl, ProofBundleDecl,
+    RoleSetDecl, TopologyDecl, TypeDecl,
+};
 use crate::compiler::layout::preprocess_layout;
 use crate::extensions::{ExtensionRegistry, ProtocolExtension};
 use pest::Parser;
@@ -85,8 +88,8 @@ use std::collections::{HashMap, HashSet};
 
 use conversion::{convert_statements_to_protocol, inline_calls};
 use declarations::{
-    enforce_same_line_equals, parse_effect_decl, parse_module_decl, parse_proof_bundle_decl,
-    parse_protocol_requires,
+    enforce_same_line_equals, parse_effect_decl, parse_fragment_decl, parse_guest_runtime_decl,
+    parse_module_decl, parse_operation_decl, parse_proof_bundle_decl, parse_protocol_requires,
     parse_protocol_uses, parse_role_set_decl, parse_topology_decl, parse_type_decl,
 };
 use linear::{infer_required_proof_bundles, validate_authority_surface, validate_linear_vm_assets};
@@ -136,6 +139,9 @@ pub fn parse_choreography_str_with_extensions(
     let mut topologies: Vec<TopologyDecl> = Vec::new();
     let mut type_decls: Vec<TypeDecl> = Vec::new();
     let mut effect_decls: Vec<EffectDecl> = Vec::new();
+    let mut fragment_decls: Vec<FragmentDecl> = Vec::new();
+    let mut operation_decls: Vec<OperationDecl> = Vec::new();
+    let mut guest_runtime_decls: Vec<GuestRuntimeDecl> = Vec::new();
 
     for pair in pairs {
         if pair.as_rule() == Rule::choreography {
@@ -161,6 +167,16 @@ pub fn parse_choreography_str_with_extensions(
                     }
                     Rule::effect_decl => {
                         effect_decls.push(parse_effect_decl(inner, &preprocessed)?);
+                    }
+                    Rule::fragment_decl => {
+                        fragment_decls.push(parse_fragment_decl(inner, &preprocessed)?);
+                    }
+                    Rule::operation_decl => {
+                        operation_decls.push(parse_operation_decl(inner, &preprocessed)?);
+                    }
+                    Rule::guest_runtime_decl => {
+                        guest_runtime_decls
+                            .push(parse_guest_runtime_decl(inner, &preprocessed)?);
                     }
                     Rule::protocol_decl => {
                         let protocol_span = inner.as_span();
@@ -325,6 +341,24 @@ pub fn parse_choreography_str_with_extensions(
         })?;
     choreography
         .set_protocol_uses(&protocol_uses)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            message,
+        })?;
+    choreography
+        .set_fragment_decls(&fragment_decls)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            message,
+        })?;
+    choreography
+        .set_operation_decls(&operation_decls)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            message,
+        })?;
+    choreography
+        .set_guest_runtime_decls(&guest_runtime_decls)
         .map_err(|message| ParseError::Syntax {
             span: ErrorSpan::from_line_col(1, 1, &preprocessed),
             message,

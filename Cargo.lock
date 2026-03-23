@@ -490,6 +490,10 @@ dependencies = [
 [[package]]
 name = "effect-scaffold"
 version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "telltale-choreography",
+]
 
 [[package]]
 name = "either"
