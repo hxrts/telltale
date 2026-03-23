@@ -1,4 +1,4 @@
-//! Generate deterministic `EffectHandler` integration stubs.
+//! Generate Rust effect interfaces and simulator scaffolds from Telltale DSL declarations.
 
 use std::env;
 use std::fs;
@@ -6,7 +6,9 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use telltale_choreography::ast::EffectOpAuthorityClass;
 use telltale_choreography::compiler::parser::parse_choreography_str;
-use telltale_choreography::{GeneratedEffectFamily, GeneratedEffectOperation, GeneratedSimulationMode};
+use telltale_choreography::{
+    GeneratedEffectFamily, GeneratedEffectOperation, GeneratedSimulationMode,
+};
 
 const DEFAULT_OUT_DIR: &str = "target/effect_handler_scaffold";
 const DEFAULT_WITH_SIMULATOR: bool = true;
@@ -134,7 +136,9 @@ fn required_flag_value<'a>(args: &'a [String], idx: usize, flag: &str) -> Result
 
 fn apply_positional_args(parsed: &mut ParsedArgs, positionals: &[String]) -> Result<(), String> {
     if positionals.len() > 2 {
-        return Err("too many positional arguments; expected at most: <out_dir> <dsl_path>".to_string());
+        return Err(
+            "too many positional arguments; expected at most: <out_dir> <dsl_path>".to_string(),
+        );
     }
     if let Some(out_dir) = positionals.first() {
         parsed.out_dir = out_dir.clone();
@@ -323,8 +327,7 @@ fn render_generated_effects(families: &[GeneratedEffectFamily]) -> String {
             let variant_name = operation_variant_name(op);
             out.push_str(&format!(
                 "    {}({}),\n",
-                variant_name,
-                op.request_type_name
+                variant_name, op.request_type_name
             ));
         }
         out.push_str("}\n\n");
@@ -338,8 +341,7 @@ fn render_generated_effects(families: &[GeneratedEffectFamily]) -> String {
             let variant_name = operation_variant_name(op);
             out.push_str(&format!(
                 "    {}({}),\n",
-                variant_name,
-                op.outcome_type_name
+                variant_name, op.outcome_type_name
             ));
         }
         out.push_str("}\n\n");
@@ -351,10 +353,7 @@ fn render_generated_effects(families: &[GeneratedEffectFamily]) -> String {
             out.push('\n');
         }
 
-        out.push_str(&format!(
-            "pub trait {} {{\n",
-            family.host_trait_name
-        ));
+        out.push_str(&format!("pub trait {} {{\n", family.host_trait_name));
         for op in &family.operations {
             out.push_str(&format!(
                 "    fn {}(&self, request: {}) -> {};\n",
@@ -404,10 +403,7 @@ impl {} {{\n\
             "    pub fn build(self) -> GeneratedEffectScenario {\n        self.builder.build()\n    }\n}\n\n",
         );
 
-        out.push_str(&format!(
-            "pub trait {} {{\n",
-            family.simulator_trait_name
-        ));
+        out.push_str(&format!("pub trait {} {{\n", family.simulator_trait_name));
         for op in &family.operations {
             out.push_str(&format!(
                 "    fn {}(&mut self, state: &mut {}State, request: Value) -> ScenarioEffectResult<Value>;\n",
@@ -420,10 +416,7 @@ impl {} {{\n\
     out
 }
 
-fn render_generated_readme(
-    families: &[GeneratedEffectFamily],
-    with_simulator: bool,
-) -> String {
+fn render_generated_readme(families: &[GeneratedEffectFamily], with_simulator: bool) -> String {
     let mut out = String::from(
         "# Generated Effect Interfaces\n\n\
          This directory was generated from Telltale `effect` declarations. The DSL is the single\n\
@@ -700,8 +693,11 @@ protocol Flow uses Runtime =
     fn preflight_rejects_existing_files_without_partial_writes() {
         let out_dir = unique_temp_dir("effect_scaffold_preflight");
         fs::create_dir_all(&out_dir).expect("create out dir");
-        fs::write(out_dir.join("generated_effect_manifest.json"), "already here")
-            .expect("seed existing file");
+        fs::write(
+            out_dir.join("generated_effect_manifest.json"),
+            "already here",
+        )
+        .expect("seed existing file");
         let choreography = parse_choreography_str(sample_dsl()).expect("parse choreography");
 
         let error = generate_effect_interface_scaffold(

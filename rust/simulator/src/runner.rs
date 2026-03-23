@@ -1,7 +1,7 @@
-//! VM-backed simulation runner.
+//! Protocol-machine-backed simulation runner.
 //!
-//! Wraps `telltale-vm` to execute choreographies through the bytecode VM,
-//! producing simulator traces via the canonical runtime.
+//! Wraps `telltale-vm` to execute choreographies through the protocol machine,
+//! producing simulator traces plus canonical semantic artifacts.
 
 use std::collections::BTreeMap;
 use telltale_types::FixedQ32;
@@ -10,8 +10,11 @@ use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::effect::{EffectHandler, EffectTraceEntry};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::output_condition::OutputConditionCheck;
-use telltale_vm::vm::{ObsEvent, StepResult, VMConfig, VM};
-use telltale_vm::{ProtocolMachineSemanticObjects, SemanticAuditRecord};
+use telltale_vm::vm::ObsEvent;
+use telltale_vm::{
+    ProtocolMachine, ProtocolMachineConfig, ProtocolMachineSemanticObjects,
+    ProtocolMachineStepResult, SemanticAuditRecord,
+};
 
 use crate::checkpoint::CheckpointStore;
 use crate::fault::FaultInjector;
@@ -26,7 +29,7 @@ use crate::value_conv::{f64s_to_values, registers_to_f64s};
 /// (coroutine_id, role_name) pair.
 type CoroInfo = Vec<(usize, String)>;
 
-// (adapter removed; simulator handlers implement VM EffectHandler directly)
+// Simulator handlers implement the same external-handler boundary used by the guest runtime.
 
 /// Count active (Send/Recv) nodes per role in one Mu body traversal.
 // RECURSION_SAFE: follows finite local-type branches after mu unfolding.
@@ -49,10 +52,15 @@ fn active_steps_per_session(local_types: &BTreeMap<String, LocalTypeR>) -> usize
 }
 
 /// Record state for all roles in a coroutine set.
-fn record_all_roles(vm: &VM, coro_info: &CoroInfo, step: usize, trace: &mut Trace) {
+fn record_all_roles(
+    machine: &ProtocolMachine,
+    coro_info: &CoroInfo,
+    step: usize,
+    trace: &mut Trace,
+) {
     let step_u64 = u64::try_from(step).unwrap_or(u64::MAX);
     for (coro_id, role) in coro_info {
-        if let Some(coro) = vm.coroutine(*coro_id) {
+        if let Some(coro) = machine.coroutine(*coro_id) {
             trace.record(StepRecord {
                 step: step_u64,
                 role: role.clone(),
@@ -64,7 +72,7 @@ fn record_all_roles(vm: &VM, coro_info: &CoroInfo, step: usize, trace: &mut Trac
 
 /// Initialize coroutine registers from FixedQ32 state vectors.
 fn init_coro_regs(
-    vm: &mut VM,
+    machine: &mut ProtocolMachine,
     coro_info: &CoroInfo,
     initial_states: &BTreeMap<String, Vec<FixedQ32>>,
 ) -> Result<(), String> {
@@ -72,7 +80,7 @@ fn init_coro_regs(
         let init = initial_states
             .get(role)
             .ok_or_else(|| format!("missing initial state for role '{role}'"))?;
-        if let Some(coro) = vm.coroutine_mut(*coro_id) {
+        if let Some(coro) = machine.coroutine_mut(*coro_id) {
             let vals = f64s_to_values(init);
             for (i, v) in vals.into_iter().enumerate() {
                 if i + 2 < coro.regs.len() {
@@ -145,7 +153,7 @@ pub struct ChoreographySpec {
     pub initial_states: BTreeMap<String, Vec<FixedQ32>>,
 }
 
-/// Run multiple choreographies concurrently on a single VM instance.
+/// Run multiple choreographies concurrently on a single protocol-machine instance.
 ///
 /// Each choreography gets its own session namespace. Returns one trace per
 /// choreography, indexed in the same order as the input specs.
@@ -159,21 +167,22 @@ pub fn run_concurrent(
     steps: usize,
     handler: &dyn EffectHandler,
 ) -> Result<Vec<Trace>, String> {
-    let mut vm = VM::new(VMConfig::default());
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
 
     let mut session_infos: Vec<(usize, CoroInfo, usize)> = Vec::new();
 
-    for spec in specs {
+    for (session_idx, spec) in specs.iter().enumerate() {
         let image = CodeImage::from_local_types(&spec.local_types, &spec.global_type);
-        let sid = vm
-            .load_choreography(&image)
+        let owned = machine
+            .load_choreography_owned(&image, format!("sim/concurrent/{session_idx}"))
             .map_err(|e| format!("load error: {e}"))?;
+        let sid = owned.session_id();
 
-        let coros = vm.session_coroutines(sid);
+        let coros = machine.session_coroutines(sid);
         let coro_info: CoroInfo = coros.iter().map(|c| (c.id, c.role.clone())).collect();
         let num_roles = coro_info.len();
 
-        init_coro_regs(&mut vm, &coro_info, &spec.initial_states)?;
+        init_coro_regs(&mut machine, &coro_info, &spec.initial_states)?;
         session_infos.push((sid, coro_info, num_roles));
     }
 
@@ -201,7 +210,7 @@ pub fn run_concurrent(
     // Record initial state (step 0 = Mu step).
     for (si, (_sid, coro_info, _)) in session_infos.iter().enumerate() {
         if steps > 0 {
-            record_all_roles(&vm, coro_info, 0, &mut traces[si]);
+            record_all_roles(&machine, coro_info, 0, &mut traces[si]);
             per_session_step[si] = 1;
         }
     }
@@ -211,14 +220,14 @@ pub fn run_concurrent(
             break;
         }
 
-        match vm.step(handler) {
-            Ok(StepResult::AllDone | StepResult::Stuck) => break,
-            Ok(StepResult::Continue) => {}
+        match machine.step(handler) {
+            Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
+            Ok(ProtocolMachineStepResult::Continue) => {}
             Err(e) => return Err(format!("vm error: {e}")),
         }
 
         let invoked_sessions: Vec<usize> = {
-            let current_trace = vm.trace();
+            let current_trace = machine.trace();
             collect_invoked_sessions(current_trace, &mut prev_trace_len, &coro_to_session)
         };
 
@@ -234,7 +243,7 @@ pub fn run_concurrent(
                 apr,
                 steps,
                 |sample_step| {
-                    record_all_roles(&vm, coro_info, sample_step, &mut traces[si]);
+                    record_all_roles(&machine, coro_info, sample_step, &mut traces[si]);
                 },
             );
         }
@@ -243,14 +252,14 @@ pub fn run_concurrent(
     // Fall back to final state if no intermediate records.
     for (i, (_sid, coro_info, _)) in session_infos.iter().enumerate() {
         if traces[i].records.is_empty() {
-            record_all_roles(&vm, coro_info, steps.saturating_sub(1), &mut traces[i]);
+            record_all_roles(&machine, coro_info, steps.saturating_sub(1), &mut traces[i]);
         }
     }
 
     Ok(traces)
 }
 
-/// Run a choreography through the VM and return a simulator-compatible trace.
+/// Run a choreography through the protocol machine and return a simulator-compatible trace.
 ///
 /// The compiler emits `Invoke` after every Send/Recv. The scheduler has N
 /// active steps + 1 Mu step per round. Every `num_roles` Invoked events
@@ -258,7 +267,7 @@ pub fn run_concurrent(
 ///
 /// # Errors
 ///
-/// Returns an error string if the VM execution fails.
+/// Returns an error string if protocol-machine execution fails.
 pub fn run(
     local_types: &BTreeMap<String, LocalTypeR>,
     global_type: &GlobalType,
@@ -268,16 +277,17 @@ pub fn run(
 ) -> Result<Trace, String> {
     let image = CodeImage::from_local_types(local_types, global_type);
 
-    let mut vm = VM::new(VMConfig::default());
-    let sid = vm
-        .load_choreography(&image)
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine
+        .load_choreography_owned(&image, "sim/run")
         .map_err(|e| format!("load error: {e}"))?;
+    let sid = sid.session_id();
 
-    let coros = vm.session_coroutines(sid);
+    let coros = machine.session_coroutines(sid);
     let coro_info: CoroInfo = coros.iter().map(|c| (c.id, c.role.clone())).collect();
     let num_roles = coro_info.len();
 
-    init_coro_regs(&mut vm, &coro_info, initial_states)?;
+    init_coro_regs(&mut machine, &coro_info, initial_states)?;
 
     let mut trace = Trace::new();
 
@@ -291,7 +301,7 @@ pub fn run(
 
     // Record initial state (step 0 = Mu step).
     if steps > 0 {
-        record_all_roles(&vm, &coro_info, 0, &mut trace);
+        record_all_roles(&machine, &coro_info, 0, &mut trace);
         step_idx = 1;
     }
 
@@ -300,13 +310,13 @@ pub fn run(
             break;
         }
 
-        match vm.step(handler) {
-            Ok(StepResult::AllDone | StepResult::Stuck) => break,
-            Ok(StepResult::Continue) => {}
+        match machine.step(handler) {
+            Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
+            Ok(ProtocolMachineStepResult::Continue) => {}
             Err(e) => return Err(format!("vm error: {e}")),
         }
 
-        let new_invokes = count_new_invokes(vm.trace(), &mut prev_trace_len);
+        let new_invokes = count_new_invokes(machine.trace(), &mut prev_trace_len);
         invoke_count += new_invokes;
         advance_sampling(
             &mut invoke_count,
@@ -315,12 +325,12 @@ pub fn run(
             num_roles,
             apr,
             steps,
-            |sample_step| record_all_roles(&vm, &coro_info, sample_step, &mut trace),
+            |sample_step| record_all_roles(&machine, &coro_info, sample_step, &mut trace),
         );
     }
 
     if trace.records.is_empty() {
-        record_all_roles(&vm, &coro_info, steps.saturating_sub(1), &mut trace);
+        record_all_roles(&machine, &coro_info, steps.saturating_sub(1), &mut trace);
     }
 
     Ok(trace)
@@ -332,7 +342,7 @@ pub struct ScenarioResult {
     pub trace: Trace,
     /// Property violations detected during execution.
     pub violations: Vec<PropertyViolation>,
-    /// Replay-ready VM artifact data captured for this run.
+    /// Replay-ready protocol-machine artifact data captured for this run.
     pub replay: ScenarioReplayArtifact,
     /// Structured run statistics for observability.
     pub stats: ScenarioStats,
@@ -340,17 +350,17 @@ pub struct ScenarioResult {
 
 /// Replay-ready artifact data captured from a scenario run.
 pub struct ScenarioReplayArtifact {
-    /// Raw observable VM trace.
+    /// Raw observable protocol-machine trace.
     pub obs_trace: Vec<ObsEvent>,
     /// Effect trace entries for deterministic replay.
     pub effect_trace: Vec<EffectTraceEntry>,
     /// Canonical typed effect exchanges captured from the guest runtime.
     pub effect_exchanges: Vec<telltale_vm::EffectExchangeRecord>,
-    /// Output-condition verification checks captured by the VM.
+    /// Output-condition verification checks captured by the protocol machine.
     pub output_condition_trace: Vec<OutputConditionCheck>,
-    /// Canonical semantic audit records derived from the VM run.
+    /// Canonical semantic audit records derived from the protocol-machine run.
     pub semantic_audit_log: Vec<SemanticAuditRecord>,
-    /// Canonical semantic object export captured from the VM run.
+    /// Canonical semantic object export captured from the protocol-machine run.
     pub semantic_objects: ProtocolMachineSemanticObjects,
 }
 
@@ -360,11 +370,11 @@ pub struct ScenarioStats {
     pub seed: u64,
     /// Scenario scheduler concurrency value.
     pub concurrency: u64,
-    /// Number of VM rounds executed by the scenario loop.
+    /// Number of protocol-machine rounds executed by the scenario loop.
     pub rounds_executed: u64,
-    /// Final VM clock tick.
+    /// Final protocol-machine clock tick.
     pub final_tick: u64,
-    /// Number of observable events in the final VM trace.
+    /// Number of observable events in the final protocol-machine trace.
     pub total_obs_events: usize,
     /// Number of observed `Invoked` events.
     pub total_invoked_events: usize,
@@ -376,7 +386,7 @@ pub struct ScenarioStats {
 ///
 /// # Errors
 ///
-/// Returns an error string if the VM execution fails.
+/// Returns an error string if protocol-machine execution fails.
 #[allow(clippy::too_many_lines)]
 pub fn run_with_scenario(
     local_types: &BTreeMap<String, LocalTypeR>,
@@ -386,12 +396,13 @@ pub fn run_with_scenario(
     handler: &dyn EffectHandler,
 ) -> Result<ScenarioResult, String> {
     let image = CodeImage::from_local_types(local_types, global_type);
-    let mut vm = VM::new(VMConfig::default());
-    let sid = vm
-        .load_choreography(&image)
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine
+        .load_choreography_owned(&image, "sim/scenario")
         .map_err(|e| format!("load error: {e}"))?;
+    let sid = sid.session_id();
 
-    let coros = vm.session_coroutines(sid);
+    let coros = machine.session_coroutines(sid);
     let coro_info: CoroInfo = coros.iter().map(|c| (c.id, c.role.clone())).collect();
     let num_roles = coro_info.len();
 
@@ -400,7 +411,7 @@ pub fn run_with_scenario(
     } else {
         initial_states.clone()
     };
-    init_coro_regs(&mut vm, &coro_info, &resolved_initial_states)?;
+    init_coro_regs(&mut machine, &coro_info, &resolved_initial_states)?;
 
     let mut trace = Trace::new();
     let apr = active_steps_per_session(local_types);
@@ -427,7 +438,7 @@ pub fn run_with_scenario(
     let mut checkpoint_writes: usize = 0;
 
     if scenario.steps > 0 {
-        record_all_roles(&vm, &coro_info, 0, &mut trace);
+        record_all_roles(&machine, &coro_info, 0, &mut trace);
         step_idx = 1;
     }
 
@@ -454,7 +465,7 @@ pub fn run_with_scenario(
             fault,
             cfg,
             rng.fork(),
-            vm.clock().tick_duration,
+            machine.clock().tick_duration,
         ));
     } else {
         fault_only = Some(fault);
@@ -465,22 +476,24 @@ pub fn run_with_scenario(
             break;
         }
 
-        let next_tick = vm.clock().tick + 1;
+        let next_tick = machine.clock().tick + 1;
         let next_logical_step = rounds_executed.saturating_add(1);
 
         if let Some(net) = &network {
             net.inner()
-                .tick(next_tick, next_logical_step, vm.trace())
+                .tick(next_tick, next_logical_step, machine.trace())
                 .map_err(|e| format!("fault middleware tick: {e}"))?;
             net.inner()
                 .deliver(next_tick, |sid, from, to, val| {
-                    vm.inject_message(sid, from, to, val)
+                    machine
+                        .inject_message(sid, from, to, val)
                         .map_err(|e| e.to_string())
                 })
                 .map_err(|e| format!("fault middleware deliver: {e}"))?;
             net.set_tick(next_tick);
             net.deliver(next_tick, |sid, from, to, val| {
-                vm.inject_message(sid, from, to, val)
+                machine
+                    .inject_message(sid, from, to, val)
                     .map_err(|e| e.to_string())
             })
             .map_err(|e| format!("network middleware deliver: {e}"))?;
@@ -488,10 +501,10 @@ pub fn run_with_scenario(
                 .inner()
                 .crashed_roles()
                 .map_err(|e| format!("fault middleware crashed_roles: {e}"))?;
-            vm.set_paused_roles(&paused_roles);
-            match vm.step_round(net, concurrency) {
-                Ok(StepResult::AllDone | StepResult::Stuck) => break,
-                Ok(StepResult::Continue) => {}
+            machine.set_paused_roles(&paused_roles);
+            match machine.step_round(net, concurrency) {
+                Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
+                Ok(ProtocolMachineStepResult::Continue) => {}
                 Err(e) => return Err(format!("vm error: {e}")),
             }
             rounds_executed = rounds_executed.saturating_add(1);
@@ -500,27 +513,28 @@ pub fn run_with_scenario(
                 return Err("internal simulator error: fault middleware missing".to_string());
             };
             fault
-                .tick(next_tick, next_logical_step, vm.trace())
+                .tick(next_tick, next_logical_step, machine.trace())
                 .map_err(|e| format!("fault middleware tick: {e}"))?;
             fault
                 .deliver(next_tick, |sid, from, to, val| {
-                    vm.inject_message(sid, from, to, val)
+                    machine
+                        .inject_message(sid, from, to, val)
                         .map_err(|e| e.to_string())
                 })
                 .map_err(|e| format!("fault middleware deliver: {e}"))?;
             let paused_roles = fault
                 .crashed_roles()
                 .map_err(|e| format!("fault middleware crashed_roles: {e}"))?;
-            vm.set_paused_roles(&paused_roles);
-            match vm.step_round(fault, concurrency) {
-                Ok(StepResult::AllDone | StepResult::Stuck) => break,
-                Ok(StepResult::Continue) => {}
+            machine.set_paused_roles(&paused_roles);
+            match machine.step_round(fault, concurrency) {
+                Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
+                Ok(ProtocolMachineStepResult::Continue) => {}
                 Err(e) => return Err(format!("vm error: {e}")),
             }
             rounds_executed = rounds_executed.saturating_add(1);
         }
 
-        let new_invokes = count_new_invokes(vm.trace(), &mut prev_trace_len);
+        let new_invokes = count_new_invokes(machine.trace(), &mut prev_trace_len);
         invoke_count += new_invokes;
         advance_sampling(
             &mut invoke_count,
@@ -529,36 +543,36 @@ pub fn run_with_scenario(
             num_roles,
             apr,
             steps_limit,
-            |sample_step| record_all_roles(&vm, &coro_info, sample_step, &mut trace),
+            |sample_step| record_all_roles(&machine, &coro_info, sample_step, &mut trace),
         );
 
         let ctx = PropertyContext {
-            tick: vm.clock().tick,
-            trace: vm.trace(),
-            sessions: vm.sessions(),
-            coroutines: vm.coroutines(),
+            tick: machine.clock().tick,
+            trace: machine.trace(),
+            sessions: machine.sessions(),
+            coroutines: machine.coroutines(),
         };
         monitor.check(&ctx);
         if let Some(store) = &mut checkpoints {
             if let Some(interval) = scenario.checkpoint_interval {
-                if interval != 0 && vm.clock().tick % interval == 0 {
+                if interval != 0 && machine.clock().tick % interval == 0 {
                     checkpoint_writes = checkpoint_writes.saturating_add(1);
                 }
             }
-            store.maybe_checkpoint(vm.clock().tick, &vm);
+            store.maybe_checkpoint(machine.clock().tick, &machine);
         }
     }
 
     if trace.records.is_empty() {
         let fallback_step = steps_limit.saturating_sub(1);
-        record_all_roles(&vm, &coro_info, fallback_step, &mut trace);
+        record_all_roles(&machine, &coro_info, fallback_step, &mut trace);
     }
 
-    let obs_trace = vm.trace().to_vec();
-    let effect_trace = vm.effect_trace().to_vec();
-    let output_condition_trace = vm.output_condition_checks().to_vec();
-    let semantic_audit_log = vm.semantic_audit_log();
-    let semantic_objects = vm.semantic_objects();
+    let obs_trace = machine.trace().to_vec();
+    let effect_trace = machine.effect_trace().to_vec();
+    let output_condition_trace = machine.output_condition_checks().to_vec();
+    let semantic_audit_log = machine.semantic_audit_log();
+    let semantic_objects = machine.semantic_objects();
     let total_invoked_events = obs_trace
         .iter()
         .filter(|event| matches!(event, ObsEvent::Invoked { .. }))
@@ -570,7 +584,7 @@ pub fn run_with_scenario(
         replay: ScenarioReplayArtifact {
             obs_trace,
             effect_trace,
-            effect_exchanges: vm.effect_exchanges().to_vec(),
+            effect_exchanges: machine.effect_exchanges().to_vec(),
             output_condition_trace,
             semantic_audit_log,
             semantic_objects,
@@ -579,8 +593,8 @@ pub fn run_with_scenario(
             seed: scenario.seed,
             concurrency: scenario.concurrency,
             rounds_executed,
-            final_tick: vm.clock().tick,
-            total_obs_events: vm.trace().len(),
+            final_tick: machine.clock().tick,
+            total_obs_events: machine.trace().len(),
             total_invoked_events,
             checkpoint_writes,
         },

@@ -122,8 +122,8 @@ pub mod protocol_machine {
     };
     pub use crate::vm::{
         EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig,
-        ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore,
-        RuntimeTuningProfile, SchedExecStatus, SchedStepDebug, ThreadedRoundSemantics,
+        ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore, RunStatus,
+        RuntimeTuningProfile, SchedExecStatus, SchedStepDebug, StepResult, ThreadedRoundSemantics,
         VMConfig as ProtocolMachineConfig, VMError as ProtocolMachineError,
         VMState as ProtocolMachineState, VmMemoryUsage, VmRetainedBytes, VM as ProtocolMachine,
     };
@@ -236,10 +236,10 @@ pub use verification::{
 };
 pub use vm::{
     EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig, ObservabilityRetentionMode,
-    PayloadValidationMode, Program, ProgramStore, RuntimeTuningProfile, SchedExecStatus,
-    SchedStepDebug, ThreadedRoundSemantics, VMConfig as ProtocolMachineConfig,
-    VMError as ProtocolMachineError, VMState as ProtocolMachineState, VmMemoryUsage,
-    VmRetainedBytes, VM as ProtocolMachine,
+    PayloadValidationMode, Program, ProgramStore, RunStatus as ProtocolMachineRunStatus,
+    RuntimeTuningProfile, SchedExecStatus, SchedStepDebug, StepResult as ProtocolMachineStepResult,
+    ThreadedRoundSemantics, VMConfig as ProtocolMachineConfig, VMError as ProtocolMachineError,
+    VMState as ProtocolMachineState, VmMemoryUsage, VmRetainedBytes, VM as ProtocolMachine,
 };
 
 cfg_if! {

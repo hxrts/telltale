@@ -7,15 +7,17 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use telltale_types::{GlobalType, Label, LocalTypeR, ValType};
 use telltale_vm::buffer::BufferConfig;
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, EffectResult};
+use telltale_vm::effect::{
+    EffectFailure, EffectHandler, EffectOutcome, EffectRequest, EffectRequestBody, EffectResponse,
+    SendDecision,
+};
 use telltale_vm::instr::Endpoint;
 use telltale_vm::loader::CodeImage;
 use telltale_vm::session::SessionStore;
-use telltale_vm::vm::{
-    ObservabilityRetentionConfig, ObservabilityRetentionMode, PayloadValidationMode, RunStatus,
-};
 use telltale_vm::{
-    CommunicationReplayMode, Instr, ProtocolMachine, ProtocolMachineConfig, VmMemoryUsage,
+    CommunicationReplayMode, Instr, ObservabilityRetentionConfig, ObservabilityRetentionMode,
+    PayloadValidationMode, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineRunStatus,
+    VmMemoryUsage,
 };
 
 pub(crate) struct CountingAllocator;
@@ -59,14 +61,46 @@ where
 pub(crate) struct BenchHandler;
 
 impl EffectHandler for BenchHandler {
+    fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
+        match request.body {
+            EffectRequestBody::SendDecision { payload, .. } => {
+                EffectOutcome::success(EffectResponse::SendDecision {
+                    decision: SendDecision::Deliver(payload.unwrap_or(Value::Unit)),
+                })
+            }
+            EffectRequestBody::Receive { state, .. } => {
+                EffectOutcome::success(EffectResponse::Receive { state })
+            }
+            EffectRequestBody::Choose { labels, .. } => match labels.first().cloned() {
+                Some(label) => EffectOutcome::success(EffectResponse::Choose { label }),
+                None => EffectOutcome::failure(EffectFailure::invalid_input(
+                    "labels should contain at least one branch",
+                )),
+            },
+            EffectRequestBody::InvokeStep { state, .. } => {
+                EffectOutcome::success(EffectResponse::InvokeStep { state })
+            }
+            EffectRequestBody::Acquire { .. } => EffectOutcome::success(EffectResponse::Acquire {
+                evidence: Value::Bool(true),
+            }),
+            EffectRequestBody::Release { .. } => EffectOutcome::success(EffectResponse::Release),
+            EffectRequestBody::TopologyEvents { .. } => {
+                EffectOutcome::success(EffectResponse::TopologyEvents { events: Vec::new() })
+            }
+            EffectRequestBody::OutputConditionHint { .. } => {
+                EffectOutcome::success(EffectResponse::OutputConditionHint { hint: None })
+            }
+        }
+    }
+
     fn handle_send(
         &self,
         _role: &str,
         _partner: &str,
         _label: &str,
         _state: &[Value],
-    ) -> EffectResult<Value> {
-        EffectResult::success(Value::Unit)
+    ) -> telltale_vm::effect::EffectResult<Value> {
+        telltale_vm::effect::EffectResult::success(Value::Unit)
     }
 
     fn handle_recv(
@@ -76,8 +110,8 @@ impl EffectHandler for BenchHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> EffectResult<()> {
-        EffectResult::success(())
+    ) -> telltale_vm::effect::EffectResult<()> {
+        telltale_vm::effect::EffectResult::success(())
     }
 
     fn handle_choose(
@@ -86,8 +120,8 @@ impl EffectHandler for BenchHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> EffectResult<String> {
-        EffectResult::success(
+    ) -> telltale_vm::effect::EffectResult<String> {
+        telltale_vm::effect::EffectResult::success(
             labels
                 .first()
                 .cloned()
@@ -95,8 +129,8 @@ impl EffectHandler for BenchHandler {
         )
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
-        EffectResult::success(())
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> telltale_vm::effect::EffectResult<()> {
+        telltale_vm::effect::EffectResult::success(())
     }
 }
 
@@ -257,9 +291,11 @@ pub(crate) fn run_yield_workload(image: &CodeImage, max_rounds: usize) -> VmMemo
         observability_retention: capped_retention_config(),
         ..ProtocolMachineConfig::strict_minimal()
     });
-    vm.load_choreography(image).expect("load choreography");
+    let _owned = vm
+        .load_choreography_owned(image, "bench/yield")
+        .expect("load choreography");
     let status = vm.run(&BenchHandler, max_rounds).expect("run vm");
-    assert!(matches!(status, RunStatus::AllDone));
+    assert!(matches!(status, ProtocolMachineRunStatus::AllDone));
     vm.memory_usage()
 }
 
@@ -267,14 +303,17 @@ pub(crate) fn run_short_lived_session_churn(iterations: usize) -> VmMemoryUsage 
     let image = yield_image(4, 8);
     let mut last_usage = VmMemoryUsage::default();
 
-    for _ in 0..iterations {
+    for idx in 0..iterations {
         let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
             observability_retention: capped_retention_config(),
             ..ProtocolMachineConfig::strict_churn()
         });
-        let sid = vm.load_choreography(&image).expect("load choreography");
+        let owned = vm
+            .load_choreography_owned(&image, format!("bench/churn/{idx}"))
+            .expect("load choreography");
+        let sid = owned.session_id();
         let status = vm.run(&BenchHandler, 10_000).expect("run vm");
-        assert!(matches!(status, RunStatus::AllDone));
+        assert!(matches!(status, ProtocolMachineRunStatus::AllDone));
         vm.sessions_mut().close(sid).expect("close session");
         let coro_ids: Vec<usize> = vm
             .session_coroutines(sid)
@@ -299,8 +338,10 @@ pub(crate) fn run_repeated_load_reuse(iterations: usize) -> VmMemoryUsage {
         ..ProtocolMachineConfig::strict_large_fanout()
     });
 
-    for _ in 0..iterations {
-        vm.load_choreography(&image).expect("load choreography");
+    for idx in 0..iterations {
+        let _owned = vm
+            .load_choreography_owned(&image, format!("bench/reuse/{idx}"))
+            .expect("load choreography");
     }
 
     vm.memory_usage()
@@ -320,8 +361,10 @@ pub(crate) fn run_repeated_open_same_image(
         .max_coroutines
         .max(iterations.saturating_mul(num_roles).saturating_add(16));
     let mut vm = ProtocolMachine::new(config);
-    for _ in 0..iterations {
-        vm.load_choreography(&image).expect("load choreography");
+    for idx in 0..iterations {
+        let _owned = vm
+            .load_choreography_owned(&image, format!("bench/open/{idx}"))
+            .expect("load choreography");
     }
     vm.memory_usage()
 }
@@ -337,12 +380,14 @@ pub(crate) fn run_send_recv_workload(
 ) -> VmMemoryUsage {
     let mut vm = ProtocolMachine::new(config);
 
-    for _ in 0..iterations {
-        vm.load_choreography(image).expect("load choreography");
+    for idx in 0..iterations {
+        let _owned = vm
+            .load_choreography_owned(image, format!("bench/send_recv/{idx}"))
+            .expect("load choreography");
     }
 
     let status = vm.run(&BenchHandler, 100_000).expect("run vm");
-    assert!(matches!(status, RunStatus::AllDone));
+    assert!(matches!(status, ProtocolMachineRunStatus::AllDone));
     vm.memory_usage()
 }
 
@@ -360,7 +405,7 @@ pub(crate) fn run_many_paused_scheduler_workload(
 ) -> VmMemoryUsage {
     let mut vm = setup_many_paused_scheduler_vm(num_roles, yields_per_role);
     let status = vm.run(&BenchHandler, 10_000).expect("run vm");
-    assert!(matches!(status, RunStatus::Stuck));
+    assert!(matches!(status, ProtocolMachineRunStatus::Stuck));
     vm.memory_usage()
 }
 
@@ -373,7 +418,9 @@ pub(crate) fn setup_many_paused_scheduler_vm(
         observability_retention: capped_retention_config(),
         ..ProtocolMachineConfig::strict_large_fanout()
     });
-    vm.load_choreography(&image).expect("load choreography");
+    let _owned = vm
+        .load_choreography_owned(&image, "bench/many_paused")
+        .expect("load choreography");
     for idx in 1..num_roles {
         vm.pause_role(&format!("R{idx}"));
     }
@@ -389,7 +436,9 @@ pub(crate) fn run_pause_resume_churn_workload(
         observability_retention: capped_retention_config(),
         ..ProtocolMachineConfig::strict_large_fanout()
     });
-    vm.load_choreography(&image).expect("load choreography");
+    let _owned = vm
+        .load_choreography_owned(&image, "bench/pause_resume")
+        .expect("load choreography");
     for idx in 1..num_roles {
         vm.pause_role(&format!("R{idx}"));
     }
@@ -421,7 +470,9 @@ pub(crate) fn choreography_load_allocation_count(
     let image = yield_image(num_roles, yields_per_role);
     let (_, allocations) = count_allocations(|| {
         let mut vm = ProtocolMachine::new(ProtocolMachineConfig::strict_large_fanout());
-        vm.load_choreography(&image).expect("load choreography");
+        let _owned = vm
+            .load_choreography_owned(&image, "bench/alloc")
+            .expect("load choreography");
         vm
     });
     allocations

@@ -74,6 +74,7 @@ ci-dry-run lane="fast":
     just check-release-conformance
     just check-telltale-style
     just check-docs-drift
+    just check-tooling-convergence
     just check-aura-borrowed-lints
     just check-doc-links-ci
     just check-doc-links-in-code
@@ -139,9 +140,13 @@ check-telltale-style:
     ./scripts/check/doc-links-extended.sh
     ./scripts/check/text-symbols.sh
 
-# Generate deterministic EffectHandler stubs plus simulator harness test templates.
-effect-scaffold out="artifacts/effect_handler_scaffold" name="HostEffectHandler":
-    cargo run -p effect-scaffold -- {{ out }} {{ name }}
+# Enforce public tooling/example cutover to generated effect interfaces and owned opens.
+check-tooling-convergence:
+    ./scripts/check/tooling-convergence.sh
+
+# Generate Rust effect interfaces and simulator scaffolds from Telltale DSL declarations.
+effect-scaffold dsl out="artifacts/effect_handler_scaffold":
+    cargo run -p effect-scaffold -- --out {{ out }} --dsl {{ dsl }}
 
 # Run a simulator harness config and print a JSON report.
 sim-run config:

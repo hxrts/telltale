@@ -1,7 +1,8 @@
 # VM Simulation Scenarios
 
 This page documents scenario configuration and middleware behavior.
-It covers scenario TOML shape, fault injection, network modeling, and property monitoring.
+It covers scenario TOML shape, generated effect-family scripting, fault injection,
+network modeling, and property monitoring.
 
 ## Scenario Schema
 
@@ -62,9 +63,25 @@ invariants = ["no_faults", "simplex", "buffer_bound(0,16)"]
 Quoted decimal strings are the safest TOML form for `FixedQ32` values.
 The parser also accepts compatible numeric representations.
 
+Generated effect interfaces add a second scenario lane for effect-centric tests.
+Instead of expressing only network or scheduler perturbations, a scenario can
+script declared effect operations directly:
+
+```rust
+let generated = GeneratedEffectScenario::builder()
+    .record_return("Runtime", "acceptInvite", serde_json::json!({ "status": "ok" }))
+    .with_delay_ms(200)
+    .record_degraded("Runtime", "watchPresence", "owner_lag")
+    .record_stale_late_result("Runtime", "acceptInvite")
+    .build();
+```
+
+This is the preferred lane for testing timeout, cancellation, stale late
+results, blocked execution, and degraded outcomes on parity-critical flows.
+
 ## Fault Middleware
 
-`FaultInjector` wraps an inner `EffectHandler`.
+`FaultInjector` wraps an inner external handler.
 It handles activation, expiry, random triggers, delay queues, corruption, and crash state.
 
 Supported actions are `MessageDrop`, `MessageDelay`, `MessageCorruption`, `NodeCrash`, and `NetworkPartition`.
@@ -91,7 +108,7 @@ Predicate strings are parsed by `parse_predicate`.
 
 ## Checkpointing and Replay
 
-`CheckpointStore` snapshots VM state as JSON bytes at configured intervals.
+`CheckpointStore` snapshots protocol-machine state as JSON bytes at configured intervals.
 When `checkpoint_interval` is set, `run_with_scenario` writes checkpoint files under `artifacts/<scenario.name>/`.
 
 Replay loads one checkpoint and one scenario.

@@ -13,19 +13,25 @@ For effect-heavy guest runtimes, it also exposes generated effect-family scenari
 ## Quick Start
 
 Use `SimulationHarness` with a `HostAdapter` implementation.
-Run the scenario and assert contracts in one path.
+For generated effect interfaces, script semantic outcomes directly with
+`GeneratedEffectScenario` and keep the host adapter thin.
 
 ```rust
 let adapter = DirectAdapter::new(&handler);
+let generated = GeneratedEffectScenario::builder()
+    .record_return("Runtime", "acceptInvite", serde_json::json!({ "status": "ok" }))
+    .record_timeout("Runtime", "watchPresence")
+    .build();
 let harness = SimulationHarness::new(&adapter);
 let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
 ```
 
-This path runs VM execution, scenario middleware, and post-run contract checks.
+This path runs protocol-machine execution, scenario middleware, generated
+effect-family scripting, and post-run contract checks.
 It is the recommended integration lane for host runtimes.
 
-It is also the recommended lane for testing ownership handoff, stale-owner rejection, and owner-failure scenarios. The simulator can inject timing, crash, and replay conditions around the same VM ownership contract used in production runtimes.
+It is also the recommended lane for testing ownership handoff, stale-owner rejection, and owner-failure scenarios. The simulator can inject timing, crash, and replay conditions around the same protocol-machine ownership contract used in production runtimes.
 
 When a project uses generated effect interfaces from `effect-scaffold`, the simulator should be treated as a first-class handler domain. Generated scenario builders cover success, timeout, cancellation, stale late result, blocked, and degraded outcomes by default.
 

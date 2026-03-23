@@ -12,12 +12,15 @@ cfg_if! {
     use telltale_types::{GlobalType, Label, LocalTypeR};
     use telltale_vm::coroutine::Value;
     use telltale_vm::determinism::{DeterminismMode, EffectDeterminismTier};
-    use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
+    use telltale_vm::effect::{
+        EffectFailure, EffectHandler, EffectOutcome, EffectRequest, EffectRequestBody,
+        EffectResponse, SendDecision,
+    };
     use telltale_vm::envelope_diff::EnvelopeDiffArtifactV1;
     use telltale_vm::loader::CodeImage;
-    use telltale_vm::threaded::ThreadedVM;
+    use telltale_vm::vm::{RuntimeTuningProfile, StepResult as ProtocolMachineStepResult};
     use telltale_vm::verification::{DefaultVerificationModel, HashTag, VerificationModel};
-    use telltale_vm::vm::{RuntimeTuningProfile, StepResult, VMConfig, VM};
+    use telltale_vm::{ProtocolMachine, ProtocolMachineConfig, ThreadedGuestRuntime};
 
     const SCHEMA_VERSION: u32 = 1;
     const DISJOINT_SESSIONS: usize = 96;
@@ -41,14 +44,49 @@ cfg_if! {
     struct PassthroughHandler;
 
     impl EffectHandler for PassthroughHandler {
+        fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
+            match request.body {
+                EffectRequestBody::SendDecision { payload, .. } => {
+                    let decision = SendDecision::Deliver(payload.unwrap_or(Value::Nat(1)));
+                    EffectOutcome::success(EffectResponse::SendDecision { decision })
+                }
+                EffectRequestBody::Receive { state, .. } => {
+                    EffectOutcome::success(EffectResponse::Receive { state })
+                }
+                EffectRequestBody::Choose { labels, .. } => match labels.first().cloned() {
+                    Some(label) => EffectOutcome::success(EffectResponse::Choose { label }),
+                    None => EffectOutcome::failure(EffectFailure::invalid_input(
+                        "no labels available",
+                    )),
+                },
+                EffectRequestBody::InvokeStep { state, .. } => {
+                    EffectOutcome::success(EffectResponse::InvokeStep { state })
+                }
+                EffectRequestBody::Acquire { .. } => EffectOutcome::success(
+                    EffectResponse::Acquire {
+                        evidence: Value::Bool(true),
+                    },
+                ),
+                EffectRequestBody::Release { .. } => {
+                    EffectOutcome::success(EffectResponse::Release)
+                }
+                EffectRequestBody::TopologyEvents { .. } => {
+                    EffectOutcome::success(EffectResponse::TopologyEvents { events: Vec::new() })
+                }
+                EffectRequestBody::OutputConditionHint { .. } => {
+                    EffectOutcome::success(EffectResponse::OutputConditionHint { hint: None })
+                }
+            }
+        }
+
         fn handle_send(
             &self,
             _role: &str,
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> EffectResult<Value> {
-            EffectResult::success(Value::Nat(1))
+        ) -> telltale_vm::effect::EffectResult<Value> {
+            telltale_vm::effect::EffectResult::success(Value::Nat(1))
         }
 
         fn handle_recv(
@@ -58,8 +96,8 @@ cfg_if! {
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> EffectResult<()> {
-            EffectResult::success(())
+        ) -> telltale_vm::effect::EffectResult<()> {
+            telltale_vm::effect::EffectResult::success(())
         }
 
         fn handle_choose(
@@ -68,17 +106,21 @@ cfg_if! {
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> EffectResult<String> {
+        ) -> telltale_vm::effect::EffectResult<String> {
             match labels.first().cloned() {
-                Some(label) => EffectResult::success(label),
-                None => {
-                    EffectResult::failure(EffectFailure::invalid_input("no labels available"))
-                }
+                Some(label) => telltale_vm::effect::EffectResult::success(label),
+                None => telltale_vm::effect::EffectResult::failure(
+                    EffectFailure::invalid_input("no labels available"),
+                ),
             }
         }
 
-        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
-            EffectResult::success(())
+        fn step(
+            &self,
+            _role: &str,
+            _state: &mut Vec<Value>,
+        ) -> telltale_vm::effect::EffectResult<()> {
+            telltale_vm::effect::EffectResult::success(())
         }
     }
 
@@ -129,9 +171,9 @@ cfg_if! {
         let tuning = workload_tuning(workload_mode, tuning_profile);
         let handler = PassthroughHandler;
 
-        let mut canonical_vm = VM::new(tuning.config.clone());
+        let mut canonical_machine = ProtocolMachine::new(tuning.config.clone());
         for i in 0..sessions {
-            canonical_vm
+            canonical_machine
                 .load_choreography_owned(
                     &build_workload_image(workload_mode, i),
                     format!("baseline/canonical/{i}"),
@@ -139,16 +181,16 @@ cfg_if! {
                 .map_err(|err| format!("canonical load failed: {err}"))?;
         }
         let canonical = run_canonical_metrics(
-            &mut canonical_vm,
+            &mut canonical_machine,
             &handler,
             tuning.canonical_concurrency,
             sessions,
         )?;
 
-        let mut threaded_vm =
-            ThreadedVM::with_workers(tuning.config.clone(), tuning.threaded_workers);
+        let mut threaded_guest_runtime =
+            ThreadedGuestRuntime::with_workers(tuning.config.clone(), tuning.threaded_workers);
         for i in 0..sessions {
-            threaded_vm
+            threaded_guest_runtime
                 .load_choreography_owned(
                     &build_workload_image(workload_mode, i),
                     format!("baseline/threaded/{i}"),
@@ -156,14 +198,14 @@ cfg_if! {
                 .map_err(|err| format!("threaded load failed: {err}"))?;
         }
         let threaded = run_threaded_metrics(
-            &mut threaded_vm,
+            &mut threaded_guest_runtime,
             &handler,
             tuning.threaded_workers,
             sessions,
         )?;
 
-        let canonical_fragment = canonical_vm.canonical_replay_fragment();
-        let threaded_fragment = threaded_vm.canonical_replay_fragment();
+        let canonical_fragment = canonical_machine.canonical_replay_fragment();
+        let threaded_fragment = threaded_guest_runtime.vm().canonical_replay_fragment();
 
         let envelope_diff_artifact = EnvelopeDiffArtifactV1::from_replay_fragments(
             "native_single_thread",
@@ -217,7 +259,7 @@ cfg_if! {
     }
 
     fn run_canonical_metrics(
-        vm: &mut VM,
+        machine: &mut ProtocolMachine,
         handler: &dyn EffectHandler,
         concurrency: usize,
         sessions: usize,
@@ -226,31 +268,33 @@ cfg_if! {
         let mut rounds = 0usize;
         let mut total_wave_width = 0usize;
         let mut max_wave_width = 0usize;
-        let mut previous_steps = vm.scheduler_step_count();
+        let mut previous_steps = machine.scheduler_step_count();
         let mut completed = false;
         let started = Instant::now();
 
         for _ in 0..MAX_ROUNDS {
             rounds += 1;
             let round_started = Instant::now();
-            let result = vm
+            let result = machine
                 .step_round(handler, concurrency)
                 .map_err(|err| format!("canonical step_round failed: {err}"))?;
             round_latencies_us.push(round_started.elapsed().as_micros());
 
-            let current_steps = vm.scheduler_step_count();
+            let current_steps = machine.scheduler_step_count();
             let wave_width = current_steps.saturating_sub(previous_steps);
             previous_steps = current_steps;
             total_wave_width = total_wave_width.saturating_add(wave_width);
             max_wave_width = max_wave_width.max(wave_width);
 
             match result {
-                StepResult::AllDone => {
+                ProtocolMachineStepResult::AllDone => {
                     completed = true;
                     break;
                 }
-                StepResult::Continue => {}
-                StepResult::Stuck => return Err("canonical run became stuck".to_string()),
+                ProtocolMachineStepResult::Continue => {}
+                ProtocolMachineStepResult::Stuck => {
+                    return Err("canonical run became stuck".to_string())
+                }
             }
         }
 
@@ -261,7 +305,7 @@ cfg_if! {
         let elapsed = started.elapsed();
         let elapsed_ms = elapsed.as_millis();
         let elapsed_secs = elapsed.as_secs_f64().max(f64::EPSILON);
-        let steps = vm.scheduler_step_count();
+        let steps = machine.scheduler_step_count();
         Ok(EngineMetrics {
             elapsed_ms,
             steps,
@@ -282,7 +326,7 @@ cfg_if! {
     }
 
     fn run_threaded_metrics(
-        vm: &mut ThreadedVM,
+        guest_runtime: &mut ThreadedGuestRuntime,
         handler: &dyn EffectHandler,
         concurrency: usize,
         sessions: usize,
@@ -296,25 +340,31 @@ cfg_if! {
 
         for _ in 0..MAX_ROUNDS {
             rounds += 1;
-            let lane_trace_before = vm.lane_trace().len();
+            let lane_trace_before = guest_runtime.vm().lane_trace().len();
 
             let round_started = Instant::now();
-            let result = vm
+            let result = guest_runtime
                 .step_round(handler, concurrency)
                 .map_err(|err| format!("threaded step_round failed: {err}"))?;
             round_latencies_us.push(round_started.elapsed().as_micros());
 
-            let wave_width = vm.lane_trace().len().saturating_sub(lane_trace_before);
+            let wave_width = guest_runtime
+                .vm()
+                .lane_trace()
+                .len()
+                .saturating_sub(lane_trace_before);
             total_wave_width = total_wave_width.saturating_add(wave_width);
             max_wave_width = max_wave_width.max(wave_width);
 
             match result {
-                StepResult::AllDone => {
+                ProtocolMachineStepResult::AllDone => {
                     completed = true;
                     break;
                 }
-                StepResult::Continue => {}
-                StepResult::Stuck => return Err("threaded run became stuck".to_string()),
+                ProtocolMachineStepResult::Continue => {}
+                ProtocolMachineStepResult::Stuck => {
+                    return Err("threaded run became stuck".to_string())
+                }
             }
         }
 
@@ -325,8 +375,8 @@ cfg_if! {
         let elapsed = started.elapsed();
         let elapsed_ms = elapsed.as_millis();
         let elapsed_secs = elapsed.as_secs_f64().max(f64::EPSILON);
-        let steps = vm.lane_trace().len();
-        let contention = vm.contention_metrics().clone();
+        let steps = guest_runtime.vm().lane_trace().len();
+        let contention = guest_runtime.vm().contention_metrics().clone();
         Ok(EngineMetrics {
             elapsed_ms,
             steps,
@@ -372,7 +422,7 @@ cfg_if! {
 
     #[derive(Debug, Clone)]
     struct WorkloadTuning {
-        config: VMConfig,
+        config: ProtocolMachineConfig,
         canonical_concurrency: usize,
         threaded_workers: usize,
     }
@@ -382,12 +432,12 @@ cfg_if! {
             && matches!(mode, WorkloadMode::Contended)
         {
             return WorkloadTuning {
-                config: VMConfig {
+                config: ProtocolMachineConfig {
                     determinism_mode: DeterminismMode::ModuloCommutativity,
                     effect_determinism_tier: EffectDeterminismTier::EnvelopeBoundedNondeterministic,
                     footprint_guided_wave_widening: true,
                     runtime_tuning_profile: profile,
-                    ..VMConfig::default()
+                    ..ProtocolMachineConfig::default()
                 },
                 canonical_concurrency: M1_STRESS_CANONICAL_CONCURRENCY,
                 threaded_workers: M1_STRESS_THREADED_WORKERS,
@@ -396,23 +446,23 @@ cfg_if! {
 
         match mode {
             WorkloadMode::Disjoint => WorkloadTuning {
-                config: VMConfig {
+                config: ProtocolMachineConfig {
                     determinism_mode: DeterminismMode::ModuloCommutativity,
                     effect_determinism_tier: EffectDeterminismTier::EnvelopeBoundedNondeterministic,
                     footprint_guided_wave_widening: true,
                     runtime_tuning_profile: profile,
-                    ..VMConfig::default()
+                    ..ProtocolMachineConfig::default()
                 },
                 canonical_concurrency: DISJOINT_CANONICAL_CONCURRENCY,
                 threaded_workers: DISJOINT_THREADED_WORKERS,
             },
             WorkloadMode::Contended => WorkloadTuning {
-                config: VMConfig {
+                config: ProtocolMachineConfig {
                     determinism_mode: DeterminismMode::ModuloCommutativity,
                     effect_determinism_tier: EffectDeterminismTier::EnvelopeBoundedNondeterministic,
                     footprint_guided_wave_widening: false,
                     runtime_tuning_profile: profile,
-                    ..VMConfig::default()
+                    ..ProtocolMachineConfig::default()
                 },
                 canonical_concurrency: CONTENDED_CANONICAL_CONCURRENCY,
                 threaded_workers: CONTENDED_THREADED_WORKERS,

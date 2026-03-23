@@ -1,7 +1,7 @@
 //! High-level simulator harness for third-party integration.
 //!
 //! This module wraps low-level runner entrypoints with a stable host-adapter
-//! interface and config-file workflow.
+//! interface, generated effect-family scenario support, and config-file workflow.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -16,7 +16,7 @@ use crate::EffectHandler;
 
 /// Host integration hook for simulator execution.
 pub trait HostAdapter {
-    /// Return the VM effect handler implementation used for execution.
+    /// Return the external handler implementation used for protocol-machine execution.
     fn effect_handler(&self) -> &dyn EffectHandler;
 
     /// Optionally provide initial role state vectors.
@@ -43,7 +43,7 @@ pub trait HostAdapter {
     }
 }
 
-/// Thin adapter that wraps a raw `EffectHandler` reference.
+/// Thin adapter that wraps an external handler reference directly.
 pub struct DirectAdapter<'a> {
     handler: &'a dyn EffectHandler,
 }
@@ -182,7 +182,7 @@ impl<'a, A: HostAdapter + ?Sized> SimulationHarness<'a, A> {
     ///
     /// # Errors
     ///
-    /// Returns an error when setup, VM run, or adapter validation fails.
+    /// Returns an error when setup, protocol-machine execution, or adapter validation fails.
     pub fn run(&self, spec: &HarnessSpec) -> Result<ScenarioResult, String> {
         let initial_states = resolve_initial_states(spec, self.adapter)?;
 
