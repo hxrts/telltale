@@ -13,9 +13,9 @@ mod test_support;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
-use telltale_lean_bridge::export::global_to_json;
-use telltale_lean_bridge::runner::{ChoreographyJson, LeanRunner, LeanRunnerError};
-use telltale_lean_bridge::{canonical_schema_version, partition_by_session, NormalizedEvent};
+use telltale_bridge::export::global_to_json;
+use telltale_bridge::runner::{ChoreographyJson, LeanRunner, LeanRunnerError};
+use telltale_bridge::{canonical_schema_version, partition_by_session, NormalizedEvent};
 use telltale_machine::loader::CodeImage;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 use test_support::{

@@ -6,9 +6,9 @@
 use std::collections::{BTreeMap, HashMap};
 use telltale_types::FixedQ32;
 
-use telltale_lean_bridge::export::global_to_json;
-use telltale_lean_bridge::import::json_to_local;
-use telltale_lean_bridge::runner::LeanRunner;
+use telltale_bridge::export::global_to_json;
+use telltale_bridge::import::json_to_local;
+use telltale_bridge::runner::LeanRunner;
 use telltale_simulator::analysis;
 use telltale_simulator::material::{HamiltonianParams, MeanFieldParams};
 use telltale_simulator::runner;

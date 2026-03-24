@@ -3,11 +3,11 @@
 //! Runs both Lean (via lean-bridge `LeanRunner`) and Rust projection on the
 //! same `GlobalType` inputs and asserts the outputs are identical.
 
-use telltale_lean_bridge::export::global_to_json;
+use telltale_bridge::export::global_to_json;
 #[cfg(feature = "async-subtyping")]
-use telltale_lean_bridge::export::local_to_json;
-use telltale_lean_bridge::import::json_to_local;
-use telltale_lean_bridge::runner::LeanRunner;
+use telltale_bridge::export::local_to_json;
+use telltale_bridge::import::json_to_local;
+use telltale_bridge::runner::LeanRunner;
 use telltale_theory::projection::project;
 #[cfg(feature = "async-subtyping")]
 use telltale_theory::subtyping::{async_subtype, orphan_free};

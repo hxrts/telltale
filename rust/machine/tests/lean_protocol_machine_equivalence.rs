@@ -6,7 +6,7 @@
 #[path = "support/mod.rs"]
 mod test_support;
 
-use telltale_lean_bridge::{
+use telltale_bridge::{
     canonical_schema_version, global_to_json, ChoreographyJson, ProtocolMachineRunInput,
     ProtocolMachineRunner,
 };

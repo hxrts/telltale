@@ -488,14 +488,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "effect-scaffold"
-version = "0.1.0"
-dependencies = [
- "serde_json",
- "telltale-choreography",
-]
-
-[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1557,6 +1549,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "telltale-bridge"
+version = "6.0.0"
+dependencies = [
+ "anyhow",
+ "bpaf",
+ "cfg-if",
+ "clap 4.5.53",
+ "proptest",
+ "serde",
+ "serde_json",
+ "telltale-choreography",
+ "telltale-machine",
+ "telltale-theory",
+ "telltale-types",
+ "tempfile",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "telltale-choreography"
 version = "6.0.0"
 dependencies = [
@@ -1600,27 +1612,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "telltale-lean-bridge"
-version = "6.0.0"
-dependencies = [
- "anyhow",
- "bpaf",
- "cfg-if",
- "clap 4.5.53",
- "proptest",
- "serde",
- "serde_json",
- "telltale-choreography",
- "telltale-machine",
- "telltale-theory",
- "telltale-types",
- "tempfile",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "telltale-lint-checks"
+name = "telltale-lints"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
@@ -1642,7 +1634,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "telltale-lean-bridge",
+ "telltale-bridge",
  "telltale-theory",
  "telltale-types",
  "thiserror",
@@ -1672,7 +1664,7 @@ dependencies = [
  "rand_chacha 0.3.1",
  "serde",
  "serde_json",
- "telltale-lean-bridge",
+ "telltale-bridge",
  "telltale-machine",
  "telltale-theory",
  "telltale-types",
@@ -1686,7 +1678,7 @@ dependencies = [
  "assert_matches",
  "criterion",
  "proptest",
- "telltale-lean-bridge",
+ "telltale-bridge",
  "telltale-types",
  "thiserror",
 ]

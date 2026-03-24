@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use telltale_lean_bridge::{
+use telltale_bridge::{
     canonical_schema_version, compute_trace_diff, global_to_json, local_to_json,
     normalize_semantic_audit, ProtocolMachineRunner, ProtocolMachineRunnerError,
     ProtocolMachineTraceEvent, SimRunInput, SimRunOutput, SimTraceValidation, TickedObsEvent,
