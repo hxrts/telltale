@@ -694,7 +694,6 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/ProtocolMachine/Monitor.lean | 24 | Monitor soundness/identity preservation lemmas moved from `Runtime/ProtocolMachine/Runtime/Monitor` |
 | Proofs/ProtocolMachine/SchedulerContracts.lean | 91 | Proof-only scheduler contract predicates moved out of `Runtime/ProtocolMachine/Runtime/SchedulerStep.lean` |
 | Proofs/ProtocolMachine/Scheduler.lean | 265 | Scheduler proof infrastructure, including single-lane/policy determinism compatibility lemmas |
-| Proofs/ProtocolMachine/SemanticObjects/Invariants.lean | 37 | Theorem layer over semantic-object discipline predicates |
 | Proofs/ProtocolMachine/SemanticObjects/OutstandingEffects.lean | 116 | Outstanding-effect admissibility, late-result rejection, and observer / `EffectBisim` lemmas |
 | Proofs/ProtocolMachine/SemanticObjects/SemanticHandoff.lean | 171 | Semantic-handoff theorems and delegation / envelope bridge lemmas |
 | Proofs/ProtocolMachine/SemanticObjects/AuthoritativeReadsPublication.lean | 185 | Authoritative-read/publication theorems and observer-projection consequences |
@@ -717,6 +716,18 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/ProtocolMachine/InstrSpec/ConfigEquivOpenCloseTransfer.lean | 493 | V2: Open/close/transfer configuration equivalence |
 | Proofs/ProtocolMachine/InstrSpec/ErasureExactness.lean | 357 | V2: Erasure exactness proofs |
 | Proofs/ProtocolMachine/InstrSpec/Preservation.lean | 290 | V2: Instruction preservation proofs |
+
+### Proofs/Conservation
+
+| File | Lines | Description |
+|------|------:|-------------|
+| Proofs/Conservation/API.lean | 17 | Public facade for the six conservation-law theorem families |
+| Proofs/Conservation/Evidence.lean | 76 | Evidence conservation theorems over authoritative reads, canonical publication, and materialization |
+| Proofs/Conservation/Authority.lean | 93 | Authority conservation theorems over effect authority classes, handoff, and single-owner discipline |
+| Proofs/Conservation/Identity.lean | 62 | Identity conservation theorems over replay stability, terminal truth, and monitor-preserved session ids |
+| Proofs/Conservation/Commitment.lean | 73 | Commitment conservation theorems over outstanding effects, progress measures, and dependent work |
+| Proofs/Conservation/Structure.lean | 60 | Structure conservation theorems over delegation-preserved coherence and scheduler-normalized traces |
+| Proofs/Conservation/Premise.lean | 68 | Premise conservation theorems over timeout discipline, progress contracts, scheduler fairness, and liveness bundles |
 
 ### Adequacy (V2 Envelope-Based)
 

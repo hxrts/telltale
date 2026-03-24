@@ -24,6 +24,7 @@ import Runtime.Proofs.EffectBisim.ConfigEquivBridge
 import Runtime.Proofs.EffectBisim.Examples
 import Runtime.Proofs.EffectBisim.RationalFragment
 import Runtime.Proofs.BridgeStrengthening
+import Runtime.Proofs.Conservation.API
 import Runtime.Proofs.ProtocolMachine.Speculation
 import Runtime.Proofs.InvariantSpace
 import Runtime.Proofs.Adapters.Progress
