@@ -4,7 +4,7 @@ This note records the Phase 1 boundary decisions for protocol-critical
 authority work in Telltale.
 
 The goal is to move more protocol-critical correctness into the
-VM/DSL/theory boundary without turning Telltale into a general-purpose
+protocol machine/DSL/theory boundary without turning Telltale into a general-purpose
 application runtime.
 
 ## Classification
@@ -78,9 +78,9 @@ Working distinction:
 The current repo already has a strong protocol-machine/effect boundary.
 Several parts of that boundary still rely on raw strings or convention-driven host behavior.
 
-### VM/Effect Callback Surface
+### protocol machine/Effect Callback Surface
 
-The VM `EffectHandler` trait in `rust/protocol-machine/src/effect/handler_trait.rs`
+The protocol machine `EffectHandler` trait in `rust/protocol-machine/src/effect/handler_trait.rs`
 has now moved to typed outcomes.
 Callbacks return `EffectResult<_>` with typed failure variants.
 Failures use `EffectFailure` and `EffectFailureKind` rather than raw `String` classification.
@@ -104,7 +104,7 @@ typed evidence/failure as the rest of the authority design firms up.
 
 ### Internal Runtime Surfaces Worth Tracking
 
-Some lower-level VM/session functions also use raw strings today.
+Some lower-level protocol machine/session functions also use raw strings today.
 They are not all equally important.
 They should be inventoried so future typed-boundary work does not stop at the trait edge.
 

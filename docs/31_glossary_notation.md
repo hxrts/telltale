@@ -26,15 +26,15 @@ It serves as the stable lookup for terminology and notation.
 | ownership epoch | Generation used to invalidate stale owner handles after transfer or scope attenuation. | [Session Lifecycle](14_session_lifecycle.md) |
 | canonical ingress | Sanctioned host event entry path such as `topology_events`, `send_decision`, `handle_recv`, or `step`. | [Effect Handlers and Session Types](11_effect_session_bridge.md) |
 | stale-owner rejection | Fail-closed behavior when a prior ownership capability is reused after transfer or attenuation. | [Effect Handlers and Session Types](11_effect_session_bridge.md), [Session Lifecycle](14_session_lifecycle.md) |
-| envelope | Declared refinement boundary for higher-concurrency and profile-scoped behavior. | [Protocol Machine Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
-| determinism profile | Runtime trace-equivalence contract mode such as `Full` or `Replay`. | [Protocol Machine Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
-| communication replay mode | Transport replay-consumption policy: `off`, `sequence`, or `nullifier`. | [Protocol Machine Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
-| communication nullifier | Domain-separated digest of canonical communication identity used for one-time receive consumption checks. | [Protocol Machine Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
-| consumption root | Deterministic accumulator root over communication replay-consumption state. | [Protocol Machine Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
-| protocol machine | Single-thread execution engine (`ProtocolMachine`) that runs projected local types with session type monitoring. | [Protocol Machine Architecture](12_vm_architecture.md) |
-| guest runtime | Telltale-owned driver (`GuestRuntime`) instantiated around the protocol machine for simulation and runtime integration. | [Protocol Machine Architecture](12_vm_architecture.md), [API Reference](30_api_reference.md) |
+| envelope | Declared refinement boundary for higher-concurrency and profile-scoped behavior. | [Protocol Machine Architecture](12_protocol_machine_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
+| determinism profile | Runtime trace-equivalence contract mode such as `Full` or `Replay`. | [Protocol Machine Architecture](12_protocol_machine_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
+| communication replay mode | Transport replay-consumption policy: `off`, `sequence`, or `nullifier`. | [Protocol Machine Architecture](12_protocol_machine_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
+| communication nullifier | Domain-separated digest of canonical communication identity used for one-time receive consumption checks. | [Protocol Machine Architecture](12_protocol_machine_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
+| consumption root | Deterministic accumulator root over communication replay-consumption state. | [Protocol Machine Architecture](12_protocol_machine_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
+| protocol machine | Single-thread execution engine (`ProtocolMachine`) that runs projected local types with session type monitoring. | [Protocol Machine Architecture](12_protocol_machine_architecture.md) |
+| guest runtime | Telltale-owned driver (`GuestRuntime`) instantiated around the protocol machine for simulation and runtime integration. | [Protocol Machine Architecture](12_protocol_machine_architecture.md), [API Reference](30_api_reference.md) |
 | external handler | Host-runtime boundary trait (`ExternalHandler`) implemented by embedders and simulators. | [Effect Handlers and Session Types](11_effect_session_bridge.md), [API Reference](30_api_reference.md) |
-| semantic object | Typed introspection record (such as `OperationInstance`, `OutstandingEffect`, `CanonicalHandle`) maintained by the protocol machine for audit and replay. | [Protocol Machine Architecture](12_vm_architecture.md), [API Reference](30_api_reference.md) |
+| semantic object | Typed introspection record (such as `OperationInstance`, `OutstandingEffect`, `CanonicalHandle`) maintained by the protocol machine for audit and replay. | [Protocol Machine Architecture](12_protocol_machine_architecture.md), [API Reference](30_api_reference.md) |
 | typed outcome | Structured success/failure result at the effect boundary using `EffectResult` and `EffectFailure` rather than raw strings. | [Protocol-Critical Authority Scope](33_protocol_authority_scope.md), [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) |
 | content addressing | Cryptographic identity scheme (`ContentId`) for protocol artifacts enabling deduplication and integrity checks. | [API Reference](30_api_reference.md) |
 | nominal effect interface | Named effect declaration (`effect Name`) that makes host dependencies explicit and typed at the language level. | [Authority Language Surface](34_authority_language_surface.md), [Protocol-Critical Authority Scope](33_protocol_authority_scope.md) |
@@ -53,11 +53,11 @@ It serves as the stable lookup for terminology and notation.
 | `?T.S` | Receive `T`, then continue as `S`. | [Theory](05_theory.md) |
 | `end` | Session termination state. | [Theory](05_theory.md) |
 | `Consume` | Recursive receiver-side trace alignment kernel used in coherence proofs. | [Theory](05_theory.md), [Theorem Program](26_theorem_program.md) |
-| `n = 1` | Canonical single-step concurrency regime for exact parity. | [Protocol Machine Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
-| `n > 1` | Higher-concurrency regime admitted under envelope and premise-scoped constraints. | [Protocol Machine Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
-| `Full`, `ModuloEffects`, `ModuloCommutativity`, `Replay` | Runtime determinism profiles. | [Protocol Machine Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
-| `off`, `sequence`, `nullifier` | Communication replay-consumption modes. | [Protocol Machine Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
-| `telltale.comm.identity.v1` | Domain-separation tag for canonical communication identity schema. | [Protocol Machine Architecture](12_vm_architecture.md) |
+| `n = 1` | Canonical single-step concurrency regime for exact parity. | [Protocol Machine Architecture](12_protocol_machine_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
+| `n > 1` | Higher-concurrency regime admitted under envelope and premise-scoped constraints. | [Protocol Machine Architecture](12_protocol_machine_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
+| `Full`, `ModuloEffects`, `ModuloCommutativity`, `Replay` | Runtime determinism profiles. | [Protocol Machine Architecture](12_protocol_machine_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
+| `off`, `sequence`, `nullifier` | Communication replay-consumption modes. | [Protocol Machine Architecture](12_protocol_machine_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
+| `telltale.comm.identity.v1` | Domain-separation tag for canonical communication identity schema. | [Protocol Machine Architecture](12_protocol_machine_architecture.md) |
 | `case ... of` | Exhaustive sum-pattern branching over forms such as `Result` and `Maybe`. | [Choreographic DSL](06_choreographic_dsl.md), [Authority Language Surface](34_authority_language_surface.md) |
 | `let x = check Effect.op(args)` | Typed external query binding that later lowers to the protocol-machine effect boundary. | [Choreographic DSL](06_choreographic_dsl.md), [Authority Language Surface](34_authority_language_surface.md) |
 | `effect Name` | Nominal effect-interface declaration. | [Authority Language Surface](34_authority_language_surface.md) |
@@ -73,6 +73,6 @@ Prefer existing symbols from this index unless precision requires a different on
 ## Related Docs
 
 - [Theory](05_theory.md)
-- [Protocol Machine Architecture](12_vm_architecture.md)
+- [Protocol Machine Architecture](12_protocol_machine_architecture.md)
 - [Rust-Lean Parity](19_rust_lean_parity.md)
 - [Theorem Program](26_theorem_program.md)

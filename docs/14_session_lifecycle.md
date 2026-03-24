@@ -129,7 +129,7 @@ raw effect trace order.
 
 ## Open Path
 
-`Open` is executed by `VM::step_open`. The instruction carries `roles`, `local_types`, `handlers`, and `dsts`.
+`Open` is executed by `protocol machine::step_open`. The instruction carries `roles`, `local_types`, `handlers`, and `dsts`.
 
 Open admission checks enforce role uniqueness and full handler coverage across the opened role set. Arity must match between `local_types` and `dsts`.
 
@@ -181,7 +181,7 @@ Policy semantics:
 
 ## Close Path
 
-`Close` is executed by `VM::step_close` and then `SessionStore::close`.
+`Close` is executed by `protocol machine::step_close` and then `SessionStore::close`.
 
 The protocol machine first checks endpoint ownership for the closing coroutine. If ownership is valid, the store sets `status = Closed`, clears buffers and edge traces, and increments `epoch`.
 
@@ -220,5 +220,5 @@ Risk notes:
 ## Related Docs
 
 - [Protocol-Machine Bytecode Instructions](13_bytecode_instructions.md)
-- [Protocol Machine Architecture](12_vm_architecture.md)
+- [Protocol Machine Architecture](12_protocol_machine_architecture.md)
 - [Rust-Lean Parity](19_rust_lean_parity.md)

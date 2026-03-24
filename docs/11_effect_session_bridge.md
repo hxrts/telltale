@@ -271,7 +271,7 @@ let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
 ```
 
-This lane validates runtime behavior without reimplementing protocol-machine checks in the host project. See [Protocol-Machine Simulation](15_vm_simulation_overview.md) for harness config fields and preset helpers.
+This lane validates runtime behavior without reimplementing protocol-machine checks in the host project. See [Protocol-Machine Simulation](15_protocol_machine_simulation_overview.md) for harness config fields and preset helpers.
 
 ## Performance and Diagnostics Controls
 
@@ -300,18 +300,18 @@ Default value is `false`.
 ## Lean Correspondence
 
 Lean splits effect execution and typing.
-This split is in `lean/Runtime/VM/Model/TypeClasses.lean` and the typed
-request/outcome model in `lean/Runtime/VM/Model/Effects.lean`.
+This split is in `lean/Runtime/protocol machine/Model/TypeClasses.lean` and the typed
+request/outcome model in `lean/Runtime/protocol machine/Model/Effects.lean`.
 
 | Rust or protocol-machine surface | Lean surface | Purpose |
 |---|---|---|
 | `EffectHandler` execution boundary | `EffectRuntime.exec` | executable effect semantics |
 | handler typing obligation | `EffectSpec.handlerType` | typing-level effect contract |
-| typed request/outcome model | `Runtime/VM/Model/Effects.lean` | shared effect-interface metadata plus request/outcome correspondence |
-| invoke typing | `WellTypedInstr.wt_invoke` in `lean/Runtime/VM/Runtime/Monitor.lean` | ties invoke to handler type |
+| typed request/outcome model | `Runtime/protocol machine/Model/Effects.lean` | shared effect-interface metadata plus request/outcome correspondence |
+| invoke typing | `WellTypedInstr.wt_invoke` in `lean/Runtime/protocol machine/Runtime/Monitor.lean` | ties invoke to handler type |
 | behavioral equivalence | `Runtime/Proofs/EffectBisim/*` | observer-level bisimulation bridge |
 | config equivalence bridge | `Runtime/Proofs/EffectBisim/ConfigEquivBridge.lean` | links protocol quotient and effect bisimulation |
-| composed effect domains | `Runtime/Proofs/VM/DomainComposition.lean` | sum and product composition instances |
+| composed effect domains | `Runtime/Proofs/protocol machine/DomainComposition.lean` | sum and product composition instances |
 
 ## Glossary
 
@@ -327,6 +327,6 @@ request/outcome model in `lean/Runtime/VM/Model/Effects.lean`.
 ## Related Docs
 
 - [Choreography Effect Handlers](09_effect_handlers.md)
-- [Protocol Machine Architecture](12_vm_architecture.md)
+- [Protocol Machine Architecture](12_protocol_machine_architecture.md)
 - [Lean Verification](23_lean_verification.md)
 - [Lean-Rust Bridge](24_lean_rust_bridge.md)

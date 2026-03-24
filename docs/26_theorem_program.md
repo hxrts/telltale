@@ -21,7 +21,7 @@ Paper 1 centers on operational coherence and the `Consume` kernel.
 | message-type alignment via `Consume` | `Protocol/Coherence/Consume.lean` |
 | subtype replacement and coherence lift | `Protocol/Coherence/SubtypeReplacement*.lean` |
 | coherence preservation stack | `Protocol/Preservation*.lean`, `Protocol/Coherence/*` |
-| typed effect bridge to protocol machine | `Runtime/Proofs/VM/BridgeStrengthening.lean`, `Runtime/Proofs/EffectBisim/*` |
+| typed effect bridge to protocol machine | `Runtime/Proofs/protocol machine/BridgeStrengthening.lean`, `Runtime/Proofs/EffectBisim/*` |
 
 Claim scope is assumption-scoped. Delivery and monitor premises remain explicit in the bridge layer.
 

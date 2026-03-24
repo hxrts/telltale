@@ -90,6 +90,6 @@ The compiler is intentionally simple. Full ISA coverage is provided by direct by
 
 ## Related Docs
 
-- [Protocol Machine Architecture](12_vm_architecture.md)
+- [Protocol Machine Architecture](12_protocol_machine_architecture.md)
 - [Session Lifecycle](14_session_lifecycle.md)
 - [Lean-Rust Bridge](24_lean_rust_bridge.md)

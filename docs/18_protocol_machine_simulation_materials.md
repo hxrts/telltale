@@ -49,7 +49,7 @@ It does not write arbitrary scenario output files by itself.
 
 ## Related Docs
 
-- [Protocol-Machine Simulation](15_vm_simulation_overview.md)
-- [Protocol-Machine Simulation Runner](16_vm_simulation_runner.md)
-- [Protocol-Machine Simulation Scenarios](17_vm_simulation_scenarios.md)
+- [Protocol-Machine Simulation](15_protocol_machine_simulation_overview.md)
+- [Protocol-Machine Simulation Runner](16_protocol_machine_simulation_runner.md)
+- [Protocol-Machine Simulation Scenarios](17_protocol_machine_simulation_scenarios.md)
 - [Rust-Lean Parity](19_rust_lean_parity.md)

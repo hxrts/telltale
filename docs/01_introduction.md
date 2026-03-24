@@ -46,13 +46,13 @@ The `telltale-lean-bridge` crate provides JSON export and import for cross-valid
 | [Choreography Effect Handlers](09_effect_handlers.md) | Guide | Mixed |
 | [Using Telltale Handlers](10_telltale_handler.md) | Guide | Informative |
 | [Effect Handlers and Session Types](11_effect_session_bridge.md) | Reference | Normative |
-| [Protocol Machine Architecture](12_vm_architecture.md) | Reference | Normative |
+| [Protocol Machine Architecture](12_protocol_machine_architecture.md) | Reference | Normative |
 | [Protocol-Machine Bytecode Instructions](13_bytecode_instructions.md) | Reference | Normative |
 | [Session Lifecycle](14_session_lifecycle.md) | Reference | Normative |
-| [Protocol-Machine Simulation](15_vm_simulation_overview.md) | Guide | Mixed |
-| [Protocol-Machine Simulation Runner](16_vm_simulation_runner.md) | Reference | Normative |
-| [Protocol-Machine Simulation Scenarios](17_vm_simulation_scenarios.md) | Guide | Mixed |
-| [Protocol-Machine Simulation Materials](18_vm_simulation_materials.md) | Reference | Informative |
+| [Protocol-Machine Simulation](15_protocol_machine_simulation_overview.md) | Guide | Mixed |
+| [Protocol-Machine Simulation Runner](16_protocol_machine_simulation_runner.md) | Reference | Normative |
+| [Protocol-Machine Simulation Scenarios](17_protocol_machine_simulation_scenarios.md) | Guide | Mixed |
+| [Protocol-Machine Simulation Materials](18_protocol_machine_simulation_materials.md) | Reference | Informative |
 | [Rust-Lean Parity](19_rust_lean_parity.md) | Reference | Normative |
 | [Content Addressing](20_content_addressing.md) | Reference | Mixed |
 | [Resource Heap](21_resource_heap.md) | Reference | Mixed |
@@ -75,7 +75,7 @@ Start with [Getting Started](02_getting_started.md). Then read [Choreographic DS
 
 ### Protocol-Machine Integrators
 
-Start with [Architecture](03_architecture.md). Then read [Effect Handlers and Session Types](11_effect_session_bridge.md) and [Protocol Machine Architecture](12_vm_architecture.md). Continue with [Protocol-Machine Bytecode Instructions](13_bytecode_instructions.md) and [Session Lifecycle](14_session_lifecycle.md). See [Protocol-Machine Simulation](15_vm_simulation_overview.md) for testing.
+Start with [Architecture](03_architecture.md). Then read [Effect Handlers and Session Types](11_effect_session_bridge.md) and [Protocol Machine Architecture](12_protocol_machine_architecture.md). Continue with [Protocol-Machine Bytecode Instructions](13_bytecode_instructions.md) and [Session Lifecycle](14_session_lifecycle.md). See [Protocol-Machine Simulation](15_protocol_machine_simulation_overview.md) for testing.
 
 ### Paper Reviewers
 

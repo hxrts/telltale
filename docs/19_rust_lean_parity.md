@@ -12,16 +12,16 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 
 | Area | Lean Surface | Rust Surface | Status |
 |---|---|---|---|
-| `FlowPolicy` variants | `Runtime/VM/Model/Knowledge.lean` | `rust/protocol-machine/src/vm.rs` | Aligned |
-| `FlowPredicate` variants | `Runtime/VM/Model/Knowledge.lean` | `rust/protocol-machine/src/vm.rs` | Aligned |
-| `OutputConditionPolicy` | `Runtime/VM/Model/OutputCondition.lean` | `rust/protocol-machine/src/output_condition.rs` | Aligned |
+| `FlowPolicy` variants | `Runtime/protocol machine/Model/Knowledge.lean` | `rust/protocol-machine/src/vm.rs` | Aligned |
+| `FlowPredicate` variants | `Runtime/protocol machine/Model/Knowledge.lean` | `rust/protocol-machine/src/vm.rs` | Aligned |
+| `OutputConditionPolicy` | `Runtime/protocol machine/Model/OutputCondition.lean` | `rust/protocol-machine/src/output_condition.rs` | Aligned |
 | Runtime `Value` variants | `Protocol/Values.lean` | `rust/protocol-machine/src/coroutine.rs` | Aligned |
-| `ProgressToken` fields | `Runtime/VM/Model/State.lean` | `rust/protocol-machine/src/coroutine.rs` | Aligned |
-| `CommunicationReplayMode` variants | `Runtime/VM/Model/Config.lean` | `rust/protocol-machine/src/communication_replay/mod.rs` | Aligned |
-| `SignedValue` transport fields (`payload`, `signature`, `sequence_no`) | `Runtime/VM/Model/TypeClasses.lean` | `rust/protocol-machine/src/buffer.rs` | Aligned |
-| Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | `Runtime/VM/Model/Config.lean`, `Runtime/VM/Semantics/ExecComm.lean` | `rust/protocol-machine/src/vm.rs` | Aligned |
-| Register bounds failure semantics (`OutOfRegisters`) | `Runtime/VM/Semantics/ExecSteps.lean` | `rust/protocol-machine/src/vm`, `rust/protocol-machine/src/threaded` | Aligned |
-| Explicit failure/timeout observable event inventory (`TimeoutIssued`, `CancellationRequested`, `Cancelled`, `FailureBranchEntered`, `SessionTerminal`) | `Runtime/VM/Model/State.lean`, `Runtime/VM/Runtime/Json.lean`, `Runtime/Proofs/TheoremPack/ReleaseConformance.lean` | `rust/protocol-machine/src/vm/vm_config.rs`, `rust/protocol-machine/src/trace.rs` | Aligned |
+| `ProgressToken` fields | `Runtime/protocol machine/Model/State.lean` | `rust/protocol-machine/src/coroutine.rs` | Aligned |
+| `CommunicationReplayMode` variants | `Runtime/protocol machine/Model/Config.lean` | `rust/protocol-machine/src/communication_replay/mod.rs` | Aligned |
+| `SignedValue` transport fields (`payload`, `signature`, `sequence_no`) | `Runtime/protocol machine/Model/TypeClasses.lean` | `rust/protocol-machine/src/buffer.rs` | Aligned |
+| Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | `Runtime/protocol machine/Model/Config.lean`, `Runtime/protocol machine/Semantics/ExecComm.lean` | `rust/protocol-machine/src/vm.rs` | Aligned |
+| Register bounds failure semantics (`OutOfRegisters`) | `Runtime/protocol machine/Semantics/ExecSteps.lean` | `rust/protocol-machine/src/vm`, `rust/protocol-machine/src/threaded` | Aligned |
+| Explicit failure/timeout observable event inventory (`TimeoutIssued`, `CancellationRequested`, `Cancelled`, `FailureBranchEntered`, `SessionTerminal`) | `Runtime/protocol machine/Model/State.lean`, `Runtime/protocol machine/Runtime/Json.lean`, `Runtime/Proofs/TheoremPack/ReleaseConformance.lean` | `rust/protocol-machine/src/vm/vm_config.rs`, `rust/protocol-machine/src/trace.rs` | Aligned |
 
 These checks are automated by `just check-parity --types`.
 
@@ -43,7 +43,7 @@ Explicit failure, timeout, cancellation, and session-terminal events are part of
 Replay tagging, JSON serialization, and theorem-pack release conformance all use the same observable event family.
 
 Language-level nominal `effect` declarations do not introduce a second runtime bridge.
-Their intended justification remains the existing protocol-machine `invoke` boundary and handler-typing obligations in `Runtime/Proofs/VM/BridgeStrengthening.lean`.
+Their intended justification remains the existing protocol-machine `invoke` boundary and handler-typing obligations in `Runtime/Proofs/protocol machine/BridgeStrengthening.lean`.
 
 Typed effect requests and outcomes are part of the parity surface directly.
 Rust and Lean must agree on effect-interface metadata, request bodies, outcome statuses, and replay-visible effect exchanges.
@@ -106,15 +106,15 @@ The canonical cross-language semantic-object family must remain aligned between 
 
 | Object | Lean Surface | Rust Surface | Bridge Surface | Status |
 |---|---|---|---|---|
-| `OperationInstance` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `OutstandingEffect` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `SemanticHandoff` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `TransformationObligation` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `AuthoritativeRead` / `ObservedRead` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `MaterializationProof` / `CanonicalHandle` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `ProgressContract` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `ProgressTransition` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| typed effect metadata / request / outcome model | `Runtime/VM/Model/Effects.lean` | `rust/protocol-machine/src/effect.rs` | `rust/lean-bridge/src/protocol_machine_runner.rs` (`effect_exchanges`) | Aligned |
+| `OperationInstance` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `OutstandingEffect` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `SemanticHandoff` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `TransformationObligation` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `AuthoritativeRead` / `ObservedRead` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `MaterializationProof` / `CanonicalHandle` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `ProgressContract` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| `ProgressTransition` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/protocol-machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
+| typed effect metadata / request / outcome model | `Runtime/protocol machine/Model/Effects.lean` | `rust/protocol-machine/src/effect.rs` | `rust/lean-bridge/src/protocol_machine_runner.rs` (`effect_exchanges`) | Aligned |
 
 `OperationInstance` and `OutstandingEffect` are compared as canonical runtime state, not as post-hoc derivations from generic effect-trace order.
 Parity on these objects covers owner identity, phase/status, budget/invalidation fields, dependent-operation edges, and terminal publication state.
@@ -127,34 +127,34 @@ This prevents stale-owner and late-result mismatches from hiding inside otherwis
 `ProgressContract` parity covers bounded-wait metadata, explicit no-progress and degraded states, and timeout escalation state.
 `ProgressTransition` parity makes those escalations replay-visible instead of leaving them as target-specific scheduling heuristics.
 
-The Lean implementation layer keeps executable semantic-object definitions in `Runtime/VM/Model/SemanticObjects/Core.lean`.
-Basic theorem-facing predicates live in `Runtime/VM/Model/SemanticObjects/Invariants.lean`.
-The re-export facade is `Runtime/VM/Model/SemanticObjects.lean`.
+The Lean implementation layer keeps executable semantic-object definitions in `Runtime/protocol machine/Model/SemanticObjects/Core.lean`.
+Basic theorem-facing predicates live in `Runtime/protocol machine/Model/SemanticObjects/Invariants.lean`.
+The re-export facade is `Runtime/protocol machine/Model/SemanticObjects.lean`.
 
-Deferred-effect admissibility, retry shape, and late-result rejection live in `Runtime/VM/Model/SemanticObjects/OutstandingEffects.lean`.
-Associated theorem-facing lemmas are in `Runtime/VM/Model/SemanticObjects/OutstandingEffectsLemmas.lean`.
+Deferred-effect admissibility, retry shape, and late-result rejection live in `Runtime/protocol machine/Model/SemanticObjects/OutstandingEffects.lean`.
+Associated theorem-facing lemmas are in `Runtime/protocol machine/Model/SemanticObjects/OutstandingEffectsLemmas.lean`.
 
-Semantic handoff realization lives in `Runtime/VM/Model/SemanticObjects/SemanticHandoffTransition.lean`.
-Theorem-facing owner/publication/delegation bridge lemmas are in `Runtime/VM/Model/SemanticObjects/SemanticHandoffLemmas.lean`.
+Semantic handoff realization lives in `Runtime/protocol machine/Model/SemanticObjects/SemanticHandoffTransition.lean`.
+Theorem-facing owner/publication/delegation bridge lemmas are in `Runtime/protocol machine/Model/SemanticObjects/SemanticHandoffLemmas.lean`.
 
-Authoritative-read commitment contexts and canonical publication-path uniqueness live in `Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublication.lean`.
-Observer-projection, blindness, and noninterference lemmas are in `Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublicationLemmas.lean`.
+Authoritative-read commitment contexts and canonical publication-path uniqueness live in `Runtime/protocol machine/Model/SemanticObjects/AuthoritativeReadsPublication.lean`.
+Observer-projection, blindness, and noninterference lemmas are in `Runtime/protocol machine/Model/SemanticObjects/AuthoritativeReadsPublicationLemmas.lean`.
 
-Proof-backed success contexts and materialization-proof adequacy live in `Runtime/VM/Model/SemanticObjects/MaterializationSuccess.lean`.
-Lemmas ruling out proof-less success and observational materialization promotion are in `Runtime/VM/Model/SemanticObjects/MaterializationSuccessLemmas.lean`.
+Proof-backed success contexts and materialization-proof adequacy live in `Runtime/protocol machine/Model/SemanticObjects/MaterializationSuccess.lean`.
+Lemmas ruling out proof-less success and observational materialization promotion are in `Runtime/protocol machine/Model/SemanticObjects/MaterializationSuccessLemmas.lean`.
 
-Progress-contract semantics live in `Runtime/VM/Model/SemanticObjects/ProgressContracts.lean`.
-Owner-liveness, escalation, and Lyapunov/weighted-measure/scheduling-bound compatibility lemmas are in `Runtime/VM/Model/SemanticObjects/ProgressContractsLemmas.lean`.
+Progress-contract semantics live in `Runtime/protocol machine/Model/SemanticObjects/ProgressContracts.lean`.
+Owner-liveness, escalation, and Lyapunov/weighted-measure/scheduling-bound compatibility lemmas are in `Runtime/protocol machine/Model/SemanticObjects/ProgressContractsLemmas.lean`.
 
-Transformation-local obligation bundles live in `Runtime/VM/Model/SemanticObjects/TransformationLocalObligations.lean`.
-Coverage/admissibility lemmas and lightweight linking/reconfiguration bridge structures are in `Runtime/VM/Model/SemanticObjects/TransformationLocalObligationsLemmas.lean`.
+Transformation-local obligation bundles live in `Runtime/protocol machine/Model/SemanticObjects/TransformationLocalObligations.lean`.
+Coverage/admissibility lemmas and lightweight linking/reconfiguration bridge structures are in `Runtime/protocol machine/Model/SemanticObjects/TransformationLocalObligationsLemmas.lean`.
 
 Theorem-pack attachment for these semantic-object proof families lives in `Runtime/Proofs/InvariantSpace.lean` via `SemanticObjectWitnessBundle`.
 The same attachment points are exposed through `Runtime/Proofs/TheoremPack/Inventory.lean`, `Runtime/Proofs/TheoremPack/API.lean`, and `Runtime/Proofs/Contracts/RuntimeContracts.lean`.
 
 ### Lean ProtocolMachineState
 
-Source: `lean/Runtime/VM/Model/State.lean`
+Source: `lean/Runtime/protocol machine/Model/State.lean`
 
 `CoroutineState` contains `id`, `programId`, `pc`, `regs`, `status`, `effectCtx`, `ownedEndpoints`, `progressTokens`, `knowledgeSet`, `costBudget`, and `specState`.
 
@@ -164,7 +164,7 @@ The Lean protocol-machine state structure (`VMState`) contains `config`, `progra
 
 Source: `rust/protocol-machine/src/vm.rs`
 
-The Rust protocol-machine structure (`ProtocolMachine`, exported as an alias for `VM`) contains `config`, `programs`, `code`, `coroutines`, `sessions`, `monitor`, `sched`, `resource_states`, `persistent`, `obs_trace`, symbol/clock counters, failure/topology state fields, and output-condition state.
+The Rust protocol-machine structure (`ProtocolMachine`, exported as an alias for `protocol machine`) contains `config`, `programs`, `code`, `coroutines`, `sessions`, `monitor`, `sched`, `resource_states`, `persistent`, `obs_trace`, symbol/clock counters, failure/topology state fields, and output-condition state.
 
 `Coroutine` in `rust/protocol-machine/src/coroutine.rs` contains identity/program/pc/status, register file, ownership/progress/knowledge sets, cost budget, speculation metadata, and effect context.
 
@@ -179,16 +179,16 @@ entrypoints remain.
 
 | Runtime Object | Lean Surface | Rust Surface | Bridge Surface | Status |
 |---|---|---|---|---|
-| protocol-machine config | `Runtime/VM/Model/Config.lean` | `telltale_protocol_machine::ProtocolMachineConfig` | `telltale_lean_bridge::ProtocolMachineRunInput` | Aligned |
-| protocol-machine state | `Runtime/VM/Model/State.lean` | `telltale_protocol_machine::ProtocolMachineState` | `telltale_lean_bridge::ProtocolMachineRunOutput` | Aligned |
-| protocol-machine executor | `Runtime/VM/API.lean`, `Runtime/VM/Runtime/Runner.lean` | `telltale_protocol_machine::ProtocolMachine` | `telltale_lean_bridge::ProtocolMachineRunner` | Aligned |
-| protocol-machine step result | `Runtime/VM/Model/ExecResult.lean` | `telltale_protocol_machine::ProtocolMachineStepResult` | `telltale_lean_bridge::ProtocolMachineStepState` | Aligned |
-| protocol-machine run status | `Runtime/VM/Model/ExecResult.lean` | `telltale_protocol_machine::ProtocolMachineRunStatus` | `telltale_lean_bridge::ProtocolMachineRunOutput.status` | Aligned |
-| protocol-machine error surface | `Runtime/VM/Model/State.lean`, `Runtime/VM/Runtime/Json.lean` | `telltale_protocol_machine::ProtocolMachineError` | `telltale_lean_bridge::LeanStructuredError` | Aligned |
-| protocol-machine memory accounting | `Runtime/VM/Model/State.lean` | `telltale_protocol_machine::ProtocolMachineMemoryUsage`, `telltale_protocol_machine::ProtocolMachineRetainedBytes` | n/a | Aligned |
-| guest runtime driver | `Runtime/VM/API.lean` | `telltale_protocol_machine::GuestRuntime`, `telltale_protocol_machine::ThreadedGuestRuntime` | n/a | Aligned |
-| threaded protocol-machine adapter | `Runtime/VM/API.lean`, `Runtime/VM/Composition.lean` | `telltale_protocol_machine::ThreadedProtocolMachine` | parity tests under `rust/lean-bridge/tests/protocol_machine_cross_target_tests.rs` | Aligned |
-| semantic-object inventory | `Runtime/VM/Model/SemanticObjects/*.lean` | `telltale_protocol_machine::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, ProgressContract, ProgressTransition}` | `telltale_lean_bridge::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, ProgressContract, ProgressTransition}` | Aligned |
+| protocol-machine config | `Runtime/protocol machine/Model/Config.lean` | `telltale_protocol_machine::ProtocolMachineConfig` | `telltale_lean_bridge::ProtocolMachineRunInput` | Aligned |
+| protocol-machine state | `Runtime/protocol machine/Model/State.lean` | `telltale_protocol_machine::ProtocolMachineState` | `telltale_lean_bridge::ProtocolMachineRunOutput` | Aligned |
+| protocol-machine executor | `Runtime/protocol machine/API.lean`, `Runtime/protocol machine/Runtime/Runner.lean` | `telltale_protocol_machine::ProtocolMachine` | `telltale_lean_bridge::ProtocolMachineRunner` | Aligned |
+| protocol-machine step result | `Runtime/protocol machine/Model/ExecResult.lean` | `telltale_protocol_machine::ProtocolMachineStepResult` | `telltale_lean_bridge::ProtocolMachineStepState` | Aligned |
+| protocol-machine run status | `Runtime/protocol machine/Model/ExecResult.lean` | `telltale_protocol_machine::ProtocolMachineRunStatus` | `telltale_lean_bridge::ProtocolMachineRunOutput.status` | Aligned |
+| protocol-machine error surface | `Runtime/protocol machine/Model/State.lean`, `Runtime/protocol machine/Runtime/Json.lean` | `telltale_protocol_machine::ProtocolMachineError` | `telltale_lean_bridge::LeanStructuredError` | Aligned |
+| protocol-machine memory accounting | `Runtime/protocol machine/Model/State.lean` | `telltale_protocol_machine::ProtocolMachineMemoryUsage`, `telltale_protocol_machine::ProtocolMachineRetainedBytes` | n/a | Aligned |
+| guest runtime driver | `Runtime/protocol machine/API.lean` | `telltale_protocol_machine::GuestRuntime`, `telltale_protocol_machine::ThreadedGuestRuntime` | n/a | Aligned |
+| threaded protocol-machine adapter | `Runtime/protocol machine/API.lean`, `Runtime/protocol machine/Composition.lean` | `telltale_protocol_machine::ThreadedProtocolMachine` | parity tests under `rust/lean-bridge/tests/protocol_machine_cross_target_tests.rs` | Aligned |
+| semantic-object inventory | `Runtime/protocol machine/Model/SemanticObjects/*.lean` | `telltale_protocol_machine::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, ProgressContract, ProgressTransition}` | `telltale_lean_bridge::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, ProgressContract, ProgressTransition}` | Aligned |
 | runtime admission contracts | `Runtime/Proofs/Contracts/RuntimeContracts.lean` | `telltale_protocol_machine::{requires_protocol_machine_runtime_contracts, admit_protocol_machine_runtime, enforce_protocol_machine_runtime_gates, request_determinism_profile, runtime_capability_snapshot}` | n/a | Aligned |
 
 ## Runtime Capability Gates
@@ -222,7 +222,7 @@ On the Lean side, `TheoremPackCapabilityContract.semanticAttachmentPoints` provi
 | Regime | Lean Surface | Rust Surface | Status |
 |---|---|---|---|
 | `n = 1` exact refinement | `runScheduledThreaded_one_eq_runScheduled` | `threaded_equivalence.rs::test_threaded_matches_cooperative` | Aligned |
-| Spawn step parity (`n = 1`) | `Runtime/VM/Semantics/ExecControl.lean`, `Runtime/VM/Semantics/ExecSteps.lean` | `differential_step_corpus.rs::threaded_matches_cooperative_step_corpus_control_spawn` | Aligned |
+| Spawn step parity (`n = 1`) | `Runtime/protocol machine/Semantics/ExecControl.lean`, `Runtime/protocol machine/Semantics/ExecSteps.lean` | `differential_step_corpus.rs::threaded_matches_cooperative_step_corpus_control_spawn` | Aligned |
 | Certified-wave fallback | `executeCertifiedRound` | `threaded.rs` wave certificate check with one-step fallback | Aligned |
 | `n > 1` envelope-bounded parity | `ThreadedRoundRefinementPremises` (premise-scoped) | `parity_fixtures_v2.rs::envelope_bounded_parity_holds_for_n_gt_1` | Aligned under envelope contract |
 
@@ -237,11 +237,11 @@ Parity fixtures are enforced by:
 
 ## Lean Module Boundaries
 
-The `lean/Runtime/VM` directory is organized into executable and proof modules.
+The `lean/Runtime/protocol machine` directory is organized into executable and proof modules.
 
-The `Runtime/VM/Model/` directory contains runtime data types, config, state, instruction forms, and event surfaces. The `Runtime/VM/Semantics/` directory contains executable step semantics. The `Runtime/VM/Runtime/` directory contains runtime adapters for loading, JSON, monitoring, and failure ingress.
+The `Runtime/protocol machine/Model/` directory contains runtime data types, config, state, instruction forms, and event surfaces. The `Runtime/protocol machine/Semantics/` directory contains executable step semantics. The `Runtime/protocol machine/Runtime/` directory contains runtime adapters for loading, JSON, monitoring, and failure ingress.
 
-The `Runtime/VM/API.lean` file provides the stable facade for executable protocol-machine API imports. The `Runtime/VM/Composition.lean` file contains composition/admission and theorem-pack integration surfaces. The `Runtime/Proofs/` directory contains proof/theorem-pack modules not required for core executable stepping.
+The `Runtime/protocol machine/API.lean` file provides the stable facade for executable protocol-machine API imports. The `Runtime/protocol machine/Composition.lean` file contains composition/admission and theorem-pack integration surfaces. The `Runtime/Proofs/` directory contains proof/theorem-pack modules not required for core executable stepping.
 
 Executable modules must not depend on placeholder proof definitions. Proof-only placeholders stay isolated under proof modules. Any executable-path dependency on a stub or placeholder is a release blocker.
 
@@ -277,7 +277,7 @@ Resolved deviations move to history after one stable release cycle with no regre
 
 #### threaded-round-extension
 
-**Lean:** `Runtime/VM/Runtime/Runner.lean`
+**Lean:** `Runtime/protocol machine/Runtime/Runner.lean`
 **Rust:** `rust/protocol-machine/src/threaded.rs`
 
 **Resolution:** VMConfig exposes `threaded_round_semantics` and defaults to canonical one-step semantics aligned with Lean.
@@ -286,7 +286,7 @@ Resolved deviations move to history after one stable release cycle with no regre
 
 #### payload-hardening-extension
 
-**Lean:** `lean/Runtime/VM/Model/Config.lean`, `lean/Runtime/VM/Semantics/ExecComm.lean`
+**Lean:** `lean/Runtime/protocol machine/Model/Config.lean`, `lean/Runtime/protocol machine/Semantics/ExecComm.lean`
 **Rust:** `rust/protocol-machine/src/vm.rs`, `rust/protocol-machine/src/threaded.rs`, `rust/protocol-machine/tests/parity_fixtures_v2.rs`
 
 **Resolution:** Lean and Rust both expose executable payload-size admission controls. Lean now emits strict-schema annotation rejection on annotationless single-branch send/receive shapes. Parity fixtures cover oversized payload rejection behavior at canonical concurrency.
@@ -295,7 +295,7 @@ Resolved deviations move to history after one stable release cycle with no regre
 
 #### comm-replay-label-context
 
-**Lean:** `Runtime/VM/Semantics/ExecComm.lean`, `Runtime/VM/Model/State.lean`
+**Lean:** `Runtime/protocol machine/Semantics/ExecComm.lean`, `Runtime/protocol machine/Model/State.lean`
 **Rust:** `rust/protocol-machine/src/vm/instruction_effects.rs`, `rust/protocol-machine/src/threaded/instructions_send_recv.rs`, `rust/protocol-machine/src/communication_replay/identity.rs`
 
 **Resolution:** Rust receive replay identity now canonicalizes to typed-context replay labels (`recv:<ValType>`) when expected payload annotations are present, matching Lean receive identity construction.
@@ -399,7 +399,7 @@ Rust protocol-machine code uses one canonical snake_case naming surface. Lean-sp
 
 ## Related Docs
 
-- [Protocol Machine Architecture](12_vm_architecture.md)
+- [Protocol Machine Architecture](12_protocol_machine_architecture.md)
 - [Protocol-Machine Bytecode Instructions](13_bytecode_instructions.md)
 - [Lean Verification](23_lean_verification.md)
 - [Capability and Admission](25_capability_admission.md)

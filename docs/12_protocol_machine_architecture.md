@@ -1,10 +1,10 @@
 # Protocol Machine Architecture
 
-This document defines the protocol-machine architecture, scheduling semantics, and concurrency envelope. These surfaces are used by Rust runtime targets and Lean conformance surfaces. The file keeps the historical `VM` filename only because the current crate/module paths still use it. The canonical public abstraction is the protocol machine.
+This document defines the protocol-machine architecture, scheduling semantics, and concurrency envelope. These surfaces are used by Rust runtime targets and Lean conformance surfaces. The file keeps the historical `protocol machine` filename only because the current crate/module paths still use it. The canonical public abstraction is the protocol machine.
 
 ## Architecture Overview
 
-The canonical semantic authority is `VMKernel`. The cooperative `ProtocolMachine` (currently implemented by `VM`) and threaded `ThreadedGuestRuntime` (currently implemented by `NativeThreadedDriver` wrapping `ThreadedVM`) are the guest-runtime execution surfaces that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
+The canonical semantic authority is `VMKernel`. The cooperative `ProtocolMachine` (currently implemented by `protocol machine`) and threaded `ThreadedGuestRuntime` (currently implemented by `NativeThreadedDriver` wrapping `ThreadedVM`) are the guest-runtime execution surfaces that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
 
 The runtime keeps a single state model across targets. Core state includes coroutines, sessions, scheduler queues, observable trace, and effect trace. It also includes live operation-instance state, live outstanding-effect state, delegation audit records, and failure-topology snapshot fields.
 The canonical exported semantic surface is the semantic-object family:
@@ -19,7 +19,7 @@ The canonical round model is one semantic step when concurrency is nonzero. Thre
 
 | Engine | Role | Contract Surface |
 |---|---|---|
-| `ProtocolMachine` (`VM`) | Canonical cooperative protocol machine | Exact reference for parity at concurrency `1` |
+| `ProtocolMachine` (`protocol machine`) | Canonical cooperative protocol machine | Exact reference for parity at concurrency `1` |
 | `ThreadedGuestRuntime` (`NativeThreadedDriver`) | Parallel wave executor | Certified-wave execution with fallback to canonical one-step |
 | WASM guest runtime | Single-thread deployment | Cooperative schedule only |
 
@@ -27,7 +27,7 @@ The canonical round model is one semantic step when concurrency is nonzero. Thre
 
 Canonical scheduling is one semantic step when concurrency is nonzero. `VMKernel` owns the selection and step contract. For cooperative execution, this gives exact behavior for deterministic replay and baseline parity.
 
-The canonical Lean runner is `runScheduled` in `Runtime/VM/Runtime/Runner.lean`. For nonzero concurrency, canonical round semantics normalize to one scheduler step. This model is the semantic reference for parity at concurrency `1`.
+The canonical Lean runner is `runScheduled` in `Runtime/protocol machine/Runtime/Runner.lean`. For nonzero concurrency, canonical round semantics normalize to one scheduler step. This model is the semantic reference for parity at concurrency `1`.
 
 ## Scheduler Policies
 
@@ -44,7 +44,7 @@ Scheduler policy controls selection order. Policy does not change instruction se
 
 Threaded execution selects compatible picks per wave. Compatibility is lane-disjoint, session-disjoint, and footprint-disjoint for picks in the same wave.
 
-The threaded extension is defined in `Runtime/VM/Runtime/ThreadedRunner.lean`. Concurrency `n = 1` is theorem-equal to canonical execution. For `n > 1`, execution is admitted through certified waves. Invalid certificates degrade to canonical one-step behavior.
+The threaded extension is defined in `Runtime/protocol machine/Runtime/ThreadedRunner.lean`. Concurrency `n = 1` is theorem-equal to canonical execution. For `n > 1`, execution is admitted through certified waves. Invalid certificates degrade to canonical one-step behavior.
 
 Each wave is checked against a `WaveCertificate`. If certificate validation fails, the runtime degrades to canonical one-step behavior for that round.
 
@@ -244,7 +244,7 @@ Replay outcomes:
 | Canonical round normalization | `Runtime/Proofs/Concurrency.lean` | Proved |
 | Threaded equality at `n = 1` | `sched_round_threaded_one_eq_sched_round_one`, `run_scheduled_threaded_one_eq_run_scheduled` | Proved |
 | Per-session trace equality at `n = 1` | `per_session_trace_threaded_one_eq_canonical` | Proved |
-| Scheduler theorem exports | `Runtime/Proofs/VM/Scheduler.lean` | Proved |
+| Scheduler theorem exports | `Runtime/Proofs/protocol machine/Scheduler.lean` | Proved |
 
 ## Premise-Scoped Interface Surfaces
 
@@ -266,7 +266,7 @@ Release conformance surfaces are exported through theorem-pack APIs and enforced
 
 - [Protocol-Machine Bytecode Instructions](13_bytecode_instructions.md)
 - [Session Lifecycle](14_session_lifecycle.md)
-- [Protocol-Machine Simulation](15_vm_simulation_overview.md)
+- [Protocol-Machine Simulation](15_protocol_machine_simulation_overview.md)
 - [Rust-Lean Parity](19_rust_lean_parity.md)
 - [Effect Handlers and Session Types](11_effect_session_bridge.md)
 - [Lean Verification](23_lean_verification.md)

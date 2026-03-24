@@ -245,7 +245,7 @@ First-class combinators (`handshake`, `retry`, `quorum_collect`) and typed metad
 
 #### Validation and Submodules
 
-Validation includes bundle and capability checks. It rejects duplicate bundle declarations, missing required bundles, and missing capability coverage for VM-core statements. See [Choreographic DSL](06_choreographic_dsl.md) for syntax details.
+Validation includes bundle and capability checks. It rejects duplicate bundle declarations, missing required bundles, and missing capability coverage for protocol machine-core statements. See [Choreographic DSL](06_choreographic_dsl.md) for syntax details.
 
 The `effects/` directory contains the effect system and handlers. The `extensions/` directory contains the DSL extension system. The `runtime/` directory contains platform abstraction.
 

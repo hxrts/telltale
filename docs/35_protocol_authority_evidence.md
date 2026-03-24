@@ -106,4 +106,4 @@ observational correctness story.
 - [Protocol-Critical Authority Scope](33_protocol_authority_scope.md)
 - [Authority Language Surface](34_authority_language_surface.md)
 - [Effect Handlers and Session Types](11_effect_session_bridge.md)
-- [Protocol Machine Architecture](12_vm_architecture.md)
+- [Protocol Machine Architecture](12_protocol_machine_architecture.md)

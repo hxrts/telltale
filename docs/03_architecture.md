@@ -44,7 +44,7 @@ graph TB
 
     subgraph Layer5["Layer 5: Protocol Machine + Simulation"]
         VMCompiler["Protocol-Machine Compiler<br/>(LocalTypeR → Bytecode)"]
-        VM["Protocol Machine"]
+        protocol machine["Protocol Machine"]
         Scheduler["Scheduler<br/>(Policy-Based)"]
         Sessions["Session Store"]
         Buffers["Bounded Buffers"]
@@ -63,11 +63,11 @@ graph TB
     Handler --> Transport
     Transport --> Exec
     LT --> VMCompiler
-    VMCompiler --> VM
-    VM --> Scheduler
+    VMCompiler --> protocol machine
+    protocol machine --> Scheduler
     Scheduler --> Sessions
     Sessions --> Buffers
-    Middleware --> VM
+    Middleware --> protocol machine
 ```
 
 This diagram summarizes the compile time flow from DSL input to runtime execution. It also highlights the boundary between compilation, the guest runtime, and host-runtime effect handling.
@@ -289,7 +289,7 @@ The protocol machine maintains session state with bounded message buffers. Each 
 
 At the embedding boundary, the protocol machine distinguishes current host ownership from protocol typing and capability admission. Production host integrations use `load_choreography_owned(...)` and `OwnedSession` for explicit session-local authority after open. Guest runtimes embed the protocol machine inside a host runtime with explicit external handlers.
 
-Delegation and reconfiguration paths emit explicit receipts and audit records. See [Protocol Machine Architecture](12_vm_architecture.md) for details on the underlying bytecode protocol-machine architecture.
+Delegation and reconfiguration paths emit explicit receipts and audit records. See [Protocol Machine Architecture](12_protocol_machine_architecture.md) for details on the underlying bytecode protocol-machine architecture.
 
 ## Data Flow
 
