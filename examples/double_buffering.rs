@@ -4,56 +4,31 @@
 #![allow(missing_docs)]
 
 use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
     executor::{self, ThreadPool},
     try_join, FutureExt,
 };
 use std::{error::Error, future::Future, marker, result};
-use telltale::{
-    channel::{Bidirectional, Nil},
-    session, try_session, End, Message, Receive, Role, Roles, Send,
-};
+use telltale::try_session;
+use telltale_macros::choreography;
 
 type Result<T> = result::Result<T, Box<dyn Error + marker::Send + Sync>>;
 
-type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
-
-#[derive(Roles)]
-struct Roles(S, K, T);
-
-#[derive(Role)]
-#[message(Label)]
-struct S(#[route(K)] Channel, #[route(T)] Nil);
-
-#[derive(Role)]
-#[message(Label)]
-struct K(#[route(S)] Channel, #[route(T)] Channel);
-
-#[derive(Role)]
-#[message(Label)]
-struct T(#[route(S)] Nil, #[route(K)] Channel);
-
-#[derive(Message)]
-enum Label {
-    Ready(Ready),
-    Copy(Copy),
+choreography! {
+    protocol DoubleBuffering {
+        roles S, K, T;
+        K -> S: Ready;
+        S -> K: Copy(i32);
+        T -> K: Ready;
+        K -> T: Copy(i32);
+        K -> S: Ready;
+        S -> K: Copy(i32);
+        T -> K: Ready;
+        K -> T: Copy(i32);
+    }
 }
 
-struct Ready;
-struct Copy(i32);
-
-#[session]
-type Source = Receive<K, Ready, Send<K, Copy, Receive<K, Ready, Send<K, Copy, End>>>>;
-
-#[session]
-#[rustfmt::skip]
-type Kernel = Send<S, Ready, Receive<S, Copy, Receive<T, Ready, Send<T, Copy, Send<S, Ready, Receive<S, Copy, Receive<T, Ready, Send<T, Copy, End>>>>>>>>;
-
-#[session]
-type Sink = Send<K, Ready, Receive<K, Copy, Send<K, Ready, Receive<K, Copy, End>>>>;
-
 async fn source(role: &mut S, input: (i32, i32)) -> Result<()> {
-    try_session(role, |s: Source<'_, _>| async {
+    try_session(role, |s: SSession<'_, _>| async {
         let (Ready, s) = s.receive().await?;
         let s = s.send(Copy(input.0)).await?;
 
@@ -66,7 +41,7 @@ async fn source(role: &mut S, input: (i32, i32)) -> Result<()> {
 }
 
 async fn kernel(role: &mut K) -> Result<()> {
-    try_session(role, |s: Kernel<'_, _>| async {
+    try_session(role, |s: KSession<'_, _>| async {
         let s = s.send(Ready).await?;
         let (Copy(x), s) = s.receive().await?;
         let (Ready, s) = s.receive().await?;
@@ -83,7 +58,7 @@ async fn kernel(role: &mut K) -> Result<()> {
 }
 
 async fn sink(role: &mut T) -> Result<(i32, i32)> {
-    try_session(role, |s: Sink<'_, _>| async {
+    try_session(role, |s: TSession<'_, _>| async {
         let s = s.send(Ready).await?;
         let (Copy(x), s) = s.receive().await?;
 

@@ -1,4 +1,12 @@
-//! Adder example demonstrating session types with arithmetic operations.
+//! Recursive adder protocol between a client and server.
+//!
+//! The client sends an initial value, then repeatedly chooses to either add
+//! another pair of numbers (receiving back the running sum) or say goodbye.
+//! The recursive `Select`/`Branch` loop (Add -> Add -> Sum -> choose again)
+//! encodes an unbounded number of additions terminated by a `Bye` exit.
+//!
+//! Uses the manual session type API because the protocol's recursive choice
+//! loop cannot be expressed with the `choreography!` macro.
 #![allow(clippy::type_complexity)]
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]

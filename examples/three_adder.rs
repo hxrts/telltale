@@ -1,56 +1,29 @@
-//! Three-party adder example with session types.
+//! Three-party adder: A and B each contribute a number, C computes the sum.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
 
-use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    executor, try_join,
-};
+use futures::{executor, try_join};
 use std::{error::Error, result};
-use telltale::{
-    channel::Bidirectional, session, try_session, End, Message, Receive, Role, Roles, Send,
-};
+use telltale::try_session;
+use telltale_macros::choreography;
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
-type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
-
-#[derive(Roles)]
-struct Roles(A, B, C);
-
-#[derive(Role)]
-#[message(Label)]
-struct A(#[route(B)] Channel, #[route(C)] Channel);
-
-#[derive(Role)]
-#[message(Label)]
-struct B(#[route(A)] Channel, #[route(C)] Channel);
-
-#[derive(Role)]
-#[message(Label)]
-struct C(#[route(A)] Channel, #[route(B)] Channel);
-
-#[derive(Message)]
-enum Label {
-    Add(Add),
-    Sum(Sum),
+choreography! {
+    protocol Adder {
+        roles A, B, C;
+        A -> B: Add(i32);
+        B -> A: Add(i32);
+        A -> C: Add(i32);
+        B -> C: Add(i32);
+        C -> A: Sum(i32);
+        C -> B: Sum(i32);
+    }
 }
 
-struct Add(i32);
-struct Sum(i32);
-
-#[session]
-type AdderA = Send<B, Add, Receive<B, Add, Send<C, Add, Receive<C, Sum, End>>>>;
-
-#[session]
-type AdderB = Receive<A, Add, Send<A, Add, Send<C, Add, Receive<C, Sum, End>>>>;
-
-#[session]
-type AdderC = Receive<A, Add, Receive<B, Add, Send<A, Sum, Send<B, Sum, End>>>>;
-
 async fn adder_a(role: &mut A) -> Result<()> {
-    try_session(role, |s: AdderA<'_, _>| async {
+    try_session(role, |s: ASession<'_, _>| async {
         let x = 2;
         let s = s.send(Add(x)).await?;
         let (Add(y), s) = s.receive().await?;
@@ -64,7 +37,7 @@ async fn adder_a(role: &mut A) -> Result<()> {
 }
 
 async fn adder_b(role: &mut B) -> Result<()> {
-    try_session(role, |s: AdderB<'_, _>| async {
+    try_session(role, |s: BSession<'_, _>| async {
         let (Add(y), s) = s.receive().await?;
         let x = 3;
         let s = s.send(Add(x)).await?;
@@ -78,7 +51,7 @@ async fn adder_b(role: &mut B) -> Result<()> {
 }
 
 async fn adder_c(role: &mut C) -> Result<()> {
-    try_session(role, |s: AdderC<'_, _>| async {
+    try_session(role, |s: CSession<'_, _>| async {
         let (Add(x), s) = s.receive().await?;
         let (Add(y), s) = s.receive().await?;
         let z = x + y;

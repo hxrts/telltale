@@ -4,23 +4,23 @@ This document points to the example programs and common usage patterns. Each exa
 
 ## Example Index
 
-All examples compile against the workspace. They use the `choreography!` macro or the effect builder API depending on the pattern.
+All examples compile against the workspace. Simple linear protocols use the `choreography!` macro. Protocols with recursion, branching, or infinite types use the manual session type API.
 
 Top level examples in `examples/`:
 
-- `adder.rs` for a simple two-party request response protocol
-- `alternating_bit.rs` for a reliable message delivery pattern with acknowledgment loops
-- `async_subtyping.rs` for async-subtyping checks and subtype relation examples
-- `bounded_recursion.rs` for bounded recursion strategies with configurable depth
-- `client_server_log.rs` for logging in a client server protocol with a third observer role
-- `ring.rs` and `ring_choice.rs` for ring topologies and branching across multiple roles
-- `three_adder.rs` for a three-party aggregation flow with intermediate accumulation
-- `double_buffering.rs` and `elevator.rs` for multi step coordination across turns
-- `fft.rs` for distributed computation with parallel decomposition
-- `oauth.rs` for a multi role authentication flow with token exchange
-- `wasm-ping-pong/` for browser builds using `wasm-pack`
-
-Advanced examples live under `examples/advanced_features/`. These cover annotation and namespace features. Protocol snapshots under `examples/running_examples/` are source and reference material only. They include `.nuscr` protocol files with corresponding Rust implementations and expected outputs.
+- `three_adder.rs` — three-party sum via `choreography!` macro
+- `ring.rs` — three-node ring topology via `choreography!` macro
+- `double_buffering.rs` — producer-consumer coordination via `choreography!` macro
+- `adder.rs` — recursive two-party adder with Add loop and Bye exit (manual API)
+- `alternating_bit.rs` — reliable delivery with ACK branching (manual API)
+- `oauth.rs` — three-party authentication with nested choices (manual API)
+- `ring_choice.rs` — ring with per-hop branching and infinite types (manual API)
+- `client_server_log.rs` — three-party protocol with infinite logging loop (manual API)
+- `elevator.rs` — three-role infinite state machine (manual API)
+- `fft.rs` — eight-role FFT butterfly network (manual API)
+- `async_subtyping.rs` — async-subtyping checks and subtype relation examples
+- `bounded_recursion.rs` — bounded recursion strategies with configurable depth
+- `wasm-ping-pong/` — browser builds using `wasm-pack`
 
 ## Common Patterns
 

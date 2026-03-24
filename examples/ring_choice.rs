@@ -1,4 +1,14 @@
-//! Ring Protocol with Choices - Demonstrates Infinite Recursive Session Types.
+//! Ring protocol with per-hop choices and infinite recursive session types.
+//!
+//! Three roles (A, B, C) form a ring where each participant forwards a value
+//! to the next, choosing Continue or Done at every hop. The session types are
+//! structurally infinite -- `RingA` recurses back to `RingA` with no `End`
+//! state in the type definition -- so execution is bounded at runtime by a
+//! configurable `MAX_ROUNDS` limit.
+//!
+//! Uses the manual session type API because the protocol's infinite recursive
+//! types and per-hop branching cannot be expressed with the `choreography!`
+//! macro.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]

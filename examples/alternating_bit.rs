@@ -1,4 +1,16 @@
 //! Alternating bit protocol example using telltale session types.
+//!
+//! This example uses the manual `#[session]`/`#[derive(Role)]`/`#[derive(Message)]` API
+//! rather than the `choreography!` macro because the protocol is fundamentally built
+//! around branching (`Branch`/choice types at every step). The `choreography!` macro
+//! only supports linear Send/Receive chains and cannot express the alternating
+//! ack/retransmit logic that defines this protocol.
+//!
+//! Protocol overview:
+//!   - Sender transmits data frames tagged with alternating bits (D0, D1).
+//!   - Receiver acknowledges with the matching bit (A0, A1).
+//!   - On mismatched ack, the sender retransmits.
+//!   - On matched ack, the sender advances to the next frame.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
@@ -16,6 +28,8 @@ type Result<T> = result::Result<T, Box<dyn Error>>;
 
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
+// --- Roles ---
+
 #[derive(Roles)]
 struct Roles(S, R);
 
@@ -26,6 +40,8 @@ struct S(#[route(R)] Channel);
 #[derive(Role)]
 #[message(Label)]
 struct R(#[route(S)] Channel);
+
+// --- Messages ---
 
 #[derive(Message)]
 enum Label {
@@ -39,6 +55,8 @@ struct A0;
 struct A1;
 struct D0(i32);
 struct D1(i32);
+
+// --- Session types (manual: branching required) ---
 
 #[session]
 type Sender = Send<R, D0, Branch<R, SenderChoice0>>;
@@ -69,6 +87,8 @@ enum ReceiverChoice1 {
     D0(D0, Send<S, A0, Branch<S, ReceiverChoice1>>),
     D1(D1, Send<S, A1, End>),
 }
+
+// --- Protocol implementation ---
 
 async fn sender(role: &mut S, input: (i32, i32)) -> Result<()> {
     try_session(role, |mut s: Sender<'_, _>| async {

@@ -1,4 +1,12 @@
-//! Elevator example demonstrating state machine session types.
+//! Elevator controller modeled as an infinite session-typed state machine.
+//!
+//! Three roles -- User, Door, and Elevator -- coordinate open/close/stop
+//! commands through mutually recursive session types with no terminal state.
+//! The user continuously selects OpenDoor or CloseDoor; the door and elevator
+//! respond with physical-state transitions (DoorOpened, DoorClosed, etc.).
+//!
+//! Uses the manual session type API because the protocol's infinite mutually
+//! recursive state machine cannot be expressed with the `choreography!` macro.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(clippy::disallowed_methods)] // Example-only randomized timing is intentionally nondeterministic.

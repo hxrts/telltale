@@ -1,4 +1,13 @@
-//! Fast Fourier Transform example using telltale session types.
+//! Eight-role radix-2 FFT butterfly network as a multiparty session type.
+//!
+//! Eight participants (P0..P7) each hold one complex input value and exchange
+//! data through the three butterfly stages of an 8-point FFT. The communication
+//! topology follows the standard Cooley-Tukey bit-reversal pattern, with each
+//! stage pairing roles at increasing stride distances.
+//!
+//! Uses the manual session type API because the eight-role butterfly topology
+//! and its non-uniform pairwise communication pattern cannot be expressed with
+//! the `choreography!` macro.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]

@@ -1,4 +1,8 @@
 //! OAuth example demonstrating authentication session types.
+//!
+//! This example uses the manual session type API (`#[session]`, `#[derive(Role)]`,
+//! `#[derive(Message)]`) because the protocol requires nested branching (`choice at S`
+//! and `choice at A`) which the `choreography!` macro does not yet support.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
@@ -33,15 +37,18 @@ use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     executor, try_join,
 };
+use std::error::Error;
 #[allow(unused_imports)]
 use telltale::{
     channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
     Select, Send,
 };
 
-use std::error::Error;
-
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
+
+// ---------------------------------------------------------------------------
+// Roles
+// ---------------------------------------------------------------------------
 
 #[derive(Roles)]
 #[allow(dead_code)]
@@ -78,6 +85,10 @@ struct A {
     s: Channel,
 }
 
+// ---------------------------------------------------------------------------
+// Messages
+// ---------------------------------------------------------------------------
+
 #[derive(Message)]
 enum Label {
     Login(Login),
@@ -89,17 +100,17 @@ enum Label {
 }
 
 struct Login(i32);
-
 struct Cancel(i32);
-
 struct Password(i32);
-
 struct Again(i32);
-
 struct Auth(i32);
 
 #[allow(dead_code)]
 struct Quit(i32);
+
+// ---------------------------------------------------------------------------
+// Session types — Client (C)
+// ---------------------------------------------------------------------------
 
 #[session]
 type ProtoC = Branch<S, ProtoC0>;
@@ -115,6 +126,10 @@ enum ProtoC3 {
     Auth(Auth, End),
     Again(Again, End),
 }
+
+// ---------------------------------------------------------------------------
+// Session types — Server (S)
+// ---------------------------------------------------------------------------
 
 #[session]
 type ProtoS = Select<C, ProtoS0>;
@@ -132,6 +147,10 @@ enum ProtoS2 {
     Auth(Auth, Send<C, Auth, End>),
 }
 
+// ---------------------------------------------------------------------------
+// Session types — Authenticator (A)
+// ---------------------------------------------------------------------------
+
 #[session]
 type ProtoA = Branch<C, ProtoA0>;
 
@@ -146,6 +165,10 @@ enum ProtoA4 {
     Again(Again, End),
     Auth(Auth, End),
 }
+
+// ---------------------------------------------------------------------------
+// Endpoint implementations
+// ---------------------------------------------------------------------------
 
 async fn client(role: &mut C) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: ProtoC<'_, _>| async {
@@ -196,7 +219,7 @@ async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
         // Change here for something != 10, so that authentication fails.
         let i: i32 = 10;
 
-        // For the sake of the example, let assume that we never Cancel
+        // For the sake of the example, assume that we never Cancel.
         let continuation = s.select(Login(i)).await?;
         match continuation.branch().await? {
             ProtoS2::Auth(Auth(i), cont) => {
@@ -211,6 +234,10 @@ async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
     })
     .await
 }
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
 
 fn main() {
     let mut roles = Roles::default();

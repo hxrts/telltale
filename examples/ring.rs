@@ -3,45 +3,25 @@
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
 
-use futures::{channel::mpsc, executor, try_join};
+use futures::{executor, try_join};
 use std::{error::Error, result};
-use telltale::{session, try_session, End, Message, Receive, Role, Roles, Send};
+use telltale::try_session;
+use telltale_macros::choreography;
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
-type Sender = mpsc::UnboundedSender<Value>;
-type Receiver = mpsc::UnboundedReceiver<Value>;
-
-#[derive(Roles)]
-struct Roles(A, B, C);
-
-#[derive(Role)]
-#[message(Value)]
-struct A(#[route(B)] Sender, #[route(C)] Receiver);
-
-#[derive(Role)]
-#[message(Value)]
-struct B(#[route(A)] Receiver, #[route(C)] Sender);
-
-#[derive(Role)]
-#[message(Value)]
-struct C(#[route(A)] Sender, #[route(B)] Receiver);
-
-#[derive(Message)]
-struct Value(i32);
-
-#[session]
-type RingA = Send<B, Value, Receive<C, Value, End>>;
-
-#[session]
-type RingB = Receive<A, Value, Send<C, Value, End>>;
-
-#[session]
-type RingC = Receive<B, Value, Send<A, Value, End>>;
+choreography! {
+    protocol Ring {
+        roles A, B, C;
+        A -> B: Value(i32);
+        B -> C: Value(i32);
+        C -> A: Value(i32);
+    }
+}
 
 async fn ring_a(role: &mut A, input: i32) -> Result<i32> {
     let x = input;
-    try_session(role, |s: RingA<'_, _>| async {
+    try_session(role, |s: ASession<'_, _>| async {
         let s = s.send(Value(x)).await?;
         let (Value(y), s) = s.receive().await?;
         Ok((x + y, s))
@@ -51,7 +31,7 @@ async fn ring_a(role: &mut A, input: i32) -> Result<i32> {
 
 async fn ring_b(role: &mut B, input: i32) -> Result<i32> {
     let x = input;
-    try_session(role, |s: RingB<'_, _>| async {
+    try_session(role, |s: BSession<'_, _>| async {
         let (Value(y), s) = s.receive().await?;
         let s = s.send(Value(x)).await?;
         Ok((x + y, s))
@@ -61,7 +41,7 @@ async fn ring_b(role: &mut B, input: i32) -> Result<i32> {
 
 async fn ring_c(role: &mut C, input: i32) -> Result<i32> {
     let x = input;
-    try_session(role, |s: RingC<'_, _>| async {
+    try_session(role, |s: CSession<'_, _>| async {
         let (Value(y), s) = s.receive().await?;
         let s = s.send(Value(x)).await?;
         Ok((x + y, s))

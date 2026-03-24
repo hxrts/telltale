@@ -1,4 +1,13 @@
-//! Client-server logging example using telltale session types.
+//! Client-server protocol with an infinite logging side-channel.
+//!
+//! A client sends a request and data to a server, which replies with OK, KO,
+//! or Fault. On success the server enters an infinite loop, forwarding log
+//! entries to a dedicated logger role. The structurally infinite `Log -> Log`
+//! cycle means the server's local type has no `End` state.
+//!
+//! Uses the manual session type API because the protocol's infinite recursive
+//! logging loop and three-way branching cannot be expressed with the
+//! `choreography!` macro.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
