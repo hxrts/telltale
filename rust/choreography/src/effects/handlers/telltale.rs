@@ -1,17 +1,10 @@
-// Telltale session-typed effect handler
+// Telltale session-typed effect handler.
 //
-// This handler provides a unified abstraction over bidirectional channels
-// and dynamically dispatched session objects. Users can keep using the
-// legacy SimpleChannel transport or register custom session interpreters
-// through the TelltaleSession wrapper.
-//
-// Key pieces:
-// - SimpleChannel: thin wrapper around telltale bidirectional channels.
-// - SessionTypeDynamic: async trait (object safe via BoxFuture) that lets any
-//   session state expose send/recv/choose/offer operations.
-// - TelltaleSession: boxed dynamic session with metadata integration.
-// - TelltaleEndpoint: tracks per-peer channels/sessions plus metadata.
-// - TelltaleHandler: implements ChoreoHandler over either transport.
+// This handler uses one canonical session boundary:
+// - SessionTypeDynamic: object-safe async session interface
+// - TelltaleSession: boxed dynamic session wrapper
+// - TelltaleEndpoint: per-peer session registry plus metadata
+// - TelltaleHandler: ChoreoHandler over registered TelltaleSession values
 
 use async_trait::async_trait;
 use cfg_if::cfg_if;
@@ -24,16 +17,11 @@ use telltale::{Message, Role};
 #[path = "telltale_session.rs"]
 mod session;
 pub use session::{
-    SessionMetadata, SessionTypeDynamic, SessionUpdate, SimpleChannel, TelltaleSession,
+    SessionMetadata, SessionTypeDynamic, SessionUpdate, TelltaleSession,
 };
 
-enum ChannelState {
-    Simple(SimpleChannel),
-    Session(TelltaleSession),
-}
-
 struct ChannelRecord {
-    state: ChannelState,
+    session: TelltaleSession,
     metadata: SessionMetadata,
 }
 
@@ -57,25 +45,13 @@ where
         }
     }
 
-    /// Register a legacy `SimpleChannel` for a peer.
-    pub fn register_channel(&mut self, peer: R, channel: SimpleChannel) {
-        tracing::debug!(?peer, "Registering SimpleChannel session");
-        self.channels.insert(
-            peer,
-            ChannelRecord {
-                state: ChannelState::Simple(channel),
-                metadata: SessionMetadata::default(),
-            },
-        );
-    }
-
     /// Register a dynamic session for a peer.
     pub fn register_session(&mut self, peer: R, session: TelltaleSession) {
         tracing::debug!(peer = ?peer, session = session.type_name(), "Registering dynamic session");
         self.channels.insert(
             peer,
             ChannelRecord {
-                state: ChannelState::Session(session),
+                session,
                 metadata: SessionMetadata::default(),
             },
         );
@@ -163,8 +139,8 @@ where
         f: F,
     ) -> ChoreoResult<T>
     where
-        F: FnOnce(ChannelState) -> Fut,
-        Fut: std::future::Future<Output = ChoreoResult<(T, ChannelState, Option<String>, bool)>>,
+        F: FnOnce(TelltaleSession) -> Fut,
+        Fut: std::future::Future<Output = ChoreoResult<(T, TelltaleSession, Option<String>, bool)>>,
     {
         let mut record = ep
             .take_record(peer)
@@ -172,8 +148,8 @@ where
                 peer: format!("{peer:?}"),
             })?;
 
-        let (result, next_state, description, completed) = f(record.state).await?;
-        record.state = next_state;
+        let (result, next_session, description, completed) = f(record.session).await?;
+        record.session = next_session;
         record.metadata.operation_count += 1;
         record.metadata.state_description =
             description.unwrap_or_else(|| default_description.to_string());
@@ -218,26 +194,9 @@ where
             })?;
 
         Self::with_channel_operation(ep, &to, "Send", |state| async move {
-            match state {
-                ChannelState::Simple(mut channel) => {
-                    channel.send(serialized).await.map_err(|e| {
-                        ChoreographyError::ChannelSendFailed {
-                            channel_type: "SimpleChannel",
-                            reason: e,
-                        }
-                    })?;
-                    Ok(((), ChannelState::Simple(channel), None, false))
-                }
-                ChannelState::Session(mut session) => {
-                    let update = session.send(serialized).await?;
-                    Ok((
-                        (),
-                        ChannelState::Session(session),
-                        update.description,
-                        update.is_complete,
-                    ))
-                }
-            }
+            let mut session = state;
+            let update = session.send(serialized).await?;
+            Ok(((), session, update.description, update.is_complete))
         })
         .await
     }
@@ -248,42 +207,16 @@ where
         from: Self::Role,
     ) -> ChoreoResult<Msg> {
         Self::with_channel_operation(ep, &from, "Recv", |state| async move {
-            match state {
-                ChannelState::Simple(mut channel) => {
-                    let serialized =
-                        channel
-                            .recv()
-                            .await
-                            .map_err(|_| ChoreographyError::ChannelClosed {
-                                channel_type: "SimpleChannel",
-                                operation: "receive",
-                            })?;
-                    let msg = bincode::deserialize(&serialized).map_err(|e| {
-                        ChoreographyError::MessageSerializationFailed {
-                            operation: "Deserialization",
-                            type_name: std::any::type_name::<Msg>(),
-                            reason: e.to_string(),
-                        }
-                    })?;
-                    Ok((msg, ChannelState::Simple(channel), None, false))
+            let mut session = state;
+            let update = session.recv().await?;
+            let msg = bincode::deserialize(&update.output).map_err(|e| {
+                ChoreographyError::MessageSerializationFailed {
+                    operation: "Deserialization",
+                    type_name: std::any::type_name::<Msg>(),
+                    reason: e.to_string(),
                 }
-                ChannelState::Session(mut session) => {
-                    let update = session.recv().await?;
-                    let msg = bincode::deserialize(&update.output).map_err(|e| {
-                        ChoreographyError::MessageSerializationFailed {
-                            operation: "Deserialization",
-                            type_name: std::any::type_name::<Msg>(),
-                            reason: e.to_string(),
-                        }
-                    })?;
-                    Ok((
-                        msg,
-                        ChannelState::Session(session),
-                        update.description,
-                        update.is_complete,
-                    ))
-                }
-            }
+            })?;
+            Ok((msg, session, update.description, update.is_complete))
         })
         .await
     }
@@ -296,32 +229,9 @@ where
     ) -> ChoreoResult<()> {
         let label_str = label.as_str().to_string();
         Self::with_channel_operation(ep, &who, "Choose", |state| async move {
-            match state {
-                ChannelState::Simple(mut channel) => {
-                    let serialized = bincode::serialize(&label_str).map_err(|e| {
-                        ChoreographyError::LabelSerializationFailed {
-                            operation: "serialization",
-                            reason: e.to_string(),
-                        }
-                    })?;
-                    channel.send(serialized).await.map_err(|e| {
-                        ChoreographyError::ChannelSendFailed {
-                            channel_type: "SimpleChannel",
-                            reason: e,
-                        }
-                    })?;
-                    Ok(((), ChannelState::Simple(channel), None, false))
-                }
-                ChannelState::Session(mut session) => {
-                    let update = session.choose(&label_str).await?;
-                    Ok((
-                        (),
-                        ChannelState::Session(session),
-                        update.description,
-                        update.is_complete,
-                    ))
-                }
-            }
+            let mut session = state;
+            let update = session.choose(&label_str).await?;
+            Ok(((), session, update.description, update.is_complete))
         })
         .await
     }
@@ -332,48 +242,17 @@ where
         from: Self::Role,
     ) -> ChoreoResult<<Self::Role as RoleId>::Label> {
         Self::with_channel_operation(ep, &from, "Offer", |state| async move {
-            match state {
-                ChannelState::Simple(mut channel) => {
-                    let serialized =
-                        channel
-                            .recv()
-                            .await
-                            .map_err(|_| ChoreographyError::ChannelClosed {
-                                channel_type: "SimpleChannel",
-                                operation: "offer",
-                            })?;
-                    let label_string: String = bincode::deserialize(&serialized).map_err(|e| {
-                        ChoreographyError::LabelSerializationFailed {
-                            operation: "deserialization",
-                            reason: e.to_string(),
-                        }
-                    })?;
-                    let label = <Self::Role as RoleId>::Label::from_str(&label_string).ok_or_else(
-                        || {
-                            ChoreographyError::ProtocolViolation(format!(
-                                "Unknown label '{label_string}'"
-                            ))
-                        },
-                    )?;
-                    Ok((label, ChannelState::Simple(channel), None, false))
-                }
-                ChannelState::Session(mut session) => {
-                    let update = session.offer().await?;
-                    let label = <Self::Role as RoleId>::Label::from_str(&update.output)
-                        .ok_or_else(|| {
-                            ChoreographyError::ProtocolViolation(format!(
-                                "Unknown label '{}'",
-                                update.output
-                            ))
-                        })?;
-                    Ok((
-                        label,
-                        ChannelState::Session(session),
-                        update.description,
-                        update.is_complete,
+            let mut session = state;
+            let update = session.offer().await?;
+            let label = <Self::Role as RoleId>::Label::from_str(&update.output).ok_or_else(
+                || {
+                    ChoreographyError::ProtocolViolation(format!(
+                        "Unknown label '{}'",
+                        update.output
                     ))
-                }
-            }
+                },
+            )?;
+            Ok((label, session, update.description, update.is_complete))
         })
         .await
     }

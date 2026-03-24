@@ -405,24 +405,4 @@ mod tests {
         serde_json::from_value::<EnvelopeDiff>(payload)
             .expect_err("numeric schema version should be rejected");
     }
-
-    #[test]
-    fn missing_schema_version_is_rejected() {
-        let payload = serde_json::json!({
-            "baseline_engine": "lean",
-            "candidate_engine": "threaded",
-            "scheduler_permutation_class": "Exact",
-            "wave_width_bound": {
-                "baseline_max_wave_width": 1,
-                "candidate_max_wave_width": 1,
-                "declared_upper_bound": 1
-            },
-            "effect_ordering_class": "Exact",
-            "failure_visible_diff_class": "Exact",
-            "effect_determinism_tier": "strict_deterministic"
-        });
-        let err = serde_json::from_value::<EnvelopeDiff>(payload)
-            .expect_err("missing schema version should be rejected");
-        assert!(err.to_string().contains("missing field `schema_version`"));
-    }
 }

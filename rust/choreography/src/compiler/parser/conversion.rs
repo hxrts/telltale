@@ -300,9 +300,9 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                     payload: message.payload.clone(),
                 },
                 continuation: Box::new(current),
-                annotations: Annotations::from_map(annotations),
-                from_annotations: Annotations::from_map(from_annotations),
-                to_annotations: Annotations::from_map(to_annotations),
+                annotations: Annotations::from_dsl_map(annotations),
+                from_annotations: Annotations::from_dsl_map(from_annotations),
+                to_annotations: Annotations::from_dsl_map(to_annotations),
             },
             Statement::Broadcast {
                 from,
@@ -326,8 +326,8 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                             payload: message.payload.clone(),
                         },
                         continuation: Box::new(current),
-                        annotations: Annotations::from_map(annotations),
-                        from_annotations: Annotations::from_map(from_annotations),
+                        annotations: Annotations::from_dsl_map(annotations),
+                        from_annotations: Annotations::from_dsl_map(from_annotations),
                     }
                 } else {
                     // No non-sender recipients: treat as no-op and preserve continuation.
@@ -351,7 +351,7 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                     Protocol::Choice {
                         role: role.clone(),
                         branches,
-                        annotations: Annotations::from_map(annotations),
+                        annotations: Annotations::from_dsl_map(annotations),
                     }
                 } else {
                     current
@@ -473,9 +473,9 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                                 payload: message.payload.clone(),
                             },
                             continuation: Box::new(continue_protocol),
-                            annotations: Annotations::from_map(send_annotations),
-                            from_annotations: Annotations::from_map(from_annotations),
-                            to_annotations: Annotations::from_map(to_annotations),
+                            annotations: Annotations::from_dsl_map(send_annotations),
+                            from_annotations: Annotations::from_dsl_map(from_annotations),
+                            to_annotations: Annotations::from_dsl_map(to_annotations),
                         };
 
                         let continue_branch = Branch {

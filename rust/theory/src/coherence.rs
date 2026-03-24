@@ -13,13 +13,13 @@
 //! - `projectable` ↔ Lean's `projectable` definition
 //! - `check_coherent` bundles all predicates
 
-use crate::merge::merge_all;
 use crate::projection::MemoizedProjector;
 use crate::semantics;
 use crate::well_formedness::unique_labels;
 use std::collections::BTreeSet;
 use telltale_types::content_id::Sha256Hasher;
 use telltale_types::contentable::Contentable;
+use telltale_types::merge::merge_all;
 use telltale_types::GlobalType;
 
 /// Coherence bundle for global types.
@@ -73,7 +73,7 @@ impl CoherentG {
 /// # Examples
 ///
 /// ```
-/// use telltale_theory::check_coherent;
+/// use telltale_theory::coherence::check_coherent;
 /// use telltale_types::{GlobalType, Label};
 ///
 /// let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
@@ -146,7 +146,7 @@ fn action_pred_rec(g: &GlobalType) -> bool {
 /// # Examples
 ///
 /// ```
-/// use telltale_theory::projectable;
+/// use telltale_theory::coherence::projectable;
 /// use telltale_types::{GlobalType, Label};
 ///
 /// let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);

@@ -21,7 +21,7 @@ use telltale_types::LocalTypeR;
 /// # Examples
 ///
 /// ```
-/// use telltale_theory::dual;
+/// use telltale_theory::duality::dual;
 /// use telltale_types::{LocalTypeR, Label};
 ///
 /// let send = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
@@ -41,7 +41,7 @@ pub fn dual(lt: &LocalTypeR) -> LocalTypeR {
 /// # Examples
 ///
 /// ```
-/// use telltale_theory::{dual, is_dual};
+/// use telltale_theory::duality::{dual, is_dual};
 /// use telltale_types::{LocalTypeR, Label};
 ///
 /// let send = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);

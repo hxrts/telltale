@@ -149,17 +149,17 @@ For multi role tests, share channels by using `InMemoryHandler::with_channels` a
 
 ## TelltaleHandler in WASM
 
-`TelltaleHandler` works in WASM with `SimpleChannel` or custom sessions. This handler manages typed endpoints and routes messages through registered channels. It is the recommended handler for integration-level WASM tests.
+`TelltaleHandler` works in WASM with `TelltaleSession` pairs or custom sessions. This handler manages typed endpoints and routes messages through registered sessions. It is the recommended handler for integration-level WASM tests.
 
 ```rust
-use telltale_choreography::{SimpleChannel, TelltaleEndpoint, TelltaleHandler};
+use telltale_choreography::{TelltaleEndpoint, TelltaleHandler, TelltaleSession};
 
-let (alice_ch, bob_ch) = SimpleChannel::pair();
+let (alice_session, bob_session) = TelltaleSession::pair();
 let mut alice_ep = TelltaleEndpoint::new(Role::Client);
 let mut bob_ep = TelltaleEndpoint::new(Role::Server);
 
-alice_ep.register_channel(Role::Server, alice_ch);
-bob_ep.register_channel(Role::Client, bob_ch);
+alice_ep.register_session(Role::Server, alice_session);
+bob_ep.register_session(Role::Client, bob_session);
 
 let mut handler = TelltaleHandler::<Role, Message>::new();
 ```

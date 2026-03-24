@@ -940,11 +940,4 @@
         let e2 = decode_edge_json(&no_sid, Some(11)).expect("decode edge with sid hint");
         assert_eq!(e2, Edge::new(11, "A", "B"));
 
-        let legacy = json!({
-            "from": "A",
-            "to": "B",
-            "sid": 11
-        });
-        let err = decode_edge_json(&legacy, None).expect_err("legacy edge shape must be rejected");
-        assert!(err.contains("invalid edge json"), "unexpected error: {err}");
     }

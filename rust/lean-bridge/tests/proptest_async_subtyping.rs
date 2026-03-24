@@ -12,9 +12,10 @@
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
-use telltale_theory::{
+use telltale_theory::limits::UnfoldSteps;
+use telltale_theory::subtyping::{
     async_subtype, orphan_free, siso_decompose, siso_decompose_with_fuel, InputTree, OutputTree,
-    SisoSegment, UnfoldSteps,
+    SisoSegment,
 };
 use telltale_types::{Label, LocalTypeR, PayloadSort};
 

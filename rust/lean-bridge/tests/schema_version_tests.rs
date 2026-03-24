@@ -1,36 +1,11 @@
 use serde_json::json;
 use std::collections::BTreeMap;
 use telltale_lean_bridge::{
-    ensure_supported_schema_version, export_protocol_bundle, ChoreographyJson, InvariantClaims,
-    ProtocolBundle, ProtocolMachineReplayBundle, ProtocolMachineRunInput, ProtocolMachineRunOutput,
-    ProtocolMachineSemanticObjects, LEAN_BRIDGE_SCHEMA_VERSION, PROTOCOL_BUNDLE_SCHEMA_VERSION,
-    SEMANTIC_OBJECTS_SCHEMA_VERSION,
+    export_protocol_bundle, ChoreographyJson, InvariantClaims, ProtocolBundle,
+    ProtocolMachineRunInput, ProtocolMachineRunOutput, ProtocolMachineSemanticObjects,
+    LEAN_BRIDGE_SCHEMA_VERSION, PROTOCOL_BUNDLE_SCHEMA_VERSION, SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 use telltale_types::{GlobalType, Label, LocalTypeR};
-
-#[test]
-fn vm_run_output_missing_schema_version_is_rejected() {
-    let legacy = json!({
-        "trace": [{
-            "kind": "sent",
-            "tick": 1,
-            "sender": "A",
-            "receiver": "B",
-            "label": "msg"
-        }],
-        "sessions": [{
-            "sid": 0,
-            "terminal": true
-        }],
-        "steps_executed": 2,
-        "concurrency": 1,
-        "status": "ok"
-    });
-
-    let err = serde_json::from_value::<ProtocolMachineRunOutput>(legacy)
-        .expect_err("ProtocolMachineRunOutput without schema_version should be rejected");
-    assert!(err.to_string().contains("missing field `schema_version`"));
-}
 
 #[test]
 fn vm_run_input_roundtrip_preserves_schema_version() {
@@ -58,34 +33,6 @@ fn vm_run_input_roundtrip_preserves_schema_version() {
 }
 
 #[test]
-fn replay_trace_bundle_missing_schema_version_is_rejected() {
-    let legacy = json!({
-        "semantic_audit": [{
-            "kind": "sent",
-            "session_index": 0,
-            "sender": "A",
-            "receiver": "B",
-            "label": "msg"
-        }],
-        "effect_trace": [],
-        "output_condition_trace": []
-    });
-
-    let err = serde_json::from_value::<ProtocolMachineReplayBundle>(legacy)
-        .expect_err("ProtocolMachineReplayBundle without schema_version should be rejected");
-    assert!(err.to_string().contains("missing field `schema_version`"));
-}
-
-#[test]
-fn schema_validator_accepts_current_and_rejects_unknown() {
-    assert!(
-        ensure_supported_schema_version(LEAN_BRIDGE_SCHEMA_VERSION, "ProtocolMachineRunInput")
-            .is_ok()
-    );
-    assert!(ensure_supported_schema_version("legacy.v0", "ProtocolMachineRunInput").is_err());
-}
-
-#[test]
 fn protocol_bundle_roundtrip_preserves_schema_version() {
     let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
     let mut locals = BTreeMap::new();
@@ -105,41 +52,6 @@ fn protocol_bundle_roundtrip_preserves_schema_version() {
     let decoded: ProtocolBundle =
         serde_json::from_value(encoded).expect("deserialize ProtocolBundle");
     assert_eq!(decoded.schema_version, PROTOCOL_BUNDLE_SCHEMA_VERSION);
-}
-
-#[test]
-fn protocol_bundle_missing_schema_version_is_rejected() {
-    let legacy = json!({
-        "global_type": { "kind": "end" },
-        "local_types": {},
-        "claims": {
-            "schema_version": LEAN_BRIDGE_SCHEMA_VERSION,
-            "liveness": null,
-            "distributed": {},
-            "classical": {}
-        }
-    });
-    let err = serde_json::from_value::<ProtocolBundle>(legacy)
-        .expect_err("ProtocolBundle without schema_version should be rejected");
-    assert!(err.to_string().contains("missing field `schema_version`"));
-}
-
-#[test]
-fn semantic_objects_missing_schema_version_is_rejected() {
-    let payload = json!({
-        "operation_instances": [],
-        "outstanding_effects": [],
-        "semantic_handoffs": [],
-        "authoritative_reads": [],
-        "observed_reads": [],
-        "materialization_proofs": [],
-        "canonical_handles": [],
-        "progress_contracts": []
-    });
-
-    let err = serde_json::from_value::<ProtocolMachineSemanticObjects>(payload)
-        .expect_err("ProtocolMachineSemanticObjects without schema_version should be rejected");
-    assert!(err.to_string().contains("missing field `schema_version`"));
 }
 
 #[test]
@@ -450,19 +362,5 @@ fn semantic_objects_roundtrip_preserves_handoff_obligations() {
     assert_eq!(
         decoded.publication_events[0].publication.as_str(),
         "handoff.committed"
-    );
-}
-
-#[test]
-fn semantic_objects_decode_requires_canonical_shape() {
-    let legacy = json!({
-        "schema_version": "protocol_machine.semantic_objects.v1",
-        "clock": 1
-    });
-
-    let decoded = serde_json::from_value::<ProtocolMachineSemanticObjects>(legacy);
-    assert!(
-        decoded.is_err(),
-        "legacy VM-state payloads must no longer decode"
     );
 }

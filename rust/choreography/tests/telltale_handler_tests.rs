@@ -3,9 +3,9 @@
 //!
 //! Verifies:
 //! - Session metadata progression (operation_count, state_description, is_complete)
-//! - Channel registration and overwrite semantics
-//! - SimpleChannel and dynamic session operation
-//! - Missing channel error handling
+//! - Session registration and overwrite semantics
+//! - TelltaleSession operation
+//! - Missing session error handling
 //! - Drop cleanup behavior
 
 #![allow(clippy::unwrap_used)]
@@ -16,7 +16,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use telltale::Message;
 use telltale_choreography::effects::{
-    handlers::telltale::{SimpleChannel, TelltaleEndpoint, TelltaleHandler},
+    handlers::telltale::{TelltaleEndpoint, TelltaleHandler, TelltaleSession},
     ChoreoHandler, LabelId, RoleId,
 };
 use telltale_choreography::RoleName;
@@ -110,36 +110,36 @@ struct TestMessage {
 }
 
 // ============================================================================
-// SimpleChannel Tests
+// TelltaleSession Tests
 // ============================================================================
 
 #[tokio::test]
-async fn test_simple_channel_pair_creation() {
-    let (mut left, mut right) = SimpleChannel::pair();
+async fn test_telltale_session_pair_creation() {
+    let (mut left, mut right) = TelltaleSession::pair();
 
     // Send from left to right
     left.send(vec![1, 2, 3]).await.expect("Send should succeed");
 
     let received = right.recv().await.expect("Recv should succeed");
-    assert_eq!(received, vec![1, 2, 3]);
+    assert_eq!(received.output, vec![1, 2, 3]);
 }
 
 #[tokio::test]
-async fn test_simple_channel_bidirectional() {
-    let (mut left, mut right) = SimpleChannel::pair();
+async fn test_telltale_session_bidirectional() {
+    let (mut left, mut right) = TelltaleSession::pair();
 
     // Left -> Right
     left.send(vec![1]).await.unwrap();
-    assert_eq!(right.recv().await.unwrap(), vec![1]);
+    assert_eq!(right.recv().await.unwrap().output, vec![1]);
 
     // Right -> Left
     right.send(vec![2]).await.unwrap();
-    assert_eq!(left.recv().await.unwrap(), vec![2]);
+    assert_eq!(left.recv().await.unwrap().output, vec![2]);
 }
 
 #[tokio::test]
-async fn test_simple_channel_multiple_messages() {
-    let (mut left, mut right) = SimpleChannel::pair();
+async fn test_telltale_session_multiple_messages() {
+    let (mut left, mut right) = TelltaleSession::pair();
 
     // Send multiple messages
     left.send(vec![1]).await.unwrap();
@@ -147,9 +147,9 @@ async fn test_simple_channel_multiple_messages() {
     left.send(vec![3]).await.unwrap();
 
     // Receive in FIFO order
-    assert_eq!(right.recv().await.unwrap(), vec![1]);
-    assert_eq!(right.recv().await.unwrap(), vec![2]);
-    assert_eq!(right.recv().await.unwrap(), vec![3]);
+    assert_eq!(right.recv().await.unwrap().output, vec![1]);
+    assert_eq!(right.recv().await.unwrap().output, vec![2]);
+    assert_eq!(right.recv().await.unwrap().output, vec![3]);
 }
 
 // ============================================================================
@@ -166,11 +166,11 @@ async fn test_endpoint_creation() {
 }
 
 #[tokio::test]
-async fn test_endpoint_register_channel() {
+async fn test_endpoint_register_session() {
     let mut endpoint = TelltaleEndpoint::new(TestRole::Alice);
-    let (channel, _other) = SimpleChannel::pair();
+    let (session, _other) = TelltaleSession::pair();
 
-    endpoint.register_channel(TestRole::Bob, channel);
+    endpoint.register_session(TestRole::Bob, session);
 
     assert!(endpoint.has_channel(&TestRole::Bob));
     assert!(!endpoint.has_channel(&TestRole::Charlie));
@@ -178,18 +178,18 @@ async fn test_endpoint_register_channel() {
 }
 
 #[tokio::test]
-async fn test_endpoint_channel_overwrite() {
+async fn test_endpoint_session_overwrite() {
     let mut endpoint = TelltaleEndpoint::new(TestRole::Alice);
 
-    // Register first channel
-    let (channel1, _) = SimpleChannel::pair();
-    endpoint.register_channel(TestRole::Bob, channel1);
+    // Register first session
+    let (session1, _) = TelltaleSession::pair();
+    endpoint.register_session(TestRole::Bob, session1);
 
-    // Register second channel (overwrites first)
-    let (channel2, _) = SimpleChannel::pair();
-    endpoint.register_channel(TestRole::Bob, channel2);
+    // Register second session (overwrites first)
+    let (session2, _) = TelltaleSession::pair();
+    endpoint.register_session(TestRole::Bob, session2);
 
-    // Still only one channel
+    // Still only one session
     assert_eq!(endpoint.active_channel_count(), 1);
     assert!(endpoint.has_channel(&TestRole::Bob));
 }
@@ -197,9 +197,9 @@ async fn test_endpoint_channel_overwrite() {
 #[tokio::test]
 async fn test_endpoint_close_channel() {
     let mut endpoint = TelltaleEndpoint::new(TestRole::Alice);
-    let (channel, _) = SimpleChannel::pair();
+    let (session, _) = TelltaleSession::pair();
 
-    endpoint.register_channel(TestRole::Bob, channel);
+    endpoint.register_session(TestRole::Bob, session);
     assert!(endpoint.has_channel(&TestRole::Bob));
 
     let closed = endpoint.close_channel(&TestRole::Bob);
@@ -215,11 +215,11 @@ async fn test_endpoint_close_channel() {
 async fn test_endpoint_close_all_channels() {
     let mut endpoint = TelltaleEndpoint::new(TestRole::Alice);
 
-    let (channel1, _) = SimpleChannel::pair();
-    let (channel2, _) = SimpleChannel::pair();
+    let (session1, _) = TelltaleSession::pair();
+    let (session2, _) = TelltaleSession::pair();
 
-    endpoint.register_channel(TestRole::Bob, channel1);
-    endpoint.register_channel(TestRole::Charlie, channel2);
+    endpoint.register_session(TestRole::Bob, session1);
+    endpoint.register_session(TestRole::Charlie, session2);
 
     assert_eq!(endpoint.active_channel_count(), 2);
 
@@ -231,9 +231,9 @@ async fn test_endpoint_close_all_channels() {
 #[tokio::test]
 async fn test_endpoint_metadata_initial() {
     let mut endpoint = TelltaleEndpoint::new(TestRole::Alice);
-    let (channel, _) = SimpleChannel::pair();
+    let (session, _) = TelltaleSession::pair();
 
-    endpoint.register_channel(TestRole::Bob, channel);
+    endpoint.register_session(TestRole::Bob, session);
 
     let metadata = endpoint.get_metadata(&TestRole::Bob).unwrap();
     assert_eq!(metadata.state_description, "Initial");
@@ -245,11 +245,11 @@ async fn test_endpoint_metadata_initial() {
 async fn test_endpoint_all_metadata() {
     let mut endpoint = TelltaleEndpoint::new(TestRole::Alice);
 
-    let (channel1, _) = SimpleChannel::pair();
-    let (channel2, _) = SimpleChannel::pair();
+    let (session1, _) = TelltaleSession::pair();
+    let (session2, _) = TelltaleSession::pair();
 
-    endpoint.register_channel(TestRole::Bob, channel1);
-    endpoint.register_channel(TestRole::Charlie, channel2);
+    endpoint.register_session(TestRole::Bob, session1);
+    endpoint.register_session(TestRole::Charlie, session2);
 
     let all = endpoint.all_metadata();
     assert_eq!(all.len(), 2);
@@ -260,16 +260,16 @@ async fn test_endpoint_all_metadata() {
 // ============================================================================
 
 #[tokio::test]
-async fn test_handler_send_recv_with_simple_channel() {
+async fn test_handler_send_recv_with_telltale_session() {
     let mut handler: TelltaleHandler<TestRole, TestLabel> = TelltaleHandler::new();
 
-    // Create endpoints with connected channels
+    // Create endpoints with connected sessions
     let mut alice_ep = TelltaleEndpoint::new(TestRole::Alice);
     let mut bob_ep = TelltaleEndpoint::new(TestRole::Bob);
 
-    let (alice_to_bob, bob_from_alice) = SimpleChannel::pair();
-    alice_ep.register_channel(TestRole::Bob, alice_to_bob);
-    bob_ep.register_channel(TestRole::Alice, bob_from_alice);
+    let (alice_to_bob, bob_from_alice) = TelltaleSession::pair();
+    alice_ep.register_session(TestRole::Bob, alice_to_bob);
+    bob_ep.register_session(TestRole::Alice, bob_from_alice);
 
     // Alice sends to Bob
     let msg = TestMessage { value: 42 };
@@ -292,8 +292,8 @@ async fn test_handler_metadata_updates_on_send() {
     let mut handler: TelltaleHandler<TestRole, TestLabel> = TelltaleHandler::new();
     let mut endpoint = TelltaleEndpoint::new(TestRole::Alice);
 
-    let (channel, mut other) = SimpleChannel::pair();
-    endpoint.register_channel(TestRole::Bob, channel);
+    let (session, mut other) = TelltaleSession::pair();
+    endpoint.register_session(TestRole::Bob, session);
 
     // Initial state
     let meta = endpoint.get_metadata(&TestRole::Bob).unwrap();
@@ -319,8 +319,8 @@ async fn test_handler_metadata_updates_on_recv() {
     let mut handler: TelltaleHandler<TestRole, TestLabel> = TelltaleHandler::new();
     let mut endpoint = TelltaleEndpoint::new(TestRole::Bob);
 
-    let (channel, mut other) = SimpleChannel::pair();
-    endpoint.register_channel(TestRole::Alice, channel);
+    let (session, mut other) = TelltaleSession::pair();
+    endpoint.register_session(TestRole::Alice, session);
 
     // Send a message from the other side
     let msg = TestMessage { value: 42 };
@@ -344,17 +344,17 @@ async fn test_handler_operation_count_increments() {
     let mut alice_ep = TelltaleEndpoint::new(TestRole::Alice);
     let mut bob_ep = TelltaleEndpoint::new(TestRole::Bob);
 
-    let (alice_to_bob, bob_from_alice) = SimpleChannel::pair();
-    let (bob_to_alice, alice_from_bob) = SimpleChannel::pair();
+    let (alice_to_bob, bob_from_alice) = TelltaleSession::pair();
+    let (bob_to_alice, alice_from_bob) = TelltaleSession::pair();
 
-    alice_ep.register_channel(TestRole::Bob, alice_to_bob);
-    bob_ep.register_channel(TestRole::Alice, bob_from_alice);
+    alice_ep.register_session(TestRole::Bob, alice_to_bob);
+    bob_ep.register_session(TestRole::Alice, bob_from_alice);
 
     // Also register reverse channels for bidirectional
     let mut alice_ep2 = TelltaleEndpoint::new(TestRole::Alice);
-    alice_ep2.register_channel(TestRole::Bob, alice_from_bob);
+    alice_ep2.register_session(TestRole::Bob, alice_from_bob);
     let mut bob_ep2 = TelltaleEndpoint::new(TestRole::Bob);
-    bob_ep2.register_channel(TestRole::Alice, bob_to_alice);
+    bob_ep2.register_session(TestRole::Alice, bob_to_alice);
 
     // Perform multiple operations
     handler
@@ -388,9 +388,9 @@ async fn test_handler_choose_offer() {
     let mut alice_ep = TelltaleEndpoint::new(TestRole::Alice);
     let mut bob_ep = TelltaleEndpoint::new(TestRole::Bob);
 
-    let (alice_to_bob, bob_from_alice) = SimpleChannel::pair();
-    alice_ep.register_channel(TestRole::Bob, alice_to_bob);
-    bob_ep.register_channel(TestRole::Alice, bob_from_alice);
+    let (alice_to_bob, bob_from_alice) = TelltaleSession::pair();
+    alice_ep.register_session(TestRole::Bob, alice_to_bob);
+    bob_ep.register_session(TestRole::Alice, bob_from_alice);
 
     // Alice chooses
     handler
@@ -412,8 +412,8 @@ async fn test_handler_choose_updates_metadata() {
     let mut handler: TelltaleHandler<TestRole, TestLabel> = TelltaleHandler::new();
     let mut endpoint = TelltaleEndpoint::new(TestRole::Alice);
 
-    let (channel, mut other) = SimpleChannel::pair();
-    endpoint.register_channel(TestRole::Bob, channel);
+    let (session, mut other) = TelltaleSession::pair();
+    endpoint.register_session(TestRole::Bob, session);
 
     handler
         .choose(&mut endpoint, TestRole::Bob, ChoiceLabel::Option1)
@@ -437,7 +437,7 @@ async fn test_handler_missing_channel_error() {
     let mut handler: TelltaleHandler<TestRole, TestLabel> = TelltaleHandler::new();
     let mut endpoint = TelltaleEndpoint::new(TestRole::Alice);
 
-    // Try to send without registering a channel
+    // Try to send without registering a session
     let result = handler
         .send(&mut endpoint, TestRole::Bob, &TestMessage { value: 1 })
         .await;
@@ -446,8 +446,8 @@ async fn test_handler_missing_channel_error() {
     let err = result.unwrap_err();
     let msg = err.to_string();
     assert!(
-        msg.contains("no channel registered"),
-        "Error should mention missing channel: {}",
+        msg.contains("no session registered"),
+        "Error should mention missing session registration: {}",
         msg
     );
 }
@@ -537,12 +537,12 @@ async fn test_endpoint_multiple_peers() {
     let mut handler: TelltaleHandler<TestRole, TestLabel> = TelltaleHandler::new();
     let mut alice_ep = TelltaleEndpoint::new(TestRole::Alice);
 
-    // Register channels to multiple peers
-    let (to_bob, mut from_bob) = SimpleChannel::pair();
-    let (to_charlie, mut from_charlie) = SimpleChannel::pair();
+    // Register sessions to multiple peers
+    let (to_bob, mut from_bob) = TelltaleSession::pair();
+    let (to_charlie, mut from_charlie) = TelltaleSession::pair();
 
-    alice_ep.register_channel(TestRole::Bob, to_bob);
-    alice_ep.register_channel(TestRole::Charlie, to_charlie);
+    alice_ep.register_session(TestRole::Bob, to_bob);
+    alice_ep.register_session(TestRole::Charlie, to_charlie);
 
     // Send to both
     handler
@@ -555,8 +555,8 @@ async fn test_endpoint_multiple_peers() {
         .unwrap();
 
     // Receive on both
-    let bob_bytes = from_bob.recv().await.unwrap();
-    let charlie_bytes = from_charlie.recv().await.unwrap();
+    let bob_bytes = from_bob.recv().await.unwrap().output;
+    let charlie_bytes = from_charlie.recv().await.unwrap().output;
 
     let bob_msg: TestMessage = bincode::deserialize(&bob_bytes).unwrap();
     let charlie_msg: TestMessage = bincode::deserialize(&charlie_bytes).unwrap();

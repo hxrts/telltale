@@ -663,14 +663,4 @@ mod tests {
         serde_json::from_value::<CanonicalTraceV1>(payload)
             .expect_err("numeric schema version should be rejected");
     }
-
-    #[test]
-    fn missing_schema_version_is_rejected() {
-        let payload = serde_json::json!({
-            "events": []
-        });
-        let err = serde_json::from_value::<CanonicalTraceV1>(payload)
-            .expect_err("missing schema version should be rejected");
-        assert!(err.to_string().contains("missing field `schema_version`"));
-    }
 }

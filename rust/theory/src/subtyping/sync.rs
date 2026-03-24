@@ -82,7 +82,7 @@ pub enum SyncSubtypeError {
 /// # Examples
 ///
 /// ```
-/// use telltale_theory::sync_subtype;
+/// use telltale_theory::subtyping::sync_subtype;
 /// use telltale_types::{LocalTypeR, Label};
 ///
 /// // end <: end

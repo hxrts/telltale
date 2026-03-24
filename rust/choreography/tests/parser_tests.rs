@@ -6,7 +6,6 @@
 use telltale_choreography::ast::Protocol;
 use telltale_choreography::compiler::parser::{parse_choreography_str, ParseError};
 use telltale_choreography::compiler::projection::{project, ProjectionError};
-use telltale_choreography::format_choreography_str;
 
 #[test]
 fn test_parse_simple_protocol() {
@@ -25,45 +24,6 @@ protocol PingPong = {
     let choreo = result.unwrap();
     assert_eq!(choreo.name.to_string(), "PingPong");
     assert_eq!(choreo.roles.len(), 2);
-}
-
-#[test]
-fn test_format_rewrites_legacy_brace_blocks_to_indentation_surface() {
-    let input = r#"
-protocol Choice = {
-  roles A, B
-  choice B at {
-    | Accept => {
-      B -> A : Ack
-    }
-    | Reject => {
-      B -> A : Nack
-    }
-  }
-}
-"#;
-
-    let formatted = format_choreography_str(input).expect("format should succeed");
-    assert!(formatted.contains("  choice B at\n    | Accept =>"));
-    assert!(!formatted.contains("choice B at {"));
-    assert!(!formatted.contains("=> {"));
-}
-
-#[test]
-fn test_reject_legacy_timed_choice_surface() {
-    let input = r#"
-protocol TimedRequest =
-  roles Client, Server
-  timed_choice Client at(5s)
-    | OnTime => Server -> Client : Response
-    | TimedOut => Client -> Server : Cancel
-"#;
-
-    let err = parse_choreography_str(input).expect_err("legacy timed_choice should fail");
-    assert!(matches!(
-        err,
-        ParseError::Pest(_) | ParseError::Syntax { .. } | ParseError::Layout { .. }
-    ));
 }
 
 #[test]

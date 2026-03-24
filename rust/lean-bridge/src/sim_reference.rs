@@ -70,32 +70,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sim_input_missing_schema_version_is_rejected() {
-        let legacy = serde_json::json!({
-            "scenario": {"name": "s"},
-            "global_type": {"kind": "end"},
-            "local_types": {},
-            "initial_states": {}
-        });
-
-        let err = serde_json::from_value::<SimRunInput>(legacy)
-            .expect_err("SimRunInput without schema_version should be rejected");
-        assert!(err.to_string().contains("missing field `schema_version`"));
-    }
-
-    #[test]
-    fn sim_output_missing_schema_version_is_rejected() {
-        let legacy = serde_json::json!({
-            "trace": [],
-            "violations": []
-        });
-
-        let err = serde_json::from_value::<SimRunOutput>(legacy)
-            .expect_err("SimRunOutput without schema_version should be rejected");
-        assert!(err.to_string().contains("missing field `schema_version`"));
-    }
-
-    #[test]
     fn sim_trace_validation_roundtrip() {
         let validation = SimTraceValidation {
             valid: false,

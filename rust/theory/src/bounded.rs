@@ -14,7 +14,8 @@
 //!
 //! ```
 //! use telltale_types::{LocalTypeR, Label};
-//! use telltale_theory::{bound_recursion, BoundingStrategy, FuelSteps};
+//! use telltale_theory::bounded::{bound_recursion, BoundingStrategy};
+//! use telltale_theory::limits::FuelSteps;
 //!
 //! // Create a recursive ping-pong protocol
 //! let lt = LocalTypeR::mu(

@@ -181,17 +181,17 @@ Messages are data exchanged between roles. They must implement `Serialize` and `
 
 Handlers interpret choreographic effects into actual communication. Different handlers provide different transports.
 
-The `InMemoryHandler` provides local testing. The `TelltaleHandler` provides channel-based communication. WebSocket handlers provide network communication.
+The `InMemoryHandler` provides local testing. The `TelltaleHandler` provides session-based communication. WebSocket handlers provide network communication.
 
-The `TelltaleHandler` supports two patterns. You can register built-in `SimpleChannel` pairs.
+The `TelltaleHandler` supports two patterns. You can register built-in `TelltaleSession` pairs.
 
 ```rust
-let (client_ch, server_ch) = SimpleChannel::pair();
-client_endpoint.register_channel(Role::Server, client_ch);
-server_endpoint.register_channel(Role::Client, server_ch);
+let (client_session, server_session) = TelltaleSession::pair();
+client_endpoint.register_session(Role::Server, client_session);
+server_endpoint.register_session(Role::Client, server_session);
 ```
 
-Both endpoints now communicate through the channel pair.
+Both endpoints now communicate through the session pair.
 
 Alternatively, you can wrap your own sink and stream transports.
 

@@ -96,7 +96,7 @@ pub struct SisoSegment {
 /// # Examples
 ///
 /// ```
-/// use telltale_theory::siso_decompose;
+/// use telltale_theory::subtyping::siso_decompose;
 /// use telltale_types::{LocalTypeR, Label};
 ///
 /// // Simple send then receive
@@ -332,7 +332,7 @@ fn find_input_continuation(lt: &LocalTypeR) -> Option<LocalTypeR> {
 /// # Examples
 ///
 /// ```
-/// use telltale_theory::async_subtype;
+/// use telltale_theory::subtyping::async_subtype;
 /// use telltale_types::{LocalTypeR, Label};
 ///
 /// let t1 = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
@@ -442,7 +442,7 @@ fn output_tree_compatible(sub: &OutputTree, sup: &OutputTree) -> bool {
 /// # Examples
 ///
 /// ```
-/// use telltale_theory::orphan_free;
+/// use telltale_theory::subtyping::orphan_free;
 /// use telltale_types::LocalTypeR;
 ///
 /// // End is always orphan-free

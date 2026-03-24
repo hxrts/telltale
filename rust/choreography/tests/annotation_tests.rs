@@ -42,6 +42,37 @@ fn annotations(pairs: &[(&str, &str)]) -> Annotations {
     Annotations::from_vec(items)
 }
 
+fn annotation_name(annotation: &ProtocolAnnotation) -> &str {
+    match annotation {
+        ProtocolAnnotation::TimedChoice { .. } => "timed_choice",
+        ProtocolAnnotation::Priority(_) => "priority",
+        ProtocolAnnotation::Retry { .. } => "retry",
+        ProtocolAnnotation::Idempotent => "idempotent",
+        ProtocolAnnotation::Trace { .. } => "trace",
+        ProtocolAnnotation::RuntimeTimeout(_) => "runtime_timeout",
+        ProtocolAnnotation::Heartbeat { .. } => "heartbeat",
+        ProtocolAnnotation::Parallel => "parallel",
+        ProtocolAnnotation::Ordered => "ordered",
+        ProtocolAnnotation::MinResponses(_) => "min_responses",
+        ProtocolAnnotation::Custom { key, .. } => key,
+    }
+}
+
+fn parse_annotation_as<T>(annotations: &Annotations, key: &str) -> Option<T>
+where
+    T: std::str::FromStr,
+{
+    annotations.custom(key)?.parse().ok()
+}
+
+fn parse_annotation_as_bool(annotations: &Annotations, key: &str) -> Option<bool> {
+    match annotations.custom(key)?.to_ascii_lowercase().as_str() {
+        "true" | "1" | "yes" | "on" => Some(true),
+        "false" | "0" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
 #[test]
 fn test_protocol_annotation_storage() {
     let alice = role("Alice");
@@ -69,26 +100,29 @@ fn test_protocol_annotation_storage() {
         .push(ProtocolAnnotation::custom("retry", "3"));
 
     // Test getting annotations
+    assert_eq!(protocol.get_annotations().custom("priority"), Some("high"));
     assert_eq!(
-        protocol.get_annotation("priority"),
-        Some("high".to_string())
+        protocol.get_from_annotations().unwrap().custom("timeout"),
+        Some("30s")
     );
     assert_eq!(
-        protocol.get_from_annotations().unwrap().get("timeout"),
-        Some("30s".to_string())
-    );
-    assert_eq!(
-        protocol.get_to_annotations().unwrap().get("retry"),
-        Some("3".to_string())
+        protocol.get_to_annotations().unwrap().custom("retry"),
+        Some("3")
     );
 
     // Test boolean annotations
     protocol.add_annotation(ProtocolAnnotation::custom("async", "true"));
-    assert_eq!(protocol.get_annotation_as_bool("async"), Some(true));
+    assert_eq!(
+        parse_annotation_as_bool(protocol.get_annotations(), "async"),
+        Some(true)
+    );
 
     // Test typed annotations
     protocol.add_annotation(ProtocolAnnotation::custom("count", "42"));
-    assert_eq!(protocol.get_annotation_as::<i32>("count"), Some(42));
+    assert_eq!(
+        parse_annotation_as::<i32>(protocol.get_annotations(), "count"),
+        Some(42)
+    );
 }
 
 #[test]
@@ -107,21 +141,21 @@ fn test_protocol_annotation_api() {
     };
 
     // Test has_annotation
-    assert!(!protocol.has_annotation("priority"));
+    assert!(protocol.get_annotations().custom("priority").is_none());
     protocol.add_annotation(ProtocolAnnotation::custom("priority", "high"));
-    assert!(protocol.has_annotation("priority"));
+    assert_eq!(protocol.get_annotations().custom("priority"), Some("high"));
 
-    // Test annotation_matches
-    assert!(protocol.annotation_matches("priority", "high"));
-    assert!(protocol.annotation_matches("priority", "HIGH")); // case-insensitive
-    assert!(!protocol.annotation_matches("priority", "low"));
+    let priority = protocol.get_annotations().custom("priority").unwrap();
+    assert!(priority.eq_ignore_ascii_case("high"));
+    assert!(priority.eq_ignore_ascii_case("HIGH"));
+    assert!(!priority.eq_ignore_ascii_case("low"));
 
     // Test annotation_keys
     protocol.add_annotation(ProtocolAnnotation::custom("timeout", "30s"));
     let keys: Vec<String> = protocol
         .get_annotations()
         .iter()
-        .map(|annotation| annotation.key().to_string())
+        .map(|annotation| annotation_name(annotation).to_string())
         .collect();
     assert!(keys.contains(&"priority".to_string()));
     assert!(keys.contains(&"timeout".to_string()));
@@ -196,26 +230,23 @@ fn test_protocol_annotation_merging() {
     protocol1.merge_annotations_from(&protocol2);
 
     // Verify merged annotations (merge is additive; first entry wins on lookup)
+    assert_eq!(protocol1.get_annotations().custom("priority"), Some("high"));
+    assert_eq!(protocol1.get_annotations().custom("async"), Some("true"));
     assert_eq!(
-        protocol1.get_annotation("priority"),
-        Some("high".to_string())
-    );
-    assert_eq!(protocol1.get_annotation("async"), Some("true".to_string()));
-    assert_eq!(
-        protocol1.get_from_annotations().unwrap().get("timeout"),
-        Some("30s".to_string())
+        protocol1.get_from_annotations().unwrap().custom("timeout"),
+        Some("30s")
     );
     assert_eq!(
-        protocol1.get_from_annotations().unwrap().get("buffer"),
-        Some("1024".to_string())
+        protocol1.get_from_annotations().unwrap().custom("buffer"),
+        Some("1024")
     );
     assert_eq!(
-        protocol1.get_to_annotations().unwrap().get("retry"),
-        Some("3".to_string())
+        protocol1.get_to_annotations().unwrap().custom("retry"),
+        Some("3")
     );
     assert_eq!(
-        protocol1.get_to_annotations().unwrap().get("backoff"),
-        Some("exponential".to_string())
+        protocol1.get_to_annotations().unwrap().custom("backoff"),
+        Some("exponential")
     );
 }
 
@@ -242,7 +273,7 @@ fn test_protocol_annotation_filtering() {
         .get_annotations()
         .iter()
         .filter_map(|annotation| {
-            let key = annotation.key();
+            let key = annotation_name(annotation);
             if key.starts_with("timeout_") {
                 annotation
                     .custom_value(key)
@@ -390,8 +421,8 @@ fn test_choice_annotation_support() {
     // Test Choice annotation support
     assert!(choice.add_annotation(ProtocolAnnotation::custom("decision_timeout", "10s")));
     assert_eq!(
-        choice.get_annotation("decision_timeout"),
-        Some("10s".to_string())
+        choice.get_annotations().custom("decision_timeout"),
+        Some("10s")
     );
     assert!(choice.has_any_annotations());
 }
@@ -419,12 +450,15 @@ fn test_broadcast_annotation_support() {
         .push(ProtocolAnnotation::custom("batch_size", "100"));
 
     assert_eq!(
-        broadcast.get_annotation("reliability"),
-        Some("at_least_once".to_string())
+        broadcast.get_annotations().custom("reliability"),
+        Some("at_least_once")
     );
     assert_eq!(
-        broadcast.get_from_annotations().unwrap().get("batch_size"),
-        Some("100".to_string())
+        broadcast
+            .get_from_annotations()
+            .unwrap()
+            .custom("batch_size"),
+        Some("100")
     );
 
     // Broadcast doesn't have to_annotations
@@ -502,28 +536,49 @@ fn test_annotation_different_types() {
 
     // Test string values
     assert_eq!(
-        protocol.get_annotation("string_value"),
-        Some("hello".to_string())
+        protocol.get_annotations().custom("string_value"),
+        Some("hello")
     );
 
     // Test numeric parsing
-    assert_eq!(protocol.get_annotation_as::<i32>("number_value"), Some(42));
-    assert_eq!(protocol.get_annotation_as::<u32>("number_value"), Some(42));
     assert_eq!(
-        protocol.get_annotation_as::<f64>("number_value"),
+        parse_annotation_as::<i32>(protocol.get_annotations(), "number_value"),
+        Some(42)
+    );
+    assert_eq!(
+        parse_annotation_as::<u32>(protocol.get_annotations(), "number_value"),
+        Some(42)
+    );
+    assert_eq!(
+        parse_annotation_as::<f64>(protocol.get_annotations(), "number_value"),
         Some(42.0)
     );
 
     // Test boolean parsing
-    assert_eq!(protocol.get_annotation_as_bool("boolean_true"), Some(true));
     assert_eq!(
-        protocol.get_annotation_as_bool("boolean_false"),
+        parse_annotation_as_bool(protocol.get_annotations(), "boolean_true"),
+        Some(true)
+    );
+    assert_eq!(
+        parse_annotation_as_bool(protocol.get_annotations(), "boolean_false"),
         Some(false)
     );
-    assert_eq!(protocol.get_annotation_as_bool("boolean_yes"), Some(true));
-    assert_eq!(protocol.get_annotation_as_bool("boolean_no"), Some(false));
+    assert_eq!(
+        parse_annotation_as_bool(protocol.get_annotations(), "boolean_yes"),
+        Some(true)
+    );
+    assert_eq!(
+        parse_annotation_as_bool(protocol.get_annotations(), "boolean_no"),
+        Some(false)
+    );
 
     // Test invalid conversions
-    assert_eq!(protocol.get_annotation_as::<i32>("string_value"), None);
-    assert_eq!(protocol.get_annotation_as_bool("string_value"), None);
+    assert_eq!(
+        parse_annotation_as::<i32>(protocol.get_annotations(), "string_value"),
+        None
+    );
+    assert_eq!(
+        parse_annotation_as_bool(protocol.get_annotations(), "string_value"),
+        None
+    );
 }

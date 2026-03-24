@@ -9,7 +9,8 @@
 //! This provides end-to-end verification that the guardedness enforcement
 //! proven necessary in Lean actually prevents deadlock-prone protocols.
 
-use telltale_theory::{project, validate_global, validate_local, ValidationError};
+use telltale_theory::projection::project;
+use telltale_theory::well_formedness::{validate_global, validate_local, ValidationError};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 // ============================================================================

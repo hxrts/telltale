@@ -2,10 +2,11 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
+use telltale_theory::coherence::check_coherent;
+use telltale_theory::limits::TraversalFuel;
 use telltale_theory::projection::{project_all, MemoizedProjector};
-use telltale_theory::{
-    async_subtype, check_coherent, reduces_star_with_fuel, sync_subtype, TraversalFuel,
-};
+use telltale_theory::semantics::reduces_star_with_fuel;
+use telltale_theory::subtyping::{async_subtype, sync_subtype};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 fn chain_global(depth: usize) -> GlobalType {

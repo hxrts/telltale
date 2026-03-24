@@ -114,17 +114,14 @@ pub fn parse_choreography_str(input: &str) -> std::result::Result<Choreography, 
 #[allow(clippy::too_many_lines)]
 pub fn parse_choreography_str_with_extensions(
     input: &str,
-    registry: &ExtensionRegistry,
+    _registry: &ExtensionRegistry,
 ) -> std::result::Result<(Choreography, Vec<Box<dyn ProtocolExtension>>), ParseError> {
     let dedented = strip_common_indent(input);
     let layout = preprocess_layout(&dedented).map_err(|e| ParseError::Layout {
         span: ErrorSpan::from_line_col(e.line, e.column, &dedented),
         message: e.message,
     })?;
-
-    let preprocessed = preprocess_extension_syntax(&layout, registry)?;
-
-    let pairs = ChoreographyParser::parse(Rule::choreography, &preprocessed).map_err(Box::new)?;
+    let pairs = ChoreographyParser::parse(Rule::choreography, &layout).map_err(Box::new)?;
 
     let mut name = format_ident!("Unnamed");
     let mut namespace: Option<String> = None;
@@ -148,46 +145,46 @@ pub fn parse_choreography_str_with_extensions(
             for inner in pair.into_inner() {
                 match inner.as_rule() {
                     Rule::module_decl => {
-                        namespace = Some(parse_module_decl(inner, &preprocessed)?);
+                        namespace = Some(parse_module_decl(inner, &layout)?);
                     }
                     Rule::import_decl => {
                         // Imports are parsed but not processed (reserved syntax)
                     }
                     Rule::proof_bundle_decl => {
-                        proof_bundles.push(parse_proof_bundle_decl(inner, &preprocessed)?);
+                        proof_bundles.push(parse_proof_bundle_decl(inner, &layout)?);
                     }
                     Rule::role_set_decl => {
-                        role_sets.push(parse_role_set_decl(inner, &preprocessed)?);
+                        role_sets.push(parse_role_set_decl(inner, &layout)?);
                     }
                     Rule::topology_decl => {
-                        topologies.push(parse_topology_decl(inner, &preprocessed)?);
+                        topologies.push(parse_topology_decl(inner, &layout)?);
                     }
                     Rule::type_decl => {
-                        type_decls.push(parse_type_decl(inner, &preprocessed)?);
+                        type_decls.push(parse_type_decl(inner, &layout)?);
                     }
                     Rule::effect_decl => {
-                        effect_decls.push(parse_effect_decl(inner, &preprocessed)?);
+                        effect_decls.push(parse_effect_decl(inner, &layout)?);
                     }
                     Rule::fragment_decl => {
-                        fragment_decls.push(parse_fragment_decl(inner, &preprocessed)?);
+                        fragment_decls.push(parse_fragment_decl(inner, &layout)?);
                     }
                     Rule::operation_decl => {
-                        operation_decls.push(parse_operation_decl(inner, &preprocessed)?);
+                        operation_decls.push(parse_operation_decl(inner, &layout)?);
                     }
                     Rule::guest_runtime_decl => {
-                        guest_runtime_decls.push(parse_guest_runtime_decl(inner, &preprocessed)?);
+                        guest_runtime_decls.push(parse_guest_runtime_decl(inner, &layout)?);
                     }
                     Rule::protocol_decl => {
                         let protocol_span = inner.as_span();
                         enforce_same_line_equals(
                             inner.as_str(),
                             protocol_span,
-                            &preprocessed,
+                            &layout,
                             "protocol declaration",
                         )?;
                         let mut proto_inner = inner.into_inner();
                         let name_pair = proto_inner.next().ok_or_else(|| ParseError::Syntax {
-                            span: ErrorSpan::from_pest_span(protocol_span, &preprocessed),
+                            span: ErrorSpan::from_pest_span(protocol_span, &layout),
                             message: "protocol declaration is missing a name".to_string(),
                         })?;
                         name = format_ident!("{}", name_pair.as_str());
@@ -199,8 +196,7 @@ pub fn parse_choreography_str_with_extensions(
                         for item in proto_inner {
                             match item.as_rule() {
                                 Rule::header_roles => {
-                                    header_roles =
-                                        Some(parse_roles_from_pair(item, &preprocessed)?);
+                                    header_roles = Some(parse_roles_from_pair(item, &layout)?);
                                 }
                                 Rule::protocol_requires => {
                                     required_bundles = parse_protocol_requires(item);
@@ -220,7 +216,7 @@ pub fn parse_choreography_str_with_extensions(
 
                         let allow_roles_decl = header_roles.is_none();
                         let body_pair = body_pair.ok_or_else(|| ParseError::Syntax {
-                            span: ErrorSpan::from_pest_span(protocol_span, &preprocessed),
+                            span: ErrorSpan::from_pest_span(protocol_span, &layout),
                             message: "protocol declaration is missing a body".to_string(),
                         })?;
                         let body_span = body_pair.as_span();
@@ -230,14 +226,14 @@ pub fn parse_choreography_str_with_extensions(
                         } = parse_protocol_body(
                             body_pair,
                             &declared_roles,
-                            &preprocessed,
+                            &layout,
                             &protocol_defs,
                             allow_roles_decl,
                         )?;
 
                         if header_roles.is_some() && body_roles.is_some() {
                             return Err(ParseError::Syntax {
-                                span: ErrorSpan::from_pest_span(body_span, &preprocessed),
+                                span: ErrorSpan::from_pest_span(body_span, &layout),
                                 message: "roles cannot be declared both in the header and body"
                                     .to_string(),
                             });
@@ -257,16 +253,16 @@ pub fn parse_choreography_str_with_extensions(
                                     parse_local_protocol_decl(
                                         local,
                                         &declared_roles,
-                                        &preprocessed,
+                                        &layout,
                                         &mut protocol_defs,
                                     )?;
                                 }
                             }
                         }
 
-                        statements = inline_calls(&body_statements, &protocol_defs, &preprocessed)?;
-                        validate_linear_vm_assets(&statements, &preprocessed)?;
-                        validate_authority_surface(&statements, &preprocessed)?;
+                        statements = inline_calls(&body_statements, &protocol_defs, &layout)?;
+                        validate_linear_vm_assets(&statements, &layout)?;
+                        validate_authority_surface(&statements, &layout)?;
                     }
                     _ => {}
                 }
@@ -291,7 +287,7 @@ pub fn parse_choreography_str_with_extensions(
     choreography
         .set_proof_bundles(&proof_bundles)
         .map_err(|message| ParseError::Syntax {
-            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     let inferred_required_bundles =
@@ -305,76 +301,65 @@ pub fn parse_choreography_str_with_extensions(
     choreography
         .set_required_proof_bundles(&resolved_required_bundles)
         .map_err(|message| ParseError::Syntax {
-            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     choreography
         .set_inferred_required_proof_bundles(&inferred_required_bundles)
         .map_err(|message| ParseError::Syntax {
-            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     choreography
         .set_role_sets(&role_sets)
         .map_err(|message| ParseError::Syntax {
-            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     choreography
         .set_topologies(&topologies)
         .map_err(|message| ParseError::Syntax {
-            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     choreography
         .set_type_decls(&type_decls)
         .map_err(|message| ParseError::Syntax {
-            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     choreography
         .set_effect_decls(&effect_decls)
         .map_err(|message| ParseError::Syntax {
-            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     choreography
         .set_protocol_uses(&protocol_uses)
         .map_err(|message| ParseError::Syntax {
-            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     choreography
         .set_fragment_decls(&fragment_decls)
         .map_err(|message| ParseError::Syntax {
-            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     choreography
         .set_operation_decls(&operation_decls)
         .map_err(|message| ParseError::Syntax {
-            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     choreography
         .set_guest_runtime_decls(&guest_runtime_decls)
         .map_err(|message| ParseError::Syntax {
-            span: ErrorSpan::from_line_col(1, 1, &preprocessed),
+            span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
 
     Ok((choreography, Vec::new()))
-}
-
-/// Preprocess extension syntax to transform it into standard DSL syntax.
-///
-/// Returns input unchanged - extension surface syntax is not used in the
-/// current DSL. This function maintains API stability.
-fn preprocess_extension_syntax(
-    input: &str,
-    _registry: &ExtensionRegistry,
-) -> std::result::Result<String, ParseError> {
-    Ok(input.to_string())
 }
 
 fn strip_common_indent(input: &str) -> String {
@@ -413,8 +398,7 @@ fn strip_common_indent(input: &str) -> String {
     out
 }
 
-/// Parse a choreographic protocol from a token stream (for macro use)
-/// This is a compatibility function that wraps the string parser
+/// Parse a choreographic protocol from a token stream for macro use.
 pub fn parse_choreography(input: TokenStream) -> syn::Result<Choreography> {
     use syn::LitStr;
 

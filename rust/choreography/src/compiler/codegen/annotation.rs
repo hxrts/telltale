@@ -120,16 +120,18 @@ pub(crate) fn generate_annotation_attributes(annotations: &crate::ast::Annotatio
         attrs.push(quote! { #[priority = #p] });
     }
 
-    // timeout/async/retry use string-based lookup (not typed Annotation variants)
-    if let Some(timeout) = annotations.get("timeout") {
+    if let Some(timeout) = annotations.custom("timeout") {
         attrs.push(quote! { #[timeout = #timeout] });
     }
 
-    if annotations.get("async").is_some_and(|v| v == "true") {
+    if annotations.custom("async").is_some_and(|v| v == "true") {
         attrs.push(quote! { #[async_trait] });
     }
 
-    if let Some(retry_count) = annotations.get("retry") {
+    if let Some(retry_count) = annotations
+        .iter()
+        .find_map(|annotation| annotation.retry_config().map(|(attempts, _)| attempts))
+    {
         attrs.push(quote! { #[retry = #retry_count] });
     }
 
@@ -146,7 +148,7 @@ pub(crate) fn generate_runtime_annotation_access(name: &str, protocol: &Protocol
     }
 
     // Convert to a flat key-value map for code generation.
-    let annotation_map = all_annotations.to_map();
+    let annotation_map = all_annotations.dsl_map();
     let mut annotation_entries: Vec<_> = annotation_map.iter().collect();
     annotation_entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
 

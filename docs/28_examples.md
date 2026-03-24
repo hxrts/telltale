@@ -93,7 +93,7 @@ Parallel branches must be independent in order to remain well formed. Each branc
 
 ## Testing Patterns
 
-Three handler types support different test scenarios. `InMemoryHandler` is the simplest, operating with in-process channels. `TelltaleHandler` uses `SimpleChannel` pairs for typed bidirectional communication. `RecordingHandler` captures events without executing real transport.
+Three handler types support different test scenarios. `InMemoryHandler` is the simplest, operating with in-process channels. `TelltaleHandler` uses `TelltaleSession` pairs for typed bidirectional communication. `RecordingHandler` captures events without executing real transport.
 
 ### Unit Test With InMemoryHandler
 
@@ -118,20 +118,20 @@ async fn test_send_only() {
 ```rust
 #[tokio::test]
 async fn test_session_types() {
-    let (alice_ch, bob_ch) = SimpleChannel::pair();
+    let (alice_session, bob_session) = TelltaleSession::pair();
 
     let mut alice_ep = TelltaleEndpoint::new(Role::Alice);
-    alice_ep.register_channel(Role::Bob, alice_ch);
+    alice_ep.register_session(Role::Bob, alice_session);
 
     let mut bob_ep = TelltaleEndpoint::new(Role::Bob);
-    bob_ep.register_channel(Role::Alice, bob_ch);
+    bob_ep.register_session(Role::Alice, bob_session);
 
     let mut handler = TelltaleHandler::<Role, Message>::new();
     // run protocol on both endpoints
 }
 ```
 
-This pattern validates the channel based handler without custom transports. The role type must implement both `telltale::Role` and `RoleId`. `SimpleChannel::pair` returns two linked endpoints that relay messages in both directions.
+This pattern validates the session-based handler without custom transports. The role type must implement both `telltale::Role` and `RoleId`. `TelltaleSession::pair` returns two linked endpoints that relay messages in both directions.
 
 ### RecordingHandler
 

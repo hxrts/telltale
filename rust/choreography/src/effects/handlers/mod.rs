@@ -5,7 +5,7 @@
 //
 // - in_memory: WASM-compatible handler using futures channels for testing
 // - recording: Captures effects for verification
-// - telltale: Session-typed Telltale integration (WASM-compatible via SimpleChannel)
+// - telltale: Session-typed Telltale integration
 
 pub mod in_memory;
 pub mod recording;
@@ -14,4 +14,4 @@ pub mod telltale;
 // Re-export handler types for convenience
 pub use in_memory::InMemoryHandler;
 pub use recording::{RecordedEvent, RecordingHandler};
-pub use telltale::{SimpleChannel, TelltaleEndpoint, TelltaleHandler, TelltaleSession};
+pub use telltale::{TelltaleEndpoint, TelltaleHandler, TelltaleSession};

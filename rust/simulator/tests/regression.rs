@@ -15,7 +15,7 @@ use telltale_simulator::runner;
 use telltale_simulator::trace::Trace;
 use telltale_simulator::EffectHandler;
 use telltale_simulator::{HamiltonianHandler, IsingHandler};
-use telltale_theory::project;
+use telltale_theory::projection::project;
 use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 
 /// Skip if Lean validator binary is unavailable.

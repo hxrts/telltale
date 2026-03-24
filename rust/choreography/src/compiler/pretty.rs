@@ -433,7 +433,7 @@ fn format_role_ref(role: &Role) -> String {
 
 fn format_sender_term(role: &Role, annotations: &Annotations) -> String {
     let mut out = format_role_ref(role);
-    let mut entries: Vec<_> = annotations.to_map().into_iter().collect();
+    let mut entries: Vec<_> = annotations.dsl_map().into_iter().collect();
     entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
     if !entries.is_empty() {
         let formatted = entries
@@ -452,11 +452,11 @@ fn merge_sender_annotations(
     sender_annotations: &Annotations,
     statement_annotations: &Annotations,
 ) -> Annotations {
-    let mut merged = sender_annotations.to_map();
-    for (key, value) in statement_annotations.to_map() {
+    let mut merged = sender_annotations.dsl_map();
+    for (key, value) in statement_annotations.dsl_map() {
         merged.entry(key).or_insert(value);
     }
-    Annotations::from_map(&merged)
+    Annotations::from_dsl_map(&merged)
 }
 
 fn normalize_surface_type_string(s: &str) -> String {

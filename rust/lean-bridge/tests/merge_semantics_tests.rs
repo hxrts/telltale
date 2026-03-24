@@ -15,7 +15,8 @@
 
 use serde_json::json;
 use telltale_lean_bridge::{global_to_json, json_to_local, local_to_json, LeanRunner};
-use telltale_theory::{can_merge, merge, project};
+use telltale_theory::projection::project;
+use telltale_types::merge::{can_merge, merge};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 /// Helper macro to skip tests when Lean binary is unavailable.

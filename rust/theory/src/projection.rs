@@ -43,11 +43,11 @@
 //! ```
 
 use crate::limits::{CacheEntries, DEFAULT_PROJECTOR_CACHE_ENTRIES};
-use crate::merge::{merge_all, MergeError};
 use std::sync::Arc;
 use telltale_types::content_id::Sha256Hasher;
 use telltale_types::content_store::{CacheMetrics, KeyedContentStore};
 use telltale_types::contentable::Contentable;
+use telltale_types::merge::{merge_all, MergeError};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use thiserror::Error;
 
@@ -114,7 +114,7 @@ fn project_non_participant(
 /// # Examples
 ///
 /// ```
-/// use telltale_theory::project;
+/// use telltale_theory::projection::project;
 /// use telltale_types::{GlobalType, LocalTypeR, Label};
 ///
 /// // A -> B: msg. end

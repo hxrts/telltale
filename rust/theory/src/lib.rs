@@ -40,8 +40,6 @@
 pub mod coherence;
 #[cfg(feature = "duality")]
 pub mod duality;
-#[cfg(feature = "merge")]
-pub mod merge;
 #[cfg(feature = "projection")]
 pub mod projection;
 #[cfg(feature = "semantics")]
@@ -57,40 +55,3 @@ pub mod bounded;
 pub mod limits;
 pub mod policy;
 pub mod subtyping;
-
-// Re-exports for core modules
-#[cfg(feature = "coherence")]
-pub use coherence::{check_coherent, projectable, CoherentG};
-#[cfg(feature = "duality")]
-pub use duality::{dual, is_dual};
-pub use limits::{
-    CacheEntries, FuelSteps, TraversalFuel, UnfoldSteps, YieldAfterSteps,
-    DEFAULT_PROJECTOR_CACHE_ENTRIES, DEFAULT_SISO_UNFOLD_STEPS, DEFAULT_TRAVERSAL_FUEL,
-};
-#[cfg(feature = "merge")]
-pub use merge::{can_merge, merge, merge_all, MergeError};
-pub use policy::{BreadthFirst, DepthFirst, RoundRobin, SchedulerPolicy};
-#[cfg(feature = "projection")]
-pub use projection::{project, project_all, MemoizedProjector, ProjectionError};
-#[cfg(feature = "semantics")]
-pub use semantics::{
-    can_step, can_step_with_fuel, consume_with_proof, consume_with_proof_with_fuel, good_g,
-    good_g_with_fuel, local_can_step, local_can_step_with_fuel, local_step, local_step_with_fuel,
-    reduces, reduces_star, reduces_star_with_fuel, reduces_with_fuel, step, step_with_fuel,
-    ConsumeResult, GlobalAction, LocalAction, LocalKind,
-};
-#[cfg(feature = "well-formedness")]
-pub use well_formedness::{unique_labels, validate_global, validate_local, ValidationError};
-
-// Re-exports for optional modules
-#[cfg(feature = "bounded")]
-pub use bounded::{bound_recursion, unfold_bounded, BoundingStrategy};
-
-// Subtyping re-exports (conditionally based on features)
-#[cfg(feature = "async-subtyping")]
-pub use subtyping::{
-    async_subtype, orphan_free, siso_decompose, siso_decompose_with_fuel, AsyncSubtypeError,
-    InputTree, OutputTree, SisoSegment,
-};
-#[cfg(feature = "sync-subtyping")]
-pub use subtyping::{sync_subtype, SyncSubtypeError};

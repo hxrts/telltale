@@ -4,10 +4,11 @@
 //! across session type operations (projection, duality, merge).
 
 use proptest::prelude::*;
-use telltale_theory::{
-    check_coherent, dual, merge, project, projectable, validate_global, validate_local,
-    well_formedness::unique_labels_local,
-};
+use telltale_theory::coherence::{check_coherent, projectable};
+use telltale_theory::duality::dual;
+use telltale_theory::projection::project;
+use telltale_theory::well_formedness::{unique_labels_local, validate_global, validate_local};
+use telltale_types::merge::merge;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 // ============================================================================

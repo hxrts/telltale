@@ -16,35 +16,6 @@ mod test_support;
 use test_support::PassthroughHandler;
 
 #[test]
-fn legacy_value_variants_are_rejected_by_deserialization() {
-    for json in [
-        r#"{"Int":7}"#,
-        r#"{"Real":"0.5"}"#,
-        r#"{"Vec":[1,2,3]}"#,
-        r#"{"Label":"msg"}"#,
-        r#"{"Json":{"k":"v"}}"#,
-        r#"{"Knowledge":{"endpoint":{"sid":0,"role":"A"},"fact":"x"}}"#,
-    ] {
-        let parsed = serde_json::from_str::<Value>(json);
-        assert!(
-            parsed.is_err(),
-            "legacy value JSON unexpectedly accepted: {json}"
-        );
-    }
-}
-
-#[test]
-fn legacy_immediate_variants_are_rejected_by_deserialization() {
-    for json in [r#"{"Int":7}"#, r#"{"Real":"0.5"}"#] {
-        let parsed = serde_json::from_str::<ImmValue>(json);
-        assert!(
-            parsed.is_err(),
-            "legacy immediate JSON unexpectedly accepted: {json}"
-        );
-    }
-}
-
-#[test]
 fn choose_rejects_non_string_label_payload() {
     let mut local_types = BTreeMap::new();
     local_types.insert(

@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 use telltale::{Message, Role};
 use telltale_choreography::{
-    ChoreoHandler, LabelId, RoleId, RoleName, SimpleChannel, TelltaleEndpoint, TelltaleHandler,
+    ChoreoHandler, LabelId, RoleId, RoleName, TelltaleEndpoint, TelltaleHandler, TelltaleSession,
 };
 
 // Define roles
@@ -84,10 +84,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut alice_ep = TelltaleEndpoint::new(MyRole::Alice);
     let mut bob_ep = TelltaleEndpoint::new(MyRole::Bob);
 
-    // Setup channels
-    let (alice_ch, bob_ch) = SimpleChannel::pair();
-    alice_ep.register_channel(MyRole::Bob, alice_ch);
-    bob_ep.register_channel(MyRole::Alice, bob_ch);
+    // Setup sessions
+    let (alice_session, bob_session) = TelltaleSession::pair();
+    alice_ep.register_session(MyRole::Bob, alice_session);
+    bob_ep.register_session(MyRole::Alice, bob_session);
 
     // Create handlers
     let mut alice_handler = TelltaleHandler::<MyRole, MyMessage>::new();
@@ -106,7 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-This example creates two endpoints and connects them with a `SimpleChannel` pair. It demonstrates direct `send` and `recv` calls through the handler.
+This example creates two endpoints and connects them with a `TelltaleSession` pair. It demonstrates direct `send` and `recv` calls through the handler.
 
 ## Simulator Regression Lane
 
@@ -149,11 +149,11 @@ Messages are the data exchanged between roles. They must:
 - Contains channels to all peers
 - Tracks session metadata (operation counts, state descriptions)
 
-### Channels
+### Sessions
 
-`SimpleChannel` provides bidirectional async byte passing:
-- Created in pairs: `SimpleChannel::pair()`
-- Uses mpsc unbounded channels internally
+`TelltaleSession` provides the canonical communication boundary:
+- Created in pairs for in-process tests: `TelltaleSession::pair()`
+- Or built from custom sink/stream transports with `TelltaleSession::from_sink_stream()`
 - The handler serializes and deserializes messages with bincode
 
 ### Handlers
@@ -187,44 +187,38 @@ pub fn local_role(&self) -> &R
 ```
 Get a reference to the local role.
 
-#### Channel Management
-```rust
-pub fn register_channel(&mut self, peer: R, channel: SimpleChannel)
-```
-Register a channel with a peer role.
-
+#### Session Management
 ```rust
 pub fn register_session(&mut self, peer: R, session: TelltaleSession)
 ```
-Register a dynamically dispatched session (for example one produced via
-`TelltaleSession::from_simple_channel` or
+Register a session (for example one produced via `TelltaleSession::pair` or
 `TelltaleSession::from_sink_stream`). Use this when you need additional
 transport logic such as WebSockets, recording, or custom middleware stacks.
 
 ```rust
 pub fn has_channel(&self, peer: &R) -> bool
 ```
-Check if a channel exists for a peer.
+Check if a session exists for a peer.
 
 ```rust
 pub fn close_channel(&mut self, peer: &R) -> bool
 ```
-Close a specific channel.
+Close a specific session.
 
 ```rust
 pub fn close_all_channels(&mut self) -> usize
 ```
-Close all channels and return count.
+Close all sessions and return count.
 
 ```rust
 pub fn active_channel_count(&self) -> usize
 ```
-Get number of active channels.
+Get number of active sessions.
 
 ```rust
 pub fn is_all_closed(&self) -> bool
 ```
-Check if all channels are closed.
+Check if all sessions are closed.
 
 #### Metadata Access
 ```rust
@@ -281,37 +275,12 @@ where F: Future<Output = ChoreoResult<T>> + Send
 ```
 Execute operation with timeout.
 
-### SimpleChannel
-
-```rust
-pub struct SimpleChannel
-```
-
-This type wraps a bidirectional byte channel. It is the default transport for the handler.
-
-#### Constructor
-```rust
-pub fn pair() -> (Self, Self)
-```
-Create a connected pair of channels.
-
-#### Operations
-```rust
-pub async fn send(&mut self, msg: Vec<u8>) -> Result<(), String>
-```
-Send raw bytes.
-
-```rust
-pub async fn recv(&mut self) -> Result<Vec<u8>, String>
-```
-Receive raw bytes.
-
 ### TelltaleSession Builders
 
 ```rust
-TelltaleSession::from_simple_channel(channel: SimpleChannel)
+TelltaleSession::pair()
 ```
-Wraps a legacy channel in the new dynamic session API.
+Builds a connected in-process session pair.
 
 ```rust
 TelltaleSession::from_sink_stream(sender, receiver)
@@ -484,29 +453,29 @@ handler.send(&mut ep, role, &msg).await.unwrap();
 
 This panics on failures and hides transport details.
 
-### 3. Channel Setup
+### 3. Session Setup
 
 Recommended approach:
 ```rust
-// Setup all channels before starting protocol
-let (ch1, ch2) = SimpleChannel::pair();
-alice_ep.register_channel(Role::Bob, ch1);
-bob_ep.register_channel(Role::Alice, ch2);
+// Setup all sessions before starting protocol
+let (alice_session, bob_session) = TelltaleSession::pair();
+alice_ep.register_session(Role::Bob, alice_session);
+bob_ep.register_session(Role::Alice, bob_session);
 
 // Then start protocol
 protocol_run().await?;
 ```
 
-This ensures channels exist before the first send.
+This ensures sessions exist before the first send.
 
 Avoid:
 ```rust
-// Don't register channels mid-protocol
-handler.send(&mut ep, role, &msg).await?; // Might not have channel!
-ep.register_channel(role, channel); // Too late!
+// Don't register sessions mid-protocol
+handler.send(&mut ep, role, &msg).await?; // Might not have session!
+ep.register_session(role, session); // Too late!
 ```
 
-This can cause send failures when a channel is missing.
+This can cause send failures when a session is missing.
 
 ### 4. Metadata Usage
 
@@ -535,9 +504,9 @@ async fn test_protocol() {
     let mut alice_ep = TelltaleEndpoint::new(Role::Alice);
     let mut bob_ep = TelltaleEndpoint::new(Role::Bob);
     
-    let (alice_ch, bob_ch) = SimpleChannel::pair();
-    alice_ep.register_channel(Role::Bob, alice_ch);
-    bob_ep.register_channel(Role::Alice, bob_ch);
+    let (alice_session, bob_session) = TelltaleSession::pair();
+    alice_ep.register_session(Role::Bob, alice_session);
+    bob_ep.register_session(Role::Alice, bob_session);
     
     // Test protocol
     let msg = TestMessage { data: vec![1, 2, 3] };
@@ -548,12 +517,12 @@ async fn test_protocol() {
 }
 ```
 
-This sets up a local channel pair and exercises a full send and receive. It validates handler wiring in tests.
+This sets up a local session pair and exercises a full send and receive. It validates handler wiring in tests.
 
 ## Operational Notes
 
 `TelltaleHandler` is intentionally thin. Most correctness comes from the session-typed state in `TelltaleEndpoint` and from protocol generation. Treat the handler as a transport adapter with stable behavior. Keep role definitions and message definitions close to each protocol module to make type drift easy to detect during review.
 
-For production integrations, prefer explicit lifecycle management even though drop-based cleanup exists. Close channels when a protocol is complete. Inspect endpoint metadata after important milestones such as branch commits or retries. Metadata captures operation counts and completion status per peer.
+For production integrations, prefer explicit lifecycle management even though drop-based cleanup exists. Close sessions when a protocol is complete. Inspect endpoint metadata after important milestones such as branch commits or retries. Metadata captures operation counts and completion status per peer.
 
 When introducing custom transports, keep serialization and framing deterministic. Use one canonical message encoding in both tests and production. Add at least one integration test that runs both endpoints concurrently and one scenario test that exercises failure handling.

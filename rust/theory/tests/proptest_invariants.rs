@@ -6,9 +6,11 @@
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
-use telltale_theory::{
-    async_subtype, check_coherent, merge, project, sync_subtype, validate_global, validate_local,
-};
+use telltale_theory::coherence::check_coherent;
+use telltale_theory::projection::project;
+use telltale_theory::subtyping::{async_subtype, sync_subtype};
+use telltale_theory::well_formedness::{validate_global, validate_local};
+use telltale_types::merge::merge;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 /// Deterministic seed for reproducibility

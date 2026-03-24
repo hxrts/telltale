@@ -198,28 +198,6 @@ impl ExtensionRegistry {
         Ok(())
     }
 
-    /// Register a grammar extension with version information
-    pub fn register_grammar_with_version<T: GrammarExtension + 'static>(
-        &mut self,
-        extension: T,
-        version: String,
-    ) -> Result<(), ParseError> {
-        let id = extension.extension_id().to_string();
-        self.extension_versions.insert(id.clone(), version);
-        self.register_grammar(extension)
-    }
-
-    /// Register a grammar extension (legacy method for compatibility).
-    ///
-    /// This method silently ignores registration errors (e.g., priority conflicts)
-    /// for backward compatibility with code that didn't check results.
-    /// Prefer `register_grammar()` which returns errors.
-    #[deprecated(since = "0.2.0", note = "use register_grammar() instead")]
-    pub fn register_grammar_legacy<T: GrammarExtension + 'static>(&mut self, extension: T) {
-        // Intentionally ignoring error: legacy API contract doesn't report failures
-        drop(self.register_grammar(extension));
-    }
-
     /// Register a statement parser
     pub fn register_parser<T: StatementParser + 'static>(&mut self, parser: T, parser_id: String) {
         self.statement_parsers.insert(parser_id, Box::new(parser));
@@ -391,37 +369,6 @@ impl ExtensionRegistry {
         registry
     }
 
-    /// Get extension version
-    pub fn get_extension_version(&self, extension_id: &str) -> Option<&String> {
-        self.extension_versions.get(extension_id)
-    }
-
-    /// List all registered extensions with versions
-    pub fn list_extensions_with_versions(&self) -> Vec<(String, String)> {
-        let mut ids: Vec<_> = self.grammar_extensions.keys().collect();
-        ids.sort();
-        ids.into_iter()
-            .map(|id| {
-                let version = self
-                    .extension_versions
-                    .get(id)
-                    .cloned()
-                    .unwrap_or_else(|| "unknown".to_string());
-                (id.clone(), version)
-            })
-            .collect()
-    }
-
-    /// Check if extension meets minimum version requirement
-    pub fn check_minimum_version(&self, extension_id: &str, min_version: &str) -> bool {
-        if let Some(version) = self.extension_versions.get(extension_id) {
-            // Simple version comparison - in production would use semver crate
-            version.as_str() >= min_version
-        } else {
-            false
-        }
-    }
-
     /// Create a minimal registry for 3rd party integration
     pub fn for_third_party() -> Self {
         Self::new()
@@ -452,29 +399,6 @@ impl ExtensionRegistry {
         }
 
         docs
-    }
-
-    /// Get basic help for a specific extension
-    pub fn get_extension_help(&self, extension_id: &str) -> Option<String> {
-        if let Some(extension) = self.grammar_extensions.get(extension_id) {
-            let mut help = format!("Extension: {}\n", extension_id);
-            help.push_str(&format!("Priority: {}\n", extension.priority()));
-            help.push_str(&format!(
-                "Rules: {}\n",
-                extension.statement_rules().join(", ")
-            ));
-
-            if let Some(version) = self.extension_versions.get(extension_id) {
-                help.push_str(&format!("Version: {}\n", version));
-            }
-
-            help.push_str("\nGrammar:\n");
-            help.push_str(extension.grammar_rules());
-
-            Some(help)
-        } else {
-            None
-        }
     }
 }
 
@@ -718,10 +642,12 @@ mod tests {
     fn test_documentation_system() {
         let mut registry = ExtensionRegistry::new();
 
-        // Register an extension with version
         registry
-            .register_grammar_with_version(MockGrammarExtension, "1.0.0".to_string())
-            .expect("versioned extension should register");
+            .extension_versions
+            .insert("mock_timeout".to_string(), "1.0.0".to_string());
+        registry
+            .register_grammar(MockGrammarExtension)
+            .expect("grammar extension should register");
 
         // Test documentation generation
         let docs = registry.generate_docs();
@@ -730,17 +656,10 @@ mod tests {
         assert!(docs.contains("**Priority:** 100"));
         assert!(docs.contains("**Version:** 1.0.0"));
 
-        // Test getting help for specific extension
-        let help = registry.get_extension_help("mock_timeout");
-        assert!(help.is_some());
-        assert!(help.unwrap().contains("Extension: mock_timeout"));
-
-        // Test listing extensions with versions
-        let extensions = registry.list_extensions_with_versions();
-        assert!(!extensions.is_empty());
-        assert!(extensions
-            .iter()
-            .any(|(name, version)| name == "mock_timeout" && version == "1.0.0"));
+        assert_eq!(
+            registry.extension_versions.get("mock_timeout"),
+            Some(&"1.0.0".to_string())
+        );
     }
 
     #[test]

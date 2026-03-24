@@ -822,8 +822,8 @@ impl Choreography {
 
     fn required_vm_core_capabilities(&self) -> BTreeSet<String> {
         fn collect(protocol: &Protocol, out: &mut BTreeSet<String>) {
-            if let Some(cap) = protocol.get_annotation("required_capability") {
-                out.insert(cap);
+            if let Some(cap) = protocol.get_annotations().custom("required_capability") {
+                out.insert(cap.to_string());
             }
             match protocol {
                 Protocol::Send { continuation, .. }

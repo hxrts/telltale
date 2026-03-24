@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 use telltale_choreography::effects::{
-    handlers::telltale::{SimpleChannel, TelltaleEndpoint, TelltaleHandler, TelltaleSession},
+    handlers::telltale::{TelltaleEndpoint, TelltaleHandler, TelltaleSession},
     ChoreoHandler, LabelId, RoleId,
 };
 use telltale_choreography::RoleName;
@@ -86,16 +86,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client_ep = TelltaleEndpoint::new(Role::Client);
     let mut server_ep = TelltaleEndpoint::new(Role::Server);
 
-    // Create bidirectional channels
-    let (client_ch, server_ch) = SimpleChannel::pair();
-    client_ep.register_session(
-        Role::Server,
-        TelltaleSession::from_simple_channel(client_ch),
-    );
-    server_ep.register_session(
-        Role::Client,
-        TelltaleSession::from_simple_channel(server_ch),
-    );
+    // Create bidirectional session pair
+    let (client_session, server_session) = TelltaleSession::pair();
+    client_ep.register_session(Role::Server, client_session);
+    server_ep.register_session(Role::Client, server_session);
 
     // Create handlers
     let mut client_handler = TelltaleHandler::<Role, Message>::new();

@@ -75,7 +75,7 @@ pub type ValidationResult = Result<(), ValidationError>;
 /// # Examples
 ///
 /// ```
-/// use telltale_theory::validate_global;
+/// use telltale_theory::well_formedness::validate_global;
 /// use telltale_types::{GlobalType, Label};
 ///
 /// // Well-formed protocol
@@ -150,7 +150,7 @@ fn find_self_comm(g: &GlobalType) -> Option<String> {
 /// # Examples
 ///
 /// ```
-/// use telltale_theory::unique_labels;
+/// use telltale_theory::well_formedness::unique_labels;
 /// use telltale_types::{GlobalType, Label};
 ///
 /// // Unique labels
@@ -229,7 +229,7 @@ fn find_duplicate_label_local(lt: &LocalTypeR) -> Option<String> {
 /// # Examples
 ///
 /// ```
-/// use telltale_theory::validate_local;
+/// use telltale_theory::well_formedness::validate_local;
 /// use telltale_types::{LocalTypeR, Label};
 ///
 /// // Well-formed local type

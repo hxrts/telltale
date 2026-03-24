@@ -29,11 +29,7 @@ impl Annotations {
         Self { items }
     }
 
-    /// Convert from a key-value map.
-    ///
-    /// Special handling for timed_choice which uses two keys (timed_choice + timeout_ms).
-    #[must_use]
-    pub fn from_map(map: &HashMap<String, String>) -> Self {
+    pub(crate) fn from_dsl_map(map: &HashMap<String, String>) -> Self {
         let mut items = Vec::new();
 
         if map.get("timed_choice").is_some_and(|v| v == "true") {
@@ -51,27 +47,18 @@ impl Annotations {
             if key == "timed_choice" || key == "timeout_ms" {
                 continue;
             }
-            items.push(ProtocolAnnotation::from_key_value(key, value));
+            items.push(ProtocolAnnotation::parse_dsl_entry(key, value));
         }
 
         Self { items }
     }
 
-    /// Convert to a key-value map.
-    #[must_use]
-    pub fn to_map(&self) -> HashMap<String, String> {
+    pub(crate) fn dsl_map(&self) -> HashMap<String, String> {
         let mut map = HashMap::new();
 
         for annotation in &self.items {
-            match annotation {
-                ProtocolAnnotation::TimedChoice { duration } => {
-                    map.insert("timed_choice".to_string(), "true".to_string());
-                    map.insert("timeout_ms".to_string(), duration.as_millis().to_string());
-                }
-                _ => {
-                    let (key, value) = annotation.to_key_value();
-                    map.insert(key, value);
-                }
+            for (key, value) in annotation.dsl_entries() {
+                map.insert(key, value);
             }
         }
 
@@ -207,35 +194,6 @@ impl Annotations {
         self.items.iter().find_map(|a| a.custom_value(key))
     }
 
-    /// Check if has a specific annotation key (backward compatibility).
-    #[must_use]
-    pub fn has(&self, key: &str) -> bool {
-        self.items.iter().any(|a| a.key() == key)
-    }
-
-    /// Get annotation value by key as string (backward compatibility).
-    #[must_use]
-    pub fn get(&self, key: &str) -> Option<String> {
-        for annotation in &self.items {
-            match annotation {
-                ProtocolAnnotation::TimedChoice { duration } if key == "timeout_ms" => {
-                    return Some(duration.as_millis().to_string());
-                }
-                ProtocolAnnotation::TimedChoice { .. } if key == "timed_choice" => {
-                    return Some("true".to_string());
-                }
-                ProtocolAnnotation::Priority(p) if key == "priority" => {
-                    return Some(p.to_string());
-                }
-                ProtocolAnnotation::Custom { key: k, value } if k == key => {
-                    return Some(value.clone());
-                }
-                _ => continue,
-            }
-        }
-        None
-    }
-
     /// Merge annotations from another set.
     pub fn merge(&mut self, other: &Annotations) {
         self.items.extend(other.items.iter().cloned());
@@ -282,7 +240,6 @@ mod tests {
         let ann = ProtocolAnnotation::timed_choice_ms(5000);
         assert!(ann.is_timed_choice());
         assert_eq!(ann.timed_choice_duration(), Some(Duration::from_secs(5)));
-        assert_eq!(ann.key(), "timed_choice");
     }
 
     #[test]
@@ -301,11 +258,11 @@ mod tests {
     }
 
     #[test]
-    fn test_from_key_value() {
-        let ann = ProtocolAnnotation::from_key_value("priority", "5");
+    fn test_parse_dsl_entry() {
+        let ann = ProtocolAnnotation::parse_dsl_entry("priority", "5");
         assert_eq!(ann, ProtocolAnnotation::Priority(5));
 
-        let ann = ProtocolAnnotation::from_key_value("unknown", "value");
+        let ann = ProtocolAnnotation::parse_dsl_entry("unknown", "value");
         assert!(matches!(ann, ProtocolAnnotation::Custom { .. }));
     }
 
@@ -328,23 +285,14 @@ mod tests {
         original.insert("timeout_ms".to_string(), "5000".to_string());
         original.insert("priority".to_string(), "10".to_string());
 
-        let anns = Annotations::from_map(&original);
+        let anns = Annotations::from_dsl_map(&original);
         assert!(anns.has_timed_choice());
         assert_eq!(anns.timed_choice(), Some(Duration::from_secs(5)));
         assert_eq!(anns.priority(), Some(10));
 
-        let restored = anns.to_map();
+        let restored = anns.dsl_map();
         assert_eq!(restored.get("timed_choice"), Some(&"true".to_string()));
         assert_eq!(restored.get("timeout_ms"), Some(&"5000".to_string()));
-    }
-
-    #[test]
-    fn test_backward_compat_get() {
-        let mut anns = Annotations::new();
-        anns.push(ProtocolAnnotation::timed_choice_ms(5000));
-
-        assert_eq!(anns.get("timed_choice"), Some("true".to_string()));
-        assert_eq!(anns.get("timeout_ms"), Some("5000".to_string()));
     }
 
     #[test]
@@ -352,7 +300,6 @@ mod tests {
         let ann = ProtocolAnnotation::parallel();
         assert!(ann.is_parallel());
         assert!(!ann.is_ordered());
-        assert_eq!(ann.key(), "parallel");
     }
 
     #[test]
@@ -360,7 +307,6 @@ mod tests {
         let ann = ProtocolAnnotation::ordered();
         assert!(ann.is_ordered());
         assert!(!ann.is_parallel());
-        assert_eq!(ann.key(), "ordered");
     }
 
     #[test]
@@ -368,7 +314,6 @@ mod tests {
         let ann = ProtocolAnnotation::min_responses(3);
         assert!(ann.is_min_responses());
         assert_eq!(ann.min_responses_value(), Some(3));
-        assert_eq!(ann.key(), "min_responses");
     }
 
     #[test]
@@ -384,20 +329,20 @@ mod tests {
     }
 
     #[test]
-    fn test_from_key_value_parallel() {
-        let ann = ProtocolAnnotation::from_key_value("parallel", "true");
+    fn test_parse_dsl_entry_parallel() {
+        let ann = ProtocolAnnotation::parse_dsl_entry("parallel", "true");
         assert_eq!(ann, ProtocolAnnotation::Parallel);
 
-        let ann = ProtocolAnnotation::from_key_value("ordered", "true");
+        let ann = ProtocolAnnotation::parse_dsl_entry("ordered", "true");
         assert_eq!(ann, ProtocolAnnotation::Ordered);
 
-        let ann = ProtocolAnnotation::from_key_value("parallel", "");
+        let ann = ProtocolAnnotation::parse_dsl_entry("parallel", "");
         assert_eq!(ann, ProtocolAnnotation::Parallel);
 
-        let ann = ProtocolAnnotation::from_key_value("ordered", "");
+        let ann = ProtocolAnnotation::parse_dsl_entry("ordered", "");
         assert_eq!(ann, ProtocolAnnotation::Ordered);
 
-        let ann = ProtocolAnnotation::from_key_value("min_responses", "3");
+        let ann = ProtocolAnnotation::parse_dsl_entry("min_responses", "3");
         assert_eq!(ann, ProtocolAnnotation::MinResponses(3));
     }
 
@@ -408,7 +353,7 @@ mod tests {
         anns.push(ProtocolAnnotation::Ordered);
         anns.push(ProtocolAnnotation::MinResponses(5));
 
-        let map = anns.to_map();
+        let map = anns.dsl_map();
         assert_eq!(map.get("parallel"), Some(&"true".to_string()));
         assert_eq!(map.get("ordered"), Some(&"true".to_string()));
         assert_eq!(map.get("min_responses"), Some(&"5".to_string()));

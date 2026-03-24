@@ -13,7 +13,6 @@
 //! - Provides type safety for known annotations
 //! - Enables pattern matching in code generation
 //! - Preserves extensibility for future annotation types
-//! - Maintains backward compatibility via `Custom` variant
 
 use std::time::Duration;
 
@@ -304,6 +303,18 @@ impl ProtocolAnnotation {
         matches!(self, Self::Retry { .. })
     }
 
+    /// Get retry parameters, if this is a retry annotation.
+    #[must_use]
+    pub fn retry_config(&self) -> Option<(u32, Option<Duration>)> {
+        match self {
+            Self::Retry {
+                max_attempts,
+                delay,
+            } => Some((*max_attempts, *delay)),
+            _ => None,
+        }
+    }
+
     /// Check if this is an idempotent annotation.
     #[must_use]
     pub fn is_idempotent(&self) -> bool {
@@ -391,27 +402,7 @@ impl ProtocolAnnotation {
         }
     }
 
-    /// Get the annotation key (for compatibility with string-based lookups).
-    #[must_use]
-    pub fn key(&self) -> &str {
-        match self {
-            Self::TimedChoice { .. } => "timed_choice",
-            Self::Priority(_) => "priority",
-            Self::Retry { .. } => "retry",
-            Self::Idempotent => "idempotent",
-            Self::Trace { .. } => "trace",
-            Self::RuntimeTimeout(_) => "runtime_timeout",
-            Self::Heartbeat { .. } => "heartbeat",
-            Self::Parallel => "parallel",
-            Self::Ordered => "ordered",
-            Self::MinResponses(_) => "min_responses",
-            Self::Custom { key, .. } => key,
-        }
-    }
-
-    /// Convert from a key-value annotation pair.
-    #[must_use]
-    pub fn from_key_value(key: &str, value: &str) -> Self {
+    pub(crate) fn parse_dsl_entry(key: &str, value: &str) -> Self {
         match key {
             "timed_choice" if value == "true" => {
                 // Duration comes from separate timeout_ms annotation; use zero default
@@ -453,38 +444,40 @@ impl ProtocolAnnotation {
         }
     }
 
-    #[must_use]
-    pub fn to_key_value(&self) -> (String, String) {
+    pub(crate) fn dsl_entries(&self) -> Vec<(String, String)> {
         match self {
-            Self::TimedChoice { duration } => {
-                ("timeout_ms".to_string(), duration.as_millis().to_string())
+            Self::TimedChoice { duration } => vec![
+                ("timed_choice".to_string(), "true".to_string()),
+                ("timeout_ms".to_string(), duration.as_millis().to_string()),
+            ],
+            Self::Priority(value) => vec![("priority".to_string(), value.to_string())],
+            Self::Retry { max_attempts, .. } => {
+                vec![("retry".to_string(), max_attempts.to_string())]
             }
-            Self::Priority(value) => ("priority".to_string(), value.to_string()),
-            Self::Retry { max_attempts, .. } => ("retry".to_string(), max_attempts.to_string()),
-            Self::Idempotent => ("idempotent".to_string(), "true".to_string()),
-            Self::Trace { label } => (
+            Self::Idempotent => vec![("idempotent".to_string(), "true".to_string())],
+            Self::Trace { label } => vec![(
                 "trace".to_string(),
                 label.clone().unwrap_or_else(|| "true".to_string()),
-            ),
-            Self::RuntimeTimeout(duration) => (
+            )],
+            Self::RuntimeTimeout(duration) => vec![(
                 "runtime_timeout".to_string(),
                 Self::format_duration_value(*duration),
-            ),
+            )],
             Self::Heartbeat {
                 interval,
                 on_missing_count,
-            } => (
+            } => vec![(
                 "heartbeat".to_string(),
                 format!(
                     "every {} on_missing {}",
                     Self::format_duration_value(*interval),
                     on_missing_count
                 ),
-            ),
-            Self::Parallel => ("parallel".to_string(), "true".to_string()),
-            Self::Ordered => ("ordered".to_string(), "true".to_string()),
-            Self::MinResponses(value) => ("min_responses".to_string(), value.to_string()),
-            Self::Custom { key, value } => (key.clone(), value.clone()),
+            )],
+            Self::Parallel => vec![("parallel".to_string(), "true".to_string())],
+            Self::Ordered => vec![("ordered".to_string(), "true".to_string())],
+            Self::MinResponses(value) => vec![("min_responses".to_string(), value.to_string())],
+            Self::Custom { key, value } => vec![(key.clone(), value.clone())],
         }
     }
 }

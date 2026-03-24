@@ -6,7 +6,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use serde::{Deserialize, Serialize};
 use telltale_choreography::effects::{
-    handlers::telltale::{SimpleChannel, TelltaleEndpoint, TelltaleHandler},
+    handlers::telltale::{TelltaleEndpoint, TelltaleHandler, TelltaleSession},
     ChoreoHandler, LabelId, RoleId,
 };
 use telltale_choreography::RoleName;
@@ -86,9 +86,9 @@ fn bench_send_recv_throughput(c: &mut Criterion) {
                     let mut alice_ep = TelltaleEndpoint::new(BenchRole::Alice);
                     let mut bob_ep = TelltaleEndpoint::new(BenchRole::Bob);
 
-                    let (alice_ch, bob_ch) = SimpleChannel::pair();
-                    alice_ep.register_channel(BenchRole::Bob, alice_ch);
-                    bob_ep.register_channel(BenchRole::Alice, bob_ch);
+                    let (alice_session, bob_session) = TelltaleSession::pair();
+                    alice_ep.register_session(BenchRole::Bob, alice_session);
+                    bob_ep.register_session(BenchRole::Alice, bob_session);
 
                     let mut alice_handler = TelltaleHandler::<BenchRole, BenchMessage>::new();
                     let mut bob_handler = TelltaleHandler::<BenchRole, BenchMessage>::new();
@@ -122,9 +122,9 @@ fn bench_choice_overhead(c: &mut Criterion) {
                 let mut alice_ep = TelltaleEndpoint::new(BenchRole::Alice);
                 let mut bob_ep = TelltaleEndpoint::new(BenchRole::Bob);
 
-                let (alice_ch, bob_ch) = SimpleChannel::pair();
-                alice_ep.register_channel(BenchRole::Bob, alice_ch);
-                bob_ep.register_channel(BenchRole::Alice, bob_ch);
+                let (alice_session, bob_session) = TelltaleSession::pair();
+                alice_ep.register_session(BenchRole::Bob, alice_session);
+                bob_ep.register_session(BenchRole::Alice, bob_session);
 
                 let mut alice_handler = TelltaleHandler::<BenchRole, BenchMessage>::new();
                 let mut bob_handler = TelltaleHandler::<BenchRole, BenchMessage>::new();
@@ -156,9 +156,9 @@ fn bench_sequential_messages(c: &mut Criterion) {
                     let mut alice_ep = TelltaleEndpoint::new(BenchRole::Alice);
                     let mut bob_ep = TelltaleEndpoint::new(BenchRole::Bob);
 
-                    let (alice_ch, bob_ch) = SimpleChannel::pair();
-                    alice_ep.register_channel(BenchRole::Bob, alice_ch);
-                    bob_ep.register_channel(BenchRole::Alice, bob_ch);
+                    let (alice_session, bob_session) = TelltaleSession::pair();
+                    alice_ep.register_session(BenchRole::Bob, alice_session);
+                    bob_ep.register_session(BenchRole::Alice, bob_session);
 
                     let mut alice_handler = TelltaleHandler::<BenchRole, BenchMessage>::new();
                     let mut bob_handler = TelltaleHandler::<BenchRole, BenchMessage>::new();
@@ -194,9 +194,9 @@ fn bench_metadata_tracking_overhead(c: &mut Criterion) {
                 let mut alice_ep = TelltaleEndpoint::new(BenchRole::Alice);
                 let mut bob_ep = TelltaleEndpoint::new(BenchRole::Bob);
 
-                let (alice_ch, bob_ch) = SimpleChannel::pair();
-                alice_ep.register_channel(BenchRole::Bob, alice_ch);
-                bob_ep.register_channel(BenchRole::Alice, bob_ch);
+                let (alice_session, bob_session) = TelltaleSession::pair();
+                alice_ep.register_session(BenchRole::Bob, alice_session);
+                bob_ep.register_session(BenchRole::Alice, bob_session);
 
                 let mut alice_handler = TelltaleHandler::<BenchRole, BenchMessage>::new();
                 let mut bob_handler = TelltaleHandler::<BenchRole, BenchMessage>::new();

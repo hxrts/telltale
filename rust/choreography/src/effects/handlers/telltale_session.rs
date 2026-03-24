@@ -1,7 +1,6 @@
 use super::{ChoreoResult, ChoreographyError};
 use futures::{channel::mpsc, future::BoxFuture, SinkExt, StreamExt};
 use std::fmt::Debug;
-use telltale::channel::{Bidirectional, Pair};
 
 /// Metadata describing the evolution of a session with a peer.
 #[derive(Debug, Clone)]
@@ -21,39 +20,6 @@ impl Default for SessionMetadata {
             is_complete: false,
             operation_count: 0,
         }
-    }
-}
-
-/// Simple bidirectional channel used for backward compatibility.
-type SimpleChannelInner =
-    Bidirectional<mpsc::UnboundedSender<Vec<u8>>, mpsc::UnboundedReceiver<Vec<u8>>>;
-#[derive(Debug)]
-pub struct SimpleChannel {
-    inner: SimpleChannelInner,
-}
-
-impl SimpleChannel {
-    /// Create a pair of connected channels.
-    #[must_use]
-    pub fn pair() -> (Self, Self) {
-        let (left, right) = SimpleChannelInner::pair();
-        (Self { inner: left }, Self { inner: right })
-    }
-
-    /// Send raw bytes across the channel.
-    pub async fn send(&mut self, msg: Vec<u8>) -> std::result::Result<(), String> {
-        self.inner
-            .send(msg)
-            .await
-            .map_err(|e| format!("Send failed: {e}"))
-    }
-
-    /// Receive raw bytes from the channel.
-    pub async fn recv(&mut self) -> std::result::Result<Vec<u8>, String> {
-        self.inner
-            .next()
-            .await
-            .ok_or_else(|| "Channel closed".to_string())
     }
 }
 
@@ -219,94 +185,6 @@ where
     }
 }
 
-/// `SimpleSession` reuses `SimpleChannel` but routes operations through the
-/// dynamic trait so that session-typed channels and legacy transport share
-/// the same machinery.
-struct SimpleSession {
-    channel: SimpleChannel,
-}
-
-impl SimpleSession {
-    fn new(channel: SimpleChannel) -> Self {
-        Self { channel }
-    }
-}
-
-impl SessionTypeDynamic for SimpleSession {
-    fn type_name(&self) -> &'static str {
-        "SimpleSession"
-    }
-
-    fn send(&mut self, data: Vec<u8>) -> BoxFuture<'_, ChoreoResult<SessionUpdate<()>>> {
-        let channel = &mut self.channel;
-        Box::pin(async move {
-            channel
-                .send(data)
-                .await
-                .map_err(|e| ChoreographyError::ChannelSendFailed {
-                    channel_type: "SimpleSession",
-                    reason: e,
-                })?;
-            Ok(SessionUpdate::new(()).with_description("Send"))
-        })
-    }
-
-    fn recv(&mut self) -> BoxFuture<'_, ChoreoResult<SessionUpdate<Vec<u8>>>> {
-        let channel = &mut self.channel;
-        Box::pin(async move {
-            let bytes = channel
-                .recv()
-                .await
-                .map_err(|_| ChoreographyError::ChannelClosed {
-                    channel_type: "SimpleSession",
-                    operation: "receive",
-                })?;
-            Ok(SessionUpdate::new(bytes).with_description("Recv"))
-        })
-    }
-
-    fn choose(&mut self, label: &str) -> BoxFuture<'_, ChoreoResult<SessionUpdate<()>>> {
-        let channel = &mut self.channel;
-        let label = label.to_string();
-        Box::pin(async move {
-            let bytes = bincode::serialize(&label).map_err(|e| {
-                ChoreographyError::LabelSerializationFailed {
-                    operation: "serialization",
-                    reason: e.to_string(),
-                }
-            })?;
-            channel
-                .send(bytes)
-                .await
-                .map_err(|e| ChoreographyError::ChannelSendFailed {
-                    channel_type: "SimpleSession",
-                    reason: e,
-                })?;
-            Ok(SessionUpdate::new(()).with_description("Choose"))
-        })
-    }
-
-    fn offer(&mut self) -> BoxFuture<'_, ChoreoResult<SessionUpdate<String>>> {
-        let channel = &mut self.channel;
-        Box::pin(async move {
-            let bytes = channel
-                .recv()
-                .await
-                .map_err(|_| ChoreographyError::ChannelClosed {
-                    channel_type: "SimpleSession",
-                    operation: "offer",
-                })?;
-            let label: String = bincode::deserialize(&bytes).map_err(|e| {
-                ChoreographyError::LabelSerializationFailed {
-                    operation: "deserialization",
-                    reason: e.to_string(),
-                }
-            })?;
-            Ok(SessionUpdate::new(label).with_description("Offer"))
-        })
-    }
-}
-
 /// Wrapper around a dynamic session object.
 pub struct TelltaleSession {
     inner: Box<dyn SessionTypeDynamic>,
@@ -326,11 +204,6 @@ impl TelltaleSession {
         Self { inner }
     }
 
-    #[must_use]
-    pub fn from_simple_channel(channel: SimpleChannel) -> Self {
-        Self::new(Box::new(SimpleSession::new(channel)))
-    }
-
     /// Build a session from independent sink/stream transports.
     pub fn from_sink_stream<S, R>(sender: S, receiver: R) -> Self
     where
@@ -340,6 +213,17 @@ impl TelltaleSession {
     {
         let label = std::any::type_name::<S>();
         Self::new(Box::new(SinkStreamSession::new(sender, receiver, label)))
+    }
+
+    /// Build a connected pair of sessions over in-process async byte streams.
+    #[must_use]
+    pub fn pair() -> (Self, Self) {
+        let (left_tx, left_rx) = mpsc::unbounded::<Vec<u8>>();
+        let (right_tx, right_rx) = mpsc::unbounded::<Vec<u8>>();
+        (
+            Self::from_sink_stream(left_tx, right_rx),
+            Self::from_sink_stream(right_tx, left_rx),
+        )
     }
 
     #[must_use]

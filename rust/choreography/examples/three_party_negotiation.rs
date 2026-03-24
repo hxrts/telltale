@@ -11,7 +11,7 @@ const BUYER_ACCEPT_PRICE_UNITS_MAX: u32 = 1200;
 
 use serde::{Deserialize, Serialize};
 use telltale_choreography::effects::{
-    handlers::telltale::{SimpleChannel, TelltaleEndpoint, TelltaleHandler},
+    handlers::telltale::{TelltaleEndpoint, TelltaleHandler, TelltaleSession},
     ChoreoHandler, LabelId, RoleId,
 };
 use telltale_choreography::RoleName;
@@ -97,23 +97,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut seller_ep = TelltaleEndpoint::new(Role::Seller);
     let mut broker_ep = TelltaleEndpoint::new(Role::Broker);
 
-    // Create channels between all parties
-    let (buyer_to_broker_ch, broker_from_buyer_ch) = SimpleChannel::pair();
-    let (seller_to_broker_ch, broker_from_seller_ch) = SimpleChannel::pair();
-    let (broker_to_buyer_ch, buyer_from_broker_ch) = SimpleChannel::pair();
-    let (broker_to_seller_ch, seller_from_broker_ch) = SimpleChannel::pair();
+    // Create one bidirectional session per peer pair.
+    let (buyer_broker_session, broker_buyer_session) = TelltaleSession::pair();
+    let (seller_broker_session, broker_seller_session) = TelltaleSession::pair();
 
-    // Register channels
-    buyer_ep.register_channel(Role::Broker, buyer_to_broker_ch);
-    buyer_ep.register_channel(Role::Broker, buyer_from_broker_ch); // Note: same peer, different direction
-
-    seller_ep.register_channel(Role::Broker, seller_to_broker_ch);
-    seller_ep.register_channel(Role::Broker, seller_from_broker_ch);
-
-    broker_ep.register_channel(Role::Buyer, broker_from_buyer_ch);
-    broker_ep.register_channel(Role::Seller, broker_from_seller_ch);
-    broker_ep.register_channel(Role::Buyer, broker_to_buyer_ch);
-    broker_ep.register_channel(Role::Seller, broker_to_seller_ch);
+    buyer_ep.register_session(Role::Broker, buyer_broker_session);
+    seller_ep.register_session(Role::Broker, seller_broker_session);
+    broker_ep.register_session(Role::Buyer, broker_buyer_session);
+    broker_ep.register_session(Role::Seller, broker_seller_session);
 
     // Create handlers
     let mut buyer_handler = TelltaleHandler::<Role, Message>::new();

@@ -127,26 +127,26 @@ pub enum ChoreographyError {
     #[error("serialization error: {0}")]
     Serialization(String),
 
-    /// Channel send operation failed
+    /// Session transport send operation failed.
     #[error("{channel_type} send failed: {reason}")]
     ChannelSendFailed {
-        /// Type of channel (e.g., "SimpleChannel", "SinkStream")
+        /// Type of session transport (for example "SinkStream")
         channel_type: &'static str,
         /// Human-readable failure reason
         reason: String,
     },
 
-    /// Channel was closed unexpectedly during operation
+    /// Session transport was closed unexpectedly during operation.
     #[error("{channel_type} closed during {operation}")]
     ChannelClosed {
-        /// Type of channel (e.g., "SimpleChannel", "SinkStream")
+        /// Type of session transport (for example "SinkStream")
         channel_type: &'static str,
         /// Operation being performed when channel closed
         operation: &'static str,
     },
 
-    /// No channel registered for the specified peer
-    #[error("no channel registered for peer: {peer}")]
+    /// No session registered for the specified peer.
+    #[error("no session registered for peer: {peer}")]
     NoPeerChannel {
         /// String representation of the peer role
         peer: String,

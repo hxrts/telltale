@@ -8,6 +8,24 @@ use proc_macro2::{Ident, TokenStream};
 mod validation;
 use validation::{ensure_declared_role, validate_choice_branches};
 
+fn annotation_has_key(annotation: &super::annotation::ProtocolAnnotation, key: &str) -> bool {
+    annotation
+        .dsl_entries()
+        .iter()
+        .any(|(entry_key, _)| entry_key == key)
+}
+
+fn annotation_has_value(
+    annotation: &super::annotation::ProtocolAnnotation,
+    key: &str,
+    value: &str,
+) -> bool {
+    annotation
+        .dsl_entries()
+        .iter()
+        .any(|(entry_key, entry_value)| entry_key == key && entry_value.eq_ignore_ascii_case(value))
+}
+
 /// Protocol specification using choreographic constructs
 #[derive(Debug)]
 pub enum Protocol {
@@ -387,16 +405,6 @@ impl Protocol {
         }
     }
 
-    /// Get a specific annotation value (backward compatibility - returns string)
-    pub fn get_annotation(&self, key: &str) -> Option<String> {
-        self.get_annotations().get(key)
-    }
-
-    /// Check if this protocol node has a specific annotation
-    pub fn has_annotation(&self, key: &str) -> bool {
-        self.get_annotations().has(key)
-    }
-
     /// Get from-role annotations for Send/Broadcast statements
     pub fn get_from_annotations(&self) -> Option<&Annotations> {
         match self {
@@ -483,30 +491,6 @@ impl Protocol {
         }
     }
 
-    /// Get annotation as a specific type (e.g., integer, boolean) - backward compat
-    pub fn get_annotation_as<T>(&self, key: &str) -> Option<T>
-    where
-        T: std::str::FromStr,
-    {
-        self.get_annotation(key)?.parse().ok()
-    }
-
-    /// Get annotation as boolean (supports "true"/"false", "1"/"0", "yes"/"no")
-    pub fn get_annotation_as_bool(&self, key: &str) -> Option<bool> {
-        let value = self.get_annotation(key)?;
-        match value.to_lowercase().as_str() {
-            "true" | "1" | "yes" | "on" => Some(true),
-            "false" | "0" | "no" | "off" => Some(false),
-            _ => None,
-        }
-    }
-
-    /// Check if annotation value matches a specific string (case-insensitive)
-    pub fn annotation_matches(&self, key: &str, expected: &str) -> bool {
-        self.get_annotation(key)
-            .is_some_and(|value| value.eq_ignore_ascii_case(expected))
-    }
-
     /// Check if any annotations are present
     pub fn has_any_annotations(&self) -> bool {
         !self.get_annotations().is_empty()
@@ -548,7 +532,12 @@ impl Protocol {
     pub fn validate_required_annotations(&self, required_keys: &[&str]) -> Result<(), Vec<String>> {
         let missing: Vec<String> = required_keys
             .iter()
-            .filter(|&key| !self.has_annotation(key))
+            .filter(|&key| {
+                !self
+                    .get_annotations()
+                    .iter()
+                    .any(|annotation| annotation_has_key(annotation, key))
+            })
             .map(|&key| key.to_string())
             .collect();
 
@@ -561,7 +550,11 @@ impl Protocol {
 
     /// Collect all protocol nodes that have a specific annotation (recursive traversal)
     pub fn collect_nodes_with_annotation<'a>(&'a self, key: &str, nodes: &mut Vec<&'a Protocol>) {
-        if self.has_annotation(key) {
+        if self
+            .get_annotations()
+            .iter()
+            .any(|annotation| annotation_has_key(annotation, key))
+        {
             nodes.push(self);
         }
 
@@ -630,7 +623,11 @@ impl Protocol {
         value: &str,
         nodes: &mut Vec<&'a Protocol>,
     ) {
-        if self.annotation_matches(key, value) {
+        if self
+            .get_annotations()
+            .iter()
+            .any(|annotation| annotation_has_value(annotation, key, value))
+        {
             nodes.push(self);
         }
 
