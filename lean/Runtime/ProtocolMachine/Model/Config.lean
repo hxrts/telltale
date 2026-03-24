@@ -84,7 +84,7 @@ structure ProtocolMachineProofConfig (γ : Type u) [GuardLayer γ] (guardChain :
 
 structure ProtocolMachineConfig (ι γ π ε ν : Type u) [ProtocolMachineDomain ι γ π ε ν]
     extends ProtocolMachineRuntimeConfig ι γ π ε ν where
-  proofConfig : ProtocolMachineProofConfig γ toVMRuntimeConfig.guardChain
+  proofConfig : ProtocolMachineProofConfig γ toProtocolMachineRuntimeConfig.guardChain
 
 def ProtocolMachineConfig.guardChainWf {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
     (cfg : ProtocolMachineConfig ι γ π ε ν) : GuardChain.wf cfg.guardChain :=
