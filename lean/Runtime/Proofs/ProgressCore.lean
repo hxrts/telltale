@@ -1,7 +1,7 @@
 
 import Runtime.Proofs.SessionLocal
 import Runtime.Resources.Arena
-import Runtime.VM.Model.TypeClasses
+import Runtime.ProtocolMachine.Model.TypeClasses
 import Protocol.Typing.Progress
 import Runtime.Proofs.Lyapunov
 

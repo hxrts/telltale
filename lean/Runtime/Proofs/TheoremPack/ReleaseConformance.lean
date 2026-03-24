@@ -151,7 +151,7 @@ private def obsTag {ε : Type u} [EffectRuntime ε] : ObsEvent ε → String
 private def replaySessionSignature {ε : Type u} [EffectRuntime ε]
     (trace : List (TickedObsEvent ε)) :
     List (SessionId × List String) :=
-  let normalized := Runtime.VM.normalizeTrace trace
+  let normalized := Runtime.ProtocolMachine.normalizeTrace trace
   let sids := traceSessionIds normalized
   sids.map (fun sid =>
     let tags := (filterBySid sid normalized).map (fun ev => obsTag ev.event)

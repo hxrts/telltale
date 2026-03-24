@@ -1,6 +1,6 @@
-import Runtime.VM.Semantics.Exec
+import Runtime.ProtocolMachine.Semantics.Exec
 import Runtime.Proofs.Frame
-import Runtime.VM.Runtime.Loader
+import Runtime.ProtocolMachine.Runtime.Loader
 import Init.Data.List.Perm
 
 /-! # Cross-Session Diamond Property

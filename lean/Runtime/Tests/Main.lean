@@ -1,11 +1,11 @@
 
 import Runtime.Examples.SimpleProtocol
-import Runtime.VM.Runtime.Runner
-import Runtime.VM.Runtime.ThreadedRunner
-import Runtime.VM.Semantics.ExecSpeculation
-import Runtime.VM.Semantics.ExecOwnership
-import Runtime.VM.Runtime.Loader
-import Runtime.VM.Runtime.Failure
+import Runtime.ProtocolMachine.Runtime.Runner
+import Runtime.ProtocolMachine.Runtime.ThreadedRunner
+import Runtime.ProtocolMachine.Semantics.ExecSpeculation
+import Runtime.ProtocolMachine.Semantics.ExecOwnership
+import Runtime.ProtocolMachine.Runtime.Loader
+import Runtime.ProtocolMachine.Runtime.Failure
 import Runtime.Adequacy.EnvelopeCore
 import Runtime.Proofs.Contracts.RuntimeContracts
 import Runtime.Proofs.Examples.ComposedProofPack
@@ -199,8 +199,8 @@ def main : IO Unit := do
   let (st4, sid2) := loadChoreography st3 twoPartyImage
   let seq := runScheduled 100 1 st4
   let par := runScheduled 100 100 st4
-  let seqTrace := Runtime.VM.normalizeTrace seq.obsTrace
-  let parTrace := Runtime.VM.normalizeTrace par.obsTrace
+  let seqTrace := Runtime.ProtocolMachine.normalizeTrace seq.obsTrace
+  let parTrace := Runtime.ProtocolMachine.normalizeTrace par.obsTrace
   let seq1 := traceTags (filterBySid sid1 seqTrace)
   let par1 := traceTags (filterBySid sid1 parTrace)
   expect (decide (seq1 = par1)) "session 1 traces differ"
@@ -369,8 +369,8 @@ def main : IO Unit := do
   -- Test 14: local envelope differential conformance (single-thread vs multi-thread modulo normalized/session-erased traces).
   let localEnvSingle := runScheduled 100 1 st4
   let localEnvMulti := runScheduled 100 32 st4
-  let localEnvSingleNorm := Runtime.VM.normalizeTrace localEnvSingle.obsTrace
-  let localEnvMultiNorm := Runtime.VM.normalizeTrace localEnvMulti.obsTrace
+  let localEnvSingleNorm := Runtime.ProtocolMachine.normalizeTrace localEnvSingle.obsTrace
+  let localEnvMultiNorm := Runtime.ProtocolMachine.normalizeTrace localEnvMulti.obsTrace
 /- ## Structured Block 6 -/
   let localS1 := traceTags (filterBySid sid1 localEnvSingleNorm)
   let localM1 := traceTags (filterBySid sid1 localEnvMultiNorm)
@@ -382,8 +382,8 @@ def main : IO Unit := do
   -- Test 15: sharded-envelope differential conformance (reference vs sharded execution modulo normalized/session-erased traces).
   let shardRef := runScheduled 100 1 st4
   let shardExec := runScheduled 100 8 st4
-  let shardRefNorm := Runtime.VM.normalizeTrace shardRef.obsTrace
-  let shardExecNorm := Runtime.VM.normalizeTrace shardExec.obsTrace
+  let shardRefNorm := Runtime.ProtocolMachine.normalizeTrace shardRef.obsTrace
+  let shardExecNorm := Runtime.ProtocolMachine.normalizeTrace shardExec.obsTrace
   let shardR1 := traceTags (filterBySid sid1 shardRefNorm)
   let shardE1 := traceTags (filterBySid sid1 shardExecNorm)
   let shardR2 := traceTags (filterBySid sid2 shardRefNorm)
@@ -444,8 +444,8 @@ def main : IO Unit := do
   let threadedEq := runScheduledThreaded 50 1 stThreadedEq
   expect (decide (canonicalEq.sched.stepCount = threadedEq.sched.stepCount))
     "threaded@1 step-count mismatch against canonical runner"
-  let canonicalEqNorm := Runtime.VM.normalizeTrace canonicalEq.obsTrace
-  let threadedEqNorm := Runtime.VM.normalizeTrace threadedEq.obsTrace
+  let canonicalEqNorm := Runtime.ProtocolMachine.normalizeTrace canonicalEq.obsTrace
+  let threadedEqNorm := Runtime.ProtocolMachine.normalizeTrace threadedEq.obsTrace
   expect (decide (traceTags (filterBySid sidThreadedEq canonicalEqNorm) =
     traceTags (filterBySid sidThreadedEq threadedEqNorm)))
     "threaded@1 per-session trace mismatch against canonical runner"
@@ -601,8 +601,8 @@ def main : IO Unit := do
   -- Test 34: threaded n>1 divergence from canonical remains envelope-bounded per session.
   let threadedEnv := runScheduledThreaded 100 4 st4
   let canonicalEnv := runScheduled 100 1 st4
-  let threadedEnvNorm := Runtime.VM.normalizeTrace threadedEnv.obsTrace
-  let canonicalEnvNorm := Runtime.VM.normalizeTrace canonicalEnv.obsTrace
+  let threadedEnvNorm := Runtime.ProtocolMachine.normalizeTrace threadedEnv.obsTrace
+  let canonicalEnvNorm := Runtime.ProtocolMachine.normalizeTrace canonicalEnv.obsTrace
   let threadedS1 := traceTags (filterBySid sid1 threadedEnvNorm)
   let canonicalS1 := traceTags (filterBySid sid1 canonicalEnvNorm)
   let threadedS2 := traceTags (filterBySid sid2 threadedEnvNorm)

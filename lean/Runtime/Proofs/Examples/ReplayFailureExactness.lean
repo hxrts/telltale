@@ -1,4 +1,4 @@
-import Runtime.VM.Model
+import Runtime.ProtocolMachine.Model
 
 set_option autoImplicit false
 
@@ -12,7 +12,7 @@ namespace Runtime
 namespace Proofs
 namespace Examples
 
-open Runtime.VM.Model
+open Runtime.ProtocolMachine.Model
 
 def replayFailedOp : OperationInstance :=
   { operationId := "op-replay"
@@ -187,11 +187,11 @@ example :
 
 example :
     ProgressState.failureObservationallyEquivalent .blocked .noProgress := by
-  exact Runtime.VM.Model.blocked_and_noProgress_are_wait_equivalent
+  exact Runtime.ProtocolMachine.Model.blocked_and_noProgress_are_wait_equivalent
 
 example :
     ¬ ProgressState.failureObservationallyEquivalent .degraded .blocked := by
-  exact Runtime.VM.Model.degraded_is_not_wait_equivalent
+  exact Runtime.ProtocolMachine.Model.degraded_is_not_wait_equivalent
 
 end Examples
 end Proofs

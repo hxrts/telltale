@@ -225,7 +225,7 @@ pub struct ProtocolMachineRunner {
 
 impl ProtocolMachineRunner {
     /// Default path to the protocol-machine runner binary (relative to workspace root).
-    pub const DEFAULT_BINARY_PATH: &'static str = "lean/.lake/build/bin/vm_runner";
+    pub const DEFAULT_BINARY_PATH: &'static str = "lean/.lake/build/bin/protocol_machine_runner";
     /// Default timeout for protocol-machine runner process invocations.
     pub const DEFAULT_TIMEOUT_MS: u64 = 120_000;
 

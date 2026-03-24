@@ -1,5 +1,5 @@
 import Runtime.Resources.SessionRA
-import Runtime.VM.Model.Knowledge
+import Runtime.ProtocolMachine.Model.Knowledge
 import IrisExtractionInstance
 
 /-! # Ghost State for Knowledge and Progress

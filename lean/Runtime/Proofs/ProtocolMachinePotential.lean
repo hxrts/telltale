@@ -1,5 +1,5 @@
 import Runtime.Proofs.Lyapunov
-import Runtime.VM.Runtime.Failure
+import Runtime.ProtocolMachine.Runtime.Failure
 import Classical.Transport.API
 import Runtime.Proofs.InvariantSpace
 

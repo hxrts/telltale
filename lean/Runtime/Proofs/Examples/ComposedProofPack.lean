@@ -30,7 +30,7 @@ def baseComposedSpace :
       {})
     {}
 
-def emptySemanticObjects : Runtime.VM.Model.ProtocolMachineSemanticObjects :=
+def emptySemanticObjects : Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects :=
   { operationInstances := []
   , outstandingEffects := []
   , semanticHandoffs := []
@@ -48,20 +48,20 @@ def coreSemanticObjectWitness :
     CoreSemanticObjectWitness :=
   { objects := emptySemanticObjects
   , invariants := by
-      simp [Runtime.VM.Model.ProtocolMachineSemanticObjects.coreSemanticObjectInvariants,
-        Runtime.VM.Model.ProtocolMachineSemanticObjects.explicitOperationIdentity,
-        Runtime.VM.Model.ProtocolMachineSemanticObjects.explicitOutstandingEffectIdentity,
-        Runtime.VM.Model.ProtocolMachineSemanticObjects.uniqueOperationIds,
-        Runtime.VM.Model.ProtocolMachineSemanticObjects.uniqueOutstandingEffectIds,
-        Runtime.VM.Model.ProtocolMachineSemanticObjects.uniqueSemanticOwner,
-        Runtime.VM.Model.ProtocolMachineSemanticObjects.explicitHandoffs,
-        Runtime.VM.Model.ProtocolMachineSemanticObjects.nonAuthoritativeObservedReads,
-        Runtime.VM.Model.ProtocolMachineSemanticObjects.disjointReadIdentities,
+      simp [Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects.coreSemanticObjectInvariants,
+        Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects.explicitOperationIdentity,
+        Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects.explicitOutstandingEffectIdentity,
+        Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects.uniqueOperationIds,
+        Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects.uniqueOutstandingEffectIds,
+        Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects.uniqueSemanticOwner,
+        Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects.explicitHandoffs,
+        Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects.nonAuthoritativeObservedReads,
+        Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects.disjointReadIdentities,
         emptySemanticObjects]
   }
 
 def semanticWitnessBundle : SemanticObjectWitnessBundle :=
-  let authoritativeRead : Runtime.VM.Model.AuthoritativeRead :=
+  let authoritativeRead : Runtime.ProtocolMachine.Model.AuthoritativeRead :=
     { readId := "read-accept"
     , session := some 7
     , ownerId := some "owner-a"
@@ -72,7 +72,7 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
     , generation := none
     , reason := none
     }
-  let publicationObjectsWithRead : Runtime.VM.Model.ProtocolMachineSemanticObjects :=
+  let publicationObjectsWithRead : Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects :=
     { publicationObjects with authoritativeReads := [authoritativeRead] }
   let authoritativeReadWitness : AuthoritativeReadPublicationWitness :=
     { objects := publicationObjectsWithRead
@@ -80,17 +80,17 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
     , read := authoritativeRead
     , readMember := by simp [publicationObjectsWithRead]
     , readSatisfiesContext := by
-        simp [Runtime.VM.Model.AuthoritativeRead.satisfiesCommitmentContext,
-          Runtime.VM.Model.AuthoritativeRead.hasAuthorityContext,
+        simp [Runtime.ProtocolMachine.Model.AuthoritativeRead.satisfiesCommitmentContext,
+          Runtime.ProtocolMachine.Model.AuthoritativeRead.hasAuthorityContext,
           authoritativeRead, publicationCtx]
     , commitmentPermitted := by
         refine ⟨authoritativeRead, by simp [publicationObjectsWithRead], ?_⟩
-        simp [Runtime.VM.Model.AuthoritativeRead.satisfiesCommitmentContext,
-          Runtime.VM.Model.AuthoritativeRead.hasAuthorityContext,
+        simp [Runtime.ProtocolMachine.Model.AuthoritativeRead.satisfiesCommitmentContext,
+          Runtime.ProtocolMachine.Model.AuthoritativeRead.hasAuthorityContext,
           authoritativeRead, publicationCtx]
     , observedCannotAuthorTruth := by
         intro read hMem
-        simp [Runtime.VM.Model.ObservedRead.satisfiesCommitmentContext]
+        simp [Runtime.ProtocolMachine.Model.ObservedRead.satisfiesCommitmentContext]
     , canonicalPublicationPathUnique := by
         intro event₁ hMem₁ event₂ hMem₂ hCanon₁ hCanon₂ hPub₁ hPub₂ hOp hSession
         have hEvent₁ : event₁ = successPublication := by
@@ -115,7 +115,7 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
         have hMem' : event = successPublication ∨ event = auditPublication := by
           simpa [publicationObjectsWithRead, publicationObjects] using hMem
         rcases hMem' with rfl | rfl
-        · simp [Runtime.VM.Model.PublicationEvent.hasCanonicalAuthorityEvidence,
+        · simp [Runtime.ProtocolMachine.Model.PublicationEvent.hasCanonicalAuthorityEvidence,
             successPublication]
         · simp [auditPublication] at hCanon
     }
@@ -129,13 +129,13 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
     , proofMember := by simp [publicationObjects]
     , handleMember := by simp [publicationObjects]
     , operationRequiresSuccessProof := by
-        simp [Runtime.VM.Model.OperationInstance.requiresSuccessProofFor,
+        simp [Runtime.ProtocolMachine.Model.OperationInstance.requiresSuccessProofFor,
           successOp, successCtx]
     , proofAdequate := by
-        simp [Runtime.VM.Model.MaterializationProof.adequateForSuccessContext,
+        simp [Runtime.ProtocolMachine.Model.MaterializationProof.adequateForSuccessContext,
           successProof, successCtx]
     , handleAdequate := by
-        simp [Runtime.VM.Model.CanonicalHandle.adequateForSuccessContext,
+        simp [Runtime.ProtocolMachine.Model.CanonicalHandle.adequateForSuccessContext,
           successHandle, successCtx, successProof]
     , successProofBacked := by
         intro operation hMem hRequires
@@ -144,9 +144,9 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
         subst hOperation
         refine ⟨successProof, by simp [publicationObjects], ?_,
           successHandle, by simp [publicationObjects], ?_⟩
-        · simp [Runtime.VM.Model.MaterializationProof.adequateForSuccessContext,
+        · simp [Runtime.ProtocolMachine.Model.MaterializationProof.adequateForSuccessContext,
             successProof, successCtx]
-        · simp [Runtime.VM.Model.CanonicalHandle.adequateForSuccessContext,
+        · simp [Runtime.ProtocolMachine.Model.CanonicalHandle.adequateForSuccessContext,
             successHandle, successCtx, successProof]
     , authoritativeMaterializationAdequate := publicationObjects_materialization_adequate
     , canonicalHandleDomainUnique := by
@@ -169,20 +169,20 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
     , contract := exactFailureContract
     , operationMember := by simp [replayFailureObjects]
     , tracksOperation := by
-        simp [Runtime.VM.Model.ProgressContract.tracksOperation,
-          Runtime.VM.Model.ProgressState.expectedOperationPhase,
+        simp [Runtime.ProtocolMachine.Model.ProgressContract.tracksOperation,
+          Runtime.ProtocolMachine.Model.ProgressState.expectedOperationPhase,
           exactFailureContract, replayFailedOp]
     , trackedLiveness := by
         constructor
-        · simp [Runtime.VM.Model.ProgressContract.hasBudgetDiscipline,
+        · simp [Runtime.ProtocolMachine.Model.ProgressContract.hasBudgetDiscipline,
             exactFailureContract]
         · refine ⟨replayFailedOp, by simp [replayFailureObjects], ?_, ?_⟩
-          · simp [Runtime.VM.Model.ProgressContract.tracksOperation,
-              Runtime.VM.Model.ProgressState.expectedOperationPhase,
+          · simp [Runtime.ProtocolMachine.Model.ProgressContract.tracksOperation,
+              Runtime.ProtocolMachine.Model.ProgressState.expectedOperationPhase,
               exactFailureContract, replayFailedOp]
           · left
-            simp [Runtime.VM.Model.ProgressContract.isTerminal,
-              Runtime.VM.Model.ProgressState.isTerminal, exactFailureContract]
+            simp [Runtime.ProtocolMachine.Model.ProgressContract.isTerminal,
+              Runtime.ProtocolMachine.Model.ProgressState.isTerminal, exactFailureContract]
     }
   let effectWitness : EffectContractWitness :=
     { metadata := boundedAuthoritativeEffect
@@ -206,7 +206,7 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
     , effectMember := by simp [replayFailureObjects]
     , contractMember := by simp [replayFailureObjects]
     , contractMatchesContext := by
-        simp [Runtime.VM.Model.ProgressContract.matchesReplayFailureContext,
+        simp [Runtime.ProtocolMachine.Model.ProgressContract.matchesReplayFailureContext,
           exactFailureContract, exactFailureCtx]
     , replayStableOperationIdentity := replayFailureObjects_identity_stable
     , terminalTruthStableUnderReplay := replayFailureObjects_terminal_truth_stable
@@ -226,8 +226,8 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
     , contract := nativeSucceeded.contract
     , parentMember := by simp [dependentWorkObjects]
     , tracksOperation := by
-        simp [Runtime.VM.Model.ProgressContract.tracksOperation,
-          Runtime.VM.Model.ProgressState.expectedOperationPhase,
+        simp [Runtime.ProtocolMachine.Model.ProgressContract.tracksOperation,
+          Runtime.ProtocolMachine.Model.ProgressState.expectedOperationPhase,
           nativeSucceeded, parentOp]
     , crossTargetProgressPreserved := success_views_cross_target_preserved
     , dependentWorkFullyResolved := dependent_work_fully_resolved

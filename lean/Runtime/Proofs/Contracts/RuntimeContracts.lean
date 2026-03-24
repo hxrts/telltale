@@ -1,7 +1,7 @@
 import Runtime.Proofs.SchedulerTheoremPack
 import Runtime.Proofs.Contracts.DeterminismApi
-import Runtime.VM.Runtime.Scheduler
-import Runtime.VM.Runtime.ThreadedRunner
+import Runtime.ProtocolMachine.Runtime.Scheduler
+import Runtime.ProtocolMachine.Runtime.ThreadedRunner
 
 set_option autoImplicit false
 

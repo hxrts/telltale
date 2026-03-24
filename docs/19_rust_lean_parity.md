@@ -174,7 +174,7 @@ The Rust public runtime surface now exposes one canonical naming scheme:
 protocol-machine objects use `ProtocolMachine*`, guest-runtime objects use
 `GuestRuntime*`, and bridge execution objects use `ProtocolMachineRunner*`.
 No public `telltale_vm::vm::*`, `telltale_vm::threaded::*`,
-`telltale_lean_bridge::vm_runner::*`, or `telltale_lean_bridge::vm_trace::*`
+`telltale_lean_bridge::protocol_machine_runner::*`, or `telltale_lean_bridge::vm_trace::*`
 entrypoints remain.
 
 | Runtime Object | Lean Surface | Rust Surface | Bridge Surface | Status |

@@ -1,7 +1,7 @@
 import Runtime.ProgramLogic.LanguageInstance
-import Runtime.VM.Model.Program
-import Runtime.VM.Model.State
-import Runtime.VM.Model.Violation
+import Runtime.ProtocolMachine.Model.Program
+import Runtime.ProtocolMachine.Model.State
+import Runtime.ProtocolMachine.Model.Violation
 import Runtime.ProgramLogic.SessionWP
 import IrisExtractionInstance
 import Protocol.Process

@@ -1,4 +1,4 @@
-import Runtime.VM.Model.Core
+import Runtime.ProtocolMachine.Model.Core
 import IrisExtractionInstance
 
 /-! # Instruction Pair Abstraction for WP Rules

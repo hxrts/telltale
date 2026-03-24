@@ -1,4 +1,4 @@
-import Runtime.VM.Model
+import Runtime.ProtocolMachine.Model
 
 set_option autoImplicit false
 
@@ -12,7 +12,7 @@ namespace Runtime
 namespace Proofs
 namespace Examples
 
-open Runtime.VM.Model
+open Runtime.ProtocolMachine.Model
 
 def boundedAuthoritativeEffect : EffectInterfaceMetadata :=
   { interfaceName := "storage"
@@ -97,7 +97,7 @@ example : boundedAuthoritativeEffect.architecturallyLegal := by
 example :
     ¬ boundedAuthoritativeEffect.reentrancyAdmissible
       sameFootprintDomain sameFootprintDomain' := by
-  apply Runtime.VM.Model.same_footprint_nonreentrant
+  apply Runtime.ProtocolMachine.Model.same_footprint_nonreentrant
   · exact boundedAuthoritativeEffect_legal
   · rfl
   · rfl
@@ -105,7 +105,7 @@ example :
 example :
     reentrantObservationEffect.reentrancyAdmissible
       sameFootprintDomain sameFootprintDomain' := by
-  apply Runtime.VM.Model.explicit_same_footprint_reentrancy_admissible
+  apply Runtime.ProtocolMachine.Model.explicit_same_footprint_reentrancy_admissible
   · exact reentrantObservationEffect_legal
   · rfl
 

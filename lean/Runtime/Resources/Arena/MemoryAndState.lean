@@ -1,6 +1,6 @@
 import Protocol.Environments.Core
-import Runtime.VM.Model.TypeClasses
-import Runtime.VM.Model.Core
+import Runtime.ProtocolMachine.Model.TypeClasses
+import Runtime.ProtocolMachine.Model.Core
 import Runtime.Resources.BufferRA
 
 /-! # Arena and Session Store

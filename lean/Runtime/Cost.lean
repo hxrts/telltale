@@ -1,4 +1,4 @@
-import Runtime.VM.Model.Config
+import Runtime.ProtocolMachine.Model.Config
 import IrisExtractionInstance
 
 /- 

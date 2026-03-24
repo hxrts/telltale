@@ -1,5 +1,5 @@
-import Runtime.VM.Model.State
-import Runtime.VM.Runtime.Failure
+import Runtime.ProtocolMachine.Model.State
+import Runtime.ProtocolMachine.Runtime.Failure
 
 set_option autoImplicit false
 

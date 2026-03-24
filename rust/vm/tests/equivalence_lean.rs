@@ -27,7 +27,7 @@ fn protocol_machine_runner_path() -> Option<PathBuf> {
     let mut path = PathBuf::from(manifest_dir);
     for _ in 0..5 {
         if path.join("lean/.lake").is_dir() {
-            let candidate = path.join("lean/.lake/build/bin/vm_runner");
+            let candidate = path.join("lean/.lake/build/bin/protocol_machine_runner");
             if candidate.exists() {
                 return Some(candidate);
             }
@@ -136,7 +136,7 @@ fn run_lean(
     max_rounds: usize,
 ) -> Result<Vec<NormalizedEvent>, LeanRunnerError> {
     let runner_path = protocol_machine_runner_path().ok_or_else(|| {
-        LeanRunnerError::BinaryNotFound(PathBuf::from("lean/.lake/build/bin/vm_runner"))
+        LeanRunnerError::BinaryNotFound(PathBuf::from("lean/.lake/build/bin/protocol_machine_runner"))
     })?;
     let runner = LeanRunner::with_binary_path(runner_path)?;
     let output = runner.run_protocol_machine(choreos, concurrency, max_rounds)?;

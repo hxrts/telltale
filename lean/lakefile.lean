@@ -54,7 +54,7 @@ lean_lib Semantics where
 lean_lib Protocol where
   globs := #[`Protocol.*]
 
-/-- VM, Iris separation logic backend, resource algebras, WP rules. -/
+/-- Protocol machine, Iris separation logic backend, resource algebras, WP rules. -/
 @[default_target]
 lean_lib Runtime where
   globs := #[`Runtime.*]
@@ -88,7 +88,7 @@ def macosLinkArgs : Array String :=
 
 /-! ## Executables -/
 
-/-- Executable runtime tests for the VM example. -/
+/-- Executable runtime tests for the protocol machine. -/
 lean_exe runtime_tests where
   root := `Runtime.Tests.Main
   moreLinkArgs := macosLinkArgs
@@ -98,9 +98,9 @@ lean_exe simulator_parity_tests where
   root := `Runtime.Tests.SimulatorParity
   moreLinkArgs := macosLinkArgs
 
-/-- VM runner: executes choreographies and emits observable traces. -/
-lean_exe vm_runner where
-  root := `Runtime.Tests.VMRunner
+/-- Protocol machine runner: executes choreographies and emits observable traces. -/
+lean_exe protocol_machine_runner where
+  root := `Runtime.Tests.ProtocolMachineRunner
   moreLinkArgs := macosLinkArgs
 
 /-- Projection validator (compares projected local types). -/

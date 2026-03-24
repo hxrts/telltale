@@ -1,4 +1,4 @@
-import Runtime.VM.Model.TypeClasses
+import Runtime.ProtocolMachine.Model.TypeClasses
 
 /-
 The Problem. V1 needs concrete, transparent instances for authenticated

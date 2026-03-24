@@ -6,7 +6,7 @@ It handles JSON conversion, schema versioning, runner invocation, trace comparis
 The bridge does not define protocol-machine semantics.
 Semantics remain in `telltale-vm`, `telltale-theory`, and Lean runtime modules.
 The canonical public bridge surface uses `ProtocolMachineRunner`, `ProtocolMachineRunInput`, `ProtocolMachineRunOutput`, `ProtocolMachineSemanticObjects`, and the `protocol_machine_runner` / `protocol_machine_trace` modules.
-No public `vm_runner` or `vm_trace` compatibility modules remain.
+No public `protocol_machine_runner` or `vm_trace` compatibility modules remain.
 
 Bridge payloads describe guest-runtime and protocol-machine artifacts.
 Host-runtime handlers remain outside the bridge and re-enter through typed effect surfaces.
@@ -155,7 +155,7 @@ Projection methods call validator export modes.
 
 ## Lean Protocol-Machine Runner Wrapper
 
-`ProtocolMachineRunner` wraps the Lean protocol-machine binary at `lean/.lake/build/bin/vm_runner`.
+`ProtocolMachineRunner` wraps the Lean protocol-machine binary at `lean/.lake/build/bin/protocol_machine_runner`.
 It serializes `ProtocolMachineRunInput` to process stdin and parses `ProtocolMachineRunOutput` from stdout.
 
 ```rust

@@ -1,6 +1,6 @@
 import Runtime.Proofs.SessionLocal
-import Runtime.VM.Semantics.InstrSpec
-import Runtime.VM.Runtime.Loader
+import Runtime.ProtocolMachine.Semantics.InstrSpec
+import Runtime.ProtocolMachine.Runtime.Loader
 
 /-! # Frame Rule and Cross-Session Diamond
 

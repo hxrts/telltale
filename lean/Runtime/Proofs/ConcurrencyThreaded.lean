@@ -1,4 +1,4 @@
-import Runtime.VM.Runtime.ThreadedRunner
+import Runtime.ProtocolMachine.Runtime.ThreadedRunner
 
 /-! # Threaded Concurrency Refinement
 
@@ -84,8 +84,8 @@ theorem run_scheduled_threaded_refines_canonical_of_round
 runners at concurrency `1`. -/
 theorem per_session_trace_threaded_one_eq_canonical
     (fuel : Nat) (st : VMState ι γ π ε ν) (sid : SessionId) :
-    filterBySid sid (Runtime.VM.normalizeTrace (runScheduledThreaded fuel 1 st).obsTrace) =
-    filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel 1 st).obsTrace) := by
+    filterBySid sid (Runtime.ProtocolMachine.normalizeTrace (runScheduledThreaded fuel 1 st).obsTrace) =
+    filterBySid sid (Runtime.ProtocolMachine.normalizeTrace (runScheduled fuel 1 st).obsTrace) := by
   simp [run_scheduled_threaded_one_eq_run_scheduled]
 
 /-- Session-filtered normalized trace equality under conditional round
@@ -94,8 +94,8 @@ theorem per_session_trace_threaded_refines_canonical_of_round
     (fuel n : Nat) (st : VMState ι γ π ε ν) (sid : SessionId)
     (premises : ThreadedRoundRefinementPremises (ι := ι) (γ := γ)
       (π := π) (ε := ε) (ν := ν) n) :
-    filterBySid sid (Runtime.VM.normalizeTrace (runScheduledThreaded fuel n st).obsTrace) =
-    filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel 1 st).obsTrace) := by
+    filterBySid sid (Runtime.ProtocolMachine.normalizeTrace (runScheduledThreaded fuel n st).obsTrace) =
+    filterBySid sid (Runtime.ProtocolMachine.normalizeTrace (runScheduled fuel 1 st).obsTrace) := by
   simp [run_scheduled_threaded_refines_canonical_of_round (fuel := fuel) (n := n)
     (st := st) premises]
 

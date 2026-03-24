@@ -8,7 +8,7 @@ Assumption-profile checks for transported theorem families.
 
 This module is intentionally decoupled from `Classical` implementation details:
 it tracks family-level eligibility labels only. Cross-family proof composition
-is performed in Runtime/VM proof layers.
+is performed in Runtime/ProtocolMachine proof layers.
 -/
 
 /-

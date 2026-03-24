@@ -1,9 +1,9 @@
-import Runtime.VM.Runtime.Monitor
+import Runtime.ProtocolMachine.Runtime.Monitor
 import Runtime.Transport
-import Runtime.VM.Runtime.Scheduler
-import Runtime.VM.Runtime.Loader
-import Runtime.Proofs.VM.Scheduler
-import Runtime.Proofs.VM.ExecOwnership
+import Runtime.ProtocolMachine.Runtime.Scheduler
+import Runtime.ProtocolMachine.Runtime.Loader
+import Runtime.Proofs.ProtocolMachine.Scheduler
+import Runtime.Proofs.ProtocolMachine.ExecOwnership
 import Runtime.ProgramLogic.GhostState
 import Runtime.Proofs.Lyapunov
 import Protocol.Coherence.Delegation

@@ -3,7 +3,7 @@ use std::io::Write;
 
 impl LeanRunner {
     /// Default path to the protocol-machine runner binary (relative to workspace root).
-    pub const PROTOCOL_MACHINE_RUNNER_BINARY_PATH: &'static str = "lean/.lake/build/bin/vm_runner";
+    pub const PROTOCOL_MACHINE_RUNNER_BINARY_PATH: &'static str = "lean/.lake/build/bin/protocol_machine_runner";
 
     /// Get the full path to the protocol-machine runner binary.
     fn get_protocol_machine_runner_path() -> Option<PathBuf> {

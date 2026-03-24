@@ -1,6 +1,6 @@
 import Runtime.Proofs.TheoremPack.Inventory
 import Runtime.Proofs.TheoremPack.ReleaseConformance
-import Runtime.Proofs.VM.Speculation
+import Runtime.Proofs.ProtocolMachine.Speculation
 
 /-! # Runtime.Proofs.TheoremPack.API
 

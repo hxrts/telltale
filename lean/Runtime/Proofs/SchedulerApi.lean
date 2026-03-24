@@ -1,4 +1,4 @@
-import Runtime.Proofs.VM.Scheduler
+import Runtime.Proofs.ProtocolMachine.Scheduler
 import Runtime.Proofs.Concurrency
 
 set_option autoImplicit false
@@ -152,17 +152,17 @@ def validateProtocolMachineSchedulerHypothesis {st₀ : VMState ι γ π ε ν}
   | .scheduleConfluence =>
       { hypothesis := h
       , passed := true
-      , detail := "Scheduler confluence theorem is available from Runtime.Proofs.VM.Scheduler."
+      , detail := "Scheduler confluence theorem is available from Runtime.Proofs.ProtocolMachine.Scheduler."
       }
   | .starvationFree =>
       { hypothesis := h
       , passed := true
-      , detail := "Starvation-freedom theorem is available from Runtime.Proofs.VM.Scheduler."
+      , detail := "Starvation-freedom theorem is available from Runtime.Proofs.ProtocolMachine.Scheduler."
       }
   | .cooperativeRefinement =>
       { hypothesis := h
       , passed := true
-      , detail := "Cooperative-refinement theorem is available from Runtime.Proofs.VM.Scheduler."
+      , detail := "Cooperative-refinement theorem is available from Runtime.Proofs.ProtocolMachine.Scheduler."
       }
   | .irisStateInvariant =>
       { hypothesis := h

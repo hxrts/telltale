@@ -1,5 +1,5 @@
-import Runtime.VM.Model.TypeClasses
-import Runtime.VM.Composition
+import Runtime.ProtocolMachine.Model.TypeClasses
+import Runtime.ProtocolMachine.Composition
 import IrisExtractionInstance
 
 /-

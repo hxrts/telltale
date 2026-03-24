@@ -1,4 +1,4 @@
-import Runtime.VM.Model.CompileLocalTypeR
+import Runtime.ProtocolMachine.Model.CompileLocalTypeR
 
 
 /-! # CompileLocalTypeR Correctness

@@ -1,4 +1,4 @@
-import Runtime.VM.Model
+import Runtime.ProtocolMachine.Model
 
 set_option autoImplicit false
 
@@ -12,7 +12,7 @@ namespace Runtime
 namespace Proofs
 namespace Examples
 
-open Runtime.VM.Model
+open Runtime.ProtocolMachine.Model
 
 def publicationCtx : AuthoritativeCommitmentContext :=
   { operationId := "op-accept"

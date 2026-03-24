@@ -1,5 +1,5 @@
 import Runtime.Transport
-import Runtime.VM.Model.State
+import Runtime.ProtocolMachine.Model.State
 import Runtime.Proofs.EffectBisim.Core
 
 /-! # Handler Equivalence

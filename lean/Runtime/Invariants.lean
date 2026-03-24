@@ -2,7 +2,7 @@ import Protocol.Environments.Core
 import Protocol.Coherence.Consume
 import Runtime.Resources.SessionRA
 import Runtime.ProgramLogic.GhostState
-import Runtime.VM.Model.State
+import Runtime.ProtocolMachine.Model.State
 import IrisExtractionInstance
 
 /-! # Session Cancelable Invariants

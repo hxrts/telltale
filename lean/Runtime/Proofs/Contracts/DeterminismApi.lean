@@ -1,4 +1,4 @@
-import Runtime.VM.API
+import Runtime.ProtocolMachine.API
 
 set_option autoImplicit false
 

@@ -1,4 +1,4 @@
-import Runtime.VM.Model.TypeClasses
+import Runtime.ProtocolMachine.Model.TypeClasses
 
 /-! # Resource Model
 

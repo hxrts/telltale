@@ -1,5 +1,5 @@
-import Runtime.VM.Runtime.Scheduler
-import Runtime.Proofs.VM.Scheduler
+import Runtime.ProtocolMachine.Runtime.Scheduler
+import Runtime.Proofs.ProtocolMachine.Scheduler
 import Protocol.DeadlockFreedom
 
 /-! # Progress Measure for Session Type Liveness

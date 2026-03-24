@@ -1,11 +1,11 @@
 import Runtime.Proofs.ProgressApi
-import Runtime.VM.Model.Effects
-import Runtime.VM.Model.OutputCondition
-import Runtime.VM.Model.SemanticObjects.AuthoritativeReadsPublication
-import Runtime.VM.Model.SemanticObjects.CrossTargetProgressDependentWork
-import Runtime.VM.Model.SemanticObjects.ProgressContracts
-import Runtime.VM.Model.SemanticObjects.ReplayFailureExactness
-import Runtime.VM.Model.SemanticObjects.TransformationLocalObligations
+import Runtime.ProtocolMachine.Model.Effects
+import Runtime.ProtocolMachine.Model.OutputCondition
+import Runtime.ProtocolMachine.Model.SemanticObjects.AuthoritativeReadsPublication
+import Runtime.ProtocolMachine.Model.SemanticObjects.CrossTargetProgressDependentWork
+import Runtime.ProtocolMachine.Model.SemanticObjects.ProgressContracts
+import Runtime.ProtocolMachine.Model.SemanticObjects.ReplayFailureExactness
+import Runtime.ProtocolMachine.Model.SemanticObjects.TransformationLocalObligations
 
 set_option autoImplicit false
 
@@ -37,12 +37,12 @@ structure OutputConditionWitness where
 
 /-- Attachment surface for core semantic-object invariants. -/
 structure CoreSemanticObjectWitness where
-  objects : Runtime.VM.Model.ProtocolMachineSemanticObjects
+  objects : Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects
   invariants : objects.coreSemanticObjectInvariants
 
 /-- Attachment surface for outstanding-effect invalidation / late-result proofs. -/
 structure OutstandingEffectSemanticWitness where
-  effect : Runtime.VM.Model.OutstandingEffect
+  effect : Runtime.ProtocolMachine.Model.OutstandingEffect
   ownerId : Option String
   tick : Nat
   rejected : effect.resultIsLate ownerId tick
@@ -50,9 +50,9 @@ structure OutstandingEffectSemanticWitness where
 
 /-- Attachment surface for semantic handoff proofs. -/
 structure SemanticHandoffWitness where
-  operation : Runtime.VM.Model.OperationInstance
-  handoff : Runtime.VM.Model.SemanticHandoff
-  obligation : Runtime.VM.Model.TransformationObligation
+  operation : Runtime.ProtocolMachine.Model.OperationInstance
+  handoff : Runtime.ProtocolMachine.Model.SemanticHandoff
+  obligation : Runtime.ProtocolMachine.Model.TransformationObligation
   handoffCommitted : handoff.isCommitted
   obligationCommitted : obligation.isCommitted
   eligible : operation.handoffEligible
@@ -62,9 +62,9 @@ structure SemanticHandoffWitness where
 
 /-- Attachment surface for authoritative-read / publication discipline. -/
 structure AuthoritativeReadPublicationWitness where
-  objects : Runtime.VM.Model.ProtocolMachineSemanticObjects
-  ctx : Runtime.VM.Model.AuthoritativeCommitmentContext
-  read : Runtime.VM.Model.AuthoritativeRead
+  objects : Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects
+  ctx : Runtime.ProtocolMachine.Model.AuthoritativeCommitmentContext
+  read : Runtime.ProtocolMachine.Model.AuthoritativeRead
   readMember : read ∈ objects.authoritativeReads
   readSatisfiesContext : read.satisfiesCommitmentContext ctx
   commitmentPermitted : objects.authoritativeCommitPermitted ctx
@@ -75,11 +75,11 @@ structure AuthoritativeReadPublicationWitness where
 
 /-- Attachment surface for proof-backed materialization / success. -/
 structure MaterializationSuccessWitness where
-  objects : Runtime.VM.Model.ProtocolMachineSemanticObjects
-  ctx : Runtime.VM.Model.SuccessProofContext
-  operation : Runtime.VM.Model.OperationInstance
-  proof : Runtime.VM.Model.MaterializationProof
-  handle : Runtime.VM.Model.CanonicalHandle
+  objects : Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects
+  ctx : Runtime.ProtocolMachine.Model.SuccessProofContext
+  operation : Runtime.ProtocolMachine.Model.OperationInstance
+  proof : Runtime.ProtocolMachine.Model.MaterializationProof
+  handle : Runtime.ProtocolMachine.Model.CanonicalHandle
   operationMember : operation ∈ objects.operationInstances
   proofMember : proof ∈ objects.materializationProofs
   handleMember : handle ∈ objects.canonicalHandles
@@ -94,18 +94,18 @@ structure MaterializationSuccessWitness where
 
 /-- Attachment surface for progress-contract / escalation discipline. -/
 structure ProgressContractWitness where
-  objects : Runtime.VM.Model.ProtocolMachineSemanticObjects
-  operation : Runtime.VM.Model.OperationInstance
-  contract : Runtime.VM.Model.ProgressContract
+  objects : Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects
+  operation : Runtime.ProtocolMachine.Model.OperationInstance
+  contract : Runtime.ProtocolMachine.Model.ProgressContract
   operationMember : operation ∈ objects.operationInstances
   tracksOperation : contract.tracksOperation operation
   trackedLiveness : objects.ownerInternalLivenessContract contract
 
 /-- Attachment surface for effect admissibility / reentrancy contracts. -/
 structure EffectContractWitness where
-  metadata : Runtime.VM.Model.EffectInterfaceMetadata
-  activeDomain : Runtime.VM.Model.EffectResponsibilityDomain
-  incomingDomain : Runtime.VM.Model.EffectResponsibilityDomain
+  metadata : Runtime.ProtocolMachine.Model.EffectInterfaceMetadata
+  activeDomain : Runtime.ProtocolMachine.Model.EffectResponsibilityDomain
+  incomingDomain : Runtime.ProtocolMachine.Model.EffectResponsibilityDomain
   architecturallyLegal : metadata.architecturallyLegal
   reentrancyPolicySound :
     metadata.reentrancyAdmissible activeDomain incomingDomain ↔
@@ -113,11 +113,11 @@ structure EffectContractWitness where
 
 /-- Attachment surface for replay stability / failure exactness discipline. -/
 structure ReplayFailureExactnessWitness where
-  objects : Runtime.VM.Model.ProtocolMachineSemanticObjects
-  ctx : Runtime.VM.Model.ReplayFailureContext
-  operation : Runtime.VM.Model.OperationInstance
-  effect : Runtime.VM.Model.OutstandingEffect
-  contract : Runtime.VM.Model.ProgressContract
+  objects : Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects
+  ctx : Runtime.ProtocolMachine.Model.ReplayFailureContext
+  operation : Runtime.ProtocolMachine.Model.OperationInstance
+  effect : Runtime.ProtocolMachine.Model.OutstandingEffect
+  contract : Runtime.ProtocolMachine.Model.ProgressContract
   operationMember : operation ∈ objects.operationInstances
   effectMember : effect ∈ objects.outstandingEffects
   contractMember : contract ∈ objects.progressContracts
@@ -130,11 +130,11 @@ structure ReplayFailureExactnessWitness where
 
 /-- Attachment surface for cross-target progress / dependent-work composition. -/
 structure CrossTargetProgressDependentWorkWitness where
-  objects : Runtime.VM.Model.ProtocolMachineSemanticObjects
-  left : Runtime.VM.Model.RealizedProgressView
-  right : Runtime.VM.Model.RealizedProgressView
-  parent : Runtime.VM.Model.OperationInstance
-  contract : Runtime.VM.Model.ProgressContract
+  objects : Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects
+  left : Runtime.ProtocolMachine.Model.RealizedProgressView
+  right : Runtime.ProtocolMachine.Model.RealizedProgressView
+  parent : Runtime.ProtocolMachine.Model.OperationInstance
+  contract : Runtime.ProtocolMachine.Model.ProgressContract
   parentMember : parent ∈ objects.operationInstances
   tracksOperation : contract.tracksOperation parent
   crossTargetProgressPreserved : objects.crossTargetProgressPreserved left right
@@ -144,8 +144,8 @@ structure CrossTargetProgressDependentWorkWitness where
 
 /-- Attachment surface for transformation-local obligation bundles. -/
 structure TransformationLocalObligationWitness where
-  objects : Runtime.VM.Model.ProtocolMachineSemanticObjects
-  bundle : Runtime.VM.Model.TransformationLocalObligationBundle
+  objects : Runtime.ProtocolMachine.Model.ProtocolMachineSemanticObjects
+  bundle : Runtime.ProtocolMachine.Model.TransformationLocalObligationBundle
   explicitLocalBundle : bundle.explicitLocalBundle objects
 
 /-- Canonical theorem-pack attachment points for semantic-object proof families. -/

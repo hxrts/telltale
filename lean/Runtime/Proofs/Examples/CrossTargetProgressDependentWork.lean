@@ -1,4 +1,4 @@
-import Runtime.VM.Model
+import Runtime.ProtocolMachine.Model
 
 set_option autoImplicit false
 
@@ -12,7 +12,7 @@ namespace Runtime
 namespace Proofs
 namespace Examples
 
-open Runtime.VM.Model
+open Runtime.ProtocolMachine.Model
 
 def parentOp : OperationInstance :=
   { operationId := "accept-invite"
@@ -125,7 +125,7 @@ theorem waiting_views_cross_target_compatible :
     nativeBlocked.crossTargetCompatible wasmNoProgress := by
   constructor
   · simp [RealizedProgressView.sameSubject, nativeBlocked, wasmNoProgress]
-  · exact Runtime.VM.Model.blocked_noProgress_crossTargetEquivalent
+  · exact Runtime.ProtocolMachine.Model.blocked_noProgress_crossTargetEquivalent
 
 theorem success_views_cross_target_preserved :
     dependentWorkObjects.crossTargetProgressPreserved nativeSucceeded wasmSucceeded := by
@@ -175,14 +175,14 @@ theorem parent_terminality_composed :
 
 example :
     parentOp.hasTerminalTruth := by
-  exact Runtime.VM.Model.parentTerminalityComposedFromDependents_terminal_truth
+  exact Runtime.ProtocolMachine.Model.parentTerminalityComposedFromDependents_terminal_truth
     parent_terminality_composed
     (by simp [ProgressContract.isTerminal, ProgressState.isTerminal, nativeSucceeded])
 
 example :
     dependentWorkObjects.hasCanonicalTerminalPublicationFor
       parentOp.operationId parentOp.session := by
-  exact Runtime.VM.Model.parentTerminalityComposedFromDependents_canonical_publication
+  exact Runtime.ProtocolMachine.Model.parentTerminalityComposedFromDependents_canonical_publication
     parent_terminality_composed
     (by simp [ProgressContract.isTerminal, ProgressState.isTerminal, nativeSucceeded])
 

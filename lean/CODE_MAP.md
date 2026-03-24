@@ -793,7 +793,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | Examples/SimpleProtocol.lean | 127 | Simple two-party protocol example |
 | Tests/Main.lean | 98 | Runtime test harness |
 | Tests/SimulatorParity.lean | 54 | Lean/Rust simulator parity tests |
-| Tests/VMRunner.lean | 116 | JSON-driven VM runner (stdin choreographies, stdout traces) |
+| Tests/ProtocolMachineRunner.lean | 116 | JSON-driven VM runner (stdin choreographies, stdout traces) |
 
 ---
 
@@ -851,7 +851,7 @@ Four executables defined in lakefile.lean:
 |------------|-------------|---------|
 | `runtime_tests` | `Runtime.Tests.Main` | VM example tests |
 | `simulator_parity_tests` | `Runtime.Tests.SimulatorParity` | Lean/Rust simulator parity tests |
-| `vm_runner` | `Runtime.Tests.VMRunner` | Execute choreographies, emit observable traces |
+| `protocol_machine_runner` | `Runtime.Tests.ProtocolMachineRunner` | Execute choreographies, emit observable traces |
 | `telltale_validator` | `Choreography.Projection.Validator` | Projection validator (default target) |
 
 ---
@@ -946,7 +946,7 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **Buffer boundedness?** → Protocol/BufferBoundedness.lean
 - **Protocol symmetry?** → Protocol/Symmetry.lean
 - **Spectral gap bounds?** → Protocol/Classical/SpectralGap.lean
-- **VM JSON runner?** → Runtime/Tests/VMRunner.lean
+- **VM JSON runner?** → Runtime/Tests/ProtocolMachineRunner.lean
 - **What is axiomatized?** → [Axiom Inventory](#axiom-inventory)
 
 ### V2 Additions

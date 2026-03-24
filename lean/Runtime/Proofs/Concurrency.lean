@@ -1,5 +1,5 @@
-import Runtime.VM.Runtime.Runner
-import Runtime.VM.Runtime.Scheduler
+import Runtime.ProtocolMachine.Runtime.Runner
+import Runtime.ProtocolMachine.Runtime.Scheduler
 import Runtime.ProgramLogic.LanguageInstance
 import IrisExtractionInstance
 
@@ -120,8 +120,8 @@ theorem per_session_trace_n_invariant {ι γ π ε ν : Type u} [IdentityModel �
     (st : VMState ι γ π ε ν)
     (_hwf : WFVMState st) (sid : SessionId) (fuel n1 n2 : Nat)
     (hn1 : n1 ≥ 1) (hn2 : n2 ≥ 1) :
-    filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel n1 st).obsTrace) =
-    filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel n2 st).obsTrace) := by
+    filterBySid sid (Runtime.ProtocolMachine.normalizeTrace (runScheduled fuel n1 st).obsTrace) =
+    filterBySid sid (Runtime.ProtocolMachine.normalizeTrace (runScheduled fuel n2 st).obsTrace) := by
   -- Reduce both schedules to the single-round form.
   have h1 := run_scheduled_eq_one (fuel:=fuel) (n:=n1) (st:=st) hn1
   have h2 := run_scheduled_eq_one (fuel:=fuel) (n:=n2) (st:=st) hn2
@@ -137,8 +137,8 @@ theorem per_session_trace_policy_invariant {ι γ π ε ν : Type u} [IdentityMo
     (st : VMState ι γ π ε ν)
     (_hwf : WFVMState st) (sid : SessionId) (fuel concurrency : Nat)
     (hpol : st.sched.policy = .roundRobin) :
-    filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel concurrency st).obsTrace) =
-    filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel concurrency
+    filterBySid sid (Runtime.ProtocolMachine.normalizeTrace (runScheduled fuel concurrency st).obsTrace) =
+    filterBySid sid (Runtime.ProtocolMachine.normalizeTrace (runScheduled fuel concurrency
       { st with sched := { st.sched with policy := .roundRobin } }).obsTrace) := by
   -- Round-robin normalization is idempotent.
   have h := run_scheduled_policy_eq (fuel:=fuel) (n:=concurrency) (st:=st) hpol

@@ -1,7 +1,7 @@
-import Runtime.VM.Model
-import Runtime.VM.Composition
-import Runtime.VM.API
-import Runtime.VM.Runtime
+import Runtime.ProtocolMachine.Model
+import Runtime.ProtocolMachine.Composition
+import Runtime.ProtocolMachine.API
+import Runtime.ProtocolMachine.Runtime
 import Runtime.ProgramLogic.LanguageInstance
 import Runtime.Resources.SessionRA
 import Runtime.Resources.BufferRA
@@ -24,7 +24,7 @@ import Runtime.Proofs.EffectBisim.ConfigEquivBridge
 import Runtime.Proofs.EffectBisim.Examples
 import Runtime.Proofs.EffectBisim.RationalFragment
 import Runtime.Proofs.BridgeStrengthening
-import Runtime.Proofs.VM.Speculation
+import Runtime.Proofs.ProtocolMachine.Speculation
 import Runtime.Proofs.InvariantSpace
 import Runtime.Proofs.Adapters.Progress
 import Runtime.Proofs.Adapters.Classical

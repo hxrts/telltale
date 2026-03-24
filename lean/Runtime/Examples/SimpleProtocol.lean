@@ -1,9 +1,9 @@
-import Runtime.VM.Model.Program
-import Runtime.VM.Semantics.Exec
-import Runtime.VM.Semantics.ExecHelpers
-import Runtime.VM.Model.UnitModel
-import Runtime.VM.Runtime.Monitor
-import Runtime.Proofs.VM.Monitor
+import Runtime.ProtocolMachine.Model.Program
+import Runtime.ProtocolMachine.Semantics.Exec
+import Runtime.ProtocolMachine.Semantics.ExecHelpers
+import Runtime.ProtocolMachine.Model.UnitModel
+import Runtime.ProtocolMachine.Runtime.Monitor
+import Runtime.Proofs.ProtocolMachine.Monitor
 
 /-
 The Problem. Provide a concrete, runnable VM example that exercises
