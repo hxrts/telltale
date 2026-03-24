@@ -1611,9 +1611,9 @@ dependencies = [
  "serde",
  "serde_json",
  "telltale-choreography",
+ "telltale-protocol-machine",
  "telltale-theory",
  "telltale-types",
- "telltale-vm",
  "tempfile",
  "thiserror",
  "tracing",
@@ -1641,6 +1641,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "telltale-protocol-machine"
+version = "6.0.0"
+dependencies = [
+ "assert_matches",
+ "bincode",
+ "cfg-if",
+ "criterion",
+ "getrandom 0.2.16",
+ "proptest",
+ "rayon",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "telltale-lean-bridge",
+ "telltale-theory",
+ "telltale-types",
+ "thiserror",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "telltale-simulator"
 version = "6.0.0"
 dependencies = [
@@ -1651,9 +1673,9 @@ dependencies = [
  "serde",
  "serde_json",
  "telltale-lean-bridge",
+ "telltale-protocol-machine",
  "telltale-theory",
  "telltale-types",
- "telltale-vm",
  "toml 0.8.23",
 ]
 
@@ -1694,28 +1716,6 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror",
-]
-
-[[package]]
-name = "telltale-vm"
-version = "6.0.0"
-dependencies = [
- "assert_matches",
- "bincode",
- "cfg-if",
- "criterion",
- "getrandom 0.2.16",
- "proptest",
- "rayon",
- "serde",
- "serde_json",
- "serde_yaml",
- "telltale-lean-bridge",
- "telltale-theory",
- "telltale-types",
- "thiserror",
- "wasm-bindgen",
- "wasm-bindgen-test",
 ]
 
 [[package]]

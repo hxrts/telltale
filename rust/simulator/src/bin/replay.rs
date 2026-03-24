@@ -8,7 +8,7 @@ use telltale_simulator::network::NetworkModel;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
 use telltale_simulator::rng::SimRng;
 use telltale_simulator::scenario::Scenario;
-use telltale_vm::{ProtocolMachine, ProtocolMachineStepResult};
+use telltale_protocol_machine::{ProtocolMachine, ProtocolMachineStepResult};
 
 struct ReplayArgs {
     checkpoint_path: PathBuf,

@@ -5,12 +5,12 @@ use std::sync::Mutex;
 use std::time::Duration;
 use telltale_types::FixedQ32;
 
-use telltale_vm::buffer::EnqueueResult;
-use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{
+use telltale_protocol_machine::buffer::EnqueueResult;
+use telltale_protocol_machine::coroutine::Value;
+use telltale_protocol_machine::effect::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
-use telltale_vm::session::SessionId;
+use telltale_protocol_machine::session::SessionId;
 
 use crate::rng::SimRng;
 
@@ -363,7 +363,7 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use telltale_vm::effect::{EffectFailure, EffectResult};
+    use telltale_protocol_machine::effect::{EffectFailure, EffectResult};
 
     struct PassthroughHandler;
 

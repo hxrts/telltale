@@ -17,7 +17,7 @@ Lean source of truth:
 [lean/Runtime/VM/Model/SemanticObjects/Core.lean](../lean/Runtime/VM/Model/SemanticObjects/Core.lean)
 
 Rust source of truth:
-[rust/vm/src/semantic_objects.rs](../rust/vm/src/semantic_objects.rs)
+[rust/protocol-machine/src/semantic_objects.rs](../rust/protocol-machine/src/semantic_objects.rs)
 
 | Shared object | Lean | Rust | Status |
 |---|---|---|---|
@@ -108,6 +108,6 @@ Rust-only wrappers, so they are not expected to have direct Lean theorem peers.
 When a shared semantic/runtime object is added, renamed, split, or removed:
 
 1. Update the Lean definition in `lean/Runtime/VM/Model/SemanticObjects/Core.lean`.
-2. Update the Rust definition in `rust/vm/src/semantic_objects.rs`.
+2. Update the Rust definition in `rust/protocol-machine/src/semantic_objects.rs`.
 3. Update the bridge schema in `rust/lean-bridge/src/semantic_objects.rs`.
 4. Update this parity inventory in the same change.

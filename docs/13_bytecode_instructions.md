@@ -1,6 +1,6 @@
 # Protocol-Machine Bytecode Instructions
 
-This document defines the current protocol-machine instruction set in `rust/vm/src/instr.rs`.
+This document defines the current protocol-machine instruction set in `rust/protocol-machine/src/instr.rs`.
 
 ## Instruction Families
 
@@ -72,7 +72,7 @@ All register operands are bounds-checked at runtime. Out-of-range reads or write
 
 ## Compilation From Local Types
 
-`rust/vm/src/compiler.rs` exposes `compile(local_type: &LocalTypeR) -> Vec<Instr>`.
+`rust/protocol-machine/src/compiler.rs` exposes `compile(local_type: &LocalTypeR) -> Vec<Instr>`.
 
 The compiler emits communication instructions, `Invoke`, and control-flow instructions. It does not emit session lifecycle, guard, speculation, or ownership opcodes.
 

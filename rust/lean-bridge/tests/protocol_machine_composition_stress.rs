@@ -9,11 +9,11 @@ use cfg_if::cfg_if;
 use std::time::Instant;
 
 use telltale_types::{GlobalType, Label, LocalTypeR};
-use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, EffectResult};
-use telltale_vm::loader::CodeImage;
-use telltale_vm::{ContentionMetrics, ThreadedProtocolMachine};
-use telltale_vm::{ProtocolMachineConfig, ProtocolMachineStepResult, ThreadedRoundSemantics};
+use telltale_protocol_machine::coroutine::Value;
+use telltale_protocol_machine::effect::{EffectHandler, EffectResult};
+use telltale_protocol_machine::loader::CodeImage;
+use telltale_protocol_machine::{ContentionMetrics, ThreadedProtocolMachine};
+use telltale_protocol_machine::{ProtocolMachineConfig, ProtocolMachineStepResult, ThreadedRoundSemantics};
 
 #[derive(Debug, Clone, Copy)]
 struct StressHandler;
@@ -195,7 +195,7 @@ fn run_stress(protocols: usize, workers: usize) -> StressReport {
         faults: vm
             .trace()
             .iter()
-            .filter(|ev| matches!(ev, telltale_vm::ObsEvent::Faulted { .. }))
+            .filter(|ev| matches!(ev, telltale_protocol_machine::ObsEvent::Faulted { .. }))
             .count(),
     }
 }

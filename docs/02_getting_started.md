@@ -19,7 +19,7 @@ This adds the facade crate and the choreographic programming layer. Pinning vers
 | Core session types plus facade APIs | `telltale` |
 | Choreography DSL, parser, and effect handlers | `telltale-choreography` |
 | Projection, merge, and subtyping algorithms | `telltale-theory` |
-| Protocol-machine execution with schedulers | `telltale-vm` |
+| Protocol-machine execution with schedulers | `telltale-protocol-machine` |
 | Deterministic simulation and scenario middleware | `telltale-simulator` |
 | Lean JSON import, export, and validation tools | `telltale-lean-bridge` |
 | Production transport adapters | `telltale-transport` |
@@ -34,7 +34,7 @@ The `telltale-types` crate contains core type definitions such as `GlobalType`, 
 
 The `telltale-theory` crate contains pure algorithms for projection, merge, subtyping, and well-formedness checks. The `telltale-choreography` crate is the choreographic programming layer that provides the DSL parser, effect handlers, and code generation.
 
-The `telltale-vm` crate provides the protocol machine and guest-runtime execution surfaces. The `telltale-simulator` crate wraps the protocol machine with deterministic middleware for testing. The `telltale-lean-bridge` crate enables cross-validation with Lean through JSON import and export functions. The `telltale-transport` crate provides production-oriented transport adapters that integrate with choreography handlers.
+The `telltale-protocol-machine` crate provides the protocol machine and guest-runtime execution surfaces. The `telltale-simulator` crate wraps the protocol machine with deterministic middleware for testing. The `telltale-lean-bridge` crate enables cross-validation with Lean through JSON import and export functions. The `telltale-transport` crate provides production-oriented transport adapters that integrate with choreography handlers.
 
 The `telltale` crate is the main facade that re-exports types from other crates with feature flags. Most users need both `telltale` and `telltale-choreography` for session types and the high-level DSL.
 

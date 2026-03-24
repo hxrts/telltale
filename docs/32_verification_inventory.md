@@ -15,6 +15,6 @@ When one of these values changes legitimately:
 | Lean core-library lines | 131,503 | `lean/CODE_MAP.md` total row |
 | Ownership contract gate commands | 6 | `just check-ownership-contracts` |
 | Aura-derived boundary checks | 6 | `just check-aura-borrowed-lints` |
-| Explicit failure/timeout observable event kinds | 5 | `rust/vm/src/vm/vm_config.rs` (`ObsEvent`) |
+| Explicit failure/timeout observable event kinds | 5 | `rust/protocol-machine/src/vm/vm_config.rs` (`ObsEvent`) |
 | Macro UI pass fixtures | 2 | `rust/macros/tests/macro_ui.rs` |
 | Macro UI compile-fail fixtures | 6 | `rust/macros/tests/macro_ui.rs` |

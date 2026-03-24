@@ -1,10 +1,10 @@
 #![allow(missing_docs)]
 
 use telltale_lean_bridge::ProtocolMachineSemanticObjects;
-use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
-use telltale_vm::loader::CodeImage;
-use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
+use telltale_protocol_machine::coroutine::Value;
+use telltale_protocol_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
+use telltale_protocol_machine::loader::CodeImage;
+use telltale_protocol_machine::{ProtocolMachine, ProtocolMachineConfig};
 
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;

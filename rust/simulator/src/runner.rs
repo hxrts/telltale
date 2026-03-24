@@ -1,17 +1,17 @@
 //! Protocol-machine-backed simulation runner.
 //!
-//! Wraps `telltale-vm` to execute choreographies through the protocol machine,
+//! Wraps `telltale-protocol-machine` to execute choreographies through the protocol machine,
 //! producing simulator traces plus canonical semantic artifacts.
 
 use std::collections::BTreeMap;
 use telltale_types::FixedQ32;
 
 use telltale_types::{GlobalType, LocalTypeR};
-use telltale_vm::effect::{EffectHandler, EffectTraceEntry};
-use telltale_vm::loader::CodeImage;
-use telltale_vm::output_condition::OutputConditionCheck;
-use telltale_vm::ObsEvent;
-use telltale_vm::{
+use telltale_protocol_machine::effect::{EffectHandler, EffectTraceEntry};
+use telltale_protocol_machine::loader::CodeImage;
+use telltale_protocol_machine::output_condition::OutputConditionCheck;
+use telltale_protocol_machine::ObsEvent;
+use telltale_protocol_machine::{
     ProtocolMachine, ProtocolMachineConfig, ProtocolMachineSemanticObjects,
     ProtocolMachineStepResult, SemanticAuditRecord,
 };
@@ -355,7 +355,7 @@ pub struct ScenarioReplayArtifact {
     /// Effect trace entries for deterministic replay.
     pub effect_trace: Vec<EffectTraceEntry>,
     /// Canonical typed effect exchanges captured from the guest runtime.
-    pub effect_exchanges: Vec<telltale_vm::EffectExchangeRecord>,
+    pub effect_exchanges: Vec<telltale_protocol_machine::EffectExchangeRecord>,
     /// Output-condition verification checks captured by the protocol machine.
     pub output_condition_trace: Vec<OutputConditionCheck>,
     /// Canonical semantic audit records derived from the protocol-machine run.

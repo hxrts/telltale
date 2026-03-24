@@ -1,7 +1,7 @@
 //! Helpers for converting between ProtocolMachine values and numeric state vectors.
 
 use telltale_types::FixedQ32;
-use telltale_vm::coroutine::Value;
+use telltale_protocol_machine::coroutine::Value;
 
 const Q32_SCALAR_PREFIX: &str = "q32:";
 const Q32_VEC_PREFIX: &str = "q32vec:";

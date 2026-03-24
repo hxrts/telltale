@@ -5,7 +5,7 @@ Detailed behavior is split into focused pages to keep this entry concise.
 
 ## Scope
 
-The simulator runs projected local types on `telltale-vm`.
+The simulator runs projected local types on `telltale-protocol-machine`.
 It adds deterministic middleware for scenarios, faults, network behavior, and properties.
 It also provides a harness API for external integration testing.
 For effect-heavy guest runtimes, it exposes generated effect-family scenario helpers written in terms of declared effect operations and their semantic outcomes.

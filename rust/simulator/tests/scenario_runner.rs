@@ -7,11 +7,11 @@ use telltale_simulator::generated::{GeneratedEffectScenario, ScenarioEffectDispo
 use telltale_simulator::runner::run_with_scenario;
 use telltale_simulator::scenario::Scenario;
 use telltale_types::{GlobalType, Label, LocalTypeR};
-use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{
+use telltale_protocol_machine::coroutine::Value;
+use telltale_protocol_machine::effect::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
-use telltale_vm::SemanticAuditRecord;
+use telltale_protocol_machine::SemanticAuditRecord;
 
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;
@@ -132,7 +132,7 @@ step_size = "0.01"
             .replay
             .obs_trace
             .iter()
-            .filter(|event| matches!(event, telltale_vm::ObsEvent::Invoked { .. }))
+            .filter(|event| matches!(event, telltale_protocol_machine::ObsEvent::Invoked { .. }))
             .count()
     );
     assert!(result.replay.effect_trace.len() <= result.replay.obs_trace.len());

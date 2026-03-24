@@ -156,7 +156,7 @@ do_freeze() {
 {
   "schema_version": 1,
   "benchmark_suite": {
-    "capture_command": "cargo run -p telltale-vm --features multi-thread --example v2_baseline_capture -- --output artifacts/v2/baseline/metrics.json",
+    "capture_command": "cargo run -p telltale-protocol-machine --features multi-thread --example v2_baseline_capture -- --output artifacts/v2/baseline/metrics.json",
     "metrics": [
       "throughput_steps_per_sec",
       "throughput_sessions_per_sec",
@@ -169,21 +169,21 @@ do_freeze() {
   },
   "conformance_corpus": {
     "canonical": [
-      "cargo test -p telltale-vm --test conformance_lean",
-      "cargo test -p telltale-vm --test equivalence_lean",
-      "cargo test -p telltale-vm --test differential_step_corpus"
+      "cargo test -p telltale-protocol-machine --test conformance_lean",
+      "cargo test -p telltale-protocol-machine --test equivalence_lean",
+      "cargo test -p telltale-protocol-machine --test differential_step_corpus"
     ],
     "threaded": [
-      "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_feature_contract",
-      "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_equivalence",
-      "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_lane_runtime"
+      "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test threaded_feature_contract",
+      "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test threaded_equivalence",
+      "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test threaded_lane_runtime"
     ]
   }
 }
 JSON
 
   echo "-> capturing benchmark/metrics artifact"
-  cargo run -p telltale-vm --features multi-thread --example v2_baseline_capture -- \
+  cargo run -p telltale-protocol-machine --features multi-thread --example v2_baseline_capture -- \
     --output "${ARTIFACT_DIR}/metrics.json"
 
   local canonical_total=0 canonical_pass=0 threaded_total=0 threaded_pass=0
@@ -201,7 +201,7 @@ JSON
   echo "-> running canonical conformance corpus"
   for test_name in conformance_lean equivalence_lean differential_step_corpus; do
     canonical_total=$((canonical_total + 1))
-    if run_test "${test_name}" cargo test -p telltale-vm --test "${test_name}"; then
+    if run_test "${test_name}" cargo test -p telltale-protocol-machine --test "${test_name}"; then
       canonical_pass=$((canonical_pass + 1))
     fi
   done
@@ -209,7 +209,7 @@ JSON
   echo "-> running threaded conformance corpus"
   for test_name in threaded_feature_contract threaded_equivalence threaded_lane_runtime; do
     threaded_total=$((threaded_total + 1))
-    if run_test "${test_name}" env TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test "${test_name}"; then
+    if run_test "${test_name}" env TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test "${test_name}"; then
       threaded_pass=$((threaded_pass + 1))
     fi
   done
@@ -267,17 +267,17 @@ do_run() {
 
   echo "== Benchmark Matrix =="
   echo "-> disjoint workload"
-  cargo run -p telltale-vm --example v2_baseline_capture --features multi-thread -- \
+  cargo run -p telltale-protocol-machine --example v2_baseline_capture --features multi-thread -- \
     --workload disjoint \
     --output "${DISJOINT_OUT}"
 
   echo "-> contended workload"
-  cargo run -p telltale-vm --example v2_baseline_capture --features multi-thread -- \
+  cargo run -p telltale-protocol-machine --example v2_baseline_capture --features multi-thread -- \
     --workload contended \
     --output "${CONTENDED_OUT}"
 
   echo "-> contended M1-stress reference workload"
-  cargo run -p telltale-vm --example v2_baseline_capture --features multi-thread -- \
+  cargo run -p telltale-protocol-machine --example v2_baseline_capture --features multi-thread -- \
     --workload contended \
     --tuning-profile m1_stress_reference \
     --output "${CONTENDED_M1_OUT}"

@@ -305,31 +305,31 @@ check_types() {
 
   compare_enum "FlowPolicy" \
     "${ROOT_DIR}/lean/Runtime/VM/Model/Knowledge.lean" "FlowPolicy" \
-    "${ROOT_DIR}/rust/vm/src/vm/runtime_state/policy.rs" "FlowPolicy" \
+    "${ROOT_DIR}/rust/protocol-machine/src/vm/runtime_state/policy.rs" "FlowPolicy" \
     "allowAll|denyAll|allowRoles|denyRoles|predicate|predicateExpr" \
     "AllowAll|DenyAll|AllowRoles|DenyRoles|Predicate|PredicateExpr"
 
   compare_enum "FlowPredicate" \
     "${ROOT_DIR}/lean/Runtime/VM/Model/Knowledge.lean" "FlowPredicate" \
-    "${ROOT_DIR}/rust/vm/src/vm/runtime_state/policy.rs" "FlowPredicate" \
+    "${ROOT_DIR}/rust/protocol-machine/src/vm/runtime_state/policy.rs" "FlowPredicate" \
     "targetRolePrefix|factContains|endpointRoleMatchesTarget|all|any" \
     "TargetRolePrefix|FactContains|EndpointRoleMatchesTarget|All|Any"
 
   compare_enum "OutputConditionPolicy" \
     "${ROOT_DIR}/lean/Runtime/VM/Model/OutputCondition.lean" "OutputConditionPolicy" \
-    "${ROOT_DIR}/rust/vm/src/output_condition.rs" "OutputConditionPolicy" \
+    "${ROOT_DIR}/rust/protocol-machine/src/output_condition.rs" "OutputConditionPolicy" \
     "disabled|allowAll|denyAll|predicateAllowList" \
     "Disabled|AllowAll|DenyAll|PredicateAllowList"
 
   compare_enum "Value" \
     "${ROOT_DIR}/lean/Protocol/Values.lean" "Value" \
-    "${ROOT_DIR}/rust/vm/src/coroutine.rs" "Value" \
+    "${ROOT_DIR}/rust/protocol-machine/src/coroutine.rs" "Value" \
     "string|chan" \
     "Str|Endpoint"
 
   compare_enum "CommunicationReplayMode" \
     "${ROOT_DIR}/lean/Runtime/VM/Model/Config.lean" "CommunicationReplayMode" \
-    "${ROOT_DIR}/rust/vm/src/communication_replay/identity.rs" "CommunicationReplayMode" \
+    "${ROOT_DIR}/rust/protocol-machine/src/communication_replay/identity.rs" "CommunicationReplayMode" \
     "off|sequence|nullifier" \
     "Off|Sequence|Nullifier"
 
@@ -337,12 +337,12 @@ check_types() {
 
   compare_struct "ProgressToken" \
     "${ROOT_DIR}/lean/Runtime/VM/Model/State.lean" "ProgressToken" \
-    "${ROOT_DIR}/rust/vm/src/coroutine.rs" "ProgressToken" \
+    "${ROOT_DIR}/rust/protocol-machine/src/coroutine.rs" "ProgressToken" \
     "" ""
 
   compare_struct "SignedValue" \
     "${ROOT_DIR}/lean/Runtime/VM/Model/TypeClasses.lean" "SignedValue" \
-    "${ROOT_DIR}/rust/vm/src/buffer.rs" "SignedValue" \
+    "${ROOT_DIR}/rust/protocol-machine/src/buffer.rs" "SignedValue" \
     "seqNo" \
     "sequence_no"
 
@@ -386,11 +386,11 @@ check_suite() {
   echo "== VM Parity Suite =="
   ensure_lean_prebuilt
   run_check "lean conformance corpus" \
-    "cargo test -p telltale-vm --test conformance_lean"
+    "cargo test -p telltale-protocol-machine --test conformance_lean"
   run_check "lean equivalence corpus" \
-    "cargo test -p telltale-vm --test equivalence_lean"
+    "cargo test -p telltale-protocol-machine --test equivalence_lean"
   run_check "differential step corpus" \
-    "cargo test -p telltale-vm --test differential_step_corpus"
+    "cargo test -p telltale-protocol-machine --test differential_step_corpus"
   run_check "bridge vm correspondence" \
     "cargo test -p telltale-lean-bridge --test vm_correspondence_tests"
   run_check "bridge vm differential-step correspondence" \
@@ -402,11 +402,11 @@ check_suite() {
   run_check "simulator material parity fixtures (Lean mirror)" \
     "lake --dir lean build simulator_parity_tests && ./lean/.lake/build/bin/simulator_parity_tests"
   run_check "threaded parity equivalence" \
-    "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_equivalence"
+    "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test threaded_equivalence"
   run_check "planner trace worker-count conformance" \
-    "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_lane_runtime planner_trace_is_worker_count_invariant_for_fixed_ready_set"
+    "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test threaded_lane_runtime planner_trace_is_worker_count_invariant_for_fixed_ready_set"
   run_check "v2 parity fixtures (speculation/scheduler/failure-envelope)" \
-    "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test parity_fixtures_v2"
+    "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test parity_fixtures_v2"
 }
 
 # ── Conformance: Strict VM Conformance ────────────────────────
@@ -414,25 +414,25 @@ check_conformance() {
   echo "== Strict VM Conformance =="
 
   # Cooperative backend
-  cargo test -p telltale-vm --test conformance_lean
-  cargo test -p telltale-vm --test equivalence_lean
-  cargo test -p telltale-vm --test lean_vm_equivalence
-  cargo test -p telltale-vm --test trace_corpus
-  cargo test -p telltale-vm --test strict_tick_equality
+  cargo test -p telltale-protocol-machine --test conformance_lean
+  cargo test -p telltale-protocol-machine --test equivalence_lean
+  cargo test -p telltale-protocol-machine --test lean_vm_equivalence
+  cargo test -p telltale-protocol-machine --test trace_corpus
+  cargo test -p telltale-protocol-machine --test strict_tick_equality
 
-  cargo test -p telltale-vm --test differential_step_corpus
-  cargo test -p telltale-vm --test strict_value_rejection
-  cargo test -p telltale-vm --test instr_fault_snapshots
-  cargo test -p telltale-vm --test schedule_robustness
-  cargo test -p telltale-vm --test serialization_lean
-  cargo test -p telltale-vm --test bytecode_conformance
+  cargo test -p telltale-protocol-machine --test differential_step_corpus
+  cargo test -p telltale-protocol-machine --test strict_value_rejection
+  cargo test -p telltale-protocol-machine --test instr_fault_snapshots
+  cargo test -p telltale-protocol-machine --test schedule_robustness
+  cargo test -p telltale-protocol-machine --test serialization_lean
+  cargo test -p telltale-protocol-machine --test bytecode_conformance
 
   # Threaded backend
-  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_contract
-  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_equivalence
-  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test threaded_lane_runtime
-  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test differential_step_corpus
-  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-vm --features multi-thread --test schedule_robustness
+  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test threaded_contract
+  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test threaded_equivalence
+  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test threaded_lane_runtime
+  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test differential_step_corpus
+  TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test schedule_robustness
 
   echo "OK   strict VM conformance passed"
 }

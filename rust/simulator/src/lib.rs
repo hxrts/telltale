@@ -53,4 +53,4 @@ pub use material_handlers::{
 pub use network::{NetworkConfig, NetworkModel};
 pub use property::{Property, PropertyMonitor};
 pub use rng::SimRng;
-pub use telltale_vm::effect::EffectHandler;
+pub use telltale_protocol_machine::effect::EffectHandler;

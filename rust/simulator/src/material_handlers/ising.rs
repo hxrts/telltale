@@ -7,8 +7,8 @@
 use crate::material::MeanFieldParams;
 use crate::value_conv::{fixed_vec_to_value, registers_to_f64s, write_f64s};
 use telltale_types::FixedQ32;
-use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
+use telltale_protocol_machine::coroutine::Value;
+use telltale_protocol_machine::effect::{EffectFailure, EffectHandler, EffectResult};
 
 /// Effect handler for the mean-field Ising model.
 pub struct IsingHandler {
@@ -112,7 +112,7 @@ mod tests {
     use super::*;
     use crate::material::MeanFieldParams;
     use crate::value_conv::{registers_to_f64s, write_f64s};
-    use telltale_vm::effect::{EffectFailure, EffectResult};
+    use telltale_protocol_machine::effect::{EffectFailure, EffectResult};
 
     fn expect_success<T>(result: EffectResult<T>) -> T {
         result

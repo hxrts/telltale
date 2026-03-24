@@ -187,11 +187,11 @@ check-parity mode="--all":
 
 # Focused ownership-contract assertions, delegation negatives, and replay checks.
 check-ownership-contracts:
-    cargo test -p telltale-vm --lib ownership_
-    cargo test -p telltale-vm --test ownership_contracts -- --nocapture
-    cargo test -p telltale-vm --test serialization_replay ownership_transfer_ -- --nocapture
-    cargo test -p telltale-vm --features multi-thread --test ownership_contracts threaded_ownership_ -- --nocapture
-    cargo test -p telltale-vm --features multi-thread --test serialization_replay threaded_ownership_transfer_ -- --nocapture
+    cargo test -p telltale-protocol-machine --lib ownership_
+    cargo test -p telltale-protocol-machine --test ownership_contracts -- --nocapture
+    cargo test -p telltale-protocol-machine --test serialization_replay ownership_transfer_ -- --nocapture
+    cargo test -p telltale-protocol-machine --features multi-thread --test ownership_contracts threaded_ownership_ -- --nocapture
+    cargo test -p telltale-protocol-machine --features multi-thread --test serialization_replay threaded_ownership_transfer_ -- --nocapture
     cargo test -p telltale-simulator --test ownership_faults -- --nocapture
 
 # Enforce parity type ledger plus deviation registry presence/shape.
@@ -305,23 +305,23 @@ bench-check:
 
 # Profile a single VM runtime benchmark with samply.
 profile-vm bench:
-    samply record cargo bench -p telltale-vm --bench vm_runtime_bench -- {{ bench }}
+    samply record cargo bench -p telltale-protocol-machine --bench vm_runtime_bench -- {{ bench }}
 
 # Profile the paused-role scheduler hotspot with samply.
 profile-vm-scheduler:
-    samply record cargo run -p telltale-vm --release --bin vm_profile_driver -- scheduler-many-paused-run-only 200000
+    samply record cargo run -p telltale-protocol-machine --release --bin vm_profile_driver -- scheduler-many-paused-run-only 200000
 
 # Profile the repeated load/reuse hotspot with samply.
 profile-vm-load:
-    samply record cargo run -p telltale-vm --release --bin vm_profile_driver -- repeated-load-reuse
+    samply record cargo run -p telltale-protocol-machine --release --bin vm_profile_driver -- repeated-load-reuse
 
 # Profile the replay/nullifier hotspot with samply.
 profile-vm-replay:
-    samply record cargo run -p telltale-vm --release --bin vm_profile_driver -- send-recv-replay-nullifier
+    samply record cargo run -p telltale-protocol-machine --release --bin vm_profile_driver -- send-recv-replay-nullifier
 
 # Profile the repeated fixed-topology open path with samply.
 profile-vm-open:
-    samply record cargo run -p telltale-vm --release --bin vm_profile_driver -- repeated-open-same-image
+    samply record cargo run -p telltale-protocol-machine --release --bin vm_profile_driver -- repeated-open-same-image
 
 # Build WASM example with wasm-pack
 wasm-build:
@@ -379,7 +379,7 @@ wasm-test-all:
       },
     );
     EOF
-    CARGO_TARGET_DIR="$vm_target" NODE_PATH="$shim_root" wasm-pack test --node rust/vm --features wasm -- --nocapture
+    CARGO_TARGET_DIR="$vm_target" NODE_PATH="$shim_root" wasm-pack test --node rust/protocol-machine --features wasm -- --nocapture
     CARGO_TARGET_DIR="$choreo_target" NODE_PATH="$shim_root" wasm-pack test --node rust/choreography --features "wasm _wasm_integration_tests" -- --nocapture
     cd examples/wasm-ping-pong
     CARGO_TARGET_DIR="$example_target" NODE_PATH="$shim_root" wasm-pack test --node
@@ -570,9 +570,9 @@ verify-vm-correspondence:
 
 # Track A gate: naming/API changes must preserve behavior.
 verify-track-a:
-    cargo test -p telltale-vm --test trace_corpus
-    cargo test -p telltale-vm --test strict_tick_equality
-    cargo test -p telltale-vm --test lean_vm_equivalence
+    cargo test -p telltale-protocol-machine --test trace_corpus
+    cargo test -p telltale-protocol-machine --test strict_tick_equality
+    cargo test -p telltale-protocol-machine --test lean_vm_equivalence
 
 # Lean-side invariant verification checks for protocol bundles.
 verify-invariants:
@@ -604,14 +604,14 @@ verify-cross-target-matrix:
     set -euo pipefail
     wasm_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-cross-target-wasm.XXXXXX")"
     trap 'rm -rf "$wasm_target"' EXIT
-    cargo test -p telltale-vm --features multi-thread --test threaded_equivalence
-    cargo test -p telltale-vm --test lean_vm_equivalence
-    CARGO_TARGET_DIR="$wasm_target" wasm-pack test --node rust/vm --features wasm -- --nocapture
+    cargo test -p telltale-protocol-machine --features multi-thread --test threaded_equivalence
+    cargo test -p telltale-protocol-machine --test lean_vm_equivalence
+    CARGO_TARGET_DIR="$wasm_target" wasm-pack test --node rust/protocol-machine --features wasm -- --nocapture
     cargo test -p telltale-lean-bridge --test vm_cross_target_matrix_tests
 
 # Composition/concurrency stress lane.
 verify-composition-stress:
-    cargo test -p telltale-vm --features multi-thread --test threaded_lane_runtime -- --nocapture
+    cargo test -p telltale-protocol-machine --features multi-thread --test threaded_lane_runtime -- --nocapture
     cargo test -p telltale-lean-bridge --test vm_composition_stress_tests -- --nocapture
 
 # Property-based verification lane.

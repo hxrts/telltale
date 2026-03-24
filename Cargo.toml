@@ -132,7 +132,7 @@ debug = 2
 incremental = false
 
 [workspace]
-members = ["rust/macros", "rust/choreography", "rust/types", "rust/theory", "rust/lean-bridge", "rust/vm", "rust/simulator", "rust/effect-scaffold", "rust/transport", "rust/lint-checks"]
+members = ["rust/macros", "rust/choreography", "rust/types", "rust/theory", "rust/lean-bridge", "rust/protocol-machine", "rust/simulator", "rust/effect-scaffold", "rust/transport", "rust/lint-checks"]
 exclude = ["examples/wasm-ping-pong", "external-demo", "external-demo-macros"]
 
 # Shared dependencies across workspace members

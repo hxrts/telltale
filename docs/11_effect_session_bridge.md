@@ -33,7 +33,7 @@ Rust exposes two handler interfaces.
 | Interface | Location | Purpose |
 |---|---|---|
 | `ChoreoHandler` | `rust/choreography/src/effects/handler.rs` | async typed API for generated choreography code |
-| `EffectHandler` | `rust/vm/src/effect.rs` | sync protocol-machine API over bytecode values |
+| `EffectHandler` | `rust/protocol-machine/src/effect.rs` | sync protocol-machine API over bytecode values |
 
 Third-party runtime integration should use `EffectHandler`.
 
@@ -107,8 +107,8 @@ Additional ownership split:
 
 ## Typed Effect Boundary
 
-The protocol-machine dispatch path is in `rust/vm/src/vm.rs`.
-The trait surface is in `rust/vm/src/effect.rs`.
+The protocol-machine dispatch path is in `rust/protocol-machine/src/vm.rs`.
+The trait surface is in `rust/protocol-machine/src/effect.rs`.
 The normative contract is documented in that trait module.
 
 | Surface | protocol-machine call point | Runtime behavior | Integration note |
@@ -129,7 +129,7 @@ Helper-method compatibility notes:
 
 - `handle_send` and `handle_choose` must not become hidden side channels for session metadata mutation.
 - helper methods remain compatibility helpers for default `handle_effect` implementations. They are not separate ingress paths.
-- Bridge traits in `rust/vm/src/bridge.rs` are deterministic lookup/projection surfaces, not mutation surfaces.
+- Bridge traits in `rust/protocol-machine/src/bridge.rs` are deterministic lookup/projection surfaces, not mutation surfaces.
 - Public host integrations open sessions through `load_choreography_owned(...)` and mutate session-local host metadata through `OwnedSession`.
 
 ## Typed Effect Outcomes

@@ -7,13 +7,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use serde::Serialize;
 use serde_json::json;
 use telltale_types::{GlobalType, Label, LocalTypeR};
-use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{
+use telltale_protocol_machine::coroutine::Value;
+use telltale_protocol_machine::effect::{
     EffectHandler, EffectResult, RecordingEffectHandler, SendDecision, SendDecisionInput,
 };
-use telltale_vm::loader::CodeImage;
-use telltale_vm::ThreadedProtocolMachine;
-use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
+use telltale_protocol_machine::loader::CodeImage;
+use telltale_protocol_machine::ThreadedProtocolMachine;
+use telltale_protocol_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 
 type NormalizedEvent = (String, String, String, String);
 type PerSessionTrace = BTreeMap<usize, Vec<NormalizedEvent>>;
@@ -174,14 +174,14 @@ fn scheduler_signature(trace: &[ObsEvent]) -> Vec<(usize, String)> {
         .collect()
 }
 
-fn effect_signature(effect_trace: &[telltale_vm::effect::EffectTraceEntry]) -> Vec<String> {
+fn effect_signature(effect_trace: &[telltale_protocol_machine::effect::EffectTraceEntry]) -> Vec<String> {
     effect_trace
         .iter()
         .map(|entry| entry.effect_kind.clone())
         .collect()
 }
 
-fn lane_selection_view(trace: &[telltale_vm::LaneSelection]) -> Vec<LaneSelectionView> {
+fn lane_selection_view(trace: &[telltale_protocol_machine::LaneSelection]) -> Vec<LaneSelectionView> {
     trace
         .iter()
         .map(|entry| (entry.tick, entry.wave, entry.session, entry.lane))
@@ -325,7 +325,7 @@ fn chain_image() -> CodeImage {
 
 fn run_single_thread(
     image: &CodeImage,
-) -> (Vec<ObsEvent>, Vec<telltale_vm::effect::EffectTraceEntry>) {
+) -> (Vec<ObsEvent>, Vec<telltale_protocol_machine::effect::EffectTraceEntry>) {
     let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(image).expect("load choreography");
     vm.run(&DeterministicHandler, 256)
@@ -337,8 +337,8 @@ fn run_threaded(
     image: &CodeImage,
 ) -> (
     Vec<ObsEvent>,
-    Vec<telltale_vm::effect::EffectTraceEntry>,
-    Vec<telltale_vm::LaneSelection>,
+    Vec<telltale_protocol_machine::effect::EffectTraceEntry>,
+    Vec<telltale_protocol_machine::LaneSelection>,
 ) {
     run_threaded_with_concurrency(image, 1, 4)
 }
@@ -349,8 +349,8 @@ fn run_threaded_with_concurrency(
     concurrency: usize,
 ) -> (
     Vec<ObsEvent>,
-    Vec<telltale_vm::effect::EffectTraceEntry>,
-    Vec<telltale_vm::LaneSelection>,
+    Vec<telltale_protocol_machine::effect::EffectTraceEntry>,
+    Vec<telltale_protocol_machine::LaneSelection>,
 ) {
     let mut vm =
         ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), concurrency.max(1));

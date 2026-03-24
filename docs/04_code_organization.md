@@ -46,7 +46,7 @@ graph TB
     end
 
     subgraph Runtime
-        vm["telltale-vm<br/>Protocol machine & guest runtime"]
+        vm["telltale-protocol-machine<br/>Protocol machine & guest runtime"]
         simulator["telltale-simulator<br/>Protocol-machine simulation"]
     end
 
@@ -159,12 +159,12 @@ lean-bridge import --input protocol.json
 
 These commands generate samples, validate round-trips, and import JSON respectively.
 
-### telltale-vm
+### telltale-protocol-machine
 
-This crate is located in `rust/vm/`. It provides the protocol machine and guest-runtime surfaces for executing session type protocols. The protocol machine is the canonical semantic core used by the simulator and by direct embeddings.
+This crate is located in `rust/protocol-machine/`. It provides the protocol machine and guest-runtime surfaces for executing session type protocols. The protocol machine is the canonical semantic core used by the simulator and by direct embeddings.
 
-The canonical public entry modules are `telltale_vm::protocol_machine`,
-`telltale_vm::guest_runtime`, and `telltale_vm::host_runtime`. The historical
+The canonical public entry modules are `telltale_protocol_machine::protocol_machine`,
+`telltale_protocol_machine::guest_runtime`, and `telltale_protocol_machine::host_runtime`. The historical
 `vm` and `threaded` modules still exist as implementation modules, but they are
 not the architectural front door.
 
@@ -185,8 +185,8 @@ The `session` module manages session state and type advancement. The `buffer` mo
 The `loader` module handles dynamic choreography loading. The `CodeImage` struct packages local types for loading. The preferred host-facing open path is `load_choreography_owned(...)`, which binds explicit guest-runtime ownership at open.
 
 ```rust
-use telltale_vm::{GuestRuntime, OwnedSession, ProtocolMachine, ProtocolMachineConfig};
-use telltale_vm::loader::CodeImage;
+use telltale_protocol_machine::{GuestRuntime, OwnedSession, ProtocolMachine, ProtocolMachineConfig};
+use telltale_protocol_machine::loader::CodeImage;
 
 let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
 let image = CodeImage::from_local_types(&local_types, &global_type);
@@ -204,7 +204,7 @@ The final two lines show the higher-level guest-runtime surface that wraps the p
 
 ### telltale-simulator
 
-This crate is located in `rust/simulator/`. It wraps the protocol machine and guest-runtime surfaces for simulation and testing. The crate depends on `telltale-vm` and `telltale-types`.
+This crate is located in `rust/simulator/`. It wraps the protocol machine and guest-runtime surfaces for simulation and testing. The crate depends on `telltale-protocol-machine` and `telltale-types`.
 
 The `runner` module provides `run`, `run_concurrent`, and `run_with_scenario` for single or multi choreography execution. Scenario runs attach middleware for faults, network latency, property monitors, and checkpoints.
 

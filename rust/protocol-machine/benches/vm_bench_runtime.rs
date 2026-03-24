@@ -1,0 +1,225 @@
+#![allow(missing_docs)]
+
+use criterion::{black_box, BatchSize, Criterion};
+use telltale_types::ValType;
+use telltale_protocol_machine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineRunStatus};
+
+use crate::common::{
+    capped_retention_config, observable_choice_config, replay_nullifier_config, replay_off_config,
+    replay_sequence_config, run_choice_workload, run_many_paused_scheduler_workload,
+    run_pause_resume_churn_workload, run_repeated_load_reuse, run_repeated_open_same_image,
+    run_repeated_open_wide_roles, run_send_recv_workload, run_short_lived_session_churn,
+    run_yield_workload, send_recv_image, setup_many_paused_scheduler_vm, typed_send_recv_image,
+    validation_off_config, validation_strict_schema_config, validation_structural_config,
+    yield_image, BenchHandler,
+};
+
+#[allow(clippy::too_many_lines)]
+pub(crate) fn bench_runtime(c: &mut Criterion) {
+    let handler = BenchHandler;
+    let image_small = yield_image(8, 64);
+    let image_wide = yield_image(32, 32);
+    let send_recv = send_recv_image("A", "B", "msg");
+    let typed_send_recv = typed_send_recv_image("A", "B", "msg", Some(ValType::Unit));
+
+    emit_runtime_snapshots(&image_small, &image_wide, &send_recv);
+
+    c.bench_function("protocol_machine_run_yield_small", |b| {
+        b.iter(|| {
+            let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+                observability_retention: capped_retention_config(),
+                ..ProtocolMachineConfig::strict_minimal()
+            });
+            vm.load_choreography_owned(black_box(&image_small), "bench/runtime/small")
+                .expect("load choreography");
+            let status = vm.run(&handler, 10_000).expect("run vm");
+            assert!(matches!(status, ProtocolMachineRunStatus::AllDone));
+            black_box((vm.trace().len(), vm.memory_usage()));
+        })
+    });
+
+    c.bench_function("protocol_machine_run_yield_wide", |b| {
+        b.iter(|| {
+            let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+                observability_retention: capped_retention_config(),
+                ..ProtocolMachineConfig::strict_large_fanout()
+            });
+            vm.load_choreography_owned(black_box(&image_wide), "bench/runtime/wide")
+                .expect("load choreography");
+            let status = vm.run(&handler, 20_000).expect("run vm");
+            assert!(matches!(status, ProtocolMachineRunStatus::AllDone));
+            black_box((vm.trace().len(), vm.memory_usage()));
+        })
+    });
+
+    c.bench_function("protocol_machine_short_lived_session_churn", |b| {
+        b.iter(|| black_box(run_short_lived_session_churn(black_box(32))))
+    });
+
+    c.bench_function("protocol_machine_repeated_load_reuse", |b| {
+        b.iter(|| black_box(run_repeated_load_reuse(black_box(32))))
+    });
+
+    c.bench_function(
+        "protocol_machine_repeated_open_same_image_fixed_topology",
+        |b| {
+            b.iter(|| {
+                black_box(run_repeated_open_same_image(
+                    black_box(32),
+                    black_box(16),
+                    black_box(16),
+                ))
+            })
+        },
+    );
+
+    c.bench_function("protocol_machine_repeated_open_wide_roles", |b| {
+        b.iter(|| black_box(run_repeated_open_wide_roles(black_box(32), black_box(64))))
+    });
+
+    c.bench_function("protocol_machine_send_recv_replay_off", |b| {
+        b.iter(|| {
+            black_box(run_send_recv_workload(
+                &send_recv,
+                replay_off_config(),
+                black_box(32),
+            ))
+        })
+    });
+
+    c.bench_function("protocol_machine_send_recv_replay_sequence", |b| {
+        b.iter(|| {
+            black_box(run_send_recv_workload(
+                &send_recv,
+                replay_sequence_config(),
+                black_box(32),
+            ))
+        })
+    });
+
+    c.bench_function("protocol_machine_send_recv_replay_nullifier", |b| {
+        b.iter(|| {
+            black_box(run_send_recv_workload(
+                &send_recv,
+                replay_nullifier_config(),
+                black_box(32),
+            ))
+        })
+    });
+
+    c.bench_function("protocol_machine_send_recv_validation_off", |b| {
+        b.iter(|| {
+            black_box(run_send_recv_workload(
+                &typed_send_recv,
+                validation_off_config(),
+                black_box(32),
+            ))
+        })
+    });
+
+    c.bench_function("protocol_machine_send_recv_validation_structural", |b| {
+        b.iter(|| {
+            black_box(run_send_recv_workload(
+                &typed_send_recv,
+                validation_structural_config(),
+                black_box(32),
+            ))
+        })
+    });
+
+    c.bench_function("protocol_machine_send_recv_validation_strict_schema", |b| {
+        b.iter(|| {
+            black_box(run_send_recv_workload(
+                &typed_send_recv,
+                validation_strict_schema_config(),
+                black_box(32),
+            ))
+        })
+    });
+
+    c.bench_function("protocol_machine_choice_heavy", |b| {
+        b.iter(|| {
+            black_box(run_choice_workload(
+                observable_choice_config(),
+                black_box(32),
+            ))
+        })
+    });
+
+    c.bench_function("protocol_machine_scheduler_many_paused", |b| {
+        b.iter(|| {
+            black_box(run_many_paused_scheduler_workload(
+                black_box(256),
+                black_box(8),
+            ))
+        })
+    });
+
+    c.bench_function("protocol_machine_scheduler_many_paused_run_only", |b| {
+        b.iter_batched(
+            || setup_many_paused_scheduler_vm(black_box(256), black_box(8)),
+            |mut vm| {
+                let status = vm.run(&handler, 10_000).expect("run vm");
+                assert!(matches!(status, ProtocolMachineRunStatus::Stuck));
+                black_box((status, vm.trace().len()));
+            },
+            BatchSize::SmallInput,
+        )
+    });
+
+    c.bench_function("protocol_machine_scheduler_pause_resume_churn", |b| {
+        b.iter(|| {
+            black_box(run_pause_resume_churn_workload(
+                black_box(256),
+                black_box(1_024),
+            ))
+        })
+    });
+}
+
+fn emit_runtime_snapshots(
+    image_small: &telltale_protocol_machine::loader::CodeImage,
+    image_wide: &telltale_protocol_machine::loader::CodeImage,
+    send_recv: &telltale_protocol_machine::loader::CodeImage,
+) {
+    eprintln!(
+        "protocol-machine benchmark snapshot small: {:?}",
+        run_yield_workload(image_small, 10_000)
+    );
+    eprintln!(
+        "protocol-machine benchmark snapshot wide: {:?}",
+        run_yield_workload(image_wide, 20_000)
+    );
+    eprintln!(
+        "protocol-machine benchmark snapshot churn: {:?}",
+        run_short_lived_session_churn(32)
+    );
+    eprintln!(
+        "protocol-machine benchmark snapshot repeated_load_reuse: {:?}",
+        run_repeated_load_reuse(32)
+    );
+    eprintln!(
+        "protocol-machine benchmark snapshot replay_off: {:?}",
+        run_send_recv_workload(send_recv, replay_off_config(), 32)
+    );
+    eprintln!(
+        "protocol-machine benchmark snapshot replay_sequence: {:?}",
+        run_send_recv_workload(send_recv, replay_sequence_config(), 32)
+    );
+    eprintln!(
+        "protocol-machine benchmark snapshot replay_nullifier: {:?}",
+        run_send_recv_workload(send_recv, replay_nullifier_config(), 32)
+    );
+    eprintln!(
+        "protocol-machine benchmark snapshot choice_heavy: {:?}",
+        run_choice_workload(observable_choice_config(), 32)
+    );
+    eprintln!(
+        "protocol-machine benchmark snapshot scheduler_many_paused: {:?}",
+        run_many_paused_scheduler_workload(256, 8)
+    );
+    eprintln!(
+        "protocol-machine benchmark snapshot scheduler_pause_resume_churn: {:?}",
+        run_pause_resume_churn_workload(256, 1_024)
+    );
+}

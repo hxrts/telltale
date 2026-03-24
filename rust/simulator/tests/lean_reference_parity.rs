@@ -11,9 +11,9 @@ use telltale_lean_bridge::{
 use telltale_simulator::runner::{run_with_scenario, ScenarioResult};
 use telltale_simulator::scenario::Scenario;
 use telltale_types::{GlobalType, Label, LocalTypeR};
-use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
-use telltale_vm::ObsEvent;
+use telltale_protocol_machine::coroutine::Value;
+use telltale_protocol_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
+use telltale_protocol_machine::ObsEvent;
 
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;

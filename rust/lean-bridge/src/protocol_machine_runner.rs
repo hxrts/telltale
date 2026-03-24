@@ -19,7 +19,7 @@ use crate::semantic_objects::{ProtocolMachineSemanticObjects, TickedObsEvent};
 use crate::sim_reference::{
     SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
 };
-use telltale_vm::EffectExchangeRecord;
+use telltale_protocol_machine::EffectExchangeRecord;
 
 #[path = "protocol_machine_runner_json_parsing.rs"]
 mod parsing;

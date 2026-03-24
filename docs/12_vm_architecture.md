@@ -65,9 +65,9 @@ Runtime mode admission and profile selection are capability gated.
 
 | Gate | Runtime Surface | Current Rust Path |
 |---|---|---|
-| Advanced mode admission | `requires_protocol_machine_runtime_contracts` and `admit_protocol_machine_runtime` | `rust/vm/src/runtime_contracts.rs`, `rust/vm/src/composition.rs` |
-| Determinism profile validation | `request_determinism_profile` | `rust/vm/src/runtime_contracts.rs`, `rust/vm/src/composition.rs` |
-| Threaded certified-wave fallback | `WaveCertificate` check with one-step degrade | `rust/vm/src/threaded.rs` |
+| Advanced mode admission | `requires_protocol_machine_runtime_contracts` and `admit_protocol_machine_runtime` | `rust/protocol-machine/src/runtime_contracts.rs`, `rust/protocol-machine/src/composition.rs` |
+| Determinism profile validation | `request_determinism_profile` | `rust/protocol-machine/src/runtime_contracts.rs`, `rust/protocol-machine/src/composition.rs` |
+| Threaded certified-wave fallback | `WaveCertificate` check with one-step degrade | `rust/protocol-machine/src/threaded.rs` |
 | Deviation registry enforcement | Undocumented parity drift rejection | `just check-parity --types` |
 
 ## Runtime Hardening Contracts

@@ -4,11 +4,11 @@ use std::collections::BTreeMap;
 
 use telltale_simulator::distributed::DistributedSimBuilder;
 use telltale_types::{GlobalType, Label, LocalTypeR};
-use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, EffectResult};
-use telltale_vm::loader::CodeImage;
-use telltale_vm::trace::normalize_trace as normalize_ticks;
-use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
+use telltale_protocol_machine::coroutine::Value;
+use telltale_protocol_machine::effect::{EffectHandler, EffectResult};
+use telltale_protocol_machine::loader::CodeImage;
+use telltale_protocol_machine::trace::normalize_trace as normalize_ticks;
+use telltale_protocol_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 
 struct NoOpHandler;
 

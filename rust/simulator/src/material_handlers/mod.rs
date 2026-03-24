@@ -9,7 +9,7 @@ pub use hamiltonian::HamiltonianHandler;
 pub use ising::IsingHandler;
 
 use crate::material::MaterialParams;
-use telltale_vm::effect::EffectHandler;
+use telltale_protocol_machine::effect::EffectHandler;
 
 /// Build a material-specific handler from scenario material parameters.
 #[must_use]

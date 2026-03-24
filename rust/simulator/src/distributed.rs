@@ -2,11 +2,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
-use telltale_vm::loader::CodeImage;
-use telltale_vm::nested::NestedVMHandler;
-use telltale_vm::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
+use telltale_protocol_machine::coroutine::Value;
+use telltale_protocol_machine::effect::{EffectFailure, EffectHandler, EffectResult};
+use telltale_protocol_machine::loader::CodeImage;
+use telltale_protocol_machine::nested::NestedVMHandler;
+use telltale_protocol_machine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 
 /// Builder for distributed simulations with nested inner VMs.
 pub struct DistributedSimBuilder {

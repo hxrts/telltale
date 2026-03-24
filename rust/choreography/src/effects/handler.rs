@@ -30,7 +30,7 @@
 //!
 //! ## VM Boundary
 //!
-//! The bytecode VM in `telltale-vm` exposes a separate, synchronous
+//! The bytecode VM in `telltale-protocol-machine` exposes a separate, synchronous
 //! `EffectHandler` trait for simulation/runtime integration. It is not
 //! interchangeable with `ChoreoHandler`: `ChoreoHandler` is async and typed
 //! over concrete message/role types, while the VM handler operates over

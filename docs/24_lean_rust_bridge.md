@@ -4,7 +4,7 @@ The `telltale-lean-bridge` crate is the typed boundary between Rust artifacts an
 It handles JSON conversion, schema versioning, runner invocation, trace comparison, and typed invariant bundle export.
 
 The bridge does not define protocol-machine semantics.
-Semantics remain in `telltale-vm`, `telltale-theory`, and Lean runtime modules.
+Semantics remain in `telltale-protocol-machine`, `telltale-theory`, and Lean runtime modules.
 The canonical public bridge surface uses `ProtocolMachineRunner`, `ProtocolMachineRunInput`, `ProtocolMachineRunOutput`, `ProtocolMachineSemanticObjects`, and the `protocol_machine_runner` / `protocol_machine_trace` modules.
 No public `protocol_machine_runner` or `vm_trace` compatibility modules remain.
 

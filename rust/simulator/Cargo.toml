@@ -16,11 +16,11 @@ bench = false
 
 [features]
 default = []
-wasm = ["getrandom/js", "telltale-vm/wasm"]
+wasm = ["getrandom/js", "telltale-protocol-machine/wasm"]
 
 [dependencies]
 telltale-types = { path = "../types", version = "6.0.0" }
-telltale-vm = { path = "../vm", version = "6.0.0" }
+telltale-protocol-machine = { path = "../protocol-machine", version = "6.0.0" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 toml = { workspace = true }

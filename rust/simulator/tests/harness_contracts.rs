@@ -8,8 +8,8 @@ use telltale_simulator::harness::{DirectAdapter, HarnessConfig, HarnessSpec, Sim
 use telltale_simulator::material::{MaterialParams, MeanFieldParams};
 use telltale_simulator::scenario::{OutputConfig, Scenario};
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
-use telltale_vm::coroutine::Value;
-use telltale_vm::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
+use telltale_protocol_machine::coroutine::Value;
+use telltale_protocol_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
 
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;

@@ -55,15 +55,15 @@ Key exports:
 
 See `rust/choreography/src/lib.rs` for the full export surface.
 
-### `telltale-vm`
+### `telltale-protocol-machine`
 
 Protocol-machine and guest-runtime surfaces for executing projected local types.
 
 Canonical public modules:
 
-- `telltale_vm::protocol_machine`
-- `telltale_vm::guest_runtime`
-- `telltale_vm::host_runtime`
+- `telltale_protocol_machine::protocol_machine`
+- `telltale_protocol_machine::guest_runtime`
+- `telltale_protocol_machine::host_runtime`
 
 Key exports:
 
@@ -90,17 +90,17 @@ embedders and simulators.
 
 Module access (not re-exported at crate root):
 - Effect boundary:
-  `telltale_vm::effect::EffectHandler`, `EffectRequest`, `EffectOutcome`,
+  `telltale_protocol_machine::effect::EffectHandler`, `EffectRequest`, `EffectOutcome`,
   `EffectInterfaceMetadata`, `EffectExchangeRecord`, `SendDecision`, `SendDecisionInput`
-- Effect trace: `telltale_vm::effect::RecordingEffectHandler`, `ReplayEffectHandler`
-- Loader: `telltale_vm::loader::CodeImage`
+- Effect trace: `telltale_protocol_machine::effect::RecordingEffectHandler`, `ReplayEffectHandler`
+- Loader: `telltale_protocol_machine::loader::CodeImage`
 
-See `rust/vm/src/lib.rs` for the full API.
+See `rust/protocol-machine/src/lib.rs` for the full API.
 See [Effect Handlers and Session Types](11_effect_session_bridge.md) for integration-boundary guidance.
 
 ### `telltale-simulator`
 
-Simulation utilities built on the VM.
+Simulation utilities built on the protocol machine.
 
 Key exports:
 

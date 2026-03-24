@@ -31,10 +31,10 @@ check_no_match '--name' Justfile rust/effect-scaffold/src
 
 # ── Retired VM Constructors ──────────────────────────────────────────
 
-check_no_match '\bThreadedVM\b' rust/vm/examples rust/vm/benches
-check_no_match '\bVM::new\b' rust/vm/examples rust/vm/benches
-check_no_match '\bVMConfig\b' rust/vm/examples rust/vm/benches
-check_no_match 'load_choreography\(' rust/vm/examples rust/vm/benches
+check_no_match '\bThreadedVM\b' rust/protocol-machine/examples rust/protocol-machine/benches
+check_no_match '\bVM::new\b' rust/protocol-machine/examples rust/protocol-machine/benches
+check_no_match '\bVMConfig\b' rust/protocol-machine/examples rust/protocol-machine/benches
+check_no_match 'load_choreography\(' rust/protocol-machine/examples rust/protocol-machine/benches
 
 # ── Stale Justfile Description ───────────────────────────────────────
 

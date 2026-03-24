@@ -34,7 +34,7 @@ golden = ["clap", "anyhow", "runner"]  # Enable golden file management CLI
 
 [dependencies]
 telltale-types = { path = "../types", version = "6.0.0" }
-telltale-vm = { path = "../vm", version = "6.0.0" }
+telltale-protocol-machine = { path = "../protocol-machine", version = "6.0.0" }
 telltale-theory = { path = "../theory", version = "6.0.0", optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -50,7 +50,7 @@ cfg-if = { workspace = true }
 proptest = { workspace = true }
 telltale-theory = { path = "../theory", version = "6.0.0" }
 telltale-choreography = { path = "../choreography", version = "6.0.0" }
-telltale-vm = { path = "../vm", version = "6.0.0", features = ["multi-thread"] }
+telltale-protocol-machine = { path = "../protocol-machine", version = "6.0.0", features = ["multi-thread"] }
 tempfile = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
