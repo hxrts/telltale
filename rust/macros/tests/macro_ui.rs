@@ -2,6 +2,10 @@
 fn choreography_macro_ui() {
     let t = trybuild::TestCases::new();
     t.pass("tests/ui/pass/multiparty_protocol.rs");
+    t.pass("tests/ui/pass/choice_protocol.rs");
+    t.pass("tests/ui/pass/string_literal_protocol.rs");
+    t.pass("tests/ui/pass/broadcast_protocol.rs");
+    t.pass("tests/ui/pass/namespaced_protocol.rs");
     t.pass("tests/ui/pass/role_derive.rs");
     t.compile_fail("tests/ui/fail/duplicate_roles.rs");
     t.compile_fail("tests/ui/fail/undefined_role.rs");

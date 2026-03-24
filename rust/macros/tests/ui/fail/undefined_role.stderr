@@ -1,5 +1,20 @@
-error: role 'C' is not declared in protocol roles
- --> tests/ui/fail/undefined_role.rs:6:14
+error: Choreography parse error:
+       Undefined role 'C'
+         --> input:2:4
+           |
+         2 | A->C:Ping
+                ^
+
+       Macro token input is parsed as DSL text after normalization.
+       You can use either string-literal DSL or token-stream DSL forms.
+ --> tests/ui/fail/undefined_role.rs:3:1
   |
-6 |         A -> C: Ping;
-  |              ^
+3 | / choreography! {
+4 | |     protocol Bad {
+5 | |         roles A, B;
+6 | |         A -> C: Ping;
+7 | |     }
+8 | | }
+  | |_^
+  |
+  = note: this error originates in the macro `choreography` (in Nightly builds, run with -Z macro-backtrace for more info)

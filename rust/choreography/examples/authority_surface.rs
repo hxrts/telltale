@@ -1,4 +1,5 @@
 use telltale_choreography::compiler::parser::parse_choreography_str;
+use telltale_choreography::ChoreographyEffectExt;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = r#"

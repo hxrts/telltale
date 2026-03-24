@@ -47,9 +47,14 @@ pub struct GeneratedEffectFamily {
     pub operations: Vec<GeneratedEffectOperation>,
 }
 
-impl Choreography {
+/// Extension trait adding generated-effect-family support to `Choreography`.
+pub trait ChoreographyEffectExt {
+    fn generated_effect_families(&self) -> Vec<GeneratedEffectFamily>;
+}
+
+impl ChoreographyEffectExt for Choreography {
     #[must_use]
-    pub fn generated_effect_families(&self) -> Vec<GeneratedEffectFamily> {
+    fn generated_effect_families(&self) -> Vec<GeneratedEffectFamily> {
         self.effect_decls()
             .into_iter()
             .map(|effect| {
@@ -155,7 +160,7 @@ fn to_upper_camel_case(input: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::GeneratedEffectBehavior;
+    use super::{ChoreographyEffectExt, GeneratedEffectBehavior};
     use crate::compiler::parser::parse_choreography_str;
 
     #[test]

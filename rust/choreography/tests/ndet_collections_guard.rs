@@ -26,8 +26,8 @@ const GUARDED_SOURCES: &[(&str, &str)] = &[
         include_str!("../src/topology/resolver.rs"),
     ),
     (
-        "src/extensions/discovery.rs",
-        include_str!("../src/extensions/discovery.rs"),
+        "parser/src/extensions/discovery.rs",
+        include_str!("../../parser/src/extensions/discovery.rs"),
     ),
     (
         "src/testing/transport.rs",

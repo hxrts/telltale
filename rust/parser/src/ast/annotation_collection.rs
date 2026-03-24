@@ -29,7 +29,7 @@ impl Annotations {
         Self { items }
     }
 
-    pub(crate) fn from_dsl_map(map: &HashMap<String, String>) -> Self {
+    pub fn from_dsl_map(map: &HashMap<String, String>) -> Self {
         let mut items = Vec::new();
 
         if map.get("timed_choice").is_some_and(|v| v == "true") {
@@ -53,7 +53,7 @@ impl Annotations {
         Self { items }
     }
 
-    pub(crate) fn dsl_map(&self) -> HashMap<String, String> {
+    pub fn dsl_map(&self) -> HashMap<String, String> {
         let mut map = HashMap::new();
 
         for annotation in &self.items {

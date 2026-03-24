@@ -7,7 +7,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use telltale_choreography::ast::EffectOpAuthorityClass;
 use telltale_choreography::compiler::parser::parse_choreography_str;
 use telltale_choreography::{
-    GeneratedEffectFamily, GeneratedEffectOperation, GeneratedSimulationMode,
+    ChoreographyEffectExt, GeneratedEffectFamily, GeneratedEffectOperation,
+    GeneratedSimulationMode,
 };
 
 const DEFAULT_OUT_DIR: &str = "target/effect_handler_scaffold";

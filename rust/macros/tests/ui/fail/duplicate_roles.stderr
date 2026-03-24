@@ -1,5 +1,20 @@
-error: duplicate role 'A'
- --> tests/ui/fail/duplicate_roles.rs:5:18
+error: Choreography parse error:
+       Duplicate role declaration 'A'
+         --> input:1:25
+           |
+         1 | protocol Bad = {roles A,A
+                                     ^
+
+       Macro token input is parsed as DSL text after normalization.
+       You can use either string-literal DSL or token-stream DSL forms.
+ --> tests/ui/fail/duplicate_roles.rs:3:1
   |
-5 |         roles A, A;
-  |                  ^
+3 | / choreography! {
+4 | |     protocol Bad {
+5 | |         roles A, A;
+6 | |         A -> A: Ping;
+7 | |     }
+8 | | }
+  | |_^
+  |
+  = note: this error originates in the macro `choreography` (in Nightly builds, run with -Z macro-backtrace for more info)

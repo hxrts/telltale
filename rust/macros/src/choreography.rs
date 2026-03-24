@@ -1,452 +1,577 @@
 //! Choreographic protocol definition macro implementation.
 //!
-//! This module provides the implementation of the `choreography!` macro,
-//! which allows defining multiparty protocols from a global viewpoint.
+//! Parsing is delegated to the shared Telltale choreography frontend. This
+//! proc-macro then lowers the parsed choreography into the historical
+//! `telltale-macros` output surface: message structs, a `Label` enum, public
+//! role structs, `Roles`, per-role session aliases, and `setup()`.
 
-use proc_macro2::{Ident, TokenStream};
-use quote::{quote, ToTokens};
-use std::collections::{BTreeMap, HashSet};
-use syn::{
-    braced, parenthesized,
-    parse::{Parse, ParseStream},
-    Error, LitStr, Result, Token,
-};
+use proc_macro2::{Delimiter, Ident, Span, TokenStream, TokenTree};
+use quote::{format_ident, quote, ToTokens};
+use std::collections::BTreeMap;
+use syn::{Error, LitStr, Result};
+use telltale_parser::ast::{Branch, Choreography, LocalType, MessageType, Protocol, Role};
 
 /// Main entry point for the choreography! macro.
-///
-/// Parses choreographic protocol definitions and generates Rust code including
-/// roles, messages, and session types.
 pub fn choreography(input: TokenStream) -> Result<TokenStream> {
-    // First, try to parse as a string literal (for inline DSL)
+    let choreography = parse_macro_choreography(input)?;
+    choreography
+        .validate()
+        .map_err(|err| Error::new(Span::call_site(), err.to_string()))?;
+
+    let local_types = project_local_types(&choreography)?;
+    let generated = generate_protocol_module(&choreography, &local_types)?;
+    Ok(generated)
+}
+
+fn parse_macro_choreography(input: TokenStream) -> Result<Choreography> {
     if let Ok(lit_str) = syn::parse2::<LitStr>(input.clone()) {
-        // Use the DSL parser
-        return Ok(choreography_from_dsl_string(lit_str.value()));
+        return telltale_parser::parse_choreography_str(&lit_str.value())
+            .map_err(|err| Error::new(lit_str.span(), format!("Choreography parse error: {err}")));
     }
 
-    // Otherwise, fall back to syn-based parsing
-    let protocol: ProtocolDef = syn::parse2(input)?;
-    validate_protocol(&protocol)?;
-
-    // Generate role structs
-    let role_structs = generate_role_structs(&protocol);
-
-    // Generate message types
-    let message_types = generate_message_types(&protocol)?;
-
-    // Generate session types for each role
-    let session_types = generate_session_types(&protocol)?;
-
-    // Generate setup function
-    let setup_fn = generate_setup_function(&protocol);
-
-    // Generate use statements for the necessary imports
-    let imports = quote! {
-        use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-    };
-
-    Ok(quote! {
-        #imports
-        #role_structs
-        #message_types
-        #session_types
-        #setup_fn
+    let normalized = normalize_token_dsl(input);
+    telltale_parser::parse_choreography_str(&normalized).map_err(|err| {
+        Error::new(
+            Span::call_site(),
+            format!(
+                "Choreography parse error: {err}\n\
+                 Macro token input is parsed as DSL text after normalization.\n\
+                 You can use either string-literal DSL or token-stream DSL forms."
+            ),
+        )
     })
 }
 
-/// Parse choreography from DSL string
-///
-/// Note: DSL string parsing with full support for parameterized roles is now available
-/// in the `telltale-choreography` crate. The macro in that crate (`telltale_choreography::choreography!`)
-/// provides complete integration. This entry point emits a compile error directing users there.
-fn choreography_from_dsl_string(dsl: String) -> proc_macro2::TokenStream {
-    drop(dsl); // Explicitly consume parameter
-    quote! {
-        compile_error!(
-            "DSL string parsing with parameterized roles support is available through the telltale_choreography crate.\n\
-             Use: telltale_choreography::choreography! instead of telltale_macros::choreography!\n\
-             \n\
-             Or use the explicit macro syntax without string literals for basic protocols."
-        );
-    }
-}
-
-/// Protocol definition from the DSL
-struct ProtocolDef {
-    name: Ident,
-    roles: Vec<RoleDef>,
-    interactions: Vec<Interaction>,
-}
-
-/// Role definition
-struct RoleDef {
-    name: Ident,
-}
-
-/// Protocol interaction
-enum Interaction {
-    Send {
-        from: Ident,
-        to: Ident,
-        message: Ident,
-        payload: Option<syn::Type>,
-    },
-}
-
-fn parse_header_roles(input: ParseStream) -> Result<Option<Vec<RoleDef>>> {
-    if !input.peek(syn::token::Paren) {
-        return Ok(None);
+fn normalize_token_dsl(input: TokenStream) -> String {
+    #[derive(Default)]
+    struct State {
+        awaiting_protocol_name: bool,
+        protocol_needs_equals: bool,
+        awaiting_choice_role: bool,
+        choice_needs_at: bool,
     }
 
-    let content;
-    parenthesized!(content in input);
-    let mut roles = Vec::new();
-    while !content.is_empty() {
-        let role_name: Ident = content.parse()?;
-        roles.push(RoleDef { name: role_name });
-        if content.peek(Token![,]) {
-            let _: Token![,] = content.parse()?;
-        } else {
+    fn needs_space_before_text(out: &str) -> bool {
+        matches!(
+            out.chars().last(),
+            Some(ch) if ch.is_ascii_alphanumeric() || ch == '_' || ch == ')' || ch == ']'
+        )
+    }
+
+    fn render_tokens(tokens: TokenStream) -> String {
+        let mut out = String::new();
+        let mut state = State::default();
+
+        for token in tokens {
+            match token {
+                TokenTree::Ident(ident) => {
+                    let text = ident.to_string();
+                    if needs_space_before_text(&out) {
+                        out.push(' ');
+                    }
+                    out.push_str(&text);
+
+                    if state.awaiting_protocol_name {
+                        state.awaiting_protocol_name = false;
+                        state.protocol_needs_equals = true;
+                    } else if state.awaiting_choice_role {
+                        state.awaiting_choice_role = false;
+                        state.choice_needs_at = true;
+                    } else if text == "protocol" {
+                        state.awaiting_protocol_name = true;
+                        state.protocol_needs_equals = false;
+                    } else if text == "choice" {
+                        state.awaiting_choice_role = true;
+                        state.choice_needs_at = false;
+                    } else if state.choice_needs_at && text == "at" {
+                        state.choice_needs_at = false;
+                    }
+                }
+                TokenTree::Punct(punct) => match punct.as_char() {
+                    ';' => out.push('\n'),
+                    '=' => {
+                        state.protocol_needs_equals = false;
+                        out.push('=');
+                    }
+                    _ => out.push(punct.as_char()),
+                },
+                TokenTree::Literal(literal) => {
+                    if needs_space_before_text(&out) {
+                        out.push(' ');
+                    }
+                    out.push_str(&literal.to_string());
+                }
+                TokenTree::Group(group) => {
+                    if group.delimiter() == Delimiter::Brace {
+                        if state.protocol_needs_equals {
+                            out.push_str(" =");
+                            state.protocol_needs_equals = false;
+                        }
+                        if state.choice_needs_at {
+                            out.push_str(" at");
+                            state.choice_needs_at = false;
+                        }
+                    }
+
+                    let open = match group.delimiter() {
+                        Delimiter::Parenthesis => '(',
+                        Delimiter::Brace => '{',
+                        Delimiter::Bracket => '[',
+                        Delimiter::None => ' ',
+                    };
+                    let close = match group.delimiter() {
+                        Delimiter::Parenthesis => ')',
+                        Delimiter::Brace => '}',
+                        Delimiter::Bracket => ']',
+                        Delimiter::None => ' ',
+                    };
+
+                    if group.delimiter() != Delimiter::None
+                        && !out.ends_with([' ', '\n', '(', '{', '['])
+                    {
+                        out.push(' ');
+                    }
+
+                    if group.delimiter() != Delimiter::None {
+                        out.push(open);
+                    }
+                    let inner = render_tokens(group.stream());
+                    out.push_str(&inner);
+                    if group.delimiter() != Delimiter::None {
+                        out.push(close);
+                    }
+                }
+            }
+        }
+
+        out
+    }
+
+    let mut normalized = render_tokens(input);
+    let patterns = [
+        ("-> *", "->*"),
+        ("->  *", "->*"),
+        ("<- >", "<->"),
+        ("< - >", "<->"),
+        ("<  - >", "<->"),
+        ("< -  >", "<->"),
+    ];
+    loop {
+        let mut changed = false;
+        for (from, to) in patterns {
+            if normalized.contains(from) {
+                normalized = normalized.replace(from, to);
+                changed = true;
+            }
+        }
+        if !changed {
             break;
         }
     }
-    Ok(Some(roles))
+    normalized
 }
 
-fn parse_roles_block(
-    content: ParseStream,
-    header_roles: Option<Vec<RoleDef>>,
-) -> Result<Vec<RoleDef>> {
-    if let Some(roles) = header_roles {
-        return Ok(roles);
+fn project_local_types(choreography: &Choreography) -> Result<Vec<(Role, LocalType)>> {
+    let mut local_types = Vec::new();
+    for role in &choreography.roles {
+        let local_type = telltale_parser::project(choreography, role)
+            .map_err(|err| Error::new(Span::call_site(), err.to_string()))?;
+        local_types.push((role.clone(), local_type));
     }
-    if !content.peek(syn::Ident) {
-        return Ok(Vec::new());
-    }
-
-    let roles_ident: Ident = content.parse()?;
-    if roles_ident != "roles" {
-        return Err(Error::new(roles_ident.span(), "expected 'roles'"));
-    }
-    if content.peek(Token![:]) {
-        let _: Token![:] = content.parse()?;
-    }
-
-    let mut roles = Vec::new();
-    loop {
-        // bounded: consumes token stream, breaks on non-comma
-        let role_name: Ident = content.parse()?;
-        roles.push(RoleDef { name: role_name });
-        if content.peek(Token![,]) {
-            let _: Token![,] = content.parse()?;
-            continue;
-        }
-        if content.peek(Token![;]) {
-            let _: Token![;] = content.parse()?;
-        }
-        break;
-    }
-    Ok(roles)
+    Ok(local_types)
 }
 
-fn parse_interactions(content: ParseStream) -> Result<Vec<Interaction>> {
-    let mut interactions = Vec::new();
-    while !content.is_empty() {
-        interactions.push(parse_interaction(content)?);
-    }
-    Ok(interactions)
+fn generate_protocol_module(
+    choreography: &Choreography,
+    local_types: &[(Role, LocalType)],
+) -> Result<TokenStream> {
+    let role_structs = generate_role_structs(&choreography.roles);
+    let helper_types = generate_helper_types(&choreography.protocol)?;
+    let session_types = generate_session_types(local_types)?;
+    let setup_fn = generate_setup_function(&choreography.name);
+
+    let body = quote! {
+        use ::telltale::Role;
+
+        #role_structs
+        #helper_types
+        #session_types
+        #setup_fn
+    };
+
+    Ok(match &choreography.namespace {
+        Some(namespace) => {
+            let ns_ident = format_ident!("{}", namespace);
+            quote! {
+                #[allow(dead_code, unused_imports, unused_variables)]
+                pub mod #ns_ident {
+                    #body
+                }
+            }
+        }
+        None => body,
+    })
 }
 
-impl Parse for ProtocolDef {
-    fn parse(input: ParseStream) -> Result<Self> {
-        // Parse: protocol Name (Roles)? (=)? { ... }
-        let protocol_ident: Ident = input.parse()?;
-        if protocol_ident != "protocol" {
-            return Err(Error::new(protocol_ident.span(), "expected 'protocol'"));
-        }
-        let name: Ident = input.parse()?;
+fn generate_role_structs(roles: &[Role]) -> TokenStream {
+    let role_names: Vec<_> = roles.iter().map(|role| role.name()).collect();
 
-        let roles_from_header = parse_header_roles(input)?;
-
-        // Optional '=' before the block
-        if input.peek(Token![=]) {
-            let _: Token![=] = input.parse()?;
-        }
-
-        let content;
-        braced!(content in input);
-
-        let roles = parse_roles_block(&content, roles_from_header)?;
-        let interactions = parse_interactions(&content)?;
-
-        Ok(ProtocolDef {
-            name,
-            roles,
-            interactions,
-        })
-    }
-}
-
-fn parse_interaction(input: ParseStream) -> Result<Interaction> {
-    // Simple send: A -> B: Message
-    if input.peek2(Token![->]) {
-        let from: Ident = input.parse()?;
-        let _: Token![->] = input.parse()?;
-        let to: Ident = input.parse()?;
-        let _: Token![:] = input.parse()?;
-        let message: Ident = input.parse()?;
-
-        let payload = if input.peek(syn::token::Paren) {
-            let content;
-            parenthesized!(content in input);
-            Some(content.parse()?)
-        } else {
-            None
-        };
-
-        if input.peek(Token![;]) {
-            let _: Token![;] = input.parse()?;
-        }
-
-        return Ok(Interaction::Send {
-            from,
-            to,
-            message,
-            payload,
-        });
-    }
-
-    Err(Error::new(input.span(), "expected interaction"))
-}
-
-fn validate_protocol(protocol: &ProtocolDef) -> Result<()> {
-    if protocol.roles.len() < 2 {
-        return Err(Error::new(
-            protocol.name.span(),
-            "protocol must declare at least two roles",
-        ));
-    }
-
-    let mut role_names = HashSet::new();
-    for role in &protocol.roles {
-        let name = role.name.to_string();
-        if !role_names.insert(name.clone()) {
-            return Err(Error::new(
-                role.name.span(),
-                format!("duplicate role '{name}'"),
-            ));
-        }
-    }
-
-    for interaction in &protocol.interactions {
-        let Interaction::Send {
-            from,
-            to,
-            message: _,
-            payload: _,
-        } = interaction;
-
-        let from_name = from.to_string();
-        if !role_names.contains(&from_name) {
-            return Err(Error::new(
-                from.span(),
-                format!("role '{from_name}' is not declared in protocol roles"),
-            ));
-        }
-
-        let to_name = to.to_string();
-        if !role_names.contains(&to_name) {
-            return Err(Error::new(
-                to.span(),
-                format!("role '{to_name}' is not declared in protocol roles"),
-            ));
-        }
-
-        if from == to {
-            return Err(Error::new(
-                from.span(),
-                format!("self-send '{from_name} -> {to_name}' is not supported"),
-            ));
-        }
-    }
-
-    Ok(())
-}
-
-/// Generate role struct definitions
-fn generate_role_structs(protocol: &ProtocolDef) -> TokenStream {
-    let role_names: Vec<_> = protocol.roles.iter().map(|r| &r.name).collect();
-
-    let mut role_structs = Vec::new();
-    for (i, role) in role_names.iter().enumerate() {
-        let route_fields: Vec<_> = role_names
+    let role_structs = roles.iter().enumerate().map(|(index, role)| {
+        let role_name = role.name();
+        let route_fields: Vec<_> = roles
             .iter()
             .enumerate()
-            .filter_map(|(j, other)| {
-                if i == j {
+            .filter_map(|(other_index, other_role)| {
+                if index == other_index {
                     None
                 } else {
-                    Some(quote! { #[route(#other)] Channel })
+                    let other_name = other_role.name();
+                    Some(quote! { #[route(#other_name)] Channel })
                 }
             })
             .collect();
 
-        role_structs.push(quote! {
-            #[derive(::telltale::Role)]
-            #[message(Label)]
-            #[allow(dead_code)]
-            pub struct #role(#(#route_fields),*);
-        });
-    }
+        if route_fields.is_empty() {
+            quote! {
+                #[derive(::telltale::Role)]
+                #[message(Label)]
+                #[allow(dead_code)]
+                pub struct #role_name;
+            }
+        } else {
+            quote! {
+                #[derive(::telltale::Role)]
+                #[message(Label)]
+                #[allow(dead_code)]
+                pub struct #role_name(#(#route_fields),*);
+            }
+        }
+    });
 
     quote! {
-        type Channel = ::telltale::channel::Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
+        type Channel = ::telltale::channel::Bidirectional<
+            ::futures::channel::mpsc::UnboundedSender<Label>,
+            ::futures::channel::mpsc::UnboundedReceiver<Label>,
+        >;
 
         #(#role_structs)*
 
-        /// Roles tuple for protocol setup
         #[derive(::telltale::Roles)]
         #[allow(dead_code)]
         pub struct Roles(#(#role_names),*);
     }
 }
 
-fn payload_signature(payload: Option<&syn::Type>) -> String {
-    match payload {
-        Some(ty) => ty.to_token_stream().to_string(),
-        None => "<none>".to_string(),
-    }
+#[derive(Clone)]
+enum LabelSurface {
+    Message {
+        name: Ident,
+        payload: Option<TokenStream>,
+    },
+    Choice {
+        name: Ident,
+    },
 }
 
-fn collect_messages(protocol: &ProtocolDef) -> Result<Vec<(Ident, Option<syn::Type>)>> {
-    let mut seen: BTreeMap<String, (Ident, Option<syn::Type>, String)> = BTreeMap::new();
-    let mut ordered = Vec::new();
+fn generate_helper_types(protocol: &Protocol) -> Result<TokenStream> {
+    let mut labels = BTreeMap::<String, LabelSurface>::new();
+    collect_label_surfaces(protocol, &mut labels)?;
 
-    for interaction in &protocol.interactions {
-        let Interaction::Send {
-            from: _,
-            to: _,
-            message,
-            payload,
-        } = interaction;
+    let mut label_variants = Vec::new();
+    let mut helper_types = Vec::new();
 
-        let key = message.to_string();
-        let signature = payload_signature(payload.as_ref());
-        if let Some((_, _, existing_signature)) = seen.get(&key) {
-            if *existing_signature != signature {
-                return Err(Error::new(
-                    message.span(),
-                    format!(
-                        "message '{key}' is used with conflicting payload types in the same protocol"
-                    ),
-                ));
-            }
-            continue;
-        }
-
-        let payload_clone = payload.clone();
-        seen.insert(key, (message.clone(), payload_clone.clone(), signature));
-        ordered.push((message.clone(), payload_clone));
-    }
-
-    Ok(ordered)
-}
-
-/// Generate message types
-fn generate_message_types(protocol: &ProtocolDef) -> Result<TokenStream> {
-    let messages = collect_messages(protocol)?;
-
-    let message_structs: Vec<_> = messages
-        .iter()
-        .map(|(name, payload)| {
-            if let Some(ty) = payload {
-                quote! {
-                    #[derive(Clone, Debug)]
-                    #[allow(dead_code)]
-                    pub struct #name(pub #ty);
+    for surface in labels.into_values() {
+        match surface {
+            LabelSurface::Message { name, payload } => {
+                if let Some(payload) = payload {
+                    helper_types.push(quote! {
+                        #[derive(Clone, Debug)]
+                        #[allow(dead_code)]
+                        pub struct #name #payload;
+                    });
+                } else {
+                    helper_types.push(quote! {
+                        #[derive(Clone, Debug)]
+                        #[allow(dead_code)]
+                        pub struct #name;
+                    });
                 }
-            } else {
-                quote! {
+                label_variants.push(quote! { #name(#name) });
+            }
+            LabelSurface::Choice { name } => {
+                helper_types.push(quote! {
                     #[derive(Clone, Debug)]
                     #[allow(dead_code)]
                     pub struct #name;
-                }
+                });
+                label_variants.push(quote! { #name(#name) });
             }
-        })
-        .collect();
-
-    let message_names: Vec<_> = messages.iter().map(|(name, _)| name).collect();
+        }
+    }
 
     Ok(quote! {
-        /// Generated message types
-        #(#message_structs)*
+        #(#helper_types)*
 
-        /// Message enum for the protocol
         #[derive(::telltale::Message)]
         #[allow(dead_code)]
         pub enum Label {
-            #(#message_names(#message_names)),*
+            #(#label_variants),*
         }
     })
 }
 
-/// Generate session types for each role
-fn generate_session_types(protocol: &ProtocolDef) -> Result<TokenStream> {
-    let mut types = TokenStream::new();
+fn collect_label_surfaces(
+    protocol: &Protocol,
+    labels: &mut BTreeMap<String, LabelSurface>,
+) -> Result<()> {
+    match protocol {
+        Protocol::Send {
+            message,
+            continuation,
+            ..
+        } => {
+            insert_message_surface(labels, message)?;
+            collect_label_surfaces(continuation, labels)?;
+        }
+        Protocol::Broadcast {
+            message,
+            continuation,
+            ..
+        } => {
+            insert_message_surface(labels, message)?;
+            collect_label_surfaces(continuation, labels)?;
+        }
+        Protocol::Choice { branches, .. } => {
+            collect_choice_surfaces(branches, labels)?;
+        }
+        Protocol::Case { branches, .. } => {
+            for branch in branches {
+                collect_label_surfaces(&branch.protocol, labels)?;
+            }
+        }
+        Protocol::Timeout {
+            body,
+            on_timeout,
+            on_cancel,
+            ..
+        } => {
+            collect_label_surfaces(body, labels)?;
+            collect_label_surfaces(on_timeout, labels)?;
+            if let Some(on_cancel) = on_cancel {
+                collect_label_surfaces(on_cancel, labels)?;
+            }
+        }
+        Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => {
+            collect_label_surfaces(body, labels)?;
+        }
+        Protocol::Parallel { protocols } => {
+            for protocol in protocols {
+                collect_label_surfaces(protocol, labels)?;
+            }
+        }
+        Protocol::Let { continuation, .. }
+        | Protocol::Publish { continuation, .. }
+        | Protocol::DependentWork { continuation, .. }
+        | Protocol::Extension { continuation, .. } => {
+            collect_label_surfaces(continuation, labels)?;
+        }
+        Protocol::Handoff { continuation, .. } => {
+            collect_label_surfaces(continuation, labels)?;
+        }
+        Protocol::Var(_) | Protocol::End => {}
+    }
 
-    // For each role, generate its session type
-    for role in &protocol.roles {
-        let role_name = &role.name;
-        let session_type = project_role(protocol, role);
+    Ok(())
+}
 
-        let session_type_name = quote::format_ident!("{}Session", role_name);
-        types.extend(quote! {
+fn collect_choice_surfaces(
+    branches: &[Branch],
+    labels: &mut BTreeMap<String, LabelSurface>,
+) -> Result<()> {
+    for branch in branches {
+        let key = branch.label.to_string();
+        match labels.get(&key) {
+            Some(LabelSurface::Message { .. }) => {
+                return Err(Error::new(
+                    branch.label.span(),
+                    format!(
+                        "choice label '{}' conflicts with a message name in the same protocol",
+                        key
+                    ),
+                ));
+            }
+            Some(LabelSurface::Choice { .. }) | None => {
+                labels.entry(key).or_insert_with(|| LabelSurface::Choice {
+                    name: branch.label.clone(),
+                });
+            }
+        }
+        collect_label_surfaces(&branch.protocol, labels)?;
+    }
+
+    Ok(())
+}
+
+fn insert_message_surface(
+    labels: &mut BTreeMap<String, LabelSurface>,
+    message: &MessageType,
+) -> Result<()> {
+    let key = message.name.to_string();
+    let payload = message.payload.clone();
+    match labels.get(&key) {
+        Some(LabelSurface::Message {
+            payload: existing_payload,
+            ..
+        }) => {
+            let existing = existing_payload
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_else(|| "<none>".to_string());
+            let next = payload
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_else(|| "<none>".to_string());
+            if existing != next {
+                return Err(Error::new(
+                    message.name.span(),
+                    format!(
+                        "message '{}' is used with conflicting payload types in the same protocol",
+                        key
+                    ),
+                ));
+            }
+        }
+        Some(LabelSurface::Choice { .. }) => {
+            return Err(Error::new(
+                message.name.span(),
+                format!(
+                    "message '{}' conflicts with a choice label in the same protocol",
+                    key
+                ),
+            ));
+        }
+        None => {
+            labels.insert(
+                key,
+                LabelSurface::Message {
+                    name: message.name.clone(),
+                    payload,
+                },
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn generate_session_types(local_types: &[(Role, LocalType)]) -> Result<TokenStream> {
+    let mut output = TokenStream::new();
+
+    for (role, local_type) in local_types {
+        let mut state = ChoiceCodegenState::new(role.name().clone());
+        let session_body = state.render_local_type(local_type)?;
+        let session_name = format_ident!("{}Session", role.name());
+        let choice_defs = state.choice_defs;
+
+        output.extend(quote! {
+            #(#choice_defs)*
+
             #[::telltale::session]
-            pub type #session_type_name = #session_type;
+            pub type #session_name = #session_body;
         });
     }
 
-    Ok(types)
+    Ok(output)
 }
 
-fn apply_send_recv_projection(
-    role_name: &Ident,
-    from: &Ident,
-    to: &Ident,
-    message: &Ident,
-    continuation: TokenStream,
-) -> TokenStream {
-    if from == role_name {
-        quote! { ::telltale::Send<#to, #message, #continuation> }
-    } else if to == role_name {
-        quote! { ::telltale::Receive<#from, #message, #continuation> }
-    } else {
-        continuation
+struct ChoiceCodegenState {
+    role_name: Ident,
+    next_choice_id: usize,
+    choice_defs: Vec<TokenStream>,
+}
+
+impl ChoiceCodegenState {
+    fn new(role_name: Ident) -> Self {
+        Self {
+            role_name,
+            next_choice_id: 0,
+            choice_defs: Vec::new(),
+        }
+    }
+
+    fn render_local_type(&mut self, local_type: &LocalType) -> Result<TokenStream> {
+        match local_type {
+            LocalType::Send {
+                to,
+                message,
+                continuation,
+            } => {
+                let continuation = self.render_local_type(continuation)?;
+                let to_name = to.name();
+                let message_name = &message.name;
+                Ok(quote! { ::telltale::Send<#to_name, #message_name, #continuation> })
+            }
+            LocalType::Receive {
+                from,
+                message,
+                continuation,
+            } => {
+                let continuation = self.render_local_type(continuation)?;
+                let from_name = from.name();
+                let message_name = &message.name;
+                Ok(quote! { ::telltale::Receive<#from_name, #message_name, #continuation> })
+            }
+            LocalType::Select { to, branches } => {
+                let enum_name = self.push_choice_enum(branches)?;
+                let to_name = to.name();
+                Ok(quote! { ::telltale::Select<#to_name, #enum_name> })
+            }
+            LocalType::Branch { from, branches } => {
+                let enum_name = self.push_choice_enum(branches)?;
+                let from_name = from.name();
+                Ok(quote! { ::telltale::Branch<#from_name, #enum_name> })
+            }
+            LocalType::End => Ok(quote! { ::telltale::End }),
+            LocalType::Rec { body, .. } => self.render_local_type(body),
+            LocalType::Var(label) => Ok(label.to_token_stream()),
+            LocalType::Loop { .. } => Err(Error::new(
+                Span::call_site(),
+                "loop session code generation is not yet supported by telltale-macros",
+            )),
+            LocalType::LocalChoice { .. } => Err(Error::new(
+                Span::call_site(),
+                "local-only choice session code generation is not yet supported by telltale-macros",
+            )),
+            LocalType::Timeout { .. } => Err(Error::new(
+                Span::call_site(),
+                "timeout session code generation is not yet supported by telltale-macros",
+            )),
+        }
+    }
+
+    fn push_choice_enum(&mut self, branches: &[(Ident, LocalType)]) -> Result<Ident> {
+        self.next_choice_id += 1;
+        let enum_name = format_ident!("{}Choice{}", self.role_name, self.next_choice_id);
+        let variants: Vec<_> = branches
+            .iter()
+            .map(|(label, local_type)| {
+                let continuation = self.render_local_type(local_type)?;
+                Ok(quote! { #label(#label, #continuation) })
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        self.choice_defs.push(quote! {
+            #[::telltale::session]
+            pub enum #enum_name {
+                #(#variants),*
+            }
+        });
+
+        Ok(enum_name)
     }
 }
 
-/// Project the protocol to a specific role's session type
-fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStream {
-    let mut type_expr = quote! { ::telltale::End };
-    let role_name = &role.name;
-
-    // Process interactions in reverse order to build the type
-    for interaction in protocol.interactions.iter().rev() {
-        let Interaction::Send {
-            from,
-            to,
-            message,
-            payload: _,
-        } = interaction;
-        type_expr = apply_send_recv_projection(role_name, from, to, message, type_expr);
-    }
-
-    type_expr
-}
-
-/// Generate setup function
-fn generate_setup_function(protocol: &ProtocolDef) -> TokenStream {
-    let protocol_name = &protocol.name;
-
+fn generate_setup_function(protocol_name: &Ident) -> TokenStream {
     quote! {
         #[doc = concat!("Setup function for the ", stringify!(#protocol_name), " protocol.")]
         pub fn setup() -> Roles {

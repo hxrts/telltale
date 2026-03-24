@@ -1595,6 +1595,7 @@ dependencies = [
  "syn 2.0.110",
  "telltale",
  "telltale-macros",
+ "telltale-parser",
  "telltale-theory",
  "telltale-types",
  "tempfile",
@@ -1651,7 +1652,25 @@ dependencies = [
  "quote",
  "syn 2.0.110",
  "telltale",
+ "telltale-parser",
  "trybuild",
+]
+
+[[package]]
+name = "telltale-parser"
+version = "6.0.0"
+dependencies = [
+ "pest",
+ "pest_derive",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn 2.0.110",
+ "telltale-types",
+ "tempfile",
+ "thiserror",
+ "toml 0.8.23",
 ]
 
 [[package]]

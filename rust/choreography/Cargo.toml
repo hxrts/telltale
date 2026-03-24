@@ -18,6 +18,7 @@ bench = false
 [dependencies]
 telltale = { path = "../..", version = "6.0.0" }
 telltale-macros = { path = "../macros", version = "6.0.0" }
+telltale-parser = { path = "../parser", version = "6.0.0" }
 telltale-types = { path = "../types", version = "6.0.0" }
 telltale-theory = { path = "../theory", version = "6.0.0" }
 futures = { workspace = true }

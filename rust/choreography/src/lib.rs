@@ -54,8 +54,8 @@ pub use extensions::{
     ParseError, ProjectionContext, ProtocolExtension, StatementParser,
 };
 pub use generated_effects::{
-    GeneratedEffectBehavior, GeneratedEffectFamily, GeneratedEffectOperation,
-    GeneratedSimulationMetadata, GeneratedSimulationMode,
+    ChoreographyEffectExt, GeneratedEffectBehavior, GeneratedEffectFamily,
+    GeneratedEffectOperation, GeneratedSimulationMetadata, GeneratedSimulationMode,
 };
 pub use runtime::{spawn, spawn_local};
 pub use topology::{

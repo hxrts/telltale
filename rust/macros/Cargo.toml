@@ -17,6 +17,7 @@ proc-macro = true
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true, features = ["parsing"] }
+telltale-parser = { path = "../parser", version = "6.0.0" }
 
 [dev-dependencies]
 futures = { workspace = true }
