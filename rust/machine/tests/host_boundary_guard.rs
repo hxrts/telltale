@@ -31,8 +31,8 @@ const DOC_SOURCES: &[(&str, &str)] = &[
         include_str!("../../../docs/30_api_reference.md"),
     ),
     (
-        "../../effect-scaffold/src/main.rs",
-        include_str!("../../effect-scaffold/src/main.rs"),
+        "../../choreography/src/bin/effect_scaffold.rs",
+        include_str!("../../choreography/src/bin/effect_scaffold.rs"),
     ),
 ];
 

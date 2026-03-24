@@ -145,7 +145,7 @@ check-tooling-convergence:
 
 # Generate Rust effect interfaces and simulator scaffolds from Telltale DSL declarations.
 effect-scaffold dsl out="artifacts/effect_handler_scaffold":
-    cargo run -p effect-scaffold -- --out {{ out }} --dsl {{ dsl }}
+    cargo run -p telltale-choreography --bin effect-scaffold -- --out {{ out }} --dsl {{ dsl }}
 
 # Run a simulator harness config and print a JSON report.
 sim-run config:

@@ -243,7 +243,7 @@ just effect-scaffold path/to/protocol.tell
 This command writes files under `artifacts/effect_handler_scaffold` by default. The direct form is:
 
 ```text
-cargo run -p effect-scaffold -- --out artifacts/effect_handler_scaffold --dsl path/to/protocol.tell
+cargo run -p telltale-choreography --bin effect-scaffold -- --out artifacts/effect_handler_scaffold --dsl path/to/protocol.tell
 ```
 
 Use `--no-simulator` when you want only the Rust effect boundary without simulator artifacts.

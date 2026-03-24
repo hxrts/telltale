@@ -17,9 +17,8 @@ telltale/
 │   ├── theory/             Session type algorithms (telltale-theory)
 │   ├── choreography/       DSL, projection glue, and effect runtime
 │   ├── lean-bridge/        Lean export/import/validation
-│   ├── protocol-machine/                 Protocol machine and guest runtime
+│   ├── machine/             Protocol machine and guest runtime
 │   ├── simulator/          Protocol-machine-backed simulation
-│   ├── effect-scaffold/    Internal scaffolding tool
 │   ├── macros/             Procedural macros
 │   └── transport/          Production transports (workspace member)
 ├── lean/                   Lean 4 formalization
@@ -51,9 +50,8 @@ graph TB
     end
 
     subgraph Application
-        choreo["telltale-choreography<br/>DSL, parsing & code generation"]
+        choreo["telltale-choreography<br/>DSL, parsing, code generation & scaffold"]
         macros["telltale-macros<br/>Proc macros"]
-        scaffold["effect-scaffold<br/>Scaffold generator"]
     end
 
     subgraph Facade
@@ -257,16 +255,16 @@ This crate is located in `rust/macros/`. It provides procedural macros for deriv
 
 The `choreography!` macro parses inline DSL text and generates role types, message types, and session types at compile time. The `Role` and `Roles` derive macros generate `RoleId` trait implementations. The `Message` derive macro generates `Serialize` and `Deserialize` bindings for protocol messages.
 
-### effect-scaffold
+### effect-scaffold (binary in telltale-choreography)
 
-This crate is located in `rust/effect-scaffold/`. It is an internal helper tool that reads Telltale `effect` declarations and generates:
+The `effect-scaffold` binary (`rust/choreography/src/bin/effect_scaffold.rs`) reads Telltale `effect` declarations and generates:
 
 - canonical Rust request/outcome enums
 - host-runtime handler traits
 - first-class simulator traits and scenario builders
 - an exported effect-family manifest
 
-The package is marked `publish = false` and is intended for repository workflows rather than library consumers. It no longer maintains a separate hand-authored scaffold vocabulary. The DSL effect surface is the single source of truth.
+Run via `just effect-scaffold path/to/protocol.tell`. The DSL effect surface is the single source of truth.
 
 ### telltale-transport
 

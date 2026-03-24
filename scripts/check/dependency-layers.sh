@@ -37,7 +37,6 @@ declare -A layer_of=(
   ["telltale-transport"]=4
   ["telltale"]=4
   # Internal support utility
-  ["effect-scaffold"]=4
   ["telltale-lint-checks"]=4
 )
 

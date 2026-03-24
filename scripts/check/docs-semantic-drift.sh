@@ -311,7 +311,7 @@ for doc_file in "${DOC_FILES[@]}"; do
                 continue
             fi
             # Check if it matches the crate name pattern but is unknown
-            if [[ "$snippet" =~ ^(telltale(-[a-z0-9]+)?|effect-scaffold)$ ]]; then
+            if [[ "$snippet" =~ ^telltale(-[a-z0-9]+)?$ ]]; then
                 echo "$doc_file:$line_no: unknown workspace crate \`$snippet\`" >> "$ERRORS_FILE"
                 continue
             fi
@@ -541,11 +541,11 @@ for vpath in "${VERSION_CHECK_FILES[@]}"; do
         crate_name=""
         declared_version=""
 
-        if [[ "$vline" =~ ^[[:space:]]*(telltale(-[a-z0-9]+)?|effect-scaffold)[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]]; then
+        if [[ "$vline" =~ ^[[:space:]]*telltale(-[a-z0-9]+)?[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]]; then
             crate_name="${BASH_REMATCH[1]}"
             declared_version="${BASH_REMATCH[3]}"
         # Match: crate_name = { version = "version" ... }
-        elif [[ "$vline" =~ ^[[:space:]]*(telltale(-[a-z0-9]+)?|effect-scaffold)[[:space:]]*=[[:space:]]*\{.*version[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]]; then
+        elif [[ "$vline" =~ ^[[:space:]]*telltale(-[a-z0-9]+)?[[:space:]]*=[[:space:]]*\{.*version[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]]; then
             crate_name="${BASH_REMATCH[1]}"
             declared_version="${BASH_REMATCH[3]}"
         fi

@@ -97,6 +97,11 @@ name = "choreo-fmt"
 path = "src/bin/choreo_fmt.rs"
 required-features = ["native-cli"]
 
+[[bin]]
+name = "effect-scaffold"
+path = "src/bin/effect_scaffold.rs"
+required-features = ["native-cli"]
+
 [[example]]
 name = "extension_workflow"
 required-features = ["native-examples"]

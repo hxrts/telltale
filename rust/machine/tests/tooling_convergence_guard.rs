@@ -39,7 +39,7 @@ fn tooling_surfaces_use_generated_effect_and_owned_open_paths() {
     let required_patterns = [
         (
             "../../../Justfile",
-            "cargo run -p effect-scaffold -- --out {{ out }} --dsl {{ dsl }}",
+            "cargo run -p telltale-choreography --bin effect-scaffold -- --out {{ out }} --dsl {{ dsl }}",
         ),
         (
             "../../../Justfile",

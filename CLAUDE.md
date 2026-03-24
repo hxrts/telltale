@@ -132,14 +132,13 @@ Rust workspace crates are split between the repo root (`telltale`) and the `rust
 | `telltale` | `rust/src/` | Facade crate with session types (`Send`, `Receive`, `Select`, `Branch`, `End`) and async channel abstractions |
 | `telltale-types` | `rust/types/` | Core types (`GlobalType`, `LocalTypeR`, `Label`) matching Lean definitions with content addressing |
 | `telltale-macros` | `rust/macros/` | Procedural macros (`choreography!`, `session`, `Role`, `Roles`, `Message`) |
-| `telltale-choreography` | `rust/choreography/` | DSL parser, projection, effect handlers, simulation, topology |
+| `telltale-choreography` | `rust/choreography/` | DSL parser, projection, effect handlers, simulation, topology, effect scaffold |
 | `telltale-theory` | `rust/theory/` | Session type algorithms (projection, merge, duality, sync/async subtyping, bounded recursion) |
 | `telltale-machine` | `rust/machine/` | Bytecode VM execution engine (single source of truth for scheduling) |
 | `telltale-simulator` | `rust/simulator/` | VM-backed simulation with deterministic middleware (network, faults, properties) |
 | `telltale-lean-bridge` | `rust/lean-bridge/` | Lean interop with JSON export/import, validation, choreography exporter |
 | `telltale-transport` | `rust/transport/` | Production transport integration layer for runtime/choreography execution |
 | `telltale-lint-checks` | `rust/lint-checks/` | Custom lint checks for architecture and style enforcement |
-| `effect-scaffold` | `rust/effect-scaffold/` | Deterministic scaffolding tool for effect handlers and simulator harness templates |
 
 ### Choreography Crate Structure (`rust/choreography/src/`)
 

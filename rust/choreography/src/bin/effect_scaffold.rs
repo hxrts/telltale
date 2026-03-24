@@ -123,8 +123,8 @@ fn print_help() {
     println!("Generate Rust effect interfaces and simulator scaffolds from Telltale effect declarations.");
     println!();
     println!("USAGE:");
-    println!("  cargo run -p effect-scaffold -- --out OUT_DIR --dsl path/to/protocol.tell");
-    println!("  cargo run -p effect-scaffold -- --out OUT_DIR --dsl path/to/protocol.tell --no-simulator");
+    println!("  cargo run -p telltale-choreography --bin effect-scaffold -- --out OUT_DIR --dsl path/to/protocol.tell");
+    println!("  cargo run -p telltale-choreography --bin effect-scaffold -- --out OUT_DIR --dsl path/to/protocol.tell --no-simulator");
     println!();
     println!("DEFAULTS:");
     println!("  OUT_DIR: {DEFAULT_OUT_DIR}");

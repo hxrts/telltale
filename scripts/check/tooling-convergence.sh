@@ -27,7 +27,7 @@ check_no_match() {
 # ── Deprecated Scaffold Flags ────────────────────────────────────────
 
 check_no_match 'effect-scaffold out=' Justfile
-check_no_match '--name' Justfile rust/effect-scaffold/src
+check_no_match '--name' Justfile rust/choreography/src/bin/effect_scaffold.rs
 
 # ── Retired Protocol Machine Constructors ──────────────────────────────────────────
 
