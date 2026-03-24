@@ -4,7 +4,6 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use telltale_types::{GlobalType, Label, LocalTypeR, ValType};
 use telltale_machine::buffer::BufferConfig;
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{
@@ -19,6 +18,7 @@ use telltale_machine::{
     PayloadValidationMode, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineMemoryUsage,
     ProtocolMachineRunStatus,
 };
+use telltale_types::{GlobalType, Label, LocalTypeR, ValType};
 
 pub(crate) struct CountingAllocator;
 
@@ -129,7 +129,11 @@ impl EffectHandler for BenchHandler {
         )
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> telltale_machine::effect::EffectResult<()> {
+    fn step(
+        &self,
+        _role: &str,
+        _state: &mut Vec<Value>,
+    ) -> telltale_machine::effect::EffectResult<()> {
         telltale_machine::effect::EffectResult::success(())
     }
 }

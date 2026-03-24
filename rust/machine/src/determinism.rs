@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use crate::effect::EffectTraceEntry;
-use crate::trace::{normalize_trace, obs_session};
 use crate::engine::ObsEvent;
+use crate::trace::{normalize_trace, obs_session};
 use serde::{Deserialize, Serialize};
 
 /// Runtime effect-determinism tier used for admission and trace artifacts.

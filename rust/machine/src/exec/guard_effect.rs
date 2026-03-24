@@ -2,10 +2,10 @@
 
 use crate::coroutine::Fault;
 use crate::effect::EffectHandler;
+use crate::engine::{GuardAcquireInput, GuardReleaseInput, ProtocolMachine, StepPack};
 use crate::instr::Endpoint;
 use crate::instr::InvokeAction;
 use crate::session::SessionId;
-use crate::engine::{GuardAcquireInput, GuardReleaseInput, StepPack, ProtocolMachine};
 
 pub(crate) fn step_invoke(
     vm: &mut ProtocolMachine,

@@ -10,10 +10,10 @@ use telltale_bridge::{
     canonical_schema_version, global_to_json, ChoreographyJson, ProtocolMachineRunInput,
     ProtocolMachineRunner,
 };
-use telltale_types::{GlobalType, Label};
 use telltale_machine::trace::normalize_trace;
 use telltale_machine::ObsEvent;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
+use telltale_types::{GlobalType, Label};
 
 use test_support::PassthroughHandler;
 

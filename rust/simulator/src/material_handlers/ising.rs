@@ -6,9 +6,9 @@
 
 use crate::material::MeanFieldParams;
 use crate::value_conv::{fixed_vec_to_value, registers_to_f64s, write_f64s};
-use telltale_types::FixedQ32;
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
+use telltale_types::FixedQ32;
 
 /// Effect handler for the mean-field Ising model.
 pub struct IsingHandler {

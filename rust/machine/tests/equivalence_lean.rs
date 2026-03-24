@@ -136,7 +136,9 @@ fn run_lean(
     max_rounds: usize,
 ) -> Result<Vec<NormalizedEvent>, LeanRunnerError> {
     let runner_path = protocol_machine_runner_path().ok_or_else(|| {
-        LeanRunnerError::BinaryNotFound(PathBuf::from("lean/.lake/build/bin/protocol_machine_runner"))
+        LeanRunnerError::BinaryNotFound(PathBuf::from(
+            "lean/.lake/build/bin/protocol_machine_runner",
+        ))
     })?;
     let runner = LeanRunner::with_binary_path(runner_path)?;
     let output = runner.run_protocol_machine(choreos, concurrency, max_rounds)?;

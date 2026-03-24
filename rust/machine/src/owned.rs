@@ -5,12 +5,12 @@
 //! remain available for tests and internal runtime wiring, but production host
 //! mutation should flow through an owned capability.
 
+use crate::engine::{ProtocolMachine, ProtocolMachineError};
 use crate::loader::CodeImage;
 use crate::session::{
     CancellationWitness, OwnershipCapability, OwnershipError, OwnershipReceipt, OwnershipScope,
     ReadinessWitness, SessionHostMutation, SessionId,
 };
-use crate::engine::{ProtocolMachineError, ProtocolMachine};
 
 /// Capability-bearing handle returned by the preferred owned open path.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -140,7 +140,10 @@ impl OwnedSession {
     /// # Errors
     ///
     /// Returns an `OwnershipError` if the live owner no longer matches this handle.
-    pub fn mark_owner_died(&self, vm: &mut ProtocolMachine) -> Result<CancellationWitness, OwnershipError> {
+    pub fn mark_owner_died(
+        &self,
+        vm: &mut ProtocolMachine,
+    ) -> Result<CancellationWitness, OwnershipError> {
         vm.mark_owner_died(self.session_id, &self.capability.owner_id)
     }
 

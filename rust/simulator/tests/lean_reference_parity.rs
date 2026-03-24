@@ -8,12 +8,12 @@ use telltale_bridge::{
     normalize_semantic_audit, ProtocolMachineRunner, ProtocolMachineRunnerError,
     ProtocolMachineTraceEvent, SimRunInput, SimRunOutput, SimTraceValidation, TickedObsEvent,
 };
-use telltale_simulator::runner::{run_with_scenario, ScenarioResult};
-use telltale_simulator::scenario::Scenario;
-use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
 use telltale_machine::ObsEvent;
+use telltale_simulator::runner::{run_with_scenario, ScenarioResult};
+use telltale_simulator::scenario::Scenario;
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;

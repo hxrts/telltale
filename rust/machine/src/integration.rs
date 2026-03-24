@@ -5,7 +5,7 @@
 
 use crate::determinism::{replay_consistent, DeterminismMode};
 use crate::effect::{EffectHandler, RecordingEffectHandler};
-use crate::engine::{ProtocolMachineError, ProtocolMachine};
+use crate::engine::{ProtocolMachine, ProtocolMachineError};
 use serde::{Deserialize, Serialize};
 
 /// Summary from loaded protocol-machine record/replay conformance execution.
@@ -94,8 +94,8 @@ mod tests {
     use super::*;
     use crate::coroutine::Value;
     use crate::effect::{EffectFailure, EffectResult, SendDecision, SendDecisionInput};
-    use crate::loader::CodeImage;
     use crate::engine::ProtocolMachineConfig;
+    use crate::loader::CodeImage;
     use std::collections::BTreeMap;
     use telltale_types::{GlobalType, Label, LocalTypeR};
 

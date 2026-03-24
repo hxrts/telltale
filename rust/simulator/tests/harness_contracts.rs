@@ -2,14 +2,14 @@
 
 use std::collections::BTreeMap;
 
+use telltale_machine::coroutine::Value;
+use telltale_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
 use telltale_simulator::contracts::{evaluate_contracts, ContractCheckConfig};
 use telltale_simulator::generated::ScenarioEffectResult;
 use telltale_simulator::harness::{DirectAdapter, HarnessConfig, HarnessSpec, SimulationHarness};
 use telltale_simulator::material::{MaterialParams, MeanFieldParams};
 use telltale_simulator::scenario::{OutputConfig, Scenario};
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
-use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
 
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;

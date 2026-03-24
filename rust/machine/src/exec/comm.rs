@@ -2,7 +2,7 @@
 
 use crate::coroutine::Fault;
 use crate::effect::EffectHandler;
-use crate::engine::{StepPack, ProtocolMachine};
+use crate::engine::{ProtocolMachine, StepPack};
 
 pub(crate) fn step_send(
     vm: &mut ProtocolMachine,

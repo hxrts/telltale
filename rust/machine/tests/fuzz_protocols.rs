@@ -17,10 +17,10 @@ use std::collections::BTreeMap;
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
-use telltale_types::{GlobalType, Label};
 use telltale_machine::buffer::{BackpressurePolicy, BoundedBuffer, BufferConfig, BufferMode};
 use telltale_machine::coroutine::Value;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
+use telltale_types::{GlobalType, Label};
 
 use test_support::{
     code_image_from_global, well_formed_global_strategy, FailingHandler, PassthroughHandler, SEED,

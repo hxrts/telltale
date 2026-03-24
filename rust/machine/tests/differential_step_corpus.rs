@@ -11,14 +11,16 @@ mod test_support;
 use cfg_if::cfg_if;
 use std::collections::BTreeMap;
 
-use telltale_types::{GlobalType, LocalTypeR};
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
 use telltale_machine::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_machine::loader::CodeImage;
-use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineStepResult};
+use telltale_machine::{
+    ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineStepResult,
+};
+use telltale_types::{GlobalType, LocalTypeR};
 
 use test_support::PassthroughHandler;
 

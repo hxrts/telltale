@@ -82,9 +82,18 @@ fn tooling_surfaces_use_generated_effect_and_owned_open_paths() {
             "../examples/v2_baseline_capture.rs",
             "ThreadedProtocolMachine",
         ),
-        ("../benches/protocol_machine_bench_common.rs", "load_choreography("),
-        ("../benches/protocol_machine_bench_runtime.rs", "\"vm_run_yield_small\""),
-        ("../benches/protocol_machine_bench_runtime.rs", "load_choreography("),
+        (
+            "../benches/protocol_machine_bench_common.rs",
+            "load_choreography(",
+        ),
+        (
+            "../benches/protocol_machine_bench_runtime.rs",
+            "\"vm_run_yield_small\"",
+        ),
+        (
+            "../benches/protocol_machine_bench_runtime.rs",
+            "load_choreography(",
+        ),
     ];
 
     let mut violations = Vec::new();

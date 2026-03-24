@@ -7,8 +7,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::session::SessionId;
 use crate::engine::ObsEvent;
+use crate::session::SessionId;
 
 fn default_trace_schema_version() -> u32 {
     1

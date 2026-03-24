@@ -2,15 +2,17 @@
 
 use std::collections::BTreeMap;
 
-use telltale_simulator::fault::{Fault, FaultInjector, FaultSchedule, ScheduledFault, Trigger};
-use telltale_simulator::rng::SimRng;
-use telltale_types::{GlobalType, LocalTypeR};
 use telltale_machine::buffer::EnqueueResult;
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
 use telltale_machine::instr::{ImmValue, Instr};
 use telltale_machine::loader::CodeImage;
-use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineStepResult};
+use telltale_machine::{
+    ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineStepResult,
+};
+use telltale_simulator::fault::{Fault, FaultInjector, FaultSchedule, ScheduledFault, Trigger};
+use telltale_simulator::rng::SimRng;
+use telltale_types::{GlobalType, LocalTypeR};
 
 #[derive(Debug, Clone, Copy)]
 struct NoopHandler;
@@ -93,7 +95,8 @@ fn transfer_image() -> CodeImage {
 
 fn run_faulted_transfer(schedule: FaultSchedule, max_rounds: usize) -> ProtocolMachine {
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
-    machine.load_choreography(&transfer_image())
+    machine
+        .load_choreography(&transfer_image())
         .expect("load transfer fixture");
     let fault = FaultInjector::new(NoopHandler, schedule, SimRng::new(7));
 
@@ -108,7 +111,8 @@ fn run_faulted_transfer(schedule: FaultSchedule, max_rounds: usize) -> ProtocolM
             .expect("advance fault schedule");
         fault
             .deliver(next_tick, |sid, from, to, value| {
-                machine.inject_message(sid, from, to, value)
+                machine
+                    .inject_message(sid, from, to, value)
                     .map_err(|err| err.to_string())
                     .map(|result| match result {
                         EnqueueResult::Ok => EnqueueResult::Ok,
@@ -123,7 +127,10 @@ fn run_faulted_transfer(schedule: FaultSchedule, max_rounds: usize) -> ProtocolM
                 .crashed_roles()
                 .expect("read currently crashed simulator roles"),
         );
-        match machine.step_round(&fault, 1).expect("step transfer fixture") {
+        match machine
+            .step_round(&fault, 1)
+            .expect("step transfer fixture")
+        {
             ProtocolMachineStepResult::Continue => {}
             ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck => break,
         }
@@ -148,7 +155,8 @@ fn ownership_owner_failure_before_handoff_emits_no_transfer_event() {
     let machine = run_faulted_transfer(schedule, 8);
 
     assert!(
-        machine.trace()
+        machine
+            .trace()
             .iter()
             .all(|event| !matches!(event, ObsEvent::Transferred { .. })),
         "crashing the current owner before the transfer should suppress handoff observables"
@@ -175,7 +183,8 @@ fn ownership_handoff_race_with_target_crash_keeps_transfer_observable() {
     let machine = run_faulted_transfer(schedule, 8);
 
     assert_eq!(
-        machine.trace()
+        machine
+            .trace()
             .iter()
             .filter(|event| matches!(event, ObsEvent::Transferred { .. }))
             .count(),

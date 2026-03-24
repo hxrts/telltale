@@ -10,7 +10,6 @@ mod test_support;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use telltale_types::{GlobalType, LocalTypeR};
 use telltale_machine::coroutine::{Fault, Value};
 use telltale_machine::effect::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
@@ -26,6 +25,7 @@ use telltale_machine::{
 use telltale_machine::{
     ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError, ThreadedRoundSemantics,
 };
+use telltale_types::{GlobalType, LocalTypeR};
 use test_support::{PassthroughHandler, ScenarioSpec};
 
 fn threaded_wave_config() -> ProtocolMachineConfig {

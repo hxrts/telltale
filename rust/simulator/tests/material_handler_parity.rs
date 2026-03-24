@@ -1,5 +1,7 @@
 //! Material-handler parity fixtures mirrored by Lean `Runtime.Tests.SimulatorParity`.
 
+use telltale_machine::coroutine::Value;
+use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_simulator::handler_from_material;
 use telltale_simulator::material::{
     ContinuumFieldParams, HamiltonianParams, MaterialParams, MeanFieldParams,
@@ -8,8 +10,6 @@ use telltale_simulator::material_handlers::{
     ContinuumFieldHandler, HamiltonianHandler, IsingHandler,
 };
 use telltale_types::FixedQ32;
-use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
 
 fn q32(value: FixedQ32) -> Value {
     Value::Str(format!("q32:{}", value.to_bits()))

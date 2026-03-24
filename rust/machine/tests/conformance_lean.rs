@@ -13,7 +13,6 @@ use std::collections::{BTreeMap, HashSet};
 use std::time::Duration;
 
 use assert_matches::assert_matches;
-use telltale_types::LocalTypeR;
 use telltale_machine::buffer::BufferConfig;
 use telltale_machine::coroutine::{CoroStatus, Fault};
 use telltale_machine::effect::{
@@ -25,6 +24,7 @@ use telltale_machine::session::{
     AuthorityArtifact, AuthorityAuditEvent, OwnershipScope, SessionStatus, SessionStore,
 };
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
+use telltale_types::LocalTypeR;
 
 use test_support::PassthroughHandler;
 
@@ -62,13 +62,17 @@ impl EffectHandler for KnowledgePayloadHandler {
     }
 
     fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
-        EffectResult::success(SendDecision::Deliver(telltale_machine::coroutine::Value::Prod(
-            Box::new(telltale_machine::coroutine::Value::Endpoint(Endpoint {
-                sid: input.sid,
-                role: input.role.to_string(),
-            })),
-            Box::new(telltale_machine::coroutine::Value::Str("secret".to_string())),
-        )))
+        EffectResult::success(SendDecision::Deliver(
+            telltale_machine::coroutine::Value::Prod(
+                Box::new(telltale_machine::coroutine::Value::Endpoint(Endpoint {
+                    sid: input.sid,
+                    role: input.role.to_string(),
+                })),
+                Box::new(telltale_machine::coroutine::Value::Str(
+                    "secret".to_string(),
+                )),
+            ),
+        ))
     }
 
     fn handle_recv(
@@ -551,8 +555,8 @@ fn test_lean_offer_choose_label_alignment() {
 /// Lean ProtocolMachine session lifecycle semantics: opened session transitions to closed and drains buffers.
 #[test]
 fn test_lean_open_close_session_state_transitions() {
-    use telltale_types::{Label, LocalTypeR};
     use telltale_machine::buffer::BufferConfig;
+    use telltale_types::{Label, LocalTypeR};
     let mut local_types = BTreeMap::new();
     local_types.insert(
         "A".to_string(),
@@ -594,9 +598,9 @@ fn test_lean_open_close_session_state_transitions() {
 /// Lean ProtocolMachine ownership semantics: transfer moves endpoint ownership to target coroutine.
 #[test]
 fn test_lean_transfer_endpoint_movement() {
-    use telltale_types::GlobalType;
     use telltale_machine::instr::{ImmValue, Instr};
     use telltale_machine::loader::CodeImage;
+    use telltale_types::GlobalType;
 
     let mut local_types = BTreeMap::new();
     local_types.insert("A".to_string(), LocalTypeR::End);

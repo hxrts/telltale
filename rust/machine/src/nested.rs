@@ -8,7 +8,7 @@ use std::sync::Mutex;
 
 use crate::coroutine::Value;
 use crate::effect::{EffectFailure, EffectHandler, EffectResult};
-use crate::engine::{ObsEvent, StepResult, ProtocolMachineError, ProtocolMachine};
+use crate::engine::{ObsEvent, ProtocolMachine, ProtocolMachineError, StepResult};
 
 struct SiteRunner {
     vm: Mutex<ProtocolMachine>,
@@ -45,7 +45,12 @@ impl NestedVMHandler {
     }
 
     /// Register a site by name with its inner ProtocolMachine and handler.
-    pub fn add_site(&mut self, name: impl Into<String>, vm: ProtocolMachine, handler: Box<dyn EffectHandler>) {
+    pub fn add_site(
+        &mut self,
+        name: impl Into<String>,
+        vm: ProtocolMachine,
+        handler: Box<dyn EffectHandler>,
+    ) {
         self.sites.insert(
             name.into(),
             SiteRunner {

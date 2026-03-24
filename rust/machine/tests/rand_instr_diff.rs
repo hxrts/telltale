@@ -4,7 +4,6 @@
 
 use std::collections::BTreeMap;
 
-use telltale_types::{GlobalType, LocalTypeR};
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
@@ -13,6 +12,7 @@ use telltale_machine::instr::{ImmValue, Instr};
 use telltale_machine::loader::CodeImage;
 use telltale_machine::ThreadedProtocolMachine;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
+use telltale_types::{GlobalType, LocalTypeR};
 
 #[derive(Debug, Clone, Copy)]
 struct DeterministicNoopHandler;

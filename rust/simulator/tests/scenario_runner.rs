@@ -3,15 +3,15 @@
 use std::collections::BTreeMap;
 
 use serde_json::json;
-use telltale_simulator::generated::{GeneratedEffectScenario, ScenarioEffectDisposition};
-use telltale_simulator::runner::run_with_scenario;
-use telltale_simulator::scenario::Scenario;
-use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
 use telltale_machine::SemanticAuditRecord;
+use telltale_simulator::generated::{GeneratedEffectScenario, ScenarioEffectDisposition};
+use telltale_simulator::runner::run_with_scenario;
+use telltale_simulator::scenario::Scenario;
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;

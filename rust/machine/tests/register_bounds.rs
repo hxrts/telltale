@@ -5,12 +5,12 @@ use cfg_if::cfg_if;
 use std::collections::BTreeMap;
 
 use proptest::prelude::*;
-use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_machine::coroutine::Fault;
 use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_machine::loader::CodeImage;
 use telltale_machine::{Instr, ProtocolMachine, ProtocolMachineConfig};
 use telltale_machine::{ProtocolMachineError, ProtocolMachineRunStatus};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {

@@ -69,6 +69,7 @@ pub mod coroutine;
 pub mod determinism;
 pub mod driver;
 pub mod effect;
+mod engine;
 pub mod envelope_diff;
 pub mod exec;
 pub mod exec_api;
@@ -94,7 +95,6 @@ pub mod session;
 pub mod trace;
 pub mod transfer_semantics;
 pub mod verification;
-mod engine;
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
@@ -110,6 +110,13 @@ cfg_if! {
 
 /// Canonical protocol-machine public surface.
 pub mod protocol_machine {
+    pub use crate::engine::{
+        EffectTraceCaptureMode, MonitorMode, ObsEvent, ObservabilityRetentionConfig,
+        ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore, ProtocolMachine,
+        ProtocolMachineConfig, ProtocolMachineError, ProtocolMachineMemoryUsage,
+        ProtocolMachineRetainedBytes, ProtocolMachineState, RunStatus, RuntimeTuningProfile,
+        SchedExecStatus, SchedStepDebug, StepResult, ThreadedRoundSemantics,
+    };
     pub use crate::kernel::ProtocolMachineKernel;
     pub use crate::semantic_objects::{
         AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
@@ -119,15 +126,7 @@ pub mod protocol_machine {
         PublicationStatus, SemanticHandoff, SEMANTIC_OBJECTS_SCHEMA_VERSION,
     };
     #[cfg(feature = "multi-thread")]
-    pub use crate::threaded::ThreadedProtocolMachine as ThreadedProtocolMachine;
-    pub use crate::engine::{
-        EffectTraceCaptureMode, MonitorMode, ObsEvent, ObservabilityRetentionConfig,
-        ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore,
-        ProtocolMachineMemoryUsage, ProtocolMachineRetainedBytes, RunStatus, RuntimeTuningProfile,
-        SchedExecStatus, SchedStepDebug, StepResult, ThreadedRoundSemantics,
-        ProtocolMachineConfig as ProtocolMachineConfig, ProtocolMachineError as ProtocolMachineError,
-        ProtocolMachineState as ProtocolMachineState, ProtocolMachine as ProtocolMachine,
-    };
+    pub use crate::threaded::ThreadedProtocolMachine;
 }
 
 /// Canonical guest-runtime public surface.
@@ -172,6 +171,15 @@ pub use effect::{
     EffectResult, EffectTimeoutPolicy, EffectTotality, EffectTraceEntry, EffectTraceTape,
     RecordingEffectHandler, ReplayEffectHandler, TopologyPerturbation,
 };
+pub use engine::{
+    EffectTraceCaptureMode, MonitorMode, ObsEvent, ObservabilityRetentionConfig,
+    ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore, ProtocolMachine,
+    ProtocolMachineConfig, ProtocolMachineError, ProtocolMachineMemoryUsage,
+    ProtocolMachineRetainedBytes, ProtocolMachineState, ResourceState,
+    RunStatus as ProtocolMachineRunStatus, RuntimeTuningProfile, SchedExecStatus, SchedStepDebug,
+    StepResult as ProtocolMachineStepResult, ThreadedRoundSemantics,
+};
+pub use engine::{FlowPolicy, FlowPredicate};
 pub use envelope_diff::{
     EffectOrderingClass, EnvelopeDiff, EnvelopeDiffArtifactV1, FailureVisibleDiffClass,
     SchedulerPermutationClass, WaveWidthBound,
@@ -237,16 +245,6 @@ pub use verification::{
     sign_value, verify_signed_value, AuthProof, AuthTree, Commitment, DefaultVerificationModel,
     Hash, HashTag, Nullifier, Signature, SigningKey, VerificationModel, VerifyingKey,
 };
-pub use engine::{
-    EffectTraceCaptureMode, MonitorMode, ObsEvent, ObservabilityRetentionConfig,
-    ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore,
-    ProtocolMachineMemoryUsage, ProtocolMachineRetainedBytes, ResourceState,
-    RunStatus as ProtocolMachineRunStatus, RuntimeTuningProfile, SchedExecStatus, SchedStepDebug,
-    StepResult as ProtocolMachineStepResult, ThreadedRoundSemantics,
-    ProtocolMachineConfig as ProtocolMachineConfig, ProtocolMachineError as ProtocolMachineError,
-    ProtocolMachineState as ProtocolMachineState, ProtocolMachine as ProtocolMachine,
-};
-pub use engine::{FlowPolicy, FlowPredicate};
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {

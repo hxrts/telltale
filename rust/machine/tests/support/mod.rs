@@ -4,12 +4,14 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use proptest::prelude::*;
-use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_machine::buffer::{BackpressurePolicy, BufferConfig, BufferMode};
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_machine::loader::CodeImage;
-use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineError, ProtocolMachineStepResult};
+use telltale_machine::{
+    ObsEvent, ProtocolMachine, ProtocolMachineError, ProtocolMachineStepResult,
+};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 /// Deterministic seed for reproducibility.
 pub const SEED: [u8; 32] = [

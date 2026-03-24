@@ -8,7 +8,6 @@ mod test_support;
 use std::collections::{BTreeMap, BTreeSet};
 
 use cfg_if::cfg_if;
-use telltale_types::{GlobalType, LocalTypeR, ValType};
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
@@ -22,6 +21,7 @@ use telltale_machine::{
     OperationPhase, OwnershipError, OwnershipScope, ProgressState, ProtocolMachine,
     ProtocolMachineConfig, PublicationStatus, SemanticAuditRecord, SessionHostMutation,
 };
+use telltale_types::{GlobalType, LocalTypeR, ValType};
 use test_support::simple_send_recv_image;
 
 cfg_if! {

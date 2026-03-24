@@ -4,13 +4,13 @@ use std::collections::BTreeMap;
 use std::env;
 use std::hint::black_box;
 
-use telltale_types::{GlobalType, Label, LocalTypeR, ValType};
 use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_machine::loader::CodeImage;
 use telltale_machine::{
     CommunicationReplayMode, Instr, ObservabilityRetentionConfig, ObservabilityRetentionMode,
     PayloadValidationMode, ProtocolMachine, ProtocolMachineConfig,
 };
+use telltale_types::{GlobalType, Label, LocalTypeR, ValType};
 
 struct ProfileHandler;
 

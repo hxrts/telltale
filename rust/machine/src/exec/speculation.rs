@@ -1,8 +1,8 @@
 //! Speculation instruction execution.
 
 use crate::coroutine::Fault;
+use crate::engine::{ProtocolMachine, StepPack};
 use crate::session::SessionId;
-use crate::engine::{StepPack, ProtocolMachine};
 
 pub(crate) fn step_fork(
     vm: &mut ProtocolMachine,

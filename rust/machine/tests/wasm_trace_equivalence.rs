@@ -5,7 +5,6 @@ use std::collections::BTreeMap;
 
 use wasm_bindgen_test::wasm_bindgen_test;
 
-use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_machine::loader::CodeImage;
@@ -13,6 +12,7 @@ use telltale_machine::trace::normalize_trace;
 use telltale_machine::wasm::WasmVM;
 use telltale_machine::ProtocolMachineSemanticObjects;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 struct NoOpHandler;
 

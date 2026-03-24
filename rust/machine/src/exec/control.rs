@@ -2,9 +2,9 @@
 
 use crate::coroutine::BlockReason;
 use crate::coroutine::{Fault, Value};
+use crate::engine::{CoroUpdate, ProtocolMachine, StepPack};
 use crate::exec::helpers::{empty_pack, write_reg_pack};
 use crate::instr::{Endpoint, ImmValue, PC};
-use crate::engine::{CoroUpdate, StepPack, ProtocolMachine};
 
 /// Execute `set`.
 #[must_use]
@@ -19,7 +19,12 @@ pub(crate) fn step_set(dst: u16, val: ImmValue) -> StepPack {
 }
 
 /// Execute `move`.
-pub(crate) fn step_move(vm: &ProtocolMachine, coro_idx: usize, dst: u16, src: u16) -> Result<StepPack, Fault> {
+pub(crate) fn step_move(
+    vm: &ProtocolMachine,
+    coro_idx: usize,
+    dst: u16,
+    src: u16,
+) -> Result<StepPack, Fault> {
     let value = vm.read_reg(coro_idx, src)?;
     Ok(write_reg_pack(dst, value))
 }

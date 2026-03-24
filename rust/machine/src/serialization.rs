@@ -3,6 +3,7 @@
 use crate::communication_replay::{CommunicationConsumptionArtifact, CommunicationReplayMode};
 use crate::determinism::EffectDeterminismTier;
 use crate::effect::{CorruptionType, EffectTraceEntry};
+use crate::engine::{ObsEvent, SessionTerminalReason};
 use crate::output_condition::OutputConditionCheck;
 use crate::semantic_objects::{
     protocol_machine_semantic_objects_v1, OperationInstance, OutstandingEffect, ProgressContract,
@@ -15,7 +16,6 @@ use crate::session::{
 use crate::trace::normalize_trace;
 use crate::transfer_semantics::{DelegationAuditRecord, DelegationReceipt, DelegationStatus};
 use crate::verification::Hash;
-use crate::engine::{ObsEvent, SessionTerminalReason};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 

@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
 
 use criterion::{black_box, BatchSize, Criterion};
-use telltale_types::ValType;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineRunStatus};
+use telltale_types::ValType;
 
 use crate::common::{
     capped_retention_config, observable_choice_config, replay_nullifier_config, replay_off_config,

@@ -1,9 +1,13 @@
 //! Session lifecycle instruction execution.
 
 use crate::coroutine::Fault;
-use crate::engine::{StepPack, ProtocolMachine};
+use crate::engine::{ProtocolMachine, StepPack};
 
-pub(crate) fn step_close(vm: &mut ProtocolMachine, coro_idx: usize, session: u16) -> Result<StepPack, Fault> {
+pub(crate) fn step_close(
+    vm: &mut ProtocolMachine,
+    coro_idx: usize,
+    session: u16,
+) -> Result<StepPack, Fault> {
     vm.step_close(coro_idx, session)
 }
 

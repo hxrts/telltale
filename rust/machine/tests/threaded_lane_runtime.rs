@@ -9,13 +9,13 @@ mod test_support;
 
 use std::collections::BTreeMap;
 
-use telltale_types::{GlobalType, LocalTypeR};
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_machine::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_machine::loader::CodeImage;
 use telltale_machine::{ContentionMetrics, ThreadedProtocolMachine};
 use telltale_machine::{ProtocolMachineConfig, ProtocolMachineStepResult, ThreadedRoundSemantics};
+use telltale_types::{GlobalType, LocalTypeR};
 use test_support::ScenarioSpec;
 
 #[derive(Debug, Clone, Copy)]

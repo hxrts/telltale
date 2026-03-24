@@ -5,8 +5,8 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::determinism::DeterminismMode;
-use crate::scheduler::SchedPolicy;
 use crate::engine::ProtocolMachineConfig;
+use crate::scheduler::SchedPolicy;
 
 /// ProtocolMachine admission result for advanced runtime mode checks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -2,9 +2,9 @@
 
 use std::collections::BTreeMap;
 
-use telltale_types::{GlobalType, LocalTypeR};
 use telltale_machine::loader::CodeImage;
 use telltale_machine::{Instr, ProtocolMachine, ProtocolMachineConfig};
+use telltale_types::{GlobalType, LocalTypeR};
 
 fn simple_single_role_image() -> CodeImage {
     let mut programs = BTreeMap::new();

@@ -13,7 +13,6 @@ mod test_support;
 use std::collections::BTreeMap;
 
 use assert_matches::assert_matches;
-use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_machine::buffer::{BackpressurePolicy, BufferConfig, BufferMode};
 use telltale_machine::coroutine::{CoroStatus, Fault, Value};
 use telltale_machine::instr::{Endpoint, ImmValue, Instr, InvokeAction};
@@ -22,6 +21,7 @@ use telltale_machine::{
     ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError,
     ProtocolMachineStepResult,
 };
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 use test_support::{FailingHandler, PassthroughHandler, RecordingHandler};
 

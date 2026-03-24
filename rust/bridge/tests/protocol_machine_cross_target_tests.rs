@@ -6,7 +6,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde::Serialize;
 use serde_json::json;
-use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{
     EffectHandler, EffectResult, RecordingEffectHandler, SendDecision, SendDecisionInput,
@@ -14,6 +13,7 @@ use telltale_machine::effect::{
 use telltale_machine::loader::CodeImage;
 use telltale_machine::ThreadedProtocolMachine;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 type NormalizedEvent = (String, String, String, String);
 type PerSessionTrace = BTreeMap<usize, Vec<NormalizedEvent>>;
@@ -325,7 +325,10 @@ fn chain_image() -> CodeImage {
 
 fn run_single_thread(
     image: &CodeImage,
-) -> (Vec<ObsEvent>, Vec<telltale_machine::effect::EffectTraceEntry>) {
+) -> (
+    Vec<ObsEvent>,
+    Vec<telltale_machine::effect::EffectTraceEntry>,
+) {
     let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(image).expect("load choreography");
     vm.run(&DeterministicHandler, 256)

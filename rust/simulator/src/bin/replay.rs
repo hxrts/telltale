@@ -2,13 +2,13 @@
 
 use std::path::PathBuf;
 
+use telltale_machine::{ProtocolMachine, ProtocolMachineStepResult};
 use telltale_simulator::fault::FaultInjector;
 use telltale_simulator::handler_from_material;
 use telltale_simulator::network::NetworkModel;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
 use telltale_simulator::rng::SimRng;
 use telltale_simulator::scenario::Scenario;
-use telltale_machine::{ProtocolMachine, ProtocolMachineStepResult};
 
 struct ReplayArgs {
     checkpoint_path: PathBuf,
@@ -67,13 +67,15 @@ fn main() {
                 .unwrap_or_else(|e| fatal(&format!("fault middleware tick: {e}")));
             net.inner()
                 .deliver(next_tick, |sid, from, to, val| {
-                    machine.inject_message(sid, from, to, val)
+                    machine
+                        .inject_message(sid, from, to, val)
                         .map_err(|e| e.to_string())
                 })
                 .unwrap_or_else(|e| fatal(&format!("fault middleware deliver: {e}")));
             net.set_tick(next_tick);
             net.deliver(next_tick, |sid, from, to, val| {
-                machine.inject_message(sid, from, to, val)
+                machine
+                    .inject_message(sid, from, to, val)
                     .map_err(|e| e.to_string())
             })
             .unwrap_or_else(|e| fatal(&format!("network middleware deliver: {e}")));
@@ -96,7 +98,8 @@ fn main() {
                 .unwrap_or_else(|e| fatal(&format!("fault middleware tick: {e}")));
             fault
                 .deliver(next_tick, |sid, from, to, val| {
-                    machine.inject_message(sid, from, to, val)
+                    machine
+                        .inject_message(sid, from, to, val)
                         .map_err(|e| e.to_string())
                 })
                 .unwrap_or_else(|e| fatal(&format!("fault middleware deliver: {e}")));

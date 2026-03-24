@@ -1,11 +1,11 @@
 #![cfg(not(target_arch = "wasm32"))]
 #![allow(missing_docs)]
 
-use telltale_types::ValType;
 use telltale_machine::coroutine::Fault;
 use telltale_machine::fault_code_of;
 use telltale_machine::instr::Endpoint;
 use telltale_machine::session::Edge;
+use telltale_types::ValType;
 
 #[test]
 fn fault_taxonomy_mapping_snapshot_is_stable() {

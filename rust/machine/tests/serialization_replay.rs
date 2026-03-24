@@ -10,7 +10,6 @@ mod test_support;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
-use telltale_types::{GlobalType, LocalTypeR};
 use telltale_machine::effect::{
     EffectFailure, EffectHandler, EffectResult, EffectTraceEntry, RecordingEffectHandler,
     SendDecision, SendDecisionInput, TopologyPerturbation,
@@ -18,6 +17,7 @@ use telltale_machine::effect::{
 use telltale_machine::trace::normalize_trace_v1;
 use telltale_machine::{CanonicalHandleKind, DelegationStatus, SemanticAuditRecord};
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
+use telltale_types::{GlobalType, LocalTypeR};
 use test_support::{simple_send_recv_image, PassthroughHandler};
 
 cfg_if! {

@@ -57,7 +57,11 @@ fn public_drivers_only_expose_owned_open_paths() {
 
 #[wasm_bindgen_test(unsupported = test)]
 fn owned_boundary_docs_do_not_recommend_raw_open_or_backend_abstractions() {
-    let forbidden_patterns = ["load_choreography(&image)", "low-level open", "ProtocolMachineBackend"];
+    let forbidden_patterns = [
+        "load_choreography(&image)",
+        "low-level open",
+        "ProtocolMachineBackend",
+    ];
     let mut violations = Vec::new();
 
     for (path, src) in DOC_SOURCES {

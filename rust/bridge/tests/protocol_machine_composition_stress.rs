@@ -8,12 +8,12 @@
 use cfg_if::cfg_if;
 use std::time::Instant;
 
-use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{EffectHandler, EffectResult};
 use telltale_machine::loader::CodeImage;
 use telltale_machine::{ContentionMetrics, ThreadedProtocolMachine};
 use telltale_machine::{ProtocolMachineConfig, ProtocolMachineStepResult, ThreadedRoundSemantics};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 #[derive(Debug, Clone, Copy)]
 struct StressHandler;

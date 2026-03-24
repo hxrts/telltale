@@ -27,6 +27,8 @@ pub enum ValidationError {
     #[error("Required proof bundle is not declared: {0}")]
     MissingProofBundle(String),
 
-    #[error("ProtocolMachine-core operation requires capability not covered by required bundles: {0}")]
+    #[error(
+        "ProtocolMachine-core operation requires capability not covered by required bundles: {0}"
+    )]
     MissingCapability(String),
 }

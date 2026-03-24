@@ -2,13 +2,13 @@
 
 use std::collections::BTreeMap;
 
-use telltale_simulator::distributed::DistributedSimBuilder;
-use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{EffectHandler, EffectResult};
 use telltale_machine::loader::CodeImage;
 use telltale_machine::trace::normalize_trace as normalize_ticks;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
+use telltale_simulator::distributed::DistributedSimBuilder;
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 struct NoOpHandler;
 
@@ -264,7 +264,8 @@ fn test_nested_matches_flat_per_site() {
     let sid_b = flat.load_choreography(&inner_image).expect("load B");
 
     let handler = NoOpHandler;
-    flat.run_concurrent(&handler, 50, 1).expect("run flat machine");
+    flat.run_concurrent(&handler, 50, 1)
+        .expect("run flat machine");
 
     let flat_a = per_session(flat.trace(), sid_a);
     let flat_b = per_session(flat.trace(), sid_b);

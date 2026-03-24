@@ -29,6 +29,11 @@ use crate::effect::{
     EffectHandler, EffectOutcome, EffectRequest, EffectResponse, EffectResult, EffectTraceEntry,
     ReplayEffectHandler, SendDecision, TopologyPerturbation,
 };
+use crate::engine::{
+    runtime_value_matches_val_type, runtime_value_val_type, runtime_value_wire_size_bytes,
+    EffectTraceCaptureMode, MonitorMode, ObsEvent, ProgramStore, ProtocolMachineConfig,
+    ProtocolMachineError, ResourceState, RunStatus, SiteId, StepResult, ThreadedRoundSemantics,
+};
 use crate::faults::{
     speculation_fault_abort_requires_active, speculation_fault_disabled,
     speculation_fault_join_requires_active, transfer_fault_delegation_guard_violation,
@@ -59,11 +64,6 @@ use crate::session::{
 use crate::transfer_semantics::{
     decode_transfer_request, delegation_receipt, move_endpoint_bundle,
     validate_delegation_coherence, DelegationAuditRecord, DelegationReceipt, DelegationStatus,
-};
-use crate::engine::{
-    runtime_value_matches_val_type, runtime_value_val_type, runtime_value_wire_size_bytes,
-    EffectTraceCaptureMode, MonitorMode, ObsEvent, ProgramStore, ResourceState, RunStatus, SiteId,
-    StepResult, ThreadedRoundSemantics, ProtocolMachineConfig, ProtocolMachineError,
 };
 
 // Lane identifier in the threaded runtime.

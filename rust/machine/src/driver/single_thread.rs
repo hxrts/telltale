@@ -1,10 +1,12 @@
 //! Native single-thread guest-runtime driver.
 
 use crate::effect::EffectHandler;
+use crate::engine::{
+    ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError, RunStatus, StepResult,
+};
 use crate::kernel::ProtocolMachineKernel;
 use crate::loader::CodeImage;
 use crate::owned::OwnedSession;
-use crate::engine::{ObsEvent, RunStatus, StepResult, ProtocolMachineConfig, ProtocolMachineError, ProtocolMachine};
 
 /// Native cooperative guest runtime backed by the canonical protocol machine.
 #[doc(alias = "GuestRuntime")]

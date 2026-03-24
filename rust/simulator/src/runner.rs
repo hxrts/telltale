@@ -6,7 +6,6 @@
 use std::collections::BTreeMap;
 use telltale_types::FixedQ32;
 
-use telltale_types::{GlobalType, LocalTypeR};
 use telltale_machine::effect::{EffectHandler, EffectTraceEntry};
 use telltale_machine::loader::CodeImage;
 use telltale_machine::output_condition::OutputConditionCheck;
@@ -15,6 +14,7 @@ use telltale_machine::{
     ProtocolMachine, ProtocolMachineConfig, ProtocolMachineSemanticObjects,
     ProtocolMachineStepResult, SemanticAuditRecord,
 };
+use telltale_types::{GlobalType, LocalTypeR};
 
 use crate::checkpoint::CheckpointStore;
 use crate::fault::FaultInjector;

@@ -10,13 +10,13 @@ use std::sync::Arc;
 
 use crate::determinism::DeterminismMode;
 use crate::effect::EffectHandler;
+use crate::engine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 use crate::loader::CodeImage;
 use crate::output_condition::OutputConditionPolicy;
 use crate::runtime_contracts::{
     enforce_protocol_machine_runtime_gates, RuntimeContracts, RuntimeGateResult,
 };
 use crate::scheduler::SchedPolicy;
-use crate::engine::{ProtocolMachineConfig, ProtocolMachineError, ProtocolMachine};
 
 /// Determinism capability required to admit a protocol bundle.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -465,7 +465,8 @@ mod tests {
 
     #[test]
     fn proof_carrying_admission_rejects_missing_link_ok_full() {
-        let mut runtime = ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+        let mut runtime =
+            ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
         let bad = ProtocolBundle::new(
             image("m"),
             CompositionCertificate {
@@ -484,7 +485,8 @@ mod tests {
     #[test]
     fn immutable_code_artifacts_are_arc_shared() {
         let shared = image("m");
-        let mut runtime = ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+        let mut runtime =
+            ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
         let b1 = ProtocolBundle::new(
             Arc::clone(&shared),
             CompositionCertificate {
@@ -513,7 +515,8 @@ mod tests {
 
     #[test]
     fn composed_execution_runs_and_usage_grows_monotonically() {
-        let mut runtime = ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+        let mut runtime =
+            ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
         let b = ProtocolBundle::new(
             image("m"),
             CompositionCertificate {

@@ -367,7 +367,9 @@ fn scan_style(file: &Path, source: &str, syntax: &File) -> Vec<String> {
     let mut violations = Vec::new();
 
     if !is_test_like_path(&path) {
-        if path.starts_with("rust/machine/src/") && !path.ends_with("rust/machine/src/serialization.rs") {
+        if path.starts_with("rust/machine/src/")
+            && !path.ends_with("rust/machine/src/serialization.rs")
+        {
             violations.extend(scan_canonical_bincode(file, syntax));
         }
 

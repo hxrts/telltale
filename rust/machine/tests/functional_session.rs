@@ -9,7 +9,6 @@ mod test_support;
 use std::collections::BTreeMap;
 
 use assert_matches::assert_matches;
-use telltale_types::{Label, LocalTypeR};
 use telltale_machine::buffer::{
     BackpressurePolicy, BoundedBuffer, BufferConfig, BufferMode, EnqueueResult,
 };
@@ -20,6 +19,7 @@ use telltale_machine::{
     ObservabilityRetentionConfig, ObservabilityRetentionMode, ProtocolMachine,
     ProtocolMachineConfig,
 };
+use telltale_types::{Label, LocalTypeR};
 
 use test_support::PassthroughHandler;
 

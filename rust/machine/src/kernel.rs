@@ -6,8 +6,8 @@
 //! stepping logic.
 
 use crate::effect::EffectHandler;
+use crate::engine::{ProtocolMachineError, RunStatus, StepResult};
 use crate::scheduler::Scheduler;
-use crate::engine::{RunStatus, StepResult, ProtocolMachineError};
 
 /// Runtime machine that can execute one kernel scheduler round.
 pub trait KernelMachine {

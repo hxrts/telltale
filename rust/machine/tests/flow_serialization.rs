@@ -147,7 +147,10 @@ fn named_strict_profiles_encode_explicit_runtime_modes() {
     let observable = ProtocolMachineConfig::strict_observable();
     let verified = ProtocolMachineConfig::strict_verified();
 
-    assert_eq!(minimal.determinism_mode, telltale_machine::DeterminismMode::Full);
+    assert_eq!(
+        minimal.determinism_mode,
+        telltale_machine::DeterminismMode::Full
+    );
     assert_eq!(
         minimal.threaded_round_semantics,
         telltale_machine::ThreadedRoundSemantics::CanonicalOneStep

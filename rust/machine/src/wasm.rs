@@ -10,9 +10,9 @@ use telltale_types::{GlobalType, LocalTypeR};
 use crate::coroutine::Value;
 use crate::driver::WasmCooperativeDriver;
 use crate::effect::{EffectFailure, EffectHandler, EffectResult};
+use crate::engine::{ObsEvent, ProtocolMachineConfig, RunStatus, StepResult};
 use crate::loader::CodeImage;
 use crate::trace::{normalize_trace, strict_trace};
-use crate::engine::{ObsEvent, RunStatus, StepResult, ProtocolMachineConfig};
 
 #[derive(Debug, Deserialize)]
 struct WasmChoreoSpec {

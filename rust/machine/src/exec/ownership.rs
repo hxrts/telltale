@@ -1,8 +1,8 @@
 //! Ownership/knowledge instruction execution.
 
 use crate::coroutine::Fault;
+use crate::engine::{ProtocolMachine, StepPack};
 use crate::session::SessionId;
-use crate::engine::{StepPack, ProtocolMachine};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn step_transfer(

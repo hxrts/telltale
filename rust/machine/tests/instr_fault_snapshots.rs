@@ -2,11 +2,11 @@
 //! Fault-shape snapshots for instruction families.
 
 use std::collections::BTreeMap;
-use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_machine::coroutine::Fault;
 use telltale_machine::instr::{ImmValue, Instr};
 use telltale_machine::loader::CodeImage;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 #[allow(dead_code, unreachable_pub)]
 #[path = "support/mod.rs"]

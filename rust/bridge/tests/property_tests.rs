@@ -7,12 +7,12 @@ use telltale_bridge::{
     export_protocol_bundle, InvariantClaims, ProtocolMachineRunner, ProtocolMachineRunnerError,
     ProtocolMachineTraceEvent, SchedulerKind,
 };
-use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_machine::coroutine::Value;
 use telltale_machine::effect::{EffectHandler, SendDecision, SendDecisionInput};
 use telltale_machine::loader::CodeImage;
 use telltale_machine::ObsEvent;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 #[derive(Clone, Debug)]
 struct GeneratedProtocol {
@@ -224,7 +224,11 @@ impl EffectHandler for PropertyHandler {
         )
     }
 
-    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> telltale_machine::effect::EffectResult<()> {
+    fn step(
+        &self,
+        _role: &str,
+        _state: &mut Vec<Value>,
+    ) -> telltale_machine::effect::EffectResult<()> {
         telltale_machine::effect::EffectResult::success(())
     }
 }
@@ -293,8 +297,12 @@ fn run_rust_semantic_audit(
 ) -> Result<Vec<ProtocolMachineTraceEvent>, String> {
     let image = CodeImage::from_local_types(&protocol.local_types, &protocol.global);
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
-    machine.load_choreography(&image).map_err(|e| e.to_string())?;
-    machine.run(&PropertyHandler, 128).map_err(|e| e.to_string())?;
+    machine
+        .load_choreography(&image)
+        .map_err(|e| e.to_string())?;
+    machine
+        .run(&PropertyHandler, 128)
+        .map_err(|e| e.to_string())?;
     Ok(machine
         .trace()
         .iter()

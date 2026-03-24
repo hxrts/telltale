@@ -2,9 +2,9 @@
 
 use crate::coroutine::Fault;
 use crate::effect::EffectHandler;
+use crate::engine::{ProtocolMachine, StepPack};
 use crate::instr::{Endpoint, Instr};
 use crate::session::SessionId;
-use crate::engine::{StepPack, ProtocolMachine};
 
 pub(crate) mod comm;
 pub(crate) mod control;
