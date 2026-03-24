@@ -1,4 +1,4 @@
-impl VM {
+impl ProtocolMachine {
     fn recv_choose_payload(
         &mut self,
         ep: &Endpoint,

@@ -27,13 +27,13 @@ pub struct EngineOwnership {
     pub trace_semantics_owner: &'static str,
 }
 
-/// Canonical semantic owner for VM execution.
-pub const CANONICAL_ENGINE: &str = "VMKernel";
+/// Canonical semantic owner for ProtocolMachine execution.
+pub const CANONICAL_ENGINE: &str = "ProtocolMachineKernel";
 
 /// Cross-target semantic contract.
 ///
 /// Native single-threaded, native threaded, and wasm cooperative runtimes
-/// must agree on canonical VM observables, modulo effect-policy differences.
+/// must agree on canonical ProtocolMachine observables, modulo effect-policy differences.
 pub const CROSS_TARGET_CONTRACT: &str =
     "NativeThreaded ~= NativeSingleThreaded ~= WasmCooperative (modulo effects)";
 
@@ -44,35 +44,35 @@ pub const EQUIVALENCE_SURFACES: &[&str] = &[
     "effect_trace",
 ];
 
-/// Declared runtime ownership for all VM execution surfaces.
+/// Declared runtime ownership for all ProtocolMachine execution surfaces.
 pub const ENGINE_OWNERSHIP: &[EngineOwnership] = &[
     EngineOwnership {
-        engine: "VMKernel",
+        engine: "ProtocolMachineKernel",
         role: EngineRole::Canonical,
-        instruction_semantics_owner: "VMKernel + exec::*",
-        scheduler_policy_owner: "VMKernel + scheduler::Scheduler",
-        trace_semantics_owner: "VMKernel commit path",
+        instruction_semantics_owner: "ProtocolMachineKernel + exec::*",
+        scheduler_policy_owner: "ProtocolMachineKernel + scheduler::Scheduler",
+        trace_semantics_owner: "ProtocolMachineKernel commit path",
     },
     EngineOwnership {
-        engine: "VM",
+        engine: "ProtocolMachine",
         role: EngineRole::AdapterOnly,
-        instruction_semantics_owner: "VMKernel + exec::*",
-        scheduler_policy_owner: "VMKernel + scheduler::Scheduler",
-        trace_semantics_owner: "VMKernel commit path",
+        instruction_semantics_owner: "ProtocolMachineKernel + exec::*",
+        scheduler_policy_owner: "ProtocolMachineKernel + scheduler::Scheduler",
+        trace_semantics_owner: "ProtocolMachineKernel commit path",
     },
     EngineOwnership {
-        engine: "ThreadedVM",
+        engine: "ThreadedProtocolMachine",
         role: EngineRole::AdapterOnly,
-        instruction_semantics_owner: "VMKernel + exec::*",
-        scheduler_policy_owner: "VMKernel + scheduler::Scheduler",
-        trace_semantics_owner: "VMKernel commit path",
+        instruction_semantics_owner: "ProtocolMachineKernel + exec::*",
+        scheduler_policy_owner: "ProtocolMachineKernel + scheduler::Scheduler",
+        trace_semantics_owner: "ProtocolMachineKernel commit path",
     },
     EngineOwnership {
         engine: "WasmCooperativeDriver",
         role: EngineRole::AdapterOnly,
-        instruction_semantics_owner: "VMKernel + exec::*",
-        scheduler_policy_owner: "VMKernel + scheduler::Scheduler",
-        trace_semantics_owner: "VMKernel commit path",
+        instruction_semantics_owner: "ProtocolMachineKernel + exec::*",
+        scheduler_policy_owner: "ProtocolMachineKernel + scheduler::Scheduler",
+        trace_semantics_owner: "ProtocolMachineKernel commit path",
     },
 ];
 

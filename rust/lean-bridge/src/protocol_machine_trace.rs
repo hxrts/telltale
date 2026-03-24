@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 
-/// Normalized event for cross-VM comparison.
+/// Normalized event for cross-ProtocolMachine comparison.
 /// Drops absolute session IDs (may differ), normalizes to session index.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NormalizedEvent {

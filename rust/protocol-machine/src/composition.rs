@@ -1,4 +1,4 @@
-//! Protocol composition API for running many protocols in one VM instance.
+//! Protocol composition API for running many protocols in one ProtocolMachine instance.
 //!
 //! This layer provides:
 //! - proof-carrying admission (`LinkOKFull`-style certificate flag),
@@ -16,7 +16,7 @@ use crate::runtime_contracts::{
     enforce_protocol_machine_runtime_gates, RuntimeContracts, RuntimeGateResult,
 };
 use crate::scheduler::SchedPolicy;
-use crate::vm::{VMConfig, VMError, VM};
+use crate::engine::{ProtocolMachineConfig, ProtocolMachineError, ProtocolMachine};
 
 /// Determinism capability required to admit a protocol bundle.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -163,7 +163,7 @@ pub enum CompositionError {
         capability: String,
     },
     /// Advanced runtime mode requires runtime contract evidence.
-    #[error("bundle `{artifact_id}` rejected: missing VM runtime contracts for advanced mode")]
+    #[error("bundle `{artifact_id}` rejected: missing ProtocolMachine runtime contracts for advanced mode")]
     MissingRuntimeContracts {
         /// Certificate artifact id that failed admission.
         artifact_id: String,
@@ -176,15 +176,15 @@ pub enum CompositionError {
         /// Human-readable budget reason.
         reason: String,
     },
-    /// VM-layer load/run failure.
+    /// ProtocolMachine-layer load/run failure.
     #[error(transparent)]
-    Vm(#[from] VMError),
+    Vm(#[from] ProtocolMachineError),
 }
 
 /// Runtime wrapper for composed protocol execution.
 #[derive(Debug)]
 pub struct ComposedRuntime {
-    vm: VM,
+    vm: ProtocolMachine,
     bundles: Vec<ProtocolBundle>,
     budget: MemoryBudget,
     usage: MemoryUsage,
@@ -193,8 +193,8 @@ pub struct ComposedRuntime {
 impl ComposedRuntime {
     /// Create an empty composed runtime.
     #[must_use]
-    pub fn new(config: VMConfig, budget: MemoryBudget) -> Self {
-        let vm = VM::new(config);
+    pub fn new(config: ProtocolMachineConfig, budget: MemoryBudget) -> Self {
+        let vm = ProtocolMachine::new(config);
         Self {
             vm,
             bundles: Vec::new(),
@@ -239,7 +239,7 @@ impl ComposedRuntime {
     ///
     /// # Errors
     ///
-    /// Returns a `CompositionError` when index is invalid or VM loading fails.
+    /// Returns a `CompositionError` when index is invalid or ProtocolMachine loading fails.
     pub fn load_bundle_session(&mut self, bundle_idx: usize) -> Result<usize, CompositionError> {
         let bundle =
             self.bundles
@@ -276,7 +276,7 @@ impl ComposedRuntime {
     ///
     /// # Errors
     ///
-    /// Returns VM-layer errors as composition errors.
+    /// Returns ProtocolMachine-layer errors as composition errors.
     pub fn run(
         &mut self,
         handler: &dyn EffectHandler,
@@ -299,9 +299,9 @@ impl ComposedRuntime {
         &self.bundles
     }
 
-    /// Access underlying VM.
+    /// Access underlying ProtocolMachine.
     #[must_use]
-    pub fn vm(&self) -> &VM {
+    pub fn vm(&self) -> &ProtocolMachine {
         &self.vm
     }
 
@@ -465,7 +465,7 @@ mod tests {
 
     #[test]
     fn proof_carrying_admission_rejects_missing_link_ok_full() {
-        let mut runtime = ComposedRuntime::new(VMConfig::default(), MemoryBudget::default());
+        let mut runtime = ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
         let bad = ProtocolBundle::new(
             image("m"),
             CompositionCertificate {
@@ -484,7 +484,7 @@ mod tests {
     #[test]
     fn immutable_code_artifacts_are_arc_shared() {
         let shared = image("m");
-        let mut runtime = ComposedRuntime::new(VMConfig::default(), MemoryBudget::default());
+        let mut runtime = ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
         let b1 = ProtocolBundle::new(
             Arc::clone(&shared),
             CompositionCertificate {
@@ -513,7 +513,7 @@ mod tests {
 
     #[test]
     fn composed_execution_runs_and_usage_grows_monotonically() {
-        let mut runtime = ComposedRuntime::new(VMConfig::default(), MemoryBudget::default());
+        let mut runtime = ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
         let b = ProtocolBundle::new(
             image("m"),
             CompositionCertificate {
@@ -538,9 +538,9 @@ mod tests {
 
     #[test]
     fn admission_rejects_missing_scheduler_profile_capability() {
-        let cfg = VMConfig {
+        let cfg = ProtocolMachineConfig {
             sched_policy: SchedPolicy::ProgressAware,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         };
         let mut runtime = ComposedRuntime::new(cfg, MemoryBudget::default());
         let bundle = ProtocolBundle::new(
@@ -569,9 +569,9 @@ mod tests {
 
     #[test]
     fn admission_rejects_missing_determinism_capability() {
-        let cfg = VMConfig {
+        let cfg = ProtocolMachineConfig {
             determinism_mode: DeterminismMode::ModuloCommutativity,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         };
         let mut runtime = ComposedRuntime::new(cfg, MemoryBudget::default());
         let bundle = ProtocolBundle::new(
@@ -600,9 +600,9 @@ mod tests {
 
     #[test]
     fn admission_rejects_missing_output_condition_capability() {
-        let cfg = VMConfig {
+        let cfg = ProtocolMachineConfig {
             output_condition_policy: OutputConditionPolicy::AllowAll,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         };
         let mut runtime = ComposedRuntime::new(cfg, MemoryBudget::default());
         let bundle = ProtocolBundle::new(
@@ -631,13 +631,13 @@ mod tests {
 
     #[test]
     fn admission_accepts_when_required_capabilities_present() {
-        let cfg = VMConfig {
+        let cfg = ProtocolMachineConfig {
             sched_policy: SchedPolicy::RoundRobin,
             determinism_mode: DeterminismMode::ModuloEffects,
             output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
                 "vm.observable_output".to_string(),
             ]),
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         };
         let mut runtime = ComposedRuntime::new(cfg, MemoryBudget::default());
         let bundle = ProtocolBundle::new(
@@ -656,7 +656,7 @@ mod tests {
 
     #[test]
     fn admission_accepts_minimal_required_capabilities_without_full_parity() {
-        let cfg = VMConfig::default();
+        let cfg = ProtocolMachineConfig::default();
         let mut runtime = ComposedRuntime::new(cfg, MemoryBudget::default());
         let bundle = ProtocolBundle::new(
             image("m"),
@@ -678,9 +678,9 @@ mod tests {
 
     #[test]
     fn admission_rejects_advanced_mode_without_runtime_contracts() {
-        let cfg = VMConfig {
+        let cfg = ProtocolMachineConfig {
             sched_policy: SchedPolicy::RoundRobin,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         };
         let mut runtime = ComposedRuntime::new(cfg, MemoryBudget::default());
         let bundle = ProtocolBundle::new(
@@ -703,9 +703,9 @@ mod tests {
 
     #[test]
     fn admission_rejects_replay_profile_without_mixed_profile_gate() {
-        let cfg = VMConfig {
+        let cfg = ProtocolMachineConfig {
             determinism_mode: DeterminismMode::Replay,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         };
         let mut runtime = ComposedRuntime::new(cfg, MemoryBudget::default());
         let mut contracts = RuntimeContracts::full();
@@ -731,9 +731,9 @@ mod tests {
 
     #[test]
     fn admission_accepts_replay_profile_with_contracts_and_capability() {
-        let cfg = VMConfig {
+        let cfg = ProtocolMachineConfig {
             determinism_mode: DeterminismMode::Replay,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         };
         let mut runtime = ComposedRuntime::new(cfg, MemoryBudget::default());
         let bundle = ProtocolBundle::new(

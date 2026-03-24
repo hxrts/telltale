@@ -943,7 +943,7 @@ pub struct SendDecisionInput<'a> {
 }
 
 
-/// Typed failure kinds at the VM effect boundary.
+/// Typed failure kinds at the ProtocolMachine effect boundary.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum EffectFailureKind {
@@ -1059,7 +1059,7 @@ impl core::fmt::Display for EffectFailure {
 
 impl std::error::Error for EffectFailure {}
 
-/// Typed outcome for one VM effect callback.
+/// Typed outcome for one ProtocolMachine effect callback.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum EffectResult<T> {
     /// Callback completed successfully and produced a value.

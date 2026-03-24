@@ -2,11 +2,11 @@
 
 use crate::coroutine::Fault;
 use crate::session::SessionId;
-use crate::vm::{StepPack, VM};
+use crate::engine::{StepPack, ProtocolMachine};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn step_transfer(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     sid: SessionId,
@@ -18,7 +18,7 @@ pub(crate) fn step_transfer(
 }
 
 pub(crate) fn step_tag(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     sid: SessionId,
@@ -30,7 +30,7 @@ pub(crate) fn step_tag(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn step_check(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     sid: SessionId,

@@ -1,19 +1,19 @@
-impl VM {
+impl ProtocolMachine {
     /// Execute one scheduler round: advance at most one ready coroutine.
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if a coroutine faults.
+    /// Returns a `ProtocolMachineError` if a coroutine faults.
     #[allow(clippy::too_many_lines)]
     pub(crate) fn kernel_step_round(
         &mut self,
         handler: &dyn EffectHandler,
         n: usize,
-    ) -> Result<StepResult, VMError> {
+    ) -> Result<StepResult, ProtocolMachineError> {
         #[cfg(debug_assertions)]
         debug_assert!(self.wf_vm_state().is_ok());
         if n == 0 {
-            return Err(VMError::InvalidConcurrency { n });
+            return Err(ProtocolMachineError::InvalidConcurrency { n });
         }
         self.last_sched_step = None;
         self.clock.advance();
@@ -100,7 +100,7 @@ impl VM {
                     exec_status: SchedExecStatus::Faulted,
                 });
                 let Some(idx) = self.coro_index(coro_id) else {
-                    return Err(VMError::Fault { coro_id, fault });
+                    return Err(ProtocolMachineError::Fault { coro_id, fault });
                 };
                 let session = self.coroutines[idx].session_id;
                 self.obs_trace.push(
@@ -124,7 +124,7 @@ impl VM {
                 self.sched.mark_done(coro_id);
                 #[cfg(debug_assertions)]
                 self.eligible_ready.remove(&coro_id);
-                return Err(VMError::Fault { coro_id, fault });
+                return Err(ProtocolMachineError::Fault { coro_id, fault });
             }
         }
 
@@ -149,8 +149,8 @@ impl VM {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if a coroutine faults.
-    pub fn step(&mut self, handler: &dyn EffectHandler) -> Result<StepResult, VMError> {
+    /// Returns a `ProtocolMachineError` if a coroutine faults.
+    pub fn step(&mut self, handler: &dyn EffectHandler) -> Result<StepResult, ProtocolMachineError> {
         self.step_round(handler, 1)
     }
 
@@ -158,44 +158,44 @@ impl VM {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if a coroutine faults.
+    /// Returns a `ProtocolMachineError` if a coroutine faults.
     pub fn step_round(
         &mut self,
         handler: &dyn EffectHandler,
         n: usize,
-    ) -> Result<StepResult, VMError> {
-        VMKernel::step_round(self, handler, n)
+    ) -> Result<StepResult, ProtocolMachineError> {
+        ProtocolMachineKernel::step_round(self, handler, n)
     }
 
-    /// Run the VM until all coroutines complete or an error occurs, with concurrency N.
+    /// Run the ProtocolMachine until all coroutines complete or an error occurs, with concurrency N.
     ///
     /// `max_rounds` prevents infinite loops.
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if any coroutine faults.
+    /// Returns a `ProtocolMachineError` if any coroutine faults.
     pub fn run_concurrent(
         &mut self,
         handler: &dyn EffectHandler,
         max_rounds: usize,
         concurrency: usize,
-    ) -> Result<RunStatus, VMError> {
-        VMKernel::run_concurrent(self, handler, max_rounds, concurrency)
+    ) -> Result<RunStatus, ProtocolMachineError> {
+        ProtocolMachineKernel::run_concurrent(self, handler, max_rounds, concurrency)
     }
 
-    /// Run the VM until all coroutines complete or an error occurs.
+    /// Run the ProtocolMachine until all coroutines complete or an error occurs.
     ///
     /// `max_steps` prevents infinite loops.
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if any coroutine faults.
+    /// Returns a `ProtocolMachineError` if any coroutine faults.
     pub fn run(
         &mut self,
         handler: &dyn EffectHandler,
         max_steps: usize,
-    ) -> Result<RunStatus, VMError> {
-        VMKernel::run(self, handler, max_steps)
+    ) -> Result<RunStatus, ProtocolMachineError> {
+        ProtocolMachineKernel::run(self, handler, max_steps)
     }
 
     /// Run with replayed effect outcomes captured from a prior execution.
@@ -205,13 +205,13 @@ impl VM {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if replay data is exhausted/mismatched or a coroutine faults.
+    /// Returns a `ProtocolMachineError` if replay data is exhausted/mismatched or a coroutine faults.
     pub fn run_replay(
         &mut self,
         fallback: &dyn EffectHandler,
         replay_trace: &[EffectTraceEntry],
         max_steps: usize,
-    ) -> Result<RunStatus, VMError> {
+    ) -> Result<RunStatus, ProtocolMachineError> {
         self.run_replay_shared(
             fallback,
             Arc::<[EffectTraceEntry]>::from(replay_trace),
@@ -226,13 +226,13 @@ impl VM {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if replay data is exhausted/mismatched or a coroutine faults.
+    /// Returns a `ProtocolMachineError` if replay data is exhausted/mismatched or a coroutine faults.
     pub fn run_replay_shared(
         &mut self,
         fallback: &dyn EffectHandler,
         replay_trace: Arc<[EffectTraceEntry]>,
         max_steps: usize,
-    ) -> Result<RunStatus, VMError> {
+    ) -> Result<RunStatus, ProtocolMachineError> {
         let replay = ReplayEffectHandler::with_fallback(replay_trace, fallback);
         self.run(&replay, max_steps)
     }
@@ -241,14 +241,14 @@ impl VM {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if replay data is exhausted/mismatched or a coroutine faults.
+    /// Returns a `ProtocolMachineError` if replay data is exhausted/mismatched or a coroutine faults.
     pub fn run_concurrent_replay(
         &mut self,
         fallback: &dyn EffectHandler,
         replay_trace: &[EffectTraceEntry],
         max_rounds: usize,
         concurrency: usize,
-    ) -> Result<RunStatus, VMError> {
+    ) -> Result<RunStatus, ProtocolMachineError> {
         self.run_concurrent_replay_shared(
             fallback,
             Arc::<[EffectTraceEntry]>::from(replay_trace),
@@ -261,14 +261,14 @@ impl VM {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if replay data is exhausted/mismatched or a coroutine faults.
+    /// Returns a `ProtocolMachineError` if replay data is exhausted/mismatched or a coroutine faults.
     pub fn run_concurrent_replay_shared(
         &mut self,
         fallback: &dyn EffectHandler,
         replay_trace: Arc<[EffectTraceEntry]>,
         max_rounds: usize,
         concurrency: usize,
-    ) -> Result<RunStatus, VMError> {
+    ) -> Result<RunStatus, ProtocolMachineError> {
         let replay = ReplayEffectHandler::with_fallback(replay_trace, fallback);
         self.run_concurrent(&replay, max_rounds, concurrency)
     }
@@ -338,9 +338,9 @@ impl VM {
         self.edge_symbols.len()
     }
 
-    /// Access VM configuration.
+    /// Access ProtocolMachine configuration.
     #[must_use]
-    pub fn config(&self) -> &VMConfig {
+    pub fn config(&self) -> &ProtocolMachineConfig {
         &self.config
     }
 
@@ -356,7 +356,7 @@ impl VM {
         self.sched.step_count()
     }
 
-    /// Number of coroutine records in the VM.
+    /// Number of coroutine records in the ProtocolMachine.
     #[must_use]
     pub fn coroutine_count(&self) -> usize {
         self.coroutines.len()
@@ -368,13 +368,13 @@ impl VM {
         self.sessions.next_session_id()
     }
 
-    /// Number of active sessions in the VM.
+    /// Number of active sessions in the ProtocolMachine.
     #[must_use]
     pub fn session_count(&self) -> usize {
         self.sessions.active_count()
     }
 
-    /// Number of sessions still resident in the VM, including closed ones.
+    /// Number of sessions still resident in the ProtocolMachine, including closed ones.
     #[must_use]
     pub fn live_session_count(&self) -> usize {
         self.sessions.live_count()

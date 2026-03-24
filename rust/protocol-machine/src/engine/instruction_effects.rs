@@ -7,7 +7,7 @@ struct RecvTypePlan {
     continuation: LocalTypeR,
 }
 
-impl VM {
+impl ProtocolMachine {
     fn recv_type_plan(
         &self,
         coro_idx: usize,

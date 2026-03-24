@@ -77,7 +77,7 @@ fn step_send(
     ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
     let prepared = {
-        let session_guard = session.lock().expect("threaded VM lock poisoned");
+        let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
         step_send_prepare(coro, &session_guard, role, chan)?
     };
 
@@ -142,16 +142,16 @@ fn step_send(
                 let mut model = ctx
                     .communication_consumption
                     .lock()
-                    .expect("threaded VM lock poisoned");
+                    .expect("threaded ProtocolMachine lock poisoned");
                 model.set_mode(ctx.config.communication_replay_mode);
                 model.allocate_send_sequence(&edge)
             };
             let payload = if let Some(corruption) = maybe_corruption {
-                ThreadedVM::apply_corruption(payload, corruption)
+                ThreadedProtocolMachine::apply_corruption(payload, corruption)
             } else {
                 payload
             };
-            let mut session_guard = session.lock().expect("threaded VM lock poisoned");
+            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             session_guard
                 .send_with_sequence(role, &prepared.partner, payload, sequence_no)
                 .map_err(|e| Fault::Invoke {
@@ -299,7 +299,7 @@ fn consume_receive_replay_identity(
         let mut model = ctx
             .communication_consumption
             .lock()
-            .expect("threaded VM lock poisoned");
+            .expect("threaded ProtocolMachine lock poisoned");
         model.set_mode(ctx.config.communication_replay_mode);
         model.consume_receive(&identity)
     }
@@ -318,7 +318,7 @@ fn consume_receive_replay_identity(
     })?;
     ctx.communication_consumption_artifacts
         .lock()
-        .expect("threaded VM lock poisoned")
+        .expect("threaded ProtocolMachine lock poisoned")
         .push(CommunicationConsumptionArtifact {
             tick: ctx.tick,
             identity,
@@ -338,7 +338,7 @@ fn step_recv(
     ctx: &ThreadedStepCtx<'_>,
 ) -> Result<StepPack, Fault> {
     let (prepared, edge, val, sequence_no) = {
-        let mut session_guard = session.lock().expect("threaded VM lock poisoned");
+        let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
         let prepared = step_recv_prepare(coro, &session_guard, role, chan)?;
         if !session_guard.has_message(&prepared.partner, role) {
             return Ok(blocked_recv_pack(&prepared, role));

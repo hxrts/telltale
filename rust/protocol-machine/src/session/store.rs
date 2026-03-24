@@ -33,7 +33,7 @@ impl<'de> Deserialize<'de> for SessionState {
     }
 }
 
-/// Store of all sessions managed by the VM.
+/// Store of all sessions managed by the ProtocolMachine.
 ///
 /// Provides type lookup/update methods that match the Lean
 /// `SessionStore.lookupType` / `SessionStore.updateType` pattern.

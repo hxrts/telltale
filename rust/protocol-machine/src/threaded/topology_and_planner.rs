@@ -1,4 +1,4 @@
-impl ThreadedVM {
+impl ThreadedProtocolMachine {
     /// Partitioned site-links currently active in topology state.
     #[must_use]
     pub fn partitioned_edges(&self) -> &BTreeSet<(String, String)> {
@@ -147,10 +147,10 @@ impl ThreadedVM {
             .sessions
             .sessions
             .read()
-            .expect("threaded VM lock poisoned");
+            .expect("threaded ProtocolMachine lock poisoned");
         let mut faulted_sessions = Vec::new();
         for session in sessions.values() {
-            let mut session_guard = session.lock().expect("threaded VM lock poisoned");
+            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             if !session_guard.roles.iter().any(|role| role == site) {
                 continue;
             }
@@ -173,7 +173,7 @@ impl ThreadedVM {
         let mut faulted = Vec::new();
         let mut newly_terminal = 0_usize;
         for coro in &self.coroutines {
-            let mut guard = coro.lock().expect("threaded VM lock poisoned");
+            let mut guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
             if guard.role == site && !guard.is_terminal() {
                 let fault = Fault::Invoke {
                     failure: EffectFailure::topology_disruption(reason.clone()),
@@ -267,7 +267,7 @@ impl ThreadedVM {
         }
     }
 
-    fn enforce_handler_identity_contract(&mut self, handler_identity: &str) -> Result<(), VMError> {
+    fn enforce_handler_identity_contract(&mut self, handler_identity: &str) -> Result<(), ProtocolMachineError> {
         if !self.config.host_contract_assertions {
             return Ok(());
         }
@@ -277,7 +277,7 @@ impl ThreadedVM {
                 Ok(())
             }
             Some(anchor) if anchor == handler_identity => Ok(()),
-            Some(anchor) => Err(VMError::HandlerError(EffectFailure::contract_violation(
+            Some(anchor) => Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
                 format!(
                     "[host-contract] handler_identity changed from '{anchor}' to '{handler_identity}'"
                 ),
@@ -289,7 +289,7 @@ impl ThreadedVM {
         &self,
         tick: u64,
         events: &[TopologyPerturbation],
-    ) -> Result<(), VMError> {
+    ) -> Result<(), ProtocolMachineError> {
         if !self.config.host_contract_assertions {
             return Ok(());
         }
@@ -297,7 +297,7 @@ impl ThreadedVM {
             let prev_key = events[idx - 1].ordering_key();
             let next_key = events[idx].ordering_key();
             if prev_key > next_key {
-                return Err(VMError::HandlerError(EffectFailure::contract_violation(
+                return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
                     format!(
                         "[host-contract] topology_events at tick {tick} must be pre-sorted by ordering_key; out-of-order index {idx}"
                     ),
@@ -307,7 +307,7 @@ impl ThreadedVM {
         Ok(())
     }
 
-    fn assert_delegation_events_audited(&self, events: &[ObsEvent]) -> Result<(), VMError> {
+    fn assert_delegation_events_audited(&self, events: &[ObsEvent]) -> Result<(), ProtocolMachineError> {
         if !self.config.host_contract_assertions {
             return Ok(());
         }
@@ -332,7 +332,7 @@ impl ThreadedVM {
                     && audit.receipt.scope == expected_scope
             });
             if !found {
-                return Err(VMError::HandlerError(EffectFailure::contract_violation(
+                return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
                     format!(
                         "[host-contract] transfer event for session {session} role {role} must have a matching committed delegation audit record"
                     ),
@@ -342,13 +342,13 @@ impl ThreadedVM {
         Ok(())
     }
 
-    fn ingest_topology_events(&mut self, handler: &dyn EffectHandler) -> Result<(), VMError> {
+    fn ingest_topology_events(&mut self, handler: &dyn EffectHandler) -> Result<(), ProtocolMachineError> {
         let tick = self.clock.tick;
         let handler_identity = handler.handler_identity();
         self.enforce_handler_identity_contract(&handler_identity)?;
         let request = EffectRequest::topology_events(tick);
         self.ensure_effect_request_allowed(&request)
-            .map_err(VMError::HandlerError)?;
+            .map_err(ProtocolMachineError::HandlerError)?;
         let predicted_effect_id = self.next_effect_id;
         let topology_outcome = handler.handle_effect(request.clone());
         self.record_effect_exchange(
@@ -363,7 +363,7 @@ impl ThreadedVM {
             .expect_success(|| {
                 EffectFailure::contract_violation("topology_events returned blocked")
             })
-            .map_err(VMError::HandlerError)?;
+            .map_err(ProtocolMachineError::HandlerError)?;
         self.assert_topology_events_sorted(tick, &events)?;
         events.sort_by_key(TopologyPerturbation::ordering_key);
         for event in events {
@@ -401,7 +401,7 @@ impl ThreadedVM {
         let blocked_ids = self.scheduler.blocked_ids();
         for coro_id in blocked_ids {
             let should_skip = self.coroutines.get(coro_id).is_some_and(|coro| {
-                let guard = coro.lock().expect("threaded VM lock poisoned");
+                let guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
                 self.crashed_sites.contains(&guard.role)
                     || self.timed_out_sites.contains_key(&guard.role)
             });
@@ -411,7 +411,7 @@ impl ThreadedVM {
             let reason = self.scheduler.block_reason(coro_id).cloned();
             if let Some(BlockReason::Recv { token, .. }) = reason {
                 if let Some(session) = self.sessions.get(token.sid) {
-                    let session = session.lock().expect("threaded VM lock poisoned");
+                    let session = session.lock().expect("threaded ProtocolMachine lock poisoned");
                     let has_msg = session.roles.iter().any(|sender| {
                         sender != &token.endpoint.role
                             && session.has_message(sender, &token.endpoint.role)
@@ -434,7 +434,7 @@ impl ThreadedVM {
         let Some(coro) = coros.get(id) else {
             return false;
         };
-        let coro_guard = coro.lock().expect("threaded VM lock poisoned");
+        let coro_guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
         let sid = coro_guard.session_id;
         let lane = id % planner.lane_count;
         if crashed_sites.contains(&coro_guard.role)
@@ -475,26 +475,26 @@ impl ThreadedVM {
         picks: &mut Vec<Picked>,
         planner: &mut WavePlannerState,
         coro_id: usize,
-    ) -> Result<(), VMError> {
+    ) -> Result<(), ProtocolMachineError> {
         let lane = coro_id % planner.lane_count;
         let coro = self
             .coroutines
             .get(coro_id)
             .cloned()
-            .ok_or(VMError::Fault {
+            .ok_or(ProtocolMachineError::Fault {
                 coro_id,
                 fault: Fault::Speculation {
                     message: "scheduler selected missing coroutine".to_string(),
                 },
             })?;
         let sid = {
-            let coro_guard = coro.lock().expect("threaded VM lock poisoned");
+            let coro_guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
             coro_guard.session_id
         };
         let session = self
             .sessions
             .get(sid)
-            .ok_or(VMError::SessionNotFound(sid))?;
+            .ok_or(ProtocolMachineError::SessionNotFound(sid))?;
         planner.used_sessions.insert(sid);
         planner.used_lanes.insert(lane);
         picks.push(Picked {
@@ -518,7 +518,7 @@ impl ThreadedVM {
             .saturating_add(planner_conflict_events);
     }
 
-    fn pick_ready(&mut self, n: usize) -> Result<Vec<Picked>, VMError> {
+    fn pick_ready(&mut self, n: usize) -> Result<Vec<Picked>, ProtocolMachineError> {
         let mut picks = Vec::new();
         let mut planner = WavePlannerState::new(
             self.lane_count.max(1),
@@ -528,7 +528,7 @@ impl ThreadedVM {
         while picks.len() < n {
             let Some(coro_id) = ({
                 let coros = &self.coroutines;
-                VMKernel::select_ready_eligible(
+                ProtocolMachineKernel::select_ready_eligible(
                     &mut self.scheduler,
                     |id| coro_has_progress(coros, id),
                     |id| {

@@ -9,7 +9,7 @@ use crate::serialization::CanonicalReplayFragmentV1;
 use crate::trace::normalize_trace;
 use crate::trace::obs_session;
 use crate::verification::{DefaultVerificationModel, HashTag, VerificationModel};
-use crate::vm::ObsEvent;
+use crate::engine::ObsEvent;
 
 /// Canonical schema version identifier for envelope differential artifacts.
 pub const ENVELOPE_DIFF_SCHEMA_VERSION: &str = "vm.envelope_diff.v1";

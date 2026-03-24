@@ -57,7 +57,7 @@ fn public_drivers_only_expose_owned_open_paths() {
 
 #[wasm_bindgen_test(unsupported = test)]
 fn owned_boundary_docs_do_not_recommend_raw_open_or_backend_abstractions() {
-    let forbidden_patterns = ["load_choreography(&image)", "low-level open", "VMBackend"];
+    let forbidden_patterns = ["load_choreography(&image)", "low-level open", "ProtocolMachineBackend"];
     let mut violations = Vec::new();
 
     for (path, src) in DOC_SOURCES {
@@ -83,7 +83,7 @@ fn internal_raw_open_surfaces_are_hidden_from_rustdoc() {
     let validation_src = include_str!("../src/vm/validation.rs");
 
     assert!(
-        !lib_src.contains("pub use backend::VMBackend;"),
+        !lib_src.contains("pub use backend::ProtocolMachineBackend;"),
         "crate root must not re-export the removed backend abstraction"
     );
     assert!(

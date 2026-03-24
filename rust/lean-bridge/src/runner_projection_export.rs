@@ -206,11 +206,11 @@ impl LeanRunner {
         Ok(result)
     }
 
-    /// Run one or more choreographies on the Lean VM at a given concurrency level.
+    /// Run one or more choreographies on the Lean ProtocolMachine at a given concurrency level.
     ///
     /// # Errors
     ///
-    /// Returns an error if the VM runner binary is missing, the process fails,
+    /// Returns an error if the ProtocolMachine runner binary is missing, the process fails,
     /// or the output is not valid JSON.
     pub fn run_protocol_machine(
         &self,

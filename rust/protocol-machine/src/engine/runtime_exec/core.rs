@@ -3,9 +3,9 @@
 pub struct ProtocolMachineMemoryUsage {
     /// Session-store retained state.
     pub session_store: SessionStoreMemoryUsage,
-    /// Number of coroutine records still retained by the VM.
+    /// Number of coroutine records still retained by the ProtocolMachine.
     pub coroutine_records: usize,
-    /// Number of terminal coroutine records retained by the VM.
+    /// Number of terminal coroutine records retained by the ProtocolMachine.
     pub terminal_coroutines: usize,
     /// Number of loaded immutable program records.
     pub program_count: usize,
@@ -53,7 +53,7 @@ pub struct ProtocolMachineRetainedBytes {
     pub monitor: usize,
     /// Arena slot storage.
     pub arena: usize,
-    /// Aggregate retained bytes across VM subsystems.
+    /// Aggregate retained bytes across ProtocolMachine subsystems.
     pub total: usize,
 }
 
@@ -61,7 +61,7 @@ fn vm_serialized_bytes<T: Serialize>(value: &T) -> usize {
     crate::serialization::binary_size(value)
 }
 
-impl VM {
+impl ProtocolMachine {
     fn intern_load_plan_symbols(&mut self, plan: &crate::session::SessionOpenPlan, sid: SessionId) {
         for role in plan.roles() {
             let _: StringId = self.role_symbols.intern(role);
@@ -79,9 +79,9 @@ impl VM {
         }
     }
 
-    /// Create a VM instance from configuration.
+    /// Create a ProtocolMachine instance from configuration.
     #[must_use]
-    pub fn new(config: VMConfig) -> Self {
+    pub fn new(config: ProtocolMachineConfig) -> Self {
         Self::new_with_models(config)
     }
 
@@ -92,9 +92,9 @@ impl VM {
             .intern(crate::session::DEFAULT_HANDLER_ID);
     }
 
-    fn ensure_session_capacity(&self) -> Result<(), VMError> {
+    fn ensure_session_capacity(&self) -> Result<(), ProtocolMachineError> {
         if self.sessions.active_count() >= self.config.max_sessions {
-            return Err(VMError::TooManySessions {
+            return Err(ProtocolMachineError::TooManySessions {
                 max: self.config.max_sessions,
             });
         }
@@ -221,14 +221,14 @@ impl VM {
         sid: SessionId,
         roles: &[String],
         plan: &crate::session::SessionOpenPlan,
-    ) -> Result<(), VMError> {
+    ) -> Result<(), ProtocolMachineError> {
         self.next_session_id = self.sessions.next_session_id();
         self.bind_default_handlers_for_session(sid);
         self.intern_load_plan_symbols(plan, sid);
         self.monitor.set_kind(sid, SessionKind::Peer);
         self.resource_states.entry(sid).or_default();
         self.apply_open_delta(sid)
-            .map_err(VMError::PersistenceError)?;
+            .map_err(ProtocolMachineError::PersistenceError)?;
         self.obs_trace.push(
             ObsEvent::Opened {
                 tick: self.clock.tick,
@@ -245,9 +245,9 @@ impl VM {
         image: &CodeImage,
         sid: SessionId,
         role: &str,
-    ) -> Result<(), VMError> {
+    ) -> Result<(), ProtocolMachineError> {
         if self.coroutines.len() >= self.config.max_coroutines {
-            return Err(VMError::TooManyCoroutines {
+            return Err(ProtocolMachineError::TooManyCoroutines {
                 max: self.config.max_coroutines,
             });
         }
@@ -305,7 +305,7 @@ impl VM {
         image: &CodeImage,
         sid: SessionId,
         roles: &[String],
-    ) -> Result<(), VMError> {
+    ) -> Result<(), ProtocolMachineError> {
         for role in roles {
             self.spawn_coroutine_for_role(image, sid, role)?;
         }
@@ -322,11 +322,11 @@ impl VM {
     ///
     /// Returns an error if session or coroutine limits are exceeded.
     #[doc(hidden)]
-    pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
+    pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, ProtocolMachineError> {
         self.ensure_session_capacity()?;
         image
             .validate_runtime_shape()
-            .map_err(|reason| VMError::InvalidCodeImage { reason })?;
+            .map_err(|reason| ProtocolMachineError::InvalidCodeImage { reason })?;
         let plan = self.session_open_plan(image).clone();
         let (sid, roles) = self.open_choreography_session(&plan);
         self.finalize_open_choreography_session(sid, &roles, &plan)?;

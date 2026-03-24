@@ -1,7 +1,7 @@
 //! Runtime drivers.
 //!
 //! Drivers own target/runtime orchestration while semantic stepping stays in
-//! the VM kernel path.
+//! the ProtocolMachine kernel path.
 
 use cfg_if::cfg_if;
 

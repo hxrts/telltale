@@ -1,4 +1,4 @@
-impl ThreadedVM {
+impl ThreadedProtocolMachine {
     fn issue_delegation_receipt(
         &mut self,
         endpoint: Endpoint,
@@ -39,7 +39,7 @@ impl ThreadedVM {
         let Some(session) = self.sessions.get(sid) else {
             return;
         };
-        let session_guard = session.lock().expect("threaded VM lock poisoned");
+        let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
         let roles = session_guard.roles.clone();
         let default_handler = session_guard.default_handler.clone();
         let handler_bindings: Vec<(Edge, String)> = session_guard
@@ -97,7 +97,7 @@ impl ThreadedVM {
             }
         }
 
-        let mut coro_guard = coro.lock().expect("threaded VM lock poisoned");
+        let mut coro_guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
         let was_terminal = coro_guard.is_terminal();
 
         match pack.coro_update {
@@ -159,7 +159,7 @@ impl ThreadedVM {
         self.note_status_transition(was_terminal, is_terminal);
 
         if let Some((ep, update)) = pack.type_update {
-            let mut session_guard = session.lock().expect("threaded VM lock poisoned");
+            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             match update {
                 TypeUpdate::Advance(lt) => {
                     if let Some(entry) = session_guard.local_types.get_mut(&ep) {
@@ -221,7 +221,7 @@ impl ThreadedVM {
             })?;
 
         self.trace.extend(pack.events);
-        let coro_guard = coro.lock().expect("threaded VM lock poisoned");
+        let coro_guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
 
         match &coro_guard.status {
             CoroStatus::Ready => Ok(ExecOutcome::Continue),
@@ -282,8 +282,8 @@ impl ThreadedVM {
             message: "target coroutine not found".into(),
         })?;
         {
-            let source = source_arc.lock().expect("threaded VM lock poisoned");
-            let target = target_arc.lock().expect("threaded VM lock poisoned");
+            let source = source_arc.lock().expect("threaded ProtocolMachine lock poisoned");
+            let target = target_arc.lock().expect("threaded ProtocolMachine lock poisoned");
             validate_delegation_coherence(&source, &target, &endpoint, &source.role)?;
         }
         let from_lane = self.lane_of_coro(from_coro).ok_or(Fault::Transfer {
@@ -445,7 +445,7 @@ impl ThreadedVM {
     ) -> Result<(), Fault> {
         let mut owners = Vec::new();
         for coro in &self.coroutines {
-            let guard = coro.lock().expect("threaded VM lock poisoned");
+            let guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
             if guard.owned_endpoints.contains(endpoint) {
                 owners.push(guard.id);
             }

@@ -1,8 +1,8 @@
-//! Cross-domain bridge traits for VM domain composition.
+//! Cross-domain bridge traits for ProtocolMachine domain composition.
 //!
 //! These bridge traits are intentionally narrow translation layers. They should
 //! be implemented as pure metadata lookups or deterministic projections, not as
-//! places that mutate session-local VM state or perform async work. Host-side
+//! places that mutate session-local ProtocolMachine state or perform async work. Host-side
 //! mutation belongs behind the explicit ownership/ingress contract instead.
 
 use crate::guard::{GuardLayer, LayerId};

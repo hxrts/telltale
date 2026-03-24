@@ -12,7 +12,7 @@ use crate::instr::{Instr, InvokeAction, PC};
 /// Compile a local type to a bytecode program.
 ///
 /// Register allocation:
-/// - Reg 0: channel/endpoint (set by VM at coroutine creation)
+/// - Reg 0: channel/endpoint (set by ProtocolMachine at coroutine creation)
 /// - Reg 1: send value / recv destination
 ///
 /// The compiler emits `Invoke` (handler step) after every Send/Recv instruction

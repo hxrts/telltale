@@ -1,4 +1,4 @@
-//! Shared transfer/delegation semantics used by cooperative and threaded VMs.
+//! Shared transfer/delegation semantics used by cooperative and threaded ProtocolMachines.
 
 use std::collections::BTreeSet;
 

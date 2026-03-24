@@ -80,7 +80,7 @@ pub trait CommunicationConsumption {
     fn prune_session(&mut self, sid: SessionId);
 }
 
-/// Default replay-consumption implementation used by the VM.
+/// Default replay-consumption implementation used by the ProtocolMachine.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct DefaultCommunicationConsumption {
     /// Configured mode.

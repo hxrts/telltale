@@ -14,7 +14,7 @@ fn step_abort(coro: &mut Coroutine, sid: SessionId, tick: u64) -> Result<StepPac
     if coro.spec_state.is_none() {
         return Err(speculation_fault_abort_requires_active());
     }
-    // Deterministic V2 policy mirrors cooperative VM: clear speculation state
+    // Deterministic V2 policy mirrors cooperative ProtocolMachine: clear speculation state
     // and emit one abort event without side effects on non-spec runtime fields.
     coro.spec_state = None;
     Ok(StepPack {
@@ -83,7 +83,7 @@ fn step_tag(
 
 fn step_check(
     coro: &mut Coroutine,
-    config: &VMConfig,
+    config: &ProtocolMachineConfig,
     role: &str,
     knowledge: u16,
     target: u16,
@@ -435,7 +435,7 @@ fn step_close(
     session.epoch = session.epoch.saturating_add(1);
     ctx.communication_consumption
         .lock()
-        .expect("threaded VM lock poisoned")
+        .expect("threaded ProtocolMachine lock poisoned")
         .prune_session(sid);
 
     Ok(StepPack {
@@ -517,7 +517,7 @@ fn step_open(
         message: "open session missing after allocation".to_string(),
     })?;
     {
-        let mut session_guard = session.lock().expect("threaded VM lock poisoned");
+        let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
         for (_, sender, receiver) in plan.edge_blueprint() {
             if let Some((_, handler_id)) = handlers
                 .iter()

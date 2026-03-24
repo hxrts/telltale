@@ -2,10 +2,10 @@
 
 use crate::coroutine::Fault;
 use crate::session::SessionId;
-use crate::vm::{StepPack, VM};
+use crate::engine::{StepPack, ProtocolMachine};
 
 pub(crate) fn step_fork(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     sid: SessionId,
@@ -15,7 +15,7 @@ pub(crate) fn step_fork(
 }
 
 pub(crate) fn step_join(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     sid: SessionId,
@@ -24,7 +24,7 @@ pub(crate) fn step_join(
 }
 
 pub(crate) fn step_abort(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     sid: SessionId,

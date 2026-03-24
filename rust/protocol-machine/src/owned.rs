@@ -10,7 +10,7 @@ use crate::session::{
     CancellationWitness, OwnershipCapability, OwnershipError, OwnershipReceipt, OwnershipScope,
     ReadinessWitness, SessionHostMutation, SessionId,
 };
-use crate::vm::{VMError, VM};
+use crate::engine::{ProtocolMachineError, ProtocolMachine};
 
 /// Capability-bearing handle returned by the preferred owned open path.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,7 +46,7 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the capability is stale or lacks scope.
     pub fn apply_host_mutation(
         &self,
-        vm: &mut VM,
+        vm: &mut ProtocolMachine,
         mutation: SessionHostMutation,
     ) -> Result<(), OwnershipError> {
         vm.sessions_mut()
@@ -60,7 +60,7 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the capability is stale or lacks session scope.
     pub fn issue_readiness_witness(
         &self,
-        vm: &mut VM,
+        vm: &mut ProtocolMachine,
         predicate_ref: impl Into<String>,
     ) -> Result<ReadinessWitness, OwnershipError> {
         vm.sessions_mut()
@@ -74,7 +74,7 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the witness is stale, forged, mismatched, or reused.
     pub fn consume_readiness_witness(
         &self,
-        vm: &mut VM,
+        vm: &mut ProtocolMachine,
         witness: &ReadinessWitness,
     ) -> Result<(), OwnershipError> {
         vm.sessions_mut()
@@ -88,7 +88,7 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the capability is stale.
     pub fn begin_transfer(
         &self,
-        vm: &mut VM,
+        vm: &mut ProtocolMachine,
         new_owner_id: impl Into<String>,
         new_scope: OwnershipScope,
     ) -> Result<OwnershipReceipt, OwnershipError> {
@@ -103,7 +103,7 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the receipt is stale or mismatched.
     pub fn commit_transfer(
         &self,
-        vm: &mut VM,
+        vm: &mut ProtocolMachine,
         receipt: &OwnershipReceipt,
     ) -> Result<Self, OwnershipError> {
         let capability = vm.sessions_mut().commit_ownership_transfer(receipt)?;
@@ -117,7 +117,7 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the capability is stale or transfer-pending.
     pub fn attenuate_scope(
         &self,
-        vm: &mut VM,
+        vm: &mut ProtocolMachine,
         new_scope: OwnershipScope,
     ) -> Result<Self, OwnershipError> {
         let capability = vm
@@ -131,7 +131,7 @@ impl OwnedSession {
     /// # Errors
     ///
     /// Returns an `OwnershipError` if the capability is stale.
-    pub fn release(&self, vm: &mut VM) -> Result<(), OwnershipError> {
+    pub fn release(&self, vm: &mut ProtocolMachine) -> Result<(), OwnershipError> {
         vm.sessions_mut().release_ownership(&self.capability)
     }
 
@@ -140,7 +140,7 @@ impl OwnedSession {
     /// # Errors
     ///
     /// Returns an `OwnershipError` if the live owner no longer matches this handle.
-    pub fn mark_owner_died(&self, vm: &mut VM) -> Result<CancellationWitness, OwnershipError> {
+    pub fn mark_owner_died(&self, vm: &mut ProtocolMachine) -> Result<CancellationWitness, OwnershipError> {
         vm.mark_owner_died(self.session_id, &self.capability.owner_id)
     }
 
@@ -151,14 +151,14 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the receipt no longer matches the live staged transfer.
     pub fn cancel_abandoned_transfer(
         &self,
-        vm: &mut VM,
+        vm: &mut ProtocolMachine,
         receipt: &OwnershipReceipt,
     ) -> Result<CancellationWitness, OwnershipError> {
         vm.cancel_abandoned_transfer(receipt)
     }
 }
 
-impl VM {
+impl ProtocolMachine {
     /// Preferred choreography open path that immediately claims session ownership.
     ///
     /// Third-party host integrations use this owned helper so subsequent
@@ -166,18 +166,18 @@ impl VM {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if the choreography cannot be loaded or the initial
+    /// Returns a `ProtocolMachineError` if the choreography cannot be loaded or the initial
     /// ownership claim fails.
     pub fn load_choreography_owned(
         &mut self,
         image: &CodeImage,
         owner_id: impl Into<String>,
-    ) -> Result<OwnedSession, VMError> {
+    ) -> Result<OwnedSession, ProtocolMachineError> {
         let sid = self.load_choreography(image)?;
         let capability = self
             .sessions_mut()
             .claim_ownership(sid, owner_id, OwnershipScope::Session)
-            .map_err(|err| VMError::OwnershipContract(format!("{err:?}")))?;
+            .map_err(|err| ProtocolMachineError::OwnershipContract(format!("{err:?}")))?;
         Ok(OwnedSession::new(sid, capability))
     }
 }

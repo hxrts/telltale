@@ -8,7 +8,7 @@ use crate::output_condition::{
     verify_output_condition, OutputConditionCheck, OutputConditionHint, OutputConditionMeta,
     OutputConditionPolicy,
 };
-use crate::vm::ObsEvent;
+use crate::engine::ObsEvent;
 
 /// Apply output-condition verification for a commit and record diagnostics.
 pub(crate) fn apply_output_condition_gate<RecordCheck, RecordEvent>(

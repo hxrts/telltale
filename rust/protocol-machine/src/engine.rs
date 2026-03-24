@@ -1,4 +1,4 @@
-//! The VM: ties coroutines, sessions, and scheduler together.
+//! The ProtocolMachine: ties coroutines, sessions, and scheduler together.
 //!
 //! Execution follows the Lean spec pattern:
 //! - `exec_instr` fetches, dispatches to per-instruction step functions
@@ -6,8 +6,8 @@
 //! - Results are bundled in `StepPack` and committed atomically via `commit_pack`
 //! - Blocking never advances type state
 //!
-//! This module is a runtime surface over the canonical `VMKernel` execution
-//! contract. Driver layers call into `VMKernel` and do not redefine instruction
+//! This module is a runtime surface over the canonical `ProtocolMachineKernel` execution
+//! contract. Driver layers call into `ProtocolMachineKernel` and do not redefine instruction
 //! semantics.
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -52,7 +52,7 @@ use crate::instruction_semantics::{
     endpoint_from_reg as decode_endpoint_from_reg,
 };
 use crate::intern::{EdgeId, EdgeSymbolTable, StringId, SymbolTable};
-use crate::kernel::{KernelMachine, VMKernel};
+use crate::kernel::{KernelMachine, ProtocolMachineKernel};
 use crate::loader::CodeImage;
 use crate::output_condition::{OutputConditionCheck, OutputConditionPolicy};
 use crate::persistence::{NoopPersistence, PersistenceModel};
@@ -80,28 +80,28 @@ use crate::transfer_semantics::{
 };
 use crate::verification::{DefaultVerificationModel, VerificationModel};
 
-include!("vm/runtime_state/mod.rs");
-include!("vm/vm_config.rs");
-include!("vm/vm_error_and_step_pack.rs");
-include!("vm/runtime_exec/mod.rs");
-include!("vm/validation.rs");
-include!("vm/topology_and_dispatch.rs");
-include!("vm/instruction_effects.rs");
-include!("vm/instruction_tag.rs");
-include!("vm/instruction_choice.rs");
-include!("vm/open_commit.rs");
-include!("vm/kernel_impl.rs");
+include!("engine/runtime_state/mod.rs");
+include!("engine/protocol_machine_config.rs");
+include!("engine/protocol_machine_error_and_step_pack.rs");
+include!("engine/runtime_exec/mod.rs");
+include!("engine/validation.rs");
+include!("engine/topology_and_dispatch.rs");
+include!("engine/instruction_effects.rs");
+include!("engine/instruction_tag.rs");
+include!("engine/instruction_choice.rs");
+include!("engine/open_commit.rs");
+include!("engine/kernel_impl.rs");
 
 #[cfg(test)]
 type ProtocolMachine<I = (), G = (), P = NoopPersistence, Nu = DefaultVerificationModel> =
-    VM<I, G, P, Nu>;
+    ProtocolMachine<I, G, P, Nu>;
 #[cfg(test)]
-type ProtocolMachineConfig = VMConfig;
+type ProtocolMachineConfig = ProtocolMachineConfig;
 #[cfg(test)]
-type ProtocolMachineError = VMError;
+type ProtocolMachineError = ProtocolMachineError;
 #[cfg(test)]
 type ProtocolMachineState<I = (), G = (), P = NoopPersistence, Nu = DefaultVerificationModel> =
-    VMState<I, G, P, Nu>;
+    ProtocolMachineState<I, G, P, Nu>;
 #[cfg(test)]
 type ProtocolMachineStepResult = StepResult;
 #[cfg(test)]
@@ -109,11 +109,11 @@ type ProtocolMachineRunStatus = RunStatus;
 
 #[cfg(test)]
 mod tests {
-    include!("../tests/unit/vm/tests_handlers_core.rs");
-    include!("../tests/unit/vm/tests_handlers_edge.rs");
-    include!("../tests/unit/vm/tests_runtime_progress.rs");
-    include!("../tests/unit/vm/tests_monitor_persist.rs");
-    include!("../tests/unit/vm/tests_compiler_topology.rs");
-    include!("../tests/unit/vm/tests_flow_policy_faults.rs");
-    include!("../tests/unit/vm/tests_semantic_state.rs");
+    include!("../tests/unit/protocol_machine/tests_handlers_core.rs");
+    include!("../tests/unit/protocol_machine/tests_handlers_edge.rs");
+    include!("../tests/unit/protocol_machine/tests_runtime_progress.rs");
+    include!("../tests/unit/protocol_machine/tests_monitor_persist.rs");
+    include!("../tests/unit/protocol_machine/tests_compiler_topology.rs");
+    include!("../tests/unit/protocol_machine/tests_flow_policy_faults.rs");
+    include!("../tests/unit/protocol_machine/tests_semantic_state.rs");
 }

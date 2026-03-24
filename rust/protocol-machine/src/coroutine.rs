@@ -1,4 +1,4 @@
-//! Coroutine: lightweight execution unit within the VM.
+//! Coroutine: lightweight execution unit within the ProtocolMachine.
 //!
 //! Each role in a choreography runs as a coroutine with its own PC,
 //! register file, and status. Matches the Lean `Coroutine` structure.
@@ -13,10 +13,10 @@ fn default_cost_budget() -> usize {
     usize::MAX
 }
 
-/// Register-file representation aligned with the Lean VM model.
+/// Register-file representation aligned with the Lean ProtocolMachine model.
 pub type RegFile = Vec<Value>;
 
-/// Progress-token representation aligned with the Lean VM model.
+/// Progress-token representation aligned with the Lean ProtocolMachine model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProgressToken {
     /// Session this token is scoped to.
@@ -36,7 +36,7 @@ impl ProgressToken {
     }
 }
 
-/// Effect context for coroutine execution, aligned with the Lean VM model.
+/// Effect context for coroutine execution, aligned with the Lean ProtocolMachine model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EffectCtx<E = ()> {
     /// Optional effect metadata captured for replay/introspection.

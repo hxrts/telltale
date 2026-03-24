@@ -18,7 +18,7 @@ pub enum OutputConditionPolicy {
     PredicateAllowList(Vec<String>),
 }
 
-/// Output-condition metadata checked by the VM kernel before committing outputs.
+/// Output-condition metadata checked by the ProtocolMachine kernel before committing outputs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OutputConditionMeta {
     /// Stable predicate id/hash.

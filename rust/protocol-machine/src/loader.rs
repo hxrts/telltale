@@ -1,7 +1,7 @@
 //! Dynamic choreography loading.
 //!
 //! Matches `CodeImage`, `UntrustedImage`, `loadTrusted`, `loadUntrusted`
-//! from `lean/Runtime/VM/Model/Program.lean`.
+//! from `lean/Runtime/ProtocolMachine/Model/Program.lean`.
 
 use std::collections::BTreeMap;
 
@@ -78,7 +78,7 @@ impl CodeImage {
     ///
     /// # Errors
     ///
-    /// Returns an error string when the image shape violates VM runtime
+    /// Returns an error string when the image shape violates ProtocolMachine runtime
     /// expectations (role coverage, type coverage, or global well-formedness).
     pub fn validate_runtime_shape(&self) -> Result<(), String> {
         if self.programs.is_empty() {

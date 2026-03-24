@@ -1,4 +1,4 @@
-impl ThreadedVM {
+impl ThreadedProtocolMachine {
     /// Get the observable trace.
     #[must_use]
     pub fn trace(&self) -> &[ObsEvent] {
@@ -91,11 +91,11 @@ impl ThreadedVM {
     pub fn require_authoritative_read(
         &self,
         read_id: &str,
-    ) -> Result<crate::semantic_objects::AuthoritativeRead, VMError> {
+    ) -> Result<crate::semantic_objects::AuthoritativeRead, ProtocolMachineError> {
         self.semantic_objects()
             .require_authoritative_read(read_id)
             .cloned()
-            .map_err(|message| VMError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
+            .map_err(|message| ProtocolMachineError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
     }
 
     /// Require that one parity-critical path use a canonical handle.
@@ -106,24 +106,24 @@ impl ThreadedVM {
     pub fn require_canonical_handle(
         &self,
         handle_id: &str,
-    ) -> Result<crate::semantic_objects::CanonicalHandle, VMError> {
+    ) -> Result<crate::semantic_objects::CanonicalHandle, ProtocolMachineError> {
         self.semantic_objects()
             .require_canonical_handle(handle_id)
             .cloned()
-            .map_err(|message| VMError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
+            .map_err(|message| ProtocolMachineError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
     }
 
     /// Deterministic communication replay-state root.
     ///
     /// # Panics
     ///
-    /// Panics if an internal threaded VM lock is poisoned.
+    /// Panics if an internal threaded ProtocolMachine lock is poisoned.
     ///
     #[must_use]
     pub fn communication_replay_root(&self) -> crate::verification::Hash {
         self.communication_consumption
             .lock()
-            .expect("threaded VM lock poisoned")
+            .expect("threaded ProtocolMachine lock poisoned")
             .root()
     }
 
@@ -131,13 +131,13 @@ impl ThreadedVM {
     ///
     /// # Panics
     ///
-    /// Panics if an internal threaded VM lock is poisoned.
+    /// Panics if an internal threaded ProtocolMachine lock is poisoned.
     ///
     #[must_use]
     pub fn communication_consumption_artifacts(&self) -> Vec<CommunicationConsumptionArtifact> {
         self.communication_consumption_artifacts
             .lock()
-            .expect("threaded VM lock poisoned")
+            .expect("threaded ProtocolMachine lock poisoned")
             .clone()
     }
 
@@ -145,19 +145,19 @@ impl ThreadedVM {
     ///
     /// # Panics
     ///
-    /// Panics if an internal threaded VM lock is poisoned.
+    /// Panics if an internal threaded ProtocolMachine lock is poisoned.
     ///
     #[must_use]
     pub fn canonical_replay_fragment(&self) -> CanonicalReplayFragmentV1 {
         let communication_replay_root = self
             .communication_consumption
             .lock()
-            .expect("threaded VM lock poisoned")
+            .expect("threaded ProtocolMachine lock poisoned")
             .root();
         let communication_consumption_artifacts = self
             .communication_consumption_artifacts
             .lock()
-            .expect("threaded VM lock poisoned")
+            .expect("threaded ProtocolMachine lock poisoned")
             .clone();
         let corrupted_edges = self
             .corrupted_edges

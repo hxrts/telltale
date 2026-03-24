@@ -1,7 +1,7 @@
-impl ThreadedVM {
+impl ThreadedProtocolMachine {
     /// Create with thread pool sized to available OS parallelism.
     #[must_use]
-    pub fn auto(config: VMConfig) -> Self {
+    pub fn auto(config: ProtocolMachineConfig) -> Self {
         let workers = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(1);
@@ -12,16 +12,16 @@ impl ThreadedVM {
     ///
     /// # Errors
     ///
-    /// Returns [`VMError::ThreadPoolBuild`] if the Rayon thread pool cannot be created.
-    pub fn try_with_workers(config: VMConfig, workers: usize) -> Result<Self, VMError> {
+    /// Returns [`ProtocolMachineError::ThreadPoolBuild`] if the Rayon thread pool cannot be created.
+    pub fn try_with_workers(config: ProtocolMachineConfig, workers: usize) -> Result<Self, ProtocolMachineError> {
         config
             .validate_invariants()
-            .map_err(|reason| VMError::InvalidConfig { reason })?;
+            .map_err(|reason| ProtocolMachineError::InvalidConfig { reason })?;
         let worker_count = workers.max(1);
         let pool = ThreadPoolBuilder::new()
             .num_threads(worker_count)
             .build()
-            .map_err(|e| VMError::ThreadPoolBuild {
+            .map_err(|e| ProtocolMachineError::ThreadPoolBuild {
                 message: e.to_string(),
             })?;
         let tick_duration = config.tick_duration;
@@ -84,23 +84,23 @@ impl ThreadedVM {
     ///
     /// Panics if the thread pool cannot be created.
     #[must_use]
-    pub fn with_workers(config: VMConfig, workers: usize) -> Self {
+    pub fn with_workers(config: ProtocolMachineConfig, workers: usize) -> Self {
         Self::try_with_workers(config, workers)
-            .unwrap_or_else(|e| panic!("threaded VM initialization failed: {e}"))
+            .unwrap_or_else(|e| panic!("threaded ProtocolMachine initialization failed: {e}"))
     }
 
-    fn ensure_session_capacity(&self) -> Result<(), VMError> {
+    fn ensure_session_capacity(&self) -> Result<(), ProtocolMachineError> {
         if self.sessions.active_count() >= self.config.max_sessions {
-            return Err(VMError::TooManySessions {
+            return Err(ProtocolMachineError::TooManySessions {
                 max: self.config.max_sessions,
             });
         }
         Ok(())
     }
 
-    fn ensure_coroutine_capacity(&self) -> Result<(), VMError> {
+    fn ensure_coroutine_capacity(&self) -> Result<(), ProtocolMachineError> {
         if self.coroutines.len() >= self.config.max_coroutines {
-            return Err(VMError::TooManyCoroutines {
+            return Err(ProtocolMachineError::TooManyCoroutines {
                 max: self.config.max_coroutines,
             });
         }
@@ -109,7 +109,7 @@ impl ThreadedVM {
 
     fn bind_default_handlers_for_session(&mut self, sid: SessionId) {
         if let Some(session) = self.sessions.get(sid) {
-            let mut session_guard = session.lock().expect("threaded VM lock poisoned");
+            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             session_guard.default_handler = crate::session::DEFAULT_HANDLER_ID.to_string();
         }
         let _: StringId = self
@@ -122,7 +122,7 @@ impl ThreadedVM {
         sid: SessionId,
         role: &str,
         image: &CodeImage,
-    ) -> Result<(), VMError> {
+    ) -> Result<(), ProtocolMachineError> {
         self.ensure_coroutine_capacity()?;
         let role_key = role.to_string();
         let program_id = self
@@ -153,22 +153,22 @@ impl ThreadedVM {
         Ok(())
     }
 
-    /// Runtime open primitive for the threaded VM.
+    /// Runtime open primitive for the threaded ProtocolMachine.
     ///
     /// # Errors
     ///
-    /// Returns a [`VMError`] when session/coroutine limits are exceeded.
+    /// Returns a [`ProtocolMachineError`] when session/coroutine limits are exceeded.
     ///
     /// # Panics
     ///
-    /// Panics if an internal threaded VM lock is poisoned.
+    /// Panics if an internal threaded ProtocolMachine lock is poisoned.
     ///
     #[doc(hidden)]
-    pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, VMError> {
+    pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, ProtocolMachineError> {
         self.ensure_session_capacity()?;
         image
             .validate_runtime_shape()
-            .map_err(|reason| VMError::InvalidCodeImage { reason })?;
+            .map_err(|reason| ProtocolMachineError::InvalidCodeImage { reason })?;
 
         let roles = image.roles();
         self.programs.reserve(image.programs.len());
@@ -182,7 +182,7 @@ impl ThreadedVM {
         self.intern_session_runtime_symbols(sid);
         self.resource_states
             .lock()
-            .expect("threaded VM lock poisoned")
+            .expect("threaded ProtocolMachine lock poisoned")
             .entry(sid)
             .or_default();
 
@@ -203,17 +203,17 @@ impl ThreadedVM {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if the choreography cannot be loaded or claimed.
+    /// Returns a `ProtocolMachineError` if the choreography cannot be loaded or claimed.
     pub fn load_choreography_owned(
         &mut self,
         image: &CodeImage,
         owner_id: impl Into<String>,
-    ) -> Result<OwnedSession, VMError> {
+    ) -> Result<OwnedSession, ProtocolMachineError> {
         let sid = self.load_choreography(image)?;
         let capability = self
             .sessions
             .claim_ownership(sid, owner_id, OwnershipScope::Session)
-            .map_err(|err| VMError::OwnershipContract(format!("{err:?}")))?;
+            .map_err(|err| ProtocolMachineError::OwnershipContract(format!("{err:?}")))?;
         Ok(OwnedSession::new(sid, capability))
     }
 
@@ -221,14 +221,14 @@ impl ThreadedVM {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if any coroutine faults.
+    /// Returns a `ProtocolMachineError` if any coroutine faults.
     pub(crate) fn kernel_step_round(
         &mut self,
         handler: &dyn EffectHandler,
         n: usize,
-    ) -> Result<StepResult, VMError> {
+    ) -> Result<StepResult, ProtocolMachineError> {
         if n == 0 {
-            return Err(VMError::InvalidConcurrency { n });
+            return Err(ProtocolMachineError::InvalidConcurrency { n });
         }
         self.clock.advance();
         let tick = self.clock.tick;
@@ -286,7 +286,7 @@ impl ThreadedVM {
         &mut self,
         budget: usize,
         enforce_certified_wave: bool,
-    ) -> Result<Option<PlannedWave>, VMError> {
+    ) -> Result<Option<PlannedWave>, ProtocolMachineError> {
         self.contention_metrics
             .observe_ready_depth(self.scheduler.ready_count());
         let ready_before_pick = self.scheduler.ready_set_snapshot();
@@ -324,7 +324,7 @@ impl ThreadedVM {
         picks: Vec<Picked>,
         handler: &dyn EffectHandler,
         tick: u64,
-    ) -> Result<bool, VMError> {
+    ) -> Result<bool, ProtocolMachineError> {
         let handler_identity = handler.handler_identity();
         self.enforce_handler_identity_contract(&handler_identity)?;
         self.contention_metrics.observe_wave_width(picks.len());
@@ -375,7 +375,7 @@ impl ThreadedVM {
         result: Result<(StepPack, Option<OutputConditionHint>), Fault>,
         tick: u64,
         handler_identity: &str,
-    ) -> Result<bool, VMError> {
+    ) -> Result<bool, ProtocolMachineError> {
         match result {
             Ok((pack, output_hint)) => {
                 match self.commit_pack(
@@ -406,12 +406,12 @@ impl ThreadedVM {
                             coro_id: pick.coro_id,
                             fault: fault.clone(),
                         });
-                        let mut coro = pick.coro.lock().expect("threaded VM lock poisoned");
+                        let mut coro = pick.coro.lock().expect("threaded ProtocolMachine lock poisoned");
                         let was_terminal = coro.is_terminal();
                         coro.status = CoroStatus::Faulted(fault.clone());
                         self.note_status_transition(was_terminal, coro.is_terminal());
                         self.scheduler.mark_done(pick.coro_id);
-                        return Err(VMError::Fault {
+                        return Err(ProtocolMachineError::Fault {
                             coro_id: pick.coro_id,
                             fault,
                         });
@@ -425,12 +425,12 @@ impl ThreadedVM {
                     coro_id: pick.coro_id,
                     fault: fault.clone(),
                 });
-                let mut coro = pick.coro.lock().expect("threaded VM lock poisoned");
+                let mut coro = pick.coro.lock().expect("threaded ProtocolMachine lock poisoned");
                 let was_terminal = coro.is_terminal();
                 coro.status = CoroStatus::Faulted(fault.clone());
                 self.note_status_transition(was_terminal, coro.is_terminal());
                 self.scheduler.mark_done(pick.coro_id);
-                Err(VMError::Fault {
+                Err(ProtocolMachineError::Fault {
                     coro_id: pick.coro_id,
                     fault,
                 })
@@ -494,7 +494,7 @@ impl ThreadedVM {
             let Some(coro) = self.coroutines.get(*coro_id) else {
                 return false;
             };
-            let guard = coro.lock().expect("threaded VM lock poisoned");
+            let guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
             if !matches!(guard.status, CoroStatus::Ready | CoroStatus::Speculating) {
                 return false;
             }
@@ -516,39 +516,39 @@ impl ThreadedVM {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if any coroutine faults.
+    /// Returns a `ProtocolMachineError` if any coroutine faults.
     pub fn step_round(
         &mut self,
         handler: &dyn EffectHandler,
         n: usize,
-    ) -> Result<StepResult, VMError> {
-        VMKernel::step_round(self, handler, n)
+    ) -> Result<StepResult, ProtocolMachineError> {
+        ProtocolMachineKernel::step_round(self, handler, n)
     }
 
-    /// Run the VM until completion, using the configured worker count.
+    /// Run the ProtocolMachine until completion, using the configured worker count.
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if any coroutine faults.
+    /// Returns a `ProtocolMachineError` if any coroutine faults.
     pub fn run(
         &mut self,
         handler: &dyn EffectHandler,
         max_rounds: usize,
-    ) -> Result<RunStatus, VMError> {
+    ) -> Result<RunStatus, ProtocolMachineError> {
         self.run_concurrent(handler, max_rounds, self.workers.max(1))
     }
 
-    /// Run the VM using replayed effect outcomes from a prior execution.
+    /// Run the ProtocolMachine using replayed effect outcomes from a prior execution.
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if replay data is exhausted/mismatched or any coroutine faults.
+    /// Returns a `ProtocolMachineError` if replay data is exhausted/mismatched or any coroutine faults.
     pub fn run_replay(
         &mut self,
         fallback: &dyn EffectHandler,
         replay_trace: &[EffectTraceEntry],
         max_rounds: usize,
-    ) -> Result<RunStatus, VMError> {
+    ) -> Result<RunStatus, ProtocolMachineError> {
         self.run_replay_shared(
             fallback,
             Arc::<[EffectTraceEntry]>::from(replay_trace),
@@ -556,33 +556,33 @@ impl ThreadedVM {
         )
     }
 
-    /// Run the VM with replayed outcomes using shared trace storage.
+    /// Run the ProtocolMachine with replayed outcomes using shared trace storage.
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if replay data is exhausted/mismatched or any coroutine faults.
+    /// Returns a `ProtocolMachineError` if replay data is exhausted/mismatched or any coroutine faults.
     pub fn run_replay_shared(
         &mut self,
         fallback: &dyn EffectHandler,
         replay_trace: Arc<[EffectTraceEntry]>,
         max_rounds: usize,
-    ) -> Result<RunStatus, VMError> {
+    ) -> Result<RunStatus, ProtocolMachineError> {
         let replay = ReplayEffectHandler::with_fallback(replay_trace, fallback);
         self.run(&replay, max_rounds)
     }
 
-    /// Run the VM with explicit concurrency.
+    /// Run the ProtocolMachine with explicit concurrency.
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if any coroutine faults.
+    /// Returns a `ProtocolMachineError` if any coroutine faults.
     pub fn run_concurrent(
         &mut self,
         handler: &dyn EffectHandler,
         max_rounds: usize,
         concurrency: usize,
-    ) -> Result<RunStatus, VMError> {
-        VMKernel::run_concurrent(self, handler, max_rounds, concurrency)
+    ) -> Result<RunStatus, ProtocolMachineError> {
+        ProtocolMachineKernel::run_concurrent(self, handler, max_rounds, concurrency)
     }
 
     /// Test/debug hook: force the next wave-certificate check to fail.
@@ -594,14 +594,14 @@ impl ThreadedVM {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if replay data is exhausted/mismatched or any coroutine faults.
+    /// Returns a `ProtocolMachineError` if replay data is exhausted/mismatched or any coroutine faults.
     pub fn run_concurrent_replay(
         &mut self,
         fallback: &dyn EffectHandler,
         replay_trace: &[EffectTraceEntry],
         max_rounds: usize,
         concurrency: usize,
-    ) -> Result<RunStatus, VMError> {
+    ) -> Result<RunStatus, ProtocolMachineError> {
         self.run_concurrent_replay_shared(
             fallback,
             Arc::<[EffectTraceEntry]>::from(replay_trace),
@@ -614,14 +614,14 @@ impl ThreadedVM {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if replay data is exhausted/mismatched or any coroutine faults.
+    /// Returns a `ProtocolMachineError` if replay data is exhausted/mismatched or any coroutine faults.
     pub fn run_concurrent_replay_shared(
         &mut self,
         fallback: &dyn EffectHandler,
         replay_trace: Arc<[EffectTraceEntry]>,
         max_rounds: usize,
         concurrency: usize,
-    ) -> Result<RunStatus, VMError> {
+    ) -> Result<RunStatus, ProtocolMachineError> {
         let replay = ReplayEffectHandler::with_fallback(replay_trace, fallback);
         self.run_concurrent(&replay, max_rounds, concurrency)
     }

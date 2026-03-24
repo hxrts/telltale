@@ -1,4 +1,4 @@
-impl VM {
+impl ProtocolMachine {
     fn combined_authority_audit_log(&self) -> Vec<AuthorityAuditRecord> {
         let mut out = self.authority_audit_log.as_slice().to_vec();
         for sid in self.sessions.session_ids() {
@@ -197,11 +197,11 @@ impl VM {
     pub fn require_authoritative_read(
         &self,
         read_id: &str,
-    ) -> Result<crate::semantic_objects::AuthoritativeRead, VMError> {
+    ) -> Result<crate::semantic_objects::AuthoritativeRead, ProtocolMachineError> {
         self.semantic_objects()
             .require_authoritative_read(read_id)
             .cloned()
-            .map_err(|message| VMError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
+            .map_err(|message| ProtocolMachineError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
     }
 
     /// Require that one parity-critical path use a canonical handle.
@@ -212,11 +212,11 @@ impl VM {
     pub fn require_canonical_handle(
         &self,
         handle_id: &str,
-    ) -> Result<crate::semantic_objects::CanonicalHandle, VMError> {
+    ) -> Result<crate::semantic_objects::CanonicalHandle, ProtocolMachineError> {
         self.semantic_objects()
             .require_canonical_handle(handle_id)
             .cloned()
-            .map_err(|message| VMError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
+            .map_err(|message| ProtocolMachineError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
     }
 
     /// Deterministic communication replay-state root.

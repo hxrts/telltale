@@ -1,4 +1,4 @@
-//! Distributed simulation builder using nested VMs.
+//! Distributed simulation builder using nested ProtocolMachines.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -8,7 +8,7 @@ use telltale_protocol_machine::loader::CodeImage;
 use telltale_protocol_machine::nested::NestedVMHandler;
 use telltale_protocol_machine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 
-/// Builder for distributed simulations with nested inner VMs.
+/// Builder for distributed simulations with nested inner ProtocolMachines.
 pub struct DistributedSimBuilder {
     sites: BTreeMap<String, Vec<CodeImage>>,
     inter_site: Option<CodeImage>,

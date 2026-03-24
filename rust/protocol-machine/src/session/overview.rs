@@ -1,6 +1,6 @@
 // Session lifecycle and store.
 //
-// Matches the Lean `SessionState`, `SessionStore` from `lean/Runtime/VM/Model/State.lean`.
+// Matches the Lean `SessionState`, `SessionStore` from `lean/Runtime/ProtocolMachine/Model/State.lean`.
 // Local type state lives here — the session store is the single source
 // of truth for per-endpoint type advancement.
 
@@ -205,7 +205,7 @@ pub struct SessionStoreRetainedBytes {
     pub total: usize,
 }
 
-/// Session identifier. Each session gets a unique ID within the VM.
+/// Session identifier. Each session gets a unique ID within the ProtocolMachine.
 pub type SessionId = usize;
 
 /// Stable host/runtime owner identifier for one session capability.

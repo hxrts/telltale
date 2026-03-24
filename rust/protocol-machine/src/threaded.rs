@@ -1,9 +1,9 @@
-//! Threaded VM backend (feature-gated, adapter runtime).
+//! Threaded ProtocolMachine backend (feature-gated, adapter runtime).
 //!
 //! Executes one coroutine per session per round in parallel, preserving
-//! per-session trace equivalence with the cooperative VM.
+//! per-session trace equivalence with the cooperative ProtocolMachine.
 //!
-//! Semantic ownership remains in the canonical `VMKernel` contract.
+//! Semantic ownership remains in the canonical `ProtocolMachineKernel` contract.
 
 use rayon::prelude::*;
 use rayon::{ThreadPool, ThreadPoolBuilder};
@@ -38,7 +38,7 @@ use crate::instruction_semantics::{
     decode_branch_label_payload, decode_endpoint_fact, endpoint_from_reg,
 };
 use crate::intern::{EdgeId, EdgeSymbolTable, StringId, SymbolTable};
-use crate::kernel::{KernelMachine, VMKernel};
+use crate::kernel::{KernelMachine, ProtocolMachineKernel};
 use crate::loader::CodeImage;
 use crate::output_condition::{OutputConditionCheck, OutputConditionHint};
 use crate::owned::OwnedSession;
@@ -60,10 +60,10 @@ use crate::transfer_semantics::{
     decode_transfer_request, delegation_receipt, move_endpoint_bundle,
     validate_delegation_coherence, DelegationAuditRecord, DelegationReceipt, DelegationStatus,
 };
-use crate::vm::{
+use crate::engine::{
     runtime_value_matches_val_type, runtime_value_val_type, runtime_value_wire_size_bytes,
     EffectTraceCaptureMode, MonitorMode, ObsEvent, ProgramStore, ResourceState, RunStatus, SiteId,
-    StepResult, ThreadedRoundSemantics, VMConfig, VMError,
+    StepResult, ThreadedRoundSemantics, ProtocolMachineConfig, ProtocolMachineError,
 };
 
 // Lane identifier in the threaded runtime.

@@ -15,18 +15,18 @@ fn lock_with_contention<'a, T>(
 ) -> std::sync::MutexGuard<'a, T> {
     match arc.try_lock() {
         Ok(guard) => guard,
-        Err(TryLockError::Poisoned(_)) => panic!("threaded VM lock poisoned"),
+        Err(TryLockError::Poisoned(_)) => panic!("threaded ProtocolMachine lock poisoned"),
         Err(TryLockError::WouldBlock) => {
             metrics.lock_contention_events = metrics.lock_contention_events.saturating_add(1);
             metrics.mutex_lock_contention_events =
                 metrics.mutex_lock_contention_events.saturating_add(1);
-            arc.lock().expect("threaded VM lock poisoned")
+            arc.lock().expect("threaded ProtocolMachine lock poisoned")
         }
     }
 }
 
 struct ThreadedStepCtx<'a> {
-    config: &'a VMConfig,
+    config: &'a ProtocolMachineConfig,
     guard_resources: &'a Arc<Mutex<BTreeMap<String, Value>>>,
     resource_states: &'a Arc<Mutex<BTreeMap<SessionId, ResourceState>>>,
     communication_consumption: &'a Arc<Mutex<DefaultCommunicationConsumption>>,
@@ -69,7 +69,7 @@ fn exec_instr(
     session: &Arc<Mutex<SessionState>>,
     ctx: &ThreadedExecCtx<'_>,
 ) -> Result<(StepPack, Option<OutputConditionHint>), Fault> {
-    let mut coro_guard = coro.lock().expect("threaded VM lock poisoned");
+    let mut coro_guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
     let pc = coro_guard.pc;
     let program = ctx
         .programs
@@ -104,7 +104,7 @@ fn exec_instr(
             step_recv(&mut coro_guard, session, &role, chan, dst, &ctx.step)
         }
         Instr::Halt => {
-            let mut session_guard = session.lock().expect("threaded VM lock poisoned");
+            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             step_halt(&mut session_guard, &ep, ctx.step.tick)
         }
         Instr::Jump { target } => Ok(StepPack {
@@ -118,7 +118,7 @@ fn exec_instr(
             events: vec![],
         }),
         Instr::Invoke { action } => {
-            let session_guard = session.lock().expect("threaded VM lock poisoned");
+            let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             step_invoke(&mut coro_guard, &session_guard, &role, action, ctx.step.handler, ctx.step.tick)
         }
         Instr::Acquire { layer, dst } => step_acquire(
@@ -205,7 +205,7 @@ fn exec_instr(
             })
         }
         Instr::Choose { chan, ref table } => {
-            let mut session_guard = session.lock().expect("threaded VM lock poisoned");
+            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             step_choose(
                 &mut coro_guard,
                 &mut session_guard,
@@ -216,7 +216,7 @@ fn exec_instr(
             )
         }
         Instr::Offer { chan, ref label } => {
-            let mut session_guard = session.lock().expect("threaded VM lock poisoned");
+            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             step_offer(
                 &mut coro_guard,
                 &mut session_guard,
@@ -230,7 +230,7 @@ fn exec_instr(
         Instr::Close {
             session: session_reg,
         } => {
-            let mut session_guard = session.lock().expect("threaded VM lock poisoned");
+            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             let close_ep = endpoint_from_reg(&coro_guard, session_reg)?;
             if !coro_guard.owned_endpoints.contains(&close_ep) {
                 return Err(Fault::Close {
@@ -301,7 +301,7 @@ fn monitor_precheck(
     }
     match instr {
         Instr::Send { .. } | Instr::Offer { .. } => {
-            let session_guard = session.lock().expect("threaded VM lock poisoned");
+            let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             let local_type = session_guard
                 .local_types
                 .get(ep)
@@ -323,7 +323,7 @@ fn monitor_precheck(
             }
         }
         Instr::Receive { .. } => {
-            let session_guard = session.lock().expect("threaded VM lock poisoned");
+            let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             let local_type = session_guard
                 .local_types
                 .get(ep)
@@ -356,7 +356,7 @@ fn monitor_precheck(
                         .to_string(),
                 });
             }
-            let session_guard = session.lock().expect("threaded VM lock poisoned");
+            let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             let local_type = session_guard
                 .local_types
                 .get(ep)
@@ -392,7 +392,7 @@ fn monitor_precheck(
 }
 
 fn validate_payload(
-    config: &VMConfig,
+    config: &ProtocolMachineConfig,
     role: &str,
     context: &str,
     label: &str,
@@ -400,7 +400,7 @@ fn validate_payload(
     value: &Value,
     strict_requires_annotation: bool,
 ) -> Result<(), Fault> {
-    if config.payload_validation_mode == crate::vm::PayloadValidationMode::Off {
+    if config.payload_validation_mode == crate::engine::PayloadValidationMode::Off {
         return Ok(());
     }
 
@@ -432,7 +432,7 @@ fn validate_payload(
             }
         }
         None
-            if config.payload_validation_mode == crate::vm::PayloadValidationMode::StrictSchema
+            if config.payload_validation_mode == crate::engine::PayloadValidationMode::StrictSchema
                 && strict_requires_annotation =>
         {
             Err(Fault::TypeViolation {

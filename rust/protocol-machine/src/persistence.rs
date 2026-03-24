@@ -40,7 +40,7 @@ pub trait PersistenceModel {
     }
 }
 
-/// No-op persistence model useful for tests and default VM construction.
+/// No-op persistence model useful for tests and default ProtocolMachine construction.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct NoopPersistence;
 

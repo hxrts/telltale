@@ -7,7 +7,7 @@
 
 use crate::effect::EffectHandler;
 use crate::scheduler::Scheduler;
-use crate::vm::{RunStatus, StepResult, VMError};
+use crate::engine::{RunStatus, StepResult, ProtocolMachineError};
 
 /// Runtime machine that can execute one kernel scheduler round.
 pub trait KernelMachine {
@@ -15,19 +15,19 @@ pub trait KernelMachine {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if a coroutine faults.
+    /// Returns a `ProtocolMachineError` if a coroutine faults.
     fn kernel_step_round(
         &mut self,
         handler: &dyn EffectHandler,
         n: usize,
-    ) -> Result<StepResult, VMError>;
+    ) -> Result<StepResult, ProtocolMachineError>;
 }
 
 /// Canonical cooperative kernel entrypoints.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct VMKernel;
+pub struct ProtocolMachineKernel;
 
-impl VMKernel {
+impl ProtocolMachineKernel {
     /// Select a ready coroutine using kernel-owned scheduler policy semantics.
     ///
     /// `has_progress` models policy-relevant progress state, while
@@ -57,12 +57,12 @@ impl VMKernel {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if a coroutine faults.
+    /// Returns a `ProtocolMachineError` if a coroutine faults.
     pub fn step_round<M: KernelMachine>(
         vm: &mut M,
         handler: &dyn EffectHandler,
         n: usize,
-    ) -> Result<StepResult, VMError> {
+    ) -> Result<StepResult, ProtocolMachineError> {
         vm.kernel_step_round(handler, n)
     }
 
@@ -70,13 +70,13 @@ impl VMKernel {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if any coroutine faults.
+    /// Returns a `ProtocolMachineError` if any coroutine faults.
     pub fn run_concurrent<M: KernelMachine>(
         vm: &mut M,
         handler: &dyn EffectHandler,
         max_rounds: usize,
         concurrency: usize,
-    ) -> Result<RunStatus, VMError> {
+    ) -> Result<RunStatus, ProtocolMachineError> {
         for _ in 0..max_rounds {
             match Self::step_round(vm, handler, concurrency)? {
                 StepResult::AllDone => return Ok(RunStatus::AllDone),
@@ -91,12 +91,12 @@ impl VMKernel {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if any coroutine faults.
+    /// Returns a `ProtocolMachineError` if any coroutine faults.
     pub fn run<M: KernelMachine>(
         vm: &mut M,
         handler: &dyn EffectHandler,
         max_steps: usize,
-    ) -> Result<RunStatus, VMError> {
+    ) -> Result<RunStatus, ProtocolMachineError> {
         Self::run_concurrent(vm, handler, max_steps, 1)
     }
 }

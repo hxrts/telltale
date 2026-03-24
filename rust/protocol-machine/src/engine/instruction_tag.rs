@@ -1,4 +1,4 @@
-impl VM {
+impl ProtocolMachine {
     pub(crate) fn step_tag(
         &mut self,
         coro_idx: usize,

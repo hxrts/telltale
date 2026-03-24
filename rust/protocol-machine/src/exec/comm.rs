@@ -2,10 +2,10 @@
 
 use crate::coroutine::Fault;
 use crate::effect::EffectHandler;
-use crate::vm::{StepPack, VM};
+use crate::engine::{StepPack, ProtocolMachine};
 
 pub(crate) fn step_send(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     chan: u16,
@@ -16,7 +16,7 @@ pub(crate) fn step_send(
 }
 
 pub(crate) fn step_receive(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     chan: u16,
@@ -27,7 +27,7 @@ pub(crate) fn step_receive(
 }
 
 pub(crate) fn step_offer(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     chan: u16,
@@ -38,7 +38,7 @@ pub(crate) fn step_offer(
 }
 
 pub(crate) fn step_choose(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     chan: u16,

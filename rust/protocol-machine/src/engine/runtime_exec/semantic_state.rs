@@ -1,4 +1,4 @@
-impl VM {
+impl ProtocolMachine {
     fn coro_owner_id(coro_id: usize) -> FragmentOwnerId {
         format!("coro:{coro_id}")
     }
@@ -189,7 +189,7 @@ impl VM {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn evaluate_progress_contracts(&mut self) -> Result<(), VMError> {
+    fn evaluate_progress_contracts(&mut self) -> Result<(), ProtocolMachineError> {
         let active_effect_ids: Vec<_> = self
             .outstanding_effects
             .as_slice()
@@ -214,7 +214,7 @@ impl VM {
             };
             let effect = self.outstanding_effects.as_slice()[effect_index].clone();
             let budget = effect.budget_ticks.ok_or_else(|| {
-                VMError::HandlerError(EffectFailure::contract_violation(format!(
+                ProtocolMachineError::HandlerError(EffectFailure::contract_violation(format!(
                     "[host-contract] semantic-path effect {} requires a bounded wait budget",
                     effect.effect_id
                 )))
@@ -225,7 +225,7 @@ impl VM {
                 .iter()
                 .find(|contract| contract.operation_id == effect.operation_id)
             else {
-                return Err(VMError::HandlerError(EffectFailure::contract_violation(
+                return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
                     format!(
                         "[host-contract] outstanding effect {} requires a live progress contract",
                         effect.effect_id
@@ -506,14 +506,14 @@ impl VM {
         effect_id: u64,
         status: OutstandingEffectStatus,
         outputs: serde_json::Value,
-    ) -> Result<(), VMError> {
+    ) -> Result<(), ProtocolMachineError> {
         let Some(effect_index) = self
             .outstanding_effects
             .as_slice()
             .iter()
             .position(|effect| effect.effect_id == effect_id)
         else {
-            return Err(VMError::HandlerError(EffectFailure::contract_violation(
+            return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
                 format!(
                     "[host-contract] completion for effect {effect_id} requires a live outstanding-effect record"
                 ),
@@ -523,7 +523,7 @@ impl VM {
             self.outstanding_effects.as_slice()[effect_index].status,
             OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
         ) {
-            return Err(VMError::HandlerError(EffectFailure::contract_violation(
+            return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
                 format!(
                     "[host-contract] late result for effect {effect_id} rejected after {:?}",
                     self.outstanding_effects.as_slice()[effect_index].status
@@ -705,8 +705,8 @@ impl VM {
 mod runtime_effect_state_tests {
     use super::*;
 
-    fn test_vm() -> VM {
-        VM::new(VMConfig::default())
+    fn test_vm() -> ProtocolMachine {
+        ProtocolMachine::new(ProtocolMachineConfig::default())
     }
 
     #[test]

@@ -4,7 +4,7 @@ use crate::coroutine::Fault;
 use crate::effect::EffectHandler;
 use crate::instr::{Endpoint, Instr};
 use crate::session::SessionId;
-use crate::vm::{StepPack, VM};
+use crate::engine::{StepPack, ProtocolMachine};
 
 pub(crate) mod comm;
 pub(crate) mod control;
@@ -16,7 +16,7 @@ pub(crate) mod speculation;
 
 /// Dispatch one instruction to its semantic execution module.
 pub(crate) fn step_instr(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     ep: &Endpoint,
     role: &str,

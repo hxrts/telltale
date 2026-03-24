@@ -1,6 +1,6 @@
-/// VM configuration.
+/// ProtocolMachine configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VMConfig {
+pub struct ProtocolMachineConfig {
     /// Migration-safe config schema version.
     #[serde(default = "default_config_schema_version")]
     pub config_schema_version: u32,
@@ -16,7 +16,7 @@ pub struct VMConfig {
     pub num_registers: u16,
     /// Simulated time per scheduler round.
     pub tick_duration: Duration,
-    /// Guard layers configured for the VM.
+    /// Guard layers configured for the ProtocolMachine.
     pub guard_layers: Vec<GuardLayerConfig>,
     /// Whether speculative execution is enabled.
     pub speculation_enabled: bool,
@@ -60,7 +60,7 @@ pub struct VMConfig {
     /// Communication replay-consumption mode.
     #[serde(default)]
     pub communication_replay_mode: CommunicationReplayMode,
-    /// Upper bound for VM payload values in estimated wire bytes.
+    /// Upper bound for ProtocolMachine payload values in estimated wire bytes.
     #[serde(default = "default_max_payload_bytes")]
     pub max_payload_bytes: usize,
     /// Enable runtime host-contract assertions with deterministic diagnostics.
@@ -68,7 +68,7 @@ pub struct VMConfig {
     pub host_contract_assertions: bool,
 }
 
-impl Default for VMConfig {
+impl Default for ProtocolMachineConfig {
     fn default() -> Self {
         Self {
             config_schema_version: default_config_schema_version(),
@@ -100,8 +100,8 @@ impl Default for VMConfig {
     }
 }
 
-impl VMConfig {
-    /// Validate VM configuration invariants required for safe state initialization.
+impl ProtocolMachineConfig {
+    /// Validate ProtocolMachine configuration invariants required for safe state initialization.
     ///
     /// # Errors
     ///
@@ -133,7 +133,7 @@ impl VMConfig {
         Ok(())
     }
 
-    /// Assert VM configuration invariants required for safe state initialization.
+    /// Assert ProtocolMachine configuration invariants required for safe state initialization.
     ///
     /// # Panics
     ///
@@ -221,7 +221,7 @@ impl VMConfig {
     }
 }
 
-/// Observable event emitted by the VM.
+/// Observable event emitted by the ProtocolMachine.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TickedObsEvent {
     /// Scheduler tick when the wrapped event occurred.
@@ -230,7 +230,7 @@ pub struct TickedObsEvent {
     pub event: ObsEvent,
 }
 
-/// Observable event emitted by the VM.
+/// Observable event emitted by the ProtocolMachine.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SessionTerminalReason {
     /// Session closed normally.
@@ -255,7 +255,7 @@ pub enum SessionTerminalReason {
     },
 }
 
-/// Observable event emitted by the VM.
+/// Observable event emitted by the ProtocolMachine.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ObsEvent {
     /// Value sent on an edge.
@@ -508,7 +508,7 @@ pub enum ObsEvent {
     },
 }
 
-/// The VM execution result for a single step.
+/// The ProtocolMachine execution result for a single step.
 #[derive(Debug)]
 pub enum StepResult {
     /// A coroutine executed an instruction and may continue.
@@ -519,7 +519,7 @@ pub enum StepResult {
     AllDone,
 }
 
-/// Terminal status returned by bounded VM run APIs.
+/// Terminal status returned by bounded ProtocolMachine run APIs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RunStatus {
     /// All coroutines reached terminal states.

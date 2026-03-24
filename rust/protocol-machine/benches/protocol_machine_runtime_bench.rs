@@ -1,10 +1,10 @@
 #![allow(missing_docs)]
 
-#[path = "vm_bench_common.rs"]
+#[path = "protocol_machine_bench_common.rs"]
 mod common;
-#[path = "vm_bench_runtime.rs"]
+#[path = "protocol_machine_bench_runtime.rs"]
 mod runtime;
-#[path = "vm_bench_verification.rs"]
+#[path = "protocol_machine_bench_verification.rs"]
 mod verification;
 
 use criterion::{criterion_group, criterion_main, Criterion};

@@ -3,41 +3,41 @@
 use crate::effect::EffectHandler;
 use crate::loader::CodeImage;
 use crate::owned::OwnedSession;
-use crate::threaded::ThreadedVM;
-use crate::vm::{ObsEvent, RunStatus, StepResult, VMConfig, VMError};
+use crate::threaded::ThreadedProtocolMachine;
+use crate::engine::{ObsEvent, RunStatus, StepResult, ProtocolMachineConfig, ProtocolMachineError};
 
 /// Native threaded guest runtime backed by the threaded protocol machine.
 #[doc(alias = "ThreadedGuestRuntime")]
 pub struct NativeThreadedDriver {
-    vm: ThreadedVM,
+    vm: ThreadedProtocolMachine,
 }
 
 impl NativeThreadedDriver {
     /// Create a threaded guest runtime with explicit worker count.
     #[must_use]
-    pub fn with_workers(config: VMConfig, workers: usize) -> Self {
+    pub fn with_workers(config: ProtocolMachineConfig, workers: usize) -> Self {
         Self {
-            vm: ThreadedVM::with_workers(config, workers),
+            vm: ThreadedProtocolMachine::with_workers(config, workers),
         }
     }
 
     /// Create a threaded guest runtime with auto worker count.
     #[must_use]
-    pub fn auto(config: VMConfig) -> Self {
+    pub fn auto(config: ProtocolMachineConfig) -> Self {
         Self {
-            vm: ThreadedVM::auto(config),
+            vm: ThreadedProtocolMachine::auto(config),
         }
     }
 
     /// Wrap an existing threaded protocol-machine instance.
     #[must_use]
-    pub fn with_vm(vm: ThreadedVM) -> Self {
+    pub fn with_vm(vm: ThreadedProtocolMachine) -> Self {
         Self { vm }
     }
 
     /// Access the inner threaded protocol machine.
     #[must_use]
-    pub fn vm(&self) -> &ThreadedVM {
+    pub fn vm(&self) -> &ThreadedProtocolMachine {
         &self.vm
     }
 
@@ -45,12 +45,12 @@ impl NativeThreadedDriver {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if the choreography cannot be loaded or claimed.
+    /// Returns a `ProtocolMachineError` if the choreography cannot be loaded or claimed.
     pub fn load_choreography_owned(
         &mut self,
         image: &CodeImage,
         owner_id: impl Into<String>,
-    ) -> Result<OwnedSession, VMError> {
+    ) -> Result<OwnedSession, ProtocolMachineError> {
         self.vm.load_choreography_owned(image, owner_id)
     }
 
@@ -58,12 +58,12 @@ impl NativeThreadedDriver {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if a coroutine faults.
+    /// Returns a `ProtocolMachineError` if a coroutine faults.
     pub fn step_round(
         &mut self,
         handler: &dyn EffectHandler,
         n: usize,
-    ) -> Result<StepResult, VMError> {
+    ) -> Result<StepResult, ProtocolMachineError> {
         self.vm.step_round(handler, n)
     }
 
@@ -71,12 +71,12 @@ impl NativeThreadedDriver {
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if a coroutine faults.
+    /// Returns a `ProtocolMachineError` if a coroutine faults.
     pub fn run(
         &mut self,
         handler: &dyn EffectHandler,
         max_rounds: usize,
-    ) -> Result<RunStatus, VMError> {
+    ) -> Result<RunStatus, ProtocolMachineError> {
         self.vm.run(handler, max_rounds)
     }
 

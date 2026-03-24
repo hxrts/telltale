@@ -1,4 +1,4 @@
-fn guard_active(config: &VMConfig, layer: &str) -> Result<(), Fault> {
+fn guard_active(config: &ProtocolMachineConfig, layer: &str) -> Result<(), Fault> {
     if config.guard_layers.is_empty() {
         return Ok(());
     }
@@ -25,7 +25,7 @@ fn step_acquire(
         let mut resources = ctx
             .guard_resources
             .lock()
-            .expect("threaded VM lock poisoned");
+            .expect("threaded ProtocolMachine lock poisoned");
         resources
             .entry(input.layer.to_string())
             .or_insert(Value::Unit);
@@ -52,14 +52,14 @@ fn step_acquire(
             let mut resources = ctx
                 .guard_resources
                 .lock()
-                .expect("threaded VM lock poisoned");
+                .expect("threaded ProtocolMachine lock poisoned");
             resources.insert(input.layer.to_string(), Value::Unit);
             drop(resources);
 
             let mut scoped_states = ctx
                 .resource_states
                 .lock()
-                .expect("threaded VM lock poisoned");
+                .expect("threaded ProtocolMachine lock poisoned");
             let state = scoped_states.entry(input.sid).or_default();
             let _commitment = state.commit(&Value::Unit);
             Ok(StepPack {
@@ -80,14 +80,14 @@ fn step_acquire(
             let mut resources = ctx
                 .guard_resources
                 .lock()
-                .expect("threaded VM lock poisoned");
+                .expect("threaded ProtocolMachine lock poisoned");
             resources.insert(input.layer.to_string(), evidence.clone());
             drop(resources);
 
             let mut scoped_states = ctx
                 .resource_states
                 .lock()
-                .expect("threaded VM lock poisoned");
+                .expect("threaded ProtocolMachine lock poisoned");
             let state = scoped_states.entry(input.sid).or_default();
             let _commitment = state.commit(&evidence);
             Ok(StepPack {
@@ -117,7 +117,7 @@ fn step_release(
         let mut resources = ctx
             .guard_resources
             .lock()
-            .expect("threaded VM lock poisoned");
+            .expect("threaded ProtocolMachine lock poisoned");
         resources
             .entry(input.layer.to_string())
             .or_insert(Value::Unit);
@@ -148,14 +148,14 @@ fn step_release(
         let mut resources = ctx
             .guard_resources
             .lock()
-            .expect("threaded VM lock poisoned");
+            .expect("threaded ProtocolMachine lock poisoned");
         resources.insert(input.layer.to_string(), ev.clone());
     }
 
     if let Some(state) = ctx
         .resource_states
         .lock()
-        .expect("threaded VM lock poisoned")
+        .expect("threaded ProtocolMachine lock poisoned")
         .get_mut(&input.sid)
     {
         state.consume(&ev).map_err(|message| Fault::Acquire {
@@ -180,7 +180,7 @@ fn step_fork(
     role: &str,
     sid: SessionId,
     ghost: u16,
-    config: &VMConfig,
+    config: &ProtocolMachineConfig,
     tick: u64,
 ) -> Result<StepPack, Fault> {
     if !config.speculation_enabled {

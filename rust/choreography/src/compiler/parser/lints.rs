@@ -48,7 +48,7 @@ pub fn collect_dsl_lints(choreography: &Choreography, level: LintLevel) -> Vec<L
             &mut diagnostics,
             level,
             "dsl.inferred_requires",
-            "Protocol requirements were inferred from VM-core capabilities",
+            "Protocol requirements were inferred from ProtocolMachine-core capabilities",
             Some(format!(
                 "Add explicit `requires {}` to the protocol header",
                 inferred.join(", ")

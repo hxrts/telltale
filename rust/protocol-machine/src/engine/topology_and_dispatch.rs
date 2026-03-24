@@ -1,4 +1,4 @@
-impl VM {
+impl ProtocolMachine {
     fn issue_timeout_witness(&mut self, site: &str, until_tick: u64) -> TimeoutWitness {
         let witness = TimeoutWitness {
             witness_id: self.next_authority_witness_id,
@@ -166,7 +166,7 @@ impl VM {
         }
     }
 
-    fn enforce_handler_identity_contract(&mut self, handler_identity: &str) -> Result<(), VMError> {
+    fn enforce_handler_identity_contract(&mut self, handler_identity: &str) -> Result<(), ProtocolMachineError> {
         if !self.config.host_contract_assertions {
             return Ok(());
         }
@@ -176,7 +176,7 @@ impl VM {
                 Ok(())
             }
             Some(anchor) if anchor == handler_identity => Ok(()),
-            Some(anchor) => Err(VMError::HandlerError(EffectFailure::contract_violation(
+            Some(anchor) => Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
                 format!(
                     "[host-contract] handler_identity changed from '{anchor}' to '{handler_identity}'"
                 ),
@@ -188,7 +188,7 @@ impl VM {
         &self,
         tick: u64,
         events: &[TopologyPerturbation],
-    ) -> Result<(), VMError> {
+    ) -> Result<(), ProtocolMachineError> {
         if !self.config.host_contract_assertions {
             return Ok(());
         }
@@ -196,7 +196,7 @@ impl VM {
             let prev_key = events[idx - 1].ordering_key();
             let next_key = events[idx].ordering_key();
             if prev_key > next_key {
-                return Err(VMError::HandlerError(EffectFailure::contract_violation(
+                return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
                     format!(
                         "[host-contract] topology_events at tick {tick} must be pre-sorted by ordering_key; out-of-order index {idx}"
                     ),
@@ -206,7 +206,7 @@ impl VM {
         Ok(())
     }
 
-    fn assert_delegation_events_audited(&self, events: &[ObsEvent]) -> Result<(), VMError> {
+    fn assert_delegation_events_audited(&self, events: &[ObsEvent]) -> Result<(), ProtocolMachineError> {
         if !self.config.host_contract_assertions {
             return Ok(());
         }
@@ -231,7 +231,7 @@ impl VM {
                     && audit.receipt.scope == expected_scope
             });
             if !found {
-                return Err(VMError::HandlerError(EffectFailure::contract_violation(
+                return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
                     format!(
                         "[host-contract] transfer event for session {session} role {role} must have a matching committed delegation audit record"
                     ),
@@ -292,13 +292,13 @@ impl VM {
         self.normalize_topology_state();
     }
 
-    fn ingest_topology_events(&mut self, handler: &dyn EffectHandler) -> Result<(), VMError> {
+    fn ingest_topology_events(&mut self, handler: &dyn EffectHandler) -> Result<(), ProtocolMachineError> {
         let tick = self.clock.tick;
         let handler_identity = handler.handler_identity();
         self.enforce_handler_identity_contract(&handler_identity)?;
         let request = EffectRequest::topology_events(tick);
         self.ensure_effect_request_allowed(&request)
-            .map_err(VMError::HandlerError)?;
+            .map_err(ProtocolMachineError::HandlerError)?;
         let predicted_effect_id = self.next_effect_id;
         let topology_outcome = handler.handle_effect(request.clone());
         self.record_effect_exchange(&request, &topology_outcome, &handler_identity, predicted_effect_id);
@@ -308,7 +308,7 @@ impl VM {
             .expect_success(|| {
                 EffectFailure::contract_violation("topology_events returned blocked")
             })
-            .map_err(VMError::HandlerError)?;
+            .map_err(ProtocolMachineError::HandlerError)?;
         self.assert_topology_events_sorted(tick, &events)?;
         events.sort_by_key(TopologyPerturbation::ordering_key);
         for event in events {

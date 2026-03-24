@@ -1,7 +1,7 @@
 //! Shared helpers for instruction-step pack construction.
 
 use crate::coroutine::Value;
-use crate::vm::{CoroUpdate, StepPack};
+use crate::engine::{CoroUpdate, StepPack};
 
 /// Build an empty step pack for control-flow style updates.
 #[must_use]

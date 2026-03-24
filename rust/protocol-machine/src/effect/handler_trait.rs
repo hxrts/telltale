@@ -1,4 +1,4 @@
-/// VM-level effect handler.
+/// ProtocolMachine-level effect handler.
 ///
 /// This is the interface between a guest runtime and the surrounding host
 /// runtime. Each choreography can bind a different handler at session open
@@ -10,7 +10,7 @@
 ///   execution and feed their results back through canonical ingress.
 /// - Implementations must treat the provided `state` as session-local scratch
 ///   for the current request only. They must not rely on unrelated session
-///   state or mutate VM session metadata through side channels.
+///   state or mutate ProtocolMachine session metadata through side channels.
 /// - Host-managed session-local mutation should flow through an explicit
 ///   ownership capability such as `OwnedSession`, not through ad hoc access to
 ///   the session store while handlers are executing.
@@ -210,7 +210,7 @@ pub trait EffectHandler: Send + Sync {
     ///
     /// Branch-selection helper for custom runners.
     ///
-    /// The canonical VM resolves branch labels from received payloads and does
+    /// The canonical ProtocolMachine resolves branch labels from received payloads and does
     /// not call this method in default dispatch paths.
     ///
     /// # Arguments
@@ -263,7 +263,7 @@ pub trait EffectHandler: Send + Sync {
 
     /// Topology perturbations injected by the environment for this scheduler tick.
     ///
-    /// The VM ingests these before selecting coroutines for the round. This is
+    /// The ProtocolMachine ingests these before selecting coroutines for the round. This is
     /// a canonical ingress surface for external events; implementations should
     /// stage async discoveries before this method is called rather than doing
     /// async work from inside request handling.
@@ -275,8 +275,8 @@ pub trait EffectHandler: Send + Sync {
 
     /// Optional output-condition metadata for commit gating.
     ///
-    /// The VM calls this only when a step emits observable events. Returning `None`
-    /// delegates to VM-default metadata.
+    /// The ProtocolMachine calls this only when a step emits observable events. Returning `None`
+    /// delegates to ProtocolMachine-default metadata.
     fn output_condition_hint(
         &self,
         _sid: SessionId,

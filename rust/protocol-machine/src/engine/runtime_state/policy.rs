@@ -289,7 +289,7 @@ impl Default for ObservabilityRetentionConfig {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PayloadValidationMode {
-    /// Disable VM-side payload validation checks.
+    /// Disable ProtocolMachine-side payload validation checks.
     Off,
     /// Validate payload size and annotated `ValType` compatibility.
     #[default]

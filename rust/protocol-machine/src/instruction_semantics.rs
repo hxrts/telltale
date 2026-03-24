@@ -1,4 +1,4 @@
-//! Shared instruction operand decoding helpers used by both VM executors.
+//! Shared instruction operand decoding helpers used by both ProtocolMachine executors.
 
 use crate::coroutine::Fault;
 use crate::coroutine::{Coroutine, Value};

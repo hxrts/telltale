@@ -1,4 +1,4 @@
-//! Distributed simulation tests using nested VMs.
+//! Distributed simulation tests using nested ProtocolMachines.
 
 use std::collections::BTreeMap;
 

@@ -1,21 +1,21 @@
-//! Nested VM handler for distributed simulation.
+//! Nested ProtocolMachine handler for distributed simulation.
 //!
-//! The outer VM schedules site coroutines; each site handler advances an
-//! inner VM that runs site-local protocols.
+//! The outer ProtocolMachine schedules site coroutines; each site handler advances an
+//! inner ProtocolMachine that runs site-local protocols.
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use crate::coroutine::Value;
 use crate::effect::{EffectFailure, EffectHandler, EffectResult};
-use crate::vm::{ObsEvent, StepResult, VMError, VM};
+use crate::engine::{ObsEvent, StepResult, ProtocolMachineError, ProtocolMachine};
 
 struct SiteRunner {
-    vm: Mutex<VM>,
+    vm: Mutex<ProtocolMachine>,
     handler: Box<dyn EffectHandler>,
 }
 
-/// Effect handler that dispatches to inner VMs keyed by outer role name.
+/// Effect handler that dispatches to inner ProtocolMachines keyed by outer role name.
 pub struct NestedVMHandler {
     sites: BTreeMap<String, SiteRunner>,
     max_rounds_per_step: usize,
@@ -31,21 +31,21 @@ impl NestedVMHandler {
         }
     }
 
-    /// Set how many inner VM rounds to advance per outer handler call.
+    /// Set how many inner ProtocolMachine rounds to advance per outer handler call.
     #[must_use]
     pub fn with_rounds_per_step(mut self, rounds: usize) -> Self {
         self.max_rounds_per_step = rounds.max(1);
         self
     }
 
-    /// Number of inner VM rounds attempted per outer handler call.
+    /// Number of inner ProtocolMachine rounds attempted per outer handler call.
     #[must_use]
     pub fn rounds_per_step(&self) -> usize {
         self.max_rounds_per_step
     }
 
-    /// Register a site by name with its inner VM and handler.
-    pub fn add_site(&mut self, name: impl Into<String>, vm: VM, handler: Box<dyn EffectHandler>) {
+    /// Register a site by name with its inner ProtocolMachine and handler.
+    pub fn add_site(&mut self, name: impl Into<String>, vm: ProtocolMachine, handler: Box<dyn EffectHandler>) {
         self.sites.insert(
             name.into(),
             SiteRunner {
@@ -55,11 +55,11 @@ impl NestedVMHandler {
         );
     }
 
-    /// Get a copy of the inner VM trace for a site.
+    /// Get a copy of the inner ProtocolMachine trace for a site.
     ///
     /// # Panics
     ///
-    /// Panics if the site VM mutex is poisoned.
+    /// Panics if the site ProtocolMachine mutex is poisoned.
     #[must_use]
     pub fn site_trace(&self, name: &str) -> Option<Vec<ObsEvent>> {
         self.sites.get(name).map(|site| {
@@ -71,11 +71,11 @@ impl NestedVMHandler {
         })
     }
 
-    /// Check whether all coroutines in a site VM are terminal.
+    /// Check whether all coroutines in a site ProtocolMachine are terminal.
     ///
     /// # Panics
     ///
-    /// Panics if the site VM mutex is poisoned.
+    /// Panics if the site ProtocolMachine mutex is poisoned.
     #[must_use]
     pub fn site_all_done(&self, name: &str) -> Option<bool> {
         self.sites.get(name).map(|site| {
@@ -102,7 +102,7 @@ impl NestedVMHandler {
             match vm.step_round(handler, 1) {
                 Ok(StepResult::Continue) => {}
                 Ok(StepResult::AllDone | StepResult::Stuck) => break,
-                Err(VMError::Fault { fault, .. }) => {
+                Err(ProtocolMachineError::Fault { fault, .. }) => {
                     return Err(format!("inner vm fault: {fault}"));
                 }
                 Err(e) => return Err(e.to_string()),

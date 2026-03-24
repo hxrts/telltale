@@ -49,5 +49,5 @@ proptest = { workspace = true }
 workspace = true
 
 [[bench]]
-name = "vm_runtime_bench"
+name = "protocol_machine_runtime_bench"
 harness = false

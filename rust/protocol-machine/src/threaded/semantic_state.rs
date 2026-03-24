@@ -1,4 +1,4 @@
-impl ThreadedVM {
+impl ThreadedProtocolMachine {
     fn coro_owner_id(coro_id: usize) -> String {
         format!("coro:{coro_id}")
     }
@@ -185,7 +185,7 @@ impl ThreadedVM {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn evaluate_progress_contracts(&mut self) -> Result<(), VMError> {
+    fn evaluate_progress_contracts(&mut self) -> Result<(), ProtocolMachineError> {
         let active_effect_ids: Vec<_> = self
             .outstanding_effects
             .iter()
@@ -208,7 +208,7 @@ impl ThreadedVM {
             };
             let effect = self.outstanding_effects[effect_index].clone();
             let budget = effect.budget_ticks.ok_or_else(|| {
-                VMError::HandlerError(EffectFailure::contract_violation(format!(
+                ProtocolMachineError::HandlerError(EffectFailure::contract_violation(format!(
                     "[host-contract] semantic-path effect {} requires a bounded wait budget",
                     effect.effect_id
                 )))
@@ -218,7 +218,7 @@ impl ThreadedVM {
                 .iter()
                 .find(|contract| contract.operation_id == effect.operation_id)
             else {
-                return Err(VMError::HandlerError(EffectFailure::contract_violation(
+                return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
                     format!(
                         "[host-contract] outstanding effect {} requires a live progress contract",
                         effect.effect_id
@@ -485,13 +485,13 @@ impl ThreadedVM {
         effect_id: u64,
         status: OutstandingEffectStatus,
         outputs: serde_json::Value,
-    ) -> Result<(), VMError> {
+    ) -> Result<(), ProtocolMachineError> {
         let Some(effect_index) = self
             .outstanding_effects
             .iter()
             .position(|effect| effect.effect_id == effect_id)
         else {
-            return Err(VMError::HandlerError(EffectFailure::contract_violation(
+            return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
                 format!(
                     "[host-contract] completion for effect {effect_id} requires a live outstanding-effect record"
                 ),
@@ -501,7 +501,7 @@ impl ThreadedVM {
             self.outstanding_effects[effect_index].status,
             OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
         ) {
-            return Err(VMError::HandlerError(EffectFailure::contract_violation(
+            return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
                 format!(
                     "[host-contract] late result for effect {effect_id} rejected after {:?}",
                     self.outstanding_effects[effect_index].status

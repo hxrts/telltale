@@ -1,6 +1,6 @@
-//! Generic execution-result API aligned with the Lean VM execution model.
+//! Generic execution-result API aligned with the Lean ProtocolMachine execution model.
 
-use crate::vm::ObsEvent;
+use crate::engine::ObsEvent;
 
 /// Execution status after one step/round.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,7 +18,7 @@ pub enum ExecStatus<G = ()> {
 /// One execution event emitted by a step.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StepEvent<E = ()> {
-    /// Observable VM event.
+    /// Observable ProtocolMachine event.
     Obs(ObsEvent),
     /// Internal effect/policy event payload.
     Internal(E),

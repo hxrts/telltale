@@ -28,12 +28,12 @@
 //! }
 //! ```
 //!
-//! ## VM Boundary
+//! ## ProtocolMachine Boundary
 //!
-//! The bytecode VM in `telltale-protocol-machine` exposes a separate, synchronous
+//! The bytecode ProtocolMachine in `telltale-protocol-machine` exposes a separate, synchronous
 //! `EffectHandler` trait for simulation/runtime integration. It is not
 //! interchangeable with `ChoreoHandler`: `ChoreoHandler` is async and typed
-//! over concrete message/role types, while the VM handler operates over
+//! over concrete message/role types, while the ProtocolMachine handler operates over
 //! bytecode values and must remain session-local for determinism.
 
 use async_trait::async_trait;

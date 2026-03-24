@@ -1,6 +1,6 @@
-/// Errors from VM operations.
+/// Errors from ProtocolMachine operations.
 #[derive(Debug, thiserror::Error)]
-pub enum VMError {
+pub enum ProtocolMachineError {
     /// A coroutine faulted.
     #[error("coroutine {coro_id} faulted: {fault}")]
     Fault {
@@ -36,8 +36,8 @@ pub enum VMError {
         /// Requested concurrency.
         n: usize,
     },
-    /// VM configuration violates required runtime invariants.
-    #[error("invalid VM config: {reason}")]
+    /// ProtocolMachine configuration violates required runtime invariants.
+    #[error("invalid ProtocolMachine config: {reason}")]
     InvalidConfig {
         /// Validation failure details.
         reason: String,
@@ -148,7 +148,7 @@ pub(crate) enum ExecOutcome {
     Halted,
 }
 
-// ---- The VM ----
+// ---- The ProtocolMachine ----
 
 /// Retained observability artifacts with optional bounded storage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -223,17 +223,17 @@ impl<T> std::ops::Deref for RetainedLog<T> {
     }
 }
 
-/// The choreographic VM.
+/// The choreographic ProtocolMachine.
 ///
 /// Manages coroutines, sessions (which own type state), and a scheduler.
-/// Multiple choreographies can be loaded into a single VM, each in its
+/// Multiple choreographies can be loaded into a single ProtocolMachine, each in its
 /// own session namespace — justified by separation logic.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct VM<I = (), G = (), P = NoopPersistence, Nu = DefaultVerificationModel>
+pub struct ProtocolMachine<I = (), G = (), P = NoopPersistence, Nu = DefaultVerificationModel>
 where
     P: PersistenceModel,
 {
-    config: VMConfig,
+    config: ProtocolMachineConfig,
     code: Option<Program>,
     programs: ProgramStore,
     identity_model: PhantomData<I>,
@@ -295,17 +295,17 @@ where
     handler_identity_anchor: Option<String>,
 }
 
-/// Lean-aligned VM state alias.
-pub type VMState<I = (), G = (), P = NoopPersistence, Nu = DefaultVerificationModel> =
-    VM<I, G, P, Nu>;
+/// Lean-aligned ProtocolMachine state alias.
+pub type ProtocolMachineState<I = (), G = (), P = NoopPersistence, Nu = DefaultVerificationModel> =
+    ProtocolMachine<I, G, P, Nu>;
 
-impl<I, G, P, Nu> VM<I, G, P, Nu>
+impl<I, G, P, Nu> ProtocolMachine<I, G, P, Nu>
 where
     P: PersistenceModel,
 {
-    /// Create a VM for arbitrary persistence/verification model parameters.
+    /// Create a ProtocolMachine for arbitrary persistence/verification model parameters.
     #[must_use]
-    pub fn new_with_models(config: VMConfig) -> Self
+    pub fn new_with_models(config: ProtocolMachineConfig) -> Self
     where
         P::PState: Default,
         Nu: VerificationModel + Default,

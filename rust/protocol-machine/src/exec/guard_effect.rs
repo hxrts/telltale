@@ -5,10 +5,10 @@ use crate::effect::EffectHandler;
 use crate::instr::Endpoint;
 use crate::instr::InvokeAction;
 use crate::session::SessionId;
-use crate::vm::{GuardAcquireInput, GuardReleaseInput, StepPack, VM};
+use crate::engine::{GuardAcquireInput, GuardReleaseInput, StepPack, ProtocolMachine};
 
 pub(crate) fn step_invoke(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     action: InvokeAction,
@@ -18,7 +18,7 @@ pub(crate) fn step_invoke(
 }
 
 pub(crate) fn step_acquire(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     ep: &Endpoint,
     role: &str,
@@ -41,7 +41,7 @@ pub(crate) fn step_acquire(
 }
 
 pub(crate) fn step_release(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     coro_idx: usize,
     ep: &Endpoint,
     role: &str,

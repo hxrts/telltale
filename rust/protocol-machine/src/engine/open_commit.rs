@@ -1,4 +1,4 @@
-impl VM {
+impl ProtocolMachine {
     fn intern_edge(&mut self, edge: &Edge) -> EdgeId {
         let sender = self.role_symbols.intern(&edge.sender);
         let receiver = self.role_symbols.intern(&edge.receiver);

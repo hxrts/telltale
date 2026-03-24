@@ -1,4 +1,4 @@
-impl VM {
+impl ProtocolMachine {
     /// Access the simulation clock.
     #[must_use]
     pub fn clock(&self) -> &SimClock {
@@ -27,7 +27,7 @@ impl VM {
             .map(|program| program.len())
     }
 
-    /// Number of unique immutable programs retained by the VM.
+    /// Number of unique immutable programs retained by the ProtocolMachine.
     #[must_use]
     pub fn unique_program_count(&self) -> usize {
         self.programs.len()
@@ -73,7 +73,7 @@ impl VM {
     ///
     /// # Errors
     ///
-    /// Returns a description of the invariant violation if the VM state is invalid.
+    /// Returns a description of the invariant violation if the ProtocolMachine state is invalid.
     #[allow(clippy::too_many_lines)]
     fn wf_coroutine_state(&self, coro: &Coroutine) -> Result<(), String> {
         if self.sessions.get(coro.session_id).is_none() {
@@ -192,7 +192,7 @@ impl VM {
     ///
     /// # Errors
     ///
-    /// Returns a description of the invariant violation if the VM state is invalid.
+    /// Returns a description of the invariant violation if the ProtocolMachine state is invalid.
     #[allow(clippy::too_many_lines)]
     pub fn wf_vm_state(&self) -> Result<(), String> {
         for coro in &self.coroutines {
@@ -211,7 +211,7 @@ impl VM {
     /// Inject a message directly into a session buffer.
     ///
     /// Used by simulation middleware (network/fault injection) to deliver
-    /// in-flight messages without executing a VM send instruction.
+    /// in-flight messages without executing a ProtocolMachine send instruction.
     ///
     /// # Errors
     ///
@@ -222,14 +222,14 @@ impl VM {
         from: &str,
         to: &str,
         value: Value,
-    ) -> Result<EnqueueResult, VMError> {
+    ) -> Result<EnqueueResult, ProtocolMachineError> {
         let session = self
             .sessions
             .get_mut(sid)
-            .ok_or(VMError::SessionNotFound(sid))?;
+            .ok_or(ProtocolMachineError::SessionNotFound(sid))?;
         session
             .send(from, to, value)
-            .map_err(|_| VMError::SessionNotFound(sid))
+            .map_err(|_| ProtocolMachineError::SessionNotFound(sid))
     }
 
     /// Access all coroutines.

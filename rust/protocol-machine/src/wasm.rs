@@ -12,7 +12,7 @@ use crate::driver::WasmCooperativeDriver;
 use crate::effect::{EffectFailure, EffectHandler, EffectResult};
 use crate::loader::CodeImage;
 use crate::trace::{normalize_trace, strict_trace};
-use crate::vm::{ObsEvent, RunStatus, StepResult, VMConfig};
+use crate::engine::{ObsEvent, RunStatus, StepResult, ProtocolMachineConfig};
 
 #[derive(Debug, Deserialize)]
 struct WasmChoreoSpec {
@@ -74,7 +74,7 @@ impl WasmVM {
     #[wasm_bindgen(constructor)]
     pub fn new() -> WasmVM {
         WasmVM {
-            inner: WasmCooperativeDriver::new(VMConfig::default()),
+            inner: WasmCooperativeDriver::new(ProtocolMachineConfig::default()),
         }
     }
 

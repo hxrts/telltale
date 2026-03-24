@@ -15,20 +15,20 @@ use crate::session::{
 use crate::trace::normalize_trace;
 use crate::transfer_semantics::{DelegationAuditRecord, DelegationReceipt, DelegationStatus};
 use crate::verification::Hash;
-use crate::vm::{ObsEvent, SessionTerminalReason};
+use crate::engine::{ObsEvent, SessionTerminalReason};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
-/// Canonical schema version identifier for VM replay/trace payloads.
+/// Canonical schema version identifier for ProtocolMachine replay/trace payloads.
 pub const SERIALIZATION_SCHEMA_VERSION: &str = "vm.serialization.v1";
 
 fn canonical_serialization_schema_version() -> String {
     SERIALIZATION_SCHEMA_VERSION.to_string()
 }
 
-/// Serialize one value through the canonical VM binary codec.
+/// Serialize one value through the canonical ProtocolMachine binary codec.
 ///
-/// This wrapper keeps binary-serialization policy centralized inside the VM
+/// This wrapper keeps binary-serialization policy centralized inside the ProtocolMachine
 /// crate instead of scattering direct `bincode` calls through runtime code.
 ///
 /// # Errors
@@ -39,9 +39,9 @@ pub fn binary_encode<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, bincod
     bincode::serialize(value)
 }
 
-/// Deserialize one value through the canonical VM binary codec.
+/// Deserialize one value through the canonical ProtocolMachine binary codec.
 ///
-/// This wrapper keeps binary-serialization policy centralized inside the VM
+/// This wrapper keeps binary-serialization policy centralized inside the ProtocolMachine
 /// crate instead of scattering direct `bincode` calls through runtime code.
 ///
 /// # Errors

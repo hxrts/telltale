@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::determinism::DeterminismMode;
 use crate::scheduler::SchedPolicy;
-use crate::vm::VMConfig;
+use crate::engine::ProtocolMachineConfig;
 
-/// VM admission result for advanced runtime mode checks.
+/// ProtocolMachine admission result for advanced runtime mode checks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RuntimeAdmissionResult {
     /// Runtime mode is admitted.
@@ -113,14 +113,14 @@ fn sched_policy_requires_contracts(policy: &SchedPolicy) -> bool {
 
 /// Whether protocol-machine config requires runtime contracts for admission.
 #[must_use]
-pub fn requires_protocol_machine_runtime_contracts(cfg: &VMConfig) -> bool {
+pub fn requires_protocol_machine_runtime_contracts(cfg: &ProtocolMachineConfig) -> bool {
     sched_policy_requires_contracts(&cfg.sched_policy) || cfg.speculation_enabled
 }
 
 /// Protocol-machine admission gate for advanced runtime modes.
 #[must_use]
 pub fn admit_protocol_machine_runtime(
-    cfg: &VMConfig,
+    cfg: &ProtocolMachineConfig,
     contracts: Option<&RuntimeContracts>,
 ) -> RuntimeAdmissionResult {
     if requires_protocol_machine_runtime_contracts(cfg) && contracts.is_none() {
@@ -167,7 +167,7 @@ pub fn request_determinism_profile(
 /// Unified runtime gate check for advanced-mode admission and profile support.
 #[must_use]
 pub fn enforce_protocol_machine_runtime_gates(
-    cfg: &VMConfig,
+    cfg: &ProtocolMachineConfig,
     contracts: Option<&RuntimeContracts>,
 ) -> RuntimeGateResult {
     match admit_protocol_machine_runtime(cfg, contracts) {
@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn admission_requires_contracts_for_advanced_modes() {
-        let mut cfg = VMConfig::default();
+        let mut cfg = ProtocolMachineConfig::default();
         assert_eq!(
             admit_protocol_machine_runtime(&cfg, None),
             RuntimeAdmissionResult::Admitted
@@ -259,7 +259,7 @@ mod tests {
     #[test]
     #[allow(clippy::field_reassign_with_default)]
     fn unified_runtime_gate_combines_admission_and_profile_checks() {
-        let mut cfg = VMConfig::default();
+        let mut cfg = ProtocolMachineConfig::default();
         cfg.speculation_enabled = true;
         assert_eq!(
             enforce_protocol_machine_runtime_gates(&cfg, None),

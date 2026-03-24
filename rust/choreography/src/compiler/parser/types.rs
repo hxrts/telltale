@@ -106,7 +106,7 @@ pub(crate) enum Statement {
     },
 }
 
-/// VM-core statement op parsed from DSL.
+/// ProtocolMachine-core statement op parsed from DSL.
 #[derive(Debug, Clone)]
 pub(crate) enum VmCoreOp {
     Acquire {

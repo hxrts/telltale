@@ -90,9 +90,9 @@ impl ContentionMetrics {
     }
 }
 
-/// Threaded VM runtime. Uses OS threads for coroutine execution.
-pub struct ThreadedVM {
-    config: VMConfig,
+/// Threaded ProtocolMachine runtime. Uses OS threads for coroutine execution.
+pub struct ThreadedProtocolMachine {
+    config: ProtocolMachineConfig,
     programs: ProgramStore,
     coroutines: Vec<Arc<Mutex<Coroutine>>>,
     sessions: ThreadedSessionStore,
@@ -135,13 +135,13 @@ pub struct ThreadedVM {
     handler_identity_anchor: Option<String>,
 }
 
-impl KernelMachine for ThreadedVM {
+impl KernelMachine for ThreadedProtocolMachine {
     fn kernel_step_round(
         &mut self,
         handler: &dyn EffectHandler,
         n: usize,
-    ) -> Result<StepResult, VMError> {
-        ThreadedVM::kernel_step_round(self, handler, n)
+    ) -> Result<StepResult, ProtocolMachineError> {
+        ThreadedProtocolMachine::kernel_step_round(self, handler, n)
     }
 }
 
@@ -190,7 +190,7 @@ impl ThreadedSessionStore {
         let sid = self.next_id.fetch_add(1, Ordering::SeqCst);
         let state = SessionState::from_open_plan(sid, plan, buffer_config);
 
-        let mut sessions = self.sessions.write().expect("threaded VM lock poisoned");
+        let mut sessions = self.sessions.write().expect("threaded ProtocolMachine lock poisoned");
         sessions.insert(sid, Arc::new(Mutex::new(state)));
         sid
     }
@@ -198,17 +198,17 @@ impl ThreadedSessionStore {
     fn get(&self, sid: SessionId) -> Option<Arc<Mutex<SessionState>>> {
         self.sessions
             .read()
-            .expect("threaded VM lock poisoned")
+            .expect("threaded ProtocolMachine lock poisoned")
             .get(&sid)
             .cloned()
     }
 
     fn active_count(&self) -> usize {
-        let sessions = self.sessions.read().expect("threaded VM lock poisoned");
+        let sessions = self.sessions.read().expect("threaded ProtocolMachine lock poisoned");
         sessions
             .values()
             .filter(|session| {
-                session.lock().expect("threaded VM lock poisoned").status == SessionStatus::Active
+                session.lock().expect("threaded ProtocolMachine lock poisoned").status == SessionStatus::Active
             })
             .count()
     }
@@ -222,7 +222,7 @@ impl ThreadedSessionStore {
         let session = self
             .get(sid)
             .ok_or(OwnershipError::SessionNotFound { session_id: sid })?;
-        let mut session = session.lock().expect("threaded VM lock poisoned");
+        let mut session = session.lock().expect("threaded ProtocolMachine lock poisoned");
         if let Some(reason) = session.ownership().terminal_reason.clone() {
             return Err(OwnershipError::Terminal {
                 session_id: sid,
@@ -326,7 +326,7 @@ fn coro_has_progress(coros: &[Arc<Mutex<Coroutine>>], coro_id: usize) -> bool {
         .map(|coro| {
             !coro
                 .lock()
-                .expect("threaded VM lock poisoned")
+                .expect("threaded ProtocolMachine lock poisoned")
                 .progress_tokens
                 .is_empty()
         })

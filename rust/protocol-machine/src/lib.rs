@@ -7,7 +7,7 @@
 //!
 //! # Architecture
 //!
-//! The protocol machine follows the Lean specification in `lean/Runtime/VM/`:
+//! The protocol machine follows the Lean specification in `lean/Runtime/ProtocolMachine/`:
 //! - **Instructions** ([`instr::Instr`]): bytecode ops for send/recv/choice/session lifecycle
 //! - **Coroutines** ([`coroutine::Coroutine`]): lightweight execution units, one per role
 //! - **Sessions** ([`session::SessionStore`]): manage session lifecycle and namespaces
@@ -94,7 +94,7 @@ pub mod session;
 pub mod trace;
 pub mod transfer_semantics;
 pub mod verification;
-mod vm;
+mod engine;
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
@@ -110,7 +110,7 @@ cfg_if! {
 
 /// Canonical protocol-machine public surface.
 pub mod protocol_machine {
-    pub use crate::kernel::VMKernel;
+    pub use crate::kernel::ProtocolMachineKernel;
     pub use crate::semantic_objects::{
         AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
         CanonicalHandleKind, ObservedRead, OperationInstance, OperationPhase, OutstandingEffect,
@@ -119,14 +119,14 @@ pub mod protocol_machine {
         PublicationStatus, SemanticHandoff, SEMANTIC_OBJECTS_SCHEMA_VERSION,
     };
     #[cfg(feature = "multi-thread")]
-    pub use crate::threaded::ThreadedVM as ThreadedProtocolMachine;
-    pub use crate::vm::{
+    pub use crate::threaded::ThreadedProtocolMachine as ThreadedProtocolMachine;
+    pub use crate::engine::{
         EffectTraceCaptureMode, MonitorMode, ObsEvent, ObservabilityRetentionConfig,
         ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore,
         ProtocolMachineMemoryUsage, ProtocolMachineRetainedBytes, RunStatus, RuntimeTuningProfile,
         SchedExecStatus, SchedStepDebug, StepResult, ThreadedRoundSemantics,
-        VMConfig as ProtocolMachineConfig, VMError as ProtocolMachineError,
-        VMState as ProtocolMachineState, VM as ProtocolMachine,
+        ProtocolMachineConfig as ProtocolMachineConfig, ProtocolMachineError as ProtocolMachineError,
+        ProtocolMachineState as ProtocolMachineState, ProtocolMachine as ProtocolMachine,
     };
 }
 
@@ -185,7 +185,7 @@ pub use integration::{
     run_loaded_protocol_machine_record_replay_conformance, LoadedProtocolMachineReplayConformance,
 };
 pub use intern::{EdgeId, EdgeSymbol, EdgeSymbolTable, StringId, SymbolTable};
-pub use kernel::VMKernel;
+pub use kernel::ProtocolMachineKernel;
 pub use nested::NestedVMHandler;
 pub use output_condition::{
     verify_output_condition, OutputConditionCheck, OutputConditionHint, OutputConditionMeta,
@@ -237,20 +237,20 @@ pub use verification::{
     sign_value, verify_signed_value, AuthProof, AuthTree, Commitment, DefaultVerificationModel,
     Hash, HashTag, Nullifier, Signature, SigningKey, VerificationModel, VerifyingKey,
 };
-pub use vm::{
+pub use engine::{
     EffectTraceCaptureMode, MonitorMode, ObsEvent, ObservabilityRetentionConfig,
     ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore,
     ProtocolMachineMemoryUsage, ProtocolMachineRetainedBytes, ResourceState,
     RunStatus as ProtocolMachineRunStatus, RuntimeTuningProfile, SchedExecStatus, SchedStepDebug,
     StepResult as ProtocolMachineStepResult, ThreadedRoundSemantics,
-    VMConfig as ProtocolMachineConfig, VMError as ProtocolMachineError,
-    VMState as ProtocolMachineState, VM as ProtocolMachine,
+    ProtocolMachineConfig as ProtocolMachineConfig, ProtocolMachineError as ProtocolMachineError,
+    ProtocolMachineState as ProtocolMachineState, ProtocolMachine as ProtocolMachine,
 };
-pub use vm::{FlowPolicy, FlowPredicate};
+pub use engine::{FlowPolicy, FlowPredicate};
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
-        pub use threaded::ThreadedVM as ThreadedProtocolMachine;
+        pub use threaded::ThreadedProtocolMachine as ThreadedProtocolMachine;
         pub use driver::NativeThreadedDriver as ThreadedGuestRuntime;
         pub use threaded::{ContentionMetrics, LaneHandoff, LaneId, LaneSchedulerState, LaneSelection};
     }

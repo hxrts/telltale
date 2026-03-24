@@ -305,23 +305,23 @@ bench-check:
 
 # Profile a single VM runtime benchmark with samply.
 profile-vm bench:
-    samply record cargo bench -p telltale-protocol-machine --bench vm_runtime_bench -- {{ bench }}
+    samply record cargo bench -p telltale-protocol-machine --bench protocol_machine_runtime_bench -- {{ bench }}
 
 # Profile the paused-role scheduler hotspot with samply.
 profile-vm-scheduler:
-    samply record cargo run -p telltale-protocol-machine --release --bin vm_profile_driver -- scheduler-many-paused-run-only 200000
+    samply record cargo run -p telltale-protocol-machine --release --bin profile_driver -- scheduler-many-paused-run-only 200000
 
 # Profile the repeated load/reuse hotspot with samply.
 profile-vm-load:
-    samply record cargo run -p telltale-protocol-machine --release --bin vm_profile_driver -- repeated-load-reuse
+    samply record cargo run -p telltale-protocol-machine --release --bin profile_driver -- repeated-load-reuse
 
 # Profile the replay/nullifier hotspot with samply.
 profile-vm-replay:
-    samply record cargo run -p telltale-protocol-machine --release --bin vm_profile_driver -- send-recv-replay-nullifier
+    samply record cargo run -p telltale-protocol-machine --release --bin profile_driver -- send-recv-replay-nullifier
 
 # Profile the repeated fixed-topology open path with samply.
 profile-vm-open:
-    samply record cargo run -p telltale-protocol-machine --release --bin vm_profile_driver -- repeated-open-same-image
+    samply record cargo run -p telltale-protocol-machine --release --bin profile_driver -- repeated-open-same-image
 
 # Build WASM example with wasm-pack
 wasm-build:

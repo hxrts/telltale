@@ -1,10 +1,10 @@
-//! Determinism profile configuration for VM execution.
+//! Determinism profile configuration for ProtocolMachine execution.
 
 use std::collections::BTreeMap;
 
 use crate::effect::EffectTraceEntry;
 use crate::trace::{normalize_trace, obs_session};
-use crate::vm::ObsEvent;
+use crate::engine::ObsEvent;
 use serde::{Deserialize, Serialize};
 
 /// Runtime effect-determinism tier used for admission and trace artifacts.
@@ -20,7 +20,7 @@ pub enum EffectDeterminismTier {
     EnvelopeBoundedNondeterministic,
 }
 
-/// Determinism profile aligned with the VM architecture spec.
+/// Determinism profile aligned with the ProtocolMachine architecture spec.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DeterminismMode {
     /// Full determinism for fixed initial state/policy/effect trace.

@@ -1,11 +1,11 @@
 //! First-party integration harness utilities.
 //!
-//! These helpers validate host integration behavior without changing VM
-//! semantics. They run on top of the canonical VM APIs.
+//! These helpers validate host integration behavior without changing ProtocolMachine
+//! semantics. They run on top of the canonical ProtocolMachine APIs.
 
 use crate::determinism::{replay_consistent, DeterminismMode};
 use crate::effect::{EffectHandler, RecordingEffectHandler};
-use crate::vm::{VMError, VM};
+use crate::engine::{ProtocolMachineError, ProtocolMachine};
 use serde::{Deserialize, Serialize};
 
 /// Summary from loaded protocol-machine record/replay conformance execution.
@@ -15,7 +15,7 @@ pub struct LoadedProtocolMachineReplayConformance {
     pub determinism_mode: DeterminismMode,
     /// Profile-aware consistency outcome.
     pub replay_consistent: bool,
-    /// Consistency outcome under `VMConfig.determinism_mode`.
+    /// Consistency outcome under `ProtocolMachineConfig.determinism_mode`.
     pub config_mode_consistent: bool,
     /// Exact observable trace equality.
     pub exact_trace_match: bool,
@@ -31,20 +31,20 @@ pub struct LoadedProtocolMachineReplayConformance {
 
 /// Run record-and-replay conformance against a loaded protocol machine.
 ///
-/// The helper snapshots the provided VM, executes a baseline run with
+/// The helper snapshots the provided ProtocolMachine, executes a baseline run with
 /// `RecordingEffectHandler`, then replays the recorded effect trace from the
 /// snapshot state. The input `vm` is left in the baseline post-run state.
 ///
 /// # Errors
 ///
-/// Returns `VMError` if baseline run, replay run, or snapshot encode/decode fails.
+/// Returns `ProtocolMachineError` if baseline run, replay run, or snapshot encode/decode fails.
 pub fn run_loaded_protocol_machine_record_replay_conformance(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     handler: &dyn EffectHandler,
     max_steps: usize,
-) -> Result<LoadedProtocolMachineReplayConformance, VMError> {
+) -> Result<LoadedProtocolMachineReplayConformance, ProtocolMachineError> {
     let snapshot = serde_yaml::to_string(vm).map_err(|e| {
-        VMError::PersistenceError(format!("integration snapshot encode failed: {e}"))
+        ProtocolMachineError::PersistenceError(format!("integration snapshot encode failed: {e}"))
     })?;
 
     let recording = RecordingEffectHandler::new(handler);
@@ -55,8 +55,8 @@ pub fn run_loaded_protocol_machine_record_replay_conformance(
     let baseline_effect_trace = vm.effect_trace().to_vec();
     let determinism_mode = vm.config().determinism_mode;
 
-    let mut replay_vm: VM = serde_yaml::from_str(&snapshot).map_err(|e| {
-        VMError::PersistenceError(format!("integration snapshot decode failed: {e}"))
+    let mut replay_vm: ProtocolMachine = serde_yaml::from_str(&snapshot).map_err(|e| {
+        ProtocolMachineError::PersistenceError(format!("integration snapshot decode failed: {e}"))
     })?;
     replay_vm.run_replay(handler, &recorded_effects, max_steps)?;
 
@@ -95,7 +95,7 @@ mod tests {
     use crate::coroutine::Value;
     use crate::effect::{EffectFailure, EffectResult, SendDecision, SendDecisionInput};
     use crate::loader::CodeImage;
-    use crate::vm::VMConfig;
+    use crate::engine::ProtocolMachineConfig;
     use std::collections::BTreeMap;
     use telltale_types::{GlobalType, Label, LocalTypeR};
 
@@ -169,7 +169,7 @@ mod tests {
     #[test]
     fn loaded_protocol_machine_harness_reports_replay_conformance() {
         let image = simple_send_recv_image();
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         vm.load_choreography(&image).expect("load choreography");
 
         let report = run_loaded_protocol_machine_record_replay_conformance(
