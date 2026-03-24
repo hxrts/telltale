@@ -51,7 +51,7 @@ fn run() -> Result<(), String> {
     let mut args = env::args().skip(1);
     let mode = args
         .next()
-        .ok_or_else(|| "usage: telltale-lint-checks <mode> <path> [<path> ...]".to_string())
+        .ok_or_else(|| "usage: telltale-lints <mode> <path> [<path> ...]".to_string())
         .and_then(|value| Mode::parse(&value))?;
     let paths = args.map(PathBuf::from).collect::<Vec<_>>();
     if paths.is_empty() {

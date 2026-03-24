@@ -37,7 +37,7 @@ declare -A layer_of=(
   ["telltale-transport"]=4
   ["telltale"]=4
   # Internal support utility
-  ["telltale-lint-checks"]=4
+  ["telltale-lints"]=4
 )
 
 # ── Cargo Metadata ────────────────────────────────────────────────────

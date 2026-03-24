@@ -138,7 +138,7 @@ Rust workspace crates are split between the repo root (`telltale`) and the `rust
 | `telltale-simulator` | `rust/simulator/` | VM-backed simulation with deterministic middleware (network, faults, properties) |
 | `telltale-lean-bridge` | `rust/lean-bridge/` | Lean interop with JSON export/import, validation, choreography exporter |
 | `telltale-transport` | `rust/transport/` | Production transport integration layer for runtime/choreography execution |
-| `telltale-lint-checks` | `rust/lint-checks/` | Custom lint checks for architecture and style enforcement |
+| `telltale-lints` | `rust/lints/` | Custom lint checks for architecture and style enforcement |
 
 ### Choreography Crate Structure (`rust/choreography/src/`)
 
