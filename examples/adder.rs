@@ -6,24 +6,19 @@
 //! encodes an unbounded number of additions terminated by a `Bye` exit.
 //!
 //! ```tell
-//! protocol Adder = {
-//!     roles C, S;
-//!     C -> S : Hello(i32);
-//!     rec adder_loop {
-//!         choice C at {
-//!             | Add => {
-//!                 C -> S : Add(i32);
-//!                 C -> S : Add(i32);
-//!                 S -> C : Sum(i32);
-//!                 continue adder_loop;
-//!             }
-//!             | Bye => {
-//!                 C -> S : Bye;
-//!                 S -> C : Bye;
-//!             }
-//!         }
-//!     }
-//! }
+//! protocol Adder =
+//!   roles C, S
+//!   C -> S : Hello(i32)
+//!   rec adder_loop
+//!     choice C at
+//!       | Add =>
+//!         C -> S : Add(i32)
+//!         C -> S : Add(i32)
+//!         S -> C : Sum(i32)
+//!         continue adder_loop
+//!       | Bye =>
+//!         C -> S : Bye
+//!         S -> C : Bye
 //! ```
 //!
 //! Uses the `choreography!` macro to derive session types, roles, messages,
@@ -38,24 +33,19 @@ use telltale::try_session;
 use telltale_macros::choreography;
 
 choreography! {
-    protocol Adder = {
-        roles C, S;
-        C -> S : Hello(i32);
-        rec adder_loop {
-            choice C at {
-                | Add => {
-                    C -> S : Add(i32);
-                    C -> S : Add(i32);
-                    S -> C : Sum(i32);
-                    continue adder_loop;
-                }
-                | Bye => {
-                    C -> S : Bye;
-                    S -> C : Bye;
-                }
-            }
-        }
-    }
+    protocol Adder =
+      roles C, S
+      C -> S : Hello(i32)
+      rec adder_loop
+        choice C at
+          | Add =>
+            C -> S : Add(i32)
+            C -> S : Add(i32)
+            S -> C : Sum(i32)
+            continue adder_loop
+          | Bye =>
+            C -> S : Bye
+            S -> C : Bye
 }
 
 // ---------------------------------------------------------------------------

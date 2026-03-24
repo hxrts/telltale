@@ -51,28 +51,22 @@ use telltale::try_session;
 use telltale_macros::choreography;
 
 choreography! {
-    protocol Elevator {
-        roles U, D, E;
-
-        choice U at {
-            | OpenDoor => {
-                U -> E : OpenDoor;
-                E -> D : OpenDoor;
-                D -> E : DoorOpened;
-                E -> U : DoorOpened;
-                // Elevator auto-closes door after opening
-                E -> D : CloseDoor;
-                D -> E : DoorClosed;
-                E -> U : DoorClosed;
-            }
-            | CloseDoor => {
-                U -> E : CloseDoor;
-                E -> D : CloseDoor;
-                D -> E : DoorClosed;
-                E -> U : DoorClosed;
-            }
-        }
-    }
+    protocol Elevator =
+      roles U, D, E
+      choice U at
+        | OpenDoor =>
+          U -> E : OpenDoor
+          E -> D : OpenDoor
+          D -> E : DoorOpened
+          E -> U : DoorOpened
+          E -> D : CloseDoor
+          D -> E : DoorClosed
+          E -> U : DoorClosed
+        | CloseDoor =>
+          U -> E : CloseDoor
+          E -> D : CloseDoor
+          D -> E : DoorClosed
+          E -> U : DoorClosed
 }
 
 // ---------------------------------------------------------------------------

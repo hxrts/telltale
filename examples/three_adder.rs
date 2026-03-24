@@ -11,15 +11,14 @@ use telltale_macros::choreography;
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
 choreography! {
-    protocol Adder {
-        roles A, B, C;
-        A -> B: Add(i32);
-        B -> A: Add(i32);
-        A -> C: Add(i32);
-        B -> C: Add(i32);
-        C -> A: Sum(i32);
-        C -> B: Sum(i32);
-    }
+    protocol Adder =
+      roles A, B, C
+      A -> B : Add(i32)
+      B -> A : Add(i32)
+      A -> C : Add(i32)
+      B -> C : Add(i32)
+      C -> A : Sum(i32)
+      C -> B : Sum(i32)
 }
 
 async fn adder_a(role: &mut A) -> Result<()> {

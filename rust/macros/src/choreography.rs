@@ -5,14 +5,15 @@
 //! `telltale-macros` output surface: message structs, a `Label` enum, public
 //! role structs, `Roles`, per-role session aliases, and `setup()`.
 
-use proc_macro2::{Delimiter, Ident, Span, TokenStream, TokenTree};
+use proc_macro::{Delimiter, TokenStream as MacroTokenStream, TokenTree as MacroTokenTree};
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use std::collections::{BTreeMap, HashMap};
 use syn::{Error, LitStr, Result};
 use telltale_parser::ast::{Branch, Choreography, LocalType, MessageType, Protocol, Role};
 
 /// Main entry point for the choreography! macro.
-pub fn choreography(input: TokenStream) -> Result<TokenStream> {
+pub fn choreography(input: MacroTokenStream) -> Result<TokenStream> {
     let choreography = parse_macro_choreography(input)?;
     choreography
         .validate()
@@ -23,152 +24,184 @@ pub fn choreography(input: TokenStream) -> Result<TokenStream> {
     Ok(generated)
 }
 
-fn parse_macro_choreography(input: TokenStream) -> Result<Choreography> {
-    if let Ok(lit_str) = syn::parse2::<LitStr>(input.clone()) {
-        return telltale_parser::parse_choreography_str(&lit_str.value())
-            .map_err(|err| Error::new(lit_str.span(), format!("Choreography parse error: {err}")));
+fn parse_macro_choreography(input: MacroTokenStream) -> Result<Choreography> {
+    if let Ok(lit_str) = syn::parse::<LitStr>(input.clone()) {
+        return Err(Error::new(
+            lit_str.span(),
+            "string-literal choreography input was removed; use the canonical indentation-based token DSL directly",
+        ));
     }
 
-    let normalized = normalize_token_dsl(input);
-    telltale_parser::parse_choreography_str(&normalized).map_err(|err| {
+    let source = macro_source_text(input)
+        .map(normalize_macro_indentation)
+        .ok_or_else(|| {
+            Error::new(
+                Span::call_site(),
+                "failed to recover original choreography source from macro input",
+            )
+        })?;
+
+    telltale_parser::parse_choreography_str(&source).map_err(|err| {
         Error::new(
             Span::call_site(),
             format!(
                 "Choreography parse error: {err}\n\
-                 Macro token input is parsed as DSL text after normalization.\n\
-                 You can use either string-literal DSL or token-stream DSL forms."
+                 Macro token input is parsed from original source text.\n\
+                 Use the canonical indentation-based DSL surface in token form."
             ),
         )
     })
 }
 
-fn normalize_token_dsl(input: TokenStream) -> String {
-    #[derive(Default)]
-    struct State {
-        awaiting_protocol_name: bool,
-        protocol_needs_equals: bool,
-        awaiting_choice_role: bool,
-        choice_needs_at: bool,
+fn normalize_macro_indentation(source: String) -> String {
+    const TOP_LEVEL_HEADERS: &[&str] = &[
+        "module ",
+        "import ",
+        "protocol ",
+        "proof_bundle ",
+        "role_set ",
+        "topology ",
+        "type ",
+        "effect ",
+        "fragment ",
+        "operation ",
+        "guest runtime ",
+    ];
+
+    let mut normalized = String::new();
+    for line in source.lines() {
+        let trimmed = line.trim_start();
+        if TOP_LEVEL_HEADERS
+            .iter()
+            .any(|prefix| trimmed.starts_with(prefix))
+        {
+            normalized.push_str(trimmed);
+        } else {
+            normalized.push_str(line);
+        }
+        normalized.push('\n');
     }
 
-    fn needs_space_before_text(out: &str) -> bool {
-        matches!(
-            out.chars().last(),
-            Some(ch) if ch.is_ascii_alphanumeric() || ch == '_' || ch == ')' || ch == ']'
+    if !source.ends_with('\n') {
+        normalized.pop();
+    }
+    normalized
+}
+
+fn macro_source_text(input: MacroTokenStream) -> Option<String> {
+    #[derive(Clone, Copy)]
+    struct Location {
+        line: usize,
+        column: usize,
+    }
+
+    fn location_of(start: proc_macro::Span) -> (Location, Location) {
+        let start_loc = start.start();
+        let end_loc = start.end();
+        (
+            Location {
+                line: start_loc.line(),
+                column: start_loc.column(),
+            },
+            Location {
+                line: end_loc.line(),
+                column: end_loc.column(),
+            },
         )
     }
 
-    fn render_tokens(tokens: TokenStream) -> String {
-        let mut out = String::new();
-        let mut state = State::default();
+    fn append_gap(out: &mut String, previous_end: Location, next_start: Location) {
+        if next_start.line > previous_end.line {
+            for _ in previous_end.line..next_start.line {
+                out.push('\n');
+            }
+            for _ in 0..next_start.column {
+                out.push(' ');
+            }
+        } else if next_start.column > previous_end.column {
+            for _ in previous_end.column..next_start.column {
+                out.push(' ');
+            }
+        }
+    }
 
-        for token in tokens {
+    fn append_stream(
+        out: &mut String,
+        previous_end: &mut Option<Location>,
+        stream: MacroTokenStream,
+    ) -> Option<()> {
+        for token in stream {
             match token {
-                TokenTree::Ident(ident) => {
-                    let text = ident.to_string();
-                    if needs_space_before_text(&out) {
-                        out.push(' ');
+                MacroTokenTree::Group(group) => {
+                    let (open_start, _) = location_of(group.span_open());
+                    let (_, close_end) = location_of(group.span_close());
+                    if let Some(prev) = previous_end.as_ref() {
+                        append_gap(out, *prev, open_start);
                     }
-                    out.push_str(&text);
-
-                    if state.awaiting_protocol_name {
-                        state.awaiting_protocol_name = false;
-                        state.protocol_needs_equals = true;
-                    } else if state.awaiting_choice_role {
-                        state.awaiting_choice_role = false;
-                        state.choice_needs_at = true;
-                    } else if text == "protocol" {
-                        state.awaiting_protocol_name = true;
-                        state.protocol_needs_equals = false;
-                    } else if text == "choice" {
-                        state.awaiting_choice_role = true;
-                        state.choice_needs_at = false;
-                    } else if state.choice_needs_at && text == "at" {
-                        state.choice_needs_at = false;
-                    }
+                    out.push_str(&group.to_string());
+                    *previous_end = Some(close_end);
                 }
-                TokenTree::Punct(punct) => match punct.as_char() {
-                    ';' => out.push('\n'),
-                    '=' => {
-                        state.protocol_needs_equals = false;
-                        out.push('=');
+                MacroTokenTree::Ident(ident) => {
+                    let span = ident.span();
+                    let (start, end) = location_of(span);
+                    if let Some(prev) = previous_end.as_ref() {
+                        append_gap(out, *prev, start);
                     }
-                    _ => out.push(punct.as_char()),
-                },
-                TokenTree::Literal(literal) => {
-                    if needs_space_before_text(&out) {
-                        out.push(' ');
+                    out.push_str(&ident.to_string());
+                    *previous_end = Some(end);
+                }
+                MacroTokenTree::Punct(punct) => {
+                    let span = punct.span();
+                    let (start, end) = location_of(span);
+                    if let Some(prev) = previous_end.as_ref() {
+                        append_gap(out, *prev, start);
+                    }
+                    out.push(punct.as_char());
+                    *previous_end = Some(end);
+                }
+                MacroTokenTree::Literal(literal) => {
+                    let span = literal.span();
+                    let (start, end) = location_of(span);
+                    if let Some(prev) = previous_end.as_ref() {
+                        append_gap(out, *prev, start);
                     }
                     out.push_str(&literal.to_string());
-                }
-                TokenTree::Group(group) => {
-                    if group.delimiter() == Delimiter::Brace {
-                        if state.protocol_needs_equals {
-                            out.push_str(" =");
-                            state.protocol_needs_equals = false;
-                        }
-                        if state.choice_needs_at {
-                            out.push_str(" at");
-                            state.choice_needs_at = false;
-                        }
-                    }
-
-                    let open = match group.delimiter() {
-                        Delimiter::Parenthesis => '(',
-                        Delimiter::Brace => '{',
-                        Delimiter::Bracket => '[',
-                        Delimiter::None => ' ',
-                    };
-                    let close = match group.delimiter() {
-                        Delimiter::Parenthesis => ')',
-                        Delimiter::Brace => '}',
-                        Delimiter::Bracket => ']',
-                        Delimiter::None => ' ',
-                    };
-
-                    if group.delimiter() != Delimiter::None
-                        && !out.ends_with([' ', '\n', '(', '{', '['])
-                    {
-                        out.push(' ');
-                    }
-
-                    if group.delimiter() != Delimiter::None {
-                        out.push(open);
-                    }
-                    let inner = render_tokens(group.stream());
-                    out.push_str(&inner);
-                    if group.delimiter() != Delimiter::None {
-                        out.push(close);
-                    }
+                    *previous_end = Some(end);
                 }
             }
         }
-
-        out
+        Some(())
     }
 
-    let mut normalized = render_tokens(input);
-    let patterns = [
-        ("-> *", "->*"),
-        ("->  *", "->*"),
-        ("<- >", "<->"),
-        ("< - >", "<->"),
-        ("<  - >", "<->"),
-        ("< -  >", "<->"),
-    ];
-    loop {
-        let mut changed = false;
-        for (from, to) in patterns {
-            if normalized.contains(from) {
-                normalized = normalized.replace(from, to);
-                changed = true;
+    fn strip_group_source(source: &str, delimiter: Delimiter) -> String {
+        let trimmed = source.trim();
+        match delimiter {
+            Delimiter::Parenthesis | Delimiter::Brace | Delimiter::Bracket
+                if trimmed.len() >= 2 =>
+            {
+                trimmed[1..trimmed.len() - 1].to_string()
+            }
+            _ => trimmed.to_string(),
+        }
+    }
+
+    let mut tokens = input.clone().into_iter();
+    if let Some(MacroTokenTree::Group(group)) = tokens.next() {
+        let single_group = tokens.next().is_none();
+        if single_group {
+            if let Some(source) = group.span().source_text() {
+                return Some(strip_group_source(&source, group.delimiter()));
             }
         }
-        if !changed {
-            break;
+        if single_group && group.delimiter() == Delimiter::Brace {
+            return macro_source_text(group.stream());
         }
     }
-    normalized
+
+    let mut out = String::new();
+    let mut previous_end = None;
+    append_stream(&mut out, &mut previous_end, input)?;
+    Some(out)
 }
 
 fn project_local_types(choreography: &Choreography) -> Result<Vec<(Role, LocalType)>> {

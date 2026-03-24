@@ -14,17 +14,16 @@ use telltale_macros::choreography;
 type Result<T> = result::Result<T, Box<dyn Error + marker::Send + Sync>>;
 
 choreography! {
-    protocol DoubleBuffering {
-        roles S, K, T;
-        K -> S: Ready;
-        S -> K: Copy(i32);
-        T -> K: Ready;
-        K -> T: Copy(i32);
-        K -> S: Ready;
-        S -> K: Copy(i32);
-        T -> K: Ready;
-        K -> T: Copy(i32);
-    }
+    protocol DoubleBuffering =
+      roles S, K, T
+      K -> S : Ready
+      S -> K : Copy(i32)
+      T -> K : Ready
+      K -> T : Copy(i32)
+      K -> S : Ready
+      S -> K : Copy(i32)
+      T -> K : Ready
+      K -> T : Copy(i32)
 }
 
 async fn source(role: &mut S, input: (i32, i32)) -> Result<()> {

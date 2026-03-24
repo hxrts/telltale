@@ -27,39 +27,32 @@ use telltale_macros::choreography;
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
 choreography! {
-    protocol FFT {
-        roles P0, P1, P2, P3, P4, P5, P6, P7;
-
-        // Stage 1: stride 1 — pairs (0,1), (2,3), (4,5), (6,7)
-        P0 -> P1 : Value(Complex32);
-        P1 -> P0 : Value(Complex32);
-        P2 -> P3 : Value(Complex32);
-        P3 -> P2 : Value(Complex32);
-        P4 -> P5 : Value(Complex32);
-        P5 -> P4 : Value(Complex32);
-        P6 -> P7 : Value(Complex32);
-        P7 -> P6 : Value(Complex32);
-
-        // Stage 2: stride 2 — pairs (0,2), (1,3), (4,6), (5,7)
-        P0 -> P2 : Value(Complex32);
-        P2 -> P0 : Value(Complex32);
-        P1 -> P3 : Value(Complex32);
-        P3 -> P1 : Value(Complex32);
-        P4 -> P6 : Value(Complex32);
-        P6 -> P4 : Value(Complex32);
-        P5 -> P7 : Value(Complex32);
-        P7 -> P5 : Value(Complex32);
-
-        // Stage 3: stride 4 — pairs (0,4), (1,5), (2,6), (3,7)
-        P0 -> P4 : Value(Complex32);
-        P4 -> P0 : Value(Complex32);
-        P1 -> P5 : Value(Complex32);
-        P5 -> P1 : Value(Complex32);
-        P2 -> P6 : Value(Complex32);
-        P6 -> P2 : Value(Complex32);
-        P3 -> P7 : Value(Complex32);
-        P7 -> P3 : Value(Complex32);
-    }
+    protocol FFT =
+      roles P0, P1, P2, P3, P4, P5, P6, P7
+      P0 -> P1 : Value(Complex32)
+      P1 -> P0 : Value(Complex32)
+      P2 -> P3 : Value(Complex32)
+      P3 -> P2 : Value(Complex32)
+      P4 -> P5 : Value(Complex32)
+      P5 -> P4 : Value(Complex32)
+      P6 -> P7 : Value(Complex32)
+      P7 -> P6 : Value(Complex32)
+      P0 -> P2 : Value(Complex32)
+      P2 -> P0 : Value(Complex32)
+      P1 -> P3 : Value(Complex32)
+      P3 -> P1 : Value(Complex32)
+      P4 -> P6 : Value(Complex32)
+      P6 -> P4 : Value(Complex32)
+      P5 -> P7 : Value(Complex32)
+      P7 -> P5 : Value(Complex32)
+      P0 -> P4 : Value(Complex32)
+      P4 -> P0 : Value(Complex32)
+      P1 -> P5 : Value(Complex32)
+      P5 -> P1 : Value(Complex32)
+      P2 -> P6 : Value(Complex32)
+      P6 -> P2 : Value(Complex32)
+      P3 -> P7 : Value(Complex32)
+      P7 -> P3 : Value(Complex32)
 }
 
 /// Twiddle factor: exp(-2πi·k/8).

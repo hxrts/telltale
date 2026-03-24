@@ -40,36 +40,20 @@ use telltale_macros::choreography;
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
 choreography! {
-    protocol AlternatingBit {
-        roles S, R;
-
-        // Frame 0: sender transmits data with bit 0
-        S -> R : D0(i32);
-
-        choice R at {
-            // Correct ack (bit 0 matches) -- advance to frame 1
-            | Ack0 => {
-                R -> S : Ack(i32);
-                // Frame 1: sender transmits data with bit 1
-                S -> R : D1(i32);
-
-                choice R at {
-                    // Correct ack (bit 1 matches) -- transfer complete
-                    | Ack1 => {
-                        R -> S : Ack(i32);
-                    }
-                    // Wrong ack -- bit mismatch on frame 1
-                    | Nack1 => {
-                        R -> S : Nack(i32);
-                    }
-                }
-            }
-            // Wrong ack -- bit mismatch on frame 0
-            | Nack0 => {
-                R -> S : Nack(i32);
-            }
-        }
-    }
+    protocol AlternatingBit =
+      roles S, R
+      S -> R : D0(i32)
+      choice R at
+        | Ack0 =>
+          R -> S : Ack(i32)
+          S -> R : D1(i32)
+          choice R at
+            | Ack1 =>
+              R -> S : Ack(i32)
+            | Nack1 =>
+              R -> S : Nack(i32)
+        | Nack0 =>
+          R -> S : Nack(i32)
 }
 
 // ---------------------------------------------------------------------------

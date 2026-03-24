@@ -50,28 +50,22 @@ use telltale::try_session;
 use telltale_macros::choreography;
 
 choreography! {
-    protocol ClientServerLog {
-        roles C, S, L;
-
-        C -> S : Request(i32);
-        choice S at {
-            | Fault => {
-                S -> C : Fault;
-                S -> L : Fault;
-            }
-            | Success => {
-                S -> C : Success(i32);
-                S -> L : Success(i32);
-            }
-            | Retry => {
-                S -> C : Retry;
-                S -> L : Retry;
-                C -> S : Request(i32);
-                S -> C : Success(i32);
-                S -> L : Success(i32);
-            }
-        }
-    }
+    protocol ClientServerLog =
+      roles C, S, L
+      C -> S : Request(i32)
+      choice S at
+        | Fault =>
+          S -> C : Fault
+          S -> L : Fault
+        | Success =>
+          S -> C : Success(i32)
+          S -> L : Success(i32)
+        | Retry =>
+          S -> C : Retry
+          S -> L : Retry
+          C -> S : Request(i32)
+          S -> C : Success(i32)
+          S -> L : Success(i32)
 }
 
 // ---------------------------------------------------------------------------

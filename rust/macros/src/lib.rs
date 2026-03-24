@@ -110,7 +110,7 @@ pub fn session(attr: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro]
 pub fn choreography(input: TokenStream) -> TokenStream {
-    choreography::choreography(input.into())
+    choreography::choreography(input)
         .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }

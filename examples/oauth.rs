@@ -43,45 +43,30 @@ use telltale::try_session;
 use telltale_macros::choreography;
 
 choreography! {
-    protocol OAuth {
-        roles S, C, A;
-        choice S at {
-            | Login => {
-                S -> C : LoginReq(i32);
-                choice C at {
-                    | Proceed => {
-                        C -> A : Password(i32);
-                        choice A at {
-                            | Granted => {
-                                A -> S : Approved(i32);
-                                choice S at {
-                                    | AuthOk => {
-                                        S -> C : AuthNotice(i32);
-                                    }
-                                }
-                            }
-                            | Denied => {
-                                A -> S : Rejected(i32);
-                                choice S at {
-                                    | AuthFail => {
-                                        S -> C : FailNotice(i32);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            | Cancel => {
-                S -> C : CancelReq(i32);
-                choice C at {
-                    | Abort => {
-                        C -> A : Quit(i32);
-                    }
-                }
-            }
-        }
-    }
+    protocol OAuth =
+      roles S, C, A
+      choice S at
+        | Login =>
+          S -> C : LoginReq(i32)
+          choice C at
+            | Proceed =>
+              C -> A : Password(i32)
+              choice A at
+                | Granted =>
+                  A -> S : Approved(i32)
+                  choice S at
+                    | AuthOk =>
+                      S -> C : AuthNotice(i32)
+                | Denied =>
+                  A -> S : Rejected(i32)
+                  choice S at
+                    | AuthFail =>
+                      S -> C : FailNotice(i32)
+        | Cancel =>
+          S -> C : CancelReq(i32)
+          choice C at
+            | Abort =>
+              C -> A : Quit(i32)
 }
 
 // ---------------------------------------------------------------------------
@@ -177,11 +162,6 @@ async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
 fn main() {
     let Roles(mut s, mut c, mut a) = Roles::default();
     executor::block_on(async {
-        try_join!(
-            client(&mut c),
-            server(&mut s),
-            auth(&mut a)
-        )
-        .unwrap();
+        try_join!(client(&mut c), server(&mut s), auth(&mut a)).unwrap();
     });
 }

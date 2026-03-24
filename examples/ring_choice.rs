@@ -8,23 +8,18 @@
 //! `RING_MAX_ROUNDS` limit (default 5).
 //!
 //! ```tell
-//! protocol RingChoice = {
-//!     roles A, B, C;
-//!     rec ring_loop {
-//!         choice A at {
-//!             | Add => {
-//!                 A -> B : Add(i32);
-//!                 B -> C : Add(i32);
-//!                 C -> A : Add(i32);
-//!                 continue ring_loop;
-//!             }
-//!             | Stop => {
-//!                 A -> B : Stop;
-//!                 B -> C : Stop;
-//!             }
-//!         }
-//!     }
-//! }
+//! protocol RingChoice =
+//!   roles A, B, C
+//!   rec ring_loop
+//!     choice A at
+//!       | Add =>
+//!         A -> B : Add(i32)
+//!         B -> C : Add(i32)
+//!         C -> A : Add(i32)
+//!         continue ring_loop
+//!       | Stop =>
+//!         A -> B : Stop
+//!         B -> C : Stop
 //! ```
 //!
 //! Uses the `choreography!` macro to derive session types, roles, messages,
@@ -50,23 +45,18 @@ fn max_rounds() -> usize {
 }
 
 choreography! {
-    protocol RingChoice = {
-        roles A, B, C;
-        rec ring_loop {
-            choice A at {
-                | Add => {
-                    A -> B : Add(i32);
-                    B -> C : Add(i32);
-                    C -> A : Add(i32);
-                    continue ring_loop;
-                }
-                | Stop => {
-                    A -> B : Stop;
-                    B -> C : Stop;
-                }
-            }
-        }
-    }
+    protocol RingChoice =
+      roles A, B, C
+      rec ring_loop
+        choice A at
+          | Add =>
+            A -> B : Add(i32)
+            B -> C : Add(i32)
+            C -> A : Add(i32)
+            continue ring_loop
+          | Stop =>
+            A -> B : Stop
+            B -> C : Stop
 }
 
 // ---------------------------------------------------------------------------

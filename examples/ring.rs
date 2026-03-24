@@ -11,12 +11,11 @@ use telltale_macros::choreography;
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
 choreography! {
-    protocol Ring {
-        roles A, B, C;
-        A -> B: Value(i32);
-        B -> C: Value(i32);
-        C -> A: Value(i32);
-    }
+    protocol Ring =
+      roles A, B, C
+      A -> B : Value(i32)
+      B -> C : Value(i32)
+      C -> A : Value(i32)
 }
 
 async fn ring_a(role: &mut A, input: i32) -> Result<i32> {

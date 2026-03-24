@@ -1,20 +1,19 @@
 error: Choreography parse error:
        Undefined role 'C'
-         --> input:2:4
+         --> input:3:13
            |
-         2 | A->C:Ping
-                ^
+         3 |        A -> C : Ping}
+                         ^^
 
-       Macro token input is parsed as DSL text after normalization.
-       You can use either string-literal DSL or token-stream DSL forms.
+       Macro token input is parsed from original source text.
+       Use the canonical indentation-based DSL surface in token form.
  --> tests/ui/fail/undefined_role.rs:3:1
   |
 3 | / choreography! {
-4 | |     protocol Bad {
-5 | |         roles A, B;
-6 | |         A -> C: Ping;
-7 | |     }
-8 | | }
+4 | |     protocol Bad =
+5 | |       roles A, B
+6 | |       A -> C : Ping
+7 | | }
   | |_^
   |
   = note: this error originates in the macro `choreography` (in Nightly builds, run with -Z macro-backtrace for more info)

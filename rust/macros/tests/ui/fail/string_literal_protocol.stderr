@@ -1,0 +1,11 @@
+error: string-literal choreography input was removed; use the canonical indentation-based token DSL directly
+ --> tests/ui/fail/string_literal_protocol.rs:3:15
+  |
+3 |   choreography!(r#"
+  |  _______________^
+4 | | protocol PingPong =
+5 | |   roles Alice, Bob
+6 | |   Alice -> Bob : Ping
+7 | |   Bob -> Alice : Pong
+8 | | "#);
+  | |__^

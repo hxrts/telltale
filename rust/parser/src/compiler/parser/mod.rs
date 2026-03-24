@@ -37,6 +37,7 @@ use pest::Parser;
 use pest_derive::Parser;
 use proc_macro2::{Span, TokenStream};
 use quote::format_ident;
+use regex::Regex;
 use std::collections::{HashMap, HashSet};
 
 use conversion::{convert_statements_to_protocol, inline_calls};
@@ -70,6 +71,7 @@ pub fn parse_choreography_str_with_extensions(
     _registry: &ExtensionRegistry,
 ) -> std::result::Result<(Choreography, Vec<Box<dyn ProtocolExtension>>), ParseError> {
     let dedented = strip_common_indent(input);
+    reject_legacy_structural_braces(&dedented)?;
     let layout = preprocess_layout(&dedented).map_err(|e| ParseError::Layout {
         span: ErrorSpan::from_line_col(e.line, e.column, &dedented),
         message: e.message,
@@ -315,6 +317,185 @@ pub fn parse_choreography_str_with_extensions(
     Ok((choreography, Vec::new()))
 }
 
+fn reject_legacy_structural_braces(input: &str) -> std::result::Result<(), ParseError> {
+    fn line_col(input: &str, offset: usize) -> (usize, usize) {
+        let prefix = &input[..offset];
+        let line = prefix.bytes().filter(|b| *b == b'\n').count() + 1;
+        let column = prefix
+            .rsplit('\n')
+            .next()
+            .map_or(1, |segment| segment.chars().count() + 1);
+        (line, column)
+    }
+
+    fn sanitize(input: &str) -> String {
+        let mut out = String::with_capacity(input.len());
+        let chars: Vec<char> = input.chars().collect();
+        let mut idx = 0usize;
+        let mut in_string = false;
+        let mut in_block_comment = false;
+        let mut escape = false;
+
+        while idx < chars.len() {
+            let ch = chars[idx];
+            let next = chars.get(idx + 1).copied();
+
+            if in_block_comment {
+                if ch == '-' && next == Some('}') {
+                    out.push(' ');
+                    out.push(' ');
+                    in_block_comment = false;
+                    idx += 2;
+                    continue;
+                }
+                out.push(if ch == '\n' { '\n' } else { ' ' });
+                idx += 1;
+                continue;
+            }
+
+            if in_string {
+                if escape {
+                    escape = false;
+                    out.push(' ');
+                    idx += 1;
+                    continue;
+                }
+                if ch == '\\' {
+                    escape = true;
+                    out.push(' ');
+                    idx += 1;
+                    continue;
+                }
+                if ch == '"' {
+                    in_string = false;
+                    out.push(' ');
+                    idx += 1;
+                    continue;
+                }
+                out.push(if ch == '\n' { '\n' } else { ' ' });
+                idx += 1;
+                continue;
+            }
+
+            if ch == '-' && next == Some('-') {
+                out.push(' ');
+                out.push(' ');
+                idx += 2;
+                while idx < chars.len() {
+                    let line_ch = chars[idx];
+                    out.push(if line_ch == '\n' { '\n' } else { ' ' });
+                    idx += 1;
+                    if line_ch == '\n' {
+                        break;
+                    }
+                }
+                continue;
+            }
+
+            if ch == '{' && next == Some('-') {
+                in_block_comment = true;
+                out.push(' ');
+                out.push(' ');
+                idx += 2;
+                continue;
+            }
+
+            if ch == '"' {
+                in_string = true;
+                out.push(' ');
+                idx += 1;
+                continue;
+            }
+
+            out.push(ch);
+            idx += 1;
+        }
+
+        out
+    }
+
+    let sanitized = sanitize(input);
+    let patterns = [
+        (
+            Regex::new(r"(?s)\bprotocol\b[^{}=\n]*=\s*\{").expect("protocol block regex"),
+            "legacy brace-based protocol blocks are removed; use indentation after `protocol ... =`",
+        ),
+        (
+            Regex::new(r"(?m)\bprotocol\b[^{}=\n]*\{").expect("protocol header brace regex"),
+            "legacy brace-based protocol blocks are removed; keep `=` on the header line and use indentation",
+        ),
+        (
+            Regex::new(r"(?s)\boperation\b[^{}=\n]*=\s*\{").expect("operation block regex"),
+            "legacy brace-based operation blocks are removed; use indentation after `operation ... =`",
+        ),
+        (
+            Regex::new(r"(?s)\bguest\s+runtime\b[^{}=\n]*=\s*\{")
+                .expect("guest runtime block regex"),
+            "legacy brace-based guest runtime blocks are removed; use indentation after `guest runtime ... =`",
+        ),
+        (
+            Regex::new(r"(?m)\bwhere\s*\{").expect("where block regex"),
+            "legacy brace-based `where` blocks are removed; use indentation for local protocol declarations",
+        ),
+        (
+            Regex::new(r"(?s)\bchoice\b.*?\bat\s*\{").expect("choice block regex"),
+            "legacy brace-based choice blocks are removed; use indentation after `choice Role at`",
+        ),
+        (
+            Regex::new(r"(?s)\bcase\b.*?\bof\s*\{").expect("case block regex"),
+            "legacy brace-based case blocks are removed; use indentation after `case ... of`",
+        ),
+        (
+            Regex::new(r"(?s)=>\s*\{").expect("branch body regex"),
+            "legacy brace-based branch bodies are removed; place the branch body on the next indented lines after `=>`",
+        ),
+        (
+            Regex::new(r"(?m)\bpar\s*\{").expect("par block regex"),
+            "legacy brace-based `par` blocks are removed; use indentation with leading `|` branches",
+        ),
+        (
+            Regex::new(r"(?s)\brec\b[^{\n]*\{").expect("rec block regex"),
+            "legacy brace-based `rec` blocks are removed; use indentation after `rec Name`",
+        ),
+        (
+            Regex::new(r"(?s)\bloop\b.*?\{").expect("loop block regex"),
+            "legacy brace-based loop blocks are removed; use indentation after the loop header",
+        ),
+        (
+            Regex::new(r"(?s)\btimeout\b.*?\bat\s*\{").expect("timeout block regex"),
+            "legacy brace-based timeout bodies are removed; use indentation after `timeout duration Role at`",
+        ),
+        (
+            Regex::new(r"(?s)\bon\s+timeout\s*=>\s*\{").expect("timeout branch regex"),
+            "legacy brace-based timeout branches are removed; use indentation after `on timeout =>`",
+        ),
+        (
+            Regex::new(r"(?s)\bon\s+cancel\s*=>\s*\{").expect("cancel branch regex"),
+            "legacy brace-based cancel branches are removed; use indentation after `on cancel =>`",
+        ),
+        (
+            Regex::new(r"(?s)\bin\s*\{").expect("let-in block regex"),
+            "legacy brace-based `let ... in` bodies are removed; use indentation after `in`",
+        ),
+    ];
+
+    for (pattern, message) in patterns {
+        if let Some(found) = pattern.find(&sanitized) {
+            let brace_offset = sanitized[found.start()..found.end()]
+                .rfind('{')
+                .map(|idx| found.start() + idx)
+                .unwrap_or(found.start());
+            let (line, column) = line_col(input, brace_offset);
+            return Err(ParseError::Syntax {
+                span: ErrorSpan::from_line_col(line, column, input),
+                message: message.to_string(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
 fn strip_common_indent(input: &str) -> String {
     let lines: Vec<&str> = input.lines().collect();
     let mut min_indent: Option<usize> = None;
@@ -355,168 +536,17 @@ fn strip_common_indent(input: &str) -> String {
 pub fn parse_choreography(input: TokenStream) -> syn::Result<Choreography> {
     use syn::LitStr;
 
-    // Try to parse as a string literal (for DSL syntax)
     if let Ok(lit_str) = syn::parse2::<LitStr>(input.clone()) {
-        // Parse the DSL string
-        let dsl_content = lit_str.value();
-        return parse_choreography_str(&dsl_content).map_err(|e| {
-            syn::Error::new(lit_str.span(), format!("Choreography parse error: {e}"))
-        });
+        return Err(syn::Error::new(
+            lit_str.span(),
+            "string-literal choreography input was removed; use parse_choreography_str for DSL strings or the choreography! proc macro with canonical token syntax",
+        ));
     }
 
-    let normalized = normalize_macro_token_input(&input);
-    parse_choreography_str(&normalized).map_err(|e| {
-        syn::Error::new(
-            proc_macro2::Span::call_site(),
-            format!(
-                "Choreography parse error: {e}\n\
-                 Macro token input is parsed as DSL text after normalization.\n\
-                 You can use either string-literal DSL or token-stream DSL forms."
-            ),
-        )
-    })
-}
-
-fn normalize_macro_token_input(input: &TokenStream) -> String {
-    fn strip_outer_delimiters(s: &str) -> &str {
-        let trimmed = s.trim();
-        if trimmed.len() < 2 {
-            return trimmed;
-        }
-        let first = trimmed.chars().next().unwrap_or_default();
-        let last = trimmed.chars().last().unwrap_or_default();
-        let is_pair = (first == '{' && last == '}') || (first == '(' && last == ')');
-        if is_pair {
-            &trimmed[1..trimmed.len() - 1]
-        } else {
-            trimmed
-        }
-    }
-
-    fn normalize_composite_ops(mut s: String) -> String {
-        let patterns = [
-            ("-> *", "->*"),
-            ("->  *", "->*"),
-            ("<- >", "<->"),
-            ("< - >", "<->"),
-            ("<  - >", "<->"),
-            ("< -  >", "<->"),
-        ];
-
-        loop {
-            // bounded: converges as patterns reduce spacing
-            let mut changed = false;
-            for (from, to) in patterns {
-                if s.contains(from) {
-                    s = s.replace(from, to);
-                    changed = true;
-                }
-            }
-            if !changed {
-                break;
-            }
-        }
-        s
-    }
-
-    fn rewrite_legacy_block_heads(input: &str) -> String {
-        fn is_ident_char(ch: char) -> bool {
-            ch.is_ascii_alphanumeric() || ch == '_'
-        }
-
-        fn skip_ws(chars: &[char], mut idx: usize) -> usize {
-            while idx < chars.len() && chars[idx].is_whitespace() {
-                idx += 1;
-            }
-            idx
-        }
-
-        fn match_keyword(chars: &[char], idx: usize, keyword: &str) -> bool {
-            let kw: Vec<char> = keyword.chars().collect();
-            if idx + kw.len() > chars.len() {
-                return false;
-            }
-            if idx > 0 && is_ident_char(chars[idx - 1]) {
-                return false;
-            }
-            for (offset, expected) in kw.iter().enumerate() {
-                if chars[idx + offset] != *expected {
-                    return false;
-                }
-            }
-            let end = idx + kw.len();
-            end >= chars.len() || !is_ident_char(chars[end])
-        }
-
-        let chars: Vec<char> = input.chars().collect();
-        let mut out = String::with_capacity(input.len() + 8);
-        let mut idx = 0usize;
-
-        while idx < chars.len() {
-            if match_keyword(&chars, idx, "protocol") {
-                let start = idx;
-                idx += "protocol".len();
-                while idx < chars.len() {
-                    let ch = chars[idx];
-                    if ch == '{' || ch == '=' {
-                        break;
-                    }
-                    idx += 1;
-                }
-                out.push_str(&input[start..idx]);
-                if idx < chars.len() && chars[idx] == '{' {
-                    out.push_str(" = ");
-                    out.push('{');
-                    idx += 1;
-                } else if idx < chars.len() && chars[idx] == '=' {
-                    out.push('=');
-                    idx += 1;
-                }
-                continue;
-            }
-
-            if match_keyword(&chars, idx, "choice") {
-                let start = idx;
-                idx += "choice".len();
-                let role_start = skip_ws(&chars, idx);
-                idx = role_start;
-                while idx < chars.len() {
-                    let ch = chars[idx];
-                    if ch == '{' || ch.is_whitespace() {
-                        break;
-                    }
-                    idx += 1;
-                }
-                let after_role = skip_ws(&chars, idx);
-
-                if after_role < chars.len() && match_keyword(&chars, after_role, "at") {
-                    out.push_str(&input[start..after_role + "at".len()]);
-                    idx = after_role + "at".len();
-                    continue;
-                }
-
-                out.push_str(&input[start..idx]);
-                if after_role < chars.len() && chars[after_role] == '{' {
-                    out.push_str(" at ");
-                    out.push('{');
-                    idx = after_role + 1;
-                    continue;
-                }
-            }
-
-            out.push(chars[idx]);
-            idx += 1;
-        }
-
-        out
-    }
-
-    let raw = input.to_string();
-    let stripped = strip_outer_delimiters(&raw);
-    let mut normalized = normalize_composite_ops(stripped.to_string());
-    normalized = rewrite_legacy_block_heads(&normalized);
-    normalized = normalized.replace(';', "\n");
-    normalized
+    Err(syn::Error::new(
+        proc_macro2::Span::call_site(),
+        "proc-macro2 token parsing for choreography DSL was removed; use parse_choreography_str for DSL text or the choreography! proc macro with canonical indentation-based token syntax",
+    ))
 }
 
 /// Parse a choreography from a file
@@ -1017,45 +1047,43 @@ protocol TypedLoop =
 
         let choreo = result.unwrap();
         match &choreo.protocol {
-            Protocol::Rec { body, .. } => {
-                match body.as_ref() {
-                    Protocol::Choice { branches, .. } => {
-                        let continue_branch = branches.first();
-                        match &continue_branch.protocol {
-                            Protocol::Send {
-                                message,
-                                continuation,
-                                ..
-                            } => {
-                                assert_eq!(message.name.to_string(), "Request");
-                                assert!(message.payload.is_some());
-                                let type_str = message.payload.as_ref().unwrap().to_string();
-                                assert!(
-                                    type_str.contains("String"),
-                                    "Expected String type, got: {}",
-                                    type_str
-                                );
+            Protocol::Rec { body, .. } => match body.as_ref() {
+                Protocol::Choice { branches, .. } => {
+                    let continue_branch = branches.first();
+                    match &continue_branch.protocol {
+                        Protocol::Send {
+                            message,
+                            continuation,
+                            ..
+                        } => {
+                            assert_eq!(message.name.to_string(), "Request");
+                            assert!(message.payload.is_some());
+                            let type_str = message.payload.as_ref().unwrap().to_string();
+                            assert!(
+                                type_str.contains("String"),
+                                "Expected String type, got: {}",
+                                type_str
+                            );
 
-                                match continuation.as_ref() {
-                                    Protocol::Send { message, .. } => {
-                                        assert_eq!(message.name.to_string(), "Response");
-                                        assert!(message.payload.is_some());
-                                        let type_str = message.payload.as_ref().unwrap().to_string();
-                                        assert!(
-                                            type_str.contains("U32"),
-                                            "Expected U32 type, got: {}",
-                                            type_str
-                                        );
-                                    }
-                                    _ => panic!("Expected Send for Response"),
+                            match continuation.as_ref() {
+                                Protocol::Send { message, .. } => {
+                                    assert_eq!(message.name.to_string(), "Response");
+                                    assert!(message.payload.is_some());
+                                    let type_str = message.payload.as_ref().unwrap().to_string();
+                                    assert!(
+                                        type_str.contains("U32"),
+                                        "Expected U32 type, got: {}",
+                                        type_str
+                                    );
                                 }
+                                _ => panic!("Expected Send for Response"),
                             }
-                            _ => panic!("Expected Send for Request"),
                         }
+                        _ => panic!("Expected Send for Request"),
                     }
-                    _ => panic!("Expected Choice"),
                 }
-            }
+                _ => panic!("Expected Choice"),
+            },
             _ => panic!("Expected Rec"),
         }
     }
@@ -2344,7 +2372,9 @@ protocol LinearBranchDivergence =
                 | Protocol::Broadcast { continuation, .. }
                 | Protocol::Publish { continuation, .. }
                 | Protocol::Handoff { continuation, .. }
-                | Protocol::DependentWork { continuation, .. } => has_quorum_extension(continuation),
+                | Protocol::DependentWork { continuation, .. } => {
+                    has_quorum_extension(continuation)
+                }
                 Protocol::Let { continuation, .. } => has_quorum_extension(continuation),
                 Protocol::Choice { branches, .. } => {
                     branches.iter().any(|b| has_quorum_extension(&b.protocol))
@@ -2362,7 +2392,9 @@ protocol LinearBranchDivergence =
                         || has_quorum_extension(on_timeout)
                         || on_cancel.as_deref().is_some_and(has_quorum_extension)
                 }
-                Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => has_quorum_extension(body),
+                Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => {
+                    has_quorum_extension(body)
+                }
                 Protocol::Parallel { protocols } => protocols.iter().any(has_quorum_extension),
                 Protocol::Var(_) | Protocol::End => false,
             }
@@ -2480,133 +2512,61 @@ protocol PredicateTyping =
     }
 
     #[test]
-    fn test_parse_choreography_macro_tokens_basic() {
+    fn test_parse_choreography_rejects_proc_macro_token_input() {
         let input: TokenStream = quote::quote! {
-            protocol PingPong = {
-                roles Alice, Bob;
-                Alice -> Bob : Ping;
-                Bob -> Alice : Pong;
-            }
+            protocol PingPong =
+              roles Alice, Bob
+              Alice -> Bob : Ping
+              Bob -> Alice : Pong
         };
 
-        let choreo = parse_choreography(input).expect("macro token parsing should succeed");
-        assert_eq!(choreo.name.to_string(), "PingPong");
-        assert_eq!(choreo.roles.len(), 2);
+        let err = parse_choreography(input).expect_err("proc-macro2 token parsing should fail");
+        assert!(err
+            .to_string()
+            .contains("proc-macro2 token parsing for choreography DSL was removed"));
     }
 
     #[test]
-    fn test_parse_choreography_macro_tokens_normalizes_composite_operators() {
-        let input: TokenStream = quote::quote! {
-            protocol Ops = {
-                roles A, B;
-                handshake A <-> B : Hello;
-                A ->* : Notice;
-            }
-        };
-
-        let choreo = parse_choreography(input).expect("macro token parsing should succeed");
-        assert_eq!(choreo.name.to_string(), "Ops");
-        assert_eq!(choreo.roles.len(), 2);
-    }
-
-    #[test]
-    fn test_parse_choreography_macro_tokens_with_sender_record_and_of_payload() {
-        let input: TokenStream = quote::quote! {
-            protocol Purchase = {
-                roles Buyer, Seller;
-                Buyer { priority = high } -> Seller : Request of shop.Order;
-            }
-        };
-
-        let choreo = parse_choreography(input).expect("macro token parsing should succeed");
-        match &choreo.protocol {
-            Protocol::Send {
-                from_annotations,
-                message,
-                ..
-            } => {
-                assert_eq!(from_annotations.custom("priority"), Some("high"));
-                assert_eq!(
-                    message.payload.as_ref().map(ToString::to_string),
-                    Some("shop :: Order".to_string())
-                );
-            }
-            _ => panic!("Expected Send"),
-        }
-    }
-
-    #[test]
-    fn test_parse_choreography_macro_string_literal_with_preferred_syntax() {
+    fn test_parse_choreography_rejects_string_literal_macro_input() {
         let input: TokenStream = quote::quote! {
             r#"
 protocol ReplicatedWrite =
   roles Client, Leader, Replica0, Replica1
-  Client { priority = high }
-    -> Leader : Put of kv.Write
-  par
-    | Leader { shard = 0 } -> Replica0 : Replicate of kv.Write
-    | Leader { shard = 1 } -> Replica1 : Replicate of kv.Write
+  Client -> Leader : Put of kv.Write
 "#
         };
 
-        let choreo = parse_choreography(input).expect("macro string-literal parsing should succeed");
-        match &choreo.protocol {
-            Protocol::Send {
-                from_annotations,
-                message,
-                continuation,
-                ..
-            } => {
-                assert_eq!(from_annotations.custom("priority"), Some("high"));
-                assert_eq!(
-                    message.payload.as_ref().map(ToString::to_string),
-                    Some("kv :: Write".to_string())
-                );
-                match continuation.as_ref() {
-                    Protocol::Parallel { protocols } => assert_eq!(protocols.len(), 2),
-                    _ => panic!("Expected parallel continuation"),
-                }
-            }
-            _ => panic!("Expected Send"),
-        }
+        let err = parse_choreography(input).expect_err("string literal macro input should fail");
+        assert!(err
+            .to_string()
+            .contains("string-literal choreography input was removed"));
     }
 
     #[test]
-    fn test_parse_choreography_macro_tokens_with_choice_bars_and_par() {
-        let input: TokenStream = quote::quote! {
-            protocol Branchy = {
-                roles A, B, C, D;
-                par {
-                    | {
-                        choice A at {
-                            | Accept => {
-                                A -> B : Ok;
-                            }
-                            | Reject => {
-                                A -> B : No;
-                            }
-                        }
-                    }
-                    | B -> D : Right;
-                }
-            }
-        };
-
-        let choreo = parse_choreography(input).expect("macro token parsing should succeed");
-        match &choreo.protocol {
-            Protocol::Parallel { protocols } => {
-                assert_eq!(protocols.len(), 2);
-                match protocols.first() {
-                    Protocol::Choice { branches, .. } => {
-                        assert_eq!(branches.len(), 2);
-                        assert_eq!(branches.first().label.to_string(), "Accept");
-                        assert_eq!(branches.as_slice()[1].label.to_string(), "Reject");
-                    }
-                    _ => panic!("Expected choice in first parallel branch"),
-                }
-            }
-            _ => panic!("Expected Parallel"),
+    fn test_parse_legacy_structural_braces_are_rejected() {
+        let input = r#"
+protocol Branchy = {
+  roles A, B, C, D;
+  par {
+    | {
+      choice A at {
+        | Accept => {
+          A -> B : Ok;
         }
+        | Reject => {
+          A -> B : No;
+        }
+      }
+    }
+    | B -> D : Right;
+  }
+}
+"#;
+
+        let err = parse_choreography_str(input).expect_err("legacy braces should fail");
+        assert!(err
+            .to_string()
+            .contains("legacy structural braces are no longer accepted"));
     }
 
     // ── authority_surface ────────────────────────────────────────────
@@ -2664,7 +2624,9 @@ protocol CommitFlow uses Runtime, Audit =
             }),
             "runtime effect metadata should carry effect authority class"
         );
-        choreography.validate().expect("declared effect uses should validate");
+        choreography
+            .validate()
+            .expect("declared effect uses should validate");
     }
 
     #[test]
@@ -2685,8 +2647,11 @@ protocol InviteFlow uses Runtime =
           Coordinator -> Worker : MissingInvite
 "#;
 
-        let choreography = parse_choreography_str(input).expect("let-in Maybe surface should parse");
-        choreography.validate().expect("effect invocation should validate");
+        let choreography =
+            parse_choreography_str(input).expect("let-in Maybe surface should parse");
+        choreography
+            .validate()
+            .expect("effect invocation should validate");
     }
 
     #[test]
@@ -2703,7 +2668,8 @@ protocol CommitFlow uses Runtime =
         Coordinator -> Worker : Commit(witness)
 "#;
 
-        let err = parse_choreography_str(input).expect_err("non-exhaustive Result case should fail");
+        let err =
+            parse_choreography_str(input).expect_err("non-exhaustive Result case should fail");
         assert!(!err.to_string().is_empty());
     }
 
@@ -2790,7 +2756,9 @@ protocol CommitFlow uses Runtime =
         let err = choreography
             .validate()
             .expect_err("duplicate effect declarations should fail validation");
-        assert!(err.to_string().contains("duplicate effect interface declaration"));
+        assert!(err
+            .to_string()
+            .contains("duplicate effect interface declaration"));
     }
 
     #[test]
@@ -2838,9 +2806,14 @@ protocol CommitFlow uses Runtime, Audit =
         let operation = &choreography.operation_decls()[0];
         assert_eq!(operation.name, "syncMembership");
         assert_eq!(operation.owner_role, "Worker");
-        assert_eq!(operation.within.as_deref(), Some("ChannelMembership(channel)"));
+        assert_eq!(
+            operation.within.as_deref(),
+            Some("ChannelMembership(channel)")
+        );
         assert_eq!(operation.params.len(), 1);
-        assert!(operation.body_source.contains("publish SyncQueued(channel)"));
+        assert!(operation
+            .body_source
+            .contains("publish SyncQueued(channel)"));
 
         assert_eq!(choreography.guest_runtime_decls().len(), 1);
         let guest_runtime = &choreography.guest_runtime_decls()[0];

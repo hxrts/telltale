@@ -333,9 +333,7 @@ impl<'a> ProjectionContext<'a> {
 
                 for branch in branches {
                     let label_matches_msg = match &branch.protocol {
-                        Protocol::Send { message, .. } => {
-                            branch.label == message.name
-                        }
+                        Protocol::Send { message, .. } => branch.label == message.name,
                         _ => false,
                     };
 
@@ -404,9 +402,7 @@ impl<'a> ProjectionContext<'a> {
 
                 for branch in branches {
                     let label_matches_msg = match &branch.protocol {
-                        Protocol::Send { message, .. } => {
-                            branch.label == message.name
-                        }
+                        Protocol::Send { message, .. } => branch.label == message.name,
                         _ => false,
                     };
 
