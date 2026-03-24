@@ -5,13 +5,10 @@
 //! topology follows the standard Cooley-Tukey bit-reversal pattern, with each
 //! stage pairing roles at increasing stride distances.
 //!
-//! Uses the `choreography!` macro to define the global protocol from which
+//! Uses the `tell!` macro to define the global protocol from which
 //! per-role session types are projected automatically. The choreography
 //! sequences each butterfly exchange so that the lower-indexed role in a pair
 //! sends first.
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(missing_docs)]
 
 use futures::{executor, try_join};
 use num_complex::{Complex, Complex32};
@@ -21,39 +18,43 @@ use std::{
     fmt::{self, Display, Formatter},
     result,
 };
-use telltale::try_session;
-use telltale_macros::choreography;
+use telltale::{tell, try_session};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
-choreography! {
+tell! {
+    -- // Stage 1 exchanges values between adjacent butterfly partners.
     protocol FFT =
       roles P0, P1, P2, P3, P4, P5, P6, P7
-      P0 -> P1 : Value(Complex32)
-      P1 -> P0 : Value(Complex32)
-      P2 -> P3 : Value(Complex32)
-      P3 -> P2 : Value(Complex32)
-      P4 -> P5 : Value(Complex32)
-      P5 -> P4 : Value(Complex32)
-      P6 -> P7 : Value(Complex32)
-      P7 -> P6 : Value(Complex32)
-      P0 -> P2 : Value(Complex32)
-      P2 -> P0 : Value(Complex32)
-      P1 -> P3 : Value(Complex32)
-      P3 -> P1 : Value(Complex32)
-      P4 -> P6 : Value(Complex32)
-      P6 -> P4 : Value(Complex32)
-      P5 -> P7 : Value(Complex32)
-      P7 -> P5 : Value(Complex32)
-      P0 -> P4 : Value(Complex32)
-      P4 -> P0 : Value(Complex32)
-      P1 -> P5 : Value(Complex32)
-      P5 -> P1 : Value(Complex32)
-      P2 -> P6 : Value(Complex32)
-      P6 -> P2 : Value(Complex32)
-      P3 -> P7 : Value(Complex32)
-      P7 -> P3 : Value(Complex32)
+      P0 -> P1 : Value(num_complex::Complex32)
+      P1 -> P0 : Value(num_complex::Complex32)
+      P2 -> P3 : Value(num_complex::Complex32)
+      P3 -> P2 : Value(num_complex::Complex32)
+      P4 -> P5 : Value(num_complex::Complex32)
+      P5 -> P4 : Value(num_complex::Complex32)
+      P6 -> P7 : Value(num_complex::Complex32)
+      P7 -> P6 : Value(num_complex::Complex32)
+      -- // Stage 2 exchanges values at stride two.
+      P0 -> P2 : Value(num_complex::Complex32)
+      P2 -> P0 : Value(num_complex::Complex32)
+      P1 -> P3 : Value(num_complex::Complex32)
+      P3 -> P1 : Value(num_complex::Complex32)
+      P4 -> P6 : Value(num_complex::Complex32)
+      P6 -> P4 : Value(num_complex::Complex32)
+      P5 -> P7 : Value(num_complex::Complex32)
+      P7 -> P5 : Value(num_complex::Complex32)
+      -- // Stage 3 exchanges values at stride four to complete the FFT network.
+      P0 -> P4 : Value(num_complex::Complex32)
+      P4 -> P0 : Value(num_complex::Complex32)
+      P1 -> P5 : Value(num_complex::Complex32)
+      P5 -> P1 : Value(num_complex::Complex32)
+      P2 -> P6 : Value(num_complex::Complex32)
+      P6 -> P2 : Value(num_complex::Complex32)
+      P3 -> P7 : Value(num_complex::Complex32)
+      P7 -> P3 : Value(num_complex::Complex32)
 }
+
+use FFT::sessions::*;
 
 /// Twiddle factor: exp(-2πi·k/8).
 fn twiddle(k: usize) -> Complex32 {
@@ -283,7 +284,7 @@ impl Display for Vector<'_> {
     }
 }
 
-fn main() {
+fn main() -> Result<()> {
     let Roles(mut p0, mut p1, mut p2, mut p3, mut p4, mut p5, mut p6, mut p7) = Roles::default();
 
     // Bit-reversed input order for Cooley-Tukey FFT
@@ -302,9 +303,9 @@ fn main() {
             process_p6(&mut p6, input[3]),
             process_p7(&mut p7, input[7]),
         )
-        .unwrap()
-    });
+    })?;
 
     let output = [o0, o1, o2, o3, o4, o5, o6, o7];
     println!("output = {}", Vector(&output));
+    Ok(())
 }

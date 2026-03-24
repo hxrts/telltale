@@ -7,7 +7,7 @@
 //! - `#[derive(Role)]` - Derive role trait implementations with routing
 //! - `#[derive(Roles)]` - Derive roles container with automatic channel setup
 //! - `#[session]` - Transform session type definitions with lifetime parameters
-//! - `choreography!` - Define protocols from choreographic descriptions
+//! - `tell!` - Define protocols from Telltale DSL specifications
 
 use proc_macro::TokenStream;
 
@@ -93,15 +93,15 @@ pub fn session(attr: TokenStream, input: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Procedural macro for defining choreographic protocols.
+/// Procedural macro for defining Telltale protocol specifications.
 ///
-/// Generates role definitions, message types, and session types from a
-/// choreographic protocol specification.
+/// Generates a protocol module with the canonical spec/effect surfaces and,
+/// when projectable, a derived `sessions` submodule.
 ///
 /// # Example
 ///
 /// ```text
-/// choreography! {
+/// tell! {
 ///     protocol Simple =
 ///       roles Client, Server
 ///       Client -> Server : Hello
@@ -109,8 +109,8 @@ pub fn session(attr: TokenStream, input: TokenStream) -> TokenStream {
 /// }
 /// ```
 #[proc_macro]
-pub fn choreography(input: TokenStream) -> TokenStream {
-    choreography::choreography(input)
+pub fn tell(input: TokenStream) -> TokenStream {
+    choreography::tell(input)
         .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }

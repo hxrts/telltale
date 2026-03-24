@@ -6,32 +6,12 @@
 //! self-referential session types that the type system enforces at
 //! compile time. Execution is bounded at runtime by a configurable
 //! `RING_MAX_ROUNDS` limit (default 5).
-//!
-//! ```tell
-//! protocol RingChoice =
-//!   roles A, B, C
-//!   rec ring_loop
-//!     choice A at
-//!       | Add =>
-//!         A -> B : Add(i32)
-//!         B -> C : Add(i32)
-//!         C -> A : Add(i32)
-//!         continue ring_loop
-//!       | Stop =>
-//!         A -> B : Stop
-//!         B -> C : Stop
-//! ```
-//!
-//! Uses the `choreography!` macro to derive session types, roles, messages,
+//! Uses the `tell!` macro to derive session types, roles, messages,
 //! and channel wiring from the global protocol specification.
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(missing_docs)]
 
 use futures::{executor, try_join};
 use std::{error::Error, result};
-use telltale::try_session;
-use telltale_macros::choreography;
+use telltale::{tell, try_session};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
@@ -44,20 +24,26 @@ fn max_rounds() -> usize {
         .unwrap_or(5)
 }
 
-choreography! {
+tell! {
+    -- // A controls whether the ring performs another add round or stops.
     protocol RingChoice =
       roles A, B, C
+      -- // Recursive loop allows repeated circulation of accumulated values.
       rec ring_loop
         choice A at
+          -- // Send one value around the ring and continue with the next round.
           | Add =>
             A -> B : Add(i32)
             B -> C : Add(i32)
             C -> A : Add(i32)
             continue ring_loop
+          -- // Propagate the stop signal to terminate the ring.
           | Stop =>
             A -> B : Stop
             B -> C : Stop
 }
+
+use RingChoice::sessions::*;
 
 // ---------------------------------------------------------------------------
 // Endpoint implementations
@@ -130,10 +116,9 @@ async fn ring_c(role: &mut C, mut input: i32) -> Result<()> {
 // Main
 // ---------------------------------------------------------------------------
 
-fn main() {
+fn main() -> Result<()> {
     let Roles(mut a, mut b, mut c) = Roles::default();
-    executor::block_on(async {
-        try_join!(ring_a(&mut a, -1), ring_b(&mut b, 0), ring_c(&mut c, 1)).unwrap();
-    });
+    executor::block_on(async { try_join!(ring_a(&mut a, -1), ring_b(&mut b, 0), ring_c(&mut c, 1)) })?;
     println!("\nRing protocol completed after {} rounds", max_rounds());
+    Ok(())
 }

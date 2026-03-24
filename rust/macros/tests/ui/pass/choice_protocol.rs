@@ -1,6 +1,6 @@
-use telltale_macros::choreography;
+use telltale_macros::tell;
 
-choreography! {
+tell! {
     protocol Purchase =
       roles Buyer, Seller
       choice Seller at
@@ -11,5 +11,5 @@ choreography! {
 }
 
 fn main() {
-    let _roles = setup();
+    let _roles = Purchase::sessions::setup();
 }

@@ -13,53 +13,48 @@
 //! logging loop `S -> L : Log` cycled forever with no `End` state). This
 //! version models a single request-response cycle with all three outcomes,
 //! demonstrating the same three-role topology and choice-based branching
-//! in a form the `choreography!` macro can project.
+//! in a form the `tell!` macro can project.
 //!
 //! The server notifies both the client and the logger in every branch so that
 //! each role's projected session type is compatible across all choice arms
 //! (a requirement for well-formed multiparty projection).
-//!
-//! ```text
-//! protocol ClientServerLog =
-//!   roles C, S, L
-//!   C -> S : Request(i32)
-//!   choice S at
-//!     | Fault =>
-//!         S -> C : Fault
-//!         S -> L : Fault
-//!     | Success =>
-//!         S -> C : Success(i32)
-//!         S -> L : Success(i32)
-//!     | Retry =>
-//!         S -> C : Retry
-//!         S -> L : Retry
-//!         C -> S : Request(i32)
-//!         S -> C : Success(i32)
-//!         S -> L : Success(i32)
-//! ```
-//!
-//! Uses the `choreography!` macro to derive session types, roles, messages,
+//! Uses the `tell!` macro to derive session types, roles, messages,
 //! and channel wiring from the global protocol specification.
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(missing_docs)]
 
 use futures::{executor, try_join};
 use std::error::Error;
-use telltale::try_session;
-use telltale_macros::choreography;
+use telltale::{tell, try_session};
 
-choreography! {
+#[derive(Clone, Copy, Debug)]
+enum ServerOutcome {
+    Fault,
+    Success(i32),
+    RetryThenSuccess(i32),
+}
+
+fn server_outcome() -> ServerOutcome {
+    match std::env::var("CLIENT_SERVER_LOG_OUTCOME").ok().as_deref() {
+        Some("fault") => ServerOutcome::Fault,
+        Some("retry") => ServerOutcome::RetryThenSuccess(420),
+        _ => ServerOutcome::Success(420),
+    }
+}
+
+tell! {
+    -- // Client submits one request and the server decides the outcome.
     protocol ClientServerLog =
       roles C, S, L
       C -> S : Request(i32)
       choice S at
+        -- // Fatal failure is broadcast to both client and logger.
         | Fault =>
           S -> C : Fault
           S -> L : Fault
+        -- // Successful completion returns data and emits the log entry.
         | Success =>
           S -> C : Success(i32)
           S -> L : Success(i32)
+        -- // Retry asks for one more request before completing successfully.
         | Retry =>
           S -> C : Retry
           S -> L : Retry
@@ -67,6 +62,8 @@ choreography! {
           S -> C : Success(i32)
           S -> L : Success(i32)
 }
+
+use ClientServerLog::sessions::*;
 
 // ---------------------------------------------------------------------------
 // Client
@@ -110,13 +107,28 @@ async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
         let (Request(i), s) = s.receive().await?;
         println!("S: received Request({i})");
 
-        // Process request and respond with Success
-        let result = i * 10;
-        let s = s.select(Success(result)).await?;
-        let end = s.send(Success(result)).await?;
-        println!("S: sent Success({result}) to C and L");
-
-        Ok(((), end))
+        match server_outcome() {
+            ServerOutcome::Fault => {
+                let s = s.select(Fault).await?;
+                let end = s.send(Fault).await?;
+                println!("S: sent Fault to C and L");
+                Ok(((), end))
+            }
+            ServerOutcome::Success(result) => {
+                let s = s.select(Success(result)).await?;
+                let end = s.send(Success(result)).await?;
+                println!("S: sent Success({result}) to C and L");
+                Ok(((), end))
+            }
+            ServerOutcome::RetryThenSuccess(result) => {
+                let s = s.select(Retry).await?;
+                let (Request(retried), s) = s.send(Retry).await?.receive().await?;
+                println!("S: received retry Request({retried})");
+                let end = s.send(Success(result)).await?.send(Success(result)).await?;
+                println!("S: sent Success({result}) after retry");
+                Ok(((), end))
+            }
+        }
     })
     .await
 }
@@ -151,10 +163,9 @@ async fn logger(role: &mut L) -> Result<(), Box<dyn Error>> {
 // Main
 // ---------------------------------------------------------------------------
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let Roles(mut c, mut s, mut l) = Roles::default();
-    executor::block_on(async {
-        try_join!(client(&mut c), server(&mut s), logger(&mut l)).unwrap();
-    });
+    executor::block_on(async { try_join!(client(&mut c), server(&mut s), logger(&mut l)) })?;
     println!("\nClient-server-log protocol completed successfully");
+    Ok(())
 }

@@ -2,55 +2,34 @@
 //!
 //! Alice wants to buy an item. She asks Seller for a quote, then negotiates
 //! with Bob to split the cost. Bob decides whether to confirm or quit.
-//!
-//! ```text
-//! protocol ThreeBuyers =
-//!   roles Alice, Bob, Seller
-//!   Alice -> Seller : Request(i32)
-//!   Seller -> Alice : Quote(i32)
-//!   Seller -> Bob : Quote(i32)
-//!   Alice -> Bob : Contribution(i32)
-//!   choice Bob at
-//!     | Confirm =>
-//!         Bob -> Alice : Confirm(i32)
-//!         Bob -> Seller : Confirm(i32)
-//!         Seller -> Bob : Date(i32)
-//!     | Quit =>
-//!         Bob -> Alice : Quit(i32)
-//!         Bob -> Seller : Quit(i32)
-//! ```
-//!
-//! Uses the `choreography!` macro to generate session types, roles, and
+//! Uses the `tell!` macro to generate session types, roles, and
 //! messages from the global protocol specification.
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(missing_docs)]
 
 use futures::{executor, try_join};
 use std::error::Error;
-use telltale::try_session;
-use telltale_macros::choreography;
+use telltale::{tell, try_session};
 
-choreography! {
-    protocol ThreeBuyers = {
-        roles Alice, Bob, Seller;
-        Alice -> Seller : Request(i32);
-        Seller -> Alice : Quote(i32);
-        Seller -> Bob : Quote(i32);
-        Alice -> Bob : Contribution(i32);
-        choice Bob at {
-            | Confirm => {
-                Bob -> Alice : Confirm(i32);
-                Bob -> Seller : Confirm(i32);
-                Seller -> Bob : Date(i32);
-            }
-            | Quit => {
-                Bob -> Alice : Quit(i32);
-                Bob -> Seller : Quit(i32);
-            }
-        }
-    }
+tell! {
+    -- // Alice asks for a quote, then Bob decides whether the purchase proceeds.
+    protocol ThreeBuyers =
+      roles Alice, Bob, Seller
+      Alice -> Seller : Request(i32)
+      Seller -> Alice : Quote(i32)
+      Seller -> Bob : Quote(i32)
+      Alice -> Bob : Contribution(i32)
+      choice Bob at
+        -- // Confirm notifies Alice and Seller, then Seller returns a delivery date.
+        | Confirm =>
+          Bob -> Alice : Confirm(i32)
+          Bob -> Seller : Confirm(i32)
+          Seller -> Bob : Date(i32)
+        -- // Quit notifies both other participants that the purchase is cancelled.
+        | Quit =>
+          Bob -> Alice : Quit(i32)
+          Bob -> Seller : Quit(i32)
 }
+
+use ThreeBuyers::sessions::*;
 
 // ---------------------------------------------------------------------------
 // Endpoint implementations
@@ -153,9 +132,8 @@ async fn seller(role: &mut Seller) -> Result<(), Box<dyn Error>> {
 // Main
 // ---------------------------------------------------------------------------
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let Roles(mut a, mut b, mut s) = Roles::default();
-    executor::block_on(async {
-        try_join!(alice(&mut a), bob(&mut b), seller(&mut s)).unwrap();
-    });
+    executor::block_on(async { try_join!(alice(&mut a), bob(&mut b), seller(&mut s)) })?;
+    Ok(())
 }

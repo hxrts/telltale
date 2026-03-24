@@ -1,6 +1,6 @@
-use telltale_macros::choreography;
+use telltale_macros::tell;
 
-choreography! {
+tell! {
     module commerce exposing (Checkout)
 
     protocol Checkout =
@@ -14,5 +14,5 @@ choreography! {
 }
 
 fn main() {
-    let _roles = commerce::setup();
+    let _roles = commerce::Checkout::sessions::setup();
 }

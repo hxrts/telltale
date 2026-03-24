@@ -17,43 +17,34 @@
 //! elevator/door state machine cycled through open/close/stop transitions
 //! without any `End` state). This version models a single command cycle with
 //! the automatic close-after-open behavior, demonstrating the same three-role
-//! topology and choice-based coordination in a form the `choreography!` macro
+//! topology and choice-based coordination in a form the `tell!` macro
 //! can project.
-//!
-//! ```text
-//! protocol Elevator =
-//!   roles U, D, E
-//!   choice U at
-//!     | OpenDoor =>
-//!         U -> E : OpenDoor
-//!         E -> D : OpenDoor
-//!         D -> E : DoorOpened
-//!         E -> U : DoorOpened
-//!         E -> D : CloseDoor
-//!         D -> E : DoorClosed
-//!         E -> U : DoorClosed
-//!     | CloseDoor =>
-//!         U -> E : CloseDoor
-//!         E -> D : CloseDoor
-//!         D -> E : DoorClosed
-//!         E -> U : DoorClosed
-//! ```
-//!
-//! Uses the `choreography!` macro to derive session types, roles, messages,
+//! Uses the `tell!` macro to derive session types, roles, messages,
 //! and channel wiring from the global protocol specification.
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(missing_docs)]
 
 use futures::{executor, try_join};
 use std::error::Error;
-use telltale::try_session;
-use telltale_macros::choreography;
+use telltale::{tell, try_session};
 
-choreography! {
+#[derive(Clone, Copy, Debug)]
+enum UserCommand {
+    OpenDoor,
+    CloseDoor,
+}
+
+fn user_command() -> UserCommand {
+    match std::env::var("ELEVATOR_COMMAND").ok().as_deref() {
+        Some("close") => UserCommand::CloseDoor,
+        _ => UserCommand::OpenDoor,
+    }
+}
+
+tell! {
+    -- // User chooses one door command and the elevator relays it to the door.
     protocol Elevator =
       roles U, D, E
       choice U at
+        -- // Open the door, confirm it, then auto-close and confirm closure.
         | OpenDoor =>
           U -> E : OpenDoor
           E -> D : OpenDoor
@@ -62,6 +53,7 @@ choreography! {
           E -> D : CloseDoor
           D -> E : DoorClosed
           E -> U : DoorClosed
+        -- // Close the door directly and confirm the result.
         | CloseDoor =>
           U -> E : CloseDoor
           E -> D : CloseDoor
@@ -69,25 +61,32 @@ choreography! {
           E -> U : DoorClosed
 }
 
+use Elevator::sessions::*;
+
 // ---------------------------------------------------------------------------
 // User
 // ---------------------------------------------------------------------------
 
 async fn user(role: &mut U) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: USession<'_, _>| async {
-        // User decides to open the door
-        println!("U: requesting door open");
-        let s = s.select(OpenDoor).await?;
-
-        // Wait for door to open
-        let (DoorOpened, s) = s.receive().await?;
-        println!("U: door is open");
-
-        // Wait for automatic close
-        let (DoorClosed, end) = s.receive().await?;
-        println!("U: door has closed");
-
-        Ok(((), end))
+        match user_command() {
+            UserCommand::OpenDoor => {
+                println!("U: requesting door open");
+                let s = s.select(OpenDoor).await?;
+                let (DoorOpened, s) = s.receive().await?;
+                println!("U: door is open");
+                let (DoorClosed, end) = s.receive().await?;
+                println!("U: door has closed");
+                Ok(((), end))
+            }
+            UserCommand::CloseDoor => {
+                println!("U: requesting door close");
+                let s = s.select(CloseDoor).await?;
+                let (DoorClosed, end) = s.receive().await?;
+                println!("U: door has closed");
+                Ok(((), end))
+            }
+        }
     })
     .await
 }
@@ -171,10 +170,9 @@ async fn elevator(role: &mut E) -> Result<(), Box<dyn Error>> {
 // Main
 // ---------------------------------------------------------------------------
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let Roles(mut u, mut d, mut e) = Roles::default();
-    executor::block_on(async {
-        try_join!(user(&mut u), door(&mut d), elevator(&mut e)).unwrap();
-    });
+    executor::block_on(async { try_join!(user(&mut u), door(&mut d), elevator(&mut e)) })?;
     println!("\nElevator protocol completed successfully");
+    Ok(())
 }

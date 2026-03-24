@@ -3,46 +3,29 @@
 //! A coordinator distributes workloads to four workers, each computes a partial
 //! result (doubling its input), and returns it. The coordinator collects all
 //! partial results and sums them.
-//!
-//! DSL equivalent (`.tell` syntax):
-//!
-//! ```tell
-//! protocol MapReduce {
-//!     roles Coordinator, W1, W2, W3, W4;
-//!     Coordinator -> W1: Work(i32);
-//!     Coordinator -> W2: Work(i32);
-//!     Coordinator -> W3: Work(i32);
-//!     Coordinator -> W4: Work(i32);
-//!     W1 -> Coordinator: PartialResult(i32);
-//!     W2 -> Coordinator: PartialResult(i32);
-//!     W3 -> Coordinator: PartialResult(i32);
-//!     W4 -> Coordinator: PartialResult(i32);
-//! }
-//! ```
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(missing_docs)]
-
 use futures::{executor, try_join};
 use std::{error::Error, result};
-use telltale::try_session;
-use telltale_macros::choreography;
+use telltale::{tell, try_session};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
-choreography! {
-    protocol MapReduce {
-        roles Coordinator, W1, W2, W3, W4;
-        Coordinator -> W1: Work(i32);
-        Coordinator -> W2: Work(i32);
-        Coordinator -> W3: Work(i32);
-        Coordinator -> W4: Work(i32);
-        W1 -> Coordinator: PartialResult(i32);
-        W2 -> Coordinator: PartialResult(i32);
-        W3 -> Coordinator: PartialResult(i32);
-        W4 -> Coordinator: PartialResult(i32);
-    }
+tell! {
+    -- // Coordinator fans work out to all workers, then collects partial results.
+    protocol MapReduce =
+      roles Coordinator, W1, W2, W3, W4
+      -- // Fan-out stage distributes one work item per worker.
+      Coordinator -> W1 : Work(i32)
+      Coordinator -> W2 : Work(i32)
+      Coordinator -> W3 : Work(i32)
+      Coordinator -> W4 : Work(i32)
+      -- // Fan-in stage gathers the computed partial results.
+      W1 -> Coordinator : PartialResult(i32)
+      W2 -> Coordinator : PartialResult(i32)
+      W3 -> Coordinator : PartialResult(i32)
+      W4 -> Coordinator : PartialResult(i32)
 }
+
+use MapReduce::sessions::*;
 
 async fn coordinator(role: &mut Coordinator) -> Result<i32> {
     try_session(role, |s: CoordinatorSession<'_, _>| async {
@@ -100,7 +83,7 @@ async fn worker_4(role: &mut W4) -> Result<()> {
     .await
 }
 
-fn main() {
+fn main() -> Result<()> {
     let Roles(mut coord, mut w1, mut w2, mut w3, mut w4) = Roles::default();
 
     let (total, _, _, _, _) = executor::block_on(async {
@@ -111,9 +94,9 @@ fn main() {
             worker_3(&mut w3),
             worker_4(&mut w4),
         )
-        .unwrap()
-    });
+    })?;
 
     println!("Total: {total}");
     assert_eq!(total, 200);
+    Ok(())
 }

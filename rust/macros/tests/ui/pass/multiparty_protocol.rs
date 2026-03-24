@@ -1,6 +1,6 @@
-use telltale_macros::choreography;
+use telltale_macros::tell;
 
-choreography! {
+tell! {
     protocol Demo =
       roles A, B, C
       A -> B : Ping
@@ -9,5 +9,5 @@ choreography! {
 }
 
 fn main() {
-    let _roles = setup();
+    let _roles = Demo::sessions::setup();
 }

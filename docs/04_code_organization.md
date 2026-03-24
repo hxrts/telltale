@@ -251,20 +251,20 @@ The `topology/` directory provides deployment configuration. See [Topology](22_t
 
 ### telltale-macros
 
-This crate is located in `rust/macros/`. It provides procedural macros for deriving session type constructs. The crate exports `choreography!`, `session`, `Role`, `Roles`, and `Message` macros.
+This crate is located in `rust/macros/`. It provides procedural macros for deriving session type constructs. The crate exports `tell!`, `session`, `Role`, `Roles`, and `Message` macros.
 
-The `choreography!` macro parses inline DSL text and generates role types, message types, and session types at compile time. The `Role` and `Roles` derive macros generate `RoleId` trait implementations. The `Message` derive macro generates `Serialize` and `Deserialize` bindings for protocol messages.
+The `tell!` macro parses inline DSL text and generates the protocol module, typed effect interfaces, and session types at compile time. The `Role` and `Roles` derive macros generate `RoleId` trait implementations. The `Message` derive macro generates `Serialize` and `Deserialize` bindings for protocol messages.
 
 ### effect-scaffold (binary in telltale-choreography)
 
-The `effect-scaffold` binary (`rust/choreography/src/bin/effect_scaffold.rs`) reads Telltale `effect` declarations and generates:
+The `effect-scaffold` binary (`rust/choreography/src/bin/effect_scaffold.rs`) is a tooling-only export path that reads Telltale `effect` declarations and writes:
 
 - canonical Rust request/outcome enums
 - host-runtime handler traits
 - first-class simulator traits and scenario builders
 - an exported effect-family manifest
 
-Run via `just effect-scaffold path/to/protocol.tell`. The DSL effect surface is the single source of truth.
+Run via `just effect-scaffold path/to/protocol.tell` when repository workflows need exported files on disk. Normal library code should use the typed effect interfaces emitted directly by `tell!`.
 
 ### telltale-transport
 

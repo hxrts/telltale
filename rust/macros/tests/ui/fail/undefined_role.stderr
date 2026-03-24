@@ -9,11 +9,11 @@ error: Choreography parse error:
        Use the canonical indentation-based DSL surface in token form.
  --> tests/ui/fail/undefined_role.rs:3:1
   |
-3 | / choreography! {
+3 | / tell! {
 4 | |     protocol Bad =
 5 | |       roles A, B
 6 | |       A -> C : Ping
 7 | | }
   | |_^
   |
-  = note: this error originates in the macro `choreography` (in Nightly builds, run with -Z macro-backtrace for more info)
+  = note: this error originates in the macro `tell` (in Nightly builds, run with -Z macro-backtrace for more info)

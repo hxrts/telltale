@@ -79,7 +79,7 @@ pub use testing::{
 };
 
 // Re-export macros from telltale-macros
-pub use telltale_macros::choreography;
+pub use telltale_macros::tell;
 pub use telltale_types::{ChannelCapacity, MessageLenBytes, QueueCapacity};
 
 /// Unstable low-level extension integration surfaces.

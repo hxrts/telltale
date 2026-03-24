@@ -1,48 +1,30 @@
-//! Seven-node ring computing distributed maximum via the `choreography!` macro.
+//! Seven-node ring computing distributed maximum via the `tell!` macro.
 //!
 //! Each node holds a local value. The ring forwards the running maximum around
 //! the full cycle so that the initiator receives the global max.
-//!
-//! DSL equivalent (`*.tell`):
-//!
-//! ```tell
-//! protocol RingMax {
-//!     roles A, B, C, D, E, F, G;
-//!     A -> B: Value(i32);
-//!     B -> C: Value(i32);
-//!     C -> D: Value(i32);
-//!     D -> E: Value(i32);
-//!     E -> F: Value(i32);
-//!     F -> G: Value(i32);
-//!     G -> A: Value(i32);
-//! }
-//! ```
-//!
 //! This protocol is purely linear (no branching or recursion), so the
-//! `choreography!` macro can express it directly.
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(missing_docs)]
+//! `tell!` projection surface can express it directly.
 
 use futures::{executor, try_join};
 use std::{cmp, error::Error, result};
-use telltale::try_session;
-use telltale_macros::choreography;
+use telltale::{tell, try_session};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
-choreography! {
-    protocol RingMax {
-        roles A, B, C, D, E, F, G;
-        A -> B: Value(i32);
-        B -> C: Value(i32);
-        C -> D: Value(i32);
-        D -> E: Value(i32);
-        E -> F: Value(i32);
-        F -> G: Value(i32);
-        G -> A: Value(i32);
-    }
+tell! {
+    -- // The running maximum is forwarded once around the seven-node ring.
+    protocol RingMax =
+      roles A, B, C, D, E, F, G
+      A -> B : Value(i32)
+      B -> C : Value(i32)
+      C -> D : Value(i32)
+      D -> E : Value(i32)
+      E -> F : Value(i32)
+      F -> G : Value(i32)
+      G -> A : Value(i32)
 }
+
+use RingMax::sessions::*;
 
 /// A initiates the ring by sending its local value and receives the global max.
 async fn node_a(role: &mut A, local: i32) -> Result<i32> {
@@ -114,11 +96,11 @@ async fn node_g(role: &mut G, local: i32) -> Result<()> {
     .await
 }
 
-fn main() {
+fn main() -> Result<()> {
     let Roles(mut a, mut b, mut c, mut d, mut e, mut f, mut g) = Roles::default();
 
     let global_max = executor::block_on(async {
-        let (result_a, (), (), (), (), (), ()) = try_join!(
+        try_join!(
             node_a(&mut a, 10),
             node_b(&mut b, 15),
             node_c(&mut c, 15),
@@ -127,10 +109,10 @@ fn main() {
             node_f(&mut f, 15),
             node_g(&mut g, 15),
         )
-        .unwrap();
-        result_a
-    });
+        .map(|(result_a, (), (), (), (), (), ())| result_a)
+    })?;
 
     println!("Global maximum: {global_max}");
     assert_eq!(global_max, 15);
+    Ok(())
 }

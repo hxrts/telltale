@@ -1,60 +1,65 @@
 # Examples
 
-This document points to the example programs and common usage patterns. Each example demonstrates a specific protocol shape or runtime feature. The choreography DSL examples show global protocol definitions. The testing pattern examples show how to validate protocol behavior in unit and integration tests.
+This document points to the example programs and common usage patterns. Each example demonstrates a specific protocol shape or runtime feature. The repo intentionally has two example families:
+
+- projection examples, where `choreography!` demonstrates global protocol structure and projected session surfaces
+- generated-interface examples, where `effect` declarations are the source of truth for the Rust host boundary and simulator scaffolding
 
 ## Example Index
 
-All examples compile against the workspace. Simple linear protocols use the `choreography!` macro. Protocols with recursion, branching, or infinite types use the manual session type API.
+All examples compile against the workspace. Use the projection examples when you want to inspect session projection and endpoint code. Use the generated-interface examples when you want to follow the target architecture: protocol-visible orchestration in Telltale, host realization in Rust.
 
 Top level examples in `examples/`:
 
-- `three_adder.rs` — three-party sum via `choreography!` macro
-- `ring.rs` — three-node ring topology via `choreography!` macro
-- `double_buffering.rs` — producer-consumer coordination via `choreography!` macro
-- `adder.rs` — recursive two-party adder with Add loop and Bye exit (manual API)
-- `alternating_bit.rs` — reliable delivery with ACK branching (manual API)
-- `oauth.rs` — three-party authentication with nested choices (manual API)
-- `ring_choice.rs` — ring with per-hop branching and infinite types (manual API)
-- `client_server_log.rs` — three-party protocol with infinite logging loop (manual API)
-- `elevator.rs` — three-role infinite state machine (manual API)
-- `fft.rs` — eight-role FFT butterfly network (manual API)
+- `three_adder.rs` — three-party sum via `choreography!`
+- `ring.rs` — three-node ring topology via `choreography!`
+- `double_buffering.rs` — producer-consumer coordination via `choreography!`
+- `adder.rs` — recursive two-party adder
+- `alternating_bit.rs` — reliable delivery with ACK branching
+- `oauth.rs` — three-party authentication with nested choices
+- `ring_choice.rs` — ring with per-hop branching and infinite types
+- `client_server_log.rs` — three-party protocol with infinite logging loop
+- `elevator.rs` — three-role infinite state machine
+- `fft.rs` — eight-role FFT butterfly network
+- `generated_effect_interfaces.rs` — generate canonical Rust handler traits, manifests, and simulator scaffolds from `effect` declarations
 - `async_subtyping.rs` — async-subtyping checks and subtype relation examples
 - `bounded_recursion.rs` — bounded recursion strategies with configurable depth
 - `wasm-ping-pong/` — browser builds using `wasm-pack`
 
+Generated-interface examples in `rust/choreography/examples/`:
+
+- `authority_surface.rs` — inspect `effect` declarations and derived effect-family metadata
+- `telltale_client_server.rs` and `three_party_negotiation.rs` — runtime-oriented examples behind `native-examples`
+
 ## Common Patterns
 
-The following patterns cover the core choreography constructs. Each pattern uses the `choreography!` macro with a raw string protocol definition. The macro parses the protocol, validates role declarations, and generates projection code.
+The following patterns cover the core choreography constructs for projection examples. `choreography!` parses the DSL at compile time, validates role declarations, and generates projection code.
 
 ### Request Response
 
 ```rust
-choreography!(r#"
-protocol RequestResponse =
-  roles Client, Server
-  Client
-    -> Server : Request of api.Request
-  Server
-    -> Client : Response of api.Response
-"#);
+choreography! {
+  protocol RequestResponse =
+    roles Client, Server
+    Client -> Server : Request(api.Request)
+    Server -> Client : Response(api.Response)
+}
 ```
 
-The `choreography!` macro parses the protocol string at compile time. Each message line declares a sender, receiver, label, and optional payload type. Projection produces one local session type per role.
+Each message line declares a sender, receiver, label, and optional payload type. Projection produces one local session type per role.
 
 ### Choice
 
 ```rust
-choreography!(r#"
-protocol ChoicePattern =
-  roles Client, Server
-  choice at Server
-    | Accept ->
-        Server
-          -> Client : Confirmation
-    | Reject ->
-        Server
-          -> Client : Rejection
-"#);
+choreography! {
+  protocol ChoicePattern =
+    roles Client, Server
+    choice at Server
+      | Accept ->
+          Server -> Client : Confirmation
+      | Reject ->
+          Server -> Client : Rejection
+}
 ```
 
 Only the deciding role selects the branch. Other roles react to that choice. The `choice at` clause names the selecting participant. Each branch label must be distinct within the choice block.
@@ -62,15 +67,13 @@ Only the deciding role selects the branch. Other roles react to that choice. The
 ### Loops
 
 ```rust
-choreography!(r#"
-protocol LoopPattern =
-  roles Client, Server
-  loop repeat 5
-    Client
-      -> Server : Request
-    Server
-      -> Client : Response
-"#);
+choreography! {
+  protocol LoopPattern =
+    roles Client, Server
+    loop repeat 5
+      Client -> Server : Request
+      Server -> Client : Response
+}
 ```
 
 Use bounded loops for batch workflows or retries. The `repeat` count sets an upper iteration limit. The body runs sequentially within each iteration.
@@ -78,18 +81,65 @@ Use bounded loops for batch workflows or retries. The `repeat` count sets an upp
 ### Parallel Branches
 
 ```rust
-choreography!(r#"
-protocol ParallelPattern =
-  roles Coordinator, Worker1, Worker2
-  par
-    | Coordinator
-        -> Worker1 : Task
-    | Coordinator
-        -> Worker2 : Task
-"#);
+choreography! {
+  protocol ParallelPattern =
+    roles Coordinator, Worker1, Worker2
+    par
+      | Coordinator -> Worker1 : Task
+      | Coordinator -> Worker2 : Task
+}
 ```
 
 Parallel branches must be independent in order to remain well formed. Each branch operates on a disjoint set of roles. The runtime executes branches concurrently when possible.
+
+## Generated Effect Interfaces
+
+Use the generated-interface path when the example needs typed effect boundaries, simulator scenarios, or richer host/runtime integration. In these examples, the DSL remains the source of truth and Rust supplies handler implementations directly against the generated traits.
+
+```rust
+use telltale::tell;
+
+tell! {
+    type CommitError =
+      | NotReady
+      | TimedOut
+
+    type alias ReadyWitness = { epoch : Int, issuedBy : Role }
+    type alias CommitReceipt = { commitId : String, publishedBy : Role }
+
+    effect Runtime
+      authoritative ready : Session -> Result CommitError ReadyWitness
+      command publish : ReadyWitness -> Result CommitError CommitReceipt
+
+    protocol CommitFlow uses Runtime =
+      roles Coordinator, Worker
+      Coordinator -> Worker : Commit
+}
+
+use CommitFlow::effects::{Runtime, RuntimeRequest, RuntimeOutcome, Session};
+use CommitFlow::{CommitReceipt, CommitError, ReadyWitness};
+
+struct Host;
+
+impl Runtime for Host {
+    fn ready(&mut self, _input: Session) -> Result<ReadyWitness, CommitError> {
+        Ok(ReadyWitness { epoch: 7, issued_by: telltale::dsl::Role::new("Coordinator") })
+    }
+
+    fn publish(&mut self, witness: ReadyWitness) -> Result<CommitReceipt, CommitError> {
+        Ok(CommitReceipt {
+            commit_id: format!("commit-{}", witness.epoch),
+            published_by: witness.issued_by,
+        })
+    }
+}
+
+let mut host = Host;
+let presence = Runtime::handle(&mut host, RuntimeRequest::Ready(Session::new("commit-7")));
+assert!(matches!(presence, RuntimeOutcome::Ready(Ok(_))));
+```
+
+This produces canonical host-facing request/outcome enums and handler traits directly from the declared `effect` surface. File export remains tooling-only and is no longer the primary developer path.
 
 ## Testing Patterns
 

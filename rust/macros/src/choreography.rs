@@ -1,34 +1,41 @@
-//! Choreographic protocol definition macro implementation.
+//! Telltale protocol definition macro implementation.
 //!
-//! Parsing is delegated to the shared Telltale choreography frontend. This
-//! proc-macro then lowers the parsed choreography into the historical
-//! `telltale-macros` output surface: message structs, a `Label` enum, public
-//! role structs, `Roles`, per-role session aliases, and `setup()`.
+//! Parsing is delegated to the shared Telltale frontend. This proc-macro emits
+//! a protocol module that always contains the canonical spec/effect surfaces
+//! and, when projection succeeds, a derived `sessions` module.
 
 use proc_macro::{Delimiter, TokenStream as MacroTokenStream, TokenTree as MacroTokenTree};
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::{Delimiter as TokenDelimiter, Group, Ident, Span, TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
 use std::collections::{BTreeMap, HashMap};
 use syn::{Error, LitStr, Result};
-use telltale_parser::ast::{Branch, Choreography, LocalType, MessageType, Protocol, Role};
+use telltale_parser::ast::{
+    Branch, Choreography, EffectDecl, EffectOpDecl, LocalType, MessageType, Protocol, Role,
+    TypeDecl,
+};
 
-/// Main entry point for the choreography! macro.
-pub fn choreography(input: MacroTokenStream) -> Result<TokenStream> {
-    let choreography = parse_macro_choreography(input)?;
-    choreography
+struct ParsedMacroChoreography {
+    choreography: Choreography,
+    source: String,
+}
+
+/// Main entry point for the tell! macro.
+pub fn tell(input: MacroTokenStream) -> Result<TokenStream> {
+    let parsed = parse_macro_choreography(input)?;
+    parsed
+        .choreography
         .validate()
         .map_err(|err| Error::new(Span::call_site(), err.to_string()))?;
 
-    let local_types = project_local_types(&choreography)?;
-    let generated = generate_protocol_module(&choreography, &local_types)?;
+    let generated = generate_protocol_module(&parsed.choreography, &parsed.source)?;
     Ok(generated)
 }
 
-fn parse_macro_choreography(input: MacroTokenStream) -> Result<Choreography> {
+fn parse_macro_choreography(input: MacroTokenStream) -> Result<ParsedMacroChoreography> {
     if let Ok(lit_str) = syn::parse::<LitStr>(input.clone()) {
         return Err(Error::new(
             lit_str.span(),
-            "string-literal choreography input was removed; use the canonical indentation-based token DSL directly",
+            "string-literal tell input was removed; use the canonical indentation-based token DSL directly",
         ));
     }
 
@@ -41,7 +48,7 @@ fn parse_macro_choreography(input: MacroTokenStream) -> Result<Choreography> {
             )
         })?;
 
-    telltale_parser::parse_choreography_str(&source).map_err(|err| {
+    let choreography = telltale_parser::parse_choreography_str(&source).map_err(|err| {
         Error::new(
             Span::call_site(),
             format!(
@@ -50,6 +57,11 @@ fn parse_macro_choreography(input: MacroTokenStream) -> Result<Choreography> {
                  Use the canonical indentation-based DSL surface in token form."
             ),
         )
+    })?;
+
+    Ok(ParsedMacroChoreography {
+        choreography,
+        source,
     })
 }
 
@@ -214,7 +226,497 @@ fn project_local_types(choreography: &Choreography) -> Result<Vec<(Role, LocalTy
     Ok(local_types)
 }
 
-fn generate_protocol_module(
+fn generate_protocol_module(choreography: &Choreography, source: &str) -> Result<TokenStream> {
+    let protocol_ident = format_ident!("{}", choreography.name);
+    let protocol_impl_ident = format_ident!(
+        "__tell_protocol_{}",
+        to_snake_identifier(&choreography.name.to_string())
+    );
+    let choreography_source = LitStr::new(source, Span::call_site());
+    let qualified_name = LitStr::new(&choreography.qualified_name(), Span::call_site());
+    let type_decls = generate_type_declarations(choreography)?;
+    let effects_module = generate_effects_module(choreography)?;
+    let (projectable, projection_error, sessions_module) = match project_local_types(choreography) {
+        Ok(local_types) => (
+            quote!(true),
+            quote!(None),
+            Some(generate_sessions_module(choreography, &local_types)?),
+        ),
+        Err(err) => {
+            let message = syn::LitStr::new(&err.to_string(), Span::call_site());
+            (quote!(false), quote!(Some(#message)), None)
+        }
+    };
+
+    let sessions_module = sessions_module.unwrap_or_else(TokenStream::new);
+    let spec_body = quote! {
+        #[allow(dead_code)]
+        pub const SOURCE: &str = #choreography_source;
+
+        #[allow(dead_code)]
+        pub const QUALIFIED_NAME: &str = #qualified_name;
+
+        #[allow(dead_code)]
+        pub const SESSION_SURFACE_AVAILABLE: bool = #projectable;
+
+        #[allow(dead_code)]
+        pub const SESSION_PROJECTION_ERROR: Option<&str> = #projection_error;
+
+        #type_decls
+
+        #effects_module
+
+        #sessions_module
+    };
+
+    Ok(match &choreography.namespace {
+        Some(namespace) => {
+            let ns_ident = format_ident!("{}", namespace);
+            quote! {
+                pub mod #ns_ident {
+                    #[doc(hidden)]
+                    pub mod #protocol_impl_ident {
+                        #![allow(dead_code, unused_imports, unused_variables, missing_docs)]
+                        #spec_body
+                    }
+
+                    pub use #protocol_impl_ident as #protocol_ident;
+                }
+            }
+        }
+        None => quote! {
+            #[doc(hidden)]
+            pub mod #protocol_impl_ident {
+                #![allow(dead_code, unused_imports, unused_variables, missing_docs)]
+                #spec_body
+            }
+
+            pub use #protocol_impl_ident as #protocol_ident;
+        },
+    })
+}
+
+#[derive(Clone, Debug)]
+enum DslTypeExpr {
+    Path(Vec<String>),
+    Result(Box<DslTypeExpr>, Box<DslTypeExpr>),
+    Maybe(Box<DslTypeExpr>),
+    Unit,
+    Record(Vec<DslRecordField>),
+}
+
+#[derive(Clone, Debug)]
+struct DslRecordField {
+    name: String,
+    ty: DslTypeExpr,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum TypeToken {
+    Ident(String),
+    LBrace,
+    RBrace,
+    Colon,
+    Comma,
+}
+
+fn generate_type_declarations(choreography: &Choreography) -> Result<TokenStream> {
+    let declarations = choreography
+        .type_decls()
+        .iter()
+        .map(generate_type_declaration)
+        .collect::<Result<Vec<_>>>()?;
+    Ok(quote! { #(#declarations)* })
+}
+
+fn generate_type_declaration(type_decl: &TypeDecl) -> Result<TokenStream> {
+    let name = format_ident!("{}", type_decl.name);
+    if type_decl.is_alias {
+        let alias_of = type_decl.alias_of.as_deref().ok_or_else(|| {
+            Error::new(
+                Span::call_site(),
+                format!("type alias `{}` is missing a right-hand side", type_decl.name),
+            )
+        })?;
+        let parsed = parse_dsl_type_expr(alias_of)?;
+        match parsed {
+            DslTypeExpr::Record(fields) => {
+                let fields = fields
+                    .iter()
+                    .map(generate_record_field)
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(quote! {
+                    #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+                    pub struct #name {
+                        #(#fields),*
+                    }
+                })
+            }
+            other => {
+                let ty = lower_dsl_type_expr(&other, false)?;
+                Ok(quote! {
+                    pub type #name = #ty;
+                })
+            }
+        }
+    } else {
+        let variants = type_decl
+            .constructors
+            .iter()
+            .map(|constructor| {
+                let variant = format_ident!("{}", constructor.name);
+                if let Some(payload_type) = constructor.payload_type.as_deref() {
+                    let payload = lower_dsl_type_expr(&parse_dsl_type_expr(payload_type)?, false)?;
+                    Ok(quote!(#variant(#payload)))
+                } else {
+                    Ok(quote!(#variant))
+                }
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(quote! {
+            #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+            pub enum #name {
+                #(#variants),*
+            }
+
+            impl ::std::fmt::Display for #name {
+                fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                    write!(f, "{self:?}")
+                }
+            }
+
+            impl ::std::error::Error for #name {}
+        })
+    }
+}
+
+fn generate_record_field(field: &DslRecordField) -> Result<TokenStream> {
+    let rust_name = to_snake_identifier(&field.name);
+    let field_ident = format_ident!("{}", rust_name);
+    let field_ty = lower_dsl_type_expr(&field.ty, false)?;
+    let rename_attr = if rust_name != field.name {
+        let original = &field.name;
+        quote!(#[serde(rename = #original)])
+    } else {
+        TokenStream::new()
+    };
+    Ok(quote! {
+        #rename_attr
+        pub #field_ident: #field_ty
+    })
+}
+
+fn generate_effects_module(choreography: &Choreography) -> Result<TokenStream> {
+    let type_exports = choreography
+        .type_decls()
+        .iter()
+        .map(|decl| format_ident!("{}", decl.name))
+        .collect::<Vec<_>>();
+    let effect_surfaces = choreography
+        .effect_decls()
+        .iter()
+        .map(generate_effect_surface)
+        .collect::<Result<Vec<_>>>()?;
+
+    let type_exports = if type_exports.is_empty() {
+        TokenStream::new()
+    } else {
+        quote!(pub use super::{#(#type_exports),*};)
+    };
+
+    Ok(quote! {
+        pub mod effects {
+            pub use ::telltale::dsl::{AuditEvent, PresenceView, Role, Session};
+            #type_exports
+            #(#effect_surfaces)*
+        }
+    })
+}
+
+fn generate_effect_surface(effect: &EffectDecl) -> Result<TokenStream> {
+    let trait_name = format_ident!("{}", effect.name);
+    let request_name = format_ident!("{}Request", effect.name);
+    let outcome_name = format_ident!("{}Outcome", effect.name);
+    let request_variants = effect
+        .operations
+        .iter()
+        .map(generate_effect_request_variant)
+        .collect::<Result<Vec<_>>>()?;
+    let outcome_variants = effect
+        .operations
+        .iter()
+        .map(generate_effect_outcome_variant)
+        .collect::<Result<Vec<_>>>()?;
+    let methods = effect
+        .operations
+        .iter()
+        .map(generate_effect_method_signature)
+        .collect::<Result<Vec<_>>>()?;
+    let handle_arms = effect
+        .operations
+        .iter()
+        .map(|op| generate_effect_handle_arm(op, &request_name, &outcome_name))
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(quote! {
+        #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+        pub enum #request_name {
+            #(#request_variants),*
+        }
+
+        #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+        pub enum #outcome_name {
+            #(#outcome_variants),*
+        }
+
+        pub trait #trait_name {
+            #(#methods)*
+
+            fn handle(&mut self, request: #request_name) -> #outcome_name {
+                match request {
+                    #(#handle_arms),*
+                }
+            }
+        }
+    })
+}
+
+fn generate_effect_request_variant(op: &EffectOpDecl) -> Result<TokenStream> {
+    let variant = format_ident!("{}", to_upper_camel_identifier(&op.name));
+    let input = lower_dsl_type_expr(&parse_dsl_type_expr(&op.input_type)?, false)?;
+    Ok(quote!(#variant(#input)))
+}
+
+fn generate_effect_outcome_variant(op: &EffectOpDecl) -> Result<TokenStream> {
+    let variant = format_ident!("{}", to_upper_camel_identifier(&op.name));
+    let output = lower_dsl_type_expr(&parse_dsl_type_expr(&op.output_type)?, false)?;
+    Ok(quote!(#variant(#output)))
+}
+
+fn generate_effect_method_signature(op: &EffectOpDecl) -> Result<TokenStream> {
+    let method = format_ident!("{}", to_snake_identifier(&op.name));
+    let input = lower_dsl_type_expr(&parse_dsl_type_expr(&op.input_type)?, false)?;
+    let output = lower_dsl_type_expr(&parse_dsl_type_expr(&op.output_type)?, false)?;
+    Ok(quote! {
+        fn #method(&mut self, input: #input) -> #output;
+    })
+}
+
+fn generate_effect_handle_arm(
+    op: &EffectOpDecl,
+    request_name: &Ident,
+    outcome_name: &Ident,
+) -> Result<TokenStream> {
+    let variant = format_ident!("{}", to_upper_camel_identifier(&op.name));
+    let method = format_ident!("{}", to_snake_identifier(&op.name));
+    Ok(quote! {
+        #request_name::#variant(input) => #outcome_name::#variant(self.#method(input))
+    })
+}
+
+fn lower_dsl_type_expr(ty: &DslTypeExpr, allow_inline_record: bool) -> Result<TokenStream> {
+    match ty {
+        DslTypeExpr::Path(path) => Ok(lower_dsl_type_path(path)),
+        DslTypeExpr::Result(error_ty, ok_ty) => {
+            let error_ty = lower_dsl_type_expr(error_ty, false)?;
+            let ok_ty = lower_dsl_type_expr(ok_ty, false)?;
+            Ok(quote!(::std::result::Result<#ok_ty, #error_ty>))
+        }
+        DslTypeExpr::Maybe(inner) => {
+            let inner = lower_dsl_type_expr(inner, false)?;
+            Ok(quote!(::std::option::Option<#inner>))
+        }
+        DslTypeExpr::Unit => Ok(quote!(())),
+        DslTypeExpr::Record(_) if !allow_inline_record => Err(Error::new(
+            Span::call_site(),
+            "anonymous record types must be declared with `type alias` before they can be used in Rust surfaces",
+        )),
+        DslTypeExpr::Record(fields) => {
+            let fields = fields
+                .iter()
+                .map(|field| {
+                    let name = format_ident!("{}", to_snake_identifier(&field.name));
+                    let ty = lower_dsl_type_expr(&field.ty, false)?;
+                    Ok(quote!(#name: #ty))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            Ok(quote!({ #(#fields),* }))
+        }
+    }
+}
+
+fn lower_dsl_type_path(path: &[String]) -> TokenStream {
+    let joined = path.join(".");
+    match joined.as_str() {
+        "Int" => quote!(i64),
+        "Bool" => quote!(bool),
+        "String" => quote!(::std::string::String),
+        "Role" => quote!(::telltale::dsl::Role),
+        "Session" => quote!(::telltale::dsl::Session),
+        "PresenceView" => quote!(::telltale::dsl::PresenceView),
+        "AuditEvent" => quote!(::telltale::dsl::AuditEvent),
+        _ => {
+            let segments = path
+                .iter()
+                .map(|segment| format_ident!("{}", segment))
+                .collect::<Vec<_>>();
+            let first = &segments[0];
+            let rest = &segments[1..];
+            quote!(#first #( :: #rest )*)
+        }
+    }
+}
+
+fn parse_dsl_type_expr(input: &str) -> Result<DslTypeExpr> {
+    let tokens = tokenize_dsl_type(input)?;
+    let mut cursor = TypeCursor { tokens, index: 0 };
+    let expr = cursor.parse_type_expr()?;
+    if cursor.peek().is_some() {
+        return Err(Error::new(
+            Span::call_site(),
+            format!("unexpected trailing tokens in DSL type `{input}`"),
+        ));
+    }
+    Ok(expr)
+}
+
+fn tokenize_dsl_type(input: &str) -> Result<Vec<TypeToken>> {
+    let chars: Vec<char> = input.chars().collect();
+    let mut index = 0;
+    let mut tokens = Vec::new();
+    while index < chars.len() {
+        match chars[index] {
+            '{' => {
+                tokens.push(TypeToken::LBrace);
+                index += 1;
+            }
+            '}' => {
+                tokens.push(TypeToken::RBrace);
+                index += 1;
+            }
+            ':' => {
+                tokens.push(TypeToken::Colon);
+                index += 1;
+            }
+            ',' => {
+                tokens.push(TypeToken::Comma);
+                index += 1;
+            }
+            ch if ch.is_whitespace() => {
+                index += 1;
+            }
+            ch if ch.is_ascii_alphabetic() => {
+                let start = index;
+                index += 1;
+                while index < chars.len()
+                    && (chars[index].is_ascii_alphanumeric()
+                        || chars[index] == '_'
+                        || chars[index] == '.')
+                {
+                    index += 1;
+                }
+                tokens.push(TypeToken::Ident(chars[start..index].iter().collect()));
+            }
+            other => {
+                return Err(Error::new(
+                    Span::call_site(),
+                    format!("unsupported token `{other}` in DSL type `{input}`"),
+                ))
+            }
+        }
+    }
+    Ok(tokens)
+}
+
+struct TypeCursor {
+    tokens: Vec<TypeToken>,
+    index: usize,
+}
+
+impl TypeCursor {
+    fn peek(&self) -> Option<&TypeToken> {
+        self.tokens.get(self.index)
+    }
+
+    fn next(&mut self) -> Option<TypeToken> {
+        let token = self.tokens.get(self.index).cloned();
+        if token.is_some() {
+            self.index += 1;
+        }
+        token
+    }
+
+    fn parse_type_expr(&mut self) -> Result<DslTypeExpr> {
+        match self.next() {
+            Some(TypeToken::LBrace) => self.parse_record(),
+            Some(TypeToken::Ident(name)) if name == "Result" => {
+                let error_ty = self.parse_type_expr()?;
+                let ok_ty = self.parse_type_expr()?;
+                Ok(DslTypeExpr::Result(Box::new(error_ty), Box::new(ok_ty)))
+            }
+            Some(TypeToken::Ident(name)) if name == "Maybe" => {
+                let inner = self.parse_type_expr()?;
+                Ok(DslTypeExpr::Maybe(Box::new(inner)))
+            }
+            Some(TypeToken::Ident(name)) if name == "Unit" => Ok(DslTypeExpr::Unit),
+            Some(TypeToken::Ident(path)) => Ok(DslTypeExpr::Path(
+                path.split('.').map(str::to_string).collect(),
+            )),
+            Some(other) => Err(Error::new(
+                Span::call_site(),
+                format!("unexpected token {:?} in DSL type", other),
+            )),
+            None => Err(Error::new(
+                Span::call_site(),
+                "unexpected end of DSL type expression",
+            )),
+        }
+    }
+
+    fn parse_record(&mut self) -> Result<DslTypeExpr> {
+        let mut fields = Vec::new();
+        loop {
+            match self.peek() {
+                Some(TypeToken::RBrace) => {
+                    self.next();
+                    break;
+                }
+                Some(TypeToken::Ident(_)) => {
+                    let field_name = match self.next() {
+                        Some(TypeToken::Ident(name)) => name,
+                        _ => unreachable!(),
+                    };
+                    match self.next() {
+                        Some(TypeToken::Colon) => {}
+                        other => {
+                            return Err(Error::new(
+                                Span::call_site(),
+                                format!("expected `:` after record field `{field_name}`, got {other:?}"),
+                            ))
+                        }
+                    }
+                    let field_ty = self.parse_type_expr()?;
+                    fields.push(DslRecordField {
+                        name: field_name,
+                        ty: field_ty,
+                    });
+                    if matches!(self.peek(), Some(TypeToken::Comma)) {
+                        self.next();
+                    }
+                }
+                other => {
+                    return Err(Error::new(
+                        Span::call_site(),
+                        format!("unexpected token {:?} in record type", other),
+                    ))
+                }
+            }
+        }
+        Ok(DslTypeExpr::Record(fields))
+    }
+}
+
+fn generate_sessions_module(
     choreography: &Choreography,
     local_types: &[(Role, LocalType)],
 ) -> Result<TokenStream> {
@@ -223,26 +725,15 @@ fn generate_protocol_module(
     let session_types = generate_session_types(local_types)?;
     let setup_fn = generate_setup_function(&choreography.name);
 
-    let body = quote! {
-        use ::telltale::Role;
+    Ok(quote! {
+        pub mod sessions {
+            use ::telltale::Role;
 
-        #role_structs
-        #helper_types
-        #session_types
-        #setup_fn
-    };
-
-    Ok(match &choreography.namespace {
-        Some(namespace) => {
-            let ns_ident = format_ident!("{}", namespace);
-            quote! {
-                #[allow(dead_code, unused_imports, unused_variables)]
-                pub mod #ns_ident {
-                    #body
-                }
-            }
+            #role_structs
+            #helper_types
+            #session_types
+            #setup_fn
         }
-        None => body,
     })
 }
 
@@ -259,7 +750,7 @@ fn generate_role_structs(roles: &[Role]) -> TokenStream {
                     None
                 } else {
                     let other_name = other_role.name();
-                    Some(quote! { #[route(#other_name)] Channel })
+                    Some(quote! { #[route(#other_name)] pub Channel })
                 }
             })
             .collect();
@@ -280,6 +771,10 @@ fn generate_role_structs(roles: &[Role]) -> TokenStream {
             }
         }
     });
+    let public_role_names: Vec<_> = role_names
+        .iter()
+        .map(|role_name| quote!(pub #role_name))
+        .collect();
 
     quote! {
         type Channel = ::telltale::channel::Bidirectional<
@@ -291,7 +786,7 @@ fn generate_role_structs(roles: &[Role]) -> TokenStream {
 
         #[derive(::telltale::Roles)]
         #[allow(dead_code)]
-        pub struct Roles(#(#role_names),*);
+        pub struct Roles(#(#public_role_names),*);
     }
 }
 
@@ -317,10 +812,11 @@ fn generate_helper_types(protocol: &Protocol) -> Result<TokenStream> {
         match surface {
             LabelSurface::Message { name, payload } => {
                 if let Some(payload) = payload {
+                    let public_payload = public_tuple_payload(&payload)?;
                     helper_types.push(quote! {
                         #[derive(Clone, Debug)]
                         #[allow(dead_code)]
-                        pub struct #name #payload;
+                        pub struct #name #public_payload;
                     });
                 } else {
                     helper_types.push(quote! {
@@ -351,6 +847,60 @@ fn generate_helper_types(protocol: &Protocol) -> Result<TokenStream> {
             #(#label_variants),*
         }
     })
+}
+
+fn public_tuple_payload(payload: &TokenStream) -> Result<TokenStream> {
+    let mut tokens = payload.clone().into_iter();
+    let Some(TokenTree::Group(group)) = tokens.next() else {
+        return Err(Error::new(
+            Span::call_site(),
+            "message payload did not parse as a tuple payload group",
+        ));
+    };
+    if tokens.next().is_some() || group.delimiter() != TokenDelimiter::Parenthesis {
+        return Err(Error::new(
+            Span::call_site(),
+            "message payload did not parse as a parenthesized tuple payload",
+        ));
+    }
+
+    let inner = group.stream();
+    let mut public_group = Group::new(TokenDelimiter::Parenthesis, quote!(pub #inner));
+    public_group.set_span(group.span());
+    Ok(TokenStream::from(TokenTree::Group(public_group)))
+}
+
+fn to_snake_identifier(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for (idx, ch) in input.chars().enumerate() {
+        if ch.is_ascii_uppercase() {
+            if idx > 0 {
+                out.push('_');
+            }
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+fn to_upper_camel_identifier(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut uppercase_next = true;
+    for ch in input.chars() {
+        if ch == '_' || ch == '-' {
+            uppercase_next = true;
+            continue;
+        }
+        if uppercase_next {
+            out.push(ch.to_ascii_uppercase());
+            uppercase_next = false;
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }
 
 fn collect_label_surfaces(

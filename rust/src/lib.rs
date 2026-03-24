@@ -43,16 +43,51 @@ pub use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 #[cfg(feature = "theory")]
 pub use telltale_theory as theory;
 
+pub use telltale_macros::tell;
 pub use telltale_macros::{session, Message, Role, Roles};
 
 /// Prelude module for convenient imports.
 pub mod prelude {
-    pub use super::{session, try_session};
+    pub use super::{session, tell, try_session};
     pub use super::{
         Branch, Choice, Choices, End, FromState, IntoSession, Message, Receive, ReceiveError, Role,
         Route, Select, Send, Session, SessionError,
     };
     pub use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
+}
+
+/// Shared DSL builtin types used by the `tell!` macro output.
+pub mod dsl {
+    use serde::{Deserialize, Serialize};
+
+    /// Opaque role identifier used by generated effect interfaces.
+    #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct Role(pub std::string::String);
+
+    impl Role {
+        /// Construct a role identifier from its stable name.
+        #[must_use]
+        pub fn new(name: impl Into<std::string::String>) -> Self {
+            Self(name.into())
+        }
+    }
+
+    /// Opaque session identifier used by generated effect interfaces.
+    #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct Session(pub std::string::String);
+
+    impl Session {
+        /// Construct a session identifier from its stable id.
+        #[must_use]
+        pub fn new(id: impl Into<std::string::String>) -> Self {
+            Self(id.into())
+        }
+    }
+
+    /// Open-shaped observation payload returned by generated `observe` effects.
+    pub type PresenceView = serde_json::Value;
+    /// Open-shaped audit payload accepted by generated audit effects.
+    pub type AuditEvent = serde_json::Value;
 }
 
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};

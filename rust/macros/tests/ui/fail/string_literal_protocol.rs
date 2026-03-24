@@ -1,6 +1,6 @@
-use telltale_macros::choreography;
+use telltale_macros::tell;
 
-choreography!(r#"
+tell!(r#"
 protocol PingPong =
   roles Alice, Bob
   Alice -> Bob : Ping

@@ -1,49 +1,28 @@
 //! Two-party travel agency negotiation protocol.
-//!
-//! ```tell
-//! protocol TravelAgency = {
-//!     roles Customer, Agency;
-//!     Customer -> Agency : Order(i32);
-//!     Agency -> Customer : Quote(i32);
-//!     choice Customer at {
-//!         | Accept => {
-//!             Customer -> Agency : Address(i32);
-//!             Agency -> Customer : Date(i32);
-//!         }
-//!         | Reject => {
-//!             Customer -> Agency : Rejection(i32);
-//!         }
-//!     }
-//! }
-//! ```
-//!
-//! Uses the `choreography!` macro to derive session types, roles, messages,
+//! Uses the `tell!` macro to derive session types, roles, messages,
 //! and channel wiring from the global protocol specification.
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(missing_docs)]
 
 use futures::{executor, try_join};
 use std::error::Error;
-use telltale::try_session;
-use telltale_macros::choreography;
+use telltale::{tell, try_session};
 
-choreography! {
-    protocol TravelAgency = {
-        roles Customer, Agency;
-        Customer -> Agency : Order(i32);
-        Agency -> Customer : Quote(i32);
-        choice Customer at {
-            | Accept => {
-                Customer -> Agency : Address(i32);
-                Agency -> Customer : Date(i32);
-            }
-            | Reject => {
-                Customer -> Agency : Rejection(i32);
-            }
-        }
-    }
+tell! {
+    -- // Customer places one order, receives a quote, then accepts or rejects it.
+    protocol TravelAgency =
+      roles Customer, Agency
+      Customer -> Agency : Order(i32)
+      Agency -> Customer : Quote(i32)
+      choice Customer at
+        -- // Accept sends the address and receives the travel date.
+        | Accept =>
+          Customer -> Agency : Address(i32)
+          Agency -> Customer : Date(i32)
+        -- // Reject ends the negotiation after sending the refusal.
+        | Reject =>
+          Customer -> Agency : Rejection(i32)
 }
+
+use TravelAgency::sessions::*;
 
 // ---------------------------------------------------------------------------
 // Endpoint implementations
@@ -110,9 +89,8 @@ async fn agency(role: &mut Agency) -> Result<(), Box<dyn Error>> {
 // Main
 // ---------------------------------------------------------------------------
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let Roles(mut c, mut a) = Roles::default();
-    executor::block_on(async {
-        try_join!(customer(&mut c), agency(&mut a)).unwrap();
-    });
+    executor::block_on(async { try_join!(customer(&mut c), agency(&mut a)) })?;
+    Ok(())
 }

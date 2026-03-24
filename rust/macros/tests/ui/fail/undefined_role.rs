@@ -1,6 +1,6 @@
-use telltale_macros::choreography;
+use telltale_macros::tell;
 
-choreography! {
+tell! {
     protocol Bad =
       roles A, B
       A -> C : Ping

@@ -1,30 +1,31 @@
 //! Double buffering example demonstrating concurrent data transfer.
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(missing_docs)]
 
 use futures::{
     executor::{self, ThreadPool},
     try_join, FutureExt,
 };
 use std::{error::Error, future::Future, marker, result};
-use telltale::try_session;
-use telltale_macros::choreography;
+use telltale::{tell, try_session};
 
 type Result<T> = result::Result<T, Box<dyn Error + marker::Send + Sync>>;
 
-choreography! {
+tell! {
+    -- // Two alternating ready/copy rounds model the double-buffer handoff.
     protocol DoubleBuffering =
       roles S, K, T
+      -- // First buffer transfer from source through kernel to sink.
       K -> S : Ready
       S -> K : Copy(i32)
       T -> K : Ready
       K -> T : Copy(i32)
+      -- // Second buffer transfer repeats the same pipeline.
       K -> S : Ready
       S -> K : Copy(i32)
       T -> K : Ready
       K -> T : Copy(i32)
 }
+
+use DoubleBuffering::sessions::*;
 
 async fn source(role: &mut S, input: (i32, i32)) -> Result<()> {
     try_session(role, |s: SSession<'_, _>| async {
@@ -78,9 +79,9 @@ where
     handle.await
 }
 
-fn main() {
+fn main() -> Result<()> {
     let Roles(mut s, mut k, mut t) = Roles::default();
-    let pool = ThreadPool::new().unwrap();
+    let pool = ThreadPool::new()?;
 
     let input = (1, 2);
     println!("input = {input:?}");
@@ -91,9 +92,9 @@ fn main() {
             spawn(&pool, async move { kernel(&mut k).await }),
             spawn(&pool, async move { sink(&mut t).await }),
         )
-        .unwrap()
-    });
+    })?;
 
     println!("output = {output:?}");
     assert_eq!(input, output);
+    Ok(())
 }

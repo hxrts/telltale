@@ -1,25 +1,27 @@
 //! Three-party adder: A and B each contribute a number, C computes the sum.
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(missing_docs)]
 
 use futures::{executor, try_join};
 use std::{error::Error, result};
-use telltale::try_session;
-use telltale_macros::choreography;
+use telltale::{tell, try_session};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
-choreography! {
+tell! {
+    -- // A and B exchange inputs, then both send them to C for summation.
     protocol Adder =
       roles A, B, C
+      -- // A and B share their local addends with each other.
       A -> B : Add(i32)
       B -> A : Add(i32)
+      -- // Both addends are delivered to C for computation.
       A -> C : Add(i32)
       B -> C : Add(i32)
+      -- // C sends the resulting sum back to both participants.
       C -> A : Sum(i32)
       C -> B : Sum(i32)
 }
+
+use Adder::sessions::*;
 
 async fn adder_a(role: &mut A) -> Result<()> {
     try_session(role, |s: ASession<'_, _>| async {
@@ -60,9 +62,8 @@ async fn adder_c(role: &mut C) -> Result<()> {
     .await
 }
 
-fn main() {
+fn main() -> Result<()> {
     let Roles(mut a, mut b, mut c) = Roles::default();
-    executor::block_on(async {
-        try_join!(adder_a(&mut a), adder_b(&mut b), adder_c(&mut c)).unwrap();
-    });
+    executor::block_on(async { try_join!(adder_a(&mut a), adder_b(&mut b), adder_c(&mut c)) })?;
+    Ok(())
 }

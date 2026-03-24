@@ -1,11 +1,11 @@
-use telltale_macros::choreography;
+use telltale_macros::tell;
 
-choreography! {
+tell! {
     protocol Broadcast =
       roles Leader, Worker1, Worker2
       Leader ->* : Start
 }
 
 fn main() {
-    let _roles = setup();
+    let _roles = Broadcast::sessions::setup();
 }

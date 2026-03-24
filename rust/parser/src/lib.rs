@@ -6,6 +6,7 @@
 
 pub mod ast;
 pub mod compiler;
+pub mod effect_spec;
 pub mod extensions;
 
 pub use ast::{
@@ -25,6 +26,11 @@ pub use compiler::parser::{
     DEFAULT_SOURCE_EXTENSION,
 };
 pub use compiler::projection::{project, ProjectionError};
+pub use effect_spec::{
+    generate_effect_interface_scaffold, generated_effect_families, GeneratedEffectBehavior,
+    GeneratedEffectFamily, GeneratedEffectOperation, GeneratedSimulationMetadata,
+    GeneratedSimulationMode,
+};
 pub use extensions::{
     CodegenContext, ExtensionRegistry, ExtensionValidationError, GrammarExtension, ParseContext,
     ParseError as ExtensionParseError, ProjectionContext, ProtocolExtension, StatementParser,

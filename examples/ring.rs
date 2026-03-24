@@ -1,22 +1,21 @@
 //! Ring topology example demonstrating circular communication.
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(missing_docs)]
 
 use futures::{executor, try_join};
 use std::{error::Error, result};
-use telltale::try_session;
-use telltale_macros::choreography;
+use telltale::{tell, try_session};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
-choreography! {
+tell! {
+    -- // Each participant forwards one value clockwise around the ring.
     protocol Ring =
       roles A, B, C
       A -> B : Value(i32)
       B -> C : Value(i32)
       C -> A : Value(i32)
 }
+
+use Ring::sessions::*;
 
 async fn ring_a(role: &mut A, input: i32) -> Result<i32> {
     let x = input;
@@ -48,7 +47,7 @@ async fn ring_c(role: &mut C, input: i32) -> Result<i32> {
     .await
 }
 
-fn main() {
+fn main() -> Result<()> {
     let Roles(mut a, mut b, mut c) = Roles::default();
 
     let input = (1, 2, 3);
@@ -60,7 +59,7 @@ fn main() {
             ring_b(&mut b, input.1),
             ring_c(&mut c, input.2),
         )
-        .unwrap()
-    });
+    })?;
     println!("output = {output:?}");
+    Ok(())
 }
