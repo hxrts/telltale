@@ -1,236 +1,166 @@
-//! Client-server protocol with an infinite logging side-channel.
+//! Client-server protocol with a logging side-channel.
 //!
-//! A client sends a request and data to a server, which replies with OK, KO,
-//! or Fault. On success the server enters an infinite loop, forwarding log
-//! entries to a dedicated logger role. The structurally infinite `Log -> Log`
-//! cycle means the server's local type has no `End` state.
+//! A client sends a request to a server, which processes it and replies with
+//! one of three outcomes:
 //!
-//! Uses the manual session type API because the protocol's infinite recursive
-//! logging loop and three-way branching cannot be expressed with the
-//! `choreography!` macro.
+//! - **Fault** -- the server encountered a fatal error and the protocol ends.
+//! - **Success** -- the request succeeded. The server sends data back to the
+//!   client and forwards a log entry to a dedicated logger role.
+//! - **Retry** -- the server asks the client to resend, then succeeds on the
+//!   second attempt.
+//!
+//! The original implementation used infinite recursive session types (the
+//! logging loop `S -> L : Log` cycled forever with no `End` state). This
+//! version models a single request-response cycle with all three outcomes,
+//! demonstrating the same three-role topology and choice-based branching
+//! in a form the `choreography!` macro can project.
+//!
+//! The server notifies both the client and the logger in every branch so that
+//! each role's projected session type is compatible across all choice arms
+//! (a requirement for well-formed multiparty projection).
+//!
+//! ```text
+//! protocol ClientServerLog =
+//!   roles C, S, L
+//!   C -> S : Request(i32)
+//!   choice S at
+//!     | Fault =>
+//!         S -> C : Fault
+//!         S -> L : Fault
+//!     | Success =>
+//!         S -> C : Success(i32)
+//!         S -> L : Success(i32)
+//!     | Retry =>
+//!         S -> C : Retry
+//!         S -> L : Retry
+//!         C -> S : Request(i32)
+//!         S -> C : Success(i32)
+//!         S -> L : Success(i32)
+//! ```
+//!
+//! Uses the `choreography!` macro to derive session types, roles, messages,
+//! and channel wiring from the global protocol specification.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
 
-// digraph C {
-//   1;
-//   2;
-//   3;
-//   6;
-//   8;
-//
-//
-//   1 -> 2 [label="S!Request(u32)", ];
-//   2 -> 3 [label="S!Data(u32)", ];
-//   3 -> 1 [label="S?KO()", ];
-//   3 -> 6 [label="S?OK(u32)", ];
-//   3 -> 8 [label="S?Fault()", ];
-//
-//   }
-//
-// digraph S {
-//   0;
-//   1;
-//   2;
-//   3;
-//
-//
-//   0 -> 1 [label="C?Request(u32)", ];
-//   1 -> 2 [label="C?Data(u32)", ];
-//   2 -> 0 [label="C!KO()", ];
-//   2 -> 3 [label="C!OK(u32)", ];
-//   3 -> 3 [label="L!Log(u32)", ];
-//
-//   }
-//
-// digraph L {
-// 	1;
-//
-// 	1 -> 1 [label="S?Log(u32)", ];
-// }
-
-use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use ::futures::{executor, try_join};
-#[allow(unused_imports)]
-use ::telltale::{
-    channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
-    Select, Send,
-};
+use futures::{executor, try_join};
 use std::error::Error;
+use telltale::try_session;
+use telltale_macros::choreography;
 
-type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
+choreography! {
+    protocol ClientServerLog {
+        roles C, S, L;
 
-#[derive(Roles)]
-#[allow(dead_code)]
-struct Roles {
-    c: C,
-    l: L,
-    s: S,
-}
-
-#[derive(Role)]
-#[message(Label)]
-struct C {
-    #[route(L)]
-    l: Channel,
-    #[route(S)]
-    s: Channel,
-}
-
-#[derive(Role)]
-#[message(Label)]
-struct L {
-    #[route(C)]
-    c: Channel,
-    #[route(S)]
-    s: Channel,
-}
-
-#[derive(Role)]
-#[message(Label)]
-struct S {
-    #[route(C)]
-    c: Channel,
-    #[route(L)]
-    l: Channel,
-}
-
-#[derive(Message)]
-enum Label {
-    Request(Request),
-    Data(Data),
-    K(K),
-    O(O),
-    Fault(Fault),
-    Log(Log),
-}
-
-struct Request(u32);
-
-struct Data(u32);
-
-struct K;
-
-#[allow(dead_code)]
-struct O(u32);
-
-struct Fault;
-
-#[allow(dead_code)]
-struct Log(u32);
-
-#[session]
-type CslC = Send<S, Request, Send<S, Data, Branch<S, CslC3>>>;
-
-#[session]
-#[allow(dead_code)]
-enum CslC3 {
-    Fault(Fault, End),
-    O(O, End),
-    K(K, CslC),
-}
-
-#[session]
-struct CslL(Receive<S, Log, CslL>);
-
-#[session]
-type CslS = Receive<C, Request, Receive<C, Data, Select<C, CslS2>>>;
-
-#[session]
-enum CslS2 {
-    O(O, CslS3),
-    K(K, CslS),
-}
-
-#[session]
-struct CslS3(Send<L, Log, CslS3>);
-
-async fn c(role: &mut C) -> Result<(), Box<dyn Error>> {
-    try_session(role, |init_s: CslC<'_, _>| async {
-        let mut s = init_s;
-        loop {
-            let s_dat = s.send(Request(0)).await?;
-            let s_branch = s_dat.send(Data(42)).await?;
-            match s_branch.branch().await? {
-                CslC3::Fault(_, end) => return Ok(((), end)),
-                CslC3::O(_, end) => return Ok(((), end)),
-                CslC3::K(_, s_loop) => {
-                    s = s_loop;
-                }
-            };
+        C -> S : Request(i32);
+        choice S at {
+            | Fault => {
+                S -> C : Fault;
+                S -> L : Fault;
+            }
+            | Success => {
+                S -> C : Success(i32);
+                S -> L : Success(i32);
+            }
+            | Retry => {
+                S -> C : Retry;
+                S -> L : Retry;
+                C -> S : Request(i32);
+                S -> C : Success(i32);
+                S -> L : Success(i32);
+            }
         }
-    })
-    .await
+    }
 }
 
-async fn s(role: &mut S) -> Result<(), Box<dyn Error>> {
-    try_session(role, |s: CslS<'_, _>| async {
-        let mut s = s;
-        loop {
-            let (Request(i), s_req) = s.receive().await?;
-            let (Data(d), s_dat) = s_req.receive().await?;
-            if i == 0 {
-                // Success
-                let CslS3(mut s) = s_dat.select(O(i)).await?;
-                loop {
-                    let CslS3(s_loop) = s.send(Log(d)).await?;
-                    s = s_loop;
-                }
-            } else {
-                s = s_dat.select(K).await?;
+// ---------------------------------------------------------------------------
+// Client
+// ---------------------------------------------------------------------------
+
+async fn client(role: &mut C) -> Result<(), Box<dyn Error>> {
+    try_session(role, |s: CSession<'_, _>| async {
+        let s = s.send(Request(42)).await?;
+        println!("C: sent Request(42)");
+
+        match s.branch().await? {
+            CChoice1::Fault(Fault, end) => {
+                println!("C: server faulted");
+                Ok(((), end))
+            }
+            CChoice1::Success(Success(d), end) => {
+                println!("C: received Success({d})");
+                Ok(((), end))
+            }
+            CChoice1::Retry(Retry, s) => {
+                println!("C: server asked to retry");
+
+                let s = s.send(Request(42)).await?;
+                println!("C: resent Request(42)");
+
+                let (Success(d), end) = s.receive().await?;
+                println!("C: received Success({d}) after retry");
+                Ok(((), end))
             }
         }
     })
     .await
 }
 
-async fn l(role: &mut L) -> Result<(), Box<dyn Error>> {
-    try_session(role, |s: CslL<'_, _>| async {
-        let mut s = s;
-        loop {
-            let (Log(_), s_rec) = s.0.receive().await?;
-            s = s_rec;
+// ---------------------------------------------------------------------------
+// Server
+// ---------------------------------------------------------------------------
+
+async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
+    try_session(role, |s: SSession<'_, _>| async {
+        let (Request(i), s) = s.receive().await?;
+        println!("S: received Request({i})");
+
+        // Process request and respond with Success
+        let result = i * 10;
+        let s = s.select(Success(result)).await?;
+        let end = s.send(Success(result)).await?;
+        println!("S: sent Success({result}) to C and L");
+
+        Ok(((), end))
+    })
+    .await
+}
+
+// ---------------------------------------------------------------------------
+// Logger
+// ---------------------------------------------------------------------------
+
+async fn logger(role: &mut L) -> Result<(), Box<dyn Error>> {
+    try_session(role, |s: LSession<'_, _>| async {
+        match s.branch().await? {
+            LChoice1::Fault(Fault, end) => {
+                println!("L: server faulted, no log entry");
+                Ok(((), end))
+            }
+            LChoice1::Success(Success(entry), end) => {
+                println!("L: logged entry {entry}");
+                Ok(((), end))
+            }
+            LChoice1::Retry(Retry, s) => {
+                println!("L: retry in progress, waiting for result");
+                let (Success(entry), end) = s.receive().await?;
+                println!("L: logged entry {entry} (after retry)");
+                Ok(((), end))
+            }
         }
     })
     .await
 }
 
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
 fn main() {
-    use std::{panic, thread, time::Duration};
-
-    // This example has infinite session types (the logging loop never terminates).
-    // We use a thread-based timeout and catch the session drop panic for clean demonstration.
-
-    let timeout_duration = Duration::from_millis(100);
-
-    let default_hook = panic::take_hook();
-    panic::set_hook(Box::new(|_| {}));
-
-    let handle = thread::spawn(|| {
-        let mut roles = Roles::default();
-        let result = executor::block_on(async {
-            try_join!(c(&mut roles.c), s(&mut roles.s), l(&mut roles.l))
-        });
-        if let Err(e) = result {
-            eprintln!("Protocol error: {e}");
-        }
+    let Roles(mut c, mut s, mut l) = Roles::default();
+    executor::block_on(async {
+        try_join!(client(&mut c), server(&mut s), logger(&mut l)).unwrap();
     });
-
-    // Wait for thread with timeout - if it takes too long, the infinite session is running
-    thread::sleep(timeout_duration);
-
-    // The thread is likely still running (infinite session), so we just let it drop
-    // when main exits - but we want to show the protocol ran
-
-    panic::set_hook(default_hook);
-
-    if handle.is_finished() {
-        match handle.join() {
-            Ok(()) => println!("Client-server-log protocol completed normally"),
-            Err(_) => println!("Client-server-log protocol panicked (session cleanup)"),
-        }
-    } else {
-        println!("Client-server-log protocol completed (infinite logging session running)");
-        println!("Note: Session types are infinite - limited execution for demonstration");
-    }
+    println!("\nClient-server-log protocol completed successfully");
 }

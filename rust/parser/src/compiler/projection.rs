@@ -323,15 +323,32 @@ impl<'a> ProjectionContext<'a> {
                 .all(|b| matches!(&b.protocol, Protocol::Send { .. }));
 
             if first_sends && !branches.is_empty() {
-                // Communicated choice - project as Select
-                // The Select represents the choice, and each branch's Send is part of
-                // the continuation (not skipped). This matches MPST semantics where
-                // the choice maker selects a branch AND sends the corresponding message.
+                // Communicated choice - project as Select.
+                //
+                // When the choice label matches the first message name, the
+                // select() call carries the payload and the first Send is
+                // consumed (avoids double-send).  Otherwise the choice label
+                // and the message are distinct communications.
                 let mut local_branches = Vec::new();
 
                 for branch in branches {
-                    // Project the entire branch protocol including the Send
-                    let local_type = self.project_protocol(&branch.protocol)?;
+                    let label_matches_msg = match &branch.protocol {
+                        Protocol::Send { message, .. } => {
+                            branch.label == message.name
+                        }
+                        _ => false,
+                    };
+
+                    let local_type = if label_matches_msg {
+                        match &branch.protocol {
+                            Protocol::Send { continuation, .. } => {
+                                self.project_protocol(continuation)?
+                            }
+                            _ => return Err(ProjectionError::NonParticipantChoice),
+                        }
+                    } else {
+                        self.project_protocol(&branch.protocol)?
+                    };
                     local_branches.push((branch.label.clone(), local_type));
                 }
 
@@ -376,12 +393,33 @@ impl<'a> ProjectionContext<'a> {
             }
 
             if receives_choice {
-                // We receive the choice - project as Branch
+                // We receive the choice - project as Branch.
+                //
+                // When the choice label matches the first message, the
+                // Branch dispatches on the received message directly and
+                // the first Receive is consumed.  Otherwise both the
+                // label dispatch and the Receive remain separate.
                 let sender = sender.ok_or(ProjectionError::NonParticipantChoice)?;
                 let mut local_branches = Vec::new();
 
                 for branch in branches {
-                    let local_type = self.project_protocol(&branch.protocol)?;
+                    let label_matches_msg = match &branch.protocol {
+                        Protocol::Send { message, .. } => {
+                            branch.label == message.name
+                        }
+                        _ => false,
+                    };
+
+                    let local_type = if label_matches_msg {
+                        match &branch.protocol {
+                            Protocol::Send { continuation, .. } => {
+                                self.project_protocol(continuation)?
+                            }
+                            _ => self.project_protocol(&branch.protocol)?,
+                        }
+                    } else {
+                        self.project_protocol(&branch.protocol)?
+                    };
                     local_branches.push((branch.label.clone(), local_type));
                 }
 

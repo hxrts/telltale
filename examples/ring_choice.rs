@@ -1,41 +1,47 @@
-//! Ring protocol with per-hop choices and infinite recursive session types.
+//! Ring protocol with per-hop choices and recursive session types.
 //!
-//! Three roles (A, B, C) form a ring where each participant forwards a value
-//! to the next, choosing Continue or Done at every hop. The session types are
-//! structurally infinite -- `RingA` recurses back to `RingA` with no `End`
-//! state in the type definition -- so execution is bounded at runtime by a
-//! configurable `MAX_ROUNDS` limit.
+//! Three roles (A, B, C) form a ring where A decides on each round to
+//! continue (sending an `Add` value around the ring) or stop (sending
+//! `Stop` to terminate). The `rec`/`continue` construct produces
+//! self-referential session types that the type system enforces at
+//! compile time. Execution is bounded at runtime by a configurable
+//! `RING_MAX_ROUNDS` limit (default 5).
 //!
-//! Uses the manual session type API because the protocol's infinite recursive
-//! types and per-hop branching cannot be expressed with the `choreography!`
-//! macro.
+//! ```tell
+//! protocol RingChoice = {
+//!     roles A, B, C;
+//!     rec ring_loop {
+//!         choice A at {
+//!             | Add => {
+//!                 A -> B : Add(i32);
+//!                 B -> C : Add(i32);
+//!                 C -> A : Add(i32);
+//!                 continue ring_loop;
+//!             }
+//!             | Stop => {
+//!                 A -> B : Stop;
+//!                 B -> C : Stop;
+//!             }
+//!         }
+//!     }
+//! }
+//! ```
+//!
+//! Uses the `choreography!` macro to derive session types, roles, messages,
+//! and channel wiring from the global protocol specification.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
-#![allow(unreachable_code)]
 
-// Ring Protocol with Choices - Demonstrates Infinite Recursive Session Types
-//
-// This example demonstrates:
-// - Ring topology communication patterns (A → B → C → A)
-// - Choice-based protocol branching in a ring
-// - **Infinite recursive session types** (no End state in type definition)
-// - Session types for circular communication
-//
-// Note: The session types are structurally infinite (RingA → RingA recursively),
-// demonstrating how session types can encode unbounded protocols. For practical
-// testing, we limit execution to MAX_ROUNDS iterations. Set the RING_MAX_ROUNDS
-// environment variable to customize (or remove the limit to see true infinite behavior).
-
-use futures::{channel::mpsc, executor, try_join};
-use std::{convert::Infallible, error::Error, result};
-use telltale::{session, try_session, Branch, Message, Receive, Role, Roles, Select, Send};
+use futures::{executor, try_join};
+use std::{error::Error, result};
+use telltale::try_session;
+use telltale_macros::choreography;
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
-// Maximum rounds for demonstration purposes
-// The session types are infinite, but we limit iterations for testing
-// Set RING_MAX_ROUNDS environment variable to override
+/// Maximum rounds for demonstration purposes.
+/// Set `RING_MAX_ROUNDS` environment variable to override (default 5).
 fn max_rounds() -> usize {
     std::env::var("RING_MAX_ROUNDS")
         .ok()
@@ -43,159 +49,101 @@ fn max_rounds() -> usize {
         .unwrap_or(5)
 }
 
-type Sender = mpsc::UnboundedSender<Label>;
-type Receiver = mpsc::UnboundedReceiver<Label>;
-
-#[derive(Roles)]
-struct Roles(A, B, C);
-
-#[derive(Role)]
-#[message(Label)]
-struct A(#[route(B)] Sender, #[route(C)] Receiver);
-
-#[derive(Role)]
-#[message(Label)]
-struct B(#[route(A)] Receiver, #[route(C)] Sender);
-
-#[derive(Role)]
-#[message(Label)]
-struct C(#[route(A)] Sender, #[route(B)] Receiver);
-
-#[derive(Message)]
-enum Label {
-    Add(Add),
-    Sub(Sub),
+choreography! {
+    protocol RingChoice = {
+        roles A, B, C;
+        rec ring_loop {
+            choice A at {
+                | Add => {
+                    A -> B : Add(i32);
+                    B -> C : Add(i32);
+                    C -> A : Add(i32);
+                    continue ring_loop;
+                }
+                | Stop => {
+                    A -> B : Stop;
+                    B -> C : Stop;
+                }
+            }
+        }
+    }
 }
 
-struct Add(i32);
-struct Sub(i32);
+// ---------------------------------------------------------------------------
+// Endpoint implementations
+// ---------------------------------------------------------------------------
 
-#[session]
-type RingA = Send<B, Add, Branch<C, RingAChoice>>;
-
-#[session]
-enum RingAChoice {
-    Add(Add, RingA),
-    Sub(Sub, RingA),
-}
-
-#[session]
-type RingB = Select<C, RingBChoice>;
-
-#[session]
-enum RingBChoice {
-    #[allow(dead_code)]
-    Add(Add, Receive<A, Add, RingB>),
-    #[allow(dead_code)]
-    Sub(Sub, Receive<A, Add, RingB>),
-}
-
-#[session]
-type RingC = Branch<B, RingCChoice>;
-
-#[session]
-enum RingCChoice {
-    Add(Add, Send<A, Add, RingC>),
-    Sub(Sub, Send<A, Sub, RingC>),
-}
-
-async fn ring_a(role: &mut A, mut input: i32) -> Result<Infallible> {
-    try_session(role, |mut s: RingA<'_, _>| async {
-        let max_rounds = max_rounds();
-        for round in 0..max_rounds {
+async fn ring_a(role: &mut A, mut input: i32) -> Result<()> {
+    try_session(role, |mut s: ASession<'_, _>| async {
+        let max = max_rounds();
+        for round in 0..max {
             println!("A (round {round}): {input}");
-            let x = input % 100; // Keep values small to prevent overflow
-            s = match s.send(Add(x)).await?.branch().await? {
-                RingAChoice::Add(Add(y), s) => {
-                    input = x + y;
-                    s
-                }
-                RingAChoice::Sub(Sub(y), s) => {
-                    input = x - y;
-                    s
-                }
-            };
+            let x = input % 100; // keep values small to prevent overflow
+            let recv_s = s.select(Add(x)).await?;
+            let (Add(y), next) = recv_s.receive().await?;
+            input = x + y;
+            s = next;
         }
-        println!("A: Completed {max_rounds} rounds, final value: {input}");
-        println!("Note: Session types are infinite - limited to {max_rounds} rounds for testing");
-        unreachable!()
+        println!("A: completed {max} rounds, final value: {input}");
+
+        // Terminate the ring
+        let end = s.select(Stop).await?;
+        Ok(((), end))
     })
     .await
 }
 
-async fn ring_b(role: &mut B, mut input: i32) -> Result<Infallible> {
-    try_session(role, |mut s: RingB<'_, _>| async {
-        let max_rounds = max_rounds();
-        for round in 0..max_rounds {
-            println!("B (round {round}): {input}");
-            let x = input % 100; // Keep values small to prevent overflow
-            s = if x > 0 {
-                let s = s.select(Add(x)).await?;
-                let (Add(y), s) = s.receive().await?;
-                input = y + x;
-                s
-            } else {
-                let s = s.select(Sub(x)).await?;
-                let (Add(y), s) = s.receive().await?;
-                input = y - x;
-                s
-            };
+async fn ring_b(role: &mut B, mut input: i32) -> Result<()> {
+    try_session(role, |mut s: BSession<'_, _>| async {
+        loop {
+            match s.branch().await? {
+                BChoice1::Add(Add(y), send_s) => {
+                    println!("B: received {y} from A, forwarding {input}");
+                    let x = input % 100;
+                    let next = send_s.send(Add(x)).await?;
+                    input = y + x;
+                    s = next;
+                }
+                BChoice1::Stop(Stop, send_s) => {
+                    println!("B: received Stop, forwarding");
+                    let end = send_s.send(Stop).await?;
+                    return Ok(((), end));
+                }
+            }
         }
-        println!("B: Completed {max_rounds} rounds, final value: {input}");
-        unreachable!()
     })
     .await
 }
 
-async fn ring_c(role: &mut C, mut input: i32) -> Result<Infallible> {
-    try_session(role, |mut s: RingC<'_, _>| async {
-        let max_rounds = max_rounds();
-        for round in 0..max_rounds {
-            println!("C (round {round}): {input}");
-            let x = input % 100; // Keep values small to prevent overflow
-            s = match s.branch().await? {
-                RingCChoice::Add(Add(y), s_recv) => {
-                    let s = s_recv.send(Add(x)).await?;
-                    input = x + y;
-                    s
+async fn ring_c(role: &mut C, mut input: i32) -> Result<()> {
+    try_session(role, |mut s: CSession<'_, _>| async {
+        loop {
+            match s.branch().await? {
+                CChoice1::Add(Add(y), send_s) => {
+                    println!("C: received {y} from B, forwarding {input}");
+                    let x = input % 100;
+                    let next = send_s.send(Add(x)).await?;
+                    input = y + x;
+                    s = next;
                 }
-                RingCChoice::Sub(Sub(y), s_recv) => {
-                    let s = s_recv.send(Sub(x)).await?;
-                    input = x - y;
-                    s
+                CChoice1::Stop(Stop, end) => {
+                    println!("C: received Stop");
+                    return Ok(((), end));
                 }
-            };
+            }
         }
-        println!("C: Completed {max_rounds} rounds, final value: {input}");
-        unreachable!()
     })
     .await
 }
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
 
 fn main() {
-    use std::panic;
-
-    // Infinite session types don't have an End state, so when we artificially
-    // limit the rounds for testing, we can't cleanly terminate the session.
-    // The session drop handler will panic, which we catch here.
-
-    let default_hook = panic::take_hook();
-    panic::set_hook(Box::new(|_| {}));
-
-    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        let Roles(mut a, mut b, mut c) = Roles::default();
-        executor::block_on(async {
-            try_join!(ring_a(&mut a, -1), ring_b(&mut b, 0), ring_c(&mut c, 1)).unwrap();
-        });
-    }));
-
-    panic::set_hook(default_hook);
-
-    match result {
-        Ok(()) => println!("\nRing protocol completed normally"),
-        Err(_) => println!(
-            "\nRing protocol completed (session dropped after {} rounds)",
-            max_rounds()
-        ),
-    }
+    let Roles(mut a, mut b, mut c) = Roles::default();
+    executor::block_on(async {
+        try_join!(ring_a(&mut a, -1), ring_b(&mut b, 0), ring_c(&mut c, 1)).unwrap();
+    });
+    println!("\nRing protocol completed after {} rounds", max_rounds());
 }

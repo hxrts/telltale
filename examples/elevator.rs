@@ -1,282 +1,186 @@
-//! Elevator controller modeled as an infinite session-typed state machine.
+//! Elevator controller with three-way coordination.
 //!
-//! Three roles -- User, Door, and Elevator -- coordinate open/close/stop
-//! commands through mutually recursive session types with no terminal state.
-//! The user continuously selects OpenDoor or CloseDoor; the door and elevator
-//! respond with physical-state transitions (DoorOpened, DoorClosed, etc.).
+//! Three roles -- User (U), Door (D), and Elevator (E) -- coordinate
+//! open/close commands through a bounded request-response cycle:
 //!
-//! Uses the manual session type API because the protocol's infinite mutually
-//! recursive state machine cannot be expressed with the `choreography!` macro.
+//! 1. The user selects **OpenDoor** or **CloseDoor** (communicated to the
+//!    elevator).
+//! 2. The elevator relays the same command label to the door.
+//! 3. The door executes the action and reports the result back to the
+//!    elevator.
+//! 4. The elevator confirms the outcome to the user.
+//! 5. On **OpenDoor**, the elevator automatically closes the door afterward
+//!    (the full open-wait-close cycle from the original protocol).
+//!
+//! The original implementation used infinite mutually recursive session types
+//! (the user continuously selected commands in an unbounded loop, and the
+//! elevator/door state machine cycled through open/close/stop transitions
+//! without any `End` state). This version models a single command cycle with
+//! the automatic close-after-open behavior, demonstrating the same three-role
+//! topology and choice-based coordination in a form the `choreography!` macro
+//! can project.
+//!
+//! ```text
+//! protocol Elevator =
+//!   roles U, D, E
+//!   choice U at
+//!     | OpenDoor =>
+//!         U -> E : OpenDoor
+//!         E -> D : OpenDoor
+//!         D -> E : DoorOpened
+//!         E -> U : DoorOpened
+//!         E -> D : CloseDoor
+//!         D -> E : DoorClosed
+//!         E -> U : DoorClosed
+//!     | CloseDoor =>
+//!         U -> E : CloseDoor
+//!         E -> D : CloseDoor
+//!         D -> E : DoorClosed
+//!         E -> U : DoorClosed
+//! ```
+//!
+//! Uses the `choreography!` macro to derive session types, roles, messages,
+//! and channel wiring from the global protocol specification.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
-#![allow(clippy::disallowed_methods)] // Example-only randomized timing is intentionally nondeterministic.
 #![allow(missing_docs)]
 
-use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    future::LocalBoxFuture,
-    FutureExt,
-};
-use rand::Rng;
-use std::{error::Error, result, time::Duration};
-use telltale::{
-    channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
-    Select, Send,
-};
-use tokio::time;
+use futures::{executor, try_join};
+use std::error::Error;
+use telltale::try_session;
+use telltale_macros::choreography;
 
-type Result<T> = result::Result<T, Box<dyn Error>>;
+choreography! {
+    protocol Elevator {
+        roles U, D, E;
 
-type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
-
-#[derive(Roles)]
-struct Roles(U, D, E);
-
-#[derive(Role)]
-#[message(Label)]
-struct U(#[route(D)] Channel, #[route(E)] Channel);
-
-#[derive(Role)]
-#[message(Label)]
-struct D(#[route(U)] Channel, #[route(E)] Channel);
-
-#[derive(Role)]
-#[message(Label)]
-struct E(#[route(U)] Channel, #[route(D)] Channel);
-
-#[derive(Message)]
-enum Label {
-    Close(Close),
-    CloseDoor(CloseDoor),
-    DoorClosed(DoorClosed),
-    DoorOpened(DoorOpened),
-    DoorStopped(DoorStopped),
-    Open(Open),
-    OpenDoor(OpenDoor),
-    Reset(Reset),
-    Stop(Stop),
+        choice U at {
+            | OpenDoor => {
+                U -> E : OpenDoor;
+                E -> D : OpenDoor;
+                D -> E : DoorOpened;
+                E -> U : DoorOpened;
+                // Elevator auto-closes door after opening
+                E -> D : CloseDoor;
+                D -> E : DoorClosed;
+                E -> U : DoorClosed;
+            }
+            | CloseDoor => {
+                U -> E : CloseDoor;
+                E -> D : CloseDoor;
+                D -> E : DoorClosed;
+                E -> U : DoorClosed;
+            }
+        }
+    }
 }
 
-struct Close;
-struct CloseDoor;
-struct DoorClosed;
-struct DoorOpened;
-struct DoorStopped;
-struct Open;
-struct OpenDoor;
-struct Reset;
-struct Stop;
+// ---------------------------------------------------------------------------
+// User
+// ---------------------------------------------------------------------------
 
-#[session]
-type User = Select<E, UserChoice>;
+async fn user(role: &mut U) -> Result<(), Box<dyn Error>> {
+    try_session(role, |s: USession<'_, _>| async {
+        // User decides to open the door
+        println!("U: requesting door open");
+        let s = s.select(OpenDoor).await?;
 
-#[session]
-enum UserChoice {
-    CloseDoor(CloseDoor, User),
-    OpenDoor(OpenDoor, User),
+        // Wait for door to open
+        let (DoorOpened, s) = s.receive().await?;
+        println!("U: door is open");
+
+        // Wait for automatic close
+        let (DoorClosed, end) = s.receive().await?;
+        println!("U: door has closed");
+
+        Ok(((), end))
+    })
+    .await
 }
 
-#[session]
-type Door = Branch<E, DoorInit>;
+// ---------------------------------------------------------------------------
+// Door
+// ---------------------------------------------------------------------------
 
-#[session]
-enum DoorInit {
-    Close(Close, Send<E, DoorClosed, Branch<E, DoorReset>>),
-    Open(Open, Send<E, DoorOpened, Branch<E, DoorReset>>),
-    Reset(Reset, Door),
-    Stop(Stop, Door),
-}
+async fn door(role: &mut D) -> Result<(), Box<dyn Error>> {
+    try_session(role, |s: DSession<'_, _>| async {
+        match s.branch().await? {
+            DChoice1::OpenDoor(OpenDoor, s) => {
+                println!("D: opening door");
+                let s = s.send(DoorOpened).await?;
+                println!("D: door opened");
 
-#[session]
-enum DoorReset {
-    Close(Close, Branch<E, DoorReset>),
-    Open(Open, Branch<E, DoorReset>),
-    Reset(Reset, Door),
-    Stop(Stop, Branch<E, DoorReset>),
-}
+                // Auto-close command from elevator
+                let (CloseDoor, s) = s.receive().await?;
+                println!("D: closing door (auto-close)");
+                let end = s.send(DoorClosed).await?;
+                println!("D: door closed");
 
-#[session]
-type Elevator = Send<D, Reset, Branch<U, ElevatorClosed>>;
+                Ok(((), end))
+            }
+            DChoice1::CloseDoor(CloseDoor, s) => {
+                println!("D: closing door");
+                let end = s.send(DoorClosed).await?;
+                println!("D: door closed");
 
-#[session]
-enum ElevatorClosed {
-    CloseDoor(CloseDoor, Branch<U, ElevatorClosed>),
-    OpenDoor(OpenDoor, ElevatorOpening),
-}
-
-#[session]
-type ElevatorOpening = Send<D, Open, Receive<D, DoorOpened, ElevatorOpened>>;
-
-#[session]
-type ElevatorOpened = Send<D, Reset, Send<D, Close, Send<D, Stop, Branch<D, ElevatorStopping>>>>;
-
-#[session]
-#[allow(clippy::enum_variant_names)]
-enum ElevatorStopping {
-    DoorStopped(DoorStopped, ElevatorOpening),
-    DoorOpened(DoorOpened, ElevatorOpened),
-    DoorClosed(DoorClosed, Elevator),
-}
-
-enum Never {}
-
-async fn sleep(mut rng: impl Rng) {
-    time::sleep(Duration::from_micros(rng.gen_range(0..500))).await;
-}
-
-async fn user(role: &mut U) -> Result<Never> {
-    let mut rng = rand::thread_rng();
-    try_session(role, |mut s: User<'_, _>| async {
-        loop {
-            s = if rng.gen() {
-                println!("user: close");
-                s.select(CloseDoor).await?
-            } else {
-                println!("user: open");
-                s.select(OpenDoor).await?
-            };
-
-            sleep(&mut rng).await;
+                Ok(((), end))
+            }
         }
     })
     .await
 }
 
-async fn door(role: &mut D) -> Result<Never> {
-    try_session(role, |mut s: Door<'_, _>| async {
-        async fn reset<'d>(mut s: Branch<'d, D, E, DoorReset<'d, D>>) -> Result<Door<'d, D>> {
-            loop {
-                s = match s.branch().await? {
-                    DoorReset::Close(Close, s)
-                    | DoorReset::Open(Open, s)
-                    | DoorReset::Stop(Stop, s) => s,
-                    DoorReset::Reset(Reset, s) => break Ok(s),
-                }
-            }
-        }
+// ---------------------------------------------------------------------------
+// Elevator
+// ---------------------------------------------------------------------------
 
-        loop {
-            s = match s.branch().await? {
-                DoorInit::Close(Close, s) => {
-                    println!("door: close");
-                    reset(s.send(DoorClosed).await?).await?
-                }
-                DoorInit::Open(Open, s) => {
-                    println!("door: open");
-                    reset(s.send(DoorOpened).await?).await?
-                }
-                DoorInit::Reset(Reset, s) | DoorInit::Stop(Stop, s) => s,
-            };
+async fn elevator(role: &mut E) -> Result<(), Box<dyn Error>> {
+    try_session(role, |s: ESession<'_, _>| async {
+        match s.branch().await? {
+            EChoice1::OpenDoor(OpenDoor, s) => {
+                // Forward open command to door
+                println!("E: received open request");
+                let s = s.send(OpenDoor).await?;
+
+                // Wait for door to confirm opened
+                let (DoorOpened, s) = s.receive().await?;
+                println!("E: door opened, notifying user");
+                let s = s.send(DoorOpened).await?;
+
+                // Auto-close: tell door to close
+                println!("E: auto-closing door");
+                let s = s.send(CloseDoor).await?;
+
+                let (DoorClosed, s) = s.receive().await?;
+                println!("E: door closed, notifying user");
+                let end = s.send(DoorClosed).await?;
+
+                Ok(((), end))
+            }
+            EChoice1::CloseDoor(CloseDoor, s) => {
+                // Forward close command to door
+                println!("E: received close request");
+                let s = s.send(CloseDoor).await?;
+
+                let (DoorClosed, s) = s.receive().await?;
+                println!("E: door closed, notifying user");
+                let end = s.send(DoorClosed).await?;
+
+                Ok(((), end))
+            }
         }
     })
     .await
 }
 
-async fn elevator(role: &mut E) -> Result<Never> {
-    fn opened<'e>(
-        s: ElevatorOpened<'e, E>,
-        mut rng: impl Rng + 'e,
-    ) -> LocalBoxFuture<'e, Result<(Never, End<'e, E>)>> {
-        async move {
-            let s = s.send(Reset).await?;
-            sleep(&mut rng).await;
-
-            let s = s.send(Close).await?.send(Stop).await?;
-            match s.branch().await? {
-                ElevatorStopping::DoorStopped(DoorStopped, s) => opening(s, rng).await,
-                ElevatorStopping::DoorOpened(DoorOpened, s) => opened(s, rng).await,
-                ElevatorStopping::DoorClosed(DoorClosed, s) => elevator(s, rng).await,
-            }
-        }
-        .boxed_local()
-    }
-
-    fn opening<'e>(
-        s: ElevatorOpening<'e, E>,
-        rng: impl Rng + 'e,
-    ) -> LocalBoxFuture<'e, Result<(Never, End<'e, E>)>> {
-        async move {
-            let (DoorOpened, s) = s.send(Open).await?.receive().await?;
-            opened(s, rng).await
-        }
-        .boxed_local()
-    }
-
-    fn closed<'e>(
-        s: Branch<'e, E, U, ElevatorClosed<'e, E>>,
-        rng: impl Rng + 'e,
-    ) -> LocalBoxFuture<'e, Result<(Never, End<'e, E>)>> {
-        async move {
-            match s.branch().await? {
-                ElevatorClosed::CloseDoor(CloseDoor, s) => closed(s, rng).await,
-                ElevatorClosed::OpenDoor(OpenDoor, s) => opening(s, rng).await,
-            }
-        }
-        .boxed_local()
-    }
-
-    fn elevator<'e>(
-        s: Elevator<'e, E>,
-        rng: impl Rng + 'e,
-    ) -> LocalBoxFuture<'e, Result<(Never, End<'e, E>)>> {
-        async move {
-            let s = s.send(Reset).await?;
-            closed(s, rng).await
-        }
-        .boxed_local()
-    }
-
-    let rng = rand::thread_rng();
-    try_session(role, |s| async { elevator(s, rng).await }).await
-}
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
 
 fn main() {
-    use std::panic;
-
-    // This example demonstrates an elevator control system using session types.
-    // All three roles (user, door, elevator) run in an infinite loop.
-    // We use a timeout to limit execution for demonstration purposes.
-    //
-    // Note: When the timeout expires, sessions are dropped without completing,
-    // which triggers a panic from the session drop handler. We catch this panic
-    // to demonstrate the protocol behavior.
-
-    let timeout_duration = Duration::from_millis(100);
-
-    // Set up a custom panic hook to suppress the session drop panic message
-    let default_hook = panic::take_hook();
-    panic::set_hook(Box::new(|_| {}));
-
-    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_time()
-            .build()
-            .unwrap();
-
-        rt.block_on(async {
-            let Roles(mut u, mut d, mut e) = Roles::default();
-
-            let result = time::timeout(timeout_duration, async {
-                futures::try_join!(user(&mut u), door(&mut d), elevator(&mut e))
-            })
-            .await;
-
-            match result {
-                Ok(Ok(_)) => println!("Protocol completed"),
-                Ok(Err(e)) => eprintln!("Protocol error: {e}"),
-                Err(_) => {} // Timeout - sessions will be dropped
-            }
-        });
-    }));
-
-    // Restore the default panic hook
-    panic::set_hook(default_hook);
-
-    match result {
-        Ok(()) => println!("\nElevator simulation completed normally"),
-        Err(_) => println!(
-            "\nElevator simulation completed (timeout after {:?})",
-            timeout_duration
-        ),
-    }
+    let Roles(mut u, mut d, mut e) = Roles::default();
+    executor::block_on(async {
+        try_join!(user(&mut u), door(&mut d), elevator(&mut e)).unwrap();
+    });
+    println!("\nElevator protocol completed successfully");
 }

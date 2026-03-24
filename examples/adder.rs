@@ -5,73 +5,65 @@
 //! The recursive `Select`/`Branch` loop (Add -> Add -> Sum -> choose again)
 //! encodes an unbounded number of additions terminated by a `Bye` exit.
 //!
-//! Uses the manual session type API because the protocol's recursive choice
-//! loop cannot be expressed with the `choreography!` macro.
-#![allow(clippy::type_complexity)]
+//! ```tell
+//! protocol Adder = {
+//!     roles C, S;
+//!     C -> S : Hello(i32);
+//!     rec adder_loop {
+//!         choice C at {
+//!             | Add => {
+//!                 C -> S : Add(i32);
+//!                 C -> S : Add(i32);
+//!                 S -> C : Sum(i32);
+//!                 continue adder_loop;
+//!             }
+//!             | Bye => {
+//!                 C -> S : Bye;
+//!                 S -> C : Bye;
+//!             }
+//!         }
+//!     }
+//! }
+//! ```
+//!
+//! Uses the `choreography!` macro to derive session types, roles, messages,
+//! and channel wiring from the global protocol specification.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
 
-use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    executor, try_join,
-};
-use std::{error::Error, result};
-use telltale::{
-    channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
-    Select, Send,
-};
+use futures::{executor, try_join};
+use std::error::Error;
+use telltale::try_session;
+use telltale_macros::choreography;
 
-type Result<T> = result::Result<T, Box<dyn Error>>;
-
-type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
-
-#[derive(Roles)]
-struct Roles(C, S);
-
-#[derive(Role)]
-#[message(Label)]
-struct C(#[route(S)] Channel);
-
-#[derive(Role)]
-#[message(Label)]
-struct S(#[route(C)] Channel);
-
-#[derive(Message)]
-enum Label {
-    Add(Add),
-    Bye(Bye),
-    Hello(Hello),
-    Sum(Sum),
+choreography! {
+    protocol Adder = {
+        roles C, S;
+        C -> S : Hello(i32);
+        rec adder_loop {
+            choice C at {
+                | Add => {
+                    C -> S : Add(i32);
+                    C -> S : Add(i32);
+                    S -> C : Sum(i32);
+                    continue adder_loop;
+                }
+                | Bye => {
+                    C -> S : Bye;
+                    S -> C : Bye;
+                }
+            }
+        }
+    }
 }
 
-struct Add(i32);
-struct Bye;
-struct Hello(i32);
-struct Sum(i32);
+// ---------------------------------------------------------------------------
+// Endpoint implementations
+// ---------------------------------------------------------------------------
 
-#[session]
-type Client = Send<S, Hello, Select<S, ClientChoice>>;
-
-#[session]
-enum ClientChoice {
-    #[allow(dead_code)]
-    Add(Add, Send<S, Add, Receive<S, Sum, Select<S, ClientChoice>>>),
-    #[allow(dead_code)]
-    Bye(Bye, Receive<S, Bye, End>),
-}
-
-#[session]
-type Server = Receive<C, Hello, Branch<C, ServerChoice>>;
-
-#[session]
-enum ServerChoice {
-    Add(Add, Receive<C, Add, Send<C, Sum, Branch<C, ServerChoice>>>),
-    Bye(Bye, Send<C, Bye, End>),
-}
-
-async fn client(role: &mut C) -> Result<()> {
-    try_session(role, |s: Client<'_, _>| async {
+async fn client(role: &mut C) -> Result<(), Box<dyn Error>> {
+    try_session(role, |s: CSession<'_, _>| async {
         let s = s.send(Hello(1)).await?;
 
         let s = s.select(Add(2)).await?;
@@ -100,16 +92,16 @@ async fn client(role: &mut C) -> Result<()> {
     .await
 }
 
-async fn server(role: &mut S) -> Result<()> {
-    try_session(role, |s: Server<'_, _>| async {
+async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
+    try_session(role, |s: SSession<'_, _>| async {
         let (Hello(u), mut s) = s.receive().await?;
         let s = loop {
             s = match s.branch().await? {
-                ServerChoice::Add(Add(v), s) => {
+                SChoice1::Add(Add(v), s) => {
                     let (Add(w), s) = s.receive().await?;
                     s.send(Sum(u + v + w)).await?
                 }
-                ServerChoice::Bye(Bye, s) => break s.send(Bye).await?,
+                SChoice1::Bye(Bye, s) => break s.send(Bye).await?,
             };
         };
 
@@ -117,6 +109,10 @@ async fn server(role: &mut S) -> Result<()> {
     })
     .await
 }
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
 
 fn main() {
     let Roles(mut c, mut s) = Roles::default();

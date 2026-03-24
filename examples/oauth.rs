@@ -1,169 +1,87 @@
 //! OAuth example demonstrating authentication session types.
 //!
-//! This example uses the manual session type API (`#[session]`, `#[derive(Role)]`,
-//! `#[derive(Message)]`) because the protocol requires nested branching (`choice at S`
-//! and `choice at A`) which the `choreography!` macro does not yet support.
+//! This example uses the `choreography!` macro to define the protocol with nested
+//! choice/branching. The outer choice is made by S (server) selecting Login or
+//! Cancel. In the Login path, A (authenticator) decides Granted or Denied, and S
+//! forwards the result to C (client) via explicit relay choices.
+//!
+//! Adapted from: Stay safe under panic: Rust programming with affine MPST
+//!
+//! ```tell
+//! protocol OAuth =
+//!   roles S, C, A
+//!   choice S at
+//!     | Login =>
+//!       S -> C : LoginReq of i32
+//!       choice C at
+//!         | Proceed =>
+//!           C -> A : Password of i32
+//!           choice A at
+//!             | Granted =>
+//!               A -> S : Approved of i32
+//!               choice S at
+//!                 | AuthOk =>
+//!                   S -> C : AuthNotice of i32
+//!             | Denied =>
+//!               A -> S : Rejected of i32
+//!               choice S at
+//!                 | AuthFail =>
+//!                   S -> C : FailNotice of i32
+//!     | Cancel =>
+//!       S -> C : CancelReq of i32
+//!       choice C at
+//!         | Abort =>
+//!           C -> A : Quit of i32
+//! ```
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
 
-// Adapted from: Stay safe under panic: Rust programming with affine MPST
-//
-// global protocol Proto(role A, role C, role S)
-// {
-//     choice at S
-//     {
-//         login(i32) from S to C;
-//         password(i32) from C to A;
-//         choice at A
-//         {
-//              Auth(i32) from A to S;
-//              Auth(i32) from S to C;
-//         }
-//         or
-//         {
-//              again(i32) from A to S;
-//              again(i32) from S to C;
-//         }
-//     }
-//     or
-//     {
-//         cancel(i32) from S to C;
-//         quit(i32) from C to A;
-//     }
-// }
-
-use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    executor, try_join,
-};
+use futures::{executor, try_join};
 use std::error::Error;
-#[allow(unused_imports)]
-use telltale::{
-    channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
-    Select, Send,
-};
+use telltale::try_session;
+use telltale_macros::choreography;
 
-type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
-
-// ---------------------------------------------------------------------------
-// Roles
-// ---------------------------------------------------------------------------
-
-#[derive(Roles)]
-#[allow(dead_code)]
-struct Roles {
-    c: C,
-    s: S,
-    a: A,
-}
-
-#[derive(Role)]
-#[message(Label)]
-struct C {
-    #[route(S)]
-    s: Channel,
-    #[route(A)]
-    a: Channel,
-}
-
-#[derive(Role)]
-#[message(Label)]
-struct S {
-    #[route(C)]
-    c: Channel,
-    #[route(A)]
-    a: Channel,
-}
-
-#[derive(Role)]
-#[message(Label)]
-struct A {
-    #[route(C)]
-    c: Channel,
-    #[route(S)]
-    s: Channel,
-}
-
-// ---------------------------------------------------------------------------
-// Messages
-// ---------------------------------------------------------------------------
-
-#[derive(Message)]
-enum Label {
-    Login(Login),
-    Cancel(Cancel),
-    Password(Password),
-    Again(Again),
-    Auth(Auth),
-    Quit(Quit),
-}
-
-struct Login(i32);
-struct Cancel(i32);
-struct Password(i32);
-struct Again(i32);
-struct Auth(i32);
-
-#[allow(dead_code)]
-struct Quit(i32);
-
-// ---------------------------------------------------------------------------
-// Session types — Client (C)
-// ---------------------------------------------------------------------------
-
-#[session]
-type ProtoC = Branch<S, ProtoC0>;
-
-#[session]
-enum ProtoC0 {
-    Cancel(Cancel, Send<A, Quit, End>),
-    Login(Login, Send<A, Password, Branch<S, ProtoC3>>),
-}
-
-#[session]
-enum ProtoC3 {
-    Auth(Auth, End),
-    Again(Again, End),
-}
-
-// ---------------------------------------------------------------------------
-// Session types — Server (S)
-// ---------------------------------------------------------------------------
-
-#[session]
-type ProtoS = Select<C, ProtoS0>;
-
-#[session]
-enum ProtoS0 {
-    Cancel(Cancel, End),
-    #[allow(dead_code)]
-    Login(Login, Branch<A, ProtoS2>),
-}
-
-#[session]
-enum ProtoS2 {
-    Again(Again, Send<C, Again, End>),
-    Auth(Auth, Send<C, Auth, End>),
-}
-
-// ---------------------------------------------------------------------------
-// Session types — Authenticator (A)
-// ---------------------------------------------------------------------------
-
-#[session]
-type ProtoA = Branch<C, ProtoA0>;
-
-#[session]
-enum ProtoA0 {
-    Password(Password, Select<S, ProtoA4>),
-    Quit(Quit, End),
-}
-
-#[session]
-enum ProtoA4 {
-    Again(Again, End),
-    Auth(Auth, End),
+choreography! {
+    protocol OAuth {
+        roles S, C, A;
+        choice S at {
+            | Login => {
+                S -> C : LoginReq(i32);
+                choice C at {
+                    | Proceed => {
+                        C -> A : Password(i32);
+                        choice A at {
+                            | Granted => {
+                                A -> S : Approved(i32);
+                                choice S at {
+                                    | AuthOk => {
+                                        S -> C : AuthNotice(i32);
+                                    }
+                                }
+                            }
+                            | Denied => {
+                                A -> S : Rejected(i32);
+                                choice S at {
+                                    | AuthFail => {
+                                        S -> C : FailNotice(i32);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            | Cancel => {
+                S -> C : CancelReq(i32);
+                choice C at {
+                    | Abort => {
+                        C -> A : Quit(i32);
+                    }
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -171,24 +89,30 @@ enum ProtoA4 {
 // ---------------------------------------------------------------------------
 
 async fn client(role: &mut C) -> Result<(), Box<dyn Error>> {
-    try_session(role, |s: ProtoC<'_, _>| async {
+    try_session(role, |s: CSession<'_, _>| async {
         match s.branch().await? {
-            ProtoC0::Cancel(Cancel(i), continuation) => {
-                let s = continuation.send(Quit(i)).await?;
-                Ok(((), s))
-            }
-            ProtoC0::Login(Login(i), continuation) => {
-                let s = continuation.send(Password(i)).await?;
+            CChoice1::Login(Login, cont) => {
+                let (LoginReq(i), s) = cont.receive().await?;
+                let s = s.select(Proceed).await?;
+                let s = s.send(Password(i)).await?;
                 match s.branch().await? {
-                    ProtoC3::Auth(_i, end) => {
+                    CChoice3::AuthOk(AuthOk, cont) => {
+                        let (AuthNotice(_i), end) = cont.receive().await?;
                         println!("Authenticated");
                         Ok(((), end))
                     }
-                    ProtoC3::Again(_i, end) => {
+                    CChoice3::AuthFail(AuthFail, cont) => {
+                        let (FailNotice(_i), end) = cont.receive().await?;
                         println!("Authentication failed");
                         Ok(((), end))
                     }
                 }
+            }
+            CChoice1::Cancel(Cancel, cont) => {
+                let (CancelReq(i), s) = cont.receive().await?;
+                let s = s.select(Abort).await?;
+                let s = s.send(Quit(i)).await?;
+                Ok(((), s))
             }
         }
     })
@@ -196,38 +120,49 @@ async fn client(role: &mut C) -> Result<(), Box<dyn Error>> {
 }
 
 async fn auth(role: &mut A) -> Result<(), Box<dyn Error>> {
-    try_session(role, |s: ProtoA<'_, _>| async {
+    try_session(role, |s: ASession<'_, _>| async {
         match s.branch().await? {
-            ProtoA0::Password(Password(i), continuation) => {
+            AChoice1::Proceed(Proceed, cont) => {
+                let (Password(i), s) = cont.receive().await?;
                 if i == 10 {
                     // Password is 10
-                    let end = continuation.select(Auth(i)).await?;
+                    let s = s.select(Granted).await?;
+                    let end = s.send(Approved(i)).await?;
                     Ok(((), end))
                 } else {
-                    let end = continuation.select(Again(i)).await?;
+                    let s = s.select(Denied).await?;
+                    let end = s.send(Rejected(i)).await?;
                     Ok(((), end))
                 }
             }
-            ProtoA0::Quit(_i, end) => Ok(((), end)),
+            AChoice1::Abort(Abort, cont) => {
+                let (Quit(_i), end) = cont.receive().await?;
+                Ok(((), end))
+            }
         }
     })
     .await
 }
 
 async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
-    try_session(role, |s: ProtoS<'_, _>| async {
+    try_session(role, |s: SSession<'_, _>| async {
         // Change here for something != 10, so that authentication fails.
         let i: i32 = 10;
 
         // For the sake of the example, assume that we never Cancel.
-        let continuation = s.select(Login(i)).await?;
-        match continuation.branch().await? {
-            ProtoS2::Auth(Auth(i), cont) => {
-                let end = cont.send(Auth(i)).await?;
+        let s = s.select(Login).await?;
+        let s = s.send(LoginReq(i)).await?;
+        match s.branch().await? {
+            SChoice2::Granted(Granted, cont) => {
+                let (Approved(i), s) = cont.receive().await?;
+                let s = s.select(AuthOk).await?;
+                let end = s.send(AuthNotice(i)).await?;
                 Ok(((), end))
             }
-            ProtoS2::Again(Again(i), cont) => {
-                let end = cont.send(Again(i)).await?;
+            SChoice2::Denied(Denied, cont) => {
+                let (Rejected(i), s) = cont.receive().await?;
+                let s = s.select(AuthFail).await?;
+                let end = s.send(FailNotice(i)).await?;
                 Ok(((), end))
             }
         }
@@ -240,12 +175,12 @@ async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
 // ---------------------------------------------------------------------------
 
 fn main() {
-    let mut roles = Roles::default();
+    let Roles(mut s, mut c, mut a) = Roles::default();
     executor::block_on(async {
         try_join!(
-            client(&mut roles.c),
-            server(&mut roles.s),
-            auth(&mut roles.a)
+            client(&mut c),
+            server(&mut s),
+            auth(&mut a)
         )
         .unwrap();
     });

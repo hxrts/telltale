@@ -7,7 +7,7 @@
 
 use proc_macro2::{Delimiter, Ident, Span, TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use syn::{Error, LitStr, Result};
 use telltale_parser::ast::{Branch, Choreography, LocalType, MessageType, Protocol, Role};
 
@@ -391,15 +391,9 @@ fn collect_choice_surfaces(
     for branch in branches {
         let key = branch.label.to_string();
         match labels.get(&key) {
-            Some(LabelSurface::Message { .. }) => {
-                return Err(Error::new(
-                    branch.label.span(),
-                    format!(
-                        "choice label '{}' conflicts with a message name in the same protocol",
-                        key
-                    ),
-                ));
-            }
+            // When a message with the same name already exists, the choice
+            // label reuses the message struct (the payload carries the label).
+            Some(LabelSurface::Message { .. }) => {}
             Some(LabelSurface::Choice { .. }) | None => {
                 labels.entry(key).or_insert_with(|| LabelSurface::Choice {
                     name: branch.label.clone(),
@@ -442,13 +436,15 @@ fn insert_message_surface(
             }
         }
         Some(LabelSurface::Choice { .. }) => {
-            return Err(Error::new(
-                message.name.span(),
-                format!(
-                    "message '{}' conflicts with a choice label in the same protocol",
-                    key
-                ),
-            ));
+            // Promote the choice label to a message — the payload-carrying
+            // message struct doubles as the choice dispatch label.
+            labels.insert(
+                key,
+                LabelSurface::Message {
+                    name: message.name.clone(),
+                    payload,
+                },
+            );
         }
         None => {
             labels.insert(
@@ -488,6 +484,11 @@ struct ChoiceCodegenState {
     role_name: Ident,
     next_choice_id: usize,
     choice_defs: Vec<TokenStream>,
+    /// Maps `rec` labels to the session-type token streams they produce.
+    /// Populated when entering a `Rec` node so that inner `Var`
+    /// references resolve to e.g. `Select<Peer, Enum>` or
+    /// `Branch<Peer, Enum>`.
+    rec_labels: HashMap<String, TokenStream>,
 }
 
 impl ChoiceCodegenState {
@@ -496,6 +497,7 @@ impl ChoiceCodegenState {
             role_name,
             next_choice_id: 0,
             choice_defs: Vec::new(),
+            rec_labels: HashMap::new(),
         }
     }
 
@@ -532,20 +534,53 @@ impl ChoiceCodegenState {
                 Ok(quote! { ::telltale::Branch<#from_name, #enum_name> })
             }
             LocalType::End => Ok(quote! { ::telltale::End }),
-            LocalType::Rec { body, .. } => self.render_local_type(body),
-            LocalType::Var(label) => Ok(label.to_token_stream()),
-            LocalType::Loop { .. } => Err(Error::new(
-                Span::call_site(),
-                "loop session code generation is not yet supported by telltale-macros",
-            )),
-            LocalType::LocalChoice { .. } => Err(Error::new(
-                Span::call_site(),
-                "local-only choice session code generation is not yet supported by telltale-macros",
-            )),
-            LocalType::Timeout { .. } => Err(Error::new(
-                Span::call_site(),
-                "timeout session code generation is not yet supported by telltale-macros",
-            )),
+            LocalType::Rec { label, body } => {
+                // Pre-register the session type that the body will
+                // produce, so that inner `Var` references resolve to
+                // `Select<Peer, Enum>` or `Branch<Peer, Enum>` rather
+                // than a bare enum name.
+                let predicted_id = self.next_choice_id + 1;
+                let predicted_name = format_ident!("{}Choice{}", self.role_name, predicted_id);
+                let predicted_tokens = match body.as_ref() {
+                    LocalType::Select { to, .. } => {
+                        let to_name = to.name();
+                        quote! { ::telltale::Select<#to_name, #predicted_name> }
+                    }
+                    LocalType::Branch { from, .. } => {
+                        let from_name = from.name();
+                        quote! { ::telltale::Branch<#from_name, #predicted_name> }
+                    }
+                    _ => predicted_name.to_token_stream(),
+                };
+                self.rec_labels.insert(label.to_string(), predicted_tokens);
+                self.render_local_type(body)
+            }
+            LocalType::Var(label) => {
+                if let Some(tokens) = self.rec_labels.get(&label.to_string()) {
+                    Ok(tokens.clone())
+                } else {
+                    Ok(label.to_token_stream())
+                }
+            }
+            LocalType::Loop { body, .. } => {
+                // Bounded/unbounded loops lower to their body. The runtime
+                // controls iteration; the session type describes one pass.
+                self.render_local_type(body)
+            }
+            LocalType::LocalChoice { branches } => {
+                // Local decisions without communication still need a choice
+                // enum so the implementation can branch.  We generate a
+                // `Select`-style enum without a partner role; the runtime
+                // dispatcher uses it structurally.
+                let enum_name = self.push_choice_enum(branches)?;
+                Ok(quote! { ::telltale::Select<Self, #enum_name> })
+            }
+            LocalType::Timeout { body, .. } => {
+                // Timeout is a runtime concern. The session type for the
+                // happy path is the body; timeout/cancel paths are handled
+                // by the handler at runtime.
+                self.render_local_type(body)
+            }
         }
     }
 
