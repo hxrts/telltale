@@ -4,12 +4,12 @@ import Runtime.Proofs.TheoremPack.Artifacts
 /-! # Theorem Pack Building
 
 `ProtocolMachineTheoremPack` structure bundling all optional proof artifacts for
-a VM invariant space, enabling certificate generation and validation. -/
+a protocol machine invariant space, enabling certificate generation and validation. -/
 
 /-
 The Problem. Protocol verification may prove various properties (FLP,
 CAP, termination, envelope adherence, etc.). We need a single structure
-bundling all available proof artifacts for a given VM configuration.
+bundling all available proof artifacts for a given protocol machine configuration.
 
 Solution Structure. Define `ProtocolMachineTheoremPack` with optional fields for
 each artifact type. The pack is parameterized by a `ProtocolMachineInvariantSpace-
@@ -278,7 +278,7 @@ def buildProtocolMachineTheoremPack
           , failureEnvelopeMaximality := p.failureEnvelopeMaximality
           }
 
-  -- Builder: VM Envelope Families
+  -- Builder: protocol machine Envelope Families
 
   let vmEnvelopeAdherence? :=
     match space.distributed.vmEnvelopeAdherence? with

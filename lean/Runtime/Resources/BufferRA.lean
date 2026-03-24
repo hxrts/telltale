@@ -19,7 +19,7 @@ Ghost state for bounded buffers and refinement chain.
 Dependencies: IrisExtractionInstance. -/
 
 /-
-The Problem. Buffers in the VM have multiple backing implementations (shared memory,
+The Problem. Buffers in the protocol machine have multiple backing implementations (shared memory,
 reliable transport, unreliable transport with acks) and bounded capacities. We need
 ghost state to track buffer ownership and a refinement chain connecting implementations.
 

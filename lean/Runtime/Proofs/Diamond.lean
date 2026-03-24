@@ -6,11 +6,11 @@ import Init.Data.List.Perm
 /-! # Cross-Session Diamond Property
 
 Proves that executing two coroutines on disjoint sessions in either order yields
-VM states that are equivalent modulo trace ordering (`VMStateEqModTrace`).
+protocol machine states that are equivalent modulo trace ordering (`ProtocolMachineStateEqModTrace`).
 
 ## Main definitions
 
-- `VMStateEqModTrace`: State equivalence ignoring `obsTrace` ordering
+- `ProtocolMachineStateEqModTrace`: State equivalence ignoring `obsTrace` ordering
 - `update_coro_comm`: Setting distinct coroutine array indices commutes
 - `cross_session_diamond`: The diamond property statement
 - `cross_session_diamond_holds`: The main theorem
@@ -43,7 +43,7 @@ shown to commute to ensure deterministic behavior regardless of scheduling order
 Naive case analysis over instruction pairs would require 21+ cases.
 
 Solution Structure. Uses the frame rule: session-local operations only affect their
-footprint, and disjoint footprints imply commutativity. Defines `VMStateEqModTrace`
+footprint, and disjoint footprints imply commutativity. Defines `ProtocolMachineStateEqModTrace`
 for state equivalence modulo trace ordering, proves `update_coro_comm` for array
 operations, then derives the diamond property from the frame rule.
 -/
@@ -55,37 +55,37 @@ universe u
 
 /-! ## State Equivalence Modulo Trace Ordering -/
 
-/-- Two VM states are equivalent modulo trace ordering if they agree on all
+/-- Two protocol machine states are equivalent modulo trace ordering if they agree on all
     computational fields and their observable traces are permutations.
     This is the correct notion of commutativity for concurrent steps:
     the trace is a multiset of ticked events, not an ordered sequence. -/
-def VMStateEqModTrace {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def ProtocolMachineStateEqModTrace {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st1 st2 : VMState ι γ π ε ν) : Prop :=
+    (st1 st2 : ProtocolMachineState ι γ π ε ν) : Prop :=
   { st1 with obsTrace := [] } = { st2 with obsTrace := [] } ∧
   st1.obsTrace.Perm st2.obsTrace
 
-theorem VMStateEqModTrace.refl {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem ProtocolMachineStateEqModTrace.refl {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : VMStateEqModTrace st st :=
+    (st : ProtocolMachineState ι γ π ε ν) : ProtocolMachineStateEqModTrace st st :=
   ⟨Eq.refl _, List.Perm.refl _⟩
 
-theorem VMStateEqModTrace.of_eq {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem ProtocolMachineStateEqModTrace.of_eq {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    {st1 st2 : VMState ι γ π ε ν} (h : st1 = st2) : VMStateEqModTrace st1 st2 := by
-  subst h; exact VMStateEqModTrace.refl _
+    {st1 st2 : ProtocolMachineState ι γ π ε ν} (h : st1 = st2) : ProtocolMachineStateEqModTrace st1 st2 := by
+  subst h; exact ProtocolMachineStateEqModTrace.refl _
 
 /-! ## Array.set Commutativity -/
 
@@ -111,7 +111,7 @@ theorem update_coro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (c1 c2 : CoroutineId)
+    (st : ProtocolMachineState ι γ π ε ν) (c1 c2 : CoroutineId)
     (co1 co2 : CoroutineState γ ε)
     (hne : c1 ≠ c2) (h1 : c1 < st.coroutines.size) (h2 : c2 < st.coroutines.size) :
     updateCoro (updateCoro st c1 co1) c2 co2 =
@@ -131,7 +131,7 @@ theorem update_coro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
+    (st : ProtocolMachineState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
     (updateCoro st c co).programs = st.programs := by
   unfold updateCoro; split <;> rfl
 
@@ -141,7 +141,7 @@ theorem update_coro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
+    (st : ProtocolMachineState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
     (updateCoro st c co).config = st.config := by
   unfold updateCoro; split <;> rfl
 
@@ -151,7 +151,7 @@ theorem update_coro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
+    (st : ProtocolMachineState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
     (updateCoro st c co).monitor = st.monitor := by
   unfold updateCoro; split <;> rfl
 
@@ -161,7 +161,7 @@ theorem update_coro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
+    (st : ProtocolMachineState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
     (updateCoro st c co).clock = st.clock := by
   unfold updateCoro; split <;> rfl
 
@@ -173,7 +173,7 @@ theorem update_coro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
+    (st : ProtocolMachineState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
     (updateCoro st c co).sessions = st.sessions := by
   unfold updateCoro; split <;> rfl
 
@@ -183,7 +183,7 @@ theorem update_coro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
+    (st : ProtocolMachineState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
     (updateCoro st c co).buffers = st.buffers := by
   unfold updateCoro; split <;> rfl
 
@@ -193,7 +193,7 @@ theorem update_coro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
+    (st : ProtocolMachineState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
     (updateCoro st c co).obsTrace = st.obsTrace := by
   unfold updateCoro; split <;> rfl
 
@@ -203,7 +203,7 @@ theorem update_coro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
+    (st : ProtocolMachineState ι γ π ε ν) (c : CoroutineId) (co : CoroutineState γ ε) :
     (updateCoro st c co).coroutines.size = st.coroutines.size := by
   unfold updateCoro; split <;> simp [Array.size_set]
 
@@ -216,7 +216,7 @@ theorem update_coro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (c1 c2 : CoroutineId)
+    (st : ProtocolMachineState ι γ π ε ν) (c1 c2 : CoroutineId)
     (co : CoroutineState γ ε)
     (hne : c1 ≠ c2) (h1 : c1 < st.coroutines.size) :
     (updateCoro st c1 co).coroutines[c2]? = st.coroutines[c2]? := by
@@ -236,7 +236,7 @@ theorem update_coro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : appendEvent st none = st := by
+    (st : ProtocolMachineState ι γ π ε ν) : appendEvent st none = st := by
   simp [appendEvent]
 
 @[simp] theorem append_event_internal {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -245,7 +245,7 @@ theorem update_coro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) :
+    (st : ProtocolMachineState ι γ π ε ν) :
     appendEvent st (some StepEvent.internal) = st := by
   simp [appendEvent]
 
@@ -258,7 +258,7 @@ theorem append_event_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (ev : Option (StepEvent ε)) :
+    (st : ProtocolMachineState ι γ π ε ν) (ev : Option (StepEvent ε)) :
     { (appendEvent st ev) with obsTrace := [] } = { st with obsTrace := [] } := by
   cases ev with
   | none => simp [appendEvent]
@@ -276,7 +276,7 @@ theorem append_event_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (ev : Option (StepEvent ε)) :
+    (st : ProtocolMachineState ι γ π ε ν) (ev : Option (StepEvent ε)) :
     (appendEvent st ev).coroutines = st.coroutines := by
   cases ev with
   | none => simp [appendEvent]
@@ -293,7 +293,7 @@ theorem append_event_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (ev : Option (StepEvent ε)) :
+    (st : ProtocolMachineState ι γ π ε ν) (ev : Option (StepEvent ε)) :
     (appendEvent st ev).programs = st.programs := by
   cases ev with
   | none => simp [appendEvent]
@@ -308,7 +308,7 @@ theorem append_event_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (ev : Option (StepEvent ε)) :
+    (st : ProtocolMachineState ι γ π ε ν) (ev : Option (StepEvent ε)) :
     (appendEvent st ev).config = st.config := by
   cases ev with
   | none => simp [appendEvent]
@@ -323,7 +323,7 @@ theorem append_event_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (ev : Option (StepEvent ε)) :
+    (st : ProtocolMachineState ι γ π ε ν) (ev : Option (StepEvent ε)) :
     (appendEvent st ev).monitor = st.monitor := by
   cases ev with
   | none => simp [appendEvent]
@@ -340,7 +340,7 @@ theorem append_event_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (ev : Option (StepEvent ε)) :
+    (st : ProtocolMachineState ι γ π ε ν) (ev : Option (StepEvent ε)) :
     (appendEvent st ev).sessions = st.sessions := by
   cases ev with
   | none => simp [appendEvent]
@@ -355,7 +355,7 @@ theorem append_event_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (ev : Option (StepEvent ε)) :
+    (st : ProtocolMachineState ι γ π ε ν) (ev : Option (StepEvent ε)) :
     (appendEvent st ev).buffers = st.buffers := by
   cases ev with
   | none => simp [appendEvent]
@@ -375,7 +375,7 @@ def sessionOf {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (cid : CoroutineId) : SessionId :=
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) : SessionId :=
   match st.coroutines[cid]? with
   | none => 0
   | some c =>
@@ -384,22 +384,22 @@ def sessionOf {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
       | ep :: _ => ep.sid
 
 /-- Cross-session diamond property: executing two coroutines on disjoint
-    sessions in either order reaches equivalent VM states (modulo trace ordering).
-    This is the VM-level analogue of `session_isolation`. -/
+    sessions in either order reaches equivalent protocol machine states (modulo trace ordering).
+    This is the protocol-machine-level analogue of `session_isolation`. -/
 def cross_session_diamond {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (_hwf : WFVMState st)
+    (st : ProtocolMachineState ι γ π ε ν) (_hwf : WFVMState st)
     (c1 c2 : CoroutineId) (_hne : c1 ≠ c2)
     (_hdisj : SessionDisjoint st (sessionOf st c1) (sessionOf st c2)) : Prop :=
   let (st_c1, _) := execInstr st c1
   let (st_c1_c2, _) := execInstr st_c1 c2
   let (st_c2, _) := execInstr st c2
   let (st_c2_c1, _) := execInstr st_c2 c1
-  VMStateEqModTrace st_c1_c2 st_c2_c1
+  ProtocolMachineStateEqModTrace st_c1_c2 st_c2_c1
 
 /-! ## execInstr Characterization Lemmas -/
 
@@ -410,7 +410,7 @@ theorem exec_instr_not_found {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (c : CoroutineId)
+    (st : ProtocolMachineState ι γ π ε ν) (c : CoroutineId)
     (h : st.coroutines[c]? = none) :
     (execInstr st c).1 = st := by
   unfold execInstr
@@ -423,7 +423,7 @@ theorem exec_at_pc_done {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (c : CoroutineId) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (c : CoroutineId) (coro : CoroutineState γ ε)
     (hd : coro.status = .done) :
     (execAtPC st c coro).1 = st := by
   unfold execAtPC
@@ -436,7 +436,7 @@ theorem exec_at_pc_faulted {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (c : CoroutineId) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (c : CoroutineId) (coro : CoroutineState γ ε)
     (err : Fault γ) (hf : coro.status = .faulted err) :
     (execAtPC st c coro).1 = st := by
   unfold execAtPC
@@ -472,7 +472,7 @@ theorem cross_session_diamond_holds {ι γ π ε ν : Type u} [IdentityModel ι]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (hwf : WFVMState st)
+    (st : ProtocolMachineState ι γ π ε ν) (hwf : WFVMState st)
     (c1 c2 : CoroutineId) (hne : c1 ≠ c2)
     (hdisj : SessionDisjoint st (sessionOf st c1) (sessionOf st c2))
     (hCoreEq :

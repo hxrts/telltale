@@ -42,14 +42,14 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | ClassicalAnalysis |     3 |   1,128 | Real analysis concrete models for classical transport      |
 | Distributed    |    59 |   7,266 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   170 |  40,077 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   170 |  32,073 | VM, Iris backend via iris-lean, resource algebras, WP      |
+| Runtime        |   170 |  32,073 | Protocol machine, Iris backend via iris-lean, resource algebras, WP      |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
 | **Total**      | **649** | **131,503** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
 ```
-Layer 8: Runtime          → VM, iris-lean backend, resource algebras, WP, adequacy
+Layer 8: Runtime          → Protocol machine, iris-lean backend, resource algebras, WP, adequacy
 Layer 7: Protocol         → Async MPST, coherence, typing, preservation, monitoring, deployment
 Layer 6: Distributed      → Distributed assumptions, validation, FLP/CAP theorem packaging
 Layer 5: Classical        → Transported theorems from queueing/probability theory
@@ -577,7 +577,7 @@ Protocol-specific instantiation of the classical transport framework.
 ## Runtime
 
 **Root Module:** `Runtime.lean`
-**Description:** VM definition, Iris separation logic backend via iris-lean, resource algebras, session invariants, WP rules, and adequacy.
+**Description:** Protocol machine definition, Iris separation logic backend via iris-lean, resource algebras, session invariants, WP rules, and adequacy.
 
 ### Iris Bridge (iris-lean integration)
 
@@ -591,7 +591,7 @@ Consolidated interface to iris-lean separation logic via the Entropy trust bound
 
 See [Entropy](#entropy) section for full trust boundary documentation.
 
-### VM Model (VM/Model/)
+### Protocol Machine Model (ProtocolMachine/Model/)
 
 | File | Lines | Description |
 |------|------:|-------------|
@@ -607,14 +607,14 @@ See [Entropy](#entropy) section for full trust boundary documentation.
 | SemanticObjects/SemanticHandoffLemmas.lean | 153 | One-owner-before/after, publication revocation, and delegation / envelope bridge lemmas |
 | SemanticObjects.lean | 9 | Re-export facade for semantic object implementation + invariants |
 | TypeClasses.lean | 251 | Identity, guard, persistence, effect, verification model typeclasses |
-| CompileLocalTypeR.lean | 190 | Compiler from LocalTypeR to VM bytecode instructions |
+| CompileLocalTypeR.lean | 190 | Compiler from LocalTypeR to protocol machine bytecode instructions |
 | Knowledge.lean | 30 | Knowledge base and fact management |
 | Violation.lean | 29 | Violation policy and fault types |
 | SchedulerTypes.lean | 26 | Scheduler type definitions |
-| UnitModel.lean | 184 | Minimal computable instances for all VM domain typeclasses |
+| UnitModel.lean | 184 | Minimal computable instances for all protocol machine domain typeclasses |
 | OutputCondition.lean | 54 | Output-condition model for commit gating |
 
-### VM Semantics (VM/Semantics/)
+### Protocol Machine Semantics (ProtocolMachine/Semantics/)
 
 | File | Lines | Description |
 |------|------:|-------------|
@@ -629,14 +629,14 @@ See [Entropy](#entropy) section for full trust boundary documentation.
 | ExecSteps.lean | 54 | Multi-step execution wrapper |
 | InstrSpec.lean | 324 | Denotational specs for 8 instruction types |
 
-### VM Runtime (VM/Runtime/)
+### Protocol Machine Runtime (ProtocolMachine/Runtime/)
 
 Executable runtime surface used for Lean↔Rust parity. Proof theorems and proof-only
-predicate vocabularies now live under `Runtime/Proofs/VM/`.
+predicate vocabularies now live under `Runtime/Proofs/ProtocolMachine/`.
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Loader.lean | 234 | Dynamic choreography loading into running VM state (result-typed admission + compatibility API) |
+| Loader.lean | 234 | Dynamic choreography loading into running protocol machine state (result-typed admission + compatibility API) |
 | Runner.lean | 104 | N-concurrent scheduler-driven execution loop |
 | ThreadedRunner.lean | 445 | V2: Deterministic threaded execution with wave planning |
 | Scheduler.lean | 294 | Process scheduler with fairness and priority |
@@ -647,7 +647,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | Failure/Transitions.lean | 201 | Deterministic recovery transition helpers and mode classifiers |
 | Json.lean | 145 | JSON serialization for runtime values and trace events |
 
-### VM Composition (VM/Composition/)
+### Protocol Machine Composition (ProtocolMachine/Composition/)
 
 | File | Lines | Description |
 |------|------:|-------------|
@@ -684,28 +684,28 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | Transport/Transport.lean | 232 | Abstract transport layer with handler specs |
 | Cost/Credits.lean | 56 | Cost credit resource algebra |
 
-### Proofs/VM (VM Instruction Proofs)
+### Proofs/ProtocolMachine (Instruction Proofs)
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Proofs/VM/InstrSpec.lean | 1,415 | Preservation theorems for all 8 instruction types, quotient-respecting variants |
+| Proofs/ProtocolMachine/InstrSpec.lean | 1,415 | Preservation theorems for all 8 instruction types, quotient-respecting variants |
 | Proofs/BridgeStrengthening.lean | 143 | Protocol-machine bridge premise bundle (`ProtocolMachineBridgePremises`), handler local/trace/step typing bridge, composed `ConfigEquiv`→`EffectBisim`→observational transport |
-| Proofs/VM/Scheduler.lean | 265 | Scheduler proof infrastructure, including single-lane/policy determinism compatibility lemmas |
-| Proofs/VM/DomainComposition.lean | 49 | Domain composition and guard chain proofs |
-| Proofs/VM/ExecOwnership.lean | 22 | Ownership transfer proof bridge |
-| Proofs/VM/LoadChoreography.lean | 83 | Loader monotonicity and choreography-load disjointness proofs |
-| Proofs/VM/Knowledge.lean | 20 | Flow-policy serialization roundtrip theorems moved from `Runtime.VM.Model.Knowledge` |
-| Proofs/VM/Monitor.lean | 24 | Monitor soundness/identity preservation lemmas moved from `Runtime.VM.Runtime.Monitor` |
-| Proofs/VM/Failure.lean | 53 | Retry/deterministic recovery lemmas moved from failure runtime modules |
-| Proofs/VM/FailurePredicates.lean | 135 | Recovery predicate vocabulary (proof-only) moved from VM failure runtime |
-| Proofs/VM/ProgramWitnesses.lean | 21 | Proof-only verified image witnesses moved from `Runtime.VM.Model.Program` |
-| Proofs/VM/Speculation.lean | 84 | V2: Speculation correctness (depth monotonicity, abort restore, join cleanup) |
-| Proofs/VM/InstrSpec/ConfigEquivSendRecv.lean | 338 | V2: Send/recv configuration equivalence |
-| Proofs/VM/InstrSpec/ConfigEquivSelectBranch.lean | 341 | V2: Select/branch configuration equivalence |
-| Proofs/VM/InstrSpec/ConfigEquivAcquire.lean | 240 | V2: Acquire configuration equivalence |
-| Proofs/VM/InstrSpec/ConfigEquivOpenCloseTransfer.lean | 493 | V2: Open/close/transfer configuration equivalence |
-| Proofs/VM/InstrSpec/ErasureExactness.lean | 357 | V2: Erasure exactness proofs |
-| Proofs/VM/InstrSpec/Preservation.lean | 290 | V2: Instruction preservation proofs |
+| Proofs/ProtocolMachine/Scheduler.lean | 265 | Scheduler proof infrastructure, including single-lane/policy determinism compatibility lemmas |
+| Proofs/ProtocolMachine/DomainComposition.lean | 49 | Domain composition and guard chain proofs |
+| Proofs/ProtocolMachine/ExecOwnership.lean | 22 | Ownership transfer proof bridge |
+| Proofs/ProtocolMachine/LoadChoreography.lean | 83 | Loader monotonicity and choreography-load disjointness proofs |
+| Proofs/ProtocolMachine/Knowledge.lean | 20 | Flow-policy serialization roundtrip theorems moved from `Runtime.protocol machine.Model.Knowledge` |
+| Proofs/ProtocolMachine/Monitor.lean | 24 | Monitor soundness/identity preservation lemmas moved from `Runtime.protocol machine.Runtime.Monitor` |
+| Proofs/ProtocolMachine/Failure.lean | 53 | Retry/deterministic recovery lemmas moved from failure runtime modules |
+| Proofs/ProtocolMachine/FailurePredicates.lean | 135 | Recovery predicate vocabulary (proof-only) moved from protocol machine failure runtime |
+| Proofs/ProtocolMachine/ProgramWitnesses.lean | 21 | Proof-only verified image witnesses moved from `Runtime.protocol machine.Model.Program` |
+| Proofs/ProtocolMachine/Speculation.lean | 84 | V2: Speculation correctness (depth monotonicity, abort restore, join cleanup) |
+| Proofs/ProtocolMachine/InstrSpec/ConfigEquivSendRecv.lean | 338 | V2: Send/recv configuration equivalence |
+| Proofs/ProtocolMachine/InstrSpec/ConfigEquivSelectBranch.lean | 341 | V2: Select/branch configuration equivalence |
+| Proofs/ProtocolMachine/InstrSpec/ConfigEquivAcquire.lean | 240 | V2: Acquire configuration equivalence |
+| Proofs/ProtocolMachine/InstrSpec/ConfigEquivOpenCloseTransfer.lean | 493 | V2: Open/close/transfer configuration equivalence |
+| Proofs/ProtocolMachine/InstrSpec/ErasureExactness.lean | 357 | V2: Erasure exactness proofs |
+| Proofs/ProtocolMachine/InstrSpec/Preservation.lean | 290 | V2: Instruction preservation proofs |
 
 ### Adequacy (V2 Envelope-Based)
 
@@ -725,7 +725,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 ### Proofs
 | Proofs/Contracts/RuntimeTheorems.lean | 493 | Runtime theorem facade unifying proof exports |
 | Proofs/Contracts/DeterminismApi.lean | 105 | Determinism profile artifacts and hypothesis bundles for runtime gating |
-| Proofs/Contracts/RuntimeContracts.lean | 274 | Runtime admission/capability contract surfaces for theorem-guided VM policy |
+| Proofs/Contracts/RuntimeContracts.lean | 274 | Runtime admission/capability contract surfaces for theorem-guided protocol machine policy |
 | Proofs/Concurrency.lean | 109 | Iris-backed N-invariance and policy-invariance proofs |
 | Proofs/ConcurrencyThreaded.lean | 102 | V2: Threaded concurrency proofs with wave certification |
 | Proofs/SchedulerTheoremPack.lean | 200 | V2: Scheduler theorem bundle for runtime admission |
@@ -782,7 +782,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | Proofs/SchedulingBoundCore.lean | 424 | Core k-fair scheduler termination bounds |
 | Proofs/SchedulingBoundTightness.lean | 328 | Tightness proofs and round-robin corollary |
 | Proofs/Diamond.lean | 468 | Cross-session diamond lemmas and main confluence theorem |
-| Proofs/Examples/DistributedProfiles.lean | 115 | End-to-end VM examples: profile attachment auto-materializes distributed theorem artifacts |
+| Proofs/Examples/DistributedProfiles.lean | 115 | End-to-end protocol machine examples: profile attachment auto-materializes distributed theorem artifacts |
 | Proofs/Examples/ComposedProofPack.lean | 347 | End-to-end theorem-pack example showing semantic-object witness bundles flowing through the canonical composition and inventory path |
 | Proofs/Examples/InvariantBundle.lean | 74 | One-shot invariant-bundle examples for liveness/progress, FLP/CAP, and classical artifact derivation |
 
@@ -793,7 +793,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | Examples/SimpleProtocol.lean | 127 | Simple two-party protocol example |
 | Tests/Main.lean | 98 | Runtime test harness |
 | Tests/SimulatorParity.lean | 54 | Lean/Rust simulator parity tests |
-| Tests/ProtocolMachineRunner.lean | 116 | JSON-driven VM runner (stdin choreographies, stdout traces) |
+| Tests/ProtocolMachineRunner.lean | 116 | JSON-driven protocol machine runner (stdin choreographies, stdout traces) |
 
 ---
 
@@ -837,7 +837,7 @@ telltale (package)
 ├── ClassicalLayer   ← Transported queueing/probability theorem families + transport API
 ├── Distributed      ← Distributed theorem families (FLP/CAP, quorum safety, liveness, ordering, DA, coordination)
 ├── Protocol         ← Async MPST, coherence, preservation, monitoring
-├── Runtime          ← VM, Iris backend, WP, adequacy (default target)
+├── Runtime          ← Protocol machine, Iris backend, WP, adequacy (default target)
 └── Entropy          ← Trust boundary: ClassicalAnalysis + IrisExtraction APIs and instances
 ```
 
@@ -849,7 +849,7 @@ Four executables defined in lakefile.lean:
 
 | Executable | Root Module | Purpose |
 |------------|-------------|---------|
-| `runtime_tests` | `Runtime.Tests.Main` | VM example tests |
+| `runtime_tests` | `Runtime.Tests.Main` | protocol machine example tests |
 | `simulator_parity_tests` | `Runtime.Tests.SimulatorParity` | Lean/Rust simulator parity tests |
 | `protocol_machine_runner` | `Runtime.Tests.ProtocolMachineRunner` | Execute choreographies, emit observable traces |
 | `telltale_validator` | `Choreography.Projection.Validator` | Projection validator (default target) |
@@ -932,34 +932,34 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **Ghost state?** → Runtime/ProgramLogic/GhostState.lean
 - **Session-local proofs?** → Runtime/Proofs/SessionLocal.lean, Runtime/Proofs/Frame.lean
 - **Delegation proofs?** → Protocol/Coherence/Delegation.lean
-- **VM-level progress theorem?** → Runtime/Proofs/Progress.lean
+- **protocol machine-level progress theorem?** → Runtime/Proofs/Progress.lean
 - **Lyapunov measure?** → Runtime/Proofs/Lyapunov.lean, Runtime/Proofs/WeightedMeasure.lean
 - **Scheduling bounds?** → Runtime/Proofs/SchedulingBound.lean
-- **VM instruction specifications?** → Runtime/VM/Semantics/InstrSpec.lean
-- **VM instruction preservation proofs?** → Runtime/Proofs/VM/InstrSpec.lean
-- **VM bytecode compiler?** → Runtime/VM/Model/CompileLocalTypeR.lean
-- **Dynamic choreography loading (executable path)?** → Runtime/VM/Runtime/Loader.lean
-- **Dynamic choreography loading proofs?** → Runtime/Proofs/VM/LoadChoreography.lean
-- **N-concurrent scheduling?** → Runtime/VM/Runtime/Runner.lean, Runtime/Proofs/Concurrency.lean
-- **VM failure model (executable path)?** → Runtime/VM/Runtime/Failure.lean, Runtime/VM/Runtime/Failure/Core.lean
-- **VM failure proofs/predicates?** → Runtime/Proofs/VM/Failure.lean, Runtime/Proofs/VM/FailurePredicates.lean
+- **protocol machine instruction specifications?** → Runtime/ProtocolMachine/Semantics/InstrSpec.lean
+- **protocol machine instruction preservation proofs?** → Runtime/Proofs/ProtocolMachine/InstrSpec.lean
+- **protocol machine bytecode compiler?** → Runtime/ProtocolMachine/Model/CompileLocalTypeR.lean
+- **Dynamic choreography loading (executable path)?** → Runtime/ProtocolMachine/Runtime/Loader.lean
+- **Dynamic choreography loading proofs?** → Runtime/Proofs/ProtocolMachine/LoadChoreography.lean
+- **N-concurrent scheduling?** → Runtime/ProtocolMachine/Runtime/Runner.lean, Runtime/Proofs/Concurrency.lean
+- **protocol machine failure model (executable path)?** → Runtime/ProtocolMachine/Runtime/Failure.lean, Runtime/ProtocolMachine/Runtime/Failure/Core.lean
+- **protocol machine failure proofs/predicates?** → Runtime/Proofs/ProtocolMachine/Failure.lean, Runtime/Proofs/ProtocolMachine/FailurePredicates.lean
 - **Buffer boundedness?** → Protocol/BufferBoundedness.lean
 - **Protocol symmetry?** → Protocol/Symmetry.lean
 - **Spectral gap bounds?** → Protocol/Classical/SpectralGap.lean
-- **VM JSON runner?** → Runtime/Tests/ProtocolMachineRunner.lean
+- **protocol machine JSON runner?** → Runtime/Tests/ProtocolMachineRunner.lean
 - **What is axiomatized?** → [Axiom Inventory](#axiom-inventory)
 
 ### V2 Additions
 
-- **Speculation semantics?** → Runtime/VM/Semantics/ExecSpeculation.lean
-- **Threaded execution?** → Runtime/VM/Runtime/ThreadedRunner.lean
+- **Speculation semantics?** → Runtime/ProtocolMachine/Semantics/ExecSpeculation.lean
+- **Threaded execution?** → Runtime/ProtocolMachine/Runtime/ThreadedRunner.lean
 - **Threaded concurrency proofs?** → Runtime/Proofs/ConcurrencyThreaded.lean
 - **Envelope-based adequacy?** → Runtime/Adequacy/EnvelopeCore/
 - **Theorem pack infrastructure?** → Runtime/Proofs/TheoremPack/
 - **Effect bisimulation?** → Runtime/Proofs/EffectBisim/
 - **Distributed profile adapters?** → Runtime/Proofs/Adapters/Distributed/
-- **VM speculation proofs?** → Runtime/Proofs/VM/Speculation.lean
-- **Configuration equivalence proofs?** → Runtime/Proofs/VM/InstrSpec/
+- **protocol machine speculation proofs?** → Runtime/Proofs/ProtocolMachine/Speculation.lean
+- **Configuration equivalence proofs?** → Runtime/Proofs/ProtocolMachine/InstrSpec/
 - **Iris extraction?** → IrisExtractionInstance/
 - **Classical analysis?** → ClassicalAnalysisInstance/
 - **Release conformance?** → Runtime/Proofs/TheoremPack/ReleaseConformance.lean

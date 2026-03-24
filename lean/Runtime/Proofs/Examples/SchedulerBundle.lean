@@ -17,7 +17,7 @@ variable [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
 variable [IdentityVerificationBridge ι ν]
 
 /-- Round-robin scheduler bundle gates the round-robin artifact on. -/
-example (st₀ : VMState ι γ π ε ν)
+example (st₀ : ProtocolMachineState ι γ π ε ν)
     (hpol : st₀.sched.policy = .roundRobin) :
     (buildProtocolMachineSchedulerArtifact
       ({ policy := .roundRobin, policyPinned := hpol } : ProtocolMachineSchedulerBundle st₀)
@@ -25,7 +25,7 @@ example (st₀ : VMState ι γ π ε ν)
   rfl
 
 /-- Cooperative scheduler bundle gates cooperative normalization on. -/
-example (st₀ : VMState ι γ π ε ν)
+example (st₀ : ProtocolMachineState ι γ π ε ν)
     (hpol : st₀.sched.policy = .cooperative) :
     (buildProtocolMachineSchedulerArtifact
       ({ policy := .cooperative, policyPinned := hpol } : ProtocolMachineSchedulerBundle st₀)
@@ -33,7 +33,7 @@ example (st₀ : VMState ι γ π ε ν)
   rfl
 
 /-- Priority scheduler bundle gates the priority artifact on. -/
-example (st₀ : VMState ι γ π ε ν)
+example (st₀ : ProtocolMachineState ι γ π ε ν)
     (f : CoroutineId → Nat)
     (hpol : st₀.sched.policy = .priority f) :
     (buildProtocolMachineSchedulerArtifact
@@ -42,7 +42,7 @@ example (st₀ : VMState ι γ π ε ν)
   rfl
 
 /-- Progress-aware scheduler bundle gates the progress-aware artifact on. -/
-example (st₀ : VMState ι γ π ε ν)
+example (st₀ : ProtocolMachineState ι γ π ε ν)
     (hpol : st₀.sched.policy = .progressAware) :
     (buildProtocolMachineSchedulerArtifact
       ({ policy := .progressAware, policyPinned := hpol } : ProtocolMachineSchedulerBundle st₀)

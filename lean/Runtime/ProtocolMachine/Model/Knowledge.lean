@@ -13,7 +13,7 @@ sets) can depend on it.
 -/
 
 /-
-The Problem. The VM model needs a small, serializable vocabulary for knowledge
+The Problem. The protocol machine model needs a small, serializable vocabulary for knowledge
 facts and flow policies that can be used uniformly by state, semantics, and
 runtime conformance checks.
 

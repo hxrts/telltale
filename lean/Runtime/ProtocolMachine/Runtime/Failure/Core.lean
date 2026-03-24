@@ -3,7 +3,7 @@ import Runtime.ProtocolMachine.Runtime.Scheduler
 import IrisExtractionInstance
 
 /-
-The Problem. The VM needs a failure model that is parametric over the
+The Problem. The protocol machine needs a failure model that is parametric over the
 identity model and integrates crashes, partitions, and recovery without
 committing to a concrete recovery algorithm.
 
@@ -14,7 +14,7 @@ and deterministic recovery actions.
 /-! # Task 24: Failure Model and Recovery
 
 Failure-aware step relation and recovery predicates
-for failure-aware VM execution.
+for failure-aware protocol machine execution.
 
 ## Definitions
 
@@ -76,7 +76,7 @@ def crashSite {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (_site : IdentityModel.SiteId ι) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (_site : IdentityModel.SiteId ι) : ProtocolMachineState ι γ π ε ν :=
   -- Mark site as crashed (idempotent list update).
   by
     classical
@@ -90,7 +90,7 @@ def disconnectEdges {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (_edges : List Edge) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (_edges : List Edge) : ProtocolMachineState ι γ π ε ν :=
   -- Mark edges as partitioned.
   let added := _edges.filter (fun e => decide (e ∉ st.partitionedEdges))
   { st with partitionedEdges := added ++ st.partitionedEdges }
@@ -101,7 +101,7 @@ def reconnectEdges {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (_edges : List Edge) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (_edges : List Edge) : ProtocolMachineState ι γ π ε ν :=
   -- Remove edges from the partitioned set.
   let remaining := st.partitionedEdges.filter (fun e => decide (e ∉ _edges))
   { st with partitionedEdges := remaining }
@@ -128,14 +128,14 @@ def applyTopologyChange {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (tc : TopologyChange (ι := ι)) :
-    VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (tc : TopologyChange (ι := ι)) :
+    ProtocolMachineState ι γ π ε ν :=
   match tc with
   | .crash site => crashSite st site
   | .partition edges => disconnectEdges st edges
   | .heal edges => reconnectEdges st edges
 
-/-- Apply one environment event to VM state.
+/-- Apply one environment event to protocol machine state.
 Topology perturbations only enter through this ingress function. -/
 def applyEnvironmentEvent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -143,8 +143,8 @@ def applyEnvironmentEvent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (ev : EnvironmentEvent (ι := ι)) :
-    VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (ev : EnvironmentEvent (ι := ι)) :
+    ProtocolMachineState ι γ π ε ν :=
   let st' :=
     match ev with
     | .topology tc => applyTopologyChange st tc
@@ -175,8 +175,8 @@ def applyEnvironmentEvents {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (events : List (EnvironmentEvent (ι := ι))) :
-    VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (events : List (EnvironmentEvent (ι := ι))) :
+    ProtocolMachineState ι γ π ε ν :=
   events.foldl applyEnvironmentEvent st
 
 /-! ### Session closure/coherence helpers -/
@@ -192,7 +192,7 @@ def closeSession {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (_sid : SessionId) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (_sid : SessionId) : ProtocolMachineState ι γ π ε ν :=
   -- Close the matching session and clear its buffers/traces.
   let rec closeStore (ss : SessionStore ν) : SessionStore ν :=
     match ss with
@@ -211,7 +211,7 @@ def failureSessionCoherentB {ι γ π ε ν : Type u} [IdentityModel ι] [GuardL
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (sid : SessionId) : Bool :=
+    (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) : Bool :=
   match sessionState? st.sessions sid with
   | none => false
   | some sess =>
@@ -294,8 +294,8 @@ def appendFailureTraceEvent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardL
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν)
-    (tag : FailureTraceTag) (detail : String) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν)
+    (tag : FailureTraceTag) (detail : String) : ProtocolMachineState ι γ π ε ν :=
   let ev : FailureTraceEvent :=
     { tick := st.clock
     , seqNo := st.nextFailureSeqNo
@@ -314,12 +314,12 @@ def emitStructuredErrorEvent {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν)
+    (st : ProtocolMachineState ι γ π ε ν)
     (faultClass : String)
     (certainty : CommitCertainty)
     (action : RecoveryAction)
     (evidenceId : Nat)
-    (detail : String) : VMState ι γ π ε ν :=
+    (detail : String) : ProtocolMachineState ι γ π ε ν :=
   let ev : StructuredErrorEvent :=
     { tick := st.clock
     , seqNo := st.nextFailureSeqNo
@@ -343,7 +343,7 @@ def reconcileBeforeReplay {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (sid : SessionId) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) : ProtocolMachineState ι γ π ε ν :=
   if st.needsReconciliation then
     let st' := { st with needsReconciliation := false }
     appendFailureTraceEvent st' .reconciliation s!"reconcile_before_replay sid={sid}"
@@ -379,7 +379,7 @@ def decideRecovery {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (sid : SessionId) (f : Failure ι)
+    (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) (f : Failure ι)
     (evidence : RecoveryEvidence := {})
     (policy : RecoveryPolicy := defaultRecoveryPolicy) : RecoveryAction :=
   if h : failureSessionCoherentB st sid then

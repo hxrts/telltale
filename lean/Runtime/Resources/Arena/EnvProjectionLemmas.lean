@@ -3,7 +3,7 @@ import Runtime.Resources.Arena.LookupUpdateLemmas
 Lemmas relating SessionStore projections (toGEnv, toDEnv) to direct
 environment operations, enabling proof transfer between representations. -/
 /-
-The Problem. The VM uses a structured `SessionStore` representation,
+The Problem. The protocol machine uses a structured `SessionStore` representation,
 but proofs often work with flat `GEnv` and `DEnv`. We need lemmas
 relating the two, especially for fold-based projections.
 

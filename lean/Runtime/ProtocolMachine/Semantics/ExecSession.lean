@@ -150,7 +150,7 @@ private def openCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (sid : SessionId)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (sid : SessionId)
     (ctx : OpenContext ν) (sess : SessionState ν) (tx : Transaction ν) : StepPack ι γ π ε ν :=
   -- Apply the resource transaction and persist the session.
   match applyTransactionAtScope st.resourceStates ctx.scope tx with
@@ -170,7 +170,7 @@ private def openWithRegs {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (sid : SessionId)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (sid : SessionId)
     (roles : RoleSet) (triples : List (Role × LocalType × Reg))
     (regs' : RegFile) (handlers : List (Edge × HandlerId)) : StepPack ι γ π ε ν :=
   -- Build session state, resource, and transaction for open.
@@ -186,7 +186,7 @@ private def openWithTriples {ι γ π ε ν : Type u} [IdentityModel ι] [GuardL
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (triples : List (Role × LocalType × Reg)) (handlers : List (Edge × HandlerId)) : StepPack ι γ π ε ν :=
   -- Validate roles and handler coverage, then write endpoints.
   let sid := st.nextSessionId
@@ -209,7 +209,7 @@ def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (localTypes : List (Role × LocalType))
     (handlers : List (Edge × HandlerId))
     (dsts : List (Role × Reg)) : StepPack ι γ π ε ν :=
@@ -279,7 +279,7 @@ private def closeCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint)
     (epoch' : Nat) (tx : Transaction ν) : StepPack ι γ π ε ν :=
   -- Apply the close transaction and update state.
   match applyTransactionAtScope st.resourceStates { id := ep.sid } tx with
@@ -299,7 +299,7 @@ private def closeWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Guar
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) : StepPack ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) : StepPack ι γ π ε ν :=
   -- Prepare resources and commit the close step.
   let epoch' := findEpoch ep.sid st.sessions + 1
   let roles := findRoles ep.sid st.sessions
@@ -315,7 +315,7 @@ def stepClose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (session : Reg) : StepPack ι γ π ε ν :=
   -- Close a session endpoint and clear its buffers.
   match readReg coro.regs session with

@@ -35,18 +35,18 @@ variable [IdentityVerificationBridge ι ν]
 /-! ## Coroutine-View Observer -/
 
 /-- Observer that exposes only coroutine-local view for a chosen coroutine id. -/
-def coroutineViewObs (cid : CoroutineId) : EffectObs (VMState ι γ π ε ν) (Option CoroutineView) where
+def coroutineViewObs (cid : CoroutineId) : EffectObs (ProtocolMachineState ι γ π ε ν) (Option CoroutineView) where
   observe := fun st => coroutineView st cid
 
 /-- Silent transition relation used for observer-level bisimulation packaging. -/
-def coroutineViewSilentStep : StateRel (VMState ι γ π ε ν) :=
+def coroutineViewSilentStep : StateRel (ProtocolMachineState ι γ π ε ν) :=
   fun _ _ => False
 
 private theorem coroutine_view_eq_postfixed (cid : CoroutineId) :
-    (fun st₁ st₂ : VMState ι γ π ε ν => coroutineView st₁ cid = coroutineView st₂ cid) ≤
+    (fun st₁ st₂ : ProtocolMachineState ι γ π ε ν => coroutineView st₁ cid = coroutineView st₂ cid) ≤
       EffectBisimF (coroutineViewObs (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid)
         (coroutineViewSilentStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν))
-        (fun st₁ st₂ : VMState ι γ π ε ν => coroutineView st₁ cid = coroutineView st₂ cid) := by
+        (fun st₁ st₂ : ProtocolMachineState ι γ π ε ν => coroutineView st₁ cid = coroutineView st₂ cid) := by
   intro st₁ st₂ hEq
   refine ⟨hEq, ?_, ?_⟩
   · intro st' hStep
@@ -59,14 +59,14 @@ private theorem coroutine_view_eq_postfixed (cid : CoroutineId) :
 /-- Any direct coroutine-view equivalence yields silent effect bisimulation. -/
 theorem effect_bisim_of_coroutine_view_equiv
     (cid : CoroutineId)
-    {st₁ st₂ : VMState ι γ π ε ν}
+    {st₁ st₂ : ProtocolMachineState ι γ π ε ν}
     (hEq : CoroutineViewEquiv st₁ st₂ cid) :
     EffectBisim
       (coroutineViewObs (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid)
       (coroutineViewSilentStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν))
       st₁ st₂ := by
   have hLift :
-      (fun a b : VMState ι γ π ε ν => coroutineView a cid = coroutineView b cid) ≤
+      (fun a b : ProtocolMachineState ι γ π ε ν => coroutineView a cid = coroutineView b cid) ≤
       EffectBisim
         (coroutineViewObs (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid)
         (coroutineViewSilentStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) :=
@@ -74,7 +74,7 @@ theorem effect_bisim_of_coroutine_view_equiv
       (F := EffectBisimF
         (coroutineViewObs (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid)
         (coroutineViewSilentStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)))
-      (S := fun a b : VMState ι γ π ε ν => coroutineView a cid = coroutineView b cid)
+      (S := fun a b : ProtocolMachineState ι γ π ε ν => coroutineView a cid = coroutineView b cid)
       (coroutine_view_eq_postfixed (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid)
   exact hLift _ _ hEq
 
@@ -82,7 +82,7 @@ theorem effect_bisim_of_coroutine_view_equiv
     coroutine-view equivalence. -/
 theorem coroutine_view_equiv_of_effect_bisim
     (cid : CoroutineId)
-    {st₁ st₂ : VMState ι γ π ε ν}
+    {st₁ st₂ : ProtocolMachineState ι γ π ε ν}
     (hBisim :
       EffectBisim
         (coroutineViewObs (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) cid)
@@ -97,7 +97,7 @@ theorem coroutine_view_equiv_of_effect_bisim
 
 /-- Topology-change noninterference restated via the effect-bisimulation bridge. -/
 theorem topology_change_preserves_coroutine_view_equiv_via_effect_bisim
-    (st : VMState ι γ π ε ν) (tc : TopologyChange (ι := ι)) (cid : CoroutineId) :
+    (st : ProtocolMachineState ι γ π ε ν) (tc : TopologyChange (ι := ι)) (cid : CoroutineId) :
     CoroutineViewEquiv (applyTopologyChange st tc) st cid := by
   have hEq : CoroutineViewEquiv (applyTopologyChange st tc) st cid :=
     topology_change_preserves_coroutine_view_equiv st tc cid

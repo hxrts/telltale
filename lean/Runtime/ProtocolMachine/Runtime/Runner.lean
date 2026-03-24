@@ -20,7 +20,7 @@ def tryUnblockReceivers {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) : ProtocolMachineState ι γ π ε ν :=
   let step := fun (sched : SchedState γ) (p : CoroutineId × BlockReason γ) =>
     let (cid, reason) := p
     match reason with
@@ -42,7 +42,7 @@ def schedRoundOne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) : ProtocolMachineState ι γ π ε ν :=
   match schedStep st with
   | none => st
   | some st' => st'
@@ -55,7 +55,7 @@ def schedRound {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (n : Nat) (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
+    (n : Nat) (st : ProtocolMachineState ι γ π ε ν) : ProtocolMachineState ι γ π ε ν :=
   if n = 0 then
     st
   else
@@ -70,7 +70,7 @@ def allTerminal {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Bool :=
+    (st : ProtocolMachineState ι γ π ε ν) : Bool :=
   st.coroutines.all (fun c =>
     match c.status with
     | .done => true
@@ -84,7 +84,7 @@ def sessionTerminal {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (sid : SessionId) : Bool :=
+    (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) : Bool :=
   st.coroutines.all (fun c =>
     if c.ownedEndpoints.any (fun ep => decide (ep.sid = sid)) then
       match c.status with
@@ -103,7 +103,7 @@ def runScheduled {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (fuel : Nat) (concurrency : Nat) (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
+    (fuel : Nat) (concurrency : Nat) (st : ProtocolMachineState ι γ π ε ν) : ProtocolMachineState ι γ π ε ν :=
   match fuel with
   | 0 => st
   | fuel' + 1 =>

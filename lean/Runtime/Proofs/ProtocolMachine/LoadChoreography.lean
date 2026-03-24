@@ -21,7 +21,7 @@ private lemma next_fresh_session_id_ge {ι γ π ε ν : Type u} [IdentityModel 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) :
+    (st : ProtocolMachineState ι γ π ε ν) :
     st.nextSessionId ≤ nextFreshSessionId st := by
   unfold nextFreshSessionId
   by_cases hAvail : sessionIdAvailable st st.nextSessionId
@@ -41,7 +41,7 @@ theorem load_choreography_snd_ge_next_session_id
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     [Inhabited (EffectRuntime.EffectCtx ε)]
-    (st : VMState ι γ π ε ν) (image : CodeImage γ ε) :
+    (st : ProtocolMachineState ι γ π ε ν) (image : CodeImage γ ε) :
     st.nextSessionId ≤ (loadChoreography st image).2 := by
   cases hRes : loadChoreographyResult st image with
   | ok st' sid =>
@@ -73,7 +73,7 @@ theorem load_choreography_disjoint {ι γ π ε ν : Type u} [IdentityModel ι] 
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     [Inhabited (EffectRuntime.EffectCtx ε)]
-    (st : VMState ι γ π ε ν) (image : CodeImage γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (image : CodeImage γ ε)
     (_hwf : WFVMState st) :
     let (st', sid) := loadChoreography st image
     ∀ sid' ∈ existingSessionIds st, SessionDisjoint st' sid sid' := by

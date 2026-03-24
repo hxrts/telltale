@@ -9,7 +9,7 @@ Core abstract objects for envelope-based adequacy and recovery taxonomy.
 -/
 
 /-
-The Problem. Envelope statements, VM adherence claims, and capability-admission
+The Problem. Envelope statements, protocol machine adherence claims, and capability-admission
 contracts need a shared core vocabulary so theorem packages can be expressed once
 and instantiated consistently across local/sharded regimes.
 

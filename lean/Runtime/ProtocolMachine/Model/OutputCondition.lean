@@ -1,12 +1,12 @@
 import Runtime.ProtocolMachine.Model.TypeClasses
 
 
-/-! # VM Output-Condition Model
+/-! # protocol machine Output-Condition Model
 
 Core model types for output-condition commit gating.
 
 - `OutputConditionClaim`: predicate id + optional witness reference + output digest.
-- `OutputConditionCheck`: verifier decision logged in VM state for replay/audit.
+- `OutputConditionCheck`: verifier decision logged in protocol machine state for replay/audit.
  -/
 
 set_option autoImplicit false

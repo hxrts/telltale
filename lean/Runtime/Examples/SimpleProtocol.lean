@@ -6,11 +6,11 @@ import Runtime.ProtocolMachine.Runtime.Monitor
 import Runtime.Proofs.ProtocolMachine.Monitor
 
 /-
-The Problem. Provide a concrete, runnable VM example that exercises
+The Problem. Provide a concrete, runnable protocol machine example that exercises
 session opening, send/receive, and offer/choose in a single coroutine.
 
 Solution Structure. Define a tiny two-role protocol, instantiate a
-computable test model, and assemble a minimal VM state for tests.
+computable test model, and assemble a minimal protocol machine state for tests.
 -/
 
 set_option autoImplicit false
@@ -67,7 +67,7 @@ def exampleProgram : Program UnitGuard UnitEffect :=
   , handlerTypes := []
   , metadata := { name := "example", version := 1, sourceHash := 0 } }
 
-/-! ## Example VM state -/
+/-! ## Example protocol machine state -/
 
 def exampleArena : Arena :=
   -- Empty arena with zero capacity for the example.
@@ -100,7 +100,7 @@ def exampleSched : SchedState UnitGuard :=
   , stepCount := 0 }
 
 def exampleMonitor : SessionMonitor UnitGuard :=
-  -- Permissive monitor for the example VM run.
+  -- Permissive monitor for the example protocol machine run.
   { step := fun sk => some sk }
 
 /-- The example monitor satisfies the control-flow acceptance contract. -/
@@ -113,8 +113,8 @@ theorem example_monitor_unified_monitor_preserves :
     unified_monitor_preserves exampleMonitor := by
   simpa [exampleMonitor] using (unified_monitor_preserves_identity (γ:=UnitGuard))
 
-def exampleState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
-  -- Assemble the initial VM state for the example program.
+def exampleState : ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+  -- Assemble the initial protocol machine state for the example program.
   { config := unitConfig
   , code := exampleProgram
   , programs := #[exampleProgram]

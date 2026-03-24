@@ -2,7 +2,7 @@ import Runtime.ProtocolMachine.Semantics.ExecSpeculation
 
 /-! # Runtime.Proofs.ProtocolMachine.Speculation
 
-Operational lemmas for VM speculation instructions (`fork`, `join`, `abort`).
+Operational lemmas for protocol machine speculation instructions (`fork`, `join`, `abort`).
 -/
 
 set_option autoImplicit false
@@ -20,7 +20,7 @@ theorem step_fork_depth_monotone_success
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (sidReg : Reg)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (sidReg : Reg)
     (spec : SpeculationState) (gsid : Nat)
     (hEnabled : st.config.speculationEnabled = true)
     (hSpec : coro.specState = some spec)
@@ -48,7 +48,7 @@ theorem step_join_cleanup_when_reconciled
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (spec : SpeculationState)
     (hSpec : coro.specState = some spec)
     (hMatch : matchesRealState st spec.ghostSid = true) :
@@ -67,8 +67,8 @@ theorem step_abort_restores_scoped_checkpoint
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
-    (spec : SpeculationState) (checkpoint : VMSpeculationCheckpoint)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (spec : SpeculationState) (checkpoint : ProtocolMachineSpeculationCheckpoint)
     (hSpec : coro.specState = some spec)
     (hCheckpoint : st.ghostSessions.checkpoints.get? spec.ghostSid = some checkpoint) :
     let out := stepAbort st coro

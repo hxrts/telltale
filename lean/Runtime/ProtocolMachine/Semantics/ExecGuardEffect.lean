@@ -39,7 +39,7 @@ def stepAcquire {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (layer : γ) (dst : Reg) : StepPack ι γ π ε ν :=
   -- Acquire a guard-layer resource and return evidence.
   if st.config.guardChain.active layer = false then
@@ -67,7 +67,7 @@ def stepRelease {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (_layer : γ) (_evidence : Reg) : StepPack ι γ π ε ν :=
   -- Release a guard-layer resource and record the layer.
   if st.config.guardChain.active _layer = false then
@@ -96,7 +96,7 @@ def stepInvoke {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (action : EffectRuntime.EffectAction ε) : StepPack ι γ π ε ν :=
   -- Execute an effect action via the bound handler.
   match SessionStore.defaultHandler st.sessions with

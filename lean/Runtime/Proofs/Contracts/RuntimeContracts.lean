@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 /-! # Runtime.Proofs.Contracts.RuntimeContracts
 
-Lean-facing runtime contract surface for proof-carrying VM admission and
+Lean-facing runtime contract surface for proof-carrying protocol machine admission and
 capability gating. This module packages the contract classes referenced by the
 runtime architecture plan:
 
@@ -46,7 +46,7 @@ variable [IdentityVerificationBridge ι ν]
 
 /-- Cross-lane handoffs must represent actual delegation/capability transfer and
 never a no-op self-handoff. -/
-def DelegationOnlyCrossLaneHandoff (st : VMState ι γ π ε ν) : Prop :=
+def DelegationOnlyCrossLaneHandoff (st : ProtocolMachineState ι γ π ε ν) : Prop :=
   ∀ h ∈ st.sched.crossLaneHandoffs,
     h.fromCoro ≠ h.toCoro ∧
     h.reason.startsWith "transfer " ∧
@@ -60,7 +60,7 @@ structure ProtocolAdmissionContract (store₀ : SessionStore ν) where
 
 /-- Proof-guided concurrency contract: runtime may step coroutines in parallel
 only when a proof-level eligibility predicate certifies the pair. -/
-structure ProofGuidedConcurrencyContract (st₀ : VMState ι γ π ε ν) where
+structure ProofGuidedConcurrencyContract (st₀ : ProtocolMachineState ι γ π ε ν) where
   eligible : CoroutineId → CoroutineId → Prop
   eligibleDecidable : DecidableRel eligible
   symmetric : ∀ a b, eligible a b → eligible b a
@@ -68,7 +68,7 @@ structure ProofGuidedConcurrencyContract (st₀ : VMState ι γ π ε ν) where
   frameGuarded : ∀ a b, eligible a b → a ≠ b
 
 /-- Boolean eligibility hook extracted from the proof-guided contract. -/
-def proofGuidedEligibleB {st₀ : VMState ι γ π ε ν}
+def proofGuidedEligibleB {st₀ : ProtocolMachineState ι γ π ε ν}
     (contract : ProofGuidedConcurrencyContract (ι := ι) (γ := γ)
       (π := π) (ε := ε) (ν := ν) st₀)
     (a b : CoroutineId) : Bool :=
@@ -76,7 +76,7 @@ def proofGuidedEligibleB {st₀ : VMState ι γ π ε ν}
   decide (contract.eligible a b)
 
 /-- Connect deterministic wave planning to proof-guided eligibility. -/
-def planDeterministicWavesByContract {st₀ : VMState ι γ π ε ν}
+def planDeterministicWavesByContract {st₀ : ProtocolMachineState ι γ π ε ν}
     (contract : ProofGuidedConcurrencyContract (ι := ι) (γ := γ)
       (π := π) (ε := ε) (ν := ν) st₀) :
     List (List CoroutineId) :=
@@ -84,7 +84,7 @@ def planDeterministicWavesByContract {st₀ : VMState ι γ π ε ν}
 
 /-- Scheduler profile contract: runtime policy selection is backed by a certified
 scheduler bundle and profile extraction theorem. -/
-structure SchedulerProfileContract (st₀ : VMState ι γ π ε ν) where
+structure SchedulerProfileContract (st₀ : ProtocolMachineState ι γ π ε ν) where
   bundle : ProtocolMachineSchedulerBundle st₀
   profilePinned : schedulerPolicyProfileOf st₀.sched.policy = bundle.profile
 
@@ -121,7 +121,7 @@ def TheoremPackCapabilityContract.semanticAttachmentPoints
 
 /-! ## Combined Runtime Bundle -/
 
-/-- Combined runtime contract bundle threaded into VM admission/runtime policy. -/
+/-- Combined runtime contract bundle threaded into protocol machine admission/runtime policy. -/
 structure ProtocolMachineRuntimeContracts (store₀ : SessionStore ν) where
   admission : ProtocolAdmissionContract (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀
   delegationOnly :
@@ -141,18 +141,18 @@ private def schedPolicyRequiresContracts : SchedPolicy → Bool
   | .cooperative => false
   | _ => true
 
-def requiresProtocolMachineRuntimeContracts (cfg : VMConfig ι γ π ε ν) : Bool :=
+def requiresProtocolMachineRuntimeContracts (cfg : ProtocolMachineConfig ι γ π ε ν) : Bool :=
   schedPolicyRequiresContracts cfg.schedPolicy || cfg.speculationEnabled
 
-/-- VM admission result for advanced runtime mode checks. -/
+/-- protocol machine admission result for advanced runtime mode checks. -/
 inductive ProtocolMachineAdmissionResult where
   | admitted
   | rejectedMissingContracts
   deriving Repr, DecidableEq
 
-/-- VM admission path: advanced runtime modes require `ProtocolMachineRuntimeContracts`. -/
+/-- protocol machine admission path: advanced runtime modes require `ProtocolMachineRuntimeContracts`. -/
 def admitProtocolMachineRuntime
-    (cfg : VMConfig ι γ π ε ν)
+    (cfg : ProtocolMachineConfig ι γ π ε ν)
     {store₀ : SessionStore ν}
     (contracts? : Option (ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)) :
     ProtocolMachineAdmissionResult :=
@@ -165,7 +165,7 @@ def admitProtocolMachineRuntime
 
 /-- Advanced-mode admission succeeds only when contracts are supplied. -/
 theorem admit_vm_runtime_requires_contracts
-    (cfg : VMConfig ι γ π ε ν) {store₀ : SessionStore ν}
+    (cfg : ProtocolMachineConfig ι γ π ε ν) {store₀ : SessionStore ν}
     (hReq : requiresProtocolMachineRuntimeContracts cfg = true)
     (contracts? : Option (ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)) :
     admitProtocolMachineRuntime cfg contracts? = .admitted ↔ contracts?.isSome = true := by
@@ -289,7 +289,7 @@ def requestDeterminismProfile
   if allowed then some profile else none
 
 /-- Build a scheduler profile contract from bundle evidence. -/
-def SchedulerProfileContract.ofBundle {st₀ : VMState ι γ π ε ν}
+def SchedulerProfileContract.ofBundle {st₀ : ProtocolMachineState ι γ π ε ν}
     (bundle : ProtocolMachineSchedulerBundle st₀) :
     SchedulerProfileContract st₀ :=
   { bundle := bundle

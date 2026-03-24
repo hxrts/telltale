@@ -4,7 +4,7 @@ import Protocol.Environments.RoleRenaming
 /-! # Delegation Preservation
 
 Proves that delegation steps preserve the coherence invariant. This bridges
-Protocol-level metatheory to VM-level instruction execution.
+Protocol-level metatheory to protocol-machine-level instruction execution.
 
 ## Main Results
 

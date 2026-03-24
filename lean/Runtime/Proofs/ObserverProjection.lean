@@ -48,7 +48,7 @@ def coroutineProjection {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) : CoroutineView :=
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) : CoroutineView :=
   let D := SessionStore.toDEnv st.sessions
   let bufs := SessionStore.toBuffers st.sessions
   { localTypes := coro.ownedEndpoints.map (fun ep => (ep, SessionStore.lookupType st.sessions ep))
@@ -64,7 +64,7 @@ def coroutineView {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (cid : CoroutineId) : Option CoroutineView :=
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) : Option CoroutineView :=
   (st.coroutines[cid]?).map (coroutineProjection st)
 
 /-- Explicit projection function (name used in Paper 3 task list). -/
@@ -74,7 +74,7 @@ def coroutineProjectionAt {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (cid : CoroutineId) : Option CoroutineView :=
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) : Option CoroutineView :=
   match st.coroutines[cid]? with
   | none => none
   | some coro => some (coroutineProjection st coro)
@@ -85,7 +85,7 @@ theorem coroutine_view_eq_projection {ι γ π ε ν : Type u} [IdentityModel ι
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (cid : CoroutineId) :
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) :
     coroutineView st cid = coroutineProjectionAt st cid := by
   cases hco : st.coroutines[cid]? <;> simp [coroutineView, coroutineProjectionAt, hco]
 
@@ -98,7 +98,7 @@ def CoroutineViewEquiv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st₁ st₂ : VMState ι γ π ε ν) (cid : CoroutineId) : Prop :=
+    (st₁ st₂ : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) : Prop :=
   coroutineView st₁ cid = coroutineView st₂ cid
 
 theorem coroutine_view_equiv_refl {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -107,7 +107,7 @@ theorem coroutine_view_equiv_refl {ι γ π ε ν : Type u} [IdentityModel ι] [
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (cid : CoroutineId) :
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) :
     CoroutineViewEquiv st st cid := rfl
 
 theorem coroutine_view_equiv_symm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -116,7 +116,7 @@ theorem coroutine_view_equiv_symm {ι γ π ε ν : Type u} [IdentityModel ι] [
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    {st₁ st₂ : VMState ι γ π ε ν} {cid : CoroutineId}
+    {st₁ st₂ : ProtocolMachineState ι γ π ε ν} {cid : CoroutineId}
     (h : CoroutineViewEquiv st₁ st₂ cid) :
     CoroutineViewEquiv st₂ st₁ cid := Eq.symm h
 
@@ -126,7 +126,7 @@ theorem coroutine_view_equiv_trans {ι γ π ε ν : Type u} [IdentityModel ι] 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    {st₁ st₂ st₃ : VMState ι γ π ε ν} {cid : CoroutineId}
+    {st₁ st₂ st₃ : ProtocolMachineState ι γ π ε ν} {cid : CoroutineId}
     (h₁₂ : CoroutineViewEquiv st₁ st₂ cid) (h₂₃ : CoroutineViewEquiv st₂ st₃ cid) :
     CoroutineViewEquiv st₁ st₃ cid := Eq.trans h₁₂ h₂₃
 
@@ -139,7 +139,7 @@ theorem topology_change_preserves_coroutine_view {ι γ π ε ν : Type u} [Iden
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (tc : TopologyChange (ι := ι)) (cid : CoroutineId) :
+    (st : ProtocolMachineState ι γ π ε ν) (tc : TopologyChange (ι := ι)) (cid : CoroutineId) :
     coroutineView (applyTopologyChange st tc) cid = coroutineView st cid := by
   unfold coroutineView
   cases hco : st.coroutines[cid]? with
@@ -169,7 +169,7 @@ theorem topology_change_preserves_coroutine_view_equiv {ι γ π ε ν : Type u}
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (tc : TopologyChange (ι := ι)) (cid : CoroutineId) :
+    (st : ProtocolMachineState ι γ π ε ν) (tc : TopologyChange (ι := ι)) (cid : CoroutineId) :
     CoroutineViewEquiv (applyTopologyChange st tc) st cid := by
   exact topology_change_preserves_coroutine_view st tc cid
 
@@ -183,7 +183,7 @@ def coroutineViewJoint (L : Type*) {ι γ π ε ν : Type u} [IdentityModel ι] 
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     [DecidableEq (Option CoroutineView)]
-    (states : L → VMState ι γ π ε ν) (cid : CoroutineId)
+    (states : L → ProtocolMachineState ι γ π ε ν) (cid : CoroutineId)
     (labelDist : L → ℝ) : L × Option CoroutineView → ℝ :=
   fun lo => if coroutineView (states lo.1) cid = lo.2 then labelDist lo.1 else 0
 
@@ -196,7 +196,7 @@ theorem coroutine_view_mutual_info_zero_of_erasure
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (states : L → VMState ι γ π ε ν) (cid : CoroutineId)
+    (states : L → ProtocolMachineState ι γ π ε ν) (cid : CoroutineId)
     (labelDist : L → ℝ) (h_nn : ∀ l, 0 ≤ labelDist l) (h_sum : ∑ l, labelDist l = 1) :
     EntropyAPI.IsErasureKernel labelDist (coroutineViewJoint L states cid labelDist) →
     EntropyAPI.mutualInfo (coroutineViewJoint L states cid labelDist) = 0 := by

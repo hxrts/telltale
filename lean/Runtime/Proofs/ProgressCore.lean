@@ -7,13 +7,13 @@ import Runtime.Proofs.Lyapunov
 
 /-! # Runtime.Proofs.ProgressCore
 
-VM-level coherence predicates, instruction enablement, and bridge lemmas.
+protocol-machine-level coherence predicates, instruction enablement, and bridge lemmas.
 -/
 
 /-
-The Problem. Lift protocol-side coherence/progress premises to VM session-store structures.
+The Problem. Lift protocol-side coherence/progress premises to protocol machine session-store structures.
 
-Solution Structure. Define VM predicates, instruction enablement, and prove store/environment bridge lemmas.
+Solution Structure. Define protocol machine predicates, instruction enablement, and prove store/environment bridge lemmas.
 -/
 
 /- ## Structured Block 1 -/
@@ -25,11 +25,11 @@ section
 
 universe u
 
--- VM-Level Coherence Predicates
+-- protocol machine-Level Coherence Predicates
 
 variable {ν : Type u} [VerificationModel ν]
 
-/-- **Safety invariant**: Coherence lifted to VM state.
+/-- **Safety invariant**: Coherence lifted to protocol machine state.
 
     This is the unconditional invariant preserved by all well-typed steps.
     It says that for all active edges, the sender's output matches what
@@ -37,7 +37,7 @@ variable {ν : Type u} [VerificationModel ν]
 def CoherentVMState (store : SessionStore ν) : Prop :=
   Coherent (SessionStore.toGEnv store) (SessionStore.toDEnv store)
 
-/-- **Liveness invariant**: Progress conditions lifted to VM state.
+/-- **Liveness invariant**: Progress conditions lifted to protocol machine state.
 
     This includes HeadCoherent (buffer heads match expected types),
     RoleComplete (peer endpoints exist), ValidLabels (branch labels valid),
@@ -61,11 +61,11 @@ structure WellFormedVMState (store : SessionStore ν) : Prop where
 
 -- Session-Level Coherence
 
-/-- Session-local coherence lifted to VM. -/
+/-- Session-local coherence lifted to protocol machine. -/
 def SessionCoherentVM (store : SessionStore ν) (s : SessionId) : Prop :=
   SessionCoherent (SessionStore.toGEnv store) (SessionStore.toDEnv store) s
 
-/-- Global VM coherence decomposes per session. -/
+/-- Global protocol machine coherence decomposes per session. -/
 theorem coherent_vm_state_iff_forall_session {store : SessionStore ν} :
     CoherentVMState store ↔ ∀ s, SessionCoherentVM store s := by
   simp only [CoherentVMState, SessionCoherentVM]

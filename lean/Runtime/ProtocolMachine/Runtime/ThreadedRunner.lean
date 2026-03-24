@@ -47,7 +47,7 @@ private def buildOwnershipIndex {ι γ π ε ν : Type u} [IdentityModel ι] [Gu
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Std.HashMap OwnershipKey LaneId :=
+    (st : ProtocolMachineState ι γ π ε ν) : Std.HashMap OwnershipKey LaneId :=
   st.coroutines.toList.foldl
     (fun acc c =>
       let lane := laneOf st.sched c.id
@@ -60,7 +60,7 @@ private def normalizeThreadedState {ι γ π ε ν : Type u} [IdentityModel ι] 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) : ProtocolMachineState ι γ π ε ν :=
   let sched' := syncLaneViews st.sched
   let st' := { st with sched := sched' }
   let ownership := buildOwnershipIndex st'
@@ -75,7 +75,7 @@ def coroFootprintAtoms {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (cid : CoroutineId) : List FootprintAtom :=
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) : List FootprintAtom :=
   match st.coroutines[cid]? with
   | none => []
   | some c =>
@@ -96,7 +96,7 @@ def coroPrimarySession? {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (cid : CoroutineId) : Option SessionId :=
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) : Option SessionId :=
   match st.coroutines[cid]? with
   | none => none
   | some c => c.ownedEndpoints.head?.map (fun ep => ep.sid)
@@ -119,7 +119,7 @@ def waveAdmissible {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (picked : List CoroutineId) : Prop :=
+    (st : ProtocolMachineState ι γ π ε ν) (picked : List CoroutineId) : Prop :=
   List.Nodup picked ∧
   (∀ cid, cid ∈ picked → cid ∈ st.sched.readyQueue ∧ isRunnable st cid = true) ∧
   (∀ c1 c2,
@@ -142,7 +142,7 @@ private def waveSessionDisjointB {ι γ π ε ν : Type u} [IdentityModel ι] [G
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (left right : CoroutineId) : Bool :=
+    (st : ProtocolMachineState ι γ π ε ν) (left right : CoroutineId) : Bool :=
   match coroPrimarySession? st left, coroPrimarySession? st right with
   | some sidL, some sidR => sidL ≠ sidR
   | _, _ => true
@@ -156,7 +156,7 @@ private def compatibleWithWave {ι γ π ε ν : Type u} [IdentityModel ι] [Gua
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (eligible : CoroutineId → CoroutineId → Bool)
+    (st : ProtocolMachineState ι γ π ε ν) (eligible : CoroutineId → CoroutineId → Bool)
     (picked : List CoroutineId) (cid : CoroutineId) : Bool :=
   (isRunnable st cid) &&
     picked.all (fun other =>
@@ -177,7 +177,7 @@ private def planWavePass {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (eligible : CoroutineId → CoroutineId → Bool)
+    (st : ProtocolMachineState ι γ π ε ν) (eligible : CoroutineId → CoroutineId → Bool)
     (remaining : List CoroutineId) :
     List CoroutineId × List CoroutineId :=
   let rec go (pending wave deferred : List CoroutineId) :=
@@ -198,7 +198,7 @@ def planDeterministicWavesEligible {ι γ π ε ν : Type u} [IdentityModel ι] 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (eligible : CoroutineId → CoroutineId → Bool) :
+    (st : ProtocolMachineState ι γ π ε ν) (eligible : CoroutineId → CoroutineId → Bool) :
     List (List CoroutineId) :=
   let st' := normalizeThreadedState st
   let rec loop (remaining : List CoroutineId) (waves : List (List CoroutineId)) (fuel : Nat) :
@@ -223,7 +223,7 @@ def planDeterministicWaves {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : List (List CoroutineId) :=
+    (st : ProtocolMachineState ι γ π ε ν) : List (List CoroutineId) :=
   planDeterministicWavesEligible st (fun _ _ => true)
 
 /-! ## Wave Chunking and Execution -/
@@ -251,7 +251,7 @@ private def executeWave {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (wave : List CoroutineId) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (wave : List CoroutineId) : ProtocolMachineState ι γ π ε ν :=
   let st0 := normalizeThreadedState st
   let sched0 := st0.sched
   let ready0 := removeWaveFromReady sched0.readyQueue wave
@@ -273,7 +273,7 @@ def executePlannedWaves {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (waves : List (List CoroutineId)) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (waves : List (List CoroutineId)) : ProtocolMachineState ι γ π ε ν :=
   waves.foldl executeWave st
 
 /-! ## Plan Certificates -/
@@ -297,7 +297,7 @@ private def waveReadyRunnableB {ι γ π ε ν : Type u} [IdentityModel ι] [Gua
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (wave : List CoroutineId) : Bool :=
+    (st : ProtocolMachineState ι γ π ε ν) (wave : List CoroutineId) : Bool :=
   wave.all (fun cid => cid ∈ st.sched.readyQueue && isRunnable st cid)
 
 private def wavePairwiseB {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -306,7 +306,7 @@ private def wavePairwiseB {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (wave : List CoroutineId) : Bool :=
+    (st : ProtocolMachineState ι γ π ε ν) (wave : List CoroutineId) : Bool :=
   let rec go (seen remaining : List CoroutineId) :=
     match remaining with
     | [] => true
@@ -329,7 +329,7 @@ def checkWaveAdmissible {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (wave : List CoroutineId) : Bool :=
+    (st : ProtocolMachineState ι γ π ε ν) (wave : List CoroutineId) : Bool :=
   waveReadyRunnableB st wave && wavePairwiseB st wave
 
 /-- Wave-certificate checker for `waveAdmissible` obligations. -/
@@ -339,7 +339,7 @@ def checkWaveCertificate {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (cert : WaveCertificate) : Bool :=
+    (st : ProtocolMachineState ι γ π ε ν) (cert : WaveCertificate) : Bool :=
   let picks := cert.waves.foldl (fun acc wave => acc ++ wave) []
   noDupB picks && cert.waves.all (checkWaveAdmissible st)
 
@@ -352,7 +352,7 @@ def plannedWaveCertificate {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (n : Nat) (st : VMState ι γ π ε ν) : WaveCertificate :=
+    (n : Nat) (st : ProtocolMachineState ι γ π ε ν) : WaveCertificate :=
   let planned := planDeterministicWaves st
   let bounded := planned.foldr (fun wave acc => chunkWave n wave ++ acc) []
   { waves := bounded, plannerStep := st.sched.stepCount }
@@ -364,7 +364,7 @@ def planThreadedRound {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (n : Nat) (st : VMState ι γ π ε ν) : ThreadedRoundPlan :=
+    (n : Nat) (st : ProtocolMachineState ι γ π ε ν) : ThreadedRoundPlan :=
   { certificate := plannedWaveCertificate n st }
 
 /-- Validate one threaded round plan certificate. -/
@@ -374,7 +374,7 @@ def checkThreadedRoundPlan {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (plan : ThreadedRoundPlan) : Bool :=
+    (st : ProtocolMachineState ι γ π ε ν) (plan : ThreadedRoundPlan) : Bool :=
   checkWaveCertificate st plan.certificate
 
 /-! ## Certified Threaded Round -/
@@ -386,7 +386,7 @@ def executeThreadedRoundPlan {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (plan : ThreadedRoundPlan) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (plan : ThreadedRoundPlan) : ProtocolMachineState ι γ π ε ν :=
   if checkThreadedRoundPlan st plan then
     executePlannedWaves st plan.certificate.waves
   else
@@ -400,7 +400,7 @@ def executeCertifiedRound {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (n : Nat) (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
+    (n : Nat) (st : ProtocolMachineState ι γ π ε ν) : ProtocolMachineState ι γ π ε ν :=
   executeThreadedRoundPlan st (planThreadedRound n st)
 
 /-! ## Threaded Scheduling API -/
@@ -412,7 +412,7 @@ def schedRoundThreaded {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (n : Nat) (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
+    (n : Nat) (st : ProtocolMachineState ι γ π ε ν) : ProtocolMachineState ι γ π ε ν :=
   if n = 0 then
     st
   else if n = 1 then
@@ -430,7 +430,7 @@ def runScheduledThreaded {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (fuel : Nat) (concurrency : Nat) (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
+    (fuel : Nat) (concurrency : Nat) (st : ProtocolMachineState ι γ π ε ν) : ProtocolMachineState ι γ π ε ν :=
   match fuel with
   | 0 => st
   | fuel' + 1 =>

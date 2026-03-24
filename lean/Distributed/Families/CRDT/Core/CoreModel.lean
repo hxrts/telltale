@@ -13,7 +13,7 @@ Reusable CRDT theorem-family infrastructure:
 
 /-
 The Problem. We need one reusable distributed-family module for CRDT theorem forms
-that can be attached to VM theorem packs, instead of keeping CRDT claims as prose only.
+that can be attached to protocol machine theorem packs, instead of keeping CRDT claims as prose only.
 Solution Structure. Define a minimal CRDT model interface and proposition families,
 then expose assumption bundles, validation helpers, and protocol-level API wrappers.
 -/

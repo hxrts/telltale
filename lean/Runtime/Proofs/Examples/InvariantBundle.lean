@@ -4,7 +4,7 @@ set_option autoImplicit false
 
 /-! # Runtime.Proofs.Examples.InvariantBundle
 
-One-shot VM invariant-space examples showing automatic theorem derivation for:
+One-shot protocol machine invariant-space examples showing automatic theorem derivation for:
 - liveness/progress,
 - FLP/CAP impossibility spaces,
 - classical transport artifacts.

@@ -3,10 +3,10 @@ import Runtime.Proofs.ProtocolMachine.InstrSpec.ConfigEquivAcquire
 /-! # Erasure Exactness and Instruction Basis
 
 Instruction classification, basis completeness, and counterexample
-infrastructure for proving VM instruction set exactness. -/
+infrastructure for proving protocol machine instruction set exactness. -/
 
 /-
-The Problem. To prove the VM instruction set is exact (neither too
+The Problem. To prove the protocol machine instruction set is exact (neither too
 large nor too small), we classify instructions and show completeness:
 every declared class is representable, and removing any class breaks
 some property.
@@ -66,7 +66,7 @@ def InstructionBasisMinimality
     ∃ w : MissingClassCounterexample declared (droppedClassRepresentable representable c),
       w.missingClass = c
 
-/-- Packaged exactness statement for VM instruction-basis claims. -/
+/-- Packaged exactness statement for protocol machine instruction-basis claims. -/
 def InstructionBasisExactness
     (declared : List InstrClass)
     (representable : InstrClass → Prop) : Prop :=
@@ -84,7 +84,7 @@ theorem instruction_basis_exactness_of_components
 
 /-! ## Concrete Canonical Basis Instantiation -/
 
-/-- Canonical class basis used by the concrete VM exactness instantiation. -/
+/-- Canonical class basis used by the concrete protocol machine exactness instantiation. -/
 def canonicalInstrBasis : List InstrClass :=
   [ .commValue
   , .commChoice
@@ -97,7 +97,7 @@ def canonicalInstrBasis : List InstrClass :=
   , .regControl
   ]
 
-/-- Canonical representability predicate for the declared VM class basis. -/
+/-- Canonical representability predicate for the declared protocol machine class basis. -/
 def canonicalRepresentable : InstrClass → Prop :=
   fun c => c ∈ canonicalInstrBasis
 
@@ -113,7 +113,7 @@ def instrClassWitnessId : InstrClass → String
   | .concurrency => "missing-concurrency"
   | .regControl => "missing-regControl"
 
-/-- Concrete completeness witness for the canonical VM class basis. -/
+/-- Concrete completeness witness for the canonical protocol machine class basis. -/
 theorem canonical_instr_basis_completeness :
     InstructionBasisCompleteness canonicalInstrBasis canonicalRepresentable := by
   intro c hIn
@@ -130,14 +130,14 @@ theorem canonical_instr_basis_minimality :
   intro hRep
   exact hRep.1 rfl
 
-/-- Concrete end-to-end exactness theorem for the canonical VM class basis. -/
+/-- Concrete end-to-end exactness theorem for the canonical protocol machine class basis. -/
 theorem canonical_instr_basis_exactness :
     InstructionBasisExactness canonicalInstrBasis canonicalRepresentable := by
   exact instruction_basis_exactness_of_components
     canonical_instr_basis_completeness
     canonical_instr_basis_minimality
 
-/-! ## VM <-> Classical-Erasure Exact Correspondence -/
+/-! ## protocol machine <-> Classical-Erasure Exact Correspondence -/
 
 /-- The twelve classical erasures tracked by the paper/theory interface. -/
 inductive ClassicalErasure where
@@ -174,19 +174,19 @@ def classRealizesErasure : InstrClass → ClassicalErasure → Prop
   | _, _ => False
 
 /-- Coverage: every tracked erasure is realized by some declared class. -/
-def VMErasureCoverage (declared : List InstrClass) : Prop :=
+def ProtocolMachineErasureCoverage (declared : List InstrClass) : Prop :=
   ∀ e : ClassicalErasure, ∃ c : InstrClass, c ∈ declared ∧ classRealizesErasure c e
 
 /-- Irredundancy: each declared class has at least one uniquely realized erasure. -/
-def VMErasureIrredundancy (declared : List InstrClass) : Prop :=
+def ProtocolMachineErasureIrredundancy (declared : List InstrClass) : Prop :=
   ∀ c : InstrClass, c ∈ declared →
     ∃ e : ClassicalErasure,
       classRealizesErasure c e ∧
       ∀ c' : InstrClass, c' ∈ declared → c' ≠ c → ¬ classRealizesErasure c' e
 
 /-- Exact correspondence package: coverage + irredundancy. -/
-def VMErasureExactCorrespondence (declared : List InstrClass) : Prop :=
-  VMErasureCoverage declared ∧ VMErasureIrredundancy declared
+def ProtocolMachineErasureExactCorrespondence (declared : List InstrClass) : Prop :=
+  ProtocolMachineErasureCoverage declared ∧ ProtocolMachineErasureIrredundancy declared
 
 /-! ## Unique Erasure Witnesses -/
 
@@ -215,9 +215,9 @@ theorem eq_of_realizes_unique_erasure {c c' : InstrClass}
 
 /-! ## Canonical Coverage and Irredundancy Proofs -/
 
-/-- Concrete coverage proof for the canonical VM class basis. -/
+/-- Concrete coverage proof for the canonical protocol machine class basis. -/
 theorem canonical_instr_basis_erasure_coverage :
-    VMErasureCoverage canonicalInstrBasis := by
+    ProtocolMachineErasureCoverage canonicalInstrBasis := by
   intro e
   cases e with
   | identity =>
@@ -245,25 +245,25 @@ theorem canonical_instr_basis_erasure_coverage :
   | timeParameter =>
       exact ⟨.regControl, by simp [canonicalInstrBasis], by simp [classRealizesErasure]⟩
 
-/-- Concrete irredundancy proof for the canonical VM class basis. -/
+/-- Concrete irredundancy proof for the canonical protocol machine class basis. -/
 theorem canonical_instr_basis_erasure_irredundancy :
-    VMErasureIrredundancy canonicalInstrBasis := by
+    ProtocolMachineErasureIrredundancy canonicalInstrBasis := by
   intro c hIn
   refine ⟨uniqueErasureOfClass c, class_realizes_unique_erasure c, ?_⟩
   intro c' hIn' hNe hReal
   have hEq : c' = c := eq_of_realizes_unique_erasure hReal
   exact hNe hEq
 
-/-- Concrete VM <-> erasure exact correspondence theorem. -/
+/-- Concrete protocol machine <-> erasure exact correspondence theorem. -/
 theorem canonical_instr_basis_vm_erasure_exact_correspondence :
-    VMErasureExactCorrespondence canonicalInstrBasis := by
+    ProtocolMachineErasureExactCorrespondence canonicalInstrBasis := by
   exact ⟨canonical_instr_basis_erasure_coverage, canonical_instr_basis_erasure_irredundancy⟩
 
 /-! ## Erasure-Basis Isomorphism -/
 
 /-- Erasure-level basis isomorphism: two instruction-class bases realize
     exactly the same classical erasures. -/
-def VMErasureBasisIsomorphic
+def ProtocolMachineErasureBasisIsomorphic
     (declared₁ declared₂ : List InstrClass) : Prop :=
   ∀ e : ClassicalErasure,
     (∃ c : InstrClass, c ∈ declared₁ ∧ classRealizesErasure c e) ↔
@@ -272,9 +272,9 @@ def VMErasureBasisIsomorphic
 /-- Any two bases with full erasure coverage are isomorphic in erasure expressivity. -/
 theorem protocol_machine_erasure_basis_isomorphic_of_coverages
     {declared₁ declared₂ : List InstrClass}
-    (hCov₁ : VMErasureCoverage declared₁)
-    (hCov₂ : VMErasureCoverage declared₂) :
-    VMErasureBasisIsomorphic declared₁ declared₂ := by
+    (hCov₁ : ProtocolMachineErasureCoverage declared₁)
+    (hCov₂ : ProtocolMachineErasureCoverage declared₂) :
+    ProtocolMachineErasureBasisIsomorphic declared₁ declared₂ := by
   intro e
   constructor
   · intro _hLeft
@@ -285,11 +285,11 @@ theorem protocol_machine_erasure_basis_isomorphic_of_coverages
     exact ⟨c, hIn, hReal⟩
 
 /-- Canonical uniqueness closure (up to erasure isomorphism):
-    any basis with exact VM↔erasure correspondence is equivalent to the canonical basis. -/
+    any basis with exact protocol machine↔erasure correspondence is equivalent to the canonical basis. -/
 theorem canonical_instr_basis_unique_up_to_erasure_isomorphism
     {declared : List InstrClass}
-    (hExact : VMErasureExactCorrespondence declared) :
-    VMErasureBasisIsomorphic declared canonicalInstrBasis := by
+    (hExact : ProtocolMachineErasureExactCorrespondence declared) :
+    ProtocolMachineErasureBasisIsomorphic declared canonicalInstrBasis := by
   exact protocol_machine_erasure_basis_isomorphic_of_coverages hExact.1 canonical_instr_basis_erasure_coverage
 
 /-! ## Canonical Morphism Generation -/
@@ -327,7 +327,7 @@ def SafeClassicalErasure (e : ClassicalErasure) : Prop :=
 /-! ## Generated-By Equivalence -/
 
 /-- Full exactness form for the classical-erasure boundary:
-    safe erasures are exactly those generated by canonical VM/ConfigEquiv morphisms. -/
+    safe erasures are exactly those generated by canonical protocol machine/ConfigEquiv morphisms. -/
 theorem safe_classical_erasure_iff_generated_by_canonical_morphisms
     (e : ClassicalErasure) :
     SafeClassicalErasure e ↔ GeneratedByCanonicalMorphisms e := by

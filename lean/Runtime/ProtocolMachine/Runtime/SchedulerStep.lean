@@ -22,7 +22,7 @@ def schedule {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν] :
-    VMState ι γ π ε ν → Option (CoroutineId × VMState ι γ π ε ν) :=
+    ProtocolMachineState ι γ π ε ν → Option (CoroutineId × ProtocolMachineState ι γ π ε ν) :=
   fun st =>
     -- Pick a runnable coroutine and remove it from the queue.
     let st' := { st with sched := syncLaneViews st.sched }
@@ -38,7 +38,7 @@ def currentInstr_coro {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coroId : CoroutineId) : Option (Instr γ ε) :=
+    (st : ProtocolMachineState ι γ π ε ν) (coroId : CoroutineId) : Option (Instr γ ε) :=
   -- Use the coroutine PC to fetch the next instruction.
   match st.coroutines[coroId]? with
   | none => none
@@ -52,7 +52,7 @@ def currentInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (_ : Unit) : Option (Instr γ ε) :=
+    (st : ProtocolMachineState ι γ π ε ν) (_ : Unit) : Option (Instr γ ε) :=
   -- Determine the instruction selected by the scheduler.
   match schedule st with
   | none => none
@@ -63,7 +63,7 @@ def schedStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν] :
-    VMState ι γ π ε ν → Option (VMState ι γ π ε ν) :=
+    ProtocolMachineState ι γ π ε ν → Option (ProtocolMachineState ι γ π ε ν) :=
   fun st =>
     -- Execute a single scheduled coroutine step.
     match schedule st with
@@ -80,7 +80,7 @@ def single_lane_schedule_compat {ι γ π ε ν : Type u} [IdentityModel ι] [Gu
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν)
+    (st : ProtocolMachineState ι γ π ε ν)
     (laneOf' : LaneOfMap)
     (laneQueues' : LaneQueueMap)
     (laneBlocked' : LaneBlockedMap γ)
@@ -99,7 +99,7 @@ def schedule_confluence {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Prop :=
+    (st : ProtocolMachineState ι γ π ε ν) : Prop :=
   -- Scheduling is deterministic for a given state.
   ∀ st1 st2, schedule st = some st1 → schedule st = some st2 → st1 = st2
 
@@ -108,35 +108,35 @@ def policy_selection_deterministic {ι γ π ε ν : Type u} [IdentityModel ι] 
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (policy : SchedPolicy) (st : VMState ι γ π ε ν) : Prop :=
+    (policy : SchedPolicy) (st : ProtocolMachineState ι γ π ε ν) : Prop :=
   st.sched.policy = policy → schedule_confluence st
 
 def roundRobin_selection_deterministic {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Prop :=
+    (st : ProtocolMachineState ι γ π ε ν) : Prop :=
   policy_selection_deterministic .roundRobin st
 
 def cooperative_selection_deterministic {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Prop :=
+    (st : ProtocolMachineState ι γ π ε ν) : Prop :=
   policy_selection_deterministic .cooperative st
 
 def priority_selection_deterministic {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (f : CoroutineId → Nat) (st : VMState ι γ π ε ν) : Prop :=
+    (f : CoroutineId → Nat) (st : ProtocolMachineState ι γ π ε ν) : Prop :=
   policy_selection_deterministic (.priority f) st
 
 def progressAware_selection_deterministic {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Prop :=
+    (st : ProtocolMachineState ι γ π ε ν) : Prop :=
   policy_selection_deterministic .progressAware st
 
 /-! ### Policy refinement and liveness predicates -/
@@ -147,7 +147,7 @@ def cooperative_refines_concurrent {ι γ π ε ν : Type u} [IdentityModel ι] 
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Prop :=
+    (st : ProtocolMachineState ι γ π ε ν) : Prop :=
   let st' := { st with sched := syncLaneViews st.sched }
   -- Cooperative and round-robin choose identically on the same normalized queue.
   st.sched.policy = .cooperative →
@@ -158,7 +158,7 @@ def starvation_free {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Prop :=
+    (st : ProtocolMachineState ι γ π ε ν) : Prop :=
   -- Scheduling is live: a runnable coroutine in the queue guarantees a scheduled step.
   ∀ cid, cid ∈ st.sched.readyQueue →
     match st.coroutines[cid]? with

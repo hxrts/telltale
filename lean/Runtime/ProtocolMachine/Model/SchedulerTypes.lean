@@ -3,7 +3,7 @@ import Std
 
 /-! # Scheduler Policy Types
 
-`SchedPolicy`, the scheduling strategy enum referenced by `VMConfig`. Defined in
+`SchedPolicy`, the scheduling strategy enum referenced by `ProtocolMachineConfig`. Defined in
 its own file to avoid circular imports: `Config.lean` needs the policy type, but the
  full scheduler implementation (`Runtime/ProtocolMachine/Scheduler.lean`) needs the config.
 

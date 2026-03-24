@@ -8,12 +8,12 @@ import Protocol.Coherence.Delegation
 set_option autoImplicit false
 set_option relaxedAutoImplicit false
 
-/-! # VM Instruction Specification Proofs
+/-! # protocol machine Instruction Specification Proofs
 
-Preservation theorems connecting VM instruction specs to Protocol-level coherence. -/
+Preservation theorems connecting protocol machine instruction specs to Protocol-level coherence. -/
 
 /-
-The Problem. VM instructions (send, recv, select, branch, delegate) must preserve
+The Problem. protocol machine instructions (send, recv, select, branch, delegate) must preserve
 the Protocol coherence invariant. Each instruction has a spec defining pre/post
 conditions that need to be connected to the coherence preservation theorems.
 

@@ -40,7 +40,7 @@ def totalTypeDepth {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Nat :=
+    (st : ProtocolMachineState ι γ π ε ν) : Nat :=
   ((SessionStore.toGEnv st.sessions).map (fun p => p.2.depth)).foldl (· + ·) 0
 
 def totalTraceLoad {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -49,7 +49,7 @@ def totalTraceLoad {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Nat :=
+    (st : ProtocolMachineState ι γ π ε ν) : Nat :=
   ((SessionStore.toDEnv st.sessions).list.map (fun p => p.2.length)).foldl (· + ·) 0
 
 /-- Productive-work measure aligned with Paper 2:
@@ -60,7 +60,7 @@ def protocolMachineWorkMeasure {ι γ π ε ν : Type u} [IdentityModel ι] [Gua
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Nat :=
+    (st : ProtocolMachineState ι γ π ε ν) : Nat :=
   2 * totalTypeDepth st + totalTraceLoad st
 
 /-- Credit bank for scheduler/administrative overhead. -/
@@ -70,7 +70,7 @@ def protocolMachineCreditBank {ι γ π ε ν : Type u} [IdentityModel ι] [Guar
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Nat :=
+    (st : ProtocolMachineState ι γ π ε ν) : Nat :=
   st.sched.readyQueue.length + st.sched.blockedSet.toList.length
 
 /-- Global protocol-machine potential = productive work + credit bank. -/
@@ -80,7 +80,7 @@ def protocolMachinePotential {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Nat :=
+    (st : ProtocolMachineState ι γ π ε ν) : Nat :=
   protocolMachineWorkMeasure st + protocolMachineCreditBank st
 
 /-! ## Topology-Change Invariance -/
@@ -91,7 +91,7 @@ theorem protocol_machine_work_measure_apply_topology_change_eq {ι γ π ε ν :
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (tc : TopologyChange (ι := ι)) :
+    (st : ProtocolMachineState ι γ π ε ν) (tc : TopologyChange (ι := ι)) :
     protocolMachineWorkMeasure (applyTopologyChange st tc) = protocolMachineWorkMeasure st := by
   cases tc with
   | crash site =>
@@ -109,7 +109,7 @@ theorem protocol_machine_credit_bank_apply_topology_change_eq {ι γ π ε ν : 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (tc : TopologyChange (ι := ι)) :
+    (st : ProtocolMachineState ι γ π ε ν) (tc : TopologyChange (ι := ι)) :
     protocolMachineCreditBank (applyTopologyChange st tc) = protocolMachineCreditBank st := by
   cases tc with
   | crash site =>
@@ -128,7 +128,7 @@ theorem topology_change_nonincreasing_potential {ι γ π ε ν : Type u} [Ident
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (tc : TopologyChange (ι := ι)) :
+    (st : ProtocolMachineState ι γ π ε ν) (tc : TopologyChange (ι := ι)) :
     protocolMachinePotential (applyTopologyChange st tc) ≤ protocolMachinePotential st := by
   simp [protocolMachinePotential, protocol_machine_work_measure_apply_topology_change_eq, protocol_machine_credit_bank_apply_topology_change_eq]
 
@@ -141,7 +141,7 @@ def ProtocolMachineProductiveStep {ι γ π ε ν : Type u} [IdentityModel ι] [
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st st' : VMState ι γ π ε ν) : Prop :=
+    (st st' : ProtocolMachineState ι γ π ε ν) : Prop :=
   schedStep st = some st' ∧ protocolMachineWorkMeasure st' < protocolMachineWorkMeasure st
 
 theorem productive_steps_decrease_work_measure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -150,7 +150,7 @@ theorem productive_steps_decrease_work_measure {ι γ π ε ν : Type u} [Identi
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    {st st' : VMState ι γ π ε ν}
+    {st st' : ProtocolMachineState ι γ π ε ν}
     (hProd : ProtocolMachineProductiveStep st st') :
     protocolMachineWorkMeasure st' + 1 ≤ protocolMachineWorkMeasure st := by
   exact Nat.succ_le_of_lt hProd.2
@@ -164,7 +164,7 @@ def paper2WorkMeasure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Nat :=
+    (st : ProtocolMachineState ι γ π ε ν) : Nat :=
   protocolMachineWorkMeasure st
 
 theorem protocol_machine_work_measure_eq_paper2_work_measure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -173,7 +173,7 @@ theorem protocol_machine_work_measure_eq_paper2_work_measure {ι γ π ε ν : T
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) :
+    (st : ProtocolMachineState ι γ π ε ν) :
     protocolMachineWorkMeasure st = paper2WorkMeasure st := rfl
 
 theorem protocol_machine_potential_extends_paper2_work_measure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -182,7 +182,7 @@ theorem protocol_machine_potential_extends_paper2_work_measure {ι γ π ε ν :
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) :
+    (st : ProtocolMachineState ι γ π ε ν) :
     paper2WorkMeasure st ≤ protocolMachinePotential st := by
   unfold paper2WorkMeasure protocolMachinePotential
   exact Nat.le_add_right (protocolMachineWorkMeasure st) (protocolMachineCreditBank st)
@@ -196,7 +196,7 @@ structure ProtocolMachineFosterAssumptions {ι γ π ε ν : Type u} [IdentityMo
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (step : VMState ι γ π ε ν → VMState ι γ π ε ν) : Prop where
+    (step : ProtocolMachineState ι γ π ε ν → ProtocolMachineState ι γ π ε ν) : Prop where
   nonincrease : ∀ st, protocolMachinePotential (step st) ≤ protocolMachinePotential st
   strict_on_pos : ∀ st, protocolMachinePotential st ≠ 0 → protocolMachinePotential (step st) < protocolMachinePotential st
 
@@ -206,9 +206,9 @@ def ProtocolMachineDriftSystem {ι γ π ε ν : Type u} [IdentityModel ι] [Gua
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (step : VMState ι γ π ε ν → VMState ι γ π ε ν)
+    (step : ProtocolMachineState ι γ π ε ν → ProtocolMachineState ι γ π ε ν)
     (h : ProtocolMachineFosterAssumptions step) :
-    Classical.FosterLyapunovHarris.DriftSystem (VMState ι γ π ε ν) :=
+    Classical.FosterLyapunovHarris.DriftSystem (ProtocolMachineState ι γ π ε ν) :=
   { step := step
     V := protocolMachinePotential
     nonincrease := h.nonincrease
@@ -222,9 +222,9 @@ def protocolMachineFosterCtx {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (step : VMState ι γ π ε ν → VMState ι γ π ε ν)
-    (w : Runtime.Proofs.ClassicalTransportWitness (VMState ι γ π ε ν)) :
-    Classical.Transport.TransportCtx (VMState ι γ π ε ν) :=
+    (step : ProtocolMachineState ι γ π ε ν → ProtocolMachineState ι γ π ε ν)
+    (w : Runtime.Proofs.ClassicalTransportWitness (ProtocolMachineState ι γ π ε ν)) :
+    Classical.Transport.TransportCtx (ProtocolMachineState ι γ π ε ν) :=
   { step := step
     coherent := w.coherent
     harmony := w.harmony
@@ -236,10 +236,10 @@ def protocolMachineFosterInput {ι γ π ε ν : Type u} [IdentityModel ι] [Gua
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (step : VMState ι γ π ε ν → VMState ι γ π ε ν)
+    (step : ProtocolMachineState ι γ π ε ν → ProtocolMachineState ι γ π ε ν)
     (h : ProtocolMachineFosterAssumptions step)
-    (w : Runtime.Proofs.ClassicalTransportWitness (VMState ι γ π ε ν)) :
-    Classical.Transport.FosterInput (VMState ι γ π ε ν) (protocolMachineFosterCtx step w) :=
+    (w : Runtime.Proofs.ClassicalTransportWitness (ProtocolMachineState ι γ π ε ν)) :
+    Classical.Transport.FosterInput (ProtocolMachineState ι γ π ε ν) (protocolMachineFosterCtx step w) :=
   { system := ProtocolMachineDriftSystem step h
     step_agrees := rfl }
 
@@ -251,9 +251,9 @@ theorem protocol_machine_transported_foster_lyapunov {ι γ π ε ν : Type u} [
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (step : VMState ι γ π ε ν → VMState ι γ π ε ν)
+    (step : ProtocolMachineState ι γ π ε ν → ProtocolMachineState ι γ π ε ν)
     (h : ProtocolMachineFosterAssumptions step)
-    (w : Runtime.Proofs.ClassicalTransportWitness (VMState ι γ π ε ν)) :
+    (w : Runtime.Proofs.ClassicalTransportWitness (ProtocolMachineState ι γ π ε ν)) :
     Classical.Transport.FosterConclusion (protocolMachineFosterInput step h w) := by
   exact Classical.Transport.transported_foster_lyapunov (input := protocolMachineFosterInput step h w)
 
@@ -263,9 +263,9 @@ theorem r7_protocol_machine_potential_integration {ι γ π ε ν : Type u} [Ide
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (step : VMState ι γ π ε ν → VMState ι γ π ε ν)
+    (step : ProtocolMachineState ι γ π ε ν → ProtocolMachineState ι γ π ε ν)
     (h : ProtocolMachineFosterAssumptions step)
-    (w : Runtime.Proofs.ClassicalTransportWitness (VMState ι γ π ε ν)) :
+    (w : Runtime.Proofs.ClassicalTransportWitness (ProtocolMachineState ι γ π ε ν)) :
     ∀ st n, protocolMachinePotential ((step^[n]) st) ≤ protocolMachinePotential st := by
   intro st n
   exact protocol_machine_transported_foster_lyapunov step h w st n

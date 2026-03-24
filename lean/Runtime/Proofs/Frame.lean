@@ -10,8 +10,8 @@ derives the cross-session diamond property as a consequence.
 ## Key Results
 
 - `session_local_op_frame`: Session-local operations preserve coherence for other sessions
-- (VM-level) `instr_frame`: Instructions only affect their footprint
-- (VM-level) `cross_session_diamond_from_frame`: Disjoint footprints → commutativity
+- (protocol-machine-level) `instr_frame`: Instructions only affect their footprint
+- (protocol-machine-level) `cross_session_diamond_from_frame`: Disjoint footprints → commutativity
 
 ## Proof Strategy
 
@@ -24,11 +24,11 @@ The proof proceeds in two steps:
 2. **Diamond from frame**: If two operations have disjoint footprints, they
    commute. The proof applies the frame rule twice.
 
-## VM Integration
+## protocol machine Integration
 
-The VM-level instruction footprint and diamond proofs require resolving the
+The protocol-machine-level instruction footprint and diamond proofs require resolving the
 Store name collision between Protocol.Environments.Core and Iris.Std.Heap.
-Once resolved, the proofs here connect to VM execution via:
+Once resolved, the proofs here connect to protocol machine execution via:
 
 - Each instruction has a footprint (set of sessions it can affect)
 - `instr_frame`: instruction i preserves SessionCoherent s when s ∉ footprint(i)
@@ -122,14 +122,14 @@ theorem disjoint_sessions_independent {s₁ s₂ : SessionId}
   rw [protocol_machine_coherent_iff_forall_session_coherent] at hCoh
   exact ⟨hCoh s₁, hCoh s₂⟩
 
-/-! ## VM-Level Footprint and Frame Interfaces -/
+/-! ## protocol machine-Level Footprint and Frame Interfaces -/
 
 /-- Primary endpoint hint for a coroutine: use the first owned endpoint when present. -/
 def coroutinePrimaryEndpoint? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (coro : CoroutineState γ ε) : Option Endpoint :=
   coro.ownedEndpoints.head?
 
-/-- VM instruction footprint derived from `InstrSpec.instrFootprint`.
+/-- protocol machine instruction footprint derived from `InstrSpec.instrFootprint`.
 
 For most instructions we use the coroutine's primary endpoint session.
 For `acquire`, we conservatively include a second session via `some ep.sid`
@@ -143,26 +143,26 @@ def vmInstrFootprint {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
       | .acquire _ _ => instrFootprint ep (some ep.sid)
       | _ => instrFootprint ep none
 
-/-! ## VM Session Coherence Projection -/
+/-! ## protocol machine Session Coherence Projection -/
 
-/-- Session coherence projected from VM state session store. -/
+/-- Session coherence projected from protocol machine state session store. -/
 def vmSessionCoherent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (s : SessionId) : Prop :=
+    (st : ProtocolMachineState ι γ π ε ν) (s : SessionId) : Prop :=
   SessionCoherent (SessionStore.toGEnv st.sessions) (SessionStore.toDEnv st.sessions) s
 
-/-- Abstract one-instruction VM step relation indexed by the decoded instruction. -/
-abbrev VMInstrStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+/-- Abstract one-instruction protocol machine step relation indexed by the decoded instruction. -/
+abbrev ProtocolMachineInstrStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν] :=
-  VMState ι γ π ε ν → CoroutineId → Instr γ ε → VMState ι γ π ε ν → Prop
+  ProtocolMachineState ι γ π ε ν → CoroutineId → Instr γ ε → ProtocolMachineState ι γ π ε ν → Prop
 
 /-! ## Instruction Frame Contract -/
 
@@ -174,8 +174,8 @@ def instruction_frame {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (step : VMInstrStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) : Prop :=
-  ∀ {st st' : VMState ι γ π ε ν} {cid : CoroutineId}
+    (step : ProtocolMachineInstrStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) : Prop :=
+  ∀ {st st' : ProtocolMachineState ι γ π ε ν} {cid : CoroutineId}
     {instr : Instr γ ε} {coro : CoroutineState γ ε} {s : SessionId},
     st.coroutines[cid]? = some coro →
     step st cid instr st' →
@@ -192,9 +192,9 @@ theorem cross_session_diamond_from_frame {ι γ π ε ν : Type u} [IdentityMode
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    {step : VMInstrStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)}
+    {step : ProtocolMachineInstrStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)}
     (hFrame : instruction_frame (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) step)
-    {st st1 st2 st12 st21 : VMState ι γ π ε ν}
+    {st st1 st2 st12 st21 : ProtocolMachineState ι γ π ε ν}
     {c1 c2 : CoroutineId}
     {i1 i2 : Instr γ ε}
     {co1 co2 : CoroutineState γ ε}

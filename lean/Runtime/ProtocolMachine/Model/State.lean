@@ -8,25 +8,25 @@ import Runtime.ProtocolMachine.Model.Program
 import Runtime.ProtocolMachine.Runtime.Monitor
 import Runtime.Resources.Arena
 import Runtime.Resources.ResourceModel
-/-! # VM Runtime State
-The mutable state of a running VM instance. Defines per-coroutine state (`CoroutineState`
+/-! # protocol machine Runtime State
+The mutable state of a running protocol machine instance. Defines per-coroutine state (`CoroutineState`
 with registers, program counter, owned endpoints, progress tokens, knowledge set, cost
 budget, and speculation state), blocking and fault reasons, observable and internal events,
 execution result containers, scheduler bookkeeping (`SchedState`), and the top-level
-`VMState` record that ties everything together.
-`VMState` holds the configuration, loaded programs, coroutine array, signed buffers,
+`ProtocolMachineState` record that ties everything together.
+`ProtocolMachineState` holds the configuration, loaded programs, coroutine array, signed buffers,
 persistent state, session store, scoped resource states, guard resources, the session
 monitor, the observable trace, failure model state (crashed sites, partitioned edges),
 and reserved fields for ghost sessions and progress supply.
 This is the Lean specification of state that will be reimplemented in Rust. The
 `WFVMState` predicate captures basic well-formedness (PC bounds, session id validity). -/
 /-
-The Problem. The VM executes multiple concurrent coroutines, each with its own
+The Problem. The protocol machine executes multiple concurrent coroutines, each with its own
 registers, program counter, owned endpoints, and cost budget. We need a state
 representation that captures all runtime information for execution, scheduling,
 monitoring, and failure handling.
 Solution Structure. Defines `CoroutineState` for per-coroutine state (registers, PC,
-endpoints, knowledge set, speculation). `VMState` aggregates coroutines with global
+endpoints, knowledge set, speculation). `ProtocolMachineState` aggregates coroutines with global
 state: configuration, loaded programs, session store, scheduler state, failure model.
 `WFVMState` predicate captures well-formedness invariants (PC bounds, session validity).
 -/
@@ -42,14 +42,14 @@ structure SpeculationState where
   ghostSid : GhostSessionId
   depth : Nat
   deriving Repr
-structure VMGhostSession where
+structure ProtocolMachineGhostSession where
   ghostSid : GhostSessionId
   realSid : SessionId
   owner : CoroutineId
   projectedLocalTypes : List (Endpoint × LocalType) := []
   createdTick : Nat
   deriving Repr
-structure VMSpeculationCheckpoint where
+structure ProtocolMachineSpeculationCheckpoint where
   ghostSid : GhostSessionId
   tick : Nat
   coroId : CoroutineId
@@ -57,11 +57,11 @@ structure VMSpeculationCheckpoint where
   nextEffectNonce : Nat
   needsReconciliation : Bool
   deriving Repr, DecidableEq, Inhabited
-abbrev VMGhostSessionStore := Std.HashMap GhostSessionId VMGhostSession
-abbrev VMSpeculationCheckpointStore := Std.HashMap GhostSessionId VMSpeculationCheckpoint
+abbrev ProtocolMachineGhostSessionStore := Std.HashMap GhostSessionId ProtocolMachineGhostSession
+abbrev ProtocolMachineSpeculationCheckpointStore := Std.HashMap GhostSessionId ProtocolMachineSpeculationCheckpoint
 structure GhostRuntimeState where
-  sessions : VMGhostSessionStore := {}
-  checkpoints : VMSpeculationCheckpointStore := {}
+  sessions : ProtocolMachineGhostSessionStore := {}
+  checkpoints : ProtocolMachineSpeculationCheckpointStore := {}
   deriving Repr, Inhabited
 structure HandlerSession where
   sid : SessionId
@@ -206,7 +206,7 @@ private def setTick (sid : SessionId) (t : Nat) (ticks : List (SessionId × Nat)
           (sid', t') :: go rest
   go ticks
 /-! ## Trace helpers: normalization -/
-/-- Normalize a VM trace by assigning session-local ticks. -/
+/-- Normalize a protocol machine trace by assigning session-local ticks. -/
 def normalizeVmTrace {ε : Type u} [EffectRuntime ε]
     (trace : List (TickedObsEvent ε)) : List (TickedObsEvent ε) :=
   let step :=
@@ -353,9 +353,9 @@ structure SchedState (γ : Type u) where
   crossLaneHandoffs : List CrossLaneHandoff := []
   timeslice : Nat
   stepCount : Nat
-/-! ## VM state -/
-structure VMState (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν] where
-  config : VMConfig ι γ π ε ν
+/-! ## protocol machine state -/
+structure ProtocolMachineState (ι γ π ε ν : Type u) [ProtocolMachineDomain ι γ π ε ν] where
+  config : ProtocolMachineConfig ι γ π ε ν
   code : Program γ ε
   programs : Array (Program γ ε)
   coroutines : Array (CoroutineState γ ε)
@@ -389,40 +389,40 @@ structure VMState (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν] where
   mask : Unit
   ghostSessions : GhostRuntimeState
   progressSupply : Unit
-/-! ## VM state helpers and invariants -/
+/-! ## protocol machine state helpers and invariants -/
 /-- Allocate a fresh externally-visible effect nonce. -/
-def allocEffectNonce {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
-    (st : VMState ι γ π ε ν) : Nat × VMState ι γ π ε ν :=
+def allocEffectNonce {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) : Nat × ProtocolMachineState ι γ π ε ν :=
   let nonce := st.nextEffectNonce
   (nonce, { st with nextEffectNonce := nonce + 1 })
 /-- Check whether an externally-visible effect nonce was already used. -/
-def effectNonceUsed {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
-    (st : VMState ι γ π ε ν) (nonce : Nat) : Bool :=
+def effectNonceUsed {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) (nonce : Nat) : Bool :=
   nonce ∈ st.usedEffectNonces
 /-- Register an externally-visible effect nonce as consumed (idempotency key). -/
-def registerEffectNonce {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
-    (st : VMState ι γ π ε ν) (nonce : Nat) : VMState ι γ π ε ν :=
+def registerEffectNonce {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) (nonce : Nat) : ProtocolMachineState ι γ π ε ν :=
   if nonce ∈ st.usedEffectNonces then
     st
   else
     { st with usedEffectNonces := nonce :: st.usedEffectNonces }
-/-- Append checkpoint metadata deterministically to VM state. -/
-def recordCheckpointMeta {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
-    (st : VMState ι γ π ε ν) (checkpoint : CheckpointMeta) : VMState ι γ π ε ν :=
+/-- Append checkpoint metadata deterministically to protocol machine state. -/
+def recordCheckpointMeta {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) (checkpoint : CheckpointMeta) : ProtocolMachineState ι γ π ε ν :=
   { st with checkpointLog := st.checkpointLog ++ [checkpoint] }
 /-- Install/update a restart anchor for replay/recovery entry. -/
-def setRestartAnchor {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
-    (st : VMState ι γ π ε ν) (anchor : RestartAnchor) : VMState ι γ π ε ν :=
+def setRestartAnchor {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) (anchor : RestartAnchor) : ProtocolMachineState ι γ π ε ν :=
   { st with restartAnchor := some anchor }
 
-/-! ## VM state helpers: communication identity and sequence state -/
+/-! ## protocol machine state helpers: communication identity and sequence state -/
 
 def communicationIdentityPayloadDigest (v : Value) : String :=
   reprStr v
 def communicationIdentityNullifier (ident : CommunicationIdentity) : String :=
   reprStr ident
-def communicationReplayRoot {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
-    (st : VMState ι γ π ε ν) : String :=
+def communicationReplayRoot {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) : String :=
   reprStr (st.commNextSendSeq, st.commNextRecvSeq, st.commConsumedNullifiers)
 def commSeqLookup (entries : List (Edge × Nat)) (edge : Edge) : Nat :=
   match entries.find? (fun p => decide (p.fst = edge)) with
@@ -439,17 +439,17 @@ def commSeqSet (entries : List (Edge × Nat)) (edge : Edge) (next : Nat) :
         else
           (edge', n') :: go rest
   go entries
-def commAllocSendSeq {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
-    (st : VMState ι γ π ε ν) (edge : Edge) : Nat × VMState ι γ π ε ν :=
+def commAllocSendSeq {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) (edge : Edge) : Nat × ProtocolMachineState ι γ π ε ν :=
   let seqNo := commSeqLookup st.commNextSendSeq edge
   let nextSend := commSeqSet st.commNextSendSeq edge (seqNo + 1)
   (seqNo, { st with commNextSendSeq := nextSend })
 
-/-! ## VM state helpers: replay-consumption transition -/
+/-! ## protocol machine state helpers: replay-consumption transition -/
 
-def commConsumeReceiveIdentity {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
-    (st : VMState ι γ π ε ν) (tick : Nat) (ident : CommunicationIdentity) :
-    Except String (CommunicationConsumeArtifact × VMState ι γ π ε ν) :=
+def commConsumeReceiveIdentity {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) (tick : Nat) (ident : CommunicationIdentity) :
+    Except String (CommunicationConsumeArtifact × ProtocolMachineState ι γ π ε ν) :=
   let preRoot := communicationReplayRoot st
   match st.config.communicationReplayMode with
   | .off =>
@@ -494,11 +494,11 @@ def commConsumeReceiveIdentity {ι γ π ε ν : Type u} [VMDomain ι γ π ε �
         let st' := { st1 with commConsumptionArtifacts := st1.commConsumptionArtifacts ++ [artifact] }
         .ok (artifact, st')
 
-/-! ## VM state invariants -/
+/-! ## protocol machine state invariants -/
 
 /-- Well-formedness: coroutine PCs are in range and sessions are bounded. -/
-def WFVMState {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
-    (st : VMState ι γ π ε ν) : Prop :=
+def WFVMState {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) : Prop :=
   (∀ i (h : i < st.coroutines.size),
     let c := st.coroutines[i]'h
     ∃ prog, st.programs[c.programId]? = some prog ∧ c.pc < prog.code.size) ∧

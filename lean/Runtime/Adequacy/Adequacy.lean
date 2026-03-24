@@ -8,16 +8,16 @@ import Protocol.Process
 
 /- 
 The Problem. Define observable traces and adequacy statements that connect
-the VM execution to protocol-level correctness claims.
+the protocol machine execution to protocol-level correctness claims.
 
 Solution Structure. Provide trace/event types and adequacy
 statements that can be refined by later proofs.
 -/
 
-/-! # Task 22: Observable Trace Infrastructure and VM Adequacy
+/-! # Task 22: Observable Trace Infrastructure and protocol machine Adequacy
 
 Observable events, trace properties, and the capstone adequacy theorem
-for VM execution.
+for protocol machine execution.
 
 ## Definitions
 
@@ -158,7 +158,7 @@ def FIFOConsistent {ε : Type u} [EffectRuntime ε]
   -- Receive order respects send order for each edge.
   ∀ e v1 v2, SendBeforeObs trace e v1 v2 → RecvBeforeObs trace e v1 v2
 
-/-! ## VM Adequacy Statement -/
+/-! ## protocol machine Adequacy Statement -/
 
 def session_endpoint_resources {ν : Type u} [VerificationModel ν]
     [GhostMapSlot LocalType]
@@ -187,7 +187,7 @@ def ghost_speculation_resources {ι γ π ε ν : Type u}
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     [GhostMapSlot Nat]
-    (γsp : GhostName) (st : VMState ι γ π ε ν) : iProp :=
+    (γsp : GhostName) (st : ProtocolMachineState ι γ π ε ν) : iProp :=
   -- Session-scoped speculation resources for active ghost sessions.
   sepList (st.ghostSessions.sessions.toList.map
     (fun p => speculation_session_inv γsp p.snd.realSid))
@@ -199,8 +199,8 @@ def session_state_interp {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     [GhostMapSlot Unit] [GhostMapSlot Nat] [GhostMapSlot LocalType]
-    (st : VMState ι γ π ε ν) : iProp :=
-  -- Interpret concrete VM state as WF/refinement facts plus concrete ghost resources.
+    (st : ProtocolMachineState ι γ π ε ν) : iProp :=
+  -- Interpret concrete protocol machine state as WF/refinement facts plus concrete ghost resources.
   iProp.exist fun γs =>
     iProp.exist fun γp =>
       iProp.exist fun γk =>
@@ -219,7 +219,7 @@ def protocol_machine_adequacy {ι γ π ε ν : Type} [IdentityModel ι] [GuardL
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν] : Prop :=
   -- V1 adequacy: observable traces are causally and FIFO consistent.
-  ∀ (st : VMState ι γ π ε ν), WFVMState st →
+  ∀ (st : ProtocolMachineState ι γ π ε ν), WFVMState st →
     let obs := obsTraceOf (ε:=ε) st.obsTrace;
     CausallyConsistent obs ∧ FIFOConsistent obs
 
@@ -228,9 +228,9 @@ theorem protocol_machine_adequacy_of_trace_consistency
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (hCausal : ∀ st : VMState ι γ π ε ν, WFVMState st →
+    (hCausal : ∀ st : ProtocolMachineState ι γ π ε ν, WFVMState st →
       CausallyConsistent (obsTraceOf (ε:=ε) st.obsTrace))
-    (hFIFO : ∀ st : VMState ι γ π ε ν, WFVMState st →
+    (hFIFO : ∀ st : ProtocolMachineState ι γ π ε ν, WFVMState st →
       FIFOConsistent (obsTraceOf (ε:=ε) st.obsTrace)) :
     protocol_machine_adequacy (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) := by
   intro st hWF
@@ -243,7 +243,7 @@ def no_phantom_events {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν] : Prop :=
   -- Every observed event comes from some step event at that index.
-  ∀ (st : VMState ι γ π ε ν) idx ev,
+  ∀ (st : ProtocolMachineState ι γ π ε ν) idx ev,
     (idx, ev) ∈ obsTraceOf (ε:=ε) st.obsTrace →
       ∃ stepEv ∈ st.obsTrace, observeAt (ε:=ε) idx stepEv = ev
 omit [Telltale.TelltaleIris] in

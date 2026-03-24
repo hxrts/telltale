@@ -65,7 +65,7 @@ private def localTypesForSid {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (sid : SessionId) : List (Endpoint × LocalType) :=
+    (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) : List (Endpoint × LocalType) :=
   match st.sessions.find? (fun p => decide (p.1 = sid)) with
   | some (_, sess) => sess.localTypes
   | none => []
@@ -76,7 +76,7 @@ def matchesRealState {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (ghostSid : GhostSessionId) : Bool :=
+    (st : ProtocolMachineState ι γ π ε ν) (ghostSid : GhostSessionId) : Bool :=
   match st.ghostSessions.sessions.get? ghostSid with
   | none => false
   | some ghost =>
@@ -88,7 +88,7 @@ def stepFork {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (sidReg : Reg) : StepPack ι γ π ε ν :=
   -- Enter speculation mode for a ghost session id, respecting configured limits.
   if !st.config.speculationEnabled then
@@ -107,13 +107,13 @@ def stepFork {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
       match readReg coro.regs sidReg with
       | some (.nat gsid) =>
           let snapshot := localTypesForSid st gsid
-          let ghost : VMGhostSession :=
+          let ghost : ProtocolMachineGhostSession :=
             { ghostSid := gsid
             , realSid := gsid
             , owner := coro.id
             , projectedLocalTypes := snapshot
             , createdTick := st.clock }
-          let checkpoint : VMSpeculationCheckpoint :=
+          let checkpoint : ProtocolMachineSpeculationCheckpoint :=
             { ghostSid := gsid
             , tick := st.clock
             , coroId := coro.id
@@ -138,7 +138,7 @@ def stepJoin {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) : StepPack ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) : StepPack ι γ π ε ν :=
   -- Join speculation: requires active speculation state.
   match coro.specState with
   | none =>
@@ -162,7 +162,7 @@ def stepAbort {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) : StepPack ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) : StepPack ι γ π ε ν :=
   -- Abort speculation: requires active speculation state.
   match coro.specState with
   | none =>

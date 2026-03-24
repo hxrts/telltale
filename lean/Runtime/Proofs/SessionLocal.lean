@@ -6,7 +6,7 @@ import Protocol.Coherence.RoleSwap
 
 This module defines per-session slicing of Protocol state and proves that coherence
 decomposes as a separating conjunction over sessions. This is the foundation for
-the frame rule and cross-session diamond proofs at the VM level.
+the frame rule and cross-session diamond proofs at the protocol machine level.
 
 ## Key Definitions
 
@@ -39,7 +39,7 @@ is used here to prove that receiving a delegated endpoint safely extends the
 coroutine's footprint.
 
 Note: This module is kept at the Protocol level (GEnv, DEnv, Coherent) to avoid
-the Iris import collision. VM-level integration requires resolving the Store
+the Iris import collision. protocol-machine-level integration requires resolving the Store
 name collision between Protocol.Environments.Core and Iris.Std.Heap.
 -/
 
@@ -107,7 +107,7 @@ to govern permitted operations.
     The delegated list contains (SessionId, LocalType) pairs where the LocalType
     governs what operations are permitted on the delegated endpoint.
 
-    Note: At the VM level, this will be computed from CoroutineState.ownedEndpoints.
+    Note: At the protocol machine level, this will be computed from CoroutineState.ownedEndpoints.
     Here we define the abstract structure to enable Protocol-level reasoning. -/
 structure SessionFootprint where
   /-- The primary session -/
@@ -208,7 +208,7 @@ theorem disjoint_footprints_different_sessions {fp₁ fp₂ : SessionFootprint}
 /-- Receiving a delegated endpoint preserves session coherence for other sessions.
 
     This is the key lemma connecting Protocol-level delegation preservation to
-    VM-level reasoning. It uses the `delegation_preserves_coherent` theorem.
+    protocol-machine-level reasoning. It uses the `delegation_preserves_coherent` theorem.
 
     **Intuition:** Delegation is message passing where the payload includes a channel.
     The sender's type changes (endpoint sent away), the receiver's type changes
@@ -444,9 +444,9 @@ theorem swap_roles_preserves_other_sessions {G : GEnv} {D : DEnv}
   exact session_local_op_preserves_other (s:=s) (f:=swapRolesOp s A B)
     (hLocal:=swap_roles_session_local (s:=s) (A:=A) (B:=B)) sOther hDiff hCoh
 
-/-! ## VM Integration Notes
+/-! ## protocol machine Integration Notes
 
-The VM-level instruction footprint and cross-session diamond proofs are in
+The protocol-machine-level instruction footprint and cross-session diamond proofs are in
 `Runtime/Proofs/Frame.lean`:
 
 - `vmInstrFootprint : Instr → CoroutineState → Set SessionId`

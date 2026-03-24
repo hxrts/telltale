@@ -7,7 +7,7 @@ Determinism and application of recovery actions, showing the failure
 handling state machine is well-defined and deterministic. -/
 
 /-
-The Problem. When failures occur, the VM must decide and apply recovery
+The Problem. When failures occur, the protocol machine must decide and apply recovery
 actions. For deterministic execution, `decideRecovery` must be a function
 (equal inputs give equal outputs) and action application must be defined.
 
@@ -29,7 +29,7 @@ def applyRecoveryAction {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (act : RecoveryAction) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (act : RecoveryAction) : ProtocolMachineState ι γ π ε ν :=
   let st' :=
     match act with
     | .continue => st
@@ -55,7 +55,7 @@ def applyFailure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (f : Failure ι) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (f : Failure ι) : ProtocolMachineState ι γ π ε ν :=
   let st0 := appendFailureTraceEvent st .failure s!"failure:{faultClassOfFailure f}"
   match f with
   | .siteCrash site =>
@@ -137,8 +137,8 @@ def applyFailureEvents {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (events : List (Failure ι)) :
-    VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (events : List (Failure ι)) :
+    ProtocolMachineState ι γ π ε ν :=
   events.foldl applyFailure st
 
 -- # Tick-level ingress orchestration
@@ -151,9 +151,9 @@ def ingressTick {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν)
+    (st : ProtocolMachineState ι γ π ε ν)
     (envEvents : List (EnvironmentEvent (ι := ι)))
-    (failureEvents : List (Failure ι)) : VMState ι γ π ε ν :=
+    (failureEvents : List (Failure ι)) : ProtocolMachineState ι γ π ε ν :=
   let st' := applyEnvironmentEvents st envEvents
   let st'' := applyFailureEvents st' failureEvents
   match schedStep st'' with
@@ -169,7 +169,7 @@ def failureTick {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (event? : Option (Failure ι)) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (event? : Option (Failure ι)) : ProtocolMachineState ι γ π ε ν :=
   match event? with
   | some f => applyFailure st f
   | none =>
@@ -186,16 +186,16 @@ inductive FStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν] :
-    VMState ι γ π ε ν → VMState ι γ π ε ν → Prop where
-  -- Failure-aware step relation for the VM.
-  | normal (st st' : VMState ι γ π ε ν)
+    ProtocolMachineState ι γ π ε ν → ProtocolMachineState ι γ π ε ν → Prop where
+  -- Failure-aware step relation for the protocol machine.
+  | normal (st st' : ProtocolMachineState ι γ π ε ν)
       (h : schedStep st = some st') : FStep st st'
-  | siteCrash (st : VMState ι γ π ε ν) (site : IdentityModel.SiteId ι) :
+  | siteCrash (st : ProtocolMachineState ι γ π ε ν) (site : IdentityModel.SiteId ι) :
       FStep st (crashSite st site)
-  | partition (st : VMState ι γ π ε ν) (edges : List Edge) :
+  | partition (st : ProtocolMachineState ι γ π ε ν) (edges : List Edge) :
       FStep st (disconnectEdges st edges)
-  | heal (st : VMState ι γ π ε ν) (edges : List Edge) :
+  | heal (st : ProtocolMachineState ι γ π ε ν) (edges : List Edge) :
       FStep st (reconnectEdges st edges)
-  | closeOnCrash (st : VMState ι γ π ε ν) (sid : SessionId) :
+  | closeOnCrash (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) :
       -- Surviving participants can close sessions after a crash.
       FStep st (closeSession st sid)

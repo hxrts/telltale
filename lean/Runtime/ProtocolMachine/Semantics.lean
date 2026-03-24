@@ -14,5 +14,5 @@ set_option autoImplicit false
 
 /-! # Runtime.ProtocolMachine.Semantics
 
-Operational and denotational instruction semantics for VM execution.
+Operational and denotational instruction semantics for protocol machine execution.
 -/

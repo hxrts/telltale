@@ -5,7 +5,7 @@ import Runtime.Invariants
 import IrisExtractionInstance
 
 /-
-The Problem. The VM needs a code loading interface with V1 hash checks
+The Problem. The protocol machine needs a code loading interface with V1 hash checks
 and a safe update predicate that preserves protocol coherence.
 
 Solution Structure. Provide hash-based load helpers and a `SafeUpdate`
@@ -54,8 +54,8 @@ def loadTrusted {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (img : CodeImage γ ε) :
-    VMState ι γ π ε ν × LoadResult ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (img : CodeImage γ ε) :
+    ProtocolMachineState ι γ π ε ν × LoadResult ν :=
   -- Trusted images replace the current program directly.
   let programs' := st.programs.push img.program
   ({ st with code := img.program, programs := programs' },
@@ -68,8 +68,8 @@ def loadUntrusted {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (img : UntrustedImage γ ε ν) :
-    VMState ι γ π ε ν × LoadResult ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (img : UntrustedImage γ ε ν) :
+    ProtocolMachineState ι γ π ε ν × LoadResult ν :=
   -- Untrusted images require signature verification.
   if code_signature_check img then
     let programs' := st.programs.push img.program

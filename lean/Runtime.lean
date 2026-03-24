@@ -36,12 +36,12 @@ import IrisExtractionInstance
 The Problem. Provide a single entry point that re-exports the runtime spec
 and its proof layers for downstream modules and documentation.
 
-Solution Structure. Import the VM spec, resources, program logic, and
+Solution Structure. Import the protocol machine spec, resources, program logic, and
 monitor/adequacy modules in one place.
 -/
 
 /-! # Runtime
 
-VM definition, Iris separation logic backend, resource algebras,
+protocol machine definition, Iris separation logic backend, resource algebras,
 session invariants, WP rules, and adequacy.
 -/

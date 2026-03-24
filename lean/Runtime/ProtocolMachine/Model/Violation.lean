@@ -6,7 +6,7 @@ import Std
 `Violation` and `ViolationPolicy`, spec-level types for safety and liveness
 violations. A `Violation` is either a safety violation (should never occur in
 well-typed runs) or a liveness violation (progress failure). The `ViolationPolicy`
-in `VMConfig` decides whether to allow or reject each violation, letting the
+in `ProtocolMachineConfig` decides whether to allow or reject each violation, letting the
 deployment choose between strict abort-on-violation and lenient logging modes.
 
 Referenced by both `Config.lean` (stores the policy) and the adequacy layer

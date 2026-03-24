@@ -11,7 +11,7 @@ set_option autoImplicit false
 
 /-! # Runtime.Proofs.InvariantSpace
 
-Proof-carrying invariant-space bundle for VM theorem derivation.
+Proof-carrying invariant-space bundle for protocol machine theorem derivation.
 -/
 
 namespace Runtime
@@ -162,7 +162,7 @@ structure SemanticObjectWitnessBundle where
     Option CrossTargetProgressDependentWorkWitness := none
   transformationLocalObligations? : Option TransformationLocalObligationWitness := none
 
-/-- Core VM invariant space:
+/-- Core protocol machine invariant space:
 - optional liveness bundle (enables termination/progress theorems when provided),
 - optional classical transport witness for theorem transport,
 - optional output-condition witness for predicate-gated output semantics,

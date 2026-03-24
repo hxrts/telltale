@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 /-! # Runtime.Proofs.Examples.DistributedProfiles
 
-End-to-end VM examples for distributed theorem spaces:
+End-to-end protocol machine examples for distributed theorem spaces:
 profile attachment in `ProtocolMachineInvariantSpaceWithProfiles` automatically materializes
 the corresponding theorem artifact in `ProtocolMachineTheoremPack`.
 -/

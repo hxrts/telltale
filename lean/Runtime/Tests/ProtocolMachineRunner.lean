@@ -12,19 +12,19 @@ import Choreography.Projection.Json
 import Choreography.Projection.Project.Primitive
 
 
-/-! # VM Runner
+/-! # protocol machine Runner
 
-Reads JSON from stdin, loads choreographies, runs the VM, and prints trace JSON.
+Reads JSON from stdin, loads choreographies, runs the protocol machine, and prints trace JSON.
 -/
 
 /-
-The Problem. Testing the VM pipeline requires an executable entry point that can
-load choreographies from JSON, run them through the VM, and produce observable
+The Problem. Testing the protocol machine pipeline requires an executable entry point that can
+load choreographies from JSON, run them through the protocol machine, and produce observable
 output for verification against expected traces.
 
 Solution Structure. Defines `emptyState` with unit implementations for all domain
 parameters, `emptyArena` and `emptyMonitor` for initialization. Reads JSON from
-stdin, parses choreographies, loads them into the VM, executes until termination,
+stdin, parses choreographies, loads them into the protocol machine, executes until termination,
 and prints the resulting trace as JSON for external validation.
 -/
 
@@ -52,8 +52,8 @@ theorem empty_monitor_unified_monitor_preserves :
     unified_monitor_preserves emptyMonitor := by
   simpa [emptyMonitor] using (unified_monitor_preserves_identity (γ:=UnitGuard))
 
-/-- Empty VM state for loading choreographies. -/
-def emptyState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+/-- Empty protocol machine state for loading choreographies. -/
+def emptyState : ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
   { config := unitConfig
   , code := { code := #[], entryPoints := [], localTypes := [], handlerTypes := [], metadata := ProgramMeta.empty }
   , programs := #[]
@@ -90,7 +90,7 @@ def buildImage (g : GlobalType) (roles : List Role) : CodeImage UnitGuard UnitEf
   CodeImage.fromLocalTypes locals g
 
 abbrev RunnerState :=
-  VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify
+  ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify
 
 def execStatusTag : ExecStatus UnitGuard → String
   | .continue => "continue"
@@ -181,7 +181,7 @@ def main : IO Unit := do
     let (st', _) := loadChoreography st image
     st := st'
 
-  -- Run the VM while collecting per-step scheduler state.
+  -- Run the protocol machine while collecting per-step scheduler state.
   let (st', stepStates) := runWithStepStates maxSteps concurrency st
 
   -- Build output JSON.

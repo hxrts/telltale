@@ -40,7 +40,7 @@ def stepSpawn {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (target : PC) (args : List Reg) : StepPack ι γ π ε ν :=
   -- Spawn a new coroutine with copied arguments.
   let newId := st.nextCoroId
@@ -61,7 +61,7 @@ def stepSet {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (dst : Reg) (v : Value) : StepPack ι γ π ε ν :=
   -- Set a register to an immediate value.
   match setReg coro.regs dst v with
@@ -74,7 +74,7 @@ def stepMove {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (dst src : Reg) : StepPack ι γ π ε ν :=
   -- Move a value between registers.
   match readReg coro.regs src with
@@ -90,7 +90,7 @@ def stepJump {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (target : PC) : StepPack ι γ π ε ν :=
   -- Jump to a new program counter.
   let coro' := { coro with pc := target, status := .ready }
@@ -102,7 +102,7 @@ def stepYield {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) : StepPack ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) : StepPack ι γ π ε ν :=
   -- Yield to scheduler by blocking the coroutine.
   let coro' := advancePc { coro with status := .blocked .spawnWait }
   pack coro' st (mkRes .yielded none)

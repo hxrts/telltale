@@ -3,7 +3,7 @@ import Runtime.ProtocolMachine.Model.SchedulerTypes
 
 /-! # Runtime.ProtocolMachine.Runtime.SchedulerHelpers
 
-Lane-aware queue and runnable-selection helpers for the VM scheduler.
+Lane-aware queue and runnable-selection helpers for the protocol machine scheduler.
 -/
 
 /-
@@ -119,7 +119,7 @@ def getCoro {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (cid : CoroutineId) : Option (CoroutineState γ ε) :=
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) : Option (CoroutineState γ ε) :=
   -- Safe coroutine lookup.
   st.coroutines[cid]?
 
@@ -127,7 +127,7 @@ def isRunnable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (cid : CoroutineId) : Bool :=
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) : Bool :=
   -- Check runnable status using the coroutine array.
   match getCoro st cid with
   | some c => runnable c
@@ -137,7 +137,7 @@ def hasProgress {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (cid : CoroutineId) : Bool :=
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) : Bool :=
   -- Check progress-token ownership for the coroutine.
   match getCoro st cid with
   | some c => hasProgressToken c
@@ -191,7 +191,7 @@ def pickRoundRobinInQueue {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (queue : SchedQueue) : Option (CoroutineId × SchedQueue) :=
+    (st : ProtocolMachineState ι γ π ε ν) (queue : SchedQueue) : Option (CoroutineId × SchedQueue) :=
   -- Pick the first runnable coroutine in the queue.
   takeOut queue (fun cid => isRunnable st cid)
 
@@ -199,14 +199,14 @@ def pickRoundRobin {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Option (CoroutineId × SchedQueue) :=
+    (st : ProtocolMachineState ι γ π ε ν) : Option (CoroutineId × SchedQueue) :=
   pickRoundRobinInQueue st st.sched.readyQueue
 
 def pickProgressInQueue {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (queue : SchedQueue) : Option (CoroutineId × SchedQueue) :=
+    (st : ProtocolMachineState ι γ π ε ν) (queue : SchedQueue) : Option (CoroutineId × SchedQueue) :=
   -- Prefer runnable coroutines with progress tokens.
   match takeOut queue (fun cid => isRunnable st cid && hasProgress st cid) with
   | some res => some res
@@ -216,14 +216,14 @@ def pickProgress {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Option (CoroutineId × SchedQueue) :=
+    (st : ProtocolMachineState ι γ π ε ν) : Option (CoroutineId × SchedQueue) :=
   pickProgressInQueue st st.sched.readyQueue
 
 def pickPriorityInQueue {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (queue : SchedQueue) (f : CoroutineId → Nat) :
+    (st : ProtocolMachineState ι γ π ε ν) (queue : SchedQueue) (f : CoroutineId → Nat) :
     Option (CoroutineId × SchedQueue) :=
   -- Pick the runnable coroutine with the highest priority.
   pickBest queue f (fun cid => isRunnable st cid)
@@ -232,7 +232,7 @@ def pickPriority {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (f : CoroutineId → Nat) :
+    (st : ProtocolMachineState ι γ π ε ν) (f : CoroutineId → Nat) :
     Option (CoroutineId × SchedQueue) :=
   pickPriorityInQueue st st.sched.readyQueue f
 
@@ -242,7 +242,7 @@ def pickRunnableInQueue {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (policy : SchedPolicy) (st : VMState ι γ π ε ν) (queue : SchedQueue) :
+    (policy : SchedPolicy) (st : ProtocolMachineState ι γ π ε ν) (queue : SchedQueue) :
     Option (CoroutineId × SchedQueue) :=
   match policy with
   | .roundRobin => pickRoundRobinInQueue st queue
@@ -256,7 +256,7 @@ def pickLaneAux {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (policy : SchedPolicy) (st : VMState ι γ π ε ν) (sched : SchedState γ)
+    (policy : SchedPolicy) (st : ProtocolMachineState ι γ π ε ν) (sched : SchedState γ)
     (lanes : List LaneId) (start offset fuel : Nat) : Option CoroutineId :=
   match fuel with
   | 0 => none
@@ -271,7 +271,7 @@ def pickRunnableFromSched {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (policy : SchedPolicy) (st : VMState ι γ π ε ν) (sched : SchedState γ) :
+    (policy : SchedPolicy) (st : ProtocolMachineState ι γ π ε ν) (sched : SchedState γ) :
     Option (CoroutineId × SchedQueue) :=
   let lanes := orderedLaneIds sched
   let start :=
@@ -291,7 +291,7 @@ def pickRunnable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : Option (CoroutineId × SchedQueue) :=
+    (st : ProtocolMachineState ι γ π ε ν) : Option (CoroutineId × SchedQueue) :=
   -- Policy-directed lane-aware runnable selection with global fallback.
   let sched := syncLaneViews st.sched
   let st' := { st with sched := sched }

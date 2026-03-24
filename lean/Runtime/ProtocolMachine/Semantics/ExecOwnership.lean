@@ -68,7 +68,7 @@ private def transferFaultPack {ι γ π ε ν : Type u} [IdentityModel ι] [Guar
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (msg : String) :
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (msg : String) :
     StepPack ι γ π ε ν :=
   faultPack st coro (.transferFault msg) msg
 
@@ -76,7 +76,7 @@ def transferCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint)
     (tid : Nat) (resources' : Std.HashMap ScopeId (ResourceState ν)) : StepPack ι γ π ε ν :=
   -- Move ownership, tokens, and facts between coroutines.
   let (movedTokens, keptTokens) := splitTokens coro ep
@@ -97,7 +97,7 @@ private def transferWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [G
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (tid : Nat) :
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (tid : Nat) :
     StepPack ι γ π ε ν :=
   -- Validate ownership and apply the transfer transaction.
   if owns coro ep then
@@ -122,7 +122,7 @@ def stepTransfer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (endpoint targetCoro _bundle : Reg) : StepPack ι γ π ε ν :=
   -- Transfer an owned endpoint to another coroutine.
   match readReg coro.regs endpoint, readReg coro.regs targetCoro with
@@ -140,7 +140,7 @@ def stepTag {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (fact dst : Reg) : StepPack ι γ π ε ν :=
   -- Record a knowledge fact and return success.
   match readReg coro.regs fact with
@@ -162,7 +162,7 @@ def stepCheck {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (knowledge target dst : Reg) : StepPack ι γ π ε ν :=
   -- Check whether a fact is in the knowledge set.
   match readReg coro.regs knowledge with

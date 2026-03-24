@@ -14,7 +14,7 @@ import SessionTypes.LocalTypeR
 import SessionTypes.GlobalType
 
 /-
-Executable Lean tests for the scheduled VM runner.
+Executable Lean tests for the scheduled protocol machine runner.
 -/
 
 /- ## Structured Block 1 -/
@@ -52,8 +52,8 @@ def obsTag : ObsEvent UnitEffect → String
 def traceTags (trace : List (TickedObsEvent UnitEffect)) : List String :=
   trace.map (fun ev => obsTag ev.event)
 
-/-- Minimal empty VM state for loading choreographies. -/
-def emptyState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+/-- Minimal empty protocol machine state for loading choreographies. -/
+def emptyState : ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
   { config := unitConfig
   , code := exampleProgram
   , programs := #[]
@@ -77,9 +77,9 @@ def emptyState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerif
   , progressSupply := () }
 
 def withCommReplayMode
-    (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify)
+    (st : ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify)
     (mode : CommunicationReplayMode) :
-    VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+    ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
   { st with config := { st.config with communicationReplayMode := mode } }
 
 def sampleCommIdentity (seqNo : Nat) : CommunicationIdentity :=
@@ -118,9 +118,9 @@ def mkReadyCoro (id : CoroutineId) (tokens : List ProgressToken := []) :
   , specState := none }
 
 def withSpecConfig
-    (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify)
+    (st : ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify)
     (enabled : Bool) (maxDepth : Nat) :
-    VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+    ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
   { st with
       config := { st.config with speculationEnabled := enabled, maxSpeculationDepth := maxDepth } }
 
@@ -141,7 +141,7 @@ def hasTransferFaultMsg (res : ExecResult UnitGuard UnitEffect) (msg : String) :
   | _ => false
 
 def schedulerTestState (policy : SchedPolicy) (allTokens : Bool := false) :
-    VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+    ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
   let token : ProgressToken := { sid := 0, endpoint := { sid := 0, role := "B" } }
   let tokensFor := fun (cid : CoroutineId) =>
     if allTokens || cid = 3 then [token] else []
@@ -165,7 +165,7 @@ def schedulerTestState (policy : SchedPolicy) (allTokens : Bool := false) :
       sched := syncLaneViews sched0 }
 
 def collectSchedulePicks (fuel : Nat)
-    (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify)
+    (st : ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify)
     (acc : List CoroutineId := []) : List CoroutineId :=
   match fuel with
   | 0 => acc.reverse
@@ -177,7 +177,7 @@ def collectSchedulePicks (fuel : Nat)
           collectSchedulePicks fuel' { st' with sched := sched' } (cid :: acc)
 
 theorem sched_round_one_eq_sched_round_one
-    (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify) :
+    (st : ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify) :
     schedRoundOne st = schedRound 1 st := by
   simp [schedRound]
 
@@ -431,9 +431,9 @@ def main : IO Unit := do
     "cross-target failure-visible conformance mismatch (reference vs sharded)"
 
   -- Test 18: restart/refinement preserves structured error adequacy (identity checkpoint/restart baseline).
-  let checkpointId := fun (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify) => st
+  let checkpointId := fun (st : ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify) => st
 /- ## Structured Block 7 -/
-  let restartId := fun (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify) => st
+  let restartId := fun (st : ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify) => st
   let restarted := restartId (checkpointId refFaultRun)
   expect (decide (restarted.structuredErrorEvents = refFaultRun.structuredErrorEvents))
     "restart structured-error adequacy mismatch under identity refinement"
@@ -516,7 +516,7 @@ def main : IO Unit := do
     match forkForJoinFail.st.ghostSessions.sessions.get? 40 with
     | none => forkForJoinFail
     | some ghost =>
-        let ghostBad : VMGhostSession :=
+        let ghostBad : ProtocolMachineGhostSession :=
           { ghost with projectedLocalTypes := [({ sid := ghost.realSid, role := "A" }, LocalType.end_)] }
         let ghostStateBad : GhostRuntimeState :=
           { forkForJoinFail.st.ghostSessions with
@@ -707,7 +707,7 @@ def main : IO Unit := do
   let regsPayload : RegFile := #[.chan epA, .string oversizedPayload, .unit, .unit, .unit, .unit, .unit, .unit]
   let senderPayload : CoroutineState UnitGuard UnitEffect :=
     { mkReadyCoro 999 with regs := regsPayload, ownedEndpoints := [epA] }
-  let stPayload : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+  let stPayload : ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
     { emptyState with
         config := { emptyState.config with maxPayloadBytes := 8 }
         coroutines := #[senderPayload]
@@ -748,7 +748,7 @@ def main : IO Unit := do
   let regsStrict : RegFile := #[.chan epStrictA, .nat 1, .unit, .unit, .unit, .unit, .unit, .unit]
   let senderStrict : CoroutineState UnitGuard UnitEffect :=
     { mkReadyCoro 1000 with regs := regsStrict, ownedEndpoints := [epStrictA] }
-  let stStrictCfg : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+  let stStrictCfg : ProtocolMachineState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
     { emptyState with
         config := { emptyState.config with payloadValidationMode := .strictSchema }
         coroutines := #[senderStrict]

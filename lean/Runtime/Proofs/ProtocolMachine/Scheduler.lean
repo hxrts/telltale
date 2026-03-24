@@ -2,13 +2,13 @@ import Runtime.ProtocolMachine.Runtime.Scheduler
 
 set_option autoImplicit false
 
-/-! # VM Scheduler Properties
+/-! # protocol machine Scheduler Properties
 
 Proofs of scheduler correctness properties: confluence, cooperative refinement,
 and helper lemmas for queue operations. -/
 
 /-
-The Problem. The VM scheduler must satisfy confluence (order of ready coroutines
+The Problem. The protocol machine scheduler must satisfy confluence (order of ready coroutines
 doesn't affect reachable states) and cooperative scheduling must refine concurrent
 semantics. These properties underpin deterministic execution guarantees.
 
@@ -26,7 +26,7 @@ theorem schedule_confluence_holds {ι γ π ε ν : Type u} [IdentityModel ι] [
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : schedule_confluence st :=
+    (st : ProtocolMachineState ι γ π ε ν) : schedule_confluence st :=
   fun _ _ h1 h2 => by
     have := h1.symm.trans h2
     exact Option.some.inj this
@@ -37,9 +37,9 @@ theorem cooperative_refines_concurrent_holds {ι γ π ε ν : Type u} [Identity
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : cooperative_refines_concurrent st := by
+    (st : ProtocolMachineState ι γ π ε ν) : cooperative_refines_concurrent st := by
   intro hcoop
-  let st' : VMState ι γ π ε ν := { st with sched := syncLaneViews st.sched }
+  let st' : ProtocolMachineState ι γ π ε ν := { st with sched := syncLaneViews st.sched }
   have hPolicy : st'.sched.policy = .cooperative := by
     simpa [st', syncLaneViews] using hcoop
   have hEq :
@@ -53,7 +53,7 @@ theorem single_lane_schedule_compat_holds {ι γ π ε ν : Type u} [IdentityMod
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν)
+    (st : ProtocolMachineState ι γ π ε ν)
     (laneOf' : LaneOfMap)
     (laneQueues' : LaneQueueMap)
     (laneBlocked' : LaneBlockedMap γ)
@@ -73,7 +73,7 @@ theorem policy_selection_deterministic_holds {ι γ π ε ν : Type u} [Identity
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (policy : SchedPolicy) (st : VMState ι γ π ε ν) :
+    (policy : SchedPolicy) (st : ProtocolMachineState ι γ π ε ν) :
     policy_selection_deterministic policy st := by
   intro _ st1 st2 h1 h2
   exact Option.some.inj (h1.symm.trans h2)
@@ -148,7 +148,7 @@ private theorem pick_runnable_in_queue_some_of_mem_runnable
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (policy : SchedPolicy) (st : VMState ι γ π ε ν) (queue : SchedQueue)
+    (policy : SchedPolicy) (st : ProtocolMachineState ι γ π ε ν) (queue : SchedQueue)
     (cid : CoroutineId) (hmem : cid ∈ queue) (hrun : isRunnable st cid = true) :
     ∃ found rest, pickRunnableInQueue policy st queue = some (found, rest) := by
   cases policy with
@@ -180,7 +180,7 @@ private theorem pick_runnable_from_sched_some_of_mem_runnable
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (policy : SchedPolicy) (st : VMState ι γ π ε ν) (sched : SchedState γ)
+    (policy : SchedPolicy) (st : ProtocolMachineState ι γ π ε ν) (sched : SchedState γ)
     (cid : CoroutineId) (hmem : cid ∈ sched.readyQueue) (hrun : isRunnable st cid = true) :
     ∃ found rest, pickRunnableFromSched policy st sched = some (found, rest) := by
   have hQueue :
@@ -212,18 +212,18 @@ private theorem pick_runnable_from_sched_some_of_mem_runnable
             | none => none) = some (picked, removeFirst picked sched.readyQueue)
       simp [hLane]
 
-/-! ## Runnable Pick From VM State -/
+/-! ## Runnable Pick From protocol machine State -/
 
 private theorem pick_runnable_some_of_mem_runnable
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (cid : CoroutineId)
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId)
     (hmem : cid ∈ st.sched.readyQueue) (hrun : isRunnable st cid = true) :
     ∃ found rest, pickRunnable st = some (found, rest) := by
   let sched : SchedState γ := syncLaneViews st.sched
-  let st' : VMState ι γ π ε ν := { st with sched := sched }
+  let st' : ProtocolMachineState ι γ π ε ν := { st with sched := sched }
   have hmem' : cid ∈ sched.readyQueue := by
     simpa [sched, syncLaneViews] using hmem
   have hrun' : isRunnable st' cid = true := by
@@ -241,7 +241,7 @@ theorem starvation_free_holds {ι γ π ε ν : Type u} [IdentityModel ι] [Guar
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : starvation_free st := by
+    (st : ProtocolMachineState ι γ π ε ν) : starvation_free st := by
   intro cid hmem
   match hcoro : st.coroutines[cid]? with
   | none => exact trivial
@@ -252,7 +252,7 @@ theorem starvation_free_holds {ι γ π ε ν : Type u} [IdentityModel ι] [Guar
       cases hstatus with
       | inl h => rw [h]
       | inr h => rw [h]
-    let stNorm : VMState ι γ π ε ν := { st with sched := syncLaneViews st.sched }
+    let stNorm : ProtocolMachineState ι γ π ε ν := { st with sched := syncLaneViews st.sched }
     have hmemNorm : cid ∈ stNorm.sched.readyQueue := by
       simpa [stNorm, syncLaneViews] using hmem
     have hrunNorm : isRunnable stNorm cid = true := by

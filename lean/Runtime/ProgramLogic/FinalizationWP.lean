@@ -27,7 +27,7 @@ def finalization_config_ready {ι γ π ε ν : Type}
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (cfg : VMConfig ι γ π ε ν) : Prop :=
+    (cfg : ProtocolMachineConfig ι γ π ε ν) : Prop :=
   -- Deterministic finalization preconditions hold.
   deterministic_finalization_ok cfg
 
@@ -39,7 +39,7 @@ def wp_close_final {ι γ π ε ν : Type}
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (γn : GhostName) (ft : FinalizationToken) (cfg : VMConfig ι γ π ε ν) : iProp :=
+    (γn : GhostName) (ft : FinalizationToken) (cfg : ProtocolMachineConfig ι γ π ε ν) : iProp :=
   -- Close-final requires token ownership and deterministic finalization readiness.
   iProp.sep (finalization_required γn ft)
     (iProp.pure (finalization_config_ready cfg))
@@ -50,7 +50,7 @@ def wp_invoke_final {ι γ π ε ν : Type}
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (γn : GhostName) (ft : FinalizationToken) (cfg : VMConfig ι γ π ε ν) : iProp :=
+    (γn : GhostName) (ft : FinalizationToken) (cfg : ProtocolMachineConfig ι γ π ε ν) : iProp :=
   -- Invoke-final has the same gate surface as close-final in V2.
   iProp.sep (finalization_required γn ft)
     (iProp.pure (finalization_config_ready cfg))

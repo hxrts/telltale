@@ -14,7 +14,7 @@ The execution pipeline is:
 6. Dispatch to the per-instruction step function via `stepInstr`.
 7. Write back the updated coroutine and append any observable event to the trace.
 
-The scheduler calls `execInstr` in a loop. Each call produces an updated `VMState`
+The scheduler calls `execInstr` in a loop. Each call produces an updated `ProtocolMachineState`
 and an `ExecResult` indicating whether the coroutine continued, yielded, blocked,
 halted, faulted, or triggered a structural change (spawn, transfer, fork, join, abort). -/
 
@@ -51,7 +51,7 @@ private def appendOutputConditionCheck {ι γ π ε ν : Type u} [IdentityModel 
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (check : OutputConditionCheck) : VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (check : OutputConditionCheck) : ProtocolMachineState ι γ π ε ν :=
   { st with outputConditionChecks := st.outputConditionChecks ++ [check] }
 
 /-! ### Monitor endpoint/tag extraction -/
@@ -112,7 +112,7 @@ private def monitorSessionShapeError? {ι γ π ε ν : Type u} [IdentityModel �
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (instr : Instr γ ε) :
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (instr : Instr γ ε) :
     Option String :=
   match instr with
   | .send chan _ | .offer chan _ =>
@@ -139,7 +139,7 @@ private def monitorPrecheckError? {ι γ π ε ν : Type u} [IdentityModel ι] [
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (instr : Instr γ ε) :
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (instr : Instr γ ε) :
     Option String :=
   if monitorAllows st.monitor instr then
     monitorSessionShapeError? st coro instr
@@ -150,8 +150,8 @@ private def recordMonitorJudgment {ι γ π ε ν : Type u} [IdentityModel ι] [
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (instr : Instr γ ε) :
-    VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (instr : Instr γ ε) :
+    ProtocolMachineState ι γ π ε ν :=
   match monitorEndpointForInstr? coro instr with
   | none => st
   | some ep =>
@@ -163,8 +163,8 @@ def commitPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (stBase : VMState ι γ π ε ν) (coroId : CoroutineId) (pack' : StepPack ι γ π ε ν) :
-    VMState ι γ π ε ν × ExecResult γ ε :=
+    (stBase : ProtocolMachineState ι γ π ε ν) (coroId : CoroutineId) (pack' : StepPack ι γ π ε ν) :
+    ProtocolMachineState ι γ π ε ν × ExecResult γ ε :=
   -- Gate protocol-visible outputs on output-condition verification.
   match pack'.res.event.bind outputConditionClaimOfEvent with
   | none =>
@@ -190,8 +190,8 @@ def execWithInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coroId : CoroutineId) (coro : CoroutineState γ ε)
-    (instr : Instr γ ε) : VMState ι γ π ε ν × ExecResult γ ε :=
+    (st : ProtocolMachineState ι γ π ε ν) (coroId : CoroutineId) (coro : CoroutineState γ ε)
+    (instr : Instr γ ε) : ProtocolMachineState ι γ π ε ν × ExecResult γ ε :=
   -- Enforce monitor typing and cost budget before execution.
   match st.config.monitorMode with
   | .off =>
@@ -224,8 +224,8 @@ def execAtPC {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coroId : CoroutineId) (coro : CoroutineState γ ε) :
-    VMState ι γ π ε ν × ExecResult γ ε :=
+    (st : ProtocolMachineState ι γ π ε ν) (coroId : CoroutineId) (coro : CoroutineState γ ε) :
+    ProtocolMachineState ι γ π ε ν × ExecResult γ ε :=
   -- Handle coroutine status and fetch the next instruction.
   match coro.status with
   | .done => (st, mkRes .halted none)
@@ -251,8 +251,8 @@ def execInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coroId : CoroutineId) :
-    VMState ι γ π ε ν × ExecResult γ ε :=
+    (st : ProtocolMachineState ι γ π ε ν) (coroId : CoroutineId) :
+    ProtocolMachineState ι γ π ε ν × ExecResult γ ε :=
   -- Guard against missing coroutine and delegate to the core stepper.
   match st.coroutines[coroId]? with
   | none =>

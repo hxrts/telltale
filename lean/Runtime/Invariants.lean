@@ -271,7 +271,7 @@ def close_makes_inaccessible {ι γ π ε ν : Type} [IdentityModel ι] [GuardLa
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (sid : SessionId) : Prop :=
+    (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) : Prop :=
   -- Closed sessions expose no buffers or traces.
   ∀ stSess, (sid, stSess) ∈ st.sessions → stSess.phase = .closed →
     stSess.buffers = [] ∧ stSess.traces = (∅ : DEnv)

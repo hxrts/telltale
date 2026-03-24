@@ -5,7 +5,7 @@ set_option autoImplicit false
 
 /-! # Scheduler API
 
-API types and definitions for scheduler reasoning in the VM runtime. -/
+API types and definitions for scheduler reasoning in the protocol machine runtime. -/
 
 /-
 The Problem. Different scheduling policies (round-robin, cooperative, priority,
@@ -34,8 +34,8 @@ variable [IdentityVerificationBridge ι ν]
 
 /-! ### Policy Classification -/
 
-/-- Scheduler policy pinned to an initial VM state. -/
-abbrev SchedulerPolicyPinned (st : VMState ι γ π ε ν) (policy : SchedPolicy) : Prop :=
+/-- Scheduler policy pinned to an initial protocol machine state. -/
+abbrev SchedulerPolicyPinned (st : ProtocolMachineState ι γ π ε ν) (policy : SchedPolicy) : Prop :=
   st.sched.policy = policy
 
 /-- Policy-class profile for scheduler reasoning and inventory gating. -/
@@ -58,7 +58,7 @@ def schedulerPolicyProfileOf (policy : SchedPolicy) : SchedulerPolicyProfile :=
 
 /-- Iris state-interpretation invariance for scheduler executions from a fixed state. -/
 def SchedulerIrisInvariant [Telltale.TelltaleIris]
-    (st : VMState ι γ π ε ν) : Prop :=
+    (st : ProtocolMachineState ι γ π ε ν) : Prop :=
   ∀ (e : Expr) (Φ : SessionVMVal → iProp),
     iProp.entails iProp.emp
       (iProp.wand
@@ -74,20 +74,20 @@ def SchedulerIrisInvariant [Telltale.TelltaleIris]
           (Iris.state_interp
             (instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) σ'))
 
-/-- Proof-carrying scheduler hypothesis bundle for one initial VM state. -/
-structure ProtocolMachineSchedulerBundle (st₀ : VMState ι γ π ε ν) where
+/-- Proof-carrying scheduler hypothesis bundle for one initial protocol machine state. -/
+structure ProtocolMachineSchedulerBundle (st₀ : ProtocolMachineState ι γ π ε ν) where
   policy : SchedPolicy
   policyPinned : SchedulerPolicyPinned st₀ policy
 
 /-! ### Bundle Metadata -/
 
 /-- Extract the policy-class profile from bundle evidence. -/
-def ProtocolMachineSchedulerBundle.profile {st₀ : VMState ι γ π ε ν}
+def ProtocolMachineSchedulerBundle.profile {st₀ : ProtocolMachineState ι γ π ε ν}
     (bundle : ProtocolMachineSchedulerBundle st₀) : SchedulerPolicyProfile :=
   schedulerPolicyProfileOf bundle.policy
 
-/-- Bundle profile agrees with the pinned VM scheduler policy class. -/
-theorem scheduler_profile_pinned_from_bundle {st₀ : VMState ι γ π ε ν}
+/-- Bundle profile agrees with the pinned protocol machine scheduler policy class. -/
+theorem scheduler_profile_pinned_from_bundle {st₀ : ProtocolMachineState ι γ π ε ν}
     (bundle : ProtocolMachineSchedulerBundle st₀) :
     schedulerPolicyProfileOf st₀.sched.policy = bundle.profile := by
   simp [ProtocolMachineSchedulerBundle.profile, schedulerPolicyProfileOf, bundle.policyPinned]
@@ -119,7 +119,7 @@ structure ProtocolMachineSchedulerSummary where
 
 /-! ### Validation Sets -/
 
-/-- Core scheduler hypotheses available from VM scheduler proofs alone. -/
+/-- Core scheduler hypotheses available from protocol machine scheduler proofs alone. -/
 def protocolMachineSchedulerCoreHypotheses : List ProtocolMachineSchedulerHypothesis :=
   [ .policyPinned
   , .policyProfileClass
@@ -135,7 +135,7 @@ def protocolMachineSchedulerWithIrisHypotheses : List ProtocolMachineSchedulerHy
 /-! ### Validation Procedures -/
 
 /-- Validate one scheduler hypothesis without Iris assumptions. -/
-def validateProtocolMachineSchedulerHypothesis {st₀ : VMState ι γ π ε ν}
+def validateProtocolMachineSchedulerHypothesis {st₀ : ProtocolMachineState ι γ π ε ν}
     (_bundle : ProtocolMachineSchedulerBundle st₀)
     (h : ProtocolMachineSchedulerHypothesis) : ProtocolMachineSchedulerValidationResult :=
   match h with
@@ -174,21 +174,21 @@ def validateProtocolMachineSchedulerHypothesis {st₀ : VMState ι γ π ε ν}
 
 /-- Validate one scheduler hypothesis when Iris support is available. -/
 def validateProtocolMachineSchedulerHypothesisWithIris [Telltale.TelltaleIris]
-    {st₀ : VMState ι γ π ε ν}
+    {st₀ : ProtocolMachineState ι γ π ε ν}
     (bundle : ProtocolMachineSchedulerBundle st₀)
     (h : ProtocolMachineSchedulerHypothesis) : ProtocolMachineSchedulerValidationResult :=
   match h with
   | .irisStateInvariant =>
       { hypothesis := h
       , passed := true
-      , detail := "Iris state-interpretation invariance is available for this VM language instance."
+      , detail := "Iris state-interpretation invariance is available for this protocol machine language instance."
       }
   | _ => validateProtocolMachineSchedulerHypothesis bundle h
 
 /-! ## Validation Procedures: Batch Summaries -/
 
 /-- Validate an arbitrary scheduler hypothesis set without Iris assumptions. -/
-def validateProtocolMachineSchedulerWithHypotheses {st₀ : VMState ι γ π ε ν}
+def validateProtocolMachineSchedulerWithHypotheses {st₀ : ProtocolMachineState ι γ π ε ν}
     (bundle : ProtocolMachineSchedulerBundle st₀)
     (hs : List ProtocolMachineSchedulerHypothesis) : ProtocolMachineSchedulerSummary :=
   let rs := hs.map (validateProtocolMachineSchedulerHypothesis bundle)
@@ -198,7 +198,7 @@ def validateProtocolMachineSchedulerWithHypotheses {st₀ : VMState ι γ π ε 
 
 /-- Validate an arbitrary scheduler hypothesis set with Iris assumptions. -/
 def validateProtocolMachineSchedulerWithHypothesesAndIris [Telltale.TelltaleIris]
-    {st₀ : VMState ι γ π ε ν}
+    {st₀ : ProtocolMachineState ι γ π ε ν}
     (bundle : ProtocolMachineSchedulerBundle st₀)
     (hs : List ProtocolMachineSchedulerHypothesis) : ProtocolMachineSchedulerSummary :=
   let rs := hs.map (validateProtocolMachineSchedulerHypothesisWithIris bundle)
@@ -207,45 +207,45 @@ def validateProtocolMachineSchedulerWithHypothesesAndIris [Telltale.TelltaleIris
   }
 
 /-- Convenience validation for scheduler core hypotheses. -/
-def validateProtocolMachineSchedulerCore {st₀ : VMState ι γ π ε ν}
+def validateProtocolMachineSchedulerCore {st₀ : ProtocolMachineState ι γ π ε ν}
     (bundle : ProtocolMachineSchedulerBundle st₀) : ProtocolMachineSchedulerSummary :=
   validateProtocolMachineSchedulerWithHypotheses bundle protocolMachineSchedulerCoreHypotheses
 
 /-- Convenience validation for scheduler hypotheses including Iris invariance. -/
 def validateProtocolMachineSchedulerWithIris [Telltale.TelltaleIris]
-    {st₀ : VMState ι γ π ε ν}
+    {st₀ : ProtocolMachineState ι γ π ε ν}
     (bundle : ProtocolMachineSchedulerBundle st₀) : ProtocolMachineSchedulerSummary :=
   validateProtocolMachineSchedulerWithHypothesesAndIris bundle protocolMachineSchedulerWithIrisHypotheses
 
 /-! ### Exported Scheduler Theorems -/
 
 /-- The pinned scheduler policy extracted from the scheduler bundle. -/
-theorem scheduler_policy_pinned_from_bundle {st₀ : VMState ι γ π ε ν}
+theorem scheduler_policy_pinned_from_bundle {st₀ : ProtocolMachineState ι γ π ε ν}
     (bundle : ProtocolMachineSchedulerBundle st₀) :
     SchedulerPolicyPinned st₀ bundle.policy :=
   bundle.policyPinned
 
 /-- Scheduler confluence theorem instantiated from a scheduler bundle. -/
-theorem scheduler_confluence_from_bundle {st₀ : VMState ι γ π ε ν}
+theorem scheduler_confluence_from_bundle {st₀ : ProtocolMachineState ι γ π ε ν}
     (_bundle : ProtocolMachineSchedulerBundle st₀) :
     schedule_confluence st₀ :=
   schedule_confluence_holds st₀
 
 /-- Starvation-freedom theorem instantiated from a scheduler bundle. -/
-theorem scheduler_starvation_free_from_bundle {st₀ : VMState ι γ π ε ν}
+theorem scheduler_starvation_free_from_bundle {st₀ : ProtocolMachineState ι γ π ε ν}
     (_bundle : ProtocolMachineSchedulerBundle st₀) :
     starvation_free st₀ :=
   starvation_free_holds st₀
 
 /-- Cooperative refinement theorem instantiated from a scheduler bundle. -/
-theorem scheduler_cooperative_refinement_from_bundle {st₀ : VMState ι γ π ε ν}
+theorem scheduler_cooperative_refinement_from_bundle {st₀ : ProtocolMachineState ι γ π ε ν}
     (_bundle : ProtocolMachineSchedulerBundle st₀) :
     cooperative_refines_concurrent st₀ :=
   cooperative_refines_concurrent_holds st₀
 
 /-- Iris scheduler invariance theorem instantiated from a scheduler bundle. -/
 theorem scheduler_iris_invariant_from_bundle [Telltale.TelltaleIris]
-    {st₀ : VMState ι γ π ε ν}
+    {st₀ : ProtocolMachineState ι γ π ε ν}
     (_bundle : ProtocolMachineSchedulerBundle st₀) :
     SchedulerIrisInvariant (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀ := by
   intro e Φ hWP e' σ' hStep

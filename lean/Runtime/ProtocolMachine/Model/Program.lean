@@ -6,7 +6,7 @@ import SessionTypes.LocalTypeR
 /-! # Program Images and Compilation
 
 `Program`, `CodeImage`, and `UntrustedImage`, the program representation that the
-VM loads and executes. A `Program` is bytecode plus per-role entry points, local types,
+protocol machine loads and executes. A `Program` is bytecode plus per-role entry points, local types,
 handler types, and source metadata. A `CodeImage` bundles executable program payload with
 its global type. An
 `UntrustedImage` is an unverified program pending signature and typing checks, used by
@@ -14,7 +14,7 @@ the code loading pipeline.
 -/
 
 /-
-The Problem. The VM needs a program representation that bundles bytecode with type
+The Problem. The protocol machine needs a program representation that bundles bytecode with type
 information, entry points, and verification evidence. The loading pipeline must
 distinguish trusted (verified) from untrusted (pending verification) code.
 

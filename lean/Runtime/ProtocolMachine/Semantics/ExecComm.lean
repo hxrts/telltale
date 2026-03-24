@@ -46,7 +46,7 @@ private def payloadSizeViolation? {ι γ π ε ν : Type u} [IdentityModel ι] [
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (context : String) (v : Value) : Option String :=
+    (st : ProtocolMachineState ι γ π ε ν) (context : String) (v : Value) : Option String :=
   if st.config.payloadValidationMode = .off then
     none
   else
@@ -64,7 +64,7 @@ private def strictSchemaMissingAnnotationSend?
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (role : Role) (choices : List (Label × LocalType)) : Option String :=
+    (st : ProtocolMachineState ι γ π ε ν) (role : Role) (choices : List (Label × LocalType)) : Option String :=
   if st.config.payloadValidationMode = .strictSchema then
     match choices with
     | (lbl, _) :: [] => some (strictSchemaAnnotationMessage role "send" lbl)
@@ -76,7 +76,7 @@ private def strictSchemaMissingAnnotationRecv?
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (role : Role) (choices : List (Label × LocalType)) : Option String :=
+    (st : ProtocolMachineState ι γ π ε ν) (role : Role) (choices : List (Label × LocalType)) : Option String :=
   if st.config.payloadValidationMode = .strictSchema then
     match choices with
     | (lbl, _) :: [] => some (strictSchemaAnnotationMessage role "receive" lbl)
@@ -95,7 +95,7 @@ private def sendCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (bufs' : SignedBuffers ν) (T : ValType) (L' : LocalType) (v : Value) (seqNo : Nat) :
     StepPack ι γ π ε ν :=
   let sessions' := sendUpdateSessions st.sessions ep edge bufs' T L'
@@ -105,7 +105,7 @@ private def sendAfterEnqueue {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (T : ValType) (L' : LocalType) (v : Value) (h : HandlerId) (seqNo : Nat)
     (res : SignedEnqueueResult) (bufs' : SignedBuffers ν) : StepPack ι γ π ε ν :=
   match res with
@@ -124,7 +124,7 @@ private def sendOnHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (T : ValType) (L' : LocalType) (v : Value) (h : HandlerId) : StepPack ι γ π ε ν :=
   let (seqNo, st') := commAllocSendSeq st edge
   let signed := signValueWithSeq (st'.config.roleSigningKey ep.role) v seqNo
@@ -136,7 +136,7 @@ private def sendOnEdge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint)
     (edge : Edge) (T : ValType) (L' : LocalType) (v : Value) : StepPack ι γ π ε ν :=
   if edgePartitioned st edge then
     blockPack st coro (.sendWait edge)
@@ -150,7 +150,7 @@ private def sendWithType {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (ep : Endpoint) (r : Role) (T : ValType) (L' : LocalType) (v : Value) : StepPack ι γ π ε ν :=
   if decide (valTypeOf v = T) then
     match payloadSizeViolation? st "send" v with
@@ -164,7 +164,7 @@ private def sendWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (ep : Endpoint) (v : Value) : StepPack ι γ π ε ν :=
   if owns coro ep then
     match SessionStore.lookupType st.sessions ep with
@@ -181,7 +181,7 @@ def stepSend {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (chan val : Reg) : StepPack ι γ π ε ν :=
   match readReg coro.regs chan, readReg coro.regs val with
   | some (.chan ep), some v => sendWithEndpoint st coro ep v
@@ -201,7 +201,7 @@ private def recvCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (bufs' : SignedBuffers ν) (L' : LocalType) (payload : Value) (tokens' : List ProgressToken)
     (dst : Reg) (seqNo : Nat) : StepPack ι γ π ε ν :=
   match setReg coro.regs dst payload with
@@ -218,7 +218,7 @@ private def recvAfterDequeue {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (T : ValType) (L' : LocalType) (dst : Reg) (h : HandlerId)
     (tokens' : List ProgressToken) (sv : SignedValue ν) (bufs' : SignedBuffers ν) : StepPack ι γ π ε ν :=
   match payloadSizeViolation? st "receive" sv.payload with
@@ -253,7 +253,7 @@ private def recvWithHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardL
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (T : ValType) (L' : LocalType) (dst : Reg) (h : HandlerId)
     (tokens' : List ProgressToken) : StepPack ι γ π ε ν :=
   match bufDequeue st.buffers edge with
@@ -266,7 +266,7 @@ private def recvOnEdge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint)
     (edge : Edge) (T : ValType) (L' : LocalType) (dst : Reg)
     (token : ProgressToken) : StepPack ι γ π ε ν :=
   if edgePartitioned st edge then
@@ -284,7 +284,7 @@ private def recvWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (ep : Endpoint) (dst : Reg) : StepPack ι γ π ε ν :=
   if owns coro ep then
     match SessionStore.lookupType st.sessions ep with
@@ -304,7 +304,7 @@ def stepReceive {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (chan dst : Reg) : StepPack ι γ π ε ν :=
   match readReg coro.regs chan with
   | some (.chan ep) => recvWithEndpoint st coro ep dst
@@ -322,7 +322,7 @@ private def offerCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (bufs' : SignedBuffers ν) (L' : LocalType) (lbl : Label) : StepPack ι γ π ε ν :=
   let sessions' := offerUpdate st.sessions ep edge bufs' L'
   let st' := { st with buffers := bufs', sessions := sessions' }
@@ -331,7 +331,7 @@ private def offerAfterEnqueue {ι γ π ε ν : Type u} [IdentityModel ι] [Guar
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (L' : LocalType) (lbl : Label) (h : HandlerId)
     (res : SignedEnqueueResult) (bufs' : SignedBuffers ν) : StepPack ι γ π ε ν :=
   match res with
@@ -350,7 +350,7 @@ private def offerOnHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (L' : LocalType) (lbl : Label) (h : HandlerId) : StepPack ι γ π ε ν :=
   let v := Value.string lbl
   let signed := signValue (st.config.roleSigningKey ep.role) v
@@ -362,7 +362,7 @@ private def offerOnEdge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint)
     (edge : Edge) (L' : LocalType) (lbl : Label) : StepPack ι γ π ε ν :=
   if edgePartitioned st edge then
     blockPack st coro (.sendWait edge)
@@ -376,7 +376,7 @@ private def offerWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Guar
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (lbl : Label) : StepPack ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (lbl : Label) : StepPack ι γ π ε ν :=
   if owns coro ep then
     match SessionStore.lookupType st.sessions ep with
     | some (.select r choices) =>
@@ -391,7 +391,7 @@ def stepOffer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (chan : Reg) (lbl : Label) : StepPack ι γ π ε ν :=
   match readReg coro.regs chan with
   | some (.chan ep) => offerWithEndpoint st coro ep lbl
@@ -402,7 +402,7 @@ private def chooseCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (bufs' : SignedBuffers ν) (L' : LocalType) (pc' : PC) (lbl : Label) : StepPack ι γ π ε ν :=
   let sessions1 := updateSessBuffers st.sessions ep.sid bufs'
   let trace := SessionStore.lookupTrace sessions1 edge
@@ -416,7 +416,7 @@ private def chooseAfterDequeue {ι γ π ε ν : Type u} [IdentityModel ι] [Gua
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (choices : List (Label × LocalType)) (table : List (Label × PC))
     (h : HandlerId) (sv : SignedValue ν) (bufs' : SignedBuffers ν) : StepPack ι γ π ε ν :=
   if st.config.transportOk h bufs' = false then
@@ -441,7 +441,7 @@ private def chooseWithHandler {ι γ π ε ν : Type u} [IdentityModel ι] [Guar
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (choices : List (Label × LocalType)) (table : List (Label × PC)) (h : HandlerId)
     (token : ProgressToken) : StepPack ι γ π ε ν :=
   match bufDequeue st.buffers edge with
@@ -451,7 +451,7 @@ private def chooseOnEdge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (edge : Edge)
     (choices : List (Label × LocalType)) (table : List (Label × PC)) (token : ProgressToken) : StepPack ι γ π ε ν :=
   if edgePartitioned st edge then
     blockPack st coro (.recvWait edge token)
@@ -465,7 +465,7 @@ private def chooseWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Gua
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (ep : Endpoint) (table : List (Label × PC)) : StepPack ι γ π ε ν :=
   if owns coro ep then
     match SessionStore.lookupType st.sessions ep with
@@ -481,7 +481,7 @@ def stepChoose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (chan : Reg) (table : List (Label × PC)) : StepPack ι γ π ε ν :=
   match readReg coro.regs chan with
   | some (.chan ep) => chooseWithEndpoint st coro ep table

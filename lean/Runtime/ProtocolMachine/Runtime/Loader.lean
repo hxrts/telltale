@@ -8,13 +8,13 @@ import Choreography.Projection.Project.Core
 
 /-! # Runtime.ProtocolMachine.Runtime.Loader
 
-Pure state transformer that adds a session and its coroutines to a running VM.
+Pure state transformer that adds a session and its coroutines to a running protocol machine.
 -/
 
 /-
 The Problem. Runtime choreography loading must validate images, allocate fresh
 session identifiers, and install new coroutines/session state without violating
-existing VM capacity and structural invariants.
+existing protocol machine capacity and structural invariants.
 
 Solution Structure. This module builds executable checks and loader primitives,
 then packages result-typed and compatibility APIs plus monotonicity lemmas for
@@ -35,14 +35,14 @@ private def allEdges (sid : SessionId) (roles : List Role) : List Edge :=
 
 -- # Existing id inspection and fresh-id selection
 
-/-- Existing session ids in a VM state. -/
+/-- Existing session ids in a protocol machine state. -/
 def existingSessionIds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν] :
-    VMState ι γ π ε ν → List SessionId :=
+    ProtocolMachineState ι γ π ε ν → List SessionId :=
   fun st => st.sessions.map (fun p => p.fst)
 
 /-- Two sessions have disjoint resources when they have distinct identifiers. -/
@@ -52,7 +52,7 @@ def SessionDisjoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (_st : VMState ι γ π ε ν) (sid1 sid2 : SessionId) : Prop :=
+    (_st : ProtocolMachineState ι γ π ε ν) (sid1 sid2 : SessionId) : Prop :=
   sid1 ≠ sid2
 
 /-- Executable session-id availability check for loader admission. -/
@@ -62,7 +62,7 @@ def sessionIdAvailable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (sid : SessionId) : Bool :=
+    (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) : Bool :=
   !(existingSessionIds st).contains sid
 
 -- ## Fresh-id synthesis and lower bound
@@ -74,7 +74,7 @@ def nextFreshSessionId {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) : SessionId :=
+    (st : ProtocolMachineState ι γ π ε ν) : SessionId :=
   let sid := st.nextSessionId
   if sessionIdAvailable st sid then
     sid
@@ -92,7 +92,7 @@ inductive ChoreographyLoadResult (ι γ π ε ν : Type u) [IdentityModel ι] [G
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν] where
-  | ok (state : VMState ι γ π ε ν) (sid : SessionId)
+  | ok (state : ProtocolMachineState ι γ π ε ν) (sid : SessionId)
   | validationFailed (reason : String)
   | tooManySessions (max : Nat)
   | tooManyCoroutines (max : Nat)
@@ -136,8 +136,8 @@ private def loadChoreographyCore {ι γ π ε ν : Type u} [IdentityModel ι] [G
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     [Inhabited (EffectRuntime.EffectCtx ε)]
-    (st : VMState ι γ π ε ν) (image : CodeImage γ ε) (sid : SessionId) :
-    VMState ι γ π ε ν :=
+    (st : ProtocolMachineState ι γ π ε ν) (image : CodeImage γ ε) (sid : SessionId) :
+    ProtocolMachineState ι γ π ε ν :=
   let programId := st.programs.size
   let programs' := st.programs.push image.program
   let roles := image.program.entryPoints.map (fun p => p.fst)
@@ -203,7 +203,7 @@ def loadChoreographyResult {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     [Inhabited (EffectRuntime.EffectCtx ε)]
-    (st : VMState ι γ π ε ν) (image : CodeImage γ ε) :
+    (st : ProtocolMachineState ι γ π ε ν) (image : CodeImage γ ε) :
     ChoreographyLoadResult ι γ π ε ν :=
   match validateImage? image with
   | some reason => .validationFailed reason
@@ -217,7 +217,7 @@ def loadChoreographyResult {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
         let st' := loadChoreographyCore st image sid
         .ok st' sid
 
-/-- Load a choreography into a running VM, returning the updated state and session id. -/
+/-- Load a choreography into a running protocol machine, returning the updated state and session id. -/
 def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -225,8 +225,8 @@ def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     [Inhabited (EffectRuntime.EffectCtx ε)]
-    (st : VMState ι γ π ε ν) (image : CodeImage γ ε) :
-    VMState ι γ π ε ν × SessionId :=
+    (st : ProtocolMachineState ι γ π ε ν) (image : CodeImage γ ε) :
+    ProtocolMachineState ι γ π ε ν × SessionId :=
   match loadChoreographyResult st image with
   | .ok st' sid => (st', sid)
   | _ => (st, st.nextSessionId)

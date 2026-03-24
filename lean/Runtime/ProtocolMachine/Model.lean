@@ -36,6 +36,6 @@ set_option autoImplicit false
 
 /-! # Runtime.ProtocolMachine.Model
 
-VM data model layer: types, configuration, protocol image/model state, and
+protocol machine data model layer: types, configuration, protocol image/model state, and
 unit/default model instances.
 -/

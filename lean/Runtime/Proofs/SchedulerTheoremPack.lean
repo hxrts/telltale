@@ -38,25 +38,25 @@ variable [IdentityVerificationBridge ι ν]
 -- Policy-Specific Artifacts
 
 /-- Round-robin profile artifact. -/
-structure RoundRobinPolicyArtifact (st₀ : VMState ι γ π ε ν) : Type where
+structure RoundRobinPolicyArtifact (st₀ : ProtocolMachineState ι γ π ε ν) : Type where
   pinned : SchedulerPolicyPinned st₀ .roundRobin
 
 /-- Cooperative profile artifact. -/
-structure CooperativePolicyArtifact (st₀ : VMState ι γ π ε ν) : Type where
+structure CooperativePolicyArtifact (st₀ : ProtocolMachineState ι γ π ε ν) : Type where
   pinned : SchedulerPolicyPinned st₀ .cooperative
   normalization : cooperative_refines_concurrent st₀
 
 /-- Priority profile artifact. -/
-structure PriorityPolicyArtifact (st₀ : VMState ι γ π ε ν) : Type where
+structure PriorityPolicyArtifact (st₀ : ProtocolMachineState ι γ π ε ν) : Type where
   priority : CoroutineId → Nat
   pinned : SchedulerPolicyPinned st₀ (.priority priority)
 
 /-- Progress-aware profile artifact. -/
-structure ProgressAwarePolicyArtifact (st₀ : VMState ι γ π ε ν) : Type where
+structure ProgressAwarePolicyArtifact (st₀ : ProtocolMachineState ι γ π ε ν) : Type where
   pinned : SchedulerPolicyPinned st₀ .progressAware
 
 /-- Packaged scheduler artifact derived from one scheduler bundle. -/
-structure ProtocolMachineSchedulerArtifact (st₀ : VMState ι γ π ε ν) where
+structure ProtocolMachineSchedulerArtifact (st₀ : ProtocolMachineState ι γ π ε ν) where
   policy : SchedPolicy
   profile : SchedulerPolicyProfile
   policyPinned : SchedulerPolicyPinned st₀ policy
@@ -72,7 +72,7 @@ structure ProtocolMachineSchedulerArtifact (st₀ : VMState ι γ π ε ν) wher
 -- Scheduler Artifact Construction
 
 /-- Build scheduler theorem artifact from a scheduler bundle. -/
-def buildProtocolMachineSchedulerArtifact {st₀ : VMState ι γ π ε ν}
+def buildProtocolMachineSchedulerArtifact {st₀ : ProtocolMachineState ι γ π ε ν}
     (bundle : ProtocolMachineSchedulerBundle st₀) : ProtocolMachineSchedulerArtifact st₀ :=
   let roundRobin? :=
     match hpol : bundle.policy with
@@ -138,10 +138,10 @@ def buildProtocolMachineSchedulerArtifact {st₀ : VMState ι γ π ε ν}
 /-- Protocol proof space that combines scheduler evidence with invariant-space
 profiles for distributed/classical theorem derivation. -/
 structure ProtocolMachineProofSpace (store₀ : SessionStore ν) where
-  st₀ : VMState ι γ π ε ν
+  st₀ : ProtocolMachineState ι γ π ε ν
   store_eq : st₀.sessions = store₀
   scheduler : ProtocolMachineSchedulerBundle st₀
-  profiles : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ (VMState ι γ π ε ν)
+  profiles : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ (ProtocolMachineState ι γ π ε ν)
 
 /-- Combined proof pack: scheduler artifact + profile-derived theorem pack. -/
 structure ProtocolMachineProofPack

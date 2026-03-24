@@ -10,16 +10,16 @@ import Runtime.ProtocolMachine.Runtime.Monitor
 import Runtime.Resources.BufferRA
 
 
-/-! # VM Configuration
+/-! # protocol machine Configuration
 
-`CostModel` and `VMConfig`, the static configuration that parameterizes a VM instance.
-`VMConfig` bundles buffer policies, scheduling policy, violation handling, knowledge flow
+`CostModel` and `ProtocolMachineConfig`, the static configuration that parameterizes a protocol machine instance.
+`ProtocolMachineConfig` bundles buffer policies, scheduling policy, violation handling, knowledge flow
 policy, spatial requirement hooks, handler transport-spec checks, guard chain configuration,
 signing keys, cost metering, and speculation settings. All five domain interfaces
 (`ι`, `γ`, `π`, `ε`, `ν`) plus their bridge classes appear as typeclass constraints.
 
-This file imports only spec-level types (no proof modules). The `VMConfig` record is
-threaded through `VMState` and read by every instruction stepper.
+This file imports only spec-level types (no proof modules). The `ProtocolMachineConfig` record is
+threaded through `ProtocolMachineState` and read by every instruction stepper.
 -/
 
 set_option autoImplicit false
@@ -40,7 +40,7 @@ structure CostModel (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
   -- Minimum cost is positive.
   hMinPos : minCost ≥ 1
 
-/-! ## VM configuration -/
+/-! ## protocol machine configuration -/
 
 inductive CommunicationReplayMode where
   | off
@@ -54,10 +54,10 @@ inductive PayloadValidationMode where
   | strictSchema
   deriving Repr, DecidableEq, Inhabited
 
-structure VMRuntimeConfig (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν] where
+structure ProtocolMachineRuntimeConfig (ι γ π ε ν : Type u) [ProtocolMachineDomain ι γ π ε ν] where
   -- Migration-safe config schema version.
   configVersion : Nat := 1
-  -- VM configuration fields for policies and hooks.
+  -- protocol machine configuration fields for policies and hooks.
   bufferConfig : Edge → BufferConfig
   schedPolicy : SchedPolicy := .cooperative
   violationPolicy : ViolationPolicy
@@ -78,21 +78,21 @@ structure VMRuntimeConfig (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν] wh
   speculationEnabled : Bool
   maxSpeculationDepth : Nat := 16
 
-structure VMProofConfig (γ : Type u) [GuardLayer γ] (guardChain : GuardChain γ) where
+structure ProtocolMachineProofConfig (γ : Type u) [GuardLayer γ] (guardChain : GuardChain γ) where
   -- Well-formedness witnesses kept separate from executable runtime fields.
   guardChainWf : GuardChain.wf guardChain
 
-structure VMConfig (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν]
-    extends VMRuntimeConfig ι γ π ε ν where
-  proofConfig : VMProofConfig γ toVMRuntimeConfig.guardChain
+structure ProtocolMachineConfig (ι γ π ε ν : Type u) [ProtocolMachineDomain ι γ π ε ν]
+    extends ProtocolMachineRuntimeConfig ι γ π ε ν where
+  proofConfig : ProtocolMachineProofConfig γ toVMRuntimeConfig.guardChain
 
-def VMConfig.guardChainWf {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
-    (cfg : VMConfig ι γ π ε ν) : GuardChain.wf cfg.guardChain :=
+def ProtocolMachineConfig.guardChainWf {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (cfg : ProtocolMachineConfig ι γ π ε ν) : GuardChain.wf cfg.guardChain :=
   cfg.proofConfig.guardChainWf
 
 def deterministic_finalization_ok {ι γ π ε ν : Type u}
-    [VMDomain ι γ π ε ν]
-    (_cfg : VMConfig ι γ π ε ν) : Prop :=
+    [ProtocolMachineDomain ι γ π ε ν]
+    (_cfg : ProtocolMachineConfig ι γ π ε ν) : Prop :=
   -- Safety violations halt execution deterministically.
   (∀ msg, _cfg.violationPolicy.allow (.safety msg) = false) ∧
   -- Speculation depth is bounded when enabled.

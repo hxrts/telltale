@@ -4,7 +4,7 @@ set_option autoImplicit false
 
 /-! # Runtime.Proofs.Contracts.DeterminismApi
 
-Lean-facing determinism contract API for VM runtime/profile gating.
+Lean-facing determinism contract API for protocol machine runtime/profile gating.
 -/
 
 namespace Runtime
@@ -32,7 +32,7 @@ inductive ProtocolMachineDeterminismProfile where
 
 /-- Reusable hypothesis bundle for determinism-oriented theorems. -/
 structure ProtocolMachineDeterminismHypotheses
-    (st₀ : VMState ι γ π ε ν) where
+    (st₀ : ProtocolMachineState ι γ π ε ν) where
   fullDeterminism : Prop
   fullDeterminismProof : fullDeterminism
   moduloEffectTrace : Prop
@@ -54,7 +54,7 @@ structure ProtocolMachineDeterminismArtifacts where
 private def witnessToBool {P : Prop} (_h : P) : Bool := true
 
 /-- Build determinism artifacts from a hypothesis bundle. -/
-def buildProtocolMachineDeterminismArtifacts {st₀ : VMState ι γ π ε ν}
+def buildProtocolMachineDeterminismArtifacts {st₀ : ProtocolMachineState ι γ π ε ν}
     (h : ProtocolMachineDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
     ProtocolMachineDeterminismArtifacts :=
   { full := witnessToBool h.fullDeterminismProof
@@ -66,25 +66,25 @@ def buildProtocolMachineDeterminismArtifacts {st₀ : VMState ι γ π ε ν}
 /-! ## Theorem Projections -/
 
 /-- Full determinism theorem from hypotheses. -/
-theorem full_determinism_from_hypotheses {st₀ : VMState ι γ π ε ν}
+theorem full_determinism_from_hypotheses {st₀ : ProtocolMachineState ι γ π ε ν}
     (h : ProtocolMachineDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
     h.fullDeterminism :=
   h.fullDeterminismProof
 
 /-- Determinism modulo fixed effect trace from hypotheses. -/
-theorem determinism_modulo_effect_trace_from_hypotheses {st₀ : VMState ι γ π ε ν}
+theorem determinism_modulo_effect_trace_from_hypotheses {st₀ : ProtocolMachineState ι γ π ε ν}
     (h : ProtocolMachineDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
     h.moduloEffectTrace :=
   h.moduloEffectTraceProof
 
 /-- Determinism modulo admissible commutativity from hypotheses. -/
-theorem determinism_modulo_commutativity_from_hypotheses {st₀ : VMState ι γ π ε ν}
+theorem determinism_modulo_commutativity_from_hypotheses {st₀ : ProtocolMachineState ι γ π ε ν}
     (h : ProtocolMachineDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
     h.moduloCommutativity :=
   h.moduloCommutativityProof
 
 /-- Replay determinism theorem from hypotheses. -/
-theorem replay_determinism_from_hypotheses {st₀ : VMState ι γ π ε ν}
+theorem replay_determinism_from_hypotheses {st₀ : ProtocolMachineState ι γ π ε ν}
     (h : ProtocolMachineDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
     h.replayDeterminism :=
   h.replayDeterminismProof

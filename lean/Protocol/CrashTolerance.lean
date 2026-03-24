@@ -235,9 +235,9 @@ theorem crash_tolerant_dec_sound (G : CommGraph) (crashed : List Role) :
   · exact hTol
   · simp [crashTolerantDec, hTol] at hDec
 
-/-! ## Connection to FStep and VMState -/
+/-! ## Connection to FStep and ProtocolMachineState -/
 
-section VMConnection
+section ProtocolMachineConnection
 
 variable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -275,7 +275,7 @@ private theorem mk_edge_eq_some {roles : RoleSet} {src dst : Role} {e : Role × 
 
 /-! ## Session Graph Extraction -/
 
-/-- Extract the communication graph from a session in VMState.
+/-- Extract the communication graph from a session in ProtocolMachineState.
     Uses the session's roles and builds edges from local type structure. -/
 def commGraphOfSession (roles : RoleSet) (localTypes : List (Endpoint × LocalType)) : CommGraph where
   participants := roles
@@ -312,8 +312,8 @@ def commGraphOfSession (roles : RoleSet) (localTypes : List (Endpoint × LocalTy
     | var n => cases he
     | mu L => cases he
 
-/-- Extract communication graph from VMState by aggregating all session graphs. -/
-def commGraphOfVMState (st : VMState ι γ π ε ν) : CommGraph where
+/-- Extract communication graph from ProtocolMachineState by aggregating all session graphs. -/
+def commGraphOfVMState (st : ProtocolMachineState ι γ π ε ν) : CommGraph where
   participants := st.sessions.flatMap (fun (_, sess) => sess.roles)
   edges := st.sessions.flatMap (fun (_, sess) =>
     (commGraphOfSession sess.roles sess.localTypes).edges)
@@ -325,12 +325,12 @@ def commGraphOfVMState (st : VMState ι γ π ε ν) : CommGraph where
     · exact List.mem_flatMap.mpr ⟨(sid, sess), hmemSess, hIn.1⟩
     · exact List.mem_flatMap.mpr ⟨(sid, sess), hmemSess, hIn.2⟩
 
-/-! ## VM-Level Crash Tolerance Predicate -/
+/-! ## protocol machine-Level Crash Tolerance Predicate -/
 
-/-- VM-level crash tolerance: a VMState tolerates a set of crashed sites
+/-- protocol machine-level crash tolerance: a ProtocolMachineState tolerates a set of crashed sites
     if the residual communication graph remains connected. -/
-def VMCrashTolerant (siteToRoles : IdentityModel.SiteId ι → List Role)
-    (st : VMState ι γ π ε ν) : Prop :=
+def ProtocolMachineCrashTolerant (siteToRoles : IdentityModel.SiteId ι → List Role)
+    (st : ProtocolMachineState ι γ π ε ν) : Prop :=
   let roles := (commGraphOfVMState st).participants
   let crashedRoles := crashedRolesOfSites siteToRoles roles st.crashedSites
   CrashTolerant (commGraphOfVMState st) crashedRoles
@@ -338,7 +338,7 @@ def VMCrashTolerant (siteToRoles : IdentityModel.SiteId ι → List Role)
 /-! ## Graph and Crash-Set Invariance Lemmas -/
 
 /-- After a site crash, the crashed sites list grows. -/
-theorem crash_site_extends_crashed (st : VMState ι γ π ε ν) (site : IdentityModel.SiteId ι) :
+theorem crash_site_extends_crashed (st : ProtocolMachineState ι γ π ε ν) (site : IdentityModel.SiteId ι) :
     (crashSite st site).crashedSites = st.crashedSites ∨
     (crashSite st site).crashedSites = site :: st.crashedSites := by
   unfold crashSite
@@ -349,20 +349,20 @@ theorem crash_site_extends_crashed (st : VMState ι γ π ε ν) (site : Identit
 
 /-- The communication graph is preserved by site crashes
     (crashes don't change session structure, only mark sites as failed). -/
-theorem comm_graph_preserved_by_crash_site (st : VMState ι γ π ε ν) (site : IdentityModel.SiteId ι) :
+theorem comm_graph_preserved_by_crash_site (st : ProtocolMachineState ι γ π ε ν) (site : IdentityModel.SiteId ι) :
     commGraphOfVMState (crashSite st site) = commGraphOfVMState st := by
   unfold commGraphOfVMState crashSite
   simp only
   split_ifs <;> rfl
 
 /-- Disconnecting edges does not change the communication graph. -/
-theorem comm_graph_preserved_by_disconnect_edges (st : VMState ι γ π ε ν) (edges : List Edge) :
+theorem comm_graph_preserved_by_disconnect_edges (st : ProtocolMachineState ι γ π ε ν) (edges : List Edge) :
     commGraphOfVMState (disconnectEdges st edges) = commGraphOfVMState st := by
   unfold commGraphOfVMState disconnectEdges
   simp
 
 /-- Reconnecting edges does not change the communication graph. -/
-theorem comm_graph_preserved_by_reconnect_edges (st : VMState ι γ π ε ν) (edges : List Edge) :
+theorem comm_graph_preserved_by_reconnect_edges (st : ProtocolMachineState ι γ π ε ν) (edges : List Edge) :
     commGraphOfVMState (reconnectEdges st edges) = commGraphOfVMState st := by
   unfold commGraphOfVMState reconnectEdges
   simp
@@ -370,27 +370,27 @@ theorem comm_graph_preserved_by_reconnect_edges (st : VMState ι γ π ε ν) (e
 /-! ## Tolerance Transport and Preservation -/
 
 /-- Crash tolerance is preserved when graph and crash set are unchanged. -/
-theorem vm_crash_tolerant_of_same_graph
+theorem protocol_machine_crash_tolerant_of_same_graph
     (siteToRoles : IdentityModel.SiteId ι → List Role)
-    (st st' : VMState ι γ π ε ν)
+    (st st' : ProtocolMachineState ι γ π ε ν)
     (hGraph : commGraphOfVMState st' = commGraphOfVMState st)
     (hCrashed : st'.crashedSites = st.crashedSites)
-    (hTol : VMCrashTolerant siteToRoles st) :
-    VMCrashTolerant siteToRoles st' := by
-  unfold VMCrashTolerant at hTol ⊢
+    (hTol : ProtocolMachineCrashTolerant siteToRoles st) :
+    ProtocolMachineCrashTolerant siteToRoles st' := by
+  unfold ProtocolMachineCrashTolerant at hTol ⊢
   simp [hGraph, hCrashed] at hTol ⊢
   exact hTol
 
 /-- If a crash doesn't add any newly crashed roles, tolerance is preserved. -/
 theorem crash_tolerant_preserved_of_no_new_role_crash
     (siteToRoles : IdentityModel.SiteId ι → List Role)
-    (st : VMState ι γ π ε ν) (site : IdentityModel.SiteId ι)
+    (st : ProtocolMachineState ι γ π ε ν) (site : IdentityModel.SiteId ι)
     (hEqCrashed :
       crashedRolesOfSites siteToRoles (commGraphOfVMState st).participants (crashSite st site).crashedSites =
       crashedRolesOfSites siteToRoles (commGraphOfVMState st).participants st.crashedSites)
-    (hTol : VMCrashTolerant siteToRoles st) :
-    VMCrashTolerant siteToRoles (crashSite st site) := by
-  unfold VMCrashTolerant at hTol ⊢
+    (hTol : ProtocolMachineCrashTolerant siteToRoles st) :
+    ProtocolMachineCrashTolerant siteToRoles (crashSite st site) := by
+  unfold ProtocolMachineCrashTolerant at hTol ⊢
   rw [comm_graph_preserved_by_crash_site]
   simpa [hEqCrashed] using hTol
 
@@ -404,12 +404,12 @@ theorem comm_path_lift_residual {G : CommGraph} {crashed₁ crashed₂ : List Ro
 /-- Crash tolerance preserved by a site crash when no new roles become fully crashed. -/
 theorem crash_site_preserves_tolerance
     (siteToRoles : IdentityModel.SiteId ι → List Role)
-    (st : VMState ι γ π ε ν) (site : IdentityModel.SiteId ι)
+    (st : ProtocolMachineState ι γ π ε ν) (site : IdentityModel.SiteId ι)
     (hEqCrashed :
       crashedRolesOfSites siteToRoles (commGraphOfVMState st).participants (crashSite st site).crashedSites =
       crashedRolesOfSites siteToRoles (commGraphOfVMState st).participants st.crashedSites)
-    (hTol : VMCrashTolerant siteToRoles st) :
-    VMCrashTolerant siteToRoles (crashSite st site) := by
+    (hTol : ProtocolMachineCrashTolerant siteToRoles st) :
+    ProtocolMachineCrashTolerant siteToRoles (crashSite st site) := by
   exact crash_tolerant_preserved_of_no_new_role_crash siteToRoles st site hEqCrashed hTol
 
 /-! ## Topology-Preserving Operations -/
@@ -417,63 +417,63 @@ theorem crash_site_preserves_tolerance
 /-- Partition steps preserve crash tolerance (no change to crash set). -/
 theorem disconnect_edges_preserves_tolerance
     (siteToRoles : IdentityModel.SiteId ι → List Role)
-    (st : VMState ι γ π ε ν) (edges : List Edge)
-    (hTol : VMCrashTolerant siteToRoles st) :
-    VMCrashTolerant siteToRoles (disconnectEdges st edges) := by
-  apply vm_crash_tolerant_of_same_graph siteToRoles _ _ ?_ rfl hTol
+    (st : ProtocolMachineState ι γ π ε ν) (edges : List Edge)
+    (hTol : ProtocolMachineCrashTolerant siteToRoles st) :
+    ProtocolMachineCrashTolerant siteToRoles (disconnectEdges st edges) := by
+  apply protocol_machine_crash_tolerant_of_same_graph siteToRoles _ _ ?_ rfl hTol
   exact comm_graph_preserved_by_disconnect_edges st edges
 
 /-- Heal steps preserve crash tolerance (no change to crash set). -/
 theorem reconnect_edges_preserves_tolerance
     (siteToRoles : IdentityModel.SiteId ι → List Role)
-    (st : VMState ι γ π ε ν) (edges : List Edge)
-    (hTol : VMCrashTolerant siteToRoles st) :
-    VMCrashTolerant siteToRoles (reconnectEdges st edges) := by
-  apply vm_crash_tolerant_of_same_graph siteToRoles _ _ ?_ rfl hTol
+    (st : ProtocolMachineState ι γ π ε ν) (edges : List Edge)
+    (hTol : ProtocolMachineCrashTolerant siteToRoles st) :
+    ProtocolMachineCrashTolerant siteToRoles (reconnectEdges st edges) := by
+  apply protocol_machine_crash_tolerant_of_same_graph siteToRoles _ _ ?_ rfl hTol
   exact comm_graph_preserved_by_reconnect_edges st edges
 
 /-- Close-on-crash preserves crash tolerance if the communication graph is unchanged. -/
 theorem close_session_preserves_tolerance
     (siteToRoles : IdentityModel.SiteId ι → List Role)
-    (st : VMState ι γ π ε ν) (sid : SessionId)
+    (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId)
     (hGraph : commGraphOfVMState (closeSession st sid) = commGraphOfVMState st)
-    (hTol : VMCrashTolerant siteToRoles st) :
-    VMCrashTolerant siteToRoles (closeSession st sid) := by
-  apply vm_crash_tolerant_of_same_graph siteToRoles _ _ hGraph rfl hTol
+    (hTol : ProtocolMachineCrashTolerant siteToRoles st) :
+    ProtocolMachineCrashTolerant siteToRoles (closeSession st sid) := by
+  apply protocol_machine_crash_tolerant_of_same_graph siteToRoles _ _ hGraph rfl hTol
 
 /-! ## Failure-Step Preservation Schema -/
 
 /-- Failure-aware steps preserve crash tolerance when each case's side conditions hold. -/
 theorem f_step_preserves_tolerance
     (siteToRoles : IdentityModel.SiteId ι → List Role)
-    (st st' : VMState ι γ π ε ν)
+    (st st' : ProtocolMachineState ι γ π ε ν)
     (hStepPres :
-      ∀ st st' : VMState ι γ π ε ν, FStep st st' →
-        VMCrashTolerant siteToRoles st → VMCrashTolerant siteToRoles st')
+      ∀ st st' : ProtocolMachineState ι γ π ε ν, FStep st st' →
+        ProtocolMachineCrashTolerant siteToRoles st → ProtocolMachineCrashTolerant siteToRoles st')
     (hStep : FStep st st')
-    (hTol : VMCrashTolerant siteToRoles st) :
-    VMCrashTolerant siteToRoles st' := by
+    (hTol : ProtocolMachineCrashTolerant siteToRoles st) :
+    ProtocolMachineCrashTolerant siteToRoles st' := by
   exact hStepPres st st' hStep hTol
 
 /-! ## Active Session Integration -/
 
 /-- Session coherence from Failure.lean implies our SessionCanComplete. -/
-theorem session_coherent_implies_active (st : VMState ι γ π ε ν) (sid : SessionId)
+theorem session_coherent_implies_active (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId)
     (hCoh : SessionCoherent st sid) :
     ∃ sess, (sid, sess) ∈ st.sessions ∧ sess.phase ≠ .closed :=
   hCoh
 
 /-- Closed sessions don't contribute to crash tolerance requirements. -/
-def SessionActive (st : VMState ι γ π ε ν) (sid : SessionId) : Prop :=
+def SessionActive (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) : Prop :=
   ∃ sess, (sid, sess) ∈ st.sessions ∧ sess.phase ≠ .closed
 
-/-- A VM state is fully crash tolerant if all active sessions can complete
+/-- A protocol machine state is fully crash tolerant if all active sessions can complete
     despite the current crashed sites. -/
-def VMFullyCrashTolerant (siteToRoles : IdentityModel.SiteId ι → List Role)
-    (st : VMState ι γ π ε ν) : Prop :=
-  ∀ sid, SessionActive st sid → VMCrashTolerant siteToRoles st
+def ProtocolMachineFullyCrashTolerant (siteToRoles : IdentityModel.SiteId ι → List Role)
+    (st : ProtocolMachineState ι γ π ε ν) : Prop :=
+  ∀ sid, SessionActive st sid → ProtocolMachineCrashTolerant siteToRoles st
 
-end VMConnection
+end ProtocolMachineConnection
 
 end
 

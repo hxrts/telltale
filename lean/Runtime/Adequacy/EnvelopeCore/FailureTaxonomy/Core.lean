@@ -2,11 +2,11 @@ import Runtime.Adequacy.EnvelopeCore.AdmissionLogic
 
 /-! # Failure Taxonomy and Recovery
 
-Classification of VM failures, commit certainty levels, and structured
+Classification of protocol machine failures, commit certainty levels, and structured
 recovery actions for deterministic fault handling. -/
 
 /-
-The Problem. The VM can fail in many ways (type violations, channel
+The Problem. The protocol machine can fail in many ways (type violations, channel
 closure, transport errors, etc.). For deterministic recovery, we need
 to classify failures by their certainty level (how much state may be
 uncommitted) and map them to recovery actions.
@@ -155,7 +155,7 @@ def errorCodeOfFailureClass : FailureClass → ErrorCode
   | .transportTimeout => .transportTimeout
   | .unknown => .unknown
 
-/-- Total mapping from Lean VM instruction faults to abstract failure classes. -/
+/-- Total mapping from Lean protocol machine instruction faults to abstract failure classes. -/
 def failureClassOfLeanFault {γ : Type u} : _root_.Fault γ → FailureClass
   | .typeViolation _ _ => .typeViolation
   | .unknownLabel _ => .unknownLabel
@@ -269,11 +269,11 @@ structure FailureVisibleSnapshot where
   safetyVerdict : Bool
   deriving Repr, DecidableEq, Inhabited
 
-/-- Build failure-visible snapshots from executable VM states. -/
+/-- Build failure-visible snapshots from executable protocol machine states. -/
 def vmFailureVisibleSnapshot
     {ι γ π ε ν : Type u}
-    [VMDomain ι γ π ε ν]
-    (st : VMState ι γ π ε ν) : FailureVisibleSnapshot :=
+    [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) : FailureVisibleSnapshot :=
   let terminalOutcome :=
     st.coroutines.toList.all (fun c =>
       match c.status with

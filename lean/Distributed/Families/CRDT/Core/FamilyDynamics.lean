@@ -9,7 +9,7 @@ preservation. -/
 /-
 The Problem. Each CRDT family (Register, Counter, OR-Set) has its own
 rich operation type, but must lower to the common `OpCore` representation
-for uniform VM execution. We need adequacy theorems ensuring the lowering
+for uniform protocol machine execution. We need adequacy theorems ensuring the lowering
 preserves observable behavior and stays within the CRDT envelope.
 
 Solution Structure. Define `InScopeFamiliesAdequacy` bundling lowering

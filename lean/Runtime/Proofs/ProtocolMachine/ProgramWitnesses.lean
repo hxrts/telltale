@@ -4,7 +4,7 @@ set_option autoImplicit false
 
 universe u
 
-/-! Proof-only image witnesses moved out of `Runtime.ProtocolMachine` so the VM tree stays
+/-! Proof-only image witnesses moved out of `Runtime.ProtocolMachine` so the protocol machine tree stays
 executable/translation-oriented. -/
 
 structure VerifiedCodeImage (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where

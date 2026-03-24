@@ -4,17 +4,17 @@ import Runtime.Resources.BufferRA
 
 /-! # Unit Model
 
-Minimal computable instances for the VM domain interfaces. -/
+Minimal computable instances for the protocol machine domain interfaces. -/
 
 /-
-The Problem. Testing the VM requires concrete implementations of all domain
+The Problem. Testing the protocol machine requires concrete implementations of all domain
 interfaces, but full implementations are complex. We need minimal computable
 instances that satisfy the interface contracts without introducing complexity.
 
 Solution Structure. Defines marker types (`UnitIdentity`, `UnitGuard`, etc.) with
 trivial typeclass instances. Each instance provides no-op implementations: single
 site per participant, empty guard layer, no persistence, no effects, no verification.
-These enable running the VM in tests without domain-specific behavior.
+These enable running the protocol machine in tests without domain-specific behavior.
 -/
 
 set_option autoImplicit false
@@ -186,7 +186,7 @@ def unitFlowPolicy : FlowPolicy :=
 def unitGuardChainWf : GuardChain.wf unitGuardChain := by
   simp [unitGuardChain, GuardChain.wf, GuardChain.layerIds]
 
-def unitConfig : VMConfig UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+def unitConfig : ProtocolMachineConfig UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
   { bufferConfig := fun _ => unitBufferConfig
   , schedPolicy := .cooperative
   , violationPolicy := { allow := fun _ => false }

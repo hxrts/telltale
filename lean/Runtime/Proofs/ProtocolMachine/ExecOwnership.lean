@@ -13,7 +13,7 @@ def transfer_preserves_coherent_prop : Prop :=
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (ep : Endpoint) (tid : Nat) (resources' : Std.HashMap ScopeId (ResourceState ν)),
     (transferCommit st coro ep tid resources').st.sessions = st.sessions ∧
     (transferCommit st coro ep tid resources').st.buffers = st.buffers

@@ -5,7 +5,7 @@ import Runtime.ProgramLogic.WPPair
 import IrisExtractionInstance
 
 /- 
-The Problem. Provide uniform WP rules for VM instructions without repeating
+The Problem. Provide uniform WP rules for protocol machine instructions without repeating
 the same invariant open/close structure across each proof.
 
 Solution Structure. Delegate each WP rule to the generic `wp_pair`

@@ -8,7 +8,7 @@ single interface.
 
 Solution Structure. Define a lightweight monitor interface parametric
 over session kinds. Failure semantics live in a separate module to avoid
-cyclic dependencies on VM state.
+cyclic dependencies on protocol machine state.
 -/
 
 /-! # Task 23: Unified Monitor
@@ -128,7 +128,7 @@ def SessionMonitor.reject {γ : Type u} (m : SessionMonitor γ) (msg : String) :
 
 /-! ## Monitor Modes and Session Interaction Filter -/
 
-/-- Monitor precheck mode aligned with Rust VM config. -/
+/-- Monitor precheck mode aligned with Rust protocol machine config. -/
 inductive MonitorMode where
   -- Disable monitor precheck.
   | off

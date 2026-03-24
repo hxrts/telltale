@@ -4,15 +4,15 @@ import Runtime.ProtocolMachine.Model.TypeClasses
 import SessionTypes.LocalTypeR
 import Protocol.LocalType
 
-/-! # Compile LocalTypeR to VM Bytecode
+/-! # Compile LocalTypeR to protocol machine Bytecode
 
-Compiler from SessionTypes.LocalTypeR into Runtime VM instructions, plus a
+Compiler from SessionTypes.LocalTypeR into Runtime protocol machine instructions, plus a
 LocalTypeR → LocalType conversion helper for building program images.
 -/
 
 /-
 The Problem. Session types are defined in `SessionTypes.LocalTypeR` using named
-recursion, but the VM works with `LocalType` using de Bruijn indices. We need
+recursion, but the protocol machine works with `LocalType` using de Bruijn indices. We need
 a compiler that performs this translation while preserving semantics.
 
 Solution Structure. Defines `localTypeRToLocalType` converting named recursion to

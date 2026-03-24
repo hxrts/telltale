@@ -7,13 +7,13 @@ set_option autoImplicit false
 
 /-! # Runtime.Proofs.TheoremPack
 
-One-shot theorem packaging from a VM invariant space carrying distributed and
+One-shot theorem packaging from a protocol machine invariant space carrying distributed and
 classical optional profiles.
 -/
 
 /-
 The Problem. Users need a single entry point to obtain all applicable runtime
-theorems for a given VM state, including optional distributed impossibility
+theorems for a given protocol machine state, including optional distributed impossibility
 results and classical analysis bounds.
 
 Solution Structure. Defines `ProtocolMachineInvariantSpaceWithProfiles` combining distributed
@@ -243,7 +243,7 @@ def ProtocolMachineInvariantSpaceWithProfiles.withFailureEnvelope
   ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with failureEnvelope? := some p })
 
-/-- Attach a VM-envelope-adherence distributed profile to a combined space. -/
+/-- Attach a protocol machine-envelope-adherence distributed profile to a combined space. -/
 def ProtocolMachineInvariantSpaceWithProfiles.withVMEnvelopeAdherence
     {store₀ : SessionStore ν} {State : Type v}
     (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
@@ -252,7 +252,7 @@ def ProtocolMachineInvariantSpaceWithProfiles.withVMEnvelopeAdherence
   ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with vmEnvelopeAdherence? := some p })
 
-/-- Attach a VM-envelope-admission distributed profile to a combined space. -/
+/-- Attach a protocol machine-envelope-admission distributed profile to a combined space. -/
 def ProtocolMachineInvariantSpaceWithProfiles.withVMEnvelopeAdmission
     {store₀ : SessionStore ν} {State : Type v}
     (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)

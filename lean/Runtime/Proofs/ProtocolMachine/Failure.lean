@@ -28,7 +28,7 @@ theorem decide_recovery_total
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (sid : SessionId) (f : Failure ι)
+    (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) (f : Failure ι)
     (evidence : RecoveryEvidence := {})
     (policy : RecoveryPolicy := defaultRecoveryPolicy) :
     ∃ act, decideRecovery st sid f evidence policy = act := by
@@ -42,7 +42,7 @@ theorem decide_recovery_deterministic
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (sid : SessionId) (f : Failure ι)
+    (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) (f : Failure ι)
     (evidence : RecoveryEvidence := {})
     (policy : RecoveryPolicy := defaultRecoveryPolicy) :
     ∀ a₁ a₂,

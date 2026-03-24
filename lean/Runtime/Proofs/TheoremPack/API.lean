@@ -278,7 +278,7 @@ def canUseMixedDeterminismProfiles
     (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
   pack.vmEnvelopeAdherence?.isSome && pack.vmEnvelopeAdmission?.isSome
 
-/-- Runtime gate: Byzantine-safe operation requires Byzantine + VM adherence artifacts. -/
+/-- Runtime gate: Byzantine-safe operation requires Byzantine + protocol machine adherence artifacts. -/
 def canOperateUnderByzantineEnvelope
     {store₀ : SessionStore ν} {State : Type v}
     {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}

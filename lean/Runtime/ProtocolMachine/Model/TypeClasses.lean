@@ -11,7 +11,7 @@ universe u
 
 /-! # Domain Model Interfaces
 
-The VM is parameterized by six interfaces:
+The protocol machine is parameterized by six interfaces:
 `IdentityModel`, `GuardLayer`, `PersistenceModel`, `EffectRuntime`, `EffectSpec`,
 and `VerificationModel`.
 
@@ -23,7 +23,7 @@ This file also defines authenticated data structure interfaces (`AuthTree`,
 `AccumulatedSet`) and `ScopeId` used for scoped resource views. -/
 
 /-
-The Problem. The VM needs to be instantiable with different identity, guard,
+The Problem. The protocol machine needs to be instantiable with different identity, guard,
 persistence, effect, and verification implementations. These form a system of
 interacting domain models with cross-cutting obligations (bridges).
 
@@ -165,7 +165,7 @@ class PersistenceModel (π : Type u) where
   /-- Delta emitted on session close. -/
   closeDelta : SessionId → Delta
 
--- Runtime effect interface used by executable VM semantics.
+-- Runtime effect interface used by executable protocol machine semantics.
 class EffectRuntime (ε : Type u) where
   /-- Effect actions and their mutable context. -/
   EffectAction : Type

@@ -18,7 +18,7 @@ the canonical implementation while preserving deterministic semantics.
 set_option autoImplicit false
 
 namespace Runtime
-namespace VM
+namespace protocol machine
 namespace Runtime
 namespace FailureFacade
 
@@ -36,5 +36,5 @@ def supportsBoundedDiff (mode : RecoveryDeterminismMode) : Bool :=
 
 end FailureFacade
 end Runtime
-end VM
+end protocol machine
 end Runtime

@@ -43,7 +43,7 @@ def cost_model_ok {ι γ π ε ν : Type}
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (cfg : VMConfig ι γ π ε ν) : Prop :=
+    (cfg : ProtocolMachineConfig ι γ π ε ν) : Prop :=
   -- Configuration respects minimum cost assumptions.
   (cfg.costModel.minCost ≥ 1) ∧
     (∀ i, i ≠ .halt → cfg.costModel.stepCost i ≥ cfg.costModel.minCost)
@@ -54,6 +54,6 @@ def step_cost {ι γ π ε ν : Type}
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (cfg : VMConfig ι γ π ε ν) (i : Instr γ ε) : Nat :=
+    (cfg : ProtocolMachineConfig ι γ π ε ν) (i : Instr γ ε) : Nat :=
   -- Extract the configured step cost.
   cfg.costModel.stepCost i

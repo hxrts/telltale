@@ -11,7 +11,7 @@ as identity elements in composition and as defaults for testing.
 
 **Sum/product instances** let independent domain models be combined. Sum instances
 dispatch on the chosen side. Product instances run both components. This enables
-protocol federation: a VM configured with `EffectRuntime (ε₁ ⊕ ε₂)` can execute
+protocol federation: a protocol machine configured with `EffectRuntime (ε₁ ⊕ ε₂)` can execute
 effects from either domain without either domain knowing about the other.
 
 **Bridge classes** (`IdentityGuardBridge`, `EffectGuardBridge`, `PersistenceEffectBridge`,
@@ -21,7 +21,7 @@ automatically lift bridges over sums so that composed domains inherit their
 component bridges. -/
 
 /-
-The Problem. The VM is parameterized over five domain interfaces (identity, guard,
+The Problem. The protocol machine is parameterized over five domain interfaces (identity, guard,
 persistence, effect, verification). We need composition operators to combine
 independent domain implementations while preserving their contracts.
 

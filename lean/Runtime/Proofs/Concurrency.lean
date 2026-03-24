@@ -10,7 +10,7 @@ Per-session normalized trace invariance and round-robin normalization. -/
 /-
 The Problem. Show that per-session normalized traces are invariant under
 concurrency bounds, and provide the round-robin normalization property, while
-keeping Iris reasoning out of the VM boundary.
+keeping Iris reasoning out of the protocol machine boundary.
 
 Solution Structure. We factor out Iris invariance, prove scheduler/concurrency
 normalization lemmas, and derive per-session trace invariants.
@@ -32,7 +32,7 @@ theorem state_interp_invariant {ι γ π ε ν : Type} [IdentityModel ι] [Guard
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (e : Expr) (σ : VMState ι γ π ε ν) (Φ : SessionVMVal → iProp)
+    (e : Expr) (σ : ProtocolMachineState ι γ π ε ν) (Φ : SessionVMVal → iProp)
     (hWP : iProp.entails iProp.emp
       (iProp.wand
         (Iris.state_interp
@@ -60,7 +60,7 @@ private lemma sched_round_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [G
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (n : Nat) (st : VMState ι γ π ε ν) (hn : n ≥ 1) :
+    (n : Nat) (st : ProtocolMachineState ι γ π ε ν) (hn : n ≥ 1) :
     schedRound n st = schedRound 1 st := by
   cases n with
   | zero =>
@@ -76,7 +76,7 @@ private lemma run_scheduled_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (fuel n : Nat) (st : VMState ι γ π ε ν) (hn : n ≥ 1) :
+    (fuel n : Nat) (st : ProtocolMachineState ι γ π ε ν) (hn : n ≥ 1) :
     runScheduled fuel n st = runScheduled fuel 1 st := by
   induction fuel generalizing st with
   | zero =>
@@ -93,7 +93,7 @@ private lemma run_scheduled_policy_eq {ι γ π ε ν : Type u} [IdentityModel �
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (fuel n : Nat) (st : VMState ι γ π ε ν)
+    (fuel n : Nat) (st : ProtocolMachineState ι γ π ε ν)
     (hpol : st.sched.policy = .roundRobin) :
     runScheduled fuel n st =
     runScheduled fuel n { st with sched := { st.sched with policy := .roundRobin } } := by
@@ -117,7 +117,7 @@ theorem per_session_trace_n_invariant {ι γ π ε ν : Type u} [IdentityModel �
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν)
+    (st : ProtocolMachineState ι γ π ε ν)
     (_hwf : WFVMState st) (sid : SessionId) (fuel n1 n2 : Nat)
     (hn1 : n1 ≥ 1) (hn2 : n2 ≥ 1) :
     filterBySid sid (Runtime.ProtocolMachine.normalizeTrace (runScheduled fuel n1 st).obsTrace) =
@@ -134,7 +134,7 @@ theorem per_session_trace_policy_invariant {ι γ π ε ν : Type u} [IdentityMo
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν)
+    (st : ProtocolMachineState ι γ π ε ν)
     (_hwf : WFVMState st) (sid : SessionId) (fuel concurrency : Nat)
     (hpol : st.sched.policy = .roundRobin) :
     filterBySid sid (Runtime.ProtocolMachine.normalizeTrace (runScheduled fuel concurrency st).obsTrace) =

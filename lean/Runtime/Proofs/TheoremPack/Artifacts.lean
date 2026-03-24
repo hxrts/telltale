@@ -304,7 +304,7 @@ structure ConsensusEnvelopeArtifact where
     Distributed.ConsensusEnvelope.AdmissionCompleteness_consensus
       protocol.premises.inferredBudget protocol.premises.envelopeBudget
 
-/-! ## Failure and VM Envelope Families -/
+/-! ## Failure and protocol machine Envelope Families -/
 
 /-- Packaged failure-envelope theorem-family artifact. -/
 structure FailureEnvelopeArtifact where
@@ -343,9 +343,9 @@ structure FailureEnvelopeArtifact where
       protocol.premises.ImplRun
       protocol.premises.injectFailure
 
-/-! ## VM Envelope Adherence -/
+/-! ## protocol machine Envelope Adherence -/
 
-/-- Packaged VM envelope-adherence theorem-family artifact. -/
+/-- Packaged protocol machine envelope-adherence theorem-family artifact. -/
 structure ProtocolMachineEnvelopeAdherenceArtifact where
   protocol : Runtime.Adequacy.ProtocolMachineEnvelopeAdherenceProtocol
   localAdherence :
@@ -391,9 +391,9 @@ structure ProtocolMachineEnvelopeAdherenceArtifact where
     protocol.premises.guarantee protocol.premises.weakCapability →
     protocol.premises.guarantee protocol.premises.strongCapability
 
-/-! ## VM Envelope Admission -/
+/-! ## protocol machine Envelope Admission -/
 
-/-- Packaged VM envelope-admission theorem-family artifact. -/
+/-- Packaged protocol machine envelope-admission theorem-family artifact. -/
 structure ProtocolMachineEnvelopeAdmissionArtifact where
   protocol : Runtime.Adequacy.ProtocolMachineEnvelopeAdmissionProtocol
   localInferenceSoundness :
@@ -477,7 +477,7 @@ structure ProtocolEnvelopeBridgeArtifact where
       profile.bundle.premises.shardedEnvelope
       profile.bundle.premises.shardCut
 
-/-- Packaged VM termination artifact (when liveness bundle is provided). -/
+/-- Packaged protocol machine termination artifact (when liveness bundle is provided). -/
 structure TerminationArtifact {store₀ : SessionStore ν} where
   bundle : ProtocolMachineLivenessBundle store₀
   proof :

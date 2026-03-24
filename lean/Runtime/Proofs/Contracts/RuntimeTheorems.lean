@@ -12,11 +12,11 @@ import ClassicalAnalysisAPI
 
 /-! # Runtime Theorems
 
-Core theorem statements and proofs for the VM runtime layer. This module collects
+Core theorem statements and proofs for the protocol machine runtime layer. This module collects
 proven theorems across several categories:
 
 - **Refinement stack**: Layered refinement from effects through scheduling to failure handling
-- **Core VM**: Deadlock freedom, transfer preservation, progress measures
+- **Core protocol machine**: Deadlock freedom, transfer preservation, progress measures
 - **Multi-session**: Cross-session diamond property (disjoint sessions commute)
 - **Handlers**: Transport spec satisfaction, effect polymorphism
 - **Cost metering**: Credit soundness, budget bounds, information-theoretic costs
@@ -24,14 +24,14 @@ proven theorems across several categories:
 Theorems in this module are stated and proved in executable form. -/
 
 /-
-The Problem. The VM runtime layer has many correctness properties spread across
+The Problem. The protocol machine runtime layer has many correctness properties spread across
 different modules (refinement, deadlock freedom, diamond, handlers, cost). Users
 need a single entry point to access proven guarantees without navigating the proof
 structure.
 
 Solution Structure. Collects theorem statements into categories, providing types
 and instantiation functions for each. Refinement stack theorems establish behavioral
-equivalences between abstraction layers. Core VM theorems cover deadlock freedom
+equivalences between abstraction layers. Core protocol machine theorems cover deadlock freedom
 and progress. Multi-session theorems prove the diamond property for disjoint sessions.
 -/
 
@@ -56,7 +56,7 @@ def effects_refines_schedStep : Prop :=
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν],
-    ∀ st : VMState ι γ π ε ν, schedule_confluence st ∧ cooperative_refines_concurrent st
+    ∀ st : ProtocolMachineState ι γ π ε ν, schedule_confluence st ∧ cooperative_refines_concurrent st
 
 theorem effects_refines_sched_step_holds : effects_refines_schedStep := by
   exact fun {ι} {γ} {π} {ε} {ν} _ _ _ _ _ _ _ _ _ _ _ _ st =>
@@ -71,7 +71,7 @@ def schedStep_refines_failure : Prop :=
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν],
-    ∀ st : VMState ι γ π ε ν, starvation_free st
+    ∀ st : ProtocolMachineState ι γ π ε ν, starvation_free st
 
 theorem sched_step_refines_failure_holds : schedStep_refines_failure := by
   exact fun {ι} {γ} {π} {ε} {ν} _ _ _ _ _ _ _ _ _ _ _ _ st =>
@@ -86,21 +86,21 @@ def failure_refines_speculative : Prop :=
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν],
-    ∀ st : VMState ι γ π ε ν,
+    ∀ st : ProtocolMachineState ι γ π ε ν,
       cooperative_refines_concurrent st ∧ starvation_free st
 
 theorem failure_refines_speculative_holds : failure_refines_speculative := by
   exact fun {ι} {γ} {π} {ε} {ν} _ _ _ _ _ _ _ _ _ _ _ _ st =>
     ⟨cooperative_refines_concurrent_holds st, starvation_free_holds st⟩
 
-/-! ## Core VM Theorems
+/-! ## Core protocol machine Theorems
 
-Fundamental VM properties: deadlock freedom via progress measures,
+Fundamental protocol machine properties: deadlock freedom via progress measures,
 coherence preservation under endpoint transfer.
 -/
 
 def protocol_machine_deadlock_free : Prop :=
-  -- Well-typed VM with a runnable coroutine can always step.
+  -- Well-typed protocol machine with a runnable coroutine can always step.
   -- Proved via progress measure framework in Lyapunov.lean:
   -- well-typed steps don't increase the measure, and scheduler
   -- liveness ensures runnable coroutines get scheduled.
@@ -121,10 +121,10 @@ theorem transfer_preserves_coherent_holds : transfer_preserves_coherent :=
 /-! ## Multi-Session Diamond
 
 The cross-session diamond property: executing coroutines on disjoint sessions
-in either order yields equivalent VM states (modulo trace ordering).
+in either order yields equivalent protocol machine states (modulo trace ordering).
 
 Definitions and proofs are in `Runtime.Proofs.Diamond`. The key insight is that
-`VMStateEqModTrace` uses permutation equality on `obsTrace` rather than exact
+`ProtocolMachineStateEqModTrace` uses permutation equality on `obsTrace` rather than exact
 equality, which is the correct notion of commutativity for concurrent steps.
 -/
 
@@ -141,8 +141,8 @@ def LoaderFrameStable {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     [Inhabited (EffectRuntime.EffectCtx ε)]
-    (Q : VMState ι γ π ε ν → Prop) : Prop :=
-  ∀ (st : VMState ι γ π ε ν) (image : CodeImage γ ε),
+    (Q : ProtocolMachineState ι γ π ε ν → Prop) : Prop :=
+  ∀ (st : ProtocolMachineState ι γ π ε ν) (image : CodeImage γ ε),
     Q st → Q (loadChoreography st image).1
 
 /-- Existing-session weakest-precondition contract:
@@ -154,8 +154,8 @@ def WPExisting {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     [Inhabited (EffectRuntime.EffectCtx ε)]
-    (st : VMState ι γ π ε ν)
-    (Q : VMState ι γ π ε ν → Prop) : Prop :=
+    (st : ProtocolMachineState ι γ π ε ν)
+    (Q : ProtocolMachineState ι γ π ε ν → Prop) : Prop :=
   Q st ∧ LoaderFrameStable (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) Q
 
 /-- Loading a new protocol preserves existing session specs. -/
@@ -166,8 +166,8 @@ theorem wp_frame_load {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     [Inhabited (EffectRuntime.EffectCtx ε)]
-    (st : VMState ι γ π ε ν) (image : CodeImage γ ε)
-    (Q : VMState ι γ π ε ν → Prop) :
+    (st : ProtocolMachineState ι γ π ε ν) (image : CodeImage γ ε)
+    (Q : ProtocolMachineState ι γ π ε ν → Prop) :
     WPExisting st Q →
     (let (st', _) := loadChoreography st image; WPExisting st' Q) :=
 by
@@ -260,7 +260,7 @@ def starvation_free_lifted : Prop :=
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν],
-    ∀ st : VMState ι γ π ε ν, starvation_free st
+    ∀ st : ProtocolMachineState ι γ π ε ν, starvation_free st
 
 theorem starvation_free_lifted_holds : starvation_free_lifted :=
   fun st => starvation_free_holds st
@@ -352,7 +352,7 @@ def wp_lift_step_with_cost : Prop :=
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (cfg : VMConfig ι γ π ε ν) (coro : CoroutineState γ ε) (i : Instr γ ε),
+    (cfg : ProtocolMachineConfig ι γ π ε ν) (coro : CoroutineState γ ε) (i : Instr γ ε),
     i ≠ .halt →
     cfg.costModel.stepCost i ≤ coro.costBudget →
     ∃ coro' : CoroutineState γ ε,
@@ -401,7 +401,7 @@ def cost_frame_preserving : Prop :=
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (cfg : VMConfig ι γ π ε ν) (coro coro' : CoroutineState γ ε) (i : Instr γ ε),
+    (cfg : ProtocolMachineConfig ι γ π ε ν) (coro coro' : CoroutineState γ ε) (i : Instr γ ε),
     chargeCost cfg coro i = some coro' →
     coro'.id = coro.id ∧
     coro'.ownedEndpoints = coro.ownedEndpoints ∧
@@ -456,14 +456,14 @@ theorem facts_monotone_holds : facts_monotone :=
 
 def aura_typeclass_resolution : Prop :=
   -- The Aura bridge typeclasses resolve for any well-formed instantiation.
-  -- Witnessed by constructing a VMState-dependent term requiring all bridges.
+  -- Witnessed by constructing a ProtocolMachineState-dependent term requiring all bridges.
   ∀ {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν), WFVMState st → WFVMState st
+    (st : ProtocolMachineState ι γ π ε ν), WFVMState st → WFVMState st
 
 theorem aura_typeclass_resolution_holds : aura_typeclass_resolution :=
   fun _ h => h
@@ -472,21 +472,21 @@ theorem aura_typeclass_resolution_holds : aura_typeclass_resolution :=
 
 The delegation preservation theorem: receiving a delegated channel endpoint
 preserves coherence. This bridges Protocol-level metatheory (Paper 3) and
-VM-level instruction execution.
+protocol-machine-level instruction execution.
 
 The proof is in `Runtime.Proofs.Delegation`. The dependency chain is linear:
 
 ```
 Paper 3: Delegation preservation (single-step, Protocol level)
     ↓
-R.1: VM instruction preserves SessionCoherent
+R.1: protocol machine instruction preserves SessionCoherent
     ↓
 R.2: Frame rule (instructions only affect their footprint)
     ↓
 R.3: Cross-session diamond (disjoint footprints commute)
 ```
 
-Protocol-level proofs don't depend on VM theorems; VM proofs use Protocol
+Protocol-level proofs don't depend on protocol machine theorems; protocol machine proofs use Protocol
 theorems as lemmas.
 -/
 

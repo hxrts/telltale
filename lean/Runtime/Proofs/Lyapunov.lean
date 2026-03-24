@@ -328,7 +328,7 @@ theorem buffer_progress_measure_enqueue {α : Type} (buf : List α) (v : α) :
     bufferProgressMeasure (buf ++ [v]) = bufferProgressMeasure buf + 1 := by
   simp [bufferProgressMeasure]
 
-/-! ## VM Progress Measure -/
+/-! ## protocol machine Progress Measure -/
 
 /-- Per-session progress measure: combines endpoint type measures with
     pending buffer sizes. This is the concrete Lyapunov function for
@@ -403,22 +403,22 @@ theorem lyapunov_conserved_under_balanced_delegation
 
 /-! ## Progress-Measure Admission Predicate -/
 
-/-- A VM configuration admits a progress measure when each session's
+/-- A protocol machine configuration admits a progress measure when each session's
     monitored types satisfy the nonincreasing property under well-typed steps.
 
     The measure function is parameterized externally to avoid self-referential
     structure fields (which would create invalid nested inductives in Lean 4). -/
-def VMAdmitsProgressMeasure {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+def ProtocolMachineAdmitsProgressMeasure {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (measure : VMState ι γ π ε ν → Nat) (st : VMState ι γ π ε ν) : Prop :=
-  ∀ st' : VMState ι γ π ε ν,
+    (measure : ProtocolMachineState ι γ π ε ν → Nat) (st : ProtocolMachineState ι γ π ε ν) : Prop :=
+  ∀ st' : ProtocolMachineState ι γ π ε ν,
     schedStep st = some st' → measure st' ≤ measure st
 
-/-! ## VM Deadlock Freedom via Progress Measure -/
+/-! ## protocol machine Deadlock Freedom via Progress Measure -/
 
 /-- Helper: if the scheduler selects a coroutine, schedStep produces a result. -/
 theorem sched_step_some_of_schedule {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
@@ -427,19 +427,19 @@ theorem sched_step_some_of_schedule {ι γ π ε ν : Type} [IdentityModel ι] [
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (cid : CoroutineId) (st' : VMState ι γ π ε ν)
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) (st' : ProtocolMachineState ι γ π ε ν)
     (h : schedule st = some (cid, st')) :
     ∃ st'', schedStep st = some st'' := by
   simp only [schedStep, h]
   exact ⟨_, rfl⟩
 
-/-- VM deadlock freedom: a well-formed VM with a runnable coroutine can step.
+/-- protocol machine deadlock freedom: a well-formed protocol machine with a runnable coroutine can step.
 
     This combines the progress measure framework with scheduler liveness.
     The progress measure ensures types can advance (nonincreasing on steps,
     strictly decreasing on communication). Scheduler liveness ensures
     runnable coroutines get scheduled. Together they give: if some coroutine
-    is ready and in the queue, the VM can take a step. -/
+    is ready and in the queue, the protocol machine can take a step. -/
 def protocol_machine_deadlock_free_via_progress : Prop :=
   ∀ {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -447,7 +447,7 @@ def protocol_machine_deadlock_free_via_progress : Prop :=
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν),
+    (st : ProtocolMachineState ι γ π ε ν),
     WFVMState st →
     (∃ cid, cid ∈ st.sched.readyQueue ∧
       match st.coroutines[cid]? with
@@ -455,7 +455,7 @@ def protocol_machine_deadlock_free_via_progress : Prop :=
       | none => False) →
     ∃ st', schedStep st = some st'
 
-/-- VM deadlock freedom holds: follows from scheduler liveness. -/
+/-- protocol machine deadlock freedom holds: follows from scheduler liveness. -/
 theorem protocol_machine_deadlock_free_via_progress_holds : protocol_machine_deadlock_free_via_progress := by
   intro ι γ π ε ν _ _ _ _ _ _ _ _ _ _ _ _ st _hwf ⟨cid, hmem, hstatus⟩
   have hsf := starvation_free_holds st

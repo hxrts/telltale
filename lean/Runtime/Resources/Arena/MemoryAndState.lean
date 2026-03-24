@@ -20,7 +20,7 @@ Physical backing model for session state.
 Dependencies: Task 10, IrisExtractionInstance. -/
 
 /-
-The Problem. The VM needs a concrete memory model for session state that supports
+The Problem. The protocol machine needs a concrete memory model for session state that supports
 efficient allocation, typed access, and refinement proofs connecting to the abstract
 Protocol environments (GEnv, DEnv).
 

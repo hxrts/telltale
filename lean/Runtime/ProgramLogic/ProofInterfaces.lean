@@ -4,7 +4,7 @@ import IrisExtractionInstance
 
 /-
 The Problem. Proof-only specifications (Iris pre/postconditions and namespace
-invariants) should not live in the runtime VM surface that will be ported.
+invariants) should not live in the runtime protocol machine surface that will be ported.
 
 Solution Structure. Provide proof-layer interfaces that extend the runtime
 models with Iris predicates and namespace bookkeeping.

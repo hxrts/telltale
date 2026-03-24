@@ -20,13 +20,13 @@ set_option autoImplicit false
 
 /-! # Runtime.Proofs.Adapters.Distributed.ProfileWrappers
 
-Distributed impossibility/lower-bound profile wrappers attached to VM invariant spaces.
+Distributed impossibility/lower-bound profile wrappers attached to protocol machine invariant spaces.
 -/
 
 /-
 The Problem. Distributed-theory families (FLP, CAP, quorum geometry, synchrony
 variants, and envelope theorem packs) need a uniform representation that can be
-attached to the VM invariant space.
+attached to the protocol machine invariant space.
 
 Solution Structure. Defines profile wrappers, canonical constructors, and the
 distributed-profile bundle carried by `ProtocolMachineInvariantSpaceWithDistributedProfiles`.
@@ -92,10 +92,10 @@ abbrev ConsensusEnvelopeProfile := Distributed.ConsensusEnvelope.ConsensusEnvelo
 /-- Canonical failure-envelope theorem-family profile carried by the invariant space. -/
 abbrev FailureEnvelopeProfile := Runtime.Adequacy.FailureEnvelopeProtocol
 
-/-- Canonical VM envelope-adherence theorem-family profile carried by the invariant space. -/
+/-- Canonical protocol machine envelope-adherence theorem-family profile carried by the invariant space. -/
 abbrev ProtocolMachineEnvelopeAdherenceProfile := Runtime.Adequacy.ProtocolMachineEnvelopeAdherenceProtocol
 
-/-- Canonical VM envelope-admission theorem-family profile carried by the invariant space. -/
+/-- Canonical protocol machine envelope-admission theorem-family profile carried by the invariant space. -/
 abbrev ProtocolMachineEnvelopeAdmissionProfile := Runtime.Adequacy.ProtocolMachineEnvelopeAdmissionProtocol
 
 /-- Protocol envelope-bridge theorem-family profile wrapper for invariant-space attachment. -/
@@ -133,7 +133,7 @@ structure DistributedProfiles where
   vmEnvelopeAdmission? : Option ProtocolMachineEnvelopeAdmissionProfile := none
   protocolEnvelopeBridge? : Option ProtocolEnvelopeBridgeProfile := none
 
-/-- VM invariant space extended with optional distributed-theory profiles. -/
+/-- protocol machine invariant space extended with optional distributed-theory profiles. -/
 structure ProtocolMachineInvariantSpaceWithDistributedProfiles
     (store₀ : SessionStore ν) (State : Type v)
     extends ProtocolMachineInvariantSpace (ν := ν) store₀ State where

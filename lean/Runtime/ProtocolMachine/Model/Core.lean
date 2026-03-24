@@ -2,7 +2,7 @@ import Std
 import Runtime.ProtocolMachine.Model.TypeClasses
 
 
-/-! # Core VM Types
+/-! # Core protocol machine Types
 
 Scalar aliases (`Reg`, `PC`, `CoroutineId`, etc.), the `Expr` handle for coroutine
 expressions, and the `Instr` bytecode instruction set. Instructions are parameterized
@@ -19,7 +19,7 @@ set_option autoImplicit false
 
 universe u
 
-/-! ## Core VM scalars -/
+/-! ## Core protocol machine scalars -/
 
 abbrev Reg := Nat
 abbrev Addr := Nat

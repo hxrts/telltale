@@ -12,7 +12,7 @@ artifacts.
 /-
 The Problem. Classical analysis theorems (Foster-Lyapunov stability, MaxWeight
 scheduling, large deviations) exist in the Mathematical Physics library but need
-to be instantiated with VM-specific invariant spaces and step functions to yield
+to be instantiated with protocol machine-specific invariant spaces and step functions to yield
 runtime guarantees.
 
 Solution Structure. Provides profile wrappers (FosterProfile, MaxWeightProfile,
@@ -32,7 +32,7 @@ section
 
 variable {ν : Type u} [VerificationModel ν]
 
-/-- Build a transport context from a classical witness and a VM step function. -/
+/-- Build a transport context from a classical witness and a protocol machine step function. -/
 def transportCtxOfWitness
     {State : Type v}
     (step : State → State)
@@ -213,7 +213,7 @@ def functionalCLTArtifactOfProfile
 
 /-! ## Classical Profile Bundles -/
 
-/-- Optional classical profile bundle attached to a VM invariant space. -/
+/-- Optional classical profile bundle attached to a protocol machine invariant space. -/
 structure ClassicalProfiles (State : Type v) where
   foster? : Option (FosterProfile State) := none
   maxWeight? : Option MaxWeightProfile := none
@@ -226,7 +226,7 @@ structure ClassicalProfiles (State : Type v) where
   littlesLaw? : Option LittlesLawProfile := none
   functionalCLT? : Option FunctionalCLTProfile := none
 
-/-- VM invariant space extended with optional classical profiles. -/
+/-- protocol machine invariant space extended with optional classical profiles. -/
 structure ProtocolMachineInvariantSpaceWithClassicalProfiles
     (store₀ : SessionStore ν) (State : Type v)
     extends ProtocolMachineInvariantSpace (ν := ν) store₀ State where

@@ -2,18 +2,18 @@ import Protocol.Coherence.Delegation
 
 /-! # Instruction Denotational Specifications
 
-This module defines denotational instruction specs for VM operations in terms of
+This module defines denotational instruction specs for protocol machine operations in terms of
 Protocol-level GEnv and DEnv updates. Each instruction has:
 
 1. **Spec** — what the instruction does to G/D (environment changes)
 2. **Footprint** — which sessions the instruction affects (for frame rule)
 3. **Delegation bridge hook** — `acquire` carries a `DelegationStep` witness
 
-These specs are the Rust-portable VM layer. Proof theorems live in
+These specs are the Rust-portable protocol machine layer. Proof theorems live in
 `Runtime.Proofs.ProtocolMachine.InstrSpec`. -/
 
 /-
-The Problem. VM instructions must be specified in terms of Protocol-level environment
+The Problem. protocol machine instructions must be specified in terms of Protocol-level environment
 updates (GEnv, DEnv) to enable coherence preservation proofs. Each instruction needs
 a clear contract specifying preconditions, postconditions, and footprint.
 
@@ -302,9 +302,9 @@ structure AcquireSpec (G G' : GEnv) (D D' : DEnv)
   delegation_applied :
     DelegationStep G G' D D' delegatedSession senderRole receiverEp.role
 
-/-- VM-level `receive` of a delegated endpoint corresponds to a Protocol-level
+/-- protocol machine-level `receive` of a delegated endpoint corresponds to a Protocol-level
     `DelegationStep` on the delegated session. -/
-def vm_receive_delegation_corresponds_protocol
+def protocol_machine_receive_delegation_corresponds_protocol
     {G G' : GEnv} {D D' : DEnv}
     {receiverEp : Endpoint} {senderRole : Role}
     {delegatedSession : SessionId} {delegatedRole : Role}
