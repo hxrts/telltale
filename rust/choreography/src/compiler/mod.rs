@@ -12,7 +12,7 @@ pub mod extension_parser;
 pub mod grammar;
 pub mod layout;
 pub mod merge;
-pub mod parser;
+pub use telltale_parser::compiler::parser;
 pub mod pretty;
 pub mod projection;
 
