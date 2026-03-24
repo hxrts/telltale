@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run telltale-lint-checks time-domain check on VM, simulator, and bridge sources.
+# Run telltale-lint-checks time-domain check on protocol machine, simulator, and bridge sources.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

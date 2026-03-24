@@ -44,8 +44,8 @@ jobs:
           args: --workspace --all-targets --all-features
       - name: Install native tooling
         run: sudo apt-get update && sudo apt-get install -y ripgrep gnuplot
-      - name: Run executable VM placeholder baseline checks
-        run: ./scripts/check/vm-placeholders.sh
+      - name: Run executable protocol machine placeholder baseline checks
+        run: ./scripts/check/protocol-machine-placeholders.sh
       - name: Run parity checks
         run: ./scripts/check/cross-runtime-parity.sh --all
       - name: Run ownership contract checks

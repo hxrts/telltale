@@ -142,7 +142,7 @@ main() {
     # Theorem shells - placeholder proofs in Runtime modules
     local RUNTIME_TARGETS=(
         "${LEAN_ROOT}/Runtime/Proofs"
-        "${LEAN_ROOT}/Runtime/VM"
+        "${LEAN_ROOT}/Runtime/ProtocolMachine"
     )
     # Check if targets exist before searching
     local existing_targets=()

@@ -57,10 +57,10 @@ jobs:
           mkdir -p artifacts
           just check-arch-lean | tee artifacts/check-arch-lean.log
 
-      - name: Run executable VM placeholder baseline checks
+      - name: Run executable protocol machine placeholder baseline checks
         run: |
           mkdir -p artifacts
-          just check-vm-placeholders | tee artifacts/check-vm-placeholders.log
+          just check-protocol-machine-placeholders | tee artifacts/check-protocol-machine-placeholders.log
 
       - name: Run parity checks
         run: |
@@ -92,8 +92,8 @@ jobs:
           mkdir -p artifacts
           just check-release-conformance | tee artifacts/check-release-conformance.log
 
-      - name: Build targeted Lean VM modules
-        run: just verify-lean-vm-targets
+      - name: Build targeted Lean protocol machine modules
+        run: just verify-lean-protocol-machine-targets
 
       - name: Run protocol verification lane
         run: |
@@ -162,10 +162,10 @@ jobs:
           mkdir -p artifacts
           just check-arch-lean | tee artifacts/check-arch-lean.log
 
-      - name: Run executable VM placeholder baseline checks
+      - name: Run executable protocol machine placeholder baseline checks
         run: |
           mkdir -p artifacts
-          just check-vm-placeholders | tee artifacts/check-vm-placeholders.log
+          just check-protocol-machine-placeholders | tee artifacts/check-protocol-machine-placeholders.log
 
       - name: Run parity checks
         run: |

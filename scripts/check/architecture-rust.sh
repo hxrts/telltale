@@ -27,36 +27,36 @@ summary_lines=""
 # ── Scope Definitions ─────────────────────────────────────────
 
 DETERMINISM_RUNTIME_SCOPE=(
-  "${RUST_DIR}/vm/src"
+  "${RUST_DIR}/protocol-machine/src"
   "${RUST_DIR}/simulator/src"
   "${RUST_DIR}/choreography/src/simulation"
 )
 
 DETERMINISM_TEST_SCOPE=(
-  "${RUST_DIR}/vm/tests"
+  "${RUST_DIR}/protocol-machine/tests"
   "${RUST_DIR}/simulator/tests"
   "${RUST_DIR}/choreography/tests/simulation_tests.rs"
 )
 
 VM_KERNEL_SCOPE=(
-  "${RUST_DIR}/vm/src/kernel.rs"
-  "${RUST_DIR}/vm/src/vm.rs"
-  "${RUST_DIR}/vm/src/threaded.rs"
-  "${RUST_DIR}/vm/src/scheduler.rs"
-  "${RUST_DIR}/vm/src/session.rs"
-  "${RUST_DIR}/vm/src/coroutine.rs"
-  "${RUST_DIR}/vm/src/exec/mod.rs"
-  "${RUST_DIR}/vm/src/exec/comm.rs"
-  "${RUST_DIR}/vm/src/exec/session.rs"
-  "${RUST_DIR}/vm/src/exec/guard_effect.rs"
-  "${RUST_DIR}/vm/src/exec/speculation.rs"
-  "${RUST_DIR}/vm/src/exec/ownership.rs"
-  "${RUST_DIR}/vm/src/exec/control.rs"
-  "${RUST_DIR}/vm/src/exec/helpers.rs"
+  "${RUST_DIR}/protocol-machine/src/kernel.rs"
+  "${RUST_DIR}/protocol-machine/src/engine.rs"
+  "${RUST_DIR}/protocol-machine/src/threaded.rs"
+  "${RUST_DIR}/protocol-machine/src/scheduler.rs"
+  "${RUST_DIR}/protocol-machine/src/session.rs"
+  "${RUST_DIR}/protocol-machine/src/coroutine.rs"
+  "${RUST_DIR}/protocol-machine/src/exec/mod.rs"
+  "${RUST_DIR}/protocol-machine/src/exec/comm.rs"
+  "${RUST_DIR}/protocol-machine/src/exec/session.rs"
+  "${RUST_DIR}/protocol-machine/src/exec/guard_effect.rs"
+  "${RUST_DIR}/protocol-machine/src/exec/speculation.rs"
+  "${RUST_DIR}/protocol-machine/src/exec/ownership.rs"
+  "${RUST_DIR}/protocol-machine/src/exec/control.rs"
+  "${RUST_DIR}/protocol-machine/src/exec/helpers.rs"
 )
 
 CORE_RUNTIME_SCOPE=(
-  "${RUST_DIR}/vm/src"
+  "${RUST_DIR}/protocol-machine/src"
   "${RUST_DIR}/simulator/src"
   "${RUST_DIR}/choreography/src"
 )
@@ -813,8 +813,8 @@ while IFS= read -r file; do
 done < <(find "${RUST_DIR}" -name '*.rs' -type f | grep -v '/target/' | grep -v '/tests/' | grep -v '/benches/' | grep -v '/examples/' | grep -v '/src/bin/')
 print_hits "warning" "functions over 60 lines (refactor into smaller units)" "${large_block_hits}" "Extract logical steps into helper functions. Each function should do one thing. Compose small functions to build complex behavior."
 
-# VM core lint-allow policy: keep suppressions narrow and explicit.
-vm_core_allow_hits="$(rg -n --pcre2 '^[[:space:]]*#[[:space:]]*\\[[[:space:]]*allow\\([[:space:]]*clippy::[^)]+\\)[[:space:]]*\\]' "${RUST_DIR}/vm/src" -g '*.rs' || true)"
+# protocol machine core lint-allow policy: keep suppressions narrow and explicit.
+vm_core_allow_hits="$(rg -n --pcre2 '^[[:space:]]*#[[:space:]]*\\[[[:space:]]*allow\\([[:space:]]*clippy::[^)]+\\)[[:space:]]*\\]' "${RUST_DIR}/protocol-machine/src" -g '*.rs' || true)"
 vm_core_allow_hits="$(printf '%s\n' "${vm_core_allow_hits}" | rg -v 'clippy::(as_conversions|derivable_impls|field_reassign_with_default)' || true)"
 print_hits "warning" "broad clippy allow annotations in vm core paths" "${vm_core_allow_hits}" "Remove broad vm-core lint suppressions or replace them with smaller helper refactors. Keep only narrowly justified allows with an adjacent rationale comment."
 
@@ -853,7 +853,7 @@ done
 # 14) Floating-point types in deterministic runtime/simulation scope.
 float_type_hits="$(scan_scope_hits '\b(f32|f64)\b' "${DETERMINISM_RUNTIME_SCOPE[@]}" "${DETERMINISM_TEST_SCOPE[@]}")"
 float_type_hits="$(filter_float_matches_to_code_tokens "${float_type_hits}")"
-float_type_hits="$(filter_out_paths "${float_type_hits}" '/vm/tests/helpers/')"
+float_type_hits="$(filter_out_paths "${float_type_hits}" '/protocol-machine/tests/helpers/')"
 print_hits "error" "floating-point types in deterministic VM/simulation scope" "${float_type_hits}" "Replace floating-point values with deterministic fixed-point or integer representations (for example, scaled i64/u64 newtypes)."
 
 # 15) Direct host nondeterminism must not appear in deterministic scope.
@@ -875,9 +875,9 @@ while IFS= read -r file; do
 done < <(find "${RUST_DIR}" -name '*.rs' -type f | grep -v '/tests/' | grep -v '/benches/')
 print_hits "warning" "potential lock-held-across-await patterns" "${lock_await_hits}" "Avoid holding lock guards across .await boundaries. Narrow lock scope or clone needed data before awaiting."
 
-# 17) VM kernel must not touch host I/O/process/env APIs directly.
+# 17) protocol machine kernel must not touch host I/O/process/env APIs directly.
 kernel_side_effect_hits="$(scan_scope_hits 'std::fs::|std::net::|std::env::var\(|std::process::Command|tokio::fs::|tokio::net::|tokio::process::Command' "${VM_KERNEL_SCOPE[@]}")"
-print_hits "error" "direct host side effects in VM kernel sources" "${kernel_side_effect_hits}" "Move host I/O, process, network, and environment reads behind the VM effect layer and inject handles at the boundary."
+print_hits "error" "direct host side effects in protocol machine kernel sources" "${kernel_side_effect_hits}" "Move host I/O, process, network, and environment reads behind the VM effect layer and inject handles at the boundary."
 
 # 18) HashMap/HashSet in deterministic scope can destabilize iteration order.
 hash_collection_hits="$(scan_scope_hits '\b(HashMap|HashSet)\b' "${DETERMINISM_RUNTIME_SCOPE[@]}")"

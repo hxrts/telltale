@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ensure executable Lean VM modules have no TODO/FIXME/stub markers
+# Ensure executable Lean protocol machine modules have no TODO/FIXME/stub markers
 # and do not import proof-layer modules.
 set -euo pipefail
 
@@ -14,21 +14,21 @@ fi
 
 PATTERN='(?i)\b(?:TODO|FIXME|TBD|placeholder|stub|unimplemented|WIP)\b'
 
-# Limit to executable VM modules (not proofs)
+# Limit to executable protocol machine modules (not proofs)
 CURRENT_HITS="$({
   rg -n --pcre2 "${PATTERN}" \
-    "${ROOT_DIR}/lean/Runtime/VM/Model" \
-    "${ROOT_DIR}/lean/Runtime/VM/Semantics" \
-    "${ROOT_DIR}/lean/Runtime/VM/Runtime" \
-    "${ROOT_DIR}/lean/Runtime/VM/API.lean" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Semantics" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Runtime" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/API.lean" \
     -g '*.lean' || true
 } | sed "s#${ROOT_DIR}/##" | sort -u)"
 
 if [[ -n "${CURRENT_HITS}" ]]; then
-  echo "error: found placeholder/todo/stub markers in executable VM modules:" >&2
+  echo "error: found placeholder/todo/stub markers in executable protocol machine modules:" >&2
   printf '%s\n' "${CURRENT_HITS}" >&2
   echo "" >&2
-  echo "Remove markers from executable VM modules." >&2
+  echo "Remove markers from executable protocol machine modules." >&2
   exit 1
 fi
 
@@ -36,17 +36,17 @@ fi
 
 PROOF_IMPORT_HITS="$(
   rg -n --pcre2 '^\s*import\s+Runtime\.Proofs(\.|$)' \
-    "${ROOT_DIR}/lean/Runtime/VM/Model" \
-    "${ROOT_DIR}/lean/Runtime/VM/Semantics" \
-    "${ROOT_DIR}/lean/Runtime/VM/Runtime" \
-    "${ROOT_DIR}/lean/Runtime/VM/API.lean" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Semantics" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Runtime" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/API.lean" \
     -g '*.lean' || true
 )"
 
 if [[ -n "${PROOF_IMPORT_HITS}" ]]; then
-  echo "error: executable Lean VM modules must not import proof-layer Runtime.Proofs modules:" >&2
+  echo "error: executable Lean protocol machine modules must not import proof-layer Runtime.Proofs modules:" >&2
   printf '%s\n' "${PROOF_IMPORT_HITS}" | sed "s#${ROOT_DIR}/##" >&2
   exit 1
 fi
 
-echo "VM placeholder/stub check passed with zero executable markers."
+echo "protocol machine placeholder/stub check passed with zero executable markers."

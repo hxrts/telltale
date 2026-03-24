@@ -11,7 +11,7 @@ No public `protocol_machine_runner` or `vm_trace` compatibility modules remain.
 Bridge payloads describe guest-runtime and protocol-machine artifacts.
 Host-runtime handlers remain outside the bridge and re-enter through typed effect surfaces.
 
-On the Lean side, semantic-object modules live under `Runtime/VM/Model/SemanticObjects/`.
+On the Lean side, semantic-object modules live under `Runtime/ProtocolMachine/Model/SemanticObjects/`.
 
 | Module | Content |
 |---|---|
@@ -106,8 +106,8 @@ Each family has an explicit version constant.
 
 `schema::ensure_supported_schema_version()` rejects unsupported `lean_bridge` versions.
 Protocol-machine semantic objects now use one canonical schema family with no
-legacy VM-state compatibility aliases.
-Protocol-machine parity artifacts use the same string-based scheme: `vm.serialization.v1` and `vm.envelope_diff.v1`.
+legacy protocol-machine-state compatibility aliases.
+Protocol-machine parity artifacts use the same string-based scheme: `protocol_machine.serialization.v1` and `protocol_machine.envelope_diff.v1`.
 Unsupported or missing schema versions are rejected rather than normalized.
 
 ## Reference Simulation Payloads
@@ -214,7 +214,7 @@ machine’s semantic object family.
 
 `semantic_objects_to_json()` and `semantic_objects_from_json()` encode and
 decode the canonical schema directly. The bridge no longer treats generic
-VM-state export as its primary cross-language contract.
+Protocol-machine-state export as its primary cross-language contract.
 
 `ProtocolMachineRunOutput.semantic_objects` carries the same canonical runtime
 state used by replay export: live `OperationInstance` and `OutstandingEffect`

@@ -343,7 +343,7 @@ type. It is a hint to the transport layer and is not verified in Lean. Use it
 for operational timeouts when you do not want the protocol to branch on
 timeout.
 
-#### 11) Proof Bundles and VM-Core Statements
+#### 11) Proof Bundles and Protocol-Machine-Core Statements
 
 `proof_bundle` declarations define capability sets. `protocol ... requires ...` selects the bundles required by a protocol.
 
@@ -363,9 +363,9 @@ protocol TransferFlow requires DelegationBase, KnowledgeBase = {
 
 The parser stores bundle declarations and required bundle names in typed choreography metadata. Bundle records include optional `version`, `issuer`, and repeated `constraint` fields.
 
-Validation fails on duplicate bundles, missing required bundles, or missing capability coverage for VM-core statements. If `requires` is omitted and bundle coverage is unambiguous, the parser infers required bundles from VM-core capability demand.
+Validation fails on duplicate bundles, missing required bundles, or missing capability coverage for protocol-machine-core statements. If `requires` is omitted and bundle coverage is unambiguous, the parser infers required bundles from protocol-machine-core capability demand.
 
-VM-core statements lower to `Protocol::Extension` nodes with annotations. The annotation keys are `vm_core_op`, `required_capability`, and `vm_core_operands`.
+protocol-machine-core statements lower to `Protocol::Extension` nodes with annotations. The annotation keys are `protocol_machine_core_op`, `required_capability`, and `protocol_machine_core_operands`.
 
 ```tell
 protocol SpeculativeFlow requires SpecBundle =
@@ -375,7 +375,7 @@ protocol SpeculativeFlow requires SpecBundle =
   join
 ```
 
-This example shows a VM-core extension form that still stays inside the typed choreography surface.
+This example shows a protocol-machine-core extension form that still stays inside the typed choreography surface.
 
 #### 12) Authority and Failure Surface
 
@@ -611,7 +611,7 @@ The parser builds the AST for projection, validation, and code generation.
 1. Preprocess layout (indentation -> `{}`/`()`).
 2. Parse with Pest grammar.
 3. Build statements and normalize `par` branches into `Parallel`.
-4. Resolve `call` references and lower VM-core statements to `Protocol::Extension`.
+4. Resolve `call` references and lower protocol-machine-core statements to `Protocol::Extension`.
 5. Build `Choreography` and attach typed proof-bundle metadata.
 6. Run semantic checks with `choreography.validate()` when required by your integration.
 
@@ -708,7 +708,7 @@ Indentation defines blocks. Use `{}` to force an empty block or to opt out of la
 
 ## Validation
 
-The parser validates role declarations and parallel branch structure. `choreography.validate()` also validates proof-bundle declarations, required bundle references, and VM-core capability coverage.
+The parser validates role declarations and parallel branch structure. `choreography.validate()` also validates proof-bundle declarations, required bundle references, and protocol-machine-core capability coverage.
 
 ## Error Messages
 

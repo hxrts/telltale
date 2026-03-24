@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Check that deprecated API patterns (old VM constructors, scaffold flags)
+# Check that deprecated API patterns (old protocol machine constructors, scaffold flags)
 # are not used in examples or benchmarks.
 set -euo pipefail
 
@@ -29,7 +29,7 @@ check_no_match() {
 check_no_match 'effect-scaffold out=' Justfile
 check_no_match '--name' Justfile rust/effect-scaffold/src
 
-# ── Retired VM Constructors ──────────────────────────────────────────
+# ── Retired Protocol Machine Constructors ──────────────────────────────────────────
 
 check_no_match '\bThreadedVM\b' rust/protocol-machine/examples rust/protocol-machine/benches
 check_no_match '\bVM::new\b' rust/protocol-machine/examples rust/protocol-machine/benches

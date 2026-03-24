@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Consolidated Lean/Rust cross-runtime parity checks.
 # Compares type shapes (enum variants, struct fields) between Lean and Rust,
-# runs the VM differential parity test suite, and validates CI gate markers.
+# runs the protocol machine differential parity test suite, and validates CI gate markers.
 set -euo pipefail
 
 # Usage:
@@ -10,8 +10,8 @@ set -euo pipefail
 # Modes:
 #   --all         Run all parity checks (default)
 #   --types       Type shape parity (enum variants, struct fields)
-#   --suite       VM differential parity test suite
-#   --conformance Strict Lean-core VM conformance (cooperative + threaded)
+#   --suite       protocol machine differential parity test suite
+#   --conformance Strict Lean-core protocol machine conformance (cooperative + threaded)
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
@@ -304,19 +304,19 @@ check_types() {
   # ── Enum checks ───────────────────────────────────────────
 
   compare_enum "FlowPolicy" \
-    "${ROOT_DIR}/lean/Runtime/VM/Model/Knowledge.lean" "FlowPolicy" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/Knowledge.lean" "FlowPolicy" \
     "${ROOT_DIR}/rust/protocol-machine/src/vm/runtime_state/policy.rs" "FlowPolicy" \
     "allowAll|denyAll|allowRoles|denyRoles|predicate|predicateExpr" \
     "AllowAll|DenyAll|AllowRoles|DenyRoles|Predicate|PredicateExpr"
 
   compare_enum "FlowPredicate" \
-    "${ROOT_DIR}/lean/Runtime/VM/Model/Knowledge.lean" "FlowPredicate" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/Knowledge.lean" "FlowPredicate" \
     "${ROOT_DIR}/rust/protocol-machine/src/vm/runtime_state/policy.rs" "FlowPredicate" \
     "targetRolePrefix|factContains|endpointRoleMatchesTarget|all|any" \
     "TargetRolePrefix|FactContains|EndpointRoleMatchesTarget|All|Any"
 
   compare_enum "OutputConditionPolicy" \
-    "${ROOT_DIR}/lean/Runtime/VM/Model/OutputCondition.lean" "OutputConditionPolicy" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/OutputCondition.lean" "OutputConditionPolicy" \
     "${ROOT_DIR}/rust/protocol-machine/src/output_condition.rs" "OutputConditionPolicy" \
     "disabled|allowAll|denyAll|predicateAllowList" \
     "Disabled|AllowAll|DenyAll|PredicateAllowList"
@@ -328,7 +328,7 @@ check_types() {
     "Str|Endpoint"
 
   compare_enum "CommunicationReplayMode" \
-    "${ROOT_DIR}/lean/Runtime/VM/Model/Config.lean" "CommunicationReplayMode" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/Config.lean" "CommunicationReplayMode" \
     "${ROOT_DIR}/rust/protocol-machine/src/communication_replay/identity.rs" "CommunicationReplayMode" \
     "off|sequence|nullifier" \
     "Off|Sequence|Nullifier"
@@ -336,12 +336,12 @@ check_types() {
   # ── Struct checks ─────────────────────────────────────────
 
   compare_struct "ProgressToken" \
-    "${ROOT_DIR}/lean/Runtime/VM/Model/State.lean" "ProgressToken" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/State.lean" "ProgressToken" \
     "${ROOT_DIR}/rust/protocol-machine/src/coroutine.rs" "ProgressToken" \
     "" ""
 
   compare_struct "SignedValue" \
-    "${ROOT_DIR}/lean/Runtime/VM/Model/TypeClasses.lean" "SignedValue" \
+    "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/TypeClasses.lean" "SignedValue" \
     "${ROOT_DIR}/rust/protocol-machine/src/buffer.rs" "SignedValue" \
     "seqNo" \
     "sequence_no"
@@ -381,9 +381,9 @@ check_types() {
   echo "[parity] CI parity-regression gates are present in workflows and ci-dry-run"
 }
 
-# ── Suite: VM Differential Parity Suite ───────────────────────
+# ── Suite: Protocol Machine Differential Parity Suite ───────────────────────
 check_suite() {
-  echo "== VM Parity Suite =="
+  echo "== Protocol Machine Parity Suite =="
   ensure_lean_prebuilt
   run_check "lean conformance corpus" \
     "cargo test -p telltale-protocol-machine --test conformance_lean"
@@ -434,7 +434,7 @@ check_conformance() {
   TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test differential_step_corpus
   TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test schedule_robustness
 
-  echo "OK   strict VM conformance passed"
+  echo "OK   strict protocol machine conformance passed"
 }
 
 # ── Main ──────────────────────────────────────────────────────

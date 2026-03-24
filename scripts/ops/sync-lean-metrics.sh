@@ -56,7 +56,7 @@ LIB_FOCUS=(
   "Real analysis concrete models for classical transport"
   "Distributed assumptions, validation, FLP/CAP theorem packaging"
   "Async buffered MPST, coherence, preservation, monitoring"
-  "VM, Iris backend via iris-lean, resource algebras, WP"
+  "Protocol machine, Iris backend via iris-lean, resource algebras, WP"
   "Iris ghost state and program logic extraction"
 )
 

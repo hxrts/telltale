@@ -78,9 +78,9 @@ ci-dry-run lane="fast":
     just check-doc-links-ci
     just check-doc-quality
     just perf-baseline check
-    just check-vm-placeholders
+    just check-protocol-machine-placeholders
     just check-parity
-    just verify-lean-vm-targets
+    just verify-lean-protocol-machine-targets
     just verify-protocols
     just verify-track-a
     just perf-baseline sla
@@ -177,9 +177,9 @@ check-release-conformance:
 perf-baseline mode="check":
     ./scripts/ops/perf-baseline.sh {{ mode }}
 
-# Prevent new placeholder/stub/TODO markers in executable Lean VM modules.
-check-vm-placeholders:
-    ./scripts/check/vm-placeholders.sh
+# Prevent new placeholder/stub/TODO markers in executable Lean protocol machine modules.
+check-protocol-machine-placeholders:
+    ./scripts/check/protocol-machine-placeholders.sh
 
 # Consolidated Lean/Rust parity checks (types, suite, conformance)
 check-parity mode="--all":
@@ -303,24 +303,24 @@ wasm-check:
 bench-check:
     cargo bench --workspace --no-run
 
-# Profile a single VM runtime benchmark with samply.
-profile-vm bench:
+# Profile a single protocol machine runtime benchmark with samply.
+profile-protocol-machine bench:
     samply record cargo bench -p telltale-protocol-machine --bench protocol_machine_runtime_bench -- {{ bench }}
 
 # Profile the paused-role scheduler hotspot with samply.
-profile-vm-scheduler:
+profile-protocol-machine-scheduler:
     samply record cargo run -p telltale-protocol-machine --release --bin profile_driver -- scheduler-many-paused-run-only 200000
 
 # Profile the repeated load/reuse hotspot with samply.
-profile-vm-load:
+profile-protocol-machine-load:
     samply record cargo run -p telltale-protocol-machine --release --bin profile_driver -- repeated-load-reuse
 
 # Profile the replay/nullifier hotspot with samply.
-profile-vm-replay:
+profile-protocol-machine-replay:
     samply record cargo run -p telltale-protocol-machine --release --bin profile_driver -- send-recv-replay-nullifier
 
 # Profile the repeated fixed-topology open path with samply.
-profile-vm-open:
+profile-protocol-machine-open:
     samply record cargo run -p telltale-protocol-machine --release --bin profile_driver -- repeated-open-same-image
 
 # Build WASM example with wasm-pack
@@ -563,8 +563,8 @@ telltale-lean-check-failing: lean-init
 export-protocol-bundles:
     cargo test -p telltale-lean-bridge --test invariant_verification_tests -- --nocapture
 
-# Rust/Lean VM trace correspondence checks.
-verify-vm-correspondence:
+# Rust/Lean protocol machine trace correspondence checks.
+verify-protocol-machine-correspondence:
     cargo test -p telltale-lean-bridge --test vm_correspondence_tests
     cargo test -p telltale-lean-bridge --test vm_differential_steps
 
@@ -580,7 +580,7 @@ verify-invariants:
 
 # Targeted protocol verification lane (fast CI).
 verify-protocols:
-    just verify-vm-correspondence
+    just verify-protocol-machine-correspondence
     just verify-invariants
     cargo test -p telltale-lean-bridge --test schema_version_tests
 
@@ -594,9 +594,9 @@ verify-track-b:
 verify-lean-full: lean-init
     LEAN_NUM_THREADS={{ lean_threads }} elan run leanprover/lean4:v4.26.0 lake --dir lean build
 
-# Targeted Lean VM architecture modules for fast CI checks.
-verify-lean-vm-targets: lean-init
-    LEAN_NUM_THREADS={{ lean_threads }} elan run leanprover/lean4:v4.26.0 lake --dir lean build Runtime.VM.API Runtime.VM.Runtime
+# Targeted Lean protocol machine architecture modules for fast CI checks.
+verify-lean-protocol-machine-targets: lean-init
+    LEAN_NUM_THREADS={{ lean_threads }} elan run leanprover/lean4:v4.26.0 lake --dir lean build Runtime.ProtocolMachine.API Runtime.ProtocolMachine.Runtime
 
 # Cross-target runtime comparison lane.
 verify-cross-target-matrix:
@@ -621,6 +621,6 @@ verify-properties:
     cargo test -p telltale-lean-bridge --test proptest_json_roundtrip
     cargo test -p telltale-lean-bridge --test proptest_async_subtyping
 
-# Generate normalized traces for bridge-level VM correspondence fixtures.
+# Generate normalized traces for bridge-level protocol machine correspondence fixtures.
 generate-test-traces:
     cargo test -p telltale-lean-bridge --test vm_correspondence_tests -- --nocapture

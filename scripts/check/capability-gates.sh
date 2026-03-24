@@ -179,18 +179,18 @@ check_envelope() {
     "rg -q '\\(\"protocol_envelope_bridge\", pack\\.protocolEnvelopeBridge\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
   check "theorem-pack carries byzantine safety capability bit" \
     "rg -q '\\(\"byzantine_safety_characterization\", pack\\.byzantineSafety\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
-  check "theorem-pack carries VM envelope adherence capability bit" \
+  check "theorem-pack carries protocol machine envelope adherence capability bit" \
     "rg -q '\\(\"vm_envelope_adherence\", pack\\.vmEnvelopeAdherence\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
-  check "theorem-pack carries VM envelope admission capability bit" \
+  check "theorem-pack carries protocol machine envelope admission capability bit" \
     "rg -q '\\(\"vm_envelope_admission\", pack\\.vmEnvelopeAdmission\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
 
   check "distributed adapter carries protocol bridge profile slot" \
     "rg -q 'protocolEnvelopeBridge\\?' '${ADAPTER_FILE}'"
   check "distributed adapter carries byzantine safety profile slot" \
     "rg -q 'byzantineSafety\\?' '${ADAPTER_FILE}'"
-  check "distributed adapter carries VM adherence profile slot" \
+  check "distributed adapter carries protocol machine adherence profile slot" \
     "rg -q 'vmEnvelopeAdherence\\?' '${ADAPTER_FILE}'"
-  check "distributed adapter carries VM admission profile slot" \
+  check "distributed adapter carries protocol machine admission profile slot" \
     "rg -q 'vmEnvelopeAdmission\\?' '${ADAPTER_FILE}'"
 
   check "local-envelope differential conformance test exists" \
@@ -216,12 +216,12 @@ check_envelope() {
 # ── Failure Capability Checks ─────────────────────────────────
 check_failure() {
   require_ripgrep
-  local FAILURE_FILE="${ROOT_DIR}/lean/Runtime/VM/Runtime/Failure.lean"
-  local FAILURE_PROOFS_FILE="${ROOT_DIR}/lean/Runtime/Proofs/VM/Failure.lean"
+  local FAILURE_FILE="${ROOT_DIR}/lean/Runtime/ProtocolMachine/Runtime/Failure.lean"
+  local FAILURE_PROOFS_FILE="${ROOT_DIR}/lean/Runtime/Proofs/ProtocolMachine/Failure.lean"
   local ADAPTER_FILE="${ROOT_DIR}/lean/Runtime/Proofs/Adapters/Distributed.lean"
   local THEOREMPACK_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack.lean"
   local TEST_FILE="${ROOT_DIR}/lean/Runtime/Tests/Main.lean"
-  local STATE_FILE="${ROOT_DIR}/lean/Runtime/VM/Model/State.lean"
+  local STATE_FILE="${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/State.lean"
   local ENVELOPE_FILE="${ROOT_DIR}/lean/Runtime/Adequacy/EnvelopeCore.lean"
 
   echo "== Failure Capability Conformance =="
@@ -272,7 +272,7 @@ check_failure() {
     "rg -q 'def RestartRefinementStructuredErrorAdequacy' '${ENVELOPE_FILE}' && \
      rg -q 'restartStructuredErrorAdequacy' '${THEOREMPACK_FILE}'"
 
-  check "phase-4 gate: VM theorem-pack exposes failure-envelope capability" \
+  check "phase-4 gate: protocol machine theorem-pack exposes failure-envelope capability" \
     "rg -q '\\(\"failure_envelope\", pack\\.failureEnvelope\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
 
   check "phase-5 gate: CI enforces failure conformance checks" \
@@ -336,7 +336,7 @@ check_speculation() {
     "${ROOT_DIR}/lean/Runtime/ProgramLogic/SessionWP.lean"
     "${ROOT_DIR}/lean/Runtime/ProgramLogic/FinalizationWP.lean"
     "${ROOT_DIR}/lean/Runtime/Adequacy/Adequacy.lean"
-    "${ROOT_DIR}/lean/Runtime/Proofs/VM/Speculation.lean"
+    "${ROOT_DIR}/lean/Runtime/Proofs/ProtocolMachine/Speculation.lean"
   )
 
   echo "== Speculation/WP Surface Conformance =="
@@ -367,7 +367,7 @@ check_speculation() {
       cd "${ROOT_DIR}/lean"
       lake build Runtime.ProgramLogic.WPPair Runtime.ProgramLogic.SessionWP \
         Runtime.ProgramLogic.FinalizationWP Runtime.Adequacy.Adequacy \
-        Runtime.Proofs.VM.Speculation >/dev/null
+        Runtime.Proofs.ProtocolMachine.Speculation >/dev/null
     )
   elif command -v elan >/dev/null 2>&1; then
     (
@@ -375,7 +375,7 @@ check_speculation() {
       elan run leanprover/lean4:v4.26.0 lake --dir lean build \
         Runtime.ProgramLogic.WPPair Runtime.ProgramLogic.SessionWP \
         Runtime.ProgramLogic.FinalizationWP Runtime.Adequacy.Adequacy \
-        Runtime.Proofs.VM.Speculation >/dev/null
+        Runtime.Proofs.ProtocolMachine.Speculation >/dev/null
     )
   else
     echo "WARN skipping Lean build check (no lake/elan found)"
