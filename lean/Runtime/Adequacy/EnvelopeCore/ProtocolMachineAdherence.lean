@@ -126,8 +126,8 @@ theorem scheduler_determinism_sharded_of_hypotheses
 /-- E3: adequacy statement form between reference and protocol-machine semantics modulo envelope. -/
 def ProtocolMachineObservationalAdequacyModuloEnvelope {State : Type u}
     (R : Run State → Run State → Prop)
-    (refRun vmRun : Run State → Prop) : Prop :=
-  ∀ ref pm, refRun ref → pmRun pm → R ref pm
+    (refRun machineRun : Run State → Prop) : Prop :=
+  ∀ ref pm, refRun ref → machineRun pm → R ref pm
 
 /-- E3: full-abstraction/adequacy statement over safety-visible observations. -/
 def EnvelopeFullAbstraction {State : Type u} {Obs : Type v}
