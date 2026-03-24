@@ -223,7 +223,7 @@ authority checks and evidence-bearing branches after lowering.
 3. Open sessions with `load_choreography_owned(...)` so the host authority boundary is explicit from the first step.
 4. Implement `EffectHandler` with deterministic host operations.
 5. Map each typed effect request to host primitives without reimplementing protocol typing.
-6. Run `run_loaded_vm_record_replay_conformance` to validate record and replay behavior on a loaded VM.
+6. Run `run_loaded_protocol_machine_record_replay_conformance` to validate record and replay behavior on a loaded protocol machine.
 7. Run Lean bridge lanes for parity and equivalence checks.
 
 ## Integration Tooling

@@ -81,11 +81,7 @@ fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
     Ok(parsed)
 }
 
-fn parse_arg_token(
-    parsed: &mut ParsedArgs,
-    args: &[String],
-    idx: usize,
-) -> Result<usize, String> {
+fn parse_arg_token(parsed: &mut ParsedArgs, args: &[String], idx: usize) -> Result<usize, String> {
     let token = args[idx].as_str();
     match token {
         "-h" | "--help" => {

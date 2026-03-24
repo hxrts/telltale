@@ -10,18 +10,18 @@ use std::thread;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 
+use crate::protocol_machine_trace::{
+    normalize_semantic_audit, semantic_audits_equivalent, EffectTraceEvent,
+    OutputConditionTraceEvent,
+};
 use crate::runner::ChoreographyJson;
 use crate::semantic_objects::{ProtocolMachineSemanticObjects, TickedObsEvent};
 use crate::sim_reference::{
     SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
 };
-use crate::vm_trace::{
-    normalize_semantic_audit, semantic_audits_equivalent, EffectTraceEvent,
-    OutputConditionTraceEvent,
-};
 use telltale_vm::EffectExchangeRecord;
 
-#[path = "vm_runner_json_parsing.rs"]
+#[path = "protocol_machine_runner_json_parsing.rs"]
 mod parsing;
 use parsing::{
     parse_required_valid, parse_sim_run_output, parse_sim_trace_validation,
@@ -380,7 +380,7 @@ impl ProtocolMachineRunner {
     /// # Errors
     ///
     /// Returns an error if the process fails or output is invalid.
-    pub fn run_lean_vm(
+    pub fn run_protocol_machine(
         &self,
         input: &ProtocolMachineRunInput,
     ) -> Result<ProtocolMachineRunOutput, ProtocolMachineRunnerError> {
@@ -392,7 +392,7 @@ impl ProtocolMachineRunner {
     /// # Errors
     ///
     /// Returns an error if the process fails or output is invalid.
-    pub fn run_lean_validation(
+    pub fn run_validation_operation(
         &self,
         operation: &str,
         payload: &Value,
@@ -439,7 +439,7 @@ impl ProtocolMachineRunner {
         let payload = serde_json::json!({
             "trace": rust_trace,
         });
-        let response = self.run_lean_validation("validateTrace", &payload)?;
+        let response = self.run_validation_operation("validateTrace", &payload)?;
         Ok(TraceValidation {
             valid: parse_required_valid(&response, "validateTrace")?,
             errors: parse_structured_errors(&response),
@@ -459,7 +459,7 @@ impl ProtocolMachineRunner {
             .map_err(ProtocolMachineRunnerError::ParseError)?;
         let payload = serde_json::to_value(input)
             .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
-        let response = self.run_lean_validation("runSimulation", &payload)?;
+        let response = self.run_validation_operation("runSimulation", &payload)?;
         parse_sim_run_output(response)
     }
 
@@ -473,7 +473,7 @@ impl ProtocolMachineRunner {
         trace: &[ProtocolMachineTraceEvent],
     ) -> Result<SimTraceValidation, ProtocolMachineRunnerError> {
         let payload = simulation_trace_payload(trace);
-        let response = self.run_lean_validation("validateSimulationTrace", &payload)?;
+        let response = self.run_validation_operation("validateSimulationTrace", &payload)?;
         parse_sim_trace_validation(&response)
     }
 
@@ -493,7 +493,7 @@ impl ProtocolMachineRunner {
             concurrency: rust_output.concurrency,
             max_steps: rust_output.steps_executed.max(1),
         };
-        let lean_output = self.run_lean_vm(&input)?;
+        let lean_output = self.run_protocol_machine(&input)?;
 
         let rust_ticked: Vec<TickedObsEvent<ProtocolMachineTraceEvent>> = rust_output
             .trace
@@ -572,7 +572,7 @@ impl ProtocolMachineRunner {
     ) -> Result<InvariantVerificationResult, ProtocolMachineRunnerError> {
         let payload = serde_json::to_value(bundle)
             .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
-        let response = self.run_lean_validation("verifyProtocolBundle", &payload)?;
+        let response = self.run_validation_operation("verifyProtocolBundle", &payload)?;
 
         Ok(InvariantVerificationResult {
             valid: parse_required_valid(&response, "verifyProtocolBundle")?,
@@ -618,7 +618,7 @@ pub fn compute_trace_diff(
 /// # Errors
 ///
 /// Returns an error if any choreography value cannot be parsed.
-pub fn vm_input_from_values(
+pub fn protocol_machine_input_from_values(
     choreographies: Vec<Value>,
     concurrency: u64,
     max_steps: u64,

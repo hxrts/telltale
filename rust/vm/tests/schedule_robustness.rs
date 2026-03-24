@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use telltale_vm::scheduler::{PriorityPolicy, SchedPolicy};
 use telltale_vm::trace::normalize_trace;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 
 #[allow(dead_code, unreachable_pub)]
 #[path = "support/mod.rs"]
@@ -15,7 +15,7 @@ use test_support::PassthroughHandler;
 
 type CommEvent = (String, String, String, String);
 
-fn canonical_comm_trace(vm: &VM) -> Vec<Vec<CommEvent>> {
+fn canonical_comm_trace(vm: &ProtocolMachine) -> Vec<Vec<CommEvent>> {
     let mut per_session: BTreeMap<usize, Vec<CommEvent>> = BTreeMap::new();
     for event in normalize_trace(vm.trace()) {
         match event {
@@ -53,9 +53,9 @@ fn canonical_comm_trace(vm: &VM) -> Vec<Vec<CommEvent>> {
 }
 
 fn run_for_policy(policy: SchedPolicy) -> Vec<Vec<CommEvent>> {
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         sched_policy: policy,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
     vm.load_choreography(&test_support::simple_send_recv_image("A", "B", "m1"))
         .expect("load image m1");

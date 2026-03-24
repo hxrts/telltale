@@ -8,7 +8,7 @@ use telltale_simulator::network::NetworkModel;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
 use telltale_simulator::rng::SimRng;
 use telltale_simulator::scenario::Scenario;
-use telltale_vm::vm::{StepResult, VM};
+use telltale_vm::{ProtocolMachine, ProtocolMachineStepResult};
 
 struct ReplayArgs {
     checkpoint_path: PathBuf,
@@ -26,7 +26,8 @@ fn main() {
 
     let checkpoint =
         std::fs::read(&replay_args.checkpoint_path).unwrap_or_else(|e| fatal(&e.to_string()));
-    let mut vm: VM = serde_json::from_slice(&checkpoint).unwrap_or_else(|e| fatal(&e.to_string()));
+    let mut vm: ProtocolMachine =
+        serde_json::from_slice(&checkpoint).unwrap_or_else(|e| fatal(&e.to_string()));
 
     let handler = handler_from_material(&scenario.material);
     let max_rounds = replay_args.rounds.unwrap_or(scenario.steps);
@@ -82,8 +83,8 @@ fn main() {
                 .unwrap_or_else(|e| fatal(&format!("fault middleware crashed_roles: {e}")));
             vm.set_paused_roles(&paused_roles);
             match vm.step_round(net, concurrency) {
-                Ok(StepResult::AllDone | StepResult::Stuck) => break,
-                Ok(StepResult::Continue) => {}
+                Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
+                Ok(ProtocolMachineStepResult::Continue) => {}
                 Err(e) => fatal(&format!("vm error: {e}")),
             }
         } else {
@@ -104,8 +105,8 @@ fn main() {
                 .unwrap_or_else(|e| fatal(&format!("fault middleware crashed_roles: {e}")));
             vm.set_paused_roles(&paused_roles);
             match vm.step_round(fault, concurrency) {
-                Ok(StepResult::AllDone | StepResult::Stuck) => break,
-                Ok(StepResult::Continue) => {}
+                Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
+                Ok(ProtocolMachineStepResult::Continue) => {}
                 Err(e) => fatal(&format!("vm error: {e}")),
             }
         }

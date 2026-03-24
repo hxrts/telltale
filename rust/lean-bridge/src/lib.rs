@@ -62,18 +62,18 @@ use cfg_if::cfg_if;
 pub mod export;
 pub mod import;
 pub mod invariants;
+pub mod protocol_machine_trace;
 pub mod schema;
 pub mod semantic_objects;
-pub mod vm_trace;
 
 cfg_if! {
     if #[cfg(feature = "runner")] {
         pub(crate) mod projection_payload;
         pub mod equivalence;
+        pub mod protocol_machine_runner;
         pub mod runner;
         pub mod sim_reference;
         pub mod validate;
-        pub mod vm_runner;
     }
 }
 
@@ -94,6 +94,11 @@ pub use invariants::{
     QuorumGeometryConfig, QuorumSystemKind, ReconfigurationConfig, ResponsivenessConfig,
     SchedulerKind, TimingModel, PROTOCOL_BUNDLE_SCHEMA_VERSION,
 };
+pub use protocol_machine_trace::{
+    event_session, normalize_semantic_audit, observationally_equivalent, partition_by_session,
+    semantic_audits_equivalent, EffectTraceEvent, NormalizedEvent, OutputConditionTraceEvent,
+    ProtocolMachineReplayBundle, SessionTrace, TopologyPerturbationEvent, TopologyPerturbationKind,
+};
 pub use schema::{
     canonical_schema_version, deserialize_schema_version, ensure_supported_schema_version,
     is_supported_schema_version, LEAN_BRIDGE_SCHEMA_VERSION,
@@ -107,11 +112,6 @@ pub use semantic_objects::{
     PublicationEvent, PublicationObserverClass, PublicationStatus, SemanticHandoff, TickedObsEvent,
     TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
-pub use vm_trace::{
-    event_session, normalize_semantic_audit, observationally_equivalent, partition_by_session,
-    semantic_audits_equivalent, EffectTraceEvent, NormalizedEvent, OutputConditionTraceEvent,
-    ProtocolMachineReplayBundle, SessionTrace, TopologyPerturbationEvent, TopologyPerturbationKind,
-};
 
 cfg_if! {
     if #[cfg(feature = "runner")] {
@@ -123,7 +123,7 @@ cfg_if! {
         pub use sim_reference::{
             SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
         };
-        pub use vm_runner::{
+        pub use protocol_machine_runner::{
             compute_trace_diff, ComparisonResult, InvariantVerificationResult, LeanStructuredError,
             ProtocolMachineRunInput, ProtocolMachineRunOutput, ProtocolMachineRunner,
             ProtocolMachineRunnerError, ProtocolMachineSessionStatus,

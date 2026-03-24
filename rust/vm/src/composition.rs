@@ -12,7 +12,9 @@ use crate::determinism::DeterminismMode;
 use crate::effect::EffectHandler;
 use crate::loader::CodeImage;
 use crate::output_condition::OutputConditionPolicy;
-use crate::runtime_contracts::{enforce_vm_runtime_gates, RuntimeContracts, RuntimeGateResult};
+use crate::runtime_contracts::{
+    enforce_protocol_machine_runtime_gates, RuntimeContracts, RuntimeGateResult,
+};
 use crate::scheduler::SchedPolicy;
 use crate::vm::{VMConfig, VMError, VM};
 
@@ -337,7 +339,7 @@ impl ComposedRuntime {
         let caps = &cert.theorem_pack;
         let runtime_contracts = cert.runtime_contracts.as_ref();
 
-        match enforce_vm_runtime_gates(self.vm.config(), runtime_contracts) {
+        match enforce_protocol_machine_runtime_gates(self.vm.config(), runtime_contracts) {
             RuntimeGateResult::Admitted => {}
             RuntimeGateResult::RejectedMissingContracts => {
                 return Err(CompositionError::MissingRuntimeContracts {

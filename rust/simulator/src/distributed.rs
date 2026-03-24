@@ -6,7 +6,7 @@ use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::nested::NestedVMHandler;
-use telltale_vm::vm::{VMConfig, VMError, VM};
+use telltale_vm::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 
 /// Builder for distributed simulations with nested inner VMs.
 pub struct DistributedSimBuilder {
@@ -35,21 +35,21 @@ impl DistributedSimBuilder {
         self
     }
 
-    /// Set the inter-site routing protocol (outer VM).
+    /// Set the inter-site routing protocol (outer ProtocolMachine).
     #[must_use]
     pub fn inter_site(mut self, protocol: CodeImage) -> Self {
         self.inter_site = Some(protocol);
         self
     }
 
-    /// Set outer VM scheduler concurrency.
+    /// Set outer ProtocolMachine scheduler concurrency.
     #[must_use]
     pub fn outer_concurrency(mut self, concurrency: usize) -> Self {
         self.outer_concurrency = concurrency.max(1);
         self
     }
 
-    /// Set inner VM rounds attempted per outer handler callback.
+    /// Set inner ProtocolMachine rounds attempted per outer handler callback.
     #[must_use]
     pub fn inner_rounds_per_step(mut self, rounds: usize) -> Self {
         self.inner_rounds_per_step = rounds.max(1);
@@ -61,7 +61,7 @@ impl DistributedSimBuilder {
     /// # Errors
     ///
     /// Returns an error if the inter-site protocol is missing or loading fails.
-    pub fn build(self, config: &VMConfig) -> Result<DistributedSimulation, String> {
+    pub fn build(self, config: &ProtocolMachineConfig) -> Result<DistributedSimulation, String> {
         self.build_with(config, |_| Box::new(NoOpHandler))
     }
 
@@ -72,7 +72,7 @@ impl DistributedSimBuilder {
     /// Returns an error if the inter-site protocol is missing or loading fails.
     pub fn build_with<F>(
         self,
-        config: &VMConfig,
+        config: &ProtocolMachineConfig,
         mut handler_factory: F,
     ) -> Result<DistributedSimulation, String>
     where
@@ -90,7 +90,7 @@ impl DistributedSimBuilder {
             ));
         }
 
-        let mut outer_vm = VM::new(config.clone());
+        let mut outer_vm = ProtocolMachine::new(config.clone());
         outer_vm
             .load_choreography(&inter_site)
             .map_err(|e| format!("outer load error: {e}"))?;
@@ -98,7 +98,7 @@ impl DistributedSimBuilder {
         let mut nested = NestedVMHandler::new().with_rounds_per_step(self.inner_rounds_per_step);
 
         for (site, protocols) in self.sites {
-            let mut inner_vm = VM::new(config.clone());
+            let mut inner_vm = ProtocolMachine::new(config.clone());
             for image in protocols {
                 inner_vm
                     .load_choreography(&image)
@@ -122,28 +122,28 @@ impl Default for DistributedSimBuilder {
     }
 }
 
-/// A distributed simulation with an outer VM and nested handler.
+/// A distributed simulation with an outer ProtocolMachine and nested handler.
 pub struct DistributedSimulation {
-    outer_vm: VM,
+    outer_vm: ProtocolMachine,
     handler: NestedVMHandler,
     outer_concurrency: usize,
 }
 
 impl DistributedSimulation {
-    /// Run the outer VM for a fixed number of rounds.
+    /// Run the outer ProtocolMachine for a fixed number of rounds.
     ///
     /// # Errors
     ///
-    /// Returns a `VMError` if the outer VM faults.
-    pub fn run(&mut self, max_rounds: usize) -> Result<(), VMError> {
+    /// Returns a `ProtocolMachineError` if the outer ProtocolMachine faults.
+    pub fn run(&mut self, max_rounds: usize) -> Result<(), ProtocolMachineError> {
         self.outer_vm
             .run_concurrent(&self.handler, max_rounds, self.outer_concurrency)
             .map(|_| ())
     }
 
-    /// Access the outer VM.
+    /// Access the outer ProtocolMachine.
     #[must_use]
-    pub fn outer(&self) -> &VM {
+    pub fn outer(&self) -> &ProtocolMachine {
         &self.outer_vm
     }
 
@@ -153,7 +153,7 @@ impl DistributedSimulation {
         &self.handler
     }
 
-    /// Configured outer VM scheduler concurrency.
+    /// Configured outer ProtocolMachine scheduler concurrency.
     #[must_use]
     pub fn outer_concurrency(&self) -> usize {
         self.outer_concurrency

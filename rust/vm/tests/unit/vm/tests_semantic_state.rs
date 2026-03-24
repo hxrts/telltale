@@ -117,14 +117,14 @@
 
     #[test]
     fn runtime_semantic_state_records_completed_operations() {
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         vm.load_choreography(&simple_send_recv_image())
             .expect("load simple image");
 
         for _ in 0..4 {
             if matches!(
                 vm.step(&SemanticStatePassthroughHandler),
-                Ok(StepResult::AllDone)
+                Ok(ProtocolMachineStepResult::AllDone)
             ) {
                 break;
             }
@@ -140,14 +140,14 @@
 
     #[test]
     fn runtime_semantic_state_tracks_blocked_outstanding_effects() {
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         vm.load_choreography(&simple_send_recv_image())
             .expect("load simple image");
 
         let step = vm
             .step(&PartitionOnTickZeroHandler)
             .expect("step simple image");
-        assert!(matches!(step, StepResult::Continue));
+        assert!(matches!(step, ProtocolMachineStepResult::Continue));
         let blocked = vm
             .outstanding_effects()
             .iter()
@@ -159,7 +159,7 @@
 
     #[test]
     fn runtime_semantic_state_rejects_late_results_without_live_effect() {
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let effect_id = vm.issue_runtime_effect(
             "invoke_step",
             None,

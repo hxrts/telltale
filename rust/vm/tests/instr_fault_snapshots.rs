@@ -6,7 +6,7 @@ use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Fault;
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{VMConfig, VMError, VM};
+use telltale_vm::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 
 #[allow(dead_code, unreachable_pub)]
 #[path = "support/mod.rs"]
@@ -53,12 +53,16 @@ fn single_role_end_image(program: Vec<Instr>) -> CodeImage {
 }
 
 /// Run a CodeImage and expect a fault, returning its name.
-fn expect_fault(image: &CodeImage, config: VMConfig, max_steps: usize) -> &'static str {
-    let mut vm = VM::new(config);
+fn expect_fault(
+    image: &CodeImage,
+    config: ProtocolMachineConfig,
+    max_steps: usize,
+) -> &'static str {
+    let mut vm = ProtocolMachine::new(config);
     vm.load_choreography(image).expect("load");
     let result = vm.run(&PassthroughHandler, max_steps);
     match result {
-        Err(VMError::Fault { fault, .. }) => fault_name(&fault),
+        Err(ProtocolMachineError::Fault { fault, .. }) => fault_name(&fault),
         other => panic!("expected fault, got {other:?}"),
     }
 }
@@ -236,7 +240,7 @@ fn case_choose_unknown_label() -> (&'static str, CodeImage) {
 #[test]
 fn snapshot_fault_tags_for_core_instruction_families() {
     let mut observed = Vec::new();
-    let default_config = VMConfig::default();
+    let default_config = ProtocolMachineConfig::default();
 
     // Test cases with default config
     let default_cases = [
@@ -261,9 +265,9 @@ fn snapshot_fault_tags_for_core_instruction_families() {
 
     // Fork case needs speculation enabled
     let (fork_name, fork_image) = case_fork_non_nat_ghost();
-    let spec_config = VMConfig {
+    let spec_config = ProtocolMachineConfig {
         speculation_enabled: true,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
     observed.push((fork_name, expect_fault(&fork_image, spec_config, 8)));
 
@@ -300,8 +304,8 @@ fn snapshot_fault_tags_for_core_instruction_families() {
 fn snapshot_fault_api_shape_is_vm_fault_wrapper() {
     use assert_matches::assert_matches;
     let image = single_role_end_image(vec![Instr::Close { session: 0 }]);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).expect("load");
     let result = vm.run(&PassthroughHandler, 8);
-    assert_matches!(result, Err(VMError::Fault { .. }));
+    assert_matches!(result, Err(ProtocolMachineError::Fault { .. }));
 }

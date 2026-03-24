@@ -15,7 +15,7 @@ use telltale_vm::effect::{EffectHandler, EffectResult, SendDecision, SendDecisio
 use telltale_vm::loader::CodeImage;
 use telltale_vm::output_condition::OutputConditionPolicy;
 use telltale_vm::session::SessionStatus;
-use telltale_vm::vm::{ObsEvent, StepResult};
+use telltale_vm::{ObsEvent, ProtocolMachineStepResult};
 use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 
 #[derive(Debug, Clone, Copy)]
@@ -216,7 +216,7 @@ fn obs_to_semantic_audit_event(ev: &ObsEvent) -> Option<ProtocolMachineTraceEven
             out.target = Some(coro_id.to_string());
             Some(out)
         }
-        // Lean vm_runner step traces do not currently emit output-condition
+        // Lean protocol-machine runner step traces do not currently emit output-condition
         // bookkeeping events; ignore them for cross-target step correspondence.
         ObsEvent::OutputConditionChecked { .. } => None,
         _ => None,
@@ -240,9 +240,9 @@ fn run_rust_step_states(
         let before_counts = session_type_counts(&vm);
         let status = vm.step(&PassthroughHandler).map_err(|e| e.to_string())?;
         let status = match status {
-            StepResult::Continue => "continue",
-            StepResult::Stuck => "stuck",
-            StepResult::AllDone => "all_done",
+            ProtocolMachineStepResult::Continue => "continue",
+            ProtocolMachineStepResult::Stuck => "stuck",
+            ProtocolMachineStepResult::AllDone => "all_done",
         }
         .to_string();
 
@@ -265,11 +265,11 @@ fn run_rust_step_states(
             selected_coro: step_meta.as_ref().map(|m| m.selected_coro as u64),
             exec_status: step_meta.as_ref().map(|m| {
                 match m.exec_status {
-                    telltale_vm::vm::SchedExecStatus::Continue => "continue",
-                    telltale_vm::vm::SchedExecStatus::Yielded => "yielded",
-                    telltale_vm::vm::SchedExecStatus::Blocked => "blocked",
-                    telltale_vm::vm::SchedExecStatus::Halted => "halted",
-                    telltale_vm::vm::SchedExecStatus::Faulted => "faulted",
+                    telltale_vm::SchedExecStatus::Continue => "continue",
+                    telltale_vm::SchedExecStatus::Yielded => "yielded",
+                    telltale_vm::SchedExecStatus::Blocked => "blocked",
+                    telltale_vm::SchedExecStatus::Halted => "halted",
+                    telltale_vm::SchedExecStatus::Faulted => "faulted",
                 }
                 .to_string()
             }),
@@ -322,11 +322,11 @@ fn assert_step_indexed_equivalence(
         max_steps: max_steps as u64,
     };
     let lean_output = runner
-        .run_lean_vm(&input)
-        .unwrap_or_else(|e| panic!("run lean vm for {}: {e}", fixture.name));
+        .run_protocol_machine(&input)
+        .unwrap_or_else(|e| panic!("run lean protocol machine for {}: {e}", fixture.name));
     if lean_trace_is_load_only(&lean_output.trace) {
         eprintln!(
-            "SKIPPED: Lean vm_runner produced load-only trace for {}",
+            "SKIPPED: Lean protocol-machine runner produced load-only trace for {}",
             fixture.name
         );
         return;
@@ -344,7 +344,7 @@ fn assert_step_indexed_equivalence(
     let lean_normalized = normalize_semantic_audit(&lean_events);
     if lean_normalized.is_empty() && !rust_normalized.is_empty() {
         eprintln!(
-            "SKIPPED: Lean vm_runner emitted no step-level observables for {}",
+            "SKIPPED: Lean protocol-machine runner emitted no step-level observables for {}",
             fixture.name
         );
         return;
@@ -447,7 +447,7 @@ fn assert_step_indexed_equivalence(
 #[test]
 fn tier1_step_indexed_correspondence() {
     let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean vm_runner not available");
+        eprintln!("SKIPPED: Lean protocol-machine runner not available");
         return;
     };
 
@@ -464,7 +464,7 @@ fn tier1_step_indexed_correspondence() {
 #[test]
 fn tier2_step_indexed_correspondence() {
     let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean vm_runner not available");
+        eprintln!("SKIPPED: Lean protocol-machine runner not available");
         return;
     };
 

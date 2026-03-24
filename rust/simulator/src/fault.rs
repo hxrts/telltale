@@ -10,7 +10,7 @@ use telltale_vm::effect::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
 use telltale_vm::session::SessionId;
-use telltale_vm::vm::ObsEvent;
+use telltale_vm::ObsEvent;
 
 use crate::rng::SimRng;
 use crate::value_conv::{
@@ -247,7 +247,7 @@ impl<H: EffectHandler> FaultInjector<H> {
     }
 
     /// Advance fault schedule, activating and expiring faults.
-    /// Uses the VM's global tick (not session-local normalization).
+    /// Uses the ProtocolMachine's global tick (not session-local normalization).
     pub fn tick(&self, tick: u64, logical_step: u64, trace: &[ObsEvent]) -> Result<(), String> {
         let mut state = self.lock_state()?;
         state.current_tick = tick;
@@ -338,7 +338,7 @@ impl<H: EffectHandler> FaultInjector<H> {
         Ok(())
     }
 
-    /// Current crashed roles (for pausing VM execution).
+    /// Current crashed roles (for pausing ProtocolMachine execution).
     pub fn crashed_roles(&self) -> Result<BTreeSet<String>, String> {
         Ok(self.lock_state()?.crashed_roles.clone())
     }

@@ -8,7 +8,7 @@ use telltale_vm::coroutine::{CoroStatus, Coroutine};
 use telltale_vm::instr::Endpoint;
 use telltale_vm::session::{SessionId, SessionStore};
 use telltale_vm::trace::obs_session;
-use telltale_vm::vm::ObsEvent;
+use telltale_vm::ObsEvent;
 
 use crate::value_conv::registers_to_f64s;
 
@@ -21,7 +21,7 @@ fn tolerance() -> FixedQ32 {
 pub struct PropertyContext<'a> {
     /// Current simulation tick.
     pub tick: u64,
-    /// Observable event trace from the VM.
+    /// Observable event trace from the ProtocolMachine.
     pub trace: &'a [ObsEvent],
     /// Session store for buffer and type state inspection.
     pub sessions: &'a SessionStore,
@@ -249,7 +249,7 @@ enum PropertyState {
     },
 }
 
-/// Online property monitor. Hooks into the VM step loop.
+/// Online property monitor. Hooks into the ProtocolMachine step loop.
 pub struct PropertyMonitor {
     properties: Vec<Property>,
     states: Vec<PropertyState>,
@@ -303,7 +303,7 @@ impl PropertyMonitor {
         &self.violations
     }
 
-    /// Check all properties against the current VM context.
+    /// Check all properties against the current ProtocolMachine context.
     #[allow(clippy::too_many_lines)]
     pub fn check(&mut self, ctx: &PropertyContext<'_>) {
         let new_events = ctx.trace.get(self.last_trace_len..).unwrap_or(&[]);

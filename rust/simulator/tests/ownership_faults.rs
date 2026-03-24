@@ -10,7 +10,7 @@ use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{ObsEvent, StepResult, VMConfig, VM};
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineStepResult};
 
 #[derive(Debug, Clone, Copy)]
 struct NoopHandler;
@@ -91,8 +91,8 @@ fn transfer_image() -> CodeImage {
     }
 }
 
-fn run_faulted_transfer(schedule: FaultSchedule, max_rounds: usize) -> VM {
-    let mut vm = VM::new(VMConfig::default());
+fn run_faulted_transfer(schedule: FaultSchedule, max_rounds: usize) -> ProtocolMachine {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&transfer_image())
         .expect("load transfer fixture");
     let fault = FaultInjector::new(NoopHandler, schedule, SimRng::new(7));
@@ -124,8 +124,8 @@ fn run_faulted_transfer(schedule: FaultSchedule, max_rounds: usize) -> VM {
                 .expect("read currently crashed simulator roles"),
         );
         match vm.step_round(&fault, 1).expect("step transfer fixture") {
-            StepResult::Continue => {}
-            StepResult::AllDone | StepResult::Stuck => break,
+            ProtocolMachineStepResult::Continue => {}
+            ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck => break,
         }
     }
 

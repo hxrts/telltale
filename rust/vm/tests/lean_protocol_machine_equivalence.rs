@@ -12,7 +12,7 @@ use telltale_lean_bridge::{
 };
 use telltale_types::{GlobalType, Label};
 use telltale_vm::trace::normalize_trace;
-use telltale_vm::vm::ObsEvent;
+use telltale_vm::ObsEvent;
 use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 
 use test_support::PassthroughHandler;
@@ -20,7 +20,9 @@ use test_support::PassthroughHandler;
 #[test]
 fn test_lean_semantic_audit_matches_rust() {
     let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("Lean vm_runner not available. Build with: cd lean && lake build vm_runner");
+        eprintln!(
+            "Lean protocol-machine runner not available. Build with: cd lean && lake build vm_runner"
+        );
         return;
     };
 
@@ -38,7 +40,9 @@ fn test_lean_semantic_audit_matches_rust() {
         max_steps: 50,
     };
 
-    let lean_out = runner.run(&input).expect("run Lean vm_runner");
+    let lean_out = runner
+        .run(&input)
+        .expect("run Lean protocol-machine runner");
     let lean_trace: Vec<(u64, String, String, String, String)> = lean_out
         .trace
         .iter()
@@ -61,7 +65,7 @@ fn test_lean_semantic_audit_matches_rust() {
         })
         .collect();
     if lean_trace.is_empty() {
-        eprintln!("SKIPPED: Lean vm_runner emitted no communication trace");
+        eprintln!("SKIPPED: Lean protocol-machine runner emitted no communication trace");
         return;
     }
 

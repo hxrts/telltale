@@ -15,9 +15,9 @@ use telltale_vm::effect::{
 };
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::ObsEvent;
+use telltale_vm::ObsEvent;
 use telltale_vm::{
-    protocol_machine_semantic_objects_v1, run_loaded_vm_record_replay_conformance,
+    protocol_machine_semantic_objects_v1, run_loaded_protocol_machine_record_replay_conformance,
     AuthoritativeReadKind, CanonicalHandleKind, DelegationStatus, Edge, OperationInstance,
     OperationPhase, OwnershipError, OwnershipScope, ProgressState, ProtocolMachine,
     ProtocolMachineConfig, PublicationStatus, SemanticAuditRecord, SessionHostMutation,
@@ -170,7 +170,7 @@ fn ownership_transfer_record_replay_preserves_observable_handoff() {
     vm.load_choreography(&transfer_image())
         .expect("load transfer fixture");
 
-    let report = run_loaded_vm_record_replay_conformance(&mut vm, &NoopHandler, 32)
+    let report = run_loaded_protocol_machine_record_replay_conformance(&mut vm, &NoopHandler, 32)
         .expect("record/replay harness should succeed");
 
     assert!(report.replay_consistent);

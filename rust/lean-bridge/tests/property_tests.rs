@@ -11,7 +11,7 @@ use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, SendDecision, SendDecisionInput};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::ObsEvent;
+use telltale_vm::ObsEvent;
 use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 
 #[derive(Clone, Debug)]

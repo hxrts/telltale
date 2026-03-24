@@ -79,9 +79,15 @@ fn tooling_surfaces_use_generated_effect_and_owned_open_paths() {
     let forbidden_patterns = [
         ("../../../Justfile", "effect-scaffold out="),
         ("../../../Justfile", "-- {{ out }} {{ name }}"),
-        ("../examples/v2_baseline_capture.rs", "ThreadedVM"),
-        ("../examples/v2_baseline_capture.rs", "VM::new"),
-        ("../examples/v2_baseline_capture.rs", "VMConfig"),
+        (
+            "../examples/v2_baseline_capture.rs",
+            "ThreadedProtocolMachine",
+        ),
+        ("../examples/v2_baseline_capture.rs", "ProtocolMachine::new"),
+        (
+            "../examples/v2_baseline_capture.rs",
+            "ProtocolMachineConfig",
+        ),
         ("../benches/vm_bench_common.rs", "load_choreography("),
         ("../benches/vm_bench_runtime.rs", "\"vm_run_yield_small\""),
         ("../benches/vm_bench_runtime.rs", "load_choreography("),

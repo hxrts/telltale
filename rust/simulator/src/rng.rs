@@ -1,6 +1,6 @@
 //! Deterministic RNG for simulation middleware.
 //!
-//! Lives in the simulator, not the VM. The VM core has no randomness.
+//! Lives in the simulator, not the ProtocolMachine. The ProtocolMachine core has no randomness.
 
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha8Rng;

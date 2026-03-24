@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
-use crate::vm_runner::ProtocolMachineTraceEvent;
+use crate::protocol_machine_runner::ProtocolMachineTraceEvent;
 
 /// Input payload for Lean reference simulation.
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -10,7 +10,7 @@ use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::effect::{EffectHandler, EffectTraceEntry};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::output_condition::OutputConditionCheck;
-use telltale_vm::vm::ObsEvent;
+use telltale_vm::ObsEvent;
 use telltale_vm::{
     ProtocolMachine, ProtocolMachineConfig, ProtocolMachineSemanticObjects,
     ProtocolMachineStepResult, SemanticAuditRecord,

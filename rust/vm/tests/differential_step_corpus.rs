@@ -18,13 +18,13 @@ use telltale_vm::effect::{
 };
 use telltale_vm::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{ObsEvent, StepResult, VMConfig, VM};
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineStepResult};
 
 use test_support::PassthroughHandler;
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
-        use telltale_vm::threaded::ThreadedVM;
+        use telltale_vm::ThreadedProtocolMachine;
     }
 }
 
@@ -34,11 +34,11 @@ struct StepSnap {
     new_events: Vec<&'static str>,
 }
 
-fn result_name(result: &StepResult) -> &'static str {
+fn result_name(result: &ProtocolMachineStepResult) -> &'static str {
     match result {
-        StepResult::Continue => "continue",
-        StepResult::Stuck => "stuck",
-        StepResult::AllDone => "all_done",
+        ProtocolMachineStepResult::Continue => "continue",
+        ProtocolMachineStepResult::Stuck => "stuck",
+        ProtocolMachineStepResult::AllDone => "all_done",
     }
 }
 
@@ -76,7 +76,7 @@ fn run_cooperative_snaps(
     handler: &dyn EffectHandler,
     max_steps: usize,
 ) -> Vec<StepSnap> {
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(image).expect("load choreography");
     let mut snaps = Vec::new();
     let mut prev_len = vm.trace().len();
@@ -95,7 +95,10 @@ fn run_cooperative_snaps(
             result: result_name(&result),
             new_events,
         });
-        if matches!(result, StepResult::AllDone | StepResult::Stuck) {
+        if matches!(
+            result,
+            ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck
+        ) {
             break;
         }
     }
@@ -113,9 +116,9 @@ fn run_cooperative_snaps_with_config(
     image: &CodeImage,
     handler: &dyn EffectHandler,
     max_steps: usize,
-    config: VMConfig,
+    config: ProtocolMachineConfig,
 ) -> Vec<StepSnap> {
-    let mut vm = VM::new(config);
+    let mut vm = ProtocolMachine::new(config);
     vm.load_choreography(image).expect("load choreography");
     let mut snaps = Vec::new();
     let mut prev_len = vm.trace().len();
@@ -134,7 +137,10 @@ fn run_cooperative_snaps_with_config(
             result: result_name(&result),
             new_events,
         });
-        if matches!(result, StepResult::AllDone | StepResult::Stuck) {
+        if matches!(
+            result,
+            ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck
+        ) {
             break;
         }
     }
@@ -440,9 +446,9 @@ fn cooperative_step_corpus_control_spawn_shape() {
 #[test]
 fn cooperative_step_corpus_speculation_shape() {
     let image = speculation_fixture_image();
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         speculation_enabled: true,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
     let snaps = run_cooperative_snaps_with_config(&image, &PassthroughHandler, 16, cfg);
     let events = flatten_events(&snaps);
@@ -472,7 +478,7 @@ cfg_if! {
             handler: &dyn EffectHandler,
             max_steps: usize,
         ) -> Vec<StepSnap> {
-            let mut vm = ThreadedVM::with_workers(VMConfig::default(), 1);
+            let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
             vm.load_choreography(image).expect("load choreography");
             let mut snaps = Vec::new();
             let mut prev_len = vm.trace().len();
@@ -491,7 +497,7 @@ cfg_if! {
                     result: result_name(&result),
                     new_events,
                 });
-                if matches!(result, StepResult::AllDone | StepResult::Stuck) {
+                if matches!(result, ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) {
                     break;
                 }
             }

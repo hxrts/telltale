@@ -7,7 +7,7 @@ use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::{Fault, Value};
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{VMConfig, VMError, VM};
+use telltale_vm::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 
 #[allow(dead_code, unreachable_pub)]
 #[path = "support/mod.rs"]
@@ -66,7 +66,7 @@ fn choose_rejects_non_string_label_payload() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).expect("load choreography");
     vm.sessions_mut()
         .get_mut(sid)
@@ -79,7 +79,7 @@ fn choose_rejects_non_string_label_payload() {
     let result = vm.run(&handler, 16);
     assert_matches!(
         result,
-        Err(VMError::Fault {
+        Err(ProtocolMachineError::Fault {
             fault: Fault::TypeViolation { .. },
             ..
         })
@@ -112,14 +112,14 @@ fn tag_rejects_non_fact_shape() {
         },
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).expect("load choreography");
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 8);
     assert_matches!(
         result,
-        Err(VMError::Fault {
+        Err(ProtocolMachineError::Fault {
             fault: Fault::Transfer { .. },
             ..
         })

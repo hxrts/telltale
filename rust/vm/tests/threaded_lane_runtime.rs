@@ -14,8 +14,8 @@ use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_vm::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::threaded::{ContentionMetrics, ThreadedVM};
-use telltale_vm::vm::{StepResult, ThreadedRoundSemantics, VMConfig};
+use telltale_vm::{ContentionMetrics, ThreadedProtocolMachine};
+use telltale_vm::{ProtocolMachineConfig, ProtocolMachineStepResult, ThreadedRoundSemantics};
 use test_support::ScenarioSpec;
 
 #[derive(Debug, Clone, Copy)]
@@ -100,15 +100,15 @@ fn transfer_image() -> CodeImage {
     }
 }
 
-fn threaded_wave_config() -> VMConfig {
-    VMConfig {
+fn threaded_wave_config() -> ProtocolMachineConfig {
+    ProtocolMachineConfig {
         threaded_round_semantics: ThreadedRoundSemantics::WaveParallelExtension,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     }
 }
 
 fn run_composed(workers: usize, protocols: usize) -> (usize, ContentionMetrics) {
-    let mut vm = ThreadedVM::with_workers(threaded_wave_config(), workers);
+    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), workers);
     for i in 0..protocols {
         let image = ScenarioSpec::simple("A", "B", &format!("m{i}")).to_code_image();
         vm.load_choreography(&image).expect("load choreography");
@@ -122,11 +122,11 @@ fn run_composed(workers: usize, protocols: usize) -> (usize, ContentionMetrics) 
             .step_round(&handler, workers.max(1))
             .expect("threaded step_round")
         {
-            StepResult::AllDone => {
+            ProtocolMachineStepResult::AllDone => {
                 return (rounds, vm.contention_metrics().clone());
             }
-            StepResult::Continue => {}
-            StepResult::Stuck => {
+            ProtocolMachineStepResult::Continue => {}
+            ProtocolMachineStepResult::Stuck => {
                 panic!("composed workload got stuck");
             }
         }
@@ -136,7 +136,7 @@ fn run_composed(workers: usize, protocols: usize) -> (usize, ContentionMetrics) 
 
 #[test]
 fn lane_assignment_and_single_lane_compatibility() {
-    let mut vm = ThreadedVM::with_workers(threaded_wave_config(), 4);
+    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
     for i in 0..6 {
         let image = ScenarioSpec::simple("A", "B", &format!("lane{i}")).to_code_image();
         vm.load_choreography(&image).expect("load choreography");
@@ -150,7 +150,7 @@ fn lane_assignment_and_single_lane_compatibility() {
         "multi-lane run should select non-zero lanes"
     );
 
-    let mut single_lane = ThreadedVM::with_workers(threaded_wave_config(), 1);
+    let mut single_lane = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 1);
     for i in 0..6 {
         let image = ScenarioSpec::simple("A", "B", &format!("lane{i}")).to_code_image();
         single_lane
@@ -167,7 +167,7 @@ fn lane_assignment_and_single_lane_compatibility() {
 
 #[test]
 fn deterministic_transfer_handoff_uses_delegation_path() {
-    let mut vm = ThreadedVM::with_workers(threaded_wave_config(), 4);
+    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
     vm.load_choreography(&transfer_image())
         .expect("load choreography");
 
@@ -212,7 +212,7 @@ fn no_deadlock_livelock_and_scaling_proxy_hold() {
 
 #[test]
 fn disjoint_footprints_parallelize_in_same_wave() {
-    let mut vm = ThreadedVM::with_workers(threaded_wave_config(), 2);
+    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 2);
     let sid_a = vm
         .load_choreography(&ScenarioSpec::simple("A", "B", "m1").to_code_image())
         .expect("load choreography A");
@@ -241,7 +241,7 @@ fn disjoint_footprints_parallelize_in_same_wave() {
 
 #[test]
 fn overlapping_footprints_serialize_per_wave() {
-    let mut vm = ThreadedVM::with_workers(threaded_wave_config(), 2);
+    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 2);
     let sid = vm
         .load_choreography(&ScenarioSpec::simple("A", "B", "m").to_code_image())
         .expect("load choreography");
@@ -267,7 +267,7 @@ fn overlapping_footprints_serialize_per_wave() {
 #[test]
 fn lane_selection_tie_break_is_repeatable_for_fixed_input() {
     let run_once = || {
-        let mut vm = ThreadedVM::with_workers(threaded_wave_config(), 4);
+        let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
         for i in 0..8 {
             let image = ScenarioSpec::simple("A", "B", &format!("det{i}")).to_code_image();
             vm.load_choreography(&image).expect("load choreography");
@@ -287,7 +287,7 @@ fn lane_selection_tie_break_is_repeatable_for_fixed_input() {
 #[test]
 fn planner_trace_is_worker_count_invariant_for_fixed_ready_set() {
     let run_once = |workers: usize| {
-        let mut vm = ThreadedVM::with_workers(threaded_wave_config(), workers);
+        let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), workers);
         for i in 0..2 {
             let image = ScenarioSpec::simple("A", "B", &format!("wc{i}")).to_code_image();
             vm.load_choreography(&image).expect("load choreography");
@@ -307,7 +307,7 @@ fn planner_trace_is_worker_count_invariant_for_fixed_ready_set() {
 
 #[test]
 fn lane_scheduler_state_roundtrip_is_stable() {
-    let mut vm = ThreadedVM::with_workers(threaded_wave_config(), 4);
+    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
     for i in 0..4 {
         let image = ScenarioSpec::simple("A", "B", &format!("state{i}")).to_code_image();
         vm.load_choreography(&image).expect("load choreography");
@@ -327,7 +327,7 @@ fn lane_scheduler_state_roundtrip_is_stable() {
 
 #[test]
 fn invalid_wave_certificate_falls_back_to_single_step() {
-    let mut vm = ThreadedVM::with_workers(threaded_wave_config(), 2);
+    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 2);
     vm.load_choreography(&ScenarioSpec::simple("A", "B", "m1").to_code_image())
         .expect("load choreography A");
     vm.load_choreography(&ScenarioSpec::simple("A", "B", "m2").to_code_image())
@@ -351,11 +351,11 @@ fn invalid_wave_certificate_falls_back_to_single_step() {
 
 #[test]
 fn footprint_guided_wave_widening_allows_same_session_disjoint_roles() {
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         footprint_guided_wave_widening: true,
         ..threaded_wave_config()
     };
-    let mut vm = ThreadedVM::with_workers(cfg, 2);
+    let mut vm = ThreadedProtocolMachine::with_workers(cfg, 2);
     let sid = vm
         .load_choreography(&ScenarioSpec::simple("A", "B", "m").to_code_image())
         .expect("load choreography");

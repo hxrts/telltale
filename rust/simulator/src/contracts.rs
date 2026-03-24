@@ -6,7 +6,7 @@
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
-use telltale_vm::vm::ObsEvent;
+use telltale_vm::ObsEvent;
 
 use crate::runner::ScenarioResult;
 
@@ -23,7 +23,7 @@ pub struct ContractCheckConfig {
     /// Require replay metadata to be internally coherent.
     #[serde(default = "default_true")]
     pub replay_coherence: bool,
-    /// Require at least this many VM rounds to execute.
+    /// Require at least this many ProtocolMachine rounds to execute.
     #[serde(default)]
     pub min_rounds_executed: Option<u64>,
     /// Require at least one sampled state for each listed role.

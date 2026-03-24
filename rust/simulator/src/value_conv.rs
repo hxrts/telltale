@@ -1,4 +1,4 @@
-//! Helpers for converting between VM values and numeric state vectors.
+//! Helpers for converting between ProtocolMachine values and numeric state vectors.
 
 use telltale_types::FixedQ32;
 use telltale_vm::coroutine::Value;
@@ -23,12 +23,12 @@ fn parse_q32_vec_text(text: &str) -> Option<Vec<FixedQ32>> {
         .collect()
 }
 
-/// Encode one fixed-point value into the current VM value surface.
+/// Encode one fixed-point value into the current ProtocolMachine value surface.
 pub(crate) fn fixed_to_value(value: FixedQ32) -> Value {
     Value::Str(format!("{Q32_SCALAR_PREFIX}{}", value.to_bits()))
 }
 
-/// Encode a fixed-point vector into the current VM value surface.
+/// Encode a fixed-point vector into the current ProtocolMachine value surface.
 pub(crate) fn fixed_vec_to_value(values: &[FixedQ32]) -> Value {
     let joined = values
         .iter()
@@ -38,7 +38,7 @@ pub(crate) fn fixed_vec_to_value(values: &[FixedQ32]) -> Value {
     Value::Str(format!("{Q32_VEC_PREFIX}{joined}"))
 }
 
-/// Decode one fixed-point value from a VM value when possible.
+/// Decode one fixed-point value from a ProtocolMachine value when possible.
 pub(crate) fn try_decode_fixed(value: &Value) -> Option<FixedQ32> {
     match value {
         Value::Str(text) => parse_q32_scalar_text(text),
@@ -46,7 +46,7 @@ pub(crate) fn try_decode_fixed(value: &Value) -> Option<FixedQ32> {
     }
 }
 
-/// Decode a fixed-point vector from a VM value when possible.
+/// Decode a fixed-point vector from a ProtocolMachine value when possible.
 pub(crate) fn try_decode_fixed_vec(value: &Value) -> Option<Vec<FixedQ32>> {
     match value {
         Value::Str(text) => parse_q32_vec_text(text),
@@ -78,14 +78,14 @@ pub(crate) fn registers_to_f64s(values: &[Value]) -> Vec<FixedQ32> {
     values_to_f64s(slice)
 }
 
-/// Convert numeric state values into VM register values.
+/// Convert numeric state values into ProtocolMachine register values.
 pub(crate) fn f64s_to_values(state: &[FixedQ32]) -> Vec<Value> {
     state.iter().copied().map(fixed_to_value).collect()
 }
 
 /// Overwrite the numeric portion of a register file with new state values.
 ///
-/// Writes start at register index 2, matching the VM runner convention.
+/// Writes start at register index 2, matching the ProtocolMachine runner convention.
 pub(crate) fn write_f64s(state: &mut Vec<Value>, values: &[FixedQ32]) {
     if state.len() < 2 {
         state.resize(2, Value::Unit);

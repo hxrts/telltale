@@ -18,18 +18,20 @@ use telltale_vm::effect::{
 };
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::threaded::ThreadedVM;
-use telltale_vm::vm::{ObsEvent, ThreadedRoundSemantics, VMConfig, VMError, VM};
+use telltale_vm::ThreadedProtocolMachine;
 use telltale_vm::{
     CommunicationReplayMode, EffectDeterminismTier, EnvelopeDiffArtifactV1,
     FailureVisibleDiffClass, SchedulerPermutationClass,
 };
+use telltale_vm::{
+    ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError, ThreadedRoundSemantics,
+};
 use test_support::{PassthroughHandler, ScenarioSpec};
 
-fn threaded_wave_config() -> VMConfig {
-    VMConfig {
+fn threaded_wave_config() -> ProtocolMachineConfig {
+    ProtocolMachineConfig {
         threaded_round_semantics: ThreadedRoundSemantics::WaveParallelExtension,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     }
 }
 
@@ -180,14 +182,14 @@ impl EffectHandler for OversizedPayloadHandler {
 
 #[test]
 fn speculation_fixture_matches_between_cooperative_and_threaded() {
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         speculation_enabled: true,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
     let bootstrap = ScenarioSpec::simple("X", "Y", "bootstrap").to_code_image();
     let image = speculation_fixture_image();
 
-    let mut coop = VM::new(cfg.clone());
+    let mut coop = ProtocolMachine::new(cfg.clone());
     coop.load_choreography(&bootstrap)
         .expect("load cooperative bootstrap image");
     let coop_sid = coop
@@ -196,7 +198,7 @@ fn speculation_fixture_matches_between_cooperative_and_threaded() {
     coop.run(&PassthroughHandler, 64)
         .expect("cooperative speculation run");
 
-    let mut threaded = ThreadedVM::with_workers(cfg, 2);
+    let mut threaded = ThreadedProtocolMachine::with_workers(cfg, 2);
     threaded
         .load_choreography(&bootstrap)
         .expect("load threaded bootstrap image");
@@ -262,8 +264,8 @@ fn canonical_parity_is_exact_at_concurrency_one() {
         ScenarioSpec::simple("A", "B", "m2").to_code_image(),
         ScenarioSpec::simple("A", "B", "m3").to_code_image(),
     ];
-    let mut coop = VM::new(VMConfig::default());
-    let mut threaded = ThreadedVM::with_workers(threaded_wave_config(), 4);
+    let mut coop = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let mut threaded = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
     for image in &images {
         coop.load_choreography(image)
             .expect("load cooperative image");
@@ -287,14 +289,14 @@ fn canonical_parity_is_exact_at_concurrency_one() {
 
 #[test]
 fn communication_replay_sequence_mode_parity_at_concurrency_one() {
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         communication_replay_mode: CommunicationReplayMode::Sequence,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
     let image = ScenarioSpec::simple("A", "B", "m-seq").to_code_image();
-    let mut coop = VM::new(cfg.clone());
-    let mut threaded = ThreadedVM::with_workers(
-        VMConfig {
+    let mut coop = ProtocolMachine::new(cfg.clone());
+    let mut threaded = ThreadedProtocolMachine::with_workers(
+        ProtocolMachineConfig {
             threaded_round_semantics: ThreadedRoundSemantics::WaveParallelExtension,
             ..cfg
         },
@@ -321,14 +323,14 @@ fn communication_replay_sequence_mode_parity_at_concurrency_one() {
 
 #[test]
 fn payload_size_rejection_parity_at_concurrency_one() {
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         max_payload_bytes: 8,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
     let image = ScenarioSpec::simple("A", "B", "oversized").to_code_image();
-    let mut coop = VM::new(cfg.clone());
-    let mut threaded = ThreadedVM::with_workers(
-        VMConfig {
+    let mut coop = ProtocolMachine::new(cfg.clone());
+    let mut threaded = ThreadedProtocolMachine::with_workers(
+        ProtocolMachineConfig {
             threaded_round_semantics: ThreadedRoundSemantics::WaveParallelExtension,
             ..cfg
         },
@@ -350,7 +352,7 @@ fn payload_size_rejection_parity_at_concurrency_one() {
     assert!(
         matches!(
             coop_err,
-            VMError::Fault {
+            ProtocolMachineError::Fault {
                 fault: Fault::TypeViolation { ref message, .. },
                 ..
             } if message.contains("exceeds max_payload_bytes")
@@ -360,7 +362,7 @@ fn payload_size_rejection_parity_at_concurrency_one() {
     assert!(
         matches!(
             threaded_err,
-            VMError::Fault {
+            ProtocolMachineError::Fault {
                 fault: Fault::TypeViolation { ref message, .. },
                 ..
             } if message.contains("exceeds max_payload_bytes")
@@ -374,13 +376,13 @@ fn envelope_bounded_parity_holds_for_n_gt_1() {
     let images: Vec<_> = (0..8)
         .map(|i| ScenarioSpec::simple("A", "B", &format!("m{i}")).to_code_image())
         .collect();
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         effect_determinism_tier: EffectDeterminismTier::EnvelopeBoundedNondeterministic,
         threaded_round_semantics: ThreadedRoundSemantics::WaveParallelExtension,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
-    let mut coop = VM::new(cfg.clone());
-    let mut threaded = ThreadedVM::with_workers(cfg.clone(), 4);
+    let mut coop = ProtocolMachine::new(cfg.clone());
+    let mut threaded = ThreadedProtocolMachine::with_workers(cfg.clone(), 4);
     for image in &images {
         coop.load_choreography(image)
             .expect("load cooperative image");
@@ -434,13 +436,13 @@ fn envelope_bounded_parity_detects_wave_width_bound_violation() {
     let images: Vec<_> = (0..8)
         .map(|i| ScenarioSpec::simple("A", "B", &format!("m{i}")).to_code_image())
         .collect();
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         effect_determinism_tier: EffectDeterminismTier::EnvelopeBoundedNondeterministic,
         threaded_round_semantics: ThreadedRoundSemantics::WaveParallelExtension,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
-    let mut coop = VM::new(cfg.clone());
-    let mut threaded = ThreadedVM::with_workers(cfg.clone(), 4);
+    let mut coop = ProtocolMachine::new(cfg.clone());
+    let mut threaded = ThreadedProtocolMachine::with_workers(cfg.clone(), 4);
     for image in &images {
         coop.load_choreography(image)
             .expect("load cooperative image");
@@ -486,13 +488,13 @@ fn envelope_bounded_parity_detects_wave_width_bound_violation() {
 fn failure_envelope_fixture_matches_cross_runtime() {
     let image = ScenarioSpec::simple("A", "B", "m").to_code_image();
     let handler = TopologyOnceHandler::new();
-    let mut coop = VM::new(VMConfig::default());
+    let mut coop = ProtocolMachine::new(ProtocolMachineConfig::default());
     coop.load_choreography(&image)
         .expect("load cooperative image");
     coop.run_concurrent(&handler, 64, 1)
         .expect("cooperative run");
 
-    let mut threaded = ThreadedVM::with_workers(threaded_wave_config(), 2);
+    let mut threaded = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 2);
     threaded
         .load_choreography(&image)
         .expect("load threaded image");

@@ -3,7 +3,7 @@
 use cfg_if::cfg_if;
 use std::collections::BTreeSet;
 
-use telltale_vm::vm::{FlowPolicy, FlowPredicate, VMConfig};
+use telltale_vm::{FlowPolicy, FlowPredicate, ProtocolMachineConfig};
 
 fn role_set(values: &[&str]) -> BTreeSet<String> {
     values.iter().map(|v| (*v).to_string()).collect()
@@ -78,11 +78,11 @@ fn dynamic_flow_predicate_is_not_serializable() {
 
 #[test]
 fn vm_config_with_dynamic_flow_predicate_is_not_serializable() {
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         flow_policy: FlowPolicy::predicate(|knowledge, target| {
             knowledge.fact.contains("secret") && target.starts_with("Obs")
         }),
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
 
     let err = serde_json::to_string(&cfg)
@@ -96,25 +96,25 @@ fn vm_config_with_dynamic_flow_predicate_is_not_serializable() {
 
 #[test]
 fn vm_config_schema_version_defaults_when_missing() {
-    let mut encoded =
-        serde_json::to_value(VMConfig::default()).expect("serialize default VM config");
+    let mut encoded = serde_json::to_value(ProtocolMachineConfig::default())
+        .expect("serialize default ProtocolMachine config");
     let obj = encoded
         .as_object_mut()
-        .expect("VM config JSON value should be an object");
+        .expect("ProtocolMachine config JSON value should be an object");
     obj.remove("config_schema_version");
 
-    let decoded: VMConfig =
-        serde_json::from_value(encoded).expect("deserialize VM config without schema version");
+    let decoded: ProtocolMachineConfig = serde_json::from_value(encoded)
+        .expect("deserialize ProtocolMachine config without schema version");
     assert_eq!(decoded.config_schema_version, 1);
 }
 
 #[test]
 fn vm_config_optional_hooks_have_deterministic_defaults() {
-    let mut encoded =
-        serde_json::to_value(VMConfig::default()).expect("serialize default VM config");
+    let mut encoded = serde_json::to_value(ProtocolMachineConfig::default())
+        .expect("serialize default ProtocolMachine config");
     let obj = encoded
         .as_object_mut()
-        .expect("VM config JSON value should be an object");
+        .expect("ProtocolMachine config JSON value should be an object");
     obj.remove("monitor_mode");
     obj.remove("flow_policy");
     obj.remove("instruction_cost");
@@ -123,9 +123,9 @@ fn vm_config_optional_hooks_have_deterministic_defaults() {
     obj.remove("max_payload_bytes");
     obj.remove("config_schema_version");
 
-    let decoded: VMConfig =
-        serde_json::from_value(encoded).expect("deserialize VM config without optional hooks");
-    let defaults = VMConfig::default();
+    let decoded: ProtocolMachineConfig = serde_json::from_value(encoded)
+        .expect("deserialize ProtocolMachine config without optional hooks");
+    let defaults = ProtocolMachineConfig::default();
     assert_eq!(decoded.monitor_mode, defaults.monitor_mode);
     assert_eq!(decoded.flow_policy, defaults.flow_policy);
     assert_eq!(decoded.instruction_cost, defaults.instruction_cost);
@@ -143,18 +143,18 @@ fn vm_config_optional_hooks_have_deterministic_defaults() {
 
 #[test]
 fn named_strict_profiles_encode_explicit_runtime_modes() {
-    let minimal = VMConfig::strict_minimal();
-    let observable = VMConfig::strict_observable();
-    let verified = VMConfig::strict_verified();
+    let minimal = ProtocolMachineConfig::strict_minimal();
+    let observable = ProtocolMachineConfig::strict_observable();
+    let verified = ProtocolMachineConfig::strict_verified();
 
     assert_eq!(minimal.determinism_mode, telltale_vm::DeterminismMode::Full);
     assert_eq!(
         minimal.threaded_round_semantics,
-        telltale_vm::vm::ThreadedRoundSemantics::CanonicalOneStep
+        telltale_vm::ThreadedRoundSemantics::CanonicalOneStep
     );
     assert_eq!(
         minimal.effect_trace_capture_mode,
-        telltale_vm::vm::EffectTraceCaptureMode::Disabled
+        telltale_vm::EffectTraceCaptureMode::Disabled
     );
     assert_eq!(
         verified.communication_replay_mode,
@@ -162,22 +162,22 @@ fn named_strict_profiles_encode_explicit_runtime_modes() {
     );
     assert_eq!(
         verified.payload_validation_mode,
-        telltale_vm::vm::PayloadValidationMode::StrictSchema
+        telltale_vm::PayloadValidationMode::StrictSchema
     );
     assert_eq!(
         observable.effect_trace_capture_mode,
-        telltale_vm::vm::EffectTraceCaptureMode::Full
+        telltale_vm::EffectTraceCaptureMode::Full
     );
 }
 
 #[test]
 #[should_panic(expected = "max_sessions must be > 0")]
 fn vm_new_rejects_invalid_config() {
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         max_sessions: 0,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
-    drop(telltale_vm::vm::VM::new(cfg));
+    drop(telltale_vm::ProtocolMachine::new(cfg));
 }
 
 cfg_if! {
@@ -185,11 +185,11 @@ cfg_if! {
         #[test]
         #[should_panic(expected = "instruction_cost must be > 0")]
         fn threaded_vm_rejects_invalid_config() {
-            let cfg = VMConfig {
+            let cfg = ProtocolMachineConfig {
                 instruction_cost: 0,
-                ..VMConfig::default()
+                ..ProtocolMachineConfig::default()
             };
-            drop(telltale_vm::threaded::ThreadedVM::with_workers(cfg, 2));
+            drop(telltale_vm::ThreadedProtocolMachine::with_workers(cfg, 2));
         }
     }
 }

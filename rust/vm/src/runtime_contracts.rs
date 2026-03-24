@@ -111,19 +111,19 @@ fn sched_policy_requires_contracts(policy: &SchedPolicy) -> bool {
     !matches!(policy, SchedPolicy::Cooperative)
 }
 
-/// Whether VM config requires runtime contracts for admission.
+/// Whether protocol-machine config requires runtime contracts for admission.
 #[must_use]
-pub fn requires_vm_runtime_contracts(cfg: &VMConfig) -> bool {
+pub fn requires_protocol_machine_runtime_contracts(cfg: &VMConfig) -> bool {
     sched_policy_requires_contracts(&cfg.sched_policy) || cfg.speculation_enabled
 }
 
-/// VM admission gate for advanced runtime modes.
+/// Protocol-machine admission gate for advanced runtime modes.
 #[must_use]
-pub fn admit_vm_runtime(
+pub fn admit_protocol_machine_runtime(
     cfg: &VMConfig,
     contracts: Option<&RuntimeContracts>,
 ) -> RuntimeAdmissionResult {
-    if requires_vm_runtime_contracts(cfg) && contracts.is_none() {
+    if requires_protocol_machine_runtime_contracts(cfg) && contracts.is_none() {
         RuntimeAdmissionResult::RejectedMissingContracts
     } else {
         RuntimeAdmissionResult::Admitted
@@ -166,11 +166,11 @@ pub fn request_determinism_profile(
 
 /// Unified runtime gate check for advanced-mode admission and profile support.
 #[must_use]
-pub fn enforce_vm_runtime_gates(
+pub fn enforce_protocol_machine_runtime_gates(
     cfg: &VMConfig,
     contracts: Option<&RuntimeContracts>,
 ) -> RuntimeGateResult {
-    match admit_vm_runtime(cfg, contracts) {
+    match admit_protocol_machine_runtime(cfg, contracts) {
         RuntimeAdmissionResult::RejectedMissingContracts => {
             RuntimeGateResult::RejectedMissingContracts
         }
@@ -215,17 +215,17 @@ mod tests {
     fn admission_requires_contracts_for_advanced_modes() {
         let mut cfg = VMConfig::default();
         assert_eq!(
-            admit_vm_runtime(&cfg, None),
+            admit_protocol_machine_runtime(&cfg, None),
             RuntimeAdmissionResult::Admitted
         );
 
         cfg.speculation_enabled = true;
         assert_eq!(
-            admit_vm_runtime(&cfg, None),
+            admit_protocol_machine_runtime(&cfg, None),
             RuntimeAdmissionResult::RejectedMissingContracts
         );
         assert_eq!(
-            admit_vm_runtime(&cfg, Some(&RuntimeContracts::full())),
+            admit_protocol_machine_runtime(&cfg, Some(&RuntimeContracts::full())),
             RuntimeAdmissionResult::Admitted
         );
     }
@@ -262,7 +262,7 @@ mod tests {
         let mut cfg = VMConfig::default();
         cfg.speculation_enabled = true;
         assert_eq!(
-            enforce_vm_runtime_gates(&cfg, None),
+            enforce_protocol_machine_runtime_gates(&cfg, None),
             RuntimeGateResult::RejectedMissingContracts
         );
 
@@ -270,13 +270,13 @@ mod tests {
         contracts.determinism_artifacts.replay = false;
         cfg.determinism_mode = DeterminismMode::Replay;
         assert_eq!(
-            enforce_vm_runtime_gates(&cfg, Some(&contracts)),
+            enforce_protocol_machine_runtime_gates(&cfg, Some(&contracts)),
             RuntimeGateResult::RejectedUnsupportedDeterminismProfile
         );
 
         contracts.determinism_artifacts.replay = true;
         assert_eq!(
-            enforce_vm_runtime_gates(&cfg, Some(&contracts)),
+            enforce_protocol_machine_runtime_gates(&cfg, Some(&contracts)),
             RuntimeGateResult::Admitted
         );
     }

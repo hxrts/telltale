@@ -11,7 +11,7 @@ fn verify_bundle_or_skip(
     bundle: &telltale_lean_bridge::ProtocolBundle,
 ) -> Option<InvariantVerificationResult> {
     let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean vm_runner not available");
+        eprintln!("SKIPPED: Lean protocol-machine runner not available");
         return None;
     };
 
@@ -23,7 +23,9 @@ fn verify_bundle_or_skip(
                 || stderr.contains("unsupported operation")
                 || stderr.contains("missing choreographies") =>
         {
-            eprintln!("SKIPPED: Lean vm_runner does not support verifyProtocolBundle yet");
+            eprintln!(
+                "SKIPPED: Lean protocol-machine runner does not support verifyProtocolBundle yet"
+            );
             None
         }
         Err(err) => panic!("verify_invariants failed unexpectedly: {err}"),

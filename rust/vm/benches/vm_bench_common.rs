@@ -16,8 +16,8 @@ use telltale_vm::loader::CodeImage;
 use telltale_vm::session::SessionStore;
 use telltale_vm::{
     CommunicationReplayMode, Instr, ObservabilityRetentionConfig, ObservabilityRetentionMode,
-    PayloadValidationMode, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineRunStatus,
-    VmMemoryUsage,
+    PayloadValidationMode, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineMemoryUsage,
+    ProtocolMachineRunStatus,
 };
 
 pub(crate) struct CountingAllocator;
@@ -286,7 +286,10 @@ pub(crate) fn observable_choice_config() -> ProtocolMachineConfig {
     }
 }
 
-pub(crate) fn run_yield_workload(image: &CodeImage, max_rounds: usize) -> VmMemoryUsage {
+pub(crate) fn run_yield_workload(
+    image: &CodeImage,
+    max_rounds: usize,
+) -> ProtocolMachineMemoryUsage {
     let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         ..ProtocolMachineConfig::strict_minimal()
@@ -299,9 +302,9 @@ pub(crate) fn run_yield_workload(image: &CodeImage, max_rounds: usize) -> VmMemo
     vm.memory_usage()
 }
 
-pub(crate) fn run_short_lived_session_churn(iterations: usize) -> VmMemoryUsage {
+pub(crate) fn run_short_lived_session_churn(iterations: usize) -> ProtocolMachineMemoryUsage {
     let image = yield_image(4, 8);
-    let mut last_usage = VmMemoryUsage::default();
+    let mut last_usage = ProtocolMachineMemoryUsage::default();
 
     for idx in 0..iterations {
         let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
@@ -331,7 +334,7 @@ pub(crate) fn run_short_lived_session_churn(iterations: usize) -> VmMemoryUsage 
     last_usage
 }
 
-pub(crate) fn run_repeated_load_reuse(iterations: usize) -> VmMemoryUsage {
+pub(crate) fn run_repeated_load_reuse(iterations: usize) -> ProtocolMachineMemoryUsage {
     let image = yield_image(16, 16);
     let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
@@ -351,7 +354,7 @@ pub(crate) fn run_repeated_open_same_image(
     iterations: usize,
     num_roles: usize,
     yields_per_role: usize,
-) -> VmMemoryUsage {
+) -> ProtocolMachineMemoryUsage {
     let image = yield_image(num_roles, yields_per_role);
     let mut config = ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
@@ -369,7 +372,10 @@ pub(crate) fn run_repeated_open_same_image(
     vm.memory_usage()
 }
 
-pub(crate) fn run_repeated_open_wide_roles(iterations: usize, num_roles: usize) -> VmMemoryUsage {
+pub(crate) fn run_repeated_open_wide_roles(
+    iterations: usize,
+    num_roles: usize,
+) -> ProtocolMachineMemoryUsage {
     run_repeated_open_same_image(iterations, num_roles, 1)
 }
 
@@ -377,7 +383,7 @@ pub(crate) fn run_send_recv_workload(
     image: &CodeImage,
     config: ProtocolMachineConfig,
     iterations: usize,
-) -> VmMemoryUsage {
+) -> ProtocolMachineMemoryUsage {
     let mut vm = ProtocolMachine::new(config);
 
     for idx in 0..iterations {
@@ -394,7 +400,7 @@ pub(crate) fn run_send_recv_workload(
 pub(crate) fn run_choice_workload(
     config: ProtocolMachineConfig,
     iterations: usize,
-) -> VmMemoryUsage {
+) -> ProtocolMachineMemoryUsage {
     let image = choice_image("A", "B", &["left", "right", "other"]);
     run_send_recv_workload(&image, config, iterations)
 }
@@ -402,7 +408,7 @@ pub(crate) fn run_choice_workload(
 pub(crate) fn run_many_paused_scheduler_workload(
     num_roles: usize,
     yields_per_role: usize,
-) -> VmMemoryUsage {
+) -> ProtocolMachineMemoryUsage {
     let mut vm = setup_many_paused_scheduler_vm(num_roles, yields_per_role);
     let status = vm.run(&BenchHandler, 10_000).expect("run vm");
     assert!(matches!(status, ProtocolMachineRunStatus::Stuck));
@@ -430,7 +436,7 @@ pub(crate) fn setup_many_paused_scheduler_vm(
 pub(crate) fn run_pause_resume_churn_workload(
     num_roles: usize,
     iterations: usize,
-) -> VmMemoryUsage {
+) -> ProtocolMachineMemoryUsage {
     let image = yield_image(num_roles, 4);
     let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),

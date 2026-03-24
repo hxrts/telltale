@@ -9,13 +9,13 @@ use assert_matches::assert_matches;
 use cfg_if::cfg_if;
 use telltale_vm::coroutine::Fault;
 use telltale_vm::instr::{ImmValue, Instr};
-use telltale_vm::vm::{MonitorMode, VMConfig, VMError, VM};
+use telltale_vm::{MonitorMode, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 
 use test_support::PassthroughHandler;
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
-        use telltale_vm::threaded::ThreadedVM;
+        use telltale_vm::ThreadedProtocolMachine;
     }
 }
 
@@ -27,9 +27,9 @@ fn cooperative_monitor_precheck_catches_mismatched_instr_shape() {
         vec![Instr::Receive { chan: 0, dst: 0 }, Instr::Halt],
     );
 
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         monitor_mode: MonitorMode::SessionTypePrecheck,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
     vm.load_choreography(&image).expect("load image");
 
@@ -38,7 +38,7 @@ fn cooperative_monitor_precheck_catches_mismatched_instr_shape() {
         .expect_err("expected mismatch");
     assert_matches!(
         err,
-        VMError::Fault {
+        ProtocolMachineError::Fault {
             fault: Fault::TypeViolation {
                 ref message,
                 ..
@@ -62,9 +62,9 @@ fn cooperative_monitor_precheck_bypasses_control_flow_instrs() {
         ],
     );
 
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         monitor_mode: MonitorMode::SessionTypePrecheck,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
     vm.load_choreography(&image).expect("load image");
 
@@ -92,9 +92,9 @@ fn cooperative_monitor_offer_passes_on_send_state() {
         ],
     );
 
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         monitor_mode: MonitorMode::SessionTypePrecheck,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
     vm.load_choreography(&image).expect("load image");
 
@@ -116,9 +116,9 @@ fn cooperative_monitor_offer_rejects_recv_state() {
         ],
     );
 
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         monitor_mode: MonitorMode::SessionTypePrecheck,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
     vm.load_choreography(&image).expect("load image");
 
@@ -127,7 +127,7 @@ fn cooperative_monitor_offer_rejects_recv_state() {
         .expect_err("offer should fail monitor on recv state");
     assert_matches!(
         err,
-        VMError::Fault {
+        ProtocolMachineError::Fault {
             fault: Fault::TypeViolation {
                 ref message,
                 ..
@@ -151,9 +151,9 @@ fn cooperative_monitor_choose_passes_on_recv_state() {
         ],
     );
 
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         monitor_mode: MonitorMode::SessionTypePrecheck,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
     vm.load_choreography(&image).expect("load image");
 
@@ -175,9 +175,9 @@ fn cooperative_monitor_choose_rejects_send_state() {
         ],
     );
 
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         monitor_mode: MonitorMode::SessionTypePrecheck,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
     vm.load_choreography(&image).expect("load image");
 
@@ -186,7 +186,7 @@ fn cooperative_monitor_choose_rejects_send_state() {
         .expect_err("choose should fail monitor on send state");
     assert_matches!(
         err,
-        VMError::Fault {
+        ProtocolMachineError::Fault {
             fault: Fault::TypeViolation {
                 ref message,
                 ..
@@ -199,10 +199,10 @@ fn cooperative_monitor_choose_rejects_send_state() {
 #[test]
 fn cooperative_out_of_credits_faults_before_dispatch() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         initial_cost_budget: 0,
         instruction_cost: 1,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
     vm.load_choreography(&image).expect("load image");
 
@@ -211,7 +211,7 @@ fn cooperative_out_of_credits_faults_before_dispatch() {
         .expect_err("expected out-of-credits");
     assert_matches!(
         err,
-        VMError::Fault {
+        ProtocolMachineError::Fault {
             fault: Fault::OutOfCredits,
             ..
         }
@@ -223,11 +223,11 @@ cfg_if! {
         #[test]
         fn threaded_out_of_credits_faults_before_dispatch() {
             let image = test_support::simple_send_recv_image("A", "B", "msg");
-            let mut vm = ThreadedVM::with_workers(
-                VMConfig {
+            let mut vm = ThreadedProtocolMachine::with_workers(
+                ProtocolMachineConfig {
                     initial_cost_budget: 0,
                     instruction_cost: 1,
-                    ..VMConfig::default()
+                    ..ProtocolMachineConfig::default()
                 },
                 2,
             );
@@ -238,7 +238,7 @@ cfg_if! {
                 .expect_err("expected out-of-credits");
             assert_matches!(
                 err,
-                VMError::Fault {
+                ProtocolMachineError::Fault {
                     fault: Fault::OutOfCredits,
                     ..
                 }
@@ -253,10 +253,10 @@ cfg_if! {
                 vec![Instr::Receive { chan: 0, dst: 0 }, Instr::Halt],
             );
 
-            let mut vm = ThreadedVM::with_workers(
-                VMConfig {
+            let mut vm = ThreadedProtocolMachine::with_workers(
+                ProtocolMachineConfig {
                     monitor_mode: MonitorMode::SessionTypePrecheck,
-                    ..VMConfig::default()
+                    ..ProtocolMachineConfig::default()
                 },
                 2,
             );
@@ -267,7 +267,7 @@ cfg_if! {
                 .expect_err("expected mismatch");
             assert_matches!(
                 err,
-                VMError::Fault {
+                ProtocolMachineError::Fault {
                     fault: Fault::TypeViolation {
                         ref message,
                         ..
@@ -291,10 +291,10 @@ cfg_if! {
                 ],
             );
 
-            let mut vm = ThreadedVM::with_workers(
-                VMConfig {
+            let mut vm = ThreadedProtocolMachine::with_workers(
+                ProtocolMachineConfig {
                     monitor_mode: MonitorMode::SessionTypePrecheck,
-                    ..VMConfig::default()
+                    ..ProtocolMachineConfig::default()
                 },
                 2,
             );

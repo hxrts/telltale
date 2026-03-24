@@ -1,4 +1,4 @@
-//! Differential randomized instruction checks between deterministic VM backends.
+//! Differential randomized instruction checks between deterministic ProtocolMachine backends.
 #![cfg(all(not(target_arch = "wasm32"), feature = "multi-thread"))]
 #![allow(missing_docs)]
 
@@ -11,8 +11,8 @@ use telltale_vm::effect::{
 };
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::threaded::ThreadedVM;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::ThreadedProtocolMachine;
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 
 #[derive(Debug, Clone, Copy)]
 struct DeterministicNoopHandler;
@@ -135,27 +135,27 @@ fn observation_signature(trace: &[ObsEvent]) -> Vec<String> {
 
 #[test]
 fn randomized_instruction_corpus_has_cross_target_observational_equivalence() {
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         num_registers: 16,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
 
     for seed in 0_u64..64 {
         let image = random_lane_image(seed, cfg.num_registers);
 
-        let mut coop = VM::new(cfg.clone());
+        let mut coop = ProtocolMachine::new(cfg.clone());
         coop.load_choreography(&image)
             .expect("load cooperative image");
         coop.run(&DeterministicNoopHandler, 256)
-            .expect("run cooperative VM");
+            .expect("run cooperative ProtocolMachine");
 
-        let mut threaded = ThreadedVM::with_workers(cfg.clone(), 4);
+        let mut threaded = ThreadedProtocolMachine::with_workers(cfg.clone(), 4);
         threaded
             .load_choreography(&image)
             .expect("load threaded image");
         threaded
             .run(&DeterministicNoopHandler, 256)
-            .expect("run threaded VM");
+            .expect("run threaded ProtocolMachine");
 
         assert_eq!(
             observation_signature(&coop.canonical_replay_fragment().obs_trace),

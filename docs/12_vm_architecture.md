@@ -65,7 +65,7 @@ Runtime mode admission and profile selection are capability gated.
 
 | Gate | Runtime Surface | Current Rust Path |
 |---|---|---|
-| Advanced mode admission | `requires_vm_runtime_contracts` and `admit_vm_runtime` | `rust/vm/src/runtime_contracts.rs`, `rust/vm/src/composition.rs` |
+| Advanced mode admission | `requires_protocol_machine_runtime_contracts` and `admit_protocol_machine_runtime` | `rust/vm/src/runtime_contracts.rs`, `rust/vm/src/composition.rs` |
 | Determinism profile validation | `request_determinism_profile` | `rust/vm/src/runtime_contracts.rs`, `rust/vm/src/composition.rs` |
 | Threaded certified-wave fallback | `WaveCertificate` check with one-step degrade | `rust/vm/src/threaded.rs` |
 | Deviation registry enforcement | Undocumented parity drift rejection | `just check-parity --types` |
@@ -194,7 +194,7 @@ This path is the runtime realization of delegation/reconfiguration. It should no
 
 | Capability Gate | Lean Surface | Rust Surface |
 |---|---|---|
-| Advanced mode admission | `requiresVMRuntimeContracts`, `admitVMRuntime` | `requires_vm_runtime_contracts`, `admit_vm_runtime` |
+| Advanced mode admission | `requiresVMRuntimeContracts`, `admitVMRuntime` | `requires_protocol_machine_runtime_contracts`, `admit_protocol_machine_runtime` |
 | Live migration switch | `requestLiveMigration` | Runtime contracts capability booleans in composition admission |
 | Autoscale/repartition switch | `requestAutoscaleOrRepartition` | Runtime contracts capability booleans in composition admission |
 | Placement refinement switch | `requestPlacementRefinement` | Runtime contracts capability booleans in composition admission |

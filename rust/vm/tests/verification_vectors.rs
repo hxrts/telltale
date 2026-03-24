@@ -7,7 +7,7 @@ use telltale_vm::verification::{
     sign_value, signing_key_for_endpoint, verify_signed_value, AuthProof, AuthTree,
     DefaultVerificationModel, Hash, HashTag, VerificationModel,
 };
-use telltale_vm::vm::ResourceState;
+use telltale_vm::ResourceState;
 
 fn hash_payload(tag: HashTag, bytes: &[u8]) -> Hash {
     DefaultVerificationModel::hash(tag, bytes)

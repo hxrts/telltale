@@ -76,9 +76,9 @@
         );
         coro.regs[3] = Value::Str(target.to_string());
 
-        let cfg = VMConfig {
+        let cfg = ProtocolMachineConfig {
             flow_policy: policy,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         };
         let pack = step_check(&mut coro, &cfg, "A", 2, 3, 4, 0).expect("check should execute");
         match pack.coro_update {
@@ -200,27 +200,27 @@
                 m
             },
         };
-        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 1);
+        let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
         vm.load_choreography(&image).expect("load choreography");
         let status = vm
             .run(&NoopHandler, 8)
             .expect("run should return bounded status");
-        assert_eq!(status, RunStatus::MaxRoundsExceeded);
+        assert_eq!(status, ProtocolMachineRunStatus::MaxRoundsExceeded);
     }
 
     #[test]
     fn try_with_workers_rejects_invalid_config_without_panicking() {
-        let config = VMConfig {
+        let config = ProtocolMachineConfig {
             num_registers: 0,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         };
-        let result = ThreadedVM::try_with_workers(config, 1);
-        assert!(matches!(result, Err(VMError::InvalidConfig { .. })));
+        let result = ThreadedProtocolMachine::try_with_workers(config, 1);
+        assert!(matches!(result, Err(ProtocolMachineError::InvalidConfig { .. })));
     }
 
     #[test]
     fn threaded_replay_accessors_fail_fast_on_poisoned_locks() {
-        let vm = ThreadedVM::with_workers(VMConfig::default(), 1);
+        let vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
         let replay = vm.communication_consumption.clone();
         let artifacts = vm.communication_consumption_artifacts.clone();
 
@@ -296,7 +296,7 @@
         coro.owned_endpoints.push(endpoint.clone());
         coro.regs[0] = Value::Endpoint(endpoint);
 
-        let config = VMConfig::default();
+        let config = ProtocolMachineConfig::default();
         let guard_resources = Arc::new(Mutex::new(BTreeMap::new()));
         let resource_states = Arc::new(Mutex::new(BTreeMap::new()));
         let communication_consumption = Arc::new(Mutex::new(
@@ -341,7 +341,7 @@
         let global = GlobalType::send("A", "B", Label::new("m"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 2);
+        let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
         let sid = vm.load_choreography(&image).expect("load choreography");
         let endpoint = Endpoint {
             sid,
@@ -398,7 +398,7 @@
         let global = GlobalType::send("A", "B", Label::new("m"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 2);
+        let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
         let sid = vm.load_choreography(&image).expect("load choreography");
         let endpoint = Endpoint {
             sid,
@@ -445,7 +445,7 @@
         let global = GlobalType::send("A", "B", Label::new("m"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 3);
+        let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 3);
         let sid = vm.load_choreography(&image).expect("load choreography");
         let endpoint = Endpoint {
             sid,
@@ -531,7 +531,7 @@
         let global = GlobalType::send("A", "B", Label::new("m"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 2);
+        let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
         let sid = vm.load_choreography(&image).expect("load choreography");
         let endpoint = Endpoint {
             sid,
@@ -638,7 +638,7 @@
 
     #[test]
     fn progress_contracts_escalate_consistently_in_threaded_runtime() {
-        let mut vm = ThreadedVM::with_workers(VMConfig::default(), 2);
+        let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
         vm.clock.tick = 1;
         let effect_id = vm.issue_runtime_effect(
             "invoke_step",

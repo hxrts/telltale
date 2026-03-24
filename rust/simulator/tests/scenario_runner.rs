@@ -132,7 +132,7 @@ step_size = "0.01"
             .replay
             .obs_trace
             .iter()
-            .filter(|event| matches!(event, telltale_vm::vm::ObsEvent::Invoked { .. }))
+            .filter(|event| matches!(event, telltale_vm::ObsEvent::Invoked { .. }))
             .count()
     );
     assert!(result.replay.effect_trace.len() <= result.replay.obs_trace.len());

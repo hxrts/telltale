@@ -12,8 +12,8 @@ use telltale_vm::effect::{
     EffectHandler, EffectResult, RecordingEffectHandler, SendDecision, SendDecisionInput,
 };
 use telltale_vm::loader::CodeImage;
-use telltale_vm::threaded::ThreadedVM;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::ThreadedProtocolMachine;
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 
 type NormalizedEvent = (String, String, String, String);
 type PerSessionTrace = BTreeMap<usize, Vec<NormalizedEvent>>;
@@ -326,7 +326,7 @@ fn chain_image() -> CodeImage {
 fn run_single_thread(
     image: &CodeImage,
 ) -> (Vec<ObsEvent>, Vec<telltale_vm::effect::EffectTraceEntry>) {
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(image).expect("load choreography");
     vm.run(&DeterministicHandler, 256)
         .expect("single-thread run");
@@ -352,7 +352,8 @@ fn run_threaded_with_concurrency(
     Vec<telltale_vm::effect::EffectTraceEntry>,
     Vec<telltale_vm::LaneSelection>,
 ) {
-    let mut vm = ThreadedVM::with_workers(VMConfig::default(), concurrency.max(1));
+    let mut vm =
+        ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), concurrency.max(1));
     for _ in 0..sessions {
         vm.load_choreography(image).expect("load choreography");
     }
@@ -410,14 +411,14 @@ fn cross_target_matrix_replay_effect_trace_comparison() {
 
     let flaky = FlakySendHandler::default();
     let recording = RecordingEffectHandler::new(&flaky);
-    let mut single = VM::new(VMConfig::default());
+    let mut single = ProtocolMachine::new(ProtocolMachineConfig::default());
     single.load_choreography(&image).expect("load choreography");
     single.run(&recording, 256).expect("single baseline run");
 
     let replay_trace = recording.effect_trace();
     let single_trace = single.trace().to_vec();
 
-    let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 4);
+    let mut threaded = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 4);
     threaded
         .load_choreography(&image)
         .expect("load choreography");

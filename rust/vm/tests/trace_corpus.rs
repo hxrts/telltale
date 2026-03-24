@@ -12,7 +12,7 @@ use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::trace::normalize_trace;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 
 struct NoOpHandler;
 
@@ -77,7 +77,7 @@ fn test_trace_corpus_send_recv() {
 
     let image = CodeImage::from_local_types(&locals, &global);
     let handler = NoOpHandler;
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
     vm.run(&handler, 50).unwrap();
 

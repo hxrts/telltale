@@ -1,6 +1,6 @@
-/// Approximate retained state for the live VM runtime.
+/// Approximate retained state for the live protocol-machine runtime.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct VmMemoryUsage {
+pub struct ProtocolMachineMemoryUsage {
     /// Session-store retained state.
     pub session_store: SessionStoreMemoryUsage,
     /// Number of coroutine records still retained by the VM.
@@ -23,12 +23,12 @@ pub struct VmMemoryUsage {
     pub communication_artifacts: usize,
     /// Number of retained output-condition checks.
     pub output_condition_checks: usize,
-    /// Estimated retained bytes by VM subsystem.
-    pub retained_bytes: VmRetainedBytes,
+    /// Estimated retained bytes by protocol-machine subsystem.
+    pub retained_bytes: ProtocolMachineRetainedBytes,
 }
-/// Estimated retained bytes for VM subsystems.
+/// Estimated retained bytes for protocol-machine subsystems.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct VmRetainedBytes {
+pub struct ProtocolMachineRetainedBytes {
     /// Session-store retained bytes.
     pub session_store: usize,
     /// Coroutine state.

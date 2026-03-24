@@ -1,4 +1,4 @@
-//! Shared test infrastructure for VM conformance tests.
+//! Shared test infrastructure for ProtocolMachine conformance tests.
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -9,7 +9,7 @@ use telltale_vm::buffer::{BackpressurePolicy, BufferConfig, BufferMode};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{ObsEvent, StepResult, VMError, VM};
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineError, ProtocolMachineStepResult};
 
 /// Deterministic seed for reproducibility.
 pub const SEED: [u8; 32] = [
@@ -350,16 +350,16 @@ pub fn choice_image(sender: &str, receiver: &str, labels: &[&str]) -> CodeImage 
     CodeImage::from_local_types(&local_types, &global)
 }
 
-/// Step a VM to completion, collecting the trace.
+/// Step a ProtocolMachine to completion, collecting the trace.
 pub fn run_to_completion(
-    vm: &mut VM,
+    vm: &mut ProtocolMachine,
     handler: &dyn EffectHandler,
     max_steps: usize,
-) -> Result<Vec<ObsEvent>, VMError> {
+) -> Result<Vec<ObsEvent>, ProtocolMachineError> {
     for _ in 0..max_steps {
         match vm.step(handler)? {
-            StepResult::AllDone | StepResult::Stuck => break,
-            StepResult::Continue => {}
+            ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck => break,
+            ProtocolMachineStepResult::Continue => {}
         }
     }
     Ok(vm.trace().to_vec())

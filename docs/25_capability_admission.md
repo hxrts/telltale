@@ -24,10 +24,10 @@ Rust runtime admission uses a fixed gate sequence.
 
 | Step | Function | Result class |
 |---|---|---|
-| advanced mode check | `requires_vm_runtime_contracts` | boolean requirement |
-| runtime admission | `admit_vm_runtime` | `Admitted` or `RejectedMissingContracts` |
+| advanced mode check | `requires_protocol_machine_runtime_contracts` | boolean requirement |
+| runtime admission | `admit_protocol_machine_runtime` | `Admitted` or `RejectedMissingContracts` |
 | profile request | `request_determinism_profile` | selected profile or `None` |
-| unified gate | `enforce_vm_runtime_gates` | `Admitted`, `RejectedMissingContracts`, or `RejectedUnsupportedDeterminismProfile` |
+| unified gate | `enforce_protocol_machine_runtime_gates` | `Admitted`, `RejectedMissingContracts`, or `RejectedUnsupportedDeterminismProfile` |
 
 The unified gate is the admission decision used by higher-level runtime loaders.
 
@@ -44,7 +44,7 @@ These concepts are intentionally separate.
 
 Practical consequence:
 
-- passing `enforce_vm_runtime_gates(...)` does not authorize session-local mutation
+- passing `enforce_protocol_machine_runtime_gates(...)` does not authorize session-local mutation
 - hosts still need a live ownership capability such as `OwnedSession`
 - stale-owner rejection can occur even when admission remains valid
 - a choreography `uses Runtime, Audit` declaration states external protocol

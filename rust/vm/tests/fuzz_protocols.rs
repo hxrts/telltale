@@ -1,5 +1,5 @@
 #![cfg(not(target_arch = "wasm32"))]
-//! Structure-aware fuzz tests for VM protocols.
+//! Structure-aware fuzz tests for ProtocolMachine protocols.
 #![allow(
     clippy::cast_possible_wrap,
     clippy::as_conversions,
@@ -20,7 +20,7 @@ use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 use telltale_types::{GlobalType, Label};
 use telltale_vm::buffer::{BackpressurePolicy, BoundedBuffer, BufferConfig, BufferMode};
 use telltale_vm::coroutine::Value;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 
 use test_support::{
     code_image_from_global, well_formed_global_strategy, FailingHandler, PassthroughHandler, SEED,
@@ -61,7 +61,7 @@ fn fuzz_random_protocol_compile_execute() {
             None => continue,
         };
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         if vm.load_choreography(&image).is_err() {
             continue;
         }
@@ -155,7 +155,7 @@ fn fuzz_random_buffer_operations() {
     }
 }
 
-/// Generate 2-3 random protocols, load into one VM, run, verify session isolation.
+/// Generate 2-3 random protocols, load into one ProtocolMachine, run, verify session isolation.
 #[test]
 fn fuzz_multi_session_interleave() {
     let mut runner = make_runner(100);
@@ -183,7 +183,7 @@ fn fuzz_multi_session_interleave() {
             None => continue,
         };
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid1 = match vm.load_choreography(&img1) {
             Ok(s) => s,
             Err(_) => continue,
@@ -239,7 +239,7 @@ fn fuzz_recursive_protocols_bounded() {
             None => continue,
         };
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         if vm.load_choreography(&image).is_err() {
             continue;
         }
@@ -261,7 +261,7 @@ fn fuzz_recursive_protocols_bounded() {
     }
 }
 
-/// Generate protocols, use FailingHandler that errors, verify VM returns clean faults (not panics).
+/// Generate protocols, use FailingHandler that errors, verify ProtocolMachine returns clean faults (not panics).
 #[test]
 fn fuzz_handler_errors_dont_panic() {
     let mut runner = make_runner(100);
@@ -280,7 +280,7 @@ fn fuzz_handler_errors_dont_panic() {
             None => continue,
         };
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         if vm.load_choreography(&image).is_err() {
             continue;
         }

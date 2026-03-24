@@ -128,7 +128,7 @@
             local_types,
         };
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let _sid = vm.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
@@ -186,7 +186,7 @@
         };
         let image = CodeImage::from_local_types(&projected, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let _sid = vm.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
@@ -207,9 +207,9 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig {
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
             output_condition_policy: OutputConditionPolicy::DenyAll,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         });
         let _sid = vm.load_choreography(&image).unwrap();
 
@@ -219,7 +219,7 @@
         assert!(
             matches!(
                 result,
-                Err(VMError::Fault {
+                Err(ProtocolMachineError::Fault {
                     fault: Fault::OutputCondition { .. },
                     ..
                 })
@@ -238,11 +238,11 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig {
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
             output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
                 "vm.observable_output".to_string(),
             ]),
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         });
         let _sid = vm.load_choreography(&image).unwrap();
 
@@ -260,7 +260,7 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let _sid = vm.load_choreography(&image).unwrap();
         let handler = PassthroughHandler;
         vm.run(&handler, 100).unwrap();
@@ -280,9 +280,9 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig {
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
             effect_trace_capture_mode: EffectTraceCaptureMode::Disabled,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         });
         vm.load_choreography(&image).expect("load choreography");
         vm.run(&PassthroughHandler, 100)
@@ -297,9 +297,9 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig {
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
             effect_trace_capture_mode: EffectTraceCaptureMode::TopologyOnly,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         });
         vm.load_choreography(&image).expect("load choreography");
         vm.run(&TimeoutOnTickOneHandler, 100)
@@ -318,9 +318,9 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig {
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
             host_contract_assertions: true,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         });
         vm.load_choreography(&image).expect("load choreography");
 
@@ -328,10 +328,10 @@
             .step(&IdentityFlappingHandler::new())
             .expect_err("identity change should fail with assertions enabled");
         match err {
-            VMError::HandlerError(message) => {
+            ProtocolMachineError::HandlerError(message) => {
                 assert!(message.message.contains("handler_identity changed"));
             }
-            VMError::Fault {
+            ProtocolMachineError::Fault {
                 fault: Fault::Invoke { failure },
                 ..
             } => {
@@ -347,9 +347,9 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig {
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
             host_contract_assertions: true,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         });
         vm.load_choreography(&image).expect("load choreography");
 
@@ -357,7 +357,7 @@
             .step(&UnsortedTopologyHandler)
             .expect_err("unsorted topology events should fail with assertions enabled");
         match err {
-            VMError::HandlerError(message) => {
+            ProtocolMachineError::HandlerError(message) => {
                 assert!(message.message.contains("topology_events"));
                 assert!(message.message.contains("pre-sorted"));
             }
@@ -371,7 +371,7 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid = vm.load_choreography(&image).unwrap();
 
         let a_idx = vm
@@ -407,7 +407,7 @@
         ]);
 
         let handler = PassthroughHandler;
-        // Intentionally discard StepResult: we only care that the step executes without panic
+        // Intentionally discard ProtocolMachineStepResult: we only care that the step executes without panic
         let _ignored = vm.step(&handler).expect("transfer step should succeed");
 
         assert!(vm.coroutines[a_idx].progress_tokens.is_empty());
@@ -435,7 +435,7 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid = vm.load_choreography(&image).unwrap();
 
         let a_idx = vm
@@ -472,7 +472,7 @@
             .step(&PassthroughHandler)
             .expect_err("transfer must fail");
         match err {
-            VMError::Fault { fault, .. } => match fault {
+            ProtocolMachineError::Fault { fault, .. } => match fault {
                 Fault::Transfer { message } => {
                     assert!(
                         message.contains("delegation guard violation before transfer"),
@@ -481,7 +481,7 @@
                 }
                 other => panic!("expected transfer fault, got {other:?}"),
             },
-            other => panic!("expected VMError::Fault, got {other:?}"),
+            other => panic!("expected ProtocolMachineError::Fault, got {other:?}"),
         }
     }
 
@@ -491,7 +491,7 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid1 = vm.load_choreography(&image).unwrap();
         let sid2 = vm.load_choreography(&image).unwrap();
 
@@ -528,7 +528,7 @@
             .step(&PassthroughHandler)
             .expect_err("cross-session transfer must fail");
         match err {
-            VMError::Fault { fault, .. } => match fault {
+            ProtocolMachineError::Fault { fault, .. } => match fault {
                 Fault::Transfer { message } => {
                     assert!(
                         message.contains("target coroutine session"),
@@ -537,7 +537,7 @@
                 }
                 other => panic!("expected transfer fault, got {other:?}"),
             },
-            other => panic!("expected VMError::Fault, got {other:?}"),
+            other => panic!("expected ProtocolMachineError::Fault, got {other:?}"),
         }
 
         assert!(
@@ -560,7 +560,7 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let owned = vm
             .load_choreography_owned(&image, "runtime/owner")
             .expect("owned open should succeed");
@@ -585,9 +585,9 @@
 
     #[test]
     fn test_host_contract_assertions_reject_unaudited_transfer_events() {
-        let vm = VM::new(VMConfig {
+        let vm = ProtocolMachine::new(ProtocolMachineConfig {
             host_contract_assertions: true,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         });
         let err = vm
             .assert_delegation_events_audited(&[ObsEvent::Transferred {
@@ -599,7 +599,7 @@
             }])
             .expect_err("unaudited transfer event must fail host assertion");
         match err {
-            VMError::HandlerError(message) => {
+            ProtocolMachineError::HandlerError(message) => {
                 assert!(
                     message
                         .message
@@ -619,9 +619,9 @@
 
         let mut denied_roles = BTreeSet::new();
         denied_roles.insert("Observer".to_string());
-        let mut vm = VM::new(VMConfig {
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
             flow_policy: FlowPolicy::DenyRoles(denied_roles),
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         });
         let sid = vm.load_choreography(&image).unwrap();
 
@@ -658,7 +658,7 @@
         ]);
 
         let handler = PassthroughHandler;
-        // Intentionally discard StepResult: we only care that the step executes without panic
+        // Intentionally discard ProtocolMachineStepResult: we only care that the step executes without panic
         let _ignored = vm.step(&handler).expect("check step should succeed");
         assert_eq!(vm.coroutines[a_idx].regs[4], Value::Bool(false));
     }

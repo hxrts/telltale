@@ -4,11 +4,11 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig {
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
             flow_policy: FlowPolicy::PredicateExpr(FlowPredicate::FactContains(
                 "secret".to_string(),
             )),
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         });
         let sid = vm.load_choreography(&image).unwrap();
 
@@ -55,11 +55,11 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig {
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
             flow_policy: FlowPolicy::predicate(|knowledge: &KnowledgeFact, target: &str| {
                 knowledge.fact.contains("secret") && target == "Observer"
             }),
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         });
         let sid = vm.load_choreography(&image).unwrap();
 
@@ -109,9 +109,9 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig {
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
             flow_policy: policy,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         });
         let sid = vm.load_choreography(&image).expect("load choreography");
         let a_idx = vm
@@ -227,12 +227,12 @@
                 m
             },
         };
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         vm.load_choreography(&image).expect("load choreography");
         let step = vm
             .step(&TimeoutOnTickOneHandler)
             .expect("timeout topology ingress should not fault");
-        assert!(matches!(step, StepResult::Stuck));
+        assert!(matches!(step, ProtocolMachineStepResult::Stuck));
         assert!(!vm.timed_out_sites().is_empty());
         let audit = vm.authority_audit_log();
         assert_eq!(audit.len(), 1);
@@ -260,7 +260,7 @@
         let local_types = simple_send_recv_types();
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid = vm.load_choreography(&image).expect("load choreography");
 
         let a_idx = vm
@@ -286,7 +286,7 @@
         let local_types = simple_send_recv_types();
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let owned = vm
             .load_choreography_owned(&image, "owner/a")
             .expect("load owned choreography");
@@ -329,7 +329,7 @@
         let local_types = simple_send_recv_types();
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid = vm.load_choreography(&image).expect("load choreography");
 
         assert!(vm.monitor.session_kinds.contains_key(&sid));
@@ -344,9 +344,9 @@
 
     #[test]
     fn vm_state_serialization_contains_lean_aligned_fields() {
-        let vm = VM::new(VMConfig::default());
-        let json = serde_json::to_value(&vm).expect("serialize VM state");
-        let obj = json.as_object().expect("VM state must serialize as object");
+        let vm = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let json = serde_json::to_value(&vm).expect("serialize ProtocolMachine state");
+        let obj = json.as_object().expect("ProtocolMachine state must serialize as object");
         for key in [
             "config",
             "code",
@@ -365,7 +365,7 @@
             "crashed_sites",
             "partitioned_edges",
         ] {
-            assert!(obj.contains_key(key), "missing VM state field: {key}");
+            assert!(obj.contains_key(key), "missing ProtocolMachine state field: {key}");
         }
     }
 
@@ -374,7 +374,7 @@
         let local_types = simple_send_recv_types();
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         vm.load_choreography(&image).expect("load choreography");
 
         vm.coroutines[0].session_id = usize::MAX - 1;
@@ -389,7 +389,7 @@
         let local_types = simple_send_recv_types();
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid = vm.load_choreography(&image).expect("load choreography");
 
         vm.monitor.remove_kind(sid);

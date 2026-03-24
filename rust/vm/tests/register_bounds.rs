@@ -9,8 +9,8 @@ use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Fault;
 use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{RunStatus, VMError};
 use telltale_vm::{Instr, ProtocolMachine, ProtocolMachineConfig};
+use telltale_vm::{ProtocolMachineError, ProtocolMachineRunStatus};
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
@@ -60,9 +60,11 @@ impl EffectHandler for NoopHandler {
     }
 }
 
-fn assert_out_of_registers(result: Result<RunStatus, VMError>) {
+fn assert_out_of_registers(result: Result<ProtocolMachineRunStatus, ProtocolMachineError>) {
     match result {
-        Err(VMError::Fault { fault, .. }) => assert!(matches!(fault, Fault::OutOfRegisters)),
+        Err(ProtocolMachineError::Fault { fault, .. }) => {
+            assert!(matches!(fault, Fault::OutOfRegisters))
+        }
         other => panic!("expected OutOfRegisters fault, got {other:?}"),
     }
 }

@@ -16,9 +16,7 @@ use telltale::{Message, Role};
 
 #[path = "telltale_session.rs"]
 mod session;
-pub use session::{
-    SessionMetadata, SessionTypeDynamic, SessionUpdate, TelltaleSession,
-};
+pub use session::{SessionMetadata, SessionTypeDynamic, SessionUpdate, TelltaleSession};
 
 struct ChannelRecord {
     session: TelltaleSession,
@@ -244,14 +242,13 @@ where
         Self::with_channel_operation(ep, &from, "Offer", |state| async move {
             let mut session = state;
             let update = session.offer().await?;
-            let label = <Self::Role as RoleId>::Label::from_str(&update.output).ok_or_else(
-                || {
+            let label =
+                <Self::Role as RoleId>::Label::from_str(&update.output).ok_or_else(|| {
                     ChoreographyError::ProtocolViolation(format!(
                         "Unknown label '{}'",
                         update.output
                     ))
-                },
-            )?;
+                })?;
             Ok((label, session, update.description, update.is_complete))
         })
         .await

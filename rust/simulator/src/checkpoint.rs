@@ -1,14 +1,14 @@
-//! VM state checkpoints for replay and debugging.
+//! ProtocolMachine state checkpoints for replay and debugging.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use telltale_vm::vm::VM;
+use telltale_vm::ProtocolMachine;
 
-/// Serialized VM state blob.
+/// Serialized ProtocolMachine state blob.
 pub type SerializedState = Vec<u8>;
 
-/// Periodic VM state snapshots for replay and debugging.
+/// Periodic ProtocolMachine state snapshots for replay and debugging.
 pub struct CheckpointStore {
     checkpoints: BTreeMap<u64, SerializedState>,
     interval: u64,
@@ -40,7 +40,7 @@ impl CheckpointStore {
     }
 
     /// Record a checkpoint if `tick` hits the interval.
-    pub fn maybe_checkpoint(&mut self, tick: u64, vm: &VM) {
+    pub fn maybe_checkpoint(&mut self, tick: u64, vm: &ProtocolMachine) {
         if self.interval == 0 || tick % self.interval != 0 {
             return;
         }
@@ -72,9 +72,9 @@ impl CheckpointStore {
         }
     }
 
-    /// Restore the VM state at a specific tick, if available.
+    /// Restore the ProtocolMachine state at a specific tick, if available.
     #[must_use]
-    pub fn restore(&self, tick: u64) -> Option<VM> {
+    pub fn restore(&self, tick: u64) -> Option<ProtocolMachine> {
         self.checkpoints
             .get(&tick)
             .and_then(|data| serde_json::from_slice(data).ok())

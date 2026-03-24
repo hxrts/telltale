@@ -13,7 +13,7 @@ use telltale_simulator::scenario::Scenario;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
-use telltale_vm::vm::ObsEvent;
+use telltale_vm::ObsEvent;
 
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;
@@ -219,7 +219,7 @@ fn run_reference_or_skip(
             if unsupported_operation(&stderr) =>
         {
             eprintln!(
-                "SKIPPED: Lean vm_runner does not support runSimulation yet ({fixture_name})"
+                "SKIPPED: Lean protocol-machine runner does not support runSimulation yet ({fixture_name})"
             );
             None
         }
@@ -238,7 +238,7 @@ fn validate_sim_trace_or_skip(
             if unsupported_operation(&stderr) =>
         {
             eprintln!(
-                "SKIPPED: Lean vm_runner does not support validateSimulationTrace yet ({fixture_name})"
+                "SKIPPED: Lean protocol-machine runner does not support validateSimulationTrace yet ({fixture_name})"
             );
             None
         }
@@ -399,7 +399,7 @@ fn assert_reference_parity(fixture: SimFixture) {
     let rust_result = run_rust_scenario(&fixture);
 
     let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean vm_runner not available");
+        eprintln!("SKIPPED: Lean protocol-machine runner not available");
         return;
     };
 
@@ -479,7 +479,7 @@ fn test_reference_simulator_parity_three_role_ring_loop() {
 fn test_rust_simulator_trace_validates_under_lean_reference_rules() {
     let fixtures = [ping_pong_loop_fixture(), three_role_ring_fixture()];
     let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean vm_runner not available");
+        eprintln!("SKIPPED: Lean protocol-machine runner not available");
         return;
     };
 

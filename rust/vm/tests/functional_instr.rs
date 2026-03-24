@@ -1,5 +1,5 @@
 #![cfg(not(target_arch = "wasm32"))]
-//! Per-instruction functional tests for the VM.
+//! Per-instruction functional tests for the ProtocolMachine.
 #![allow(
     clippy::approx_constant,
     clippy::needless_collect,
@@ -18,7 +18,10 @@ use telltale_vm::buffer::{BackpressurePolicy, BufferConfig, BufferMode};
 use telltale_vm::coroutine::{CoroStatus, Fault, Value};
 use telltale_vm::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{ObsEvent, StepResult, VMConfig, VMError, VM};
+use telltale_vm::{
+    ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError,
+    ProtocolMachineStepResult,
+};
 
 use test_support::{FailingHandler, PassthroughHandler, RecordingHandler};
 
@@ -29,7 +32,7 @@ use test_support::{FailingHandler, PassthroughHandler, RecordingHandler};
 #[test]
 fn test_send_success() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -87,14 +90,14 @@ fn test_send_type_mismatch() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
     assert_matches!(
         result,
-        Err(VMError::Fault {
+        Err(ProtocolMachineError::Fault {
             fault: Fault::TypeViolation { .. },
             ..
         })
@@ -105,7 +108,7 @@ fn test_send_type_mismatch() {
 fn test_send_no_type() {
     // Create image, then remove the type for A before stepping.
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let ep_a = Endpoint {
@@ -118,7 +121,7 @@ fn test_send_no_type() {
     let result = vm.run(&handler, 100);
     assert_matches!(
         result,
-        Err(VMError::Fault {
+        Err(ProtocolMachineError::Fault {
             fault: Fault::TypeViolation { .. },
             ..
         })
@@ -146,15 +149,15 @@ fn test_send_buffer_full_error() {
     let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
     let image = CodeImage::from_local_types(&local_types, &global);
 
-    let config = VMConfig {
+    let config = ProtocolMachineConfig {
         buffer_config: BufferConfig {
             mode: BufferMode::Fifo,
             initial_capacity: 1,
             policy: BackpressurePolicy::Error,
         },
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
-    let mut vm = VM::new(config);
+    let mut vm = ProtocolMachine::new(config);
     let sid = vm.load_choreography(&image).unwrap();
 
     // Pre-fill the buffer so the next send fails.
@@ -165,7 +168,7 @@ fn test_send_buffer_full_error() {
     let result = vm.run(&handler, 100);
     assert_matches!(
         result,
-        Err(VMError::Fault {
+        Err(ProtocolMachineError::Fault {
             fault: Fault::BufferFull { .. },
             ..
         })
@@ -193,15 +196,15 @@ fn test_send_buffer_full_block() {
     let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
     let image = CodeImage::from_local_types(&local_types, &global);
 
-    let config = VMConfig {
+    let config = ProtocolMachineConfig {
         buffer_config: BufferConfig {
             mode: BufferMode::Fifo,
             initial_capacity: 1,
             policy: BackpressurePolicy::Block,
         },
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
-    let mut vm = VM::new(config);
+    let mut vm = ProtocolMachine::new(config);
     let sid = vm.load_choreography(&image).unwrap();
 
     // Pre-fill the buffer.
@@ -213,9 +216,9 @@ fn test_send_buffer_full_block() {
     // Step scheduler until A runs.
     for _ in 0..10 {
         match vm.step(&handler) {
-            Ok(StepResult::Continue) => {}
-            Ok(StepResult::Stuck) => break,
-            Ok(StepResult::AllDone) => break,
+            Ok(ProtocolMachineStepResult::Continue) => {}
+            Ok(ProtocolMachineStepResult::Stuck) => break,
+            Ok(ProtocolMachineStepResult::AllDone) => break,
             Err(_) => break,
         }
     }
@@ -250,15 +253,15 @@ fn test_send_buffer_full_drop() {
     let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
     let image = CodeImage::from_local_types(&local_types, &global);
 
-    let config = VMConfig {
+    let config = ProtocolMachineConfig {
         buffer_config: BufferConfig {
             mode: BufferMode::Fifo,
             initial_capacity: 1,
             policy: BackpressurePolicy::Drop,
         },
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
-    let mut vm = VM::new(config);
+    let mut vm = ProtocolMachine::new(config);
     let sid = vm.load_choreography(&image).unwrap();
 
     // Pre-fill.
@@ -281,14 +284,14 @@ fn test_send_buffer_full_drop() {
 #[test]
 fn test_send_handler_error() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = FailingHandler::new("handler failed");
     let result = vm.run(&handler, 100);
     assert_matches!(
         result,
-        Err(VMError::Fault {
+        Err(ProtocolMachineError::Fault {
             fault: Fault::Invoke { .. },
             ..
         })
@@ -302,7 +305,7 @@ fn test_send_handler_error() {
 #[test]
 fn test_recv_success() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -318,7 +321,7 @@ fn test_recv_success() {
 #[test]
 fn test_recv_blocks_when_empty() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -374,14 +377,14 @@ fn test_recv_type_mismatch() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
     assert_matches!(
         result,
-        Err(VMError::Fault {
+        Err(ProtocolMachineError::Fault {
             fault: Fault::TypeViolation { .. },
             ..
         })
@@ -392,7 +395,7 @@ fn test_recv_type_mismatch() {
 fn test_recv_unblocks_on_send() {
     // Standard send/recv: B blocks, A sends, B unblocks.
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -414,7 +417,7 @@ fn test_recv_unblocks_on_send() {
 #[test]
 fn test_choose_success() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -490,14 +493,14 @@ fn test_choose_unknown_label() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
     assert_matches!(
         result,
-        Err(VMError::Fault {
+        Err(ProtocolMachineError::Fault {
             fault: Fault::UnknownLabel { .. },
             ..
         })
@@ -553,14 +556,14 @@ fn test_choose_type_not_send() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
     assert_matches!(
         result,
-        Err(VMError::Fault {
+        Err(ProtocolMachineError::Fault {
             fault: Fault::TypeViolation { .. },
             ..
         })
@@ -574,7 +577,7 @@ fn test_choose_type_not_send() {
 #[test]
 fn test_offer_recv_mode_success() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -591,7 +594,7 @@ fn test_offer_recv_mode_success() {
 fn test_offer_recv_mode_blocks() {
     // B Choose before A Offer → B blocks until A sends label.
     let image = test_support::choice_image("A", "B", &["go"]);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -667,14 +670,14 @@ fn test_offer_unknown_label_in_table() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
     assert_matches!(
         result,
-        Err(VMError::Fault {
+        Err(ProtocolMachineError::Fault {
             fault: Fault::UnknownLabel { .. },
             ..
         })
@@ -709,14 +712,14 @@ fn test_offer_wrong_type() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
     assert_matches!(
         result,
-        Err(VMError::Fault {
+        Err(ProtocolMachineError::Fault {
             fault: Fault::TypeViolation { .. },
             ..
         })
@@ -771,7 +774,7 @@ fn test_close_empty_buffers() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -787,7 +790,7 @@ fn test_close_empty_buffers() {
 #[test]
 fn test_open_creates_session() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let opened = vm
@@ -804,7 +807,7 @@ fn test_open_creates_session() {
 #[test]
 fn test_invoke_calls_step() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = RecordingHandler::new();
@@ -842,7 +845,7 @@ fn test_invoke_handler_error() {
     let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
     let image = CodeImage::from_local_types(&local_types, &global);
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     // FailingHandler: handle_send returns Err.
@@ -850,7 +853,7 @@ fn test_invoke_handler_error() {
     let result = vm.run(&handler, 100);
     assert_matches!(
         result,
-        Err(VMError::Fault {
+        Err(ProtocolMachineError::Fault {
             fault: Fault::Invoke { .. },
             ..
         })
@@ -900,7 +903,7 @@ fn test_loadimm_all_types() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -937,7 +940,7 @@ fn test_mov_copies_register() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -971,7 +974,7 @@ fn test_jmp_sets_pc() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -1005,7 +1008,7 @@ fn test_yield_advances_pc_and_reschedules() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -1019,7 +1022,7 @@ fn test_yield_advances_pc_and_reschedules() {
 #[test]
 fn test_halt_sets_done_removes_type() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -1049,30 +1052,30 @@ fn test_halt_sets_done_removes_type() {
 
 #[test]
 fn test_max_sessions_exceeded() {
-    let config = VMConfig {
+    let config = ProtocolMachineConfig {
         max_sessions: 1,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
-    let mut vm = VM::new(config);
+    let mut vm = ProtocolMachine::new(config);
 
     let image = test_support::simple_send_recv_image("A", "B", "msg");
     vm.load_choreography(&image).unwrap();
 
     let result = vm.load_choreography(&image);
-    assert_matches!(result, Err(VMError::TooManySessions { .. }));
+    assert_matches!(result, Err(ProtocolMachineError::TooManySessions { .. }));
 }
 
 #[test]
 fn test_max_coroutines_exceeded() {
-    let config = VMConfig {
+    let config = ProtocolMachineConfig {
         max_coroutines: 1,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
-    let mut vm = VM::new(config);
+    let mut vm = ProtocolMachine::new(config);
 
     let image = test_support::simple_send_recv_image("A", "B", "msg");
     let result = vm.load_choreography(&image);
-    assert_matches!(result, Err(VMError::TooManyCoroutines { .. }));
+    assert_matches!(result, Err(ProtocolMachineError::TooManyCoroutines { .. }));
 }
 
 #[test]
@@ -1089,14 +1092,14 @@ fn test_pc_out_of_bounds() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 10);
     assert_matches!(
         result,
-        Err(VMError::Fault {
+        Err(ProtocolMachineError::Fault {
             fault: Fault::PcOutOfBounds,
             ..
         })

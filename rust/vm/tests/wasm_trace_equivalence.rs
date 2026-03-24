@@ -10,9 +10,9 @@ use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::trace::normalize_trace;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
 use telltale_vm::wasm::WasmVM;
 use telltale_vm::ProtocolMachineSemanticObjects;
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 
 struct NoOpHandler;
 
@@ -80,7 +80,7 @@ fn assert_wasm_trace_matches_vm(
 
     let image = CodeImage::from_local_types(&local_copy, &global);
     let handler = NoOpHandler;
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
     vm.run(&handler, max_steps).unwrap();
     let native_trace = normalize_trace(vm.trace());

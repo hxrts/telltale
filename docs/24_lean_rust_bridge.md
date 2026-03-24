@@ -5,8 +5,8 @@ It handles JSON conversion, schema versioning, runner invocation, trace comparis
 
 The bridge does not define protocol-machine semantics.
 Semantics remain in `telltale-vm`, `telltale-theory`, and Lean runtime modules.
-The canonical public bridge surface uses `ProtocolMachineRunner`, `ProtocolMachineRunInput`, `ProtocolMachineRunOutput`, and `ProtocolMachineSemanticObjects`.
-Historical module names such as `vm_runner` and `vm_trace` still exist internally.
+The canonical public bridge surface uses `ProtocolMachineRunner`, `ProtocolMachineRunInput`, `ProtocolMachineRunOutput`, `ProtocolMachineSemanticObjects`, and the `protocol_machine_runner` / `protocol_machine_trace` modules.
+No public `vm_runner` or `vm_trace` compatibility modules remain.
 
 Bridge payloads describe guest-runtime and protocol-machine artifacts.
 Host-runtime handlers remain outside the bridge and re-enter through typed effect surfaces.
@@ -31,8 +31,9 @@ Canonical inventory and contract surfaces for those attachment points live in `R
 ## Scope
 
 This document covers runtime bridge behavior implemented in `rust/lean-bridge/src`.
-It covers `export`, `import`, `schema`, `runner`, `vm_runner`, `sim_reference`,
-`semantic_objects`, `vm_trace`, `invariants`, `equivalence`, and `validate`.
+It covers `export`, `import`, `schema`, `runner`, `protocol_machine_runner`,
+`sim_reference`, `semantic_objects`, `protocol_machine_trace`, `invariants`,
+`equivalence`, and `validate`.
 
 This document also covers bridge CLIs and bridge test lanes in `rust/lean-bridge/tests`.
 It does not restate theorem internals from Lean proof files.
@@ -107,7 +108,7 @@ Each family has an explicit version constant.
 Protocol-machine semantic objects now use one canonical schema family with no
 legacy VM-state compatibility aliases.
 Protocol-machine parity artifacts use the same string-based scheme: `vm.serialization.v1` and `vm.envelope_diff.v1`.
-Legacy numeric schema values (`1`) are normalized during deserialization for backward compatibility where the family still supports them.
+Unsupported or missing schema versions are rejected rather than normalized.
 
 ## Reference Simulation Payloads
 
@@ -137,8 +138,7 @@ pub struct SimTraceValidation {
 }
 ```
 
-`SimRunInput` and `SimRunOutput` default `schema_version` to `lean_bridge.v1` during deserialization.
-This preserves compatibility with legacy payloads that omit explicit schema fields.
+`SimRunInput` and `SimRunOutput` require `schema_version = "lean_bridge.v1"` during deserialization.
 
 ## Lean Runner
 
@@ -151,7 +151,7 @@ The parsed result is `LeanValidationResult { success, role, message, raw_output 
 Projection methods call validator export modes.
 `project()` runs `--export-all-projections` and accepts both object and array projection formats from Lean output.
 `export_projection()` and `export_all_projections()` expose single-role and all-role export modes directly.
-`run_vm_protocol()` is also exposed on `LeanRunner` and forwards protocol-machine choreographies to the Lean protocol-machine runner binary (`vm_runner`) through stdin JSON.
+`run_protocol_machine()` is also exposed on `LeanRunner` and forwards protocol-machine choreographies to the Lean protocol-machine runner binary through stdin JSON.
 
 ## Lean Protocol-Machine Runner Wrapper
 
@@ -250,7 +250,7 @@ normalizes successfully.
 
 ## Semantic-Audit Normalization and Equivalence
 
-`vm_trace::event_session()` extracts session ids from common event shapes.
+`protocol_machine_trace::event_session()` extracts session ids from common event shapes.
 Supported fields include `session`, `sid`, `edge.sid`, and `endpoint.sid`.
 The extractor also searches nested objects.
 

@@ -8,7 +8,7 @@ use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, EffectResult};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::trace::normalize_trace as normalize_ticks;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 
 struct NoOpHandler;
 
@@ -217,7 +217,7 @@ fn test_distributed_two_site() {
         .inter_site(outer_image);
 
     let mut sim = builder
-        .build_with(&VMConfig::default(), |_| Box::new(NoOpHandler))
+        .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
         .expect("build distributed sim");
 
     sim.run(50).expect("run outer vm");
@@ -251,7 +251,7 @@ fn test_nested_matches_flat_per_site() {
         .inter_site(outer_image);
 
     let mut sim = builder
-        .build_with(&VMConfig::default(), |_| Box::new(NoOpHandler))
+        .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
         .expect("build distributed sim");
 
     sim.run(50).expect("run outer vm");
@@ -259,7 +259,7 @@ fn test_nested_matches_flat_per_site() {
     let nested_a = normalized_pairs(&sim.handler().site_trace("site_A").expect("site A trace"));
     let nested_b = normalized_pairs(&sim.handler().site_trace("site_B").expect("site B trace"));
 
-    let mut flat = VM::new(VMConfig::default());
+    let mut flat = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid_a = flat.load_choreography(&inner_image).expect("load A");
     let sid_b = flat.load_choreography(&inner_image).expect("load B");
 
@@ -289,7 +289,7 @@ fn test_distributed_concurrency_configuration() {
         .inner_rounds_per_step(3);
 
     let mut sim = builder
-        .build_with(&VMConfig::default(), |_| Box::new(NoOpHandler))
+        .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
         .expect("build distributed sim");
 
     assert_eq!(sim.outer_concurrency(), 2);

@@ -16,13 +16,13 @@ use telltale_vm::effect::{
     SendDecision, SendDecisionInput, TopologyPerturbation,
 };
 use telltale_vm::trace::normalize_trace_v1;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
 use telltale_vm::{CanonicalHandleKind, DelegationStatus, SemanticAuditRecord};
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 use test_support::{simple_send_recv_image, PassthroughHandler};
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
-        use telltale_vm::threaded::ThreadedVM;
+        use telltale_vm::ThreadedProtocolMachine;
     }
 }
 
@@ -92,11 +92,11 @@ fn canonical_replay_fragment_is_stable_for_identical_runs() {
     let image = simple_send_recv_image("A", "B", "m");
     let handler = PassthroughHandler;
 
-    let mut vm_a = VM::new(VMConfig::default());
+    let mut vm_a = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm_a.load_choreography(&image).expect("load vm_a");
     vm_a.run(&handler, 64).expect("run vm_a");
 
-    let mut vm_b = VM::new(VMConfig::default());
+    let mut vm_b = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm_b.load_choreography(&image).expect("load vm_b");
     vm_b.run(&handler, 64).expect("run vm_b");
 
@@ -158,7 +158,7 @@ fn canonical_replay_fragment_sorts_topology_state() {
     );
     let handler = OrderedTopologyHandler::new(events);
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).expect("load vm");
     vm.step_round(&handler, 1)
         .expect("step with topology events");
@@ -196,15 +196,15 @@ fn canonical_replay_fragment_sorts_topology_state() {
 
 #[test]
 fn vm_config_schema_versions_remain_compatible() {
-    let default_cfg =
-        serde_json::to_value(VMConfig::default()).expect("serialize default VM config");
+    let default_cfg = serde_json::to_value(ProtocolMachineConfig::default())
+        .expect("serialize default ProtocolMachine config");
 
     let mut missing_version = default_cfg.clone();
     missing_version
         .as_object_mut()
         .expect("config object")
         .remove("config_schema_version");
-    let decoded_missing: VMConfig =
+    let decoded_missing: ProtocolMachineConfig =
         serde_json::from_value(missing_version).expect("decode config without schema version");
     assert_eq!(decoded_missing.config_schema_version, 1);
 
@@ -213,10 +213,11 @@ fn vm_config_schema_versions_remain_compatible() {
         .as_object_mut()
         .expect("config object")
         .insert("config_schema_version".to_string(), serde_json::json!(2));
-    let decoded_v2: VMConfig = serde_json::from_value(v2_cfg).expect("decode schema version 2");
+    let decoded_v2: ProtocolMachineConfig =
+        serde_json::from_value(v2_cfg).expect("decode schema version 2");
     assert_eq!(decoded_v2.config_schema_version, 2);
 
-    let vm = VM::new(decoded_v2);
+    let vm = ProtocolMachine::new(decoded_v2);
     assert_eq!(vm.config().config_schema_version, 2);
 }
 
@@ -237,7 +238,7 @@ fn run_replay_shared_accepts_arc_backed_trace() {
     let handler = PassthroughHandler;
     let recording = RecordingEffectHandler::new(&handler);
 
-    let mut baseline = VM::new(VMConfig::default());
+    let mut baseline = ProtocolMachine::new(ProtocolMachineConfig::default());
     baseline.load_choreography(&image).expect("load baseline");
     baseline.run(&recording, 64).expect("run baseline");
     let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
@@ -255,11 +256,13 @@ fn run_replay_shared_accepts_arc_backed_trace() {
         .collect();
     let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(recording.effect_trace());
 
-    let mut replay_vm = VM::new(VMConfig::default());
-    replay_vm.load_choreography(&image).expect("load replay VM");
+    let mut replay_vm = ProtocolMachine::new(ProtocolMachineConfig::default());
+    replay_vm
+        .load_choreography(&image)
+        .expect("load replay ProtocolMachine");
     replay_vm
         .run_replay_shared(&handler, replay_trace, 64)
-        .expect("run replay VM");
+        .expect("run replay ProtocolMachine");
     let replay_obs = replay_vm.canonical_replay_fragment().obs_trace;
     let replay_effect_semantics: Vec<_> = replay_vm
         .effect_trace()
@@ -289,7 +292,7 @@ fn semantic_object_bundle_roundtrips_through_replay_fragment() {
     let image = simple_send_recv_image("A", "B", "m");
     let handler = PassthroughHandler;
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).expect("load vm");
     vm.run(&handler, 64).expect("run vm");
 
@@ -355,17 +358,19 @@ fn ownership_transfer_replay_preserves_observable_trace() {
     let handler = PassthroughHandler;
     let recording = RecordingEffectHandler::new(&handler);
 
-    let mut baseline = VM::new(VMConfig::default());
+    let mut baseline = ProtocolMachine::new(ProtocolMachineConfig::default());
     baseline.load_choreography(&image).expect("load baseline");
     baseline.run(&recording, 32).expect("run baseline");
     let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
     let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(recording.effect_trace());
 
-    let mut replay_vm = VM::new(VMConfig::default());
-    replay_vm.load_choreography(&image).expect("load replay VM");
+    let mut replay_vm = ProtocolMachine::new(ProtocolMachineConfig::default());
+    replay_vm
+        .load_choreography(&image)
+        .expect("load replay ProtocolMachine");
     replay_vm
         .run_replay_shared(&handler, replay_trace, 32)
-        .expect("run replay VM");
+        .expect("run replay ProtocolMachine");
     let replay_obs = replay_vm.canonical_replay_fragment().obs_trace;
 
     assert_eq!(baseline_obs, replay_obs);
@@ -428,16 +433,16 @@ cfg_if! {
             let image = simple_send_recv_image("A", "B", "m");
             let handler = PassthroughHandler;
 
-            let mut coop = VM::new(VMConfig::default());
+            let mut coop = ProtocolMachine::new(ProtocolMachineConfig::default());
             coop.load_choreography(&image)
                 .expect("load cooperative image");
-            coop.run(&handler, 64).expect("run cooperative VM");
+            coop.run(&handler, 64).expect("run cooperative ProtocolMachine");
 
-            let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 2);
+            let mut threaded = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
             threaded
                 .load_choreography(&image)
                 .expect("load threaded image");
-            threaded.run(&handler, 64).expect("run threaded VM");
+            threaded.run(&handler, 64).expect("run threaded ProtocolMachine");
 
             assert_eq!(
                 obs_signature(&coop.canonical_replay_fragment().obs_trace),
@@ -452,7 +457,7 @@ cfg_if! {
             let handler = PassthroughHandler;
             let recording = RecordingEffectHandler::new(&handler);
 
-            let mut baseline = ThreadedVM::with_workers(VMConfig::default(), 2);
+            let mut baseline = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
             baseline.load_choreography(&image).expect("load baseline");
             baseline.run(&recording, 64).expect("run baseline");
             let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
@@ -470,11 +475,11 @@ cfg_if! {
                 .collect();
             let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(recording.effect_trace());
 
-            let mut replay_vm = ThreadedVM::with_workers(VMConfig::default(), 2);
-            replay_vm.load_choreography(&image).expect("load replay VM");
+            let mut replay_vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+            replay_vm.load_choreography(&image).expect("load replay ProtocolMachine");
             replay_vm
                 .run_replay_shared(&handler, replay_trace, 64)
-                .expect("run replay VM");
+                .expect("run replay ProtocolMachine");
             let replay_obs = replay_vm.canonical_replay_fragment().obs_trace;
             let replay_effect_semantics: Vec<_> = replay_vm
                 .effect_trace()
@@ -505,17 +510,17 @@ cfg_if! {
             let handler = PassthroughHandler;
             let recording = RecordingEffectHandler::new(&handler);
 
-            let mut baseline = ThreadedVM::with_workers(VMConfig::default(), 2);
+            let mut baseline = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
             baseline.load_choreography(&image).expect("load baseline");
             baseline.run(&recording, 32).expect("run baseline");
             let baseline_obs = baseline.canonical_replay_fragment().obs_trace;
             let replay_trace: Arc<[EffectTraceEntry]> = Arc::from(recording.effect_trace());
 
-            let mut replay_vm = ThreadedVM::with_workers(VMConfig::default(), 2);
-            replay_vm.load_choreography(&image).expect("load replay VM");
+            let mut replay_vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+            replay_vm.load_choreography(&image).expect("load replay ProtocolMachine");
             replay_vm
                 .run_replay_shared(&handler, replay_trace, 32)
-                .expect("run replay VM");
+                .expect("run replay ProtocolMachine");
             let replay_obs = replay_vm.canonical_replay_fragment().obs_trace;
 
             assert_eq!(baseline_obs, replay_obs);

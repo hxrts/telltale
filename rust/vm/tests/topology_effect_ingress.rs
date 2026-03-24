@@ -13,14 +13,14 @@ use telltale_vm::effect::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
     TopologyPerturbation,
 };
-use telltale_vm::vm::{VMConfig, VM};
+use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 use test_support::simple_send_recv_image;
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
         use std::{collections::BTreeMap, time::Duration};
 
-        use telltale_vm::threaded::ThreadedVM;
+        use telltale_vm::ThreadedProtocolMachine;
         use telltale_vm::CorruptionType;
     }
 }
@@ -101,7 +101,7 @@ impl EffectHandler for TopologyBurstHandler {
 fn cooperative_vm_ingests_topology_events_before_instruction_effects() {
     let image = simple_send_recv_image("A", "B", "m");
     let handler = TopologyBurstHandler::new();
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).expect("load choreography");
 
     vm.step_round(&handler, 1).expect("step round");
@@ -184,7 +184,7 @@ cfg_if! {
         fn threaded_vm_ingests_topology_events_before_instruction_effects() {
             let image = simple_send_recv_image("A", "B", "m");
             let handler = TopologyBurstHandler::new();
-            let mut vm = ThreadedVM::with_workers(VMConfig::default(), 2);
+            let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
             vm.load_choreography(&image).expect("load choreography");
 
             vm.step_round(&handler, 1).expect("step round");
@@ -238,13 +238,13 @@ cfg_if! {
             );
             let handler = ScriptedTopologyHandler::new(script);
 
-            let mut coop = VM::new(VMConfig::default());
+            let mut coop = ProtocolMachine::new(ProtocolMachineConfig::default());
             coop.load_choreography(&image)
                 .expect("load cooperative image");
             coop.step_round(&handler, 1)
                 .expect("cooperative step round");
 
-            let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 2);
+            let mut threaded = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
             threaded
                 .load_choreography(&image)
                 .expect("load threaded image");
@@ -265,11 +265,11 @@ cfg_if! {
             assert!(coop
                 .trace()
                 .iter()
-                .any(|ev| matches!(ev, telltale_vm::vm::ObsEvent::Faulted { .. })));
+                .any(|ev| matches!(ev, telltale_vm::ObsEvent::Faulted { .. })));
             assert!(threaded
                 .trace()
                 .iter()
-                .any(|ev| matches!(ev, telltale_vm::vm::ObsEvent::Faulted { .. })));
+                .any(|ev| matches!(ev, telltale_vm::ObsEvent::Faulted { .. })));
         }
 
         #[test]
@@ -292,14 +292,14 @@ cfg_if! {
             );
             let handler = ScriptedTopologyHandler::new(script);
 
-            let mut coop = VM::new(VMConfig::default());
+            let mut coop = ProtocolMachine::new(ProtocolMachineConfig::default());
             coop.load_choreography(&image)
                 .expect("load cooperative image");
             coop.step_round(&handler, 1).expect("cooperative tick 1");
             coop.step_round(&handler, 1).expect("cooperative tick 2");
             coop.run(&handler, 32).expect("cooperative run after heal");
 
-            let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 2);
+            let mut threaded = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
             threaded
                 .load_choreography(&image)
                 .expect("load threaded image");
@@ -312,11 +312,11 @@ cfg_if! {
             assert!(coop
                 .trace()
                 .iter()
-                .all(|ev| !matches!(ev, telltale_vm::vm::ObsEvent::Faulted { .. })));
+                .all(|ev| !matches!(ev, telltale_vm::ObsEvent::Faulted { .. })));
             assert!(threaded
                 .trace()
                 .iter()
-                .all(|ev| !matches!(ev, telltale_vm::vm::ObsEvent::Faulted { .. })));
+                .all(|ev| !matches!(ev, telltale_vm::ObsEvent::Faulted { .. })));
         }
     }
 }

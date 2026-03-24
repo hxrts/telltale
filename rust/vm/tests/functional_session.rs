@@ -16,7 +16,10 @@ use telltale_vm::buffer::{
 use telltale_vm::coroutine::{CoroStatus, Value};
 use telltale_vm::instr::Endpoint;
 use telltale_vm::session::{SessionStatus, SessionStore};
-use telltale_vm::vm::{ObservabilityRetentionConfig, ObservabilityRetentionMode, VMConfig, VM};
+use telltale_vm::{
+    ObservabilityRetentionConfig, ObservabilityRetentionMode, ProtocolMachine,
+    ProtocolMachineConfig,
+};
 
 use test_support::PassthroughHandler;
 
@@ -40,7 +43,7 @@ fn simple_send_recv_types() -> BTreeMap<String, LocalTypeR> {
 #[test]
 fn test_session_active_to_closed() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -121,7 +124,7 @@ fn test_active_count_tracks_sessions() {
 
 #[test]
 fn test_vm_reap_closed_sessions_removes_terminal_coroutines_and_live_session_state() {
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm
         .load_choreography(&test_support::simple_send_recv_image("A", "B", "msg"))
         .expect("load choreography");
@@ -163,7 +166,7 @@ fn test_vm_reap_closed_sessions_removes_terminal_coroutines_and_live_session_sta
 
 #[test]
 fn test_vm_reap_closed_sessions_skips_nonterminal_coroutines() {
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm
         .load_choreography(&test_support::simple_send_recv_image("A", "B", "msg"))
         .expect("load choreography");
@@ -179,19 +182,19 @@ fn test_vm_observability_retention_capped_keeps_latest_suffix_in_order() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
     let handler = PassthroughHandler;
 
-    let mut full = VM::new(VMConfig::default());
+    let mut full = ProtocolMachine::new(ProtocolMachineConfig::default());
     full.load_choreography(&image).expect("load choreography");
     full.run(&handler, 100).expect("run choreography");
     let full_trace = full.trace().to_vec();
     let full_effect_trace = full.effect_trace().to_vec();
 
     let cap = 3;
-    let mut capped = VM::new(VMConfig {
+    let mut capped = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: ObservabilityRetentionConfig {
             mode: ObservabilityRetentionMode::Capped,
             capacity: cap,
         },
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
     capped.load_choreography(&image).expect("load choreography");
     capped.run(&handler, 100).expect("run choreography");
@@ -219,12 +222,12 @@ fn test_vm_observability_retention_capped_keeps_latest_suffix_in_order() {
 #[test]
 fn test_vm_observability_retention_disabled_drops_storage_without_changing_faults() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: ObservabilityRetentionConfig {
             mode: ObservabilityRetentionMode::Disabled,
             capacity: 1,
         },
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
     vm.load_choreography(&image).expect("load choreography");
     vm.run(&PassthroughHandler, 100).expect("run choreography");
@@ -246,7 +249,7 @@ fn test_vm_observability_retention_disabled_drops_storage_without_changing_fault
 #[test]
 fn test_vm_reuses_immutable_program_storage_across_identical_loads() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
 
     let sid1 = vm.load_choreography(&image).expect("load choreography");
     let usage_after_first = vm.memory_usage();
@@ -270,12 +273,12 @@ fn test_vm_reuses_immutable_program_storage_across_identical_loads() {
 fn test_vm_session_churn_with_reaping_and_capped_retention_stays_bounded() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
     let cap = 8;
-    let mut vm = VM::new(VMConfig {
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: ObservabilityRetentionConfig {
             mode: ObservabilityRetentionMode::Capped,
             capacity: cap,
         },
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     });
     let handler = PassthroughHandler;
 
@@ -436,7 +439,7 @@ fn test_two_sessions_independent_types() {
     let image1 = test_support::simple_send_recv_image("A", "B", "msg");
     let image2 = test_support::simple_send_recv_image("A", "B", "data");
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid1 = vm.load_choreography(&image1).unwrap();
     let sid2 = vm.load_choreography(&image2).unwrap();
 
@@ -493,7 +496,7 @@ fn test_two_sessions_independent_buffers() {
 fn test_three_sessions_complete_independently() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid1 = vm.load_choreography(&image).unwrap();
     let sid2 = vm.load_choreography(&image).unwrap();
     let sid3 = vm.load_choreography(&image).unwrap();

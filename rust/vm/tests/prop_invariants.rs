@@ -1,5 +1,5 @@
 #![cfg(not(target_arch = "wasm32"))]
-//! Property-based invariant tests for VM conformance.
+//! Property-based invariant tests for ProtocolMachine conformance.
 #![allow(
     clippy::cast_possible_wrap,
     clippy::as_conversions,
@@ -22,7 +22,7 @@ use telltale_vm::coroutine::Value;
 use telltale_vm::instr::{Endpoint, Instr};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::session::{unfold_if_var, unfold_mu};
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 
 use test_support::{
     code_image_from_global, role_pair_strategy, value_strategy, well_formed_global_strategy,
@@ -70,7 +70,7 @@ fn prop_send_advances_to_continuation() {
         let global = GlobalType::send(&s, &r, Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid = vm.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
@@ -110,7 +110,7 @@ fn prop_recv_advances_to_continuation() {
         let global = GlobalType::send(&s, &r, Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid = vm.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
@@ -124,7 +124,7 @@ fn prop_recv_advances_to_continuation() {
 #[test]
 fn prop_choose_advances_to_selected_branch() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -141,7 +141,7 @@ fn prop_choose_advances_to_selected_branch() {
 #[test]
 fn prop_offer_advances_to_received_label() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -176,7 +176,7 @@ fn prop_compile_execute_reaches_end() {
         }
 
         if let Some(image) = code_image_from_global(&global) {
-            let mut vm = VM::new(VMConfig::default());
+            let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
             if vm.load_choreography(&image).is_err() {
                 continue;
             }
@@ -325,7 +325,7 @@ fn prop_multi_session_no_cross_talk() {
     let image1 = test_support::simple_send_recv_image("A", "B", "msg");
     let image2 = test_support::simple_send_recv_image("A", "B", "data");
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid1 = vm.load_choreography(&image1).unwrap();
     let sid2 = vm.load_choreography(&image2).unwrap();
 
@@ -352,7 +352,7 @@ fn prop_session_type_independence() {
     let image1 = test_support::simple_send_recv_image("A", "B", "msg");
     let image2 = test_support::simple_send_recv_image("A", "B", "data");
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let _sid1 = vm.load_choreography(&image1).unwrap();
     let sid2 = vm.load_choreography(&image2).unwrap();
 
@@ -395,7 +395,7 @@ fn prop_session_type_independence() {
 fn prop_block_preserves_type() {
     // B tries to recv before A sends → blocks → type unchanged.
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let ep_b = Endpoint {
@@ -420,7 +420,7 @@ fn prop_block_preserves_type() {
 #[test]
 fn prop_block_preserves_pc() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     // Find B's coroutine.

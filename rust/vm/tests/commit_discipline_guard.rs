@@ -1,6 +1,6 @@
-//! Guardrail: commit-owned VM state must be mutated only in `commit_pack`.
+//! Guardrail: commit-owned ProtocolMachine state must be mutated only in `commit_pack`.
 //!
-//! This check is intentionally source-based. It protects the canonical VM
+//! This check is intentionally source-based. It protects the canonical ProtocolMachine
 //! execution structure from accidental regressions where per-instruction step
 //! functions directly mutate session type state, trace, or control-state fields.
 

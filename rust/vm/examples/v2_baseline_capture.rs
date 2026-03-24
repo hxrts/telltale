@@ -18,7 +18,7 @@ cfg_if! {
     };
     use telltale_vm::envelope_diff::EnvelopeDiffArtifactV1;
     use telltale_vm::loader::CodeImage;
-    use telltale_vm::vm::{RuntimeTuningProfile, StepResult as ProtocolMachineStepResult};
+    use telltale_vm::{RuntimeTuningProfile, ProtocolMachineStepResult as ProtocolMachineStepResult};
     use telltale_vm::verification::{DefaultVerificationModel, HashTag, VerificationModel};
     use telltale_vm::{ProtocolMachine, ProtocolMachineConfig, ThreadedGuestRuntime};
 

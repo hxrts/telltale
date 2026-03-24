@@ -8,9 +8,9 @@ use crate::effect::{EffectHandler, RecordingEffectHandler};
 use crate::vm::{VMError, VM};
 use serde::{Deserialize, Serialize};
 
-/// Summary from loaded-VM record/replay conformance execution.
+/// Summary from loaded protocol-machine record/replay conformance execution.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct LoadedVmReplayConformance {
+pub struct LoadedProtocolMachineReplayConformance {
     /// Determinism mode used for replay consistency checks.
     pub determinism_mode: DeterminismMode,
     /// Profile-aware consistency outcome.
@@ -29,7 +29,7 @@ pub struct LoadedVmReplayConformance {
     pub replay_event_count: usize,
 }
 
-/// Run record-and-replay conformance against a loaded VM.
+/// Run record-and-replay conformance against a loaded protocol machine.
 ///
 /// The helper snapshots the provided VM, executes a baseline run with
 /// `RecordingEffectHandler`, then replays the recorded effect trace from the
@@ -38,11 +38,11 @@ pub struct LoadedVmReplayConformance {
 /// # Errors
 ///
 /// Returns `VMError` if baseline run, replay run, or snapshot encode/decode fails.
-pub fn run_loaded_vm_record_replay_conformance(
+pub fn run_loaded_protocol_machine_record_replay_conformance(
     vm: &mut VM,
     handler: &dyn EffectHandler,
     max_steps: usize,
-) -> Result<LoadedVmReplayConformance, VMError> {
+) -> Result<LoadedProtocolMachineReplayConformance, VMError> {
     let snapshot = serde_yaml::to_string(vm).map_err(|e| {
         VMError::PersistenceError(format!("integration snapshot encode failed: {e}"))
     })?;
@@ -77,7 +77,7 @@ pub fn run_loaded_vm_record_replay_conformance(
         &replay_effect_trace,
     );
 
-    Ok(LoadedVmReplayConformance {
+    Ok(LoadedProtocolMachineReplayConformance {
         determinism_mode,
         replay_consistent: replay_mode_consistent,
         config_mode_consistent,
@@ -167,13 +167,17 @@ mod tests {
     }
 
     #[test]
-    fn loaded_vm_harness_reports_replay_conformance() {
+    fn loaded_protocol_machine_harness_reports_replay_conformance() {
         let image = simple_send_recv_image();
         let mut vm = VM::new(VMConfig::default());
         vm.load_choreography(&image).expect("load choreography");
 
-        let report = run_loaded_vm_record_replay_conformance(&mut vm, &DeterministicHandler, 100)
-            .expect("harness run should succeed");
+        let report = run_loaded_protocol_machine_record_replay_conformance(
+            &mut vm,
+            &DeterministicHandler,
+            100,
+        )
+        .expect("harness run should succeed");
 
         assert!(report.replay_consistent);
         assert!(!report.config_mode_consistent);

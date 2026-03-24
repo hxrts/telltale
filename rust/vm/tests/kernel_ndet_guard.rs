@@ -1,4 +1,4 @@
-//! Guardrail: VM kernel modules must not call host nondeterministic APIs directly.
+//! Guardrail: ProtocolMachine kernel modules must not call host nondeterministic APIs directly.
 //!
 //! Nondeterminism is required to flow through `EffectHandler` so cross-target
 //! replay and determinism-mode checks remain meaningful.
@@ -85,7 +85,7 @@ fn vm_kernel_has_no_direct_nondeterministic_calls() {
 
     assert!(
         violations.is_empty(),
-        "direct host nondeterminism detected in VM kernel:\n{}",
+        "direct host nondeterminism detected in ProtocolMachine kernel:\n{}",
         violations.join("\n")
     );
 }

@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{VMConfig, VMError, VM};
+use telltale_vm::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 
 #[allow(dead_code, unreachable_pub)]
 #[path = "support/mod.rs"]
@@ -14,9 +14,9 @@ mod test_support;
 
 use test_support::PassthroughHandler;
 
-fn fault_name(err: &VMError) -> Option<&'static str> {
+fn fault_name(err: &ProtocolMachineError) -> Option<&'static str> {
     match err {
-        VMError::Fault { fault, .. } => Some(match fault {
+        ProtocolMachineError::Fault { fault, .. } => Some(match fault {
             telltale_vm::coroutine::Fault::TypeViolation { .. } => "type_violation",
             telltale_vm::coroutine::Fault::UnknownLabel { .. } => "unknown_label",
             telltale_vm::coroutine::Fault::Transfer { .. } => "transfer_fault",
@@ -125,7 +125,7 @@ fn mutated_programs_are_deterministically_rejected() {
 
     let mut observed = Vec::new();
     for (name, image, expected_fault) in cases {
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         vm.load_choreography(&image).expect("load mutated image");
         let result = vm.run(&PassthroughHandler, 32);
         let tag = match result {

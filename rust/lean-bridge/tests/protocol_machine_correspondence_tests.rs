@@ -12,7 +12,7 @@ use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::output_condition::OutputConditionPolicy;
-use telltale_vm::vm::ObsEvent;
+use telltale_vm::ObsEvent;
 use telltale_vm::{ProtocolMachine, ProtocolMachineConfig};
 
 #[derive(Debug, thiserror::Error)]
@@ -156,7 +156,7 @@ fn obs_to_semantic_audit_event(ev: &ObsEvent) -> Option<ProtocolMachineTraceEven
             out.target = Some(coro_id.to_string());
             Some(out)
         }
-        // Lean vm_runner trace export currently models VM observables, not
+        // Lean protocol-machine runner trace export currently models protocol-machine observables, not
         // output-condition bookkeeping. Exclude these from correspondence.
         ObsEvent::OutputConditionChecked { .. } => None,
         _ => None,
@@ -278,10 +278,10 @@ fn assert_stepwise_prefix_equivalent(
 #[test]
 fn test_protocol_machine_semantic_audit_correspondence_ping_pong() {
     let fixture = test_choreographies::ping_pong();
-    let rust_output = run_rust_vm(&fixture, 200).expect("run rust VM");
+    let rust_output = run_rust_vm(&fixture, 200).expect("run rust ProtocolMachine");
 
     let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean vm_runner not available");
+        eprintln!("SKIPPED: Lean protocol-machine runner not available");
         return;
     };
     let choreography = fixture_to_choreography_json(&fixture);
@@ -289,7 +289,7 @@ fn test_protocol_machine_semantic_audit_correspondence_ping_pong() {
         .compare_execution(&choreography, &rust_output)
         .expect("compare execution");
     if lean_trace_is_load_only(&result.lean_output.trace) {
-        eprintln!("SKIPPED: Lean vm_runner produced load-only trace");
+        eprintln!("SKIPPED: Lean protocol-machine runner produced load-only trace");
         return;
     }
     assert!(
@@ -308,19 +308,19 @@ fn test_protocol_machine_semantic_audit_correspondence_all_tier1() {
     ];
 
     let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean vm_runner not available");
+        eprintln!("SKIPPED: Lean protocol-machine runner not available");
         return;
     };
 
     for fixture in fixtures {
         let rust_output = run_rust_vm(&fixture, 250)
-            .unwrap_or_else(|err| panic!("run rust VM for {}: {err}", fixture.name));
+            .unwrap_or_else(|err| panic!("run rust ProtocolMachine for {}: {err}", fixture.name));
         let choreography = fixture_to_choreography_json(&fixture);
         let result = runner
             .compare_execution(&choreography, &rust_output)
             .unwrap_or_else(|err| panic!("compare execution for {}: {err}", fixture.name));
         if lean_trace_is_load_only(&result.lean_output.trace) {
-            eprintln!("SKIPPED: Lean vm_runner produced load-only trace");
+            eprintln!("SKIPPED: Lean protocol-machine runner produced load-only trace");
             return;
         }
 
@@ -343,19 +343,19 @@ fn test_protocol_machine_semantic_audit_correspondence_tier2_to_tier4() {
     ];
 
     let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean vm_runner not available");
+        eprintln!("SKIPPED: Lean protocol-machine runner not available");
         return;
     };
 
     for fixture in fixtures {
         let rust_output = run_rust_vm(&fixture, 300)
-            .unwrap_or_else(|err| panic!("run rust VM for {}: {err}", fixture.name));
+            .unwrap_or_else(|err| panic!("run rust ProtocolMachine for {}: {err}", fixture.name));
         let choreography = fixture_to_choreography_json(&fixture);
         let result = runner
             .compare_execution(&choreography, &rust_output)
             .unwrap_or_else(|err| panic!("compare execution for {}: {err}", fixture.name));
         if lean_trace_is_load_only(&result.lean_output.trace) {
-            eprintln!("SKIPPED: Lean vm_runner produced load-only trace");
+            eprintln!("SKIPPED: Lean protocol-machine runner produced load-only trace");
             return;
         }
 

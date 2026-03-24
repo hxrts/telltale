@@ -3,7 +3,7 @@
 #![allow(clippy::needless_collect, clippy::let_underscore_must_use)]
 //!
 //! Each test maps to a specific Lean definition/theorem from the
-//! `lean/Runtime/VM/` specification files.
+//! `lean/Runtime/ProtocolMachine/` specification files.
 
 #[allow(dead_code, unreachable_pub)]
 #[path = "support/mod.rs"]
@@ -24,7 +24,7 @@ use telltale_vm::output_condition::OutputConditionHint;
 use telltale_vm::session::{
     AuthorityArtifact, AuthorityAuditEvent, OwnershipScope, SessionStatus, SessionStore,
 };
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 
 use test_support::PassthroughHandler;
 
@@ -236,7 +236,7 @@ impl EffectHandler for TimeoutAtTickOneHandler {
 #[test]
 fn test_lean_session_coherent() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -275,7 +275,7 @@ fn test_lean_session_ns_disjoint() {
     let image1 = test_support::simple_send_recv_image("A", "B", "msg");
     let image2 = test_support::simple_send_recv_image("A", "B", "data");
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid1 = vm.load_choreography(&image1).unwrap();
     let sid2 = vm.load_choreography(&image2).unwrap();
 
@@ -299,7 +299,7 @@ fn test_lean_session_ns_disjoint() {
 #[test]
 fn test_lean_conservation_inv_preserved() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -343,7 +343,7 @@ fn test_lean_close_empty() {
 #[test]
 fn test_lean_leave_preserves_coherent() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -364,7 +364,7 @@ fn test_lean_leave_preserves_coherent() {
 #[test]
 fn test_lean_transport_fifo() {
     let image = test_support::recursive_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -409,7 +409,7 @@ fn test_lean_transport_fifo() {
 #[test]
 fn test_lean_transport_no_dup() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -434,7 +434,7 @@ fn test_lean_transport_no_dup() {
 #[test]
 fn test_lean_transport_no_create() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -473,11 +473,11 @@ fn test_lean_transport_no_create() {
     }
 }
 
-/// Lean VM comm semantics: receive must verify transport signatures.
+/// Lean ProtocolMachine comm semantics: receive must verify transport signatures.
 #[test]
 fn test_lean_send_receive_signature_verification() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
     let handler = PassthroughHandler;
 
@@ -510,18 +510,18 @@ fn test_lean_send_receive_signature_verification() {
     let result = vm.run(&handler, 32);
     assert_matches!(
         result,
-        Err(telltale_vm::vm::VMError::Fault {
+        Err(telltale_vm::ProtocolMachineError::Fault {
             fault: Fault::VerificationFailed { .. },
             ..
         })
     );
 }
 
-/// Lean VM comm semantics: choose consumes exactly the offered label branch.
+/// Lean ProtocolMachine comm semantics: choose consumes exactly the offered label branch.
 #[test]
 fn test_lean_offer_choose_label_alignment() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -548,7 +548,7 @@ fn test_lean_offer_choose_label_alignment() {
     assert_eq!(offered, chose, "offered/chose label traces diverged");
 }
 
-/// Lean VM session lifecycle semantics: opened session transitions to closed and drains buffers.
+/// Lean ProtocolMachine session lifecycle semantics: opened session transitions to closed and drains buffers.
 #[test]
 fn test_lean_open_close_session_state_transitions() {
     use telltale_types::{Label, LocalTypeR};
@@ -591,7 +591,7 @@ fn test_lean_open_close_session_state_transitions() {
     );
 }
 
-/// Lean VM ownership semantics: transfer moves endpoint ownership to target coroutine.
+/// Lean ProtocolMachine ownership semantics: transfer moves endpoint ownership to target coroutine.
 #[test]
 fn test_lean_transfer_endpoint_movement() {
     use telltale_types::GlobalType;
@@ -625,7 +625,7 @@ fn test_lean_transfer_endpoint_movement() {
         local_types,
     };
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
     vm.run(&PassthroughHandler, 100).unwrap();
 
@@ -660,7 +660,7 @@ fn test_lean_transfer_endpoint_movement() {
     );
 }
 
-/// Lean VM epistemic semantics: tag/check operate over encoded `(endpoint, fact)` knowledge.
+/// Lean ProtocolMachine epistemic semantics: tag/check operate over encoded `(endpoint, fact)` knowledge.
 #[test]
 fn test_lean_tag_check_epistemic_behavior() {
     use telltale_vm::coroutine::Value;
@@ -689,7 +689,7 @@ fn test_lean_tag_check_epistemic_behavior() {
         ],
     );
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
     vm.run(&KnowledgePayloadHandler, 100).unwrap();
 
@@ -712,7 +712,7 @@ fn test_lean_tag_check_epistemic_behavior() {
     assert_eq!(b.regs[4], Value::Bool(true));
 }
 
-/// Lean VM guard/effect semantics: acquire then release emits aligned events.
+/// Lean ProtocolMachine guard/effect semantics: acquire then release emits aligned events.
 #[test]
 fn test_lean_acquire_release_guard_behavior() {
     use telltale_vm::instr::Instr;
@@ -728,7 +728,7 @@ fn test_lean_acquire_release_guard_behavior() {
         },
         Instr::Halt,
     ]);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
     vm.run(&PassthroughHandler, 100).unwrap();
 
@@ -746,7 +746,7 @@ fn test_lean_acquire_release_guard_behavior() {
     );
 }
 
-/// Lean VM invoke semantics: invoke emits event and output-condition hint is used in commit checks.
+/// Lean ProtocolMachine invoke semantics: invoke emits event and output-condition hint is used in commit checks.
 #[test]
 fn test_lean_invoke_and_output_condition_hint_behavior() {
     use telltale_vm::instr::{Instr, InvokeAction};
@@ -758,13 +758,13 @@ fn test_lean_invoke_and_output_condition_hint_behavior() {
         },
         Instr::Halt,
     ]);
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
             "vm.custom.observable".to_string(),
         ]),
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
-    let mut vm = VM::new(cfg);
+    let mut vm = ProtocolMachine::new(cfg);
     vm.load_choreography(&image).unwrap();
     vm.run(&HintedInvokeHandler, 100).unwrap();
 
@@ -789,7 +789,7 @@ fn test_lean_invoke_and_output_condition_hint_behavior() {
     );
 }
 
-/// Lean VM failure observability: failure branch entry is explicit and ordered
+/// Lean ProtocolMachine failure observability: failure branch entry is explicit and ordered
 /// before the terminal fault artifact for the same coroutine/session.
 #[test]
 fn test_lean_failure_branch_and_terminal_fault_ordering() {
@@ -802,7 +802,7 @@ fn test_lean_failure_branch_and_terminal_fault_ordering() {
         },
         Instr::Halt,
     ]);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let err = vm.step(&PassthroughHandler);
@@ -826,14 +826,14 @@ fn test_lean_failure_branch_and_terminal_fault_ordering() {
     );
 }
 
-/// Lean VM authority observability: timeout and cancellation paths surface as
+/// Lean ProtocolMachine authority observability: timeout and cancellation paths surface as
 /// explicit witness-bearing events rather than silent host-side control flow.
 #[test]
 fn test_lean_authority_timeout_and_cancellation_trace_behavior() {
     use telltale_vm::instr::Instr;
 
     let image = single_role_end_image(vec![Instr::Halt]);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let owned = vm
         .load_choreography_owned(&image, "owner/a")
         .expect("load owned choreography");
@@ -842,7 +842,7 @@ fn test_lean_authority_timeout_and_cancellation_trace_behavior() {
         .step(&TimeoutAtTickOneHandler)
         .expect("timeout ingress should not fault");
     assert!(
-        matches!(step, telltale_vm::vm::StepResult::Stuck),
+        matches!(step, telltale_vm::ProtocolMachineStepResult::Stuck),
         "timeout ingress should block scheduling"
     );
     assert!(
@@ -902,7 +902,7 @@ fn test_lean_authority_timeout_and_cancellation_trace_behavior() {
     );
 }
 
-/// Lean VM authority semantics: evidence is single-use and invalid/stale uses
+/// Lean ProtocolMachine authority semantics: evidence is single-use and invalid/stale uses
 /// are rejected with explicit audit artifacts.
 #[test]
 fn test_lean_authority_evidence_rejection_behavior() {
@@ -967,7 +967,7 @@ fn test_lean_authority_evidence_rejection_behavior() {
     );
 }
 
-/// Lean VM control semantics: set/move/jump/yield/halt and spawn state transitions.
+/// Lean ProtocolMachine control semantics: set/move/jump/yield/halt and spawn state transitions.
 #[test]
 fn test_lean_control_and_spawn_behavior() {
     use telltale_vm::coroutine::Value;
@@ -993,7 +993,7 @@ fn test_lean_control_and_spawn_behavior() {
         Instr::Halt,
     ]);
 
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
     vm.run(&PassthroughHandler, 100).unwrap();
 
@@ -1015,7 +1015,7 @@ fn test_lean_control_and_spawn_behavior() {
     );
 }
 
-/// Lean VM speculation semantics: fork/join/abort emit aligned observable events.
+/// Lean ProtocolMachine speculation semantics: fork/join/abort emit aligned observable events.
 #[test]
 fn test_lean_fork_join_abort_speculation_behavior() {
     use telltale_vm::instr::{ImmValue, Instr};
@@ -1031,11 +1031,11 @@ fn test_lean_fork_join_abort_speculation_behavior() {
         Instr::Abort,
         Instr::Halt,
     ]);
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         speculation_enabled: true,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
-    let mut vm = VM::new(cfg);
+    let mut vm = ProtocolMachine::new(cfg);
     vm.load_choreography(&image).unwrap();
     vm.run(&PassthroughHandler, 100).unwrap();
 
@@ -1059,7 +1059,7 @@ fn test_lean_fork_join_abort_speculation_behavior() {
     );
 }
 
-/// Lean VM speculation semantics: `fork` fails when speculation is disabled.
+/// Lean ProtocolMachine speculation semantics: `fork` fails when speculation is disabled.
 #[test]
 fn test_lean_fork_requires_speculation_enabled() {
     use telltale_vm::instr::{ImmValue, Instr};
@@ -1071,59 +1071,59 @@ fn test_lean_fork_requires_speculation_enabled() {
         },
         Instr::Fork { ghost: 1 },
     ]);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let result = vm.run(&PassthroughHandler, 16);
     assert_matches!(
         result,
-        Err(telltale_vm::vm::VMError::Fault {
+        Err(telltale_vm::ProtocolMachineError::Fault {
             fault: Fault::Speculation { .. },
             ..
         })
     );
 }
 
-/// Lean VM speculation semantics: `join` requires active speculation state.
+/// Lean ProtocolMachine speculation semantics: `join` requires active speculation state.
 #[test]
 fn test_lean_join_requires_active_speculation() {
     use telltale_vm::instr::Instr;
 
     let image = single_role_end_image(vec![Instr::Join]);
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         speculation_enabled: true,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
-    let mut vm = VM::new(cfg);
+    let mut vm = ProtocolMachine::new(cfg);
     vm.load_choreography(&image).unwrap();
 
     let result = vm.run(&PassthroughHandler, 16);
     assert_matches!(
         result,
-        Err(telltale_vm::vm::VMError::Fault {
+        Err(telltale_vm::ProtocolMachineError::Fault {
             fault: Fault::Speculation { .. },
             ..
         })
     );
 }
 
-/// Lean VM speculation semantics: `abort` requires active speculation state.
+/// Lean ProtocolMachine speculation semantics: `abort` requires active speculation state.
 #[test]
 fn test_lean_abort_requires_active_speculation() {
     use telltale_vm::instr::Instr;
 
     let image = single_role_end_image(vec![Instr::Abort]);
-    let cfg = VMConfig {
+    let cfg = ProtocolMachineConfig {
         speculation_enabled: true,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
-    let mut vm = VM::new(cfg);
+    let mut vm = ProtocolMachine::new(cfg);
     vm.load_choreography(&image).unwrap();
 
     let result = vm.run(&PassthroughHandler, 16);
     assert_matches!(
         result,
-        Err(telltale_vm::vm::VMError::Fault {
+        Err(telltale_vm::ProtocolMachineError::Fault {
             fault: Fault::Speculation { .. },
             ..
         })
@@ -1146,20 +1146,20 @@ fn test_lean_abort_policy_is_deterministic_and_scoped() {
     ]);
 
     let run_once = || {
-        let cfg = VMConfig {
+        let cfg = ProtocolMachineConfig {
             speculation_enabled: true,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         };
-        let mut vm = VM::new(cfg);
+        let mut vm = ProtocolMachine::new(cfg);
         let sid = vm.load_choreography(&image).unwrap();
 
         assert_matches!(
             vm.step(&PassthroughHandler),
-            Ok(telltale_vm::vm::StepResult::Continue)
+            Ok(telltale_vm::ProtocolMachineStepResult::Continue)
         ); // set
         assert_matches!(
             vm.step(&PassthroughHandler),
-            Ok(telltale_vm::vm::StepResult::Continue)
+            Ok(telltale_vm::ProtocolMachineStepResult::Continue)
         ); // fork
 
         let before_effect_len = vm.effect_trace().len();
@@ -1171,7 +1171,7 @@ fn test_lean_abort_policy_is_deterministic_and_scoped() {
 
         assert_matches!(
             vm.step(&PassthroughHandler),
-            Ok(telltale_vm::vm::StepResult::Continue)
+            Ok(telltale_vm::ProtocolMachineStepResult::Continue)
         ); // abort
 
         let coros = vm.session_coroutines(sid);
@@ -1217,7 +1217,7 @@ fn test_lean_abort_policy_is_deterministic_and_scoped() {
 }
 
 // ============================================================================
-// Runtime/VM/Runtime/Scheduler.lean
+// Runtime/ProtocolMachine/Runtime/Scheduler.lean
 // ============================================================================
 
 /// Lean: `Scheduler.schedule_confluence`
@@ -1229,11 +1229,11 @@ fn test_lean_schedule_confluence() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
 
     let run_with_policy = |policy: SchedPolicy| -> HashSet<String> {
-        let config = VMConfig {
+        let config = ProtocolMachineConfig {
             sched_policy: policy,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         };
-        let mut vm = VM::new(config);
+        let mut vm = ProtocolMachine::new(config);
         vm.load_choreography(&image).unwrap();
         let handler = PassthroughHandler;
         vm.run(&handler, 100).unwrap();
@@ -1263,11 +1263,11 @@ fn test_lean_cooperative_refines_concurrent() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
 
     let run_with_policy = |policy: SchedPolicy| -> bool {
-        let config = VMConfig {
+        let config = ProtocolMachineConfig {
             sched_policy: policy,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         };
-        let mut vm = VM::new(config);
+        let mut vm = ProtocolMachine::new(config);
         let sid = vm.load_choreography(&image).unwrap();
         let handler = PassthroughHandler;
         vm.run(&handler, 100).unwrap();
@@ -1279,7 +1279,7 @@ fn test_lean_cooperative_refines_concurrent() {
 }
 
 // ============================================================================
-// Runtime/VM/Runtime/Monitor.lean
+// Runtime/ProtocolMachine/Runtime/Monitor.lean
 // ============================================================================
 
 /// Lean: `Monitor.sound_send`
@@ -1287,7 +1287,7 @@ fn test_lean_cooperative_refines_concurrent() {
 #[test]
 fn test_lean_monitor_sound_send() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -1306,7 +1306,7 @@ fn test_lean_monitor_sound_send() {
 #[test]
 fn test_lean_monitor_sound_recv() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -1325,7 +1325,7 @@ fn test_lean_monitor_sound_recv() {
 #[test]
 fn test_lean_monitor_sound_choose() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -1344,7 +1344,7 @@ fn test_lean_monitor_sound_choose() {
 #[test]
 fn test_lean_monitor_sound_offer() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -1367,7 +1367,7 @@ fn test_lean_monitor_sound_offer() {
 #[test]
 fn test_lean_causal_consistency() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -1393,7 +1393,7 @@ fn test_lean_causal_consistency() {
 #[test]
 fn test_lean_fifo_consistency() {
     let image = test_support::recursive_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -1438,7 +1438,7 @@ fn test_lean_fifo_consistency() {
 #[test]
 fn test_lean_no_phantom_events() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -1483,7 +1483,7 @@ fn test_lean_no_phantom_events() {
 }
 
 // ============================================================================
-// Runtime/VM/Model/State.lean
+// Runtime/ProtocolMachine/Model/State.lean
 // ============================================================================
 
 /// Lean: `State.wf_pc_bounds`
@@ -1491,7 +1491,7 @@ fn test_lean_no_phantom_events() {
 #[test]
 fn test_lean_wf_pc_bounds() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
@@ -1515,8 +1515,11 @@ fn test_lean_wf_pc_bounds() {
         }
 
         match vm.step(&handler) {
-            Ok(telltale_vm::vm::StepResult::AllDone | telltale_vm::vm::StepResult::Stuck) => break,
-            Ok(telltale_vm::vm::StepResult::Continue) => {}
+            Ok(
+                telltale_vm::ProtocolMachineStepResult::AllDone
+                | telltale_vm::ProtocolMachineStepResult::Stuck,
+            ) => break,
+            Ok(telltale_vm::ProtocolMachineStepResult::Continue) => {}
             Err(_) => break,
         }
     }
@@ -1527,7 +1530,7 @@ fn test_lean_wf_pc_bounds() {
 #[test]
 fn test_lean_endpoint_ownership_unique() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
     let mut seen_endpoints = HashSet::new();

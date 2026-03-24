@@ -1,5 +1,5 @@
 #![cfg(not(target_arch = "wasm32"))]
-//! Threaded vs cooperative VM equivalence tests.
+//! Threaded vs cooperative ProtocolMachine equivalence tests.
 
 #![cfg(feature = "multi-thread")]
 
@@ -17,10 +17,10 @@ use telltale_vm::effect::{
     EffectFailure, EffectHandler, EffectResult, RecordingEffectHandler, SendDecision,
     SendDecisionInput,
 };
-use telltale_vm::threaded::ThreadedVM;
-use telltale_vm::vm::{ObsEvent, VMConfig, VMError, VM};
 use telltale_vm::OutputConditionPolicy;
 use telltale_vm::ProgressState;
+use telltale_vm::ThreadedProtocolMachine;
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 use test_support::{
     choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,
 };
@@ -68,7 +68,7 @@ fn run_cooperative(
     concurrency: usize,
 ) -> BTreeMap<usize, Vec<Normalized>> {
     let handler = PassthroughHandler;
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     for image in images {
         vm.load_choreography(image).expect("load image");
     }
@@ -82,7 +82,7 @@ fn run_threaded(
     workers: usize,
 ) -> BTreeMap<usize, Vec<Normalized>> {
     let handler = PassthroughHandler;
-    let mut vm = ThreadedVM::with_workers(VMConfig::default(), workers);
+    let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), workers);
     for image in images {
         vm.load_choreography(image).expect("load image");
     }
@@ -100,7 +100,7 @@ fn run_progress_states(
 ) {
     let handler = PassthroughHandler;
 
-    let mut coop = VM::new(VMConfig::default());
+    let mut coop = ProtocolMachine::new(ProtocolMachineConfig::default());
     coop.load_choreography(image).expect("load image");
     coop.run(&handler, 64).expect("cooperative run");
     let coop_progress = coop
@@ -110,7 +110,7 @@ fn run_progress_states(
         .map(|contract| (contract.operation_id, contract.state, contract.reason))
         .collect();
 
-    let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 2);
+    let mut threaded = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
     threaded.load_choreography(image).expect("load image");
     threaded.run(&handler, 64).expect("threaded run");
     let threaded_progress = threaded
@@ -208,16 +208,16 @@ fn test_output_condition_gate_applies_to_all_drivers() {
     let image = simple_send_recv_image("A", "B", "msg");
     let handler = PassthroughHandler;
 
-    let deny_cfg = VMConfig {
+    let deny_cfg = ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::DenyAll,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
 
-    let mut coop = VM::new(deny_cfg.clone());
+    let mut coop = ProtocolMachine::new(deny_cfg.clone());
     coop.load_choreography(&image).expect("load image");
     assert!(coop.run(&handler, 50).is_err());
 
-    let mut threaded = ThreadedVM::with_workers(deny_cfg, 2);
+    let mut threaded = ThreadedProtocolMachine::with_workers(deny_cfg, 2);
     threaded.load_choreography(&image).expect("load image");
     assert!(threaded.run(&handler, 50).is_err());
 }
@@ -227,14 +227,14 @@ fn test_output_condition_outcomes_match_across_drivers() {
     let image = simple_send_recv_image("A", "B", "msg");
     let handler = PassthroughHandler;
 
-    let allow_cfg = VMConfig {
+    let allow_cfg = ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
             "vm.observable_output".to_string(),
         ]),
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
 
-    let mut coop = VM::new(allow_cfg.clone());
+    let mut coop = ProtocolMachine::new(allow_cfg.clone());
     coop.load_choreography(&image).expect("load image");
     coop.run(&handler, 50).expect("cooperative run");
     let coop_checks: Vec<(String, bool)> = coop
@@ -243,7 +243,7 @@ fn test_output_condition_outcomes_match_across_drivers() {
         .map(|c| (c.meta.predicate_ref.clone(), c.passed))
         .collect();
 
-    let mut threaded = ThreadedVM::with_workers(allow_cfg, 2);
+    let mut threaded = ThreadedProtocolMachine::with_workers(allow_cfg, 2);
     threaded.load_choreography(&image).expect("load image");
     threaded.run(&handler, 50).expect("threaded run");
     let threaded_checks: Vec<(String, bool)> = threaded
@@ -260,25 +260,25 @@ fn test_output_condition_commit_fail_artifacts_match_across_drivers() {
     let image = simple_send_recv_image("A", "B", "msg");
     let handler = PassthroughHandler;
 
-    let deny_cfg = VMConfig {
+    let deny_cfg = ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::DenyAll,
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
 
-    let mut coop = VM::new(deny_cfg.clone());
+    let mut coop = ProtocolMachine::new(deny_cfg.clone());
     coop.load_choreography(&image).expect("load image");
     let coop_err = coop
         .run(&handler, 50)
         .expect_err("cooperative run should fault");
 
-    let mut threaded = ThreadedVM::with_workers(deny_cfg, 2);
+    let mut threaded = ThreadedProtocolMachine::with_workers(deny_cfg, 2);
     threaded.load_choreography(&image).expect("load image");
     let threaded_err = threaded
         .run(&handler, 50)
         .expect_err("threaded run should fault");
 
-    let extract_output_condition_fault = |err: VMError| match err {
-        VMError::Fault {
+    let extract_output_condition_fault = |err: ProtocolMachineError| match err {
+        ProtocolMachineError::Fault {
             fault: Fault::OutputCondition { predicate_ref },
             ..
         } => predicate_ref,
@@ -336,18 +336,18 @@ fn test_output_condition_commit_pass_artifacts_match_across_drivers() {
     let image = simple_send_recv_image("A", "B", "msg");
     let handler = PassthroughHandler;
 
-    let allow_cfg = VMConfig {
+    let allow_cfg = ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
             "vm.observable_output".to_string(),
         ]),
-        ..VMConfig::default()
+        ..ProtocolMachineConfig::default()
     };
 
-    let mut coop = VM::new(allow_cfg.clone());
+    let mut coop = ProtocolMachine::new(allow_cfg.clone());
     coop.load_choreography(&image).expect("load image");
     coop.run(&handler, 50).expect("cooperative run");
 
-    let mut threaded = ThreadedVM::with_workers(allow_cfg, 2);
+    let mut threaded = ThreadedProtocolMachine::with_workers(allow_cfg, 2);
     threaded.load_choreography(&image).expect("load image");
     threaded.run(&handler, 50).expect("threaded run");
 
@@ -385,12 +385,12 @@ fn test_effect_trace_records_for_coop_and_threaded() {
     let image = simple_send_recv_image("A", "B", "msg");
     let handler = PassthroughHandler;
 
-    let mut coop = VM::new(VMConfig::default());
+    let mut coop = ProtocolMachine::new(ProtocolMachineConfig::default());
     coop.load_choreography(&image).expect("load image");
     coop.run(&handler, 50).expect("cooperative run");
     assert!(!coop.effect_trace().is_empty());
 
-    let mut threaded = ThreadedVM::with_workers(VMConfig::default(), 2);
+    let mut threaded = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
     threaded.load_choreography(&image).expect("load image");
     threaded.run(&handler, 50).expect("threaded run");
     assert!(!threaded.effect_trace().is_empty());
@@ -403,14 +403,14 @@ fn test_replay_mode_reproduces_cooperative_trace() {
     let base = FlakySendHandler::default();
     let recording = RecordingEffectHandler::new(&base);
 
-    let mut baseline = VM::new(VMConfig::default());
+    let mut baseline = ProtocolMachine::new(ProtocolMachineConfig::default());
     baseline.load_choreography(&image).expect("load image");
     baseline.run(&recording, 50).expect("baseline run");
 
     let recorded_effects = recording.effect_trace();
     let baseline_trace = baseline.trace().to_vec();
 
-    let mut replay_vm = VM::new(VMConfig::default());
+    let mut replay_vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     replay_vm.load_choreography(&image).expect("load image");
     let fallback = FlakySendHandler::default();
     replay_vm
@@ -433,12 +433,13 @@ fn test_replay_mode_cross_target_differential() {
     let base = FlakySendHandler::default();
     let recording = RecordingEffectHandler::new(&base);
 
-    let mut baseline = VM::new(VMConfig::default());
+    let mut baseline = ProtocolMachine::new(ProtocolMachineConfig::default());
     baseline.load_choreography(&image).expect("load image");
     baseline.run(&recording, 50).expect("baseline run");
     let recorded_effects = recording.effect_trace();
 
-    let mut replay_threaded = ThreadedVM::with_workers(VMConfig::default(), 2);
+    let mut replay_threaded =
+        ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
     replay_threaded
         .load_choreography(&image)
         .expect("load image");

@@ -12,8 +12,8 @@ use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, EffectResult};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::threaded::{ContentionMetrics, ThreadedVM};
-use telltale_vm::vm::{StepResult, ThreadedRoundSemantics, VMConfig};
+use telltale_vm::{ContentionMetrics, ThreadedProtocolMachine};
+use telltale_vm::{ProtocolMachineConfig, ProtocolMachineStepResult, ThreadedRoundSemantics};
 
 #[derive(Debug, Clone, Copy)]
 struct StressHandler;
@@ -133,10 +133,10 @@ cfg_if! {
 }
 
 fn run_stress(protocols: usize, workers: usize) -> StressReport {
-    let mut vm = ThreadedVM::with_workers(
-        VMConfig {
+    let mut vm = ThreadedProtocolMachine::with_workers(
+        ProtocolMachineConfig {
             threaded_round_semantics: ThreadedRoundSemantics::WaveParallelExtension,
-            ..VMConfig::default()
+            ..ProtocolMachineConfig::default()
         },
         workers,
     );
@@ -162,9 +162,9 @@ fn run_stress(protocols: usize, workers: usize) -> StressReport {
         }
 
         match outcome {
-            StepResult::AllDone => break,
-            StepResult::Continue => {}
-            StepResult::Stuck => panic!("stress workload became stuck"),
+            ProtocolMachineStepResult::AllDone => break,
+            ProtocolMachineStepResult::Continue => {}
+            ProtocolMachineStepResult::Stuck => panic!("stress workload became stuck"),
         }
     }
 
@@ -195,7 +195,7 @@ fn run_stress(protocols: usize, workers: usize) -> StressReport {
         faults: vm
             .trace()
             .iter()
-            .filter(|ev| matches!(ev, telltale_vm::vm::ObsEvent::Faulted { .. }))
+            .filter(|ev| matches!(ev, telltale_vm::ObsEvent::Faulted { .. }))
             .count(),
     }
 }

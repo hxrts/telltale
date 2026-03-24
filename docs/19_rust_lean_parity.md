@@ -114,7 +114,7 @@ The canonical cross-language semantic-object family must remain aligned between 
 | `MaterializationProof` / `CanonicalHandle` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | `ProgressContract` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | `ProgressTransition` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| typed effect metadata / request / outcome model | `Runtime/VM/Model/Effects.lean` | `rust/vm/src/effect.rs` | `rust/lean-bridge/src/vm_runner.rs` (`effect_exchanges`) | Aligned |
+| typed effect metadata / request / outcome model | `Runtime/VM/Model/Effects.lean` | `rust/vm/src/effect.rs` | `rust/lean-bridge/src/protocol_machine_runner.rs` (`effect_exchanges`) | Aligned |
 
 `OperationInstance` and `OutstandingEffect` are compared as canonical runtime state, not as post-hoc derivations from generic effect-trace order.
 Parity on these objects covers owner identity, phase/status, budget/invalidation fields, dependent-operation edges, and terminal publication state.
@@ -168,13 +168,36 @@ The Rust protocol-machine structure (`ProtocolMachine`, exported as an alias for
 
 `Coroutine` in `rust/vm/src/coroutine.rs` contains identity/program/pc/status, register file, ownership/progress/knowledge sets, cost budget, speculation metadata, and effect context.
 
+### Canonical Rust Runtime Object Inventory
+
+The Rust public runtime surface now exposes one canonical naming scheme:
+protocol-machine objects use `ProtocolMachine*`, guest-runtime objects use
+`GuestRuntime*`, and bridge execution objects use `ProtocolMachineRunner*`.
+No public `telltale_vm::vm::*`, `telltale_vm::threaded::*`,
+`telltale_lean_bridge::vm_runner::*`, or `telltale_lean_bridge::vm_trace::*`
+entrypoints remain.
+
+| Runtime Object | Lean Surface | Rust Surface | Bridge Surface | Status |
+|---|---|---|---|---|
+| protocol-machine config | `Runtime/VM/Model/Config.lean` | `telltale_vm::ProtocolMachineConfig` | `telltale_lean_bridge::ProtocolMachineRunInput` | Aligned |
+| protocol-machine state | `Runtime/VM/Model/State.lean` | `telltale_vm::ProtocolMachineState` | `telltale_lean_bridge::ProtocolMachineRunOutput` | Aligned |
+| protocol-machine executor | `Runtime/VM/API.lean`, `Runtime/VM/Runtime/Runner.lean` | `telltale_vm::ProtocolMachine` | `telltale_lean_bridge::ProtocolMachineRunner` | Aligned |
+| protocol-machine step result | `Runtime/VM/Model/ExecResult.lean` | `telltale_vm::ProtocolMachineStepResult` | `telltale_lean_bridge::ProtocolMachineStepState` | Aligned |
+| protocol-machine run status | `Runtime/VM/Model/ExecResult.lean` | `telltale_vm::ProtocolMachineRunStatus` | `telltale_lean_bridge::ProtocolMachineRunOutput.status` | Aligned |
+| protocol-machine error surface | `Runtime/VM/Model/State.lean`, `Runtime/VM/Runtime/Json.lean` | `telltale_vm::ProtocolMachineError` | `telltale_lean_bridge::LeanStructuredError` | Aligned |
+| protocol-machine memory accounting | `Runtime/VM/Model/State.lean` | `telltale_vm::ProtocolMachineMemoryUsage`, `telltale_vm::ProtocolMachineRetainedBytes` | n/a | Aligned |
+| guest runtime driver | `Runtime/VM/API.lean` | `telltale_vm::GuestRuntime`, `telltale_vm::ThreadedGuestRuntime` | n/a | Aligned |
+| threaded protocol-machine adapter | `Runtime/VM/API.lean`, `Runtime/VM/Composition.lean` | `telltale_vm::ThreadedProtocolMachine` | parity tests under `rust/lean-bridge/tests/protocol_machine_cross_target_tests.rs` | Aligned |
+| semantic-object inventory | `Runtime/VM/Model/SemanticObjects/*.lean` | `telltale_vm::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, ProgressContract, ProgressTransition}` | `telltale_lean_bridge::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, ProgressContract, ProgressTransition}` | Aligned |
+| runtime admission contracts | `Runtime/Proofs/Contracts/RuntimeContracts.lean` | `telltale_vm::{requires_protocol_machine_runtime_contracts, admit_protocol_machine_runtime, enforce_protocol_machine_runtime_gates, request_determinism_profile, runtime_capability_snapshot}` | n/a | Aligned |
+
 ## Runtime Capability Gates
 
 Runtime modes that require theorem/capability evidence are admission gated.
 
 | Gate Surface | Lean API | Rust API | Status |
 |---|---|---|---|
-| Advanced mode admission | `requiresVMRuntimeContracts`, `admitVMRuntime` | `requires_vm_runtime_contracts`, `admit_vm_runtime` | Aligned |
+| Advanced mode admission | `requiresVMRuntimeContracts`, `admitVMRuntime` | `requires_protocol_machine_runtime_contracts`, `admit_protocol_machine_runtime` | Aligned |
 | Determinism profile validation | `requestDeterminismProfile` | `request_determinism_profile` | Aligned |
 | Runtime capability snapshot | `runtimeCapabilitySnapshot` | `runtime_capability_snapshot` | Aligned |
 

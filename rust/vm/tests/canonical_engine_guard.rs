@@ -10,9 +10,9 @@ use telltale_vm::architecture::{EngineRole, CANONICAL_ENGINE, ENGINE_OWNERSHIP};
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
-        use telltale_vm::threaded::ThreadedVM;
+        use telltale_vm::ThreadedProtocolMachine;
         use telltale_vm::trace::{normalize_trace, with_tick};
-        use telltale_vm::vm::{VMConfig, VM};
+        use telltale_vm::{ProtocolMachineConfig, ProtocolMachine};
         use test_support::{simple_send_recv_image, PassthroughHandler};
     }
 }
@@ -46,13 +46,13 @@ cfg_if! {
             let image = simple_send_recv_image("A", "B", "m");
             let handler = PassthroughHandler;
 
-            let mut canonical = VM::new(VMConfig::default());
+            let mut canonical = ProtocolMachine::new(ProtocolMachineConfig::default());
             canonical
                 .load_choreography(&image)
                 .expect("load canonical choreography");
             canonical.run(&handler, 64).expect("canonical run");
 
-            let mut adapter = ThreadedVM::with_workers(VMConfig::default(), 2);
+            let mut adapter = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
             adapter
                 .load_choreography(&image)
                 .expect("load adapter choreography");
@@ -72,14 +72,14 @@ cfg_if! {
             );
         }
 
-        fn canonicalize_event(event: &telltale_vm::vm::ObsEvent) -> telltale_vm::vm::ObsEvent {
+        fn canonicalize_event(event: &telltale_vm::ObsEvent) -> telltale_vm::ObsEvent {
             match event {
-                telltale_vm::vm::ObsEvent::OutputConditionChecked {
+                telltale_vm::ObsEvent::OutputConditionChecked {
                     predicate_ref,
                     witness_ref,
                     passed,
                     ..
-                } => telltale_vm::vm::ObsEvent::OutputConditionChecked {
+                } => telltale_vm::ObsEvent::OutputConditionChecked {
                     tick: 0,
                     predicate_ref: predicate_ref.clone(),
                     witness_ref: witness_ref.clone(),

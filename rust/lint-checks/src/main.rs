@@ -310,7 +310,7 @@ fn scan_session_ingress(file: &Path, syntax: &File) -> Vec<String> {
 fn scan_time_domain(file: &Path, syntax: &File) -> Vec<String> {
     const ALLOWED_SUFFIXES: &[&str] = &[
         "rust/lean-bridge/src/runner.rs",
-        "rust/lean-bridge/src/vm_runner.rs",
+        "rust/lean-bridge/src/protocol_machine_runner.rs",
     ];
 
     if file_matches_suffix(file, ALLOWED_SUFFIXES) {

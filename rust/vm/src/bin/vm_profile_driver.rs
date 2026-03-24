@@ -7,10 +7,10 @@ use std::hint::black_box;
 use telltale_types::{GlobalType, Label, LocalTypeR, ValType};
 use telltale_vm::effect::{EffectFailure, EffectHandler, EffectResult};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{
-    ObservabilityRetentionConfig, ObservabilityRetentionMode, PayloadValidationMode,
+use telltale_vm::{
+    CommunicationReplayMode, Instr, ObservabilityRetentionConfig, ObservabilityRetentionMode,
+    PayloadValidationMode, ProtocolMachine, ProtocolMachineConfig,
 };
-use telltale_vm::{CommunicationReplayMode, Instr, ProtocolMachine, ProtocolMachineConfig};
 
 struct ProfileHandler;
 
@@ -114,7 +114,7 @@ fn profile_scheduler_many_paused(iterations: usize) -> usize {
         checksum ^= black_box(vm.trace().len())
             ^ black_box(bool_to_usize(matches!(
                 status,
-                telltale_vm::vm::RunStatus::Stuck
+                telltale_vm::ProtocolMachineRunStatus::Stuck
             )));
     }
     checksum
@@ -153,7 +153,7 @@ fn profile_scheduler_many_paused_run_only(yields_per_role: usize) -> usize {
     black_box(vm.trace().len())
         ^ black_box(bool_to_usize(matches!(
             status,
-            telltale_vm::vm::RunStatus::MaxRoundsExceeded
+            telltale_vm::ProtocolMachineRunStatus::MaxRoundsExceeded
         )))
 }
 
@@ -173,7 +173,7 @@ fn profile_send_recv_replay_nullifier(iterations: usize) -> usize {
     black_box(vm.trace().len())
         ^ black_box(bool_to_usize(matches!(
             status,
-            telltale_vm::vm::RunStatus::AllDone
+            telltale_vm::ProtocolMachineRunStatus::AllDone
         )))
 }
 

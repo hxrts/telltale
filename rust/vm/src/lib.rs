@@ -94,13 +94,11 @@ pub mod session;
 pub mod trace;
 pub mod transfer_semantics;
 pub mod verification;
-#[doc(hidden)]
-pub mod vm;
+mod vm;
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
-        #[doc(hidden)]
-        pub mod threaded;
+        mod threaded;
     }
 }
 
@@ -120,12 +118,15 @@ pub mod protocol_machine {
         ProtocolMachineSemanticObjects, PublicationEvent, PublicationObserverClass,
         PublicationStatus, SemanticHandoff, SEMANTIC_OBJECTS_SCHEMA_VERSION,
     };
+    #[cfg(feature = "multi-thread")]
+    pub use crate::threaded::ThreadedVM as ThreadedProtocolMachine;
     pub use crate::vm::{
-        EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig,
-        ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore, RunStatus,
-        RuntimeTuningProfile, SchedExecStatus, SchedStepDebug, StepResult, ThreadedRoundSemantics,
+        EffectTraceCaptureMode, MonitorMode, ObsEvent, ObservabilityRetentionConfig,
+        ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore,
+        ProtocolMachineMemoryUsage, ProtocolMachineRetainedBytes, RunStatus, RuntimeTuningProfile,
+        SchedExecStatus, SchedStepDebug, StepResult, ThreadedRoundSemantics,
         VMConfig as ProtocolMachineConfig, VMError as ProtocolMachineError,
-        VMState as ProtocolMachineState, VmMemoryUsage, VmRetainedBytes, VM as ProtocolMachine,
+        VMState as ProtocolMachineState, VM as ProtocolMachine,
     };
 }
 
@@ -180,7 +181,9 @@ pub use faults::{classify_fault, fault_code, fault_code_of, FaultClass};
 pub use guard::{GuardLayer, InMemoryGuardLayer, LayerId};
 pub use identity::{IdentityModel, ParticipantId, SiteId as IdentitySiteId, StaticIdentityModel};
 pub use instr::Instr;
-pub use integration::{run_loaded_vm_record_replay_conformance, LoadedVmReplayConformance};
+pub use integration::{
+    run_loaded_protocol_machine_record_replay_conformance, LoadedProtocolMachineReplayConformance,
+};
 pub use intern::{EdgeId, EdgeSymbol, EdgeSymbolTable, StringId, SymbolTable};
 pub use kernel::VMKernel;
 pub use nested::NestedVMHandler;
@@ -191,10 +194,10 @@ pub use output_condition::{
 pub use owned::OwnedSession;
 pub use persistence::{NoopPersistence, PersistenceModel};
 pub use runtime_contracts::{
-    admit_vm_runtime, determinism_profile_supported, enforce_vm_runtime_gates,
-    request_determinism_profile, requires_vm_runtime_contracts, runtime_capability_snapshot,
-    DeterminismArtifacts, RuntimeAdmissionResult, RuntimeCapability, RuntimeContracts,
-    RuntimeGateResult,
+    admit_protocol_machine_runtime, determinism_profile_supported,
+    enforce_protocol_machine_runtime_gates, request_determinism_profile,
+    requires_protocol_machine_runtime_contracts, runtime_capability_snapshot, DeterminismArtifacts,
+    RuntimeAdmissionResult, RuntimeCapability, RuntimeContracts, RuntimeGateResult,
 };
 pub use scheduler::{
     CrossLaneHandoff, LaneId as SchedulerLaneId, PriorityPolicy, SchedPolicy, SchedState,
@@ -235,15 +238,19 @@ pub use verification::{
     Hash, HashTag, Nullifier, Signature, SigningKey, VerificationModel, VerifyingKey,
 };
 pub use vm::{
-    EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig, ObservabilityRetentionMode,
-    PayloadValidationMode, Program, ProgramStore, RunStatus as ProtocolMachineRunStatus,
-    RuntimeTuningProfile, SchedExecStatus, SchedStepDebug, StepResult as ProtocolMachineStepResult,
-    ThreadedRoundSemantics, VMConfig as ProtocolMachineConfig, VMError as ProtocolMachineError,
-    VMState as ProtocolMachineState, VmMemoryUsage, VmRetainedBytes, VM as ProtocolMachine,
+    EffectTraceCaptureMode, MonitorMode, ObsEvent, ObservabilityRetentionConfig,
+    ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore,
+    ProtocolMachineMemoryUsage, ProtocolMachineRetainedBytes, ResourceState,
+    RunStatus as ProtocolMachineRunStatus, RuntimeTuningProfile, SchedExecStatus, SchedStepDebug,
+    StepResult as ProtocolMachineStepResult, ThreadedRoundSemantics,
+    VMConfig as ProtocolMachineConfig, VMError as ProtocolMachineError,
+    VMState as ProtocolMachineState, VM as ProtocolMachine,
 };
+pub use vm::{FlowPolicy, FlowPredicate};
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
+        pub use threaded::ThreadedVM as ThreadedProtocolMachine;
         pub use driver::NativeThreadedDriver as ThreadedGuestRuntime;
         pub use threaded::{ContentionMetrics, LaneHandoff, LaneId, LaneSchedulerState, LaneSelection};
     }

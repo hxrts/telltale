@@ -7,7 +7,7 @@
             dsts: vec![("A".to_string(), 0)],
         });
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         vm.load_choreography(&image).expect("load choreography");
         let handler = PassthroughHandler;
 
@@ -15,7 +15,7 @@
             .step_round(&handler, 1)
             .expect_err("open monitor precheck should fail");
         match err {
-            VMError::Fault {
+            ProtocolMachineError::Fault {
                 fault: Fault::Speculation { message },
                 ..
             } => assert!(message.contains("open arity mismatch")),
@@ -28,7 +28,7 @@
         let image = open_test_image(Instr::Invoke {
             action: InvokeAction::Reg(0),
         });
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid = vm.load_choreography(&image).expect("load choreography");
         vm.sessions_mut()
             .get_mut(sid)
@@ -46,7 +46,7 @@
             .step_round(&handler, 1)
             .expect_err("invoke should fault without default handler");
         match err {
-            VMError::Fault {
+            ProtocolMachineError::Fault {
                 fault: Fault::Invoke { failure },
                 ..
             } => assert_eq!(failure.message, "no handler bound"),
@@ -56,8 +56,8 @@
 
     #[test]
     fn test_invoke_applies_persistence_delta_when_model_provides_one() {
-        let mut vm: VM<(), (), RecordingPersistence, DefaultVerificationModel> =
-            VM::new_with_models(VMConfig::default());
+        let mut vm: ProtocolMachine<(), (), RecordingPersistence, DefaultVerificationModel> =
+            ProtocolMachine::new_with_models(ProtocolMachineConfig::default());
         vm.apply_open_delta(0).expect("open delta");
         vm.apply_invoke_delta(0, "Nat(7)").expect("invoke delta");
 
@@ -75,8 +75,8 @@
 
     #[test]
     fn test_close_applies_persistence_delta_when_model_provides_one() {
-        let mut vm: VM<(), (), RecordingPersistence, DefaultVerificationModel> =
-            VM::new_with_models(VMConfig::default());
+        let mut vm: ProtocolMachine<(), (), RecordingPersistence, DefaultVerificationModel> =
+            ProtocolMachine::new_with_models(ProtocolMachineConfig::default());
         vm.apply_close_delta(0).expect("close delta");
         assert!(
             vm.persistent_state()
@@ -91,7 +91,7 @@
         let image = open_test_image(Instr::Invoke {
             action: InvokeAction::Reg(0),
         });
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         vm.load_choreography(&image).expect("load choreography");
         let handler = PassthroughHandler;
 
@@ -153,7 +153,7 @@
         );
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let _sid = vm.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
@@ -191,7 +191,7 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid = vm.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
@@ -219,7 +219,7 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid = vm.load_choreography(&image).unwrap();
         vm.pause_role("A");
 
@@ -238,7 +238,7 @@
 
         let handler = PassthroughHandler;
         let step_result = vm.step(&handler).expect("step should succeed");
-        assert!(matches!(step_result, StepResult::Continue));
+        assert!(matches!(step_result, ProtocolMachineStepResult::Continue));
 
         let type_after = vm.sessions.lookup_type(&ep_b).cloned();
         let b_coro_after = vm
@@ -266,7 +266,7 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid = vm.load_choreography(&image).unwrap();
         vm.pause_role("B");
 
@@ -278,7 +278,7 @@
 
         let handler = FailingSendHandler;
         let result = vm.step(&handler);
-        assert!(matches!(result, Err(VMError::Fault { .. })));
+        assert!(matches!(result, Err(ProtocolMachineError::Fault { .. })));
 
         let type_after = vm.sessions.lookup_type(&ep_a).cloned();
         assert_eq!(type_before, type_after, "faulted step advanced type state");
@@ -302,7 +302,7 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid = vm.load_choreography(&image).unwrap();
         vm.pause_role("B");
 
@@ -348,7 +348,7 @@
         let image1 = CodeImage::from_local_types(&local_types, &global);
         let image2 = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let sid1 = vm.load_choreography(&image1).unwrap();
         let sid2 = vm.load_choreography(&image2).unwrap();
 
@@ -424,7 +424,7 @@
             local_types,
         };
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let _sid = vm.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
@@ -486,7 +486,7 @@
             local_types,
         };
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let _sid = vm.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
@@ -538,7 +538,7 @@
             local_types,
         };
 
-        let mut vm = VM::new(VMConfig::default());
+        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
         let _sid = vm.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;

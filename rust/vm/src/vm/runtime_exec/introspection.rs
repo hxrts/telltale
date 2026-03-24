@@ -21,12 +21,12 @@ impl VM {
         out
     }
 
-/// Approximate retained state for the VM runtime.
+/// Approximate retained state for the protocol-machine runtime.
     #[must_use]
-    pub fn memory_usage(&self) -> VmMemoryUsage {
+    pub fn memory_usage(&self) -> ProtocolMachineMemoryUsage {
         let session_store = self.sessions.memory_usage();
         let retained_bytes = self.retained_bytes(session_store.retained_bytes.total);
-        VmMemoryUsage {
+        ProtocolMachineMemoryUsage {
             session_store,
             coroutine_records: self.coroutines.len(),
             terminal_coroutines: self.coroutines.iter().filter(|coro| coro.is_terminal()).count(),
@@ -42,8 +42,8 @@ impl VM {
         }
     }
 
-    fn retained_bytes(&self, session_store_bytes: usize) -> VmRetainedBytes {
-        let mut retained_bytes = VmRetainedBytes {
+    fn retained_bytes(&self, session_store_bytes: usize) -> ProtocolMachineRetainedBytes {
+        let mut retained_bytes = ProtocolMachineRetainedBytes {
             session_store: session_store_bytes,
             coroutines: self.coroutines.iter().map(vm_serialized_bytes).sum(),
             programs: vm_serialized_bytes(&self.programs)
@@ -81,7 +81,7 @@ impl VM {
         retained_bytes
     }
 
-    fn retained_bytes_total(retained_bytes: &VmRetainedBytes) -> usize {
+    fn retained_bytes_total(retained_bytes: &ProtocolMachineRetainedBytes) -> usize {
         retained_bytes
             .session_store
             .saturating_add(retained_bytes.coroutines)

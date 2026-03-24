@@ -93,6 +93,21 @@ include!("vm/open_commit.rs");
 include!("vm/kernel_impl.rs");
 
 #[cfg(test)]
+type ProtocolMachine<I = (), G = (), P = NoopPersistence, Nu = DefaultVerificationModel> =
+    VM<I, G, P, Nu>;
+#[cfg(test)]
+type ProtocolMachineConfig = VMConfig;
+#[cfg(test)]
+type ProtocolMachineError = VMError;
+#[cfg(test)]
+type ProtocolMachineState<I = (), G = (), P = NoopPersistence, Nu = DefaultVerificationModel> =
+    VMState<I, G, P, Nu>;
+#[cfg(test)]
+type ProtocolMachineStepResult = StepResult;
+#[cfg(test)]
+type ProtocolMachineRunStatus = RunStatus;
+
+#[cfg(test)]
 mod tests {
     include!("../tests/unit/vm/tests_handlers_core.rs");
     include!("../tests/unit/vm/tests_handlers_edge.rs");

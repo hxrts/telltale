@@ -1,5 +1,5 @@
 #![cfg(not(target_arch = "wasm32"))]
-//! Cross-language equivalence tests: Rust VM vs Lean VM runner.
+//! Cross-language equivalence tests: Rust ProtocolMachine vs Lean ProtocolMachine runner.
 #![allow(
     clippy::needless_collect,
     clippy::as_conversions,
@@ -17,12 +17,12 @@ use telltale_lean_bridge::export::global_to_json;
 use telltale_lean_bridge::runner::{ChoreographyJson, LeanRunner, LeanRunnerError};
 use telltale_lean_bridge::{canonical_schema_version, partition_by_session, NormalizedEvent};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{ObsEvent, VMConfig, VMError, VM};
+use telltale_vm::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 use test_support::{
     choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,
 };
 
-fn vm_runner_path() -> Option<PathBuf> {
+fn protocol_machine_runner_path() -> Option<PathBuf> {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let mut path = PathBuf::from(manifest_dir);
     for _ in 0..5 {
@@ -118,9 +118,9 @@ fn run_rust(
     images: &[CodeImage],
     concurrency: usize,
     max_rounds: usize,
-) -> Result<Vec<NormalizedEvent>, VMError> {
+) -> Result<Vec<NormalizedEvent>, ProtocolMachineError> {
     let handler = PassthroughHandler;
-    let mut vm = VM::new(VMConfig::default());
+    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     let mut session_ids = Vec::new();
     for image in images {
         let sid = vm.load_choreography(image)?;
@@ -135,11 +135,11 @@ fn run_lean(
     concurrency: usize,
     max_rounds: usize,
 ) -> Result<Vec<NormalizedEvent>, LeanRunnerError> {
-    let runner_path = vm_runner_path().ok_or_else(|| {
+    let runner_path = protocol_machine_runner_path().ok_or_else(|| {
         LeanRunnerError::BinaryNotFound(PathBuf::from("lean/.lake/build/bin/vm_runner"))
     })?;
     let runner = LeanRunner::with_binary_path(runner_path)?;
-    let output = runner.run_vm_protocol(choreos, concurrency, max_rounds)?;
+    let output = runner.run_protocol_machine(choreos, concurrency, max_rounds)?;
     Ok(normalize_lean_trace(&output))
 }
 
@@ -187,7 +187,7 @@ fn equivalence_lean_basic() {
         rust_traces.insert(n, rust_trace);
     }
 
-    // N-invariance within Rust VM.
+    // N-invariance within Rust ProtocolMachine.
     let mut rust_partitioned: Vec<BTreeMap<usize, Vec<NormalizedEvent>>> = Vec::new();
     for &n in &concurrencies {
         rust_partitioned.push(partition_by_session(&rust_traces[&n]));
@@ -222,7 +222,7 @@ fn equivalence_lean_basic() {
         Err(e) => panic!("Lean runner failed: {e}"),
     };
     if lean_trace.is_empty() {
-        eprintln!("SKIPPED: Lean vm_runner emitted no communication events");
+        eprintln!("SKIPPED: Lean protocol-machine runner emitted no communication events");
         return;
     }
     let rust_trace = &rust_traces[&concurrencies[0]];
@@ -240,7 +240,7 @@ fn equivalence_lean_basic() {
             Err(e) => panic!("Lean runner failed: {e}"),
         };
         if lean_trace_n.is_empty() {
-            eprintln!("SKIPPED: Lean vm_runner emitted no communication events");
+            eprintln!("SKIPPED: Lean protocol-machine runner emitted no communication events");
             return;
         }
         assert_eq!(

@@ -3,12 +3,12 @@ use std::io::Write;
 
 impl LeanRunner {
     /// Default path to the protocol-machine runner binary (relative to workspace root).
-    pub const VM_RUNNER_BINARY_PATH: &'static str = "lean/.lake/build/bin/vm_runner";
+    pub const PROTOCOL_MACHINE_RUNNER_BINARY_PATH: &'static str = "lean/.lake/build/bin/vm_runner";
 
     /// Get the full path to the protocol-machine runner binary.
-    fn get_vm_runner_path() -> Option<PathBuf> {
+    fn get_protocol_machine_runner_path() -> Option<PathBuf> {
         Self::find_workspace_root()
-            .map(|root| root.join(Self::VM_RUNNER_BINARY_PATH))
+            .map(|root| root.join(Self::PROTOCOL_MACHINE_RUNNER_BINARY_PATH))
             .filter(|p| p.exists())
     }
 
@@ -212,14 +212,16 @@ impl LeanRunner {
     ///
     /// Returns an error if the VM runner binary is missing, the process fails,
     /// or the output is not valid JSON.
-    pub fn run_vm_protocol(
+    pub fn run_protocol_machine(
         &self,
         choreographies: &[ChoreographyJson],
         concurrency: usize,
         max_steps: usize,
     ) -> Result<Value, LeanRunnerError> {
-        let vm_path = Self::get_vm_runner_path().ok_or_else(|| {
-            LeanRunnerError::BinaryNotFound(PathBuf::from(Self::VM_RUNNER_BINARY_PATH))
+        let runner_path = Self::get_protocol_machine_runner_path().ok_or_else(|| {
+            LeanRunnerError::BinaryNotFound(PathBuf::from(
+                Self::PROTOCOL_MACHINE_RUNNER_BINARY_PATH,
+            ))
         })?;
 
         let input = serde_json::json!({
@@ -231,7 +233,7 @@ impl LeanRunner {
         let input_str = serde_json::to_string(&input)
             .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
 
-        let mut child = Command::new(&vm_path)
+        let mut child = Command::new(&runner_path)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -243,7 +245,8 @@ impl LeanRunner {
                 .map_err(LeanRunnerError::TempFileError)?;
         }
 
-        let output = Self::wait_with_timeout(child, Self::process_timeout(), "run_vm_protocol")?;
+        let output =
+            Self::wait_with_timeout(child, Self::process_timeout(), "run_protocol_machine")?;
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
